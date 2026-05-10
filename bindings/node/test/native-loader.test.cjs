@@ -615,6 +615,62 @@ const expectedNativeRootBridgeRequestShape = {
             'root-active',
             'root-retired'
           ],
+          streamRoundtripGate: {
+            streamRoundtripGateStatus:
+              'diagnosed-native-root-bridge-json-stream-batch-roundtrip',
+            batchId: 'native-root-bridge-json-batch-552',
+            streamId: 'native-root-bridge-json-stream-batch-roundtrip-587',
+            validationModel:
+              'fast-react-napi.NativeRootBridgeRequestSequenceValidator',
+            jsonTransportStreamBatchRoundtripChunkRowFields: [
+              'id',
+              'batchId',
+              'streamId',
+              'requestId',
+              'requestOrder',
+              'responseOrder',
+              'chunkOrder',
+              'batchSequence',
+              'chunkKind',
+              'chunkStatus',
+              'responseStatus',
+              'assemblyState',
+              'assembledResponse',
+              'teardownState',
+              'teardownBlocker',
+              'code',
+              'sourceErrorCode',
+              'boundaryErrorCode',
+              'nativeAddonLoaded',
+              'nativeExecution',
+              'rendererExecution',
+              'reconcilerExecution',
+              'crossEnvironmentHandleReuseBlocked',
+              'publicNativeCompatibility',
+              'reactBehaviorError'
+            ],
+            jsonTransportStreamBatchRoundtripErrorCaseIds: [
+              'stream-chunk-out-of-order',
+              'stream-chunk-duplicate',
+              'stream-chunk-missing',
+              'stream-chunk-after-teardown'
+            ],
+            chunkKinds: ['metadata', 'payload'],
+            chunkStatuses: ['accepted', 'error'],
+            assemblyStates: ['partial', 'assembled', 'rejected'],
+            teardownBlockers: [
+              'none',
+              'root-retired-after-assembly',
+              'post-teardown-chunk-blocked'
+            ],
+            nativeAddonLoaded: false,
+            nativeExecution: false,
+            rendererExecution: false,
+            reconcilerExecution: false,
+            crossEnvironmentHandleReuseBlocked: true,
+            publicNativeCompatibility: false,
+            reactBehaviorError: false
+          },
           nativeAddonLoaded: false,
           nativeExecution: false,
           rendererExecution: false,
@@ -788,6 +844,22 @@ for (const shapeValue of [
     .batchedRecordGate.responseSequenceGate.errorRowStatuses,
   native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
     .batchedRecordGate.responseSequenceGate.teardownStates,
+  native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+    .batchedRecordGate.responseSequenceGate.streamRoundtripGate,
+  native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+    .batchedRecordGate.responseSequenceGate.streamRoundtripGate
+    .jsonTransportStreamBatchRoundtripChunkRowFields,
+  native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+    .batchedRecordGate.responseSequenceGate.streamRoundtripGate
+    .jsonTransportStreamBatchRoundtripErrorCaseIds,
+  native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+    .batchedRecordGate.responseSequenceGate.streamRoundtripGate.chunkKinds,
+  native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+    .batchedRecordGate.responseSequenceGate.streamRoundtripGate.chunkStatuses,
+  native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+    .batchedRecordGate.responseSequenceGate.streamRoundtripGate.assemblyStates,
+  native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+    .batchedRecordGate.responseSequenceGate.streamRoundtripGate.teardownBlockers,
   native.nativeRootBridgeRequestShape.crossEnvironmentTeardownGate,
   native.nativeRootBridgeRequestShape.crossEnvironmentTeardownGate
     .environmentTeardownFields,
@@ -1780,6 +1852,10 @@ function assertNativeRootBridgeBatchResponseSequenceGate(responseGate) {
     staticResponseGate.errorRowStatuses
   );
   assert.equal(responseGate.teardownStates, staticResponseGate.teardownStates);
+  assert.equal(Object.isFrozen(responseGate.streamRoundtripGate), true);
+  assertNativeRootBridgeJsonTransportStreamBatchRoundtripGate(
+    responseGate.streamRoundtripGate
+  );
   assert.deepEqual(
     responseGate.rows.map((row) => row.id),
     [
@@ -1885,6 +1961,186 @@ function assertNativeRootBridgeBatchResponseSequenceGate(responseGate) {
   assert.equal(responseGate.rendererExecution, false);
   assert.equal(responseGate.reconcilerExecution, false);
   assert.equal(responseGate.reactBehaviorError, false);
+}
+
+function assertNativeRootBridgeJsonTransportStreamBatchRoundtripGate(
+  streamGate
+) {
+  const staticStreamGate =
+    native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+      .batchedRecordGate.responseSequenceGate.streamRoundtripGate;
+
+  assert.equal(Object.isFrozen(streamGate.rows), true);
+  assert.equal(Object.isFrozen(streamGate.errorRows), true);
+  assert.equal(
+    streamGate.streamRoundtripGateStatus,
+    'diagnosed-native-root-bridge-json-stream-batch-roundtrip'
+  );
+  assert.equal(streamGate.batchId, 'native-root-bridge-json-batch-552');
+  assert.equal(
+    streamGate.streamId,
+    'native-root-bridge-json-stream-batch-roundtrip-587'
+  );
+  assert.equal(
+    streamGate.validationModel,
+    'fast-react-napi.NativeRootBridgeRequestSequenceValidator'
+  );
+  assert.equal(streamGate.requestCount, 3);
+  assert.equal(streamGate.chunkCount, 6);
+  assert.equal(streamGate.assembledResponseCount, 3);
+  assert.equal(streamGate.errorRowCount, 4);
+  assert.equal(
+    streamGate.jsonTransportStreamBatchRoundtripChunkRowFields,
+    staticStreamGate.jsonTransportStreamBatchRoundtripChunkRowFields
+  );
+  assert.equal(
+    streamGate.jsonTransportStreamBatchRoundtripErrorCaseIds,
+    staticStreamGate.jsonTransportStreamBatchRoundtripErrorCaseIds
+  );
+  assert.equal(streamGate.chunkKinds, staticStreamGate.chunkKinds);
+  assert.equal(streamGate.chunkStatuses, staticStreamGate.chunkStatuses);
+  assert.equal(streamGate.assemblyStates, staticStreamGate.assemblyStates);
+  assert.equal(streamGate.teardownBlockers, staticStreamGate.teardownBlockers);
+  assert.deepEqual(
+    streamGate.rows.map((row) => row.id),
+    [
+      'stream-batch-chunk-0-request-1-metadata',
+      'stream-batch-chunk-1-request-1-payload',
+      'stream-batch-chunk-2-request-2-metadata',
+      'stream-batch-chunk-3-request-2-payload',
+      'stream-batch-chunk-4-request-3-metadata',
+      'stream-batch-chunk-5-request-3-payload'
+    ]
+  );
+  assert.deepEqual(
+    streamGate.rows.map((row) => row.requestId),
+    [1, 1, 2, 2, 3, 3]
+  );
+  assert.deepEqual(
+    streamGate.rows.map((row) => row.requestOrder),
+    [0, 0, 1, 1, 2, 2]
+  );
+  assert.deepEqual(
+    streamGate.rows.map((row) => row.responseOrder),
+    [0, 0, 1, 1, 2, 2]
+  );
+  assert.deepEqual(
+    streamGate.rows.map((row) => row.chunkOrder),
+    [0, 1, 0, 1, 0, 1]
+  );
+  assert.deepEqual(
+    streamGate.rows.map((row) => row.batchSequence),
+    [0, 1, 2, 3, 4, 5]
+  );
+  assert.deepEqual(
+    streamGate.rows.map((row) => row.chunkKind),
+    ['metadata', 'payload', 'metadata', 'payload', 'metadata', 'payload']
+  );
+  assert.deepEqual(
+    streamGate.rows.map((row) => row.chunkStatus),
+    ['accepted', 'accepted', 'accepted', 'accepted', 'accepted', 'accepted']
+  );
+  assert.deepEqual(
+    streamGate.rows.map((row) => row.assemblyState),
+    ['partial', 'assembled', 'partial', 'assembled', 'partial', 'assembled']
+  );
+  assert.deepEqual(
+    streamGate.rows.map((row) => row.assembledResponse),
+    [false, true, false, true, false, true]
+  );
+  assert.deepEqual(
+    streamGate.rows.map((row) => row.teardownState),
+    [
+      'root-active',
+      'root-active',
+      'root-active',
+      'root-active',
+      'root-active',
+      'root-retired'
+    ]
+  );
+  assert.deepEqual(
+    streamGate.rows.map((row) => row.teardownBlocker),
+    [
+      'none',
+      'none',
+      'none',
+      'none',
+      'none',
+      'root-retired-after-assembly'
+    ]
+  );
+  assert.deepEqual(
+    streamGate.errorRows.map((row) => row.id),
+    [
+      'stream-chunk-out-of-order',
+      'stream-chunk-duplicate',
+      'stream-chunk-missing',
+      'stream-chunk-after-teardown'
+    ]
+  );
+  assert.deepEqual(
+    streamGate.errorRows.map((row) => row.requestId),
+    [1, 1, 1, 4]
+  );
+  assert.deepEqual(
+    streamGate.errorRows.map((row) => row.responseOrder),
+    [0, 0, 0, 3]
+  );
+  assert.deepEqual(
+    streamGate.errorRows.map((row) => row.chunkOrder),
+    [1, 0, 1, 0]
+  );
+  assert.deepEqual(
+    streamGate.errorRows.map((row) => row.batchSequence),
+    [0, 1, 1, 6]
+  );
+  assert.deepEqual(
+    streamGate.errorRows.map((row) => row.chunkKind),
+    ['payload', 'metadata', 'payload', 'metadata']
+  );
+  assert.deepEqual(
+    streamGate.errorRows.map((row) => row.chunkStatus),
+    ['error', 'error', 'error', 'error']
+  );
+  assert.deepEqual(
+    streamGate.errorRows.map((row) => row.assemblyState),
+    ['rejected', 'rejected', 'rejected', 'rejected']
+  );
+  assert.deepEqual(
+    streamGate.errorRows.map((row) => row.teardownBlocker),
+    ['none', 'none', 'none', 'post-teardown-chunk-blocked']
+  );
+  assert.deepEqual(
+    streamGate.errorRows.map((row) => row.code),
+    [
+      'FAST_REACT_NAPI_ROOT_RESPONSE_STREAM_CHUNK_OUT_OF_ORDER',
+      'FAST_REACT_NAPI_ROOT_RESPONSE_STREAM_DUPLICATE_CHUNK',
+      'FAST_REACT_NAPI_ROOT_RESPONSE_STREAM_MISSING_CHUNK',
+      'FAST_REACT_NAPI_ROOT_RESPONSE_STREAM_CHUNK_AFTER_TEARDOWN'
+    ]
+  );
+  for (const row of [...streamGate.rows, ...streamGate.errorRows]) {
+    assert.equal(Object.isFrozen(row), true);
+    assert.deepEqual(
+      Object.keys(row),
+      streamGate.jsonTransportStreamBatchRoundtripChunkRowFields
+    );
+    assert.equal(row.nativeAddonLoaded, false);
+    assert.equal(row.nativeExecution, false);
+    assert.equal(row.rendererExecution, false);
+    assert.equal(row.reconcilerExecution, false);
+    assert.equal(row.crossEnvironmentHandleReuseBlocked, true);
+    assert.equal(row.publicNativeCompatibility, false);
+    assert.equal(row.reactBehaviorError, false);
+  }
+  assert.equal(streamGate.nativeAddonLoaded, false);
+  assert.equal(streamGate.nativeExecution, false);
+  assert.equal(streamGate.rendererExecution, false);
+  assert.equal(streamGate.reconcilerExecution, false);
+  assert.equal(streamGate.crossEnvironmentHandleReuseBlocked, true);
+  assert.equal(streamGate.publicNativeCompatibility, false);
+  assert.equal(streamGate.reactBehaviorError, false);
 }
 
 function assertNativeRootBridgeCrossEnvironmentTeardownGate(teardownGate) {

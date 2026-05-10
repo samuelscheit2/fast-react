@@ -17,6 +17,7 @@ mod root_bridge_requests {
     //! bridge. They only retain handle-table metadata and do not store raw
     //! JavaScript values, invoke the reconciler, or perform host work.
 
+    use std::collections::HashSet;
     use std::error::Error;
     use std::fmt::{self, Display, Formatter};
 
@@ -922,6 +923,7 @@ mod root_bridge_requests {
         error_row_count: usize,
         rows: Vec<NativeRootBridgeBatchResponseSequenceRow>,
         error_rows: Vec<NativeRootBridgeBatchResponseSequenceRow>,
+        stream_roundtrip_gate: NativeRootBridgeJsonTransportStreamBatchRoundtripGate,
         native_addon_loaded: bool,
         native_execution: bool,
         renderer_execution: bool,
@@ -963,6 +965,13 @@ mod root_bridge_requests {
         #[must_use]
         pub(crate) fn error_rows(&self) -> &[NativeRootBridgeBatchResponseSequenceRow] {
             &self.error_rows
+        }
+
+        #[must_use]
+        pub(crate) const fn stream_roundtrip_gate(
+            &self,
+        ) -> &NativeRootBridgeJsonTransportStreamBatchRoundtripGate {
+            &self.stream_roundtrip_gate
         }
 
         #[must_use]
@@ -1224,6 +1233,452 @@ mod root_bridge_requests {
         code: Option<&'static str>,
         source_error_code: Option<&'static str>,
         boundary_error_code: Option<&'static str>,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(crate) struct NativeRootBridgeJsonTransportStreamBatchRoundtripGate {
+        status: &'static str,
+        batch_id: &'static str,
+        stream_id: &'static str,
+        request_count: usize,
+        chunk_count: usize,
+        assembled_response_count: usize,
+        error_row_count: usize,
+        rows: Vec<NativeRootBridgeJsonTransportStreamBatchRoundtripChunkRow>,
+        error_rows: Vec<NativeRootBridgeJsonTransportStreamBatchRoundtripChunkRow>,
+        native_addon_loaded: bool,
+        native_execution: bool,
+        renderer_execution: bool,
+        reconciler_execution: bool,
+        cross_environment_handle_reuse_blocked: bool,
+        public_native_compatibility: bool,
+        react_behavior_error: bool,
+    }
+
+    impl NativeRootBridgeJsonTransportStreamBatchRoundtripGate {
+        #[must_use]
+        pub(crate) const fn status(&self) -> &'static str {
+            self.status
+        }
+
+        #[must_use]
+        pub(crate) const fn batch_id(&self) -> &'static str {
+            self.batch_id
+        }
+
+        #[must_use]
+        pub(crate) const fn stream_id(&self) -> &'static str {
+            self.stream_id
+        }
+
+        #[must_use]
+        pub(crate) const fn request_count(&self) -> usize {
+            self.request_count
+        }
+
+        #[must_use]
+        pub(crate) const fn chunk_count(&self) -> usize {
+            self.chunk_count
+        }
+
+        #[must_use]
+        pub(crate) const fn assembled_response_count(&self) -> usize {
+            self.assembled_response_count
+        }
+
+        #[must_use]
+        pub(crate) const fn error_row_count(&self) -> usize {
+            self.error_row_count
+        }
+
+        #[must_use]
+        pub(crate) fn rows(&self) -> &[NativeRootBridgeJsonTransportStreamBatchRoundtripChunkRow] {
+            &self.rows
+        }
+
+        #[must_use]
+        pub(crate) fn error_rows(
+            &self,
+        ) -> &[NativeRootBridgeJsonTransportStreamBatchRoundtripChunkRow] {
+            &self.error_rows
+        }
+
+        #[must_use]
+        pub(crate) const fn native_addon_loaded(&self) -> bool {
+            self.native_addon_loaded
+        }
+
+        #[must_use]
+        pub(crate) const fn native_execution(&self) -> bool {
+            self.native_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn renderer_execution(&self) -> bool {
+            self.renderer_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn reconciler_execution(&self) -> bool {
+            self.reconciler_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn cross_environment_handle_reuse_blocked(&self) -> bool {
+            self.cross_environment_handle_reuse_blocked
+        }
+
+        #[must_use]
+        pub(crate) const fn public_native_compatibility(&self) -> bool {
+            self.public_native_compatibility
+        }
+
+        #[must_use]
+        pub(crate) const fn react_behavior_error(&self) -> bool {
+            self.react_behavior_error
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum NativeRootBridgeJsonTransportStreamChunkKind {
+        Metadata,
+        Payload,
+    }
+
+    impl NativeRootBridgeJsonTransportStreamChunkKind {
+        #[must_use]
+        pub(crate) const fn code(self) -> &'static str {
+            match self {
+                Self::Metadata => "metadata",
+                Self::Payload => "payload",
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum NativeRootBridgeJsonTransportStreamChunkStatus {
+        Accepted,
+        Error,
+    }
+
+    impl NativeRootBridgeJsonTransportStreamChunkStatus {
+        #[must_use]
+        pub(crate) const fn code(self) -> &'static str {
+            match self {
+                Self::Accepted => "accepted",
+                Self::Error => "error",
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum NativeRootBridgeJsonTransportStreamAssemblyState {
+        Partial,
+        Assembled,
+        Rejected,
+    }
+
+    impl NativeRootBridgeJsonTransportStreamAssemblyState {
+        #[must_use]
+        pub(crate) const fn code(self) -> &'static str {
+            match self {
+                Self::Partial => "partial",
+                Self::Assembled => "assembled",
+                Self::Rejected => "rejected",
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum NativeRootBridgeJsonTransportStreamTeardownBlocker {
+        None,
+        RootRetiredAfterAssembly,
+        PostTeardownChunkBlocked,
+    }
+
+    impl NativeRootBridgeJsonTransportStreamTeardownBlocker {
+        #[must_use]
+        pub(crate) const fn code(self) -> &'static str {
+            match self {
+                Self::None => "none",
+                Self::RootRetiredAfterAssembly => "root-retired-after-assembly",
+                Self::PostTeardownChunkBlocked => "post-teardown-chunk-blocked",
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(crate) struct NativeRootBridgeJsonTransportStreamBatchRoundtripChunkRow {
+        id: String,
+        batch_id: &'static str,
+        stream_id: &'static str,
+        request_id: u64,
+        request_order: usize,
+        response_order: usize,
+        chunk_order: usize,
+        batch_sequence: usize,
+        chunk_kind: NativeRootBridgeJsonTransportStreamChunkKind,
+        chunk_status: NativeRootBridgeJsonTransportStreamChunkStatus,
+        response_status: NativeRootBridgeBatchedJsonTransportLifecycleStatus,
+        assembly_state: NativeRootBridgeJsonTransportStreamAssemblyState,
+        assembled_response: bool,
+        teardown_state: NativeRootBridgeBatchResponseTeardownState,
+        teardown_blocker: NativeRootBridgeJsonTransportStreamTeardownBlocker,
+        code: Option<&'static str>,
+        source_error_code: Option<&'static str>,
+        boundary_error_code: Option<&'static str>,
+        native_addon_loaded: bool,
+        native_execution: bool,
+        renderer_execution: bool,
+        reconciler_execution: bool,
+        cross_environment_handle_reuse_blocked: bool,
+        public_native_compatibility: bool,
+        react_behavior_error: bool,
+    }
+
+    impl NativeRootBridgeJsonTransportStreamBatchRoundtripChunkRow {
+        fn accepted(chunk: NativeRootBridgeJsonTransportStreamBatchRoundtripChunk) -> Self {
+            let assembled_response =
+                chunk.chunk_kind == NativeRootBridgeJsonTransportStreamChunkKind::Payload;
+            let assembly_state = if assembled_response {
+                NativeRootBridgeJsonTransportStreamAssemblyState::Assembled
+            } else {
+                NativeRootBridgeJsonTransportStreamAssemblyState::Partial
+            };
+            let teardown_blocker = if assembled_response
+                && chunk.teardown_state == NativeRootBridgeBatchResponseTeardownState::RootRetired
+            {
+                NativeRootBridgeJsonTransportStreamTeardownBlocker::RootRetiredAfterAssembly
+            } else {
+                NativeRootBridgeJsonTransportStreamTeardownBlocker::None
+            };
+
+            Self::new(
+                NativeRootBridgeJsonTransportStreamBatchRoundtripChunkRowInit {
+                    id: format!(
+                        "stream-batch-chunk-{}-request-{}-{}",
+                        chunk.batch_sequence,
+                        chunk.request_id,
+                        chunk.chunk_kind.code()
+                    ),
+                    chunk,
+                    chunk_status: NativeRootBridgeJsonTransportStreamChunkStatus::Accepted,
+                    assembly_state,
+                    assembled_response,
+                    teardown_blocker,
+                    code: None,
+                    source_error_code: None,
+                    boundary_error_code: None,
+                },
+            )
+        }
+
+        fn rejected(
+            id: &'static str,
+            chunk: NativeRootBridgeJsonTransportStreamBatchRoundtripChunk,
+            code: &'static str,
+            teardown_blocker: NativeRootBridgeJsonTransportStreamTeardownBlocker,
+        ) -> Self {
+            Self::new(
+                NativeRootBridgeJsonTransportStreamBatchRoundtripChunkRowInit {
+                    id: id.to_owned(),
+                    chunk,
+                    chunk_status: NativeRootBridgeJsonTransportStreamChunkStatus::Error,
+                    assembly_state: NativeRootBridgeJsonTransportStreamAssemblyState::Rejected,
+                    assembled_response: false,
+                    teardown_blocker,
+                    code: Some(code),
+                    source_error_code: Some(code),
+                    boundary_error_code: Some("FAST_REACT_NAPI_ROOT_BRIDGE_WRONG_LIFECYCLE_ORDER"),
+                },
+            )
+        }
+
+        fn new(init: NativeRootBridgeJsonTransportStreamBatchRoundtripChunkRowInit) -> Self {
+            Self {
+                id: init.id,
+                batch_id: super::NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_BATCH_RESPONSE_SEQUENCE_BATCH_ID,
+                stream_id:
+                    super::NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_ROUNDTRIP_STREAM_ID,
+                request_id: init.chunk.request_id,
+                request_order: init.chunk.request_order,
+                response_order: init.chunk.response_order,
+                chunk_order: init.chunk.chunk_order,
+                batch_sequence: init.chunk.batch_sequence,
+                chunk_kind: init.chunk.chunk_kind,
+                chunk_status: init.chunk_status,
+                response_status: init.chunk.response_status,
+                assembly_state: init.assembly_state,
+                assembled_response: init.assembled_response,
+                teardown_state: init.chunk.teardown_state,
+                teardown_blocker: init.teardown_blocker,
+                code: init.code,
+                source_error_code: init.source_error_code,
+                boundary_error_code: init.boundary_error_code,
+                native_addon_loaded: false,
+                native_execution: false,
+                renderer_execution: false,
+                reconciler_execution: false,
+                cross_environment_handle_reuse_blocked: true,
+                public_native_compatibility: false,
+                react_behavior_error: false,
+            }
+        }
+
+        #[must_use]
+        pub(crate) fn id(&self) -> &str {
+            &self.id
+        }
+
+        #[must_use]
+        pub(crate) const fn batch_id(&self) -> &'static str {
+            self.batch_id
+        }
+
+        #[must_use]
+        pub(crate) const fn stream_id(&self) -> &'static str {
+            self.stream_id
+        }
+
+        #[must_use]
+        pub(crate) const fn request_id(&self) -> u64 {
+            self.request_id
+        }
+
+        #[must_use]
+        pub(crate) const fn request_order(&self) -> usize {
+            self.request_order
+        }
+
+        #[must_use]
+        pub(crate) const fn response_order(&self) -> usize {
+            self.response_order
+        }
+
+        #[must_use]
+        pub(crate) const fn chunk_order(&self) -> usize {
+            self.chunk_order
+        }
+
+        #[must_use]
+        pub(crate) const fn batch_sequence(&self) -> usize {
+            self.batch_sequence
+        }
+
+        #[must_use]
+        pub(crate) const fn chunk_kind(&self) -> NativeRootBridgeJsonTransportStreamChunkKind {
+            self.chunk_kind
+        }
+
+        #[must_use]
+        pub(crate) const fn chunk_status(&self) -> NativeRootBridgeJsonTransportStreamChunkStatus {
+            self.chunk_status
+        }
+
+        #[must_use]
+        pub(crate) const fn response_status(
+            &self,
+        ) -> NativeRootBridgeBatchedJsonTransportLifecycleStatus {
+            self.response_status
+        }
+
+        #[must_use]
+        pub(crate) const fn assembly_state(
+            &self,
+        ) -> NativeRootBridgeJsonTransportStreamAssemblyState {
+            self.assembly_state
+        }
+
+        #[must_use]
+        pub(crate) const fn assembled_response(&self) -> bool {
+            self.assembled_response
+        }
+
+        #[must_use]
+        pub(crate) const fn teardown_state(&self) -> NativeRootBridgeBatchResponseTeardownState {
+            self.teardown_state
+        }
+
+        #[must_use]
+        pub(crate) const fn teardown_blocker(
+            &self,
+        ) -> NativeRootBridgeJsonTransportStreamTeardownBlocker {
+            self.teardown_blocker
+        }
+
+        #[must_use]
+        pub(crate) const fn code(&self) -> Option<&'static str> {
+            self.code
+        }
+
+        #[must_use]
+        pub(crate) const fn source_error_code(&self) -> Option<&'static str> {
+            self.source_error_code
+        }
+
+        #[must_use]
+        pub(crate) const fn boundary_error_code(&self) -> Option<&'static str> {
+            self.boundary_error_code
+        }
+
+        #[must_use]
+        pub(crate) const fn native_addon_loaded(&self) -> bool {
+            self.native_addon_loaded
+        }
+
+        #[must_use]
+        pub(crate) const fn native_execution(&self) -> bool {
+            self.native_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn renderer_execution(&self) -> bool {
+            self.renderer_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn reconciler_execution(&self) -> bool {
+            self.reconciler_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn cross_environment_handle_reuse_blocked(&self) -> bool {
+            self.cross_environment_handle_reuse_blocked
+        }
+
+        #[must_use]
+        pub(crate) const fn public_native_compatibility(&self) -> bool {
+            self.public_native_compatibility
+        }
+
+        #[must_use]
+        pub(crate) const fn react_behavior_error(&self) -> bool {
+            self.react_behavior_error
+        }
+    }
+
+    struct NativeRootBridgeJsonTransportStreamBatchRoundtripChunkRowInit {
+        id: String,
+        chunk: NativeRootBridgeJsonTransportStreamBatchRoundtripChunk,
+        chunk_status: NativeRootBridgeJsonTransportStreamChunkStatus,
+        assembly_state: NativeRootBridgeJsonTransportStreamAssemblyState,
+        assembled_response: bool,
+        teardown_blocker: NativeRootBridgeJsonTransportStreamTeardownBlocker,
+        code: Option<&'static str>,
+        source_error_code: Option<&'static str>,
+        boundary_error_code: Option<&'static str>,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct NativeRootBridgeJsonTransportStreamBatchRoundtripChunk {
+        request_id: u64,
+        request_order: usize,
+        response_order: usize,
+        chunk_order: usize,
+        batch_sequence: usize,
+        chunk_kind: NativeRootBridgeJsonTransportStreamChunkKind,
+        response_status: NativeRootBridgeBatchedJsonTransportLifecycleStatus,
+        teardown_state: NativeRootBridgeBatchResponseTeardownState,
     }
 
     #[derive(Debug, Clone)]
@@ -2537,6 +2992,8 @@ mod root_bridge_requests {
                 )
             })
             .collect::<Vec<_>>();
+        let stream_roundtrip_gate =
+            native_root_bridge_json_transport_stream_batch_roundtrip_gate(&rows);
 
         NativeRootBridgeBatchResponseSequenceGate {
             status: super::NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_BATCH_RESPONSE_SEQUENCE_GATE_STATUS,
@@ -2546,12 +3003,278 @@ mod root_bridge_requests {
             error_row_count: deterministic_error_rows.len(),
             rows,
             error_rows: deterministic_error_rows,
+            stream_roundtrip_gate,
             native_addon_loaded: false,
             native_execution: false,
             renderer_execution: false,
             reconciler_execution: false,
             react_behavior_error: false,
         }
+    }
+
+    pub(crate) fn native_root_bridge_json_transport_stream_batch_roundtrip_gate(
+        response_rows: &[NativeRootBridgeBatchResponseSequenceRow],
+    ) -> NativeRootBridgeJsonTransportStreamBatchRoundtripGate {
+        let chunks = native_root_bridge_json_transport_stream_batch_roundtrip_chunks(response_rows);
+        let rows =
+            validate_native_root_bridge_json_transport_stream_batch_roundtrip_chunks(&chunks)
+                .expect("deterministic native JSON stream batch roundtrip chunks are accepted");
+        let error_rows =
+            native_root_bridge_json_transport_stream_batch_roundtrip_error_rows(response_rows);
+
+        NativeRootBridgeJsonTransportStreamBatchRoundtripGate {
+            status: super::NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_ROUNDTRIP_GATE_STATUS,
+            batch_id: super::NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_BATCH_RESPONSE_SEQUENCE_BATCH_ID,
+            stream_id: super::NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_ROUNDTRIP_STREAM_ID,
+            request_count: response_rows.len(),
+            chunk_count: rows.len(),
+            assembled_response_count: rows.iter().filter(|row| row.assembled_response()).count(),
+            error_row_count: error_rows.len(),
+            rows,
+            error_rows,
+            native_addon_loaded: false,
+            native_execution: false,
+            renderer_execution: false,
+            reconciler_execution: false,
+            cross_environment_handle_reuse_blocked: true,
+            public_native_compatibility: false,
+            react_behavior_error: false,
+        }
+    }
+
+    fn native_root_bridge_json_transport_stream_batch_roundtrip_chunks(
+        response_rows: &[NativeRootBridgeBatchResponseSequenceRow],
+    ) -> Vec<NativeRootBridgeJsonTransportStreamBatchRoundtripChunk> {
+        response_rows
+            .iter()
+            .flat_map(|row| {
+                [
+                    native_root_bridge_json_transport_stream_batch_roundtrip_chunk(row, 0),
+                    native_root_bridge_json_transport_stream_batch_roundtrip_chunk(row, 1),
+                ]
+            })
+            .enumerate()
+            .map(|(batch_sequence, mut chunk)| {
+                chunk.batch_sequence = batch_sequence;
+                chunk
+            })
+            .collect()
+    }
+
+    fn native_root_bridge_json_transport_stream_batch_roundtrip_chunk(
+        row: &NativeRootBridgeBatchResponseSequenceRow,
+        chunk_order: usize,
+    ) -> NativeRootBridgeJsonTransportStreamBatchRoundtripChunk {
+        let chunk_kind = if chunk_order == 0 {
+            NativeRootBridgeJsonTransportStreamChunkKind::Metadata
+        } else {
+            NativeRootBridgeJsonTransportStreamChunkKind::Payload
+        };
+        let teardown_state = if row.kind() == NativeRootBridgeRequestKind::Unmount.code()
+            && chunk_kind == NativeRootBridgeJsonTransportStreamChunkKind::Metadata
+        {
+            NativeRootBridgeBatchResponseTeardownState::RootActive
+        } else {
+            row.teardown_state()
+        };
+
+        NativeRootBridgeJsonTransportStreamBatchRoundtripChunk {
+            request_id: row.request_id(),
+            request_order: row.request_order(),
+            response_order: row.response_order(),
+            chunk_order,
+            batch_sequence: 0,
+            chunk_kind,
+            response_status: row.response_status(),
+            teardown_state,
+        }
+    }
+
+    fn validate_native_root_bridge_json_transport_stream_batch_roundtrip_chunks(
+        chunks: &[NativeRootBridgeJsonTransportStreamBatchRoundtripChunk],
+    ) -> Result<
+        Vec<NativeRootBridgeJsonTransportStreamBatchRoundtripChunkRow>,
+        NativeRootBridgeJsonTransportStreamBatchRoundtripChunkRow,
+    > {
+        let mut rows = Vec::with_capacity(chunks.len());
+        let mut seen_chunks = HashSet::new();
+        let mut expected_batch_sequence = 0;
+        let mut expected_response_order = 0;
+        let mut expected_chunk_order = 0;
+        let mut teardown_seen = false;
+
+        for chunk in chunks.iter().copied() {
+            if chunk.batch_sequence != expected_batch_sequence {
+                return Err(NativeRootBridgeJsonTransportStreamBatchRoundtripChunkRow::rejected(
+                    "stream-chunk-out-of-order",
+                    chunk,
+                    super::NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_OUT_OF_ORDER_CHUNK_CODE,
+                    NativeRootBridgeJsonTransportStreamTeardownBlocker::None,
+                ));
+            }
+
+            if teardown_seen {
+                return Err(NativeRootBridgeJsonTransportStreamBatchRoundtripChunkRow::rejected(
+                    "stream-chunk-after-teardown",
+                    chunk,
+                    super::NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_POST_TEARDOWN_CHUNK_CODE,
+                    NativeRootBridgeJsonTransportStreamTeardownBlocker::PostTeardownChunkBlocked,
+                ));
+            }
+
+            if !seen_chunks.insert((chunk.response_order, chunk.chunk_order)) {
+                return Err(
+                    NativeRootBridgeJsonTransportStreamBatchRoundtripChunkRow::rejected(
+                        "stream-chunk-duplicate",
+                        chunk,
+                        super::NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_DUPLICATE_CHUNK_CODE,
+                        NativeRootBridgeJsonTransportStreamTeardownBlocker::None,
+                    ),
+                );
+            }
+
+            if chunk.response_order != expected_response_order
+                || chunk.chunk_order != expected_chunk_order
+            {
+                return Err(NativeRootBridgeJsonTransportStreamBatchRoundtripChunkRow::rejected(
+                    "stream-chunk-out-of-order",
+                    chunk,
+                    super::NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_OUT_OF_ORDER_CHUNK_CODE,
+                    NativeRootBridgeJsonTransportStreamTeardownBlocker::None,
+                ));
+            }
+
+            rows.push(NativeRootBridgeJsonTransportStreamBatchRoundtripChunkRow::accepted(chunk));
+            expected_batch_sequence += 1;
+
+            if chunk.chunk_kind == NativeRootBridgeJsonTransportStreamChunkKind::Payload {
+                expected_response_order += 1;
+                expected_chunk_order = 0;
+
+                if chunk.teardown_state == NativeRootBridgeBatchResponseTeardownState::RootRetired {
+                    teardown_seen = true;
+                }
+            } else {
+                expected_chunk_order = 1;
+            }
+        }
+
+        if expected_chunk_order != 0 {
+            let previous = chunks
+                .last()
+                .copied()
+                .expect("missing stream chunk requires an open response");
+            let missing_chunk = NativeRootBridgeJsonTransportStreamBatchRoundtripChunk {
+                chunk_order: expected_chunk_order,
+                batch_sequence: expected_batch_sequence,
+                chunk_kind: NativeRootBridgeJsonTransportStreamChunkKind::Payload,
+                ..previous
+            };
+
+            return Err(
+                NativeRootBridgeJsonTransportStreamBatchRoundtripChunkRow::rejected(
+                    "stream-chunk-missing",
+                    missing_chunk,
+                    super::NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_MISSING_CHUNK_CODE,
+                    NativeRootBridgeJsonTransportStreamTeardownBlocker::None,
+                ),
+            );
+        }
+
+        Ok(rows)
+    }
+
+    fn native_root_bridge_json_transport_stream_batch_roundtrip_error_rows(
+        response_rows: &[NativeRootBridgeBatchResponseSequenceRow],
+    ) -> Vec<NativeRootBridgeJsonTransportStreamBatchRoundtripChunkRow> {
+        let Some(first_response_row) = response_rows.first() else {
+            return Vec::new();
+        };
+
+        let first_metadata =
+            native_root_bridge_json_transport_stream_batch_roundtrip_chunk(first_response_row, 0);
+        let mut first_payload =
+            native_root_bridge_json_transport_stream_batch_roundtrip_chunk(first_response_row, 1);
+        first_payload.batch_sequence = 0;
+        let mut duplicate_metadata = first_metadata;
+        duplicate_metadata.batch_sequence = 1;
+
+        let mut accepted_chunks =
+            native_root_bridge_json_transport_stream_batch_roundtrip_chunks(response_rows);
+        let last_response_row = response_rows.last().unwrap_or(first_response_row);
+        if !accepted_chunks.iter().any(|chunk| {
+            chunk.chunk_kind == NativeRootBridgeJsonTransportStreamChunkKind::Payload
+                && chunk.teardown_state == NativeRootBridgeBatchResponseTeardownState::RootRetired
+        }) {
+            let synthetic_response_order = last_response_row.response_order().saturating_add(1);
+            let synthetic_request_order = last_response_row.request_order().saturating_add(1);
+            let synthetic_request_id = last_response_row.request_id().saturating_add(1);
+            accepted_chunks.push(NativeRootBridgeJsonTransportStreamBatchRoundtripChunk {
+                request_id: synthetic_request_id,
+                request_order: synthetic_request_order,
+                response_order: synthetic_response_order,
+                chunk_order: 0,
+                batch_sequence: accepted_chunks.len(),
+                chunk_kind: NativeRootBridgeJsonTransportStreamChunkKind::Metadata,
+                response_status: NativeRootBridgeBatchedJsonTransportLifecycleStatus::Accepted,
+                teardown_state: NativeRootBridgeBatchResponseTeardownState::RootActive,
+            });
+            accepted_chunks.push(NativeRootBridgeJsonTransportStreamBatchRoundtripChunk {
+                request_id: synthetic_request_id,
+                request_order: synthetic_request_order,
+                response_order: synthetic_response_order,
+                chunk_order: 1,
+                batch_sequence: accepted_chunks.len(),
+                chunk_kind: NativeRootBridgeJsonTransportStreamChunkKind::Payload,
+                response_status: NativeRootBridgeBatchedJsonTransportLifecycleStatus::Accepted,
+                teardown_state: NativeRootBridgeBatchResponseTeardownState::RootRetired,
+            });
+        }
+        let mut post_teardown_chunk =
+            native_root_bridge_json_transport_stream_batch_roundtrip_chunk(last_response_row, 0);
+        post_teardown_chunk.request_id = last_response_row.request_id().saturating_add(1);
+        post_teardown_chunk.request_order = last_response_row.request_order().saturating_add(1);
+        post_teardown_chunk.response_order = accepted_chunks.last().map_or(
+            last_response_row.response_order().saturating_add(1),
+            |chunk| chunk.response_order.saturating_add(1),
+        );
+        post_teardown_chunk.batch_sequence = accepted_chunks.len();
+        post_teardown_chunk.teardown_state =
+            NativeRootBridgeBatchResponseTeardownState::RootRetired;
+        accepted_chunks.push(post_teardown_chunk);
+
+        [
+            (
+                "stream-chunk-out-of-order",
+                vec![first_payload],
+                super::NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_OUT_OF_ORDER_CHUNK_CODE,
+            ),
+            (
+                "stream-chunk-duplicate",
+                vec![first_metadata, duplicate_metadata],
+                super::NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_DUPLICATE_CHUNK_CODE,
+            ),
+            (
+                "stream-chunk-missing",
+                vec![first_metadata],
+                super::NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_MISSING_CHUNK_CODE,
+            ),
+            (
+                "stream-chunk-after-teardown",
+                accepted_chunks,
+                super::NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_POST_TEARDOWN_CHUNK_CODE,
+            ),
+        ]
+        .into_iter()
+        .map(|(id, chunks, expected_code)| {
+            let row =
+                validate_native_root_bridge_json_transport_stream_batch_roundtrip_chunks(&chunks)
+                    .expect_err("deterministic stream batch roundtrip case must reject");
+            assert_eq!(row.id(), id);
+            assert_eq!(row.code(), Some(expected_code));
+            row
+        })
+        .collect()
     }
 
     fn validate_batched_json_transport_lifecycle_rows(
@@ -4269,6 +4992,18 @@ pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_BATCH_RESPONSE_SEQUENCE_GATE_STATUS:
     "diagnosed-native-root-bridge-json-batch-response-sequence";
 pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_BATCH_RESPONSE_SEQUENCE_BATCH_ID: &str =
     "native-root-bridge-json-batch-552";
+pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_ROUNDTRIP_GATE_STATUS: &str =
+    "diagnosed-native-root-bridge-json-stream-batch-roundtrip";
+pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_ROUNDTRIP_STREAM_ID: &str =
+    "native-root-bridge-json-stream-batch-roundtrip-587";
+pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_OUT_OF_ORDER_CHUNK_CODE: &str =
+    "FAST_REACT_NAPI_ROOT_RESPONSE_STREAM_CHUNK_OUT_OF_ORDER";
+pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_DUPLICATE_CHUNK_CODE: &str =
+    "FAST_REACT_NAPI_ROOT_RESPONSE_STREAM_DUPLICATE_CHUNK";
+pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_MISSING_CHUNK_CODE: &str =
+    "FAST_REACT_NAPI_ROOT_RESPONSE_STREAM_MISSING_CHUNK";
+pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_POST_TEARDOWN_CHUNK_CODE: &str =
+    "FAST_REACT_NAPI_ROOT_RESPONSE_STREAM_CHUNK_AFTER_TEARDOWN";
 pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_FORMAT: &str = "json";
 pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_SCHEMA_VERSION: u32 = 1;
 pub const TEST_RENDERER_NATIVE_ROOT_EXECUTION_BRIDGE_STATUS: &str =
@@ -4402,6 +5137,50 @@ pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_BATCH_RESPONSE_ERROR_ROW_STATUSES: &
 ];
 pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_BATCH_RESPONSE_TEARDOWN_STATES: &[&str] =
     &["root-uninitialized", "root-active", "root-retired"];
+pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_ROUNDTRIP_CHUNK_ROW_FIELDS: &[&str] = &[
+    "id",
+    "batch_id",
+    "stream_id",
+    "request_id",
+    "request_order",
+    "response_order",
+    "chunk_order",
+    "batch_sequence",
+    "chunk_kind",
+    "chunk_status",
+    "response_status",
+    "assembly_state",
+    "assembled_response",
+    "teardown_state",
+    "teardown_blocker",
+    "code",
+    "source_error_code",
+    "boundary_error_code",
+    "native_addon_loaded",
+    "native_execution",
+    "renderer_execution",
+    "reconciler_execution",
+    "cross_environment_handle_reuse_blocked",
+    "public_native_compatibility",
+    "react_behavior_error",
+];
+pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_ROUNDTRIP_ERROR_CASE_IDS: &[&str] = &[
+    "stream-chunk-out-of-order",
+    "stream-chunk-duplicate",
+    "stream-chunk-missing",
+    "stream-chunk-after-teardown",
+];
+pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_ROUNDTRIP_CHUNK_KINDS: &[&str] =
+    &["metadata", "payload"];
+pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_ROUNDTRIP_CHUNK_STATUSES: &[&str] =
+    &["accepted", "error"];
+pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_ROUNDTRIP_ASSEMBLY_STATES: &[&str] =
+    &["partial", "assembled", "rejected"];
+pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_ROUNDTRIP_TEARDOWN_BLOCKERS: &[&str] = &[
+    "none",
+    "root-retired-after-assembly",
+    "post-teardown-chunk-blocked",
+];
 pub const NATIVE_ROOT_BRIDGE_TRANSPORT_WORKER_THREAD_TEARDOWN_ROW_FIELDS: &[&str] = &[
     "id",
     "operation",
@@ -4846,11 +5625,15 @@ mod tests {
         NativeRootBridgeBatchedJsonTransportLifecycleStatus, NativeRootBridgeCreateRequest,
         NativeRootBridgeHandleAdmissionAction, NativeRootBridgeJsonTransportHandle,
         NativeRootBridgeJsonTransportParseError, NativeRootBridgeJsonTransportRecord,
-        NativeRootBridgeJsonTransportValueKind, NativeRootBridgeLifecycleTransition,
-        NativeRootBridgeRenderRequest, NativeRootBridgeRequestError, NativeRootBridgeRequestKind,
-        NativeRootBridgeRequestRecord, NativeRootBridgeRequestRecorder,
-        NativeRootBridgeRequestSequenceValidator, NativeRootBridgeRootHandleState,
-        NativeRootBridgeUnmountRequest, native_root_bridge_batched_json_transport_error_rows,
+        NativeRootBridgeJsonTransportStreamAssemblyState,
+        NativeRootBridgeJsonTransportStreamChunkKind,
+        NativeRootBridgeJsonTransportStreamChunkStatus,
+        NativeRootBridgeJsonTransportStreamTeardownBlocker, NativeRootBridgeJsonTransportValueKind,
+        NativeRootBridgeLifecycleTransition, NativeRootBridgeRenderRequest,
+        NativeRootBridgeRequestError, NativeRootBridgeRequestKind, NativeRootBridgeRequestRecord,
+        NativeRootBridgeRequestRecorder, NativeRootBridgeRequestSequenceValidator,
+        NativeRootBridgeRootHandleState, NativeRootBridgeUnmountRequest,
+        native_root_bridge_batched_json_transport_error_rows,
         native_root_bridge_cross_environment_teardown_gate,
         native_root_bridge_json_transport_error_diagnostic_rows,
         native_root_bridge_transport_worker_thread_teardown_gate,
@@ -6198,6 +6981,254 @@ mod tests {
     }
 
     #[test]
+    fn native_root_bridge_json_transport_stream_batch_roundtrip_reports_chunk_assembly() {
+        let json = r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":587,"root_handle":{"environment_id":587,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":587,"slot":2,"generation":1,"kind":"value"},"root_handle_state":"active"},{"request_id":2,"kind":"render","environment_id":587,"root_handle":{"environment_id":587,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":587,"slot":3,"generation":1,"kind":"value"},"root_handle_state":"active"},{"request_id":3,"kind":"unmount","environment_id":587,"root_handle":{"environment_id":587,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"retired"}]}"#;
+        let gate = parse_native_root_bridge_json_transport_for_gate(json).unwrap();
+        let stream_gate = gate
+            .batched_record_gate()
+            .response_sequence_gate()
+            .stream_roundtrip_gate();
+        let rows = stream_gate.rows();
+
+        assert_eq!(
+            stream_gate.status(),
+            NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_ROUNDTRIP_GATE_STATUS
+        );
+        assert_eq!(
+            stream_gate.batch_id(),
+            NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_BATCH_RESPONSE_SEQUENCE_BATCH_ID
+        );
+        assert_eq!(
+            stream_gate.stream_id(),
+            NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_ROUNDTRIP_STREAM_ID
+        );
+        assert_eq!(stream_gate.request_count(), 3);
+        assert_eq!(stream_gate.chunk_count(), 6);
+        assert_eq!(stream_gate.assembled_response_count(), 3);
+        assert_eq!(stream_gate.error_row_count(), 4);
+        assert!(!stream_gate.native_addon_loaded());
+        assert!(!stream_gate.native_execution());
+        assert!(!stream_gate.renderer_execution());
+        assert!(!stream_gate.reconciler_execution());
+        assert!(stream_gate.cross_environment_handle_reuse_blocked());
+        assert!(!stream_gate.public_native_compatibility());
+        assert!(!stream_gate.react_behavior_error());
+        assert_eq!(
+            rows.iter().map(|row| row.id()).collect::<Vec<_>>(),
+            [
+                "stream-batch-chunk-0-request-1-metadata",
+                "stream-batch-chunk-1-request-1-payload",
+                "stream-batch-chunk-2-request-2-metadata",
+                "stream-batch-chunk-3-request-2-payload",
+                "stream-batch-chunk-4-request-3-metadata",
+                "stream-batch-chunk-5-request-3-payload"
+            ]
+        );
+        assert_eq!(
+            rows.iter().map(|row| row.request_id()).collect::<Vec<_>>(),
+            [1, 1, 2, 2, 3, 3]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.request_order())
+                .collect::<Vec<_>>(),
+            [0, 0, 1, 1, 2, 2]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.response_order())
+                .collect::<Vec<_>>(),
+            [0, 0, 1, 1, 2, 2]
+        );
+        assert_eq!(
+            rows.iter().map(|row| row.chunk_order()).collect::<Vec<_>>(),
+            [0, 1, 0, 1, 0, 1]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.batch_sequence())
+                .collect::<Vec<_>>(),
+            [0, 1, 2, 3, 4, 5]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.chunk_kind().code())
+                .collect::<Vec<_>>(),
+            [
+                "metadata", "payload", "metadata", "payload", "metadata", "payload"
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.chunk_status().code())
+                .collect::<Vec<_>>(),
+            [
+                "accepted", "accepted", "accepted", "accepted", "accepted", "accepted"
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.response_status().code())
+                .collect::<Vec<_>>(),
+            [
+                "accepted", "accepted", "accepted", "accepted", "accepted", "accepted"
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.assembly_state().code())
+                .collect::<Vec<_>>(),
+            [
+                "partial",
+                "assembled",
+                "partial",
+                "assembled",
+                "partial",
+                "assembled"
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.assembled_response())
+                .collect::<Vec<_>>(),
+            [false, true, false, true, false, true]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.teardown_state().code())
+                .collect::<Vec<_>>(),
+            [
+                "root-active",
+                "root-active",
+                "root-active",
+                "root-active",
+                "root-active",
+                "root-retired"
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.teardown_blocker().code())
+                .collect::<Vec<_>>(),
+            [
+                "none",
+                "none",
+                "none",
+                "none",
+                "none",
+                "root-retired-after-assembly"
+            ]
+        );
+        assert!(rows.iter().all(|row| {
+            row.batch_id() == NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_BATCH_RESPONSE_SEQUENCE_BATCH_ID
+                && row.stream_id()
+                    == NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_ROUNDTRIP_STREAM_ID
+                && row.code().is_none()
+                && row.source_error_code().is_none()
+                && row.boundary_error_code().is_none()
+                && !row.native_addon_loaded()
+                && !row.native_execution()
+                && !row.renderer_execution()
+                && !row.reconciler_execution()
+                && row.cross_environment_handle_reuse_blocked()
+                && !row.public_native_compatibility()
+                && !row.react_behavior_error()
+        }));
+    }
+
+    #[test]
+    fn native_root_bridge_json_transport_stream_batch_roundtrip_rejects_bad_chunks() {
+        let json = r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":587,"root_handle":{"environment_id":587,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":587,"slot":2,"generation":1,"kind":"value"},"root_handle_state":"active"},{"request_id":2,"kind":"render","environment_id":587,"root_handle":{"environment_id":587,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":587,"slot":3,"generation":1,"kind":"value"},"root_handle_state":"active"},{"request_id":3,"kind":"unmount","environment_id":587,"root_handle":{"environment_id":587,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"retired"}]}"#;
+        let gate = parse_native_root_bridge_json_transport_for_gate(json).unwrap();
+        let rows = gate
+            .batched_record_gate()
+            .response_sequence_gate()
+            .stream_roundtrip_gate()
+            .error_rows();
+
+        assert_eq!(
+            rows.iter().map(|row| row.id()).collect::<Vec<_>>(),
+            [
+                "stream-chunk-out-of-order",
+                "stream-chunk-duplicate",
+                "stream-chunk-missing",
+                "stream-chunk-after-teardown"
+            ]
+        );
+        assert_eq!(
+            rows.iter().map(|row| row.request_id()).collect::<Vec<_>>(),
+            [1, 1, 1, 4]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.response_order())
+                .collect::<Vec<_>>(),
+            [0, 0, 0, 3]
+        );
+        assert_eq!(
+            rows.iter().map(|row| row.chunk_order()).collect::<Vec<_>>(),
+            [1, 0, 1, 0]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.batch_sequence())
+                .collect::<Vec<_>>(),
+            [0, 1, 1, 6]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.chunk_kind().code())
+                .collect::<Vec<_>>(),
+            ["payload", "metadata", "payload", "metadata"]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.chunk_status().code())
+                .collect::<Vec<_>>(),
+            ["error", "error", "error", "error"]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.assembly_state().code())
+                .collect::<Vec<_>>(),
+            ["rejected", "rejected", "rejected", "rejected"]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.assembled_response())
+                .collect::<Vec<_>>(),
+            [false, false, false, false]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.teardown_blocker().code())
+                .collect::<Vec<_>>(),
+            ["none", "none", "none", "post-teardown-chunk-blocked"]
+        );
+        assert_eq!(
+            rows.iter().map(|row| row.code()).collect::<Vec<_>>(),
+            [
+                Some(NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_OUT_OF_ORDER_CHUNK_CODE),
+                Some(NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_DUPLICATE_CHUNK_CODE),
+                Some(NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_MISSING_CHUNK_CODE),
+                Some(NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_POST_TEARDOWN_CHUNK_CODE)
+            ]
+        );
+        assert!(rows.iter().all(|row| {
+            row.source_error_code() == row.code()
+                && row.boundary_error_code()
+                    == Some("FAST_REACT_NAPI_ROOT_BRIDGE_WRONG_LIFECYCLE_ORDER")
+                && !row.native_addon_loaded()
+                && !row.native_execution()
+                && !row.renderer_execution()
+                && !row.reconciler_execution()
+                && row.cross_environment_handle_reuse_blocked()
+                && !row.public_native_compatibility()
+                && !row.react_behavior_error()
+        }));
+    }
+
+    #[test]
     fn native_root_bridge_json_transport_parser_gate_reports_error_diagnostic_rows() {
         let rows = native_root_bridge_json_transport_error_diagnostic_rows();
 
@@ -6584,6 +7615,30 @@ mod tests {
             "native-root-bridge-json-batch-552"
         );
         assert_eq!(
+            NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_ROUNDTRIP_GATE_STATUS,
+            "diagnosed-native-root-bridge-json-stream-batch-roundtrip"
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_ROUNDTRIP_STREAM_ID,
+            "native-root-bridge-json-stream-batch-roundtrip-587"
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_OUT_OF_ORDER_CHUNK_CODE,
+            "FAST_REACT_NAPI_ROOT_RESPONSE_STREAM_CHUNK_OUT_OF_ORDER"
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_DUPLICATE_CHUNK_CODE,
+            "FAST_REACT_NAPI_ROOT_RESPONSE_STREAM_DUPLICATE_CHUNK"
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_MISSING_CHUNK_CODE,
+            "FAST_REACT_NAPI_ROOT_RESPONSE_STREAM_MISSING_CHUNK"
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_POST_TEARDOWN_CHUNK_CODE,
+            "FAST_REACT_NAPI_ROOT_RESPONSE_STREAM_CHUNK_AFTER_TEARDOWN"
+        );
+        assert_eq!(
             NATIVE_ROOT_BRIDGE_TRANSPORT_WORKER_THREAD_TEARDOWN_GATE_STATUS,
             "diagnosed-native-root-bridge-transport-worker-thread-teardown"
         );
@@ -6777,6 +7832,75 @@ mod tests {
                 NativeRootBridgeBatchResponseTeardownState::RootUninitialized.code(),
                 NativeRootBridgeBatchResponseTeardownState::RootActive.code(),
                 NativeRootBridgeBatchResponseTeardownState::RootRetired.code()
+            ]
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_ROUNDTRIP_CHUNK_ROW_FIELDS,
+            &[
+                "id",
+                "batch_id",
+                "stream_id",
+                "request_id",
+                "request_order",
+                "response_order",
+                "chunk_order",
+                "batch_sequence",
+                "chunk_kind",
+                "chunk_status",
+                "response_status",
+                "assembly_state",
+                "assembled_response",
+                "teardown_state",
+                "teardown_blocker",
+                "code",
+                "source_error_code",
+                "boundary_error_code",
+                "native_addon_loaded",
+                "native_execution",
+                "renderer_execution",
+                "reconciler_execution",
+                "cross_environment_handle_reuse_blocked",
+                "public_native_compatibility",
+                "react_behavior_error"
+            ]
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_ROUNDTRIP_ERROR_CASE_IDS,
+            &[
+                "stream-chunk-out-of-order",
+                "stream-chunk-duplicate",
+                "stream-chunk-missing",
+                "stream-chunk-after-teardown"
+            ]
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_ROUNDTRIP_CHUNK_KINDS,
+            &[
+                NativeRootBridgeJsonTransportStreamChunkKind::Metadata.code(),
+                NativeRootBridgeJsonTransportStreamChunkKind::Payload.code()
+            ]
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_ROUNDTRIP_CHUNK_STATUSES,
+            &[
+                NativeRootBridgeJsonTransportStreamChunkStatus::Accepted.code(),
+                NativeRootBridgeJsonTransportStreamChunkStatus::Error.code()
+            ]
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_ROUNDTRIP_ASSEMBLY_STATES,
+            &[
+                NativeRootBridgeJsonTransportStreamAssemblyState::Partial.code(),
+                NativeRootBridgeJsonTransportStreamAssemblyState::Assembled.code(),
+                NativeRootBridgeJsonTransportStreamAssemblyState::Rejected.code()
+            ]
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_STREAM_BATCH_ROUNDTRIP_TEARDOWN_BLOCKERS,
+            &[
+                NativeRootBridgeJsonTransportStreamTeardownBlocker::None.code(),
+                NativeRootBridgeJsonTransportStreamTeardownBlocker::RootRetiredAfterAssembly.code(),
+                NativeRootBridgeJsonTransportStreamTeardownBlocker::PostTeardownChunkBlocked.code()
             ]
         );
         assert_eq!(
