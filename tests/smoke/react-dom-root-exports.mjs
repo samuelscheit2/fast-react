@@ -26,7 +26,6 @@ const entrypoints = [
     mode: 'default-node-development',
     subpath: '.',
     unsupportedExports: [
-      'createPortal',
       'flushSync',
       'preconnect',
       'prefetchDNS',
@@ -44,7 +43,6 @@ const entrypoints = [
     mode: 'default-node-development',
     subpath: './profiling',
     unsupportedExports: [
-      'createPortal',
       'createRoot',
       'flushSync',
       'hydrateRoot',
