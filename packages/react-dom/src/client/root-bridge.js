@@ -12,6 +12,12 @@ const {
   isContainerMarkedAsRoot,
   legacyRootWarning
 } = require('./root-markers.js');
+const {
+  UNSUPPORTED_HYDRATION_ROOT_KIND,
+  createHydrationBoundaryGate,
+  getPrivateHydrationBoundaryRecordPayload,
+  isPrivateHydrationBoundaryRecord
+} = require('./hydration-boundary-gate.js');
 const {hasListeningMarker} = require('../events/listener-registry.js');
 
 const CLIENT_ROOT_KIND = 'client';
@@ -21,6 +27,8 @@ const privateRootOwnerType = 'fast.react_dom.private_root_owner';
 const privateRootHandleType = 'fast.react_dom.private_root_handle';
 const privateRootCreateRecordType =
   'fast.react_dom.private_root_create_record';
+const privateRootHydrateRecordType =
+  'fast.react_dom.private_root_hydrate_record';
 const privateRootUpdateRecordType =
   'fast.react_dom.private_root_update_record';
 const privateRootAdmissionRecordType =
@@ -33,6 +41,7 @@ const privateRootNativeBridgeHandleType =
 const ROOT_LIFECYCLE_CREATED = 'created';
 const ROOT_LIFECYCLE_RENDERED = 'rendered';
 const ROOT_LIFECYCLE_UNMOUNTED = 'unmounted';
+const ROOT_LIFECYCLE_UNSUPPORTED_HYDRATION = 'unsupported-hydration';
 
 const ROOT_BRIDGE_REQUEST_ADMITTED =
   'admitted-private-root-bridge-request-record';
@@ -79,7 +88,8 @@ const ROOT_BRIDGE_BLOCKED_CAPABILITIES = freezeArray([
   freezeRecord({
     id: 'hydration',
     blocked: true,
-    reason: 'Hydration root creation, marker parsing, and replay are not admitted.'
+    reason:
+      'Hydration root creation, marker consumption, and replay are not admitted.'
   }),
   freezeRecord({
     id: 'events',
@@ -108,6 +118,14 @@ function createPrivateRootBridgeShell(options) {
         bridgeState,
         container,
         rootOptions
+      );
+    },
+    createHydrateRoot(container, initialChildren, hydrationOptions) {
+      return createHydrateRootRecordWithBridge(
+        bridgeState,
+        container,
+        initialChildren,
+        hydrationOptions
       );
     },
     renderContainer(rootHandle, element, callback) {
@@ -158,6 +176,14 @@ function createClientRootRecord(container, rootOptions) {
   return defaultBridgeShell.createClientRoot(container, rootOptions);
 }
 
+function createHydrateRootRecord(container, initialChildren, hydrationOptions) {
+  return defaultBridgeShell.createHydrateRoot(
+    container,
+    initialChildren,
+    hydrationOptions
+  );
+}
+
 function createRootUpdateRecord(rootHandle, element, callback) {
   const state = assertPrivateRootHandle(rootHandle);
   return createRootUpdateRecordWithBridge(
@@ -196,10 +222,7 @@ function createNativeRootBridgeHandoffRecord(record) {
 
 function admitRootBridgeRequestWithBridge(bridgeState, record) {
   const validation = validateRootBridgeRequestRecord(record);
-  if (
-    bridgeState !== null &&
-    validation.rootHandleState.bridgeState !== bridgeState
-  ) {
+  if (bridgeState !== null && validation.bridgeState !== bridgeState) {
     const error = new Error(
       'Cannot use a private root bridge request with a different root bridge shell.'
     );
@@ -212,15 +235,17 @@ function admitRootBridgeRequestWithBridge(bridgeState, record) {
 
 function createNativeRootBridgeHandoffRecordWithBridge(bridgeState, record) {
   const validation = validateRootBridgeRequestRecord(record);
-  if (
-    bridgeState !== null &&
-    validation.rootHandleState.bridgeState !== bridgeState
-  ) {
+  if (bridgeState !== null && validation.bridgeState !== bridgeState) {
     const error = new Error(
       'Cannot use a private root bridge request with a different root bridge shell.'
     );
     error.code = 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE';
     throw error;
+  }
+  if (validation.operation === 'hydrate') {
+    throwInvalidRootBridgeRequest(
+      'Private hydrateRoot bridge records are diagnostic-only and cannot be handed to the native root bridge.'
+    );
   }
 
   const existing = rootNativeHandoffRecords.get(record);
@@ -403,6 +428,76 @@ function createClientRootRecordWithBridge(bridgeState, container, rootOptions) {
   return record;
 }
 
+function createHydrateRootRecordWithBridge(
+  bridgeState,
+  container,
+  initialChildren,
+  hydrationOptions
+) {
+  const hydrationBoundaryRecord =
+    bridgeState.hydrationBoundaryGate.recordUnsupportedHydrateRoot(
+      container,
+      initialChildren,
+      hydrationOptions
+    );
+  const sequence = bridgeState.nextHydrateSequence++;
+  const hydrateId = `${bridgeState.hydrateIdPrefix}:${sequence}`;
+  const requestInfo = createRequestInfo(bridgeState, 'hydrateRoot');
+  const record = freezeRecord({
+    $$typeof: privateRootHydrateRecordType,
+    kind: 'FastReactDomPrivateRootHydrateRecord',
+    operation: 'hydrate',
+    requestId: requestInfo.requestId,
+    requestSequence: requestInfo.requestSequence,
+    requestType: requestInfo.requestType,
+    sequence,
+    hydrateId,
+    rootId: null,
+    rootKind: UNSUPPORTED_HYDRATION_ROOT_KIND,
+    rootTag: CONCURRENT_ROOT_TAG,
+    lifecycleStatusBefore: null,
+    lifecycleStatusAfter: ROOT_LIFECYCLE_UNSUPPORTED_HYDRATION,
+    status: 'unsupported',
+    containerInfo: hydrationBoundaryRecord.containerInfo,
+    initialChildrenInfo: hydrationBoundaryRecord.initialChildrenInfo,
+    optionsInfo: hydrationBoundaryRecord.optionsInfo,
+    oracleInfo: hydrationBoundaryRecord.oracleInfo,
+    blockedOn: hydrationBoundaryRecord.blockedOn,
+    hydrationBoundaryRecord,
+    markerDiagnostics: hydrationBoundaryRecord.markerDiagnostics,
+    markerEvidence: hydrationBoundaryRecord.markerEvidence,
+    markerGuard: hydrationBoundaryRecord.markerGuard,
+    listenerGuard: hydrationBoundaryRecord.listenerGuard,
+    hydrationRequested: true,
+    canHydrate: false,
+    publicRootCreated: false,
+    containerMarked: false,
+    listenersAttached: false,
+    domMutated: false,
+    eventsReplayed: false,
+    rootScheduled: false,
+    suspenseHydrationScheduled: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false
+  });
+
+  rootRecordPayloads.set(record, {
+    bridgeState,
+    container,
+    hydrationBoundaryRecord,
+    hydrationOptions,
+    initialChildren
+  });
+
+  return record;
+}
+
 function createRootUpdateRecordWithBridge(
   bridgeState,
   rootHandle,
@@ -498,6 +593,10 @@ function validateRootBridgeRequestRecord(record) {
     return validateCreateRootBridgeRequestRecord(record);
   }
 
+  if (record.$$typeof === privateRootHydrateRecordType) {
+    return validateHydrateRootBridgeRequestRecord(record);
+  }
+
   if (record.$$typeof === privateRootUpdateRecordType) {
     return validateUpdateRootBridgeRequestRecord(record);
   }
@@ -536,9 +635,88 @@ function validateCreateRootBridgeRequestRecord(record) {
   });
 
   return {
+    bridgeState: rootHandleState.bridgeState,
     lifecycleTransition: 'none->created',
     operation: 'create',
     rootHandleState
+  };
+}
+
+function validateHydrateRootBridgeRequestRecord(record) {
+  const payload = rootRecordPayloads.get(record);
+  if (payload === undefined) {
+    throwInvalidRootBridgeRequest(
+      'Expected a hydrateRoot bridge record produced by the private root bridge.'
+    );
+  }
+
+  assertRecordField(record, 'operation', 'hydrate');
+  assertRecordField(record, 'requestType', 'hydrateRoot');
+  assertRecordField(record, 'rootId', null);
+  assertRecordField(record, 'rootKind', UNSUPPORTED_HYDRATION_ROOT_KIND);
+  assertRecordField(record, 'rootTag', CONCURRENT_ROOT_TAG);
+  assertRecordField(record, 'lifecycleStatusBefore', null);
+  assertRecordField(
+    record,
+    'lifecycleStatusAfter',
+    ROOT_LIFECYCLE_UNSUPPORTED_HYDRATION
+  );
+  assertRecordField(record, 'status', 'unsupported');
+  assertRecordField(record, 'hydrationRequested', true);
+  assertRecordField(record, 'canHydrate', false);
+  assertRecordField(record, 'publicRootCreated', false);
+  assertRecordField(record, 'containerMarked', false);
+  assertRecordField(record, 'listenersAttached', false);
+  assertRecordField(record, 'domMutated', false);
+  assertRecordField(record, 'eventsReplayed', false);
+  assertRecordField(record, 'rootScheduled', false);
+  assertRecordField(record, 'suspenseHydrationScheduled', false);
+  assertExecutionIsBlockedOnRequestRecord(record);
+
+  const hydrationBoundaryRecord = record.hydrationBoundaryRecord;
+  if (!isPrivateHydrationBoundaryRecord(hydrationBoundaryRecord)) {
+    throwInvalidRootBridgeRequest(
+      'Expected hydrateRoot bridge records to include a private hydration boundary record.'
+    );
+  }
+
+  const hydrationPayload = getPrivateHydrationBoundaryRecordPayload(
+    hydrationBoundaryRecord
+  );
+  if (
+    hydrationPayload === null ||
+    hydrationPayload.container !== payload.container ||
+    hydrationPayload.initialChildren !== payload.initialChildren ||
+    hydrationPayload.hydrationOptions !== payload.hydrationOptions ||
+    payload.hydrationBoundaryRecord !== hydrationBoundaryRecord
+  ) {
+    throwInvalidRootBridgeRequest(
+      'Private hydrateRoot bridge payload does not match its hydration boundary record.'
+    );
+  }
+
+  assertRecordField(
+    record,
+    'markerDiagnostics',
+    hydrationBoundaryRecord.markerDiagnostics
+  );
+  assertRecordField(
+    record,
+    'markerEvidence',
+    hydrationBoundaryRecord.markerEvidence
+  );
+  assertRecordField(record, 'markerGuard', hydrationBoundaryRecord.markerGuard);
+  assertRecordField(
+    record,
+    'listenerGuard',
+    hydrationBoundaryRecord.listenerGuard
+  );
+
+  return {
+    bridgeState: payload.bridgeState,
+    lifecycleTransition: `none->${ROOT_LIFECYCLE_UNSUPPORTED_HYDRATION}`,
+    operation: 'hydrate',
+    rootHandleState: null
   };
 }
 
@@ -574,6 +752,7 @@ function validateUpdateRootBridgeRequestRecord(record) {
       ROOT_LIFECYCLE_RENDERED
     ]);
     return {
+      bridgeState: rootHandleState.bridgeState,
       lifecycleTransition: `${record.lifecycleStatusBefore}->${record.lifecycleStatusAfter}`,
       operation: 'render',
       rootHandleState
@@ -601,6 +780,7 @@ function validateUpdateRootBridgeRequestRecord(record) {
       );
     }
     return {
+      bridgeState: rootHandleState.bridgeState,
       lifecycleTransition: `${record.lifecycleStatusBefore}->${record.lifecycleStatusAfter}`,
       operation: 'unmount',
       rootHandleState
@@ -623,6 +803,7 @@ function createRootBridgeAdmissionRecord(record, validation) {
     rootId: record.rootId,
     rootKind: record.rootKind,
     rootTag: record.rootTag,
+    hydrateId: record.hydrateId || null,
     updateId: record.updateId || null,
     sequence: record.sequence,
     admissionStatus: ROOT_BRIDGE_REQUEST_ADMITTED,
@@ -634,9 +815,10 @@ function createRootBridgeAdmissionRecord(record, validation) {
       lifecycleStatusAfter: record.lifecycleStatusAfter,
       lifecycleTransition: validation.lifecycleTransition,
       operation: validation.operation,
-      rootKind: CLIENT_ROOT_KIND,
-      rootTag: CONCURRENT_ROOT_TAG
+      rootKind: record.rootKind,
+      rootTag: record.rootTag
     }),
+    markerEvidence: record.markerEvidence || null,
     blockedCapabilities: ROOT_BRIDGE_BLOCKED_CAPABILITIES,
     nativeExecution: false,
     reconcilerExecution: false,
@@ -748,7 +930,24 @@ function getIdPrefix(value, fallback) {
 }
 
 function createBridgeState(options) {
+  const hydrationBoundaryOptions = {
+    markerOptions: options && options.markerOptions,
+    recordIdPrefix: getIdPrefix(
+      options && options.hydrationRecordIdPrefix,
+      'hydration'
+    ),
+    validationOptions: options && options.validationOptions
+  };
+  if (options && Object.prototype.hasOwnProperty.call(options, 'markerOracle')) {
+    hydrationBoundaryOptions.markerOracle = options.markerOracle;
+  }
+  const hydrationBoundaryGate = createHydrationBoundaryGate(
+    hydrationBoundaryOptions
+  );
+
   return {
+    hydrateIdPrefix: getIdPrefix(options && options.hydrateIdPrefix, 'hydrate'),
+    hydrationBoundaryGate,
     markerOptions: options && options.markerOptions,
     nativeEnvironmentId: getPositiveInteger(
       options && options.nativeEnvironmentId,
@@ -767,6 +966,7 @@ function createBridgeState(options) {
     updateIdPrefix: getIdPrefix(options && options.updateIdPrefix, 'update'),
     nextNativeHandleSlot: 1,
     nextNativeRootId: 1,
+    nextHydrateSequence: 1,
     nextRootSequence: 1,
     nextUpdateSequence: 1,
     validationOptions: options && options.validationOptions
@@ -1011,6 +1211,7 @@ module.exports = {
   ROOT_LIFECYCLE_CREATED,
   ROOT_LIFECYCLE_RENDERED,
   ROOT_LIFECYCLE_UNMOUNTED,
+  ROOT_LIFECYCLE_UNSUPPORTED_HYDRATION,
   NATIVE_ROOT_BRIDGE_HANDLE_ROOT,
   NATIVE_ROOT_BRIDGE_HANDLE_VALUE,
   NATIVE_ROOT_BRIDGE_REQUEST_CREATE,
@@ -1021,6 +1222,7 @@ module.exports = {
   NATIVE_ROOT_BRIDGE_SYNTHETIC_ENVIRONMENT_ID,
   admitRootBridgeRequestRecord,
   createClientRootRecord,
+  createHydrateRootRecord,
   createNativeRootBridgeHandoffRecord,
   createPrivateRootBridgeShell,
   createPrivateRootHandle,
@@ -1042,6 +1244,7 @@ module.exports = {
   privateRootNativeHandoffRecordType,
   privateRootCreateRecordType,
   privateRootHandleType,
+  privateRootHydrateRecordType,
   privateRootOwnerType,
   privateRootUpdateRecordType
 };
