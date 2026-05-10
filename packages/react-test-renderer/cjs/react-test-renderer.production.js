@@ -27,6 +27,49 @@ const createRoutingPrerequisites = Object.freeze([
       'The JS package has no public bridge to Rust host-output serialization for toJSON, toTree, or TestInstance surfaces.'
   })
 ]);
+const updatePrivateRoute = Object.freeze({
+  id: 'react-test-renderer-update-private-route',
+  publicSurface: 'create().update',
+  status: 'blocked-js-native-bridge-not-loaded',
+  deterministic: true,
+  publicRouteAvailable: false,
+  privateRustCanaryAccepted: true,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  acceptedWorker: 'worker-234-test-renderer-host-output-update-unmount-canary',
+  acceptedRustCrate: 'fast-react-test-renderer',
+  acceptedRustApis: Object.freeze([
+    'TestRendererRoot::update_host_component_with_text_for_canary',
+    'TestRendererRoot::render_and_commit_host_output_update_for_canary'
+  ]),
+  acceptedRustTests: Object.freeze([
+    'root_host_output_canary_updates_committed_text_with_update_diagnostics',
+    'root_host_output_update_canary_fails_closed_without_committed_output'
+  ])
+});
+const unmountPrivateRoute = Object.freeze({
+  id: 'react-test-renderer-unmount-private-route',
+  publicSurface: 'create().unmount',
+  status: 'blocked-js-native-bridge-not-loaded',
+  deterministic: true,
+  publicRouteAvailable: false,
+  privateRustCanaryAccepted: true,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  acceptedWorker: 'worker-234-test-renderer-host-output-update-unmount-canary',
+  acceptedRustCrate: 'fast-react-test-renderer',
+  acceptedRustApis: Object.freeze([
+    'TestRendererRoot::unmount',
+    'TestRendererRoot::render_and_commit_host_output_unmount_for_canary'
+  ]),
+  acceptedRustTests: Object.freeze([
+    'root_host_output_canary_unmounts_committed_output_with_deletion_diagnostics'
+  ])
+});
+const privateRoutes = Object.freeze([
+  updatePrivateRoute,
+  unmountPrivateRoute
+]);
 const createRoutingGate = Object.freeze({
   id: 'react-test-renderer-create-routing-prerequisite-gate',
   status: createRoutingGateStatus,
@@ -42,7 +85,10 @@ const createRoutingGate = Object.freeze({
   schedulerIntegrationAvailable: false,
   compatibilityClaimed: false,
   missingPrerequisites: createRoutingMissingPrerequisites,
-  prerequisites: createRoutingPrerequisites
+  prerequisites: createRoutingPrerequisites,
+  privateRoutes,
+  updatePrivateRoute,
+  unmountPrivateRoute
 });
 const schedulerMockKeys = [
   'log',
@@ -133,6 +179,9 @@ function createUnsupportedError(exportName, action, detail, routingGate) {
     error.nativeBridgeAvailable = routingGate.nativeBridgeAvailable;
     error.serializationAvailable = routingGate.serializationAvailable;
     error.compatibilityClaimed = routingGate.compatibilityClaimed;
+    error.privateRoutes = routingGate.privateRoutes;
+    error.updatePrivateRoute = routingGate.updatePrivateRoute;
+    error.unmountPrivateRoute = routingGate.unmountPrivateRoute;
   }
 
   return error;
