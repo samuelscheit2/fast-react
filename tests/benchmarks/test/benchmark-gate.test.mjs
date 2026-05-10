@@ -27,13 +27,19 @@ const minimalRootMilestoneManifest = readManifest(
 const privateDiagnosticManifest = readManifest(
   "private-diagnostic-gate-admissions.json"
 );
+const privateRootHostOutputDiagnosticScenarioIds = [
+  "private-root-host-output-create-mark-listen-diagnostics",
+  "private-root-host-output-initial-render-diagnostics",
+  "private-root-host-output-update-render-diagnostics",
+  "private-root-host-output-unmount-cleanup-diagnostics"
+];
 
 test("checked benchmark manifests pass the fail-closed gate", () => {
   const result = assertBenchmarkGate({ benchmarkRoot, repoRoot });
 
   assert.equal(result.manifestCount, 5);
-  assert.equal(result.scenarioCount, 74);
-  assert.equal(result.milestoneCount, 16);
+  assert.equal(result.scenarioCount, 78);
+  assert.equal(result.milestoneCount, 17);
   assert.equal(result.resultCount, 0);
   assert.deepEqual(COMPATIBILITY_STATUSES, [
     "blocked-by-conformance",
@@ -97,13 +103,23 @@ test("checked benchmark manifests pass the fail-closed gate", () => {
   const diagnosticScenarios = result.manifests
     .flatMap((manifest) => manifest.scenarios)
     .filter((scenario) => scenario.timingStatus === "diagnostic-only");
-  assert.equal(diagnosticScenarios.length, 9);
+  assert.equal(diagnosticScenarios.length, 13);
   for (const scenario of diagnosticScenarios) {
     assert.equal(
       scenario.compatibilityStatus,
       "matched-but-compatibility-not-claimed"
     );
   }
+  assert.deepEqual(
+    privateDiagnosticManifest.scenarios
+      .filter((scenario) =>
+        scenario.conformanceGateIds.includes(
+          "react-dom-root-private-host-output-gate"
+        )
+      )
+      .map((scenario) => scenario.id),
+    privateRootHostOutputDiagnosticScenarioIds
+  );
 
   const diagnosticMilestones = result.manifests
     .flatMap((manifest) => manifest.milestones ?? [])
@@ -111,7 +127,7 @@ test("checked benchmark manifests pass the fail-closed gate", () => {
       (milestone) =>
         milestone.benchmarkReadinessStatus === "diagnostic-admitted"
     );
-  assert.equal(diagnosticMilestones.length, 4);
+  assert.equal(diagnosticMilestones.length, 5);
   for (const milestone of diagnosticMilestones) {
     assert.equal(
       milestone.compatibilityStatus,
@@ -130,7 +146,7 @@ test("checked benchmark manifests pass the fail-closed gate", () => {
     }, {});
   assert.deepEqual(acceptedGateStatusCounts, {
     "accepted-blocked": 5,
-    "accepted-private-partial": 16,
+    "accepted-private-partial": 17,
     "accepted-oracle-only": 5
   });
 
@@ -142,10 +158,10 @@ test("checked benchmark manifests pass the fail-closed gate", () => {
         acceptedGate?.status === "accepted-private-partial" &&
         acceptedGate.admitted === true
     ).length;
-  assert.equal(admittedPrivateGateCount, 8);
+  assert.equal(admittedPrivateGateCount, 9);
 });
 
-test("public benchmark manifests stay blocked without new gate evidence", () => {
+test("public benchmark manifests stay blocked despite private diagnostics", () => {
   const result = assertBenchmarkGate({ benchmarkRoot, repoRoot });
   const publicManifests = result.manifests.filter(
     (manifest) => manifest.manifestId !== privateDiagnosticManifest.manifestId
@@ -280,6 +296,21 @@ test("benchmark scenario gate rejects diagnostic timing without private admissio
   assert.match(
     errors.join("\n"),
     /scenario private-root-bridge-request-records: diagnostic private admission requires react-dom-root-private-bridge-request-gate acceptedGate.status=accepted-private-partial, admitted=true, and compatibilityClaimed=false/
+  );
+});
+
+test("benchmark scenario gate rejects private host-output diagnostics without admitted gate", () => {
+  const manifest = clone(privateDiagnosticManifest);
+  const hostOutputGate = manifest.conformanceGates.find(
+    (gate) => gate.id === "react-dom-root-private-host-output-gate"
+  );
+  hostOutputGate.acceptedGate.admitted = false;
+
+  const errors = validateBenchmarkManifest(manifest, { repoRoot });
+
+  assert.match(
+    errors.join("\n"),
+    /scenario private-root-host-output-initial-render-diagnostics: diagnostic private admission requires react-dom-root-private-host-output-gate acceptedGate.status=accepted-private-partial, admitted=true, and compatibilityClaimed=false/
   );
 });
 
