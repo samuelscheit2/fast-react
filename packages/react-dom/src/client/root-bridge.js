@@ -1,6 +1,18 @@
 'use strict';
 
-const {assertValidContainer, describeContainer} = require('./dom-container.js');
+const {
+  assertValidContainer,
+  describeContainer,
+  getOwnerDocument
+} = require('./dom-container.js');
+const {
+  duplicateCreateRootWarning,
+  getCreateRootWarning,
+  hasLegacyRootMarker,
+  isContainerMarkedAsRoot,
+  legacyRootWarning
+} = require('./root-markers.js');
+const {hasListeningMarker} = require('../events/listener-registry.js');
 
 const CLIENT_ROOT_KIND = 'client';
 const CONCURRENT_ROOT_TAG = 'ConcurrentRoot';
@@ -11,6 +23,10 @@ const privateRootCreateRecordType =
   'fast.react_dom.private_root_create_record';
 const privateRootUpdateRecordType =
   'fast.react_dom.private_root_update_record';
+
+const ROOT_LIFECYCLE_CREATED = 'created';
+const ROOT_LIFECYCLE_RENDERED = 'rendered';
+const ROOT_LIFECYCLE_UNMOUNTED = 'unmounted';
 
 const rootOwnerState = new WeakMap();
 const rootHandleState = new WeakMap();
@@ -27,12 +43,23 @@ function createPrivateRootBridgeShell(options) {
         rootOptions
       );
     },
+    renderContainer(rootHandle, element, callback) {
+      assertHandleBelongsToBridge(rootHandle, bridgeState);
+      return createRootUpdateRecordWithBridge(
+        bridgeState,
+        rootHandle,
+        'render',
+        false,
+        element,
+        callback
+      );
+    },
     updateContainer(rootHandle, element, callback) {
       assertHandleBelongsToBridge(rootHandle, bridgeState);
       return createRootUpdateRecordWithBridge(
         bridgeState,
         rootHandle,
-        'update',
+        'render',
         false,
         element,
         callback
@@ -63,11 +90,15 @@ function createRootUpdateRecord(rootHandle, element, callback) {
   return createRootUpdateRecordWithBridge(
     state.bridgeState,
     rootHandle,
-    'update',
+    'render',
     false,
     element,
     callback
   );
+}
+
+function createRootRenderRecord(rootHandle, element, callback) {
+  return createRootUpdateRecord(rootHandle, element, callback);
 }
 
 function createRootUnmountRecord(rootHandle, callback) {
@@ -122,6 +153,8 @@ function createPrivateRootHandle(owner, container, rootOptions, bridgeState) {
     bridgeState: rootBridgeState,
     container,
     containerInfo: freezeRecord(describeContainer(container)),
+    lifecycleStatus: ROOT_LIFECYCLE_CREATED,
+    renderCount: 0,
     rootOptions
   });
 
@@ -157,16 +190,26 @@ function createClientRootRecordWithBridge(bridgeState, container, rootOptions) {
     bridgeState
   );
   const handleState = rootHandleState.get(handle);
+  const requestInfo = createRequestInfo(bridgeState, 'createRoot');
 
   const record = freezeRecord({
     $$typeof: privateRootCreateRecordType,
     kind: 'FastReactDomPrivateRootCreateRecord',
     operation: 'create',
+    requestId: requestInfo.requestId,
+    requestSequence: requestInfo.requestSequence,
+    requestType: requestInfo.requestType,
     sequence,
     rootId,
     rootKind: CLIENT_ROOT_KIND,
     rootTag: CONCURRENT_ROOT_TAG,
     containerInfo: handleState.containerInfo,
+    listenerGuard: describeRootListenerGuard(container),
+    markerGuard: describeCreateRootMarkerGuard(
+      container,
+      bridgeState.markerOptions
+    ),
+    nativeExecution: false,
     rootOptionsInfo: describeBridgeValue(rootOptions),
     owner,
     handle
@@ -188,7 +231,7 @@ function createRootUpdateRecordWithBridge(
   element,
   callback
 ) {
-  const handleState = assertPrivateRootHandle(rootHandle);
+  const handleState = getPrivateRootHandleState(rootHandle);
   if (handleState.bridgeState !== bridgeState) {
     const error = new Error(
       'Cannot use a private root handle with a different root bridge shell.'
@@ -197,18 +240,53 @@ function createRootUpdateRecordWithBridge(
     throw error;
   }
 
+  const lifecycleStatusBefore = handleState.lifecycleStatus;
+  let lifecycleStatusAfter = lifecycleStatusBefore;
+  let noOp = false;
+  let recordSync = sync;
+  let requestType = 'root.render';
+
+  if (operation === 'render') {
+    assertRootHandleCanRender(handleState);
+    lifecycleStatusAfter = ROOT_LIFECYCLE_RENDERED;
+    handleState.renderCount++;
+  } else if (operation === 'unmount') {
+    requestType = 'root.unmount';
+    if (lifecycleStatusBefore === ROOT_LIFECYCLE_UNMOUNTED) {
+      noOp = true;
+      recordSync = false;
+    } else {
+      lifecycleStatusAfter = ROOT_LIFECYCLE_UNMOUNTED;
+    }
+  }
+
+  handleState.lifecycleStatus = lifecycleStatusAfter;
+
   const sequence = bridgeState.nextUpdateSequence++;
   const updateId = `${bridgeState.updateIdPrefix}:${sequence}`;
+  const requestInfo = createRequestInfo(bridgeState, requestType);
   const record = freezeRecord({
     $$typeof: privateRootUpdateRecordType,
     kind: 'FastReactDomPrivateRootUpdateRecord',
     operation,
+    requestId: requestInfo.requestId,
+    requestSequence: requestInfo.requestSequence,
+    requestType: requestInfo.requestType,
     sequence,
     updateId,
     rootId: rootHandle.rootId,
     rootKind: rootHandle.rootKind,
     rootTag: rootHandle.rootTag,
-    sync,
+    lifecycleStatusAfter,
+    lifecycleStatusBefore,
+    markerGuard:
+      operation === 'unmount'
+        ? describeUnmountMarkerGuard(handleState.container)
+        : null,
+    nativeExecution: false,
+    noOp,
+    renderCount: handleState.renderCount,
+    sync: recordSync,
     elementInfo: describeBridgeValue(element),
     callbackInfo: describeBridgeValue(callback)
   });
@@ -222,6 +300,16 @@ function createRootUpdateRecordWithBridge(
   return record;
 }
 
+function getPrivateRootHandleState(rootHandle) {
+  const state = rootHandleState.get(rootHandle);
+  if (state === undefined) {
+    const error = new Error('Expected a private React DOM root handle.');
+    error.code = 'FAST_REACT_DOM_INVALID_ROOT_HANDLE';
+    throw error;
+  }
+  return state;
+}
+
 function assertPrivateRootOwner(owner) {
   const state = rootOwnerState.get(owner);
   if (state === undefined) {
@@ -233,12 +321,7 @@ function assertPrivateRootOwner(owner) {
 }
 
 function assertPrivateRootHandle(rootHandle) {
-  const state = rootHandleState.get(rootHandle);
-  if (state === undefined) {
-    const error = new Error('Expected a private React DOM root handle.');
-    error.code = 'FAST_REACT_DOM_INVALID_ROOT_HANDLE';
-    throw error;
-  }
+  const state = getPrivateRootHandleState(rootHandle);
   return {
     ...state,
     owner: rootHandle.owner
@@ -263,7 +346,13 @@ function getIdPrefix(value, fallback) {
 
 function createBridgeState(options) {
   return {
+    markerOptions: options && options.markerOptions,
+    nextRequestSequence: 1,
     rootIdPrefix: getIdPrefix(options && options.rootIdPrefix, 'root'),
+    requestIdPrefix: getIdPrefix(
+      options && options.requestIdPrefix,
+      'request'
+    ),
     updateIdPrefix: getIdPrefix(options && options.updateIdPrefix, 'update'),
     nextRootSequence: 1,
     nextUpdateSequence: 1,
@@ -277,6 +366,82 @@ function getRootKind(options) {
 
 function getRootTag(options) {
   return (options && options.rootTag) || CONCURRENT_ROOT_TAG;
+}
+
+function createRequestInfo(bridgeState, requestType) {
+  const requestSequence = bridgeState.nextRequestSequence++;
+  return freezeRecord({
+    requestId: `${bridgeState.requestIdPrefix}:${requestSequence}`,
+    requestSequence,
+    requestType
+  });
+}
+
+function assertRootHandleCanRender(handleState) {
+  if (handleState.lifecycleStatus === ROOT_LIFECYCLE_UNMOUNTED) {
+    const error = new Error('Cannot update an unmounted root.');
+    error.code = 'FAST_REACT_DOM_UNMOUNTED_ROOT';
+    throw error;
+  }
+}
+
+function describeCreateRootMarkerGuard(container, options) {
+  const warningMessage = getCreateRootWarning(container, options);
+  return freezeRecord({
+    action: 'defer-mark-container-as-root',
+    hasLegacyRootMarker: hasLegacyRootMarker(container),
+    isContainerMarkedAsRoot: isContainerMarkedAsRoot(container),
+    warning: describeCreateRootWarning(warningMessage)
+  });
+}
+
+function describeCreateRootWarning(message) {
+  if (message === null) {
+    return null;
+  }
+
+  let warningType = 'unknown';
+  if (message === duplicateCreateRootWarning) {
+    warningType = 'duplicate-create-root';
+  } else if (message === legacyRootWarning) {
+    warningType = 'legacy-root-container';
+  }
+
+  return freezeRecord({
+    message,
+    type: warningType
+  });
+}
+
+function describeUnmountMarkerGuard(container) {
+  return freezeRecord({
+    action: 'defer-unmark-container-as-root-after-sync-flush',
+    isContainerMarkedAsRoot: isContainerMarkedAsRoot(container)
+  });
+}
+
+function describeRootListenerGuard(container) {
+  const ownerDocument = getOwnerDocument(container);
+  return freezeRecord({
+    action: 'defer-listen-to-all-supported-events',
+    canInstallRootListeners: canInstallListener(container),
+    hasRootListeningMarker: hasListeningMarker(container),
+    ownerDocumentCanInstallSelectionChange: canInstallListener(ownerDocument),
+    ownerDocumentHasSelectionChangeMarker: hasListeningMarker(ownerDocument),
+    ownerDocumentInfo:
+      ownerDocument === null
+        ? null
+        : freezeRecord(describeContainer(ownerDocument)),
+    rootEventTargetInfo: freezeRecord(describeContainer(container))
+  });
+}
+
+function canInstallListener(target) {
+  return !!(
+    target != null &&
+    (typeof target === 'object' || typeof target === 'function') &&
+    typeof target.addEventListener === 'function'
+  );
 }
 
 function describeBridgeValue(value) {
@@ -335,12 +500,19 @@ function freezeRecord(record) {
 module.exports = {
   CLIENT_ROOT_KIND,
   CONCURRENT_ROOT_TAG,
+  ROOT_LIFECYCLE_CREATED,
+  ROOT_LIFECYCLE_RENDERED,
+  ROOT_LIFECYCLE_UNMOUNTED,
   createClientRootRecord,
   createPrivateRootBridgeShell,
   createPrivateRootHandle,
   createPrivateRootOwner,
+  createRootRenderRecord,
   createRootUnmountRecord,
   createRootUpdateRecord,
+  describeCreateRootMarkerGuard,
+  describeRootListenerGuard,
+  describeUnmountMarkerGuard,
   getPrivateRootRecordPayload,
   getRootOwnerFromHandle,
   isPrivateRootHandle,
