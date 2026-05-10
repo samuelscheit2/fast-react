@@ -31,10 +31,14 @@ mod work_in_progress;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-use fast_react_core::{FiberTopologyError, UnimplementedReactBehavior, unimplemented_behavior};
+use fast_react_core::{
+    ElementTypeHandle, FiberFlags, FiberId, FiberTag, FiberTopologyError, Lanes, PropsHandle,
+    StateNodeHandle, UnimplementedReactBehavior, bubble_properties, unimplemented_behavior,
+};
 use fast_react_host_config::{
-    HostCapability, HostError, HostOperationError, HostTreeUpdateMode, HostTreeUpdateModeError,
-    MutationRenderer, UnsupportedHostCapability,
+    HostCapability, HostError, HostFiberTokenPhase, HostFiberTokenTarget, HostOperationError,
+    HostTreeUpdateMode, HostTreeUpdateModeError, HostTypes, MutationRenderer,
+    UnsupportedHostCapability,
 };
 
 pub use concurrent_updates::{
@@ -350,6 +354,363 @@ where
 pub fn render_placeholder<H: ?Sized>(host: &H) -> Result<(), UnimplementedReactBehavior> {
     let _host = host;
     Err(unimplemented_behavior(RENDER_PLACEHOLDER_FEATURE))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TestRendererHostOutputCanaryError {
+    FiberRootStore(FiberRootStoreError),
+    FiberTopology(FiberTopologyError),
+    HostFiberToken(HostFiberTokenValidationError),
+    ExpectedFiberTag {
+        fiber: FiberId,
+        expected: FiberTag,
+        actual: FiberTag,
+    },
+    EmptyStateNode {
+        fiber: FiberId,
+        tag: FiberTag,
+    },
+}
+
+impl Display for TestRendererHostOutputCanaryError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::FiberRootStore(error) => Display::fmt(error, formatter),
+            Self::FiberTopology(error) => Display::fmt(error, formatter),
+            Self::HostFiberToken(error) => Display::fmt(error, formatter),
+            Self::ExpectedFiberTag {
+                fiber,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "test-renderer canary fiber {} must be {:?}, found {:?}",
+                fiber.slot().get(),
+                expected,
+                actual
+            ),
+            Self::EmptyStateNode { fiber, tag } => write!(
+                formatter,
+                "test-renderer canary {:?} fiber {} has an empty host state node",
+                tag,
+                fiber.slot().get()
+            ),
+        }
+    }
+}
+
+impl Error for TestRendererHostOutputCanaryError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::FiberRootStore(error) => Some(error),
+            Self::FiberTopology(error) => Some(error),
+            Self::HostFiberToken(error) => Some(error),
+            Self::ExpectedFiberTag { .. } | Self::EmptyStateNode { .. } => None,
+        }
+    }
+}
+
+impl From<FiberRootStoreError> for TestRendererHostOutputCanaryError {
+    fn from(error: FiberRootStoreError) -> Self {
+        Self::FiberRootStore(error)
+    }
+}
+
+impl From<FiberTopologyError> for TestRendererHostOutputCanaryError {
+    fn from(error: FiberTopologyError) -> Self {
+        Self::FiberTopology(error)
+    }
+}
+
+impl From<HostFiberTokenValidationError> for TestRendererHostOutputCanaryError {
+    fn from(error: HostFiberTokenValidationError) -> Self {
+        Self::HostFiberToken(error)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererHostOutputCanaryFixture {
+    element_type_raw: u64,
+    component_props_raw: u64,
+    text_props_raw: u64,
+}
+
+impl TestRendererHostOutputCanaryFixture {
+    #[must_use]
+    pub const fn new(element_type_raw: u64, component_props_raw: u64, text_props_raw: u64) -> Self {
+        Self {
+            element_type_raw,
+            component_props_raw,
+            text_props_raw,
+        }
+    }
+
+    #[must_use]
+    pub const fn element_type_raw(self) -> u64 {
+        self.element_type_raw
+    }
+
+    #[must_use]
+    pub const fn component_props_raw(self) -> u64 {
+        self.component_props_raw
+    }
+
+    #[must_use]
+    pub const fn text_props_raw(self) -> u64 {
+        self.text_props_raw
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererHostOutputCanaryPreparedFibers {
+    root: FiberRootId,
+    host_root: FiberId,
+    component: FiberId,
+    text: FiberId,
+    render_lanes: Lanes,
+    component_token: HostFiberTokenId,
+    text_token: HostFiberTokenId,
+    fixture: TestRendererHostOutputCanaryFixture,
+}
+
+impl TestRendererHostOutputCanaryPreparedFibers {
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn host_root(self) -> FiberId {
+        self.host_root
+    }
+
+    #[must_use]
+    pub const fn component(self) -> FiberId {
+        self.component
+    }
+
+    #[must_use]
+    pub const fn text(self) -> FiberId {
+        self.text
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub const fn component_token(self) -> HostFiberTokenId {
+        self.component_token
+    }
+
+    #[must_use]
+    pub const fn text_token(self) -> HostFiberTokenId {
+        self.text_token
+    }
+
+    #[must_use]
+    pub const fn fixture(self) -> TestRendererHostOutputCanaryFixture {
+        self.fixture
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererHostOutputCanaryCompletedFibers {
+    prepared: TestRendererHostOutputCanaryPreparedFibers,
+    component_state_node_raw: u64,
+    text_state_node_raw: u64,
+}
+
+impl TestRendererHostOutputCanaryCompletedFibers {
+    #[must_use]
+    pub const fn prepared(self) -> TestRendererHostOutputCanaryPreparedFibers {
+        self.prepared
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.prepared.root()
+    }
+
+    #[must_use]
+    pub const fn host_root(self) -> FiberId {
+        self.prepared.host_root()
+    }
+
+    #[must_use]
+    pub const fn component(self) -> FiberId {
+        self.prepared.component()
+    }
+
+    #[must_use]
+    pub const fn text(self) -> FiberId {
+        self.prepared.text()
+    }
+
+    #[must_use]
+    pub const fn component_state_node_raw(self) -> u64 {
+        self.component_state_node_raw
+    }
+
+    #[must_use]
+    pub const fn text_state_node_raw(self) -> u64 {
+        self.text_state_node_raw
+    }
+}
+
+pub fn prepare_test_renderer_host_output_canary_fibers<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    render: HostRootRenderPhaseRecord,
+    fixture: TestRendererHostOutputCanaryFixture,
+) -> Result<TestRendererHostOutputCanaryPreparedFibers, TestRendererHostOutputCanaryError> {
+    expect_test_renderer_host_output_canary_tag(
+        store,
+        render.work_in_progress(),
+        FiberTag::HostRoot,
+    )?;
+
+    let mode = store.fiber_arena().get(render.work_in_progress())?.mode();
+    let component = store.fiber_arena_mut().create_fiber(
+        FiberTag::HostComponent,
+        None,
+        PropsHandle::from_raw(fixture.component_props_raw()),
+        mode,
+    );
+    {
+        let node = store.fiber_arena_mut().get_mut(component)?;
+        node.set_element_type(ElementTypeHandle::from_raw(fixture.element_type_raw()));
+        node.merge_flags(FiberFlags::PLACEMENT);
+    }
+
+    let text = store.fiber_arena_mut().create_fiber(
+        FiberTag::HostText,
+        None,
+        PropsHandle::from_raw(fixture.text_props_raw()),
+        mode,
+    );
+    store.fiber_arena_mut().set_children(component, &[text])?;
+    store
+        .fiber_arena_mut()
+        .set_children(render.work_in_progress(), &[component])?;
+
+    let text_token = store.host_tokens_mut().issue(
+        render.root(),
+        text,
+        HostFiberTokenPhase::Creation,
+        HostFiberTokenTarget::TextInstance,
+    );
+    store.host_tokens().validate(
+        text_token,
+        render.root(),
+        text,
+        HostFiberTokenPhase::Creation,
+        HostFiberTokenTarget::TextInstance,
+    )?;
+    let component_token = store.host_tokens_mut().issue(
+        render.root(),
+        component,
+        HostFiberTokenPhase::Creation,
+        HostFiberTokenTarget::Instance,
+    );
+    store.host_tokens().validate(
+        component_token,
+        render.root(),
+        component,
+        HostFiberTokenPhase::Creation,
+        HostFiberTokenTarget::Instance,
+    )?;
+
+    Ok(TestRendererHostOutputCanaryPreparedFibers {
+        root: render.root(),
+        host_root: render.work_in_progress(),
+        component,
+        text,
+        render_lanes: render.render_lanes(),
+        component_token,
+        text_token,
+        fixture,
+    })
+}
+
+pub fn finish_test_renderer_host_output_canary_fibers<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    prepared: TestRendererHostOutputCanaryPreparedFibers,
+    component_state_node_raw: u64,
+    text_state_node_raw: u64,
+) -> Result<TestRendererHostOutputCanaryCompletedFibers, TestRendererHostOutputCanaryError> {
+    expect_test_renderer_host_output_canary_tag(store, prepared.host_root(), FiberTag::HostRoot)?;
+    expect_test_renderer_host_output_canary_tag(
+        store,
+        prepared.component(),
+        FiberTag::HostComponent,
+    )?;
+    expect_test_renderer_host_output_canary_tag(store, prepared.text(), FiberTag::HostText)?;
+
+    complete_test_renderer_host_output_canary_fiber(
+        store,
+        prepared.text(),
+        FiberTag::HostText,
+        prepared.fixture().text_props_raw(),
+        text_state_node_raw,
+    )?;
+    complete_test_renderer_host_output_canary_fiber(
+        store,
+        prepared.component(),
+        FiberTag::HostComponent,
+        prepared.fixture().component_props_raw(),
+        component_state_node_raw,
+    )?;
+
+    let bubbled = bubble_properties(store.fiber_arena(), prepared.host_root())?;
+    let host_root = store.fiber_arena_mut().get_mut(prepared.host_root())?;
+    host_root.set_child_lanes(bubbled.child_lanes());
+    host_root.set_subtree_flags(bubbled.subtree_flags());
+
+    Ok(TestRendererHostOutputCanaryCompletedFibers {
+        prepared,
+        component_state_node_raw,
+        text_state_node_raw,
+    })
+}
+
+fn complete_test_renderer_host_output_canary_fiber<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    fiber: FiberId,
+    tag: FiberTag,
+    props_raw: u64,
+    state_node_raw: u64,
+) -> Result<(), TestRendererHostOutputCanaryError> {
+    if state_node_raw == StateNodeHandle::NONE.raw() {
+        return Err(TestRendererHostOutputCanaryError::EmptyStateNode { fiber, tag });
+    }
+
+    let state_node = StateNodeHandle::from_raw(state_node_raw);
+    let props = PropsHandle::from_raw(props_raw);
+    let bubbled = bubble_properties(store.fiber_arena(), fiber)?;
+    let node = store.fiber_arena_mut().get_mut(fiber)?;
+    node.set_state_node(state_node);
+    node.set_memoized_props(props);
+    node.set_child_lanes(bubbled.child_lanes());
+    node.set_subtree_flags(bubbled.subtree_flags());
+    Ok(())
+}
+
+fn expect_test_renderer_host_output_canary_tag<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    fiber: FiberId,
+    expected: FiberTag,
+) -> Result<(), TestRendererHostOutputCanaryError> {
+    let actual = store.fiber_arena().get(fiber)?.tag();
+    if actual == expected {
+        Ok(())
+    } else {
+        Err(TestRendererHostOutputCanaryError::ExpectedFiberTag {
+            fiber,
+            expected,
+            actual,
+        })
+    }
 }
 
 #[cfg(test)]

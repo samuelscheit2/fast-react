@@ -5,7 +5,8 @@
 //! legacy `HostConfig` behavior. Its root canary delegates create/update/
 //! unmount scheduling to `fast-react-reconciler` and exposes a diagnostic
 //! HostRoot render/commit handoff, including callback snapshot diagnostics,
-//! but it still stops before host output, serialization, act, or public
+//! plus a private committed host-output canary for one HostComponent with one
+//! HostText child. It still stops before serialization, act, or public
 //! `react-test-renderer` compatibility.
 
 use std::collections::BTreeMap;
@@ -25,9 +26,12 @@ use fast_react_reconciler::{
     FiberRootId, FiberRootStore, FiberRootStoreError, HostRootCommitRecord,
     HostRootRenderPhaseRecord, RootCommitError, RootElementHandle, RootOptions,
     RootScheduleMicrotaskResult, RootSchedulerError, RootUpdateCallbackHandle, RootUpdateError,
-    RootWorkLoopError, ScheduledRootUpdateResult, UpdateContainerResult, commit_finished_host_root,
-    ensure_root_is_scheduled, process_root_schedule_in_microtask, render_host_root_for_lanes,
-    scheduled_roots, update_container, update_container_sync,
+    RootWorkLoopError, ScheduledRootUpdateResult, TestRendererHostOutputCanaryCompletedFibers,
+    TestRendererHostOutputCanaryError, TestRendererHostOutputCanaryFixture,
+    TestRendererHostOutputCanaryPreparedFibers, UpdateContainerResult, commit_finished_host_root,
+    ensure_root_is_scheduled, finish_test_renderer_host_output_canary_fibers,
+    prepare_test_renderer_host_output_canary_fibers, process_root_schedule_in_microtask,
+    render_host_root_for_lanes, scheduled_roots, update_container, update_container_sync,
 };
 
 pub const TEST_RENDERER_NAME: &str = "fast-react-test-renderer";
@@ -730,6 +734,68 @@ pub enum TestRendererRootUpdateKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct TestRendererHostOutputFixture {
+    element: RootElementHandle,
+    element_type: TestElementType,
+    props: TestProps,
+    text: String,
+    canary_fixture: TestRendererHostOutputCanaryFixture,
+}
+
+impl TestRendererHostOutputFixture {
+    fn new(element: RootElementHandle, element_type: TestElementType, text: String) -> Self {
+        let base_raw = element.raw();
+        Self {
+            element,
+            element_type,
+            props: TestProps::new(),
+            text,
+            canary_fixture: TestRendererHostOutputCanaryFixture::new(
+                base_raw,
+                base_raw.saturating_mul(2).saturating_sub(1),
+                base_raw.saturating_mul(2),
+            ),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererCommittedHostOutput {
+    render: HostRootRenderPhaseRecord,
+    prepared_fibers: TestRendererHostOutputCanaryPreparedFibers,
+    completed_fibers: TestRendererHostOutputCanaryCompletedFibers,
+    commit: HostRootCommitRecord,
+    snapshot: TestContainerSnapshot,
+}
+
+impl TestRendererCommittedHostOutput {
+    #[must_use]
+    pub const fn render(&self) -> HostRootRenderPhaseRecord {
+        self.render
+    }
+
+    #[must_use]
+    pub const fn prepared_fibers(&self) -> TestRendererHostOutputCanaryPreparedFibers {
+        self.prepared_fibers
+    }
+
+    #[must_use]
+    pub const fn completed_fibers(&self) -> TestRendererHostOutputCanaryCompletedFibers {
+        self.completed_fibers
+    }
+
+    #[must_use]
+    pub const fn commit(&self) -> &HostRootCommitRecord {
+        &self.commit
+    }
+
+    #[must_use]
+    pub const fn snapshot(&self) -> &TestContainerSnapshot {
+        &self.snapshot
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestRendererRootScheduledUpdate {
     kind: TestRendererRootUpdateKind,
     element: RootElementHandle,
@@ -784,6 +850,8 @@ pub enum TestRendererRootError {
     RootScheduler(RootSchedulerError),
     RootWorkLoop(RootWorkLoopError),
     RootCommit(RootCommitError),
+    HostOutputCanary(TestRendererHostOutputCanaryError),
+    MissingHostOutputFixture { element: RootElementHandle },
 }
 
 impl Display for TestRendererRootError {
@@ -795,6 +863,12 @@ impl Display for TestRendererRootError {
             Self::RootScheduler(error) => Display::fmt(error, formatter),
             Self::RootWorkLoop(error) => Display::fmt(error, formatter),
             Self::RootCommit(error) => Display::fmt(error, formatter),
+            Self::HostOutputCanary(error) => Display::fmt(error, formatter),
+            Self::MissingHostOutputFixture { element } => write!(
+                formatter,
+                "test-renderer host-output canary has no fixture for root element {}",
+                element.raw()
+            ),
         }
     }
 }
@@ -808,6 +882,8 @@ impl Error for TestRendererRootError {
             Self::RootScheduler(error) => Some(error),
             Self::RootWorkLoop(error) => Some(error),
             Self::RootCommit(error) => Some(error),
+            Self::HostOutputCanary(error) => Some(error),
+            Self::MissingHostOutputFixture { .. } => None,
         }
     }
 }
@@ -848,6 +924,12 @@ impl From<RootCommitError> for TestRendererRootError {
     }
 }
 
+impl From<TestRendererHostOutputCanaryError> for TestRendererRootError {
+    fn from(error: TestRendererHostOutputCanaryError) -> Self {
+        Self::HostOutputCanary(error)
+    }
+}
+
 pub struct TestRendererRoot {
     renderer: TestRenderer,
     container: TestContainer,
@@ -856,6 +938,7 @@ pub struct TestRendererRoot {
     options: TestRendererOptions,
     lifecycle: TestRendererRootLifecycle,
     scheduled_updates: Vec<TestRendererRootScheduledUpdate>,
+    host_output_fixtures: Vec<TestRendererHostOutputFixture>,
 }
 
 impl TestRendererRoot {
@@ -874,16 +957,40 @@ impl TestRendererRoot {
         Self::create_with_root_update_callback(element, options, Some(callback))
     }
 
+    pub fn create_host_component_with_text_for_canary(
+        element_type: impl Into<TestElementType>,
+        text: impl Into<String>,
+        options: TestRendererOptions,
+    ) -> Result<Self, TestRendererRootError> {
+        let mut root = Self::new_without_initial_update(options)?;
+        let element = root.push_host_output_fixture_for_canary(element_type.into(), text.into());
+        let record =
+            root.schedule_root_update(TestRendererRootUpdateKind::Create, element, None)?;
+        root.scheduled_updates.push(record);
+        Ok(root)
+    }
+
     fn create_with_root_update_callback(
         element: RootElementHandle,
         options: TestRendererOptions,
         callback: Option<RootUpdateCallbackHandle>,
     ) -> Result<Self, TestRendererRootError> {
+        let mut root = Self::new_without_initial_update(options)?;
+
+        let record =
+            root.schedule_root_update(TestRendererRootUpdateKind::Create, element, callback)?;
+        root.scheduled_updates.push(record);
+        Ok(root)
+    }
+
+    fn new_without_initial_update(
+        options: TestRendererOptions,
+    ) -> Result<Self, TestRendererRootError> {
         let mut renderer = TestRenderer::new();
         let container = renderer.create_container();
         let mut store = FiberRootStore::<TestRenderer>::new();
         let root_id = store.create_client_root(container, options.reconciler_options())?;
-        let mut root = Self {
+        Ok(Self {
             renderer,
             container,
             store,
@@ -891,12 +998,8 @@ impl TestRendererRoot {
             options,
             lifecycle: TestRendererRootLifecycle::Active,
             scheduled_updates: Vec::new(),
-        };
-
-        let record =
-            root.schedule_root_update(TestRendererRootUpdateKind::Create, element, callback)?;
-        root.scheduled_updates.push(record);
-        Ok(root)
+            host_output_fixtures: Vec::new(),
+        })
     }
 
     pub fn update(
@@ -1029,6 +1132,44 @@ impl TestRendererRoot {
         Ok(commit_finished_host_root(&mut self.store, render)?)
     }
 
+    pub fn render_and_commit_host_output_for_canary(
+        &mut self,
+    ) -> Result<Option<TestRendererCommittedHostOutput>, TestRendererRootError> {
+        let Some(render) = self.render_latest_scheduled_host_root_for_commit_handoff()? else {
+            return Ok(None);
+        };
+        let fixture = self
+            .host_output_fixture(render.resulting_element())?
+            .clone();
+        let prepared = prepare_test_renderer_host_output_canary_fibers(
+            &mut self.store,
+            render,
+            fixture.canary_fixture,
+        )?;
+        let (instance, text) = self.create_detached_host_output_for_canary(&fixture, prepared)?;
+        let completed = finish_test_renderer_host_output_canary_fibers(
+            &mut self.store,
+            prepared,
+            Self::instance_state_node_raw(instance),
+            Self::text_state_node_raw(text),
+        )?;
+        let commit = self.commit_host_root_render_for_canary(render)?;
+        let mut container = self.container;
+        let commit_state = self.renderer.prepare_for_commit(&container)?;
+        self.renderer
+            .append_child_to_container(&mut container, HostChild::Instance(&instance))?;
+        self.renderer.reset_after_commit(&container, commit_state)?;
+        let snapshot = self.diagnostic_container_snapshot()?;
+
+        Ok(Some(TestRendererCommittedHostOutput {
+            render,
+            prepared_fibers: prepared,
+            completed_fibers: completed,
+            commit,
+            snapshot,
+        }))
+    }
+
     pub fn diagnostic_container_snapshot(
         &self,
     ) -> Result<TestContainerSnapshot, TestRendererRootError> {
@@ -1056,6 +1197,90 @@ impl TestRendererRoot {
             container_update,
             root_schedule,
         })
+    }
+
+    fn push_host_output_fixture_for_canary(
+        &mut self,
+        element_type: TestElementType,
+        text: String,
+    ) -> RootElementHandle {
+        let element = RootElementHandle::from_raw(self.host_output_fixtures.len() as u64 + 1);
+        self.host_output_fixtures
+            .push(TestRendererHostOutputFixture::new(
+                element,
+                element_type,
+                text,
+            ));
+        element
+    }
+
+    fn host_output_fixture(
+        &self,
+        element: RootElementHandle,
+    ) -> Result<&TestRendererHostOutputFixture, TestRendererRootError> {
+        if element.is_none() {
+            return Err(TestRendererRootError::MissingHostOutputFixture { element });
+        }
+
+        self.host_output_fixtures
+            .get((element.raw() - 1) as usize)
+            .filter(|fixture| fixture.element == element)
+            .ok_or(TestRendererRootError::MissingHostOutputFixture { element })
+    }
+
+    fn create_detached_host_output_for_canary(
+        &mut self,
+        fixture: &TestRendererHostOutputFixture,
+        prepared: TestRendererHostOutputCanaryPreparedFibers,
+    ) -> Result<(TestInstance, TestTextInstance), TestRendererRootError> {
+        let container = self.container;
+        let root_context = self.renderer.root_host_context(&container)?;
+        let child_context = self.renderer.child_host_context(
+            &root_context,
+            &fixture.element_type,
+            &fixture.props,
+        )?;
+        let text_token = prepared.text_token().raw();
+        let text = self.renderer.create_text_instance(
+            HostFiberTokenRef::new(
+                &text_token,
+                HostFiberTokenPhase::Creation,
+                HostFiberTokenTarget::TextInstance,
+            ),
+            &fixture.text,
+            &container,
+            &child_context,
+        )?;
+        let component_token = prepared.component_token().raw();
+        let mut instance = self.renderer.create_instance(
+            HostFiberTokenRef::new(
+                &component_token,
+                HostFiberTokenPhase::Creation,
+                HostFiberTokenTarget::Instance,
+            ),
+            &fixture.element_type,
+            &fixture.props,
+            &container,
+            &root_context,
+        )?;
+        self.renderer
+            .append_initial_child(&mut instance, HostChild::Text(&text))?;
+        self.renderer.finalize_initial_children(
+            &mut instance,
+            &fixture.element_type,
+            &fixture.props,
+            &container,
+            &root_context,
+        )?;
+        Ok((instance, text))
+    }
+
+    const fn instance_state_node_raw(instance: TestInstance) -> u64 {
+        instance.index as u64 + 1
+    }
+
+    const fn text_state_node_raw(text: TestTextInstance) -> u64 {
+        text.index as u64 + 1
     }
 }
 
@@ -1784,6 +2009,89 @@ mod tests {
             root.store().root(root.root_id()).unwrap().finished_work(),
             None
         );
+        assert!(
+            root.diagnostic_container_snapshot()
+                .unwrap()
+                .children()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn root_host_output_canary_commits_minimal_host_component_with_text() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let previous_current = root.store().root(root.root_id()).unwrap().current();
+
+        let output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let render = output.render();
+        let commit = output.commit();
+        let completed = output.completed_fibers();
+        let prepared = output.prepared_fibers();
+        let snapshot = output.snapshot();
+
+        assert_eq!(render.root(), root.root_id());
+        assert_eq!(render.current(), previous_current);
+        assert_eq!(commit.root(), root.root_id());
+        assert_eq!(commit.previous_current(), previous_current);
+        assert_eq!(commit.current(), render.finished_work());
+        assert_eq!(completed.root(), root.root_id());
+        assert_eq!(completed.host_root(), render.finished_work());
+        assert_eq!(completed.prepared(), prepared);
+        assert_ne!(completed.component(), completed.text());
+        assert_eq!(completed.component_state_node_raw(), 1);
+        assert_eq!(completed.text_state_node_raw(), 1);
+        assert_eq!(prepared.text_token().raw(), 1);
+        assert_eq!(prepared.component_token().raw(), 2);
+        assert_eq!(root.store().host_tokens().len(), 2);
+        assert_empty_root_update_callback_snapshot(commit, &render);
+        assert_eq!(
+            root.store().root(root.root_id()).unwrap().current(),
+            render.finished_work()
+        );
+        assert_eq!(host_storage_counts(&root), (1, 1, 1));
+        assert_eq!(snapshot.children().len(), 1);
+
+        let TestNodeSnapshot::Element(element) = &snapshot.children()[0] else {
+            panic!("expected committed host component");
+        };
+        assert_eq!(element.element_type().as_str(), "span");
+        assert_eq!(element.props(), &TestProps::new());
+        assert!(!element.is_hidden());
+        assert!(!element.is_detached());
+        assert_eq!(child_texts(element), vec!["hello"]);
+        assert_eq!(
+            root.diagnostic_container_snapshot().unwrap(),
+            snapshot.clone()
+        );
+    }
+
+    #[test]
+    fn root_host_output_canary_rejects_non_fixture_element_without_mutation() {
+        let mut root =
+            TestRendererRoot::create(root_element(99), TestRendererOptions::new()).unwrap();
+        let current = root.store().root(root.root_id()).unwrap().current();
+
+        let error = root.render_and_commit_host_output_for_canary().unwrap_err();
+
+        assert!(matches!(
+            error,
+            TestRendererRootError::MissingHostOutputFixture { element }
+                if element == root_element(99)
+        ));
+        assert_eq!(
+            root.store().root(root.root_id()).unwrap().current(),
+            current
+        );
+        assert_eq!(current_host_root_element(&root), RootElementHandle::NONE);
+        assert_eq!(host_storage_counts(&root), (1, 0, 0));
         assert!(
             root.diagnostic_container_snapshot()
                 .unwrap()
