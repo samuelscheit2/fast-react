@@ -1067,6 +1067,226 @@ test("private resource-map commit diagnostics stay record-only", () => {
   assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
 });
 
+
+test("private stylesheet load/error state diagnostics stay fake-record-only", () => {
+  const dispatcherGate = resourceFormGate.createResourceFormActionInternalsGate({
+    requestIdPrefix: "resource-conformance-load-state-source"
+  });
+  const adapterGate = resourceFormGate.createResourceHintFakeDomAdapterGate({
+    requestIdPrefix: "resource-conformance-load-state-adapter"
+  });
+  const orderGate =
+    resourceFormGate.createResourceHintPreloadPreinitOrderGate({
+      requestIdPrefix: "resource-conformance-load-state-order"
+    });
+  const stylesheetGate =
+    resourceFormGate.createResourceHintStylesheetPrecedenceGate({
+      requestIdPrefix: "resource-conformance-load-state-precedence"
+    });
+  const loadStateGate =
+    resourceFormGate.createResourceHintStylesheetLoadErrorStateGate({
+      requestIdPrefix: "resource-conformance-load-state"
+    });
+  const fakeDom = createDeterministicResourceHintDom();
+  const dispatcherRecords = [
+    dispatcherGate.recordResourceHintDispatcherRequest("L", [
+      "/style.css",
+      "style",
+      {
+        crossOrigin: undefined,
+        integrity: undefined,
+        nonce: undefined,
+        type: undefined,
+        fetchPriority: "low",
+        referrerPolicy: undefined,
+        imageSrcSet: undefined,
+        imageSizes: undefined,
+        media: undefined
+      }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest("S", [
+      "/style.css",
+      "theme",
+      {
+        crossOrigin: "",
+        integrity: "sha256-style",
+        fetchPriority: "high"
+      }
+    ])
+  ];
+  const headRecord = dispatcherGate.recordSingletonRequest("head", [
+    { title: "blocked-head-singleton-props" }
+  ]);
+  const admissions = dispatcherRecords.map((record) =>
+    adapterGate.admitDispatcherRecord(record, {
+      explicitAdmission: true,
+      adapterKind: "deterministic-fake-dom",
+      targetKind: "document-head"
+    })
+  );
+  appendResourceHintFakeHeadChild(fakeDom, "link", {
+    rel: "stylesheet",
+    "data-precedence": "theme",
+    "data-fast-react-resource-key": "style-main",
+    "data-fast-react-precedence-key": "precedence-main"
+  });
+  appendResourceHintFakeHeadChild(fakeDom, "link", {
+    rel: "preload",
+    as: "style",
+    "data-fast-react-resource-key": "style-main"
+  });
+
+  const order = orderGate.recordPreloadPreinitOrderDiagnostic(
+    admissions,
+    {
+      explicitOrderDiagnostic: true,
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head,
+      resourceDescriptors: [
+        {
+          sourceAdapterAdmissionId: admissions[0].adapterAdmissionId,
+          resourceKind: "style",
+          resourceKey: "style-main"
+        },
+        {
+          sourceAdapterAdmissionId: admissions[1].adapterAdmissionId,
+          resourceKind: "style",
+          resourceKey: "style-main",
+          precedenceKey: "precedence-main"
+        }
+      ]
+    }
+  );
+  const stylesheetPrecedence =
+    stylesheetGate.recordStylesheetPrecedenceDiagnostic(
+      order,
+      headRecord,
+      {
+        explicitStylesheetPrecedenceDiagnostic: true,
+        fakeDocument: fakeDom.document,
+        fakeHead: fakeDom.head
+      }
+    );
+  const diagnostic =
+    loadStateGate.recordStylesheetLoadErrorStateDiagnostic(
+      stylesheetPrecedence,
+      {
+        explicitStylesheetLoadErrorStateDiagnostic: true,
+        stateKind: "deterministic-fake-stylesheet-load-error-state",
+        targetKind: "stylesheet-resource-state"
+      }
+    );
+
+  assert.equal(
+    diagnostic.stylesheetLoadErrorStateStatus,
+    resourceFormGate.privateResourceHintStylesheetLoadErrorStateStatus
+  );
+  assert.deepEqual(
+    diagnostic.loadingStateBits.map((row) => [row.name, row.bitmask]),
+    [
+      ["NotLoaded", 0],
+      ["Loaded", 1],
+      ["Errored", 2],
+      ["Settled", 3],
+      ["Inserted", 4]
+    ]
+  );
+  assert.deepEqual(
+    diagnostic.resourceStateRows.map((row) => ({
+      resourceKey: row.resourceKey,
+      type: row.reactResourceShape.type,
+      instance: row.reactResourceShape.instance,
+      count: row.reactResourceShape.count,
+      loading: row.stateShape.loading,
+      preload: row.stateShape.preload,
+      preloadSeenBefore: row.preloadSeenBefore,
+      plannedInsertionCount: row.plannedInsertionCount
+    })),
+    [
+      {
+        resourceKey: "style:style-main",
+        type: "stylesheet",
+        instance: null,
+        count: 1,
+        loading: 0,
+        preload: null,
+        preloadSeenBefore: true,
+        plannedInsertionCount: 1
+      }
+    ]
+  );
+  assert.deepEqual(
+    diagnostic.loadingStateRows.map((row) => ({
+      label: row.label,
+      bitmask: row.bitmask,
+      loadListenerInstalled: row.loadListenerInstalled,
+      errorListenerInstalled: row.errorListenerInstalled,
+      loadingPromiseCreated: row.loadingPromiseCreated
+    })),
+    [
+      {
+        label: "not-loaded",
+        bitmask: 0,
+        loadListenerInstalled: false,
+        errorListenerInstalled: false,
+        loadingPromiseCreated: false
+      },
+      {
+        label: "loaded",
+        bitmask: 1,
+        loadListenerInstalled: false,
+        errorListenerInstalled: false,
+        loadingPromiseCreated: false
+      },
+      {
+        label: "errored",
+        bitmask: 2,
+        loadListenerInstalled: false,
+        errorListenerInstalled: false,
+        loadingPromiseCreated: false
+      },
+      {
+        label: "inserted-not-settled",
+        bitmask: 4,
+        loadListenerInstalled: false,
+        errorListenerInstalled: false,
+        loadingPromiseCreated: false
+      },
+      {
+        label: "inserted-loaded",
+        bitmask: 5,
+        loadListenerInstalled: false,
+        errorListenerInstalled: false,
+        loadingPromiseCreated: false
+      },
+      {
+        label: "inserted-errored",
+        bitmask: 6,
+        loadListenerInstalled: false,
+        errorListenerInstalled: false,
+        loadingPromiseCreated: false
+      }
+    ]
+  );
+  assert.equal(diagnostic.preloadStateRows[0].preloadFetchStarted, false);
+  assert.equal(diagnostic.commitSuspensionRows[0].commitSuspended, false);
+  assert.equal(
+    diagnostic.suspendedCommitBoundary.realTimerScheduled,
+    false
+  );
+  assert.equal(diagnostic.sideEffects.stylesheetFetchStarted, false);
+  assert.equal(diagnostic.sideEffects.stylesheetCommitSuspended, false);
+  assert.deepEqual(
+    diagnostic.blockedCapabilities,
+    resourceFormGate.resourceHintStylesheetLoadErrorStateBlockedCapabilities
+  );
+  assert.equal(JSON.stringify(diagnostic).includes("/style.css"), false);
+  assert.equal(JSON.stringify(diagnostic).includes("sha256-style"), false);
+  assert.equal(/"theme"/u.test(JSON.stringify(diagnostic)), false);
+  assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
+});
+
+
 test("React DOM resource hint oracle artifact does not leak temporary generation paths", () => {
   const oracleText = readCheckedReactDomResourceHintsOracleText();
   assert.doesNotMatch(oracleText, /\/private\/var\/folders/u);
