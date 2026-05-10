@@ -29,6 +29,13 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Worker 495 was accepted from queue 473-502. It added private native batched
+  JSON transport lifecycle diagnostics and deterministic batch error rows,
+  integrating with the already accepted cross-environment teardown diagnostics
+  without loading a native addon or changing public native behavior. It was
+  verified after merge with full `fast-react-napi` tests, native workspace CJS
+  and ESM loader checks, Rust fmt, conflict-marker scanning, and
+  `git diff --check`.
 - Worker 494 was accepted from queue 473-502. It extended private
   `scheduler/unstable_post_task` abort and continuation diagnostics for the
   controlled shim path, keeping the public node shape, checked oracle, and
