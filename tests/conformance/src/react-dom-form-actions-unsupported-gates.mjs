@@ -181,7 +181,8 @@ export function assertPrivateFormActionResetDispatcherGate() {
     summary.sideEffects,
     resourceFormGate.formActionResetDispatcherBlockedSideEffects
   );
-  assertPrivateFormResetQueueCommitGate(resourceFormGate, reset);
+  const resetQueueCommit =
+    assertPrivateFormResetQueueCommitGate(resourceFormGate, reset);
 
   assert.equal(
     resourceFormGate.isPrivateFormActionResetDispatcherRecord(submission),
@@ -334,6 +335,12 @@ export function assertPrivateFormActionResetDispatcherGate() {
   assert.equal(extraction.sideEffects.realFormInspected, false);
   assert.equal(extraction.sideEffects.formDataConstructed, false);
 
+  assertPrivateFormActionSubmitDispatchGate(
+    resourceFormGate,
+    extraction,
+    resetQueueCommit
+  );
+
   const actionCompletionReset = gate.recordResetIntent({
     explicitIntent: true,
     dispatcherKey: "r",
@@ -391,6 +398,167 @@ export function assertPrivateFormActionResetDispatcherGate() {
       code: resourceFormGate.privateFormActionEventExtractionInvalidRecordCode,
       compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
       reason: "source record must be a recorded submit action intent"
+    }
+  );
+}
+
+export function assertPrivateFormActionSubmitDispatchGate(
+  resourceFormGate,
+  extraction,
+  resetQueueCommit
+) {
+  const formActions = requireReactDomPackageFile(
+    "src/shared/form-actions.js"
+  );
+  const blockerGate =
+    formActions.createFormActionFormDataBlockerDiagnosticGate({
+      requestIdPrefix: "conformance-submit-dispatch-blocker"
+    });
+  const dispatchGate =
+    formActions.createFormActionSubmitDispatchDiagnosticGate({
+      requestIdPrefix: "conformance-submit-dispatch"
+    });
+  const blocker = blockerGate.recordFormDataBlockerDiagnostic(
+    extraction,
+    resetQueueCommit,
+    {
+      explicitFormActionFormDataBlocker: true,
+      formTargetShape: { targetKind: "form", hostTag: "form" },
+      submitterShape: { controlKind: "input", hostTag: "input" }
+    }
+  );
+  const record = dispatchGate.recordSubmitDispatchDiagnostic(blocker, {
+    explicitFormActionSubmitDispatch: true,
+    submitControlKind: "input"
+  });
+  const summary =
+    formActions.describePrivateFormActionSubmitDispatchGate();
+
+  assert.equal(
+    summary.gateId,
+    formActions.privateFormActionSubmitDispatchGateId
+  );
+  assert.equal(
+    summary.status,
+    formActions.privateFormActionSubmitDispatchStatus
+  );
+  assert.equal(summary.recordsActionIdentity, true);
+  assert.equal(summary.recordsFormDataBlockerRows, true);
+  assert.equal(summary.recordsResetQueueIntent, true);
+  assert.equal(summary.recordsDispatchQueueRow, true);
+  assert.equal(summary.rejectsLiveForms, true);
+  assert.equal(summary.rejectsUnsupportedSubmitControls, true);
+  assert.equal(summary.blocksCallbackDispatchExecution, true);
+  assert.equal(summary.acceptsRealForms, false);
+  assert.equal(summary.acceptsRawEvents, false);
+  assert.equal(summary.acceptsActionFunctions, false);
+  assert.equal(summary.constructsFormData, false);
+  assert.equal(summary.createsSyntheticEvents, false);
+  assert.equal(summary.dispatchesSubmitCallbacks, false);
+  assert.equal(summary.invokesActions, false);
+  assert.equal(summary.startsHostTransition, false);
+  assert.equal(summary.queuesReactUpdates, false);
+  assert.deepEqual(
+    summary.sideEffects,
+    formActions.formActionSubmitDispatchBlockedSideEffects
+  );
+  assert.deepEqual(
+    resourceFormGate.describePrivateFormActionSubmitDispatchBoundary(null),
+    summary
+  );
+
+  assert.equal(
+    formActions.isPrivateFormActionSubmitDispatchRecord(record),
+    true
+  );
+  assert.equal(
+    formActions.getPrivateFormActionSubmitDispatchRecordPayload(record),
+    record
+  );
+  assert.equal(
+    record.status,
+    formActions.privateFormActionSubmitDispatchRecordedStatus
+  );
+  assert.equal(record.sourceFormDataBlockerId, blocker.blockerId);
+  assert.equal(record.sourceEventExtractionId, extraction.extractionId);
+  assert.equal(
+    record.sourceResetQueueCommitRequestId,
+    resetQueueCommit.requestId
+  );
+  assert.equal(record.actionIdentity.metadataOnly, true);
+  assert.equal(record.actionIdentity.resolvedActionKind, "function");
+  assert.equal(record.actionIdentity.actionSource, "submit-control");
+  assert.equal(record.actionIdentity.submitControlActionKind, "function");
+  assert.equal(record.actionIdentity.actionFunctionCaptured, false);
+  assert.equal(record.actionIdentity.actionInvoked, false);
+  assert.equal(record.formDataBlockerLink.formDataConstructionBlocked, true);
+  assert.equal(record.formDataBlockerLink.formDataConstructed, false);
+  assert.equal(record.resetQueueIntentLink.resetStateWouldBeQueued, true);
+  assert.equal(record.resetQueueIntentLink.resetStateQueued, false);
+  assert.equal(record.resetQueueIntentLink.realFormReset, false);
+  assert.equal(record.submitDispatchQueue.callbackDispatchBlocked, true);
+  assert.equal(record.submitDispatchQueue.syntheticEventCreated, false);
+  assert.equal(record.submitDispatchQueue.callbackDispatchExecuted, false);
+  assert.equal(record.submitDispatchQueue.submitCallbackInvoked, false);
+  assert.equal(record.submitDispatchQueue.actionInvoked, false);
+  assert.equal(record.publicFormActionBoundary.publicFormActionsEnabled, false);
+  assert.equal(record.publicFormActionBoundary.submitDispatchReachable, false);
+  assert.deepEqual(
+    record.sideEffects,
+    formActions.formActionSubmitDispatchDiagnosticSideEffects
+  );
+  assert.equal(record.sideEffects.sourceFormDataBlockerAccepted, true);
+  assert.equal(record.sideEffects.actionIdentityRecorded, true);
+  assert.equal(record.sideEffects.dispatchQueueRowRecorded, true);
+  assert.equal(record.sideEffects.resetQueueIntentLinked, true);
+  assert.equal(record.sideEffects.liveFormAccepted, false);
+  assert.equal(record.sideEffects.unsupportedSubmitControlAccepted, false);
+  assert.equal(record.sideEffects.callbackDispatchExecuted, false);
+  assert.equal(record.sideEffects.actionInvoked, false);
+  assert.equal(record.sideEffects.realFormReset, false);
+
+  let callbackCalls = 0;
+  const callback = () => {
+    callbackCalls++;
+  };
+  assert.throws(
+    () =>
+      dispatchGate.recordSubmitDispatchDiagnostic(blocker, {
+        explicitFormActionSubmitDispatch: true,
+        callback
+      }),
+    {
+      code:
+        formActions.privateFormActionSubmitDispatchInvalidAdmissionCode,
+      compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
+      reason: "callback must not be passed to the submit dispatch metadata gate"
+    }
+  );
+  assert.equal(callbackCalls, 0);
+  assert.throws(
+    () =>
+      dispatchGate.recordSubmitDispatchDiagnostic(blocker, {
+        explicitFormActionSubmitDispatch: true,
+        form: throwingProxy("form")
+      }),
+    {
+      code:
+        formActions.privateFormActionSubmitDispatchInvalidAdmissionCode,
+      compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
+      reason: "form must not be passed to the submit dispatch metadata gate"
+    }
+  );
+  assert.throws(
+    () =>
+      dispatchGate.recordSubmitDispatchDiagnostic(blocker, {
+        explicitFormActionSubmitDispatch: true,
+        callbackDispatchExecutionRequested: true
+      }),
+    {
+      code:
+        formActions.privateFormActionSubmitDispatchInvalidAdmissionCode,
+      compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
+      reason: "callback dispatch execution must remain blocked"
     }
   );
 }
@@ -516,6 +684,8 @@ export function assertPrivateFormResetQueueCommitGate(
       compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET
     }
   );
+
+  return record;
 }
 
 export function assertFastReactFormActionPrerequisiteGate() {
