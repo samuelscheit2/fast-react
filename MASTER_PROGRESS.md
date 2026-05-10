@@ -29,6 +29,25 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 721
+
+- Worker 721 added a private React DOM fake-DOM execution path for admitted
+  dangerousHTML and text-reset rows. The path consumes accepted HostComponent
+  update metadata, applies `innerHTML` / `textContent` / reset rows only on
+  privately admitted fake-DOM targets, records hidden mutation and rollback
+  payloads, and publishes latest props only after mutation succeeds.
+- Acceptance review found and blocked an initial live-DOM admission gap. The
+  accepted fix added private WeakSet target admission, rejects unadmitted
+  live-like component-tree hosts before any DOM reads or writes, and added
+  package/conformance regression tests for that fail-closed behavior.
+- Worker 721 was accepted after independent post-fix audit and verification
+  with focused React DOM root-bridge tests, text-content and
+  dangerousHTML/style conformance gates, React DOM workspace checks, package
+  surface guard, import smoke, full `npm run check`, conflict-marker scanning,
+  and `git diff --check`; its subagent, worktree, and branch were removed after
+  merge. Public roots, browser DOM, hydration, events, refs, controlled inputs,
+  resources, and full child reconciliation remain blocked.
+
 ### Follow-Ups 716-717
 
 - Worker 716 added the private-admission and package-surface ledger for the

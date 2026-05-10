@@ -47,22 +47,18 @@ Drive toward a minimal real root render/update/unmount path:
 
 Top-level cap: 30 workers. Queue 685-714 was launched from queue base commit
 `9ec6678` in isolated `worker/<slug>` branches and worktrees and has been
-accepted and cleaned up. Workers 715-717 have also been accepted and cleaned
-up.
+accepted and cleaned up. Workers 715-717 and 721 have also been accepted and
+cleaned up.
 
-- Worker 721: DOM text reset / dangerousHTML fake-DOM execution gate;
-  implementation complete in its isolated worktree, with acceptance audit in
-  progress.
+- No active worker branches are open.
 
 ## Near-Term Sequencing
 
-1. Accept worker 721 only if it remains fake-DOM/private and keeps public React
-   DOM text/dangerousHTML compatibility blocked.
-2. If accepted, commit the worker's intended diff/report, merge it into
-   `main`, then close the subagent and remove the isolated worktree/branch.
-3. Launch the next root/effect/test-renderer follow-ups only after the active
-   audit and post-merge verification are green.
-4. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
+1. Run post-worker-721 verification on `main`, including focused React DOM and
+   conformance gates plus full workspace checks.
+2. Launch the next root/effect/test-renderer follow-ups only after post-merge
+   verification is green.
+3. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
 
 ## Next Queue Candidates
@@ -73,8 +69,6 @@ up.
   on workers 688/689 and stable commit ownership from worker 717.
 - Worker 720: test-renderer serialization finished-work identity gate,
   dependent on workers 695-702 and 717.
-- Worker 721: DOM text reset / dangerousHTML fake-DOM execution gate, dependent
-  on worker 704 and existing text-content gates.
 
 Premature until later gates are green: public React DOM root render/unmount,
 public `act`, public `flushSync`, public Scheduler timing, public hydration,
