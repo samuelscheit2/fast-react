@@ -84,6 +84,7 @@ test("react-test-renderer serialization gate is ready for private diagnostics wh
     privateToJSONSerializationFacadeSerializesHostOutputDiagnostics: true,
     privateToJSONSerializationFacadePubliclyBlocked: true,
     privateRecordOnlyTestInstanceWrapperPresent: true,
+    privateRecordOnlyTestInstanceQueryPathPresent: true,
     publicToJSONAvailable: false,
     publicToTreeAvailable: false,
     publicTestInstanceWrappersPresent: false,
@@ -123,6 +124,10 @@ test("react-test-renderer serialization gate records accepted Rust-private prere
   assert.deepEqual(gate.privateToJSONFacadeBlockers, []);
   assert.equal(gate.publicCompatibilityReady, false);
   assert.equal(gate.localChecks.privateRecordOnlyTestInstanceWrapperPresent, true);
+  assert.equal(
+    gate.localChecks.privateRecordOnlyTestInstanceQueryPathPresent,
+    true
+  );
   assert.equal(gate.localChecks.publicTestInstanceWrappersPresent, false);
   assert.equal(gate.localChecks.publicJsFacadeRoutingPresent, false);
   assert.deepEqual(gate.admittedScenarios, []);

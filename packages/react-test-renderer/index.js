@@ -307,12 +307,90 @@ const privateTestInstanceTextChildRecord = Object.freeze({
 const privateTestInstanceChildren = Object.freeze([
   privateTestInstanceTextChildRecord
 ]);
+const privateTestInstanceHostComponentType = 'span';
+const privateTestInstanceHostRootInspectionRecord = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-inspection-host-root',
+  kind: 'TestRendererCommittedFiberNodeInspection',
+  source: 'TestRendererCommittedFiberTreeInspection::host_root',
+  fiberTag: 'HostRoot',
+  index: 0,
+  parentRecord: null,
+  childRecord:
+    'react-test-renderer-private-test-instance-inspection-host-component',
+  siblingRecord: null,
+  path: Object.freeze(['HostRoot']),
+  wrapperEligible: false,
+  queryCandidate: false,
+  publicObject: false
+});
+const privateTestInstanceHostComponentInspectionRecord = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-inspection-host-component',
+  kind: 'TestRendererCommittedFiberNodeInspection',
+  source: 'TestRendererCommittedFiberTreeInspection::host_component',
+  fiberTag: 'HostComponent',
+  index: 0,
+  parentRecord:
+    'react-test-renderer-private-test-instance-inspection-host-root',
+  childRecord: 'react-test-renderer-private-test-instance-inspection-host-text',
+  siblingRecord: null,
+  path: Object.freeze(['HostRoot', 'HostComponent']),
+  wrapperEligible: true,
+  queryCandidate: true,
+  elementTypeSource:
+    'TestRendererCommittedFiberNodeInspection::element_type',
+  propsSource: 'TestRendererCommittedFiberNodeInspection::memoized_props',
+  type: privateTestInstanceHostComponentType,
+  props: privateTestInstanceEmptyProps,
+  publicObject: false
+});
+const privateTestInstanceHostTextInspectionRecord = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-inspection-host-text',
+  kind: 'TestRendererCommittedFiberNodeInspection',
+  source: 'TestRendererCommittedFiberTreeInspection::host_text',
+  fiberTag: 'HostText',
+  index: 0,
+  parentRecord:
+    'react-test-renderer-private-test-instance-inspection-host-component',
+  childRecord: null,
+  siblingRecord: null,
+  path: Object.freeze(['HostRoot', 'HostComponent', 'HostText']),
+  wrapperEligible: false,
+  queryCandidate: false,
+  text: privateTestInstanceTextChildRecord.text,
+  skippedByQueryTraversal: true,
+  publicObject: false
+});
+const privateTestInstanceAcceptedInspectionRecords = Object.freeze([
+  privateTestInstanceHostRootInspectionRecord,
+  privateTestInstanceHostComponentInspectionRecord,
+  privateTestInstanceHostTextInspectionRecord
+]);
+const privateTestInstanceQueryPath = Object.freeze([
+  privateTestInstanceHostComponentInspectionRecord
+]);
+const privateTestInstanceSkippedQueryRecords = Object.freeze([
+  privateTestInstanceHostTextInspectionRecord
+]);
+const privateTestInstanceQueryTraversalMetadata = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-query-traversal-metadata',
+  source: 'ReactTestRenderer.js ReactTestInstance.findAll',
+  traversalOrder: 'self-then-descendants',
+  rootCandidateCount: 1,
+  acceptedCandidateCount: privateTestInstanceQueryPath.length,
+  skippedTextChildCount: privateTestInstanceSkippedQueryRecords.length,
+  textChildrenSkipped: true,
+  publicQueryMethodsAvailable: false,
+  predicateExecution: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false
+});
 const privateTestInstanceFiberInspectionMetadata = Object.freeze({
   acceptedWorker: 'worker-235-test-renderer-private-fiber-inspection',
   acceptedRustCrate: 'fast-react-reconciler',
   acceptedRustModule: 'private_fiber_inspection',
   acceptedRustApis: Object.freeze([
     'inspect_test_renderer_committed_fiber_tree',
+    'TestRendererCommittedFiberTreeInspection::host_root',
     'TestRendererCommittedFiberTreeInspection::host_component',
     'TestRendererCommittedFiberTreeInspection::host_text',
     'TestRendererCommittedFiberNodeInspection::element_type',
@@ -331,7 +409,7 @@ const privateTestInstanceTypeQueryRecord = Object.freeze({
   query: 'type',
   source: 'TestRendererCommittedFiberNodeInspection::element_type',
   fiberTag: 'HostComponent',
-  value: 'span',
+  value: privateTestInstanceHostComponentType,
   deterministic: true,
   publicQueryMethodAvailable: false
 });
@@ -358,6 +436,7 @@ const privateTestInstanceRootRecord = Object.freeze({
   kind: 'ReactTestInstancePrivateRecord',
   source: 'TestRendererCommittedFiberTreeInspection::host_component',
   fiberTag: 'HostComponent',
+  inspectionRecord: privateTestInstanceHostComponentInspectionRecord,
   publicObject: false,
   type: privateTestInstanceTypeQueryRecord.value,
   props: privateTestInstancePropsQueryRecord.value,
@@ -367,6 +446,137 @@ const privateTestInstanceRootRecord = Object.freeze({
     props: privateTestInstancePropsQueryRecord,
     children: privateTestInstanceChildrenQueryRecord
   })
+});
+const privateTestInstanceFindAllQueryRecord = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-find-all-query',
+  query: 'findAll',
+  publicSurface: 'ReactTestInstance.findAll',
+  status: 'private-query-metadata-ready-public-method-blocked',
+  source: 'ReactTestRenderer.js findAll(root, predicate, options)',
+  deterministic: true,
+  resultKind: 'array',
+  defaultDeep: true,
+  effectiveDeep: true,
+  predicateExecution: false,
+  expectedCanaryMatchCount: privateTestInstanceQueryPath.length,
+  candidateRecords: privateTestInstanceQueryPath,
+  skippedRecords: privateTestInstanceSkippedQueryRecords,
+  publicQueryMethodAvailable: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  compatibilityClaimed: false
+});
+const privateTestInstanceFindQueryRecord = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-find-query',
+  query: 'find',
+  publicSurface: 'ReactTestInstance.find',
+  status: 'private-query-metadata-ready-public-method-blocked',
+  source: 'ReactTestRenderer.js ReactTestInstance.find',
+  deterministic: true,
+  resultKind: 'single',
+  basedOn: privateTestInstanceFindAllQueryRecord.id,
+  expectOne: true,
+  effectiveDeep: false,
+  predicateExecution: false,
+  expectedCanaryMatchCount: privateTestInstanceQueryPath.length,
+  candidateRecords: privateTestInstanceQueryPath,
+  skippedRecords: privateTestInstanceSkippedQueryRecords,
+  publicQueryMethodAvailable: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  compatibilityClaimed: false
+});
+const privateTestInstanceFindAllByTypeQueryRecord = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-find-all-by-type-query',
+  query: 'findAllByType',
+  publicSurface: 'ReactTestInstance.findAllByType',
+  status: 'private-query-metadata-ready-public-method-blocked',
+  source: 'ReactTestRenderer.js ReactTestInstance.findAllByType',
+  deterministic: true,
+  resultKind: 'array',
+  defaultDeep: true,
+  effectiveDeep: true,
+  criteria: Object.freeze({
+    kind: 'type',
+    value: privateTestInstanceTypeQueryRecord.value
+  }),
+  expectedCanaryMatchCount: privateTestInstanceQueryPath.length,
+  candidateRecords: privateTestInstanceQueryPath,
+  skippedRecords: privateTestInstanceSkippedQueryRecords,
+  publicQueryMethodAvailable: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  compatibilityClaimed: false
+});
+const privateTestInstanceFindByTypeQueryRecord = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-find-by-type-query',
+  query: 'findByType',
+  publicSurface: 'ReactTestInstance.findByType',
+  status: 'private-query-metadata-ready-public-method-blocked',
+  source: 'ReactTestRenderer.js ReactTestInstance.findByType',
+  deterministic: true,
+  resultKind: 'single',
+  basedOn: privateTestInstanceFindAllByTypeQueryRecord.id,
+  expectOne: true,
+  effectiveDeep: false,
+  criteria: privateTestInstanceFindAllByTypeQueryRecord.criteria,
+  expectedCanaryMatchCount: privateTestInstanceQueryPath.length,
+  candidateRecords: privateTestInstanceQueryPath,
+  skippedRecords: privateTestInstanceSkippedQueryRecords,
+  publicQueryMethodAvailable: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  compatibilityClaimed: false
+});
+const privateTestInstanceFindAllByPropsQueryRecord = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-find-all-by-props-query',
+  query: 'findAllByProps',
+  publicSurface: 'ReactTestInstance.findAllByProps',
+  status: 'private-query-metadata-ready-public-method-blocked',
+  source: 'ReactTestRenderer.js ReactTestInstance.findAllByProps',
+  deterministic: true,
+  resultKind: 'array',
+  defaultDeep: true,
+  effectiveDeep: true,
+  criteria: Object.freeze({
+    kind: 'props',
+    value: privateTestInstancePropsQueryRecord.value
+  }),
+  expectedCanaryMatchCount: privateTestInstanceQueryPath.length,
+  candidateRecords: privateTestInstanceQueryPath,
+  skippedRecords: privateTestInstanceSkippedQueryRecords,
+  publicQueryMethodAvailable: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  compatibilityClaimed: false
+});
+const privateTestInstanceFindByPropsQueryRecord = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-find-by-props-query',
+  query: 'findByProps',
+  publicSurface: 'ReactTestInstance.findByProps',
+  status: 'private-query-metadata-ready-public-method-blocked',
+  source: 'ReactTestRenderer.js ReactTestInstance.findByProps',
+  deterministic: true,
+  resultKind: 'single',
+  basedOn: privateTestInstanceFindAllByPropsQueryRecord.id,
+  expectOne: true,
+  effectiveDeep: false,
+  criteria: privateTestInstanceFindAllByPropsQueryRecord.criteria,
+  expectedCanaryMatchCount: privateTestInstanceQueryPath.length,
+  candidateRecords: privateTestInstanceQueryPath,
+  skippedRecords: privateTestInstanceSkippedQueryRecords,
+  publicQueryMethodAvailable: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  compatibilityClaimed: false
+});
+const privateTestInstanceQueryMethodRecords = Object.freeze({
+  find: privateTestInstanceFindQueryRecord,
+  findAll: privateTestInstanceFindAllQueryRecord,
+  findByType: privateTestInstanceFindByTypeQueryRecord,
+  findAllByType: privateTestInstanceFindAllByTypeQueryRecord,
+  findByProps: privateTestInstanceFindByPropsQueryRecord,
+  findAllByProps: privateTestInstanceFindAllByPropsQueryRecord
 });
 const privateTestInstanceRootQueryRecord = Object.freeze({
   id: 'react-test-renderer-private-test-instance-root-query',
@@ -391,13 +601,17 @@ const privateTestInstanceWrapperSkeleton = Object.freeze({
   nativeExecution: false,
   compatibilityClaimed: false,
   fiberInspection: privateTestInstanceFiberInspectionMetadata,
+  acceptedInspectionRecords: privateTestInstanceAcceptedInspectionRecords,
+  queryTraversal: privateTestInstanceQueryTraversalMetadata,
+  queryPath: privateTestInstanceQueryPath,
   rootQueryRecord: privateTestInstanceRootQueryRecord,
   queryRecords: Object.freeze({
     root: privateTestInstanceRootQueryRecord,
     type: privateTestInstanceTypeQueryRecord,
     props: privateTestInstancePropsQueryRecord,
     children: privateTestInstanceChildrenQueryRecord
-  })
+  }),
+  queryMethodRecords: privateTestInstanceQueryMethodRecords
 });
 const privateRoutes = Object.freeze([
   updatePrivateRoute,
@@ -2089,7 +2303,7 @@ function createPlaceholderRenderer(routingGate, element, options, createRequest)
     toTree: createRendererUnsupportedFunction(
       'create().toTree',
       0,
-      'Fiber tree inspection is intentionally blocked until a committed-fiber inspection API exists.',
+      'Fiber tree inspection is intentionally blocked for the public API. The JS facade only records private TestInstance query metadata; it has no native bridge, public toTree serializer, or compatibility claim.',
       routingGate,
       undefined,
       () => createRequest
@@ -2142,7 +2356,7 @@ function createPlaceholderRenderer(routingGate, element, options, createRequest)
       throw createUnsupportedError(
         'create().root',
         'was accessed',
-        'TestInstance root access is intentionally blocked until committed fiber inspection is implemented.',
+        'TestInstance root access is intentionally blocked until public TestInstance routing is implemented.',
         routingGate,
         undefined,
         undefined,

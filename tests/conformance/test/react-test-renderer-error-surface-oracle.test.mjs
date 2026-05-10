@@ -200,6 +200,10 @@ test("React test renderer error surface local gate admits only private diagnosti
     gate.localChecks.privateRecordOnlyTestInstanceWrapperPresent,
     true
   );
+  assert.equal(
+    gate.localChecks.privateRecordOnlyTestInstanceQueryPathPresent,
+    true
+  );
   assert.equal(gate.localChecks.privateActQueueMetadataPresent, true);
   assert.equal(gate.localChecks.passiveEffectMetadataOnly, true);
   assert.equal(gate.localChecks.actFlushExecutionPresent, false);
