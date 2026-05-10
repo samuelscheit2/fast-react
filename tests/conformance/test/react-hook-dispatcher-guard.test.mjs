@@ -62,11 +62,31 @@ const effectRegistrationFieldNames = [
   "instance",
   "phase",
   "tag",
+  "create",
   "dependencies",
   "fiber_flags"
 ];
+const effectUpdateQueueRecordFieldNames = [
+  "update_index",
+  "fiber",
+  "hook_list",
+  "hook",
+  "previous_effect",
+  "effect",
+  "instance",
+  "phase",
+  "tag",
+  "create",
+  "destroy",
+  "previous_dependencies",
+  "dependencies",
+  "dependency_status"
+];
+const effectDependencyStatusNames = ["Changed", "Unchanged"];
+const hookRenderPhaseNames = ["Mount", "Update"];
 const passiveEffectMetadataFieldNames = [
   "fiber",
+  "render_phase",
   "hook_list",
   "effect_index",
   "effect",
@@ -196,14 +216,35 @@ test("effect hook private metadata names stay aligned to accepted effect records
     assert.equal(Object.isFrozen(metadata), true, hookName);
     assert.equal(metadata.hookName, hookName);
     assert.equal(metadata.compatibilityStatus, "blocked", hookName);
+    assert.equal(
+      metadata.effectDependencyStatusEnumName,
+      "FunctionComponentEffectDependencyStatus"
+    );
+    assert.deepEqual(
+      metadata.effectDependencyStatusNames,
+      effectDependencyStatusNames
+    );
     assert.equal(metadata.effectPhaseEnumName, "FunctionComponentEffectPhase");
     assert.equal(metadata.effectPhaseName, expected.effectPhaseName, hookName);
     assert.equal(metadata.effectRegistrationRecordName, "FunctionComponentEffectRegistration");
     assert.deepEqual(metadata.effectRegistrationFieldNames, effectRegistrationFieldNames);
+    assert.equal(
+      metadata.effectUpdateQueueRecordName,
+      "FunctionComponentEffectUpdateQueueRecord"
+    );
+    assert.deepEqual(
+      metadata.effectUpdateQueueRecordFieldNames,
+      effectUpdateQueueRecordFieldNames
+    );
     assert.equal(metadata.executesEffectCallback, false, hookName);
     assert.equal(metadata.fiberFlagsRecordName, "FiberFlags");
     assert.equal(metadata.hookEffectFlagsRecordName, "HookEffectFlags");
     assert.equal(metadata.hookEffectFlagName, expected.hookEffectFlagName, hookName);
+    assert.equal(
+      metadata.hookRenderPhaseEnumName,
+      "FunctionComponentHookRenderPhase"
+    );
+    assert.deepEqual(metadata.hookRenderPhaseNames, hookRenderPhaseNames);
     assert.deepEqual(metadata.mountFiberFlagNames, expected.mountFiberFlagNames);
     assert.equal(
       metadata.passiveEffectMetadataRecordName,
