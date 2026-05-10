@@ -18,6 +18,11 @@ use fast_react_core::{
 };
 use fast_react_host_config::{HostFiberTokenPhase, HostFiberTokenTarget, HostTypes};
 
+#[cfg(test)]
+use crate::complete_work::{
+    OffscreenRevealCommitMetadataRecord, OffscreenRevealCommitMetadataStatus,
+    OffscreenVisibilitySubtreeFlagBubblingIntent,
+};
 use crate::function_component::{
     FunctionComponentCommittedEffectQueue, FunctionComponentEffectDependencyPhase,
     FunctionComponentEffectDependencyStatus, FunctionComponentHookRenderPhase,
@@ -33,6 +38,8 @@ use crate::root_config::{
     PendingPassiveEffectOrder, PendingPassiveEffectPhase, PendingPassiveState,
     PendingPassiveUnmountOrigin, RootErrorOptionCallbackPhase, RootErrorOptionCallbackRecord,
 };
+#[cfg(test)]
+use crate::unsupported_features::OFFSCREEN_UNSUPPORTED_FEATURE;
 use crate::unsupported_features::unsupported_reconciler_feature_for_fiber_tag;
 use crate::{
     FiberRootId, FiberRootStore, FiberRootStoreError, HostFiberTokenId,
@@ -1146,6 +1153,582 @@ const HOST_ROOT_FINISHED_WORK_COMMIT_EXECUTION_BLOCKERS:
     HostRootFinishedWorkCommitExecutionBlockerForCanary::Hydration,
     HostRootFinishedWorkCommitExecutionBlockerForCanary::PublicCompatibilityClaim,
 ];
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct HostRootOffscreenRevealCommitHandoffRecordForCanary {
+    reveal_metadata: OffscreenRevealCommitMetadataRecord,
+    execution_request: HostRootOffscreenRevealCommitExecutionRequestForCanary,
+    finished_work_handoff: HostRootFinishedWorkCommitHandoffRecordForCanary,
+}
+
+#[cfg(test)]
+impl HostRootOffscreenRevealCommitHandoffRecordForCanary {
+    #[must_use]
+    pub(crate) const fn reveal_metadata(&self) -> &OffscreenRevealCommitMetadataRecord {
+        &self.reveal_metadata
+    }
+
+    #[must_use]
+    pub(crate) const fn execution_request(
+        &self,
+    ) -> &HostRootOffscreenRevealCommitExecutionRequestForCanary {
+        &self.execution_request
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work_handoff(
+        &self,
+    ) -> &HostRootFinishedWorkCommitHandoffRecordForCanary {
+        &self.finished_work_handoff
+    }
+
+    #[must_use]
+    pub(crate) const fn commit(&self) -> &HostRootCommitRecord {
+        self.finished_work_handoff.commit()
+    }
+
+    #[must_use]
+    pub(crate) const fn pending(&self) -> HostRootFinishedWorkPendingCommitRecordForCanary {
+        self.finished_work_handoff.pending()
+    }
+
+    #[must_use]
+    pub(crate) const fn commit_order(&self) -> usize {
+        self.finished_work_handoff.commit_order()
+    }
+
+    #[must_use]
+    pub(crate) const fn current_after_commit(&self) -> FiberId {
+        self.finished_work_handoff.current_after_commit()
+    }
+
+    #[must_use]
+    pub(crate) const fn consumed_finished_work_record(&self) -> bool {
+        self.finished_work_handoff.consumed_finished_work_record()
+    }
+
+    #[must_use]
+    pub(crate) fn complete_metadata_matches_commit(&self) -> bool {
+        self.execution_request.reveal_metadata() == self.reveal_metadata()
+            && self.commit().root() == self.execution_request.root()
+            && self.commit().finished_work() == self.execution_request.finished_work()
+            && self.commit().finished_lanes() == self.execution_request.render_lanes()
+    }
+
+    #[must_use]
+    pub(crate) fn visibility_commit_work_blocked(&self) -> bool {
+        self.execution_request.host_visibility_mutation_blocked()
+            && self.execution_request.passive_visibility_effects_blocked()
+            && self
+                .execution_request
+                .newly_visible_suspensey_commit_traversal_blocked()
+    }
+
+    #[must_use]
+    pub(crate) fn public_compatibility_blocked(&self) -> bool {
+        self.execution_request
+            .public_offscreen_compatibility_blocked()
+            && self
+                .execution_request
+                .public_activity_compatibility_blocked()
+            && self.execution_request.public_root_rendering_blocked()
+            && self.execution_request.public_compatibility_claim_blocked()
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct HostRootOffscreenRevealCommitExecutionRequestForCanary {
+    pending: HostRootFinishedWorkPendingCommitRecordForCanary,
+    reveal_metadata: OffscreenRevealCommitMetadataRecord,
+    request_order: usize,
+    status: HostRootOffscreenRevealCommitExecutionStatusForCanary,
+    blockers: [HostRootOffscreenRevealCommitExecutionBlockerForCanary; 7],
+    hidden_update_lane: Lane,
+    hidden_update_count: usize,
+    actual_child_flags: FiberFlags,
+    actual_child_subtree_flags: FiberFlags,
+}
+
+#[cfg(test)]
+impl HostRootOffscreenRevealCommitExecutionRequestForCanary {
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.pending.root
+    }
+
+    #[must_use]
+    pub(crate) const fn root_token(&self) -> StateNodeHandle {
+        self.pending.root_token
+    }
+
+    #[must_use]
+    pub(crate) const fn previous_current(&self) -> FiberId {
+        self.pending.previous_current
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(&self) -> FiberId {
+        self.pending.finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn render_lanes(&self) -> Lanes {
+        self.pending.render_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_lanes_before_commit(&self) -> Lanes {
+        self.pending.pending_lanes_before_commit
+    }
+
+    #[must_use]
+    pub(crate) const fn source_handoff_order(&self) -> usize {
+        self.pending.handoff_order
+    }
+
+    #[must_use]
+    pub(crate) const fn request_order(&self) -> usize {
+        self.request_order
+    }
+
+    #[must_use]
+    pub(crate) const fn hidden_update_lane(&self) -> Lane {
+        self.hidden_update_lane
+    }
+
+    #[must_use]
+    pub(crate) const fn hidden_update_count(&self) -> usize {
+        self.hidden_update_count
+    }
+
+    #[must_use]
+    pub(crate) const fn reveal_metadata(&self) -> &OffscreenRevealCommitMetadataRecord {
+        &self.reveal_metadata
+    }
+
+    #[must_use]
+    pub(crate) const fn offscreen(&self) -> FiberId {
+        self.reveal_metadata.offscreen()
+    }
+
+    #[must_use]
+    pub(crate) const fn child(&self) -> FiberId {
+        self.reveal_metadata.child()
+    }
+
+    #[must_use]
+    pub(crate) const fn child_tag(&self) -> FiberTag {
+        self.reveal_metadata.child_tag()
+    }
+
+    #[must_use]
+    pub(crate) const fn committed_lanes(&self) -> Lanes {
+        self.reveal_metadata.committed_lanes()
+    }
+
+    #[must_use]
+    pub(crate) const fn actual_child_flags(&self) -> FiberFlags {
+        self.actual_child_flags
+    }
+
+    #[must_use]
+    pub(crate) const fn actual_child_subtree_flags(&self) -> FiberFlags {
+        self.actual_child_subtree_flags
+    }
+
+    #[must_use]
+    pub(crate) const fn actual_candidate_subtree_flags(&self) -> FiberFlags {
+        self.actual_child_flags
+            .merge(self.actual_child_subtree_flags)
+    }
+
+    #[must_use]
+    pub(crate) const fn status(&self) -> HostRootOffscreenRevealCommitExecutionStatusForCanary {
+        self.status
+    }
+
+    #[must_use]
+    pub(crate) const fn execution_requested(&self) -> bool {
+        matches!(
+            self.status,
+            HostRootOffscreenRevealCommitExecutionStatusForCanary::ValidatedForCommitHandoff
+        )
+    }
+
+    #[must_use]
+    pub(crate) fn blockers(&self) -> &[HostRootOffscreenRevealCommitExecutionBlockerForCanary; 7] {
+        &self.blockers
+    }
+
+    #[must_use]
+    pub(crate) fn committed_lanes_match_render(&self) -> bool {
+        self.committed_lanes() == self.render_lanes()
+    }
+
+    #[must_use]
+    pub(crate) fn offscreen_lane_metadata_recorded(&self) -> bool {
+        self.hidden_update_count > 0
+            && self.render_lanes().contains_lane(Lane::OFFSCREEN)
+            && self
+                .reveal_metadata
+                .transition()
+                .records_offscreen_lane_participation()
+    }
+
+    #[must_use]
+    pub(crate) fn hidden_to_visible_reveal(&self) -> bool {
+        self.reveal_metadata
+            .transition()
+            .is_hidden_to_visible_reveal()
+    }
+
+    #[must_use]
+    pub(crate) const fn host_visibility_mutation_blocked(&self) -> bool {
+        self.reveal_metadata.host_visibility_mutation_blocked()
+    }
+
+    #[must_use]
+    pub(crate) const fn passive_visibility_effects_blocked(&self) -> bool {
+        self.reveal_metadata.passive_visibility_effects_blocked()
+    }
+
+    #[must_use]
+    pub(crate) const fn newly_visible_suspensey_commit_traversal_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn would_accumulate_newly_visible_suspensey_commit(&self) -> bool {
+        self.reveal_metadata
+            .would_accumulate_newly_visible_suspensey_commit()
+    }
+
+    #[must_use]
+    pub(crate) const fn public_offscreen_compatibility_blocked(&self) -> bool {
+        self.reveal_metadata.public_compatibility_blocked()
+    }
+
+    #[must_use]
+    pub(crate) const fn public_activity_compatibility_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_rendering_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_compatibility_claim_blocked(&self) -> bool {
+        true
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum HostRootOffscreenRevealCommitExecutionStatusForCanary {
+    ValidatedForCommitHandoff,
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum HostRootOffscreenRevealCommitExecutionBlockerForCanary {
+    HostVisibilityMutation,
+    PassiveVisibilityEffects,
+    NewlyVisibleSuspenseyCommitTraversal,
+    PublicOffscreenCompatibility,
+    PublicActivityCompatibility,
+    PublicRootRendering,
+    PublicCompatibilityClaim,
+}
+
+#[cfg(test)]
+const HOST_ROOT_OFFSCREEN_REVEAL_COMMIT_EXECUTION_BLOCKERS:
+    [HostRootOffscreenRevealCommitExecutionBlockerForCanary; 7] = [
+    HostRootOffscreenRevealCommitExecutionBlockerForCanary::HostVisibilityMutation,
+    HostRootOffscreenRevealCommitExecutionBlockerForCanary::PassiveVisibilityEffects,
+    HostRootOffscreenRevealCommitExecutionBlockerForCanary::NewlyVisibleSuspenseyCommitTraversal,
+    HostRootOffscreenRevealCommitExecutionBlockerForCanary::PublicOffscreenCompatibility,
+    HostRootOffscreenRevealCommitExecutionBlockerForCanary::PublicActivityCompatibility,
+    HostRootOffscreenRevealCommitExecutionBlockerForCanary::PublicRootRendering,
+    HostRootOffscreenRevealCommitExecutionBlockerForCanary::PublicCompatibilityClaim,
+];
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum HostRootOffscreenRevealCommitHandoffErrorForCanary {
+    FinishedWork(HostRootFinishedWorkCommitHandoffErrorForCanary),
+    FiberTopology(FiberTopologyError),
+    RevealCommitLanesMismatch {
+        root: FiberRootId,
+        expected_render_lanes: Lanes,
+        expected_finished_lanes: Lanes,
+        actual_committed_lanes: Lanes,
+    },
+    OffscreenLaneMetadataMissing {
+        root: FiberRootId,
+        pending_lanes_before_commit: Lanes,
+        render_lanes: Lanes,
+    },
+    ExpectedHostRootOffscreenChild {
+        root: FiberRootId,
+        finished_work: FiberId,
+        expected_offscreen: FiberId,
+        actual_child: Option<FiberId>,
+        actual_tag: Option<FiberTag>,
+    },
+    ExpectedOffscreenFiber {
+        offscreen: FiberId,
+        tag: FiberTag,
+    },
+    ExpectedRevealChild {
+        offscreen: FiberId,
+        expected_child: FiberId,
+        actual_child: Option<FiberId>,
+        actual_tag: Option<FiberTag>,
+    },
+    RevealChildTagMismatch {
+        child: FiberId,
+        expected_tag: FiberTag,
+        actual_tag: FiberTag,
+    },
+    RevealChildParentMismatch {
+        offscreen: FiberId,
+        child: FiberId,
+        actual_parent: Option<FiberId>,
+    },
+    UnexpectedRevealChildSibling {
+        offscreen: FiberId,
+        child: FiberId,
+        sibling: FiberId,
+        sibling_tag: FiberTag,
+    },
+    StaleRevealTransition {
+        offscreen: FiberId,
+        transition_offscreen: FiberId,
+        expected_render_lanes: Lanes,
+        actual_transition_lanes: Lanes,
+    },
+    StaleRevealChildFlags {
+        offscreen: FiberId,
+        child: FiberId,
+        expected_candidate_subtree_flags: FiberFlags,
+        actual_candidate_subtree_flags: FiberFlags,
+    },
+    UnsupportedRevealMetadata {
+        root: FiberRootId,
+        offscreen: FiberId,
+        status: OffscreenRevealCommitMetadataStatus,
+        intent: OffscreenVisibilitySubtreeFlagBubblingIntent,
+        feature: &'static str,
+        visibility_effect_required: bool,
+        visibility_flag_set: bool,
+    },
+    RevealCommitBlockerMissing {
+        root: FiberRootId,
+        offscreen: FiberId,
+        blocker: HostRootOffscreenRevealCommitExecutionBlockerForCanary,
+    },
+}
+
+#[cfg(test)]
+impl Display for HostRootOffscreenRevealCommitHandoffErrorForCanary {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::FinishedWork(error) => Display::fmt(error, formatter),
+            Self::FiberTopology(error) => Display::fmt(error, formatter),
+            Self::RevealCommitLanesMismatch {
+                root,
+                expected_render_lanes,
+                expected_finished_lanes,
+                actual_committed_lanes,
+            } => write!(
+                formatter,
+                "root {} Offscreen reveal commit metadata lanes {:?} do not match render {:?} and finished {:?}",
+                root.raw(),
+                actual_committed_lanes,
+                expected_render_lanes,
+                expected_finished_lanes
+            ),
+            Self::OffscreenLaneMetadataMissing {
+                root,
+                pending_lanes_before_commit,
+                render_lanes,
+            } => write!(
+                formatter,
+                "root {} Offscreen reveal commit handoff requires retained Offscreen lane metadata before commit; pending {:?}, render {:?}",
+                root.raw(),
+                pending_lanes_before_commit,
+                render_lanes
+            ),
+            Self::ExpectedHostRootOffscreenChild {
+                root,
+                finished_work,
+                expected_offscreen,
+                actual_child,
+                actual_tag,
+            } => write!(
+                formatter,
+                "root {} finished work fiber slot {} expected Offscreen child slot {}, found {:?} ({:?})",
+                root.raw(),
+                finished_work.slot().get(),
+                expected_offscreen.slot().get(),
+                actual_child.map(|fiber| fiber.slot().get()),
+                actual_tag
+            ),
+            Self::ExpectedOffscreenFiber { offscreen, tag } => write!(
+                formatter,
+                "Offscreen reveal commit metadata expected fiber slot {} to be Offscreen, found {:?}",
+                offscreen.slot().get(),
+                tag
+            ),
+            Self::ExpectedRevealChild {
+                offscreen,
+                expected_child,
+                actual_child,
+                actual_tag,
+            } => write!(
+                formatter,
+                "Offscreen fiber slot {} expected reveal child slot {}, found {:?} ({:?})",
+                offscreen.slot().get(),
+                expected_child.slot().get(),
+                actual_child.map(|fiber| fiber.slot().get()),
+                actual_tag
+            ),
+            Self::RevealChildTagMismatch {
+                child,
+                expected_tag,
+                actual_tag,
+            } => write!(
+                formatter,
+                "Offscreen reveal child slot {} expected {:?}, found {:?}",
+                child.slot().get(),
+                expected_tag,
+                actual_tag
+            ),
+            Self::RevealChildParentMismatch {
+                offscreen,
+                child,
+                actual_parent,
+            } => write!(
+                formatter,
+                "Offscreen reveal child slot {} expected parent slot {}, found {:?}",
+                child.slot().get(),
+                offscreen.slot().get(),
+                actual_parent.map(|fiber| fiber.slot().get())
+            ),
+            Self::UnexpectedRevealChildSibling {
+                offscreen,
+                child,
+                sibling,
+                sibling_tag,
+            } => write!(
+                formatter,
+                "Offscreen fiber slot {} reveal child slot {} must have no sibling for private commit handoff, found slot {} ({:?})",
+                offscreen.slot().get(),
+                child.slot().get(),
+                sibling.slot().get(),
+                sibling_tag
+            ),
+            Self::StaleRevealTransition {
+                offscreen,
+                transition_offscreen,
+                expected_render_lanes,
+                actual_transition_lanes,
+            } => write!(
+                formatter,
+                "Offscreen reveal commit metadata for slot {} has stale transition for slot {} or lanes {:?}/{:?}",
+                offscreen.slot().get(),
+                transition_offscreen.slot().get(),
+                actual_transition_lanes,
+                expected_render_lanes
+            ),
+            Self::StaleRevealChildFlags {
+                offscreen,
+                child,
+                expected_candidate_subtree_flags,
+                actual_candidate_subtree_flags,
+            } => write!(
+                formatter,
+                "Offscreen reveal commit metadata for slot {} child slot {} has stale candidate subtree flags {:?}/{:?}",
+                offscreen.slot().get(),
+                child.slot().get(),
+                actual_candidate_subtree_flags,
+                expected_candidate_subtree_flags
+            ),
+            Self::UnsupportedRevealMetadata {
+                root,
+                offscreen,
+                status,
+                intent,
+                feature,
+                visibility_effect_required,
+                visibility_flag_set,
+            } => write!(
+                formatter,
+                "root {} Offscreen reveal metadata for slot {} is not the private hidden-to-visible handoff shape: status {}, intent {}, feature {}, visibility_required {}, visibility_flag_set {}",
+                root.raw(),
+                offscreen.slot().get(),
+                status.as_str(),
+                intent.as_str(),
+                feature,
+                visibility_effect_required,
+                visibility_flag_set
+            ),
+            Self::RevealCommitBlockerMissing {
+                root,
+                offscreen,
+                blocker,
+            } => write!(
+                formatter,
+                "root {} Offscreen reveal commit handoff for slot {} is missing {:?} blocker",
+                root.raw(),
+                offscreen.slot().get(),
+                blocker
+            ),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Error for HostRootOffscreenRevealCommitHandoffErrorForCanary {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::FinishedWork(error) => Some(error),
+            Self::FiberTopology(error) => Some(error),
+            Self::RevealCommitLanesMismatch { .. }
+            | Self::OffscreenLaneMetadataMissing { .. }
+            | Self::ExpectedHostRootOffscreenChild { .. }
+            | Self::ExpectedOffscreenFiber { .. }
+            | Self::ExpectedRevealChild { .. }
+            | Self::RevealChildTagMismatch { .. }
+            | Self::RevealChildParentMismatch { .. }
+            | Self::UnexpectedRevealChildSibling { .. }
+            | Self::StaleRevealTransition { .. }
+            | Self::StaleRevealChildFlags { .. }
+            | Self::UnsupportedRevealMetadata { .. }
+            | Self::RevealCommitBlockerMissing { .. } => None,
+        }
+    }
+}
+
+#[cfg(test)]
+impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
+    for HostRootOffscreenRevealCommitHandoffErrorForCanary
+{
+    fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
+        Self::FinishedWork(error)
+    }
+}
+
+#[cfg(test)]
+impl From<FiberTopologyError> for HostRootOffscreenRevealCommitHandoffErrorForCanary {
+    fn from(error: FiberTopologyError) -> Self {
+        Self::FiberTopology(error)
+    }
+}
 
 #[cfg(test)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -6728,6 +7311,273 @@ pub(crate) fn commit_finished_host_root_with_finished_work_handoff_for_canary<H:
         finished_work_after_commit: root.finished_work(),
         finished_lanes_after_commit: root.finished_lanes(),
         render_phase_work_after_commit: root.scheduling().work_in_progress(),
+    })
+}
+
+#[cfg(test)]
+pub(crate) fn commit_offscreen_reveal_complete_metadata_handoff_for_canary<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    render: HostRootRenderPhaseRecord,
+    pending: Option<HostRootFinishedWorkPendingCommitRecordForCanary>,
+    reveal_metadata: OffscreenRevealCommitMetadataRecord,
+    commit_order: usize,
+) -> Result<
+    HostRootOffscreenRevealCommitHandoffRecordForCanary,
+    HostRootOffscreenRevealCommitHandoffErrorForCanary,
+> {
+    let Some(pending) = pending else {
+        return Err(
+            HostRootFinishedWorkCommitHandoffErrorForCanary::MissingFinishedWorkRecord {
+                root: render.root(),
+                finished_work: render.finished_work(),
+            }
+            .into(),
+        );
+    };
+
+    validate_host_root_finished_work_pending_commit_for_canary(store, render, pending)?;
+    let execution_request = validate_offscreen_reveal_commit_metadata_for_canary(
+        store,
+        render,
+        pending,
+        &reveal_metadata,
+        commit_order,
+    )?;
+    let finished_work_handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
+        store,
+        render,
+        Some(pending),
+        commit_order,
+    )?;
+
+    Ok(HostRootOffscreenRevealCommitHandoffRecordForCanary {
+        reveal_metadata,
+        execution_request,
+        finished_work_handoff,
+    })
+}
+
+#[cfg(test)]
+fn validate_offscreen_reveal_commit_metadata_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    render: HostRootRenderPhaseRecord,
+    pending: HostRootFinishedWorkPendingCommitRecordForCanary,
+    reveal_metadata: &OffscreenRevealCommitMetadataRecord,
+    request_order: usize,
+) -> Result<
+    HostRootOffscreenRevealCommitExecutionRequestForCanary,
+    HostRootOffscreenRevealCommitHandoffErrorForCanary,
+> {
+    let root = render.root();
+    let expected_lanes = render.render_lanes();
+    if reveal_metadata.committed_lanes() != expected_lanes
+        || reveal_metadata.committed_lanes() != pending.finished_lanes()
+    {
+        return Err(
+            HostRootOffscreenRevealCommitHandoffErrorForCanary::RevealCommitLanesMismatch {
+                root,
+                expected_render_lanes: expected_lanes,
+                expected_finished_lanes: pending.finished_lanes(),
+                actual_committed_lanes: reveal_metadata.committed_lanes(),
+            },
+        );
+    }
+
+    let hidden_update_lane = expected_lanes
+        .remove_lane(Lane::OFFSCREEN)
+        .highest_priority_lane();
+    let hidden_update_count = store
+        .root(root)
+        .map_err(RootCommitError::from)
+        .map_err(HostRootFinishedWorkCommitHandoffErrorForCanary::from)?
+        .lanes()
+        .hidden_update_count(hidden_update_lane)
+        .unwrap_or_default();
+    if hidden_update_lane.is_empty()
+        || hidden_update_count == 0
+        || !expected_lanes.contains_lane(Lane::OFFSCREEN)
+        || !reveal_metadata
+            .transition()
+            .records_offscreen_lane_participation()
+    {
+        return Err(
+            HostRootOffscreenRevealCommitHandoffErrorForCanary::OffscreenLaneMetadataMissing {
+                root,
+                pending_lanes_before_commit: pending.pending_lanes_before_commit(),
+                render_lanes: expected_lanes,
+            },
+        );
+    }
+
+    let arena = store.fiber_arena();
+    let finished_work = render.finished_work();
+    let finished_node = arena.get(finished_work)?;
+    let actual_root_child = finished_node.child();
+    let actual_root_child_tag = actual_root_child
+        .map(|child| arena.get(child).map(|node| node.tag()))
+        .transpose()?;
+    if actual_root_child != Some(reveal_metadata.offscreen()) {
+        return Err(
+            HostRootOffscreenRevealCommitHandoffErrorForCanary::ExpectedHostRootOffscreenChild {
+                root,
+                finished_work,
+                expected_offscreen: reveal_metadata.offscreen(),
+                actual_child: actual_root_child,
+                actual_tag: actual_root_child_tag,
+            },
+        );
+    }
+
+    let offscreen_node = arena.get(reveal_metadata.offscreen())?;
+    if offscreen_node.tag() != FiberTag::Offscreen {
+        return Err(
+            HostRootOffscreenRevealCommitHandoffErrorForCanary::ExpectedOffscreenFiber {
+                offscreen: reveal_metadata.offscreen(),
+                tag: offscreen_node.tag(),
+            },
+        );
+    }
+
+    let actual_reveal_child = offscreen_node.child();
+    let actual_reveal_child_tag = actual_reveal_child
+        .map(|child| arena.get(child).map(|node| node.tag()))
+        .transpose()?;
+    if actual_reveal_child != Some(reveal_metadata.child()) {
+        return Err(
+            HostRootOffscreenRevealCommitHandoffErrorForCanary::ExpectedRevealChild {
+                offscreen: reveal_metadata.offscreen(),
+                expected_child: reveal_metadata.child(),
+                actual_child: actual_reveal_child,
+                actual_tag: actual_reveal_child_tag,
+            },
+        );
+    }
+
+    let child_node = arena.get(reveal_metadata.child())?;
+    if child_node.tag() != reveal_metadata.child_tag() {
+        return Err(
+            HostRootOffscreenRevealCommitHandoffErrorForCanary::RevealChildTagMismatch {
+                child: reveal_metadata.child(),
+                expected_tag: reveal_metadata.child_tag(),
+                actual_tag: child_node.tag(),
+            },
+        );
+    }
+    if child_node.return_fiber() != Some(reveal_metadata.offscreen()) {
+        return Err(
+            HostRootOffscreenRevealCommitHandoffErrorForCanary::RevealChildParentMismatch {
+                offscreen: reveal_metadata.offscreen(),
+                child: reveal_metadata.child(),
+                actual_parent: child_node.return_fiber(),
+            },
+        );
+    }
+    if let Some(sibling) = child_node.sibling() {
+        return Err(
+            HostRootOffscreenRevealCommitHandoffErrorForCanary::UnexpectedRevealChildSibling {
+                offscreen: reveal_metadata.offscreen(),
+                child: reveal_metadata.child(),
+                sibling,
+                sibling_tag: arena.get(sibling)?.tag(),
+            },
+        );
+    }
+
+    let transition = reveal_metadata.transition();
+    if transition.work_in_progress() != reveal_metadata.offscreen()
+        || transition.render_lanes() != expected_lanes
+        || !transition.is_hidden_to_visible_reveal()
+    {
+        return Err(
+            HostRootOffscreenRevealCommitHandoffErrorForCanary::StaleRevealTransition {
+                offscreen: reveal_metadata.offscreen(),
+                transition_offscreen: transition.work_in_progress(),
+                expected_render_lanes: expected_lanes,
+                actual_transition_lanes: transition.render_lanes(),
+            },
+        );
+    }
+
+    let actual_candidate_subtree_flags = child_node.flags() | child_node.subtree_flags();
+    let actual_child_may_suspend_commit =
+        actual_candidate_subtree_flags.contains_any(FiberFlags::MAY_SUSPEND_COMMIT);
+    if actual_candidate_subtree_flags != reveal_metadata.candidate_subtree_flags()
+        || actual_child_may_suspend_commit != reveal_metadata.child_may_suspend_commit()
+        || reveal_metadata.would_accumulate_newly_visible_suspensey_commit()
+            != reveal_metadata.child_may_suspend_commit()
+    {
+        return Err(
+            HostRootOffscreenRevealCommitHandoffErrorForCanary::StaleRevealChildFlags {
+                offscreen: reveal_metadata.offscreen(),
+                child: reveal_metadata.child(),
+                expected_candidate_subtree_flags: reveal_metadata.candidate_subtree_flags(),
+                actual_candidate_subtree_flags,
+            },
+        );
+    }
+
+    if reveal_metadata.status()
+        != OffscreenRevealCommitMetadataStatus::AcceptedHiddenToVisibleReveal
+        || reveal_metadata.subtree_flag_bubbling_intent()
+            != OffscreenVisibilitySubtreeFlagBubblingIntent::BubbleVisibleSubtree
+        || reveal_metadata.feature() != OFFSCREEN_UNSUPPORTED_FEATURE
+        || !reveal_metadata.visibility_effect_required()
+        || reveal_metadata.visibility_flag_set()
+    {
+        return Err(
+            HostRootOffscreenRevealCommitHandoffErrorForCanary::UnsupportedRevealMetadata {
+                root,
+                offscreen: reveal_metadata.offscreen(),
+                status: reveal_metadata.status(),
+                intent: reveal_metadata.subtree_flag_bubbling_intent(),
+                feature: reveal_metadata.feature(),
+                visibility_effect_required: reveal_metadata.visibility_effect_required(),
+                visibility_flag_set: reveal_metadata.visibility_flag_set(),
+            },
+        );
+    }
+
+    if !reveal_metadata.host_visibility_mutation_blocked() {
+        return Err(
+            HostRootOffscreenRevealCommitHandoffErrorForCanary::RevealCommitBlockerMissing {
+                root,
+                offscreen: reveal_metadata.offscreen(),
+                blocker:
+                    HostRootOffscreenRevealCommitExecutionBlockerForCanary::HostVisibilityMutation,
+            },
+        );
+    }
+    if !reveal_metadata.passive_visibility_effects_blocked() {
+        return Err(
+            HostRootOffscreenRevealCommitHandoffErrorForCanary::RevealCommitBlockerMissing {
+                root,
+                offscreen: reveal_metadata.offscreen(),
+                blocker:
+                    HostRootOffscreenRevealCommitExecutionBlockerForCanary::PassiveVisibilityEffects,
+            },
+        );
+    }
+    if !reveal_metadata.public_compatibility_blocked() {
+        return Err(
+            HostRootOffscreenRevealCommitHandoffErrorForCanary::RevealCommitBlockerMissing {
+                root,
+                offscreen: reveal_metadata.offscreen(),
+                blocker:
+                    HostRootOffscreenRevealCommitExecutionBlockerForCanary::PublicOffscreenCompatibility,
+            },
+        );
+    }
+
+    Ok(HostRootOffscreenRevealCommitExecutionRequestForCanary {
+        pending,
+        reveal_metadata: reveal_metadata.clone(),
+        request_order,
+        status: HostRootOffscreenRevealCommitExecutionStatusForCanary::ValidatedForCommitHandoff,
+        blockers: HOST_ROOT_OFFSCREEN_REVEAL_COMMIT_EXECUTION_BLOCKERS,
+        hidden_update_lane,
+        hidden_update_count,
+        actual_child_flags: child_node.flags(),
+        actual_child_subtree_flags: child_node.subtree_flags(),
     })
 }
 
@@ -12477,6 +13327,11 @@ fn validate_finished_host_root<H: HostTypes>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::begin_work::{BeginWorkRequest, unsupported_offscreen_begin_work_record};
+    use crate::complete_work::{
+        complete_offscreen_visibility_transition_blocker_for_test,
+        offscreen_reveal_commit_metadata_for_test,
+    };
     use crate::function_component::{
         FunctionComponentEffectDependencyPhase, FunctionComponentEffectDependencyStatus,
         FunctionComponentEffectPhase, FunctionComponentEffectRegistration,
@@ -12503,14 +13358,14 @@ mod tests {
     };
     use crate::{
         RootElementHandle, RootOptions, RootTaskScheduleOutcome, RootUpdateCallbackHandle,
-        RootUpdateCallbackRecord, RootUpdateCallbackVisibility, ensure_root_is_scheduled,
+        RootUpdateCallbackRecord, RootUpdateCallbackVisibility, UpdateId, ensure_root_is_scheduled,
         process_root_schedule_in_microtask, render_host_root_for_lanes,
         render_host_root_via_scheduler_callback, update_container,
     };
     use fast_react_core::{
         DeletionListId, DependenciesHandle, FiberFlags, FiberMode, FiberTag, FiberTypeHandle,
         HookEffectCallbackHandle, HookEffectDependencies, HookEffectFlags, Lane, Lanes,
-        PropsHandle, RefHandle, StateNodeHandle,
+        PropsHandle, ReactKey, RefHandle, StateHandle, StateNodeHandle,
     };
     use fast_react_host_config::HostFiberTokenViolation;
 
@@ -12521,6 +13376,134 @@ mod tests {
             .create_client_root(FakeContainer::new(1), RootOptions::new())
             .unwrap();
         (store, root_id, host)
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    struct OffscreenRevealCommitFixture {
+        render: HostRootRenderPhaseRecord,
+        pending: HostRootFinishedWorkPendingCommitRecordForCanary,
+        reveal_metadata: OffscreenRevealCommitMetadataRecord,
+        previous_offscreen: FiberId,
+        offscreen: FiberId,
+        child: FiberId,
+        hidden_update: UpdateId,
+    }
+
+    fn prepare_offscreen_reveal_commit_fixture(
+        store: &mut FiberRootStore<RecordingHost>,
+        root: FiberRootId,
+        element: RootElementHandle,
+        retain_offscreen_lane: bool,
+        reveal_committed_lanes: Lanes,
+        child_tag: FiberTag,
+    ) -> OffscreenRevealCommitFixture {
+        let hidden_update = update_container(
+            store,
+            root,
+            element,
+            Some(RootUpdateCallbackHandle::from_raw(element.raw() + 10_000)),
+        )
+        .unwrap();
+        if retain_offscreen_lane {
+            store
+                .update_queues_mut()
+                .mark_update_hidden(hidden_update.update())
+                .unwrap();
+            store
+                .root_mut(root)
+                .unwrap()
+                .lanes_mut()
+                .mark_hidden_update(hidden_update.lane())
+                .unwrap();
+        }
+
+        let render_lanes = Lanes::DEFAULT.merge_lane(Lane::OFFSCREEN);
+        let render = render_host_root_for_lanes(store, root, render_lanes).unwrap();
+        let (previous_offscreen, offscreen, child) =
+            attach_offscreen_reveal_commit_child(store, render.finished_work(), child_tag);
+        let begin_work = unsupported_offscreen_begin_work_record(
+            store.fiber_arena(),
+            BeginWorkRequest::new(offscreen, render_lanes),
+        )
+        .unwrap();
+        let complete_work = complete_offscreen_visibility_transition_blocker_for_test(
+            store.fiber_arena(),
+            offscreen,
+            &begin_work,
+            render_lanes,
+        )
+        .unwrap();
+        let reveal_metadata =
+            offscreen_reveal_commit_metadata_for_test(&complete_work, reveal_committed_lanes)
+                .unwrap();
+        let pending =
+            record_host_root_finished_work_pending_commit_for_canary(store, render, 1).unwrap();
+
+        OffscreenRevealCommitFixture {
+            render,
+            pending,
+            reveal_metadata,
+            previous_offscreen,
+            offscreen,
+            child,
+            hidden_update: hidden_update.update(),
+        }
+    }
+
+    fn attach_offscreen_reveal_commit_child(
+        store: &mut FiberRootStore<RecordingHost>,
+        host_root_work_in_progress: FiberId,
+        child_tag: FiberTag,
+    ) -> (FiberId, FiberId, FiberId) {
+        let previous = store.fiber_arena_mut().create_fiber(
+            FiberTag::Offscreen,
+            Some(ReactKey::from_normalized("commit-reveal")),
+            PropsHandle::from_raw(8_600),
+            FiberMode::CONCURRENT,
+        );
+        {
+            let node = store.fiber_arena_mut().get_mut(previous).unwrap();
+            node.set_memoized_state(StateHandle::from_raw(8_601));
+            node.set_lanes(Lanes::OFFSCREEN);
+            node.set_child_lanes(Lanes::from(Lane::RETRY_1));
+            node.set_state_node(StateNodeHandle::from_raw(8_602));
+        }
+
+        let offscreen = store
+            .fiber_arena_mut()
+            .create_work_in_progress(previous, PropsHandle::from_raw(8_603))
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(offscreen).unwrap();
+            node.set_memoized_props(PropsHandle::from_raw(8_604));
+            node.set_memoized_state(StateHandle::NONE);
+            node.set_lanes(Lanes::DEFAULT);
+            node.set_child_lanes(Lanes::from(Lane::TRANSITION_1));
+            node.set_state_node(StateNodeHandle::from_raw(8_605));
+        }
+
+        let child = store.fiber_arena_mut().create_fiber(
+            child_tag,
+            None,
+            PropsHandle::from_raw(8_606),
+            FiberMode::NO,
+        );
+        {
+            let node = store.fiber_arena_mut().get_mut(child).unwrap();
+            node.merge_flags(FiberFlags::PLACEMENT | FiberFlags::MAY_SUSPEND_COMMIT);
+            node.set_state_node(StateNodeHandle::from_raw(8_607));
+        }
+
+        store
+            .fiber_arena_mut()
+            .set_children(offscreen, &[child])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root_work_in_progress, &[offscreen])
+            .unwrap();
+
+        (previous, offscreen, child)
     }
 
     fn host_root_element(
@@ -18733,6 +19716,246 @@ mod tests {
         assert!(handoff.public_root_rendering_blocked());
         assert!(handoff.effects_refs_and_hydration_blocked());
         assert!(handoff.proves_private_finished_work_commit_execution());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_offscreen_reveal_complete_metadata_handoff_records_private_commit_proof() {
+        let (mut store, root_id, host) = root_store();
+        let fixture = prepare_offscreen_reveal_commit_fixture(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(8_610),
+            true,
+            Lanes::DEFAULT.merge_lane(Lane::OFFSCREEN),
+            FiberTag::HostComponent,
+        );
+
+        let handoff = commit_offscreen_reveal_complete_metadata_handoff_for_canary(
+            &mut store,
+            fixture.render,
+            Some(fixture.pending),
+            fixture.reveal_metadata.clone(),
+            2,
+        )
+        .unwrap();
+
+        assert_eq!(handoff.pending(), fixture.pending);
+        assert_eq!(handoff.reveal_metadata(), &fixture.reveal_metadata);
+        assert_eq!(handoff.commit_order(), 2);
+        assert_eq!(handoff.finished_work_handoff().commit_order(), 2);
+        assert_eq!(
+            handoff.current_after_commit(),
+            fixture.render.finished_work()
+        );
+        assert!(handoff.consumed_finished_work_record());
+        assert!(handoff.complete_metadata_matches_commit());
+        assert!(handoff.visibility_commit_work_blocked());
+        assert!(handoff.public_compatibility_blocked());
+        assert_eq!(handoff.commit().root(), root_id);
+        assert_eq!(
+            handoff.commit().previous_current(),
+            fixture.render.current()
+        );
+        assert_eq!(
+            handoff.commit().finished_work(),
+            fixture.render.finished_work()
+        );
+        assert_eq!(
+            handoff.commit().finished_lanes(),
+            Lanes::DEFAULT.merge_lane(Lane::OFFSCREEN)
+        );
+        assert!(handoff.commit().mutation_log().is_empty());
+        assert!(handoff.commit().mutation_apply_log().is_empty());
+
+        let request = handoff.execution_request();
+        assert_eq!(request.root(), root_id);
+        assert_eq!(request.root_token(), root_id.state_node_handle());
+        assert_eq!(request.previous_current(), fixture.render.current());
+        assert_eq!(request.finished_work(), fixture.render.finished_work());
+        assert_eq!(
+            request.render_lanes(),
+            Lanes::DEFAULT.merge_lane(Lane::OFFSCREEN)
+        );
+        assert_eq!(request.pending_lanes_before_commit(), Lanes::DEFAULT);
+        assert_eq!(request.source_handoff_order(), 1);
+        assert_eq!(request.request_order(), 2);
+        assert_eq!(request.hidden_update_lane(), Lane::DEFAULT);
+        assert_eq!(request.hidden_update_count(), 1);
+        assert_eq!(request.offscreen(), fixture.offscreen);
+        assert_eq!(request.child(), fixture.child);
+        assert_eq!(request.child_tag(), FiberTag::HostComponent);
+        assert_eq!(request.committed_lanes(), request.render_lanes());
+        assert_eq!(
+            request.status(),
+            HostRootOffscreenRevealCommitExecutionStatusForCanary::ValidatedForCommitHandoff
+        );
+        assert!(request.execution_requested());
+        assert_eq!(
+            request.blockers(),
+            &HOST_ROOT_OFFSCREEN_REVEAL_COMMIT_EXECUTION_BLOCKERS
+        );
+        assert!(request.committed_lanes_match_render());
+        assert!(request.offscreen_lane_metadata_recorded());
+        assert!(request.hidden_to_visible_reveal());
+        assert!(request.host_visibility_mutation_blocked());
+        assert!(request.passive_visibility_effects_blocked());
+        assert!(request.newly_visible_suspensey_commit_traversal_blocked());
+        assert!(request.would_accumulate_newly_visible_suspensey_commit());
+        assert!(request.public_offscreen_compatibility_blocked());
+        assert!(request.public_activity_compatibility_blocked());
+        assert!(request.public_root_rendering_blocked());
+        assert!(request.public_compatibility_claim_blocked());
+        assert_eq!(
+            request.actual_candidate_subtree_flags(),
+            fixture.reveal_metadata.candidate_subtree_flags()
+        );
+        assert!(
+            request
+                .actual_child_flags()
+                .contains_all(FiberFlags::PLACEMENT | FiberFlags::MAY_SUSPEND_COMMIT)
+        );
+        assert_eq!(request.actual_child_subtree_flags(), FiberFlags::NO);
+        assert_eq!(
+            fixture.reveal_metadata.transition().previous(),
+            fixture.previous_offscreen
+        );
+        assert_eq!(
+            store
+                .update_queues()
+                .update(fixture.hidden_update)
+                .unwrap()
+                .lane(),
+            Lanes::DEFAULT.merge_lane(Lane::OFFSCREEN)
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            fixture.render.finished_work()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_offscreen_reveal_complete_metadata_requires_retained_offscreen_lane() {
+        let (mut store, root_id, host) = root_store();
+        let fixture = prepare_offscreen_reveal_commit_fixture(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(8_620),
+            false,
+            Lanes::DEFAULT.merge_lane(Lane::OFFSCREEN),
+            FiberTag::HostText,
+        );
+        let previous_current = fixture.render.current();
+
+        let error = commit_offscreen_reveal_complete_metadata_handoff_for_canary(
+            &mut store,
+            fixture.render,
+            Some(fixture.pending),
+            fixture.reveal_metadata,
+            2,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            HostRootOffscreenRevealCommitHandoffErrorForCanary::OffscreenLaneMetadataMissing {
+                root: root_id,
+                pending_lanes_before_commit: Lanes::DEFAULT,
+                render_lanes: Lanes::DEFAULT.merge_lane(Lane::OFFSCREEN),
+            }
+        );
+        assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            Some(fixture.render.finished_work())
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_offscreen_reveal_complete_metadata_rejects_stale_records_before_switching_current()
+     {
+        let (mut store, root_id, host) = root_store();
+        let lanes = Lanes::DEFAULT.merge_lane(Lane::OFFSCREEN);
+        let fixture = prepare_offscreen_reveal_commit_fixture(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(8_630),
+            true,
+            Lanes::DEFAULT,
+            FiberTag::HostComponent,
+        );
+        let previous_current = fixture.render.current();
+
+        assert_eq!(
+            commit_offscreen_reveal_complete_metadata_handoff_for_canary(
+                &mut store,
+                fixture.render,
+                Some(fixture.pending),
+                fixture.reveal_metadata,
+                2,
+            )
+            .unwrap_err(),
+            HostRootOffscreenRevealCommitHandoffErrorForCanary::RevealCommitLanesMismatch {
+                root: root_id,
+                expected_render_lanes: lanes,
+                expected_finished_lanes: lanes,
+                actual_committed_lanes: Lanes::DEFAULT,
+            }
+        );
+        assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+
+        let (mut store, root_id, host) = root_store();
+        let fixture = prepare_offscreen_reveal_commit_fixture(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(8_640),
+            true,
+            lanes,
+            FiberTag::HostText,
+        );
+        let previous_current = fixture.render.current();
+        store
+            .fiber_arena_mut()
+            .get_mut(fixture.child)
+            .unwrap()
+            .merge_flags(FiberFlags::UPDATE);
+
+        match commit_offscreen_reveal_complete_metadata_handoff_for_canary(
+            &mut store,
+            fixture.render,
+            Some(fixture.pending),
+            fixture.reveal_metadata.clone(),
+            2,
+        )
+        .unwrap_err()
+        {
+            HostRootOffscreenRevealCommitHandoffErrorForCanary::StaleRevealChildFlags {
+                offscreen,
+                child,
+                expected_candidate_subtree_flags,
+                actual_candidate_subtree_flags,
+            } => {
+                assert_eq!(offscreen, fixture.offscreen);
+                assert_eq!(child, fixture.child);
+                assert_eq!(
+                    expected_candidate_subtree_flags,
+                    fixture.reveal_metadata.candidate_subtree_flags()
+                );
+                assert!(
+                    actual_candidate_subtree_flags
+                        .contains_all(FiberFlags::PLACEMENT | FiberFlags::UPDATE)
+                );
+            }
+            other => panic!("expected stale reveal child flags, got {other:?}"),
+        }
+        assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            Some(fixture.render.finished_work())
+        );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
