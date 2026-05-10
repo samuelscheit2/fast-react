@@ -1137,12 +1137,12 @@ test("react-test-renderer private update native bridge admission consumes Rust h
       entry.entrypoint
     );
     const renderer = moduleExports.create({
-      props: { "data-state": "old", children: "hello" },
+      props: { "data-state": "old", children: "hello", style: { color: "red" } },
       type: "span"
     });
     const updateError = captureThrown(() =>
       renderer.update({
-        props: { "data-state": "new", children: "goodbye" },
+        props: { "data-state": "new", children: "goodbye", style: { color: "blue" } },
         type: "span"
       })
     );
@@ -1252,12 +1252,12 @@ test("react-test-renderer CJS development private act diagnostics consume update
   assert.equal(diagnostics.drainsAcceptedPendingPassiveFlushMetadata, true);
 
   const renderer = moduleExports.create({
-    props: { "data-state": "old", children: "hello" },
+    props: { "data-state": "old", children: "hello", style: { color: "red" } },
     type: "span"
   });
   const updateError = captureThrown(() =>
     renderer.update({
-      props: { "data-state": "new", children: "goodbye" },
+      props: { "data-state": "new", children: "goodbye", style: { color: "blue" } },
       type: "span"
     })
   );
@@ -1310,6 +1310,12 @@ test("react-test-renderer CJS development private act diagnostics consume update
   assert.equal(report.rustExecution, true);
   assert.equal(report.reconcilerExecution, true);
   assert.equal(report.hostOutputProduced, true);
+  assert.equal(report.hostComponentPropUpdateRecorded, true);
+  assert.equal(report.hostComponentStyleUpdateRecorded, true);
+  assert.equal(
+    report.acceptedHostComponentUpdatePayloadShape,
+    "HostComponentPropStyleTextUpdate"
+  );
   assert.equal(report.pendingBefore, 1);
   assert.equal(report.drainedCount, 1);
   assert.equal(report.remainingCount, 0);
@@ -5267,6 +5273,10 @@ function createRustUpdateRouteRootWorkLoopDiagnosticSource(request) {
     hostTextUpdateMetadata: {
       hostOutputUpdateRecord: "TestRendererUpdatedHostOutput",
       hostTextUpdateApplyRequired: true,
+      hostComponentPropUpdateRecorded: true,
+      hostComponentStyleUpdateRecorded: true,
+      acceptedHostComponentUpdatePayloadShape:
+        "HostComponentPropStyleTextUpdate",
       textUpdateApplyRecorded: true,
       hostTextUpdateApplyCount: 1,
       hostComponentUpdateApplyCount: 1
@@ -5704,6 +5714,14 @@ function assertRustCanaryMetadata(metadata, label) {
     expectedAcceptedRustWorkers.push(
       "worker-637-test-renderer-update-native-execution"
     );
+    if (
+      metadata.hostOutput.updateNativeBridgeAdmissionGate
+        .propStyleTextExecutionWorker !== undefined
+    ) {
+      expectedAcceptedRustWorkers.push(
+        "worker-696-test-renderer-root-update-prop-style-execution"
+      );
+    }
   }
   if (metadata.unmountPassiveRefCleanupOrder !== undefined) {
     expectedAcceptedRustWorkers.push(
@@ -5748,6 +5766,14 @@ function assertRustCanaryMetadata(metadata, label) {
     expectedAcceptedJsBridgeWorkers.push(
       "worker-637-test-renderer-update-native-execution"
     );
+    if (
+      metadata.hostOutput.updateNativeBridgeAdmissionGate
+        .propStyleTextExecutionWorker !== undefined
+    ) {
+      expectedAcceptedJsBridgeWorkers.push(
+        "worker-696-test-renderer-root-update-prop-style-execution"
+      );
+    }
   }
   if (
     metadata.acceptedJsBridgeWorkers.includes(
@@ -6622,10 +6648,24 @@ function assertRustCanaryOperationMetadata(metadata, expected) {
     expectedWorkersByOperation.update.push(
       "worker-637-test-renderer-update-native-execution"
     );
+    if (
+      metadata.nativeBridgeAdmission.propStyleTextExecutionWorker !==
+      undefined
+    ) {
+      expectedWorkersByOperation.update.push(
+        "worker-696-test-renderer-root-update-prop-style-execution"
+      );
+    }
     expectedTestsByOperation.update.splice(
       expectedTestsByOperation.update.length - 1,
       0,
       "root_private_update_native_bridge_admission_consumes_actual_update_host_output_handoff",
+      ...(metadata.nativeBridgeAdmission.propStyleTextExecutionWorker ===
+      undefined
+        ? []
+        : [
+            "root_private_update_native_bridge_admission_consumes_prop_style_text_update_execution"
+          ]),
       "root_private_update_native_bridge_admission_rejects_missing_handoff",
       "root_private_update_native_bridge_admission_rejects_stale_route_outcome"
     );
@@ -6998,6 +7038,14 @@ function assertPrivateRoute(privateRoute, expected) {
       expectedAcceptedWorkers.push(
         "worker-637-test-renderer-update-native-execution"
       );
+      if (
+        privateRoute.nativeBridgeAdmission.propStyleTextExecutionWorker !==
+        undefined
+      ) {
+        expectedAcceptedWorkers.push(
+          "worker-696-test-renderer-root-update-prop-style-execution"
+        );
+      }
     }
     assert.deepEqual(privateRoute.acceptedWorkers, expectedAcceptedWorkers);
   }
@@ -7138,6 +7186,12 @@ function assertPrivateRoute(privateRoute, expected) {
     expectedAcceptedRustTests = [
       ...expectedAcceptedRustTests.slice(0, -2),
       "root_private_update_native_bridge_admission_consumes_actual_update_host_output_handoff",
+      ...(privateRoute.nativeBridgeAdmission.propStyleTextExecutionWorker ===
+      undefined
+        ? []
+        : [
+            "root_private_update_native_bridge_admission_consumes_prop_style_text_update_execution"
+          ]),
       "root_private_update_native_bridge_admission_rejects_missing_handoff",
       "root_private_update_native_bridge_admission_rejects_stale_route_outcome",
       ...expectedAcceptedRustTests.slice(-2)
@@ -7264,14 +7318,24 @@ function assertPrivateUpdateNativeBridgeAdmissionGate(gate, label) {
     "worker-637-test-renderer-update-native-execution",
     label
   );
+  if (gate.acceptedWorkers !== undefined) {
+    assert.deepEqual(gate.acceptedWorkers, [
+      "worker-637-test-renderer-update-native-execution",
+      "worker-696-test-renderer-root-update-prop-style-execution"
+    ]);
+  }
   assert.equal(gate.acceptedRustCrate, "fast-react-test-renderer", label);
-  assert.deepEqual(gate.acceptedRustRecords, [
+  const expectedRecords = [
     "TestRendererRootUpdateOutcome",
     "TestRendererRootScheduledUpdate",
     "TestRendererUpdatedHostOutput",
     "TestRendererPrivateUpdateRouteAdmissionRecord",
     "TestRendererUpdateNativeBridgeAdmission"
-  ]);
+  ];
+  if (gate.acceptedRustRecords.includes("TestProps")) {
+    expectedRecords.splice(4, 0, "TestProps");
+  }
+  assert.deepEqual(gate.acceptedRustRecords, expectedRecords);
   assert.deepEqual(gate.acceptedRustApis, [
     "TestRendererRoot::update_host_component_with_props_and_text_for_canary",
     "TestRendererRoot::render_and_commit_host_output_update_for_canary",
@@ -7279,11 +7343,19 @@ function assertPrivateUpdateNativeBridgeAdmissionGate(gate, label) {
     "TestRendererRoot::describe_private_update_native_bridge_admission_for_canary",
     "TestRendererRoot::render_and_admit_private_update_native_bridge_handoff_for_canary"
   ]);
-  assert.deepEqual(gate.acceptedRustTests, [
+  const expectedTests = [
     "root_private_update_native_bridge_admission_consumes_actual_update_host_output_handoff",
     "root_private_update_native_bridge_admission_rejects_missing_handoff",
     "root_private_update_native_bridge_admission_rejects_stale_route_outcome"
-  ]);
+  ];
+  if (gate.propStyleTextExecutionWorker !== undefined) {
+    expectedTests.splice(
+      1,
+      0,
+      "root_private_update_native_bridge_admission_consumes_prop_style_text_update_execution"
+    );
+  }
+  assert.deepEqual(gate.acceptedRustTests, expectedTests);
   assert.equal(
     gate.privateRouteDependencyId,
     "react-test-renderer-update-route-private-diagnostic",
@@ -7302,6 +7374,19 @@ function assertPrivateUpdateNativeBridgeAdmissionGate(gate, label) {
   assert.equal(gate.consumesAcceptedHostOutputHandoff, true, label);
   assert.equal(gate.validatesLifecycleEvidence, true, label);
   assert.equal(gate.validatesTextAndPropertyUpdateEvidence, true, label);
+  if (gate.validatesPropStyleTextUpdateEvidence !== undefined) {
+    assert.equal(gate.validatesPropStyleTextUpdateEvidence, true, label);
+    assert.equal(
+      gate.acceptedHostComponentUpdatePayloadShape,
+      "HostComponentPropStyleTextUpdate",
+      label
+    );
+    assert.equal(
+      gate.propStyleTextExecutionWorker,
+      "worker-696-test-renderer-root-update-prop-style-execution",
+      label
+    );
+  }
   assert.equal(gate.rejectsStaleUpdateHandoffs, true, label);
   assert.equal(gate.rejectsUnmountedRoots, true, label);
   assert.equal(gate.rejectsMissingHostOutputHandoff, true, label);
@@ -7367,6 +7452,14 @@ function assertPrivateUpdateNativeBridgeAdmission(record, request) {
   assert.equal(record.lifecycleEvidenceAccepted, true);
   assert.equal(record.rootWorkLoopHandoffAccepted, true);
   assert.equal(record.hostOutputHandoffAccepted, true);
+  if (Object.hasOwn(record, "hostComponentPropUpdateRecorded")) {
+    assert.equal(record.hostComponentPropUpdateRecorded, true);
+    assert.equal(record.hostComponentStyleUpdateRecorded, true);
+    assert.equal(
+      record.acceptedHostComponentUpdatePayloadShape,
+      "HostComponentPropStyleTextUpdate"
+    );
+  }
   assert.equal(record.textUpdateApplyRecorded, true);
   assert.equal(record.hostTextUpdateApplyCount, 1);
   assert.equal(record.hostComponentUpdateApplyCount, 1);
@@ -10295,6 +10388,14 @@ function assertPrivateUpdateRouteHostOutputEvidence(evidence) {
   assert.equal(Object.isFrozen(evidence), true);
   assert.equal(evidence.hostOutputUpdateRecord, "TestRendererUpdatedHostOutput");
   assert.equal(evidence.hostTextUpdateApplyRequired, true);
+  if (Object.hasOwn(evidence, "hostComponentPropUpdateRecorded")) {
+    assert.equal(evidence.hostComponentPropUpdateRecorded, true);
+    assert.equal(evidence.hostComponentStyleUpdateRecorded, true);
+    assert.equal(
+      evidence.acceptedHostComponentUpdatePayloadShape,
+      "HostComponentPropStyleTextUpdate"
+    );
+  }
   assert.equal(evidence.textUpdateApplyRecorded, true);
   assert.equal(evidence.hostTextUpdateApplyCount, 1);
   assert.equal(evidence.hostComponentUpdateApplyCount, 1);

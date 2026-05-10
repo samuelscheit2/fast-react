@@ -2098,12 +2098,17 @@ const privateUpdateNativeBridgeAdmissionGate = Object.freeze({
   deterministic: true,
   acceptedWorker:
     'worker-637-test-renderer-update-native-execution',
+  acceptedWorkers: Object.freeze([
+    'worker-637-test-renderer-update-native-execution',
+    'worker-696-test-renderer-root-update-prop-style-execution'
+  ]),
   acceptedRustCrate: 'fast-react-test-renderer',
   acceptedRustRecords: Object.freeze([
     'TestRendererRootUpdateOutcome',
     'TestRendererRootScheduledUpdate',
     'TestRendererUpdatedHostOutput',
     'TestRendererPrivateUpdateRouteAdmissionRecord',
+    'TestProps',
     'TestRendererUpdateNativeBridgeAdmission'
   ]),
   acceptedRustApis: Object.freeze([
@@ -2115,6 +2120,7 @@ const privateUpdateNativeBridgeAdmissionGate = Object.freeze({
   ]),
   acceptedRustTests: Object.freeze([
     'root_private_update_native_bridge_admission_consumes_actual_update_host_output_handoff',
+    'root_private_update_native_bridge_admission_consumes_prop_style_text_update_execution',
     'root_private_update_native_bridge_admission_rejects_missing_handoff',
     'root_private_update_native_bridge_admission_rejects_stale_route_outcome'
   ]),
@@ -2129,6 +2135,11 @@ const privateUpdateNativeBridgeAdmissionGate = Object.freeze({
   consumesAcceptedHostOutputHandoff: true,
   validatesLifecycleEvidence: true,
   validatesTextAndPropertyUpdateEvidence: true,
+  validatesPropStyleTextUpdateEvidence: true,
+  acceptedHostComponentUpdatePayloadShape:
+    'HostComponentPropStyleTextUpdate',
+  propStyleTextExecutionWorker:
+    'worker-696-test-renderer-root-update-prop-style-execution',
   rejectsStaleUpdateHandoffs: true,
   rejectsUnmountedRoots: true,
   rejectsMissingHostOutputHandoff: true,
@@ -2204,7 +2215,8 @@ const updatePrivateRoute = Object.freeze({
   acceptedWorkers: Object.freeze([
     'worker-234-test-renderer-host-output-update-unmount-canary',
     'worker-574-test-renderer-update-via-root-work-loop',
-    'worker-637-test-renderer-update-native-execution'
+    'worker-637-test-renderer-update-native-execution',
+    'worker-696-test-renderer-root-update-prop-style-execution'
   ]),
   acceptedRustCrate: 'fast-react-test-renderer',
   rootWorkLoopUpdateRouteGate: privateUpdateRouteRootWorkLoopGate,
@@ -2244,6 +2256,7 @@ const updatePrivateRoute = Object.freeze({
     'root_private_update_route_rejects_unmounted_root',
     'root_private_update_route_rejects_incompatible_finished_work_record',
     'root_private_update_native_bridge_admission_consumes_actual_update_host_output_handoff',
+    'root_private_update_native_bridge_admission_consumes_prop_style_text_update_execution',
     'root_private_update_native_bridge_admission_rejects_missing_handoff',
     'root_private_update_native_bridge_admission_rejects_stale_route_outcome',
     'root_host_output_canary_updates_committed_text_with_update_diagnostics',
@@ -4182,7 +4195,8 @@ const currentRustTestRendererRootCanaryOperations = freezeRecord({
       'worker-195-test-renderer-root-callback-snapshot',
       'worker-234-test-renderer-host-output-update-unmount-canary',
       'worker-574-test-renderer-update-via-root-work-loop',
-      'worker-637-test-renderer-update-native-execution'
+      'worker-637-test-renderer-update-native-execution',
+      'worker-696-test-renderer-root-update-prop-style-execution'
     ]),
     acceptedRustTests: freezeArray([
       'root_update_reuses_same_fiber_root_and_shared_scheduler_record',
@@ -4193,6 +4207,7 @@ const currentRustTestRendererRootCanaryOperations = freezeRecord({
       'root_private_update_route_rejects_unmounted_root',
       'root_private_update_route_rejects_incompatible_finished_work_record',
       'root_private_update_native_bridge_admission_consumes_actual_update_host_output_handoff',
+      'root_private_update_native_bridge_admission_consumes_prop_style_text_update_execution',
       'root_private_update_native_bridge_admission_rejects_missing_handoff',
       'root_private_update_native_bridge_admission_rejects_stale_route_outcome',
       'root_update_after_unmount_does_not_mutate_or_reschedule'
@@ -4291,6 +4306,7 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     'worker-612-test-renderer-unmount-native-bridge-admission',
     'worker-638-test-renderer-unmount-native-execution',
     'worker-637-test-renderer-update-native-execution',
+    'worker-696-test-renderer-root-update-prop-style-execution',
     'worker-672-test-renderer-unmount-passive-ref-order'
   ]),
   acceptedJsBridgeWorkers: freezeArray([
@@ -4306,6 +4322,7 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     'worker-612-test-renderer-unmount-native-bridge-admission',
     'worker-638-test-renderer-unmount-native-execution',
     'worker-637-test-renderer-update-native-execution',
+    'worker-696-test-renderer-root-update-prop-style-execution',
     'worker-669-test-renderer-error-boundary-native-execution'
   ]),
   root: freezeRecord({
@@ -5106,6 +5123,10 @@ function createPrivateUpdateRouteRootWorkLoopDiagnostic(rootRequest) {
     hostTextUpdateMetadata: Object.freeze({
       hostOutputUpdateRecord: 'TestRendererUpdatedHostOutput',
       hostTextUpdateApplyRequired: true,
+      hostComponentPropUpdateRecorded: true,
+      hostComponentStyleUpdateRecorded: true,
+      acceptedHostComponentUpdatePayloadShape:
+        'HostComponentPropStyleTextUpdate',
       textUpdateApplyRecorded: true,
       hostTextUpdateApplyCount: 1,
       hostComponentUpdateApplyCount: 1
@@ -5254,6 +5275,10 @@ function createPrivateUpdateRouteHostOutputEvidence() {
   return freezeRecord({
     hostOutputUpdateRecord: 'TestRendererUpdatedHostOutput',
     hostTextUpdateApplyRequired: true,
+    hostComponentPropUpdateRecorded: true,
+    hostComponentStyleUpdateRecorded: true,
+    acceptedHostComponentUpdatePayloadShape:
+      'HostComponentPropStyleTextUpdate',
     textUpdateApplyRecorded: true,
     hostTextUpdateApplyCount: 1,
     hostComponentUpdateApplyCount: 1
@@ -7772,6 +7797,10 @@ function getRejectedNativeUpdateExecutionResultReason(result) {
     admission.lifecycleEvidenceAccepted !== true ||
     admission.rootWorkLoopHandoffAccepted !== true ||
     admission.hostOutputHandoffAccepted !== true ||
+    admission.hostComponentPropUpdateRecorded !== true ||
+    admission.hostComponentStyleUpdateRecorded !== true ||
+    admission.acceptedHostComponentUpdatePayloadShape !==
+      'HostComponentPropStyleTextUpdate' ||
     admission.textUpdateApplyRecorded !== true ||
     admission.hostTextUpdateApplyCount !== 1 ||
     admission.hostComponentUpdateApplyCount !== 1 ||
@@ -7894,6 +7923,12 @@ function consumeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
     rustExecution: true,
     reconcilerExecution: true,
     hostOutputProduced: true,
+    hostComponentPropUpdateRecorded:
+      admission.hostComponentPropUpdateRecorded,
+    hostComponentStyleUpdateRecorded:
+      admission.hostComponentStyleUpdateRecorded,
+    acceptedHostComponentUpdatePayloadShape:
+      admission.acceptedHostComponentUpdatePayloadShape,
     textUpdateApplyRecorded: admission.textUpdateApplyRecorded,
     hostTextUpdateApplyCount: admission.hostTextUpdateApplyCount,
     hostComponentUpdateApplyCount: admission.hostComponentUpdateApplyCount,
@@ -8793,6 +8828,12 @@ function createPrivateUpdateNativeBridgeAdmissionRecord(options) {
     lifecycleEvidenceAccepted: true,
     rootWorkLoopHandoffAccepted: true,
     hostOutputHandoffAccepted: true,
+    hostComponentPropUpdateRecorded:
+      hostOutputEvidence.hostComponentPropUpdateRecorded,
+    hostComponentStyleUpdateRecorded:
+      hostOutputEvidence.hostComponentStyleUpdateRecorded,
+    acceptedHostComponentUpdatePayloadShape:
+      hostOutputEvidence.acceptedHostComponentUpdatePayloadShape,
     textUpdateApplyRecorded: hostOutputEvidence.textUpdateApplyRecorded,
     hostTextUpdateApplyCount: hostOutputEvidence.hostTextUpdateApplyCount,
     hostComponentUpdateApplyCount:
@@ -10287,6 +10328,18 @@ function normalizeAcceptedRustUpdateRouteHostTextMetadata(hostTextUpdate) {
       'hostTextUpdateApplyRequired',
       'host_text_update_apply_required'
     ]),
+    hostComponentPropUpdateRecorded: readDiagnosticField(hostTextUpdate, [
+      'hostComponentPropUpdateRecorded',
+      'host_component_prop_update_recorded'
+    ]),
+    hostComponentStyleUpdateRecorded: readDiagnosticField(hostTextUpdate, [
+      'hostComponentStyleUpdateRecorded',
+      'host_component_style_update_recorded'
+    ]),
+    acceptedHostComponentUpdatePayloadShape: readDiagnosticField(hostTextUpdate, [
+      'acceptedHostComponentUpdatePayloadShape',
+      'accepted_host_component_update_payload_shape'
+    ]),
     textUpdateApplyRecorded: readDiagnosticField(hostTextUpdate, [
       'textUpdateApplyRecorded',
       'text_update_apply_recorded'
@@ -10441,6 +10494,10 @@ function assertAcceptedRustUpdateRouteRootWorkLoopMatchesRequest(
     hostText === null ||
     hostText.hostOutputUpdateRecord !== 'TestRendererUpdatedHostOutput' ||
     hostText.hostTextUpdateApplyRequired !== true ||
+    hostText.hostComponentPropUpdateRecorded !== true ||
+    hostText.hostComponentStyleUpdateRecorded !== true ||
+    hostText.acceptedHostComponentUpdatePayloadShape !==
+      'HostComponentPropStyleTextUpdate' ||
     hostText.textUpdateApplyRecorded !== true ||
     hostText.hostTextUpdateApplyCount !== 1 ||
     hostText.hostComponentUpdateApplyCount !== 1

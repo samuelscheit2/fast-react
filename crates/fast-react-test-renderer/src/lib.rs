@@ -483,6 +483,7 @@ impl From<String> for TestElementType {
 pub struct TestProps {
     text_content: Option<String>,
     attributes: BTreeMap<String, String>,
+    styles: BTreeMap<String, String>,
 }
 
 impl TestProps {
@@ -496,12 +497,19 @@ impl TestProps {
         Self {
             text_content: Some(text.into()),
             attributes: BTreeMap::new(),
+            styles: BTreeMap::new(),
         }
     }
 
     #[must_use]
     pub fn with_attribute(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
         self.attributes.insert(name.into(), value.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_style(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
+        self.styles.insert(name.into(), value.into());
         self
     }
 
@@ -513,6 +521,11 @@ impl TestProps {
     #[must_use]
     pub fn attributes(&self) -> &BTreeMap<String, String> {
         &self.attributes
+    }
+
+    #[must_use]
+    pub fn styles(&self) -> &BTreeMap<String, String> {
+        &self.styles
     }
 }
 
@@ -2742,6 +2755,8 @@ pub struct TestRendererPrivateUpdateRouteHostTextDiagnostics {
     previous_text_fiber: TestRendererFiberHandleDiagnostics,
     updated_text_fiber: TestRendererFiberHandleDiagnostics,
     text_state_node_raw: u64,
+    host_component_prop_update_recorded: bool,
+    host_component_style_update_recorded: bool,
     text_update_apply_recorded: bool,
     host_text_update_apply_count: usize,
     host_component_update_apply_count: usize,
@@ -2761,6 +2776,16 @@ impl TestRendererPrivateUpdateRouteHostTextDiagnostics {
     #[must_use]
     pub const fn text_state_node_raw(self) -> u64 {
         self.text_state_node_raw
+    }
+
+    #[must_use]
+    pub const fn host_component_prop_update_recorded(self) -> bool {
+        self.host_component_prop_update_recorded
+    }
+
+    #[must_use]
+    pub const fn host_component_style_update_recorded(self) -> bool {
+        self.host_component_style_update_recorded
     }
 
     #[must_use]
@@ -3015,6 +3040,8 @@ pub struct TestRendererUpdateNativeBridgeAdmission {
     lifecycle_evidence_accepted: bool,
     root_work_loop_handoff_accepted: bool,
     host_output_handoff_accepted: bool,
+    host_component_prop_update_recorded: bool,
+    host_component_style_update_recorded: bool,
     text_update_apply_recorded: bool,
     host_text_update_apply_count: usize,
     host_component_update_apply_count: usize,
@@ -3090,6 +3117,16 @@ impl TestRendererUpdateNativeBridgeAdmission {
     #[must_use]
     pub const fn host_output_handoff_accepted(self) -> bool {
         self.host_output_handoff_accepted
+    }
+
+    #[must_use]
+    pub const fn host_component_prop_update_recorded(self) -> bool {
+        self.host_component_prop_update_recorded
+    }
+
+    #[must_use]
+    pub const fn host_component_style_update_recorded(self) -> bool {
+        self.host_component_style_update_recorded
     }
 
     #[must_use]
@@ -10112,6 +10149,30 @@ impl TestRendererRoot {
         if !text_update_apply_recorded {
             return Err(TestRendererPrivateUpdateRouteError::MissingHostTextUpdateApply.into());
         }
+        let Some(TestNodeSnapshot::Element(previous_component)) =
+            output.previous_snapshot().children().first()
+        else {
+            return Err(
+                TestRendererPrivateUpdateRouteError::IncompatibleFinishedWork {
+                    reason: "previous-host-component-snapshot-missing",
+                }
+                .into(),
+            );
+        };
+        let Some(TestNodeSnapshot::Element(current_component)) =
+            output.snapshot().children().first()
+        else {
+            return Err(
+                TestRendererPrivateUpdateRouteError::IncompatibleFinishedWork {
+                    reason: "current-host-component-snapshot-missing",
+                }
+                .into(),
+            );
+        };
+        let host_component_prop_update_recorded =
+            previous_component.props().attributes() != current_component.props().attributes();
+        let host_component_style_update_recorded =
+            previous_component.props().styles() != current_component.props().styles();
 
         let schedule_fiber = scheduled_update.container_update().schedule().fiber();
         let render_current = render.current();
@@ -10214,6 +10275,8 @@ impl TestRendererRoot {
                     generation: updated_fibers.current().text().generation().get(),
                 },
                 text_state_node_raw: updated_fibers.text_state_node_raw(),
+                host_component_prop_update_recorded,
+                host_component_style_update_recorded,
                 text_update_apply_recorded,
                 host_text_update_apply_count: commit
                     .test_only_host_text_update_apply_count_for_canary(),
@@ -10311,6 +10374,10 @@ impl TestRendererRoot {
             lifecycle_evidence_accepted: true,
             root_work_loop_handoff_accepted: true,
             host_output_handoff_accepted: true,
+            host_component_prop_update_recorded: host_text_update
+                .host_component_prop_update_recorded(),
+            host_component_style_update_recorded: host_text_update
+                .host_component_style_update_recorded(),
             text_update_apply_recorded: host_text_update.text_update_apply_recorded(),
             host_text_update_apply_count: host_text_update.host_text_update_apply_count(),
             host_component_update_apply_count: host_text_update.host_component_update_apply_count(),
@@ -19087,6 +19154,75 @@ mod tests {
         assert!(!admission.native_execution());
         assert!(admission.rust_execution_from_js());
         assert!(admission.reconciler_execution_from_js());
+        assert!(!admission.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_update_native_bridge_admission_consumes_prop_style_text_update_execution() {
+        let initial_props = props()
+            .with_attribute("data-state", "old")
+            .with_style("color", "red");
+        let updated_props = props()
+            .with_attribute("data-state", "new")
+            .with_style("color", "blue");
+        let mut root = TestRendererRoot::create_host_component_with_props_and_text_for_canary(
+            "span",
+            initial_props.clone(),
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let (_outcome, updated, admission) = root
+            .render_and_admit_private_update_native_bridge_handoff_for_canary(
+                "span",
+                updated_props.clone(),
+                "goodbye",
+            )
+            .unwrap();
+        let route = root
+            .describe_private_update_route_via_root_work_loop_for_canary(&updated)
+            .unwrap();
+        let host_output = route.host_text_update();
+
+        assert!(updated.updated_fibers().component_props_changed());
+        assert!(updated.updated_fibers().text_props_changed());
+        let TestNodeSnapshot::Element(previous) = &updated.previous_snapshot().children()[0] else {
+            panic!("expected previous host component");
+        };
+        assert_eq!(previous.props(), &initial_props);
+        assert_eq!(
+            previous.props().styles().get("color").map(String::as_str),
+            Some("red")
+        );
+        assert_eq!(child_texts(previous), vec!["hello"]);
+        let TestNodeSnapshot::Element(current) = &updated.snapshot().children()[0] else {
+            panic!("expected updated host component");
+        };
+        assert_eq!(current.props(), &updated_props);
+        assert_eq!(
+            current.props().styles().get("color").map(String::as_str),
+            Some("blue")
+        );
+        assert_eq!(child_texts(current), vec!["goodbye"]);
+
+        assert!(host_output.host_component_prop_update_recorded());
+        assert!(host_output.host_component_style_update_recorded());
+        assert!(host_output.text_update_apply_recorded());
+        assert_eq!(host_output.host_component_update_apply_count(), 1);
+        assert_eq!(host_output.host_text_update_apply_count(), 1);
+        assert!(admission.host_component_prop_update_recorded());
+        assert!(admission.host_component_style_update_recorded());
+        assert!(admission.text_update_apply_recorded());
+        assert!(admission.update_route_admission_accepted());
+        assert!(admission.host_output_handoff_accepted());
+        assert!(!admission.public_update_compatibility_claimed());
+        assert!(!admission.public_serialization_available());
+        assert!(!admission.native_bridge_available());
+        assert!(!admission.native_execution());
         assert!(!admission.compatibility_claimed());
     }
 
