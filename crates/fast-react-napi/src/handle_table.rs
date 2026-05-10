@@ -1,0 +1,678 @@
+//! Private bridge handle table for future Node-API rooted values.
+//!
+//! This module deliberately models only deterministic environment-local handle
+//! behavior. It does not retain Node-API values, call JS, or connect to the
+//! reconciler root store.
+
+#![allow(dead_code)]
+
+use std::error::Error;
+use std::fmt::{self, Display, Formatter};
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub(crate) struct BridgeEnvironmentId(u64);
+
+impl BridgeEnvironmentId {
+    pub(crate) const NONE: Self = Self(0);
+
+    #[must_use]
+    pub(crate) const fn from_raw(raw: u64) -> Self {
+        Self(raw)
+    }
+
+    #[must_use]
+    pub(crate) const fn raw(self) -> u64 {
+        self.0
+    }
+
+    #[must_use]
+    pub(crate) const fn is_none(self) -> bool {
+        self.0 == 0
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum BridgeHandleKind {
+    Root,
+    Value,
+}
+
+impl Display for BridgeHandleKind {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Root => formatter.write_str("root"),
+            Self::Value => formatter.write_str("value"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct BridgeHandle {
+    environment_id: BridgeEnvironmentId,
+    slot: u64,
+    generation: u64,
+    kind: BridgeHandleKind,
+}
+
+impl BridgeHandle {
+    #[must_use]
+    pub(crate) const fn new(
+        environment_id: BridgeEnvironmentId,
+        slot: u64,
+        generation: u64,
+        kind: BridgeHandleKind,
+    ) -> Self {
+        Self {
+            environment_id,
+            slot,
+            generation,
+            kind,
+        }
+    }
+
+    #[must_use]
+    pub(crate) const fn environment_id(self) -> BridgeEnvironmentId {
+        self.environment_id
+    }
+
+    #[must_use]
+    pub(crate) const fn slot(self) -> u64 {
+        self.slot
+    }
+
+    #[must_use]
+    pub(crate) const fn generation(self) -> u64 {
+        self.generation
+    }
+
+    #[must_use]
+    pub(crate) const fn kind(self) -> BridgeHandleKind {
+        self.kind
+    }
+
+    #[must_use]
+    pub(crate) const fn is_empty(self) -> bool {
+        self.environment_id.is_none() || self.slot == 0 || self.generation == 0
+    }
+
+    #[must_use]
+    pub(crate) const fn with_environment_id(self, environment_id: BridgeEnvironmentId) -> Self {
+        Self {
+            environment_id,
+            ..self
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PlaceholderRootRecord {
+    root_id: u64,
+}
+
+impl PlaceholderRootRecord {
+    #[must_use]
+    pub(crate) const fn new(root_id: u64) -> Self {
+        Self { root_id }
+    }
+
+    #[must_use]
+    pub(crate) const fn root_id(&self) -> u64 {
+        self.root_id
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PlaceholderValueRecord {
+    value_id: u64,
+}
+
+impl PlaceholderValueRecord {
+    #[must_use]
+    pub(crate) const fn new(value_id: u64) -> Self {
+        Self { value_id }
+    }
+
+    #[must_use]
+    pub(crate) const fn value_id(&self) -> u64 {
+        self.value_id
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum BridgeRecord {
+    Root(PlaceholderRootRecord),
+    Value(PlaceholderValueRecord),
+}
+
+impl BridgeRecord {
+    const fn kind(&self) -> BridgeHandleKind {
+        match self {
+            Self::Root(_) => BridgeHandleKind::Root,
+            Self::Value(_) => BridgeHandleKind::Value,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct BridgeHandleEntry {
+    generation: u64,
+    record: BridgeRecord,
+    disposed: bool,
+}
+
+impl BridgeHandleEntry {
+    const fn new(generation: u64, record: BridgeRecord) -> Self {
+        Self {
+            generation,
+            record,
+            disposed: false,
+        }
+    }
+
+    const fn handle(
+        &self,
+        environment_id: BridgeEnvironmentId,
+        slot: u64,
+        kind: BridgeHandleKind,
+    ) -> BridgeHandle {
+        BridgeHandle::new(environment_id, slot, self.generation, kind)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum BridgeHandleSlot {
+    Vacant { next_generation: u64 },
+    Occupied(BridgeHandleEntry),
+}
+
+impl Default for BridgeHandleSlot {
+    fn default() -> Self {
+        Self::Vacant { next_generation: 1 }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum BridgeHandleTableError {
+    EmptyHandle {
+        handle: BridgeHandle,
+    },
+    WrongEnvironment {
+        handle: BridgeHandle,
+        expected: BridgeEnvironmentId,
+    },
+    InvalidHandle {
+        handle: BridgeHandle,
+    },
+    StaleHandle {
+        handle: BridgeHandle,
+        current_generation: u64,
+    },
+    DisposedHandle {
+        handle: BridgeHandle,
+    },
+    DuplicateDispose {
+        handle: BridgeHandle,
+    },
+    WrongKind {
+        handle: BridgeHandle,
+        expected: BridgeHandleKind,
+        actual: BridgeHandleKind,
+    },
+    GenerationExhausted {
+        slot: u64,
+    },
+}
+
+impl BridgeHandleTableError {
+    #[must_use]
+    pub(crate) const fn code(&self) -> &'static str {
+        match self {
+            Self::EmptyHandle { .. } => "FAST_REACT_NAPI_EMPTY_HANDLE",
+            Self::WrongEnvironment { .. } => "FAST_REACT_NAPI_WRONG_ENVIRONMENT",
+            Self::InvalidHandle { .. } => "FAST_REACT_NAPI_INVALID_HANDLE",
+            Self::StaleHandle { .. } => "FAST_REACT_NAPI_STALE_HANDLE",
+            Self::DisposedHandle { .. } => "FAST_REACT_NAPI_DISPOSED_HANDLE",
+            Self::DuplicateDispose { .. } => "FAST_REACT_NAPI_DUPLICATE_DISPOSE",
+            Self::WrongKind { .. } => "FAST_REACT_NAPI_WRONG_HANDLE_KIND",
+            Self::GenerationExhausted { .. } => "FAST_REACT_NAPI_HANDLE_GENERATION_EXHAUSTED",
+        }
+    }
+}
+
+impl Display for BridgeHandleTableError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EmptyHandle { .. } => formatter.write_str("bridge handle is empty"),
+            Self::WrongEnvironment { handle, expected } => write!(
+                formatter,
+                "bridge handle belongs to environment {}, expected environment {}",
+                handle.environment_id().raw(),
+                expected.raw()
+            ),
+            Self::InvalidHandle { handle } => {
+                write!(formatter, "bridge handle slot {} is invalid", handle.slot())
+            }
+            Self::StaleHandle {
+                handle,
+                current_generation,
+            } => write!(
+                formatter,
+                "bridge handle slot {} generation {} is stale; current generation is {}",
+                handle.slot(),
+                handle.generation(),
+                current_generation
+            ),
+            Self::DisposedHandle { handle } => {
+                write!(
+                    formatter,
+                    "bridge handle slot {} is disposed",
+                    handle.slot()
+                )
+            }
+            Self::DuplicateDispose { handle } => write!(
+                formatter,
+                "bridge handle slot {} has already been disposed",
+                handle.slot()
+            ),
+            Self::WrongKind {
+                handle,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "bridge handle slot {} has kind {}, expected {}",
+                handle.slot(),
+                actual,
+                expected
+            ),
+            Self::GenerationExhausted { slot } => write!(
+                formatter,
+                "bridge handle slot {slot} cannot allocate another generation"
+            ),
+        }
+    }
+}
+
+impl Error for BridgeHandleTableError {}
+
+#[derive(Debug, Clone)]
+pub(crate) struct BridgeHandleTable {
+    environment_id: BridgeEnvironmentId,
+    slots: Vec<BridgeHandleSlot>,
+}
+
+impl BridgeHandleTable {
+    #[must_use]
+    pub(crate) const fn new(environment_id: BridgeEnvironmentId) -> Self {
+        Self {
+            environment_id,
+            slots: Vec::new(),
+        }
+    }
+
+    #[must_use]
+    pub(crate) const fn environment_id(&self) -> BridgeEnvironmentId {
+        self.environment_id
+    }
+
+    pub(crate) fn insert_root(&mut self, record: PlaceholderRootRecord) -> BridgeHandle {
+        self.insert_record(BridgeRecord::Root(record))
+    }
+
+    pub(crate) fn insert_value(&mut self, record: PlaceholderValueRecord) -> BridgeHandle {
+        self.insert_record(BridgeRecord::Value(record))
+    }
+
+    pub(crate) fn get_root(
+        &self,
+        handle: BridgeHandle,
+    ) -> Result<&PlaceholderRootRecord, BridgeHandleTableError> {
+        match self.active_record(handle, BridgeHandleKind::Root)? {
+            BridgeRecord::Root(record) => Ok(record),
+            BridgeRecord::Value(_) => unreachable!("active_record validates bridge handle kind"),
+        }
+    }
+
+    pub(crate) fn get_value(
+        &self,
+        handle: BridgeHandle,
+    ) -> Result<&PlaceholderValueRecord, BridgeHandleTableError> {
+        match self.active_record(handle, BridgeHandleKind::Value)? {
+            BridgeRecord::Value(record) => Ok(record),
+            BridgeRecord::Root(_) => unreachable!("active_record validates bridge handle kind"),
+        }
+    }
+
+    pub(crate) fn remove_root(
+        &mut self,
+        handle: BridgeHandle,
+    ) -> Result<PlaceholderRootRecord, BridgeHandleTableError> {
+        match self.remove_record(handle, BridgeHandleKind::Root)? {
+            BridgeRecord::Root(record) => Ok(record),
+            BridgeRecord::Value(_) => unreachable!("remove_record validates bridge handle kind"),
+        }
+    }
+
+    pub(crate) fn remove_value(
+        &mut self,
+        handle: BridgeHandle,
+    ) -> Result<PlaceholderValueRecord, BridgeHandleTableError> {
+        match self.remove_record(handle, BridgeHandleKind::Value)? {
+            BridgeRecord::Value(record) => Ok(record),
+            BridgeRecord::Root(_) => unreachable!("remove_record validates bridge handle kind"),
+        }
+    }
+
+    pub(crate) fn dispose(&mut self, handle: BridgeHandle) -> Result<(), BridgeHandleTableError> {
+        self.validate_handle_identity(handle)?;
+
+        let expected = handle.kind();
+        let slot = self.occupied_slot_mut(handle)?;
+        let entry = match slot {
+            BridgeHandleSlot::Occupied(entry) => entry,
+            BridgeHandleSlot::Vacant { .. } => unreachable!("occupied_slot_mut rejects vacancies"),
+        };
+
+        validate_entry_generation(handle, entry.generation)?;
+        validate_entry_kind(handle, expected, entry.record.kind())?;
+
+        if entry.disposed {
+            return Err(BridgeHandleTableError::DuplicateDispose { handle });
+        }
+
+        entry.disposed = true;
+        Ok(())
+    }
+
+    fn insert_record(&mut self, record: BridgeRecord) -> BridgeHandle {
+        let kind = record.kind();
+
+        for (index, slot) in self.slots.iter_mut().enumerate() {
+            if let BridgeHandleSlot::Vacant { next_generation } = slot {
+                let generation = *next_generation;
+                let entry = BridgeHandleEntry::new(generation, record);
+                let handle = entry.handle(self.environment_id, index as u64 + 1, kind);
+                *slot = BridgeHandleSlot::Occupied(entry);
+                return handle;
+            }
+        }
+
+        let entry = BridgeHandleEntry::new(1, record);
+        let handle = entry.handle(self.environment_id, self.slots.len() as u64 + 1, kind);
+        self.slots.push(BridgeHandleSlot::Occupied(entry));
+        handle
+    }
+
+    fn active_record(
+        &self,
+        handle: BridgeHandle,
+        expected: BridgeHandleKind,
+    ) -> Result<&BridgeRecord, BridgeHandleTableError> {
+        self.validate_handle_identity(handle)?;
+
+        let entry = self.occupied_entry(handle)?;
+        validate_entry_generation(handle, entry.generation)?;
+        validate_entry_kind(handle, expected, entry.record.kind())?;
+
+        if entry.disposed {
+            return Err(BridgeHandleTableError::DisposedHandle { handle });
+        }
+
+        Ok(&entry.record)
+    }
+
+    fn remove_record(
+        &mut self,
+        handle: BridgeHandle,
+        expected: BridgeHandleKind,
+    ) -> Result<BridgeRecord, BridgeHandleTableError> {
+        self.validate_handle_identity(handle)?;
+
+        let slot = self.occupied_slot_mut(handle)?;
+        let entry = match slot {
+            BridgeHandleSlot::Occupied(entry) => entry,
+            BridgeHandleSlot::Vacant { .. } => unreachable!("occupied_slot_mut rejects vacancies"),
+        };
+
+        validate_entry_generation(handle, entry.generation)?;
+        validate_entry_kind(handle, expected, entry.record.kind())?;
+
+        if entry.disposed {
+            return Err(BridgeHandleTableError::DisposedHandle { handle });
+        }
+
+        let next_generation =
+            entry
+                .generation
+                .checked_add(1)
+                .ok_or(BridgeHandleTableError::GenerationExhausted {
+                    slot: handle.slot(),
+                })?;
+        let old_slot = std::mem::replace(slot, BridgeHandleSlot::Vacant { next_generation });
+
+        match old_slot {
+            BridgeHandleSlot::Occupied(entry) => Ok(entry.record),
+            BridgeHandleSlot::Vacant { .. } => unreachable!("occupied slot was just replaced"),
+        }
+    }
+
+    fn validate_handle_identity(&self, handle: BridgeHandle) -> Result<(), BridgeHandleTableError> {
+        if handle.is_empty() {
+            return Err(BridgeHandleTableError::EmptyHandle { handle });
+        }
+
+        if handle.environment_id() != self.environment_id {
+            return Err(BridgeHandleTableError::WrongEnvironment {
+                handle,
+                expected: self.environment_id,
+            });
+        }
+
+        Ok(())
+    }
+
+    fn occupied_entry(
+        &self,
+        handle: BridgeHandle,
+    ) -> Result<&BridgeHandleEntry, BridgeHandleTableError> {
+        match self.slot(handle)? {
+            BridgeHandleSlot::Occupied(entry) => Ok(entry),
+            BridgeHandleSlot::Vacant { next_generation } => {
+                Err(BridgeHandleTableError::StaleHandle {
+                    handle,
+                    current_generation: *next_generation,
+                })
+            }
+        }
+    }
+
+    fn occupied_slot_mut(
+        &mut self,
+        handle: BridgeHandle,
+    ) -> Result<&mut BridgeHandleSlot, BridgeHandleTableError> {
+        let slot = self.slot_mut(handle)?;
+
+        match slot {
+            BridgeHandleSlot::Occupied(_) => Ok(slot),
+            BridgeHandleSlot::Vacant { next_generation } => {
+                Err(BridgeHandleTableError::StaleHandle {
+                    handle,
+                    current_generation: *next_generation,
+                })
+            }
+        }
+    }
+
+    fn slot(&self, handle: BridgeHandle) -> Result<&BridgeHandleSlot, BridgeHandleTableError> {
+        self.slots
+            .get((handle.slot() - 1) as usize)
+            .ok_or(BridgeHandleTableError::InvalidHandle { handle })
+    }
+
+    fn slot_mut(
+        &mut self,
+        handle: BridgeHandle,
+    ) -> Result<&mut BridgeHandleSlot, BridgeHandleTableError> {
+        self.slots
+            .get_mut((handle.slot() - 1) as usize)
+            .ok_or(BridgeHandleTableError::InvalidHandle { handle })
+    }
+}
+
+fn validate_entry_generation(
+    handle: BridgeHandle,
+    current_generation: u64,
+) -> Result<(), BridgeHandleTableError> {
+    if handle.generation() == current_generation {
+        return Ok(());
+    }
+
+    Err(BridgeHandleTableError::StaleHandle {
+        handle,
+        current_generation,
+    })
+}
+
+fn validate_entry_kind(
+    handle: BridgeHandle,
+    expected: BridgeHandleKind,
+    actual: BridgeHandleKind,
+) -> Result<(), BridgeHandleTableError> {
+    if actual == expected {
+        return Ok(());
+    }
+
+    Err(BridgeHandleTableError::WrongKind {
+        handle,
+        expected,
+        actual,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn environment(raw: u64) -> BridgeHandleTable {
+        BridgeHandleTable::new(BridgeEnvironmentId::from_raw(raw))
+    }
+
+    #[test]
+    fn inserts_and_reads_root_and_value_records() {
+        let mut table = environment(1);
+
+        let root_handle = table.insert_root(PlaceholderRootRecord::new(101));
+        let value_handle = table.insert_value(PlaceholderValueRecord::new(202));
+
+        assert_eq!(root_handle.environment_id(), table.environment_id());
+        assert_eq!(root_handle.slot(), 1);
+        assert_eq!(root_handle.generation(), 1);
+        assert_eq!(root_handle.kind(), BridgeHandleKind::Root);
+        assert_eq!(value_handle.slot(), 2);
+        assert_eq!(value_handle.kind(), BridgeHandleKind::Value);
+        assert_eq!(table.get_root(root_handle).unwrap().root_id(), 101);
+        assert_eq!(table.get_value(value_handle).unwrap().value_id(), 202);
+    }
+
+    #[test]
+    fn rejects_handles_from_the_wrong_environment() {
+        let mut first = environment(1);
+        let second = environment(2);
+        let handle = first.insert_root(PlaceholderRootRecord::new(1));
+
+        let error = second.get_root(handle).unwrap_err();
+
+        assert_eq!(
+            error,
+            BridgeHandleTableError::WrongEnvironment {
+                handle,
+                expected: second.environment_id()
+            }
+        );
+        assert_eq!(error.code(), "FAST_REACT_NAPI_WRONG_ENVIRONMENT");
+    }
+
+    #[test]
+    fn removed_handles_become_stale_and_slots_are_reused_with_new_generation() {
+        let mut table = environment(1);
+        let old_handle = table.insert_value(PlaceholderValueRecord::new(7));
+
+        let removed = table.remove_value(old_handle).unwrap();
+        let new_handle = table.insert_value(PlaceholderValueRecord::new(8));
+
+        assert_eq!(removed.value_id(), 7);
+        assert_eq!(new_handle.slot(), old_handle.slot());
+        assert_eq!(new_handle.generation(), old_handle.generation() + 1);
+        assert_eq!(
+            table.get_value(old_handle).unwrap_err(),
+            BridgeHandleTableError::StaleHandle {
+                handle: old_handle,
+                current_generation: new_handle.generation()
+            }
+        );
+        assert_eq!(table.get_value(new_handle).unwrap().value_id(), 8);
+    }
+
+    #[test]
+    fn disposed_handles_are_rejected_before_record_access() {
+        let mut table = environment(1);
+        let handle = table.insert_root(PlaceholderRootRecord::new(9));
+
+        table.dispose(handle).unwrap();
+
+        let error = table.get_root(handle).unwrap_err();
+        assert_eq!(error, BridgeHandleTableError::DisposedHandle { handle });
+        assert_eq!(error.code(), "FAST_REACT_NAPI_DISPOSED_HANDLE");
+    }
+
+    #[test]
+    fn duplicate_dispose_is_reported_without_changing_handle_generation() {
+        let mut table = environment(1);
+        let handle = table.insert_root(PlaceholderRootRecord::new(9));
+
+        table.dispose(handle).unwrap();
+        let error = table.dispose(handle).unwrap_err();
+
+        assert_eq!(error, BridgeHandleTableError::DuplicateDispose { handle });
+        assert_eq!(error.code(), "FAST_REACT_NAPI_DUPLICATE_DISPOSE");
+        assert_eq!(
+            error.to_string(),
+            "bridge handle slot 1 has already been disposed"
+        );
+    }
+
+    #[test]
+    fn wrong_kind_handles_are_rejected() {
+        let mut table = environment(1);
+        let handle = table.insert_root(PlaceholderRootRecord::new(11));
+
+        let error = table.get_value(handle).unwrap_err();
+
+        assert_eq!(
+            error,
+            BridgeHandleTableError::WrongKind {
+                handle,
+                expected: BridgeHandleKind::Value,
+                actual: BridgeHandleKind::Root
+            }
+        );
+        assert_eq!(error.code(), "FAST_REACT_NAPI_WRONG_HANDLE_KIND");
+    }
+
+    #[test]
+    fn remove_returns_root_records_and_invalidates_old_handles() {
+        let mut table = environment(1);
+        let handle = table.insert_root(PlaceholderRootRecord::new(44));
+
+        let removed = table.remove_root(handle).unwrap();
+
+        assert_eq!(removed.root_id(), 44);
+        assert_eq!(
+            table.get_root(handle).unwrap_err(),
+            BridgeHandleTableError::StaleHandle {
+                handle,
+                current_generation: 2
+            }
+        );
+    }
+}
