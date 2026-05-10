@@ -56,9 +56,17 @@ sequencing belong in `MASTER_PLAN.md`.
   callback identity validation, selected-lane HostRoot update processing into
   WIP state, WIP queue refresh from current, and render-phase records without
   commit, host mutation, or `root.current` switching.
+- Report-only planning refresh workers 130-148 were merged and closed, covering
+  commit readiness, sync flush/act, host complete work, test-renderer, DOM
+  mutation/root bridge, hooks/effects, conformance/benchmark gates, hydration,
+  events/node maps, native bridge, resource/form boundaries, scheduler/package
+  surfaces, Suspense/Offscreen blockers, and doc drift.
 
 ## Latest Accepted Verification
 
+- Workers 130-148 were accepted as report-only branches after pane inspection
+  and scoped changed-path checks showing one `worker-progress/*.md` report per
+  worker; they were merged as a single octopus report batch.
 - Worker 129 was verified on `main` with `cargo fmt --all --check`, focused
   root work loop, work-in-progress, update queue, and root scheduler tests,
   full `fast-react-reconciler` tests, reconciler clippy, `git diff --check`,

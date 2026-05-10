@@ -45,54 +45,75 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 130: minimal commit slice readiness refresh in
-  `/Users/user/Developer/Developer/fast-react-worker-130-commit-readiness-refresh`.
-- Worker 131: sync flush and act integration refresh in
-  `/Users/user/Developer/Developer/fast-react-worker-131-sync-flush-act-refresh`.
-- Worker 132: host component/text render and complete-work slice refresh in
-  `/Users/user/Developer/Developer/fast-react-worker-132-host-complete-work-refresh`.
-- Worker 133: test-renderer root canary sequencing refresh in
-  `/Users/user/Developer/Developer/fast-react-worker-133-test-renderer-root-refresh`.
-- Worker 134: DOM mutation adapter canary sequencing refresh in
-  `/Users/user/Developer/Developer/fast-react-worker-134-dom-mutation-refresh`.
-- Worker 135: React DOM root facade bridge refresh in
-  `/Users/user/Developer/Developer/fast-react-worker-135-react-dom-root-bridge-refresh`.
-- Worker 136: function component and hook vertical slice refresh in
-  `/Users/user/Developer/Developer/fast-react-worker-136-function-hooks-refresh`.
-- Worker 137: root render conformance and benchmark gate refresh in
-  `/Users/user/Developer/Developer/fast-react-worker-137-conformance-benchmark-refresh`.
-- Worker 138: root error/callback surface sequencing refresh in
-  `/Users/user/Developer/Developer/fast-react-worker-138-root-error-callback-refresh`.
-- Worker 139: passive effects and ref lifecycle sequencing refresh in
-  `/Users/user/Developer/Developer/fast-react-worker-139-passive-ref-refresh`.
-- Worker 140: hydration boundary sequencing refresh in
-  `/Users/user/Developer/Developer/fast-react-worker-140-hydration-boundary-refresh`.
-- Worker 141: event plugin and node map sequencing refresh in
-  `/Users/user/Developer/Developer/fast-react-worker-141-event-node-map-refresh`.
-- Worker 142: native/JS binding bridge sequencing refresh in
-  `/Users/user/Developer/Developer/fast-react-worker-142-native-js-bridge-refresh`.
-- Worker 143: forms/resources/singletons boundary refresh in
-  `/Users/user/Developer/Developer/fast-react-worker-143-resource-form-refresh`.
-- Worker 144: scheduler package regression audit refresh in
-  `/Users/user/Developer/Developer/fast-react-worker-144-scheduler-regression-refresh`.
-- Worker 145: package export/type surface refresh in
-  `/Users/user/Developer/Developer/fast-react-worker-145-package-surface-refresh`.
-- Worker 146: performance and profiling gate refresh in
-  `/Users/user/Developer/Developer/fast-react-worker-146-performance-gate-refresh`.
-- Worker 147: Suspense/Offscreen/root-lane blocker refresh in
-  `/Users/user/Developer/Developer/fast-react-worker-147-suspense-offscreen-refresh`.
-- Worker 148: coordination-doc drift audit in
-  `/Users/user/Developer/Developer/fast-react-worker-148-doc-drift-audit`.
+- Worker 149: HostRoot current-switch commit in
+  `/Users/user/Developer/Developer/fast-react-worker-149-host-root-current-switch-commit`.
+- Worker 150: sync flush execution context in
+  `/Users/user/Developer/Developer/fast-react-worker-150-sync-flush-execution-context`.
+- Worker 151: HostComponent/HostText complete-work skeleton in
+  `/Users/user/Developer/Developer/fast-react-worker-151-host-complete-work-skeleton`.
+- Worker 152: host-config text content boundary in
+  `/Users/user/Developer/Developer/fast-react-worker-152-host-config-text-content-boundary`.
+- Worker 153: Rust test-renderer root canary in
+  `/Users/user/Developer/Developer/fast-react-worker-153-test-renderer-root-canary`.
+- Worker 154: private DOM mutation adapter shell in
+  `/Users/user/Developer/Developer/fast-react-worker-154-dom-mutation-adapter-shell`.
+- Worker 155: scheduler callback execution in
+  `/Users/user/Developer/Developer/fast-react-worker-155-scheduler-callback-execution`.
+- Worker 156: root lane selection helpers in
+  `/Users/user/Developer/Developer/fast-react-worker-156-root-lane-selection-helpers`.
+- Worker 157: core hook effect ring in
+  `/Users/user/Developer/Developer/fast-react-worker-157-core-hook-effect-ring`.
+- Worker 158: core hook state queue in
+  `/Users/user/Developer/Developer/fast-react-worker-158-core-hook-state-queue`.
+- Worker 159: function component render skeleton in
+  `/Users/user/Developer/Developer/fast-react-worker-159-function-component-render-skeleton`.
+- Worker 160: root update callback commit prep in
+  `/Users/user/Developer/Developer/fast-react-worker-160-root-update-callback-commit-prep`.
+- Worker 161: root error option handles in
+  `/Users/user/Developer/Developer/fast-react-worker-161-root-error-option-handles`.
+- Worker 162: benchmark manifest gate in
+  `/Users/user/Developer/Developer/fast-react-worker-162-benchmark-manifest-gate`.
+- Worker 163: root E2E conformance gate in
+  `/Users/user/Developer/Developer/fast-react-worker-163-root-e2e-conformance-gate`.
+- Worker 164: scheduler regression tests in
+  `/Users/user/Developer/Developer/fast-react-worker-164-scheduler-regression-tests`.
+- Worker 165: package surface guard in
+  `/Users/user/Developer/Developer/fast-react-worker-165-package-surface-guard`.
+- Worker 166: native bridge handle table in
+  `/Users/user/Developer/Developer/fast-react-worker-166-native-bridge-handle-table`.
+- Worker 167: React DOM private root bridge in
+  `/Users/user/Developer/Developer/fast-react-worker-167-react-dom-private-root-bridge`.
+- Worker 168: DOM component tree map shell in
+  `/Users/user/Developer/Developer/fast-react-worker-168-dom-component-tree-map-shell`.
+- Worker 169: hydration boundary skeleton in
+  `/Users/user/Developer/Developer/fast-react-worker-169-hydration-boundary-skeleton`.
+- Worker 170: DOM event priority shell in
+  `/Users/user/Developer/Developer/fast-react-worker-170-dom-event-priority-shell`.
+- Worker 171: DOM root marker/listener guard in
+  `/Users/user/Developer/Developer/fast-react-worker-171-dom-root-marker-listener-guard`.
+- Worker 172: resource/form unsupported gates in
+  `/Users/user/Developer/Developer/fast-react-worker-172-resource-form-unsupported-gates`.
+- Worker 173: passive pending state in
+  `/Users/user/Developer/Developer/fast-react-worker-173-passive-pending-state`.
+- Worker 174: ref token lifecycle in
+  `/Users/user/Developer/Developer/fast-react-worker-174-ref-token-lifecycle`.
+- Worker 175: Suspense/Offscreen fail-closed markers in
+  `/Users/user/Developer/Developer/fast-react-worker-175-suspense-offscreen-fail-closed`.
+- Worker 176: act queue routing skeleton in
+  `/Users/user/Developer/Developer/fast-react-worker-176-act-queue-routing-skeleton`.
+- Worker 177: React DOM flushSync private guard in
+  `/Users/user/Developer/Developer/fast-react-worker-177-react-dom-flush-sync-private-guard`.
+- Worker 178: test-renderer serialization gate in
+  `/Users/user/Developer/Developer/fast-react-worker-178-test-renderer-serialization-gate`.
 
 ## Near-Term Sequencing
 
-1. Inspect and merge useful report-only outputs from workers 130-148 as they
-   finish.
-2. Keep total active top-level worker sessions at or below 20 while queueing
-   overlapping code workers with explicit file ownership.
-3. Queue the minimal commit/root-current switch slice first, then sync flush,
-   host complete-work, test-renderer canary, and DOM mutation canary slices as
-   separate code worktrees even if later merges require conflict resolution.
+1. Keep the implementation queue at 30 top-level workers or fewer.
+2. Accept code workers opportunistically, resolving conflicts after the fact
+   rather than serializing all implementation behind one commit path.
+3. Prioritize worker 149 if multiple accepted branches contend for root commit
+   ownership, then fold scheduler, host complete-work, and canary branches onto
+   the accepted root lifecycle shape.
 
 ## Next Queue Candidates
 
