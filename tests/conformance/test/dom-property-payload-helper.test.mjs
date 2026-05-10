@@ -22,6 +22,9 @@ const propertyPayload = require(
     "property-payload.js"
   )
 );
+const domMutation = require(
+  path.join(repoRoot, "packages", "react-dom", "src", "dom-host", "mutation.js")
+);
 const reactDomPackageJson = require(
   path.join(repoRoot, "packages", "react-dom", "package.json")
 );
@@ -39,6 +42,7 @@ const {
   diffDomPropertyPayload,
   isOrdinaryPropertyPayloadEntry
 } = propertyPayload;
+const { applyStyleDangerousHtmlPayload } = domMutation;
 
 test("private DOM property payload preserves insertion order for ordinary attributes", () => {
   assert.deepEqual(
@@ -408,6 +412,208 @@ test("private DOM property payload validates dangerous HTML without mutating", (
   );
 });
 
+test("private DOM style and innerHTML applier applies accepted payload records in order", () => {
+  const element = new FakeElement("div");
+  const payload = diffDomPropertyPayload(
+    "div",
+    {},
+    orderedProps([
+      [
+        "style",
+        orderedProps([
+          ["color", "red"],
+          ["marginTop", 4],
+          ["opacity", 0.5],
+          ["flex", 1],
+          ["--gap", "4px"],
+          ["--count", 3],
+          ["backgroundImage", 'url("x&y")']
+        ])
+      ],
+      ["dangerouslySetInnerHTML", { __html: "<span>raw</span>" }]
+    ])
+  );
+
+  assert.deepEqual(applyStyleDangerousHtmlPayload(element, payload), [
+    setStyle("color", "propertyAssignment", "red"),
+    setStyle("marginTop", "propertyAssignment", "4px"),
+    setStyle("opacity", "propertyAssignment", "0.5"),
+    setStyle("flex", "propertyAssignment", "1"),
+    setStyle("--gap", "setProperty", "4px"),
+    setStyle("--count", "setProperty", "3"),
+    setStyle("backgroundImage", "propertyAssignment", 'url("x&y")'),
+    setInnerHTML("<span>raw</span>")
+  ]);
+  assert.deepEqual(element.mutationLog, [
+    ["stylePropertyAssignment", "color", "red"],
+    ["stylePropertyAssignment", "marginTop", "4px"],
+    ["stylePropertyAssignment", "opacity", "0.5"],
+    ["stylePropertyAssignment", "flex", "1"],
+    ["styleSetProperty", "--gap", "4px"],
+    ["styleSetProperty", "--count", "3"],
+    ["stylePropertyAssignment", "backgroundImage", 'url("x&y")'],
+    ["setInnerHTML", "<span>raw</span>"]
+  ]);
+  assert.deepEqual(element.activeStyleProperties(), [
+    ["--count", "3"],
+    ["--gap", "4px"],
+    ["backgroundImage", 'url("x&y")'],
+    ["color", "red"],
+    ["flex", "1"],
+    ["marginTop", "4px"],
+    ["opacity", "0.5"]
+  ]);
+  assert.equal(element.assignedInnerHTML, "<span>raw</span>");
+  assert.deepEqual(element.childNodes, []);
+});
+
+test("private DOM style applier applies update and removal records deterministically", () => {
+  const element = new FakeElement("div");
+  const initialPayload = diffDomPropertyPayload(
+    "div",
+    {},
+    orderedProps([
+      [
+        "style",
+        orderedProps([
+          ["color", "red"],
+          ["marginTop", 4],
+          ["opacity", 0.5],
+          ["flex", 1],
+          ["--gap", "4px"],
+          ["--count", 3],
+          ["backgroundColor", "yellow"],
+          ["borderWidth", 2],
+          ["paddingLeft", "1em"]
+        ])
+      ]
+    ])
+  );
+  const updatePayload = diffDomPropertyPayload(
+    "div",
+    orderedProps([
+      [
+        "style",
+        orderedProps([
+          ["color", "red"],
+          ["marginTop", 4],
+          ["opacity", 0.5],
+          ["flex", 1],
+          ["--gap", "4px"],
+          ["--count", 3],
+          ["backgroundColor", "yellow"],
+          ["borderWidth", 2],
+          ["paddingLeft", "1em"]
+        ])
+      ]
+    ]),
+    orderedProps([
+      [
+        "style",
+        orderedProps([
+          ["color", null],
+          ["marginTop", 0],
+          ["opacity", null],
+          ["--gap", null],
+          ["backgroundColor", "blue"]
+        ])
+      ]
+    ])
+  );
+
+  applyStyleDangerousHtmlPayload(element, initialPayload);
+  element.mutationLog = [];
+
+  assert.deepEqual(applyStyleDangerousHtmlPayload(element, updatePayload), [
+    removeStyle("flex", "propertyAssignment"),
+    removeStyle("--count", "setProperty"),
+    removeStyle("borderWidth", "propertyAssignment"),
+    removeStyle("paddingLeft", "propertyAssignment"),
+    removeStyle("color", "propertyAssignment"),
+    setStyle("marginTop", "propertyAssignment", "0"),
+    removeStyle("opacity", "propertyAssignment"),
+    removeStyle("--gap", "setProperty"),
+    setStyle("backgroundColor", "propertyAssignment", "blue")
+  ]);
+  assert.deepEqual(element.mutationLog, [
+    ["stylePropertyAssignment", "flex", ""],
+    ["styleSetProperty", "--count", ""],
+    ["stylePropertyAssignment", "borderWidth", ""],
+    ["stylePropertyAssignment", "paddingLeft", ""],
+    ["stylePropertyAssignment", "color", ""],
+    ["stylePropertyAssignment", "marginTop", "0"],
+    ["stylePropertyAssignment", "opacity", ""],
+    ["styleSetProperty", "--gap", ""],
+    ["stylePropertyAssignment", "backgroundColor", "blue"]
+  ]);
+  assert.deepEqual(element.activeStyleProperties(), [
+    ["backgroundColor", "blue"],
+    ["marginTop", "0"]
+  ]);
+});
+
+test("private DOM style and innerHTML applier fails closed before mutating unsupported records", () => {
+  const element = new FakeElement("div");
+  const invalidStylePayload = diffDomPropertyPayload(
+    "div",
+    {},
+    orderedProps([
+      [
+        "style",
+        orderedProps([
+          ["color", "red"],
+          ["width", Number.NaN]
+        ])
+      ],
+      ["dangerouslySetInnerHTML", { __html: "<span>raw</span>" }]
+    ])
+  );
+
+  assert.throws(
+    () => applyStyleDangerousHtmlPayload(element, invalidStylePayload),
+    {
+      code: "FAST_REACT_DOM_UNSUPPORTED_PAYLOAD_ENTRY"
+    }
+  );
+  assert.deepEqual(element.mutationLog, []);
+  assert.deepEqual(element.activeStyleProperties(), []);
+  assert.equal(element.assignedInnerHTML, null);
+
+  assert.throws(
+    () =>
+      applyStyleDangerousHtmlPayload(
+        element,
+        diffDomPropertyPayload(
+          "div",
+          {},
+          orderedProps([["dangerouslySetInnerHTML", { __html: null }]])
+        )
+      ),
+    {
+      code: "FAST_REACT_DOM_NON_PAYLOAD_ENTRY"
+    }
+  );
+  assert.deepEqual(element.mutationLog, []);
+});
+
+test("private DOM style and innerHTML applier rejects ordinary attribute records", () => {
+  const element = new FakeElement("div");
+  const attributePayload = diffDomPropertyPayload(
+    "div",
+    {},
+    orderedProps([["id", "not-this-worker"]])
+  );
+
+  assert.throws(
+    () => applyStyleDangerousHtmlPayload(element, attributePayload),
+    {
+      code: "FAST_REACT_DOM_UNSUPPORTED_PAYLOAD_ENTRY"
+    }
+  );
+  assert.deepEqual(element.mutationLog, []);
+  assert.deepEqual(element.activeStyleProperties(), []);
+});
+
 test("private DOM property payload reports controlled form and document resource host entries as unsupported", () => {
   assert.deepEqual(
     diffDomPropertyPayload(
@@ -687,4 +893,73 @@ function unsupported(propName, category, reason, details) {
     };
   }
   return entry;
+}
+
+class FakeElement {
+  constructor(nodeName) {
+    this.nodeName = nodeName.toUpperCase();
+    this.nodeType = 1;
+    this.childNodes = [];
+    this.mutationLog = [];
+    this.style = new FakeStyle(this);
+    this.assignedInnerHTML = null;
+  }
+
+  get innerHTML() {
+    return this.assignedInnerHTML ?? "";
+  }
+
+  set innerHTML(value) {
+    const html = String(value);
+    this.mutationLog.push(["setInnerHTML", html]);
+    this.childNodes = [];
+    this.assignedInnerHTML = html;
+  }
+
+  activeStyleProperties() {
+    return Array.from(this.style.properties.entries())
+      .filter(([, value]) => value !== "")
+      .sort(([left], [right]) => left.localeCompare(right));
+  }
+}
+
+class FakeStyle {
+  constructor(ownerElement) {
+    this.ownerElement = ownerElement;
+    this.properties = new Map();
+
+    return new Proxy(this, {
+      set(target, property, value, receiver) {
+        if (shouldRecordStyleProperty(property)) {
+          const stringValue = String(value);
+          target.properties.set(property, stringValue);
+          target.ownerElement.mutationLog.push([
+            "stylePropertyAssignment",
+            property,
+            stringValue
+          ]);
+        }
+        return Reflect.set(target, property, value, receiver);
+      }
+    });
+  }
+
+  setProperty(name, value) {
+    const propertyName = String(name);
+    const stringValue = String(value);
+    this.properties.set(propertyName, stringValue);
+    this.ownerElement.mutationLog.push([
+      "styleSetProperty",
+      propertyName,
+      stringValue
+    ]);
+  }
+}
+
+function shouldRecordStyleProperty(property) {
+  return (
+    typeof property === "string" &&
+    !property.startsWith("_") &&
+    !["ownerElement", "properties", "setProperty"].includes(property)
+  );
 }
