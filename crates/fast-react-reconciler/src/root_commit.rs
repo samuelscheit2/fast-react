@@ -773,6 +773,15 @@ impl HostRootFinishedWorkPendingCommitRecordForCanary {
     pub(crate) fn records_finished_work(self) -> bool {
         matches!(self.pending_work, Some(pending_work) if pending_work == self.finished_work)
     }
+
+    #[must_use]
+    pub(crate) const fn with_previous_current_for_canary(
+        mut self,
+        previous_current: FiberId,
+    ) -> Self {
+        self.previous_current = previous_current;
+        self
+    }
 }
 
 #[cfg(test)]
@@ -4820,6 +4829,20 @@ impl HostRootCommitRecord {
             .collect()
     }
 
+    #[cfg(test)]
+    pub(crate) fn single_host_update_apply_record_for_canary(
+        &self,
+    ) -> Result<
+        HostRootSingleHostUpdateApplyRecordForCanary,
+        HostRootSingleHostUpdateApplyRecordErrorForCanary,
+    > {
+        single_host_update_apply_record_for_canary_from_log(
+            self.root,
+            self.current,
+            &self.mutation_apply_log,
+        )
+    }
+
     #[doc(hidden)]
     #[must_use]
     pub fn has_test_only_host_text_update_apply_for_canary(
@@ -5505,6 +5528,33 @@ pub(crate) fn commit_finished_host_root_with_finished_work_handoff_for_canary<H:
         finished_lanes_after_commit: root.finished_lanes(),
         render_phase_work_after_commit: root.scheduling().work_in_progress(),
     })
+}
+
+#[cfg(test)]
+pub(crate) fn record_host_root_single_host_update_apply_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    render: HostRootRenderPhaseRecord,
+) -> Result<
+    HostRootSingleHostUpdateApplyRecordForCanary,
+    HostRootSingleHostUpdateApplyRecordErrorForCanary,
+> {
+    validate_finished_host_root(store, render)?;
+
+    let root = render.root();
+    let finished_work = render.finished_work();
+    let lanes = render.render_lanes();
+    let mutation_log = collect_host_root_mutation_phase_log(store, root, finished_work, lanes)?;
+    let deletion_lists = collect_deletion_list_metadata(store, finished_work)?;
+    let mutation_apply_log = collect_host_root_mutation_apply_log(
+        store,
+        root,
+        finished_work,
+        lanes,
+        &mutation_log,
+        &deletion_lists,
+    )?;
+
+    single_host_update_apply_record_for_canary_from_log(root, finished_work, &mutation_apply_log)
 }
 
 #[cfg(test)]
@@ -7931,6 +7981,210 @@ impl HostComponentUpdateApplyDiagnosticForCanary {
     pub const fn apply_kind(self) -> &'static str {
         self.apply_kind
     }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct HostRootSingleHostUpdateApplyRecordForCanary {
+    root: FiberRootId,
+    finished_work: FiberId,
+    mutation_record_count: usize,
+    host_update_record_count: usize,
+    mutation: HostRootMutationApplyRecord,
+}
+
+#[cfg(test)]
+impl HostRootSingleHostUpdateApplyRecordForCanary {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn mutation_record_count(self) -> usize {
+        self.mutation_record_count
+    }
+
+    #[must_use]
+    pub(crate) const fn host_update_record_count(self) -> usize {
+        self.host_update_record_count
+    }
+
+    #[must_use]
+    pub(crate) const fn mutation(self) -> HostRootMutationApplyRecord {
+        self.mutation
+    }
+
+    #[must_use]
+    pub(crate) const fn fiber(self) -> FiberId {
+        self.mutation.fiber()
+    }
+
+    #[must_use]
+    pub(crate) const fn alternate_fiber(self) -> Option<FiberId> {
+        self.mutation.alternate_fiber()
+    }
+
+    #[must_use]
+    pub(crate) const fn state_node(self) -> StateNodeHandle {
+        self.mutation.state_node()
+    }
+
+    #[must_use]
+    pub(crate) const fn kind(self) -> HostRootMutationApplyRecordKind {
+        self.mutation.kind()
+    }
+
+    #[must_use]
+    pub(crate) const fn kind_name(self) -> &'static str {
+        host_root_mutation_apply_record_kind_name(self.mutation.kind())
+    }
+
+    #[must_use]
+    pub(crate) const fn is_host_component_props_update(self) -> bool {
+        matches!(
+            self.mutation.kind(),
+            HostRootMutationApplyRecordKind::CommitHostComponentUpdate
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn is_host_text_content_update(self) -> bool {
+        matches!(
+            self.mutation.kind(),
+            HostRootMutationApplyRecordKind::CommitHostTextUpdate
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn test_host_commit_path_only(self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_rendering_blocked(self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_renderer_package_behavior_exposed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn react_dom_compatibility_claimed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn test_renderer_compatibility_claimed(self) -> bool {
+        false
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum HostRootSingleHostUpdateApplyRecordErrorForCanary {
+    Commit(RootCommitError),
+    ExpectedSingleHostUpdateRecord {
+        root: FiberRootId,
+        finished_work: FiberId,
+        mutation_record_count: usize,
+        host_update_record_count: usize,
+    },
+}
+
+#[cfg(test)]
+impl Display for HostRootSingleHostUpdateApplyRecordErrorForCanary {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Commit(error) => Display::fmt(error, formatter),
+            Self::ExpectedSingleHostUpdateRecord {
+                root,
+                finished_work,
+                mutation_record_count,
+                host_update_record_count,
+            } => write!(
+                formatter,
+                "root {} finished work fiber slot {} expected exactly one private HostComponent/HostText update apply record and no other mutation records, found {} mutation records and {} host update records",
+                root.raw(),
+                finished_work.slot().get(),
+                mutation_record_count,
+                host_update_record_count
+            ),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Error for HostRootSingleHostUpdateApplyRecordErrorForCanary {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::Commit(error) => Some(error),
+            Self::ExpectedSingleHostUpdateRecord { .. } => None,
+        }
+    }
+}
+
+#[cfg(test)]
+impl From<RootCommitError> for HostRootSingleHostUpdateApplyRecordErrorForCanary {
+    fn from(error: RootCommitError) -> Self {
+        Self::Commit(error)
+    }
+}
+
+#[cfg(test)]
+fn single_host_update_apply_record_for_canary_from_log(
+    root: FiberRootId,
+    finished_work: FiberId,
+    mutation_apply_log: &HostRootMutationApplyLog,
+) -> Result<
+    HostRootSingleHostUpdateApplyRecordForCanary,
+    HostRootSingleHostUpdateApplyRecordErrorForCanary,
+> {
+    let mutation_record_count = mutation_apply_log.len();
+    let update_records = mutation_apply_log
+        .records()
+        .iter()
+        .copied()
+        .filter(|record| is_host_update_apply_record_kind_for_canary(record.kind()))
+        .collect::<Vec<_>>();
+    let host_update_record_count = update_records.len();
+
+    if mutation_record_count != 1 || host_update_record_count != 1 {
+        return Err(
+            HostRootSingleHostUpdateApplyRecordErrorForCanary::ExpectedSingleHostUpdateRecord {
+                root,
+                finished_work,
+                mutation_record_count,
+                host_update_record_count,
+            },
+        );
+    }
+
+    Ok(HostRootSingleHostUpdateApplyRecordForCanary {
+        root,
+        finished_work,
+        mutation_record_count,
+        host_update_record_count,
+        mutation: update_records[0],
+    })
+}
+
+#[cfg(test)]
+const fn is_host_update_apply_record_kind_for_canary(
+    kind: HostRootMutationApplyRecordKind,
+) -> bool {
+    matches!(
+        kind,
+        HostRootMutationApplyRecordKind::CommitHostComponentUpdate
+            | HostRootMutationApplyRecordKind::CommitHostTextUpdate
+    )
 }
 
 const fn host_root_mutation_apply_record_kind_name(
@@ -13054,6 +13308,68 @@ mod tests {
             store.root(root_id).unwrap().current(),
             render.finished_work()
         );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_host_component_update_single_record_diagnostic_stays_private() {
+        let (mut store, root_id, host) = root_store();
+        let current_root = store.root(root_id).unwrap().current();
+        let current_props = PropsHandle::from_raw(805);
+        let next_pending_props = PropsHandle::from_raw(806);
+        let next_memoized_props = PropsHandle::from_raw(807);
+        let state_node = StateNodeHandle::from_raw(808);
+        let current_child = attach_host_root_child(
+            &mut store,
+            current_root,
+            FiberTag::HostComponent,
+            FiberFlags::NO,
+            state_node,
+            current_props,
+            current_props,
+        );
+        update_container(&mut store, root_id, RootElementHandle::from_raw(46), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let finished_child = attach_host_root_child(
+            &mut store,
+            render.finished_work(),
+            FiberTag::HostComponent,
+            FiberFlags::UPDATE,
+            state_node,
+            next_pending_props,
+            next_memoized_props,
+        );
+        store
+            .fiber_arena_mut()
+            .link_alternates(current_child, finished_child)
+            .unwrap();
+
+        let pending_update =
+            record_host_root_single_host_update_apply_for_canary(&store, render).unwrap();
+
+        assert_eq!(pending_update.root(), root_id);
+        assert_eq!(pending_update.finished_work(), render.finished_work());
+        assert_eq!(pending_update.mutation_record_count(), 1);
+        assert_eq!(pending_update.host_update_record_count(), 1);
+        assert_eq!(pending_update.fiber(), finished_child);
+        assert_eq!(pending_update.alternate_fiber(), Some(current_child));
+        assert_eq!(pending_update.state_node(), state_node);
+        assert_eq!(
+            pending_update.kind(),
+            HostRootMutationApplyRecordKind::CommitHostComponentUpdate
+        );
+        assert_eq!(pending_update.kind_name(), "commit-host-component-update");
+        assert!(pending_update.is_host_component_props_update());
+        assert!(!pending_update.is_host_text_content_update());
+        assert!(pending_update.test_host_commit_path_only());
+        assert!(pending_update.public_root_rendering_blocked());
+        assert!(!pending_update.public_renderer_package_behavior_exposed());
+        assert!(!pending_update.react_dom_compatibility_claimed());
+        assert!(!pending_update.test_renderer_compatibility_claimed());
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let committed_update = commit.single_host_update_apply_record_for_canary().unwrap();
+        assert_eq!(committed_update, pending_update);
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
