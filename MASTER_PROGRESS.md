@@ -44,10 +44,13 @@ sequencing belong in `MASTER_PLAN.md`.
 - Worker 122 React DOM container marker and root listener shell internals were
   merged.
 - Worker 123 reconciler FiberRoot/HostRoot internal model was merged.
+- Worker 124 reconciler HostRoot update queue plus `update_container` and
+  `update_container_sync` was merged.
+- Worker 125 scheduler `unstable_post_task` implementation and smoke behavior
+  was merged.
 
 ## Latest Accepted Verification
 
-- Worker 123 was verified on `main` with `cargo fmt --all --check`, focused
-  `root_config`, `fiber_root`, `host_tokens`, and `work_in_progress` tests,
-  full `fast-react-reconciler` tests, reconciler clippy, and `git diff
-  --check`.
+- Workers 124 and 125 were verified on `main` with `cargo fmt --all --check`,
+  full `fast-react-reconciler` tests, `npm run check:js` with 414 conformance
+  tests, reconciler clippy, `git diff --check`, and clean git status.

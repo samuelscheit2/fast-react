@@ -45,27 +45,22 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 124: reconciler HostRoot update queue plus `update_container` and
-  `update_container_sync`.
-- Worker 125: independent `scheduler/unstable_post_task` implementation.
-- Worker 126: independent scheduler native entrypoint implementation.
+- Worker 126: scheduler native entrypoint implementation is committed on its
+  worker branch and pending smoke integration before merge to `main`.
+- Worker 127: launch a narrow native scheduler smoke integration worker based
+  on current `main` plus worker 126's committed implementation.
 
 ## Near-Term Sequencing
 
-1. Keep workers 124, 125, and 126 running while their tmux panes show active
-   `Working` or `Pursuing goal`; ignore stale usage-limit text unless the
-   process is stopped, idle, or blocked at a prompt.
-2. Keep worker 124 serialized around reconciler root queue/API surfaces. Do not
-   launch dependent root scheduler, work-loop, commit, DOM event-dispatch, or
-   React DOM facade source slices until worker 124 is accepted or abandoned.
-3. Keep workers 125 and 126 independent from root/reconciler work. Resolve the
-   scheduler smoke integration expectations before accepting their broad JS
-   gates as green.
-4. After worker 124 lands, queue the next non-overlapping root/reconciler slices
-   from the accepted sequencing reports.
-5. After scheduler variant smoke integration is settled, accept or follow up on
-   workers 125 and 126 through their focused oracle gates plus `npm run
-   check:js`.
+1. Keep worker 126's implementation branch out of `main` until native smoke
+   integration proves the broad JS gate after its changes.
+2. Launch worker 127 in an isolated integration worktree with worker 126's
+   commit merged in. Limit its write scope to
+   `tests/smoke/import-entrypoints.mjs` and its progress report.
+3. After worker 127 passes `npm run check:js`, accept the integration branch
+   and close workers 126 and 127 together.
+4. Queue the next non-overlapping root/reconciler slices from accepted
+   sequencing reports now that worker 124's HostRoot queue model is merged.
 
 ## Next Queue Candidates
 
