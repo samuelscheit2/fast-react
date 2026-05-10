@@ -383,6 +383,18 @@ impl FunctionComponentContextRenderStore {
         self.stack.create_context(default_value)
     }
 
+    #[must_use]
+    pub fn stack_depth(&self) -> usize {
+        self.stack.stack_depth()
+    }
+
+    pub fn active_provider_count(
+        &self,
+        context: ContextHandle,
+    ) -> Result<usize, ContextStackError> {
+        Ok(self.stack.context_slot(context)?.active_provider_count())
+    }
+
     pub fn push_provider(
         &mut self,
         context: ContextHandle,
