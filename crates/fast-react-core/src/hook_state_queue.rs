@@ -1556,6 +1556,44 @@ mod tests {
     }
 
     #[test]
+    fn eager_metadata_survives_no_lane_clone_after_prior_skip() {
+        let mut store = HookQueueStore::<i32, i32>::new();
+        let mut slot = store.create_state_slot(1);
+        let skipped = store.create_update(lane(Lane::DEFAULT), 10);
+        let eager_applied = store.create_update_from_dispatch_metadata(
+            HookUpdateDispatchMetadata::new(lane(Lane::SYNC), 1000).with_eager_state(7),
+        );
+        store.append_pending_update(slot.queue(), skipped).unwrap();
+        store
+            .append_pending_update(slot.queue(), eager_applied)
+            .unwrap();
+        let mut reducer_calls = 0;
+
+        let result = store
+            .process_update_queue(&mut slot, Lanes::SYNC, Lanes::SYNC, |state, action| {
+                reducer_calls += 1;
+                state + action
+            })
+            .unwrap();
+
+        assert_eq!(*result.memoized_state(), 7);
+        assert_eq!(*result.base_state(), 1);
+        assert_eq!(result.applied_update_count(), 1);
+        assert_eq!(result.skipped_update_count(), 1);
+        assert_eq!(result.eager_update_count(), 1);
+        assert_eq!(reducer_calls, 0);
+        let rebased = store.update_ring(slot.base_queue()).unwrap();
+        assert_eq!(rebased.len(), 2);
+        assert_eq!(
+            store.update(rebased[0]).unwrap().lane().priority_lanes(),
+            Lanes::DEFAULT
+        );
+        assert_eq!(store.update(rebased[0]).unwrap().eager_state(), None);
+        assert!(store.update(rebased[1]).unwrap().lane().is_no_lane());
+        assert_eq!(store.update(rebased[1]).unwrap().eager_state(), Some(&7));
+    }
+
+    #[test]
     fn optimistic_update_applies_until_revert_lane_renders() {
         let mut store = HookQueueStore::<i32, i32>::new();
         let mut slot = store.create_state_slot(0);

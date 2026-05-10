@@ -345,6 +345,8 @@ pub(crate) struct FunctionComponentReducerDispatchRequest {
     dispatch: FunctionComponentStateDispatchHandle,
     action: FunctionComponentStateActionHandle,
     lane: HookUpdateLane,
+    revert_lane: HookRevertLane,
+    eager_state: Option<FunctionComponentStateDispatchEagerState>,
 }
 
 impl FunctionComponentReducerDispatchRequest {
@@ -358,7 +360,24 @@ impl FunctionComponentReducerDispatchRequest {
             dispatch,
             action,
             lane,
+            revert_lane: HookRevertLane::NO,
+            eager_state: None,
         }
+    }
+
+    #[must_use]
+    pub const fn with_revert_lane(mut self, revert_lane: HookRevertLane) -> Self {
+        self.revert_lane = revert_lane;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_eager_state(
+        mut self,
+        eager_state: FunctionComponentStateDispatchEagerState,
+    ) -> Self {
+        self.eager_state = Some(eager_state);
+        self
     }
 
     #[must_use]
@@ -374,6 +393,21 @@ impl FunctionComponentReducerDispatchRequest {
     #[must_use]
     pub const fn lane(self) -> HookUpdateLane {
         self.lane
+    }
+
+    #[must_use]
+    pub const fn revert_lane(self) -> HookRevertLane {
+        self.revert_lane
+    }
+
+    #[must_use]
+    pub const fn eager_state(self) -> Option<FunctionComponentStateDispatchEagerState> {
+        self.eager_state
+    }
+
+    #[must_use]
+    pub const fn has_eager_state(self) -> bool {
+        self.eager_state.is_some()
     }
 }
 
@@ -397,7 +431,9 @@ pub(crate) struct FunctionComponentReducerDispatchRecord {
     reducer: FunctionComponentReducerHandle,
     update: HookUpdateId,
     lane: HookUpdateLane,
+    revert_lane: HookRevertLane,
     action: FunctionComponentStateActionHandle,
+    eager_state: Option<FunctionComponentStateDispatchEagerState>,
 }
 
 impl FunctionComponentReducerDispatchRecord {
@@ -432,8 +468,23 @@ impl FunctionComponentReducerDispatchRecord {
     }
 
     #[must_use]
+    pub const fn revert_lane(self) -> HookRevertLane {
+        self.revert_lane
+    }
+
+    #[must_use]
     pub const fn action(self) -> FunctionComponentStateActionHandle {
         self.action
+    }
+
+    #[must_use]
+    pub const fn eager_state(self) -> Option<FunctionComponentStateDispatchEagerState> {
+        self.eager_state
+    }
+
+    #[must_use]
+    pub const fn has_eager_state(self) -> bool {
+        self.eager_state.is_some()
     }
 }
 
@@ -1718,7 +1769,7 @@ impl FunctionComponentHookRenderStore {
         request: FunctionComponentStateDispatchRequest,
     ) -> Result<FunctionComponentStateDispatchRecord, FunctionComponentRenderError> {
         let binding = self.state_dispatch_binding(request.dispatch())?;
-        self.validate_state_dispatch_metadata(binding, request)?;
+        self.validate_dispatch_eager_state(binding, request.eager_state())?;
         let update = self
             .state_queues
             .create_update(request.lane(), request.action());
@@ -1754,9 +1805,20 @@ impl FunctionComponentHookRenderStore {
     ) -> Result<FunctionComponentReducerDispatchRecord, FunctionComponentRenderError> {
         let binding = self.state_dispatch_binding(request.dispatch())?;
         let reducer = self.reducer_for_queue(binding.fiber, binding.queue)?;
+        self.validate_dispatch_eager_state(binding, request.eager_state())?;
         let update = self
             .state_queues
             .create_update(request.lane(), request.action());
+        {
+            let update_record = self
+                .state_queues
+                .update_mut(update)
+                .map_err(|error| FunctionComponentRenderError::hook_queue(binding.fiber, error))?;
+            update_record.set_revert_lane(request.revert_lane());
+            if let Some(eager_state) = request.eager_state() {
+                update_record.set_eager_state(eager_state.eager_state());
+            }
+        }
         self.state_queues
             .append_pending_update(binding.queue, update)
             .map_err(|error| FunctionComponentRenderError::hook_queue(binding.fiber, error))?;
@@ -1768,7 +1830,9 @@ impl FunctionComponentHookRenderStore {
             reducer,
             update,
             lane: request.lane(),
+            revert_lane: request.revert_lane(),
             action: request.action(),
+            eager_state: request.eager_state(),
         })
     }
 
@@ -2003,12 +2067,12 @@ impl FunctionComponentHookRenderStore {
         Ok(dispatch)
     }
 
-    fn validate_state_dispatch_metadata(
+    fn validate_dispatch_eager_state(
         &self,
         binding: FunctionComponentStateDispatchBinding,
-        request: FunctionComponentStateDispatchRequest,
+        eager_state: Option<FunctionComponentStateDispatchEagerState>,
     ) -> Result<(), FunctionComponentRenderError> {
-        let Some(eager_state) = request.eager_state() else {
+        let Some(eager_state) = eager_state else {
             return Ok(());
         };
         let queue = self
@@ -5204,7 +5268,10 @@ mod tests {
         assert_eq!(dispatch_record.dispatch(), reducer_record.dispatch());
         assert_eq!(dispatch_record.reducer(), reducer_id);
         assert_eq!(dispatch_record.lane(), lane);
+        assert_eq!(dispatch_record.revert_lane(), HookRevertLane::NO);
         assert_eq!(dispatch_record.action(), action(7));
+        assert_eq!(dispatch_record.eager_state(), None);
+        assert!(!dispatch_record.has_eager_state());
         assert_eq!(
             hook_store
                 .state_queues()
@@ -5389,6 +5456,232 @@ mod tests {
         );
 
         hook_store.finish_render_cursor(cursor).unwrap();
+    }
+
+    #[test]
+    fn private_use_reducer_dispatch_records_and_rebases_eager_metadata() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let reducer_id = reducer(705);
+        let current_reducer = hook_store
+            .create_current_reducer_hook(current, reducer_id, StateHandle::from_raw(50))
+            .unwrap();
+        let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+        let revert_lane = HookRevertLane::from_lane(Lane::TRANSITION_1);
+        let eager_state = FunctionComponentStateDispatchEagerState::new(
+            StateHandle::from_raw(50),
+            StateHandle::from_raw(57),
+        );
+        let queued = hook_store
+            .dispatch_reducer_update(
+                FunctionComponentReducerDispatchRequest::new(
+                    current_reducer.dispatch(),
+                    action(7),
+                    lane,
+                )
+                .with_revert_lane(revert_lane)
+                .with_eager_state(eager_state),
+            )
+            .unwrap();
+
+        assert_eq!(queued.fiber(), current);
+        assert_eq!(queued.queue(), current_reducer.queue());
+        assert_eq!(queued.dispatch(), current_reducer.dispatch());
+        assert_eq!(queued.reducer(), reducer_id);
+        assert_eq!(queued.lane(), lane);
+        assert_eq!(queued.revert_lane(), revert_lane);
+        assert_eq!(queued.action(), action(7));
+        assert_eq!(queued.eager_state(), Some(eager_state));
+        assert!(queued.has_eager_state());
+        let update = hook_store.state_queues().update(queued.update()).unwrap();
+        assert_eq!(update.lane(), lane);
+        assert_eq!(update.revert_lane(), revert_lane);
+        assert_eq!(*update.action(), action(7));
+        assert_eq!(
+            update.eager_state().copied(),
+            Some(StateHandle::from_raw(57))
+        );
+
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(72)));
+        let render = render_function_component_with_hook_state(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::SYNC,
+            &mut registry,
+        )
+        .unwrap();
+        let mut cursor = hook_store
+            .begin_render_cursor(render.hook_state().unwrap())
+            .unwrap();
+        let lanes = FunctionComponentStateUpdateRenderLanes::new(Lanes::SYNC, Lanes::SYNC);
+        let update_render = hook_store
+            .update_reducer_hook_with_queued_updates(&mut cursor, reducer_id, lanes, |_, _| {
+                panic!("skipped eager reducer update should not be applied")
+            })
+            .unwrap();
+
+        assert_eq!(update_render.memoized_state(), StateHandle::from_raw(50));
+        assert_eq!(update_render.base_state(), StateHandle::from_raw(50));
+        assert_eq!(update_render.remaining_lanes(), Lanes::DEFAULT);
+        assert_eq!(update_render.applied_update_count(), 0);
+        assert_eq!(update_render.skipped_update_count(), 1);
+        assert_eq!(update_render.eager_update_count(), 0);
+        let rebased = hook_store
+            .state_queues()
+            .update_ring(update_render.base_queue())
+            .unwrap();
+        assert_eq!(rebased.len(), 1);
+        let rebased_update = hook_store.state_queues().update(rebased[0]).unwrap();
+        assert_eq!(rebased_update.lane().priority_lanes(), Lanes::DEFAULT);
+        assert_eq!(rebased_update.revert_lane(), revert_lane);
+        assert_eq!(*rebased_update.action(), action(7));
+        assert_eq!(
+            rebased_update.eager_state().copied(),
+            Some(StateHandle::from_raw(57))
+        );
+
+        hook_store.finish_render_cursor(cursor).unwrap();
+    }
+
+    #[test]
+    fn private_use_reducer_update_render_applies_rebased_eager_state_without_reducer_call() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let reducer_id = reducer(706);
+        let current_reducer = hook_store
+            .create_current_reducer_hook(current, reducer_id, StateHandle::from_raw(60))
+            .unwrap();
+        let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+        let eager_state = FunctionComponentStateDispatchEagerState::new(
+            StateHandle::from_raw(60),
+            StateHandle::from_raw(67),
+        );
+        hook_store
+            .dispatch_reducer_update(
+                FunctionComponentReducerDispatchRequest::new(
+                    current_reducer.dispatch(),
+                    action(7),
+                    lane,
+                )
+                .with_eager_state(eager_state),
+            )
+            .unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(73)));
+
+        let skipped_render = render_function_component_with_hook_state(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::SYNC,
+            &mut registry,
+        )
+        .unwrap();
+        let skipped_state = skipped_render.hook_state().unwrap();
+        let mut skipped_cursor = hook_store.begin_render_cursor(skipped_state).unwrap();
+        let skipped_lanes = FunctionComponentStateUpdateRenderLanes::new(Lanes::SYNC, Lanes::SYNC);
+        let skipped_update = hook_store
+            .update_reducer_hook_with_queued_updates(
+                &mut skipped_cursor,
+                reducer_id,
+                skipped_lanes,
+                |_, _| panic!("skipped eager reducer update should not be applied"),
+            )
+            .unwrap();
+        assert_eq!(skipped_update.skipped_update_count(), 1);
+        assert_eq!(skipped_update.eager_update_count(), 0);
+        hook_store.finish_render_cursor(skipped_cursor).unwrap();
+        hook_store.bind_current_list_unchecked(current, skipped_state.work_in_progress_list());
+
+        let retry_render = render_function_component_with_hook_state(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap();
+        let mut retry_cursor = hook_store
+            .begin_render_cursor(retry_render.hook_state().unwrap())
+            .unwrap();
+        let retry_lanes =
+            FunctionComponentStateUpdateRenderLanes::new(Lanes::DEFAULT, Lanes::DEFAULT);
+        let mut reducer_calls = 0;
+        let applied_update = hook_store
+            .update_reducer_hook_with_queued_updates(
+                &mut retry_cursor,
+                reducer_id,
+                retry_lanes,
+                |state, action| {
+                    reducer_calls += 1;
+                    StateHandle::from_raw(state.raw() + action.raw())
+                },
+            )
+            .unwrap();
+
+        assert_eq!(applied_update.memoized_state(), StateHandle::from_raw(67));
+        assert_eq!(applied_update.resulting_state(), StateHandle::from_raw(67));
+        assert_eq!(applied_update.base_state(), StateHandle::from_raw(67));
+        assert_eq!(applied_update.base_queue(), None);
+        assert_eq!(applied_update.remaining_lanes(), Lanes::NO);
+        assert_eq!(applied_update.applied_update_count(), 1);
+        assert_eq!(applied_update.skipped_update_count(), 0);
+        assert_eq!(applied_update.eager_update_count(), 1);
+        assert_eq!(reducer_calls, 0);
+        let queue = hook_store
+            .state_queues()
+            .queue(current_reducer.queue())
+            .unwrap();
+        assert_eq!(*queue.last_rendered_state(), StateHandle::from_raw(67));
+        hook_store.finish_render_cursor(retry_cursor).unwrap();
+    }
+
+    #[test]
+    fn private_use_reducer_dispatch_rejects_stale_eager_last_rendered_state() {
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let mut arena = FiberArena::new();
+        let current = arena.create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(1),
+            FiberMode::NO,
+        );
+        let current_reducer = hook_store
+            .create_current_reducer_hook(current, reducer(707), StateHandle::from_raw(70))
+            .unwrap();
+        let stale_eager_state = FunctionComponentStateDispatchEagerState::new(
+            StateHandle::from_raw(69),
+            StateHandle::from_raw(77),
+        );
+        let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+
+        assert_eq!(
+            hook_store.dispatch_reducer_update(
+                FunctionComponentReducerDispatchRequest::new(
+                    current_reducer.dispatch(),
+                    action(7),
+                    lane,
+                )
+                .with_eager_state(stale_eager_state),
+            ),
+            Err(
+                FunctionComponentRenderError::StateDispatchEagerStateMismatch {
+                    fiber: current,
+                    queue: current_reducer.queue(),
+                    expected: StateHandle::from_raw(70),
+                    actual: StateHandle::from_raw(69),
+                },
+            )
+        );
+        assert_eq!(
+            hook_store
+                .state_queues()
+                .pending_updates(current_reducer.queue())
+                .unwrap(),
+            Vec::<HookUpdateId>::new()
+        );
     }
 
     #[test]
