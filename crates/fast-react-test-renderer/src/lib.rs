@@ -1768,6 +1768,8 @@ pub const TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.serialization.private-tree-canary";
 pub const TEST_RENDERER_PRIVATE_TEST_INSTANCE_FIND_ALL_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.testinstance.find-all-private-query";
+pub const TEST_RENDERER_PRIVATE_TEST_INSTANCE_FIND_BY_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.testinstance.find-by-private-query";
 pub const TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.error-boundary.private-root-options-canary";
 pub const TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_STATUS: &str =
@@ -3348,6 +3350,278 @@ impl TestRendererPrivateTestInstanceFindAllQueryDiagnostics {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TestRendererPrivateTestInstanceFindByQueryKind {
+    Type,
+    Props,
+}
+
+impl TestRendererPrivateTestInstanceFindByQueryKind {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Type => "findByType",
+            Self::Props => "findByProps",
+        }
+    }
+
+    #[must_use]
+    pub const fn criteria_kind(self) -> &'static str {
+        match self {
+            Self::Type => "type",
+            Self::Props => "props",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateTestInstanceFindByResultDiagnostic {
+    query_kind: TestRendererPrivateTestInstanceFindByQueryKind,
+    public_surface: &'static str,
+    source: &'static str,
+    based_on_find_all_source: &'static str,
+    based_on_predicate_kind: TestRendererPrivateTestInstanceFindAllPredicateKind,
+    expect_one_message: String,
+    expected_type: Option<TestElementType>,
+    expected_props: Option<TestProps>,
+    effective_deep: bool,
+    expect_one: bool,
+    result_kind: &'static str,
+    expected_canary_match_count: usize,
+    matched_candidate_count: usize,
+    candidate_fiber_tags: Vec<&'static str>,
+    traversed_candidate_fiber_tags: Vec<&'static str>,
+    skipped_fiber_tags: Vec<&'static str>,
+    zero_match_error_prefix: &'static str,
+    duplicate_match_error_prefix: &'static str,
+    predicate_execution: bool,
+    public_query_method_available: bool,
+    public_test_instance_object_available: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererPrivateTestInstanceFindByResultDiagnostic {
+    #[must_use]
+    pub const fn query_kind(&self) -> TestRendererPrivateTestInstanceFindByQueryKind {
+        self.query_kind
+    }
+
+    #[must_use]
+    pub const fn public_surface(&self) -> &'static str {
+        self.public_surface
+    }
+
+    #[must_use]
+    pub const fn source(&self) -> &'static str {
+        self.source
+    }
+
+    #[must_use]
+    pub const fn based_on_find_all_source(&self) -> &'static str {
+        self.based_on_find_all_source
+    }
+
+    #[must_use]
+    pub const fn based_on_predicate_kind(
+        &self,
+    ) -> TestRendererPrivateTestInstanceFindAllPredicateKind {
+        self.based_on_predicate_kind
+    }
+
+    #[must_use]
+    pub fn expect_one_message(&self) -> &str {
+        &self.expect_one_message
+    }
+
+    #[must_use]
+    pub fn expected_type(&self) -> Option<&TestElementType> {
+        self.expected_type.as_ref()
+    }
+
+    #[must_use]
+    pub fn expected_props(&self) -> Option<&TestProps> {
+        self.expected_props.as_ref()
+    }
+
+    #[must_use]
+    pub const fn effective_deep(&self) -> bool {
+        self.effective_deep
+    }
+
+    #[must_use]
+    pub const fn expect_one(&self) -> bool {
+        self.expect_one
+    }
+
+    #[must_use]
+    pub const fn result_kind(&self) -> &'static str {
+        self.result_kind
+    }
+
+    #[must_use]
+    pub const fn expected_canary_match_count(&self) -> usize {
+        self.expected_canary_match_count
+    }
+
+    #[must_use]
+    pub const fn matched_candidate_count(&self) -> usize {
+        self.matched_candidate_count
+    }
+
+    #[must_use]
+    pub fn candidate_fiber_tags(&self) -> &[&'static str] {
+        &self.candidate_fiber_tags
+    }
+
+    #[must_use]
+    pub fn traversed_candidate_fiber_tags(&self) -> &[&'static str] {
+        &self.traversed_candidate_fiber_tags
+    }
+
+    #[must_use]
+    pub fn skipped_fiber_tags(&self) -> &[&'static str] {
+        &self.skipped_fiber_tags
+    }
+
+    #[must_use]
+    pub const fn zero_match_error_prefix(&self) -> &'static str {
+        self.zero_match_error_prefix
+    }
+
+    #[must_use]
+    pub const fn duplicate_match_error_prefix(&self) -> &'static str {
+        self.duplicate_match_error_prefix
+    }
+
+    #[must_use]
+    pub const fn predicate_execution(&self) -> bool {
+        self.predicate_execution
+    }
+
+    #[must_use]
+    pub const fn public_query_method_available(&self) -> bool {
+        self.public_query_method_available
+    }
+
+    #[must_use]
+    pub const fn public_test_instance_object_available(&self) -> bool {
+        self.public_test_instance_object_available
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(&self) -> bool {
+        self.compatibility_claimed
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateTestInstanceFindByQueryDiagnostics {
+    diagnostic_name: &'static str,
+    source_find_all_diagnostic_name: &'static str,
+    source_tree_diagnostic_name: &'static str,
+    host_output_update_kind: TestRendererRootUpdateKind,
+    host_output_snapshot_current: bool,
+    source: &'static str,
+    accepted_find_all_traversal_source: &'static str,
+    effective_deep: bool,
+    expect_one: bool,
+    find_all_candidate_fiber_tags: Vec<&'static str>,
+    find_all_skipped_fiber_tags: Vec<&'static str>,
+    find_by_type: TestRendererPrivateTestInstanceFindByResultDiagnostic,
+    find_by_props: TestRendererPrivateTestInstanceFindByResultDiagnostic,
+    public_blockers: TestRendererPrivateJsonPublicSurfaceBlockers,
+    public_test_instance_object_available: bool,
+    public_query_methods_available: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererPrivateTestInstanceFindByQueryDiagnostics {
+    #[must_use]
+    pub const fn diagnostic_name(&self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn source_find_all_diagnostic_name(&self) -> &'static str {
+        self.source_find_all_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn source_tree_diagnostic_name(&self) -> &'static str {
+        self.source_tree_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn host_output_update_kind(&self) -> TestRendererRootUpdateKind {
+        self.host_output_update_kind
+    }
+
+    #[must_use]
+    pub const fn host_output_snapshot_current(&self) -> bool {
+        self.host_output_snapshot_current
+    }
+
+    #[must_use]
+    pub const fn source(&self) -> &'static str {
+        self.source
+    }
+
+    #[must_use]
+    pub const fn accepted_find_all_traversal_source(&self) -> &'static str {
+        self.accepted_find_all_traversal_source
+    }
+
+    #[must_use]
+    pub const fn effective_deep(&self) -> bool {
+        self.effective_deep
+    }
+
+    #[must_use]
+    pub const fn expect_one(&self) -> bool {
+        self.expect_one
+    }
+
+    #[must_use]
+    pub fn find_all_candidate_fiber_tags(&self) -> &[&'static str] {
+        &self.find_all_candidate_fiber_tags
+    }
+
+    #[must_use]
+    pub fn find_all_skipped_fiber_tags(&self) -> &[&'static str] {
+        &self.find_all_skipped_fiber_tags
+    }
+
+    #[must_use]
+    pub const fn find_by_type(&self) -> &TestRendererPrivateTestInstanceFindByResultDiagnostic {
+        &self.find_by_type
+    }
+
+    #[must_use]
+    pub const fn find_by_props(&self) -> &TestRendererPrivateTestInstanceFindByResultDiagnostic {
+        &self.find_by_props
+    }
+
+    #[must_use]
+    pub const fn public_blockers(&self) -> TestRendererPrivateJsonPublicSurfaceBlockers {
+        self.public_blockers
+    }
+
+    #[must_use]
+    pub const fn public_test_instance_object_available(&self) -> bool {
+        self.public_test_instance_object_available
+    }
+
+    #[must_use]
+    pub const fn public_query_methods_available(&self) -> bool {
+        self.public_query_methods_available
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(&self) -> bool {
+        self.compatibility_claimed
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestRendererPrivateGetInstanceFailClosedRootDiagnostic {
     root_fiber_shape: [&'static str; 2],
@@ -4412,6 +4686,26 @@ impl TestRendererRoot {
         Ok(Self::private_test_instance_find_all_query_from_tree_report(
             &tree_report,
         ))
+    }
+
+    pub fn describe_private_test_instance_find_by_query_for_canary(
+        &self,
+        output: &TestRendererCommittedHostOutput,
+    ) -> Result<TestRendererPrivateTestInstanceFindByQueryDiagnostics, TestRendererRootError> {
+        let find_all_report =
+            self.describe_private_test_instance_find_all_query_for_canary(output)?;
+
+        Ok(Self::private_test_instance_find_by_query_from_find_all_report(&find_all_report))
+    }
+
+    pub fn describe_private_test_instance_find_by_query_after_update_for_canary(
+        &self,
+        output: &TestRendererUpdatedHostOutput,
+    ) -> Result<TestRendererPrivateTestInstanceFindByQueryDiagnostics, TestRendererRootError> {
+        let find_all_report =
+            self.describe_private_test_instance_find_all_query_after_update_for_canary(output)?;
+
+        Ok(Self::private_test_instance_find_by_query_from_find_all_report(&find_all_report))
     }
 
     pub fn describe_private_get_instance_class_root_for_canary(
@@ -5836,6 +6130,96 @@ impl TestRendererRoot {
                 public_query_method_available: false,
             },
             public_blockers: tree_report.public_blockers(),
+            public_test_instance_object_available: false,
+            public_query_methods_available: false,
+            compatibility_claimed: false,
+        }
+    }
+
+    fn private_test_instance_find_by_query_from_find_all_report(
+        find_all_report: &TestRendererPrivateTestInstanceFindAllQueryDiagnostics,
+    ) -> TestRendererPrivateTestInstanceFindByQueryDiagnostics {
+        let type_predicate = find_all_report.type_predicate();
+        let props_predicate = find_all_report.props_predicate();
+        let expected_type = type_predicate.expected_type().cloned();
+        let expected_type_name = expected_type
+            .as_ref()
+            .map(TestElementType::as_str)
+            .unwrap_or("Unknown");
+        let expected_props = props_predicate.expected_props().cloned();
+        let find_all_candidate_fiber_tags = find_all_report.candidate_fiber_tags().to_vec();
+        let find_all_skipped_fiber_tags = find_all_report.skipped_fiber_tags().to_vec();
+
+        TestRendererPrivateTestInstanceFindByQueryDiagnostics {
+            diagnostic_name: TEST_RENDERER_PRIVATE_TEST_INSTANCE_FIND_BY_DIAGNOSTIC_NAME,
+            source_find_all_diagnostic_name: find_all_report.diagnostic_name(),
+            source_tree_diagnostic_name: find_all_report.source_tree_diagnostic_name(),
+            host_output_update_kind: find_all_report.host_output_update_kind(),
+            host_output_snapshot_current: find_all_report.host_output_snapshot_current(),
+            source: "ReactTestRenderer.js ReactTestInstance.findByType/findByProps",
+            accepted_find_all_traversal_source: find_all_report.traversal_source(),
+            effective_deep: false,
+            expect_one: true,
+            find_all_candidate_fiber_tags,
+            find_all_skipped_fiber_tags: find_all_skipped_fiber_tags.clone(),
+            find_by_type: TestRendererPrivateTestInstanceFindByResultDiagnostic {
+                query_kind: TestRendererPrivateTestInstanceFindByQueryKind::Type,
+                public_surface: "ReactTestInstance.findByType",
+                source: "ReactTestRenderer.js ReactTestInstance.findByType",
+                based_on_find_all_source: type_predicate.source(),
+                based_on_predicate_kind: type_predicate.predicate_kind(),
+                expect_one_message: format!("with node type: \"{expected_type_name}\""),
+                expected_type,
+                expected_props: None,
+                effective_deep: false,
+                expect_one: true,
+                result_kind: "single",
+                expected_canary_match_count: type_predicate.matched_candidate_count(),
+                matched_candidate_count: type_predicate.matched_candidate_count(),
+                candidate_fiber_tags: type_predicate.matched_fiber_tags().to_vec(),
+                traversed_candidate_fiber_tags: type_predicate.evaluated_fiber_tags().to_vec(),
+                skipped_fiber_tags: find_all_skipped_fiber_tags.clone(),
+                zero_match_error_prefix: "No instances found ",
+                duplicate_match_error_prefix: "Expected 1 but found N instances ",
+                predicate_execution: type_predicate.predicate_execution(),
+                public_query_method_available: false,
+                public_test_instance_object_available: false,
+                compatibility_claimed: false,
+            },
+            find_by_props: TestRendererPrivateTestInstanceFindByResultDiagnostic {
+                query_kind: TestRendererPrivateTestInstanceFindByQueryKind::Props,
+                public_surface: "ReactTestInstance.findByProps",
+                source: "ReactTestRenderer.js ReactTestInstance.findByProps",
+                based_on_find_all_source: props_predicate.source(),
+                based_on_predicate_kind: props_predicate.predicate_kind(),
+                expect_one_message: format!(
+                    "with props: {}",
+                    if expected_props.as_ref().is_some_and(|props| {
+                        props.text_content().is_none() && props.attributes().is_empty()
+                    }) {
+                        "{}"
+                    } else {
+                        "<private-props>"
+                    }
+                ),
+                expected_type: None,
+                expected_props,
+                effective_deep: false,
+                expect_one: true,
+                result_kind: "single",
+                expected_canary_match_count: props_predicate.matched_candidate_count(),
+                matched_candidate_count: props_predicate.matched_candidate_count(),
+                candidate_fiber_tags: props_predicate.matched_fiber_tags().to_vec(),
+                traversed_candidate_fiber_tags: props_predicate.evaluated_fiber_tags().to_vec(),
+                skipped_fiber_tags: find_all_skipped_fiber_tags,
+                zero_match_error_prefix: "No instances found ",
+                duplicate_match_error_prefix: "Expected 1 but found N instances ",
+                predicate_execution: props_predicate.predicate_execution(),
+                public_query_method_available: false,
+                public_test_instance_object_available: false,
+                compatibility_claimed: false,
+            },
+            public_blockers: find_all_report.public_blockers(),
             public_test_instance_object_available: false,
             public_query_methods_available: false,
             compatibility_claimed: false,
@@ -7783,6 +8167,229 @@ mod tests {
         assert_eq!(diagnostics.type_predicate().matched_candidate_count(), 1);
         assert_eq!(diagnostics.props_predicate().matched_candidate_count(), 1);
         assert_eq!(diagnostics.predicate_like().matched_candidate_count(), 1);
+        assert!(!diagnostics.public_query_methods_available());
+        assert!(!diagnostics.public_test_instance_object_available());
+        assert!(!diagnostics.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_test_instance_find_by_query_diagnostics_build_on_find_all_metadata() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let find_all = root
+            .describe_private_test_instance_find_all_query_for_canary(&output)
+            .unwrap();
+        let diagnostics = root
+            .describe_private_test_instance_find_by_query_for_canary(&output)
+            .unwrap();
+        let find_by_type = diagnostics.find_by_type();
+        let find_by_props = diagnostics.find_by_props();
+
+        assert_eq!(
+            diagnostics.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TEST_INSTANCE_FIND_BY_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            diagnostics.source_find_all_diagnostic_name(),
+            find_all.diagnostic_name()
+        );
+        assert_eq!(
+            diagnostics.source_tree_diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            diagnostics.host_output_update_kind(),
+            TestRendererRootUpdateKind::Create
+        );
+        assert!(diagnostics.host_output_snapshot_current());
+        assert_eq!(
+            diagnostics.source(),
+            "ReactTestRenderer.js ReactTestInstance.findByType/findByProps"
+        );
+        assert_eq!(
+            diagnostics.accepted_find_all_traversal_source(),
+            find_all.traversal_source()
+        );
+        assert!(!diagnostics.effective_deep());
+        assert!(diagnostics.expect_one());
+        assert_eq!(
+            diagnostics.find_all_candidate_fiber_tags(),
+            find_all.candidate_fiber_tags()
+        );
+        assert_eq!(
+            diagnostics.find_all_skipped_fiber_tags(),
+            find_all.skipped_fiber_tags()
+        );
+
+        assert_eq!(
+            find_by_type.query_kind(),
+            TestRendererPrivateTestInstanceFindByQueryKind::Type
+        );
+        assert_eq!(find_by_type.query_kind().as_str(), "findByType");
+        assert_eq!(find_by_type.query_kind().criteria_kind(), "type");
+        assert_eq!(
+            find_by_type.public_surface(),
+            "ReactTestInstance.findByType"
+        );
+        assert_eq!(
+            find_by_type.source(),
+            "ReactTestRenderer.js ReactTestInstance.findByType"
+        );
+        assert_eq!(
+            find_by_type.based_on_find_all_source(),
+            find_all.type_predicate().source()
+        );
+        assert_eq!(
+            find_by_type.based_on_predicate_kind(),
+            TestRendererPrivateTestInstanceFindAllPredicateKind::Type
+        );
+        assert_eq!(
+            find_by_type.expect_one_message(),
+            "with node type: \"span\""
+        );
+        assert_eq!(find_by_type.expected_type().unwrap().as_str(), "span");
+        assert!(find_by_type.expected_props().is_none());
+        assert!(!find_by_type.effective_deep());
+        assert!(find_by_type.expect_one());
+        assert_eq!(find_by_type.result_kind(), "single");
+        assert_eq!(find_by_type.expected_canary_match_count(), 1);
+        assert_eq!(find_by_type.matched_candidate_count(), 1);
+        assert_eq!(find_by_type.candidate_fiber_tags(), &["HostComponent"]);
+        assert_eq!(
+            find_by_type.traversed_candidate_fiber_tags(),
+            find_all.type_predicate().evaluated_fiber_tags()
+        );
+        assert_eq!(find_by_type.skipped_fiber_tags(), &["HostText"]);
+        assert_eq!(
+            find_by_type.zero_match_error_prefix(),
+            "No instances found "
+        );
+        assert_eq!(
+            find_by_type.duplicate_match_error_prefix(),
+            "Expected 1 but found N instances "
+        );
+        assert!(!find_by_type.predicate_execution());
+        assert!(!find_by_type.public_query_method_available());
+        assert!(!find_by_type.public_test_instance_object_available());
+        assert!(!find_by_type.compatibility_claimed());
+
+        assert_eq!(
+            find_by_props.query_kind(),
+            TestRendererPrivateTestInstanceFindByQueryKind::Props
+        );
+        assert_eq!(find_by_props.query_kind().as_str(), "findByProps");
+        assert_eq!(find_by_props.query_kind().criteria_kind(), "props");
+        assert_eq!(
+            find_by_props.public_surface(),
+            "ReactTestInstance.findByProps"
+        );
+        assert_eq!(
+            find_by_props.source(),
+            "ReactTestRenderer.js ReactTestInstance.findByProps"
+        );
+        assert_eq!(
+            find_by_props.based_on_find_all_source(),
+            find_all.props_predicate().source()
+        );
+        assert_eq!(
+            find_by_props.based_on_predicate_kind(),
+            TestRendererPrivateTestInstanceFindAllPredicateKind::Props
+        );
+        assert_eq!(find_by_props.expect_one_message(), "with props: {}");
+        assert!(find_by_props.expected_type().is_none());
+        assert_eq!(find_by_props.expected_props().unwrap(), &TestProps::new());
+        assert!(!find_by_props.effective_deep());
+        assert!(find_by_props.expect_one());
+        assert_eq!(find_by_props.result_kind(), "single");
+        assert_eq!(find_by_props.expected_canary_match_count(), 1);
+        assert_eq!(find_by_props.matched_candidate_count(), 1);
+        assert_eq!(find_by_props.candidate_fiber_tags(), &["HostComponent"]);
+        assert_eq!(
+            find_by_props.traversed_candidate_fiber_tags(),
+            find_all.props_predicate().evaluated_fiber_tags()
+        );
+        assert_eq!(find_by_props.skipped_fiber_tags(), &["HostText"]);
+        assert_eq!(
+            find_by_props.zero_match_error_prefix(),
+            "No instances found "
+        );
+        assert_eq!(
+            find_by_props.duplicate_match_error_prefix(),
+            "Expected 1 but found N instances "
+        );
+        assert!(!find_by_props.predicate_execution());
+        assert!(!find_by_props.public_query_method_available());
+        assert!(!find_by_props.public_test_instance_object_available());
+        assert!(!find_by_props.compatibility_claimed());
+
+        assert!(diagnostics.public_blockers().all_blocked());
+        assert!(diagnostics.public_blockers().instance_wrapper_blocked());
+        assert!(!diagnostics.public_test_instance_object_available());
+        assert!(!diagnostics.public_query_methods_available());
+        assert!(!diagnostics.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_test_instance_find_by_query_diagnostics_follow_update_host_output() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let updated = root
+            .render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let find_all = root
+            .describe_private_test_instance_find_all_query_after_update_for_canary(&updated)
+            .unwrap();
+        let diagnostics = root
+            .describe_private_test_instance_find_by_query_after_update_for_canary(&updated)
+            .unwrap();
+
+        assert_eq!(
+            diagnostics.host_output_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert!(diagnostics.host_output_snapshot_current());
+        assert_eq!(
+            diagnostics.source_find_all_diagnostic_name(),
+            find_all.diagnostic_name()
+        );
+        assert_eq!(
+            diagnostics.find_all_candidate_fiber_tags(),
+            find_all.candidate_fiber_tags()
+        );
+        assert_eq!(
+            diagnostics.find_all_skipped_fiber_tags(),
+            find_all.skipped_fiber_tags()
+        );
+        assert_eq!(
+            diagnostics.find_by_type().expected_type().unwrap().as_str(),
+            "span"
+        );
+        assert_eq!(
+            diagnostics.find_by_props().expected_props().unwrap(),
+            &TestProps::new()
+        );
+        assert_eq!(diagnostics.find_by_type().matched_candidate_count(), 1);
+        assert_eq!(diagnostics.find_by_props().matched_candidate_count(), 1);
         assert!(!diagnostics.public_query_methods_available());
         assert!(!diagnostics.public_test_instance_object_available());
         assert!(!diagnostics.compatibility_claimed());

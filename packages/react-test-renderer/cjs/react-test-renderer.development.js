@@ -1870,6 +1870,106 @@ const privateTestInstanceFindByPropsQueryRecord = Object.freeze({
   nativeExecution: false,
   compatibilityClaimed: false
 });
+const privateTestInstanceFindByTypeResultDiagnostics = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-find-by-type-query-diagnostics',
+  kind: 'ReactTestInstancePrivateFindByQueryMetadata',
+  query: 'findByType',
+  publicSurface: 'ReactTestInstance.findByType',
+  status: 'private-findby-query-diagnostics-ready-public-method-blocked',
+  source: 'ReactTestRenderer.js ReactTestInstance.findByType',
+  basedOnFindAllRecord: privateTestInstanceFindAllByTypeQueryRecord,
+  basedOnFindAllPredicate:
+    privateTestInstanceFindAllPredicateDiagnostics.typePredicate,
+  expectOneSource: 'ReactTestRenderer.js expectOne',
+  expectOneMessage: 'with node type: "span"',
+  zeroMatchErrorPrefix: 'No instances found ',
+  duplicateMatchErrorPrefix: 'Expected 1 but found N instances ',
+  criteria: privateTestInstanceFindAllByTypeQueryRecord.criteria,
+  resultKind: 'single',
+  effectiveDeep: false,
+  expectOne: true,
+  expectedCanaryMatchCount:
+    privateTestInstanceFindAllByTypeQueryRecord.expectedCanaryMatchCount,
+  candidateRecords: privateTestInstanceFindAllByTypeQueryRecord.candidateRecords,
+  traversedCandidateRecords:
+    privateTestInstanceFindAllByTypeQueryRecord.traversedCandidateRecords,
+  skippedRecords: privateTestInstanceFindAllByTypeQueryRecord.skippedRecords,
+  predicateExecution: false,
+  deterministic: true,
+  publicQueryMethodAvailable: false,
+  publicTestInstanceObjectAvailable: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  compatibilityClaimed: false
+});
+const privateTestInstanceFindByPropsResultDiagnostics = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-find-by-props-query-diagnostics',
+  kind: 'ReactTestInstancePrivateFindByQueryMetadata',
+  query: 'findByProps',
+  publicSurface: 'ReactTestInstance.findByProps',
+  status: 'private-findby-query-diagnostics-ready-public-method-blocked',
+  source: 'ReactTestRenderer.js ReactTestInstance.findByProps',
+  basedOnFindAllRecord: privateTestInstanceFindAllByPropsQueryRecord,
+  basedOnFindAllPredicate:
+    privateTestInstanceFindAllPredicateDiagnostics.propsPredicate,
+  expectOneSource: 'ReactTestRenderer.js expectOne',
+  expectOneMessage: 'with props: {}',
+  zeroMatchErrorPrefix: 'No instances found ',
+  duplicateMatchErrorPrefix: 'Expected 1 but found N instances ',
+  criteria: privateTestInstanceFindAllByPropsQueryRecord.criteria,
+  resultKind: 'single',
+  effectiveDeep: false,
+  expectOne: true,
+  expectedCanaryMatchCount:
+    privateTestInstanceFindAllByPropsQueryRecord.expectedCanaryMatchCount,
+  candidateRecords: privateTestInstanceFindAllByPropsQueryRecord.candidateRecords,
+  traversedCandidateRecords:
+    privateTestInstanceFindAllByPropsQueryRecord.traversedCandidateRecords,
+  skippedRecords: privateTestInstanceFindAllByPropsQueryRecord.skippedRecords,
+  predicateExecution: false,
+  deterministic: true,
+  publicQueryMethodAvailable: false,
+  publicTestInstanceObjectAvailable: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  compatibilityClaimed: false
+});
+const privateTestInstanceFindByQueryDiagnostics = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-find-by-query-diagnostics',
+  diagnosticName: 'fast-react-test-renderer.testinstance.find-by-private-query',
+  status: 'private-findby-query-diagnostics-ready-public-method-blocked',
+  acceptedWorker: 'worker-484-test-instance-find-by-private-query-gate',
+  acceptedRustDiagnosticName:
+    'fast-react-test-renderer.testinstance.find-by-private-query',
+  acceptedRustApis: Object.freeze([
+    'TestRendererRoot::describe_private_test_instance_find_by_query_for_canary',
+    'TestRendererRoot::describe_private_test_instance_find_by_query_after_update_for_canary',
+    'TestRendererPrivateTestInstanceFindByQueryDiagnostics',
+    'TestRendererPrivateTestInstanceFindByResultDiagnostic'
+  ]),
+  acceptedRustTests: Object.freeze([
+    'root_private_test_instance_find_by_query_diagnostics_build_on_find_all_metadata',
+    'root_private_test_instance_find_by_query_diagnostics_follow_update_host_output'
+  ]),
+  source: 'ReactTestRenderer.js ReactTestInstance.findByType/findByProps',
+  acceptedReactSourceAlgorithm:
+    'ReactTestRenderer.js expectOne(findAllBy*, {deep: false})',
+  findAllDiagnosticName:
+    privateTestInstanceFindAllPredicateDiagnostics.diagnosticName,
+  basedOnFindAllPredicateDiagnostics:
+    privateTestInstanceFindAllPredicateDiagnostics,
+  queries: Object.freeze(['findByType', 'findByProps']),
+  effectiveDeep: false,
+  expectOne: true,
+  predicateExecution: false,
+  typeQuery: privateTestInstanceFindByTypeResultDiagnostics,
+  propsQuery: privateTestInstanceFindByPropsResultDiagnostics,
+  publicQueryMethodAvailable: false,
+  publicTestInstanceObjectAvailable: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  compatibilityClaimed: false
+});
 const privateTestInstanceQueryMethodRecords = Object.freeze({
   find: privateTestInstanceFindQueryRecord,
   findAll: privateTestInstanceFindAllQueryRecord,
@@ -1907,6 +2007,7 @@ const privateTestInstanceWrapperSkeleton = Object.freeze({
   queryPath: privateTestInstanceQueryPath,
   hostComponentQueryPath: privateTestInstanceHostComponentQueryPath,
   findAllPredicateDiagnostics: privateTestInstanceFindAllPredicateDiagnostics,
+  findByQueryDiagnostics: privateTestInstanceFindByQueryDiagnostics,
   rootQueryRecord: privateTestInstanceRootQueryRecord,
   queryRecords: Object.freeze({
     root: privateTestInstanceRootQueryRecord,
@@ -2285,6 +2386,23 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     findAllAcceptedRustTests: freezeArray([
       'root_private_test_instance_find_all_query_diagnostics_describe_type_props_and_predicate_metadata',
       'root_private_test_instance_find_all_query_diagnostics_follow_update_host_output'
+    ]),
+    findByDiagnosticName:
+      'fast-react-test-renderer.testinstance.find-by-private-query',
+    findByDiagnosticsAvailable: true,
+    findByQueries: freezeArray(['findByType', 'findByProps']),
+    findByEffectiveDeep: false,
+    findByExpectOne: true,
+    findByPredicateExecution: false,
+    findByAcceptedRustApis: freezeArray([
+      'TestRendererRoot::describe_private_test_instance_find_by_query_for_canary',
+      'TestRendererRoot::describe_private_test_instance_find_by_query_after_update_for_canary',
+      'TestRendererPrivateTestInstanceFindByQueryDiagnostics',
+      'TestRendererPrivateTestInstanceFindByResultDiagnostic'
+    ]),
+    findByAcceptedRustTests: freezeArray([
+      'root_private_test_instance_find_by_query_diagnostics_build_on_find_all_metadata',
+      'root_private_test_instance_find_by_query_diagnostics_follow_update_host_output'
     ]),
     publicRootAvailable: false,
     publicQueryMethodsAvailable: false,

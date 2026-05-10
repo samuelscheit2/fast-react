@@ -1217,6 +1217,69 @@ test("react-test-renderer CJS private TestInstance bridge records deterministic 
   }
 });
 
+test("react-test-renderer CJS development private TestInstance bridge records deterministic findBy diagnostics", () => {
+  const entry = cjsEntrypoints.find((candidate) =>
+    candidate.entrypoint.endsWith("react-test-renderer.development")
+  );
+  assert.notEqual(entry, undefined);
+
+  const moduleExports = loadFresh(entry.modulePath);
+  const bridge = assertPrivateRootRequestBridge(
+    moduleExports,
+    entry.entrypoint
+  );
+  const renderer = moduleExports.create({ type: "private-find-by" });
+  const [createRequest] = bridge.getRendererRootRequests(renderer);
+  const record = Object.getOwnPropertyDescriptor(
+    renderer,
+    privateTestInstanceWrapperRecordSymbol
+  ).value;
+  const diagnostics = record.findByQueryDiagnostics;
+
+  assertPrivateFindByQueryDiagnostics(diagnostics, record, entry.entrypoint);
+  assert.equal(
+    diagnostics.basedOnFindAllPredicateDiagnostics,
+    record.findAllPredicateDiagnostics,
+    entry.entrypoint
+  );
+  assert.equal(
+    record.rootRequestTestInstanceQueryMetadata.findByDiagnosticsAvailable,
+    true,
+    entry.entrypoint
+  );
+  assert.deepEqual(
+    record.rootRequestTestInstanceQueryMetadata.findByQueries,
+    ["findByType", "findByProps"],
+    entry.entrypoint
+  );
+  assert.equal(
+    record.rootRequestTestInstanceQueryMetadata.findByEffectiveDeep,
+    false,
+    entry.entrypoint
+  );
+  assert.equal(
+    record.rootRequestTestInstanceQueryMetadata.findByExpectOne,
+    true,
+    entry.entrypoint
+  );
+  assert.equal(
+    record.rootRequestTestInstanceQueryMetadata.findByPredicateExecution,
+    false,
+    entry.entrypoint
+  );
+  assert.deepEqual(
+    record.rootRequestTestInstanceQueryMetadata.findByAcceptedRustApis,
+    diagnostics.acceptedRustApis,
+    entry.entrypoint
+  );
+  assert.equal(
+    bridge.getTestInstanceQueryDiagnostics(createRequest),
+    record,
+    entry.entrypoint
+  );
+  assertNoPublicTestInstanceQueryMethods(renderer, entry.entrypoint);
+});
+
 test("react-test-renderer create routing gate does not load native bridge artifacts", () => {
   const originalLoad = Module._load;
   const originalNodeExtension = Module._extensions[".node"];
@@ -3425,6 +3488,181 @@ function assertPrivateFindAllPredicateRecord(
     false,
     entrypoint
   );
+}
+
+function assertPrivateFindByQueryDiagnostics(diagnostics, owner, entrypoint) {
+  assert.equal(Object.isFrozen(diagnostics), true, entrypoint);
+  assert.equal(
+    diagnostics.id,
+    "react-test-renderer-private-test-instance-find-by-query-diagnostics",
+    entrypoint
+  );
+  assert.equal(
+    diagnostics.diagnosticName,
+    "fast-react-test-renderer.testinstance.find-by-private-query",
+    entrypoint
+  );
+  assert.equal(
+    diagnostics.status,
+    "private-findby-query-diagnostics-ready-public-method-blocked",
+    entrypoint
+  );
+  assert.equal(
+    diagnostics.acceptedWorker,
+    "worker-484-test-instance-find-by-private-query-gate",
+    entrypoint
+  );
+  assert.equal(
+    diagnostics.acceptedRustDiagnosticName,
+    "fast-react-test-renderer.testinstance.find-by-private-query",
+    entrypoint
+  );
+  assert.deepEqual(diagnostics.acceptedRustApis, [
+    "TestRendererRoot::describe_private_test_instance_find_by_query_for_canary",
+    "TestRendererRoot::describe_private_test_instance_find_by_query_after_update_for_canary",
+    "TestRendererPrivateTestInstanceFindByQueryDiagnostics",
+    "TestRendererPrivateTestInstanceFindByResultDiagnostic"
+  ]);
+  assert.deepEqual(diagnostics.acceptedRustTests, [
+    "root_private_test_instance_find_by_query_diagnostics_build_on_find_all_metadata",
+    "root_private_test_instance_find_by_query_diagnostics_follow_update_host_output"
+  ]);
+  assert.equal(
+    diagnostics.source,
+    "ReactTestRenderer.js ReactTestInstance.findByType/findByProps",
+    entrypoint
+  );
+  assert.equal(
+    diagnostics.acceptedReactSourceAlgorithm,
+    "ReactTestRenderer.js expectOne(findAllBy*, {deep: false})",
+    entrypoint
+  );
+  assert.equal(
+    diagnostics.findAllDiagnosticName,
+    owner.findAllPredicateDiagnostics.diagnosticName,
+    entrypoint
+  );
+  assert.deepEqual(diagnostics.queries, ["findByType", "findByProps"]);
+  assert.equal(diagnostics.effectiveDeep, false, entrypoint);
+  assert.equal(diagnostics.expectOne, true, entrypoint);
+  assert.equal(diagnostics.predicateExecution, false, entrypoint);
+  assert.equal(diagnostics.publicQueryMethodAvailable, false, entrypoint);
+  assert.equal(diagnostics.publicTestInstanceObjectAvailable, false, entrypoint);
+  assert.equal(diagnostics.nativeBridgeAvailable, false, entrypoint);
+  assert.equal(diagnostics.nativeExecution, false, entrypoint);
+  assert.equal(diagnostics.compatibilityClaimed, false, entrypoint);
+
+  assertPrivateFindByResultDiagnostics(diagnostics.typeQuery, {
+    basedOnFindAllPredicate: owner.findAllPredicateDiagnostics.typePredicate,
+    basedOnFindAllRecord: owner.queryMethodRecords.findAllByType,
+    criteria: { kind: "type", value: "span" },
+    expectOneMessage: "with node type: \"span\"",
+    id: "react-test-renderer-private-test-instance-find-by-type-query-diagnostics",
+    publicSurface: "ReactTestInstance.findByType",
+    query: "findByType",
+    source: "ReactTestRenderer.js ReactTestInstance.findByType"
+  }, owner, entrypoint);
+  assertPrivateFindByResultDiagnostics(diagnostics.propsQuery, {
+    basedOnFindAllPredicate: owner.findAllPredicateDiagnostics.propsPredicate,
+    basedOnFindAllRecord: owner.queryMethodRecords.findAllByProps,
+    criteria: {
+      kind: "props",
+      value: owner.queryRecords.hostComponentProps.value
+    },
+    expectOneMessage: "with props: {}",
+    id: "react-test-renderer-private-test-instance-find-by-props-query-diagnostics",
+    publicSurface: "ReactTestInstance.findByProps",
+    query: "findByProps",
+    source: "ReactTestRenderer.js ReactTestInstance.findByProps"
+  }, owner, entrypoint);
+}
+
+function assertPrivateFindByResultDiagnostics(
+  resultDiagnostics,
+  expected,
+  owner,
+  entrypoint
+) {
+  assert.equal(Object.isFrozen(resultDiagnostics), true, entrypoint);
+  assert.equal(resultDiagnostics.id, expected.id, entrypoint);
+  assert.equal(
+    resultDiagnostics.kind,
+    "ReactTestInstancePrivateFindByQueryMetadata",
+    entrypoint
+  );
+  assert.equal(resultDiagnostics.query, expected.query, entrypoint);
+  assert.equal(
+    resultDiagnostics.publicSurface,
+    expected.publicSurface,
+    entrypoint
+  );
+  assert.equal(
+    resultDiagnostics.status,
+    "private-findby-query-diagnostics-ready-public-method-blocked",
+    entrypoint
+  );
+  assert.equal(resultDiagnostics.source, expected.source, entrypoint);
+  assert.equal(
+    resultDiagnostics.basedOnFindAllRecord,
+    expected.basedOnFindAllRecord,
+    entrypoint
+  );
+  assert.equal(
+    resultDiagnostics.basedOnFindAllPredicate,
+    expected.basedOnFindAllPredicate,
+    entrypoint
+  );
+  assert.equal(
+    resultDiagnostics.expectOneSource,
+    "ReactTestRenderer.js expectOne",
+    entrypoint
+  );
+  assert.equal(
+    resultDiagnostics.expectOneMessage,
+    expected.expectOneMessage,
+    entrypoint
+  );
+  assert.equal(
+    resultDiagnostics.zeroMatchErrorPrefix,
+    "No instances found ",
+    entrypoint
+  );
+  assert.equal(
+    resultDiagnostics.duplicateMatchErrorPrefix,
+    "Expected 1 but found N instances ",
+    entrypoint
+  );
+  assert.deepEqual(resultDiagnostics.criteria, expected.criteria, entrypoint);
+  assert.equal(resultDiagnostics.resultKind, "single", entrypoint);
+  assert.equal(resultDiagnostics.effectiveDeep, false, entrypoint);
+  assert.equal(resultDiagnostics.expectOne, true, entrypoint);
+  assert.equal(resultDiagnostics.expectedCanaryMatchCount, 1, entrypoint);
+  assert.equal(
+    resultDiagnostics.candidateRecords,
+    owner.hostComponentQueryPath,
+    entrypoint
+  );
+  assert.equal(
+    resultDiagnostics.traversedCandidateRecords,
+    owner.queryPath,
+    entrypoint
+  );
+  assert.equal(
+    resultDiagnostics.skippedRecords,
+    owner.queryMethodRecords.findAll.skippedRecords,
+    entrypoint
+  );
+  assert.equal(resultDiagnostics.predicateExecution, false, entrypoint);
+  assert.equal(resultDiagnostics.deterministic, true, entrypoint);
+  assert.equal(resultDiagnostics.publicQueryMethodAvailable, false, entrypoint);
+  assert.equal(
+    resultDiagnostics.publicTestInstanceObjectAvailable,
+    false,
+    entrypoint
+  );
+  assert.equal(resultDiagnostics.nativeBridgeAvailable, false, entrypoint);
+  assert.equal(resultDiagnostics.nativeExecution, false, entrypoint);
+  assert.equal(resultDiagnostics.compatibilityClaimed, false, entrypoint);
 }
 
 function assertPrivateQueryMethodRecord(queryRecord, expected, owner, entrypoint) {
