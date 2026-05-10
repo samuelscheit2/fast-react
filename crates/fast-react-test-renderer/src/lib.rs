@@ -954,6 +954,164 @@ impl TestRendererUnmountedHostOutput {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TestRendererStableSiblingInsertionApplyKind {
+    InsertInContainerBefore,
+    InsertionBlocked,
+    AppendToContainer,
+    Other,
+}
+
+impl TestRendererStableSiblingInsertionApplyKind {
+    fn from_reconciler_apply_kind(kind: &str) -> Self {
+        match kind {
+            "insert-placement-in-container-before" => Self::InsertInContainerBefore,
+            "record-placement-insertion-blocked" => Self::InsertionBlocked,
+            "append-placement-to-container" => Self::AppendToContainer,
+            _ => Self::Other,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TestRendererStableSiblingInsertionSiblingStatus {
+    Append,
+    InsertBefore,
+    BlockedPendingPlacement,
+    BlockedUnsupportedTag,
+    BlockedMissingStateNode,
+    MissingPlacementSiblingRecord,
+    Other,
+}
+
+impl TestRendererStableSiblingInsertionSiblingStatus {
+    fn from_reconciler_sibling_status(status: &str) -> Self {
+        match status {
+            "append" => Self::Append,
+            "insert-before" => Self::InsertBefore,
+            "blocked-pending-placement" => Self::BlockedPendingPlacement,
+            "blocked-unsupported-tag" => Self::BlockedUnsupportedTag,
+            "blocked-missing-state-node" => Self::BlockedMissingStateNode,
+            "missing-placement-sibling-record" => Self::MissingPlacementSiblingRecord,
+            _ => Self::Other,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TestRendererStableSiblingInsertionMutationStatus {
+    AppliedInsertInContainerBefore,
+    RecordedOnly,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererStableSiblingInsertionDiagnostics {
+    apply_kind: TestRendererStableSiblingInsertionApplyKind,
+    sibling_status: TestRendererStableSiblingInsertionSiblingStatus,
+    mutation_status: TestRendererStableSiblingInsertionMutationStatus,
+    fiber: TestRendererFiberHandleDiagnostics,
+    sibling: Option<TestRendererFiberHandleDiagnostics>,
+    state_node_raw: u64,
+    sibling_state_node_raw: u64,
+    can_insert_before: bool,
+}
+
+impl TestRendererStableSiblingInsertionDiagnostics {
+    #[must_use]
+    pub const fn apply_kind(self) -> TestRendererStableSiblingInsertionApplyKind {
+        self.apply_kind
+    }
+
+    #[must_use]
+    pub const fn sibling_status(self) -> TestRendererStableSiblingInsertionSiblingStatus {
+        self.sibling_status
+    }
+
+    #[must_use]
+    pub const fn mutation_status(self) -> TestRendererStableSiblingInsertionMutationStatus {
+        self.mutation_status
+    }
+
+    #[must_use]
+    pub const fn fiber(self) -> TestRendererFiberHandleDiagnostics {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn sibling(self) -> Option<TestRendererFiberHandleDiagnostics> {
+        self.sibling
+    }
+
+    #[must_use]
+    pub const fn state_node_raw(self) -> u64 {
+        self.state_node_raw
+    }
+
+    #[must_use]
+    pub const fn sibling_state_node_raw(self) -> u64 {
+        self.sibling_state_node_raw
+    }
+
+    #[must_use]
+    pub const fn can_insert_before(self) -> bool {
+        self.can_insert_before
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererStableSiblingInsertedHostOutput {
+    render: HostRootRenderPhaseRecord,
+    stable_fibers: TestRendererHostOutputCanaryUpdatedFibers,
+    inserted_fibers: TestRendererHostOutputCanaryCompletedFibers,
+    commit: HostRootCommitRecord,
+    commit_diagnostics: TestRendererHostOutputCanaryCommitDiagnostics,
+    insertion_diagnostics: TestRendererStableSiblingInsertionDiagnostics,
+    previous_snapshot: TestContainerSnapshot,
+    snapshot: TestContainerSnapshot,
+}
+
+impl TestRendererStableSiblingInsertedHostOutput {
+    #[must_use]
+    pub const fn render(&self) -> HostRootRenderPhaseRecord {
+        self.render
+    }
+
+    #[must_use]
+    pub const fn stable_fibers(&self) -> TestRendererHostOutputCanaryUpdatedFibers {
+        self.stable_fibers
+    }
+
+    #[must_use]
+    pub const fn inserted_fibers(&self) -> TestRendererHostOutputCanaryCompletedFibers {
+        self.inserted_fibers
+    }
+
+    #[must_use]
+    pub const fn commit(&self) -> &HostRootCommitRecord {
+        &self.commit
+    }
+
+    #[must_use]
+    pub const fn commit_diagnostics(&self) -> &TestRendererHostOutputCanaryCommitDiagnostics {
+        &self.commit_diagnostics
+    }
+
+    #[must_use]
+    pub const fn insertion_diagnostics(&self) -> TestRendererStableSiblingInsertionDiagnostics {
+        self.insertion_diagnostics
+    }
+
+    #[must_use]
+    pub const fn previous_snapshot(&self) -> &TestContainerSnapshot {
+        &self.previous_snapshot
+    }
+
+    #[must_use]
+    pub const fn snapshot(&self) -> &TestContainerSnapshot {
+        &self.snapshot
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestRendererRootScheduledUpdate {
     kind: TestRendererRootUpdateKind,
@@ -1811,6 +1969,36 @@ impl Display for TestRendererPrivateJsonSerializationError {
 impl Error for TestRendererPrivateJsonSerializationError {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TestRendererStableSiblingInsertionCanaryError {
+    MissingPlacementRecord,
+    MultiplePlacementRecords { actual: usize },
+    UnexpectedInsertedFiber,
+    UnexpectedStableSibling,
+}
+
+impl Display for TestRendererStableSiblingInsertionCanaryError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MissingPlacementRecord => formatter.write_str(
+                "stable-sibling insertion canary found no HostRoot placement apply record",
+            ),
+            Self::MultiplePlacementRecords { actual } => write!(
+                formatter,
+                "stable-sibling insertion canary expected one HostRoot placement apply record, found {actual}",
+            ),
+            Self::UnexpectedInsertedFiber => formatter.write_str(
+                "stable-sibling insertion canary placement record does not target the inserted fiber",
+            ),
+            Self::UnexpectedStableSibling => formatter.write_str(
+                "stable-sibling insertion canary placement record does not target the stable sibling",
+            ),
+        }
+    }
+}
+
+impl Error for TestRendererStableSiblingInsertionCanaryError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TestRendererRootError {
     Host(HostError),
     FiberRootStore(FiberRootStoreError),
@@ -1820,6 +2008,7 @@ pub enum TestRendererRootError {
     RootCommit(RootCommitError),
     SerializationGate(Box<TestRendererSerializationGateError>),
     PrivateJsonSerialization(Box<TestRendererPrivateJsonSerializationError>),
+    StableSiblingInsertionCanary(Box<TestRendererStableSiblingInsertionCanaryError>),
     HostOutputCanary(TestRendererHostOutputCanaryError),
     FiberInspection(TestRendererCommittedFiberInspectionError),
     MissingHostOutputFixture {
@@ -1849,6 +2038,7 @@ impl Display for TestRendererRootError {
             Self::RootCommit(error) => Display::fmt(error, formatter),
             Self::SerializationGate(error) => Display::fmt(error, formatter),
             Self::PrivateJsonSerialization(error) => Display::fmt(error, formatter),
+            Self::StableSiblingInsertionCanary(error) => Display::fmt(error, formatter),
             Self::HostOutputCanary(error) => Display::fmt(error, formatter),
             Self::FiberInspection(error) => Display::fmt(error, formatter),
             Self::MissingHostOutputFixture { element } => write!(
@@ -1888,6 +2078,7 @@ impl Error for TestRendererRootError {
             Self::RootCommit(error) => Some(error),
             Self::SerializationGate(error) => Some(error),
             Self::PrivateJsonSerialization(error) => Some(error),
+            Self::StableSiblingInsertionCanary(error) => Some(error),
             Self::HostOutputCanary(error) => Some(error),
             Self::FiberInspection(error) => Some(error),
             Self::MissingHostOutputFixture { .. }
@@ -1946,6 +2137,12 @@ impl From<TestRendererPrivateJsonSerializationError> for TestRendererRootError {
     }
 }
 
+impl From<TestRendererStableSiblingInsertionCanaryError> for TestRendererRootError {
+    fn from(error: TestRendererStableSiblingInsertionCanaryError) -> Self {
+        Self::StableSiblingInsertionCanary(Box::new(error))
+    }
+}
+
 impl From<TestRendererHostOutputCanaryError> for TestRendererRootError {
     fn from(error: TestRendererHostOutputCanaryError) -> Self {
         Self::HostOutputCanary(error)
@@ -1968,6 +2165,12 @@ pub struct TestRendererRoot {
     scheduled_updates: Vec<TestRendererRootScheduledUpdate>,
     host_output_fixtures: Vec<TestRendererHostOutputFixture>,
     current_host_output: Option<TestRendererCurrentHostOutput>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StableSiblingInsertionCanaryMode {
+    StableCommittedSibling,
+    AmbiguousMissingSiblingStateNode,
 }
 
 impl TestRendererRoot {
@@ -2054,6 +2257,27 @@ impl TestRendererRoot {
     ) -> Result<TestRendererRootUpdateOutcome, TestRendererRootError> {
         if !matches!(self.lifecycle, TestRendererRootLifecycle::Active) {
             return Ok(TestRendererRootUpdateOutcome::IgnoredAfterUnmount);
+        }
+
+        let element = self.push_host_output_fixture_for_canary(element_type.into(), text.into());
+        let record =
+            self.schedule_root_update(TestRendererRootUpdateKind::Update, element, None)?;
+        self.scheduled_updates.push(record.clone());
+        Ok(TestRendererRootUpdateOutcome::Scheduled(record))
+    }
+
+    pub fn insert_host_component_with_text_before_stable_sibling_for_canary(
+        &mut self,
+        element_type: impl Into<TestElementType>,
+        text: impl Into<String>,
+    ) -> Result<TestRendererRootUpdateOutcome, TestRendererRootError> {
+        if !matches!(self.lifecycle, TestRendererRootLifecycle::Active) {
+            return Ok(TestRendererRootUpdateOutcome::IgnoredAfterUnmount);
+        }
+        if self.current_host_output.is_none() {
+            return Err(TestRendererRootError::MissingCommittedHostOutput {
+                operation: TestRendererRootUpdateKind::Update,
+            });
         }
 
         let element = self.push_host_output_fixture_for_canary(element_type.into(), text.into());
@@ -2537,6 +2761,119 @@ impl TestRendererRoot {
         })
     }
 
+    pub fn render_and_commit_host_output_insert_before_stable_sibling_for_canary(
+        &mut self,
+    ) -> Result<Option<TestRendererStableSiblingInsertedHostOutput>, TestRendererRootError> {
+        self.render_and_commit_host_output_insert_before_current_sibling_for_canary(
+            StableSiblingInsertionCanaryMode::StableCommittedSibling,
+        )
+    }
+
+    pub fn render_and_commit_host_output_insert_before_ambiguous_sibling_for_canary(
+        &mut self,
+    ) -> Result<Option<TestRendererStableSiblingInsertedHostOutput>, TestRendererRootError> {
+        self.render_and_commit_host_output_insert_before_current_sibling_for_canary(
+            StableSiblingInsertionCanaryMode::AmbiguousMissingSiblingStateNode,
+        )
+    }
+
+    fn render_and_commit_host_output_insert_before_current_sibling_for_canary(
+        &mut self,
+        mode: StableSiblingInsertionCanaryMode,
+    ) -> Result<Option<TestRendererStableSiblingInsertedHostOutput>, TestRendererRootError> {
+        let Some(update) = self.scheduled_updates.last() else {
+            return Ok(None);
+        };
+        if update.kind() != TestRendererRootUpdateKind::Update {
+            return Err(TestRendererRootError::UnexpectedHostOutputUpdateKind {
+                expected: TestRendererRootUpdateKind::Update,
+                actual: update.kind(),
+            });
+        }
+        let stable = self.current_host_output.clone().ok_or(
+            TestRendererRootError::MissingCommittedHostOutput {
+                operation: TestRendererRootUpdateKind::Update,
+            },
+        )?;
+        let Some(render) = self.render_latest_scheduled_host_root_for_commit_handoff()? else {
+            return Ok(None);
+        };
+        let inserted_fixture = self
+            .host_output_fixture(render.resulting_element())?
+            .clone();
+        let previous_snapshot = self.diagnostic_container_snapshot()?;
+        let stable_fibers = prepare_test_renderer_host_output_update_canary_fibers(
+            &mut self.store,
+            render,
+            stable.fibers,
+            stable.fixture.canary_fixture,
+            Self::instance_state_node_raw(stable.instance),
+            Self::text_state_node_raw(stable.text),
+        )?;
+        let inserted_prepared = prepare_test_renderer_host_output_canary_fibers(
+            &mut self.store,
+            render,
+            inserted_fixture.canary_fixture,
+        )?;
+        self.store
+            .prepare_test_renderer_host_output_stable_sibling_insertion_children_for_canary(
+                render,
+                inserted_prepared,
+                stable_fibers,
+                mode == StableSiblingInsertionCanaryMode::AmbiguousMissingSiblingStateNode,
+            )?;
+
+        let (inserted_instance, inserted_text) =
+            self.create_detached_host_output_for_canary(&inserted_fixture, inserted_prepared)?;
+        let inserted_completed = finish_test_renderer_host_output_canary_fibers(
+            &mut self.store,
+            inserted_prepared,
+            Self::instance_state_node_raw(inserted_instance),
+            Self::text_state_node_raw(inserted_text),
+        )?;
+        let commit = self.commit_host_root_render_for_canary(render)?;
+        let commit_diagnostics = inspect_test_renderer_host_output_canary_commit(&commit);
+        let placement = self.stable_sibling_insertion_diagnostics_for_canary(
+            &commit,
+            inserted_completed,
+            stable_fibers,
+        )?;
+
+        let mut container = self.container;
+        let commit_state = self.renderer.prepare_for_commit(&container)?;
+        let mutation_status = if placement.can_insert_before()
+            && placement.apply_kind()
+                == TestRendererStableSiblingInsertionApplyKind::InsertInContainerBefore
+        {
+            self.renderer.insert_in_container_before(
+                &mut container,
+                HostChild::Instance(&inserted_instance),
+                HostChild::Instance(&stable.instance),
+            )?;
+            TestRendererStableSiblingInsertionMutationStatus::AppliedInsertInContainerBefore
+        } else {
+            TestRendererStableSiblingInsertionMutationStatus::RecordedOnly
+        };
+        self.renderer.reset_after_commit(&container, commit_state)?;
+        let insertion_diagnostics = TestRendererStableSiblingInsertionDiagnostics {
+            mutation_status,
+            ..placement
+        };
+        let snapshot = self.diagnostic_container_snapshot()?;
+        self.current_host_output = None;
+
+        Ok(Some(TestRendererStableSiblingInsertedHostOutput {
+            render,
+            stable_fibers,
+            inserted_fibers: inserted_completed,
+            commit,
+            commit_diagnostics,
+            insertion_diagnostics,
+            previous_snapshot,
+            snapshot,
+        }))
+    }
+
     pub fn render_and_commit_host_output_unmount_for_canary(
         &mut self,
     ) -> Result<Option<TestRendererUnmountedHostOutput>, TestRendererRootError> {
@@ -2599,6 +2936,67 @@ impl TestRendererRoot {
         &self,
     ) -> Result<TestContainerSnapshot, TestRendererRootError> {
         Ok(self.renderer.snapshot_container(&self.container)?)
+    }
+
+    fn stable_sibling_insertion_diagnostics_for_canary(
+        &self,
+        commit: &HostRootCommitRecord,
+        inserted: TestRendererHostOutputCanaryCompletedFibers,
+        stable: TestRendererHostOutputCanaryUpdatedFibers,
+    ) -> Result<TestRendererStableSiblingInsertionDiagnostics, TestRendererRootError> {
+        let placement_records = commit.host_root_placement_apply_diagnostics_for_canary();
+        if placement_records.is_empty() {
+            return Err(
+                TestRendererStableSiblingInsertionCanaryError::MissingPlacementRecord.into(),
+            );
+        }
+        if placement_records.len() != 1 {
+            return Err(
+                TestRendererStableSiblingInsertionCanaryError::MultiplePlacementRecords {
+                    actual: placement_records.len(),
+                }
+                .into(),
+            );
+        }
+
+        let placement = placement_records[0];
+        if placement.fiber() != inserted.component() {
+            return Err(
+                TestRendererStableSiblingInsertionCanaryError::UnexpectedInsertedFiber.into(),
+            );
+        }
+        if placement.sibling() != Some(stable.component()) {
+            return Err(
+                TestRendererStableSiblingInsertionCanaryError::UnexpectedStableSibling.into(),
+            );
+        }
+
+        macro_rules! fiber_handle {
+            ($fiber:expr) => {{
+                let fiber = $fiber;
+                TestRendererFiberHandleDiagnostics {
+                    arena_id: fiber.arena_id().get(),
+                    slot: fiber.slot().get(),
+                    generation: fiber.generation().get(),
+                }
+            }};
+        }
+
+        Ok(TestRendererStableSiblingInsertionDiagnostics {
+            apply_kind: TestRendererStableSiblingInsertionApplyKind::from_reconciler_apply_kind(
+                placement.apply_kind(),
+            ),
+            sibling_status:
+                TestRendererStableSiblingInsertionSiblingStatus::from_reconciler_sibling_status(
+                    placement.sibling_status(),
+                ),
+            mutation_status: TestRendererStableSiblingInsertionMutationStatus::RecordedOnly,
+            fiber: fiber_handle!(placement.fiber()),
+            sibling: placement.sibling().map(|fiber| fiber_handle!(fiber)),
+            state_node_raw: placement.state_node_raw(),
+            sibling_state_node_raw: placement.sibling_state_node_raw(),
+            can_insert_before: placement.can_insert_before(),
+        })
     }
 
     fn validate_serialization_gate_commit(
@@ -3442,6 +3840,20 @@ mod tests {
             .collect()
     }
 
+    fn container_element_texts(snapshot: &TestContainerSnapshot) -> Vec<&str> {
+        snapshot
+            .children()
+            .iter()
+            .map(|child| match child {
+                TestNodeSnapshot::Element(element) => match &element.children()[0] {
+                    TestNodeSnapshot::Text(text) => text.text(),
+                    TestNodeSnapshot::Element(_) => panic!("expected text child"),
+                },
+                TestNodeSnapshot::Text(_) => panic!("expected element child"),
+            })
+            .collect()
+    }
+
     fn assert_mutation_renderer<T: MutationRenderer>(_renderer: &T) {}
 
     fn assert_operation_error(error: HostError, expected: HostOperationErrorKind) {
@@ -4136,6 +4548,152 @@ mod tests {
             updated.snapshot().clone()
         );
         assert_eq!(current_host_root_element(&root), root_element(2));
+    }
+
+    #[test]
+    fn root_host_output_canary_inserts_placed_child_before_stable_sibling() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "Stable",
+            "stable",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let created = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let outcome = root
+            .insert_host_component_with_text_before_stable_sibling_for_canary(
+                "Inserted", "inserted",
+            )
+            .unwrap();
+        let scheduled = outcome.scheduled().unwrap();
+
+        let inserted = root
+            .render_and_commit_host_output_insert_before_stable_sibling_for_canary()
+            .unwrap()
+            .unwrap();
+        let diagnostics = inserted.insertion_diagnostics();
+        let commit_diagnostics = inserted.commit_diagnostics();
+
+        assert_eq!(scheduled.kind(), TestRendererRootUpdateKind::Update);
+        assert_eq!(scheduled.element(), root_element(2));
+        assert_eq!(inserted.render().current(), created.commit().current());
+        assert_eq!(
+            inserted.commit().previous_current(),
+            created.commit().current()
+        );
+        assert_eq!(
+            inserted.commit().current(),
+            inserted.render().finished_work()
+        );
+        assert_eq!(
+            inserted.stable_fibers().previous(),
+            created.completed_fibers().current()
+        );
+        assert_eq!(
+            inserted.stable_fibers().component_state_node_raw(),
+            created.completed_fibers().component_state_node_raw()
+        );
+        assert_eq!(inserted.inserted_fibers().component_state_node_raw(), 2);
+        assert_eq!(inserted.inserted_fibers().text_state_node_raw(), 2);
+        assert_eq!(
+            diagnostics.apply_kind(),
+            TestRendererStableSiblingInsertionApplyKind::InsertInContainerBefore
+        );
+        assert_eq!(
+            diagnostics.sibling_status(),
+            TestRendererStableSiblingInsertionSiblingStatus::InsertBefore
+        );
+        assert_eq!(
+            diagnostics.mutation_status(),
+            TestRendererStableSiblingInsertionMutationStatus::AppliedInsertInContainerBefore
+        );
+        assert!(diagnostics.can_insert_before());
+        assert_eq!(diagnostics.state_node_raw(), 2);
+        assert_eq!(diagnostics.sibling_state_node_raw(), 1);
+        assert_eq!(
+            diagnostics.fiber().slot(),
+            inserted.inserted_fibers().component().slot().get()
+        );
+        assert_eq!(
+            diagnostics.sibling().unwrap().slot(),
+            inserted.stable_fibers().component().slot().get()
+        );
+        assert_eq!(commit_diagnostics.mutation_records().len(), 1);
+        assert_eq!(
+            commit_diagnostics.mutation_records()[0].kind(),
+            TestRendererHostOutputCanaryMutationKind::Placement
+        );
+        assert_eq!(
+            commit_diagnostics.mutation_records()[0].fiber(),
+            inserted.inserted_fibers().component()
+        );
+        assert_eq!(
+            container_element_texts(inserted.previous_snapshot()),
+            vec!["stable"]
+        );
+        assert_eq!(
+            container_element_names(inserted.snapshot()),
+            vec!["Inserted", "Stable"]
+        );
+        assert_eq!(
+            container_element_texts(inserted.snapshot()),
+            vec!["inserted", "stable"]
+        );
+        assert_eq!(host_storage_counts(&root), (1, 2, 2));
+        assert!(root.current_host_output.is_none());
+    }
+
+    #[test]
+    fn root_host_output_canary_keeps_ambiguous_sibling_insertion_recorded_only() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "Stable",
+            "stable",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.insert_host_component_with_text_before_stable_sibling_for_canary(
+            "Inserted", "inserted",
+        )
+        .unwrap();
+
+        let blocked = root
+            .render_and_commit_host_output_insert_before_ambiguous_sibling_for_canary()
+            .unwrap()
+            .unwrap();
+        let diagnostics = blocked.insertion_diagnostics();
+
+        assert_eq!(
+            diagnostics.apply_kind(),
+            TestRendererStableSiblingInsertionApplyKind::InsertionBlocked
+        );
+        assert_eq!(
+            diagnostics.sibling_status(),
+            TestRendererStableSiblingInsertionSiblingStatus::BlockedMissingStateNode
+        );
+        assert_eq!(
+            diagnostics.mutation_status(),
+            TestRendererStableSiblingInsertionMutationStatus::RecordedOnly
+        );
+        assert!(!diagnostics.can_insert_before());
+        assert_eq!(diagnostics.state_node_raw(), 2);
+        assert_eq!(diagnostics.sibling_state_node_raw(), 0);
+        assert_eq!(blocked.commit_diagnostics().mutation_records().len(), 1);
+        assert_eq!(
+            blocked.commit_diagnostics().mutation_records()[0].fiber(),
+            blocked.inserted_fibers().component()
+        );
+        assert_eq!(
+            container_element_texts(blocked.previous_snapshot()),
+            vec!["stable"]
+        );
+        assert_eq!(container_element_texts(blocked.snapshot()), vec!["stable"]);
+        assert_eq!(host_storage_counts(&root), (1, 2, 2));
+        assert!(root.current_host_output.is_none());
     }
 
     #[test]
