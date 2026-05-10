@@ -276,6 +276,221 @@ test('private resource/form internals gate records deterministic unsupported met
   );
 });
 
+test('private form action/reset dispatcher gate records intent metadata only', () => {
+  const gate = resourceFormGate.createFormActionResetDispatcherGate({
+    requestIdPrefix: 'form-dispatcher-gate'
+  });
+  const records = [
+    gate.recordSubmissionIntent({
+      explicitIntent: true,
+      eventName: 'submit',
+      actionKind: 'function',
+      actionSource: 'form',
+      submitControlKind: 'button',
+      defaultPrevented: false,
+      transitionScheduled: false,
+      replayed: false
+    }),
+    gate.recordResetIntent({
+      explicitIntent: true,
+      dispatcherKey: 'r',
+      resetSource: 'requestFormReset',
+      formOwnership: 'not-inspected',
+      transitionContext: 'action'
+    })
+  ];
+  const summary =
+    resourceFormGate.describePrivateFormActionResetDispatcherGate();
+
+  assert.deepEqual(
+    records.map((record) => ({
+      requestId: record.requestId,
+      requestType: record.requestType,
+      intentKind: record.intentKind,
+      contractId: record.contractId,
+      status: record.status,
+      eventName: record.eventName,
+      dispatcherName: record.dispatcherName,
+      privateDispatcherKey: record.privateDispatcherKey,
+      intent: record.intent
+    })),
+    [
+      {
+        requestId: 'form-dispatcher-gate:1',
+        requestType: 'form-action-reset-dispatcher.submission',
+        intentKind: 'submission',
+        contractId: 'form-action-submission-intent',
+        status:
+          resourceFormGate.privateFormActionSubmissionIntentRecordedStatus,
+        eventName: 'submit',
+        dispatcherName: 'form-action-event-plugin',
+        privateDispatcherKey: null,
+        intent: {
+          explicitIntent: true,
+          intentKind: 'submission',
+          eventName: 'submit',
+          actionKind: 'function',
+          actionSource: 'form',
+          submitControlKind: 'button',
+          defaultPrevented: false,
+          transitionScheduled: false,
+          replayed: false,
+          formCaptured: false,
+          rawEventCaptured: false,
+          rawActionCaptured: false,
+          realFormInspected: false,
+          submitControlInspected: false,
+          formDataConstructed: false,
+          syntheticEventCreated: false,
+          defaultPreventedByGate: false,
+          nativeNavigationWouldBePrevented: true,
+          pendingStatusWouldBeSet: true,
+          actionInvocationWouldBeScheduled: true,
+          actionInvoked: false,
+          hostTransitionStarted: false,
+          compatibilityClaimed: false
+        }
+      },
+      {
+        requestId: 'form-dispatcher-gate:2',
+        requestType: 'form-action-reset-dispatcher.reset',
+        intentKind: 'reset',
+        contractId: 'form-action-reset-intent',
+        status: resourceFormGate.privateFormActionResetIntentRecordedStatus,
+        eventName: null,
+        dispatcherName: 'request-form-reset-dispatcher',
+        privateDispatcherKey: 'r',
+        intent: {
+          explicitIntent: true,
+          intentKind: 'reset',
+          dispatcherKey: 'r',
+          resetSource: 'requestFormReset',
+          formOwnership: 'not-inspected',
+          transitionContext: 'action',
+          formCaptured: false,
+          rawDispatcherArgumentCaptured: false,
+          realFormInspected: false,
+          formFiberResolved: false,
+          previousDispatcherCalled: false,
+          resetWouldBeRequested: true,
+          resetStateWouldBeQueued: true,
+          resetCommitWouldRun: false,
+          realFormReset: false,
+          compatibilityClaimed: false
+        }
+      }
+    ]
+  );
+
+  assert.equal(summary.gateId, resourceFormGate.privateFormActionResetDispatcherGateId);
+  assert.equal(summary.status, resourceFormGate.privateFormActionResetDispatcherStatus);
+  assert.equal(summary.recordsSubmissionIntentMetadata, true);
+  assert.equal(summary.recordsResetIntentMetadata, true);
+  assert.equal(summary.acceptsRealForms, false);
+  assert.equal(summary.acceptsRawEvents, false);
+  assert.equal(summary.acceptsActionFunctions, false);
+  assert.equal(summary.invokesActions, false);
+  assert.equal(summary.constructsFormData, false);
+  assert.equal(summary.startsHostTransition, false);
+  assert.equal(summary.resetsForms, false);
+  assert.deepEqual(
+    summary.sideEffects,
+    resourceFormGate.formActionResetDispatcherBlockedSideEffects
+  );
+  assert.deepEqual(
+    summary.contracts.map((contract) => ({
+      id: contract.id,
+      intentKind: contract.intentKind,
+      eventName: contract.eventName,
+      dispatcherName: contract.dispatcherName,
+      privateDispatcherKey: contract.privateDispatcherKey,
+      acceptsRealForms: contract.acceptsRealForms,
+      acceptsActionFunctions: contract.acceptsActionFunctions
+    })),
+    [
+      {
+        id: 'form-action-submission-intent',
+        intentKind: 'submission',
+        eventName: 'submit',
+        dispatcherName: 'form-action-event-plugin',
+        privateDispatcherKey: null,
+        acceptsRealForms: false,
+        acceptsActionFunctions: false
+      },
+      {
+        id: 'form-action-reset-intent',
+        intentKind: 'reset',
+        eventName: null,
+        dispatcherName: 'request-form-reset-dispatcher',
+        privateDispatcherKey: 'r',
+        acceptsRealForms: false,
+        acceptsActionFunctions: false
+      }
+    ]
+  );
+
+  for (const record of records) {
+    assert.equal(Object.isFrozen(record), true, record.requestType);
+    assert.equal(
+      resourceFormGate.isPrivateFormActionResetDispatcherRecord(record),
+      true,
+      record.requestType
+    );
+    assert.equal(
+      resourceFormGate.getPrivateFormActionResetDispatcherRecordPayload(
+        record
+      ),
+      record,
+      record.requestType
+    );
+    assert.equal(record.compatibilityTarget, compatibilityTarget);
+    assert.equal(record.unsupportedCode, unsupportedCode);
+    assert.equal(record.dispatcherBoundary.recordsIntentMetadata, true);
+    assert.equal(record.dispatcherBoundary.acceptsRealForms, false);
+    assert.equal(record.dispatcherBoundary.acceptsRawEvents, false);
+    assert.equal(record.dispatcherBoundary.acceptsActionFunctions, false);
+    assert.equal(record.dispatcherBoundary.realFormInspected, false);
+    assert.equal(record.dispatcherBoundary.submitControlInspected, false);
+    assert.equal(record.dispatcherBoundary.formDataConstructed, false);
+    assert.equal(record.dispatcherBoundary.syntheticEventCreated, false);
+    assert.equal(record.dispatcherBoundary.defaultPrevented, false);
+    assert.equal(record.dispatcherBoundary.actionInvoked, false);
+    assert.equal(record.dispatcherBoundary.hostTransitionStarted, false);
+    assert.equal(record.dispatcherBoundary.resetFiberResolved, false);
+    assert.equal(record.dispatcherBoundary.resetStateQueued, false);
+    assert.equal(record.dispatcherBoundary.formResetCommitted, false);
+    assert.equal(record.dispatcherBoundary.realFormReset, false);
+    assert.equal(record.dispatcherBoundary.compatibilityClaimed, false);
+  }
+
+  assert.deepEqual(
+    records[0].sideEffects,
+    resourceFormGate.formActionSubmissionIntentSideEffects
+  );
+  assert.equal(records[0].sideEffects.formDispatcherMetadataRecorded, true);
+  assert.equal(records[0].sideEffects.submissionIntentRecorded, true);
+  assert.equal(records[0].sideEffects.resetIntentRecorded, false);
+  assert.equal(records[0].sideEffects.formActionEventPluginInvoked, false);
+  assert.equal(records[0].sideEffects.realFormInspected, false);
+  assert.equal(records[0].sideEffects.submitControlInspected, false);
+  assert.equal(records[0].sideEffects.formDataConstructed, false);
+  assert.equal(records[0].sideEffects.actionInvoked, false);
+  assert.equal(records[0].sideEffects.hostTransitionStarted, false);
+
+  assert.deepEqual(
+    records[1].sideEffects,
+    resourceFormGate.formActionResetIntentSideEffects
+  );
+  assert.equal(records[1].sideEffects.formDispatcherMetadataRecorded, true);
+  assert.equal(records[1].sideEffects.submissionIntentRecorded, false);
+  assert.equal(records[1].sideEffects.resetIntentRecorded, true);
+  assert.equal(records[1].sideEffects.requestFormResetDispatcherInvoked, false);
+  assert.equal(records[1].sideEffects.resetFiberResolved, false);
+  assert.equal(records[1].sideEffects.resetStateQueued, false);
+  assert.equal(records[1].sideEffects.formResetCommitted, false);
+  assert.equal(records[1].sideEffects.realFormReset, false);
+});
+
 test('private controlled input value-tracker gate records deterministic metadata only', () => {
   const first = createPrivateControlledValueTrackerScenario();
   const second = createPrivateControlledValueTrackerScenario();
@@ -4312,6 +4527,154 @@ test('private resource hint dispatcher metadata rejects malformed or dispatching
   );
 });
 
+test('private form action/reset dispatcher gate rejects real form and action inputs', () => {
+  const gate = resourceFormGate.createFormActionResetDispatcherGate({
+    requestIdPrefix: 'form-dispatcher-error-gate'
+  });
+  let actionCalls = 0;
+  const action = () => {
+    actionCalls++;
+  };
+  const record = gate.recordSubmissionIntent({
+    explicitIntent: true,
+    eventName: 'submit',
+    actionKind: 'none',
+    actionSource: 'none',
+    submitControlKind: 'none'
+  });
+  const error =
+    resourceFormGate.createUnsupportedFormActionResetDispatcherError(record);
+
+  assert.equal(error.name, 'FastReactDomUnimplementedError');
+  assert.equal(
+    error.code,
+    resourceFormGate.privateFormActionResetDispatcherGateErrorCode
+  );
+  assert.equal(error.entrypoint, 'react-dom/private-internals');
+  assert.equal(
+    error.exportName,
+    'form-action-reset-dispatcher.submission'
+  );
+  assert.equal(error.compatibilityTarget, compatibilityTarget);
+  assert.equal(error.requestId, 'form-dispatcher-error-gate:1');
+  assert.equal(error.requestSequence, 1);
+  assert.equal(error.intentKind, 'submission');
+  assert.equal(error.contractId, 'form-action-submission-intent');
+  assert.equal(
+    error.status,
+    resourceFormGate.privateFormActionSubmissionIntentRecordedStatus
+  );
+  assert.deepEqual(
+    error.sideEffects,
+    resourceFormGate.formActionSubmissionIntentSideEffects
+  );
+  assert.match(
+    error.message,
+    /private form action\/reset dispatcher gate records intent metadata only/u
+  );
+
+  assert.throws(
+    () =>
+      gate.recordSubmissionIntent({
+        explicitIntent: true,
+        eventName: 'submit',
+        actionKind: 'function',
+        action
+      }),
+    {
+      code:
+        resourceFormGate.privateFormActionResetDispatcherInvalidIntentCode,
+      compatibilityTarget,
+      contractId: 'form-action-submission-intent',
+      intentKind: 'submission',
+      reason: 'action must not be passed to the metadata gate'
+    }
+  );
+  assert.equal(actionCalls, 0);
+  assert.throws(
+    () =>
+      gate.recordSubmissionIntent({
+        explicitIntent: true,
+        eventName: 'submit',
+        form: throwingProxy('real form')
+      }),
+    {
+      code:
+        resourceFormGate.privateFormActionResetDispatcherInvalidIntentCode,
+      compatibilityTarget,
+      reason: 'form must not be passed to the metadata gate'
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordSubmissionIntent({
+        explicitIntent: true,
+        eventName: 'submit',
+        submitter: throwingProxy('submitter')
+      }),
+    {
+      code:
+        resourceFormGate.privateFormActionResetDispatcherInvalidIntentCode,
+      compatibilityTarget,
+      reason: 'submitter must not be passed to the metadata gate'
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordSubmissionIntent({
+        explicitIntent: true,
+        eventName: 'reset'
+      }),
+    {
+      code:
+        resourceFormGate.privateFormActionResetDispatcherInvalidIntentCode,
+      compatibilityTarget,
+      reason: 'eventName must be submit'
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordResetIntent({
+        explicitIntent: true,
+        dispatcherKey: 'x'
+      }),
+    {
+      code:
+        resourceFormGate.privateFormActionResetDispatcherInvalidIntentCode,
+      compatibilityTarget,
+      contractId: 'form-action-reset-intent',
+      intentKind: 'reset',
+      reason: 'dispatcherKey must be r'
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate
+        .createResourceFormActionInternalsGate()
+        .recordFormActionResetIntent({
+          explicitIntent: true,
+          form: throwingProxy('reset form')
+        }),
+    {
+      code:
+        resourceFormGate.privateFormActionResetDispatcherInvalidIntentCode,
+      compatibilityTarget,
+      contractId: 'form-action-reset-intent',
+      intentKind: 'reset',
+      reason: 'form must not be passed to the metadata gate'
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate.createUnsupportedFormActionResetDispatcherError({}),
+    {
+      code:
+        resourceFormGate.privateFormActionResetDispatcherInvalidRecordCode,
+      compatibilityTarget
+    }
+  );
+});
+
 test('private resource/form internals gate errors are deterministic and fail closed', () => {
   const gate = resourceFormGate.createResourceFormActionInternalsGate({
     requestIdPrefix: 'error-gate'
@@ -4507,6 +4870,18 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
   assert.equal(summary.sideEffects.publicHeadSingletonBehavior, false);
   assert.equal(summary.sideEffects.realDocumentMutated, false);
   assert.equal(summary.sideEffects.publicResourceHintDomInsertion, false);
+  assert.equal(
+    summary.sideEffects.formDispatcherMetadataRecorded,
+    false
+  );
+  assert.equal(summary.sideEffects.submissionIntentRecorded, false);
+  assert.equal(summary.sideEffects.resetIntentRecorded, false);
+  assert.equal(summary.sideEffects.realFormInspected, false);
+  assert.equal(summary.sideEffects.submitControlInspected, false);
+  assert.equal(summary.sideEffects.formDataConstructed, false);
+  assert.equal(summary.sideEffects.actionInvoked, false);
+  assert.equal(summary.sideEffects.hostTransitionStarted, false);
+  assert.equal(summary.sideEffects.realFormReset, false);
   assert.deepEqual(
     summary.privateResourceDispatcherBoundary,
     resourceFormGate.describePrivateResourceDispatcherBoundary(null)
@@ -4514,6 +4889,14 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
   assert.deepEqual(
     summary.privateResourceDispatcherBoundary,
     resourceFormGate.describePrivateResourceHintDispatcherMetadataGate()
+  );
+  assert.deepEqual(
+    summary.privateFormActionResetDispatcherBoundary,
+    resourceFormGate.describePrivateFormActionResetDispatcherBoundary(null)
+  );
+  assert.deepEqual(
+    summary.privateFormActionResetDispatcherBoundary,
+    resourceFormGate.describePrivateFormActionResetDispatcherGate()
   );
 
   assert.deepEqual(summary.publicRootBoundary, {
@@ -4617,6 +5000,29 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
       preloadPreinitOrderGate:
         resourceFormGate.describePrivateResourceHintPreloadPreinitOrderGate()
     },
+    formActionResetDispatcherBoundary: {
+      gateStatus: resourceFormGate.privateSourceAdapterBlockedStatus,
+      behaviorArea: null,
+      supportedBehaviorArea: 'form-action',
+      appliesToRequest: false,
+      metadataGateAvailable: true,
+      dispatcherRecordsAccepted: true,
+      realFormAccepted: false,
+      rawTargetCaptured: false,
+      formInspected: false,
+      submitControlInspected: false,
+      formDataConstructed: false,
+      syntheticEventCreated: false,
+      actionInvoked: false,
+      transitionStarted: false,
+      resetFiberResolved: false,
+      resetStateQueued: false,
+      formResetCommitted: false,
+      realFormReset: false,
+      compatibilityClaimed: false,
+      dispatcherGate:
+        resourceFormGate.describePrivateFormActionResetDispatcherGate()
+    },
     controlledValueTrackerBoundary: {
       gateStatus: resourceFormGate.privateControlledValueTrackerBlockedStatus,
       behaviorArea: null,
@@ -4671,6 +5077,9 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
       resourceHintAdapterApplies:
         record.sourceAdapterBoundary.resourceHintFakeDomAdapterBoundary !==
         null,
+      formActionDispatcherApplies:
+        record.sourceAdapterBoundary.formActionResetDispatcherBoundary !==
+        null,
       trackerBoundaryApplies:
         record.sourceAdapterBoundary.controlledValueTrackerBoundary
           .appliesToRequest
@@ -4684,6 +5093,7 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
         rootBridgeStatus: resourceFormGate.privateRootBridgeRecordOnlyStatus,
         sourceAdapterStatus: resourceFormGate.privateSourceAdapterBlockedStatus,
         resourceHintAdapterApplies: true,
+        formActionDispatcherApplies: false,
         trackerBoundaryApplies: false
       },
       {
@@ -4694,6 +5104,7 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
         rootBridgeStatus: resourceFormGate.privateRootBridgeRecordOnlyStatus,
         sourceAdapterStatus: resourceFormGate.privateSourceAdapterBlockedStatus,
         resourceHintAdapterApplies: false,
+        formActionDispatcherApplies: true,
         trackerBoundaryApplies: false
       },
       {
@@ -4704,6 +5115,7 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
         rootBridgeStatus: resourceFormGate.privateRootBridgeRecordOnlyStatus,
         sourceAdapterStatus: resourceFormGate.privateSourceAdapterBlockedStatus,
         resourceHintAdapterApplies: false,
+        formActionDispatcherApplies: false,
         trackerBoundaryApplies: true
       }
     ]

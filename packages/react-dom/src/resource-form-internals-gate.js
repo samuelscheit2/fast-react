@@ -9,6 +9,7 @@ const {
 const hasOwn = Object.prototype.hasOwnProperty;
 
 const resourceFormActionInternalsGateSchemaVersion = 1;
+const formActionResetDispatcherGateSchemaVersion = 1;
 const resourceHintDispatcherMetadataGateSchemaVersion = 1;
 const resourceHintFakeDomAdapterGateSchemaVersion = 1;
 const resourceHintFakeDomInsertionGateSchemaVersion = 1;
@@ -21,6 +22,8 @@ const controlledInputPrivateRestoreQueueDiagnosticGateSchemaVersion = 1;
 const controlledInputPrivateWrapperGateSchemaVersion = 1;
 const privateResourceFormActionGateRecordType =
   'fast.react_dom.private_resource_form_action_gate_record';
+const privateFormActionResetDispatcherRecordType =
+  'fast.react_dom.private_form_action_reset_dispatcher_record';
 const privateResourceHintDispatcherMetadataRecordType =
   'fast.react_dom.private_resource_hint_dispatcher_metadata_record';
 const privateResourceHintFakeDomAdapterAdmissionRecordType =
@@ -53,6 +56,8 @@ const privateResourceHintHeadClearRetainGateId =
   'resource-hint-head-clear-retain-private-gate-1';
 const privateResourceHintPreloadPreinitOrderGateId =
   'resource-hint-preload-preinit-dedupe-order-private-gate-1';
+const privateFormActionResetDispatcherGateId =
+  'form-action-reset-private-dispatcher-gate-1';
 const privateResourceHintFakeDomAdapterAdmissionRequiredStatus =
   'blocked-private-resource-hint-fake-dom-adapter-admission-required';
 const privateResourceHintFakeDomAdapterAdmissionStatus =
@@ -95,10 +100,24 @@ const privateResourceHintPreloadPreinitOrderExecutionStatus =
   'diagnosed-private-resource-hint-fake-dom-preload-preinit-dedupe-order';
 const privateResourceHintPreloadPreinitOrderCompatibilityBlockedStatus =
   'blocked-private-resource-hint-preload-preinit-dedupe-order-compatibility';
+const privateFormActionResetDispatcherStatus =
+  'private-form-action-reset-dispatcher-metadata-only';
+const privateFormActionSubmissionIntentRecordedStatus =
+  'recorded-private-form-action-submission-intent';
+const privateFormActionResetIntentRecordedStatus =
+  'recorded-private-form-action-reset-intent';
 const privateResourceFormActionGateErrorCode =
   'FAST_REACT_DOM_RESOURCE_FORM_ACTION_GATE';
 const privateResourceFormActionGateUnknownRequestCode =
   'FAST_REACT_DOM_RESOURCE_FORM_ACTION_GATE_UNKNOWN_REQUEST';
+const privateFormActionResetDispatcherGateErrorCode =
+  'FAST_REACT_DOM_FORM_ACTION_RESET_DISPATCHER_GATE';
+const privateFormActionResetDispatcherInvalidIntentCode =
+  'FAST_REACT_DOM_FORM_ACTION_RESET_DISPATCHER_INVALID_INTENT';
+const privateFormActionResetDispatcherInvalidRecordCode =
+  'FAST_REACT_DOM_FORM_ACTION_RESET_DISPATCHER_INVALID_RECORD';
+const privateFormActionResetDispatcherUnknownIntentCode =
+  'FAST_REACT_DOM_FORM_ACTION_RESET_DISPATCHER_UNKNOWN_INTENT';
 const privateResourceHintDispatcherMetadataGateErrorCode =
   'FAST_REACT_DOM_RESOURCE_HINT_DISPATCHER_METADATA_GATE';
 const privateResourceHintDispatcherMetadataInvalidShapeCode =
@@ -198,6 +217,39 @@ const noSideEffects = freezeRecord({
   controlsTracked: false,
   publicRootTouched: false,
   compatibilityClaimed: false
+});
+
+const formActionResetDispatcherBlockedSideEffects = freezeRecord({
+  formDispatcherMetadataRecorded: false,
+  submissionIntentRecorded: false,
+  resetIntentRecorded: false,
+  formActionEventPluginInvoked: false,
+  requestFormResetDispatcherInvoked: false,
+  realFormInspected: false,
+  submitControlInspected: false,
+  formDataConstructed: false,
+  syntheticEventCreated: false,
+  defaultPrevented: false,
+  actionInvoked: false,
+  hostTransitionStarted: false,
+  resetFiberResolved: false,
+  resetStateQueued: false,
+  formResetCommitted: false,
+  realFormReset: false,
+  publicRootTouched: false,
+  compatibilityClaimed: false
+});
+
+const formActionSubmissionIntentSideEffects = freezeRecord({
+  ...formActionResetDispatcherBlockedSideEffects,
+  formDispatcherMetadataRecorded: true,
+  submissionIntentRecorded: true
+});
+
+const formActionResetIntentSideEffects = freezeRecord({
+  ...formActionResetDispatcherBlockedSideEffects,
+  formDispatcherMetadataRecorded: true,
+  resetIntentRecorded: true
 });
 
 const resourceHintDispatcherSideEffects = freezeRecord({
@@ -459,6 +511,39 @@ const resourceHintDispatcherMissingPrerequisites = freezeArray([
     'no-fizz-resource-integration',
     'react-dom-resource',
     'Fizz resource emission and preloading are not connected to the package facade.'
+  )
+]);
+
+const formActionResetDispatcherMissingPrerequisites = freezeArray([
+  prerequisite(
+    'no-form-action-event-plugin-execution',
+    'react-dom-events',
+    'Form action event extraction remains metadata-only and does not create SyntheticEvents or invoke listeners.'
+  ),
+  prerequisite(
+    'no-client-form-data-construction',
+    'react-dom-form',
+    'Client submission intent does not construct form data or inspect form controls.'
+  ),
+  prerequisite(
+    'no-host-transition-form-status',
+    'react-dom-form',
+    'Host transition pending form status is not wired to public roots.'
+  ),
+  prerequisite(
+    'no-form-reset-fiber-queue',
+    'react-dom-form',
+    'React-owned form reset requests do not resolve fibers or enqueue reset state.'
+  ),
+  prerequisite(
+    'no-form-reset-commit',
+    'react-dom-form',
+    'Commit-time form reset effects and real form.reset calls remain blocked.'
+  ),
+  prerequisite(
+    'no-public-form-action-compatibility',
+    'react-dom-client',
+    'Public form action and reset compatibility remains unclaimed.'
   )
 ]);
 
@@ -914,6 +999,23 @@ const formActionContracts = freezeArray([
   formActionContract('function-form-action', 'formAction', null)
 ]);
 
+const formActionResetDispatcherContracts = freezeArray([
+  formActionResetDispatcherContract(
+    'form-action-submission-intent',
+    'submission',
+    'submit',
+    'form-action-event-plugin',
+    null
+  ),
+  formActionResetDispatcherContract(
+    'form-action-reset-intent',
+    'reset',
+    null,
+    'request-form-reset-dispatcher',
+    'r'
+  )
+]);
+
 const controlledFormContracts = freezeArray([
   controlledFormContract('input-controlled-value', 'input'),
   controlledFormContract('select-controlled-value', 'select'),
@@ -1103,6 +1205,7 @@ const controlledInputPrivateWrapperContractByKey = new Map();
 indexControlledInputPrivateWrapperPropertyPayloadContracts();
 
 const recordPayloads = new WeakMap();
+const formActionResetDispatcherPayloads = new WeakMap();
 const resourceHintDispatcherMetadataPayloads = new WeakMap();
 const resourceHintFakeDomAdapterAdmissionPayloads = new WeakMap();
 const resourceHintFakeDomInsertionPayloads = new WeakMap();
@@ -1117,6 +1220,8 @@ const controlledInputPrivateRestoreQueueDiagnosticPayloads = new WeakMap();
 const controlledInputPrivateWrapperPropertyPayloadRecordPayloads =
   new WeakMap();
 const defaultGate = createResourceFormActionInternalsGate();
+const defaultFormActionResetDispatcherGate =
+  createFormActionResetDispatcherGate();
 const defaultResourceHintFakeDomAdapterGate =
   createResourceHintFakeDomAdapterGate();
 const defaultControlledInputValueTrackerGate =
@@ -1159,12 +1264,50 @@ function createResourceFormActionInternalsGate(options) {
         args
       );
     },
+    recordFormActionSubmissionIntent(intent) {
+      return recordFormActionResetDispatcherIntentWithGate(
+        gateState,
+        'submission',
+        intent
+      );
+    },
+    recordFormActionResetIntent(intent) {
+      return recordFormActionResetDispatcherIntentWithGate(
+        gateState,
+        'reset',
+        intent
+      );
+    },
     recordControlledFormRequest(requestName, args) {
       return recordUnsupportedRequestWithGate(
         gateState,
         'controlled-form',
         requestName,
         args
+      );
+    }
+  });
+}
+
+function createFormActionResetDispatcherGate(options) {
+  const gateState = createGateStateWithDefaultPrefix(
+    options,
+    'form-action-reset-dispatcher'
+  );
+
+  return Object.freeze({
+    recordSubmissionIntent(intent) {
+      return recordFormActionResetDispatcherIntentWithGate(
+        gateState,
+        'submission',
+        intent
+      );
+    },
+    recordResetIntent(intent) {
+      return recordFormActionResetDispatcherIntentWithGate(
+        gateState,
+        'reset',
+        intent
       );
     }
   });
@@ -1339,6 +1482,14 @@ function recordUnsupportedFormActionRequest(requestName, args) {
   return defaultGate.recordFormActionRequest(requestName, args);
 }
 
+function recordFormActionSubmissionIntent(intent) {
+  return defaultFormActionResetDispatcherGate.recordSubmissionIntent(intent);
+}
+
+function recordFormActionResetIntent(intent) {
+  return defaultFormActionResetDispatcherGate.recordResetIntent(intent);
+}
+
 function recordUnsupportedControlledFormRequest(requestName, args) {
   return defaultGate.recordControlledFormRequest(requestName, args);
 }
@@ -1433,6 +1584,14 @@ function getPrivateResourceFormActionGateRecordPayload(record) {
 
 function isPrivateResourceFormActionGateRecord(value) {
   return recordPayloads.has(value);
+}
+
+function getPrivateFormActionResetDispatcherRecordPayload(record) {
+  return formActionResetDispatcherPayloads.get(record) || null;
+}
+
+function isPrivateFormActionResetDispatcherRecord(value) {
+  return formActionResetDispatcherPayloads.has(value);
 }
 
 function getPrivateResourceHintDispatcherMetadataRecordPayload(record) {
@@ -1542,6 +1701,7 @@ function describeResourceFormActionInternalsGate() {
         resourceHintPreloadPreinitOrderContracts,
       singletons: singletonContracts,
       formActions: formActionContracts,
+      formActionResetDispatchers: formActionResetDispatcherContracts,
       controlledForms: controlledFormContracts,
       controlledInputValueTrackers: controlledInputValueTrackerContracts,
       controlledInputPrivateWrapperPropertyPayloads:
@@ -1550,8 +1710,37 @@ function describeResourceFormActionInternalsGate() {
     sideEffects: noSideEffects,
     resourceHintDispatcherMetadata:
       describePrivateResourceHintDispatcherMetadataGate(),
+    formActionResetDispatcher:
+      describePrivateFormActionResetDispatcherGate(),
     controlledInputValueTracker: describeControlledInputValueTrackerGate(),
     missingPrerequisites
+  });
+}
+
+function describePrivateFormActionResetDispatcherGate() {
+  return freezeRecord({
+    schemaVersion: formActionResetDispatcherGateSchemaVersion,
+    gateId: privateFormActionResetDispatcherGateId,
+    compatibilityTarget,
+    status: privateFormActionResetDispatcherStatus,
+    unsupportedCode: unimplementedCode,
+    oracleEvidence: oracleEvidence(
+      formActionsOracleKind,
+      formActionResetDispatcherContracts.length
+    ),
+    contracts: formActionResetDispatcherContracts,
+    acceptedIntentKinds: freezeArray(['submission', 'reset']),
+    acceptsRealForms: false,
+    acceptsRawEvents: false,
+    acceptsActionFunctions: false,
+    recordsSubmissionIntentMetadata: true,
+    recordsResetIntentMetadata: true,
+    invokesActions: false,
+    constructsFormData: false,
+    startsHostTransition: false,
+    resetsForms: false,
+    sideEffects: formActionResetDispatcherBlockedSideEffects,
+    missingPrerequisites: formActionResetDispatcherMissingPrerequisites
   });
 }
 
@@ -1880,6 +2069,28 @@ function createUnsupportedControlledInputValueTrackerError(record) {
   return error;
 }
 
+function createUnsupportedFormActionResetDispatcherError(record) {
+  const payload = assertPrivateFormActionResetDispatcherRecord(record);
+  const error = createUnsupportedError(
+    'react-dom/private-internals',
+    payload.requestType,
+    'was recorded',
+    'The private form action/reset dispatcher gate records intent metadata only.'
+  );
+
+  error.code = privateFormActionResetDispatcherGateErrorCode;
+  error.requestId = payload.requestId;
+  error.requestSequence = payload.requestSequence;
+  error.requestType = payload.requestType;
+  error.intentKind = payload.intentKind;
+  error.contractId = payload.contractId;
+  error.status = payload.status;
+  error.intent = payload.intent;
+  error.sideEffects = payload.sideEffects;
+
+  return error;
+}
+
 function createUnsupportedControlledInputRestoreQueueDiagnosticError(record) {
   const payload = assertPrivateControlledInputRestoreQueueDiagnosticRecord(
     record
@@ -2092,6 +2303,54 @@ function recordUnsupportedRequestWithGate(
   });
 
   recordPayloads.set(payload, payload);
+  return payload;
+}
+
+function recordFormActionResetDispatcherIntentWithGate(
+  gateState,
+  intentKind,
+  intent
+) {
+  const contract = getFormActionResetDispatcherContract(intentKind);
+  const normalizedIntent =
+    normalizeFormActionResetDispatcherIntent(contract, intent);
+  const requestSequence = gateState.nextRequestSequence++;
+  const requestId = `${gateState.requestIdPrefix}:${requestSequence}`;
+  const status =
+    intentKind === 'submission'
+      ? privateFormActionSubmissionIntentRecordedStatus
+      : privateFormActionResetIntentRecordedStatus;
+  const sideEffects =
+    intentKind === 'submission'
+      ? formActionSubmissionIntentSideEffects
+      : formActionResetIntentSideEffects;
+
+  const payload = freezeRecord({
+    schemaVersion: formActionResetDispatcherGateSchemaVersion,
+    $$typeof: privateFormActionResetDispatcherRecordType,
+    kind: 'FastReactDomPrivateFormActionResetDispatcherRecord',
+    gateId: privateFormActionResetDispatcherGateId,
+    compatibilityTarget,
+    status,
+    unsupportedCode: unimplementedCode,
+    requestId,
+    requestSequence,
+    requestType: `form-action-reset-dispatcher.${intentKind}`,
+    intentKind,
+    contractId: contract.id,
+    oracleKind: formActionsOracleKind,
+    oracleSchemaVersion: 1,
+    eventName: contract.eventName,
+    dispatcherName: contract.dispatcherName,
+    privateDispatcherKey: contract.privateDispatcherKey,
+    intent: normalizedIntent,
+    dispatcherBoundary:
+      createFormActionResetDispatcherBoundary(contract, normalizedIntent),
+    sideEffects,
+    missingPrerequisites: formActionResetDispatcherMissingPrerequisites
+  });
+
+  formActionResetDispatcherPayloads.set(payload, payload);
   return payload;
 }
 
@@ -2820,6 +3079,25 @@ function getAcceptedContract(behaviorArea, requestName) {
   throw error;
 }
 
+function getFormActionResetDispatcherContract(intentKind) {
+  for (const contract of formActionResetDispatcherContracts) {
+    if (contract.intentKind === intentKind) {
+      return contract;
+    }
+  }
+
+  const error = new Error(
+    `Unknown private React DOM form action/reset dispatcher intent: ${String(
+      intentKind
+    )}.`
+  );
+  error.name = 'FastReactDomFormActionResetDispatcherGateError';
+  error.code = privateFormActionResetDispatcherUnknownIntentCode;
+  error.intentKind = intentKind;
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
 function getControlledInputValueTrackerContract(hostTag, controlKind) {
   const key = `${hostTag}:${controlKind}`;
   const contract = controlledInputValueTrackerContractByKey.get(key);
@@ -2870,6 +3148,21 @@ function assertPrivateResourceFormActionGateRecord(record) {
   );
   error.name = 'FastReactDomResourceFormActionGateError';
   error.code = 'FAST_REACT_DOM_RESOURCE_FORM_ACTION_GATE_INVALID_RECORD';
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
+function assertPrivateFormActionResetDispatcherRecord(record) {
+  const payload = getPrivateFormActionResetDispatcherRecordPayload(record);
+  if (payload !== null) {
+    return payload;
+  }
+
+  const error = new Error(
+    'Expected a private React DOM form action/reset dispatcher record.'
+  );
+  error.name = 'FastReactDomFormActionResetDispatcherGateError';
+  error.code = privateFormActionResetDispatcherInvalidRecordCode;
   error.compatibilityTarget = compatibilityTarget;
   throw error;
 }
@@ -5361,6 +5654,280 @@ function getAdmissionStringProperty(record, key, fallback) {
   return typeof value === 'string' && value.length > 0 ? value : fallback;
 }
 
+function normalizeFormActionResetDispatcherIntent(contract, intent) {
+  if (intent == null || typeof intent !== 'object') {
+    throwInvalidFormActionResetDispatcherIntent(
+      contract,
+      'intent metadata must be an object'
+    );
+  }
+
+  if (intent.explicitIntent !== true) {
+    throwInvalidFormActionResetDispatcherIntent(
+      contract,
+      'explicitIntent must be true'
+    );
+  }
+
+  assertNoRawFormActionResetDispatcherFields(contract, intent);
+
+  if (contract.intentKind === 'submission') {
+    return normalizeFormActionSubmissionIntent(contract, intent);
+  }
+
+  return normalizeFormActionResetIntent(contract, intent);
+}
+
+function assertNoRawFormActionResetDispatcherFields(contract, intent) {
+  for (const field of [
+    'form',
+    'nativeEvent',
+    'event',
+    'action',
+    'formData',
+    'submitter',
+    'submitControl',
+    'target'
+  ]) {
+    if (hasOwnProp(intent, field)) {
+      throwInvalidFormActionResetDispatcherIntent(
+        contract,
+        `${field} must not be passed to the metadata gate`
+      );
+    }
+  }
+}
+
+function normalizeFormActionSubmissionIntent(contract, intent) {
+  const eventName = getIntentStringProperty(
+    contract,
+    intent,
+    'eventName',
+    'submit'
+  );
+  if (eventName !== 'submit') {
+    throwInvalidFormActionResetDispatcherIntent(
+      contract,
+      'eventName must be submit'
+    );
+  }
+
+  const actionKind = getIntentEnumProperty(
+    contract,
+    intent,
+    'actionKind',
+    freezeArray(['function', 'string', 'none', 'unknown']),
+    'unknown'
+  );
+  const actionSource = getIntentEnumProperty(
+    contract,
+    intent,
+    'actionSource',
+    freezeArray(['form', 'submit-control', 'replay', 'none', 'unknown']),
+    'unknown'
+  );
+  const submitControlKind = getIntentEnumProperty(
+    contract,
+    intent,
+    'submitControlKind',
+    freezeArray(['button', 'input', 'none', 'unknown']),
+    'unknown'
+  );
+  const defaultPrevented = getIntentBooleanProperty(
+    contract,
+    intent,
+    'defaultPrevented',
+    false
+  );
+  const transitionScheduled = getIntentBooleanProperty(
+    contract,
+    intent,
+    'transitionScheduled',
+    false
+  );
+  const replayed = getIntentBooleanProperty(
+    contract,
+    intent,
+    'replayed',
+    false
+  );
+  const functionAction = actionKind === 'function';
+
+  return freezeRecord({
+    explicitIntent: true,
+    intentKind: 'submission',
+    eventName,
+    actionKind,
+    actionSource,
+    submitControlKind,
+    defaultPrevented,
+    transitionScheduled,
+    replayed,
+    formCaptured: false,
+    rawEventCaptured: false,
+    rawActionCaptured: false,
+    realFormInspected: false,
+    submitControlInspected: false,
+    formDataConstructed: false,
+    syntheticEventCreated: false,
+    defaultPreventedByGate: false,
+    nativeNavigationWouldBePrevented: functionAction && !defaultPrevented,
+    pendingStatusWouldBeSet:
+      functionAction || (defaultPrevented && transitionScheduled),
+    actionInvocationWouldBeScheduled: functionAction && !defaultPrevented,
+    actionInvoked: false,
+    hostTransitionStarted: false,
+    compatibilityClaimed: false
+  });
+}
+
+function normalizeFormActionResetIntent(contract, intent) {
+  const dispatcherKey = getIntentStringProperty(
+    contract,
+    intent,
+    'dispatcherKey',
+    'r'
+  );
+  if (dispatcherKey !== 'r') {
+    throwInvalidFormActionResetDispatcherIntent(
+      contract,
+      'dispatcherKey must be r'
+    );
+  }
+
+  const resetSource = getIntentEnumProperty(
+    contract,
+    intent,
+    'resetSource',
+    freezeArray([
+      'requestFormReset',
+      'action-completion',
+      'transition',
+      'unknown'
+    ]),
+    'unknown'
+  );
+  const formOwnership = getIntentEnumProperty(
+    contract,
+    intent,
+    'formOwnership',
+    freezeArray(['not-inspected', 'react-owned', 'not-react-owned', 'unknown']),
+    'not-inspected'
+  );
+  const transitionContext = getIntentEnumProperty(
+    contract,
+    intent,
+    'transitionContext',
+    freezeArray(['action', 'transition', 'none', 'unknown']),
+    'unknown'
+  );
+
+  return freezeRecord({
+    explicitIntent: true,
+    intentKind: 'reset',
+    dispatcherKey,
+    resetSource,
+    formOwnership,
+    transitionContext,
+    formCaptured: false,
+    rawDispatcherArgumentCaptured: false,
+    realFormInspected: false,
+    formFiberResolved: false,
+    previousDispatcherCalled: false,
+    resetWouldBeRequested: true,
+    resetStateWouldBeQueued: transitionContext !== 'none',
+    resetCommitWouldRun: false,
+    realFormReset: false,
+    compatibilityClaimed: false
+  });
+}
+
+function getIntentStringProperty(contract, record, key, fallback) {
+  if (!hasOwnProp(record, key)) {
+    return fallback;
+  }
+
+  const value = record[key];
+  if (typeof value === 'string' && value.length > 0) {
+    return value;
+  }
+
+  throwInvalidFormActionResetDispatcherIntent(
+    contract,
+    `${key} must be a non-empty string`
+  );
+}
+
+function getIntentEnumProperty(contract, record, key, allowedValues, fallback) {
+  const value = getIntentStringProperty(contract, record, key, fallback);
+  if (allowedValues.includes(value)) {
+    return value;
+  }
+
+  throwInvalidFormActionResetDispatcherIntent(
+    contract,
+    `${key} must be one of ${allowedValues.join(', ')}`
+  );
+}
+
+function getIntentBooleanProperty(contract, record, key, fallback) {
+  if (!hasOwnProp(record, key)) {
+    return fallback;
+  }
+
+  const value = record[key];
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  throwInvalidFormActionResetDispatcherIntent(
+    contract,
+    `${key} must be a boolean`
+  );
+}
+
+function createFormActionResetDispatcherBoundary(contract, normalizedIntent) {
+  return freezeRecord({
+    gateId: privateFormActionResetDispatcherGateId,
+    gateStatus: privateFormActionResetDispatcherStatus,
+    intentKind: contract.intentKind,
+    contractId: contract.id,
+    eventName: contract.eventName,
+    dispatcherName: contract.dispatcherName,
+    privateDispatcherKey: contract.privateDispatcherKey,
+    recordsIntentMetadata: true,
+    formCaptured: normalizedIntent.formCaptured,
+    acceptsRealForms: false,
+    acceptsRawEvents: false,
+    acceptsActionFunctions: false,
+    realFormInspected: false,
+    submitControlInspected: false,
+    formDataConstructed: false,
+    syntheticEventCreated: false,
+    defaultPrevented: false,
+    actionInvoked: false,
+    hostTransitionStarted: false,
+    resetFiberResolved: false,
+    resetStateQueued: false,
+    formResetCommitted: false,
+    realFormReset: false,
+    compatibilityClaimed: false
+  });
+}
+
+function throwInvalidFormActionResetDispatcherIntent(contract, reason) {
+  const error = new Error(
+    `Invalid private React DOM form action/reset dispatcher intent for ${contract.id}: ${reason}.`
+  );
+  error.name = 'FastReactDomFormActionResetDispatcherGateError';
+  error.code = privateFormActionResetDispatcherInvalidIntentCode;
+  error.compatibilityTarget = compatibilityTarget;
+  error.contractId = contract.id;
+  error.intentKind = contract.intentKind;
+  error.reason = reason;
+  throw error;
+}
+
 function throwInvalidResourceHintFakeDomInsertionAdmission(reason) {
   const error = new Error(
     `Invalid private React DOM resource hint fake DOM insertion admission: ${reason}.`
@@ -6445,6 +7012,28 @@ function formActionContract(id, publicName, privateDispatcherKey) {
   });
 }
 
+function formActionResetDispatcherContract(
+  id,
+  intentKind,
+  eventName,
+  dispatcherName,
+  privateDispatcherKey
+) {
+  return freezeRecord({
+    id,
+    intentKind,
+    eventName,
+    dispatcherName,
+    privateDispatcherKey,
+    capability: 'react-dom-form-action-reset-private-dispatcher',
+    oracleKind: formActionsOracleKind,
+    acceptsRealForms: false,
+    acceptsRawEvents: false,
+    acceptsActionFunctions: false,
+    compatibilityClaimed: false
+  });
+}
+
 function controlledFormContract(id, hostTag) {
   return freezeRecord({
     id,
@@ -6573,6 +7162,7 @@ module.exports = {
   controlledInputValueTrackerMissingPrerequisites,
   controlledInputValueTrackerOracleCoverage,
   controlledInputValueTrackerSideEffects,
+  createFormActionResetDispatcherGate,
   createControlledInputPrivateWrapperPropertyPayloadRecord,
   createControlledInputPrivateRestoreQueueDiagnosticGate,
   createControlledInputValueTrackerGate,
@@ -6582,6 +7172,7 @@ module.exports = {
   createResourceHintHeadClearRetainGate,
   createResourceHintPreloadPreinitOrderGate,
   createResourceFormActionInternalsGate,
+  createUnsupportedFormActionResetDispatcherError,
   createUnsupportedControlledInputValueTrackerError,
   createUnsupportedControlledInputRestoreQueueDiagnosticError,
   createUnsupportedResourceHintFakeDomAdapterError,
@@ -6595,6 +7186,7 @@ module.exports = {
   describeControlledInputValueTrackerFakeDomDiagnosticGate,
   describeControlledInputPrivateRestoreQueueDiagnosticGate,
   describeControlledInputPrivateWrapperPropertyPayloadGate,
+  describePrivateFormActionResetDispatcherGate,
   describePrivateResourceHintFakeDomAdapterGate,
   describePrivateResourceHintFakeDomInsertionGate,
   describePrivateResourceHintHeadBoundaryGate,
@@ -6602,12 +7194,19 @@ module.exports = {
   describePrivateResourceHintPreloadPreinitOrderGate,
   describePrivateResourceHintDispatcherMetadataGate,
   describeResourceFormActionInternalsGate,
+  formActionResetDispatcherBlockedSideEffects,
+  formActionResetDispatcherContracts,
+  formActionResetDispatcherGateSchemaVersion,
+  formActionResetDispatcherMissingPrerequisites,
+  formActionResetIntentSideEffects,
+  formActionSubmissionIntentSideEffects,
   formActionContracts,
   detachControlledInputValueTrackerFakeDomDiagnostic,
   getPrivateControlledInputValueTrackerRecordPayload,
   getPrivateControlledInputValueTrackerFakeDomDiagnosticRecordPayload,
   getPrivateControlledInputRestoreQueueDiagnosticRecordPayload,
   getPrivateControlledInputWrapperPropertyPayloadRecordPayload,
+  getPrivateFormActionResetDispatcherRecordPayload,
   getPrivateResourceHintFakeDomAdapterAdmissionRecordPayload,
   getPrivateResourceHintFakeDomInsertionRecordPayload,
   getPrivateResourceHintHeadBoundaryRecordPayload,
@@ -6624,6 +7223,7 @@ module.exports = {
   isPrivateControlledInputValueTrackerFakeDomDiagnosticRecord,
   isPrivateControlledInputRestoreQueueDiagnosticRecord,
   isPrivateControlledInputWrapperPropertyPayloadRecord,
+  isPrivateFormActionResetDispatcherRecord,
   isPrivateResourceFormActionGateRecord,
   isPrivateResourceHintDispatcherMetadataRecord,
   missingPrerequisites,
@@ -6642,6 +7242,15 @@ module.exports = {
   privateControlledInputValueTrackerGateRecordType,
   privateControlledInputValueTrackerGateUnknownScenarioCode,
   privateControlledInputWrapperPropertyPayloadRecordType,
+  privateFormActionResetDispatcherGateErrorCode,
+  privateFormActionResetDispatcherGateId,
+  privateFormActionResetDispatcherInvalidIntentCode,
+  privateFormActionResetDispatcherInvalidRecordCode,
+  privateFormActionResetDispatcherRecordType,
+  privateFormActionResetDispatcherStatus,
+  privateFormActionResetDispatcherUnknownIntentCode,
+  privateFormActionResetIntentRecordedStatus,
+  privateFormActionSubmissionIntentRecordedStatus,
   privateResourceFormActionGateErrorCode,
   privateResourceFormActionGateRecordType,
   privateResourceFormActionGateUnknownRequestCode,
@@ -6698,6 +7307,8 @@ module.exports = {
   privateResourceHintDispatcherMetadataUnknownRequestCode,
   installControlledInputValueTrackerFakeDomDiagnostic,
   observeControlledInputValueTrackerFakeDomDiagnostic,
+  recordFormActionResetIntent,
+  recordFormActionSubmissionIntent,
   recordControlledInputPostEventRestoreIntentFromFakeDomObservation,
   recordControlledInputValueTrackerScenario,
   recordUnsupportedControlledFormRequest,
