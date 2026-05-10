@@ -8,7 +8,7 @@ const {
 const entrypoint = 'react-dom/test-utils';
 
 const privateRoutingGateId =
-  'react-dom-test-utils-act-private-routing-gate-3';
+  'react-dom-test-utils-act-private-routing-gate-4';
 const privateRoutingGateStatus =
   'blocked-public-test-utils-act-private-routing';
 const publicActStatus = 'unsupported-public-test-utils-act-placeholder';
@@ -36,6 +36,14 @@ const privateRootHostOutputBlockedDiagnosticStatus =
   'blocked-private-root-host-output-diagnostic';
 const privateRootHostOutputPublicPrerequisiteStatus =
   'blocked-accepted-private-root-host-output-until-public-root-execution';
+const privateRootWarningBoundaryDiagnosticGateId =
+  'root-render-private-warning-boundary-diagnostic-gate-1';
+const privateRootWarningBoundaryDiagnosticStatus =
+  'accepted-private-root-warning-boundary-diagnostic-without-public-warning-compatibility';
+const privateRootWarningBoundaryBlockedDiagnosticStatus =
+  'blocked-private-root-warning-boundary-diagnostic';
+const privateRootWarningBoundaryPublicPrerequisiteStatus =
+  'blocked-accepted-private-root-warning-boundary-until-public-warning-compatibility';
 
 const reactActPrivateRecords = freezeArray([
   'SchedulerActQueueRequest',
@@ -76,10 +84,10 @@ const privateRootHostOutputDiagnosticScenarios = freezeArray([
   'render-null-clears-container',
   'root-unmount',
   'double-unmount',
-  'render-after-unmount'
+  'render-after-unmount',
+  'flush-sync-cross-root-render'
 ]);
 const privateRootHostOutputBlockedScenarios = freezeArray([
-  'flush-sync-cross-root-render',
   'development-warning-boundaries'
 ]);
 const privateRootHostOutputDiagnosticEvidence = freezeArray([
@@ -93,13 +101,16 @@ const privateRootHostOutputDiagnosticEvidence = freezeArray([
   'private-render-null-clear-container-output',
   'private-unmount-host-output-cleanup',
   'private-double-unmount-noop-host-output',
-  'private-render-after-unmount-guard-no-extra-mutation'
+  'private-render-after-unmount-guard-no-extra-mutation',
+  'private-flush-sync-cross-root-host-output',
+  'private-flush-sync-guard-hook-call',
+  'private-cross-root-sync-flush-diagnostic'
 ]);
 const privateRootHostOutputDiagnosticSummary = freezeRecord({
   admittedScenarioIds: privateRootHostOutputDiagnosticScenarios,
   blockedScenarioIds: privateRootHostOutputBlockedScenarios,
-  admittedScenarioModeRowCount: 16,
-  blockedScenarioModeRowCount: 4,
+  admittedScenarioModeRowCount: 18,
+  blockedScenarioModeRowCount: 2,
   acceptedStatus: privateRootHostOutputDiagnosticStatus,
   blockedStatus: privateRootHostOutputBlockedDiagnosticStatus,
   compatibilityClaimed: false,
@@ -125,6 +136,68 @@ const privateRootHostOutputBlockedPrerequisites = freezeRecords(
 );
 const privateRootHostOutputBlockedPrerequisiteIds = freezeArray(
   privateRootHostOutputBlockedPrerequisites.map(
+    (prerequisite) => prerequisite.id
+  )
+);
+const privateRootWarningBoundaryDiagnosticScenarios = freezeArray([
+  'development-warning-boundaries'
+]);
+const privateRootWarningBoundaryBlockedScenarios = freezeArray([
+  'create-root-no-render',
+  'initial-host-render',
+  'update-host-render',
+  'replace-host-tree',
+  'render-null-clears-container',
+  'root-unmount',
+  'double-unmount',
+  'render-after-unmount',
+  'flush-sync-cross-root-render'
+]);
+const privateRootWarningBoundaryDiagnosticEvidence = freezeArray([
+  'root-render-private-warning-boundary-diagnostic-gate-1',
+  'accepted-private-root-warning-boundary-diagnostic',
+  'private-root-warning-boundary',
+  'root-render-callback-second-argument',
+  'root-render-container-second-argument',
+  'root-render-generic-second-argument',
+  'root-unmount-callback-argument',
+  'duplicate-create-root',
+  'console-output-not-used-as-evidence',
+  'public-development-warning-compatibility-blocked'
+]);
+const privateRootWarningBoundaryDiagnosticSummary = freezeRecord({
+  admittedScenarioIds: privateRootWarningBoundaryDiagnosticScenarios,
+  blockedScenarioIds: privateRootWarningBoundaryBlockedScenarios,
+  admittedScenarioModeRowCount: 2,
+  blockedScenarioModeRowCount: 18,
+  acceptedStatus: privateRootWarningBoundaryDiagnosticStatus,
+  blockedStatus: privateRootWarningBoundaryBlockedDiagnosticStatus,
+  publicRootCompatibilitySurface: false,
+  consoleOutputUsedAsEvidence: false,
+  compatibilityClaimed: false,
+  source: 'tests/conformance/src/react-dom-root-render-e2e-conformance-gate.mjs'
+});
+const privateRootWarningBoundaryBlockedPrerequisites = freezeRecords(
+  privateRootWarningBoundaryDiagnosticScenarios.map((scenarioId) => ({
+    id: `accepted-private-root-warning-boundary-${scenarioId}`,
+    scenarioId,
+    present: false,
+    requiredBeforePublicAct: true,
+    acceptedPrivateDiagnostic: true,
+    status: privateRootWarningBoundaryPublicPrerequisiteStatus,
+    diagnosticGateId: privateRootWarningBoundaryDiagnosticGateId,
+    diagnosticStatus: privateRootWarningBoundaryDiagnosticStatus,
+    publicRootExecution: false,
+    publicWarningCompatibility: false,
+    consoleOutputUsedAsEvidence: false,
+    publicActExecution: false,
+    compatibilityClaimed: false,
+    reason:
+      'Accepted only as private warning-boundary metadata; public react-dom/test-utils.act must stay blocked until public roots produce compatible warning behavior.'
+  }))
+);
+const privateRootWarningBoundaryBlockedPrerequisiteIds = freezeArray(
+  privateRootWarningBoundaryBlockedPrerequisites.map(
     (prerequisite) => prerequisite.id
   )
 );
@@ -320,10 +393,64 @@ const acceptedPrivatePrerequisites = freezeRecords([
       privateRootHostOutputDiagnosticSummary,
     privateHostOutputBlockedPrerequisiteIds:
       privateRootHostOutputBlockedPrerequisiteIds,
+    privateWarningBoundaryDiagnosticGateId:
+      privateRootWarningBoundaryDiagnosticGateId,
+    privateWarningBoundaryDiagnostics: true,
+    privateWarningBoundaryDiagnosticStatus:
+      privateRootWarningBoundaryDiagnosticStatus,
+    privateWarningBoundaryDiagnosticScenarios:
+      privateRootWarningBoundaryDiagnosticScenarios,
+    privateWarningBoundaryBlockedDiagnosticStatus:
+      privateRootWarningBoundaryBlockedDiagnosticStatus,
+    privateWarningBoundaryBlockedScenarios:
+      privateRootWarningBoundaryBlockedScenarios,
+    privateWarningBoundaryDiagnosticSummary:
+      privateRootWarningBoundaryDiagnosticSummary,
+    privateWarningBoundaryBlockedPrerequisiteIds:
+      privateRootWarningBoundaryBlockedPrerequisiteIds,
     fakeDomHostOutputOnly: true,
     publicRootExecution: false,
     publicDomMutation: false,
+    publicWarningCompatibility: false,
+    consoleOutputUsedAsEvidence: false,
     records: rootBridgeRequestRecords
+  },
+  {
+    id: 'react-dom-private-flush-sync-root-output-diagnostic',
+    present: true,
+    status: privateRootHostOutputDiagnosticStatus,
+    source: 'tests/conformance/src/react-dom-root-render-e2e-conformance-gate.mjs',
+    recordOnly: false,
+    privateDiagnostic: true,
+    scenarioId: 'flush-sync-cross-root-render',
+    diagnosticGateId: privateRootHostOutputDiagnosticGateId,
+    crossRootHostOutputDiagnostic: true,
+    requiresPrivateFlushSyncGuard: true,
+    requiresCrossRootSyncFlushEvidence: true,
+    publicRootExecution: false,
+    publicDomMutation: false,
+    publicFlushSyncCompatibilityClaimed: false,
+    publicActCompatibilityClaimed: false,
+    records: freezeArray([
+      'private-flush-sync-cross-root-host-output',
+      'private-flush-sync-guard-hook-call',
+      'private-cross-root-sync-flush-diagnostic'
+    ])
+  },
+  {
+    id: 'react-dom-private-root-warning-boundary-diagnostics',
+    present: true,
+    status: privateRootWarningBoundaryDiagnosticStatus,
+    source: 'tests/conformance/src/react-dom-root-render-e2e-conformance-gate.mjs',
+    recordOnly: false,
+    privateDiagnostic: true,
+    scenarioId: 'development-warning-boundaries',
+    diagnosticGateId: privateRootWarningBoundaryDiagnosticGateId,
+    publicRootCompatibilitySurface: false,
+    publicWarningCompatibility: false,
+    consoleOutputUsedAsEvidence: false,
+    publicActCompatibilityClaimed: false,
+    records: privateRootWarningBoundaryDiagnosticEvidence
   },
   {
     id: 'react-dom-private-flush-sync-guard',
@@ -363,6 +490,7 @@ const blockedPublicPrerequisites = freezeRecords([
     present: false,
     requiredBeforePublicAct: true,
     blockedByAcceptedPrivateRootHostOutputDiagnostics: true,
+    blockedByAcceptedPrivateRootWarningBoundaryDiagnostics: true,
     privateHostOutputDiagnosticGateId:
       privateRootHostOutputDiagnosticGateId,
     privateHostOutputDiagnosticStatus: privateRootHostOutputDiagnosticStatus,
@@ -370,10 +498,20 @@ const blockedPublicPrerequisites = freezeRecords([
       privateRootHostOutputDiagnosticScenarios,
     unsupportedPrivateHostOutputDiagnosticScenarios:
       privateRootHostOutputBlockedScenarios,
-    acceptedPrivateHostOutputScenarioModeRowCount: 16,
-    unsupportedPrivateHostOutputScenarioModeRowCount: 4,
+    acceptedPrivateHostOutputScenarioModeRowCount: 18,
+    unsupportedPrivateHostOutputScenarioModeRowCount: 2,
+    privateWarningBoundaryDiagnosticGateId:
+      privateRootWarningBoundaryDiagnosticGateId,
+    privateWarningBoundaryDiagnosticStatus:
+      privateRootWarningBoundaryDiagnosticStatus,
+    acceptedPrivateWarningBoundaryDiagnosticScenarios:
+      privateRootWarningBoundaryDiagnosticScenarios,
+    unsupportedPrivateWarningBoundaryDiagnosticScenarios:
+      privateRootWarningBoundaryBlockedScenarios,
+    acceptedPrivateWarningBoundaryScenarioModeRowCount: 2,
+    unsupportedPrivateWarningBoundaryScenarioModeRowCount: 18,
     reason:
-      'Private fake-DOM host-output diagnostics exist, but public React DOM roots still throw placeholders instead of routing create, render, update, or unmount work.'
+      'Private fake-DOM host-output and warning-boundary diagnostics exist, but public React DOM roots still throw placeholders instead of routing create, render, update, unmount, or warning behavior.'
   },
   {
     id: 'public-react-dom-flush-sync-execution',
@@ -381,6 +519,13 @@ const blockedPublicPrerequisites = freezeRecords([
     requiredBeforePublicAct: true,
     reason:
       'Public React DOM flushSync remains an unsupported placeholder even though private sync-flush metadata exists.'
+  },
+  {
+    id: 'public-react-dom-warning-boundary-compatibility',
+    present: false,
+    requiredBeforePublicAct: true,
+    reason:
+      'Private warning-boundary diagnostics use root metadata only; public development warning output compatibility remains blocked while public roots are placeholders.'
   }
 ]);
 
@@ -421,6 +566,8 @@ function getReactDomTestUtilsActPrivateRoutingGate(overrides = {}) {
     blockedPublicPrerequisites,
     blockedPrivateRootHostOutputPrerequisites:
       privateRootHostOutputBlockedPrerequisites,
+    blockedPrivateRootWarningBoundaryPrerequisites:
+      privateRootWarningBoundaryBlockedPrerequisites,
     acceptedPrivatePrerequisiteIds: acceptedPrivatePrerequisites.map(
       (prerequisite) => prerequisite.id
     ),
@@ -429,6 +576,8 @@ function getReactDomTestUtilsActPrivateRoutingGate(overrides = {}) {
     ),
     blockedPrivateRootHostOutputPrerequisiteIds:
       privateRootHostOutputBlockedPrerequisiteIds,
+    blockedPrivateRootWarningBoundaryPrerequisiteIds:
+      privateRootWarningBoundaryBlockedPrerequisiteIds,
     reactActPrivateDispatcher: freezeRecord({
       status: reactActPrivateDispatcherStatus,
       requiredRecords: reactActPrivateRecords,
@@ -527,11 +676,34 @@ function getReactDomTestUtilsActPrivateRoutingGate(overrides = {}) {
         publicActExecution: false,
         compatibilityClaimed: false
       }),
+      privateWarningBoundaryDiagnostics: freezeRecord({
+        gateId: privateRootWarningBoundaryDiagnosticGateId,
+        status: privateRootWarningBoundaryDiagnosticStatus,
+        scenarios: privateRootWarningBoundaryDiagnosticScenarios,
+        blockedStatus: privateRootWarningBoundaryBlockedDiagnosticStatus,
+        blockedScenarios: privateRootWarningBoundaryBlockedScenarios,
+        evidence: privateRootWarningBoundaryDiagnosticEvidence,
+        summary: privateRootWarningBoundaryDiagnosticSummary,
+        blockedPrerequisiteStatus:
+          privateRootWarningBoundaryPublicPrerequisiteStatus,
+        blockedPrerequisites:
+          privateRootWarningBoundaryBlockedPrerequisites,
+        blockedPrerequisiteIds:
+          privateRootWarningBoundaryBlockedPrerequisiteIds,
+        publicRootCompatibilitySurface: false,
+        publicRootExecution: false,
+        publicWarningCompatibility: false,
+        publicActExecution: false,
+        consoleOutputUsedAsEvidence: false,
+        compatibilityClaimed: false
+      }),
       nativeExecution: false,
       reconcilerExecution: false,
       domMutation: false,
       markerWrites: false,
       listenerInstallation: false,
+      publicWarningCompatibility: false,
+      consoleOutputUsedAsEvidence: false,
       compatibilityClaimed: false
     }),
     sideEffectPolicy,
@@ -550,6 +722,9 @@ function evaluateReactDomTestUtilsActPrivateRoutingGate(options = {}) {
   const blockedPrivateRootHostOutputPrerequisites =
     options.blockedPrivateRootHostOutputPrerequisites ??
     gate.blockedPrivateRootHostOutputPrerequisites;
+  const blockedPrivateRootWarningBoundaryPrerequisites =
+    options.blockedPrivateRootWarningBoundaryPrerequisites ??
+    gate.blockedPrivateRootWarningBoundaryPrerequisites;
   const publicCompatibilityClaimed =
     options.publicCompatibilityClaimed ?? gate.publicCompatibilityClaimed;
   const publicTestUtilsActReady =
@@ -566,6 +741,10 @@ function evaluateReactDomTestUtilsActPrivateRoutingGate(options = {}) {
     .map((prerequisite) => prerequisite.id);
   const privateRootHostOutputPrerequisitesStillBlocked =
     blockedPrivateRootHostOutputPrerequisites
+      .filter((prerequisite) => prerequisite.present !== true)
+      .map((prerequisite) => prerequisite.id);
+  const privateRootWarningBoundaryPrerequisitesStillBlocked =
+    blockedPrivateRootWarningBoundaryPrerequisites
       .filter((prerequisite) => prerequisite.present !== true)
       .map((prerequisite) => prerequisite.id);
   const violations = [];
@@ -599,6 +778,13 @@ function evaluateReactDomTestUtilsActPrivateRoutingGate(options = {}) {
       )
     );
   }
+  if (privateRootWarningBoundaryPrerequisitesStillBlocked.length === 0) {
+    violations.push(
+      createViolation(
+        'private-root-warning-boundary-prerequisites-unblocked-without-new-gate'
+      )
+    );
+  }
 
   return freezeRecord({
     ...gate,
@@ -609,6 +795,7 @@ function evaluateReactDomTestUtilsActPrivateRoutingGate(options = {}) {
     privatePrerequisitesPresent: missingPrivatePrerequisites.length === 0,
     publicPrerequisitesStillBlocked,
     privateRootHostOutputPrerequisitesStillBlocked,
+    privateRootWarningBoundaryPrerequisitesStillBlocked,
     violations,
     status:
       violations.length === 0
@@ -650,6 +837,8 @@ module.exports = {
   acceptedPrivatePrerequisites,
   blockedPrivateRootHostOutputPrerequisites:
     privateRootHostOutputBlockedPrerequisites,
+  blockedPrivateRootWarningBoundaryPrerequisites:
+    privateRootWarningBoundaryBlockedPrerequisites,
   blockedPublicPrerequisites,
   createReactDomTestUtilsActBlockedError,
   createReactDomTestUtilsActPlaceholder,

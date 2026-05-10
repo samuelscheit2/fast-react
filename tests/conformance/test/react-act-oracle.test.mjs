@@ -895,6 +895,8 @@ test("React DOM test-utils act private routing gate tracks React act metadata wi
     "passive-effects-flush-metadata",
     "passive-effect-callback-handle-metadata",
     "react-dom-private-root-bridge-records",
+    "react-dom-private-flush-sync-root-output-diagnostic",
+    "react-dom-private-root-warning-boundary-diagnostics",
     "react-dom-private-flush-sync-guard"
   ]);
   assert.deepEqual(domGate.blockedPublicPrerequisiteIds, [
@@ -902,7 +904,8 @@ test("React DOM test-utils act private routing gate tracks React act metadata wi
     "act-queue-flushing-execution",
     "passive-effect-callback-execution",
     "public-react-dom-root-execution",
-    "public-react-dom-flush-sync-execution"
+    "public-react-dom-flush-sync-execution",
+    "public-react-dom-warning-boundary-compatibility"
   ]);
   assert.equal(domGate.privatePrerequisitesPresent, true);
   assert.equal(domGate.privateRoutingReady, false);

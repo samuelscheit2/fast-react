@@ -239,15 +239,24 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     "render-null-clears-container",
     "root-unmount",
     "double-unmount",
-    "render-after-unmount"
+    "render-after-unmount",
+    "flush-sync-cross-root-render"
   ];
   const unsupportedPrivateHostOutputScenarioIds = [
-    "flush-sync-cross-root-render",
     "development-warning-boundaries"
   ];
+  const acceptedPrivateWarningBoundaryScenarioIds = [
+    "development-warning-boundaries"
+  ];
+  const unsupportedPrivateWarningBoundaryScenarioIds =
+    acceptedPrivateHostOutputScenarioIds;
   const blockedPrivateHostOutputPrerequisiteIds =
     acceptedPrivateHostOutputScenarioIds.map(
       (scenarioId) => `accepted-private-root-host-output-${scenarioId}`
+    );
+  const blockedPrivateWarningBoundaryPrerequisiteIds =
+    acceptedPrivateWarningBoundaryScenarioIds.map(
+      (scenarioId) => `accepted-private-root-warning-boundary-${scenarioId}`
     );
 
   assert.equal(
@@ -256,7 +265,7 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
   );
   assert.equal(
     gate.id,
-    "react-dom-test-utils-act-private-routing-gate-3"
+    "react-dom-test-utils-act-private-routing-gate-4"
   );
   assert.equal(gate.entrypoint, "react-dom/test-utils");
   assert.equal(gate.compatibilityTarget, "react-dom@19.2.6");
@@ -276,6 +285,8 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     "passive-effects-flush-metadata",
     "passive-effect-callback-handle-metadata",
     "react-dom-private-root-bridge-records",
+    "react-dom-private-flush-sync-root-output-diagnostic",
+    "react-dom-private-root-warning-boundary-diagnostics",
     "react-dom-private-flush-sync-guard"
   ]);
   assert.deepEqual(gate.blockedPublicPrerequisiteIds, [
@@ -283,14 +294,16 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     "act-queue-flushing-execution",
     "passive-effect-callback-execution",
     "public-react-dom-root-execution",
-    "public-react-dom-flush-sync-execution"
+    "public-react-dom-flush-sync-execution",
+    "public-react-dom-warning-boundary-compatibility"
   ]);
   assert.deepEqual(gate.publicPrerequisitesStillBlocked, [
     "public-react-act-delegation",
     "act-queue-flushing-execution",
     "passive-effect-callback-execution",
     "public-react-dom-root-execution",
-    "public-react-dom-flush-sync-execution"
+    "public-react-dom-flush-sync-execution",
+    "public-react-dom-warning-boundary-compatibility"
   ]);
   assert.deepEqual(
     gate.blockedPrivateRootHostOutputPrerequisiteIds,
@@ -300,11 +313,23 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     gate.privateRootHostOutputPrerequisitesStillBlocked,
     blockedPrivateHostOutputPrerequisiteIds
   );
+  assert.deepEqual(
+    gate.blockedPrivateRootWarningBoundaryPrerequisiteIds,
+    blockedPrivateWarningBoundaryPrerequisiteIds
+  );
+  assert.deepEqual(
+    gate.privateRootWarningBoundaryPrerequisitesStillBlocked,
+    blockedPrivateWarningBoundaryPrerequisiteIds
+  );
   const publicRootPrerequisite = gate.blockedPublicPrerequisites.find(
     (prerequisite) => prerequisite.id === "public-react-dom-root-execution"
   );
   assert.equal(
     publicRootPrerequisite.blockedByAcceptedPrivateRootHostOutputDiagnostics,
+    true
+  );
+  assert.equal(
+    publicRootPrerequisite.blockedByAcceptedPrivateRootWarningBoundaryDiagnostics,
     true
   );
   assert.deepEqual(
@@ -317,11 +342,27 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
   );
   assert.equal(
     publicRootPrerequisite.acceptedPrivateHostOutputScenarioModeRowCount,
-    16
+    18
   );
   assert.equal(
     publicRootPrerequisite.unsupportedPrivateHostOutputScenarioModeRowCount,
-    4
+    2
+  );
+  assert.deepEqual(
+    publicRootPrerequisite.acceptedPrivateWarningBoundaryDiagnosticScenarios,
+    acceptedPrivateWarningBoundaryScenarioIds
+  );
+  assert.deepEqual(
+    publicRootPrerequisite.unsupportedPrivateWarningBoundaryDiagnosticScenarios,
+    unsupportedPrivateWarningBoundaryScenarioIds
+  );
+  assert.equal(
+    publicRootPrerequisite.acceptedPrivateWarningBoundaryScenarioModeRowCount,
+    2
+  );
+  assert.equal(
+    publicRootPrerequisite.unsupportedPrivateWarningBoundaryScenarioModeRowCount,
+    18
   );
   assert.deepEqual(gate.sideEffectPolicy, {
     invokesActCallback: false,
@@ -517,13 +558,16 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     "private-render-null-clear-container-output",
     "private-unmount-host-output-cleanup",
     "private-double-unmount-noop-host-output",
-    "private-render-after-unmount-guard-no-extra-mutation"
+    "private-render-after-unmount-guard-no-extra-mutation",
+    "private-flush-sync-cross-root-host-output",
+    "private-flush-sync-guard-hook-call",
+    "private-cross-root-sync-flush-diagnostic"
   ]);
   assert.deepEqual(hostOutputDiagnostics.summary, {
     admittedScenarioIds: acceptedPrivateHostOutputScenarioIds,
     blockedScenarioIds: unsupportedPrivateHostOutputScenarioIds,
-    admittedScenarioModeRowCount: 16,
-    blockedScenarioModeRowCount: 4,
+    admittedScenarioModeRowCount: 18,
+    blockedScenarioModeRowCount: 2,
     acceptedStatus:
       "accepted-private-root-host-output-diagnostic-without-public-root-execution",
     blockedStatus: "blocked-private-root-host-output-diagnostic",
@@ -539,7 +583,7 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     hostOutputDiagnostics.blockedPrerequisiteIds,
     blockedPrivateHostOutputPrerequisiteIds
   );
-  assert.equal(hostOutputDiagnostics.blockedPrerequisites.length, 8);
+  assert.equal(hostOutputDiagnostics.blockedPrerequisites.length, 9);
   assert.deepEqual(hostOutputDiagnostics.blockedPrerequisites[0], {
     id: "accepted-private-root-host-output-create-root-no-render",
     scenarioId: "create-root-no-render",
@@ -563,10 +607,164 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
   assert.equal(hostOutputDiagnostics.publicDomMutation, false);
   assert.equal(hostOutputDiagnostics.publicActExecution, false);
   assert.equal(hostOutputDiagnostics.compatibilityClaimed, false);
+
+  const warningBoundaryDiagnostics =
+    gate.reactDomRootBridge.privateWarningBoundaryDiagnostics;
+  assert.equal(
+    warningBoundaryDiagnostics.gateId,
+    "root-render-private-warning-boundary-diagnostic-gate-1"
+  );
+  assert.equal(
+    warningBoundaryDiagnostics.status,
+    "accepted-private-root-warning-boundary-diagnostic-without-public-warning-compatibility"
+  );
+  assert.deepEqual(
+    warningBoundaryDiagnostics.scenarios,
+    acceptedPrivateWarningBoundaryScenarioIds
+  );
+  assert.equal(
+    warningBoundaryDiagnostics.blockedStatus,
+    "blocked-private-root-warning-boundary-diagnostic"
+  );
+  assert.deepEqual(
+    warningBoundaryDiagnostics.blockedScenarios,
+    unsupportedPrivateWarningBoundaryScenarioIds
+  );
+  assert.deepEqual(warningBoundaryDiagnostics.evidence, [
+    "root-render-private-warning-boundary-diagnostic-gate-1",
+    "accepted-private-root-warning-boundary-diagnostic",
+    "private-root-warning-boundary",
+    "root-render-callback-second-argument",
+    "root-render-container-second-argument",
+    "root-render-generic-second-argument",
+    "root-unmount-callback-argument",
+    "duplicate-create-root",
+    "console-output-not-used-as-evidence",
+    "public-development-warning-compatibility-blocked"
+  ]);
+  assert.deepEqual(warningBoundaryDiagnostics.summary, {
+    admittedScenarioIds: acceptedPrivateWarningBoundaryScenarioIds,
+    blockedScenarioIds: unsupportedPrivateWarningBoundaryScenarioIds,
+    admittedScenarioModeRowCount: 2,
+    blockedScenarioModeRowCount: 18,
+    acceptedStatus:
+      "accepted-private-root-warning-boundary-diagnostic-without-public-warning-compatibility",
+    blockedStatus: "blocked-private-root-warning-boundary-diagnostic",
+    publicRootCompatibilitySurface: false,
+    consoleOutputUsedAsEvidence: false,
+    compatibilityClaimed: false,
+    source:
+      "tests/conformance/src/react-dom-root-render-e2e-conformance-gate.mjs"
+  });
+  assert.equal(
+    warningBoundaryDiagnostics.blockedPrerequisiteStatus,
+    "blocked-accepted-private-root-warning-boundary-until-public-warning-compatibility"
+  );
+  assert.deepEqual(
+    warningBoundaryDiagnostics.blockedPrerequisiteIds,
+    blockedPrivateWarningBoundaryPrerequisiteIds
+  );
+  assert.equal(warningBoundaryDiagnostics.blockedPrerequisites.length, 1);
+  assert.deepEqual(warningBoundaryDiagnostics.blockedPrerequisites[0], {
+    id:
+      "accepted-private-root-warning-boundary-development-warning-boundaries",
+    scenarioId: "development-warning-boundaries",
+    present: false,
+    requiredBeforePublicAct: true,
+    acceptedPrivateDiagnostic: true,
+    status:
+      "blocked-accepted-private-root-warning-boundary-until-public-warning-compatibility",
+    diagnosticGateId:
+      "root-render-private-warning-boundary-diagnostic-gate-1",
+    diagnosticStatus:
+      "accepted-private-root-warning-boundary-diagnostic-without-public-warning-compatibility",
+    publicRootExecution: false,
+    publicWarningCompatibility: false,
+    consoleOutputUsedAsEvidence: false,
+    publicActExecution: false,
+    compatibilityClaimed: false,
+    reason:
+      "Accepted only as private warning-boundary metadata; public react-dom/test-utils.act must stay blocked until public roots produce compatible warning behavior."
+  });
+  assert.equal(warningBoundaryDiagnostics.publicRootCompatibilitySurface, false);
+  assert.equal(warningBoundaryDiagnostics.publicRootExecution, false);
+  assert.equal(warningBoundaryDiagnostics.publicWarningCompatibility, false);
+  assert.equal(warningBoundaryDiagnostics.publicActExecution, false);
+  assert.equal(warningBoundaryDiagnostics.consoleOutputUsedAsEvidence, false);
+  assert.equal(warningBoundaryDiagnostics.compatibilityClaimed, false);
   assert.equal(gate.reactDomRootBridge.nativeExecution, false);
   assert.equal(gate.reactDomRootBridge.reconcilerExecution, false);
   assert.equal(gate.reactDomRootBridge.domMutation, false);
+  assert.equal(gate.reactDomRootBridge.publicWarningCompatibility, false);
+  assert.equal(gate.reactDomRootBridge.consoleOutputUsedAsEvidence, false);
   assert.equal(gate.reactDomRootBridge.compatibilityClaimed, false);
+
+  const flushSyncRootOutputPrerequisite =
+    gate.acceptedPrivatePrerequisites.find(
+      (prerequisite) =>
+        prerequisite.id ===
+        "react-dom-private-flush-sync-root-output-diagnostic"
+    );
+  assert.deepEqual(flushSyncRootOutputPrerequisite, {
+    id: "react-dom-private-flush-sync-root-output-diagnostic",
+    present: true,
+    status:
+      "accepted-private-root-host-output-diagnostic-without-public-root-execution",
+    source:
+      "tests/conformance/src/react-dom-root-render-e2e-conformance-gate.mjs",
+    recordOnly: false,
+    privateDiagnostic: true,
+    scenarioId: "flush-sync-cross-root-render",
+    diagnosticGateId: "root-render-private-host-output-diagnostic-gate-1",
+    crossRootHostOutputDiagnostic: true,
+    requiresPrivateFlushSyncGuard: true,
+    requiresCrossRootSyncFlushEvidence: true,
+    publicRootExecution: false,
+    publicDomMutation: false,
+    publicFlushSyncCompatibilityClaimed: false,
+    publicActCompatibilityClaimed: false,
+    records: [
+      "private-flush-sync-cross-root-host-output",
+      "private-flush-sync-guard-hook-call",
+      "private-cross-root-sync-flush-diagnostic"
+    ]
+  });
+
+  const warningBoundaryPrerequisite =
+    gate.acceptedPrivatePrerequisites.find(
+      (prerequisite) =>
+        prerequisite.id ===
+        "react-dom-private-root-warning-boundary-diagnostics"
+    );
+  assert.deepEqual(warningBoundaryPrerequisite, {
+    id: "react-dom-private-root-warning-boundary-diagnostics",
+    present: true,
+    status:
+      "accepted-private-root-warning-boundary-diagnostic-without-public-warning-compatibility",
+    source:
+      "tests/conformance/src/react-dom-root-render-e2e-conformance-gate.mjs",
+    recordOnly: false,
+    privateDiagnostic: true,
+    scenarioId: "development-warning-boundaries",
+    diagnosticGateId:
+      "root-render-private-warning-boundary-diagnostic-gate-1",
+    publicRootCompatibilitySurface: false,
+    publicWarningCompatibility: false,
+    consoleOutputUsedAsEvidence: false,
+    publicActCompatibilityClaimed: false,
+    records: [
+      "root-render-private-warning-boundary-diagnostic-gate-1",
+      "accepted-private-root-warning-boundary-diagnostic",
+      "private-root-warning-boundary",
+      "root-render-callback-second-argument",
+      "root-render-container-second-argument",
+      "root-render-generic-second-argument",
+      "root-unmount-callback-argument",
+      "duplicate-create-root",
+      "console-output-not-used-as-evidence",
+      "public-development-warning-compatibility-blocked"
+    ]
+  });
 
   const placeholder = gateModule.createReactDomTestUtilsActPlaceholder();
   assert.deepEqual(describeFunctionValue(placeholder), {
@@ -639,6 +837,28 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     {
       id:
         "private-root-host-output-prerequisites-unblocked-without-new-gate"
+    }
+  ]);
+
+  const unblockedWarningBoundaryGate =
+    gateModule.evaluateReactDomTestUtilsActPrivateRoutingGate({
+      blockedPrivateRootWarningBoundaryPrerequisites:
+        gate.blockedPrivateRootWarningBoundaryPrerequisites.map(
+          (prerequisite) => ({
+            ...prerequisite,
+            present: true
+          })
+        )
+    });
+  assert.deepEqual(
+    unblockedWarningBoundaryGate
+      .privateRootWarningBoundaryPrerequisitesStillBlocked,
+    []
+  );
+  assert.deepEqual(unblockedWarningBoundaryGate.violations, [
+    {
+      id:
+        "private-root-warning-boundary-prerequisites-unblocked-without-new-gate"
     }
   ]);
 });
