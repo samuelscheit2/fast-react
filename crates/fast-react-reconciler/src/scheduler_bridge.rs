@@ -105,6 +105,21 @@ impl SchedulerActContinuationRecord {
     pub(crate) const fn status(self) -> SchedulerActContinuationStatus {
         self.status
     }
+
+    #[must_use]
+    pub(crate) const fn drains_public_react_act_queue(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_act_compatibility_claimed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_flush_sync_compatibility_claimed(self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -780,6 +795,9 @@ mod tests {
             record.status(),
             SchedulerActContinuationStatus::PendingContinuation
         );
+        assert!(!record.drains_public_react_act_queue());
+        assert!(!record.public_act_compatibility_claimed());
+        assert!(!record.public_flush_sync_compatibility_claimed());
         assert_eq!(bridge.act_continuation_records(), &[record]);
     }
 
