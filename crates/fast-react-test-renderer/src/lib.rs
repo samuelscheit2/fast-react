@@ -3103,12 +3103,12 @@ impl TestRendererRoot {
             .fiber_inspection()
             .cloned()
             .ok_or(TestRendererPrivateJsonSerializationError::CommittedFiberInspectionMissing)?;
-        if let Some(expected_fiber_inspection) = expected_fiber_inspection {
-            if &fiber_inspection != expected_fiber_inspection {
-                return Err(
-                    TestRendererPrivateJsonSerializationError::CommittedFiberInspectionStale.into(),
-                );
-            }
+        if let Some(expected_fiber_inspection) = expected_fiber_inspection
+            && &fiber_inspection != expected_fiber_inspection
+        {
+            return Err(
+                TestRendererPrivateJsonSerializationError::CommittedFiberInspectionStale.into(),
+            );
         }
         let current_snapshot = self.diagnostic_container_snapshot()?;
         if current_snapshot != *snapshot {

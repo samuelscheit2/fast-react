@@ -4732,16 +4732,16 @@ mod tests {
 
     #[derive(Debug, Clone, Copy)]
     enum UseContextBehavior {
-        ReadOnce {
+        Single {
             context: ContextHandle,
         },
-        ReadNone {
+        NoRead {
             output: FunctionComponentOutputHandle,
         },
-        ReadTwice {
+        Double {
             context: ContextHandle,
         },
-        ReadUnknown {
+        Unknown {
             context: ContextHandle,
         },
     }
@@ -4791,13 +4791,13 @@ mod tests {
             }
 
             match self.behavior {
-                UseContextBehavior::ReadOnce { context } => {
+                UseContextBehavior::Single { context } => {
                     let read = reader.use_context(context)?;
                     self.reads.push(read);
                     Ok(FunctionComponentOutputHandle::from_raw(read.value().raw()))
                 }
-                UseContextBehavior::ReadNone { output } => Ok(output),
-                UseContextBehavior::ReadTwice { context } => {
+                UseContextBehavior::NoRead { output } => Ok(output),
+                UseContextBehavior::Double { context } => {
                     let first = reader.use_context(context)?;
                     let second = reader.use_context(context)?;
                     self.reads.push(first);
@@ -4806,7 +4806,7 @@ mod tests {
                         second.value().raw(),
                     ))
                 }
-                UseContextBehavior::ReadUnknown { context } => {
+                UseContextBehavior::Unknown { context } => {
                     let read = reader.use_context(context)?;
                     self.reads.push(read);
                     Ok(FunctionComponentOutputHandle::from_raw(read.value().raw()))
@@ -5192,10 +5192,8 @@ mod tests {
         let context = context_store.create_context(default_value);
         let before_outer = context_store.push_provider(context, outer_value).unwrap();
         let before_inner = context_store.push_provider(context, inner_value).unwrap();
-        let mut registry = TestUseContextComponentRegistry::new(
-            component,
-            UseContextBehavior::ReadOnce { context },
-        );
+        let mut registry =
+            TestUseContextComponentRegistry::new(component, UseContextBehavior::Single { context });
 
         let record = render_function_component_with_use_context(
             &mut arena,
@@ -5250,7 +5248,7 @@ mod tests {
         let mut context_store = FunctionComponentContextRenderStore::new();
         let mut registry = TestUseContextComponentRegistry::new(
             component,
-            UseContextBehavior::ReadNone {
+            UseContextBehavior::NoRead {
                 output: FunctionComponentOutputHandle::from_raw(710),
             },
         );
@@ -5284,10 +5282,8 @@ mod tests {
         let (mut arena, _current, work_in_progress, component) = function_component_pair();
         let mut context_store = FunctionComponentContextRenderStore::new();
         let context = context_store.create_context(context_value(720));
-        let mut registry = TestUseContextComponentRegistry::new(
-            component,
-            UseContextBehavior::ReadTwice { context },
-        );
+        let mut registry =
+            TestUseContextComponentRegistry::new(component, UseContextBehavior::Double { context });
 
         let error = render_function_component_with_use_context(
             &mut arena,
@@ -5320,7 +5316,7 @@ mod tests {
         let unknown = ContextHandle::from_raw(7_700);
         let mut registry = TestUseContextComponentRegistry::new(
             component,
-            UseContextBehavior::ReadUnknown { context: unknown },
+            UseContextBehavior::Unknown { context: unknown },
         );
 
         let error = render_function_component_with_use_context(

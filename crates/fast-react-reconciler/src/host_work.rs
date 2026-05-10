@@ -2498,11 +2498,10 @@ mod tests {
         detached_hosts: &mut DetachedHostRecords,
         root_id: FiberRootId,
         host_root: FiberId,
-        current_outer: FiberId,
-        current_inner: FiberId,
-        current_text: FiberId,
+        current_fibers: (FiberId, FiberId, FiberId),
         text: &str,
     ) -> (FiberId, FiberId, FiberId, FiberId) {
+        let (current_outer, current_inner, current_text) = current_fibers;
         let outer_props = store
             .fiber_arena()
             .get(current_outer)
@@ -3563,9 +3562,7 @@ mod tests {
                 &mut detached_hosts,
                 root_id,
                 placement_render.finished_work(),
-                current_outer,
-                current_inner,
-                current_text,
+                (current_outer, current_inner, current_text),
                 "nested placed",
             );
         let text_state_node = store.fiber_arena().get(placed_text).unwrap().state_node();

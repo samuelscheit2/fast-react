@@ -334,24 +334,24 @@ mod root_bridge_requests {
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub(crate) enum NativeRootBridgeHandleAdmissionAction {
-        AdmitRootHandle,
-        AdmitValueHandle,
-        ValidateActiveRootHandle,
-        ValidateValueHandle,
-        RetireRootHandle,
-        ValidateRetiredRootHandle,
+        AdmitRoot,
+        AdmitValue,
+        ValidateActiveRoot,
+        ValidateValue,
+        RetireRoot,
+        ValidateRetiredRoot,
     }
 
     impl NativeRootBridgeHandleAdmissionAction {
         #[must_use]
         pub(crate) const fn code(self) -> &'static str {
             match self {
-                Self::AdmitRootHandle => "admit-root-handle",
-                Self::AdmitValueHandle => "admit-value-handle",
-                Self::ValidateActiveRootHandle => "validate-active-root-handle",
-                Self::ValidateValueHandle => "validate-value-handle",
-                Self::RetireRootHandle => "retire-root-handle",
-                Self::ValidateRetiredRootHandle => "validate-retired-root-handle",
+                Self::AdmitRoot => "admit-root-handle",
+                Self::AdmitValue => "admit-value-handle",
+                Self::ValidateActiveRoot => "validate-active-root-handle",
+                Self::ValidateValue => "validate-value-handle",
+                Self::RetireRoot => "retire-root-handle",
+                Self::ValidateRetiredRoot => "validate-retired-root-handle",
             }
         }
     }
@@ -935,7 +935,7 @@ mod root_bridge_requests {
                     NativeRootBridgeLifecycleTransition::NoneToActive,
                     root_handle_state_before,
                     NativeRootBridgeRootHandleState::Active,
-                    NativeRootBridgeHandleAdmissionAction::AdmitRootHandle,
+                    NativeRootBridgeHandleAdmissionAction::AdmitRoot,
                     root_admission.current_generation(),
                     value_admission.map(value_handoff_admission_action),
                     value_admission.map(|admission| admission.current_generation()),
@@ -961,7 +961,7 @@ mod root_bridge_requests {
                     NativeRootBridgeLifecycleTransition::ActiveToActive,
                     root_handle_state_before,
                     NativeRootBridgeRootHandleState::Active,
-                    NativeRootBridgeHandleAdmissionAction::ValidateActiveRootHandle,
+                    NativeRootBridgeHandleAdmissionAction::ValidateActiveRoot,
                     request.root_handle().generation(),
                     value_admission.map(value_handoff_admission_action),
                     value_admission.map(|admission| admission.current_generation()),
@@ -1002,7 +1002,7 @@ mod root_bridge_requests {
                     NativeRootBridgeLifecycleTransition::ActiveToRetired,
                     root_handle_state_before,
                     NativeRootBridgeRootHandleState::Retired,
-                    NativeRootBridgeHandleAdmissionAction::RetireRootHandle,
+                    NativeRootBridgeHandleAdmissionAction::RetireRoot,
                     retired_root_current_generation,
                     None,
                     None,
@@ -1017,10 +1017,10 @@ mod root_bridge_requests {
     ) -> NativeRootBridgeHandleAdmissionAction {
         match admission.outcome() {
             BridgeHandleAdmissionOutcome::Admitted => {
-                NativeRootBridgeHandleAdmissionAction::AdmitValueHandle
+                NativeRootBridgeHandleAdmissionAction::AdmitValue
             }
             BridgeHandleAdmissionOutcome::Validated => {
-                NativeRootBridgeHandleAdmissionAction::ValidateValueHandle
+                NativeRootBridgeHandleAdmissionAction::ValidateValue
             }
         }
     }
@@ -2286,9 +2286,9 @@ mod tests {
                 .map(|record| record.root_handle_action().code())
                 .collect::<Vec<_>>(),
             [
-                NativeRootBridgeHandleAdmissionAction::AdmitRootHandle.code(),
-                NativeRootBridgeHandleAdmissionAction::ValidateActiveRootHandle.code(),
-                NativeRootBridgeHandleAdmissionAction::RetireRootHandle.code()
+                NativeRootBridgeHandleAdmissionAction::AdmitRoot.code(),
+                NativeRootBridgeHandleAdmissionAction::ValidateActiveRoot.code(),
+                NativeRootBridgeHandleAdmissionAction::RetireRoot.code()
             ]
         );
         assert_eq!(
@@ -2304,8 +2304,8 @@ mod tests {
                 .map(|record| record.value_handle_action().map(|action| action.code()))
                 .collect::<Vec<_>>(),
             [
-                Some(NativeRootBridgeHandleAdmissionAction::AdmitValueHandle.code()),
-                Some(NativeRootBridgeHandleAdmissionAction::AdmitValueHandle.code()),
+                Some(NativeRootBridgeHandleAdmissionAction::AdmitValue.code()),
+                Some(NativeRootBridgeHandleAdmissionAction::AdmitValue.code()),
                 None
             ]
         );
@@ -2440,12 +2440,12 @@ mod tests {
         assert_eq!(
             NATIVE_ROOT_BRIDGE_HANDLE_ADMISSION_ACTION_CODES,
             &[
-                NativeRootBridgeHandleAdmissionAction::AdmitRootHandle.code(),
-                NativeRootBridgeHandleAdmissionAction::AdmitValueHandle.code(),
-                NativeRootBridgeHandleAdmissionAction::ValidateActiveRootHandle.code(),
-                NativeRootBridgeHandleAdmissionAction::ValidateValueHandle.code(),
-                NativeRootBridgeHandleAdmissionAction::RetireRootHandle.code(),
-                NativeRootBridgeHandleAdmissionAction::ValidateRetiredRootHandle.code()
+                NativeRootBridgeHandleAdmissionAction::AdmitRoot.code(),
+                NativeRootBridgeHandleAdmissionAction::AdmitValue.code(),
+                NativeRootBridgeHandleAdmissionAction::ValidateActiveRoot.code(),
+                NativeRootBridgeHandleAdmissionAction::ValidateValue.code(),
+                NativeRootBridgeHandleAdmissionAction::RetireRoot.code(),
+                NativeRootBridgeHandleAdmissionAction::ValidateRetiredRoot.code()
             ]
         );
         assert_eq!(

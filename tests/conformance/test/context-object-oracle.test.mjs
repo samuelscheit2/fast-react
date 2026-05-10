@@ -120,7 +120,7 @@ test("context-object local gate compares live provider object shape to the accep
   );
   assert.equal(
     gate.localChecks.functionComponentUseContextRenderReadPresent,
-    false
+    true
   );
 });
 
