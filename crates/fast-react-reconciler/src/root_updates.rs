@@ -199,6 +199,208 @@ impl UpdateContainerResult {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct HostRootQueuedCallbackOrderRecord {
+    queue_order: usize,
+    root: FiberRootId,
+    fiber: FiberId,
+    queue: UpdateQueueHandle,
+    update: UpdateId,
+    callback: RootUpdateCallbackHandle,
+    lane_choice: RootUpdateLaneChoiceRecord,
+    schedule: RootScheduleUpdateRecord,
+    pending_lanes_after_enqueue: Lanes,
+    selected_next_lanes: Lanes,
+}
+
+#[allow(
+    dead_code,
+    reason = "private HostRoot queue callback-order diagnostics are exercised by focused canaries"
+)]
+impl HostRootQueuedCallbackOrderRecord {
+    #[must_use]
+    pub(crate) const fn queue_order(self) -> usize {
+        self.queue_order
+    }
+
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub(crate) const fn queue(self) -> UpdateQueueHandle {
+        self.queue
+    }
+
+    #[must_use]
+    pub(crate) const fn update(self) -> UpdateId {
+        self.update
+    }
+
+    #[must_use]
+    pub(crate) const fn callback(self) -> RootUpdateCallbackHandle {
+        self.callback
+    }
+
+    #[must_use]
+    pub(crate) const fn lane(self) -> Lane {
+        self.lane_choice.lane()
+    }
+
+    #[must_use]
+    pub(crate) const fn lane_choice(self) -> RootUpdateLaneChoiceRecord {
+        self.lane_choice
+    }
+
+    #[must_use]
+    pub(crate) const fn event_priority(self) -> EventPriority {
+        self.lane_choice.event_priority()
+    }
+
+    #[must_use]
+    pub(crate) const fn source_priority(self) -> RootUpdateLaneSourcePriority {
+        self.lane_choice.source_priority()
+    }
+
+    #[must_use]
+    pub(crate) const fn schedule(self) -> RootScheduleUpdateRecord {
+        self.schedule
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_lanes_after_enqueue(self) -> Lanes {
+        self.pending_lanes_after_enqueue
+    }
+
+    #[must_use]
+    pub(crate) const fn selected_next_lanes(self) -> Lanes {
+        self.selected_next_lanes
+    }
+
+    #[must_use]
+    pub(crate) fn lane_and_schedule_match(self) -> bool {
+        self.lane_choice.lane() == self.schedule.lane()
+            && self.schedule.root().raw() == self.root.raw()
+            && self.schedule.fiber() == self.fiber
+    }
+
+    #[must_use]
+    pub(crate) const fn public_callback_invoked(self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct HostRootQueuedCallbackOrderSnapshot {
+    root: FiberRootId,
+    queue: UpdateQueueHandle,
+    records: Vec<HostRootQueuedCallbackOrderRecord>,
+    pending_lanes: Lanes,
+    selected_next_lanes: Lanes,
+}
+
+#[allow(
+    dead_code,
+    reason = "private HostRoot queue callback-order diagnostics are exercised by focused canaries"
+)]
+impl HostRootQueuedCallbackOrderSnapshot {
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn queue(&self) -> UpdateQueueHandle {
+        self.queue
+    }
+
+    #[must_use]
+    pub(crate) fn records(&self) -> &[HostRootQueuedCallbackOrderRecord] {
+        &self.records
+    }
+
+    #[must_use]
+    pub(crate) fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    #[must_use]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_lanes(&self) -> Lanes {
+        self.pending_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn selected_next_lanes(&self) -> Lanes {
+        self.selected_next_lanes
+    }
+
+    #[must_use]
+    pub(crate) fn records_in_queue_order(&self) -> bool {
+        self.records
+            .iter()
+            .enumerate()
+            .all(|(order, record)| record.queue_order() == order)
+    }
+
+    #[must_use]
+    pub(crate) fn records_have_distinct_lanes_and_callbacks(&self) -> bool {
+        self.records.iter().enumerate().all(|(index, record)| {
+            self.records
+                .iter()
+                .skip(index + 1)
+                .all(|next| record.lane() != next.lane() && record.callback() != next.callback())
+        })
+    }
+
+    #[must_use]
+    pub(crate) fn records_match_accepted_lane_and_schedule(&self) -> bool {
+        self.records
+            .iter()
+            .all(|record| record.lane_and_schedule_match())
+    }
+
+    #[must_use]
+    pub(crate) const fn root_rendering_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn commit_execution_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn callback_invocation_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn user_callbacks_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_callback_behavior_exposed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_batching_compatibility_claimed(&self) -> bool {
+        false
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RootUpdateError {
     FiberRootStore(FiberRootStoreError),
@@ -218,6 +420,24 @@ pub enum RootUpdateError {
         update: UpdateId,
         expected_pending_lanes: Lanes,
         actual_pending_lanes: Lanes,
+    },
+    StaleQueueSnapshot {
+        root: FiberRootId,
+        queue: UpdateQueueHandle,
+        expected_updates: Vec<UpdateId>,
+        actual_updates: Vec<UpdateId>,
+        expected_pending_lanes: Lanes,
+        actual_pending_lanes: Lanes,
+    },
+    MismatchedRootToken {
+        expected: FiberRootId,
+        actual: FiberRootId,
+        update: UpdateId,
+    },
+    MissingCallbackHandle {
+        root: FiberRootId,
+        queue: UpdateQueueHandle,
+        update: UpdateId,
     },
     EnqueuedWrongRoot {
         expected: FiberRootId,
@@ -260,6 +480,45 @@ impl Display for RootUpdateError {
                 expected_pending_lanes.bits(),
                 actual_pending_lanes.bits()
             ),
+            Self::StaleQueueSnapshot {
+                root,
+                queue,
+                expected_updates,
+                actual_updates,
+                expected_pending_lanes,
+                actual_pending_lanes,
+            } => write!(
+                formatter,
+                "root {} queue {} has stale callback-order snapshot; expected updates {:?} with pending lanes {}, actual updates {:?} with pending lanes {}",
+                root.raw(),
+                queue.raw(),
+                expected_updates,
+                expected_pending_lanes.bits(),
+                actual_updates,
+                actual_pending_lanes.bits()
+            ),
+            Self::MismatchedRootToken {
+                expected,
+                actual,
+                update,
+            } => write!(
+                formatter,
+                "queued HostRoot callback update {} references root {}, expected root {}",
+                update.raw(),
+                actual.raw(),
+                expected.raw()
+            ),
+            Self::MissingCallbackHandle {
+                root,
+                queue,
+                update,
+            } => write!(
+                formatter,
+                "root {} queue {} update {} is missing a callback handle for callback-order diagnostics",
+                root.raw(),
+                queue.raw(),
+                update.raw()
+            ),
             Self::EnqueuedWrongRoot { expected, actual } => write!(
                 formatter,
                 "enqueued HostRoot update for root {}, expected root {}",
@@ -280,6 +539,9 @@ impl Error for RootUpdateError {
             Self::UnknownPriorityLane { .. }
             | Self::EmptyRoot { .. }
             | Self::StaleQueueEvidence { .. }
+            | Self::StaleQueueSnapshot { .. }
+            | Self::MismatchedRootToken { .. }
+            | Self::MissingCallbackHandle { .. }
             | Self::EnqueuedWrongRoot { .. } => None,
         }
     }
@@ -501,6 +763,112 @@ pub(crate) fn validate_update_container_lane_diagnostics_for_canary<H: HostTypes
     Ok(lane_snapshot)
 }
 
+pub(crate) fn host_root_queued_callback_order_snapshot_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root_id: FiberRootId,
+    accepted_updates: &[UpdateContainerResult],
+) -> Result<HostRootQueuedCallbackOrderSnapshot, RootUpdateError> {
+    if accepted_updates.is_empty() {
+        return Err(RootUpdateError::EmptyRoot { root: root_id });
+    }
+
+    for update in accepted_updates {
+        let actual = update.schedule().root();
+        if actual != root_id {
+            return Err(RootUpdateError::MismatchedRootToken {
+                expected: root_id,
+                actual,
+                update: update.update(),
+            });
+        }
+    }
+
+    let queue = accepted_updates[0].queue();
+    let expected_updates = accepted_updates
+        .iter()
+        .map(UpdateContainerResult::update)
+        .collect::<Vec<_>>();
+    let actual_updates = store.update_queues().pending_updates(queue)?;
+    let root = store.root(root_id)?;
+    let actual_pending_lanes = root.lanes().pending_lanes();
+    let lane_snapshot = root_lane_priority_scheduling_snapshot_for_canary(store, root_id)?;
+    let expected_pending_lanes = accepted_updates
+        .last()
+        .expect("accepted updates is not empty")
+        .pending_lanes_after_enqueue();
+    let expected_selected_next_lanes = accepted_updates
+        .last()
+        .expect("accepted updates is not empty")
+        .selected_next_lanes();
+    let current_queue = store.fiber_arena().get(root.current())?.update_queue();
+    let stale = current_queue != queue
+        || accepted_updates
+            .iter()
+            .any(|update| update.queue() != queue)
+        || expected_updates != actual_updates
+        || actual_pending_lanes != expected_pending_lanes
+        || lane_snapshot.selected_next_lanes() != expected_selected_next_lanes;
+
+    if stale {
+        return Err(RootUpdateError::StaleQueueSnapshot {
+            root: root_id,
+            queue,
+            expected_updates,
+            actual_updates,
+            expected_pending_lanes,
+            actual_pending_lanes,
+        });
+    }
+
+    let mut records = Vec::with_capacity(accepted_updates.len());
+    for (queue_order, result) in accepted_updates.iter().enumerate() {
+        let update = store.update_queues().update(result.update())?;
+        let callback = update.callback();
+        if callback.is_none() {
+            return Err(RootUpdateError::MissingCallbackHandle {
+                root: root_id,
+                queue,
+                update: result.update(),
+            });
+        }
+
+        if !update.lane().contains_lane(result.lane())
+            || result.lane_choice().lane() != result.lane()
+            || result.schedule().lane() != result.lane()
+        {
+            return Err(RootUpdateError::StaleQueueSnapshot {
+                root: root_id,
+                queue,
+                expected_updates,
+                actual_updates,
+                expected_pending_lanes,
+                actual_pending_lanes,
+            });
+        }
+
+        records.push(HostRootQueuedCallbackOrderRecord {
+            queue_order,
+            root: root_id,
+            fiber: result.schedule().fiber(),
+            queue,
+            update: result.update(),
+            callback,
+            lane_choice: result.lane_choice(),
+            schedule: result.schedule(),
+            pending_lanes_after_enqueue: result.pending_lanes_after_enqueue(),
+            selected_next_lanes: result.selected_next_lanes(),
+        });
+    }
+
+    Ok(HostRootQueuedCallbackOrderSnapshot {
+        root: root_id,
+        queue,
+        records,
+        pending_lanes: actual_pending_lanes,
+        selected_next_lanes: lane_snapshot.selected_next_lanes(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -634,6 +1002,199 @@ mod tests {
                 .unwrap()
                 .callbacks()
                 .is_empty()
+        );
+    }
+
+    #[test]
+    fn root_updates_callback_order_snapshot_ties_callbacks_to_lane_and_schedule_records() {
+        let (mut store, root_id, host) = root_store();
+        let first_callback = RootUpdateCallbackHandle::from_raw(5671);
+        let second_callback = RootUpdateCallbackHandle::from_raw(5672);
+
+        let first = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(1),
+            Some(first_callback),
+        )
+        .unwrap();
+        let second = update_container_sync(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(2),
+            Some(second_callback),
+        )
+        .unwrap();
+
+        let snapshot = host_root_queued_callback_order_snapshot_for_canary(
+            &store,
+            root_id,
+            &[first.clone(), second.clone()],
+        )
+        .unwrap();
+
+        assert_eq!(snapshot.root(), root_id);
+        assert_eq!(snapshot.queue(), first.queue());
+        assert_eq!(snapshot.len(), 2);
+        assert!(!snapshot.is_empty());
+        assert_eq!(snapshot.pending_lanes(), Lanes::SYNC.merge(Lanes::DEFAULT));
+        assert_eq!(
+            snapshot.selected_next_lanes(),
+            Lanes::SYNC.merge(Lanes::DEFAULT)
+        );
+        assert!(snapshot.records_in_queue_order());
+        assert!(snapshot.records_have_distinct_lanes_and_callbacks());
+        assert!(snapshot.records_match_accepted_lane_and_schedule());
+        assert!(snapshot.root_rendering_blocked());
+        assert!(snapshot.commit_execution_blocked());
+        assert!(snapshot.callback_invocation_blocked());
+        assert!(!snapshot.user_callbacks_invoked());
+        assert!(!snapshot.public_root_callback_behavior_exposed());
+        assert!(!snapshot.public_batching_compatibility_claimed());
+
+        let records = snapshot.records();
+        assert_eq!(records[0].queue_order(), 0);
+        assert_eq!(records[0].root(), root_id);
+        assert_eq!(records[0].fiber(), first.schedule().fiber());
+        assert_eq!(records[0].queue(), first.queue());
+        assert_eq!(records[0].update(), first.update());
+        assert_eq!(records[0].callback(), first_callback);
+        assert_eq!(records[0].lane(), Lane::DEFAULT);
+        assert_eq!(records[0].lane_choice(), first.lane_choice());
+        assert_eq!(records[0].event_priority(), EventPriority::DEFAULT);
+        assert_eq!(
+            records[0].source_priority(),
+            RootUpdateLaneSourcePriority::DefaultEventPriority
+        );
+        assert_eq!(records[0].schedule(), first.schedule());
+        assert_eq!(records[0].pending_lanes_after_enqueue(), Lanes::DEFAULT);
+        assert_eq!(records[0].selected_next_lanes(), Lanes::DEFAULT);
+        assert!(records[0].lane_and_schedule_match());
+        assert!(!records[0].public_callback_invoked());
+
+        assert_eq!(records[1].queue_order(), 1);
+        assert_eq!(records[1].root(), root_id);
+        assert_eq!(records[1].fiber(), second.schedule().fiber());
+        assert_eq!(records[1].queue(), second.queue());
+        assert_eq!(records[1].update(), second.update());
+        assert_eq!(records[1].callback(), second_callback);
+        assert_eq!(records[1].lane(), Lane::SYNC);
+        assert_eq!(records[1].lane_choice(), second.lane_choice());
+        assert_eq!(records[1].event_priority(), EventPriority::DISCRETE);
+        assert_eq!(
+            records[1].source_priority(),
+            RootUpdateLaneSourcePriority::ExplicitSync
+        );
+        assert_eq!(records[1].schedule(), second.schedule());
+        assert_eq!(
+            records[1].pending_lanes_after_enqueue(),
+            Lanes::SYNC.merge(Lanes::DEFAULT)
+        );
+        assert_eq!(
+            records[1].selected_next_lanes(),
+            Lanes::SYNC.merge(Lanes::DEFAULT)
+        );
+        assert!(records[1].lane_and_schedule_match());
+        assert!(!records[1].public_callback_invoked());
+
+        assert!(first.callback_scheduling_blocked());
+        assert!(first.callback_execution_blocked());
+        assert!(second.callback_scheduling_blocked());
+        assert!(second.callback_execution_blocked());
+        assert_eq!(store.root_scheduler().first_scheduled_root(), None);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            None
+        );
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert!(store.scheduler_bridge().callback_requests().is_empty());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_updates_callback_order_snapshot_rejects_mismatched_root_token() {
+        let (mut store, root_id, _host) = root_store();
+        let other_root = store
+            .create_client_root(FakeContainer::new(2), RootOptions::new())
+            .unwrap();
+        let update = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(1),
+            Some(RootUpdateCallbackHandle::from_raw(5673)),
+        )
+        .unwrap();
+        let update_id = update.update();
+
+        let error =
+            host_root_queued_callback_order_snapshot_for_canary(&store, other_root, &[update])
+                .unwrap_err();
+
+        assert_eq!(
+            error,
+            RootUpdateError::MismatchedRootToken {
+                expected: other_root,
+                actual: root_id,
+                update: update_id
+            }
+        );
+    }
+
+    #[test]
+    fn root_updates_callback_order_snapshot_rejects_missing_callback_handle() {
+        let (mut store, root_id, _host) = root_store();
+        let update =
+            update_container(&mut store, root_id, RootElementHandle::from_raw(1), None).unwrap();
+
+        let error =
+            host_root_queued_callback_order_snapshot_for_canary(&store, root_id, &[update.clone()])
+                .unwrap_err();
+
+        assert_eq!(
+            error,
+            RootUpdateError::MissingCallbackHandle {
+                root: root_id,
+                queue: update.queue(),
+                update: update.update()
+            }
+        );
+    }
+
+    #[test]
+    fn root_updates_callback_order_snapshot_rejects_stale_queue_snapshot() {
+        let (mut store, root_id, _host) = root_store();
+        let accepted = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(1),
+            Some(RootUpdateCallbackHandle::from_raw(5674)),
+        )
+        .unwrap();
+        let stale_extra = update_container_sync(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(2),
+            Some(RootUpdateCallbackHandle::from_raw(5675)),
+        )
+        .unwrap();
+
+        let error = host_root_queued_callback_order_snapshot_for_canary(
+            &store,
+            root_id,
+            &[accepted.clone()],
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            RootUpdateError::StaleQueueSnapshot {
+                root: root_id,
+                queue: accepted.queue(),
+                expected_updates: vec![accepted.update()],
+                actual_updates: vec![accepted.update(), stale_extra.update()],
+                expected_pending_lanes: Lanes::DEFAULT,
+                actual_pending_lanes: Lanes::SYNC.merge(Lanes::DEFAULT)
+            }
         );
     }
 
