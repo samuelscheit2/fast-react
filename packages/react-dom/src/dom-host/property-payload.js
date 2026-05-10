@@ -15,6 +15,8 @@ const CONTROLLED_FORM_PROPERTY_PAYLOAD_STATUS =
   'blocked-controlled-form-property-payload';
 const CONTROLLED_VALUE_TRACKER_GATE_STATUS =
   'private-controlled-value-tracker-metadata-only';
+const CONTROLLED_VALUE_TRACKER_FAKE_DOM_DIAGNOSTIC_STATUS =
+  resourceFormInternalsGate.controlledInputValueTrackerFakeDomDiagnosticStatus;
 const CONTROLLED_PRIVATE_WRAPPER_PROPERTY_PAYLOAD_STATUS =
   resourceFormInternalsGate.controlledInputPrivateWrapperGateStatus;
 
@@ -665,9 +667,15 @@ function createControlledFormUnsupportedEntry(tag, propName, props) {
             : CONTROLLED_PRIVATE_WRAPPER_PROPERTY_PAYLOAD_STATUS,
         privateWrapperGateRecord,
         valueTrackerGateStatus: CONTROLLED_VALUE_TRACKER_GATE_STATUS,
+        fakeDomTrackerDiagnosticStatus:
+          CONTROLLED_VALUE_TRACKER_FAKE_DOM_DIAGNOSTIC_STATUS,
         hostTag: tag,
         ordinaryPayloadAccepted: false,
         sourceAdapterInvoked: false,
+        fakeDomTrackerDiagnosticAvailable: true,
+        fakeDomTrackerDiagnosticInstalled: false,
+        fakeDomTrackerDiagnosticObserved: false,
+        fakeDomTrackerDiagnosticDetached: false,
         liveTrackingStarted: false,
         postEventRestoreQueued: false,
         publicControlledBehaviorEnabled: false,
@@ -779,6 +787,7 @@ function getStyleMutationTarget(styleName) {
 module.exports = {
   CONTROLLED_FORM_PROPERTY_PAYLOAD_STATUS,
   CONTROLLED_PRIVATE_WRAPPER_PROPERTY_PAYLOAD_STATUS,
+  CONTROLLED_VALUE_TRACKER_FAKE_DOM_DIAGNOSTIC_STATUS,
   CONTROLLED_VALUE_TRACKER_GATE_STATUS,
   ENTRY_NON_PAYLOAD,
   ENTRY_REMOVE_ATTRIBUTE,
