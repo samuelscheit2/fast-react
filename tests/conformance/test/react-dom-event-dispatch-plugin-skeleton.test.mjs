@@ -1131,6 +1131,282 @@ test("private root host-output fake click dispatch proves capture before bubble 
   bridge.revertCreateRootSideEffects(sideEffects);
 });
 
+test("private root host-output click canary records propagation stop routing without public dispatch", () => {
+  const document = createHostOutputDocument("root-output-propagation-stop");
+  const container = document.createElement("div");
+  const calls = [];
+  const element = {
+    props: {
+      children: "stop target",
+      onClick(event) {
+        calls.push({
+          event,
+          phase: "bubble"
+        });
+      },
+      onClickCapture(event) {
+        event.stopPropagation();
+        calls.push({
+          currentTarget: event.currentTarget,
+          event,
+          phase: "capture",
+          stoppedAfter: event.isPropagationStopped(),
+          target: event.target
+        });
+      }
+    },
+    type: "button"
+  };
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    createRenderAdmissionIdPrefix: "event-stop-admission",
+    initialHostOutputIdPrefix: "event-stop-output",
+    sideEffectIdPrefix: "event-stop-side-effect"
+  });
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const render = bridge.renderContainer(create.handle, element);
+  const admission = bridge.admitCreateRenderPath(
+    create,
+    sideEffects,
+    render
+  );
+  const handoff = bridge.applyInitialRenderHostOutput(admission);
+  const hostOutputPayload =
+    rootBridge.getPrivateRootInitialHostOutputHandoffPayload(handoff);
+  const targetRecord =
+    componentTree.createPrivateRootHostOutputEventTargetRecord(
+      hostOutputPayload
+    );
+
+  const clickRecord =
+    rootListeners.invokePrivateRootHostOutputClickDispatchCanary(
+      sideEffects.listenerRegistration,
+      targetRecord,
+      {
+        enablePropagationStopDiagnostics: true
+      }
+    );
+
+  assert.equal(clickRecord.publicDispatchEnabled, false);
+  assert.equal(clickRecord.syntheticEventCount, 0);
+  assert.equal(clickRecord.propagationStopDiagnosticEnabled, true);
+  assert.equal(clickRecord.propagationStopped, true);
+  assert.equal(clickRecord.propagationStopCallCount, 1);
+  assert.equal(clickRecord.propagationStopNativeCallCount, 1);
+  assert.equal(clickRecord.propagationSkippedListenerCount, 1);
+  assert.equal(clickRecord.listenerInvocationCount, 1);
+  assert.equal(clickRecord.captureListenerInvocationCount, 1);
+  assert.equal(clickRecord.bubbleListenerInvocationCount, 0);
+  assert.equal(clickRecord.listenerErrorCount, 0);
+  assert.deepEqual(
+    clickRecord.invocationOrder.map((entry) => [
+      entry.phase,
+      entry.registrationName,
+      entry.invocationStatus,
+      entry.skippedByPropagationStop
+    ]),
+    [
+      ["capture", "onClickCapture", "invoked-single-listener", false],
+      ["bubble", "onClick", "skipped-propagation-stopped", true]
+    ]
+  );
+  assert.deepEqual(
+    clickRecord.propagationStopDiagnostics.map((record) => [
+      record.kind,
+      record.action,
+      record.phase,
+      record.registrationName,
+      record.propagationSkippedListener,
+      record.stoppedByRegistrationName
+    ]),
+    [
+      [
+        pluginEventSystem.DISPATCH_PROPAGATION_STOP_DIAGNOSTIC_RECORD_KIND,
+        "stop-propagation",
+        "capture",
+        "onClickCapture",
+        false,
+        "onClickCapture"
+      ],
+      [
+        pluginEventSystem.DISPATCH_PROPAGATION_STOP_DIAGNOSTIC_RECORD_KIND,
+        "skip-listener",
+        "bubble",
+        "onClick",
+        true,
+        "onClickCapture"
+      ]
+    ]
+  );
+  assert.deepEqual(
+    calls.map((call) => [
+      call.phase,
+      call.currentTarget,
+      call.target,
+      call.stoppedAfter
+    ]),
+    [
+      [
+        "capture",
+        hostOutputPayload.hostNode,
+        hostOutputPayload.hostNode,
+        true
+      ]
+    ]
+  );
+  assert.equal(typeof calls[0].event.stopPropagation, "function");
+  assert.equal(typeof calls[0].event.isPropagationStopped, "function");
+  assert.equal(calls[0].event.syntheticEvent, false);
+  assert.equal(calls[0].event.propagationStopDiagnosticEnabled, true);
+
+  const clickPayload =
+    rootListeners.getPrivateRootHostOutputClickDispatchCanaryPayload(
+      clickRecord
+    );
+  assert.equal(clickPayload.nativeEvent.stopPropagationCallCount, 1);
+  assert.equal(
+    clickPayload.queueInvocationRecord.propagationStopCallCount,
+    1
+  );
+  assert.equal(
+    clickPayload.queueInvocationRecord.propagationSkippedListenerCount,
+    1
+  );
+  assert.equal(hostOutputPayload.hostNode.__registrations.length, 0);
+  assert.equal(container.__registrations.length, 138);
+  assert.equal(document.__registrations.length, 1);
+
+  bridge.cleanupInitialRenderHostOutput(handoff);
+  bridge.revertCreateRootSideEffects(sideEffects);
+});
+
+test("private root host-output click canary records listener error routing without reporting globally", () => {
+  const document = createHostOutputDocument("root-output-listener-error");
+  const container = document.createElement("div");
+  const thrown = new Error("private root-output listener boom");
+  const calls = [];
+  const element = {
+    props: {
+      children: "error target",
+      onClick(event) {
+        calls.push({
+          event,
+          phase: "bubble"
+        });
+        return "bubble-after-error";
+      },
+      onClickCapture(event) {
+        calls.push({
+          event,
+          phase: "capture"
+        });
+        throw thrown;
+      }
+    },
+    type: "button"
+  };
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    createRenderAdmissionIdPrefix: "event-error-admission",
+    initialHostOutputIdPrefix: "event-error-output",
+    sideEffectIdPrefix: "event-error-side-effect"
+  });
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const render = bridge.renderContainer(create.handle, element);
+  const admission = bridge.admitCreateRenderPath(
+    create,
+    sideEffects,
+    render
+  );
+  const handoff = bridge.applyInitialRenderHostOutput(admission);
+  const hostOutputPayload =
+    rootBridge.getPrivateRootInitialHostOutputHandoffPayload(handoff);
+
+  const clickRecord =
+    rootListeners.invokePrivateRootHostOutputClickDispatchCanary(
+      sideEffects.listenerRegistration,
+      hostOutputPayload,
+      {
+        enableListenerErrorRoutingDiagnostics: true
+      }
+    );
+
+  assert.equal(clickRecord.publicDispatchEnabled, false);
+  assert.equal(clickRecord.syntheticEventCount, 0);
+  assert.equal(clickRecord.listenerInvocationCount, 2);
+  assert.equal(clickRecord.captureListenerInvocationCount, 1);
+  assert.equal(clickRecord.bubbleListenerInvocationCount, 1);
+  assert.equal(clickRecord.listenerErrorCount, 1);
+  assert.equal(clickRecord.listenerErrorRouteCount, 1);
+  assert.equal(clickRecord.listenerErrorRoutingDiagnosticEnabled, true);
+  assert.equal(
+    clickRecord.listenerErrorRoutingStatus,
+    pluginEventSystem.PRIVATE_LISTENER_ERROR_ROUTING_DIAGNOSTIC_STATUS
+  );
+  assert.deepEqual(
+    calls.map((call) => call.phase),
+    ["capture", "bubble"]
+  );
+  for (const call of calls) {
+    assert.equal(call.event.syntheticEvent, false);
+    assert.equal(Object.hasOwn(call.event, "stopPropagation"), false);
+  }
+
+  const [errorRoute] = clickRecord.listenerErrorRoutes;
+  assert.equal(
+    errorRoute.kind,
+    pluginEventSystem.DISPATCH_LISTENER_ERROR_ROUTE_RECORD_KIND
+  );
+  assert.equal(
+    pluginEventSystem.isDispatchListenerErrorRouteRecord(errorRoute),
+    true
+  );
+  assert.equal(errorRoute.errorRouteTarget, "reportGlobalError");
+  assert.equal(errorRoute.errorReported, false);
+  assert.equal(errorRoute.exposesError, false);
+  assert.equal(Object.hasOwn(errorRoute, "error"), false);
+  assert.equal(errorRoute.phase, "capture");
+  assert.equal(errorRoute.registrationName, "onClickCapture");
+  assert.equal(errorRoute.targetInst, hostOutputPayload.hostToken);
+  assert.equal(
+    errorRoute.blockedReason,
+    pluginEventSystem.LISTENER_ERROR_ROUTING_BLOCKED_CODE
+  );
+  assert.equal(
+    pluginEventSystem.getDispatchListenerErrorRouteRecordPayload(
+      errorRoute
+    ).error,
+    thrown
+  );
+
+  const clickPayload =
+    rootListeners.getPrivateRootHostOutputClickDispatchCanaryPayload(
+      clickRecord
+    );
+  assert.deepEqual(
+    clickPayload.invocationRecords.map((record) => [
+      record.phase,
+      record.listenerErrorCaptured,
+      record.listenerReturnStatus
+    ]),
+    [
+      ["capture", true, "not-applicable"],
+      ["bubble", false, "string"]
+    ]
+  );
+  assert.equal(
+    clickPayload.queueInvocationRecord.listenerErrorRouteCount,
+    1
+  );
+  assert.equal(clickPayload.nativeEvent.stopPropagationCallCount, 0);
+  assert.equal(hostOutputPayload.hostNode.__registrations.length, 0);
+  assert.equal(container.__registrations.length, 138);
+  assert.equal(document.__registrations.length, 1);
+
+  bridge.cleanupInitialRenderHostOutput(handoff);
+  bridge.revertCreateRootSideEffects(sideEffects);
+});
+
 test("plugin extraction records remain deterministic and fail closed for flag variants", () => {
   const root = createEventTarget("plugin-root");
   assert.equal(
