@@ -979,10 +979,12 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
       facadeGate.acceptedCompositeFiberShape,
       privateToTreeCompositeAcceptedFiberShape
     );
-    assert.deepEqual(facadeGate.acceptedHostOutputUpdateKinds, [
-      "Create",
-      "Update"
-    ]);
+    const nativeToTreeEvidence =
+      facadeGate.privateNativeExecutionEvidenceAvailable === true;
+    assert.deepEqual(
+      facadeGate.acceptedHostOutputUpdateKinds,
+      nativeToTreeEvidence ? ["Create", "Update", "Unmount"] : ["Create", "Update"]
+    );
     assert.equal(facadeGate.hostOutputSnapshotFreshnessRequired, true);
     assert.equal(facadeGate.staleSnapshotRejection, true);
     assert.equal(facadeGate.publicTreeAvailable, false);
@@ -997,7 +999,17 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
     assert.deepEqual(facadeGate.acceptedRustApis, [
       "TestRendererRoot::describe_private_tree_metadata_for_canary",
       "TestRendererRoot::describe_private_tree_metadata_after_update_for_canary",
+      ...(nativeToTreeEvidence
+        ? [
+            "TestRendererRoot::describe_private_to_tree_after_create_native_execution_for_canary",
+            "TestRendererRoot::describe_private_to_tree_after_update_native_execution_for_canary",
+            "TestRendererRoot::describe_private_to_tree_after_unmount_native_execution_for_canary"
+          ]
+        : []),
       "TestRendererPrivateTreeMetadataReport",
+      ...(nativeToTreeEvidence
+        ? ["TestRendererPrivateToTreeNativeExecutionEvidence"]
+        : []),
       "TestRendererPrivateTreeFunctionComponentDiagnostic",
       "TestRendererPrivateTreeHostComponentDiagnostic",
       "TestRendererPrivateTreeHostTextDiagnostic"
@@ -1006,8 +1018,19 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
       "root_private_tree_metadata_canary_describes_minimal_host_component_with_text",
       "root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit",
       "root_private_tree_metadata_canary_describes_function_component_above_host_output",
+      ...(nativeToTreeEvidence
+        ? [
+            "root_private_to_tree_native_execution_evidence_consumes_create_update_unmount_records"
+          ]
+        : []),
       "root_private_tree_metadata_canary_rejects_stale_host_output_snapshot"
     ]);
+    if (nativeToTreeEvidence) {
+      assert.equal(
+        facadeGate.nativeExecutionEvidenceWorker,
+        "worker-667-test-renderer-totree-native-execution"
+      );
+    }
     if (entry.entrypoint.endsWith(".development")) {
       assert.equal(facadeGate.privateMultiChildTreeMetadataSerializable, true);
       assert.equal(
@@ -1830,7 +1853,7 @@ function createAcceptedMinimalTreeMetadataDiagnostic({
   hostOutputUpdateKind = "Create",
   text = "hello"
 } = {}) {
-  return {
+  const diagnostic = {
     diagnosticName: privateToTreeAcceptedDiagnosticName,
     sourceJsonDiagnosticName:
       "fast-react-test-renderer.serialization.private-json-canary",
@@ -1913,6 +1936,11 @@ function createAcceptedMinimalTreeMetadataDiagnostic({
     },
     publicTreeObjectAvailable: false
   };
+  attachToJSONUpdateUnmountRow(diagnostic, {
+    previousRootChildCount: 1,
+    currentRootChildCount: 1
+  });
+  return diagnostic;
 }
 
 function createAcceptedMultiChildTreeMetadataDiagnostic({

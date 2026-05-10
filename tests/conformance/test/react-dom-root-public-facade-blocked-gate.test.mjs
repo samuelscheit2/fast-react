@@ -84,7 +84,7 @@ test("React DOM public root facade gate blocks placeholders while oracle prerequ
     REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ADMISSIONS.filter(
       (admission) => Number(admission.workerId) >= 503
     ).length,
-    13
+    14
   );
   const privateMetadataBlockedRow = gate.blockedPublicFacadeRows.find(
     (row) =>
