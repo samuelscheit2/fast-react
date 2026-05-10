@@ -29,6 +29,13 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Worker 477 was accepted from queue 473-502. It added private function
+  component `useMemo` update diagnostics for dependency reuse versus recompute,
+  plus a private React hook dispatcher memo gate that keeps public `useMemo`
+  fail-closed unless a marked private dispatcher is installed. It was verified
+  after merge with focused function-component reconciler tests, hook dispatcher
+  conformance tests, the React workspace smoke check, Rust fmt,
+  conflict-marker scanning, and `git diff --check`.
 - Worker 473 was accepted from queue 473-502. It replaced the stale worker 466
   with private react-test-renderer act passive-drain diagnostics that consume
   accepted pending-passive flush metadata through the existing private

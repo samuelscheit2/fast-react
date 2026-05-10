@@ -46,13 +46,12 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Queue 473-502 is assigned in isolated worktrees.
-Workers 473, 474, 475, 476, 483, 487, 489, 493, 494, 495, 496, 497, 498, 499,
-500, 501, and 502 have been accepted, leaving 13 active top-level workers from
-this queue.
+Workers 473, 474, 475, 476, 477, 483, 487, 489, 493, 494, 495, 496, 497, 498,
+499, 500, 501, and 502 have been accepted, leaving 12 active top-level workers
+from this queue.
 
 | Worker | Focus |
 | --- | --- |
-| 477 | Function component `useMemo` bailout gate |
 | 478 | Function component `useEffect` update gate |
 | 479 | Context multi-consumer propagation gate |
 | 480 | Suspense/Offscreen blocker diagnostics |
