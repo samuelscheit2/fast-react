@@ -29,6 +29,33 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 738
+
+- Worker 738 added a Rust-only real committed sibling-text host-output update
+  path for `HostRoot -> [HostText("first sibling"), HostComponent("span") ->
+  HostText("second sibling")]`. The committed output carries render handoff,
+  host handles, committed fiber inspection, commit diagnostics, snapshots, and
+  state-node diagnostics for the real sibling-text path.
+- The private `toJSON` sibling-text host-output row now reads the committed
+  output and emits a private JSON report with a root-array source shape from
+  current committed fibers and the real snapshot. This is a prerequisite only:
+  sibling snapshot/finished-work identity admission remains blocked.
+- Acceptance audit found that the generic
+  `describe_private_to_json_finished_work_identity_gate_for_canary` path could
+  consume the new `SiblingText` private JSON report before a dedicated sibling
+  identity gate existed. The accepted fix added an explicit fail-closed guard
+  for `TestRendererPrivateToJsonHostOutputShape::SiblingText`, returning
+  `sibling-text-finished-work-identity-gate-not-implemented`, plus focused
+  negative coverage proving the generic gate rejects the real sibling-text
+  report.
+- Worker 738 was accepted after focused sibling-text, sibling-snapshot,
+  `toJSON`, committed-fiber inspection, private-admission, formatting, clippy,
+  package-surface, import-smoke, conflict-marker, and `git diff --check`
+  verification. Its branch and worktree were cleaned up after merge. Public
+  serialization, JS/CJS admission, native bridge loading/execution, package
+  compatibility, public compatibility, and sibling identity admission remain
+  blocked.
+
 ### Worker 737
 
 - Worker 737 added the static private-admission ledger for Workers 734-736.
