@@ -1289,6 +1289,62 @@ const privateUpdateRouteRootWorkLoopGate = Object.freeze({
   rustExecutionFromJs: false,
   compatibilityClaimed: false
 });
+const privateUpdateNativeBridgeAdmissionDiagnosticId =
+  'react-test-renderer-update-native-bridge-admission-private-diagnostic';
+const privateUpdateNativeBridgeAdmissionStatus =
+  'private-update-native-bridge-admission-host-output-handoff-public-update-blocked';
+const privateUpdateNativeBridgeAdmissionGate = Object.freeze({
+  id: privateUpdateNativeBridgeAdmissionDiagnosticId,
+  status: privateUpdateNativeBridgeAdmissionStatus,
+  publicSurface: 'create().update',
+  deterministic: true,
+  acceptedWorker:
+    'worker-637-test-renderer-update-native-execution',
+  acceptedRustCrate: 'fast-react-test-renderer',
+  acceptedRustRecords: Object.freeze([
+    'TestRendererRootUpdateOutcome',
+    'TestRendererRootScheduledUpdate',
+    'TestRendererUpdatedHostOutput',
+    'TestRendererPrivateUpdateRouteAdmissionRecord',
+    'TestRendererUpdateNativeBridgeAdmission'
+  ]),
+  acceptedRustApis: Object.freeze([
+    'TestRendererRoot::update_host_component_with_props_and_text_for_canary',
+    'TestRendererRoot::render_and_commit_host_output_update_for_canary',
+    'TestRendererRoot::describe_private_update_route_via_root_work_loop_for_canary',
+    'TestRendererRoot::describe_private_update_native_bridge_admission_for_canary',
+    'TestRendererRoot::render_and_admit_private_update_native_bridge_handoff_for_canary'
+  ]),
+  acceptedRustTests: Object.freeze([
+    'root_private_update_native_bridge_admission_consumes_actual_update_host_output_handoff',
+    'root_private_update_native_bridge_admission_rejects_missing_handoff',
+    'root_private_update_native_bridge_admission_rejects_stale_route_outcome'
+  ]),
+  privateRouteDependencyId:
+    'react-test-renderer-update-route-private-diagnostic',
+  updateRouteRootWorkLoopGate: privateUpdateRouteRootWorkLoopGate,
+  updateRouteAdmissionRecordId: privateUpdateRouteRootWorkLoopAdmissionId,
+  lifecycleDiagnosticGate: updateUnmountRustLifecycleDiagnosticGate,
+  consumesPrivateUpdateRouteMetadata: true,
+  consumesAcceptedRustLifecycleDiagnostics: true,
+  consumesAcceptedRootWorkLoopHandoff: true,
+  consumesAcceptedHostOutputHandoff: true,
+  validatesLifecycleEvidence: true,
+  validatesTextAndPropertyUpdateEvidence: true,
+  rejectsStaleUpdateHandoffs: true,
+  rejectsUnmountedRoots: true,
+  rejectsMissingHostOutputHandoff: true,
+  publicRouteAvailable: false,
+  publicUpdateCompatibilityClaimed: false,
+  publicSerializationAvailable: false,
+  actFlushingClaimed: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  rustExecutionFromJs: true,
+  reconcilerExecutionFromJs: true,
+  hostOutputProducedFromJs: true,
+  compatibilityClaimed: false
+});
 const updatePrivateRoute = Object.freeze({
   id: 'react-test-renderer-update-private-route',
   publicSurface: 'create().update',
@@ -1308,16 +1364,27 @@ const updatePrivateRoute = Object.freeze({
   acceptedWorker: 'worker-234-test-renderer-host-output-update-unmount-canary',
   acceptedWorkers: Object.freeze([
     'worker-234-test-renderer-host-output-update-unmount-canary',
-    'worker-574-test-renderer-update-via-root-work-loop'
+    'worker-574-test-renderer-update-via-root-work-loop',
+    'worker-637-test-renderer-update-native-execution'
   ]),
   acceptedRustCrate: 'fast-react-test-renderer',
   rootWorkLoopUpdateRouteGate: privateUpdateRouteRootWorkLoopGate,
   privateUpdateAdmissionRecordId: privateUpdateRouteRootWorkLoopAdmissionId,
   privateUpdateAdmissionStatus: privateUpdateRouteRootWorkLoopAdmissionStatus,
   privateUpdateAdmissionRecordAvailable: true,
+  nativeBridgeAdmission: privateUpdateNativeBridgeAdmissionGate,
+  nativeBridgeAdmissionAvailable: true,
+  updateNativeBridgeAdmissionApi:
+    'TestRendererRoot::describe_private_update_native_bridge_admission_for_canary',
+  updateNativeBridgeAdmissionDiagnosticId:
+    privateUpdateNativeBridgeAdmissionDiagnosticId,
+  updateNativeBridgeAdmissionStatus:
+    privateUpdateNativeBridgeAdmissionStatus,
   consumesAcceptedHostRootUpdateQueueMetadata: true,
   consumesAcceptedRootWorkLoopMetadata: true,
   consumesAcceptedHostOutputMetadata: true,
+  consumesAcceptedRootWorkLoopHandoff: true,
+  consumesAcceptedHostOutputHandoff: true,
   hostTextUpdateMetadataAvailable: true,
   publicSerializationAvailable: false,
   compatibilityClaimed: false,
@@ -1325,7 +1392,10 @@ const updatePrivateRoute = Object.freeze({
     'TestRendererRoot::describe_private_update_route_admission_for_canary',
     'TestRendererRoot::describe_private_update_route_via_root_work_loop_for_canary',
     'TestRendererRoot::update_host_component_with_text_for_canary',
-    'TestRendererRoot::render_and_commit_host_output_update_for_canary'
+    'TestRendererRoot::update_host_component_with_props_and_text_for_canary',
+    'TestRendererRoot::render_and_commit_host_output_update_for_canary',
+    'TestRendererRoot::describe_private_update_native_bridge_admission_for_canary',
+    'TestRendererRoot::render_and_admit_private_update_native_bridge_handoff_for_canary'
   ]),
   acceptedRustTests: Object.freeze([
     'root_private_update_route_admission_record_consumes_update_work_loop_diagnostics',
@@ -1334,6 +1404,9 @@ const updatePrivateRoute = Object.freeze({
     'root_private_update_route_rejects_missing_update_queue_evidence',
     'root_private_update_route_rejects_unmounted_root',
     'root_private_update_route_rejects_incompatible_finished_work_record',
+    'root_private_update_native_bridge_admission_consumes_actual_update_host_output_handoff',
+    'root_private_update_native_bridge_admission_rejects_missing_handoff',
+    'root_private_update_native_bridge_admission_rejects_stale_route_outcome',
     'root_host_output_canary_updates_committed_text_with_update_diagnostics',
     'root_host_output_update_canary_fails_closed_without_committed_output'
   ])
@@ -2546,8 +2619,18 @@ const currentRustTestRendererRootCanaryOperations = freezeRecord({
     rootApi: 'TestRendererRoot::update',
     hostOutputCanaryApi:
       'TestRendererRoot::update_host_component_with_text_for_canary',
+    hostOutputPropsCanaryApi:
+      'TestRendererRoot::update_host_component_with_props_and_text_for_canary',
     hostOutputCommitApi:
       'TestRendererRoot::render_and_commit_host_output_update_for_canary',
+    nativeBridgeAdmissionApi:
+      'TestRendererRoot::describe_private_update_native_bridge_admission_for_canary',
+    nativeBridgeAdmissionDiagnosticId:
+      privateUpdateNativeBridgeAdmissionDiagnosticId,
+    nativeBridgeAdmissionStatus:
+      privateUpdateNativeBridgeAdmissionStatus,
+    nativeBridgeAdmission:
+      privateUpdateNativeBridgeAdmissionGate,
     updateKind: 'Update',
     rustUpdateKind: 'TestRendererRootUpdateKind::Update',
     scheduledUpdateRecord: 'TestRendererRootScheduledUpdate',
@@ -2560,12 +2643,21 @@ const currentRustTestRendererRootCanaryOperations = freezeRecord({
     acceptedWorkers: freezeArray([
       'worker-153-test-renderer-root-canary',
       'worker-195-test-renderer-root-callback-snapshot',
-      'worker-234-test-renderer-host-output-update-unmount-canary'
+      'worker-234-test-renderer-host-output-update-unmount-canary',
+      'worker-574-test-renderer-update-via-root-work-loop',
+      'worker-637-test-renderer-update-native-execution'
     ]),
     acceptedRustTests: freezeArray([
       'root_update_reuses_same_fiber_root_and_shared_scheduler_record',
       'root_update_commit_handoff_exposes_visible_callback_snapshot',
       'root_host_output_canary_updates_committed_text_with_update_diagnostics',
+      'root_private_update_route_consumes_root_work_loop_update_queue_and_text_update_metadata',
+      'root_private_update_route_rejects_stale_root_update_output',
+      'root_private_update_route_rejects_unmounted_root',
+      'root_private_update_route_rejects_incompatible_finished_work_record',
+      'root_private_update_native_bridge_admission_consumes_actual_update_host_output_handoff',
+      'root_private_update_native_bridge_admission_rejects_missing_handoff',
+      'root_private_update_native_bridge_admission_rejects_stale_route_outcome',
       'root_update_after_unmount_does_not_mutate_or_reschedule'
     ])
   }),
@@ -2633,9 +2725,11 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     'worker-208-test-renderer-host-output-canary',
     'worker-234-test-renderer-host-output-update-unmount-canary',
     'worker-265-test-renderer-private-json-ready-diagnostics',
+    'worker-574-test-renderer-update-via-root-work-loop',
     'worker-575-test-renderer-unmount-deletion-commit-link',
     'worker-610-test-renderer-create-native-bridge-admission',
-    'worker-612-test-renderer-unmount-native-bridge-admission'
+    'worker-612-test-renderer-unmount-native-bridge-admission',
+    'worker-637-test-renderer-update-native-execution'
   ]),
   acceptedJsBridgeWorkers: freezeArray([
     'worker-304-test-renderer-js-private-root-request-bridge',
@@ -2644,7 +2738,8 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     'worker-423-test-renderer-native-root-execution-bridge',
     'worker-426-test-renderer-testinstance-bridge-query',
     'worker-610-test-renderer-create-native-bridge-admission',
-    'worker-612-test-renderer-unmount-native-bridge-admission'
+    'worker-612-test-renderer-unmount-native-bridge-admission',
+    'worker-637-test-renderer-update-native-execution'
   ]),
   root: freezeRecord({
     rustType: 'TestRendererRoot',
@@ -2683,6 +2778,19 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     createApi: 'TestRendererRoot::render_and_commit_host_output_for_canary',
     updateApi:
       'TestRendererRoot::render_and_commit_host_output_update_for_canary',
+    updateRouteDiagnosticApi:
+      'TestRendererRoot::describe_private_update_route_via_root_work_loop_for_canary',
+    updateRouteRootWorkLoopGate: privateUpdateRouteRootWorkLoopGate,
+    updateNativeBridgeAdmissionApi:
+      'TestRendererRoot::describe_private_update_native_bridge_admission_for_canary',
+    updateNativeBridgeAdmissionDiagnosticId:
+      privateUpdateNativeBridgeAdmissionDiagnosticId,
+    updateNativeBridgeAdmissionStatus:
+      privateUpdateNativeBridgeAdmissionStatus,
+    updateNativeBridgeAdmissionGate:
+      privateUpdateNativeBridgeAdmissionGate,
+    updateNativeBridgeAdmission:
+      'TestRendererUpdateNativeBridgeAdmission',
     unmountApi:
       'TestRendererRoot::render_and_commit_host_output_unmount_for_canary',
     unmountDeletionCommitHandoffApi:
@@ -4370,6 +4478,7 @@ const rootHandleStates = new WeakMap();
 const rendererRootHandles = new WeakMap();
 const rootRequestTestInstanceQueryDiagnostics = new WeakMap();
 const rootRequestUpdateRouteAdmissions = new WeakMap();
+const rootRequestUpdateNativeBridgeAdmissions = new WeakMap();
 
 function createTestRendererRootRequestBridge(options) {
   const bridgeState = {
@@ -4516,6 +4625,23 @@ function createTestRendererRootRequestBridge(options) {
       return consumeAcceptedRustUpdateRouteRootWorkLoopForRequest(
         record,
         diagnostic
+      );
+    },
+    canConsumePrivateUpdateNativeBridgeAdmission(record, evidence) {
+      try {
+        consumePrivateUpdateNativeBridgeAdmissionForRequest(
+          record,
+          evidence
+        );
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    },
+    consumePrivateUpdateNativeBridgeAdmission(record, evidence) {
+      return consumePrivateUpdateNativeBridgeAdmissionForRequest(
+        record,
+        evidence
       );
     },
     canConsumePrivateUnmountNativeBridgeAdmission(record, evidence) {
@@ -4741,6 +4867,11 @@ function createRootRequestRecord({
       operation === 'update' ? privateUpdateRouteRootWorkLoopGate : null,
     privateUpdateRouteRootWorkLoopAdmissionAvailable:
       operation === 'update',
+    privateUpdateNativeBridgeAdmissionGate:
+      operation === 'update'
+        ? privateUpdateNativeBridgeAdmissionGate
+        : null,
+    privateUpdateNativeBridgeAdmissionAvailable: operation === 'update',
     privateUnmountDeletionCommitHandoff:
       operation === 'unmount'
         ? createPrivateUnmountDeletionCommitHandoffRecord({
@@ -4766,6 +4897,10 @@ function createRootRequestRecord({
       updateRouteAdmissionApi:
         operation === 'update'
           ? 'TestRendererRoot::describe_private_update_route_admission_for_canary'
+          : null,
+      updateNativeBridgeAdmissionApi:
+        operation === 'update'
+          ? 'TestRendererRoot::describe_private_update_native_bridge_admission_for_canary'
           : null,
       containerUpdateApi,
       schedulerApi: 'ensure_root_is_scheduled',
@@ -4841,6 +4976,157 @@ function createRootRequestRustLifecycleDiagnosticRecord(options) {
     rustExecutionFromJs: false,
     reconcilerExecutionFromJs: false,
     hostOutputProducedFromJs: false,
+    compatibilityClaimed: false
+  });
+}
+
+function consumePrivateUpdateNativeBridgeAdmissionForRequest(
+  record,
+  evidence,
+  acceptedLifecycleDiagnostic
+) {
+  if (!isRootRequestRecord(record)) {
+    throwInvalidRootRequest(
+      'Expected a private react-test-renderer root request record.'
+    );
+  }
+  if (record.operation !== 'update') {
+    throwInvalidRootRequest(
+      'Private update native bridge admission only accepts update requests.'
+    );
+  }
+  if (
+    record.rustOutcome !== testRendererRootUpdateOutcomeScheduled ||
+    record.scheduled !== true
+  ) {
+    throwInvalidRootRequest(
+      'Private update native bridge admission requires a scheduled update request.'
+    );
+  }
+  if (evidence === null || typeof evidence !== 'object') {
+    throwInvalidRootRequest(
+      'Expected private update native bridge admission evidence.'
+    );
+  }
+  if (
+    readDiagnosticField(evidence, [
+      'hostOutputProduced',
+      'host_output_produced',
+      'hostOutputProducedFromJs'
+    ]) !== true
+  ) {
+    throwInvalidRootRequest(
+      'Private update native bridge admission requires update host-output handoff evidence.'
+    );
+  }
+
+  const consumedLifecycleDiagnostic =
+    acceptedLifecycleDiagnostic ??
+    consumeAcceptedRustLifecycleDiagnosticForRequest(
+      record,
+      readUpdateAdmissionLifecycleDiagnostic(evidence)
+    );
+  const updateRouteAdmission =
+    consumeAcceptedRustUpdateRouteRootWorkLoopForRequest(
+      record,
+      readUpdateAdmissionRouteDiagnostic(evidence)
+    );
+  const admission = createPrivateUpdateNativeBridgeAdmissionRecord({
+    evidence,
+    record,
+    rustLifecycleDiagnostic: consumedLifecycleDiagnostic,
+    updateRouteAdmission
+  });
+  rootRequestUpdateNativeBridgeAdmissions.set(record, admission);
+  return admission;
+}
+
+function readUpdateAdmissionLifecycleDiagnostic(evidence) {
+  if (evidence === null || typeof evidence !== 'object') {
+    throwInvalidRootRequest(
+      'Expected private update admission evidence with lifecycle diagnostics.'
+    );
+  }
+
+  return (
+    readDiagnosticField(evidence, [
+      'rustLifecycleDiagnostic',
+      'lifecycleDiagnostic',
+      'acceptedRustLifecycleDiagnostic'
+    ]) ?? evidence
+  );
+}
+
+function readUpdateAdmissionRouteDiagnostic(evidence) {
+  if (evidence === null || typeof evidence !== 'object') {
+    throwInvalidRootRequest(
+      'Expected private update admission evidence with update route diagnostics.'
+    );
+  }
+
+  const diagnostic =
+    readDiagnosticField(evidence, [
+      'updateRouteRootWorkLoopDiagnostic',
+      'privateUpdateRouteRootWorkLoopDiagnostic',
+      'updateHostOutputHandoff',
+      'hostOutputHandoff',
+      'update_route_root_work_loop_diagnostic'
+    ]) ?? evidence;
+  if (diagnostic === null || typeof diagnostic !== 'object') {
+    throwInvalidRootRequest(
+      'Expected Rust update route root work-loop handoff diagnostics.'
+    );
+  }
+  return diagnostic;
+}
+
+function createPrivateUpdateNativeBridgeAdmissionRecord(options) {
+  const hostOutputEvidence = options.updateRouteAdmission.hostOutputEvidence;
+
+  return freezeRecord({
+    id: privateUpdateNativeBridgeAdmissionDiagnosticId,
+    kind: 'FastReactTestRendererPrivateUpdateNativeBridgeAdmission',
+    status: privateUpdateNativeBridgeAdmissionStatus,
+    gate: privateUpdateNativeBridgeAdmissionGate,
+    operation: 'update',
+    publicSurface: 'create().update',
+    request: options.record,
+    requestId: options.record.requestId,
+    requestSequence: options.record.requestSequence,
+    rootId: options.record.rootId,
+    rootSequence: options.record.rootSequence,
+    updateKind: testRendererRootUpdateKindUpdate,
+    updateOutcome: testRendererRootUpdateOutcomeScheduled,
+    scheduled: true,
+    lifecycleStatusBefore: options.record.lifecycleStatusBefore,
+    lifecycleStatusAfter: options.record.lifecycleStatusAfter,
+    routeDependencyId:
+      'react-test-renderer-update-route-private-diagnostic',
+    updateRouteAdmissionId: privateUpdateRouteRootWorkLoopAdmissionId,
+    rustLifecycleDiagnostic: options.rustLifecycleDiagnostic,
+    updateRouteRootWorkLoopAdmission: options.updateRouteAdmission,
+    updateRouteRootWorkLoopDiagnostic:
+      options.updateRouteAdmission.sourceDiagnostic,
+    sourceDiagnostic: options.evidence,
+    updateRouteAdmissionAccepted: true,
+    lifecycleEvidenceAccepted: true,
+    rootWorkLoopHandoffAccepted: true,
+    hostOutputHandoffAccepted: true,
+    textUpdateApplyRecorded: hostOutputEvidence.textUpdateApplyRecorded,
+    hostTextUpdateApplyCount: hostOutputEvidence.hostTextUpdateApplyCount,
+    hostComponentUpdateApplyCount:
+      hostOutputEvidence.hostComponentUpdateApplyCount,
+    rejectsStaleUpdateHandoffs: true,
+    rejectsUnmountedRoots: true,
+    rejectsMissingHostOutputHandoff: true,
+    publicUpdateCompatibilityClaimed: false,
+    publicSerializationAvailable: false,
+    actFlushingClaimed: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    rustExecutionFromJs: true,
+    reconcilerExecutionFromJs: true,
+    hostOutputProduced: true,
     compatibilityClaimed: false
   });
 }
@@ -6020,6 +6306,10 @@ function createRootExecutionHandoff(record) {
       record.privateUnmountDeletionCommitHandoff,
     privateUnmountDeletionCommitHandoffAvailable:
       record.privateUnmountDeletionCommitHandoffAvailable,
+    privateUpdateNativeBridgeAdmissionGate:
+      record.privateUpdateNativeBridgeAdmissionGate,
+    privateUpdateNativeBridgeAdmissionAvailable:
+      record.privateUpdateNativeBridgeAdmissionAvailable,
     privateUnmountNativeBridgeAdmissionGate:
       record.privateUnmountNativeBridgeAdmissionGate,
     privateUnmountNativeBridgeAdmissionAvailable:
@@ -6086,6 +6376,14 @@ function consumeRootExecutionResult(record, result, handoff) {
       record,
       rustLifecycleDiagnostic
     );
+  const privateUpdateNativeBridgeAdmission =
+    record.operation === 'update' && result.hostOutputProduced === true
+      ? consumePrivateUpdateNativeBridgeAdmissionForRequest(
+          record,
+          result,
+          consumedLifecycleDiagnostic
+        )
+      : null;
   const privateUnmountNativeBridgeAdmission =
     record.operation === 'unmount'
       ? consumePrivateUnmountNativeBridgeAdmissionForRequest(
@@ -6117,6 +6415,9 @@ function consumeRootExecutionResult(record, result, handoff) {
       record.privateUnmountDeletionCommitHandoff,
     privateUnmountDeletionCommitHandoffAvailable:
       record.privateUnmountDeletionCommitHandoffAvailable,
+    privateUpdateNativeBridgeAdmission,
+    privateUpdateNativeBridgeAdmissionAvailable:
+      record.privateUpdateNativeBridgeAdmissionAvailable,
     privateUnmountNativeBridgeAdmission,
     privateUnmountNativeBridgeAdmissionAvailable:
       record.privateUnmountNativeBridgeAdmissionAvailable,
@@ -6131,7 +6432,7 @@ function consumeRootExecutionResult(record, result, handoff) {
     nativeExecution: result.nativeExecution === true,
     rustExecution: result.rustExecution === false ? false : true,
     reconcilerExecution: record.scheduled,
-    hostOutputProduced: false,
+    hostOutputProduced: privateUpdateNativeBridgeAdmission !== null,
     serializationAvailable: false,
     publicRouteAvailable: false,
     publicCreateUpdateUnmountBehaviorAvailable: false,
