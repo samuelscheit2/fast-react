@@ -4130,7 +4130,9 @@ pub struct TestRendererRootWorkLoopFinishedWorkPreflightDiagnostics {
     resulting_element: RootElementHandle,
     scheduled_update_kind: TestRendererRootUpdateKind,
     render_lanes_empty: bool,
+    render_lanes_bits: u32,
     remaining_lanes_empty: bool,
+    remaining_lanes_bits: u32,
     finished_work_matches_render_phase: bool,
     records_accepted_finished_work_metadata: bool,
     public_create_behavior_available: bool,
@@ -4186,8 +4188,18 @@ impl TestRendererRootWorkLoopFinishedWorkPreflightDiagnostics {
     }
 
     #[must_use]
+    pub const fn render_lanes_bits(self) -> u32 {
+        self.render_lanes_bits
+    }
+
+    #[must_use]
     pub const fn remaining_lanes_empty(self) -> bool {
         self.remaining_lanes_empty
+    }
+
+    #[must_use]
+    pub const fn remaining_lanes_bits(self) -> u32 {
+        self.remaining_lanes_bits
     }
 
     #[must_use]
@@ -4563,9 +4575,15 @@ pub struct TestRendererPrivateCreateNativeBridgeHostOutputHandoff {
     render_finished_work: TestRendererFiberHandleDiagnostics,
     commit_current: TestRendererFiberHandleDiagnostics,
     work_loop_finished_work_preflight: TestRendererRootWorkLoopFinishedWorkPreflightDiagnostics,
+    render_lanes_bits: u32,
+    commit_finished_lanes_bits: u32,
+    commit_remaining_lanes_bits: u32,
+    commit_pending_lanes_bits: u32,
     render_finished_work_matches_create_route_preflight: bool,
     commit_current_matches_render_finished_work: bool,
+    commit_lanes_match_render_lanes: bool,
     minimal_tree_host_output_consumes_root_finished_work: bool,
+    minimal_tree_host_output_consumes_root_finished_lanes: bool,
     create_route_admission_accepted: bool,
     host_output_handoff_accepted: bool,
     actual_rust_create_host_output_handoff: bool,
@@ -4665,6 +4683,26 @@ impl TestRendererPrivateCreateNativeBridgeHostOutputHandoff {
     }
 
     #[must_use]
+    pub const fn render_lanes_bits(self) -> u32 {
+        self.render_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn commit_finished_lanes_bits(self) -> u32 {
+        self.commit_finished_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn commit_remaining_lanes_bits(self) -> u32 {
+        self.commit_remaining_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn commit_pending_lanes_bits(self) -> u32 {
+        self.commit_pending_lanes_bits
+    }
+
+    #[must_use]
     pub const fn render_finished_work_matches_create_route_preflight(self) -> bool {
         self.render_finished_work_matches_create_route_preflight
     }
@@ -4675,8 +4713,18 @@ impl TestRendererPrivateCreateNativeBridgeHostOutputHandoff {
     }
 
     #[must_use]
+    pub const fn commit_lanes_match_render_lanes(self) -> bool {
+        self.commit_lanes_match_render_lanes
+    }
+
+    #[must_use]
     pub const fn minimal_tree_host_output_consumes_root_finished_work(self) -> bool {
         self.minimal_tree_host_output_consumes_root_finished_work
+    }
+
+    #[must_use]
+    pub const fn minimal_tree_host_output_consumes_root_finished_lanes(self) -> bool {
+        self.minimal_tree_host_output_consumes_root_finished_lanes
     }
 
     #[must_use]
@@ -11293,7 +11341,9 @@ impl TestRendererRoot {
                 resulting_element: render.resulting_element(),
                 scheduled_update_kind,
                 render_lanes_empty: render.render_lanes().is_empty(),
+                render_lanes_bits: render.render_lanes().bits(),
                 remaining_lanes_empty: render.remaining_lanes().is_empty(),
+                remaining_lanes_bits: render.remaining_lanes().bits(),
                 finished_work_matches_render_phase: finished_work == render.work_in_progress(),
                 records_accepted_finished_work_metadata: true,
                 public_create_behavior_available: false,
@@ -11400,7 +11450,9 @@ impl TestRendererRoot {
                 resulting_element: render.resulting_element(),
                 scheduled_update_kind,
                 render_lanes_empty: render.render_lanes().is_empty(),
+                render_lanes_bits: render.render_lanes().bits(),
                 remaining_lanes_empty: render.remaining_lanes().is_empty(),
+                remaining_lanes_bits: render.remaining_lanes().bits(),
                 finished_work_matches_render_phase: finished_work == render.work_in_progress(),
                 records_accepted_finished_work_metadata: true,
                 public_create_behavior_available: false,
@@ -11573,6 +11625,8 @@ impl TestRendererRoot {
 
         let render_finished_work_handle = output.render().finished_work();
         let commit_current_handle = output.commit().current();
+        let render_lanes_bits = output.render().render_lanes().bits();
+        let commit_finished_lanes_bits = output.commit().finished_lanes().bits();
         let render_finished_work = TestRendererFiberHandleDiagnostics {
             arena_id: render_finished_work_handle.arena_id().get(),
             slot: render_finished_work_handle.slot().get(),
@@ -11603,10 +11657,16 @@ impl TestRendererRoot {
             render_finished_work,
             commit_current,
             work_loop_finished_work_preflight,
+            render_lanes_bits,
+            commit_finished_lanes_bits,
+            commit_remaining_lanes_bits: output.commit().remaining_lanes().bits(),
+            commit_pending_lanes_bits: output.commit().pending_lanes().bits(),
             render_finished_work_matches_create_route_preflight: render_finished_work
                 == work_loop_finished_work_preflight.finished_work(),
             commit_current_matches_render_finished_work: commit_current == render_finished_work,
+            commit_lanes_match_render_lanes: commit_finished_lanes_bits == render_lanes_bits,
             minimal_tree_host_output_consumes_root_finished_work: true,
+            minimal_tree_host_output_consumes_root_finished_lanes: true,
             create_route_admission_accepted: true,
             host_output_handoff_accepted: true,
             actual_rust_create_host_output_handoff: true,
@@ -11710,6 +11770,18 @@ impl TestRendererRoot {
                 .into(),
             );
         }
+        if render.render_lanes().is_empty()
+            || commit.finished_lanes() != render.render_lanes()
+            || !commit.remaining_lanes().is_empty()
+            || !commit.pending_lanes().is_empty()
+        {
+            return Err(
+                TestRendererPrivateCreateRouteAdmissionError::StaleCreateHostOutputHandoff {
+                    reason: "commit-finished-lanes-render-lanes-mismatch",
+                }
+                .into(),
+            );
+        }
         let work_loop_finished_work_preflight = admission.work_loop_finished_work_preflight();
         let render_finished_work = TestRendererFiberHandleDiagnostics {
             arena_id: render.finished_work().arena_id().get(),
@@ -11720,6 +11792,17 @@ impl TestRendererRoot {
             return Err(
                 TestRendererPrivateCreateRouteAdmissionError::StaleCreateHostOutputHandoff {
                     reason: "create-route-admission-finished-work-mismatch",
+                }
+                .into(),
+            );
+        }
+        if work_loop_finished_work_preflight.render_lanes_bits() != render.render_lanes().bits()
+            || work_loop_finished_work_preflight.remaining_lanes_bits()
+                != render.remaining_lanes().bits()
+        {
+            return Err(
+                TestRendererPrivateCreateRouteAdmissionError::StaleCreateHostOutputHandoff {
+                    reason: "create-route-admission-finished-lanes-mismatch",
                 }
                 .into(),
             );
@@ -20987,7 +21070,9 @@ mod tests {
             TestRendererRootUpdateKind::Create
         );
         assert!(!work_loop_preflight.render_lanes_empty());
+        assert_ne!(work_loop_preflight.render_lanes_bits(), 0);
         assert!(work_loop_preflight.remaining_lanes_empty());
+        assert_eq!(work_loop_preflight.remaining_lanes_bits(), 0);
         assert!(work_loop_preflight.finished_work_matches_render_phase());
         assert!(work_loop_preflight.records_accepted_finished_work_metadata());
         assert_ne!(
@@ -21358,9 +21443,24 @@ mod tests {
             handoff.work_loop_finished_work_preflight(),
             admission.work_loop_finished_work_preflight()
         );
+        assert_ne!(handoff.render_lanes_bits(), 0);
+        assert_eq!(
+            handoff.render_lanes_bits(),
+            admission
+                .work_loop_finished_work_preflight()
+                .render_lanes_bits()
+        );
+        assert_eq!(
+            handoff.commit_finished_lanes_bits(),
+            handoff.render_lanes_bits()
+        );
+        assert_eq!(handoff.commit_remaining_lanes_bits(), 0);
+        assert_eq!(handoff.commit_pending_lanes_bits(), 0);
         assert!(handoff.render_finished_work_matches_create_route_preflight());
         assert!(handoff.commit_current_matches_render_finished_work());
+        assert!(handoff.commit_lanes_match_render_lanes());
         assert!(handoff.minimal_tree_host_output_consumes_root_finished_work());
+        assert!(handoff.minimal_tree_host_output_consumes_root_finished_lanes());
         assert!(handoff.create_route_admission_accepted());
         assert!(handoff.host_output_handoff_accepted());
         assert!(handoff.actual_rust_create_host_output_handoff());
@@ -21468,6 +21568,56 @@ mod tests {
             error.as_ref(),
             TestRendererPrivateCreateRouteAdmissionError::StaleCreateHostOutputHandoff {
                 reason: "create-route-admission-finished-work-mismatch"
+            }
+        ));
+    }
+
+    #[test]
+    fn root_private_create_native_bridge_handoff_rejects_mismatched_finished_lanes_preflight() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let input = TestRendererRootCreatePreflightInputShape::host_component_with_text_child(
+            output.render().resulting_element(),
+            "span",
+        );
+        let preflight = root
+            .describe_private_root_create_preflight_from_render_for_canary(
+                input,
+                TestRendererRootCreatePreflightCanaryApiIdentity::current(),
+                Some(TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current()),
+                output.render(),
+            )
+            .unwrap();
+        let mut admission = TestRendererRoot::describe_private_create_route_admission_for_canary(
+            Some(preflight),
+            Some(TestRendererPrivateCreateRouteAdmissionMetadata::current()),
+        )
+        .unwrap();
+        admission
+            .work_loop_finished_work_preflight
+            .render_lanes_bits += 1;
+
+        let error = root
+            .describe_private_create_native_bridge_host_output_handoff_for_canary(
+                &admission, &output,
+            )
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateCreateRouteAdmission(error) = error else {
+            panic!("expected create-route admission error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateCreateRouteAdmissionError::StaleCreateHostOutputHandoff {
+                reason: "create-route-admission-finished-lanes-mismatch"
             }
         ));
     }

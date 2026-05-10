@@ -968,6 +968,10 @@ const privateSerializationFinishedWorkIdentityDiagnosticName =
   'fast-react-test-renderer.serialization.private-finished-work-identity';
 const privateSerializationFinishedWorkIdentityStatus =
   'private-serialization-finished-work-identity-validated-public-serialization-blocked';
+const privateRootFinishedLanesHandoffDiagnosticName =
+  'react-test-renderer-root-finished-lanes-handoff-private-diagnostic';
+const privateRootFinishedLanesHandoffStatus =
+  'private-root-finished-work-lanes-handoff-public-serialization-native-blocked';
 const privateToJSONUnmountHostOutputRowId =
   'react-test-renderer-tojson-unmount-host-output-private-diagnostic';
 const privateToJSONUpdateUnmountRowStatus =
@@ -1006,6 +1010,13 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
     privateSerializationFinishedWorkIdentityStatus,
   consumesCommittedHostRootFinishedWorkIdentity: true,
   consumesCommittedHostRootFinishedWorkLanes: true,
+  privateRootFinishedLanesHandoffGateAvailable: true,
+  privateRootFinishedLanesHandoffDiagnosticName,
+  privateRootFinishedLanesHandoffStatus,
+  requiresRootFinishedLanesHandoffEvidence: true,
+  rejectsMissingRootFinishedLanesHandoff: true,
+  rejectsStaleRootFinishedLanesHandoff: true,
+  rejectsPublicNativePackageRootFinishedLanesHandoffClaims: true,
   acceptedUnmountFinishedWorkIdentityWorker:
     'worker-733-test-renderer-unmount-finished-work-identity',
   acceptedUnmountHostOutputUpdateKindForFinishedWorkIdentity: 'Unmount',
@@ -1203,6 +1214,13 @@ const toTreePrivateFacadeGate = Object.freeze({
     privateSerializationFinishedWorkIdentityStatus,
   consumesCommittedHostRootFinishedWorkIdentity: true,
   consumesCommittedHostRootFinishedWorkLanes: true,
+  privateRootFinishedLanesHandoffGateAvailable: true,
+  privateRootFinishedLanesHandoffDiagnosticName,
+  privateRootFinishedLanesHandoffStatus,
+  requiresRootFinishedLanesHandoffEvidence: true,
+  rejectsMissingRootFinishedLanesHandoff: true,
+  rejectsStaleRootFinishedLanesHandoff: true,
+  rejectsPublicNativePackageRootFinishedLanesHandoffClaims: true,
   acceptedUnmountFinishedWorkIdentityWorker:
     'worker-733-test-renderer-unmount-finished-work-identity',
   acceptedUnmountHostOutputUpdateKindForFinishedWorkIdentity: 'Unmount',
@@ -4061,6 +4079,10 @@ function createPrivateToJSONSerializationFacade(rootRequest) {
       privateSerializationFinishedWorkIdentityStatus,
     consumesCommittedHostRootFinishedWorkIdentity: true,
     consumesCommittedHostRootFinishedWorkLanes: true,
+    privateRootFinishedLanesHandoffGateAvailable: true,
+    privateRootFinishedLanesHandoffDiagnosticName,
+    privateRootFinishedLanesHandoffStatus,
+    requiresRootFinishedLanesHandoffEvidence: true,
     publicSerializationAvailable: false,
     publicRouteAvailable: false,
     nativeBridgeAvailable: false,
@@ -4178,6 +4200,10 @@ function createPrivateToTreeFacade(rootRequest) {
       privateSerializationFinishedWorkIdentityStatus,
     consumesCommittedHostRootFinishedWorkIdentity: true,
     consumesCommittedHostRootFinishedWorkLanes: true,
+    privateRootFinishedLanesHandoffGateAvailable: true,
+    privateRootFinishedLanesHandoffDiagnosticName,
+    privateRootFinishedLanesHandoffStatus,
+    requiresRootFinishedLanesHandoffEvidence: true,
     publicTreeAvailable: false,
     publicRouteAvailable: false,
     nativeBridgeAvailable: false,
@@ -4719,6 +4745,13 @@ function createPrivateSerializationFinishedWorkIdentityGateResult(
       'Private serialization finished-work identity belongs to a foreign root.'
     );
   }
+  const rootFinishedLanesHandoff =
+    validatePrivateRootFinishedLanesHandoffEvidence(
+      publicSurface,
+      identityRootRequest,
+      normalized,
+      evidence
+    );
   const unmountHandoffIdentity =
     normalized.hostOutputUpdateKind === 'Unmount'
       ? validatePrivateSerializationUnmountHandoffIdentity(
@@ -4820,6 +4853,12 @@ function createPrivateSerializationFinishedWorkIdentityGateResult(
     rootRequestUpdateKind: identityRootRequest.updateKind,
     rootId: identityRootRequest.rootId,
     hostOutputUpdateKind: normalized.hostOutputUpdateKind,
+    rootFinishedLanesHandoff,
+    rootFinishedLanesHandoffDiagnosticName:
+      rootFinishedLanesHandoff.diagnosticName,
+    rootFinishedLanesHandoffStatus: rootFinishedLanesHandoff.status,
+    rootFinishedLanesHandoffAccepted: true,
+    consumesPrivateRootFinishedLanesHandoffGate: true,
     ...(unmountHandoffIdentity === null
       ? {}
       : {
@@ -4905,6 +4944,403 @@ function rootRequestOperationForHostOutputUpdateKind(
         'Private serialization finished-work identity host output update kind is not accepted.'
       );
   }
+}
+
+function validatePrivateRootFinishedLanesHandoffEvidence(
+  publicSurface,
+  identityRootRequest,
+  identity,
+  evidence
+) {
+  if (
+    evidence === null ||
+    typeof evidence !== 'object' ||
+    !Object.hasOwn(evidence, 'rootFinishedLanesHandoff')
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Expected canonical private rootFinishedLanesHandoff evidence.'
+    );
+  }
+  const handoff = evidence.rootFinishedLanesHandoff;
+  assertPrivateRootFinishedLanesHandoffRecord(
+    publicSurface,
+    handoff,
+    'Expected private root finished_work/finished_lanes handoff evidence.'
+  );
+
+  const normalized = freezeRecord({
+    diagnosticName: readPrivateRootFinishedLanesHandoffRequiredString(
+      publicSurface,
+      handoff,
+      ['diagnosticName', 'diagnostic_name', 'diagnosticId', 'diagnostic_id', 'id'],
+      'diagnostic id'
+    ),
+    status: readPrivateRootFinishedLanesHandoffRequiredString(
+      publicSurface,
+      handoff,
+      ['status'],
+      'status'
+    ),
+    rootRequestId: readPrivateRootFinishedLanesHandoffRequiredField(
+      publicSurface,
+      handoff,
+      ['rootRequestId', 'root_request_id', 'requestId', 'request_id'],
+      'request id'
+    ),
+    rootRequestSequence:
+      readPrivateRootFinishedLanesHandoffRequiredNonNegativeInteger(
+        publicSurface,
+        handoff,
+        [
+          'rootRequestSequence',
+          'root_request_sequence',
+          'requestSequence',
+          'request_sequence'
+        ],
+        'request sequence'
+      ),
+    rootId: readPrivateRootFinishedLanesHandoffRequiredField(
+      publicSurface,
+      handoff,
+      ['rootId', 'root_id', 'root'],
+      'root id'
+    ),
+    operation: readPrivateRootFinishedLanesHandoffRequiredString(
+      publicSurface,
+      handoff,
+      ['operation', 'rootOperation', 'root_operation'],
+      'operation'
+    ),
+    updateKind: readPrivateRootFinishedLanesHandoffRequiredString(
+      publicSurface,
+      handoff,
+      ['updateKind', 'update_kind', 'scheduledUpdateKind'],
+      'update kind'
+    ),
+    hostOutputUpdateKind: readPrivateRootFinishedLanesHandoffRequiredString(
+      publicSurface,
+      handoff,
+      ['hostOutputUpdateKind', 'host_output_update_kind'],
+      'host output update kind'
+    ),
+    renderCurrent: normalizePrivateSerializationFinishedWorkHandle(
+      publicSurface,
+      readPrivateRootFinishedLanesHandoffRequiredField(
+        publicSurface,
+        handoff,
+        ['renderCurrent', 'render_current'],
+        'render current'
+      ),
+      'rootFinishedLanesHandoff.renderCurrent'
+    ),
+    renderFinishedWork: normalizePrivateSerializationFinishedWorkHandle(
+      publicSurface,
+      readPrivateRootFinishedLanesHandoffRequiredField(
+        publicSurface,
+        handoff,
+        ['renderFinishedWork', 'render_finished_work', 'finishedWork', 'finished_work'],
+        'render finished_work'
+      ),
+      'rootFinishedLanesHandoff.renderFinishedWork'
+    ),
+    commitPreviousCurrent: normalizePrivateSerializationFinishedWorkHandle(
+      publicSurface,
+      readPrivateRootFinishedLanesHandoffRequiredField(
+        publicSurface,
+        handoff,
+        ['commitPreviousCurrent', 'commit_previous_current'],
+        'commit previous current'
+      ),
+      'rootFinishedLanesHandoff.commitPreviousCurrent'
+    ),
+    commitCurrent: normalizePrivateSerializationFinishedWorkHandle(
+      publicSurface,
+      readPrivateRootFinishedLanesHandoffRequiredField(
+        publicSurface,
+        handoff,
+        ['commitCurrent', 'commit_current'],
+        'commit current'
+      ),
+      'rootFinishedLanesHandoff.commitCurrent'
+    ),
+    renderLanesBits: readPrivateRootFinishedLanesHandoffRequiredNonNegativeInteger(
+      publicSurface,
+      handoff,
+      ['renderLanesBits', 'render_lanes_bits'],
+      'render lanes bits'
+    ),
+    commitFinishedLanesBits:
+      readPrivateRootFinishedLanesHandoffRequiredNonNegativeInteger(
+        publicSurface,
+        handoff,
+        ['commitFinishedLanesBits', 'commit_finished_lanes_bits', 'finishedLanesBits', 'finished_lanes_bits'],
+        'commit finished lanes bits'
+      ),
+    commitRemainingLanesBits:
+      readPrivateRootFinishedLanesHandoffRequiredNonNegativeInteger(
+        publicSurface,
+        handoff,
+        ['commitRemainingLanesBits', 'commit_remaining_lanes_bits'],
+        'commit remaining lanes bits'
+      ),
+    commitPendingLanesBits:
+      readPrivateRootFinishedLanesHandoffRequiredNonNegativeInteger(
+        publicSurface,
+        handoff,
+        ['commitPendingLanesBits', 'commit_pending_lanes_bits'],
+        'commit pending lanes bits'
+      ),
+    commitCurrentMatchesRenderFinishedWork:
+      readPrivateRootFinishedLanesHandoffRequiredBoolean(
+        publicSurface,
+        handoff,
+        [
+          'commitCurrentMatchesRenderFinishedWork',
+          'commit_current_matches_render_finished_work'
+        ],
+        'commit current finished_work match'
+      ),
+    commitPreviousCurrentMatchesRenderCurrent:
+      readPrivateRootFinishedLanesHandoffRequiredBoolean(
+        publicSurface,
+        handoff,
+        [
+          'commitPreviousCurrentMatchesRenderCurrent',
+          'commit_previous_current_matches_render_current'
+        ],
+        'commit previous current render current match'
+      ),
+    commitLanesMatchRenderLanes:
+      readPrivateRootFinishedLanesHandoffRequiredBoolean(
+        publicSurface,
+        handoff,
+        ['commitLanesMatchRenderLanes', 'commit_lanes_match_render_lanes'],
+        'finished lanes render lanes match'
+      ),
+    consumesFinishedWork: readPrivateRootFinishedLanesHandoffRequiredBoolean(
+      publicSurface,
+      handoff,
+      ['consumesFinishedWork', 'consumes_finished_work'],
+      'finished_work consumption marker'
+    ),
+    consumesFinishedLanes: readPrivateRootFinishedLanesHandoffRequiredBoolean(
+      publicSurface,
+      handoff,
+      ['consumesFinishedLanes', 'consumes_finished_lanes'],
+      'finished_lanes consumption marker'
+    ),
+    publicSerializationAvailable:
+      readPrivateRootFinishedLanesHandoffRequiredBoolean(
+        publicSurface,
+        handoff,
+        ['publicSerializationAvailable', 'public_serialization_available'],
+        'public serialization marker'
+      ),
+    publicRouteAvailable: readPrivateRootFinishedLanesHandoffRequiredBoolean(
+      publicSurface,
+      handoff,
+      ['publicRouteAvailable', 'public_route_available'],
+      'public route marker'
+    ),
+    nativeBridgeAvailable: readPrivateRootFinishedLanesHandoffRequiredBoolean(
+      publicSurface,
+      handoff,
+      ['nativeBridgeAvailable', 'native_bridge_available'],
+      'native bridge marker'
+    ),
+    nativeExecution: readPrivateRootFinishedLanesHandoffRequiredBoolean(
+      publicSurface,
+      handoff,
+      ['nativeExecution', 'native_execution'],
+      'native execution marker'
+    ),
+    packageCompatibilityClaimed:
+      readPrivateRootFinishedLanesHandoffRequiredBoolean(
+        publicSurface,
+        handoff,
+        [
+          'packageCompatibilityClaimed',
+          'package_compatibility_claimed'
+        ],
+        'package compatibility marker'
+      ),
+    compatibilityClaimed: readPrivateRootFinishedLanesHandoffRequiredBoolean(
+      publicSurface,
+      handoff,
+      ['compatibilityClaimed', 'compatibility_claimed'],
+      'compatibility marker'
+    )
+  });
+
+  if (
+    normalized.diagnosticName !== privateRootFinishedLanesHandoffDiagnosticName ||
+    normalized.status !== privateRootFinishedLanesHandoffStatus ||
+    normalized.rootRequestId !== identityRootRequest.requestId ||
+    normalized.rootRequestSequence !== identityRootRequest.requestSequence ||
+    normalized.rootId !== identityRootRequest.rootId ||
+    normalized.operation !== identityRootRequest.operation ||
+    normalized.updateKind !== identityRootRequest.updateKind ||
+    normalized.hostOutputUpdateKind !== identity.hostOutputUpdateKind
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private root finished_work/finished_lanes handoff does not match the private root request.'
+    );
+  }
+  if (
+    !privateSerializationFinishedWorkHandlesEqual(
+      normalized.renderCurrent,
+      identity.renderCurrent
+    ) ||
+    !privateSerializationFinishedWorkHandlesEqual(
+      normalized.renderFinishedWork,
+      identity.renderFinishedWork
+    ) ||
+    !privateSerializationFinishedWorkHandlesEqual(
+      normalized.commitPreviousCurrent,
+      identity.commitPreviousCurrent
+    ) ||
+    !privateSerializationFinishedWorkHandlesEqual(
+      normalized.commitCurrent,
+      identity.commitCurrent
+    ) ||
+    normalized.commitCurrentMatchesRenderFinishedWork !== true ||
+    normalized.commitPreviousCurrentMatchesRenderCurrent !== true ||
+    normalized.consumesFinishedWork !== true
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private root finished_work handoff does not match the committed HostRoot identity.'
+    );
+  }
+  if (
+    normalized.renderLanesBits <= 0 ||
+    normalized.renderLanesBits !== identity.renderLanesBits ||
+    normalized.commitFinishedLanesBits !== identity.commitFinishedLanesBits ||
+    normalized.commitRemainingLanesBits !== identity.commitRemainingLanesBits ||
+    normalized.commitPendingLanesBits !== identity.commitPendingLanesBits ||
+    normalized.commitLanesMatchRenderLanes !== true ||
+    normalized.consumesFinishedLanes !== true
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private root finished_lanes handoff does not match the committed HostRoot lanes.'
+    );
+  }
+  if (
+    normalized.publicSerializationAvailable !== false ||
+    normalized.publicRouteAvailable !== false ||
+    normalized.nativeBridgeAvailable !== false ||
+    normalized.nativeExecution !== false ||
+    normalized.packageCompatibilityClaimed !== false ||
+    normalized.compatibilityClaimed !== false
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private root finished_work/finished_lanes handoff cannot open public, native, or package compatibility.'
+    );
+  }
+
+  return normalized;
+}
+
+function assertPrivateRootFinishedLanesHandoffRecord(
+  publicSurface,
+  value,
+  message
+) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throwPrivateSerializationFinishedWorkIdentityError(publicSurface, message);
+  }
+}
+
+function readPrivateRootFinishedLanesHandoffField(record, names) {
+  for (const name of names) {
+    if (Object.hasOwn(record, name)) {
+      return record[name];
+    }
+  }
+  return undefined;
+}
+
+function readPrivateRootFinishedLanesHandoffRequiredField(
+  publicSurface,
+  record,
+  names,
+  label
+) {
+  const value = readPrivateRootFinishedLanesHandoffField(record, names);
+  if (value === undefined) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      `Expected private root finished_work/finished_lanes handoff ${label}.`
+    );
+  }
+  return value;
+}
+
+function readPrivateRootFinishedLanesHandoffRequiredString(
+  publicSurface,
+  record,
+  names,
+  label
+) {
+  const value = readPrivateRootFinishedLanesHandoffRequiredField(
+    publicSurface,
+    record,
+    names,
+    label
+  );
+  if (typeof value !== 'string') {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      `Expected private root finished_work/finished_lanes handoff ${label} string.`
+    );
+  }
+  return value;
+}
+
+function readPrivateRootFinishedLanesHandoffRequiredBoolean(
+  publicSurface,
+  record,
+  names,
+  label
+) {
+  const value = readPrivateRootFinishedLanesHandoffRequiredField(
+    publicSurface,
+    record,
+    names,
+    label
+  );
+  if (typeof value !== 'boolean') {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      `Expected private root finished_work/finished_lanes handoff ${label} boolean.`
+    );
+  }
+  return value;
+}
+
+function readPrivateRootFinishedLanesHandoffRequiredNonNegativeInteger(
+  publicSurface,
+  record,
+  names,
+  label
+) {
+  const value = readPrivateRootFinishedLanesHandoffRequiredField(
+    publicSurface,
+    record,
+    names,
+    label
+  );
+  if (!Number.isInteger(value) || value < 0) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      `Expected private root finished_work/finished_lanes handoff ${label} non-negative integer.`
+    );
+  }
+  return value;
 }
 
 function validatePrivateSerializationUnmountHandoffIdentity(
