@@ -66,6 +66,7 @@ const rootBoundarySideEffects = freezeRecord({
   ...internalsGate.resourceHintFakeDomAdapterSideEffects,
   ...internalsGate.resourceHintFakeDomInsertionBlockedSideEffects,
   ...internalsGate.resourceHintHeadBoundaryBlockedSideEffects,
+  ...internalsGate.resourceHintHeadClearRetainBlockedSideEffects,
   ...internalsGate.controlledInputValueTrackerSideEffects,
   privateRootBridgeExecuted: false,
   publicRootFacadeCreated: false,
@@ -452,6 +453,19 @@ function describeResourceHintFakeDomAdapterBoundary(behaviorArea) {
     fakeHeadBoundaryInvoked: false,
     fakeHeadInsertionObserved: false,
     fakeHeadUpdateApplied: false,
+    fakeHeadClearRetainDiagnosticInvoked: false,
+    fakeHeadRetainPolicyEvaluated: false,
+    fakeHeadChildrenScanned: false,
+    fakeHeadClearableChildrenObserved: false,
+    fakeHeadRetainedChildrenObserved: false,
+    fakeHeadChildRemoved: false,
+    fakeHeadChildRetained: false,
+    resourceHintClearRetainRowsRecorded: false,
+    singletonClearRetainRowsRecorded: false,
+    stylesheetPrecedenceBlockedCapabilitiesRecorded: false,
+    stylesheetPrecedenceOrderQueried: false,
+    stylesheetPrecedenceOrderMutated: false,
+    publicStylesheetPrecedenceBehavior: false,
     resourceFetchStarted: false,
     realDocumentMutated: false,
     publicResourceHintDomInsertion: false,
@@ -460,7 +474,9 @@ function describeResourceHintFakeDomAdapterBoundary(behaviorArea) {
     insertionGate:
       internalsGate.describePrivateResourceHintFakeDomInsertionGate(),
     headBoundaryGate:
-      internalsGate.describePrivateResourceHintHeadBoundaryGate()
+      internalsGate.describePrivateResourceHintHeadBoundaryGate(),
+    headClearRetainGate:
+      internalsGate.describePrivateResourceHintHeadClearRetainGate()
   });
 }
 

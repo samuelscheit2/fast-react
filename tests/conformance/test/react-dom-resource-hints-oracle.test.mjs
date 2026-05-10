@@ -360,6 +360,10 @@ test("private fake-DOM insertion diagnostics stay separate from public resource 
     resourceFormGate.createResourceHintHeadBoundaryGate({
       requestIdPrefix: "resource-conformance-head-boundary"
     });
+  const headClearRetainGate =
+    resourceFormGate.createResourceHintHeadClearRetainGate({
+      requestIdPrefix: "resource-conformance-head-clear-retain"
+    });
   const fakeDom = createDeterministicResourceHintDom();
   const dispatcherRecord = dispatcherGate.recordResourceHintDispatcherRequest(
     "C",
@@ -391,6 +395,21 @@ test("private fake-DOM insertion diagnostics stay separate from public resource 
       explicitBoundary: true,
       boundaryKind:
         "deterministic-fake-dom-head-singleton-insertion-update",
+      targetKind: "document-head",
+      hostTag: "head",
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head
+    }
+  );
+  const stylesheet = fakeDom.document.createElement("link");
+  stylesheet.setAttribute("rel", "stylesheet");
+  stylesheet.setAttribute("data-precedence", "theme");
+  fakeDom.head.appendChild(stylesheet);
+  const clearRetain = headClearRetainGate.recordHeadClearRetainDiagnostic(
+    headBoundary,
+    {
+      explicitClearRetain: true,
+      clearRetainKind: "deterministic-fake-dom-head-clear-retain",
       targetKind: "document-head",
       hostTag: "head",
       fakeDocument: fakeDom.document,
@@ -453,11 +472,55 @@ test("private fake-DOM insertion diagnostics stay separate from public resource 
     headBoundary.resourceElementPlan.updateAttributeNames[0],
     "data-fast-react-head-boundary"
   );
+  assert.equal(
+    clearRetain.clearRetainStatus,
+    resourceFormGate.privateResourceHintHeadClearRetainStatus
+  );
+  assert.equal(
+    clearRetain.executionStatus,
+    resourceFormGate.privateResourceHintHeadClearRetainExecutionStatus
+  );
+  assert.equal(clearRetain.singletonRows[0].rowType, "host-singleton");
+  assert.equal(clearRetain.singletonRows[0].retainedChildCount, 1);
+  assert.equal(clearRetain.singletonRows[0].clearableChildCount, 1);
+  assert.equal(clearRetain.resourceHintRows[0].rowType, "resource-hint");
+  assert.equal(clearRetain.resourceHintRows[0].contractId, "preconnect");
+  assert.equal(
+    clearRetain.resourceHintRows[0].clearRetainDecision,
+    "clear"
+  );
+  assert.equal(
+    clearRetain.resourceHintRows[0].resourceHoistableRetentionBlocked,
+    true
+  );
+  assert.equal(clearRetain.sideEffects.fakeHeadChildrenScanned, true);
+  assert.equal(clearRetain.sideEffects.fakeHeadMutated, false);
+  assert.equal(clearRetain.sideEffects.headChildrenCleared, false);
+  assert.equal(
+    clearRetain.stylesheetPrecedenceBoundary.status,
+    resourceFormGate.privateResourceHintHeadStylesheetPrecedenceBlockedStatus
+  );
+  assert.equal(
+    clearRetain.stylesheetPrecedenceBoundary.stylesheetPrecedenceRowsObserved,
+    true
+  );
+  assert.deepEqual(
+    clearRetain.stylesheetPrecedenceBoundary.blockedCapabilities,
+    resourceFormGate.resourceHintHeadStylesheetPrecedenceBlockedCapabilities
+  );
+  assert.deepEqual(
+    clearRetain.blockedCapabilities,
+    resourceFormGate.resourceHintHeadClearRetainBlockedCapabilities
+  );
+  assert.equal(clearRetain.publicHeadBoundary.headChildrenCleared, false);
+  assert.equal(clearRetain.publicHeadBoundary.publicSingletonBehavior, false);
   assert.equal(JSON.stringify(insertion).includes("connect.example"), false);
   assert.equal(
     JSON.stringify(headBoundary).includes("connect.example"),
     false
   );
+  assert.equal(JSON.stringify(clearRetain).includes("connect.example"), false);
+  assert.equal(JSON.stringify(clearRetain).includes("theme"), false);
   assert.equal(
     oracle.intentionalGaps.some(
       (gap) => gap.id === "no-dom-or-server-rendering-resource-effects"
