@@ -915,6 +915,19 @@ export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ADMISSIONS =
         "Worker 512 accepted only the symbol-private react-dom/client facade unmount cleanup diagnostic that clears fake-DOM host output and root markers without opening public root unmount compatibility."
     }),
     Object.freeze({
+      metadataId: "worker-674-public-facade-unmount-ref-passive-cleanup",
+      workerId: "674",
+      category: "host-output",
+      scenarioId: "root-unmount",
+      admission: "private-react-dom-metadata-diagnostic",
+      gateStatus:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS,
+      evidenceKind:
+        "private-root-public-facade-unmount-ref-passive-cleanup",
+      reason:
+        "Worker 674 accepted only the symbol-private react-dom/client facade root.unmount cleanup diagnostic that links one fake-DOM host tree to ref detach and passive destroy metadata while public root unmount compatibility remains blocked."
+    }),
+    Object.freeze({
       metadataId: "worker-513-event-type-dispatch-canary",
       workerId: "513",
       category: "event",
@@ -6657,6 +6670,13 @@ function runPrivateReactDomMetadataDiagnostic({ admission, mode, modules }) {
             modules
           });
         break;
+      case "worker-674-public-facade-unmount-ref-passive-cleanup":
+        metadataEvidence =
+          runPrivateReactDomMetadataHostOutputUnmountRefPassiveCleanupDiagnostic({
+            mode,
+            modules
+          });
+        break;
       case "worker-513-event-type-dispatch-canary":
         metadataEvidence =
           runPrivateReactDomMetadataEventTypeDispatchDiagnostic({
@@ -8129,6 +8149,120 @@ function runPrivateReactDomMetadataHostOutputUnmountCleanupDiagnostic({
     unmountCleanupStatus: payload.unmountCleanupRecord.cleanupStatus,
     unmountRecordNoOp: unmountRecord.noOp,
     unmountNoOp: diagnostic.unmountNoOp
+  };
+}
+
+function runPrivateReactDomMetadataHostOutputUnmountRefPassiveCleanupDiagnostic({
+  mode,
+  modules
+}) {
+  const document = createPrivateHostOutputDocument({
+    domContainer: modules.domContainer,
+    label: `${mode.id}:metadata-facade-unmount-ref-passive`
+  });
+  const container = document.createElement("div");
+  const descriptor = Object.getOwnPropertyDescriptor(
+    modules.reactDomClient.createRoot,
+    modules.rootBridge.privateRootPublicFacadeAdapterSymbol
+  );
+  const adapter = descriptor.value({
+    publicFacadeHostOutputRenderIdPrefix:
+      `${mode.id}:metadata-facade-unmount-ref-passive-render`,
+    publicFacadeHostOutputUnmountCleanupIdPrefix:
+      `${mode.id}:metadata-facade-unmount-ref-passive-diagnostic`,
+    requestIdPrefix:
+      `${mode.id}:metadata-facade-unmount-ref-passive-request`,
+    rootCommitRefMetadataIdPrefix:
+      `${mode.id}:metadata-facade-unmount-ref-passive-ref-metadata`,
+    rootIdPrefix: `${mode.id}:metadata-facade-unmount-ref-passive-root`,
+    sideEffectIdPrefix:
+      `${mode.id}:metadata-facade-unmount-ref-passive-side-effect`,
+    unmountCleanupIdPrefix:
+      `${mode.id}:metadata-facade-unmount-ref-passive-cleanup`,
+    updateIdPrefix: `${mode.id}:metadata-facade-unmount-ref-passive-update`
+  });
+  let refCallCount = 0;
+  function metadataFacadeUnmountRef() {
+    refCallCount += 1;
+  }
+  const root = adapter.createRoot(container);
+  root.render({
+    privatePassiveDestroy: true,
+    props: {
+      children: "facade cleanup ref passive",
+      id: "facade-cleanup-ref-passive-host",
+      ref: metadataFacadeUnmountRef
+    },
+    type: "section"
+  });
+  const unmountRecord = root.unmount();
+  const [diagnostic] = adapter.getRootHostOutputUnmountCleanupDiagnostics(root);
+  const evidence = diagnostic.unmountRefPassiveEvidence;
+
+  return {
+    acceptedCapabilityIds: diagnostic.acceptedCapabilities.map(
+      (capability) => capability.id
+    ),
+    blockedCapabilityIds: diagnostic.blockedCapabilities.map(
+      (capability) => capability.id
+    ),
+    cleanupSource: diagnostic.cleanupSource,
+    compatibilityClaimed: diagnostic.compatibilityClaimed,
+    containerChildCountAfterUnmount: container.childNodes.length,
+    diagnosticStatus: diagnostic.diagnosticStatus,
+    passiveDestroyEvidence: {
+      compatibilityClaimed:
+        evidence.passiveDestroyEvidence.compatibilityClaimed,
+      destroyCallbackHandlesAccepted:
+        evidence.passiveDestroyEvidence.destroyCallbackHandlesAccepted,
+      invokesDestroyCallbacks:
+        evidence.passiveDestroyEvidence.invokesDestroyCallbacks,
+      invokesDestroyCallbacksUnderTestControl:
+        evidence.passiveDestroyEvidence
+          .invokesDestroyCallbacksUnderTestControl,
+      publicActPassiveDrain:
+        evidence.passiveDestroyEvidence.publicActPassiveDrain,
+      publicEffectExecutionEnabled:
+        evidence.passiveDestroyEvidence.publicEffectExecutionEnabled,
+      publicRootExecution:
+        evidence.passiveDestroyEvidence.publicRootExecution,
+      schedulerDrivenPassiveExecutionEnabled:
+        evidence.passiveDestroyEvidence
+          .schedulerDrivenPassiveExecutionEnabled,
+      status: evidence.passiveDestroyEvidence.status
+    },
+    passiveEffects: diagnostic.passiveEffects,
+    publicRootCompatibilitySurface: diagnostic.publicRootCompatibilitySurface,
+    publicRootExecution: diagnostic.publicRootExecution,
+    publicRootUnmounted: diagnostic.publicRootUnmounted,
+    refCallCount,
+    refDetachEvidence: {
+      attachCount: evidence.refDetachEvidence.attachCount,
+      callbackRefsInvoked: evidence.refDetachEvidence.callbackRefsInvoked,
+      compatibilityClaimed: evidence.refDetachEvidence.compatibilityClaimed,
+      detachCount: evidence.refDetachEvidence.detachCount,
+      detachReason: evidence.refDetachEvidence.detachReason,
+      hostOutputCanary: evidence.refDetachEvidence.hostOutputCanary,
+      objectRefsMutated: evidence.refDetachEvidence.objectRefsMutated,
+      publicRootExecution: evidence.refDetachEvidence.publicRootExecution,
+      refAction: evidence.refDetachEvidence.refAction,
+      rootCommitRefMetadataStatus:
+        evidence.refDetachEvidence.rootCommitRefMetadataStatus,
+      status: evidence.refDetachEvidence.status
+    },
+    refEffects: diagnostic.refEffects,
+    unmountNoOp: diagnostic.unmountNoOp,
+    unmountPassiveDestroyEvidenceAccepted:
+      diagnostic.unmountPassiveDestroyEvidenceAccepted,
+    unmountRecordNoOp: unmountRecord.noOp,
+    unmountRefDetachMetadataAccepted:
+      diagnostic.unmountRefDetachMetadataAccepted,
+    unmountRefPassiveEvidenceAccepted:
+      diagnostic.unmountRefPassiveEvidenceAccepted,
+    unmountRefPassiveEvidenceBeforeHostCleanup:
+      diagnostic.unmountRefPassiveEvidenceBeforeHostCleanup,
+    unmountRefPassiveEvidenceOrder: evidence.order,
+    unmountRefPassiveEvidenceStatus: evidence.status
   };
 }
 
@@ -12857,6 +12991,90 @@ function expectedPrivateReactDomMetadataEvidence(metadataId) {
         unmountRecordNoOp: false,
         unmountNoOp: false
       };
+    case "worker-674-public-facade-unmount-ref-passive-cleanup":
+      return {
+        acceptedCapabilityIds: [
+          "public-facade-create-root-record",
+          "public-facade-root-render-record",
+          "public-facade-root-unmount-record",
+          "root-marker-setup-cleanup",
+          "root-listener-setup-cleanup",
+          "create-render-admission",
+          "fake-dom-host-output-mutation",
+          "fake-dom-unmount-cleanup",
+          "root-unmount-admission-metadata",
+          "fake-dom-container-cleanup-metadata",
+          "component-tree-metadata-detach",
+          "root-facade-metadata-clear",
+          "latest-props-publication",
+          "root-unmount-ref-detach-metadata",
+          "root-unmount-passive-destroy-evidence",
+          "ref-passive-before-host-cleanup-order"
+        ],
+        blockedCapabilityIds: [
+          "public-root-execution",
+          "public-root-unmount",
+          "native-execution",
+          "reconciler-execution",
+          "browser-dom-compatibility",
+          "hydration",
+          "events",
+          "ref-callback-invocation",
+          "passive-effect-execution",
+          "compatibility-claims"
+        ],
+        cleanupSource: "root.unmount",
+        compatibilityClaimed: false,
+        containerChildCountAfterUnmount: 0,
+        diagnosticStatus:
+          "cleaned-private-root-public-facade-host-output-unmount-cleanup-diagnostic",
+        passiveDestroyEvidence: {
+          compatibilityClaimed: false,
+          destroyCallbackHandlesAccepted: true,
+          invokesDestroyCallbacks: false,
+          invokesDestroyCallbacksUnderTestControl: true,
+          publicActPassiveDrain: false,
+          publicEffectExecutionEnabled: false,
+          publicRootExecution: false,
+          schedulerDrivenPassiveExecutionEnabled: false,
+          status:
+            "accepted-private-root-public-facade-unmount-passive-destroy-evidence"
+        },
+        passiveEffects: false,
+        publicRootCompatibilitySurface: false,
+        publicRootExecution: false,
+        publicRootUnmounted: false,
+        refCallCount: 0,
+        refDetachEvidence: {
+          attachCount: 0,
+          callbackRefsInvoked: false,
+          compatibilityClaimed: false,
+          detachCount: 1,
+          detachReason: "deleted",
+          hostOutputCanary: "unmount-host-output",
+          objectRefsMutated: false,
+          publicRootExecution: false,
+          refAction: "detach",
+          rootCommitRefMetadataStatus:
+            "accepted-private-root-commit-ref-metadata",
+          status:
+            "accepted-private-root-public-facade-unmount-ref-detach-metadata"
+        },
+        refEffects: false,
+        unmountNoOp: false,
+        unmountPassiveDestroyEvidenceAccepted: true,
+        unmountRecordNoOp: false,
+        unmountRefDetachMetadataAccepted: true,
+        unmountRefPassiveEvidenceAccepted: true,
+        unmountRefPassiveEvidenceBeforeHostCleanup: true,
+        unmountRefPassiveEvidenceOrder: [
+          "root-unmount-ref-detach-metadata",
+          "root-unmount-passive-destroy-evidence",
+          "fake-dom-host-output-cleanup"
+        ],
+        unmountRefPassiveEvidenceStatus:
+          "accepted-private-root-public-facade-unmount-ref-passive-evidence"
+      };
     case "worker-513-event-type-dispatch-canary":
       return {
         cases: [
@@ -13145,6 +13363,7 @@ function comparablePrivateReactDomMetadataEvidence(metadataId, evidence) {
     case "worker-510-controlled-radio-sibling-props":
     case "worker-511-public-facade-host-output-update":
     case "worker-512-public-facade-unmount-cleanup":
+    case "worker-674-public-facade-unmount-ref-passive-cleanup":
     case "worker-513-event-type-dispatch-canary":
     case "worker-514-portal-event-error-routing":
     case "worker-528-hydration-replay-error-metadata":

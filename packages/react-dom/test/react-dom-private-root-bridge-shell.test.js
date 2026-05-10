@@ -6829,6 +6829,180 @@ test('private react-dom/client facade root.unmount clears active host output met
   });
 });
 
+test('private react-dom/client facade root.unmount links ref detach and passive destroy evidence before cleanup', () => {
+  const document = createDocument('private-client-facade-root-unmount-ref-passive');
+  const container = createElement('DIV', document);
+  const refCalls = [];
+  function privateFacadeUnmountRef(value) {
+    refCalls.push(value);
+  }
+  const element = {
+    privatePassiveDestroy: {
+      destroyCount: 1,
+      metadataOnly: true
+    },
+    props: {
+      children: 'facade root unmount ref passive output',
+      id: 'facade-root-unmount-ref-passive-host',
+      ref: privateFacadeUnmountRef
+    },
+    type: 'section'
+  };
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    rootBridge.privateRootPublicFacadeAdapterSymbol
+  );
+  const adapter = descriptor.value({
+    publicFacadeHostOutputRenderIdPrefix:
+      'facade-root-unmount-ref-passive-render',
+    publicFacadeHostOutputUnmountCleanupIdPrefix:
+      'facade-root-unmount-ref-passive-cleanup-diagnostic',
+    requestIdPrefix: 'facade-root-unmount-ref-passive-request',
+    rootCommitRefMetadataIdPrefix:
+      'facade-root-unmount-ref-passive-ref-metadata',
+    rootIdPrefix: 'facade-root-unmount-ref-passive-root',
+    sideEffectIdPrefix: 'facade-root-unmount-ref-passive-side-effect',
+    unmountCleanupIdPrefix: 'facade-root-unmount-ref-passive-cleanup',
+    updateIdPrefix: 'facade-root-unmount-ref-passive-update'
+  });
+  const root = adapter.createRoot(container);
+  const renderDiagnostic = root.render(element);
+  const renderPayload =
+    rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(
+      renderDiagnostic
+    );
+  const handoffPayload =
+    rootBridge.getPrivateRootInitialHostOutputHandoffPayload(
+      renderPayload.hostOutputHandoff
+    );
+  const hostNode = handoffPayload.hostNode;
+
+  const unmount = root.unmount();
+  const [diagnostic] =
+    adapter.getRootHostOutputUnmountCleanupDiagnostics(root);
+  const hidden =
+    rootBridge.getPrivateRootPublicFacadeHostOutputUnmountCleanupPayload(
+      diagnostic
+    );
+  const evidence = diagnostic.unmountRefPassiveEvidence;
+
+  assert.equal(refCalls.length, 0);
+  assert.equal(unmount.noOp, false);
+  assert.equal(diagnostic.cleanupSource, 'root.unmount');
+  assert.equal(diagnostic.unmountRefPassiveEvidenceAccepted, true);
+  assert.equal(diagnostic.unmountRefDetachMetadataAccepted, true);
+  assert.equal(diagnostic.unmountPassiveDestroyEvidenceAccepted, true);
+  assert.equal(diagnostic.unmountRefPassiveEvidenceBeforeHostCleanup, true);
+  assert.equal(diagnostic.refEffects, false);
+  assert.equal(diagnostic.passiveEffects, false);
+  assert.equal(
+    evidence.status,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_UNMOUNT_REF_PASSIVE_EVIDENCE_ACCEPTED
+  );
+  assert.deepEqual(evidence.order, [
+    'root-unmount-ref-detach-metadata',
+    'root-unmount-passive-destroy-evidence',
+    'fake-dom-host-output-cleanup'
+  ]);
+  assert.equal(
+    evidence.refDetachEvidence.status,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_UNMOUNT_REF_DETACH_METADATA_ACCEPTED
+  );
+  assert.equal(
+    evidence.refDetachEvidence.rootCommitRefMetadataStatus,
+    rootBridge.ROOT_BRIDGE_ROOT_COMMIT_REF_METADATA_ACCEPTED
+  );
+  assert.equal(evidence.refDetachEvidence.hostOutputCanary, 'unmount-host-output');
+  assert.equal(evidence.refDetachEvidence.detachCount, 1);
+  assert.equal(evidence.refDetachEvidence.attachCount, 0);
+  assert.equal(evidence.refDetachEvidence.refAction, 'detach');
+  assert.equal(evidence.refDetachEvidence.detachReason, 'deleted');
+  assert.equal(evidence.refDetachEvidence.callbackRefsInvoked, false);
+  assert.equal(evidence.refDetachEvidence.objectRefsMutated, false);
+  assert.equal(evidence.refDetachEvidence.publicRootExecution, false);
+  assert.equal(evidence.refDetachEvidence.compatibilityClaimed, false);
+  assert.equal(
+    rootBridge.getPrivateRootCommitRefMetadataPayload(
+      evidence.refDetachEvidence.metadataRecord
+    ).sourceRecord,
+    unmount
+  );
+  assert.equal(
+    evidence.passiveDestroyEvidence.status,
+    rootBridge
+      .ROOT_BRIDGE_PUBLIC_FACADE_UNMOUNT_PASSIVE_DESTROY_EVIDENCE_ACCEPTED
+  );
+  assert.equal(
+    evidence.passiveDestroyEvidence.destroyCallbackHandlesAccepted,
+    true
+  );
+  assert.equal(
+    evidence.passiveDestroyEvidence.invokesDestroyCallbacksUnderTestControl,
+    true
+  );
+  assert.equal(evidence.passiveDestroyEvidence.invokesDestroyCallbacks, false);
+  assert.equal(
+    evidence.passiveDestroyEvidence.publicEffectExecutionEnabled,
+    false
+  );
+  assert.equal(
+    evidence.passiveDestroyEvidence.schedulerDrivenPassiveExecutionEnabled,
+    false
+  );
+  assert.equal(evidence.passiveDestroyEvidence.publicActPassiveDrain, false);
+  assert.equal(evidence.passiveDestroyEvidence.publicRootExecution, false);
+  assert.equal(evidence.passiveDestroyEvidence.compatibilityClaimed, false);
+  assert.deepEqual(
+    diagnostic.acceptedCapabilities.map((capability) => capability.id),
+    [
+      'public-facade-create-root-record',
+      'public-facade-root-render-record',
+      'public-facade-root-unmount-record',
+      'root-marker-setup-cleanup',
+      'root-listener-setup-cleanup',
+      'create-render-admission',
+      'fake-dom-host-output-mutation',
+      'fake-dom-unmount-cleanup',
+      'root-unmount-admission-metadata',
+      'fake-dom-container-cleanup-metadata',
+      'component-tree-metadata-detach',
+      'root-facade-metadata-clear',
+      'latest-props-publication',
+      'root-unmount-ref-detach-metadata',
+      'root-unmount-passive-destroy-evidence',
+      'ref-passive-before-host-cleanup-order'
+    ]
+  );
+  assert.deepEqual(
+    diagnostic.blockedCapabilities.map((capability) => capability.id),
+    [
+      'public-root-execution',
+      'public-root-unmount',
+      'native-execution',
+      'reconciler-execution',
+      'browser-dom-compatibility',
+      'hydration',
+      'events',
+      'ref-callback-invocation',
+      'passive-effect-execution',
+      'compatibility-claims'
+    ]
+  );
+  assert.equal(hidden.unmountRefPassiveEvidence, evidence);
+  assert.equal(container.childNodes.length, 0);
+  assert.equal(componentTree.getRootOwnerFromNode(hostNode), null);
+  assert.equal(componentTree.getLatestPropsFromNode(hostNode), null);
+  assert.equal(diagnostic.publicRootUnmounted, false);
+  assert.equal(diagnostic.publicRootExecution, false);
+  assert.equal(diagnostic.publicRootCompatibilitySurface, false);
+  assert.equal(diagnostic.compatibilityClaimed, false);
+
+  const serialized = JSON.stringify(diagnostic);
+  assert.equal(serialized.includes('privateFacadeUnmountRef'), false);
+  assert.equal(serialized.includes('__mutationLog'), false);
+  assert.equal(serialized.includes('__registrations'), false);
+});
+
 test('private react-dom/client facade unmount cleanup diagnostic routes through bridge cleanup', () => {
   const document = createDocument('private-client-facade-unmount-cleanup');
   const container = createElement('DIV', document);
