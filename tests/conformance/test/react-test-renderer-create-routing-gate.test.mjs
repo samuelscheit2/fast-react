@@ -264,6 +264,9 @@ const entrypoints = [
     production: true
   }
 ];
+const cjsEntrypoints = entrypoints.filter((entry) =>
+  entry.entrypoint.includes("/cjs/")
+);
 
 test("react-test-renderer create shell exposes routing gate metadata without changing public keys", () => {
   for (const entry of entrypoints) {
@@ -1152,6 +1155,60 @@ test("react-test-renderer private TestInstance wrapper skeleton exposes record-o
       descriptor.value,
       entry.entrypoint
     );
+  }
+});
+
+test("react-test-renderer CJS private TestInstance bridge records deterministic findAll predicate diagnostics", () => {
+  for (const entry of cjsEntrypoints) {
+    const moduleExports = loadFresh(entry.modulePath);
+    const bridge = assertPrivateRootRequestBridge(
+      moduleExports,
+      entry.entrypoint
+    );
+    const renderer = moduleExports.create({ type: "private-find-all" });
+    const [createRequest] = bridge.getRendererRootRequests(renderer);
+    const record = Object.getOwnPropertyDescriptor(
+      renderer,
+      privateTestInstanceWrapperRecordSymbol
+    ).value;
+    const diagnostics = record.findAllPredicateDiagnostics;
+
+    assertPrivateFindAllPredicateDiagnostics(
+      diagnostics,
+      record,
+      entry.entrypoint
+    );
+    assert.equal(
+      record.queryMethodRecords.findAll.predicateDiagnostics,
+      diagnostics,
+      entry.entrypoint
+    );
+    assert.equal(
+      record.rootRequestTestInstanceQueryMetadata.findAllPredicateDiagnosticsAvailable,
+      true,
+      entry.entrypoint
+    );
+    assert.deepEqual(
+      record.rootRequestTestInstanceQueryMetadata.findAllPredicateKinds,
+      ["type", "props", "predicate-like"],
+      entry.entrypoint
+    );
+    assert.equal(
+      record.rootRequestTestInstanceQueryMetadata.findAllPredicateExecution,
+      false,
+      entry.entrypoint
+    );
+    assert.deepEqual(
+      record.rootRequestTestInstanceQueryMetadata.findAllAcceptedRustApis,
+      diagnostics.acceptedRustApis,
+      entry.entrypoint
+    );
+    assert.equal(
+      bridge.getTestInstanceQueryDiagnostics(createRequest),
+      record,
+      entry.entrypoint
+    );
+    assertNoPublicTestInstanceQueryMethods(renderer, entry.entrypoint);
   }
 });
 
@@ -3198,6 +3255,158 @@ function assertPrivateQueryTraversal(record, entrypoint) {
     resultKind: "array",
     traversedCandidateRecords: record.queryPath
   }, record, entrypoint);
+}
+
+function assertPrivateFindAllPredicateDiagnostics(diagnostics, owner, entrypoint) {
+  assert.equal(Object.isFrozen(diagnostics), true, entrypoint);
+  assert.equal(
+    diagnostics.id,
+    "react-test-renderer-private-test-instance-find-all-query-diagnostics",
+    entrypoint
+  );
+  assert.equal(
+    diagnostics.diagnosticName,
+    "fast-react-test-renderer.testinstance.find-all-private-query",
+    entrypoint
+  );
+  assert.equal(
+    diagnostics.status,
+    "private-findall-query-diagnostics-ready-public-method-blocked",
+    entrypoint
+  );
+  assert.equal(
+    diagnostics.acceptedWorker,
+    "worker-463-test-renderer-find-all-private-query",
+    entrypoint
+  );
+  assert.equal(
+    diagnostics.acceptedRustDiagnosticName,
+    "fast-react-test-renderer.testinstance.find-all-private-query",
+    entrypoint
+  );
+  assert.deepEqual(diagnostics.acceptedRustApis, [
+    "TestRendererRoot::describe_private_test_instance_find_all_query_for_canary",
+    "TestRendererRoot::describe_private_test_instance_find_all_query_after_update_for_canary",
+    "TestRendererPrivateTestInstanceFindAllQueryDiagnostics",
+    "TestRendererPrivateTestInstanceFindAllPredicateDiagnostic"
+  ]);
+  assert.deepEqual(diagnostics.acceptedRustTests, [
+    "root_private_test_instance_find_all_query_diagnostics_describe_type_props_and_predicate_metadata",
+    "root_private_test_instance_find_all_query_diagnostics_follow_update_host_output"
+  ]);
+  assert.equal(
+    diagnostics.source,
+    "ReactTestRenderer.js findAll(root, predicate, options)",
+    entrypoint
+  );
+  assert.equal(
+    diagnostics.acceptedReactSourceAlgorithm,
+    "ReactTestRenderer.js findAll",
+    entrypoint
+  );
+  assert.equal(diagnostics.traversalOrder, "self-then-descendants", entrypoint);
+  assert.equal(diagnostics.defaultDeep, true, entrypoint);
+  assert.equal(diagnostics.effectiveDeep, true, entrypoint);
+  assert.deepEqual(diagnostics.predicateKinds, [
+    "type",
+    "props",
+    "predicate-like"
+  ]);
+  assert.equal(diagnostics.predicateExecution, false, entrypoint);
+  assert.equal(diagnostics.candidateRecords, owner.queryPath, entrypoint);
+  assert.equal(diagnostics.skippedRecords, owner.queryMethodRecords.findAll.skippedRecords, entrypoint);
+  assert.equal(diagnostics.publicQueryMethodAvailable, false, entrypoint);
+  assert.equal(diagnostics.publicTestInstanceObjectAvailable, false, entrypoint);
+  assert.equal(diagnostics.nativeBridgeAvailable, false, entrypoint);
+  assert.equal(diagnostics.nativeExecution, false, entrypoint);
+  assert.equal(diagnostics.compatibilityClaimed, false, entrypoint);
+
+  assertPrivateFindAllPredicateRecord(diagnostics.typePredicate, {
+    criteria: { kind: "type", value: "span" },
+    id: "react-test-renderer-private-test-instance-find-all-type-predicate",
+    predicateKind: "type",
+    predicateSource: "node => node.type === type",
+    source: "ReactTestRenderer.js ReactTestInstance.findAllByType"
+  }, owner, entrypoint);
+  assertPrivateFindAllPredicateRecord(diagnostics.propsPredicate, {
+    criteria: {
+      kind: "props",
+      value: owner.queryRecords.hostComponentProps.value
+    },
+    id: "react-test-renderer-private-test-instance-find-all-props-predicate",
+    predicateKind: "props",
+    predicateSource: "node => node.props && propsMatch(node.props, props)",
+    source: "ReactTestRenderer.js ReactTestInstance.findAllByProps"
+  }, owner, entrypoint);
+  assertPrivateFindAllPredicateRecord(diagnostics.predicateLike, {
+    criteria: {
+      kind: "predicate-like",
+      props: owner.queryRecords.hostComponentProps.value,
+      type: "span"
+    },
+    id: "react-test-renderer-private-test-instance-find-all-predicate-like",
+    predicateKind: "predicate-like",
+    predicateSource:
+      "metadata-only predicate matching accepted type and props diagnostics",
+    source: "ReactTestRenderer.js ReactTestInstance.findAll"
+  }, owner, entrypoint);
+}
+
+function assertPrivateFindAllPredicateRecord(
+  predicateRecord,
+  expected,
+  owner,
+  entrypoint
+) {
+  assert.equal(Object.isFrozen(predicateRecord), true, entrypoint);
+  assert.equal(predicateRecord.id, expected.id, entrypoint);
+  assert.equal(
+    predicateRecord.kind,
+    "ReactTestInstancePrivateFindAllPredicateMetadata",
+    entrypoint
+  );
+  assert.equal(predicateRecord.predicateKind, expected.predicateKind, entrypoint);
+  assert.equal(predicateRecord.source, expected.source, entrypoint);
+  assert.equal(
+    predicateRecord.predicateSource,
+    expected.predicateSource,
+    entrypoint
+  );
+  assert.deepEqual(predicateRecord.criteria, expected.criteria, entrypoint);
+  assert.equal(
+    predicateRecord.evaluatedCandidateRecords,
+    owner.queryPath,
+    entrypoint
+  );
+  assert.equal(
+    predicateRecord.matchedCandidateRecords,
+    owner.hostComponentQueryPath,
+    entrypoint
+  );
+  assert.deepEqual(
+    predicateRecord.rejectedCandidateRecords.map((inspection) => inspection.id),
+    ["react-test-renderer-private-test-instance-inspection-host-root"],
+    entrypoint
+  );
+  assert.equal(
+    predicateRecord.rejectedCandidateRecords[0],
+    owner.acceptedInspectionRecords[0],
+    entrypoint
+  );
+  assert.equal(
+    predicateRecord.skippedRecords,
+    owner.queryMethodRecords.findAll.skippedRecords,
+    entrypoint
+  );
+  assert.equal(predicateRecord.expectedCanaryMatchCount, 1, entrypoint);
+  assert.equal(predicateRecord.predicateExecution, false, entrypoint);
+  assert.equal(predicateRecord.deterministic, true, entrypoint);
+  assert.equal(predicateRecord.publicQueryMethodAvailable, false, entrypoint);
+  assert.equal(
+    predicateRecord.publicPredicateExecutionAvailable,
+    false,
+    entrypoint
+  );
 }
 
 function assertPrivateQueryMethodRecord(queryRecord, expected, owner, entrypoint) {

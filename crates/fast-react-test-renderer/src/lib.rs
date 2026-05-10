@@ -1722,6 +1722,8 @@ pub const TEST_RENDERER_PRIVATE_TO_JSON_FACADE_RESULT_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.tojson.private-facade-result";
 pub const TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.serialization.private-tree-canary";
+pub const TEST_RENDERER_PRIVATE_TEST_INSTANCE_FIND_ALL_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.testinstance.find-all-private-query";
 pub const TEST_RENDERER_PRIVATE_TREE_ACCEPTED_FIBER_SHAPE: [&str; 3] =
     ["HostRoot", "HostComponent", "HostText"];
 pub const TEST_RENDERER_PRIVATE_TREE_COMPOSITE_ACCEPTED_FIBER_SHAPE: [&str; 4] =
@@ -2845,6 +2847,229 @@ impl TestRendererPrivateTreeMetadataReport {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TestRendererPrivateTestInstanceFindAllPredicateKind {
+    Type,
+    Props,
+    PredicateLike,
+}
+
+impl TestRendererPrivateTestInstanceFindAllPredicateKind {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Type => "type",
+            Self::Props => "props",
+            Self::PredicateLike => "predicate-like",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateTestInstanceFindAllPredicateDiagnostic {
+    predicate_kind: TestRendererPrivateTestInstanceFindAllPredicateKind,
+    source: &'static str,
+    predicate_source: &'static str,
+    expected_type: Option<TestElementType>,
+    expected_props: Option<TestProps>,
+    evaluated_fiber_tags: Vec<&'static str>,
+    matched_fiber_tags: Vec<&'static str>,
+    rejected_fiber_tags: Vec<&'static str>,
+    skipped_text_child_count: usize,
+    predicate_execution: bool,
+    public_query_method_available: bool,
+}
+
+impl TestRendererPrivateTestInstanceFindAllPredicateDiagnostic {
+    #[must_use]
+    pub const fn predicate_kind(&self) -> TestRendererPrivateTestInstanceFindAllPredicateKind {
+        self.predicate_kind
+    }
+
+    #[must_use]
+    pub const fn source(&self) -> &'static str {
+        self.source
+    }
+
+    #[must_use]
+    pub const fn predicate_source(&self) -> &'static str {
+        self.predicate_source
+    }
+
+    #[must_use]
+    pub fn expected_type(&self) -> Option<&TestElementType> {
+        self.expected_type.as_ref()
+    }
+
+    #[must_use]
+    pub fn expected_props(&self) -> Option<&TestProps> {
+        self.expected_props.as_ref()
+    }
+
+    #[must_use]
+    pub fn evaluated_fiber_tags(&self) -> &[&'static str] {
+        &self.evaluated_fiber_tags
+    }
+
+    #[must_use]
+    pub fn matched_fiber_tags(&self) -> &[&'static str] {
+        &self.matched_fiber_tags
+    }
+
+    #[must_use]
+    pub fn rejected_fiber_tags(&self) -> &[&'static str] {
+        &self.rejected_fiber_tags
+    }
+
+    #[must_use]
+    pub fn evaluated_candidate_count(&self) -> usize {
+        self.evaluated_fiber_tags.len()
+    }
+
+    #[must_use]
+    pub fn matched_candidate_count(&self) -> usize {
+        self.matched_fiber_tags.len()
+    }
+
+    #[must_use]
+    pub fn rejected_candidate_count(&self) -> usize {
+        self.rejected_fiber_tags.len()
+    }
+
+    #[must_use]
+    pub const fn skipped_text_child_count(&self) -> usize {
+        self.skipped_text_child_count
+    }
+
+    #[must_use]
+    pub const fn predicate_execution(&self) -> bool {
+        self.predicate_execution
+    }
+
+    #[must_use]
+    pub const fn public_query_method_available(&self) -> bool {
+        self.public_query_method_available
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateTestInstanceFindAllQueryDiagnostics {
+    diagnostic_name: &'static str,
+    source_tree_diagnostic_name: &'static str,
+    host_output_update_kind: TestRendererRootUpdateKind,
+    host_output_snapshot_current: bool,
+    traversal_source: &'static str,
+    traversal_order: &'static str,
+    default_deep: bool,
+    candidate_fiber_tags: Vec<&'static str>,
+    skipped_fiber_tags: Vec<&'static str>,
+    type_predicate: TestRendererPrivateTestInstanceFindAllPredicateDiagnostic,
+    props_predicate: TestRendererPrivateTestInstanceFindAllPredicateDiagnostic,
+    predicate_like: TestRendererPrivateTestInstanceFindAllPredicateDiagnostic,
+    public_blockers: TestRendererPrivateJsonPublicSurfaceBlockers,
+    public_test_instance_object_available: bool,
+    public_query_methods_available: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererPrivateTestInstanceFindAllQueryDiagnostics {
+    #[must_use]
+    pub const fn diagnostic_name(&self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn source_tree_diagnostic_name(&self) -> &'static str {
+        self.source_tree_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn host_output_update_kind(&self) -> TestRendererRootUpdateKind {
+        self.host_output_update_kind
+    }
+
+    #[must_use]
+    pub const fn host_output_snapshot_current(&self) -> bool {
+        self.host_output_snapshot_current
+    }
+
+    #[must_use]
+    pub const fn traversal_source(&self) -> &'static str {
+        self.traversal_source
+    }
+
+    #[must_use]
+    pub const fn traversal_order(&self) -> &'static str {
+        self.traversal_order
+    }
+
+    #[must_use]
+    pub const fn default_deep(&self) -> bool {
+        self.default_deep
+    }
+
+    #[must_use]
+    pub fn candidate_fiber_tags(&self) -> &[&'static str] {
+        &self.candidate_fiber_tags
+    }
+
+    #[must_use]
+    pub fn skipped_fiber_tags(&self) -> &[&'static str] {
+        &self.skipped_fiber_tags
+    }
+
+    #[must_use]
+    pub fn candidate_count(&self) -> usize {
+        self.candidate_fiber_tags.len()
+    }
+
+    #[must_use]
+    pub fn skipped_text_child_count(&self) -> usize {
+        self.skipped_fiber_tags.len()
+    }
+
+    #[must_use]
+    pub const fn type_predicate(
+        &self,
+    ) -> &TestRendererPrivateTestInstanceFindAllPredicateDiagnostic {
+        &self.type_predicate
+    }
+
+    #[must_use]
+    pub const fn props_predicate(
+        &self,
+    ) -> &TestRendererPrivateTestInstanceFindAllPredicateDiagnostic {
+        &self.props_predicate
+    }
+
+    #[must_use]
+    pub const fn predicate_like(
+        &self,
+    ) -> &TestRendererPrivateTestInstanceFindAllPredicateDiagnostic {
+        &self.predicate_like
+    }
+
+    #[must_use]
+    pub const fn public_blockers(&self) -> TestRendererPrivateJsonPublicSurfaceBlockers {
+        self.public_blockers
+    }
+
+    #[must_use]
+    pub const fn public_test_instance_object_available(&self) -> bool {
+        self.public_test_instance_object_available
+    }
+
+    #[must_use]
+    pub const fn public_query_methods_available(&self) -> bool {
+        self.public_query_methods_available
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(&self) -> bool {
+        self.compatibility_claimed
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TestRendererSerializationGateError {
     CommitRootMismatch {
@@ -3613,6 +3838,28 @@ impl TestRendererRoot {
             self.describe_private_json_serialization_after_update_for_canary(output)?;
 
         Ok(Self::private_tree_metadata_from_json_report(json_report))
+    }
+
+    pub fn describe_private_test_instance_find_all_query_for_canary(
+        &self,
+        output: &TestRendererCommittedHostOutput,
+    ) -> Result<TestRendererPrivateTestInstanceFindAllQueryDiagnostics, TestRendererRootError> {
+        let tree_report = self.describe_private_tree_metadata_for_canary(output)?;
+
+        Ok(Self::private_test_instance_find_all_query_from_tree_report(
+            &tree_report,
+        ))
+    }
+
+    pub fn describe_private_test_instance_find_all_query_after_update_for_canary(
+        &self,
+        output: &TestRendererUpdatedHostOutput,
+    ) -> Result<TestRendererPrivateTestInstanceFindAllQueryDiagnostics, TestRendererRootError> {
+        let tree_report = self.describe_private_tree_metadata_after_update_for_canary(output)?;
+
+        Ok(Self::private_test_instance_find_all_query_from_tree_report(
+            &tree_report,
+        ))
     }
 
     fn describe_private_json_serialization_from_current_fibers_for_canary(
@@ -4933,6 +5180,70 @@ impl TestRendererRoot {
             },
             public_blockers: json_report.public_blockers(),
             public_tree_object_available: false,
+        }
+    }
+
+    fn private_test_instance_find_all_query_from_tree_report(
+        tree_report: &TestRendererPrivateTreeMetadataReport,
+    ) -> TestRendererPrivateTestInstanceFindAllQueryDiagnostics {
+        let host_component = tree_report.host_component();
+        let host_text = tree_report.host_text();
+        let candidate_fiber_tags = vec![host_component.fiber_tag()];
+        let skipped_fiber_tags = vec![host_text.fiber_tag()];
+
+        TestRendererPrivateTestInstanceFindAllQueryDiagnostics {
+            diagnostic_name: TEST_RENDERER_PRIVATE_TEST_INSTANCE_FIND_ALL_DIAGNOSTIC_NAME,
+            source_tree_diagnostic_name: tree_report.diagnostic_name(),
+            host_output_update_kind: tree_report.host_output_update_kind(),
+            host_output_snapshot_current: tree_report.host_output_snapshot_current(),
+            traversal_source: "ReactTestRenderer.js findAll(root, predicate, options)",
+            traversal_order: "self-then-descendants",
+            default_deep: true,
+            candidate_fiber_tags: candidate_fiber_tags.clone(),
+            skipped_fiber_tags: skipped_fiber_tags.clone(),
+            type_predicate: TestRendererPrivateTestInstanceFindAllPredicateDiagnostic {
+                predicate_kind: TestRendererPrivateTestInstanceFindAllPredicateKind::Type,
+                source: "ReactTestRenderer.js ReactTestInstance.findAllByType",
+                predicate_source: "node => node.type === type",
+                expected_type: Some(host_component.element_type().clone()),
+                expected_props: None,
+                evaluated_fiber_tags: candidate_fiber_tags.clone(),
+                matched_fiber_tags: vec![host_component.fiber_tag()],
+                rejected_fiber_tags: Vec::new(),
+                skipped_text_child_count: skipped_fiber_tags.len(),
+                predicate_execution: false,
+                public_query_method_available: false,
+            },
+            props_predicate: TestRendererPrivateTestInstanceFindAllPredicateDiagnostic {
+                predicate_kind: TestRendererPrivateTestInstanceFindAllPredicateKind::Props,
+                source: "ReactTestRenderer.js ReactTestInstance.findAllByProps",
+                predicate_source: "node => node.props && propsMatch(node.props, props)",
+                expected_type: None,
+                expected_props: Some(host_component.props().clone()),
+                evaluated_fiber_tags: candidate_fiber_tags.clone(),
+                matched_fiber_tags: vec![host_component.fiber_tag()],
+                rejected_fiber_tags: Vec::new(),
+                skipped_text_child_count: skipped_fiber_tags.len(),
+                predicate_execution: false,
+                public_query_method_available: false,
+            },
+            predicate_like: TestRendererPrivateTestInstanceFindAllPredicateDiagnostic {
+                predicate_kind: TestRendererPrivateTestInstanceFindAllPredicateKind::PredicateLike,
+                source: "ReactTestRenderer.js ReactTestInstance.findAll",
+                predicate_source: "metadata-only predicate matching accepted type and props diagnostics",
+                expected_type: Some(host_component.element_type().clone()),
+                expected_props: Some(host_component.props().clone()),
+                evaluated_fiber_tags: candidate_fiber_tags,
+                matched_fiber_tags: vec![host_component.fiber_tag()],
+                rejected_fiber_tags: Vec::new(),
+                skipped_text_child_count: skipped_fiber_tags.len(),
+                predicate_execution: false,
+                public_query_method_available: false,
+            },
+            public_blockers: tree_report.public_blockers(),
+            public_test_instance_object_available: false,
+            public_query_methods_available: false,
+            compatibility_claimed: false,
         }
     }
 
@@ -6646,6 +6957,184 @@ mod tests {
         assert_eq!(report.host_component().rendered_text(), "hello");
         assert!(!report.public_tree_object_available());
         assert!(report.public_blockers().tree_method_blocked());
+    }
+
+    #[test]
+    fn root_private_test_instance_find_all_query_diagnostics_describe_type_props_and_predicate_metadata()
+     {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let diagnostics = root
+            .describe_private_test_instance_find_all_query_for_canary(&output)
+            .unwrap();
+        let type_predicate = diagnostics.type_predicate();
+        let props_predicate = diagnostics.props_predicate();
+        let predicate_like = diagnostics.predicate_like();
+
+        assert_eq!(
+            diagnostics.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TEST_INSTANCE_FIND_ALL_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            diagnostics.source_tree_diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            diagnostics.host_output_update_kind(),
+            TestRendererRootUpdateKind::Create
+        );
+        assert!(diagnostics.host_output_snapshot_current());
+        assert_eq!(
+            diagnostics.traversal_source(),
+            "ReactTestRenderer.js findAll(root, predicate, options)"
+        );
+        assert_eq!(diagnostics.traversal_order(), "self-then-descendants");
+        assert!(diagnostics.default_deep());
+        assert_eq!(diagnostics.candidate_fiber_tags(), &["HostComponent"]);
+        assert_eq!(diagnostics.skipped_fiber_tags(), &["HostText"]);
+        assert_eq!(diagnostics.candidate_count(), 1);
+        assert_eq!(diagnostics.skipped_text_child_count(), 1);
+
+        assert_eq!(
+            type_predicate.predicate_kind(),
+            TestRendererPrivateTestInstanceFindAllPredicateKind::Type
+        );
+        assert_eq!(type_predicate.predicate_kind().as_str(), "type");
+        assert_eq!(
+            type_predicate.source(),
+            "ReactTestRenderer.js ReactTestInstance.findAllByType"
+        );
+        assert_eq!(
+            type_predicate.predicate_source(),
+            "node => node.type === type"
+        );
+        assert_eq!(type_predicate.expected_type().unwrap().as_str(), "span");
+        assert!(type_predicate.expected_props().is_none());
+        assert_eq!(type_predicate.evaluated_fiber_tags(), &["HostComponent"]);
+        assert_eq!(type_predicate.matched_fiber_tags(), &["HostComponent"]);
+        assert!(type_predicate.rejected_fiber_tags().is_empty());
+        assert_eq!(type_predicate.evaluated_candidate_count(), 1);
+        assert_eq!(type_predicate.matched_candidate_count(), 1);
+        assert_eq!(type_predicate.rejected_candidate_count(), 0);
+        assert_eq!(type_predicate.skipped_text_child_count(), 1);
+        assert!(!type_predicate.predicate_execution());
+        assert!(!type_predicate.public_query_method_available());
+
+        assert_eq!(
+            props_predicate.predicate_kind(),
+            TestRendererPrivateTestInstanceFindAllPredicateKind::Props
+        );
+        assert_eq!(props_predicate.predicate_kind().as_str(), "props");
+        assert_eq!(
+            props_predicate.source(),
+            "ReactTestRenderer.js ReactTestInstance.findAllByProps"
+        );
+        assert_eq!(
+            props_predicate.predicate_source(),
+            "node => node.props && propsMatch(node.props, props)"
+        );
+        assert!(props_predicate.expected_type().is_none());
+        assert_eq!(props_predicate.expected_props().unwrap(), &TestProps::new());
+        assert_eq!(props_predicate.evaluated_fiber_tags(), &["HostComponent"]);
+        assert_eq!(props_predicate.matched_fiber_tags(), &["HostComponent"]);
+        assert!(props_predicate.rejected_fiber_tags().is_empty());
+        assert_eq!(props_predicate.skipped_text_child_count(), 1);
+        assert!(!props_predicate.predicate_execution());
+        assert!(!props_predicate.public_query_method_available());
+
+        assert_eq!(
+            predicate_like.predicate_kind(),
+            TestRendererPrivateTestInstanceFindAllPredicateKind::PredicateLike
+        );
+        assert_eq!(predicate_like.predicate_kind().as_str(), "predicate-like");
+        assert_eq!(
+            predicate_like.source(),
+            "ReactTestRenderer.js ReactTestInstance.findAll"
+        );
+        assert_eq!(
+            predicate_like.predicate_source(),
+            "metadata-only predicate matching accepted type and props diagnostics"
+        );
+        assert_eq!(predicate_like.expected_type().unwrap().as_str(), "span");
+        assert_eq!(predicate_like.expected_props().unwrap(), &TestProps::new());
+        assert_eq!(predicate_like.evaluated_fiber_tags(), &["HostComponent"]);
+        assert_eq!(predicate_like.matched_fiber_tags(), &["HostComponent"]);
+        assert!(predicate_like.rejected_fiber_tags().is_empty());
+        assert_eq!(predicate_like.skipped_text_child_count(), 1);
+        assert!(!predicate_like.predicate_execution());
+        assert!(!predicate_like.public_query_method_available());
+
+        assert!(diagnostics.public_blockers().all_blocked());
+        assert!(diagnostics.public_blockers().instance_wrapper_blocked());
+        assert!(!diagnostics.public_test_instance_object_available());
+        assert!(!diagnostics.public_query_methods_available());
+        assert!(!diagnostics.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_test_instance_find_all_query_diagnostics_follow_update_host_output() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let updated = root
+            .render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let diagnostics = root
+            .describe_private_test_instance_find_all_query_after_update_for_canary(&updated)
+            .unwrap();
+
+        assert_eq!(
+            diagnostics.host_output_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert!(diagnostics.host_output_snapshot_current());
+        assert_eq!(diagnostics.candidate_fiber_tags(), &["HostComponent"]);
+        assert_eq!(diagnostics.skipped_fiber_tags(), &["HostText"]);
+        assert_eq!(
+            diagnostics
+                .type_predicate()
+                .expected_type()
+                .unwrap()
+                .as_str(),
+            "span"
+        );
+        assert_eq!(
+            diagnostics
+                .predicate_like()
+                .expected_type()
+                .unwrap()
+                .as_str(),
+            "span"
+        );
+        assert_eq!(
+            diagnostics.props_predicate().expected_props().unwrap(),
+            &TestProps::new()
+        );
+        assert_eq!(diagnostics.type_predicate().matched_candidate_count(), 1);
+        assert_eq!(diagnostics.props_predicate().matched_candidate_count(), 1);
+        assert_eq!(diagnostics.predicate_like().matched_candidate_count(), 1);
+        assert!(!diagnostics.public_query_methods_available());
+        assert!(!diagnostics.public_test_instance_object_available());
+        assert!(!diagnostics.compatibility_claimed());
     }
 
     #[test]
