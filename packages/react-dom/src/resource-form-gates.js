@@ -20,6 +20,8 @@ const privateRootBridgeRecordOnlyStatus =
   'blocked-private-root-bridge-record-only';
 const privateSourceAdapterBlockedStatus =
   'blocked-private-source-adapter';
+const privateControlledValueTrackerBlockedStatus =
+  'blocked-private-controlled-value-tracker-metadata-only';
 const rootBoundaryInvalidRecordCode =
   'FAST_REACT_DOM_RESOURCE_FORM_ROOT_BOUNDARY_INVALID_RECORD';
 const rootBoundaryInvalidRootMetadataCode =
@@ -215,6 +217,28 @@ function describeSourceAdapterBoundary(behaviorArea) {
     adaptersInvoked: false,
     rawTargetCaptured: false,
     publicRootTouched: false,
+    compatibilityClaimed: false,
+    controlledValueTrackerBoundary:
+      describeControlledValueTrackerBoundary(behaviorArea)
+  });
+}
+
+function describeControlledValueTrackerBoundary(behaviorArea) {
+  return freezeRecord({
+    gateStatus: privateControlledValueTrackerBlockedStatus,
+    behaviorArea,
+    supportedBehaviorArea: 'controlled-form',
+    appliesToRequest: behaviorArea === 'controlled-form',
+    metadataGateAvailable: true,
+    trackerRecordsAccepted:
+      behaviorArea === null || behaviorArea === 'controlled-form',
+    liveHostNodeRequired: false,
+    rawTargetCaptured: false,
+    trackerAttached: false,
+    hostValueRead: false,
+    hostValueWritten: false,
+    postEventRestoreQueued: false,
+    publicControlledBehaviorEnabled: false,
     compatibilityClaimed: false
   });
 }
@@ -350,6 +374,7 @@ module.exports = Object.assign({}, internalsGate, {
   describeResourceFormRootBridgeBlockedGate,
   getResourceFormRootBridgeBlockedRecordPayload,
   isResourceFormRootBridgeBlockedRecord,
+  privateControlledValueTrackerBlockedStatus,
   privateRootBridgeRecordOnlyStatus,
   privateSourceAdapterBlockedStatus,
   publicRootFacadeBlockedGateId,
