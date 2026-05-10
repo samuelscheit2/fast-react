@@ -119,6 +119,48 @@ async function main() {
       12
     );
     assert.equal(
+      native.nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate
+        .workerThreadTeardownGateStatus,
+      'diagnosed-native-root-bridge-transport-worker-thread-teardown'
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate
+        .nativeAddonLoaded,
+      false
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate
+        .nativeExecution,
+      false
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate
+        .publicNativeCompatibility,
+      false
+    );
+    assert.deepEqual(
+      native.nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate
+        .rows.map((row) => row.id),
+      [
+        'worker-root-stale-after-thread-teardown',
+        'worker-create-value-stale-after-thread-teardown',
+        'worker-render-value-stale-after-thread-teardown',
+        'peer-root-active-after-worker-thread-teardown'
+      ]
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate.rows
+        .every(
+          (row) =>
+            row.nativeAddonLoaded === false &&
+            row.nativeExecution === false &&
+            row.rendererExecution === false &&
+            row.reconcilerExecution === false &&
+            row.reactBehaviorError === false
+        ),
+      true
+    );
+    assert.equal(
       native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
         .batchedRecordGate.responseSequenceGate.responseSequenceGateStatus,
       'diagnosed-native-root-bridge-json-batch-response-sequence'

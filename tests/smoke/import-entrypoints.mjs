@@ -4568,6 +4568,8 @@ async function runNativePackageProbe(tempRoot) {
         runtimeGate.jsonTransportSmoke.parserGate.batchedRecordGate;
       const streamGate = batchGate.responseSequenceGate.streamRoundtripGate;
       const teardownGate = requestShape.crossEnvironmentTeardownGate;
+      const workerThreadTeardownGate =
+        requestShape.transportWorkerThreadTeardownGate;
 
       assert.equal(
         batchMetadata.batchGateStatus,
@@ -4690,6 +4692,69 @@ async function runNativePackageProbe(tempRoot) {
         assertNoExecution(row, label + ' teardown ' + row.id);
       }
       assertNoExecution(teardownGate, label + ' teardown gate');
+
+      assert.equal(
+        workerThreadTeardownGate.workerThreadTeardownGateStatus,
+        'diagnosed-native-root-bridge-transport-worker-thread-teardown',
+        label + ' worker-thread teardown status'
+      );
+      assert.equal(
+        workerThreadTeardownGate.batchGateStatus,
+        'validated-native-root-bridge-batched-json-transport-records',
+        label + ' worker-thread teardown batch mirror status'
+      );
+      assert.equal(
+        workerThreadTeardownGate.crossEnvironmentTeardownGateStatus,
+        'diagnosed-native-root-bridge-cross-environment-teardown-isolation',
+        label + ' worker-thread teardown cross-environment mirror status'
+      );
+      assert.deepEqual(
+        workerThreadTeardownGate.rows.map((row) => row.id),
+        [
+          'worker-root-stale-after-thread-teardown',
+          'worker-create-value-stale-after-thread-teardown',
+          'worker-render-value-stale-after-thread-teardown',
+          'peer-root-active-after-worker-thread-teardown'
+        ],
+        label + ' worker-thread teardown row ids'
+      );
+      assert.deepEqual(
+        workerThreadTeardownGate.rows.map((row) => row.errorCode),
+        [
+          'FAST_REACT_NAPI_STALE_HANDLE',
+          'FAST_REACT_NAPI_STALE_HANDLE',
+          'FAST_REACT_NAPI_STALE_HANDLE',
+          null
+        ],
+        label + ' worker-thread teardown row errors'
+      );
+      assert.deepEqual(
+        workerThreadTeardownGate.rows.map((row) => row.boundaryErrorCode),
+        [
+          'FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE',
+          'FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE',
+          'FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE',
+          null
+        ],
+        label + ' worker-thread teardown boundary errors'
+      );
+      for (const row of workerThreadTeardownGate.rows) {
+        assert.deepEqual(
+          Object.keys(row),
+          workerThreadTeardownGate.workerThreadTeardownDiagnosticRowFields,
+          label + ' worker-thread teardown row fields ' + row.id
+        );
+        assertNoExecution(row, label + ' worker-thread teardown ' + row.id);
+      }
+      assertNoExecution(
+        workerThreadTeardownGate,
+        label + ' worker-thread teardown gate'
+      );
+      assert.equal(
+        workerThreadTeardownGate.publicNativeCompatibility,
+        false,
+        label + ' worker-thread teardown public compatibility'
+      );
     }
 
     (async () => {

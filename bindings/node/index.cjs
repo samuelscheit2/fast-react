@@ -24,6 +24,8 @@ const nativeRootBridgeCrossEnvironmentTeardownGateStatus =
   'diagnosed-native-root-bridge-cross-environment-teardown-isolation';
 const nativeRootBridgeBatchedJsonTransportGateStatus =
   'validated-native-root-bridge-batched-json-transport-records';
+const nativeRootBridgeTransportWorkerThreadTeardownGateStatus =
+  'diagnosed-native-root-bridge-transport-worker-thread-teardown';
 const nativeRootBridgeJsonTransportBatchResponseSequenceGateStatus =
   'diagnosed-native-root-bridge-json-batch-response-sequence';
 const nativeRootBridgeJsonTransportBatchResponseSequenceBatchId =
@@ -285,6 +287,28 @@ const nativeRootBridgeCrossEnvironmentTeardownRowFields = Object.freeze([
   'recordId',
   'errorCode',
   'rejectedByHandleTable',
+  'nativeAddonLoaded',
+  'nativeExecution',
+  'rendererExecution',
+  'reconcilerExecution',
+  'reactBehaviorError'
+]);
+const nativeRootBridgeTransportWorkerThreadTeardownRowFields = Object.freeze([
+  'id',
+  'operation',
+  'workerThreadId',
+  'transport',
+  'sourceBatchIndex',
+  'requestId',
+  'handleKind',
+  'tableEnvironmentId',
+  'handleEnvironmentId',
+  'slot',
+  'handleGeneration',
+  'currentGeneration',
+  'recordId',
+  'errorCode',
+  'boundaryErrorCode',
   'nativeAddonLoaded',
   'nativeExecution',
   'rendererExecution',
@@ -756,6 +780,46 @@ function freezeNativeRootBridgeTeardownDiagnosticRow({
   });
 }
 
+function freezeNativeRootBridgeTransportWorkerThreadTeardownRow({
+  id,
+  operation,
+  workerThreadId,
+  sourceBatchIndex,
+  requestId,
+  handleKind,
+  tableEnvironmentId,
+  handleEnvironmentId,
+  slot,
+  handleGeneration,
+  currentGeneration,
+  recordId,
+  errorCode,
+  boundaryErrorCode
+}) {
+  return Object.freeze({
+    id,
+    operation,
+    workerThreadId,
+    transport: nativeRootBridgeJsonTransportFormat,
+    sourceBatchIndex,
+    requestId,
+    handleKind,
+    tableEnvironmentId,
+    handleEnvironmentId,
+    slot,
+    handleGeneration,
+    currentGeneration,
+    recordId,
+    errorCode,
+    boundaryErrorCode,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    reactBehaviorError: false
+  });
+}
+
 const nativeBoundaryErrorCodeMap = Object.freeze({
   unsupportedNativeExecution: unavailableErrorCode,
   rustNativeExportsNotBuilt: rustNativeExportsNotBuiltErrorCode,
@@ -799,6 +863,107 @@ const nativeRootBridgeValidationEvidence = Object.freeze([
   })
 ]);
 
+const nativeRootBridgeTransportWorkerThreadTeardownGate = Object.freeze({
+  workerThreadTeardownGateStatus:
+    nativeRootBridgeTransportWorkerThreadTeardownGateStatus,
+  transport: nativeRootBridgeJsonTransportFormat,
+  workerThreadId: 524,
+  workerEnvironmentId: 524,
+  peerEnvironmentId: 1524,
+  validationModel: nativeRootBridgeRequestValidationModel,
+  handleTableModel: nativeRootBridgeHandleTableModel,
+  batchGateStatus: nativeRootBridgeBatchedJsonTransportGateStatus,
+  crossEnvironmentTeardownGateStatus:
+    nativeRootBridgeCrossEnvironmentTeardownGateStatus,
+  environmentTeardownFields: nativeRootBridgeEnvironmentTeardownFields,
+  workerThreadTeardownDiagnosticRowFields:
+    nativeRootBridgeTransportWorkerThreadTeardownRowFields,
+  mismatchedTeardown: freezeNativeRootBridgeEnvironmentTeardown({
+    requestedEnvironmentId: 524,
+    tableEnvironmentId: 1524,
+    rootHandlesInvalidated: 0,
+    valueHandlesInvalidated: 0
+  }),
+  matchedTeardown: freezeNativeRootBridgeEnvironmentTeardown({
+    requestedEnvironmentId: 524,
+    tableEnvironmentId: 524,
+    rootHandlesInvalidated: 1,
+    valueHandlesInvalidated: 2
+  }),
+  rows: Object.freeze([
+    freezeNativeRootBridgeTransportWorkerThreadTeardownRow({
+      id: 'worker-root-stale-after-thread-teardown',
+      operation: 'worker-thread-teardown',
+      workerThreadId: 524,
+      sourceBatchIndex: 0,
+      requestId: 1,
+      handleKind: nativeRootBridgeHandleKindRoot,
+      tableEnvironmentId: 524,
+      handleEnvironmentId: 524,
+      slot: 1,
+      handleGeneration: 1,
+      currentGeneration: 2,
+      recordId: null,
+      errorCode: nativeRootBridgeValidationErrorCodes.staleHandle,
+      boundaryErrorCode: nativeBoundaryErrorCodeMap.rootBridgeStaleHandle
+    }),
+    freezeNativeRootBridgeTransportWorkerThreadTeardownRow({
+      id: 'worker-create-value-stale-after-thread-teardown',
+      operation: 'worker-thread-teardown',
+      workerThreadId: 524,
+      sourceBatchIndex: 0,
+      requestId: 1,
+      handleKind: nativeRootBridgeHandleKindValue,
+      tableEnvironmentId: 524,
+      handleEnvironmentId: 524,
+      slot: 2,
+      handleGeneration: 1,
+      currentGeneration: 2,
+      recordId: null,
+      errorCode: nativeRootBridgeValidationErrorCodes.staleHandle,
+      boundaryErrorCode: nativeBoundaryErrorCodeMap.rootBridgeStaleHandle
+    }),
+    freezeNativeRootBridgeTransportWorkerThreadTeardownRow({
+      id: 'worker-render-value-stale-after-thread-teardown',
+      operation: 'worker-thread-teardown',
+      workerThreadId: 524,
+      sourceBatchIndex: 1,
+      requestId: 2,
+      handleKind: nativeRootBridgeHandleKindValue,
+      tableEnvironmentId: 524,
+      handleEnvironmentId: 524,
+      slot: 3,
+      handleGeneration: 1,
+      currentGeneration: 2,
+      recordId: null,
+      errorCode: nativeRootBridgeValidationErrorCodes.staleHandle,
+      boundaryErrorCode: nativeBoundaryErrorCodeMap.rootBridgeStaleHandle
+    }),
+    freezeNativeRootBridgeTransportWorkerThreadTeardownRow({
+      id: 'peer-root-active-after-worker-thread-teardown',
+      operation: 'peer-environment-isolation',
+      workerThreadId: 524,
+      sourceBatchIndex: null,
+      requestId: null,
+      handleKind: nativeRootBridgeHandleKindRoot,
+      tableEnvironmentId: 1524,
+      handleEnvironmentId: 1524,
+      slot: 1,
+      handleGeneration: 1,
+      currentGeneration: 1,
+      recordId: 152401,
+      errorCode: null,
+      boundaryErrorCode: null
+    })
+  ]),
+  nativeAddonLoaded: false,
+  nativeExecution: false,
+  rendererExecution: false,
+  reconcilerExecution: false,
+  publicNativeCompatibility: false,
+  reactBehaviorError: false
+});
+
 const nativeRootBridgeRequestShape = Object.freeze({
   gateStatus: nativeRootBridgeRequestShapeGateStatus,
   validationModel: nativeRootBridgeRequestValidationModel,
@@ -817,6 +982,8 @@ const nativeRootBridgeRequestShape = Object.freeze({
     nativeRootBridgeRustHandleTableAdmissionSmoke,
   jsonTransportSmoke: nativeRootBridgeJsonTransportSmoke,
   crossEnvironmentTeardownGate: nativeRootBridgeCrossEnvironmentTeardownGate,
+  transportWorkerThreadTeardownGate:
+    nativeRootBridgeTransportWorkerThreadTeardownGate,
   validationErrorCodes: nativeRootBridgeValidationErrorCodes
 });
 
