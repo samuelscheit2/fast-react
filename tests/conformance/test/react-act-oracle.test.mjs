@@ -46,6 +46,8 @@ const publicReactEntrypoints = [
 ];
 const privateActDispatcherGateModule =
   "packages/react/private-act-dispatcher-gate.js";
+const reactDomTestUtilsActPrivateRoutingGateModule =
+  "packages/react-dom/src/test-utils-act-gate.js";
 
 test("checked React.act oracle artifact has the expected schema and targets", () => {
   assert.equal(
@@ -342,6 +344,89 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
     );
     assert.equal(gate.isPrivateActDispatcher(rejectedDispatcher), false);
   }
+});
+
+test("React DOM test-utils act private routing gate tracks React act metadata without opening public act", () => {
+  const reactGate = loadFreshWorkspaceModule(privateActDispatcherGateModule);
+  const domGateModule = loadFreshWorkspaceModule(
+    reactDomTestUtilsActPrivateRoutingGateModule
+  );
+  const domGate =
+    domGateModule.evaluateReactDomTestUtilsActPrivateRoutingGate();
+
+  assert.equal(domGate.reactActPrivateDispatcher.status, reactGate.status);
+  assert.deepEqual(
+    domGate.reactActPrivateDispatcher.requiredRecords,
+    reactGate.requiredRecords
+  );
+  assert.deepEqual(
+    domGate.reactActPrivateDispatcher.requiredTaskKinds,
+    reactGate.requiredTaskKinds
+  );
+  assert.deepEqual(
+    domGate.reactActPrivateDispatcher.requiredContinuationStatuses,
+    reactGate.requiredContinuationStatuses
+  );
+  assert.equal(
+    domGate.reactActPrivateDispatcher.queueFlushingReady,
+    reactGate.queueFlushingReady
+  );
+  assert.equal(
+    domGate.reactActPrivateDispatcher.rendererRootsReady,
+    reactGate.rendererRootsReady
+  );
+  assert.equal(
+    domGate.reactActPrivateDispatcher.passiveEffectsReady,
+    reactGate.passiveEffectsReady
+  );
+  assert.equal(
+    domGate.reactActPrivateDispatcher.continuationFlushingReady,
+    reactGate.continuationFlushingReady
+  );
+  assert.equal(domGate.reactActPrivateDispatcher.executesQueuedWork, false);
+  assert.equal(domGate.reactActPrivateDispatcher.executesEffects, false);
+  assert.deepEqual(domGate.acceptedPrivatePrerequisiteIds, [
+    "react-act-private-dispatcher-gate",
+    "scheduler-act-queue-routing-records",
+    "scheduler-mock-flush-helper-metadata",
+    "sync-flush-act-continuation-records",
+    "passive-effects-flush-metadata",
+    "react-dom-private-root-bridge-records",
+    "react-dom-private-flush-sync-guard"
+  ]);
+  assert.deepEqual(domGate.blockedPublicPrerequisiteIds, [
+    "public-react-act-delegation",
+    "act-queue-flushing-execution",
+    "passive-effect-callback-execution",
+    "public-react-dom-root-execution",
+    "public-react-dom-flush-sync-execution"
+  ]);
+  assert.equal(domGate.privatePrerequisitesPresent, true);
+  assert.equal(domGate.privateRoutingReady, false);
+  assert.equal(domGate.publicReactActReady, false);
+  assert.equal(domGate.publicTestUtilsActReady, false);
+  assert.equal(domGate.publicCompatibilityClaimed, false);
+  assert.deepEqual(domGate.violations, []);
+
+  const React = loadFreshWorkspaceModule(publicReactEntrypoints[0]);
+  let publicActCallbackInvoked = false;
+  const publicActError = captureThrown(() =>
+    React.act(() => {
+      publicActCallbackInvoked = true;
+    })
+  );
+  assertReactActPlaceholderError(publicActError);
+  assert.equal(publicActCallbackInvoked, false);
+
+  const openedGate =
+    domGateModule.evaluateReactDomTestUtilsActPrivateRoutingGate({
+      publicReactActReady: true,
+      publicTestUtilsActReady: true
+    });
+  assert.deepEqual(
+    openedGate.violations.map((violation) => violation.id),
+    ["public-act-routing-opened-before-prerequisites"]
+  );
 });
 
 test("React.act oracle covers every scenario in every probe mode", () => {

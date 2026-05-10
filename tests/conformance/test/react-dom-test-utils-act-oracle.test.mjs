@@ -28,6 +28,12 @@ const fastReactDomTestUtilsPath = fileURLToPath(
 const fastReactPath = fileURLToPath(
   new URL("../../../packages/react/index.js", import.meta.url)
 );
+const fastReactDomTestUtilsActGatePath = fileURLToPath(
+  new URL(
+    "../../../packages/react-dom/src/test-utils-act-gate.js",
+    import.meta.url
+  )
+);
 
 test("checked react-dom/test-utils.act oracle artifact has the expected schema and targets", () => {
   assert.equal(
@@ -220,6 +226,161 @@ test("Fast React test-utils act keeps the oracle-shaped package surface but fail
   );
 
   assertFastReactDomActBlocked(testUtils.act);
+});
+
+test("Fast React test-utils act private routing gate records accepted prerequisites without opening public act", () => {
+  const gateModule = loadFreshCjs(fastReactDomTestUtilsActGatePath);
+  const gate = gateModule.evaluateReactDomTestUtilsActPrivateRoutingGate();
+
+  assert.equal(
+    gate.status,
+    "blocked-public-test-utils-act-private-routing"
+  );
+  assert.equal(gate.entrypoint, "react-dom/test-utils");
+  assert.equal(gate.compatibilityTarget, "react-dom@19.2.6");
+  assert.equal(gate.publicActStatus, "unsupported-public-test-utils-act-placeholder");
+  assert.equal(gate.publicCompatibilityClaimed, false);
+  assert.equal(gate.privatePrerequisitesPresent, true);
+  assert.equal(gate.privateRoutingReady, false);
+  assert.equal(gate.publicReactActReady, false);
+  assert.equal(gate.publicTestUtilsActReady, false);
+  assert.deepEqual(gate.violations, []);
+  assert.deepEqual(gate.acceptedPrivatePrerequisiteIds, [
+    "react-act-private-dispatcher-gate",
+    "scheduler-act-queue-routing-records",
+    "scheduler-mock-flush-helper-metadata",
+    "sync-flush-act-continuation-records",
+    "passive-effects-flush-metadata",
+    "react-dom-private-root-bridge-records",
+    "react-dom-private-flush-sync-guard"
+  ]);
+  assert.deepEqual(gate.blockedPublicPrerequisiteIds, [
+    "public-react-act-delegation",
+    "act-queue-flushing-execution",
+    "passive-effect-callback-execution",
+    "public-react-dom-root-execution",
+    "public-react-dom-flush-sync-execution"
+  ]);
+  assert.deepEqual(gate.publicPrerequisitesStillBlocked, [
+    "public-react-act-delegation",
+    "act-queue-flushing-execution",
+    "passive-effect-callback-execution",
+    "public-react-dom-root-execution",
+    "public-react-dom-flush-sync-execution"
+  ]);
+  assert.deepEqual(gate.sideEffectPolicy, {
+    invokesActCallback: false,
+    executesQueuedWork: false,
+    executesPassiveEffects: false,
+    executesRendererRoots: false,
+    executesSyncFlush: false,
+    emitsDeprecationWarning: false,
+    delegatesToReactAct: false
+  });
+  assert.equal(
+    gate.deprecationWarningBehavior,
+    "preserved-no-warning-while-public-test-utils-act-is-placeholder"
+  );
+
+  assert.deepEqual(gate.reactActPrivateDispatcher, {
+    status: "blocked-until-renderer-roots-passive-effects-and-act-continuations",
+    requiredRecords: [
+      "SchedulerActQueueRequest",
+      "SchedulerActScopeBoundaryRecord",
+      "SyncFlushActContinuationRecord"
+    ],
+    requiredTaskKinds: ["RootSchedule", "SchedulerCallback"],
+    requiredContinuationStatuses: ["NoContinuation", "PendingContinuation"],
+    publicCompatibilityClaimed: false,
+    queueFlushingReady: false,
+    rendererRootsReady: false,
+    passiveEffectsReady: false,
+    continuationFlushingReady: false,
+    executesQueuedWork: false,
+    executesEffects: false
+  });
+  assert.deepEqual(gate.schedulerMockFlushHelpers, {
+    status: "accepted-scheduler-mock-flush-helper-metadata",
+    helpers: [
+      "unstable_flushAll",
+      "unstable_flushAllWithoutAsserting",
+      "unstable_flushExpired",
+      "unstable_flushNumberOfYields",
+      "unstable_flushUntilNextPaint"
+    ],
+    executesScheduledCallbacks: false
+  });
+  assert.deepEqual(gate.syncFlushActContinuation.records, [
+    "SchedulerActContinuationRecord",
+    "SyncFlushActPostPassiveContinuationGateRecord",
+    "SyncFlushRootRecord.act_continuation",
+    "SyncFlushRootRecord.act_post_passive_continuation_gate"
+  ]);
+  assert.deepEqual(gate.reactDomRootBridge.records, [
+    "FastReactDomPrivateRootCreateRecord",
+    "FastReactDomPrivateRootUpdateRecord",
+    "FastReactDomPrivateRootAdmissionRecord",
+    "FastReactDomPrivateRootNativeRequestHandoffRecord"
+  ]);
+  assert.equal(gate.reactDomRootBridge.nativeExecution, false);
+  assert.equal(gate.reactDomRootBridge.reconcilerExecution, false);
+  assert.equal(gate.reactDomRootBridge.domMutation, false);
+  assert.equal(gate.reactDomRootBridge.compatibilityClaimed, false);
+
+  const placeholder = gateModule.createReactDomTestUtilsActPlaceholder();
+  assert.deepEqual(describeFunctionValue(placeholder), {
+    type: "function",
+    name: "",
+    length: 1,
+    isAsync: false,
+    ownPropertyNames: ["length", "name", "prototype"],
+    ownKeys: [
+      { type: "string", value: "length" },
+      { type: "string", value: "name" },
+      { type: "string", value: "prototype" }
+    ]
+  });
+  assertFastReactDomActBlocked(placeholder);
+
+  const blockedError = gateModule.createReactDomTestUtilsActBlockedError();
+  assert.equal(blockedError.name, "FastReactDomUnimplementedError");
+  assert.equal(blockedError.code, "FAST_REACT_UNIMPLEMENTED");
+  assert.equal(blockedError.entrypoint, "react-dom/test-utils");
+  assert.equal(blockedError.exportName, "act");
+
+  const claimGate = gateModule.evaluateReactDomTestUtilsActPrivateRoutingGate({
+    publicCompatibilityClaimed: true
+  });
+  assert.equal(
+    claimGate.status,
+    "blocked-public-test-utils-act-private-routing-with-violations"
+  );
+  assert.deepEqual(
+    claimGate.violations.map((violation) => violation.id),
+    ["compatibility-claimed-before-public-act-routing"]
+  );
+
+  const openedGate = gateModule.evaluateReactDomTestUtilsActPrivateRoutingGate({
+    publicReactActReady: true
+  });
+  assert.deepEqual(
+    openedGate.violations.map((violation) => violation.id),
+    ["public-act-routing-opened-before-prerequisites"]
+  );
+
+  const missingPrivateGate =
+    gateModule.evaluateReactDomTestUtilsActPrivateRoutingGate({
+      acceptedPrivatePrerequisites: gate.acceptedPrivatePrerequisites.map(
+        (prerequisite, index) =>
+          index === 0 ? { ...prerequisite, present: false } : prerequisite
+      )
+    });
+  assert.deepEqual(missingPrivateGate.violations, [
+    {
+      id: "accepted-private-prerequisite-missing",
+      prerequisiteIds: ["react-act-private-dispatcher-gate"]
+    }
+  ]);
 });
 
 test("CommonJS descriptors are mutable while dynamic import namespace bindings reject writes", () => {
