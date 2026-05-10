@@ -67,6 +67,12 @@ export const REACT_TEST_RENDERER_TOJSON_PRIVATE_FACADE_REQUIREMENTS = [
       "The private toJSON facade must serialize the accepted minimal committed host-output diagnostic shape without exposing public toJSON."
   },
   {
+    id: "js-tojson-exposes-private-diagnostic-result",
+    requiredBeforePrivateDiagnostics: true,
+    reason:
+      "The private toJSON facade must expose an evidence-backed diagnostic result record without turning the public toJSON method on."
+  },
+  {
     id: "js-tojson-public-serialization-blocked",
     requiredBeforePrivateDiagnostics: true,
     reason:
@@ -258,6 +264,7 @@ export function evaluateReactTestRendererSerializationLocalGate({
     localChecks.privateToJSONSerializationFacadeGatePresent &&
     localChecks.privateToJSONSerializationFacadeRecognizesRustDiagnostics &&
     localChecks.privateToJSONSerializationFacadeSerializesHostOutputDiagnostics &&
+    localChecks.privateToJSONSerializationFacadeExposesDiagnosticResult &&
     localChecks.privateToJSONSerializationFacadePubliclyBlocked;
   const privateToTreeMetadataGateReady =
     privateDiagnosticsReady &&
@@ -326,6 +333,11 @@ export function evaluateReactTestRendererSerializationLocalGate({
           "js-tojson-serializes-accepted-host-output-diagnostics"
         ) {
           return !localChecks.privateToJSONSerializationFacadeSerializesHostOutputDiagnostics;
+        }
+        if (
+          requirement.id === "js-tojson-exposes-private-diagnostic-result"
+        ) {
+          return !localChecks.privateToJSONSerializationFacadeExposesDiagnosticResult;
         }
         if (requirement.id === "js-tojson-public-serialization-blocked") {
           return !localChecks.privateToJSONSerializationFacadePubliclyBlocked;
@@ -678,6 +690,40 @@ export function inspectReactTestRendererSerializationLocalTargets({
       publicJsReactTestRendererPackageSource,
       /\breact-test-renderer-tojson-private-host-output-serializer\b/u
     );
+  const privateToJSONSerializationFacadeExposesDiagnosticResult =
+    privateToJSONSerializationFacadeGatePresent &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bprivateDiagnosticResultAvailable\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bacceptedRustPrivateToJSONFacadeResult\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bfast-react-test-renderer\.tojson\.private-facade-result\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bTestRendererRoot::describe_private_to_json_facade_result_for_canary\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bTestRendererRoot::describe_private_to_json_facade_result_after_update_for_canary\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bcreateAcceptedHostOutputDiagnosticResult\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\breact-test-renderer-private-tojson-diagnostic-result\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bTestRendererPrivateToJsonFacadeResult\b/u
+    );
   const privateToJSONSerializationFacadePubliclyBlocked =
     privateToJSONSerializationFacadeGatePresent &&
     hasSourcePattern(
@@ -880,6 +926,7 @@ export function inspectReactTestRendererSerializationLocalTargets({
     privateToJSONSerializationFacadeGatePresent,
     privateToJSONSerializationFacadeRecognizesRustDiagnostics,
     privateToJSONSerializationFacadeSerializesHostOutputDiagnostics,
+    privateToJSONSerializationFacadeExposesDiagnosticResult,
     privateToJSONSerializationFacadePubliclyBlocked,
     privateToTreeHostOutputMetadataGatePresent,
     privateToTreeHostOutputMetadataRecognizesMinimalShape,
