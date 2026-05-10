@@ -17,6 +17,7 @@ const ReactSharedInternals = {
 };
 
 const privateStateHookDispatchers = new WeakSet();
+const privateContextHookDispatchers = new WeakSet();
 
 const ReactCurrentDispatcher = {};
 
@@ -54,6 +55,10 @@ function isPrivateStateHookDispatcher(dispatcher) {
   return isObjectLike(dispatcher) && privateStateHookDispatchers.has(dispatcher);
 }
 
+function isPrivateContextHookDispatcher(dispatcher) {
+  return isObjectLike(dispatcher) && privateContextHookDispatchers.has(dispatcher);
+}
+
 function validatePrivateStateHookDispatcher(dispatcher) {
   if (!isObjectLike(dispatcher)) {
     throw createMissingPrivateStateHookDispatcherError('useState');
@@ -66,9 +71,21 @@ function validatePrivateStateHookDispatcher(dispatcher) {
   }
 }
 
+function validatePrivateContextHookDispatcher(dispatcher) {
+  if (!isObjectLike(dispatcher) || typeof dispatcher.useContext !== 'function') {
+    throw createInvalidHookCallError('useContext');
+  }
+}
+
 function markPrivateStateHookDispatcher(dispatcher) {
   validatePrivateStateHookDispatcher(dispatcher);
   privateStateHookDispatchers.add(dispatcher);
+  return dispatcher;
+}
+
+function markPrivateContextHookDispatcher(dispatcher) {
+  validatePrivateContextHookDispatcher(dispatcher);
+  privateContextHookDispatchers.add(dispatcher);
   return dispatcher;
 }
 
@@ -106,13 +123,37 @@ function getPrivateStateDispatcherHook(dispatcher, hookName) {
   return hook;
 }
 
+function getPrivateContextDispatcherHook(dispatcher, hookName) {
+  if (!isPrivateContextHookDispatcher(dispatcher)) {
+    throw createInvalidHookCallError(hookName);
+  }
+
+  const hook = dispatcher[hookName];
+
+  if (typeof hook !== 'function') {
+    throw createInvalidHookCallError(hookName);
+  }
+
+  return hook;
+}
+
 function callDispatcherHook(hookName, args) {
   if (hookName === 'useReducer' || hookName === 'useState') {
     return callPrivateStateDispatcherHook(hookName, args);
   }
 
+  if (hookName === 'useContext') {
+    return callPrivateContextDispatcherHook(hookName, args);
+  }
+
   const dispatcher = resolveDispatcher(hookName);
   const hook = getDispatcherHook(dispatcher, hookName);
+  return hook.apply(dispatcher, args);
+}
+
+function callPrivateContextDispatcherHook(hookName, args) {
+  const dispatcher = resolveDispatcher(hookName);
+  const hook = getPrivateContextDispatcherHook(dispatcher, hookName);
   return hook.apply(dispatcher, args);
 }
 
@@ -146,7 +187,7 @@ const useCallback = defineHookFunctionShape(function (callback, deps) {
 }, 2);
 
 const useContext = defineHookFunctionShape(function (Context) {
-  return callDispatcherHook('useContext', arguments);
+  return callPrivateContextDispatcherHook('useContext', arguments);
 }, 1);
 
 const useEffect = defineHookFunctionShape(function (create, deps) {
@@ -177,12 +218,15 @@ module.exports = {
   ReactCurrentDispatcher,
   ReactSharedInternals,
   callDispatcherHook,
+  callPrivateContextDispatcherHook,
   callPrivateStateDispatcherHook,
   createInvalidHookCallError,
   createMissingPrivateStateHookDispatcherError,
   invalidHookCallErrorCode,
   invalidHookCallMessage,
+  isPrivateContextHookDispatcher,
   isPrivateStateHookDispatcher,
+  markPrivateContextHookDispatcher,
   markPrivateStateHookDispatcher,
   resolveDispatcher,
   use,

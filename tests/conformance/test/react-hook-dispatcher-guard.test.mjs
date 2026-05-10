@@ -39,10 +39,18 @@ const statefulDefaultHooks = [
   ["useState", 1, [0]]
 ];
 
+const contextDefaultHooks = [
+  ["useContext", 1, [{ $$typeof: Symbol.for("react.context") }]]
+];
+
 const dispatcherForwardedDefaultHooks = selectedDefaultHooks.filter(
-  ([hookName]) => !statefulDefaultHooks.some(
-    ([statefulHookName]) => statefulHookName === hookName
-  )
+  ([hookName]) =>
+    !statefulDefaultHooks.some(
+      ([statefulHookName]) => statefulHookName === hookName
+    ) &&
+    !contextDefaultHooks.some(
+      ([contextHookName]) => contextHookName === hookName
+    )
 );
 
 const selectedServerHooks = [
@@ -71,6 +79,10 @@ test("selected public React hooks preserve React 19.2.6 function names and lengt
 
 test("selected public React hooks throw the invalid-hook-call boundary without a dispatcher", () => {
   for (const [hookName, , args] of dispatcherForwardedDefaultHooks) {
+    assertInvalidHookCall(() => React[hookName](...args), hookName);
+  }
+
+  for (const [hookName, , args] of contextDefaultHooks) {
     assertInvalidHookCall(() => React[hookName](...args), hookName);
   }
 
@@ -105,6 +117,29 @@ test("useState and useReducer fail closed without a private state-hook dispatche
   assert.deepEqual(calls, []);
   assert.equal(
     hookDispatcher.isPrivateStateHookDispatcher(genericDispatcher),
+    false
+  );
+});
+
+test("useContext fails closed without a marked private context dispatcher", () => {
+  const context = { $$typeof: Symbol.for("react.context") };
+
+  assertInvalidHookCall(() => React.useContext(context), "useContext");
+
+  const calls = [];
+  const genericDispatcher = {
+    useContext(value) {
+      calls.push(value);
+      return "context";
+    }
+  };
+
+  hookDispatcher.ReactCurrentDispatcher.current = genericDispatcher;
+
+  assertInvalidHookCall(() => React.useContext(context), "useContext");
+  assert.deepEqual(calls, []);
+  assert.equal(
+    hookDispatcher.isPrivateContextHookDispatcher(genericDispatcher),
     false
   );
 });
@@ -188,6 +223,34 @@ test("useState and useReducer forward only to a marked private state-hook dispat
     }
   ]);
   assert.equal(hookDispatcher.isPrivateStateHookDispatcher(dispatcher), true);
+});
+
+test("useContext forwards only to a marked private context dispatcher", () => {
+  const calls = [];
+  const dispatcher = hookDispatcher.markPrivateContextHookDispatcher({
+    useContext(context) {
+      calls.push({
+        context,
+        thisMatchesDispatcher: this === dispatcher
+      });
+      return context._currentValue;
+    }
+  });
+  const context = {
+    $$typeof: Symbol.for("react.context"),
+    _currentValue: "private-context-value"
+  };
+
+  hookDispatcher.ReactCurrentDispatcher.current = dispatcher;
+
+  assert.equal(React.useContext(context), "private-context-value");
+  assert.deepEqual(calls, [
+    {
+      context,
+      thisMatchesDispatcher: true
+    }
+  ]);
+  assert.equal(hookDispatcher.isPrivateContextHookDispatcher(dispatcher), true);
 });
 
 test("react-server hooks share the dispatcher guard with the default React entrypoint", () => {

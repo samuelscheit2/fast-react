@@ -184,7 +184,7 @@ export function inspectContextObjectRuntimeLocalTargets({
     );
   const useContextStillDispatcherOnly = hasSourcePattern(
     hookDispatcherSource,
-    /\bcallDispatcherHook\('useContext',\s*arguments\)/u
+    /\bcall(?:PrivateContext)?DispatcherHook\('useContext',\s*arguments\)/u
   );
   const beginWorkRejectsContextProvider =
     hasSourcePattern(beginWorkSource, /\bFiberTag::ContextProvider\b/u) &&
