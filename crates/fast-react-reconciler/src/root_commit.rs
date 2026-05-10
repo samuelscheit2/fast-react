@@ -944,6 +944,29 @@ impl HostRootFinishedWorkCommitHandoffRecordForCanary {
     pub(crate) const fn effects_refs_and_hydration_blocked(&self) -> bool {
         self.execution_request.refs_effects_and_hydration_blocked()
     }
+
+    #[must_use]
+    pub(crate) fn proves_private_finished_work_commit_execution(&self) -> bool {
+        self.pending.records_finished_work()
+            && self.execution_request.execution_requested()
+            && self
+                .execution_request
+                .accepted_current_finished_work_record_shape()
+            && self.commit_order_after_pending_record()
+            && self.consumed_finished_work_record()
+            && self.current_after_commit == self.pending.finished_work()
+            && self.commit.root() == self.pending.root()
+            && self.commit.previous_current() == self.pending.previous_current()
+            && self.commit.current() == self.pending.finished_work()
+            && self.commit.finished_work() == self.pending.finished_work()
+            && self.commit.finished_lanes() == self.pending.finished_lanes()
+            && self.commit.remaining_lanes() == self.pending.remaining_lanes()
+            && self.commit.pending_lanes() == self.pending.remaining_lanes()
+            && self.mutation_execution_blocked()
+            && self.public_root_rendering_blocked()
+            && self.effects_refs_and_hydration_blocked()
+            && self.execution_request.compatibility_claim_blocked()
+    }
 }
 
 #[cfg(test)]
@@ -18584,6 +18607,7 @@ mod tests {
         assert!(handoff.mutation_execution_blocked());
         assert!(handoff.public_root_rendering_blocked());
         assert!(handoff.effects_refs_and_hydration_blocked());
+        assert!(handoff.proves_private_finished_work_commit_execution());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 

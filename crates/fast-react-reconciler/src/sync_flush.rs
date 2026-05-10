@@ -22,6 +22,11 @@ use crate::root_commit::{
     HostRootCommitRecoverySnapshotForCanary, PendingPassiveCommitHandoff,
     host_root_commit_recovery_snapshot_for_canary,
 };
+#[cfg(test)]
+use crate::root_scheduler::{
+    RootSyncSchedulerContinuationExecutionError, RootSyncSchedulerContinuationExecutionRecord,
+    execute_sync_scheduler_continuation_for_render_handoff,
+};
 use crate::root_scheduler::{
     SYNC_FLUSH_LANES, SchedulerBridgeActContinuationExecutionError,
     SchedulerBridgeActContinuationExecutionResult, SyncFlushActContinuationDrainRecord,
@@ -658,6 +663,73 @@ impl SyncFlushRootCommitContinuationRecordForCanary {
     }
 }
 
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SyncFlushActRootExecutionPathRecordForCanary {
+    root_scheduler_execution: RootSyncSchedulerContinuationExecutionRecord,
+    sync_flush_record: Option<SyncFlushRootRecord>,
+}
+
+#[cfg(test)]
+impl SyncFlushActRootExecutionPathRecordForCanary {
+    #[must_use]
+    pub(crate) const fn root_scheduler_execution(
+        &self,
+    ) -> &RootSyncSchedulerContinuationExecutionRecord {
+        &self.root_scheduler_execution
+    }
+
+    #[must_use]
+    pub(crate) fn sync_flush_record(&self) -> Option<&SyncFlushRootRecord> {
+        self.sync_flush_record.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) fn committed_sync_flush_record(&self) -> bool {
+        self.sync_flush_record.is_some()
+    }
+
+    #[must_use]
+    pub(crate) fn recorded_private_act_continuation(&self) -> bool {
+        self.sync_flush_record
+            .as_ref()
+            .is_some_and(|record| record.act_continuation.as_ref().is_some())
+    }
+
+    #[must_use]
+    pub(crate) fn accepted_root_scheduler_execution_evidence(&self) -> bool {
+        self.root_scheduler_execution
+            .accepted_root_scheduler_execution_evidence_for_canary()
+    }
+
+    #[must_use]
+    pub(crate) fn accepted_root_commit_execution_evidence(&self) -> bool {
+        self.root_scheduler_execution
+            .accepted_root_commit_execution_evidence_for_canary()
+    }
+
+    #[must_use]
+    pub(crate) fn routed_private_sync_flush_act_path(&self) -> bool {
+        self.committed_sync_flush_record()
+            && self.recorded_private_act_continuation()
+            && self
+                .root_scheduler_execution
+                .routed_through_root_scheduler_and_commit_evidence_for_canary()
+            && !self.public_act_compatibility_claimed()
+            && !self.public_flush_sync_compatibility_claimed()
+    }
+
+    #[must_use]
+    pub(crate) const fn public_act_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_flush_sync_compatibility_claimed(&self) -> bool {
+        false
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SyncFlushErrorRecoveryRootStatusForCanary {
     Committed,
@@ -1183,6 +1255,51 @@ impl SyncFlushRootRecord {
         let committed = commit_render_phase(store, record.order(), record.render_phase())?;
         recompute_might_have_pending_sync_work(store)?;
         Ok(committed)
+    }
+
+    #[cfg(test)]
+    #[allow(
+        dead_code,
+        reason = "crate-private sync-flush/act root execution path is exercised by focused canary tests"
+    )]
+    pub(crate) fn commit_rendered_sync_flush_act_record_through_root_execution_evidence_for_canary<
+        H: HostTypes,
+    >(
+        store: &mut FiberRootStore<H>,
+        record: RootSyncFlushRecord,
+        requested_callback_node: RootSchedulerCallbackHandle,
+    ) -> Result<
+        SyncFlushActRootExecutionPathRecordForCanary,
+        RootSyncSchedulerContinuationExecutionError,
+    > {
+        let root_scheduler_execution = execute_sync_scheduler_continuation_for_render_handoff(
+            store,
+            record,
+            requested_callback_node,
+        )?;
+        let sync_flush_record =
+            if root_scheduler_execution.did_execute_private_sync_scheduler_continuation() {
+                let commit = root_scheduler_execution
+                    .commit()
+                    .expect("executed sync scheduler continuation must carry commit evidence")
+                    .clone();
+                Some(
+                    sync_flush_root_record_after_commit(
+                        store,
+                        record.order(),
+                        record.render_phase(),
+                        commit,
+                    )
+                    .map_err(RootSyncSchedulerContinuationExecutionError::from)?,
+                )
+            } else {
+                None
+            };
+
+        Ok(SyncFlushActRootExecutionPathRecordForCanary {
+            root_scheduler_execution,
+            sync_flush_record,
+        })
     }
 
     #[doc(hidden)]
@@ -1971,6 +2088,16 @@ fn commit_render_phase<H: HostTypes>(
     render_phase: HostRootRenderPhaseRecord,
 ) -> Result<SyncFlushRootRecord, SyncFlushError> {
     let commit = commit_finished_host_root(store, render_phase)?;
+    sync_flush_root_record_after_commit(store, order, render_phase, commit)
+        .map_err(SyncFlushError::from)
+}
+
+fn sync_flush_root_record_after_commit<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    order: usize,
+    render_phase: HostRootRenderPhaseRecord,
+    commit: HostRootCommitRecord,
+) -> Result<SyncFlushRootRecord, RootSchedulerError> {
     let continuation_lanes =
         sync_flush_act_continuation_lanes_for_root(store, render_phase.root())?;
     let act_continuation = store
@@ -2007,6 +2134,7 @@ mod tests {
         RootUpdateCallbackInvocationTestControl,
     };
     use crate::root_scheduler::{
+        RootSyncSchedulerContinuationExecutionStatus,
         SchedulerBridgeActContinuationExecutionStatus, root_sync_flush_record_for_canary,
     };
     use crate::scheduler_bridge::SchedulerActContinuationStatus;
@@ -2302,6 +2430,80 @@ mod tests {
         assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
         assert!(!store.root_scheduler().is_flushing_work());
         assert!(!store.root_scheduler().might_have_pending_sync_work());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_act_root_execution_path_uses_scheduler_and_commit_evidence() {
+        let (mut store, root_id, host) = root_store();
+        let sync_element = RootElementHandle::from_raw(66_150);
+        let default_element = RootElementHandle::from_raw(66_151);
+        let previous_current = store.root(root_id).unwrap().current();
+        store.scheduler_bridge_mut().enter_act_scope();
+        schedule_sync_update(&mut store, root_id, sync_element);
+        let default_update = update_container(&mut store, root_id, default_element, None).unwrap();
+        ensure_root_is_scheduled(&mut store, default_update.schedule()).unwrap();
+
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+        let rendered_record = rendered.records()[0];
+        let render_phase = rendered_record.render_phase();
+
+        let routed =
+            SyncFlushRootRecord::commit_rendered_sync_flush_act_record_through_root_execution_evidence_for_canary(
+                &mut store,
+                rendered_record,
+                RootSchedulerCallbackHandle::NONE,
+            )
+            .unwrap();
+
+        assert!(routed.routed_private_sync_flush_act_path());
+        assert!(routed.accepted_root_scheduler_execution_evidence());
+        assert!(routed.accepted_root_commit_execution_evidence());
+        assert!(!routed.public_act_compatibility_claimed());
+        assert!(!routed.public_flush_sync_compatibility_claimed());
+        let root_execution = routed.root_scheduler_execution();
+        assert_eq!(
+            root_execution.status(),
+            RootSyncSchedulerContinuationExecutionStatus::RenderedAndCommitted
+        );
+        assert_eq!(root_execution.root(), root_id);
+        assert_eq!(root_execution.handoff(), rendered_record);
+        assert_eq!(root_execution.handoff_lanes(), Lanes::SYNC);
+        assert_eq!(root_execution.selected_lanes(), Lanes::SYNC);
+        assert!(root_execution.routed_through_root_scheduler_and_commit_evidence_for_canary());
+        let handoff = root_execution.root_commit_handoff_for_canary().unwrap();
+        assert!(handoff.proves_private_finished_work_commit_execution());
+        assert_eq!(handoff.pending().previous_current(), previous_current);
+        assert_eq!(
+            handoff.pending().finished_work(),
+            render_phase.finished_work()
+        );
+
+        let sync_flush = routed.sync_flush_record().unwrap();
+        assert_eq!(sync_flush.root(), root_id);
+        assert_eq!(sync_flush.order(), rendered_record.order());
+        assert_eq!(sync_flush.render_lanes(), Lanes::SYNC);
+        assert_eq!(sync_flush.commit().previous_current(), previous_current);
+        assert_eq!(sync_flush.commit().current(), render_phase.finished_work());
+        assert_eq!(
+            sync_flush
+                .act_continuation
+                .as_ref()
+                .unwrap()
+                .continuation_lanes(),
+            Lanes::DEFAULT
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            render_phase.finished_work()
+        );
+        assert_eq!(current_host_root_element(&store, root_id), sync_element);
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            Lanes::DEFAULT
+        );
+        assert!(store.scheduler_bridge().callback_requests().is_empty());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
@@ -2960,6 +3162,13 @@ mod tests {
         assert_eq!(record.root(), root_id);
         assert_eq!(record.requested_lanes(), Lanes::DEFAULT);
         assert_eq!(record.selected_lanes(), Lanes::DEFAULT);
+        assert!(record.routed_through_root_scheduler_and_commit_evidence_for_canary());
+        assert!(record.accepted_root_scheduler_execution_evidence_for_canary());
+        assert!(record.accepted_root_commit_execution_evidence_for_canary());
+        let handoff = record.root_commit_handoff_for_canary().unwrap();
+        assert!(handoff.proves_private_finished_work_commit_execution());
+        assert_eq!(handoff.pending().root(), root_id);
+        assert_eq!(handoff.pending().render_lanes(), Lanes::DEFAULT);
         assert_eq!(
             record.render_phase().unwrap().resulting_element(),
             default_element
