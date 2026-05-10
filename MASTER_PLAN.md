@@ -46,29 +46,28 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Queue 685-714 is launched from queue base commit
-`9ec6678` in isolated `worker/<slug>` branches and worktrees. Workers 685-694
-and 712 have been accepted from this queue; after cleanup, fill open slots only
-after checking for additional completed workers.
+`9ec6678` in isolated `worker/<slug>` branches and worktrees. Workers 685-694,
+697, 704, 710, and 712-714 have been accepted from this queue; after cleanup,
+fill open slots only after checking for additional completed workers.
 
-- 695-702: React test-renderer private native execution and metadata parity for
-  root create/update, `toJSON`, `toTree`, TestInstance queries, act, error
-  boundaries, and production private metadata.
-- 703-711: React DOM private execution for root render/update/unmount,
-  delegated events, controlled restore, hydration, portals, resources, and form
+- 695-696 and 698-702: remaining React test-renderer private native execution
+  and metadata parity for root create/update, `toTree`, TestInstance queries,
+  act, error boundaries, and production private metadata.
+- 703, 705-709, and 711: remaining React DOM private execution for root render/
+  unmount, delegated events, controlled restore, hydration, portals, and form
   actions.
-- 713: Scheduler postTask private continuation evidence.
-- 714: Package-surface/private-admission audit for accepted queue 655-684
-  diagnostics.
 
 ## Near-Term Sequencing
 
-1. Launch replacement workers 685-714 up to the 30 top-level cap from the
-   queue prompt commit.
-2. Monitor tmux pane state and worker progress reports, then classify
+1. Clean accepted worker sessions/worktrees/branches, then re-check live panes
+   for additional completions.
+2. Launch replacement workers up to the 30 top-level cap from the queue prompt
+   commit after completed work has been merged.
+3. Monitor tmux pane state and worker progress reports, then classify
    completions before accepting work.
-3. Merge accepted completed work in batches, resolving overlap conflicts on
+4. Merge accepted completed work in batches, resolving overlap conflicts on
    `main`, then clean accepted sessions/worktrees/branches.
-4. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
+5. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
 
 ## Next Queue Candidates

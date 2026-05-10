@@ -60,6 +60,18 @@ sequencing belong in `MASTER_PLAN.md`.
 - The batch was verified after merge with `cargo fmt --all --check`, full
   `fast-react-reconciler` tests, conflict-marker scanning, and `git diff
   --check`.
+- Workers 697, 704, 710, 713, and 714 were accepted from the active queue. The
+  batch added private react-test-renderer `toJSON` nested/sibling host-output
+  execution evidence, React DOM fake-DOM `dangerouslySetInnerHTML` root-update
+  execution with rollback evidence, resource fake-head preload/preinit/script
+  dedupe and load-order execution, Scheduler postTask priority-timeout
+  continuation metadata, and queue 655-684 private-admission guards. Public
+  serialization, React DOM root/resource, Scheduler timing, and package
+  compatibility claims remain blocked.
+- The batch was verified after merge with `cargo fmt --all --check`, full
+  `fast-react-test-renderer` tests, React DOM/test-renderer/Scheduler
+  workspace checks, `npm run check:package-surface`, full conformance checks,
+  conflict-marker scanning, and `git diff --check`.
 
 ### Queue 655-684
 
