@@ -5555,6 +5555,24 @@ mod tests {
         passive_dependencies: HookEffectDependencies,
     }
 
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct NestedDeletedHostSubtreeRefPassiveFixture {
+        host_parent: FiberId,
+        host_parent_state_node: StateNodeHandle,
+        deleted_host: FiberId,
+        deleted_host_state_node: StateNodeHandle,
+        deleted_host_ref: RefHandle,
+        deleted_function: FiberId,
+        nested_host: FiberId,
+        nested_host_state_node: StateNodeHandle,
+        nested_host_ref: RefHandle,
+        deleted_text: FiberId,
+        deleted_text_state_node: StateNodeHandle,
+        passive_create: HookEffectCallbackHandle,
+        passive_destroy: HookEffectCallbackHandle,
+        passive_dependencies: HookEffectDependencies,
+    }
+
     fn create_function_component_fiber(
         store: &mut FiberRootStore<RecordingHost>,
         mode: FiberMode,
@@ -5680,6 +5698,109 @@ mod tests {
             deleted_host_state_node,
             deleted_host_ref,
             deleted_function,
+            deleted_text,
+            deleted_text_state_node,
+            passive_create,
+            passive_destroy,
+            passive_dependencies,
+        }
+    }
+
+    fn attach_nested_deleted_host_subtree_ref_passive_fixture(
+        store: &mut FiberRootStore<RecordingHost>,
+        hook_store: &mut FunctionComponentHookRenderStore,
+        host_root_work_in_progress: FiberId,
+    ) -> NestedDeletedHostSubtreeRefPassiveFixture {
+        let mode = store
+            .fiber_arena()
+            .get(host_root_work_in_progress)
+            .unwrap()
+            .mode();
+        let host_parent = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::from_raw(9_731),
+            mode,
+        );
+        let host_parent_state_node = StateNodeHandle::from_raw(9_831);
+        store
+            .fiber_arena_mut()
+            .get_mut(host_parent)
+            .unwrap()
+            .set_state_node(host_parent_state_node);
+
+        let deleted_host_ref = RefHandle::from_raw(9_732);
+        let deleted_host_state_node = StateNodeHandle::from_raw(9_832);
+        let deleted_host =
+            create_host_ref_fiber(store, mode, deleted_host_ref, deleted_host_state_node);
+        let deleted_function = create_function_component_fiber(
+            store,
+            mode,
+            PropsHandle::from_raw(9_733),
+            FiberTypeHandle::from_raw(9_933),
+        );
+        let nested_host_ref = RefHandle::from_raw(9_734);
+        let nested_host_state_node = StateNodeHandle::from_raw(9_834);
+        let nested_host =
+            create_host_ref_fiber(store, mode, nested_host_ref, nested_host_state_node);
+        let deleted_text = create_host_text_fiber(
+            store,
+            mode,
+            PropsHandle::from_raw(9_735),
+            StateNodeHandle::from_raw(9_835),
+        );
+        let deleted_text_state_node = StateNodeHandle::from_raw(9_835);
+        store
+            .fiber_arena_mut()
+            .set_children(nested_host, &[deleted_text])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(deleted_function, &[nested_host])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(deleted_host, &[deleted_function])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_parent, &[deleted_host])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root_work_in_progress, &[host_parent])
+            .unwrap();
+
+        let passive_create = callback(9_934);
+        let passive_destroy = callback(9_935);
+        let passive_dependencies = deps(9_936);
+        hook_store
+            .create_current_effect_metadata(
+                store.fiber_arena_mut(),
+                deleted_function,
+                FunctionComponentEffectPhase::Passive,
+                passive_create,
+                passive_dependencies,
+                Some(passive_destroy),
+            )
+            .unwrap();
+
+        store
+            .fiber_arena_mut()
+            .mark_child_for_deletion(host_parent, deleted_host)
+            .unwrap();
+        bubble_test_fiber(store, host_root_work_in_progress);
+
+        NestedDeletedHostSubtreeRefPassiveFixture {
+            host_parent,
+            host_parent_state_node,
+            deleted_host,
+            deleted_host_state_node,
+            deleted_host_ref,
+            deleted_function,
+            nested_host,
+            nested_host_state_node,
+            nested_host_ref,
             deleted_text,
             deleted_text_state_node,
             passive_create,
@@ -9528,6 +9649,209 @@ mod tests {
             !commit
                 .host_node_deletion_cleanup_log()
                 .public_unmount_compatibility_claimed()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn deletion_ref_passive_cleanup_execution_orders_nested_host_refs_before_passive_destroy() {
+        let (mut store, root_id, host) = root_store();
+        update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(9_966),
+            None,
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let finished_work = render.finished_work();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let fixture = attach_nested_deleted_host_subtree_ref_passive_fixture(
+            &mut store,
+            &mut hook_store,
+            finished_work,
+        );
+        let deleted_handoff = queue_function_component_deleted_subtree_pending_passive_effects(
+            &mut store,
+            root_id,
+            &hook_store,
+            fixture.host_parent,
+            fixture.deleted_host,
+            Lanes::DEFAULT,
+        )
+        .unwrap();
+        let queued_passive = deleted_handoff.records()[0];
+
+        let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+        commit
+            .record_function_component_deleted_subtree_passive_effects_for_canary(&[
+                deleted_handoff,
+            ])
+            .unwrap();
+        let callback_request_count = store.scheduler_bridge().callback_requests().len();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+        let mut executor = RecordingDeletedCleanupExecutor::default();
+
+        let execution = execute_deleted_subtree_ref_and_passive_cleanup_after_commit_for_canary(
+            &mut store,
+            &commit,
+            &mut executor,
+        )
+        .unwrap();
+
+        assert_eq!(execution.root(), root_id);
+        assert_eq!(execution.finished_work(), finished_work);
+        assert!(execution.ref_cleanup_return_callbacks_invoked());
+        assert!(execution.passive_destroy_callbacks_invoked());
+        assert!(!execution.public_unmount_compatibility_claimed());
+        assert!(!execution.public_ref_or_effect_compatibility_claimed());
+        assert_eq!(
+            executor.events(),
+            &[
+                DeletedCleanupExecutionEvent::RefCleanup(fixture.deleted_host),
+                DeletedCleanupExecutionEvent::RefCleanup(fixture.nested_host),
+                DeletedCleanupExecutionEvent::PassiveDestroy(fixture.passive_destroy),
+            ]
+        );
+        assert_eq!(executor.ref_cleanup_calls().len(), 2);
+        assert_eq!(executor.destroy_calls().len(), 1);
+
+        let first_ref = execution.ref_cleanup_return_executions()[0];
+        assert_eq!(first_ref.execution_order(), 0);
+        assert_eq!(first_ref.deleted_root(), fixture.deleted_host);
+        assert_eq!(first_ref.fiber(), fixture.deleted_host);
+        assert_eq!(first_ref.state_node(), fixture.deleted_host_state_node);
+        assert_eq!(first_ref.ref_handle(), fixture.deleted_host_ref);
+        assert_eq!(first_ref.request(), executor.ref_cleanup_calls()[0]);
+        assert_eq!(first_ref.request().order_gate_sequence(), 0);
+        assert_eq!(first_ref.request().cleanup_return_sequence(), 0);
+
+        let second_ref = execution.ref_cleanup_return_executions()[1];
+        assert_eq!(second_ref.execution_order(), 1);
+        assert_eq!(second_ref.deleted_root(), fixture.deleted_host);
+        assert_eq!(second_ref.fiber(), fixture.nested_host);
+        assert_eq!(second_ref.state_node(), fixture.nested_host_state_node);
+        assert_eq!(second_ref.ref_handle(), fixture.nested_host_ref);
+        assert_eq!(second_ref.request(), executor.ref_cleanup_calls()[1]);
+        assert_eq!(second_ref.request().order_gate_sequence(), 1);
+        assert_eq!(second_ref.request().cleanup_return_sequence(), 1);
+
+        let passive = execution.passive_effects().unwrap();
+        assert_eq!(passive.status(), PassiveEffectsFlushStatus::Flushed);
+        assert!(passive.consumed_pending_passive());
+        assert!(passive.did_execute_destroy_callbacks());
+        assert!(!passive.public_effect_execution_enabled());
+        assert!(!passive.public_act_compatibility_claimed());
+        assert!(!passive.scheduler_driven_passive_execution_enabled());
+        assert_eq!(passive.records().len(), 1);
+        assert_eq!(passive.records()[0].fiber(), fixture.deleted_function);
+        assert_eq!(
+            passive.records()[0].unmount_origin(),
+            Some(PendingPassiveUnmountOrigin::DeletedSubtree {
+                nearest_mounted_ancestor: fixture.host_parent,
+            })
+        );
+        assert_eq!(
+            passive.records()[0].destroy_callback(),
+            Some(fixture.passive_destroy)
+        );
+        assert!(passive.records()[0].destroy_callback_invoked());
+        assert_eq!(passive.destroy_callback_executions().len(), 1);
+        let passive_execution = passive.destroy_callback_executions()[0];
+        assert_eq!(passive_execution.execution_order(), 0);
+        assert_eq!(passive_execution.fiber(), fixture.deleted_function);
+        assert_eq!(
+            passive_execution.pending_order(),
+            queued_passive.unmount_order()
+        );
+        assert_eq!(
+            passive_execution.destroy_callback(),
+            fixture.passive_destroy
+        );
+        assert_eq!(executor.destroy_calls()[0], passive_execution.request());
+
+        let records = execution.records();
+        assert_eq!(records.len(), 6);
+        assert_eq!(
+            records
+                .iter()
+                .map(|record| record.sequence())
+                .collect::<Vec<_>>(),
+            vec![0, 1, 2, 3, 4, 5]
+        );
+        assert_eq!(
+            records
+                .iter()
+                .map(|record| record.phase())
+                .collect::<Vec<_>>(),
+            vec![
+                HostRootDeletionCleanupOrderPhase::RefCleanupReturn,
+                HostRootDeletionCleanupOrderPhase::RefCleanupReturn,
+                HostRootDeletionCleanupOrderPhase::PassiveDestroy,
+                HostRootDeletionCleanupOrderPhase::HostNodeCleanup,
+                HostRootDeletionCleanupOrderPhase::HostNodeCleanup,
+                HostRootDeletionCleanupOrderPhase::HostNodeCleanup,
+            ]
+        );
+        assert_eq!(records[0].fiber(), fixture.deleted_host);
+        assert_eq!(records[0].deleted_root(), fixture.deleted_host);
+        assert_eq!(records[0].ref_cleanup_return_execution_order(), Some(0));
+        assert_eq!(records[0].passive_destroy_execution_order(), None);
+        assert_eq!(records[0].host_cleanup_sequence(), None);
+        assert_eq!(records[1].fiber(), fixture.nested_host);
+        assert_eq!(records[1].deleted_root(), fixture.deleted_host);
+        assert_eq!(records[1].ref_cleanup_return_execution_order(), Some(1));
+        assert_eq!(records[1].passive_destroy_execution_order(), None);
+        assert_eq!(records[1].host_cleanup_sequence(), None);
+        assert_eq!(records[2].fiber(), fixture.deleted_function);
+        assert_eq!(records[2].deleted_root(), fixture.deleted_host);
+        assert_eq!(records[2].ref_cleanup_return_execution_order(), None);
+        assert_eq!(records[2].passive_destroy_execution_order(), Some(0));
+        assert_eq!(records[2].host_cleanup_sequence(), None);
+        assert_eq!(records[3].fiber(), fixture.deleted_text);
+        assert_eq!(records[3].host_cleanup_sequence(), Some(0));
+        assert_eq!(records[4].fiber(), fixture.nested_host);
+        assert_eq!(records[4].host_cleanup_sequence(), Some(1));
+        assert_eq!(records[5].fiber(), fixture.deleted_host);
+        assert_eq!(records[5].host_cleanup_sequence(), Some(2));
+
+        assert_eq!(queued_passive.create(), fixture.passive_create);
+        assert_eq!(queued_passive.destroy(), Some(fixture.passive_destroy));
+        assert_eq!(queued_passive.dependencies(), fixture.passive_dependencies);
+        assert_eq!(
+            commit.host_node_deletion_cleanup_log().records()[0].state_node(),
+            fixture.deleted_text_state_node
+        );
+        assert_eq!(
+            commit.host_node_deletion_cleanup_log().records()[1].state_node(),
+            fixture.nested_host_state_node
+        );
+        assert_eq!(
+            commit.host_node_deletion_cleanup_log().records()[2].state_node(),
+            fixture.deleted_host_state_node
+        );
+        for cleanup in commit.host_node_deletion_cleanup_log().records() {
+            assert_eq!(cleanup.host_parent(), Some(fixture.host_parent));
+            assert_eq!(
+                cleanup.host_parent_state_node(),
+                fixture.host_parent_state_node
+            );
+        }
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .scheduling()
+                .pending_passive()
+                .is_empty()
+        );
+        assert_eq!(
+            store.scheduler_bridge().callback_requests().len(),
+            callback_request_count
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
         );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
