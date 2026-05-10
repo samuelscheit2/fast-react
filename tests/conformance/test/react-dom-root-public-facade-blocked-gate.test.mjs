@@ -290,6 +290,105 @@ test("React DOM client private facade adapter is symbol-only and routes to priva
   ]);
 });
 
+test("React DOM client private facade preflights marker/listener setup and cleanup without public behavior", () => {
+  const reactDomClient = require(
+    path.join(repoRoot, "packages/react-dom/client.js")
+  );
+  const rootBridge = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-bridge.js")
+  );
+  const rootMarkers = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-markers.js")
+  );
+  const listenerRegistry = require(
+    path.join(repoRoot, "packages/react-dom/src/events/listener-registry.js")
+  );
+  const rootListeners = require(
+    path.join(repoRoot, "packages/react-dom/src/events/root-listeners.js")
+  );
+  const domContainer = require(
+    path.join(repoRoot, "packages/react-dom/src/client/dom-container.js")
+  );
+  const symbol = rootBridge.privateRootPublicFacadeAdapterSymbol;
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    symbol
+  );
+  const document = createPrivateGateDocument(
+    "public-facade-marker-listener-preflight",
+    domContainer
+  );
+  const container = createPrivateGateElement("DIV", document, domContainer);
+  const adapter = descriptor.value({
+    publicFacadePreflightIdPrefix: "facade-marker-listener-preflight",
+    requestIdPrefix: "facade-preflight-request",
+    rootIdPrefix: "facade-preflight-root",
+    sideEffectIdPrefix: "facade-preflight-side-effect"
+  });
+  const root = adapter.createRoot(container);
+  const preflight =
+    adapter.preflightRootMarkerListenerSetupAndCleanup(root);
+
+  assert.equal(
+    preflight.preflightStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHTED
+  );
+  assert.equal(preflight.preflightId, "facade-marker-listener-preflight:1");
+  assert.deepEqual(
+    preflight.acceptedCapabilities.map((capability) => capability.id),
+    [
+      "public-facade-create-root-record",
+      "root-marker-setup-cleanup",
+      "root-listener-setup-cleanup"
+    ]
+  );
+  assert.equal(preflight.setupPrerequisites.rootMarkerMatchesOwner, true);
+  assert.equal(preflight.setupPrerequisites.rootListeningMarkerPresent, true);
+  assert.equal(
+    preflight.setupPrerequisites.ownerDocumentListeningMarkerPresent,
+    true
+  );
+  assert.equal(preflight.setupPrerequisites.listenerRegistrationCount, 139);
+  assert.equal(
+    preflight.cleanupPrerequisites.markerCleanupStatus,
+    rootMarkers.ROOT_MARKER_REVERTED
+  );
+  assert.equal(
+    preflight.cleanupPrerequisites.listenerCleanupStatus,
+    rootListeners.ROOT_LISTENERS_REVERTED
+  );
+  assert.equal(preflight.cleanupPrerequisites.listenerRemovalCount, 139);
+  assert.equal(
+    preflight.cleanupPrerequisites.restoredInitialMarkerState,
+    true
+  );
+  assert.equal(preflight.publicCreateRootEnabled, false);
+  assert.equal(preflight.publicRootExecution, false);
+  assert.equal(preflight.nativeExecution, false);
+  assert.equal(preflight.reconcilerExecution, false);
+  assert.equal(preflight.domMutation, false);
+  assert.equal(preflight.markerWrites, false);
+  assert.equal(preflight.listenerInstallation, false);
+  assert.equal(preflight.eventDispatch, false);
+  assert.equal(preflight.compatibilityClaimed, false);
+  assert.equal(rootMarkers.getContainerRoot(container), null);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+  assert.equal(container.__registrations.length, 0);
+  assert.equal(document.__registrations.length, 0);
+  assert.equal(container.__mutationLog.length, 0);
+  assert.equal(document.__mutationLog.length, 0);
+
+  const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
+  assert.equal(publicBoundary.createRoot.status, "throws");
+  assert.equal(publicBoundary.createRoot.rootObjectCreated, false);
+  assert.equal(publicBoundary.createRoot.sideEffects.mutationCount, 0);
+  assert.equal(
+    publicBoundary.createRoot.sideEffects.listenerRegistrationCount,
+    0
+  );
+});
+
 test("React DOM public root facade update and unmount rows stay blocked apart from private request metadata", () => {
   const gate = evaluateReactDomRootPublicFacadeBlockedGate({
     checkedOracle: rootRenderOracle,

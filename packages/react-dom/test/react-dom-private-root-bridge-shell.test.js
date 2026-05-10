@@ -2593,6 +2593,250 @@ test('private react-dom/client facade adapter routes root calls to bridge record
   assertBridgeDidNotTouchContainer(container, document);
 });
 
+test('private react-dom/client facade preflights root marker/listener setup and cleanup', () => {
+  const document = createDocument('private-client-facade-preflight');
+  const container = createElement('DIV', document);
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    rootBridge.privateRootPublicFacadeAdapterSymbol
+  );
+  const adapter = descriptor.value({
+    publicFacadePreflightIdPrefix: 'facade-preflight',
+    requestIdPrefix: 'facade-preflight-request',
+    rootIdPrefix: 'facade-preflight-root',
+    sideEffectIdPrefix: 'facade-preflight-side-effect'
+  });
+  const root = adapter.createRoot(container);
+  const create = adapter.getRootCreateRecord(root);
+
+  assertBridgeDidNotTouchContainer(container, document);
+
+  const preflight = adapter.preflightRootMarkerListenerSetupAndCleanup(root);
+  const hidden =
+    rootBridge.getPrivateRootPublicFacadeMarkerListenerPreflightPayload(
+      preflight
+    );
+
+  assert.equal(Object.isFrozen(preflight), true);
+  assert.equal(
+    preflight.$$typeof,
+    rootBridge.privateRootPublicFacadeMarkerListenerPreflightRecordType
+  );
+  assert.equal(
+    preflight.kind,
+    'FastReactDomPrivateRootPublicFacadeMarkerListenerPreflightRecord'
+  );
+  assert.equal(
+    preflight.preflightStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHTED
+  );
+  assert.equal(preflight.preflightId, 'facade-preflight:1');
+  assert.equal(preflight.rootId, create.rootId);
+  assert.equal(preflight.createRequestId, create.requestId);
+  assert.equal(
+    preflight.sideEffectId,
+    'facade-preflight-side-effect:1'
+  );
+  assert.equal(
+    preflight.setupSideEffectStatus,
+    rootBridge.ROOT_BRIDGE_MARK_LISTEN_APPLIED
+  );
+  assert.equal(
+    preflight.cleanupSideEffectStatus,
+    rootBridge.ROOT_BRIDGE_MARK_LISTEN_REVERTED
+  );
+  assert.equal(
+    preflight.markerRecordType,
+    rootMarkers.privateRootMarkerMutationRecordType
+  );
+  assert.equal(preflight.markerStatus, rootMarkers.ROOT_MARKER_APPLIED);
+  assert.equal(preflight.markerCleanupStatus, rootMarkers.ROOT_MARKER_REVERTED);
+  assert.equal(
+    preflight.listenerRegistrationType,
+    rootListeners.privateRootListenerRegistrationRecordType
+  );
+  assert.equal(
+    preflight.listenerRegistrationStatus,
+    rootListeners.ROOT_LISTENERS_REGISTERED
+  );
+  assert.equal(
+    preflight.listenerCleanupType,
+    rootListeners.privateRootListenerCleanupRecordType
+  );
+  assert.equal(
+    preflight.listenerCleanupStatus,
+    rootListeners.ROOT_LISTENERS_REVERTED
+  );
+  assert.deepEqual(
+    preflight.acceptedCapabilities.map((capability) => capability.id),
+    [
+      'public-facade-create-root-record',
+      'root-marker-setup-cleanup',
+      'root-listener-setup-cleanup'
+    ]
+  );
+  assert.deepEqual(
+    preflight.blockedCapabilities.map((capability) => capability.id),
+    [
+      'public-root-execution',
+      'native-execution',
+      'reconciler-execution',
+      'dom-mutation',
+      'hydration',
+      'events',
+      'compatibility-claims'
+    ]
+  );
+  assert.deepEqual(preflight.setupPrerequisites, {
+    accepted: true,
+    markerStatus: rootMarkers.ROOT_MARKER_APPLIED,
+    listenerRegistrationStatus: rootListeners.ROOT_LISTENERS_REGISTERED,
+    rootMarkerMatchesOwner: true,
+    rootListeningMarkerPresent: true,
+    ownerDocumentListeningMarkerPresent: true,
+    listenerRegistrationCount: 139,
+    rootRegistrationCount: 138,
+    ownerDocumentRegistrationCount: 1
+  });
+  assert.deepEqual(preflight.cleanupPrerequisites, {
+    accepted: true,
+    markerCleanupStatus: rootMarkers.ROOT_MARKER_REVERTED,
+    listenerCleanupStatus: rootListeners.ROOT_LISTENERS_REVERTED,
+    listenerRemovalCount: 139,
+    listenerSetKeyRemovalCount: 139,
+    restoredTargetCount: 2,
+    restoredInitialMarkerState: true,
+    finalRootListeningMarkerPresent: false,
+    finalOwnerDocumentListeningMarkerPresent: false
+  });
+  assert.equal(preflight.beforeState.containerMarker.propertyCount, 0);
+  assert.equal(preflight.setupState.containerMarker.truthyCount, 1);
+  assert.equal(preflight.setupState.rootListenerRegistrationCount, 138);
+  assert.equal(
+    preflight.setupState.ownerDocumentListenerRegistrationCount,
+    1
+  );
+  assert.equal(preflight.afterState.containerMarker.propertyCount, 0);
+  assert.equal(preflight.afterState.rootListenerRegistrationCount, 0);
+  assert.equal(
+    preflight.afterState.ownerDocumentListenerRegistrationCount,
+    0
+  );
+  assert.equal(preflight.publicCreateRootEnabled, false);
+  assert.equal(preflight.publicRootCreated, false);
+  assert.equal(preflight.publicRootExecution, false);
+  assert.equal(preflight.nativeExecution, false);
+  assert.equal(preflight.reconcilerExecution, false);
+  assert.equal(preflight.rootScheduled, false);
+  assert.equal(preflight.domMutation, false);
+  assert.equal(preflight.markerWrites, false);
+  assert.equal(preflight.listenerInstallation, false);
+  assert.equal(preflight.setupMarkerWrites, true);
+  assert.equal(preflight.setupListenerInstallation, true);
+  assert.equal(preflight.cleanupCompleted, true);
+  assert.equal(preflight.hydration, false);
+  assert.equal(preflight.eventDispatch, false);
+  assert.equal(preflight.compatibilityClaimed, false);
+  assert.equal(preflight.reversible, false);
+
+  assert.equal(
+    rootBridge.isPrivateRootPublicFacadeMarkerListenerPreflightRecord(
+      preflight
+    ),
+    true
+  );
+  assert.equal(
+    rootBridge.isPrivateRootPublicFacadeMarkerListenerPreflightRecord({}),
+    false
+  );
+  assert.equal(hidden.adapter, adapter);
+  assert.equal(hidden.root, root);
+  assert.equal(hidden.createRecord, create);
+  assert.equal(hidden.container, container);
+  assert.equal(hidden.ownerDocument, document);
+  assert.equal(
+    hidden.sideEffectRecord.markerRecord.markerStatus,
+    rootMarkers.ROOT_MARKER_APPLIED
+  );
+  assert.equal(
+    hidden.cleanupRecord.listenerCleanup.listenerRemovalCount,
+    139
+  );
+  assert.deepEqual(adapter.getRootMarkerListenerPreflightRecords(root), [
+    preflight
+  ]);
+  assert.deepEqual(
+    rootBridge.getPrivateRootPublicFacadeRootPayload(root)
+      .markerListenerPreflightRecords,
+    [preflight]
+  );
+  assert.equal(
+    rootBridge.preflightPrivateRootPublicFacadeMarkerListenerSetup(root)
+      .preflightId,
+    'facade-preflight:2'
+  );
+
+  const serialized = JSON.stringify(preflight);
+  assert.equal(serialized.includes('__registrations'), false);
+  assert.equal(serialized.includes('__mutationLog'), false);
+  assert.equal(serialized.includes('__FAST_REACT_DOM_EVENT_TARGET__'), false);
+  assertBridgeDidNotTouchContainer(container, document);
+});
+
+test('private react-dom/client facade marker/listener preflight fails closed', () => {
+  const document = createDocument('private-client-facade-preflight-invalid');
+  const container = createElement('DIV', document);
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    rootBridge.privateRootPublicFacadeAdapterSymbol
+  );
+  const adapter = descriptor.value();
+  const otherAdapter = descriptor.value();
+  const root = adapter.createRoot(container);
+
+  assert.throws(
+    () => otherAdapter.preflightRootMarkerListenerSetupAndCleanup(root),
+    {
+      code: 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE'
+    }
+  );
+  assert.throws(
+    () => adapter.preflightRootMarkerListenerSetupAndCleanup({}),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_ADAPTER'
+    }
+  );
+
+  const occupiedDocument = createDocument('private-client-facade-occupied');
+  const occupiedContainer = createElement('DIV', occupiedDocument);
+  rootMarkers.markContainerAsRoot(
+    rootBridge.createPrivateRootOwner('occupied-public-facade-root:1'),
+    occupiedContainer
+  );
+  const occupiedRoot = adapter.createRoot(occupiedContainer);
+  assert.throws(
+    () => adapter.preflightRootMarkerListenerSetupAndCleanup(occupiedRoot),
+    {
+      code: 'FAST_REACT_DOM_ROOT_MARKER_OCCUPIED'
+    }
+  );
+  assert.equal(occupiedContainer.__registrations.length, 0);
+  assert.equal(occupiedDocument.__registrations.length, 0);
+
+  const unmountedDocument = createDocument('private-client-facade-unmounted');
+  const unmountedContainer = createElement('DIV', unmountedDocument);
+  const unmountedRoot = adapter.createRoot(unmountedContainer);
+  unmountedRoot.unmount();
+  assert.throws(
+    () =>
+      adapter.preflightRootMarkerListenerSetupAndCleanup(unmountedRoot),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT'
+    }
+  );
+  assertBridgeDidNotTouchContainer(unmountedContainer, unmountedDocument);
+});
+
 test('public react-dom/client root placeholders remain inert', () => {
   const document = createDocument('public-placeholder');
   const container = createElement('DIV', document);
