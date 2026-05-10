@@ -12,12 +12,18 @@ Write scope:
 - `worker-progress/worker-235-test-renderer-private-fiber-inspection.md`
 
 Context to inspect:
-Workers 153, 178, 188, 195, 203, 208, 209, and React test renderer serialization oracle workers 085/178.
+Use the accepted-history bullets in `MASTER_PROGRESS.md` for workers 153, 178,
+188, 195, 203, 208, 209, and 085. Do not read those full worker reports unless
+you are blocked by a specific API question.
 
 Constraints:
 - You are not alone in the codebase. Coordinate by keeping APIs private, minimal, and diagnostic-only.
 - Do not expose host state nodes or public JS objects.
 - Do not claim serialization compatibility; this is prerequisite inspection evidence only.
+- Do not spawn subagents for this task. Implement directly after reading the
+  current reconciler/test-renderer source and the summary bullets above.
+- Keep the first implementation pass small: a read-only current-tree diagnostic
+  for HostRoot, HostComponent, and HostText is enough.
 
 Verification:
 - `cargo fmt --all --check`
