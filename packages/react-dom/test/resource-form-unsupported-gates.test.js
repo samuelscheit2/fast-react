@@ -5764,6 +5764,255 @@ test('private controlled restore wrapper mutation intent consumes execution and 
   foreignBSources.cleanup();
 });
 
+test('private input/change controlled restore execution consumes fake-DOM text path only', () => {
+  const gate =
+    controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({
+      requestIdPrefix: 'input-change-execution'
+    });
+  const dispatch = createControlledInputEventDispatch({
+    domEventName: 'input',
+    latestProps: {
+      type: 'text',
+      value: 'alpha',
+      onChange() {},
+      onInput() {}
+    },
+    nodeName: 'INPUT',
+    value: 'browser-mutated'
+  });
+  const inputPreflight =
+    pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+      dispatch.dispatchRecord
+    );
+  const intent = gate.recordPostEventRestoreIntentFromEventLatestProps(
+    dispatch.dispatchRecord,
+    {
+      explicitAdmission: true,
+      queueKind:
+        'deterministic-event-latest-props-post-event-restore-queue',
+      queueId: 'input-change-execution-restore',
+      eventName: 'input',
+      targetKind: 'controlled-input-post-event-restore-queue'
+    }
+  );
+  const writePreflight = gate.preflightRestoreQueueWrites([intent], {
+    explicitAdmission: true,
+    queueKind:
+      'deterministic-controlled-input-post-event-restore-queue-write-preflight',
+    queueId: 'input-change-execution-preflight',
+    targetKind: 'controlled-input-post-event-restore-queue-write-preflight'
+  });
+  const bridge = gate.recordInputChangeEventControlledRestoreBridge(
+    inputPreflight,
+    intent,
+    writePreflight,
+    {
+      explicitAdmission: true,
+      queueKind:
+        'deterministic-input-change-event-controlled-restore-bridge',
+      queueId: 'input-change-execution-bridge',
+      targetKind: 'controlled-input-change-event-restore-queue-bridge'
+    }
+  );
+  const execution = gate.recordRestoreQueueWriteExecution(writePreflight, {
+    explicitAdmission: true,
+    queueKind:
+      'deterministic-controlled-input-post-event-restore-queue-write-execution',
+    queueId: 'input-change-execution-write',
+    targetKind: 'controlled-input-post-event-restore-queue-write-execution'
+  });
+  const flushBlocker = gate.recordRestoreQueueFlushBlocker(writePreflight, {
+    explicitAdmission: true,
+    queueKind:
+      'deterministic-controlled-input-post-event-restore-queue-flush-blocker',
+    queueId: 'input-change-execution-flush',
+    targetKind: 'controlled-input-post-event-restore-queue-flush-blocker'
+  });
+  const wrapperIntent = gate.recordRestoreQueueWrapperMutationIntent(
+    execution,
+    flushBlocker,
+    {
+      explicitAdmission: true,
+      queueKind:
+        'deterministic-controlled-input-post-event-restore-wrapper-mutation-intent',
+      queueId: 'input-change-execution-wrapper',
+      targetKind: 'controlled-input-post-event-restore-wrapper-mutation-intent'
+    }
+  );
+  const fakeTarget = createControlledInputFakeDomTarget({
+    value: 'browser-mutated'
+  });
+  const restoreExecution =
+    gate.recordInputChangeEventControlledRestoreExecution(
+      inputPreflight,
+      bridge,
+      execution,
+      flushBlocker,
+      wrapperIntent,
+      {
+        explicitAdmission: true,
+        queueKind:
+          'deterministic-input-change-event-controlled-restore-execution',
+        queueId: 'input-change-execution-final',
+        targetKind: 'controlled-input-change-event-restore-queue-execution',
+        fakeDomTarget: fakeTarget
+      }
+    );
+
+  assert.equal(
+    restoreExecution.status,
+    controlledRestoreQueue.controlledInputPostEventRestoreQueueInputChangeExecutionStatus
+  );
+  assert.equal(
+    controlledRestoreQueue.isPrivateControlledInputPostEventRestoreQueueInputChangeExecutionRecord(
+      restoreExecution
+    ),
+    true
+  );
+  assert.equal(
+    controlledRestoreQueue.getPrivateControlledInputPostEventRestoreQueueInputChangeExecutionRecordPayload(
+      restoreExecution
+    ),
+    restoreExecution
+  );
+  assert.equal(fakeTarget.value, 'alpha');
+  assert.equal(dispatch.targetNode.value, 'browser-mutated');
+  assert.equal(restoreExecution.executionRowCount, 1);
+  assert.deepEqual(
+    restoreExecution.inputChangeRestoreExecutionRows.map((row) => ({
+      acceptedRestoreKind: row.acceptedRestoreKind,
+      targetField: row.targetField,
+      beforeValueSnapshot: row.beforeValueSnapshot,
+      nextValueSnapshot: row.nextValueSnapshot,
+      afterValueSnapshot: row.afterValueSnapshot,
+      fakeDomTargetAccepted: row.fakeDomTargetAccepted,
+      latestPropsEvidenceMatch: row.latestPropsEvidenceMatch,
+      restoreQueueWriteExecutionAccepted:
+        row.restoreQueueWriteExecutionAccepted,
+      flushIntentAccepted: row.flushIntentAccepted,
+      wrapperMutationExecutionRecorded:
+        row.wrapperMutationExecutionRecorded,
+      restoreQueueWritten: row.restoreQueueWritten,
+      restoreQueueFlushed: row.restoreQueueFlushed,
+      hostWrapperInvoked: row.hostWrapperInvoked,
+      wrapperWritePerformed: row.wrapperWritePerformed,
+      fakeDomInputMutated: row.fakeDomInputMutated,
+      browserInputMutated: row.browserInputMutated
+    })),
+    [
+      {
+        acceptedRestoreKind: 'input-text-value',
+        targetField: 'value',
+        beforeValueSnapshot: 'browser-mutated',
+        nextValueSnapshot: 'alpha',
+        afterValueSnapshot: 'alpha',
+        fakeDomTargetAccepted: true,
+        latestPropsEvidenceMatch: true,
+        restoreQueueWriteExecutionAccepted: true,
+        flushIntentAccepted: true,
+        wrapperMutationExecutionRecorded: true,
+        restoreQueueWritten: true,
+        restoreQueueFlushed: true,
+        hostWrapperInvoked: true,
+        wrapperWritePerformed: true,
+        fakeDomInputMutated: true,
+        browserInputMutated: false
+      }
+    ]
+  );
+  assert.equal(
+    restoreExecution.latestPropsValidation.staleLatestPropsRejected,
+    true
+  );
+  assert.equal(
+    restoreExecution.latestPropsValidation.latestPropsValidationAccepted,
+    true
+  );
+  assert.equal(
+    restoreExecution.latestPropsValidation.currentLatestPropsFresh,
+    true
+  );
+  assert.equal(
+    restoreExecution.wrapperMutationExecutionEvidence
+      .wrapperMutationExecutionRecorded,
+    true
+  );
+  assert.equal(
+    restoreExecution.wrapperMutationExecutionEvidence.wrapperWritePerformed,
+    true
+  );
+  assert.equal(restoreExecution.postEventRestoreBoundary.fakeDomOnly, true);
+  assert.equal(
+    restoreExecution.postEventRestoreBoundary.restoreQueueWritten,
+    true
+  );
+  assert.equal(
+    restoreExecution.postEventRestoreBoundary.restoreQueueFlushed,
+    true
+  );
+  assert.equal(restoreExecution.sideEffects.restoreQueueWritten, false);
+  assert.equal(restoreExecution.sideEffects.restoreQueueFlushed, false);
+  assert.equal(restoreExecution.sideEffects.privateRestoreQueueWritten, true);
+  assert.equal(restoreExecution.sideEffects.privateRestoreQueueFlushed, true);
+  assert.equal(restoreExecution.sideEffects.hostWrapperInvoked, true);
+  assert.equal(restoreExecution.sideEffects.fakeDomInputMutated, true);
+  assert.equal(restoreExecution.sideEffects.browserInputMutated, false);
+  assert.equal(
+    restoreExecution.publicControlledBehaviorBoundary.compatibilityClaimed,
+    false
+  );
+  assert.equal(Object.hasOwn(dispatch.targetNode, '_valueTracker'), false);
+
+  const summary =
+    controlledRestoreQueue.describeControlledInputPostEventRestoreQueueGate();
+  assert.equal(
+    summary.recordsInputChangeEventControlledRestoreExecution,
+    true
+  );
+  assert.equal(
+    summary.inputChangeEventControlledRestoreExecution
+      .rejectsLiveDomNodesBeforeMutation,
+    true
+  );
+  assert.equal(
+    summary.inputChangeEventControlledRestoreExecution.liveDomMutations,
+    false
+  );
+
+  const liveDocument = createRootBridgeDocument();
+  liveDocument.defaultView = {};
+  const liveNode = createRootBridgeElement('INPUT', liveDocument);
+  liveNode[resourceFormGate.controlledInputValueTrackerFakeDomTargetMarker] =
+    true;
+  assert.throws(
+    () =>
+      gate.recordInputChangeEventControlledRestoreExecution(
+        inputPreflight,
+        bridge,
+        execution,
+        flushBlocker,
+        wrapperIntent,
+        {
+          explicitAdmission: true,
+          queueKind:
+            'deterministic-input-change-event-controlled-restore-execution',
+          queueId: 'input-change-live-reject',
+          targetKind:
+            'controlled-input-change-event-restore-queue-execution',
+          fakeDomTarget: liveNode
+        }
+      ),
+    {
+      code:
+        controlledRestoreQueue.controlledInputPostEventRestoreQueueInvalidInputChangeExecutionCode,
+      compatibilityTarget,
+      reason: 'unsupported-live-dom-node'
+    }
+  );
+
+  componentTree.detachHostInstanceToken(dispatch.token);
+});
+
 test('private controlled input fake-DOM value-tracker diagnostic rejects live DOM-like or inactive records', () => {
   const gate = resourceFormGate.createControlledInputValueTrackerGate({
     requestIdPrefix: 'fake-tracker-error'
