@@ -20,6 +20,9 @@ use crate::function_component::{
     FunctionComponentHookRenderPhase, FunctionComponentHookRenderState,
     FunctionComponentHookRenderStore, FunctionComponentPassiveEffectMetadata,
 };
+use crate::root_callbacks::{
+    RootUpdateCallbackInvocationGateSnapshot, materialize_root_update_callback_invocation_gate,
+};
 use crate::root_config::{
     PendingPassiveEffectOrder, PendingPassiveEffectPhase, PendingPassiveUnmountOrigin,
 };
@@ -1048,6 +1051,7 @@ pub struct HostRootCommitRecord {
     mutation_log: HostRootMutationPhaseLog,
     mutation_apply_log: HostRootMutationApplyLog,
     root_update_callbacks: RootUpdateCallbackSnapshot,
+    root_update_callback_invocation_gate: RootUpdateCallbackInvocationGateSnapshot,
     pending_passive_handoff: Option<PendingPassiveCommitHandoff>,
     deletion_lists: Vec<HostRootDeletionListRecord>,
     ref_commit_metadata: HostRootRefCommitSnapshot,
@@ -1098,6 +1102,17 @@ impl HostRootCommitRecord {
     #[must_use]
     pub fn root_update_callbacks(&self) -> &RootUpdateCallbackSnapshot {
         &self.root_update_callbacks
+    }
+
+    #[must_use]
+    #[allow(
+        dead_code,
+        reason = "crate-private root callback invocation metadata is reserved for future commit workers"
+    )]
+    pub(crate) fn root_update_callback_invocation_gate(
+        &self,
+    ) -> &RootUpdateCallbackInvocationGateSnapshot {
+        &self.root_update_callback_invocation_gate
     }
 
     #[must_use]
@@ -1200,6 +1215,8 @@ pub fn commit_finished_host_root<H: HostTypes>(
     let root_update_callbacks = store
         .update_queues_mut()
         .take_root_update_callback_records(work_in_progress_update_queue)?;
+    let root_update_callback_invocation_gate =
+        materialize_root_update_callback_invocation_gate(&root_update_callbacks);
     let ref_commit_metadata = materialize_ref_commit_metadata(store, pending_ref_commit_metadata)?;
     let dom_ref_callback_commit_gate =
         materialize_dom_ref_callback_commit_gate(store, &ref_commit_metadata)?;
@@ -1214,6 +1231,7 @@ pub fn commit_finished_host_root<H: HostTypes>(
         mutation_log,
         mutation_apply_log,
         root_update_callbacks,
+        root_update_callback_invocation_gate,
         pending_passive_handoff,
         deletion_lists,
         ref_commit_metadata,
@@ -2419,6 +2437,10 @@ mod tests {
         FunctionComponentEffectDependencyStatus, FunctionComponentEffectPhase,
         FunctionComponentHookRenderStore,
     };
+    use crate::root_callbacks::{
+        ROOT_UPDATE_CALLBACK_INVOCATION_GATE_BLOCKERS, RootUpdateCallbackInvocationGateSnapshot,
+        RootUpdateCallbackInvocationGateStatus,
+    };
     use crate::test_support::{FakeContainer, RecordingHost};
     use crate::{
         RootElementHandle, RootOptions, RootTaskScheduleOutcome, RootUpdateCallbackHandle,
@@ -2662,6 +2684,10 @@ mod tests {
         assert!(commit.ref_commit_metadata().is_empty());
         assert!(commit.dom_ref_callback_commit_gate().is_empty());
         assert_dom_ref_callback_gate_is_inert(commit.dom_ref_callback_commit_gate());
+        assert!(commit.root_update_callback_invocation_gate().is_empty());
+        assert_root_update_callback_invocation_gate_is_inert(
+            commit.root_update_callback_invocation_gate(),
+        );
         assert!(!commit.has_remaining_work());
         assert_eq!(new_current, render.work_in_progress());
         assert_eq!(host_root_element(&store, new_current), element);
@@ -3659,6 +3685,93 @@ mod tests {
     }
 
     #[test]
+    fn root_commit_records_visible_callback_invocation_gate_without_invoking_callbacks() {
+        let (mut store, root_id, host) = root_store();
+        let first_callback = RootUpdateCallbackHandle::from_raw(177);
+        let hidden_callback = RootUpdateCallbackHandle::from_raw(178);
+        let second_callback = RootUpdateCallbackHandle::from_raw(179);
+        let first = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(17),
+            Some(first_callback),
+        )
+        .unwrap();
+        let hidden = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(18),
+            Some(hidden_callback),
+        )
+        .unwrap();
+        let second = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(19),
+            Some(second_callback),
+        )
+        .unwrap();
+        store
+            .update_queues_mut()
+            .mark_update_hidden(hidden.update())
+            .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let callbacks = commit.root_update_callbacks();
+        let gate = commit.root_update_callback_invocation_gate();
+        let records = gate.records();
+        let current_queue = store
+            .fiber_arena()
+            .get(commit.current())
+            .unwrap()
+            .update_queue();
+        let after_commit = store
+            .update_queues()
+            .peek_root_update_callback_records(current_queue)
+            .unwrap();
+
+        assert_eq!(
+            callback_handles(callbacks.visible()),
+            vec![first_callback, second_callback]
+        );
+        assert!(callbacks.hidden().is_empty());
+        assert_eq!(
+            callback_handles(callbacks.deferred_hidden()),
+            vec![hidden_callback]
+        );
+        assert_eq!(gate.len(), 2);
+        assert_eq!(gate.hidden_record_count(), 0);
+        assert_eq!(gate.deferred_hidden_record_count(), 1);
+        assert_root_update_callback_invocation_gate_is_inert(gate);
+        assert_eq!(records[0].invocation_order(), 0);
+        assert_eq!(records[0].accepted_sequence(), 0);
+        assert_eq!(records[0].queue(), callbacks.queue());
+        assert_eq!(records[0].update(), first.update());
+        assert_eq!(records[0].callback(), first_callback);
+        assert_eq!(
+            records[0].visibility(),
+            RootUpdateCallbackVisibility::Visible
+        );
+        assert_eq!(records[1].invocation_order(), 1);
+        assert_eq!(records[1].accepted_sequence(), 2);
+        assert_eq!(records[1].queue(), callbacks.queue());
+        assert_eq!(records[1].update(), second.update());
+        assert_eq!(records[1].callback(), second_callback);
+        assert_eq!(
+            records[1].visibility(),
+            RootUpdateCallbackVisibility::Visible
+        );
+        assert!(after_commit.visible().is_empty());
+        assert!(after_commit.hidden().is_empty());
+        assert_eq!(
+            callback_handles(after_commit.deferred_hidden()),
+            vec![hidden_callback]
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
     fn root_commit_drains_visible_callback_records_only_once() {
         let (mut store, root_id, _host) = root_store();
         let callback = RootUpdateCallbackHandle::from_raw(88);
@@ -3822,6 +3935,25 @@ mod tests {
                 HostRootDomRefCallbackCommitGateStatus::Blocked
             );
             assert_eq!(record.blockers(), &DOM_REF_CALLBACK_GATE_BLOCKERS);
+        }
+    }
+
+    fn assert_root_update_callback_invocation_gate_is_inert(
+        gate: &RootUpdateCallbackInvocationGateSnapshot,
+    ) {
+        assert!(!gate.user_callbacks_invoked());
+        assert!(!gate.hidden_callbacks_invoked());
+        assert!(!gate.public_root_callback_behavior_exposed());
+        for record in gate.records() {
+            assert_eq!(
+                record.status(),
+                RootUpdateCallbackInvocationGateStatus::Blocked
+            );
+            assert_eq!(
+                record.blockers(),
+                &ROOT_UPDATE_CALLBACK_INVOCATION_GATE_BLOCKERS
+            );
+            assert_eq!(record.visibility(), RootUpdateCallbackVisibility::Visible);
         }
     }
 }
