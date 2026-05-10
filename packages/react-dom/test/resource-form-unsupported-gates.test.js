@@ -456,6 +456,7 @@ test('private form action/reset dispatcher gate records intent metadata only', (
   assert.equal(summary.recordsSubmitRequestSubmitActionMetadata, true);
   assert.equal(summary.recordsResetIntentMetadata, true);
   assert.equal(summary.recordsResetDispatcherOrdering, true);
+  assert.equal(summary.resetQueueCommitMetadataGateAvailable, true);
   assert.deepEqual(summary.acceptedSubmissionTriggers, [
     'submit',
     'requestSubmit',
@@ -478,6 +479,10 @@ test('private form action/reset dispatcher gate records intent metadata only', (
   assert.deepEqual(
     summary.sideEffects,
     resourceFormGate.formActionResetDispatcherBlockedSideEffects
+  );
+  assert.deepEqual(
+    summary.resetQueueCommit,
+    resourceFormGate.describePrivateFormActionResetQueueCommitGate()
   );
   assert.deepEqual(
     summary.contracts.map((contract) => ({
@@ -654,6 +659,219 @@ test('private form action/reset dispatcher gate records intent metadata only', (
     false
   );
   assert.equal(actionCompletionReset.intent.realFormReset, false);
+});
+
+test('private form reset queue/commit gate records boundary metadata only', () => {
+  const dispatcherGate = resourceFormGate.createFormActionResetDispatcherGate({
+    requestIdPrefix: 'form-reset-source'
+  });
+  const reset = dispatcherGate.recordResetIntent({
+    explicitIntent: true,
+    dispatcherKey: 'r',
+    resetSource: 'requestFormReset',
+    formOwnership: 'react-owned',
+    transitionContext: 'transition'
+  });
+  const queueCommitGate =
+    resourceFormGate.createFormActionResetQueueCommitGate({
+      requestIdPrefix: 'form-reset-queue-commit'
+    });
+  const record = queueCommitGate.recordResetQueueCommit(reset, {
+    explicitAdmission: true,
+    queueSource: 'requestFormResetOnFiber',
+    queueKind: 'metadata-only-reset-state-queue',
+    commitKind: 'after-mutation-form-reset-order',
+    hostTag: 'form'
+  });
+  const summary =
+    resourceFormGate.describePrivateFormActionResetQueueCommitGate();
+
+  assert.equal(summary.gateId, resourceFormGate.privateFormActionResetQueueCommitGateId);
+  assert.equal(summary.status, resourceFormGate.privateFormActionResetQueueCommitStatus);
+  assert.equal(
+    summary.acceptedSourceRecordType,
+    resourceFormGate.privateFormActionResetDispatcherRecordType
+  );
+  assert.equal(summary.acceptedSourceIntentKind, 'reset');
+  assert.equal(
+    summary.acceptedSourceStatus,
+    resourceFormGate.privateFormActionResetIntentRecordedStatus
+  );
+  assert.deepEqual(summary.acceptedQueueSources, [
+    'requestFormResetOnFiber',
+    'action-completion',
+    'transition',
+    'unknown'
+  ]);
+  assert.deepEqual(summary.commitOrderPhases, [
+    'request-reset',
+    'queue-reset-state-update',
+    'render-detect-reset-state-change',
+    'after-mutation-effects',
+    'recursive-form-reset',
+    'reset-form-instance'
+  ]);
+  assert.equal(summary.recordsResetQueueMetadata, true);
+  assert.equal(summary.recordsResetCommitOrderMetadata, true);
+  assert.equal(summary.recordsRenderFlagHandoffMetadata, true);
+  assert.equal(summary.acceptsRealForms, false);
+  assert.equal(summary.acceptsFormFibers, false);
+  assert.equal(summary.acceptsResetQueues, false);
+  assert.equal(summary.acceptsHostInstances, false);
+  assert.equal(summary.callsPreviousDispatchers, false);
+  assert.equal(summary.queuesReactUpdates, false);
+  assert.equal(summary.marksFiberFlags, false);
+  assert.equal(summary.commitsFormResets, false);
+  assert.equal(summary.callsResetFormInstance, false);
+  assert.equal(summary.callsFormReset, false);
+  assert.deepEqual(
+    summary.sideEffects,
+    resourceFormGate.formActionResetQueueCommitBlockedSideEffects
+  );
+
+  assert.equal(Object.isFrozen(record), true);
+  assert.equal(
+    resourceFormGate.isPrivateFormActionResetQueueCommitRecord(record),
+    true
+  );
+  assert.equal(
+    resourceFormGate.getPrivateFormActionResetQueueCommitRecordPayload(record),
+    record
+  );
+  assert.equal(
+    record.status,
+    resourceFormGate.privateFormActionResetQueueCommitRecordedStatus
+  );
+  assert.equal(record.requestId, 'form-reset-queue-commit:1');
+  assert.equal(record.sourceResetRequestId, 'form-reset-source:1');
+  assert.equal(record.sourceResetOrderingKind, 'current-dispatcher-react-owned-first');
+  assert.equal(record.sourceResetSource, 'requestFormReset');
+  assert.equal(record.sourceTransitionContext, 'transition');
+  assert.equal(record.sourceResetIntent.resetStateWouldBeQueued, true);
+  assert.equal(record.sourceResetIntent.resetStateQueued, false);
+  assert.equal(record.sourceResetIntent.formResetCommitted, false);
+  assert.equal(record.sourceResetIntent.realFormReset, false);
+
+  assert.equal(record.admission.metadataOnly, true);
+  assert.equal(record.admission.rawFormCaptured, false);
+  assert.equal(record.admission.rawFiberCaptured, false);
+  assert.equal(record.admission.rawQueueCaptured, false);
+  assert.equal(record.admission.realFormInspected, false);
+  assert.equal(record.admission.formFiberResolved, false);
+  assert.equal(record.admission.previousDispatcherCalled, false);
+  assert.equal(record.admission.compatibilityClaimed, false);
+
+  assert.equal(record.queueBoundary.status, 'blocked-private-form-reset-state-queue');
+  assert.equal(record.queueBoundary.resetStateWouldBeQueued, true);
+  assert.equal(record.queueBoundary.statefulHostComponentWouldBeEnsured, true);
+  assert.equal(record.queueBoundary.resetStateHookWouldBeUsed, true);
+  assert.equal(record.queueBoundary.resetStateObjectWouldChange, true);
+  assert.equal(record.queueBoundary.updateLaneWouldBeRequested, true);
+  assert.equal(record.queueBoundary.renderWouldDetectResetStateChange, true);
+  assert.equal(record.queueBoundary.formResetFlagWouldBeMarked, true);
+  assert.equal(record.queueBoundary.realFormInspected, false);
+  assert.equal(record.queueBoundary.formFiberResolved, false);
+  assert.equal(record.queueBoundary.stateHookCreated, false);
+  assert.equal(record.queueBoundary.resetStateQueueResolved, false);
+  assert.equal(record.queueBoundary.updateLaneRequested, false);
+  assert.equal(record.queueBoundary.resetUpdateEnqueued, false);
+  assert.equal(record.queueBoundary.reactUpdateQueued, false);
+  assert.equal(record.queueBoundary.renderFormResetFlagMarked, false);
+  assert.equal(record.queueBoundary.previousDispatcherCalled, false);
+  assert.equal(record.queueBoundary.compatibilityClaimed, false);
+
+  assert.equal(record.commitBoundary.status, 'blocked-private-form-reset-after-mutation-commit');
+  assert.equal(record.commitBoundary.resetFlagWouldBeDetectedDuringMutationEffects, true);
+  assert.equal(record.commitBoundary.needsFormResetWouldBeSet, true);
+  assert.equal(record.commitBoundary.resetTraversalWouldRunAfterMutationEffects, true);
+  assert.equal(record.commitBoundary.defaultValueUpdatesWouldPrecedeReset, true);
+  assert.equal(record.commitBoundary.resetFormInstanceWouldCallFormReset, true);
+  assert.equal(record.commitBoundary.afterMutationEffectsVisited, false);
+  assert.equal(record.commitBoundary.recursivelyResetFormsCalled, false);
+  assert.equal(record.commitBoundary.resetFormInstanceCalled, false);
+  assert.equal(record.commitBoundary.formResetCommitted, false);
+  assert.equal(record.commitBoundary.realFormReset, false);
+  assert.equal(record.commitBoundary.compatibilityClaimed, false);
+  assert.equal(record.publicFormActionBoundary.publicFormActionsEnabled, false);
+  assert.equal(record.publicFormActionBoundary.publicRequestFormResetReachable, false);
+  assert.equal(record.publicFormActionBoundary.reactUpdateQueued, false);
+  assert.equal(record.publicFormActionBoundary.realFormReset, false);
+  assert.equal(record.publicFormActionBoundary.compatibilityClaimed, false);
+
+  assert.deepEqual(
+    record.sideEffects,
+    resourceFormGate.formActionResetQueueCommitDiagnosticSideEffects
+  );
+  assert.equal(record.sideEffects.sourceResetIntentAccepted, true);
+  assert.equal(record.sideEffects.resetQueueCommitMetadataRecorded, true);
+  assert.equal(record.sideEffects.resetQueueBoundaryRecorded, true);
+  assert.equal(record.sideEffects.resetCommitOrderRecorded, true);
+  assert.equal(record.sideEffects.realFormInspected, false);
+  assert.equal(record.sideEffects.formFiberResolved, false);
+  assert.equal(record.sideEffects.resetStateQueueResolved, false);
+  assert.equal(record.sideEffects.resetUpdateEnqueued, false);
+  assert.equal(record.sideEffects.reactUpdateQueued, false);
+  assert.equal(record.sideEffects.resetFormInstanceCalled, false);
+  assert.equal(record.sideEffects.formResetCommitted, false);
+  assert.equal(record.sideEffects.realFormReset, false);
+  assert.equal(record.sideEffects.previousDispatcherCalled, false);
+  assert.equal(record.sideEffects.compatibilityClaimed, false);
+
+  const error =
+    resourceFormGate.createUnsupportedFormActionResetQueueCommitError(record);
+  assert.equal(
+    error.code,
+    resourceFormGate.privateFormActionResetQueueCommitGateErrorCode
+  );
+  assert.equal(error.requestId, 'form-reset-queue-commit:1');
+  assert.equal(error.sourceResetRequestId, 'form-reset-source:1');
+  assert.deepEqual(error.queueBoundary, record.queueBoundary);
+  assert.match(
+    error.message,
+    /private form reset queue\/commit gate records boundary metadata only/u
+  );
+
+  const submission = dispatcherGate.recordSubmissionIntent({
+    explicitIntent: true,
+    eventName: 'submit',
+    actionKind: 'none',
+    actionSource: 'none',
+    submitControlKind: 'none'
+  });
+  assert.throws(
+    () => queueCommitGate.recordResetQueueCommit(submission, {
+      explicitAdmission: true
+    }),
+    {
+      code:
+        resourceFormGate.privateFormActionResetQueueCommitInvalidRecordCode,
+      compatibilityTarget
+    }
+  );
+  assert.throws(
+    () => queueCommitGate.recordResetQueueCommit(reset, {
+      explicitAdmission: true,
+      form: throwingProxy('form')
+    }),
+    {
+      code:
+        resourceFormGate.privateFormActionResetQueueCommitInvalidAdmissionCode,
+      compatibilityTarget,
+      reason: 'form must not be passed to the queue/commit metadata gate'
+    }
+  );
+  assert.throws(
+    () => queueCommitGate.recordResetQueueCommit(reset, {
+      explicitAdmission: true,
+      queueKind: 'real-reset-state-queue'
+    }),
+    {
+      code:
+        resourceFormGate.privateFormActionResetQueueCommitInvalidAdmissionCode,
+      compatibilityTarget,
+      reason: 'queueKind must be metadata-only-reset-state-queue'
+    }
+  );
 });
 
 test('private controlled input value-tracker gate records deterministic metadata only', () => {
@@ -6005,6 +6223,9 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
       dispatcherRecordsAccepted: true,
       submitRequestSubmitActionMetadataRecorded: true,
       resetDispatcherOrderingRecorded: true,
+      resetQueueCommitMetadataRecorded: true,
+      resetQueueBoundaryRecorded: true,
+      resetCommitOrderRecorded: true,
       realFormAccepted: false,
       rawTargetCaptured: false,
       formInspected: false,
@@ -6015,11 +6236,18 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
       transitionStarted: false,
       resetFiberResolved: false,
       resetStateQueued: false,
+      resetUpdateEnqueued: false,
+      reactUpdateQueued: false,
+      renderFormResetFlagMarked: false,
+      afterMutationEffectsVisited: false,
+      resetFormInstanceCalled: false,
       formResetCommitted: false,
       realFormReset: false,
       compatibilityClaimed: false,
       dispatcherGate:
-        resourceFormGate.describePrivateFormActionResetDispatcherGate()
+        resourceFormGate.describePrivateFormActionResetDispatcherGate(),
+      resetQueueCommitGate:
+        resourceFormGate.describePrivateFormActionResetQueueCommitGate()
     },
     controlledValueTrackerBoundary: {
       gateStatus: resourceFormGate.privateControlledValueTrackerBlockedStatus,

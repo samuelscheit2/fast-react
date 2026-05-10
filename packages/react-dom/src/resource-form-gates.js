@@ -70,6 +70,7 @@ const rootBoundarySideEffects = freezeRecord({
   ...internalsGate.resourceHintPreloadPreinitOrderBlockedSideEffects,
   ...internalsGate.resourceHintStylesheetPrecedenceBlockedSideEffects,
   ...internalsGate.formActionResetDispatcherBlockedSideEffects,
+  ...internalsGate.formActionResetQueueCommitBlockedSideEffects,
   ...internalsGate.controlledInputValueTrackerSideEffects,
   privateRootBridgeExecuted: false,
   publicRootFacadeCreated: false,
@@ -524,6 +525,9 @@ function describeFormActionResetDispatcherBoundary(behaviorArea) {
       behaviorArea === null || behaviorArea === 'form-action',
     submitRequestSubmitActionMetadataRecorded: true,
     resetDispatcherOrderingRecorded: true,
+    resetQueueCommitMetadataRecorded: true,
+    resetQueueBoundaryRecorded: true,
+    resetCommitOrderRecorded: true,
     realFormAccepted: false,
     rawTargetCaptured: false,
     formInspected: false,
@@ -534,10 +538,18 @@ function describeFormActionResetDispatcherBoundary(behaviorArea) {
     transitionStarted: false,
     resetFiberResolved: false,
     resetStateQueued: false,
+    resetUpdateEnqueued: false,
+    reactUpdateQueued: false,
+    renderFormResetFlagMarked: false,
+    afterMutationEffectsVisited: false,
+    resetFormInstanceCalled: false,
     formResetCommitted: false,
     realFormReset: false,
     compatibilityClaimed: false,
-    dispatcherGate: internalsGate.describePrivateFormActionResetDispatcherGate()
+    dispatcherGate:
+      internalsGate.describePrivateFormActionResetDispatcherGate(),
+    resetQueueCommitGate:
+      internalsGate.describePrivateFormActionResetQueueCommitGate()
   });
 }
 
