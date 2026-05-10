@@ -55,6 +55,9 @@ pub(crate) enum HostWorkError {
         parent: FiberId,
         child: FiberId,
     },
+    ExpectedMultipleRootChildren {
+        count: usize,
+    },
     InvalidDetachedInstance {
         handle: StateNodeHandle,
     },
@@ -124,6 +127,10 @@ impl Display for HostWorkError {
                 parent.slot().get(),
                 child.slot().get()
             ),
+            Self::ExpectedMultipleRootChildren { count } => write!(
+                formatter,
+                "private multiple-sibling host complete-work handoff requires at least two root HostComponent/HostText source children, found {count}"
+            ),
             Self::InvalidDetachedInstance { handle } => write!(
                 formatter,
                 "detached host instance handle {} is invalid",
@@ -162,6 +169,7 @@ impl Error for HostWorkError {
             | Self::MissingStateNode { .. }
             | Self::FunctionComponentParentTopologyMismatch(_)
             | Self::UnexpectedExistingChild { .. }
+            | Self::ExpectedMultipleRootChildren { .. }
             | Self::InvalidDetachedInstance { .. }
             | Self::InvalidDetachedText { .. }
             | Self::CommitCurrentMismatch { .. } => None,
@@ -464,7 +472,9 @@ pub(crate) struct HostWorkResult {
     root: FiberRootId,
     work_in_progress: FiberId,
     root_child: Option<FiberId>,
+    root_children: Vec<FiberId>,
     completed_child: Option<FiberId>,
+    completed_children: Vec<FiberId>,
     detached_hosts: DetachedHostRecords,
 }
 
@@ -481,8 +491,24 @@ impl HostWorkResult {
         self.root_child
     }
 
+    pub(crate) fn root_children(&self) -> &[FiberId] {
+        &self.root_children
+    }
+
+    pub(crate) fn root_child_count(&self) -> usize {
+        self.root_children.len()
+    }
+
     pub(crate) const fn completed_child(&self) -> Option<FiberId> {
         self.completed_child
+    }
+
+    pub(crate) fn completed_children(&self) -> &[FiberId] {
+        &self.completed_children
+    }
+
+    pub(crate) fn completed_child_count(&self) -> usize {
+        self.completed_children.len()
     }
 
     pub(crate) fn detached_instance_count(&self) -> usize {
@@ -1120,7 +1146,73 @@ pub(crate) fn mount_test_host_work(
         root: render.root(),
         work_in_progress: render.work_in_progress(),
         root_child,
+        root_children: root_child.into_iter().collect(),
         completed_child: root_child,
+        completed_children: root_child.into_iter().collect(),
+        detached_hosts,
+    })
+}
+
+pub(crate) fn mount_test_host_sibling_work(
+    store: &mut FiberRootStore<RecordingHost>,
+    host: &mut RecordingHost,
+    render: HostRootRenderPhaseRecord,
+    source: &TestHostTree,
+    source_children: &[RootElementHandle],
+) -> Result<HostWorkResult, HostWorkError> {
+    expect_tag(store, render.work_in_progress(), FiberTag::HostRoot)?;
+    if source_children.len() < 2 {
+        return Err(HostWorkError::ExpectedMultipleRootChildren {
+            count: source_children.len(),
+        });
+    }
+    if let Some(child) = store.fiber_arena().get(render.work_in_progress())?.child() {
+        return Err(HostWorkError::UnexpectedExistingChild {
+            parent: render.work_in_progress(),
+            child,
+        });
+    }
+
+    let mut root_nodes = Vec::with_capacity(source_children.len());
+    for &handle in source_children {
+        let node = source
+            .root(handle)
+            .ok_or(HostWorkError::MissingTestRootElement { handle })?;
+        root_nodes.push(node);
+    }
+
+    let container = *store.root(render.root())?.container_info();
+    let mut detached_hosts = DetachedHostRecords::default();
+    let mut root_children = Vec::with_capacity(root_nodes.len());
+    host.root_host_context(&container)?;
+    for node in root_nodes {
+        root_children.push(begin_test_host_node(
+            store,
+            host,
+            &container,
+            render.root(),
+            render.work_in_progress(),
+            node,
+            &(),
+            true,
+            render.render_lanes(),
+            &mut detached_hosts,
+        )?);
+    }
+
+    store
+        .fiber_arena_mut()
+        .set_children(render.work_in_progress(), &root_children)?;
+    complete_host_root(store, render.work_in_progress())?;
+
+    let root_child = root_children.first().copied();
+    Ok(HostWorkResult {
+        root: render.root(),
+        work_in_progress: render.work_in_progress(),
+        root_child,
+        root_children: root_children.clone(),
+        completed_child: root_child,
+        completed_children: root_children,
         detached_hosts,
     })
 }
@@ -1171,7 +1263,9 @@ pub(crate) fn mount_test_function_component_single_host_child_work(
         root: render.root(),
         work_in_progress: render.work_in_progress(),
         root_child: Some(function_component),
+        root_children: vec![function_component],
         completed_child: Some(host_child),
+        completed_children: vec![host_child],
         detached_hosts,
     })
 }
@@ -2390,6 +2484,191 @@ mod tests {
                 .unwrap_err()
                 .violation(),
             HostNodeViolation::WrongTarget
+        );
+    }
+
+    #[test]
+    fn host_work_mounts_multiple_host_root_siblings_under_host_root_wip() {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut source = TestHostTree::new();
+        let first_element = source.insert_text("first sibling");
+        let second_element = source.insert_host_element_with_text("span", "second sibling");
+        let current = store.root(root_id).unwrap().current();
+        let render = render_test_root(&mut store, root_id, RootElementHandle::from_raw(7_700));
+        let work_in_progress = render.work_in_progress();
+
+        let result = mount_test_host_sibling_work(
+            &mut store,
+            &mut host,
+            render,
+            &source,
+            &[first_element, second_element],
+        )
+        .unwrap();
+
+        assert_eq!(result.root, root_id);
+        assert_eq!(result.work_in_progress, work_in_progress);
+        assert_eq!(result.root_child_count(), 2);
+        assert_eq!(result.completed_child_count(), 2);
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.fiber_arena().get(current).unwrap().child(), None);
+
+        let root = store.fiber_arena().get(work_in_progress).unwrap();
+        let first = root.child().unwrap();
+        let first_node = store.fiber_arena().get(first).unwrap();
+        let second = first_node.sibling().unwrap();
+        let second_node = store.fiber_arena().get(second).unwrap();
+        let nested_text = second_node.child().unwrap();
+        assert_eq!(result.root_child, Some(first));
+        assert_eq!(result.completed_child, Some(first));
+        assert_eq!(result.root_children(), &[first, second]);
+        assert_eq!(result.completed_children(), &[first, second]);
+        assert_eq!(root.child_lanes(), Lanes::DEFAULT);
+        assert!(root.subtree_flags().contains_all(FiberFlags::PLACEMENT));
+
+        assert_eq!(first_node.tag(), FiberTag::HostText);
+        assert_eq!(first_node.return_fiber(), Some(work_in_progress));
+        assert_eq!(first_node.sibling(), Some(second));
+        assert!(first_node.flags().contains_all(FiberFlags::PLACEMENT));
+        assert!(first_node.state_node().is_some());
+
+        assert_eq!(second_node.tag(), FiberTag::HostComponent);
+        assert_eq!(second_node.return_fiber(), Some(work_in_progress));
+        assert_eq!(second_node.sibling(), None);
+        assert!(second_node.flags().contains_all(FiberFlags::PLACEMENT));
+        assert!(second_node.state_node().is_some());
+
+        let nested_text_node = store.fiber_arena().get(nested_text).unwrap();
+        assert_eq!(nested_text_node.tag(), FiberTag::HostText);
+        assert_eq!(nested_text_node.return_fiber(), Some(second));
+        assert_eq!(nested_text_node.sibling(), None);
+        assert!(nested_text_node.state_node().is_some());
+
+        let first_text_instance = result
+            .detached_hosts()
+            .text(first_node.state_node())
+            .unwrap();
+        let second_instance = result
+            .detached_hosts()
+            .instance(second_node.state_node())
+            .unwrap();
+        let nested_text_instance = result
+            .detached_hosts()
+            .text(nested_text_node.state_node())
+            .unwrap();
+        assert_eq!(first_text_instance.text(), "first sibling");
+        assert_eq!(second_instance.ty(), "span");
+        assert_eq!(nested_text_instance.text(), "second sibling");
+        assert_eq!(
+            second_instance.children(),
+            &[FakeHostChild::Text(nested_text_instance.id())]
+        );
+        assert_eq!(result.detached_hosts().instance_count(), 1);
+        assert_eq!(result.detached_hosts().text_count(), 2);
+        assert_eq!(store.host_tokens().len(), 3);
+        store.fiber_arena().validate_topology().unwrap();
+
+        assert_eq!(
+            host.operations(),
+            vec![
+                "root_host_context",
+                "create_text_instance",
+                "child_host_context",
+                "should_set_text_content",
+                "create_text_instance",
+                "create_instance",
+                "append_initial_child",
+                "finalize_initial_children",
+            ]
+        );
+    }
+
+    #[test]
+    fn host_work_multiple_sibling_handoff_rejects_non_multiple_or_existing_children() {
+        let (mut single_store, single_root_id) = root_store();
+        let mut single_host = RecordingHost::default();
+        let mut single_source = TestHostTree::new();
+        let only_child = single_source.insert_text("only");
+        let single_render = render_test_root(
+            &mut single_store,
+            single_root_id,
+            RootElementHandle::from_raw(7_710),
+        );
+
+        let single_error = mount_test_host_sibling_work(
+            &mut single_store,
+            &mut single_host,
+            single_render,
+            &single_source,
+            &[only_child],
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            single_error,
+            HostWorkError::ExpectedMultipleRootChildren { count: 1 }
+        );
+        assert_eq!(single_host.operations(), Vec::<&'static str>::new());
+        assert_eq!(
+            single_store
+                .fiber_arena()
+                .get(single_render.work_in_progress())
+                .unwrap()
+                .child(),
+            None
+        );
+
+        let (mut existing_store, existing_root_id) = root_store();
+        let mut existing_host = RecordingHost::default();
+        let mut existing_source = TestHostTree::new();
+        let first = existing_source.insert_text("first");
+        let second = existing_source.insert_text("second");
+        let existing_render = render_test_root(
+            &mut existing_store,
+            existing_root_id,
+            RootElementHandle::from_raw(7_720),
+        );
+        let existing_mode = existing_store
+            .fiber_arena()
+            .get(existing_render.work_in_progress())
+            .unwrap()
+            .mode();
+        let existing_child = existing_store.fiber_arena_mut().create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(7_721),
+            existing_mode,
+        );
+        existing_store
+            .fiber_arena_mut()
+            .set_children(existing_render.work_in_progress(), &[existing_child])
+            .unwrap();
+
+        let existing_error = mount_test_host_sibling_work(
+            &mut existing_store,
+            &mut existing_host,
+            existing_render,
+            &existing_source,
+            &[first, second],
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            existing_error,
+            HostWorkError::UnexpectedExistingChild {
+                parent: existing_render.work_in_progress(),
+                child: existing_child,
+            }
+        );
+        assert_eq!(existing_host.operations(), Vec::<&'static str>::new());
+        assert_eq!(
+            existing_store
+                .fiber_arena()
+                .get(existing_render.work_in_progress())
+                .unwrap()
+                .child(),
+            Some(existing_child)
         );
     }
 
