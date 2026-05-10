@@ -28,7 +28,9 @@ pub use compatibility::{
     REACT_DOM_COMPATIBILITY_TARGET, REACT_DOM_PACKAGE_TARGET, REACT_PACKAGE_TARGET,
     TYPES_REACT_COMPATIBILITY_TARGET, TYPES_REACT_PACKAGE_TARGET,
 };
-pub use element::{ReactElementRecord, ReactKey, ReactOwner, ReactOwnerSlot, ReactRefSlot};
+pub use element::{
+    ReactElementRecord, ReactKey, ReactOwner, ReactOwnerSlot, ReactPortalRecord, ReactRefSlot,
+};
 pub use event_priority::{
     EventPriority, event_priority_to_lane, higher_event_priority, is_higher_event_priority,
     lanes_to_event_priority, lower_event_priority,
