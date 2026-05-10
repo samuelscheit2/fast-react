@@ -47,26 +47,34 @@ Drive toward a minimal real root render/update/unmount path:
 
 Top-level cap: 30 workers. Queue 685-714 was launched from queue base commit
 `9ec6678` in isolated `worker/<slug>` branches and worktrees and has been
-accepted and cleaned up. Workers 715-719 and 721 have also been accepted and
-cleaned up.
+accepted and cleaned up. Workers 715-721 have also been accepted and cleaned
+up.
 
-- Worker 720: test-renderer serialization finished-work identity gate.
+No worker branches or worktrees are currently active.
 
 ## Near-Term Sequencing
 
-1. Monitor worker 720 and accept only scoped private evidence that keeps
-   public root, act, flushSync, hooks/effects, test-renderer, and React DOM
-   compatibility blocked.
-2. Audit and merge completed workers one at a time or in a small non-conflicting
+1. Finish post-worker-720 `main` verification and record any accepted follow-up
+   evidence in `MASTER_PROGRESS.md`.
+2. Select the next queue from accepted private blockers only; keep public root,
+   act, flushSync, hooks/effects, test-renderer, and React DOM compatibility
+   blocked until each private gate is proven.
+3. Audit and merge completed workers one at a time or in a small non-conflicting
    batch, with focused reruns before each merge and full workspace checks after
    the batch.
-3. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
+4. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
 
 ## Next Queue Candidates
 
-- Select the next queue after workers 718-720 finish, based on the blockers and
-  follow-up evidence they report.
+- Private test-renderer native bridge consumption of Worker 720's finished-work
+  identity gate, without widening public `toJSON`, `toTree`, `.root`, or
+  `TestInstance` behavior.
+- Private package/admission ledger coverage for Workers 715-721 so accepted
+  hidden capabilities remain closed by default at package boundaries.
+- Additional private root/test-renderer bridge gates that require accepted
+  `finished_work` / `finished_lanes` handoff before any serialization or native
+  bridge execution.
 
 Premature until later gates are green: public React DOM root render/unmount,
 public `act`, public `flushSync`, public Scheduler timing, public hydration,

@@ -29,6 +29,24 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 720
+
+- Worker 720 added the private react-test-renderer serialization finished-work
+  identity gate. Rust and JS hidden toJSON/toTree facades now require accepted
+  committed HostRoot `finished_work` identity and lane evidence before private
+  serialization readiness is admitted.
+- Acceptance review rejected an initial JS hidden-facade fail-open path. The
+  accepted fix now requires root request id, sequence, root id, source report,
+  matching `renderCurrent` / `commitPreviousCurrent`, matching lane data, and
+  finished-work identity evidence while rejecting public compatibility flags.
+- Worker 720 was accepted after independent post-fix audit and verification
+  with focused test-renderer Rust tests, serialization local gates,
+  create-routing gates, workspace checks, package-surface checks,
+  import-entrypoint smoke, full `npm run check`, conflict-marker scanning, and
+  `git diff --check`; its subagent, worktree, and branch were removed after
+  merge. Public `toJSON`, `toTree`, `.root`, `TestInstance`, native execution,
+  and compatibility claims remain blocked.
+
 ### Worker 719
 
 - Worker 719 added private function-component effect destroy-handle
