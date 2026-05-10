@@ -32,6 +32,10 @@ The orchestrator goal is continuous. Do not call
 - Prefer interactive Codex TUI workers wrapped with `script -q -F "$log_file"
   codex --yolo --no-alt-screen ... "$prompt_text"` so tmux panes remain
   inspectable and logs are captured.
+- Use `scripts/run-worker.sh` as the single worker launcher. Its `.codex.log`
+  and `.exitcode` artifacts record worker id, prompt file, log file, exit-code
+  file, start/end timestamps, and Codex command mode; the `.exitcode` first
+  line remains the numeric process status.
 - Load prompt markdown into a shell variable or otherwise quote it so literal
   backticks, `$()`, and paths in worker prompts are passed to Codex as text.
   Never inline `$(cat prompt.md)` or unquoted prompt text in a way that lets the
