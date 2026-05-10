@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ "$#" -ne 2 ]; then
+usage() {
   echo "usage: scripts/run-worker.sh <worker-id> <prompt-file>" >&2
   exit 2
-fi
+}
+
+[ "$#" -eq 2 ] || usage
 
 worker_id="$1"
 prompt_file="$2"
@@ -20,10 +22,10 @@ record_exit_code() {
 }
 trap record_exit_code EXIT
 
-if [ ! -f "$prompt_file" ]; then
-  echo "missing prompt file: $prompt_file" | tee "$log_file" >&2
+[ -f "$prompt_file" ] || {
+  printf 'missing prompt file: %s\n' "$prompt_file" | tee "$log_file" >&2
   exit 2
-fi
+}
 
 prompt_text="$(cat "$prompt_file")
 
@@ -40,19 +42,13 @@ Subagent policy from the orchestrator:
 - If nested agents affect your conclusions, summarize what you delegated and how you used their results in your report.
 "
 
-export FAST_REACT_WORKER_PROMPT_TEXT="$prompt_text"
-export FAST_REACT_WORKER_ROOT="$repo_root"
-
 # Use the interactive TUI, not `codex exec`, so the tmux pane remains readable
 # (including "Pursuing goal") while `script` also records the session log.
-script -q -F "$log_file" bash -lc '
-  cd "$FAST_REACT_WORKER_ROOT"
-  exec codex \
-    --yolo \
-    --no-alt-screen \
-    --search \
-    -m gpt-5.5 \
-    -c '\''model_reasoning_effort="xhigh"'\'' \
-    -C "$FAST_REACT_WORKER_ROOT" \
-    "$FAST_REACT_WORKER_PROMPT_TEXT"
-'
+script -q -F "$log_file" codex \
+  --yolo \
+  --no-alt-screen \
+  --search \
+  -m gpt-5.5 \
+  -c 'model_reasoning_effort="xhigh"' \
+  -C "$repo_root" \
+  "$prompt_text"
