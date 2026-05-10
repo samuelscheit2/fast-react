@@ -45,22 +45,32 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue 655-684 has been merged and verified. Clean
-the accepted sessions/worktrees/branches, then launch the next replacement
-queue from the current `main` commit.
+Top-level cap: 30 workers. Queue 685-714 is prepared for launch from the
+current `main` commit after the queue prompt commit.
+
+- 685-694: Rust reconciler execution paths for root work-loop finished-work
+  handoff, HostRoot update queues, function-component hooks/effects, layout
+  effects, context, Suspense, Offscreen, deletion cleanup order, and nested
+  sync flush/act continuations.
+- 695-702: React test-renderer private native execution and metadata parity for
+  root create/update, `toJSON`, `toTree`, TestInstance queries, act, error
+  boundaries, and production private metadata.
+- 703-711: React DOM private execution for root render/update/unmount,
+  delegated events, controlled restore, hydration, portals, resources, and form
+  actions.
+- 712-713: Scheduler mock and postTask private continuation evidence.
+- 714: Package-surface/private-admission audit for accepted queue 655-684
+  diagnostics.
 
 ## Near-Term Sequencing
 
-1. Clean queue 655-684 accepted sessions, worktrees, and worker branches.
-2. Prepare the next replacement queue with non-overlapping write scopes and
-   prompts that require `create_goal` as the first worker action.
-3. Launch replacement workers up to the 30 top-level cap from the current
-   `main` commit.
-4. Monitor tmux pane state and worker progress reports, then classify
+1. Launch replacement workers 685-714 up to the 30 top-level cap from the
+   queue prompt commit.
+2. Monitor tmux pane state and worker progress reports, then classify
    completions before accepting work.
-5. Merge accepted completed work in batches, resolving overlap conflicts on
+3. Merge accepted completed work in batches, resolving overlap conflicts on
    `main`, then clean accepted sessions/worktrees/branches.
-6. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
+4. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
 
 ## Next Queue Candidates
