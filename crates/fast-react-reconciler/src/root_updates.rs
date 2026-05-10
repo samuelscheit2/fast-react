@@ -14,10 +14,14 @@ use fast_react_core::{
 };
 use fast_react_host_config::HostTypes;
 
+use crate::root_callbacks::{
+    RootUpdateCallbackInvocationExecutionGateSnapshot, RootUpdateCallbackInvocationTestControl,
+};
 use crate::{
-    ConcurrentUpdateError, FiberRootId, FiberRootStore, FiberRootStoreError, RootElementHandle,
-    RootUpdateCallbackHandle, RootUpdatePayload, UpdateId, UpdatePriorityState, UpdateQueueError,
-    enqueue_concurrent_host_root_update, finish_queueing_concurrent_updates, request_update_lane,
+    ConcurrentUpdateError, FiberRootId, FiberRootStore, FiberRootStoreError, HostRootCommitRecord,
+    RootElementHandle, RootUpdateCallbackHandle, RootUpdateCallbackVisibility, RootUpdatePayload,
+    UpdateId, UpdatePriorityState, UpdateQueueError, enqueue_concurrent_host_root_update,
+    finish_queueing_concurrent_updates, request_update_lane,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -402,6 +406,111 @@ impl HostRootQueuedCallbackOrderSnapshot {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct HostRootVisibleCallbackInvocationAfterCommitSnapshot {
+    root: FiberRootId,
+    queue: UpdateQueueHandle,
+    finished_work: FiberId,
+    finished_lanes: Lanes,
+    pending_lanes_after_commit: Lanes,
+    accepted_order_record_count: usize,
+    execution: RootUpdateCallbackInvocationExecutionGateSnapshot,
+}
+
+#[allow(
+    dead_code,
+    reason = "private HostRoot visible callback invocation canary is exercised by focused tests"
+)]
+impl HostRootVisibleCallbackInvocationAfterCommitSnapshot {
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn queue(&self) -> UpdateQueueHandle {
+        self.queue
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(&self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_lanes(&self) -> Lanes {
+        self.finished_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_lanes_after_commit(&self) -> Lanes {
+        self.pending_lanes_after_commit
+    }
+
+    #[must_use]
+    pub(crate) const fn accepted_order_record_count(&self) -> usize {
+        self.accepted_order_record_count
+    }
+
+    #[must_use]
+    pub(crate) const fn execution(&self) -> &RootUpdateCallbackInvocationExecutionGateSnapshot {
+        &self.execution
+    }
+
+    #[must_use]
+    pub(crate) fn len(&self) -> usize {
+        self.execution.len()
+    }
+
+    #[must_use]
+    pub(crate) fn completed_count(&self) -> usize {
+        self.execution.completed_count()
+    }
+
+    #[must_use]
+    pub(crate) fn error_count(&self) -> usize {
+        self.execution.error_count()
+    }
+
+    #[must_use]
+    pub(crate) fn invoked_accepted_visible_callbacks(&self) -> bool {
+        self.accepted_order_record_count > 0
+            && self.execution.did_drain_accepted_visible_callbacks()
+            && self.execution.len() == self.accepted_order_record_count
+    }
+
+    #[must_use]
+    pub(crate) fn records_in_deterministic_commit_order(&self) -> bool {
+        self.execution.records_in_invocation_order()
+            && self
+                .execution
+                .records()
+                .iter()
+                .enumerate()
+                .all(|(order, record)| record.accepted_sequence() == order)
+    }
+
+    #[must_use]
+    pub(crate) const fn public_js_callbacks_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_callback_behavior_exposed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn hidden_callbacks_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn root_error_callbacks_invoked(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RootUpdateError {
     FiberRootStore(FiberRootStoreError),
     FiberTopology(FiberTopologyError),
@@ -432,10 +541,31 @@ pub enum RootUpdateError {
         expected_pending_lanes: Lanes,
         actual_pending_lanes: Lanes,
     },
+    StaleCallbackOrderSnapshotAfterCommit {
+        root: FiberRootId,
+        queue: UpdateQueueHandle,
+        expected_updates: Vec<UpdateId>,
+        actual_visible_updates: Vec<UpdateId>,
+        expected_callbacks: Vec<RootUpdateCallbackHandle>,
+        actual_visible_callbacks: Vec<RootUpdateCallbackHandle>,
+    },
+    HiddenOrDeferredCallbackSnapshotRejected {
+        root: FiberRootId,
+        queue: UpdateQueueHandle,
+        update: UpdateId,
+        callback: RootUpdateCallbackHandle,
+        visibility: RootUpdateCallbackVisibility,
+    },
     MismatchedRootToken {
         expected: FiberRootId,
         actual: FiberRootId,
         update: UpdateId,
+    },
+    WrongRootCallbackHandle {
+        expected: FiberRootId,
+        actual: FiberRootId,
+        queue: UpdateQueueHandle,
+        callback: RootUpdateCallbackHandle,
     },
     MissingCallbackHandle {
         root: FiberRootId,
@@ -505,6 +635,38 @@ impl Display for RootUpdateError {
                 actual_updates,
                 actual_pending_lanes.bits()
             ),
+            Self::StaleCallbackOrderSnapshotAfterCommit {
+                root,
+                queue,
+                expected_updates,
+                actual_visible_updates,
+                expected_callbacks,
+                actual_visible_callbacks,
+            } => write!(
+                formatter,
+                "root {} queue {} has stale callback-order snapshot after commit; expected visible updates {:?} callbacks {:?}, actual visible updates {:?} callbacks {:?}",
+                root.raw(),
+                queue.raw(),
+                expected_updates,
+                expected_callbacks,
+                actual_visible_updates,
+                actual_visible_callbacks
+            ),
+            Self::HiddenOrDeferredCallbackSnapshotRejected {
+                root,
+                queue,
+                update,
+                callback,
+                visibility,
+            } => write!(
+                formatter,
+                "root {} queue {} rejected {:?} callback update {} handle {} before visible callback invocation",
+                root.raw(),
+                queue.raw(),
+                visibility,
+                update.raw(),
+                callback.raw()
+            ),
             Self::MismatchedRootToken {
                 expected,
                 actual,
@@ -513,6 +675,19 @@ impl Display for RootUpdateError {
                 formatter,
                 "queued HostRoot callback update {} references root {}, expected root {}",
                 update.raw(),
+                actual.raw(),
+                expected.raw()
+            ),
+            Self::WrongRootCallbackHandle {
+                expected,
+                actual,
+                queue,
+                callback,
+            } => write!(
+                formatter,
+                "queued HostRoot callback handle {} in queue {} belongs to root {}, expected root {}",
+                callback.raw(),
+                queue.raw(),
                 actual.raw(),
                 expected.raw()
             ),
@@ -549,7 +724,10 @@ impl Error for RootUpdateError {
             | Self::EmptyRoot { .. }
             | Self::StaleQueueEvidence { .. }
             | Self::StaleQueueSnapshot { .. }
+            | Self::StaleCallbackOrderSnapshotAfterCommit { .. }
+            | Self::HiddenOrDeferredCallbackSnapshotRejected { .. }
             | Self::MismatchedRootToken { .. }
+            | Self::WrongRootCallbackHandle { .. }
             | Self::MissingCallbackHandle { .. }
             | Self::EnqueuedWrongRoot { .. } => None,
         }
@@ -900,11 +1078,142 @@ pub(crate) fn host_root_queued_callback_order_snapshot_for_canary<H: HostTypes>(
     })
 }
 
+pub(crate) fn invoke_host_root_accepted_visible_callbacks_after_matching_commit_under_test_control_for_canary(
+    accepted_order: &HostRootQueuedCallbackOrderSnapshot,
+    commit: &mut HostRootCommitRecord,
+    control: &mut impl RootUpdateCallbackInvocationTestControl,
+) -> Result<HostRootVisibleCallbackInvocationAfterCommitSnapshot, RootUpdateError> {
+    validate_host_root_accepted_callback_order_matches_commit_for_canary(accepted_order, commit)?;
+
+    let root = commit.root();
+    let queue = commit.root_update_callbacks().queue();
+    let finished_work = commit.finished_work();
+    let finished_lanes = commit.finished_lanes();
+    let pending_lanes_after_commit = commit.pending_lanes();
+    let accepted_order_record_count = accepted_order.len();
+    let execution = commit.drain_root_update_callbacks_under_test_control(control);
+
+    Ok(HostRootVisibleCallbackInvocationAfterCommitSnapshot {
+        root,
+        queue,
+        finished_work,
+        finished_lanes,
+        pending_lanes_after_commit,
+        accepted_order_record_count,
+        execution,
+    })
+}
+
+fn validate_host_root_accepted_callback_order_matches_commit_for_canary(
+    accepted_order: &HostRootQueuedCallbackOrderSnapshot,
+    commit: &HostRootCommitRecord,
+) -> Result<(), RootUpdateError> {
+    let commit_root = commit.root();
+    let accepted_root = accepted_order.root();
+    let first_callback = accepted_order
+        .records()
+        .first()
+        .map_or(RootUpdateCallbackHandle::NONE, |record| record.callback());
+    if accepted_root != commit_root {
+        return Err(RootUpdateError::WrongRootCallbackHandle {
+            expected: commit_root,
+            actual: accepted_root,
+            queue: accepted_order.queue(),
+            callback: first_callback,
+        });
+    }
+
+    if let Some(record) = accepted_order
+        .records()
+        .iter()
+        .find(|record| record.root() != commit_root)
+    {
+        return Err(RootUpdateError::WrongRootCallbackHandle {
+            expected: commit_root,
+            actual: record.root(),
+            queue: record.queue(),
+            callback: record.callback(),
+        });
+    }
+
+    let callbacks = commit.root_update_callbacks();
+    for hidden in callbacks
+        .hidden()
+        .iter()
+        .chain(callbacks.deferred_hidden().iter())
+    {
+        if accepted_order
+            .records()
+            .iter()
+            .any(|record| record.update() == hidden.update())
+        {
+            return Err(RootUpdateError::HiddenOrDeferredCallbackSnapshotRejected {
+                root: commit_root,
+                queue: callbacks.queue(),
+                update: hidden.update(),
+                callback: hidden.callback(),
+                visibility: hidden.visibility(),
+            });
+        }
+    }
+
+    let expected_updates = accepted_order
+        .records()
+        .iter()
+        .map(|record| record.update())
+        .collect::<Vec<_>>();
+    let actual_visible_updates = callbacks
+        .visible()
+        .iter()
+        .map(|record| record.update())
+        .collect::<Vec<_>>();
+    let expected_callbacks = accepted_order
+        .records()
+        .iter()
+        .map(|record| record.callback())
+        .collect::<Vec<_>>();
+    let actual_visible_callbacks = callbacks
+        .visible()
+        .iter()
+        .map(|record| record.callback())
+        .collect::<Vec<_>>();
+
+    let visible_records_match_accepted_order = accepted_order.len() == callbacks.visible().len()
+        && accepted_order
+            .records()
+            .iter()
+            .zip(callbacks.visible().iter())
+            .all(|(accepted, visible)| {
+                accepted.queue_order() == visible.sequence()
+                    && accepted.update() == visible.update()
+                    && accepted.callback() == visible.callback()
+                    && visible.visibility().is_visible()
+            });
+
+    if !visible_records_match_accepted_order {
+        return Err(RootUpdateError::StaleCallbackOrderSnapshotAfterCommit {
+            root: commit_root,
+            queue: callbacks.queue(),
+            expected_updates,
+            actual_visible_updates,
+            expected_callbacks,
+            actual_visible_callbacks,
+        });
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::RootOptions;
+    use crate::root_callbacks::{
+        RootUpdateCallbackInvocationErrorHandle, RootUpdateCallbackInvocationExecutionGateStatus,
+        RootUpdateCallbackInvocationRequest, RootUpdateCallbackInvocationStatus,
+    };
     use crate::test_support::{FakeContainer, RecordingHost};
+    use crate::{commit_finished_host_root, render_host_root_for_lanes};
 
     fn root_store() -> (FiberRootStore<RecordingHost>, FiberRootId, RecordingHost) {
         let host = RecordingHost::default();
@@ -913,6 +1222,27 @@ mod tests {
             .create_client_root(FakeContainer::new(1), RootOptions::new())
             .unwrap();
         (store, root_id, host)
+    }
+
+    #[derive(Default)]
+    struct TestRootUpdateCallbackControl {
+        calls: Vec<RootUpdateCallbackInvocationRequest>,
+    }
+
+    impl TestRootUpdateCallbackControl {
+        fn calls(&self) -> &[RootUpdateCallbackInvocationRequest] {
+            &self.calls
+        }
+    }
+
+    impl RootUpdateCallbackInvocationTestControl for TestRootUpdateCallbackControl {
+        fn invoke_root_update_callback(
+            &mut self,
+            request: RootUpdateCallbackInvocationRequest,
+        ) -> Result<(), RootUpdateCallbackInvocationErrorHandle> {
+            self.calls.push(request);
+            Ok(())
+        }
     }
 
     #[test]
@@ -1227,6 +1557,255 @@ mod tests {
                 actual_pending_lanes: Lanes::SYNC.merge(Lanes::DEFAULT)
             }
         );
+    }
+
+    #[test]
+    fn root_updates_callback_order_invokes_accepted_visible_callbacks_after_matching_commit() {
+        let (mut store, root_id, host) = root_store();
+        let first_callback = RootUpdateCallbackHandle::from_raw(5981);
+        let second_callback = RootUpdateCallbackHandle::from_raw(5982);
+        let first = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(5981),
+            Some(first_callback),
+        )
+        .unwrap();
+        let second = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(5982),
+            Some(second_callback),
+        )
+        .unwrap();
+        let accepted = host_root_queued_callback_order_snapshot_for_canary(
+            &store,
+            root_id,
+            &[first.clone(), second.clone()],
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+        let mut control = TestRootUpdateCallbackControl::default();
+
+        let invocation =
+            invoke_host_root_accepted_visible_callbacks_after_matching_commit_under_test_control_for_canary(
+                &accepted,
+                &mut commit,
+                &mut control,
+            )
+            .unwrap();
+
+        assert_eq!(invocation.root(), root_id);
+        assert_eq!(invocation.queue(), commit.root_update_callbacks().queue());
+        assert_eq!(invocation.finished_work(), commit.finished_work());
+        assert_eq!(invocation.finished_lanes(), Lanes::DEFAULT);
+        assert_eq!(invocation.pending_lanes_after_commit(), Lanes::NO);
+        assert_eq!(invocation.accepted_order_record_count(), 2);
+        assert_eq!(invocation.len(), 2);
+        assert_eq!(invocation.completed_count(), 2);
+        assert_eq!(invocation.error_count(), 0);
+        assert!(invocation.invoked_accepted_visible_callbacks());
+        assert!(invocation.records_in_deterministic_commit_order());
+        assert!(!invocation.public_js_callbacks_invoked());
+        assert!(!invocation.public_root_callback_behavior_exposed());
+        assert!(!invocation.hidden_callbacks_invoked());
+        assert!(!invocation.root_error_callbacks_invoked());
+
+        let execution = invocation.execution();
+        assert_eq!(
+            execution.status(),
+            RootUpdateCallbackInvocationExecutionGateStatus::TestControlOnly
+        );
+        assert!(execution.records_in_invocation_order());
+        assert!(execution.records_are_visible());
+        assert!(!execution.public_js_callbacks_invoked());
+        assert!(!execution.public_root_callback_behavior_exposed());
+        assert!(!execution.hidden_callbacks_invoked());
+        assert!(!execution.root_error_callbacks_invoked());
+        let records = execution.records();
+        assert_eq!(records[0].update(), first.update());
+        assert_eq!(records[0].callback(), first_callback);
+        assert_eq!(
+            records[0].status(),
+            RootUpdateCallbackInvocationStatus::Completed
+        );
+        assert_eq!(records[1].update(), second.update());
+        assert_eq!(records[1].callback(), second_callback);
+        assert_eq!(
+            records[1].status(),
+            RootUpdateCallbackInvocationStatus::Completed
+        );
+        assert_eq!(control.calls().len(), 2);
+        assert_eq!(control.calls()[0].callback(), first_callback);
+        assert_eq!(control.calls()[1].callback(), second_callback);
+        assert!(commit.root_update_callback_invocation_gate().is_empty());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_updates_callback_order_invocation_gate_rejects_hidden_callback_before_invocation() {
+        let (mut store, root_id, _host) = root_store();
+        let first = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(5983),
+            Some(RootUpdateCallbackHandle::from_raw(5983)),
+        )
+        .unwrap();
+        let hidden_callback = RootUpdateCallbackHandle::from_raw(5984);
+        let hidden = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(5984),
+            Some(hidden_callback),
+        )
+        .unwrap();
+        let second = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(5985),
+            Some(RootUpdateCallbackHandle::from_raw(5985)),
+        )
+        .unwrap();
+        store
+            .update_queues_mut()
+            .mark_update_hidden(hidden.update())
+            .unwrap();
+        let accepted = host_root_queued_callback_order_snapshot_for_canary(
+            &store,
+            root_id,
+            &[first, hidden.clone(), second],
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+        let mut control = TestRootUpdateCallbackControl::default();
+
+        let error =
+            invoke_host_root_accepted_visible_callbacks_after_matching_commit_under_test_control_for_canary(
+                &accepted,
+                &mut commit,
+                &mut control,
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            RootUpdateError::HiddenOrDeferredCallbackSnapshotRejected {
+                root: root_id,
+                queue: commit.root_update_callbacks().queue(),
+                update: hidden.update(),
+                callback: hidden_callback,
+                visibility: RootUpdateCallbackVisibility::DeferredHidden
+            }
+        );
+        assert!(control.calls().is_empty());
+        assert_eq!(commit.root_update_callback_invocation_gate().len(), 2);
+    }
+
+    #[test]
+    fn root_updates_callback_order_rejects_stale_after_partial_commit() {
+        let (mut store, root_id, _host) = root_store();
+        let default_callback = RootUpdateCallbackHandle::from_raw(5986);
+        let sync_callback = RootUpdateCallbackHandle::from_raw(5987);
+        let default_update = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(5986),
+            Some(default_callback),
+        )
+        .unwrap();
+        let sync_update = update_container_sync(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(5987),
+            Some(sync_callback),
+        )
+        .unwrap();
+        let accepted = host_root_queued_callback_order_snapshot_for_canary(
+            &store,
+            root_id,
+            &[default_update.clone(), sync_update.clone()],
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::SYNC).unwrap();
+        let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+        let mut control = TestRootUpdateCallbackControl::default();
+
+        let error =
+            invoke_host_root_accepted_visible_callbacks_after_matching_commit_under_test_control_for_canary(
+                &accepted,
+                &mut commit,
+                &mut control,
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            RootUpdateError::StaleCallbackOrderSnapshotAfterCommit {
+                root: root_id,
+                queue: commit.root_update_callbacks().queue(),
+                expected_updates: vec![default_update.update(), sync_update.update()],
+                actual_visible_updates: vec![sync_update.update()],
+                expected_callbacks: vec![default_callback, sync_callback],
+                actual_visible_callbacks: vec![sync_callback]
+            }
+        );
+        assert!(control.calls().is_empty());
+        assert_eq!(commit.root_update_callback_invocation_gate().len(), 1);
+    }
+
+    #[test]
+    fn root_updates_callback_order_rejects_wrong_root_before_invocation() {
+        let (mut store, root_id, _host) = root_store();
+        let other_root = store
+            .create_client_root(FakeContainer::new(598), RootOptions::new())
+            .unwrap();
+        let callback = RootUpdateCallbackHandle::from_raw(5988);
+        let accepted_update = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(5988),
+            Some(callback),
+        )
+        .unwrap();
+        let accepted = host_root_queued_callback_order_snapshot_for_canary(
+            &store,
+            root_id,
+            std::slice::from_ref(&accepted_update),
+        )
+        .unwrap();
+        update_container(
+            &mut store,
+            other_root,
+            RootElementHandle::from_raw(5989),
+            Some(RootUpdateCallbackHandle::from_raw(5989)),
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, other_root, Lanes::DEFAULT).unwrap();
+        let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+        let mut control = TestRootUpdateCallbackControl::default();
+
+        let error =
+            invoke_host_root_accepted_visible_callbacks_after_matching_commit_under_test_control_for_canary(
+                &accepted,
+                &mut commit,
+                &mut control,
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            RootUpdateError::WrongRootCallbackHandle {
+                expected: other_root,
+                actual: root_id,
+                queue: accepted.queue(),
+                callback
+            }
+        );
+        assert!(control.calls().is_empty());
+        assert_eq!(commit.root_update_callback_invocation_gate().len(), 1);
     }
 
     #[test]

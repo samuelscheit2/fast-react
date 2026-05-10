@@ -540,6 +540,21 @@ impl RootUpdateCallbackInvocationExecutionGateSnapshot {
     }
 
     #[must_use]
+    pub(crate) fn records_in_invocation_order(&self) -> bool {
+        self.records
+            .iter()
+            .enumerate()
+            .all(|(order, record)| record.invocation_order() == order)
+    }
+
+    #[must_use]
+    pub(crate) fn records_are_visible(&self) -> bool {
+        self.records
+            .iter()
+            .all(|record| record.visibility().is_visible())
+    }
+
+    #[must_use]
     pub(crate) fn test_control_invoked_callback_handles(&self) -> bool {
         !self.records.is_empty()
     }
@@ -1002,6 +1017,8 @@ mod tests {
             &ROOT_UPDATE_CALLBACK_INVOCATION_EXECUTION_GATE_BLOCKERS
         );
         assert!(execution.did_drain_accepted_visible_callbacks());
+        assert!(execution.records_in_invocation_order());
+        assert!(execution.records_are_visible());
         assert!(execution.test_control_invoked_callback_handles());
         assert!(!execution.public_js_callbacks_invoked());
         assert!(!execution.public_root_callback_behavior_exposed());
