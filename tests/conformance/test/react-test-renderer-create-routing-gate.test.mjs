@@ -27,6 +27,11 @@ const rootRequestExecutionStatus =
   "blocked-private-test-renderer-root-request-execution";
 const rootRequestCompatibilityStatus =
   "blocked-private-test-renderer-root-compatibility";
+const privateTestInstanceWrapperRecordSymbolDescription =
+  "fast.react_test_renderer.private_test_instance_wrapper_record";
+const privateTestInstanceWrapperRecordSymbol = Symbol.for(
+  privateTestInstanceWrapperRecordSymbolDescription
+);
 const missingPrerequisites = [
   "rust-native-test-renderer-create-bridge",
   "react-test-renderer-host-output-serialization"
@@ -709,6 +714,37 @@ test("react-test-renderer TestInstance query and serialization surfaces stay pub
   }
 });
 
+test("react-test-renderer private TestInstance wrapper skeleton exposes record-only metadata", () => {
+  for (const entry of entrypoints) {
+    const moduleExports = loadFresh(entry.modulePath);
+    const renderer = moduleExports.create({ type: "private-query-record" });
+    const descriptor = Object.getOwnPropertyDescriptor(
+      renderer,
+      privateTestInstanceWrapperRecordSymbol
+    );
+
+    assert.equal(descriptor.enumerable, false, entry.entrypoint);
+    assert.equal(descriptor.configurable, false, entry.entrypoint);
+    assert.equal(descriptor.writable, false, entry.entrypoint);
+    assertPrivateTestInstanceWrapperSkeleton(
+      descriptor.value,
+      entry.entrypoint
+    );
+
+    const rootError = captureThrown(() => renderer.root);
+    assertReactTestRendererUnimplemented(
+      rootError,
+      entry.entrypoint,
+      "create().root"
+    );
+    assert.equal(
+      rootError.routingGate.privateTestInstanceWrapperSkeleton,
+      descriptor.value,
+      entry.entrypoint
+    );
+  }
+});
+
 test("react-test-renderer create routing gate does not load native bridge artifacts", () => {
   const originalLoad = Module._load;
   const originalNodeExtension = Module._extensions[".node"];
@@ -885,9 +921,25 @@ function assertRootRequest(request, expected) {
 function assertRendererShape(renderer, label, moduleScheduler) {
   assert.deepEqual(Object.keys(renderer), rendererKeys, label);
   assert.deepEqual(Object.getOwnPropertyNames(renderer), rendererKeys, label);
-  assert.deepEqual(Reflect.ownKeys(renderer), rendererKeys, label);
+  assert.deepEqual(
+    Reflect.ownKeys(renderer).filter((key) => typeof key === "string"),
+    rendererKeys,
+    label
+  );
+  assert.deepEqual(
+    Object.getOwnPropertySymbols(renderer),
+    [privateTestInstanceWrapperRecordSymbol],
+    label
+  );
   assert.equal(Object.hasOwn(renderer, "routingGate"), false, label);
   assert.equal(Object.hasOwn(renderer, "missingPrerequisites"), false, label);
+  assert.equal(
+    Object.keys(renderer).includes(
+      privateTestInstanceWrapperRecordSymbolDescription
+    ),
+    false,
+    label
+  );
   assert.equal(renderer._Scheduler, moduleScheduler, label);
 
   const rootDescriptor = Object.getOwnPropertyDescriptor(renderer, "root");
@@ -988,6 +1040,10 @@ function assertCreateRoutingGate(error, entrypoint) {
   assert.equal(gate.privateRoutes[1], gate.unmountPrivateRoute);
   assertPrivateRoute(gate.updatePrivateRoute, expectedPrivateRoutes[0]);
   assertPrivateRoute(gate.unmountPrivateRoute, expectedPrivateRoutes[1]);
+  assertPrivateTestInstanceWrapperSkeleton(
+    gate.privateTestInstanceWrapperSkeleton,
+    entrypoint
+  );
 }
 
 function assertPrivateRoute(privateRoute, expected) {
@@ -1009,6 +1065,166 @@ function assertPrivateRoute(privateRoute, expected) {
   assert.deepEqual(privateRoute.acceptedRustApis, expected.acceptedRustApis);
   assert.equal(Object.isFrozen(privateRoute.acceptedRustTests), true);
   assert.deepEqual(privateRoute.acceptedRustTests, expected.acceptedRustTests);
+}
+
+function assertPrivateTestInstanceWrapperSkeleton(record, entrypoint) {
+  assert.equal(Object.isFrozen(record), true, entrypoint);
+  assert.equal(
+    record.id,
+    "react-test-renderer-private-test-instance-wrapper-skeleton",
+    entrypoint
+  );
+  assert.equal(
+    record.status,
+    "private-record-ready-public-test-instance-blocked",
+    entrypoint
+  );
+  assert.equal(record.entrypoint, entrypoint);
+  assert.equal(record.deterministic, true, entrypoint);
+  assert.equal(
+    record.symbol,
+    privateTestInstanceWrapperRecordSymbolDescription,
+    entrypoint
+  );
+  assert.equal(record.publicRootAvailable, false, entrypoint);
+  assert.equal(record.publicQueryMethodsAvailable, false, entrypoint);
+  assert.equal(record.publicTestInstanceObjectAvailable, false, entrypoint);
+  assert.equal(record.nativeBridgeAvailable, false, entrypoint);
+  assert.equal(record.nativeExecution, false, entrypoint);
+  assert.equal(record.compatibilityClaimed, false, entrypoint);
+
+  const fiberInspection = record.fiberInspection;
+  assert.equal(Object.isFrozen(fiberInspection), true, entrypoint);
+  assert.equal(
+    fiberInspection.acceptedWorker,
+    "worker-235-test-renderer-private-fiber-inspection",
+    entrypoint
+  );
+  assert.equal(
+    fiberInspection.acceptedRustCrate,
+    "fast-react-reconciler",
+    entrypoint
+  );
+  assert.equal(
+    fiberInspection.acceptedRustModule,
+    "private_fiber_inspection",
+    entrypoint
+  );
+  assert.deepEqual(fiberInspection.acceptedRustApis, [
+    "inspect_test_renderer_committed_fiber_tree",
+    "TestRendererCommittedFiberTreeInspection::host_component",
+    "TestRendererCommittedFiberTreeInspection::host_text",
+    "TestRendererCommittedFiberNodeInspection::element_type",
+    "TestRendererCommittedFiberNodeInspection::memoized_props"
+  ]);
+  assert.deepEqual(fiberInspection.acceptedRustTests, [
+    "committed_fiber_inspection_describes_host_root_component_and_text",
+    "committed_fiber_inspection_rejects_empty_current_host_root"
+  ]);
+  assert.deepEqual(fiberInspection.committedShape, [
+    "HostRoot",
+    "HostComponent",
+    "HostText"
+  ]);
+  assert.equal(fiberInspection.exposesHostNodes, false, entrypoint);
+  assert.equal(fiberInspection.mutatesFibers, false, entrypoint);
+
+  assert.equal(Object.isFrozen(record.queryRecords), true, entrypoint);
+  assert.deepEqual(Object.keys(record.queryRecords), [
+    "root",
+    "type",
+    "props",
+    "children"
+  ]);
+  assert.equal(record.rootQueryRecord, record.queryRecords.root, entrypoint);
+  assertPrivateQueryRecord(
+    record.queryRecords.root,
+    "root",
+    "react-test-renderer-private-test-instance-root-query",
+    entrypoint
+  );
+  assertPrivateQueryRecord(
+    record.queryRecords.type,
+    "type",
+    "react-test-renderer-private-test-instance-type-query",
+    entrypoint
+  );
+  assertPrivateQueryRecord(
+    record.queryRecords.props,
+    "props",
+    "react-test-renderer-private-test-instance-props-query",
+    entrypoint
+  );
+  assertPrivateQueryRecord(
+    record.queryRecords.children,
+    "children",
+    "react-test-renderer-private-test-instance-children-query",
+    entrypoint
+  );
+
+  const rootRecord = record.rootQueryRecord.result;
+  assert.equal(Object.isFrozen(rootRecord), true, entrypoint);
+  assert.equal(
+    rootRecord.id,
+    "react-test-renderer-private-test-instance-root-record",
+    entrypoint
+  );
+  assert.equal(rootRecord.kind, "ReactTestInstancePrivateRecord", entrypoint);
+  assert.equal(rootRecord.publicObject, false, entrypoint);
+  assert.equal(rootRecord.fiberTag, "HostComponent", entrypoint);
+  assert.equal(rootRecord.type, "span", entrypoint);
+  assert.equal(Object.isFrozen(rootRecord.props), true, entrypoint);
+  assert.deepEqual(rootRecord.props, {});
+  assert.equal(Object.isFrozen(rootRecord.children), true, entrypoint);
+  assert.equal(rootRecord.children.length, 1, entrypoint);
+  assert.equal(rootRecord.queryRecords.type, record.queryRecords.type);
+  assert.equal(rootRecord.queryRecords.props, record.queryRecords.props);
+  assert.equal(rootRecord.queryRecords.children, record.queryRecords.children);
+
+  const textChild = rootRecord.children[0];
+  assert.equal(Object.isFrozen(textChild), true, entrypoint);
+  assert.deepEqual(textChild, {
+    id: "react-test-renderer-private-test-instance-host-text-child",
+    kind: "ReactTestInstancePrivateTextChildRecord",
+    fiberTag: "HostText",
+    source: "TestRendererCommittedFiberTreeInspection::host_text",
+    text: "hello",
+    publicObject: false
+  });
+
+  for (const queryName of testInstanceQuerySurfaceNames) {
+    assert.equal(
+      Object.hasOwn(rootRecord, queryName),
+      false,
+      `${entrypoint} ${queryName}`
+    );
+  }
+}
+
+function assertPrivateQueryRecord(record, query, id, label) {
+  assert.equal(Object.isFrozen(record), true, `${label} ${query}`);
+  assert.equal(record.id, id, label);
+  assert.equal(record.query, query, label);
+  assert.equal(record.deterministic, true, label);
+
+  if (query === "root") {
+    assert.equal(
+      record.status,
+      "private-record-ready-public-root-blocked",
+      label
+    );
+    assert.equal(record.publicSurface, "create().root", label);
+    assert.equal(record.publicAccessAvailable, false, label);
+    assert.equal(
+      record.source,
+      "TestRendererCommittedFiberTreeInspection::host_component",
+      label
+    );
+    return;
+  }
+
+  assert.equal(record.fiberTag, "HostComponent", label);
+  assert.equal(record.publicQueryMethodAvailable, false, label);
 }
 
 function assertPrivateRootCreateRequest(createRequest) {

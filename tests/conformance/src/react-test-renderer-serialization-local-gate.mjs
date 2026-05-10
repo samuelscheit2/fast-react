@@ -389,6 +389,41 @@ export function inspectReactTestRendererSerializationLocalTargets({
       publicJsReactTestRendererPackageSource,
       /\bcreateRendererUnsupportedFunction\(\s*['"]create\(\)\.toJSON['"]/u
     );
+  const privateRecordOnlyTestInstanceWrapperPresent =
+    publicJsReactTestRendererFacadePresent &&
+    publicJsReactTestRendererFacadePlaceholder &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bprivateTestInstanceWrapperRecordSymbol\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bprivateTestInstanceWrapperSkeleton\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /fast\.react_test_renderer\.private_test_instance_wrapper_record/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bworker-235-test-renderer-private-fiber-inspection\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\binspect_test_renderer_committed_fiber_tree\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bpublicRootAvailable\s*:\s*false\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bpublicQueryMethodsAvailable\s*:\s*false\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bpublicTestInstanceObjectAvailable\s*:\s*false\b/u
+    );
   const publicJsFacadeRoutingPresent =
     publicJsReactTestRendererFacadePresent &&
     !publicJsReactTestRendererFacadePlaceholder &&
@@ -412,6 +447,7 @@ export function inspectReactTestRendererSerializationLocalTargets({
     );
   const publicTestInstanceWrappersPresent =
     publicJsFacadeRoutingPresent &&
+    !privateRecordOnlyTestInstanceWrapperPresent &&
     hasSourcePattern(
       publicJsReactTestRendererPackageSource,
       /\bReactTestInstance\b|\bfindAllBy(?:Type|Props)\b|\bfindBy(?:Type|Props)\b/u
@@ -428,6 +464,7 @@ export function inspectReactTestRendererSerializationLocalTargets({
     privateToJSONSerializationFacadeGatePresent,
     privateToJSONSerializationFacadeRecognizesRustDiagnostics,
     privateToJSONSerializationFacadePubliclyBlocked,
+    privateRecordOnlyTestInstanceWrapperPresent,
     publicToJSONAvailable,
     publicToTreeAvailable,
     publicTestInstanceWrappersPresent,
