@@ -78,6 +78,18 @@ pointers, Node-API types, or public native APIs.
   passed.
 - `git diff --check`: passed.
 
+## Post-Merge Orchestrator Verification
+
+- Orchestrator merged current `main` into this branch without conflicts.
+- Post-merge verification passed:
+  - `cargo fmt --all --check`
+  - `cargo test -p fast-react-napi --all-features handle_table`: 12
+    handle-table tests
+  - `cargo test -p fast-react-napi --all-features`: 17 unit tests and 0
+    doctests
+  - `cargo clippy -p fast-react-napi --all-targets --all-features -- -D warnings`
+  - `git diff --check`
+
 ## Risks Or Blockers
 
 - The teardown path is intentionally private and unwired, so it does not prove
