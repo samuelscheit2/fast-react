@@ -1904,6 +1904,187 @@ test("package-private React act gate consumes Scheduler mock expired act/root di
   }
 });
 
+test("React act gate consumes only the nested expired report from delayed Scheduler renderer-root handoff", () => {
+  const gate = loadFreshWorkspaceModule(privateActDispatcherGateModule);
+  const React = loadFreshWorkspaceModule("packages/react/index.js");
+
+  for (const nodeEnv of ["development", "production"]) {
+    const Scheduler = loadFreshSchedulerMock(nodeEnv);
+    const diagnostics =
+      Scheduler.unstable_flushExpired[privateActQueueFlushDiagnosticsExport];
+
+    Scheduler.reset();
+    const events = [];
+    const createCallback = (label) =>
+      gate.createInternalActQueueTestCallback(
+        (didTimeout) => {
+          events.push([
+            label,
+            didTimeout,
+            Scheduler.unstable_getCurrentPriorityLevel(),
+            Scheduler.unstable_now()
+          ]);
+          Scheduler.log(label);
+        },
+        { label }
+      );
+    const delayedHandle = Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_UserBlockingPriority,
+      createCallback("delayed-renderer-root-callback"),
+      { delay: 10 }
+    );
+    let publicSchedulerCallbackRan = false;
+    Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_NormalPriority,
+      () => {
+        publicSchedulerCallbackRan = true;
+        Scheduler.log("public-scheduler-work");
+      }
+    );
+    let publicReactActCallbackRan = false;
+    assert.throws(
+      () => React.act(() => {
+        publicReactActCallbackRan = true;
+      }),
+      (error) => {
+        assert.equal(error.name, "FastReactUnimplementedError");
+        assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED");
+        assert.equal(error.entrypoint, "react");
+        assert.equal(error.exportName, "act");
+        assert.equal(error.compatibilityTarget, "react@19.2.6");
+        return true;
+      },
+      nodeEnv
+    );
+
+    const actQueue = gate.createInternalActQueueTestQueue([
+      gate.createInternalActQueueTestTask({
+        label: "renderer-root-act-schedule",
+        recordKind: "SchedulerActQueueRequest",
+        taskKind: "RootSchedule",
+        continuationStatus: "NoContinuation",
+        callback: createCallback("renderer-root-act-schedule")
+      })
+    ]);
+    const rendererRootMetadata =
+      diagnostics.createDelayedRendererRootWorkMetadataForDiagnostics({
+        callbackHandle: delayedHandle,
+        actQueue,
+        rootWorkRecords: [
+          createAcceptedExpiredActRootWorkRecord(
+            "RootLaneSchedulingSnapshot"
+          ),
+          createAcceptedExpiredActRootWorkRecord(
+            "HostRootFinishedWorkPendingCommitRecordForCanary"
+          )
+        ],
+        rootId: 772,
+        rootLabel: "react-delayed-renderer-root-772",
+        scheduledVirtualTime: 0,
+        delayMs: 10,
+        schedulerPriority: "UserBlocking"
+      });
+    const delayedMetadata =
+      diagnostics.createDelayedActRootWorkMetadataFromAcceptedRendererRootMetadataForDiagnostics(
+        rendererRootMetadata
+      );
+    const delayedReport = Scheduler.unstable_flushExpired(delayedMetadata);
+
+    assert.equal(
+      gate.isAcceptedSchedulerMockExpiredActRootWorkDiagnostics(
+        delayedReport
+      ),
+      false,
+      nodeEnv
+    );
+    assert.throws(
+      () =>
+        gate.consumeSchedulerMockExpiredActRootWorkDiagnostics(
+          delayedReport
+        ),
+      (error) => {
+        assert.equal(
+          error.reason,
+          "scheduler-expired-act-root-diagnostics-brand"
+        );
+        assert.equal(error.drainsPublicReactActQueue, false);
+        assert.equal(error.executesRendererRoots, false);
+        return true;
+      },
+      nodeEnv
+    );
+
+    const nestedExpiredReport = delayedReport.expiredActRootWorkDrainReport;
+    assert.equal(
+      gate.isAcceptedSchedulerMockExpiredActRootWorkDiagnostics(
+        nestedExpiredReport
+      ),
+      true,
+      nodeEnv
+    );
+    assert.equal(
+      gate.isAcceptedSchedulerMockExpiredActRootWorkDiagnostics(
+        cloneExpiredActRootWorkReport(nestedExpiredReport)
+      ),
+      false,
+      nodeEnv
+    );
+    assert.throws(
+      () =>
+        gate.consumeSchedulerMockExpiredActRootWorkDiagnostics(
+          cloneExpiredActRootWorkReport(nestedExpiredReport)
+        ),
+      (error) => {
+        assert.equal(
+          error.reason,
+          "scheduler-expired-act-root-diagnostics-source-proof"
+        );
+        return true;
+      },
+      nodeEnv
+    );
+
+    const consumeReport =
+      gate.consumeSchedulerMockExpiredActRootWorkDiagnostics(
+        nestedExpiredReport
+      );
+    assert.equal(
+      consumeReport.status,
+      gate.schedulerMockExpiredActRootWorkConsumptionStatus,
+      nodeEnv
+    );
+    assert.equal(consumeReport.accepted, true, nodeEnv);
+    assert.equal(
+      consumeReport.drainsPublicSchedulerTaskQueue,
+      false,
+      nodeEnv
+    );
+    assert.equal(consumeReport.drainsPublicReactActQueue, false, nodeEnv);
+    assert.equal(consumeReport.publicReactActCompatibilityClaimed, false);
+    assert.equal(consumeReport.executesRendererWork, false, nodeEnv);
+    assert.equal(consumeReport.executesRendererRoots, false, nodeEnv);
+    assert.deepEqual(events, [
+      [
+        "delayed-renderer-root-callback",
+        true,
+        Scheduler.unstable_UserBlockingPriority,
+        260
+      ],
+      [
+        "renderer-root-act-schedule",
+        false,
+        Scheduler.unstable_NormalPriority,
+        260
+      ]
+    ]);
+    assert.equal(publicSchedulerCallbackRan, false, nodeEnv);
+    assert.equal(publicReactActCallbackRan, false, nodeEnv);
+    assert.equal(Scheduler.unstable_hasPendingWork(), true, nodeEnv);
+
+    Scheduler.reset();
+  }
+});
+
 test("React DOM test-utils act private routing gate tracks React act metadata without opening public act", () => {
   const reactGate = loadFreshWorkspaceModule(privateActDispatcherGateModule);
   const domGateModule = loadFreshWorkspaceModule(

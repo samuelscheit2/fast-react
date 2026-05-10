@@ -20,6 +20,11 @@ const delayedActRootWorkDiagnosticsKind =
 const delayedActRootWorkDiagnosticsBrand = Symbol.for(
   delayedActRootWorkDiagnosticsKind
 );
+const delayedRendererRootWorkMetadataKind =
+  'fast-react.scheduler.mock-delayed-renderer-root-work-metadata';
+const delayedRendererRootWorkMetadataBrand = Symbol.for(
+  delayedRendererRootWorkMetadataKind
+);
 const expiredActRootWorkMetadataKind =
   'fast-react.scheduler.mock-expired-act-root-work-metadata';
 const expiredActRootWorkMetadataBrand = Symbol.for(
@@ -277,6 +282,219 @@ test('scheduler mock promotes delayed act/root metadata through the expired rout
   }
 });
 
+test('scheduler mock promotes delayed renderer-root metadata through private act/root handoff', () => {
+  const reactGate = loadFreshReactActDispatcherGate();
+
+  for (const nodeEnv of ['development', 'production']) {
+    const Scheduler = loadFreshSchedulerMock(nodeEnv);
+    const diagnostics = readPrivateFlushDiagnostics(Scheduler);
+    assertDelayedDiagnosticsReady(diagnostics, nodeEnv);
+
+    Scheduler.reset();
+    const events = [];
+    const createCallback = (label, continuation = null) =>
+      reactGate.createInternalActQueueTestCallback(
+        (didTimeout) => {
+          events.push([
+            label,
+            didTimeout,
+            Scheduler.unstable_getCurrentPriorityLevel(),
+            Scheduler.unstable_now()
+          ]);
+          Scheduler.log(label);
+          return continuation;
+        },
+        { label }
+      );
+
+    const delayedContinuation = createCallback(
+      'renderer-root-delayed-continuation'
+    );
+    const delayedCallback = createCallback(
+      'renderer-root-delayed-callback',
+      delayedContinuation
+    );
+    const delayedHandle = Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_UserBlockingPriority,
+      delayedCallback,
+      { delay: 10 }
+    );
+    let publicSchedulerCallbackRan = false;
+    Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_NormalPriority,
+      () => {
+        publicSchedulerCallbackRan = true;
+        Scheduler.log('public-renderer-work');
+      }
+    );
+
+    const actRootContinuation = createCallback(
+      'renderer-root-act-continuation'
+    );
+    const actQueue = reactGate.createInternalActQueueTestQueue([
+      reactGate.createInternalActQueueTestTask({
+        label: 'renderer-root-schedule',
+        recordKind: 'SchedulerActQueueRequest',
+        taskKind: 'RootSchedule',
+        continuationStatus: 'NoContinuation',
+        callback: createCallback('renderer-root-schedule')
+      }),
+      reactGate.createInternalActQueueTestTask({
+        label: 'renderer-root-callback',
+        recordKind: 'SyncFlushActContinuationRecord',
+        taskKind: 'SchedulerCallback',
+        continuationStatus: 'PendingContinuation',
+        callback: createCallback(
+          'renderer-root-callback',
+          actRootContinuation
+        )
+      })
+    ]);
+    const rootWorkRecords = [
+      createAcceptedRootWorkRecord('RootLaneSchedulingSnapshot'),
+      createAcceptedRootWorkRecord('UpdateContainerResult'),
+      createAcceptedRootWorkRecord(
+        'HostRootFinishedWorkPendingCommitRecordForCanary'
+      ),
+      createAcceptedRootWorkRecord(
+        'HostRootFinishedWorkCommitHandoffRecordForCanary'
+      )
+    ];
+    const rendererRootMetadata =
+      diagnostics.createDelayedRendererRootWorkMetadataForDiagnostics({
+        callbackHandle: delayedHandle,
+        actQueue,
+        rootWorkRecords,
+        rootId: 772,
+        rootLabel: 'renderer-root-772',
+        rootRequestId: 'renderer-root-request-772',
+        rootRequestSequence: 1,
+        rootOperation: 'create',
+        scheduledVirtualTime: 0,
+        delayMs: 10,
+        schedulerPriority: 'UserBlocking'
+      });
+    assert.equal(
+      rendererRootMetadata[delayedRendererRootWorkMetadataBrand],
+      true,
+      nodeEnv
+    );
+    assert.equal(
+      rendererRootMetadata.kind,
+      delayedRendererRootWorkMetadataKind,
+      nodeEnv
+    );
+
+    const delayedMetadata =
+      diagnostics.createDelayedActRootWorkMetadataFromAcceptedRendererRootMetadataForDiagnostics(
+        rendererRootMetadata
+      );
+    assert.equal(delayedMetadata[delayedActRootWorkMetadataBrand], true);
+    assert.equal(
+      delayedMetadata.producerStatus,
+      'produced-private-delayed-act-root-work-metadata-from-accepted-renderer-root-metadata',
+      nodeEnv
+    );
+    assert.equal(
+      delayedMetadata.producerKind,
+      'accepted-renderer-root-metadata',
+      nodeEnv
+    );
+
+    const described =
+      diagnostics.describeDelayedActRootWorkMetadataForDiagnostics(
+        delayedMetadata
+      );
+    assert.equal(described.accepted, true, nodeEnv);
+    assert.equal(described.rejectionReason, null, nodeEnv);
+    assert.equal(
+      described.metadata.producedByPrivateDelayedRendererRootProducer,
+      true,
+      nodeEnv
+    );
+    assert.equal(
+      described.metadata.rendererRootMetadata.sourceEvidenceMatches,
+      true,
+      nodeEnv
+    );
+    assert.equal(
+      described.metadata.rendererRootMetadata.rootWorkRecordCount,
+      4,
+      nodeEnv
+    );
+    assert.equal(described.drainsPublicSchedulerTaskQueue, false, nodeEnv);
+    assert.equal(described.drainsPublicReactActQueue, false, nodeEnv);
+
+    const report = Scheduler.unstable_flushExpired(delayedMetadata);
+    assert.equal(report[delayedActRootWorkDiagnosticsBrand], true, nodeEnv);
+    assert.equal(
+      report.producedByPrivateDelayedRendererRootProducer,
+      true,
+      nodeEnv
+    );
+    assert.equal(
+      report.delayedRendererRootMetadata.sourceEvidenceMatches,
+      true,
+      nodeEnv
+    );
+    assert.equal(
+      report.expiredActRootWorkDrainReport[expiredActRootWorkDiagnosticsBrand],
+      true,
+      nodeEnv
+    );
+    assert.equal(report.rootWorkRecordsConsumedCount, 4, nodeEnv);
+    assert.equal(report.actQueuePendingBefore, 2, nodeEnv);
+    assert.equal(report.actQueuePendingAfter, 0, nodeEnv);
+    assert.equal(report.drainsPublicSchedulerTaskQueue, false, nodeEnv);
+    assert.equal(report.drainsPublicReactActQueue, false, nodeEnv);
+    assert.equal(report.publicReactActCompatibilityClaimed, false, nodeEnv);
+    assert.equal(report.executesRendererWork, false, nodeEnv);
+    assert.equal(report.executesRendererRoots, false, nodeEnv);
+    assert.deepEqual(
+      events,
+      [
+        [
+          'renderer-root-delayed-callback',
+          true,
+          Scheduler.unstable_UserBlockingPriority,
+          260
+        ],
+        [
+          'renderer-root-delayed-continuation',
+          true,
+          Scheduler.unstable_UserBlockingPriority,
+          260
+        ],
+        [
+          'renderer-root-schedule',
+          false,
+          Scheduler.unstable_NormalPriority,
+          260
+        ],
+        [
+          'renderer-root-callback',
+          false,
+          Scheduler.unstable_NormalPriority,
+          260
+        ],
+        [
+          'renderer-root-act-continuation',
+          false,
+          Scheduler.unstable_NormalPriority,
+          260
+        ]
+      ],
+      nodeEnv
+    );
+    assert.equal(publicSchedulerCallbackRan, false, nodeEnv);
+    assert.equal(rootWorkRecords.length, 0, nodeEnv);
+    assert.equal(actQueue.records.length, 0, nodeEnv);
+    assert.equal(Scheduler.unstable_hasPendingWork(), true, nodeEnv);
+
+    Scheduler.reset();
+  }
+});
+
 test('scheduler mock rejects unbranded delayed act/root continuations', () => {
   const reactGate = loadFreshReactActDispatcherGate();
 
@@ -508,6 +726,93 @@ test('scheduler mock rejects mutated delayed producer nested evidence', () => {
     assert.equal(injectedActCallbackRan, false, nodeEnv);
     assert.equal(actMutationExpiredMetadata.rootWorkRecords.length, 2, nodeEnv);
     assert.equal(actMutationActQueue.records.length, 1, nodeEnv);
+    assert.equal(Scheduler.unstable_now(), 0, nodeEnv);
+    assert.deepEqual(Scheduler.unstable_clearLog(), [], nodeEnv);
+
+    Scheduler.reset();
+    const staleRendererHandle = Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_UserBlockingPriority,
+      createAcceptedCallback(reactGate, 'stale-renderer-root-callback'),
+      { delay: 10 }
+    );
+    const staleRendererMetadata =
+      diagnostics.createDelayedRendererRootWorkMetadataForDiagnostics({
+        callbackHandle: staleRendererHandle,
+        actQueue: createAcceptedActRootWorkQueue(reactGate),
+        rootWorkRecords: [
+          createAcceptedRootWorkRecord('RootLaneSchedulingSnapshot'),
+          createAcceptedRootWorkRecord('RootTaskScheduleRecord')
+        ],
+        scheduledVirtualTime: 0,
+        delayMs: 10,
+        schedulerPriority: 'UserBlocking'
+      });
+    Scheduler.unstable_cancelCallback(staleRendererHandle);
+    assertDelayedActRootWorkRejection(
+      () =>
+        diagnostics.createDelayedActRootWorkMetadataFromAcceptedRendererRootMetadataForDiagnostics(
+          staleRendererMetadata
+        ),
+      'renderer-root-producer-stale-callback-handle',
+      nodeEnv
+    );
+    assert.equal(Scheduler.unstable_now(), 0, nodeEnv);
+
+    Scheduler.reset();
+    let rendererRootMutationDelayedCallbackRan = false;
+    const rendererRootMutationHandle = Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_UserBlockingPriority,
+      createAcceptedCallback(
+        reactGate,
+        'renderer-root-mutation-delayed-callback',
+        () => {
+          rendererRootMutationDelayedCallbackRan = true;
+          Scheduler.log('renderer-root-mutation-delayed-callback');
+        }
+      ),
+      { delay: 10 }
+    );
+    const rendererRootMutationActQueue =
+      createAcceptedActRootWorkQueue(reactGate);
+    const rendererRootMutationRecords = [
+      createAcceptedRootWorkRecord('RootLaneSchedulingSnapshot'),
+      createAcceptedRootWorkRecord(
+        'HostRootFinishedWorkPendingCommitRecordForCanary'
+      )
+    ];
+    const rendererRootMutationMetadata =
+      diagnostics.createDelayedRendererRootWorkMetadataForDiagnostics({
+        callbackHandle: rendererRootMutationHandle,
+        actQueue: rendererRootMutationActQueue,
+        rootWorkRecords: rendererRootMutationRecords,
+        scheduledVirtualTime: 0,
+        delayMs: 10,
+        schedulerPriority: 'UserBlocking'
+      });
+    const rendererRootMutationDelayedMetadata =
+      diagnostics.createDelayedActRootWorkMetadataFromAcceptedRendererRootMetadataForDiagnostics(
+        rendererRootMutationMetadata
+      );
+    rendererRootMutationRecords.push(
+      createAcceptedRootWorkRecord(
+        'HostRootFinishedWorkCommitHandoffRecordForCanary'
+      )
+    );
+    assertDelayedDescriptionRejection(
+      diagnostics,
+      rendererRootMutationDelayedMetadata,
+      'metadata-source-renderer-root-work-record-count-mismatch',
+      nodeEnv
+    );
+    assertDelayedActRootWorkRejection(
+      () =>
+        Scheduler.unstable_flushExpired(rendererRootMutationDelayedMetadata),
+      'metadata-source-renderer-root-work-record-count-mismatch',
+      nodeEnv
+    );
+    assert.equal(rendererRootMutationDelayedCallbackRan, false, nodeEnv);
+    assert.equal(rendererRootMutationRecords.length, 3, nodeEnv);
+    assert.equal(rendererRootMutationActQueue.records.length, 1, nodeEnv);
     assert.equal(Scheduler.unstable_now(), 0, nodeEnv);
     assert.deepEqual(Scheduler.unstable_clearLog(), [], nodeEnv);
 
@@ -764,6 +1069,47 @@ test('scheduler mock rejects unsupported delayed act/root metadata', () => {
     );
     assert.equal(Scheduler.unstable_now(), 0, nodeEnv);
     assert.equal(producerExpiredMetadata.rootWorkRecords.length, 2, nodeEnv);
+    const rendererSourceMetadata =
+      diagnostics.createDelayedRendererRootWorkMetadataForDiagnostics({
+        callbackHandle: producerHandle,
+        actQueue: createAcceptedActRootWorkQueue(reactGate),
+        rootWorkRecords: [
+          createAcceptedRootWorkRecord('RootLaneSchedulingSnapshot'),
+          createAcceptedRootWorkRecord(
+            'HostRootFinishedWorkPendingCommitRecordForCanary'
+          )
+        ],
+        scheduledVirtualTime: 0,
+        delayMs: 10,
+        schedulerPriority: 'UserBlocking'
+      });
+    const clonedRendererSourceMetadata =
+      cloneDelayedRendererRootWorkMetadata(rendererSourceMetadata);
+    assertDelayedActRootWorkRejection(
+      () =>
+        diagnostics.createDelayedActRootWorkMetadataFromAcceptedRendererRootMetadataForDiagnostics(
+          clonedRendererSourceMetadata
+        ),
+      'renderer-root-metadata-source-proof',
+      nodeEnv
+    );
+    const rendererProducedMetadata =
+      diagnostics.createDelayedActRootWorkMetadataFromAcceptedRendererRootMetadataForDiagnostics(
+        rendererSourceMetadata
+      );
+    const clonedRendererProducedMetadata =
+      cloneDelayedActRootWorkMetadata(rendererProducedMetadata);
+    assertDelayedDescriptionRejection(
+      diagnostics,
+      clonedRendererProducedMetadata,
+      'metadata-not-produced-by-private-delayed-root-producer',
+      nodeEnv
+    );
+    assertDelayedActRootWorkRejection(
+      () => Scheduler.unstable_flushExpired(clonedRendererProducedMetadata),
+      'metadata-not-produced-by-private-delayed-root-producer',
+      nodeEnv
+    );
 
     Scheduler.reset();
   }
@@ -921,6 +1267,17 @@ function cloneDelayedActRootWorkMetadata(metadata) {
   return Object.freeze(clone);
 }
 
+function cloneDelayedRendererRootWorkMetadata(metadata) {
+  const clone = { ...metadata };
+  Object.defineProperty(clone, delayedRendererRootWorkMetadataBrand, {
+    configurable: false,
+    enumerable: false,
+    value: true,
+    writable: false
+  });
+  return Object.freeze(clone);
+}
+
 function createAcceptedRootWorkRecord(recordKind, overrides = {}) {
   return Object.freeze({
     recordKind,
@@ -1026,6 +1383,41 @@ function assertDelayedDiagnosticsReady(diagnostics, label) {
     label
   );
   assert.equal(
+    diagnostics.producesDelayedActRootWorkMetadataFromAcceptedRendererRootMetadata,
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.createsDelayedRendererRootWorkMetadataForDiagnostics,
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.recognizesDelayedRendererRootWorkMetadata,
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.bindsDelayedRendererRootProducerEvidence,
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.rejectsStaleDelayedRendererRootProducerEvidence,
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.rejectsClonedDelayedRendererRootSourceEvidence,
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.handsOffDelayedRendererRootWorkThroughPrivateActRootRoute,
+    true,
+    label
+  );
+  assert.equal(
     diagnostics.rejectsUnownedDelayedActRootWorkMetadata,
     true,
     label
@@ -1065,6 +1457,14 @@ function assertDelayedDiagnosticsReady(diagnostics, label) {
   );
   assert.equal(
     typeof diagnostics.createDelayedActRootWorkMetadataFromAcceptedRootMetadataForDiagnostics,
+    'function'
+  );
+  assert.equal(
+    typeof diagnostics.createDelayedActRootWorkMetadataFromAcceptedRendererRootMetadataForDiagnostics,
+    'function'
+  );
+  assert.equal(
+    typeof diagnostics.createDelayedRendererRootWorkMetadataForDiagnostics,
     'function'
   );
 }
