@@ -5319,6 +5319,328 @@ test('private resource hint stylesheet precedence diagnostic records style dedup
   );
 });
 
+test('private stylesheet load/error state diagnostic records fake resource state only', () => {
+  const scenario = createStylesheetPrecedenceLoadErrorStateScenario(
+    'stylesheet-load-state'
+  );
+  const loadStateGate =
+    resourceFormGate.createResourceHintStylesheetLoadErrorStateGate({
+      requestIdPrefix: 'stylesheet-load-state'
+    });
+  const diagnostic =
+    loadStateGate.recordStylesheetLoadErrorStateDiagnostic(
+      scenario.stylesheetPrecedence,
+      {
+        explicitStylesheetLoadErrorStateDiagnostic: true,
+        stateKind: 'deterministic-fake-stylesheet-load-error-state',
+        stateId: 'stylesheet-load-state',
+        targetKind: 'stylesheet-resource-state'
+      }
+    );
+  const summary =
+    resourceFormGate
+      .describePrivateResourceHintStylesheetLoadErrorStateGate();
+
+  assert.equal(Object.isFrozen(diagnostic), true);
+  assert.equal(
+    resourceFormGate.isPrivateResourceHintStylesheetLoadErrorStateRecord(
+      diagnostic
+    ),
+    true
+  );
+  assert.equal(
+    resourceFormGate
+      .getPrivateResourceHintStylesheetLoadErrorStateRecordPayload(
+        diagnostic
+      ),
+    diagnostic
+  );
+  assert.equal(
+    diagnostic.stylesheetLoadErrorStateId,
+    'stylesheet-load-state:1'
+  );
+  assert.equal(
+    diagnostic.stylesheetLoadErrorStateStatus,
+    resourceFormGate.privateResourceHintStylesheetLoadErrorStateStatus
+  );
+  assert.equal(
+    diagnostic.executionStatus,
+    resourceFormGate
+      .privateResourceHintStylesheetLoadErrorStateExecutionStatus
+  );
+  assert.deepEqual(
+    diagnostic.sideEffects,
+    resourceFormGate.resourceHintStylesheetLoadErrorStateSideEffects
+  );
+  assert.equal(
+    diagnostic.sideEffects.fakeStylesheetLoadErrorStateDiagnosticInvoked,
+    true
+  );
+  assert.equal(diagnostic.sideEffects.stylesheetFetchStarted, false);
+  assert.equal(diagnostic.sideEffects.stylesheetLoadListenerInstalled, false);
+  assert.equal(diagnostic.sideEffects.stylesheetErrorListenerInstalled, false);
+  assert.equal(diagnostic.sideEffects.stylesheetPromiseCreated, false);
+  assert.equal(diagnostic.sideEffects.stylesheetCommitSuspended, false);
+  assert.equal(diagnostic.sideEffects.stylesheetRealTimerScheduled, false);
+  assert.deepEqual(
+    diagnostic.loadingStateBits.map((row) => [row.name, row.bitmask]),
+    [
+      ['NotLoaded', 0],
+      ['Loaded', 1],
+      ['Errored', 2],
+      ['Settled', 3],
+      ['Inserted', 4]
+    ]
+  );
+  assert.deepEqual(
+    diagnostic.resourceStateRows.map((row) => ({
+      resourceKey: row.resourceKey,
+      type: row.reactResourceShape.type,
+      instance: row.reactResourceShape.instance,
+      count: row.reactResourceShape.count,
+      loading: row.stateShape.loading,
+      preload: row.stateShape.preload,
+      preloadSeenBefore: row.preloadSeenBefore,
+      preinitSeenBefore: row.preinitSeenBefore,
+      plannedInsertionCount: row.plannedInsertionCount,
+      loadListenerInstalled: row.loadListenerInstalled,
+      errorListenerInstalled: row.errorListenerInstalled,
+      loadingPromiseCreated: row.loadingPromiseCreated,
+      resourceFetchStarted: row.resourceFetchStarted
+    })),
+    [
+      {
+        resourceKey: 'style:style-main',
+        type: 'stylesheet',
+        instance: null,
+        count: 1,
+        loading: 0,
+        preload: null,
+        preloadSeenBefore: true,
+        preinitSeenBefore: true,
+        plannedInsertionCount: 1,
+        loadListenerInstalled: false,
+        errorListenerInstalled: false,
+        loadingPromiseCreated: false,
+        resourceFetchStarted: false
+      }
+    ]
+  );
+  assert.deepEqual(
+    diagnostic.loadingStateRows.map((row) => ({
+      label: row.label,
+      bitmask: row.bitmask,
+      loaded: row.snapshot.loaded,
+      errored: row.snapshot.errored,
+      inserted: row.snapshot.inserted,
+      loadListenerInstalled: row.loadListenerInstalled,
+      errorListenerInstalled: row.errorListenerInstalled,
+      loadingPromiseCreated: row.loadingPromiseCreated
+    })),
+    [
+      {
+        label: 'not-loaded',
+        bitmask: 0,
+        loaded: false,
+        errored: false,
+        inserted: false,
+        loadListenerInstalled: false,
+        errorListenerInstalled: false,
+        loadingPromiseCreated: false
+      },
+      {
+        label: 'loaded',
+        bitmask: 1,
+        loaded: true,
+        errored: false,
+        inserted: false,
+        loadListenerInstalled: false,
+        errorListenerInstalled: false,
+        loadingPromiseCreated: false
+      },
+      {
+        label: 'errored',
+        bitmask: 2,
+        loaded: false,
+        errored: true,
+        inserted: false,
+        loadListenerInstalled: false,
+        errorListenerInstalled: false,
+        loadingPromiseCreated: false
+      },
+      {
+        label: 'inserted-not-settled',
+        bitmask: 4,
+        loaded: false,
+        errored: false,
+        inserted: true,
+        loadListenerInstalled: false,
+        errorListenerInstalled: false,
+        loadingPromiseCreated: false
+      },
+      {
+        label: 'inserted-loaded',
+        bitmask: 5,
+        loaded: true,
+        errored: false,
+        inserted: true,
+        loadListenerInstalled: false,
+        errorListenerInstalled: false,
+        loadingPromiseCreated: false
+      },
+      {
+        label: 'inserted-errored',
+        bitmask: 6,
+        loaded: false,
+        errored: true,
+        inserted: true,
+        loadListenerInstalled: false,
+        errorListenerInstalled: false,
+        loadingPromiseCreated: false
+      }
+    ]
+  );
+  assert.equal(diagnostic.preloadStateRows[0].preloadWouldBeTracked, true);
+  assert.equal(
+    diagnostic.preloadStateRows[0].preloadLoadListenerInstalled,
+    false
+  );
+  assert.equal(
+    diagnostic.preloadStateRows[0].preloadErrorListenerInstalled,
+    false
+  );
+  assert.equal(diagnostic.preloadStateRows[0].preloadFetchStarted, false);
+  assert.equal(
+    diagnostic.commitSuspensionRows[0].maySuspendCommitIfNotInserted,
+    true
+  );
+  assert.equal(diagnostic.commitSuspensionRows[0].stylesheetsMapCreated, false);
+  assert.equal(
+    diagnostic.commitSuspensionRows[0].suspendedStateCountIncremented,
+    false
+  );
+  assert.equal(diagnostic.commitSuspensionRows[0].timerScheduled, false);
+  assert.equal(diagnostic.commitSuspensionRows[0].commitSuspended, false);
+  assert.deepEqual(diagnostic.suspendedCommitBoundary.stateShape, {
+    stylesheets: null,
+    count: 0,
+    unsuspend: null
+  });
+  assert.equal(
+    diagnostic.suspendedCommitBoundary.realTimerScheduled,
+    false
+  );
+  assert.equal(
+    diagnostic.suspendedCommitBoundary.suspendedCommitStarted,
+    false
+  );
+  assert.deepEqual(
+    diagnostic.blockedCapabilities,
+    resourceFormGate.resourceHintStylesheetLoadErrorStateBlockedCapabilities
+  );
+  assert.equal(
+    diagnostic.publicResourceBoundary.publicResourceHintCallsReachable,
+    false
+  );
+  assert.equal(fakeResourceSourceUsesNoLoadErrorListeners(), true);
+  assert.equal(scenario.fakeDom.head.childNodes.length, 2);
+  assert.equal(JSON.stringify(diagnostic).includes('/style.css'), false);
+  assert.equal(JSON.stringify(diagnostic).includes('sha256-style'), false);
+  assert.equal(/"theme"/u.test(JSON.stringify(diagnostic)), false);
+
+  assert.equal(
+    summary.gateId,
+    resourceFormGate.privateResourceHintStylesheetLoadErrorStateGateId
+  );
+  assert.equal(summary.recordsStylesheetResourceShape, true);
+  assert.equal(summary.recordsLoadingBitmasks, true);
+  assert.equal(summary.installsLoadListeners, false);
+  assert.equal(summary.installsErrorListeners, false);
+  assert.equal(summary.createsLoadingPromises, false);
+  assert.equal(summary.fetchesStylesheets, false);
+  assert.equal(summary.suspendsCommits, false);
+  assert.deepEqual(
+    summary.sideEffects,
+    resourceFormGate.resourceHintStylesheetLoadErrorStateBlockedSideEffects
+  );
+
+  const error =
+    resourceFormGate.createUnsupportedResourceHintStylesheetLoadErrorStateError(
+      diagnostic
+    );
+  assert.equal(error.name, 'FastReactDomUnimplementedError');
+  assert.equal(
+    error.code,
+    resourceFormGate.privateResourceHintStylesheetLoadErrorStateGateErrorCode
+  );
+  assert.equal(error.exportName, 'resource-hint-stylesheet-load-error-state');
+  assert.equal(error.stylesheetLoadErrorStateId, 'stylesheet-load-state:1');
+  assert.deepEqual(
+    error.blockedCapabilities,
+    resourceFormGate.resourceHintStylesheetLoadErrorStateBlockedCapabilities
+  );
+
+  assert.throws(
+    () =>
+      loadStateGate.recordStylesheetLoadErrorStateDiagnostic(
+        scenario.stylesheetPrecedence,
+        { explicitStylesheetLoadErrorStateDiagnostic: true }
+      ),
+    {
+      code:
+        resourceFormGate
+          .privateResourceHintStylesheetLoadErrorStateInvalidAdmissionCode,
+      compatibilityTarget,
+      reason:
+        'stylesheet load/error state gate admits exactly one diagnostic record'
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate
+        .createResourceHintStylesheetLoadErrorStateGate()
+        .recordStylesheetLoadErrorStateDiagnostic({}, {
+          explicitStylesheetLoadErrorStateDiagnostic: true
+        }),
+    {
+      code:
+        resourceFormGate
+          .privateResourceHintStylesheetLoadErrorStateInvalidRecordCode,
+      compatibilityTarget
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate
+        .createResourceHintStylesheetLoadErrorStateGate()
+        .recordStylesheetLoadErrorStateDiagnostic(
+          scenario.stylesheetPrecedence,
+          {
+            explicitStylesheetLoadErrorStateDiagnostic: true,
+            element: {}
+          }
+        ),
+    {
+      code:
+        resourceFormGate
+          .privateResourceHintStylesheetLoadErrorStateInvalidAdmissionCode,
+      compatibilityTarget,
+      reason: 'element must not be passed to the metadata gate'
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate
+        .createUnsupportedResourceHintStylesheetLoadErrorStateError({}),
+    {
+      code:
+        resourceFormGate
+          .privateResourceHintStylesheetLoadErrorStateInvalidRecordCode,
+      compatibilityTarget
+    }
+  );
+});
+
 test('private resource hint dispatcher metadata rejects malformed or dispatching shapes', () => {
   const gate = resourceFormGate.createResourceFormActionInternalsGate({
     requestIdPrefix: 'resource-dispatcher-error-gate'
@@ -7232,6 +7554,124 @@ function summarizePreloadPreinitOrder(diagnostic) {
       dedupedRowCount: diagnostic.resourceMapPlan.dedupedRowCount
     }
   };
+}
+
+function createStylesheetPrecedenceLoadErrorStateScenario(prefix) {
+  const gate = resourceFormGate.createResourceFormActionInternalsGate({
+    requestIdPrefix: `${prefix}-source`
+  });
+  const adapterGate = resourceFormGate.createResourceHintFakeDomAdapterGate({
+    requestIdPrefix: `${prefix}-adapter`
+  });
+  const orderGate =
+    resourceFormGate.createResourceHintPreloadPreinitOrderGate({
+      requestIdPrefix: `${prefix}-order`
+    });
+  const stylesheetGate =
+    resourceFormGate.createResourceHintStylesheetPrecedenceGate({
+      requestIdPrefix: `${prefix}-precedence`
+    });
+  const fakeDom = createDeterministicFakeResourceDom();
+  const records = [
+    gate.recordResourceHintDispatcherRequest('L', [
+      '/style.css',
+      'style',
+      {
+        crossOrigin: undefined,
+        integrity: undefined,
+        nonce: undefined,
+        type: undefined,
+        fetchPriority: 'low',
+        referrerPolicy: undefined,
+        imageSrcSet: undefined,
+        imageSizes: undefined,
+        media: undefined
+      }
+    ]),
+    gate.recordResourceHintDispatcherRequest('S', [
+      '/style.css',
+      'theme',
+      {
+        crossOrigin: '',
+        integrity: 'sha256-style',
+        fetchPriority: 'high'
+      }
+    ])
+  ];
+  const headRecord = gate.recordSingletonRequest('head', [
+    throwingProxy('stylesheet load state head props')
+  ]);
+  const admissions = records.map((record) =>
+    adapterGate.admitDispatcherRecord(record, {
+      explicitAdmission: true,
+      adapterKind: 'deterministic-fake-dom',
+      targetKind: 'document-head'
+    })
+  );
+
+  appendFakeHeadChild(fakeDom, 'link', {
+    rel: 'stylesheet',
+    'data-precedence': 'theme',
+    'data-fast-react-resource-key': 'style-main',
+    'data-fast-react-precedence-key': 'precedence-main'
+  });
+  appendFakeHeadChild(fakeDom, 'link', {
+    rel: 'preload',
+    as: 'style',
+    'data-fast-react-resource-key': 'style-main'
+  });
+
+  const order = orderGate.recordPreloadPreinitOrderDiagnostic(
+    admissions,
+    {
+      explicitOrderDiagnostic: true,
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head,
+      resourceDescriptors: [
+        {
+          sourceAdapterAdmissionId: admissions[0].adapterAdmissionId,
+          resourceKind: 'style',
+          resourceKey: 'style-main'
+        },
+        {
+          sourceAdapterAdmissionId: admissions[1].adapterAdmissionId,
+          resourceKind: 'style',
+          resourceKey: 'style-main',
+          precedenceKey: 'precedence-main'
+        }
+      ]
+    }
+  );
+  const stylesheetPrecedence =
+    stylesheetGate.recordStylesheetPrecedenceDiagnostic(
+      order,
+      headRecord,
+      {
+        explicitStylesheetPrecedenceDiagnostic: true,
+        precedenceKind: 'deterministic-fake-dom-stylesheet-precedence-order',
+        precedenceId: `${prefix}-precedence`,
+        targetKind: 'document-head',
+        hostTag: 'head',
+        fakeDocument: fakeDom.document,
+        fakeHead: fakeDom.head
+      }
+    );
+
+  return { fakeDom, stylesheetPrecedence };
+}
+
+function fakeResourceSourceUsesNoLoadErrorListeners() {
+  const source = readFileSync(
+    path.join(sourceRoot, 'resource-form-internals-gate.js'),
+    'utf8'
+  );
+  assert.doesNotMatch(
+    source,
+    /addEventListener\(\s*['"](?:load|error)['"]/u
+  );
+  assert.doesNotMatch(source, /\.(?:onload|onerror)\s*=/u);
+  assert.doesNotMatch(source, /\bsetTimeout\s*\(/u);
+  return true;
 }
 
 function requireFresh(fileName) {

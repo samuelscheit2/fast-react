@@ -17,6 +17,7 @@ const resourceHintHeadBoundaryGateSchemaVersion = 1;
 const resourceHintHeadClearRetainGateSchemaVersion = 1;
 const resourceHintPreloadPreinitOrderGateSchemaVersion = 1;
 const resourceHintStylesheetPrecedenceGateSchemaVersion = 1;
+const resourceHintStylesheetLoadErrorStateGateSchemaVersion = 1;
 const controlledInputValueTrackerGateSchemaVersion = 1;
 const controlledInputValueTrackerFakeDomDiagnosticGateSchemaVersion = 1;
 const controlledInputPrivateRestoreQueueDiagnosticGateSchemaVersion = 1;
@@ -39,6 +40,8 @@ const privateResourceHintPreloadPreinitOrderRecordType =
   'fast.react_dom.private_resource_hint_preload_preinit_order_record';
 const privateResourceHintStylesheetPrecedenceRecordType =
   'fast.react_dom.private_resource_hint_stylesheet_precedence_record';
+const privateResourceHintStylesheetLoadErrorStateRecordType =
+  'fast.react_dom.private_resource_hint_stylesheet_load_error_state_record';
 const privateControlledInputValueTrackerGateRecordType =
   'fast.react_dom.private_controlled_input_value_tracker_gate_record';
 const privateControlledInputValueTrackerFakeDomDiagnosticRecordType =
@@ -61,6 +64,8 @@ const privateResourceHintPreloadPreinitOrderGateId =
   'resource-hint-preload-preinit-dedupe-order-private-gate-1';
 const privateResourceHintStylesheetPrecedenceGateId =
   'resource-hint-stylesheet-precedence-private-gate-1';
+const privateResourceHintStylesheetLoadErrorStateGateId =
+  'resource-hint-stylesheet-load-error-state-private-gate-1';
 const privateFormActionResetDispatcherGateId =
   'form-action-reset-private-dispatcher-gate-1';
 const privateResourceHintFakeDomAdapterAdmissionRequiredStatus =
@@ -113,6 +118,14 @@ const privateResourceHintStylesheetPrecedenceExecutionStatus =
   'diagnosed-private-resource-hint-fake-dom-stylesheet-precedence-order';
 const privateResourceHintStylesheetPrecedenceCompatibilityBlockedStatus =
   'blocked-private-resource-hint-stylesheet-precedence-compatibility';
+const privateResourceHintStylesheetLoadErrorStateAdmissionRequiredStatus =
+  'blocked-private-resource-hint-stylesheet-load-error-state-admission-required';
+const privateResourceHintStylesheetLoadErrorStateStatus =
+  'admitted-private-resource-hint-stylesheet-load-error-state-record';
+const privateResourceHintStylesheetLoadErrorStateExecutionStatus =
+  'diagnosed-private-resource-hint-fake-dom-stylesheet-load-error-state';
+const privateResourceHintStylesheetLoadErrorStateCompatibilityBlockedStatus =
+  'blocked-private-resource-hint-stylesheet-load-error-state-compatibility';
 const privateFormActionResetDispatcherStatus =
   'private-form-action-reset-dispatcher-metadata-only';
 const privateFormActionSubmissionIntentRecordedStatus =
@@ -173,6 +186,12 @@ const privateResourceHintStylesheetPrecedenceInvalidRecordCode =
   'FAST_REACT_DOM_RESOURCE_HINT_STYLESHEET_PRECEDENCE_INVALID_RECORD';
 const privateResourceHintStylesheetPrecedenceInvalidAdmissionCode =
   'FAST_REACT_DOM_RESOURCE_HINT_STYLESHEET_PRECEDENCE_INVALID_ADMISSION';
+const privateResourceHintStylesheetLoadErrorStateGateErrorCode =
+  'FAST_REACT_DOM_RESOURCE_HINT_STYLESHEET_LOAD_ERROR_STATE_GATE';
+const privateResourceHintStylesheetLoadErrorStateInvalidRecordCode =
+  'FAST_REACT_DOM_RESOURCE_HINT_STYLESHEET_LOAD_ERROR_STATE_INVALID_RECORD';
+const privateResourceHintStylesheetLoadErrorStateInvalidAdmissionCode =
+  'FAST_REACT_DOM_RESOURCE_HINT_STYLESHEET_LOAD_ERROR_STATE_INVALID_ADMISSION';
 const privateControlledInputValueTrackerGateErrorCode =
   'FAST_REACT_DOM_CONTROLLED_INPUT_VALUE_TRACKER_GATE';
 const privateControlledInputValueTrackerGateUnknownScenarioCode =
@@ -501,6 +520,39 @@ const resourceHintStylesheetPrecedenceSideEffects = freezeRecord({
   stylesheetPrecedenceResourceMapMutated: false
 });
 
+const resourceHintStylesheetLoadErrorStateBlockedSideEffects =
+  freezeRecord({
+    ...resourceHintStylesheetPrecedenceBlockedSideEffects,
+    fakeStylesheetLoadErrorStateDiagnosticInvoked: false,
+    stylesheetResourceStateRowsRecorded: false,
+    stylesheetLoadingStateRowsRecorded: false,
+    stylesheetPreloadStateRowsRecorded: false,
+    stylesheetCommitSuspensionRowsRecorded: false,
+    stylesheetLoadListenerInstalled: false,
+    stylesheetErrorListenerInstalled: false,
+    stylesheetPromiseCreated: false,
+    stylesheetPreloadListenerInstalled: false,
+    stylesheetFetchStarted: false,
+    stylesheetCommitSuspended: false,
+    stylesheetRealTimerScheduled: false
+  });
+
+const resourceHintStylesheetLoadErrorStateSideEffects = freezeRecord({
+  ...resourceHintStylesheetPrecedenceBlockedSideEffects,
+  fakeStylesheetLoadErrorStateDiagnosticInvoked: true,
+  stylesheetResourceStateRowsRecorded: true,
+  stylesheetLoadingStateRowsRecorded: true,
+  stylesheetPreloadStateRowsRecorded: true,
+  stylesheetCommitSuspensionRowsRecorded: true,
+  stylesheetLoadListenerInstalled: false,
+  stylesheetErrorListenerInstalled: false,
+  stylesheetPromiseCreated: false,
+  stylesheetPreloadListenerInstalled: false,
+  stylesheetFetchStarted: false,
+  stylesheetCommitSuspended: false,
+  stylesheetRealTimerScheduled: false
+});
+
 const controlledInputValueTrackerSideEffects = freezeRecord({
   controlsTracked: false,
   trackerAttached: false,
@@ -796,6 +848,34 @@ const resourceHintStylesheetPrecedenceMissingPrerequisites = freezeArray([
   )
 ]);
 
+const resourceHintStylesheetLoadErrorStateMissingPrerequisites = freezeArray([
+  prerequisite(
+    'no-stylesheet-loading-state-commit',
+    'react-dom-resource',
+    'Stylesheet resource loading bits are recorded as deterministic fake metadata only.'
+  ),
+  prerequisite(
+    'no-stylesheet-load-error-listeners',
+    'react-dom-resource',
+    'Stylesheet load and error listeners are not installed.'
+  ),
+  prerequisite(
+    'no-stylesheet-preload-state-commit',
+    'react-dom-resource',
+    'Stylesheet preload element references are not created, captured, or fetched.'
+  ),
+  prerequisite(
+    'no-suspended-stylesheet-commit',
+    'react-dom-resource',
+    'Suspended stylesheet commit state, timers, and unsuspend callbacks remain blocked.'
+  ),
+  prerequisite(
+    'no-public-resource-compatibility',
+    'react-dom-client',
+    'Public stylesheet resource compatibility remains unclaimed.'
+  )
+]);
+
 const resourceHintHeadClearRetainBlockedCapabilities = freezeArray([
   blockedCapability(
     'head-singleton-release',
@@ -889,6 +969,37 @@ const resourceHintStylesheetPrecedenceBlockedCapabilities = freezeArray([
   blockedCapability(
     'real-document-head-mutation',
     'Real document head query and mutation behavior remains blocked.'
+  ),
+  blockedCapability(
+    'public-resource-compatibility',
+    'Public stylesheet resource compatibility remains unclaimed.'
+  )
+]);
+
+const resourceHintStylesheetLoadErrorStateBlockedCapabilities = freezeArray([
+  blockedCapability(
+    'stylesheet-resource-state-map',
+    'No root-owned hoistableStyles resource map is created or mutated.'
+  ),
+  blockedCapability(
+    'stylesheet-load-error-listeners',
+    'No load or error listeners are installed on stylesheet or preload elements.'
+  ),
+  blockedCapability(
+    'stylesheet-loading-promise',
+    'No stylesheet loading promise or _p field is created.'
+  ),
+  blockedCapability(
+    'stylesheet-preload-element',
+    'No preload element is created, captured, or fetched.'
+  ),
+  blockedCapability(
+    'suspended-stylesheet-commit',
+    'No suspended commit count, timer, or unsuspend callback is scheduled.'
+  ),
+  blockedCapability(
+    'real-document-resource-fetch',
+    'No real document, network, timer, or DOM event behavior is used.'
   ),
   blockedCapability(
     'public-resource-compatibility',
@@ -1168,6 +1279,41 @@ const resourceHintStylesheetPrecedenceContracts = freezeArray([
   )
 ]);
 
+const stylesheetLoadingStateBits = freezeRecord({
+  NotLoaded: 0,
+  Loaded: 1,
+  Errored: 2,
+  Settled: 3,
+  Inserted: 4
+});
+
+const resourceHintStylesheetLoadErrorStateContracts = freezeArray([
+  resourceHintStylesheetLoadErrorStateContract(
+    'stylesheet-resource-shape',
+    'resource',
+    'type-instance-count-state',
+    ['type', 'instance', 'count', 'state']
+  ),
+  resourceHintStylesheetLoadErrorStateContract(
+    'stylesheet-state-shape',
+    'state',
+    'loading-and-preload',
+    ['loading', 'preload']
+  ),
+  resourceHintStylesheetLoadErrorStateContract(
+    'stylesheet-loading-bits',
+    'loading-state',
+    'notloaded-loaded-errored-settled-inserted',
+    ['NotLoaded', 'Loaded', 'Errored', 'Settled', 'Inserted']
+  ),
+  resourceHintStylesheetLoadErrorStateContract(
+    'stylesheet-suspended-commit-state',
+    'suspended-commit',
+    'stylesheets-count-unsuspend',
+    ['stylesheets', 'count', 'unsuspend']
+  )
+]);
+
 const singletonContracts = freezeArray([
   singletonContract('html-singleton', 'html'),
   singletonContract('head-singleton', 'head'),
@@ -1395,6 +1541,7 @@ const resourceHintHeadBoundaryPayloads = new WeakMap();
 const resourceHintHeadClearRetainPayloads = new WeakMap();
 const resourceHintPreloadPreinitOrderPayloads = new WeakMap();
 const resourceHintStylesheetPrecedencePayloads = new WeakMap();
+const resourceHintStylesheetLoadErrorStatePayloads = new WeakMap();
 const controlledInputValueTrackerRecordPayloads = new WeakMap();
 const controlledInputValueTrackerFakeDomDiagnosticPayloads = new WeakMap();
 const controlledInputValueTrackerFakeDomDiagnosticStates = new WeakMap();
@@ -1411,6 +1558,8 @@ const defaultControlledInputValueTrackerGate =
   createControlledInputValueTrackerGate();
 const defaultControlledInputPrivateRestoreQueueDiagnosticGate =
   createControlledInputPrivateRestoreQueueDiagnosticGate();
+const defaultResourceHintStylesheetLoadErrorStateGate =
+  createResourceHintStylesheetLoadErrorStateGate();
 
 function createResourceFormActionInternalsGate(options) {
   const gateState = createGateState(options);
@@ -1661,6 +1810,27 @@ function createResourceHintStylesheetPrecedenceGate(options) {
   });
 }
 
+function createResourceHintStylesheetLoadErrorStateGate(options) {
+  const gateState = createGateStateWithDefaultPrefix(
+    options,
+    'resource-hint-stylesheet-load-error-state'
+  );
+  gateState.stylesheetLoadErrorStateConsumed = false;
+
+  return Object.freeze({
+    recordStylesheetLoadErrorStateDiagnostic(
+      stylesheetPrecedenceRecord,
+      diagnostic
+    ) {
+      return recordResourceHintStylesheetLoadErrorStateWithGate(
+        gateState,
+        stylesheetPrecedenceRecord,
+        diagnostic
+      );
+    }
+  });
+}
+
 function recordUnsupportedResourceHintRequest(requestName, args) {
   return defaultGate.recordResourceHintRequest(requestName, args);
 }
@@ -1724,6 +1894,11 @@ function recordControlledInputPostEventRestoreIntentFromFakeDomObservation(
 ) {
   return defaultControlledInputPrivateRestoreQueueDiagnosticGate
     .recordPostEventRestoreIntentFromFakeDomObservation(record, admission);
+}
+
+function recordStylesheetLoadErrorStateDiagnostic(record, diagnostic) {
+  return defaultResourceHintStylesheetLoadErrorStateGate
+    .recordStylesheetLoadErrorStateDiagnostic(record, diagnostic);
 }
 
 function createControlledInputPrivateWrapperPropertyPayloadRecord(row) {
@@ -1852,6 +2027,14 @@ function isPrivateResourceHintStylesheetPrecedenceRecord(value) {
   return resourceHintStylesheetPrecedencePayloads.has(value);
 }
 
+function getPrivateResourceHintStylesheetLoadErrorStateRecordPayload(record) {
+  return resourceHintStylesheetLoadErrorStatePayloads.get(record) || null;
+}
+
+function isPrivateResourceHintStylesheetLoadErrorStateRecord(value) {
+  return resourceHintStylesheetLoadErrorStatePayloads.has(value);
+}
+
 function getPrivateControlledInputValueTrackerRecordPayload(record) {
   return controlledInputValueTrackerRecordPayloads.get(record) || null;
 }
@@ -1911,6 +2094,8 @@ function describeResourceFormActionInternalsGate() {
         resourceHintPreloadPreinitOrderContracts,
       resourceHintStylesheetPrecedence:
         resourceHintStylesheetPrecedenceContracts,
+      resourceHintStylesheetLoadErrorState:
+        resourceHintStylesheetLoadErrorStateContracts,
       singletons: singletonContracts,
       formActions: formActionContracts,
       formActionResetDispatchers: formActionResetDispatcherContracts,
@@ -2163,11 +2348,54 @@ function describePrivateResourceHintStylesheetPrecedenceGate() {
     publicResourceHintDomInsertion: false,
     publicStylesheetPrecedenceBehavior: false,
     publicHeadSingletonBehavior: false,
+    stylesheetLoadErrorState:
+      describePrivateResourceHintStylesheetLoadErrorStateGate(),
     blockedCapabilities: resourceHintStylesheetPrecedenceBlockedCapabilities,
     contracts: resourceHintStylesheetPrecedenceContracts,
     sideEffects: resourceHintStylesheetPrecedenceBlockedSideEffects,
     missingPrerequisites:
       resourceHintStylesheetPrecedenceMissingPrerequisites
+  });
+}
+
+function describePrivateResourceHintStylesheetLoadErrorStateGate() {
+  return freezeRecord({
+    schemaVersion: resourceHintStylesheetLoadErrorStateGateSchemaVersion,
+    gateId: privateResourceHintStylesheetLoadErrorStateGateId,
+    compatibilityTarget,
+    status: unsupportedStatus,
+    unsupportedCode: unimplementedCode,
+    admissionStatus:
+      privateResourceHintStylesheetLoadErrorStateAdmissionRequiredStatus,
+    executionStatus: null,
+    compatibilityStatus:
+      privateResourceHintStylesheetLoadErrorStateCompatibilityBlockedStatus,
+    acceptedStylesheetPrecedenceRecordType:
+      privateResourceHintStylesheetPrecedenceRecordType,
+    deterministicFakeRecordsOnly: true,
+    recordsStylesheetResourceShape: true,
+    recordsStylesheetStateShape: true,
+    recordsLoadingBitmasks: true,
+    recordsLoadErrorTransitions: true,
+    recordsPreloadStateShape: true,
+    recordsSuspendedCommitShape: true,
+    installsLoadListeners: false,
+    installsErrorListeners: false,
+    createsLoadingPromises: false,
+    fetchesStylesheets: false,
+    suspendsCommits: false,
+    schedulesRealTimers: false,
+    rawValuesRetained: false,
+    publicResourceHintDomInsertion: false,
+    publicStylesheetResourceBehavior: false,
+    publicStylesheetPrecedenceBehavior: false,
+    loadingStateBits: createStylesheetLoadingStateBitRows(),
+    blockedCapabilities:
+      resourceHintStylesheetLoadErrorStateBlockedCapabilities,
+    contracts: resourceHintStylesheetLoadErrorStateContracts,
+    sideEffects: resourceHintStylesheetLoadErrorStateBlockedSideEffects,
+    missingPrerequisites:
+      resourceHintStylesheetLoadErrorStateMissingPrerequisites
   });
 }
 
@@ -2543,6 +2771,33 @@ function createUnsupportedResourceHintStylesheetPrecedenceError(record) {
   error.compatibilityStatus = payload.compatibilityStatus;
   error.sourceOrderDiagnosticId = payload.sourceOrderDiagnosticId;
   error.sourceHeadRequestId = payload.sourceHeadRequestId;
+  error.blockedCapabilities = payload.blockedCapabilities;
+  error.sideEffects = payload.sideEffects;
+
+  return error;
+}
+
+function createUnsupportedResourceHintStylesheetLoadErrorStateError(record) {
+  const payload =
+    assertPrivateResourceHintStylesheetLoadErrorStateRecord(record);
+  const error = createUnsupportedError(
+    'react-dom/private-internals',
+    payload.requestType,
+    'was recorded',
+    'The private resource hint stylesheet load/error state gate is a deterministic fake-record diagnostic only.'
+  );
+
+  error.code = privateResourceHintStylesheetLoadErrorStateGateErrorCode;
+  error.stylesheetLoadErrorStateId = payload.stylesheetLoadErrorStateId;
+  error.stylesheetLoadErrorStateSequence =
+    payload.stylesheetLoadErrorStateSequence;
+  error.requestType = payload.requestType;
+  error.stylesheetLoadErrorStateStatus =
+    payload.stylesheetLoadErrorStateStatus;
+  error.executionStatus = payload.executionStatus;
+  error.compatibilityStatus = payload.compatibilityStatus;
+  error.sourceStylesheetPrecedenceId =
+    payload.sourceStylesheetPrecedenceId;
   error.blockedCapabilities = payload.blockedCapabilities;
   error.sideEffects = payload.sideEffects;
 
@@ -3119,6 +3374,82 @@ function recordResourceHintStylesheetPrecedenceWithGate(
   });
 
   resourceHintStylesheetPrecedencePayloads.set(payload, payload);
+  return payload;
+}
+
+function recordResourceHintStylesheetLoadErrorStateWithGate(
+  gateState,
+  stylesheetPrecedenceRecord,
+  diagnostic
+) {
+  if (gateState.stylesheetLoadErrorStateConsumed === true) {
+    throwInvalidResourceHintStylesheetLoadErrorStateAdmission(
+      'stylesheet load/error state gate admits exactly one diagnostic record'
+    );
+  }
+
+  const stylesheetPrecedence =
+    assertStylesheetPrecedenceRecordForLoadErrorState(
+      stylesheetPrecedenceRecord
+    );
+  const stateAdmission =
+    normalizeResourceHintStylesheetLoadErrorStateAdmission(diagnostic);
+  const statePlan =
+    createResourceHintStylesheetLoadErrorStatePlan(stylesheetPrecedence);
+  gateState.stylesheetLoadErrorStateConsumed = true;
+
+  const stylesheetLoadErrorStateSequence = gateState.nextRequestSequence++;
+  const stylesheetLoadErrorStateId =
+    `${gateState.requestIdPrefix}:${stylesheetLoadErrorStateSequence}`;
+
+  const payload = freezeRecord({
+    schemaVersion: resourceHintStylesheetLoadErrorStateGateSchemaVersion,
+    $$typeof: privateResourceHintStylesheetLoadErrorStateRecordType,
+    kind: 'FastReactDomPrivateResourceHintStylesheetLoadErrorStateRecord',
+    gateId: privateResourceHintStylesheetLoadErrorStateGateId,
+    compatibilityTarget,
+    status: unsupportedStatus,
+    unsupportedCode: unimplementedCode,
+    stylesheetLoadErrorStateId,
+    stylesheetLoadErrorStateSequence,
+    sourceStylesheetPrecedenceId:
+      stylesheetPrecedence.stylesheetPrecedenceId,
+    sourceStylesheetPrecedenceSequence:
+      stylesheetPrecedence.stylesheetPrecedenceSequence,
+    sourceOrderDiagnosticId:
+      stylesheetPrecedence.sourceOrderDiagnosticId,
+    sourceHeadRequestId: stylesheetPrecedence.sourceHeadRequestId,
+    requestType: 'resource-hint-stylesheet-load-error-state',
+    hostTag: 'head',
+    oracleKind: resourceHintOracleKind,
+    oracleSchemaVersion: 1,
+    stylesheetLoadErrorStateStatus:
+      privateResourceHintStylesheetLoadErrorStateStatus,
+    executionStatus:
+      privateResourceHintStylesheetLoadErrorStateExecutionStatus,
+    compatibilityStatus:
+      privateResourceHintStylesheetLoadErrorStateCompatibilityBlockedStatus,
+    stateAdmission,
+    sourceStylesheetPrecedence:
+      createResourceHintStylesheetLoadErrorStateSourcePrecedence(
+        stylesheetPrecedence
+      ),
+    loadingStateBits: statePlan.loadingStateBits,
+    resourceStateRows: statePlan.resourceStateRows,
+    loadingStateRows: statePlan.loadingStateRows,
+    preloadStateRows: statePlan.preloadStateRows,
+    commitSuspensionRows: statePlan.commitSuspensionRows,
+    suspendedCommitBoundary: statePlan.suspendedCommitBoundary,
+    publicResourceBoundary: createPublicResourceHintDomInsertionBoundary(),
+    publicHeadBoundary: createPublicHeadSingletonBoundary(),
+    blockedCapabilities:
+      resourceHintStylesheetLoadErrorStateBlockedCapabilities,
+    sideEffects: resourceHintStylesheetLoadErrorStateSideEffects,
+    missingPrerequisites:
+      resourceHintStylesheetLoadErrorStateMissingPrerequisites
+  });
+
+  resourceHintStylesheetLoadErrorStatePayloads.set(payload, payload);
   return payload;
 }
 
@@ -3865,6 +4196,22 @@ function assertPrivateResourceHintStylesheetPrecedenceRecord(record) {
   throw error;
 }
 
+function assertPrivateResourceHintStylesheetLoadErrorStateRecord(record) {
+  const payload =
+    getPrivateResourceHintStylesheetLoadErrorStateRecordPayload(record);
+  if (payload !== null) {
+    return payload;
+  }
+
+  const error = new Error(
+    'Expected a private React DOM resource hint stylesheet load/error state record.'
+  );
+  error.name = 'FastReactDomResourceHintStylesheetLoadErrorStateGateError';
+  error.code = privateResourceHintStylesheetLoadErrorStateInvalidRecordCode;
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
 function assertResourceHintDispatcherMetadataRecordForFakeDomAdapter(record) {
   const payload =
     getPrivateResourceHintDispatcherMetadataRecordPayload(record);
@@ -4070,6 +4417,36 @@ function assertHeadSingletonRequestRecordForStylesheetPrecedence(record) {
   );
   error.name = 'FastReactDomResourceHintStylesheetPrecedenceGateError';
   error.code = privateResourceHintStylesheetPrecedenceInvalidRecordCode;
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
+function assertStylesheetPrecedenceRecordForLoadErrorState(record) {
+  const payload =
+    getPrivateResourceHintStylesheetPrecedenceRecordPayload(record);
+  if (
+    payload !== null &&
+    payload.stylesheetPrecedenceStatus ===
+      privateResourceHintStylesheetPrecedenceStatus &&
+    payload.executionStatus ===
+      privateResourceHintStylesheetPrecedenceExecutionStatus &&
+    payload.compatibilityStatus ===
+      privateResourceHintStylesheetPrecedenceCompatibilityBlockedStatus &&
+    payload.publicResourceBoundary?.publicResourceHintCallsReachable === false
+  ) {
+    if (payload.stylesheetDedupeRows.length === 0) {
+      throwInvalidResourceHintStylesheetLoadErrorStateAdmission(
+        'source stylesheet precedence record must include stylesheet rows'
+      );
+    }
+    return payload;
+  }
+
+  const error = new Error(
+    'Expected a private React DOM stylesheet precedence record for the load/error state diagnostic.'
+  );
+  error.name = 'FastReactDomResourceHintStylesheetLoadErrorStateGateError';
+  error.code = privateResourceHintStylesheetLoadErrorStateInvalidRecordCode;
   error.compatibilityTarget = compatibilityTarget;
   throw error;
 }
@@ -6615,6 +6992,475 @@ function createResourceHintStylesheetPrecedenceSourceHeadRequest(headRequest) {
   });
 }
 
+function normalizeResourceHintStylesheetLoadErrorStateAdmission(diagnostic) {
+  if (diagnostic == null || typeof diagnostic !== 'object') {
+    throwInvalidResourceHintStylesheetLoadErrorStateAdmission(
+      'stylesheet load/error state admission metadata must be an object'
+    );
+  }
+
+  if (diagnostic.explicitStylesheetLoadErrorStateDiagnostic !== true) {
+    throwInvalidResourceHintStylesheetLoadErrorStateAdmission(
+      'explicitStylesheetLoadErrorStateDiagnostic must be true'
+    );
+  }
+
+  assertNoRawStylesheetLoadErrorStateFields(diagnostic);
+
+  const stateKind = getAdmissionStringProperty(
+    diagnostic,
+    'stateKind',
+    'deterministic-fake-stylesheet-load-error-state'
+  );
+  if (stateKind !== 'deterministic-fake-stylesheet-load-error-state') {
+    throwInvalidResourceHintStylesheetLoadErrorStateAdmission(
+      'stateKind must be deterministic-fake-stylesheet-load-error-state'
+    );
+  }
+
+  const targetKind = getAdmissionStringProperty(
+    diagnostic,
+    'targetKind',
+    'stylesheet-resource-state'
+  );
+  if (targetKind !== 'stylesheet-resource-state') {
+    throwInvalidResourceHintStylesheetLoadErrorStateAdmission(
+      'targetKind must be stylesheet-resource-state'
+    );
+  }
+
+  return freezeRecord({
+    stateKind,
+    stateId: getAdmissionStringProperty(
+      diagnostic,
+      'stateId',
+      'anonymous-fake-stylesheet-load-error-state'
+    ),
+    targetKind,
+    explicitStylesheetLoadErrorStateDiagnostic: true,
+    deterministicFakeRecordsOnly: true,
+    rawDocumentCaptured: false,
+    rawHeadCaptured: false,
+    rawElementCaptured: false,
+    rawPreloadCaptured: false,
+    rawPromiseCaptured: false,
+    rawValuesRetained: false,
+    loadListenerInstallationAllowed: false,
+    errorListenerInstallationAllowed: false,
+    promiseCreationAllowed: false,
+    resourceFetchAllowed: false,
+    commitSuspensionAllowed: false,
+    realTimerAllowed: false,
+    publicResourceHintDomInsertion: false,
+    publicStylesheetResourceBehavior: false,
+    publicRootTouched: false,
+    compatibilityClaimed: false
+  });
+}
+
+function assertNoRawStylesheetLoadErrorStateFields(diagnostic) {
+  for (const field of [
+    'document',
+    'head',
+    'element',
+    'instance',
+    'link',
+    'node',
+    'preload',
+    'promise',
+    'thenable',
+    'loadEvent',
+    'errorEvent',
+    'timer',
+    'timeout',
+    'onLoad',
+    'onError'
+  ]) {
+    if (hasOwnProp(diagnostic, field)) {
+      throwInvalidResourceHintStylesheetLoadErrorStateAdmission(
+        `${field} must not be passed to the metadata gate`
+      );
+    }
+  }
+}
+
+function createResourceHintStylesheetLoadErrorStatePlan(stylesheetPrecedence) {
+  const resourceStates = collectStylesheetLoadErrorResourceStates(
+    stylesheetPrecedence
+  );
+  const resourceStateRows =
+    createStylesheetLoadErrorResourceStateRows(resourceStates);
+  const loadingStateRows =
+    createStylesheetLoadErrorLoadingStateRows(resourceStateRows);
+  const preloadStateRows =
+    createStylesheetLoadErrorPreloadStateRows(resourceStateRows);
+  const commitSuspensionRows =
+    createStylesheetLoadErrorCommitSuspensionRows(resourceStateRows);
+
+  return freezeRecord({
+    loadingStateBits: createStylesheetLoadingStateBitRows(),
+    resourceStateRows,
+    loadingStateRows,
+    preloadStateRows,
+    commitSuspensionRows,
+    suspendedCommitBoundary:
+      createStylesheetLoadErrorSuspendedCommitBoundary(
+        resourceStateRows,
+        commitSuspensionRows
+      )
+  });
+}
+
+function collectStylesheetLoadErrorResourceStates(stylesheetPrecedence) {
+  const stateByResourceKey = new Map();
+  for (const row of stylesheetPrecedence.stylesheetDedupeRows) {
+    let state = stateByResourceKey.get(row.resourceKey);
+    if (state === undefined) {
+      state = {
+        resourceKey: row.resourceKey,
+        opaqueResourceKey: row.opaqueResourceKey,
+        precedenceKey: row.precedenceKey,
+        dedupeRows: [],
+        plannedRows: [],
+        observedRows: []
+      };
+      stateByResourceKey.set(row.resourceKey, state);
+    }
+    state.dedupeRows.push(row);
+    if (state.precedenceKey === null && row.precedenceKey !== null) {
+      state.precedenceKey = row.precedenceKey;
+    }
+  }
+
+  for (const row of stylesheetPrecedence.plannedStylesheetOrder.rows) {
+    const state = stateByResourceKey.get(row.resourceKey);
+    if (state !== undefined) {
+      state.plannedRows.push(row);
+      if (state.precedenceKey === null && row.precedenceKey !== null) {
+        state.precedenceKey = row.precedenceKey;
+      }
+    }
+  }
+
+  for (const row of stylesheetPrecedence.observedStylesheetOrder.stylesheetRows) {
+    if (row.resourceKey !== null) {
+      const resourceKey = `style:${row.resourceKey}`;
+      const state = stateByResourceKey.get(resourceKey);
+      if (state !== undefined) {
+        state.observedRows.push(row);
+        if (state.precedenceKey === null && row.precedenceKey !== null) {
+          state.precedenceKey = row.precedenceKey;
+        }
+      }
+    }
+  }
+
+  return freezeArray(Array.from(stateByResourceKey.values()));
+}
+
+function createStylesheetLoadErrorResourceStateRows(resourceStates) {
+  return freezeArray(
+    resourceStates.map((state, index) => {
+      const preloadRows = state.dedupeRows.filter(
+        (row) => row.resourceStage === 'preload'
+      );
+      const preinitRows = state.dedupeRows.filter(
+        (row) => row.resourceStage === 'preinit'
+      );
+      return freezeRecord({
+        rowId: `stylesheet-resource-state-${index}`,
+        rowType: 'stylesheet-resource-state',
+        resourceIndex: index,
+        resourceKey: state.resourceKey,
+        opaqueResourceKey: state.opaqueResourceKey,
+        precedenceKey: state.precedenceKey,
+        sourceStylesheetDedupeRowIds: freezeArray(
+          state.dedupeRows.map((row) => row.rowId)
+        ),
+        sourceAdapterAdmissionIds: freezeArray(
+          state.dedupeRows.map((row) => row.sourceAdapterAdmissionId)
+        ),
+        plannedStylesheetRowIds: freezeArray(
+          state.plannedRows.map((row) => row.rowId)
+        ),
+        observedStylesheetRowIds: freezeArray(
+          state.observedRows.map((row) => row.rowId)
+        ),
+        reactResourceShape: createStylesheetResourceShapeRecord(
+          preloadRows,
+          preinitRows
+        ),
+        stateShape: createStylesheetStateShapeRecord(preloadRows),
+        preloadSeenBefore: preloadRows.length > 0,
+        preinitSeenBefore: preinitRows.length > 0,
+        plannedInsertionCount: state.plannedRows.length,
+        observedStylesheetCount: state.observedRows.length,
+        loadListenerInstalled: false,
+        errorListenerInstalled: false,
+        loadingPromiseCreated: false,
+        resourceFetchStarted: false,
+        commitSuspensionAllowed: false,
+        rawValuesRetained: false,
+        compatibilityClaimed: false
+      });
+    })
+  );
+}
+
+function createStylesheetResourceShapeRecord(preloadRows, preinitRows) {
+  return freezeRecord({
+    type: 'stylesheet',
+    instance: null,
+    instanceCaptured: false,
+    instanceWouldBeLinkElement: true,
+    count: preinitRows.length > 0 ? 1 : 0,
+    countSource:
+      preinitRows.length > 0
+        ? 'preinit-style-resource-count'
+        : 'host-hoistable-resource-count-before-acquire',
+    state: createStylesheetStateShapeRecord(preloadRows),
+    resourceMapCreated: false,
+    resourceMapMutated: false,
+    rawInstanceCaptured: false,
+    rawValuesRetained: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createStylesheetStateShapeRecord(preloadRows) {
+  return freezeRecord({
+    loading: stylesheetLoadingStateBits.NotLoaded,
+    loadingState: createStylesheetLoadingStateSnapshot(
+      'not-loaded',
+      stylesheetLoadingStateBits.NotLoaded
+    ),
+    preload: null,
+    preloadWouldBeTracked: preloadRows.length > 0,
+    preloadElementCaptured: false,
+    loadListenerInstalled: false,
+    errorListenerInstalled: false,
+    promiseCreated: false,
+    fetchStarted: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createStylesheetLoadErrorLoadingStateRows(resourceStateRows) {
+  return freezeArray(
+    resourceStateRows.flatMap((row) =>
+      [
+        ['not-loaded', stylesheetLoadingStateBits.NotLoaded],
+        ['loaded', stylesheetLoadingStateBits.Loaded],
+        ['errored', stylesheetLoadingStateBits.Errored],
+        ['inserted-not-settled', stylesheetLoadingStateBits.Inserted],
+        [
+          'inserted-loaded',
+          stylesheetLoadingStateBits.Inserted |
+            stylesheetLoadingStateBits.Loaded
+        ],
+        [
+          'inserted-errored',
+          stylesheetLoadingStateBits.Inserted |
+            stylesheetLoadingStateBits.Errored
+        ]
+      ].map(([label, bitmask]) =>
+        createStylesheetLoadErrorLoadingStateRow(row, label, bitmask)
+      )
+    )
+  );
+}
+
+function createStylesheetLoadErrorLoadingStateRow(resourceRow, label, bitmask) {
+  const snapshot = createStylesheetLoadingStateSnapshot(label, bitmask);
+  return freezeRecord({
+    rowId: `${resourceRow.rowId}-${label}`,
+    rowType: 'stylesheet-loading-state',
+    sourceResourceStateRowId: resourceRow.rowId,
+    resourceKey: resourceRow.resourceKey,
+    label,
+    bitmask,
+    snapshot,
+    loadedBitWouldBeSetByLoadListener: snapshot.loaded,
+    erroredBitWouldBeSetByErrorListener: snapshot.errored,
+    insertedBitWouldBeSetByInsertion: snapshot.inserted,
+    loadListenerInstalled: false,
+    errorListenerInstalled: false,
+    loadingPromiseCreated: false,
+    loadingPromiseSettled: false,
+    rawEventCaptured: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createStylesheetLoadErrorPreloadStateRows(resourceStateRows) {
+  return freezeArray(
+    resourceStateRows.map((row) =>
+      freezeRecord({
+        rowId: `stylesheet-preload-state-${row.resourceIndex}`,
+        rowType: 'stylesheet-preload-state',
+        sourceResourceStateRowId: row.rowId,
+        resourceKey: row.resourceKey,
+        statePreloadField: null,
+        preloadWouldBeTracked: row.preloadSeenBefore,
+        preloadElementCaptured: false,
+        preloadLoadListenerInstalled: false,
+        preloadErrorListenerInstalled: false,
+        preloadFetchStarted: false,
+        preloadLoadingBitWouldSetLoaded: row.preloadSeenBefore,
+        preloadLoadingBitWouldSetErrored: row.preloadSeenBefore,
+        rawPreloadCaptured: false,
+        compatibilityClaimed: false
+      })
+    )
+  );
+}
+
+function createStylesheetLoadErrorCommitSuspensionRows(resourceStateRows) {
+  return freezeArray(
+    resourceStateRows.map((row) =>
+      freezeRecord({
+        rowId: `stylesheet-commit-suspension-${row.resourceIndex}`,
+        rowType: 'stylesheet-commit-suspension',
+        sourceResourceStateRowId: row.rowId,
+        resourceKey: row.resourceKey,
+        mayResourceSuspendCommitWouldCheckInserted: true,
+        maySuspendCommitIfNotInserted: row.plannedInsertionCount > 0,
+        preloadResourceWouldCheckSettled: true,
+        preloadResourceWouldReturnReadyForNotLoaded: false,
+        suspendResourceWouldCreateStylesheetMap:
+          row.plannedInsertionCount > 0,
+        stylesheetsMapCreated: false,
+        suspendedStateCountIncremented: false,
+        loadListenerInstalled: false,
+        errorListenerInstalled: false,
+        timerScheduled: false,
+        unsuspendCallbackRegistered: false,
+        insertSuspendedStylesheetsCalled: false,
+        commitSuspended: false,
+        compatibilityClaimed: false
+      })
+    )
+  );
+}
+
+function createStylesheetLoadErrorSuspendedCommitBoundary(
+  resourceStateRows,
+  commitSuspensionRows
+) {
+  return freezeRecord({
+    rowId: 'stylesheet-suspended-commit-boundary',
+    rowType: 'suspended-commit-state',
+    stateShape: freezeRecord({
+      stylesheets: null,
+      count: 0,
+      unsuspend: null
+    }),
+    stylesheetResourceCount: resourceStateRows.length,
+    wouldSuspendResourceCount: commitSuspensionRows.filter(
+      (row) => row.maySuspendCommitIfNotInserted
+    ).length,
+    stylesheetsMapCreated: false,
+    countIncremented: false,
+    realTimerScheduled: false,
+    unsuspendCallbackRegistered: false,
+    suspendedCommitStarted: false,
+    suspendedCommitResolved: false,
+    compatibilityClaimed: false,
+    blockedCapabilities:
+      resourceHintStylesheetLoadErrorStateBlockedCapabilities
+  });
+}
+
+function createStylesheetLoadingStateBitRows() {
+  return freezeArray([
+    stylesheetLoadingStateBitRow(
+      'NotLoaded',
+      stylesheetLoadingStateBits.NotLoaded
+    ),
+    stylesheetLoadingStateBitRow(
+      'Loaded',
+      stylesheetLoadingStateBits.Loaded
+    ),
+    stylesheetLoadingStateBitRow(
+      'Errored',
+      stylesheetLoadingStateBits.Errored
+    ),
+    stylesheetLoadingStateBitRow(
+      'Settled',
+      stylesheetLoadingStateBits.Settled
+    ),
+    stylesheetLoadingStateBitRow(
+      'Inserted',
+      stylesheetLoadingStateBits.Inserted
+    )
+  ]);
+}
+
+function stylesheetLoadingStateBitRow(name, bitmask) {
+  return freezeRecord({
+    name,
+    bitmask,
+    loaded: (bitmask & stylesheetLoadingStateBits.Loaded) !== 0,
+    errored: (bitmask & stylesheetLoadingStateBits.Errored) !== 0,
+    settled:
+      bitmask === stylesheetLoadingStateBits.Settled ||
+      (bitmask & stylesheetLoadingStateBits.Settled) !== 0,
+    inserted: (bitmask & stylesheetLoadingStateBits.Inserted) !== 0,
+    compatibilityClaimed: false
+  });
+}
+
+function createStylesheetLoadingStateSnapshot(label, bitmask) {
+  return freezeRecord({
+    label,
+    bitmask,
+    notLoaded: bitmask === stylesheetLoadingStateBits.NotLoaded,
+    loaded: (bitmask & stylesheetLoadingStateBits.Loaded) !== 0,
+    errored: (bitmask & stylesheetLoadingStateBits.Errored) !== 0,
+    settled: (bitmask & stylesheetLoadingStateBits.Settled) !== 0,
+    inserted: (bitmask & stylesheetLoadingStateBits.Inserted) !== 0,
+    loadListenerInstalled: false,
+    errorListenerInstalled: false,
+    promiseCreated: false,
+    eventDispatched: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createResourceHintStylesheetLoadErrorStateSourcePrecedence(
+  stylesheetPrecedence
+) {
+  return freezeRecord({
+    stylesheetPrecedenceId:
+      stylesheetPrecedence.stylesheetPrecedenceId,
+    stylesheetPrecedenceSequence:
+      stylesheetPrecedence.stylesheetPrecedenceSequence,
+    stylesheetPrecedenceStatus:
+      stylesheetPrecedence.stylesheetPrecedenceStatus,
+    executionStatus: stylesheetPrecedence.executionStatus,
+    compatibilityStatus: stylesheetPrecedence.compatibilityStatus,
+    sourceOrderDiagnosticId:
+      stylesheetPrecedence.sourceOrderDiagnosticId,
+    sourceHeadRequestId: stylesheetPrecedence.sourceHeadRequestId,
+    stylesheetDedupeRowCount:
+      stylesheetPrecedence.stylesheetDedupeRows.length,
+    plannedStylesheetRowCount:
+      stylesheetPrecedence.plannedStylesheetOrder.rowCount,
+    observedStylesheetRowCount:
+      stylesheetPrecedence.observedStylesheetOrder.stylesheetRowCount,
+    stylesheetResourceMapCreated:
+      stylesheetPrecedence.stylesheetResourceMapPlan
+        .stylesheetResourceMapCreated,
+    stylesheetResourceMapMutated:
+      stylesheetPrecedence.stylesheetResourceMapPlan
+        .stylesheetResourceMapMutated,
+    publicResourceHintDomInsertion:
+      stylesheetPrecedence.publicResourceBoundary
+        .publicResourceHintCallsReachable,
+    compatibilityClaimed: false
+  });
+}
+
 function getAdmissionStringProperty(record, key, fallback) {
   const value = record[key];
   return typeof value === 'string' && value.length > 0 ? value : fallback;
@@ -7144,6 +7990,17 @@ function throwInvalidResourceHintStylesheetPrecedenceAdmission(reason) {
   );
   error.name = 'FastReactDomResourceHintStylesheetPrecedenceGateError';
   error.code = privateResourceHintStylesheetPrecedenceInvalidAdmissionCode;
+  error.compatibilityTarget = compatibilityTarget;
+  error.reason = reason;
+  throw error;
+}
+
+function throwInvalidResourceHintStylesheetLoadErrorStateAdmission(reason) {
+  const error = new Error(
+    `Invalid private React DOM resource hint stylesheet load/error state admission: ${reason}.`
+  );
+  error.name = 'FastReactDomResourceHintStylesheetLoadErrorStateGateError';
+  error.code = privateResourceHintStylesheetLoadErrorStateInvalidAdmissionCode;
   error.compatibilityTarget = compatibilityTarget;
   error.reason = reason;
   throw error;
@@ -8177,6 +9034,27 @@ function resourceHintStylesheetPrecedenceContract(
   });
 }
 
+function resourceHintStylesheetLoadErrorStateContract(
+  id,
+  rowType,
+  reactShape,
+  trackedFields
+) {
+  return freezeRecord({
+    id,
+    rowType,
+    reactShape,
+    trackedFields: freezeArray(trackedFields),
+    sourceRecordType: privateResourceHintStylesheetPrecedenceRecordType,
+    hostTag: 'head',
+    resourceType: 'stylesheet',
+    capability: 'react-dom-resource-stylesheet-load-error-state-diagnostic',
+    oracleKind: resourceHintOracleKind,
+    deterministicFakeRecordsOnly: true,
+    compatibilityClaimed: false
+  });
+}
+
 function singletonContract(id, hostTag) {
   return freezeRecord({
     id,
@@ -8362,6 +9240,7 @@ module.exports = {
   createResourceHintHeadBoundaryGate,
   createResourceHintHeadClearRetainGate,
   createResourceHintPreloadPreinitOrderGate,
+  createResourceHintStylesheetLoadErrorStateGate,
   createResourceHintStylesheetPrecedenceGate,
   createResourceFormActionInternalsGate,
   createUnsupportedFormActionResetDispatcherError,
@@ -8372,6 +9251,7 @@ module.exports = {
   createUnsupportedResourceHintHeadBoundaryError,
   createUnsupportedResourceHintHeadClearRetainError,
   createUnsupportedResourceHintPreloadPreinitOrderError,
+  createUnsupportedResourceHintStylesheetLoadErrorStateError,
   createUnsupportedResourceHintStylesheetPrecedenceError,
   createUnsupportedResourceFormActionInternalsError,
   createUnsupportedResourceHintDispatcherMetadataError,
@@ -8385,6 +9265,7 @@ module.exports = {
   describePrivateResourceHintHeadBoundaryGate,
   describePrivateResourceHintHeadClearRetainGate,
   describePrivateResourceHintPreloadPreinitOrderGate,
+  describePrivateResourceHintStylesheetLoadErrorStateGate,
   describePrivateResourceHintStylesheetPrecedenceGate,
   describePrivateResourceHintDispatcherMetadataGate,
   describeResourceFormActionInternalsGate,
@@ -8406,6 +9287,7 @@ module.exports = {
   getPrivateResourceHintHeadBoundaryRecordPayload,
   getPrivateResourceHintHeadClearRetainRecordPayload,
   getPrivateResourceHintPreloadPreinitOrderRecordPayload,
+  getPrivateResourceHintStylesheetLoadErrorStateRecordPayload,
   getPrivateResourceHintStylesheetPrecedenceRecordPayload,
   getPrivateResourceFormActionGateRecordPayload,
   getPrivateResourceHintDispatcherMetadataRecordPayload,
@@ -8414,6 +9296,7 @@ module.exports = {
   isPrivateResourceHintHeadBoundaryRecord,
   isPrivateResourceHintHeadClearRetainRecord,
   isPrivateResourceHintPreloadPreinitOrderRecord,
+  isPrivateResourceHintStylesheetLoadErrorStateRecord,
   isPrivateResourceHintStylesheetPrecedenceRecord,
   isPrivateControlledInputValueTrackerRecord,
   isPrivateControlledInputValueTrackerFakeDomDiagnosticRecord,
@@ -8505,6 +9388,15 @@ module.exports = {
   privateResourceHintStylesheetPrecedenceInvalidRecordCode,
   privateResourceHintStylesheetPrecedenceRecordType,
   privateResourceHintStylesheetPrecedenceStatus,
+  privateResourceHintStylesheetLoadErrorStateAdmissionRequiredStatus,
+  privateResourceHintStylesheetLoadErrorStateCompatibilityBlockedStatus,
+  privateResourceHintStylesheetLoadErrorStateExecutionStatus,
+  privateResourceHintStylesheetLoadErrorStateGateErrorCode,
+  privateResourceHintStylesheetLoadErrorStateGateId,
+  privateResourceHintStylesheetLoadErrorStateInvalidAdmissionCode,
+  privateResourceHintStylesheetLoadErrorStateInvalidRecordCode,
+  privateResourceHintStylesheetLoadErrorStateRecordType,
+  privateResourceHintStylesheetLoadErrorStateStatus,
   privateResourceHintDispatcherMetadataGateErrorCode,
   privateResourceHintDispatcherMetadataGateId,
   privateResourceHintDispatcherMetadataInvalidShapeCode,
@@ -8521,6 +9413,7 @@ module.exports = {
   recordUnsupportedResourceHintDispatcherRequest,
   recordUnsupportedResourceHintRequest,
   recordUnsupportedSingletonRequest,
+  recordStylesheetLoadErrorStateDiagnostic,
   resourceFormActionInternalsGateSchemaVersion,
   resourceHintFakeDomAdapterContracts,
   resourceHintFakeDomAdapterGateSchemaVersion,
@@ -8555,7 +9448,14 @@ module.exports = {
   resourceHintStylesheetPrecedenceGateSchemaVersion,
   resourceHintStylesheetPrecedenceMissingPrerequisites,
   resourceHintStylesheetPrecedenceSideEffects,
+  resourceHintStylesheetLoadErrorStateBlockedCapabilities,
+  resourceHintStylesheetLoadErrorStateBlockedSideEffects,
+  resourceHintStylesheetLoadErrorStateContracts,
+  resourceHintStylesheetLoadErrorStateGateSchemaVersion,
+  resourceHintStylesheetLoadErrorStateMissingPrerequisites,
+  resourceHintStylesheetLoadErrorStateSideEffects,
   resourceHintDispatcherMetadataContracts,
+  stylesheetLoadingStateBits,
   resourceHintDispatcherMetadataGateSchemaVersion,
   resourceHintDispatcherMissingPrerequisites,
   resourceHintDispatcherSideEffects,
