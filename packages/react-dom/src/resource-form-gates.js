@@ -65,6 +65,7 @@ const rootBoundarySideEffects = freezeRecord({
   ...internalsGate.resourceHintDispatcherSideEffects,
   ...internalsGate.resourceHintFakeDomAdapterSideEffects,
   ...internalsGate.resourceHintFakeDomInsertionBlockedSideEffects,
+  ...internalsGate.resourceHintHeadBoundaryBlockedSideEffects,
   ...internalsGate.controlledInputValueTrackerSideEffects,
   privateRootBridgeExecuted: false,
   publicRootFacadeCreated: false,
@@ -448,13 +449,18 @@ function describeResourceHintFakeDomAdapterBoundary(behaviorArea) {
     resourceElementInserted: false,
     fakeDomInsertionGateInvoked: false,
     fakeResourceElementAttributesApplied: false,
+    fakeHeadBoundaryInvoked: false,
+    fakeHeadInsertionObserved: false,
+    fakeHeadUpdateApplied: false,
     resourceFetchStarted: false,
     realDocumentMutated: false,
     publicResourceHintDomInsertion: false,
     compatibilityClaimed: false,
     adapterGate: internalsGate.describePrivateResourceHintFakeDomAdapterGate(),
     insertionGate:
-      internalsGate.describePrivateResourceHintFakeDomInsertionGate()
+      internalsGate.describePrivateResourceHintFakeDomInsertionGate(),
+    headBoundaryGate:
+      internalsGate.describePrivateResourceHintHeadBoundaryGate()
   });
 }
 
