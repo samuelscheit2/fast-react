@@ -64,6 +64,7 @@ use crate::{
         NestedContextProviderTwoConsumerUseContextBeginWorkRecord,
         UnsupportedActivityChildShapeKind, UnsupportedOffscreenChildShapeKind,
         UnsupportedSuspenseChildShapeKind, UnsupportedSuspenseListChildShapeKind,
+        UnsupportedThenableIdentityClass, UnsupportedThenableRetryQueueKind,
         begin_work_context_provider_child, begin_work_context_provider_use_context_child,
         begin_work_context_provider_use_context_single_child,
         begin_work_context_provider_use_context_single_child_for_complete_traversal,
@@ -90,6 +91,7 @@ use crate::{
         mount_test_host_sibling_work, mount_test_host_work,
     },
     root_commit::HostRootPlacementApplyDiagnosticForCanary,
+    root_scheduler::{RootPingedRetryExecutionStatus, execute_pinged_retry_root_callback},
     test_support::{RecordingHost, TestHostNode, TestHostTree},
 };
 
@@ -314,12 +316,24 @@ impl Display for HostRootChildBeginWorkPreflightError {
                 suspense,
             } => write!(
                 formatter,
-                "root {} HostRoot work-in-progress {} cannot admit Suspense child {} shape {} into root work: {}",
+                "root {} HostRoot work-in-progress {} cannot admit Suspense child {} shape {} into root work: {}; thenable {}, ping lane {:?}, retry queue {}, primary blocked {}, fallback blocked {}",
                 root.raw(),
                 host_root_work_in_progress.slot().get(),
                 suspense.fiber().slot().get(),
                 suspense.shape().as_str(),
-                suspense.feature()
+                suspense.feature(),
+                suspense
+                    .thenable_ping_blocker()
+                    .thenable_identity_class()
+                    .as_str(),
+                suspense.thenable_ping_blocker().ping_lane(),
+                suspense.thenable_ping_blocker().retry_queue_kind().as_str(),
+                suspense
+                    .thenable_ping_blocker()
+                    .primary_child_rendering_blocked(),
+                suspense
+                    .thenable_ping_blocker()
+                    .fallback_child_rendering_blocked()
             ),
             Self::UnsupportedOffscreenChildShape {
                 root,
@@ -327,12 +341,24 @@ impl Display for HostRootChildBeginWorkPreflightError {
                 offscreen,
             } => write!(
                 formatter,
-                "root {} HostRoot work-in-progress {} cannot admit Offscreen child {} shape {} into root work: {}",
+                "root {} HostRoot work-in-progress {} cannot admit Offscreen child {} shape {} into root work: {}; thenable {}, ping lane {:?}, retry queue {}, child rendering blocked {}",
                 root.raw(),
                 host_root_work_in_progress.slot().get(),
                 offscreen.fiber().slot().get(),
                 offscreen.shape().as_str(),
-                offscreen.feature()
+                offscreen.feature(),
+                offscreen
+                    .thenable_ping_blocker()
+                    .thenable_identity_class()
+                    .as_str(),
+                offscreen.thenable_ping_blocker().ping_lane(),
+                offscreen
+                    .thenable_ping_blocker()
+                    .retry_queue_kind()
+                    .as_str(),
+                offscreen
+                    .thenable_ping_blocker()
+                    .primary_child_rendering_blocked()
             ),
             Self::UnsupportedSuspenseListChildShape {
                 root,
@@ -4309,17 +4335,22 @@ mod tests {
             PropsHandle::from_raw(741),
             FiberMode::NO,
         );
-        store
-            .fiber_arena_mut()
-            .get_mut(suspense)
-            .unwrap()
-            .set_memoized_state(StateHandle::from_raw(742));
+        {
+            let node = store.fiber_arena_mut().get_mut(suspense).unwrap();
+            node.set_memoized_state(StateHandle::from_raw(742));
+            node.set_update_queue(UpdateQueueHandle::from_raw(747));
+        }
         let primary = store.fiber_arena_mut().create_fiber(
             FiberTag::Offscreen,
             None,
             PropsHandle::from_raw(743),
             FiberMode::NO,
         );
+        store
+            .fiber_arena_mut()
+            .get_mut(primary)
+            .unwrap()
+            .set_update_queue(UpdateQueueHandle::from_raw(748));
         let primary_child = store.fiber_arena_mut().create_fiber(
             FiberTag::HostComponent,
             None,
@@ -4373,6 +4404,8 @@ mod tests {
             node.set_memoized_props(PropsHandle::from_raw(752));
             node.set_memoized_state(StateHandle::from_raw(753));
             node.set_state_node(StateNodeHandle::from_raw(754));
+            node.set_update_queue(UpdateQueueHandle::from_raw(757));
+            node.merge_flags(FiberFlags::SCHEDULE_RETRY);
         }
         let first_child = store.fiber_arena_mut().create_fiber(
             FiberTag::HostText,
@@ -4733,6 +4766,18 @@ mod tests {
                     assert_eq!(suspense.shape(), UnsupportedSuspenseChildShapeKind::Empty);
                     assert_eq!(suspense.child(), None);
                     assert_eq!(suspense.render_lanes(), render_lanes);
+                    let thenable = suspense.thenable_ping_blocker();
+                    assert_eq!(
+                        thenable.thenable_identity_class(),
+                        UnsupportedThenableIdentityClass::NoThenable
+                    );
+                    assert_eq!(thenable.ping_lane(), render_lanes.highest_priority_lane());
+                    assert_eq!(
+                        thenable.retry_queue_kind(),
+                        UnsupportedThenableRetryQueueKind::None
+                    );
+                    assert!(!thenable.primary_child_rendering_blocked());
+                    assert!(!thenable.fallback_child_rendering_blocked());
                     assert_eq!(suspense.feature(), feature);
                 }
                 other => panic!("expected Suspense child-shape preflight, got {other:?}"),
@@ -4749,6 +4794,18 @@ mod tests {
                     assert_eq!(offscreen.shape(), UnsupportedOffscreenChildShapeKind::Empty);
                     assert_eq!(offscreen.child(), None);
                     assert_eq!(offscreen.render_lanes(), render_lanes);
+                    let thenable = offscreen.thenable_ping_blocker();
+                    assert_eq!(
+                        thenable.thenable_identity_class(),
+                        UnsupportedThenableIdentityClass::NoThenable
+                    );
+                    assert_eq!(thenable.ping_lane(), render_lanes.highest_priority_lane());
+                    assert_eq!(
+                        thenable.retry_queue_kind(),
+                        UnsupportedThenableRetryQueueKind::None
+                    );
+                    assert!(!thenable.primary_child_rendering_blocked());
+                    assert!(!thenable.fallback_child_rendering_blocked());
                     assert_eq!(offscreen.feature(), feature);
                 }
                 other => panic!("expected Offscreen child-shape preflight, got {other:?}"),
@@ -6639,6 +6696,104 @@ mod tests {
     }
 
     #[test]
+    fn root_work_loop_pinged_retry_path_records_suspense_thenable_blocker_metadata() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        let callback = scheduled_pinged_retry_callback(&mut store, root_id);
+
+        let execution = execute_pinged_retry_root_callback(&mut store, callback).unwrap();
+        let render = execution.render_phase().unwrap();
+        let (suspense, primary, primary_child, fallback, fallback_child) =
+            attach_suspense_wip_child_with_primary_and_fallback(
+                &mut store,
+                render.work_in_progress(),
+            );
+        let mut registry = TestFunctionComponentRegistry::default();
+
+        let error = preflight_host_root_child_begin_work(
+            &mut store,
+            root_id,
+            render.work_in_progress(),
+            render.render_lanes(),
+            &mut registry,
+        )
+        .unwrap_err();
+
+        assert_eq!(execution.status(), RootPingedRetryExecutionStatus::Rendered);
+        assert_eq!(execution.pinged_retry_lanes(), Lanes::from(Lane::RETRY_2));
+        assert_eq!(
+            execution.selected_priority_lanes(),
+            Lanes::from(Lane::RETRY_2)
+        );
+        assert_eq!(
+            execution.selected_render_lanes(),
+            Lanes::from(Lane::RETRY_2)
+        );
+        assert_eq!(render.render_lanes(), Lanes::from(Lane::RETRY_2));
+
+        match error {
+            HostRootChildBeginWorkPreflightError::UnsupportedSuspenseChildShape {
+                root,
+                host_root_work_in_progress,
+                suspense: record,
+            } => {
+                assert_eq!(root, root_id);
+                assert_eq!(host_root_work_in_progress, render.work_in_progress());
+                assert_eq!(record.fiber(), suspense);
+                assert_eq!(record.child(), Some(primary));
+                assert_eq!(record.fallback_child(), Some(fallback));
+                assert_eq!(
+                    record.shape(),
+                    UnsupportedSuspenseChildShapeKind::PrimaryOffscreenWithFallback
+                );
+                assert_eq!(record.render_lanes(), Lanes::from(Lane::RETRY_2));
+
+                let thenable = record.thenable_ping_blocker();
+                assert_eq!(
+                    thenable.thenable_identity_class(),
+                    UnsupportedThenableIdentityClass::OpaqueWakeable
+                );
+                assert_eq!(thenable.ping_lane(), Lane::RETRY_2);
+                assert_eq!(thenable.ping_lanes(), Lanes::from(Lane::RETRY_2));
+                assert_eq!(
+                    thenable.retry_queue_kind(),
+                    UnsupportedThenableRetryQueueKind::SuspenseBoundaryAndPrimaryOffscreen
+                );
+                assert_eq!(thenable.retry_queue(), UpdateQueueHandle::from_raw(747));
+                assert_eq!(
+                    thenable.primary_offscreen_retry_queue(),
+                    Some(UpdateQueueHandle::from_raw(748))
+                );
+                assert!(!thenable.schedule_retry_flag());
+                assert!(thenable.primary_child_rendering_blocked());
+                assert!(thenable.fallback_child_rendering_blocked());
+            }
+            other => panic!("expected Suspense child-shape preflight, got {other:?}"),
+        }
+
+        assert!(registry.calls().is_empty());
+        assert_client_root_fail_closed_without_side_effects(
+            &store, &host, root_id, current, render, suspense,
+        );
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(primary_child)
+                .unwrap()
+                .return_fiber(),
+            Some(primary)
+        );
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(fallback_child)
+                .unwrap()
+                .return_fiber(),
+            Some(fallback)
+        );
+    }
+
+    #[test]
     fn root_work_loop_preflight_and_complete_handoff_report_suspense_offscreen_child_shapes() {
         let (mut suspense_store, suspense_root, mut suspense_host) = root_store();
         let mut suspense_source = TestHostTree::new();
@@ -6687,6 +6842,25 @@ mod tests {
                     UnsupportedSuspenseChildShapeKind::PrimaryOffscreenWithFallback
                 );
                 assert_eq!(record.render_lanes(), Lanes::from(Lane::RETRY_1));
+                let thenable = record.thenable_ping_blocker();
+                assert_eq!(
+                    thenable.thenable_identity_class(),
+                    UnsupportedThenableIdentityClass::OpaqueWakeable
+                );
+                assert_eq!(thenable.ping_lane(), Lane::RETRY_1);
+                assert_eq!(thenable.ping_lanes(), Lanes::from(Lane::RETRY_1));
+                assert_eq!(
+                    thenable.retry_queue_kind(),
+                    UnsupportedThenableRetryQueueKind::SuspenseBoundaryAndPrimaryOffscreen
+                );
+                assert_eq!(thenable.retry_queue(), UpdateQueueHandle::from_raw(747));
+                assert_eq!(
+                    thenable.primary_offscreen_retry_queue(),
+                    Some(UpdateQueueHandle::from_raw(748))
+                );
+                assert!(!thenable.schedule_retry_flag());
+                assert!(thenable.primary_child_rendering_blocked());
+                assert!(thenable.fallback_child_rendering_blocked());
                 assert_eq!(record.feature(), SUSPENSE_UNSUPPORTED_FEATURE);
             }
             other => panic!("expected Suspense child-shape preflight, got {other:?}"),
@@ -6720,6 +6894,14 @@ mod tests {
                     assert_eq!(record.child(), Some(primary));
                     assert_eq!(record.fallback_child(), Some(fallback));
                     assert_eq!(record.render_lanes(), suspense_render.render_lanes());
+                    assert_eq!(
+                        record.thenable_ping_blocker().ping_lane(),
+                        suspense_render.render_lanes().highest_priority_lane()
+                    );
+                    assert_eq!(
+                        record.thenable_ping_blocker().retry_queue_kind(),
+                        UnsupportedThenableRetryQueueKind::SuspenseBoundaryAndPrimaryOffscreen
+                    );
                 }
                 other => panic!("expected Suspense child-shape preflight, got {other:?}"),
             },
@@ -6806,6 +6988,22 @@ mod tests {
                     UnsupportedOffscreenChildShapeKind::MultipleChildren
                 );
                 assert_eq!(record.render_lanes(), Lanes::OFFSCREEN);
+                let thenable = record.thenable_ping_blocker();
+                assert_eq!(
+                    thenable.thenable_identity_class(),
+                    UnsupportedThenableIdentityClass::OpaqueWakeableAndSuspenseyCommitResource
+                );
+                assert_eq!(thenable.ping_lane(), Lane::OFFSCREEN);
+                assert_eq!(thenable.ping_lanes(), Lanes::OFFSCREEN);
+                assert_eq!(
+                    thenable.retry_queue_kind(),
+                    UnsupportedThenableRetryQueueKind::Offscreen
+                );
+                assert_eq!(thenable.retry_queue(), UpdateQueueHandle::from_raw(757));
+                assert_eq!(thenable.primary_offscreen_retry_queue(), None);
+                assert!(thenable.schedule_retry_flag());
+                assert!(thenable.primary_child_rendering_blocked());
+                assert!(!thenable.fallback_child_rendering_blocked());
                 assert_eq!(record.feature(), OFFSCREEN_UNSUPPORTED_FEATURE);
             }
             other => panic!("expected Offscreen child-shape preflight, got {other:?}"),
@@ -6839,6 +7037,11 @@ mod tests {
                     assert_eq!(record.child(), Some(first_child));
                     assert_eq!(record.child_sibling(), Some(second_child));
                     assert_eq!(record.render_lanes(), offscreen_render.render_lanes());
+                    assert_eq!(
+                        record.thenable_ping_blocker().retry_queue_kind(),
+                        UnsupportedThenableRetryQueueKind::Offscreen
+                    );
+                    assert!(record.thenable_ping_blocker().schedule_retry_flag());
                 }
                 other => panic!("expected Offscreen child-shape preflight, got {other:?}"),
             },
