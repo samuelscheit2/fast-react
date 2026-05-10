@@ -99,6 +99,10 @@ test("react-test-renderer serialization oracle remains public-compatibility bloc
   assert.equal(gate.status, REACT_TEST_RENDERER_SERIALIZATION_LOCAL_GATE_STATUS);
   assert.equal(gate.privateDiagnosticsReady, true);
   assert.deepEqual(gate.privateDiagnosticBlockers, []);
+  assert.equal(gate.privateToJSONFacadeGateReady, true);
+  assert.deepEqual(gate.privateToJSONFacadeBlockers, []);
+  assert.equal(gate.privateToTreeMetadataGateReady, true);
+  assert.deepEqual(gate.privateToTreeMetadataBlockers, []);
   assert.equal(gate.publicCompatibilityReady, false);
   assert.equal(gate.publicCompatibilityClaimed, false);
   assert.deepEqual(gate.publicCompatibilityBlockers, [

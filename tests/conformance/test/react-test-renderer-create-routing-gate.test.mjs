@@ -39,6 +39,11 @@ const privateTestInstanceWrapperRecordSymbolDescription =
 const privateTestInstanceWrapperRecordSymbol = Symbol.for(
   privateTestInstanceWrapperRecordSymbolDescription
 );
+const privateToTreeHostOutputMetadataSymbolDescription =
+  "fast.react_test_renderer.private_totree_host_output_metadata";
+const privateToTreeHostOutputMetadataSymbol = Symbol.for(
+  privateToTreeHostOutputMetadataSymbolDescription
+);
 const missingPrerequisites = [
   "rust-native-test-renderer-create-bridge",
   "react-test-renderer-host-output-serialization"
@@ -748,6 +753,14 @@ test("react-test-renderer create routing gate feeds only private error diagnosti
     true
   );
   assert.equal(
+    gate.localChecks.privateToTreeHostOutputMetadataGatePresent,
+    true
+  );
+  assert.equal(
+    gate.localChecks.privateToTreeHostOutputMetadataPubliclyBlocked,
+    true
+  );
+  assert.equal(
     gate.localChecks.privateRecordOnlyTestInstanceWrapperPresent,
     true
   );
@@ -1326,6 +1339,22 @@ function assertRendererShape(renderer, label, moduleScheduler) {
   assert.equal(rootDescriptor.get.length, 0, label);
   assert.equal(renderer.toJSON.length, 0, label);
   assert.equal(renderer.toTree.length, 0, label);
+  assert.deepEqual(
+    Object.getOwnPropertySymbols(renderer.toTree),
+    [privateToTreeHostOutputMetadataSymbol],
+    label
+  );
+  const toTreeMetadataDescriptor = Object.getOwnPropertyDescriptor(
+    renderer.toTree,
+    privateToTreeHostOutputMetadataSymbol
+  );
+  assert.equal(toTreeMetadataDescriptor.enumerable, false, label);
+  assert.equal(toTreeMetadataDescriptor.configurable, false, label);
+  assert.equal(toTreeMetadataDescriptor.writable, false, label);
+  assertPrivateToTreeHostOutputMetadata(
+    toTreeMetadataDescriptor.value,
+    label
+  );
   assert.equal(renderer.update.length, 1, label);
   assert.equal(renderer.unmount.length, 0, label);
   assert.equal(renderer.getInstance.length, 0, label);
@@ -1417,6 +1446,14 @@ function assertCreateRoutingGate(error, entrypoint) {
   assert.equal(gate.privateRoutes[1], gate.unmountPrivateRoute);
   assertPrivateRoute(gate.updatePrivateRoute, expectedPrivateRoutes[0]);
   assertPrivateRoute(gate.unmountPrivateRoute, expectedPrivateRoutes[1]);
+  assert.equal(
+    error.toTreeHostOutputMetadataGate,
+    gate.toTreeHostOutputMetadataGate
+  );
+  assertPrivateToTreeHostOutputMetadataGate(
+    gate.toTreeHostOutputMetadataGate,
+    entrypoint
+  );
   assertPrivateTestInstanceWrapperSkeleton(
     gate.privateTestInstanceWrapperSkeleton,
     entrypoint
@@ -1442,6 +1479,125 @@ function assertPrivateRoute(privateRoute, expected) {
   assert.deepEqual(privateRoute.acceptedRustApis, expected.acceptedRustApis);
   assert.equal(Object.isFrozen(privateRoute.acceptedRustTests), true);
   assert.deepEqual(privateRoute.acceptedRustTests, expected.acceptedRustTests);
+}
+
+function assertPrivateToTreeHostOutputMetadataGate(gate, entrypoint) {
+  assert.equal(Object.isFrozen(gate), true, entrypoint);
+  assert.equal(
+    gate.id,
+    "react-test-renderer-totree-private-host-output-metadata-gate",
+    entrypoint
+  );
+  assert.equal(gate.publicSurface, "create().toTree", entrypoint);
+  assert.equal(
+    gate.status,
+    "ready-for-private-diagnostics-public-totree-blocked",
+    entrypoint
+  );
+  assert.equal(gate.deterministic, true, entrypoint);
+  assert.equal(gate.privateHostOutputTreeMetadataAvailable, true, entrypoint);
+  assert.equal(
+    gate.privateMetadataSymbol,
+    privateToTreeHostOutputMetadataSymbolDescription,
+    entrypoint
+  );
+  assert.equal(
+    gate.privateMetadataStatus,
+    "private-host-output-totree-metadata-ready-public-totree-blocked",
+    entrypoint
+  );
+  assert.deepEqual(gate.acceptedMinimalFiberShape, [
+    "HostRoot",
+    "HostComponent",
+    "HostText"
+  ]);
+  assert.equal(gate.acceptedReactSourceAlgorithm, "ReactTestRenderer.js toTree");
+  assert.equal(gate.hostRootBehavior, "childrenToTree(node.child)", entrypoint);
+  assert.match(gate.hostComponentBehavior, /nodeType 'host'/u, entrypoint);
+  assert.match(gate.hostTextBehavior, /text string/u, entrypoint);
+  assert.equal(gate.acceptedRustPrivateJsonDiagnostics, true, entrypoint);
+  assert.equal(gate.acceptedCommittedFiberInspection, true, entrypoint);
+  assert.equal(gate.publicTreeAvailable, false, entrypoint);
+  assert.equal(gate.publicRouteAvailable, false, entrypoint);
+  assert.equal(gate.nativeBridgeAvailable, false, entrypoint);
+  assert.equal(gate.nativeExecution, false, entrypoint);
+  assert.equal(gate.compatibilityClaimed, false, entrypoint);
+  assert.equal(
+    gate.acceptedWorker,
+    "worker-364-test-renderer-totree-private-host-output",
+    entrypoint
+  );
+  assert.deepEqual(gate.acceptedRustWorkers, [
+    "worker-235-test-renderer-private-fiber-inspection",
+    "worker-265-test-renderer-private-json-ready-diagnostics"
+  ]);
+  assert.deepEqual(gate.acceptedRustApis, [
+    "inspect_test_renderer_committed_fiber_tree",
+    "TestRendererCommittedFiberTreeInspection::host_root",
+    "TestRendererCommittedFiberTreeInspection::host_component",
+    "TestRendererCommittedFiberTreeInspection::host_text",
+    "TestRendererRoot::describe_private_json_serialization_for_canary",
+    "TestRendererPrivateJsonSerializationReport"
+  ]);
+  assert.deepEqual(gate.acceptedRustTests, [
+    "committed_fiber_inspection_describes_host_root_component_and_text",
+    "root_private_json_serialization_canary_describes_minimal_host_component_with_text"
+  ]);
+  assert.deepEqual(gate.blockedPublicSurfaces, [
+    "create().toTree",
+    "create().toJSON",
+    "create().root",
+    "ReactTestInstance",
+    "public-js-react-test-renderer-routing",
+    "compatibility-claim"
+  ]);
+  assert.deepEqual(gate.missingPrerequisites, [
+    "rust-native-test-renderer-create-bridge",
+    "public-react-test-renderer-totree-bridge",
+    "public-test-instance-and-totree-serialization-contract"
+  ]);
+}
+
+function assertPrivateToTreeHostOutputMetadata(record, entrypoint) {
+  assert.equal(Object.isFrozen(record), true, entrypoint);
+  assert.equal(
+    record.id,
+    "react-test-renderer-totree-private-host-output-metadata",
+    entrypoint
+  );
+  assert.equal(
+    record.status,
+    "private-host-output-totree-metadata-ready-public-totree-blocked",
+    entrypoint
+  );
+  assert.equal(
+    entrypoint.startsWith(record.entrypoint),
+    true,
+    `${entrypoint} entrypoint`
+  );
+  assert.equal(record.publicSurface, "create().toTree", entrypoint);
+  assert.equal(
+    record.symbol,
+    privateToTreeHostOutputMetadataSymbolDescription,
+    entrypoint
+  );
+  assertPrivateToTreeHostOutputMetadataGate(record.gate, entrypoint);
+  assert.equal(record.privateHostOutputTreeMetadataAvailable, true, entrypoint);
+  assert.equal(record.publicTreeAvailable, false, entrypoint);
+  assert.equal(record.publicRouteAvailable, false, entrypoint);
+  assert.equal(record.nativeBridgeAvailable, false, entrypoint);
+  assert.equal(record.nativeExecution, false, entrypoint);
+  assert.equal(record.compatibilityClaimed, false, entrypoint);
+  assert.equal(
+    typeof record.canDescribeAcceptedHostOutputDiagnostic,
+    "function",
+    entrypoint
+  );
+  assert.equal(
+    typeof record.describeAcceptedHostOutputDiagnostic,
+    "function",
+    entrypoint
+  );
 }
 
 function assertPrivateTestInstanceWrapperSkeleton(record, entrypoint) {
