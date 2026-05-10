@@ -100,7 +100,10 @@ use crate::{
     },
     root_scheduler::{
         RootPingedRetryExecutionStatus, RootSyncSchedulerContinuationExecutionStatus,
-        execute_pinged_retry_root_callback, execute_sync_scheduler_continuation_for_render_handoff,
+        SuspenseThenableRetryRootSchedulerStatus, execute_pinged_retry_root_callback,
+        execute_suspense_thenable_retry_root_callback,
+        execute_sync_scheduler_continuation_for_render_handoff,
+        request_suspense_thenable_retry_root_scheduler,
     },
     test_support::{RecordingHost, TestHostNode, TestHostTree},
 };
@@ -3854,8 +3857,8 @@ mod tests {
         RootElementHandle, RootHydrationCallbacksHandle, RootKind, RootOptions,
         RootSchedulerCallbackExecutionStatus, RootSuspenseBoundarySetHandle,
         RootTaskScheduleOutcome, RootTransitionCallbacksHandle, RootUpdateError,
-        RootUpdateLaneSourcePriority, SchedulerCallbackRequest, ensure_root_is_scheduled,
-        execute_scheduled_root_callback, flush_sync_work_on_all_roots,
+        RootUpdateLaneSourcePriority, SchedulerCallbackRequest, commit_finished_host_root,
+        ensure_root_is_scheduled, execute_scheduled_root_callback, flush_sync_work_on_all_roots,
         process_root_schedule_in_microtask, update_container, update_container_sync,
     };
     use fast_react_core::{
@@ -7025,6 +7028,136 @@ mod tests {
                 .unwrap()
                 .return_fiber(),
             Some(fallback)
+        );
+    }
+
+    #[test]
+    fn root_work_loop_suspense_pinged_retry_handoff_reaches_complete_work_record() {
+        let (mut store, root_id, mut host) = root_store();
+        let mut source = TestHostTree::new();
+        let element = source.insert_host_element_with_text("section", "retry handoff");
+        update_container(&mut store, root_id, element, None).unwrap();
+        let initial_render =
+            render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let initial_commit = commit_finished_host_root(&mut store, initial_render).unwrap();
+        assert_eq!(initial_commit.finished_lanes(), Lanes::DEFAULT);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+
+        let current = store.root(root_id).unwrap().current();
+        let (suspense, primary, primary_child, fallback, fallback_child) =
+            attach_suspense_wip_child_with_primary_and_fallback(&mut store, current);
+        let suspense_record = unsupported_suspense_begin_work_record(
+            store.fiber_arena(),
+            BeginWorkRequest::new(suspense, Lanes::from(Lane::RETRY_2)),
+        )
+        .unwrap();
+        {
+            let lanes = store.root_mut(root_id).unwrap().lanes_mut();
+            lanes.mark_updated(Lane::RETRY_2);
+            lanes.mark_suspended(Lanes::from(Lane::RETRY_2), Lane::NO, true);
+        }
+
+        let request =
+            request_suspense_thenable_retry_root_scheduler(&mut store, root_id, &suspense_record)
+                .unwrap();
+        let processed = process_root_schedule_in_microtask(&mut store).unwrap();
+        let callback = processed.records()[0].scheduled_callback().unwrap();
+        let execution =
+            execute_suspense_thenable_retry_root_callback(&mut store, request, callback).unwrap();
+        let render = execution.render_phase().unwrap();
+        let handoff = handoff_completed_host_root_render_to_test_complete_work(
+            &mut store, &mut host, render, &source,
+        )
+        .unwrap();
+
+        assert_eq!(
+            request.status(),
+            SuspenseThenableRetryRootSchedulerStatus::Accepted
+        );
+        assert!(request.accepted());
+        assert_eq!(request.boundary(), suspense);
+        assert_eq!(request.retry_queue(), UpdateQueueHandle::from_raw(747));
+        assert_eq!(
+            request.primary_offscreen_retry_queue(),
+            Some(UpdateQueueHandle::from_raw(748))
+        );
+        assert_eq!(request.retry_lane(), Lane::RETRY_2);
+        assert_eq!(request.pinged_lanes(), Lanes::from(Lane::RETRY_2));
+        assert!(!request.public_suspense_compatibility_claimed());
+        assert_eq!(
+            processed.records()[0].next_lanes(),
+            Lanes::from(Lane::RETRY_2)
+        );
+
+        assert_eq!(execution.status(), RootPingedRetryExecutionStatus::Rendered);
+        assert_eq!(execution.pinged_retry_lanes(), Lanes::from(Lane::RETRY_2));
+        assert_eq!(
+            execution.selected_priority_lanes(),
+            Lanes::from(Lane::RETRY_2)
+        );
+        assert_eq!(
+            execution.selected_render_lanes(),
+            Lanes::from(Lane::RETRY_2)
+        );
+        assert_eq!(render.root(), root_id);
+        assert_eq!(render.current(), current);
+        assert_eq!(render.render_lanes(), Lanes::from(Lane::RETRY_2));
+        assert_eq!(render.resulting_element(), element);
+        assert_eq!(render.applied_update_count(), 0);
+        assert_eq!(render.skipped_update_count(), 0);
+
+        assert_eq!(handoff.root(), root_id);
+        assert_eq!(
+            handoff.host_root_work_in_progress(),
+            render.work_in_progress()
+        );
+        assert_eq!(handoff.root_child_tag(), Some(FiberTag::HostComponent));
+        assert_eq!(handoff.render_lanes(), Lanes::from(Lane::RETRY_2));
+        assert_eq!(handoff.resulting_element(), element);
+        assert_eq!(handoff.detached_instance_count(), 1);
+        assert_eq!(handoff.detached_text_count(), 1);
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            Some(render.work_in_progress())
+        );
+        assert_eq!(
+            store
+                .root(root_id)
+                .unwrap()
+                .scheduling()
+                .render_exit_status(),
+            RootRenderExitStatus::Completed
+        );
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(primary_child)
+                .unwrap()
+                .return_fiber(),
+            Some(primary)
+        );
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(fallback_child)
+                .unwrap()
+                .return_fiber(),
+            Some(fallback)
+        );
+        assert_eq!(
+            host.operations(),
+            vec![
+                "root_host_context",
+                "child_host_context",
+                "should_set_text_content",
+                "create_text_instance",
+                "create_instance",
+                "append_initial_child",
+                "finalize_initial_children",
+            ]
         );
     }
 

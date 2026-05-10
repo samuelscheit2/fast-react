@@ -743,6 +743,8 @@ pub(crate) enum RootPingedRetryExecutionStatus {
     StaleCallback,
     NoWork,
     NoPingedRetryWork,
+    RejectedSuspenseRetryRequest,
+    StaleThenableBlocker,
     Rendered,
 }
 
@@ -2690,6 +2692,62 @@ pub(crate) fn execute_pinged_retry_root_callback<H: HostTypes>(
     })
 }
 
+#[allow(
+    dead_code,
+    reason = "crate-private Suspense retry execution path reserved for future Suspense retry workers"
+)]
+pub(crate) fn execute_suspense_thenable_retry_root_callback<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    request: SuspenseThenableRetryRootSchedulerRequestRecord,
+    callback: SchedulerCallbackRequest,
+) -> Result<RootPingedRetryExecutionRecord, RootSchedulerError> {
+    let validation =
+        validate_scheduled_host_root_callback(store, callback.root(), callback.node())?;
+    let pinged_retry_lanes = store
+        .root(callback.root())?
+        .lanes()
+        .pinged_lanes()
+        .intersect(Lanes::RETRY);
+
+    if validation.is_stale() {
+        return Ok(RootPingedRetryExecutionRecord {
+            callback,
+            validation,
+            pinged_retry_lanes,
+            selected_priority_lanes: Lanes::NO,
+            selected_render_lanes: Lanes::NO,
+            status: RootPingedRetryExecutionStatus::StaleCallback,
+            render_phase: None,
+        });
+    }
+
+    if !suspense_retry_request_is_accepted_for_callback(request, callback, pinged_retry_lanes) {
+        return Ok(RootPingedRetryExecutionRecord {
+            callback,
+            validation,
+            pinged_retry_lanes,
+            selected_priority_lanes: Lanes::NO,
+            selected_render_lanes: Lanes::NO,
+            status: RootPingedRetryExecutionStatus::RejectedSuspenseRetryRequest,
+            render_phase: None,
+        });
+    }
+
+    if !suspense_retry_request_is_current(store, request) {
+        return Ok(RootPingedRetryExecutionRecord {
+            callback,
+            validation,
+            pinged_retry_lanes,
+            selected_priority_lanes: Lanes::NO,
+            selected_render_lanes: Lanes::NO,
+            status: RootPingedRetryExecutionStatus::StaleThenableBlocker,
+            render_phase: None,
+        });
+    }
+
+    execute_pinged_retry_root_callback(store, callback)
+}
+
 fn suspense_thenable_retry_root_scheduler_record(
     root: FiberRootId,
     suspense: &UnsupportedSuspenseChildShapeRecord,
@@ -2713,6 +2771,33 @@ fn suspense_thenable_retry_root_scheduler_record(
         scheduled_root,
         scheduler_callback_blockers: &SUSPENSE_THENABLE_RETRY_SCHEDULER_CALLBACK_BLOCKERS,
     }
+}
+
+fn suspense_retry_request_is_accepted_for_callback(
+    request: SuspenseThenableRetryRootSchedulerRequestRecord,
+    callback: SchedulerCallbackRequest,
+    pinged_retry_lanes: Lanes,
+) -> bool {
+    request.accepted()
+        && request.root == callback.root()
+        && request.pinged_lanes.is_non_empty()
+        && request.pinged_lanes.includes_only_retries()
+        && request.pinged_lanes.intersect(pinged_retry_lanes) == request.pinged_lanes
+}
+
+fn suspense_retry_request_is_current<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    request: SuspenseThenableRetryRootSchedulerRequestRecord,
+) -> bool {
+    let Ok(node) = store.fiber_arena().get(request.boundary) else {
+        return false;
+    };
+
+    if node.tag() != FiberTag::Suspense || node.update_queue() != request.retry_queue {
+        return false;
+    }
+
+    matches!(root_for_updated_fiber(store, request.boundary), Ok(actual) if actual == request.root)
 }
 
 fn suspense_boundary_is_current_for_retry<H: HostTypes>(
@@ -4878,6 +4963,104 @@ mod tests {
         assert_eq!(
             store.root(root_id).unwrap().scheduling().callback_node(),
             callback.node()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_pinged_retry_execution_path_rejects_non_retry_reselection() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        let suspense = attach_suspense_retry_boundary(
+            &mut store,
+            root_id,
+            Lanes::from(Lane::RETRY_2),
+            UpdateQueueHandle::from_raw(991),
+            Some(UpdateQueueHandle::from_raw(992)),
+        );
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .lanes_mut()
+            .mark_updated(Lane::DEFAULT);
+        mark_suspended_lane(&mut store, root_id, Lane::RETRY_2);
+        let request =
+            request_suspense_thenable_retry_root_scheduler(&mut store, root_id, &suspense).unwrap();
+        let processed = process_root_schedule_in_microtask(&mut store).unwrap();
+        let callback = processed.records()[0].scheduled_callback().unwrap();
+
+        let execution =
+            execute_suspense_thenable_retry_root_callback(&mut store, request, callback).unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootPingedRetryExecutionStatus::NoPingedRetryWork
+        );
+        assert!(!execution.validation().is_stale());
+        assert_eq!(execution.pinged_retry_lanes(), Lanes::from(Lane::RETRY_2));
+        assert_eq!(execution.selected_priority_lanes(), Lanes::DEFAULT);
+        assert_eq!(execution.selected_render_lanes(), Lanes::DEFAULT);
+        assert_eq!(execution.render_phase(), None);
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            None
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().callback_node(),
+            callback.node()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_pinged_retry_execution_path_rejects_stale_thenable_blocker() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        let suspense = attach_suspense_retry_boundary(
+            &mut store,
+            root_id,
+            Lanes::from(Lane::RETRY_2),
+            UpdateQueueHandle::from_raw(993),
+            Some(UpdateQueueHandle::from_raw(994)),
+        );
+        mark_suspended_lane(&mut store, root_id, Lane::RETRY_2);
+        let request =
+            request_suspense_thenable_retry_root_scheduler(&mut store, root_id, &suspense).unwrap();
+        let processed = process_root_schedule_in_microtask(&mut store).unwrap();
+        let callback = processed.records()[0].scheduled_callback().unwrap();
+        store
+            .fiber_arena_mut()
+            .get_mut(suspense.fiber())
+            .unwrap()
+            .set_update_queue(UpdateQueueHandle::from_raw(995));
+
+        let execution =
+            execute_suspense_thenable_retry_root_callback(&mut store, request, callback).unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootPingedRetryExecutionStatus::StaleThenableBlocker
+        );
+        assert!(!execution.validation().is_stale());
+        assert_eq!(execution.pinged_retry_lanes(), Lanes::from(Lane::RETRY_2));
+        assert_eq!(execution.selected_priority_lanes(), Lanes::NO);
+        assert_eq!(execution.selected_render_lanes(), Lanes::NO);
+        assert_eq!(execution.render_phase(), None);
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            None
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().callback_node(),
+            callback.node()
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pinged_lanes(),
+            Lanes::from(Lane::RETRY_2)
         );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
