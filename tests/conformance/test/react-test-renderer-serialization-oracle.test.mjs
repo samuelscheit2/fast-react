@@ -8,6 +8,10 @@ import {
   readCheckedReactTestRendererSerializationOracleText
 } from "../src/react-test-renderer-serialization-oracle.mjs";
 import {
+  REACT_TEST_RENDERER_SERIALIZATION_LOCAL_GATE_STATUS,
+  evaluateReactTestRendererSerializationLocalGate
+} from "../src/react-test-renderer-serialization-local-gate.mjs";
+import {
   REACT_TEST_RENDERER_SERIALIZATION_LOCAL_FAST_REACT_STATUS,
   REACT_TEST_RENDERER_SERIALIZATION_ORACLE_ARTIFACT_PATH,
   REACT_TEST_RENDERER_SERIALIZATION_PROBE_MODES,
@@ -87,6 +91,32 @@ test("react-test-renderer serialization oracle keeps local Fast React status exp
     ),
     true
   );
+});
+
+test("react-test-renderer serialization oracle remains public-compatibility blocked after private diagnostics are ready", () => {
+  const gate = evaluateReactTestRendererSerializationLocalGate({ oracle });
+
+  assert.equal(gate.status, REACT_TEST_RENDERER_SERIALIZATION_LOCAL_GATE_STATUS);
+  assert.equal(gate.privateDiagnosticsReady, true);
+  assert.deepEqual(gate.privateDiagnosticBlockers, []);
+  assert.equal(gate.publicCompatibilityReady, false);
+  assert.equal(gate.publicCompatibilityClaimed, false);
+  assert.deepEqual(gate.publicCompatibilityBlockers, [
+    "public-to-json-api",
+    "public-to-tree-api",
+    "public-test-instance-wrappers",
+    "public-js-react-test-renderer-routing"
+  ]);
+  assert.deepEqual(gate.admittedScenarios, []);
+  assert.deepEqual(gate.violations, []);
+
+  assert.deepEqual(oracle.conformanceClaims, {
+    realReactTestRendererBehaviorProbed: true,
+    fastReactComparedToReactTestRenderer: false,
+    fastReactBehaviorCompatible: false,
+    fullDualRunOracleExists: false,
+    compatibilityClaimed: false
+  });
 });
 
 test("react-test-renderer serialization oracle covers every scenario in each mode", () => {

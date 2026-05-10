@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -10,6 +9,8 @@ import {
 } from "./react-test-renderer-serialization-scenarios.mjs";
 import {
   REACT_TEST_RENDERER_SERIALIZATION_LOCAL_GATE_STATUS,
+  REACT_TEST_RENDERER_SERIALIZATION_PRIVATE_DIAGNOSTIC_REQUIREMENTS,
+  REACT_TEST_RENDERER_SERIALIZATION_PUBLIC_COMPATIBILITY_STATUS,
   REACT_TEST_RENDERER_SERIALIZATION_LOCAL_SCENARIO_ADMISSIONS,
   REACT_TEST_RENDERER_SERIALIZATION_LOCAL_UNBLOCKING_REQUIREMENTS,
   evaluateReactTestRendererSerializationLocalGate
@@ -17,64 +18,61 @@ import {
 
 const oracle = readCheckedReactTestRendererSerializationOracle();
 
-test("react-test-renderer serialization compatibility stays blocked while public TestInstance serialization surfaces are unsupported", () => {
+test("react-test-renderer serialization gate is ready for private diagnostics while public compatibility stays blocked", () => {
   const gate = evaluateReactTestRendererSerializationLocalGate({ oracle });
 
   assert.equal(gate.status, REACT_TEST_RENDERER_SERIALIZATION_LOCAL_GATE_STATUS);
-  assert.equal(gate.requiredLocalTargetsReady, false);
+  assert.equal(gate.requiredLocalTargetsReady, true);
+  assert.equal(gate.privateDiagnosticsReady, true);
+  assert.deepEqual(gate.privateDiagnosticBlockers, []);
+  assert.equal(gate.publicCompatibilityReady, false);
   assert.equal(gate.publicCompatibilityClaimed, false);
+  assert.deepEqual(gate.publicCompatibilityBlockers, [
+    "public-to-json-api",
+    "public-to-tree-api",
+    "public-test-instance-wrappers",
+    "public-js-react-test-renderer-routing"
+  ]);
   assert.deepEqual(gate.violations, []);
   assert.deepEqual(gate.localChecks, {
     publicJsReactTestRendererFacadePresent: true,
     publicJsReactTestRendererFacadePlaceholder: true,
     publicJsReactTestRendererFacadeStatus: "placeholder-present",
     rustTestRendererRootFacadePresent: true,
-    committedTestRendererHostOutputPresent: false,
-    committedFiberInspectionPresent: false,
-    rustSerializationApiPresent: false
+    committedTestRendererHostOutputPresent: true,
+    committedFiberInspectionPresent: true,
+    privateJsonDiagnosticsPresent: true,
+    publicToJSONAvailable: false,
+    publicToTreeAvailable: false,
+    publicTestInstanceWrappersPresent: false,
+    publicJsFacadeRoutingPresent: false
   });
 });
 
 test("react-test-renderer serialization gate records accepted Rust-private prerequisites without public TestInstance admission", () => {
-  assert.deepEqual(inspectAcceptedRustPrivatePrerequisites(), [
-    {
-      id: "rust-test-renderer-root-facade",
-      acceptedPrivatePrerequisite: true,
-      publicJsSurfaceSupported: false,
-      compatibilityClaimed: false
-    },
-    {
-      id: "test-renderer-host-output-create-update-unmount-canary",
-      acceptedPrivatePrerequisite: true,
-      publicJsSurfaceSupported: false,
-      compatibilityClaimed: false
-    },
-    {
-      id: "committed-fiber-inspection-api",
-      acceptedPrivatePrerequisite: true,
-      publicJsSurfaceSupported: false,
-      compatibilityClaimed: false
-    },
-    {
-      id: "private-json-serialization-diagnostic",
-      acceptedPrivatePrerequisite: true,
-      publicJsSurfaceSupported: false,
-      compatibilityClaimed: false
-    }
-  ]);
-
   const gate = evaluateReactTestRendererSerializationLocalGate({ oracle });
-  assert.equal(gate.requiredLocalTargetsReady, false);
-  assert.equal(
-    gate.localChecks.publicJsReactTestRendererFacadeStatus,
-    "placeholder-present"
+
+  assert.deepEqual(
+    REACT_TEST_RENDERER_SERIALIZATION_PRIVATE_DIAGNOSTIC_REQUIREMENTS.map(
+      (requirement) => requirement.id
+    ),
+    [
+      "rust-test-renderer-root-facade",
+      "committed-test-renderer-host-output",
+      "committed-fiber-inspection-api",
+      "private-json-diagnostics"
+    ]
   );
-  assert.equal(gate.localChecks.rustSerializationApiPresent, false);
-  assert.equal(gate.publicCompatibilityClaimed, false);
+  assert.equal(gate.requiredLocalTargetsReady, true);
+  assert.equal(gate.privateDiagnosticsReady, true);
+  assert.deepEqual(gate.privateDiagnosticBlockers, []);
+  assert.equal(gate.publicCompatibilityReady, false);
+  assert.equal(gate.localChecks.publicTestInstanceWrappersPresent, false);
+  assert.equal(gate.localChecks.publicJsFacadeRoutingPresent, false);
   assert.deepEqual(gate.admittedScenarios, []);
 });
 
-test("react-test-renderer serialization scenario admission is explicit before any Fast React comparison", () => {
+test("react-test-renderer serialization scenario admission is explicit and blocked for public rows", () => {
   assert.deepEqual(
     REACT_TEST_RENDERER_SERIALIZATION_LOCAL_SCENARIO_ADMISSIONS.map(
       (scenario) => scenario.scenarioId
@@ -83,7 +81,12 @@ test("react-test-renderer serialization scenario admission is explicit before an
   );
 
   for (const scenario of REACT_TEST_RENDERER_SERIALIZATION_LOCAL_SCENARIO_ADMISSIONS) {
-    assert.equal(scenario.status, REACT_TEST_RENDERER_SERIALIZATION_LOCAL_GATE_STATUS);
+    assert.equal(
+      scenario.status,
+      REACT_TEST_RENDERER_SERIALIZATION_PUBLIC_COMPATIBILITY_STATUS
+    );
+    assert.equal(scenario.readyForPrivateDiagnostics, true);
+    assert.equal(scenario.publicComparisonBlocked, true);
     assert.equal(scenario.admittedForFastReactComparison, false);
     assert.equal(scenario.compatibilityClaimed, false);
     assert.deepEqual(
@@ -98,7 +101,7 @@ test("react-test-renderer serialization scenario admission is explicit before an
   assert.deepEqual(gate.admittedScenarios, []);
 });
 
-test("react-test-renderer serialization gate rejects premature compatibility claims before local root and commit output", () => {
+test("react-test-renderer serialization gate rejects premature public compatibility claims", () => {
   const prematureClaimOracle = JSON.parse(JSON.stringify(oracle));
   prematureClaimOracle.conformanceClaims.compatibilityClaimed = true;
 
@@ -107,129 +110,24 @@ test("react-test-renderer serialization gate rejects premature compatibility cla
   });
 
   assert.equal(gate.status, "blocked-with-violations");
+  assert.equal(gate.privateDiagnosticsReady, true);
+  assert.equal(gate.publicCompatibilityReady, false);
   assert.deepEqual(
     gate.violations.map((violation) => violation.id),
-    ["compatibility-claimed-before-rust-root-and-commit-output"]
+    ["compatibility-claimed-before-public-serialization-support"]
+  );
+  assert.deepEqual(
+    gate.violations[0].blockers,
+    [
+      "public-to-json-api",
+      "public-to-tree-api",
+      "public-test-instance-wrappers",
+      "public-js-react-test-renderer-routing"
+    ]
   );
 });
 
-function inspectAcceptedRustPrivatePrerequisites() {
-  const sources = {
-    testRenderer: readRepoText("crates/fast-react-test-renderer/src/lib.rs"),
-    reconciler: readRepoText("crates/fast-react-reconciler/src/lib.rs"),
-    fiberInspection: readRepoText(
-      "crates/fast-react-reconciler/src/private_fiber_inspection.rs"
-    )
-  };
-
-  return [
-    {
-      id: "rust-test-renderer-root-facade",
-      acceptedPrivatePrerequisite: hasAllSourcePatterns([
-        [sources.testRenderer, /\bpub struct TestRendererRoot\b/u],
-        [sources.testRenderer, /\bpub fn create\b/u],
-        [
-          sources.testRenderer,
-          /\bpub fn create_host_component_with_text_for_canary\b/u
-        ]
-      ]),
-      publicJsSurfaceSupported: false,
-      compatibilityClaimed: false
-    },
-    {
-      id: "test-renderer-host-output-create-update-unmount-canary",
-      acceptedPrivatePrerequisite: hasAllSourcePatterns([
-        [
-          sources.testRenderer,
-          /\bpub struct TestRendererCommittedHostOutput\b/u
-        ],
-        [
-          sources.testRenderer,
-          /\bpub struct TestRendererUpdatedHostOutput\b/u
-        ],
-        [
-          sources.testRenderer,
-          /\bpub struct TestRendererUnmountedHostOutput\b/u
-        ],
-        [
-          sources.testRenderer,
-          /\bpub fn render_and_commit_host_output_for_canary\b/u
-        ],
-        [
-          sources.testRenderer,
-          /\bpub fn render_and_commit_host_output_update_for_canary\b/u
-        ],
-        [
-          sources.testRenderer,
-          /\bpub fn render_and_commit_host_output_unmount_for_canary\b/u
-        ]
-      ]),
-      publicJsSurfaceSupported: false,
-      compatibilityClaimed: false
-    },
-    {
-      id: "committed-fiber-inspection-api",
-      acceptedPrivatePrerequisite: hasAllSourcePatterns([
-        [sources.reconciler, /\bpub use private_fiber_inspection::/u],
-        [
-          sources.fiberInspection,
-          /\bpub struct TestRendererCommittedFiberTreeInspection\b/u
-        ],
-        [
-          sources.fiberInspection,
-          /\bpub fn inspect_test_renderer_committed_fiber_tree\b/u
-        ],
-        [
-          sources.testRenderer,
-          /\bpub fn describe_committed_fiber_tree_for_canary\b/u
-        ]
-      ]),
-      publicJsSurfaceSupported: false,
-      compatibilityClaimed: false
-    },
-    {
-      id: "private-json-serialization-diagnostic",
-      acceptedPrivatePrerequisite: hasAllSourcePatterns([
-        [
-          sources.testRenderer,
-          /\bTEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME\b/u
-        ],
-        [
-          sources.testRenderer,
-          /\bpub struct TestRendererPrivateJsonSerializationReport\b/u
-        ],
-        [
-          sources.testRenderer,
-          /\bpub struct TestRendererPrivateJsonPublicSurfaceBlockers\b/u
-        ],
-        [
-          sources.testRenderer,
-          /\bpub fn describe_private_json_serialization_for_canary\b/u
-        ],
-        [sources.testRenderer, /\bjson_method_blocked: true\b/u],
-        [sources.testRenderer, /\btree_method_blocked: true\b/u],
-        [sources.testRenderer, /\binstance_wrapper_blocked: true\b/u],
-        [sources.testRenderer, /\bjs_facade_routing_blocked: true\b/u],
-        [sources.testRenderer, /\bcompatibility_claim_blocked: true\b/u]
-      ]),
-      publicJsSurfaceSupported: false,
-      compatibilityClaimed: false
-    }
-  ];
-}
-
-function readRepoText(relativePath) {
-  return readFileSync(
-    new URL(`../../../${relativePath}`, import.meta.url),
-    "utf8"
-  );
-}
-
-function hasAllSourcePatterns(sourcePatterns) {
-  return sourcePatterns.every(([source, pattern]) => pattern.test(source));
-}
-
-test("react-test-renderer serialization React oracle generation remains React-only while the local gate is closed", () => {
+test("react-test-renderer serialization React oracle generation remains React-only while public compatibility is blocked", () => {
   assert.deepEqual(oracle.conformanceClaims, {
     realReactTestRendererBehaviorProbed: true,
     fastReactComparedToReactTestRenderer: false,
@@ -237,10 +135,7 @@ test("react-test-renderer serialization React oracle generation remains React-on
     fullDualRunOracleExists: false,
     compatibilityClaimed: false
   });
-  assert.equal(
-    oracle.localFastReactStatus.status,
-    "not-present-in-workspace"
-  );
+  assert.equal(oracle.localFastReactStatus.status, "not-present-in-workspace");
   assert.equal(
     oracle.localFastReactStatus.behaviorCompatibilityClaimed,
     false

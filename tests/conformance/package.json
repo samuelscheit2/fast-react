@@ -34,6 +34,7 @@
     "wrapper-object:print:markdown": "node scripts/print-wrapper-object-oracle.mjs --format=markdown",
     "check": "npm test",
     "test": "node --test test/*.test.mjs src/react-test-renderer-serialization-local-gate.test.mjs",
+    "test:conformance": "npm test",
     "test:react-test-renderer:serialization": "node --test test/react-test-renderer-serialization-oracle.test.mjs src/react-test-renderer-serialization-local-gate.test.mjs"
   },
   "engines": {
