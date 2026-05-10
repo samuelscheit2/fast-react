@@ -3,12 +3,16 @@
 //! Real reconciliation is intentionally absent from the scaffold. The module
 //! layout reserves the boundary where lane/update/hook semantics will be built.
 
+mod concurrent_updates;
 mod fiber_root;
 mod fiber_store;
 mod host_tokens;
 mod root_config;
+mod root_updates;
 #[cfg(test)]
 mod test_support;
+mod update_priority;
+mod update_queue;
 mod work_in_progress;
 
 use std::error::Error;
@@ -20,6 +24,11 @@ use fast_react_host_config::{
     MutationRenderer, UnsupportedHostCapability,
 };
 
+pub use concurrent_updates::{
+    ConcurrentUpdateError, ConcurrentUpdateStaging, FinishedConcurrentUpdates,
+    StagedConcurrentUpdate, enqueue_concurrent_host_root_update,
+    finish_queueing_concurrent_updates, mark_update_lane_from_fiber_to_root,
+};
 pub use fiber_root::{
     FiberRoot, HostRootHydrationState, HostRootState, HostRootStateStore, HostRootStateStoreError,
     RootSchedulingState, create_host_root_current_fiber,
@@ -36,6 +45,15 @@ pub use root_config::{
     RootKind, RootLifecycleState, RootOptions, RootRecoverableErrorCallbackHandle,
     RootRenderExitStatus, RootSchedulerCallbackHandle, RootSuspenseBoundarySetHandle, RootTag,
     RootTransitionCallbacksHandle, RootWorkStatus, UnsupportedHydrationKind,
+};
+pub use root_updates::{
+    RootScheduleUpdateRecord, RootTransitionEntanglementRecord, RootUpdateError,
+    UpdateContainerResult, update_container, update_container_sync,
+};
+pub use update_priority::{UpdatePriorityState, request_update_lane};
+pub use update_queue::{
+    CollectedRootUpdateCallback, RootUpdate, RootUpdateCallbackHandle, RootUpdatePayload,
+    SharedQueue, UpdateId, UpdateQueue, UpdateQueueError, UpdateQueueStore, UpdateTag,
 };
 pub use work_in_progress::{WorkInProgressError, create_host_root_work_in_progress};
 
@@ -54,6 +72,9 @@ pub enum ReconcilerError {
     FiberRootStore(FiberRootStoreError),
     HostRootStateStore(HostRootStateStoreError),
     HostFiberToken(HostFiberTokenValidationError),
+    UpdateQueue(UpdateQueueError),
+    ConcurrentUpdate(ConcurrentUpdateError),
+    RootUpdate(RootUpdateError),
     WorkInProgress(WorkInProgressError),
 }
 
@@ -75,6 +96,9 @@ impl Display for ReconcilerError {
             Self::FiberRootStore(error) => Display::fmt(error, formatter),
             Self::HostRootStateStore(error) => Display::fmt(error, formatter),
             Self::HostFiberToken(error) => Display::fmt(error, formatter),
+            Self::UpdateQueue(error) => Display::fmt(error, formatter),
+            Self::ConcurrentUpdate(error) => Display::fmt(error, formatter),
+            Self::RootUpdate(error) => Display::fmt(error, formatter),
             Self::WorkInProgress(error) => Display::fmt(error, formatter),
         }
     }
@@ -91,6 +115,9 @@ impl Error for ReconcilerError {
             Self::FiberRootStore(error) => Some(error),
             Self::HostRootStateStore(error) => Some(error),
             Self::HostFiberToken(error) => Some(error),
+            Self::UpdateQueue(error) => Some(error),
+            Self::ConcurrentUpdate(error) => Some(error),
+            Self::RootUpdate(error) => Some(error),
             Self::WorkInProgress(error) => Some(error),
         }
     }
@@ -144,6 +171,24 @@ impl From<HostRootStateStoreError> for ReconcilerError {
 impl From<HostFiberTokenValidationError> for ReconcilerError {
     fn from(error: HostFiberTokenValidationError) -> Self {
         Self::HostFiberToken(error)
+    }
+}
+
+impl From<UpdateQueueError> for ReconcilerError {
+    fn from(error: UpdateQueueError) -> Self {
+        Self::UpdateQueue(error)
+    }
+}
+
+impl From<ConcurrentUpdateError> for ReconcilerError {
+    fn from(error: ConcurrentUpdateError) -> Self {
+        Self::ConcurrentUpdate(error)
+    }
+}
+
+impl From<RootUpdateError> for ReconcilerError {
+    fn from(error: RootUpdateError) -> Self {
+        Self::RootUpdate(error)
     }
 }
 

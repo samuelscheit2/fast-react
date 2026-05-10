@@ -75,6 +75,12 @@ impl HostRootState {
     }
 
     #[must_use]
+    pub const fn with_element(mut self, element: RootElementHandle) -> Self {
+        self.element = element;
+        self
+    }
+
+    #[must_use]
     pub const fn is_dehydrated(self) -> bool {
         self.is_dehydrated
     }
@@ -347,6 +353,10 @@ impl<H: HostTypes> FiberRoot<H> {
     #[must_use]
     pub const fn lanes(&self) -> &RootLaneState {
         &self.lanes
+    }
+
+    pub(crate) fn lanes_mut(&mut self) -> &mut RootLaneState {
+        &mut self.lanes
     }
 
     #[must_use]
