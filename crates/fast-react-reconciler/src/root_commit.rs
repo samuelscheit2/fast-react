@@ -2196,6 +2196,147 @@ struct HostRootDeletionHostParentRecord {
     traversal_depth: usize,
 }
 
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct HostRootCommitOrderDiagnosticsForCanary {
+    records: Vec<HostRootCommitOrderRecordForCanary>,
+}
+
+impl HostRootCommitOrderDiagnosticsForCanary {
+    #[must_use]
+    pub fn records(&self) -> &[HostRootCommitOrderRecordForCanary] {
+        &self.records
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    #[must_use]
+    pub const fn public_effects_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn host_containers_mutated(&self) -> bool {
+        false
+    }
+
+    fn push(
+        &mut self,
+        phase: HostRootCommitOrderPhaseForCanary,
+        metadata_kind: HostRootCommitOrderMetadataKindForCanary,
+        root: FiberRootId,
+        finished_work: FiberId,
+        fiber: FiberId,
+        tag: FiberTag,
+        source_order: u64,
+    ) {
+        self.records.push(HostRootCommitOrderRecordForCanary {
+            sequence: self.records.len(),
+            phase,
+            metadata_kind,
+            root,
+            finished_work,
+            fiber,
+            tag,
+            source_order,
+        });
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HostRootCommitOrderRecordForCanary {
+    sequence: usize,
+    phase: HostRootCommitOrderPhaseForCanary,
+    metadata_kind: HostRootCommitOrderMetadataKindForCanary,
+    root: FiberRootId,
+    finished_work: FiberId,
+    fiber: FiberId,
+    tag: FiberTag,
+    source_order: u64,
+}
+
+impl HostRootCommitOrderRecordForCanary {
+    #[must_use]
+    pub const fn sequence(self) -> usize {
+        self.sequence
+    }
+
+    #[must_use]
+    pub const fn phase(self) -> HostRootCommitOrderPhaseForCanary {
+        self.phase
+    }
+
+    #[must_use]
+    pub const fn phase_name(self) -> &'static str {
+        host_root_commit_order_phase_name(self.phase)
+    }
+
+    #[must_use]
+    pub const fn metadata_kind(self) -> HostRootCommitOrderMetadataKindForCanary {
+        self.metadata_kind
+    }
+
+    #[must_use]
+    pub const fn metadata_kind_name(self) -> &'static str {
+        host_root_commit_order_metadata_kind_name(self.metadata_kind)
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn finished_work(self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn tag(self) -> FiberTag {
+        self.tag
+    }
+
+    #[must_use]
+    pub const fn tag_name(self) -> &'static str {
+        host_root_fiber_tag_name(self.tag)
+    }
+
+    #[must_use]
+    pub const fn source_order(self) -> u64 {
+        self.source_order
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HostRootCommitOrderPhaseForCanary {
+    Mutation,
+    Layout,
+    Passive,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HostRootCommitOrderMetadataKindForCanary {
+    DeletionCleanup,
+    RefDetach,
+    RefAttach,
+    LayoutEffect,
+    RootUpdateCallback,
+    PassiveUnmount,
+    PassiveMount,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostRootCommitRecord {
     root: FiberRootId,
@@ -2664,6 +2805,77 @@ impl HostRootCommitRecord {
     #[must_use]
     pub const fn host_node_deletion_cleanup_log(&self) -> &HostRootDeletionCleanupLog {
         &self.host_node_deletion_cleanup_log
+    }
+
+    #[doc(hidden)]
+    #[must_use]
+    pub fn commit_order_diagnostics_for_canary(&self) -> HostRootCommitOrderDiagnosticsForCanary {
+        let mut diagnostics = HostRootCommitOrderDiagnosticsForCanary::default();
+
+        for record in self.host_node_deletion_cleanup_log.records() {
+            diagnostics.push(
+                HostRootCommitOrderPhaseForCanary::Mutation,
+                HostRootCommitOrderMetadataKindForCanary::DeletionCleanup,
+                record.root(),
+                self.current,
+                record.fiber(),
+                record.tag(),
+                record.sequence() as u64,
+            );
+        }
+
+        for record in self.ref_callback_execution_handoff.records() {
+            diagnostics.push(
+                HostRootCommitOrderPhaseForCanary::Layout,
+                host_root_commit_order_ref_kind(record.action()),
+                record.root(),
+                self.current,
+                record.fiber(),
+                FiberTag::HostComponent,
+                record.sequence() as u64,
+            );
+        }
+
+        for record in self.function_component_layout_effects.records() {
+            diagnostics.push(
+                HostRootCommitOrderPhaseForCanary::Layout,
+                HostRootCommitOrderMetadataKindForCanary::LayoutEffect,
+                self.root,
+                self.current,
+                record.fiber(),
+                FiberTag::FunctionComponent,
+                record.commit_order() as u64,
+            );
+        }
+
+        for record in self.root_update_callback_invocation_gate.records() {
+            diagnostics.push(
+                HostRootCommitOrderPhaseForCanary::Layout,
+                HostRootCommitOrderMetadataKindForCanary::RootUpdateCallback,
+                self.root,
+                self.current,
+                self.current,
+                FiberTag::HostRoot,
+                record.invocation_order() as u64,
+            );
+        }
+
+        for record in self
+            .function_component_committed_passive_effects
+            .phase_records()
+        {
+            diagnostics.push(
+                HostRootCommitOrderPhaseForCanary::Passive,
+                host_root_commit_order_passive_kind(record.phase()),
+                self.root,
+                self.current,
+                record.fiber(),
+                FiberTag::FunctionComponent,
+                host_root_commit_order_passive_source_order(record.order()),
+            );
+        }
+
+        diagnostics
     }
 }
 
@@ -4337,6 +4549,54 @@ const fn host_root_fiber_tag_name(tag: FiberTag) -> &'static str {
         FiberTag::Portal => "Portal",
         _ => "Other",
     }
+}
+
+const fn host_root_commit_order_phase_name(
+    phase: HostRootCommitOrderPhaseForCanary,
+) -> &'static str {
+    match phase {
+        HostRootCommitOrderPhaseForCanary::Mutation => "mutation",
+        HostRootCommitOrderPhaseForCanary::Layout => "layout",
+        HostRootCommitOrderPhaseForCanary::Passive => "passive",
+    }
+}
+
+const fn host_root_commit_order_metadata_kind_name(
+    kind: HostRootCommitOrderMetadataKindForCanary,
+) -> &'static str {
+    match kind {
+        HostRootCommitOrderMetadataKindForCanary::DeletionCleanup => "deletion-cleanup",
+        HostRootCommitOrderMetadataKindForCanary::RefDetach => "ref-detach",
+        HostRootCommitOrderMetadataKindForCanary::RefAttach => "ref-attach",
+        HostRootCommitOrderMetadataKindForCanary::LayoutEffect => "layout-effect",
+        HostRootCommitOrderMetadataKindForCanary::RootUpdateCallback => "root-update-callback",
+        HostRootCommitOrderMetadataKindForCanary::PassiveUnmount => "passive-unmount",
+        HostRootCommitOrderMetadataKindForCanary::PassiveMount => "passive-mount",
+    }
+}
+
+const fn host_root_commit_order_ref_kind(
+    action: HostRootRefCommitAction,
+) -> HostRootCommitOrderMetadataKindForCanary {
+    match action {
+        HostRootRefCommitAction::Detach => HostRootCommitOrderMetadataKindForCanary::RefDetach,
+        HostRootRefCommitAction::Attach => HostRootCommitOrderMetadataKindForCanary::RefAttach,
+    }
+}
+
+const fn host_root_commit_order_passive_kind(
+    phase: PendingPassiveEffectPhase,
+) -> HostRootCommitOrderMetadataKindForCanary {
+    match phase {
+        PendingPassiveEffectPhase::Unmount => {
+            HostRootCommitOrderMetadataKindForCanary::PassiveUnmount
+        }
+        PendingPassiveEffectPhase::Mount => HostRootCommitOrderMetadataKindForCanary::PassiveMount,
+    }
+}
+
+const fn host_root_commit_order_passive_source_order(order: PendingPassiveEffectOrder) -> u64 {
+    ((order.flush_rank() as u64) << 32) | order.sequence()
 }
 
 fn collect_host_root_mutation_phase_log<H: HostTypes>(
@@ -9125,6 +9385,260 @@ mod tests {
                 .scheduling()
                 .pending_passive()
                 .is_empty()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_records_private_effect_metadata_in_deterministic_commit_order_without_execution()
+    {
+        let (mut store, root_id, host) = root_store();
+        let current_root = store.root(root_id).unwrap().current();
+        let component = FiberTypeHandle::from_raw(760);
+        let current_function = append_function_component_child(
+            &mut store,
+            current_root,
+            PropsHandle::from_raw(761),
+            component,
+        );
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let previous_layout = hook_store
+            .create_current_effect_metadata(
+                store.fiber_arena_mut(),
+                current_function,
+                FunctionComponentEffectPhase::Layout,
+                callback(762),
+                deps(763),
+                Some(callback(764)),
+            )
+            .unwrap();
+        let previous_passive = hook_store
+            .create_current_effect_metadata(
+                store.fiber_arena_mut(),
+                current_function,
+                FunctionComponentEffectPhase::Passive,
+                callback(765),
+                deps(766),
+                Some(callback(767)),
+            )
+            .unwrap();
+        bubble_test_fiber(&mut store, current_function);
+        bubble_test_fiber(&mut store, current_root);
+
+        let root_callback = RootUpdateCallbackHandle::from_raw(768);
+        let root_update = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(769),
+            Some(root_callback),
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let finished_work = render.finished_work();
+        let finished_function = append_function_component_child(
+            &mut store,
+            finished_work,
+            PropsHandle::from_raw(770),
+            component,
+        );
+        store
+            .fiber_arena_mut()
+            .link_alternates(current_function, finished_function)
+            .unwrap();
+        let ref_child = append_host_ref_child(
+            &mut store,
+            finished_function,
+            RefHandle::from_raw(771),
+            StateNodeHandle::from_raw(772),
+            FiberFlags::REF,
+        );
+
+        let deletion_parent = create_test_fiber(&mut store, FiberTag::HostComponent, 773);
+        let deleted_text = create_test_fiber(&mut store, FiberTag::HostText, 774);
+        let deletion_parent_state_node = StateNodeHandle::from_raw(775);
+        let deleted_text_state_node = StateNodeHandle::from_raw(776);
+        {
+            let node = store.fiber_arena_mut().get_mut(deletion_parent).unwrap();
+            node.set_state_node(deletion_parent_state_node);
+            node.set_memoized_props(PropsHandle::from_raw(773));
+        }
+        {
+            let node = store.fiber_arena_mut().get_mut(deleted_text).unwrap();
+            node.set_state_node(deleted_text_state_node);
+            node.set_memoized_props(PropsHandle::from_raw(774));
+        }
+        store
+            .fiber_arena_mut()
+            .set_children(deletion_parent, &[deleted_text])
+            .unwrap();
+        let deletion_list = store
+            .fiber_arena_mut()
+            .mark_child_for_deletion(deletion_parent, deleted_text)
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(finished_work, &[finished_function, deletion_parent])
+            .unwrap();
+
+        let state = hook_store
+            .prepare_render_state(store.fiber_arena(), finished_function)
+            .unwrap();
+        assert_eq!(state.phase(), FunctionComponentHookRenderPhase::Update);
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+        let layout = hook_store
+            .update_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut cursor,
+                FunctionComponentEffectPhase::Layout,
+                callback(777),
+                deps(778),
+                FunctionComponentEffectDependencyStatus::Changed,
+            )
+            .unwrap();
+        let passive = hook_store
+            .update_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(779),
+                deps(780),
+                FunctionComponentEffectDependencyStatus::Changed,
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(cursor).unwrap();
+
+        let queued_passive = queue_function_component_pending_passive_effects(
+            &mut store,
+            root_id,
+            &hook_store,
+            state,
+            Lanes::DEFAULT,
+        )
+        .unwrap();
+        bubble_test_fiber(&mut store, ref_child);
+        bubble_test_fiber(&mut store, finished_function);
+        bubble_test_fiber(&mut store, deletion_parent);
+        bubble_test_fiber(&mut store, finished_work);
+
+        let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+        let layout_snapshot = commit
+            .record_function_component_layout_effects_for_canary(&store, &mut hook_store)
+            .unwrap()
+            .clone();
+        let passive_snapshot = commit
+            .record_function_component_committed_passive_effects_for_canary(&[queued_passive])
+            .unwrap()
+            .clone();
+        let diagnostics = commit.commit_order_diagnostics_for_canary();
+        let records = diagnostics.records();
+
+        assert_eq!(commit.deletion_lists().len(), 1);
+        assert_eq!(commit.deletion_lists()[0].list(), deletion_list);
+        assert_eq!(commit.deletion_lists()[0].deleted(), &[deleted_text]);
+        assert_eq!(commit.host_node_deletion_cleanup_log().len(), 1);
+        assert_eq!(commit.ref_callback_execution_handoff().len(), 1);
+        assert_eq!(layout_snapshot.len(), 1);
+        assert_eq!(passive_snapshot.phase_records().len(), 2);
+        assert_eq!(commit.root_update_callback_invocation_gate().len(), 1);
+        assert_eq!(diagnostics.len(), 6);
+        assert!(!diagnostics.public_effects_invoked());
+        assert!(!diagnostics.host_containers_mutated());
+        assert_eq!(
+            records
+                .iter()
+                .map(|record| record.sequence())
+                .collect::<Vec<_>>(),
+            vec![0, 1, 2, 3, 4, 5]
+        );
+        assert_eq!(
+            records
+                .iter()
+                .map(|record| record.phase_name())
+                .collect::<Vec<_>>(),
+            vec![
+                "mutation", "layout", "layout", "layout", "passive", "passive"
+            ]
+        );
+        assert_eq!(
+            records
+                .iter()
+                .map(|record| record.metadata_kind_name())
+                .collect::<Vec<_>>(),
+            vec![
+                "deletion-cleanup",
+                "ref-attach",
+                "layout-effect",
+                "root-update-callback",
+                "passive-unmount",
+                "passive-mount",
+            ]
+        );
+
+        assert_eq!(records[0].fiber(), deleted_text);
+        assert_eq!(records[0].tag_name(), "HostText");
+        assert_eq!(records[0].source_order(), 0);
+        assert_eq!(records[1].fiber(), ref_child);
+        assert_eq!(records[1].tag_name(), "HostComponent");
+        assert_eq!(records[1].source_order(), 0);
+        assert_eq!(records[2].fiber(), finished_function);
+        assert_eq!(records[2].tag_name(), "FunctionComponent");
+        assert_eq!(records[2].source_order(), 0);
+        assert_eq!(records[3].fiber(), finished_work);
+        assert_eq!(records[3].tag_name(), "HostRoot");
+        assert_eq!(records[3].source_order(), 0);
+        assert_eq!(records[4].fiber(), finished_function);
+        assert_eq!(records[4].tag_name(), "FunctionComponent");
+        assert!(records[4].source_order() < records[5].source_order());
+        assert_eq!(records[5].fiber(), finished_function);
+        assert_eq!(records[5].tag_name(), "FunctionComponent");
+
+        assert_eq!(layout_snapshot.records()[0].effect(), layout.effect());
+        assert_eq!(
+            layout_snapshot.records()[0].instance(),
+            previous_layout.instance()
+        );
+        assert_eq!(layout_snapshot.records()[0].create(), callback(777));
+        assert_eq!(
+            passive_snapshot.phase_records()[0].phase(),
+            PendingPassiveEffectPhase::Unmount
+        );
+        assert_eq!(
+            passive_snapshot.phase_records()[0].destroy(),
+            Some(callback(767))
+        );
+        assert_eq!(
+            passive_snapshot.phase_records()[1].phase(),
+            PendingPassiveEffectPhase::Mount
+        );
+        assert_eq!(
+            passive_snapshot.phase_records()[1].create(),
+            Some(callback(779))
+        );
+        assert_eq!(
+            passive.effect(),
+            passive_snapshot.phase_records()[1].effect()
+        );
+        assert_eq!(
+            passive_snapshot.phase_records()[1].instance(),
+            previous_passive.instance()
+        );
+        assert_eq!(
+            commit.root_update_callback_invocation_gate().records()[0].update(),
+            root_update.update()
+        );
+        assert_eq!(
+            commit.root_update_callback_invocation_gate().records()[0].callback(),
+            root_callback
+        );
+        assert_dom_ref_callback_gate_is_inert(commit.dom_ref_callback_commit_gate());
+        assert_ref_callback_execution_handoff_keeps_public_blockers(
+            commit.ref_callback_execution_handoff(),
+        );
+        assert_ref_cleanup_return_execution_gate_keeps_public_blockers(
+            commit.ref_cleanup_return_execution_gate(),
+        );
+        assert_root_update_callback_invocation_gate_is_inert(
+            commit.root_update_callback_invocation_gate(),
         );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
