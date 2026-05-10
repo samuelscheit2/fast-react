@@ -5,6 +5,8 @@ function shouldSetTextContent(type, props) {
     return false;
   }
 
+  // React DOM's private predicate returns true for these host types. Fast React
+  // keeps them blocked here until textarea/form and noscript behavior exists.
   if (type === 'textarea' || type === 'noscript') {
     return false;
   }

@@ -59,6 +59,7 @@ export const DOM_TEXT_CONTENT_ADMITTED_PRIVATE_SHOULD_SET_SCENARIO_IDS =
     "should-set-string-child",
     "should-set-empty-string-child",
     "should-set-number-child",
+    "should-set-bigint-child",
     "should-not-set-nullish-children",
     "should-not-set-boolean-child",
     "should-not-set-array-children",
@@ -75,22 +76,16 @@ export const DOM_TEXT_CONTENT_ADMITTED_PRIVATE_SHOULD_SET_SCENARIO_IDS =
 export const DOM_TEXT_CONTENT_UNSUPPORTED_PRIVATE_SHOULD_SET_SCENARIOS =
   Object.freeze([
     {
-      scenarioId: "should-set-bigint-child",
-      gateStatus: DOM_TEXT_CONTENT_UNSUPPORTED_PRIVATE_SHOULD_SET_STATUS,
-      reason:
-        "The local private helper does not yet implement React DOM's BigInt text-content predicate branch."
-    },
-    {
       scenarioId: "should-set-textarea-special-case",
       gateStatus: DOM_TEXT_CONTENT_UNSUPPORTED_PRIVATE_SHOULD_SET_STATUS,
       reason:
-        "Textarea text-content behavior stays outside the private text helper claim until controlled form and textarea value tracking support exists."
+        "React DOM's private predicate returns true for textarea, but Fast React keeps the local helper false until controlled form, defaultValue/value tracking, and textarea text-content side effects are implemented."
     },
     {
       scenarioId: "should-set-noscript-special-case",
       gateStatus: DOM_TEXT_CONTENT_UNSUPPORTED_PRIVATE_SHOULD_SET_STATUS,
       reason:
-        "Noscript text-content behavior stays outside the private text helper claim until browser/server noscript behavior is explicitly implemented."
+        "React DOM's private predicate returns true for noscript, but Fast React keeps the local helper false until browser and server noscript behavior is explicitly implemented."
     }
   ]);
 
@@ -219,10 +214,36 @@ export function evaluateDomTextContentConformanceGate({
       }
 
       if (admission?.admission === "unsupported") {
+        const localObservation = localObservationByScenario.get(scenario.id);
+        if (!localObservation) {
+          failures.push({
+            scenarioId: scenario.id,
+            gateStatus: "missing-local-private-should-set-observation"
+          });
+          continue;
+        }
+
+        const firstDifferencePath = findFirstDifferencePath(
+          checkedObservation.result,
+          localObservation.result
+        );
+        if (firstDifferencePath === null) {
+          failures.push({
+            scenarioId: scenario.id,
+            gateStatus: "private-should-set-row-skipped-despite-local-match",
+            reason:
+              "Private shouldSetTextContent rows that match the checked React DOM oracle must be admitted instead of skipped."
+          });
+          continue;
+        }
+
         skippedUnsupportedPrivateShouldSetRows.push({
           scenarioId: scenario.id,
           gateStatus: admission.gateStatus,
-          reason: admission.reason
+          reason: admission.reason,
+          checkedResult: checkedObservation.result,
+          localResult: localObservation.result,
+          firstDifferencePath
         });
         continue;
       }
@@ -443,6 +464,12 @@ function validateAdmissionMetadata({ shouldSetAdmissions, failures }) {
       failures.push({
         scenarioId: unsupported.scenarioId,
         gateStatus: "private-should-set-admission-conflict"
+      });
+    }
+    if (typeof unsupported.reason !== "string" || unsupported.reason.length === 0) {
+      failures.push({
+        scenarioId: unsupported.scenarioId,
+        gateStatus: "unsupported-private-should-set-missing-reason"
       });
     }
   }
