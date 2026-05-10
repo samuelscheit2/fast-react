@@ -233,6 +233,8 @@ const privateHydrateRootPublicFacadePreflightType =
   'fast.react_dom.private_hydrate_root_public_facade_preflight';
 const privateHydrateRootPublicFacadePreflightRecordType =
   'fast.react_dom.private_hydrate_root_public_facade_preflight_record';
+const privateHydrateRootPublicFacadeMarkerListenerPreflightRecordType =
+  'fast.react_dom.private_hydrate_root_public_facade_marker_listener_preflight_record';
 const privateRootLiveContainerPreflightRecordType =
   'fast.react_dom.private_root_live_container_preflight_record';
 const privateRootPublicFacadeMarkerListenerPreflightRecordType =
@@ -341,6 +343,8 @@ const ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_READY =
   'ready-private-react-dom-client-root-public-facade-preflight';
 const ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_ACCEPTED =
   'accepted-private-react-dom-client-root-public-facade-preflight';
+const ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHTED =
+  'preflighted-private-hydrate-root-public-facade-marker-listener-gate';
 const ROOT_BRIDGE_LIVE_CONTAINER_PREFLIGHT_BLOCKED =
   'blocked-private-root-live-container-preflight';
 const ROOT_BRIDGE_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHTED =
@@ -509,6 +513,12 @@ const ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_ACCEPTED_CAPABILITIES =
       accepted: true,
       reason:
         'The private hydrateRoot request captured unsupported hydration boundary diagnostics without executing hydration.'
+    }),
+    freezeRecord({
+      id: 'hydrate-root-marker-listener-preflight-diagnostics',
+      accepted: true,
+      reason:
+        'The private hydrateRoot preflight validated root marker and listener guard snapshots without writing markers or installing listeners.'
     })
   ]);
 const ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_BLOCKED_CAPABILITIES =
@@ -573,6 +583,29 @@ const ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_BLOCKED_CAPABILITIES =
       reason: 'React DOM hydrateRoot compatibility remains unclaimed.'
     })
   ]);
+const ROOT_BRIDGE_HYDRATE_ROOT_MARKER_LISTENER_PREFLIGHT_ACCEPTED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'hydrate-root-marker-guard-snapshot',
+      accepted: true,
+      reason:
+        'The private hydrateRoot preflight validated the deferred root marker guard against the container marker snapshot.'
+    }),
+    freezeRecord({
+      id: 'hydrate-root-listener-guard-snapshot',
+      accepted: true,
+      reason:
+        'The private hydrateRoot preflight validated the deferred listener guard against the root and owner-document listener snapshots.'
+    }),
+    freezeRecord({
+      id: 'hydrate-root-marker-listener-state-unchanged',
+      accepted: true,
+      reason:
+        'The private hydrateRoot preflight proved marker/listener diagnostics left the container state unchanged.'
+    })
+  ]);
+const ROOT_BRIDGE_HYDRATE_ROOT_MARKER_LISTENER_PREFLIGHT_BLOCKED_CAPABILITIES =
+  ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_BLOCKED_CAPABILITIES;
 const HYDRATION_BOUNDARY_ACCEPTED_METADATA_BLOCKED_PUBLIC_FIELDS = freezeArray([
   'compatibilityClaimed',
   'publicRootCompatibilitySurface',
@@ -2666,6 +2699,7 @@ const rootPublicFacadePreflightRootPayloads = new WeakMap();
 const rootPublicFacadePreflightRecordPayloads = new WeakMap();
 const rootHydratePublicFacadePreflightPayloads = new WeakMap();
 const rootHydratePublicFacadePreflightRecordPayloads = new WeakMap();
+const rootHydratePublicFacadeMarkerListenerPreflightPayloads = new WeakMap();
 const rootLiveContainerPreflightPayloads = new WeakMap();
 const rootPublicFacadeMarkerListenerPreflightPayloads = new WeakMap();
 const rootPublicFacadeHostOutputRenderPayloads = new WeakMap();
@@ -3183,6 +3217,7 @@ function createPrivateHydrateRootPublicFacadePreflight(options) {
   const bridge = createPrivateRootBridgeShell(options);
   const preflightState = {
     bridge,
+    markerListenerPreflightRecords: [],
     nextPreflightSequence: 1,
     preflight: null,
     preflightIdPrefix: getIdPrefix(
@@ -3243,6 +3278,16 @@ function createPrivateHydrateRootPublicFacadePreflightRecord(
   const preflightSequence = preflightState.nextPreflightSequence++;
   const preflightId =
     `${preflightState.preflightIdPrefix}:${preflightSequence}`;
+  const markerListenerPreflight =
+    createPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord(
+      preflightState,
+      requestRecord,
+      preflightId,
+      preflightSequence
+    );
+  preflightState.markerListenerPreflightRecords.push(
+    markerListenerPreflight
+  );
   const record = freezeRecord({
     $$typeof: privateHydrateRootPublicFacadePreflightRecordType,
     kind: 'FastReactDomPrivateHydrateRootPublicFacadePreflightRecord',
@@ -3278,6 +3323,15 @@ function createPrivateHydrateRootPublicFacadePreflightRecord(
     acceptedPrivateMetadataIds: requestRecord.acceptedPrivateMetadataIds,
     acceptedPrivateMetadataGateIds:
       requestRecord.acceptedPrivateMetadataGateIds,
+    markerListenerPreflight,
+    markerListenerPreflightId:
+      markerListenerPreflight.markerListenerPreflightId,
+    markerListenerPreflightStatus:
+      markerListenerPreflight.preflightStatus,
+    markerListenerPreconditionsAccepted:
+      markerListenerPreflight.preconditions.accepted,
+    markerListenerStateUnchanged:
+      markerListenerPreflight.preconditions.stateUnchanged,
     requestAdmission,
     nativeHandoffRecord: null,
     requestAdmissionStatus: requestAdmission.admissionStatus,
@@ -3314,9 +3368,194 @@ function createPrivateHydrateRootPublicFacadePreflightRecord(
 
   rootHydratePublicFacadePreflightRecordPayloads.set(record, {
     bridge: preflightState.bridge,
+    markerListenerPreflight,
     nativeHandoffRecord: null,
     preflight: preflightState.preflight,
     requestAdmission,
+    requestRecord
+  });
+  return record;
+}
+
+function createPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord(
+  preflightState,
+  requestRecord,
+  preflightId,
+  preflightSequence
+) {
+  const requestPayload = rootRecordPayloads.get(requestRecord);
+  if (requestPayload === undefined) {
+    throwInvalidRootPublicFacadePreflight(
+      'Expected a private React DOM hydrateRoot record for public-facade marker/listener preflight.'
+    );
+  }
+
+  const container = requestPayload.container;
+  assertValidContainer(container, requestPayload.bridgeState.validationOptions);
+  assertHydrateRootMarkerListenerPreflightRequestBlocked(requestRecord);
+
+  const ownerDocument = getOwnerDocument(container);
+  const beforeState =
+    inspectPublicFacadeMarkerListenerPreflightState(container);
+  assertHydrateRootMarkerGuardMatchesPreflightState(
+    requestRecord.markerGuard,
+    container,
+    beforeState
+  );
+  assertHydrateRootListenerGuardMatchesPreflightState(
+    requestRecord.listenerGuard,
+    container,
+    beforeState
+  );
+  const afterState =
+    inspectPublicFacadeMarkerListenerPreflightState(container);
+  const stateUnchanged = markerListenerStateMatches(beforeState, afterState);
+
+  if (!stateUnchanged) {
+    throwInvalidRootPublicFacadePreflight(
+      'hydrateRoot marker/listener preflight state changed while collecting blocked diagnostics.'
+    );
+  }
+
+  const markerGuard = requestRecord.markerGuard;
+  const listenerGuard = requestRecord.listenerGuard;
+  const markerListenerPreflightId = `${preflightId}:marker-listener`;
+  const blockerReasons = freezeArray([
+    'public-hydrate-root-disabled',
+    'hydration-root-construction-disabled',
+    'hydration-marker-consumption-disabled',
+    'root-marker-write-disabled',
+    'root-listener-installation-disabled',
+    'event-replay-disabled',
+    'recoverable-error-routing-disabled',
+    'compatibility-unclaimed'
+  ]);
+  const preconditions = freezeRecord({
+    accepted: true,
+    stateUnchanged,
+    markerGuardAction: markerGuard.action,
+    listenerGuardAction: listenerGuard.action,
+    markerGuardMatchesContainerState: true,
+    listenerGuardMatchesContainerState: true,
+    hasLegacyRootMarker: markerGuard.hasLegacyRootMarker,
+    isContainerMarkedAsRoot: markerGuard.isContainerMarkedAsRoot,
+    rootMarkerPropertyCount:
+      markerGuard.rootMarkerSnapshot.propertyCount,
+    rootMarkerTruthyCount: markerGuard.rootMarkerSnapshot.truthyCount,
+    rootMarkerNullCount: markerGuard.rootMarkerSnapshot.nullCount,
+    canInstallRootListeners: listenerGuard.canInstallRootListeners,
+    rootListeningMarkerPresent: listenerGuard.hasRootListeningMarker,
+    rootListeningMarkerPropertyCount:
+      beforeState.rootListeningMarker.propertyCount,
+    rootListeningMarkerTrueValueCount:
+      beforeState.rootListeningMarker.trueValueCount,
+    ownerDocumentCanInstallSelectionChange:
+      listenerGuard.ownerDocumentCanInstallSelectionChange,
+    ownerDocumentListeningMarkerPresent:
+      listenerGuard.ownerDocumentHasSelectionChangeMarker,
+    ownerDocumentListeningMarkerPropertyCount:
+      beforeState.ownerDocumentListeningMarker === null
+        ? 0
+        : beforeState.ownerDocumentListeningMarker.propertyCount,
+    ownerDocumentListeningMarkerTrueValueCount:
+      beforeState.ownerDocumentListeningMarker === null
+        ? 0
+        : beforeState.ownerDocumentListeningMarker.trueValueCount,
+    rootListenerRegistrationCount:
+      beforeState.rootListenerRegistrationCount,
+    ownerDocumentListenerRegistrationCount:
+      beforeState.ownerDocumentListenerRegistrationCount,
+    rootListenerSetSize: beforeState.rootListenerSetSize,
+    ownerDocumentListenerSetSize:
+      beforeState.ownerDocumentListenerSetSize,
+    rootMutationCount: beforeState.rootMutationCount,
+    ownerDocumentMutationCount: beforeState.ownerDocumentMutationCount
+  });
+  const blockerEvidence = freezeRecord({
+    status:
+      ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHTED,
+    blockerReasons,
+    markerStateUnchanged: stateUnchanged,
+    listenerStateUnchanged: stateUnchanged,
+    rootMarkerWriteBlocked: true,
+    rootListenerInstallationBlocked: true,
+    hydrationMarkerConsumptionBlocked: true,
+    eventReplayBlocked: true,
+    recoverableErrorRoutingBlocked: true,
+    publicHydrateRootBlocked: true,
+    compatibilityClaimed: false
+  });
+  const record = freezeRecord({
+    $$typeof:
+      privateHydrateRootPublicFacadeMarkerListenerPreflightRecordType,
+    kind:
+      'FastReactDomPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord',
+    operation: 'hydrate-root-marker-listener-preflight',
+    facadeCall: 'hydrateRoot',
+    entrypoint: 'react-dom/client',
+    preflightId,
+    preflightSequence,
+    markerListenerPreflightId,
+    preflightStatus:
+      ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHTED,
+    executionStatus: ROOT_BRIDGE_EXECUTION_BLOCKED,
+    compatibilityStatus: ROOT_BRIDGE_COMPATIBILITY_BLOCKED,
+    requestId: requestRecord.requestId,
+    requestSequence: requestRecord.requestSequence,
+    requestType: requestRecord.requestType,
+    hydrateId: requestRecord.hydrateId,
+    rootId: requestRecord.rootId,
+    rootKind: requestRecord.rootKind,
+    rootTag: requestRecord.rootTag,
+    containerInfo: beforeState.containerInfo,
+    ownerDocumentInfo: beforeState.ownerDocumentInfo,
+    markerGuard,
+    listenerGuard,
+    beforeState,
+    afterState,
+    preconditions,
+    blockerEvidence,
+    acceptedCapabilities:
+      ROOT_BRIDGE_HYDRATE_ROOT_MARKER_LISTENER_PREFLIGHT_ACCEPTED_CAPABILITIES,
+    blockedCapabilities:
+      ROOT_BRIDGE_HYDRATE_ROOT_MARKER_LISTENER_PREFLIGHT_BLOCKED_CAPABILITIES,
+    acceptedPrivateBridgeDiagnostics: true,
+    hydrateRootRequestRecorded: true,
+    hydrationRequested: requestRecord.hydrationRequested,
+    canHydrate: false,
+    publicRootCreated: false,
+    publicRootObjectExposed: false,
+    publicCreateRootEnabled: false,
+    publicHydrateRootEnabled: false,
+    publicRootCompatibilitySurface: false,
+    containerMarked: false,
+    listenersAttached: false,
+    domMutated: false,
+    eventsReplayed: false,
+    rootScheduled: false,
+    suspenseHydrationScheduled: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    recoverableErrorRouting: false,
+    compatibilityClaimed: false
+  });
+
+  rootHydratePublicFacadeMarkerListenerPreflightPayloads.set(record, {
+    afterState,
+    beforeState,
+    blockerEvidence,
+    bridge: preflightState.bridge,
+    container,
+    listenerGuard,
+    markerGuard,
+    ownerDocument,
+    preconditions,
+    preflight: preflightState.preflight,
     requestRecord
   });
   return record;
@@ -8331,6 +8570,11 @@ function getPrivateHydrateRootPublicFacadePreflightPayload(preflight) {
 
   return freezeRecord({
     bridge: payload.bridge,
+    markerListenerPreflightRecordCount:
+      payload.markerListenerPreflightRecords.length,
+    markerListenerPreflightRecords: freezeArray(
+      payload.markerListenerPreflightRecords
+    ),
     preflight: payload.preflight,
     preflightRecordCount: payload.records.length,
     preflightRecords: freezeArray(payload.records)
@@ -8349,6 +8593,7 @@ function getPrivateHydrateRootPublicFacadePreflightRecordPayload(record) {
 
   return freezeRecord({
     bridge: payload.bridge,
+    markerListenerPreflight: payload.markerListenerPreflight,
     nativeHandoffRecord: payload.nativeHandoffRecord,
     preflight: payload.preflight,
     requestAdmission: payload.requestAdmission,
@@ -8358,6 +8603,21 @@ function getPrivateHydrateRootPublicFacadePreflightRecordPayload(record) {
 
 function isPrivateHydrateRootPublicFacadePreflightRecord(value) {
   return rootHydratePublicFacadePreflightRecordPayloads.has(value);
+}
+
+function getPrivateHydrateRootPublicFacadeMarkerListenerPreflightPayload(
+  record
+) {
+  return (
+    rootHydratePublicFacadeMarkerListenerPreflightPayloads.get(record) ||
+    null
+  );
+}
+
+function isPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord(
+  value
+) {
+  return rootHydratePublicFacadeMarkerListenerPreflightPayloads.has(value);
 }
 
 function getPrivateRootLiveContainerPreflightPayload(record) {
@@ -17270,8 +17530,36 @@ function markerSnapshotMatches(left, right) {
     left.inspectable === right.inspectable &&
     left.propertyCount === right.propertyCount &&
     left.truthyCount === right.truthyCount &&
-    left.nullCount === right.nullCount
+    left.nullCount === right.nullCount &&
+    markerSnapshotPropertiesMatch(left.properties, right.properties)
   );
+}
+
+function markerSnapshotPropertiesMatch(leftProperties, rightProperties) {
+  if (!Array.isArray(leftProperties) || !Array.isArray(rightProperties)) {
+    return false;
+  }
+
+  if (leftProperties.length !== rightProperties.length) {
+    return false;
+  }
+
+  for (let index = 0; index < leftProperties.length; index++) {
+    const left = leftProperties[index];
+    const right = rightProperties[index];
+    if (
+      !isObjectOrFunction(left) ||
+      !isObjectOrFunction(right) ||
+      left.enumerable !== right.enumerable ||
+      left.keyPrefix !== right.keyPrefix ||
+      left.valueState !== right.valueState ||
+      left.valueType !== right.valueType
+    ) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function listeningMarkerSnapshotMatches(left, right) {
@@ -17282,6 +17570,149 @@ function listeningMarkerSnapshotMatches(left, right) {
     left.inspectable === right.inspectable &&
     left.propertyCount === right.propertyCount &&
     left.trueValueCount === right.trueValueCount
+  );
+}
+
+function assertHydrateRootMarkerListenerPreflightRequestBlocked(record) {
+  const blockedFields = [
+    'canHydrate',
+    'publicRootCreated',
+    'containerMarked',
+    'listenersAttached',
+    'domMutated',
+    'eventsReplayed',
+    'rootScheduled',
+    'suspenseHydrationScheduled',
+    'nativeExecution',
+    'reconcilerExecution',
+    'domMutation',
+    'markerWrites',
+    'listenerInstallation',
+    'hydration',
+    'eventDispatch',
+    'compatibilityClaimed'
+  ];
+
+  for (const field of blockedFields) {
+    if (record[field] !== false) {
+      throwInvalidRootPublicFacadePreflight(
+        'hydrateRoot marker/listener preflight requires blocked private hydrateRoot request flags.'
+      );
+    }
+  }
+
+  if (
+    record.operation !== 'hydrate' ||
+    record.requestType !== 'hydrateRoot' ||
+    record.hydrationRequested !== true ||
+    record.rootKind !== UNSUPPORTED_HYDRATION_ROOT_KIND ||
+    record.status !== 'unsupported'
+  ) {
+    throwInvalidRootPublicFacadePreflight(
+      'hydrateRoot marker/listener preflight requires an unsupported private hydrateRoot request record.'
+    );
+  }
+
+  const acceptedMetadata = record.acceptedPrivateMetadataDiagnostics;
+  if (
+    !acceptedMetadata ||
+    acceptedMetadata.compatibilityClaimed !== false ||
+    acceptedMetadata.publicHydrationCompatibilityClaimed !== false ||
+    acceptedMetadata.publicHydrationReplayCompatibilityClaimed !== false ||
+    acceptedMetadata.publicRootRenderCompatibilityClaimed !== false
+  ) {
+    throwInvalidRootPublicFacadePreflight(
+      'hydrateRoot marker/listener preflight cannot accept public compatibility claims.'
+    );
+  }
+}
+
+function assertHydrateRootMarkerGuardMatchesPreflightState(
+  markerGuard,
+  container,
+  state
+) {
+  if (
+    !isObjectOrFunction(markerGuard) ||
+    markerGuard.action !== 'defer-mark-container-as-root-for-hydrate-root' ||
+    !isObjectOrFunction(markerGuard.rootMarkerSnapshot)
+  ) {
+    throwInvalidRootPublicFacadePreflight(
+      'hydrateRoot marker/listener preflight requires a deferred hydrateRoot marker guard.'
+    );
+  }
+
+  if (
+    markerGuard.hasLegacyRootMarker !== hasLegacyRootMarker(container) ||
+    markerGuard.isContainerMarkedAsRoot !==
+      isContainerMarkedAsRoot(container) ||
+    !markerSnapshotMatches(
+      markerGuard.rootMarkerSnapshot,
+      state.containerMarker
+    )
+  ) {
+    throwInvalidRootPublicFacadePreflight(
+      'hydrateRoot marker/listener preflight marker guard does not match the container marker snapshot.'
+    );
+  }
+}
+
+function assertHydrateRootListenerGuardMatchesPreflightState(
+  listenerGuard,
+  container,
+  state
+) {
+  const ownerDocument = getOwnerDocument(container);
+  if (
+    !isObjectOrFunction(listenerGuard) ||
+    listenerGuard.action !==
+      'defer-listen-to-all-supported-events-for-hydrate-root'
+  ) {
+    throwInvalidRootPublicFacadePreflight(
+      'hydrateRoot marker/listener preflight requires a deferred hydrateRoot listener guard.'
+    );
+  }
+
+  if (
+    listenerGuard.canInstallRootListeners !== canInstallListener(container) ||
+    listenerGuard.hasRootListeningMarker !== hasListeningMarker(container) ||
+    listenerGuard.ownerDocumentCanInstallSelectionChange !==
+      canInstallListener(ownerDocument) ||
+    listenerGuard.ownerDocumentHasSelectionChangeMarker !==
+      hasListeningMarker(ownerDocument) ||
+    !containerInfoMatches(
+      listenerGuard.rootEventTargetInfo,
+      state.containerInfo
+    ) ||
+    !containerInfoMatches(
+      listenerGuard.ownerDocumentInfo,
+      state.ownerDocumentInfo
+    ) ||
+    !listeningMarkerSnapshotMatches(
+      state.rootListeningMarker,
+      inspectListeningMarker(container)
+    ) ||
+    !listeningMarkerSnapshotMatches(
+      state.ownerDocumentListeningMarker,
+      ownerDocument === null ? null : inspectListeningMarker(ownerDocument)
+    )
+  ) {
+    throwInvalidRootPublicFacadePreflight(
+      'hydrateRoot marker/listener preflight listener guard does not match the root listener snapshot.'
+    );
+  }
+}
+
+function containerInfoMatches(left, right) {
+  if (left === null || right === null) {
+    return left === right;
+  }
+  return (
+    isObjectOrFunction(left) &&
+    isObjectOrFunction(right) &&
+    left.kind === right.kind &&
+    left.nodeName === right.nodeName &&
+    left.nodeType === right.nodeType
   );
 }
 
@@ -19717,8 +20148,11 @@ module.exports = {
   ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_READY,
+  ROOT_BRIDGE_HYDRATE_ROOT_MARKER_LISTENER_PREFLIGHT_ACCEPTED_CAPABILITIES,
+  ROOT_BRIDGE_HYDRATE_ROOT_MARKER_LISTENER_PREFLIGHT_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_BLOCKED_CAPABILITIES,
+  ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHTED,
   ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_REF_CALLBACK_ERROR_ROUTING_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_REF_CALLBACK_ERROR_ROUTING_RECORDED,
@@ -19815,6 +20249,7 @@ module.exports = {
   getPrivateRootPublicFacadePreflightRecordPayload,
   getPrivateRootPublicFacadePreflightRootPayload,
   getPrivateHydrateRootPublicFacadePreflightPayload,
+  getPrivateHydrateRootPublicFacadeMarkerListenerPreflightPayload,
   getPrivateHydrateRootPublicFacadePreflightRecordPayload,
   getPrivateRootPublicFacadeRootPayload,
   getPrivateRootEventListenerErrorRoutingPayload,
@@ -19858,6 +20293,7 @@ module.exports = {
   isPrivateRootPublicFacadePreflightRecord,
   isPrivateRootPublicFacadePreflightRoot,
   isPrivateHydrateRootPublicFacadePreflight,
+  isPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord,
   isPrivateHydrateRootPublicFacadePreflightRecord,
   isPrivateRootPublicFacadeRoot,
   isPrivateRootUnmountAdmissionRecord,
@@ -19900,6 +20336,7 @@ module.exports = {
   privateRootPublicFacadeHostOutputUpdateRecordType,
   privateRootPublicFacadeNestedHostOutputUpdateRecordType,
   privateRootPublicFacadeHostOutputUnmountCleanupRecordType,
+  privateHydrateRootPublicFacadeMarkerListenerPreflightRecordType,
   privateHydrateRootPublicFacadePreflightRecordType,
   privateHydrateRootPublicFacadePreflightSymbol,
   privateHydrateRootPublicFacadePreflightType,
