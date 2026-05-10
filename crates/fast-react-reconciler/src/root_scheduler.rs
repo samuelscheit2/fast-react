@@ -912,6 +912,24 @@ impl SuspenseThenableRetryRootSchedulerRequestRecord {
     }
 
     #[must_use]
+    pub(crate) fn thenable_ping_scheduled_expected_retry_lane(self) -> bool {
+        let expected_lanes = Lanes::from(self.retry_lane);
+        let Some(scheduled_root) = self.scheduled_root else {
+            return false;
+        };
+
+        self.accepted()
+            && self.retry_lane.is_non_empty()
+            && self.pinged_lanes == expected_lanes
+            && self.pinged_lanes.includes_only_retries()
+            && !self
+                .root_pinged_lanes_before
+                .contains_all(self.pinged_lanes)
+            && self.root_pinged_lanes_after.contains_all(self.pinged_lanes)
+            && scheduled_root.root() == self.root
+    }
+
+    #[must_use]
     pub(crate) const fn accepted(self) -> bool {
         matches!(
             self.status,
@@ -1009,6 +1027,16 @@ impl SuspenseThenableRetryRootRenderHandoffRecord {
     }
 
     #[must_use]
+    pub(crate) fn thenable_ping_scheduled_expected_retry_lane(self) -> bool {
+        self.request.thenable_ping_scheduled_expected_retry_lane()
+    }
+
+    #[must_use]
+    pub(crate) fn thenable_ping_reached_expected_retry_handoff(self) -> bool {
+        self.thenable_ping_scheduled_expected_retry_lane() && self.root_work_loop_reached()
+    }
+
+    #[must_use]
     pub(crate) fn root_work_loop_reached(self) -> bool {
         let Some(render) = self.render_phase() else {
             return false;
@@ -1030,7 +1058,7 @@ impl SuspenseThenableRetryRootRenderHandoffRecord {
 
     #[must_use]
     pub(crate) fn proves_private_thenable_ping_render_handoff(self) -> bool {
-        self.root_work_loop_reached()
+        self.thenable_ping_reached_expected_retry_handoff()
             && !self.suspense_boundary_rendering_executed()
             && !self.fallback_traversal_executed()
             && !self.wakeable_subscription_performed()
@@ -5287,6 +5315,7 @@ mod tests {
             SuspenseThenableRetryRootSchedulerStatus::Accepted
         );
         assert!(request.accepted());
+        assert!(request.thenable_ping_scheduled_expected_retry_lane());
         assert_eq!(request.root(), root_id);
         assert_eq!(request.boundary(), suspense.fiber());
         assert_eq!(request.retry_queue(), UpdateQueueHandle::from_raw(941));
@@ -5632,6 +5661,8 @@ mod tests {
         assert_eq!(handoff.pinged_lanes(), Lanes::from(Lane::RETRY_2));
         assert_eq!(handoff.callback(), callback);
         assert_eq!(handoff.scheduled_root(), request.scheduled_root());
+        assert!(handoff.thenable_ping_scheduled_expected_retry_lane());
+        assert!(handoff.thenable_ping_reached_expected_retry_handoff());
         assert!(handoff.root_work_loop_reached());
         assert!(handoff.proves_private_thenable_ping_render_handoff());
         assert!(!handoff.suspense_boundary_rendering_executed());

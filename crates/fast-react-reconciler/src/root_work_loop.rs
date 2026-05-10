@@ -9940,6 +9940,7 @@ mod tests {
             SuspenseThenableRetryRootSchedulerStatus::Accepted
         );
         assert!(request.accepted());
+        assert!(request.thenable_ping_scheduled_expected_retry_lane());
         assert_eq!(request.boundary(), suspense);
         assert_eq!(request.retry_queue(), UpdateQueueHandle::from_raw(747));
         assert_eq!(
@@ -9960,6 +9961,8 @@ mod tests {
         assert_eq!(render_handoff.retry_lane(), Lane::RETRY_2);
         assert_eq!(render_handoff.pinged_lanes(), Lanes::from(Lane::RETRY_2));
         assert_eq!(render_handoff.callback(), callback);
+        assert!(render_handoff.thenable_ping_scheduled_expected_retry_lane());
+        assert!(render_handoff.thenable_ping_reached_expected_retry_handoff());
         assert!(render_handoff.root_work_loop_reached());
         assert!(render_handoff.proves_private_thenable_ping_render_handoff());
         assert!(!render_handoff.suspense_boundary_rendering_executed());
@@ -10135,6 +10138,7 @@ mod tests {
             SuspenseThenableRetryRootSchedulerStatus::Accepted
         );
         assert!(request.accepted());
+        assert!(request.thenable_ping_scheduled_expected_retry_lane());
         assert_eq!(request.boundary(), suspense);
         assert_eq!(request.retry_queue(), UpdateQueueHandle::from_raw(747));
         assert_eq!(
@@ -10157,6 +10161,8 @@ mod tests {
         assert_eq!(render_handoff.retry_lane(), Lane::RETRY_2);
         assert_eq!(render_handoff.pinged_lanes(), Lanes::from(Lane::RETRY_2));
         assert_eq!(render_handoff.callback(), callback);
+        assert!(render_handoff.thenable_ping_scheduled_expected_retry_lane());
+        assert!(render_handoff.thenable_ping_reached_expected_retry_handoff());
         assert!(render_handoff.root_work_loop_reached());
         assert!(render_handoff.proves_private_thenable_ping_render_handoff());
         assert!(!render_handoff.public_suspense_compatibility_claimed());
