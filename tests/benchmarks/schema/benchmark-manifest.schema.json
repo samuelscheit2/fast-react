@@ -48,6 +48,13 @@
         "$ref": "#/$defs/conformanceGate"
       }
     },
+    "milestones": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/milestone"
+      }
+    },
     "scenarios": {
       "type": "array",
       "minItems": 1,
@@ -79,6 +86,13 @@
         "improvement"
       ]
     },
+    "benchmarkReadinessStatus": {
+      "enum": [
+        "blocked-by-conformance",
+        "diagnostic-admitted",
+        "comparable-admitted"
+      ]
+    },
     "conformanceGate": {
       "type": "object",
       "additionalProperties": false,
@@ -103,6 +117,61 @@
             ]
           },
           "uniqueItems": true
+        }
+      }
+    },
+    "milestone": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "description",
+        "scenarioIds",
+        "conformanceGateIds",
+        "compatibilityStatus",
+        "timingStatus",
+        "benchmarkReadinessStatus",
+        "blockedReason"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scenarioIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "conformanceGateIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "compatibilityStatus": {
+          "$ref": "#/$defs/compatibilityStatus"
+        },
+        "timingStatus": {
+          "$ref": "#/$defs/timingStatus"
+        },
+        "benchmarkReadinessStatus": {
+          "$ref": "#/$defs/benchmarkReadinessStatus"
+        },
+        "blockedReason": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },

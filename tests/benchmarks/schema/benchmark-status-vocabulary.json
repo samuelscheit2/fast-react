@@ -74,5 +74,25 @@
       "claimCapable": true,
       "description": "A comparable timing result shows Fast React faster for this exact scenario and lane."
     }
+  ],
+  "benchmarkReadinessStatuses": [
+    {
+      "id": "blocked-by-conformance",
+      "admittedForTiming": false,
+      "claimCapable": false,
+      "description": "The benchmark milestone is represented in schema, but timing admission is blocked by non-green conformance evidence."
+    },
+    {
+      "id": "diagnostic-admitted",
+      "admittedForTiming": true,
+      "claimCapable": false,
+      "description": "The benchmark milestone may collect diagnostic timing in a future runner, but cannot support a speed claim."
+    },
+    {
+      "id": "comparable-admitted",
+      "admittedForTiming": true,
+      "claimCapable": true,
+      "description": "The benchmark milestone may collect comparable timing only after all required compatibility gates are green."
+    }
   ]
 }

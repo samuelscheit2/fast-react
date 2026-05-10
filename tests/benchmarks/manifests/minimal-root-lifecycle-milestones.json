@@ -1,0 +1,385 @@
+{
+  "schemaVersion": 1,
+  "kind": "fast-react-benchmark-manifest",
+  "manifestId": "minimal-root-lifecycle-milestones",
+  "description": "Schema-backed admission status coverage for the next minimal public root render, update, sync flush, and unmount benchmark milestones.",
+  "timingDataPolicy": "diagnostic-until-compatible",
+  "requiredScenarioIds": [
+    "client-entrypoint-shape",
+    "create-root-valid-containers",
+    "root-object-shape",
+    "create-root-root-container",
+    "create-root-no-render",
+    "initial-host-render",
+    "update-host-render",
+    "replace-host-tree",
+    "render-null-clears-container",
+    "root-unmount",
+    "double-unmount",
+    "render-after-unmount",
+    "root-render-after-unmount",
+    "react-dom-flush-sync-batching-callback-contracts",
+    "react-dom-flush-sync-batching-public-scheduler-priority",
+    "flush-sync-cross-root-render",
+    "create-root-duplicate-warnings",
+    "development-warning-boundaries"
+  ],
+  "conformanceGates": [
+    {
+      "id": "react-dom-root-render-e2e",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-root-render-e2e-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ]
+    },
+    {
+      "id": "react-dom-client-root",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-client-root-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ]
+    },
+    {
+      "id": "react-dom-container-root-markers",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-container-root-markers-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ]
+    },
+    {
+      "id": "react-dom-root-listener-installation",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-root-listener-installation-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ]
+    },
+    {
+      "id": "react-dom-flush-sync-batching",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-flush-sync-batching-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ]
+    },
+    {
+      "id": "dom-text-content",
+      "artifact": "tests/conformance/oracles/react-19.2.6-dom-text-content-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ]
+    }
+  ],
+  "milestones": [
+    {
+      "id": "root-create-admission",
+      "description": "createRoot entrypoint, container, marker, listener, and root object readiness before render timings exist.",
+      "scenarioIds": [
+        "client-entrypoint-shape",
+        "create-root-valid-containers",
+        "root-object-shape",
+        "create-root-root-container",
+        "create-root-no-render"
+      ],
+      "conformanceGateIds": [
+        "react-dom-client-root",
+        "react-dom-container-root-markers",
+        "react-dom-root-listener-installation",
+        "react-dom-root-render-e2e"
+      ],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "benchmarkReadinessStatus": "blocked-by-conformance",
+      "blockedReason": "Public root creation and side-effect conformance artifacts do not claim Fast React compatibility."
+    },
+    {
+      "id": "root-render-admission",
+      "description": "Initial host/text root render readiness through public react-dom and react-dom/client entrypoints.",
+      "scenarioIds": ["initial-host-render"],
+      "conformanceGateIds": [
+        "react-dom-root-render-e2e",
+        "dom-text-content"
+      ],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "benchmarkReadinessStatus": "blocked-by-conformance",
+      "blockedReason": "Initial root render and text host conformance artifacts do not claim Fast React compatibility."
+    },
+    {
+      "id": "root-update-admission",
+      "description": "Same-root host text update and replacement readiness before update timings are admitted.",
+      "scenarioIds": [
+        "update-host-render",
+        "replace-host-tree"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-render-e2e",
+        "dom-text-content"
+      ],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "benchmarkReadinessStatus": "blocked-by-conformance",
+      "blockedReason": "Root update/replacement and text host conformance artifacts do not claim Fast React compatibility."
+    },
+    {
+      "id": "root-unmount-admission",
+      "description": "render(null), unmount, repeated unmount, marker cleanup, and render-after-unmount readiness.",
+      "scenarioIds": [
+        "render-null-clears-container",
+        "root-unmount",
+        "double-unmount",
+        "render-after-unmount",
+        "root-render-after-unmount"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-render-e2e",
+        "react-dom-client-root",
+        "react-dom-container-root-markers"
+      ],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "benchmarkReadinessStatus": "blocked-by-conformance",
+      "blockedReason": "Root clearing, unmount, marker cleanup, and error-surface conformance artifacts do not claim Fast React compatibility."
+    },
+    {
+      "id": "root-sync-flush-admission",
+      "description": "flushSync callback contract, public scheduler priority, and cross-root synchronous commit readiness.",
+      "scenarioIds": [
+        "react-dom-flush-sync-batching-callback-contracts",
+        "react-dom-flush-sync-batching-public-scheduler-priority",
+        "flush-sync-cross-root-render"
+      ],
+      "conformanceGateIds": [
+        "react-dom-flush-sync-batching",
+        "react-dom-root-render-e2e"
+      ],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "benchmarkReadinessStatus": "blocked-by-conformance",
+      "blockedReason": "flushSync and cross-root render conformance artifacts do not claim Fast React compatibility."
+    },
+    {
+      "id": "root-development-warning-admission",
+      "description": "Development warning boundary readiness for duplicate roots and render/unmount argument diagnostics.",
+      "scenarioIds": [
+        "create-root-duplicate-warnings",
+        "development-warning-boundaries"
+      ],
+      "conformanceGateIds": [
+        "react-dom-client-root",
+        "react-dom-root-render-e2e"
+      ],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "benchmarkReadinessStatus": "blocked-by-conformance",
+      "blockedReason": "Development warning conformance artifacts do not claim Fast React compatibility."
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "client-entrypoint-shape",
+      "area": "react-dom client root facade",
+      "entrypoints": ["react-dom/client"],
+      "conformanceGateIds": ["react-dom-client-root"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The checked client-root oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "create-root-valid-containers",
+      "area": "react-dom root creation",
+      "entrypoints": ["react-dom/client"],
+      "conformanceGateIds": [
+        "react-dom-client-root",
+        "react-dom-container-root-markers"
+      ],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The checked client-root and marker oracles do not claim Fast React compatibility."
+    },
+    {
+      "id": "root-object-shape",
+      "area": "react-dom root object",
+      "entrypoints": ["react-dom/client"],
+      "conformanceGateIds": ["react-dom-client-root"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The checked client-root oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "create-root-root-container",
+      "area": "react-dom root listener setup",
+      "entrypoints": ["react-dom/client"],
+      "conformanceGateIds": ["react-dom-root-listener-installation"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The checked root listener oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "create-root-no-render",
+      "area": "react-dom root creation",
+      "entrypoints": ["react-dom/client"],
+      "conformanceGateIds": [
+        "react-dom-root-render-e2e",
+        "react-dom-container-root-markers"
+      ],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The checked root e2e and marker oracles do not claim Fast React compatibility."
+    },
+    {
+      "id": "initial-host-render",
+      "area": "react-dom root mount",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": [
+        "react-dom-root-render-e2e",
+        "dom-text-content"
+      ],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The checked root e2e and text-content oracles do not claim Fast React compatibility."
+    },
+    {
+      "id": "update-host-render",
+      "area": "react-dom root update",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": [
+        "react-dom-root-render-e2e",
+        "dom-text-content"
+      ],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The checked root e2e and text-content oracles do not claim Fast React compatibility."
+    },
+    {
+      "id": "replace-host-tree",
+      "area": "react-dom root replacement",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": ["react-dom-root-render-e2e"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The checked root e2e oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "render-null-clears-container",
+      "area": "react-dom root clearing",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": ["react-dom-root-render-e2e"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The checked root e2e oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "root-unmount",
+      "area": "react-dom root unmount",
+      "entrypoints": ["react-dom/client"],
+      "conformanceGateIds": [
+        "react-dom-root-render-e2e",
+        "react-dom-container-root-markers"
+      ],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The checked root e2e and marker oracles do not claim Fast React compatibility."
+    },
+    {
+      "id": "double-unmount",
+      "area": "react-dom root unmount",
+      "entrypoints": ["react-dom/client"],
+      "conformanceGateIds": ["react-dom-root-render-e2e"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The checked root e2e oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "render-after-unmount",
+      "area": "react-dom root error surface",
+      "entrypoints": ["react-dom/client"],
+      "conformanceGateIds": ["react-dom-root-render-e2e"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The checked root e2e oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "root-render-after-unmount",
+      "area": "react-dom root error surface",
+      "entrypoints": ["react-dom/client"],
+      "conformanceGateIds": ["react-dom-client-root"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The checked client-root oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "react-dom-flush-sync-batching-callback-contracts",
+      "area": "react-dom flushSync",
+      "entrypoints": ["react-dom", "react-dom/profiling"],
+      "conformanceGateIds": ["react-dom-flush-sync-batching"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The checked flushSync batching oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "react-dom-flush-sync-batching-public-scheduler-priority",
+      "area": "react-dom flushSync scheduler priority",
+      "entrypoints": ["react-dom", "react-dom/profiling"],
+      "conformanceGateIds": ["react-dom-flush-sync-batching"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The checked flushSync batching oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "flush-sync-cross-root-render",
+      "area": "react-dom flushSync cross-root commit",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": ["react-dom-root-render-e2e"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The checked root e2e oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "create-root-duplicate-warnings",
+      "area": "react-dom development warnings",
+      "entrypoints": ["react-dom/client"],
+      "conformanceGateIds": ["react-dom-client-root"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The checked client-root oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "development-warning-boundaries",
+      "area": "react-dom development warnings",
+      "entrypoints": ["react-dom/client"],
+      "conformanceGateIds": ["react-dom-root-render-e2e"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The checked root e2e oracle does not claim Fast React compatibility."
+    }
+  ]
+}
