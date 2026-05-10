@@ -31,11 +31,31 @@ const effectRegistrationFieldNames = Object.freeze([
   'instance',
   'phase',
   'tag',
+  'create',
   'dependencies',
   'fiber_flags'
 ]);
+const effectUpdateQueueRecordFieldNames = Object.freeze([
+  'update_index',
+  'fiber',
+  'hook_list',
+  'hook',
+  'previous_effect',
+  'effect',
+  'instance',
+  'phase',
+  'tag',
+  'create',
+  'destroy',
+  'previous_dependencies',
+  'dependencies',
+  'dependency_status'
+]);
+const effectDependencyStatusNames = Object.freeze(['Changed', 'Unchanged']);
+const hookRenderPhaseNames = Object.freeze(['Mount', 'Update']);
 const passiveEffectMetadataFieldNames = Object.freeze([
   'fiber',
+  'render_phase',
   'hook_list',
   'effect_index',
   'effect',
@@ -400,15 +420,21 @@ function createEffectHookMetadata({
 }) {
   return Object.freeze({
     compatibilityStatus: 'blocked',
+    effectDependencyStatusEnumName: 'FunctionComponentEffectDependencyStatus',
+    effectDependencyStatusNames,
     effectPhaseEnumName: 'FunctionComponentEffectPhase',
     effectPhaseName,
     effectRegistrationFieldNames,
     effectRegistrationRecordName: 'FunctionComponentEffectRegistration',
+    effectUpdateQueueRecordFieldNames,
+    effectUpdateQueueRecordName: 'FunctionComponentEffectUpdateQueueRecord',
     executesEffectCallback: false,
     fiberFlagsRecordName: 'FiberFlags',
     hookEffectFlagName,
     hookEffectFlagsRecordName: 'HookEffectFlags',
     hookName,
+    hookRenderPhaseEnumName: 'FunctionComponentHookRenderPhase',
+    hookRenderPhaseNames,
     mountFiberFlagNames: Object.freeze(mountFiberFlagNames.slice()),
     passiveEffectMetadataFieldNames: hasPassiveHandoff
       ? passiveEffectMetadataFieldNames
