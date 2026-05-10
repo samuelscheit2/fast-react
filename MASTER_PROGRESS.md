@@ -29,6 +29,14 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Worker 491 was accepted from queue 473-502. It added a private resource
+  stylesheet precedence diagnostic gate for redacted preload/preinit dedupe,
+  planned precedence ordering, observed fake-head order, resource-map counts,
+  and singleton clear/retain ordering while public resource dispatch remains
+  blocked. It was verified after merge with resource/form package tests,
+  resource-hint and resource/form/controlled conformance gates, React DOM
+  workspace checks, syntax checks, conflict-marker scanning, and
+  `git diff --check`.
 - Worker 490 was accepted from queue 473-502. It added private controlled
   checkbox/radio restore diagnostics, including radio group intent metadata,
   and property-payload checkable restore blockers while keeping live DOM
