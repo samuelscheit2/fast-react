@@ -2,8 +2,9 @@
 //!
 //! This module consumes a completed HostRoot render-phase record and switches
 //! `root.current` to that HostRoot work-in-progress fiber. It deliberately
-//! stops before host mutation, child/effect traversal, callbacks, deletions,
-//! public facade behavior, DOM wiring, or test-renderer serialization.
+//! stops before host mutation, child/effect traversal, callback execution,
+//! deletions, public facade behavior, DOM wiring, or test-renderer
+//! serialization.
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
@@ -16,7 +17,7 @@ use fast_react_host_config::HostTypes;
 
 use crate::{
     FiberRootId, FiberRootStore, FiberRootStoreError, HostRootRenderPhaseRecord,
-    HostRootStateStoreError, RootRenderExitStatus,
+    HostRootStateStoreError, RootRenderExitStatus, RootUpdateCallbackSnapshot, UpdateQueueError,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -24,6 +25,7 @@ pub enum RootCommitError {
     FiberRootStore(FiberRootStoreError),
     FiberTopology(FiberTopologyError),
     HostRootStateStore(HostRootStateStoreError),
+    UpdateQueue(UpdateQueueError),
     EmptyFinishedLanes {
         root: FiberRootId,
     },
@@ -89,6 +91,7 @@ impl Display for RootCommitError {
             Self::FiberRootStore(error) => Display::fmt(error, formatter),
             Self::FiberTopology(error) => Display::fmt(error, formatter),
             Self::HostRootStateStore(error) => Display::fmt(error, formatter),
+            Self::UpdateQueue(error) => Display::fmt(error, formatter),
             Self::EmptyFinishedLanes { root } => {
                 write!(formatter, "root {} commit lanes are empty", root.raw())
             }
@@ -222,6 +225,7 @@ impl Error for RootCommitError {
             Self::FiberRootStore(error) => Some(error),
             Self::FiberTopology(error) => Some(error),
             Self::HostRootStateStore(error) => Some(error),
+            Self::UpdateQueue(error) => Some(error),
             Self::EmptyFinishedLanes { .. }
             | Self::CurrentMismatch { .. }
             | Self::FinishedWorkIsCurrent { .. }
@@ -256,7 +260,13 @@ impl From<HostRootStateStoreError> for RootCommitError {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+impl From<UpdateQueueError> for RootCommitError {
+    fn from(error: UpdateQueueError) -> Self {
+        Self::UpdateQueue(error)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostRootCommitRecord {
     root: FiberRootId,
     previous_current: FiberId,
@@ -264,47 +274,53 @@ pub struct HostRootCommitRecord {
     finished_lanes: Lanes,
     remaining_lanes: Lanes,
     pending_lanes: Lanes,
+    root_update_callbacks: RootUpdateCallbackSnapshot,
 }
 
 impl HostRootCommitRecord {
     #[must_use]
-    pub const fn root(self) -> FiberRootId {
+    pub const fn root(&self) -> FiberRootId {
         self.root
     }
 
     #[must_use]
-    pub const fn previous_current(self) -> FiberId {
+    pub const fn previous_current(&self) -> FiberId {
         self.previous_current
     }
 
     #[must_use]
-    pub const fn current(self) -> FiberId {
+    pub const fn current(&self) -> FiberId {
         self.current
     }
 
     #[must_use]
-    pub const fn finished_work(self) -> FiberId {
+    pub const fn finished_work(&self) -> FiberId {
         self.current
     }
 
     #[must_use]
-    pub const fn finished_lanes(self) -> Lanes {
+    pub const fn finished_lanes(&self) -> Lanes {
         self.finished_lanes
     }
 
     #[must_use]
-    pub const fn remaining_lanes(self) -> Lanes {
+    pub const fn remaining_lanes(&self) -> Lanes {
         self.remaining_lanes
     }
 
     #[must_use]
-    pub const fn pending_lanes(self) -> Lanes {
+    pub const fn pending_lanes(&self) -> Lanes {
         self.pending_lanes
     }
 
     #[must_use]
-    pub const fn has_remaining_work(self) -> bool {
+    pub const fn has_remaining_work(&self) -> bool {
         self.pending_lanes.is_non_empty()
+    }
+
+    #[must_use]
+    pub fn root_update_callbacks(&self) -> &RootUpdateCallbackSnapshot {
+        &self.root_update_callbacks
     }
 }
 
@@ -319,6 +335,7 @@ pub fn commit_finished_host_root<H: HostTypes>(
     let finished_work = render.finished_work();
     let finished_lanes = render.render_lanes();
     let remaining_lanes = render.remaining_lanes();
+    let work_in_progress_update_queue = render.work_in_progress_update_queue();
 
     let pending_lanes = {
         let root = store.root_mut(root_id)?;
@@ -330,6 +347,9 @@ pub fn commit_finished_host_root<H: HostTypes>(
         root.scheduling_mut().clear_callback();
         root.lanes().pending_lanes()
     };
+    let root_update_callbacks = store
+        .update_queues_mut()
+        .take_root_update_callback_records(work_in_progress_update_queue)?;
 
     Ok(HostRootCommitRecord {
         root: root_id,
@@ -338,6 +358,7 @@ pub fn commit_finished_host_root<H: HostTypes>(
         finished_lanes,
         remaining_lanes,
         pending_lanes,
+        root_update_callbacks,
     })
 }
 
@@ -465,6 +486,10 @@ fn validate_finished_host_root<H: HostTypes>(
             actual: finished_node.update_queue(),
         });
     }
+    store.update_queues().queue(render.current_update_queue())?;
+    store
+        .update_queues()
+        .queue(render.work_in_progress_update_queue())?;
 
     let actual_remaining_lanes = finished_node.lanes().merge(finished_node.child_lanes());
     if actual_remaining_lanes != render.remaining_lanes() {
@@ -483,7 +508,8 @@ mod tests {
     use super::*;
     use crate::test_support::{FakeContainer, RecordingHost};
     use crate::{
-        RootElementHandle, RootOptions, RootTaskScheduleOutcome, ensure_root_is_scheduled,
+        RootElementHandle, RootOptions, RootTaskScheduleOutcome, RootUpdateCallbackHandle,
+        RootUpdateCallbackRecord, RootUpdateCallbackVisibility, ensure_root_is_scheduled,
         process_root_schedule_in_microtask, render_host_root_for_lanes,
         render_host_root_via_scheduler_callback, update_container,
     };
@@ -640,5 +666,136 @@ mod tests {
             error,
             RootCommitError::CurrentMismatch { root, .. } if root == root_id
         ));
+    }
+
+    #[test]
+    fn root_commit_hands_off_visible_root_update_callback_records() {
+        let (mut store, root_id, host) = root_store();
+        let callback = RootUpdateCallbackHandle::from_raw(77);
+        let update = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(12),
+            Some(callback),
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let callbacks = commit.root_update_callbacks();
+
+        assert_eq!(callbacks.queue(), render.work_in_progress_update_queue());
+        assert_eq!(callback_handles(callbacks.visible()), vec![callback]);
+        assert_eq!(
+            callbacks.visible()[0].queue(),
+            render.work_in_progress_update_queue()
+        );
+        assert_eq!(callbacks.visible()[0].update(), update.update());
+        assert_eq!(callbacks.visible()[0].sequence(), 0);
+        assert_eq!(
+            callbacks.visible()[0].visibility(),
+            RootUpdateCallbackVisibility::Visible
+        );
+        assert!(callbacks.hidden().is_empty());
+        assert!(callbacks.deferred_hidden().is_empty());
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            render.work_in_progress()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_drains_visible_callback_records_only_once() {
+        let (mut store, root_id, _host) = root_store();
+        let callback = RootUpdateCallbackHandle::from_raw(88);
+        update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(13),
+            Some(callback),
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let current_queue = store
+            .fiber_arena()
+            .get(commit.current())
+            .unwrap()
+            .update_queue();
+        let second_take = store
+            .update_queues_mut()
+            .take_root_update_callback_records(current_queue)
+            .unwrap();
+        let stale_commit_error = commit_finished_host_root(&mut store, render).unwrap_err();
+        let after_stale_commit = store
+            .update_queues_mut()
+            .take_root_update_callback_records(current_queue)
+            .unwrap();
+
+        assert_eq!(
+            callback_handles(commit.root_update_callbacks().visible()),
+            vec![callback]
+        );
+        assert!(second_take.is_empty());
+        assert!(matches!(
+            stale_commit_error,
+            RootCommitError::CurrentMismatch { root, .. } if root == root_id
+        ));
+        assert!(after_stale_commit.is_empty());
+    }
+
+    #[test]
+    fn root_commit_defers_hidden_callbacks_without_visible_invocation_records() {
+        let (mut store, root_id, host) = root_store();
+        let callback = RootUpdateCallbackHandle::from_raw(99);
+        let update = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(14),
+            Some(callback),
+        )
+        .unwrap();
+        store
+            .update_queues_mut()
+            .mark_update_hidden(update.update())
+            .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let callbacks = commit.root_update_callbacks();
+        let current_queue = store
+            .fiber_arena()
+            .get(commit.current())
+            .unwrap()
+            .update_queue();
+        let after_commit = store
+            .update_queues()
+            .peek_root_update_callback_records(current_queue)
+            .unwrap();
+
+        assert!(callbacks.visible().is_empty());
+        assert!(callbacks.hidden().is_empty());
+        assert_eq!(
+            callback_handles(callbacks.deferred_hidden()),
+            vec![callback]
+        );
+        assert_eq!(callbacks.deferred_hidden()[0].update(), update.update());
+        assert_eq!(
+            callbacks.deferred_hidden()[0].visibility(),
+            RootUpdateCallbackVisibility::DeferredHidden
+        );
+        assert!(after_commit.visible().is_empty());
+        assert!(after_commit.hidden().is_empty());
+        assert_eq!(
+            callback_handles(after_commit.deferred_hidden()),
+            vec![callback]
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    fn callback_handles(records: &[RootUpdateCallbackRecord]) -> Vec<RootUpdateCallbackHandle> {
+        records.iter().map(|record| record.callback()).collect()
     }
 }
