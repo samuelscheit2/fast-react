@@ -24,6 +24,30 @@ const snapshot = JSON.parse(await readFile(snapshotPath, 'utf8'));
 
 const resolverFilePattern = /\.(?:js|json|node)$/;
 const declarationFilePattern = /\.(?:d\.ts|d\.mts|d\.cts)$/;
+const allowedRuntimeMetadataKeys = new Set([
+  '__FAST_REACT_ENTRYPOINT__',
+  '__FAST_REACT_PLACEHOLDER__',
+  'compatibilityTarget'
+]);
+const privateDiagnosticRuntimeExportPattern =
+  /(?:private|diagnostic|diagnostics|gate|bridge|dispatcher|metadata|route|routes|secret)/iu;
+const privateDiagnosticPublicFileGuards = {
+  react: [
+    /(?:^|\/)(?:.*act.*dispatcher.*|.*act.*queue.*|.*dispatcher.*|.*diagnostic.*|.*gate.*|.*metadata.*|.*private.*|.*route.*|.*secret.*)\.(?:js|json|node)$/iu
+  ],
+  'react-dom': [
+    /(?:^|\/)(?:.*diagnostic.*|.*gate.*|.*metadata.*|.*private.*|.*root-bridge.*|.*route.*|.*secret.*)\.(?:js|json|node)$/iu,
+    /^src\//u
+  ],
+  'react-test-renderer': [
+    /(?:^|\/)(?:.*diagnostic.*|.*gate.*|.*metadata.*|.*private.*|.*route.*|.*secret.*)\.(?:js|json|node)$/iu,
+    /^src\//u
+  ],
+  scheduler: [
+    /(?:^|\/)(?:.*diagnostic.*|.*flush-helper.*|.*gate.*|.*metadata.*|.*private.*|.*react-test-renderer.*helper.*|.*secret.*)\.(?:js|json|node)$/iu,
+    /^src\//u
+  ]
+};
 
 function normalizeRelativePath(filePath) {
   return filePath.split(path.sep).join('/');
@@ -144,6 +168,27 @@ function assertPlaceholderMetadata(moduleExports, expected, label) {
     false,
     `${label} target enumerable`
   );
+}
+
+function assertNoPrivateDiagnosticRuntimeExports(moduleExports, label) {
+  if (
+    moduleExports === null ||
+    (typeof moduleExports !== 'object' && typeof moduleExports !== 'function')
+  ) {
+    return;
+  }
+
+  for (const key of Reflect.ownKeys(moduleExports)) {
+    if (typeof key !== 'string' || allowedRuntimeMetadataKeys.has(key)) {
+      continue;
+    }
+
+    assert.equal(
+      privateDiagnosticRuntimeExportPattern.test(key),
+      false,
+      `${label} must not expose private diagnostic export ${key}`
+    );
+  }
 }
 
 function assertLoadError(error, expected, label) {
@@ -443,6 +488,7 @@ function assertReactTestRendererSchedulerPlaceholder(
     expectedSchedulerKeys,
     `${label} scheduler ownKeys`
   );
+  assertNoPrivateDiagnosticRuntimeExports(scheduler, `${label} scheduler`);
   assert.equal(
     typeof scheduler[propertyName],
     'function',
@@ -496,6 +542,7 @@ function assertReactTestRendererRootBehavior(moduleExports, entry, label) {
     snapshot.keySets[expectedRoot.rendererKeySet],
     `${label}.create() renderer keys`
   );
+  assertNoPrivateDiagnosticRuntimeExports(renderer, `${label}.create()`);
   assertReactTestRendererSchedulerPlaceholder(
     renderer._Scheduler,
     entry,
@@ -691,6 +738,19 @@ function assertPhysicalNoExportsSubpaths(
   }
 }
 
+function assertNoPrivateDiagnosticPublicFiles(publicResolverFiles, packageName) {
+  const guards = privateDiagnosticPublicFileGuards[packageName] ?? [];
+  for (const publicFile of publicResolverFiles) {
+    for (const guard of guards) {
+      assert.equal(
+        guard.test(publicFile),
+        false,
+        `${packageName}/${publicFile} must not be a public private-diagnostic subpath`
+      );
+    }
+  }
+}
+
 function loadFresh(modulePath) {
   const resolved = require.resolve(modulePath);
   delete require.cache[resolved];
@@ -715,6 +775,7 @@ async function assertRuntimeEntrypoint(packageRoot, entry, packageName) {
 
   const moduleExports = loadFresh(modulePath);
   assert.deepEqual(Object.keys(moduleExports), expectedKeysFor(entry), label);
+  assertNoPrivateDiagnosticRuntimeExports(moduleExports, label);
   assertPlaceholderMetadata(moduleExports, entry.metadata, label);
   assertRuntimeVersion(moduleExports, entry, label);
   assertUndefinedExports(moduleExports, entry, label);
@@ -779,6 +840,7 @@ for (const packageName of snapshot.packageDirectories) {
     expectedPackage.publicResolverFiles,
     `${packageName} public resolver files`
   );
+  assertNoPrivateDiagnosticPublicFiles(actualPublicFiles, packageName);
   assertPhysicalNoExportsSubpaths(
     surfaceManifest,
     actualPublicFiles,
