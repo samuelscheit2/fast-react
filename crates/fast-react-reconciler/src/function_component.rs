@@ -9,8 +9,9 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::{
-    FiberArena, FiberId, FiberTag, FiberTopologyError, FiberTypeHandle, Lanes, PropsHandle,
-    StateHandle, UpdateQueueHandle,
+    FiberArena, FiberId, FiberTag, FiberTopologyError, FiberTypeHandle, HookListArena,
+    HookListError, HookListId, HookListMountCursor, HookListTraversalResult, HookListUpdateCursor,
+    HookSlotId, HookSlotPayload, Lanes, PropsHandle, StateHandle, UpdateQueueHandle,
 };
 
 #[repr(transparent)]
@@ -42,11 +43,279 @@ impl FunctionComponentOutputHandle {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FunctionComponentHookRenderPhase {
+    Mount,
+    Update,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentHookRenderState {
+    phase: FunctionComponentHookRenderPhase,
+    render_fiber: FiberId,
+    current: Option<FiberId>,
+    current_list: Option<HookListId>,
+    work_in_progress_list: HookListId,
+}
+
+impl FunctionComponentHookRenderState {
+    #[must_use]
+    pub const fn phase(self) -> FunctionComponentHookRenderPhase {
+        self.phase
+    }
+
+    #[must_use]
+    pub const fn render_fiber(self) -> FiberId {
+        self.render_fiber
+    }
+
+    #[must_use]
+    pub const fn current(self) -> Option<FiberId> {
+        self.current
+    }
+
+    #[must_use]
+    pub const fn current_list(self) -> Option<HookListId> {
+        self.current_list
+    }
+
+    #[must_use]
+    pub const fn work_in_progress_list(self) -> HookListId {
+        self.work_in_progress_list
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FunctionComponentCurrentHookList {
+    fiber: FiberId,
+    list: HookListId,
+}
+
+#[derive(Debug, Default, Clone)]
+pub(crate) struct FunctionComponentHookRenderStore {
+    hook_lists: HookListArena,
+    current_lists: Vec<FunctionComponentCurrentHookList>,
+}
+
+impl FunctionComponentHookRenderStore {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    #[must_use]
+    pub const fn hook_lists(&self) -> &HookListArena {
+        &self.hook_lists
+    }
+
+    pub fn hook_lists_mut(&mut self) -> &mut HookListArena {
+        &mut self.hook_lists
+    }
+
+    pub fn create_current_list(&mut self, fiber: FiberId) -> HookListId {
+        let list = self.hook_lists.create_list(fiber);
+        self.bind_current_list_unchecked(fiber, list);
+        list
+    }
+
+    #[must_use]
+    pub fn current_list(&self, fiber: FiberId) -> Option<HookListId> {
+        self.current_lists
+            .iter()
+            .find(|binding| binding.fiber == fiber)
+            .map(|binding| binding.list)
+    }
+
+    pub fn prepare_render_state(
+        &mut self,
+        arena: &FiberArena,
+        work_in_progress: FiberId,
+    ) -> Result<FunctionComponentHookRenderState, FunctionComponentRenderError> {
+        let current = arena.get(work_in_progress)?.alternate();
+        let current_list = current.and_then(|fiber| self.current_list(fiber));
+        let (phase, owner) = match current_list {
+            Some(list) => {
+                let owner = self
+                    .hook_lists
+                    .list(list)
+                    .map_err(|error| {
+                        FunctionComponentRenderError::hook_list(work_in_progress, error)
+                    })?
+                    .owner();
+                (FunctionComponentHookRenderPhase::Update, owner)
+            }
+            None => (FunctionComponentHookRenderPhase::Mount, work_in_progress),
+        };
+        let work_in_progress_list = self.hook_lists.create_list(owner);
+
+        Ok(FunctionComponentHookRenderState {
+            phase,
+            render_fiber: work_in_progress,
+            current,
+            current_list,
+            work_in_progress_list,
+        })
+    }
+
+    pub fn begin_render_cursor(
+        &self,
+        state: FunctionComponentHookRenderState,
+    ) -> Result<FunctionComponentHookRenderCursor, FunctionComponentRenderError> {
+        match state.phase() {
+            FunctionComponentHookRenderPhase::Mount => {
+                let cursor = self
+                    .hook_lists
+                    .begin_mount(state.work_in_progress_list())
+                    .map_err(|error| {
+                        FunctionComponentRenderError::hook_list(state.render_fiber(), error)
+                    })?;
+                Ok(FunctionComponentHookRenderCursor::Mount { state, cursor })
+            }
+            FunctionComponentHookRenderPhase::Update => {
+                let current_list = state.current_list().ok_or(
+                    FunctionComponentRenderError::MissingCurrentHookList {
+                        fiber: state.render_fiber(),
+                    },
+                )?;
+                let cursor = self
+                    .hook_lists
+                    .begin_update(current_list, state.work_in_progress_list())
+                    .map_err(|error| {
+                        FunctionComponentRenderError::hook_list(state.render_fiber(), error)
+                    })?;
+                Ok(FunctionComponentHookRenderCursor::Update { state, cursor })
+            }
+        }
+    }
+
+    pub fn mount_hook_metadata(
+        &mut self,
+        cursor: &mut FunctionComponentHookRenderCursor,
+        payload: HookSlotPayload,
+    ) -> Result<HookSlotId, FunctionComponentRenderError> {
+        match cursor {
+            FunctionComponentHookRenderCursor::Mount { state, cursor } => self
+                .hook_lists
+                .mount_hook(cursor, payload)
+                .map_err(|error| {
+                    FunctionComponentRenderError::hook_list(state.render_fiber(), error)
+                }),
+            FunctionComponentHookRenderCursor::Update { state, .. } => {
+                Err(FunctionComponentRenderError::HookCursorPhaseMismatch {
+                    fiber: state.render_fiber(),
+                    expected: FunctionComponentHookRenderPhase::Mount,
+                    actual: FunctionComponentHookRenderPhase::Update,
+                })
+            }
+        }
+    }
+
+    pub fn update_hook_metadata(
+        &mut self,
+        cursor: &mut FunctionComponentHookRenderCursor,
+    ) -> Result<HookSlotId, FunctionComponentRenderError> {
+        match cursor {
+            FunctionComponentHookRenderCursor::Update { state, cursor } => {
+                self.hook_lists.update_hook(cursor).map_err(|error| {
+                    FunctionComponentRenderError::hook_list(state.render_fiber(), error)
+                })
+            }
+            FunctionComponentHookRenderCursor::Mount { state, .. } => {
+                Err(FunctionComponentRenderError::HookCursorPhaseMismatch {
+                    fiber: state.render_fiber(),
+                    expected: FunctionComponentHookRenderPhase::Update,
+                    actual: FunctionComponentHookRenderPhase::Mount,
+                })
+            }
+        }
+    }
+
+    pub fn finish_render_cursor(
+        &self,
+        cursor: FunctionComponentHookRenderCursor,
+    ) -> Result<FunctionComponentHookRenderResult, FunctionComponentRenderError> {
+        let (state, traversal) = match cursor {
+            FunctionComponentHookRenderCursor::Mount { state, cursor } => {
+                let traversal = self.hook_lists.finish_mount(cursor).map_err(|error| {
+                    FunctionComponentRenderError::hook_list(state.render_fiber(), error)
+                })?;
+                (state, traversal)
+            }
+            FunctionComponentHookRenderCursor::Update { state, cursor } => {
+                let traversal = self.hook_lists.finish_update(cursor).map_err(|error| {
+                    FunctionComponentRenderError::hook_list(state.render_fiber(), error)
+                })?;
+                (state, traversal)
+            }
+        };
+
+        Ok(FunctionComponentHookRenderResult { state, traversal })
+    }
+
+    fn bind_current_list_unchecked(&mut self, fiber: FiberId, list: HookListId) {
+        if let Some(binding) = self
+            .current_lists
+            .iter_mut()
+            .find(|binding| binding.fiber == fiber)
+        {
+            binding.list = list;
+        } else {
+            self.current_lists
+                .push(FunctionComponentCurrentHookList { fiber, list });
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FunctionComponentHookRenderCursor {
+    Mount {
+        state: FunctionComponentHookRenderState,
+        cursor: HookListMountCursor,
+    },
+    Update {
+        state: FunctionComponentHookRenderState,
+        cursor: HookListUpdateCursor,
+    },
+}
+
+impl FunctionComponentHookRenderCursor {
+    #[must_use]
+    pub const fn state(self) -> FunctionComponentHookRenderState {
+        match self {
+            Self::Mount { state, .. } | Self::Update { state, .. } => state,
+        }
+    }
+
+    #[must_use]
+    pub const fn phase(self) -> FunctionComponentHookRenderPhase {
+        self.state().phase()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentHookRenderResult {
+    state: FunctionComponentHookRenderState,
+    traversal: HookListTraversalResult,
+}
+
+impl FunctionComponentHookRenderResult {
+    #[must_use]
+    pub const fn state(self) -> FunctionComponentHookRenderState {
+        self.state
+    }
+
+    #[must_use]
+    pub const fn traversal(self) -> HookListTraversalResult {
+        self.traversal
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentInvocationRequest {
     fiber: FiberId,
     component: FiberTypeHandle,
     props: PropsHandle,
     render_lanes: Lanes,
+    hook_state: Option<FunctionComponentHookRenderState>,
 }
 
 impl FunctionComponentInvocationRequest {
@@ -68,6 +337,19 @@ impl FunctionComponentInvocationRequest {
     #[must_use]
     pub const fn render_lanes(self) -> Lanes {
         self.render_lanes
+    }
+
+    #[must_use]
+    pub const fn hook_state(self) -> Option<FunctionComponentHookRenderState> {
+        self.hook_state
+    }
+
+    #[must_use]
+    fn with_hook_state(self, hook_state: FunctionComponentHookRenderState) -> Self {
+        Self {
+            hook_state: Some(hook_state),
+            ..self
+        }
     }
 }
 
@@ -169,6 +451,18 @@ pub(crate) enum FunctionComponentRenderError {
         fiber: FiberId,
         feature: UnsupportedFunctionComponentFeature,
     },
+    HookList {
+        fiber: FiberId,
+        error: Box<HookListError>,
+    },
+    MissingCurrentHookList {
+        fiber: FiberId,
+    },
+    HookCursorPhaseMismatch {
+        fiber: FiberId,
+        expected: FunctionComponentHookRenderPhase,
+        actual: FunctionComponentHookRenderPhase,
+    },
     UnexpectedFiberTag {
         fiber: FiberId,
         tag: FiberTag,
@@ -178,6 +472,15 @@ pub(crate) enum FunctionComponentRenderError {
         component: FiberTypeHandle,
         error: FunctionComponentInvocationError,
     },
+}
+
+impl FunctionComponentRenderError {
+    fn hook_list(fiber: FiberId, error: HookListError) -> Self {
+        Self::HookList {
+            fiber,
+            error: Box::new(error),
+        }
+    }
 }
 
 impl Display for FunctionComponentRenderError {
@@ -193,6 +496,27 @@ impl Display for FunctionComponentRenderError {
                 formatter,
                 "function component fiber {} cannot render: {feature}",
                 fiber.slot().get()
+            ),
+            Self::HookList { fiber, error } => write!(
+                formatter,
+                "function component fiber {} hook-list render metadata failed: {error}",
+                fiber.slot().get()
+            ),
+            Self::MissingCurrentHookList { fiber } => write!(
+                formatter,
+                "function component fiber {} entered update hook-list traversal without a current hook list",
+                fiber.slot().get()
+            ),
+            Self::HookCursorPhaseMismatch {
+                fiber,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "function component fiber {} used a {:?} hook-list cursor where {:?} metadata was required",
+                fiber.slot().get(),
+                actual,
+                expected
             ),
             Self::UnexpectedFiberTag { fiber, tag } => write!(
                 formatter,
@@ -218,8 +542,11 @@ impl Error for FunctionComponentRenderError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::FiberTopology(error) => Some(error),
+            Self::HookList { error, .. } => Some(error),
             Self::Invocation { error, .. } => Some(error),
             Self::MissingComponentHandle { .. }
+            | Self::MissingCurrentHookList { .. }
+            | Self::HookCursorPhaseMismatch { .. }
             | Self::Unsupported { .. }
             | Self::UnexpectedFiberTag { .. } => None,
         }
@@ -239,6 +566,7 @@ pub(crate) struct FunctionComponentRenderRecord {
     component: FiberTypeHandle,
     props: PropsHandle,
     render_lanes: Lanes,
+    hook_state: Option<FunctionComponentHookRenderState>,
     output: FunctionComponentOutputHandle,
 }
 
@@ -269,6 +597,11 @@ impl FunctionComponentRenderRecord {
     }
 
     #[must_use]
+    pub const fn hook_state(self) -> Option<FunctionComponentHookRenderState> {
+        self.hook_state
+    }
+
+    #[must_use]
     pub const fn output(self) -> FunctionComponentOutputHandle {
         self.output
     }
@@ -280,7 +613,39 @@ pub(crate) fn render_function_component(
     render_lanes: Lanes,
     invoker: &mut impl FunctionComponentInvoker,
 ) -> Result<FunctionComponentRenderRecord, FunctionComponentRenderError> {
-    let request = prepare_function_component_render(arena, work_in_progress, render_lanes)?;
+    render_function_component_impl(arena, work_in_progress, render_lanes, invoker, None)
+}
+
+pub(crate) fn render_function_component_with_hook_state(
+    arena: &mut FiberArena,
+    hook_store: &mut FunctionComponentHookRenderStore,
+    work_in_progress: FiberId,
+    render_lanes: Lanes,
+    invoker: &mut impl FunctionComponentInvoker,
+) -> Result<FunctionComponentRenderRecord, FunctionComponentRenderError> {
+    render_function_component_impl(
+        arena,
+        work_in_progress,
+        render_lanes,
+        invoker,
+        Some(hook_store),
+    )
+}
+
+fn render_function_component_impl(
+    arena: &mut FiberArena,
+    work_in_progress: FiberId,
+    render_lanes: Lanes,
+    invoker: &mut impl FunctionComponentInvoker,
+    hook_store: Option<&mut FunctionComponentHookRenderStore>,
+) -> Result<FunctionComponentRenderRecord, FunctionComponentRenderError> {
+    let mut request = validate_function_component_render(arena, work_in_progress, render_lanes)?;
+    if let Some(hook_store) = hook_store {
+        let hook_state = hook_store.prepare_render_state(arena, work_in_progress)?;
+        request = request.with_hook_state(hook_state);
+    }
+    reset_function_component_render_state(arena, work_in_progress)?;
+
     let output = invoker
         .invoke_function_component(request)
         .map_err(|error| FunctionComponentRenderError::Invocation {
@@ -299,12 +664,13 @@ pub(crate) fn render_function_component(
         component: request.component(),
         props: request.props(),
         render_lanes: request.render_lanes(),
+        hook_state: request.hook_state(),
         output,
     })
 }
 
-fn prepare_function_component_render(
-    arena: &mut FiberArena,
+fn validate_function_component_render(
+    arena: &FiberArena,
     work_in_progress: FiberId,
     render_lanes: Lanes,
 ) -> Result<FunctionComponentInvocationRequest, FunctionComponentRenderError> {
@@ -347,17 +713,24 @@ fn prepare_function_component_render(
         });
     }
 
-    let node = arena.get_mut(work_in_progress)?;
-    node.set_memoized_state(StateHandle::NONE);
-    node.set_update_queue(UpdateQueueHandle::NONE);
-    node.set_lanes(Lanes::NO);
-
     Ok(FunctionComponentInvocationRequest {
         fiber: work_in_progress,
         component,
         props,
         render_lanes,
+        hook_state: None,
     })
+}
+
+fn reset_function_component_render_state(
+    arena: &mut FiberArena,
+    work_in_progress: FiberId,
+) -> Result<(), FunctionComponentRenderError> {
+    let node = arena.get_mut(work_in_progress)?;
+    node.set_memoized_state(StateHandle::NONE);
+    node.set_update_queue(UpdateQueueHandle::NONE);
+    node.set_lanes(Lanes::NO);
+    Ok(())
 }
 
 #[cfg(test)]
@@ -429,6 +802,10 @@ mod tests {
         (arena, current, work_in_progress, component)
     }
 
+    fn opaque(raw: u64) -> HookSlotPayload {
+        HookSlotPayload::opaque(StateHandle::from_raw(raw))
+    }
+
     #[test]
     fn function_component_render_invokes_registered_component_and_records_output() {
         let (mut arena, current, work_in_progress, component) = function_component_pair();
@@ -446,6 +823,7 @@ mod tests {
         assert_eq!(record.props(), PropsHandle::from_raw(2));
         assert_eq!(record.render_lanes(), Lanes::DEFAULT);
         assert_eq!(record.output(), output);
+        assert_eq!(record.hook_state(), None);
         assert_eq!(record.output().raw(), 44);
         assert!(FunctionComponentOutputHandle::NONE.is_none());
         assert!(record.output().is_some());
@@ -456,6 +834,7 @@ mod tests {
                 component,
                 props: PropsHandle::from_raw(2),
                 render_lanes: Lanes::DEFAULT,
+                hook_state: None,
             }]
         );
 
@@ -491,6 +870,139 @@ mod tests {
         assert_eq!(
             arena.get(work_in_progress).unwrap().memoized_props(),
             PropsHandle::NONE
+        );
+    }
+
+    #[test]
+    fn function_component_render_associates_mount_hook_metadata_with_request() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let output = FunctionComponentOutputHandle::from_raw(45);
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+
+        let record = render_function_component_with_hook_state(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap();
+
+        let state = record.hook_state().unwrap();
+        assert_eq!(state.phase(), FunctionComponentHookRenderPhase::Mount);
+        assert_eq!(state.render_fiber(), work_in_progress);
+        assert_eq!(state.current(), Some(current));
+        assert_eq!(state.current_list(), None);
+        assert_eq!(record.output(), output);
+        assert_eq!(registry.calls()[0].hook_state(), Some(state));
+        assert_eq!(
+            hook_store
+                .hook_lists()
+                .list(state.work_in_progress_list())
+                .unwrap()
+                .owner(),
+            work_in_progress
+        );
+
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+        assert_eq!(cursor.phase(), FunctionComponentHookRenderPhase::Mount);
+        let mounted_hook = hook_store
+            .mount_hook_metadata(&mut cursor, opaque(30))
+            .unwrap();
+        let finished = hook_store.finish_render_cursor(cursor).unwrap();
+        assert_eq!(finished.state(), state);
+        assert_eq!(finished.traversal().traversed_count(), 1);
+        assert_eq!(
+            hook_store
+                .hook_lists()
+                .ordered_hooks(state.work_in_progress_list())
+                .unwrap(),
+            vec![mounted_hook]
+        );
+        assert_eq!(
+            hook_store
+                .hook_lists()
+                .hook(mounted_hook)
+                .unwrap()
+                .payload(),
+            opaque(30)
+        );
+    }
+
+    #[test]
+    fn function_component_render_associates_update_hook_metadata_with_request() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let current_list = hook_store.create_current_list(current);
+        let first_payload = opaque(10);
+        let second_payload = opaque(20);
+        let current_first = hook_store
+            .hook_lists_mut()
+            .append_hook(current_list, first_payload)
+            .unwrap();
+        let current_second = hook_store
+            .hook_lists_mut()
+            .append_hook(current_list, second_payload)
+            .unwrap();
+        let output = FunctionComponentOutputHandle::from_raw(46);
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+
+        let record = render_function_component_with_hook_state(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap();
+
+        let state = record.hook_state().unwrap();
+        assert_eq!(state.phase(), FunctionComponentHookRenderPhase::Update);
+        assert_eq!(state.render_fiber(), work_in_progress);
+        assert_eq!(state.current(), Some(current));
+        assert_eq!(state.current_list(), Some(current_list));
+        assert_eq!(record.output(), output);
+        assert_eq!(registry.calls()[0].hook_state(), Some(state));
+        assert_eq!(
+            hook_store
+                .hook_lists()
+                .list(state.work_in_progress_list())
+                .unwrap()
+                .owner(),
+            current
+        );
+
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+        assert_eq!(cursor.phase(), FunctionComponentHookRenderPhase::Update);
+        assert_eq!(cursor.state(), state);
+        let work_first = hook_store.update_hook_metadata(&mut cursor).unwrap();
+        let work_second = hook_store.update_hook_metadata(&mut cursor).unwrap();
+        let finished = hook_store.finish_render_cursor(cursor).unwrap();
+
+        assert_eq!(finished.state(), state);
+        assert_eq!(finished.traversal().traversed_count(), 2);
+        assert_eq!(
+            hook_store.hook_lists().ordered_hooks(current_list).unwrap(),
+            vec![current_first, current_second]
+        );
+        assert_eq!(
+            hook_store
+                .hook_lists()
+                .ordered_hooks(state.work_in_progress_list())
+                .unwrap(),
+            vec![work_first, work_second]
+        );
+        assert_ne!(current_first, work_first);
+        assert_eq!(
+            hook_store.hook_lists().hook(work_first).unwrap().payload(),
+            first_payload
+        );
+        assert_eq!(
+            hook_store.hook_lists().hook(work_second).unwrap().payload(),
+            second_payload
         );
     }
 
@@ -594,9 +1106,11 @@ mod tests {
             .unwrap();
         let mut registry = TestFunctionComponentRegistry::default();
         registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(55)));
+        let mut hook_store = FunctionComponentHookRenderStore::new();
 
-        let record = render_function_component(
+        let record = render_function_component_with_hook_state(
             store.fiber_arena_mut(),
+            &mut hook_store,
             work_in_progress,
             Lanes::DEFAULT,
             &mut registry,
@@ -604,6 +1118,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(record.output(), FunctionComponentOutputHandle::from_raw(55));
+        assert!(record.hook_state().is_some());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
         assert_eq!(store.root(root_id).unwrap().current(), root_current);
         assert_eq!(store.root(root_id).unwrap().finished_work(), None);
