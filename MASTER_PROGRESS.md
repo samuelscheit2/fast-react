@@ -29,6 +29,14 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Worker 492 was accepted from queue 473-502. It added private form
+  submit/requestSubmit action metadata and reset-dispatcher ordering
+  diagnostics while keeping real form inspection, FormData, action invocation,
+  previous-dispatcher calls, reset queueing, and public compatibility blocked.
+  It was verified after merge with resource/form package tests, focused
+  form-actions conformance, combined resource/form/controlled conformance,
+  React DOM workspace checks, syntax checks, conflict-marker scanning, and
+  `git diff --check`.
 - Worker 491 was accepted from queue 473-502. It added a private resource
   stylesheet precedence diagnostic gate for redacted preload/preinit dedupe,
   planned precedence ordering, observed fake-head order, resource-map counts,

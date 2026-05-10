@@ -45,19 +45,12 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue 473-502 is assigned in isolated worktrees.
-Workers 473, 474, 475, 476, 477, 478, 479, 480, 481, 482, 483, 484, 485, 486,
-487, 488, 489, 490, 491, 493, 494, 495, 496, 497, 498, 499, 500, 501, and 502
-have been accepted, leaving 1 active top-level worker from this queue.
-
-| Worker | Focus |
-| --- | --- |
-| 492 | Form submit action metadata gate |
+Top-level cap: 30 workers. Queue 473-502 has been accepted and cleaned up.
+No top-level workers are currently active.
 
 ## Near-Term Sequencing
 
-1. Monitor queue 473-502 and merge completed workers before queuing beyond the
-   30 top-level worker cap.
+1. Queue the next independent worker batch below the 30 top-level worker cap.
 2. Accept code workers opportunistically, resolving merge conflicts after the
    fact when overlapping work lands on different implementation surfaces.
 3. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
