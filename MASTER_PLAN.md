@@ -45,20 +45,22 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 128: Rust reconciler root scheduler foundation in
-  `/Users/user/Developer/Developer/fast-react-worker-128-reconciler-root-scheduler-foundation`.
+- Worker 129: HostRoot render-phase foundation in
+  `/Users/user/Developer/Developer/fast-react-worker-129-host-root-render-phase-foundation`.
 
 ## Near-Term Sequencing
 
-1. Keep worker 128 on root scheduler foundation only; keep it out of JS
-   package, smoke, native scheduler, React DOM, and commit/host mutation files.
-2. Queue the next non-overlapping root/reconciler slices from accepted
-   sequencing reports now that worker 124's HostRoot queue model is merged.
+1. Keep worker 129 limited to HostRoot render-phase queue processing and
+   scheduler callback identity validation.
+2. Keep worker 129 out of commit, host mutation, JS packages, React DOM,
+   test-renderer facades, scheduler-native files, and smoke/conformance tests.
+3. After worker 129 is accepted, queue the minimal commit/root-current switch
+   slice or a sync-flush integration slice depending on the worker's risks.
 
 ## Next Queue Candidates
 
-- Root scheduler/work loop once HostRoot updates are accepted.
 - Minimal commit path after root work loop ownership is clear.
+- Sync flush integration once HostRoot render work can produce finished work.
 - Function component render and hook queue slices after the root queue model is
   stable.
 - Test renderer root serialization and act/error surfaces once commit behavior

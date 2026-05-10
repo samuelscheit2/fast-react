@@ -51,9 +51,14 @@ sequencing belong in `MASTER_PLAN.md`.
 - Worker 126 scheduler native entrypoint implementation was merged through
   worker 127's integration branch.
 - Worker 127 scheduler native smoke integration was merged.
+- Worker 128 reconciler root scheduler foundation was merged.
 
 ## Latest Accepted Verification
 
+- Worker 128 was verified on `main` with `cargo fmt --all --check`, focused
+  root scheduler and scheduler bridge tests, full `fast-react-reconciler`
+  tests, reconciler clippy, `git diff --check`, and a scoped changed-path
+  audit before merge; the Rust gates were repeated on `main` after merge.
 - Workers 126 and 127 were verified on `main` with the focused scheduler native
   oracle test, `npm run check:js` with 415 conformance tests, `git diff
   --check`, and clean git status.
