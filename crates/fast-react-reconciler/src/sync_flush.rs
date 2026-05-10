@@ -15,12 +15,14 @@ use fast_react_host_config::HostTypes;
 use crate::root_scheduler::{recompute_might_have_pending_sync_work, sync_flush_lanes_for_root};
 use crate::{
     FiberRootId, FiberRootStore, FiberRootStoreError, HostRootCommitRecord,
-    HostRootRenderPhaseRecord, RootCommitError, RootSchedulerError, RootUpdateCallbackSnapshot,
-    RootWorkLoopError, commit_finished_host_root, render_host_root_for_lanes,
+    HostRootRenderPhaseRecord, RootCommitError, RootSchedulerError, RootSyncFlushRecord,
+    RootUpdateCallbackSnapshot, RootWorkLoopError, commit_finished_host_root,
+    render_host_root_for_lanes,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyncFlushRootRecord {
+    order: usize,
     root: FiberRootId,
     render_lanes: Lanes,
     render_phase: HostRootRenderPhaseRecord,
@@ -28,6 +30,11 @@ pub struct SyncFlushRootRecord {
 }
 
 impl SyncFlushRootRecord {
+    #[must_use]
+    pub const fn order(&self) -> usize {
+        self.order
+    }
+
     #[must_use]
     pub const fn root(&self) -> FiberRootId {
         self.root
@@ -76,6 +83,15 @@ impl SyncFlushRootRecord {
     #[must_use]
     pub const fn has_remaining_work(&self) -> bool {
         self.commit.has_remaining_work()
+    }
+
+    pub fn commit_rendered_sync_flush_record<H: HostTypes>(
+        store: &mut FiberRootStore<H>,
+        record: RootSyncFlushRecord,
+    ) -> Result<Self, SyncFlushError> {
+        let committed = commit_render_phase(store, record.order(), record.render_phase())?;
+        recompute_might_have_pending_sync_work(store)?;
+        Ok(committed)
     }
 }
 
@@ -210,13 +226,7 @@ fn flush_sync_work_across_scheduled_roots<H: HostTypes>(
 
             if render_lanes.is_non_empty() {
                 let render_phase = render_host_root_for_lanes(store, root_id, render_lanes)?;
-                let commit = commit_finished_host_root(store, render_phase)?;
-                records.push(SyncFlushRootRecord {
-                    root: root_id,
-                    render_lanes,
-                    render_phase,
-                    commit,
-                });
+                records.push(commit_render_phase(store, records.len(), render_phase)?);
                 did_perform_some_work = true;
             }
 
@@ -229,13 +239,29 @@ fn flush_sync_work_across_scheduled_roots<H: HostTypes>(
     }
 }
 
+fn commit_render_phase<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    order: usize,
+    render_phase: HostRootRenderPhaseRecord,
+) -> Result<SyncFlushRootRecord, SyncFlushError> {
+    let commit = commit_finished_host_root(store, render_phase)?;
+    Ok(SyncFlushRootRecord {
+        order,
+        root: render_phase.root(),
+        render_lanes: render_phase.render_lanes(),
+        render_phase,
+        commit,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::test_support::{FakeContainer, RecordingHost};
     use crate::{
-        RootElementHandle, RootOptions, ensure_root_is_scheduled, scheduled_roots,
-        update_container, update_container_sync,
+        ExecutionContextState, RootElementHandle, RootOptions, RootSyncFlushRecordStatus,
+        ensure_root_is_scheduled, flush_sync_work_on_all_roots, scheduled_roots, update_container,
+        update_container_sync,
     };
     use crate::{RootUpdateCallbackHandle, RootUpdateCallbackRecord, RootUpdateCallbackVisibility};
     use fast_react_core::{Lane, Lanes};
@@ -303,6 +329,7 @@ mod tests {
         assert!(result.did_flush_work());
         assert_eq!(result.records().len(), 1);
         let record = &result.records()[0];
+        assert_eq!(record.order(), 0);
         assert_eq!(record.root(), root_id);
         assert_eq!(record.render_lanes(), Lanes::SYNC);
         assert_eq!(record.applied_update_count(), 1);
@@ -317,6 +344,95 @@ mod tests {
         );
         assert_eq!(current_host_root_element(&store, root_id), element);
         assert!(!store.root_scheduler().might_have_pending_sync_work());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_handoff_commits_completed_render_record_as_inert_commit_record() {
+        let (mut store, root_id, host) = root_store();
+        let element = RootElementHandle::from_raw(66);
+        let callback = RootUpdateCallbackHandle::from_raw(660);
+        let previous_current = store.root(root_id).unwrap().current();
+        let update = update_container_sync(&mut store, root_id, element, Some(callback)).unwrap();
+        ensure_root_is_scheduled(&mut store, update.schedule()).unwrap();
+
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+
+        assert_eq!(rendered.records().len(), 1);
+        assert_eq!(
+            rendered.records()[0].status(),
+            RootSyncFlushRecordStatus::RenderedAwaitingCommit
+        );
+        assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+        assert!(store.root_scheduler().might_have_pending_sync_work());
+
+        let committed = SyncFlushRootRecord::commit_rendered_sync_flush_record(
+            &mut store,
+            rendered.records()[0],
+        )
+        .unwrap();
+
+        assert_eq!(committed.order(), 0);
+        assert_eq!(committed.root(), root_id);
+        assert_eq!(committed.render_lanes(), Lanes::SYNC);
+        assert_eq!(committed.applied_update_count(), 1);
+        assert_eq!(committed.skipped_update_count(), 0);
+        assert_eq!(committed.remaining_lanes(), Lanes::NO);
+        assert_eq!(committed.pending_lanes(), Lanes::NO);
+        assert_eq!(committed.commit().previous_current(), previous_current);
+        assert_eq!(committed.commit().finished_lanes(), Lanes::SYNC);
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            committed.commit().current()
+        );
+        assert_eq!(current_host_root_element(&store, root_id), element);
+
+        let callbacks = committed.root_update_callbacks();
+        assert_eq!(
+            callbacks.queue(),
+            committed.render_phase().work_in_progress_update_queue()
+        );
+        assert_eq!(callback_handles(callbacks.visible()), vec![callback]);
+        assert_eq!(callbacks.visible()[0].update(), update.update());
+        assert!(callbacks.hidden().is_empty());
+        assert!(callbacks.deferred_hidden().is_empty());
+        assert!(!store.root_scheduler().might_have_pending_sync_work());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_handoff_surfaces_pending_passive_commit_metadata_without_effects() {
+        let (mut store, root_id, host) = root_store();
+        schedule_sync_update(&mut store, root_id, RootElementHandle::from_raw(67));
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .scheduling_mut()
+            .prepare_pending_passive(root_id, Lanes::NO);
+
+        let committed = SyncFlushRootRecord::commit_rendered_sync_flush_record(
+            &mut store,
+            rendered.records()[0],
+        )
+        .unwrap();
+        let handoff = committed.commit().pending_passive_handoff().unwrap();
+        let pending_passive = store.root(root_id).unwrap().scheduling().pending_passive();
+
+        assert_eq!(handoff.root(), root_id);
+        assert_eq!(handoff.finished_work(), committed.commit().finished_work());
+        assert_eq!(handoff.lanes(), Lanes::SYNC);
+        assert_eq!(
+            pending_passive.finished_work(),
+            Some(committed.commit().finished_work())
+        );
+        assert_eq!(pending_passive.lanes(), Lanes::SYNC);
+        assert!(pending_passive.has_commit_handoff());
+        assert!(!pending_passive.has_effects());
+        assert!(pending_passive.passive_unmounts().is_empty());
+        assert!(pending_passive.passive_mounts().is_empty());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
