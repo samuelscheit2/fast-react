@@ -45,8 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 153: Rust test-renderer root canary in
-  `/Users/user/Developer/Developer/fast-react-worker-153-test-renderer-root-canary`.
 - Worker 154: private DOM mutation adapter shell in
   `/Users/user/Developer/Developer/fast-react-worker-154-dom-mutation-adapter-shell`.
 - Worker 155: scheduler callback execution in
