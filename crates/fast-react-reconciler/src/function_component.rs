@@ -1813,6 +1813,14 @@ impl FunctionComponentEffectUpdateQueue {
             .filter(|record| record.accepted_for_pending_passive())
             .count()
     }
+
+    #[must_use]
+    pub fn accepted_layout_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| record.accepted_for_layout_commit())
+            .count()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1928,6 +1936,11 @@ impl FunctionComponentEffectUpdateQueueRecord {
     pub const fn accepted_for_pending_passive(self) -> bool {
         matches!(self.phase, FunctionComponentEffectPhase::Passive) && self.tag.fires_in_passive()
     }
+
+    #[must_use]
+    pub const fn accepted_for_layout_commit(self) -> bool {
+        matches!(self.phase, FunctionComponentEffectPhase::Layout) && self.tag.fires_in_layout()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2026,6 +2039,11 @@ impl FunctionComponentCommittedEffectRecord {
     pub const fn accepted_for_pending_passive(self) -> bool {
         matches!(self.phase, FunctionComponentEffectPhase::Passive) && self.tag.fires_in_passive()
     }
+
+    #[must_use]
+    pub const fn accepted_for_layout_commit(self) -> bool {
+        matches!(self.phase, FunctionComponentEffectPhase::Layout) && self.tag.fires_in_layout()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2086,6 +2104,49 @@ impl FunctionComponentCommittedEffectQueue {
     }
 
     #[must_use]
+    pub fn accepted_layout_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| record.accepted_for_layout_commit())
+            .count()
+    }
+
+    #[must_use]
+    pub fn layout_effect_metadata(
+        &self,
+        flags: HookEffectFlags,
+    ) -> Vec<FunctionComponentLayoutEffectMetadata> {
+        if self.lanes.is_empty() {
+            return Vec::new();
+        }
+
+        let mut accepted = Vec::new();
+        for record in &self.records {
+            if record.phase() != FunctionComponentEffectPhase::Layout {
+                continue;
+            }
+
+            if !record.matches_flags(flags) {
+                continue;
+            }
+
+            accepted.push(FunctionComponentLayoutEffectMetadata {
+                fiber: self.fiber,
+                hook_list: record.hook_list(),
+                effect_index: accepted.len(),
+                effect: record.effect(),
+                instance: record.instance(),
+                tag: record.tag(),
+                create: record.create(),
+                destroy: record.destroy(),
+                dependencies: record.dependencies(),
+                lanes: self.lanes,
+            });
+        }
+        accepted
+    }
+
+    #[must_use]
     pub fn passive_effect_metadata(
         &self,
         flags: HookEffectFlags,
@@ -2096,6 +2157,10 @@ impl FunctionComponentCommittedEffectQueue {
 
         let mut accepted = Vec::new();
         for record in &self.records {
+            if record.phase() != FunctionComponentEffectPhase::Passive {
+                continue;
+            }
+
             if !record.matches_flags(flags) {
                 continue;
             }
@@ -2256,6 +2321,72 @@ impl FunctionComponentHookRenderStore {
             .unwrap_or_default()
     }
 
+    #[must_use]
+    pub fn committed_layout_effect_metadata(
+        &self,
+        fiber: FiberId,
+        flags: HookEffectFlags,
+    ) -> Vec<FunctionComponentLayoutEffectMetadata> {
+        self.committed_effect_queue(fiber)
+            .map(|queue| queue.layout_effect_metadata(flags))
+            .unwrap_or_default()
+    }
+
+    pub fn layout_effect_metadata(
+        &self,
+        state: FunctionComponentHookRenderState,
+        lanes: Lanes,
+    ) -> Result<Vec<FunctionComponentLayoutEffectMetadata>, FunctionComponentRenderError> {
+        if lanes.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let list = state.work_in_progress_list();
+        self.hook_lists.list(list).map_err(|error| {
+            FunctionComponentRenderError::hook_list(state.render_fiber(), error)
+        })?;
+
+        if state.phase() == FunctionComponentHookRenderPhase::Update {
+            return self.layout_effect_metadata_from_update_queue(state, lanes);
+        }
+
+        let Some(ring) = self.effect_ring(list) else {
+            return Ok(Vec::new());
+        };
+
+        let effects = ring
+            .iter_matching(&self.hook_effects, HookEffectFlags::LAYOUT_EFFECT)
+            .map_err(|error| {
+                FunctionComponentRenderError::hook_effect(state.render_fiber(), error)
+            })?;
+        let mut records = Vec::new();
+        for (effect_index, effect) in effects.enumerate() {
+            let effect = effect.map_err(|error| {
+                FunctionComponentRenderError::hook_effect(state.render_fiber(), error)
+            })?;
+            let destroy = self
+                .hook_effects
+                .effect_destroy(effect.id())
+                .map_err(|error| {
+                    FunctionComponentRenderError::hook_effect(state.render_fiber(), error)
+                })?;
+            records.push(FunctionComponentLayoutEffectMetadata {
+                fiber: state.render_fiber(),
+                hook_list: list,
+                effect_index,
+                effect: effect.id(),
+                instance: effect.instance(),
+                tag: effect.tag(),
+                create: effect.create(),
+                destroy,
+                dependencies: effect.dependencies(),
+                lanes,
+            });
+        }
+
+        Ok(records)
+    }
+
     pub fn passive_effect_metadata(
         &self,
         state: FunctionComponentHookRenderState,
@@ -2325,6 +2456,36 @@ impl FunctionComponentHookRenderStore {
             }
 
             accepted.push(FunctionComponentPassiveEffectMetadata {
+                fiber: record.fiber(),
+                hook_list: record.hook_list(),
+                effect_index: accepted.len(),
+                effect: record.effect(),
+                instance: record.instance(),
+                tag: record.tag(),
+                create: record.create(),
+                destroy: record.destroy(),
+                dependencies: record.dependencies(),
+                lanes,
+            });
+        }
+
+        Ok(accepted)
+    }
+
+    fn layout_effect_metadata_from_update_queue(
+        &self,
+        state: FunctionComponentHookRenderState,
+        lanes: Lanes,
+    ) -> Result<Vec<FunctionComponentLayoutEffectMetadata>, FunctionComponentRenderError> {
+        let records = self.effect_update_queue_records(state)?;
+        let mut accepted = Vec::new();
+
+        for record in records {
+            if !record.accepted_for_layout_commit() {
+                continue;
+            }
+
+            accepted.push(FunctionComponentLayoutEffectMetadata {
                 fiber: record.fiber(),
                 hook_list: record.hook_list(),
                 effect_index: accepted.len(),
@@ -3973,6 +4134,72 @@ impl FunctionComponentEffectRegistration {
     #[must_use]
     pub const fn fiber_flags(self) -> FiberFlags {
         self.fiber_flags
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentLayoutEffectMetadata {
+    fiber: FiberId,
+    hook_list: HookListId,
+    effect_index: usize,
+    effect: HookEffectId,
+    instance: HookEffectInstanceId,
+    tag: HookEffectFlags,
+    create: HookEffectCallbackHandle,
+    destroy: Option<HookEffectCallbackHandle>,
+    dependencies: HookEffectDependencies,
+    lanes: Lanes,
+}
+
+impl FunctionComponentLayoutEffectMetadata {
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn hook_list(self) -> HookListId {
+        self.hook_list
+    }
+
+    #[must_use]
+    pub const fn effect_index(self) -> usize {
+        self.effect_index
+    }
+
+    #[must_use]
+    pub const fn effect(self) -> HookEffectId {
+        self.effect
+    }
+
+    #[must_use]
+    pub const fn instance(self) -> HookEffectInstanceId {
+        self.instance
+    }
+
+    #[must_use]
+    pub const fn tag(self) -> HookEffectFlags {
+        self.tag
+    }
+
+    #[must_use]
+    pub const fn create(self) -> HookEffectCallbackHandle {
+        self.create
+    }
+
+    #[must_use]
+    pub const fn destroy(self) -> Option<HookEffectCallbackHandle> {
+        self.destroy
+    }
+
+    #[must_use]
+    pub const fn dependencies(self) -> HookEffectDependencies {
+        self.dependencies
+    }
+
+    #[must_use]
+    pub const fn lanes(self) -> Lanes {
+        self.lanes
     }
 }
 
@@ -6963,6 +7190,75 @@ mod tests {
     }
 
     #[test]
+    fn function_component_layout_metadata_mount_is_distinct_from_passive_metadata() {
+        let (mut arena, _current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(94)));
+
+        let record = render_function_component_with_hook_state(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap();
+        let state = record.hook_state().unwrap();
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+        let layout = hook_store
+            .mount_effect_metadata(
+                &mut arena,
+                &mut cursor,
+                FunctionComponentEffectPhase::Layout,
+                callback(940),
+                deps(941),
+            )
+            .unwrap();
+        let passive = hook_store
+            .mount_effect_metadata(
+                &mut arena,
+                &mut cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(942),
+                deps(943),
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(cursor).unwrap();
+
+        let layout_metadata = hook_store
+            .layout_effect_metadata(state, Lanes::DEFAULT)
+            .unwrap();
+        assert_eq!(layout_metadata.len(), 1);
+        assert_eq!(layout_metadata[0].fiber(), work_in_progress);
+        assert_eq!(
+            layout_metadata[0].hook_list(),
+            state.work_in_progress_list()
+        );
+        assert_eq!(layout_metadata[0].effect_index(), 0);
+        assert_eq!(layout_metadata[0].effect(), layout.effect());
+        assert_eq!(layout_metadata[0].instance(), layout.instance());
+        assert_eq!(layout_metadata[0].tag(), HookEffectFlags::LAYOUT_EFFECT);
+        assert_eq!(layout_metadata[0].create(), callback(940));
+        assert_eq!(layout_metadata[0].destroy(), None);
+        assert_eq!(layout_metadata[0].dependencies(), deps(941));
+        assert_eq!(layout_metadata[0].lanes(), Lanes::DEFAULT);
+        assert!(
+            hook_store
+                .layout_effect_metadata(state, Lanes::NO)
+                .unwrap()
+                .is_empty()
+        );
+
+        let passive_metadata = hook_store
+            .passive_effect_metadata(state, Lanes::DEFAULT)
+            .unwrap();
+        assert_eq!(passive_metadata.len(), 1);
+        assert_eq!(passive_metadata[0].effect(), passive.effect());
+        assert_eq!(passive_metadata[0].tag(), HookEffectFlags::PASSIVE_EFFECT);
+    }
+
+    #[test]
     fn function_component_committed_effect_queue_records_rendered_effects_by_fiber() {
         let (mut arena, _current, work_in_progress, component) = function_component_pair();
         let mut hook_store = FunctionComponentHookRenderStore::new();
@@ -7012,6 +7308,7 @@ mod tests {
         assert_eq!(committed.len(), 2);
         assert!(!committed.is_empty());
         assert_eq!(committed.accepted_passive_count(), 1);
+        assert_eq!(committed.accepted_layout_count(), 1);
         assert_eq!(
             hook_store.current_list(work_in_progress),
             Some(state.work_in_progress_list())
@@ -7040,11 +7337,35 @@ mod tests {
         assert_eq!(records[0].dependency_status(), None);
         assert_eq!(records[0].lanes(), Lanes::DEFAULT);
         assert!(!records[0].accepted_for_pending_passive());
+        assert!(records[0].accepted_for_layout_commit());
         assert_eq!(records[1].effect_index(), 1);
         assert_eq!(records[1].effect(), passive.effect());
         assert_eq!(records[1].phase(), FunctionComponentEffectPhase::Passive);
         assert_eq!(records[1].tag(), HookEffectFlags::PASSIVE_EFFECT);
         assert!(records[1].accepted_for_pending_passive());
+        assert!(!records[1].accepted_for_layout_commit());
+
+        let layout_metadata = hook_store
+            .committed_layout_effect_metadata(work_in_progress, HookEffectFlags::LAYOUT_EFFECT);
+        assert_eq!(layout_metadata.len(), 1);
+        assert_eq!(layout_metadata[0].fiber(), work_in_progress);
+        assert_eq!(
+            layout_metadata[0].hook_list(),
+            state.work_in_progress_list()
+        );
+        assert_eq!(layout_metadata[0].effect_index(), 0);
+        assert_eq!(layout_metadata[0].effect(), layout.effect());
+        assert_eq!(layout_metadata[0].instance(), layout.instance());
+        assert_eq!(layout_metadata[0].tag(), HookEffectFlags::LAYOUT_EFFECT);
+        assert_eq!(layout_metadata[0].create(), callback(930));
+        assert_eq!(layout_metadata[0].destroy(), None);
+        assert_eq!(layout_metadata[0].dependencies(), deps(931));
+        assert_eq!(layout_metadata[0].lanes(), Lanes::DEFAULT);
+        assert!(
+            hook_store
+                .committed_layout_effect_metadata(work_in_progress, HookEffectFlags::PASSIVE)
+                .is_empty()
+        );
 
         let passive_metadata = hook_store
             .committed_passive_effect_metadata(work_in_progress, HookEffectFlags::PASSIVE_EFFECT);
@@ -7062,6 +7383,11 @@ mod tests {
         assert_eq!(passive_metadata[0].destroy(), None);
         assert_eq!(passive_metadata[0].dependencies(), deps(933));
         assert_eq!(passive_metadata[0].lanes(), Lanes::DEFAULT);
+        assert!(
+            hook_store
+                .committed_passive_effect_metadata(work_in_progress, HookEffectFlags::LAYOUT)
+                .is_empty()
+        );
     }
 
     #[test]
@@ -9103,6 +9429,197 @@ mod tests {
         assert_eq!(all_passive.len(), 2);
         assert_eq!(all_passive[0].effect(), changed.effect());
         assert_eq!(all_passive[1].effect(), unchanged.effect());
+    }
+
+    #[test]
+    fn function_component_layout_metadata_update_records_changed_and_unchanged_dependencies() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let previous_changed = hook_store
+            .create_current_effect_metadata(
+                &mut arena,
+                current,
+                FunctionComponentEffectPhase::Layout,
+                callback(1020),
+                deps(1021),
+                Some(callback(1022)),
+            )
+            .unwrap();
+        let previous_unchanged = hook_store
+            .create_current_effect_metadata(
+                &mut arena,
+                current,
+                FunctionComponentEffectPhase::Layout,
+                callback(1030),
+                deps(1031),
+                Some(callback(1032)),
+            )
+            .unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(51)));
+
+        let record = render_function_component_with_hook_state(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap();
+        let state = record.hook_state().unwrap();
+        assert_eq!(state.phase(), FunctionComponentHookRenderPhase::Update);
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+        let changed = hook_store
+            .update_effect_metadata(
+                &mut arena,
+                &mut cursor,
+                FunctionComponentEffectPhase::Layout,
+                callback(1023),
+                deps(1024),
+                FunctionComponentEffectDependencyStatus::Changed,
+            )
+            .unwrap();
+        let unchanged = hook_store
+            .update_effect_metadata(
+                &mut arena,
+                &mut cursor,
+                FunctionComponentEffectPhase::Layout,
+                callback(1033),
+                deps(1031),
+                FunctionComponentEffectDependencyStatus::Unchanged,
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(cursor).unwrap();
+
+        let queue = hook_store.effect_update_queue(state).unwrap().unwrap();
+        assert_eq!(queue.len(), 2);
+        assert_eq!(queue.changed_dependency_count(), 1);
+        assert_eq!(queue.unchanged_dependency_count(), 1);
+        assert_eq!(queue.accepted_layout_count(), 1);
+        assert_eq!(queue.accepted_passive_count(), 0);
+
+        let records = queue.records();
+        assert_eq!(records[0].update_index(), 0);
+        assert_eq!(records[0].fiber(), work_in_progress);
+        assert_eq!(records[0].hook(), changed.hook());
+        assert_eq!(records[0].previous_effect(), previous_changed.effect());
+        assert_eq!(records[0].effect(), changed.effect());
+        assert_eq!(records[0].instance(), previous_changed.instance());
+        assert_eq!(records[0].phase(), FunctionComponentEffectPhase::Layout);
+        assert_eq!(records[0].tag(), HookEffectFlags::LAYOUT_EFFECT);
+        assert_eq!(records[0].create(), callback(1023));
+        assert_eq!(records[0].destroy(), Some(callback(1022)));
+        assert_eq!(records[0].previous_dependencies(), deps(1021));
+        assert_eq!(records[0].dependencies(), deps(1024));
+        assert_eq!(
+            records[0].dependency_status(),
+            FunctionComponentEffectDependencyStatus::Changed
+        );
+        assert!(records[0].accepted_for_layout_commit());
+        assert!(!records[0].accepted_for_pending_passive());
+
+        assert_eq!(records[1].update_index(), 1);
+        assert_eq!(records[1].fiber(), work_in_progress);
+        assert_eq!(records[1].hook(), unchanged.hook());
+        assert_eq!(records[1].previous_effect(), previous_unchanged.effect());
+        assert_eq!(records[1].effect(), unchanged.effect());
+        assert_eq!(records[1].instance(), previous_unchanged.instance());
+        assert_eq!(records[1].phase(), FunctionComponentEffectPhase::Layout);
+        assert_eq!(records[1].tag(), HookEffectFlags::LAYOUT);
+        assert_eq!(records[1].create(), callback(1033));
+        assert_eq!(records[1].destroy(), Some(callback(1032)));
+        assert_eq!(records[1].previous_dependencies(), deps(1031));
+        assert_eq!(records[1].dependencies(), deps(1031));
+        assert_eq!(
+            records[1].dependency_status(),
+            FunctionComponentEffectDependencyStatus::Unchanged
+        );
+        assert!(!records[1].accepted_for_layout_commit());
+        assert!(!records[1].accepted_for_pending_passive());
+
+        let layout = hook_store
+            .layout_effect_metadata(state, Lanes::DEFAULT)
+            .unwrap();
+        assert_eq!(layout.len(), 1);
+        assert_eq!(layout[0].fiber(), work_in_progress);
+        assert_eq!(layout[0].hook_list(), state.work_in_progress_list());
+        assert_eq!(layout[0].effect_index(), 0);
+        assert_eq!(layout[0].effect(), changed.effect());
+        assert_eq!(layout[0].instance(), changed.instance());
+        assert_eq!(layout[0].tag(), HookEffectFlags::LAYOUT_EFFECT);
+        assert_eq!(layout[0].create(), callback(1023));
+        assert_eq!(layout[0].destroy(), Some(callback(1022)));
+        assert_eq!(layout[0].dependencies(), deps(1024));
+        assert_eq!(layout[0].lanes(), Lanes::DEFAULT);
+        assert!(
+            hook_store
+                .passive_effect_metadata(state, Lanes::DEFAULT)
+                .unwrap()
+                .is_empty()
+        );
+
+        let committed = hook_store
+            .commit_pending_effect_queue_for_fiber(work_in_progress, Lanes::DEFAULT)
+            .unwrap()
+            .unwrap();
+        assert_eq!(committed.fiber(), work_in_progress);
+        assert_eq!(committed.phase(), FunctionComponentHookRenderPhase::Update);
+        assert_eq!(committed.hook_list(), state.work_in_progress_list());
+        assert_eq!(committed.len(), 2);
+        assert_eq!(committed.accepted_layout_count(), 1);
+        assert_eq!(committed.accepted_passive_count(), 0);
+
+        let committed_records = committed.records();
+        assert_eq!(committed_records[0].effect_index(), 0);
+        assert_eq!(
+            committed_records[0].previous_effect(),
+            Some(previous_changed.effect())
+        );
+        assert_eq!(committed_records[0].effect(), changed.effect());
+        assert_eq!(
+            committed_records[0].previous_dependencies(),
+            Some(deps(1021))
+        );
+        assert_eq!(committed_records[0].dependencies(), deps(1024));
+        assert_eq!(
+            committed_records[0].dependency_status(),
+            Some(FunctionComponentEffectDependencyStatus::Changed)
+        );
+        assert!(committed_records[0].accepted_for_layout_commit());
+        assert!(!committed_records[0].accepted_for_pending_passive());
+        assert_eq!(committed_records[1].effect_index(), 1);
+        assert_eq!(
+            committed_records[1].previous_effect(),
+            Some(previous_unchanged.effect())
+        );
+        assert_eq!(committed_records[1].effect(), unchanged.effect());
+        assert_eq!(
+            committed_records[1].dependency_status(),
+            Some(FunctionComponentEffectDependencyStatus::Unchanged)
+        );
+        assert!(!committed_records[1].accepted_for_layout_commit());
+        assert!(!committed_records[1].accepted_for_pending_passive());
+
+        let firing_layout = hook_store
+            .committed_layout_effect_metadata(work_in_progress, HookEffectFlags::LAYOUT_EFFECT);
+        assert_eq!(firing_layout.len(), 1);
+        assert_eq!(firing_layout[0].effect(), changed.effect());
+        assert_eq!(firing_layout[0].destroy(), Some(callback(1022)));
+        let all_layout =
+            hook_store.committed_layout_effect_metadata(work_in_progress, HookEffectFlags::LAYOUT);
+        assert_eq!(all_layout.len(), 2);
+        assert_eq!(all_layout[0].effect(), changed.effect());
+        assert_eq!(all_layout[1].effect(), unchanged.effect());
+        assert!(
+            hook_store
+                .committed_passive_effect_metadata(work_in_progress, HookEffectFlags::PASSIVE)
+                .is_empty()
+        );
+        assert!(
+            hook_store
+                .committed_layout_effect_metadata(work_in_progress, HookEffectFlags::PASSIVE)
+                .is_empty()
+        );
     }
 
     #[test]
