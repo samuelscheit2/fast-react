@@ -3,15 +3,15 @@
 //! This module consumes a completed HostRoot render-phase record and switches
 //! `root.current` to that HostRoot work-in-progress fiber. It deliberately
 //! stops before host mutation, child/effect traversal, callback execution,
-//! deletions, public facade behavior, DOM wiring, or test-renderer
+//! deletion cleanup, public facade behavior, DOM wiring, or test-renderer
 //! serialization.
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::{
-    FiberId, FiberTag, FiberTopologyError, Lanes, RootFinishedLanes, StateHandle, StateNodeHandle,
-    UpdateQueueHandle,
+    DeletionListId, FiberFlags, FiberId, FiberTag, FiberTopologyError, Lanes, RootFinishedLanes,
+    StateHandle, StateNodeHandle, UpdateQueueHandle,
 };
 use fast_react_host_config::HostTypes;
 
@@ -307,6 +307,34 @@ impl PendingPassiveCommitHandoff {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct HostRootDeletionListRecord {
+    parent: FiberId,
+    list: DeletionListId,
+    deleted: Vec<FiberId>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private deletion metadata for future mutation/passive deletion workers"
+)]
+impl HostRootDeletionListRecord {
+    #[must_use]
+    pub(crate) const fn parent(&self) -> FiberId {
+        self.parent
+    }
+
+    #[must_use]
+    pub(crate) const fn list(&self) -> DeletionListId {
+        self.list
+    }
+
+    #[must_use]
+    pub(crate) fn deleted(&self) -> &[FiberId] {
+        &self.deleted
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostRootCommitRecord {
     root: FiberRootId,
     previous_current: FiberId,
@@ -316,6 +344,7 @@ pub struct HostRootCommitRecord {
     pending_lanes: Lanes,
     root_update_callbacks: RootUpdateCallbackSnapshot,
     pending_passive_handoff: Option<PendingPassiveCommitHandoff>,
+    deletion_lists: Vec<HostRootDeletionListRecord>,
 }
 
 impl HostRootCommitRecord {
@@ -372,6 +401,15 @@ impl HostRootCommitRecord {
     pub(crate) const fn pending_passive_handoff(&self) -> Option<PendingPassiveCommitHandoff> {
         self.pending_passive_handoff
     }
+
+    #[allow(
+        dead_code,
+        reason = "crate-private deletion metadata for future mutation/passive deletion workers"
+    )]
+    #[must_use]
+    pub(crate) fn deletion_lists(&self) -> &[HostRootDeletionListRecord] {
+        &self.deletion_lists
+    }
 }
 
 pub fn commit_finished_host_root<H: HostTypes>(
@@ -386,6 +424,7 @@ pub fn commit_finished_host_root<H: HostTypes>(
     let finished_lanes = render.render_lanes();
     let remaining_lanes = render.remaining_lanes();
     let work_in_progress_update_queue = render.work_in_progress_update_queue();
+    let deletion_lists = collect_deletion_list_metadata(store, finished_work)?;
 
     let (pending_lanes, pending_passive_handoff) = {
         let root = store.root_mut(root_id)?;
@@ -416,7 +455,65 @@ pub fn commit_finished_host_root<H: HostTypes>(
         pending_lanes,
         root_update_callbacks,
         pending_passive_handoff,
+        deletion_lists,
     })
+}
+
+fn collect_deletion_list_metadata<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    finished_work: FiberId,
+) -> Result<Vec<HostRootDeletionListRecord>, RootCommitError> {
+    let arena = store.fiber_arena();
+    let mut records = Vec::new();
+    let mut stack = vec![finished_work];
+
+    while let Some(parent) = stack.pop() {
+        let node = arena.get(parent)?;
+        let deletion_list = node.deletions();
+        let flags = node.flags();
+        let child_ids = arena.child_ids(parent)?;
+
+        if let Some(list_id) = deletion_list {
+            let list = arena
+                .deletion_list(list_id)
+                .ok_or(FiberTopologyError::InvalidDeletionList { id: list_id })?;
+            if list.parent() != parent {
+                return Err(FiberTopologyError::InvalidDeletionList { id: list_id }.into());
+            }
+            if !list.is_empty() && !flags.contains_all(FiberFlags::CHILD_DELETION) {
+                return Err(FiberTopologyError::DeletionListMissingFlag {
+                    parent,
+                    list: list_id,
+                }
+                .into());
+            }
+
+            let mut deleted = Vec::with_capacity(list.len());
+            for &deleted_fiber in list {
+                arena.get(deleted_fiber)?;
+                if child_ids.contains(&deleted_fiber) {
+                    return Err(FiberTopologyError::DeletedChildStillInFinishedChain {
+                        parent,
+                        deleted: deleted_fiber,
+                    }
+                    .into());
+                }
+                deleted.push(deleted_fiber);
+            }
+
+            if !deleted.is_empty() {
+                records.push(HostRootDeletionListRecord {
+                    parent,
+                    list: list_id,
+                    deleted,
+                });
+            }
+        }
+
+        stack.extend(child_ids.into_iter().rev());
+    }
+
+    Ok(records)
 }
 
 fn record_pending_passive_commit_handoff<H: HostTypes>(
@@ -598,7 +695,9 @@ mod tests {
         process_root_schedule_in_microtask, render_host_root_for_lanes,
         render_host_root_via_scheduler_callback, update_container,
     };
-    use fast_react_core::{Lane, Lanes};
+    use fast_react_core::{
+        DeletionListId, FiberFlags, FiberMode, FiberTag, Lane, Lanes, PropsHandle,
+    };
 
     fn root_store() -> (FiberRootStore<RecordingHost>, FiberRootId, RecordingHost) {
         let host = RecordingHost::default();
@@ -632,6 +731,75 @@ mod tests {
         store.root(root_id).unwrap().scheduling().callback_node()
     }
 
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct DeletionMetadataFixture {
+        first_parent: FiberId,
+        first_list: DeletionListId,
+        first_deleted: FiberId,
+        second_deleted: FiberId,
+        second_parent: FiberId,
+        second_list: DeletionListId,
+        third_deleted: FiberId,
+    }
+
+    fn create_test_fiber(
+        store: &mut FiberRootStore<RecordingHost>,
+        tag: FiberTag,
+        props: u64,
+    ) -> FiberId {
+        store
+            .fiber_arena_mut()
+            .create_fiber(tag, None, PropsHandle::from_raw(props), FiberMode::NO)
+    }
+
+    fn attach_deletion_metadata_fixture(
+        store: &mut FiberRootStore<RecordingHost>,
+        host_root_work_in_progress: FiberId,
+    ) -> DeletionMetadataFixture {
+        let first_parent = create_test_fiber(store, FiberTag::HostComponent, 101);
+        let second_parent = create_test_fiber(store, FiberTag::HostComponent, 102);
+        store
+            .fiber_arena_mut()
+            .set_children(host_root_work_in_progress, &[first_parent, second_parent])
+            .unwrap();
+
+        let first_kept = create_test_fiber(store, FiberTag::HostText, 201);
+        let first_deleted = create_test_fiber(store, FiberTag::HostText, 202);
+        let second_deleted = create_test_fiber(store, FiberTag::HostText, 203);
+        store
+            .fiber_arena_mut()
+            .set_children(first_parent, &[first_kept, first_deleted, second_deleted])
+            .unwrap();
+        let first_list = store
+            .fiber_arena_mut()
+            .mark_child_for_deletion(first_parent, second_deleted)
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .mark_child_for_deletion(first_parent, first_deleted)
+            .unwrap();
+
+        let third_deleted = create_test_fiber(store, FiberTag::HostText, 301);
+        store
+            .fiber_arena_mut()
+            .set_children(second_parent, &[third_deleted])
+            .unwrap();
+        let second_list = store
+            .fiber_arena_mut()
+            .mark_child_for_deletion(second_parent, third_deleted)
+            .unwrap();
+
+        DeletionMetadataFixture {
+            first_parent,
+            first_list,
+            first_deleted,
+            second_deleted,
+            second_parent,
+            second_list,
+            third_deleted,
+        }
+    }
+
     #[test]
     fn root_commit_switches_current_to_completed_host_root_wip() {
         let (mut store, root_id, host) = root_store();
@@ -651,6 +819,7 @@ mod tests {
         assert_eq!(commit.remaining_lanes(), Lanes::NO);
         assert_eq!(commit.pending_lanes(), Lanes::NO);
         assert_eq!(commit.pending_passive_handoff(), None);
+        assert!(commit.deletion_lists().is_empty());
         assert!(!commit.has_remaining_work());
         assert_eq!(new_current, render.work_in_progress());
         assert_eq!(host_root_element(&store, new_current), element);
@@ -673,6 +842,105 @@ mod tests {
                 .unwrap()
                 .alternate(),
             Some(new_current)
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_records_deletion_lists_in_finished_tree_order_without_cleanup() {
+        let (mut store, root_id, host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(45), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let fixture = attach_deletion_metadata_fixture(&mut store, render.finished_work());
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let deletion_lists = commit.deletion_lists();
+
+        assert_eq!(deletion_lists.len(), 2);
+        assert_eq!(deletion_lists[0].parent(), fixture.first_parent);
+        assert_eq!(deletion_lists[0].list(), fixture.first_list);
+        assert_eq!(
+            deletion_lists[0].deleted(),
+            &[fixture.second_deleted, fixture.first_deleted]
+        );
+        assert_eq!(deletion_lists[1].parent(), fixture.second_parent);
+        assert_eq!(deletion_lists[1].list(), fixture.second_list);
+        assert_eq!(deletion_lists[1].deleted(), &[fixture.third_deleted]);
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            render.finished_work()
+        );
+        assert!(
+            store
+                .fiber_arena()
+                .deletion_list(fixture.first_list)
+                .is_some()
+        );
+        assert!(
+            store
+                .fiber_arena()
+                .deletion_list(fixture.second_list)
+                .is_some()
+        );
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(fixture.first_parent)
+                .unwrap()
+                .deletions(),
+            Some(fixture.first_list)
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_rejects_invalid_deletion_list_before_switch_or_callback_drain() {
+        let (mut store, root_id, host) = root_store();
+        let callback = RootUpdateCallbackHandle::from_raw(123);
+        update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(46),
+            Some(callback),
+        )
+        .unwrap();
+        let previous_current = store.root(root_id).unwrap().current();
+        let pending_lanes = store.root(root_id).unwrap().lanes().pending_lanes();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let fixture = attach_deletion_metadata_fixture(&mut store, render.finished_work());
+        let callbacks_before = store
+            .update_queues()
+            .peek_root_update_callback_records(render.work_in_progress_update_queue())
+            .unwrap();
+        let parent_node = store
+            .fiber_arena_mut()
+            .get_mut(fixture.first_parent)
+            .unwrap();
+        parent_node.set_flags(parent_node.flags() - FiberFlags::CHILD_DELETION);
+
+        let error = commit_finished_host_root(&mut store, render).unwrap_err();
+        let callbacks_after = store
+            .update_queues()
+            .peek_root_update_callback_records(render.work_in_progress_update_queue())
+            .unwrap();
+
+        assert!(matches!(
+            error,
+            RootCommitError::FiberTopology(FiberTopologyError::DeletionListMissingFlag {
+                parent,
+                list,
+            }) if parent == fixture.first_parent && list == fixture.first_list
+        ));
+        assert_eq!(callback_handles(callbacks_before.visible()), vec![callback]);
+        assert_eq!(callback_handles(callbacks_after.visible()), vec![callback]);
+        assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            pending_lanes
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            Some(render.finished_work())
         );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
