@@ -29,6 +29,46 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 728
+
+- Worker 728 added a hidden react-test-renderer native serialization guard so
+  unmount `toJSON` and `toTree` diagnostic helpers reject non-`undefined`
+  finished-work identity evidence instead of silently ignoring it. Create and
+  update remain the only native diagnostic operations that consume the accepted
+  finished-work identity adapter.
+- The accepted change was limited to the CJS development/production hidden
+  facades, the serialization local gate, and worker progress evidence. Rust
+  unmount native serialization already has no identity-argument path, and the
+  full unmount identity adapter remains deferred behind deletion cleanup,
+  passive/ref ordering, and empty-root host-output proof.
+- Worker 728 was accepted after independent audit and verification with the
+  serialization local gate, react-test-renderer workspace check,
+  package-surface guard, import smoke, conflict-marker-free diff inspection,
+  and `git diff --check`; its subagent, worktree, and branch were removed after
+  merge. Public serialization, `.root`, `update`, `TestInstance`, native
+  loading/execution, native bridge, `act`, root routing, React DOM/root
+  surfaces, Scheduler, hydration, events, refs, resources, forms, controlled
+  inputs, full unmount identity admission, and multichild/sibling identity
+  admission remain blocked.
+
+### Worker 727
+
+- Worker 727 added the static private-admission ledger for Workers 724-726.
+  Worker 724 is recorded as skip/meta ledger work, Worker 725 as accepted
+  private update-path serialization finished-work identity evidence depending
+  on Worker 720, and Worker 726 as accepted private update native serialization
+  identity admission depending on Worker 725.
+- Acceptance audit found missing carry-forward blockers for broad
+  test-renderer compatibility plus unmount and multichild native serialization.
+  The accepted fix keeps those broad blockers and the narrower identity
+  admission blockers in the ledger and tests.
+- Worker 727 was accepted after post-fix audit and verification with focused
+  private-admission tests, focused conformance workspace tests,
+  package-surface guard, import smoke, conflict-marker-free diff inspection,
+  and `git diff --check`; its subagent, worktree, and branch were removed after
+  merge. This is static ledger evidence only and does not execute runtime
+  paths or promote public/package compatibility.
+
 ### Worker 726
 
 - Worker 726 extended private update-path react-test-renderer native
