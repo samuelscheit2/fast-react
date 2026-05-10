@@ -29,6 +29,13 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Worker 490 was accepted from queue 473-502. It added private controlled
+  checkbox/radio restore diagnostics, including radio group intent metadata,
+  and property-payload checkable restore blockers while keeping live DOM
+  control behavior blocked. It was verified after merge with package
+  resource/form/controlled tests, controlled-input and DOM property payload
+  conformance gates, React DOM workspace checks, syntax checks,
+  conflict-marker scanning, and `git diff --check`.
 - Worker 488 was accepted from queue 473-502. It added private React DOM event
   listener error-routing diagnostics that consume existing fake-DOM listener
   error routes and record root option callback metadata without invoking public
