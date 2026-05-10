@@ -4,11 +4,15 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::{
-    FiberArena, FiberId, FiberMode, FiberTag, FiberTopologyError, Lanes, PropsHandle,
+    FiberArena, FiberId, FiberMode, FiberTag, FiberTopologyError, Lane, Lanes, PropsHandle,
     RootLaneState, StateHandle, StateNodeHandle,
 };
 use fast_react_host_config::HostTypes;
 
+use crate::root_config::{
+    HydrationBoundaryHandle, HydrationBoundaryKind, HydrationErrorQueueHandle,
+    HydrationTreeContextHandle,
+};
 use crate::{
     FiberRootId, PendingChildrenHandle, PendingCommitCancelHandle, PendingCommitHandle,
     PendingPassiveState, RootCacheHandle, RootCallbackPriority, RootContextHandle,
@@ -27,6 +31,196 @@ impl HostRootHydrationState {
     #[must_use]
     pub const fn is_dehydrated(self) -> bool {
         matches!(self, Self::ReservedUnsupported(_))
+    }
+
+    #[must_use]
+    pub const fn unsupported_kind(self) -> Option<UnsupportedHydrationKind> {
+        match self {
+            Self::NotHydrated => None,
+            Self::ReservedUnsupported(kind) => Some(kind),
+        }
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "reserved for fail-closed hydration boundary state"
+)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReservedHydrationBoundaryState {
+    kind: HydrationBoundaryKind,
+    dehydrated: HydrationBoundaryHandle,
+    tree_context: HydrationTreeContextHandle,
+    retry_lane: Lane,
+    hydration_errors: HydrationErrorQueueHandle,
+    dehydrated_fragment: Option<FiberId>,
+    unsupported_kind: UnsupportedHydrationKind,
+}
+
+#[allow(
+    dead_code,
+    reason = "reserved for fail-closed hydration boundary state"
+)]
+impl ReservedHydrationBoundaryState {
+    #[must_use]
+    pub const fn new(
+        kind: HydrationBoundaryKind,
+        dehydrated: HydrationBoundaryHandle,
+        tree_context: HydrationTreeContextHandle,
+        retry_lane: Lane,
+        hydration_errors: HydrationErrorQueueHandle,
+        dehydrated_fragment: Option<FiberId>,
+        unsupported_kind: UnsupportedHydrationKind,
+    ) -> Self {
+        Self {
+            kind,
+            dehydrated,
+            tree_context,
+            retry_lane,
+            hydration_errors,
+            dehydrated_fragment,
+            unsupported_kind,
+        }
+    }
+
+    #[must_use]
+    pub const fn reserved_unsupported(
+        kind: HydrationBoundaryKind,
+        dehydrated: HydrationBoundaryHandle,
+    ) -> Self {
+        Self::new(
+            kind,
+            dehydrated,
+            HydrationTreeContextHandle::NONE,
+            Lane::OFFSCREEN,
+            HydrationErrorQueueHandle::NONE,
+            None,
+            UnsupportedHydrationKind::HydrationRoot,
+        )
+    }
+
+    #[must_use]
+    pub const fn kind(self) -> HydrationBoundaryKind {
+        self.kind
+    }
+
+    #[must_use]
+    pub const fn dehydrated(self) -> HydrationBoundaryHandle {
+        self.dehydrated
+    }
+
+    #[must_use]
+    pub const fn tree_context(self) -> HydrationTreeContextHandle {
+        self.tree_context
+    }
+
+    #[must_use]
+    pub const fn retry_lane(self) -> Lane {
+        self.retry_lane
+    }
+
+    #[must_use]
+    pub const fn hydration_errors(self) -> HydrationErrorQueueHandle {
+        self.hydration_errors
+    }
+
+    #[must_use]
+    pub const fn dehydrated_fragment(self) -> Option<FiberId> {
+        self.dehydrated_fragment
+    }
+
+    #[must_use]
+    pub const fn unsupported_kind(self) -> UnsupportedHydrationKind {
+        self.unsupported_kind
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "reserved for fail-closed hydration boundary state"
+)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HydrationBoundaryState {
+    ReservedUnsupported(ReservedHydrationBoundaryState),
+}
+
+#[allow(
+    dead_code,
+    reason = "reserved for fail-closed hydration boundary state"
+)]
+impl HydrationBoundaryState {
+    #[must_use]
+    pub const fn reserved_unsupported(
+        kind: HydrationBoundaryKind,
+        dehydrated: HydrationBoundaryHandle,
+    ) -> Self {
+        Self::ReservedUnsupported(ReservedHydrationBoundaryState::reserved_unsupported(
+            kind, dehydrated,
+        ))
+    }
+
+    #[must_use]
+    pub const fn reserved_unsupported_activity(dehydrated: HydrationBoundaryHandle) -> Self {
+        Self::reserved_unsupported(HydrationBoundaryKind::Activity, dehydrated)
+    }
+
+    #[must_use]
+    pub const fn reserved_unsupported_suspense(dehydrated: HydrationBoundaryHandle) -> Self {
+        Self::reserved_unsupported(HydrationBoundaryKind::Suspense, dehydrated)
+    }
+
+    #[must_use]
+    pub const fn is_reserved_unsupported(self) -> bool {
+        matches!(self, Self::ReservedUnsupported(_))
+    }
+
+    #[must_use]
+    pub const fn kind(self) -> HydrationBoundaryKind {
+        match self {
+            Self::ReservedUnsupported(state) => state.kind(),
+        }
+    }
+
+    #[must_use]
+    pub const fn dehydrated(self) -> HydrationBoundaryHandle {
+        match self {
+            Self::ReservedUnsupported(state) => state.dehydrated(),
+        }
+    }
+
+    #[must_use]
+    pub const fn tree_context(self) -> HydrationTreeContextHandle {
+        match self {
+            Self::ReservedUnsupported(state) => state.tree_context(),
+        }
+    }
+
+    #[must_use]
+    pub const fn retry_lane(self) -> Lane {
+        match self {
+            Self::ReservedUnsupported(state) => state.retry_lane(),
+        }
+    }
+
+    #[must_use]
+    pub const fn hydration_errors(self) -> HydrationErrorQueueHandle {
+        match self {
+            Self::ReservedUnsupported(state) => state.hydration_errors(),
+        }
+    }
+
+    #[must_use]
+    pub const fn dehydrated_fragment(self) -> Option<FiberId> {
+        match self {
+            Self::ReservedUnsupported(state) => state.dehydrated_fragment(),
+        }
+    }
+
+    #[must_use]
+    pub const fn unsupported_kind(self) -> UnsupportedHydrationKind {
+        match self {
+            Self::ReservedUnsupported(state) => state.unsupported_kind(),
+        }
     }
 }
 
@@ -450,11 +644,63 @@ mod tests {
         assert_eq!(state.element(), RootElementHandle::from_raw(9));
         assert!(!state.is_dehydrated());
         assert_eq!(state.hydration(), HostRootHydrationState::NotHydrated);
+        assert_eq!(state.hydration().unsupported_kind(), None);
         assert_eq!(state.cache(), RootCacheHandle::NONE);
         assert_eq!(state.form_state(), RootFormStateHandle::from_raw(3));
         assert_eq!(
             state.pending_suspense_boundaries(),
             RootSuspenseBoundarySetHandle::NONE
+        );
+    }
+
+    #[test]
+    fn fiber_root_reserves_unsupported_host_root_hydration_state() {
+        let state = HostRootState::reserved_unsupported_hydration(
+            RootElementHandle::from_raw(10),
+            RootFormStateHandle::from_raw(11),
+            UnsupportedHydrationKind::HydrationRoot,
+        );
+
+        assert_eq!(state.element(), RootElementHandle::from_raw(10));
+        assert!(state.is_dehydrated());
+        assert_eq!(
+            state.hydration(),
+            HostRootHydrationState::ReservedUnsupported(UnsupportedHydrationKind::HydrationRoot)
+        );
+        assert_eq!(
+            state.hydration().unsupported_kind(),
+            Some(UnsupportedHydrationKind::HydrationRoot)
+        );
+        assert_eq!(state.form_state(), RootFormStateHandle::from_raw(11));
+    }
+
+    #[test]
+    fn fiber_root_reserves_hydration_boundary_state_fail_closed() {
+        let suspense = HydrationBoundaryState::reserved_unsupported_suspense(
+            HydrationBoundaryHandle::from_raw(7),
+        );
+        let activity = HydrationBoundaryState::reserved_unsupported_activity(
+            HydrationBoundaryHandle::from_raw(8),
+        );
+
+        assert!(suspense.is_reserved_unsupported());
+        assert_eq!(suspense.kind(), HydrationBoundaryKind::Suspense);
+        assert_eq!(suspense.dehydrated(), HydrationBoundaryHandle::from_raw(7));
+        assert_eq!(suspense.tree_context(), HydrationTreeContextHandle::NONE);
+        assert_eq!(suspense.retry_lane(), Lane::OFFSCREEN);
+        assert_eq!(suspense.hydration_errors(), HydrationErrorQueueHandle::NONE);
+        assert_eq!(suspense.dehydrated_fragment(), None);
+        assert_eq!(
+            suspense.unsupported_kind(),
+            UnsupportedHydrationKind::HydrationRoot
+        );
+
+        assert!(activity.is_reserved_unsupported());
+        assert_eq!(activity.kind(), HydrationBoundaryKind::Activity);
+        assert_eq!(activity.dehydrated(), HydrationBoundaryHandle::from_raw(8));
+        assert_eq!(
+            activity.unsupported_kind(),
+            UnsupportedHydrationKind::HydrationRoot
         );
     }
 

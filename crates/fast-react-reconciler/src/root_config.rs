@@ -9,11 +9,13 @@ use fast_react_core::{FiberMode, Lane, Lanes};
 use crate::FiberRootId;
 
 macro_rules! opaque_root_handle {
-    ($name:ident) => {
+    ($(#[$attr:meta])* $name:ident) => {
+        $(#[$attr])*
         #[repr(transparent)]
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
         pub struct $name(u64);
 
+        $(#[$attr])*
         impl $name {
             pub const NONE: Self = Self(0);
 
@@ -47,6 +49,27 @@ opaque_root_handle!(RootDefaultTransitionIndicatorHandle);
 opaque_root_handle!(RootErrorCallbackHandle);
 opaque_root_handle!(RootFormStateHandle);
 opaque_root_handle!(RootHydrationCallbacksHandle);
+opaque_root_handle!(
+    #[allow(
+        dead_code,
+        reason = "reserved for fail-closed hydration boundary state"
+    )]
+    HydrationBoundaryHandle
+);
+opaque_root_handle!(
+    #[allow(
+        dead_code,
+        reason = "reserved for fail-closed hydration boundary state"
+    )]
+    HydrationErrorQueueHandle
+);
+opaque_root_handle!(
+    #[allow(
+        dead_code,
+        reason = "reserved for fail-closed hydration boundary state"
+    )]
+    HydrationTreeContextHandle
+);
 opaque_root_handle!(RootRecoverableErrorCallbackHandle);
 opaque_root_handle!(RootSchedulerCallbackHandle);
 opaque_root_handle!(RootSuspenseBoundarySetHandle);
@@ -89,6 +112,50 @@ impl UnsupportedHydrationKind {
 pub enum RootKind {
     Client,
     ReservedUnsupportedHydration(UnsupportedHydrationKind),
+}
+
+impl RootKind {
+    #[must_use]
+    pub const fn is_client(self) -> bool {
+        matches!(self, Self::Client)
+    }
+
+    #[must_use]
+    pub const fn unsupported_hydration_kind(self) -> Option<UnsupportedHydrationKind> {
+        match self {
+            Self::Client => None,
+            Self::ReservedUnsupportedHydration(kind) => Some(kind),
+        }
+    }
+
+    #[must_use]
+    pub const fn is_reserved_unsupported_hydration(self) -> bool {
+        self.unsupported_hydration_kind().is_some()
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "reserved for fail-closed hydration boundary state"
+)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum HydrationBoundaryKind {
+    Activity,
+    Suspense,
+}
+
+#[allow(
+    dead_code,
+    reason = "reserved for fail-closed hydration boundary state"
+)]
+impl HydrationBoundaryKind {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Activity => "activity",
+            Self::Suspense => "suspense",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -343,6 +410,9 @@ mod tests {
             FiberMode::CONCURRENT
         );
         assert_eq!(RootKind::Client, RootKind::Client);
+        assert!(RootKind::Client.is_client());
+        assert!(!RootKind::Client.is_reserved_unsupported_hydration());
+        assert_eq!(RootKind::Client.unsupported_hydration_kind(), None);
         assert_eq!(RootTag::Concurrent.react_tag(), 1);
         assert_eq!(RootTag::Legacy.react_tag(), 0);
     }
@@ -373,13 +443,41 @@ mod tests {
 
     #[test]
     fn root_config_reserves_unsupported_hydration_kind() {
+        let kind = RootKind::ReservedUnsupportedHydration(UnsupportedHydrationKind::HydrationRoot);
+
         assert_eq!(
-            RootKind::ReservedUnsupportedHydration(UnsupportedHydrationKind::HydrationRoot),
+            kind,
             RootKind::ReservedUnsupportedHydration(UnsupportedHydrationKind::HydrationRoot)
+        );
+        assert!(!kind.is_client());
+        assert!(kind.is_reserved_unsupported_hydration());
+        assert_eq!(
+            kind.unsupported_hydration_kind(),
+            Some(UnsupportedHydrationKind::HydrationRoot)
         );
         assert_eq!(
             UnsupportedHydrationKind::HydrationRoot.as_str(),
             "hydration root"
         );
+    }
+
+    #[test]
+    fn root_config_reserves_typed_hydration_boundary_handles_without_markers() {
+        assert_eq!(HydrationBoundaryKind::Activity.as_str(), "activity");
+        assert_eq!(HydrationBoundaryKind::Suspense.as_str(), "suspense");
+
+        let boundary = HydrationBoundaryHandle::from_raw(4);
+        let tree_context = HydrationTreeContextHandle::from_raw(5);
+        let errors = HydrationErrorQueueHandle::from_raw(6);
+
+        assert!(HydrationBoundaryHandle::NONE.is_none());
+        assert!(HydrationTreeContextHandle::NONE.is_none());
+        assert!(HydrationErrorQueueHandle::NONE.is_none());
+        assert!(boundary.is_some());
+        assert!(tree_context.is_some());
+        assert!(errors.is_some());
+        assert_eq!(boundary.raw(), 4);
+        assert_eq!(tree_context.raw(), 5);
+        assert_eq!(errors.raw(), 6);
     }
 }
