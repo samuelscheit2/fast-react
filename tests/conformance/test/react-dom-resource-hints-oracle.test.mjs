@@ -356,11 +356,18 @@ test("private fake-DOM insertion diagnostics stay separate from public resource 
   const insertionGate = resourceFormGate.createResourceHintFakeDomInsertionGate({
     requestIdPrefix: "resource-conformance-insertion"
   });
+  const headBoundaryGate =
+    resourceFormGate.createResourceHintHeadBoundaryGate({
+      requestIdPrefix: "resource-conformance-head-boundary"
+    });
   const fakeDom = createDeterministicResourceHintDom();
   const dispatcherRecord = dispatcherGate.recordResourceHintDispatcherRequest(
     "C",
     ["https://connect.example.test", ""]
   );
+  const headRecord = dispatcherGate.recordSingletonRequest("head", [
+    { title: "blocked-head-singleton-props" }
+  ]);
   const adapterAdmission = adapterGate.admitDispatcherRecord(
     dispatcherRecord,
     {
@@ -373,6 +380,19 @@ test("private fake-DOM insertion diagnostics stay separate from public resource 
     adapterAdmission,
     {
       explicitInsertion: true,
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head
+    }
+  );
+  const headBoundary = headBoundaryGate.recordInsertionUpdateBoundary(
+    insertion,
+    headRecord,
+    {
+      explicitBoundary: true,
+      boundaryKind:
+        "deterministic-fake-dom-head-singleton-insertion-update",
+      targetKind: "document-head",
+      hostTag: "head",
       fakeDocument: fakeDom.document,
       fakeHead: fakeDom.head
     }
@@ -395,9 +415,49 @@ test("private fake-DOM insertion diagnostics stay separate from public resource 
   assert.deepEqual(fakeDom.head.childNodes[0].attributes, {
     rel: "preconnect",
     href: "[fast-react-redacted-resource-hint:href]",
-    crossOrigin: ""
+    crossOrigin: "",
+    "data-fast-react-head-boundary":
+      "[fast-react-head-boundary:resource-hint-insertion-update]"
   });
+  assert.equal(headBoundary.hostTag, "head");
+  assert.equal(headBoundary.sourceHeadRequestType, "host-singleton.head");
+  assert.equal(headBoundary.headContractId, "head-singleton");
+  assert.equal(
+    headBoundary.boundaryStatus,
+    resourceFormGate.privateResourceHintHeadBoundaryStatus
+  );
+  assert.equal(
+    headBoundary.executionStatus,
+    resourceFormGate.privateResourceHintHeadBoundaryExecutionStatus
+  );
+  assert.equal(headBoundary.sideEffects.fakeHeadBoundaryInvoked, true);
+  assert.equal(headBoundary.sideEffects.fakeHeadInsertionObserved, true);
+  assert.equal(headBoundary.sideEffects.fakeHeadUpdateApplied, true);
+  assert.equal(headBoundary.sideEffects.singletonsResolved, false);
+  assert.equal(headBoundary.sideEffects.headSingletonResolved, false);
+  assert.equal(headBoundary.sideEffects.publicHeadSingletonBehavior, false);
+  assert.equal(headBoundary.sideEffects.realDocumentMutated, false);
+  assert.equal(
+    headBoundary.sideEffects.publicResourceHintDomInsertion,
+    false
+  );
+  assert.equal(
+    headBoundary.publicHeadBoundary.publicSingletonBehavior,
+    false
+  );
+  assert.equal(
+    headBoundary.resourceElementPlan.singletonOwnershipClaimed,
+    false
+  );
+  assert.equal(
+    headBoundary.resourceElementPlan.updateAttributeNames[0],
+    "data-fast-react-head-boundary"
+  );
   assert.equal(JSON.stringify(insertion).includes("connect.example"), false);
+  assert.equal(
+    JSON.stringify(headBoundary).includes("connect.example"),
+    false
+  );
   assert.equal(
     oracle.intentionalGaps.some(
       (gap) => gap.id === "no-dom-or-server-rendering-resource-effects"

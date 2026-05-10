@@ -1777,6 +1777,292 @@ test('private resource hint fake-DOM insertion gate admits one deterministic pre
   );
 });
 
+test('private resource hint head-singleton boundary observes fake-DOM insertion and update only', () => {
+  const gate = resourceFormGate.createResourceFormActionInternalsGate({
+    requestIdPrefix: 'head-boundary-source'
+  });
+  const adapterGate = resourceFormGate.createResourceHintFakeDomAdapterGate({
+    requestIdPrefix: 'head-boundary-adapter'
+  });
+  const insertionGate = resourceFormGate.createResourceHintFakeDomInsertionGate({
+    requestIdPrefix: 'head-boundary-insertion'
+  });
+  const headBoundaryGate =
+    resourceFormGate.createResourceHintHeadBoundaryGate({
+      requestIdPrefix: 'head-boundary'
+    });
+  const fakeDom = createDeterministicFakeResourceDom();
+  const dispatcherRecord = gate.recordResourceHintDispatcherRequest('C', [
+    'https://connect.example.test',
+    ''
+  ]);
+  const headRecord = gate.recordSingletonRequest('head', [
+    throwingProxy('head singleton props')
+  ]);
+  const adapterAdmission = adapterGate.admitDispatcherRecord(
+    dispatcherRecord,
+    {
+      explicitAdmission: true,
+      adapterKind: 'deterministic-fake-dom',
+      adapterId: 'head-boundary-resource-adapter',
+      targetKind: 'document-head'
+    }
+  );
+  const insertion = insertionGate.insertAdapterAdmissionRecord(
+    adapterAdmission,
+    {
+      explicitInsertion: true,
+      insertionKind: 'deterministic-fake-dom-head-append',
+      insertionId: 'preconnect-head-boundary-insertion',
+      targetKind: 'document-head',
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head
+    }
+  );
+  const boundary = headBoundaryGate.recordInsertionUpdateBoundary(
+    insertion,
+    headRecord,
+    {
+      explicitBoundary: true,
+      boundaryKind:
+        'deterministic-fake-dom-head-singleton-insertion-update',
+      boundaryId: 'preconnect-head-boundary-update',
+      targetKind: 'document-head',
+      hostTag: 'head',
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head
+    }
+  );
+  const summary =
+    resourceFormGate.describePrivateResourceHintHeadBoundaryGate();
+
+  assert.equal(Object.isFrozen(boundary), true);
+  assert.equal(
+    resourceFormGate.isPrivateResourceHintHeadBoundaryRecord(boundary),
+    true
+  );
+  assert.equal(
+    resourceFormGate.getPrivateResourceHintHeadBoundaryRecordPayload(
+      boundary
+    ),
+    boundary
+  );
+  assert.deepEqual(summarizeHeadBoundary(boundary), {
+    boundaryId: 'head-boundary:1',
+    sourceInsertionId: 'head-boundary-insertion:1',
+    sourceHeadRequestId: 'head-boundary-source:2',
+    requestType: 'resource-hint-head-singleton-boundary.preconnect',
+    contractId: 'preconnect',
+    boundaryContractId: 'preconnect-head-singleton-boundary',
+    headContractId: 'head-singleton',
+    hostTag: 'head',
+    boundaryStatus: resourceFormGate.privateResourceHintHeadBoundaryStatus,
+    executionStatus:
+      resourceFormGate.privateResourceHintHeadBoundaryExecutionStatus,
+    elementPlan: {
+      elementTag: 'link',
+      relationship: 'preconnect',
+      insertedElementObserved: true,
+      updateApplied: true,
+      updateAttributeNames: ['data-fast-react-head-boundary']
+    }
+  });
+  assert.equal(boundary.status, resourceFormGate.unsupportedStatus);
+  assert.equal(boundary.unsupportedCode, unsupportedCode);
+  assert.equal(boundary.compatibilityTarget, compatibilityTarget);
+  assert.equal(
+    boundary.compatibilityStatus,
+    resourceFormGate.privateResourceHintHeadBoundaryCompatibilityBlockedStatus
+  );
+  assert.deepEqual(
+    boundary.sideEffects,
+    resourceFormGate.resourceHintHeadBoundarySideEffects
+  );
+  assert.equal(boundary.sideEffects.singletonsResolved, false);
+  assert.equal(boundary.sideEffects.fakeHeadBoundaryInvoked, true);
+  assert.equal(boundary.sideEffects.fakeHeadInsertionObserved, true);
+  assert.equal(boundary.sideEffects.fakeHeadUpdateApplied, true);
+  assert.equal(boundary.sideEffects.fakeHeadMutated, true);
+  assert.equal(boundary.sideEffects.fakeResourceElementInserted, false);
+  assert.equal(
+    boundary.sideEffects.fakeResourceElementAttributesApplied,
+    true
+  );
+  assert.equal(boundary.sideEffects.headSingletonResolved, false);
+  assert.equal(boundary.sideEffects.headSingletonAcquired, false);
+  assert.equal(boundary.sideEffects.headSingletonReleased, false);
+  assert.equal(boundary.sideEffects.headChildrenCleared, false);
+  assert.equal(boundary.sideEffects.publicHeadSingletonBehavior, false);
+  assert.equal(boundary.sideEffects.realDocumentMutated, false);
+  assert.equal(boundary.sideEffects.publicResourceHintDomInsertion, false);
+  assert.equal(boundary.sideEffects.publicRootTouched, false);
+  assert.equal(boundary.sideEffects.compatibilityClaimed, false);
+  assert.equal(boundary.sourceInsertion.elementInserted, true);
+  assert.equal(
+    boundary.sourceInsertion.publicResourceHintDomInsertion,
+    false
+  );
+  assert.equal(boundary.sourceHeadRequest.singletonsResolved, false);
+  assert.equal(
+    boundary.sourceHeadRequest.compatibilityClaimed,
+    false
+  );
+  assert.equal(boundary.boundaryAdmission.rawDocumentCaptured, false);
+  assert.equal(boundary.boundaryAdmission.rawHeadCaptured, false);
+  assert.equal(boundary.boundaryAdmission.rawElementCaptured, false);
+  assert.equal(
+    boundary.boundaryAdmission.singletonResolutionAllowed,
+    false
+  );
+  assert.equal(
+    boundary.boundaryAdmission.publicHeadSingletonBehavior,
+    false
+  );
+  assert.equal(boundary.resourceElementPlan.rawValuesRetained, false);
+  assert.equal(
+    boundary.resourceElementPlan.singletonResolutionAllowed,
+    false
+  );
+  assert.equal(
+    boundary.resourceElementPlan.singletonOwnershipClaimed,
+    false
+  );
+  assert.equal(
+    boundary.resourceElementPlan.publicHeadSingletonBehavior,
+    false
+  );
+  assert.equal(
+    boundary.publicResourceBoundary.publicResourceHintCallsReachable,
+    false
+  );
+  assert.equal(boundary.publicResourceBoundary.realDocumentMutated, false);
+  assert.equal(
+    boundary.publicHeadBoundary.publicSingletonBehavior,
+    false
+  );
+  assert.equal(
+    boundary.publicHeadBoundary.singletonResolutionReachable,
+    false
+  );
+  assert.equal(boundary.publicHeadBoundary.realDocumentMutated, false);
+  assert.equal(boundary.publicHeadBoundary.compatibilityClaimed, false);
+  assert.equal(fakeDom.head.childNodes.length, 1);
+  assert.deepEqual(fakeDom.head.childNodes[0].attributes, {
+    rel: 'preconnect',
+    href: '[fast-react-redacted-resource-hint:href]',
+    crossOrigin: '',
+    'data-fast-react-head-boundary':
+      '[fast-react-head-boundary:resource-hint-insertion-update]'
+  });
+  assert.deepEqual(fakeDom.log.map((entry) => entry.type), [
+    'document.createElement',
+    'element.setAttribute',
+    'element.setAttribute',
+    'element.setAttribute',
+    'head.appendChild',
+    'element.setAttribute'
+  ]);
+  assert.equal(JSON.stringify(boundary).includes('connect.example'), false);
+
+  assert.equal(
+    summary.gateId,
+    resourceFormGate.privateResourceHintHeadBoundaryGateId
+  );
+  assert.equal(summary.status, resourceFormGate.unsupportedStatus);
+  assert.equal(
+    summary.admissionStatus,
+    resourceFormGate.privateResourceHintHeadBoundaryAdmissionRequiredStatus
+  );
+  assert.deepEqual(summary.acceptsContractIds, ['preconnect', 'preload']);
+  assert.equal(summary.acceptedHostTag, 'head');
+  assert.equal(summary.maxBoundariesPerGate, 1);
+  assert.equal(summary.publicResourceHintDomInsertion, false);
+  assert.equal(summary.publicHeadSingletonBehavior, false);
+  assert.deepEqual(
+    summary.sideEffects,
+    resourceFormGate.resourceHintHeadBoundaryBlockedSideEffects
+  );
+
+  const error =
+    resourceFormGate.createUnsupportedResourceHintHeadBoundaryError(boundary);
+  assert.equal(error.name, 'FastReactDomUnimplementedError');
+  assert.equal(
+    error.code,
+    resourceFormGate.privateResourceHintHeadBoundaryGateErrorCode
+  );
+  assert.equal(
+    error.exportName,
+    'resource-hint-head-singleton-boundary.preconnect'
+  );
+  assert.equal(error.boundaryId, 'head-boundary:1');
+  assert.equal(error.sourceInsertionId, 'head-boundary-insertion:1');
+  assert.equal(error.sourceHeadRequestId, 'head-boundary-source:2');
+  assert.equal(error.boundaryContractId, 'preconnect-head-singleton-boundary');
+  assert.equal(error.hostTag, 'head');
+  assert.deepEqual(
+    error.sideEffects,
+    resourceFormGate.resourceHintHeadBoundarySideEffects
+  );
+
+  assert.throws(
+    () =>
+      headBoundaryGate.recordInsertionUpdateBoundary(insertion, headRecord, {
+        explicitBoundary: true,
+        fakeDocument: fakeDom.document,
+        fakeHead: fakeDom.head
+      }),
+    {
+      code:
+        resourceFormGate.privateResourceHintHeadBoundaryInvalidAdmissionCode,
+      compatibilityTarget,
+      reason:
+        'head boundary gate admits exactly one insertion/update record'
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate
+        .createResourceHintHeadBoundaryGate()
+        .recordInsertionUpdateBoundary(
+          insertion,
+          gate.recordSingletonRequest('body', []),
+          {
+            explicitBoundary: true,
+            fakeDocument: fakeDom.document,
+            fakeHead: fakeDom.head
+          }
+        ),
+    {
+      code: resourceFormGate.privateResourceHintHeadBoundaryInvalidRecordCode,
+      compatibilityTarget
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate
+        .createResourceHintHeadBoundaryGate()
+        .recordInsertionUpdateBoundary(insertion, headRecord, {
+          explicitBoundary: true,
+          fakeDocument: createDeterministicFakeResourceDom().document,
+          fakeHead: createDeterministicFakeResourceDom().head
+        }),
+    {
+      code:
+        resourceFormGate.privateResourceHintHeadBoundaryInvalidAdmissionCode,
+      compatibilityTarget,
+      reason:
+        'fakeHead must belong to the deterministic fake resource document'
+    }
+  );
+  assert.throws(
+    () => resourceFormGate.createUnsupportedResourceHintHeadBoundaryError({}),
+    {
+      code: resourceFormGate.privateResourceHintHeadBoundaryInvalidRecordCode,
+      compatibilityTarget
+    }
+  );
+});
+
 test('private resource hint dispatcher metadata rejects malformed or dispatching shapes', () => {
   const gate = resourceFormGate.createResourceFormActionInternalsGate({
     requestIdPrefix: 'resource-dispatcher-error-gate'
@@ -2130,6 +2416,11 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
     summary.sideEffects.fakeResourceElementAttributesApplied,
     false
   );
+  assert.equal(summary.sideEffects.fakeHeadBoundaryInvoked, false);
+  assert.equal(summary.sideEffects.fakeHeadInsertionObserved, false);
+  assert.equal(summary.sideEffects.fakeHeadUpdateApplied, false);
+  assert.equal(summary.sideEffects.headSingletonResolved, false);
+  assert.equal(summary.sideEffects.publicHeadSingletonBehavior, false);
   assert.equal(summary.sideEffects.realDocumentMutated, false);
   assert.equal(summary.sideEffects.publicResourceHintDomInsertion, false);
   assert.deepEqual(
@@ -2203,13 +2494,18 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
       resourceElementInserted: false,
       fakeDomInsertionGateInvoked: false,
       fakeResourceElementAttributesApplied: false,
+      fakeHeadBoundaryInvoked: false,
+      fakeHeadInsertionObserved: false,
+      fakeHeadUpdateApplied: false,
       resourceFetchStarted: false,
       realDocumentMutated: false,
       publicResourceHintDomInsertion: false,
       compatibilityClaimed: false,
       adapterGate: resourceFormGate.describePrivateResourceHintFakeDomAdapterGate(),
       insertionGate:
-        resourceFormGate.describePrivateResourceHintFakeDomInsertionGate()
+        resourceFormGate.describePrivateResourceHintFakeDomInsertionGate(),
+      headBoundaryGate:
+        resourceFormGate.describePrivateResourceHintHeadBoundaryGate()
     },
     controlledValueTrackerBoundary: {
       gateStatus: resourceFormGate.privateControlledValueTrackerBlockedStatus,
@@ -2370,6 +2666,14 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
       blockedRecord.sideEffects.fakeResourceElementAttributesApplied,
       false
     );
+    assert.equal(blockedRecord.sideEffects.fakeHeadBoundaryInvoked, false);
+    assert.equal(blockedRecord.sideEffects.fakeHeadInsertionObserved, false);
+    assert.equal(blockedRecord.sideEffects.fakeHeadUpdateApplied, false);
+    assert.equal(blockedRecord.sideEffects.headSingletonResolved, false);
+    assert.equal(
+      blockedRecord.sideEffects.publicHeadSingletonBehavior,
+      false
+    );
     assert.equal(blockedRecord.sideEffects.realDocumentMutated, false);
     assert.equal(
       blockedRecord.sideEffects.publicResourceHintDomInsertion,
@@ -2400,6 +2704,9 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
         adapterBoundary.fakeResourceElementAttributesApplied,
         false
       );
+      assert.equal(adapterBoundary.fakeHeadBoundaryInvoked, false);
+      assert.equal(adapterBoundary.fakeHeadInsertionObserved, false);
+      assert.equal(adapterBoundary.fakeHeadUpdateApplied, false);
       assert.equal(adapterBoundary.resourceFetchStarted, false);
       assert.equal(adapterBoundary.realDocumentMutated, false);
       assert.equal(adapterBoundary.publicResourceHintDomInsertion, false);
@@ -2410,6 +2717,10 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
       assert.deepEqual(
         adapterBoundary.insertionGate,
         resourceFormGate.describePrivateResourceHintFakeDomInsertionGate()
+      );
+      assert.deepEqual(
+        adapterBoundary.headBoundaryGate,
+        resourceFormGate.describePrivateResourceHintHeadBoundaryGate()
       );
     } else {
       assert.equal(
@@ -3104,6 +3415,30 @@ function summarizeFakeDomInsertion(insertion) {
       relationship: insertion.resourceElementPlan.relationship,
       insertionMethod: insertion.resourceElementPlan.insertionMethod,
       attributeNames: insertion.resourceElementPlan.attributeNames
+    }
+  };
+}
+
+function summarizeHeadBoundary(boundary) {
+  return {
+    boundaryId: boundary.boundaryId,
+    sourceInsertionId: boundary.sourceInsertionId,
+    sourceHeadRequestId: boundary.sourceHeadRequestId,
+    requestType: boundary.requestType,
+    contractId: boundary.contractId,
+    boundaryContractId: boundary.boundaryContractId,
+    headContractId: boundary.headContractId,
+    hostTag: boundary.hostTag,
+    boundaryStatus: boundary.boundaryStatus,
+    executionStatus: boundary.executionStatus,
+    elementPlan: {
+      elementTag: boundary.resourceElementPlan.elementTag,
+      relationship: boundary.resourceElementPlan.relationship,
+      insertedElementObserved:
+        boundary.resourceElementPlan.insertedElementObserved,
+      updateApplied: boundary.resourceElementPlan.updateApplied,
+      updateAttributeNames:
+        boundary.resourceElementPlan.updateAttributeNames
     }
   };
 }

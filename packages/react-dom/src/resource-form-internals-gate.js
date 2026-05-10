@@ -12,6 +12,7 @@ const resourceFormActionInternalsGateSchemaVersion = 1;
 const resourceHintDispatcherMetadataGateSchemaVersion = 1;
 const resourceHintFakeDomAdapterGateSchemaVersion = 1;
 const resourceHintFakeDomInsertionGateSchemaVersion = 1;
+const resourceHintHeadBoundaryGateSchemaVersion = 1;
 const controlledInputValueTrackerGateSchemaVersion = 1;
 const controlledInputValueTrackerFakeDomDiagnosticGateSchemaVersion = 1;
 const controlledInputPrivateWrapperGateSchemaVersion = 1;
@@ -23,6 +24,8 @@ const privateResourceHintFakeDomAdapterAdmissionRecordType =
   'fast.react_dom.private_resource_hint_fake_dom_adapter_admission_record';
 const privateResourceHintFakeDomInsertionRecordType =
   'fast.react_dom.private_resource_hint_fake_dom_insertion_record';
+const privateResourceHintHeadBoundaryRecordType =
+  'fast.react_dom.private_resource_hint_head_singleton_boundary_record';
 const privateControlledInputValueTrackerGateRecordType =
   'fast.react_dom.private_controlled_input_value_tracker_gate_record';
 const privateControlledInputValueTrackerFakeDomDiagnosticRecordType =
@@ -35,6 +38,8 @@ const privateResourceHintFakeDomAdapterGateId =
   'resource-hint-private-dispatcher-fake-dom-adapter-gate-1';
 const privateResourceHintFakeDomInsertionGateId =
   'resource-hint-private-fake-dom-insertion-gate-1';
+const privateResourceHintHeadBoundaryGateId =
+  'resource-hint-head-singleton-private-gate-1';
 const privateResourceHintFakeDomAdapterAdmissionRequiredStatus =
   'blocked-private-resource-hint-fake-dom-adapter-admission-required';
 const privateResourceHintFakeDomAdapterAdmissionStatus =
@@ -51,6 +56,14 @@ const privateResourceHintFakeDomInsertionExecutionStatus =
   'executed-private-resource-hint-deterministic-fake-dom-insertion';
 const privateResourceHintFakeDomInsertionCompatibilityBlockedStatus =
   'blocked-private-resource-hint-fake-dom-insertion-compatibility';
+const privateResourceHintHeadBoundaryAdmissionRequiredStatus =
+  'blocked-private-resource-hint-head-singleton-boundary-admission-required';
+const privateResourceHintHeadBoundaryStatus =
+  'admitted-private-resource-hint-head-singleton-insertion-update-boundary-record';
+const privateResourceHintHeadBoundaryExecutionStatus =
+  'executed-private-resource-hint-fake-dom-head-singleton-insertion-update-boundary';
+const privateResourceHintHeadBoundaryCompatibilityBlockedStatus =
+  'blocked-private-resource-hint-head-singleton-boundary-compatibility';
 const privateResourceFormActionGateErrorCode =
   'FAST_REACT_DOM_RESOURCE_FORM_ACTION_GATE';
 const privateResourceFormActionGateUnknownRequestCode =
@@ -73,6 +86,12 @@ const privateResourceHintFakeDomInsertionInvalidRecordCode =
   'FAST_REACT_DOM_RESOURCE_HINT_FAKE_DOM_INSERTION_INVALID_RECORD';
 const privateResourceHintFakeDomInsertionInvalidAdmissionCode =
   'FAST_REACT_DOM_RESOURCE_HINT_FAKE_DOM_INSERTION_INVALID_ADMISSION';
+const privateResourceHintHeadBoundaryGateErrorCode =
+  'FAST_REACT_DOM_RESOURCE_HINT_HEAD_SINGLETON_BOUNDARY_GATE';
+const privateResourceHintHeadBoundaryInvalidRecordCode =
+  'FAST_REACT_DOM_RESOURCE_HINT_HEAD_SINGLETON_BOUNDARY_INVALID_RECORD';
+const privateResourceHintHeadBoundaryInvalidAdmissionCode =
+  'FAST_REACT_DOM_RESOURCE_HINT_HEAD_SINGLETON_BOUNDARY_INVALID_ADMISSION';
 const privateControlledInputValueTrackerGateErrorCode =
   'FAST_REACT_DOM_CONTROLLED_INPUT_VALUE_TRACKER_GATE';
 const privateControlledInputValueTrackerGateUnknownScenarioCode =
@@ -184,6 +203,34 @@ const resourceHintFakeDomInsertionSideEffects = freezeRecord({
   publicResourceHintDomInsertion: false,
   publicRootTouched: false,
   compatibilityClaimed: false
+});
+
+const resourceHintHeadBoundaryBlockedSideEffects = freezeRecord({
+  ...resourceHintFakeDomInsertionBlockedSideEffects,
+  singletonsResolved: false,
+  fakeHeadBoundaryInvoked: false,
+  fakeHeadInsertionObserved: false,
+  fakeHeadUpdateApplied: false,
+  headSingletonResolved: false,
+  headSingletonAcquired: false,
+  headSingletonReleased: false,
+  headChildrenCleared: false,
+  publicHeadSingletonBehavior: false
+});
+
+const resourceHintHeadBoundarySideEffects = freezeRecord({
+  ...resourceHintFakeDomInsertionBlockedSideEffects,
+  singletonsResolved: false,
+  fakeHeadBoundaryInvoked: true,
+  fakeHeadInsertionObserved: true,
+  fakeHeadUpdateApplied: true,
+  fakeHeadMutated: true,
+  fakeResourceElementAttributesApplied: true,
+  headSingletonResolved: false,
+  headSingletonAcquired: false,
+  headSingletonReleased: false,
+  headChildrenCleared: false,
+  publicHeadSingletonBehavior: false
 });
 
 const controlledInputValueTrackerSideEffects = freezeRecord({
@@ -322,6 +369,24 @@ const resourceHintFakeDomInsertionMissingPrerequisites = freezeArray([
     'no-public-resource-hint-dom-insertion',
     'react-dom-resource',
     'Public resource hint APIs remain placeholders and do not reach fake or real DOM insertion.'
+  )
+]);
+
+const resourceHintHeadBoundaryMissingPrerequisites = freezeArray([
+  prerequisite(
+    'no-head-singleton-ownership',
+    'react-dom-resource',
+    'Head singleton resolution, acquisition, ownership, and release remain blocked.'
+  ),
+  prerequisite(
+    'no-real-head-resource-boundary',
+    'react-dom-resource',
+    'Only deterministic fake DOM head insertion/update diagnostics are admitted.'
+  ),
+  prerequisite(
+    'no-public-resource-or-singleton-root-behavior',
+    'react-dom-client',
+    'Public resource hints and singleton roots remain placeholder-gated.'
   )
 ]);
 
@@ -496,6 +561,23 @@ const resourceHintFakeDomInsertionContracts = freezeArray([
       'imageSizes',
       'media'
     ]
+  )
+]);
+
+const resourceHintHeadBoundaryContracts = freezeArray([
+  resourceHintHeadBoundaryContract(
+    'preconnect-head-singleton-boundary',
+    'preconnect',
+    'C',
+    'link',
+    'preconnect'
+  ),
+  resourceHintHeadBoundaryContract(
+    'preload-head-singleton-boundary',
+    'preload',
+    'L',
+    'link',
+    'preload'
   )
 ]);
 
@@ -704,6 +786,7 @@ const recordPayloads = new WeakMap();
 const resourceHintDispatcherMetadataPayloads = new WeakMap();
 const resourceHintFakeDomAdapterAdmissionPayloads = new WeakMap();
 const resourceHintFakeDomInsertionPayloads = new WeakMap();
+const resourceHintHeadBoundaryPayloads = new WeakMap();
 const controlledInputValueTrackerRecordPayloads = new WeakMap();
 const controlledInputValueTrackerFakeDomDiagnosticPayloads = new WeakMap();
 const controlledInputValueTrackerFakeDomDiagnosticStates = new WeakMap();
@@ -824,6 +907,25 @@ function createResourceHintFakeDomInsertionGate(options) {
         gateState,
         record,
         insertion
+      );
+    }
+  });
+}
+
+function createResourceHintHeadBoundaryGate(options) {
+  const gateState = createGateStateWithDefaultPrefix(
+    options,
+    'resource-hint-head-boundary'
+  );
+  gateState.headBoundaryConsumed = false;
+
+  return Object.freeze({
+    recordInsertionUpdateBoundary(insertionRecord, headRecord, boundary) {
+      return recordResourceHintHeadBoundaryWithGate(
+        gateState,
+        insertionRecord,
+        headRecord,
+        boundary
       );
     }
   });
@@ -964,6 +1066,14 @@ function isPrivateResourceHintFakeDomInsertionRecord(value) {
   return resourceHintFakeDomInsertionPayloads.has(value);
 }
 
+function getPrivateResourceHintHeadBoundaryRecordPayload(record) {
+  return resourceHintHeadBoundaryPayloads.get(record) || null;
+}
+
+function isPrivateResourceHintHeadBoundaryRecord(value) {
+  return resourceHintHeadBoundaryPayloads.has(value);
+}
+
 function getPrivateControlledInputValueTrackerRecordPayload(record) {
   return controlledInputValueTrackerRecordPayloads.get(record) || null;
 }
@@ -1009,6 +1119,7 @@ function describeResourceFormActionInternalsGate() {
       resourceHintDispatchers: resourceHintDispatcherMetadataContracts,
       resourceHintFakeDomAdapters: resourceHintFakeDomAdapterContracts,
       resourceHintFakeDomInsertions: resourceHintFakeDomInsertionContracts,
+      resourceHintHeadBoundaries: resourceHintHeadBoundaryContracts,
       singletons: singletonContracts,
       formActions: formActionContracts,
       controlledForms: controlledFormContracts,
@@ -1084,7 +1195,34 @@ function describePrivateResourceHintFakeDomInsertionGate() {
     publicResourceHintDomInsertion: false,
     contracts: resourceHintFakeDomInsertionContracts,
     sideEffects: resourceHintFakeDomInsertionBlockedSideEffects,
-    missingPrerequisites: resourceHintFakeDomInsertionMissingPrerequisites
+    missingPrerequisites: resourceHintFakeDomInsertionMissingPrerequisites,
+    headBoundary: describePrivateResourceHintHeadBoundaryGate()
+  });
+}
+
+function describePrivateResourceHintHeadBoundaryGate() {
+  return freezeRecord({
+    schemaVersion: resourceHintHeadBoundaryGateSchemaVersion,
+    gateId: privateResourceHintHeadBoundaryGateId,
+    compatibilityTarget,
+    status: unsupportedStatus,
+    unsupportedCode: unimplementedCode,
+    admissionStatus: privateResourceHintHeadBoundaryAdmissionRequiredStatus,
+    executionStatus: null,
+    compatibilityStatus:
+      privateResourceHintHeadBoundaryCompatibilityBlockedStatus,
+    acceptedInsertionRecordType: privateResourceHintFakeDomInsertionRecordType,
+    acceptedHeadRecordType: privateResourceFormActionGateRecordType,
+    acceptedHostTag: 'head',
+    acceptsContractIds: freezeArray(['preconnect', 'preload']),
+    maxBoundariesPerGate: 1,
+    deterministicFakeDomOnly: true,
+    rawValuesRetained: false,
+    publicResourceHintDomInsertion: false,
+    publicHeadSingletonBehavior: false,
+    contracts: resourceHintHeadBoundaryContracts,
+    sideEffects: resourceHintHeadBoundaryBlockedSideEffects,
+    missingPrerequisites: resourceHintHeadBoundaryMissingPrerequisites
   });
 }
 
@@ -1273,6 +1411,32 @@ function createUnsupportedResourceHintFakeDomInsertionError(record) {
   error.contractId = payload.contractId;
   error.privateDispatcherKey = payload.privateDispatcherKey;
   error.insertionStatus = payload.insertionStatus;
+  error.executionStatus = payload.executionStatus;
+  error.compatibilityStatus = payload.compatibilityStatus;
+  error.sideEffects = payload.sideEffects;
+
+  return error;
+}
+
+function createUnsupportedResourceHintHeadBoundaryError(record) {
+  const payload = assertPrivateResourceHintHeadBoundaryRecord(record);
+  const error = createUnsupportedError(
+    'react-dom/private-internals',
+    payload.requestType,
+    'was recorded',
+    'The private resource hint head singleton boundary gate is a deterministic fake-DOM diagnostic only.'
+  );
+
+  error.code = privateResourceHintHeadBoundaryGateErrorCode;
+  error.boundaryId = payload.boundaryId;
+  error.boundarySequence = payload.boundarySequence;
+  error.sourceInsertionId = payload.sourceInsertionId;
+  error.sourceHeadRequestId = payload.sourceHeadRequestId;
+  error.requestType = payload.requestType;
+  error.contractId = payload.contractId;
+  error.boundaryContractId = payload.boundaryContractId;
+  error.hostTag = payload.hostTag;
+  error.boundaryStatus = payload.boundaryStatus;
   error.executionStatus = payload.executionStatus;
   error.compatibilityStatus = payload.compatibilityStatus;
   error.sideEffects = payload.sideEffects;
@@ -1479,6 +1643,87 @@ function insertResourceHintFakeDomAdapterAdmissionRecordWithGate(
   });
 
   resourceHintFakeDomInsertionPayloads.set(payload, payload);
+  return payload;
+}
+
+function recordResourceHintHeadBoundaryWithGate(
+  gateState,
+  insertionRecord,
+  headRecord,
+  boundary
+) {
+  if (gateState.headBoundaryConsumed === true) {
+    throwInvalidResourceHintHeadBoundaryAdmission(
+      'head boundary gate admits exactly one insertion/update record'
+    );
+  }
+
+  const insertion =
+    assertFakeDomInsertionRecordForHeadBoundary(insertionRecord);
+  const headRequest = assertHeadSingletonRequestRecordForBoundary(headRecord);
+  const contract = getResourceHintHeadBoundaryContract(insertion.contractId);
+  const boundaryAdmission =
+    normalizeResourceHintHeadBoundaryAdmission(boundary);
+  const boundaryUpdate = applyFakeDomHeadBoundaryUpdate(
+    insertion,
+    boundary.fakeDocument,
+    boundary.fakeHead
+  );
+  gateState.headBoundaryConsumed = true;
+
+  const boundarySequence = gateState.nextRequestSequence++;
+  const boundaryId = `${gateState.requestIdPrefix}:${boundarySequence}`;
+
+  const payload = freezeRecord({
+    schemaVersion: resourceHintHeadBoundaryGateSchemaVersion,
+    $$typeof: privateResourceHintHeadBoundaryRecordType,
+    kind: 'FastReactDomPrivateResourceHintHeadSingletonBoundaryRecord',
+    gateId: privateResourceHintHeadBoundaryGateId,
+    compatibilityTarget,
+    status: unsupportedStatus,
+    unsupportedCode: unimplementedCode,
+    boundaryId,
+    boundarySequence,
+    sourceInsertionId: insertion.insertionId,
+    sourceInsertionSequence: insertion.insertionSequence,
+    sourceAdapterAdmissionId: insertion.sourceAdapterAdmissionId,
+    sourceRequestId: insertion.sourceRequestId,
+    sourceRequestSequence: insertion.sourceRequestSequence,
+    sourceRequestType: insertion.sourceRequestType,
+    sourceHeadRequestId: headRequest.requestId,
+    sourceHeadRequestSequence: headRequest.requestSequence,
+    sourceHeadRequestType: headRequest.requestType,
+    requestType: `resource-hint-head-singleton-boundary.${contract.resourceContractId}`,
+    requestName: insertion.requestName,
+    contractId: contract.resourceContractId,
+    boundaryContractId: contract.id,
+    headContractId: headRequest.contractId,
+    hostTag: 'head',
+    oracleKind: insertion.oracleKind,
+    oracleSchemaVersion: insertion.oracleSchemaVersion,
+    publicName: insertion.publicName,
+    privateDispatcherKey: insertion.privateDispatcherKey,
+    boundaryStatus: privateResourceHintHeadBoundaryStatus,
+    executionStatus: privateResourceHintHeadBoundaryExecutionStatus,
+    compatibilityStatus:
+      privateResourceHintHeadBoundaryCompatibilityBlockedStatus,
+    dispatcherShape: insertion.dispatcherShape,
+    insertionAdmission: insertion.insertionAdmission,
+    boundaryAdmission,
+    sourceInsertion: createResourceHintHeadBoundarySourceInsertion(insertion),
+    sourceHeadRequest:
+      createResourceHintHeadBoundarySourceHeadRequest(headRequest),
+    resourceElementPlan: createResourceHintHeadBoundaryResourceElementPlan(
+      contract,
+      boundaryUpdate
+    ),
+    publicResourceBoundary: createPublicResourceHintDomInsertionBoundary(),
+    publicHeadBoundary: createPublicHeadSingletonBoundary(),
+    sideEffects: resourceHintHeadBoundarySideEffects,
+    missingPrerequisites: resourceHintHeadBoundaryMissingPrerequisites
+  });
+
+  resourceHintHeadBoundaryPayloads.set(payload, payload);
   return payload;
 }
 
@@ -1905,6 +2150,25 @@ function getResourceHintFakeDomInsertionContract(contractId) {
   throw error;
 }
 
+function getResourceHintHeadBoundaryContract(contractId) {
+  for (const contract of resourceHintHeadBoundaryContracts) {
+    if (contract.resourceContractId === contractId) {
+      return contract;
+    }
+  }
+
+  const error = new Error(
+    `Unsupported private React DOM resource hint head singleton boundary contract: ${String(
+      contractId
+    )}.`
+  );
+  error.name = 'FastReactDomResourceHintHeadBoundaryGateError';
+  error.code = privateResourceHintHeadBoundaryInvalidRecordCode;
+  error.contractId = contractId;
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
 function assertPrivateResourceHintDispatcherMetadataRecord(record) {
   const payload =
     getPrivateResourceHintDispatcherMetadataRecordPayload(record);
@@ -1953,6 +2217,21 @@ function assertPrivateResourceHintFakeDomInsertionRecord(record) {
   throw error;
 }
 
+function assertPrivateResourceHintHeadBoundaryRecord(record) {
+  const payload = getPrivateResourceHintHeadBoundaryRecordPayload(record);
+  if (payload !== null) {
+    return payload;
+  }
+
+  const error = new Error(
+    'Expected a private React DOM resource hint head singleton boundary record.'
+  );
+  error.name = 'FastReactDomResourceHintHeadBoundaryGateError';
+  error.code = privateResourceHintHeadBoundaryInvalidRecordCode;
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
 function assertResourceHintDispatcherMetadataRecordForFakeDomAdapter(record) {
   const payload =
     getPrivateResourceHintDispatcherMetadataRecordPayload(record);
@@ -1989,6 +2268,53 @@ function assertFakeDomAdapterAdmissionRecordForInsertion(record) {
   );
   error.name = 'FastReactDomResourceHintFakeDomInsertionGateError';
   error.code = privateResourceHintFakeDomInsertionInvalidRecordCode;
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
+function assertFakeDomInsertionRecordForHeadBoundary(record) {
+  const payload = getPrivateResourceHintFakeDomInsertionRecordPayload(record);
+  if (
+    payload !== null &&
+    payload.insertionStatus === privateResourceHintFakeDomInsertionStatus &&
+    payload.executionStatus ===
+      privateResourceHintFakeDomInsertionExecutionStatus &&
+    payload.compatibilityStatus ===
+      privateResourceHintFakeDomInsertionCompatibilityBlockedStatus &&
+    payload.resourceElementPlan?.elementInserted === true &&
+    payload.publicResourceBoundary?.publicResourceHintCallsReachable === false
+  ) {
+    return payload;
+  }
+
+  const error = new Error(
+    'Expected an executed private React DOM resource hint fake DOM insertion record for the head boundary diagnostic.'
+  );
+  error.name = 'FastReactDomResourceHintHeadBoundaryGateError';
+  error.code = privateResourceHintHeadBoundaryInvalidRecordCode;
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
+function assertHeadSingletonRequestRecordForBoundary(record) {
+  const payload = getPrivateResourceFormActionGateRecordPayload(record);
+  if (
+    payload !== null &&
+    payload.behaviorArea === 'host-singleton' &&
+    payload.contractId === 'head-singleton' &&
+    payload.hostTag === 'head' &&
+    payload.status === unsupportedStatus &&
+    payload.sideEffects?.singletonsResolved === false &&
+    payload.sideEffects?.compatibilityClaimed === false
+  ) {
+    return payload;
+  }
+
+  const error = new Error(
+    'Expected a private React DOM head singleton gate record for the resource hint head boundary diagnostic.'
+  );
+  error.name = 'FastReactDomResourceHintHeadBoundaryGateError';
+  error.code = privateResourceHintHeadBoundaryInvalidRecordCode;
   error.compatibilityTarget = compatibilityTarget;
   throw error;
 }
@@ -2615,6 +2941,276 @@ function createPublicResourceHintDomInsertionBoundary() {
   });
 }
 
+function normalizeResourceHintHeadBoundaryAdmission(boundary) {
+  if (boundary == null || typeof boundary !== 'object') {
+    throwInvalidResourceHintHeadBoundaryAdmission(
+      'head boundary admission metadata must be an object'
+    );
+  }
+
+  if (boundary.explicitBoundary !== true) {
+    throwInvalidResourceHintHeadBoundaryAdmission(
+      'explicitBoundary must be true'
+    );
+  }
+
+  const boundaryKind = getAdmissionStringProperty(
+    boundary,
+    'boundaryKind',
+    'deterministic-fake-dom-head-singleton-insertion-update'
+  );
+  if (
+    boundaryKind !==
+    'deterministic-fake-dom-head-singleton-insertion-update'
+  ) {
+    throwInvalidResourceHintHeadBoundaryAdmission(
+      'boundaryKind must be deterministic-fake-dom-head-singleton-insertion-update'
+    );
+  }
+
+  const targetKind = getAdmissionStringProperty(
+    boundary,
+    'targetKind',
+    'document-head'
+  );
+  if (targetKind !== 'document-head') {
+    throwInvalidResourceHintHeadBoundaryAdmission(
+      'targetKind must be document-head'
+    );
+  }
+
+  const hostTag = getAdmissionStringProperty(boundary, 'hostTag', 'head');
+  if (hostTag !== 'head') {
+    throwInvalidResourceHintHeadBoundaryAdmission('hostTag must be head');
+  }
+
+  assertDeterministicFakeHeadBoundaryTarget(
+    boundary.fakeDocument,
+    boundary.fakeHead
+  );
+
+  return freezeRecord({
+    boundaryKind,
+    boundaryId: getAdmissionStringProperty(
+      boundary,
+      'boundaryId',
+      'anonymous-fake-dom-head-singleton-boundary'
+    ),
+    targetKind,
+    hostTag,
+    explicitBoundary: true,
+    deterministicFakeDomOnly: true,
+    rawDocumentCaptured: false,
+    rawHeadCaptured: false,
+    rawElementCaptured: false,
+    singletonResolutionAllowed: false,
+    singletonAcquisitionAllowed: false,
+    singletonReleaseAllowed: false,
+    publicHeadSingletonBehavior: false,
+    publicRootTouched: false,
+    compatibilityClaimed: false
+  });
+}
+
+function assertDeterministicFakeHeadBoundaryTarget(fakeDocument, fakeHead) {
+  if (
+    fakeDocument == null ||
+    typeof fakeDocument !== 'object' ||
+    fakeDocument.__fastReactFakeResourceDocument !== true
+  ) {
+    throwInvalidResourceHintHeadBoundaryAdmission(
+      'fakeDocument must be an explicit deterministic fake resource document'
+    );
+  }
+
+  if (
+    fakeHead == null ||
+    typeof fakeHead !== 'object' ||
+    fakeHead.__fastReactFakeResourceHead !== true ||
+    fakeHead.ownerDocument !== fakeDocument
+  ) {
+    throwInvalidResourceHintHeadBoundaryAdmission(
+      'fakeHead must belong to the deterministic fake resource document'
+    );
+  }
+
+  if (!Array.isArray(fakeHead.childNodes)) {
+    throwInvalidResourceHintHeadBoundaryAdmission(
+      'fakeHead must expose deterministic childNodes for inserted resources'
+    );
+  }
+}
+
+function applyFakeDomHeadBoundaryUpdate(insertionRecord, fakeDocument, fakeHead) {
+  const element = findInsertedFakeHeadResourceElement(
+    insertionRecord,
+    fakeDocument,
+    fakeHead
+  );
+  const updateAttribute = insertionAttribute(
+    'data-fast-react-head-boundary',
+    'diagnostic-constant',
+    '[fast-react-head-boundary:resource-hint-insertion-update]'
+  );
+
+  element.node.setAttribute(updateAttribute.name, updateAttribute.value);
+
+  return freezeRecord({
+    childIndex: element.index,
+    childNodeName: element.node.nodeName,
+    insertedElementObserved: true,
+    updateApplied: true,
+    updateAttributeNames: freezeArray([updateAttribute.name]),
+    updateAttributeValueKinds: freezeArray([
+      freezeRecord({
+        name: updateAttribute.name,
+        valueKind: updateAttribute.valueKind,
+        rawValueRetained: false
+      })
+    ])
+  });
+}
+
+function findInsertedFakeHeadResourceElement(
+  insertionRecord,
+  fakeDocument,
+  fakeHead
+) {
+  const expectedNodeName =
+    insertionRecord.resourceElementPlan.elementTag.toUpperCase();
+  const expectedRelationship = insertionRecord.resourceElementPlan.relationship;
+
+  for (let index = fakeHead.childNodes.length - 1; index >= 0; index--) {
+    const node = fakeHead.childNodes[index];
+    if (
+      isDeterministicFakeHeadBoundaryResourceElement(
+        node,
+        fakeDocument,
+        fakeHead,
+        expectedNodeName,
+        expectedRelationship
+      )
+    ) {
+      return {index, node};
+    }
+  }
+
+  throwInvalidResourceHintHeadBoundaryAdmission(
+    'fakeHead must contain the inserted deterministic resource element'
+  );
+}
+
+function isDeterministicFakeHeadBoundaryResourceElement(
+  node,
+  fakeDocument,
+  fakeHead,
+  expectedNodeName,
+  expectedRelationship
+) {
+  if (
+    node == null ||
+    typeof node !== 'object' ||
+    node.__fastReactFakeResourceElement !== true ||
+    node.ownerDocument !== fakeDocument ||
+    node.parentNode !== fakeHead ||
+    node.nodeName !== expectedNodeName ||
+    typeof node.setAttribute !== 'function'
+  ) {
+    return false;
+  }
+
+  const attributes = node.attributes;
+  return (
+    attributes != null &&
+    typeof attributes === 'object' &&
+    attributes.rel === expectedRelationship
+  );
+}
+
+function createResourceHintHeadBoundarySourceInsertion(insertion) {
+  return freezeRecord({
+    insertionId: insertion.insertionId,
+    insertionSequence: insertion.insertionSequence,
+    insertionStatus: insertion.insertionStatus,
+    executionStatus: insertion.executionStatus,
+    compatibilityStatus: insertion.compatibilityStatus,
+    contractId: insertion.contractId,
+    elementTag: insertion.resourceElementPlan.elementTag,
+    relationship: insertion.resourceElementPlan.relationship,
+    insertionMethod: insertion.resourceElementPlan.insertionMethod,
+    elementInserted: insertion.resourceElementPlan.elementInserted,
+    publicResourceHintDomInsertion:
+      insertion.resourceElementPlan.publicResourceHintDomInsertion,
+    compatibilityClaimed: insertion.resourceElementPlan.compatibilityClaimed,
+    sideEffects: insertion.sideEffects
+  });
+}
+
+function createResourceHintHeadBoundarySourceHeadRequest(headRequest) {
+  return freezeRecord({
+    requestId: headRequest.requestId,
+    requestSequence: headRequest.requestSequence,
+    requestType: headRequest.requestType,
+    behaviorArea: headRequest.behaviorArea,
+    contractId: headRequest.contractId,
+    hostTag: headRequest.hostTag,
+    status: headRequest.status,
+    singletonsResolved: false,
+    publicRootTouched: false,
+    compatibilityClaimed: false,
+    sideEffects: headRequest.sideEffects
+  });
+}
+
+function createResourceHintHeadBoundaryResourceElementPlan(
+  contract,
+  boundaryUpdate
+) {
+  return freezeRecord({
+    boundaryContractId: contract.id,
+    adapterContractId: contract.resourceContractId,
+    privateDispatcherKey: contract.privateDispatcherKey,
+    targetKind: 'document-head',
+    hostTag: 'head',
+    elementTag: contract.elementTag,
+    relationship: contract.relationship,
+    insertionMethod: 'appendChild',
+    insertedElementObserved: boundaryUpdate.insertedElementObserved,
+    childIndex: boundaryUpdate.childIndex,
+    childNodeName: boundaryUpdate.childNodeName,
+    updateApplied: boundaryUpdate.updateApplied,
+    updateAttributeNames: boundaryUpdate.updateAttributeNames,
+    updateAttributeValueKinds: boundaryUpdate.updateAttributeValueKinds,
+    normalizedDispatcherRecordRequired: true,
+    fakeDocumentMarkerRequired: true,
+    fakeHeadMarkerRequired: true,
+    rawValuesRetained: false,
+    singletonResolutionAllowed: false,
+    singletonOwnershipClaimed: false,
+    resourceFetchStarted: false,
+    stylesheetPrecedenceApplied: false,
+    publicResourceHintDomInsertion: false,
+    publicHeadSingletonBehavior: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createPublicHeadSingletonBoundary() {
+  return freezeRecord({
+    status: 'blocked-public-head-singleton-boundary',
+    hostTag: 'head',
+    publicSingletonBehavior: false,
+    singletonResolutionReachable: false,
+    singletonAcquisitionReachable: false,
+    singletonReleaseReachable: false,
+    headAttributesMutated: false,
+    headChildrenCleared: false,
+    realDocumentMutated: false,
+    publicRootTouched: false,
+    compatibilityClaimed: false
+  });
+}
+
 function getAdmissionStringProperty(record, key, fallback) {
   const value = record[key];
   return typeof value === 'string' && value.length > 0 ? value : fallback;
@@ -2637,6 +3233,17 @@ function throwInvalidResourceHintFakeDomAdapterAdmission(reason) {
   );
   error.name = 'FastReactDomResourceHintFakeDomAdapterGateError';
   error.code = privateResourceHintFakeDomAdapterInvalidAdmissionCode;
+  error.compatibilityTarget = compatibilityTarget;
+  error.reason = reason;
+  throw error;
+}
+
+function throwInvalidResourceHintHeadBoundaryAdmission(reason) {
+  const error = new Error(
+    `Invalid private React DOM resource hint head singleton boundary admission: ${reason}.`
+  );
+  error.name = 'FastReactDomResourceHintHeadBoundaryGateError';
+  error.code = privateResourceHintHeadBoundaryInvalidAdmissionCode;
   error.compatibilityTarget = compatibilityTarget;
   error.reason = reason;
   throw error;
@@ -3414,6 +4021,28 @@ function resourceHintFakeDomInsertionContract(
   });
 }
 
+function resourceHintHeadBoundaryContract(
+  id,
+  resourceContractId,
+  privateDispatcherKey,
+  elementTag,
+  relationship
+) {
+  return freezeRecord({
+    id,
+    resourceContractId,
+    privateDispatcherKey,
+    hostTag: 'head',
+    headContractId: 'head-singleton',
+    elementTag,
+    relationship,
+    capability: 'react-dom-resource-hint-head-singleton-boundary',
+    oracleKind: resourceHintOracleKind,
+    deterministicFakeDomOnly: true,
+    compatibilityClaimed: false
+  });
+}
+
 function singletonContract(id, hostTag) {
   return freezeRecord({
     id,
@@ -3556,10 +4185,12 @@ module.exports = {
   createControlledInputValueTrackerGate,
   createResourceHintFakeDomAdapterGate,
   createResourceHintFakeDomInsertionGate,
+  createResourceHintHeadBoundaryGate,
   createResourceFormActionInternalsGate,
   createUnsupportedControlledInputValueTrackerError,
   createUnsupportedResourceHintFakeDomAdapterError,
   createUnsupportedResourceHintFakeDomInsertionError,
+  createUnsupportedResourceHintHeadBoundaryError,
   createUnsupportedResourceFormActionInternalsError,
   createUnsupportedResourceHintDispatcherMetadataError,
   describeControlledInputValueTrackerGate,
@@ -3567,6 +4198,7 @@ module.exports = {
   describeControlledInputPrivateWrapperPropertyPayloadGate,
   describePrivateResourceHintFakeDomAdapterGate,
   describePrivateResourceHintFakeDomInsertionGate,
+  describePrivateResourceHintHeadBoundaryGate,
   describePrivateResourceHintDispatcherMetadataGate,
   describeResourceFormActionInternalsGate,
   formActionContracts,
@@ -3576,10 +4208,12 @@ module.exports = {
   getPrivateControlledInputWrapperPropertyPayloadRecordPayload,
   getPrivateResourceHintFakeDomAdapterAdmissionRecordPayload,
   getPrivateResourceHintFakeDomInsertionRecordPayload,
+  getPrivateResourceHintHeadBoundaryRecordPayload,
   getPrivateResourceFormActionGateRecordPayload,
   getPrivateResourceHintDispatcherMetadataRecordPayload,
   isPrivateResourceHintFakeDomAdapterAdmissionRecord,
   isPrivateResourceHintFakeDomInsertionRecord,
+  isPrivateResourceHintHeadBoundaryRecord,
   isPrivateControlledInputValueTrackerRecord,
   isPrivateControlledInputValueTrackerFakeDomDiagnosticRecord,
   isPrivateControlledInputWrapperPropertyPayloadRecord,
@@ -3617,6 +4251,15 @@ module.exports = {
   privateResourceHintFakeDomInsertionInvalidRecordCode,
   privateResourceHintFakeDomInsertionRecordType,
   privateResourceHintFakeDomInsertionStatus,
+  privateResourceHintHeadBoundaryAdmissionRequiredStatus,
+  privateResourceHintHeadBoundaryCompatibilityBlockedStatus,
+  privateResourceHintHeadBoundaryExecutionStatus,
+  privateResourceHintHeadBoundaryGateErrorCode,
+  privateResourceHintHeadBoundaryGateId,
+  privateResourceHintHeadBoundaryInvalidAdmissionCode,
+  privateResourceHintHeadBoundaryInvalidRecordCode,
+  privateResourceHintHeadBoundaryRecordType,
+  privateResourceHintHeadBoundaryStatus,
   privateResourceHintDispatcherMetadataGateErrorCode,
   privateResourceHintDispatcherMetadataGateId,
   privateResourceHintDispatcherMetadataInvalidShapeCode,
@@ -3640,6 +4283,11 @@ module.exports = {
   resourceHintFakeDomInsertionGateSchemaVersion,
   resourceHintFakeDomInsertionMissingPrerequisites,
   resourceHintFakeDomInsertionSideEffects,
+  resourceHintHeadBoundaryBlockedSideEffects,
+  resourceHintHeadBoundaryContracts,
+  resourceHintHeadBoundaryGateSchemaVersion,
+  resourceHintHeadBoundaryMissingPrerequisites,
+  resourceHintHeadBoundarySideEffects,
   resourceHintDispatcherMetadataContracts,
   resourceHintDispatcherMetadataGateSchemaVersion,
   resourceHintDispatcherMissingPrerequisites,
