@@ -51,7 +51,9 @@ const {
   createPortalPrepareMountListenerIntentRecord:
     createPortalPrepareMountEventListenerIntentRecord,
   describePortalContainerListenerGuard,
+  getPrivateRootHostOutputClickDispatchCanaryPayload,
   getPortalPrepareMountListenerIntentPayload,
+  isPrivateRootHostOutputClickDispatchCanaryRecord,
   privatePortalPrepareMountListenerIntentRecordType:
     privateEventPortalPrepareMountListenerIntentRecordType,
   privateRootListenerCleanupRecordType,
@@ -62,8 +64,10 @@ const {
 const {
   createPortalEventOwnerRootGateRecord:
     createPluginPortalEventOwnerRootGateRecord,
+  getDispatchListenerErrorRouteRecordPayload,
   getPortalEventOwnerRootGateRecordPayload:
     getPluginPortalEventOwnerRootGateRecordPayload,
+  isDispatchListenerErrorRouteRecord,
   isPortalEventOwnerRootGateRecord:
     isPluginPortalEventOwnerRootGateRecord
 } = require('../events/plugin-event-system.js');
@@ -145,6 +149,8 @@ const privateRootRefCallbackHostOutputOrderingDiagnosticRecordType =
   'fast.react_dom.private_root_ref_callback_host_output_ordering_diagnostic_record';
 const privateRootRefCallbackErrorRoutingRecordType =
   'fast.react_dom.private_root_ref_callback_error_routing_record';
+const privateRootEventListenerErrorRoutingRecordType =
+  'fast.react_dom.private_root_event_listener_error_routing_record';
 const privateRootPublicFacadeAdapterType =
   'fast.react_dom.private_root_public_facade_adapter';
 const privateRootPublicFacadeRootType =
@@ -222,6 +228,10 @@ const ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC_ADMITTED =
   'admitted-private-root-ref-callback-host-output-ordering-diagnostic';
 const ROOT_BRIDGE_REF_CALLBACK_ERROR_ROUTING_RECORDED =
   'recorded-private-root-ref-callback-error-routing';
+const ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_RECORDED =
+  'recorded-private-root-event-listener-error-routing';
+const ROOT_BRIDGE_ROOT_ERROR_OPTION_CALLBACK_ACCEPTED =
+  'accepted-private-root-error-option-callback-record';
 const ROOT_BRIDGE_PUBLIC_FACADE_ADAPTER_READY =
   'ready-private-react-dom-client-root-public-facade-adapter';
 const ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_READY =
@@ -1049,6 +1059,60 @@ const ROOT_BRIDGE_REF_CALLBACK_ERROR_ROUTING_BLOCKED_CAPABILITIES =
         'React DOM ref error propagation compatibility is not claimed by this private record.'
     })
   ]);
+const ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_ACCEPTED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'private-listener-error-route',
+      accepted: true,
+      reason:
+        'The diagnostic consumes listener error route records captured by the private dispatch-queue canary.'
+    }),
+    freezeRecord({
+      id: 'root-error-option-callback-metadata',
+      accepted: true,
+      reason:
+        'Root onUncaughtError, onCaughtError, and onRecoverableError options are preserved as metadata-only callback records.'
+    })
+  ]);
+const ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_BLOCKED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'public-root-execution',
+      blocked: true,
+      reason:
+        'The routing record consumes private bridge metadata and does not execute public React DOM roots.'
+    }),
+    freezeRecord({
+      id: 'browser-dom-event-dispatch',
+      blocked: true,
+      reason:
+        'The listener error came from a private fake-DOM canary, not from browser DOM event dispatch.'
+    }),
+    freezeRecord({
+      id: 'report-global-error',
+      blocked: true,
+      reason:
+        'The diagnostic records reportGlobalError routing metadata without reporting globally.'
+    }),
+    freezeRecord({
+      id: 'root-error-update-scheduling',
+      blocked: true,
+      reason:
+        'Captured event listener errors are not scheduled as root error updates by this private record.'
+    }),
+    freezeRecord({
+      id: 'public-root-error-callback-invocation',
+      blocked: true,
+      reason:
+        'Root onUncaughtError, onCaughtError, and onRecoverableError callbacks are preserved as metadata only.'
+    }),
+    freezeRecord({
+      id: 'compatibility-claims',
+      blocked: true,
+      reason:
+        'React DOM event error or root error callback compatibility is not claimed by this private record.'
+    })
+  ]);
 const ROOT_BRIDGE_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHT_ACCEPTED_CAPABILITIES = freezeArray([
   freezeRecord({
     id: 'public-facade-create-root-record',
@@ -1138,6 +1202,7 @@ const rootCommitRefMetadataPayloads = new WeakMap();
 const rootCommitRefMetadataRecordsByRequest = new WeakMap();
 const rootRefCallbackHostOutputOrderingDiagnosticPayloads = new WeakMap();
 const rootRefCallbackErrorRoutingPayloads = new WeakMap();
+const rootEventListenerErrorRoutingPayloads = new WeakMap();
 const rootPublicFacadeAdapterPayloads = new WeakMap();
 const rootPublicFacadeRootPayloads = new WeakMap();
 const rootPublicFacadePreflightPayloads = new WeakMap();
@@ -1317,6 +1382,18 @@ function createPrivateRootBridgeShell(options) {
       return createRefCallbackRootErrorRoutingRecordWithBridge(
         bridgeState,
         rootRequestRecords,
+        options
+      );
+    },
+    createEventListenerRootErrorRouting(
+      rootRequestRecords,
+      eventDispatchCanaryRecord,
+      options
+    ) {
+      return createEventListenerRootErrorRoutingRecordWithBridge(
+        bridgeState,
+        rootRequestRecords,
+        eventDispatchCanaryRecord,
         options
       );
     }
@@ -2044,6 +2121,19 @@ function createRefCallbackRootErrorRoutingRecord(rootRequestRecords, options) {
   return createRefCallbackRootErrorRoutingRecordWithBridge(
     null,
     rootRequestRecords,
+    options
+  );
+}
+
+function createEventListenerRootErrorRoutingRecord(
+  rootRequestRecords,
+  eventDispatchCanaryRecord,
+  options
+) {
+  return createEventListenerRootErrorRoutingRecordWithBridge(
+    null,
+    rootRequestRecords,
+    eventDispatchCanaryRecord,
     options
   );
 }
@@ -3207,6 +3297,14 @@ function getPrivateRootRefCallbackErrorRoutingPayload(record) {
 
 function isPrivateRootRefCallbackErrorRoutingRecord(value) {
   return rootRefCallbackErrorRoutingPayloads.has(value);
+}
+
+function getPrivateRootEventListenerErrorRoutingPayload(record) {
+  return rootEventListenerErrorRoutingPayloads.get(record) || null;
+}
+
+function isPrivateRootEventListenerErrorRoutingRecord(value) {
+  return rootEventListenerErrorRoutingPayloads.has(value);
 }
 
 function getPrivateRootPublicFacadeAdapterPayload(adapter) {
@@ -5553,6 +5651,130 @@ function createRefCallbackRootErrorRoutingRecordWithBridge(
   return record;
 }
 
+function createEventListenerRootErrorRoutingRecordWithBridge(
+  bridgeState,
+  rootRequestRecords,
+  eventDispatchCanaryRecord,
+  options
+) {
+  const requestValidation = validateEventListenerRootErrorRoutingRequests(
+    bridgeState,
+    rootRequestRecords
+  );
+  const eventValidation = validateEventListenerRootErrorRoutingCanary(
+    requestValidation,
+    eventDispatchCanaryRecord
+  );
+  const rootErrorCallbacks = describeRootErrorCallbacks(
+    requestValidation.rootHandleState.rootOptions
+  );
+  const routingOptions = normalizeEventListenerRootErrorRoutingOptions(options);
+  const rootErrorOptionCallbackRecords = freezeArray(
+    eventValidation.listenerErrorRoutes.map((errorRoute, index) =>
+      createEventListenerRootErrorOptionCallbackRecord({
+        errorRoute,
+        errorRoutePayload: eventValidation.listenerErrorRoutePayloads[index],
+        index,
+        requestValidation,
+        rootErrorCallbacks,
+        routingOptions
+      })
+    )
+  );
+  const record = freezeRecord({
+    $$typeof: privateRootEventListenerErrorRoutingRecordType,
+    kind: 'FastReactDomPrivateRootEventListenerErrorRoutingRecord',
+    routingStatus: ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_RECORDED,
+    executionStatus: ROOT_BRIDGE_EXECUTION_BLOCKED,
+    compatibilityStatus: ROOT_BRIDGE_COMPATIBILITY_BLOCKED,
+    rootId: requestValidation.rootId,
+    rootKind: requestValidation.rootKind,
+    rootTag: requestValidation.rootTag,
+    sourceRequestCount: requestValidation.records.length,
+    sourceRequestIds: freezeArray(
+      requestValidation.records.map((requestRecord) => requestRecord.requestId)
+    ),
+    sourceRequestTypes: freezeArray(
+      requestValidation.records.map(
+        (requestRecord) => requestRecord.requestType
+      )
+    ),
+    sourceOperations: freezeArray(
+      requestValidation.records.map((requestRecord) => requestRecord.operation)
+    ),
+    sourceEventRecordKind: eventValidation.eventDispatchCanaryRecord.kind,
+    sourceEventRecordStatus: eventValidation.eventDispatchCanaryRecord.status,
+    sourceEventRecordDomEventName:
+      eventValidation.eventDispatchCanaryRecord.domEventName,
+    eventErrorRouteSource:
+      'private-root-host-output-click-dispatch-canary',
+    rootErrorOptionCallbackRecordStatus:
+      ROOT_BRIDGE_ROOT_ERROR_OPTION_CALLBACK_ACCEPTED,
+    rootErrorOptionCallbackRecordCount:
+      rootErrorOptionCallbackRecords.length,
+    rootErrorOptionCallbackRecords,
+    listenerErrorCount:
+      eventValidation.eventDispatchCanaryRecord.listenerErrorCount,
+    listenerErrorRouteCount: eventValidation.listenerErrorRoutes.length,
+    capturedErrorCount: eventValidation.listenerErrorRoutes.length,
+    rootErrorChannel: 'event-listener-reportGlobalError',
+    rootErrorCallbacks,
+    onUncaughtErrorConfigured:
+      rootErrorCallbacks.onUncaughtError.configured,
+    onCaughtErrorConfigured: rootErrorCallbacks.onCaughtError.configured,
+    onRecoverableErrorConfigured:
+      rootErrorCallbacks.onRecoverableError.configured,
+    acceptedCapabilities:
+      ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_ACCEPTED_CAPABILITIES,
+    blockedCapabilities:
+      ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_BLOCKED_CAPABILITIES,
+    publicRootExecution: false,
+    publicRootObjectExposed: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    rootErrorUpdatesScheduled: false,
+    publicRootErrorCallbacksInvoked: false,
+    rootErrorCallbackInvocationCount: 0,
+    reportGlobalErrorInvoked: false,
+    eventListenerErrorsReported: false,
+    rootErrorsReported: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    privateCanaryInvocation: true,
+    browserDomEventCompatibilityClaimed: false,
+    publicDispatchEnabled: false,
+    publicRootBehaviorChanged: false,
+    compatibilityClaimed: false,
+    exposesErrorValue: false,
+    exposesListener: false,
+    exposesNativeEvent: false,
+    exposesSyntheticEvent: false
+  });
+
+  rootEventListenerErrorRoutingPayloads.set(
+    record,
+    freezeRecord({
+      bridgeState: requestValidation.bridgeState,
+      eventDispatchCanaryPayload: eventValidation.eventDispatchCanaryPayload,
+      eventDispatchCanaryRecord: eventValidation.eventDispatchCanaryRecord,
+      listenerErrorRoutePayloads:
+        eventValidation.listenerErrorRoutePayloads,
+      listenerErrorRoutes: eventValidation.listenerErrorRoutes,
+      options: routingOptions.rawOptions,
+      rootErrorCallbacks,
+      rootErrorOptionCallbackRecords,
+      rootOptions: requestValidation.rootHandleState.rootOptions,
+      rootRequestRecords: requestValidation.records
+    })
+  );
+
+  return record;
+}
+
 function createNativeBridgeHandle(bridgeState, kind) {
   return freezeRecord({
     $$typeof: privateRootNativeBridgeHandleType,
@@ -7631,6 +7853,301 @@ function validateRefCallbackRootErrorRoutingRequests(
   };
 }
 
+function validateEventListenerRootErrorRoutingRequests(
+  bridgeState,
+  rootRequestRecords
+) {
+  if (!Array.isArray(rootRequestRecords) || rootRequestRecords.length === 0) {
+    throwInvalidEventListenerRootErrorRouting(
+      'Event listener root error routing requires private root request records.'
+    );
+  }
+
+  const validations = rootRequestRecords.map((record) => ({
+    record,
+    validation: validateRootBridgeRequestRecord(record)
+  }));
+  const firstValidation = validations[0].validation;
+  if (firstValidation.operation === 'hydrate') {
+    throwInvalidEventListenerRootErrorRouting(
+      'Event listener root error routing does not support hydration records.'
+    );
+  }
+  if (bridgeState !== null && firstValidation.bridgeState !== bridgeState) {
+    throwForeignRootBridgeRequest();
+  }
+
+  const rootId = validations[0].record.rootId;
+  const rootKind = validations[0].record.rootKind;
+  const rootTag = validations[0].record.rootTag;
+  const eligibleRequests = [];
+  let rootOwner = null;
+
+  for (const {record, validation} of validations) {
+    if (validation.operation === 'hydrate') {
+      throwInvalidEventListenerRootErrorRouting(
+        'Event listener root error routing does not support hydration records.'
+      );
+    }
+    if (bridgeState !== null && validation.bridgeState !== bridgeState) {
+      throwForeignRootBridgeRequest();
+    }
+    if (validation.bridgeState !== firstValidation.bridgeState) {
+      throwInvalidEventListenerRootErrorRouting(
+        'Event listener root error routing requires one private root bridge shell.'
+      );
+    }
+    if (
+      record.rootId !== rootId ||
+      record.rootKind !== rootKind ||
+      record.rootTag !== rootTag
+    ) {
+      throwInvalidEventListenerRootErrorRouting(
+        'Event listener root error routing requires one root identity.'
+      );
+    }
+
+    const requestRootOwner = getRootOwnerFromRootBridgeRequestRecord(record);
+    if (requestRootOwner !== null) {
+      if (rootOwner === null) {
+        rootOwner = requestRootOwner;
+      } else if (rootOwner !== requestRootOwner) {
+        throwInvalidEventListenerRootErrorRouting(
+          'Event listener root error routing requires one root owner.'
+        );
+      }
+    }
+
+    if (record.operation === 'render') {
+      eligibleRequests.push(record);
+    }
+  }
+
+  if (eligibleRequests.length === 0) {
+    throwInvalidEventListenerRootErrorRouting(
+      'Event listener root error routing requires a private root.render request.'
+    );
+  }
+  if (rootOwner === null) {
+    throwInvalidEventListenerRootErrorRouting(
+      'Event listener root error routing requires a private root owner.'
+    );
+  }
+
+  return {
+    bridgeState: firstValidation.bridgeState,
+    records: validations.map(({record}) => record),
+    rootHandleState: firstValidation.rootHandleState,
+    rootId,
+    rootKind,
+    rootOwner,
+    rootTag
+  };
+}
+
+function validateEventListenerRootErrorRoutingCanary(
+  requestValidation,
+  eventDispatchCanaryRecord
+) {
+  const eventDispatchCanaryPayload =
+    getPrivateRootHostOutputClickDispatchCanaryPayload(
+      eventDispatchCanaryRecord
+    );
+  if (
+    eventDispatchCanaryPayload === null ||
+    !isPrivateRootHostOutputClickDispatchCanaryRecord(
+      eventDispatchCanaryRecord
+    )
+  ) {
+    throwInvalidEventListenerRootErrorRouting(
+      'Event listener root error routing requires a private root host-output click dispatch canary record.'
+    );
+  }
+  if (
+    eventDispatchCanaryRecord.listenerErrorRoutingDiagnosticEnabled !== true
+  ) {
+    throwInvalidEventListenerRootErrorRouting(
+      'Event listener root error routing requires listener error routing diagnostics to be enabled.'
+    );
+  }
+  if (
+    eventDispatchCanaryPayload.targetPayload.targetRootOwner !==
+    requestValidation.rootOwner
+  ) {
+    throwInvalidEventListenerRootErrorRouting(
+      'Event listener root error routing requires an event target from the same private root owner.'
+    );
+  }
+
+  const listenerErrorRoutes = Array.isArray(
+    eventDispatchCanaryRecord.listenerErrorRoutes
+  )
+    ? eventDispatchCanaryRecord.listenerErrorRoutes
+    : [];
+  if (
+    listenerErrorRoutes.length === 0 ||
+    eventDispatchCanaryRecord.listenerErrorRouteCount !==
+      listenerErrorRoutes.length
+  ) {
+    throwInvalidEventListenerRootErrorRouting(
+      'Event listener root error routing requires captured listener error route records.'
+    );
+  }
+
+  const listenerErrorRoutePayloads = [];
+  for (const errorRoute of listenerErrorRoutes) {
+    const routePayload =
+      getDispatchListenerErrorRouteRecordPayload(errorRoute);
+    if (
+      !isDispatchListenerErrorRouteRecord(errorRoute) ||
+      routePayload === null ||
+      errorRoute.errorRouteTarget !== 'reportGlobalError' ||
+      errorRoute.errorReported !== false
+    ) {
+      throwInvalidEventListenerRootErrorRouting(
+        'Event listener root error routing requires blocked reportGlobalError route records.'
+      );
+    }
+    listenerErrorRoutePayloads.push(routePayload);
+  }
+
+  return {
+    eventDispatchCanaryPayload,
+    eventDispatchCanaryRecord,
+    listenerErrorRoutePayloads: freezeArray(listenerErrorRoutePayloads),
+    listenerErrorRoutes: freezeArray(listenerErrorRoutes)
+  };
+}
+
+function createEventListenerRootErrorOptionCallbackRecord({
+  errorRoute,
+  errorRoutePayload,
+  index,
+  requestValidation,
+  rootErrorCallbacks,
+  routingOptions
+}) {
+  const errorSummary = describeCapturedErrorForDiagnostics(
+    errorRoutePayload.error
+  );
+  const sourceLabel =
+    routingOptions.routeLabels[index] === undefined
+      ? null
+      : routingOptions.routeLabels[index];
+
+  return freezeRecord({
+    kind: 'FastReactDomPrivateRootEventListenerErrorOptionCallbackRecord',
+    status: ROOT_BRIDGE_ROOT_ERROR_OPTION_CALLBACK_ACCEPTED,
+    acceptedRootOptionCallbackRecord: true,
+    diagnosticOnly: true,
+    phase: 'event-listener',
+    rootId: requestValidation.rootId,
+    rootKind: requestValidation.rootKind,
+    rootTag: requestValidation.rootTag,
+    errorRouteIndex: index,
+    sourceErrorRouteIndex: errorRoute.errorRouteIndex,
+    sourceErrorRouteKind: errorRoute.kind,
+    sourceErrorRouteTarget: errorRoute.errorRouteTarget,
+    sourceLabel,
+    dispatchPathIndex: errorRoute.dispatchPathIndex,
+    domEventName: errorRoute.domEventName,
+    nativeEventType: errorRoute.nativeEventType,
+    registrationName: errorRoute.registrationName,
+    listenerPhase: errorRoute.phase,
+    targetInst: errorRoute.targetInst,
+    errorName: errorSummary.name,
+    errorMessage: errorSummary.message,
+    errorCode: errorSummary.code,
+    errorType: errorSummary.type,
+    errorReported: false,
+    reportGlobalErrorInvoked: false,
+    rootErrorCallbacks,
+    onUncaughtErrorConfigured:
+      rootErrorCallbacks.onUncaughtError.configured,
+    onCaughtErrorConfigured: rootErrorCallbacks.onCaughtError.configured,
+    onRecoverableErrorConfigured:
+      rootErrorCallbacks.onRecoverableError.configured,
+    rootErrorCallbacksInvoked: false,
+    publicRootErrorCallbacksInvoked: false,
+    rootErrorCallbackInvocationCount: 0,
+    rootErrorUpdatesScheduled: false,
+    publicErrorBoundariesEnabled: false,
+    recoverableErrorCompatibilityClaimed: false,
+    publicRootBehaviorChanged: false,
+    compatibilityClaimed: false,
+    exposesErrorValue: false,
+    exposesListener: false,
+    exposesNativeEvent: false,
+    exposesSyntheticEvent: false
+  });
+}
+
+function normalizeEventListenerRootErrorRoutingOptions(options) {
+  const normalizedOptions =
+    options !== null &&
+    (typeof options === 'object' || typeof options === 'function')
+      ? options
+      : {};
+  const routeLabels = Array.isArray(normalizedOptions.routeLabels)
+    ? normalizedOptions.routeLabels.map((label) =>
+        typeof label === 'string' ? label : null
+      )
+    : [];
+
+  return freezeRecord({
+    rawOptions: options,
+    routeLabels: freezeArray(routeLabels)
+  });
+}
+
+function describeCapturedErrorForDiagnostics(error) {
+  if (error !== null && typeof error === 'object') {
+    const name =
+      typeof error.name === 'string' && error.name.length > 0
+        ? error.name
+        : 'Object';
+    const message =
+      typeof error.message === 'string' ? error.message : String(error);
+    const code = typeof error.code === 'string' ? error.code : null;
+
+    return freezeRecord({
+      code,
+      message,
+      name,
+      type: 'object'
+    });
+  }
+
+  const type = error === null ? 'null' : typeof error;
+  return freezeRecord({
+    code: null,
+    message: String(error),
+    name: type,
+    type
+  });
+}
+
+function getRootOwnerFromRootBridgeRequestRecord(record) {
+  if (
+    record !== null &&
+    typeof record === 'object' &&
+    isPrivateRootHandle(record.handle)
+  ) {
+    return record.handle.owner;
+  }
+
+  const payload = rootRecordPayloads.get(record);
+  if (
+    payload !== undefined &&
+    payload.rootHandle !== undefined &&
+    isPrivateRootHandle(payload.rootHandle)
+  ) {
+    return payload.rootHandle.owner;
+  }
+
+  return null;
+}
+
 function assertPortalBoundaryStillBlocked(record) {
   if (
     record.nativeExecution !== false ||
@@ -8365,6 +8882,13 @@ function throwInvalidRefCallbackRootErrorRouting(message) {
   throw error;
 }
 
+function throwInvalidEventListenerRootErrorRouting(message) {
+  const error = new Error(message);
+  error.code =
+    'FAST_REACT_DOM_INVALID_EVENT_LISTENER_ROOT_ERROR_ROUTING';
+  throw error;
+}
+
 function throwInvalidRootPublicFacadeAdapter(message) {
   const error = new Error(message);
   error.code = 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_ADAPTER';
@@ -8536,6 +9060,9 @@ module.exports = {
   ROOT_BRIDGE_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_COMPATIBILITY_BLOCKED,
   ROOT_BRIDGE_EXECUTION_BLOCKED,
+  ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_ACCEPTED_CAPABILITIES,
+  ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_BLOCKED_CAPABILITIES,
+  ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_RECORDED,
   ROOT_BRIDGE_CREATE_RENDER_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_CREATE_RENDER_ADMITTED,
   ROOT_BRIDGE_CREATE_RENDER_BLOCKED_CAPABILITIES,
@@ -8583,6 +9110,7 @@ module.exports = {
   ROOT_BRIDGE_REF_CALLBACK_ERROR_ROUTING_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_REF_CALLBACK_ERROR_ROUTING_RECORDED,
   ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC_ADMITTED,
+  ROOT_BRIDGE_ROOT_ERROR_OPTION_CALLBACK_ACCEPTED,
   ROOT_BRIDGE_REQUEST_ADMITTED,
   ROOT_BRIDGE_ROOT_COMMIT_REF_METADATA_ACCEPTED,
   ROOT_BRIDGE_ROOT_COMMIT_REF_METADATA_BLOCKED_CAPABILITIES,
@@ -8624,6 +9152,7 @@ module.exports = {
   createPrivateRootPublicFacadePreflight,
   createPrivateRootHandle,
   createPrivateRootOwner,
+  createEventListenerRootErrorRoutingRecord,
   createRefCallbackRootErrorRoutingRecord,
   createRefCallbackHostOutputOrderingDiagnosticRecord,
   createRootRenderRecord,
@@ -8650,6 +9179,7 @@ module.exports = {
   getPrivateRootPublicFacadePreflightRecordPayload,
   getPrivateRootPublicFacadePreflightRootPayload,
   getPrivateRootPublicFacadeRootPayload,
+  getPrivateRootEventListenerErrorRoutingPayload,
   getPrivateRootRefCallbackErrorRoutingPayload,
   getPrivateRootRefCallbackHostOutputOrderingDiagnosticPayload,
   getPrivateRootRecordPayload,
@@ -8674,6 +9204,7 @@ module.exports = {
   isPrivateRootPublicFacadePreflightRoot,
   isPrivateRootPublicFacadeRoot,
   isPrivateRootUnmountHostOutputCleanupRecord,
+  isPrivateRootEventListenerErrorRoutingRecord,
   isPrivateRootRefCallbackErrorRoutingRecord,
   isPrivateRootRefCallbackHostOutputOrderingDiagnosticRecord,
   isPrivateRootHandle,
@@ -8704,6 +9235,7 @@ module.exports = {
   privateRootPublicFacadeRootType,
   privateRootUnmountHostOutputCleanupRecordType,
   privateRootPortalFakeDomMountRecordType,
+  privateRootEventListenerErrorRoutingRecordType,
   privateRootRefCallbackHostOutputOrderingDiagnosticRecordType,
   privateRootRefCallbackErrorRoutingRecordType,
   privateRootCreateRecordType,
