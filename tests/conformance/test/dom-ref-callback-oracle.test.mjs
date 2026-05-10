@@ -630,6 +630,175 @@ test("private controlled DOM ref callback invocation gate records fake host call
   assert.equal(componentTree.detachHostInstanceToken(token), token);
 });
 
+test("private root-commit ref callback execution handoff proves cleanup detach before changed attach without public roots", () => {
+  const rootOwner = {kind: "PrivateRootCommitRefExecutionHandoffRoot"};
+  const hostOwner = {kind: "PrivateRootCommitRefExecutionHandoffHost"};
+  const node = createElement("DIV");
+  const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
+  const events = [];
+
+  function firstCleanup() {
+    events.push("first:cleanup");
+  }
+
+  function secondCleanup() {
+    events.push("second:cleanup");
+  }
+
+  function firstRef(value) {
+    events.push(`first:attach:${value.localName}`);
+    return firstCleanup;
+  }
+
+  function secondRef(value) {
+    events.push(`second:attach:${value.localName}`);
+    return secondCleanup;
+  }
+
+  const updateProps = {id: "changed-ref", ref: secondRef};
+  componentTree.attachHostInstanceNode(node, token, updateProps);
+
+  const detachRecord = refCallbackGate.createRefDetachMetadataRecord({
+    rootOwner,
+    hostOwner,
+    hostInstanceToken: token,
+    fiber: {id: "changed-current-fiber"},
+    stateNode: {id: "state-node"},
+    refHandle: {id: "first-ref-handle"},
+    ref: firstRef,
+    refCleanup: firstCleanup,
+    expectedLatestRef: secondRef,
+    sourceToken: "deletion-token:first-cleanup",
+    tokenPhase: refCallbackGate.REF_TOKEN_PHASE_DELETION,
+    tokenTarget: refCallbackGate.REF_TOKEN_TARGET_INSTANCE,
+    detachReason: refCallbackGate.REF_DETACH_REASON_REF_CHANGED
+  });
+  const attachRecord = refCallbackGate.createRefAttachMetadataRecord({
+    rootOwner,
+    hostOwner,
+    hostInstanceToken: token,
+    fiber: {id: "changed-finished-fiber"},
+    stateNode: {id: "state-node"},
+    refHandle: {id: "second-ref-handle"},
+    ref: secondRef,
+    sourceToken: "commit-token:second-attach",
+    tokenPhase: refCallbackGate.REF_TOKEN_PHASE_COMMIT,
+    tokenTarget: refCallbackGate.REF_TOKEN_TARGET_INSTANCE
+  });
+
+  const handoff = refCallbackGate.createRefCallbackExecutionHandoffRecord({
+    rootCommitRefMetadata: {
+      detach: [detachRecord],
+      attach: [attachRecord]
+    }
+  });
+
+  assert.equal(
+    handoff.$$typeof,
+    refCallbackGate.privateDomRefCallbackExecutionHandoffRecordType
+  );
+  assert.equal(
+    handoff.status,
+    refCallbackGate.REF_CALLBACK_EXECUTION_HANDOFF_STATUS
+  );
+  assert.equal(
+    refCallbackGate.isPrivateRefCallbackExecutionHandoffRecord(handoff),
+    true
+  );
+  assert.equal(handoff.recordCount, 2);
+  assert.equal(handoff.detachCount, 1);
+  assert.equal(handoff.attachCount, 1);
+  assert.equal(handoff.callbackRefRecordCount, 2);
+  assert.equal(handoff.objectRefRecordCount, 0);
+  assert.equal(handoff.callbackInvocationAttemptCount, 1);
+  assert.equal(handoff.cleanupInvocationAttemptCount, 1);
+  assert.equal(handoff.callbackCleanupReturnCount, 1);
+  assert.equal(handoff.cleanupReturnDetachCount, 1);
+  assert.equal(handoff.callbackAttachInvocationCount, 1);
+  assert.equal(handoff.callbackNullDetachAttemptCount, 0);
+  assert.equal(handoff.changedRefDetachBeforeAttach, true);
+  assert.equal(handoff.changedRefDetachSequence, 0);
+  assert.equal(handoff.changedRefAttachSequence, 1);
+  assert.equal(handoff.callbackRefsInvoked, true);
+  assert.equal(handoff.callbackCleanupReturnsInvoked, true);
+  assert.equal(handoff.objectRefsMutated, false);
+  assert.equal(handoff.publicRootsTouched, false);
+  assert.equal(handoff.rootErrorsReported, false);
+  assert.equal(handoff.compatibilityClaimed, false);
+  assert.equal(handoff.executionSnapshot.publicRootsTouched, false);
+  assert.equal(handoff.executionSnapshot.rootErrorsReported, false);
+  assert.deepEqual(events, ["first:cleanup", "second:attach:div"]);
+  assert.deepEqual(
+    handoff.executionRecords.map((record) => [
+      record.sequence,
+      record.action,
+      record.detachReason,
+      record.invocationKind,
+      record.cleanupReturnInvocationAttempted,
+      record.callbackRefInvocationAttempted
+    ]),
+    [
+      [
+        0,
+        refCallbackGate.REF_ACTION_DETACH,
+        refCallbackGate.REF_DETACH_REASON_REF_CHANGED,
+        refCallbackGate.REF_CALLBACK_INVOCATION_CLEANUP_RETURN,
+        true,
+        false
+      ],
+      [
+        1,
+        refCallbackGate.REF_ACTION_ATTACH,
+        null,
+        refCallbackGate.REF_CALLBACK_INVOCATION_ATTACH,
+        false,
+        true
+      ]
+    ]
+  );
+  assert.equal(
+    handoff.blockedCapabilities.some(
+      (capability) => capability.id === "object-ref-mutation"
+    ),
+    true
+  );
+  assert.equal(
+    handoff.blockedCapabilities.some(
+      (capability) => capability.id === "root-error-propagation"
+    ),
+    true
+  );
+  assert.equal(
+    handoff.blockedCapabilities.some(
+      (capability) => capability.id === "react-dom-ref-compatibility-claim"
+    ),
+    true
+  );
+  assert.equal(Object.hasOwn(handoff, "ref"), false);
+  assert.equal(Object.hasOwn(handoff, "node"), false);
+  assert.equal(Object.hasOwn(handoff, "latestProps"), false);
+
+  const payload =
+    refCallbackGate.getPrivateRefCallbackExecutionHandoffRecordPayload(
+      handoff
+    );
+  assert.equal(payload.controlledInvocationSnapshot, handoff.executionSnapshot);
+  assert.equal(
+    payload.controlledInvocationPayload.invocationResults[0].metadata.ref,
+    firstRef
+  );
+  assert.equal(
+    payload.controlledInvocationPayload.invocationResults[0].metadata.refCleanup,
+    firstCleanup
+  );
+  assert.equal(
+    payload.controlledInvocationPayload.invocationResults[1].cleanupReturn,
+    secondCleanup
+  );
+
+  assert.equal(componentTree.detachHostInstanceToken(token), token);
+});
+
 test("private root bridge ref ordering diagnostic proves update identity and unmount cleanup without public roots", () => {
   const bridge = rootBridge.createPrivateRootBridgeShell();
   const container = createContainer("DIV");
