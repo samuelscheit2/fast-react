@@ -8576,6 +8576,8 @@ mod tests {
         let diagnostics = unmounted.commit_diagnostics();
         let cleanup = unmounted.host_node_cleanup();
         let cleanup_records = cleanup.records();
+        let order_gate = commit.deletion_cleanup_order_gate_for_canary();
+        let order_records = order_gate.records();
 
         assert_eq!(scheduled.kind(), TestRendererRootUpdateKind::Unmount);
         assert_eq!(scheduled.element(), RootElementHandle::NONE);
@@ -8663,6 +8665,36 @@ mod tests {
         );
         assert_eq!(cleanup_records[1].state_node_raw(), 1);
         assert_eq!(cleanup_records[1].token_raw(), 5);
+        assert_eq!(order_gate.len(), 2);
+        assert_eq!(order_gate.ref_cleanup_return_count(), 0);
+        assert_eq!(order_gate.passive_destroy_count(), 0);
+        assert_eq!(order_gate.host_node_cleanup_count(), 2);
+        assert!(!order_gate.ref_cleanup_return_callbacks_invoked());
+        assert!(!order_gate.passive_destroy_callbacks_invoked());
+        assert!(!order_gate.public_effects_flushed());
+        assert!(!order_gate.public_ref_or_effect_compatibility_claimed());
+        assert_eq!(order_records[0].sequence(), 0);
+        assert_eq!(order_records[0].phase_name(), "host-node-cleanup");
+        assert_eq!(order_records[0].host_cleanup_sequence(), Some(0));
+        assert_eq!(
+            order_records[0].deletion_list_index(),
+            Some(cleanup_records[0].deletion_list_index())
+        );
+        assert_eq!(
+            order_records[0].deleted_index(),
+            Some(cleanup_records[0].deleted_index())
+        );
+        assert_eq!(
+            order_records[0].subtree_index(),
+            Some(cleanup_records[0].subtree_index())
+        );
+        assert_eq!(order_records[1].sequence(), 1);
+        assert_eq!(order_records[1].phase_name(), "host-node-cleanup");
+        assert_eq!(order_records[1].host_cleanup_sequence(), Some(1));
+        assert_eq!(
+            order_records[1].subtree_index(),
+            Some(cleanup_records[1].subtree_index())
+        );
         assert_eq!(host_node_activity_counts(&root), (0, 2));
         assert_eq!(unmounted.previous_snapshot().children().len(), 1);
         assert!(unmounted.snapshot().children().is_empty());
