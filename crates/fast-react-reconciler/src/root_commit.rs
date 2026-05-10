@@ -6542,6 +6542,23 @@ impl HostRootCommitRecord {
             .collect()
     }
 
+    #[doc(hidden)]
+    #[allow(
+        dead_code,
+        reason = "crate-private HostComponent ref/update ordering diagnostics are reserved for future ref lifecycle workers"
+    )]
+    #[must_use]
+    pub(crate) fn ref_host_component_update_order_for_canary(
+        &self,
+    ) -> HostRootRefHostComponentUpdateOrderSnapshotForCanary {
+        collect_ref_host_component_update_order_for_canary(
+            self.root,
+            self.current,
+            &self.mutation_apply_log,
+            &self.ref_callback_execution_handoff,
+        )
+    }
+
     #[cfg(test)]
     pub(crate) fn single_host_update_apply_record_for_canary(
         &self,
@@ -10325,6 +10342,250 @@ pub(crate) enum HostRootMutationApplyRecordKind {
     SkipDeletedNonHostFiber,
 }
 
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(crate) struct HostRootRefHostComponentUpdateOrderSnapshotForCanary {
+    records: Vec<HostRootRefHostComponentUpdateOrderRecordForCanary>,
+    changed_ref_update_count: usize,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private HostComponent ref/update ordering diagnostics are reserved for future ref lifecycle workers"
+)]
+impl HostRootRefHostComponentUpdateOrderSnapshotForCanary {
+    #[must_use]
+    pub(crate) fn records(&self) -> &[HostRootRefHostComponentUpdateOrderRecordForCanary] {
+        &self.records
+    }
+
+    #[must_use]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    #[must_use]
+    pub(crate) fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    #[must_use]
+    pub(crate) const fn changed_ref_update_count(&self) -> usize {
+        self.changed_ref_update_count
+    }
+
+    #[must_use]
+    pub(crate) fn records_in_ref_detach_update_attach_order(&self) -> bool {
+        self.records.len() == self.changed_ref_update_count * 3
+            && self.records.chunks_exact(3).all(|chunk| {
+                let detach = chunk[0];
+                let update = chunk[1];
+                let attach = chunk[2];
+                detach.kind() == HostRootRefHostComponentUpdateOrderKindForCanary::RefDetach
+                    && update.kind()
+                        == HostRootRefHostComponentUpdateOrderKindForCanary::HostComponentUpdate
+                    && attach.kind() == HostRootRefHostComponentUpdateOrderKindForCanary::RefAttach
+                    && detach.order_group() == update.order_group()
+                    && update.order_group() == attach.order_group()
+                    && detach.root() == update.root()
+                    && update.root() == attach.root()
+                    && detach.finished_work() == update.finished_work()
+                    && update.finished_work() == attach.finished_work()
+                    && detach.current_fiber() == update.current_fiber()
+                    && update.current_fiber() == attach.current_fiber()
+                    && detach.updated_fiber() == update.updated_fiber()
+                    && update.updated_fiber() == attach.updated_fiber()
+                    && detach.state_node() == update.state_node()
+                    && update.state_node() == attach.state_node()
+            })
+    }
+
+    #[must_use]
+    pub(crate) const fn callback_refs_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn object_refs_mutated(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn host_mutations_executed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_roots_touched(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn react_dom_ref_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    fn push_ref_record(
+        &mut self,
+        root: FiberRootId,
+        finished_work: FiberId,
+        order_group: usize,
+        kind: HostRootRefHostComponentUpdateOrderKindForCanary,
+        ref_record: HostRootRefCallbackExecutionHandoffRecord,
+        mutation: HostRootMutationApplyRecord,
+    ) {
+        self.records
+            .push(HostRootRefHostComponentUpdateOrderRecordForCanary {
+                sequence: self.records.len(),
+                order_group,
+                kind,
+                source_sequence: ref_record.sequence(),
+                root,
+                finished_work,
+                current_fiber: mutation.alternate_fiber(),
+                updated_fiber: mutation.fiber(),
+                fiber: ref_record.fiber(),
+                state_node: ref_record.state_node(),
+                ref_handle: ref_record.ref_handle(),
+                detach_reason: ref_record.detach_reason(),
+                mutation_kind: None,
+            });
+    }
+
+    fn push_mutation_record(
+        &mut self,
+        root: FiberRootId,
+        finished_work: FiberId,
+        order_group: usize,
+        source_sequence: usize,
+        mutation: HostRootMutationApplyRecord,
+    ) {
+        self.records
+            .push(HostRootRefHostComponentUpdateOrderRecordForCanary {
+                sequence: self.records.len(),
+                order_group,
+                kind: HostRootRefHostComponentUpdateOrderKindForCanary::HostComponentUpdate,
+                source_sequence,
+                root,
+                finished_work,
+                current_fiber: mutation.alternate_fiber(),
+                updated_fiber: mutation.fiber(),
+                fiber: mutation.fiber(),
+                state_node: mutation.state_node(),
+                ref_handle: RefHandle::NONE,
+                detach_reason: None,
+                mutation_kind: Some(mutation.kind()),
+            });
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct HostRootRefHostComponentUpdateOrderRecordForCanary {
+    sequence: usize,
+    order_group: usize,
+    kind: HostRootRefHostComponentUpdateOrderKindForCanary,
+    source_sequence: usize,
+    root: FiberRootId,
+    finished_work: FiberId,
+    current_fiber: Option<FiberId>,
+    updated_fiber: FiberId,
+    fiber: FiberId,
+    state_node: StateNodeHandle,
+    ref_handle: RefHandle,
+    detach_reason: Option<HostRootRefDetachReason>,
+    mutation_kind: Option<HostRootMutationApplyRecordKind>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private HostComponent ref/update ordering diagnostics are reserved for future ref lifecycle workers"
+)]
+impl HostRootRefHostComponentUpdateOrderRecordForCanary {
+    #[must_use]
+    pub(crate) const fn sequence(self) -> usize {
+        self.sequence
+    }
+
+    #[must_use]
+    pub(crate) const fn order_group(self) -> usize {
+        self.order_group
+    }
+
+    #[must_use]
+    pub(crate) const fn kind(self) -> HostRootRefHostComponentUpdateOrderKindForCanary {
+        self.kind
+    }
+
+    #[must_use]
+    pub(crate) const fn kind_name(self) -> &'static str {
+        host_root_ref_host_component_update_order_kind_name(self.kind)
+    }
+
+    #[must_use]
+    pub(crate) const fn source_sequence(self) -> usize {
+        self.source_sequence
+    }
+
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn current_fiber(self) -> Option<FiberId> {
+        self.current_fiber
+    }
+
+    #[must_use]
+    pub(crate) const fn updated_fiber(self) -> FiberId {
+        self.updated_fiber
+    }
+
+    #[must_use]
+    pub(crate) const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub(crate) const fn state_node(self) -> StateNodeHandle {
+        self.state_node
+    }
+
+    #[must_use]
+    pub(crate) const fn ref_handle(self) -> RefHandle {
+        self.ref_handle
+    }
+
+    #[must_use]
+    pub(crate) const fn detach_reason(self) -> Option<HostRootRefDetachReason> {
+        self.detach_reason
+    }
+
+    #[must_use]
+    pub(crate) const fn mutation_kind(self) -> Option<HostRootMutationApplyRecordKind> {
+        self.mutation_kind
+    }
+
+    #[must_use]
+    pub(crate) const fn mutation_kind_name(self) -> Option<&'static str> {
+        match self.mutation_kind {
+            Some(kind) => Some(host_root_mutation_apply_record_kind_name(kind)),
+            None => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum HostRootRefHostComponentUpdateOrderKindForCanary {
+    RefDetach,
+    HostComponentUpdate,
+    RefAttach,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HostRootPlacementApplyDiagnosticForCanary {
     root: FiberRootId,
@@ -10864,6 +11125,75 @@ fn single_host_update_apply_record_for_canary_from_log(
     })
 }
 
+fn collect_ref_host_component_update_order_for_canary(
+    root: FiberRootId,
+    finished_work: FiberId,
+    mutation_apply_log: &HostRootMutationApplyLog,
+    handoff: &HostRootRefCallbackExecutionHandoffSnapshot,
+) -> HostRootRefHostComponentUpdateOrderSnapshotForCanary {
+    let mut snapshot = HostRootRefHostComponentUpdateOrderSnapshotForCanary::default();
+
+    for (mutation_sequence, mutation) in mutation_apply_log
+        .records()
+        .iter()
+        .copied()
+        .enumerate()
+        .filter(|(_, record)| {
+            record.kind() == HostRootMutationApplyRecordKind::CommitHostComponentUpdate
+        })
+    {
+        let Some(current_fiber) = mutation.alternate_fiber() else {
+            continue;
+        };
+        let Some(detach) = handoff.records().iter().copied().find(|record| {
+            record.action() == HostRootRefCommitAction::Detach
+                && record.detach_reason() == Some(HostRootRefDetachReason::RefChanged)
+                && record.root() == root
+                && record.fiber() == current_fiber
+                && record.state_node() == mutation.state_node()
+        }) else {
+            continue;
+        };
+        let Some(attach) = handoff.records().iter().copied().find(|record| {
+            record.action() == HostRootRefCommitAction::Attach
+                && record.root() == root
+                && record.fiber() == mutation.fiber()
+                && record.state_node() == mutation.state_node()
+                && record.sequence() > detach.sequence()
+        }) else {
+            continue;
+        };
+
+        let order_group = snapshot.changed_ref_update_count();
+        snapshot.changed_ref_update_count += 1;
+        snapshot.push_ref_record(
+            root,
+            finished_work,
+            order_group,
+            HostRootRefHostComponentUpdateOrderKindForCanary::RefDetach,
+            detach,
+            mutation,
+        );
+        snapshot.push_mutation_record(
+            root,
+            finished_work,
+            order_group,
+            mutation_sequence,
+            mutation,
+        );
+        snapshot.push_ref_record(
+            root,
+            finished_work,
+            order_group,
+            HostRootRefHostComponentUpdateOrderKindForCanary::RefAttach,
+            attach,
+            mutation,
+        );
+    }
+
+    snapshot
+}
+
 #[cfg(test)]
 const fn is_host_update_apply_record_kind_for_canary(
     kind: HostRootMutationApplyRecordKind,
@@ -10918,6 +11248,18 @@ const fn host_root_mutation_apply_record_kind_name(
             "skip-unsupported-nested-placement"
         }
         HostRootMutationApplyRecordKind::SkipDeletedNonHostFiber => "skip-deleted-non-host-fiber",
+    }
+}
+
+const fn host_root_ref_host_component_update_order_kind_name(
+    kind: HostRootRefHostComponentUpdateOrderKindForCanary,
+) -> &'static str {
+    match kind {
+        HostRootRefHostComponentUpdateOrderKindForCanary::RefDetach => "ref-detach",
+        HostRootRefHostComponentUpdateOrderKindForCanary::HostComponentUpdate => {
+            "host-component-update"
+        }
+        HostRootRefHostComponentUpdateOrderKindForCanary::RefAttach => "ref-attach",
     }
 }
 
@@ -19523,6 +19865,203 @@ mod tests {
         assert!(cleanup_gate.records()[1].cleanup_return_handle_recording_gate());
         assert!(!cleanup_gate.records()[1].cleanup_return_execution_gate());
         assert!(cleanup_gate.records()[1].changed_ref_cleanup_before_attach());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_records_ref_detach_update_attach_order_for_host_component_update() {
+        let (mut store, root_id, host) = root_store();
+        let current_root = store.root(root_id).unwrap().current();
+        let old_ref = RefHandle::from_raw(113);
+        let new_ref = RefHandle::from_raw(114);
+        let state_node = StateNodeHandle::from_raw(213);
+        let current_props = PropsHandle::from_raw(313);
+        let next_pending_props = PropsHandle::from_raw(314);
+        let next_memoized_props = PropsHandle::from_raw(315);
+        let current_child = attach_host_root_child(
+            &mut store,
+            current_root,
+            FiberTag::HostComponent,
+            FiberFlags::NO,
+            state_node,
+            current_props,
+            current_props,
+        );
+        store
+            .fiber_arena_mut()
+            .get_mut(current_child)
+            .unwrap()
+            .set_ref_handle(old_ref);
+
+        update_container(&mut store, root_id, RootElementHandle::from_raw(48), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let finished_child = attach_host_root_child(
+            &mut store,
+            render.finished_work(),
+            FiberTag::HostComponent,
+            FiberFlags::UPDATE | FiberFlags::REF,
+            state_node,
+            next_pending_props,
+            next_memoized_props,
+        );
+        store
+            .fiber_arena_mut()
+            .get_mut(finished_child)
+            .unwrap()
+            .set_ref_handle(new_ref);
+        store
+            .fiber_arena_mut()
+            .link_alternates(current_child, finished_child)
+            .unwrap();
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let apply_records = commit.mutation_apply_log().records();
+        let refs = commit.ref_commit_metadata();
+        let handoff = commit.ref_callback_execution_handoff();
+        let cleanup_gate = commit.ref_cleanup_return_execution_gate();
+        let order = commit.ref_host_component_update_order_for_canary();
+        let order_records = order.records();
+
+        assert_eq!(apply_records.len(), 1);
+        assert_eq!(
+            apply_records[0].kind(),
+            HostRootMutationApplyRecordKind::CommitHostComponentUpdate
+        );
+        assert_eq!(apply_records[0].fiber(), finished_child);
+        assert_eq!(apply_records[0].alternate_fiber(), Some(current_child));
+        assert_eq!(apply_records[0].state_node(), state_node);
+        assert_eq!(apply_records[0].pending_props(), next_pending_props);
+        assert_eq!(apply_records[0].memoized_props(), next_memoized_props);
+        assert_eq!(
+            apply_records[0].alternate_memoized_props(),
+            Some(current_props)
+        );
+
+        assert_eq!(refs.detach().len(), 1);
+        assert_eq!(refs.attach().len(), 1);
+        assert_eq!(refs.detach()[0].fiber(), current_child);
+        assert_eq!(refs.detach()[0].state_node(), state_node);
+        assert_eq!(refs.detach()[0].ref_handle(), old_ref);
+        assert_eq!(
+            refs.detach()[0].detach_reason(),
+            Some(HostRootRefDetachReason::RefChanged)
+        );
+        assert_eq!(refs.attach()[0].fiber(), finished_child);
+        assert_eq!(refs.attach()[0].state_node(), state_node);
+        assert_eq!(refs.attach()[0].ref_handle(), new_ref);
+
+        assert_ref_callback_execution_handoff_keeps_public_blockers(handoff);
+        assert_eq!(handoff.len(), 2);
+        assert_eq!(handoff.detach_count(), 1);
+        assert_eq!(handoff.attach_count(), 1);
+        assert_eq!(handoff.changed_ref_detach_before_attach_count(), 1);
+        assert_ref_cleanup_return_execution_gate_keeps_public_blockers(cleanup_gate);
+
+        assert_eq!(order.changed_ref_update_count(), 1);
+        assert_eq!(order.len(), 3);
+        assert!(order.records_in_ref_detach_update_attach_order());
+        assert!(!order.callback_refs_invoked());
+        assert!(!order.object_refs_mutated());
+        assert!(!order.host_mutations_executed());
+        assert!(!order.public_roots_touched());
+        assert!(!order.react_dom_ref_compatibility_claimed());
+        assert_eq!(
+            order_records
+                .iter()
+                .map(|record| record.sequence())
+                .collect::<Vec<_>>(),
+            vec![0, 1, 2]
+        );
+        assert_eq!(
+            order_records
+                .iter()
+                .map(|record| record.kind_name())
+                .collect::<Vec<_>>(),
+            vec!["ref-detach", "host-component-update", "ref-attach"]
+        );
+        assert_eq!(
+            order_records
+                .iter()
+                .map(|record| record.order_group())
+                .collect::<Vec<_>>(),
+            vec![0, 0, 0]
+        );
+        assert_eq!(
+            order_records
+                .iter()
+                .map(|record| record.root())
+                .collect::<Vec<_>>(),
+            vec![root_id, root_id, root_id]
+        );
+        assert_eq!(
+            order_records
+                .iter()
+                .map(|record| record.finished_work())
+                .collect::<Vec<_>>(),
+            vec![
+                render.finished_work(),
+                render.finished_work(),
+                render.finished_work()
+            ]
+        );
+        assert_eq!(
+            order_records
+                .iter()
+                .map(|record| record.current_fiber())
+                .collect::<Vec<_>>(),
+            vec![
+                Some(current_child),
+                Some(current_child),
+                Some(current_child)
+            ]
+        );
+        assert_eq!(
+            order_records
+                .iter()
+                .map(|record| record.updated_fiber())
+                .collect::<Vec<_>>(),
+            vec![finished_child, finished_child, finished_child]
+        );
+        assert_eq!(
+            order_records
+                .iter()
+                .map(|record| record.fiber())
+                .collect::<Vec<_>>(),
+            vec![current_child, finished_child, finished_child]
+        );
+        assert_eq!(
+            order_records
+                .iter()
+                .map(|record| record.state_node())
+                .collect::<Vec<_>>(),
+            vec![state_node, state_node, state_node]
+        );
+        assert_eq!(
+            order_records
+                .iter()
+                .map(|record| record.source_sequence())
+                .collect::<Vec<_>>(),
+            vec![0, 0, 1]
+        );
+        assert_eq!(order_records[0].ref_handle(), old_ref);
+        assert_eq!(order_records[1].ref_handle(), RefHandle::NONE);
+        assert_eq!(order_records[2].ref_handle(), new_ref);
+        assert_eq!(
+            order_records[0].detach_reason(),
+            Some(HostRootRefDetachReason::RefChanged)
+        );
+        assert_eq!(order_records[1].detach_reason(), None);
+        assert_eq!(order_records[2].detach_reason(), None);
+        assert_eq!(order_records[0].mutation_kind(), None);
+        assert_eq!(
+            order_records[1].mutation_kind(),
+            Some(HostRootMutationApplyRecordKind::CommitHostComponentUpdate)
+        );
+        assert_eq!(
+            order_records[1].mutation_kind_name(),
+            Some("commit-host-component-update")
+        );
+        assert_eq!(order_records[2].mutation_kind(), None);
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
