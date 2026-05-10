@@ -1059,6 +1059,8 @@ test("scheduler post-task private priority diagnostics capture continuation fall
       );
       assert.equal(diagnostics.continuationFallbackDiagnostics, true);
       assert.equal(diagnostics.continuationFallbackMetadataDiagnostics, true);
+      assert.equal(diagnostics.continuationSignalValidationDiagnostics, true);
+      assert.equal(diagnostics.continuationAbortOrderingDiagnostics, false);
       assert.equal(
         diagnostics.fallbackEnvironmentClassificationDiagnostics,
         true
@@ -1142,6 +1144,11 @@ test("scheduler post-task private priority diagnostics capture continuation fall
             callbackRunCountAtSchedule: 1,
             reusesOriginalSignal: true,
             signalAbortedAtSchedule: false,
+            signalValidationStatus:
+              "validated-shimmed-post-task-continuation-signal",
+            signalValidationRejectionReason: null,
+            abortOrderingStatus:
+              "continuation-abort-ordering-pending-abort-call",
             fallbackEnvironmentClassification:
               expectedFallbackEnvironmentClassification(withYield)
                 .classification,
@@ -1152,6 +1159,14 @@ test("scheduler post-task private priority diagnostics capture continuation fall
           },
           fallbackEnvironmentClassification:
             expectedFallbackEnvironmentClassification(withYield),
+          signalValidation: expectedContinuationSignalValidation(
+            8,
+            "user-visible"
+          ),
+          abortOrdering: expectedContinuationAbortOrderingPending({
+            signalId: 8,
+            signalPriority: "user-visible"
+          }),
           reusesOriginalSignal: true,
           signalAtSchedule: {
             id: 8,
@@ -1213,6 +1228,8 @@ test("scheduler post-task private priority diagnostics capture abort ordering ar
     const afterFallback = flow.diagnosticsAfterFallback;
     assert.equal(afterFallback.diagnosticEventCount, 3);
     assert.equal(afterFallback.continuationFallbackMetadataDiagnostics, true);
+    assert.equal(afterFallback.continuationSignalValidationDiagnostics, true);
+    assert.equal(afterFallback.continuationAbortOrderingDiagnostics, false);
     assert.equal(afterFallback.taskControllerAbortOrderingDiagnostics, false);
     assert.deepEqual(
       afterFallback.callbackRuns.map((entry) => [
@@ -1258,6 +1275,8 @@ test("scheduler post-task private priority diagnostics capture abort ordering ar
     );
     assert.equal(afterCancel.taskControllerAbortOrderingDiagnostics, true);
     assert.equal(afterCancel.continuationFallbackMetadataDiagnostics, true);
+    assert.equal(afterCancel.continuationSignalValidationDiagnostics, true);
+    assert.equal(afterCancel.continuationAbortOrderingDiagnostics, true);
     assert.equal(afterCancel.delayAbortOrderingDiagnostics, true);
     assert.equal(
       afterCancel.fallbackEnvironmentClassificationDiagnostics,
@@ -1315,6 +1334,19 @@ test("scheduler post-task private priority diagnostics capture abort ordering ar
       continuationFallbackCountAtRequest: 1,
       continuationFallbackCountAtCompletion: 1
     });
+    assert.deepEqual(
+      afterCancel.continuationFallbacks[0].abortOrdering,
+      expectedContinuationAbortOrderingObserved({
+        requestEventIndex: 3,
+        completionEventIndex: 4,
+        signalId: 9,
+        signalPriority: "user-visible"
+      })
+    );
+    assert.deepEqual(
+      afterCancel.continuationFallbacks[0].signalValidation,
+      expectedContinuationSignalValidation(9, "user-visible")
+    );
     assert.deepEqual(flow.cancellationEvents, [
       {
         type: "abort",
@@ -1393,6 +1425,83 @@ function expectedFallbackEnvironmentClassification(withYield) {
     hasSchedulerYield: withYield,
     usesSchedulerYield: withYield,
     usesSchedulerPostTaskFallback: !withYield,
+    browserPostTaskCompatibilityClaimed: false,
+    browserTaskOrderingCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  };
+}
+
+function expectedContinuationSignalValidation(signalId, signalPriority) {
+  return {
+    status: "validated-shimmed-post-task-continuation-signal",
+    signalSource: "continuationOptions.signal",
+    hasSignalProperty: true,
+    hasSignal: true,
+    signalMatchesTaskController: true,
+    signalId,
+    signalPriority,
+    signalAbortedAtSchedule: false,
+    signalOwnKeys: ["id", "aborted", "priority"],
+    rejectionReason: null,
+    browserPostTaskCompatibilityClaimed: false,
+    browserTaskOrderingCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  };
+}
+
+function expectedContinuationAbortOrderingPending({
+  signalId,
+  signalPriority
+}) {
+  return {
+    status: "continuation-abort-ordering-pending-abort-call",
+    requestEventIndex: null,
+    completionEventIndex: null,
+    continuationIndex: 0,
+    sourceCallbackRunIndex: 0,
+    callbackRunCountAtSchedule: 1,
+    callbackRunCountAtAbortRequest: null,
+    callbackRunCountAtAbortCompletion: null,
+    continuationFallbackCountAtSchedule: 1,
+    continuationFallbackCountAtAbortRequest: null,
+    continuationFallbackCountAtAbortCompletion: null,
+    signalAtSchedule: expectedPostTaskSignal(signalId, signalPriority, false),
+    signalBeforeAbort: null,
+    signalAfterAbort: null,
+    abortSignalStateAfterAbort: null,
+    cancellationStatus: null,
+    browserPostTaskCompatibilityClaimed: false,
+    browserTaskOrderingCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  };
+}
+
+function expectedContinuationAbortOrderingObserved({
+  requestEventIndex,
+  completionEventIndex,
+  signalId,
+  signalPriority
+}) {
+  return {
+    status: "continuation-abort-ordering-observed-after-abort-call",
+    requestEventIndex,
+    completionEventIndex,
+    continuationIndex: 0,
+    sourceCallbackRunIndex: 0,
+    callbackRunCountAtSchedule: 1,
+    callbackRunCountAtAbortRequest: 1,
+    callbackRunCountAtAbortCompletion: 1,
+    continuationFallbackCountAtSchedule: 1,
+    continuationFallbackCountAtAbortRequest: 1,
+    continuationFallbackCountAtAbortCompletion: 1,
+    signalAtSchedule: expectedPostTaskSignal(signalId, signalPriority, false),
+    signalBeforeAbort: expectedPostTaskSignal(signalId, signalPriority, false),
+    signalAfterAbort: expectedPostTaskSignal(signalId, signalPriority, true),
+    abortSignalStateAfterAbort: "aborted",
+    cancellationStatus: "cancelled-shimmed-task-controller",
     browserPostTaskCompatibilityClaimed: false,
     browserTaskOrderingCompatibilityClaimed: false,
     publicSchedulerTimingCompatibilityClaimed: false,

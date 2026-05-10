@@ -10,7 +10,19 @@ const ROOT_CONTINUATION_RECORD_TYPE =
   'fast.scheduler.post_task.private_root_continuation_metadata';
 const ROOT_CONTINUATION_BLOCKED_STATUS =
   'blocked-private-root-continuation-execution';
+const ACCEPTED_ROOT_CONTINUATION_STATUS =
+  'accepted-private-scheduler-post-task-root-continuation';
+const ROOT_CONTINUATION_FALLBACK_STATUS =
+  'private-scheduler-post-task-root-continuation-fallback';
+const ROOT_CONTINUATION_SIGNAL_VALIDATION_STATUS =
+  'validated-private-scheduler-post-task-root-continuation-signal';
 const SCHEDULER_COMPATIBILITY_TARGET = 'scheduler@0.27.0';
+const publicCompatibilityClaimKeys = new Set([
+  'browserPostTaskCompatibilityClaimed',
+  'browserTaskOrderingCompatibilityClaimed',
+  'publicSchedulerTimingCompatibilityClaimed',
+  'compatibilityClaimed'
+]);
 
 const priorityLabelsByLevel = new Map([
   [1, 'immediate'],
@@ -28,6 +40,15 @@ function createPrivatePostTaskRootContinuationMetadataRow(record, options) {
     return createRejectedRow(base, priorityValidation.reason, priorityValidation);
   }
 
+  const compatibilityValidation = validateNoPublicCompatibilityClaims(record);
+  if (compatibilityValidation !== null) {
+    return createRejectedRow(
+      base,
+      compatibilityValidation.reason,
+      compatibilityValidation
+    );
+  }
+
   const continuationValidation = readContinuation(record, normalizedOptions);
   if (continuationValidation.reason) {
     return createRejectedRow(
@@ -39,11 +60,15 @@ function createPrivatePostTaskRootContinuationMetadataRow(record, options) {
 
   const continuation = continuationValidation.continuation;
   const signal = readContinuationSignal(continuation);
-  if (signal === null || signal.id === null) {
-    return createRejectedRow(base, 'missing-continuation-signal', {
+  const signalValidation = createRootContinuationSignalValidation(
+    continuation,
+    signal
+  );
+  if (signalValidation.rejectionReason !== null) {
+    return createRejectedRow(base, signalValidation.rejectionReason, {
       continuationIndex: continuationValidation.continuationIndex,
       continuationId: continuationValidation.continuationId,
-      hasSignal: signal !== null
+      signalValidation
     });
   }
 
@@ -60,6 +85,23 @@ function createPrivatePostTaskRootContinuationMetadataRow(record, options) {
       : cancellation && cancellation.signal
         ? cancellation.signal
         : signal;
+  const abortOrdering = readContinuationAbortOrdering(
+    continuation,
+    cancellation,
+    delayAbortOrdering,
+    signal,
+    abortSignal
+  );
+  const continuationFallback = createRootContinuationFallbackMetadata(
+    continuation
+  );
+  const acceptedRootContinuation = createAcceptedRootContinuationRecord({
+    continuationId: continuationValidation.continuationId,
+    continuation,
+    signalValidation,
+    abortOrdering,
+    continuationFallback
+  });
 
   return freezeRecord({
     ...base,
@@ -89,6 +131,10 @@ function createPrivatePostTaskRootContinuationMetadataRow(record, options) {
       abortSignal && abortSignal.aborted === true ? 'aborted' : 'not-aborted',
     continuationStatus: continuation.continuationStatus,
     fallback: continuation.fallback,
+    signalValidation: cloneDiagnosticValue(signalValidation),
+    abortOrdering: cloneDiagnosticValue(abortOrdering),
+    continuationFallback: cloneDiagnosticValue(continuationFallback),
+    acceptedRootContinuation: cloneDiagnosticValue(acceptedRootContinuation),
     fallbackEnvironmentClassification: cloneDiagnosticValue(
       continuation.fallbackEnvironmentClassification || null
     ),
@@ -108,6 +154,10 @@ function createPrivatePostTaskRootContinuationMetadataRow(record, options) {
         record.continuationFallbackMetadataDiagnostics === true,
       taskControllerAbortOrderingDiagnostics:
         record.taskControllerAbortOrderingDiagnostics === true,
+      continuationSignalValidationDiagnostics:
+        record.continuationSignalValidationDiagnostics === true,
+      continuationAbortOrderingDiagnostics:
+        record.continuationAbortOrderingDiagnostics === true,
       fallbackEnvironmentClassificationDiagnostics:
         record.fallbackEnvironmentClassificationDiagnostics === true
     }),
@@ -164,6 +214,39 @@ function validatePriorityRecord(record) {
       reason: 'invalid-post-task-delay-diagnostics',
       hasSchedule: !!record.schedule
     };
+  }
+  return null;
+}
+
+function validateNoPublicCompatibilityClaims(record) {
+  return findPublicCompatibilityClaim(record, 'record', new Set());
+}
+
+function findPublicCompatibilityClaim(value, path, seen) {
+  let index;
+  if (value === null || typeof value !== 'object') {
+    return null;
+  }
+  if (seen.has(value)) {
+    return null;
+  }
+  seen.add(value);
+  const keys = Object.keys(value);
+  for (index = 0; index < keys.length; index++) {
+    const key = keys[index];
+    const nextPath = `${path}.${key}`;
+    if (publicCompatibilityClaimKeys.has(key) && value[key] === true) {
+      return {
+        reason: 'public-compatibility-claimed',
+        claimName: key,
+        claimPath: nextPath,
+        claimValue: true
+      };
+    }
+    const nested = findPublicCompatibilityClaim(value[key], nextPath, seen);
+    if (nested !== null) {
+      return nested;
+    }
   }
   return null;
 }
@@ -240,6 +323,168 @@ function readContinuationSignal(continuation) {
   return null;
 }
 
+function createRootContinuationSignalValidation(continuation, signal) {
+  const sourceValidation =
+    continuation &&
+    continuation.signalValidation &&
+    typeof continuation.signalValidation === 'object'
+      ? continuation.signalValidation
+      : null;
+  const hasSignal = signal !== null && typeof signal === 'object';
+  const hasSignalId =
+    hasSignal && signal.id !== null && signal.id !== undefined;
+  const sourceRejectionReason =
+    sourceValidation && sourceValidation.rejectionReason
+      ? sourceValidation.rejectionReason
+      : null;
+  const rejectionReason = hasSignalId
+    ? sourceRejectionReason
+    : 'missing-continuation-signal';
+  return freezeRecord({
+    status:
+      rejectionReason === null
+        ? ROOT_CONTINUATION_SIGNAL_VALIDATION_STATUS
+        : 'rejected-private-scheduler-post-task-root-continuation-signal',
+    signalSource:
+      continuation && continuation.signal && typeof continuation.signal === 'object'
+        ? 'continuation.signal'
+        : continuation &&
+            continuation.signalAtSchedule &&
+            typeof continuation.signalAtSchedule === 'object'
+          ? 'continuation.signalAtSchedule'
+          : 'missing-continuation-signal',
+    hasSignal,
+    hasSignalId,
+    signalId: hasSignal ? signal.id : null,
+    signalPriority: hasSignal ? signal.priority : null,
+    signalAbortedAtSchedule: hasSignal ? signal.aborted === true : null,
+    signalOwnKeys: hasSignal ? cloneDiagnosticValue(signal.ownKeys || []) : [],
+    sourceSignalValidation: cloneDiagnosticValue(sourceValidation),
+    rejectionReason,
+    browserPostTaskCompatibilityClaimed: false,
+    browserTaskOrderingCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
+}
+
+function readContinuationAbortOrdering(
+  continuation,
+  cancellation,
+  delayAbortOrdering,
+  signal,
+  abortSignal
+) {
+  if (
+    continuation &&
+    continuation.abortOrdering &&
+    typeof continuation.abortOrdering === 'object'
+  ) {
+    return continuation.abortOrdering;
+  }
+  const cancellationAbortOrdering =
+    cancellation &&
+    cancellation.abortOrdering &&
+    typeof cancellation.abortOrdering === 'object'
+      ? cancellation.abortOrdering
+      : null;
+  return freezeRecord({
+    status: cancellationAbortOrdering
+      ? 'continuation-abort-ordering-observed-after-abort-call'
+      : 'continuation-abort-ordering-pending-abort-call',
+    requestEventIndex: cancellationAbortOrdering
+      ? cancellationAbortOrdering.requestEventIndex
+      : null,
+    completionEventIndex: cancellationAbortOrdering
+      ? cancellationAbortOrdering.completionEventIndex
+      : null,
+    continuationIndex: continuation.continuationIndex,
+    sourceCallbackRunIndex: continuation.sourceCallbackRunIndex,
+    callbackRunCountAtSchedule: continuation.callbackRunCountAtSchedule,
+    callbackRunCountAtAbortRequest: cancellationAbortOrdering
+      ? cancellationAbortOrdering.callbackRunCountAtRequest
+      : null,
+    callbackRunCountAtAbortCompletion: cancellationAbortOrdering
+      ? cancellationAbortOrdering.callbackRunCountAtCompletion
+      : null,
+    continuationFallbackCountAtSchedule: continuation.continuationIndex + 1,
+    continuationFallbackCountAtAbortRequest: cancellationAbortOrdering
+      ? cancellationAbortOrdering.continuationFallbackCountAtRequest
+      : null,
+    continuationFallbackCountAtAbortCompletion: cancellationAbortOrdering
+      ? cancellationAbortOrdering.continuationFallbackCountAtCompletion
+      : null,
+    signalAtSchedule: cloneDiagnosticValue(signal),
+    signalBeforeAbort: delayAbortOrdering
+      ? cloneDiagnosticValue(delayAbortOrdering.signalBeforeAbort)
+      : null,
+    signalAfterAbort: cloneDiagnosticValue(abortSignal),
+    abortSignalStateAfterAbort:
+      abortSignal && abortSignal.aborted === true ? 'aborted' : 'not-aborted',
+    cancellationStatus: cancellation ? cancellation.status : null,
+    browserPostTaskCompatibilityClaimed: false,
+    browserTaskOrderingCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createRootContinuationFallbackMetadata(continuation) {
+  return freezeRecord({
+    status: ROOT_CONTINUATION_FALLBACK_STATUS,
+    continuationStatus: continuation.continuationStatus,
+    fallback: continuation.fallback,
+    selectedFallback:
+      continuation.continuationMetadata &&
+      continuation.continuationMetadata.selectedFallback
+        ? continuation.continuationMetadata.selectedFallback
+        : continuation.fallback,
+    continuationIndex: continuation.continuationIndex,
+    sourceCallbackRunIndex: continuation.sourceCallbackRunIndex,
+    callbackRunCountAtSchedule: continuation.callbackRunCountAtSchedule,
+    reusesOriginalSignal: continuation.reusesOriginalSignal === true,
+    continuationMetadata: cloneDiagnosticValue(
+      continuation.continuationMetadata || null
+    ),
+    fallbackEnvironmentClassification: cloneDiagnosticValue(
+      continuation.fallbackEnvironmentClassification || null
+    ),
+    browserPostTaskCompatibilityClaimed: false,
+    browserTaskOrderingCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createAcceptedRootContinuationRecord({
+  continuationId,
+  continuation,
+  signalValidation,
+  abortOrdering,
+  continuationFallback
+}) {
+  return freezeRecord({
+    status: ACCEPTED_ROOT_CONTINUATION_STATUS,
+    accepted: true,
+    continuationId,
+    continuationIndex: continuation.continuationIndex,
+    sourceCallbackRunIndex: continuation.sourceCallbackRunIndex,
+    signalValidation: cloneDiagnosticValue(signalValidation),
+    abortOrdering: cloneDiagnosticValue(abortOrdering),
+    continuationFallback: cloneDiagnosticValue(continuationFallback),
+    rootContinuationMetadataOnly: true,
+    rendererWorkExecuted: false,
+    reconcilerWorkExecuted: false,
+    nativeRendererWorkExecuted: false,
+    publicRootExecution: false,
+    publicSchedulerFlush: false,
+    browserPostTaskCompatibilityClaimed: false,
+    browserTaskOrderingCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
+}
+
 function createBaseRow(record) {
   return {
     type: ROOT_CONTINUATION_RECORD_TYPE,
@@ -312,11 +557,14 @@ function freezeRecord(record) {
 }
 
 module.exports = {
+  ACCEPTED_ROOT_CONTINUATION_STATUS,
   POST_TASK_PRIORITY_DIAGNOSTIC_STATUS,
   ROOT_CONTINUATION_BLOCKED_STATUS,
+  ROOT_CONTINUATION_FALLBACK_STATUS,
   ROOT_CONTINUATION_METADATA_STATUS,
   ROOT_CONTINUATION_RECORD_TYPE,
   ROOT_CONTINUATION_REJECTED_STATUS,
+  ROOT_CONTINUATION_SIGNAL_VALIDATION_STATUS,
   createPrivatePostTaskRootContinuationMetadataRow,
   derivePrivatePostTaskRootContinuationId
 };
