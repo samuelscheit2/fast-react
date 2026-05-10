@@ -6,12 +6,17 @@ const {
   unimplementedCode
 } = require('../placeholder-utils.js');
 
+const hasOwn = Object.prototype.hasOwnProperty;
+
 const resourceFormActionInternalsGateSchemaVersion = 1;
 const resourceHintDispatcherMetadataGateSchemaVersion = 1;
+const controlledInputValueTrackerGateSchemaVersion = 1;
 const privateResourceFormActionGateRecordType =
   'fast.react_dom.private_resource_form_action_gate_record';
 const privateResourceHintDispatcherMetadataRecordType =
   'fast.react_dom.private_resource_hint_dispatcher_metadata_record';
+const privateControlledInputValueTrackerGateRecordType =
+  'fast.react_dom.private_controlled_input_value_tracker_gate_record';
 const privateResourceHintDispatcherMetadataGateId =
   'resource-hint-private-dispatcher-metadata-gate-1';
 const privateResourceFormActionGateErrorCode =
@@ -24,7 +29,15 @@ const privateResourceHintDispatcherMetadataInvalidShapeCode =
   'FAST_REACT_DOM_RESOURCE_HINT_DISPATCHER_METADATA_INVALID_SHAPE';
 const privateResourceHintDispatcherMetadataUnknownRequestCode =
   'FAST_REACT_DOM_RESOURCE_HINT_DISPATCHER_METADATA_UNKNOWN_REQUEST';
+const privateControlledInputValueTrackerGateErrorCode =
+  'FAST_REACT_DOM_CONTROLLED_INPUT_VALUE_TRACKER_GATE';
+const privateControlledInputValueTrackerGateUnknownScenarioCode =
+  'FAST_REACT_DOM_CONTROLLED_INPUT_VALUE_TRACKER_GATE_UNKNOWN_SCENARIO';
+const privateControlledInputValueTrackerGateInvalidScenarioCode =
+  'FAST_REACT_DOM_CONTROLLED_INPUT_VALUE_TRACKER_GATE_INVALID_SCENARIO';
 const unsupportedStatus = 'unsupported';
+const controlledInputValueTrackerGateId =
+  'controlled-input-value-tracker-private-gate-1';
 
 const resourceHintOracleKind =
   'react-19.2.6-react-dom-resource-hints-oracle';
@@ -52,6 +65,19 @@ const resourceHintDispatcherSideEffects = freezeRecord({
   resourceElementCreated: false,
   stylesheetPrecedenceApplied: false,
   fizzInstructionEmitted: false,
+  publicRootTouched: false,
+  compatibilityClaimed: false
+});
+
+const controlledInputValueTrackerSideEffects = freezeRecord({
+  controlsTracked: false,
+  trackerAttached: false,
+  hostValueRead: false,
+  hostValueWritten: false,
+  propertyDescriptorInstalled: false,
+  changeEventsObserved: false,
+  postEventRestoreQueued: false,
+  publicControlledBehaviorEnabled: false,
   publicRootTouched: false,
   compatibilityClaimed: false
 });
@@ -104,6 +130,34 @@ const resourceHintDispatcherMissingPrerequisites = freezeArray([
     'no-fizz-resource-integration',
     'react-dom-resource',
     'Fizz resource emission and preloading are not connected to the package facade.'
+  )
+]);
+
+const controlledInputValueTrackerMissingPrerequisites = freezeArray([
+  prerequisite(
+    'no-live-controlled-value-tracker',
+    'react-dom-form',
+    'Controlled form controls only record metadata; no host value tracker is attached.'
+  ),
+  prerequisite(
+    'no-controlled-host-wrapper',
+    'react-dom-form',
+    'Input, select, and textarea wrapper property writes are not wired.'
+  ),
+  prerequisite(
+    'no-controlled-change-event-adapter',
+    'react-dom-events',
+    'Change events are not routed through controlled form adapters.'
+  ),
+  prerequisite(
+    'no-post-event-controlled-restore',
+    'react-dom-events',
+    'Post-event restore is not queued or flushed for controlled controls.'
+  ),
+  prerequisite(
+    'no-public-controlled-root-behavior',
+    'react-dom-client',
+    'Public roots remain placeholder-gated for controlled form behavior.'
   )
 ]);
 
@@ -198,15 +252,70 @@ const controlledFormContracts = freezeArray([
   controlledFormContract('textarea-controlled-value', 'textarea')
 ]);
 
+const controlledInputValueTrackerContracts = freezeArray([
+  controlledInputValueTrackerContract(
+    'input-value-tracker',
+    'input',
+    'value',
+    'value',
+    'string-current-value',
+    ['type', 'value', 'defaultValue', 'onChange']
+  ),
+  controlledInputValueTrackerContract(
+    'input-checked-tracker',
+    'input',
+    'checked',
+    'checked',
+    'boolean-string-current-value',
+    ['type', 'checked', 'defaultChecked', 'onChange']
+  ),
+  controlledInputValueTrackerContract(
+    'select-single-value-tracker',
+    'select',
+    'single',
+    'selectedOptions',
+    'single-option-value',
+    ['value', 'defaultValue', 'onChange']
+  ),
+  controlledInputValueTrackerContract(
+    'select-multiple-value-tracker',
+    'select',
+    'multiple',
+    'selectedOptions',
+    'array-option-values',
+    ['multiple', 'value', 'defaultValue', 'onChange']
+  ),
+  controlledInputValueTrackerContract(
+    'textarea-value-tracker',
+    'textarea',
+    'value',
+    'value',
+    'string-current-value',
+    ['value', 'defaultValue', 'children', 'onChange']
+  )
+]);
+
+const controlledInputValueTrackerOracleCoverage = freezeArray([
+  controlledInputValueTrackerCoverage('input', 12, ['value', 'checked']),
+  controlledInputValueTrackerCoverage('select', 6, ['selectedOptions']),
+  controlledInputValueTrackerCoverage('textarea', 7, ['value'])
+]);
+
 const contractByAreaAndName = new Map();
 indexContracts('resource-hint', resourceHintContracts);
 indexContracts('host-singleton', singletonContracts);
 indexContracts('form-action', formActionContracts);
 indexContracts('controlled-form', controlledFormContracts);
 
+const controlledInputValueTrackerContractByKey = new Map();
+indexControlledInputValueTrackerContracts();
+
 const recordPayloads = new WeakMap();
 const resourceHintDispatcherMetadataPayloads = new WeakMap();
+const controlledInputValueTrackerRecordPayloads = new WeakMap();
 const defaultGate = createResourceFormActionInternalsGate();
+const defaultControlledInputValueTrackerGate =
+  createControlledInputValueTrackerGate();
 
 function createResourceFormActionInternalsGate(options) {
   const gateState = createGateState(options);
@@ -254,6 +363,19 @@ function createResourceFormActionInternalsGate(options) {
   });
 }
 
+function createControlledInputValueTrackerGate(options) {
+  const gateState = createGateState(options);
+
+  return Object.freeze({
+    recordTrackerScenario(scenario) {
+      return recordControlledInputValueTrackerScenarioWithGate(
+        gateState,
+        scenario
+      );
+    }
+  });
+}
+
 function recordUnsupportedResourceHintRequest(requestName, args) {
   return defaultGate.recordResourceHintRequest(requestName, args);
 }
@@ -274,6 +396,10 @@ function recordUnsupportedControlledFormRequest(requestName, args) {
   return defaultGate.recordControlledFormRequest(requestName, args);
 }
 
+function recordControlledInputValueTrackerScenario(scenario) {
+  return defaultControlledInputValueTrackerGate.recordTrackerScenario(scenario);
+}
+
 function getPrivateResourceFormActionGateRecordPayload(record) {
   return recordPayloads.get(record) || null;
 }
@@ -288,6 +414,14 @@ function getPrivateResourceHintDispatcherMetadataRecordPayload(record) {
 
 function isPrivateResourceHintDispatcherMetadataRecord(value) {
   return resourceHintDispatcherMetadataPayloads.has(value);
+}
+
+function getPrivateControlledInputValueTrackerRecordPayload(record) {
+  return controlledInputValueTrackerRecordPayloads.get(record) || null;
+}
+
+function isPrivateControlledInputValueTrackerRecord(value) {
+  return controlledInputValueTrackerRecordPayloads.has(value);
 }
 
 function describeResourceFormActionInternalsGate() {
@@ -306,11 +440,13 @@ function describeResourceFormActionInternalsGate() {
       resourceHintDispatchers: resourceHintDispatcherMetadataContracts,
       singletons: singletonContracts,
       formActions: formActionContracts,
-      controlledForms: controlledFormContracts
+      controlledForms: controlledFormContracts,
+      controlledInputValueTrackers: controlledInputValueTrackerContracts
     }),
     sideEffects: noSideEffects,
     resourceHintDispatcherMetadata:
       describePrivateResourceHintDispatcherMetadataGate(),
+    controlledInputValueTracker: describeControlledInputValueTrackerGate(),
     missingPrerequisites
   });
 }
@@ -332,6 +468,29 @@ function describePrivateResourceHintDispatcherMetadataGate() {
   });
 }
 
+function describeControlledInputValueTrackerGate() {
+  return freezeRecord({
+    schemaVersion: controlledInputValueTrackerGateSchemaVersion,
+    gateId: controlledInputValueTrackerGateId,
+    compatibilityTarget,
+    status: unsupportedStatus,
+    unsupportedCode: unimplementedCode,
+    oracleEvidence: freezeArray([
+      oracleEvidence(
+        controlledInputOracleKind,
+        controlledInputValueTrackerContracts.length
+      )
+    ]),
+    oracleCoverage: controlledInputValueTrackerOracleCoverage,
+    contracts: controlledInputValueTrackerContracts,
+    postEventRestoreBoundary: createPostEventRestoreBoundary(),
+    publicControlledBehaviorBoundary:
+      createPublicControlledBehaviorBoundary(),
+    sideEffects: controlledInputValueTrackerSideEffects,
+    missingPrerequisites: controlledInputValueTrackerMissingPrerequisites
+  });
+}
+
 function createUnsupportedResourceFormActionInternalsError(record) {
   const payload = assertPrivateResourceFormActionGateRecord(record);
   const error = createUnsupportedError(
@@ -347,6 +506,28 @@ function createUnsupportedResourceFormActionInternalsError(record) {
   error.requestType = payload.requestType;
   error.behaviorArea = payload.behaviorArea;
   error.requestName = payload.requestName;
+  error.status = payload.status;
+  error.sideEffects = payload.sideEffects;
+
+  return error;
+}
+
+function createUnsupportedControlledInputValueTrackerError(record) {
+  const payload = assertPrivateControlledInputValueTrackerRecord(record);
+  const error = createUnsupportedError(
+    'react-dom/private-internals',
+    `controlled-value-tracker.${payload.hostTag}`,
+    'was requested',
+    'The private controlled input value-tracker gate records metadata only.'
+  );
+
+  error.code = privateControlledInputValueTrackerGateErrorCode;
+  error.requestId = payload.requestId;
+  error.requestSequence = payload.requestSequence;
+  error.scenarioId = payload.scenarioId;
+  error.phaseId = payload.phaseId;
+  error.hostTag = payload.hostTag;
+  error.controlKind = payload.controlKind;
   error.status = payload.status;
   error.sideEffects = payload.sideEffects;
 
@@ -453,6 +634,49 @@ function recordUnsupportedResourceHintDispatcherRequestWithGate(
   return payload;
 }
 
+function recordControlledInputValueTrackerScenarioWithGate(gateState, scenario) {
+  const normalized = normalizeControlledInputValueTrackerScenario(scenario);
+  const contract = getControlledInputValueTrackerContract(
+    normalized.hostTag,
+    normalized.controlKind
+  );
+  const requestSequence = gateState.nextRequestSequence++;
+  const requestId = `${gateState.requestIdPrefix}:${requestSequence}`;
+
+  const payload = freezeRecord({
+    schemaVersion: controlledInputValueTrackerGateSchemaVersion,
+    $$typeof: privateControlledInputValueTrackerGateRecordType,
+    kind: 'FastReactDomPrivateControlledInputValueTrackerGateRecord',
+    gateId: controlledInputValueTrackerGateId,
+    compatibilityTarget,
+    status: unsupportedStatus,
+    unsupportedCode: unimplementedCode,
+    requestId,
+    requestSequence,
+    scenarioId: normalized.scenarioId,
+    phaseId: normalized.phaseId,
+    hostTag: normalized.hostTag,
+    inputType: normalized.inputType,
+    multiple: normalized.multiple,
+    controlKind: normalized.controlKind,
+    contractId: contract.id,
+    oracleKind: controlledInputOracleKind,
+    oracleSchemaVersion: 1,
+    trackerMetadata: createControlledInputValueTrackerMetadata(
+      contract,
+      normalized
+    ),
+    postEventRestoreBoundary: createPostEventRestoreBoundary(),
+    publicControlledBehaviorBoundary:
+      createPublicControlledBehaviorBoundary(),
+    sideEffects: controlledInputValueTrackerSideEffects,
+    missingPrerequisites: controlledInputValueTrackerMissingPrerequisites
+  });
+
+  controlledInputValueTrackerRecordPayloads.set(payload, payload);
+  return payload;
+}
+
 function getAcceptedContract(behaviorArea, requestName) {
   const key = `${behaviorArea}:${requestName}`;
   const contract = contractByAreaAndName.get(key);
@@ -471,6 +695,24 @@ function getAcceptedContract(behaviorArea, requestName) {
   throw error;
 }
 
+function getControlledInputValueTrackerContract(hostTag, controlKind) {
+  const key = `${hostTag}:${controlKind}`;
+  const contract = controlledInputValueTrackerContractByKey.get(key);
+  if (contract !== undefined) {
+    return contract;
+  }
+
+  const error = new Error(
+    `Unknown private React DOM controlled value-tracker scenario: ${key}.`
+  );
+  error.name = 'FastReactDomControlledInputValueTrackerGateError';
+  error.code = privateControlledInputValueTrackerGateUnknownScenarioCode;
+  error.hostTag = hostTag;
+  error.controlKind = controlKind;
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
 function assertPrivateResourceFormActionGateRecord(record) {
   const payload = getPrivateResourceFormActionGateRecordPayload(record);
   if (payload !== null) {
@@ -482,6 +724,21 @@ function assertPrivateResourceFormActionGateRecord(record) {
   );
   error.name = 'FastReactDomResourceFormActionGateError';
   error.code = 'FAST_REACT_DOM_RESOURCE_FORM_ACTION_GATE_INVALID_RECORD';
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
+function assertPrivateControlledInputValueTrackerRecord(record) {
+  const payload = getPrivateControlledInputValueTrackerRecordPayload(record);
+  if (payload !== null) {
+    return payload;
+  }
+
+  const error = new Error(
+    'Expected a private React DOM controlled input value-tracker gate record.'
+  );
+  error.name = 'FastReactDomControlledInputValueTrackerGateError';
+  error.code = 'FAST_REACT_DOM_CONTROLLED_INPUT_VALUE_TRACKER_GATE_INVALID_RECORD';
   error.compatibilityTarget = compatibilityTarget;
   throw error;
 }
@@ -791,6 +1048,216 @@ function throwInvalidResourceHintDispatcherShape(contract, reason) {
   throw error;
 }
 
+function normalizeControlledInputValueTrackerScenario(scenario) {
+  if (scenario == null || typeof scenario !== 'object') {
+    throwInvalidControlledInputValueTrackerScenario(
+      'Controlled value-tracker scenarios must be metadata records.'
+    );
+  }
+
+  const hostTag = getScenarioStringProperty(scenario, 'hostTag', null);
+  if (
+    hostTag !== 'input' &&
+    hostTag !== 'select' &&
+    hostTag !== 'textarea'
+  ) {
+    throwInvalidControlledInputValueTrackerScenario(
+      'Controlled value-tracker scenarios require input, select, or textarea host tags.'
+    );
+  }
+
+  const inputType = getScenarioStringProperty(
+    scenario,
+    'inputType',
+    hostTag === 'input' ? 'text' : null
+  );
+  const multiple = getScenarioBooleanProperty(scenario, 'multiple', false);
+  const controlKind = getScenarioStringProperty(
+    scenario,
+    'controlKind',
+    inferControlledInputValueTrackerControlKind(
+      hostTag,
+      inputType,
+      multiple
+    )
+  );
+
+  return freezeRecord({
+    scenarioId: getScenarioStringProperty(
+      scenario,
+      'scenarioId',
+      `${hostTag}-${controlKind}-metadata`
+    ),
+    phaseId: getScenarioStringProperty(scenario, 'phaseId', 'unknown'),
+    hostTag,
+    inputType,
+    multiple,
+    controlKind,
+    props: describeControlledInputValueTrackerProps(scenario.props)
+  });
+}
+
+function inferControlledInputValueTrackerControlKind(
+  hostTag,
+  inputType,
+  multiple
+) {
+  if (hostTag === 'input') {
+    return inputType === 'checkbox' || inputType === 'radio'
+      ? 'checked'
+      : 'value';
+  }
+
+  if (hostTag === 'select') {
+    return multiple ? 'multiple' : 'single';
+  }
+
+  return 'value';
+}
+
+function describeControlledInputValueTrackerProps(props) {
+  if (props == null) {
+    return freezeRecord({
+      source: describeValue(props),
+      enumerableKeysAvailable: true,
+      propKeys: freezeArray([]),
+      controlledPropSummary: freezeRecord({})
+    });
+  }
+
+  const propsType = typeof props;
+  if (propsType !== 'object' && propsType !== 'function') {
+    return freezeRecord({
+      source: describeValue(props),
+      enumerableKeysAvailable: false,
+      propKeys: null,
+      controlledPropSummary: freezeRecord({})
+    });
+  }
+
+  let propKeys;
+  try {
+    propKeys = Object.keys(props);
+  } catch (error) {
+    return freezeRecord({
+      source: describeValue(props),
+      enumerableKeysAvailable: false,
+      propKeys: null,
+      controlledPropSummary: freezeRecord({})
+    });
+  }
+
+  return freezeRecord({
+    source: describeValue(props),
+    enumerableKeysAvailable: true,
+    propKeys: freezeArray(propKeys),
+    controlledPropSummary:
+      summarizeControlledInputValueTrackerProps(props)
+  });
+}
+
+function summarizeControlledInputValueTrackerProps(props) {
+  const summary = {};
+  for (const propName of [
+    'type',
+    'value',
+    'defaultValue',
+    'checked',
+    'defaultChecked',
+    'multiple',
+    'children',
+    'onChange',
+    'readOnly',
+    'disabled'
+  ]) {
+    if (hasOwnProp(props, propName)) {
+      summary[propName] = describePropValueWithoutRawData(props, propName);
+    }
+  }
+  return freezeRecord(summary);
+}
+
+function describePropValueWithoutRawData(props, propName) {
+  try {
+    return freezeRecord({
+      present: true,
+      value: describeValue(props[propName])
+    });
+  } catch (error) {
+    return freezeRecord({
+      present: true,
+      value: freezeRecord({type: 'inaccessible'})
+    });
+  }
+}
+
+function hasOwnProp(value, propName) {
+  try {
+    return hasOwn.call(value, propName);
+  } catch (error) {
+    return false;
+  }
+}
+
+function createControlledInputValueTrackerMetadata(contract, normalized) {
+  return freezeRecord({
+    gateId: controlledInputValueTrackerGateId,
+    contractId: contract.id,
+    hostTag: contract.hostTag,
+    controlKind: contract.controlKind,
+    trackedField: contract.trackedField,
+    valueKind: contract.valueKind,
+    expectedPropKeys: contract.expectedPropKeys,
+    observedPropKeys: normalized.props.propKeys,
+    propSummary: normalized.props.controlledPropSummary,
+    deterministicMetadataOnly: true,
+    liveHostNodeRequired: false,
+    rawTargetCaptured: false,
+    trackerAttached: false,
+    currentValueSnapshot: null
+  });
+}
+
+function createPostEventRestoreBoundary() {
+  return freezeRecord({
+    status: 'blocked-post-event-controlled-restore',
+    latestPropsLookup: false,
+    eventPluginDispatch: false,
+    restoreQueued: false,
+    restoreFlushed: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createPublicControlledBehaviorBoundary() {
+  return freezeRecord({
+    status: 'blocked-public-controlled-form-behavior',
+    rootRenderReachable: false,
+    hostWrapperWrites: false,
+    warningsEmitted: false,
+    nativeFormIntegration: false,
+    compatibilityClaimed: false
+  });
+}
+
+function getScenarioStringProperty(record, key, fallback) {
+  const value = record[key];
+  return typeof value === 'string' && value.length > 0 ? value : fallback;
+}
+
+function getScenarioBooleanProperty(record, key, fallback) {
+  const value = record[key];
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+function throwInvalidControlledInputValueTrackerScenario(message) {
+  const error = new Error(message);
+  error.name = 'FastReactDomControlledInputValueTrackerGateError';
+  error.code = privateControlledInputValueTrackerGateInvalidScenarioCode;
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
 function describeArgumentList(args) {
   if (args == null) {
     return freezeRecord({
@@ -884,6 +1351,15 @@ function indexContracts(behaviorArea, contracts) {
   }
 }
 
+function indexControlledInputValueTrackerContracts() {
+  for (const contract of controlledInputValueTrackerContracts) {
+    controlledInputValueTrackerContractByKey.set(
+      `${contract.hostTag}:${contract.controlKind}`,
+      contract
+    );
+  }
+}
+
 function resourceHintContract(id, publicName, privateDispatcherKey, capability) {
   return freezeRecord({
     id,
@@ -949,6 +1425,39 @@ function controlledFormContract(id, hostTag) {
   });
 }
 
+function controlledInputValueTrackerContract(
+  id,
+  hostTag,
+  controlKind,
+  trackedField,
+  valueKind,
+  expectedPropKeys
+) {
+  return freezeRecord({
+    id,
+    hostTag,
+    controlKind,
+    trackedField,
+    valueKind,
+    expectedPropKeys: freezeArray(expectedPropKeys),
+    oracleKind: controlledInputOracleKind,
+    compatibilityClaimed: false
+  });
+}
+
+function controlledInputValueTrackerCoverage(
+  hostTag,
+  scenarioCount,
+  trackedFields
+) {
+  return freezeRecord({
+    hostTag,
+    scenarioCount,
+    trackedFields: freezeArray(trackedFields),
+    compatibilityClaimed: false
+  });
+}
+
 function prerequisite(id, area, reason) {
   return freezeRecord({
     id,
@@ -977,18 +1486,33 @@ function freezeRecord(value) {
 
 module.exports = {
   controlledFormContracts,
+  controlledInputValueTrackerContracts,
+  controlledInputValueTrackerGateId,
+  controlledInputValueTrackerGateSchemaVersion,
+  controlledInputValueTrackerMissingPrerequisites,
+  controlledInputValueTrackerOracleCoverage,
+  controlledInputValueTrackerSideEffects,
+  createControlledInputValueTrackerGate,
   createResourceFormActionInternalsGate,
+  createUnsupportedControlledInputValueTrackerError,
   createUnsupportedResourceFormActionInternalsError,
   createUnsupportedResourceHintDispatcherMetadataError,
+  describeControlledInputValueTrackerGate,
   describePrivateResourceHintDispatcherMetadataGate,
   describeResourceFormActionInternalsGate,
   formActionContracts,
+  getPrivateControlledInputValueTrackerRecordPayload,
   getPrivateResourceFormActionGateRecordPayload,
   getPrivateResourceHintDispatcherMetadataRecordPayload,
+  isPrivateControlledInputValueTrackerRecord,
   isPrivateResourceFormActionGateRecord,
   isPrivateResourceHintDispatcherMetadataRecord,
   missingPrerequisites,
   noSideEffects,
+  privateControlledInputValueTrackerGateErrorCode,
+  privateControlledInputValueTrackerGateInvalidScenarioCode,
+  privateControlledInputValueTrackerGateRecordType,
+  privateControlledInputValueTrackerGateUnknownScenarioCode,
   privateResourceFormActionGateErrorCode,
   privateResourceFormActionGateRecordType,
   privateResourceFormActionGateUnknownRequestCode,
@@ -997,6 +1521,7 @@ module.exports = {
   privateResourceHintDispatcherMetadataInvalidShapeCode,
   privateResourceHintDispatcherMetadataRecordType,
   privateResourceHintDispatcherMetadataUnknownRequestCode,
+  recordControlledInputValueTrackerScenario,
   recordUnsupportedControlledFormRequest,
   recordUnsupportedFormActionRequest,
   recordUnsupportedResourceHintDispatcherRequest,

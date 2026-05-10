@@ -256,6 +256,247 @@ test('private resource/form internals gate records deterministic unsupported met
   );
 });
 
+test('private controlled input value-tracker gate records deterministic metadata only', () => {
+  const first = createPrivateControlledValueTrackerScenario();
+  const second = createPrivateControlledValueTrackerScenario();
+
+  assert.deepEqual(first.records, second.records);
+  assert.deepEqual(first.summary, second.summary);
+
+  for (const record of first.records) {
+    assert.equal(Object.isFrozen(record), true, record.scenarioId);
+    assert.equal(
+      resourceFormGate.isPrivateControlledInputValueTrackerRecord(record),
+      true,
+      record.scenarioId
+    );
+    assert.equal(
+      resourceFormGate.getPrivateControlledInputValueTrackerRecordPayload(
+        record
+      ),
+      record,
+      record.scenarioId
+    );
+    assert.equal(record.status, resourceFormGate.unsupportedStatus);
+    assert.equal(record.unsupportedCode, unsupportedCode);
+    assert.equal(record.compatibilityTarget, compatibilityTarget);
+    assert.deepEqual(
+      record.sideEffects,
+      resourceFormGate.controlledInputValueTrackerSideEffects
+    );
+    assert.equal(record.sideEffects.controlsTracked, false);
+    assert.equal(record.sideEffects.trackerAttached, false);
+    assert.equal(record.sideEffects.hostValueRead, false);
+    assert.equal(record.sideEffects.hostValueWritten, false);
+    assert.equal(record.sideEffects.propertyDescriptorInstalled, false);
+    assert.equal(record.sideEffects.changeEventsObserved, false);
+    assert.equal(record.sideEffects.postEventRestoreQueued, false);
+    assert.equal(
+      record.sideEffects.publicControlledBehaviorEnabled,
+      false
+    );
+    assert.equal(record.sideEffects.publicRootTouched, false);
+    assert.equal(record.sideEffects.compatibilityClaimed, false);
+    assert.equal(record.trackerMetadata.deterministicMetadataOnly, true);
+    assert.equal(record.trackerMetadata.liveHostNodeRequired, false);
+    assert.equal(record.trackerMetadata.rawTargetCaptured, false);
+    assert.equal(record.trackerMetadata.trackerAttached, false);
+    assert.equal(record.trackerMetadata.currentValueSnapshot, null);
+    assert.equal(record.postEventRestoreBoundary.latestPropsLookup, false);
+    assert.equal(record.postEventRestoreBoundary.eventPluginDispatch, false);
+    assert.equal(record.postEventRestoreBoundary.restoreQueued, false);
+    assert.equal(record.postEventRestoreBoundary.restoreFlushed, false);
+    assert.equal(
+      record.publicControlledBehaviorBoundary.rootRenderReachable,
+      false
+    );
+    assert.equal(
+      record.publicControlledBehaviorBoundary.hostWrapperWrites,
+      false
+    );
+    assert.equal(
+      record.publicControlledBehaviorBoundary.compatibilityClaimed,
+      false
+    );
+  }
+
+  assert.deepEqual(
+    first.records.map((record) => ({
+      requestId: record.requestId,
+      requestSequence: record.requestSequence,
+      scenarioId: record.scenarioId,
+      phaseId: record.phaseId,
+      hostTag: record.hostTag,
+      inputType: record.inputType,
+      multiple: record.multiple,
+      controlKind: record.controlKind,
+      contractId: record.contractId,
+      trackerMetadata: {
+        trackedField: record.trackerMetadata.trackedField,
+        valueKind: record.trackerMetadata.valueKind,
+        expectedPropKeys: record.trackerMetadata.expectedPropKeys,
+        observedPropKeys: record.trackerMetadata.observedPropKeys,
+        propSummary: record.trackerMetadata.propSummary
+      }
+    })),
+    [
+      {
+        requestId: 'tracker-gate:1',
+        requestSequence: 1,
+        scenarioId: 'input-text-controlled-value-update',
+        phaseId: 'initial',
+        hostTag: 'input',
+        inputType: 'text',
+        multiple: false,
+        controlKind: 'value',
+        contractId: 'input-value-tracker',
+        trackerMetadata: {
+          trackedField: 'value',
+          valueKind: 'string-current-value',
+          expectedPropKeys: ['type', 'value', 'defaultValue', 'onChange'],
+          observedPropKeys: ['type', 'value', 'onChange'],
+          propSummary: {
+            type: {present: true, value: {type: 'string', empty: false}},
+            value: {present: true, value: {type: 'string', empty: false}},
+            onChange: {present: true, value: {type: 'function'}}
+          }
+        }
+      },
+      {
+        requestId: 'tracker-gate:2',
+        requestSequence: 2,
+        scenarioId: 'checkbox-controlled-checked-update',
+        phaseId: 'initial',
+        hostTag: 'input',
+        inputType: 'checkbox',
+        multiple: false,
+        controlKind: 'checked',
+        contractId: 'input-checked-tracker',
+        trackerMetadata: {
+          trackedField: 'checked',
+          valueKind: 'boolean-string-current-value',
+          expectedPropKeys: ['type', 'checked', 'defaultChecked', 'onChange'],
+          observedPropKeys: ['type', 'checked', 'onChange'],
+          propSummary: {
+            type: {present: true, value: {type: 'string', empty: false}},
+            checked: {present: true, value: {type: 'boolean'}},
+            onChange: {present: true, value: {type: 'function'}}
+          }
+        }
+      },
+      {
+        requestId: 'tracker-gate:3',
+        requestSequence: 3,
+        scenarioId: 'select-single-controlled-update',
+        phaseId: 'initial',
+        hostTag: 'select',
+        inputType: null,
+        multiple: false,
+        controlKind: 'single',
+        contractId: 'select-single-value-tracker',
+        trackerMetadata: {
+          trackedField: 'selectedOptions',
+          valueKind: 'single-option-value',
+          expectedPropKeys: ['value', 'defaultValue', 'onChange'],
+          observedPropKeys: ['value', 'onChange'],
+          propSummary: {
+            value: {present: true, value: {type: 'string', empty: false}},
+            onChange: {present: true, value: {type: 'function'}}
+          }
+        }
+      },
+      {
+        requestId: 'tracker-gate:4',
+        requestSequence: 4,
+        scenarioId: 'select-multiple-controlled-update',
+        phaseId: 'update',
+        hostTag: 'select',
+        inputType: null,
+        multiple: true,
+        controlKind: 'multiple',
+        contractId: 'select-multiple-value-tracker',
+        trackerMetadata: {
+          trackedField: 'selectedOptions',
+          valueKind: 'array-option-values',
+          expectedPropKeys: [
+            'multiple',
+            'value',
+            'defaultValue',
+            'onChange'
+          ],
+          observedPropKeys: ['multiple', 'value', 'onChange'],
+          propSummary: {
+            multiple: {present: true, value: {type: 'boolean'}},
+            value: {present: true, value: {type: 'object'}},
+            onChange: {present: true, value: {type: 'function'}}
+          }
+        }
+      },
+      {
+        requestId: 'tracker-gate:5',
+        requestSequence: 5,
+        scenarioId: 'textarea-controlled-value-update',
+        phaseId: 'initial',
+        hostTag: 'textarea',
+        inputType: null,
+        multiple: false,
+        controlKind: 'value',
+        contractId: 'textarea-value-tracker',
+        trackerMetadata: {
+          trackedField: 'value',
+          valueKind: 'string-current-value',
+          expectedPropKeys: [
+            'value',
+            'defaultValue',
+            'children',
+            'onChange'
+          ],
+          observedPropKeys: ['value', 'onChange'],
+          propSummary: {
+            value: {present: true, value: {type: 'string', empty: false}},
+            onChange: {present: true, value: {type: 'function'}}
+          }
+        }
+      }
+    ]
+  );
+
+  assert.equal(
+    first.summary.gateId,
+    resourceFormGate.controlledInputValueTrackerGateId
+  );
+  assert.equal(first.summary.compatibilityTarget, compatibilityTarget);
+  assert.equal(first.summary.status, resourceFormGate.unsupportedStatus);
+  assert.equal(first.summary.unsupportedCode, unsupportedCode);
+  assert.deepEqual(
+    first.summary.sideEffects,
+    resourceFormGate.controlledInputValueTrackerSideEffects
+  );
+  assert.deepEqual(
+    first.summary.oracleCoverage,
+    [
+      {
+        hostTag: 'input',
+        scenarioCount: 12,
+        trackedFields: ['value', 'checked'],
+        compatibilityClaimed: false
+      },
+      {
+        hostTag: 'select',
+        scenarioCount: 6,
+        trackedFields: ['selectedOptions'],
+        compatibilityClaimed: false
+      },
+      {
+        hostTag: 'textarea',
+        scenarioCount: 7,
+        trackedFields: ['value'],
+        compatibilityClaimed: false
+      }
+    ]
+  );
+});
+
 test('private resource hint dispatcher metadata gate validates normalized shapes without dispatching', () => {
   const gate = resourceFormGate.createResourceFormActionInternalsGate({
     requestIdPrefix: 'resource-dispatcher-gate'
@@ -631,6 +872,79 @@ test('private resource/form internals gate errors are deterministic and fail clo
   );
 });
 
+test('private controlled input value-tracker gate errors are deterministic and fail closed', () => {
+  const gate = resourceFormGate.createControlledInputValueTrackerGate({
+    requestIdPrefix: 'tracker-error-gate'
+  });
+  const record = gate.recordTrackerScenario({
+    scenarioId: 'textarea-controlled-value-update',
+    phaseId: 'initial',
+    hostTag: 'textarea',
+    props: {
+      value: 'locked',
+      onChange() {}
+    }
+  });
+  const error =
+    resourceFormGate.createUnsupportedControlledInputValueTrackerError(
+      record
+    );
+
+  assert.equal(error.name, 'FastReactDomUnimplementedError');
+  assert.equal(
+    error.code,
+    resourceFormGate.privateControlledInputValueTrackerGateErrorCode
+  );
+  assert.equal(error.entrypoint, 'react-dom/private-internals');
+  assert.equal(error.exportName, 'controlled-value-tracker.textarea');
+  assert.equal(error.compatibilityTarget, compatibilityTarget);
+  assert.equal(error.requestId, 'tracker-error-gate:1');
+  assert.equal(error.requestSequence, 1);
+  assert.equal(error.scenarioId, 'textarea-controlled-value-update');
+  assert.equal(error.phaseId, 'initial');
+  assert.equal(error.hostTag, 'textarea');
+  assert.equal(error.controlKind, 'value');
+  assert.equal(error.status, resourceFormGate.unsupportedStatus);
+  assert.deepEqual(
+    error.sideEffects,
+    resourceFormGate.controlledInputValueTrackerSideEffects
+  );
+  assert.match(
+    error.message,
+    /controlled input value-tracker gate records metadata only/u
+  );
+
+  assert.throws(
+    () => gate.recordTrackerScenario({hostTag: 'input', controlKind: 'range'}),
+    {
+      code:
+        resourceFormGate.privateControlledInputValueTrackerGateUnknownScenarioCode,
+      compatibilityTarget,
+      hostTag: 'input',
+      controlKind: 'range'
+    }
+  );
+  assert.throws(
+    () => gate.recordTrackerScenario({hostTag: 'button'}),
+    {
+      code:
+        resourceFormGate.privateControlledInputValueTrackerGateInvalidScenarioCode,
+      compatibilityTarget
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate.createUnsupportedControlledInputValueTrackerError({
+        requestId: 'not-a-private-record'
+      }),
+    {
+      code:
+        'FAST_REACT_DOM_CONTROLLED_INPUT_VALUE_TRACKER_GATE_INVALID_RECORD',
+      compatibilityTarget
+    }
+  );
+});
+
 test('resource/form root bridge boundary metadata matches accepted blocked root gates', async () => {
   const rootFacadeGate = await import(
     pathToFileURL(
@@ -712,7 +1026,23 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
     adaptersInvoked: false,
     rawTargetCaptured: false,
     publicRootTouched: false,
-    compatibilityClaimed: false
+    compatibilityClaimed: false,
+    controlledValueTrackerBoundary: {
+      gateStatus: resourceFormGate.privateControlledValueTrackerBlockedStatus,
+      behaviorArea: null,
+      supportedBehaviorArea: 'controlled-form',
+      appliesToRequest: false,
+      metadataGateAvailable: true,
+      trackerRecordsAccepted: true,
+      liveHostNodeRequired: false,
+      rawTargetCaptured: false,
+      trackerAttached: false,
+      hostValueRead: false,
+      hostValueWritten: false,
+      postEventRestoreQueued: false,
+      publicControlledBehaviorEnabled: false,
+      compatibilityClaimed: false
+    }
   });
 });
 
@@ -747,7 +1077,10 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
       status: record.status,
       publicRootStatus: record.publicRootBoundary.gateStatus,
       rootBridgeStatus: record.rootBridgeBoundary.gateStatus,
-      sourceAdapterStatus: record.sourceAdapterBoundary.gateStatus
+      sourceAdapterStatus: record.sourceAdapterBoundary.gateStatus,
+      trackerBoundaryApplies:
+        record.sourceAdapterBoundary.controlledValueTrackerBoundary
+          .appliesToRequest
     })),
     [
       {
@@ -756,7 +1089,8 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
         status: resourceFormGate.unsupportedStatus,
         publicRootStatus: resourceFormGate.publicRootFacadeBlockedStatus,
         rootBridgeStatus: resourceFormGate.privateRootBridgeRecordOnlyStatus,
-        sourceAdapterStatus: resourceFormGate.privateSourceAdapterBlockedStatus
+        sourceAdapterStatus: resourceFormGate.privateSourceAdapterBlockedStatus,
+        trackerBoundaryApplies: false
       },
       {
         behaviorArea: 'form-action',
@@ -764,7 +1098,8 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
         status: resourceFormGate.unsupportedStatus,
         publicRootStatus: resourceFormGate.publicRootFacadeBlockedStatus,
         rootBridgeStatus: resourceFormGate.privateRootBridgeRecordOnlyStatus,
-        sourceAdapterStatus: resourceFormGate.privateSourceAdapterBlockedStatus
+        sourceAdapterStatus: resourceFormGate.privateSourceAdapterBlockedStatus,
+        trackerBoundaryApplies: false
       },
       {
         behaviorArea: 'controlled-form',
@@ -772,7 +1107,8 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
         status: resourceFormGate.unsupportedStatus,
         publicRootStatus: resourceFormGate.publicRootFacadeBlockedStatus,
         rootBridgeStatus: resourceFormGate.privateRootBridgeRecordOnlyStatus,
-        sourceAdapterStatus: resourceFormGate.privateSourceAdapterBlockedStatus
+        sourceAdapterStatus: resourceFormGate.privateSourceAdapterBlockedStatus,
+        trackerBoundaryApplies: true
       }
     ]
   );
@@ -837,6 +1173,36 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
     assert.equal(blockedRecord.sourceAdapterBoundary.publicRootTouched, false);
     assert.equal(
       blockedRecord.sourceAdapterBoundary.compatibilityClaimed,
+      false
+    );
+    assert.equal(
+      blockedRecord.sourceAdapterBoundary.controlledValueTrackerBoundary
+        .gateStatus,
+      resourceFormGate.privateControlledValueTrackerBlockedStatus
+    );
+    assert.equal(
+      blockedRecord.sourceAdapterBoundary.controlledValueTrackerBoundary
+        .trackerAttached,
+      false
+    );
+    assert.equal(
+      blockedRecord.sourceAdapterBoundary.controlledValueTrackerBoundary
+        .hostValueRead,
+      false
+    );
+    assert.equal(
+      blockedRecord.sourceAdapterBoundary.controlledValueTrackerBoundary
+        .hostValueWritten,
+      false
+    );
+    assert.equal(
+      blockedRecord.sourceAdapterBoundary.controlledValueTrackerBoundary
+        .postEventRestoreQueued,
+      false
+    );
+    assert.equal(
+      blockedRecord.sourceAdapterBoundary.controlledValueTrackerBoundary
+        .publicControlledBehaviorEnabled,
       false
     );
   }
@@ -1138,6 +1504,75 @@ function createPrivateGateScenario() {
   return {
     records,
     summary: resourceFormGate.describeResourceFormActionInternalsGate()
+  };
+}
+
+function createPrivateControlledValueTrackerScenario() {
+  const gate = resourceFormGate.createControlledInputValueTrackerGate({
+    requestIdPrefix: 'tracker-gate'
+  });
+  const records = [
+    gate.recordTrackerScenario({
+      scenarioId: 'input-text-controlled-value-update',
+      phaseId: 'initial',
+      hostTag: 'input',
+      inputType: 'text',
+      props: {
+        type: 'text',
+        value: 'alpha',
+        onChange() {}
+      },
+      target: throwingProxy('input target')
+    }),
+    gate.recordTrackerScenario({
+      scenarioId: 'checkbox-controlled-checked-update',
+      phaseId: 'initial',
+      hostTag: 'input',
+      inputType: 'checkbox',
+      props: {
+        type: 'checkbox',
+        checked: true,
+        onChange() {}
+      },
+      target: throwingProxy('checkbox target')
+    }),
+    gate.recordTrackerScenario({
+      scenarioId: 'select-single-controlled-update',
+      phaseId: 'initial',
+      hostTag: 'select',
+      props: {
+        value: 'b',
+        onChange() {}
+      },
+      target: throwingProxy('select target')
+    }),
+    gate.recordTrackerScenario({
+      scenarioId: 'select-multiple-controlled-update',
+      phaseId: 'update',
+      hostTag: 'select',
+      multiple: true,
+      props: {
+        multiple: true,
+        value: ['a'],
+        onChange() {}
+      },
+      target: throwingProxy('select multiple target')
+    }),
+    gate.recordTrackerScenario({
+      scenarioId: 'textarea-controlled-value-update',
+      phaseId: 'initial',
+      hostTag: 'textarea',
+      props: {
+        value: 'alpha',
+        onChange() {}
+      },
+      target: throwingProxy('textarea target')
+    })
+  ];
+
+  return {
+    records,
+    summary: resourceFormGate.describeControlledInputValueTrackerGate()
   };
 }
 

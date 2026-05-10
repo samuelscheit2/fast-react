@@ -40,6 +40,8 @@ const reactDomPackageJson = require(
 );
 
 const {
+  CONTROLLED_FORM_PROPERTY_PAYLOAD_STATUS,
+  CONTROLLED_VALUE_TRACKER_GATE_STATUS,
   ENTRY_NON_PAYLOAD,
   ENTRY_REMOVE_ATTRIBUTE,
   ENTRY_REMOVE_PROPERTY,
@@ -1002,26 +1004,10 @@ test("private DOM property payload reports controlled form and document resource
     ),
     [
       setAttribute("id", "id", "name-field"),
-      unsupported(
-        "type",
-        "controlled-input",
-        "controlled input props are handled by the controlled form wrapper path"
-      ),
-      unsupported(
-        "value",
-        "controlled-input",
-        "controlled input props are handled by the controlled form wrapper path"
-      ),
-      unsupported(
-        "checked",
-        "controlled-input",
-        "controlled input props are handled by the controlled form wrapper path"
-      ),
-      unsupported(
-        "defaultValue",
-        "controlled-input",
-        "controlled input props are handled by the controlled form wrapper path"
-      )
+      controlledUnsupported("input", "type"),
+      controlledUnsupported("input", "value"),
+      controlledUnsupported("input", "checked"),
+      controlledUnsupported("input", "defaultValue")
     ]
   );
 
@@ -1059,21 +1045,9 @@ test("private DOM property payload reports controlled form and document resource
       ])
     ),
     [
-      unsupported(
-        "value",
-        "controlled-select",
-        "controlled select props are handled by the controlled form wrapper path"
-      ),
-      unsupported(
-        "defaultValue",
-        "controlled-select",
-        "controlled select props are handled by the controlled form wrapper path"
-      ),
-      unsupported(
-        "multiple",
-        "controlled-select",
-        "controlled select props are handled by the controlled form wrapper path"
-      )
+      controlledUnsupported("select", "value"),
+      controlledUnsupported("select", "defaultValue"),
+      controlledUnsupported("select", "multiple")
     ]
   );
 
@@ -1087,16 +1061,8 @@ test("private DOM property payload reports controlled form and document resource
       ])
     ),
     [
-      unsupported(
-        "value",
-        "controlled-textarea",
-        "controlled textarea props are handled by the controlled form wrapper path"
-      ),
-      unsupported(
-        "defaultValue",
-        "controlled-textarea",
-        "controlled textarea props are handled by the controlled form wrapper path"
-      )
+      controlledUnsupported("textarea", "value"),
+      controlledUnsupported("textarea", "defaultValue")
     ]
   );
 
@@ -1331,6 +1297,27 @@ function unsupported(propName, category, reason, details) {
     };
   }
   return entry;
+}
+
+function controlledUnsupported(hostTag, propName) {
+  return unsupported(
+    propName,
+    `controlled-${hostTag}`,
+    `controlled ${hostTag} props are handled by the controlled form wrapper path`,
+    {
+      controlledFormBoundary: {
+        propertyPayloadStatus: CONTROLLED_FORM_PROPERTY_PAYLOAD_STATUS,
+        valueTrackerGateStatus: CONTROLLED_VALUE_TRACKER_GATE_STATUS,
+        hostTag,
+        ordinaryPayloadAccepted: false,
+        sourceAdapterInvoked: false,
+        liveTrackingStarted: false,
+        postEventRestoreQueued: false,
+        publicControlledBehaviorEnabled: false,
+        compatibilityClaimed: false
+      }
+    }
+  );
 }
 
 class FakeElement {

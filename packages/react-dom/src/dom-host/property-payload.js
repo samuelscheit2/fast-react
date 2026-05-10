@@ -9,6 +9,10 @@ const ENTRY_REMOVE_STYLE = 'removeStyle';
 const ENTRY_SET_INNER_HTML = 'setInnerHTML';
 const ENTRY_NON_PAYLOAD = 'nonPayload';
 const ENTRY_UNSUPPORTED = 'unsupported';
+const CONTROLLED_FORM_PROPERTY_PAYLOAD_STATUS =
+  'blocked-controlled-form-property-payload';
+const CONTROLLED_VALUE_TRACKER_GATE_STATUS =
+  'private-controlled-value-tracker-metadata-only';
 
 const emptyProps = Object.freeze({});
 
@@ -266,11 +270,7 @@ function createEntries(tag, propName, value, previousValue, props) {
   }
 
   if (isControlledFormProp(tag, propName)) {
-    return createUnsupportedEntry(
-      propName,
-      `controlled-${tag}`,
-      `controlled ${tag} props are handled by the controlled form wrapper path`
-    );
+    return createControlledFormUnsupportedEntry(tag, propName);
   }
 
   if (formActionProps.has(propName)) {
@@ -640,6 +640,27 @@ function createUnsupportedEntry(propName, category, reason, details) {
   return entry;
 }
 
+function createControlledFormUnsupportedEntry(tag, propName) {
+  return createUnsupportedEntry(
+    propName,
+    `controlled-${tag}`,
+    `controlled ${tag} props are handled by the controlled form wrapper path`,
+    {
+      controlledFormBoundary: {
+        propertyPayloadStatus: CONTROLLED_FORM_PROPERTY_PAYLOAD_STATUS,
+        valueTrackerGateStatus: CONTROLLED_VALUE_TRACKER_GATE_STATUS,
+        hostTag: tag,
+        ordinaryPayloadAccepted: false,
+        sourceAdapterInvoked: false,
+        liveTrackingStarted: false,
+        postEventRestoreQueued: false,
+        publicControlledBehaviorEnabled: false,
+        compatibilityClaimed: false
+      }
+    }
+  );
+}
+
 function isControlledFormProp(tag, propName) {
   const controlledProps =
     typeof tag === 'string' ? controlledPropsByTag[tag] : undefined;
@@ -723,6 +744,8 @@ function getStyleMutationTarget(styleName) {
 }
 
 module.exports = {
+  CONTROLLED_FORM_PROPERTY_PAYLOAD_STATUS,
+  CONTROLLED_VALUE_TRACKER_GATE_STATUS,
   ENTRY_NON_PAYLOAD,
   ENTRY_REMOVE_ATTRIBUTE,
   ENTRY_REMOVE_PROPERTY,
