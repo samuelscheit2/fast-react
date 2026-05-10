@@ -452,6 +452,18 @@ impl UpdateQueueStore {
             .ok_or(UpdateQueueError::InvalidQueueHandle { handle })
     }
 
+    pub fn clone_host_root_update_queue(
+        &mut self,
+        queue: UpdateQueueHandle,
+    ) -> Result<UpdateQueueHandle, UpdateQueueError> {
+        let mut clone = self.queue(queue)?.clone();
+        clone.callbacks.clear();
+
+        let raw = self.queues.len() as u64 + 1;
+        self.queues.push(clone);
+        Ok(UpdateQueueHandle::from_raw(raw))
+    }
+
     pub fn append_pending_update(
         &mut self,
         queue: UpdateQueueHandle,
@@ -671,8 +683,15 @@ impl UpdateQueueStore {
 
         if let Some(current_queue) = current_queue
             && current_queue != queue
-            && self.queue(current_queue)?.last_base_update != Some(last_pending_update)
         {
+            if self.queue(current_queue)?.shared.pending == Some(last_pending_update) {
+                self.queue_mut(current_queue)?.shared.pending = None;
+            }
+
+            if self.queue(current_queue)?.last_base_update == Some(last_pending_update) {
+                return Ok(());
+            }
+
             self.append_linear_segment_to_base_queue(
                 current_queue,
                 first_pending_update,
@@ -827,6 +846,38 @@ mod tests {
             Vec::<UpdateId>::new()
         );
         assert_eq!(store.base_updates(current_queue).unwrap(), vec![update]);
+    }
+
+    #[test]
+    fn update_queue_clone_for_work_in_progress_clears_shared_current_pending() {
+        let mut store = UpdateQueueStore::new();
+        let current_queue = store.initialize_host_root_queue(state(0));
+        let update = update_with_element(&mut store, Lane::DEFAULT, 7);
+        store.append_pending_update(current_queue, update).unwrap();
+        let work_in_progress_queue = store.clone_host_root_update_queue(current_queue).unwrap();
+
+        let result = store
+            .process_host_root_update_queue(
+                work_in_progress_queue,
+                Some(current_queue),
+                Lanes::DEFAULT,
+                Lanes::DEFAULT,
+            )
+            .unwrap();
+
+        assert_eq!(
+            result.memoized_state().element(),
+            RootElementHandle::from_raw(7)
+        );
+        assert_eq!(
+            store.pending_updates(current_queue).unwrap(),
+            Vec::<UpdateId>::new()
+        );
+        assert_eq!(store.base_updates(current_queue).unwrap(), vec![update]);
+        assert_eq!(
+            store.base_updates(work_in_progress_queue).unwrap(),
+            Vec::<UpdateId>::new()
+        );
     }
 
     #[test]

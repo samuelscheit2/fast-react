@@ -3,7 +3,9 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-use fast_react_core::{FiberArena, FiberTopologyError, StateNodeHandle, UpdateQueueHandle};
+use fast_react_core::{
+    FiberArena, FiberTopologyError, StateHandle, StateNodeHandle, UpdateQueueHandle,
+};
 use fast_react_host_config::HostTypes;
 
 use crate::{
@@ -223,6 +225,10 @@ impl<H: HostTypes> FiberRootStore<H> {
     #[must_use]
     pub const fn host_root_states(&self) -> &HostRootStateStore {
         &self.host_root_states
+    }
+
+    pub(crate) fn insert_host_root_state(&mut self, state: HostRootState) -> StateHandle {
+        self.host_root_states.insert(state)
     }
 
     #[must_use]

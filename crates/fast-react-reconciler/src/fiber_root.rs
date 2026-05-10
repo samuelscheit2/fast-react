@@ -257,6 +257,17 @@ impl<H: HostTypes> RootSchedulingState<H> {
     pub const fn pending_passive(&self) -> PendingPassiveState {
         self.pending_passive
     }
+
+    pub(crate) fn record_render_phase_work(
+        &mut self,
+        work_in_progress: FiberId,
+        render_lanes: Lanes,
+        render_exit_status: RootRenderExitStatus,
+    ) {
+        self.work_in_progress = Some(work_in_progress);
+        self.work_in_progress_root_render_lanes = render_lanes;
+        self.render_exit_status = render_exit_status;
+    }
 }
 
 impl<H: HostTypes> Default for RootSchedulingState<H> {
