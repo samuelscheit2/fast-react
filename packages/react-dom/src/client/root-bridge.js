@@ -23,10 +23,61 @@ const privateRootCreateRecordType =
   'fast.react_dom.private_root_create_record';
 const privateRootUpdateRecordType =
   'fast.react_dom.private_root_update_record';
+const privateRootAdmissionRecordType =
+  'fast.react_dom.private_root_admission_record';
 
 const ROOT_LIFECYCLE_CREATED = 'created';
 const ROOT_LIFECYCLE_RENDERED = 'rendered';
 const ROOT_LIFECYCLE_UNMOUNTED = 'unmounted';
+
+const ROOT_BRIDGE_REQUEST_ADMITTED =
+  'admitted-private-root-bridge-request-record';
+const ROOT_BRIDGE_EXECUTION_BLOCKED =
+  'blocked-private-root-bridge-execution';
+const ROOT_BRIDGE_COMPATIBILITY_BLOCKED =
+  'blocked-private-root-bridge-compatibility';
+const ROOT_BRIDGE_BLOCKED_CAPABILITIES = freezeArray([
+  freezeRecord({
+    id: 'native-execution',
+    blocked: true,
+    reason: 'No native or Rust root bridge execution is admitted.'
+  }),
+  freezeRecord({
+    id: 'reconciler-execution',
+    blocked: true,
+    reason: 'No reconciler create/update/unmount execution is admitted.'
+  }),
+  freezeRecord({
+    id: 'dom-mutation',
+    blocked: true,
+    reason: 'No container children, text, attributes, or HTML may be mutated.'
+  }),
+  freezeRecord({
+    id: 'marker-writes',
+    blocked: true,
+    reason: 'Root marker writes and clears remain deferred.'
+  }),
+  freezeRecord({
+    id: 'listener-installation',
+    blocked: true,
+    reason: 'Root listener installation remains deferred.'
+  }),
+  freezeRecord({
+    id: 'hydration',
+    blocked: true,
+    reason: 'Hydration root creation, marker parsing, and replay are not admitted.'
+  }),
+  freezeRecord({
+    id: 'events',
+    blocked: true,
+    reason: 'Synthetic event extraction and dispatch are not admitted.'
+  }),
+  freezeRecord({
+    id: 'compatibility-claims',
+    blocked: true,
+    reason: 'React DOM root lifecycle compatibility remains unclaimed.'
+  })
+]);
 
 const rootOwnerState = new WeakMap();
 const rootHandleState = new WeakMap();
@@ -75,6 +126,9 @@ function createPrivateRootBridgeShell(options) {
         null,
         callback
       );
+    },
+    admitRequest(record) {
+      return admitRootBridgeRequestWithBridge(bridgeState, record);
     }
   });
 }
@@ -111,6 +165,26 @@ function createRootUnmountRecord(rootHandle, callback) {
     null,
     callback
   );
+}
+
+function admitRootBridgeRequestRecord(record) {
+  return admitRootBridgeRequestWithBridge(null, record);
+}
+
+function admitRootBridgeRequestWithBridge(bridgeState, record) {
+  const validation = validateRootBridgeRequestRecord(record);
+  if (
+    bridgeState !== null &&
+    validation.rootHandleState.bridgeState !== bridgeState
+  ) {
+    const error = new Error(
+      'Cannot use a private root bridge request with a different root bridge shell.'
+    );
+    error.code = 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE';
+    throw error;
+  }
+
+  return createRootBridgeAdmissionRecord(record, validation);
 }
 
 function createPrivateRootOwner(rootId, options) {
@@ -203,6 +277,8 @@ function createClientRootRecordWithBridge(bridgeState, container, rootOptions) {
     rootId,
     rootKind: CLIENT_ROOT_KIND,
     rootTag: CONCURRENT_ROOT_TAG,
+    lifecycleStatusBefore: null,
+    lifecycleStatusAfter: ROOT_LIFECYCLE_CREATED,
     containerInfo: handleState.containerInfo,
     listenerGuard: describeRootListenerGuard(container),
     markerGuard: describeCreateRootMarkerGuard(
@@ -300,6 +376,168 @@ function createRootUpdateRecordWithBridge(
   return record;
 }
 
+function validateRootBridgeRequestRecord(record) {
+  if (!record || typeof record !== 'object') {
+    throwInvalidRootBridgeRequest(
+      'Expected a private React DOM root bridge request record.'
+    );
+  }
+
+  if (record.$$typeof === privateRootCreateRecordType) {
+    return validateCreateRootBridgeRequestRecord(record);
+  }
+
+  if (record.$$typeof === privateRootUpdateRecordType) {
+    return validateUpdateRootBridgeRequestRecord(record);
+  }
+
+  throwInvalidRootBridgeRequest(
+    'Expected a private React DOM root bridge create, render, or unmount record.'
+  );
+}
+
+function validateCreateRootBridgeRequestRecord(record) {
+  const payload = rootRecordPayloads.get(record);
+  if (payload === undefined) {
+    throwInvalidRootBridgeRequest(
+      'Expected a root bridge create record produced by the private root bridge.'
+    );
+  }
+
+  assertRecordField(record, 'operation', 'create');
+  assertRecordField(record, 'requestType', 'createRoot');
+  assertRecordField(record, 'rootKind', CLIENT_ROOT_KIND);
+  assertRecordField(record, 'rootTag', CONCURRENT_ROOT_TAG);
+  assertRecordField(record, 'lifecycleStatusBefore', null);
+  assertRecordField(
+    record,
+    'lifecycleStatusAfter',
+    ROOT_LIFECYCLE_CREATED
+  );
+  assertExecutionIsBlockedOnRequestRecord(record);
+
+  const rootHandleState = getPrivateRootHandleState(record.handle);
+  const ownerState = assertPrivateRootOwner(record.owner);
+  assertRootIdentityMatchesRecord({
+    handle: record.handle,
+    ownerState,
+    record
+  });
+
+  return {
+    lifecycleTransition: 'none->created',
+    operation: 'create',
+    rootHandleState
+  };
+}
+
+function validateUpdateRootBridgeRequestRecord(record) {
+  const payload = rootRecordPayloads.get(record);
+  if (payload === undefined) {
+    throwInvalidRootBridgeRequest(
+      'Expected a root bridge render or unmount record produced by the private root bridge.'
+    );
+  }
+
+  assertRecordField(record, 'rootKind', CLIENT_ROOT_KIND);
+  assertRecordField(record, 'rootTag', CONCURRENT_ROOT_TAG);
+  assertExecutionIsBlockedOnRequestRecord(record);
+
+  const rootHandle = payload.rootHandle;
+  const rootHandleState = getPrivateRootHandleState(rootHandle);
+  const ownerState = assertPrivateRootOwner(rootHandle.owner);
+  assertRootIdentityMatchesRecord({
+    handle: rootHandle,
+    ownerState,
+    record
+  });
+
+  if (record.operation === 'render') {
+    assertRecordField(record, 'requestType', 'root.render');
+    assertRecordField(record, 'lifecycleStatusAfter', ROOT_LIFECYCLE_RENDERED);
+    assertRecordField(record, 'markerGuard', null);
+    assertRecordField(record, 'noOp', false);
+    assertRecordField(record, 'sync', false);
+    assertAllowedLifecycleBefore(record, [
+      ROOT_LIFECYCLE_CREATED,
+      ROOT_LIFECYCLE_RENDERED
+    ]);
+    return {
+      lifecycleTransition: `${record.lifecycleStatusBefore}->${record.lifecycleStatusAfter}`,
+      operation: 'render',
+      rootHandleState
+    };
+  }
+
+  if (record.operation === 'unmount') {
+    assertRecordField(record, 'requestType', 'root.unmount');
+    assertRecordField(record, 'lifecycleStatusAfter', ROOT_LIFECYCLE_UNMOUNTED);
+    assertAllowedLifecycleBefore(record, [
+      ROOT_LIFECYCLE_CREATED,
+      ROOT_LIFECYCLE_RENDERED,
+      ROOT_LIFECYCLE_UNMOUNTED
+    ]);
+    if (record.lifecycleStatusBefore === ROOT_LIFECYCLE_UNMOUNTED) {
+      assertRecordField(record, 'noOp', true);
+      assertRecordField(record, 'sync', false);
+    } else {
+      assertRecordField(record, 'noOp', false);
+      assertRecordField(record, 'sync', true);
+    }
+    if (record.markerGuard === null || typeof record.markerGuard !== 'object') {
+      throwInvalidRootBridgeRequest(
+        'Expected an unmount request to include a deferred marker guard.'
+      );
+    }
+    return {
+      lifecycleTransition: `${record.lifecycleStatusBefore}->${record.lifecycleStatusAfter}`,
+      operation: 'unmount',
+      rootHandleState
+    };
+  }
+
+  throwInvalidRootBridgeRequest(
+    `Unsupported private root bridge request operation: ${String(record.operation)}.`
+  );
+}
+
+function createRootBridgeAdmissionRecord(record, validation) {
+  return freezeRecord({
+    $$typeof: privateRootAdmissionRecordType,
+    kind: 'FastReactDomPrivateRootAdmissionRecord',
+    operation: record.operation,
+    requestId: record.requestId,
+    requestSequence: record.requestSequence,
+    requestType: record.requestType,
+    rootId: record.rootId,
+    rootKind: record.rootKind,
+    rootTag: record.rootTag,
+    updateId: record.updateId || null,
+    sequence: record.sequence,
+    admissionStatus: ROOT_BRIDGE_REQUEST_ADMITTED,
+    executionStatus: ROOT_BRIDGE_EXECUTION_BLOCKED,
+    compatibilityStatus: ROOT_BRIDGE_COMPATIBILITY_BLOCKED,
+    lifecyclePrerequisites: freezeRecord({
+      accepted: true,
+      lifecycleStatusBefore: record.lifecycleStatusBefore,
+      lifecycleStatusAfter: record.lifecycleStatusAfter,
+      lifecycleTransition: validation.lifecycleTransition,
+      operation: validation.operation,
+      rootKind: CLIENT_ROOT_KIND,
+      rootTag: CONCURRENT_ROOT_TAG
+    }),
+    blockedCapabilities: ROOT_BRIDGE_BLOCKED_CAPABILITIES,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false
+  });
+}
+
 function getPrivateRootHandleState(rootHandle) {
   const state = rootHandleState.get(rootHandle);
   if (state === undefined) {
@@ -383,6 +621,88 @@ function assertRootHandleCanRender(handleState) {
     error.code = 'FAST_REACT_DOM_UNMOUNTED_ROOT';
     throw error;
   }
+}
+
+function assertRootIdentityMatchesRecord({handle, ownerState, record}) {
+  if (
+    handle.rootId !== record.rootId ||
+    ownerState.rootId !== record.rootId ||
+    handle.rootKind !== record.rootKind ||
+    ownerState.rootKind !== record.rootKind ||
+    handle.rootTag !== record.rootTag ||
+    ownerState.rootTag !== record.rootTag
+  ) {
+    throwInvalidRootBridgeRequest(
+      'Private root bridge request identity does not match its root handle.'
+    );
+  }
+}
+
+function assertExecutionIsBlockedOnRequestRecord(record) {
+  if (record.nativeExecution !== false) {
+    throwInvalidRootBridgeRequest(
+      'Private root bridge request records must not claim native execution.'
+    );
+  }
+  if (record.reconcilerExecution === true) {
+    throwInvalidRootBridgeRequest(
+      'Private root bridge request records must not claim reconciler execution.'
+    );
+  }
+  if (record.domMutation === true) {
+    throwInvalidRootBridgeRequest(
+      'Private root bridge request records must not claim DOM mutation.'
+    );
+  }
+  if (record.markerWrites === true) {
+    throwInvalidRootBridgeRequest(
+      'Private root bridge request records must not claim marker writes.'
+    );
+  }
+  if (record.listenerInstallation === true) {
+    throwInvalidRootBridgeRequest(
+      'Private root bridge request records must not claim listener installation.'
+    );
+  }
+  if (record.hydration === true) {
+    throwInvalidRootBridgeRequest(
+      'Private root bridge request records must not claim hydration.'
+    );
+  }
+  if (record.eventDispatch === true) {
+    throwInvalidRootBridgeRequest(
+      'Private root bridge request records must not claim event dispatch.'
+    );
+  }
+  if (record.compatibilityClaimed === true) {
+    throwInvalidRootBridgeRequest(
+      'Private root bridge request records must not claim compatibility.'
+    );
+  }
+}
+
+function assertAllowedLifecycleBefore(record, allowedStatuses) {
+  if (!allowedStatuses.includes(record.lifecycleStatusBefore)) {
+    throwInvalidRootBridgeRequest(
+      `Unexpected lifecycle state before ${record.operation} request: ${String(
+        record.lifecycleStatusBefore
+      )}.`
+    );
+  }
+}
+
+function assertRecordField(record, field, expectedValue) {
+  if (!Object.is(record[field], expectedValue)) {
+    throwInvalidRootBridgeRequest(
+      `Invalid private root bridge request field ${field}.`
+    );
+  }
+}
+
+function throwInvalidRootBridgeRequest(message) {
+  const error = new Error(message);
+  error.code = 'FAST_REACT_DOM_INVALID_ROOT_BRIDGE_REQUEST';
+  throw error;
 }
 
 function describeCreateRootMarkerGuard(container, options) {
@@ -497,12 +817,21 @@ function freezeRecord(record) {
   return Object.freeze(record);
 }
 
+function freezeArray(array) {
+  return Object.freeze(array.slice());
+}
+
 module.exports = {
   CLIENT_ROOT_KIND,
   CONCURRENT_ROOT_TAG,
+  ROOT_BRIDGE_BLOCKED_CAPABILITIES,
+  ROOT_BRIDGE_COMPATIBILITY_BLOCKED,
+  ROOT_BRIDGE_EXECUTION_BLOCKED,
+  ROOT_BRIDGE_REQUEST_ADMITTED,
   ROOT_LIFECYCLE_CREATED,
   ROOT_LIFECYCLE_RENDERED,
   ROOT_LIFECYCLE_UNMOUNTED,
+  admitRootBridgeRequestRecord,
   createClientRootRecord,
   createPrivateRootBridgeShell,
   createPrivateRootHandle,
@@ -517,6 +846,7 @@ module.exports = {
   getRootOwnerFromHandle,
   isPrivateRootHandle,
   isPrivateRootOwner,
+  privateRootAdmissionRecordType,
   privateRootCreateRecordType,
   privateRootHandleType,
   privateRootOwnerType,
