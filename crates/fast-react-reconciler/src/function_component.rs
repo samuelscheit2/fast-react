@@ -9,6 +9,7 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::{
+    ContextHandle, ContextStack, ContextStackError, ContextStackSnapshot, ContextValueHandle,
     FiberArena, FiberFlags, FiberId, FiberTag, FiberTopologyError, FiberTypeHandle,
     HookEffectArena, HookEffectArenaError, HookEffectCallbackHandle, HookEffectDependencies,
     HookEffectFlags, HookEffectId, HookEffectInstanceId, HookEffectPayload, HookEffectRing,
@@ -281,6 +282,174 @@ impl FunctionComponentHookRenderState {
     #[must_use]
     pub const fn work_in_progress_list(self) -> HookListId {
         self.work_in_progress_list
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentContextRenderState {
+    render_fiber: FiberId,
+    context_count: usize,
+    stack_depth: usize,
+    start_read_index: usize,
+}
+
+impl FunctionComponentContextRenderState {
+    #[must_use]
+    pub const fn render_fiber(self) -> FiberId {
+        self.render_fiber
+    }
+
+    #[must_use]
+    pub const fn context_count(self) -> usize {
+        self.context_count
+    }
+
+    #[must_use]
+    pub const fn stack_depth(self) -> usize {
+        self.stack_depth
+    }
+
+    #[must_use]
+    pub const fn start_read_index(self) -> usize {
+        self.start_read_index
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentContextReadRecord {
+    fiber: FiberId,
+    context: ContextHandle,
+    default_value: ContextValueHandle,
+    value: ContextValueHandle,
+    active_provider_count: usize,
+}
+
+impl FunctionComponentContextReadRecord {
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn context(self) -> ContextHandle {
+        self.context
+    }
+
+    #[must_use]
+    pub const fn default_value(self) -> ContextValueHandle {
+        self.default_value
+    }
+
+    #[must_use]
+    pub const fn value(self) -> ContextValueHandle {
+        self.value
+    }
+
+    #[must_use]
+    pub const fn active_provider_count(self) -> usize {
+        self.active_provider_count
+    }
+
+    #[must_use]
+    pub const fn has_active_provider(self) -> bool {
+        self.active_provider_count != 0
+    }
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct FunctionComponentContextRenderStore {
+    stack: ContextStack,
+    reads: Vec<FunctionComponentContextReadRecord>,
+}
+
+impl FunctionComponentContextRenderStore {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    #[must_use]
+    pub const fn context_stack(&self) -> &ContextStack {
+        &self.stack
+    }
+
+    pub fn context_stack_mut(&mut self) -> &mut ContextStack {
+        &mut self.stack
+    }
+
+    pub fn create_context(&mut self, default_value: ContextValueHandle) -> ContextHandle {
+        self.stack.create_context(default_value)
+    }
+
+    pub fn push_provider(
+        &mut self,
+        context: ContextHandle,
+        value: ContextValueHandle,
+    ) -> Result<ContextStackSnapshot, ContextStackError> {
+        self.stack.push_provider(context, value)
+    }
+
+    pub fn restore_snapshot(
+        &mut self,
+        snapshot: ContextStackSnapshot,
+    ) -> Result<(), ContextStackError> {
+        self.stack.restore_snapshot(snapshot)
+    }
+
+    pub fn current_value(
+        &self,
+        context: ContextHandle,
+    ) -> Result<ContextValueHandle, ContextStackError> {
+        self.stack.current_value(context)
+    }
+
+    pub fn prepare_render_state(
+        &self,
+        work_in_progress: FiberId,
+    ) -> FunctionComponentContextRenderState {
+        FunctionComponentContextRenderState {
+            render_fiber: work_in_progress,
+            context_count: self.stack.context_count(),
+            stack_depth: self.stack.stack_depth(),
+            start_read_index: self.reads.len(),
+        }
+    }
+
+    pub fn read_context(
+        &mut self,
+        state: FunctionComponentContextRenderState,
+        context: ContextHandle,
+    ) -> Result<FunctionComponentContextReadRecord, FunctionComponentRenderError> {
+        let slot = self.stack.context_slot(context).map_err(|error| {
+            FunctionComponentRenderError::context_stack(state.render_fiber(), error)
+        })?;
+        let record = FunctionComponentContextReadRecord {
+            fiber: state.render_fiber(),
+            context,
+            default_value: slot.default_value(),
+            value: slot.current_value(),
+            active_provider_count: slot.active_provider_count(),
+        };
+        self.reads.push(record);
+        Ok(record)
+    }
+
+    #[must_use]
+    pub fn context_reads(&self) -> &[FunctionComponentContextReadRecord] {
+        &self.reads
+    }
+
+    #[must_use]
+    pub fn context_reads_for_record(
+        &self,
+        record: FunctionComponentRenderRecord,
+    ) -> &[FunctionComponentContextReadRecord] {
+        let Some(state) = record.context_state() else {
+            return &[];
+        };
+        let start = state.start_read_index();
+        let end = start + record.context_read_count();
+        &self.reads[start..end]
     }
 }
 
@@ -1050,6 +1219,7 @@ pub(crate) struct FunctionComponentInvocationRequest {
     props: PropsHandle,
     render_lanes: Lanes,
     hook_state: Option<FunctionComponentHookRenderState>,
+    context_state: Option<FunctionComponentContextRenderState>,
 }
 
 impl FunctionComponentInvocationRequest {
@@ -1079,9 +1249,22 @@ impl FunctionComponentInvocationRequest {
     }
 
     #[must_use]
+    pub const fn context_state(self) -> Option<FunctionComponentContextRenderState> {
+        self.context_state
+    }
+
+    #[must_use]
     fn with_hook_state(self, hook_state: FunctionComponentHookRenderState) -> Self {
         Self {
             hook_state: Some(hook_state),
+            ..self
+        }
+    }
+
+    #[must_use]
+    fn with_context_state(self, context_state: FunctionComponentContextRenderState) -> Self {
+        Self {
+            context_state: Some(context_state),
             ..self
         }
     }
@@ -1197,6 +1380,10 @@ pub(crate) enum FunctionComponentRenderError {
         fiber: FiberId,
         error: Box<HookQueueError>,
     },
+    ContextStack {
+        fiber: FiberId,
+        error: Box<ContextStackError>,
+    },
     MissingCurrentHookList {
         fiber: FiberId,
     },
@@ -1253,6 +1440,13 @@ impl FunctionComponentRenderError {
             error: Box::new(error),
         }
     }
+
+    fn context_stack(fiber: FiberId, error: ContextStackError) -> Self {
+        Self::ContextStack {
+            fiber,
+            error: Box::new(error),
+        }
+    }
 }
 
 impl Display for FunctionComponentRenderError {
@@ -1282,6 +1476,11 @@ impl Display for FunctionComponentRenderError {
             Self::HookQueue { fiber, error } => write!(
                 formatter,
                 "function component fiber {} hook state queue metadata failed: {error}",
+                fiber.slot().get()
+            ),
+            Self::ContextStack { fiber, error } => write!(
+                formatter,
+                "function component fiber {} context read metadata failed: {error}",
                 fiber.slot().get()
             ),
             Self::MissingCurrentHookList { fiber } => write!(
@@ -1353,6 +1552,7 @@ impl Error for FunctionComponentRenderError {
             Self::HookList { error, .. } => Some(error),
             Self::HookEffect { error, .. } => Some(error),
             Self::HookQueue { error, .. } => Some(error),
+            Self::ContextStack { error, .. } => Some(error),
             Self::Invocation { error, .. } => Some(error),
             Self::ExpectedEffectHookPayload { .. }
             | Self::MissingComponentHandle { .. }
@@ -1382,6 +1582,8 @@ pub(crate) struct FunctionComponentRenderRecord {
     props: PropsHandle,
     render_lanes: Lanes,
     hook_state: Option<FunctionComponentHookRenderState>,
+    context_state: Option<FunctionComponentContextRenderState>,
+    context_read_count: usize,
     output: FunctionComponentOutputHandle,
 }
 
@@ -1417,6 +1619,21 @@ impl FunctionComponentRenderRecord {
     }
 
     #[must_use]
+    pub const fn context_state(self) -> Option<FunctionComponentContextRenderState> {
+        self.context_state
+    }
+
+    #[must_use]
+    pub const fn context_read_count(self) -> usize {
+        self.context_read_count
+    }
+
+    #[must_use]
+    pub const fn has_context_reads(self) -> bool {
+        self.context_read_count != 0
+    }
+
+    #[must_use]
     pub const fn output(self) -> FunctionComponentOutputHandle {
         self.output
     }
@@ -1445,6 +1662,49 @@ pub(crate) fn render_function_component_with_hook_state(
         invoker,
         Some(hook_store),
     )
+}
+
+pub(crate) fn render_function_component_with_context_reads(
+    arena: &mut FiberArena,
+    context_store: &mut FunctionComponentContextRenderStore,
+    work_in_progress: FiberId,
+    render_lanes: Lanes,
+    contexts: &[ContextHandle],
+    invoker: &mut impl FunctionComponentInvoker,
+) -> Result<FunctionComponentRenderRecord, FunctionComponentRenderError> {
+    let mut request = validate_function_component_render(arena, work_in_progress, render_lanes)?;
+    let context_state = context_store.prepare_render_state(work_in_progress);
+    request = request.with_context_state(context_state);
+    reset_function_component_render_state(arena, work_in_progress)?;
+
+    for &context in contexts {
+        context_store.read_context(context_state, context)?;
+    }
+
+    let output = invoker
+        .invoke_function_component(request)
+        .map_err(|error| FunctionComponentRenderError::Invocation {
+            fiber: request.fiber(),
+            component: request.component(),
+            error,
+        })?;
+    let context_read_count = context_store.context_reads().len() - context_state.start_read_index();
+
+    arena
+        .get_mut(work_in_progress)?
+        .set_memoized_props(request.props());
+
+    Ok(FunctionComponentRenderRecord {
+        current: arena.get(work_in_progress)?.alternate(),
+        work_in_progress,
+        component: request.component(),
+        props: request.props(),
+        render_lanes: request.render_lanes(),
+        hook_state: request.hook_state(),
+        context_state: request.context_state(),
+        context_read_count,
+        output,
+    })
 }
 
 fn render_function_component_impl(
@@ -1480,6 +1740,8 @@ fn render_function_component_impl(
         props: request.props(),
         render_lanes: request.render_lanes(),
         hook_state: request.hook_state(),
+        context_state: request.context_state(),
+        context_read_count: 0,
         output,
     })
 }
@@ -1534,6 +1796,7 @@ fn validate_function_component_render(
         props,
         render_lanes,
         hook_state: None,
+        context_state: None,
     })
 }
 
@@ -1629,6 +1892,10 @@ mod tests {
         HookEffectDependencies::array(DependenciesHandle::from_raw(raw))
     }
 
+    fn context_value(raw: u64) -> ContextValueHandle {
+        ContextValueHandle::from_raw(raw)
+    }
+
     fn seed_current_effect_metadata(
         arena: &mut FiberArena,
         hook_store: &mut FunctionComponentHookRenderStore,
@@ -1677,6 +1944,9 @@ mod tests {
         assert_eq!(record.render_lanes(), Lanes::DEFAULT);
         assert_eq!(record.output(), output);
         assert_eq!(record.hook_state(), None);
+        assert_eq!(record.context_state(), None);
+        assert_eq!(record.context_read_count(), 0);
+        assert!(!record.has_context_reads());
         assert_eq!(record.output().raw(), 44);
         assert!(FunctionComponentOutputHandle::NONE.is_none());
         assert!(record.output().is_some());
@@ -1688,6 +1958,7 @@ mod tests {
                 props: PropsHandle::from_raw(2),
                 render_lanes: Lanes::DEFAULT,
                 hook_state: None,
+                context_state: None,
             }]
         );
 
@@ -1699,6 +1970,123 @@ mod tests {
         assert_eq!(work_node.update_queue(), UpdateQueueHandle::NONE);
         assert_eq!(work_node.lanes(), Lanes::NO);
         assert_eq!(work_node.child(), None);
+    }
+
+    #[test]
+    fn function_component_context_read_canary_records_default_value() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let output = FunctionComponentOutputHandle::from_raw(61);
+        let default_value = context_value(10);
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let context = context_store.create_context(default_value);
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+
+        let record = render_function_component_with_context_reads(
+            &mut arena,
+            &mut context_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &[context],
+            &mut registry,
+        )
+        .unwrap();
+
+        let state = record.context_state().unwrap();
+        assert_eq!(record.current(), Some(current));
+        assert_eq!(record.output(), output);
+        assert_eq!(record.hook_state(), None);
+        assert_eq!(record.context_read_count(), 1);
+        assert!(record.has_context_reads());
+        assert_eq!(state.render_fiber(), work_in_progress);
+        assert_eq!(state.context_count(), 1);
+        assert_eq!(state.stack_depth(), 0);
+        assert_eq!(state.start_read_index(), 0);
+        assert_eq!(registry.calls().len(), 1);
+        assert_eq!(registry.calls()[0].context_state(), Some(state));
+
+        let reads = context_store.context_reads_for_record(record);
+        assert_eq!(reads.len(), 1);
+        assert_eq!(reads[0].fiber(), work_in_progress);
+        assert_eq!(reads[0].context(), context);
+        assert_eq!(reads[0].default_value(), default_value);
+        assert_eq!(reads[0].value(), default_value);
+        assert_eq!(reads[0].active_provider_count(), 0);
+        assert!(!reads[0].has_active_provider());
+        assert_eq!(context_store.current_value(context).unwrap(), default_value);
+        assert_eq!(context_store.context_stack().stack_depth(), 0);
+    }
+
+    #[test]
+    fn function_component_context_read_canary_records_provider_value_then_default_after_unwind() {
+        let (mut arena, _current, work_in_progress, component) = function_component_pair();
+        let default_value = context_value(20);
+        let provided_value = context_value(30);
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let context = context_store.create_context(default_value);
+        let before_provider = context_store
+            .push_provider(context, provided_value)
+            .unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(62)));
+
+        let provider_record = render_function_component_with_context_reads(
+            &mut arena,
+            &mut context_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &[context],
+            &mut registry,
+        )
+        .unwrap();
+
+        let provider_state = provider_record.context_state().unwrap();
+        assert_eq!(provider_state.stack_depth(), 1);
+        assert_eq!(provider_state.start_read_index(), 0);
+        assert_eq!(provider_record.context_read_count(), 1);
+        let provider_reads = context_store.context_reads_for_record(provider_record);
+        assert_eq!(provider_reads[0].value(), provided_value);
+        assert_eq!(provider_reads[0].default_value(), default_value);
+        assert_eq!(provider_reads[0].active_provider_count(), 1);
+        assert!(provider_reads[0].has_active_provider());
+        assert_eq!(
+            context_store.current_value(context).unwrap(),
+            provided_value
+        );
+
+        context_store.restore_snapshot(before_provider).unwrap();
+        assert_eq!(context_store.current_value(context).unwrap(), default_value);
+        assert_eq!(context_store.context_stack().stack_depth(), 0);
+
+        let default_record = render_function_component_with_context_reads(
+            &mut arena,
+            &mut context_store,
+            work_in_progress,
+            Lanes::SYNC,
+            &[context],
+            &mut registry,
+        )
+        .unwrap();
+
+        let default_state = default_record.context_state().unwrap();
+        assert_eq!(default_state.stack_depth(), 0);
+        assert_eq!(default_state.start_read_index(), 1);
+        assert_eq!(default_record.context_read_count(), 1);
+        let default_reads = context_store.context_reads_for_record(default_record);
+        assert_eq!(default_reads[0].value(), default_value);
+        assert_eq!(default_reads[0].active_provider_count(), 0);
+        assert!(!default_reads[0].has_active_provider());
+        assert_eq!(registry.calls().len(), 2);
+        assert_eq!(registry.calls()[0].context_state(), Some(provider_state));
+        assert_eq!(registry.calls()[1].context_state(), Some(default_state));
+        assert_eq!(
+            context_store
+                .context_reads()
+                .iter()
+                .map(|read| read.value())
+                .collect::<Vec<_>>(),
+            vec![provided_value, default_value]
+        );
     }
 
     #[test]
