@@ -2,6 +2,9 @@
 
 const {ELEMENT_NODE, TEXT_NODE} = require('./dom-container.js');
 const {getContainerRoot} = require('./root-markers.js');
+const {
+  getLatestPropsCommitRecordPayload
+} = require('../dom-host/mutation.js');
 
 const hostInstanceMarkerPrefix = '__fastReactHostInstance$';
 const latestPropsMarkerPrefix = '__fastReactProps$';
@@ -240,6 +243,57 @@ function updateLatestPropsForHostInstanceToken(token, latestProps) {
   );
 }
 
+function commitLatestPropsFromMutationRecord(record) {
+  const payload = getLatestPropsCommitPayload(record);
+  assertAttachedLatestPropsCommitPayload(payload);
+  return updateLatestPropsForNode(payload.node, payload.latestProps);
+}
+
+function commitLatestPropsFromMutationRecords(records) {
+  const payloads = normalizeLatestPropsCommitRecords(records);
+
+  for (const payload of payloads) {
+    assertAttachedLatestPropsCommitPayload(payload);
+  }
+
+  for (const payload of payloads) {
+    updateLatestPropsForNode(payload.node, payload.latestProps);
+  }
+
+  return payloads.length;
+}
+
+function normalizeLatestPropsCommitRecords(records) {
+  if (!Array.isArray(records)) {
+    throw createComponentTreeError(
+      'Cannot commit latest props from a non-array mutation record batch.',
+      'FAST_REACT_DOM_INVALID_LATEST_PROPS_COMMIT_BATCH'
+    );
+  }
+
+  return records.map((record) => getLatestPropsCommitPayload(record));
+}
+
+function getLatestPropsCommitPayload(record) {
+  const payload = getLatestPropsCommitRecordPayload(record);
+  if (payload === null) {
+    throw createComponentTreeError(
+      'Cannot commit latest props from an invalid mutation record.',
+      'FAST_REACT_DOM_INVALID_LATEST_PROPS_COMMIT_RECORD'
+    );
+  }
+  return payload;
+}
+
+function assertAttachedLatestPropsCommitPayload(payload) {
+  if (getHostInstanceTokenFromNode(payload.node) === null) {
+    throw createComponentTreeError(
+      'Cannot commit latest props for an unattached React DOM host instance node.',
+      'FAST_REACT_DOM_UNATTACHED_HOST_INSTANCE_NODE'
+    );
+  }
+}
+
 function getLatestPropsFromNode(node) {
   if (getHostInstanceTokenFromNode(node) === null) {
     return null;
@@ -294,6 +348,8 @@ module.exports = {
   assertMountedHostInstanceToken,
   assertHostInstanceNode,
   attachHostInstanceNode,
+  commitLatestPropsFromMutationRecord,
+  commitLatestPropsFromMutationRecords,
   createHostInstanceToken,
   detachHostInstanceNode,
   detachHostInstanceToken,

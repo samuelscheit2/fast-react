@@ -16,6 +16,9 @@ const componentTree = require(
 const domContainer = require(
   path.join(repoRoot, 'packages/react-dom/src/client/dom-container.js')
 );
+const domHost = require(
+  path.join(repoRoot, 'packages/react-dom/src/dom-host/index.js')
+);
 const rootMarkers = require(
   path.join(repoRoot, 'packages/react-dom/src/client/root-markers.js')
 );
@@ -87,6 +90,42 @@ const reactDomPackage = require(
     tokenProps
   );
   assert.equal(componentTree.getLatestPropsFromNode(node), tokenProps);
+
+  let eventCallCount = 0;
+  const recordProps = {
+    disabled: true,
+    id: 'from-record',
+    onClick() {
+      eventCallCount += 1;
+    }
+  };
+  const record = domHost.createLatestPropsCommitRecord(node, recordProps, [
+    setAttributePayload('id', 'id', 'from-record'),
+    removeAttributePayload('disabled', 'disabled'),
+    nonPayload('onClick', 'event')
+  ]);
+  const hiddenPayload = domHost.getLatestPropsCommitRecordPayload(record);
+
+  assert.equal(record.kind, domHost.LATEST_PROPS_COMMIT_RECORD);
+  assert.equal(record.payloadCount, 3);
+  assert.equal(record.status, 'safe-for-latest-props');
+  assert.deepEqual(Object.keys(record), ['kind', 'payloadCount', 'status']);
+  assert.equal(Object.hasOwn(record, 'node'), false);
+  assert.equal(Object.hasOwn(record, 'latestProps'), false);
+  assert.equal(domHost.isLatestPropsCommitRecord(record), true);
+  assert.equal(hiddenPayload.node, node);
+  assert.equal(hiddenPayload.latestProps, recordProps);
+  assert.equal(Object.isFrozen(hiddenPayload.payloadRecords), true);
+  assert.equal(
+    componentTree.commitLatestPropsFromMutationRecord(record),
+    recordProps
+  );
+  assert.equal(componentTree.getLatestPropsFromNode(node), recordProps);
+  assert.equal(
+    componentTree.getLatestPropsFromHostInstanceToken(token),
+    recordProps
+  );
+  assert.equal(eventCallCount, 0);
   assert.equal(
     componentTree.detachHostInstanceToken(token),
     token
@@ -168,6 +207,153 @@ const reactDomPackage = require(
   assert.equal(componentTree.getHostInstanceTokenFromNode(ownedNode), token);
   assert.equal(componentTree.getLatestPropsFromNode(ownedNode), props);
   assert.equal(componentTree.detachHostInstanceNode(ownedNode), token);
+}
+
+{
+  const rootOwner = {kind: 'CommitBatchRoot'};
+  const firstHostOwner = {kind: 'CommitBatchFirst'};
+  const secondHostOwner = {kind: 'CommitBatchSecond'};
+  const firstNode = createElement('DIV');
+  const secondNode = createElement('DIV');
+  const firstToken = componentTree.createHostInstanceToken(
+    firstHostOwner,
+    rootOwner
+  );
+  const secondToken = componentTree.createHostInstanceToken(
+    secondHostOwner,
+    rootOwner
+  );
+  const firstInitialProps = {id: 'first-initial'};
+  const secondInitialProps = {id: 'second-initial'};
+  const firstNextProps = {id: 'first-next'};
+  const secondNextProps = {id: 'second-next'};
+
+  componentTree.attachHostInstanceNode(
+    firstNode,
+    firstToken,
+    firstInitialProps
+  );
+  componentTree.attachHostInstanceNode(
+    secondNode,
+    secondToken,
+    secondInitialProps
+  );
+
+  assert.equal(
+    componentTree.commitLatestPropsFromMutationRecords([
+      domHost.createLatestPropsCommitRecord(firstNode, firstNextProps, [
+        setAttributePayload('id', 'id', 'first-next')
+      ]),
+      domHost.createLatestPropsCommitRecord(secondNode, secondNextProps, [
+        setAttributePayload('id', 'id', 'second-next')
+      ])
+    ]),
+    2
+  );
+  assert.equal(componentTree.getLatestPropsFromNode(firstNode), firstNextProps);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(secondNode),
+    secondNextProps
+  );
+
+  const firstBlockedProps = {id: 'first-blocked'};
+  const invalidBatchRecord = {kind: 'latestPropsCommit'};
+  assert.throws(
+    () =>
+      componentTree.commitLatestPropsFromMutationRecords([
+        domHost.createLatestPropsCommitRecord(firstNode, firstBlockedProps, [
+          setAttributePayload('id', 'id', 'first-blocked')
+        ]),
+        invalidBatchRecord
+      ]),
+    {
+      code: 'FAST_REACT_DOM_INVALID_LATEST_PROPS_COMMIT_RECORD'
+    }
+  );
+  assert.equal(componentTree.getLatestPropsFromNode(firstNode), firstNextProps);
+
+  assert.equal(componentTree.detachHostInstanceToken(firstToken), firstToken);
+  assert.equal(componentTree.detachHostInstanceToken(secondToken), secondToken);
+}
+
+{
+  const rootOwner = {kind: 'CommitRecordGuardsRoot'};
+  const hostOwner = {kind: 'CommitRecordGuardsHost'};
+  const node = createElement('DIV');
+  const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
+  const initialProps = {id: 'initial'};
+
+  componentTree.attachHostInstanceNode(node, token, initialProps);
+
+  assert.throws(
+    () =>
+      domHost.createLatestPropsCommitRecord(node, {id: 'unsafe-style'}, [
+        {
+          kind: 'setStyle',
+          mutation: 'propertyAssignment',
+          propName: 'style',
+          styleName: 'color',
+          value: 'red'
+        }
+      ]),
+    {
+      code: 'FAST_REACT_DOM_UNSAFE_LATEST_PROPS_PAYLOAD_RECORD'
+    }
+  );
+  assert.throws(
+    () =>
+      domHost.createLatestPropsCommitRecord(node, {id: 'unsafe-html'}, [
+        {
+          kind: 'setInnerHTML',
+          propName: 'dangerouslySetInnerHTML',
+          propertyName: 'innerHTML',
+          value: '<span>raw</span>'
+        }
+      ]),
+    {
+      code: 'FAST_REACT_DOM_UNSAFE_LATEST_PROPS_PAYLOAD_RECORD'
+    }
+  );
+  assert.throws(
+    () =>
+      domHost.createLatestPropsCommitRecord(node, {id: 'bad-shape'}, [
+        {
+          attributeName: 'id',
+          kind: 'setAttribute',
+          value: 'bad-shape'
+        }
+      ]),
+    {
+      code: 'FAST_REACT_DOM_INVALID_LATEST_PROPS_PAYLOAD_RECORD'
+    }
+  );
+  assert.throws(
+    () => domHost.createLatestPropsCommitRecord(node, {id: 'not-array'}, {}),
+    {
+      code: 'FAST_REACT_DOM_INVALID_LATEST_PROPS_PAYLOAD'
+    }
+  );
+  assert.throws(
+    () => componentTree.commitLatestPropsFromMutationRecords({}),
+    {
+      code: 'FAST_REACT_DOM_INVALID_LATEST_PROPS_COMMIT_BATCH'
+    }
+  );
+
+  assert.equal(componentTree.detachHostInstanceToken(token), token);
+
+  const detachedRecord = domHost.createLatestPropsCommitRecord(
+    node,
+    {id: 'detached'},
+    [setAttributePayload('id', 'id', 'detached')]
+  );
+  assert.throws(
+    () => componentTree.commitLatestPropsFromMutationRecord(detachedRecord),
+    {
+      code: 'FAST_REACT_DOM_UNATTACHED_HOST_INSTANCE_NODE'
+    }
+  );
+  assert.equal(componentTree.getLatestPropsFromNode(node), null);
 }
 
 {
@@ -295,6 +481,8 @@ const reactDomPackage = require(
   const privateHelperNames = [
     'assertMountedHostInstanceToken',
     'attachHostInstanceNode',
+    'commitLatestPropsFromMutationRecord',
+    'commitLatestPropsFromMutationRecords',
     'createHostInstanceToken',
     'detachHostInstanceNode',
     'detachHostInstanceToken',
@@ -327,6 +515,32 @@ const reactDomPackage = require(
 }
 
 console.log('React DOM private component tree map shell smoke checks passed.');
+
+function setAttributePayload(propName, attributeName, value) {
+  return {
+    attributeName,
+    kind: 'setAttribute',
+    propName,
+    value
+  };
+}
+
+function removeAttributePayload(propName, attributeName) {
+  return {
+    attributeName,
+    kind: 'removeAttribute',
+    propName
+  };
+}
+
+function nonPayload(propName, category) {
+  return {
+    category,
+    kind: 'nonPayload',
+    propName,
+    reason: `${propName} is stored by the latest-props map`
+  };
+}
 
 function createElement(nodeName) {
   return {

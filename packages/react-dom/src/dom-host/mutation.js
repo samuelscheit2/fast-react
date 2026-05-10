@@ -35,6 +35,14 @@ const unsafePropertyNames = new Set([
 
 const propertyNamePattern = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
+const LATEST_PROPS_COMMIT_RECORD = 'latestPropsCommit';
+
+const latestPropsCommitRecordPayloads = new WeakMap();
+const latestPropsSafePayloadKinds = new Set([
+  'setAttribute',
+  'removeAttribute',
+  'nonPayload'
+]);
 function createDomHostMutationError(code, message) {
   const error = new Error(message);
   error.code = code;
@@ -151,6 +159,40 @@ function applyStyleDangerousHtmlPayload(instance, payload) {
   }
 
   return entries;
+}
+
+function createLatestPropsCommitRecord(node, latestProps, payloadRecords) {
+  assertDomLikeObject(node, 'createLatestPropsCommitRecord', 'child');
+
+  const safePayloadRecords =
+    normalizeLatestPropsCommitPayloadRecords(payloadRecords);
+  const record = Object.freeze({
+    kind: LATEST_PROPS_COMMIT_RECORD,
+    payloadCount: safePayloadRecords.length,
+    status: 'safe-for-latest-props'
+  });
+
+  latestPropsCommitRecordPayloads.set(
+    record,
+    Object.freeze({
+      latestProps: latestProps === undefined ? null : latestProps,
+      node,
+      payloadRecords: safePayloadRecords
+    })
+  );
+
+  return record;
+}
+
+function getLatestPropsCommitRecordPayload(record) {
+  if (!isWeakMapKey(record)) {
+    return null;
+  }
+  return latestPropsCommitRecordPayloads.get(record) || null;
+}
+
+function isLatestPropsCommitRecord(record) {
+  return getLatestPropsCommitRecordPayload(record) !== null;
 }
 
 function assertAppendParent(parent, operation) {
@@ -378,6 +420,73 @@ function assertDomLikeObject(value, operation, role) {
         ? 'FAST_REACT_DOM_INVALID_PARENT_NODE'
         : 'FAST_REACT_DOM_INVALID_CHILD_NODE',
       `Cannot ${operation} with an invalid ${role} node.`
+    );
+  }
+}
+
+function isWeakMapKey(value) {
+  return (
+    value !== null &&
+    (typeof value === 'object' || typeof value === 'function')
+  );
+}
+
+function normalizeLatestPropsCommitPayloadRecords(payloadRecords) {
+  if (payloadRecords == null) {
+    return Object.freeze([]);
+  }
+
+  if (!Array.isArray(payloadRecords)) {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_LATEST_PROPS_PAYLOAD',
+      'Cannot create a latest-props commit record from a non-array payload.'
+    );
+  }
+
+  return Object.freeze(
+    payloadRecords.map((payloadRecord, index) =>
+      cloneSafeLatestPropsPayloadRecord(payloadRecord, index)
+    )
+  );
+}
+
+function cloneSafeLatestPropsPayloadRecord(payloadRecord, index) {
+  if (payloadRecord == null || typeof payloadRecord !== 'object') {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_LATEST_PROPS_PAYLOAD_RECORD',
+      `Cannot include invalid latest-props payload record at index ${index}.`
+    );
+  }
+
+  const kind = payloadRecord.kind;
+  if (!latestPropsSafePayloadKinds.has(kind)) {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_UNSAFE_LATEST_PROPS_PAYLOAD_RECORD',
+      `Cannot publish latest props from unsafe payload record kind ${String(
+        kind
+      )}.`
+    );
+  }
+
+  if (kind === 'setAttribute') {
+    assertStringPayloadField(payloadRecord, 'propName', index);
+    assertStringPayloadField(payloadRecord, 'attributeName', index);
+  } else if (kind === 'removeAttribute') {
+    assertStringPayloadField(payloadRecord, 'propName', index);
+    assertStringPayloadField(payloadRecord, 'attributeName', index);
+  } else {
+    assertStringPayloadField(payloadRecord, 'propName', index);
+    assertStringPayloadField(payloadRecord, 'category', index);
+  }
+
+  return Object.freeze({...payloadRecord});
+}
+
+function assertStringPayloadField(payloadRecord, fieldName, index) {
+  if (typeof payloadRecord[fieldName] !== 'string') {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_LATEST_PROPS_PAYLOAD_RECORD',
+      `Cannot include latest-props payload record at index ${index} without a string ${fieldName}.`
     );
   }
 }
@@ -664,8 +773,12 @@ module.exports = {
   clearContainer,
   commitTextUpdate,
   createDomHostMutationError,
+  createLatestPropsCommitRecord,
+  getLatestPropsCommitRecordPayload,
   insertBefore,
   insertInContainerBefore,
+  isLatestPropsCommitRecord,
+  LATEST_PROPS_COMMIT_RECORD,
   removeChild,
   removeChildFromContainer,
   resetTextContent,
