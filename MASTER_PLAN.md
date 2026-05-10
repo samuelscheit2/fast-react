@@ -47,20 +47,17 @@ Drive toward a minimal real root render/update/unmount path:
 
 Top-level cap: 30 workers. Queue 685-714 was launched from queue base commit
 `9ec6678` in isolated `worker/<slug>` branches and worktrees and has been
-accepted and cleaned up. Workers 715-725 have also been accepted and cleaned
+accepted and cleaned up. Workers 715-726 have also been accepted and cleaned
 up.
 
-Worker 726 was launched from queue base commit `50d1dab` in an isolated
-`worker/<slug>` branch and worktree.
-
-- Worker 726: update-path test-renderer native serialization admission
-  consuming Worker 725 identity evidence.
+No worker branches or worktrees are currently active.
 
 ## Near-Term Sequencing
 
-1. Monitor Worker 726, accepting only scoped private update-native
-   serialization admission with public root, act, flushSync, hooks/effects,
-   test-renderer, and React DOM compatibility still blocked.
+1. Select the next runtime queue from accepted Worker 726 evidence and
+   remaining private blockers only; keep public root, act, flushSync,
+   hooks/effects, test-renderer, and React DOM compatibility blocked until each
+   private gate is proven.
 2. Audit and merge completed workers one at a time or in a small non-conflicting
    batch, with focused reruns before each merge and full workspace checks after
    the batch.
@@ -70,8 +67,8 @@ Worker 726 was launched from queue base commit `50d1dab` in an isolated
 ## Next Queue Candidates
 
 - Decide whether unmount private diagnostics need a distinct finished-work
-  identity adapter after Worker 726, or should remain behind existing route /
-  host-output gates until broader serialization work starts.
+  identity adapter, or should remain behind existing route / host-output gates
+  until broader serialization work starts.
 - Defer multichild/sibling serializer identity admission until the committed
   fiber/report shape is narrow enough to prove without widening public
   serialization.

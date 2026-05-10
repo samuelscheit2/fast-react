@@ -29,6 +29,26 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 726
+
+- Worker 726 extended private update-path react-test-renderer native
+  serialization admission so hidden update `toJSON` and `toTree` native
+  diagnostic results require Worker 725's accepted update finished-work
+  identity evidence.
+- Acceptance audit found an initial Rust replay gap where a stale update route
+  admission could be paired with later output/identity on the same root. The
+  accepted fix binds update route admission, output handoff, and finished-work
+  identity to the same scheduled update sequence plus render/commit/lane
+  identity for both `toJSON` and `toTree`.
+- Worker 726 was accepted after independent post-fix audit and verification
+  with focused Rust update-native and serialization identity tests,
+  create-routing and serialization local gates, react-test-renderer workspace
+  checks, package-surface guard, import smoke, conflict-marker scanning, and
+  `git diff --check`; its subagent, worktree, and branch were removed after
+  merge. Public serialization, `.root`, `update`, `TestInstance`, native
+  loading, and compatibility claims remain blocked. Unmount and
+  multichild/sibling identity admission remain deferred.
+
 ### Worker 725
 
 - Worker 725 added private update-path finished-work identity evidence for
