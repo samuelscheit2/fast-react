@@ -927,6 +927,70 @@ function runSmokeChecks() {
 
   {
     const element = createElement('div');
+    const child = createElement('span', element.ownerDocument);
+
+    element.style.color = 'green';
+    element.assignedInnerHTML = '<em>old</em>';
+    element.appendChild(child);
+    element.styleLog = [];
+
+    const mutationRecords = domHost.applyStyleDangerousHtmlPayload(element, [
+      styleSet('color', 'propertyAssignment', 'red'),
+      innerHtmlSet('<span>raw</span>')
+    ]);
+    const diagnostic =
+      domHost.getDomPropertyPayloadMutationRecordsPayload(mutationRecords);
+
+    assert.equal(
+      domHost.isDomPropertyPayloadMutationRecords(mutationRecords),
+      true
+    );
+    assert.equal(diagnostic.rollbackRecordCount, 2);
+    assert.equal(diagnostic.node, element);
+    assert.equal(Object.hasOwn(mutationRecords, 'node'), false);
+    assert.deepEqual(element.activeStyleProperties(), [['color', 'red']]);
+    assert.equal(element.assignedInnerHTML, '<span>raw</span>');
+    assert.deepEqual(childNames(element), []);
+
+    assert.equal(
+      domHost.rollbackDomPropertyPayloadMutationRecords(mutationRecords),
+      2
+    );
+    assert.deepEqual(element.activeStyleProperties(), [['color', 'green']]);
+    assert.equal(element.assignedInnerHTML, '<em>old</em>');
+    assert.deepEqual(childNames(element), ['span']);
+    assert.equal(child.parentNode, element);
+  }
+
+  {
+    const element = createElement('div');
+    const thrownError = new Error('fake innerHTML failed after mutation');
+
+    element.style.color = 'green';
+    element.assignedInnerHTML = '<em>old</em>';
+    element.throwNextInnerHTMLAfterAssign = thrownError;
+    element.styleLog = [];
+
+    assert.throws(
+      () =>
+        domHost.applyStyleDangerousHtmlPayload(element, [
+          styleSet('color', 'propertyAssignment', 'red'),
+          innerHtmlSet('<span>raw</span>')
+        ]),
+      (error) => error === thrownError
+    );
+    assert.deepEqual(element.activeStyleProperties(), [['color', 'green']]);
+    assert.equal(element.assignedInnerHTML, '<em>old</em>');
+    assert.deepEqual(element.styleLog, [
+      ['stylePropertyAssignment', 'color', 'red'],
+      ['setInnerHTML', '<span>raw</span>'],
+      ['setInnerHTML', '<em>old</em>'],
+      ['stylePropertyAssignment', 'color', 'green']
+    ]);
+  }
+
+  {
+    const element = createElement('div');
 
     assert.throws(
       () =>
@@ -1130,6 +1194,7 @@ class FakeElement extends FakeNode {
     this.propertyLog = [];
     this.styleLog = [];
     this.style = new FakeStyle(this);
+    this.throwNextInnerHTMLAfterAssign = null;
   }
 
   get textContent() {
@@ -1158,6 +1223,11 @@ class FakeElement extends FakeNode {
     }
     this.assignedInnerHTML = html;
     this.styleLog.push(['setInnerHTML', html]);
+    if (this.throwNextInnerHTMLAfterAssign !== null) {
+      const error = this.throwNextInnerHTMLAfterAssign;
+      this.throwNextInnerHTMLAfterAssign = null;
+      throw error;
+    }
   }
 
   activeStyleProperties() {
