@@ -1104,6 +1104,13 @@ pub(crate) fn invoke_host_root_accepted_visible_callbacks_after_matching_commit_
     })
 }
 
+pub(crate) fn validate_host_root_accepted_visible_callbacks_after_matching_commit_for_canary(
+    accepted_order: &HostRootQueuedCallbackOrderSnapshot,
+    commit: &HostRootCommitRecord,
+) -> Result<(), RootUpdateError> {
+    validate_host_root_accepted_callback_order_matches_commit_for_canary(accepted_order, commit)
+}
+
 fn validate_host_root_accepted_callback_order_matches_commit_for_canary(
     accepted_order: &HostRootQueuedCallbackOrderSnapshot,
     commit: &HostRootCommitRecord,

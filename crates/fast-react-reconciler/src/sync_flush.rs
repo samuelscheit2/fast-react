@@ -15,7 +15,9 @@ use fast_react_core::{FiberId, Lanes, StateNodeHandle, UpdateQueueHandle};
 use fast_react_host_config::HostTypes;
 
 use crate::root_callbacks::{
-    RootUpdateCallbackInvocationExecutionGateSnapshot, RootUpdateCallbackInvocationTestControl,
+    RootUpdateCallbackInvocationExecutionGateSnapshot, RootUpdateCallbackInvocationExecutionRecord,
+    RootUpdateCallbackInvocationStatus, RootUpdateCallbackInvocationTestControl,
+    RootUpdateCallbackVisibility,
 };
 use crate::root_commit::{
     HostRootCallbackDrainRecordForCanary, HostRootCallbackDrainSnapshotForCanary,
@@ -40,13 +42,19 @@ use crate::root_scheduler::{
     RootSyncSchedulerContinuationExecutionError, RootSyncSchedulerContinuationExecutionRecord,
     execute_sync_scheduler_continuation_for_render_handoff,
 };
+use crate::root_updates::{
+    HostRootQueuedCallbackOrderSnapshot, HostRootVisibleCallbackInvocationAfterCommitSnapshot,
+    RootUpdateError,
+    invoke_host_root_accepted_visible_callbacks_after_matching_commit_under_test_control_for_canary,
+    validate_host_root_accepted_visible_callbacks_after_matching_commit_for_canary,
+};
 use crate::scheduler_bridge::SchedulerActContinuationRecord;
 use crate::{
     ExecutionContextState, FiberRootId, FiberRootStore, FiberRootStoreError, HostRootCommitRecord,
     HostRootRenderPhaseRecord, RootCallbackPriority, RootCommitError, RootSchedulerCallbackHandle,
-    RootSchedulerError, RootSyncFlushRecord, RootSyncFlushRecordStatus, RootUpdateCallbackSnapshot,
-    RootWorkLoopError, SyncFlushExecutionContextRecord, commit_finished_host_root,
-    render_host_root_for_lanes,
+    RootSchedulerError, RootSyncFlushRecord, RootSyncFlushRecordStatus, RootUpdateCallbackHandle,
+    RootUpdateCallbackSnapshot, RootWorkLoopError, SyncFlushExecutionContextRecord, UpdateId,
+    commit_finished_host_root, render_host_root_for_lanes,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1245,6 +1253,235 @@ impl SyncFlushRootCallbackDrainDiagnosticsForCanary {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SyncFlushAcceptedVisibleCallbackExecutionRecordForCanary {
+    root: FiberRootId,
+    commit_order: usize,
+    cross_root_invocation_order: usize,
+    record: RootUpdateCallbackInvocationExecutionRecord,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private sync-flush visible callback execution records are reserved for cross-root canaries"
+)]
+impl SyncFlushAcceptedVisibleCallbackExecutionRecordForCanary {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn commit_order(self) -> usize {
+        self.commit_order
+    }
+
+    #[must_use]
+    pub(crate) const fn cross_root_invocation_order(self) -> usize {
+        self.cross_root_invocation_order
+    }
+
+    #[must_use]
+    pub(crate) const fn root_invocation_order(self) -> usize {
+        self.record.invocation_order()
+    }
+
+    #[must_use]
+    pub(crate) const fn accepted_sequence(self) -> usize {
+        self.record.accepted_sequence()
+    }
+
+    #[must_use]
+    pub(crate) const fn update(self) -> UpdateId {
+        self.record.update()
+    }
+
+    #[must_use]
+    pub(crate) const fn callback(self) -> RootUpdateCallbackHandle {
+        self.record.callback()
+    }
+
+    #[must_use]
+    pub(crate) const fn visibility(self) -> RootUpdateCallbackVisibility {
+        self.record.visibility()
+    }
+
+    #[must_use]
+    pub(crate) const fn status(self) -> RootUpdateCallbackInvocationStatus {
+        self.record.status()
+    }
+
+    #[must_use]
+    pub(crate) const fn completed(self) -> bool {
+        self.record.completed()
+    }
+
+    #[must_use]
+    pub(crate) const fn errored(self) -> bool {
+        self.record.errored()
+    }
+
+    #[must_use]
+    pub(crate) fn is_visible_callback(self) -> bool {
+        self.visibility().is_visible()
+    }
+
+    #[must_use]
+    pub(crate) const fn public_callback_invoked(self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SyncFlushAcceptedVisibleCallbackExecutionDiagnosticsForCanary {
+    skipped_reentrant_flush: bool,
+    skipped_no_sync_work: bool,
+    committed_root_order: Vec<FiberRootId>,
+    accepted_root_order: Vec<FiberRootId>,
+    invocations: Vec<HostRootVisibleCallbackInvocationAfterCommitSnapshot>,
+    records: Vec<SyncFlushAcceptedVisibleCallbackExecutionRecordForCanary>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private sync-flush visible callback execution diagnostics are reserved for cross-root canaries"
+)]
+impl SyncFlushAcceptedVisibleCallbackExecutionDiagnosticsForCanary {
+    #[must_use]
+    pub(crate) const fn skipped_reentrant_flush(&self) -> bool {
+        self.skipped_reentrant_flush
+    }
+
+    #[must_use]
+    pub(crate) const fn skipped_no_sync_work(&self) -> bool {
+        self.skipped_no_sync_work
+    }
+
+    #[must_use]
+    pub(crate) fn committed_root_order(&self) -> &[FiberRootId] {
+        &self.committed_root_order
+    }
+
+    #[must_use]
+    pub(crate) fn accepted_root_order(&self) -> &[FiberRootId] {
+        &self.accepted_root_order
+    }
+
+    #[must_use]
+    pub(crate) fn invocations(&self) -> &[HostRootVisibleCallbackInvocationAfterCommitSnapshot] {
+        &self.invocations
+    }
+
+    #[must_use]
+    pub(crate) fn records(&self) -> &[SyncFlushAcceptedVisibleCallbackExecutionRecordForCanary] {
+        &self.records
+    }
+
+    #[must_use]
+    pub(crate) fn matched_committed_roots(&self) -> bool {
+        self.committed_root_order == self.accepted_root_order
+            && self.invocations.len() == self.committed_root_order.len()
+    }
+
+    #[must_use]
+    pub(crate) fn accepted_visible_callback_count(&self) -> usize {
+        self.invocations
+            .iter()
+            .map(HostRootVisibleCallbackInvocationAfterCommitSnapshot::accepted_order_record_count)
+            .sum()
+    }
+
+    #[must_use]
+    pub(crate) fn completed_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| record.completed())
+            .count()
+    }
+
+    #[must_use]
+    pub(crate) fn error_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| record.errored())
+            .count()
+    }
+
+    #[must_use]
+    pub(crate) fn invoked_accepted_visible_callbacks_for_all_roots(&self) -> bool {
+        self.invocations.len() == self.committed_root_order.len()
+            && self
+                .invocations
+                .iter()
+                .all(HostRootVisibleCallbackInvocationAfterCommitSnapshot::invoked_accepted_visible_callbacks)
+    }
+
+    #[must_use]
+    pub(crate) fn records_are_visible(&self) -> bool {
+        self.records
+            .iter()
+            .all(|record| record.is_visible_callback())
+    }
+
+    #[must_use]
+    pub(crate) fn records_in_cross_root_commit_order(&self) -> bool {
+        self.records
+            .iter()
+            .enumerate()
+            .all(|(order, record)| record.cross_root_invocation_order() == order)
+            && self.records.windows(2).all(|records| {
+                let previous = records[0];
+                let next = records[1];
+                previous.commit_order() < next.commit_order()
+                    || (previous.commit_order() == next.commit_order()
+                        && previous.root_invocation_order() < next.root_invocation_order())
+            })
+    }
+
+    #[must_use]
+    pub(crate) fn records_match_accepted_visible_count(&self) -> bool {
+        self.records.len() == self.accepted_visible_callback_count()
+    }
+
+    #[must_use]
+    pub(crate) fn public_callbacks_invoked(&self) -> bool {
+        self.records
+            .iter()
+            .any(|record| record.public_callback_invoked())
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_callback_behavior_exposed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn hidden_callbacks_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn root_error_callbacks_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) fn proves_cross_root_accepted_visible_callback_execution(&self) -> bool {
+        self.committed_root_order.len() >= 2
+            && self.matched_committed_roots()
+            && self.invoked_accepted_visible_callbacks_for_all_roots()
+            && self.records_are_visible()
+            && self.records_in_cross_root_commit_order()
+            && self.records_match_accepted_visible_count()
+            && !self.skipped_reentrant_flush
+            && !self.skipped_no_sync_work
+            && !self.public_callbacks_invoked()
+            && !self.public_root_callback_behavior_exposed()
+            && !self.hidden_callbacks_invoked()
+            && !self.root_error_callbacks_invoked()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyncFlushRootRecord {
     order: usize,
@@ -1723,6 +1960,83 @@ impl SyncFlushResult {
             root_snapshots,
             records: callback_records,
         })
+    }
+
+    #[allow(
+        dead_code,
+        reason = "crate-private sync-flush visible callback execution is reserved for cross-root canaries"
+    )]
+    pub(crate) fn execute_accepted_visible_root_update_callbacks_after_matching_commits_under_test_control_for_canary(
+        &mut self,
+        accepted_orders: &[HostRootQueuedCallbackOrderSnapshot],
+        control: &mut impl RootUpdateCallbackInvocationTestControl,
+    ) -> Result<SyncFlushAcceptedVisibleCallbackExecutionDiagnosticsForCanary, RootUpdateError>
+    {
+        let committed_root_order = self
+            .records
+            .iter()
+            .map(SyncFlushRootRecord::root)
+            .collect::<Vec<_>>();
+        let accepted_root_order = accepted_orders
+            .iter()
+            .map(HostRootQueuedCallbackOrderSnapshot::root)
+            .collect::<Vec<_>>();
+
+        if committed_root_order != accepted_root_order {
+            return Ok(
+                SyncFlushAcceptedVisibleCallbackExecutionDiagnosticsForCanary {
+                    skipped_reentrant_flush: self.skipped_reentrant_flush,
+                    skipped_no_sync_work: self.skipped_no_sync_work,
+                    committed_root_order,
+                    accepted_root_order,
+                    invocations: Vec::new(),
+                    records: Vec::new(),
+                },
+            );
+        }
+
+        for (accepted_order, record) in accepted_orders.iter().zip(&self.records) {
+            validate_host_root_accepted_visible_callbacks_after_matching_commit_for_canary(
+                accepted_order,
+                record.commit(),
+            )?;
+        }
+
+        let mut invocations = Vec::with_capacity(accepted_orders.len());
+        let mut callback_records = Vec::new();
+
+        for (accepted_order, record) in accepted_orders.iter().zip(&mut self.records) {
+            let root = record.root();
+            let commit_order = record.order();
+            let invocation =
+                invoke_host_root_accepted_visible_callbacks_after_matching_commit_under_test_control_for_canary(
+                    accepted_order,
+                    &mut record.commit,
+                    control,
+                )?;
+
+            for execution_record in invocation.execution().records() {
+                callback_records.push(SyncFlushAcceptedVisibleCallbackExecutionRecordForCanary {
+                    root,
+                    commit_order,
+                    cross_root_invocation_order: callback_records.len(),
+                    record: *execution_record,
+                });
+            }
+
+            invocations.push(invocation);
+        }
+
+        Ok(
+            SyncFlushAcceptedVisibleCallbackExecutionDiagnosticsForCanary {
+                skipped_reentrant_flush: self.skipped_reentrant_flush,
+                skipped_no_sync_work: self.skipped_no_sync_work,
+                committed_root_order,
+                accepted_root_order,
+                invocations,
+                records: callback_records,
+            },
+        )
     }
 }
 
@@ -2254,6 +2568,7 @@ mod tests {
         RootSyncSchedulerContinuationExecutionStatus,
         SchedulerBridgeActContinuationExecutionStatus, root_sync_flush_record_for_canary,
     };
+    use crate::root_updates::host_root_queued_callback_order_snapshot_for_canary;
     use crate::scheduler_bridge::SchedulerActContinuationStatus;
     use crate::test_support::{FakeContainer, RecordingHost};
     use crate::{
@@ -4128,6 +4443,232 @@ mod tests {
         assert_eq!(records[3].update_lanes(), Lanes::SYNC);
         assert_eq!(records[3].callback_lanes(), Lanes::SYNC);
         assert!(records[3].callback_lanes_match_commit());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_private_callback_execution_drains_matching_two_root_commits() {
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let host = RecordingHost::default();
+        let first_root = store
+            .create_client_root(FakeContainer::new(701), RootOptions::new())
+            .unwrap();
+        let second_root = store
+            .create_client_root(FakeContainer::new(702), RootOptions::new())
+            .unwrap();
+        let first_callback = RootUpdateCallbackHandle::from_raw(70101);
+        let second_callback = RootUpdateCallbackHandle::from_raw(70201);
+
+        let first_update = update_container_sync(
+            &mut store,
+            first_root,
+            RootElementHandle::from_raw(70101),
+            Some(first_callback),
+        )
+        .unwrap();
+        ensure_root_is_scheduled(&mut store, first_update.schedule()).unwrap();
+        let first_accepted = host_root_queued_callback_order_snapshot_for_canary(
+            &store,
+            first_root,
+            std::slice::from_ref(&first_update),
+        )
+        .unwrap();
+
+        let second_update = update_container_sync(
+            &mut store,
+            second_root,
+            RootElementHandle::from_raw(70201),
+            Some(second_callback),
+        )
+        .unwrap();
+        ensure_root_is_scheduled(&mut store, second_update.schedule()).unwrap();
+        let second_accepted = host_root_queued_callback_order_snapshot_for_canary(
+            &store,
+            second_root,
+            std::slice::from_ref(&second_update),
+        )
+        .unwrap();
+
+        let mut result = flush_sync_commit_work_on_all_roots(&mut store).unwrap();
+        let callback_request_count = store.scheduler_bridge().callback_requests().len();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+        let mut control = TestRootUpdateCallbackControl::default();
+        let accepted_orders = vec![first_accepted, second_accepted];
+
+        let diagnostics = result
+            .execute_accepted_visible_root_update_callbacks_after_matching_commits_under_test_control_for_canary(
+                &accepted_orders,
+                &mut control,
+            )
+            .unwrap();
+
+        assert_eq!(result.records().len(), 2);
+        assert_eq!(
+            diagnostics.committed_root_order(),
+            &[first_root, second_root]
+        );
+        assert_eq!(
+            diagnostics.accepted_root_order(),
+            &[first_root, second_root]
+        );
+        assert_eq!(diagnostics.invocations().len(), 2);
+        assert_eq!(diagnostics.records().len(), 2);
+        assert!(diagnostics.matched_committed_roots());
+        assert!(diagnostics.invoked_accepted_visible_callbacks_for_all_roots());
+        assert!(diagnostics.records_are_visible());
+        assert!(diagnostics.records_in_cross_root_commit_order());
+        assert!(diagnostics.records_match_accepted_visible_count());
+        assert_eq!(diagnostics.accepted_visible_callback_count(), 2);
+        assert_eq!(diagnostics.completed_count(), 2);
+        assert_eq!(diagnostics.error_count(), 0);
+        assert!(diagnostics.proves_cross_root_accepted_visible_callback_execution());
+        assert!(!diagnostics.skipped_reentrant_flush());
+        assert!(!diagnostics.skipped_no_sync_work());
+        assert!(!diagnostics.public_callbacks_invoked());
+        assert!(!diagnostics.public_root_callback_behavior_exposed());
+        assert!(!diagnostics.hidden_callbacks_invoked());
+        assert!(!diagnostics.root_error_callbacks_invoked());
+
+        let records = diagnostics.records();
+        assert_eq!(records[0].root(), first_root);
+        assert_eq!(records[0].commit_order(), 0);
+        assert_eq!(records[0].cross_root_invocation_order(), 0);
+        assert_eq!(records[0].root_invocation_order(), 0);
+        assert_eq!(records[0].accepted_sequence(), 0);
+        assert_eq!(records[0].update(), first_update.update());
+        assert_eq!(records[0].callback(), first_callback);
+        assert_eq!(
+            records[0].visibility(),
+            RootUpdateCallbackVisibility::Visible
+        );
+        assert_eq!(
+            records[0].status(),
+            RootUpdateCallbackInvocationStatus::Completed
+        );
+
+        assert_eq!(records[1].root(), second_root);
+        assert_eq!(records[1].commit_order(), 1);
+        assert_eq!(records[1].cross_root_invocation_order(), 1);
+        assert_eq!(records[1].root_invocation_order(), 0);
+        assert_eq!(records[1].accepted_sequence(), 0);
+        assert_eq!(records[1].update(), second_update.update());
+        assert_eq!(records[1].callback(), second_callback);
+        assert_eq!(
+            records[1].visibility(),
+            RootUpdateCallbackVisibility::Visible
+        );
+        assert_eq!(
+            records[1].status(),
+            RootUpdateCallbackInvocationStatus::Completed
+        );
+
+        assert_eq!(control.calls().len(), 2);
+        assert_eq!(control.calls()[0].callback(), first_callback);
+        assert_eq!(control.calls()[1].callback(), second_callback);
+        assert!(
+            result.records()[0]
+                .commit()
+                .root_update_callback_invocation_gate()
+                .is_empty()
+        );
+        assert!(
+            result.records()[1]
+                .commit()
+                .root_update_callback_invocation_gate()
+                .is_empty()
+        );
+        assert_eq!(
+            store.scheduler_bridge().callback_requests().len(),
+            callback_request_count
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_private_callback_execution_blocks_mismatched_cross_root_order() {
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let host = RecordingHost::default();
+        let first_root = store
+            .create_client_root(FakeContainer::new(711), RootOptions::new())
+            .unwrap();
+        let second_root = store
+            .create_client_root(FakeContainer::new(712), RootOptions::new())
+            .unwrap();
+
+        let first_update = update_container_sync(
+            &mut store,
+            first_root,
+            RootElementHandle::from_raw(71101),
+            Some(RootUpdateCallbackHandle::from_raw(71101)),
+        )
+        .unwrap();
+        ensure_root_is_scheduled(&mut store, first_update.schedule()).unwrap();
+        let first_accepted = host_root_queued_callback_order_snapshot_for_canary(
+            &store,
+            first_root,
+            std::slice::from_ref(&first_update),
+        )
+        .unwrap();
+
+        let second_update = update_container_sync(
+            &mut store,
+            second_root,
+            RootElementHandle::from_raw(71201),
+            Some(RootUpdateCallbackHandle::from_raw(71201)),
+        )
+        .unwrap();
+        ensure_root_is_scheduled(&mut store, second_update.schedule()).unwrap();
+        let second_accepted = host_root_queued_callback_order_snapshot_for_canary(
+            &store,
+            second_root,
+            std::slice::from_ref(&second_update),
+        )
+        .unwrap();
+
+        let mut result = flush_sync_commit_work_on_all_roots(&mut store).unwrap();
+        let mut control = TestRootUpdateCallbackControl::default();
+        let accepted_orders = vec![second_accepted, first_accepted];
+
+        let diagnostics = result
+            .execute_accepted_visible_root_update_callbacks_after_matching_commits_under_test_control_for_canary(
+                &accepted_orders,
+                &mut control,
+            )
+            .unwrap();
+
+        assert_eq!(result.records().len(), 2);
+        assert_eq!(
+            diagnostics.committed_root_order(),
+            &[first_root, second_root]
+        );
+        assert_eq!(
+            diagnostics.accepted_root_order(),
+            &[second_root, first_root]
+        );
+        assert!(!diagnostics.matched_committed_roots());
+        assert!(diagnostics.invocations().is_empty());
+        assert!(diagnostics.records().is_empty());
+        assert!(!diagnostics.proves_cross_root_accepted_visible_callback_execution());
+        assert!(control.calls().is_empty());
+        assert_eq!(
+            result.records()[0]
+                .commit()
+                .root_update_callback_invocation_gate()
+                .len(),
+            1
+        );
+        assert_eq!(
+            result.records()[1]
+                .commit()
+                .root_update_callback_invocation_gate()
+                .len(),
+            1
+        );
+        assert!(!diagnostics.public_root_callback_behavior_exposed());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
