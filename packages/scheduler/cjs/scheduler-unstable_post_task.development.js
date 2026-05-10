@@ -68,10 +68,14 @@
         compatibilityTarget: schedulerCompatibilityTarget,
         diagnosticKind: "shimmed-task-controller-priority",
         diagnosticEventSequence: 0,
+        environmentCapabilities: null,
+        priorityMapping: null,
         schedule: null,
         cancellation: null,
         callbackRuns: [],
         continuationFallbacks: [],
+        environmentCapabilityDiagnostics: true,
+        priorityMappingDiagnostics: true,
         shimmedTaskControllerScheduling: true,
         shimmedTaskControllerCancellation: false,
         continuationFallbackDiagnostics: false,
@@ -82,13 +86,21 @@
         publicSchedulerTimingCompatibilityClaimed: false,
         compatibilityClaimed: false
       };
+      record.environmentCapabilities =
+        describePrivatePostTaskEnvironmentCapabilities();
+      record.priorityMapping = describePrivatePostTaskPriorityMapping(
+        priorityLevel,
+        postTaskPriority
+      );
       record.schedule = {
         status: "scheduled-shimmed-task-controller",
         diagnosticEventIndex:
           claimPrivatePostTaskDiagnosticEventIndex(record),
         priorityLevel: priorityLevel,
         postTaskPriority: postTaskPriority,
+        priorityMapping: record.priorityMapping,
         delay: describePrivatePostTaskDelay(postTaskOptions),
+        environmentCapabilities: record.environmentCapabilities,
         controller: describePrivatePostTaskController(controller),
         signal: describePrivatePostTaskSignal(controller.signal)
       };
@@ -137,28 +149,47 @@
       if (null === record) {
         return;
       }
+      var sourceCallbackRunIndex = record.callbackRuns.length - 1,
+        callbackRunCountAtSchedule = record.callbackRuns.length,
+        reusesOriginalSignal =
+          continuationOptions.signal === node._controller.signal,
+        continuationOptionsDescription =
+          describePrivatePostTaskContinuationOptions(
+            continuationOptions,
+            node
+          ),
+        signalAtSchedule = describePrivatePostTaskSignal(
+          continuationOptions.signal
+        );
       record.continuationFallbackDiagnostics = true;
       record.continuationFallbackMetadataDiagnostics = true;
       record.continuationFallbacks.push({
         status: "scheduled-shimmed-post-task-continuation",
         diagnosticEventIndex: claimPrivatePostTaskDiagnosticEventIndex(record),
         continuationIndex: record.continuationFallbacks.length,
-        sourceCallbackRunIndex: record.callbackRuns.length - 1,
-        callbackRunCountAtSchedule: record.callbackRuns.length,
+        sourceCallbackRunIndex: sourceCallbackRunIndex,
+        callbackRunCountAtSchedule: callbackRunCountAtSchedule,
         fallback: fallback,
         priorityLevel: priorityLevel,
         postTaskPriority: postTaskPriority,
-        continuationOptions:
-          describePrivatePostTaskContinuationOptions(
-            continuationOptions,
-            node
-          ),
-        reusesOriginalSignal:
-          continuationOptions.signal === node._controller.signal,
-        signalAtSchedule: describePrivatePostTaskSignal(
-          continuationOptions.signal
-        ),
-        signal: describePrivatePostTaskSignal(continuationOptions.signal),
+        continuationOptions: continuationOptionsDescription,
+        continuationMetadata: {
+          status: "shimmed-post-task-continuation-metadata",
+          selectedFallback: fallback,
+          schedulerYieldAvailableAtSchedule: void 0 !== scheduler.yield,
+          schedulerPostTaskAvailableAtSchedule:
+            "function" === typeof scheduler.postTask,
+          sourceCallbackRunIndex: sourceCallbackRunIndex,
+          callbackRunCountAtSchedule: callbackRunCountAtSchedule,
+          reusesOriginalSignal: reusesOriginalSignal,
+          signalAbortedAtSchedule: signalAtSchedule.aborted,
+          browserPostTaskCompatibilityClaimed: false,
+          publicSchedulerTimingCompatibilityClaimed: false,
+          compatibilityClaimed: false
+        },
+        reusesOriginalSignal: reusesOriginalSignal,
+        signalAtSchedule: signalAtSchedule,
+        signal: signalAtSchedule,
         browserPostTaskCompatibilityClaimed: false,
         publicSchedulerTimingCompatibilityClaimed: false,
         compatibilityClaimed: false
@@ -171,6 +202,9 @@
       }
       record.shimmedTaskControllerCancellation = true;
       record.taskControllerAbortOrderingDiagnostics = true;
+      var signalBeforeAbort = describePrivatePostTaskSignal(
+        node._controller.signal
+      );
       record.cancellation = {
         status: "cancelled-shimmed-task-controller",
         abortOrdering: {
@@ -187,9 +221,23 @@
             record.continuationFallbacks.length,
           continuationFallbackCountAtCompletion: null
         },
-        signalBeforeAbort: describePrivatePostTaskSignal(
-          node._controller.signal
-        ),
+        abortMetadata: {
+          status: "shimmed-task-controller-abort-metadata",
+          controller: describePrivatePostTaskController(node._controller),
+          signalSource: "node._controller.signal",
+          signalAbortedBeforeAbort: signalBeforeAbort.aborted,
+          signalAbortedAfterAbort: null,
+          callbackRunCountBeforeAbort: record.callbackRuns.length,
+          callbackRunCountAfterAbort: null,
+          continuationFallbackCountBeforeAbort:
+            record.continuationFallbacks.length,
+          continuationFallbackCountAfterAbort: null,
+          abortMarkedSignalAborted: null,
+          browserPostTaskCompatibilityClaimed: false,
+          publicSchedulerTimingCompatibilityClaimed: false,
+          compatibilityClaimed: false
+        },
+        signalBeforeAbort: signalBeforeAbort,
         signalAfterAbort: null,
         signal: null,
         abortObserved: false,
@@ -219,6 +267,99 @@
       );
       cancellation.signal = cancellation.signalAfterAbort;
       cancellation.abortObserved = node._controller.signal.aborted === true;
+      cancellation.abortMetadata.signalAbortedAfterAbort =
+        cancellation.signalAfterAbort.aborted;
+      cancellation.abortMetadata.callbackRunCountAfterAbort =
+        record.callbackRuns.length;
+      cancellation.abortMetadata.continuationFallbackCountAfterAbort =
+        record.continuationFallbacks.length;
+      cancellation.abortMetadata.abortMarkedSignalAborted =
+        cancellation.signalBeforeAbort.aborted === false &&
+        cancellation.signalAfterAbort.aborted === true;
+    }
+    function describePrivatePostTaskEnvironmentCapabilities() {
+      var windowValue = "object" === typeof window ? window : null,
+        performanceValue = windowValue ? windowValue.performance : null,
+        schedulerValue = scheduler;
+      return {
+        status: "controlled-task-scheduling-api-capability-snapshot",
+        hasWindow: null !== windowValue,
+        hasWindowPerformance:
+          null !== performanceValue && "object" === typeof performanceValue,
+        hasWindowPerformanceNow:
+          !!performanceValue && "function" === typeof performanceValue.now,
+        hasWindowSetTimeout:
+          !!windowValue && "function" === typeof windowValue.setTimeout,
+        hasTaskController: "function" === typeof TaskController,
+        taskControllerConstructorName:
+          "function" === typeof TaskController &&
+          "string" === typeof TaskController.name
+            ? TaskController.name
+            : null,
+        hasScheduler:
+          !!schedulerValue &&
+          ("object" === typeof schedulerValue ||
+            "function" === typeof schedulerValue),
+        hasSchedulerPostTask:
+          !!schedulerValue && "function" === typeof schedulerValue.postTask,
+        hasSchedulerYield:
+          !!schedulerValue && "function" === typeof schedulerValue.yield,
+        schedulerOwnKeys:
+          schedulerValue && "object" === typeof schedulerValue
+            ? Object.keys(schedulerValue)
+            : [],
+        browserPostTaskCompatibilityClaimed: false,
+        publicSchedulerTimingCompatibilityClaimed: false,
+        compatibilityClaimed: false
+      };
+    }
+    function describePrivatePostTaskPriorityMapping(
+      priorityLevel,
+      postTaskPriority
+    ) {
+      switch (priorityLevel) {
+        case 1:
+          var schedulerPriorityName = "unstable_ImmediatePriority",
+            mappingReason = "immediate-and-user-blocking-map-to-user-blocking",
+            recognizedPriority = true;
+          break;
+        case 2:
+          schedulerPriorityName = "unstable_UserBlockingPriority";
+          mappingReason = "immediate-and-user-blocking-map-to-user-blocking";
+          recognizedPriority = true;
+          break;
+        case 3:
+          schedulerPriorityName = "unstable_NormalPriority";
+          mappingReason = "normal-and-low-map-to-user-visible";
+          recognizedPriority = true;
+          break;
+        case 4:
+          schedulerPriorityName = "unstable_LowPriority";
+          mappingReason = "normal-and-low-map-to-user-visible";
+          recognizedPriority = true;
+          break;
+        case 5:
+          schedulerPriorityName = "unstable_IdlePriority";
+          mappingReason = "idle-maps-to-background";
+          recognizedPriority = true;
+          break;
+        default:
+          schedulerPriorityName = "unknown";
+          mappingReason = "unknown-priority-defaults-to-user-visible";
+          recognizedPriority = false;
+      }
+      return {
+        status: "scheduler-priority-to-post-task-priority-mapping",
+        priorityLevel: priorityLevel,
+        schedulerPriorityName: schedulerPriorityName,
+        recognizedPriority: recognizedPriority,
+        postTaskPriority: postTaskPriority,
+        taskControllerPriority: postTaskPriority,
+        mappingReason: mappingReason,
+        browserPostTaskCompatibilityClaimed: false,
+        publicSchedulerTimingCompatibilityClaimed: false,
+        compatibilityClaimed: false
+      };
     }
     function describePrivatePostTaskDelay(postTaskOptions) {
       var delay = postTaskOptions.delay;
@@ -288,10 +429,15 @@
         compatibilityTarget: record.compatibilityTarget,
         diagnosticKind: record.diagnosticKind,
         diagnosticEventCount: record.diagnosticEventSequence,
+        environmentCapabilities: record.environmentCapabilities,
+        priorityMapping: record.priorityMapping,
         schedule: record.schedule,
         cancellation: record.cancellation,
         callbackRuns: record.callbackRuns,
         continuationFallbacks: record.continuationFallbacks,
+        environmentCapabilityDiagnostics:
+          record.environmentCapabilityDiagnostics,
+        priorityMappingDiagnostics: record.priorityMappingDiagnostics,
         shimmedTaskControllerScheduling:
           record.shimmedTaskControllerScheduling,
         shimmedTaskControllerCancellation:

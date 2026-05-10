@@ -651,6 +651,66 @@ test("scheduler post-task private priority diagnostics capture shimmed TaskContr
     ["idle-zero-delay", 5, "background", "number", 0],
     ["invalid-delay", 99, "user-visible", "number", 2]
   ];
+  const expectedPriorityMappings = [
+    [
+      "immediate",
+      "unstable_ImmediatePriority",
+      true,
+      "user-blocking",
+      "immediate-and-user-blocking-map-to-user-blocking"
+    ],
+    [
+      "user-blocking",
+      "unstable_UserBlockingPriority",
+      true,
+      "user-blocking",
+      "immediate-and-user-blocking-map-to-user-blocking"
+    ],
+    [
+      "normal",
+      "unstable_NormalPriority",
+      true,
+      "user-visible",
+      "normal-and-low-map-to-user-visible"
+    ],
+    [
+      "low-delay",
+      "unstable_LowPriority",
+      true,
+      "user-visible",
+      "normal-and-low-map-to-user-visible"
+    ],
+    [
+      "idle-zero-delay",
+      "unstable_IdlePriority",
+      true,
+      "background",
+      "idle-maps-to-background"
+    ],
+    [
+      "invalid-delay",
+      "unknown",
+      false,
+      "user-visible",
+      "unknown-priority-defaults-to-user-visible"
+    ]
+  ];
+  const expectedEnvironmentCapabilities = {
+    status: "controlled-task-scheduling-api-capability-snapshot",
+    hasWindow: true,
+    hasWindowPerformance: true,
+    hasWindowPerformanceNow: true,
+    hasWindowSetTimeout: true,
+    hasTaskController: true,
+    taskControllerConstructorName: "TaskController",
+    hasScheduler: true,
+    hasSchedulerPostTask: true,
+    hasSchedulerYield: true,
+    schedulerOwnKeys: ["postTask", "yield"],
+    browserPostTaskCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  };
 
   for (const mode of SCHEDULER_POST_TASK_PROBE_MODES) {
     const report = inspectSchedulerPostTaskPriorityDiagnostics({
@@ -669,6 +729,16 @@ test("scheduler post-task private priority diagnostics capture shimmed TaskContr
       ]),
       expectedScheduling
     );
+    assert.deepEqual(
+      report.scheduling.map((entry) => [
+        entry.label,
+        entry.diagnosticsBeforeFlush.priorityMapping.schedulerPriorityName,
+        entry.diagnosticsBeforeFlush.priorityMapping.recognizedPriority,
+        entry.diagnosticsBeforeFlush.priorityMapping.taskControllerPriority,
+        entry.diagnosticsBeforeFlush.priorityMapping.mappingReason
+      ]),
+      expectedPriorityMappings
+    );
 
     for (const entry of report.scheduling) {
       assert.deepEqual(entry.publicNodeKeys, ["_controller"], entry.label);
@@ -681,6 +751,27 @@ test("scheduler post-task private priority diagnostics capture shimmed TaskContr
       );
       assert.equal(
         entry.diagnosticsBeforeFlush.publicSchedulerTimingCompatibilityClaimed,
+        false
+      );
+      assert.equal(
+        entry.diagnosticsBeforeFlush.environmentCapabilityDiagnostics,
+        true
+      );
+      assert.equal(entry.diagnosticsBeforeFlush.priorityMappingDiagnostics, true);
+      assert.deepEqual(
+        entry.diagnosticsBeforeFlush.environmentCapabilities,
+        expectedEnvironmentCapabilities
+      );
+      assert.deepEqual(
+        entry.diagnosticsBeforeFlush.schedule.environmentCapabilities,
+        expectedEnvironmentCapabilities
+      );
+      assert.deepEqual(
+        entry.diagnosticsBeforeFlush.schedule.priorityMapping,
+        entry.diagnosticsBeforeFlush.priorityMapping
+      );
+      assert.equal(
+        entry.diagnosticsBeforeFlush.priorityMapping.browserPostTaskCompatibilityClaimed,
         false
       );
       assert.equal(
@@ -770,6 +861,28 @@ test("scheduler post-task private priority diagnostics capture shimmed TaskContr
     assert.equal(
       report.cancellation.diagnosticsAfterCancel.cancellation.status,
       "cancelled-shimmed-task-controller"
+    );
+    assert.deepEqual(
+      report.cancellation.diagnosticsAfterCancel.cancellation.abortMetadata,
+      {
+        status: "shimmed-task-controller-abort-metadata",
+        controller: {
+          type: "object",
+          constructorName: "TaskController",
+          ownKeys: ["priority", "signal"]
+        },
+        signalSource: "node._controller.signal",
+        signalAbortedBeforeAbort: false,
+        signalAbortedAfterAbort: true,
+        callbackRunCountBeforeAbort: 0,
+        callbackRunCountAfterAbort: 0,
+        continuationFallbackCountBeforeAbort: 0,
+        continuationFallbackCountAfterAbort: 0,
+        abortMarkedSignalAborted: true,
+        browserPostTaskCompatibilityClaimed: false,
+        publicSchedulerTimingCompatibilityClaimed: false,
+        compatibilityClaimed: false
+      }
     );
     assert.deepEqual(
       report.cancellation.diagnosticsAfterCancel.cancellation.abortOrdering,
@@ -869,6 +982,17 @@ test("scheduler post-task private priority diagnostics capture continuation fall
         diagnostics.publicSchedulerTimingCompatibilityClaimed,
         false
       );
+      assert.equal(diagnostics.environmentCapabilityDiagnostics, true);
+      assert.equal(diagnostics.priorityMappingDiagnostics, true);
+      assert.equal(
+        diagnostics.environmentCapabilities.hasSchedulerYield,
+        withYield
+      );
+      assert.equal(diagnostics.environmentCapabilities.hasSchedulerPostTask, true);
+      assert.deepEqual(
+        diagnostics.priorityMapping,
+        diagnostics.schedule.priorityMapping
+      );
       assert.equal(diagnostics.continuationFallbackDiagnostics, true);
       assert.equal(diagnostics.continuationFallbackMetadataDiagnostics, true);
       assert.equal(diagnostics.taskControllerAbortOrderingDiagnostics, false);
@@ -904,6 +1028,19 @@ test("scheduler post-task private priority diagnostics capture continuation fall
             ownKeys: ["signal"],
             signalMatchesTaskController: true,
             signalAbortedAtSchedule: false
+          },
+          continuationMetadata: {
+            status: "shimmed-post-task-continuation-metadata",
+            selectedFallback: expectedFallback,
+            schedulerYieldAvailableAtSchedule: withYield,
+            schedulerPostTaskAvailableAtSchedule: true,
+            sourceCallbackRunIndex: 0,
+            callbackRunCountAtSchedule: 1,
+            reusesOriginalSignal: true,
+            signalAbortedAtSchedule: false,
+            browserPostTaskCompatibilityClaimed: false,
+            publicSchedulerTimingCompatibilityClaimed: false,
+            compatibilityClaimed: false
           },
           reusesOriginalSignal: true,
           signalAtSchedule: {
@@ -998,6 +1135,25 @@ test("scheduler post-task private priority diagnostics capture abort ordering ar
     assert.equal(afterCancel.taskControllerAbortOrderingDiagnostics, true);
     assert.equal(afterCancel.continuationFallbackMetadataDiagnostics, true);
     assert.equal(afterCancel.diagnosticEventCount, 5);
+    assert.deepEqual(afterCancel.cancellation.abortMetadata, {
+      status: "shimmed-task-controller-abort-metadata",
+      controller: {
+        type: "object",
+        constructorName: "TaskController",
+        ownKeys: ["priority", "signal"]
+      },
+      signalSource: "node._controller.signal",
+      signalAbortedBeforeAbort: false,
+      signalAbortedAfterAbort: true,
+      callbackRunCountBeforeAbort: 1,
+      callbackRunCountAfterAbort: 1,
+      continuationFallbackCountBeforeAbort: 1,
+      continuationFallbackCountAfterAbort: 1,
+      abortMarkedSignalAborted: true,
+      browserPostTaskCompatibilityClaimed: false,
+      publicSchedulerTimingCompatibilityClaimed: false,
+      compatibilityClaimed: false
+    });
     assert.deepEqual(afterCancel.cancellation.abortOrdering, {
       status: "task-controller-abort-observed-after-abort-call",
       requestEventIndex: 3,
