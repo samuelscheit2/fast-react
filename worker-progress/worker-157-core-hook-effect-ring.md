@@ -1,7 +1,7 @@
 # Worker 157: Core Hook Effect Ring
 
 ## Goal
-- Status: active
+- Status: complete
 - Objective: implement pure core hook effect ring storage and iteration helpers using existing HookEffectFlags, without integrating function component render or commit phases
 
 ## Summary
@@ -47,10 +47,14 @@
 - `cargo test -p fast-react-core --all-features hook_effect` passed:
   10 passed, 0 failed.
 - `cargo test -p fast-react-core --all-features` passed:
-  85 passed, 0 failed, doc-tests 0 passed.
+  98 passed, 0 failed, doc-tests 0 passed after integrating current `main`.
 - `cargo clippy -p fast-react-core --all-targets --all-features -- -D warnings`
   passed.
 - `git diff --check` passed.
+
+## Integration With Current Main
+- Merged current `main` after implementation and reran the full verification
+  set above on the integrated worker branch.
 
 ## Risks Or Blockers
 - The module intentionally does not release rooted JS resources on aborted
