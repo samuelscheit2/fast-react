@@ -122,6 +122,10 @@ test("context-object local gate compares live provider object shape to the accep
       ready: true
     },
     {
+      id: "private-context-dependency-metadata",
+      ready: true
+    },
+    {
       id: "private-context-provider-begin-work-handoff",
       ready: true
     },
@@ -155,6 +159,10 @@ test("context-object local gate compares live provider object shape to the accep
   );
   assert.equal(
     gate.localChecks.functionComponentUseContextRenderReadPresent,
+    true
+  );
+  assert.equal(
+    gate.localChecks.privateContextDependencyMetadataPresent,
     true
   );
   assert.equal(
@@ -232,6 +240,10 @@ test("context-object local gate keeps runtime unblock requirements explicit", ()
       {
         id: "private-function-component-use-context-render-read",
         readyCheck: "functionComponentUseContextRenderReadPresent"
+      },
+      {
+        id: "private-context-dependency-metadata",
+        readyCheck: "privateContextDependencyMetadataPresent"
       },
       {
         id: "private-context-provider-begin-work-handoff",
