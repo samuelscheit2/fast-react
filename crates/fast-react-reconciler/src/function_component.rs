@@ -9,9 +9,12 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::{
-    FiberArena, FiberId, FiberTag, FiberTopologyError, FiberTypeHandle, HookListArena,
-    HookListError, HookListId, HookListMountCursor, HookListTraversalResult, HookListUpdateCursor,
-    HookSlotId, HookSlotPayload, Lanes, PropsHandle, StateHandle, UpdateQueueHandle,
+    FiberArena, FiberFlags, FiberId, FiberTag, FiberTopologyError, FiberTypeHandle,
+    HookEffectArena, HookEffectArenaError, HookEffectCallbackHandle, HookEffectDependencies,
+    HookEffectFlags, HookEffectId, HookEffectInstanceId, HookEffectPayload, HookEffectRing,
+    HookListArena, HookListError, HookListId, HookListMountCursor, HookListTraversalResult,
+    HookListUpdateCursor, HookSlotId, HookSlotPayload, Lanes, PropsHandle, StateHandle,
+    UpdateQueueHandle,
 };
 
 #[repr(transparent)]
@@ -90,10 +93,18 @@ struct FunctionComponentCurrentHookList {
     list: HookListId,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FunctionComponentEffectRingBinding {
+    list: HookListId,
+    ring: HookEffectRing,
+}
+
 #[derive(Debug, Default, Clone)]
 pub(crate) struct FunctionComponentHookRenderStore {
     hook_lists: HookListArena,
+    hook_effects: HookEffectArena,
     current_lists: Vec<FunctionComponentCurrentHookList>,
+    effect_rings: Vec<FunctionComponentEffectRingBinding>,
 }
 
 impl FunctionComponentHookRenderStore {
@@ -111,6 +122,15 @@ impl FunctionComponentHookRenderStore {
         &mut self.hook_lists
     }
 
+    #[must_use]
+    pub const fn hook_effects(&self) -> &HookEffectArena {
+        &self.hook_effects
+    }
+
+    pub fn hook_effects_mut(&mut self) -> &mut HookEffectArena {
+        &mut self.hook_effects
+    }
+
     pub fn create_current_list(&mut self, fiber: FiberId) -> HookListId {
         let list = self.hook_lists.create_list(fiber);
         self.bind_current_list_unchecked(fiber, list);
@@ -123,6 +143,14 @@ impl FunctionComponentHookRenderStore {
             .iter()
             .find(|binding| binding.fiber == fiber)
             .map(|binding| binding.list)
+    }
+
+    #[must_use]
+    pub fn effect_ring(&self, list: HookListId) -> Option<HookEffectRing> {
+        self.effect_rings
+            .iter()
+            .find(|binding| binding.list == list)
+            .map(|binding| binding.ring)
     }
 
     pub fn prepare_render_state(
@@ -229,6 +257,148 @@ impl FunctionComponentHookRenderStore {
         }
     }
 
+    pub fn mount_effect_metadata(
+        &mut self,
+        arena: &mut FiberArena,
+        cursor: &mut FunctionComponentHookRenderCursor,
+        phase: FunctionComponentEffectPhase,
+        create: HookEffectCallbackHandle,
+        dependencies: HookEffectDependencies,
+    ) -> Result<FunctionComponentEffectRegistration, FunctionComponentRenderError> {
+        let (state, cursor) = match cursor {
+            FunctionComponentHookRenderCursor::Mount { state, cursor } => (*state, cursor),
+            FunctionComponentHookRenderCursor::Update { state, .. } => {
+                return Err(FunctionComponentRenderError::HookCursorPhaseMismatch {
+                    fiber: state.render_fiber(),
+                    expected: FunctionComponentHookRenderPhase::Mount,
+                    actual: FunctionComponentHookRenderPhase::Update,
+                });
+            }
+        };
+        self.ensure_mount_cursor_ready(state, cursor)?;
+
+        let tag = HookEffectFlags::HAS_EFFECT | phase.hook_flags();
+        let instance = self.hook_effects.create_effect_instance();
+        let effect = self.push_effect_for_list(
+            state,
+            state.work_in_progress_list(),
+            tag,
+            instance,
+            create,
+            dependencies,
+        )?;
+        let hook = self
+            .hook_lists
+            .mount_hook(
+                cursor,
+                HookSlotPayload::effect(HookEffectPayload::new(effect)),
+            )
+            .map_err(|error| {
+                FunctionComponentRenderError::hook_list(state.render_fiber(), error)
+            })?;
+        let fiber_flags = phase.mount_fiber_flags();
+        arena
+            .get_mut(state.render_fiber())?
+            .merge_flags(fiber_flags);
+
+        Ok(FunctionComponentEffectRegistration {
+            hook,
+            effect,
+            instance,
+            phase,
+            tag,
+            dependencies,
+            fiber_flags,
+        })
+    }
+
+    pub fn update_effect_metadata(
+        &mut self,
+        arena: &mut FiberArena,
+        cursor: &mut FunctionComponentHookRenderCursor,
+        phase: FunctionComponentEffectPhase,
+        create: HookEffectCallbackHandle,
+        dependencies: HookEffectDependencies,
+        dependency_status: FunctionComponentEffectDependencyStatus,
+    ) -> Result<FunctionComponentEffectRegistration, FunctionComponentRenderError> {
+        let (state, cursor) = match cursor {
+            FunctionComponentHookRenderCursor::Update { state, cursor } => (*state, cursor),
+            FunctionComponentHookRenderCursor::Mount { state, .. } => {
+                return Err(FunctionComponentRenderError::HookCursorPhaseMismatch {
+                    fiber: state.render_fiber(),
+                    expected: FunctionComponentHookRenderPhase::Update,
+                    actual: FunctionComponentHookRenderPhase::Mount,
+                });
+            }
+        };
+
+        let hook = self.hook_lists.update_hook(cursor).map_err(|error| {
+            FunctionComponentRenderError::hook_list(state.render_fiber(), error)
+        })?;
+        let previous_effect = self
+            .hook_lists
+            .hook(hook)
+            .map_err(|error| FunctionComponentRenderError::hook_list(state.render_fiber(), error))?
+            .payload()
+            .effect_payload()
+            .ok_or(FunctionComponentRenderError::ExpectedEffectHookPayload {
+                fiber: state.render_fiber(),
+                hook,
+            })?
+            .effect();
+        let instance = self
+            .hook_effects
+            .get_effect(previous_effect)
+            .map_err(|error| {
+                FunctionComponentRenderError::hook_effect(state.render_fiber(), error)
+            })?
+            .instance();
+        let should_fire =
+            dependencies.is_always_run() || dependency_status.should_register_has_effect();
+        let tag = if should_fire {
+            HookEffectFlags::HAS_EFFECT | phase.hook_flags()
+        } else {
+            phase.hook_flags()
+        };
+        let effect = self.push_effect_for_list(
+            state,
+            state.work_in_progress_list(),
+            tag,
+            instance,
+            create,
+            dependencies,
+        )?;
+        self.hook_lists
+            .set_hook_payload(
+                hook,
+                HookSlotPayload::effect(HookEffectPayload::new(effect)),
+            )
+            .map_err(|error| {
+                FunctionComponentRenderError::hook_list(state.render_fiber(), error)
+            })?;
+
+        let fiber_flags = if should_fire {
+            phase.update_fiber_flags()
+        } else {
+            FiberFlags::NO
+        };
+        if fiber_flags.is_non_empty() {
+            arena
+                .get_mut(state.render_fiber())?
+                .merge_flags(fiber_flags);
+        }
+
+        Ok(FunctionComponentEffectRegistration {
+            hook,
+            effect,
+            instance,
+            phase,
+            tag,
+            dependencies,
+            fiber_flags,
+        })
+    }
+
     pub fn finish_render_cursor(
         &self,
         cursor: FunctionComponentHookRenderCursor,
@@ -263,6 +433,67 @@ impl FunctionComponentHookRenderStore {
                 .push(FunctionComponentCurrentHookList { fiber, list });
         }
     }
+
+    fn ensure_mount_cursor_ready(
+        &self,
+        state: FunctionComponentHookRenderState,
+        cursor: &HookListMountCursor,
+    ) -> Result<(), FunctionComponentRenderError> {
+        let list = self.hook_lists.list(cursor.list()).map_err(|error| {
+            FunctionComponentRenderError::hook_list(state.render_fiber(), error)
+        })?;
+        if list.len() != cursor.appended() {
+            return Err(FunctionComponentRenderError::hook_list(
+                state.render_fiber(),
+                HookListError::TraversalCursorOutOfSync {
+                    list: cursor.list(),
+                    expected_len: cursor.appended(),
+                    actual_len: list.len(),
+                },
+            ));
+        }
+        Ok(())
+    }
+
+    fn push_effect_for_list(
+        &mut self,
+        state: FunctionComponentHookRenderState,
+        list: HookListId,
+        tag: HookEffectFlags,
+        instance: HookEffectInstanceId,
+        create: HookEffectCallbackHandle,
+        dependencies: HookEffectDependencies,
+    ) -> Result<HookEffectId, FunctionComponentRenderError> {
+        self.hook_lists.list(list).map_err(|error| {
+            FunctionComponentRenderError::hook_list(state.render_fiber(), error)
+        })?;
+        let ring_index = self.ensure_effect_ring_index(list);
+        let mut ring = self.effect_rings[ring_index].ring;
+        let effect = self
+            .hook_effects
+            .push_effect(&mut ring, tag, instance, create, dependencies)
+            .map_err(|error| {
+                FunctionComponentRenderError::hook_effect(state.render_fiber(), error)
+            })?;
+        self.effect_rings[ring_index].ring = ring;
+        Ok(effect)
+    }
+
+    fn ensure_effect_ring_index(&mut self, list: HookListId) -> usize {
+        if let Some(index) = self
+            .effect_rings
+            .iter()
+            .position(|binding| binding.list == list)
+        {
+            index
+        } else {
+            self.effect_rings.push(FunctionComponentEffectRingBinding {
+                list,
+                ring: HookEffectRing::new(),
+            });
+            self.effect_rings.len() - 1
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -288,6 +519,102 @@ impl FunctionComponentHookRenderCursor {
     #[must_use]
     pub const fn phase(self) -> FunctionComponentHookRenderPhase {
         self.state().phase()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FunctionComponentEffectPhase {
+    Insertion,
+    Layout,
+    Passive,
+}
+
+impl FunctionComponentEffectPhase {
+    #[must_use]
+    pub const fn hook_flags(self) -> HookEffectFlags {
+        match self {
+            Self::Insertion => HookEffectFlags::INSERTION,
+            Self::Layout => HookEffectFlags::LAYOUT,
+            Self::Passive => HookEffectFlags::PASSIVE,
+        }
+    }
+
+    #[must_use]
+    pub const fn mount_fiber_flags(self) -> FiberFlags {
+        match self {
+            Self::Insertion => FiberFlags::UPDATE,
+            Self::Layout => FiberFlags::UPDATE.merge(FiberFlags::LAYOUT_STATIC),
+            Self::Passive => FiberFlags::PASSIVE.merge(FiberFlags::PASSIVE_STATIC),
+        }
+    }
+
+    #[must_use]
+    pub const fn update_fiber_flags(self) -> FiberFlags {
+        match self {
+            Self::Insertion | Self::Layout => FiberFlags::UPDATE,
+            Self::Passive => FiberFlags::PASSIVE,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FunctionComponentEffectDependencyStatus {
+    Changed,
+    Unchanged,
+}
+
+impl FunctionComponentEffectDependencyStatus {
+    #[must_use]
+    pub const fn should_register_has_effect(self) -> bool {
+        matches!(self, Self::Changed)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentEffectRegistration {
+    hook: HookSlotId,
+    effect: HookEffectId,
+    instance: HookEffectInstanceId,
+    phase: FunctionComponentEffectPhase,
+    tag: HookEffectFlags,
+    dependencies: HookEffectDependencies,
+    fiber_flags: FiberFlags,
+}
+
+impl FunctionComponentEffectRegistration {
+    #[must_use]
+    pub const fn hook(self) -> HookSlotId {
+        self.hook
+    }
+
+    #[must_use]
+    pub const fn effect(self) -> HookEffectId {
+        self.effect
+    }
+
+    #[must_use]
+    pub const fn instance(self) -> HookEffectInstanceId {
+        self.instance
+    }
+
+    #[must_use]
+    pub const fn phase(self) -> FunctionComponentEffectPhase {
+        self.phase
+    }
+
+    #[must_use]
+    pub const fn tag(self) -> HookEffectFlags {
+        self.tag
+    }
+
+    #[must_use]
+    pub const fn dependencies(self) -> HookEffectDependencies {
+        self.dependencies
+    }
+
+    #[must_use]
+    pub const fn fiber_flags(self) -> FiberFlags {
+        self.fiber_flags
     }
 }
 
@@ -455,6 +782,10 @@ pub(crate) enum FunctionComponentRenderError {
         fiber: FiberId,
         error: Box<HookListError>,
     },
+    HookEffect {
+        fiber: FiberId,
+        error: Box<HookEffectArenaError>,
+    },
     MissingCurrentHookList {
         fiber: FiberId,
     },
@@ -462,6 +793,10 @@ pub(crate) enum FunctionComponentRenderError {
         fiber: FiberId,
         expected: FunctionComponentHookRenderPhase,
         actual: FunctionComponentHookRenderPhase,
+    },
+    ExpectedEffectHookPayload {
+        fiber: FiberId,
+        hook: HookSlotId,
     },
     UnexpectedFiberTag {
         fiber: FiberId,
@@ -477,6 +812,13 @@ pub(crate) enum FunctionComponentRenderError {
 impl FunctionComponentRenderError {
     fn hook_list(fiber: FiberId, error: HookListError) -> Self {
         Self::HookList {
+            fiber,
+            error: Box::new(error),
+        }
+    }
+
+    fn hook_effect(fiber: FiberId, error: HookEffectArenaError) -> Self {
+        Self::HookEffect {
             fiber,
             error: Box::new(error),
         }
@@ -502,6 +844,11 @@ impl Display for FunctionComponentRenderError {
                 "function component fiber {} hook-list render metadata failed: {error}",
                 fiber.slot().get()
             ),
+            Self::HookEffect { fiber, error } => write!(
+                formatter,
+                "function component fiber {} hook-effect render metadata failed: {error}",
+                fiber.slot().get()
+            ),
             Self::MissingCurrentHookList { fiber } => write!(
                 formatter,
                 "function component fiber {} entered update hook-list traversal without a current hook list",
@@ -517,6 +864,12 @@ impl Display for FunctionComponentRenderError {
                 fiber.slot().get(),
                 actual,
                 expected
+            ),
+            Self::ExpectedEffectHookPayload { fiber, hook } => write!(
+                formatter,
+                "function component fiber {} expected hook slot {} to carry effect metadata",
+                fiber.slot().get(),
+                hook.slot().get()
             ),
             Self::UnexpectedFiberTag { fiber, tag } => write!(
                 formatter,
@@ -543,8 +896,10 @@ impl Error for FunctionComponentRenderError {
         match self {
             Self::FiberTopology(error) => Some(error),
             Self::HookList { error, .. } => Some(error),
+            Self::HookEffect { error, .. } => Some(error),
             Self::Invocation { error, .. } => Some(error),
-            Self::MissingComponentHandle { .. }
+            Self::ExpectedEffectHookPayload { .. }
+            | Self::MissingComponentHandle { .. }
             | Self::MissingCurrentHookList { .. }
             | Self::HookCursorPhaseMismatch { .. }
             | Self::Unsupported { .. }
@@ -738,7 +1093,7 @@ mod tests {
     use super::*;
     use crate::test_support::{FakeContainer, RecordingHost};
     use crate::{FiberRootStore, RootOptions};
-    use fast_react_core::{FiberMode, FiberTypeHandle, PropsHandle};
+    use fast_react_core::{DependenciesHandle, FiberMode, FiberTypeHandle, PropsHandle};
 
     #[derive(Debug, Clone)]
     struct RegisteredComponent {
@@ -804,6 +1159,40 @@ mod tests {
 
     fn opaque(raw: u64) -> HookSlotPayload {
         HookSlotPayload::opaque(StateHandle::from_raw(raw))
+    }
+
+    fn callback(raw: u64) -> HookEffectCallbackHandle {
+        HookEffectCallbackHandle::from_raw(raw)
+    }
+
+    fn deps(raw: u64) -> HookEffectDependencies {
+        HookEffectDependencies::array(DependenciesHandle::from_raw(raw))
+    }
+
+    fn seed_current_effect_metadata(
+        arena: &mut FiberArena,
+        hook_store: &mut FunctionComponentHookRenderStore,
+        current: FiberId,
+        current_list: HookListId,
+        phase: FunctionComponentEffectPhase,
+        create: HookEffectCallbackHandle,
+        dependencies: HookEffectDependencies,
+    ) -> FunctionComponentEffectRegistration {
+        let state = FunctionComponentHookRenderState {
+            phase: FunctionComponentHookRenderPhase::Mount,
+            render_fiber: current,
+            current: None,
+            current_list: None,
+            work_in_progress_list: current_list,
+        };
+        let cursor = hook_store.hook_lists().begin_mount(current_list).unwrap();
+        let mut cursor = FunctionComponentHookRenderCursor::Mount { state, cursor };
+        let registration = hook_store
+            .mount_effect_metadata(arena, &mut cursor, phase, create, dependencies)
+            .unwrap();
+        let finished = hook_store.finish_render_cursor(cursor).unwrap();
+        assert_eq!(finished.traversal().traversed_count(), 1);
+        registration
     }
 
     #[test]
@@ -1003,6 +1392,228 @@ mod tests {
         assert_eq!(
             hook_store.hook_lists().hook(work_second).unwrap().payload(),
             second_payload
+        );
+    }
+
+    #[test]
+    fn function_component_effect_metadata_mount_registers_ring_hook_and_flags() {
+        let (mut arena, _current, work_in_progress, component) = function_component_pair();
+        let output = FunctionComponentOutputHandle::from_raw(47);
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+
+        let record = render_function_component_with_hook_state(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap();
+        let state = record.hook_state().unwrap();
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+
+        let registration = hook_store
+            .mount_effect_metadata(
+                &mut arena,
+                &mut cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(70),
+                deps(700),
+            )
+            .unwrap();
+        let finished = hook_store.finish_render_cursor(cursor).unwrap();
+
+        assert_eq!(finished.traversal().traversed_count(), 1);
+        assert_eq!(registration.phase(), FunctionComponentEffectPhase::Passive);
+        assert_eq!(registration.tag(), HookEffectFlags::PASSIVE_EFFECT);
+        assert_eq!(registration.dependencies(), deps(700));
+        assert_eq!(
+            registration.fiber_flags(),
+            FiberFlags::PASSIVE | FiberFlags::PASSIVE_STATIC
+        );
+        assert_eq!(
+            arena.get(work_in_progress).unwrap().flags(),
+            FiberFlags::PASSIVE | FiberFlags::PASSIVE_STATIC
+        );
+        assert_eq!(
+            hook_store
+                .hook_lists()
+                .hook(registration.hook())
+                .unwrap()
+                .payload(),
+            HookSlotPayload::effect(HookEffectPayload::new(registration.effect()))
+        );
+
+        let ring = hook_store
+            .effect_ring(state.work_in_progress_list())
+            .unwrap();
+        assert_eq!(ring.last_effect(), Some(registration.effect()));
+        assert_eq!(
+            ring.first_effect(hook_store.hook_effects()).unwrap(),
+            Some(registration.effect())
+        );
+        let effect = hook_store
+            .hook_effects()
+            .get_effect(registration.effect())
+            .unwrap();
+        assert_eq!(effect.tag(), HookEffectFlags::PASSIVE_EFFECT);
+        assert_eq!(effect.create(), callback(70));
+        assert_eq!(effect.dependencies(), deps(700));
+        assert_eq!(effect.instance(), registration.instance());
+        assert_eq!(
+            hook_store
+                .hook_effects()
+                .get_instance(registration.instance())
+                .unwrap()
+                .destroy(),
+            None
+        );
+    }
+
+    #[test]
+    fn function_component_effect_metadata_update_changed_deps_reuses_instance_and_marks_flags() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let current_list = hook_store.create_current_list(current);
+        let previous = seed_current_effect_metadata(
+            &mut arena,
+            &mut hook_store,
+            current,
+            current_list,
+            FunctionComponentEffectPhase::Layout,
+            callback(80),
+            deps(800),
+        );
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(48)));
+
+        let record = render_function_component_with_hook_state(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap();
+        let state = record.hook_state().unwrap();
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+        let registration = hook_store
+            .update_effect_metadata(
+                &mut arena,
+                &mut cursor,
+                FunctionComponentEffectPhase::Layout,
+                callback(81),
+                deps(801),
+                FunctionComponentEffectDependencyStatus::Changed,
+            )
+            .unwrap();
+        let finished = hook_store.finish_render_cursor(cursor).unwrap();
+
+        assert_eq!(finished.traversal().traversed_count(), 1);
+        assert_ne!(registration.effect(), previous.effect());
+        assert_eq!(registration.instance(), previous.instance());
+        assert_eq!(registration.tag(), HookEffectFlags::LAYOUT_EFFECT);
+        assert_eq!(registration.fiber_flags(), FiberFlags::UPDATE);
+        assert_eq!(
+            arena.get(work_in_progress).unwrap().flags(),
+            FiberFlags::UPDATE
+        );
+
+        let ring = hook_store
+            .effect_ring(state.work_in_progress_list())
+            .unwrap();
+        assert_eq!(ring.last_effect(), Some(registration.effect()));
+        let effect = hook_store
+            .hook_effects()
+            .get_effect(registration.effect())
+            .unwrap();
+        assert_eq!(effect.instance(), previous.instance());
+        assert_eq!(effect.create(), callback(81));
+        assert_eq!(effect.dependencies(), deps(801));
+    }
+
+    #[test]
+    fn function_component_effect_metadata_update_equal_deps_skips_has_effect_and_flags() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let current_list = hook_store.create_current_list(current);
+        let previous = seed_current_effect_metadata(
+            &mut arena,
+            &mut hook_store,
+            current,
+            current_list,
+            FunctionComponentEffectPhase::Passive,
+            callback(90),
+            deps(900),
+        );
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(49)));
+
+        let record = render_function_component_with_hook_state(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap();
+        let state = record.hook_state().unwrap();
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+        let registration = hook_store
+            .update_effect_metadata(
+                &mut arena,
+                &mut cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(91),
+                deps(900),
+                FunctionComponentEffectDependencyStatus::Unchanged,
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(cursor).unwrap();
+
+        assert_eq!(registration.instance(), previous.instance());
+        assert_eq!(registration.tag(), HookEffectFlags::PASSIVE);
+        assert!(!registration.tag().should_fire());
+        assert_eq!(registration.fiber_flags(), FiberFlags::NO);
+        assert_eq!(arena.get(work_in_progress).unwrap().flags(), FiberFlags::NO);
+        assert_eq!(
+            hook_store
+                .hook_effects()
+                .get_instance(previous.instance())
+                .unwrap()
+                .destroy(),
+            None
+        );
+        assert!(
+            hook_store
+                .effect_ring(state.work_in_progress_list())
+                .unwrap()
+                .iter_matching(hook_store.hook_effects(), HookEffectFlags::PASSIVE_EFFECT)
+                .unwrap()
+                .next()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn function_component_effect_phase_maps_to_react_effect_flags() {
+        assert_eq!(
+            FunctionComponentEffectPhase::Insertion.hook_flags(),
+            HookEffectFlags::INSERTION
+        );
+        assert_eq!(
+            FunctionComponentEffectPhase::Insertion.mount_fiber_flags(),
+            FiberFlags::UPDATE
+        );
+        assert_eq!(
+            FunctionComponentEffectPhase::Layout.mount_fiber_flags(),
+            FiberFlags::UPDATE | FiberFlags::LAYOUT_STATIC
+        );
+        assert_eq!(
+            FunctionComponentEffectPhase::Passive.update_fiber_flags(),
+            FiberFlags::PASSIVE
         );
     }
 
