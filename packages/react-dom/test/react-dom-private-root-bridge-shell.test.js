@@ -2214,6 +2214,8 @@ test('private root bridge ref ordering diagnostic wraps update and unmount canar
   const hostOwner = {kind: 'PrivateRootBridgeRefOrderingHost'};
   const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
   const calls = [];
+  const firstRefHandle = {id: 'first-ref'};
+  const secondRefHandle = {id: 'second-ref'};
 
   function firstCleanup() {
     calls.push('first:cleanup');
@@ -2237,7 +2239,7 @@ test('private root bridge ref ordering diagnostic wraps update and unmount canar
     hostInstanceToken: token,
     fiber: {id: 'initial-fiber'},
     stateNode: {id: 'state-node'},
-    refHandle: {id: 'first-ref'},
+    refHandle: firstRefHandle,
     ref: firstRef,
     sourceToken: 'commit:first'
   });
@@ -2249,9 +2251,8 @@ test('private root bridge ref ordering diagnostic wraps update and unmount canar
     hostInstanceToken: token,
     fiber: {id: 'update-current-fiber'},
     stateNode: {id: 'state-node'},
-    refHandle: {id: 'first-ref'},
+    refHandle: firstRefHandle,
     ref: firstRef,
-    refCleanup: firstCleanup,
     expectedLatestRef: secondRef,
     sourceToken: 'deletion:first',
     detachReason: refCallbackGate.REF_DETACH_REASON_REF_CHANGED
@@ -2262,7 +2263,7 @@ test('private root bridge ref ordering diagnostic wraps update and unmount canar
     hostInstanceToken: token,
     fiber: {id: 'update-finished-fiber'},
     stateNode: {id: 'state-node'},
-    refHandle: {id: 'second-ref'},
+    refHandle: secondRefHandle,
     ref: secondRef,
     sourceToken: 'commit:second'
   });
@@ -2272,9 +2273,8 @@ test('private root bridge ref ordering diagnostic wraps update and unmount canar
     hostInstanceToken: token,
     fiber: {id: 'unmount-current-fiber'},
     stateNode: {id: 'state-node'},
-    refHandle: {id: 'second-ref'},
+    refHandle: secondRefHandle,
     ref: secondRef,
-    refCleanup: secondCleanup,
     sourceToken: 'deletion:second',
     detachReason: refCallbackGate.REF_DETACH_REASON_DELETED
   });
@@ -2372,8 +2372,10 @@ test('private root bridge ref ordering diagnostic wraps update and unmount canar
   assert.equal(diagnostic.acceptedRootCommitRefMetadataCount, 3);
   assert.equal(diagnostic.refOrderingRecordCount, 4);
   assert.equal(diagnostic.callbackIdentityChangedCount, 1);
+  assert.equal(diagnostic.callbackCleanupReturnHandleCount, 2);
   assert.equal(diagnostic.cleanupReturnMatchedCount, 2);
   assert.equal(diagnostic.cleanupInvocationAttemptCount, 2);
+  assert.equal(diagnostic.cleanupReturnHandleConsumedCount, 2);
   assert.equal(diagnostic.callbackNullDetachAttemptCount, 0);
   assert.equal(diagnostic.publicRootExecution, false);
   assert.equal(diagnostic.reconcilerExecution, false);
@@ -2404,13 +2406,14 @@ test('private root bridge ref ordering diagnostic wraps update and unmount canar
       record.action,
       record.hostOutputCanary,
       record.callbackIdentityStatus,
-      record.cleanupReturnMatchesPreviousAttach
+      record.cleanupReturnMatchesPreviousAttach,
+      record.cleanupReturnHandleMatchesPreviousAttach
     ]),
     [
-      ['attach', 'initial-host-output', 'new-active-ref', null],
-      ['detach', 'update-host-output', 'matches-active-ref', true],
-      ['attach', 'update-host-output', 'changed-from-detached-ref', null],
-      ['detach', 'unmount-host-output', 'matches-active-ref', true]
+      ['attach', 'initial-host-output', 'new-active-ref', null, null],
+      ['detach', 'update-host-output', 'matches-active-ref', true, true],
+      ['attach', 'update-host-output', 'changed-from-detached-ref', null, null],
+      ['detach', 'unmount-host-output', 'matches-active-ref', true, true]
     ]
   );
 
