@@ -10,6 +10,11 @@ const {
   getEventListenerTargetLookupRecordPayload
 } = require('./component-tree.js');
 const {
+  controlledInputValueTrackerFakeDomObservedStatus,
+  getPrivateControlledInputValueTrackerFakeDomDiagnosticRecordPayload,
+  privateControlledInputValueTrackerFakeDomDiagnosticRecordType
+} = require('../resource-form-internals-gate.js');
+const {
   CONTROLLED_STATE_RESTORE_BLOCKED_CODE,
   EVENT_DISPATCH_BLOCKED_CODE,
   EVENT_DISPATCH_RECORD_KIND,
@@ -29,6 +34,8 @@ const controlledInputPostEventRestoreQueueIntentSkippedStatus =
   'skipped-private-controlled-input-post-event-restore-intent';
 const controlledInputPostEventRestoreQueueInvalidEventCode =
   'FAST_REACT_DOM_CONTROLLED_INPUT_POST_EVENT_RESTORE_QUEUE_INVALID_EVENT';
+const controlledInputPostEventRestoreQueueInvalidFakeDomObservationCode =
+  'FAST_REACT_DOM_CONTROLLED_INPUT_POST_EVENT_RESTORE_QUEUE_INVALID_FAKE_DOM_OBSERVATION';
 const controlledInputPostEventRestoreQueueInvalidAdmissionCode =
   'FAST_REACT_DOM_CONTROLLED_INPUT_POST_EVENT_RESTORE_QUEUE_INVALID_ADMISSION';
 const controlledInputPostEventRestoreQueueInvalidLatestPropsCode =
@@ -45,10 +52,12 @@ const defaultControlledInputPostEventRestoreQueueGate =
 
 const controlledInputPostEventRestoreQueueNoSideEffects = freezeRecord({
   eventDispatchRecordAccepted: false,
+  fakeDomTrackerObservationAccepted: false,
   latestPropsEvidenceAccepted: false,
   latestPropsMetadataRead: false,
   postEventRestoreIntentRecorded: false,
   postEventRestoreIntentSkipped: false,
+  fakeDomValueChangeObserved: false,
   restoreQueueRecordCreated: false,
   restoreQueueWritten: false,
   restoreQueueFlushed: false,
@@ -79,6 +88,18 @@ function createControlledInputPostEventRestoreQueueGate(options) {
         dispatchRecord,
         admission
       );
+    },
+    recordPostEventRestoreIntentFromFakeDomObservationLatestProps(
+      observationRecord,
+      latestPropsRecord,
+      admission
+    ) {
+      return recordControlledInputPostEventRestoreIntentFromFakeDomObservationLatestPropsWithGate(
+        gateState,
+        observationRecord,
+        latestPropsRecord,
+        admission
+      );
     }
   });
 }
@@ -90,6 +111,19 @@ function recordControlledInputPostEventRestoreIntentFromEventLatestProps(
   return defaultControlledInputPostEventRestoreQueueGate
     .recordPostEventRestoreIntentFromEventLatestProps(
       dispatchRecord,
+      admission
+    );
+}
+
+function recordControlledInputPostEventRestoreIntentFromFakeDomObservationLatestProps(
+  observationRecord,
+  latestPropsRecord,
+  admission
+) {
+  return defaultControlledInputPostEventRestoreQueueGate
+    .recordPostEventRestoreIntentFromFakeDomObservationLatestProps(
+      observationRecord,
+      latestPropsRecord,
       admission
     );
 }
@@ -167,6 +201,92 @@ function recordControlledInputPostEventRestoreIntentFromEventLatestPropsWithGate
   return payload;
 }
 
+function recordControlledInputPostEventRestoreIntentFromFakeDomObservationLatestPropsWithGate(
+  gateState,
+  observationRecord,
+  latestPropsRecord,
+  admission
+) {
+  const observationEvidence =
+    assertFakeDomTrackerObservationForPostEventRestore(observationRecord);
+  const normalizedAdmission = normalizePostEventRestoreQueueAdmission(
+    admission
+  );
+  const latestPropsEvidence =
+    createLatestPropsEvidenceFromLookupRecord(latestPropsRecord);
+  const controlledTarget =
+    createControlledTargetEvidenceFromFakeDomObservation(
+      observationEvidence,
+      latestPropsEvidence,
+      normalizedAdmission
+    );
+  const intentRecorded = shouldRecordRestoreIntentFromFakeDomObservation(
+    observationEvidence,
+    latestPropsEvidence,
+    controlledTarget
+  );
+  const requestSequence = gateState.nextRequestSequence++;
+  const requestId = `${gateState.requestIdPrefix}:${requestSequence}`;
+  const status = intentRecorded
+    ? controlledInputPostEventRestoreQueueIntentRecordedStatus
+    : controlledInputPostEventRestoreQueueIntentSkippedStatus;
+
+  const payload = freezeRecord({
+    schemaVersion: controlledInputPostEventRestoreQueueGateSchemaVersion,
+    $$typeof: privateControlledInputPostEventRestoreQueueRecordType,
+    kind: 'FastReactDomPrivateControlledInputPostEventRestoreQueueRecord',
+    gateId: controlledInputPostEventRestoreQueueGateId,
+    compatibilityTarget,
+    status,
+    unsupportedCode: unimplementedCode,
+    requestId,
+    requestSequence,
+    sourceKind: 'private-fake-dom-observation-latest-props-evidence',
+    sourceEventKind: null,
+    sourceEventStatus: null,
+    sourceObservationKind: observationEvidence.kind,
+    sourceObservationStatus: observationEvidence.status,
+    sourceObservationOperation: observationEvidence.operation,
+    domEventName: normalizedAdmission.eventName,
+    nativeEventType: null,
+    hostTag: controlledTarget.hostTag,
+    inputType: controlledTarget.inputType,
+    multiple: controlledTarget.multiple,
+    controlKind: controlledTarget.controlKind,
+    trackedField: controlledTarget.trackedField,
+    controlledPropName: controlledTarget.controlledPropName,
+    admission: normalizedAdmission,
+    eventEvidence: null,
+    fakeDomObservationEvidence:
+      createFakeDomObservationEvidenceSummary(observationEvidence),
+    latestPropsEvidence: latestPropsEvidence.record,
+    controlledTarget,
+    restoreIntent:
+      createPostEventRestoreIntentSummaryFromFakeDomObservation(
+        observationEvidence,
+        latestPropsEvidence,
+        controlledTarget,
+        normalizedAdmission,
+        intentRecorded
+      ),
+    postEventRestoreBoundary: createPostEventRestoreBoundary(
+      latestPropsEvidence,
+      intentRecorded,
+      status
+    ),
+    publicControlledBehaviorBoundary: createPublicControlledBehaviorBoundary(),
+    sideEffects:
+      createPostEventRestoreQueueSideEffectsFromFakeDomObservation(
+        observationEvidence,
+        latestPropsEvidence,
+        intentRecorded
+      )
+  });
+
+  controlledInputPostEventRestoreQueueRecordPayloads.set(payload, payload);
+  return payload;
+}
+
 function describeControlledInputPostEventRestoreQueueGate() {
   return freezeRecord({
     schemaVersion: controlledInputPostEventRestoreQueueGateSchemaVersion,
@@ -175,11 +295,15 @@ function describeControlledInputPostEventRestoreQueueGate() {
     status: controlledInputPostEventRestoreQueueStatus,
     unsupportedCode: unimplementedCode,
     acceptedSourceRecordType: EVENT_DISPATCH_RECORD_KIND,
+    acceptedFakeDomObservationRecordType:
+      privateControlledInputValueTrackerFakeDomDiagnosticRecordType,
+    acceptedFakeDomObservationOperation: 'observe',
     acceptedLatestPropsEvidenceRecordType:
       EVENT_LISTENER_TARGET_LOOKUP_RECORD_KIND,
     recordsPostEventRestoreIntent: true,
     deterministicMetadataOnly: true,
     consumesEventDispatchEvidence: true,
+    consumesFakeDomTrackerObservation: true,
     consumesLatestPropsEvidence: true,
     rawTargetCaptured: false,
     rawEventCaptured: false,
@@ -273,17 +397,48 @@ function assertEventDispatchRecordForPostEventRestore(dispatchRecord) {
   return dispatchRecord;
 }
 
+function assertFakeDomTrackerObservationForPostEventRestore(record) {
+  const payload =
+    getPrivateControlledInputValueTrackerFakeDomDiagnosticRecordPayload(
+      record
+    );
+  if (payload === null) {
+    throwPostEventRestoreFakeDomObservationError(
+      'Expected a private React DOM controlled input fake DOM tracker observation record.'
+    );
+  }
+
+  if (
+    payload.operation !== 'observe' ||
+    payload.status !== controlledInputValueTrackerFakeDomObservedStatus ||
+    !isObjectLike(payload.trackerRecord) ||
+    payload.trackerRecord.fakeDomOnly !== true
+  ) {
+    throwPostEventRestoreFakeDomObservationError(
+      'Expected an observed fake DOM tracker record.'
+    );
+  }
+
+  return payload;
+}
+
 function createLatestPropsEvidence(dispatchRecord) {
   const lookupRecord = dispatchRecord.targetListenerLookupRecord;
   if (lookupRecord === null || lookupRecord === undefined) {
     return {
       latestProps: null,
       accepted: false,
+      targetHostTag: null,
+      targetHostInstanceStatus: null,
+      targetResolved: false,
       record: freezeRecord({
         sourceRecordKind: null,
         latestPropsStatus: 'missing',
         latestPropsObject: false,
         listenerLookupStatus: 'not-applicable',
+        targetHostInstanceStatus: null,
+        targetHostTag: null,
+        targetResolved: false,
         propKeys: freezeArray([]),
         controlledPropSummary: freezeRecord({}),
         exposesLatestProps: false,
@@ -293,6 +448,10 @@ function createLatestPropsEvidence(dispatchRecord) {
     };
   }
 
+  return createLatestPropsEvidenceFromLookupRecord(lookupRecord);
+}
+
+function createLatestPropsEvidenceFromLookupRecord(lookupRecord) {
   if (
     !isObjectLike(lookupRecord) ||
     lookupRecord.kind !== EVENT_LISTENER_TARGET_LOOKUP_RECORD_KIND
@@ -315,10 +474,18 @@ function createLatestPropsEvidence(dispatchRecord) {
   const propDescription = describeLatestProps(latestProps);
   const accepted =
     lookupRecord.latestPropsStatus === 'present' && latestPropsIsObject;
+  const targetHostTag = getHostTagFromTargetNode(
+    lookupRecord.targetHostInstanceNode
+  );
+  const targetResolved =
+    lookupRecord.targetHostInstanceStatus === 'mounted-host-instance';
 
   return {
     latestProps,
     accepted,
+    targetHostTag,
+    targetHostInstanceStatus: lookupRecord.targetHostInstanceStatus,
+    targetResolved,
     record: freezeRecord({
       sourceRecordKind: lookupRecord.kind,
       latestPropsStatus: lookupRecord.latestPropsStatus,
@@ -327,6 +494,8 @@ function createLatestPropsEvidence(dispatchRecord) {
       listenerFound: lookupRecord.listenerFound,
       registrationName: lookupRecord.registrationName,
       targetHostInstanceStatus: lookupRecord.targetHostInstanceStatus,
+      targetHostTag,
+      targetResolved,
       propKeys: propDescription.propKeys,
       controlledPropSummary: propDescription.controlledPropSummary,
       exposesLatestProps: false,
@@ -388,6 +557,86 @@ function createControlledTargetEvidence(dispatchRecord, latestPropsEvidence) {
   });
 }
 
+function createControlledTargetEvidenceFromFakeDomObservation(
+  observationRecord,
+  latestPropsEvidence,
+  admission
+) {
+  const props = latestPropsEvidence.latestProps;
+  const hostTag = observationRecord.hostTag;
+  const inputType =
+    hostTag === 'input'
+      ? observationRecord.inputType || getInputType(hostTag, props)
+      : null;
+  const multiple =
+    hostTag === 'select'
+      ? observationRecord.multiple === true
+      : false;
+  const latestPropsMultiple = getSelectMultiple(hostTag, props);
+  const latestPropsControlKind = inferControlKind(
+    hostTag,
+    inputType,
+    latestPropsMultiple,
+    props
+  );
+  const controlKind = observationRecord.controlKind;
+  const controlledPropName = getControlledPropName(
+    hostTag,
+    latestPropsControlKind,
+    props
+  );
+  const controlledPropPresent =
+    controlledPropName !== null &&
+    isObjectLike(props) &&
+    hasOwnProp(props, controlledPropName);
+  const controlledPropIsNonNull =
+    controlledPropPresent && props[controlledPropName] != null;
+  const supportedEventName = isSupportedPostEventRestoreTrigger(
+    admission.eventName,
+    hostTag,
+    controlKind
+  );
+  const supportedHostTag = supportedHostTags.has(hostTag);
+  const latestPropsTargetHostTag = latestPropsEvidence.targetHostTag;
+  const sourceMatchesLatestPropsTarget =
+    latestPropsTargetHostTag === hostTag &&
+    latestPropsControlKind === controlKind;
+
+  return freezeRecord({
+    hostTag,
+    inputType,
+    multiple,
+    latestPropsMultiple,
+    controlKind,
+    latestPropsControlKind,
+    controlledPropName,
+    controlledPropPresent,
+    controlledPropIsNonNull,
+    controlled: controlledPropIsNonNull,
+    supportedHostTag,
+    supportedEventName,
+    targetResolved: latestPropsEvidence.targetResolved === true,
+    targetInstStatus: null,
+    targetHostInstanceStatus: latestPropsEvidence.targetHostInstanceStatus,
+    latestPropsTargetHostTag,
+    sourceMatchesLatestPropsTarget,
+    sourceObservationChanged: observationRecord.trackerRecord.changed === true,
+    sourceObservationStatus: observationRecord.status,
+    sourceObservationOperation: observationRecord.operation,
+    trackedField: getTrackedField(hostTag, controlKind),
+    valueKind: getValueKind(hostTag, controlKind),
+    wrapperKind: getWrapperKind(hostTag),
+    liveValueTrackerRequired: true,
+    liveValueTrackerInstalled: false,
+    valueTrackerFieldWritten: false,
+    propertyDescriptorInstalled: false,
+    hostValueRead: false,
+    hostValueWritten: false,
+    rawTargetCaptured: false,
+    rawLatestPropsRetained: false
+  });
+}
+
 function shouldRecordRestoreIntent(
   dispatchRecord,
   latestPropsEvidence,
@@ -399,6 +648,22 @@ function shouldRecordRestoreIntent(
     controlledTarget.supportedHostTag === true &&
     controlledTarget.supportedEventName === true &&
     controlledTarget.controlled === true
+  );
+}
+
+function shouldRecordRestoreIntentFromFakeDomObservation(
+  observationRecord,
+  latestPropsEvidence,
+  controlledTarget
+) {
+  return (
+    observationRecord.trackerRecord.changed === true &&
+    latestPropsEvidence.accepted === true &&
+    controlledTarget.targetResolved === true &&
+    controlledTarget.supportedHostTag === true &&
+    controlledTarget.supportedEventName === true &&
+    controlledTarget.controlled === true &&
+    controlledTarget.sourceMatchesLatestPropsTarget === true
   );
 }
 
@@ -448,6 +713,40 @@ function createEventEvidenceSummary(dispatchRecord) {
     syntheticEventCount: dispatchRecord.syntheticEventCount,
     listenerInvocationCount: dispatchRecord.listenerInvocationCount,
     willInvokeListeners: dispatchRecord.willInvokeListeners
+  });
+}
+
+function createFakeDomObservationEvidenceSummary(observationRecord) {
+  return freezeRecord({
+    sourceRecordKind: observationRecord.kind,
+    sourceRecordStatus: observationRecord.status,
+    sourceGateId: observationRecord.gateId,
+    operation: observationRecord.operation,
+    lifecycleId: observationRecord.lifecycleId,
+    lifecycleSequence: observationRecord.lifecycleSequence,
+    operationRequestId: observationRecord.requestId,
+    operationRequestSequence: observationRecord.requestSequence,
+    scenarioId: observationRecord.scenarioId,
+    phaseId: observationRecord.phaseId,
+    hostTag: observationRecord.hostTag,
+    inputType: observationRecord.inputType,
+    multiple: observationRecord.multiple,
+    controlKind: observationRecord.controlKind,
+    contractId: observationRecord.contractId,
+    fakeDomOnly: observationRecord.trackerRecord.fakeDomOnly,
+    trackerAttached: observationRecord.trackerRecord.attachedAfter,
+    changed: observationRecord.trackerRecord.changed,
+    observedCount: observationRecord.trackerRecord.observedCount,
+    trackedField: observationRecord.trackerMetadata.trackedField,
+    valueKind: observationRecord.trackerMetadata.valueKind,
+    previousValueSnapshot:
+      observationRecord.trackerRecord.previousValueSnapshot,
+    currentValueSnapshot:
+      observationRecord.trackerRecord.currentValueSnapshot,
+    propertyDescriptorInstalled:
+      observationRecord.trackerRecord.propertyDescriptorInstalled,
+    rawTargetCaptured: false,
+    realDomNodeTouched: false
   });
 }
 
@@ -501,6 +800,64 @@ function createPostEventRestoreIntentSummary(
   });
 }
 
+function createPostEventRestoreIntentSummaryFromFakeDomObservation(
+  observationRecord,
+  latestPropsEvidence,
+  controlledTarget,
+  admission,
+  intentRecorded
+) {
+  return freezeRecord({
+    source: 'private-fake-dom-observation-latest-props-evidence',
+    queueKind: admission.queueKind,
+    queueId: admission.queueId,
+    admissionEventName: admission.eventName,
+    domEventName: admission.eventName,
+    nativeEventType: null,
+    hostTag: controlledTarget.hostTag,
+    inputType: controlledTarget.inputType,
+    multiple: controlledTarget.multiple,
+    latestPropsMultiple: controlledTarget.latestPropsMultiple,
+    controlKind: controlledTarget.controlKind,
+    latestPropsControlKind: controlledTarget.latestPropsControlKind,
+    trackedField: controlledTarget.trackedField,
+    controlledPropName: controlledTarget.controlledPropName,
+    targetResolved: controlledTarget.targetResolved,
+    latestPropsTargetHostTag: controlledTarget.latestPropsTargetHostTag,
+    sourceMatchesLatestPropsTarget:
+      controlledTarget.sourceMatchesLatestPropsTarget,
+    sourceChanged: observationRecord.trackerRecord.changed,
+    latestPropsEvidenceAccepted: latestPropsEvidence.accepted,
+    controlledPropPresent: controlledTarget.controlledPropPresent,
+    controlledPropIsNonNull: controlledTarget.controlledPropIsNonNull,
+    supportedHostTag: controlledTarget.supportedHostTag,
+    supportedEventName: controlledTarget.supportedEventName,
+    intentRecorded,
+    restoreTargetWouldBeQueued: intentRecorded,
+    queuePosition: intentRecorded ? 'primary' : null,
+    latestPropsLookupRequired: observationRecord.trackerRecord.changed === true,
+    latestPropsLookupPerformed: latestPropsEvidence.accepted,
+    fakeDomTrackerObservationAccepted: true,
+    eventDispatchRecordAccepted: false,
+    eventPluginDispatchRequired: observationRecord.trackerRecord.changed === true,
+    eventPluginDispatchPerformed: false,
+    restoreQueueWritten: false,
+    controlledStateRestoreScheduled: false,
+    controlledStateRestoreInvoked: false,
+    restoreFlushed: false,
+    liveValueTrackerInstalled: false,
+    valueTrackerFieldWritten: false,
+    propertyDescriptorInstalled: false,
+    hostValueRead: false,
+    hostValueWritten: false,
+    rawTargetCaptured: false,
+    rawEventCaptured: false,
+    rawLatestPropsRetained: false,
+    publicControlledBehaviorEnabled: false,
+    compatibilityClaimed: false
+  });
+}
+
 function createPostEventRestoreBoundary(
   latestPropsEvidence,
   intentRecorded,
@@ -527,6 +884,23 @@ function createPostEventRestoreQueueSideEffects(
   return freezeRecord({
     ...controlledInputPostEventRestoreQueueNoSideEffects,
     eventDispatchRecordAccepted: true,
+    latestPropsEvidenceAccepted: latestPropsEvidence.accepted,
+    latestPropsMetadataRead: latestPropsEvidence.accepted,
+    postEventRestoreIntentRecorded: intentRecorded,
+    postEventRestoreIntentSkipped: !intentRecorded,
+    restoreQueueRecordCreated: true
+  });
+}
+
+function createPostEventRestoreQueueSideEffectsFromFakeDomObservation(
+  observationRecord,
+  latestPropsEvidence,
+  intentRecorded
+) {
+  return freezeRecord({
+    ...controlledInputPostEventRestoreQueueNoSideEffects,
+    fakeDomTrackerObservationAccepted: true,
+    fakeDomValueChangeObserved: observationRecord.trackerRecord.changed === true,
     latestPropsEvidenceAccepted: latestPropsEvidence.accepted,
     latestPropsMetadataRead: latestPropsEvidence.accepted,
     postEventRestoreIntentRecorded: intentRecorded,
@@ -562,10 +936,12 @@ function normalizePostEventRestoreQueueAdmission(admission) {
   );
   if (
     queueKind !==
-    'deterministic-event-latest-props-post-event-restore-queue'
+      'deterministic-event-latest-props-post-event-restore-queue' &&
+    queueKind !==
+      'deterministic-fake-dom-latest-props-post-event-restore-queue'
   ) {
     throwInvalidAdmission(
-      'queueKind must be deterministic-event-latest-props-post-event-restore-queue'
+      'queueKind must be a deterministic post-event restore queue'
     );
   }
 
@@ -595,7 +971,12 @@ function normalizePostEventRestoreQueueAdmission(admission) {
     targetKind,
     explicitAdmission: true,
     deterministicMetadataOnly: true,
-    sourceEventRecordRequired: true,
+    sourceEventRecordRequired:
+      queueKind ===
+      'deterministic-event-latest-props-post-event-restore-queue',
+    sourceFakeDomObservationRecordRequired:
+      queueKind ===
+      'deterministic-fake-dom-latest-props-post-event-restore-queue',
     latestPropsEvidenceRequired: true,
     rawTargetCaptured: false,
     rawEventCaptured: false,
@@ -711,7 +1092,10 @@ function describeValue(value) {
 }
 
 function getHostTagFromEventRecord(dispatchRecord) {
-  const targetNode = dispatchRecord.targetHostInstanceNode;
+  return getHostTagFromTargetNode(dispatchRecord.targetHostInstanceNode);
+}
+
+function getHostTagFromTargetNode(targetNode) {
   if (!isObjectLike(targetNode)) {
     return null;
   }
@@ -867,6 +1251,18 @@ function throwPostEventRestoreEventError(reason) {
   throw error;
 }
 
+function throwPostEventRestoreFakeDomObservationError(reason) {
+  const error = new Error(
+    `Invalid private React DOM controlled input post-event restore queue fake DOM observation evidence: ${reason}.`
+  );
+  error.name = 'FastReactDomControlledInputPostEventRestoreQueueGateError';
+  error.code =
+    controlledInputPostEventRestoreQueueInvalidFakeDomObservationCode;
+  error.compatibilityTarget = compatibilityTarget;
+  error.reason = reason;
+  throw error;
+}
+
 function throwLatestPropsEvidenceError(reason) {
   const error = new Error(
     `Invalid private React DOM controlled input post-event restore queue latest-props evidence: ${reason}.`
@@ -924,6 +1320,7 @@ module.exports = {
   controlledInputPostEventRestoreQueueIntentSkippedStatus,
   controlledInputPostEventRestoreQueueInvalidAdmissionCode,
   controlledInputPostEventRestoreQueueInvalidEventCode,
+  controlledInputPostEventRestoreQueueInvalidFakeDomObservationCode,
   controlledInputPostEventRestoreQueueInvalidLatestPropsCode,
   controlledInputPostEventRestoreQueueInvalidRecordCode,
   controlledInputPostEventRestoreQueueNoSideEffects,
@@ -934,5 +1331,6 @@ module.exports = {
   getPrivateControlledInputPostEventRestoreQueueRecordPayload,
   isPrivateControlledInputPostEventRestoreQueueRecord,
   privateControlledInputPostEventRestoreQueueRecordType,
-  recordControlledInputPostEventRestoreIntentFromEventLatestProps
+  recordControlledInputPostEventRestoreIntentFromEventLatestProps,
+  recordControlledInputPostEventRestoreIntentFromFakeDomObservationLatestProps
 };

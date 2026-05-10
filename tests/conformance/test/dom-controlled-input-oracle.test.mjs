@@ -264,6 +264,182 @@ test("private controlled post-event restore queue consumes event latest-props ev
   componentTree.detachHostInstanceToken(eventDispatch.token);
 });
 
+test("private controlled select and textarea post-event restore queue consumes fake-DOM observations with latest props only", () => {
+  const trackerGate = resourceFormGate.createControlledInputValueTrackerGate({
+    requestIdPrefix: "controlled-oracle-fake-dom-tracker"
+  });
+  const restoreGate =
+    controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({
+      requestIdPrefix: "controlled-oracle-fake-dom-restore"
+    });
+  const rows = [
+    {
+      controlKind: "multiple",
+      eventName: "change",
+      fakeInitial: {selectedValues: ["b", "c"]},
+      fakeNext: {selectedValues: ["a"]},
+      hostTag: "select",
+      latestProps: {
+        multiple: true,
+        value: ["a"],
+        onChange() {}
+      },
+      multiple: true,
+      nodeName: "SELECT",
+      scenarioId: "select-multiple-controlled-update"
+    },
+    {
+      controlKind: "value",
+      eventName: "input",
+      fakeInitial: {value: "alpha"},
+      fakeNext: {value: "beta"},
+      hostTag: "textarea",
+      latestProps: {
+        value: "beta",
+        onChange() {},
+        onInput() {}
+      },
+      nodeName: "TEXTAREA",
+      scenarioId: "textarea-controlled-value-update"
+    }
+  ];
+  const tokens = [];
+  const intents = rows.map((row) => {
+    const fakeTarget = createPrivateControlledInputFakeDomTarget(
+      row.fakeInitial
+    );
+    const install = trackerGate.installFakeDomTracker(
+      {
+        scenarioId: row.scenarioId,
+        phaseId: "post-event",
+        hostTag: row.hostTag,
+        multiple: row.multiple === true,
+        controlKind: row.controlKind,
+        props: row.latestProps
+      },
+      {
+        explicitAdmission: true,
+        adapterKind: "deterministic-fake-dom",
+        targetKind: "controlled-input-value-tracker",
+        fakeTarget
+      }
+    );
+    Object.assign(fakeTarget, row.fakeNext);
+    const observation = trackerGate.observeFakeDomTracker(install);
+    const latestPropsLookup = createPrivateControlledLatestPropsLookup({
+      latestProps: row.latestProps,
+      nodeName: row.nodeName,
+      registrationName: row.eventName === "input" ? "onInput" : "onChange"
+    });
+    tokens.push(latestPropsLookup.token);
+
+    return {
+      fakeTarget,
+      intent:
+        restoreGate.recordPostEventRestoreIntentFromFakeDomObservationLatestProps(
+          observation,
+          latestPropsLookup.lookupRecord,
+          {
+            explicitAdmission: true,
+            queueKind:
+              "deterministic-fake-dom-latest-props-post-event-restore-queue",
+            queueId: `${row.scenarioId}-restore-queue`,
+            eventName: row.eventName,
+            targetKind: "controlled-input-post-event-restore-queue"
+          }
+        ),
+      row
+    };
+  });
+
+  assert.deepEqual(
+    intents.map(({intent}) => ({
+      status: intent.status,
+      sourceKind: intent.sourceKind,
+      hostTag: intent.hostTag,
+      controlKind: intent.controlKind,
+      trackedField: intent.trackedField,
+      sourceChanged: intent.restoreIntent.sourceChanged,
+      latestPropsEvidenceAccepted:
+        intent.restoreIntent.latestPropsEvidenceAccepted,
+      latestPropsLookupPerformed:
+        intent.restoreIntent.latestPropsLookupPerformed,
+      sourceMatchesLatestPropsTarget:
+        intent.restoreIntent.sourceMatchesLatestPropsTarget,
+      intentRecorded: intent.restoreIntent.intentRecorded,
+      eventDispatchRecordAccepted:
+        intent.restoreIntent.eventDispatchRecordAccepted,
+      fakeDomTrackerObservationAccepted:
+        intent.restoreIntent.fakeDomTrackerObservationAccepted,
+      restoreQueueWritten: intent.restoreIntent.restoreQueueWritten,
+      controlledStateRestoreInvoked:
+        intent.restoreIntent.controlledStateRestoreInvoked
+    })),
+    [
+      {
+        status:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueIntentRecordedStatus,
+        sourceKind: "private-fake-dom-observation-latest-props-evidence",
+        hostTag: "select",
+        controlKind: "multiple",
+        trackedField: "selectedOptions",
+        sourceChanged: true,
+        latestPropsEvidenceAccepted: true,
+        latestPropsLookupPerformed: true,
+        sourceMatchesLatestPropsTarget: true,
+        intentRecorded: true,
+        eventDispatchRecordAccepted: false,
+        fakeDomTrackerObservationAccepted: true,
+        restoreQueueWritten: false,
+        controlledStateRestoreInvoked: false
+      },
+      {
+        status:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueIntentRecordedStatus,
+        sourceKind: "private-fake-dom-observation-latest-props-evidence",
+        hostTag: "textarea",
+        controlKind: "value",
+        trackedField: "value",
+        sourceChanged: true,
+        latestPropsEvidenceAccepted: true,
+        latestPropsLookupPerformed: true,
+        sourceMatchesLatestPropsTarget: true,
+        intentRecorded: true,
+        eventDispatchRecordAccepted: false,
+        fakeDomTrackerObservationAccepted: true,
+        restoreQueueWritten: false,
+        controlledStateRestoreInvoked: false
+      }
+    ]
+  );
+
+  for (const {fakeTarget, intent} of intents) {
+    assert.equal(intent.eventEvidence, null);
+    assert.equal(intent.postEventRestoreBoundary.eventPluginDispatch, false);
+    assert.equal(intent.postEventRestoreBoundary.restoreQueued, false);
+    assert.equal(intent.postEventRestoreBoundary.restoreFlushed, false);
+    assert.equal(intent.sideEffects.eventDispatchRecordAccepted, false);
+    assert.equal(intent.sideEffects.restoreQueueWritten, false);
+    assert.equal(intent.sideEffects.restoreQueueFlushed, false);
+    assert.equal(intent.sideEffects.hostWrapperInvoked, false);
+    assert.equal(intent.sideEffects.hostValueRead, false);
+    assert.equal(intent.sideEffects.hostValueWritten, false);
+    assert.equal(intent.sideEffects.browserInputMutated, false);
+    assert.equal(intent.sideEffects.publicControlledBehaviorEnabled, false);
+    assert.equal(intent.sideEffects.compatibilityClaimed, false);
+    assert.equal(Object.hasOwn(fakeTarget, "_valueTracker"), false);
+    assert.equal(
+      intent.publicControlledBehaviorBoundary.compatibilityClaimed,
+      false
+    );
+  }
+  assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
+
+  for (const token of tokens) {
+    componentTree.detachHostInstanceToken(token);
+  }
+});
+
 test("DOM controlled input oracle covers every scenario in every probe mode", () => {
   assert.deepEqual(oracle.probeModes, DOM_CONTROLLED_INPUT_PROBE_MODES);
   assert.deepEqual(oracle.scenarios, DOM_CONTROLLED_INPUT_SCENARIOS);
@@ -814,6 +990,41 @@ function createPrivateControlledEventDispatch(options) {
       type: options.domEventName
     }),
     document,
+    targetNode,
+    token
+  };
+}
+
+function createPrivateControlledLatestPropsLookup(options) {
+  const document = {
+    nodeName: "#document",
+    nodeType: 9
+  };
+  document.ownerDocument = document;
+  const targetNode = createPrivateControlledHostNode(
+    options.nodeName,
+    document
+  );
+  const token = componentTree.createHostInstanceToken(
+    {kind: "ControlledOracleLatestPropsHost"},
+    {kind: "ControlledOracleLatestPropsRoot"}
+  );
+  componentTree.attachHostInstanceNode(
+    targetNode,
+    token,
+    options.latestProps
+  );
+  const normalizationRecord =
+    componentTree.createEventTargetNormalizationRecord(targetNode);
+  const lookupRecord = componentTree.createEventListenerTargetLookupRecord(
+    normalizationRecord,
+    options.registrationName
+  );
+
+  return {
+    document,
+    lookupRecord,
+    normalizationRecord,
     targetNode,
     token
   };

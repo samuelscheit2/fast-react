@@ -95,7 +95,7 @@ const disallowedSourcePatterns = [
   {
     id: 'controlled-control-adapter',
     pattern:
-      /\b(?:inputValueTracking|trackValueOnNode|updateValueIfChanged|getTracker|_valueTracker|enqueueStateRestore|restoreStateIfNeeded|restoreControlledState|restoreControlledInputState|initInput|updateInput|hydrateInput|validateInputProps|initSelect|updateSelect|postUpdateSelect|validateSelectProps|initTextarea|updateTextarea|hydrateTextarea|validateTextareaProps|internalPropsKey|getFiberCurrentPropsFromNode|updateFiberProps|getInstanceFromNode|ChangeEventPlugin|BeforeInputEventPlugin|SelectEventPlugin)\b/u
+      /\b(?:inputValueTracking|trackValueOnNode|updateValueIfChanged|getTracker|_valueTracker|enqueueStateRestore|restoreStateIfNeeded|restoreControlledState|restoreControlledInputState|restoreControlledSelectState|restoreControlledTextareaState|initInput|updateInput|hydrateInput|validateInputProps|initSelect|updateSelect|postUpdateSelect|validateSelectProps|initTextarea|updateTextarea|hydrateTextarea|validateTextareaProps|internalPropsKey|getFiberCurrentPropsFromNode|updateFiberProps|getInstanceFromNode|ChangeEventPlugin|BeforeInputEventPlugin|SelectEventPlugin)\b/u
   }
 ];
 
@@ -1262,6 +1262,395 @@ test('private controlled input post-event restore queue gate records event/lates
 
   componentTree.detachHostInstanceToken(controlled.token);
   componentTree.detachHostInstanceToken(skippedControlled.token);
+});
+
+test('private controlled input post-event restore queue gate records select and textarea fake-DOM latest-props intent only', () => {
+  const trackerGate = resourceFormGate.createControlledInputValueTrackerGate({
+    requestIdPrefix: 'select-textarea-tracker'
+  });
+  const restoreGate =
+    controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({
+      requestIdPrefix: 'select-textarea-restore'
+    });
+
+  const rows = [
+    {
+      controlKind: 'single',
+      eventName: 'change',
+      fakeInitial: {value: 'b'},
+      fakeNext: {value: 'c'},
+      hostTag: 'select',
+      latestProps: {
+        value: 'c',
+        onChange() {}
+      },
+      nodeName: 'SELECT',
+      queueId: 'select-single-fake-dom-latest-props-restore',
+      scenarioId: 'select-single-controlled-update'
+    },
+    {
+      controlKind: 'multiple',
+      eventName: 'change',
+      fakeInitial: {selectedValues: ['b', 'c']},
+      fakeNext: {selectedValues: ['a']},
+      hostTag: 'select',
+      latestProps: {
+        multiple: true,
+        value: ['a'],
+        onChange() {}
+      },
+      multiple: true,
+      nodeName: 'SELECT',
+      queueId: 'select-multiple-fake-dom-latest-props-restore',
+      scenarioId: 'select-multiple-controlled-update'
+    },
+    {
+      controlKind: 'value',
+      eventName: 'input',
+      fakeInitial: {value: 'alpha'},
+      fakeNext: {value: 'beta'},
+      hostTag: 'textarea',
+      latestProps: {
+        value: 'beta',
+        onChange() {},
+        onInput() {}
+      },
+      nodeName: 'TEXTAREA',
+      queueId: 'textarea-fake-dom-latest-props-restore',
+      scenarioId: 'textarea-controlled-value-update'
+    }
+  ];
+
+  const records = [];
+  const cleanupTokens = [];
+
+  for (const row of rows) {
+    const fakeTarget = createControlledInputFakeDomTarget(row.fakeInitial);
+    const descriptorBefore = Object.getOwnPropertyDescriptor(
+      fakeTarget,
+      row.hostTag === 'select' && row.controlKind === 'multiple'
+        ? 'selectedValues'
+        : 'value'
+    );
+    const install = trackerGate.installFakeDomTracker(
+      {
+        scenarioId: row.scenarioId,
+        phaseId: 'post-event',
+        hostTag: row.hostTag,
+        multiple: row.multiple === true,
+        controlKind: row.controlKind,
+        props: row.latestProps
+      },
+      {
+        explicitAdmission: true,
+        adapterKind: 'deterministic-fake-dom',
+        adapterId: `${row.scenarioId}-fake-target`,
+        targetKind: 'controlled-input-value-tracker',
+        fakeTarget
+      }
+    );
+    Object.assign(fakeTarget, row.fakeNext);
+    const observation = trackerGate.observeFakeDomTracker(install);
+    const latestProps = createControlledLatestPropsLookup({
+      latestProps: row.latestProps,
+      nodeName: row.nodeName,
+      registrationName: row.eventName === 'input' ? 'onInput' : 'onChange'
+    });
+    cleanupTokens.push(latestProps.token);
+
+    const intent =
+      restoreGate.recordPostEventRestoreIntentFromFakeDomObservationLatestProps(
+        observation,
+        latestProps.lookupRecord,
+        {
+          explicitAdmission: true,
+          queueKind:
+            'deterministic-fake-dom-latest-props-post-event-restore-queue',
+          queueId: row.queueId,
+          eventName: row.eventName,
+          targetKind: 'controlled-input-post-event-restore-queue'
+        }
+      );
+
+    records.push({
+      descriptorBefore,
+      fakeTarget,
+      intent,
+      latestProps,
+      observation,
+      row
+    });
+  }
+
+  assert.deepEqual(
+    records.map(({intent, row}) => ({
+      requestId: intent.requestId,
+      requestSequence: intent.requestSequence,
+      sourceKind: intent.sourceKind,
+      status: intent.status,
+      domEventName: intent.domEventName,
+      hostTag: intent.hostTag,
+      multiple: intent.multiple,
+      controlKind: intent.controlKind,
+      controlledPropName: intent.controlledPropName,
+      trackedField: intent.trackedField,
+      sourceChanged: intent.restoreIntent.sourceChanged,
+      latestPropsEvidenceAccepted:
+        intent.restoreIntent.latestPropsEvidenceAccepted,
+      latestPropsTargetHostTag:
+        intent.restoreIntent.latestPropsTargetHostTag,
+      sourceMatchesLatestPropsTarget:
+        intent.restoreIntent.sourceMatchesLatestPropsTarget,
+      supportedEventName: intent.restoreIntent.supportedEventName,
+      intentRecorded: intent.restoreIntent.intentRecorded,
+      restoreTargetWouldBeQueued:
+        intent.restoreIntent.restoreTargetWouldBeQueued,
+      queuePosition: intent.restoreIntent.queuePosition,
+      eventDispatchRecordAccepted:
+        intent.restoreIntent.eventDispatchRecordAccepted,
+      fakeDomTrackerObservationAccepted:
+        intent.restoreIntent.fakeDomTrackerObservationAccepted,
+      latestPropsLookupPerformed:
+        intent.restoreIntent.latestPropsLookupPerformed,
+      restoreQueueWritten: intent.restoreIntent.restoreQueueWritten,
+      controlledStateRestoreInvoked:
+        intent.restoreIntent.controlledStateRestoreInvoked,
+      latestPropsMetadataRead: intent.sideEffects.latestPropsMetadataRead,
+      fakeDomValueChangeObserved:
+        intent.sideEffects.fakeDomValueChangeObserved
+    })),
+    [
+      {
+        requestId: 'select-textarea-restore:1',
+        requestSequence: 1,
+        sourceKind: 'private-fake-dom-observation-latest-props-evidence',
+        status:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueIntentRecordedStatus,
+        domEventName: 'change',
+        hostTag: 'select',
+        multiple: false,
+        controlKind: 'single',
+        controlledPropName: 'value',
+        trackedField: 'selectedOptions',
+        sourceChanged: true,
+        latestPropsEvidenceAccepted: true,
+        latestPropsTargetHostTag: 'select',
+        sourceMatchesLatestPropsTarget: true,
+        supportedEventName: true,
+        intentRecorded: true,
+        restoreTargetWouldBeQueued: true,
+        queuePosition: 'primary',
+        eventDispatchRecordAccepted: false,
+        fakeDomTrackerObservationAccepted: true,
+        latestPropsLookupPerformed: true,
+        restoreQueueWritten: false,
+        controlledStateRestoreInvoked: false,
+        latestPropsMetadataRead: true,
+        fakeDomValueChangeObserved: true
+      },
+      {
+        requestId: 'select-textarea-restore:2',
+        requestSequence: 2,
+        sourceKind: 'private-fake-dom-observation-latest-props-evidence',
+        status:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueIntentRecordedStatus,
+        domEventName: 'change',
+        hostTag: 'select',
+        multiple: true,
+        controlKind: 'multiple',
+        controlledPropName: 'value',
+        trackedField: 'selectedOptions',
+        sourceChanged: true,
+        latestPropsEvidenceAccepted: true,
+        latestPropsTargetHostTag: 'select',
+        sourceMatchesLatestPropsTarget: true,
+        supportedEventName: true,
+        intentRecorded: true,
+        restoreTargetWouldBeQueued: true,
+        queuePosition: 'primary',
+        eventDispatchRecordAccepted: false,
+        fakeDomTrackerObservationAccepted: true,
+        latestPropsLookupPerformed: true,
+        restoreQueueWritten: false,
+        controlledStateRestoreInvoked: false,
+        latestPropsMetadataRead: true,
+        fakeDomValueChangeObserved: true
+      },
+      {
+        requestId: 'select-textarea-restore:3',
+        requestSequence: 3,
+        sourceKind: 'private-fake-dom-observation-latest-props-evidence',
+        status:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueIntentRecordedStatus,
+        domEventName: 'input',
+        hostTag: 'textarea',
+        multiple: false,
+        controlKind: 'value',
+        controlledPropName: 'value',
+        trackedField: 'value',
+        sourceChanged: true,
+        latestPropsEvidenceAccepted: true,
+        latestPropsTargetHostTag: 'textarea',
+        sourceMatchesLatestPropsTarget: true,
+        supportedEventName: true,
+        intentRecorded: true,
+        restoreTargetWouldBeQueued: true,
+        queuePosition: 'primary',
+        eventDispatchRecordAccepted: false,
+        fakeDomTrackerObservationAccepted: true,
+        latestPropsLookupPerformed: true,
+        restoreQueueWritten: false,
+        controlledStateRestoreInvoked: false,
+        latestPropsMetadataRead: true,
+        fakeDomValueChangeObserved: true
+      }
+    ]
+  );
+
+  for (const {descriptorBefore, fakeTarget, intent, latestProps, row} of records) {
+    assert.equal(Object.isFrozen(intent), true, row.scenarioId);
+    assert.equal(
+      controlledRestoreQueue.isPrivateControlledInputPostEventRestoreQueueRecord(
+        intent
+      ),
+      true,
+      row.scenarioId
+    );
+    assert.equal(
+      controlledRestoreQueue.getPrivateControlledInputPostEventRestoreQueueRecordPayload(
+        intent
+      ),
+      intent,
+      row.scenarioId
+    );
+    assert.equal(intent.eventEvidence, null);
+    assert.equal(intent.fakeDomObservationEvidence.changed, true);
+    assert.equal(intent.latestPropsEvidence.latestPropsStatus, 'present');
+    assert.equal(intent.latestPropsEvidence.exposesLatestProps, false);
+    assert.equal(intent.latestPropsEvidence.rawLatestPropsRetained, false);
+    assert.equal(intent.controlledTarget.liveValueTrackerInstalled, false);
+    assert.equal(intent.controlledTarget.valueTrackerFieldWritten, false);
+    assert.equal(intent.controlledTarget.propertyDescriptorInstalled, false);
+    assert.equal(intent.controlledTarget.hostValueRead, false);
+    assert.equal(intent.controlledTarget.hostValueWritten, false);
+    assert.equal(intent.restoreIntent.eventPluginDispatchPerformed, false);
+    assert.equal(intent.restoreIntent.rawTargetCaptured, false);
+    assert.equal(intent.restoreIntent.rawEventCaptured, false);
+    assert.equal(intent.restoreIntent.rawLatestPropsRetained, false);
+    assert.equal(intent.postEventRestoreBoundary.latestPropsLookup, true);
+    assert.equal(intent.postEventRestoreBoundary.eventPluginDispatch, false);
+    assert.equal(intent.postEventRestoreBoundary.restoreQueued, false);
+    assert.equal(intent.postEventRestoreBoundary.restoreFlushed, false);
+    assert.equal(intent.sideEffects.eventDispatchRecordAccepted, false);
+    assert.equal(intent.sideEffects.fakeDomTrackerObservationAccepted, true);
+    assert.equal(intent.sideEffects.latestPropsEvidenceAccepted, true);
+    assert.equal(intent.sideEffects.restoreQueueRecordCreated, true);
+    assert.equal(intent.sideEffects.restoreQueueWritten, false);
+    assert.equal(intent.sideEffects.restoreQueueFlushed, false);
+    assert.equal(intent.sideEffects.controlledStateRestoreScheduled, false);
+    assert.equal(intent.sideEffects.controlledStateRestoreInvoked, false);
+    assert.equal(intent.sideEffects.hostWrapperInvoked, false);
+    assert.equal(intent.sideEffects.hostValueRead, false);
+    assert.equal(intent.sideEffects.hostValueWritten, false);
+    assert.equal(intent.sideEffects.browserInputMutated, false);
+    assert.equal(intent.sideEffects.rawLatestPropsRetained, false);
+    assert.equal(
+      intent.publicControlledBehaviorBoundary.compatibilityClaimed,
+      false
+    );
+    assert.equal(Object.hasOwn(fakeTarget, '_valueTracker'), false);
+    assert.equal(Object.hasOwn(latestProps.targetNode, '_valueTracker'), false);
+    assert.equal(descriptorBefore.get, undefined);
+    assert.equal(descriptorBefore.set, undefined);
+  }
+
+  const skipTarget = createControlledInputFakeDomTarget({value: 'alpha'});
+  const skipInstall = trackerGate.installFakeDomTracker(
+    {
+      scenarioId: 'textarea-default-value-update',
+      phaseId: 'post-event',
+      hostTag: 'textarea',
+      props: {
+        defaultValue: 'alpha',
+        onChange() {}
+      }
+    },
+    {
+      explicitAdmission: true,
+      adapterKind: 'deterministic-fake-dom',
+      adapterId: 'textarea-uncontrolled-fake-target',
+      targetKind: 'controlled-input-value-tracker',
+      fakeTarget: skipTarget
+    }
+  );
+  skipTarget.value = 'beta';
+  const skipObservation = trackerGate.observeFakeDomTracker(skipInstall);
+  const skipLatestProps = createControlledLatestPropsLookup({
+    latestProps: {
+      defaultValue: 'alpha',
+      onChange() {}
+    },
+    nodeName: 'TEXTAREA',
+    registrationName: 'onChange'
+  });
+  cleanupTokens.push(skipLatestProps.token);
+  const skipped =
+    restoreGate.recordPostEventRestoreIntentFromFakeDomObservationLatestProps(
+      skipObservation,
+      skipLatestProps.lookupRecord,
+      {
+        explicitAdmission: true,
+        queueKind:
+          'deterministic-fake-dom-latest-props-post-event-restore-queue',
+        queueId: 'textarea-uncontrolled-fake-dom-latest-props-restore',
+        eventName: 'input',
+        targetKind: 'controlled-input-post-event-restore-queue'
+      }
+    );
+
+  assert.equal(
+    skipped.status,
+    controlledRestoreQueue.controlledInputPostEventRestoreQueueIntentSkippedStatus
+  );
+  assert.equal(skipped.restoreIntent.sourceChanged, true);
+  assert.equal(skipped.restoreIntent.controlledPropPresent, false);
+  assert.equal(skipped.restoreIntent.intentRecorded, false);
+  assert.equal(skipped.restoreIntent.restoreTargetWouldBeQueued, false);
+  assert.equal(skipped.restoreIntent.queuePosition, null);
+  assert.equal(skipped.sideEffects.postEventRestoreIntentRecorded, false);
+  assert.equal(skipped.sideEffects.postEventRestoreIntentSkipped, true);
+  assert.equal(skipped.sideEffects.restoreQueueWritten, false);
+
+  const summary =
+    controlledRestoreQueue.describeControlledInputPostEventRestoreQueueGate();
+  assert.equal(
+    summary.acceptedFakeDomObservationRecordType,
+    resourceFormGate.privateControlledInputValueTrackerFakeDomDiagnosticRecordType
+  );
+  assert.equal(summary.acceptedFakeDomObservationOperation, 'observe');
+  assert.equal(summary.consumesFakeDomTrackerObservation, true);
+  assert.equal(summary.consumesLatestPropsEvidence, true);
+  assert.equal(summary.consumesEventDispatchEvidence, true);
+  assert.equal(summary.writesRestoreQueue, false);
+  assert.equal(summary.flushesRestoreQueue, false);
+
+  assert.throws(
+    () =>
+      restoreGate.recordPostEventRestoreIntentFromFakeDomObservationLatestProps(
+        {},
+        records[0].latestProps.lookupRecord,
+        {explicitAdmission: true}
+      ),
+    {
+      code:
+        controlledRestoreQueue.controlledInputPostEventRestoreQueueInvalidFakeDomObservationCode,
+      compatibilityTarget
+    }
+  );
+
+  for (const token of cleanupTokens) {
+    componentTree.detachHostInstanceToken(token);
+  }
 });
 
 test('private controlled input fake-DOM value-tracker diagnostic rejects live DOM-like or inactive records', () => {
@@ -4320,6 +4709,34 @@ function createControlledInputEventDispatch(options) {
       type: options.domEventName
     }),
     document,
+    targetNode,
+    token
+  };
+}
+
+function createControlledLatestPropsLookup(options) {
+  const document = createRootBridgeDocument();
+  const targetNode = createRootBridgeElement(options.nodeName, document);
+  const token = componentTree.createHostInstanceToken(
+    {kind: 'ControlledLatestPropsHost'},
+    {kind: 'ControlledLatestPropsRoot'}
+  );
+  componentTree.attachHostInstanceNode(
+    targetNode,
+    token,
+    options.latestProps
+  );
+  const normalizationRecord =
+    componentTree.createEventTargetNormalizationRecord(targetNode);
+  const lookupRecord = componentTree.createEventListenerTargetLookupRecord(
+    normalizationRecord,
+    options.registrationName
+  );
+
+  return {
+    document,
+    lookupRecord,
+    normalizationRecord,
     targetNode,
     token
   };
