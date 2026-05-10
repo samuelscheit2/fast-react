@@ -80,6 +80,14 @@ const ERROR_BOUNDARY_ROOT_OPTIONS_RUST_API =
   "TestRendererRoot::describe_private_error_boundary_diagnostics_for_canary";
 const ERROR_BOUNDARY_UPDATE_RUST_API =
   "TestRendererRoot::describe_private_error_boundary_update_diagnostics_for_canary";
+const ERROR_BOUNDARY_NATIVE_EXECUTION_RUST_API =
+  "TestRendererRoot::describe_private_error_boundary_update_native_execution_for_canary";
+const ERROR_BOUNDARY_COMMIT_RECOVERY_RUST_API =
+  "TestRendererRoot::describe_private_error_boundary_commit_recovery_for_canary";
+const ERROR_BOUNDARY_COMMIT_RECOVERY_DIAGNOSTIC_NAME =
+  "fast-react-test-renderer.error-boundary.private-commit-recovery-evidence";
+const ERROR_BOUNDARY_COMMIT_RECOVERY_STATUS =
+  "private-error-boundary-commit-recovery-metadata-public-recovery-blocked";
 const jsEntrypoints = [
   {
     entrypoint: "react-test-renderer",
@@ -376,6 +384,46 @@ test("React test renderer private update and commit error rows stay metadata onl
     diagnostics.acceptedRustApi,
     ERROR_BOUNDARY_ROOT_OPTIONS_RUST_API
   );
+  assert.deepEqual(diagnostics.gate.acceptedRustApis, [
+    ERROR_BOUNDARY_ROOT_OPTIONS_RUST_API,
+    ERROR_BOUNDARY_UPDATE_RUST_API,
+    ERROR_BOUNDARY_NATIVE_EXECUTION_RUST_API,
+    ERROR_BOUNDARY_COMMIT_RECOVERY_RUST_API
+  ]);
+  assert.deepEqual(diagnostics.gate.acceptedRustRecords, [
+    "TestRendererPrivateErrorBoundaryDiagnostics",
+    "TestRendererPrivateErrorDiagnosticRow",
+    "TestRendererPrivateErrorBoundaryDependencyDiagnostics",
+    "TestRendererPrivateErrorBoundaryCommitRecoveryMetadata",
+    "TestRendererPrivateErrorBoundaryNativeExecutionEvidence",
+    "TestRendererRootErrorOptionDiagnostics",
+    "HostRootRenderFailureRecoveryCommitEvidenceForCanary",
+    "HostRootCommitRecoverySnapshotForCanary"
+  ]);
+  assert.equal(diagnostics.commitRecoveryMetadataAvailable, true);
+  assert.equal(
+    diagnostics.commitRecoveryDiagnosticName,
+    ERROR_BOUNDARY_COMMIT_RECOVERY_DIAGNOSTIC_NAME
+  );
+  assert.equal(
+    diagnostics.commitRecoveryStatus,
+    ERROR_BOUNDARY_COMMIT_RECOVERY_STATUS
+  );
+  assert.equal(
+    diagnostics.commitRecoveryRustApi,
+    ERROR_BOUNDARY_COMMIT_RECOVERY_RUST_API
+  );
+  assert.equal(
+    diagnostics.commitPhaseRecoveryPath,
+    "ReactFiberWorkLoop.captureCommitPhaseError"
+  );
+  assert.equal(
+    diagnostics.commitPhaseRecoveryAction,
+    "createRootErrorUpdate(SyncLane)"
+  );
+  assert.equal(diagnostics.consumesAcceptedRustUpdateMetadata, true);
+  assert.equal(diagnostics.consumesAcceptedRustFailureMetadata, true);
+  assert.equal(diagnostics.consumesAcceptedCommitRecoveryMetadata, true);
   assert.equal(diagnostics.dependencyDiagnostics.updateRouteDiagnosticsAvailable, true);
   assert.equal(diagnostics.dependencyDiagnostics.serializationDiagnosticsAvailable, true);
   assert.equal(diagnostics.dependencyDiagnostics.testInstanceQueryDiagnosticsAvailable, true);
@@ -445,6 +493,22 @@ test("React test renderer private update and commit error rows stay metadata onl
   assert.equal(
     updateError.privateErrorBoundaryDiagnostics.acceptedRustApi,
     ERROR_BOUNDARY_UPDATE_RUST_API
+  );
+  assert.equal(
+    updateError.privateErrorBoundaryDiagnostics.commitRecoveryRustApi,
+    ERROR_BOUNDARY_COMMIT_RECOVERY_RUST_API
+  );
+  assert.equal(
+    updateError.privateErrorBoundaryDiagnostics.commitRecoveryDiagnosticName,
+    ERROR_BOUNDARY_COMMIT_RECOVERY_DIAGNOSTIC_NAME
+  );
+  assert.equal(
+    updateError.privateErrorBoundaryDiagnostics.commitRecoveryStatus,
+    ERROR_BOUNDARY_COMMIT_RECOVERY_STATUS
+  );
+  assert.equal(
+    updateError.privateErrorBoundaryDiagnostics.consumesAcceptedRustFailureMetadata,
+    true
   );
   assert.deepEqual(
     updateError.privateErrorBoundaryDiagnostics.rows.map((row) => row.id),

@@ -3125,10 +3125,22 @@ const privateErrorBoundaryUpdateRustApi =
   'TestRendererRoot::describe_private_error_boundary_update_diagnostics_for_canary';
 const privateErrorBoundaryNativeExecutionRustApi =
   'TestRendererRoot::describe_private_error_boundary_update_native_execution_for_canary';
+const privateErrorBoundaryCommitRecoveryRustApi =
+  'TestRendererRoot::describe_private_error_boundary_commit_recovery_for_canary';
 const privateErrorBoundaryDiagnosticPhases = Object.freeze([
   'Update',
   'Commit'
 ]);
+const privateErrorBoundaryCommitRecoveryDiagnosticName =
+  'fast-react-test-renderer.error-boundary.private-commit-recovery-evidence';
+const privateErrorBoundaryCommitRecoveryStatus =
+  'private-error-boundary-commit-recovery-metadata-public-recovery-blocked';
+const privateErrorBoundaryCommitRecoveryPath =
+  'ReactFiberWorkLoop.captureCommitPhaseError';
+const privateErrorBoundaryCommitRecoveryAction =
+  'createRootErrorUpdate(SyncLane)';
+const privateErrorBoundaryCommitRecoveryReference =
+  'ReactFiberWorkLoop.captureCommitPhaseError -> createRootErrorUpdate(SyncLane)';
 const privateErrorBoundaryDiagnosticDependencyIds = Object.freeze([
   'react-test-renderer-update-private-route',
   'react-test-renderer-serialization-private-json-diagnostic',
@@ -3167,13 +3179,17 @@ const privateErrorBoundaryDiagnosticsGate = Object.freeze({
     'TestRendererPrivateErrorBoundaryDiagnostics',
     'TestRendererPrivateErrorDiagnosticRow',
     'TestRendererPrivateErrorBoundaryDependencyDiagnostics',
+    'TestRendererPrivateErrorBoundaryCommitRecoveryMetadata',
     'TestRendererPrivateErrorBoundaryNativeExecutionEvidence',
-    'TestRendererRootErrorOptionDiagnostics'
+    'TestRendererRootErrorOptionDiagnostics',
+    'HostRootRenderFailureRecoveryCommitEvidenceForCanary',
+    'HostRootCommitRecoverySnapshotForCanary'
   ]),
   acceptedRustApis: Object.freeze([
     privateErrorBoundaryRootOptionsRustApi,
     privateErrorBoundaryUpdateRustApi,
-    privateErrorBoundaryNativeExecutionRustApi
+    privateErrorBoundaryNativeExecutionRustApi,
+    privateErrorBoundaryCommitRecoveryRustApi
   ]),
   acceptedRustTests: Object.freeze([
     'root_options_store_error_callback_handles_without_invocation',
@@ -3192,7 +3208,9 @@ const privateErrorBoundaryDiagnosticsGate = Object.freeze({
     'worker-484-test-instance-find-by-private-query-gate',
     'worker-485-test-renderer-totree-multichild-gate',
     'worker-637-test-renderer-update-native-execution',
-    'worker-669-test-renderer-error-boundary-native-execution'
+    'worker-664-root-error-recovery-commit-execution',
+    'worker-669-test-renderer-error-boundary-native-execution',
+    'worker-701-test-renderer-error-boundary-commit-recovery'
   ]),
   acceptedPrivateDiagnosticDependencyIds:
     privateErrorBoundaryDiagnosticDependencyIds,
@@ -3210,11 +3228,25 @@ const privateErrorBoundaryDiagnosticsGate = Object.freeze({
   nativeExecutionEvidenceDiagnosticName:
     privateErrorBoundaryNativeExecutionDiagnosticName,
   nativeExecutionEvidenceStatus: privateErrorBoundaryNativeExecutionStatus,
+  commitRecoveryMetadataAvailable: true,
+  commitRecoveryDiagnosticName:
+    privateErrorBoundaryCommitRecoveryDiagnosticName,
+  commitRecoveryStatus: privateErrorBoundaryCommitRecoveryStatus,
+  commitRecoveryRustApi: privateErrorBoundaryCommitRecoveryRustApi,
+  commitPhaseRecoveryPath: privateErrorBoundaryCommitRecoveryPath,
+  commitPhaseRecoveryAction: privateErrorBoundaryCommitRecoveryAction,
+  commitPhaseRecoveryReference:
+    privateErrorBoundaryCommitRecoveryReference,
   acceptedNativeExecutionRecordKind: privateToJSONNativeExecutionRecordKind,
   acceptedNativeExecutionOperations: Object.freeze(['update']),
   nativeExecutionEvidenceWorker:
     'worker-669-test-renderer-error-boundary-native-execution',
+  commitRecoveryEvidenceWorker:
+    'worker-701-test-renderer-error-boundary-commit-recovery',
   consumesAcceptedRootExecutionDiagnostics: true,
+  consumesAcceptedRustUpdateMetadata: true,
+  consumesAcceptedRustFailureMetadata: true,
+  consumesAcceptedCommitRecoveryMetadata: true,
   publicErrorBoundaryBehaviorAvailable: false,
   publicErrorBoundaryBehaviorExposed: false,
   publicErrorRecoveryAvailable: false,
@@ -10592,6 +10624,14 @@ function consumeRootExecutionResult(record, result, handoff) {
           consumedLifecycleDiagnostic
         )
       : null;
+  const privateErrorBoundaryCommitRecoveryMetadata =
+    record.operation === 'update' && privateUpdateNativeBridgeAdmission !== null
+      ? consumePrivateErrorBoundaryCommitRecoveryMetadataForRequest(
+          record,
+          result,
+          privateUpdateNativeBridgeAdmission
+        )
+      : null;
   const privateUnmountNativeBridgeAdmission =
     record.operation === 'unmount'
       ? consumePrivateUnmountNativeBridgeAdmissionForRequest(
@@ -10642,6 +10682,9 @@ function consumeRootExecutionResult(record, result, handoff) {
     privateUpdateNativeBridgeAdmission,
     privateUpdateNativeBridgeAdmissionAvailable:
       record.privateUpdateNativeBridgeAdmissionAvailable,
+    privateErrorBoundaryCommitRecoveryMetadata,
+    privateErrorBoundaryCommitRecoveryMetadataAvailable:
+      record.operation === 'update',
     privateUnmountNativeBridgeCleanupHandoff:
       privateUnmountNativeBridgeAdmission === null
         ? null
@@ -12803,7 +12846,19 @@ function createPrivateErrorBoundaryDiagnosticsForRootRequest(rootRequest) {
     nativeExecutionEvidenceStatus: privateErrorBoundaryNativeExecutionStatus,
     acceptedNativeExecutionRecordKind: privateToJSONNativeExecutionRecordKind,
     acceptedNativeExecutionOperations: freezeArray(['update']),
+    commitRecoveryMetadataAvailable: true,
+    commitRecoveryDiagnosticName:
+      privateErrorBoundaryCommitRecoveryDiagnosticName,
+    commitRecoveryStatus: privateErrorBoundaryCommitRecoveryStatus,
+    commitRecoveryRustApi: privateErrorBoundaryCommitRecoveryRustApi,
+    commitPhaseRecoveryPath: privateErrorBoundaryCommitRecoveryPath,
+    commitPhaseRecoveryAction: privateErrorBoundaryCommitRecoveryAction,
+    commitPhaseRecoveryReference:
+      privateErrorBoundaryCommitRecoveryReference,
     consumesAcceptedRootExecutionDiagnostics: true,
+    consumesAcceptedRustUpdateMetadata: true,
+    consumesAcceptedRustFailureMetadata: true,
+    consumesAcceptedCommitRecoveryMetadata: true,
     publicErrorRecoveryAvailable: false,
     nativeBridgeAvailable: false,
     nativeExecution: false,
@@ -12876,6 +12931,109 @@ function createPrivateErrorBoundaryDiagnosticRow(
   });
 }
 
+function consumePrivateErrorBoundaryCommitRecoveryMetadataForRequest(
+  rootRequest,
+  evidence,
+  updateAdmission
+) {
+  if (!isRootRequestRecord(rootRequest)) {
+    throwInvalidRootRequest(
+      'Expected a private root request for error boundary commit recovery metadata.'
+    );
+  }
+  const source =
+    readDiagnosticField(evidence, [
+      'privateErrorBoundaryCommitRecoveryMetadata',
+      'commitPhaseRecoveryMetadata',
+      'errorBoundaryCommitRecoveryMetadata',
+      'commit_recovery_metadata'
+    ]) ?? evidence.privateErrorBoundaryCommitRecoveryMetadata;
+  if (source === undefined || source === null || typeof source !== 'object') {
+    throwInvalidRootRequest(
+      'Expected private error boundary commit recovery metadata.'
+    );
+  }
+  if (
+    source.id !== privateErrorBoundaryCommitRecoveryDiagnosticName ||
+    source.status !== privateErrorBoundaryCommitRecoveryStatus ||
+    source.acceptedRustApi !== privateErrorBoundaryCommitRecoveryRustApi ||
+    source.kind !==
+      'FastReactTestRendererPrivateErrorBoundaryCommitRecoveryMetadata' ||
+    source.rootRequestId !== rootRequest.requestId ||
+    source.rootId !== rootRequest.rootId ||
+    source.operation !== 'update' ||
+    source.updateFailurePath !== 'commit' ||
+    source.commitPhaseRecoveryPath !== privateErrorBoundaryCommitRecoveryPath ||
+    source.commitPhaseRecoveryAction !==
+      privateErrorBoundaryCommitRecoveryAction ||
+    source.sourceUpdateRecord !== 'TestRendererUpdateNativeBridgeAdmission' ||
+    source.sourceUpdateRecordId !== privateUpdateNativeBridgeAdmissionDiagnosticId ||
+    source.sourceUpdateRecordStatus !== privateUpdateNativeBridgeAdmissionStatus ||
+    source.sourceUpdateKind !== 'Update' ||
+    source.sourceFailureRecord !==
+      'HostRootRenderFailureRecoveryCommitEvidenceForCanary' ||
+    source.sourceCommitRecoverySnapshotRecord !==
+      'HostRootCommitRecoverySnapshotForCanary' ||
+    source.consumesAcceptedRustUpdateMetadata !== true ||
+    source.consumesAcceptedRustFailureMetadata !== true ||
+    source.consumesAcceptedCommitRecoverySnapshot !== true ||
+    source.preservesRootErrorOptionHandles !== true ||
+    source.commitPhaseRecoveryPathConsumed !== true
+  ) {
+    throwInvalidRootRequest(
+      'Expected accepted private error boundary commit recovery metadata.'
+    );
+  }
+  if (
+    source.rootErrorUpdateScheduled !== false ||
+    source.publicRootErrorCallbacksInvoked !== false ||
+    source.publicErrorBoundaryBehaviorAvailable !== false ||
+    source.publicErrorRecoveryAvailable !== false ||
+    source.compatibilityClaimed !== false ||
+    updateAdmission.publicUpdateCompatibilityClaimed !== false ||
+    updateAdmission.compatibilityClaimed !== false
+  ) {
+    throwInvalidRootRequest(
+      'Private error boundary commit recovery metadata cannot claim public recovery compatibility.'
+    );
+  }
+
+  return freezeRecord({
+    id: privateErrorBoundaryCommitRecoveryDiagnosticName,
+    kind: 'FastReactTestRendererPrivateErrorBoundaryCommitRecoveryMetadata',
+    status: privateErrorBoundaryCommitRecoveryStatus,
+    acceptedRustApi: privateErrorBoundaryCommitRecoveryRustApi,
+    rootRequest,
+    rootRequestId: rootRequest.requestId,
+    rootId: rootRequest.rootId,
+    operation: 'update',
+    updateFailurePath: 'commit',
+    commitPhaseRecoveryPath: privateErrorBoundaryCommitRecoveryPath,
+    commitPhaseRecoveryAction: privateErrorBoundaryCommitRecoveryAction,
+    reactReference: privateErrorBoundaryCommitRecoveryReference,
+    sourceUpdateRecord: 'TestRendererUpdateNativeBridgeAdmission',
+    sourceUpdateRecordId: privateUpdateNativeBridgeAdmissionDiagnosticId,
+    sourceUpdateRecordStatus: privateUpdateNativeBridgeAdmissionStatus,
+    sourceUpdateKind: 'Update',
+    sourceFailureRecord:
+      'HostRootRenderFailureRecoveryCommitEvidenceForCanary',
+    sourceCommitRecoverySnapshotRecord:
+      'HostRootCommitRecoverySnapshotForCanary',
+    sourceMetadata: source,
+    privateUpdateNativeBridgeAdmission: updateAdmission,
+    consumesAcceptedRustUpdateMetadata: true,
+    consumesAcceptedRustFailureMetadata: true,
+    consumesAcceptedCommitRecoverySnapshot: true,
+    preservesRootErrorOptionHandles: true,
+    commitPhaseRecoveryPathConsumed: true,
+    rootErrorUpdateScheduled: false,
+    publicRootErrorCallbacksInvoked: false,
+    publicErrorBoundaryBehaviorAvailable: false,
+    publicErrorRecoveryAvailable: false,
+    compatibilityClaimed: false
+  });
+}
+
 function createPrivateErrorBoundaryNativeExecutionDiagnosticResult(
   rootRequest,
   executionRecord
@@ -12887,6 +13045,8 @@ function createPrivateErrorBoundaryNativeExecutionDiagnosticResult(
   const diagnostics = getPrivateErrorBoundaryDiagnosticsForRootRequest(
     rootRequest
   );
+  const commitRecoveryMetadata =
+    execution.privateErrorBoundaryCommitRecoveryMetadata;
 
   if (
     diagnostics.publicErrorBoundaryBehaviorAvailable !== false ||
@@ -12896,6 +13056,21 @@ function createPrivateErrorBoundaryNativeExecutionDiagnosticResult(
   ) {
     throwInvalidRootRequest(
       'Private error boundary native execution evidence cannot consume public recovery diagnostics.'
+    );
+  }
+  if (
+    commitRecoveryMetadata === null ||
+    commitRecoveryMetadata === undefined ||
+    commitRecoveryMetadata.consumesAcceptedRustUpdateMetadata !== true ||
+    commitRecoveryMetadata.consumesAcceptedRustFailureMetadata !== true ||
+    commitRecoveryMetadata.consumesAcceptedCommitRecoverySnapshot !== true ||
+    commitRecoveryMetadata.preservesRootErrorOptionHandles !== true ||
+    commitRecoveryMetadata.commitPhaseRecoveryPathConsumed !== true ||
+    commitRecoveryMetadata.publicErrorRecoveryAvailable !== false ||
+    commitRecoveryMetadata.compatibilityClaimed !== false
+  ) {
+    throwInvalidRootRequest(
+      'Private error boundary native execution evidence requires accepted commit recovery metadata.'
     );
   }
 
@@ -12909,13 +13084,18 @@ function createPrivateErrorBoundaryNativeExecutionDiagnosticResult(
     publicSurface: 'create().update error boundary',
     sourceDiagnostic: privateErrorBoundaryDiagnosticName,
     sourceDiagnosticResult: diagnostics.id,
+    acceptedRustApi: privateErrorBoundaryCommitRecoveryRustApi,
     acceptedNativeExecutionRecordKind: privateToJSONNativeExecutionRecordKind,
     rootRequest,
     rootExecutionResult: execution,
     privateUpdateNativeBridgeAdmission:
       execution.privateUpdateNativeBridgeAdmission,
+    commitRecoveryMetadata,
     operation: 'update',
     updateFailurePath: 'update',
+    commitPhaseRecoveryPath: commitRecoveryMetadata.commitPhaseRecoveryPath,
+    commitPhaseRecoveryAction:
+      commitRecoveryMetadata.commitPhaseRecoveryAction,
     requestId: execution.requestId,
     requestSequence: execution.requestSequence,
     rootId: execution.request.rootId,
@@ -12930,6 +13110,11 @@ function createPrivateErrorBoundaryNativeExecutionDiagnosticResult(
     consumesAcceptedNativeExecutionRecord: true,
     consumesAcceptedNativeUpdateExecutionRecord: true,
     consumesPrivateErrorBoundaryDiagnostics: true,
+    consumesPrivateCommitRecoveryMetadata: true,
+    consumesAcceptedRustUpdateMetadata: true,
+    consumesAcceptedRustFailureMetadata: true,
+    consumesAcceptedCommitRecoveryMetadata: true,
+    preservesRootErrorOptionHandles: true,
     consumesUpdateErrorRow: diagnostics.updateErrorRowAvailable,
     consumesCommitErrorRow: diagnostics.commitErrorRowAvailable,
     rootErrorUpdateScheduled: false,
@@ -12938,6 +13123,7 @@ function createPrivateErrorBoundaryNativeExecutionDiagnosticResult(
     publicErrorBoundaryBehaviorExposed: false,
     errorBoundaryRecoveryExecuted: false,
     publicErrorRecoveryAvailable: false,
+    publicCommitPhaseRecoveryAvailable: false,
     nativeBridgeAvailable: false,
     nativeExecution: false,
     rustExecutionFromJs: true,

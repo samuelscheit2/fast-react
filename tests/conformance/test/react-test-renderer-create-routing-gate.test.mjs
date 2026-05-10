@@ -87,15 +87,26 @@ const privateErrorBoundaryUpdateRustApi =
   "TestRendererRoot::describe_private_error_boundary_update_diagnostics_for_canary";
 const privateErrorBoundaryNativeExecutionRustApi =
   "TestRendererRoot::describe_private_error_boundary_update_native_execution_for_canary";
+const privateErrorBoundaryCommitRecoveryRustApi =
+  "TestRendererRoot::describe_private_error_boundary_commit_recovery_for_canary";
 const privateErrorBoundaryAcceptedRustApis = [
   privateErrorBoundaryRootOptionsRustApi,
   privateErrorBoundaryUpdateRustApi,
-  privateErrorBoundaryNativeExecutionRustApi
+  privateErrorBoundaryNativeExecutionRustApi,
+  privateErrorBoundaryCommitRecoveryRustApi
 ];
 const privateErrorBoundaryNativeExecutionDiagnosticName =
   "fast-react-test-renderer.error-boundary.private-native-execution-evidence";
 const privateErrorBoundaryNativeExecutionStatus =
   "private-error-boundary-native-execution-update-failure-evidence-public-recovery-blocked";
+const privateErrorBoundaryCommitRecoveryDiagnosticName =
+  "fast-react-test-renderer.error-boundary.private-commit-recovery-evidence";
+const privateErrorBoundaryCommitRecoveryStatus =
+  "private-error-boundary-commit-recovery-metadata-public-recovery-blocked";
+const privateErrorBoundaryCommitRecoveryPath =
+  "ReactFiberWorkLoop.captureCommitPhaseError";
+const privateErrorBoundaryCommitRecoveryAction =
+  "createRootErrorUpdate(SyncLane)";
 const privateToTreeHostOutputMetadataSymbolDescription =
   "fast.react_test_renderer.private_totree_host_output_metadata";
 const privateToTreeHostOutputMetadataSymbol = Symbol.for(
@@ -2788,8 +2799,11 @@ test("react-test-renderer development private error-boundary diagnostics follow 
       "TestRendererPrivateErrorBoundaryDiagnostics",
       "TestRendererPrivateErrorDiagnosticRow",
       "TestRendererPrivateErrorBoundaryDependencyDiagnostics",
+      "TestRendererPrivateErrorBoundaryCommitRecoveryMetadata",
       "TestRendererPrivateErrorBoundaryNativeExecutionEvidence",
-      "TestRendererRootErrorOptionDiagnostics"
+      "TestRendererRootErrorOptionDiagnostics",
+      "HostRootRenderFailureRecoveryCommitEvidenceForCanary",
+      "HostRootCommitRecoverySnapshotForCanary"
     ]
   );
   assert.deepEqual(
@@ -2853,6 +2867,30 @@ test("react-test-renderer development private error-boundary diagnostics follow 
     updateDiagnostics.nativeExecutionEvidenceStatus,
     privateErrorBoundaryNativeExecutionStatus
   );
+  assert.equal(updateDiagnostics.commitRecoveryMetadataAvailable, true);
+  assert.equal(
+    updateDiagnostics.commitRecoveryDiagnosticName,
+    privateErrorBoundaryCommitRecoveryDiagnosticName
+  );
+  assert.equal(
+    updateDiagnostics.commitRecoveryStatus,
+    privateErrorBoundaryCommitRecoveryStatus
+  );
+  assert.equal(
+    updateDiagnostics.commitRecoveryRustApi,
+    privateErrorBoundaryCommitRecoveryRustApi
+  );
+  assert.equal(
+    updateDiagnostics.commitPhaseRecoveryPath,
+    privateErrorBoundaryCommitRecoveryPath
+  );
+  assert.equal(
+    updateDiagnostics.commitPhaseRecoveryAction,
+    privateErrorBoundaryCommitRecoveryAction
+  );
+  assert.equal(updateDiagnostics.consumesAcceptedRustUpdateMetadata, true);
+  assert.equal(updateDiagnostics.consumesAcceptedRustFailureMetadata, true);
+  assert.equal(updateDiagnostics.consumesAcceptedCommitRecoveryMetadata, true);
   assert.deepEqual(updateDiagnostics.acceptedNativeExecutionOperations, [
     "update"
   ]);
@@ -2923,14 +2961,27 @@ test("react-test-renderer development private error-boundary native execution ev
   );
   assert.equal(evidence.publicSurface, "create().update error boundary");
   assert.equal(evidence.sourceDiagnosticResult, updateDiagnostics.id);
+  assert.equal(evidence.acceptedRustApi, privateErrorBoundaryCommitRecoveryRustApi);
   assert.equal(evidence.rootRequest, updateRequest);
   assert.equal(evidence.rootExecutionResult, updateResult);
   assert.equal(
     evidence.privateUpdateNativeBridgeAdmission,
     updateResult.privateUpdateNativeBridgeAdmission
   );
+  assert.equal(
+    evidence.commitRecoveryMetadata,
+    updateResult.privateErrorBoundaryCommitRecoveryMetadata
+  );
   assert.equal(evidence.operation, "update");
   assert.equal(evidence.updateFailurePath, "update");
+  assert.equal(
+    evidence.commitPhaseRecoveryPath,
+    privateErrorBoundaryCommitRecoveryPath
+  );
+  assert.equal(
+    evidence.commitPhaseRecoveryAction,
+    privateErrorBoundaryCommitRecoveryAction
+  );
   assert.equal(evidence.requestId, updateRequest.requestId);
   assert.equal(evidence.requestSequence, updateRequest.requestSequence);
   assert.equal(evidence.rootId, updateRequest.rootId);
@@ -2947,6 +2998,11 @@ test("react-test-renderer development private error-boundary native execution ev
   assert.equal(evidence.consumesAcceptedNativeExecutionRecord, true);
   assert.equal(evidence.consumesAcceptedNativeUpdateExecutionRecord, true);
   assert.equal(evidence.consumesPrivateErrorBoundaryDiagnostics, true);
+  assert.equal(evidence.consumesPrivateCommitRecoveryMetadata, true);
+  assert.equal(evidence.consumesAcceptedRustUpdateMetadata, true);
+  assert.equal(evidence.consumesAcceptedRustFailureMetadata, true);
+  assert.equal(evidence.consumesAcceptedCommitRecoveryMetadata, true);
+  assert.equal(evidence.preservesRootErrorOptionHandles, true);
   assert.equal(evidence.consumesUpdateErrorRow, true);
   assert.equal(evidence.consumesCommitErrorRow, true);
   assert.equal(evidence.rootErrorUpdateScheduled, false);
@@ -2954,6 +3010,7 @@ test("react-test-renderer development private error-boundary native execution ev
   assert.equal(evidence.publicErrorBoundaryBehaviorAvailable, false);
   assert.equal(evidence.errorBoundaryRecoveryExecuted, false);
   assert.equal(evidence.publicErrorRecoveryAvailable, false);
+  assert.equal(evidence.publicCommitPhaseRecoveryAvailable, false);
   assert.equal(evidence.nativeBridgeAvailable, false);
   assert.equal(evidence.nativeExecution, false);
   assert.equal(evidence.rustExecutionFromJs, true);
@@ -2962,6 +3019,12 @@ test("react-test-renderer development private error-boundary native execution ev
   assert.equal(evidence.hostOutputProduced, true);
   assert.equal(evidence.compatibilityClaimed, false);
   assert.deepEqual(calls, []);
+
+  assertPrivateErrorBoundaryCommitRecoveryMetadata(
+    updateResult.privateErrorBoundaryCommitRecoveryMetadata,
+    updateRequest,
+    updateResult.privateUpdateNativeBridgeAdmission
+  );
 
   const createResult = bridge.executeRootRequest(createRequest, () => ({
     rustLifecycleDiagnostic: createRustLifecycleDiagnosticSource(createRequest),
@@ -4412,6 +4475,17 @@ function assertRootExecutionResult(result, request) {
       result.privateUpdateNativeBridgeAdmission,
       request
     );
+    if (result.privateErrorBoundaryCommitRecoveryMetadata !== undefined) {
+      assertPrivateErrorBoundaryCommitRecoveryMetadata(
+        result.privateErrorBoundaryCommitRecoveryMetadata,
+        request,
+        result.privateUpdateNativeBridgeAdmission
+      );
+      assert.equal(
+        result.privateErrorBoundaryCommitRecoveryMetadataAvailable,
+        true
+      );
+    }
   }
   assert.equal(result.privateExecutorInvoked, true);
   assert.equal(result.privateRootRequestExecution, true);
@@ -5292,10 +5366,44 @@ function createRustUpdateNativeBridgeAdmissionEvidence(request, overrides = {}) 
       overrides.hostOutputProduced === undefined
         ? true
         : overrides.hostOutputProduced,
+    privateErrorBoundaryCommitRecoveryMetadata:
+      overrides.privateErrorBoundaryCommitRecoveryMetadata ??
+      createRustErrorBoundaryCommitRecoveryMetadataSource(request),
     nativeAddonLoaded: false,
     nativeExecution: false,
     rustExecution: true,
     reconcilerExecution: true
+  };
+}
+
+function createRustErrorBoundaryCommitRecoveryMetadataSource(request) {
+  return {
+    id: privateErrorBoundaryCommitRecoveryDiagnosticName,
+    kind: "FastReactTestRendererPrivateErrorBoundaryCommitRecoveryMetadata",
+    status: privateErrorBoundaryCommitRecoveryStatus,
+    acceptedRustApi: privateErrorBoundaryCommitRecoveryRustApi,
+    rootRequestId: request.requestId,
+    rootId: request.rootId,
+    operation: "update",
+    updateFailurePath: "commit",
+    commitPhaseRecoveryPath: privateErrorBoundaryCommitRecoveryPath,
+    commitPhaseRecoveryAction: privateErrorBoundaryCommitRecoveryAction,
+    sourceUpdateRecord: "TestRendererUpdateNativeBridgeAdmission",
+    sourceUpdateRecordId: privateUpdateNativeBridgeAdmissionDiagnosticId,
+    sourceUpdateRecordStatus: privateUpdateNativeBridgeAdmissionStatus,
+    sourceUpdateKind: "Update",
+    sourceFailureRecord: "HostRootRenderFailureRecoveryCommitEvidenceForCanary",
+    sourceCommitRecoverySnapshotRecord: "HostRootCommitRecoverySnapshotForCanary",
+    consumesAcceptedRustUpdateMetadata: true,
+    consumesAcceptedRustFailureMetadata: true,
+    consumesAcceptedCommitRecoverySnapshot: true,
+    preservesRootErrorOptionHandles: true,
+    commitPhaseRecoveryPathConsumed: true,
+    rootErrorUpdateScheduled: false,
+    publicRootErrorCallbacksInvoked: false,
+    publicErrorBoundaryBehaviorAvailable: false,
+    publicErrorRecoveryAvailable: false,
+    compatibilityClaimed: false
   };
 }
 
@@ -7382,6 +7490,64 @@ function assertPrivateUpdateNativeBridgeAdmission(record, request) {
   assert.equal(record.reconcilerExecutionFromJs, true);
   assert.equal(record.hostOutputProduced, true);
   assert.equal(record.compatibilityClaimed, false);
+}
+
+function assertPrivateErrorBoundaryCommitRecoveryMetadata(
+  metadata,
+  request,
+  updateAdmission
+) {
+  assert.equal(Object.isFrozen(metadata), true, request.entrypoint);
+  assert.equal(metadata.id, privateErrorBoundaryCommitRecoveryDiagnosticName);
+  assert.equal(
+    metadata.kind,
+    "FastReactTestRendererPrivateErrorBoundaryCommitRecoveryMetadata"
+  );
+  assert.equal(metadata.status, privateErrorBoundaryCommitRecoveryStatus);
+  assert.equal(metadata.acceptedRustApi, privateErrorBoundaryCommitRecoveryRustApi);
+  assert.equal(metadata.rootRequest, request);
+  assert.equal(metadata.rootRequestId, request.requestId);
+  assert.equal(metadata.rootId, request.rootId);
+  assert.equal(metadata.operation, "update");
+  assert.equal(metadata.updateFailurePath, "commit");
+  assert.equal(metadata.commitPhaseRecoveryPath, privateErrorBoundaryCommitRecoveryPath);
+  assert.equal(
+    metadata.commitPhaseRecoveryAction,
+    privateErrorBoundaryCommitRecoveryAction
+  );
+  assert.equal(
+    metadata.reactReference,
+    "ReactFiberWorkLoop.captureCommitPhaseError -> createRootErrorUpdate(SyncLane)"
+  );
+  assert.equal(metadata.sourceUpdateRecord, "TestRendererUpdateNativeBridgeAdmission");
+  assert.equal(
+    metadata.sourceUpdateRecordId,
+    privateUpdateNativeBridgeAdmissionDiagnosticId
+  );
+  assert.equal(
+    metadata.sourceUpdateRecordStatus,
+    privateUpdateNativeBridgeAdmissionStatus
+  );
+  assert.equal(metadata.sourceUpdateKind, "Update");
+  assert.equal(
+    metadata.sourceFailureRecord,
+    "HostRootRenderFailureRecoveryCommitEvidenceForCanary"
+  );
+  assert.equal(
+    metadata.sourceCommitRecoverySnapshotRecord,
+    "HostRootCommitRecoverySnapshotForCanary"
+  );
+  assert.equal(metadata.privateUpdateNativeBridgeAdmission, updateAdmission);
+  assert.equal(metadata.consumesAcceptedRustUpdateMetadata, true);
+  assert.equal(metadata.consumesAcceptedRustFailureMetadata, true);
+  assert.equal(metadata.consumesAcceptedCommitRecoverySnapshot, true);
+  assert.equal(metadata.preservesRootErrorOptionHandles, true);
+  assert.equal(metadata.commitPhaseRecoveryPathConsumed, true);
+  assert.equal(metadata.rootErrorUpdateScheduled, false);
+  assert.equal(metadata.publicRootErrorCallbacksInvoked, false);
+  assert.equal(metadata.publicErrorBoundaryBehaviorAvailable, false);
+  assert.equal(metadata.publicErrorRecoveryAvailable, false);
+  assert.equal(metadata.compatibilityClaimed, false);
 }
 
 function assertPrivateUnmountDeletionCommitHandoffGate(gate, label) {
