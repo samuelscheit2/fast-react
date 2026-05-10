@@ -9,6 +9,10 @@ const hydrationGate = require(path.join(
   packageRoot,
   'src/client/hydration-boundary-gate.js'
 ));
+const rootBridge = require(path.join(
+  packageRoot,
+  'src/client/root-bridge.js'
+));
 const domContainer = require(path.join(
   packageRoot,
   'src/client/dom-container.js'
@@ -153,6 +157,113 @@ test('private hydration replay target-dispatch link records one blocked replay c
   assert.deepEqual(fixture.document.__registrations, []);
 });
 
+test('private hydration target claiming records one inert dehydrated boundary target', () => {
+  const fixture = createHydrationReplayTargetDispatchFixture(
+    'target-claiming'
+  );
+  const dispatchRecord = createDispatchRecord(
+    fixture.container,
+    'click',
+    eventSystemFlags.IS_CAPTURE_PHASE,
+    fixture.boundaryTarget
+  );
+  const targetDispatchLink =
+    hydrationGate.createHydrationReplayTargetDispatchLinkDiagnostic(
+      fixture.record,
+      dispatchRecord,
+      {
+        source: 'hydration-private-target-claiming-link'
+      }
+    );
+  const ownershipDiagnostics =
+    hydrationGate.createHydrationReplayOwnershipGateDiagnostic(
+      fixture.record,
+      dispatchRecord,
+      {
+        source: 'hydration-private-target-claiming-ownership'
+      }
+    );
+  const claim = hydrationGate.createHydrationTargetClaimingDiagnostic(
+    fixture.record,
+    ownershipDiagnostics,
+    targetDispatchLink,
+    {
+      source: 'hydration-private-target-claiming'
+    }
+  );
+
+  assert.equal(
+    claim.kind,
+    hydrationGate.HYDRATION_TARGET_CLAIMING_DIAGNOSTIC_KIND
+  );
+  assert.equal(claim.gateId, hydrationGate.privateHydrationTargetClaimingGateId);
+  assert.equal(claim.metadataId, 'hydration-target-claiming');
+  assert.equal(
+    claim.status,
+    hydrationGate.privateHydrationTargetClaimingMetadataStatus
+  );
+  assert.equal(Object.isFrozen(claim), true);
+  assert.equal(claim.diagnosticOnly, true);
+  assert.equal(claim.readOnly, true);
+  assert.equal(claim.compatibilityClaimed, false);
+  assert.equal(claim.publicHydrationCompatibilityClaimed, false);
+  assert.equal(claim.publicHydrationReplayCompatibilityClaimed, false);
+  assert.equal(claim.hydrationReplaySupported, false);
+  assert.equal(claim.eventReplaySupported, false);
+  assert.equal(claim.queueMutationAllowed, false);
+  assert.equal(claim.replayQueuesDrained, false);
+  assert.equal(claim.willDrainReplayQueues, false);
+  assert.equal(claim.eventsReplayed, false);
+  assert.equal(claim.willDispatch, false);
+  assert.equal(claim.willHydrate, false);
+  assert.equal(claim.willReplay, false);
+  assert.equal(claim.claimRecorded, true);
+  assert.equal(claim.claimedTargetMetadata, true);
+  assert.equal(claim.targetClaimExecuted, false);
+  assert.equal(claim.publicHydrationTargetClaimed, false);
+  assert.equal(claim.hydrateInstanceCalled, false);
+  assert.equal(claim.markerParserEvidenceAccepted, true);
+  assert.equal(claim.rootRecordId, 'hydration-link:1');
+  assert.equal(claim.markerId, 'suspense-completed-start@container.childNodes[0]');
+  assert.equal(claim.markerPath, 'container.childNodes[0]');
+  assert.equal(claim.markerContractId, 'suspense-completed-start');
+  assert.equal(claim.markerReplayTargetCandidate.path, claim.markerPath);
+  assert.equal(claim.targetDispatchLinkDiagnostic, targetDispatchLink);
+  assert.equal(claim.inputOrder, 0);
+  assert.equal(claim.domEventName, 'click');
+  assert.equal(claim.queueName, 'discrete-hydration-replay-attempt');
+  assert.equal(claim.ownershipDiagnostics, ownershipDiagnostics);
+  assert.equal(claim.ownershipRowStatus, 'retained-root-and-boundary-ownership-through-drain-order');
+  assert.equal(claim.ownershipRetainedThroughDrainOrder, true);
+  assert.equal(claim.rootOwnershipStatus, 'owned-by-dehydrated-root');
+  assert.equal(claim.dehydratedBoundaryOwnerId, 'hydration-link:1:boundary:0');
+  assert.equal(claim.dehydratedBoundaryOwnerPath, 'container.childNodes[0]');
+  assert.equal(claim.ownerBoundaryKind, 'suspense-boundary');
+  assert.equal(claim.targetPath, 'container.childNodes[1]');
+  assert.equal(claim.targetPathStatus, 'found-in-container-child-list');
+  assert.equal(claim.targetPathParentPath, 'container');
+  assert.equal(claim.targetPathIndex, 1);
+  assert.equal(claim.targetPathSegmentCount, 1);
+  assert.equal(claim.targetDispatchPathStatus, 'no-mounted-host-instance');
+  assert.equal(claim.targetDispatchPathLength, 0);
+
+  const payload =
+    hydrationGate.getPrivateHydrationTargetClaimingDiagnosticPayload(claim);
+  assert.equal(payload.hydrationBoundaryRecord, fixture.record);
+  assert.equal(payload.markerRow, fixture.record.markerDiagnostics.markers[0]);
+  assert.equal(payload.ownershipDiagnostics, ownershipDiagnostics);
+  assert.equal(payload.ownershipRow, claim.ownershipRow);
+  assert.equal(payload.targetDispatchLinkDiagnostic, targetDispatchLink);
+  assert.equal(
+    rootBridge.getPrivateHydrationTargetClaimingDiagnosticPayload(claim),
+    payload
+  );
+  assert.equal(rootBridge.isPrivateHydrationTargetClaimingDiagnostic(claim), true);
+  assert.equal(dispatchRecord.hydrationReplay.queued, false);
+  assert.deepEqual(fixture.container.__registrations, []);
+  assert.deepEqual(fixture.document.__registrations, []);
+});
+
 test('private hydration replay target-dispatch link rejects stale queue entries and missing ownership', () => {
   const fixture = createHydrationReplayTargetDispatchFixture(
     'target-dispatch-link-stale'
@@ -267,16 +378,143 @@ test('private hydration replay target-dispatch link rejects foreign dispatch pat
   assert.deepEqual(fixture.document.__registrations, []);
 });
 
+test('private hydration target claiming rejects stale markers missing ownership and unsupported paths', () => {
+  const fixture = createHydrationReplayTargetDispatchFixture(
+    'target-claiming-negative'
+  );
+  const dispatchRecord = createDispatchRecord(
+    fixture.container,
+    'click',
+    eventSystemFlags.IS_CAPTURE_PHASE,
+    fixture.boundaryTarget
+  );
+  const targetDispatchLink =
+    hydrationGate.createHydrationReplayTargetDispatchLinkDiagnostic(
+      fixture.record,
+      dispatchRecord,
+      {
+        source: 'hydration-private-target-claiming-negative-link'
+      }
+    );
+  const ownershipDiagnostics =
+    hydrationGate.createHydrationReplayOwnershipGateDiagnostic(
+      fixture.record,
+      dispatchRecord,
+      {
+        source: 'hydration-private-target-claiming-negative-ownership'
+      }
+    );
+  const staleMarkerFixture = createHydrationReplayTargetDispatchFixture(
+    'target-claiming-stale-marker'
+  );
+
+  assert.throws(
+    () =>
+      hydrationGate.createHydrationTargetClaimingDiagnostic(
+        fixture.record,
+        ownershipDiagnostics,
+        targetDispatchLink,
+        {
+          markerRow: staleMarkerFixture.record.markerDiagnostics.markers[0],
+          source: 'hydration-private-target-claiming-stale-marker'
+        }
+      ),
+    {
+      code:
+        hydrationGate.INVALID_HYDRATION_TARGET_CLAIMING_DIAGNOSTIC_CODE
+    }
+  );
+
+  assert.throws(
+    () =>
+      hydrationGate.createHydrationTargetClaimingDiagnostic(
+        fixture.record,
+        fixture.record.eventReplayOwnershipDiagnostics,
+        targetDispatchLink,
+        {
+          source: 'hydration-private-target-claiming-missing-ownership'
+        }
+      ),
+    {
+      code:
+        hydrationGate.INVALID_HYDRATION_TARGET_CLAIMING_DIAGNOSTIC_CODE
+    }
+  );
+
+  const nestedFixture = createHydrationReplayTargetDispatchFixture(
+    'target-claiming-nested-path',
+    {
+      nestedTarget: true
+    }
+  );
+  const nestedDispatchRecord = createDispatchRecord(
+    nestedFixture.container,
+    'click',
+    eventSystemFlags.IS_CAPTURE_PHASE,
+    nestedFixture.boundaryTarget
+  );
+  const nestedTargetDispatchLink =
+    hydrationGate.createHydrationReplayTargetDispatchLinkDiagnostic(
+      nestedFixture.record,
+      nestedDispatchRecord,
+      {
+        source: 'hydration-private-target-claiming-nested-link'
+      }
+    );
+  const nestedOwnershipDiagnostics =
+    hydrationGate.createHydrationReplayOwnershipGateDiagnostic(
+      nestedFixture.record,
+      nestedDispatchRecord,
+      {
+        source: 'hydration-private-target-claiming-nested-ownership'
+      }
+    );
+
+  assert.equal(
+    nestedTargetDispatchLink.targetPath,
+    'container.childNodes[1].childNodes[0]'
+  );
+  assert.throws(
+    () =>
+      hydrationGate.createHydrationTargetClaimingDiagnostic(
+        nestedFixture.record,
+        nestedOwnershipDiagnostics,
+        nestedTargetDispatchLink,
+        {
+          source: 'hydration-private-target-claiming-unsupported-path'
+        }
+      ),
+    {
+      code:
+        hydrationGate.INVALID_HYDRATION_TARGET_CLAIMING_DIAGNOSTIC_CODE
+    }
+  );
+  assert.equal(dispatchRecord.hydrationReplay.queued, false);
+  assert.equal(nestedDispatchRecord.hydrationReplay.queued, false);
+  assert.deepEqual(fixture.container.__registrations, []);
+  assert.deepEqual(fixture.document.__registrations, []);
+  assert.deepEqual(nestedFixture.container.__registrations, []);
+  assert.deepEqual(nestedFixture.document.__registrations, []);
+});
+
 function createHydrationReplayTargetDispatchFixture(label, options) {
   const normalizedOptions = options || {};
   const document = createDocument(label);
   const container = createElement('DIV', document);
   const boundaryTarget = createElement('BUTTON', document);
-  boundaryTarget.parentNode = container;
-  container.childNodes =
-    normalizedOptions.targetInsideBoundary === false
-      ? [createComment('$'), createComment('/$'), boundaryTarget]
-      : [createComment('$'), boundaryTarget, createComment('/$')];
+  if (normalizedOptions.nestedTarget === true) {
+    const wrapper = createElement('SPAN', document);
+    boundaryTarget.parentNode = wrapper;
+    wrapper.parentNode = container;
+    wrapper.childNodes = [boundaryTarget];
+    container.childNodes = [createComment('$'), wrapper, createComment('/$')];
+  } else {
+    boundaryTarget.parentNode = container;
+    container.childNodes =
+      normalizedOptions.targetInsideBoundary === false
+        ? [createComment('$'), createComment('/$'), boundaryTarget]
+        : [createComment('$'), boundaryTarget, createComment('/$')];
+  }
 
   const gate = hydrationGate.createHydrationBoundaryGate({
     recordIdPrefix: 'hydration-link'

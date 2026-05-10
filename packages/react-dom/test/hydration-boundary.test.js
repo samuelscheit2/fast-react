@@ -111,6 +111,7 @@ test('unsupported hydrateRoot records bridge hydration parser evidence with root
         contractId: 'suspense-completed-start',
         kind: 'comment',
         lifecycle: 'server-emitted-client-consumed',
+        markerId: 'suspense-completed-start@container.childNodes[0]',
         path: 'container.childNodes[0]'
       },
       {
@@ -119,6 +120,7 @@ test('unsupported hydrateRoot records bridge hydration parser evidence with root
         contractId: 'suspense-end',
         kind: 'comment',
         lifecycle: 'server-emitted-client-consumed',
+        markerId: 'suspense-end@container.childNodes[1]',
         path: 'container.childNodes[1]'
       }
     ],

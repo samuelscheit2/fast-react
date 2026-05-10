@@ -165,6 +165,7 @@ function inspectCommentMarker({
     state,
     freezeRecord({
       kind: 'comment',
+      markerId: createMarkerRowId(contract.id, path),
       path,
       depth,
       index,
@@ -206,6 +207,7 @@ function inspectTemplateMarker({depth, index, node, path, state}) {
     state,
     freezeRecord({
       kind: 'template',
+      markerId: createMarkerRowId(contract.id, path),
       path,
       depth,
       index,
@@ -347,6 +349,10 @@ function pushMarkerRow(state, markerRow) {
     markerRow.contractId,
     (state.summaryCounts.get(markerRow.contractId) || 0) + 1
   );
+}
+
+function createMarkerRowId(contractId, path) {
+  return `${contractId}@${path}`;
 }
 
 function createSummaryByContract(state) {

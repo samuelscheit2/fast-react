@@ -35,10 +35,15 @@ const {
 const {
   HYDRATION_REPLAY_OWNERSHIP_GATE_DIAGNOSTIC_KIND,
   HYDRATION_REPLAY_OWNERSHIP_GATE_ENTRY_RECORD_KIND,
+  HYDRATION_TARGET_CLAIMING_DIAGNOSTIC_KIND,
   UNSUPPORTED_HYDRATION_ROOT_KIND,
   createHydrationBoundaryGate,
   getPrivateHydrationBoundaryRecordPayload,
-  isPrivateHydrationBoundaryRecord
+  getPrivateHydrationTargetClaimingDiagnosticPayload,
+  isPrivateHydrationBoundaryRecord,
+  isPrivateHydrationTargetClaimingDiagnostic,
+  privateHydrationTargetClaimingGateId,
+  privateHydrationTargetClaimingMetadataStatus
 } = require('./hydration-boundary-gate.js');
 const {
   hasListeningMarker,
@@ -13340,6 +13345,7 @@ module.exports = {
   NATIVE_ROOT_BRIDGE_ROOT_HANDLE_ACTIVE,
   NATIVE_ROOT_BRIDGE_ROOT_HANDLE_RETIRED,
   NATIVE_ROOT_BRIDGE_SYNTHETIC_ENVIRONMENT_ID,
+  HYDRATION_TARGET_CLAIMING_DIAGNOSTIC_KIND,
   admitPrivateCreateRenderPath,
   admitPrivateRootCommitRefMetadata,
   admitRootBridgeRequestRecord,
@@ -13400,6 +13406,7 @@ module.exports = {
   getPrivateRootPublicFacadeRootPayload,
   getPrivateRootEventListenerErrorRoutingPayload,
   getPrivateRootHydrationReplayErrorMetadataPayload,
+  getPrivateHydrationTargetClaimingDiagnosticPayload,
   getPrivateRootRefCallbackErrorRoutingPayload,
   getPrivateRootRefCallbackHostOutputOrderingDiagnosticPayload,
   getPrivateRootRecordPayload,
@@ -13432,6 +13439,7 @@ module.exports = {
   isPrivateRootUnmountHostOutputCleanupRecord,
   isPrivateRootEventListenerErrorRoutingRecord,
   isPrivateRootHydrationReplayErrorMetadataRecord,
+  isPrivateHydrationTargetClaimingDiagnostic,
   isPrivateRootRefCallbackErrorRoutingRecord,
   isPrivateRootRefCallbackHostOutputOrderingDiagnosticRecord,
   isPrivateRootHandle,
@@ -13470,6 +13478,8 @@ module.exports = {
   privateRootPortalFakeDomMountRecordType,
   privateRootEventListenerErrorRoutingRecordType,
   privateRootHydrationReplayErrorMetadataRecordType,
+  privateHydrationTargetClaimingGateId,
+  privateHydrationTargetClaimingMetadataStatus,
   privateRootRefCallbackHostOutputOrderingDiagnosticRecordType,
   privateRootRefCallbackErrorRoutingRecordType,
   privateRootCreateRecordType,
