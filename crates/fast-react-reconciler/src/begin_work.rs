@@ -663,6 +663,27 @@ impl UnsupportedOffscreenVisibilityTransitionRecord {
     }
 
     #[must_use]
+    pub(crate) const fn is_hidden_to_visible_reveal(&self) -> bool {
+        matches!(
+            self.transition,
+            UnsupportedOffscreenVisibilityTransitionKind::HiddenToVisible
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn is_visible_to_hidden_hide(&self) -> bool {
+        matches!(
+            self.transition,
+            UnsupportedOffscreenVisibilityTransitionKind::VisibleToHidden
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn records_offscreen_lane_participation(&self) -> bool {
+        self.render_includes_offscreen_lane || self.work_in_progress_includes_offscreen_lane
+    }
+
+    #[must_use]
     pub(crate) fn has_same_transition_identity(&self, other: &Self) -> bool {
         self.work_in_progress == other.work_in_progress
             && self.previous == other.previous
@@ -8477,6 +8498,12 @@ mod tests {
             true,
             false,
         );
+        let transition = record
+            .visibility_transition()
+            .expect("hidden to visible transition diagnostic");
+        assert!(transition.is_hidden_to_visible_reveal());
+        assert!(!transition.is_visible_to_hidden_hide());
+        assert!(transition.records_offscreen_lane_participation());
         assert_eq!(
             hidden_to_visible_arena
                 .get(work_in_progress)
@@ -8541,6 +8568,12 @@ mod tests {
             false,
             true,
         );
+        let transition = record
+            .visibility_transition()
+            .expect("visible to hidden transition diagnostic");
+        assert!(!transition.is_hidden_to_visible_reveal());
+        assert!(transition.is_visible_to_hidden_hide());
+        assert!(transition.records_offscreen_lane_participation());
         assert_eq!(
             visible_to_hidden_arena
                 .get(work_in_progress)

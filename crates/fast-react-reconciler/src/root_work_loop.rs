@@ -23,14 +23,15 @@ use fast_react_core::ContextValueChange;
 #[cfg(test)]
 use fast_react_core::bubble_properties;
 use fast_react_core::{
-    ContextHandle, ContextValueHandle, FiberId, FiberTag, FiberTopologyError, Lanes, PropsHandle,
-    StateHandle, UpdateQueueHandle,
+    ContextHandle, ContextValueHandle, FiberId, FiberTag, FiberTopologyError, Lane, Lanes,
+    PropsHandle, StateHandle, UpdateQueueHandle,
 };
 use fast_react_host_config::HostTypes;
 
 use crate::{
     FiberRootId, FiberRootStore, FiberRootStoreError, HostRootStateStoreError, RootElementHandle,
-    RootRenderExitStatus, RootSchedulerCallbackHandle, UpdateQueueError, WorkInProgressError,
+    RootRenderExitStatus, RootSchedulerCallbackHandle, UpdateId, UpdateQueueError,
+    WorkInProgressError,
     begin_work::{
         BeginWorkError, BeginWorkRequest, BeginWorkResult, NestedContextProviderBeginWorkError,
         NestedContextProviderBeginWorkRecord, NestedContextProviderBeginWorkRequest,
@@ -75,8 +76,12 @@ use crate::{
     complete_work::{
         ContextProviderStackRestorationError, ContextProviderStackRestorationPhase,
         ContextProviderStackRestorationRecord, HostRootOneLevelChildSetCompletionError,
-        HostRootOneLevelChildSetCompletionRecord, complete_context_provider_for_test,
-        complete_host_root_one_level_child_set_for_test, unwind_context_provider_for_test,
+        HostRootOneLevelChildSetCompletionRecord, OffscreenRevealCommitMetadataError,
+        OffscreenRevealCommitMetadataRecord, OffscreenVisibilityTransitionCompleteWorkBlockerError,
+        OffscreenVisibilityTransitionCompleteWorkBlockerRecord, complete_context_provider_for_test,
+        complete_host_root_one_level_child_set_for_test,
+        complete_offscreen_visibility_transition_blocker_for_test,
+        offscreen_reveal_commit_metadata_for_test, unwind_context_provider_for_test,
     },
     function_component::{
         FunctionComponentContextChangePropagationError,
@@ -962,6 +967,367 @@ impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
     fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
         Self::FinishedWorkCommitHandoff(error)
     }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct OffscreenHiddenLaneRevealCommitGateRecord {
+    root: FiberRootId,
+    host_root_work_in_progress: FiberId,
+    offscreen: FiberId,
+    hidden_update: UpdateId,
+    hidden_update_lane: Lane,
+    retained_hidden_update_lanes: Lanes,
+    hidden_update_count: usize,
+    begin_work: UnsupportedOffscreenChildShapeRecord,
+    complete_work: OffscreenVisibilityTransitionCompleteWorkBlockerRecord,
+    reveal_commit: OffscreenRevealCommitMetadataRecord,
+    child_traversal_blocked: bool,
+    host_visibility_mutation_blocked: bool,
+    public_offscreen_compatibility_blocked: bool,
+    public_activity_compatibility_blocked: bool,
+}
+
+#[cfg(test)]
+impl OffscreenHiddenLaneRevealCommitGateRecord {
+    #[must_use]
+    const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    const fn host_root_work_in_progress(&self) -> FiberId {
+        self.host_root_work_in_progress
+    }
+
+    #[must_use]
+    const fn offscreen(&self) -> FiberId {
+        self.offscreen
+    }
+
+    #[must_use]
+    const fn hidden_update(&self) -> UpdateId {
+        self.hidden_update
+    }
+
+    #[must_use]
+    const fn hidden_update_lane(&self) -> Lane {
+        self.hidden_update_lane
+    }
+
+    #[must_use]
+    const fn retained_hidden_update_lanes(&self) -> Lanes {
+        self.retained_hidden_update_lanes
+    }
+
+    #[must_use]
+    const fn hidden_update_count(&self) -> usize {
+        self.hidden_update_count
+    }
+
+    #[must_use]
+    const fn begin_work(&self) -> &UnsupportedOffscreenChildShapeRecord {
+        &self.begin_work
+    }
+
+    #[must_use]
+    const fn complete_work(&self) -> &OffscreenVisibilityTransitionCompleteWorkBlockerRecord {
+        &self.complete_work
+    }
+
+    #[must_use]
+    const fn reveal_commit(&self) -> &OffscreenRevealCommitMetadataRecord {
+        &self.reveal_commit
+    }
+
+    #[must_use]
+    const fn child_traversal_blocked(&self) -> bool {
+        self.child_traversal_blocked
+    }
+
+    #[must_use]
+    const fn host_visibility_mutation_blocked(&self) -> bool {
+        self.host_visibility_mutation_blocked
+    }
+
+    #[must_use]
+    const fn public_offscreen_compatibility_blocked(&self) -> bool {
+        self.public_offscreen_compatibility_blocked
+    }
+
+    #[must_use]
+    const fn public_activity_compatibility_blocked(&self) -> bool {
+        self.public_activity_compatibility_blocked
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum OffscreenHiddenLaneRevealCommitGateError {
+    FiberRootStore(FiberRootStoreError),
+    FiberTopology(FiberTopologyError),
+    BeginWork(BeginWorkError),
+    CompleteWork(OffscreenVisibilityTransitionCompleteWorkBlockerError),
+    RevealCommit(OffscreenRevealCommitMetadataError),
+    UpdateQueue(UpdateQueueError),
+    ExpectedHostRootWorkInProgress {
+        fiber: FiberId,
+        tag: FiberTag,
+    },
+    UnexpectedHostRootChild {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        expected: FiberId,
+        actual: Option<FiberId>,
+        actual_tag: Option<FiberTag>,
+    },
+    HiddenUpdateLaneNotRetained {
+        update: UpdateId,
+        expected: Lanes,
+        actual: Lanes,
+    },
+    HiddenUpdateLaneNotRecorded {
+        root: FiberRootId,
+        lane: Lane,
+    },
+    StaleBeginWorkRecord {
+        offscreen: FiberId,
+    },
+    StaleCompleteWorkRecord {
+        offscreen: FiberId,
+    },
+}
+
+#[cfg(test)]
+impl Display for OffscreenHiddenLaneRevealCommitGateError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::FiberRootStore(error) => Display::fmt(error, formatter),
+            Self::FiberTopology(error) => Display::fmt(error, formatter),
+            Self::BeginWork(error) => Display::fmt(error, formatter),
+            Self::CompleteWork(error) => Display::fmt(error, formatter),
+            Self::RevealCommit(error) => Display::fmt(error, formatter),
+            Self::UpdateQueue(error) => Display::fmt(error, formatter),
+            Self::ExpectedHostRootWorkInProgress { fiber, tag } => write!(
+                formatter,
+                "fiber {} must be HostRoot work-in-progress for private Offscreen reveal gate, found {:?}",
+                fiber.slot().get(),
+                tag
+            ),
+            Self::UnexpectedHostRootChild {
+                root,
+                host_root_work_in_progress,
+                expected,
+                actual,
+                actual_tag,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} must point at Offscreen child {}; found {:?} ({:?})",
+                root.raw(),
+                host_root_work_in_progress.slot().get(),
+                expected.slot().get(),
+                actual.map(|fiber| fiber.slot().get()),
+                actual_tag
+            ),
+            Self::HiddenUpdateLaneNotRetained {
+                update,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "hidden update {} did not retain Offscreen lane metadata; expected {:?}, actual {:?}",
+                update.raw(),
+                expected,
+                actual
+            ),
+            Self::HiddenUpdateLaneNotRecorded { root, lane } => write!(
+                formatter,
+                "root {} has no private hidden update lane record for {:?}",
+                root.raw(),
+                lane
+            ),
+            Self::StaleBeginWorkRecord { offscreen } => write!(
+                formatter,
+                "Offscreen fiber {} has stale begin-work evidence for private hidden-lane reveal gate",
+                offscreen.slot().get()
+            ),
+            Self::StaleCompleteWorkRecord { offscreen } => write!(
+                formatter,
+                "Offscreen fiber {} has stale complete-work evidence for private hidden-lane reveal gate",
+                offscreen.slot().get()
+            ),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Error for OffscreenHiddenLaneRevealCommitGateError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::FiberRootStore(error) => Some(error),
+            Self::FiberTopology(error) => Some(error),
+            Self::BeginWork(error) => Some(error),
+            Self::CompleteWork(error) => Some(error),
+            Self::RevealCommit(error) => Some(error),
+            Self::UpdateQueue(error) => Some(error),
+            Self::ExpectedHostRootWorkInProgress { .. }
+            | Self::UnexpectedHostRootChild { .. }
+            | Self::HiddenUpdateLaneNotRetained { .. }
+            | Self::HiddenUpdateLaneNotRecorded { .. }
+            | Self::StaleBeginWorkRecord { .. }
+            | Self::StaleCompleteWorkRecord { .. } => None,
+        }
+    }
+}
+
+#[cfg(test)]
+impl From<FiberRootStoreError> for OffscreenHiddenLaneRevealCommitGateError {
+    fn from(error: FiberRootStoreError) -> Self {
+        Self::FiberRootStore(error)
+    }
+}
+
+#[cfg(test)]
+impl From<FiberTopologyError> for OffscreenHiddenLaneRevealCommitGateError {
+    fn from(error: FiberTopologyError) -> Self {
+        Self::FiberTopology(error)
+    }
+}
+
+#[cfg(test)]
+impl From<BeginWorkError> for OffscreenHiddenLaneRevealCommitGateError {
+    fn from(error: BeginWorkError) -> Self {
+        Self::BeginWork(error)
+    }
+}
+
+#[cfg(test)]
+impl From<OffscreenVisibilityTransitionCompleteWorkBlockerError>
+    for OffscreenHiddenLaneRevealCommitGateError
+{
+    fn from(error: OffscreenVisibilityTransitionCompleteWorkBlockerError) -> Self {
+        Self::CompleteWork(error)
+    }
+}
+
+#[cfg(test)]
+impl From<OffscreenRevealCommitMetadataError> for OffscreenHiddenLaneRevealCommitGateError {
+    fn from(error: OffscreenRevealCommitMetadataError) -> Self {
+        Self::RevealCommit(error)
+    }
+}
+
+#[cfg(test)]
+impl From<UpdateQueueError> for OffscreenHiddenLaneRevealCommitGateError {
+    fn from(error: UpdateQueueError) -> Self {
+        Self::UpdateQueue(error)
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::too_many_arguments)]
+fn offscreen_hidden_lane_reveal_commit_gate_for_test(
+    store: &FiberRootStore<RecordingHost>,
+    root: FiberRootId,
+    host_root_work_in_progress: FiberId,
+    offscreen: FiberId,
+    hidden_update: UpdateId,
+    hidden_update_lane: Lane,
+    begin_work: &UnsupportedOffscreenChildShapeRecord,
+    complete_work: &OffscreenVisibilityTransitionCompleteWorkBlockerRecord,
+    committed_lanes: Lanes,
+) -> Result<OffscreenHiddenLaneRevealCommitGateRecord, OffscreenHiddenLaneRevealCommitGateError> {
+    let host_root = store.fiber_arena().get(host_root_work_in_progress)?;
+    let host_root_tag = host_root.tag();
+    if host_root_tag != FiberTag::HostRoot {
+        return Err(
+            OffscreenHiddenLaneRevealCommitGateError::ExpectedHostRootWorkInProgress {
+                fiber: host_root_work_in_progress,
+                tag: host_root_tag,
+            },
+        );
+    }
+
+    let actual_child = host_root.child();
+    let actual_child_tag = actual_child
+        .map(|child| store.fiber_arena().get(child).map(|node| node.tag()))
+        .transpose()?;
+    if actual_child != Some(offscreen) {
+        return Err(
+            OffscreenHiddenLaneRevealCommitGateError::UnexpectedHostRootChild {
+                root,
+                host_root_work_in_progress,
+                expected: offscreen,
+                actual: actual_child,
+                actual_tag: actual_child_tag,
+            },
+        );
+    }
+
+    let retained_hidden_update_lanes = store.update_queues().update(hidden_update)?.lane();
+    let expected_hidden_update_lanes = hidden_update_lane.to_lanes().merge_lane(Lane::OFFSCREEN);
+    if retained_hidden_update_lanes != expected_hidden_update_lanes {
+        return Err(
+            OffscreenHiddenLaneRevealCommitGateError::HiddenUpdateLaneNotRetained {
+                update: hidden_update,
+                expected: expected_hidden_update_lanes,
+                actual: retained_hidden_update_lanes,
+            },
+        );
+    }
+
+    let hidden_update_count = store
+        .root(root)?
+        .lanes()
+        .hidden_update_count(hidden_update_lane)
+        .unwrap_or_default();
+    if hidden_update_count == 0 {
+        return Err(
+            OffscreenHiddenLaneRevealCommitGateError::HiddenUpdateLaneNotRecorded {
+                root,
+                lane: hidden_update_lane,
+            },
+        );
+    }
+
+    let current_begin_work = unsupported_offscreen_begin_work_record(
+        store.fiber_arena(),
+        BeginWorkRequest::new(offscreen, begin_work.render_lanes()),
+    )?;
+    if &current_begin_work != begin_work {
+        return Err(OffscreenHiddenLaneRevealCommitGateError::StaleBeginWorkRecord { offscreen });
+    }
+
+    let current_complete_work = complete_offscreen_visibility_transition_blocker_for_test(
+        store.fiber_arena(),
+        offscreen,
+        begin_work,
+        complete_work.transition().render_lanes(),
+    )?;
+    if &current_complete_work != complete_work {
+        return Err(
+            OffscreenHiddenLaneRevealCommitGateError::StaleCompleteWorkRecord { offscreen },
+        );
+    }
+
+    let reveal_commit = offscreen_reveal_commit_metadata_for_test(complete_work, committed_lanes)?;
+
+    Ok(OffscreenHiddenLaneRevealCommitGateRecord {
+        root,
+        host_root_work_in_progress,
+        offscreen,
+        hidden_update,
+        hidden_update_lane,
+        retained_hidden_update_lanes,
+        hidden_update_count,
+        begin_work: begin_work.clone(),
+        complete_work: complete_work.clone(),
+        reveal_commit,
+        child_traversal_blocked: complete_work.child_traversal_blocked(),
+        host_visibility_mutation_blocked: complete_work.host_mutation_blocked(),
+        public_offscreen_compatibility_blocked: complete_work.public_compatibility_blocked(),
+        public_activity_compatibility_blocked: true,
+    })
 }
 
 #[cfg(test)]
@@ -3856,10 +4222,11 @@ mod tests {
         PendingChildrenHandle, PendingCommitHandle, ReconcilerError, RootContextHandle,
         RootElementHandle, RootHydrationCallbacksHandle, RootKind, RootOptions,
         RootSchedulerCallbackExecutionStatus, RootSuspenseBoundarySetHandle,
-        RootTaskScheduleOutcome, RootTransitionCallbacksHandle, RootUpdateError,
-        RootUpdateLaneSourcePriority, SchedulerCallbackRequest, commit_finished_host_root,
-        ensure_root_is_scheduled, execute_scheduled_root_callback, flush_sync_work_on_all_roots,
-        process_root_schedule_in_microtask, update_container, update_container_sync,
+        RootTaskScheduleOutcome, RootTransitionCallbacksHandle, RootUpdateCallbackHandle,
+        RootUpdateError, RootUpdateLaneSourcePriority, SchedulerCallbackRequest,
+        commit_finished_host_root, ensure_root_is_scheduled, execute_scheduled_root_callback,
+        flush_sync_work_on_all_roots, process_root_schedule_in_microtask, update_container,
+        update_container_sync,
     };
     use fast_react_core::{
         ContextHandle, ContextValueHandle, DependenciesHandle, ElementTypeHandle, EventPriority,
@@ -4465,6 +4832,86 @@ mod tests {
             .unwrap();
 
         (offscreen, first_child, second_child)
+    }
+
+    fn attach_offscreen_reveal_wip_child(
+        store: &mut FiberRootStore<RecordingHost>,
+        host_root_work_in_progress: FiberId,
+        child_tag: FiberTag,
+    ) -> (FiberId, FiberId, FiberId, FiberId) {
+        let previous = store.fiber_arena_mut().create_fiber(
+            FiberTag::Offscreen,
+            Some(ReactKey::from_normalized("reveal")),
+            PropsHandle::from_raw(758),
+            FiberMode::CONCURRENT,
+        );
+        {
+            let node = store.fiber_arena_mut().get_mut(previous).unwrap();
+            node.set_memoized_state(StateHandle::from_raw(759));
+            node.set_lanes(Lanes::OFFSCREEN);
+            node.set_child_lanes(Lanes::from(Lane::RETRY_1));
+            node.set_state_node(StateNodeHandle::from_raw(760));
+        }
+        let offscreen = store
+            .fiber_arena_mut()
+            .create_work_in_progress(previous, PropsHandle::from_raw(761))
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(offscreen).unwrap();
+            node.set_memoized_props(PropsHandle::from_raw(762));
+            node.set_memoized_state(StateHandle::NONE);
+            node.set_lanes(Lanes::DEFAULT);
+            node.set_child_lanes(Lanes::from(Lane::TRANSITION_1));
+            node.set_state_node(StateNodeHandle::from_raw(763));
+        }
+        let child = store.fiber_arena_mut().create_fiber(
+            child_tag,
+            None,
+            PropsHandle::from_raw(764),
+            FiberMode::NO,
+        );
+        store
+            .fiber_arena_mut()
+            .get_mut(child)
+            .unwrap()
+            .merge_flags(FiberFlags::PLACEMENT | FiberFlags::MAY_SUSPEND_COMMIT);
+        store
+            .fiber_arena_mut()
+            .set_children(offscreen, &[child])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root_work_in_progress, &[offscreen])
+            .unwrap();
+
+        (previous, offscreen, child, host_root_work_in_progress)
+    }
+
+    fn offscreen_begin_work_record_from_host_root_preflight(
+        store: &mut FiberRootStore<RecordingHost>,
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        render_lanes: Lanes,
+    ) -> UnsupportedOffscreenChildShapeRecord {
+        let mut registry = TestFunctionComponentRegistry::default();
+        match preflight_host_root_child_begin_work(
+            store,
+            root,
+            host_root_work_in_progress,
+            render_lanes,
+            &mut registry,
+        )
+        .unwrap_err()
+        {
+            HostRootChildBeginWorkPreflightError::UnsupportedOffscreenChildShape {
+                offscreen,
+                ..
+            } => {
+                assert!(registry.calls().is_empty());
+                *offscreen
+            }
+            other => panic!("expected Offscreen preflight blocker, got {other:?}"),
+        }
     }
 
     fn attach_suspense_list_wip_child_with_rows(
@@ -7440,6 +7887,342 @@ mod tests {
                 .return_fiber(),
             Some(offscreen)
         );
+    }
+
+    #[test]
+    fn root_work_loop_offscreen_hidden_lane_reveal_commit_gate_records_private_metadata() {
+        let (mut store, root_id, mut host) = root_store();
+        let hidden_callback = RootUpdateCallbackHandle::from_raw(7601);
+        let hidden_update = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(7601),
+            Some(hidden_callback),
+        )
+        .unwrap();
+        store
+            .update_queues_mut()
+            .mark_update_hidden(hidden_update.update())
+            .unwrap();
+        let retained_hidden_lanes = store
+            .root_mut(root_id)
+            .unwrap()
+            .lanes_mut()
+            .mark_hidden_update(hidden_update.lane())
+            .unwrap();
+        assert_eq!(
+            retained_hidden_lanes,
+            Lanes::DEFAULT.merge_lane(Lane::OFFSCREEN)
+        );
+
+        let render_lanes = Lanes::DEFAULT.merge_lane(Lane::OFFSCREEN);
+        let render = render_host_root_for_lanes(&mut store, root_id, render_lanes).unwrap();
+        let (previous, offscreen, child, host_root_work_in_progress) =
+            attach_offscreen_reveal_wip_child(
+                &mut store,
+                render.work_in_progress(),
+                FiberTag::HostComponent,
+            );
+        let begin_work = offscreen_begin_work_record_from_host_root_preflight(
+            &mut store,
+            root_id,
+            render.work_in_progress(),
+            render_lanes,
+        );
+        let complete_work = complete_offscreen_visibility_transition_blocker_for_test(
+            store.fiber_arena(),
+            offscreen,
+            &begin_work,
+            render_lanes,
+        )
+        .unwrap();
+
+        let record = offscreen_hidden_lane_reveal_commit_gate_for_test(
+            &store,
+            root_id,
+            render.work_in_progress(),
+            offscreen,
+            hidden_update.update(),
+            hidden_update.lane(),
+            &begin_work,
+            &complete_work,
+            render_lanes,
+        )
+        .unwrap();
+
+        assert_eq!(record.root(), root_id);
+        assert_eq!(
+            record.host_root_work_in_progress(),
+            host_root_work_in_progress
+        );
+        assert_eq!(record.offscreen(), offscreen);
+        assert_eq!(record.hidden_update(), hidden_update.update());
+        assert_eq!(record.hidden_update_lane(), Lane::DEFAULT);
+        assert_eq!(
+            record.retained_hidden_update_lanes(),
+            Lanes::DEFAULT.merge_lane(Lane::OFFSCREEN)
+        );
+        assert_eq!(record.hidden_update_count(), 1);
+        assert_eq!(record.begin_work().fiber(), offscreen);
+        assert_eq!(
+            record.begin_work().shape(),
+            UnsupportedOffscreenChildShapeKind::SingleChild
+        );
+        let begin_transition = record
+            .begin_work()
+            .visibility_transition()
+            .expect("reveal begin-work transition");
+        assert_eq!(begin_transition.previous(), previous);
+        assert!(begin_transition.is_hidden_to_visible_reveal());
+        assert!(begin_transition.records_offscreen_lane_participation());
+        assert_eq!(record.complete_work().offscreen(), offscreen);
+        assert_eq!(record.complete_work().child(), Some(child));
+        assert_eq!(
+            record
+                .complete_work()
+                .subtree_flag_bubbling_intent()
+                .as_str(),
+            "bubble-visible-subtree"
+        );
+        assert!(record.complete_work().would_schedule_visibility_effect());
+        assert!(
+            !record
+                .complete_work()
+                .flags()
+                .contains_any(FiberFlags::VISIBILITY)
+        );
+
+        let reveal = record.reveal_commit();
+        assert_eq!(reveal.offscreen(), offscreen);
+        assert_eq!(reveal.child(), child);
+        assert_eq!(reveal.child_tag(), FiberTag::HostComponent);
+        assert_eq!(reveal.committed_lanes(), render_lanes);
+        assert_eq!(
+            reveal.status().as_str(),
+            "accepted-hidden-to-visible-reveal"
+        );
+        assert_eq!(
+            reveal.suspensey_commit_flag(),
+            FiberFlags::MAY_SUSPEND_COMMIT
+        );
+        assert!(reveal.child_may_suspend_commit());
+        assert!(reveal.would_accumulate_newly_visible_suspensey_commit());
+        assert!(reveal.would_unhide_host_children());
+        assert!(reveal.visibility_effect_required());
+        assert!(!reveal.visibility_flag_set());
+        assert!(reveal.host_visibility_mutation_blocked());
+        assert!(reveal.passive_visibility_effects_blocked());
+        assert!(reveal.public_compatibility_blocked());
+        assert!(record.child_traversal_blocked());
+        assert!(record.host_visibility_mutation_blocked());
+        assert!(record.public_offscreen_compatibility_blocked());
+        assert!(record.public_activity_compatibility_blocked());
+
+        let source = TestHostTree::new();
+        let public_complete_error = handoff_completed_host_root_render_to_test_complete_work(
+            &mut store, &mut host, render, &source,
+        )
+        .unwrap_err();
+        match public_complete_error {
+            HostRootCompleteWorkHandoffError::ChildPreflight(error) => match *error {
+                HostRootChildBeginWorkPreflightError::UnsupportedOffscreenChildShape {
+                    offscreen: record,
+                    ..
+                } => {
+                    assert_eq!(record.fiber(), offscreen);
+                    assert_eq!(record.feature(), OFFSCREEN_UNSUPPORTED_FEATURE);
+                }
+                other => panic!("expected Offscreen public blocker, got {other:?}"),
+            },
+            other => panic!("expected child preflight blocker, got {other:?}"),
+        }
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_work_loop_offscreen_hidden_lane_reveal_commit_gate_rejects_stale_records_and_children()
+    {
+        let render_lanes = Lanes::DEFAULT.merge_lane(Lane::OFFSCREEN);
+
+        let (mut store, root_id, _host) = root_store();
+        let hidden_update = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(7611),
+            Some(RootUpdateCallbackHandle::from_raw(7611)),
+        )
+        .unwrap();
+        store
+            .update_queues_mut()
+            .mark_update_hidden(hidden_update.update())
+            .unwrap();
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .lanes_mut()
+            .mark_hidden_update(hidden_update.lane())
+            .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, render_lanes).unwrap();
+        let (_, offscreen, _, _) = attach_offscreen_reveal_wip_child(
+            &mut store,
+            render.work_in_progress(),
+            FiberTag::HostText,
+        );
+        let begin_work = offscreen_begin_work_record_from_host_root_preflight(
+            &mut store,
+            root_id,
+            render.work_in_progress(),
+            render_lanes,
+        );
+        let complete_work = complete_offscreen_visibility_transition_blocker_for_test(
+            store.fiber_arena(),
+            offscreen,
+            &begin_work,
+            render_lanes,
+        )
+        .unwrap();
+        store
+            .fiber_arena_mut()
+            .get_mut(offscreen)
+            .unwrap()
+            .set_memoized_props(PropsHandle::from_raw(7612));
+        assert_eq!(
+            offscreen_hidden_lane_reveal_commit_gate_for_test(
+                &store,
+                root_id,
+                render.work_in_progress(),
+                offscreen,
+                hidden_update.update(),
+                hidden_update.lane(),
+                &begin_work,
+                &complete_work,
+                render_lanes,
+            ),
+            Err(OffscreenHiddenLaneRevealCommitGateError::StaleBeginWorkRecord { offscreen })
+        );
+
+        let (mut store, root_id, _host) = root_store();
+        let hidden_update = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(7621),
+            Some(RootUpdateCallbackHandle::from_raw(7621)),
+        )
+        .unwrap();
+        store
+            .update_queues_mut()
+            .mark_update_hidden(hidden_update.update())
+            .unwrap();
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .lanes_mut()
+            .mark_hidden_update(hidden_update.lane())
+            .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, render_lanes).unwrap();
+        let (_, offscreen, child, _) = attach_offscreen_reveal_wip_child(
+            &mut store,
+            render.work_in_progress(),
+            FiberTag::HostText,
+        );
+        let begin_work = offscreen_begin_work_record_from_host_root_preflight(
+            &mut store,
+            root_id,
+            render.work_in_progress(),
+            render_lanes,
+        );
+        let complete_work = complete_offscreen_visibility_transition_blocker_for_test(
+            store.fiber_arena(),
+            offscreen,
+            &begin_work,
+            render_lanes,
+        )
+        .unwrap();
+        store
+            .fiber_arena_mut()
+            .get_mut(child)
+            .unwrap()
+            .merge_flags(FiberFlags::UPDATE);
+        assert_eq!(
+            offscreen_hidden_lane_reveal_commit_gate_for_test(
+                &store,
+                root_id,
+                render.work_in_progress(),
+                offscreen,
+                hidden_update.update(),
+                hidden_update.lane(),
+                &begin_work,
+                &complete_work,
+                render_lanes,
+            ),
+            Err(OffscreenHiddenLaneRevealCommitGateError::StaleCompleteWorkRecord { offscreen })
+        );
+
+        let (mut store, root_id, _host) = root_store();
+        let hidden_update = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(7631),
+            Some(RootUpdateCallbackHandle::from_raw(7631)),
+        )
+        .unwrap();
+        store
+            .update_queues_mut()
+            .mark_update_hidden(hidden_update.update())
+            .unwrap();
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .lanes_mut()
+            .mark_hidden_update(hidden_update.lane())
+            .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, render_lanes).unwrap();
+        let (_, offscreen, child, _) = attach_offscreen_reveal_wip_child(
+            &mut store,
+            render.work_in_progress(),
+            FiberTag::Fragment,
+        );
+        let begin_work = offscreen_begin_work_record_from_host_root_preflight(
+            &mut store,
+            root_id,
+            render.work_in_progress(),
+            render_lanes,
+        );
+        let complete_work = complete_offscreen_visibility_transition_blocker_for_test(
+            store.fiber_arena(),
+            offscreen,
+            &begin_work,
+            render_lanes,
+        )
+        .unwrap();
+        match offscreen_hidden_lane_reveal_commit_gate_for_test(
+            &store,
+            root_id,
+            render.work_in_progress(),
+            offscreen,
+            hidden_update.update(),
+            hidden_update.lane(),
+            &begin_work,
+            &complete_work,
+            render_lanes,
+        ) {
+            Err(OffscreenHiddenLaneRevealCommitGateError::RevealCommit(
+                OffscreenRevealCommitMetadataError::UnsupportedOffscreenChild {
+                    offscreen: rejected_offscreen,
+                    child: rejected_child,
+                    child_tag,
+                    child_sibling,
+                    child_sibling_tag,
+                },
+            )) => {
+                assert_eq!(rejected_offscreen, offscreen);
+                assert_eq!(rejected_child, child);
+                assert_eq!(child_tag, FiberTag::Fragment);
+                assert_eq!(child_sibling, None);
+                assert_eq!(child_sibling_tag, None);
+            }
+            other => panic!("expected unsupported Offscreen child rejection, got {other:?}"),
+        }
     }
 
     #[test]
