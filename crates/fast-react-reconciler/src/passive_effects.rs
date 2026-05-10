@@ -23,7 +23,8 @@ use crate::root_commit::{
 };
 use crate::root_config::{
     PendingPassiveEffectOrder, PendingPassiveEffectPhase, PendingPassiveState,
-    PendingPassiveUnmountOrigin, RootErrorCallbackHandle, RootRecoverableErrorCallbackHandle,
+    PendingPassiveUnmountOrigin, RootErrorCallbackHandle, RootErrorOptionCallbackPhase,
+    RootErrorOptionCallbackRecord, RootRecoverableErrorCallbackHandle,
 };
 use crate::root_scheduler::{
     PassiveEffectSchedulerFlushGateRecord, RootErrorCaptureScheduleRecord, RootErrorCaptureSource,
@@ -720,9 +721,7 @@ pub(crate) const PASSIVE_EFFECT_ROOT_ERROR_CALLBACK_BLOCKERS:
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct PassiveEffectRootErrorPropagationRecord {
     root: FiberRootId,
-    on_uncaught_error: RootErrorCallbackHandle,
-    on_caught_error: RootErrorCallbackHandle,
-    on_recoverable_error: RootRecoverableErrorCallbackHandle,
+    error_option_callbacks: RootErrorOptionCallbackRecord,
     scheduled_root_error_count: usize,
 }
 
@@ -733,18 +732,23 @@ impl PassiveEffectRootErrorPropagationRecord {
     }
 
     #[must_use]
+    pub const fn error_option_callbacks(self) -> RootErrorOptionCallbackRecord {
+        self.error_option_callbacks
+    }
+
+    #[must_use]
     pub const fn on_uncaught_error(self) -> RootErrorCallbackHandle {
-        self.on_uncaught_error
+        self.error_option_callbacks.on_uncaught_error()
     }
 
     #[must_use]
     pub const fn on_caught_error(self) -> RootErrorCallbackHandle {
-        self.on_caught_error
+        self.error_option_callbacks.on_caught_error()
     }
 
     #[must_use]
     pub const fn on_recoverable_error(self) -> RootRecoverableErrorCallbackHandle {
-        self.on_recoverable_error
+        self.error_option_callbacks.on_recoverable_error()
     }
 
     #[must_use]
@@ -787,9 +791,17 @@ impl PassiveEffectRootErrorPropagationRecord {
 
     #[must_use]
     pub const fn has_configured_error_callback(self) -> bool {
-        self.on_uncaught_error.is_some()
-            || self.on_caught_error.is_some()
-            || self.on_recoverable_error.is_some()
+        self.error_option_callbacks.has_configured_error_callback()
+    }
+
+    #[must_use]
+    pub const fn public_error_boundaries_enabled(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn recoverable_error_compatibility_claimed(self) -> bool {
+        false
     }
 
     #[must_use]
@@ -938,6 +950,26 @@ impl PassiveEffectRootErrorCaptureRecord {
     }
 
     #[must_use]
+    pub const fn error_option_callbacks(self) -> RootErrorOptionCallbackRecord {
+        self.schedule.error_option_callbacks()
+    }
+
+    #[must_use]
+    pub const fn on_uncaught_error(self) -> RootErrorCallbackHandle {
+        self.schedule.on_uncaught_error()
+    }
+
+    #[must_use]
+    pub const fn on_caught_error(self) -> RootErrorCallbackHandle {
+        self.schedule.on_caught_error()
+    }
+
+    #[must_use]
+    pub const fn on_recoverable_error(self) -> RootRecoverableErrorCallbackHandle {
+        self.schedule.on_recoverable_error()
+    }
+
+    #[must_use]
     pub const fn root_error_update_scheduled(self) -> bool {
         self.schedule.root_error_update_scheduled()
     }
@@ -959,6 +991,171 @@ impl PassiveEffectRootErrorCaptureRecord {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PassiveEffectRootErrorRoutingStatus {
+    CapturedForRootUpdate,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct PassiveEffectRootErrorRoutingRecord {
+    routing_order: usize,
+    root_error_capture: PassiveEffectRootErrorCaptureRecord,
+    root_error_propagation: PassiveEffectRootErrorPropagationRecord,
+}
+
+impl PassiveEffectRootErrorRoutingRecord {
+    #[must_use]
+    pub const fn routing_order(self) -> usize {
+        self.routing_order
+    }
+
+    #[must_use]
+    pub const fn kind(self) -> PassiveEffectCallbackExecutionErrorKind {
+        self.root_error_capture.kind()
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root_error_capture.root()
+    }
+
+    #[must_use]
+    pub const fn finished_work(self) -> FiberId {
+        self.root_error_capture.finished_work()
+    }
+
+    #[must_use]
+    pub const fn committed_lanes(self) -> Lanes {
+        self.root_error_capture.committed_lanes()
+    }
+
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.root_error_capture.fiber()
+    }
+
+    #[must_use]
+    pub const fn effect_lanes(self) -> Lanes {
+        self.root_error_capture.effect_lanes()
+    }
+
+    #[must_use]
+    pub const fn phase(self) -> PendingPassiveEffectPhase {
+        self.root_error_capture.phase()
+    }
+
+    #[must_use]
+    pub const fn pending_order(self) -> PendingPassiveEffectOrder {
+        self.root_error_capture.pending_order()
+    }
+
+    #[must_use]
+    pub const fn flush_index(self) -> usize {
+        self.root_error_capture.flush_index()
+    }
+
+    #[must_use]
+    pub const fn effect_index(self) -> Option<usize> {
+        self.root_error_capture.effect_index()
+    }
+
+    #[must_use]
+    pub const fn effect(self) -> Option<HookEffectId> {
+        self.root_error_capture.effect()
+    }
+
+    #[must_use]
+    pub const fn effect_instance(self) -> Option<HookEffectInstanceId> {
+        self.root_error_capture.effect_instance()
+    }
+
+    #[must_use]
+    pub const fn callback(self) -> HookEffectCallbackHandle {
+        self.root_error_capture.callback()
+    }
+
+    #[must_use]
+    pub const fn error(self) -> PassiveEffectCallbackExecutionErrorHandle {
+        self.root_error_capture.error()
+    }
+
+    #[must_use]
+    pub const fn root_error_capture(self) -> PassiveEffectRootErrorCaptureRecord {
+        self.root_error_capture
+    }
+
+    #[must_use]
+    pub const fn root_error_propagation(self) -> PassiveEffectRootErrorPropagationRecord {
+        self.root_error_propagation
+    }
+
+    #[must_use]
+    pub const fn schedule(self) -> RootErrorCaptureScheduleRecord {
+        self.root_error_capture.schedule()
+    }
+
+    #[must_use]
+    pub const fn error_option_callbacks(self) -> RootErrorOptionCallbackRecord {
+        self.root_error_capture.error_option_callbacks()
+    }
+
+    #[must_use]
+    pub const fn on_uncaught_error(self) -> RootErrorCallbackHandle {
+        self.error_option_callbacks().on_uncaught_error()
+    }
+
+    #[must_use]
+    pub const fn on_caught_error(self) -> RootErrorCallbackHandle {
+        self.error_option_callbacks().on_caught_error()
+    }
+
+    #[must_use]
+    pub const fn on_recoverable_error(self) -> RootRecoverableErrorCallbackHandle {
+        self.error_option_callbacks().on_recoverable_error()
+    }
+
+    #[must_use]
+    pub const fn status(self) -> PassiveEffectRootErrorRoutingStatus {
+        if self.root_error_update_scheduled() {
+            PassiveEffectRootErrorRoutingStatus::CapturedForRootUpdate
+        } else {
+            PassiveEffectRootErrorRoutingStatus::Blocked
+        }
+    }
+
+    #[must_use]
+    pub const fn root_error_update_scheduled(self) -> bool {
+        self.root_error_capture.root_error_update_scheduled()
+    }
+
+    #[must_use]
+    pub const fn root_error_callbacks_invoked(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn public_error_boundaries_enabled(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn public_act_error_aggregation_enabled(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn recoverable_error_compatibility_claimed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn has_configured_error_callback(self) -> bool {
+        self.error_option_callbacks()
+            .has_configured_error_callback()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct PassiveEffectCallbackExecutionErrorRecord {
     error_order: usize,
     kind: PassiveEffectCallbackExecutionErrorKind,
@@ -976,6 +1173,7 @@ pub(crate) struct PassiveEffectCallbackExecutionErrorRecord {
     callback: HookEffectCallbackHandle,
     error: PassiveEffectCallbackExecutionErrorHandle,
     root_error_capture: PassiveEffectRootErrorCaptureRecord,
+    root_error_routing: PassiveEffectRootErrorRoutingRecord,
     root_error_propagation: PassiveEffectRootErrorPropagationRecord,
 }
 
@@ -1061,6 +1259,11 @@ impl PassiveEffectCallbackExecutionErrorRecord {
     }
 
     #[must_use]
+    pub const fn root_error_routing(self) -> PassiveEffectRootErrorRoutingRecord {
+        self.root_error_routing
+    }
+
+    #[must_use]
     pub const fn root_error_propagation(self) -> PassiveEffectRootErrorPropagationRecord {
         self.root_error_propagation
     }
@@ -1079,6 +1282,7 @@ pub(crate) struct PassiveEffectsFlushResult {
     mount_create_callback_executions: Vec<PassiveEffectMountCreateCallbackExecutionRecord>,
     mount_create_callback_errors: Vec<PassiveEffectMountCreateCallbackErrorRecord>,
     root_error_captures: Vec<PassiveEffectRootErrorCaptureRecord>,
+    root_error_routing: Vec<PassiveEffectRootErrorRoutingRecord>,
     callback_execution_errors: Vec<PassiveEffectCallbackExecutionErrorRecord>,
 }
 
@@ -1141,6 +1345,11 @@ impl PassiveEffectsFlushResult {
     }
 
     #[must_use]
+    pub fn root_error_routing(&self) -> &[PassiveEffectRootErrorRoutingRecord] {
+        &self.root_error_routing
+    }
+
+    #[must_use]
     pub fn callback_execution_errors(&self) -> &[PassiveEffectCallbackExecutionErrorRecord] {
         &self.callback_execution_errors
     }
@@ -1178,6 +1387,11 @@ impl PassiveEffectsFlushResult {
     #[must_use]
     pub fn did_schedule_root_error_captures(&self) -> bool {
         !self.root_error_captures.is_empty()
+    }
+
+    #[must_use]
+    pub fn did_record_root_error_routing(&self) -> bool {
+        !self.root_error_routing.is_empty()
     }
 
     #[must_use]
@@ -2371,6 +2585,7 @@ fn flush_passive_effects_after_commit_inner<H: HostTypes>(
             mount_create_callback_executions: Vec::new(),
             mount_create_callback_errors: Vec::new(),
             root_error_captures: Vec::new(),
+            root_error_routing: Vec::new(),
             callback_execution_errors: Vec::new(),
         });
     };
@@ -2381,9 +2596,9 @@ fn flush_passive_effects_after_commit_inner<H: HostTypes>(
             root.scheduling().pending_passive().clone(),
             PassiveEffectRootErrorPropagationRecord {
                 root: root_id,
-                on_uncaught_error: root.options().on_uncaught_error(),
-                on_caught_error: root.options().on_caught_error(),
-                on_recoverable_error: root.options().on_recoverable_error(),
+                error_option_callbacks: root
+                    .options()
+                    .error_option_callback_record(root_id, RootErrorOptionCallbackPhase::Commit),
                 scheduled_root_error_count: 0,
             },
         )
@@ -2429,9 +2644,12 @@ fn flush_passive_effects_after_commit_inner<H: HostTypes>(
     )?;
     let root_error_propagation =
         root_error_propagation.with_scheduled_root_error_count(root_error_captures.len());
+    let root_error_routing =
+        build_passive_root_error_routing_records(&root_error_captures, root_error_propagation);
     let callback_execution_errors = build_passive_callback_execution_error_records(
         &callback_execution_error_metadata,
         &root_error_captures,
+        &root_error_routing,
         root_error_propagation,
     );
 
@@ -2447,6 +2665,7 @@ fn flush_passive_effects_after_commit_inner<H: HostTypes>(
         mount_create_callback_executions,
         mount_create_callback_errors,
         root_error_captures,
+        root_error_routing,
         callback_execution_errors,
     })
 }
@@ -2857,33 +3076,55 @@ fn schedule_passive_callback_execution_root_error_captures<H: HostTypes>(
 fn build_passive_callback_execution_error_records(
     records: &[PassiveEffectCallbackExecutionErrorMetadata],
     root_error_captures: &[PassiveEffectRootErrorCaptureRecord],
+    root_error_routing: &[PassiveEffectRootErrorRoutingRecord],
     root_error_propagation: PassiveEffectRootErrorPropagationRecord,
 ) -> Vec<PassiveEffectCallbackExecutionErrorRecord> {
     records
         .iter()
         .zip(root_error_captures)
+        .zip(root_error_routing)
         .enumerate()
-        .map(|(error_order, (record, root_error_capture))| {
-            PassiveEffectCallbackExecutionErrorRecord {
-                error_order,
-                kind: record.kind,
-                root: record.root,
-                finished_work: record.finished_work,
-                committed_lanes: record.committed_lanes,
-                fiber: record.fiber,
-                effect_lanes: record.effect_lanes,
-                phase: record.phase,
-                pending_order: record.pending_order,
-                flush_index: record.flush_index,
-                effect_index: record.effect_index,
-                effect: record.effect,
-                instance: record.instance,
-                callback: record.callback,
-                error: record.error,
+        .map(
+            |(error_order, ((record, root_error_capture), root_error_routing))| {
+                PassiveEffectCallbackExecutionErrorRecord {
+                    error_order,
+                    kind: record.kind,
+                    root: record.root,
+                    finished_work: record.finished_work,
+                    committed_lanes: record.committed_lanes,
+                    fiber: record.fiber,
+                    effect_lanes: record.effect_lanes,
+                    phase: record.phase,
+                    pending_order: record.pending_order,
+                    flush_index: record.flush_index,
+                    effect_index: record.effect_index,
+                    effect: record.effect,
+                    instance: record.instance,
+                    callback: record.callback,
+                    error: record.error,
+                    root_error_capture: *root_error_capture,
+                    root_error_routing: *root_error_routing,
+                    root_error_propagation,
+                }
+            },
+        )
+        .collect()
+}
+
+fn build_passive_root_error_routing_records(
+    root_error_captures: &[PassiveEffectRootErrorCaptureRecord],
+    root_error_propagation: PassiveEffectRootErrorPropagationRecord,
+) -> Vec<PassiveEffectRootErrorRoutingRecord> {
+    root_error_captures
+        .iter()
+        .enumerate()
+        .map(
+            |(routing_order, root_error_capture)| PassiveEffectRootErrorRoutingRecord {
+                routing_order,
                 root_error_capture: *root_error_capture,
                 root_error_propagation,
-            }
-        })
+            },
+        )
         .collect()
 }
 
@@ -5379,6 +5620,7 @@ mod tests {
         assert_eq!(flush.mount_create_callback_errors().len(), 1);
         assert!(flush.did_record_callback_execution_errors());
         assert!(flush.did_schedule_root_error_captures());
+        assert!(flush.did_record_root_error_routing());
         assert!(flush.did_record_blocked_root_error_propagation());
         assert!(!flush.public_effect_execution_enabled());
         assert!(!flush.public_act_compatibility_claimed());
@@ -5386,6 +5628,12 @@ mod tests {
 
         let root_error = flush.root_error_propagation().unwrap();
         assert_eq!(root_error.root(), root_id);
+        let root_error_callbacks = root_error.error_option_callbacks();
+        assert_eq!(root_error_callbacks.root(), root_id);
+        assert_eq!(
+            root_error_callbacks.phase(),
+            RootErrorOptionCallbackPhase::Commit
+        );
         assert_eq!(
             root_error.on_uncaught_error(),
             RootErrorCallbackHandle::from_raw(1001)
@@ -5410,16 +5658,25 @@ mod tests {
         assert!(root_error.root_error_update_scheduled());
         assert_eq!(root_error.scheduled_root_error_count(), 2);
         assert!(!root_error.root_error_callbacks_invoked());
+        assert!(!root_error.public_error_boundaries_enabled());
         assert!(!root_error.public_act_error_aggregation_enabled());
+        assert!(!root_error.recoverable_error_compatibility_claimed());
+        assert!(!root_error_callbacks.root_error_callbacks_invoked());
+        assert!(!root_error_callbacks.public_error_boundaries_enabled());
+        assert!(!root_error_callbacks.recoverable_error_compatibility_claimed());
 
         let errors = flush.callback_execution_errors();
         let captures = flush.root_error_captures();
+        let routing = flush.root_error_routing();
         assert_eq!(errors.len(), 2);
         assert_eq!(captures.len(), 2);
+        assert_eq!(routing.len(), 2);
         assert_eq!(errors[0].error_order(), 0);
         assert_eq!(errors[1].error_order(), 1);
         assert_eq!(captures[0].capture_order(), 0);
         assert_eq!(captures[1].capture_order(), 1);
+        assert_eq!(routing[0].routing_order(), 0);
+        assert_eq!(routing[1].routing_order(), 1);
         assert_eq!(
             errors[0].kind(),
             PassiveEffectCallbackExecutionErrorKind::Destroy
@@ -5473,6 +5730,8 @@ mod tests {
         assert_eq!(errors[1].root_error_propagation(), root_error);
         assert_eq!(errors[0].root_error_capture(), captures[0]);
         assert_eq!(errors[1].root_error_capture(), captures[1]);
+        assert_eq!(errors[0].root_error_routing(), routing[0]);
+        assert_eq!(errors[1].root_error_routing(), routing[1]);
         assert_eq!(
             captures[0].kind(),
             PassiveEffectCallbackExecutionErrorKind::Destroy
@@ -5521,8 +5780,102 @@ mod tests {
         assert!(!captures[1].public_act_error_aggregation_enabled());
         assert!(captures[0].has_configured_error_callback());
         assert!(captures[1].has_configured_error_callback());
+        assert_eq!(captures[0].error_option_callbacks(), root_error_callbacks);
+        assert_eq!(captures[1].error_option_callbacks(), root_error_callbacks);
+        assert_eq!(
+            captures[0].on_uncaught_error(),
+            RootErrorCallbackHandle::from_raw(1001)
+        );
+        assert_eq!(
+            captures[1].on_caught_error(),
+            RootErrorCallbackHandle::from_raw(1002)
+        );
+        assert_eq!(
+            captures[0].on_recoverable_error(),
+            RootRecoverableErrorCallbackHandle::from_raw(1003)
+        );
+        assert_eq!(
+            routing[0].kind(),
+            PassiveEffectCallbackExecutionErrorKind::Destroy
+        );
+        assert_eq!(
+            routing[1].kind(),
+            PassiveEffectCallbackExecutionErrorKind::MountCreate
+        );
+        assert_eq!(routing[0].root(), root_id);
+        assert_eq!(routing[1].root(), root_id);
+        assert_eq!(routing[0].finished_work(), finished_work);
+        assert_eq!(routing[1].finished_work(), finished_work);
+        assert_eq!(routing[0].committed_lanes(), Lanes::DEFAULT);
+        assert_eq!(routing[1].committed_lanes(), Lanes::DEFAULT);
+        assert_eq!(routing[0].fiber(), finished_function);
+        assert_eq!(routing[1].fiber(), finished_function);
+        assert_eq!(routing[0].effect_lanes(), Lanes::DEFAULT);
+        assert_eq!(routing[1].effect_lanes(), Lanes::DEFAULT);
+        assert_eq!(routing[0].phase(), PendingPassiveEffectPhase::Unmount);
+        assert_eq!(routing[1].phase(), PendingPassiveEffectPhase::Mount);
+        assert_eq!(routing[0].pending_order(), errors[0].pending_order());
+        assert_eq!(routing[1].pending_order(), errors[1].pending_order());
+        assert_eq!(routing[0].flush_index(), 0);
+        assert_eq!(routing[1].flush_index(), 1);
+        assert_eq!(routing[0].effect_index(), Some(0));
+        assert_eq!(routing[1].effect_index(), Some(0));
+        assert_eq!(routing[0].effect(), Some(registration.effect()));
+        assert_eq!(routing[1].effect(), Some(registration.effect()));
+        assert_eq!(routing[0].effect_instance(), Some(previous.instance()));
+        assert_eq!(routing[1].effect_instance(), Some(registration.instance()));
+        assert_eq!(routing[0].callback(), callback(1008));
+        assert_eq!(routing[1].callback(), callback(1011));
+        assert_eq!(
+            routing[0].error(),
+            PassiveEffectCallbackExecutionErrorHandle::Destroy(destroy_error(1013))
+        );
+        assert_eq!(
+            routing[1].error(),
+            PassiveEffectCallbackExecutionErrorHandle::MountCreate(mount_create_error(1014))
+        );
+        assert_eq!(routing[0].root_error_capture(), captures[0]);
+        assert_eq!(routing[1].root_error_capture(), captures[1]);
+        assert_eq!(routing[0].root_error_propagation(), root_error);
+        assert_eq!(routing[1].root_error_propagation(), root_error);
+        assert_eq!(routing[0].error_option_callbacks(), root_error_callbacks);
+        assert_eq!(routing[1].error_option_callbacks(), root_error_callbacks);
+        assert_eq!(
+            routing[0].status(),
+            PassiveEffectRootErrorRoutingStatus::CapturedForRootUpdate
+        );
+        assert_eq!(
+            routing[1].status(),
+            PassiveEffectRootErrorRoutingStatus::CapturedForRootUpdate
+        );
+        assert!(routing[0].root_error_update_scheduled());
+        assert!(routing[1].root_error_update_scheduled());
+        assert!(!routing[0].root_error_callbacks_invoked());
+        assert!(!routing[1].root_error_callbacks_invoked());
+        assert!(!routing[0].public_error_boundaries_enabled());
+        assert!(!routing[1].public_error_boundaries_enabled());
+        assert!(!routing[0].public_act_error_aggregation_enabled());
+        assert!(!routing[1].public_act_error_aggregation_enabled());
+        assert!(!routing[0].recoverable_error_compatibility_claimed());
+        assert!(!routing[1].recoverable_error_compatibility_claimed());
+        assert!(routing[0].has_configured_error_callback());
+        assert!(routing[1].has_configured_error_callback());
+        assert_eq!(
+            routing[0].on_uncaught_error(),
+            RootErrorCallbackHandle::from_raw(1001)
+        );
+        assert_eq!(
+            routing[1].on_caught_error(),
+            RootErrorCallbackHandle::from_raw(1002)
+        );
+        assert_eq!(
+            routing[0].on_recoverable_error(),
+            RootRecoverableErrorCallbackHandle::from_raw(1003)
+        );
         let first_schedule = captures[0].schedule();
         let second_schedule = captures[1].schedule();
+        assert_eq!(routing[0].schedule(), first_schedule);
+        assert_eq!(routing[1].schedule(), second_schedule);
         assert_eq!(
             first_schedule.source(),
             RootErrorCaptureSource::PassiveEffectDestroy
