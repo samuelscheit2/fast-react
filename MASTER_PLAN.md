@@ -45,18 +45,31 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue 565-594 has been accepted and merged.
-Replacement workers should start from current `main` after accepted worker
-sessions, worktrees, and branches are cleaned.
+Top-level cap: 30 workers. Replacement queue 595-624 is prepared from current
+`main` and should run in isolated `worker/<slug>` worktrees.
+
+- 595-609: Rust root commit/scheduler/sync-flush/callback, hook dispatch,
+  passive/layout effect, context, Suspense, Offscreen, host update, and
+  deletion execution gates.
+- 610-612: React test-renderer create/update/unmount private native-bridge
+  admission gates.
+- 613-621: React DOM root render/update/unmount, event, controlled restore,
+  hydration, resource, and form private execution/admission gates.
+- 622-623: Scheduler mock and postTask private execution/continuation gates.
+- 624: Package-surface, benchmark, and conformance guards for accepted
+  queue 565-594.
 
 ## Near-Term Sequencing
 
-1. Clean accepted queue 565-594 tmux sessions, worktrees, and worker branches.
-2. Queue replacement workers from current `main`, up to the 30 top-level cap,
-   after prompt docs are committed.
-3. Accept overlapping implementation work when scopes are different enough;
+1. Launch workers 595-624 with `scripts/run-worker.sh`, keeping at most 30
+   top-level tmux sessions.
+2. Monitor workers 595-624 and classify completions from tmux pane state,
+   worker reports, worktree status, and verification evidence.
+3. Before queueing further replacements, merge and clean all completed accepted
+   work already available so replacement capacity starts from current `main`.
+4. Accept overlapping implementation work when scopes are different enough;
    resolve merge conflicts on `main` after merge attempts.
-4. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
+5. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
 
 ## Next Queue Candidates
