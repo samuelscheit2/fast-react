@@ -47,8 +47,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 - Worker 201: DOM text-content oracle in
   `/Users/user/Developer/Developer/fast-react-worker-201-dom-text-content-oracle`.
-- Worker 202: React test renderer package placeholder in
-  `/Users/user/Developer/Developer/fast-react-worker-202-react-test-renderer-package-placeholder`.
 
 ## Near-Term Sequencing
 
