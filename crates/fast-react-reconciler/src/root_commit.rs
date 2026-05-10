@@ -11125,6 +11125,19 @@ impl HostRootSingleHostUpdateApplyRecordForCanary {
     }
 
     #[must_use]
+    pub(crate) const fn private_host_store_commit_evidence_supported(self) -> bool {
+        matches!(
+            self.mutation.kind(),
+            HostRootMutationApplyRecordKind::CommitHostComponentUpdate
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn latest_props_publication_after_payload_required(self) -> bool {
+        self.private_host_store_commit_evidence_supported()
+    }
+
+    #[must_use]
     pub(crate) const fn public_root_rendering_blocked(self) -> bool {
         true
     }
@@ -17765,6 +17778,8 @@ mod tests {
         assert!(pending_update.is_host_component_props_update());
         assert!(!pending_update.is_host_text_content_update());
         assert!(pending_update.test_host_commit_path_only());
+        assert!(pending_update.private_host_store_commit_evidence_supported());
+        assert!(pending_update.latest_props_publication_after_payload_required());
         assert!(pending_update.public_root_rendering_blocked());
         assert!(!pending_update.public_renderer_package_behavior_exposed());
         assert!(!pending_update.react_dom_compatibility_claimed());
