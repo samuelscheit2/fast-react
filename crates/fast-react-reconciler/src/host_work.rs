@@ -2858,6 +2858,16 @@ mod tests {
         );
         let text_state_node = store.fiber_arena().get(placed_text).unwrap().state_node();
         let placement_commit = commit_finished_host_root(&mut store, placement_render).unwrap();
+        assert_eq!(
+            placement_commit.test_only_host_parent_placement_apply_count_for_canary(),
+            1
+        );
+        assert!(
+            placement_commit.has_test_only_host_parent_placement_apply_for_canary(
+                parent_state_node.raw(),
+                text_state_node.raw()
+            )
+        );
         let operations_before_apply = host.operations();
         let apply = apply_test_host_root_commit_mutations(
             &mut store,
