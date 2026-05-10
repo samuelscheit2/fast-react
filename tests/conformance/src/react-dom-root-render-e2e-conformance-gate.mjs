@@ -149,6 +149,14 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_BOUNDARY_ROWS =
       privateWarningBoundaryEvidence: "separate"
     }),
     Object.freeze({
+      id: "public-flush-sync-cross-root-compatibility",
+      publicApi: "ReactDOM.flushSync across public roots",
+      admission: "blocked",
+      expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      privateCrossRootSchedulingEvidence: "separate"
+    }),
+    Object.freeze({
       id: "public-dom-mutation",
       publicApi: "DOM mutation through public roots",
       admission: "blocked",
@@ -211,6 +219,15 @@ export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_ACCEPTED_STATUS 
 
 export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_BLOCKED_STATUS =
   "blocked-private-root-warning-boundary-diagnostic";
+
+export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_GATE_ID =
+  "root-render-private-cross-root-scheduling-diagnostic-gate-1";
+
+export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_ACCEPTED_STATUS =
+  "accepted-private-cross-root-scheduling-diagnostic";
+
+export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_BLOCKED_STATUS =
+  "blocked-private-cross-root-scheduling-diagnostic";
 
 export const REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_GATE_ID =
   "react-dom-portal-root-render-blocked-gate-1";
@@ -471,6 +488,29 @@ export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_ADMISSIONS =
     )
   );
 
+export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_ADMISSIONS =
+  Object.freeze(
+    REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.map((scenarioId) =>
+      scenarioId === "flush-sync-cross-root-render"
+        ? Object.freeze({
+            scenarioId,
+            admission: "private-cross-root-scheduling-diagnostic",
+            gateStatus:
+              REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_ACCEPTED_STATUS,
+            reason:
+              "Private bridge records, the private flushSync guard, and reconciler cross-root sync-flush diagnostics prove two scheduled roots are flushed together without admitting public flushSync or public root compatibility."
+          })
+        : Object.freeze({
+            scenarioId,
+            admission: "unsupported",
+            gateStatus:
+              REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_BLOCKED_STATUS,
+            reason:
+              "This root E2E scenario is not cross-root scheduling evidence; its public behavior remains blocked by the root-render facade gate."
+          })
+    )
+  );
+
 export async function runReactDomRootRenderE2EConformanceGate({
   checkedOracle = readCheckedReactDomRootRenderE2EOracle(),
   currentOracle,
@@ -487,6 +527,10 @@ export async function runReactDomRootRenderE2EConformanceGate({
       }),
     privateWarningBoundaryDiagnostics:
       inspectReactDomRootRenderE2EPrivateWarningBoundaryDiagnostics({
+        workspaceRoot
+      }),
+    privateCrossRootSchedulingDiagnostics:
+      inspectReactDomRootRenderE2EPrivateCrossRootSchedulingDiagnostics({
         workspaceRoot
       }),
     portalRootRenderObservations: inspectReactDomPortalRootRenderBlockedBoundary({
@@ -526,6 +570,8 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
     inspectReactDomRootRenderE2EPrivateHostOutputDiagnostics(),
   privateWarningBoundaryDiagnostics =
     inspectReactDomRootRenderE2EPrivateWarningBoundaryDiagnostics(),
+  privateCrossRootSchedulingDiagnostics =
+    inspectReactDomRootRenderE2EPrivateCrossRootSchedulingDiagnostics(),
   portalRootRenderObservations =
     inspectReactDomPortalRootRenderBlockedBoundary()
 }) {
@@ -538,6 +584,8 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
   const privateHostOutputBlockedRows = [];
   const privateWarningBoundaryDiagnosticRows = [];
   const privateWarningBoundaryBlockedRows = [];
+  const privateCrossRootSchedulingDiagnosticRows = [];
+  const privateCrossRootSchedulingBlockedRows = [];
   const behaviorByScenario = new Map(
     REACT_DOM_ROOT_RENDER_E2E_LOCAL_FAST_REACT_BEHAVIOR.map((behavior) => [
       behavior.scenarioId,
@@ -577,6 +625,17 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
       row
     ])
   );
+  const privateCrossRootSchedulingAdmissionByScenario = new Map(
+    REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_ADMISSIONS.map(
+      (admission) => [admission.scenarioId, admission]
+    )
+  );
+  const privateCrossRootSchedulingObservationByRow = new Map(
+    (privateCrossRootSchedulingDiagnostics.rows ?? []).map((row) => [
+      formatScenarioModeKey(row),
+      row
+    ])
+  );
 
   validateOracleShape({
     checkedOracle,
@@ -599,6 +658,10 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
     privateWarningBoundaryAdmissionByScenario,
     failures
   });
+  validatePrivateCrossRootSchedulingAdmissionMetadata({
+    privateCrossRootSchedulingAdmissionByScenario,
+    failures
+  });
 
   if (privateBridgeObservations.loadError) {
     failures.push({
@@ -616,6 +679,12 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
     failures.push({
       gateStatus: "private-root-warning-boundary-diagnostic-load-failed",
       error: privateWarningBoundaryDiagnostics.loadError
+    });
+  }
+  if (privateCrossRootSchedulingDiagnostics.loadError) {
+    failures.push({
+      gateStatus: "private-cross-root-scheduling-diagnostic-load-failed",
+      error: privateCrossRootSchedulingDiagnostics.loadError
     });
   }
 
@@ -866,6 +935,85 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
         });
       }
 
+      const privateCrossRootSchedulingAdmission =
+        privateCrossRootSchedulingAdmissionByScenario.get(scenarioId);
+      if (!privateCrossRootSchedulingAdmission) {
+        failures.push({
+          ...context,
+          gateStatus: "missing-private-cross-root-scheduling-admission"
+        });
+      } else if (
+        privateCrossRootSchedulingAdmission.admission ===
+        "private-cross-root-scheduling-diagnostic"
+      ) {
+        const privateCrossRootSchedulingObservation =
+          privateCrossRootSchedulingObservationByRow.get(
+            formatScenarioModeKey(context)
+          );
+
+        if (!privateCrossRootSchedulingObservation) {
+          failures.push({
+            ...context,
+            gateStatus: "missing-private-cross-root-scheduling-diagnostic"
+          });
+        } else {
+          const validationFailure =
+            validatePrivateCrossRootSchedulingDiagnosticObservation({
+              observation: privateCrossRootSchedulingObservation,
+              scenarioId
+            });
+
+          if (validationFailure === null) {
+            privateCrossRootSchedulingDiagnosticRows.push({
+              ...context,
+              gateStatus: privateCrossRootSchedulingAdmission.gateStatus,
+              oracleRowAccepted,
+              publicFacadeGateStatus: behavior.gateStatus,
+              publicRootCompatibilitySurface: false,
+              comparedToReactDomOracle: false,
+              compatibilityClaimed: false,
+              publicFlushSyncCompatibilityClaimed: false,
+              diagnosticKind:
+                privateCrossRootSchedulingObservation.evidence.diagnosticKind,
+              rootBridgeEvidence:
+                privateCrossRootSchedulingObservation.evidence
+                  .rootBridgeEvidence,
+              rootSideEffectEvidence:
+                privateCrossRootSchedulingObservation.evidence
+                  .rootSideEffectEvidence,
+              schedulingEvidence:
+                privateCrossRootSchedulingObservation.evidence
+                  .schedulingEvidence
+            });
+          } else {
+            failures.push({
+              ...context,
+              ...validationFailure
+            });
+          }
+        }
+      } else if (
+        privateCrossRootSchedulingAdmission.admission === "unsupported"
+      ) {
+        privateCrossRootSchedulingBlockedRows.push({
+          ...context,
+          gateStatus: privateCrossRootSchedulingAdmission.gateStatus,
+          oracleRowAccepted,
+          publicFacadeGateStatus: behavior.gateStatus,
+          publicRootCompatibilitySurface: false,
+          reason: privateCrossRootSchedulingAdmission.reason,
+          comparedToReactDomOracle: false,
+          compatibilityClaimed: false,
+          publicFlushSyncCompatibilityClaimed: false
+        });
+      } else {
+        failures.push({
+          ...context,
+          gateStatus: "unknown-private-cross-root-scheduling-admission",
+          admission: privateCrossRootSchedulingAdmission.admission
+        });
+      }
+
       const privateHostOutputAdmission =
         privateHostOutputAdmissionByScenario.get(scenarioId);
       if (!privateHostOutputAdmission) {
@@ -1014,6 +1162,23 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
       consoleOutputUsedAsEvidence: false,
       compatibilityClaimed: false
     },
+    privateCrossRootSchedulingGate: {
+      id: REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_GATE_ID,
+      localEntrypoint:
+        "packages/react-dom/src/client/root-bridge.js + packages/react-dom/src/shared/flush-sync-guard.js + crates/fast-react-reconciler/src/sync_flush.rs private diagnostics",
+      admittedPrivateCrossRootSchedulingScenarioIds:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_ADMISSIONS.filter(
+          (admission) =>
+            admission.admission ===
+            "private-cross-root-scheduling-diagnostic"
+        ).map((admission) => admission.scenarioId),
+      unsupportedPrivateCrossRootSchedulingScenarioIds:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_ADMISSIONS.filter(
+          (admission) => admission.admission === "unsupported"
+        ).map((admission) => admission.scenarioId),
+      publicFlushSyncCompatibilityClaimed: false,
+      compatibilityClaimed: false
+    },
     privateHostOutputDiagnosticScenarioModeRows:
       privateHostOutputDiagnosticRows,
     privateHostOutputBlockedScenarioModeRows: privateHostOutputBlockedRows,
@@ -1021,6 +1186,10 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
       privateWarningBoundaryDiagnosticRows,
     privateWarningBoundaryBlockedScenarioModeRows:
       privateWarningBoundaryBlockedRows,
+    privateCrossRootSchedulingDiagnosticScenarioModeRows:
+      privateCrossRootSchedulingDiagnosticRows,
+    privateCrossRootSchedulingBlockedScenarioModeRows:
+      privateCrossRootSchedulingBlockedRows,
     portalRootRenderGate,
     portalRootRenderPrerequisiteRows: portalRootRenderGate.prerequisiteRows,
     portalRootRenderBlockedRows: portalRootRenderGate.blockedRows,
@@ -1040,6 +1209,10 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
         privateWarningBoundaryDiagnosticRows.length,
       privateWarningBoundaryBlockedScenarioModeRowCount:
         privateWarningBoundaryBlockedRows.length,
+      privateCrossRootSchedulingDiagnosticScenarioModeRowCount:
+        privateCrossRootSchedulingDiagnosticRows.length,
+      privateCrossRootSchedulingBlockedScenarioModeRowCount:
+        privateCrossRootSchedulingBlockedRows.length,
       portalRootRenderPrerequisiteRowCount:
         portalRootRenderGate.summary.prerequisiteRowCount,
       portalRootRenderBlockedRowCount:
@@ -1056,6 +1229,8 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
       privateHostOutputCompatibilityClaimed: false,
       privateWarningBoundaryCompatibilityClaimed: false,
       privateWarningBoundaryConsoleOutputUsedAsEvidence: false,
+      privateCrossRootSchedulingCompatibilityClaimed: false,
+      privateCrossRootSchedulingPublicFlushSyncCompatibilityClaimed: false,
       portalRootRenderCompatibilityClaimed: false,
       compatibilityClaimed: false
     }
@@ -1232,6 +1407,8 @@ export function formatReactDomRootRenderE2EConformanceGateResult(result) {
     `Private host-output diagnostic rows blocked: ${result.summary.privateHostOutputBlockedScenarioModeRowCount}`,
     `Private warning-boundary diagnostic rows admitted: ${result.summary.privateWarningBoundaryDiagnosticScenarioModeRowCount}`,
     `Private warning-boundary diagnostic rows blocked: ${result.summary.privateWarningBoundaryBlockedScenarioModeRowCount}`,
+    `Private cross-root scheduling diagnostic rows admitted: ${result.summary.privateCrossRootSchedulingDiagnosticScenarioModeRowCount}`,
+    `Private cross-root scheduling diagnostic rows blocked: ${result.summary.privateCrossRootSchedulingBlockedScenarioModeRowCount}`,
     `Portal root-render prerequisite rows accepted: ${result.summary.portalRootRenderPrerequisiteRowCount}`,
     `Portal root-render rows blocked: ${result.summary.portalRootRenderBlockedRowCount}`,
     `Failures: ${result.summary.failureCount}`
@@ -1255,6 +1432,11 @@ export function formatReactDomRootRenderE2EConformanceGateResult(result) {
   if (result.privateWarningBoundaryDiagnosticScenarioModeRows.length > 0) {
     lines.push(
       "Private warning-boundary diagnostics use root record metadata only; console output and public development warning compatibility remain blocked."
+    );
+  }
+  if (result.privateCrossRootSchedulingDiagnosticScenarioModeRows.length > 0) {
+    lines.push(
+      "Private cross-root scheduling diagnostics use private bridge, flush guard, and reconciler canary evidence only; public flushSync and public root compatibility remain blocked."
     );
   }
   if (result.portalRootRenderBlockedRows.length > 0) {
@@ -1304,6 +1486,14 @@ export function formatReactDomRootPublicFacadeBlockedGateResult(result) {
       result.rootRenderGate?.summary
         .privateWarningBoundaryBlockedScenarioModeRowCount ?? 0
     }`,
+    `Root-render private cross-root scheduling diagnostic rows admitted: ${
+      result.rootRenderGate?.summary
+        .privateCrossRootSchedulingDiagnosticScenarioModeRowCount ?? 0
+    }`,
+    `Root-render private cross-root scheduling diagnostic rows blocked: ${
+      result.rootRenderGate?.summary
+        .privateCrossRootSchedulingBlockedScenarioModeRowCount ?? 0
+    }`,
     `Root-render portal rows blocked: ${
       result.rootRenderGate?.summary.portalRootRenderBlockedRowCount ?? 0
     }`,
@@ -1334,6 +1524,14 @@ export function formatReactDomRootPublicFacadeBlockedGateResult(result) {
   ) {
     lines.push(
       "Private warning-boundary diagnostics remain metadata evidence only and do not unblock public warning compatibility."
+    );
+  }
+  if (
+    (result.rootRenderGate?.summary
+      .privateCrossRootSchedulingDiagnosticScenarioModeRowCount ?? 0) > 0
+  ) {
+    lines.push(
+      "Private cross-root scheduling diagnostics remain private flush evidence only and do not unblock public flushSync or public root compatibility."
     );
   }
   if ((result.rootRenderGate?.summary.portalRootRenderBlockedRowCount ?? 0) > 0) {
@@ -1524,6 +1722,44 @@ export function inspectReactDomRootRenderE2EPrivateWarningBoundaryDiagnostics({
 
         rows.push(
           runPrivateWarningBoundaryDiagnosticScenario({
+            mode,
+            modules,
+            scenarioId: admission.scenarioId
+          })
+        );
+      }
+    }
+
+    return {
+      loadError: null,
+      rows
+    };
+  } catch (error) {
+    return {
+      loadError: describePrivateBridgeError(error),
+      rows: []
+    };
+  }
+}
+
+export function inspectReactDomRootRenderE2EPrivateCrossRootSchedulingDiagnostics({
+  workspaceRoot = DEFAULT_WORKSPACE_ROOT
+} = {}) {
+  try {
+    const modules = loadPrivateCrossRootSchedulingModules(workspaceRoot);
+    const rows = [];
+
+    for (const mode of REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES) {
+      for (const admission of REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_ADMISSIONS) {
+        if (
+          admission.admission !==
+          "private-cross-root-scheduling-diagnostic"
+        ) {
+          continue;
+        }
+
+        rows.push(
+          runPrivateCrossRootSchedulingDiagnosticScenario({
             mode,
             modules,
             scenarioId: admission.scenarioId
@@ -1903,6 +2139,10 @@ function validateRootRenderGatePrerequisites({
     rootRenderGateResult,
     failures
   });
+  validateRootRenderPrivateCrossRootSchedulingBlockers({
+    rootRenderGateResult,
+    failures
+  });
   validateRootRenderPortalBlockers({
     rootRenderGateResult,
     failures
@@ -2201,6 +2441,150 @@ function validateRootRenderPrivateWarningBoundaryBlockers({
   }
 }
 
+function validateRootRenderPrivateCrossRootSchedulingBlockers({
+  rootRenderGateResult,
+  failures
+}) {
+  if (!rootRenderGateResult) {
+    return;
+  }
+
+  const admittedScenarioIds =
+    REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_ADMISSIONS.filter(
+      (admission) =>
+        admission.admission === "private-cross-root-scheduling-diagnostic"
+    ).map((admission) => admission.scenarioId);
+  const unsupportedScenarioIds =
+    REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_ADMISSIONS.filter(
+      (admission) => admission.admission === "unsupported"
+    ).map((admission) => admission.scenarioId);
+  const expectedAdmittedRows =
+    admittedScenarioIds.length * REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES.length;
+  const expectedBlockedRows =
+    unsupportedScenarioIds.length *
+    REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES.length;
+
+  if (
+    rootRenderGateResult.summary
+      .privateCrossRootSchedulingDiagnosticScenarioModeRowCount !==
+      expectedAdmittedRows ||
+    rootRenderGateResult.summary
+      .privateCrossRootSchedulingBlockedScenarioModeRowCount !==
+      expectedBlockedRows
+  ) {
+    failures.push({
+      gateStatus: "root-render-private-cross-root-scheduling-row-count-mismatch",
+      actualAdmitted:
+        rootRenderGateResult.summary
+          .privateCrossRootSchedulingDiagnosticScenarioModeRowCount ?? null,
+      actualBlocked:
+        rootRenderGateResult.summary
+          .privateCrossRootSchedulingBlockedScenarioModeRowCount ?? null,
+      expectedAdmitted: expectedAdmittedRows,
+      expectedBlocked: expectedBlockedRows
+    });
+  }
+
+  if (
+    rootRenderGateResult.summary
+      .privateCrossRootSchedulingCompatibilityClaimed !== false ||
+    rootRenderGateResult.summary
+      .privateCrossRootSchedulingPublicFlushSyncCompatibilityClaimed !==
+      false ||
+    rootRenderGateResult.privateCrossRootSchedulingGate
+      ?.compatibilityClaimed !== false ||
+    rootRenderGateResult.privateCrossRootSchedulingGate
+      ?.publicFlushSyncCompatibilityClaimed !== false
+  ) {
+    failures.push({
+      gateStatus:
+        "root-render-private-cross-root-scheduling-claims-compatibility-while-public-facade-blocked",
+      summaryClaim:
+        rootRenderGateResult.summary
+          .privateCrossRootSchedulingCompatibilityClaimed ?? null,
+      summaryPublicFlushSyncClaim:
+        rootRenderGateResult.summary
+          .privateCrossRootSchedulingPublicFlushSyncCompatibilityClaimed ??
+        null,
+      gateClaim:
+        rootRenderGateResult.privateCrossRootSchedulingGate
+          ?.compatibilityClaimed ?? null,
+      gatePublicFlushSyncClaim:
+        rootRenderGateResult.privateCrossRootSchedulingGate
+          ?.publicFlushSyncCompatibilityClaimed ?? null
+    });
+  }
+
+  if (
+    findFirstDifferencePath(
+      rootRenderGateResult.privateCrossRootSchedulingGate
+        ?.admittedPrivateCrossRootSchedulingScenarioIds ?? [],
+      admittedScenarioIds
+    ) !== null ||
+    findFirstDifferencePath(
+      rootRenderGateResult.privateCrossRootSchedulingGate
+        ?.unsupportedPrivateCrossRootSchedulingScenarioIds ?? [],
+      unsupportedScenarioIds
+    ) !== null
+  ) {
+    failures.push({
+      gateStatus:
+        "root-render-private-cross-root-scheduling-admission-set-mismatch",
+      admitted:
+        rootRenderGateResult.privateCrossRootSchedulingGate
+          ?.admittedPrivateCrossRootSchedulingScenarioIds ?? null,
+      unsupported:
+        rootRenderGateResult.privateCrossRootSchedulingGate
+          ?.unsupportedPrivateCrossRootSchedulingScenarioIds ?? null
+    });
+  }
+
+  for (const row of rootRenderGateResult.privateCrossRootSchedulingDiagnosticScenarioModeRows ??
+    []) {
+    if (
+      row.gateStatus !==
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_ACCEPTED_STATUS ||
+      row.scenarioId !== "flush-sync-cross-root-render" ||
+      row.publicFacadeGateStatus !==
+        REACT_DOM_ROOT_RENDER_E2E_FAST_REACT_BLOCKED_STATUS ||
+      row.publicRootCompatibilitySurface !== false ||
+      row.comparedToReactDomOracle !== false ||
+      row.compatibilityClaimed !== false ||
+      row.publicFlushSyncCompatibilityClaimed !== false ||
+      row.diagnosticKind !== "private-cross-root-scheduling-flush"
+    ) {
+      failures.push({
+        modeId: row.modeId,
+        scenarioId: row.scenarioId,
+        gateStatus: "root-render-private-cross-root-scheduling-row-not-private",
+        row
+      });
+    }
+  }
+
+  for (const row of rootRenderGateResult.privateCrossRootSchedulingBlockedScenarioModeRows ??
+    []) {
+    if (
+      row.gateStatus !==
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_BLOCKED_STATUS ||
+      row.publicFacadeGateStatus !==
+        REACT_DOM_ROOT_RENDER_E2E_FAST_REACT_BLOCKED_STATUS ||
+      row.publicRootCompatibilitySurface !== false ||
+      row.comparedToReactDomOracle !== false ||
+      row.compatibilityClaimed !== false ||
+      row.publicFlushSyncCompatibilityClaimed !== false
+    ) {
+      failures.push({
+        modeId: row.modeId,
+        scenarioId: row.scenarioId,
+        gateStatus:
+          "root-render-private-cross-root-scheduling-blocked-row-not-fail-closed",
+        row
+      });
+    }
+  }
+}
+
 function validateRootRenderPortalBlockers({ rootRenderGateResult, failures }) {
   if (!rootRenderGateResult) {
     return;
@@ -2469,6 +2853,15 @@ function validatePublicFacadeBoundary({
       "Private warning-boundary metadata remains separate from public console warning compatibility while public roots are placeholders.",
     compatibilityClaimed: false,
     privateWarningBoundaryEvidence: "separate"
+  });
+
+  blockedPublicFacadeRows.push({
+    id: "public-flush-sync-cross-root-compatibility",
+    gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+    reason:
+      "Private cross-root scheduling diagnostics remain separate from public ReactDOM.flushSync compatibility while public roots are placeholders.",
+    compatibilityClaimed: false,
+    privateCrossRootSchedulingEvidence: "separate"
   });
 
   const createRootSideEffects = localPublicFacadeBoundary.createRoot.sideEffects;
@@ -3362,6 +3755,16 @@ function loadPrivateHostOutputModules(workspaceRoot) {
   };
 }
 
+function loadPrivateCrossRootSchedulingModules(workspaceRoot) {
+  const reactDomRoot = join(workspaceRoot, "packages/react-dom");
+  return {
+    ...loadPrivateBridgeModules(workspaceRoot),
+    flushSyncGuard: require(join(reactDomRoot, "src/shared/flush-sync-guard.js")),
+    syncFlushCrossRootReconcilerDiagnostics:
+      inspectSyncFlushCrossRootReconcilerDiagnostics({ workspaceRoot })
+  };
+}
+
 function runPrivateBridgeRequestScenario({ mode, modules, scenarioId }) {
   try {
     const plan = getPrivateBridgeRequestPlan(scenarioId);
@@ -3615,6 +4018,153 @@ function runPrivateHostOutputDiagnosticScenario({ mode, modules, scenarioId }) {
   }
 }
 
+function runPrivateCrossRootSchedulingDiagnosticScenario({
+  mode,
+  modules,
+  scenarioId
+}) {
+  try {
+    if (scenarioId !== "flush-sync-cross-root-render") {
+      throw new Error(
+        `No private cross-root scheduling diagnostic plan for scenario: ${scenarioId}`
+      );
+    }
+
+    const harness = createPrivateCrossRootSchedulingHarness({
+      mode,
+      modules,
+      scenarioId
+    });
+    const firstRoot = {
+      container: harness.container,
+      create: harness.create,
+      document: harness.document
+    };
+    const firstSideEffects =
+      applyPrivateHostOutputRootSideEffectsForRoot(harness, firstRoot);
+    const {
+      rawRecord: firstRawSideEffectRecord,
+      ...firstSideEffectEvidence
+    } = firstSideEffects;
+    const secondRoot = createAdditionalPrivateHostOutputRoot(
+      harness,
+      "cross-root-b"
+    );
+    recordPrivateHostOutputRootRequest(harness, secondRoot.create);
+    const secondSideEffects =
+      applyPrivateHostOutputRootSideEffectsForRoot(harness, secondRoot);
+    const {
+      rawRecord: secondRawSideEffectRecord,
+      ...secondSideEffectEvidence
+    } = secondSideEffects;
+
+    const callbackEvents = [];
+    const firstRender = harness.bridge.renderContainer(
+      firstRoot.create.handle,
+      createPrivateHostOutputElementValue("cross-a")
+    );
+    recordPrivateHostOutputRootRequest(harness, firstRender);
+    callbackEvents.push("root.render:first");
+    const secondRender = harness.bridge.renderContainer(
+      secondRoot.create.handle,
+      createPrivateHostOutputElementValue("cross-b")
+    );
+    recordPrivateHostOutputRootRequest(harness, secondRender);
+    callbackEvents.push("root.render:second");
+
+    const flushSyncWarnings = [];
+    const flushSyncWorkWasInRender =
+      harness.modules.flushSyncGuard.finishFlushSyncGuard(
+        {
+          f() {
+            callbackEvents.push("flushSyncWork");
+            return false;
+          }
+        },
+        {
+          console: {
+            error(message) {
+              flushSyncWarnings.push(message);
+            }
+          },
+          development: harness.mode.nodeEnv !== "production"
+        }
+      );
+    const rootSideEffectStateAfterFlush = {
+      first: summarizePrivateRootMarkerListenerState({
+        container: firstRoot.container,
+        document: firstRoot.document,
+        modules: harness.modules
+      }),
+      second: summarizePrivateRootMarkerListenerState({
+        container: secondRoot.container,
+        document: secondRoot.document,
+        modules: harness.modules
+      })
+    };
+
+    const secondCleanup = cleanupPrivateHostOutputRootSideEffectsForRoot(
+      harness,
+      secondRoot,
+      secondRawSideEffectRecord
+    );
+    const firstCleanup = cleanupPrivateHostOutputRootSideEffectsForRoot(
+      harness,
+      firstRoot,
+      firstRawSideEffectRecord
+    );
+
+    return {
+      modeId: mode.id,
+      scenarioId,
+      status: "ok",
+      evidence: {
+        compatibilityClaimed: false,
+        comparedToReactDomOracle: false,
+        diagnosticKind: "private-cross-root-scheduling-flush",
+        publicFlushSyncCompatibilityClaimed: false,
+        publicRootCompatibilitySurface: false,
+        rootBridgeEvidence: summarizePrivateHostOutputRootBridgeEvidence(
+          harness
+        ),
+        rootSideEffectEvidence: {
+          first: {
+            ...firstSideEffectEvidence,
+            cleanup: firstCleanup
+          },
+          second: {
+            ...secondSideEffectEvidence,
+            cleanup: secondCleanup
+          }
+        },
+        schedulingEvidence: {
+          callbackEvents,
+          callbackRenderRequestCount: 2,
+          callbackReturnValue: "two-root-flush-complete",
+          committedRootCountAfterFlush: 2,
+          flushSyncGuardWarningCount: flushSyncWarnings.length,
+          flushSyncWorkCallCount: callbackEvents.filter(
+            (event) => event === "flushSyncWork"
+          ).length,
+          flushSyncWorkWasInRender,
+          privateReconcilerDiagnostics:
+            harness.modules.syncFlushCrossRootReconcilerDiagnostics,
+          publicFlushSyncCompatibilityClaimed: false,
+          rootSideEffectStateAfterFlush,
+          scheduledRootCount: 2
+        }
+      }
+    };
+  } catch (error) {
+    return {
+      modeId: mode.id,
+      scenarioId,
+      status: "throws",
+      error: describePrivateBridgeError(error)
+    };
+  }
+}
+
 function runPrivateWarningBoundaryDiagnosticScenario({
   mode,
   modules,
@@ -3825,6 +4375,37 @@ function createPrivateHostOutputHarness({ mode, modules, scenarioId }) {
     rootIdPrefix: "host-output-root",
     sideEffectIdPrefix: "host-output-side-effect",
     updateIdPrefix: "host-output-update"
+  });
+  const create = bridge.createClientRoot(container);
+  const harness = {
+    bridge,
+    container,
+    create,
+    document,
+    mode,
+    modules,
+    nativeHandoffRecords: [],
+    requestAdmissionRecords: [],
+    requestRecords: [],
+    scenarioId,
+    thrownOperations: [],
+    rootOwner: modules.rootBridge.getRootOwnerFromHandle(create.handle)
+  };
+  recordPrivateHostOutputRootRequest(harness, create);
+  return harness;
+}
+
+function createPrivateCrossRootSchedulingHarness({ mode, modules, scenarioId }) {
+  const document = createPrivateHostOutputDocument({
+    domContainer: modules.domContainer,
+    label: `${mode.id}:${scenarioId}:cross-root-scheduling`
+  });
+  const container = document.createElement("div");
+  const bridge = modules.rootBridge.createPrivateRootBridgeShell({
+    requestIdPrefix: "cross-root-scheduling-request",
+    rootIdPrefix: "cross-root-scheduling-root",
+    sideEffectIdPrefix: "cross-root-scheduling-side-effect",
+    updateIdPrefix: "cross-root-scheduling-update"
   });
   const create = bridge.createClientRoot(container);
   const harness = {
@@ -6137,6 +6718,96 @@ function isPortalRootRenderSideEffectFree(sideEffects) {
   );
 }
 
+function validatePrivateCrossRootSchedulingDiagnosticObservation({
+  observation,
+  scenarioId
+}) {
+  if (observation.status !== "ok") {
+    return {
+      gateStatus: "private-cross-root-scheduling-diagnostic-failed",
+      status: observation.status,
+      error: observation.error ?? null
+    };
+  }
+
+  if (scenarioId !== "flush-sync-cross-root-render") {
+    return {
+      gateStatus: "private-cross-root-scheduling-unexpected-scenario"
+    };
+  }
+
+  const evidence = observation.evidence;
+  const commonDifference = findFirstDifferencePath(
+    {
+      compatibilityClaimed: false,
+      comparedToReactDomOracle: false,
+      diagnosticKind: "private-cross-root-scheduling-flush",
+      publicFlushSyncCompatibilityClaimed: false,
+      publicRootCompatibilitySurface: false,
+      requestOperations: ["create", "create", "render", "render"],
+      requestRecordCount: 4,
+      thrownOperations: []
+    },
+    {
+      compatibilityClaimed: evidence.compatibilityClaimed,
+      comparedToReactDomOracle: evidence.comparedToReactDomOracle,
+      diagnosticKind: evidence.diagnosticKind,
+      publicFlushSyncCompatibilityClaimed:
+        evidence.publicFlushSyncCompatibilityClaimed,
+      publicRootCompatibilitySurface: evidence.publicRootCompatibilitySurface,
+      requestOperations: evidence.rootBridgeEvidence?.requestOperations,
+      requestRecordCount: evidence.rootBridgeEvidence?.requestRecordCount,
+      thrownOperations: evidence.rootBridgeEvidence?.thrownOperations
+    }
+  );
+  if (commonDifference !== null) {
+    return {
+      gateStatus: "private-cross-root-scheduling-common-evidence-mismatch",
+      firstDifferencePath: commonDifference
+    };
+  }
+
+  if (
+    evidence.rootBridgeEvidence.admissions.some(
+      (admission) =>
+        admission.admissionStatus !==
+          "admitted-private-root-bridge-request-record" ||
+        admission.executionStatus !==
+          "blocked-private-root-bridge-execution" ||
+        admission.compatibilityClaimed !== false
+    ) ||
+    evidence.rootBridgeEvidence.nativeHandoffs.some(
+      (handoff) =>
+        handoff.handoffStatus !==
+          "mirrored-private-native-root-request-record" ||
+        handoff.nativeExecution !== false ||
+        handoff.reconcilerExecution !== false ||
+        handoff.domMutation !== false ||
+        handoff.markerWrites !== false ||
+        handoff.listenerInstallation !== false ||
+        handoff.compatibilityClaimed !== false
+    )
+  ) {
+    return {
+      gateStatus:
+        "private-cross-root-scheduling-root-bridge-evidence-mismatch"
+    };
+  }
+
+  const schedulingDifference = findFirstDifferencePath(
+    expectedPrivateCrossRootSchedulingEvidence(),
+    comparablePrivateCrossRootSchedulingDiagnosticEvidence(evidence)
+  );
+  if (schedulingDifference !== null) {
+    return {
+      gateStatus: "private-cross-root-scheduling-evidence-mismatch",
+      firstDifferencePath: schedulingDifference
+    };
+  }
+
+  return null;
+}
+
 function validatePrivateWarningBoundaryDiagnosticObservation({
   mode,
   observation,
@@ -6833,6 +7504,104 @@ function expectedSyncFlushCrossRootReconcilerDiagnostics() {
   };
 }
 
+function expectedPrivateCrossRootSchedulingEvidence() {
+  const afterApply = expectedPrivateRootSideEffectStateAfterApply();
+  return {
+    rootSideEffectEvidence: {
+      first: expectedPrivateRootSideEffectEvidence(),
+      second: expectedPrivateRootSideEffectEvidence()
+    },
+    schedulingEvidence: {
+      callbackEvents: [
+        "root.render:first",
+        "root.render:second",
+        "flushSyncWork"
+      ],
+      callbackRenderRequestCount: 2,
+      callbackReturnValue: "two-root-flush-complete",
+      committedRootCountAfterFlush: 2,
+      flushSyncGuardWarningCount: 0,
+      flushSyncWorkCallCount: 1,
+      flushSyncWorkWasInRender: false,
+      privateReconcilerDiagnostics:
+        expectedSyncFlushCrossRootReconcilerDiagnostics(),
+      publicFlushSyncCompatibilityClaimed: false,
+      rootSideEffectStateAfterFlush: {
+        first: afterApply,
+        second: afterApply
+      },
+      scheduledRootCount: 2
+    }
+  };
+}
+
+function expectedPrivateRootSideEffectEvidence() {
+  return {
+    afterApply: expectedPrivateRootSideEffectStateAfterApply(),
+    before: expectedPrivateRootSideEffectStateBefore(),
+    cleanup: {
+      afterCleanup: expectedPrivateRootSideEffectStateBefore(),
+      status: "reverted-private-root-create-mark-listen-gate"
+    },
+    status: "applied-private-root-create-mark-listen-gate"
+  };
+}
+
+function expectedPrivateRootSideEffectStateBefore() {
+  return {
+    containerListenerRegistrationCount: 0,
+    containerListeningMarkerPropertyCount: 0,
+    containerMarkerPropertyCount: 0,
+    containerMarkerTruthyCount: 0,
+    ownerDocumentListenerRegistrationCount: 0,
+    ownerDocumentListeningMarkerPropertyCount: 0
+  };
+}
+
+function expectedPrivateRootSideEffectStateAfterApply() {
+  return {
+    containerListenerRegistrationCount: 138,
+    containerListeningMarkerPropertyCount: 1,
+    containerMarkerPropertyCount: 1,
+    containerMarkerTruthyCount: 1,
+    ownerDocumentListenerRegistrationCount: 1,
+    ownerDocumentListeningMarkerPropertyCount: 1
+  };
+}
+
+function comparablePrivateCrossRootSchedulingDiagnosticEvidence(evidence) {
+  return {
+    rootSideEffectEvidence: {
+      first: comparablePrivateHostOutputRootSideEffectEvidence(
+        evidence.rootSideEffectEvidence.first
+      ),
+      second: comparablePrivateHostOutputRootSideEffectEvidence(
+        evidence.rootSideEffectEvidence.second
+      )
+    },
+    schedulingEvidence: {
+      callbackEvents: evidence.schedulingEvidence.callbackEvents,
+      callbackRenderRequestCount:
+        evidence.schedulingEvidence.callbackRenderRequestCount,
+      callbackReturnValue: evidence.schedulingEvidence.callbackReturnValue,
+      committedRootCountAfterFlush:
+        evidence.schedulingEvidence.committedRootCountAfterFlush,
+      flushSyncGuardWarningCount:
+        evidence.schedulingEvidence.flushSyncGuardWarningCount,
+      flushSyncWorkCallCount: evidence.schedulingEvidence.flushSyncWorkCallCount,
+      flushSyncWorkWasInRender:
+        evidence.schedulingEvidence.flushSyncWorkWasInRender,
+      privateReconcilerDiagnostics:
+        evidence.schedulingEvidence.privateReconcilerDiagnostics,
+      publicFlushSyncCompatibilityClaimed:
+        evidence.schedulingEvidence.publicFlushSyncCompatibilityClaimed,
+      rootSideEffectStateAfterFlush:
+        evidence.schedulingEvidence.rootSideEffectStateAfterFlush,
+      scheduledRootCount: evidence.schedulingEvidence.scheduledRootCount
+    }
+  };
+}
+
 function comparablePrivateHostOutputScenarioEvidence(evidence) {
   if (evidence.flushSyncEvidence !== undefined) {
     return {
@@ -7146,6 +7915,51 @@ function validatePrivateWarningBoundaryAdmissionMetadata({
       failures.push({
         scenarioId,
         gateStatus: "unexpected-private-root-warning-boundary-admission"
+      });
+    }
+  }
+}
+
+function validatePrivateCrossRootSchedulingAdmissionMetadata({
+  privateCrossRootSchedulingAdmissionByScenario,
+  failures
+}) {
+  for (const scenarioId of REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS) {
+    if (!privateCrossRootSchedulingAdmissionByScenario.has(scenarioId)) {
+      failures.push({
+        scenarioId,
+        gateStatus: "missing-private-cross-root-scheduling-admission"
+      });
+    }
+  }
+
+  for (const [
+    scenarioId,
+    admission
+  ] of privateCrossRootSchedulingAdmissionByScenario) {
+    if (!REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.includes(scenarioId)) {
+      failures.push({
+        scenarioId,
+        gateStatus: "unknown-private-cross-root-scheduling-admission-scenario"
+      });
+    }
+    if (
+      admission.admission !== "private-cross-root-scheduling-diagnostic" &&
+      admission.admission !== "unsupported"
+    ) {
+      failures.push({
+        scenarioId,
+        gateStatus: "unknown-private-cross-root-scheduling-admission",
+        admission: admission.admission
+      });
+    }
+    if (
+      admission.admission === "private-cross-root-scheduling-diagnostic" &&
+      scenarioId !== "flush-sync-cross-root-render"
+    ) {
+      failures.push({
+        scenarioId,
+        gateStatus: "unexpected-private-cross-root-scheduling-admission"
       });
     }
   }

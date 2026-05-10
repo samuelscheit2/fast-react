@@ -25,6 +25,7 @@ import {
   REACT_DOM_ROOT_PUBLIC_FACADE_BRIDGE_RECORD_ONLY_STATUS,
   REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS,
   REACT_DOM_ROOT_PUBLIC_FACADE_SCENARIO_ADMISSIONS,
+  REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_ACCEPTED_STATUS,
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_ACCEPTED_STATUS,
   evaluateReactDomRootRenderE2EConformanceGate,
   evaluateReactDomRootPublicFacadeBlockedGate,
@@ -99,6 +100,25 @@ test("React DOM public root facade gate blocks placeholders while oracle prerequ
     gate.rootRenderGate.summary.privateWarningBoundaryConsoleOutputUsedAsEvidence,
     false
   );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privateCrossRootSchedulingDiagnosticScenarioModeRowCount,
+    2
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privateCrossRootSchedulingBlockedScenarioModeRowCount,
+    18
+  );
+  assert.equal(
+    gate.rootRenderGate.summary.privateCrossRootSchedulingCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privateCrossRootSchedulingPublicFlushSyncCompatibilityClaimed,
+    false
+  );
   assert.equal(gate.rootRenderGate.summary.portalRootRenderBlockedRowCount, 5);
   assert.equal(
     gate.rootRenderGate.summary.portalRootRenderCompatibilityClaimed,
@@ -110,6 +130,10 @@ test("React DOM public root facade gate blocks placeholders while oracle prerequ
     assert.notEqual(
       row.gateStatus,
       REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_ACCEPTED_STATUS
+    );
+    assert.notEqual(
+      row.gateStatus,
+      REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_ACCEPTED_STATUS
     );
     assert.notEqual(row.gateStatus, "blocked-portal-root-render");
     if ("compatibilityClaimed" in row) {
@@ -642,6 +666,51 @@ test("React DOM public root facade gate rejects private warning-boundary promoti
       (failure) =>
         failure.gateStatus ===
         "root-render-private-warning-boundary-row-not-private"
+    )
+  );
+});
+
+test("React DOM public root facade gate rejects private cross-root scheduling promotion to public flushSync compatibility", () => {
+  const rootRenderGate = clone(
+    evaluateReactDomRootRenderE2EConformanceGate({
+      checkedOracle: rootRenderOracle,
+      currentOracle: rootRenderOracle
+    })
+  );
+  rootRenderGate.summary.privateCrossRootSchedulingCompatibilityClaimed = true;
+  rootRenderGate.summary
+    .privateCrossRootSchedulingPublicFlushSyncCompatibilityClaimed = true;
+  rootRenderGate.privateCrossRootSchedulingGate.compatibilityClaimed = true;
+  rootRenderGate.privateCrossRootSchedulingGate.publicFlushSyncCompatibilityClaimed =
+    true;
+  rootRenderGate.privateCrossRootSchedulingDiagnosticScenarioModeRows[0] = {
+    ...rootRenderGate.privateCrossRootSchedulingDiagnosticScenarioModeRows[0],
+    comparedToReactDomOracle: true,
+    compatibilityClaimed: true,
+    publicFlushSyncCompatibilityClaimed: true,
+    publicRootCompatibilitySurface: true
+  };
+
+  const gate = evaluateReactDomRootPublicFacadeBlockedGate({
+    checkedOracle: rootRenderOracle,
+    currentOracle: rootRenderOracle,
+    clientRootOracle,
+    rootRenderGateResult: rootRenderGate
+  });
+
+  assert.equal(gate.ok, false);
+  assert.ok(
+    gate.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+        "root-render-private-cross-root-scheduling-claims-compatibility-while-public-facade-blocked"
+    )
+  );
+  assert.ok(
+    gate.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+        "root-render-private-cross-root-scheduling-row-not-private"
     )
   );
 });
