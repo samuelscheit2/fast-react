@@ -194,9 +194,20 @@ sequencing belong in `MASTER_PLAN.md`.
   default/current value lookup, provider push snapshots, restore validation,
   stable handle reports, and ownership checks for future function-component and
   context integration without JS facade or renderer wiring.
+- Worker 181 React DOM `createPortal` object behavior was merged, replacing
+  the root and profiling placeholder with a conformance-backed portal object
+  constructor that validates containers, preserves React portal shape and key
+  coercion, keeps server/client render behavior fail-closed, and leaves portal
+  mounting/listeners/commit work unimplemented.
 
 ## Latest Accepted Verification
 
+- Worker 181 was verified on its integrated worktree and again on `main` with
+  focused React DOM `createPortal` conformance tests, smoke entrypoint and
+  React DOM root export checks, `npm run check:js` covering the package-surface
+  guard, benchmark gate, workspace checks, native loader probes, and 441
+  conformance tests, plus `git diff --check`; merging current `main` into the
+  worker branch produced no conflicts.
 - Worker 180 was verified on its integrated worktree and again on `main` with
   `cargo fmt --all --check`, focused `context_stack` tests, full
   `fast-react-core` tests with 118 unit tests, core clippy with warnings

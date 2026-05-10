@@ -45,8 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 181: React DOM createPortal object in
-  `/Users/user/Developer/Developer/fast-react-worker-181-react-dom-create-portal-object`.
 - Worker 182: React hook dispatcher guard in
   `/Users/user/Developer/Developer/fast-react-worker-182-react-hook-dispatcher-guard`.
 - Worker 183: React transition facade in
