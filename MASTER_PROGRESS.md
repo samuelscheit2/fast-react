@@ -29,6 +29,23 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 718
+
+- Worker 718 hardened the private sync-flush/root-scheduler finished-work
+  handoff. Root scheduler sync continuations and sync-flush commit
+  continuations now require matching root-level `finished_work` /
+  `finished_lanes` evidence before the private commit helper can switch
+  current, with missing, stale, foreign, lane-mismatch, and pending-passive
+  blockers kept fail-closed.
+- The accepted work stayed in private/test-build plumbing and did not open
+  public render, public `act`, public `flushSync`, public Scheduler, host
+  mutation, refs/effects, or hydration behavior.
+- Worker 718 was accepted after independent audit and verification with focused
+  root-scheduler, sync-flush, root-work-loop, and finished-work commit handoff
+  tests, full reconciler tests, formatting, clippy, full `npm run check`,
+  conflict-marker scanning, and `git diff --check`; its subagent, worktree, and
+  branch were removed after merge.
+
 ### Worker 721
 
 - Worker 721 added a private React DOM fake-DOM execution path for admitted
