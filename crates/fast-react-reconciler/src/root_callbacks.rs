@@ -891,6 +891,92 @@ mod tests {
     }
 
     #[test]
+    fn root_callbacks_materialize_multiple_reduced_host_root_callbacks_in_stable_order() {
+        let mut store = UpdateQueueStore::new();
+        let queue = store.initialize_host_root_queue(state(0));
+        let first = update_with_callback(&mut store, Lane::DEFAULT, 6861, 68621);
+        let second = update_with_callback(&mut store, Lane::DEFAULT, 6862, 68622);
+        let third = update_with_callback(&mut store, Lane::DEFAULT, 6863, 68623);
+        store.append_pending_update(queue, first).unwrap();
+        store.append_pending_update(queue, second).unwrap();
+        store.append_pending_update(queue, third).unwrap();
+
+        store
+            .process_host_root_update_queue(queue, None, Lanes::DEFAULT, Lanes::DEFAULT)
+            .unwrap();
+        let taken = store.take_root_update_callback_records(queue).unwrap();
+        let mut gate = materialize_root_update_callback_invocation_gate(&taken);
+        let mut control = TestRootUpdateCallbackControl::default();
+
+        assert_eq!(
+            taken
+                .visible()
+                .iter()
+                .map(|record| record.update())
+                .collect::<Vec<_>>(),
+            vec![first, second, third]
+        );
+        assert_eq!(
+            callback_handles(taken.visible()),
+            vec![
+                RootUpdateCallbackHandle::from_raw(68621),
+                RootUpdateCallbackHandle::from_raw(68622),
+                RootUpdateCallbackHandle::from_raw(68623)
+            ]
+        );
+        assert_eq!(
+            taken
+                .visible()
+                .iter()
+                .map(|record| record.sequence())
+                .collect::<Vec<_>>(),
+            vec![0, 1, 2]
+        );
+        assert!(taken.hidden().is_empty());
+        assert!(taken.deferred_hidden().is_empty());
+        assert_eq!(gate.len(), 3);
+        assert_eq!(gate.hidden_record_count(), 0);
+        assert_eq!(gate.deferred_hidden_record_count(), 0);
+        assert!(!gate.user_callbacks_invoked());
+        assert!(!gate.hidden_callbacks_invoked());
+        assert!(!gate.public_root_callback_behavior_exposed());
+
+        let execution = invoke_root_update_callbacks_under_test_control(&mut gate, &mut control);
+
+        assert_eq!(execution.source_visible_record_count(), 3);
+        assert_eq!(execution.completed_count(), 3);
+        assert_eq!(execution.error_count(), 0);
+        assert!(execution.did_drain_accepted_visible_callbacks());
+        assert!(execution.records_in_invocation_order());
+        assert!(execution.records_are_visible());
+        assert!(!execution.public_js_callbacks_invoked());
+        assert!(!execution.public_root_callback_behavior_exposed());
+        assert!(!execution.hidden_callbacks_invoked());
+        assert!(!execution.root_error_callbacks_invoked());
+        assert_eq!(
+            execution
+                .records()
+                .iter()
+                .map(|record| record.update())
+                .collect::<Vec<_>>(),
+            vec![first, second, third]
+        );
+        assert_eq!(
+            execution
+                .records()
+                .iter()
+                .map(|record| record.accepted_sequence())
+                .collect::<Vec<_>>(),
+            vec![0, 1, 2]
+        );
+        assert_eq!(control.calls().len(), 3);
+        assert_eq!(control.calls()[0].update(), first);
+        assert_eq!(control.calls()[1].update(), second);
+        assert_eq!(control.calls()[2].update(), third);
+        assert!(gate.records().is_empty());
+    }
+
+    #[test]
     fn root_callbacks_invocation_gate_records_visible_callbacks_in_drained_order() {
         let mut store = UpdateQueueStore::new();
         let queue = store.initialize_host_root_queue(state(0));
