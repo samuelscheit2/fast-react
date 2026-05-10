@@ -3327,6 +3327,12 @@ pub const TEST_RENDERER_PRIVATE_SERIALIZATION_FINISHED_WORK_IDENTITY_DIAGNOSTIC_
     "fast-react-test-renderer.serialization.private-finished-work-identity";
 pub const TEST_RENDERER_PRIVATE_SERIALIZATION_FINISHED_WORK_IDENTITY_STATUS: &str =
     "private-serialization-finished-work-identity-validated-public-serialization-blocked";
+pub const TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_SNAPSHOT_IDENTITY_BLOCKER_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.tojson.sibling-snapshot.finished-work-identity-blocker";
+pub const TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_SNAPSHOT_IDENTITY_BLOCKER_STATUS: &str =
+    "private-tojson-sibling-snapshot-finished-work-identity-blocked";
+pub const TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_SNAPSHOT_IDENTITY_BLOCKER_REASON: &str =
+    "missing-committed-sibling-text-fiber-inspection-and-handoff";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_HOST_OUTPUT_ROW_ID: &str =
     "react-test-renderer-tojson-update-host-output-private-diagnostic";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_NESTED_UPDATE_HOST_OUTPUT_ROW_ID: &str =
@@ -7206,6 +7212,265 @@ impl TestRendererPrivateSerializationFinishedWorkIdentityGate {
     #[must_use]
     pub const fn compatibility_claimed(self) -> bool {
         self.compatibility_claimed
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererPrivateToJsonSiblingSnapshotFinishedWorkIdentityBlocker {
+    diagnostic_name: &'static str,
+    status: &'static str,
+    root: FiberRootId,
+    public_surface: &'static str,
+    source_execution_record_id: &'static str,
+    source_execution_status: &'static str,
+    host_output_row: TestRendererPrivateToJsonHostOutputRow,
+    snapshot_based_host_output_row: bool,
+    candidate_finished_work_identity_supplied: bool,
+    candidate_identity_diagnostic_name: Option<&'static str>,
+    candidate_identity_status: Option<&'static str>,
+    candidate_identity_root_matches: bool,
+    candidate_identity_update_sequence_matches_root: bool,
+    candidate_identity_update_to_json_surface: bool,
+    candidate_identity_source_report_matches_to_json: bool,
+    candidate_identity_update_kind_matches: bool,
+    candidate_identity_committed_host_root_current: bool,
+    candidate_identity_lanes_match: bool,
+    candidate_identity_matches_update_route_handoff: bool,
+    candidate_identity_public_blockers_closed: bool,
+    plausible_finished_work_identity_rejected: bool,
+    committed_sibling_text_fiber_inspection_available: bool,
+    committed_sibling_text_report_shape_available: bool,
+    real_sibling_text_handoff_available: bool,
+    consumes_committed_host_root_finished_work_identity: bool,
+    consumes_committed_host_root_finished_work_lanes: bool,
+    identity_admission_available: bool,
+    rejection_reason: &'static str,
+    public_to_json_available: bool,
+    public_serialization_available: bool,
+    public_route_available: bool,
+    native_bridge_available: bool,
+    native_execution_available: bool,
+    package_compatibility_claimed: bool,
+}
+
+impl TestRendererPrivateToJsonSiblingSnapshotFinishedWorkIdentityBlocker {
+    #[must_use]
+    pub const fn diagnostic_name(self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn status(self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn public_surface(self) -> &'static str {
+        self.public_surface
+    }
+
+    #[must_use]
+    pub const fn source_execution_record_id(self) -> &'static str {
+        self.source_execution_record_id
+    }
+
+    #[must_use]
+    pub const fn source_execution_status(self) -> &'static str {
+        self.source_execution_status
+    }
+
+    #[must_use]
+    pub const fn host_output_row(self) -> TestRendererPrivateToJsonHostOutputRow {
+        self.host_output_row
+    }
+
+    #[must_use]
+    pub const fn host_output_update_kind(self) -> TestRendererRootUpdateKind {
+        self.host_output_row.host_output_update_kind()
+    }
+
+    #[must_use]
+    pub const fn host_output_shape(self) -> TestRendererPrivateToJsonHostOutputShape {
+        self.host_output_row.host_output_shape()
+    }
+
+    #[must_use]
+    pub const fn snapshot_based_host_output_row(self) -> bool {
+        self.snapshot_based_host_output_row
+    }
+
+    #[must_use]
+    pub const fn candidate_finished_work_identity_supplied(self) -> bool {
+        self.candidate_finished_work_identity_supplied
+    }
+
+    #[must_use]
+    pub const fn candidate_identity_diagnostic_name(self) -> Option<&'static str> {
+        self.candidate_identity_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn candidate_identity_status(self) -> Option<&'static str> {
+        self.candidate_identity_status
+    }
+
+    #[must_use]
+    pub const fn candidate_identity_root_matches(self) -> bool {
+        self.candidate_identity_root_matches
+    }
+
+    #[must_use]
+    pub const fn candidate_identity_update_sequence_matches_root(self) -> bool {
+        self.candidate_identity_update_sequence_matches_root
+    }
+
+    #[must_use]
+    pub const fn candidate_identity_update_to_json_surface(self) -> bool {
+        self.candidate_identity_update_to_json_surface
+    }
+
+    #[must_use]
+    pub const fn candidate_identity_source_report_matches_to_json(self) -> bool {
+        self.candidate_identity_source_report_matches_to_json
+    }
+
+    #[must_use]
+    pub const fn candidate_identity_update_kind_matches(self) -> bool {
+        self.candidate_identity_update_kind_matches
+    }
+
+    #[must_use]
+    pub const fn candidate_identity_committed_host_root_current(self) -> bool {
+        self.candidate_identity_committed_host_root_current
+    }
+
+    #[must_use]
+    pub const fn candidate_identity_lanes_match(self) -> bool {
+        self.candidate_identity_lanes_match
+    }
+
+    #[must_use]
+    pub const fn candidate_identity_matches_update_route_handoff(self) -> bool {
+        self.candidate_identity_matches_update_route_handoff
+    }
+
+    #[must_use]
+    pub const fn candidate_identity_public_blockers_closed(self) -> bool {
+        self.candidate_identity_public_blockers_closed
+    }
+
+    #[must_use]
+    pub fn candidate_identity_plausible_for_update_to_json(self) -> bool {
+        self.candidate_finished_work_identity_supplied()
+            && self.candidate_identity_diagnostic_name()
+                == Some(TEST_RENDERER_PRIVATE_SERIALIZATION_FINISHED_WORK_IDENTITY_DIAGNOSTIC_NAME)
+            && self.candidate_identity_status()
+                == Some(TEST_RENDERER_PRIVATE_SERIALIZATION_FINISHED_WORK_IDENTITY_STATUS)
+            && self.candidate_identity_root_matches()
+            && self.candidate_identity_update_sequence_matches_root()
+            && self.candidate_identity_update_to_json_surface()
+            && self.candidate_identity_source_report_matches_to_json()
+            && self.candidate_identity_update_kind_matches()
+            && self.candidate_identity_committed_host_root_current()
+            && self.candidate_identity_lanes_match()
+            && self.candidate_identity_matches_update_route_handoff()
+            && self.candidate_identity_public_blockers_closed()
+    }
+
+    #[must_use]
+    pub const fn plausible_finished_work_identity_rejected(self) -> bool {
+        self.plausible_finished_work_identity_rejected
+    }
+
+    #[must_use]
+    pub const fn committed_sibling_text_fiber_inspection_available(self) -> bool {
+        self.committed_sibling_text_fiber_inspection_available
+    }
+
+    #[must_use]
+    pub const fn committed_sibling_text_report_shape_available(self) -> bool {
+        self.committed_sibling_text_report_shape_available
+    }
+
+    #[must_use]
+    pub const fn real_sibling_text_handoff_available(self) -> bool {
+        self.real_sibling_text_handoff_available
+    }
+
+    #[must_use]
+    pub const fn consumes_committed_host_root_finished_work_identity(self) -> bool {
+        self.consumes_committed_host_root_finished_work_identity
+    }
+
+    #[must_use]
+    pub const fn consumes_committed_host_root_finished_work_lanes(self) -> bool {
+        self.consumes_committed_host_root_finished_work_lanes
+    }
+
+    #[must_use]
+    pub const fn identity_admission_available(self) -> bool {
+        self.identity_admission_available
+    }
+
+    #[must_use]
+    pub const fn rejection_reason(self) -> &'static str {
+        self.rejection_reason
+    }
+
+    #[must_use]
+    pub const fn public_to_json_available(self) -> bool {
+        self.public_to_json_available
+    }
+
+    #[must_use]
+    pub const fn public_serialization_available(self) -> bool {
+        self.public_serialization_available
+    }
+
+    #[must_use]
+    pub const fn public_route_available(self) -> bool {
+        self.public_route_available
+    }
+
+    #[must_use]
+    pub const fn native_bridge_available(self) -> bool {
+        self.native_bridge_available
+    }
+
+    #[must_use]
+    pub const fn native_execution_available(self) -> bool {
+        self.native_execution_available
+    }
+
+    #[must_use]
+    pub const fn package_compatibility_claimed(self) -> bool {
+        self.package_compatibility_claimed
+    }
+
+    #[must_use]
+    pub fn identity_admission_blocked(self) -> bool {
+        self.snapshot_based_host_output_row()
+            && self.host_output_update_kind() == TestRendererRootUpdateKind::Update
+            && self.host_output_shape() == TestRendererPrivateToJsonHostOutputShape::SiblingText
+            && !self.committed_sibling_text_fiber_inspection_available()
+            && !self.committed_sibling_text_report_shape_available()
+            && !self.real_sibling_text_handoff_available()
+            && !self.consumes_committed_host_root_finished_work_identity()
+            && !self.consumes_committed_host_root_finished_work_lanes()
+            && !self.identity_admission_available()
+            && self.rejection_reason()
+                == TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_SNAPSHOT_IDENTITY_BLOCKER_REASON
+            && !self.public_to_json_available()
+            && !self.public_serialization_available()
+            && !self.public_route_available()
+            && !self.native_bridge_available()
+            && !self.native_execution_available()
+            && !self.package_compatibility_claimed()
     }
 }
 
@@ -12766,12 +13031,14 @@ impl TestRendererRoot {
         current_snapshot: &TestContainerSnapshot,
         execution: TestRendererPrivateUpdateRouteAdmissionRecord,
     ) -> Result<TestRendererPrivateToJsonNativeExecutionEvidence, TestRendererRootError> {
-        self.validate_private_to_json_update_native_execution_record_for_canary(execution)?;
-        let row =
-            Self::describe_private_to_json_sibling_text_host_output_row_from_snapshot_for_diagnostics(
+        let blocker = self
+            .describe_private_to_json_sibling_text_snapshot_finished_work_identity_blocker_for_diagnostics(
                 previous_snapshot,
                 current_snapshot,
+                execution,
+                None,
             )?;
+        let row = blocker.host_output_row();
 
         self.private_to_json_native_execution_evidence_from_host_output_row(
             "update",
@@ -12784,6 +13051,159 @@ impl TestRendererRoot {
             row,
             current_snapshot,
         )
+    }
+
+    pub fn describe_private_to_json_sibling_text_snapshot_finished_work_identity_blocker_for_diagnostics(
+        &self,
+        previous_snapshot: &TestContainerSnapshot,
+        current_snapshot: &TestContainerSnapshot,
+        execution: TestRendererPrivateUpdateRouteAdmissionRecord,
+        identity: Option<TestRendererPrivateSerializationFinishedWorkIdentityGate>,
+    ) -> Result<
+        TestRendererPrivateToJsonSiblingSnapshotFinishedWorkIdentityBlocker,
+        TestRendererRootError,
+    > {
+        self.validate_private_to_json_update_native_execution_record_for_canary(execution)?;
+        let row =
+            Self::describe_private_to_json_sibling_text_host_output_row_from_snapshot_for_diagnostics(
+                previous_snapshot,
+                current_snapshot,
+            )?;
+        let shape = Self::private_to_json_host_output_shape_from_snapshot(current_snapshot);
+        if !Self::private_to_json_native_execution_shape_is_accepted(row, shape) {
+            return self.private_to_json_native_execution_record_error(
+                "update",
+                "sibling-snapshot-host-output-shape-missing",
+            );
+        }
+
+        let actual_current = self.store.root(self.root_id)?.current();
+        let actual_current = TestRendererFiberHandleDiagnostics {
+            arena_id: actual_current.arena_id().get(),
+            slot: actual_current.slot().get(),
+            generation: actual_current.generation().get(),
+        };
+
+        let candidate_identity_diagnostic_name =
+            identity.map(|identity| identity.diagnostic_name());
+        let candidate_identity_status = identity.map(|identity| identity.status());
+        let candidate_identity_root_matches =
+            identity.is_some_and(|identity| identity.root() == self.root_id);
+        let candidate_identity_update_sequence_matches_root = identity.is_some_and(|identity| {
+            identity.root_scheduled_update_sequence() == self.scheduled_updates.len()
+        });
+        let candidate_identity_update_to_json_surface =
+            identity.is_some_and(|identity| identity.public_surface() == "create().toJSON");
+        let candidate_identity_source_report_matches_to_json = identity.is_some_and(|identity| {
+            identity.source_serialization_diagnostic_name()
+                == TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME
+        });
+        let candidate_identity_update_kind_matches = identity.is_some_and(|identity| {
+            identity.host_output_update_kind() == TestRendererRootUpdateKind::Update
+        });
+        let candidate_identity_committed_host_root_current = identity.is_some_and(|identity| {
+            identity.commit_current() == actual_current
+                && identity.render_finished_work() == identity.commit_current()
+                && identity.report_finished_work() == identity.commit_current()
+                && identity.commit_previous_current() == identity.render_current()
+                && identity.commit_current_matches_render_finished_work()
+                && identity.commit_previous_current_matches_render_current()
+                && identity.report_finished_work_matches_commit_current()
+                && identity.committed_fiber_inspection_current_matches_commit()
+                && identity.host_output_snapshot_current()
+                && identity.consumes_committed_host_root_finished_work_identity()
+        });
+        let candidate_identity_lanes_match = identity.is_some_and(|identity| {
+            identity.render_lanes_bits() != 0
+                && identity.render_lanes_bits() == identity.commit_finished_lanes_bits()
+                && identity.report_finished_lanes_bits() == identity.commit_finished_lanes_bits()
+                && identity.commit_remaining_lanes_bits() == 0
+                && identity.commit_pending_lanes_bits() == 0
+                && identity.commit_lanes_match_render_lanes()
+                && identity.report_lanes_match_commit_lanes()
+                && identity.consumes_committed_host_root_finished_work_lanes()
+        });
+        let candidate_identity_matches_update_route_handoff = identity.is_some_and(|identity| {
+            identity.render_current() == execution.render_current()
+                && identity.render_finished_work() == execution.render_finished_work()
+                && identity.commit_previous_current() == execution.commit_previous_current()
+                && identity.commit_current() == execution.commit_current()
+                && identity.render_lanes_bits() == execution.render_lanes_bits()
+                && identity.commit_finished_lanes_bits() == execution.commit_finished_lanes_bits()
+        });
+        let candidate_identity_public_blockers_closed = identity.is_some_and(|identity| {
+            !identity.public_to_json_available()
+                && !identity.public_to_tree_available()
+                && !identity.public_test_instance_available()
+                && !identity.public_serialization_available()
+                && !identity.compatibility_claimed()
+        });
+
+        let candidate_identity_plausible_for_update_to_json = identity.is_some()
+            && candidate_identity_diagnostic_name
+                == Some(TEST_RENDERER_PRIVATE_SERIALIZATION_FINISHED_WORK_IDENTITY_DIAGNOSTIC_NAME)
+            && candidate_identity_status
+                == Some(TEST_RENDERER_PRIVATE_SERIALIZATION_FINISHED_WORK_IDENTITY_STATUS)
+            && candidate_identity_root_matches
+            && candidate_identity_update_sequence_matches_root
+            && candidate_identity_update_to_json_surface
+            && candidate_identity_source_report_matches_to_json
+            && candidate_identity_update_kind_matches
+            && candidate_identity_committed_host_root_current
+            && candidate_identity_lanes_match
+            && candidate_identity_matches_update_route_handoff
+            && candidate_identity_public_blockers_closed;
+
+        let blocker = TestRendererPrivateToJsonSiblingSnapshotFinishedWorkIdentityBlocker {
+            diagnostic_name:
+                TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_SNAPSHOT_IDENTITY_BLOCKER_DIAGNOSTIC_NAME,
+            status: TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_SNAPSHOT_IDENTITY_BLOCKER_STATUS,
+            root: self.root_id,
+            public_surface: "create().update -> create().toJSON",
+            source_execution_record_id: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID,
+            source_execution_status: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS,
+            host_output_row: row,
+            snapshot_based_host_output_row: true,
+            candidate_finished_work_identity_supplied: identity.is_some(),
+            candidate_identity_diagnostic_name,
+            candidate_identity_status,
+            candidate_identity_root_matches,
+            candidate_identity_update_sequence_matches_root,
+            candidate_identity_update_to_json_surface,
+            candidate_identity_source_report_matches_to_json,
+            candidate_identity_update_kind_matches,
+            candidate_identity_committed_host_root_current,
+            candidate_identity_lanes_match,
+            candidate_identity_matches_update_route_handoff,
+            candidate_identity_public_blockers_closed,
+            plausible_finished_work_identity_rejected:
+                candidate_identity_plausible_for_update_to_json,
+            committed_sibling_text_fiber_inspection_available: false,
+            committed_sibling_text_report_shape_available: false,
+            real_sibling_text_handoff_available: false,
+            consumes_committed_host_root_finished_work_identity: false,
+            consumes_committed_host_root_finished_work_lanes: false,
+            identity_admission_available: false,
+            rejection_reason:
+                TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_SNAPSHOT_IDENTITY_BLOCKER_REASON,
+            public_to_json_available: false,
+            public_serialization_available: false,
+            public_route_available: false,
+            native_bridge_available: false,
+            native_execution_available: false,
+            package_compatibility_claimed: false,
+        };
+        Self::validate_private_to_json_sibling_snapshot_finished_work_identity_blocker_for_diagnostics(
+            blocker,
+        )
+        .map_err(|reason| {
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "update",
+                reason,
+            }
+        })?;
+
+        Ok(blocker)
     }
 
     pub fn describe_private_to_json_after_unmount_native_execution_for_canary(
@@ -14067,6 +14487,74 @@ impl TestRendererRoot {
         }
 
         Ok(identity)
+    }
+
+    fn validate_private_to_json_sibling_snapshot_finished_work_identity_blocker_for_diagnostics(
+        blocker: TestRendererPrivateToJsonSiblingSnapshotFinishedWorkIdentityBlocker,
+    ) -> Result<(), &'static str> {
+        if blocker.diagnostic_name()
+            != TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_SNAPSHOT_IDENTITY_BLOCKER_DIAGNOSTIC_NAME
+            || blocker.status()
+                != TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_SNAPSHOT_IDENTITY_BLOCKER_STATUS
+        {
+            return Err("sibling-snapshot-identity-blocker-diagnostic-mismatch");
+        }
+        if blocker.source_execution_record_id()
+            != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID
+            || blocker.source_execution_status()
+                != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS
+        {
+            return Err("sibling-snapshot-identity-blocker-route-mismatch");
+        }
+        if blocker.host_output_row().id()
+            != TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_HOST_OUTPUT_ROW_ID
+            || blocker.host_output_update_kind() != TestRendererRootUpdateKind::Update
+            || blocker.host_output_shape() != TestRendererPrivateToJsonHostOutputShape::SiblingText
+            || !blocker.host_output_row().public_blockers().all_blocked()
+            || !blocker
+                .host_output_row()
+                .dependency_diagnostics()
+                .public_surfaces_blocked()
+        {
+            return Err("sibling-snapshot-identity-blocker-row-mismatch");
+        }
+        if !blocker.snapshot_based_host_output_row() {
+            return Err("sibling-snapshot-identity-blocker-not-snapshot-based");
+        }
+        if blocker.committed_sibling_text_fiber_inspection_available()
+            || blocker.committed_sibling_text_report_shape_available()
+            || blocker.real_sibling_text_handoff_available()
+        {
+            return Err("sibling-snapshot-identity-binding-unexpectedly-open");
+        }
+        if blocker.consumes_committed_host_root_finished_work_identity()
+            || blocker.consumes_committed_host_root_finished_work_lanes()
+            || blocker.identity_admission_available()
+        {
+            return Err("sibling-snapshot-finished-work-identity-admitted");
+        }
+        if blocker.candidate_identity_plausible_for_update_to_json()
+            && !blocker.plausible_finished_work_identity_rejected()
+        {
+            return Err("sibling-snapshot-plausible-identity-not-rejected");
+        }
+        if blocker.rejection_reason()
+            != TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_SNAPSHOT_IDENTITY_BLOCKER_REASON
+            || !blocker.identity_admission_blocked()
+        {
+            return Err("sibling-snapshot-identity-blocker-reason-mismatch");
+        }
+        if blocker.public_to_json_available()
+            || blocker.public_serialization_available()
+            || blocker.public_route_available()
+            || blocker.native_bridge_available()
+            || blocker.native_execution_available()
+            || blocker.package_compatibility_claimed()
+        {
+            return Err("public-or-native-compatibility-claim");
+        }
+
+        Ok(())
     }
 
     fn validate_private_update_native_execution_matches_handoff_for_canary(
@@ -17704,6 +18192,41 @@ mod tests {
         RootElementHandle::from_raw(raw)
     }
 
+    fn sibling_text_snapshots_for_diagnostics() -> (TestContainerSnapshot, TestContainerSnapshot) {
+        let previous_snapshot = TestContainerSnapshot {
+            children: vec![TestNodeSnapshot::Element(TestElementSnapshot {
+                element_type: element_type("span"),
+                props: TestProps::new(),
+                hidden: false,
+                detached: false,
+                children: vec![TestNodeSnapshot::Text(TestTextSnapshot {
+                    text: "second sibling".to_owned(),
+                    hidden: false,
+                })],
+            })],
+        };
+        let current_snapshot = TestContainerSnapshot {
+            children: vec![
+                TestNodeSnapshot::Text(TestTextSnapshot {
+                    text: "first sibling".to_owned(),
+                    hidden: false,
+                }),
+                TestNodeSnapshot::Element(TestElementSnapshot {
+                    element_type: element_type("span"),
+                    props: TestProps::new(),
+                    hidden: false,
+                    detached: false,
+                    children: vec![TestNodeSnapshot::Text(TestTextSnapshot {
+                        text: "second sibling".to_owned(),
+                        hidden: false,
+                    })],
+                }),
+            ],
+        };
+
+        (previous_snapshot, current_snapshot)
+    }
+
     fn accepted_nested_update_route_admission_for_root(
         root: &TestRendererRoot,
         output: &TestRendererNestedHostParentPlacedHostOutput,
@@ -20420,6 +20943,155 @@ mod tests {
         assert_eq!(
             component.children().unwrap()[0].as_text(),
             Some("second sibling")
+        );
+    }
+
+    #[test]
+    fn root_private_to_json_sibling_snapshot_finished_work_identity_blocker_rejects_plausible_identity()
+     {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let updated = root
+            .render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+        let execution = root
+            .describe_private_update_route_admission_for_canary(&updated)
+            .unwrap();
+        let report = root
+            .describe_private_json_serialization_after_update_for_canary(&updated)
+            .unwrap();
+        let identity = root
+            .describe_private_to_json_finished_work_identity_gate_for_canary(
+                Some(updated.render()),
+                Some(updated.commit()),
+                Some(&report),
+            )
+            .unwrap();
+        let (previous_snapshot, current_snapshot) = sibling_text_snapshots_for_diagnostics();
+
+        let blocker = root
+            .describe_private_to_json_sibling_text_snapshot_finished_work_identity_blocker_for_diagnostics(
+                &previous_snapshot,
+                &current_snapshot,
+                execution,
+                Some(identity),
+            )
+            .unwrap();
+
+        assert_eq!(
+            blocker.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_SNAPSHOT_IDENTITY_BLOCKER_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            blocker.status(),
+            TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_SNAPSHOT_IDENTITY_BLOCKER_STATUS
+        );
+        assert_eq!(blocker.root(), root.root_id());
+        assert_eq!(
+            blocker.public_surface(),
+            "create().update -> create().toJSON"
+        );
+        assert_eq!(
+            blocker.host_output_row().id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_HOST_OUTPUT_ROW_ID
+        );
+        assert_eq!(
+            blocker.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::SiblingText
+        );
+        assert!(blocker.snapshot_based_host_output_row());
+        assert!(blocker.candidate_finished_work_identity_supplied());
+        assert!(blocker.candidate_identity_plausible_for_update_to_json());
+        assert!(blocker.candidate_identity_matches_update_route_handoff());
+        assert!(blocker.plausible_finished_work_identity_rejected());
+        assert!(!blocker.committed_sibling_text_fiber_inspection_available());
+        assert!(!blocker.committed_sibling_text_report_shape_available());
+        assert!(!blocker.real_sibling_text_handoff_available());
+        assert!(!blocker.consumes_committed_host_root_finished_work_identity());
+        assert!(!blocker.consumes_committed_host_root_finished_work_lanes());
+        assert!(!blocker.identity_admission_available());
+        assert_eq!(
+            blocker.rejection_reason(),
+            TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_SNAPSHOT_IDENTITY_BLOCKER_REASON
+        );
+        assert!(blocker.identity_admission_blocked());
+        assert!(!blocker.public_to_json_available());
+        assert!(!blocker.public_serialization_available());
+        assert!(!blocker.public_route_available());
+        assert!(!blocker.native_bridge_available());
+        assert!(!blocker.native_execution_available());
+        assert!(!blocker.package_compatibility_claimed());
+
+        let evidence = root
+            .describe_private_to_json_sibling_text_update_native_execution_from_snapshot_for_diagnostics(
+                &previous_snapshot,
+                &current_snapshot,
+                execution,
+            )
+            .unwrap();
+        assert_eq!(
+            evidence.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::SiblingText
+        );
+        assert!(evidence.consumes_accepted_native_update_execution_record());
+        assert!(evidence.consumes_accepted_host_output_row());
+        assert!(!evidence.native_bridge_available());
+        assert!(!evidence.native_execution_available());
+        assert!(!evidence.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_to_json_sibling_snapshot_finished_work_identity_blocker_fails_closed_when_tampered()
+     {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let updated = root
+            .render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+        let execution = root
+            .describe_private_update_route_admission_for_canary(&updated)
+            .unwrap();
+        let (previous_snapshot, current_snapshot) = sibling_text_snapshots_for_diagnostics();
+        let mut blocker = root
+            .describe_private_to_json_sibling_text_snapshot_finished_work_identity_blocker_for_diagnostics(
+                &previous_snapshot,
+                &current_snapshot,
+                execution,
+                None,
+            )
+            .unwrap();
+
+        assert!(blocker.identity_admission_blocked());
+        blocker.real_sibling_text_handoff_available = true;
+
+        let reason =
+            TestRendererRoot::validate_private_to_json_sibling_snapshot_finished_work_identity_blocker_for_diagnostics(
+                blocker,
+            )
+            .unwrap_err();
+        assert_eq!(
+            reason,
+            "sibling-snapshot-identity-binding-unexpectedly-open"
         );
     }
 
