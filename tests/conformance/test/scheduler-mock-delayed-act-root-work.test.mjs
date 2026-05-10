@@ -103,14 +103,28 @@ test('scheduler mock promotes delayed act/root metadata through the expired rout
       actQueue,
       { rootWorkRecords }
     );
-    const delayedMetadata = createDelayedActRootWorkMetadata(
-      Scheduler,
-      delayedHandle,
-      expiredMetadata,
-      {
-        scheduledVirtualTime: 0,
-        delayMs: 10
-      }
+    const delayedMetadata =
+      diagnostics.createDelayedActRootWorkMetadataFromAcceptedRootMetadataForDiagnostics(
+        expiredMetadata,
+        {
+          scheduledVirtualTime: 0,
+          delayMs: 10,
+          startTime: delayedHandle.startTime,
+          expirationTime: delayedHandle.expirationTime,
+          priorityTimeoutMs:
+            delayedHandle.expirationTime - delayedHandle.startTime
+        }
+      );
+    assert.equal(
+      delayedMetadata[delayedActRootWorkMetadataBrand],
+      true,
+      nodeEnv
+    );
+    assert.equal(delayedMetadata.kind, delayedActRootWorkMetadataKind, nodeEnv);
+    assert.equal(
+      delayedMetadata.producerStatus,
+      'produced-private-delayed-act-root-work-metadata-from-accepted-root-metadata',
+      nodeEnv
     );
 
     const described =
@@ -126,6 +140,11 @@ test('scheduler mock promotes delayed act/root metadata through the expired rout
     assert.equal(described.metadata.delayMatchesCallbackHandle, true, nodeEnv);
     assert.equal(
       described.metadata.expirationTimeMatchesCallbackHandle,
+      true,
+      nodeEnv
+    );
+    assert.equal(
+      described.metadata.producedByPrivateDelayedActRootWorkMetadataProducer,
       true,
       nodeEnv
     );
@@ -247,6 +266,12 @@ test('scheduler mock promotes delayed act/root metadata through the expired rout
     assert.equal(expiredMetadata.rootWorkRecords.length, 0, nodeEnv);
     assert.equal(actQueue.records.length, 0, nodeEnv);
     assert.equal(Scheduler.unstable_hasPendingWork(), true, nodeEnv);
+    const stale =
+      diagnostics.describeDelayedActRootWorkMetadataForDiagnostics(
+        delayedMetadata
+      );
+    assert.equal(stale.accepted, false, nodeEnv);
+    assert.equal(stale.rejectionReason, 'stale-callback-handle', nodeEnv);
 
     Scheduler.reset();
   }
@@ -299,15 +324,14 @@ test('scheduler mock rejects unbranded delayed act/root continuations', () => {
       delayedHandle,
       actQueue
     );
-    const delayedMetadata = createDelayedActRootWorkMetadata(
-      Scheduler,
-      delayedHandle,
-      expiredMetadata,
-      {
-        scheduledVirtualTime: 0,
-        delayMs: 10
-      }
-    );
+    const delayedMetadata =
+      diagnostics.createDelayedActRootWorkMetadataFromAcceptedRootMetadataForDiagnostics(
+        expiredMetadata,
+        {
+          scheduledVirtualTime: 0,
+          delayMs: 10
+        }
+      );
 
     const described =
       diagnostics.describeDelayedActRootWorkMetadataForDiagnostics(
@@ -341,6 +365,151 @@ test('scheduler mock rejects unbranded delayed act/root continuations', () => {
     assert.equal(actQueue.records.length, 1, nodeEnv);
     assert.equal(Scheduler.unstable_now(), 260, nodeEnv);
     assert.equal(Scheduler.unstable_hasPendingWork(), true, nodeEnv);
+
+    Scheduler.reset();
+  }
+});
+
+test('scheduler mock rejects mutated delayed producer nested evidence', () => {
+  const reactGate = loadFreshReactActDispatcherGate();
+
+  for (const nodeEnv of ['development', 'production']) {
+    const Scheduler = loadFreshSchedulerMock(nodeEnv);
+    const diagnostics = readPrivateFlushDiagnostics(Scheduler);
+    assertDelayedDiagnosticsReady(diagnostics, nodeEnv);
+
+    Scheduler.reset();
+    const missingExpectedHandle = Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_UserBlockingPriority,
+      createAcceptedCallback(reactGate, 'missing-expected-delayed-callback'),
+      { delay: 10 }
+    );
+    const missingExpectedMetadata = createExpiredActRootWorkMetadata(
+      Scheduler,
+      missingExpectedHandle,
+      createAcceptedActRootWorkQueue(reactGate),
+      {
+        expectedActQueuePendingCount: undefined
+      }
+    );
+    assertDelayedActRootWorkRejection(
+      () =>
+        diagnostics.createDelayedActRootWorkMetadataFromAcceptedRootMetadataForDiagnostics(
+          missingExpectedMetadata,
+          {
+            scheduledVirtualTime: 0,
+            delayMs: 10
+          }
+        ),
+      'producer-expected-act-queue-pending-count-mismatch',
+      nodeEnv
+    );
+
+    Scheduler.reset();
+    let rootMutationDelayedCallbackRan = false;
+    const rootMutationHandle = Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_UserBlockingPriority,
+      createAcceptedCallback(
+        reactGate,
+        'root-mutation-delayed-callback',
+        () => {
+          rootMutationDelayedCallbackRan = true;
+          Scheduler.log('root-mutation-delayed-callback');
+        }
+      ),
+      { delay: 10 }
+    );
+    const rootMutationActQueue = createAcceptedActRootWorkQueue(reactGate);
+    const rootMutationExpiredMetadata = createExpiredActRootWorkMetadata(
+      Scheduler,
+      rootMutationHandle,
+      rootMutationActQueue
+    );
+    const rootMutationDelayedMetadata =
+      diagnostics.createDelayedActRootWorkMetadataFromAcceptedRootMetadataForDiagnostics(
+        rootMutationExpiredMetadata,
+        {
+          scheduledVirtualTime: 0,
+          delayMs: 10
+        }
+      );
+    rootMutationExpiredMetadata.rootWorkRecords.push(
+      createAcceptedRootWorkRecord('RootSchedulerCallbackExecutionRecord', {
+        rootId: 765,
+        rootLabel: 'injected-root-work'
+      })
+    );
+    assertDelayedDescriptionRejection(
+      diagnostics,
+      rootMutationDelayedMetadata,
+      'metadata-source-root-work-record-count-mismatch',
+      nodeEnv
+    );
+    assertDelayedActRootWorkRejection(
+      () => Scheduler.unstable_flushExpired(rootMutationDelayedMetadata),
+      'metadata-source-root-work-record-count-mismatch',
+      nodeEnv
+    );
+    assert.equal(rootMutationDelayedCallbackRan, false, nodeEnv);
+    assert.equal(rootMutationExpiredMetadata.rootWorkRecords.length, 3, nodeEnv);
+    assert.equal(rootMutationActQueue.records.length, 1, nodeEnv);
+    assert.equal(Scheduler.unstable_now(), 0, nodeEnv);
+    assert.deepEqual(Scheduler.unstable_clearLog(), [], nodeEnv);
+
+    Scheduler.reset();
+    let injectedActCallbackRan = false;
+    let actMutationDelayedCallbackRan = false;
+    const actMutationHandle = Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_UserBlockingPriority,
+      createAcceptedCallback(
+        reactGate,
+        'act-mutation-delayed-callback',
+        () => {
+          actMutationDelayedCallbackRan = true;
+          Scheduler.log('act-mutation-delayed-callback');
+        }
+      ),
+      { delay: 10 }
+    );
+    const actMutationActQueue = createAcceptedActRootWorkQueue(reactGate);
+    const actMutationExpiredMetadata = createExpiredActRootWorkMetadata(
+      Scheduler,
+      actMutationHandle,
+      actMutationActQueue
+    );
+    const actMutationDelayedMetadata =
+      diagnostics.createDelayedActRootWorkMetadataFromAcceptedRootMetadataForDiagnostics(
+        actMutationExpiredMetadata,
+        {
+          scheduledVirtualTime: 0,
+          delayMs: 10
+        }
+      );
+    actMutationActQueue.records[0] = createInjectedActRootWorkTask(
+      reactGate,
+      'injected-act-root-work',
+      () => {
+        injectedActCallbackRan = true;
+        Scheduler.log('injected-act-root-work');
+      }
+    );
+    assertDelayedDescriptionRejection(
+      diagnostics,
+      actMutationDelayedMetadata,
+      'metadata-source-act-queue-record-0-identity-mismatch',
+      nodeEnv
+    );
+    assertDelayedActRootWorkRejection(
+      () => Scheduler.unstable_flushExpired(actMutationDelayedMetadata),
+      'metadata-source-act-queue-record-0-identity-mismatch',
+      nodeEnv
+    );
+    assert.equal(actMutationDelayedCallbackRan, false, nodeEnv);
+    assert.equal(injectedActCallbackRan, false, nodeEnv);
+    assert.equal(actMutationExpiredMetadata.rootWorkRecords.length, 2, nodeEnv);
+    assert.equal(actMutationActQueue.records.length, 1, nodeEnv);
+    assert.equal(Scheduler.unstable_now(), 0, nodeEnv);
+    assert.deepEqual(Scheduler.unstable_clearLog(), [], nodeEnv);
 
     Scheduler.reset();
   }
@@ -540,11 +709,68 @@ test('scheduler mock rejects unsupported delayed act/root metadata', () => {
     );
 
     Scheduler.reset();
+    const producerHandle = Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_UserBlockingPriority,
+      createAcceptedCallback(reactGate, 'producer-delayed-callback'),
+      { delay: 10 }
+    );
+    const producerExpiredMetadata = createExpiredActRootWorkMetadata(
+      Scheduler,
+      producerHandle,
+      createAcceptedActRootWorkQueue(reactGate)
+    );
+    assertDelayedActRootWorkRejection(
+      () =>
+        diagnostics.createDelayedActRootWorkMetadataFromAcceptedRootMetadataForDiagnostics(
+          producerExpiredMetadata,
+          {
+            scheduledVirtualTime: 0,
+            delayMs: 11
+          }
+        ),
+      'producer-delay-metadata-mismatch',
+      nodeEnv
+    );
+    assertDelayedActRootWorkRejection(
+      () =>
+        diagnostics.createDelayedActRootWorkMetadataFromAcceptedRootMetadataForDiagnostics(
+          producerExpiredMetadata,
+          {
+            publicCompatibilityClaimed: true
+          }
+        ),
+      'producer-public-claim',
+      nodeEnv
+    );
+    const producedMetadata =
+      diagnostics.createDelayedActRootWorkMetadataFromAcceptedRootMetadataForDiagnostics(
+        producerExpiredMetadata,
+        {
+          scheduledVirtualTime: 0,
+          delayMs: 10
+        }
+      );
+    const clonedMetadata = cloneDelayedActRootWorkMetadata(producedMetadata);
+    assertDelayedDescriptionRejection(
+      diagnostics,
+      clonedMetadata,
+      'metadata-not-produced-by-private-delayed-root-producer',
+      nodeEnv
+    );
+    assertDelayedActRootWorkRejection(
+      () => Scheduler.unstable_flushExpired(clonedMetadata),
+      'metadata-not-produced-by-private-delayed-root-producer',
+      nodeEnv
+    );
+    assert.equal(Scheduler.unstable_now(), 0, nodeEnv);
+    assert.equal(producerExpiredMetadata.rootWorkRecords.length, 2, nodeEnv);
+
+    Scheduler.reset();
   }
 });
 
-function createAcceptedCallback(reactGate, label) {
-  return reactGate.createInternalActQueueTestCallback(() => {}, { label });
+function createAcceptedCallback(reactGate, label, callback = () => {}) {
+  return reactGate.createInternalActQueueTestCallback(callback, { label });
 }
 
 function createAcceptedActRootWorkQueue(reactGate) {
@@ -556,6 +782,18 @@ function createAcceptedActRootWorkQueue(reactGate) {
       continuationStatus: 'NoContinuation'
     })
   ]);
+}
+
+function createInjectedActRootWorkTask(reactGate, label, callback) {
+  return reactGate.createInternalActQueueTestTask({
+    label,
+    recordKind: 'SchedulerActQueueRequest',
+    taskKind: 'RootSchedule',
+    continuationStatus: 'NoContinuation',
+    callback: reactGate.createInternalActQueueTestCallback(callback, {
+      label: `${label}:callback`
+    })
+  });
 }
 
 function createExpiredActRootWorkMetadata(
@@ -672,6 +910,17 @@ function createDelayedActRootWorkMetadata(
   return Object.freeze(metadata);
 }
 
+function cloneDelayedActRootWorkMetadata(metadata) {
+  const clone = { ...metadata };
+  Object.defineProperty(clone, delayedActRootWorkMetadataBrand, {
+    configurable: false,
+    enumerable: false,
+    value: true,
+    writable: false
+  });
+  return Object.freeze(clone);
+}
+
 function createAcceptedRootWorkRecord(recordKind, overrides = {}) {
   return Object.freeze({
     recordKind,
@@ -771,6 +1020,31 @@ function assertDelayedDiagnosticsReady(diagnostics, label) {
     true,
     label
   );
+  assert.equal(
+    diagnostics.producesDelayedActRootWorkMetadataFromAcceptedRootMetadata,
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.rejectsUnownedDelayedActRootWorkMetadata,
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.rejectsClonedDelayedActRootWorkEvidence,
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.bindsProducedDelayedActRootWorkNestedEvidence,
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.rejectsMutatedDelayedActRootWorkNestedEvidence,
+    true,
+    label
+  );
   assert.equal(diagnostics.drainsPublicSchedulerTaskQueue, false, label);
   assert.equal(diagnostics.drainsPublicReactActQueue, false, label);
   assert.equal(
@@ -787,6 +1061,10 @@ function assertDelayedDiagnosticsReady(diagnostics, label) {
   );
   assert.equal(
     typeof diagnostics.drainDelayedMockSchedulerWorkWithActRootMetadataForDiagnostics,
+    'function'
+  );
+  assert.equal(
+    typeof diagnostics.createDelayedActRootWorkMetadataFromAcceptedRootMetadataForDiagnostics,
     'function'
   );
 }
