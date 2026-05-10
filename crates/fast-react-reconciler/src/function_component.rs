@@ -545,6 +545,50 @@ impl FunctionComponentHookRenderStore {
             .map(|binding| binding.ring)
     }
 
+    pub fn passive_effect_metadata(
+        &self,
+        state: FunctionComponentHookRenderState,
+        lanes: Lanes,
+    ) -> Result<Vec<FunctionComponentPassiveEffectMetadata>, FunctionComponentRenderError> {
+        if lanes.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let list = state.work_in_progress_list();
+        self.hook_lists.list(list).map_err(|error| {
+            FunctionComponentRenderError::hook_list(state.render_fiber(), error)
+        })?;
+
+        let Some(ring) = self.effect_ring(list) else {
+            return Ok(Vec::new());
+        };
+
+        let effects = ring
+            .iter_matching(&self.hook_effects, HookEffectFlags::PASSIVE_EFFECT)
+            .map_err(|error| {
+                FunctionComponentRenderError::hook_effect(state.render_fiber(), error)
+            })?;
+        let mut records = Vec::new();
+        for (effect_index, effect) in effects.enumerate() {
+            let effect = effect.map_err(|error| {
+                FunctionComponentRenderError::hook_effect(state.render_fiber(), error)
+            })?;
+            records.push(FunctionComponentPassiveEffectMetadata {
+                fiber: state.render_fiber(),
+                hook_list: list,
+                effect_index,
+                effect: effect.id(),
+                instance: effect.instance(),
+                tag: effect.tag(),
+                create: effect.create(),
+                dependencies: effect.dependencies(),
+                lanes,
+            });
+        }
+
+        Ok(records)
+    }
+
     pub fn prepare_render_state(
         &mut self,
         arena: &FiberArena,
@@ -862,6 +906,51 @@ impl FunctionComponentHookRenderStore {
             base_queue: payload.base_queue(),
             queue: payload.queue(),
             dispatch,
+        })
+    }
+
+    pub fn create_current_effect_metadata(
+        &mut self,
+        arena: &mut FiberArena,
+        fiber: FiberId,
+        phase: FunctionComponentEffectPhase,
+        create: HookEffectCallbackHandle,
+        dependencies: HookEffectDependencies,
+        destroy: Option<HookEffectCallbackHandle>,
+    ) -> Result<FunctionComponentEffectRegistration, FunctionComponentRenderError> {
+        let list = self
+            .current_list(fiber)
+            .unwrap_or_else(|| self.create_current_list(fiber));
+        let state = FunctionComponentHookRenderState {
+            phase: FunctionComponentHookRenderPhase::Mount,
+            render_fiber: fiber,
+            current: None,
+            current_list: None,
+            work_in_progress_list: list,
+        };
+        let tag = HookEffectFlags::HAS_EFFECT | phase.hook_flags();
+        let instance = self
+            .hook_effects
+            .create_effect_instance_with_destroy(destroy);
+        let effect = self.push_effect_for_list(state, list, tag, instance, create, dependencies)?;
+        let hook = self
+            .hook_lists
+            .append_hook(
+                list,
+                HookSlotPayload::effect(HookEffectPayload::new(effect)),
+            )
+            .map_err(|error| FunctionComponentRenderError::hook_list(fiber, error))?;
+        let fiber_flags = phase.mount_fiber_flags();
+        arena.get_mut(fiber)?.merge_flags(fiber_flags);
+
+        Ok(FunctionComponentEffectRegistration {
+            hook,
+            effect,
+            instance,
+            phase,
+            tag,
+            dependencies,
+            fiber_flags,
         })
     }
 
@@ -1191,6 +1280,66 @@ impl FunctionComponentEffectRegistration {
     #[must_use]
     pub const fn fiber_flags(self) -> FiberFlags {
         self.fiber_flags
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentPassiveEffectMetadata {
+    fiber: FiberId,
+    hook_list: HookListId,
+    effect_index: usize,
+    effect: HookEffectId,
+    instance: HookEffectInstanceId,
+    tag: HookEffectFlags,
+    create: HookEffectCallbackHandle,
+    dependencies: HookEffectDependencies,
+    lanes: Lanes,
+}
+
+impl FunctionComponentPassiveEffectMetadata {
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn hook_list(self) -> HookListId {
+        self.hook_list
+    }
+
+    #[must_use]
+    pub const fn effect_index(self) -> usize {
+        self.effect_index
+    }
+
+    #[must_use]
+    pub const fn effect(self) -> HookEffectId {
+        self.effect
+    }
+
+    #[must_use]
+    pub const fn instance(self) -> HookEffectInstanceId {
+        self.instance
+    }
+
+    #[must_use]
+    pub const fn tag(self) -> HookEffectFlags {
+        self.tag
+    }
+
+    #[must_use]
+    pub const fn create(self) -> HookEffectCallbackHandle {
+        self.create
+    }
+
+    #[must_use]
+    pub const fn dependencies(self) -> HookEffectDependencies {
+        self.dependencies
+    }
+
+    #[must_use]
+    pub const fn lanes(self) -> Lanes {
+        self.lanes
     }
 }
 
@@ -2322,6 +2471,29 @@ mod tests {
                 .destroy(),
             None
         );
+
+        let pending_metadata = hook_store
+            .passive_effect_metadata(state, Lanes::DEFAULT)
+            .unwrap();
+        assert_eq!(pending_metadata.len(), 1);
+        assert_eq!(pending_metadata[0].fiber(), work_in_progress);
+        assert_eq!(
+            pending_metadata[0].hook_list(),
+            state.work_in_progress_list()
+        );
+        assert_eq!(pending_metadata[0].effect_index(), 0);
+        assert_eq!(pending_metadata[0].effect(), registration.effect());
+        assert_eq!(pending_metadata[0].instance(), registration.instance());
+        assert_eq!(pending_metadata[0].tag(), HookEffectFlags::PASSIVE_EFFECT);
+        assert_eq!(pending_metadata[0].create(), callback(70));
+        assert_eq!(pending_metadata[0].dependencies(), deps(700));
+        assert_eq!(pending_metadata[0].lanes(), Lanes::DEFAULT);
+        assert!(
+            hook_store
+                .passive_effect_metadata(state, Lanes::NO)
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]
@@ -2650,6 +2822,12 @@ mod tests {
                 .unwrap()
                 .next()
                 .is_none()
+        );
+        assert!(
+            hook_store
+                .passive_effect_metadata(state, Lanes::DEFAULT)
+                .unwrap()
+                .is_empty()
         );
     }
 
