@@ -8,7 +8,7 @@ const {
 const entrypoint = 'react-dom/test-utils';
 
 const privateRoutingGateId =
-  'react-dom-test-utils-act-private-routing-gate-1';
+  'react-dom-test-utils-act-private-routing-gate-2';
 const privateRoutingGateStatus =
   'blocked-public-test-utils-act-private-routing';
 const publicActStatus = 'unsupported-public-test-utils-act-placeholder';
@@ -20,8 +20,14 @@ const schedulerActQueueRecordOnlyStatus =
   'private-scheduler-act-records-without-flushing';
 const syncFlushRecordOnlyStatus =
   'private-sync-flush-act-continuation-records-without-execution';
+const syncFlushPostPassiveExecutionGateStatus =
+  'private-sync-flush-post-passive-continuation-execution-gate-record-only';
 const schedulerMockFlushHelperStatus =
   'accepted-scheduler-mock-flush-helper-metadata';
+const passiveEffectsFlushMetadataStatus =
+  'metadata-only-passive-flush-without-callback-execution';
+const passiveEffectCallbackHandleStatus =
+  'data-only-passive-effect-callback-handles-without-invocation';
 
 const reactActPrivateRecords = freezeArray([
   'SchedulerActQueueRequest',
@@ -54,6 +60,37 @@ const syncFlushContinuationRecords = freezeArray([
   'SyncFlushActPostPassiveContinuationGateRecord',
   'SyncFlushRootRecord.act_continuation',
   'SyncFlushRootRecord.act_post_passive_continuation_gate'
+]);
+const syncFlushPostPassiveContinuationExecutionRecords = freezeArray([
+  'SyncFlushPostPassiveContinuationExecutionGateRecord',
+  'SyncFlushPostPassiveContinuationRootRecord',
+  'sync_flush_post_passive_continuation_execution_gate',
+  'observe_sync_flush_post_passive_continuation_execution_gate_after_commit',
+  'SyncFlushRootRecord.post_passive_continuation_execution_gate'
+]);
+const passiveEffectsFlushRecords = freezeArray([
+  'PendingPassiveCommitHandoff',
+  'PassiveEffectsFlushResult',
+  'PassiveEffectFlushRecord',
+  'FunctionComponentPendingPassiveCommitHandoff',
+  'FunctionComponentPendingPassiveEffectPhaseCommitRecord'
+]);
+const passiveEffectCallbackHandleRecords = freezeArray([
+  'FunctionComponentPendingPassiveEffectCommitRecord.create',
+  'FunctionComponentPendingPassiveEffectCommitRecord.destroy',
+  'FunctionComponentPendingPassiveEffectPhaseCommitRecord.create',
+  'FunctionComponentPendingPassiveEffectPhaseCommitRecord.destroy',
+  'PassiveEffectFlushEffectRecord.create_callback',
+  'PassiveEffectFlushEffectRecord.destroy_callback',
+  'PassiveEffectFlushRecord.create_callback',
+  'PassiveEffectFlushRecord.destroy_callback',
+  'PassiveEffectFlushRecord.create_callback_invoked',
+  'PassiveEffectFlushRecord.destroy_callback_invoked'
+]);
+const passiveEffectCallbackPhaseRules = freezeArray([
+  'unmount-phase-carries-destroy-handle-without-create-handle',
+  'mount-phase-carries-create-handle-without-destroy-handle',
+  'callback-invoked-accessors-return-false'
 ]);
 
 const acceptedPrivatePrerequisites = freezeRecords([
@@ -104,17 +141,47 @@ const acceptedPrivatePrerequisites = freezeRecords([
     records: syncFlushContinuationRecords
   },
   {
+    id: 'sync-flush-post-passive-continuation-execution-gate',
+    present: true,
+    status: syncFlushPostPassiveExecutionGateStatus,
+    source: 'crates/fast-react-reconciler/src/root_scheduler.rs',
+    recordOnly: true,
+    observesPendingPassiveHandoff: true,
+    collectsContinuationRoots: true,
+    consumesPendingPassive: false,
+    rendersContinuationRoots: false,
+    commitsContinuationRoots: false,
+    executesSyncFlush: false,
+    executesPassiveEffects: false,
+    invokesCallbacks: false,
+    records: syncFlushPostPassiveContinuationExecutionRecords
+  },
+  {
     id: 'passive-effects-flush-metadata',
     present: true,
-    status: 'metadata-only-passive-flush-without-callback-execution',
+    status: passiveEffectsFlushMetadataStatus,
     source: 'crates/fast-react-reconciler/src/passive_effects.rs',
     recordOnly: true,
+    consumesPendingPassiveMetadata: true,
+    discoversCommittedFiberEffects: false,
     executesPassiveEffects: false,
-    records: freezeArray([
-      'PendingPassiveCommitHandoff',
-      'PassiveEffectsFlushRecord',
-      'FunctionComponentPendingPassiveEffectPhaseCommitRecord'
-    ])
+    invokesCreateCallbacks: false,
+    invokesDestroyCallbacks: false,
+    records: passiveEffectsFlushRecords
+  },
+  {
+    id: 'passive-effect-callback-handle-metadata',
+    present: true,
+    status: passiveEffectCallbackHandleStatus,
+    source: 'crates/fast-react-reconciler/src/passive_effects.rs',
+    recordOnly: true,
+    carriesCreateCallbackHandles: true,
+    carriesDestroyCallbackHandles: true,
+    invokesCreateCallbacks: false,
+    invokesDestroyCallbacks: false,
+    effectCallbackExecutionReady: false,
+    records: passiveEffectCallbackHandleRecords,
+    phaseRules: passiveEffectCallbackPhaseRules
   },
   {
     id: 'react-dom-private-root-bridge-records',
@@ -156,7 +223,7 @@ const blockedPublicPrerequisites = freezeRecords([
     present: false,
     requiredBeforePublicAct: true,
     reason:
-      'Passive effect flush metadata is data-only and does not invoke create or destroy callbacks.'
+      'Passive effect flush records now carry create and destroy callback handles, but callback invocation remains explicitly false.'
   },
   {
     id: 'public-react-dom-root-execution',
@@ -242,6 +309,37 @@ function getReactDomTestUtilsActPrivateRoutingGate(overrides = {}) {
       records: syncFlushContinuationRecords,
       executesSyncFlush: false,
       executesPassiveEffects: false
+    }),
+    syncFlushPostPassiveContinuationExecution: freezeRecord({
+      status: syncFlushPostPassiveExecutionGateStatus,
+      records: syncFlushPostPassiveContinuationExecutionRecords,
+      observesPendingPassiveHandoff: true,
+      collectsContinuationRoots: true,
+      consumesPendingPassive: false,
+      rendersContinuationRoots: false,
+      commitsContinuationRoots: false,
+      executesSyncFlush: false,
+      executesPassiveEffects: false,
+      invokesCallbacks: false
+    }),
+    passiveEffects: freezeRecord({
+      status: passiveEffectsFlushMetadataStatus,
+      records: passiveEffectsFlushRecords,
+      consumesPendingPassiveMetadata: true,
+      discoversCommittedFiberEffects: false,
+      executesPassiveEffects: false,
+      invokesCreateCallbacks: false,
+      invokesDestroyCallbacks: false
+    }),
+    passiveEffectCallbackHandles: freezeRecord({
+      status: passiveEffectCallbackHandleStatus,
+      records: passiveEffectCallbackHandleRecords,
+      phaseRules: passiveEffectCallbackPhaseRules,
+      carriesCreateCallbackHandles: true,
+      carriesDestroyCallbackHandles: true,
+      invokesCreateCallbacks: false,
+      invokesDestroyCallbacks: false,
+      effectCallbackExecutionReady: false
     }),
     reactDomRootBridge: freezeRecord({
       status: rootBridgeRecordOnlyStatus,
