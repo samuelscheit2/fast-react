@@ -711,6 +711,178 @@ test("private preload/preinit dedupe and order diagnostics stay record-only", ()
   assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
 });
 
+test("private stylesheet precedence diagnostics stay record-only", () => {
+  const dispatcherGate = resourceFormGate.createResourceFormActionInternalsGate({
+    requestIdPrefix: "resource-conformance-stylesheet-source"
+  });
+  const adapterGate = resourceFormGate.createResourceHintFakeDomAdapterGate({
+    requestIdPrefix: "resource-conformance-stylesheet-adapter"
+  });
+  const orderGate =
+    resourceFormGate.createResourceHintPreloadPreinitOrderGate({
+      requestIdPrefix: "resource-conformance-stylesheet-order"
+    });
+  const stylesheetGate =
+    resourceFormGate.createResourceHintStylesheetPrecedenceGate({
+      requestIdPrefix: "resource-conformance-stylesheet"
+    });
+  const fakeDom = createDeterministicResourceHintDom();
+  const dispatcherRecords = [
+    dispatcherGate.recordResourceHintDispatcherRequest("L", [
+      "/style.css",
+      "style",
+      {
+        crossOrigin: undefined,
+        integrity: undefined,
+        nonce: undefined,
+        type: undefined,
+        fetchPriority: "low",
+        referrerPolicy: undefined,
+        imageSrcSet: undefined,
+        imageSizes: undefined,
+        media: undefined
+      }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest("S", [
+      "/style.css",
+      "theme",
+      {
+        crossOrigin: "",
+        integrity: "sha256-style",
+        fetchPriority: "high"
+      }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest("S", [
+      "/style.css",
+      "theme",
+      {
+        crossOrigin: "",
+        integrity: "sha256-style-dupe",
+        fetchPriority: "high"
+      }
+    ])
+  ];
+  const headRecord = dispatcherGate.recordSingletonRequest("head", [
+    { title: "blocked-head-singleton-props" }
+  ]);
+  const admissions = dispatcherRecords.map((record) =>
+    adapterGate.admitDispatcherRecord(record, {
+      explicitAdmission: true,
+      adapterKind: "deterministic-fake-dom",
+      targetKind: "document-head"
+    })
+  );
+  appendResourceHintFakeHeadChild(fakeDom, "link", {
+    rel: "stylesheet",
+    "data-precedence": "theme",
+    "data-fast-react-resource-key": "style-main",
+    "data-fast-react-precedence-key": "precedence-main"
+  });
+  appendResourceHintFakeHeadChild(fakeDom, "style", {
+    "data-precedence": "theme",
+    "data-fast-react-resource-key": "inline-main",
+    "data-fast-react-precedence-key": "precedence-main"
+  });
+  appendResourceHintFakeHeadChild(fakeDom, "meta", {
+    name: "description"
+  });
+
+  const order = orderGate.recordPreloadPreinitOrderDiagnostic(
+    admissions,
+    {
+      explicitOrderDiagnostic: true,
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head,
+      resourceDescriptors: [
+        {
+          sourceAdapterAdmissionId: admissions[0].adapterAdmissionId,
+          resourceKind: "style",
+          resourceKey: "style-main"
+        },
+        {
+          sourceAdapterAdmissionId: admissions[1].adapterAdmissionId,
+          resourceKind: "style",
+          resourceKey: "style-main",
+          precedenceKey: "precedence-main"
+        },
+        {
+          sourceAdapterAdmissionId: admissions[2].adapterAdmissionId,
+          resourceKind: "style",
+          resourceKey: "style-main",
+          precedenceKey: "precedence-main"
+        }
+      ]
+    }
+  );
+  const diagnostic = stylesheetGate.recordStylesheetPrecedenceDiagnostic(
+    order,
+    headRecord,
+    {
+      explicitStylesheetPrecedenceDiagnostic: true,
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head
+    }
+  );
+
+  assert.equal(
+    diagnostic.stylesheetPrecedenceStatus,
+    resourceFormGate.privateResourceHintStylesheetPrecedenceStatus
+  );
+  assert.deepEqual(
+    diagnostic.stylesheetDedupeRows.map((row) => row.dedupeAction),
+    ["insert-preload", "preinit-adopts-preload", "dedupe-preinit"]
+  );
+  assert.deepEqual(
+    diagnostic.plannedStylesheetOrder.rows.map((row) => ({
+      contractId: row.contractId,
+      precedenceKey: row.precedenceKey,
+      insertionApplied: row.insertionApplied
+    })),
+    [
+      {
+        contractId: "preinit-style",
+        precedenceKey: "precedence-main",
+        insertionApplied: false
+      }
+    ]
+  );
+  assert.equal(diagnostic.precedenceRows[0].observedStylesheetCount, 2);
+  assert.equal(
+    diagnostic.headSingletonOrderBoundary.clearHeadWouldRetainStylesheets,
+    true
+  );
+  assert.equal(
+    diagnostic.headSingletonOrderBoundary.singletonOrderingApplied,
+    false
+  );
+  assert.equal(
+    diagnostic.headSingletonOrderBoundary.publicHeadSingletonBehavior,
+    false
+  );
+  assert.equal(
+    diagnostic.stylesheetResourceMapPlan.stylesheetResourceMapCreated,
+    false
+  );
+  assert.equal(diagnostic.sideEffects.fakeHeadMutated, false);
+  assert.equal(diagnostic.sideEffects.realDocumentMutated, false);
+  assert.equal(
+    diagnostic.sideEffects.publicResourceHintDomInsertion,
+    false
+  );
+  assert.equal(
+    diagnostic.sideEffects.publicStylesheetPrecedenceBehavior,
+    false
+  );
+  assert.deepEqual(
+    diagnostic.blockedCapabilities,
+    resourceFormGate.resourceHintStylesheetPrecedenceBlockedCapabilities
+  );
+  assert.equal(JSON.stringify(diagnostic).includes("/style.css"), false);
+  assert.equal(JSON.stringify(diagnostic).includes("sha256-style"), false);
+  assert.equal(/"theme"/u.test(JSON.stringify(diagnostic)), false);
+  assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
+});
+
 test("React DOM resource hint oracle artifact does not leak temporary generation paths", () => {
   const oracleText = readCheckedReactDomResourceHintsOracleText();
   assert.doesNotMatch(oracleText, /\/private\/var\/folders/u);
