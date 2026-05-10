@@ -7,6 +7,7 @@ publish.workspace = true
 
 [dependencies]
 fast-react-host-config.workspace = true
+fast-react-reconciler.workspace = true
 
 [lib]
 path = "src/lib.rs"

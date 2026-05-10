@@ -16,6 +16,7 @@ mod fiber_flags;
 mod fiber_handles;
 mod fiber_id;
 mod hook_effect_flags;
+mod hook_effect_ring;
 mod hook_state_queue;
 mod lane;
 mod root_lanes;
@@ -51,6 +52,12 @@ pub use fiber_handles::{
 };
 pub use fiber_id::{FiberArenaId, FiberGeneration, FiberId, FiberIdError, FiberSlot};
 pub use hook_effect_flags::{HookEffectFlags, VALID_HOOK_EFFECT_FLAG_BITS};
+pub use hook_effect_ring::{
+    HookEffectArena, HookEffectArenaError, HookEffectArenaId, HookEffectCallbackHandle,
+    HookEffectDependencies, HookEffectFilteredIter, HookEffectGeneration, HookEffectId,
+    HookEffectInstance, HookEffectInstanceGeneration, HookEffectInstanceId, HookEffectInstanceSlot,
+    HookEffectIter, HookEffectNode, HookEffectRing, HookEffectSlot,
+};
 pub use hook_state_queue::{
     HookQueue, HookQueueError, HookQueueId, HookQueueStore, HookRevertLane, HookStateSlot,
     HookUpdate, HookUpdateId, HookUpdateLane, HookUpdateStaging, ProcessHookQueueResult,
@@ -60,6 +67,7 @@ pub use lane::{Lane, LaneIndex, LaneMap, Lanes, TOTAL_LANES, VALID_LANE_BITS};
 pub use root_lanes::{
     LaneClaimers, LaneTimestamp, NO_TIMESTAMP, RETRY_LANE_EXPIRATION_MS, RootFinishedLanes,
     RootLaneFeatureFlags, RootLaneState, SYNC_LANE_EXPIRATION_MS, TRANSITION_LANE_EXPIRATION_MS,
+    check_if_root_is_prerendering, get_next_lanes, get_next_lanes_to_flush_sync,
     highest_priority_lanes,
 };
 pub use symbols::ReactSymbolTag;

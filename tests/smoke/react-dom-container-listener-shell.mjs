@@ -36,11 +36,7 @@ const {
   TEXT_NODE
 } = domContainer;
 
-assert.equal(typeof reactDomClient.createRoot, 'function');
-assert.equal(reactDomClient.__FAST_REACT_PLACEHOLDER__, true);
-assert.throws(() => reactDomClient.createRoot({nodeType: ELEMENT_NODE}), {
-  code: 'FAST_REACT_UNIMPLEMENTED'
-});
+assertReactDomClientPlaceholder();
 
 assert.equal(eventNames.allNativeEvents.length, 86);
 assert.equal(eventNames.nonDelegatedEvents.length, 32);
@@ -102,6 +98,20 @@ assert.equal(
     rootMarkers.getCreateRootWarning(container, {development: false}),
     null
   );
+  const warningMessages = [];
+  assert.equal(
+    rootMarkers.warnIfContainerAlreadyRoot(container, {
+      console: {
+        error(message) {
+          warningMessages.push(message);
+        }
+      },
+      development: true
+    }),
+    true
+  );
+  assert.deepEqual(warningMessages, [rootMarkers.duplicateCreateRootWarning]);
+  assert.equal(rootMarkers.getContainerRoot(container), rootOwner);
 
   const afterMark = rootMarkers.inspectContainerRootMarker(container);
   assert.equal(afterMark.propertyCount, 1);
@@ -111,11 +121,27 @@ assert.equal(
     rootMarkers.containerMarkerPrefix
   );
 
+  const replacementRootOwner = {kind: 'FastReactDomReplacementRoot'};
+  rootMarkers.markContainerAsRoot(replacementRootOwner, container);
+  assert.equal(rootMarkers.getContainerRoot(container), replacementRootOwner);
+  const afterDuplicateMark = rootMarkers.inspectContainerRootMarker(container);
+  assert.equal(afterDuplicateMark.propertyCount, 1);
+  assert.equal(afterDuplicateMark.truthyCount, 1);
+  assert.equal(afterDuplicateMark.nullCount, 0);
+
   rootMarkers.unmarkContainerAsRoot(container);
   assert.equal(rootMarkers.isContainerMarkedAsRoot(container), false);
+  assert.equal(rootMarkers.getCreateRootWarning(container), null);
   const afterUnmount = rootMarkers.inspectContainerRootMarker(container);
   assert.equal(afterUnmount.propertyCount, 1);
   assert.equal(afterUnmount.nullCount, 1);
+
+  rootMarkers.markContainerAsRoot(rootOwner, container);
+  assert.equal(rootMarkers.getContainerRoot(container), rootOwner);
+  const afterRemark = rootMarkers.inspectContainerRootMarker(container);
+  assert.equal(afterRemark.propertyCount, 1);
+  assert.equal(afterRemark.truthyCount, 1);
+  rootMarkers.unmarkContainerAsRoot(container);
 
   container[rootMarkers.legacyRootContainerKey] = {};
   assert.equal(
@@ -137,6 +163,8 @@ assert.equal(
   rootListeners.listenToAllSupportedEvents(container);
   assert.equal(container.__registrations.length, 138);
   assert.equal(document.__registrations.length, 1);
+  assert.equal(listenerRegistry.getEventListenerSet(container).size, 138);
+  assert.equal(listenerRegistry.getEventListenerSet(document).size, 1);
 
   const secondRoot = createElement('MAIN', document);
   rootListeners.listenToAllSupportedEvents(secondRoot);
@@ -157,12 +185,59 @@ assert.equal(
   const documentRoot = document;
   rootListeners.listenToAllSupportedEvents(documentRoot);
   const documentRootSummary = summarizeRegistrations(documentRoot);
+  assert.equal(documentRootSummary.listenerCount, 139);
   assert.equal(
     documentRootSummary.byEvent.get('selectionchange').bubble,
     1
   );
   assert.equal(documentRootSummary.byEvent.get('click').capture, 1);
   assert.equal(documentRootSummary.byEvent.get('click').bubble, 1);
+}
+
+{
+  const document = createDocument('listener-once');
+  const container = createElement('DIV', document);
+
+  const firstClickBubble = rootListeners.listenToNativeEvent(
+    'click',
+    false,
+    container
+  );
+  assert.equal(firstClickBubble.__FAST_REACT_DOM_EVENT_SHELL__, true);
+  assert.equal(firstClickBubble.__FAST_REACT_DOM_EVENT_NAME__, 'click');
+  assert.equal(firstClickBubble.__FAST_REACT_DOM_EVENT_FLAGS__, 0);
+  assert.equal(firstClickBubble.__FAST_REACT_DOM_EVENT_TARGET__, container);
+  assert.equal(container.__registrations.length, 1);
+  assert.equal(
+    rootListeners.listenToNativeEvent('click', false, container),
+    null
+  );
+  assert.equal(container.__registrations.length, 1);
+
+  const firstClickCapture = rootListeners.listenToNativeEvent(
+    'click',
+    true,
+    container
+  );
+  assert.equal(
+    firstClickCapture.__FAST_REACT_DOM_EVENT_FLAGS__,
+    rootListeners.IS_CAPTURE_PHASE
+  );
+  assert.equal(container.__registrations.length, 2);
+  assert.equal(
+    rootListeners.listenToNativeEvent('click', true, container),
+    null
+  );
+  assert.equal(container.__registrations.length, 2);
+
+  rootListeners.listenToAllSupportedEvents(container);
+  assertRootListenerSet(container, 'pre-seeded listener-once root');
+  assert.equal(listenerRegistry.getEventListenerSet(container).size, 138);
+  assertSelectionChangeOnlyOnDocument(document);
+
+  rootListeners.listenToAllSupportedEvents(container);
+  assert.equal(container.__registrations.length, 138);
+  assert.equal(document.__registrations.length, 1);
 }
 
 {
@@ -185,8 +260,16 @@ assert.equal(
 
   const listener = rootListeners.listenToNativeEvent('click', false, button);
   assert.equal(listener.__FAST_REACT_DOM_EVENT_SHELL__, true);
-  assert.equal(listener({type: 'click'}), undefined);
+  assert.equal(listener.__FAST_REACT_DOM_EVENT_NAME__, 'click');
+  assert.equal(listener.__FAST_REACT_DOM_EVENT_FLAGS__, 0);
+  assert.equal(listener.__FAST_REACT_DOM_EVENT_TARGET__, button);
   assert.equal(rootListeners.listenToNativeEvent('click', false, button), null);
+  assert.equal(
+    button.__registrations.filter(
+      (entry) => entry.type === 'click' && entry.capture === false
+    ).length,
+    1
+  );
 
   rootListeners.listenToNonDelegatedEvent('scroll', button);
   assert.equal(
@@ -241,6 +324,62 @@ function createEventTarget(fields) {
       });
     }
   };
+}
+
+function assertReactDomClientPlaceholder() {
+  assert.deepEqual(Object.keys(reactDomClient), [
+    'createRoot',
+    'hydrateRoot',
+    'version'
+  ]);
+  assert.equal(reactDomClient.__FAST_REACT_PLACEHOLDER__, true);
+  assert.equal(reactDomClient.__FAST_REACT_ENTRYPOINT__, 'react-dom/client');
+  assert.equal(reactDomClient.compatibilityTarget, 'react-dom@19.2.6');
+  assert.equal(
+    Object.keys(reactDomClient).includes('__FAST_REACT_PLACEHOLDER__'),
+    false
+  );
+  assert.equal(
+    Object.keys(reactDomClient).includes('compatibilityTarget'),
+    false
+  );
+  assert.equal(
+    reactDomClient.version,
+    '0.0.0-fast-react-dom-placeholder'
+  );
+
+  const document = createDocument('public-placeholder');
+  const container = createElement('DIV', document);
+  for (const exportName of ['createRoot', 'hydrateRoot']) {
+    const fn = reactDomClient[exportName];
+    assert.equal(typeof fn, 'function', exportName);
+    assert.equal(fn.name, exportName, exportName);
+    assert.equal(fn.length, 0, exportName);
+    assert.throws(
+      () => fn(container),
+      (error) => {
+        assert.equal(error.name, 'FastReactDomUnimplementedError', exportName);
+        assert.equal(error.code, 'FAST_REACT_UNIMPLEMENTED', exportName);
+        assert.equal(error.entrypoint, 'react-dom/client', exportName);
+        assert.equal(error.exportName, exportName, exportName);
+        assert.equal(
+          error.compatibilityTarget,
+          'react-dom@19.2.6',
+          exportName
+        );
+        return true;
+      }
+    );
+  }
+  assert.deepEqual(rootMarkers.inspectContainerRootMarker(container), {
+    inspectable: true,
+    nullCount: 0,
+    properties: [],
+    propertyCount: 0,
+    truthyCount: 0
+  });
+  assert.equal(container.__registrations.length, 0);
+  assert.equal(document.__registrations.length, 0);
 }
 
 function getCapture(options) {
