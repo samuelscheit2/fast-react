@@ -20,12 +20,15 @@ import {
 } from "../src/react-dom-root-render-e2e-oracle.mjs";
 import {
   evaluateReactDomRootRenderE2EConformanceGate,
+  inspectReactDomRootRenderE2EPrivateHostOutputDiagnostics,
   inspectReactDomRootRenderE2EPrivateBridgeRequests,
   REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_STATUS,
   REACT_DOM_PORTAL_ROOT_RENDER_OBJECT_ACCEPTED_STATUS,
   REACT_DOM_PORTAL_ROOT_RENDER_RECONCILER_DIAGNOSTIC_STATUS,
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_BRIDGE_BLOCKED_STATUS,
-  REACT_DOM_ROOT_RENDER_E2E_PRIVATE_BRIDGE_MATCH_STATUS
+  REACT_DOM_ROOT_RENDER_E2E_PRIVATE_BRIDGE_MATCH_STATUS,
+  REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ACCEPTED_STATUS,
+  REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_BLOCKED_STATUS
 } from "../src/react-dom-root-render-e2e-conformance-gate.mjs";
 
 const oracle = readCheckedReactDomRootRenderE2EOracle();
@@ -340,10 +343,16 @@ test("root render e2e conformance gate records private bridge request rows separ
   assert.equal(result.summary.blockedScenarioModeRowCount, 20);
   assert.equal(result.summary.privateBridgeComparableScenarioModeRowCount, 18);
   assert.equal(result.summary.privateBridgeBlockedScenarioModeRowCount, 2);
+  assert.equal(
+    result.summary.privateHostOutputDiagnosticScenarioModeRowCount,
+    8
+  );
+  assert.equal(result.summary.privateHostOutputBlockedScenarioModeRowCount, 12);
   assert.equal(result.summary.portalRootRenderPrerequisiteRowCount, 4);
   assert.equal(result.summary.portalRootRenderBlockedRowCount, 5);
   assert.equal(result.summary.compatibilityClaimed, false);
   assert.equal(result.summary.privateBridgeCompatibilityClaimed, false);
+  assert.equal(result.summary.privateHostOutputCompatibilityClaimed, false);
   assert.equal(result.summary.portalRootRenderCompatibilityClaimed, false);
   assert.equal(result.summary.compatibilityAdmitted, false);
   assert.deepEqual(result.privateBridgeGate.admittedPrivateRequestScenarioIds, [
@@ -360,6 +369,15 @@ test("root render e2e conformance gate records private bridge request rows separ
   assert.deepEqual(result.privateBridgeGate.unsupportedPrivateRequestScenarioIds, [
     "development-warning-boundaries"
   ]);
+  assert.deepEqual(
+    result.privateHostOutputGate.admittedPrivateHostOutputScenarioIds,
+    [
+      "create-root-no-render",
+      "initial-host-render",
+      "update-host-render",
+      "root-unmount"
+    ]
+  );
 
   for (const row of result.blockedScenarioModeRows) {
     assert.equal(row.oracleRowAccepted, true);
@@ -398,6 +416,35 @@ test("root render e2e conformance gate records private bridge request rows separ
     assert.equal(row.comparedToReactDomOracle, false);
     assert.equal(row.compatibilityClaimed, false);
   }
+
+  for (const row of result.privateHostOutputDiagnosticScenarioModeRows) {
+    assert.equal(
+      row.gateStatus,
+      REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ACCEPTED_STATUS
+    );
+    assert.equal(row.oracleRowAccepted, true);
+    assert.equal(row.comparedToReactDomOracle, false);
+    assert.equal(row.compatibilityClaimed, false);
+    assert.equal(row.publicFacadeGateStatus, "blocked-unsupported-root-e2e");
+    assert.equal(row.diagnosticKind, "private-fake-dom-root-host-output");
+    assert.equal(
+      row.rootSideEffectEvidence.record.sideEffectStatus,
+      "applied-private-root-create-mark-listen-gate"
+    );
+    assert.equal(
+      row.rootSideEffectEvidence.cleanup.record.sideEffectStatus,
+      "reverted-private-root-create-mark-listen-gate"
+    );
+  }
+
+  assert.deepEqual(
+    new Set(
+      result.privateHostOutputBlockedScenarioModeRows.map(
+        (row) => row.gateStatus
+      )
+    ),
+    new Set([REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_BLOCKED_STATUS])
+  );
 
   assert.equal(result.portalRootRenderGate.ok, true);
   assert.deepEqual(
@@ -466,6 +513,91 @@ test("private root bridge request observations stay inert and private", () => {
       }
     }
   ]);
+});
+
+test("private host-output diagnostics admit only explicit fake-DOM evidence", () => {
+  const observations =
+    inspectReactDomRootRenderE2EPrivateHostOutputDiagnostics();
+
+  assert.equal(observations.loadError, null);
+  assert.equal(observations.rows.length, 8);
+
+  for (const row of observations.rows) {
+    assert.equal(row.status, "ok");
+    assert.equal(row.evidence.comparedToReactDomOracle, false);
+    assert.equal(row.evidence.compatibilityClaimed, false);
+    assert.equal(row.evidence.publicRootCompatibilitySurface, false);
+    assert.equal(
+      row.evidence.rootSideEffectEvidence.record.sideEffectStatus,
+      "applied-private-root-create-mark-listen-gate"
+    );
+    assert.equal(
+      row.evidence.rootSideEffectEvidence.cleanup.record.sideEffectStatus,
+      "reverted-private-root-create-mark-listen-gate"
+    );
+    assert.equal(
+      row.evidence.rootSideEffectEvidence.afterApply
+        .containerListenerRegistrationCount,
+      138
+    );
+    assert.equal(
+      row.evidence.rootSideEffectEvidence.afterApply
+        .ownerDocumentListenerRegistrationCount,
+      1
+    );
+    assert.equal(
+      row.evidence.rootSideEffectEvidence.cleanup.afterCleanup
+        .containerListenerRegistrationCount,
+      0
+    );
+    assert.ok(
+      row.evidence.rootBridgeEvidence.nativeHandoffs.every(
+        (handoff) =>
+          handoff.nativeExecution === false &&
+          handoff.reconcilerExecution === false &&
+          handoff.domMutation === false &&
+          handoff.compatibilityClaimed === false
+      )
+    );
+  }
+
+  const initial = observations.rows.find(
+    (row) =>
+      row.modeId === "default-node-development" &&
+      row.scenarioId === "initial-host-render"
+  );
+  assert.equal(initial.evidence.hostOutputEvidence.containerTextContent, "hello");
+  assert.deepEqual(initial.evidence.hostOutputEvidence.attributes, [
+    ["class", "root-card"],
+    ["data-phase", "initial"],
+    ["id", "message"],
+    ["title", "initial title"]
+  ]);
+  assert.equal(initial.evidence.hostOutputEvidence.latestPropsPublished, true);
+
+  const update = observations.rows.find(
+    (row) =>
+      row.modeId === "default-node-development" &&
+      row.scenarioId === "update-host-render"
+  );
+  assert.equal(update.evidence.hostOutputEvidence.containerTextContent, "goodbye");
+  assert.deepEqual(update.evidence.hostOutputEvidence.textWriteLog, [
+    ["nodeValue", "goodbye"]
+  ]);
+
+  const unmount = observations.rows.find(
+    (row) =>
+      row.modeId === "default-node-development" &&
+      row.scenarioId === "root-unmount"
+  );
+  assert.equal(
+    unmount.evidence.hostOutputEvidence.containerChildCountAfterUnmount,
+    0
+  );
+  assert.equal(
+    unmount.evidence.hostOutputEvidence.hostDetachedFromLatestPropsMap,
+    true
+  );
 });
 
 test("React DOM root render e2e oracle artifact does not leak paths or randomized markers", () => {

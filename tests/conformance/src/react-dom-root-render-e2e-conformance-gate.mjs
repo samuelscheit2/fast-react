@@ -168,6 +168,15 @@ export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_BRIDGE_MATCH_STATUS =
 export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_BRIDGE_BLOCKED_STATUS =
   "blocked-private-root-bridge-request-row";
 
+export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_GATE_ID =
+  "root-render-private-host-output-diagnostic-gate-1";
+
+export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ACCEPTED_STATUS =
+  "accepted-private-root-host-output-diagnostic";
+
+export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_BLOCKED_STATUS =
+  "blocked-private-root-host-output-diagnostic";
+
 export const REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_GATE_ID =
   "react-dom-portal-root-render-blocked-gate-1";
 
@@ -317,6 +326,53 @@ export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_BRIDGE_REQUEST_ADMISSIONS =
     }
   ]);
 
+export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ADMISSIONS =
+  Object.freeze([
+    {
+      scenarioId: "create-root-no-render",
+      admission: "private-host-output-diagnostic",
+      gateStatus: REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ACCEPTED_STATUS,
+      reason:
+        "The private root bridge can apply and revert explicit createRoot marker/listener diagnostics without exposing a public root object or mutating host children."
+    },
+    {
+      scenarioId: "initial-host-render",
+      admission: "private-host-output-diagnostic",
+      gateStatus: REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ACCEPTED_STATUS,
+      reason:
+        "Private fake-DOM HostComponent/HostText helpers can produce initial host output behind a private render request while public createRoot remains blocked."
+    },
+    {
+      scenarioId: "update-host-render",
+      admission: "private-host-output-diagnostic",
+      gateStatus: REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ACCEPTED_STATUS,
+      reason:
+        "Private fake-DOM property/text mutation helpers can update host output and publish latest props only after mutation handoff validation."
+    },
+    {
+      scenarioId: "root-unmount",
+      admission: "private-host-output-diagnostic",
+      gateStatus: REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ACCEPTED_STATUS,
+      reason:
+        "Private unmount diagnostics can clear fake host output and revert explicit createRoot marker/listener side effects without admitting public root unmount behavior."
+    },
+    ...REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.filter(
+      (scenarioId) =>
+        ![
+          "create-root-no-render",
+          "initial-host-render",
+          "update-host-render",
+          "root-unmount"
+        ].includes(scenarioId)
+    ).map((scenarioId) => ({
+      scenarioId,
+      admission: "unsupported",
+      gateStatus: REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_BLOCKED_STATUS,
+      reason:
+        "This root E2E scenario still needs fuller private host-output evidence before it can be admitted as a diagnostic row."
+    }))
+  ]);
+
 export async function runReactDomRootRenderE2EConformanceGate({
   checkedOracle = readCheckedReactDomRootRenderE2EOracle(),
   currentOracle,
@@ -327,6 +383,10 @@ export async function runReactDomRootRenderE2EConformanceGate({
     currentOracle: currentOracle ?? (await generateReactDomRootRenderE2EOracle()),
     privateBridgeObservations:
       inspectReactDomRootRenderE2EPrivateBridgeRequests({ workspaceRoot }),
+    privateHostOutputDiagnostics:
+      inspectReactDomRootRenderE2EPrivateHostOutputDiagnostics({
+        workspaceRoot
+      }),
     portalRootRenderObservations: inspectReactDomPortalRootRenderBlockedBoundary({
       workspaceRoot
     })
@@ -360,6 +420,8 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
   currentOracle,
   privateBridgeObservations =
     inspectReactDomRootRenderE2EPrivateBridgeRequests(),
+  privateHostOutputDiagnostics =
+    inspectReactDomRootRenderE2EPrivateHostOutputDiagnostics(),
   portalRootRenderObservations =
     inspectReactDomPortalRootRenderBlockedBoundary()
 }) {
@@ -368,6 +430,8 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
   const blocked = [];
   const privateBridgeComparableRows = [];
   const privateBridgeBlockedRows = [];
+  const privateHostOutputDiagnosticRows = [];
+  const privateHostOutputBlockedRows = [];
   const behaviorByScenario = new Map(
     REACT_DOM_ROOT_RENDER_E2E_LOCAL_FAST_REACT_BEHAVIOR.map((behavior) => [
       behavior.scenarioId,
@@ -381,6 +445,17 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
   );
   const privateBridgeObservationByRow = new Map(
     (privateBridgeObservations.rows ?? []).map((row) => [
+      formatScenarioModeKey(row),
+      row
+    ])
+  );
+  const privateHostOutputAdmissionByScenario = new Map(
+    REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ADMISSIONS.map(
+      (admission) => [admission.scenarioId, admission]
+    )
+  );
+  const privateHostOutputObservationByRow = new Map(
+    (privateHostOutputDiagnostics.rows ?? []).map((row) => [
       formatScenarioModeKey(row),
       row
     ])
@@ -399,11 +474,21 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
     privateBridgeAdmissionByScenario,
     failures
   });
+  validatePrivateHostOutputAdmissionMetadata({
+    privateHostOutputAdmissionByScenario,
+    failures
+  });
 
   if (privateBridgeObservations.loadError) {
     failures.push({
       gateStatus: "private-root-bridge-request-observation-load-failed",
       error: privateBridgeObservations.loadError
+    });
+  }
+  if (privateHostOutputDiagnostics.loadError) {
+    failures.push({
+      gateStatus: "private-root-host-output-diagnostic-load-failed",
+      error: privateHostOutputDiagnostics.loadError
     });
   }
 
@@ -521,10 +606,7 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
           ...context,
           gateStatus: "missing-private-root-bridge-request-admission"
         });
-        continue;
-      }
-
-      if (privateAdmission.admission === "private-request-comparable") {
+      } else if (privateAdmission.admission === "private-request-comparable") {
         const privateObservation = privateBridgeObservationByRow.get(
           formatScenarioModeKey(context)
         );
@@ -534,45 +616,38 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
             ...context,
             gateStatus: "missing-private-root-bridge-request-observation"
           });
-          continue;
-        }
-
-        if (privateObservation.status !== "ok") {
+        } else if (privateObservation.status !== "ok") {
           failures.push({
             ...context,
             gateStatus: "private-root-bridge-request-observation-failed",
             status: privateObservation.status,
             error: privateObservation.error ?? null
           });
-          continue;
-        }
-
-        const firstDifferencePath = findFirstDifferencePath(
-          expectedPrivateBridgeComparableObservation(scenarioId),
-          comparablePrivateBridgeObservation(privateObservation)
-        );
-
-        if (firstDifferencePath === null) {
-          privateBridgeComparableRows.push({
-            ...context,
-            gateStatus: privateAdmission.gateStatus,
-            oracleRowAccepted,
-            publicFacadeGateStatus: behavior.gateStatus,
-            requestRecordCount: privateObservation.requestRecords.length,
-            comparedToReactDomOracle: false,
-            compatibilityClaimed: false
-          });
         } else {
-          failures.push({
-            ...context,
-            gateStatus: "private-root-bridge-request-output-mismatch",
-            firstDifferencePath
-          });
-        }
-        continue;
-      }
+          const firstDifferencePath = findFirstDifferencePath(
+            expectedPrivateBridgeComparableObservation(scenarioId),
+            comparablePrivateBridgeObservation(privateObservation)
+          );
 
-      if (privateAdmission.admission === "unsupported") {
+          if (firstDifferencePath === null) {
+            privateBridgeComparableRows.push({
+              ...context,
+              gateStatus: privateAdmission.gateStatus,
+              oracleRowAccepted,
+              publicFacadeGateStatus: behavior.gateStatus,
+              requestRecordCount: privateObservation.requestRecords.length,
+              comparedToReactDomOracle: false,
+              compatibilityClaimed: false
+            });
+          } else {
+            failures.push({
+              ...context,
+              gateStatus: "private-root-bridge-request-output-mismatch",
+              firstDifferencePath
+            });
+          }
+        }
+      } else if (privateAdmission.admission === "unsupported") {
         privateBridgeBlockedRows.push({
           ...context,
           gateStatus: privateAdmission.gateStatus,
@@ -582,13 +657,88 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
           comparedToReactDomOracle: false,
           compatibilityClaimed: false
         });
+      } else {
+        failures.push({
+          ...context,
+          gateStatus: "unknown-private-root-bridge-request-admission",
+          admission: privateAdmission.admission
+        });
+      }
+
+      const privateHostOutputAdmission =
+        privateHostOutputAdmissionByScenario.get(scenarioId);
+      if (!privateHostOutputAdmission) {
+        failures.push({
+          ...context,
+          gateStatus: "missing-private-root-host-output-admission"
+        });
+        continue;
+      }
+
+      if (
+        privateHostOutputAdmission.admission ===
+        "private-host-output-diagnostic"
+      ) {
+        const privateHostOutputObservation =
+          privateHostOutputObservationByRow.get(formatScenarioModeKey(context));
+
+        if (!privateHostOutputObservation) {
+          failures.push({
+            ...context,
+            gateStatus: "missing-private-root-host-output-diagnostic"
+          });
+          continue;
+        }
+
+        const validationFailure =
+          validatePrivateHostOutputDiagnosticObservation({
+            observation: privateHostOutputObservation,
+            scenarioId
+          });
+
+        if (validationFailure === null) {
+          privateHostOutputDiagnosticRows.push({
+            ...context,
+            gateStatus: privateHostOutputAdmission.gateStatus,
+            oracleRowAccepted,
+            publicFacadeGateStatus: behavior.gateStatus,
+            comparedToReactDomOracle: false,
+            compatibilityClaimed: false,
+            diagnosticKind:
+              privateHostOutputObservation.evidence.diagnosticKind,
+            hostOutputEvidence:
+              privateHostOutputObservation.evidence.hostOutputEvidence,
+            rootBridgeEvidence:
+              privateHostOutputObservation.evidence.rootBridgeEvidence,
+            rootSideEffectEvidence:
+              privateHostOutputObservation.evidence.rootSideEffectEvidence
+          });
+        } else {
+          failures.push({
+            ...context,
+            ...validationFailure
+          });
+        }
+        continue;
+      }
+
+      if (privateHostOutputAdmission.admission === "unsupported") {
+        privateHostOutputBlockedRows.push({
+          ...context,
+          gateStatus: privateHostOutputAdmission.gateStatus,
+          oracleRowAccepted,
+          publicFacadeGateStatus: behavior.gateStatus,
+          reason: privateHostOutputAdmission.reason,
+          comparedToReactDomOracle: false,
+          compatibilityClaimed: false
+        });
         continue;
       }
 
       failures.push({
         ...context,
-        gateStatus: "unknown-private-root-bridge-request-admission",
-        admission: privateAdmission.admission
+        gateStatus: "unknown-private-root-host-output-admission",
+        admission: privateHostOutputAdmission.admission
       });
     }
   }
@@ -630,6 +780,24 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
     blockedScenarioModeRows: blocked,
     privateBridgeComparableScenarioModeRows: privateBridgeComparableRows,
     privateBridgeBlockedScenarioModeRows: privateBridgeBlockedRows,
+    privateHostOutputGate: {
+      id: REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_GATE_ID,
+      localEntrypoint:
+        "packages/react-dom/src/client/root-bridge.js + packages/react-dom/src/dom-host/mutation.js private diagnostics",
+      admittedPrivateHostOutputScenarioIds:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ADMISSIONS.filter(
+          (admission) =>
+            admission.admission === "private-host-output-diagnostic"
+        ).map((admission) => admission.scenarioId),
+      unsupportedPrivateHostOutputScenarioIds:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ADMISSIONS.filter(
+          (admission) => admission.admission === "unsupported"
+        ).map((admission) => admission.scenarioId),
+      compatibilityClaimed: false
+    },
+    privateHostOutputDiagnosticScenarioModeRows:
+      privateHostOutputDiagnosticRows,
+    privateHostOutputBlockedScenarioModeRows: privateHostOutputBlockedRows,
     portalRootRenderGate,
     portalRootRenderPrerequisiteRows: portalRootRenderGate.prerequisiteRows,
     portalRootRenderBlockedRows: portalRootRenderGate.blockedRows,
@@ -641,6 +809,10 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
         privateBridgeComparableRows.length,
       privateBridgeBlockedScenarioModeRowCount:
         privateBridgeBlockedRows.length,
+      privateHostOutputDiagnosticScenarioModeRowCount:
+        privateHostOutputDiagnosticRows.length,
+      privateHostOutputBlockedScenarioModeRowCount:
+        privateHostOutputBlockedRows.length,
       portalRootRenderPrerequisiteRowCount:
         portalRootRenderGate.summary.prerequisiteRowCount,
       portalRootRenderBlockedRowCount:
@@ -654,6 +826,7 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
         blocked.length === 0 &&
         admitted.length > 0,
       privateBridgeCompatibilityClaimed: false,
+      privateHostOutputCompatibilityClaimed: false,
       portalRootRenderCompatibilityClaimed: false,
       compatibilityClaimed: false
     }
@@ -824,6 +997,8 @@ export function formatReactDomRootRenderE2EConformanceGateResult(result) {
     `Blocked unsupported scenario-mode rows: ${result.summary.blockedScenarioModeRowCount}`,
     `Private bridge request rows compared: ${result.summary.privateBridgeComparableScenarioModeRowCount}`,
     `Private bridge request rows blocked: ${result.summary.privateBridgeBlockedScenarioModeRowCount}`,
+    `Private host-output diagnostic rows admitted: ${result.summary.privateHostOutputDiagnosticScenarioModeRowCount}`,
+    `Private host-output diagnostic rows blocked: ${result.summary.privateHostOutputBlockedScenarioModeRowCount}`,
     `Portal root-render prerequisite rows accepted: ${result.summary.portalRootRenderPrerequisiteRowCount}`,
     `Portal root-render rows blocked: ${result.summary.portalRootRenderBlockedRowCount}`,
     `Failures: ${result.summary.failureCount}`
@@ -837,6 +1012,11 @@ export function formatReactDomRootRenderE2EConformanceGateResult(result) {
   if (result.privateBridgeComparableScenarioModeRows.length > 0) {
     lines.push(
       "Private root-bridge rows compare request metadata only; public createRoot, DOM mutation, listeners, hydration, and compatibility claims remain blocked."
+    );
+  }
+  if (result.privateHostOutputDiagnosticScenarioModeRows.length > 0) {
+    lines.push(
+      "Private host-output diagnostics use fake-DOM helper evidence only; public root render scenarios and compatibility claims remain blocked."
     );
   }
   if (result.portalRootRenderBlockedRows.length > 0) {
@@ -870,6 +1050,14 @@ export function formatReactDomRootPublicFacadeBlockedGateResult(result) {
     `Blocked root-render scenario-mode rows: ${result.summary.blockedScenarioModeRowCount}`,
     `Blocked public facade rows: ${result.summary.blockedPublicFacadeRowCount}`,
     `Blocked private bridge rows: ${result.summary.blockedPrivateBridgeRowCount}`,
+    `Root-render private host-output diagnostic rows admitted: ${
+      result.rootRenderGate?.summary
+        .privateHostOutputDiagnosticScenarioModeRowCount ?? 0
+    }`,
+    `Root-render private host-output diagnostic rows blocked: ${
+      result.rootRenderGate?.summary
+        .privateHostOutputBlockedScenarioModeRowCount ?? 0
+    }`,
     `Failures: ${result.summary.failureCount}`
   ];
 
@@ -881,6 +1069,14 @@ export function formatReactDomRootPublicFacadeBlockedGateResult(result) {
   if (result.summary.blockedPrivateBridgeRowCount > 0) {
     lines.push(
       "Private root-bridge request and admission rows remain metadata-only and are not public compatibility evidence."
+    );
+  }
+  if (
+    (result.rootRenderGate?.summary
+      .privateHostOutputDiagnosticScenarioModeRowCount ?? 0) > 0
+  ) {
+    lines.push(
+      "Private host-output diagnostics remain fake-DOM evidence only and do not unblock public root facade rows."
     );
   }
 
@@ -999,6 +1195,41 @@ export function inspectReactDomRootRenderE2EPrivateBridgeRequests({
             mode,
             modules,
             scenarioId
+          })
+        );
+      }
+    }
+
+    return {
+      loadError: null,
+      rows
+    };
+  } catch (error) {
+    return {
+      loadError: describePrivateBridgeError(error),
+      rows: []
+    };
+  }
+}
+
+export function inspectReactDomRootRenderE2EPrivateHostOutputDiagnostics({
+  workspaceRoot = DEFAULT_WORKSPACE_ROOT
+} = {}) {
+  try {
+    const modules = loadPrivateHostOutputModules(workspaceRoot);
+    const rows = [];
+
+    for (const mode of REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES) {
+      for (const admission of REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ADMISSIONS) {
+        if (admission.admission !== "private-host-output-diagnostic") {
+          continue;
+        }
+
+        rows.push(
+          runPrivateHostOutputDiagnosticScenario({
+            mode,
+            modules,
+            scenarioId: admission.scenarioId
           })
         );
       }
@@ -2412,6 +2643,15 @@ function loadPrivateBridgeModules(workspaceRoot) {
   };
 }
 
+function loadPrivateHostOutputModules(workspaceRoot) {
+  const reactDomRoot = join(workspaceRoot, "packages/react-dom");
+  return {
+    ...loadPrivateBridgeModules(workspaceRoot),
+    componentTree: require(join(reactDomRoot, "src/client/component-tree.js")),
+    domHost: require(join(reactDomRoot, "src/dom-host/mutation.js"))
+  };
+}
+
 function runPrivateBridgeRequestScenario({ mode, modules, scenarioId }) {
   try {
     const plan = getPrivateBridgeRequestPlan(scenarioId);
@@ -2512,6 +2752,296 @@ function runPrivateBridgeRequestScenario({ mode, modules, scenarioId }) {
       error: describePrivateBridgeError(error)
     };
   }
+}
+
+function runPrivateHostOutputDiagnosticScenario({ mode, modules, scenarioId }) {
+  try {
+    const harness = createPrivateHostOutputHarness({
+      mode,
+      modules,
+      scenarioId
+    });
+    const sideEffects = applyPrivateHostOutputRootSideEffects(harness);
+    let hostOutputEvidence;
+
+    if (scenarioId === "create-root-no-render") {
+      hostOutputEvidence = {
+        childNodeNames: summarizeChildNodeNames(harness.container),
+        containerChildCount: harness.container.childNodes.length,
+        containerTextContent: harness.container.textContent,
+        hostMutationObserved: false,
+        latestPropsPublished: false
+      };
+    } else if (scenarioId === "initial-host-render") {
+      const render = harness.bridge.renderContainer(
+        harness.create.handle,
+        createPrivateHostOutputElementValue("initial")
+      );
+      recordPrivateHostOutputRootRequest(harness, render);
+      hostOutputEvidence = mountPrivateInitialHostOutput(harness);
+    } else if (scenarioId === "update-host-render") {
+      const initialRender = harness.bridge.renderContainer(
+        harness.create.handle,
+        createPrivateHostOutputElementValue("initial")
+      );
+      recordPrivateHostOutputRootRequest(harness, initialRender);
+      const mounted = mountPrivateInitialHostOutput(harness);
+      const updateRender = harness.bridge.renderContainer(
+        harness.create.handle,
+        createPrivateHostOutputElementValue("updated")
+      );
+      recordPrivateHostOutputRootRequest(harness, updateRender);
+      hostOutputEvidence = updatePrivateHostOutput(harness, mounted);
+    } else if (scenarioId === "root-unmount") {
+      const render = harness.bridge.renderContainer(
+        harness.create.handle,
+        createPrivateHostOutputElementValue("initial")
+      );
+      recordPrivateHostOutputRootRequest(harness, render);
+      const mounted = mountPrivateInitialHostOutput(harness);
+      const unmount = harness.bridge.unmountContainer(harness.create.handle);
+      recordPrivateHostOutputRootRequest(harness, unmount);
+      hostOutputEvidence = unmountPrivateHostOutput(harness, mounted);
+    } else {
+      throw new Error(
+        `No private host-output diagnostic plan for scenario: ${scenarioId}`
+      );
+    }
+
+    const cleanup = cleanupPrivateHostOutputRootSideEffects(
+      harness,
+      sideEffects.rawRecord
+    );
+    const { rawRecord, ...sideEffectEvidence } = sideEffects;
+
+    return {
+      modeId: mode.id,
+      scenarioId,
+      status: "ok",
+      evidence: {
+        compatibilityClaimed: false,
+        comparedToReactDomOracle: false,
+        diagnosticKind: "private-fake-dom-root-host-output",
+        hostOutputEvidence,
+        publicRootCompatibilitySurface: false,
+        rootBridgeEvidence: summarizePrivateHostOutputRootBridgeEvidence(
+          harness
+        ),
+        rootSideEffectEvidence: {
+          ...sideEffectEvidence,
+          cleanup
+        }
+      }
+    };
+  } catch (error) {
+    return {
+      modeId: mode.id,
+      scenarioId,
+      status: "throws",
+      error: describePrivateBridgeError(error)
+    };
+  }
+}
+
+function createPrivateHostOutputHarness({ mode, modules, scenarioId }) {
+  const document = createPrivateHostOutputDocument({
+    domContainer: modules.domContainer,
+    label: `${mode.id}:${scenarioId}:host-output`
+  });
+  const container = document.createElement("div");
+  const bridge = modules.rootBridge.createPrivateRootBridgeShell({
+    requestIdPrefix: "host-output-request",
+    rootIdPrefix: "host-output-root",
+    sideEffectIdPrefix: "host-output-side-effect",
+    updateIdPrefix: "host-output-update"
+  });
+  const create = bridge.createClientRoot(container);
+  const harness = {
+    bridge,
+    container,
+    create,
+    document,
+    modules,
+    nativeHandoffRecords: [],
+    requestAdmissionRecords: [],
+    requestRecords: [],
+    rootOwner: modules.rootBridge.getRootOwnerFromHandle(create.handle)
+  };
+  recordPrivateHostOutputRootRequest(harness, create);
+  return harness;
+}
+
+function recordPrivateHostOutputRootRequest(harness, record) {
+  harness.requestRecords.push(normalizePrivateBridgeRequestRecord(record));
+  harness.requestAdmissionRecords.push(
+    summarizePrivateRootBridgeAdmissionRecord(harness.bridge.admitRequest(record))
+  );
+  harness.nativeHandoffRecords.push(
+    summarizeNativeRootBridgeHandoffRecord(
+      harness.bridge.createNativeRequestHandoff(record)
+    )
+  );
+}
+
+function applyPrivateHostOutputRootSideEffects(harness) {
+  const before = summarizePrivateRootMarkerListenerState(harness);
+  const record = harness.bridge.applyCreateRootSideEffects(harness.create);
+  const afterApply = summarizePrivateRootMarkerListenerState(harness);
+  return {
+    afterApply,
+    before,
+    rawRecord: record,
+    record: summarizePrivateRootCreateSideEffectRecord(record)
+  };
+}
+
+function cleanupPrivateHostOutputRootSideEffects(harness, rawRecord) {
+  const cleanupRecord = harness.bridge.revertCreateRootSideEffects(rawRecord);
+  return {
+    afterCleanup: summarizePrivateRootMarkerListenerState(harness),
+    record: summarizePrivateRootCreateSideEffectCleanupRecord(cleanupRecord)
+  };
+}
+
+function mountPrivateInitialHostOutput(harness) {
+  const previousProps = {};
+  const nextProps = createPrivateHostOutputProps("initial");
+  const host = harness.document.createElement("div");
+  const token = harness.modules.componentTree.createHostInstanceToken(
+    {
+      kind: "PrivateHostOutputDiagnosticHost",
+      phase: "initial"
+    },
+    harness.rootOwner
+  );
+  harness.modules.componentTree.attachHostInstanceNode(
+    host,
+    token,
+    previousProps
+  );
+  const handoff = harness.modules.domHost.commitDomPropertyUpdateForLatestProps(
+    host,
+    "div",
+    previousProps,
+    nextProps
+  );
+  const latestPropsBeforeCommit =
+    harness.modules.componentTree.getLatestPropsFromNode(host);
+  const handoffPayload =
+    harness.modules.domHost.getDomPropertyUpdateLatestPropsHandoffPayload(
+      handoff
+    );
+  harness.modules.componentTree.commitLatestPropsFromMutationHandoff(handoff);
+  const latestPropsAfterCommit =
+    harness.modules.componentTree.getLatestPropsFromNode(host);
+  const text = harness.modules.domHost.createDomHostTextInstance(
+    "hello",
+    harness.container
+  );
+
+  harness.modules.domHost.appendInitialChild(host, text);
+  harness.modules.domHost.appendChildToContainer(harness.container, host);
+
+  return {
+    attributes: summarizeAttributeEntries(host),
+    childNodeNames: summarizeChildNodeNames(harness.container),
+    containerChildCount: harness.container.childNodes.length,
+    containerMutationLog: harness.container.mutationLog.slice(),
+    containerTextContent: harness.container.textContent,
+    handoff: summarizePrivateHostOutputHandoff(handoff, handoffPayload),
+    hostAttributeLog: host.attributeLog.slice(),
+    hostMutationObserved: true,
+    latestPropsAfterCommit: summarizePrivateHostOutputProps(
+      latestPropsAfterCommit
+    ),
+    latestPropsBeforeCommit: summarizePrivateHostOutputProps(
+      latestPropsBeforeCommit
+    ),
+    latestPropsPublished: latestPropsAfterCommit === nextProps,
+    textNodeValue: text.nodeValue,
+    textWriteLog: text.writeLog.slice()
+  };
+}
+
+function updatePrivateHostOutput(harness, mounted) {
+  const host = harness.container.childNodes[0];
+  const text = host.childNodes[0];
+  const previousProps =
+    harness.modules.componentTree.getLatestPropsFromNode(host);
+  const nextProps = createPrivateHostOutputProps("updated");
+  const handoff = harness.modules.domHost.commitDomPropertyUpdateForLatestProps(
+    host,
+    "div",
+    previousProps,
+    nextProps
+  );
+  const latestPropsBeforeCommit =
+    harness.modules.componentTree.getLatestPropsFromNode(host);
+  const handoffPayload =
+    harness.modules.domHost.getDomPropertyUpdateLatestPropsHandoffPayload(
+      handoff
+    );
+  harness.modules.domHost.commitTextUpdate(text, "hello", "goodbye");
+  harness.modules.componentTree.commitLatestPropsFromMutationHandoff(handoff);
+  const latestPropsAfterCommit =
+    harness.modules.componentTree.getLatestPropsFromNode(host);
+
+  return {
+    ...mounted,
+    attributes: summarizeAttributeEntries(host),
+    childNodeNames: summarizeChildNodeNames(harness.container),
+    containerChildCount: harness.container.childNodes.length,
+    containerTextContent: harness.container.textContent,
+    handoff: summarizePrivateHostOutputHandoff(handoff, handoffPayload),
+    hostAttributeLog: host.attributeLog.slice(),
+    latestPropsAfterCommit: summarizePrivateHostOutputProps(
+      latestPropsAfterCommit
+    ),
+    latestPropsBeforeCommit: summarizePrivateHostOutputProps(
+      latestPropsBeforeCommit
+    ),
+    latestPropsPublished: latestPropsAfterCommit === nextProps,
+    textNodeValue: text.nodeValue,
+    textWriteLog: text.writeLog.slice(),
+    updateMutationObserved: true
+  };
+}
+
+function unmountPrivateHostOutput(harness, mounted) {
+  const host = harness.container.childNodes[0] ?? null;
+  if (host !== null) {
+    harness.modules.domHost.clearContainer(harness.container);
+    harness.modules.componentTree.detachHostInstanceNode(host);
+  }
+
+  return {
+    ...mounted,
+    childNodeNamesAfterUnmount: summarizeChildNodeNames(harness.container),
+    containerChildCountAfterUnmount: harness.container.childNodes.length,
+    containerMutationLogAfterUnmount: harness.container.mutationLog.slice(),
+    containerTextContentAfterUnmount: harness.container.textContent,
+    hostDetachedFromLatestPropsMap:
+      host === null
+        ? false
+        : harness.modules.componentTree.getLatestPropsFromNode(host) === null,
+    unmountMutationObserved: true
+  };
+}
+
+function summarizePrivateHostOutputRootBridgeEvidence(harness) {
+  return {
+    admissions: harness.requestAdmissionRecords.map((record) => ({
+      admissionStatus: record.admissionStatus,
+      compatibilityClaimed: record.compatibilityClaimed,
+      executionStatus: record.executionStatus,
+      operation: record.operation,
+      requestType: record.requestType
+    })),
+    nativeHandoffs: harness.nativeHandoffRecords,
+    requestOperations: harness.requestRecords.map((record) => record.operation),
+    requestRecordCount: harness.requestRecords.length,
+    requestTypes: harness.requestRecords.map((record) => record.requestType)
+  };
 }
 
 function inspectRootFacadeSideEffects(
@@ -2633,6 +3163,143 @@ function summarizePrivateRootBridgeAdmissionRecord(record) {
     hydration: record.hydration,
     eventDispatch: record.eventDispatch,
     compatibilityClaimed: record.compatibilityClaimed
+  };
+}
+
+function summarizeNativeRootBridgeHandoffRecord(record) {
+  return {
+    compatibilityClaimed: record.compatibilityClaimed,
+    domMutation: record.domMutation,
+    eventDispatch: record.eventDispatch,
+    handoffStatus: record.handoffStatus,
+    hydration: record.hydration,
+    listenerInstallation: record.listenerInstallation,
+    markerWrites: record.markerWrites,
+    nativeExecution: record.nativeExecution,
+    nativeRequestKind: record.nativeRequestRecord?.kind ?? null,
+    nativeRootHandleState:
+      record.nativeRequestRecord?.rootHandle?.state ?? null,
+    operation: record.operation,
+    reconcilerExecution: record.reconcilerExecution,
+    requestType: record.sourceRequestType
+  };
+}
+
+function summarizePrivateRootCreateSideEffectRecord(record) {
+  return {
+    compatibilityClaimed: record.compatibilityClaimed,
+    domMutation: record.domMutation,
+    eventDispatch: record.eventDispatch,
+    hydration: record.hydration,
+    listenerInstallation: record.listenerInstallation,
+    listenerRegistrationCount:
+      record.listenerRegistration?.registrationCount ?? 0,
+    markerStatus: record.markerRecord?.markerStatus ?? null,
+    markerWrites: record.markerWrites,
+    nativeExecution: record.nativeExecution,
+    reconcilerExecution: record.reconcilerExecution,
+    reversible: record.reversible,
+    sideEffectStatus: record.sideEffectStatus
+  };
+}
+
+function summarizePrivateRootCreateSideEffectCleanupRecord(record) {
+  return {
+    compatibilityClaimed: record.compatibilityClaimed,
+    domMutation: record.domMutation,
+    eventDispatch: record.eventDispatch,
+    hydration: record.hydration,
+    listenerInstallation: record.listenerInstallation,
+    listenerRemovalCount: record.listenerCleanup?.listenerRemovalCount ?? 0,
+    markerCleanupStatus: record.markerCleanup?.markerStatus ?? null,
+    markerWrites: record.markerWrites,
+    nativeExecution: record.nativeExecution,
+    reconcilerExecution: record.reconcilerExecution,
+    reversible: record.reversible,
+    sideEffectStatus: record.sideEffectStatus
+  };
+}
+
+function summarizePrivateRootMarkerListenerState({
+  container,
+  document,
+  modules
+}) {
+  const containerMarker =
+    modules.rootMarkers.inspectContainerRootMarker(container);
+  const containerListening =
+    modules.listenerRegistry.inspectListeningMarker(container);
+  const documentListening =
+    modules.listenerRegistry.inspectListeningMarker(document);
+
+  return {
+    containerListenerRegistrationCount: container.__registrations.length,
+    containerListeningMarkerPropertyCount: containerListening.propertyCount,
+    containerMarkerPropertyCount: containerMarker.propertyCount,
+    containerMarkerTruthyCount: containerMarker.truthyCount,
+    ownerDocumentListenerRegistrationCount: document.__registrations.length,
+    ownerDocumentListeningMarkerPropertyCount: documentListening.propertyCount
+  };
+}
+
+function summarizePrivateHostOutputHandoff(handoff, payload) {
+  return {
+    kind: handoff.kind,
+    latestPropsCommitRecordKind: payload.latestPropsCommitRecord.kind,
+    latestPropsCommitRecordStatus: payload.latestPropsCommitRecord.status,
+    mutationRecordCount: payload.mutationRecords.length,
+    payloadCount: handoff.payloadCount,
+    status: handoff.status
+  };
+}
+
+function summarizePrivateHostOutputProps(props) {
+  if (props == null || typeof props !== "object") {
+    return describeLocalValue(props);
+  }
+
+  return Object.fromEntries(
+    Object.entries(props).map(([key, value]) => [
+      key,
+      typeof value === "function" ? { type: "function" } : value
+    ])
+  );
+}
+
+function summarizeAttributeEntries(element) {
+  return Array.from(element.attributes.entries()).sort(([left], [right]) =>
+    left.localeCompare(right)
+  );
+}
+
+function summarizeChildNodeNames(parent) {
+  return parent.childNodes.map((child) => child.nodeName);
+}
+
+function createPrivateHostOutputProps(phase) {
+  if (phase === "updated") {
+    return {
+      id: "message",
+      className: "root-card updated",
+      title: "updated title",
+      "data-phase": "updated",
+      children: "goodbye"
+    };
+  }
+
+  return {
+    id: "message",
+    className: "root-card",
+    title: "initial title",
+    "data-phase": "initial",
+    children: "hello"
+  };
+}
+
+function createPrivateHostOutputElementValue(phase) {
+  return {
+    props: createPrivateHostOutputProps(phase),
+    type: "div"
   };
 }
 
@@ -3308,6 +3975,281 @@ function createPrivateBridgeEventTarget(fields) {
   return target;
 }
 
+function createPrivateHostOutputDocument({ domContainer, label }) {
+  return new PrivateHostOutputDocument({
+    documentNodeType: domContainer.DOCUMENT_NODE,
+    elementNodeType: domContainer.ELEMENT_NODE,
+    label,
+    textNodeType: domContainer.TEXT_NODE
+  });
+}
+
+class PrivateHostOutputNode {
+  constructor({ nodeName, nodeType, ownerDocument }) {
+    this.__mutationLog = [];
+    this.__registrations = [];
+    this.childNodes = [];
+    this.mutationLog = [];
+    this.nodeName = nodeName;
+    this.nodeType = nodeType;
+    this.ownerDocument = ownerDocument;
+    this.parentNode = null;
+  }
+
+  get firstChild() {
+    return this.childNodes[0] ?? null;
+  }
+
+  get lastChild() {
+    return this.childNodes[this.childNodes.length - 1] ?? null;
+  }
+
+  get textContent() {
+    return this.childNodes.map((child) => child.textContent).join("");
+  }
+
+  set textContent(value) {
+    for (const child of [...this.childNodes]) {
+      detachPrivateHostOutputChild(child);
+    }
+    const text = String(value);
+    this.__mutationLog.push({ type: "textContent", value: text });
+    this.mutationLog.push(["textContent", text]);
+  }
+
+  addEventListener(type, listener, options) {
+    this.__registrations.push({
+      listener,
+      options,
+      type
+    });
+  }
+
+  removeEventListener(type, listener, options) {
+    const index = this.__registrations.findIndex(
+      (entry) =>
+        entry.type === type &&
+        entry.listener === listener &&
+        entry.options === options
+    );
+    if (index !== -1) {
+      this.__registrations.splice(index, 1);
+    }
+  }
+
+  appendChild(child) {
+    assertPrivateHostOutputChild(child);
+    assertPrivateHostOutputCanAcceptChild(this, child);
+    detachPrivateHostOutputChild(child);
+    this.childNodes.push(child);
+    child.parentNode = this;
+    this.__mutationLog.push({ child: child.nodeName, type: "appendChild" });
+    this.mutationLog.push(["appendChild", child.nodeName]);
+    return child;
+  }
+
+  insertBefore(child, beforeChild) {
+    assertPrivateHostOutputChild(child);
+    assertPrivateHostOutputCanAcceptChild(this, child);
+    if (beforeChild?.parentNode !== this) {
+      throw new Error("Private host-output insert target is not a child.");
+    }
+    if (child === beforeChild) {
+      return child;
+    }
+
+    detachPrivateHostOutputChild(child);
+    const index = this.childNodes.indexOf(beforeChild);
+    this.childNodes.splice(index, 0, child);
+    child.parentNode = this;
+    this.__mutationLog.push({
+      beforeChild: beforeChild.nodeName,
+      child: child.nodeName,
+      type: "insertBefore"
+    });
+    this.mutationLog.push(["insertBefore", child.nodeName, beforeChild.nodeName]);
+    return child;
+  }
+
+  removeChild(child) {
+    if (child?.parentNode !== this) {
+      throw new Error("Private host-output remove target is not a child.");
+    }
+
+    detachPrivateHostOutputChild(child);
+    this.__mutationLog.push({ child: child.nodeName, type: "removeChild" });
+    this.mutationLog.push(["removeChild", child.nodeName]);
+    return child;
+  }
+}
+
+class PrivateHostOutputDocument extends PrivateHostOutputNode {
+  constructor({ documentNodeType, elementNodeType, label, textNodeType }) {
+    super({
+      nodeName: "#document",
+      nodeType: documentNodeType,
+      ownerDocument: null
+    });
+    this.defaultView = new PrivateHostOutputNode({
+      nodeName: `${label}:window`,
+      nodeType: 0,
+      ownerDocument: this
+    });
+    this.elementNodeType = elementNodeType;
+    this.ownerDocument = this;
+    this.textNodeType = textNodeType;
+  }
+
+  createElement(nodeName) {
+    return new PrivateHostOutputElement({
+      nodeName: String(nodeName).toUpperCase(),
+      nodeType: this.elementNodeType,
+      ownerDocument: this
+    });
+  }
+
+  createTextNode(text) {
+    return new PrivateHostOutputText({
+      nodeType: this.textNodeType,
+      ownerDocument: this,
+      text
+    });
+  }
+}
+
+class PrivateHostOutputElement extends PrivateHostOutputNode {
+  constructor(fields) {
+    super(fields);
+    this.attributes = new Map();
+    this.attributeLog = [];
+    this._className = "";
+    this._id = "";
+    this._title = "";
+  }
+
+  get className() {
+    return this._className;
+  }
+
+  set className(value) {
+    this._className = String(value);
+    this.setAttribute("class", this._className);
+  }
+
+  get id() {
+    return this._id;
+  }
+
+  set id(value) {
+    this._id = String(value);
+    this.setAttribute("id", this._id);
+  }
+
+  get title() {
+    return this._title;
+  }
+
+  set title(value) {
+    this._title = String(value);
+    this.setAttribute("title", this._title);
+  }
+
+  setAttribute(name, value) {
+    const attributeName = String(name);
+    const stringValue = String(value);
+    this.attributeLog.push(["setAttribute", attributeName, stringValue]);
+    this.attributes.set(attributeName, stringValue);
+  }
+
+  removeAttribute(name) {
+    const attributeName = String(name);
+    this.attributeLog.push([
+      "removeAttribute",
+      attributeName,
+      this.attributes.has(attributeName)
+    ]);
+    this.attributes.delete(attributeName);
+  }
+
+  getAttribute(name) {
+    const attributeName = String(name);
+    return this.attributes.has(attributeName)
+      ? this.attributes.get(attributeName)
+      : null;
+  }
+}
+
+class PrivateHostOutputText extends PrivateHostOutputNode {
+  constructor({ nodeType, ownerDocument, text }) {
+    super({
+      nodeName: "#text",
+      nodeType,
+      ownerDocument
+    });
+    this._data = String(text);
+    this.writeLog = [];
+  }
+
+  get data() {
+    return this._data;
+  }
+
+  set data(value) {
+    const text = String(value);
+    this.writeLog.push(["data", text]);
+    this._data = text;
+  }
+
+  get nodeValue() {
+    return this._data;
+  }
+
+  set nodeValue(value) {
+    const text = String(value);
+    this.writeLog.push(["nodeValue", text]);
+    this._data = text;
+  }
+
+  get textContent() {
+    return this._data;
+  }
+
+  set textContent(value) {
+    const text = String(value);
+    this.writeLog.push(["textContent", text]);
+    this._data = text;
+  }
+}
+
+function assertPrivateHostOutputChild(child) {
+  if (child == null || typeof child !== "object") {
+    throw new Error("Private host-output child must be a node.");
+  }
+}
+
+function assertPrivateHostOutputCanAcceptChild(parent, child) {
+  let current = parent;
+  while (current !== null) {
+    if (current === child) {
+      throw new Error("Private host-output cannot insert an ancestor.");
+    }
+    current = current.parentNode;
+  }
+}
+
+function detachPrivateHostOutputChild(child) {
+  if (child.parentNode === null) {
+    return;
+  }
+
+  const siblings = child.parentNode.childNodes;
+  const index = siblings.indexOf(child);
+  if (index !== -1) {
+    siblings.splice(index, 1);
+  }
+  child.parentNode = null;
+}
+
 function describeLocalFunction(value) {
   if (typeof value !== "function") {
     return describeLocalValue(value);
@@ -3626,6 +4568,262 @@ function isPortalRootRenderSideEffectFree(sideEffects) {
   );
 }
 
+function validatePrivateHostOutputDiagnosticObservation({
+  observation,
+  scenarioId
+}) {
+  if (observation.status !== "ok") {
+    return {
+      gateStatus: "private-root-host-output-diagnostic-failed",
+      status: observation.status,
+      error: observation.error ?? null
+    };
+  }
+
+  const evidence = observation.evidence;
+  const commonExpectation = {
+    compatibilityClaimed: false,
+    comparedToReactDomOracle: false,
+    diagnosticKind: "private-fake-dom-root-host-output",
+    publicRootCompatibilitySurface: false,
+    requestOperations: expectedPrivateHostOutputRequestOperations(scenarioId),
+    rootSideEffects: {
+      afterApply: {
+        containerListenerRegistrationCount: 138,
+        containerListeningMarkerPropertyCount: 1,
+        containerMarkerPropertyCount: 1,
+        containerMarkerTruthyCount: 1,
+        ownerDocumentListenerRegistrationCount: 1,
+        ownerDocumentListeningMarkerPropertyCount: 1
+      },
+      afterCleanup: {
+        containerListenerRegistrationCount: 0,
+        containerListeningMarkerPropertyCount: 0,
+        containerMarkerPropertyCount: 0,
+        containerMarkerTruthyCount: 0,
+        ownerDocumentListenerRegistrationCount: 0,
+        ownerDocumentListeningMarkerPropertyCount: 0
+      },
+      before: {
+        containerListenerRegistrationCount: 0,
+        containerListeningMarkerPropertyCount: 0,
+        containerMarkerPropertyCount: 0,
+        containerMarkerTruthyCount: 0,
+        ownerDocumentListenerRegistrationCount: 0,
+        ownerDocumentListeningMarkerPropertyCount: 0
+      },
+      cleanupStatus: "reverted-private-root-create-mark-listen-gate",
+      sideEffectStatus: "applied-private-root-create-mark-listen-gate"
+    }
+  };
+  const commonActual = {
+    compatibilityClaimed: evidence.compatibilityClaimed,
+    comparedToReactDomOracle: evidence.comparedToReactDomOracle,
+    diagnosticKind: evidence.diagnosticKind,
+    publicRootCompatibilitySurface: evidence.publicRootCompatibilitySurface,
+    requestOperations: evidence.rootBridgeEvidence.requestOperations,
+    rootSideEffects: {
+      afterApply: evidence.rootSideEffectEvidence.afterApply,
+      afterCleanup: evidence.rootSideEffectEvidence.cleanup.afterCleanup,
+      before: evidence.rootSideEffectEvidence.before,
+      cleanupStatus:
+        evidence.rootSideEffectEvidence.cleanup.record.sideEffectStatus,
+      sideEffectStatus: evidence.rootSideEffectEvidence.record.sideEffectStatus
+    }
+  };
+  const commonDifference = findFirstDifferencePath(
+    commonExpectation,
+    commonActual
+  );
+  if (commonDifference !== null) {
+    return {
+      gateStatus: "private-root-host-output-common-evidence-mismatch",
+      firstDifferencePath: commonDifference
+    };
+  }
+
+  if (
+    evidence.rootBridgeEvidence.admissions.some(
+      (admission) =>
+        admission.admissionStatus !==
+          "admitted-private-root-bridge-request-record" ||
+        admission.executionStatus !==
+          "blocked-private-root-bridge-execution" ||
+        admission.compatibilityClaimed !== false
+    ) ||
+    evidence.rootBridgeEvidence.nativeHandoffs.some(
+      (handoff) =>
+        handoff.handoffStatus !==
+          "mirrored-private-native-root-request-record" ||
+        handoff.nativeExecution !== false ||
+        handoff.reconcilerExecution !== false ||
+        handoff.domMutation !== false ||
+        handoff.markerWrites !== false ||
+        handoff.listenerInstallation !== false ||
+        handoff.compatibilityClaimed !== false
+    )
+  ) {
+    return {
+      gateStatus: "private-root-host-output-root-bridge-evidence-mismatch"
+    };
+  }
+
+  const scenarioDifference = findFirstDifferencePath(
+    expectedPrivateHostOutputScenarioEvidence(scenarioId),
+    comparablePrivateHostOutputScenarioEvidence(evidence.hostOutputEvidence)
+  );
+  if (scenarioDifference !== null) {
+    return {
+      gateStatus: "private-root-host-output-scenario-evidence-mismatch",
+      firstDifferencePath: scenarioDifference
+    };
+  }
+
+  return null;
+}
+
+function expectedPrivateHostOutputRequestOperations(scenarioId) {
+  switch (scenarioId) {
+    case "create-root-no-render":
+      return ["create"];
+    case "initial-host-render":
+      return ["create", "render"];
+    case "update-host-render":
+      return ["create", "render", "render"];
+    case "root-unmount":
+      return ["create", "render", "unmount"];
+    default:
+      return [];
+  }
+}
+
+function expectedPrivateHostOutputScenarioEvidence(scenarioId) {
+  switch (scenarioId) {
+    case "create-root-no-render":
+      return {
+        childNodeNames: [],
+        containerChildCount: 0,
+        containerTextContent: "",
+        hostMutationObserved: false,
+        latestPropsPublished: false
+      };
+    case "initial-host-render":
+      return {
+        attributes: [
+          ["class", "root-card"],
+          ["data-phase", "initial"],
+          ["id", "message"],
+          ["title", "initial title"]
+        ],
+        childNodeNames: ["DIV"],
+        containerChildCount: 1,
+        containerTextContent: "hello",
+        handoff: {
+          kind: "domPropertyUpdateLatestPropsHandoff",
+          latestPropsCommitRecordKind: "latestPropsCommit",
+          latestPropsCommitRecordStatus: "safe-for-latest-props",
+          mutationRecordCount: 5,
+          payloadCount: 5,
+          status: "mutated"
+        },
+        hostMutationObserved: true,
+        latestPropsAfterCommit: createPrivateHostOutputProps("initial"),
+        latestPropsBeforeCommit: {},
+        latestPropsPublished: true,
+        textNodeValue: "hello",
+        textWriteLog: []
+      };
+    case "update-host-render":
+      return {
+        attributes: [
+          ["class", "root-card updated"],
+          ["data-phase", "updated"],
+          ["id", "message"],
+          ["title", "updated title"]
+        ],
+        childNodeNames: ["DIV"],
+        containerChildCount: 1,
+        containerTextContent: "goodbye",
+        handoff: {
+          kind: "domPropertyUpdateLatestPropsHandoff",
+          latestPropsCommitRecordKind: "latestPropsCommit",
+          latestPropsCommitRecordStatus: "safe-for-latest-props",
+          mutationRecordCount: 4,
+          payloadCount: 4,
+          status: "mutated"
+        },
+        latestPropsAfterCommit: createPrivateHostOutputProps("updated"),
+        latestPropsBeforeCommit: createPrivateHostOutputProps("initial"),
+        latestPropsPublished: true,
+        textNodeValue: "goodbye",
+        textWriteLog: [["nodeValue", "goodbye"]],
+        updateMutationObserved: true
+      };
+    case "root-unmount":
+      return {
+        childNodeNamesAfterUnmount: [],
+        containerChildCountAfterUnmount: 0,
+        containerTextContentAfterUnmount: "",
+        hostDetachedFromLatestPropsMap: true,
+        unmountMutationObserved: true
+      };
+    default:
+      return null;
+  }
+}
+
+function comparablePrivateHostOutputScenarioEvidence(evidence) {
+  if (evidence.containerChildCountAfterUnmount !== undefined) {
+    return {
+      childNodeNamesAfterUnmount: evidence.childNodeNamesAfterUnmount,
+      containerChildCountAfterUnmount: evidence.containerChildCountAfterUnmount,
+      containerTextContentAfterUnmount: evidence.containerTextContentAfterUnmount,
+      hostDetachedFromLatestPropsMap: evidence.hostDetachedFromLatestPropsMap,
+      unmountMutationObserved: evidence.unmountMutationObserved
+    };
+  }
+
+  if (evidence.updateMutationObserved === true) {
+    return {
+      attributes: evidence.attributes,
+      childNodeNames: evidence.childNodeNames,
+      containerChildCount: evidence.containerChildCount,
+      containerTextContent: evidence.containerTextContent,
+      handoff: evidence.handoff,
+      latestPropsAfterCommit: evidence.latestPropsAfterCommit,
+      latestPropsBeforeCommit: evidence.latestPropsBeforeCommit,
+      latestPropsPublished: evidence.latestPropsPublished,
+      textNodeValue: evidence.textNodeValue,
+      textWriteLog: evidence.textWriteLog,
+      updateMutationObserved: evidence.updateMutationObserved
+    };
+  }
+
+  if (evidence.hostMutationObserved === true) {
+    return {
+      attributes: evidence.attributes,
+      childNodeNames: evidence.childNodeNames,
+      containerChildCount: evidence.containerChildCount,
+      containerTextContent: evidence.containerTextContent,
+      handoff: evidence.handoff,
+      hostMutationObserved: evidence.hostMutationObserved,
+      latestPropsAfterCommit: evidence.latestPropsAfterCommit,
+      latestPropsBeforeCommit: evidence.latestPropsBeforeCommit,
+      latestPropsPublished: evidence.latestPropsPublished,
+      textNodeValue: evidence.textNodeValue,
+      textWriteLog: evidence.textWriteLog
+    };
+  }
+
+  return {
+    childNodeNames: evidence.childNodeNames,
+    containerChildCount: evidence.containerChildCount,
+    containerTextContent: evidence.containerTextContent,
+    hostMutationObserved: evidence.hostMutationObserved,
+    latestPropsPublished: evidence.latestPropsPublished
+  };
+}
+
 function validatePrivateBridgeAdmissionMetadata({
   privateBridgeAdmissionByScenario,
   failures
@@ -3666,6 +4864,48 @@ function validatePrivateBridgeAdmissionMetadata({
           error: error.message
         });
       }
+    }
+  }
+}
+
+function validatePrivateHostOutputAdmissionMetadata({
+  privateHostOutputAdmissionByScenario,
+  failures
+}) {
+  for (const scenarioId of REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS) {
+    if (!privateHostOutputAdmissionByScenario.has(scenarioId)) {
+      failures.push({
+        scenarioId,
+        gateStatus: "missing-private-root-host-output-admission"
+      });
+    }
+  }
+
+  for (const [scenarioId, admission] of privateHostOutputAdmissionByScenario) {
+    if (!REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.includes(scenarioId)) {
+      failures.push({
+        scenarioId,
+        gateStatus: "unknown-private-root-host-output-admission-scenario"
+      });
+    }
+    if (
+      admission.admission !== "private-host-output-diagnostic" &&
+      admission.admission !== "unsupported"
+    ) {
+      failures.push({
+        scenarioId,
+        gateStatus: "unknown-private-root-host-output-admission",
+        admission: admission.admission
+      });
+    }
+    if (
+      admission.admission === "private-host-output-diagnostic" &&
+      expectedPrivateHostOutputRequestOperations(scenarioId).length === 0
+    ) {
+      failures.push({
+        scenarioId,
+        gateStatus: "missing-private-root-host-output-plan"
+      });
     }
   }
 }

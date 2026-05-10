@@ -69,6 +69,18 @@ test("React DOM public root facade gate blocks placeholders while oracle prerequ
     REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_BOUNDARY_ROWS.map((row) => row.id)
   );
   assert.equal(gate.blockedPrivateBridgeRows.length, 8);
+  assert.equal(
+    gate.rootRenderGate.summary.privateHostOutputDiagnosticScenarioModeRowCount,
+    8
+  );
+  assert.equal(
+    gate.rootRenderGate.summary.privateHostOutputBlockedScenarioModeRowCount,
+    12
+  );
+  assert.equal(
+    gate.rootRenderGate.summary.privateHostOutputCompatibilityClaimed,
+    false
+  );
 });
 
 test("React DOM public root facade scenario admission is explicit and non-compatible", () => {
