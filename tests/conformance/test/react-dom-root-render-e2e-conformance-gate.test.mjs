@@ -58,6 +58,80 @@ test("root render E2E gate keeps private render native handoff metadata below pu
   payload.bridge.cleanupInitialRenderHostOutput(payload.hostOutputHandoff);
 });
 
+test("root render E2E gate keeps private facade root.unmount cleanup below public compatibility", () => {
+  const document = createDocument();
+  const container = document.createElement("div");
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    rootBridge.privateRootPublicFacadeAdapterSymbol
+  );
+  const adapter = descriptor.value({
+    publicFacadeHostOutputUnmountCleanupIdPrefix:
+      "conformance-root-unmount-cleanup"
+  });
+  const root = adapter.createRoot(container);
+  const render = adapter.renderHostOutput(root, {
+    props: {
+      children: "conformance private unmount"
+    },
+    type: "section"
+  });
+  const renderPayload =
+    rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(render);
+
+  assert.equal(container.childNodes.length, 1);
+  assert.equal(
+    rootBridge.getPrivateRootPublicFacadeRootPayload(root)
+      .activeHostOutputRenderRecordCount,
+    1
+  );
+  assert.equal(
+    rootBridge.getPrivateRootInitialHostOutputHandoffPayload(
+      renderPayload.hostOutputHandoff
+    ).active,
+    true
+  );
+
+  const unmount = root.unmount();
+  const [cleanup] = adapter.getRootHostOutputUnmountCleanupDiagnostics(root);
+  const rootPayloadAfter =
+    rootBridge.getPrivateRootPublicFacadeRootPayload(root);
+
+  assert.equal(unmount.requestType, "root.unmount");
+  assert.equal(unmount.noOp, false);
+  assert.equal(cleanup.cleanupSource, "root.unmount");
+  assert.equal(
+    cleanup.diagnosticStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_CLEANED
+  );
+  assert.equal(
+    cleanup.rootMetadataCleanupStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_ROOT_UNMOUNT_METADATA_CLEARED
+  );
+  assert.equal(cleanup.rootCreateRenderAdmissionMetadataCleared, true);
+  assert.equal(cleanup.activeHostOutputMetadataCleared, true);
+  assert.equal(cleanup.publicRootUnmounted, false);
+  assert.equal(cleanup.publicRootExecution, false);
+  assert.equal(cleanup.publicRootCompatibilitySurface, false);
+  assert.equal(cleanup.compatibilityClaimed, false);
+  assert.equal(container.childNodes.length, 0);
+  assert.equal(rootPayloadAfter.activeHostOutputRenderRecordCount, 0);
+  assert.equal(rootPayloadAfter.rootCreateRenderAdmissionActive, false);
+  assert.equal(
+    rootPayloadAfter.rootLifecycleStatus,
+    rootBridge.ROOT_LIFECYCLE_UNMOUNTED
+  );
+  assert.equal(
+    rootBridge.getPrivateRootInitialHostOutputHandoffPayload(
+      renderPayload.hostOutputHandoff
+    ).active,
+    false
+  );
+  assert.throws(() => reactDomClient.createRoot(document.createElement("div")), {
+    code: "FAST_REACT_UNIMPLEMENTED"
+  });
+});
+
 function createDocument() {
   const document = createEventTarget({
     nodeName: "#document",

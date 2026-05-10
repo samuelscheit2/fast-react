@@ -1282,7 +1282,10 @@ test("React DOM client private facade unmount cleanup stays private and non-comp
       "create-render-admission",
       "fake-dom-host-output-mutation",
       "fake-dom-unmount-cleanup",
+      "root-unmount-admission-metadata",
+      "fake-dom-container-cleanup-metadata",
       "component-tree-metadata-detach",
+      "root-facade-metadata-clear",
       "latest-props-publication"
     ]
   );
@@ -1309,6 +1312,12 @@ test("React DOM client private facade unmount cleanup stays private and non-comp
   assert.equal(diagnostic.browserDomMutation, false);
   assert.equal(diagnostic.rootContainerChildrenCleared, true);
   assert.equal(diagnostic.componentTreeMetadataDetached, true);
+  assert.equal(
+    diagnostic.rootMetadataCleanupStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_ROOT_UNMOUNT_METADATA_CLEARED
+  );
+  assert.equal(diagnostic.rootCreateRenderAdmissionMetadataCleared, true);
+  assert.equal(diagnostic.activeHostOutputMetadataCleared, true);
   assert.equal(diagnostic.compatibilityClaimed, false);
   assert.equal(diagnostic.cleanupRequired, false);
   assert.equal(

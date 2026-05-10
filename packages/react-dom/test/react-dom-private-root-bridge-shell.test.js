@@ -6644,6 +6644,127 @@ test('private react-dom/client facade nested host-output update diagnostic targe
   });
 });
 
+test('private react-dom/client facade root.unmount clears active host output metadata', () => {
+  const document = createDocument('private-client-facade-root-unmount-exec');
+  const container = createElement('DIV', document);
+  const unmountCallback = function afterFacadeRootUnmount() {};
+  const element = {
+    props: {
+      children: 'facade root unmount output',
+      id: 'facade-root-unmount-host'
+    },
+    type: 'section'
+  };
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    rootBridge.privateRootPublicFacadeAdapterSymbol
+  );
+  const adapter = descriptor.value({
+    publicFacadeHostOutputRenderIdPrefix: 'facade-root-unmount-render',
+    publicFacadeHostOutputUnmountCleanupIdPrefix:
+      'facade-root-unmount-cleanup-diagnostic',
+    requestIdPrefix: 'facade-root-unmount-request',
+    rootIdPrefix: 'facade-root-unmount-root',
+    sideEffectIdPrefix: 'facade-root-unmount-side-effect',
+    unmountCleanupIdPrefix: 'facade-root-unmount-cleanup',
+    updateIdPrefix: 'facade-root-unmount-update'
+  });
+  const root = adapter.createRoot(container);
+  const renderDiagnostic = adapter.renderHostOutput(root, element);
+  const renderPayload =
+    rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(
+      renderDiagnostic
+    );
+  const handoffPayload =
+    rootBridge.getPrivateRootInitialHostOutputHandoffPayload(
+      renderPayload.hostOutputHandoff
+    );
+  const hostNode = handoffPayload.hostNode;
+  const textNode = handoffPayload.textNode;
+
+  assert.equal(container.childNodes.length, 1);
+  assert.equal(handoffPayload.active, true);
+  assert.equal(
+    rootBridge.getPrivateRootPublicFacadeRootPayload(root)
+      .activeHostOutputRenderRecordCount,
+    1
+  );
+  assert.equal(
+    rootBridge.getPrivateRootPublicFacadeRootPayload(root)
+      .rootCreateRenderAdmissionActive,
+    true
+  );
+
+  const unmount = root.unmount(unmountCallback);
+  const diagnostics = adapter.getRootHostOutputUnmountCleanupDiagnostics(root);
+  const diagnostic = diagnostics[0];
+  const cleanupPayload =
+    rootBridge.getPrivateRootPublicFacadeHostOutputUnmountCleanupPayload(
+      diagnostic
+    );
+  const rootPayloadAfter =
+    rootBridge.getPrivateRootPublicFacadeRootPayload(root);
+
+  assert.equal(unmount.requestType, 'root.unmount');
+  assert.equal(unmount.noOp, false);
+  assert.equal(
+    unmount.lifecycleStatusBefore,
+    rootBridge.ROOT_LIFECYCLE_RENDERED
+  );
+  assert.equal(
+    unmount.lifecycleStatusAfter,
+    rootBridge.ROOT_LIFECYCLE_UNMOUNTED
+  );
+  assert.equal(diagnostics.length, 1);
+  assert.equal(diagnostic.cleanupSource, 'root.unmount');
+  assert.equal(diagnostic.unmountRequestId, unmount.requestId);
+  assert.equal(diagnostic.renderRequestId, renderDiagnostic.renderRequestId);
+  assert.equal(
+    diagnostic.diagnosticStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_CLEANED
+  );
+  assert.equal(
+    diagnostic.rootMetadataCleanupStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_ROOT_UNMOUNT_METADATA_CLEARED
+  );
+  assert.equal(diagnostic.rootCreateRenderAdmissionMetadataCleared, true);
+  assert.equal(diagnostic.activeHostOutputMetadataCleared, true);
+  assert.equal(diagnostic.hostOutputHandoffActiveBeforeCleanup, true);
+  assert.equal(diagnostic.hostOutputHandoffActiveAfterCleanup, false);
+  assert.equal(diagnostic.rootContainerChildrenCleared, true);
+  assert.equal(diagnostic.componentTreeMetadataDetached, true);
+  assert.equal(diagnostic.publicRootUnmounted, false);
+  assert.equal(diagnostic.publicRootExecution, false);
+  assert.equal(diagnostic.publicRootCompatibilitySurface, false);
+  assert.equal(diagnostic.compatibilityClaimed, false);
+  assert.equal(cleanupPayload.unmountRecord, unmount);
+  assert.equal(handoffPayload.active, false);
+  assert.deepEqual(container.childNodes, []);
+  assert.equal(hostNode.parentNode, null);
+  assert.equal(textNode.parentNode, hostNode);
+  assert.equal(componentTree.getRootOwnerFromNode(hostNode), null);
+  assert.equal(componentTree.getLatestPropsFromNode(hostNode), null);
+  assert.equal(rootPayloadAfter.activeHostOutputRenderRecordCount, 0);
+  assert.equal(rootPayloadAfter.rootCreateRenderAdmissionActive, false);
+  assert.equal(
+    rootPayloadAfter.rootLifecycleStatus,
+    rootBridge.ROOT_LIFECYCLE_UNMOUNTED
+  );
+  assert.deepEqual(rootPayloadAfter.hostOutputUnmountCleanupRecords, [
+    diagnostic
+  ]);
+
+  const secondUnmount = root.unmount();
+  assert.equal(secondUnmount.noOp, true);
+  assert.equal(
+    adapter.getRootHostOutputUnmountCleanupDiagnostics(root).length,
+    1
+  );
+  assert.throws(() => reactDomClient.createRoot(document.createElement('div')), {
+    code: 'FAST_REACT_UNIMPLEMENTED'
+  });
+});
+
 test('private react-dom/client facade unmount cleanup diagnostic routes through bridge cleanup', () => {
   const document = createDocument('private-client-facade-unmount-cleanup');
   const container = createElement('DIV', document);
@@ -6814,6 +6935,7 @@ test('private react-dom/client facade unmount cleanup diagnostic routes through 
       'root-unmount-admission-metadata',
       'fake-dom-container-cleanup-metadata',
       'component-tree-metadata-detach',
+      'root-facade-metadata-clear',
       'latest-props-publication'
     ]
   );
@@ -6846,6 +6968,13 @@ test('private react-dom/client facade unmount cleanup diagnostic routes through 
   assert.equal(diagnostic.browserDomMutation, false);
   assert.equal(diagnostic.rootContainerChildrenCleared, true);
   assert.equal(diagnostic.componentTreeMetadataDetached, true);
+  assert.equal(diagnostic.cleanupSource, 'adapter.unmountHostOutput');
+  assert.equal(
+    diagnostic.rootMetadataCleanupStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_ROOT_UNMOUNT_METADATA_CLEARED
+  );
+  assert.equal(diagnostic.rootCreateRenderAdmissionMetadataCleared, true);
+  assert.equal(diagnostic.activeHostOutputMetadataCleared, true);
   assert.equal(diagnostic.rootMarkerReverted, true);
   assert.equal(diagnostic.rootListenersReverted, true);
   assert.equal(diagnostic.markerWrites, false);
