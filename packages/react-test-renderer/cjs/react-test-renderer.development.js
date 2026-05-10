@@ -2504,6 +2504,11 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
   privateSiblingTextHostOutputRowId: privateToJSONSiblingTextHostOutputRowId,
   privateUpdateHostOutputRowIds: privateToJSONUpdateHostOutputRowIds,
   privateUnmountHostOutputRowId: privateToJSONUnmountHostOutputRowId,
+  privateUpdateHostComponentPropSerializationEvidenceAvailable: true,
+  acceptedUpdateHostComponentPropPayloadShape:
+    'HostComponentPropPlusTextUpdate',
+  updatePropSerializationWorker:
+    'worker-671-test-renderer-root-update-serialization-props',
   mismatchedUpdateUnmountRecordRejection: true,
   mismatchedUpdateShapeRejection: true,
   publicSerializationAvailable: false,
@@ -12183,6 +12188,11 @@ function createPrivateToJSONSerializationFacade(rootRequest) {
     privateHostOutputShapes: privateToJSONHostOutputShapes,
     privateUpdateUnmountDependencyMetadata:
       privateToJSONUpdateUnmountDependencyMetadata,
+    privateUpdateHostComponentPropSerializationEvidenceAvailable: true,
+    acceptedUpdateHostComponentPropPayloadShape:
+      'HostComponentPropPlusTextUpdate',
+    updatePropSerializationWorker:
+      'worker-671-test-renderer-root-update-serialization-props',
     privateNativeExecutionEvidenceAvailable: true,
     privateNativeExecutionDiagnosticName:
       privateToJSONNativeExecutionDiagnosticName,

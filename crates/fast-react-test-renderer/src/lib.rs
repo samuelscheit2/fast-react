@@ -14112,8 +14112,11 @@ mod tests {
 
     #[test]
     fn root_private_json_serialization_canary_describes_updated_host_component_text_after_commit() {
-        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+        let initial_props = props().with_attribute("data-state", "old");
+        let updated_props = props().with_attribute("data-state", "new");
+        let mut root = TestRendererRoot::create_host_component_with_props_and_text_for_canary(
             "span",
+            initial_props.clone(),
             "hello",
             TestRendererOptions::new(),
         )
@@ -14122,8 +14125,12 @@ mod tests {
             .render_and_commit_host_output_for_canary()
             .unwrap()
             .unwrap();
-        root.update_host_component_with_text_for_canary("span", "goodbye")
-            .unwrap();
+        root.update_host_component_with_props_and_text_for_canary(
+            "span",
+            updated_props.clone(),
+            "goodbye",
+        )
+        .unwrap();
         let updated = root
             .render_and_commit_host_output_update_for_canary()
             .unwrap()
@@ -14218,14 +14225,14 @@ mod tests {
             TestRendererPrivateJsonNodeKind::HostComponent
         );
         assert_eq!(nodes[0].element_type().unwrap().as_str(), "span");
-        assert_eq!(nodes[0].props(), Some(&TestProps::new()));
+        assert_eq!(nodes[0].props(), Some(&updated_props));
         assert_eq!(nodes[0].child_ordinals(), &[1]);
         assert_eq!(nodes[1].ordinal(), 1);
         assert_eq!(nodes[1].node_kind(), TestRendererPrivateJsonNodeKind::Text);
         assert_eq!(nodes[1].parent_ordinal(), Some(0));
         assert_eq!(nodes[1].text(), Some("goodbye"));
         assert_eq!(component.element_type().as_str(), "span");
-        assert_eq!(component.props(), &TestProps::new());
+        assert_eq!(component.props(), &updated_props);
         assert_eq!(component.child_count(), 1);
         assert_eq!(text.text(), "goodbye");
         assert!(report.public_blockers().all_blocked());
@@ -14233,10 +14240,12 @@ mod tests {
         let TestNodeSnapshot::Element(previous) = &updated.previous_snapshot().children()[0] else {
             panic!("expected previous host component");
         };
+        assert_eq!(previous.props(), &initial_props);
         assert_eq!(child_texts(previous), vec!["hello"]);
         let TestNodeSnapshot::Element(current) = &updated.snapshot().children()[0] else {
             panic!("expected updated host component");
         };
+        assert_eq!(current.props(), &updated_props);
         assert_eq!(child_texts(current), vec!["goodbye"]);
     }
 
@@ -14293,8 +14302,11 @@ mod tests {
 
     #[test]
     fn root_private_to_json_facade_result_canary_wraps_update_serialization_evidence() {
-        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+        let initial_props = props().with_attribute("data-state", "old");
+        let updated_props = props().with_attribute("data-state", "new");
+        let mut root = TestRendererRoot::create_host_component_with_props_and_text_for_canary(
             "span",
+            initial_props,
             "hello",
             TestRendererOptions::new(),
         )
@@ -14302,8 +14314,12 @@ mod tests {
         root.render_and_commit_host_output_for_canary()
             .unwrap()
             .unwrap();
-        root.update_host_component_with_text_for_canary("span", "goodbye")
-            .unwrap();
+        root.update_host_component_with_props_and_text_for_canary(
+            "span",
+            updated_props.clone(),
+            "goodbye",
+        )
+        .unwrap();
         let updated = root
             .render_and_commit_host_output_update_for_canary()
             .unwrap()
@@ -14335,9 +14351,13 @@ mod tests {
         );
         assert!(result.host_output_snapshot_current());
         assert_eq!(result.element_type().as_str(), "span");
-        assert_eq!(result.props(), &TestProps::new());
+        assert_eq!(result.props(), &updated_props);
         assert_eq!(result.children(), &["goodbye".to_owned()]);
         let rendered_root = result.rendered_root().as_host_component().unwrap();
+        assert_eq!(
+            rendered_root.props().get("data-state").map(String::as_str),
+            Some("new")
+        );
         assert_eq!(
             rendered_root.children().unwrap()[0].as_text(),
             Some("goodbye")
@@ -14430,8 +14450,12 @@ mod tests {
         assert!(!create_evidence.native_execution_available());
         assert!(!create_evidence.compatibility_claimed());
 
-        root.update_host_component_with_text_for_canary("span", "goodbye")
-            .unwrap();
+        root.update_host_component_with_props_and_text_for_canary(
+            "span",
+            props().with_attribute("data-state", "new"),
+            "goodbye",
+        )
+        .unwrap();
         let updated = root
             .render_and_commit_host_output_update_for_canary()
             .unwrap()
@@ -14466,6 +14490,13 @@ mod tests {
         assert!(update_evidence.consumes_accepted_host_output_row());
         assert!(update_evidence.minimal_tree_shape());
         let updated_rendered_root = update_evidence.rendered_root().as_host_component().unwrap();
+        assert_eq!(
+            updated_rendered_root
+                .props()
+                .get("data-state")
+                .map(String::as_str),
+            Some("new")
+        );
         assert_eq!(
             updated_rendered_root.children().unwrap()[0].as_text(),
             Some("goodbye")
