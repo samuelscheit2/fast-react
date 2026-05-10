@@ -9114,6 +9114,14 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
   assert.equal(diagnostic.sideEffects.modulePreloadStarted, false);
   assert.equal(diagnostic.sideEffects.scriptPreinitStarted, false);
   assert.equal(diagnostic.sideEffects.moduleScriptPreinitStarted, false);
+  assert.equal(
+    diagnostic.sideEffects.moduleResourceMapOrderRowsRecorded,
+    true
+  );
+  assert.equal(
+    diagnostic.sideEffects.moduleResourceMapDedupeKeysRecorded,
+    true
+  );
   assert.equal(diagnostic.sideEffects.scriptExecutionStarted, false);
   assert.equal(
     diagnostic.sideEffects.publicScriptModuleResourceDispatch,
@@ -9156,6 +9164,10 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
     scriptRecordCount: 2,
     modulePreloadRecordCount: 1,
     moduleScriptRecordCount: 1,
+    moduleResourceMapOrderRowCount: 4,
+    moduleResourceMapDedupeKeyCount: 2,
+    malformedModuleRowCount: 0,
+    conflictingDuplicateRecordCount: 0,
     dedupedRecordCount: 1,
     wouldInsertRecordCount: 7,
     realResourceMapsCreated: false,
@@ -9319,6 +9331,8 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
       .map((row) => ({
         contractId: row.contractId,
         resourceKey: row.resourceKey,
+        dedupeKey: row.dedupeKey,
+        resourceMapDedupeKey: row.resourceMapDedupeKey,
         scriptKind: row.scriptKind,
         modulePreload: row.modulePreload,
         moduleScript: row.moduleScript,
@@ -9334,6 +9348,8 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
       {
         contractId: 'preload',
         resourceKey: 'style:style-main',
+        dedupeKey: 'style:style-main',
+        resourceMapDedupeKey: 'preload-props:style:style-main',
         scriptKind: null,
         modulePreload: false,
         moduleScript: false,
@@ -9347,6 +9363,8 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
       {
         contractId: 'preload',
         resourceKey: 'script:script-main',
+        dedupeKey: 'script:script-main',
+        resourceMapDedupeKey: 'preload-props:script:script-main',
         scriptKind: 'classic',
         modulePreload: false,
         moduleScript: false,
@@ -9360,6 +9378,8 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
       {
         contractId: 'preinit-script',
         resourceKey: 'script:script-main',
+        dedupeKey: 'script:script-main',
+        resourceMapDedupeKey: 'hoistable-scripts:script:script-main',
         scriptKind: 'classic',
         modulePreload: false,
         moduleScript: false,
@@ -9373,6 +9393,8 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
       {
         contractId: 'preload-module',
         resourceKey: 'script:module-main',
+        dedupeKey: 'script:module-main',
+        resourceMapDedupeKey: 'preload-props:script:module-main',
         scriptKind: 'module',
         modulePreload: true,
         moduleScript: false,
@@ -9386,6 +9408,8 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
       {
         contractId: 'preinit-module-script',
         resourceKey: 'script:module-main',
+        dedupeKey: 'script:module-main',
+        resourceMapDedupeKey: 'hoistable-scripts:script:module-main',
         scriptKind: 'module',
         modulePreload: false,
         moduleScript: true,
@@ -9399,6 +9423,8 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
       {
         contractId: 'preload',
         resourceKey: 'font:font-main',
+        dedupeKey: 'font:font-main',
+        resourceMapDedupeKey: 'preload-props:font:font-main',
         scriptKind: null,
         modulePreload: false,
         moduleScript: false,
@@ -9410,6 +9436,163 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
         scriptExecutionStarted: false
       }
     ]
+  );
+  assert.deepEqual(
+    diagnostic.moduleResourceMapOrder.rows.map((row) => ({
+      moduleOrderIndex: row.moduleOrderIndex,
+      resourceMapOrderIndex: row.resourceMapOrderIndex,
+      contractId: row.contractId,
+      recordKind: row.recordKind,
+      mapKind: row.mapKind,
+      scriptKind: row.scriptKind,
+      dedupeKey: row.dedupeKey,
+      resourceMapDedupeKey: row.resourceMapDedupeKey,
+      modulePreload: row.modulePreload,
+      moduleScript: row.moduleScript,
+      headInsertionApplied: row.headInsertionApplied,
+      publicScriptModuleResourceDispatch:
+        row.publicScriptModuleResourceDispatch,
+      scriptExecutionStarted: row.scriptExecutionStarted
+    })),
+    [
+      {
+        moduleOrderIndex: 0,
+        resourceMapOrderIndex: 3,
+        contractId: 'preload',
+        recordKind: 'preload',
+        mapKind: 'preload-props',
+        scriptKind: 'classic',
+        dedupeKey: 'script:script-main',
+        resourceMapDedupeKey: 'preload-props:script:script-main',
+        modulePreload: false,
+        moduleScript: false,
+        headInsertionApplied: false,
+        publicScriptModuleResourceDispatch: false,
+        scriptExecutionStarted: false
+      },
+      {
+        moduleOrderIndex: 1,
+        resourceMapOrderIndex: 4,
+        contractId: 'preinit-script',
+        recordKind: 'script',
+        mapKind: 'hoistable-scripts',
+        scriptKind: 'classic',
+        dedupeKey: 'script:script-main',
+        resourceMapDedupeKey: 'hoistable-scripts:script:script-main',
+        modulePreload: false,
+        moduleScript: false,
+        headInsertionApplied: false,
+        publicScriptModuleResourceDispatch: false,
+        scriptExecutionStarted: false
+      },
+      {
+        moduleOrderIndex: 2,
+        resourceMapOrderIndex: 5,
+        contractId: 'preload-module',
+        recordKind: 'preload',
+        mapKind: 'preload-props',
+        scriptKind: 'module',
+        dedupeKey: 'script:module-main',
+        resourceMapDedupeKey: 'preload-props:script:module-main',
+        modulePreload: true,
+        moduleScript: false,
+        headInsertionApplied: false,
+        publicScriptModuleResourceDispatch: false,
+        scriptExecutionStarted: false
+      },
+      {
+        moduleOrderIndex: 3,
+        resourceMapOrderIndex: 6,
+        contractId: 'preinit-module-script',
+        recordKind: 'script',
+        mapKind: 'hoistable-scripts',
+        scriptKind: 'module',
+        dedupeKey: 'script:module-main',
+        resourceMapDedupeKey: 'hoistable-scripts:script:module-main',
+        modulePreload: false,
+        moduleScript: true,
+        headInsertionApplied: false,
+        publicScriptModuleResourceDispatch: false,
+        scriptExecutionStarted: false
+      }
+    ]
+  );
+  assert.deepEqual(
+    diagnostic.moduleResourceMapOrder.dedupeKeys.map((row) => ({
+      dedupeKey: row.dedupeKey,
+      rowCount: row.rowCount,
+      resourceMapDedupeKeys: row.resourceMapDedupeKeys,
+      contractIdsInOrder: row.contractIdsInOrder,
+      recordKindsInOrder: row.recordKindsInOrder,
+      scriptKindsInOrder: row.scriptKindsInOrder,
+      hasClassicScriptPreload: row.hasClassicScriptPreload,
+      hasModulePreload: row.hasModulePreload,
+      hasClassicScriptPreinit: row.hasClassicScriptPreinit,
+      hasModuleScriptPreinit: row.hasModuleScriptPreinit,
+      conflictStatus: row.conflictStatus
+    })),
+    [
+      {
+        dedupeKey: 'script:script-main',
+        rowCount: 2,
+        resourceMapDedupeKeys: [
+          'preload-props:script:script-main',
+          'hoistable-scripts:script:script-main'
+        ],
+        contractIdsInOrder: ['preload', 'preinit-script'],
+        recordKindsInOrder: ['preload', 'script'],
+        scriptKindsInOrder: ['classic', 'classic'],
+        hasClassicScriptPreload: true,
+        hasModulePreload: false,
+        hasClassicScriptPreinit: true,
+        hasModuleScriptPreinit: false,
+        conflictStatus: 'validated-no-conflicting-duplicates'
+      },
+      {
+        dedupeKey: 'script:module-main',
+        rowCount: 2,
+        resourceMapDedupeKeys: [
+          'preload-props:script:module-main',
+          'hoistable-scripts:script:module-main'
+        ],
+        contractIdsInOrder: [
+          'preload-module',
+          'preinit-module-script'
+        ],
+        recordKindsInOrder: ['preload', 'script'],
+        scriptKindsInOrder: ['module', 'module'],
+        hasClassicScriptPreload: false,
+        hasModulePreload: true,
+        hasClassicScriptPreinit: false,
+        hasModuleScriptPreinit: true,
+        conflictStatus: 'validated-no-conflicting-duplicates'
+      }
+    ]
+  );
+  assert.deepEqual(
+    {
+      status: diagnostic.resourceMapConflictBoundary.status,
+      checkedScriptModuleRecordCount:
+        diagnostic.resourceMapConflictBoundary
+          .checkedScriptModuleRecordCount,
+      checkedDedupeKeyCount:
+        diagnostic.resourceMapConflictBoundary.checkedDedupeKeyCount,
+      malformedModuleRowCount:
+        diagnostic.resourceMapConflictBoundary.malformedModuleRowCount,
+      conflictingDuplicateRecordCount:
+        diagnostic.resourceMapConflictBoundary
+          .conflictingDuplicateRecordCount,
+      validationMutatedRecords:
+        diagnostic.resourceMapConflictBoundary.validationMutatedRecords
+    },
+    {
+      status: 'validated-private-resource-map-commit-record-conflicts',
+      checkedScriptModuleRecordCount: 4,
+      checkedDedupeKeyCount: 4,
+      malformedModuleRowCount: 0,
+      conflictingDuplicateRecordCount: 0,
+      validationMutatedRecords: false
+    }
   );
   assert.equal(diagnostic.stylesheetResourceMapRecords.length, 2);
   assert.equal(diagnostic.preloadResourceMapRecords.length, 4);
@@ -9483,6 +9666,10 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
   assert.equal(summary.mutatesLoadState, false);
   assert.equal(summary.recordsModulePreloadRows, true);
   assert.equal(summary.recordsModuleScriptRows, true);
+  assert.equal(summary.recordsModuleResourceMapOrderRows, true);
+  assert.equal(summary.recordsModuleResourceMapDedupeKeys, true);
+  assert.equal(summary.rejectsMalformedModuleRows, true);
+  assert.equal(summary.rejectsConflictingDuplicateRecords, true);
   assert.equal(summary.publicScriptModuleResourceDispatch, false);
   assert.deepEqual(
     summary.sideEffects,
@@ -9562,6 +9749,249 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
       compatibilityTarget
     }
   );
+});
+
+test('private resource-map commit rejects conflicting script and modulepreload duplicate records', () => {
+  const scenario = createResourceMapCommitScenario(
+    'resource-map-conflicting-module',
+    [
+      [
+        'L',
+        [
+          '/style.css',
+          'style',
+          {
+            crossOrigin: undefined,
+            integrity: undefined,
+            nonce: undefined,
+            type: undefined,
+            fetchPriority: 'low',
+            referrerPolicy: undefined,
+            imageSrcSet: undefined,
+            imageSizes: undefined,
+            media: undefined
+          }
+        ]
+      ],
+      [
+        'S',
+        [
+          '/style.css',
+          'theme',
+          {
+            crossOrigin: '',
+            integrity: 'sha256-style',
+            fetchPriority: 'high'
+          }
+        ]
+      ],
+      [
+        'L',
+        [
+          '/shared.js',
+          'script',
+          {
+            crossOrigin: undefined,
+            integrity: 'sha256-shared-classic',
+            nonce: undefined,
+            type: undefined,
+            fetchPriority: undefined,
+            referrerPolicy: undefined,
+            imageSrcSet: undefined,
+            imageSizes: undefined,
+            media: undefined
+          }
+        ]
+      ],
+      [
+        'm',
+        [
+          '/shared.js',
+          {
+            as: undefined,
+            crossOrigin: '',
+            integrity: 'sha256-shared-module'
+          }
+        ]
+      ]
+    ],
+    (admissions) => [
+      {
+        sourceAdapterAdmissionId: admissions[0].adapterAdmissionId,
+        resourceKind: 'style',
+        resourceKey: 'style-main'
+      },
+      {
+        sourceAdapterAdmissionId: admissions[1].adapterAdmissionId,
+        resourceKind: 'style',
+        resourceKey: 'style-main',
+        precedenceKey: 'precedence-main'
+      },
+      {
+        sourceAdapterAdmissionId: admissions[2].adapterAdmissionId,
+        resourceKind: 'script',
+        resourceKey: 'shared'
+      },
+      {
+        sourceAdapterAdmissionId: admissions[3].adapterAdmissionId,
+        resourceKind: 'script',
+        resourceKey: 'shared'
+      }
+    ],
+    [
+      {
+        tagName: 'link',
+        attributes: {
+          rel: 'stylesheet',
+          'data-precedence': 'theme',
+          'data-fast-react-resource-key': 'style-main',
+          'data-fast-react-precedence-key': 'precedence-main'
+        }
+      },
+      {
+        tagName: 'link',
+        attributes: {
+          rel: 'preload',
+          as: 'script',
+          'data-fast-react-resource-key': 'shared'
+        }
+      },
+      {
+        tagName: 'link',
+        attributes: {
+          rel: 'modulepreload',
+          'data-fast-react-resource-key': 'shared'
+        }
+      }
+    ]
+  );
+
+  assert.throws(
+    () =>
+      scenario.commitGate.recordResourceMapCommitDiagnostic(
+        scenario.order,
+        scenario.stylesheet,
+        {
+          explicitResourceMapCommitDiagnostic: true
+        }
+      ),
+    {
+      code:
+        resourceFormGate
+          .privateResourceHintResourceMapCommitInvalidAdmissionCode,
+      compatibilityTarget,
+      reason:
+        'duplicate conflicting resource-map records for preload-props:script:shared'
+    }
+  );
+  assert.equal(scenario.fakeDom.head.childNodes.length, 3);
+});
+
+test('private resource-map commit rejects malformed non-script modulepreload rows', () => {
+  const scenario = createResourceMapCommitScenario(
+    'resource-map-malformed-module',
+    [
+      [
+        'L',
+        [
+          '/style.css',
+          'style',
+          {
+            crossOrigin: undefined,
+            integrity: undefined,
+            nonce: undefined,
+            type: undefined,
+            fetchPriority: 'low',
+            referrerPolicy: undefined,
+            imageSrcSet: undefined,
+            imageSizes: undefined,
+            media: undefined
+          }
+        ]
+      ],
+      [
+        'S',
+        [
+          '/style.css',
+          'theme',
+          {
+            crossOrigin: '',
+            integrity: 'sha256-style',
+            fetchPriority: 'high'
+          }
+        ]
+      ],
+      [
+        'm',
+        [
+          '/worker.mjs',
+          {
+            as: 'worker',
+            crossOrigin: '',
+            integrity: 'sha256-worker-module'
+          }
+        ]
+      ]
+    ],
+    (admissions) => [
+      {
+        sourceAdapterAdmissionId: admissions[0].adapterAdmissionId,
+        resourceKind: 'style',
+        resourceKey: 'style-main'
+      },
+      {
+        sourceAdapterAdmissionId: admissions[1].adapterAdmissionId,
+        resourceKind: 'style',
+        resourceKey: 'style-main',
+        precedenceKey: 'precedence-main'
+      },
+      {
+        sourceAdapterAdmissionId: admissions[2].adapterAdmissionId,
+        resourceKind: 'worker',
+        resourceKey: 'worker-main'
+      }
+    ],
+    [
+      {
+        tagName: 'link',
+        attributes: {
+          rel: 'stylesheet',
+          'data-precedence': 'theme',
+          'data-fast-react-resource-key': 'style-main',
+          'data-fast-react-precedence-key': 'precedence-main'
+        }
+      },
+      {
+        tagName: 'link',
+        attributes: {
+          rel: 'modulepreload',
+          as: 'worker',
+          'data-fast-react-resource-key': 'worker-main'
+        }
+      }
+    ]
+  );
+
+  assert.throws(
+    () =>
+      scenario.commitGate.recordResourceMapCommitDiagnostic(
+        scenario.order,
+        scenario.stylesheet,
+        {
+          explicitResourceMapCommitDiagnostic: true
+        }
+      ),
+    {
+      code:
+        resourceFormGate
+          .privateResourceHintResourceMapCommitInvalidAdmissionCode,
+      compatibilityTarget,
+      reason:
+        'modulepreload resource-map commit rows must describe script module preload records'
+    }
+  );
+  assert.equal(scenario.order.scriptModulePreinitRows.length, 0);
+  assert.equal(scenario.fakeDom.head.childNodes.length, 2);
 });
 
 
@@ -12020,6 +12450,77 @@ function summarizePreloadPreinitOrder(diagnostic) {
       scriptModuleRowCount: diagnostic.resourceMapPlan.scriptModuleRowCount,
       dedupedRowCount: diagnostic.resourceMapPlan.dedupedRowCount
     }
+  };
+}
+
+function createResourceMapCommitScenario(
+  prefix,
+  dispatcherRequests,
+  createResourceDescriptors,
+  headChildren
+) {
+  const gate = resourceFormGate.createResourceFormActionInternalsGate({
+    requestIdPrefix: `${prefix}-source`
+  });
+  const adapterGate = resourceFormGate.createResourceHintFakeDomAdapterGate({
+    requestIdPrefix: `${prefix}-adapter`
+  });
+  const orderGate =
+    resourceFormGate.createResourceHintPreloadPreinitOrderGate({
+      requestIdPrefix: `${prefix}-order`
+    });
+  const stylesheetGate =
+    resourceFormGate.createResourceHintStylesheetPrecedenceGate({
+      requestIdPrefix: `${prefix}-stylesheet`
+    });
+  const commitGate =
+    resourceFormGate.createResourceHintResourceMapCommitGate({
+      requestIdPrefix: `${prefix}-commit`
+    });
+  const fakeDom = createDeterministicFakeResourceDom();
+  const records = dispatcherRequests.map(([dispatcherKey, args]) =>
+    gate.recordResourceHintDispatcherRequest(dispatcherKey, args)
+  );
+  const headRecord = gate.recordSingletonRequest('head', [
+    throwingProxy(`${prefix} head props`)
+  ]);
+  const admissions = records.map((record) =>
+    adapterGate.admitDispatcherRecord(record, {
+      explicitAdmission: true,
+      adapterKind: 'deterministic-fake-dom',
+      targetKind: 'document-head'
+    })
+  );
+
+  for (const child of headChildren) {
+    appendFakeHeadChild(fakeDom, child.tagName, child.attributes);
+  }
+
+  const order = orderGate.recordPreloadPreinitOrderDiagnostic(
+    admissions,
+    {
+      explicitOrderDiagnostic: true,
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head,
+      resourceDescriptors: createResourceDescriptors(admissions)
+    }
+  );
+  const stylesheet = stylesheetGate.recordStylesheetPrecedenceDiagnostic(
+    order,
+    headRecord,
+    {
+      explicitStylesheetPrecedenceDiagnostic: true,
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head
+    }
+  );
+
+  return {
+    admissions,
+    commitGate,
+    fakeDom,
+    order,
+    stylesheet
   };
 }
 

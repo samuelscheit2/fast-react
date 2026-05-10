@@ -1248,6 +1248,18 @@ test("private resource-map commit diagnostics stay record-only", () => {
   assert.equal(diagnostic.resourceMapCommitPlan.scriptRecordCount, 2);
   assert.equal(diagnostic.resourceMapCommitPlan.modulePreloadRecordCount, 1);
   assert.equal(diagnostic.resourceMapCommitPlan.moduleScriptRecordCount, 1);
+  assert.equal(
+    diagnostic.resourceMapCommitPlan.moduleResourceMapOrderRowCount,
+    4
+  );
+  assert.equal(
+    diagnostic.resourceMapCommitPlan.moduleResourceMapDedupeKeyCount,
+    2
+  );
+  assert.equal(
+    diagnostic.resourceMapCommitPlan.conflictingDuplicateRecordCount,
+    0
+  );
   assert.deepEqual(
     diagnostic.privateResourceMapRecords
       .filter((row) =>
@@ -1257,6 +1269,8 @@ test("private resource-map commit diagnostics stay record-only", () => {
         contractId: row.contractId,
         scriptKind: row.scriptKind,
         resourceKey: row.resourceKey,
+        dedupeKey: row.dedupeKey,
+        resourceMapDedupeKey: row.resourceMapDedupeKey,
         publicScriptModuleResourceDispatch:
           row.publicScriptModuleResourceDispatch,
         scriptExecutionStarted: row.scriptExecutionStarted
@@ -1266,6 +1280,8 @@ test("private resource-map commit diagnostics stay record-only", () => {
         contractId: "preload-module",
         scriptKind: "module",
         resourceKey: "script:module-main",
+        dedupeKey: "script:module-main",
+        resourceMapDedupeKey: "preload-props:script:module-main",
         publicScriptModuleResourceDispatch: false,
         scriptExecutionStarted: false
       },
@@ -1273,8 +1289,88 @@ test("private resource-map commit diagnostics stay record-only", () => {
         contractId: "preinit-module-script",
         scriptKind: "module",
         resourceKey: "script:module-main",
+        dedupeKey: "script:module-main",
+        resourceMapDedupeKey: "hoistable-scripts:script:module-main",
         publicScriptModuleResourceDispatch: false,
         scriptExecutionStarted: false
+      }
+    ]
+  );
+  assert.deepEqual(
+    diagnostic.moduleResourceMapOrder.rows.map((row) => ({
+      contractId: row.contractId,
+      recordKind: row.recordKind,
+      scriptKind: row.scriptKind,
+      dedupeKey: row.dedupeKey,
+      resourceMapDedupeKey: row.resourceMapDedupeKey,
+      publicScriptModuleResourceDispatch:
+        row.publicScriptModuleResourceDispatch,
+      scriptExecutionStarted: row.scriptExecutionStarted
+    })),
+    [
+      {
+        contractId: "preload",
+        recordKind: "preload",
+        scriptKind: "classic",
+        dedupeKey: "script:script-main",
+        resourceMapDedupeKey: "preload-props:script:script-main",
+        publicScriptModuleResourceDispatch: false,
+        scriptExecutionStarted: false
+      },
+      {
+        contractId: "preinit-script",
+        recordKind: "script",
+        scriptKind: "classic",
+        dedupeKey: "script:script-main",
+        resourceMapDedupeKey: "hoistable-scripts:script:script-main",
+        publicScriptModuleResourceDispatch: false,
+        scriptExecutionStarted: false
+      },
+      {
+        contractId: "preload-module",
+        recordKind: "preload",
+        scriptKind: "module",
+        dedupeKey: "script:module-main",
+        resourceMapDedupeKey: "preload-props:script:module-main",
+        publicScriptModuleResourceDispatch: false,
+        scriptExecutionStarted: false
+      },
+      {
+        contractId: "preinit-module-script",
+        recordKind: "script",
+        scriptKind: "module",
+        dedupeKey: "script:module-main",
+        resourceMapDedupeKey: "hoistable-scripts:script:module-main",
+        publicScriptModuleResourceDispatch: false,
+        scriptExecutionStarted: false
+      }
+    ]
+  );
+  assert.deepEqual(
+    diagnostic.moduleResourceMapOrder.dedupeKeys.map((row) => ({
+      dedupeKey: row.dedupeKey,
+      rowCount: row.rowCount,
+      contractIdsInOrder: row.contractIdsInOrder,
+      scriptKindsInOrder: row.scriptKindsInOrder,
+      conflictStatus: row.conflictStatus
+    })),
+    [
+      {
+        dedupeKey: "script:script-main",
+        rowCount: 2,
+        contractIdsInOrder: ["preload", "preinit-script"],
+        scriptKindsInOrder: ["classic", "classic"],
+        conflictStatus: "validated-no-conflicting-duplicates"
+      },
+      {
+        dedupeKey: "script:module-main",
+        rowCount: 2,
+        contractIdsInOrder: [
+          "preload-module",
+          "preinit-module-script"
+        ],
+        scriptKindsInOrder: ["module", "module"],
+        conflictStatus: "validated-no-conflicting-duplicates"
       }
     ]
   );
@@ -1288,6 +1384,11 @@ test("private resource-map commit diagnostics stay record-only", () => {
   assert.equal(diagnostic.sideEffects.realResourceMapsMutated, false);
   assert.equal(diagnostic.sideEffects.fakeResourceMapsMutated, false);
   assert.equal(diagnostic.sideEffects.resourceFetchStarted, false);
+  assert.equal(diagnostic.sideEffects.moduleResourceMapOrderRowsRecorded, true);
+  assert.equal(
+    diagnostic.sideEffects.moduleResourceMapDedupeKeysRecorded,
+    true
+  );
   assert.equal(diagnostic.sideEffects.scriptExecutionStarted, false);
   assert.equal(diagnostic.sideEffects.publicScriptModuleResourceDispatch, false);
   assert.equal(diagnostic.sideEffects.resourceLoadStateMutated, false);
