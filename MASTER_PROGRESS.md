@@ -133,9 +133,18 @@ sequencing belong in `MASTER_PLAN.md`.
   test-renderer, and DOM benchmark manifests, and a `check:benchmarks` script
   wired into `check:js` so timing claims stay diagnostic until referenced
   conformance artifacts are green.
+- Worker 163 root E2E conformance gate was merged, adding a fail-closed
+  `root-render-e2e:conformance` command around the React DOM 19.2.6 root
+  render/update/unmount oracle so local Fast React placeholder output remains
+  blocked until scenarios are explicitly admitted and matched.
 
 ## Latest Accepted Verification
 
+- Worker 163 was verified on its integrated worktree and again on `main` with
+  focused root E2E syntax checks, the root oracle test, the
+  `root-render-e2e:conformance` gate showing 0 admitted and 20 blocked rows,
+  byte-stable oracle regeneration, `npm run test:conformance` with 427 tests,
+  `npm run check:js`, and `git diff --check`.
 - Worker 162 was verified on its integrated worktree and again on `main` with
   `npm run check:benchmarks` covering 3 manifests, 40 scenarios, and 6
   focused node tests, `npm run check:js` with 427 conformance tests, and

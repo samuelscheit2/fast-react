@@ -45,8 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 163: root E2E conformance gate in
-  `/Users/user/Developer/Developer/fast-react-worker-163-root-e2e-conformance-gate`.
 - Worker 164: scheduler regression tests in
   `/Users/user/Developer/Developer/fast-react-worker-164-scheduler-regression-tests`.
 - Worker 165: package surface guard in
