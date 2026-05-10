@@ -1088,6 +1088,392 @@ test('private root host-output update admits attribute and style rows without te
   bridge.revertCreateRootSideEffects(sideEffects);
 });
 
+test('private root commit HostComponent update consumes reconciler metadata for fake-DOM mutation', () => {
+  const document = createHostOutputDocument(
+    'private-root-commit-host-component-update'
+  );
+  const container = document.createElement('div');
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    hostOutputUpdateIdPrefix: 'root-commit-host-output',
+    rootCommitHostComponentUpdateIdPrefix: 'root-commit-host-component',
+    sideEffectIdPrefix: 'root-commit-side-effect'
+  });
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const initialProps = createHostOutputAttributeStyleProps('initial');
+  const nextProps = createHostOutputAttributeStyleProps('updated');
+  const initialRender = bridge.renderContainer(create.handle, {
+    props: initialProps,
+    type: 'div'
+  });
+  bridge.admitCreateRenderPath(create, sideEffects, initialRender);
+  const mounted = mountPrivateHostOutput(container, create.owner, initialProps);
+  const update = bridge.renderContainer(create.handle, {
+    props: nextProps,
+    type: 'div'
+  });
+  const rootCommitMetadata = {
+    kind: 'HostRootCommitRecord',
+    mutationApplyRecords: [
+      {
+        kind: 'commit-host-text-update',
+        tag: 'HostText',
+        stateNodeRaw: 902,
+        pendingPropsRaw: 4003,
+        memoizedPropsRaw: 4003,
+        alternateMemoizedPropsRaw: 4001
+      },
+      createRootCommitHostComponentUpdateRecord({
+        recordIndex: 1,
+        stateNodeRaw: 901
+      })
+    ]
+  };
+
+  mounted.host.attributeLog = [];
+  mounted.host.styleLog = [];
+  mounted.text.writeLog = [];
+
+  const handoff = bridge.applyRootCommitHostComponentUpdate(
+    update,
+    rootCommitMetadata,
+    {
+      hostInstanceToken: mounted.token,
+      nextProps,
+      tag: 'div',
+      stateNodeRaw: 901
+    }
+  );
+  const hiddenHandoff =
+    rootBridge.getPrivateRootCommitHostComponentUpdateHandoffPayload(
+      handoff
+    );
+
+  assert.equal(
+    handoff.$$typeof,
+    rootBridge.privateRootCommitHostComponentUpdateHandoffRecordType
+  );
+  assert.equal(
+    handoff.kind,
+    'FastReactDomPrivateRootCommitHostComponentUpdateHandoffRecord'
+  );
+  assert.equal(handoff.handoffId, 'root-commit-host-component:1');
+  assert.equal(
+    handoff.updateStatus,
+    rootBridge.ROOT_BRIDGE_ROOT_COMMIT_HOST_COMPONENT_UPDATE_APPLIED
+  );
+  assert.equal(handoff.sourceUpdateId, update.updateId);
+  assert.equal(handoff.hostTag, 'div');
+  assert.equal(handoff.rootCommitMetadataSource, 'mutationApplyRecords');
+  assert.equal(handoff.rootCommitMetadataRecordCount, 2);
+  assert.equal(handoff.rootCommitHostComponentUpdateRecordCount, 1);
+  assert.deepEqual(handoff.rootCommitHostComponentUpdate, {
+    metadataSource: 'mutationApplyRecords',
+    recordIndex: 1,
+    recordKind: 'CommitHostComponentUpdate',
+    applyKind: 'commit-host-component-update',
+    phaseKind: null,
+    tag: 'HostComponent',
+    parentTag: 'HostRoot',
+    stateNodeRaw: 901,
+    pendingPropsRaw: 3003,
+    memoizedPropsRaw: 3003,
+    alternateMemoizedPropsRaw: 3001,
+    rootInfo: {
+      keys: ['slot'],
+      type: 'object'
+    },
+    hostRootInfo: {
+      keys: ['slot'],
+      type: 'object'
+    },
+    parentInfo: {
+      keys: ['slot'],
+      type: 'object'
+    },
+    fiberInfo: {
+      keys: ['slot'],
+      type: 'object'
+    },
+    alternateFiberInfo: {
+      keys: ['slot'],
+      type: 'object'
+    },
+    sourceInfo: {
+      keys: ['kind'],
+      type: 'object'
+    }
+  });
+  assert.equal(
+    handoff.hostOutputUpdateHandoffId,
+    'root-commit-host-output:1'
+  );
+  assert.equal(
+    handoff.hostOutputUpdateStatus,
+    rootBridge.ROOT_BRIDGE_HOST_OUTPUT_UPDATE_APPLIED
+  );
+  assert.equal(handoff.propertyMutation.mutationRecordCount, 8);
+  assert.equal(
+    handoff.propertyMutation.propertyPayloadEvidence.styleRowCount,
+    4
+  );
+  assert.deepEqual(handoff.textMutation, {
+    newTextLength: null,
+    oldTextLength: null,
+    status: 'not-requested'
+  });
+  assert.equal(handoff.latestPropsPublished, true);
+  assert.equal(handoff.latestPropsPublishOrder, 'after-property-mutation');
+  assert.equal(handoff.fakeDomMutation, true);
+  assert.equal(handoff.domMutation, true);
+  assert.equal(handoff.browserDomMutation, false);
+  assert.equal(handoff.nativeExecution, false);
+  assert.equal(handoff.reconcilerExecution, false);
+  assert.equal(handoff.eventDispatch, false);
+  assert.equal(handoff.refEffects, false);
+  assert.equal(handoff.compatibilityClaimed, false);
+  assert.deepEqual(
+    handoff.acceptedCapabilities.map((capability) => capability.id),
+    [
+      'root-commit-host-component-update-metadata',
+      'fake-dom-property-update',
+      'property-payload-evidence',
+      'latest-props-after-mutation',
+      'attribute-payload-rows',
+      'style-payload-rows'
+    ]
+  );
+  assert.deepEqual(
+    handoff.blockedCapabilities.map((capability) => capability.id),
+    [
+      'host-text-update',
+      'native-execution',
+      'reconciler-execution',
+      'browser-dom-compatibility',
+      'hydration',
+      'events',
+      'refs',
+      'compatibility-claims'
+    ]
+  );
+  assert.equal(
+    rootBridge.isPrivateRootCommitHostComponentUpdateHandoffRecord(handoff),
+    true
+  );
+  assert.equal(
+    rootBridge.isPrivateRootCommitHostComponentUpdateHandoffRecord({}),
+    false
+  );
+  assert.equal(
+    rootBridge.getPrivateRootCommitHostComponentUpdateHandoffPayload({}),
+    null
+  );
+  assert.equal(hiddenHandoff.sourceRecord, update);
+  assert.equal(hiddenHandoff.rootHandle, create.handle);
+  assert.equal(hiddenHandoff.hostInstanceNode, mounted.host);
+  assert.equal(hiddenHandoff.hostInstanceToken, mounted.token);
+  assert.equal(hiddenHandoff.previousProps, initialProps);
+  assert.equal(hiddenHandoff.nextProps, nextProps);
+  assert.equal(hiddenHandoff.latestPropsPublished, true);
+  assert.equal(hiddenHandoff.rootCommitMetadata, rootCommitMetadata);
+  assert.equal(
+    hiddenHandoff.selectedRootCommitRecord,
+    rootCommitMetadata.mutationApplyRecords[1]
+  );
+  assert.equal(
+    hiddenHandoff.hostOutputHandoff.handoffId,
+    handoff.hostOutputUpdateHandoffId
+  );
+  assert.equal(
+    rootBridge.applyPrivateRootCommitHostComponentUpdate(
+      update,
+      rootCommitMetadata,
+      {}
+    ),
+    handoff
+  );
+
+  assert.deepEqual(activeHostOutputAttributes(mounted.host), [
+    ['class', 'root-card updated'],
+    ['data-phase', 'updated'],
+    ['id', 'message']
+  ]);
+  assert.deepEqual(activeHostOutputStyleProperties(mounted.host), [
+    ['color', 'blue'],
+    ['width', '12px']
+  ]);
+  assert.deepEqual(mounted.text.writeLog, []);
+  assert.equal(container.textContent, 'stable');
+  assert.equal(componentTree.getLatestPropsFromNode(mounted.host), nextProps);
+
+  const serialized = JSON.stringify(handoff);
+  assert.equal(serialized.includes('blue'), false);
+  assert.equal(serialized.includes('root-card updated'), false);
+
+  assert.equal(
+    componentTree.detachHostInstanceToken(mounted.token),
+    mounted.token
+  );
+  bridge.revertCreateRootSideEffects(sideEffects);
+});
+
+test('private root commit HostComponent update validates reconciler metadata fail-closed', () => {
+  const document = createHostOutputDocument(
+    'private-root-commit-host-component-update-validation'
+  );
+  const container = document.createElement('div');
+  const bridge = rootBridge.createPrivateRootBridgeShell();
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const initialProps = createHostOutputAttributeStyleProps('initial');
+  const nextProps = createHostOutputAttributeStyleProps('updated');
+  const initialRender = bridge.renderContainer(create.handle, {
+    props: initialProps,
+    type: 'div'
+  });
+  bridge.admitCreateRenderPath(create, sideEffects, initialRender);
+  const mounted = mountPrivateHostOutput(container, create.owner, initialProps);
+  const noHostUpdate = bridge.renderContainer(create.handle, {
+    props: nextProps,
+    type: 'div'
+  });
+  const ambiguousUpdate = bridge.renderContainer(create.handle, {
+    props: nextProps,
+    type: 'div'
+  });
+  const mismatchUpdate = bridge.renderContainer(create.handle, {
+    props: nextProps,
+    type: 'div'
+  });
+  const textUpdate = bridge.renderContainer(create.handle, {
+    props: nextProps,
+    type: 'div'
+  });
+
+  assert.throws(
+    () =>
+      bridge.applyRootCommitHostComponentUpdate(
+        noHostUpdate,
+        {
+          mutationApplyRecords: [
+            {
+              kind: 'commit-host-text-update',
+              tag: 'HostText',
+              stateNodeRaw: 902,
+              pendingPropsRaw: 4003,
+              memoizedPropsRaw: 4003,
+              alternateMemoizedPropsRaw: 4001
+            }
+          ]
+        },
+        {
+          hostInstanceToken: mounted.token,
+          nextProps,
+          tag: 'div'
+        }
+      ),
+    {
+      code:
+        'FAST_REACT_DOM_INVALID_ROOT_COMMIT_HOST_COMPONENT_UPDATE_HANDOFF'
+    }
+  );
+  assert.throws(
+    () =>
+      bridge.applyRootCommitHostComponentUpdate(
+        ambiguousUpdate,
+        {
+          mutation_apply_records: [
+            createRootCommitHostComponentUpdateRecord({
+              stateNodeRaw: 901
+            }),
+            createRootCommitHostComponentUpdateRecord({
+              stateNodeRaw: 903
+            })
+          ]
+        },
+        {
+          hostInstanceToken: mounted.token,
+          nextProps,
+          tag: 'div'
+        }
+      ),
+    {
+      code:
+        'FAST_REACT_DOM_INVALID_ROOT_COMMIT_HOST_COMPONENT_UPDATE_HANDOFF'
+    }
+  );
+  assert.throws(
+    () =>
+      bridge.applyRootCommitHostComponentUpdate(
+        mismatchUpdate,
+        {
+          mutationApplyRecords: [
+            createRootCommitHostComponentUpdateRecord({
+              stateNodeRaw: 901
+            })
+          ]
+        },
+        {
+          hostInstanceToken: mounted.token,
+          nextProps,
+          tag: 'div',
+          stateNodeRaw: 999
+        }
+      ),
+    {
+      code:
+        'FAST_REACT_DOM_INVALID_ROOT_COMMIT_HOST_COMPONENT_UPDATE_HANDOFF'
+    }
+  );
+  assert.throws(
+    () =>
+      bridge.applyRootCommitHostComponentUpdate(
+        textUpdate,
+        {
+          mutationApplyRecords: [
+            createRootCommitHostComponentUpdateRecord({
+              stateNodeRaw: 901
+            })
+          ]
+        },
+        {
+          hostInstanceToken: mounted.token,
+          nextProps,
+          tag: 'div',
+          textUpdate: {
+            newText: 'updated text',
+            oldText: 'stable',
+            textInstance: mounted.text
+          }
+        }
+      ),
+    {
+      code:
+        'FAST_REACT_DOM_INVALID_ROOT_COMMIT_HOST_COMPONENT_UPDATE_HANDOFF'
+    }
+  );
+
+  assert.deepEqual(activeHostOutputAttributes(mounted.host), [
+    ['class', 'root-card'],
+    ['data-phase', 'initial'],
+    ['hidden', ''],
+    ['id', 'message'],
+    ['title', 'initial title']
+  ]);
+  assert.deepEqual(activeHostOutputStyleProperties(mounted.host), [
+    ['--gap', '4px'],
+    ['color', 'red'],
+    ['marginTop', '4px']
+  ]);
+  assert.equal(componentTree.getLatestPropsFromNode(mounted.host), initialProps);
+
+  assert.equal(
+    componentTree.detachHostInstanceToken(mounted.token),
+    mounted.token
+  );
+  bridge.revertCreateRootSideEffects(sideEffects);
+});
+
 test('private root host-output update rolls back props when text mutation fails', () => {
   const document = createHostOutputDocument(
     'private-host-output-update-rollback'
@@ -3086,6 +3472,36 @@ function createHostOutputAttributeStyleProps(phase) {
     },
     'data-phase': 'initial',
     children: 'stable'
+  };
+}
+
+function createRootCommitHostComponentUpdateRecord(options) {
+  return {
+    kind: 'commit-host-component-update',
+    tag: 'HostComponent',
+    source: {
+      kind: 'Update'
+    },
+    root: {
+      slot: 3
+    },
+    hostRoot: {
+      slot: 4
+    },
+    parent: {
+      slot: 4
+    },
+    parentTag: 'HostRoot',
+    fiber: {
+      slot: 12 + (options.recordIndex || 0)
+    },
+    alternateFiber: {
+      slot: 8 + (options.recordIndex || 0)
+    },
+    stateNodeRaw: options.stateNodeRaw,
+    pendingPropsRaw: 3003,
+    memoizedPropsRaw: 3003,
+    alternateMemoizedPropsRaw: 3001
   };
 }
 
