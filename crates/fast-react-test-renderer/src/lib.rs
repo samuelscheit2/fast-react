@@ -12444,9 +12444,24 @@ impl TestRendererRoot {
         &self,
         output: &TestRendererCommittedHostOutput,
         execution: TestRendererPrivateCreateRouteAdmissionDiagnostics,
+        identity: Option<TestRendererPrivateSerializationFinishedWorkIdentityGate>,
     ) -> Result<TestRendererPrivateToJsonNativeExecutionEvidence, TestRendererRootError> {
         self.validate_private_to_json_create_native_execution_record_for_canary(execution)?;
         let result = self.describe_private_to_json_facade_result_for_canary(output)?;
+        self.validate_private_serialization_finished_work_identity_for_native_execution(
+            "create().toJSON",
+            TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME,
+            result.host_output_update_kind(),
+            true,
+            false,
+            identity,
+        )
+        .map_err(|reason| {
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "create",
+                reason,
+            }
+        })?;
 
         self.private_to_json_native_execution_evidence_from_facade_result(
             "create",
@@ -12607,9 +12622,24 @@ impl TestRendererRoot {
         &self,
         output: &TestRendererCommittedHostOutput,
         execution: TestRendererPrivateCreateRouteAdmissionDiagnostics,
+        identity: Option<TestRendererPrivateSerializationFinishedWorkIdentityGate>,
     ) -> Result<TestRendererPrivateToTreeNativeExecutionEvidence, TestRendererRootError> {
         self.validate_private_to_tree_create_native_execution_record_for_canary(execution)?;
         let report = self.describe_private_tree_metadata_for_canary(output)?;
+        self.validate_private_serialization_finished_work_identity_for_native_execution(
+            "create().toTree",
+            TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME,
+            report.host_output_update_kind(),
+            false,
+            true,
+            identity,
+        )
+        .map_err(|reason| {
+            TestRendererPrivateJsonSerializationError::TreeNativeExecutionRecordMismatch {
+                operation: "create",
+                reason,
+            }
+        })?;
 
         self.private_to_tree_native_execution_evidence_from_tree_report(
             "create",
@@ -13602,6 +13632,100 @@ impl TestRendererRoot {
             && !function_component.public_tree_object_available()
             && report.host_component().fiber_tag() == function_component.rendered_child_fiber_tag()
             && report.host_component().node_type() == function_component.rendered_child_node_type()
+    }
+
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "native serialization admission must mirror the finished-work identity proof"
+    )]
+    fn validate_private_serialization_finished_work_identity_for_native_execution(
+        &self,
+        public_surface: &'static str,
+        source_serialization_diagnostic_name: &'static str,
+        host_output_update_kind: TestRendererRootUpdateKind,
+        consumes_private_to_json_evidence: bool,
+        consumes_private_to_tree_evidence: bool,
+        identity: Option<TestRendererPrivateSerializationFinishedWorkIdentityGate>,
+    ) -> Result<(), &'static str> {
+        let Some(identity) = identity else {
+            return Err("finished-work-identity-missing");
+        };
+
+        if identity.diagnostic_name()
+            != TEST_RENDERER_PRIVATE_SERIALIZATION_FINISHED_WORK_IDENTITY_DIAGNOSTIC_NAME
+            || identity.status()
+                != TEST_RENDERER_PRIVATE_SERIALIZATION_FINISHED_WORK_IDENTITY_STATUS
+        {
+            return Err("finished-work-identity-diagnostic-mismatch");
+        }
+        if identity.root() != self.root_id {
+            return Err("finished-work-identity-root-mismatch");
+        }
+        if identity.public_surface() != public_surface {
+            return Err("finished-work-identity-public-surface-mismatch");
+        }
+        if identity.source_serialization_diagnostic_name() != source_serialization_diagnostic_name {
+            return Err("finished-work-identity-source-report-mismatch");
+        }
+        if identity.host_output_update_kind() != host_output_update_kind {
+            return Err("finished-work-identity-host-output-kind-mismatch");
+        }
+
+        let actual_current = self
+            .store
+            .root(self.root_id)
+            .map_err(|_| "finished-work-identity-root-stale")?
+            .current();
+        let actual_current = TestRendererFiberHandleDiagnostics {
+            arena_id: actual_current.arena_id().get(),
+            slot: actual_current.slot().get(),
+            generation: actual_current.generation().get(),
+        };
+        if identity.commit_current() != actual_current {
+            return Err("finished-work-identity-stale");
+        }
+
+        if identity.render_finished_work() != identity.commit_current()
+            || identity.report_finished_work() != identity.commit_current()
+            || identity.commit_previous_current() != identity.render_current()
+            || !identity.commit_current_matches_render_finished_work()
+            || !identity.commit_previous_current_matches_render_current()
+            || !identity.report_finished_work_matches_commit_current()
+            || !identity.committed_fiber_inspection_current_matches_commit()
+            || !identity.host_output_snapshot_current()
+            || !identity.consumes_committed_host_root_finished_work_identity()
+        {
+            return Err("finished-work-identity-stale");
+        }
+
+        if identity.render_lanes_bits() == 0
+            || identity.render_lanes_bits() != identity.commit_finished_lanes_bits()
+            || identity.report_finished_lanes_bits() != identity.commit_finished_lanes_bits()
+            || identity.commit_remaining_lanes_bits() != 0
+            || identity.commit_pending_lanes_bits() != 0
+            || !identity.commit_lanes_match_render_lanes()
+            || !identity.report_lanes_match_commit_lanes()
+            || !identity.consumes_committed_host_root_finished_work_lanes()
+        {
+            return Err("finished-work-identity-lane-mismatch");
+        }
+
+        if identity.consumes_private_to_json_evidence() != consumes_private_to_json_evidence
+            || identity.consumes_private_to_tree_evidence() != consumes_private_to_tree_evidence
+        {
+            return Err("finished-work-identity-source-report-mismatch");
+        }
+
+        if identity.public_to_json_available()
+            || identity.public_to_tree_available()
+            || identity.public_test_instance_available()
+            || identity.public_serialization_available()
+            || identity.compatibility_claimed()
+        {
+            return Err("public-or-native-compatibility-claim");
+        }
+
+        Ok(())
     }
 
     fn validate_private_to_json_create_native_execution_record_for_canary(
@@ -18401,11 +18525,22 @@ mod tests {
             .render_and_commit_host_output_for_canary()
             .unwrap()
             .unwrap();
+        let create_report = root
+            .describe_private_json_serialization_for_canary(&created)
+            .unwrap();
+        let create_identity = root
+            .describe_private_to_json_finished_work_identity_gate_for_canary(
+                Some(created.render()),
+                Some(created.commit()),
+                Some(&create_report),
+            )
+            .unwrap();
 
         let create_evidence = root
             .describe_private_to_json_after_create_native_execution_for_canary(
                 &created,
                 create_admission,
+                Some(create_identity),
             )
             .unwrap();
 
@@ -18558,6 +18693,167 @@ mod tests {
         assert!(!unmount_evidence.native_bridge_available());
         assert!(!unmount_evidence.native_execution_available());
         assert!(!unmount_evidence.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_to_json_create_native_execution_requires_finished_work_identity_gate() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let create_input =
+            TestRendererRootCreatePreflightInputShape::host_component_with_text_child(
+                root_element(1),
+                "span",
+            );
+        let create_preflight = TestRendererRoot::describe_private_root_create_preflight_for_canary(
+            create_input,
+            Some(TestRendererOptions::new()),
+            TestRendererRootCreatePreflightCanaryApiIdentity::current(),
+            Some(TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current()),
+        )
+        .unwrap();
+        let create_admission =
+            TestRendererRoot::describe_private_create_route_admission_for_canary(
+                Some(create_preflight),
+                Some(TestRendererPrivateCreateRouteAdmissionMetadata::current()),
+            )
+            .unwrap();
+        let created = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let report = root
+            .describe_private_json_serialization_for_canary(&created)
+            .unwrap();
+        let identity = root
+            .describe_private_to_json_finished_work_identity_gate_for_canary(
+                Some(created.render()),
+                Some(created.commit()),
+                Some(&report),
+            )
+            .unwrap();
+
+        let error = root
+            .describe_private_to_json_after_create_native_execution_for_canary(
+                &created,
+                create_admission,
+                None,
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON native execution identity rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "create",
+                reason: "finished-work-identity-missing"
+            }
+        ));
+
+        let mut foreign_identity = identity;
+        foreign_identity.root = FiberRootId::new(root.root_id().raw() + 1).unwrap();
+        let error = root
+            .describe_private_to_json_after_create_native_execution_for_canary(
+                &created,
+                create_admission,
+                Some(foreign_identity),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON native execution identity rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "create",
+                reason: "finished-work-identity-root-mismatch"
+            }
+        ));
+
+        let mut stale_identity = identity;
+        stale_identity.commit_current.slot += 1;
+        let error = root
+            .describe_private_to_json_after_create_native_execution_for_canary(
+                &created,
+                create_admission,
+                Some(stale_identity),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON native execution identity rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "create",
+                reason: "finished-work-identity-stale"
+            }
+        ));
+
+        let mut lane_identity = identity;
+        lane_identity.commit_finished_lanes_bits += 1;
+        let error = root
+            .describe_private_to_json_after_create_native_execution_for_canary(
+                &created,
+                create_admission,
+                Some(lane_identity),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON native execution identity rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "create",
+                reason: "finished-work-identity-lane-mismatch"
+            }
+        ));
+
+        let mut surface_identity = identity;
+        surface_identity.public_surface = "create().toTree";
+        let error = root
+            .describe_private_to_json_after_create_native_execution_for_canary(
+                &created,
+                create_admission,
+                Some(surface_identity),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON native execution identity rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "create",
+                reason: "finished-work-identity-public-surface-mismatch"
+            }
+        ));
+
+        let mut source_identity = identity;
+        source_identity.source_serialization_diagnostic_name =
+            TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME;
+        let error = root
+            .describe_private_to_json_after_create_native_execution_for_canary(
+                &created,
+                create_admission,
+                Some(source_identity),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON native execution identity rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "create",
+                reason: "finished-work-identity-source-report-mismatch"
+            }
+        ));
     }
 
     #[test]
@@ -18836,11 +19132,22 @@ mod tests {
             .render_and_commit_host_output_for_canary()
             .unwrap()
             .unwrap();
+        let create_report = root
+            .describe_private_tree_metadata_for_canary(&created)
+            .unwrap();
+        let create_identity = root
+            .describe_private_to_tree_finished_work_identity_gate_for_canary(
+                Some(created.render()),
+                Some(created.commit()),
+                Some(&create_report),
+            )
+            .unwrap();
 
         let create_evidence = root
             .describe_private_to_tree_after_create_native_execution_for_canary(
                 &created,
                 create_admission,
+                Some(create_identity),
             )
             .unwrap();
 
@@ -19028,11 +19335,22 @@ mod tests {
             .render_and_commit_host_output_for_canary()
             .unwrap()
             .unwrap();
+        let create_report = root
+            .describe_private_tree_metadata_for_canary(&created)
+            .unwrap();
+        let create_identity = root
+            .describe_private_to_tree_finished_work_identity_gate_for_canary(
+                Some(created.render()),
+                Some(created.commit()),
+                Some(&create_report),
+            )
+            .unwrap();
 
         let evidence = root
             .describe_private_to_tree_after_create_native_execution_for_canary(
                 &created,
                 create_admission,
+                Some(create_identity),
             )
             .unwrap();
         let component = evidence.rendered_root().as_function_component().unwrap();
@@ -19062,6 +19380,87 @@ mod tests {
         assert!(!evidence.public_to_tree_available());
         assert!(!evidence.native_execution_available());
         assert!(!evidence.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_to_tree_create_native_execution_requires_finished_work_identity_gate() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let create_input =
+            TestRendererRootCreatePreflightInputShape::host_component_with_text_child(
+                root_element(1),
+                "span",
+            );
+        let create_preflight = TestRendererRoot::describe_private_root_create_preflight_for_canary(
+            create_input,
+            Some(TestRendererOptions::new()),
+            TestRendererRootCreatePreflightCanaryApiIdentity::current(),
+            Some(TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current()),
+        )
+        .unwrap();
+        let create_admission =
+            TestRendererRoot::describe_private_create_route_admission_for_canary(
+                Some(create_preflight),
+                Some(TestRendererPrivateCreateRouteAdmissionMetadata::current()),
+            )
+            .unwrap();
+        let created = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let report = root
+            .describe_private_tree_metadata_for_canary(&created)
+            .unwrap();
+        let identity = root
+            .describe_private_to_tree_finished_work_identity_gate_for_canary(
+                Some(created.render()),
+                Some(created.commit()),
+                Some(&report),
+            )
+            .unwrap();
+
+        let error = root
+            .describe_private_to_tree_after_create_native_execution_for_canary(
+                &created,
+                create_admission,
+                None,
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private toTree native execution identity rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::TreeNativeExecutionRecordMismatch {
+                operation: "create",
+                reason: "finished-work-identity-missing"
+            }
+        ));
+
+        let mut source_identity = identity;
+        source_identity.source_serialization_diagnostic_name =
+            TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME;
+        let error = root
+            .describe_private_to_tree_after_create_native_execution_for_canary(
+                &created,
+                create_admission,
+                Some(source_identity),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private toTree native execution identity rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::TreeNativeExecutionRecordMismatch {
+                operation: "create",
+                reason: "finished-work-identity-source-report-mismatch"
+            }
+        ));
     }
 
     #[test]

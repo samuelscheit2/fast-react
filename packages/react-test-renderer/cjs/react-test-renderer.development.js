@@ -14432,23 +14432,33 @@ function createPrivateToJSONSerializationFacade(rootRequest) {
     createAcceptedHostOutputDiagnosticResult(report) {
       return createPrivateToJSONHostOutputDiagnosticResult(report);
     },
-    canCreateAcceptedNativeExecutionDiagnosticResult(executionRecord, report) {
+    canCreateAcceptedNativeExecutionDiagnosticResult(
+      executionRecord,
+      report,
+      finishedWorkIdentityEvidence = undefined
+    ) {
       try {
         createPrivateToJSONNativeExecutionDiagnosticResult(
           rootRequest,
           executionRecord,
-          report
+          report,
+          finishedWorkIdentityEvidence
         );
         return true;
       } catch (_error) {
         return false;
       }
     },
-    createAcceptedNativeExecutionDiagnosticResult(executionRecord, report) {
+    createAcceptedNativeExecutionDiagnosticResult(
+      executionRecord,
+      report,
+      finishedWorkIdentityEvidence = undefined
+    ) {
       return createPrivateToJSONNativeExecutionDiagnosticResult(
         rootRequest,
         executionRecord,
-        report
+        report,
+        finishedWorkIdentityEvidence
       );
     },
     canValidateAcceptedFinishedWorkIdentity(evidence, report) {
@@ -14556,23 +14566,33 @@ function createPrivateToTreeFacade(rootRequest) {
     serializeAcceptedTreeMetadata(report) {
       return serializePrivateToTreeMetadataDiagnostic(report);
     },
-    canCreateAcceptedNativeExecutionDiagnosticResult(executionRecord, report) {
+    canCreateAcceptedNativeExecutionDiagnosticResult(
+      executionRecord,
+      report,
+      finishedWorkIdentityEvidence = undefined
+    ) {
       try {
         createPrivateToTreeNativeExecutionDiagnosticResult(
           rootRequest,
           executionRecord,
-          report
+          report,
+          finishedWorkIdentityEvidence
         );
         return true;
       } catch (_error) {
         return false;
       }
     },
-    createAcceptedNativeExecutionDiagnosticResult(executionRecord, report) {
+    createAcceptedNativeExecutionDiagnosticResult(
+      executionRecord,
+      report,
+      finishedWorkIdentityEvidence = undefined
+    ) {
       return createPrivateToTreeNativeExecutionDiagnosticResult(
         rootRequest,
         executionRecord,
-        report
+        report,
+        finishedWorkIdentityEvidence
       );
     },
     canValidateAcceptedFinishedWorkIdentity(evidence, report) {
@@ -15578,12 +15598,23 @@ function serializePrivateToTreeMetadataDiagnostic(report) {
 function createPrivateToTreeNativeExecutionDiagnosticResult(
   rootRequest,
   executionRecord,
-  report
+  report,
+  finishedWorkIdentityEvidence = undefined
 ) {
   const execution = consumeAcceptedToTreeNativeExecutionRecord(
     rootRequest,
     executionRecord
   );
+  const finishedWorkIdentity =
+    execution.operation === 'create'
+      ? createPrivateSerializationFinishedWorkIdentityGateResult(
+          rootRequest,
+          'create().toTree',
+          privateToTreeAcceptedDiagnosticName,
+          finishedWorkIdentityEvidence,
+          report
+        )
+      : null;
   const diagnostic = validatePrivateToTreeNativeExecutionDiagnostic(report);
   const expectedHostOutputUpdateKind =
     hostOutputUpdateKindForRootExecutionOperation(execution.operation);
@@ -15622,6 +15653,7 @@ function createPrivateToTreeNativeExecutionDiagnosticResult(
     sourceFiberCount: diagnostic.sourceFiberCount,
     rootChildCount: diagnostic.rootChildCount,
     result: diagnostic.result,
+    finishedWorkIdentity,
     consumesAcceptedNativeExecutionRecord: true,
     consumesAcceptedNativeCreateExecutionRecord:
       execution.operation === 'create',
@@ -15629,6 +15661,8 @@ function createPrivateToTreeNativeExecutionDiagnosticResult(
       execution.operation === 'update',
     consumesAcceptedNativeUnmountExecutionRecord:
       execution.operation === 'unmount',
+    consumesAcceptedFinishedWorkIdentityGate:
+      finishedWorkIdentity !== null,
     consumesAcceptedRustLifecycleDiagnostic: true,
     consumesPrivateToTreeEvidence: true,
     consumesAcceptedHostOutputRow: diagnostic.hostOutputRow !== null,
@@ -16432,12 +16466,23 @@ function createPrivateToJSONHostOutputDiagnosticResult(report) {
 function createPrivateToJSONNativeExecutionDiagnosticResult(
   rootRequest,
   executionRecord,
-  report
+  report,
+  finishedWorkIdentityEvidence = undefined
 ) {
   const execution = consumeAcceptedToJSONNativeExecutionRecord(
     rootRequest,
     executionRecord
   );
+  const finishedWorkIdentity =
+    execution.operation === 'create'
+      ? createPrivateSerializationFinishedWorkIdentityGateResult(
+          rootRequest,
+          'create().toJSON',
+          privateToJSONAcceptedDiagnosticName,
+          finishedWorkIdentityEvidence,
+          report
+        )
+      : null;
   const diagnostic = validatePrivateToJSONHostOutputDiagnostic(report);
   const expectedHostOutputUpdateKind =
     hostOutputUpdateKindForRootExecutionOperation(execution.operation);
@@ -16478,6 +16523,7 @@ function createPrivateToJSONNativeExecutionDiagnosticResult(
     rootChildCount: diagnostic.rootChildCount,
     result: diagnostic.result,
     diagnosticResult,
+    finishedWorkIdentity,
     consumesAcceptedNativeExecutionRecord: true,
     consumesAcceptedNativeCreateExecutionRecord:
       execution.operation === 'create',
@@ -16485,6 +16531,8 @@ function createPrivateToJSONNativeExecutionDiagnosticResult(
       execution.operation === 'update',
     consumesAcceptedNativeUnmountExecutionRecord:
       execution.operation === 'unmount',
+    consumesAcceptedFinishedWorkIdentityGate:
+      finishedWorkIdentity !== null,
     consumesAcceptedRustLifecycleDiagnostic: true,
     consumesPrivateToJSONEvidence: true,
     consumesAcceptedHostOutputRow: diagnostic.hostOutputRow !== null,

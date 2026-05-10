@@ -176,6 +176,10 @@ const privateToTreeNativeExecutionDiagnosticName =
   "fast-react-test-renderer.totree.private-native-execution-evidence";
 const privateToTreeNativeExecutionStatus =
   "private-totree-native-execution-records-consumed-public-totree-blocked";
+const privateSerializationFinishedWorkIdentityDiagnosticName =
+  "fast-react-test-renderer.serialization.private-finished-work-identity";
+const privateSerializationFinishedWorkIdentityStatus =
+  "private-serialization-finished-work-identity-validated-public-serialization-blocked";
 const privateToTreeAcceptedDiagnosticName =
   "fast-react-test-renderer.serialization.private-tree-canary";
 const privateToTreeCommittedFiberInspectionDiagnosticName =
@@ -2399,20 +2403,30 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
     "function"
   );
 
+  const createJSONReport = privateToJSONReport({
+    hostOutputUpdateKind: "Create",
+    rowId: null,
+    rowShape: null,
+    rootChildCount: 1,
+    rootNodeKind: "HostComponent",
+    nodes: [
+      hostComponentNode(0, null, [1], "span"),
+      textNode(1, 0, "hello")
+    ]
+  });
+  const createJSONIdentity = privateSerializationFinishedWorkIdentityEvidence({
+    rootRequest: createRequest,
+    publicSurface: "create().toJSON",
+    sourceSerializationDiagnosticName:
+      "fast-react-test-renderer.serialization.private-json-canary",
+    consumesPrivateToJSONEvidence: true,
+    consumesPrivateToTreeEvidence: false
+  });
   const createEvidence =
     facade.createAcceptedNativeExecutionDiagnosticResult(
       createResult,
-      privateToJSONReport({
-        hostOutputUpdateKind: "Create",
-        rowId: null,
-        rowShape: null,
-        rootChildCount: 1,
-        rootNodeKind: "HostComponent",
-        nodes: [
-          hostComponentNode(0, null, [1], "span"),
-          textNode(1, 0, "hello")
-        ]
-      })
+      createJSONReport,
+      createJSONIdentity
     );
   assert.equal(createEvidence.diagnosticName, privateToJSONNativeExecutionDiagnosticName);
   assert.equal(createEvidence.status, privateToJSONNativeExecutionStatus);
@@ -2431,6 +2445,12 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
   assert.equal(createEvidence.consumesAcceptedNativeCreateExecutionRecord, true);
   assert.equal(createEvidence.consumesAcceptedNativeUpdateExecutionRecord, false);
   assert.equal(createEvidence.consumesAcceptedNativeUnmountExecutionRecord, false);
+  assert.equal(createEvidence.consumesAcceptedFinishedWorkIdentityGate, true);
+  assert.equal(createEvidence.finishedWorkIdentity.publicSurface, "create().toJSON");
+  assert.equal(
+    createEvidence.finishedWorkIdentity.rootRequestId,
+    createRequest.requestId
+  );
   assert.equal(createEvidence.consumesPrivateToJSONEvidence, true);
   assert.equal(createEvidence.consumesAcceptedHostOutputRow, false);
   assert.equal(createEvidence.minimalTreeShape, true);
@@ -2439,6 +2459,82 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
   assert.equal(createEvidence.nativeBridgeAvailable, false);
   assert.equal(createEvidence.nativeExecution, false);
   assert.equal(createEvidence.compatibilityClaimed, false);
+  assert.equal(
+    facade.canCreateAcceptedNativeExecutionDiagnosticResult(
+      createResult,
+      createJSONReport
+    ),
+    false
+  );
+  const missingIdentityError = captureThrown(() =>
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      createResult,
+      createJSONReport
+    )
+  );
+  assert.equal(
+    missingIdentityError.name,
+    "FastReactTestRendererPrivateToJSONSerializationError"
+  );
+  assert.match(
+    missingIdentityError.message,
+    /finished-work identity evidence/u
+  );
+  assert.equal(missingIdentityError.nativeExecution, false);
+  assert.equal(
+    facade.canCreateAcceptedNativeExecutionDiagnosticResult(
+      createResult,
+      createJSONReport,
+      {
+        ...createJSONIdentity,
+        rootRequestSequence: createJSONIdentity.rootRequestSequence + 1
+      }
+    ),
+    false
+  );
+  const staleIdentityError = captureThrown(() =>
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      createResult,
+      createJSONReport,
+      {
+        ...createJSONIdentity,
+        rootRequestSequence: createJSONIdentity.rootRequestSequence + 1
+      }
+    )
+  );
+  assert.equal(
+    staleIdentityError.name,
+    "FastReactTestRendererPrivateToJSONSerializationError"
+  );
+  assert.match(staleIdentityError.message, /request sequence is stale/u);
+  assert.equal(staleIdentityError.compatibilityClaimed, false);
+  const foreignIdentityError = captureThrown(() =>
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      createResult,
+      createJSONReport,
+      {
+        ...createJSONIdentity,
+        rootId: `${createJSONIdentity.rootId}:foreign`
+      }
+    )
+  );
+  assert.equal(
+    foreignIdentityError.name,
+    "FastReactTestRendererPrivateToJSONSerializationError"
+  );
+  assert.match(foreignIdentityError.message, /foreign root/u);
+  const sourceReportError = captureThrown(() =>
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      createResult,
+      undefined,
+      createJSONIdentity
+    )
+  );
+  assert.equal(
+    sourceReportError.name,
+    "FastReactTestRendererPrivateToJSONSerializationError"
+  );
+  assert.match(sourceReportError.message, /serialization source report/u);
 
   const updateEvidence =
     facade.createAcceptedNativeExecutionDiagnosticResult(
@@ -2758,17 +2854,26 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
     "function"
   );
 
+  const createTreeReport = privateToTreeReport({
+    hostOutputUpdateKind: "Create",
+    rowId: null,
+    rowShape: null,
+    rootChildCount: 1,
+    text: "hello",
+    compositeNativeExecution: true
+  });
+  const createTreeIdentity = privateSerializationFinishedWorkIdentityEvidence({
+    rootRequest: createRequest,
+    publicSurface: "create().toTree",
+    sourceSerializationDiagnosticName: privateToTreeAcceptedDiagnosticName,
+    consumesPrivateToJSONEvidence: false,
+    consumesPrivateToTreeEvidence: true
+  });
   const createEvidence =
     facade.createAcceptedNativeExecutionDiagnosticResult(
       createResult,
-      privateToTreeReport({
-        hostOutputUpdateKind: "Create",
-        rowId: null,
-        rowShape: null,
-        rootChildCount: 1,
-        text: "hello",
-        compositeNativeExecution: true
-      })
+      createTreeReport,
+      createTreeIdentity
     );
   assert.equal(createEvidence.diagnosticName, privateToTreeNativeExecutionDiagnosticName);
   assert.equal(createEvidence.status, privateToTreeNativeExecutionStatus);
@@ -2795,6 +2900,8 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
   assert.equal(createEvidence.consumesAcceptedNativeCreateExecutionRecord, true);
   assert.equal(createEvidence.consumesAcceptedNativeUpdateExecutionRecord, false);
   assert.equal(createEvidence.consumesAcceptedNativeUnmountExecutionRecord, false);
+  assert.equal(createEvidence.consumesAcceptedFinishedWorkIdentityGate, true);
+  assert.equal(createEvidence.finishedWorkIdentity.publicSurface, "create().toTree");
   assert.equal(createEvidence.consumesPrivateToTreeEvidence, true);
   assert.equal(createEvidence.consumesAcceptedHostOutputRow, false);
   assert.equal(createEvidence.minimalTreeShape, true);
@@ -2805,6 +2912,45 @@ test("react-test-renderer CJS development private toTree facade consumes accepte
   assert.equal(createEvidence.nativeBridgeAvailable, false);
   assert.equal(createEvidence.nativeExecution, false);
   assert.equal(createEvidence.compatibilityClaimed, false);
+  assert.equal(
+    facade.canCreateAcceptedNativeExecutionDiagnosticResult(
+      createResult,
+      createTreeReport
+    ),
+    false
+  );
+  const missingIdentityError = captureThrown(() =>
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      createResult,
+      createTreeReport
+    )
+  );
+  assert.equal(
+    missingIdentityError.name,
+    "FastReactTestRendererPrivateToTreeMetadataError"
+  );
+  assert.match(
+    missingIdentityError.message,
+    /finished-work identity evidence/u
+  );
+  const wrongSurfaceIdentityError = captureThrown(() =>
+    facade.createAcceptedNativeExecutionDiagnosticResult(
+      createResult,
+      createTreeReport,
+      {
+        ...createTreeIdentity,
+        publicSurface: "create().toJSON"
+      }
+    )
+  );
+  assert.equal(
+    wrongSurfaceIdentityError.name,
+    "FastReactTestRendererPrivateToTreeMetadataError"
+  );
+  assert.match(
+    wrongSurfaceIdentityError.message,
+    /diagnostic identity is not accepted/u
+  );
 
   const updateEvidence =
     facade.createAcceptedNativeExecutionDiagnosticResult(
@@ -4277,6 +4423,54 @@ test("react-test-renderer cjs development private toJSON facade records nested u
   assert.equal(mismatchError.nativeExecution, false);
   assert.match(mismatchError.message, /row shape/u);
 });
+
+function privateSerializationFinishedWorkIdentityEvidence({
+  rootRequest,
+  publicSurface,
+  sourceSerializationDiagnosticName,
+  consumesPrivateToJSONEvidence,
+  consumesPrivateToTreeEvidence,
+  hostOutputUpdateKind = "Create"
+}) {
+  const current = { arenaId: 1, slot: 10, generation: 1 };
+  const finishedWork = { arenaId: 1, slot: 11, generation: 1 };
+  return {
+    diagnosticName: privateSerializationFinishedWorkIdentityDiagnosticName,
+    status: privateSerializationFinishedWorkIdentityStatus,
+    publicSurface,
+    sourceSerializationDiagnosticName,
+    rootRequestId: rootRequest.requestId,
+    rootRequestSequence: rootRequest.requestSequence,
+    rootId: rootRequest.rootId,
+    hostOutputUpdateKind,
+    renderCurrent: current,
+    renderFinishedWork: finishedWork,
+    commitPreviousCurrent: current,
+    commitCurrent: finishedWork,
+    reportFinishedWork: finishedWork,
+    renderLanesBits: 1,
+    commitFinishedLanesBits: 1,
+    reportFinishedLanesBits: 1,
+    commitRemainingLanesBits: 0,
+    commitPendingLanesBits: 0,
+    commitCurrentMatchesRenderFinishedWork: true,
+    commitPreviousCurrentMatchesRenderCurrent: true,
+    commitLanesMatchRenderLanes: true,
+    reportFinishedWorkMatchesCommitCurrent: true,
+    reportLanesMatchCommitLanes: true,
+    committedFiberInspectionCurrentMatchesCommit: true,
+    hostOutputSnapshotCurrent: true,
+    consumesCommittedHostRootFinishedWorkIdentity: true,
+    consumesCommittedHostRootFinishedWorkLanes: true,
+    consumesPrivateToJSONEvidence,
+    consumesPrivateToTreeEvidence,
+    publicToJSONAvailable: false,
+    publicToTreeAvailable: false,
+    publicTestInstanceAvailable: false,
+    publicSerializationAvailable: false,
+    compatibilityClaimed: false
+  };
+}
 
 function privateToJSONReport({
   hostOutputUpdateKind = "Update",
