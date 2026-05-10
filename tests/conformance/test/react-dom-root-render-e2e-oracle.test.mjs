@@ -345,9 +345,9 @@ test("root render e2e conformance gate records private bridge request rows separ
   assert.equal(result.summary.privateBridgeBlockedScenarioModeRowCount, 2);
   assert.equal(
     result.summary.privateHostOutputDiagnosticScenarioModeRowCount,
-    8
+    16
   );
-  assert.equal(result.summary.privateHostOutputBlockedScenarioModeRowCount, 12);
+  assert.equal(result.summary.privateHostOutputBlockedScenarioModeRowCount, 4);
   assert.equal(result.summary.portalRootRenderPrerequisiteRowCount, 4);
   assert.equal(result.summary.portalRootRenderBlockedRowCount, 5);
   assert.equal(result.summary.compatibilityClaimed, false);
@@ -375,7 +375,11 @@ test("root render e2e conformance gate records private bridge request rows separ
       "create-root-no-render",
       "initial-host-render",
       "update-host-render",
-      "root-unmount"
+      "replace-host-tree",
+      "render-null-clears-container",
+      "root-unmount",
+      "double-unmount",
+      "render-after-unmount"
     ]
   );
 
@@ -444,6 +448,16 @@ test("root render e2e conformance gate records private bridge request rows separ
       )
     ),
     new Set([REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_BLOCKED_STATUS])
+  );
+  assert.deepEqual(
+    Array.from(
+      new Set(
+        result.privateHostOutputBlockedScenarioModeRows.map(
+          (row) => row.scenarioId
+        )
+      )
+    ),
+    ["flush-sync-cross-root-render", "development-warning-boundaries"]
   );
 
   assert.equal(result.portalRootRenderGate.ok, true);
@@ -520,7 +534,7 @@ test("private host-output diagnostics admit only explicit fake-DOM evidence", ()
     inspectReactDomRootRenderE2EPrivateHostOutputDiagnostics();
 
   assert.equal(observations.loadError, null);
-  assert.equal(observations.rows.length, 8);
+  assert.equal(observations.rows.length, 16);
 
   for (const row of observations.rows) {
     assert.equal(row.status, "ok");
@@ -585,6 +599,43 @@ test("private host-output diagnostics admit only explicit fake-DOM evidence", ()
     ["nodeValue", "goodbye"]
   ]);
 
+  const replace = observations.rows.find(
+    (row) =>
+      row.modeId === "default-node-development" &&
+      row.scenarioId === "replace-host-tree"
+  );
+  assert.equal(
+    replace.evidence.hostOutputEvidence.initialContainerTextContent,
+    "before"
+  );
+  assert.equal(
+    replace.evidence.hostOutputEvidence.replaceContainerTextContent,
+    "after"
+  );
+  assert.deepEqual(replace.evidence.hostOutputEvidence.replaceMutationLog, [
+    ["removeChild", "SPAN"],
+    ["appendChild", "SECTION"]
+  ]);
+  assert.equal(
+    replace.evidence.hostOutputEvidence.removedHostDetachedFromLatestPropsMap,
+    true
+  );
+
+  const renderNull = observations.rows.find(
+    (row) =>
+      row.modeId === "default-node-development" &&
+      row.scenarioId === "render-null-clears-container"
+  );
+  assert.equal(
+    renderNull.evidence.hostOutputEvidence.containerChildCountAfterRenderNull,
+    0
+  );
+  assert.equal(
+    renderNull.evidence.hostOutputEvidence.rootSideEffectStateAfterRenderNull
+      .containerMarkerTruthyCount,
+    1
+  );
+
   const unmount = observations.rows.find(
     (row) =>
       row.modeId === "default-node-development" &&
@@ -597,6 +648,43 @@ test("private host-output diagnostics admit only explicit fake-DOM evidence", ()
   assert.equal(
     unmount.evidence.hostOutputEvidence.hostDetachedFromLatestPropsMap,
     true
+  );
+
+  const doubleUnmount = observations.rows.find(
+    (row) =>
+      row.modeId === "default-node-development" &&
+      row.scenarioId === "double-unmount"
+  );
+  assert.equal(
+    doubleUnmount.evidence.hostOutputEvidence.secondUnmountBridgeNoOp,
+    true
+  );
+  assert.deepEqual(
+    doubleUnmount.evidence.hostOutputEvidence.secondUnmountMutationLog,
+    []
+  );
+
+  const renderAfterUnmount = observations.rows.find(
+    (row) =>
+      row.modeId === "default-node-development" &&
+      row.scenarioId === "render-after-unmount"
+  );
+  assert.deepEqual(
+    renderAfterUnmount.evidence.rootBridgeEvidence.thrownOperations,
+    [
+      {
+        operation: "root.render",
+        error: {
+          code: "FAST_REACT_DOM_UNMOUNTED_ROOT",
+          message: "Cannot update an unmounted root."
+        }
+      }
+    ]
+  );
+  assert.deepEqual(
+    renderAfterUnmount.evidence.hostOutputEvidence
+      .renderAfterUnmountMutationLog,
+    []
   );
 });
 
