@@ -44,6 +44,38 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS =
 export const REACT_DOM_ROOT_PUBLIC_FACADE_BRIDGE_RECORD_ONLY_STATUS =
   "blocked-private-root-bridge-record-only";
 
+export const REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS =
+  Object.freeze([
+    Object.freeze({
+      id: "public-create-root-render-initial",
+      publicApi: "react-dom/client.createRoot(container).render(element)",
+      scenarioId: "initial-host-render",
+      admission: "blocked",
+      expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      privateBridgeEvidence: "separate"
+    }),
+    Object.freeze({
+      id: "public-create-root-render-update",
+      publicApi:
+        "react-dom/client.createRoot(container).render(updatedElement)",
+      scenarioId: "update-host-render",
+      admission: "blocked",
+      expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      privateBridgeEvidence: "separate"
+    }),
+    Object.freeze({
+      id: "public-create-root-unmount-call",
+      publicApi: "react-dom/client.createRoot(container).unmount()",
+      scenarioId: "root-unmount",
+      admission: "blocked",
+      expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      privateBridgeEvidence: "separate"
+    })
+  ]);
+
 export const REACT_DOM_ROOT_PUBLIC_FACADE_SCENARIO_ADMISSIONS = Object.freeze(
   REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.map((scenarioId) =>
     Object.freeze({
@@ -88,6 +120,7 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_BOUNDARY_ROWS =
       expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
       compatibilityClaimed: false
     }),
+    ...REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS,
     Object.freeze({
       id: "public-dom-mutation",
       publicApi: "DOM mutation through public roots",
@@ -681,6 +714,11 @@ export function formatReactDomRootPublicFacadeBlockedGateResult(result) {
       "Compatibility remains blocked; public createRoot/hydrateRoot/root lifecycle behavior is still placeholder-only."
     );
   }
+  if (result.summary.blockedPrivateBridgeRowCount > 0) {
+    lines.push(
+      "Private root-bridge request and admission rows remain metadata-only and are not public compatibility evidence."
+    );
+  }
 
   if (result.failures.length > 0) {
     lines.push("", "Failure details:");
@@ -747,6 +785,12 @@ export function inspectReactDomRootPublicFacadeBoundary({
       rootMarkers,
       listenerRegistry
     );
+    const publicRootLifecycle = inspectReactDomRootPublicFacadeLifecycle({
+      domContainer,
+      listenerRegistry,
+      reactDomClient,
+      rootMarkers
+    });
 
     return {
       loadError: null,
@@ -759,7 +803,8 @@ export function inspectReactDomRootPublicFacadeBoundary({
       createRootExport: describeLocalFunction(reactDomClient.createRoot),
       hydrateRootExport: describeLocalFunction(reactDomClient.hydrateRoot),
       createRoot,
-      hydrateRoot
+      hydrateRoot,
+      publicRootLifecycle
     };
   } catch (error) {
     return {
@@ -847,6 +892,20 @@ export function inspectReactDomPrivateRootBridgeBoundary({
     const renderAfterUnmount = attemptGateOperation("root.render after unmount", () =>
       bridge.renderContainer(create.handle, element)
     );
+    const admissions = {
+      create: summarizePrivateRootBridgeAdmissionRecord(
+        bridge.admitRequest(create)
+      ),
+      render: summarizePrivateRootBridgeAdmissionRecord(
+        bridge.admitRequest(render)
+      ),
+      unmount: summarizePrivateRootBridgeAdmissionRecord(
+        bridge.admitRequest(unmount)
+      ),
+      secondUnmount: summarizePrivateRootBridgeAdmissionRecord(
+        bridge.admitRequest(secondUnmount)
+      )
+    };
 
     return {
       loadError: null,
@@ -854,6 +913,7 @@ export function inspectReactDomPrivateRootBridgeBoundary({
       render: summarizePrivateRootBridgeUpdateRecord(render),
       unmount: summarizePrivateRootBridgeUpdateRecord(unmount),
       secondUnmount: summarizePrivateRootBridgeUpdateRecord(secondUnmount),
+      admissions,
       renderAfterUnmount,
       payloadsHidden: {
         createContainer:
@@ -1167,6 +1227,12 @@ function validatePublicFacadeBoundary({
     });
   }
 
+  validatePublicRootLifecycleBlocked({
+    publicRootLifecycle: localPublicFacadeBoundary.publicRootLifecycle,
+    blockedPublicFacadeRows,
+    failures
+  });
+
   const createRootSideEffects = localPublicFacadeBoundary.createRoot.sideEffects;
   const hydrateRootSideEffects = localPublicFacadeBoundary.hydrateRoot.sideEffects;
   if (
@@ -1245,6 +1311,103 @@ function validatePublicRootExportBlocked({
   });
 }
 
+function validatePublicRootLifecycleBlocked({
+  publicRootLifecycle,
+  blockedPublicFacadeRows,
+  failures
+}) {
+  if (!publicRootLifecycle || typeof publicRootLifecycle !== "object") {
+    failures.push({
+      gateStatus: "missing-public-root-lifecycle-boundary"
+    });
+    return;
+  }
+
+  const lifecycleRows = [
+    {
+      key: "renderInitial",
+      expected: REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[0],
+      expectedLabel: "react-dom/client.createRoot(...).render(initial)"
+    },
+    {
+      key: "renderUpdate",
+      expected: REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[1],
+      expectedLabel: "react-dom/client.createRoot(...).render(update)"
+    },
+    {
+      key: "unmount",
+      expected: REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS[2],
+      expectedLabel: "react-dom/client.createRoot(...).unmount()"
+    }
+  ];
+
+  for (const { expected, expectedLabel, key } of lifecycleRows) {
+    const operation = publicRootLifecycle[key];
+    if (!operation) {
+      failures.push({
+        gateStatus: "missing-public-root-lifecycle-operation",
+        id: expected.id
+      });
+      continue;
+    }
+
+    if (
+      !operation.sideEffects ||
+      !isRootFacadeSideEffectFree(operation.sideEffects)
+    ) {
+      failures.push({
+        gateStatus: "public-root-lifecycle-operation-produced-side-effects",
+        id: expected.id,
+        sideEffects: operation.sideEffects
+      });
+      continue;
+    }
+
+    if (operation.compatibilityClaimed !== false) {
+      failures.push({
+        gateStatus: "public-root-lifecycle-operation-claims-compatibility",
+        id: expected.id,
+        compatibilityClaimed: operation.compatibilityClaimed ?? null
+      });
+      continue;
+    }
+
+    if (
+      operation.label === expectedLabel &&
+      operation.status === "throws" &&
+      operation.thrown.code === "FAST_REACT_UNIMPLEMENTED" &&
+      operation.thrown.entrypoint === "react-dom/client" &&
+      operation.thrown.exportName === "createRoot" &&
+      operation.blockedAt === "createRoot" &&
+      operation.createRootAttempt?.status === "throws" &&
+      operation.createRootAttempt.thrown.code === "FAST_REACT_UNIMPLEMENTED" &&
+      operation.lifecycleOperationAttempted === false &&
+      operation.rootObjectCreated === false
+    ) {
+      blockedPublicFacadeRows.push({
+        id: expected.id,
+        gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+        blockedAt: "createRoot",
+        compatibilityClaimed: false,
+        listenerRegistrationCount: getRootFacadeListenerRegistrationCount(
+          operation.sideEffects
+        ),
+        mutationCount: getRootFacadeMutationCount(operation.sideEffects),
+        privateBridgeEvidence: "separate",
+        publicApi: expected.publicApi,
+        scenarioId: expected.scenarioId
+      });
+      continue;
+    }
+
+    failures.push({
+      gateStatus: "public-root-lifecycle-operation-not-placeholder-blocked",
+      id: expected.id,
+      operation
+    });
+  }
+}
+
 function validatePrivateRootBridgeBoundary({
   privateRootBridgeBoundary,
   blockedPrivateBridgeRows,
@@ -1310,6 +1473,10 @@ function validatePrivateRootBridgeBoundary({
       secondUnmount: privateRootBridgeBoundary.secondUnmount
     });
   }
+  validatePrivateRootBridgeAdmissions({
+    admissions: privateRootBridgeBoundary.admissions,
+    failures
+  });
   if (
     privateRootBridgeBoundary.renderAfterUnmount.status !== "throws" ||
     privateRootBridgeBoundary.renderAfterUnmount.thrown.code !==
@@ -1335,12 +1502,111 @@ function validatePrivateRootBridgeBoundary({
     "private-create-root-record",
     "private-root-render-record",
     "private-root-unmount-record",
-    "private-double-unmount-noop-record"
+    "private-double-unmount-noop-record",
+    "private-create-root-admission",
+    "private-root-render-admission",
+    "private-root-unmount-admission",
+    "private-double-unmount-noop-admission"
   ]) {
     blockedPrivateBridgeRows.push({
       id,
       gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BRIDGE_RECORD_ONLY_STATUS,
       compatibilityClaimed: false
+    });
+  }
+}
+
+function validatePrivateRootBridgeAdmissions({ admissions, failures }) {
+  if (!admissions || typeof admissions !== "object") {
+    failures.push({
+      gateStatus: "private-root-bridge-admission-metadata-missing"
+    });
+    return;
+  }
+
+  const expectedAdmissions = [
+    {
+      key: "create",
+      operation: "create",
+      requestType: "createRoot",
+      lifecycleTransition: "none->created"
+    },
+    {
+      key: "render",
+      operation: "render",
+      requestType: "root.render",
+      lifecycleTransition: "created->rendered"
+    },
+    {
+      key: "unmount",
+      operation: "unmount",
+      requestType: "root.unmount",
+      lifecycleTransition: "rendered->unmounted"
+    },
+    {
+      key: "secondUnmount",
+      operation: "unmount",
+      requestType: "root.unmount",
+      lifecycleTransition: "unmounted->unmounted"
+    }
+  ];
+
+  for (const expected of expectedAdmissions) {
+    const admission = admissions[expected.key];
+    if (!admission) {
+      failures.push({
+        gateStatus: "private-root-bridge-admission-row-missing",
+        key: expected.key
+      });
+      continue;
+    }
+
+    const blockedCapabilityIds = admission.blockedCapabilities?.map(
+      (capability) => capability.id
+    );
+    const allCapabilitiesBlocked = admission.blockedCapabilities?.every(
+      (capability) => capability.blocked === true
+    );
+
+    if (
+      admission.kind === "FastReactDomPrivateRootAdmissionRecord" &&
+      admission.operation === expected.operation &&
+      admission.requestType === expected.requestType &&
+      admission.admissionStatus ===
+        "admitted-private-root-bridge-request-record" &&
+      admission.executionStatus === "blocked-private-root-bridge-execution" &&
+      admission.compatibilityStatus ===
+        "blocked-private-root-bridge-compatibility" &&
+      admission.lifecyclePrerequisites?.accepted === true &&
+      admission.lifecyclePrerequisites?.lifecycleTransition ===
+        expected.lifecycleTransition &&
+      admission.nativeExecution === false &&
+      admission.reconcilerExecution === false &&
+      admission.domMutation === false &&
+      admission.markerWrites === false &&
+      admission.listenerInstallation === false &&
+      admission.hydration === false &&
+      admission.eventDispatch === false &&
+      admission.compatibilityClaimed === false &&
+      allCapabilitiesBlocked === true &&
+      findFirstDifferencePath(blockedCapabilityIds, [
+        "native-execution",
+        "reconciler-execution",
+        "dom-mutation",
+        "marker-writes",
+        "listener-installation",
+        "hydration",
+        "events",
+        "compatibility-claims"
+      ]) === null
+    ) {
+      continue;
+    }
+
+    failures.push({
+      gateStatus: "private-root-bridge-admission-row-not-record-only",
+      key: expected.key,
+      admission
     });
   }
 }
@@ -1364,6 +1630,113 @@ function rejectClientRootCompatibilityClaimsWhileBlocked({
       });
     }
   }
+}
+
+function inspectReactDomRootPublicFacadeLifecycle({
+  domContainer,
+  listenerRegistry,
+  reactDomClient,
+  rootMarkers
+}) {
+  return {
+    renderInitial: attemptChainedPublicRootOperation({
+      domContainer,
+      label: "react-dom/client.createRoot(...).render(initial)",
+      listenerRegistry,
+      reactDomClient,
+      rootMarkers,
+      runLifecycleOperation(root) {
+        return root.render({
+          props: {
+            children: "initial public child"
+          },
+          type: "span"
+        });
+      }
+    }),
+    renderUpdate: attemptChainedPublicRootOperation({
+      domContainer,
+      label: "react-dom/client.createRoot(...).render(update)",
+      listenerRegistry,
+      reactDomClient,
+      rootMarkers,
+      runLifecycleOperation(root) {
+        root.render({
+          props: {
+            children: "initial public child"
+          },
+          type: "span"
+        });
+        return root.render({
+          props: {
+            children: "updated public child"
+          },
+          type: "span"
+        });
+      }
+    }),
+    unmount: attemptChainedPublicRootOperation({
+      domContainer,
+      label: "react-dom/client.createRoot(...).unmount()",
+      listenerRegistry,
+      reactDomClient,
+      rootMarkers,
+      runLifecycleOperation(root) {
+        return root.unmount();
+      }
+    })
+  };
+}
+
+function attemptChainedPublicRootOperation({
+  domContainer,
+  label,
+  listenerRegistry,
+  reactDomClient,
+  rootMarkers,
+  runLifecycleOperation
+}) {
+  const ownerDocument = createGateDocument(label, domContainer);
+  const container = createGateElement("DIV", ownerDocument, domContainer);
+  let createRootAttempt = null;
+  let lifecycleOperationAttempted = false;
+  let rootObjectCreated = false;
+
+  const result = attemptGateOperation(label, () => {
+    let root;
+    try {
+      root = reactDomClient.createRoot(container);
+      createRootAttempt = {
+        status: "ok",
+        value: describeLocalValue(root)
+      };
+      rootObjectCreated = root !== null && typeof root === "object";
+    } catch (error) {
+      createRootAttempt = {
+        status: "throws",
+        thrown: serializeGateError(error)
+      };
+      throw error;
+    }
+
+    lifecycleOperationAttempted = true;
+    return runLifecycleOperation(root);
+  });
+
+  return {
+    ...result,
+    blockedAt: createRootAttempt?.status === "throws" ? "createRoot" : null,
+    compatibilityClaimed: false,
+    createRootAttempt,
+    lifecycleOperationAttempted,
+    rootObjectCreated,
+    sideEffects: inspectRootFacadeSideEffects(
+      container,
+      ownerDocument,
+      rootMarkers,
+      listenerRegistry
+    )
+  };
 }
 
 function attemptRootFacadeOperation(
@@ -1551,6 +1924,17 @@ function isRootFacadeSideEffectFree(sideEffects) {
   );
 }
 
+function getRootFacadeListenerRegistrationCount(sideEffects) {
+  return (
+    sideEffects.listenerRegistrationCount +
+    sideEffects.ownerDocumentListenerRegistrationCount
+  );
+}
+
+function getRootFacadeMutationCount(sideEffects) {
+  return sideEffects.mutationCount + sideEffects.ownerDocumentMutationCount;
+}
+
 function summarizePrivateRootBridgeCreateRecord(record) {
   return {
     $$typeof: record.$$typeof,
@@ -1595,6 +1979,38 @@ function summarizePrivateRootBridgeUpdateRecord(record) {
     sync: record.sync,
     elementInfo: record.elementInfo,
     callbackInfo: record.callbackInfo
+  };
+}
+
+function summarizePrivateRootBridgeAdmissionRecord(record) {
+  return {
+    $$typeof: record.$$typeof,
+    kind: record.kind,
+    operation: record.operation,
+    requestId: record.requestId,
+    requestSequence: record.requestSequence,
+    requestType: record.requestType,
+    sequence: record.sequence,
+    updateId: record.updateId,
+    rootId: record.rootId,
+    rootKind: record.rootKind,
+    rootTag: record.rootTag,
+    admissionStatus: record.admissionStatus,
+    executionStatus: record.executionStatus,
+    compatibilityStatus: record.compatibilityStatus,
+    lifecyclePrerequisites: record.lifecyclePrerequisites,
+    blockedCapabilities: record.blockedCapabilities.map((capability) => ({
+      blocked: capability.blocked,
+      id: capability.id
+    })),
+    nativeExecution: record.nativeExecution,
+    reconcilerExecution: record.reconcilerExecution,
+    domMutation: record.domMutation,
+    markerWrites: record.markerWrites,
+    listenerInstallation: record.listenerInstallation,
+    hydration: record.hydration,
+    eventDispatch: record.eventDispatch,
+    compatibilityClaimed: record.compatibilityClaimed
   };
 }
 

@@ -13,8 +13,9 @@ if (args.has("--help") || args.has("-h")) {
 Run the fail-closed React DOM public root facade gate. The command compares the
 accepted client-root and root-render E2E oracle prerequisites with the current
 Fast React public placeholder and private root-bridge record-only boundaries.
-It keeps createRoot, hydrateRoot, root.render, root.unmount, DOM mutation,
-listener setup, and compatibility claims blocked.
+It keeps createRoot, hydrateRoot, createRoot().render update paths,
+createRoot().unmount, DOM mutation, listener setup, and compatibility claims
+blocked while private request/admission metadata remains separate evidence.
 `);
   process.exit(0);
 }
