@@ -16,6 +16,9 @@ const {
   getEventListenerSet,
   getListenerSetKey,
   hasListeningMarker,
+  inspectListeningMarker,
+  internalEventHandlersKey,
+  internalListeningMarker,
   markTargetAsListening
 } = require('./listener-registry.js');
 const {
@@ -25,6 +28,18 @@ const {
   IS_CAPTURE_PHASE,
   IS_NON_DELEGATED
 } = require('./event-system-flags.js');
+
+const privateRootListenerRegistrationRecordType =
+  'fast.react_dom.private_root_listener_registration_record';
+const privateRootListenerCleanupRecordType =
+  'fast.react_dom.private_root_listener_cleanup_record';
+const ROOT_LISTENERS_REGISTERED =
+  'registered-private-root-listeners';
+const ROOT_LISTENERS_REVERTED =
+  'reverted-private-root-listeners';
+
+const rootListenerRegistrationPayloads = new WeakMap();
+const rootListenerCleanupRecords = new WeakMap();
 
 function createEventListenerShell(target, domEventName, eventSystemFlags) {
   const wrapperRecord = createEventListenerWrapperRecordWithPriority(
@@ -100,7 +115,53 @@ function addTrappedEventListener(
   return listener;
 }
 
+function addTrappedEventListenerRecord(
+  target,
+  domEventName,
+  eventSystemFlags,
+  isCapturePhaseListener,
+  options
+) {
+  const listener = createEventListenerShell(
+    target,
+    domEventName,
+    eventSystemFlags
+  );
+  const listenerOptions = getAddEventListenerOptions(
+    domEventName,
+    isCapturePhaseListener,
+    options
+  );
+
+  target.addEventListener(domEventName, listener, listenerOptions);
+  return {
+    domEventName,
+    eventSystemFlags,
+    isCapturePhaseListener,
+    listener,
+    listenerOptions,
+    listenerOptionsInfo: describeListenerOptions(listenerOptions),
+    listenerSetKey: getListenerSetKey(domEventName, isCapturePhaseListener),
+    target
+  };
+}
+
 function listenToNativeEvent(
+  domEventName,
+  isCapturePhaseListener,
+  target,
+  options
+) {
+  const listenerRecord = listenToNativeEventRecord(
+    domEventName,
+    isCapturePhaseListener,
+    target,
+    options
+  );
+  return listenerRecord === null ? null : listenerRecord.listener;
+}
+
+function listenToNativeEventRecord(
   domEventName,
   isCapturePhaseListener,
   target,
@@ -136,7 +197,7 @@ function listenToNativeEvent(
     eventSystemFlags |= IS_CAPTURE_PHASE;
   }
 
-  const listener = addTrappedEventListener(
+  const listenerRecord = addTrappedEventListenerRecord(
     target,
     domEventName,
     eventSystemFlags,
@@ -144,10 +205,19 @@ function listenToNativeEvent(
     options
   );
   listenerSet.add(listenerSetKey);
-  return listener;
+  return listenerRecord;
 }
 
 function listenToNonDelegatedEvent(domEventName, target, options) {
+  const listenerRecord = listenToNonDelegatedEventRecord(
+    domEventName,
+    target,
+    options
+  );
+  return listenerRecord === null ? null : listenerRecord.listener;
+}
+
+function listenToNonDelegatedEventRecord(domEventName, target, options) {
   if (!isNonDelegatedEvent(domEventName)) {
     const error = new Error(
       `Expected "${domEventName}" to be a non-delegated React DOM event.`
@@ -162,7 +232,7 @@ function listenToNonDelegatedEvent(domEventName, target, options) {
     return null;
   }
 
-  const listener = addTrappedEventListener(
+  const listenerRecord = addTrappedEventListenerRecord(
     target,
     domEventName,
     IS_NON_DELEGATED,
@@ -170,34 +240,176 @@ function listenToNonDelegatedEvent(domEventName, target, options) {
     options
   );
   listenerSet.add(listenerSetKey);
-  return listener;
+  return listenerRecord;
 }
 
 function listenToAllSupportedEvents(rootContainerElement, options) {
   assertEventTarget(rootContainerElement);
+  registerSupportedRootListeners(rootContainerElement, options, false);
+}
+
+function registerRootListenersForPrivateRoot(rootContainerElement, options) {
+  assertEventTarget(rootContainerElement);
+  return registerSupportedRootListeners(rootContainerElement, options, true);
+}
+
+function registerSupportedRootListeners(
+  rootContainerElement,
+  options,
+  reversible
+) {
+  const ownerDocument = getOwnerDocument(rootContainerElement);
+  const targets = uniqueTargets([rootContainerElement, ownerDocument]);
+  if (reversible) {
+    for (const target of targets) {
+      assertReversibleEventTarget(target);
+    }
+  }
+
+  const targetSnapshots = targets.map(snapshotListenerTarget);
+  const installedListeners = [];
+
   markTargetAsListening(rootContainerElement);
 
-  for (const domEventName of allNativeEvents) {
-    if (domEventName === 'selectionchange') {
-      continue;
+  try {
+    for (const domEventName of allNativeEvents) {
+      if (domEventName === 'selectionchange') {
+        continue;
+      }
+
+      if (!isNonDelegatedEvent(domEventName)) {
+        pushListenerRecord(
+          installedListeners,
+          listenToNativeEventRecord(
+            domEventName,
+            false,
+            rootContainerElement,
+            options
+          )
+        );
+      }
+      pushListenerRecord(
+        installedListeners,
+        listenToNativeEventRecord(
+          domEventName,
+          true,
+          rootContainerElement,
+          options
+        )
+      );
     }
 
-    if (!isNonDelegatedEvent(domEventName)) {
-      listenToNativeEvent(domEventName, false, rootContainerElement, options);
+    if (ownerDocument !== null) {
+      assertEventTarget(ownerDocument);
+      markTargetAsListening(ownerDocument);
+      pushListenerRecord(
+        installedListeners,
+        listenToNativeEventRecord(
+          'selectionchange',
+          false,
+          ownerDocument,
+          options
+        )
+      );
     }
-    listenToNativeEvent(domEventName, true, rootContainerElement, options);
+  } catch (error) {
+    if (reversible) {
+      cleanupInstalledRootListeners(installedListeners, targetSnapshots);
+    }
+    throw error;
   }
 
-  const ownerDocument = getOwnerDocument(rootContainerElement);
-  if (ownerDocument !== null) {
-    assertEventTarget(ownerDocument);
-    markTargetAsListening(ownerDocument);
-    listenToNativeEvent('selectionchange', false, ownerDocument, options);
+  if (!reversible) {
+    return undefined;
   }
+
+  const record = freezeRecord({
+    $$typeof: privateRootListenerRegistrationRecordType,
+    kind: 'FastReactDomPrivateRootListenerRegistrationRecord',
+    action: 'register-root-listeners',
+    registrationStatus: ROOT_LISTENERS_REGISTERED,
+    rootEventTargetInfo: freezeRecord(describeContainer(rootContainerElement)),
+    ownerDocumentInfo:
+      ownerDocument === null
+        ? null
+        : freezeRecord(describeContainer(ownerDocument)),
+    targetCount: targets.length,
+    registrationCount: installedListeners.length,
+    rootRegistrationCount: installedListeners.filter(
+      (listenerRecord) => listenerRecord.target === rootContainerElement
+    ).length,
+    ownerDocumentRegistrationCount:
+      ownerDocument === null
+        ? 0
+        : installedListeners.filter(
+            (listenerRecord) => listenerRecord.target === ownerDocument
+          ).length,
+    targetSnapshotsBefore: freezeArray(
+      targetSnapshots.map((snapshot) => snapshot.beforeInfo)
+    ),
+    targetSnapshotsAfter: freezeArray(
+      targets.map((target) => describeListenerTargetSnapshot(target))
+    ),
+    listenerRecords: freezeArray(
+      installedListeners.map((listenerRecord) =>
+        summarizeInstalledListenerRecord(listenerRecord)
+      )
+    ),
+    reversible: true
+  });
+
+  rootListenerRegistrationPayloads.set(record, {
+    active: true,
+    installedListeners,
+    targetSnapshots
+  });
+
+  return record;
 }
 
 function listenToPortalContainerEvents(portalContainer, options) {
   listenToAllSupportedEvents(portalContainer, options);
+}
+
+function revertRootListenersForPrivateRoot(registrationRecord) {
+  const payload = rootListenerRegistrationPayloads.get(registrationRecord);
+  if (payload === undefined) {
+    const error = new Error(
+      'Expected a private React DOM root listener registration record.'
+    );
+    error.code = 'FAST_REACT_DOM_INVALID_ROOT_LISTENER_RECORD';
+    throw error;
+  }
+
+  const existingCleanup = rootListenerCleanupRecords.get(registrationRecord);
+  if (!payload.active && existingCleanup !== undefined) {
+    return existingCleanup;
+  }
+
+  const cleanupSummary = cleanupInstalledRootListeners(
+    payload.installedListeners,
+    payload.targetSnapshots
+  );
+  payload.active = false;
+
+  const cleanupRecord = freezeRecord({
+    $$typeof: privateRootListenerCleanupRecordType,
+    kind: 'FastReactDomPrivateRootListenerCleanupRecord',
+    action: 'revert-root-listeners',
+    registrationStatus: ROOT_LISTENERS_REVERTED,
+    listenerRemovalCount: cleanupSummary.listenerRemovalCount,
+    listenerSetKeyRemovalCount: cleanupSummary.listenerSetKeyRemovalCount,
+    restoredTargetCount: cleanupSummary.restoredTargetCount,
+    targetSnapshotsAfter: freezeArray(
+      payload.targetSnapshots.map((snapshot) =>
+        describeListenerTargetSnapshot(snapshot.target)
+      )
+    ),
+    reversible: false
+  });
+
+  rootListenerCleanupRecords.set(registrationRecord, cleanupRecord);
+  return cleanupRecord;
 }
 
 function describeRootListenerGuard(rootContainerElement, options) {
@@ -233,13 +445,154 @@ function canInstallListener(target) {
   );
 }
 
+function assertReversibleEventTarget(target) {
+  assertEventTarget(target);
+  if (typeof target.removeEventListener !== 'function') {
+    const error = new Error(
+      'Cannot register reversible React DOM root listeners on a target without removeEventListener.'
+    );
+    error.code = 'FAST_REACT_DOM_LISTENER_REVERT_UNSUPPORTED';
+    throw error;
+  }
+}
+
+function uniqueTargets(targets) {
+  const unique = [];
+  for (const target of targets) {
+    if (target === null || target === undefined) {
+      continue;
+    }
+    if (!unique.includes(target)) {
+      unique.push(target);
+    }
+  }
+  return unique;
+}
+
+function snapshotListenerTarget(target) {
+  return {
+    target,
+    hadEventHandlersKey: Object.prototype.hasOwnProperty.call(
+      target,
+      internalEventHandlersKey
+    ),
+    hadListeningMarker: Object.prototype.hasOwnProperty.call(
+      target,
+      internalListeningMarker
+    ),
+    listeningMarkerValue: target[internalListeningMarker],
+    beforeInfo: describeListenerTargetSnapshot(target)
+  };
+}
+
+function describeListenerTargetSnapshot(target) {
+  const eventListenerSet = target && target[internalEventHandlersKey];
+  return freezeRecord({
+    canInstallListeners: canInstallListener(target),
+    eventListenerSetSize:
+      eventListenerSet instanceof Set ? eventListenerSet.size : 0,
+    listeningMarker: inspectListeningMarker(target)
+  });
+}
+
+function pushListenerRecord(installedListeners, listenerRecord) {
+  if (listenerRecord !== null) {
+    installedListeners.push(listenerRecord);
+  }
+}
+
+function cleanupInstalledRootListeners(installedListeners, targetSnapshots) {
+  let listenerRemovalCount = 0;
+  let listenerSetKeyRemovalCount = 0;
+
+  for (let index = installedListeners.length - 1; index >= 0; index--) {
+    const listenerRecord = installedListeners[index];
+    listenerRecord.target.removeEventListener(
+      listenerRecord.domEventName,
+      listenerRecord.listener,
+      listenerRecord.listenerOptions
+    );
+    listenerRemovalCount++;
+
+    const listenerSet = listenerRecord.target[internalEventHandlersKey];
+    if (listenerSet instanceof Set) {
+      listenerSet.delete(listenerRecord.listenerSetKey);
+      listenerSetKeyRemovalCount++;
+    }
+  }
+
+  for (const snapshot of targetSnapshots) {
+    if (snapshot.hadListeningMarker) {
+      snapshot.target[internalListeningMarker] = snapshot.listeningMarkerValue;
+    } else {
+      delete snapshot.target[internalListeningMarker];
+    }
+
+    const listenerSet = snapshot.target[internalEventHandlersKey];
+    if (
+      !snapshot.hadEventHandlersKey &&
+      listenerSet instanceof Set &&
+      listenerSet.size === 0
+    ) {
+      delete snapshot.target[internalEventHandlersKey];
+    }
+  }
+
+  return {
+    listenerRemovalCount,
+    listenerSetKeyRemovalCount,
+    restoredTargetCount: targetSnapshots.length
+  };
+}
+
+function summarizeInstalledListenerRecord(listenerRecord) {
+  return freezeRecord({
+    domEventName: listenerRecord.domEventName,
+    eventSystemFlags: listenerRecord.eventSystemFlags,
+    isCapturePhaseListener: listenerRecord.isCapturePhaseListener,
+    listenerOptions: listenerRecord.listenerOptionsInfo,
+    listenerSetKey: listenerRecord.listenerSetKey,
+    targetInfo: freezeRecord(describeContainer(listenerRecord.target))
+  });
+}
+
+function describeListenerOptions(options) {
+  if (typeof options === 'boolean') {
+    return freezeRecord({
+      capture: options,
+      passive: false,
+      type: 'boolean'
+    });
+  }
+
+  if (options && typeof options === 'object') {
+    return freezeRecord({
+      capture: options.capture === true,
+      passive: options.passive === true,
+      type: 'object'
+    });
+  }
+
+  return freezeRecord({
+    capture: false,
+    passive: false,
+    type: typeof options
+  });
+}
+
 function freezeRecord(record) {
   return Object.freeze(record);
+}
+
+function freezeArray(array) {
+  return Object.freeze(array.slice());
 }
 
 module.exports = {
   IS_CAPTURE_PHASE,
   IS_NON_DELEGATED,
+  ROOT_LISTENERS_REGISTERED,
+  ROOT_LISTENERS_REVERTED,
   addTrappedEventListener,
   createEventListenerShell,
   describeRootListenerGuard,
@@ -248,5 +601,9 @@ module.exports = {
   listenToAllSupportedEvents,
   listenToNativeEvent,
   listenToNonDelegatedEvent,
-  listenToPortalContainerEvents
+  listenToPortalContainerEvents,
+  privateRootListenerCleanupRecordType,
+  privateRootListenerRegistrationRecordType,
+  registerRootListenersForPrivateRoot,
+  revertRootListenersForPrivateRoot
 };

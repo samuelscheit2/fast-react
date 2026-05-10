@@ -10,9 +10,15 @@ const {
   getCreateRootWarning,
   hasLegacyRootMarker,
   isContainerMarkedAsRoot,
-  legacyRootWarning
+  legacyRootWarning,
+  markContainerAsRootWithRevertRecord,
+  revertContainerRootMarkerMutation
 } = require('./root-markers.js');
 const {hasListeningMarker} = require('../events/listener-registry.js');
+const {
+  registerRootListenersForPrivateRoot,
+  revertRootListenersForPrivateRoot
+} = require('../events/root-listeners.js');
 
 const CLIENT_ROOT_KIND = 'client';
 const CONCURRENT_ROOT_TAG = 'ConcurrentRoot';
@@ -29,6 +35,10 @@ const privateRootNativeHandoffRecordType =
   'fast.react_dom.private_root_native_handoff_record';
 const privateRootNativeBridgeHandleType =
   'fast.react_dom.private_root_native_bridge_handle';
+const privateRootCreateSideEffectRecordType =
+  'fast.react_dom.private_root_create_side_effect_record';
+const privateRootCreateSideEffectCleanupRecordType =
+  'fast.react_dom.private_root_create_side_effect_cleanup_record';
 
 const ROOT_LIFECYCLE_CREATED = 'created';
 const ROOT_LIFECYCLE_RENDERED = 'rendered';
@@ -42,6 +52,10 @@ const ROOT_BRIDGE_COMPATIBILITY_BLOCKED =
   'blocked-private-root-bridge-compatibility';
 const ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED =
   'mirrored-private-native-root-request-record';
+const ROOT_BRIDGE_MARK_LISTEN_APPLIED =
+  'applied-private-root-create-mark-listen-gate';
+const ROOT_BRIDGE_MARK_LISTEN_REVERTED =
+  'reverted-private-root-create-mark-listen-gate';
 const NATIVE_ROOT_BRIDGE_REQUEST_CREATE = 'create';
 const NATIVE_ROOT_BRIDGE_REQUEST_RENDER = 'render';
 const NATIVE_ROOT_BRIDGE_REQUEST_UNMOUNT = 'unmount';
@@ -98,6 +112,9 @@ const rootHandleState = new WeakMap();
 const rootRecordPayloads = new WeakMap();
 const rootNativeHandoffPayloads = new WeakMap();
 const rootNativeHandoffRecords = new WeakMap();
+const rootCreateSideEffectPayloads = new WeakMap();
+const rootCreateSideEffectRecords = new WeakMap();
+const rootCreateSideEffectCleanupRecords = new WeakMap();
 
 function createPrivateRootBridgeShell(options) {
   const bridgeState = createBridgeState(options);
@@ -146,8 +163,18 @@ function createPrivateRootBridgeShell(options) {
     admitRequest(record) {
       return admitRootBridgeRequestWithBridge(bridgeState, record);
     },
+    applyCreateRootSideEffects(record, options) {
+      return applyPrivateCreateRootSideEffectsWithBridge(
+        bridgeState,
+        record,
+        options
+      );
+    },
     createNativeRequestHandoff(record) {
       return createNativeRootBridgeHandoffRecordWithBridge(bridgeState, record);
+    },
+    revertCreateRootSideEffects(record) {
+      return revertPrivateCreateRootSideEffectsWithBridge(bridgeState, record);
     }
   });
 }
@@ -192,6 +219,14 @@ function admitRootBridgeRequestRecord(record) {
 
 function createNativeRootBridgeHandoffRecord(record) {
   return createNativeRootBridgeHandoffRecordWithBridge(null, record);
+}
+
+function applyPrivateCreateRootSideEffects(record, options) {
+  return applyPrivateCreateRootSideEffectsWithBridge(null, record, options);
+}
+
+function revertPrivateCreateRootSideEffects(record) {
+  return revertPrivateCreateRootSideEffectsWithBridge(null, record);
 }
 
 function admitRootBridgeRequestWithBridge(bridgeState, record) {
@@ -270,6 +305,158 @@ function createNativeRootBridgeHandoffRecordWithBridge(bridgeState, record) {
   });
 
   return handoff;
+}
+
+function applyPrivateCreateRootSideEffectsWithBridge(
+  bridgeState,
+  record,
+  options
+) {
+  const validation = validateCreateRootSideEffectRequest(record);
+  const rootBridgeState = validation.rootHandleState.bridgeState;
+  if (bridgeState !== null && rootBridgeState !== bridgeState) {
+    const error = new Error(
+      'Cannot use a private root bridge request with a different root bridge shell.'
+    );
+    error.code = 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE';
+    throw error;
+  }
+
+  const existing = rootCreateSideEffectRecords.get(record);
+  if (existing !== undefined) {
+    const existingPayload = rootCreateSideEffectPayloads.get(existing);
+    if (existingPayload && existingPayload.active) {
+      return existing;
+    }
+  }
+
+  const sourcePayload = rootRecordPayloads.get(record);
+  const container = sourcePayload.container;
+  const sideEffectSequence = rootBridgeState.nextSideEffectSequence++;
+  const sideEffectId = `${rootBridgeState.sideEffectIdPrefix}:${sideEffectSequence}`;
+  let markerRecord = null;
+  let listenerRegistration = null;
+
+  try {
+    markerRecord = markContainerAsRootWithRevertRecord(
+      record.owner,
+      container,
+      rootBridgeState.markerOptions
+    );
+    listenerRegistration = registerRootListenersForPrivateRoot(
+      container,
+      getCreateRootSideEffectListenerOptions(options)
+    );
+  } catch (error) {
+    if (markerRecord !== null) {
+      try {
+        revertContainerRootMarkerMutation(markerRecord);
+      } catch (cleanupError) {
+        error.cleanupError = {
+          code: cleanupError.code || null,
+          message: cleanupError.message
+        };
+      }
+    }
+    throw error;
+  }
+
+  const sideEffectRecord = freezeRecord({
+    $$typeof: privateRootCreateSideEffectRecordType,
+    kind: 'FastReactDomPrivateRootCreateSideEffectRecord',
+    operation: 'create',
+    requestId: record.requestId,
+    requestSequence: record.requestSequence,
+    requestType: record.requestType,
+    rootId: record.rootId,
+    rootKind: record.rootKind,
+    rootTag: record.rootTag,
+    sideEffectId,
+    sideEffectSequence,
+    sideEffectStatus: ROOT_BRIDGE_MARK_LISTEN_APPLIED,
+    markerRecord,
+    listenerRegistration,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: false,
+    markerWrites: true,
+    listenerInstallation: true,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false,
+    reversible: true
+  });
+
+  rootCreateSideEffectRecords.set(record, sideEffectRecord);
+  rootCreateSideEffectPayloads.set(sideEffectRecord, {
+    active: true,
+    bridgeState: rootBridgeState,
+    container,
+    listenerRegistration,
+    markerRecord,
+    sourceRecord: record
+  });
+
+  return sideEffectRecord;
+}
+
+function revertPrivateCreateRootSideEffectsWithBridge(bridgeState, record) {
+  const payload = rootCreateSideEffectPayloads.get(record);
+  if (payload === undefined) {
+    const error = new Error(
+      'Expected a private React DOM createRoot side-effect record.'
+    );
+    error.code = 'FAST_REACT_DOM_INVALID_ROOT_SIDE_EFFECT_RECORD';
+    throw error;
+  }
+
+  if (bridgeState !== null && payload.bridgeState !== bridgeState) {
+    const error = new Error(
+      'Cannot revert a private root bridge side-effect record with a different root bridge shell.'
+    );
+    error.code = 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE';
+    throw error;
+  }
+
+  const existingCleanup = rootCreateSideEffectCleanupRecords.get(record);
+  if (!payload.active && existingCleanup !== undefined) {
+    return existingCleanup;
+  }
+
+  const listenerCleanup = revertRootListenersForPrivateRoot(
+    payload.listenerRegistration
+  );
+  const markerCleanup = revertContainerRootMarkerMutation(payload.markerRecord);
+  payload.active = false;
+
+  const cleanupRecord = freezeRecord({
+    $$typeof: privateRootCreateSideEffectCleanupRecordType,
+    kind: 'FastReactDomPrivateRootCreateSideEffectCleanupRecord',
+    operation: 'create',
+    requestId: payload.sourceRecord.requestId,
+    requestSequence: payload.sourceRecord.requestSequence,
+    requestType: payload.sourceRecord.requestType,
+    rootId: payload.sourceRecord.rootId,
+    rootKind: payload.sourceRecord.rootKind,
+    rootTag: payload.sourceRecord.rootTag,
+    sideEffectId: record.sideEffectId,
+    sideEffectSequence: record.sideEffectSequence,
+    sideEffectStatus: ROOT_BRIDGE_MARK_LISTEN_REVERTED,
+    markerCleanup,
+    listenerCleanup,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false,
+    reversible: false
+  });
+
+  rootCreateSideEffectCleanupRecords.set(record, cleanupRecord);
+  return cleanupRecord;
 }
 
 function createPrivateRootOwner(rootId, options) {
@@ -386,6 +573,13 @@ function createClientRootRecordWithBridge(bridgeState, container, rootOptions) {
       bridgeState.markerOptions
     ),
     nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false,
     rootOptionsInfo: describeBridgeValue(rootOptions),
     owner,
     handle
@@ -464,6 +658,13 @@ function createRootUpdateRecordWithBridge(
         ? describeUnmountMarkerGuard(handleState.container)
         : null,
     nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false,
     noOp,
     renderCount: handleState.renderCount,
     sync: recordSync,
@@ -505,6 +706,16 @@ function validateRootBridgeRequestRecord(record) {
   throwInvalidRootBridgeRequest(
     'Expected a private React DOM root bridge create, render, or unmount record.'
   );
+}
+
+function validateCreateRootSideEffectRequest(record) {
+  const validation = validateRootBridgeRequestRecord(record);
+  if (validation.operation !== 'create') {
+    throwInvalidRootBridgeRequest(
+      'Expected a private React DOM root bridge create record for root marker and listener side effects.'
+    );
+  }
+  return validation;
 }
 
 function validateCreateRootBridgeRequestRecord(record) {
@@ -764,10 +975,15 @@ function createBridgeState(options) {
       options && options.requestIdPrefix,
       'request'
     ),
+    sideEffectIdPrefix: getIdPrefix(
+      options && options.sideEffectIdPrefix,
+      'side-effect'
+    ),
     updateIdPrefix: getIdPrefix(options && options.updateIdPrefix, 'update'),
     nextNativeHandleSlot: 1,
     nextNativeRootId: 1,
     nextRootSequence: 1,
+    nextSideEffectSequence: 1,
     nextUpdateSequence: 1,
     validationOptions: options && options.validationOptions
   };
@@ -792,6 +1008,17 @@ function createRequestInfo(bridgeState, requestType) {
 
 function getPositiveInteger(value, fallback) {
   return Number.isSafeInteger(value) && value > 0 ? value : fallback;
+}
+
+function getCreateRootSideEffectListenerOptions(options) {
+  if (
+    options &&
+    typeof options === 'object' &&
+    Object.prototype.hasOwnProperty.call(options, 'listenerOptions')
+  ) {
+    return options.listenerOptions;
+  }
+  return options;
 }
 
 function assertRootHandleCanRender(handleState) {
@@ -1006,6 +1233,8 @@ module.exports = {
   ROOT_BRIDGE_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_COMPATIBILITY_BLOCKED,
   ROOT_BRIDGE_EXECUTION_BLOCKED,
+  ROOT_BRIDGE_MARK_LISTEN_APPLIED,
+  ROOT_BRIDGE_MARK_LISTEN_REVERTED,
   ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED,
   ROOT_BRIDGE_REQUEST_ADMITTED,
   ROOT_LIFECYCLE_CREATED,
@@ -1020,6 +1249,7 @@ module.exports = {
   NATIVE_ROOT_BRIDGE_ROOT_HANDLE_RETIRED,
   NATIVE_ROOT_BRIDGE_SYNTHETIC_ENVIRONMENT_ID,
   admitRootBridgeRequestRecord,
+  applyPrivateCreateRootSideEffects,
   createClientRootRecord,
   createNativeRootBridgeHandoffRecord,
   createPrivateRootBridgeShell,
@@ -1038,10 +1268,13 @@ module.exports = {
   isPrivateRootHandle,
   isPrivateRootOwner,
   privateRootAdmissionRecordType,
+  privateRootCreateSideEffectCleanupRecordType,
+  privateRootCreateSideEffectRecordType,
   privateRootNativeBridgeHandleType,
   privateRootNativeHandoffRecordType,
   privateRootCreateRecordType,
   privateRootHandleType,
   privateRootOwnerType,
-  privateRootUpdateRecordType
+  privateRootUpdateRecordType,
+  revertPrivateCreateRootSideEffects
 };

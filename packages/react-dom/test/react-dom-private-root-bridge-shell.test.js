@@ -18,6 +18,10 @@ const listenerRegistry = require(path.join(
   packageRoot,
   'src/events/listener-registry.js'
 ));
+const rootListeners = require(path.join(
+  packageRoot,
+  'src/events/root-listeners.js'
+));
 const {
   DOCUMENT_NODE,
   ELEMENT_NODE
@@ -184,6 +188,181 @@ test('private native handoff stays fail-closed for invalid or foreign records', 
   });
 });
 
+test('private createRoot mark/listen gate applies and reverts explicit side effects', () => {
+  const document = createDocument('private-mark-listen');
+  const container = createElement('DIV', document);
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    sideEffectIdPrefix: 'mark-listen'
+  });
+  const create = bridge.createClientRoot(container);
+
+  assertBridgeDidNotTouchContainer(container, document);
+
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  assert.equal(bridge.applyCreateRootSideEffects(create), sideEffects);
+  assert.equal(Object.isFrozen(sideEffects), true);
+  assert.equal(
+    sideEffects.$$typeof,
+    rootBridge.privateRootCreateSideEffectRecordType
+  );
+  assert.equal(
+    sideEffects.sideEffectStatus,
+    rootBridge.ROOT_BRIDGE_MARK_LISTEN_APPLIED
+  );
+  assert.equal(sideEffects.sideEffectId, 'mark-listen:1');
+  assert.equal(sideEffects.requestId, create.requestId);
+  assert.equal(sideEffects.rootId, create.rootId);
+  assert.equal(sideEffects.nativeExecution, false);
+  assert.equal(sideEffects.reconcilerExecution, false);
+  assert.equal(sideEffects.domMutation, false);
+  assert.equal(sideEffects.markerWrites, true);
+  assert.equal(sideEffects.listenerInstallation, true);
+  assert.equal(sideEffects.hydration, false);
+  assert.equal(sideEffects.eventDispatch, false);
+  assert.equal(sideEffects.compatibilityClaimed, false);
+  assert.equal(sideEffects.reversible, true);
+
+  assert.equal(rootMarkers.getContainerRoot(container), create.owner);
+  assert.equal(rootMarkers.isContainerMarkedAsRoot(container), true);
+  assert.equal(
+    rootMarkers.inspectContainerRootMarker(container).propertyCount,
+    1
+  );
+  assert.equal(listenerRegistry.hasListeningMarker(container), true);
+  assert.equal(listenerRegistry.hasListeningMarker(document), true);
+  assert.equal(container.__registrations.length, 138);
+  assert.equal(document.__registrations.length, 1);
+  assert.equal(listenerRegistry.getEventListenerSet(container).size, 138);
+  assert.equal(listenerRegistry.getEventListenerSet(document).size, 1);
+  assert.equal(container.__mutationLog.length, 0);
+  assert.equal(document.__mutationLog.length, 0);
+
+  assert.equal(
+    sideEffects.markerRecord.$$typeof,
+    rootMarkers.privateRootMarkerMutationRecordType
+  );
+  assert.equal(
+    sideEffects.markerRecord.markerStatus,
+    rootMarkers.ROOT_MARKER_APPLIED
+  );
+  assert.equal(
+    sideEffects.listenerRegistration.$$typeof,
+    rootListeners.privateRootListenerRegistrationRecordType
+  );
+  assert.equal(
+    sideEffects.listenerRegistration.registrationStatus,
+    rootListeners.ROOT_LISTENERS_REGISTERED
+  );
+  assert.equal(sideEffects.listenerRegistration.registrationCount, 139);
+  assert.equal(sideEffects.listenerRegistration.rootRegistrationCount, 138);
+  assert.equal(
+    sideEffects.listenerRegistration.ownerDocumentRegistrationCount,
+    1
+  );
+
+  const serialized = JSON.stringify(sideEffects);
+  assert.equal(serialized.includes('__mutationLog'), false);
+  assert.equal(serialized.includes('__registrations'), false);
+  assert.equal(serialized.includes('__FAST_REACT_DOM_EVENT_TARGET__'), false);
+
+  const cleanup = bridge.revertCreateRootSideEffects(sideEffects);
+  assert.equal(bridge.revertCreateRootSideEffects(sideEffects), cleanup);
+  assert.equal(Object.isFrozen(cleanup), true);
+  assert.equal(
+    cleanup.$$typeof,
+    rootBridge.privateRootCreateSideEffectCleanupRecordType
+  );
+  assert.equal(
+    cleanup.sideEffectStatus,
+    rootBridge.ROOT_BRIDGE_MARK_LISTEN_REVERTED
+  );
+  assert.equal(cleanup.sideEffectId, sideEffects.sideEffectId);
+  assert.equal(cleanup.nativeExecution, false);
+  assert.equal(cleanup.reconcilerExecution, false);
+  assert.equal(cleanup.domMutation, false);
+  assert.equal(cleanup.markerWrites, false);
+  assert.equal(cleanup.listenerInstallation, false);
+  assert.equal(cleanup.compatibilityClaimed, false);
+  assert.equal(
+    cleanup.markerCleanup.$$typeof,
+    rootMarkers.privateRootMarkerCleanupRecordType
+  );
+  assert.equal(
+    cleanup.listenerCleanup.$$typeof,
+    rootListeners.privateRootListenerCleanupRecordType
+  );
+  assert.equal(cleanup.listenerCleanup.listenerRemovalCount, 139);
+
+  assertBridgeDidNotTouchContainer(container, document);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(
+      container,
+      listenerRegistry.internalEventHandlersKey
+    ),
+    false
+  );
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(
+      document,
+      listenerRegistry.internalEventHandlersKey
+    ),
+    false
+  );
+});
+
+test('private createRoot mark/listen gate validates records before side effects', () => {
+  const document = createDocument('private-mark-listen-validation');
+  const container = createElement('DIV', document);
+  const bridge = rootBridge.createPrivateRootBridgeShell();
+  const otherBridge = rootBridge.createPrivateRootBridgeShell();
+  const create = bridge.createClientRoot(container);
+  const render = bridge.renderContainer(create.handle, {
+    props: {},
+    type: 'span'
+  });
+
+  assert.throws(() => bridge.applyCreateRootSideEffects(render), {
+    code: 'FAST_REACT_DOM_INVALID_ROOT_BRIDGE_REQUEST'
+  });
+  assert.throws(() => otherBridge.applyCreateRootSideEffects(create), {
+    code: 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE'
+  });
+  assertBridgeDidNotTouchContainer(container, document);
+
+  const validDocument = createDocument('private-mark-listen-valid-revert');
+  const validContainer = createElement('DIV', validDocument);
+  const validCreate = bridge.createClientRoot(validContainer);
+  const sideEffects = bridge.applyCreateRootSideEffects(validCreate);
+  assert.throws(() => otherBridge.revertCreateRootSideEffects(sideEffects), {
+    code: 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE'
+  });
+  bridge.revertCreateRootSideEffects(sideEffects);
+  assertBridgeDidNotTouchContainer(validContainer, validDocument);
+
+  const invalidDocument = createDocument('private-mark-listen-no-remove');
+  const invalidContainer = createElement('DIV', invalidDocument);
+  delete invalidContainer.removeEventListener;
+  const invalidCreate = bridge.createClientRoot(invalidContainer);
+  assert.throws(() => bridge.applyCreateRootSideEffects(invalidCreate), {
+    code: 'FAST_REACT_DOM_LISTENER_REVERT_UNSUPPORTED'
+  });
+  assertBridgeDidNotTouchContainer(invalidContainer, invalidDocument);
+
+  const occupiedDocument = createDocument('private-mark-listen-occupied');
+  const occupiedContainer = createElement('DIV', occupiedDocument);
+  const existingOwner = rootBridge.createPrivateRootOwner('occupied-root:1');
+  rootMarkers.markContainerAsRoot(existingOwner, occupiedContainer);
+  const occupiedCreate = bridge.createClientRoot(occupiedContainer);
+  assert.throws(() => bridge.applyCreateRootSideEffects(occupiedCreate), {
+    code: 'FAST_REACT_DOM_ROOT_MARKER_OCCUPIED'
+  });
+  assert.equal(rootMarkers.getContainerRoot(occupiedContainer), existingOwner);
+  assert.equal(occupiedContainer.__registrations.length, 0);
+  assert.equal(occupiedDocument.__registrations.length, 0);
+});
+
 test('public react-dom/client root placeholders remain inert', () => {
   const document = createDocument('public-placeholder');
   const container = createElement('DIV', document);
@@ -311,9 +490,26 @@ function createEventTarget(fields) {
   const target = {
     ...fields,
     __mutationLog: [],
+    __removals: [],
     __registrations: [],
     addEventListener(type, listener, options) {
       this.__registrations.push({
+        listener,
+        options,
+        type
+      });
+    },
+    removeEventListener(type, listener, options) {
+      const index = this.__registrations.findIndex(
+        (entry) =>
+          entry.type === type &&
+          entry.listener === listener &&
+          entry.options === options
+      );
+      if (index !== -1) {
+        this.__registrations.splice(index, 1);
+      }
+      this.__removals.push({
         listener,
         options,
         type

@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   readCheckedReactDomClientRootOracle
@@ -29,6 +32,13 @@ import {
 
 const rootRenderOracle = readCheckedReactDomRootRenderE2EOracle();
 const clientRootOracle = readCheckedReactDomClientRootOracle();
+const require = createRequire(import.meta.url);
+const repoRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  ".."
+);
 
 test("React DOM public root facade gate blocks placeholders while oracle prerequisites remain accepted", () => {
   const gate = evaluateReactDomRootPublicFacadeBlockedGate({
@@ -346,6 +356,139 @@ test("React DOM private root bridge inspection stays record-only", () => {
   assert.equal(gate.blockedPrivateBridgeRows.length, 8);
 });
 
+test("React DOM explicit private createRoot mark/listen gate stays separate from public placeholders", () => {
+  const rootBridge = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-bridge.js")
+  );
+  const rootMarkers = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-markers.js")
+  );
+  const listenerRegistry = require(
+    path.join(repoRoot, "packages/react-dom/src/events/listener-registry.js")
+  );
+  const domContainer = require(
+    path.join(repoRoot, "packages/react-dom/src/client/dom-container.js")
+  );
+
+  const document = createPrivateGateDocument(
+    "public-facade-private-mark-listen",
+    domContainer
+  );
+  const container = createPrivateGateElement("DIV", document, domContainer);
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    sideEffectIdPrefix: "public-gate-side-effect"
+  });
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+
+  assert.equal(
+    sideEffects.sideEffectStatus,
+    rootBridge.ROOT_BRIDGE_MARK_LISTEN_APPLIED
+  );
+  assert.equal(sideEffects.markerWrites, true);
+  assert.equal(sideEffects.listenerInstallation, true);
+  assert.equal(sideEffects.nativeExecution, false);
+  assert.equal(sideEffects.reconcilerExecution, false);
+  assert.equal(sideEffects.domMutation, false);
+  assert.equal(sideEffects.compatibilityClaimed, false);
+  assert.equal(rootMarkers.getContainerRoot(container), create.owner);
+  assert.equal(container.__registrations.length, 138);
+  assert.equal(document.__registrations.length, 1);
+  assert.equal(container.__mutationLog.length, 0);
+  assert.equal(document.__mutationLog.length, 0);
+
+  const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
+  assert.equal(publicBoundary.createRoot.status, "throws");
+  assert.equal(publicBoundary.createRoot.sideEffects.listenerRegistrationCount, 0);
+  assert.equal(publicBoundary.createRoot.sideEffects.mutationCount, 0);
+  assert.equal(publicBoundary.createRoot.sideEffects.containerMarker.propertyCount, 0);
+
+  const defaultPrivateBoundary = inspectReactDomPrivateRootBridgeBoundary();
+  assert.equal(defaultPrivateBoundary.sideEffects.listenerRegistrationCount, 0);
+  assert.equal(defaultPrivateBoundary.sideEffects.mutationCount, 0);
+  assert.equal(defaultPrivateBoundary.sideEffects.containerMarker.propertyCount, 0);
+
+  const cleanup = bridge.revertCreateRootSideEffects(sideEffects);
+  assert.equal(
+    cleanup.sideEffectStatus,
+    rootBridge.ROOT_BRIDGE_MARK_LISTEN_REVERTED
+  );
+  assert.equal(rootMarkers.inspectContainerRootMarker(container).propertyCount, 0);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+  assert.equal(container.__registrations.length, 0);
+  assert.equal(document.__registrations.length, 0);
+});
+
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function createPrivateGateDocument(label, domContainer) {
+  const document = createPrivateGateEventTarget({
+    label,
+    nodeName: "#document",
+    nodeType: domContainer.DOCUMENT_NODE
+  });
+  document.ownerDocument = document;
+  document.defaultView = createPrivateGateEventTarget({
+    label: `${label}-window`
+  });
+  return document;
+}
+
+function createPrivateGateElement(nodeName, ownerDocument, domContainer) {
+  return createPrivateGateEventTarget({
+    nodeName,
+    nodeType: domContainer.ELEMENT_NODE,
+    ownerDocument
+  });
+}
+
+function createPrivateGateEventTarget(fields) {
+  const target = {
+    ...fields,
+    __mutationLog: [],
+    __registrations: [],
+    addEventListener(type, listener, options) {
+      this.__registrations.push({
+        listener,
+        options,
+        type
+      });
+    },
+    removeEventListener(type, listener, options) {
+      const index = this.__registrations.findIndex(
+        (entry) =>
+          entry.type === type &&
+          entry.listener === listener &&
+          entry.options === options
+      );
+      if (index !== -1) {
+        this.__registrations.splice(index, 1);
+      }
+    },
+    appendChild(child) {
+      this.__mutationLog.push({ child, type: "appendChild" });
+    },
+    insertBefore(child, beforeChild) {
+      this.__mutationLog.push({ beforeChild, child, type: "insertBefore" });
+    },
+    removeChild(child) {
+      this.__mutationLog.push({ child, type: "removeChild" });
+    }
+  };
+  let textContent = "";
+  Object.defineProperty(target, "textContent", {
+    configurable: true,
+    enumerable: true,
+    get() {
+      return textContent;
+    },
+    set(value) {
+      textContent = value;
+      this.__mutationLog.push({ type: "textContent", value });
+    }
+  });
+  return target;
 }
