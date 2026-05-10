@@ -30,4 +30,5 @@ name = "fast-react-test-renderer"
 version = "0.0.0"
 dependencies = [
  "fast-react-host-config",
+ "fast-react-reconciler",
 ]

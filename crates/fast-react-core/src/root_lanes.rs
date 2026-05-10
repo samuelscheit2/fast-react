@@ -402,6 +402,101 @@ impl RootLaneState {
     }
 
     #[must_use]
+    pub fn get_next_lanes(&self, wip_lanes: Lanes, root_has_pending_commit: bool) -> Lanes {
+        if self.pending_lanes.is_empty() {
+            return Lanes::NO;
+        }
+
+        let mut next_lanes = Lanes::NO;
+        let non_idle_pending_lanes = self.pending_lanes.intersect(Lanes::NON_IDLE);
+
+        if non_idle_pending_lanes.is_non_empty() {
+            let non_idle_unblocked_lanes = non_idle_pending_lanes.remove(self.suspended_lanes);
+            if non_idle_unblocked_lanes.is_non_empty() {
+                next_lanes = highest_priority_lanes(non_idle_unblocked_lanes);
+            } else {
+                let non_idle_pinged_lanes = non_idle_pending_lanes.intersect(self.pinged_lanes);
+                if non_idle_pinged_lanes.is_non_empty() {
+                    next_lanes = highest_priority_lanes(non_idle_pinged_lanes);
+                } else if !root_has_pending_commit {
+                    let lanes_to_prewarm = non_idle_pending_lanes.remove(self.warm_lanes);
+                    if lanes_to_prewarm.is_non_empty() {
+                        next_lanes = highest_priority_lanes(lanes_to_prewarm);
+                    }
+                }
+            }
+        } else {
+            let unblocked_lanes = self.pending_lanes.remove(self.suspended_lanes);
+            if unblocked_lanes.is_non_empty() {
+                next_lanes = highest_priority_lanes(unblocked_lanes);
+            } else if self.pinged_lanes.is_non_empty() {
+                next_lanes = highest_priority_lanes(self.pinged_lanes);
+            } else if !root_has_pending_commit {
+                let lanes_to_prewarm = self.pending_lanes.remove(self.warm_lanes);
+                if lanes_to_prewarm.is_non_empty() {
+                    next_lanes = highest_priority_lanes(lanes_to_prewarm);
+                }
+            }
+        }
+
+        if next_lanes.is_empty() {
+            return Lanes::NO;
+        }
+
+        if wip_lanes.is_non_empty()
+            && wip_lanes != next_lanes
+            && wip_lanes.intersect(self.suspended_lanes).is_empty()
+        {
+            let next_lane = next_lanes.highest_priority_lane();
+            let wip_lane = wip_lanes.highest_priority_lane();
+            if next_lane.bits() >= wip_lane.bits()
+                || (next_lane == Lane::DEFAULT && wip_lane.is_transition())
+            {
+                return wip_lanes;
+            }
+        }
+
+        next_lanes
+    }
+
+    #[must_use]
+    pub fn get_next_lanes_to_flush_sync(
+        &self,
+        extra_lanes_to_force_sync: impl Into<Lanes>,
+    ) -> Lanes {
+        let lanes_to_flush = Lanes::SYNC_UPDATE.merge(extra_lanes_to_force_sync.into());
+
+        if self.pending_lanes.is_empty() {
+            return Lanes::NO;
+        }
+
+        let suspended_but_not_pinged = self.suspended_lanes.remove(self.pinged_lanes);
+        let unblocked_lanes = self.pending_lanes.remove(suspended_but_not_pinged);
+        let unblocked_lanes_with_matching_priority =
+            unblocked_lanes.intersect(lanes_to_flush.lanes_of_equal_or_higher_priority());
+
+        let matching_hydration_lanes =
+            unblocked_lanes_with_matching_priority.intersect(Lanes::HYDRATION);
+        if matching_hydration_lanes.is_non_empty() {
+            return matching_hydration_lanes.merge_lane(Lane::SYNC_HYDRATION);
+        }
+
+        if unblocked_lanes_with_matching_priority.is_non_empty() {
+            return unblocked_lanes_with_matching_priority.merge_lane(Lane::SYNC);
+        }
+
+        Lanes::NO
+    }
+
+    #[must_use]
+    pub fn check_if_root_is_prerendering(&self, render_lanes: Lanes) -> bool {
+        let suspended_but_not_pinged = self.suspended_lanes.remove(self.pinged_lanes);
+        let unblocked_lanes = self.pending_lanes.remove(suspended_but_not_pinged);
+
+        unblocked_lanes.intersect(render_lanes).is_empty()
+    }
+
+    #[must_use]
     pub fn entangled_lanes_for(&self, render_lanes: Lanes) -> Lanes {
         let mut entangled_lanes = render_lanes;
 
@@ -451,6 +546,28 @@ impl Default for RootLaneState {
     fn default() -> Self {
         Self::new()
     }
+}
+
+#[must_use]
+pub fn get_next_lanes(
+    root_lanes: &RootLaneState,
+    wip_lanes: Lanes,
+    root_has_pending_commit: bool,
+) -> Lanes {
+    root_lanes.get_next_lanes(wip_lanes, root_has_pending_commit)
+}
+
+#[must_use]
+pub fn get_next_lanes_to_flush_sync(
+    root_lanes: &RootLaneState,
+    extra_lanes_to_force_sync: impl Into<Lanes>,
+) -> Lanes {
+    root_lanes.get_next_lanes_to_flush_sync(extra_lanes_to_force_sync)
+}
+
+#[must_use]
+pub fn check_if_root_is_prerendering(root_lanes: &RootLaneState, render_lanes: Lanes) -> bool {
+    root_lanes.check_if_root_is_prerendering(render_lanes)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -896,6 +1013,222 @@ mod tests {
             state.entangled_lanes_for(Lanes::INPUT_CONTINUOUS),
             Lanes::INPUT_CONTINUOUS
         );
+    }
+
+    #[test]
+    fn get_next_lanes_returns_no_work_without_pending_lanes() {
+        let state = RootLaneState::new();
+
+        assert_eq!(state.get_next_lanes(Lanes::NO, false), Lanes::NO);
+        assert_eq!(get_next_lanes(&state, Lanes::NO, false), Lanes::NO);
+    }
+
+    #[test]
+    fn get_next_lanes_selects_fresh_non_idle_pending_lanes() {
+        let mut state = RootLaneState::new();
+        state.mark_updated(Lane::TRANSITION_1);
+        state.mark_updated(Lane::DEFAULT);
+        state.mark_updated(Lane::IDLE);
+
+        assert_eq!(state.highest_priority_pending_lanes(), Lanes::DEFAULT);
+        assert_eq!(state.get_next_lanes(Lanes::NO, false), Lanes::DEFAULT);
+    }
+
+    #[test]
+    fn get_next_lanes_respects_suspended_pinged_and_prewarm_state() {
+        let mut warm_state = RootLaneState::new();
+        warm_state.mark_updated(Lane::DEFAULT);
+        warm_state.mark_suspended(Lanes::DEFAULT, Lane::NO, true);
+
+        assert_eq!(warm_state.get_next_lanes(Lanes::NO, false), Lanes::NO);
+        assert!(warm_state.check_if_root_is_prerendering(Lanes::DEFAULT));
+
+        warm_state.mark_pinged(Lanes::DEFAULT);
+        assert_eq!(warm_state.get_next_lanes(Lanes::NO, false), Lanes::DEFAULT);
+        assert!(!warm_state.check_if_root_is_prerendering(Lanes::DEFAULT));
+
+        let mut prewarm_state = RootLaneState::new();
+        prewarm_state.mark_updated(Lane::DEFAULT);
+        prewarm_state.mark_suspended(Lanes::DEFAULT, Lane::NO, false);
+
+        assert_eq!(
+            prewarm_state.get_next_lanes(Lanes::NO, false),
+            Lanes::DEFAULT
+        );
+        assert!(check_if_root_is_prerendering(
+            &prewarm_state,
+            Lanes::DEFAULT
+        ));
+        assert_eq!(prewarm_state.get_next_lanes(Lanes::NO, true), Lanes::NO);
+    }
+
+    #[test]
+    fn get_next_lanes_waits_on_non_idle_work_before_idle_work() {
+        let mut idle_only = RootLaneState::new();
+        idle_only.mark_updated(Lane::IDLE);
+        assert_eq!(idle_only.get_next_lanes(Lanes::NO, false), Lanes::IDLE);
+
+        let mut state = RootLaneState::new();
+        state.mark_updated(Lane::DEFAULT);
+        state.mark_suspended(Lanes::DEFAULT, Lane::NO, true);
+        state.mark_updated(Lane::IDLE);
+
+        assert_eq!(state.get_next_lanes(Lanes::NO, false), Lanes::NO);
+    }
+
+    #[test]
+    fn get_next_lanes_groups_retries_and_waits_for_retry_ping() {
+        let mut pending_state = RootLaneState::new();
+        pending_state.mark_updated(Lane::RETRY_1);
+        pending_state.mark_updated(Lane::RETRY_3);
+
+        assert_eq!(
+            pending_state.get_next_lanes(Lanes::NO, false),
+            lanes(&[Lane::RETRY_1, Lane::RETRY_3])
+        );
+
+        let mut suspended_state = RootLaneState::new();
+        suspended_state.mark_updated(Lane::RETRY_1);
+        suspended_state.mark_updated(Lane::RETRY_2);
+        suspended_state.mark_suspended(lanes(&[Lane::RETRY_1, Lane::RETRY_2]), Lane::NO, true);
+        assert_eq!(suspended_state.get_next_lanes(Lanes::NO, false), Lanes::NO);
+
+        suspended_state.mark_pinged(Lanes::from(Lane::RETRY_2));
+        assert_eq!(
+            suspended_state.get_next_lanes(Lanes::NO, false),
+            Lanes::from(Lane::RETRY_2)
+        );
+    }
+
+    #[test]
+    fn get_next_lanes_groups_sync_updates_like_react_source() {
+        let mut state = RootLaneState::new();
+        state.mark_updated(Lane::SYNC);
+        state.mark_updated(Lane::INPUT_CONTINUOUS);
+        state.mark_updated(Lane::DEFAULT);
+        state.mark_updated(Lane::TRANSITION_1);
+
+        assert_eq!(state.get_next_lanes(Lanes::NO, false), Lanes::SYNC_UPDATE);
+    }
+
+    #[test]
+    fn get_next_lanes_preserves_in_progress_work_when_priority_allows() {
+        let mut lower_priority_update = RootLaneState::new();
+        lower_priority_update.mark_updated(Lane::TRANSITION_1);
+        assert_eq!(
+            lower_priority_update.get_next_lanes(Lanes::DEFAULT, false),
+            Lanes::DEFAULT
+        );
+
+        let mut default_during_transition = RootLaneState::new();
+        default_during_transition.mark_updated(Lane::DEFAULT);
+        default_during_transition.mark_updated(Lane::TRANSITION_1);
+        assert_eq!(
+            default_during_transition.get_next_lanes(Lanes::from(Lane::TRANSITION_1), false),
+            Lanes::from(Lane::TRANSITION_1)
+        );
+
+        let mut higher_priority_update = RootLaneState::new();
+        higher_priority_update.mark_updated(Lane::SYNC);
+        higher_priority_update.mark_updated(Lane::DEFAULT);
+        assert_eq!(
+            higher_priority_update.get_next_lanes(Lanes::DEFAULT, false),
+            Lanes::SYNC.merge(Lanes::DEFAULT)
+        );
+    }
+
+    #[test]
+    fn get_next_lanes_keeps_selection_priority_separate_from_entanglements() {
+        let mut state = RootLaneState::new();
+        state.mark_updated(Lane::DEFAULT);
+        state.mark_updated(Lane::TRANSITION_1);
+        state.mark_entangled(lanes(&[Lane::DEFAULT, Lane::TRANSITION_1]));
+
+        let selected = state.get_next_lanes(Lanes::NO, false);
+        assert_eq!(selected, Lanes::DEFAULT);
+        assert_eq!(
+            state.entangled_lanes_for(selected),
+            lanes(&[Lane::DEFAULT, Lane::TRANSITION_1])
+        );
+    }
+
+    #[test]
+    fn get_next_lanes_exposes_expired_lanes_without_changing_selection_priority() {
+        let mut state = RootLaneState::new();
+        state.mark_updated(Lane::TRANSITION_1);
+        state.mark_expired(Lanes::from(Lane::TRANSITION_1));
+
+        let expired_selected = state.get_next_lanes(Lanes::NO, false);
+        assert_eq!(expired_selected, Lanes::from(Lane::TRANSITION_1));
+        assert!(state.includes_expired_lane(expired_selected));
+
+        state.mark_updated(Lane::DEFAULT);
+        let higher_priority_selected = state.get_next_lanes(Lanes::NO, false);
+        assert_eq!(higher_priority_selected, Lanes::DEFAULT);
+        assert!(!state.includes_expired_lane(higher_priority_selected));
+    }
+
+    #[test]
+    fn get_next_lanes_to_flush_sync_excludes_suspended_lanes_until_pinged() {
+        let mut state = RootLaneState::new();
+        state.mark_updated(Lane::DEFAULT);
+        state.mark_suspended(Lanes::DEFAULT, Lane::NO, true);
+
+        assert_eq!(get_next_lanes_to_flush_sync(&state, Lanes::NO), Lanes::NO);
+
+        state.mark_pinged(Lanes::DEFAULT);
+        assert_eq!(
+            state.get_next_lanes_to_flush_sync(Lanes::NO),
+            Lanes::SYNC.merge(Lanes::DEFAULT)
+        );
+    }
+
+    #[test]
+    fn get_next_lanes_to_flush_sync_batches_equal_or_higher_priority_lanes() {
+        let mut state = RootLaneState::new();
+        state.mark_updated(Lane::DEFAULT);
+        state.mark_updated(Lane::TRANSITION_1);
+        state.mark_updated(Lane::RETRY_1);
+
+        let selected = state.get_next_lanes_to_flush_sync(Lane::TRANSITION_1);
+
+        assert_eq!(
+            selected,
+            lanes(&[Lane::SYNC, Lane::DEFAULT, Lane::TRANSITION_1])
+        );
+        assert!(!selected.contains_lane(Lane::RETRY_1));
+    }
+
+    #[test]
+    fn get_next_lanes_to_flush_sync_isolates_hydration_lanes() {
+        let mut state = RootLaneState::new();
+        state.mark_updated(Lane::DEFAULT_HYDRATION);
+        state.mark_updated(Lane::DEFAULT);
+
+        let selected = state.get_next_lanes_to_flush_sync(Lanes::NO);
+
+        assert_eq!(
+            selected,
+            lanes(&[Lane::SYNC_HYDRATION, Lane::DEFAULT_HYDRATION])
+        );
+        assert!(!selected.contains_lane(Lane::DEFAULT));
+    }
+
+    #[test]
+    fn offscreen_suspended_warm_selection_fails_closed_until_pinged() {
+        let mut state = RootLaneState::new();
+        state.mark_updated(Lane::OFFSCREEN);
+        state.mark_suspended(Lanes::OFFSCREEN, Lane::NO, true);
+
+        // Core does not own Offscreen visibility or wakeable listeners yet, so
+        // fully warm suspended Offscreen work stays unscheduled until a ping or
+        // a future update changes the lane state.
+        assert_eq!(state.get_next_lanes(Lanes::NO, false), Lanes::NO);
+        assert!(state.check_if_root_is_prerendering(Lanes::OFFSCREEN));
+
+        state.mark_pinged(Lanes::OFFSCREEN);
+        assert_eq!(state.get_next_lanes(Lanes::NO, false), Lanes::OFFSCREEN);
+        assert!(!state.check_if_root_is_prerendering(Lanes::OFFSCREEN));
     }
 
     #[test]
