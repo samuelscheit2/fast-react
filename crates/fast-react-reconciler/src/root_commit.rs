@@ -1112,6 +1112,23 @@ impl FunctionComponentDeletedSubtreePendingPassiveEffectCommitRecord {
     pub(crate) const fn unmount_order(self) -> PendingPassiveEffectOrder {
         self.unmount_order
     }
+
+    #[must_use]
+    pub(crate) const fn unmount_phase_record(
+        self,
+    ) -> FunctionComponentPendingPassiveEffectPhaseCommitRecord {
+        FunctionComponentPendingPassiveEffectPhaseCommitRecord {
+            fiber: self.fiber,
+            effect_index: self.effect_index,
+            effect: self.effect,
+            instance: self.instance,
+            create: None,
+            destroy: self.destroy,
+            lanes: self.lanes,
+            phase: PendingPassiveEffectPhase::Unmount,
+            order: self.unmount_order,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1199,6 +1216,16 @@ impl FunctionComponentDeletedSubtreePassiveEffectsSnapshot {
             .iter()
             .filter(|record| record.destroy().is_some())
             .count()
+    }
+
+    #[must_use]
+    pub(crate) fn effect_phase_records(
+        &self,
+    ) -> Vec<FunctionComponentPendingPassiveEffectPhaseCommitRecord> {
+        self.records
+            .iter()
+            .map(|record| record.unmount_phase_record())
+            .collect()
     }
 }
 
@@ -11605,6 +11632,69 @@ mod tests {
         assert_eq!(order_records[2].host_cleanup_sequence(), Some(0));
         assert_eq!(order_records[3].fiber(), fixture.deleted_host);
         assert_eq!(order_records[3].host_cleanup_sequence(), Some(1));
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_deletion_passive_snapshot_exposes_unmount_phase_records_for_private_flush() {
+        let (mut store, root_id, host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(49), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let fixture = attach_deleted_host_subtree_ref_passive_fixture(
+            &mut store,
+            &mut hook_store,
+            render.finished_work(),
+        );
+        let deleted_passive_handoff =
+            queue_function_component_deleted_subtree_pending_passive_effects(
+                &mut store,
+                root_id,
+                &hook_store,
+                render.finished_work(),
+                fixture.deleted_host,
+                Lanes::DEFAULT,
+            )
+            .unwrap();
+        let queued_passive = deleted_passive_handoff.records()[0];
+
+        let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+        commit
+            .record_function_component_deleted_subtree_passive_effects_for_canary(&[
+                deleted_passive_handoff,
+            ])
+            .unwrap();
+        let snapshot = commit.function_component_deleted_subtree_passive_effects();
+        let phase_records = snapshot.effect_phase_records();
+
+        assert_eq!(snapshot.len(), 1);
+        assert_eq!(snapshot.destroy_count(), 1);
+        assert_eq!(snapshot.records()[0], queued_passive);
+        assert_eq!(phase_records.len(), 1);
+        assert_eq!(phase_records[0].fiber(), fixture.deleted_function);
+        assert_eq!(phase_records[0].effect_index(), 0);
+        assert_eq!(phase_records[0].effect(), queued_passive.effect());
+        assert_eq!(phase_records[0].instance(), queued_passive.instance());
+        assert_eq!(phase_records[0].create(), None);
+        assert_eq!(phase_records[0].destroy(), Some(fixture.passive_destroy));
+        assert_eq!(phase_records[0].lanes(), Lanes::DEFAULT);
+        assert_eq!(phase_records[0].phase(), PendingPassiveEffectPhase::Unmount);
+        assert_eq!(phase_records[0].order(), queued_passive.unmount_order());
+
+        let order_gate = commit.deletion_cleanup_order_gate_for_canary();
+        assert_eq!(
+            order_gate.records()[0].phase(),
+            HostRootDeletionCleanupOrderPhase::RefCleanupReturn
+        );
+        assert_eq!(
+            order_gate.records()[1].phase(),
+            HostRootDeletionCleanupOrderPhase::PassiveDestroy
+        );
+        assert_eq!(
+            order_gate.records()[2].phase(),
+            HostRootDeletionCleanupOrderPhase::HostNodeCleanup
+        );
+        assert!(!order_gate.public_ref_or_effect_compatibility_claimed());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
