@@ -101,6 +101,21 @@ the oracle fixtures.
 - No-index `git diff --check` over untracked worker files passed.
 - Scoped trailing-whitespace and conflict-marker scans passed.
 
+## Orchestrator Acceptance Verification
+
+- Worker tmux pane reported `Goal achieved`.
+- Merged current `main` into
+  `worker/172-resource-form-unsupported-gates` without conflicts.
+- `node --check` passed for all three new unsupported-gate source files.
+- Focused resource hints test passed: 12/12.
+- Focused form actions test passed: 13/13.
+- Focused controlled input test passed: 12/12.
+- `npm run test:conformance` passed with 433 conformance tests.
+- `npm run check:js` passed on the integrated branch, including the package
+  surface guard, import smoke, benchmark gate, workspace checks, and 433
+  conformance tests.
+- `git diff --check main...HEAD` passed.
+
 ## Evidence Gathered
 
 - Current `packages/react-dom/index.js` and `profiling.js` expose resource and
