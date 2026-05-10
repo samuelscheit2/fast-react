@@ -56,10 +56,12 @@ use crate::{
         FunctionComponentSingleChildBeginWorkRecord, HostRootOneLevelChildSet,
         HostRootOneLevelChildSetBeginWorkError, HostRootOneLevelChildSetBeginWorkRecord,
         HostRootOneLevelChildSetEntry, HostRootOneLevelChildSetKind,
+        NestedContextProviderTwoConsumerUseContextBeginWorkRecord,
         begin_work_context_provider_child, begin_work_context_provider_use_context_child,
         begin_work_context_provider_use_context_single_child,
         begin_work_context_provider_use_context_single_child_for_complete_traversal,
         begin_work_host_root_one_level_child_set,
+        begin_work_nested_context_provider_two_consumer_use_context_children,
         begin_work_reconcile_function_component_single_child,
     },
     commit_finished_host_root,
@@ -1739,6 +1741,155 @@ impl HostRootContextProviderUseContextPropagationGateRecord {
 }
 
 #[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct HostRootNestedContextProviderTwoConsumerPropagationGateRequest {
+    root: FiberRootId,
+    host_root_work_in_progress: FiberId,
+    render_lanes: Lanes,
+    outer_context: ContextHandle,
+    outer_value: ContextValueHandle,
+    inner_context: ContextHandle,
+    inner_value: ContextValueHandle,
+    next_value: ContextValueHandle,
+    propagation_lanes: Lanes,
+}
+
+#[cfg(test)]
+impl HostRootNestedContextProviderTwoConsumerPropagationGateRequest {
+    #[must_use]
+    const fn new(
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        render_lanes: Lanes,
+        outer_context: ContextHandle,
+        outer_value: ContextValueHandle,
+        inner_context: ContextHandle,
+        inner_value: ContextValueHandle,
+        next_value: ContextValueHandle,
+        propagation_lanes: Lanes,
+    ) -> Self {
+        Self {
+            root,
+            host_root_work_in_progress,
+            render_lanes,
+            outer_context,
+            outer_value,
+            inner_context,
+            inner_value,
+            next_value,
+            propagation_lanes,
+        }
+    }
+
+    #[must_use]
+    const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    const fn host_root_work_in_progress(self) -> FiberId {
+        self.host_root_work_in_progress
+    }
+
+    #[must_use]
+    const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    const fn outer_context(self) -> ContextHandle {
+        self.outer_context
+    }
+
+    #[must_use]
+    const fn outer_value(self) -> ContextValueHandle {
+        self.outer_value
+    }
+
+    #[must_use]
+    const fn inner_context(self) -> ContextHandle {
+        self.inner_context
+    }
+
+    #[must_use]
+    const fn inner_value(self) -> ContextValueHandle {
+        self.inner_value
+    }
+
+    #[must_use]
+    const fn propagation_lanes(self) -> Lanes {
+        self.propagation_lanes
+    }
+
+    #[must_use]
+    const fn change(self) -> ContextValueChange {
+        ContextValueChange::new(self.inner_context, self.inner_value, self.next_value)
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct HostRootNestedContextProviderTwoConsumerPropagationGateRecord {
+    root: FiberRootId,
+    host_root_work_in_progress: FiberId,
+    outer_provider: FiberId,
+    inner_provider: FiberId,
+    first_function_component: FiberId,
+    second_function_component: FiberId,
+    begin_work: NestedContextProviderTwoConsumerUseContextBeginWorkRecord,
+    first_propagation: FunctionComponentContextChangePropagationRecord,
+    second_propagation: FunctionComponentContextChangePropagationRecord,
+}
+
+#[cfg(test)]
+impl HostRootNestedContextProviderTwoConsumerPropagationGateRecord {
+    #[must_use]
+    const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    const fn host_root_work_in_progress(&self) -> FiberId {
+        self.host_root_work_in_progress
+    }
+
+    #[must_use]
+    const fn outer_provider(&self) -> FiberId {
+        self.outer_provider
+    }
+
+    #[must_use]
+    const fn inner_provider(&self) -> FiberId {
+        self.inner_provider
+    }
+
+    #[must_use]
+    const fn first_function_component(&self) -> FiberId {
+        self.first_function_component
+    }
+
+    #[must_use]
+    const fn second_function_component(&self) -> FiberId {
+        self.second_function_component
+    }
+
+    #[must_use]
+    const fn begin_work(&self) -> NestedContextProviderTwoConsumerUseContextBeginWorkRecord {
+        self.begin_work
+    }
+
+    #[must_use]
+    const fn first_propagation(&self) -> &FunctionComponentContextChangePropagationRecord {
+        &self.first_propagation
+    }
+
+    #[must_use]
+    const fn second_propagation(&self) -> &FunctionComponentContextChangePropagationRecord {
+        &self.second_propagation
+    }
+}
+
+#[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum HostRootContextProviderUseContextPropagationGateError {
     ChildPreflight(Box<HostRootChildBeginWorkPreflightError>),
@@ -1785,6 +1936,109 @@ impl From<HostRootCompleteWorkHandoffError>
 #[cfg(test)]
 impl From<FunctionComponentContextChangePropagationError>
     for HostRootContextProviderUseContextPropagationGateError
+{
+    fn from(error: FunctionComponentContextChangePropagationError) -> Self {
+        Self::Propagation(error)
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum HostRootNestedContextProviderTwoConsumerPropagationGateError {
+    ChildPreflight(Box<HostRootChildBeginWorkPreflightError>),
+    NestedContextProvider(Box<NestedContextProviderBeginWorkError>),
+    CompleteWork(HostRootCompleteWorkHandoffError),
+    Propagation(FunctionComponentContextChangePropagationError),
+    MissingContextProviderChild {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+    },
+    ExpectedContextProviderChild {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        child: FiberId,
+        tag: FiberTag,
+    },
+}
+
+#[cfg(test)]
+impl Display for HostRootNestedContextProviderTwoConsumerPropagationGateError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ChildPreflight(error) => Display::fmt(error, formatter),
+            Self::NestedContextProvider(error) => Display::fmt(error, formatter),
+            Self::CompleteWork(error) => Display::fmt(error, formatter),
+            Self::Propagation(error) => Display::fmt(error, formatter),
+            Self::MissingContextProviderChild {
+                root,
+                host_root_work_in_progress,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} has no ContextProvider child for private nested multi-consumer context propagation",
+                root.raw(),
+                host_root_work_in_progress.slot().get()
+            ),
+            Self::ExpectedContextProviderChild {
+                root,
+                host_root_work_in_progress,
+                child,
+                tag,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} child {} must be ContextProvider for private nested multi-consumer context propagation, found {:?}",
+                root.raw(),
+                host_root_work_in_progress.slot().get(),
+                child.slot().get(),
+                tag
+            ),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Error for HostRootNestedContextProviderTwoConsumerPropagationGateError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::ChildPreflight(error) => Some(error.as_ref()),
+            Self::NestedContextProvider(error) => Some(error.as_ref()),
+            Self::CompleteWork(error) => Some(error),
+            Self::Propagation(error) => Some(error),
+            Self::MissingContextProviderChild { .. }
+            | Self::ExpectedContextProviderChild { .. } => None,
+        }
+    }
+}
+
+#[cfg(test)]
+impl From<HostRootChildBeginWorkPreflightError>
+    for HostRootNestedContextProviderTwoConsumerPropagationGateError
+{
+    fn from(error: HostRootChildBeginWorkPreflightError) -> Self {
+        Self::ChildPreflight(Box::new(error))
+    }
+}
+
+#[cfg(test)]
+impl From<NestedContextProviderBeginWorkError>
+    for HostRootNestedContextProviderTwoConsumerPropagationGateError
+{
+    fn from(error: NestedContextProviderBeginWorkError) -> Self {
+        Self::NestedContextProvider(Box::new(error))
+    }
+}
+
+#[cfg(test)]
+impl From<HostRootCompleteWorkHandoffError>
+    for HostRootNestedContextProviderTwoConsumerPropagationGateError
+{
+    fn from(error: HostRootCompleteWorkHandoffError) -> Self {
+        Self::CompleteWork(error)
+    }
+}
+
+#[cfg(test)]
+impl From<FunctionComponentContextChangePropagationError>
+    for HostRootNestedContextProviderTwoConsumerPropagationGateError
 {
     fn from(error: FunctionComponentContextChangePropagationError) -> Self {
         Self::Propagation(error)
@@ -2066,6 +2320,92 @@ fn propagate_host_root_context_provider_use_context_change_for_test(
         begin_work,
         propagation,
     })
+}
+
+#[cfg(test)]
+fn propagate_host_root_nested_context_provider_two_consumer_use_context_change_for_test(
+    store: &mut FiberRootStore<RecordingHost>,
+    render: HostRootRenderPhaseRecord,
+    request: HostRootNestedContextProviderTwoConsumerPropagationGateRequest,
+    context_store: &mut FunctionComponentContextRenderStore,
+    invoker: &mut impl FunctionComponentContextConsumerInvoker,
+) -> Result<
+    HostRootNestedContextProviderTwoConsumerPropagationGateRecord,
+    HostRootNestedContextProviderTwoConsumerPropagationGateError,
+> {
+    validate_completed_host_root_render_for_complete_work_handoff(store, render)?;
+    let validated = validate_host_root_child_preflight(
+        store,
+        request.root(),
+        request.host_root_work_in_progress(),
+        request.render_lanes(),
+    )?;
+    let outer_provider = validated.child.ok_or(
+        HostRootNestedContextProviderTwoConsumerPropagationGateError::MissingContextProviderChild {
+            root: request.root(),
+            host_root_work_in_progress: request.host_root_work_in_progress(),
+        },
+    )?;
+    let child_tag = validated.child_tag.ok_or(
+        HostRootNestedContextProviderTwoConsumerPropagationGateError::MissingContextProviderChild {
+            root: request.root(),
+            host_root_work_in_progress: request.host_root_work_in_progress(),
+        },
+    )?;
+    if child_tag != FiberTag::ContextProvider {
+        return Err(
+            HostRootNestedContextProviderTwoConsumerPropagationGateError::ExpectedContextProviderChild {
+                root: request.root(),
+                host_root_work_in_progress: request.host_root_work_in_progress(),
+                child: outer_provider,
+                tag: child_tag,
+            },
+        );
+    }
+
+    let begin_work = begin_work_nested_context_provider_two_consumer_use_context_children(
+        store.fiber_arena_mut(),
+        NestedContextProviderBeginWorkRequest::new(
+            outer_provider,
+            request.render_lanes(),
+            request.outer_context(),
+            request.outer_value(),
+            request.inner_context(),
+            request.inner_value(),
+        ),
+        context_store,
+        invoker,
+    )?;
+    let propagation_request = FunctionComponentContextChangePropagationRequest::new(
+        request.change(),
+        request.propagation_lanes(),
+    );
+    let first_propagation = propagate_context_change_to_function_component_dependencies(
+        store,
+        context_store,
+        begin_work.first_child_render(),
+        propagation_request,
+    )?;
+    let second_propagation = propagate_context_change_to_function_component_dependencies(
+        store,
+        context_store,
+        begin_work.second_child_render(),
+        propagation_request,
+    )?;
+
+    Ok(
+        HostRootNestedContextProviderTwoConsumerPropagationGateRecord {
+            root: request.root(),
+            host_root_work_in_progress: request.host_root_work_in_progress(),
+            outer_provider,
+            inner_provider: begin_work.inner_provider(),
+            first_function_component: begin_work.first_child(),
+            second_function_component: begin_work.second_child(),
+            begin_work,
+            first_propagation,
+            second_propagation,
+        },
+    )
 }
 
 #[cfg(test)]
@@ -3381,22 +3721,35 @@ mod tests {
         ReadTwice { context: ContextHandle },
     }
 
-    #[derive(Debug)]
-    struct TestUseContextComponentRegistry {
+    #[derive(Debug, Clone, Copy)]
+    struct RegisteredUseContextComponent {
         component: FiberTypeHandle,
         behavior: UseContextBehavior,
+    }
+
+    #[derive(Debug)]
+    struct TestUseContextComponentRegistry {
+        components: Vec<RegisteredUseContextComponent>,
         calls: Vec<FunctionComponentInvocationRequest>,
         reads: Vec<FunctionComponentContextReadRecord>,
     }
 
     impl TestUseContextComponentRegistry {
         fn new(component: FiberTypeHandle, behavior: UseContextBehavior) -> Self {
-            Self {
-                component,
-                behavior,
+            let mut registry = Self {
+                components: Vec::new(),
                 calls: Vec::new(),
                 reads: Vec::new(),
-            }
+            };
+            registry.register(component, behavior);
+            registry
+        }
+
+        fn register(&mut self, component: FiberTypeHandle, behavior: UseContextBehavior) {
+            self.components.push(RegisteredUseContextComponent {
+                component,
+                behavior,
+            });
         }
 
         fn calls(&self) -> &[FunctionComponentInvocationRequest] {
@@ -3415,7 +3768,11 @@ mod tests {
             reader: &mut FunctionComponentContextRenderReader<'_>,
         ) -> Result<FunctionComponentOutputHandle, FunctionComponentRenderError> {
             self.calls.push(request);
-            if request.component() != self.component {
+            let Some(component) = self
+                .components
+                .iter()
+                .find(|component| component.component == request.component())
+            else {
                 return Err(FunctionComponentRenderError::Invocation {
                     fiber: request.fiber(),
                     component: request.component(),
@@ -3423,9 +3780,9 @@ mod tests {
                         "missing use_context test component registration",
                     ),
                 });
-            }
+            };
 
-            match self.behavior {
+            match component.behavior {
                 UseContextBehavior::ReadOnce { context } => {
                     let read = reader.use_context(context)?;
                     self.reads.push(read);
@@ -3671,6 +4028,87 @@ mod tests {
             .unwrap();
 
         (outer_provider, inner_provider, work_in_progress, component)
+    }
+
+    fn attach_nested_context_provider_two_consumer_wip_children(
+        store: &mut FiberRootStore<RecordingHost>,
+        host_root_work_in_progress: FiberId,
+    ) -> (
+        FiberId,
+        FiberId,
+        FiberId,
+        FiberTypeHandle,
+        FiberId,
+        FiberTypeHandle,
+    ) {
+        let outer_provider = store.fiber_arena_mut().create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(841),
+            FiberMode::NO,
+        );
+        let inner_provider = store.fiber_arena_mut().create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(842),
+            FiberMode::NO,
+        );
+        let first_current = store.fiber_arena_mut().create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(843),
+            FiberMode::NO,
+        );
+        let first_component = FiberTypeHandle::from_raw(844);
+        store
+            .fiber_arena_mut()
+            .get_mut(first_current)
+            .unwrap()
+            .set_fiber_type(first_component);
+        let first_work_in_progress = store
+            .fiber_arena_mut()
+            .create_work_in_progress(first_current, PropsHandle::from_raw(845))
+            .unwrap();
+        let second_current = store.fiber_arena_mut().create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(846),
+            FiberMode::NO,
+        );
+        let second_component = FiberTypeHandle::from_raw(847);
+        store
+            .fiber_arena_mut()
+            .get_mut(second_current)
+            .unwrap()
+            .set_fiber_type(second_component);
+        let second_work_in_progress = store
+            .fiber_arena_mut()
+            .create_work_in_progress(second_current, PropsHandle::from_raw(848))
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(
+                inner_provider,
+                &[first_work_in_progress, second_work_in_progress],
+            )
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(outer_provider, &[inner_provider])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root_work_in_progress, &[outer_provider])
+            .unwrap();
+
+        (
+            outer_provider,
+            inner_provider,
+            first_work_in_progress,
+            first_component,
+            second_work_in_progress,
+            second_component,
+        )
     }
 
     fn context_value(raw: u64) -> ContextValueHandle {
@@ -4413,6 +4851,255 @@ mod tests {
                 .flags()
                 .contains_any(FiberFlags::NEEDS_PROPAGATION)
         );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+    }
+
+    #[test]
+    fn root_work_loop_nested_context_provider_change_propagation_marks_two_consumers_and_unwinds() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(137), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let host_root_work_in_progress = render.work_in_progress();
+        let (
+            outer_provider,
+            inner_provider,
+            first_function_component,
+            first_component,
+            second_function_component,
+            second_component,
+        ) = attach_nested_context_provider_two_consumer_wip_children(
+            &mut store,
+            host_root_work_in_progress,
+        );
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let default_value = context_value(1_120);
+        let outer_value = context_value(1_121);
+        let previous_inner_value = context_value(1_122);
+        let next_inner_value = context_value(1_123);
+        let context = context_store.create_context(default_value);
+        let mut registry = TestUseContextComponentRegistry::new(
+            first_component,
+            UseContextBehavior::ReadOnce { context },
+        );
+        registry.register(second_component, UseContextBehavior::ReadOnce { context });
+        let propagation_lanes = Lanes::SYNC
+            .merge_lane(Lane::TRANSITION_1)
+            .merge_lane(Lane::RETRY_1);
+
+        let record =
+            propagate_host_root_nested_context_provider_two_consumer_use_context_change_for_test(
+                &mut store,
+                render,
+                HostRootNestedContextProviderTwoConsumerPropagationGateRequest::new(
+                    root_id,
+                    host_root_work_in_progress,
+                    Lanes::DEFAULT,
+                    context,
+                    outer_value,
+                    context,
+                    previous_inner_value,
+                    next_inner_value,
+                    propagation_lanes,
+                ),
+                &mut context_store,
+                &mut registry,
+            )
+            .unwrap();
+
+        assert_eq!(record.root(), root_id);
+        assert_eq!(
+            record.host_root_work_in_progress(),
+            host_root_work_in_progress
+        );
+        assert_eq!(record.outer_provider(), outer_provider);
+        assert_eq!(record.inner_provider(), inner_provider);
+        assert_eq!(record.first_function_component(), first_function_component);
+        assert_eq!(
+            record.second_function_component(),
+            second_function_component
+        );
+
+        let begin_work = record.begin_work();
+        assert_eq!(begin_work.outer_provider(), outer_provider);
+        assert_eq!(begin_work.inner_provider(), inner_provider);
+        assert_eq!(begin_work.first_child(), first_function_component);
+        assert_eq!(begin_work.second_child(), second_function_component);
+        assert_eq!(begin_work.outer_context(), context);
+        assert_eq!(begin_work.inner_context(), context);
+        assert_eq!(begin_work.outer_value(), outer_value);
+        assert_eq!(begin_work.inner_value(), previous_inner_value);
+        assert_eq!(begin_work.outer_pushed_stack_depth(), 1);
+        assert_eq!(begin_work.inner_pushed_stack_depth(), 2);
+        assert_eq!(begin_work.inner_restored_stack_depth(), 1);
+        assert_eq!(begin_work.outer_restored_stack_depth(), 0);
+        assert_eq!(begin_work.first_child_context_read_count(), 1);
+        assert_eq!(begin_work.second_child_context_read_count(), 1);
+
+        assert_eq!(registry.calls().len(), 2);
+        assert_eq!(registry.calls()[0].fiber(), first_function_component);
+        assert_eq!(registry.calls()[1].fiber(), second_function_component);
+        assert_eq!(
+            registry.calls()[0].context_state().unwrap().stack_depth(),
+            2
+        );
+        assert_eq!(
+            registry.calls()[1].context_state().unwrap().stack_depth(),
+            2
+        );
+
+        let first_read = begin_work.first_child_context_read();
+        let second_read = begin_work.second_child_context_read();
+        assert_eq!(registry.reads(), &[first_read, second_read]);
+        for (read, consumer) in [
+            (first_read, first_function_component),
+            (second_read, second_function_component),
+        ] {
+            assert_eq!(read.fiber(), consumer);
+            assert_eq!(read.context(), context);
+            assert_eq!(read.default_value(), default_value);
+            assert_eq!(read.value(), previous_inner_value);
+            assert_eq!(read.active_provider_count(), 2);
+        }
+        assert_eq!(
+            context_store.context_reads_for_record(begin_work.first_child_render()),
+            &[first_read]
+        );
+        assert_eq!(
+            context_store.context_reads_for_record(begin_work.second_child_render()),
+            &[second_read]
+        );
+        assert_eq!(context_store.current_value(context).unwrap(), default_value);
+        assert_eq!(context_store.stack_depth(), 0);
+        assert_eq!(context_store.active_provider_count(context).unwrap(), 0);
+
+        let first_propagation = record.first_propagation();
+        assert_eq!(first_propagation.context(), context);
+        assert_eq!(first_propagation.previous_value(), previous_inner_value);
+        assert_eq!(first_propagation.next_value(), next_inner_value);
+        assert_eq!(first_propagation.propagation_lanes(), propagation_lanes);
+        assert_eq!(first_propagation.scanned_dependency_count(), 1);
+        assert_eq!(first_propagation.marked_dependency_count(), 1);
+        assert_eq!(first_propagation.roots(), &[root_id]);
+        let first_marked = first_propagation.marked_dependencies()[0];
+        assert_eq!(first_marked.dependency(), first_read.dependency());
+        assert_eq!(first_marked.fiber(), first_function_component);
+        assert_eq!(first_marked.memoized_value(), previous_inner_value);
+        assert_eq!(first_marked.previous_dependency_lanes(), Lanes::NO);
+        assert_eq!(first_marked.dependency_lanes(), propagation_lanes);
+
+        let second_propagation = record.second_propagation();
+        assert_eq!(second_propagation.context(), context);
+        assert_eq!(second_propagation.previous_value(), previous_inner_value);
+        assert_eq!(second_propagation.next_value(), next_inner_value);
+        assert_eq!(second_propagation.propagation_lanes(), propagation_lanes);
+        assert_eq!(second_propagation.scanned_dependency_count(), 1);
+        assert_eq!(second_propagation.marked_dependency_count(), 1);
+        assert_eq!(second_propagation.roots(), &[root_id]);
+        let second_marked = second_propagation.marked_dependencies()[0];
+        assert_eq!(second_marked.dependency(), second_read.dependency());
+        assert_eq!(second_marked.fiber(), second_function_component);
+        assert_eq!(second_marked.memoized_value(), previous_inner_value);
+        assert_eq!(second_marked.previous_dependency_lanes(), Lanes::NO);
+        assert_eq!(second_marked.dependency_lanes(), propagation_lanes);
+
+        for read in [first_read, second_read] {
+            assert_eq!(
+                context_store
+                    .context_dependency(read.dependency())
+                    .unwrap()
+                    .dependency_lanes(),
+                propagation_lanes
+            );
+        }
+
+        for consumer in [first_function_component, second_function_component] {
+            let consumer_node = store.fiber_arena().get(consumer).unwrap();
+            assert!(consumer_node.lanes().contains_all(propagation_lanes));
+            assert_eq!(consumer_node.dependencies(), DependenciesHandle::NONE);
+            assert!(
+                !consumer_node
+                    .flags()
+                    .contains_any(FiberFlags::NEEDS_PROPAGATION)
+            );
+        }
+        assert!(
+            store
+                .fiber_arena()
+                .get(inner_provider)
+                .unwrap()
+                .child_lanes()
+                .contains_all(propagation_lanes)
+        );
+        assert!(
+            store
+                .fiber_arena()
+                .get(outer_provider)
+                .unwrap()
+                .child_lanes()
+                .contains_all(propagation_lanes)
+        );
+        assert!(
+            store
+                .fiber_arena()
+                .get(host_root_work_in_progress)
+                .unwrap()
+                .child_lanes()
+                .contains_all(propagation_lanes)
+        );
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .lanes()
+                .pending_lanes()
+                .contains_all(propagation_lanes)
+        );
+
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(host_root_work_in_progress)
+                .unwrap()
+                .child(),
+            Some(outer_provider)
+        );
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(outer_provider)
+                .unwrap()
+                .return_fiber(),
+            Some(host_root_work_in_progress)
+        );
+        assert_eq!(
+            store.fiber_arena().get(outer_provider).unwrap().child(),
+            Some(inner_provider)
+        );
+        assert_eq!(
+            store.fiber_arena().get(inner_provider).unwrap().child(),
+            Some(first_function_component)
+        );
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(first_function_component)
+                .unwrap()
+                .sibling(),
+            Some(second_function_component)
+        );
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(second_function_component)
+                .unwrap()
+                .sibling(),
+            None
+        );
+        store.fiber_arena().validate_topology().unwrap();
         assert_eq!(host.operations(), Vec::<&'static str>::new());
         assert_eq!(store.root(root_id).unwrap().current(), current);
         assert_eq!(store.root(root_id).unwrap().finished_work(), None);
