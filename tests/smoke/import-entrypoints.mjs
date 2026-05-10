@@ -923,6 +923,37 @@ function assertReactDomUnimplemented(callback, label) {
   );
 }
 
+function assertReactDomTestUtilsActFailClosed(moduleExports, label) {
+  const consoleCalls = [];
+  const originalError = console.error;
+  const originalWarn = console.warn;
+  let callbackCalls = 0;
+
+  console.error = (...args) => {
+    consoleCalls.push(['error', ...args]);
+  };
+  console.warn = (...args) => {
+    consoleCalls.push(['warn', ...args]);
+  };
+
+  try {
+    assertReactDomUnimplemented(
+      () =>
+        moduleExports.act(() => {
+          callbackCalls += 1;
+          return 'unexpected-act-callback-result';
+        }),
+      `${label}.act callback`
+    );
+  } finally {
+    console.error = originalError;
+    console.warn = originalWarn;
+  }
+
+  assert.equal(callbackCalls, 0, `${label}.act callback calls`);
+  assert.deepEqual(consoleCalls, [], `${label}.act console calls`);
+}
+
 function assertReactServerUnsupported(callback, label) {
   assert.throws(
     callback,
@@ -2399,6 +2430,10 @@ async function assertReactDomFileEntrypoint(entrypoint, labelPrefix) {
     `${labelPrefix}.${entrypoint.unsupportedExport}`
   );
 
+  if (entrypoint.specifier === '@fast-react/react-dom/test-utils') {
+    assertReactDomTestUtilsActFailClosed(cjsModule, labelPrefix);
+  }
+
   if (entrypoint.specifier === '@fast-react/react-dom/server.bun') {
     assert.equal(cjsModule.resume, undefined, `${labelPrefix}.resume`);
   }
@@ -3159,6 +3194,37 @@ async function runReactDomPackageProbe(
       );
     }
 
+    function assertTestUtilsActFailClosed(moduleExports, label) {
+      const consoleCalls = [];
+      const originalError = console.error;
+      const originalWarn = console.warn;
+      let callbackCalls = 0;
+
+      console.error = (...args) => {
+        consoleCalls.push(['error', ...args]);
+      };
+      console.warn = (...args) => {
+        consoleCalls.push(['warn', ...args]);
+      };
+
+      try {
+        assertUnimplemented(
+          () =>
+            moduleExports.act(() => {
+              callbackCalls += 1;
+              return 'unexpected-act-callback-result';
+            }),
+          label + ' act callback'
+        );
+      } finally {
+        console.error = originalError;
+        console.warn = originalWarn;
+      }
+
+      assert.equal(callbackCalls, 0, label + ' act callback calls');
+      assert.deepEqual(consoleCalls, [], label + ' act console calls');
+    }
+
     function assertReactServerUnsupported(callback, label) {
       assert.throws(
         callback,
@@ -3199,6 +3265,9 @@ async function runReactDomPackageProbe(
           () => cjsModule[unsupportedExport](),
           specifier + ' ' + unsupportedExport
         );
+        if (specifier === '@fast-react/react-dom/test-utils') {
+          assertTestUtilsActFailClosed(cjsModule, specifier);
+        }
 
         const esmModule = await import(specifier);
         assert.equal(esmModule.default, cjsModule, specifier);

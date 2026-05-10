@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import test from "node:test";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   REACT_DOM_TEST_UTILS_ACT_ORACLE_ARTIFACT_PATH,
@@ -19,6 +21,13 @@ import {
 } from "../src/react-dom-test-utils-act-oracle.mjs";
 
 const oracle = readCheckedReactDomTestUtilsActOracle();
+const require = createRequire(import.meta.url);
+const fastReactDomTestUtilsPath = fileURLToPath(
+  new URL("../../../packages/react-dom/test-utils.js", import.meta.url)
+);
+const fastReactPath = fileURLToPath(
+  new URL("../../../packages/react/index.js", import.meta.url)
+);
 
 test("checked react-dom/test-utils.act oracle artifact has the expected schema and targets", () => {
   assert.equal(
@@ -146,6 +155,71 @@ test("React DOM test-utils act export shape and React.act relationship are recor
   const server = resultFor("react-server-development", "module-export-shape");
   assert.equal(server.reactActExport.hasOwn, false);
   assert.equal(server.relationships.reactActType, "undefined");
+});
+
+test("Fast React test-utils act keeps the oracle-shaped package surface but fails closed", async () => {
+  const development = resultFor("default-node-development", "module-export-shape");
+  const expectedActDescriptor = descriptorFor(
+    development.requireModule.descriptors,
+    "act"
+  );
+  const testUtils = loadFreshCjs(fastReactDomTestUtilsPath);
+  const react = loadFreshCjs(fastReactPath);
+
+  assert.deepEqual(
+    Object.keys(testUtils),
+    development.requireModule.objectKeys
+  );
+  assert.deepEqual(
+    dataDescriptorFieldsForObject(
+      Object.getOwnPropertyDescriptor(testUtils, "act")
+    ),
+    dataDescriptorFields(expectedActDescriptor)
+  );
+  assert.deepEqual(
+    describeFunctionValue(testUtils.act),
+    expectedActDescriptor.value
+  );
+  assert.equal(testUtils.act === react.act, false);
+
+  assert.deepEqual(
+    Object.getOwnPropertyDescriptor(testUtils, "__FAST_REACT_PLACEHOLDER__"),
+    {
+      configurable: false,
+      enumerable: false,
+      value: true,
+      writable: false
+    }
+  );
+  assert.deepEqual(
+    Object.getOwnPropertyDescriptor(testUtils, "__FAST_REACT_ENTRYPOINT__"),
+    {
+      configurable: false,
+      enumerable: false,
+      value: "react-dom/test-utils",
+      writable: false
+    }
+  );
+  assert.deepEqual(
+    Object.getOwnPropertyDescriptor(testUtils, "compatibilityTarget"),
+    {
+      configurable: false,
+      enumerable: false,
+      value: "react-dom@19.2.6",
+      writable: false
+    }
+  );
+
+  const imported = await import(pathToFileURL(fastReactDomTestUtilsPath).href);
+  assert.equal(imported.act, testUtils.act);
+  assert.equal(imported.default, testUtils);
+  assert.equal(imported["module.exports"], testUtils);
+  assert.deepEqual(
+    keyValues(describeOwnKeys(imported)),
+    keyValues(development.dynamicImportModule.ownKeys)
+  );
+
+  assertFastReactDomActBlocked(testUtils.act);
 });
 
 test("CommonJS descriptors are mutable while dynamic import namespace bindings reject writes", () => {
@@ -352,6 +426,12 @@ function resultFor(modeId, scenarioId) {
   return observationFor(modeId, scenarioId).result;
 }
 
+function loadFreshCjs(filePath) {
+  const resolved = require.resolve(filePath);
+  delete require.cache[resolved];
+  return require(resolved);
+}
+
 function descriptorFor(descriptors, key) {
   const match = descriptors.find(
     (entry) =>
@@ -371,6 +451,38 @@ function dataDescriptorFields(descriptor) {
   };
 }
 
+function dataDescriptorFieldsForObject(descriptor) {
+  assert.notEqual(descriptor, undefined);
+  assert.equal(Object.hasOwn(descriptor, "value"), true);
+  return {
+    configurable: descriptor.configurable,
+    enumerable: descriptor.enumerable,
+    writable: descriptor.writable
+  };
+}
+
+function describeFunctionValue(value) {
+  assert.equal(typeof value, "function");
+  return {
+    type: "function",
+    name: value.name,
+    length: value.length,
+    isAsync: value.constructor.name === "AsyncFunction",
+    ownPropertyNames: Object.getOwnPropertyNames(value),
+    ownKeys: describeOwnKeys(value)
+  };
+}
+
+function describeOwnKeys(value) {
+  return Reflect.ownKeys(value).map((key) => {
+    if (typeof key === "symbol") {
+      return { type: "symbol", description: key.description };
+    }
+
+    return { type: "string", value: key };
+  });
+}
+
 function describedObjectPropertyValue(objectDescription, key) {
   return descriptorFor(objectDescription.descriptors, key).value;
 }
@@ -383,6 +495,47 @@ function keyValues(keys) {
 
 function consoleMessages(observation) {
   return observation.consoleCalls.map((call) => call.args[0].value);
+}
+
+function assertFastReactDomActBlocked(act) {
+  const consoleCalls = [];
+  const originalError = console.error;
+  const originalWarn = console.warn;
+  let callbackCalls = 0;
+
+  console.error = (...args) => {
+    consoleCalls.push(["error", ...args]);
+  };
+  console.warn = (...args) => {
+    consoleCalls.push(["warn", ...args]);
+  };
+
+  try {
+    assert.throws(
+      () =>
+        act(() => {
+          callbackCalls += 1;
+          return "unexpected-act-callback-result";
+        }),
+      (error) => {
+        assert.equal(error.name, "FastReactDomUnimplementedError");
+        assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED");
+        assert.equal(error.entrypoint, "react-dom/test-utils");
+        assert.equal(error.exportName, "act");
+        assert.equal(error.compatibilityTarget, "react-dom@19.2.6");
+        assert.match(error.message, /react-dom\/test-utils\.act was called/u);
+        assert.match(error.message, /no React DOM behavior implementation yet/u);
+        assert.match(error.message, /do not treat it as React DOM-compatible/u);
+        return true;
+      }
+    );
+  } finally {
+    console.error = originalError;
+    console.warn = originalWarn;
+  }
+
+  assert.equal(callbackCalls, 0);
+  assert.deepEqual(consoleCalls, []);
 }
 
 function assertActResolved(actObservation, expectedValue) {

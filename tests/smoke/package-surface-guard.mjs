@@ -315,6 +315,113 @@ function assertUnsupportedExport(moduleExports, entry, expectedExport, label) {
     },
     `${label}.${exportName} should remain an unsupported placeholder`
   );
+
+  if (expectedExport.failClosed !== undefined) {
+    assertFailClosedUnsupportedExport(
+      exportValue,
+      entrypoint,
+      compatibilityTarget,
+      expectedExport,
+      label
+    );
+  }
+}
+
+function assertFailClosedUnsupportedExport(
+  exportValue,
+  entrypoint,
+  compatibilityTarget,
+  expectedExport,
+  label
+) {
+  const expected = expectedExport.failClosed;
+  const exportName = expectedExport.exportName;
+
+  assert.equal(
+    expected.compatibilityClaimed,
+    false,
+    `${label}.${exportName} compatibility claim`
+  );
+  assert.equal(
+    expected.status,
+    'unsupported-placeholder',
+    `${label}.${exportName} fail-closed status`
+  );
+  assert.equal(
+    expected.oracleKind,
+    'react-19.2.6-react-dom-test-utils-act-oracle',
+    `${label}.${exportName} accepted oracle`
+  );
+
+  const consoleCalls = [];
+  const originalError = console.error;
+  const originalWarn = console.warn;
+  let callbackCalls = 0;
+
+  console.error = (...args) => {
+    consoleCalls.push(['error', ...args]);
+  };
+  console.warn = (...args) => {
+    consoleCalls.push(['warn', ...args]);
+  };
+
+  try {
+    assert.throws(
+      () =>
+        exportValue(() => {
+          callbackCalls += 1;
+          return 'unexpected-act-callback-result';
+        }),
+      (error) => {
+        assert.equal(
+          error.name,
+          'FastReactDomUnimplementedError',
+          `${label}.${exportName} callback error name`
+        );
+        assert.equal(
+          error.code,
+          'FAST_REACT_UNIMPLEMENTED',
+          `${label}.${exportName} callback error code`
+        );
+        assert.equal(
+          error.entrypoint,
+          entrypoint,
+          `${label}.${exportName} callback error entrypoint`
+        );
+        assert.equal(
+          error.exportName,
+          exportName,
+          `${label}.${exportName} callback error export name`
+        );
+        assert.equal(
+          error.compatibilityTarget,
+          compatibilityTarget,
+          `${label}.${exportName} callback compatibility target`
+        );
+        assert.equal(
+          error.message.includes('do not treat it as React DOM-compatible'),
+          true,
+          `${label}.${exportName} callback error should deny compatibility`
+        );
+        return true;
+      },
+      `${label}.${exportName} callback call should stay blocked`
+    );
+  } finally {
+    console.error = originalError;
+    console.warn = originalWarn;
+  }
+
+  assert.equal(
+    callbackCalls,
+    expected.callbackCalls,
+    `${label}.${exportName} callback calls`
+  );
+  assert.deepEqual(
+    consoleCalls,
+    expected.consoleCalls,
+    `${label}.${exportName} console calls`
+  );
 }
 
 function assertReactTestRendererSchedulerPlaceholder(
