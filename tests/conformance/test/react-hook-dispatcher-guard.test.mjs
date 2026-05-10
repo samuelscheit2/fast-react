@@ -52,6 +52,99 @@ const effectDefaultHooks = [
   ["useLayoutEffect", 2, [() => undefined, []]]
 ];
 
+const effectRegistrationFieldNames = [
+  "hook",
+  "effect",
+  "instance",
+  "phase",
+  "tag",
+  "dependencies",
+  "fiber_flags"
+];
+const passiveEffectMetadataFieldNames = [
+  "fiber",
+  "hook_list",
+  "effect_index",
+  "effect",
+  "instance",
+  "tag",
+  "create",
+  "dependencies",
+  "lanes"
+];
+const pendingPassiveCommitHandoffFieldNames = [
+  "root",
+  "fiber",
+  "phase",
+  "lanes",
+  "records"
+];
+const pendingPassiveEffectCommitFieldNames = [
+  "fiber",
+  "effect_index",
+  "effect",
+  "instance",
+  "unmount_order",
+  "mount_order"
+];
+
+const expectedEffectHookMetadata = {
+  useEffect: {
+    effectPhaseName: "Passive",
+    hookEffectFlagName: "PASSIVE",
+    mountFiberFlagNames: ["PASSIVE", "PASSIVE_STATIC"],
+    passiveEffectMetadataFieldNames,
+    passiveEffectMetadataRecordName: "FunctionComponentPassiveEffectMetadata",
+    pendingPassiveCommitHandoffFieldNames,
+    pendingPassiveCommitHandoffRecordName:
+      "FunctionComponentPendingPassiveCommitHandoff",
+    pendingPassiveEffectCommitFieldNames,
+    pendingPassiveEffectCommitRecordName:
+      "FunctionComponentPendingPassiveEffectCommitRecord",
+    pendingPassivePhaseNames: ["Unmount", "Mount"],
+    updateFiberFlagNames: ["PASSIVE"]
+  },
+  useImperativeHandle: {
+    effectPhaseName: "Layout",
+    hookEffectFlagName: "LAYOUT",
+    mountFiberFlagNames: ["UPDATE", "LAYOUT_STATIC"],
+    passiveEffectMetadataFieldNames: [],
+    passiveEffectMetadataRecordName: null,
+    pendingPassiveCommitHandoffFieldNames: [],
+    pendingPassiveCommitHandoffRecordName: null,
+    pendingPassiveEffectCommitFieldNames: [],
+    pendingPassiveEffectCommitRecordName: null,
+    pendingPassivePhaseNames: [],
+    updateFiberFlagNames: ["UPDATE"]
+  },
+  useInsertionEffect: {
+    effectPhaseName: "Insertion",
+    hookEffectFlagName: "INSERTION",
+    mountFiberFlagNames: ["UPDATE"],
+    passiveEffectMetadataFieldNames: [],
+    passiveEffectMetadataRecordName: null,
+    pendingPassiveCommitHandoffFieldNames: [],
+    pendingPassiveCommitHandoffRecordName: null,
+    pendingPassiveEffectCommitFieldNames: [],
+    pendingPassiveEffectCommitRecordName: null,
+    pendingPassivePhaseNames: [],
+    updateFiberFlagNames: ["UPDATE"]
+  },
+  useLayoutEffect: {
+    effectPhaseName: "Layout",
+    hookEffectFlagName: "LAYOUT",
+    mountFiberFlagNames: ["UPDATE", "LAYOUT_STATIC"],
+    passiveEffectMetadataFieldNames: [],
+    passiveEffectMetadataRecordName: null,
+    pendingPassiveCommitHandoffFieldNames: [],
+    pendingPassiveCommitHandoffRecordName: null,
+    pendingPassiveEffectCommitFieldNames: [],
+    pendingPassiveEffectCommitRecordName: null,
+    pendingPassivePhaseNames: [],
+    updateFiberFlagNames: ["UPDATE"]
+  }
+};
+
 const invalidHookCallDefaultHooks = selectedDefaultHooks.filter(
   ([hookName]) => !hasHookName(statefulDefaultHooks, hookName)
 );
@@ -85,6 +178,70 @@ test("selected public React hooks preserve React 19.2.6 function names and lengt
     assert.equal(ReactServer[hookName].name, "", hookName);
     assert.equal(ReactServer[hookName].length, length, hookName);
   }
+});
+
+test("effect hook private metadata names stay aligned to accepted effect records", () => {
+  assert.deepEqual(
+    hookDispatcher.effectHookNames,
+    Object.keys(expectedEffectHookMetadata)
+  );
+
+  for (const [hookName, expected] of Object.entries(expectedEffectHookMetadata)) {
+    const metadata = hookDispatcher.getEffectHookMetadata(hookName);
+
+    assert.equal(metadata, hookDispatcher.effectHookMetadataByHookName[hookName]);
+    assert.equal(Object.isFrozen(metadata), true, hookName);
+    assert.equal(metadata.hookName, hookName);
+    assert.equal(metadata.compatibilityStatus, "blocked", hookName);
+    assert.equal(metadata.effectPhaseEnumName, "FunctionComponentEffectPhase");
+    assert.equal(metadata.effectPhaseName, expected.effectPhaseName, hookName);
+    assert.equal(metadata.effectRegistrationRecordName, "FunctionComponentEffectRegistration");
+    assert.deepEqual(metadata.effectRegistrationFieldNames, effectRegistrationFieldNames);
+    assert.equal(metadata.executesEffectCallback, false, hookName);
+    assert.equal(metadata.fiberFlagsRecordName, "FiberFlags");
+    assert.equal(metadata.hookEffectFlagsRecordName, "HookEffectFlags");
+    assert.equal(metadata.hookEffectFlagName, expected.hookEffectFlagName, hookName);
+    assert.deepEqual(metadata.mountFiberFlagNames, expected.mountFiberFlagNames);
+    assert.equal(
+      metadata.passiveEffectMetadataRecordName,
+      expected.passiveEffectMetadataRecordName,
+      hookName
+    );
+    assert.deepEqual(
+      metadata.passiveEffectMetadataFieldNames,
+      expected.passiveEffectMetadataFieldNames,
+      hookName
+    );
+    assert.equal(
+      metadata.pendingPassiveCommitHandoffRecordName,
+      expected.pendingPassiveCommitHandoffRecordName,
+      hookName
+    );
+    assert.deepEqual(
+      metadata.pendingPassiveCommitHandoffFieldNames,
+      expected.pendingPassiveCommitHandoffFieldNames,
+      hookName
+    );
+    assert.equal(
+      metadata.pendingPassiveEffectCommitRecordName,
+      expected.pendingPassiveEffectCommitRecordName,
+      hookName
+    );
+    assert.deepEqual(
+      metadata.pendingPassiveEffectCommitFieldNames,
+      expected.pendingPassiveEffectCommitFieldNames,
+      hookName
+    );
+    assert.deepEqual(
+      metadata.pendingPassivePhaseNames,
+      expected.pendingPassivePhaseNames,
+      hookName
+    );
+    assert.equal(metadata.schedulesPublicAct, false, hookName);
+    assert.deepEqual(metadata.updateFiberFlagNames, expected.updateFiberFlagNames);
+  }
+
+  assert.equal(hookDispatcher.getEffectHookMetadata("useEffectEvent"), null);
 });
 
 test("selected public React hooks throw the invalid-hook-call boundary without a dispatcher", () => {
@@ -302,34 +459,38 @@ test("effect hooks forward only to a marked private effect-hook dispatcher", () 
     createdEffects.push("layout");
   };
   const dispatcher = hookDispatcher.markPrivateEffectHookDispatcher({
-    useEffect(create, deps) {
+    useEffect(create, deps, metadata) {
       calls.push({
         args: [create, deps],
         hookName: "useEffect",
+        metadata,
         thisMatchesDispatcher: this === dispatcher
       });
       return "return:useEffect";
     },
-    useImperativeHandle(ref, create, deps) {
+    useImperativeHandle(ref, create, deps, metadata) {
       calls.push({
         args: [ref, create, deps],
         hookName: "useImperativeHandle",
+        metadata,
         thisMatchesDispatcher: this === dispatcher
       });
       return "return:useImperativeHandle";
     },
-    useInsertionEffect(create, deps) {
+    useInsertionEffect(create, deps, metadata) {
       calls.push({
         args: [create, deps],
         hookName: "useInsertionEffect",
+        metadata,
         thisMatchesDispatcher: this === dispatcher
       });
       return "return:useInsertionEffect";
     },
-    useLayoutEffect(create, deps) {
+    useLayoutEffect(create, deps, metadata) {
       calls.push({
         args: [create, deps],
         hookName: "useLayoutEffect",
+        metadata,
         thisMatchesDispatcher: this === dispatcher
       });
       return "return:useLayoutEffect";
@@ -364,21 +525,25 @@ test("effect hooks forward only to a marked private effect-hook dispatcher", () 
     {
       args: [passiveCreate, ["passive-dep"]],
       hookName: "useEffect",
+      metadata: hookDispatcher.getEffectHookMetadata("useEffect"),
       thisMatchesDispatcher: true
     },
     {
       args: [imperativeRef, imperativeCreate, ["imperative-dep"]],
       hookName: "useImperativeHandle",
+      metadata: hookDispatcher.getEffectHookMetadata("useImperativeHandle"),
       thisMatchesDispatcher: true
     },
     {
       args: [insertionCreate, ["insertion-dep"]],
       hookName: "useInsertionEffect",
+      metadata: hookDispatcher.getEffectHookMetadata("useInsertionEffect"),
       thisMatchesDispatcher: true
     },
     {
       args: [layoutCreate, ["layout-dep"]],
       hookName: "useLayoutEffect",
+      metadata: hookDispatcher.getEffectHookMetadata("useLayoutEffect"),
       thisMatchesDispatcher: true
     }
   ]);
