@@ -6184,6 +6184,174 @@ test('private react-dom/client facade preflight routes root calls to accepted br
   assertBridgeDidNotTouchContainer(container, document);
 });
 
+test('private react-dom/client hydrateRoot facade preflight records only blocked diagnostics', () => {
+  const document = createDocument('private-client-hydrate-facade-preflight');
+  const container = createElement('DIV', document);
+  const initialChildren = {
+    props: {
+      children: 'private hydrate preflight child'
+    },
+    type: 'span'
+  };
+  const hydrationOptions = {
+    identifierPrefix: 'private-hydrate-preflight-',
+    onRecoverableError() {}
+  };
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.hydrateRoot,
+    rootBridge.privateHydrateRootPublicFacadePreflightSymbol
+  );
+
+  assert.equal(
+    Object.hasOwn(reactDomClient, 'hydrateRootPublicFacadePreflight'),
+    false
+  );
+  assert.equal(
+    Object.hasOwn(
+      reactDomClient,
+      '__FAST_REACT_PRIVATE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT__'
+    ),
+    false
+  );
+  assert.equal(
+    Object.getOwnPropertyDescriptor(
+      reactDomClient.createRoot,
+      rootBridge.privateHydrateRootPublicFacadePreflightSymbol
+    ),
+    undefined
+  );
+  assert.equal(
+    Object.getOwnPropertyDescriptor(
+      reactDomClient.hydrateRoot,
+      rootBridge.privateRootPublicFacadePreflightSymbol
+    ),
+    undefined
+  );
+  assert.equal(descriptor.configurable, false);
+  assert.equal(descriptor.enumerable, false);
+  assert.equal(descriptor.writable, false);
+  assert.equal(
+    descriptor.value,
+    rootBridge.createPrivateHydrateRootPublicFacadePreflight
+  );
+
+  const preflight = descriptor.value({
+    hydrateIdPrefix: 'hydrate-preflight-root',
+    publicFacadeHydratePreflightIdPrefix: 'hydrate-facade-preflight',
+    requestIdPrefix: 'hydrate-preflight-request'
+  });
+  assert.equal(
+    preflight.$$typeof,
+    rootBridge.privateHydrateRootPublicFacadePreflightType
+  );
+  assert.equal(
+    preflight.kind,
+    'FastReactDomPrivateHydrateRootPublicFacadePreflight'
+  );
+  assert.equal(preflight.entrypoint, 'react-dom/client');
+  assert.equal(
+    preflight.preflightStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_READY
+  );
+  assert.equal(preflight.publicCreateRootEnabled, false);
+  assert.equal(preflight.publicHydrateRootEnabled, false);
+  assert.equal(preflight.acceptedPrivateBridgeDiagnostics, true);
+  assert.equal(preflight.nativeExecution, false);
+  assert.equal(preflight.reconcilerExecution, false);
+  assert.equal(preflight.domMutation, false);
+  assert.equal(preflight.markerWrites, false);
+  assert.equal(preflight.listenerInstallation, false);
+  assert.equal(preflight.hydration, false);
+  assert.equal(preflight.eventDispatch, false);
+  assert.equal(preflight.compatibilityClaimed, false);
+  assert.equal(preflight.hydrateRoot.length, 3);
+  assert.equal(
+    rootBridge.isPrivateHydrateRootPublicFacadePreflight(preflight),
+    true
+  );
+  assert.equal(
+    rootBridge.isPrivateHydrateRootPublicFacadePreflight({}),
+    false
+  );
+  assert.equal(Object.isFrozen(preflight), true);
+
+  const hydratePreflight = preflight.hydrateRoot(
+    container,
+    initialChildren,
+    hydrationOptions
+  );
+  const payload =
+    rootBridge.getPrivateHydrateRootPublicFacadePreflightRecordPayload(
+      hydratePreflight
+    );
+  const hydratePayload = rootBridge.getPrivateRootRecordPayload(
+    payload.requestRecord
+  );
+
+  assertPrivateHydrateRootPublicFacadePreflightRecord(hydratePreflight, {
+    hydrateId: 'hydrate-preflight-root:1',
+    preflightId: 'hydrate-facade-preflight:1',
+    requestId: 'hydrate-preflight-request:1'
+  });
+  assert.equal(payload.requestAdmission, hydratePreflight.requestAdmission);
+  assert.equal(payload.nativeHandoffRecord, null);
+  assert.equal(payload.preflight, preflight);
+  assert.equal(hydratePayload.container, container);
+  assert.equal(hydratePayload.initialChildren, initialChildren);
+  assert.equal(hydratePayload.hydrationOptions, hydrationOptions);
+  assert.equal(
+    hydratePayload.hydrationBoundaryRecord,
+    hydratePreflight.hydrationBoundaryRecord
+  );
+  assert.deepEqual(preflight.getHydrateRootPreflightRecords(), [
+    hydratePreflight
+  ]);
+  assert.equal(
+    rootBridge.getPrivateHydrateRootPublicFacadePreflightPayload(preflight)
+      .preflightRecordCount,
+    1
+  );
+  assert.deepEqual(
+    rootBridge.getPrivateHydrateRootPublicFacadePreflightPayload(preflight)
+      .preflightRecords,
+    [hydratePreflight]
+  );
+  assert.equal(
+    rootBridge.getPrivateHydrateRootPublicFacadePreflightPayload({}),
+    null
+  );
+  assert.equal(
+    rootBridge.getPrivateHydrateRootPublicFacadePreflightRecordPayload({}),
+    null
+  );
+  assert.throws(
+    () =>
+      payload.bridge.createNativeRequestHandoff(payload.requestRecord),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_BRIDGE_REQUEST',
+      message: /diagnostic-only/
+    }
+  );
+
+  assert.throws(
+    () =>
+      reactDomClient.hydrateRoot(
+        container,
+        initialChildren,
+        hydrationOptions
+      ),
+    {
+      code: 'FAST_REACT_UNIMPLEMENTED'
+    }
+  );
+
+  const serialized = JSON.stringify(hydratePreflight);
+  assert.equal(serialized.includes('__mutationLog'), false);
+  assert.equal(serialized.includes('__registrations'), false);
+  assert.equal(serialized.includes('__reactContainer$'), false);
+  assertBridgeDidNotTouchContainer(container, document);
+});
+
 test('private react-dom/client facade preflight accepts live container only as blocked evidence', () => {
   const {container, document} = createLiveRootContainerPreflightTarget(
     'private-client-live-container-preflight'
@@ -9656,6 +9824,108 @@ function assertPrivatePublicFacadePreflightRecord(record, expected) {
   assert.equal(record.nativeExecution, false);
   assert.equal(record.reconcilerExecution, false);
   assert.equal(record.rootScheduled, false);
+  assert.equal(record.domMutation, false);
+  assert.equal(record.markerWrites, false);
+  assert.equal(record.listenerInstallation, false);
+  assert.equal(record.hydration, false);
+  assert.equal(record.eventDispatch, false);
+  assert.equal(record.compatibilityClaimed, false);
+}
+
+function assertPrivateHydrateRootPublicFacadePreflightRecord(record, expected) {
+  assert.equal(Object.isFrozen(record), true);
+  assert.equal(
+    record.$$typeof,
+    rootBridge.privateHydrateRootPublicFacadePreflightRecordType
+  );
+  assert.equal(
+    record.kind,
+    'FastReactDomPrivateHydrateRootPublicFacadePreflightRecord'
+  );
+  assert.equal(record.operation, 'hydrate');
+  assert.equal(record.facadeCall, 'hydrateRoot');
+  assert.equal(record.entrypoint, 'react-dom/client');
+  assert.equal(record.preflightId, expected.preflightId);
+  assert.equal(
+    record.preflightStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_ACCEPTED
+  );
+  assert.equal(record.executionStatus, rootBridge.ROOT_BRIDGE_EXECUTION_BLOCKED);
+  assert.equal(
+    record.compatibilityStatus,
+    rootBridge.ROOT_BRIDGE_COMPATIBILITY_BLOCKED
+  );
+  assert.equal(record.requestId, expected.requestId);
+  assert.equal(record.requestType, 'hydrateRoot');
+  assert.equal(record.hydrateId, expected.hydrateId);
+  assert.equal(record.rootId, null);
+  assert.equal(record.rootKind, 'unsupported-hydration');
+  assert.equal(
+    record.lifecycleStatusAfter,
+    rootBridge.ROOT_LIFECYCLE_UNSUPPORTED_HYDRATION
+  );
+  assert.equal(record.status, 'unsupported');
+  assert.equal(
+    record.requestAdmissionStatus,
+    rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED
+  );
+  assert.equal(
+    record.requestAdmission.admissionStatus,
+    rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED
+  );
+  assert.equal(record.nativeHandoffRecord, null);
+  assert.equal(
+    record.nativeHandoffStatus,
+    rootBridge.ROOT_BRIDGE_EXECUTION_BLOCKED
+  );
+  assert.equal(
+    record.nativeHandoffBlockedReason,
+    'hydrate-root-records-are-diagnostic-only'
+  );
+  assert.deepEqual(
+    record.acceptedCapabilities.map((capability) => capability.id),
+    [
+      'private-hydrate-root-bridge-request-admission',
+      'unsupported-hydration-boundary-diagnostics'
+    ]
+  );
+  assert.deepEqual(
+    record.blockedCapabilities.map((capability) => capability.id),
+    [
+      'public-hydrate-root-execution',
+      'public-root-object',
+      'native-request-handoff',
+      'native-execution',
+      'reconciler-execution',
+      'dom-mutation',
+      'marker-writes',
+      'listener-installation',
+      'hydration',
+      'events',
+      'compatibility-claims'
+    ]
+  );
+  assert.equal(
+    rootBridge.isPrivateHydrateRootPublicFacadePreflightRecord(record),
+    true
+  );
+  assert.equal(record.acceptedPrivateBridgeDiagnostics, true);
+  assert.equal(record.hydrateRootRequestRecorded, true);
+  assert.equal(record.hydrationRequested, true);
+  assert.equal(record.canHydrate, false);
+  assert.equal(record.publicRootCreated, false);
+  assert.equal(record.publicRootObjectExposed, false);
+  assert.equal(record.publicCreateRootEnabled, false);
+  assert.equal(record.publicHydrateRootEnabled, false);
+  assert.equal(record.publicRootCompatibilitySurface, false);
+  assert.equal(record.containerMarked, false);
+  assert.equal(record.listenersAttached, false);
+  assert.equal(record.domMutated, false);
+  assert.equal(record.eventsReplayed, false);
+  assert.equal(record.rootScheduled, false);
+  assert.equal(record.suspenseHydrationScheduled, false);
+  assert.equal(record.nativeExecution, false);
+  assert.equal(record.reconcilerExecution, false);
   assert.equal(record.domMutation, false);
   assert.equal(record.markerWrites, false);
   assert.equal(record.listenerInstallation, false);

@@ -692,6 +692,9 @@
             "createRoot": [
               "fast.react_dom.client.private_root_public_facade_adapter",
               "fast.react_dom.client.private_root_public_facade_preflight"
+            ],
+            "hydrateRoot": [
+              "fast.react_dom.client.private_hydrate_root_public_facade_preflight"
             ]
           }
         },

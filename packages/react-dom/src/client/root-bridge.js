@@ -223,6 +223,10 @@ const privateRootPublicFacadePreflightRootType =
   'fast.react_dom.private_root_public_facade_preflight_root';
 const privateRootPublicFacadePreflightRecordType =
   'fast.react_dom.private_root_public_facade_preflight_record';
+const privateHydrateRootPublicFacadePreflightType =
+  'fast.react_dom.private_hydrate_root_public_facade_preflight';
+const privateHydrateRootPublicFacadePreflightRecordType =
+  'fast.react_dom.private_hydrate_root_public_facade_preflight_record';
 const privateRootLiveContainerPreflightRecordType =
   'fast.react_dom.private_root_live_container_preflight_record';
 const privateRootPublicFacadeMarkerListenerPreflightRecordType =
@@ -246,6 +250,9 @@ const privateRootPublicFacadeAdapterSymbol = Symbol.for(
 );
 const privateRootPublicFacadePreflightSymbol = Symbol.for(
   'fast.react_dom.client.private_root_public_facade_preflight'
+);
+const privateHydrateRootPublicFacadePreflightSymbol = Symbol.for(
+  'fast.react_dom.client.private_hydrate_root_public_facade_preflight'
 );
 
 const ROOT_LIFECYCLE_CREATED = 'created';
@@ -481,6 +488,83 @@ const ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_BLOCKED_CAPABILITIES =
       id: 'compatibility-claims',
       blocked: true,
       reason: 'React DOM root lifecycle compatibility remains unclaimed.'
+    })
+  ]);
+const ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_ACCEPTED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'private-hydrate-root-bridge-request-admission',
+      accepted: true,
+      reason:
+        'The private hydrateRoot facade call produced a bridge-owned unsupported hydration request record.'
+    }),
+    freezeRecord({
+      id: 'unsupported-hydration-boundary-diagnostics',
+      accepted: true,
+      reason:
+        'The private hydrateRoot request captured unsupported hydration boundary diagnostics without executing hydration.'
+    })
+  ]);
+const ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_BLOCKED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'public-hydrate-root-execution',
+      blocked: true,
+      reason:
+        'The preflight is private and does not call public hydrateRoot behavior.'
+    }),
+    freezeRecord({
+      id: 'public-root-object',
+      blocked: true,
+      reason: 'No public React DOM root object is created or exposed.'
+    }),
+    freezeRecord({
+      id: 'native-request-handoff',
+      blocked: true,
+      reason:
+        'Unsupported hydrateRoot records are diagnostic-only and are not mirrored to the native root bridge.'
+    }),
+    freezeRecord({
+      id: 'native-execution',
+      blocked: true,
+      reason: 'No native or Rust root bridge execution is admitted.'
+    }),
+    freezeRecord({
+      id: 'reconciler-execution',
+      blocked: true,
+      reason:
+        'No reconciler hydration, render, schedule, or commit execution is admitted.'
+    }),
+    freezeRecord({
+      id: 'dom-mutation',
+      blocked: true,
+      reason: 'No container children, text, attributes, or HTML may be mutated.'
+    }),
+    freezeRecord({
+      id: 'marker-writes',
+      blocked: true,
+      reason: 'Hydration marker consumption and root marker writes remain blocked.'
+    }),
+    freezeRecord({
+      id: 'listener-installation',
+      blocked: true,
+      reason: 'Root listener installation remains blocked.'
+    }),
+    freezeRecord({
+      id: 'hydration',
+      blocked: true,
+      reason:
+        'Hydration root creation, marker consumption, target claiming, and replay are not admitted.'
+    }),
+    freezeRecord({
+      id: 'events',
+      blocked: true,
+      reason: 'Hydration replay and synthetic event dispatch are not admitted.'
+    }),
+    freezeRecord({
+      id: 'compatibility-claims',
+      blocked: true,
+      reason: 'React DOM hydrateRoot compatibility remains unclaimed.'
     })
   ]);
 const ROOT_BRIDGE_LIVE_CONTAINER_PREFLIGHT_ACCEPTED_CAPABILITIES =
@@ -2542,6 +2626,8 @@ const rootPublicFacadeRootPayloads = new WeakMap();
 const rootPublicFacadePreflightPayloads = new WeakMap();
 const rootPublicFacadePreflightRootPayloads = new WeakMap();
 const rootPublicFacadePreflightRecordPayloads = new WeakMap();
+const rootHydratePublicFacadePreflightPayloads = new WeakMap();
+const rootHydratePublicFacadePreflightRecordPayloads = new WeakMap();
 const rootLiveContainerPreflightPayloads = new WeakMap();
 const rootPublicFacadeMarkerListenerPreflightPayloads = new WeakMap();
 const rootPublicFacadeHostOutputRenderPayloads = new WeakMap();
@@ -3053,6 +3139,144 @@ function createPrivateRootPublicFacadePreflight(options) {
   preflightState.preflight = preflight;
   rootPublicFacadePreflightPayloads.set(preflight, preflightState);
   return preflight;
+}
+
+function createPrivateHydrateRootPublicFacadePreflight(options) {
+  const bridge = createPrivateRootBridgeShell(options);
+  const preflightState = {
+    bridge,
+    nextPreflightSequence: 1,
+    preflight: null,
+    preflightIdPrefix: getIdPrefix(
+      options && options.publicFacadeHydratePreflightIdPrefix,
+      'hydrate-root-public-facade-preflight'
+    ),
+    records: []
+  };
+  const preflight = freezeRecord({
+    $$typeof: privateHydrateRootPublicFacadePreflightType,
+    kind: 'FastReactDomPrivateHydrateRootPublicFacadePreflight',
+    entrypoint: 'react-dom/client',
+    preflightStatus: ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_READY,
+    executionStatus: ROOT_BRIDGE_EXECUTION_BLOCKED,
+    compatibilityStatus: ROOT_BRIDGE_COMPATIBILITY_BLOCKED,
+    acceptedPrivateBridgeDiagnostics: true,
+    publicCreateRootEnabled: false,
+    publicHydrateRootEnabled: false,
+    publicRootObjectExposed: false,
+    publicRootCompatibilitySurface: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false,
+    hydrateRoot(container, initialChildren, hydrationOptions) {
+      const requestRecord = preflightState.bridge.createHydrateRoot(
+        container,
+        initialChildren,
+        hydrationOptions
+      );
+      const preflightRecord =
+        createPrivateHydrateRootPublicFacadePreflightRecord(
+          preflightState,
+          requestRecord
+        );
+      preflightState.records.push(preflightRecord);
+      return preflightRecord;
+    },
+    getHydrateRootPreflightRecords() {
+      return freezeArray(preflightState.records);
+    }
+  });
+
+  preflightState.preflight = preflight;
+  rootHydratePublicFacadePreflightPayloads.set(preflight, preflightState);
+  return preflight;
+}
+
+function createPrivateHydrateRootPublicFacadePreflightRecord(
+  preflightState,
+  requestRecord
+) {
+  const requestAdmission = preflightState.bridge.admitRequest(requestRecord);
+  const preflightSequence = preflightState.nextPreflightSequence++;
+  const preflightId =
+    `${preflightState.preflightIdPrefix}:${preflightSequence}`;
+  const record = freezeRecord({
+    $$typeof: privateHydrateRootPublicFacadePreflightRecordType,
+    kind: 'FastReactDomPrivateHydrateRootPublicFacadePreflightRecord',
+    operation: requestRecord.operation,
+    facadeCall: 'hydrateRoot',
+    entrypoint: 'react-dom/client',
+    preflightId,
+    preflightSequence,
+    preflightStatus: ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_ACCEPTED,
+    executionStatus: ROOT_BRIDGE_EXECUTION_BLOCKED,
+    compatibilityStatus: ROOT_BRIDGE_COMPATIBILITY_BLOCKED,
+    requestId: requestRecord.requestId,
+    requestSequence: requestRecord.requestSequence,
+    requestType: requestRecord.requestType,
+    hydrateId: requestRecord.hydrateId,
+    updateId: null,
+    rootId: requestRecord.rootId,
+    rootKind: requestRecord.rootKind,
+    rootTag: requestRecord.rootTag,
+    lifecycleStatusBefore: requestRecord.lifecycleStatusBefore,
+    lifecycleStatusAfter: requestRecord.lifecycleStatusAfter,
+    status: requestRecord.status,
+    hydrationBoundaryRecord: requestRecord.hydrationBoundaryRecord,
+    markerParserEvidence: requestRecord.markerParserEvidence,
+    markerEvidence: requestRecord.markerEvidence,
+    textMismatchDiagnostics: requestRecord.textMismatchDiagnostics,
+    recoverableErrorMetadata: requestRecord.recoverableErrorMetadata,
+    replayQueueDiagnostics: requestRecord.replayQueueDiagnostics,
+    targetResolutionDiagnostics: requestRecord.targetResolutionDiagnostics,
+    eventReplayBlockers: requestRecord.eventReplayBlockers,
+    requestAdmission,
+    nativeHandoffRecord: null,
+    requestAdmissionStatus: requestAdmission.admissionStatus,
+    nativeHandoffStatus: ROOT_BRIDGE_EXECUTION_BLOCKED,
+    nativeHandoffBlockedReason: 'hydrate-root-records-are-diagnostic-only',
+    acceptedCapabilities:
+      ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_ACCEPTED_CAPABILITIES,
+    blockedCapabilities:
+      ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_BLOCKED_CAPABILITIES,
+    acceptedPrivateBridgeDiagnostics: true,
+    hydrateRootRequestRecorded: true,
+    hydrationRequested: requestRecord.hydrationRequested,
+    canHydrate: requestRecord.canHydrate,
+    publicRootCreated: false,
+    publicRootObjectExposed: false,
+    publicCreateRootEnabled: false,
+    publicHydrateRootEnabled: false,
+    publicRootCompatibilitySurface: false,
+    containerMarked: requestRecord.containerMarked,
+    listenersAttached: requestRecord.listenersAttached,
+    domMutated: requestRecord.domMutated,
+    eventsReplayed: requestRecord.eventsReplayed,
+    rootScheduled: requestRecord.rootScheduled,
+    suspenseHydrationScheduled: requestRecord.suspenseHydrationScheduled,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false
+  });
+
+  rootHydratePublicFacadePreflightRecordPayloads.set(record, {
+    bridge: preflightState.bridge,
+    nativeHandoffRecord: null,
+    preflight: preflightState.preflight,
+    requestAdmission,
+    requestRecord
+  });
+  return record;
 }
 
 function createPrivateRootPublicFacadeRoot(
@@ -7971,6 +8195,43 @@ function getPrivateRootPublicFacadePreflightRecordPayload(record) {
 
 function isPrivateRootPublicFacadePreflightRecord(value) {
   return rootPublicFacadePreflightRecordPayloads.has(value);
+}
+
+function getPrivateHydrateRootPublicFacadePreflightPayload(preflight) {
+  const payload = rootHydratePublicFacadePreflightPayloads.get(preflight);
+  if (payload === undefined) {
+    return null;
+  }
+
+  return freezeRecord({
+    bridge: payload.bridge,
+    preflight: payload.preflight,
+    preflightRecordCount: payload.records.length,
+    preflightRecords: freezeArray(payload.records)
+  });
+}
+
+function isPrivateHydrateRootPublicFacadePreflight(value) {
+  return rootHydratePublicFacadePreflightPayloads.has(value);
+}
+
+function getPrivateHydrateRootPublicFacadePreflightRecordPayload(record) {
+  const payload = rootHydratePublicFacadePreflightRecordPayloads.get(record);
+  if (payload === undefined) {
+    return null;
+  }
+
+  return freezeRecord({
+    bridge: payload.bridge,
+    nativeHandoffRecord: payload.nativeHandoffRecord,
+    preflight: payload.preflight,
+    requestAdmission: payload.requestAdmission,
+    requestRecord: payload.requestRecord
+  });
+}
+
+function isPrivateHydrateRootPublicFacadePreflightRecord(value) {
+  return rootHydratePublicFacadePreflightRecordPayloads.has(value);
 }
 
 function getPrivateRootLiveContainerPreflightPayload(record) {
@@ -19013,6 +19274,8 @@ module.exports = {
   ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_READY,
+  ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_ACCEPTED_CAPABILITIES,
+  ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_REF_CALLBACK_ERROR_ROUTING_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_REF_CALLBACK_ERROR_ROUTING_RECORDED,
@@ -19064,6 +19327,7 @@ module.exports = {
   preflightPrivateRootLiveContainer,
   createPrivateRootPublicFacadeAdapter,
   createPrivateRootPublicFacadePreflight,
+  createPrivateHydrateRootPublicFacadePreflight,
   createPrivateRootHandle,
   createPrivateRootOwner,
   createEventListenerRootErrorRoutingRecord,
@@ -19107,6 +19371,8 @@ module.exports = {
   getPrivateRootPublicFacadePreflightPayload,
   getPrivateRootPublicFacadePreflightRecordPayload,
   getPrivateRootPublicFacadePreflightRootPayload,
+  getPrivateHydrateRootPublicFacadePreflightPayload,
+  getPrivateHydrateRootPublicFacadePreflightRecordPayload,
   getPrivateRootPublicFacadeRootPayload,
   getPrivateRootEventListenerErrorRoutingPayload,
   getPrivateRootHydrationRecoverableErrorCallbackInvocationPayload,
@@ -19148,6 +19414,8 @@ module.exports = {
   isPrivateRootPublicFacadePreflight,
   isPrivateRootPublicFacadePreflightRecord,
   isPrivateRootPublicFacadePreflightRoot,
+  isPrivateHydrateRootPublicFacadePreflight,
+  isPrivateHydrateRootPublicFacadePreflightRecord,
   isPrivateRootPublicFacadeRoot,
   isPrivateRootUnmountAdmissionRecord,
   isPrivateRootUnmountHostOutputCleanupRecord,
@@ -19189,6 +19457,9 @@ module.exports = {
   privateRootPublicFacadeHostOutputUpdateRecordType,
   privateRootPublicFacadeNestedHostOutputUpdateRecordType,
   privateRootPublicFacadeHostOutputUnmountCleanupRecordType,
+  privateHydrateRootPublicFacadePreflightRecordType,
+  privateHydrateRootPublicFacadePreflightSymbol,
+  privateHydrateRootPublicFacadePreflightType,
   privateRootPublicFacadeAdapterSymbol,
   privateRootPublicFacadeAdapterType,
   privateRootPublicFacadePreflightRecordType,
