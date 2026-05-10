@@ -8,6 +8,8 @@ mod execution_context;
 mod fiber_root;
 mod fiber_store;
 mod host_tokens;
+#[cfg(test)]
+mod host_work;
 mod root_commit;
 mod root_config;
 mod root_scheduler;
