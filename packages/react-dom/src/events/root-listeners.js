@@ -25,7 +25,8 @@ const {
   createEventListenerWrapperRecordWithPriority
 } = require('./react-dom-event-listener.js');
 const {
-  createEventDispatchRecordFromWrapperRecord
+  createEventDispatchRecordFromWrapperRecord,
+  invokeSingleListenerCanaryFromDispatchRecord
 } = require('./plugin-event-system.js');
 const {
   IS_CAPTURE_PHASE,
@@ -44,6 +45,7 @@ const ROOT_LISTENERS_REVERTED =
 const rootListenerRegistrationPayloads = new WeakMap();
 const rootListenerCleanupRecords = new WeakMap();
 const rootListenerDispatchRecords = new WeakMap();
+const rootListenerInvocationCanaryRecords = new WeakMap();
 
 function createEventListenerShell(target, domEventName, eventSystemFlags) {
   const priorityWrapperRecord = createEventListenerWrapperRecordWithPriority(
@@ -124,6 +126,27 @@ function getLastRootListenerDispatchRecord(listener) {
   }
 
   return rootListenerDispatchRecords.get(listener) || null;
+}
+
+function invokeLastRootListenerSingleListenerCanary(listener, options) {
+  const dispatchRecord = getLastRootListenerDispatchRecord(listener);
+  const invocationRecord = invokeSingleListenerCanaryFromDispatchRecord(
+    dispatchRecord,
+    options
+  );
+  rootListenerInvocationCanaryRecords.set(listener, invocationRecord);
+  return invocationRecord;
+}
+
+function getLastRootListenerInvocationCanaryRecord(listener) {
+  if (
+    listener === null ||
+    (typeof listener !== 'object' && typeof listener !== 'function')
+  ) {
+    return null;
+  }
+
+  return rootListenerInvocationCanaryRecords.get(listener) || null;
 }
 
 function getAddEventListenerOptions(
@@ -673,8 +696,10 @@ module.exports = {
   describePortalContainerListenerGuard,
   describeRootListenerGuard,
   getAddEventListenerOptions,
+  getLastRootListenerInvocationCanaryRecord,
   getLastRootListenerDispatchRecord,
   getRootEventTargetOwnerDocument,
+  invokeLastRootListenerSingleListenerCanary,
   listenToAllSupportedEvents,
   listenToNativeEvent,
   listenToNonDelegatedEvent,

@@ -471,6 +471,253 @@ test("private target listener lookup sees current latest props without dispatchi
   assert.equal(componentTree.detachHostInstanceToken(token), token);
 });
 
+test("private single-listener invocation canary invokes one hidden listener without SyntheticEvent or public dispatch", () => {
+  const root = createEventTarget("single-listener-canary-root");
+  const parent = createNode("DIV", domContainer.ELEMENT_NODE, root);
+  const child = createNode("BUTTON", domContainer.ELEMENT_NODE, parent);
+  const rootOwner = {kind: "SingleListenerCanaryRootOwner"};
+  const parentHostOwner = {kind: "SingleListenerCanaryParentHostOwner"};
+  const childHostOwner = {kind: "SingleListenerCanaryChildHostOwner"};
+  const calls = [];
+  const parentProps = {
+    onClick(event) {
+      calls.push({
+        event,
+        name: "parent",
+        thisValue: this
+      });
+      return "parent-return";
+    }
+  };
+  const childProps = {
+    onClick(event) {
+      calls.push({
+        event,
+        name: "child",
+        thisValue: this
+      });
+      return "child-return";
+    }
+  };
+  const parentToken = componentTree.createHostInstanceToken(
+    parentHostOwner,
+    rootOwner
+  );
+  const childToken = componentTree.createHostInstanceToken(
+    childHostOwner,
+    rootOwner
+  );
+  componentTree.attachHostInstanceNode(parent, parentToken, parentProps);
+  componentTree.attachHostInstanceNode(child, childToken, childProps);
+  const wrapperRecord = eventListener.createEventListenerWrapperRecordWithPriority(
+    root,
+    "click",
+    0
+  );
+  const nativeEvent = createNativeEvent("click", child);
+  const dispatchRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      wrapperRecord,
+      nativeEvent
+    );
+
+  const invocationRecord =
+    pluginEventSystem.invokeSingleListenerCanaryFromDispatchRecord(
+      dispatchRecord
+    );
+
+  assert.equal(Object.isFrozen(invocationRecord), true);
+  assert.equal(
+    invocationRecord.kind,
+    pluginEventSystem.DISPATCH_LISTENER_INVOCATION_CANARY_RECORD_KIND
+  );
+  assert.equal(
+    pluginEventSystem.isDispatchListenerInvocationCanaryRecord(
+      invocationRecord
+    ),
+    true
+  );
+  assert.equal(
+    invocationRecord.status,
+    pluginEventSystem.PRIVATE_SINGLE_LISTENER_INVOCATION_CANARY_STATUS
+  );
+  assert.equal(invocationRecord.invocationStatus, "invoked-single-listener");
+  assert.equal(invocationRecord.invocationAttempted, true);
+  assert.equal(invocationRecord.listenerInvocationCount, 1);
+  assert.equal(invocationRecord.listenerErrorCaptured, false);
+  assert.equal(invocationRecord.listenerReturnStatus, "string");
+  assert.equal(invocationRecord.dispatchQueueProcessed, false);
+  assert.equal(invocationRecord.publicDispatchEnabled, false);
+  assert.equal(
+    invocationRecord.publicDispatchBlockedReason,
+    pluginEventSystem.PUBLIC_EVENT_DISPATCH_BLOCKED_CODE
+  );
+  assert.equal(invocationRecord.syntheticEventCount, 0);
+  assert.equal(invocationRecord.syntheticEventStatus, "blocked-not-created");
+  assert.equal(
+    invocationRecord.syntheticEventBlockedReason,
+    pluginEventSystem.SYNTHETIC_EVENT_BLOCKED_CODE
+  );
+  assert.equal(invocationRecord.exposesSyntheticEvent, false);
+  assert.equal(invocationRecord.exposesCanaryEvent, false);
+  assert.equal(invocationRecord.exposesNativeEvent, false);
+  assert.equal(invocationRecord.exposesLatestProps, false);
+  assert.equal(invocationRecord.exposesListener, false);
+  assert.equal(invocationRecord.browserDomEventCompatibilityClaimed, false);
+  assert.equal(invocationRecord.publicRootBehaviorChanged, false);
+  assert.equal(invocationRecord.registrationName, "onClick");
+  assert.equal(invocationRecord.currentTarget, child);
+  assert.equal(invocationRecord.targetInst, childToken);
+  assert.equal(invocationRecord.selectedFromProcessingOrder, true);
+  assert.equal(Object.hasOwn(invocationRecord, "listener"), false);
+  assert.equal(Object.hasOwn(invocationRecord, "latestProps"), false);
+  assert.equal(Object.hasOwn(invocationRecord, "canaryEvent"), false);
+  assert.equal(Object.hasOwn(invocationRecord, "nativeEvent"), false);
+
+  assert.deepEqual(
+    calls.map((call) => call.name),
+    ["child"]
+  );
+  assert.equal(calls[0].thisValue, undefined);
+  const canaryEvent = calls[0].event;
+  assert.equal(Object.isFrozen(canaryEvent), true);
+  assert.equal(
+    canaryEvent.kind,
+    pluginEventSystem.DISPATCH_LISTENER_CANARY_EVENT_KIND
+  );
+  assert.equal(canaryEvent.status, "private-canary-not-synthetic-event");
+  assert.equal(canaryEvent.syntheticEvent, false);
+  assert.equal(canaryEvent.currentTarget, child);
+  assert.equal(canaryEvent.target, child);
+  assert.equal(canaryEvent.targetInst, childToken);
+  assert.equal(canaryEvent.type, "click");
+  assert.equal(canaryEvent.domEventName, "click");
+  assert.equal(canaryEvent.registrationName, "onClick");
+  for (const publicEventMember of [
+    "nativeEvent",
+    "preventDefault",
+    "stopPropagation",
+    "isDefaultPrevented",
+    "isPropagationStopped",
+    "persist"
+  ]) {
+    assert.equal(
+      Object.hasOwn(canaryEvent, publicEventMember),
+      false,
+      publicEventMember
+    );
+  }
+
+  const invocationPayload =
+    pluginEventSystem.getDispatchListenerInvocationCanaryRecordPayload(
+      invocationRecord
+    );
+  assert.equal(invocationPayload.listener, childProps.onClick);
+  assert.equal(invocationPayload.latestProps, childProps);
+  assert.equal(invocationPayload.canaryEvent, canaryEvent);
+  assert.equal(invocationPayload.returnValue, "child-return");
+  assert.equal(invocationPayload.error, null);
+  assert.equal(invocationPayload.nativeEvent, nativeEvent);
+  assert.equal(invocationPayload.dispatchRecord, dispatchRecord);
+  assert.equal(dispatchRecord.listenerInvocationCount, 0);
+  assert.equal(dispatchRecord.dispatchQueue.listenerInvocationCount, 0);
+  assert.equal(dispatchRecord.willInvokeListeners, false);
+  assert.equal(
+    dispatchRecord.dispatchQueue.singleListenerInvocationCanaryStatus,
+    "available-private-helper-only"
+  );
+  assert.equal(nativeEvent.stopPropagationCallCount, 0);
+  assert.equal(nativeEvent.preventDefaultCallCount, 0);
+  assert.equal(componentTree.detachHostInstanceToken(childToken), childToken);
+  assert.equal(
+    componentTree.detachHostInstanceToken(parentToken),
+    parentToken
+  );
+});
+
+test("private single-listener invocation canary captures listener errors without processing the dispatch queue", () => {
+  const root = createEventTarget("single-listener-error-root");
+  const parent = createNode("DIV", domContainer.ELEMENT_NODE, root);
+  const child = createNode("BUTTON", domContainer.ELEMENT_NODE, parent);
+  const rootOwner = {kind: "SingleListenerErrorRootOwner"};
+  const parentHostOwner = {kind: "SingleListenerErrorParentHostOwner"};
+  const childHostOwner = {kind: "SingleListenerErrorChildHostOwner"};
+  const calls = [];
+  const thrown = new Error("private event listener canary boom");
+  const parentProps = {
+    onClick(event) {
+      calls.push(["parent", event]);
+      throw thrown;
+    }
+  };
+  const childProps = {
+    onClick(event) {
+      calls.push(["child", event]);
+      return "child-return";
+    }
+  };
+  const parentToken = componentTree.createHostInstanceToken(
+    parentHostOwner,
+    rootOwner
+  );
+  const childToken = componentTree.createHostInstanceToken(
+    childHostOwner,
+    rootOwner
+  );
+  componentTree.attachHostInstanceNode(parent, parentToken, parentProps);
+  componentTree.attachHostInstanceNode(child, childToken, childProps);
+  const wrapperRecord = eventListener.createEventListenerWrapperRecordWithPriority(
+    root,
+    "click",
+    0
+  );
+  const nativeEvent = createNativeEvent("click", child);
+  const dispatchRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      wrapperRecord,
+      nativeEvent
+    );
+
+  const invocationRecord =
+    pluginEventSystem.invokeSingleListenerCanaryFromDispatchRecord(
+      dispatchRecord,
+      {
+        listenerIndex: 1
+      }
+    );
+
+  assert.equal(invocationRecord.listenerIndex, 1);
+  assert.equal(invocationRecord.currentTarget, parent);
+  assert.equal(invocationRecord.targetInst, parentToken);
+  assert.equal(invocationRecord.invocationStatus, "captured-single-listener-error");
+  assert.equal(invocationRecord.listenerErrorCaptured, true);
+  assert.equal(invocationRecord.listenerInvocationCount, 1);
+  assert.equal(invocationRecord.listenerReturnStatus, "not-applicable");
+  assert.equal(invocationRecord.dispatchQueueProcessed, false);
+  assert.equal(invocationRecord.syntheticEventCount, 0);
+  assert.deepEqual(
+    calls.map(([name]) => name),
+    ["parent"]
+  );
+  const invocationPayload =
+    pluginEventSystem.getDispatchListenerInvocationCanaryRecordPayload(
+      invocationRecord
+    );
+  assert.equal(invocationPayload.listener, parentProps.onClick);
+  assert.equal(invocationPayload.latestProps, parentProps);
+  assert.equal(invocationPayload.error, thrown);
+  assert.equal(invocationPayload.returnValue, undefined);
+  assert.equal(dispatchRecord.listenerInvocationCount, 0);
+  assert.equal(dispatchRecord.dispatchQueue.listenerInvocationCount, 0);
+  assert.equal(nativeEvent.stopPropagationCallCount, 0);
+  assert.equal(nativeEvent.preventDefaultCallCount, 0);
+  assert.equal(componentTree.detachHostInstanceToken(childToken), childToken);
+  assert.equal(
+    componentTree.detachHostInstanceToken(parentToken),
+    parentToken
+  );
+});
+
 test("private listener dispatch entry points return records while installed listeners stay inert", () => {
   const root = createEventTarget("listener-root");
   const listener = rootListeners.listenToNativeEvent("mousemove", false, root);
@@ -576,6 +823,83 @@ test("installed private root listeners record fake DOM dispatch path metadata", 
     parentProps.onClick
   );
   assert.equal(listenerCalls, 0);
+  assert.equal(nativeEvent.stopPropagationCallCount, 0);
+  assert.equal(nativeEvent.preventDefaultCallCount, 0);
+  assert.equal(componentTree.detachHostInstanceToken(childToken), childToken);
+  assert.equal(
+    componentTree.detachHostInstanceToken(parentToken),
+    parentToken
+  );
+});
+
+test("installed private root listener canary invokes one listener only after explicit private request", () => {
+  const root = createEventTarget("installed-listener-canary-root");
+  const parent = createNode("DIV", domContainer.ELEMENT_NODE, root);
+  const child = createNode("BUTTON", domContainer.ELEMENT_NODE, parent);
+  const rootOwner = {kind: "InstalledListenerCanaryRootOwner"};
+  const parentHostOwner = {kind: "InstalledListenerCanaryParentHostOwner"};
+  const childHostOwner = {kind: "InstalledListenerCanaryChildHostOwner"};
+  const calls = [];
+  const parentProps = {
+    onClick(event) {
+      calls.push(["parent", event]);
+    }
+  };
+  const childProps = {
+    onClick(event) {
+      calls.push(["child", event]);
+    }
+  };
+  const parentToken = componentTree.createHostInstanceToken(
+    parentHostOwner,
+    rootOwner
+  );
+  const childToken = componentTree.createHostInstanceToken(
+    childHostOwner,
+    rootOwner
+  );
+  componentTree.attachHostInstanceNode(parent, parentToken, parentProps);
+  componentTree.attachHostInstanceNode(child, childToken, childProps);
+  const listener = rootListeners.listenToNativeEvent("click", false, root);
+  const nativeEvent = createNativeEvent("click", child);
+
+  assert.equal(listener(nativeEvent), undefined);
+  assert.deepEqual(calls, []);
+  const dispatchRecord =
+    rootListeners.getLastRootListenerDispatchRecord(listener);
+  assert.equal(dispatchRecord.targetInst, childToken);
+  assert.equal(dispatchRecord.listenerInvocationCount, 0);
+  assert.equal(dispatchRecord.dispatchQueue.listenerInvocationCount, 0);
+
+  const invocationRecord =
+    rootListeners.invokeLastRootListenerSingleListenerCanary(listener);
+
+  assert.equal(
+    rootListeners.getLastRootListenerInvocationCanaryRecord(listener),
+    invocationRecord
+  );
+  assert.equal(
+    invocationRecord.kind,
+    pluginEventSystem.DISPATCH_LISTENER_INVOCATION_CANARY_RECORD_KIND
+  );
+  assert.equal(invocationRecord.invocationAttempted, true);
+  assert.equal(invocationRecord.listenerInvocationCount, 1);
+  assert.equal(invocationRecord.currentTarget, child);
+  assert.equal(invocationRecord.targetInst, childToken);
+  assert.equal(invocationRecord.publicDispatchEnabled, false);
+  assert.equal(invocationRecord.syntheticEventCount, 0);
+  assert.deepEqual(
+    calls.map(([name]) => name),
+    ["child"]
+  );
+  assert.equal(
+    pluginEventSystem.getDispatchListenerInvocationCanaryRecordPayload(
+      invocationRecord
+    ).listener,
+    childProps.onClick
+  );
+  assert.equal(dispatchRecord.listenerInvocationCount, 0);
+  assert.equal(dispatchRecord.dispatchQueue.listenerInvocationCount, 0);
   assert.equal(nativeEvent.stopPropagationCallCount, 0);
   assert.equal(nativeEvent.preventDefaultCallCount, 0);
   assert.equal(componentTree.detachHostInstanceToken(childToken), childToken);
@@ -790,6 +1114,18 @@ test("invalid dispatch wrapper metadata fails before any native event side effec
     );
   }
 
+  assert.throws(
+    () => pluginEventSystem.invokeSingleListenerCanaryFromDispatchRecord({}),
+    {
+      code: pluginEventSystem.INVALID_EVENT_DISPATCH_RECORD_CODE
+    }
+  );
+  assert.throws(
+    () => pluginEventSystem.invokeDispatchListenerRecordForCanary({}),
+    {
+      code: pluginEventSystem.INVALID_DISPATCH_LISTENER_RECORD_CODE
+    }
+  );
   assert.equal(nativeEvent.stopPropagationCallCount, 0);
   assert.equal(nativeEvent.preventDefaultCallCount, 0);
 });
@@ -889,6 +1225,14 @@ test("private dispatch skeleton does not change public React DOM exports", () =>
       "default-node-development",
       "./client"
     ).require.exportKeys
+  );
+  assert.equal(
+    Object.hasOwn(reactDom, "invokeSingleListenerCanaryFromDispatchRecord"),
+    false
+  );
+  assert.equal(
+    Object.hasOwn(reactDomClient, "invokeLastRootListenerSingleListenerCanary"),
+    false
   );
 
   const exportedSubpaths = Object.keys(reactDomPackageJson.exports);

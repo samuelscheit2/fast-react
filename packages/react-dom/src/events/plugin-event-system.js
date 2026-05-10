@@ -28,20 +28,34 @@ const DISPATCH_QUEUE_ENTRY_RECORD_KIND =
   'FastReactDomDispatchQueueEntryRecord';
 const DISPATCH_LISTENER_RECORD_KIND =
   'FastReactDomDispatchListenerRecord';
+const DISPATCH_LISTENER_INVOCATION_CANARY_RECORD_KIND =
+  'FastReactDomDispatchListenerInvocationCanaryRecord';
+const DISPATCH_LISTENER_CANARY_EVENT_KIND =
+  'FastReactDomDispatchListenerCanaryEvent';
 
 const EVENT_DISPATCH_BLOCKED_CODE = 'FAST_REACT_DOM_EVENT_DISPATCH_BLOCKED';
 const PLUGIN_EXTRACTION_BLOCKED_CODE =
   'FAST_REACT_DOM_PLUGIN_EXTRACTION_BLOCKED';
 const EVENT_TARGET_RESOLUTION_BLOCKED_CODE =
   'FAST_REACT_DOM_EVENT_TARGET_RESOLUTION_BLOCKED';
+const SYNTHETIC_EVENT_BLOCKED_CODE =
+  'FAST_REACT_DOM_SYNTHETIC_EVENT_BLOCKED';
+const PUBLIC_EVENT_DISPATCH_BLOCKED_CODE =
+  'FAST_REACT_DOM_PUBLIC_EVENT_DISPATCH_BLOCKED';
 const HYDRATION_REPLAY_BLOCKED_CODE =
   'FAST_REACT_DOM_HYDRATION_REPLAY_BLOCKED';
 const CONTROLLED_STATE_RESTORE_BLOCKED_CODE =
   'FAST_REACT_DOM_CONTROLLED_STATE_RESTORE_BLOCKED';
 const INVALID_EVENT_WRAPPER_RECORD_CODE =
   'FAST_REACT_DOM_INVALID_EVENT_WRAPPER_RECORD';
+const INVALID_EVENT_DISPATCH_RECORD_CODE =
+  'FAST_REACT_DOM_INVALID_EVENT_DISPATCH_RECORD';
+const INVALID_DISPATCH_LISTENER_RECORD_CODE =
+  'FAST_REACT_DOM_INVALID_DISPATCH_LISTENER_RECORD';
 const PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS =
   'admitted-private-fake-dom-event-dispatch-metadata';
+const PRIVATE_SINGLE_LISTENER_INVOCATION_CANARY_STATUS =
+  'controlled-private-single-listener-invocation-canary';
 
 const SIMPLE_EVENT_PLUGIN_NAME = 'simple-event-plugin';
 const POLYFILL_EVENT_PLUGIN_NAMES = Object.freeze([
@@ -132,6 +146,7 @@ const simpleEventPluginEvents = Object.freeze([
 const simpleEventReactNames = createSimpleEventReactNameMap();
 const dispatchListenerRecordPayloads = new WeakMap();
 const dispatchQueueEntryRecordPayloads = new WeakMap();
+const dispatchListenerInvocationCanaryRecordPayloads = new WeakMap();
 
 function isObjectLike(value) {
   return (
@@ -145,6 +160,12 @@ function createInvalidEventWrapperRecordError() {
     'Cannot create a React DOM event dispatch record without a private listener wrapper record.'
   );
   error.code = INVALID_EVENT_WRAPPER_RECORD_CODE;
+  return error;
+}
+
+function createPluginEventSystemError(message, code) {
+  const error = new Error(message);
+  error.code = code;
   return error;
 }
 
@@ -191,6 +212,10 @@ function createDispatchQueueRecord(entries) {
     listenerCount,
     listenerInvocationCount: 0,
     publicRootBehaviorChanged: false,
+    singleListenerInvocationCanaryStatus:
+      listenerCount === 0
+        ? 'unavailable-no-listeners'
+        : 'available-private-helper-only',
     status:
       frozenEntries.length === 0
         ? 'empty'
@@ -477,6 +502,403 @@ function isDispatchQueueEntryRecord(record) {
   return getDispatchQueueEntryRecordPayload(record) !== null;
 }
 
+function invokeSingleListenerCanaryFromDispatchRecord(dispatchRecord, options) {
+  const normalizedDispatchRecord = assertEventDispatchRecord(dispatchRecord);
+  const invocationOptions = normalizeSingleListenerCanaryOptions(options);
+  const dispatchQueue = normalizedDispatchRecord.dispatchQueue;
+  const dispatchQueueEntry =
+    dispatchQueue.entries[invocationOptions.dispatchQueueEntryIndex] || null;
+
+  if (dispatchQueueEntry === null) {
+    return createSkippedSingleListenerInvocationCanaryRecord(
+      normalizedDispatchRecord,
+      null,
+      null,
+      invocationOptions,
+      'no-dispatch-queue-entry'
+    );
+  }
+
+  const listenerRecords = invocationOptions.useProcessingOrder
+    ? dispatchQueueEntry.processingListenerRecords
+    : dispatchQueueEntry.listeners;
+  const dispatchListenerRecord =
+    listenerRecords[invocationOptions.listenerIndex] || null;
+
+  if (dispatchListenerRecord === null) {
+    return createSkippedSingleListenerInvocationCanaryRecord(
+      normalizedDispatchRecord,
+      dispatchQueueEntry,
+      null,
+      invocationOptions,
+      'no-dispatch-listener-record'
+    );
+  }
+
+  return invokeDispatchListenerRecordForCanary(dispatchListenerRecord, {
+    dispatchQueueEntry,
+    dispatchRecord: normalizedDispatchRecord,
+    listenerIndex: invocationOptions.listenerIndex,
+    selectedFromProcessingOrder: invocationOptions.useProcessingOrder
+  });
+}
+
+function invokeDispatchListenerRecordForCanary(dispatchListenerRecord, options) {
+  const normalizedListenerRecord =
+    assertDispatchListenerRecord(dispatchListenerRecord);
+  const payload =
+    getDispatchListenerRecordPayload(normalizedListenerRecord);
+  const normalizedOptions = isObjectLike(options) ? options : {};
+  const dispatchRecord =
+    normalizedOptions.dispatchRecord === undefined
+      ? null
+      : assertEventDispatchRecord(normalizedOptions.dispatchRecord);
+  const dispatchQueueEntry =
+    normalizedOptions.dispatchQueueEntry === undefined
+      ? null
+      : assertDispatchQueueEntryRecord(normalizedOptions.dispatchQueueEntry);
+  const selectedFromProcessingOrder =
+    normalizedOptions.selectedFromProcessingOrder !== false;
+  const listenerIndex =
+    typeof normalizedOptions.listenerIndex === 'number'
+      ? normalizedOptions.listenerIndex
+      : 0;
+
+  if (typeof payload.listener !== 'function') {
+    return createSkippedSingleListenerInvocationCanaryRecord(
+      dispatchRecord,
+      dispatchQueueEntry,
+      normalizedListenerRecord,
+      {
+        dispatchQueueEntryIndex: 0,
+        listenerIndex,
+        useProcessingOrder: selectedFromProcessingOrder
+      },
+      'missing-listener'
+    );
+  }
+
+  const canaryEvent = createDispatchListenerCanaryEvent(
+    normalizedListenerRecord,
+    payload
+  );
+  let returnValue;
+  let error = null;
+
+  try {
+    returnValue = payload.listener.call(undefined, canaryEvent);
+  } catch (thrownValue) {
+    error = thrownValue;
+    returnValue = undefined;
+  }
+
+  const record = Object.freeze({
+    admissionStatus: PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS,
+    browserDomEventCompatibilityClaimed: false,
+    canaryEventKind: DISPATCH_LISTENER_CANARY_EVENT_KIND,
+    currentTarget: normalizedListenerRecord.currentTarget,
+    dispatchPathIndex: normalizedListenerRecord.dispatchPathIndex,
+    dispatchQueueEntryKind:
+      dispatchQueueEntry === null ? null : dispatchQueueEntry.kind,
+    dispatchQueueProcessed: false,
+    dispatchRecordKind:
+      dispatchRecord === null ? null : dispatchRecord.kind,
+    domEventName: normalizedListenerRecord.domEventName,
+    exposesCanaryEvent: false,
+    exposesLatestProps: false,
+    exposesListener: false,
+    exposesNativeEvent: false,
+    exposesSyntheticEvent: false,
+    inCapturePhase: normalizedListenerRecord.inCapturePhase,
+    invocationAttempted: true,
+    invocationStatus:
+      error === null
+        ? 'invoked-single-listener'
+        : 'captured-single-listener-error',
+    kind: DISPATCH_LISTENER_INVOCATION_CANARY_RECORD_KIND,
+    latestPropsStatus: normalizedListenerRecord.latestPropsStatus,
+    listenerErrorCaptured: error !== null,
+    listenerIndex,
+    listenerInvocationCount: 1,
+    listenerReturnStatus:
+      error === null ? describeReturnValue(returnValue) : 'not-applicable',
+    listenerStatus: normalizedListenerRecord.listenerStatus,
+    nativeEventTarget: normalizedListenerRecord.nativeEventTarget,
+    nativeEventType: normalizedListenerRecord.nativeEventType,
+    phase: normalizedListenerRecord.phase,
+    publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
+    publicDispatchEnabled: false,
+    publicRootBehaviorChanged: false,
+    registrationName: normalizedListenerRecord.registrationName,
+    selectedFromProcessingOrder,
+    status: PRIVATE_SINGLE_LISTENER_INVOCATION_CANARY_STATUS,
+    syntheticEventBlockedReason: SYNTHETIC_EVENT_BLOCKED_CODE,
+    syntheticEventCount: 0,
+    syntheticEventStatus: 'blocked-not-created',
+    targetHostInstanceNode:
+      normalizedListenerRecord.targetHostInstanceNode,
+    targetHostInstanceToken:
+      normalizedListenerRecord.targetHostInstanceToken,
+    targetInst: normalizedListenerRecord.targetInst,
+    targetInstStatus: normalizedListenerRecord.targetInstStatus,
+    willInvokeListeners: false
+  });
+
+  dispatchListenerInvocationCanaryRecordPayloads.set(
+    record,
+    Object.freeze({
+      canaryEvent,
+      dispatchListenerRecord: normalizedListenerRecord,
+      dispatchQueueEntry,
+      dispatchRecord,
+      error,
+      latestProps: payload.latestProps,
+      listener: payload.listener,
+      nativeEvent: payload.nativeEvent,
+      nativeEventTarget: payload.nativeEventTarget,
+      pathEntry: payload.pathEntry,
+      returnValue,
+      targetListenerLookupRecord: payload.targetListenerLookupRecord
+    })
+  );
+
+  return record;
+}
+
+function createSkippedSingleListenerInvocationCanaryRecord(
+  dispatchRecord,
+  dispatchQueueEntry,
+  dispatchListenerRecord,
+  options,
+  reason
+) {
+  const record = Object.freeze({
+    admissionStatus: PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS,
+    browserDomEventCompatibilityClaimed: false,
+    canaryEventKind: DISPATCH_LISTENER_CANARY_EVENT_KIND,
+    currentTarget:
+      dispatchListenerRecord === null
+        ? null
+        : dispatchListenerRecord.currentTarget,
+    dispatchPathIndex:
+      dispatchListenerRecord === null
+        ? null
+        : dispatchListenerRecord.dispatchPathIndex,
+    dispatchQueueEntryKind:
+      dispatchQueueEntry === null ? null : dispatchQueueEntry.kind,
+    dispatchQueueProcessed: false,
+    dispatchRecordKind: dispatchRecord === null ? null : dispatchRecord.kind,
+    domEventName:
+      dispatchListenerRecord === null
+        ? dispatchRecord === null
+          ? null
+          : dispatchRecord.domEventName
+        : dispatchListenerRecord.domEventName,
+    exposesCanaryEvent: false,
+    exposesLatestProps: false,
+    exposesListener: false,
+    exposesNativeEvent: false,
+    exposesSyntheticEvent: false,
+    inCapturePhase:
+      dispatchListenerRecord === null
+        ? dispatchRecord !== null && dispatchRecord.inCapturePhase === true
+        : dispatchListenerRecord.inCapturePhase,
+    invocationAttempted: false,
+    invocationStatus: 'skipped-' + reason,
+    kind: DISPATCH_LISTENER_INVOCATION_CANARY_RECORD_KIND,
+    latestPropsStatus:
+      dispatchListenerRecord === null
+        ? 'not-applicable'
+        : dispatchListenerRecord.latestPropsStatus,
+    listenerErrorCaptured: false,
+    listenerIndex: options.listenerIndex,
+    listenerInvocationCount: 0,
+    listenerReturnStatus: 'not-applicable',
+    listenerStatus:
+      dispatchListenerRecord === null
+        ? 'not-applicable'
+        : dispatchListenerRecord.listenerStatus,
+    nativeEventTarget:
+      dispatchListenerRecord === null
+        ? dispatchRecord === null
+          ? null
+          : dispatchRecord.nativeEventTarget
+        : dispatchListenerRecord.nativeEventTarget,
+    nativeEventType:
+      dispatchListenerRecord === null
+        ? dispatchRecord === null
+          ? null
+          : dispatchRecord.nativeEventType
+        : dispatchListenerRecord.nativeEventType,
+    phase:
+      dispatchListenerRecord === null ? null : dispatchListenerRecord.phase,
+    publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
+    publicDispatchEnabled: false,
+    publicRootBehaviorChanged: false,
+    registrationName:
+      dispatchListenerRecord === null
+        ? null
+        : dispatchListenerRecord.registrationName,
+    selectedFromProcessingOrder: options.useProcessingOrder,
+    status: PRIVATE_SINGLE_LISTENER_INVOCATION_CANARY_STATUS,
+    syntheticEventBlockedReason: SYNTHETIC_EVENT_BLOCKED_CODE,
+    syntheticEventCount: 0,
+    syntheticEventStatus: 'blocked-not-created',
+    targetHostInstanceNode:
+      dispatchListenerRecord === null
+        ? null
+        : dispatchListenerRecord.targetHostInstanceNode,
+    targetHostInstanceToken:
+      dispatchListenerRecord === null
+        ? null
+        : dispatchListenerRecord.targetHostInstanceToken,
+    targetInst:
+      dispatchListenerRecord === null ? null : dispatchListenerRecord.targetInst,
+    targetInstStatus:
+      dispatchListenerRecord === null
+        ? 'not-applicable'
+        : dispatchListenerRecord.targetInstStatus,
+    willInvokeListeners: false
+  });
+
+  dispatchListenerInvocationCanaryRecordPayloads.set(
+    record,
+    Object.freeze({
+      canaryEvent: null,
+      dispatchListenerRecord,
+      dispatchQueueEntry,
+      dispatchRecord,
+      error: null,
+      latestProps: null,
+      listener: null,
+      nativeEvent: null,
+      nativeEventTarget:
+        dispatchListenerRecord === null
+          ? dispatchRecord === null
+            ? null
+            : dispatchRecord.nativeEventTarget
+          : dispatchListenerRecord.nativeEventTarget,
+      pathEntry: null,
+      returnValue: undefined,
+      targetListenerLookupRecord: null
+    })
+  );
+
+  return record;
+}
+
+function createDispatchListenerCanaryEvent(dispatchListenerRecord, payload) {
+  return Object.freeze({
+    browserDomEventCompatibilityClaimed: false,
+    currentTarget: dispatchListenerRecord.currentTarget,
+    domEventName: dispatchListenerRecord.domEventName,
+    kind: DISPATCH_LISTENER_CANARY_EVENT_KIND,
+    nativeEventType: dispatchListenerRecord.nativeEventType,
+    phase: dispatchListenerRecord.phase,
+    publicRootBehaviorChanged: false,
+    registrationName: dispatchListenerRecord.registrationName,
+    status: 'private-canary-not-synthetic-event',
+    syntheticEvent: false,
+    target: payload.nativeEventTarget,
+    targetInst: dispatchListenerRecord.targetInst,
+    type: dispatchListenerRecord.nativeEventType
+  });
+}
+
+function getDispatchListenerInvocationCanaryRecordPayload(record) {
+  if (!isObjectLike(record)) {
+    return null;
+  }
+
+  return dispatchListenerInvocationCanaryRecordPayloads.get(record) || null;
+}
+
+function isDispatchListenerInvocationCanaryRecord(record) {
+  return getDispatchListenerInvocationCanaryRecordPayload(record) !== null;
+}
+
+function assertEventDispatchRecord(record) {
+  if (
+    !isObjectLike(record) ||
+    record.kind !== EVENT_DISPATCH_RECORD_KIND ||
+    !isObjectLike(record.dispatchQueue) ||
+    record.dispatchQueue.kind !== DISPATCH_QUEUE_RECORD_KIND ||
+    !Array.isArray(record.dispatchQueue.entries)
+  ) {
+    throw createPluginEventSystemError(
+      'Cannot invoke a React DOM event listener canary without a private event dispatch record.',
+      INVALID_EVENT_DISPATCH_RECORD_CODE
+    );
+  }
+
+  return record;
+}
+
+function assertDispatchQueueEntryRecord(record) {
+  if (!isDispatchQueueEntryRecord(record)) {
+    throw createPluginEventSystemError(
+      'Cannot invoke a React DOM event listener canary without a private dispatch queue entry record.',
+      INVALID_EVENT_DISPATCH_RECORD_CODE
+    );
+  }
+
+  return record;
+}
+
+function assertDispatchListenerRecord(record) {
+  if (!isDispatchListenerRecord(record)) {
+    throw createPluginEventSystemError(
+      'Cannot invoke a React DOM event listener canary without a private dispatch listener record.',
+      INVALID_DISPATCH_LISTENER_RECORD_CODE
+    );
+  }
+
+  return record;
+}
+
+function normalizeSingleListenerCanaryOptions(options) {
+  const normalizedOptions = isObjectLike(options) ? options : {};
+
+  return {
+    dispatchQueueEntryIndex: normalizeNonNegativeInteger(
+      normalizedOptions.dispatchQueueEntryIndex,
+      0,
+      'dispatchQueueEntryIndex'
+    ),
+    listenerIndex: normalizeNonNegativeInteger(
+      normalizedOptions.listenerIndex,
+      0,
+      'listenerIndex'
+    ),
+    useProcessingOrder: normalizedOptions.useProcessingOrder !== false
+  };
+}
+
+function normalizeNonNegativeInteger(value, fallback, fieldName) {
+  if (value === undefined) {
+    return fallback;
+  }
+
+  if (!Number.isInteger(value) || value < 0) {
+    throw createPluginEventSystemError(
+      `Expected ${fieldName} to be a non-negative integer.`,
+      INVALID_EVENT_DISPATCH_RECORD_CODE
+    );
+  }
+
+  return value;
+}
+
+function describeReturnValue(value) {
+  if (value === undefined) {
+    return 'undefined';
+  }
+  if (value === null) {
+    return 'null';
+  }
+  return typeof value;
+}
+
 function createPluginExtractionRecord(
   wrapperRecord,
   nativeEvent,
@@ -710,6 +1132,8 @@ function getSimpleEventRegistrationName(domEventName, eventSystemFlags) {
 module.exports = {
   CONTROLLED_STATE_RESTORE_BLOCKED_CODE,
   DISPATCH_LISTENER_RECORD_KIND,
+  DISPATCH_LISTENER_CANARY_EVENT_KIND,
+  DISPATCH_LISTENER_INVOCATION_CANARY_RECORD_KIND,
   DISPATCH_QUEUE_ENTRY_RECORD_KIND,
   DISPATCH_QUEUE_RECORD_KIND,
   EVENT_DISPATCH_BLOCKED_CODE,
@@ -719,21 +1143,30 @@ module.exports = {
   EVENT_PLUGIN_NAMES,
   EVENT_TARGET_RESOLUTION_BLOCKED_CODE,
   HYDRATION_REPLAY_BLOCKED_CODE,
+  INVALID_DISPATCH_LISTENER_RECORD_CODE,
+  INVALID_EVENT_DISPATCH_RECORD_CODE,
   INVALID_EVENT_WRAPPER_RECORD_CODE,
   PLUGIN_EXTRACTION_BLOCKED_CODE,
   PLUGIN_EXTRACTION_RECORD_KIND,
   POLYFILL_EVENT_PLUGIN_NAMES,
   PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS,
+  PRIVATE_SINGLE_LISTENER_INVOCATION_CANARY_STATUS,
+  PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
   SCROLL_END_EVENT_PLUGIN_NAME,
   SIMPLE_EVENT_PLUGIN_NAME,
+  SYNTHETIC_EVENT_BLOCKED_CODE,
   assertEventListenerWrapperRecord,
   createEventDispatchRecordFromWrapperRecord,
   createPluginExtractionRecord,
+  getDispatchListenerInvocationCanaryRecordPayload,
   getDispatchListenerRecordPayload,
   getDispatchQueueEntryRecordPayload,
   getSimpleEventReactName,
   getSimpleEventRegistrationName,
   getWrapperRecord,
+  invokeDispatchListenerRecordForCanary,
+  invokeSingleListenerCanaryFromDispatchRecord,
+  isDispatchListenerInvocationCanaryRecord,
   isDispatchListenerRecord,
   isDispatchQueueEntryRecord
 };
