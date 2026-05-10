@@ -19,7 +19,8 @@ const {
 const {
   EVENT_DISPATCH_BLOCKED_CODE,
   EVENT_TARGET_RESOLUTION_BLOCKED_CODE,
-  HYDRATION_REPLAY_BLOCKED_CODE
+  HYDRATION_REPLAY_BLOCKED_CODE,
+  createHydrationReplayEventQueueDiagnostic
 } = require('../events/plugin-event-system.js');
 
 const HYDRATION_MARKER_ORACLE_KIND =
@@ -437,7 +438,14 @@ function createUnsupportedHydrateRootRecordWithGate(
     markerGuard,
     markerParserEvidence
   });
+  const eventReplayQueueDiagnostics =
+    createHydrationReplayEventQueueDiagnostic([], {
+      markerReplayTargetCandidates:
+        replayQueueDiagnostics.markerReplayTargetCandidates,
+      source: 'unsupported-hydrate-root-boundary-record'
+    });
   const eventReplayBlockers = createHydrationEventReplayBlockers({
+    eventReplayQueueDiagnostics,
     listenerGuard,
     markerDiagnostics,
     markerParserEvidence,
@@ -463,6 +471,7 @@ function createUnsupportedHydrateRootRecordWithGate(
     markerParserEvidence,
     markerEvidence,
     replayQueueDiagnostics,
+    eventReplayQueueDiagnostics,
     eventReplayBlockers,
     canHydrate: false,
     publicRootCreated: false,
@@ -714,6 +723,7 @@ function getHydrationMarkerReplayTargetKind(contractId) {
 }
 
 function createHydrationEventReplayBlockers({
+  eventReplayQueueDiagnostics,
   listenerGuard,
   markerDiagnostics,
   markerParserEvidence,
@@ -739,6 +749,18 @@ function createHydrationEventReplayBlockers({
     markerParserEvidenceAccepted:
       markerParserEvidence.status ===
       'accepted-marker-parser-evidence-recorded',
+    eventReplayQueueDiagnostics,
+    eventReplayQueueDiagnosticsAccepted:
+      eventReplayQueueDiagnostics.status ===
+        'blocked-no-event-replay-targets-recorded' ||
+      eventReplayQueueDiagnostics.status ===
+        'blocked-event-replay-targets-recorded',
+    blockedEventReplayTargetCount:
+      eventReplayQueueDiagnostics.blockedEventReplayTargetCount,
+    queuedEventReplayTargetCount:
+      eventReplayQueueDiagnostics.queuedEventReplayTargetCount,
+    eventQueueOrder: eventReplayQueueDiagnostics.eventQueueOrder,
+    priorityQueueOrder: eventReplayQueueDiagnostics.priorityQueueOrder,
     replayQueueDiagnostics,
     replayQueueDiagnosticsAccepted:
       replayQueueDiagnostics.status ===
