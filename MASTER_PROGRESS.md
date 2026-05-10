@@ -118,9 +118,18 @@ sequencing belong in `MASTER_PLAN.md`.
   internal invocation request/record boundary, opaque output handle, explicit
   unsupported hook/context/class/thrown-value errors, and focused tests proving
   no host mutation, commit, child reconciliation, or public hook facade wiring.
+- Worker 160 root update callback commit prep was merged, adding deterministic
+  HostRoot callback records with queue, source update, sequence, handle, and
+  visible/hidden/deferred visibility, plus peek/take APIs for future layout
+  commit tests without invoking JS callbacks or wiring error/public/native
+  callback paths.
 
 ## Latest Accepted Verification
 
+- Worker 160 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused update-queue and root-callback tests, full
+  `fast-react-reconciler` tests with 94 unit tests plus 1 doctest, reconciler
+  clippy with warnings denied, and `git diff --check`.
 - Worker 159 was verified on its integrated worktree and again on `main` with
   `cargo fmt --all --check`, focused `function_component` tests, full
   `fast-react-reconciler` tests with 90 unit tests plus 1 doctest, reconciler

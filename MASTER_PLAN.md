@@ -45,8 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 160: root update callback commit prep in
-  `/Users/user/Developer/Developer/fast-react-worker-160-root-update-callback-commit-prep`.
 - Worker 161: root error option handles in
   `/Users/user/Developer/Developer/fast-react-worker-161-root-error-option-handles`.
 - Worker 162: benchmark manifest gate in
