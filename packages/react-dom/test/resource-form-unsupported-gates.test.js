@@ -1800,6 +1800,247 @@ test('private controlled checkbox and radio restore queue gate records checkable
   }
 });
 
+test('private controlled radio sibling-props lookup diagnostics stay metadata-only', () => {
+  const gate =
+    controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({
+      requestIdPrefix: 'radio-sibling-props'
+    });
+  const latestProps = {
+    type: 'radio',
+    name: 'choice',
+    checked: true,
+    onChange() {},
+    onClick() {}
+  };
+  const dispatch = createControlledInputEventDispatch({
+    domEventName: 'click',
+    latestProps,
+    nodeName: 'INPUT'
+  });
+  const intent = gate.recordPostEventRestoreIntentFromEventLatestProps(
+    dispatch.dispatchRecord,
+    {
+      explicitAdmission: true,
+      queueKind:
+        'deterministic-event-latest-props-post-event-restore-queue',
+      queueId: 'radio-sibling-props-restore',
+      eventName: 'click',
+      targetKind: 'controlled-input-post-event-restore-queue',
+      radioGroupFormKey: 'form:checkout',
+      radioGroupSiblingProps: [
+        {
+          formKey: 'form:checkout',
+          props: {
+            type: 'radio',
+            name: 'choice',
+            checked: false,
+            defaultChecked: false,
+            value: 'card',
+            onChange() {}
+          }
+        },
+        {
+          formKey: 'form:other',
+          props: {
+            type: 'radio',
+            name: 'choice',
+            checked: false,
+            onChange() {}
+          }
+        },
+        {
+          formKey: 'form:checkout',
+          props: {
+            type: 'radio',
+            name: 'shipping',
+            checked: false,
+            onChange() {}
+          }
+        },
+        {
+          formKey: 'form:checkout',
+          isPrimary: true,
+          props: latestProps
+        }
+      ]
+    }
+  );
+  const lookup = intent.radioGroupSiblingPropsLookup;
+  const groupIntent = intent.groupIntentRecords[0];
+
+  assert.equal(Object.isFrozen(lookup), true);
+  assert.equal(Object.isFrozen(lookup.records), true);
+  for (const record of lookup.records) {
+    assert.equal(Object.isFrozen(record), true);
+    assert.equal(Object.isFrozen(record.nameProp), true);
+    assert.equal(Object.isFrozen(record.controlledPropSummary), true);
+  }
+  assert.deepEqual(intent.admission.radioGroupSiblingPropsEvidence, {
+    provided: true,
+    candidateCount: 4,
+    primaryFormKeyStatus: {present: true, empty: false},
+    deterministicMetadataOnly: true,
+    propsRedacted: true,
+    rawSiblingPropsRetained: false,
+    rawFormRetained: false,
+    livePropsLookupAllowed: false,
+    formTraversalAllowed: false,
+    wrapperExecutionAllowed: false
+  });
+  assert.equal(
+    lookup.status,
+    controlledRestoreQueue.controlledInputPostEventRestoreQueueRadioSiblingPropsLookupRecordedStatus
+  );
+  assert.equal(lookup.groupRestoreRequired, true);
+  assert.equal(lookup.groupRestoreIntentRecorded, true);
+  assert.equal(lookup.candidateCount, 4);
+  assert.equal(lookup.acceptedSameNameSameFormCount, 1);
+  assert.equal(lookup.acceptedSiblingPropsEvidenceCount, 1);
+  assert.equal(lookup.skippedCandidateCount, 3);
+  assert.deepEqual(
+    lookup.records.map((record) => ({
+      status: record.status,
+      targetRole: record.targetRole,
+      hostTag: record.hostTag,
+      inputType: record.inputType,
+      sameName: record.sameName,
+      sameForm: record.sameForm,
+      sameTarget: record.sameTarget,
+      skipReason: record.skipReason,
+      siblingWouldReceiveRestore: record.siblingWouldReceiveRestore,
+      siblingLatestPropsLookupPerformed:
+        record.siblingLatestPropsLookupPerformed,
+      livePropsLookupPerformed: record.livePropsLookupPerformed,
+      formTraversalPerformed: record.formTraversalPerformed,
+      wrapperExecuted: record.wrapperExecuted,
+      siblingInputRestorePerformed: record.siblingInputRestorePerformed,
+      valueTrackerRefreshed: record.valueTrackerRefreshed,
+      realDomQueried: record.realDomQueried,
+      rawLatestPropsRetained: record.rawLatestPropsRetained,
+      rawFormRetained: record.rawFormRetained,
+      rawNameRetained: record.rawNameRetained,
+      compatibilityClaimed: record.compatibilityClaimed
+    })),
+    [
+      {
+        status:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueRadioSiblingPropsEvidenceAcceptedStatus,
+        targetRole: 'sibling',
+        hostTag: 'input',
+        inputType: 'radio',
+        sameName: true,
+        sameForm: true,
+        sameTarget: false,
+        skipReason: null,
+        siblingWouldReceiveRestore: true,
+        siblingLatestPropsLookupPerformed: false,
+        livePropsLookupPerformed: false,
+        formTraversalPerformed: false,
+        wrapperExecuted: false,
+        siblingInputRestorePerformed: false,
+        valueTrackerRefreshed: false,
+        realDomQueried: false,
+        rawLatestPropsRetained: false,
+        rawFormRetained: false,
+        rawNameRetained: false,
+        compatibilityClaimed: false
+      },
+      {
+        status:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueRadioSiblingPropsEvidenceSkippedStatus,
+        targetRole: 'sibling',
+        hostTag: 'input',
+        inputType: 'radio',
+        sameName: true,
+        sameForm: false,
+        sameTarget: false,
+        skipReason: 'sibling-radio-form-does-not-match',
+        siblingWouldReceiveRestore: false,
+        siblingLatestPropsLookupPerformed: false,
+        livePropsLookupPerformed: false,
+        formTraversalPerformed: false,
+        wrapperExecuted: false,
+        siblingInputRestorePerformed: false,
+        valueTrackerRefreshed: false,
+        realDomQueried: false,
+        rawLatestPropsRetained: false,
+        rawFormRetained: false,
+        rawNameRetained: false,
+        compatibilityClaimed: false
+      },
+      {
+        status:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueRadioSiblingPropsEvidenceSkippedStatus,
+        targetRole: 'sibling',
+        hostTag: 'input',
+        inputType: 'radio',
+        sameName: false,
+        sameForm: true,
+        sameTarget: false,
+        skipReason: 'sibling-radio-name-does-not-match',
+        siblingWouldReceiveRestore: false,
+        siblingLatestPropsLookupPerformed: false,
+        livePropsLookupPerformed: false,
+        formTraversalPerformed: false,
+        wrapperExecuted: false,
+        siblingInputRestorePerformed: false,
+        valueTrackerRefreshed: false,
+        realDomQueried: false,
+        rawLatestPropsRetained: false,
+        rawFormRetained: false,
+        rawNameRetained: false,
+        compatibilityClaimed: false
+      },
+      {
+        status:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueRadioSiblingPropsEvidenceSkippedStatus,
+        targetRole: 'primary',
+        hostTag: 'input',
+        inputType: 'radio',
+        sameName: true,
+        sameForm: true,
+        sameTarget: true,
+        skipReason: 'primary-radio-is-not-a-sibling',
+        siblingWouldReceiveRestore: false,
+        siblingLatestPropsLookupPerformed: false,
+        livePropsLookupPerformed: false,
+        formTraversalPerformed: false,
+        wrapperExecuted: false,
+        siblingInputRestorePerformed: false,
+        valueTrackerRefreshed: false,
+        realDomQueried: false,
+        rawLatestPropsRetained: false,
+        rawFormRetained: false,
+        rawNameRetained: false,
+        compatibilityClaimed: false
+      }
+    ]
+  );
+  assert.equal(groupIntent.siblingPropsLookup, lookup);
+  assert.equal(groupIntent.groupLookupPerformed, false);
+  assert.equal(groupIntent.siblingLatestPropsLookupPerformed, false);
+  assert.equal(groupIntent.siblingInputRestorePerformed, false);
+  assert.equal(groupIntent.valueTrackerRefreshed, false);
+  assert.equal(intent.sideEffects.radioGroupSiblingMetadataRead, true);
+  assert.equal(intent.sideEffects.radioGroupSiblingPropsEvidenceAccepted, true);
+  assert.equal(
+    intent.sideEffects.radioGroupSiblingPropsSameNameSameFormRecorded,
+    true
+  );
+  assert.equal(intent.sideEffects.radioGroupFormBoundaryMetadataRead, true);
+  assert.equal(intent.sideEffects.radioGroupLivePropsLookupPerformed, false);
+  assert.equal(intent.sideEffects.radioGroupFormTraversalPerformed, false);
+  assert.equal(intent.sideEffects.radioGroupLookupPerformed, false);
+  assert.equal(intent.sideEffects.radioGroupMembersEnumerated, false);
+  assert.equal(intent.sideEffects.radioGroupValueTrackerRefreshed, false);
+  assert.equal(intent.sideEffects.hostWrapperInvoked, false);
+  assert.equal(intent.sideEffects.browserInputMutated, false);
+  assert.equal(intent.sideEffects.compatibilityClaimed, false);
+  assert.equal(Object.hasOwn(dispatch.targetNode, '_valueTracker'), false);
+
+  componentTree.detachHostInstanceToken(dispatch.token);
+});
+
 test('private controlled input post-event restore queue gate records select and textarea fake-DOM latest-props intent only', () => {
   const trackerGate = resourceFormGate.createControlledInputValueTrackerGate({
     requestIdPrefix: 'select-textarea-tracker'

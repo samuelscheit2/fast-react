@@ -38,6 +38,14 @@ const controlledInputPostEventRestoreQueueRadioGroupIntentRecordedStatus =
   'recorded-private-controlled-radio-group-restore-intent';
 const controlledInputPostEventRestoreQueueRadioGroupIntentSkippedStatus =
   'skipped-private-controlled-radio-group-restore-intent';
+const controlledInputPostEventRestoreQueueRadioSiblingPropsLookupRecordedStatus =
+  'recorded-private-controlled-radio-sibling-props-lookup-intent';
+const controlledInputPostEventRestoreQueueRadioSiblingPropsLookupSkippedStatus =
+  'skipped-private-controlled-radio-sibling-props-lookup-intent';
+const controlledInputPostEventRestoreQueueRadioSiblingPropsEvidenceAcceptedStatus =
+  'accepted-private-controlled-radio-sibling-props-evidence';
+const controlledInputPostEventRestoreQueueRadioSiblingPropsEvidenceSkippedStatus =
+  'skipped-private-controlled-radio-sibling-props-evidence';
 const controlledInputPostEventRestoreQueueInvalidEventCode =
   'FAST_REACT_DOM_CONTROLLED_INPUT_POST_EVENT_RESTORE_QUEUE_INVALID_EVENT';
 const controlledInputPostEventRestoreQueueInvalidFakeDomObservationCode =
@@ -76,6 +84,11 @@ const controlledInputPostEventRestoreQueueNoSideEffects = freezeRecord({
   radioGroupLookupPerformed: false,
   radioGroupMembersEnumerated: false,
   radioGroupSiblingMetadataRead: false,
+  radioGroupSiblingPropsEvidenceAccepted: false,
+  radioGroupSiblingPropsSameNameSameFormRecorded: false,
+  radioGroupFormBoundaryMetadataRead: false,
+  radioGroupFormTraversalPerformed: false,
+  radioGroupLivePropsLookupPerformed: false,
   radioGroupValueTrackerRefreshRequired: false,
   radioGroupValueTrackerRefreshed: false,
   liveValueTrackerInstalled: false,
@@ -167,11 +180,18 @@ function recordControlledInputPostEventRestoreIntentFromEventLatestPropsWithGate
     latestPropsEvidence,
     intentRecorded
   );
+  const radioGroupSiblingPropsLookup = createRadioGroupSiblingPropsLookup(
+    controlledTarget,
+    latestPropsEvidence,
+    admission,
+    intentRecorded
+  );
   const groupIntentRecords = createCheckableGroupIntentRecords(
     controlledTarget,
     latestPropsEvidence,
     normalizedAdmission,
-    intentRecorded
+    intentRecorded,
+    radioGroupSiblingPropsLookup
   );
   const requestSequence = gateState.nextRequestSequence++;
   const requestId = `${gateState.requestIdPrefix}:${requestSequence}`;
@@ -204,6 +224,7 @@ function recordControlledInputPostEventRestoreIntentFromEventLatestPropsWithGate
     latestPropsEvidence: latestPropsEvidence.record,
     controlledTarget,
     checkableRestoreMetadata,
+    radioGroupSiblingPropsLookup,
     groupIntentRecords,
     restoreIntent: createPostEventRestoreIntentSummary(
       eventEvidence,
@@ -222,7 +243,8 @@ function recordControlledInputPostEventRestoreIntentFromEventLatestPropsWithGate
       latestPropsEvidence,
       intentRecorded,
       controlledTarget,
-      groupIntentRecords
+      groupIntentRecords,
+      radioGroupSiblingPropsLookup
     )
   });
 
@@ -259,11 +281,18 @@ function recordControlledInputPostEventRestoreIntentFromFakeDomObservationLatest
     latestPropsEvidence,
     intentRecorded
   );
+  const radioGroupSiblingPropsLookup = createRadioGroupSiblingPropsLookup(
+    controlledTarget,
+    latestPropsEvidence,
+    admission,
+    intentRecorded
+  );
   const groupIntentRecords = createCheckableGroupIntentRecords(
     controlledTarget,
     latestPropsEvidence,
     normalizedAdmission,
-    intentRecorded
+    intentRecorded,
+    radioGroupSiblingPropsLookup
   );
   const requestSequence = gateState.nextRequestSequence++;
   const requestId = `${gateState.requestIdPrefix}:${requestSequence}`;
@@ -302,6 +331,7 @@ function recordControlledInputPostEventRestoreIntentFromFakeDomObservationLatest
     latestPropsEvidence: latestPropsEvidence.record,
     controlledTarget,
     checkableRestoreMetadata,
+    radioGroupSiblingPropsLookup,
     groupIntentRecords,
     restoreIntent:
       createPostEventRestoreIntentSummaryFromFakeDomObservation(
@@ -323,7 +353,8 @@ function recordControlledInputPostEventRestoreIntentFromFakeDomObservationLatest
         latestPropsEvidence,
         intentRecorded,
         controlledTarget,
-        groupIntentRecords
+        groupIntentRecords,
+        radioGroupSiblingPropsLookup
       )
   });
 
@@ -351,11 +382,15 @@ function describeControlledInputPostEventRestoreQueueGate() {
     consumesLatestPropsEvidence: true,
     recordsCheckableRestoreMetadata: true,
     recordsRadioGroupIntentMetadata: true,
+    recordsRadioSiblingPropsLookupMetadata: true,
+    acceptsRadioSiblingPropsAdmissionMetadata: true,
     rawTargetCaptured: false,
     rawEventCaptured: false,
     rawLatestPropsRetained: false,
     installsLiveDescriptors: false,
     writesValueTrackerField: false,
+    performsRadioSiblingPropsLookup: false,
+    performsFormTraversal: false,
     readsHostValue: false,
     writesHostValue: false,
     writesRestoreQueue: false,
@@ -961,11 +996,230 @@ function createCheckableRestoreMetadata(
   });
 }
 
-function createCheckableGroupIntentRecords(
+function createRadioGroupSiblingPropsLookup(
   controlledTarget,
   latestPropsEvidence,
   admission,
   intentRecorded
+) {
+  const props = latestPropsEvidence.latestProps;
+  const nameProp = describeMetadataProp(props, 'name');
+  const radioGroupRestoreRequired =
+    isCheckableControlledTarget(controlledTarget) &&
+    controlledTarget.inputType === 'radio' &&
+    nameProp.nonNull === true;
+  const radioGroupIntentRecorded =
+    radioGroupRestoreRequired === true && intentRecorded === true;
+  const primaryFormKey = getOptionalAdmissionStringProperty(
+    admission,
+    'radioGroupFormKey'
+  );
+  const siblingEntries = getRadioGroupSiblingPropsAdmissionEntries(
+    admission
+  );
+  const siblingRecords = siblingEntries.map((entry, index) =>
+    createRadioGroupSiblingPropsRecord(
+      entry,
+      index,
+      props,
+      nameProp,
+      primaryFormKey,
+      radioGroupRestoreRequired,
+      radioGroupIntentRecorded
+    )
+  );
+  const acceptedSameNameSameFormCount = siblingRecords.filter(
+    (record) =>
+      record.status ===
+        controlledInputPostEventRestoreQueueRadioSiblingPropsEvidenceAcceptedStatus &&
+      record.sameName === true &&
+      record.sameForm === true
+  ).length;
+  const acceptedSiblingPropsEvidenceCount = siblingRecords.filter(
+    (record) =>
+      record.status ===
+      controlledInputPostEventRestoreQueueRadioSiblingPropsEvidenceAcceptedStatus
+  ).length;
+  const evidenceProvided = siblingRecords.length > 0;
+
+  return freezeRecord({
+    status:
+      radioGroupIntentRecorded === true && evidenceProvided === true
+        ? controlledInputPostEventRestoreQueueRadioSiblingPropsLookupRecordedStatus
+        : controlledInputPostEventRestoreQueueRadioSiblingPropsLookupSkippedStatus,
+    source: 'private-controlled-radio-group-restore-intent',
+    hostTag: controlledTarget.hostTag,
+    inputType: controlledTarget.inputType,
+    controlKind: controlledTarget.controlKind,
+    trackedField: controlledTarget.trackedField,
+    groupRestoreRequired: radioGroupRestoreRequired,
+    groupRestoreIntentRecorded: radioGroupIntentRecorded,
+    latestPropsEvidenceAccepted: latestPropsEvidence.accepted,
+    targetResolved: controlledTarget.targetResolved,
+    primaryNameProp: nameProp,
+    primaryFormKeyStatus: describeOptionalStringStatus(primaryFormKey),
+    evidenceProvided,
+    candidateCount: siblingRecords.length,
+    acceptedSameNameSameFormCount,
+    acceptedSiblingPropsEvidenceCount,
+    skippedCandidateCount:
+      siblingRecords.length - acceptedSiblingPropsEvidenceCount,
+    expectedSiblingShape: freezeRecord({
+      hostTag: 'input',
+      inputType: 'radio',
+      sameNameRequired: radioGroupRestoreRequired,
+      sameFormRequired: radioGroupRestoreRequired,
+      skipPrimaryNodeRequired: radioGroupRestoreRequired,
+      latestPropsEvidenceRequired: radioGroupRestoreRequired,
+      wrapperExecutionRequired: false,
+      valueTrackerRefreshRequired: radioGroupRestoreRequired
+    }),
+    records: freezeArray(siblingRecords),
+    sameNameSameFormSiblingMetadataRead:
+      acceptedSameNameSameFormCount > 0,
+    siblingLatestPropsLookupRequired: radioGroupRestoreRequired,
+    siblingLatestPropsLookupPerformed: false,
+    livePropsLookupPerformed: false,
+    formBoundaryCheckRequired: radioGroupRestoreRequired,
+    formBoundaryMetadataRead: evidenceProvided,
+    formTraversalPerformed: false,
+    groupLookupRequired: radioGroupRestoreRequired,
+    groupLookupPerformed: false,
+    groupMembersEnumerated: false,
+    wrapperExecuted: false,
+    siblingInputRestorePerformed: false,
+    valueTrackerRefreshRequired: radioGroupRestoreRequired,
+    valueTrackerRefreshed: false,
+    realDomQueried: false,
+    rawGroupNodesCaptured: false,
+    rawNameRetained: false,
+    rawLatestPropsRetained: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createRadioGroupSiblingPropsRecord(
+  entry,
+  index,
+  primaryProps,
+  primaryNameProp,
+  primaryFormKey,
+  radioGroupRestoreRequired,
+  radioGroupIntentRecorded
+) {
+  const siblingProps = isObjectLike(entry.props) ? entry.props : null;
+  const hostTag = getAdmissionStringOrDefault(entry, 'hostTag', 'input');
+  const inputType = getInputType(hostTag, siblingProps);
+  const nameProp = describeMetadataProp(siblingProps, 'name');
+  const checkedProp = describeMetadataProp(siblingProps, 'checked');
+  const defaultCheckedProp = describeMetadataProp(
+    siblingProps,
+    'defaultChecked'
+  );
+  const valueProp = describeMetadataProp(siblingProps, 'value');
+  const siblingFormKey = getOptionalAdmissionStringProperty(
+    entry,
+    'formKey'
+  );
+  const targetRole = entry.isPrimary === true ? 'primary' : 'sibling';
+  const primaryNameValue = getComparablePropString(primaryProps, 'name');
+  const siblingNameValue = getComparablePropString(siblingProps, 'name');
+  const sameName =
+    primaryNameValue !== null &&
+    siblingNameValue !== null &&
+    primaryNameValue === siblingNameValue;
+  const sameForm =
+    primaryFormKey === null || siblingFormKey === null
+      ? false
+      : primaryFormKey === siblingFormKey;
+  const validRadioSibling =
+    hostTag === 'input' &&
+    inputType === 'radio' &&
+    nameProp.nonNull === true &&
+    sameName === true &&
+    sameForm === true &&
+    targetRole === 'sibling';
+  const evidenceAccepted =
+    radioGroupIntentRecorded === true && validRadioSibling === true;
+
+  return freezeRecord({
+    status: evidenceAccepted
+      ? controlledInputPostEventRestoreQueueRadioSiblingPropsEvidenceAcceptedStatus
+      : controlledInputPostEventRestoreQueueRadioSiblingPropsEvidenceSkippedStatus,
+    source: 'private-controlled-radio-sibling-props-admission',
+    candidateIndex: index,
+    targetRole,
+    hostTag,
+    inputType,
+    controlKind: inferControlKind(hostTag, inputType, false, siblingProps),
+    trackedField: getTrackedField(
+      hostTag,
+      inferControlKind(hostTag, inputType, false, siblingProps)
+    ),
+    latestPropsObject: siblingProps !== null,
+    latestPropsEvidenceAccepted: siblingProps !== null,
+    propKeys:
+      siblingProps === null
+        ? freezeArray([])
+        : describeLatestProps(siblingProps).propKeys,
+    controlledPropSummary:
+      siblingProps === null
+        ? freezeRecord({})
+        : describeLatestProps(siblingProps).controlledPropSummary,
+    nameProp,
+    checkedProp,
+    defaultCheckedProp,
+    valueProp,
+    primaryNameProp,
+    sameName,
+    sameForm,
+    sameTarget: targetRole === 'primary',
+    formKeyStatus: describeOptionalStringStatus(siblingFormKey),
+    primaryFormKeyStatus: describeOptionalStringStatus(primaryFormKey),
+    formBoundarySource: 'admission-form-key',
+    skipReason: getRadioGroupSiblingPropsSkipReason(
+      radioGroupRestoreRequired,
+      radioGroupIntentRecorded,
+      siblingProps,
+      hostTag,
+      inputType,
+      nameProp,
+      sameName,
+      sameForm,
+      targetRole
+    ),
+    siblingPropsShapeAccepted: validRadioSibling,
+    siblingWouldReceiveRestore: evidenceAccepted,
+    siblingLatestPropsLookupRequired: radioGroupRestoreRequired,
+    siblingLatestPropsLookupPerformed: false,
+    livePropsLookupPerformed: false,
+    formBoundaryCheckRequired: radioGroupRestoreRequired,
+    formBoundaryMetadataRead: true,
+    formTraversalPerformed: false,
+    wrapperExecutionRequired: evidenceAccepted,
+    wrapperExecuted: false,
+    siblingInputRestoreRequired: evidenceAccepted,
+    siblingInputRestorePerformed: false,
+    valueTrackerRefreshRequired: radioGroupRestoreRequired,
+    valueTrackerRefreshed: false,
+    realDomQueried: false,
+    hostValueRead: false,
+    hostValueWritten: false,
+    browserInputMutated: false,
+    rawTargetCaptured: false,
+    rawLatestPropsRetained: false,
+    rawFormRetained: false,
+    rawNameRetained: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createCheckableGroupIntentRecords(
+  controlledTarget,
+  latestPropsEvidence,
+  admission,
+  intentRecorded,
+  radioGroupSiblingPropsLookup
 ) {
   if (!isCheckableControlledTarget(controlledTarget)) {
     return freezeArray([]);
@@ -1030,6 +1284,7 @@ function createCheckableGroupIntentRecords(
       valueTrackerRefreshed: false,
       formBoundaryCheckRequired: radioGroupRestoreRequired,
       formBoundaryChecked: false,
+      siblingPropsLookup: radioGroupSiblingPropsLookup,
       realDomQueried: false,
       hostValueRead: false,
       hostValueWritten: false,
@@ -1071,6 +1326,89 @@ function getCheckableGroupIntentSkipReason(
   return null;
 }
 
+function getRadioGroupSiblingPropsSkipReason(
+  radioGroupRestoreRequired,
+  radioGroupIntentRecorded,
+  siblingProps,
+  hostTag,
+  inputType,
+  nameProp,
+  sameName,
+  sameForm,
+  targetRole
+) {
+  if (radioGroupRestoreRequired !== true) {
+    return 'radio-group-restore-not-required';
+  }
+  if (radioGroupIntentRecorded !== true) {
+    return 'radio-group-restore-intent-not-recorded';
+  }
+  if (siblingProps === null) {
+    return 'sibling-latest-props-missing';
+  }
+  if (targetRole === 'primary') {
+    return 'primary-radio-is-not-a-sibling';
+  }
+  if (hostTag !== 'input') {
+    return 'sibling-host-tag-is-not-input';
+  }
+  if (inputType !== 'radio') {
+    return 'sibling-input-type-is-not-radio';
+  }
+  if (nameProp.nonNull !== true) {
+    return 'sibling-radio-name-prop-missing';
+  }
+  if (sameName !== true) {
+    return 'sibling-radio-name-does-not-match';
+  }
+  if (sameForm !== true) {
+    return 'sibling-radio-form-does-not-match';
+  }
+  return null;
+}
+
+function getRadioGroupSiblingPropsAdmissionEntries(admission) {
+  if (!isObjectLike(admission)) {
+    return freezeArray([]);
+  }
+
+  const entries = admission.radioGroupSiblingProps;
+  if (entries == null) {
+    return freezeArray([]);
+  }
+  if (!Array.isArray(entries)) {
+    throwInvalidAdmission('radioGroupSiblingProps must be an array');
+  }
+
+  for (const entry of entries) {
+    if (!isObjectLike(entry)) {
+      throwInvalidAdmission('radioGroupSiblingProps entries must be objects');
+    }
+  }
+  return freezeArray(entries);
+}
+
+function createRadioGroupSiblingPropsAdmissionSummary(admission) {
+  const entries = getRadioGroupSiblingPropsAdmissionEntries(admission);
+  const primaryFormKey = getOptionalAdmissionStringProperty(
+    admission,
+    'radioGroupFormKey'
+  );
+
+  return freezeRecord({
+    provided: entries.length > 0,
+    candidateCount: entries.length,
+    primaryFormKeyStatus: describeOptionalStringStatus(primaryFormKey),
+    deterministicMetadataOnly: true,
+    propsRedacted: true,
+    rawSiblingPropsRetained: false,
+    rawFormRetained: false,
+    livePropsLookupAllowed: false,
+    formTraversalAllowed: false,
+    wrapperExecutionAllowed: false
+  });
+}
+
 function createPostEventRestoreBoundary(
   latestPropsEvidence,
   intentRecorded,
@@ -1094,10 +1432,13 @@ function createPostEventRestoreQueueSideEffects(
   latestPropsEvidence,
   intentRecorded,
   controlledTarget,
-  groupIntentRecords
+  groupIntentRecords,
+  radioGroupSiblingPropsLookup
 ) {
   const radioGroupIntent = getRecordedRadioGroupIntent(groupIntentRecords);
   const checkable = isCheckableControlledTarget(controlledTarget);
+  const siblingPropsAccepted =
+    radioGroupSiblingPropsLookup.acceptedSiblingPropsEvidenceCount > 0;
 
   return freezeRecord({
     ...controlledInputPostEventRestoreQueueNoSideEffects,
@@ -1113,6 +1454,13 @@ function createPostEventRestoreQueueSideEffects(
       radioGroupIntent === null
         ? false
         : radioGroupIntent.groupLookupRequired,
+    radioGroupSiblingMetadataRead:
+      radioGroupSiblingPropsLookup.sameNameSameFormSiblingMetadataRead,
+    radioGroupSiblingPropsEvidenceAccepted: siblingPropsAccepted,
+    radioGroupSiblingPropsSameNameSameFormRecorded:
+      radioGroupSiblingPropsLookup.acceptedSameNameSameFormCount > 0,
+    radioGroupFormBoundaryMetadataRead:
+      radioGroupSiblingPropsLookup.formBoundaryMetadataRead,
     radioGroupValueTrackerRefreshRequired:
       radioGroupIntent === null
         ? false
@@ -1125,10 +1473,13 @@ function createPostEventRestoreQueueSideEffectsFromFakeDomObservation(
   latestPropsEvidence,
   intentRecorded,
   controlledTarget,
-  groupIntentRecords
+  groupIntentRecords,
+  radioGroupSiblingPropsLookup
 ) {
   const radioGroupIntent = getRecordedRadioGroupIntent(groupIntentRecords);
   const checkable = isCheckableControlledTarget(controlledTarget);
+  const siblingPropsAccepted =
+    radioGroupSiblingPropsLookup.acceptedSiblingPropsEvidenceCount > 0;
 
   return freezeRecord({
     ...controlledInputPostEventRestoreQueueNoSideEffects,
@@ -1145,6 +1496,13 @@ function createPostEventRestoreQueueSideEffectsFromFakeDomObservation(
       radioGroupIntent === null
         ? false
         : radioGroupIntent.groupLookupRequired,
+    radioGroupSiblingMetadataRead:
+      radioGroupSiblingPropsLookup.sameNameSameFormSiblingMetadataRead,
+    radioGroupSiblingPropsEvidenceAccepted: siblingPropsAccepted,
+    radioGroupSiblingPropsSameNameSameFormRecorded:
+      radioGroupSiblingPropsLookup.acceptedSameNameSameFormCount > 0,
+    radioGroupFormBoundaryMetadataRead:
+      radioGroupSiblingPropsLookup.formBoundaryMetadataRead,
     radioGroupValueTrackerRefreshRequired:
       radioGroupIntent === null
         ? false
@@ -1214,6 +1572,8 @@ function normalizePostEventRestoreQueueAdmission(admission) {
     targetKind,
     explicitAdmission: true,
     deterministicMetadataOnly: true,
+    radioGroupSiblingPropsEvidence:
+      createRadioGroupSiblingPropsAdmissionSummary(admission),
     sourceEventRecordRequired:
       queueKind ===
       'deterministic-event-latest-props-post-event-restore-queue',
@@ -1531,6 +1891,49 @@ function getAdmissionStringProperty(record, key, fallback) {
   return typeof value === 'string' && value.length > 0 ? value : fallback;
 }
 
+function getAdmissionStringOrDefault(record, key, fallback) {
+  if (!isObjectLike(record)) {
+    return fallback;
+  }
+  const value = record[key];
+  return typeof value === 'string' && value.length > 0 ? value : fallback;
+}
+
+function getOptionalAdmissionStringProperty(record, key) {
+  if (!isObjectLike(record)) {
+    return null;
+  }
+
+  const value = record[key];
+  if (value == null) {
+    return null;
+  }
+  if (typeof value !== 'string') {
+    throwInvalidAdmission(`${key} must be a string when provided`);
+  }
+  return value.length > 0 ? value : null;
+}
+
+function describeOptionalStringStatus(value) {
+  return freezeRecord({
+    present: value !== null,
+    empty: value === ''
+  });
+}
+
+function getComparablePropString(props, propName) {
+  if (!isObjectLike(props) || !hasOwnProp(props, propName)) {
+    return null;
+  }
+
+  try {
+    const value = props[propName];
+    return value == null ? null : String(value);
+  } catch (error) {
+    return null;
+  }
+}
+
 function hasOwnProp(value, propName) {
   try {
     return Object.prototype.hasOwnProperty.call(value, propName);
@@ -1626,6 +2029,10 @@ module.exports = {
   controlledInputPostEventRestoreQueueNoSideEffects,
   controlledInputPostEventRestoreQueueRadioGroupIntentRecordedStatus,
   controlledInputPostEventRestoreQueueRadioGroupIntentSkippedStatus,
+  controlledInputPostEventRestoreQueueRadioSiblingPropsEvidenceAcceptedStatus,
+  controlledInputPostEventRestoreQueueRadioSiblingPropsEvidenceSkippedStatus,
+  controlledInputPostEventRestoreQueueRadioSiblingPropsLookupRecordedStatus,
+  controlledInputPostEventRestoreQueueRadioSiblingPropsLookupSkippedStatus,
   controlledInputPostEventRestoreQueueStatus,
   createControlledInputPostEventRestoreQueueGate,
   createUnsupportedControlledInputPostEventRestoreQueueError,
