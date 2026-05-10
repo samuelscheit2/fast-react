@@ -47,19 +47,22 @@ Drive toward a minimal real root render/update/unmount path:
 
 - Worker 126: scheduler native entrypoint implementation is committed on its
   worker branch and pending smoke integration before merge to `main`.
-- Worker 127: launch a narrow native scheduler smoke integration worker based
-  on current `main` plus worker 126's committed implementation.
+- Worker 127: native scheduler smoke integration in
+  `/Users/user/Developer/Developer/fast-react-worker-127-scheduler-native-smoke-integration`.
+- Worker 128: launch a Rust reconciler root scheduler foundation worker from
+  current `main`.
 
 ## Near-Term Sequencing
 
 1. Keep worker 126's implementation branch out of `main` until native smoke
    integration proves the broad JS gate after its changes.
-2. Launch worker 127 in an isolated integration worktree with worker 126's
-   commit merged in. Limit its write scope to
-   `tests/smoke/import-entrypoints.mjs` and its progress report.
-3. After worker 127 passes `npm run check:js`, accept the integration branch
+2. Keep worker 127 limited to `tests/smoke/import-entrypoints.mjs` and its
+   progress report.
+3. Launch worker 128 on root scheduler foundation only; keep it out of JS
+   package, smoke, native scheduler, React DOM, and commit/host mutation files.
+4. After worker 127 passes `npm run check:js`, accept the integration branch
    and close workers 126 and 127 together.
-4. Queue the next non-overlapping root/reconciler slices from accepted
+5. Queue the next non-overlapping root/reconciler slices from accepted
    sequencing reports now that worker 124's HostRoot queue model is merged.
 
 ## Next Queue Candidates
