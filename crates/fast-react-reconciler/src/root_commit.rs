@@ -1013,6 +1013,194 @@ impl FunctionComponentCommittedPassiveEffectsSnapshot {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct FunctionComponentDeletedSubtreePendingPassiveEffectCommitRecord {
+    root: FiberRootId,
+    nearest_mounted_ancestor: FiberId,
+    deleted_root: FiberId,
+    traversal_index: usize,
+    fiber: FiberId,
+    hook_list: HookListId,
+    effect_index: usize,
+    effect: HookEffectId,
+    instance: HookEffectInstanceId,
+    tag: HookEffectFlags,
+    create: HookEffectCallbackHandle,
+    destroy: Option<HookEffectCallbackHandle>,
+    dependencies: HookEffectDependencies,
+    lanes: Lanes,
+    unmount_order: PendingPassiveEffectOrder,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private deleted-subtree passive destroy metadata for deterministic deletion canaries"
+)]
+impl FunctionComponentDeletedSubtreePendingPassiveEffectCommitRecord {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn nearest_mounted_ancestor(self) -> FiberId {
+        self.nearest_mounted_ancestor
+    }
+
+    #[must_use]
+    pub(crate) const fn deleted_root(self) -> FiberId {
+        self.deleted_root
+    }
+
+    #[must_use]
+    pub(crate) const fn traversal_index(self) -> usize {
+        self.traversal_index
+    }
+
+    #[must_use]
+    pub(crate) const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub(crate) const fn hook_list(self) -> HookListId {
+        self.hook_list
+    }
+
+    #[must_use]
+    pub(crate) const fn effect_index(self) -> usize {
+        self.effect_index
+    }
+
+    #[must_use]
+    pub(crate) const fn effect(self) -> HookEffectId {
+        self.effect
+    }
+
+    #[must_use]
+    pub(crate) const fn instance(self) -> HookEffectInstanceId {
+        self.instance
+    }
+
+    #[must_use]
+    pub(crate) const fn tag(self) -> HookEffectFlags {
+        self.tag
+    }
+
+    #[must_use]
+    pub(crate) const fn create(self) -> HookEffectCallbackHandle {
+        self.create
+    }
+
+    #[must_use]
+    pub(crate) const fn destroy(self) -> Option<HookEffectCallbackHandle> {
+        self.destroy
+    }
+
+    #[must_use]
+    pub(crate) const fn dependencies(self) -> HookEffectDependencies {
+        self.dependencies
+    }
+
+    #[must_use]
+    pub(crate) const fn lanes(self) -> Lanes {
+        self.lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn unmount_order(self) -> PendingPassiveEffectOrder {
+        self.unmount_order
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FunctionComponentDeletedSubtreePendingPassiveCommitHandoff {
+    root: FiberRootId,
+    nearest_mounted_ancestor: FiberId,
+    deleted_root: FiberId,
+    lanes: Lanes,
+    records: Vec<FunctionComponentDeletedSubtreePendingPassiveEffectCommitRecord>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private deleted-subtree passive destroy metadata for deterministic deletion canaries"
+)]
+impl FunctionComponentDeletedSubtreePendingPassiveCommitHandoff {
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn nearest_mounted_ancestor(&self) -> FiberId {
+        self.nearest_mounted_ancestor
+    }
+
+    #[must_use]
+    pub(crate) const fn deleted_root(&self) -> FiberId {
+        self.deleted_root
+    }
+
+    #[must_use]
+    pub(crate) const fn lanes(&self) -> Lanes {
+        self.lanes
+    }
+
+    #[must_use]
+    pub(crate) fn records(
+        &self,
+    ) -> &[FunctionComponentDeletedSubtreePendingPassiveEffectCommitRecord] {
+        &self.records
+    }
+
+    #[must_use]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    #[must_use]
+    pub(crate) fn queued_unmount_count(&self) -> usize {
+        self.records.len()
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(crate) struct FunctionComponentDeletedSubtreePassiveEffectsSnapshot {
+    records: Vec<FunctionComponentDeletedSubtreePendingPassiveEffectCommitRecord>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private deleted-subtree passive destroy metadata for deterministic deletion canaries"
+)]
+impl FunctionComponentDeletedSubtreePassiveEffectsSnapshot {
+    #[must_use]
+    pub(crate) fn records(
+        &self,
+    ) -> &[FunctionComponentDeletedSubtreePendingPassiveEffectCommitRecord] {
+        &self.records
+    }
+
+    #[must_use]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    #[must_use]
+    pub(crate) fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    #[must_use]
+    pub(crate) fn destroy_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| record.destroy().is_some())
+            .count()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentLayoutEffectCommitRecord {
     commit_order: usize,
@@ -2170,6 +2358,184 @@ impl HostRootDeletionCleanupRecord {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HostRootDeletionCleanupOrderGateSnapshot {
+    records: Vec<HostRootDeletionCleanupOrderGateRecord>,
+    ref_cleanup_return_count: usize,
+    passive_destroy_count: usize,
+    host_node_cleanup_count: usize,
+}
+
+impl HostRootDeletionCleanupOrderGateSnapshot {
+    #[must_use]
+    pub fn records(&self) -> &[HostRootDeletionCleanupOrderGateRecord] {
+        &self.records
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    #[must_use]
+    pub const fn ref_cleanup_return_count(&self) -> usize {
+        self.ref_cleanup_return_count
+    }
+
+    #[must_use]
+    pub const fn passive_destroy_count(&self) -> usize {
+        self.passive_destroy_count
+    }
+
+    #[must_use]
+    pub const fn host_node_cleanup_count(&self) -> usize {
+        self.host_node_cleanup_count
+    }
+
+    #[must_use]
+    pub const fn ref_cleanup_return_callbacks_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn passive_destroy_callbacks_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn public_effects_flushed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn public_ref_or_effect_compatibility_claimed(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HostRootDeletionCleanupOrderGateRecord {
+    sequence: usize,
+    phase: HostRootDeletionCleanupOrderPhase,
+    root: FiberRootId,
+    finished_work: FiberId,
+    deletion_list: Option<DeletionListId>,
+    deletion_list_index: Option<usize>,
+    deleted_index: Option<usize>,
+    subtree_index: Option<usize>,
+    deleted_root: FiberId,
+    fiber: FiberId,
+    tag: FiberTag,
+    ref_cleanup_return_sequence: Option<usize>,
+    passive_unmount_order: Option<PendingPassiveEffectOrder>,
+    passive_destroy: Option<HookEffectCallbackHandle>,
+    host_cleanup_sequence: Option<usize>,
+}
+
+impl HostRootDeletionCleanupOrderGateRecord {
+    #[must_use]
+    pub const fn sequence(self) -> usize {
+        self.sequence
+    }
+
+    #[must_use]
+    pub const fn phase(self) -> HostRootDeletionCleanupOrderPhase {
+        self.phase
+    }
+
+    #[must_use]
+    pub const fn phase_name(self) -> &'static str {
+        host_root_deletion_cleanup_order_phase_name(self.phase)
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn finished_work(self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub const fn deletion_list(self) -> Option<DeletionListId> {
+        self.deletion_list
+    }
+
+    #[must_use]
+    pub const fn deletion_list_index(self) -> Option<usize> {
+        self.deletion_list_index
+    }
+
+    #[must_use]
+    pub const fn deleted_index(self) -> Option<usize> {
+        self.deleted_index
+    }
+
+    #[must_use]
+    pub const fn subtree_index(self) -> Option<usize> {
+        self.subtree_index
+    }
+
+    #[must_use]
+    pub const fn deleted_root(self) -> FiberId {
+        self.deleted_root
+    }
+
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn tag(self) -> FiberTag {
+        self.tag
+    }
+
+    #[must_use]
+    pub const fn ref_cleanup_return_sequence(self) -> Option<usize> {
+        self.ref_cleanup_return_sequence
+    }
+
+    #[must_use]
+    pub const fn passive_unmount_order(self) -> Option<PendingPassiveEffectOrder> {
+        self.passive_unmount_order
+    }
+
+    #[must_use]
+    pub const fn passive_destroy(self) -> Option<HookEffectCallbackHandle> {
+        self.passive_destroy
+    }
+
+    #[must_use]
+    pub const fn host_cleanup_sequence(self) -> Option<usize> {
+        self.host_cleanup_sequence
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HostRootDeletionCleanupOrderPhase {
+    RefCleanupReturn,
+    PassiveDestroy,
+    HostNodeCleanup,
+}
+
+const fn host_root_deletion_cleanup_order_phase_name(
+    phase: HostRootDeletionCleanupOrderPhase,
+) -> &'static str {
+    match phase {
+        HostRootDeletionCleanupOrderPhase::RefCleanupReturn => "ref-cleanup-return",
+        HostRootDeletionCleanupOrderPhase::PassiveDestroy => "passive-destroy",
+        HostRootDeletionCleanupOrderPhase::HostNodeCleanup => "host-node-cleanup",
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct PendingHostRootDeletionCleanupRecord {
     root: FiberRootId,
@@ -2210,6 +2576,8 @@ pub struct HostRootCommitRecord {
     root_update_callback_invocation_gate: RootUpdateCallbackInvocationGateSnapshot,
     pending_passive_handoff: Option<PendingPassiveCommitHandoff>,
     function_component_committed_passive_effects: FunctionComponentCommittedPassiveEffectsSnapshot,
+    function_component_deleted_subtree_passive_effects:
+        FunctionComponentDeletedSubtreePassiveEffectsSnapshot,
     function_component_layout_effects: FunctionComponentLayoutEffectsSnapshot,
     deletion_lists: Vec<HostRootDeletionListRecord>,
     host_node_deletion_cleanup_log: HostRootDeletionCleanupLog,
@@ -2614,6 +2982,75 @@ impl HostRootCommitRecord {
 
     #[allow(
         dead_code,
+        reason = "crate-private deleted-subtree passive destroy metadata for deterministic deletion canaries"
+    )]
+    #[must_use]
+    pub(crate) const fn function_component_deleted_subtree_passive_effects(
+        &self,
+    ) -> &FunctionComponentDeletedSubtreePassiveEffectsSnapshot {
+        &self.function_component_deleted_subtree_passive_effects
+    }
+
+    #[allow(
+        dead_code,
+        reason = "crate-private deleted-subtree passive destroy metadata for deterministic deletion canaries"
+    )]
+    pub(crate) fn record_function_component_deleted_subtree_passive_effects_for_canary(
+        &mut self,
+        handoffs: &[FunctionComponentDeletedSubtreePendingPassiveCommitHandoff],
+    ) -> Result<&FunctionComponentDeletedSubtreePassiveEffectsSnapshot, RootCommitError> {
+        let Some(pending_passive_handoff) = self.pending_passive_handoff else {
+            if handoffs.is_empty() {
+                self.function_component_deleted_subtree_passive_effects =
+                    FunctionComponentDeletedSubtreePassiveEffectsSnapshot::default();
+                return Ok(&self.function_component_deleted_subtree_passive_effects);
+            }
+
+            return Err(
+                RootCommitError::CommittedPassiveEffectsWithoutPendingPassiveHandoff {
+                    root: self.root,
+                },
+            );
+        };
+
+        let mut records = Vec::new();
+        for handoff in handoffs {
+            if handoff.root() != self.root {
+                return Err(RootCommitError::CommittedPassiveEffectHandoffRootMismatch {
+                    commit_root: self.root,
+                    handoff_root: handoff.root(),
+                });
+            }
+            if handoff.lanes() != pending_passive_handoff.lanes() {
+                return Err(
+                    RootCommitError::CommittedPassiveEffectHandoffLanesMismatch {
+                        root: self.root,
+                        expected: pending_passive_handoff.lanes(),
+                        actual: handoff.lanes(),
+                    },
+                );
+            }
+
+            records.extend_from_slice(handoff.records());
+        }
+        records.sort_by_key(|record| record.unmount_order());
+
+        self.function_component_deleted_subtree_passive_effects =
+            FunctionComponentDeletedSubtreePassiveEffectsSnapshot { records };
+
+        Ok(&self.function_component_deleted_subtree_passive_effects)
+    }
+
+    #[doc(hidden)]
+    #[must_use]
+    pub fn deletion_cleanup_order_gate_for_canary(
+        &self,
+    ) -> HostRootDeletionCleanupOrderGateSnapshot {
+        materialize_deletion_cleanup_order_gate(self)
+    }
+
+    #[allow(
+        dead_code,
         reason = "crate-private layout hook-effect handoff metadata for deterministic canaries"
     )]
     #[must_use]
@@ -2744,6 +3181,8 @@ pub fn commit_finished_host_root<H: HostTypes>(
         pending_passive_handoff,
         function_component_committed_passive_effects:
             FunctionComponentCommittedPassiveEffectsSnapshot::default(),
+        function_component_deleted_subtree_passive_effects:
+            FunctionComponentDeletedSubtreePassiveEffectsSnapshot::default(),
         function_component_layout_effects: FunctionComponentLayoutEffectsSnapshot::default(),
         deletion_lists,
         host_node_deletion_cleanup_log,
@@ -3119,6 +3558,209 @@ fn queue_pending_passive_record<H: HostTypes>(
         phase,
         lanes: passive_effect.lanes(),
     })
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private deleted-subtree passive destroy handoff helper exercised by deterministic canaries"
+)]
+pub(crate) fn queue_function_component_deleted_subtree_pending_passive_effects<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    root: FiberRootId,
+    hook_store: &FunctionComponentHookRenderStore,
+    nearest_mounted_ancestor: FiberId,
+    deleted_root: FiberId,
+    lanes: Lanes,
+) -> Result<FunctionComponentDeletedSubtreePendingPassiveCommitHandoff, RootCommitError> {
+    store.root(root)?;
+    store.fiber_arena().get(nearest_mounted_ancestor)?;
+    store.fiber_arena().get(deleted_root)?;
+
+    if lanes.is_empty() {
+        return Ok(FunctionComponentDeletedSubtreePendingPassiveCommitHandoff {
+            root,
+            nearest_mounted_ancestor,
+            deleted_root,
+            lanes,
+            records: Vec::new(),
+        });
+    }
+
+    let mut pending_effects = Vec::new();
+    collect_deleted_subtree_passive_effect_metadata(
+        store.fiber_arena(),
+        hook_store,
+        deleted_root,
+        lanes,
+        &mut pending_effects,
+    )?;
+    if pending_effects.is_empty() {
+        return Ok(FunctionComponentDeletedSubtreePendingPassiveCommitHandoff {
+            root,
+            nearest_mounted_ancestor,
+            deleted_root,
+            lanes,
+            records: Vec::new(),
+        });
+    }
+
+    let scheduling = store.root_mut(root)?.scheduling_mut();
+    match scheduling.pending_passive().root() {
+        Some(pending_root) if pending_root != root => {
+            return Err(RootCommitError::PendingPassiveRootMismatch { root, pending_root });
+        }
+        Some(_) if scheduling.pending_passive().finished_work().is_some() => {
+            return Err(RootCommitError::PendingPassiveAlreadyCommitted {
+                root,
+                finished_work: scheduling
+                    .pending_passive()
+                    .finished_work()
+                    .expect("pending passive finished work was checked above"),
+            });
+        }
+        Some(_) => {}
+        None => scheduling.prepare_pending_passive(root, Lanes::NO),
+    }
+
+    let mut records = Vec::with_capacity(pending_effects.len());
+    for pending in pending_effects {
+        let unmount_order = scheduling
+            .pending_passive_mut()
+            .queue_unmount(
+                pending.fiber,
+                PendingPassiveUnmountOrigin::DeletedSubtree {
+                    nearest_mounted_ancestor,
+                },
+                pending.lanes,
+            )
+            .ok_or(RootCommitError::PendingPassiveQueueRejected {
+                root,
+                fiber: pending.fiber,
+                effect: pending.effect,
+                phase: PendingPassiveEffectPhase::Unmount,
+                lanes: pending.lanes,
+            })?;
+
+        records.push(
+            FunctionComponentDeletedSubtreePendingPassiveEffectCommitRecord {
+                root,
+                nearest_mounted_ancestor,
+                deleted_root,
+                traversal_index: pending.traversal_index,
+                fiber: pending.fiber,
+                hook_list: pending.hook_list,
+                effect_index: pending.effect_index,
+                effect: pending.effect,
+                instance: pending.instance,
+                tag: pending.tag,
+                create: pending.create,
+                destroy: pending.destroy,
+                dependencies: pending.dependencies,
+                lanes: pending.lanes,
+                unmount_order,
+            },
+        );
+    }
+
+    Ok(FunctionComponentDeletedSubtreePendingPassiveCommitHandoff {
+        root,
+        nearest_mounted_ancestor,
+        deleted_root,
+        lanes,
+        records,
+    })
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct DeletedSubtreePassiveEffectMetadata {
+    traversal_index: usize,
+    fiber: FiberId,
+    hook_list: HookListId,
+    effect_index: usize,
+    effect: HookEffectId,
+    instance: HookEffectInstanceId,
+    tag: HookEffectFlags,
+    create: HookEffectCallbackHandle,
+    destroy: Option<HookEffectCallbackHandle>,
+    dependencies: HookEffectDependencies,
+    lanes: Lanes,
+}
+
+fn collect_deleted_subtree_passive_effect_metadata(
+    arena: &FiberArena,
+    hook_store: &FunctionComponentHookRenderStore,
+    fiber: FiberId,
+    lanes: Lanes,
+    records: &mut Vec<DeletedSubtreePassiveEffectMetadata>,
+) -> Result<(), RootCommitError> {
+    let node = arena.get(fiber)?;
+    if node.tag() == FiberTag::FunctionComponent {
+        collect_deleted_function_component_passive_effect_metadata(
+            hook_store, fiber, lanes, records,
+        )?;
+    }
+
+    for child in arena.child_ids(fiber)? {
+        collect_deleted_subtree_passive_effect_metadata(arena, hook_store, child, lanes, records)?;
+    }
+
+    Ok(())
+}
+
+fn collect_deleted_function_component_passive_effect_metadata(
+    hook_store: &FunctionComponentHookRenderStore,
+    fiber: FiberId,
+    lanes: Lanes,
+    records: &mut Vec<DeletedSubtreePassiveEffectMetadata>,
+) -> Result<(), RootCommitError> {
+    let Some(hook_list) = hook_store.current_list(fiber) else {
+        return Ok(());
+    };
+    let Some(ring) = hook_store.effect_ring(hook_list) else {
+        return Ok(());
+    };
+
+    let effects = ring
+        .iter_matching(hook_store.hook_effects(), HookEffectFlags::PASSIVE)
+        .map_err(
+            |error| RootCommitError::FunctionComponentCommittedEffectQueue {
+                fiber,
+                message: error.to_string(),
+            },
+        )?;
+    for (effect_index, effect) in effects.enumerate() {
+        let effect =
+            effect.map_err(
+                |error| RootCommitError::FunctionComponentCommittedEffectQueue {
+                    fiber,
+                    message: error.to_string(),
+                },
+            )?;
+        let destroy = hook_store
+            .hook_effects()
+            .effect_destroy(effect.id())
+            .map_err(
+                |error| RootCommitError::FunctionComponentCommittedEffectQueue {
+                    fiber,
+                    message: error.to_string(),
+                },
+            )?;
+        records.push(DeletedSubtreePassiveEffectMetadata {
+            traversal_index: records.len(),
+            fiber,
+            hook_list,
+            effect_index,
+            effect: effect.id(),
+            instance: effect.instance(),
+            tag: effect.tag(),
+            create: effect.create(),
+            destroy,
+            dependencies: effect.dependencies(),
+            lanes,
+        });
+    }
+
+    Ok(())
 }
 
 fn collect_pending_ref_commit_metadata(
@@ -5885,6 +6527,155 @@ fn materialize_host_node_deletion_cleanup_log<H: HostTypes>(
     Ok(log)
 }
 
+fn materialize_deletion_cleanup_order_gate(
+    commit: &HostRootCommitRecord,
+) -> HostRootDeletionCleanupOrderGateSnapshot {
+    let mut records = Vec::new();
+    let mut ref_cleanup_return_count = 0;
+    let mut passive_destroy_count = 0;
+    let mut host_node_cleanup_count = 0;
+
+    for cleanup_return in commit
+        .ref_cleanup_return_execution_gate
+        .records()
+        .iter()
+        .filter(|record| {
+            record.action() == HostRootRefCommitAction::Detach
+                && record.detach_reason() == Some(HostRootRefDetachReason::Deleted)
+        })
+    {
+        ref_cleanup_return_count += 1;
+        let coordinate = deletion_cleanup_coordinate_for_fiber(commit, cleanup_return.fiber());
+        records.push(HostRootDeletionCleanupOrderGateRecord {
+            sequence: records.len(),
+            phase: HostRootDeletionCleanupOrderPhase::RefCleanupReturn,
+            root: cleanup_return.root(),
+            finished_work: commit.finished_work(),
+            deletion_list: coordinate.map(|coordinate| coordinate.deletion_list),
+            deletion_list_index: coordinate.map(|coordinate| coordinate.deletion_list_index),
+            deleted_index: coordinate.map(|coordinate| coordinate.deleted_index),
+            subtree_index: coordinate.map(|coordinate| coordinate.subtree_index),
+            deleted_root: coordinate
+                .map(|coordinate| coordinate.deleted_root)
+                .unwrap_or_else(|| cleanup_return.fiber()),
+            fiber: cleanup_return.fiber(),
+            tag: coordinate
+                .map(|coordinate| coordinate.tag)
+                .unwrap_or(FiberTag::HostComponent),
+            ref_cleanup_return_sequence: Some(cleanup_return.sequence()),
+            passive_unmount_order: None,
+            passive_destroy: None,
+            host_cleanup_sequence: None,
+        });
+    }
+
+    for passive in commit
+        .function_component_deleted_subtree_passive_effects
+        .records()
+    {
+        passive_destroy_count += 1;
+        let coordinate = deletion_list_coordinate_for_deleted_root(commit, passive.deleted_root());
+        records.push(HostRootDeletionCleanupOrderGateRecord {
+            sequence: records.len(),
+            phase: HostRootDeletionCleanupOrderPhase::PassiveDestroy,
+            root: passive.root(),
+            finished_work: commit.finished_work(),
+            deletion_list: coordinate.map(|coordinate| coordinate.deletion_list),
+            deletion_list_index: coordinate.map(|coordinate| coordinate.deletion_list_index),
+            deleted_index: coordinate.map(|coordinate| coordinate.deleted_index),
+            subtree_index: Some(passive.traversal_index()),
+            deleted_root: passive.deleted_root(),
+            fiber: passive.fiber(),
+            tag: FiberTag::FunctionComponent,
+            ref_cleanup_return_sequence: None,
+            passive_unmount_order: Some(passive.unmount_order()),
+            passive_destroy: passive.destroy(),
+            host_cleanup_sequence: None,
+        });
+    }
+
+    for cleanup in commit.host_node_deletion_cleanup_log.records() {
+        host_node_cleanup_count += 1;
+        records.push(HostRootDeletionCleanupOrderGateRecord {
+            sequence: records.len(),
+            phase: HostRootDeletionCleanupOrderPhase::HostNodeCleanup,
+            root: cleanup.root(),
+            finished_work: cleanup.host_root(),
+            deletion_list: Some(cleanup.deletion_list()),
+            deletion_list_index: Some(cleanup.deletion_list_index()),
+            deleted_index: Some(cleanup.deleted_index()),
+            subtree_index: Some(cleanup.subtree_index()),
+            deleted_root: cleanup.deleted_root(),
+            fiber: cleanup.fiber(),
+            tag: cleanup.tag(),
+            ref_cleanup_return_sequence: None,
+            passive_unmount_order: None,
+            passive_destroy: None,
+            host_cleanup_sequence: Some(cleanup.sequence()),
+        });
+    }
+
+    HostRootDeletionCleanupOrderGateSnapshot {
+        records,
+        ref_cleanup_return_count,
+        passive_destroy_count,
+        host_node_cleanup_count,
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct DeletionCleanupOrderCoordinate {
+    deletion_list: DeletionListId,
+    deletion_list_index: usize,
+    deleted_index: usize,
+    subtree_index: usize,
+    deleted_root: FiberId,
+    tag: FiberTag,
+}
+
+fn deletion_cleanup_coordinate_for_fiber(
+    commit: &HostRootCommitRecord,
+    fiber: FiberId,
+) -> Option<DeletionCleanupOrderCoordinate> {
+    commit
+        .host_node_deletion_cleanup_log
+        .records()
+        .iter()
+        .find(|cleanup| cleanup.fiber() == fiber)
+        .map(|cleanup| DeletionCleanupOrderCoordinate {
+            deletion_list: cleanup.deletion_list(),
+            deletion_list_index: cleanup.deletion_list_index(),
+            deleted_index: cleanup.deleted_index(),
+            subtree_index: cleanup.subtree_index(),
+            deleted_root: cleanup.deleted_root(),
+            tag: cleanup.tag(),
+        })
+}
+
+fn deletion_list_coordinate_for_deleted_root(
+    commit: &HostRootCommitRecord,
+    deleted_root: FiberId,
+) -> Option<DeletionCleanupOrderCoordinate> {
+    commit
+        .deletion_lists()
+        .iter()
+        .enumerate()
+        .find_map(|(deletion_list_index, deletion_list)| {
+            deletion_list
+                .deleted()
+                .iter()
+                .position(|deleted| *deleted == deleted_root)
+                .map(|deleted_index| DeletionCleanupOrderCoordinate {
+                    deletion_list: deletion_list.list(),
+                    deletion_list_index,
+                    deleted_index,
+                    subtree_index: 0,
+                    deleted_root,
+                    tag: FiberTag::FunctionComponent,
+                })
+        })
+}
+
 fn record_pending_passive_commit_handoff<H: HostTypes>(
     scheduling: &mut RootSchedulingState<H>,
     root: FiberRootId,
@@ -6301,6 +7092,20 @@ mod tests {
         nested_text_state_node: StateNodeHandle,
     }
 
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct DeletedHostSubtreeRefPassiveFixture {
+        list: DeletionListId,
+        deleted_host: FiberId,
+        deleted_host_state_node: StateNodeHandle,
+        deleted_host_ref: RefHandle,
+        deleted_function: FiberId,
+        deleted_text: FiberId,
+        deleted_text_state_node: StateNodeHandle,
+        passive_create: HookEffectCallbackHandle,
+        passive_destroy: HookEffectCallbackHandle,
+        passive_dependencies: HookEffectDependencies,
+    }
+
     fn create_test_fiber(
         store: &mut FiberRootStore<RecordingHost>,
         tag: FiberTag,
@@ -6661,6 +7466,82 @@ mod tests {
             deleted_component_state_node,
             nested_text,
             nested_text_state_node,
+        }
+    }
+
+    fn attach_deleted_host_subtree_ref_passive_fixture(
+        store: &mut FiberRootStore<RecordingHost>,
+        hook_store: &mut FunctionComponentHookRenderStore,
+        host_root_work_in_progress: FiberId,
+    ) -> DeletedHostSubtreeRefPassiveFixture {
+        let mode = store
+            .fiber_arena()
+            .get(host_root_work_in_progress)
+            .unwrap()
+            .mode();
+        let deleted_host = create_host_ref_fiber(
+            store,
+            RefHandle::from_raw(8_701),
+            StateNodeHandle::from_raw(8_801),
+            FiberFlags::NO,
+        );
+        let deleted_function = create_function_component_fiber(
+            store,
+            mode,
+            PropsHandle::from_raw(8_702),
+            FiberTypeHandle::from_raw(8_902),
+        );
+        let deleted_text = create_test_fiber(store, FiberTag::HostText, 8_703);
+        let deleted_text_state_node = StateNodeHandle::from_raw(8_803);
+        store
+            .fiber_arena_mut()
+            .get_mut(deleted_text)
+            .unwrap()
+            .set_state_node(deleted_text_state_node);
+        store
+            .fiber_arena_mut()
+            .set_children(deleted_function, &[deleted_text])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(deleted_host, &[deleted_function])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root_work_in_progress, &[deleted_host])
+            .unwrap();
+
+        let passive_create = callback(8_901);
+        let passive_destroy = callback(8_911);
+        let passive_dependencies = deps(8_921);
+        hook_store
+            .create_current_effect_metadata(
+                store.fiber_arena_mut(),
+                deleted_function,
+                FunctionComponentEffectPhase::Passive,
+                passive_create,
+                passive_dependencies,
+                Some(passive_destroy),
+            )
+            .unwrap();
+
+        let list = store
+            .fiber_arena_mut()
+            .mark_child_for_deletion(host_root_work_in_progress, deleted_host)
+            .unwrap();
+        bubble_test_fiber(store, host_root_work_in_progress);
+
+        DeletedHostSubtreeRefPassiveFixture {
+            list,
+            deleted_host,
+            deleted_host_state_node: StateNodeHandle::from_raw(8_801),
+            deleted_host_ref: RefHandle::from_raw(8_701),
+            deleted_function,
+            deleted_text,
+            deleted_text_state_node,
+            passive_create,
+            passive_destroy,
+            passive_dependencies,
         }
     }
 
@@ -9487,6 +10368,164 @@ mod tests {
             HostRootRefCleanupReturnExecutionPhase::ExecuteDetachCleanupReturnHandleOrNull
         );
         assert!(cleanup_gate.records()[1].cleanup_return_execution_gate());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_deletion_order_gate_records_ref_cleanup_before_passive_destroy_metadata() {
+        let (mut store, root_id, host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(48), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let fixture = attach_deleted_host_subtree_ref_passive_fixture(
+            &mut store,
+            &mut hook_store,
+            render.finished_work(),
+        );
+        let deleted_passive_handoff =
+            queue_function_component_deleted_subtree_pending_passive_effects(
+                &mut store,
+                root_id,
+                &hook_store,
+                render.finished_work(),
+                fixture.deleted_host,
+                Lanes::DEFAULT,
+            )
+            .unwrap();
+
+        assert_eq!(deleted_passive_handoff.root(), root_id);
+        assert_eq!(
+            deleted_passive_handoff.nearest_mounted_ancestor(),
+            render.finished_work()
+        );
+        assert_eq!(deleted_passive_handoff.deleted_root(), fixture.deleted_host);
+        assert_eq!(deleted_passive_handoff.queued_unmount_count(), 1);
+        let queued_passive = deleted_passive_handoff.records()[0];
+        assert_eq!(queued_passive.fiber(), fixture.deleted_function);
+        assert_eq!(queued_passive.traversal_index(), 0);
+        assert_eq!(queued_passive.create(), fixture.passive_create);
+        assert_eq!(queued_passive.destroy(), Some(fixture.passive_destroy));
+        assert_eq!(queued_passive.dependencies(), fixture.passive_dependencies);
+        assert_eq!(
+            queued_passive.unmount_order().phase(),
+            PendingPassiveEffectPhase::Unmount
+        );
+
+        let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+        let handoff = commit.pending_passive_handoff().unwrap();
+        assert_eq!(handoff.pending_unmount_count(), 1);
+        assert_eq!(handoff.pending_mount_count(), 0);
+        let pending_passive = store.root(root_id).unwrap().scheduling().pending_passive();
+        assert_eq!(pending_passive.passive_unmounts().len(), 1);
+        assert_eq!(
+            pending_passive.passive_unmounts()[0].unmount_origin(),
+            Some(PendingPassiveUnmountOrigin::DeletedSubtree {
+                nearest_mounted_ancestor: render.finished_work()
+            })
+        );
+
+        let passive_snapshot = commit
+            .record_function_component_deleted_subtree_passive_effects_for_canary(&[
+                deleted_passive_handoff,
+            ])
+            .unwrap()
+            .clone();
+        let refs = commit.ref_commit_metadata();
+        let cleanup_gate = commit.ref_cleanup_return_execution_gate();
+        let host_cleanup = commit.host_node_deletion_cleanup_log();
+        let order_gate = commit.deletion_cleanup_order_gate_for_canary();
+        let order_records = order_gate.records();
+
+        assert_eq!(commit.deletion_lists().len(), 1);
+        assert_eq!(commit.deletion_lists()[0].list(), fixture.list);
+        assert_eq!(
+            commit.deletion_lists()[0].deleted(),
+            &[fixture.deleted_host]
+        );
+        assert_eq!(refs.detach().len(), 1);
+        assert_eq!(refs.detach()[0].fiber(), fixture.deleted_host);
+        assert_eq!(
+            refs.detach()[0].state_node(),
+            fixture.deleted_host_state_node
+        );
+        assert_eq!(refs.detach()[0].ref_handle(), fixture.deleted_host_ref);
+        assert_eq!(
+            refs.detach()[0].detach_reason(),
+            Some(HostRootRefDetachReason::Deleted)
+        );
+        assert_ref_cleanup_return_execution_gate_keeps_public_blockers(cleanup_gate);
+        assert_eq!(cleanup_gate.cleanup_return_execution_gate_count(), 1);
+        assert_eq!(cleanup_gate.records()[0].fiber(), fixture.deleted_host);
+        assert_eq!(cleanup_gate.records()[0].sequence(), 0);
+        assert!(cleanup_gate.records()[0].cleanup_return_execution_gate());
+
+        assert_eq!(passive_snapshot.len(), 1);
+        assert_eq!(passive_snapshot.destroy_count(), 1);
+        assert_eq!(passive_snapshot.records()[0], queued_passive);
+        assert_eq!(host_cleanup.len(), 2);
+        assert_eq!(host_cleanup.records()[0].fiber(), fixture.deleted_text);
+        assert_eq!(
+            host_cleanup.records()[0].state_node(),
+            fixture.deleted_text_state_node
+        );
+        assert_eq!(host_cleanup.records()[1].fiber(), fixture.deleted_host);
+        assert_eq!(
+            host_cleanup.records()[1].state_node(),
+            fixture.deleted_host_state_node
+        );
+
+        assert_eq!(order_gate.len(), 4);
+        assert_eq!(order_gate.ref_cleanup_return_count(), 1);
+        assert_eq!(order_gate.passive_destroy_count(), 1);
+        assert_eq!(order_gate.host_node_cleanup_count(), 2);
+        assert!(!order_gate.ref_cleanup_return_callbacks_invoked());
+        assert!(!order_gate.passive_destroy_callbacks_invoked());
+        assert!(!order_gate.public_effects_flushed());
+        assert!(!order_gate.public_ref_or_effect_compatibility_claimed());
+        assert_eq!(
+            order_records
+                .iter()
+                .map(|record| record.sequence())
+                .collect::<Vec<_>>(),
+            vec![0, 1, 2, 3]
+        );
+        assert_eq!(
+            order_records
+                .iter()
+                .map(|record| record.phase())
+                .collect::<Vec<_>>(),
+            vec![
+                HostRootDeletionCleanupOrderPhase::RefCleanupReturn,
+                HostRootDeletionCleanupOrderPhase::PassiveDestroy,
+                HostRootDeletionCleanupOrderPhase::HostNodeCleanup,
+                HostRootDeletionCleanupOrderPhase::HostNodeCleanup,
+            ]
+        );
+        assert_eq!(order_records[0].fiber(), fixture.deleted_host);
+        assert_eq!(order_records[0].deleted_root(), fixture.deleted_host);
+        assert_eq!(order_records[0].deletion_list(), Some(fixture.list));
+        assert_eq!(order_records[0].deletion_list_index(), Some(0));
+        assert_eq!(order_records[0].deleted_index(), Some(0));
+        assert_eq!(order_records[0].subtree_index(), Some(1));
+        assert_eq!(order_records[0].ref_cleanup_return_sequence(), Some(0));
+        assert_eq!(order_records[0].passive_unmount_order(), None);
+        assert_eq!(order_records[0].host_cleanup_sequence(), None);
+        assert_eq!(order_records[1].fiber(), fixture.deleted_function);
+        assert_eq!(order_records[1].deleted_root(), fixture.deleted_host);
+        assert_eq!(order_records[1].deletion_list(), Some(fixture.list));
+        assert_eq!(order_records[1].subtree_index(), Some(0));
+        assert_eq!(
+            order_records[1].passive_unmount_order(),
+            Some(queued_passive.unmount_order())
+        );
+        assert_eq!(
+            order_records[1].passive_destroy(),
+            Some(fixture.passive_destroy)
+        );
+        assert_eq!(order_records[2].fiber(), fixture.deleted_text);
+        assert_eq!(order_records[2].host_cleanup_sequence(), Some(0));
+        assert_eq!(order_records[3].fiber(), fixture.deleted_host);
+        assert_eq!(order_records[3].host_cleanup_sequence(), Some(1));
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
