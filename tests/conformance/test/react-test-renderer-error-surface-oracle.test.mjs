@@ -232,6 +232,10 @@ test("React test renderer error surface local gate admits only private diagnosti
     gate.localChecks.privateTestInstanceBridgeQueryDiagnosticsPresent,
     true
   );
+  assert.equal(
+    gate.localChecks.privateTestInstanceFindAllQueryDiagnosticsPresent,
+    true
+  );
   assert.equal(gate.localChecks.privateActQueueMetadataPresent, true);
   assert.equal(gate.localChecks.passiveEffectMetadataOnly, true);
   assert.equal(gate.localChecks.actFlushExecutionPresent, false);
@@ -268,6 +272,10 @@ test("React test renderer error surface gate keeps multi-child TestInstance quer
   );
   assert.equal(
     gate.localChecks.privateTestInstanceBridgeQueryDiagnosticsPresent,
+    true
+  );
+  assert.equal(
+    gate.localChecks.privateTestInstanceFindAllQueryDiagnosticsPresent,
     true
   );
   assert.equal(gate.localChecks.publicTestInstanceErrorSurfaceBlocked, true);

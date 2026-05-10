@@ -1121,6 +1121,44 @@ export function inspectReactTestRendererSerializationLocalTargets({
       publicJsReactTestRendererPackageSource,
       /private-test-instance-query-diagnostics-routed-through-root-bridge/u
     );
+  const privateTestInstanceFindAllQueryDiagnosticsPresent =
+    privateTestInstanceBridgeQueryDiagnosticsPresent &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bprivateTestInstanceFindAllPredicateDiagnostics\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /fast-react-test-renderer\.testinstance\.find-all-private-query/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bReactTestInstancePrivateFindAllPredicateMetadata\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bpredicateKind\s*:\s*['"]type['"]/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bpredicateKind\s*:\s*['"]props['"]/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bpredicateKind\s*:\s*['"]predicate-like['"]/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bTestRendererRoot::describe_private_test_instance_find_all_query_for_canary\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bworker-463-test-renderer-find-all-private-query\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bpublicPredicateExecutionAvailable\s*:\s*false\b/u
+    );
   const publicJsFacadeRoutingPresent =
     publicJsReactTestRendererFacadePresent &&
     !publicJsReactTestRendererFacadePlaceholder &&
@@ -1174,6 +1212,7 @@ export function inspectReactTestRendererSerializationLocalTargets({
     privateRecordOnlyTestInstanceWrapperPresent,
     privateRecordOnlyTestInstanceQueryPathPresent,
     privateTestInstanceBridgeQueryDiagnosticsPresent,
+    privateTestInstanceFindAllQueryDiagnosticsPresent,
     publicToJSONAvailable,
     publicToTreeAvailable,
     publicTestInstanceWrappersPresent,
