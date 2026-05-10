@@ -8417,6 +8417,10 @@ pub fn commit_finished_host_root<H: HostTypes>(
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::result_large_err,
+    reason = "private canary handoff diagnostics intentionally retain full finished-work evidence"
+)]
 pub(crate) fn record_host_root_finished_work_pending_commit_for_canary<H: HostTypes>(
     store: &FiberRootStore<H>,
     render: HostRootRenderPhaseRecord,
@@ -8446,6 +8450,10 @@ pub(crate) fn record_host_root_finished_work_pending_commit_for_canary<H: HostTy
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::result_large_err,
+    reason = "private canary handoff diagnostics intentionally retain full finished-work evidence"
+)]
 pub(crate) fn commit_finished_host_root_with_finished_work_handoff_for_canary<H: HostTypes>(
     store: &mut FiberRootStore<H>,
     render: HostRootRenderPhaseRecord,
@@ -8667,6 +8675,10 @@ fn validate_context_provider_update_ancestor_child_lanes_for_canary(
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::result_large_err,
+    reason = "private Offscreen reveal canary diagnostics preserve finished-work and reveal evidence"
+)]
 pub(crate) fn commit_offscreen_reveal_complete_metadata_handoff_for_canary<H: HostTypes>(
     store: &mut FiberRootStore<H>,
     render: HostRootRenderPhaseRecord,
@@ -8710,6 +8722,10 @@ pub(crate) fn commit_offscreen_reveal_complete_metadata_handoff_for_canary<H: Ho
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::result_large_err,
+    reason = "private Offscreen reveal canary diagnostics preserve finished-work and reveal evidence"
+)]
 fn validate_offscreen_reveal_commit_metadata_for_canary<H: HostTypes>(
     store: &FiberRootStore<H>,
     render: HostRootRenderPhaseRecord,
@@ -8961,6 +8977,10 @@ pub(crate) fn record_host_root_single_host_update_apply_for_canary<H: HostTypes>
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::result_large_err,
+    reason = "private HostText canary diagnostics preserve the full stale commit handoff evidence"
+)]
 pub(crate) fn host_root_text_update_commit_execution_request_for_canary(
     handoff: &HostRootFinishedWorkCommitHandoffRecordForCanary,
     mutation_index: usize,
@@ -9073,6 +9093,10 @@ pub(crate) fn host_root_text_update_commit_execution_request_for_canary(
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::result_large_err,
+    reason = "private canary validator returns detailed finished-work handoff mismatches"
+)]
 fn validate_host_root_finished_work_pending_commit_for_canary<H: HostTypes>(
     store: &FiberRootStore<H>,
     render: HostRootRenderPhaseRecord,
@@ -9544,6 +9568,10 @@ struct FunctionComponentLayoutEffectCallbackExecutionPlan {
     first_passive_sequence: Option<usize>,
 }
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "private layout-effect canary control helper mirrors the evidence record shape"
+)]
 fn execute_function_component_layout_effect_callback_record_under_test_control<H: HostTypes>(
     store: &FiberRootStore<H>,
     root: FiberRootId,
@@ -9616,6 +9644,10 @@ fn execute_function_component_layout_effect_callback_record_under_test_control<H
     )
 }
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "private layout-effect update canary control helper mirrors the evidence record shape"
+)]
 fn execute_function_component_layout_effect_update_destroy_create_record_under_test_control<
     H: HostTypes,
 >(
@@ -9742,6 +9774,10 @@ fn layout_effect_callback_error_captures(
     captures
 }
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "private layout-effect validator checks each evidence source explicitly"
+)]
 fn validate_layout_effect_callback_execution_record<H: HostTypes>(
     store: &FiberRootStore<H>,
     root: FiberRootId,
@@ -10513,6 +10549,10 @@ fn committed_subtree_contains_fiber(
     Ok(false)
 }
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "private effect-list evidence builder mirrors commit phase dimensions"
+)]
 fn build_function_component_effect_list_commit_phase_order_snapshot<H: HostTypes>(
     store: &FiberRootStore<H>,
     root: FiberRootId,
@@ -14566,6 +14606,10 @@ fn collect_deletion_subtree_traversal_gate_records(
     Ok(())
 }
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "private deletion traversal evidence records each observed deletion dimension"
+)]
 fn push_deletion_subtree_traversal_gate_record(
     records: &mut Vec<HostRootDeletionSubtreeTraversalGateRecord>,
     request: DeletionSubtreeTraversalGateRequest,
@@ -21448,7 +21492,7 @@ mod tests {
                 } if root == root_id
                     && fiber == fixture.finished_function
                     && hook_list == fixture.state.work_in_progress_list()
-                    && current_list == None
+                    && current_list.is_none()
             ),
             "unexpected error: {error:?}"
         );
@@ -21506,7 +21550,7 @@ mod tests {
                 } if root == root_id
                     && fiber == fixture.finished_work
                     && tag == FiberTag::HostRoot
-                    && unsupported_feature == None
+                    && unsupported_feature.is_none()
             ),
             "unexpected error: {error:?}"
         );
@@ -23667,7 +23711,7 @@ mod tests {
             } if root == root_id
                 && finished_work == render.finished_work()
                 && current == render.finished_work()
-                && pending_work_after_commit == None
+                && pending_work_after_commit.is_none()
                 && handoff_order == 1
         ));
         assert_eq!(

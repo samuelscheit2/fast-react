@@ -3424,11 +3424,11 @@ pub(crate) enum BeginWorkError {
     FunctionComponent(FunctionComponentRenderError),
     FunctionComponentSingleChild(FunctionComponentSingleChildReconciliationError),
     FragmentSingleHostChild(FragmentSingleHostChildBeginWorkError),
-    UnsupportedPortal(UnsupportedPortalBeginWorkRecord),
-    UnsupportedSuspenseChildShape(UnsupportedSuspenseChildShapeRecord),
-    UnsupportedOffscreenChildShape(UnsupportedOffscreenChildShapeRecord),
-    UnsupportedSuspenseListChildShape(UnsupportedSuspenseListChildShapeRecord),
-    UnsupportedActivityChildShape(UnsupportedActivityChildShapeRecord),
+    UnsupportedPortal(Box<UnsupportedPortalBeginWorkRecord>),
+    UnsupportedSuspenseChildShape(Box<UnsupportedSuspenseChildShapeRecord>),
+    UnsupportedOffscreenChildShape(Box<UnsupportedOffscreenChildShapeRecord>),
+    UnsupportedSuspenseListChildShape(Box<UnsupportedSuspenseListChildShapeRecord>),
+    UnsupportedActivityChildShape(Box<UnsupportedActivityChildShapeRecord>),
     UnsupportedFiberTag { fiber: FiberId, tag: FiberTag },
 }
 
@@ -4257,21 +4257,21 @@ fn unsupported_begin_work_error(
     let tag = arena.get(fiber)?.tag();
 
     match tag {
-        FiberTag::Portal => Ok(BeginWorkError::UnsupportedPortal(
+        FiberTag::Portal => Ok(BeginWorkError::UnsupportedPortal(Box::new(
             unsupported_portal_begin_work_record(arena, request)?,
-        )),
-        FiberTag::Suspense => Ok(BeginWorkError::UnsupportedSuspenseChildShape(
+        ))),
+        FiberTag::Suspense => Ok(BeginWorkError::UnsupportedSuspenseChildShape(Box::new(
             unsupported_suspense_begin_work_record(arena, request)?,
-        )),
-        FiberTag::Offscreen => Ok(BeginWorkError::UnsupportedOffscreenChildShape(
+        ))),
+        FiberTag::Offscreen => Ok(BeginWorkError::UnsupportedOffscreenChildShape(Box::new(
             unsupported_offscreen_begin_work_record(arena, request)?,
-        )),
-        FiberTag::SuspenseList => Ok(BeginWorkError::UnsupportedSuspenseListChildShape(
+        ))),
+        FiberTag::SuspenseList => Ok(BeginWorkError::UnsupportedSuspenseListChildShape(Box::new(
             unsupported_suspense_list_begin_work_record(arena, request)?,
-        )),
-        FiberTag::Activity => Ok(BeginWorkError::UnsupportedActivityChildShape(
+        ))),
+        FiberTag::Activity => Ok(BeginWorkError::UnsupportedActivityChildShape(Box::new(
             unsupported_activity_begin_work_record(arena, request)?,
-        )),
+        ))),
         _ => Ok(BeginWorkError::UnsupportedFiberTag { fiber, tag }),
     }
 }

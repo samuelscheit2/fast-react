@@ -273,6 +273,10 @@ pub(crate) struct ContextProviderUpdateSubtreeLaneRequest {
 
 impl ContextProviderUpdateSubtreeLaneRequest {
     #[must_use]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "request constructor mirrors the context propagation evidence fields"
+    )]
     pub const fn new(
         root: FiberRootId,
         host_root_work_in_progress: FiberId,
@@ -356,6 +360,10 @@ pub(crate) struct ContextProviderUpdateTwoConsumerLaneRequest {
 
 impl ContextProviderUpdateTwoConsumerLaneRequest {
     #[must_use]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "request constructor mirrors the two-consumer context propagation evidence fields"
+    )]
     pub const fn new(
         root: FiberRootId,
         host_root_work_in_progress: FiberId,
@@ -447,6 +455,10 @@ pub(crate) struct ContextProviderUpdateSingleConsumerLaneRequest {
 #[cfg(test)]
 impl ContextProviderUpdateSingleConsumerLaneRequest {
     #[must_use]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "test request constructor mirrors the single-consumer context propagation evidence fields"
+    )]
     pub const fn new(
         root: FiberRootId,
         host_root_work_in_progress: FiberId,
@@ -2960,6 +2972,10 @@ fn validate_dependency_path(
     Ok(())
 }
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "private canary helper validates each consumer lane evidence field explicitly"
+)]
 fn consumer_lane_record_from_provider_decision<H: HostTypes>(
     store: &mut FiberRootStore<H>,
     context_store: &mut FunctionComponentContextRenderStore,
@@ -3000,6 +3016,10 @@ fn consumer_lane_record_from_provider_decision<H: HostTypes>(
     )
 }
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "private canary helper validates each unchanged-provider bailout evidence field explicitly"
+)]
 fn consumer_lane_record_from_unchanged_provider_bailout<H: HostTypes>(
     store: &FiberRootStore<H>,
     context_store: &FunctionComponentContextRenderStore,

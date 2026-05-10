@@ -3355,6 +3355,10 @@ pub(crate) fn record_deleted_subtree_unmount_effect_lifecycle_execution_evidence
 }
 
 impl EffectLifecycleExecutionSnapshot {
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "private evidence accumulator records each lifecycle dimension explicitly"
+    )]
     fn push(
         &mut self,
         phase: EffectLifecycleExecutionPhase,
@@ -7462,8 +7466,7 @@ mod tests {
         let reveal_metadata =
             offscreen_reveal_commit_metadata_for_test(&complete_work, lanes).unwrap();
         let pending =
-            record_host_root_finished_work_pending_commit_for_canary(&mut store, render, 1)
-                .unwrap();
+            record_host_root_finished_work_pending_commit_for_canary(&store, render, 1).unwrap();
         let reveal_handoff = commit_offscreen_reveal_complete_metadata_handoff_for_canary(
             &mut store,
             render,

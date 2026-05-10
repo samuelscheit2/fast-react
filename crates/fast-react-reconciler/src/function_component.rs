@@ -9154,7 +9154,7 @@ mod tests {
     #[derive(Debug, Clone, PartialEq, Eq)]
     enum FunctionComponentReducerDispatchCommitHandoffCanaryError {
         SingleChild(FunctionComponentSingleChildReconciliationError),
-        Commit(HostRootFinishedWorkCommitHandoffErrorForCanary),
+        Commit(Box<HostRootFinishedWorkCommitHandoffErrorForCanary>),
     }
 
     impl From<FunctionComponentSingleChildReconciliationError>
@@ -9169,7 +9169,7 @@ mod tests {
         for FunctionComponentReducerDispatchCommitHandoffCanaryError
     {
         fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
-            Self::Commit(error)
+            Self::Commit(Box::new(error))
         }
     }
 

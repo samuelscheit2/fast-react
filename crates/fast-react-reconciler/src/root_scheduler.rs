@@ -2571,19 +2571,19 @@ impl From<RootWorkLoopError> for RootSchedulerError {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum SchedulerBridgeActContinuationExecutionError {
-    RootScheduler(RootSchedulerError),
-    RootCommit(RootCommitError),
+    Scheduler(RootSchedulerError),
+    Commit(RootCommitError),
     #[cfg(test)]
-    RootCommitHandoff(HostRootFinishedWorkCommitHandoffErrorForCanary),
+    CommitHandoff(Box<HostRootFinishedWorkCommitHandoffErrorForCanary>),
 }
 
 impl Display for SchedulerBridgeActContinuationExecutionError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::RootScheduler(error) => Display::fmt(error, formatter),
-            Self::RootCommit(error) => Display::fmt(error, formatter),
+            Self::Scheduler(error) => Display::fmt(error, formatter),
+            Self::Commit(error) => Display::fmt(error, formatter),
             #[cfg(test)]
-            Self::RootCommitHandoff(error) => Display::fmt(error, formatter),
+            Self::CommitHandoff(error) => Display::fmt(error, formatter),
         }
     }
 }
@@ -2591,23 +2591,23 @@ impl Display for SchedulerBridgeActContinuationExecutionError {
 impl Error for SchedulerBridgeActContinuationExecutionError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            Self::RootScheduler(error) => Some(error),
-            Self::RootCommit(error) => Some(error),
+            Self::Scheduler(error) => Some(error),
+            Self::Commit(error) => Some(error),
             #[cfg(test)]
-            Self::RootCommitHandoff(error) => Some(error),
+            Self::CommitHandoff(error) => Some(error.as_ref()),
         }
     }
 }
 
 impl From<RootSchedulerError> for SchedulerBridgeActContinuationExecutionError {
     fn from(error: RootSchedulerError) -> Self {
-        Self::RootScheduler(error)
+        Self::Scheduler(error)
     }
 }
 
 impl From<RootCommitError> for SchedulerBridgeActContinuationExecutionError {
     fn from(error: RootCommitError) -> Self {
-        Self::RootCommit(error)
+        Self::Commit(error)
     }
 }
 
@@ -2616,25 +2616,25 @@ impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
     for SchedulerBridgeActContinuationExecutionError
 {
     fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
-        Self::RootCommitHandoff(error)
+        Self::CommitHandoff(Box::new(error))
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum RootSyncSchedulerContinuationExecutionError {
-    RootScheduler(RootSchedulerError),
-    RootCommit(RootCommitError),
+    Scheduler(RootSchedulerError),
+    Commit(RootCommitError),
     #[cfg(test)]
-    RootCommitHandoff(HostRootFinishedWorkCommitHandoffErrorForCanary),
+    CommitHandoff(Box<HostRootFinishedWorkCommitHandoffErrorForCanary>),
 }
 
 impl Display for RootSyncSchedulerContinuationExecutionError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::RootScheduler(error) => Display::fmt(error, formatter),
-            Self::RootCommit(error) => Display::fmt(error, formatter),
+            Self::Scheduler(error) => Display::fmt(error, formatter),
+            Self::Commit(error) => Display::fmt(error, formatter),
             #[cfg(test)]
-            Self::RootCommitHandoff(error) => Display::fmt(error, formatter),
+            Self::CommitHandoff(error) => Display::fmt(error, formatter),
         }
     }
 }
@@ -2642,23 +2642,23 @@ impl Display for RootSyncSchedulerContinuationExecutionError {
 impl Error for RootSyncSchedulerContinuationExecutionError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            Self::RootScheduler(error) => Some(error),
-            Self::RootCommit(error) => Some(error),
+            Self::Scheduler(error) => Some(error),
+            Self::Commit(error) => Some(error),
             #[cfg(test)]
-            Self::RootCommitHandoff(error) => Some(error),
+            Self::CommitHandoff(error) => Some(error.as_ref()),
         }
     }
 }
 
 impl From<RootSchedulerError> for RootSyncSchedulerContinuationExecutionError {
     fn from(error: RootSchedulerError) -> Self {
-        Self::RootScheduler(error)
+        Self::Scheduler(error)
     }
 }
 
 impl From<RootCommitError> for RootSyncSchedulerContinuationExecutionError {
     fn from(error: RootCommitError) -> Self {
-        Self::RootCommit(error)
+        Self::Commit(error)
     }
 }
 
@@ -2667,7 +2667,7 @@ impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
     for RootSyncSchedulerContinuationExecutionError
 {
     fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
-        Self::RootCommitHandoff(error)
+        Self::CommitHandoff(Box::new(error))
     }
 }
 
@@ -3692,7 +3692,7 @@ fn execute_scheduler_bridge_act_continuation<H: HostTypes>(
         .lanes()
         .pending_lanes();
 
-    let mut record = scheduler_bridge_act_continuation_execution_record(
+    let record = scheduler_bridge_act_continuation_execution_record(
         continuation,
         execution_order,
         selected_lanes,
@@ -3703,13 +3703,19 @@ fn execute_scheduler_bridge_act_continuation<H: HostTypes>(
         Some(commit),
     );
     #[cfg(test)]
-    {
+    let record = {
+        let mut record = record;
         record.root_commit_handoff = Some(root_commit_handoff);
-    }
+        record
+    };
 
     Ok(record)
 }
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "private scheduler continuation evidence record mirrors the canary assertion shape"
+)]
 fn scheduler_bridge_act_continuation_execution_record(
     continuation: SyncFlushActContinuationDrainRecord,
     execution_order: usize,
@@ -3985,7 +3991,7 @@ pub(crate) fn execute_sync_scheduler_continuation_for_render_handoff<H: HostType
     let commit = crate::commit_finished_host_root(store, handoff.render_phase())?;
     recompute_might_have_pending_sync_work(store)?;
 
-    let mut record = sync_scheduler_continuation_execution_record(
+    let record = sync_scheduler_continuation_execution_record(
         handoff,
         requested_callback_node,
         current_callback_node,
@@ -3995,9 +4001,11 @@ pub(crate) fn execute_sync_scheduler_continuation_for_render_handoff<H: HostType
         Some(commit),
     );
     #[cfg(test)]
-    {
+    let record = {
+        let mut record = record;
         record.root_commit_handoff = Some(root_commit_handoff);
-    }
+        record
+    };
 
     Ok(record)
 }

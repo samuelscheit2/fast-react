@@ -55,6 +55,10 @@ impl RootUpdateLaneChoiceRecord {
         self.source_priority
     }
 
+    #[allow(
+        dead_code,
+        reason = "crate-private transition lane choice evidence is exercised by canary tests"
+    )]
     fn transition_for_lane_for_canary(lane: Lane) -> Self {
         Self {
             lane,
@@ -792,6 +796,10 @@ pub fn update_container_sync<H: HostTypes>(
     update_container_impl(store, root_id, current, lane_choice, element, callback)
 }
 
+#[allow(
+    dead_code,
+    reason = "crate-private transition update entrypoint is exercised by canary tests"
+)]
 pub(crate) fn update_container_transition_for_canary<H: HostTypes>(
     store: &mut FiberRootStore<H>,
     root_id: FiberRootId,
@@ -972,6 +980,10 @@ pub(crate) fn validate_update_container_lane_diagnostics_for_canary<H: HostTypes
     Ok(lane_snapshot)
 }
 
+#[allow(
+    dead_code,
+    reason = "crate-private callback queue snapshot is exercised by canary tests"
+)]
 pub(crate) fn host_root_queued_callback_order_snapshot_for_canary<H: HostTypes>(
     store: &FiberRootStore<H>,
     root_id: FiberRootId,
@@ -1514,9 +1526,12 @@ mod tests {
         let update =
             update_container(&mut store, root_id, RootElementHandle::from_raw(1), None).unwrap();
 
-        let error =
-            host_root_queued_callback_order_snapshot_for_canary(&store, root_id, &[update.clone()])
-                .unwrap_err();
+        let error = host_root_queued_callback_order_snapshot_for_canary(
+            &store,
+            root_id,
+            std::slice::from_ref(&update),
+        )
+        .unwrap_err();
 
         assert_eq!(
             error,
@@ -1549,7 +1564,7 @@ mod tests {
         let error = host_root_queued_callback_order_snapshot_for_canary(
             &store,
             root_id,
-            &[accepted.clone()],
+            std::slice::from_ref(&accepted),
         )
         .unwrap_err();
 

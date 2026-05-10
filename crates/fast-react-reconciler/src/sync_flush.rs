@@ -2186,6 +2186,10 @@ pub(crate) fn commit_sync_flush_root_finished_work_continuation_for_canary<H: Ho
     ))
 }
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "private sync-flush continuation evidence record mirrors the canary assertion shape"
+)]
 fn sync_flush_root_commit_continuation_record(
     execution_context: SyncFlushExecutionContextRecord,
     status: SyncFlushRootCommitContinuationStatusForCanary,
