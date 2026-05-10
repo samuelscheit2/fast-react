@@ -606,6 +606,42 @@ test("react-test-renderer create shell exposes routing gate metadata without cha
   }
 });
 
+test("react-test-renderer package root private serialization facades advertise unmount identity admission without opening public routes", () => {
+  const entry = entrypoints.find(
+    (candidate) => candidate.entrypoint === "react-test-renderer"
+  );
+  assert.notEqual(entry, undefined);
+  const moduleExports = loadFresh(entry.modulePath);
+  const renderer = moduleExports.create({ type: "span" });
+
+  const jsonFacade = renderer.toJSON[privateToJSONSerializationFacadeSymbol];
+  const treeFacade = renderer.toTree[privateToTreeFacadeSymbol];
+
+  assert.equal(jsonFacade.privateUnmountFinishedWorkIdentityGateAvailable, true);
+  assert.equal(jsonFacade.validatesUnmountRootRequestIdentity, true);
+  assert.equal(
+    jsonFacade.validatesUnmountDeletionAndCleanupHandoffIdentity,
+    true
+  );
+  assert.equal(jsonFacade.publicSerializationAvailable, false);
+  assert.equal(jsonFacade.publicRouteAvailable, false);
+  assert.equal(jsonFacade.nativeBridgeAvailable, false);
+  assert.equal(jsonFacade.nativeExecution, false);
+  assert.equal(jsonFacade.compatibilityClaimed, false);
+
+  assert.equal(treeFacade.privateUnmountFinishedWorkIdentityGateAvailable, true);
+  assert.equal(treeFacade.validatesUnmountRootRequestIdentity, true);
+  assert.equal(
+    treeFacade.validatesUnmountDeletionAndCleanupHandoffIdentity,
+    true
+  );
+  assert.equal(treeFacade.publicTreeAvailable, false);
+  assert.equal(treeFacade.publicRouteAvailable, false);
+  assert.equal(treeFacade.nativeBridgeAvailable, false);
+  assert.equal(treeFacade.nativeExecution, false);
+  assert.equal(treeFacade.compatibilityClaimed, false);
+});
+
 test("react-test-renderer create shell keeps every behaviorful renderer surface fail-closed", () => {
   for (const entry of entrypoints) {
     const moduleExports = loadFresh(entry.modulePath);
@@ -9593,6 +9629,9 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
   );
   const nativeToTreeEvidence =
     gate.privateNativeExecutionEvidenceAvailable === true;
+  const packageRootUnmountIdentity =
+    entrypoint.startsWith("react-test-renderer") &&
+    !entrypoint.includes("/cjs/");
   const developmentCompositeToTreeEvidence =
     nativeToTreeEvidence &&
     gate.nativeExecutionCompositeWorker ===
@@ -9695,6 +9734,11 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
         ]
       : []),
     "TestRendererRoot::describe_private_to_tree_finished_work_identity_gate_for_canary",
+    ...(packageRootUnmountIdentity
+      ? [
+          "TestRendererRoot::describe_private_to_tree_unmount_finished_work_identity_gate_for_canary"
+        ]
+      : []),
     "TestRendererPrivateTreeMetadataReport",
     ...(nativeToTreeEvidence
       ? ["TestRendererPrivateToTreeNativeExecutionEvidence"]
@@ -9721,6 +9765,11 @@ function assertPrivateToTreeFacadeGate(gate, entrypoint) {
       : []),
     "root_private_to_tree_serialization_finished_work_identity_gate_accepts_committed_handoff",
     "root_private_to_tree_update_serialization_finished_work_identity_gate_accepts_committed_handoff",
+    ...(packageRootUnmountIdentity
+      ? [
+          "root_private_to_tree_unmount_native_execution_requires_finished_work_identity_gate"
+        ]
+      : []),
     "root_private_serialization_finished_work_identity_gate_rejects_stale_update_evidence",
     "root_private_tree_metadata_canary_rejects_stale_host_output_snapshot"
   ]);
