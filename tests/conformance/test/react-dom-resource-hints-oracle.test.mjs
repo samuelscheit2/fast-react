@@ -1272,6 +1272,15 @@ test("private resource-map commit diagnostics stay record-only", () => {
     1
   );
   assert.equal(
+    diagnostic.resourceMapCommitPlan.stylesheetLoadStateCommitTransitionCount,
+    1
+  );
+  assert.equal(
+    diagnostic.resourceMapCommitPlan
+      .stylesheetLoadStateCommitTransitionResourceCount,
+    1
+  );
+  assert.equal(
     diagnostic.resourceMapCommitPlan.staleResourceMapEntryCount,
     0
   );
@@ -1413,8 +1422,62 @@ test("private resource-map commit diagnostics stay record-only", () => {
       }
     ]
   );
+  assert.deepEqual(
+    {
+      transitionStatus:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .transitionStatus,
+      fakeResourceKeys:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .fakeResourceKeys,
+      fakeResourceMapDedupeKeys:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .fakeResourceMapDedupeKeys,
+      transitionCount:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .transitionCount,
+      fakeResourceCount:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .fakeResourceCount,
+      preloadElementCreated:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .preloadElementCreated,
+      stylesheetElementInserted:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .stylesheetElementInserted,
+      loadEventSubscribed:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .loadEventSubscribed,
+      loadingStateMutated:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .loadingStateMutated,
+      publicStylesheetLoadStateDispatch:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .publicStylesheetLoadStateDispatch
+    },
+    {
+      transitionStatus:
+        resourceFormGate
+          .privateResourceHintStylesheetLoadStateCommitTransitionStatus,
+      fakeResourceKeys: ["style:style-main"],
+      fakeResourceMapDedupeKeys: [
+        "hoistable-styles:style:style-main"
+      ],
+      transitionCount: 1,
+      fakeResourceCount: 1,
+      preloadElementCreated: false,
+      stylesheetElementInserted: false,
+      loadEventSubscribed: false,
+      loadingStateMutated: false,
+      publicStylesheetLoadStateDispatch: false
+    }
+  );
   assert.equal(diagnostic.resourceMapCommitPlan.realResourceMapsMutated, false);
   assert.equal(diagnostic.resourceMapCommitPlan.fakeResourceMapsMutated, false);
+  assert.equal(
+    diagnostic.resourceMapCommitPlan.preloadOrStyleDomWorkDispatched,
+    false
+  );
   assert.equal(
     diagnostic.resourceMapCommitPlan.publicScriptModuleResourceDispatch,
     false
@@ -1432,9 +1495,21 @@ test("private resource-map commit diagnostics stay record-only", () => {
     diagnostic.sideEffects.stylesheetLoadStateCommitOrderRowsRecorded,
     true
   );
+  assert.equal(
+    diagnostic.sideEffects.stylesheetLoadStateCommitTransitionRecorded,
+    true
+  );
+  assert.equal(
+    diagnostic.sideEffects.fakeStylesheetResourceCommitTransitionRecorded,
+    true
+  );
   assert.equal(diagnostic.sideEffects.scriptExecutionStarted, false);
   assert.equal(diagnostic.sideEffects.publicScriptModuleResourceDispatch, false);
   assert.equal(diagnostic.sideEffects.resourceLoadStateMutated, false);
+  assert.equal(
+    diagnostic.sideEffects.preloadOrStyleDomWorkDispatched,
+    false
+  );
   assert.equal(
     diagnostic.resourceLifecycleBoundary.singletonOwnershipClaimed,
     false
@@ -1446,6 +1521,15 @@ test("private resource-map commit diagnostics stay record-only", () => {
   assert.equal(
     diagnostic.resourceLifecycleBoundary.stylesheetLoadStateRecordConsumed,
     true
+  );
+  assert.equal(
+    diagnostic.resourceLifecycleBoundary
+      .stylesheetLoadStateCommitTransitionRecorded,
+    true
+  );
+  assert.equal(
+    diagnostic.resourceLifecycleBoundary.preloadOrStyleDomWorkDispatched,
+    false
   );
   assert.equal(
     diagnostic.publicResourceBoundary.publicResourceHintCallsReachable,
