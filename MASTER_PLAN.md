@@ -48,7 +48,18 @@ Drive toward a minimal real root render/update/unmount path:
 Top-level cap: 30 workers. Queue 685-714 was launched from queue base commit
 `9ec6678` in isolated `worker/<slug>` branches and worktrees and has been
 accepted and cleaned up. Workers 715-745 have also been accepted and are no
-longer active.
+longer active. Workers 746, 748-761 have been accepted and cleaned up as
+private evidence batches; Worker 747 remains active after final audit found a
+forgeable Scheduler source-proof path that must be hardened before merge.
+
+Workers 762-766 are running from queue base commit `14bbce7` in isolated
+worktrees:
+
+- Worker 762: hydrateRoot private marker/listener gate.
+- Worker 763: sibling-text JS/CJS private serialization admission.
+- Worker 764: native worker-thread teardown executable/preflight evidence.
+- Worker 765: Scheduler mock delayed root/act producer gate.
+- Worker 766: test-renderer root finished-work/finished-lanes handoff gate.
 
 ## Near-Term Sequencing
 

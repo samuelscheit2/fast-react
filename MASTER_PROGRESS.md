@@ -29,6 +29,39 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 750, 754-761
+
+- Worker 750 added private nested hydration target-claiming evidence while
+  keeping public hydration, event replay, DOM mutation, and compatibility
+  blocked.
+- Workers 754 and 757 tightened react-test-renderer unmount finished-work
+  identity. Worker 757 required package-root unmount identity validation to use
+  matching root request/deletion/cleanup handoff evidence; Worker 754 extended
+  the JS/CJS private native unmount path so accepted native execution must
+  consume strict unmount finished-work identity, cleanup-level passive/ref order
+  evidence, and matching cleanup counts before diagnostic admission.
+- Workers 755 and 756 refreshed private public-facade/DOM evidence: nested DOM
+  initial host-output rollback remains private and public facade act/passive
+  recognition stays record-only.
+- Worker 759 added the static package/private-admission ledger for the
+  746-753 evidence batch.
+- Worker 760 added Rust-only sibling-text native `toTree` diagnostics that
+  consume the dedicated Worker 745 sibling-text finished-work identity gate
+  without opening public serialization, JS/CJS, native bridge loading, package
+  compatibility, or broad multichild identity.
+- Worker 761 added a private scheduler postTask deferred-yield guard, and
+  Worker 758 added the React private act consumer for scheduler postTask
+  `scheduler.yield` act/root handoff diagnostics. Worker 758's accepted audit
+  verified deeper timeout evidence is frozen/current-shape and rejects
+  `packageCompatibilityClaimed` across the diagnostic graph.
+- The batch was accepted with focused hydration/event/React DOM,
+  react-test-renderer serialization/create-routing and workspace checks,
+  scheduler postTask/React act checks, package-surface guards, import-smoke,
+  Rust fmt/clippy/focused test-renderer checks where applicable, conflict-marker
+  scans, and `git diff --check`. Public root, public `act`, public Scheduler
+  timing, public hydration, public serialization, native execution, package
+  compatibility, and broad renderer compatibility remain blocked.
+
 ### Worker 745
 
 - Worker 745 added a Rust-only private sibling-text `toJSON` finished-work
