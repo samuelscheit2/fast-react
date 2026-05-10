@@ -4,7 +4,8 @@ const {ELEMENT_NODE, TEXT_NODE} = require('./dom-container.js');
 const {getContainerRoot} = require('./root-markers.js');
 const {
   getDomPropertyUpdateLatestPropsHandoffPayload,
-  getLatestPropsCommitRecordPayload
+  getLatestPropsCommitRecordPayload,
+  rollbackDomPropertyUpdateLatestPropsHandoff
 } = require('../dom-host/mutation.js');
 
 const hostInstanceMarkerPrefix = '__fastReactHostInstance$';
@@ -707,17 +708,44 @@ function commitLatestPropsFromMutationRecords(records) {
 
 function commitLatestPropsFromMutationHandoff(handoff) {
   const payload = getLatestPropsMutationHandoffPayload(handoff);
-  return commitLatestPropsFromMutationRecord(payload.latestPropsCommitRecord);
+  try {
+    return commitLatestPropsFromMutationRecord(payload.latestPropsCommitRecord);
+  } catch (error) {
+    rollbackLatestPropsMutationHandoffs([handoff]);
+    throw error;
+  }
 }
 
 function commitLatestPropsFromMutationHandoffs(handoffs) {
-  const payloads = normalizeLatestPropsMutationHandoffs(handoffs);
-  const latestPropsPayloads = payloads.map((payload) =>
-    getLatestPropsCommitPayload(payload.latestPropsCommitRecord)
-  );
+  if (!Array.isArray(handoffs)) {
+    throw createComponentTreeError(
+      'Cannot commit latest props from a non-array mutation handoff batch.',
+      'FAST_REACT_DOM_INVALID_LATEST_PROPS_MUTATION_HANDOFF_BATCH'
+    );
+  }
 
-  for (const latestPropsPayload of latestPropsPayloads) {
-    assertAttachedLatestPropsCommitPayload(latestPropsPayload);
+  const normalizedHandoffs = [];
+  let latestPropsPayloads;
+  try {
+    for (const handoff of handoffs) {
+      normalizedHandoffs.push({
+        handoff,
+        payload: getLatestPropsMutationHandoffPayload(handoff)
+      });
+    }
+
+    latestPropsPayloads = normalizedHandoffs.map(({payload}) =>
+      getLatestPropsCommitPayload(payload.latestPropsCommitRecord)
+    );
+
+    for (const latestPropsPayload of latestPropsPayloads) {
+      assertAttachedLatestPropsCommitPayload(latestPropsPayload);
+    }
+  } catch (error) {
+    rollbackLatestPropsMutationHandoffs(
+      normalizedHandoffs.map(({handoff}) => handoff)
+    );
+    throw error;
   }
 
   for (const latestPropsPayload of latestPropsPayloads) {
@@ -741,17 +769,14 @@ function normalizeLatestPropsCommitRecords(records) {
   return records.map((record) => getLatestPropsCommitPayload(record));
 }
 
-function normalizeLatestPropsMutationHandoffs(handoffs) {
-  if (!Array.isArray(handoffs)) {
-    throw createComponentTreeError(
-      'Cannot commit latest props from a non-array mutation handoff batch.',
-      'FAST_REACT_DOM_INVALID_LATEST_PROPS_MUTATION_HANDOFF_BATCH'
-    );
+function rollbackLatestPropsMutationHandoffs(handoffs) {
+  for (let index = handoffs.length - 1; index >= 0; index -= 1) {
+    try {
+      rollbackDomPropertyUpdateLatestPropsHandoff(handoffs[index]);
+    } catch (error) {
+      // Rollback is best effort on already-failed private handoff admission.
+    }
   }
-
-  return handoffs.map((handoff) =>
-    getLatestPropsMutationHandoffPayload(handoff)
-  );
 }
 
 function getLatestPropsMutationHandoffPayload(handoff) {
