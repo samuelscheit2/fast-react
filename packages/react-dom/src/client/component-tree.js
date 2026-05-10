@@ -16,6 +16,10 @@ const internalLatestPropsKey = latestPropsMarkerPrefix + randomKey;
 const hostInstanceTokenBrand = Symbol('fast.react.dom.hostInstanceToken');
 const EVENT_TARGET_NORMALIZATION_RECORD_KIND =
   'FastReactDomEventTargetNormalizationRecord';
+const EVENT_TARGET_DISPATCH_PATH_RECORD_KIND =
+  'FastReactDomEventTargetDispatchPathRecord';
+const EVENT_TARGET_DISPATCH_PATH_ENTRY_RECORD_KIND =
+  'FastReactDomEventTargetDispatchPathEntryRecord';
 const EVENT_LISTENER_TARGET_LOOKUP_RECORD_KIND =
   'FastReactDomEventListenerTargetLookupRecord';
 const EVENT_LISTENER_TARGET_LOOKUP_BLOCKED_CODE =
@@ -276,6 +280,114 @@ function createEventTargetNormalizationRecord(targetNode) {
       typeof normalizedTargetNode.nodeType === 'number'
         ? normalizedTargetNode.nodeType
         : null
+  });
+}
+
+function createEventTargetDispatchPathRecord(targetNormalizationRecord) {
+  const normalizedTargetRecord =
+    assertEventTargetNormalizationRecord(targetNormalizationRecord);
+  const entries = [];
+  let currentNode = normalizedTargetRecord.closestMountedHostInstanceNode;
+
+  while (currentNode !== null) {
+    assertTargetNodeDoesNotHaveMismatchedHostInstanceToken(currentNode);
+
+    const hostInstanceToken =
+      getMountedHostInstanceTokenFromNode(currentNode);
+    if (hostInstanceToken !== null) {
+      entries.push(
+        createEventTargetDispatchPathEntryRecord(
+          entries.length,
+          currentNode,
+          hostInstanceToken,
+          normalizedTargetRecord
+        )
+      );
+    }
+
+    let parentNode = isObjectLike(currentNode.parentNode)
+      ? currentNode.parentNode
+      : null;
+    while (parentNode !== null) {
+      assertTargetNodeDoesNotHaveMismatchedHostInstanceToken(parentNode);
+      if (getContainerRoot(parentNode) !== null) {
+        parentNode = null;
+        break;
+      }
+      if (getMountedHostInstanceTokenFromNode(parentNode) !== null) {
+        break;
+      }
+      parentNode = isObjectLike(parentNode.parentNode)
+        ? parentNode.parentNode
+        : null;
+    }
+
+    currentNode = parentNode;
+  }
+
+  const frozenEntries = Object.freeze(entries);
+  const targetEntry = frozenEntries.length === 0 ? null : frozenEntries[0];
+  const targetInst =
+    targetEntry === null ? null : targetEntry.targetHostInstanceToken;
+
+  return Object.freeze({
+    browserDomEventCompatibilityClaimed: false,
+    entries: frozenEntries,
+    kind: EVENT_TARGET_DISPATCH_PATH_RECORD_KIND,
+    length: frozenEntries.length,
+    publicRootBehaviorChanged: false,
+    rootOwner: targetEntry === null ? null : targetEntry.rootOwner,
+    status:
+      targetInst === null
+        ? 'no-mounted-host-instance'
+        : 'resolved-component-tree-dispatch-path',
+    targetHostInstanceNode:
+      targetEntry === null ? null : targetEntry.targetHostInstanceNode,
+    targetHostInstanceStatus:
+      targetInst === null
+        ? 'no-mounted-host-instance'
+        : 'mounted-host-instance',
+    targetHostInstanceToken: targetInst,
+    targetInst,
+    targetInstStatus:
+      targetInst === null
+        ? 'not-resolved'
+        : 'resolved-component-tree-host-instance',
+    targetNormalizationRecord: normalizedTargetRecord,
+    targetNode: normalizedTargetRecord.targetNode
+  });
+}
+
+function createEventTargetDispatchPathEntryRecord(
+  index,
+  hostInstanceNode,
+  hostInstanceToken,
+  normalizedTargetRecord
+) {
+  const latestProps = getLatestPropsFromNode(hostInstanceNode);
+
+  return Object.freeze({
+    browserDomEventCompatibilityClaimed: false,
+    componentTreeStatus: 'mounted-host-instance',
+    hostOwner: getHostInstanceOwnerFromToken(hostInstanceToken),
+    index,
+    isDirectEventTarget:
+      normalizedTargetRecord.directMountedHostInstanceToken !== null &&
+      normalizedTargetRecord.directMountedHostInstanceToken ===
+        hostInstanceToken,
+    isTargetHostInstance: index === 0,
+    kind: EVENT_TARGET_DISPATCH_PATH_ENTRY_RECORD_KIND,
+    latestPropsStatus: latestProps === null ? 'missing' : 'present',
+    nodeType:
+      typeof hostInstanceNode.nodeType === 'number'
+        ? hostInstanceNode.nodeType
+        : null,
+    publicRootBehaviorChanged: false,
+    rootOwner: getRootOwnerFromHostInstanceToken(hostInstanceToken),
+    targetHostInstanceNode: hostInstanceNode,
+    targetHostInstanceStatus: 'mounted-host-instance',
+    targetHostInstanceToken: hostInstanceToken,
+    targetNode: normalizedTargetRecord.targetNode
   });
 }
 
@@ -1004,6 +1116,8 @@ module.exports = {
   EVENT_LISTENER_TARGET_LOOKUP_NODE_MISMATCH_CODE,
   EVENT_LISTENER_TARGET_LOOKUP_RECORD_KIND,
   EVENT_LISTENER_TARGET_LOOKUP_UNMOUNTED_CODE,
+  EVENT_TARGET_DISPATCH_PATH_ENTRY_RECORD_KIND,
+  EVENT_TARGET_DISPATCH_PATH_RECORD_KIND,
   EVENT_TARGET_NORMALIZATION_RECORD_KIND,
   HOST_INSTANCE_NODE_RECORD_KIND,
   INVALID_EVENT_LISTENER_CODE,
@@ -1019,6 +1133,7 @@ module.exports = {
   commitLatestPropsFromMutationRecord,
   commitLatestPropsFromMutationRecords,
   createEventListenerTargetLookupRecord,
+  createEventTargetDispatchPathRecord,
   createEventTargetNormalizationRecord,
   createHostInstanceToken,
   createMountedHostInstanceNodeRecord,
