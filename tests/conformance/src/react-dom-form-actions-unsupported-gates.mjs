@@ -446,6 +446,7 @@ export function assertPrivateFormActionSubmitDispatchGate(
   assert.equal(summary.recordsFormDataBlockerRows, true);
   assert.equal(summary.recordsResetQueueIntent, true);
   assert.equal(summary.recordsDispatchQueueRow, true);
+  assert.equal(summary.submitResetExecutionGateAvailable, true);
   assert.equal(summary.rejectsLiveForms, true);
   assert.equal(summary.rejectsUnsupportedSubmitControls, true);
   assert.equal(summary.blocksCallbackDispatchExecution, true);
@@ -559,6 +560,228 @@ export function assertPrivateFormActionSubmitDispatchGate(
         formActions.privateFormActionSubmitDispatchInvalidAdmissionCode,
       compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
       reason: "callback dispatch execution must remain blocked"
+    }
+  );
+
+  const resetDispatcherGate =
+    resourceFormGate.createFormActionResetDispatcherGate({
+      requestIdPrefix: "conformance-submit-reset-source"
+    });
+  const resetQueueCommitGate =
+    resourceFormGate.createFormActionResetQueueCommitGate({
+      requestIdPrefix: "conformance-submit-reset-queue"
+    });
+  const actionCompletionReset = resetDispatcherGate.recordResetIntent({
+    explicitIntent: true,
+    dispatcherKey: "r",
+    resetSource: "action-completion",
+    formOwnership: "react-owned",
+    transitionContext: "action"
+  });
+  const actionCompletionQueueCommit =
+    resetQueueCommitGate.recordResetQueueCommit(actionCompletionReset, {
+      explicitAdmission: true,
+      queueSource: "action-completion",
+      queueKind: "metadata-only-reset-state-queue",
+      commitKind: "after-mutation-form-reset-order",
+      hostTag: "form"
+    });
+  const actionCompletionBlocker = blockerGate.recordFormDataBlockerDiagnostic(
+    extraction,
+    actionCompletionQueueCommit,
+    {
+      explicitFormActionFormDataBlocker: true,
+      formTargetShape: { targetKind: "form", hostTag: "form" },
+      submitterShape: { controlKind: "input", hostTag: "input" }
+    }
+  );
+  const actionCompletionDispatch =
+    dispatchGate.recordSubmitDispatchDiagnostic(actionCompletionBlocker, {
+      explicitFormActionSubmitDispatch: true,
+      submitControlKind: "input"
+    });
+  const executionGate =
+    formActions.createFormActionSubmitResetExecutionDiagnosticGate({
+      requestIdPrefix: "conformance-submit-reset-execution"
+    });
+  const execution = executionGate.recordSubmitResetExecution(
+    actionCompletionDispatch,
+    {
+      explicitFormActionSubmitResetExecution: true,
+      fakeFormPath: {
+        pathId: "conformance-fake-form-action-completion-reset",
+        pathKind: "action-completion-submit-reset",
+        hostTag: "form",
+        resetMode: "record-only-fake-reset"
+      }
+    }
+  );
+  const executionSummary =
+    formActions.describePrivateFormActionSubmitResetExecutionGate();
+
+  assert.equal(
+    executionSummary.gateId,
+    formActions.privateFormActionSubmitResetExecutionGateId
+  );
+  assert.equal(
+    executionSummary.status,
+    formActions.privateFormActionSubmitResetExecutionStatus
+  );
+  assert.equal(
+    executionSummary.acceptedSubmitDispatchRecordType,
+    formActions.privateFormActionSubmitDispatchRecordType
+  );
+  assert.equal(
+    executionSummary.acceptedResetOrderingKind,
+    "action-completion-reset-before-action"
+  );
+  assert.equal(executionSummary.consumesBlockedFormDataMetadata, true);
+  assert.equal(executionSummary.consumesResetIntentMetadata, true);
+  assert.equal(executionSummary.executesDeterministicFakeFormResetPath, true);
+  assert.equal(executionSummary.admitsExactlyOneFakeFormPath, true);
+  assert.equal(executionSummary.acceptsRealForms, false);
+  assert.equal(executionSummary.constructsFormData, false);
+  assert.equal(executionSummary.dispatchesSubmitCallbacks, false);
+  assert.equal(executionSummary.invokesActions, false);
+  assert.equal(executionSummary.queuesReactUpdates, false);
+  assert.equal(executionSummary.resetsForms, false);
+  assert.deepEqual(
+    executionSummary.sideEffects,
+    formActions.formActionSubmitResetExecutionBlockedSideEffects
+  );
+  assert.equal(
+    formActions.isPrivateFormActionSubmitResetExecutionRecord(execution),
+    true
+  );
+  assert.equal(
+    formActions.getPrivateFormActionSubmitResetExecutionRecordPayload(
+      execution
+    ),
+    execution
+  );
+  assert.equal(
+    execution.status,
+    formActions.privateFormActionSubmitResetExecutionRecordedStatus
+  );
+  assert.equal(
+    execution.sourceSubmitDispatchId,
+    actionCompletionDispatch.dispatchId
+  );
+  assert.equal(
+    execution.sourceFormDataBlockerId,
+    actionCompletionBlocker.blockerId
+  );
+  assert.equal(
+    execution.sourceResetIntentRequestId,
+    actionCompletionReset.requestId
+  );
+  assert.equal(
+    execution.formDataBlockerConsumption.blockedFormDataConsumed,
+    true
+  );
+  assert.equal(
+    execution.formDataBlockerConsumption.formDataConstructed,
+    false
+  );
+  assert.equal(
+    execution.resetIntentConsumption.resetIntentMetadataConsumed,
+    true
+  );
+  assert.equal(
+    execution.resetIntentConsumption.actionCompletionResetBeforeAction,
+    true
+  );
+  assert.equal(execution.resetIntentConsumption.resetStateQueued, false);
+  assert.equal(execution.resetIntentConsumption.realFormReset, false);
+  assert.equal(
+    execution.fakeFormResetExecution.fakeFormPathId,
+    "conformance-fake-form-action-completion-reset"
+  );
+  assert.equal(
+    execution.fakeFormResetExecution.fakeFormResetPathExecuted,
+    true
+  );
+  assert.equal(execution.fakeFormResetExecution.fakeFormResetRecorded, true);
+  assert.equal(execution.fakeFormResetExecution.formDataConstructed, false);
+  assert.equal(
+    execution.fakeFormResetExecution.callbackDispatchExecuted,
+    false
+  );
+  assert.equal(execution.fakeFormResetExecution.actionInvoked, false);
+  assert.equal(execution.fakeFormResetExecution.resetStateQueued, false);
+  assert.equal(execution.fakeFormResetExecution.realFormReset, false);
+  assert.equal(
+    execution.publicFormActionBoundary.publicFormActionsEnabled,
+    false
+  );
+  assert.equal(execution.publicFormActionBoundary.realFormReset, false);
+  assert.deepEqual(
+    execution.sideEffects,
+    formActions.formActionSubmitResetExecutionDiagnosticSideEffects
+  );
+  assert.equal(execution.sideEffects.sourceSubmitDispatchAccepted, true);
+  assert.equal(execution.sideEffects.blockedFormDataConsumed, true);
+  assert.equal(execution.sideEffects.resetIntentMetadataConsumed, true);
+  assert.equal(execution.sideEffects.fakeFormResetPathExecuted, true);
+  assert.equal(execution.sideEffects.formDataConstructed, false);
+  assert.equal(execution.sideEffects.actionInvoked, false);
+  assert.equal(execution.sideEffects.realFormReset, false);
+
+  const executionError =
+    formActions.createUnsupportedFormActionSubmitResetExecutionError(
+      execution
+    );
+  assert.equal(
+    executionError.code,
+    formActions.privateFormActionSubmitResetExecutionGateErrorCode
+  );
+  assert.equal(executionError.executionId, execution.executionId);
+  assert.deepEqual(
+    executionError.resetIntentConsumption,
+    execution.resetIntentConsumption
+  );
+  assert.throws(
+    () =>
+      executionGate.recordSubmitResetExecution(actionCompletionDispatch, {
+        explicitFormActionSubmitResetExecution: true
+      }),
+    {
+      code:
+        formActions.privateFormActionSubmitResetExecutionInvalidAdmissionCode,
+      compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
+      reason:
+        "fake form reset execution gate admits exactly one fake form path"
+    }
+  );
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionSubmitResetExecutionDiagnosticGate()
+        .recordSubmitResetExecution(record, {
+          explicitFormActionSubmitResetExecution: true
+        }),
+    {
+      code:
+        formActions.privateFormActionSubmitResetExecutionInvalidRecordCode,
+      compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
+      reason:
+        "source submit dispatch must be accepted metadata-only action-completion reset dispatch"
+    }
+  );
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionSubmitResetExecutionDiagnosticGate()
+        .recordSubmitResetExecution(actionCompletionDispatch, {
+          explicitFormActionSubmitResetExecution: true,
+          form: throwingProxy("form")
+        }),
+    {
+      code:
+        formActions.privateFormActionSubmitResetExecutionInvalidAdmissionCode,
+      compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
+      reason:
+        "form must not be passed to the submit reset execution fake form gate"
     }
   );
 }

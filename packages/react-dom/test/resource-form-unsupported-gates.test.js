@@ -1825,6 +1825,397 @@ test('private form action submit dispatch gate links blocker, action identity, a
   );
 });
 
+test('private form action submit reset execution consumes one fake form path only', () => {
+  const dispatcherGate = resourceFormGate.createFormActionResetDispatcherGate({
+    requestIdPrefix: 'submit-reset-source'
+  });
+  const extractionGate = resourceFormGate.createFormActionEventExtractionGate({
+    requestIdPrefix: 'submit-reset-extraction'
+  });
+  const queueCommitGate =
+    resourceFormGate.createFormActionResetQueueCommitGate({
+      requestIdPrefix: 'submit-reset-queue'
+    });
+  const blockerGate =
+    formActions.createFormActionFormDataBlockerDiagnosticGate({
+      requestIdPrefix: 'submit-reset-blocker'
+    });
+  const dispatchGate =
+    formActions.createFormActionSubmitDispatchDiagnosticGate({
+      requestIdPrefix: 'submit-reset-dispatch'
+    });
+  const executionGate =
+    formActions.createFormActionSubmitResetExecutionDiagnosticGate({
+      requestIdPrefix: 'submit-reset-execution'
+    });
+  const submitIntent = dispatcherGate.recordSubmissionIntent({
+    explicitIntent: true,
+    eventName: 'submit',
+    submissionTrigger: 'requestSubmit',
+    actionKind: 'function',
+    actionSource: 'form',
+    submitControlKind: 'button',
+    formActionKind: 'function',
+    submitterActionKind: 'none',
+    defaultPrevented: false,
+    transitionScheduled: false
+  });
+  const extraction =
+    extractionGate.recordEventExtractionFromSubmissionIntent(submitIntent);
+  const resetIntent = dispatcherGate.recordResetIntent({
+    explicitIntent: true,
+    dispatcherKey: 'r',
+    resetSource: 'action-completion',
+    formOwnership: 'react-owned',
+    transitionContext: 'action'
+  });
+  const resetQueueCommit = queueCommitGate.recordResetQueueCommit(
+    resetIntent,
+    {
+      explicitAdmission: true,
+      queueSource: 'action-completion',
+      queueKind: 'metadata-only-reset-state-queue',
+      commitKind: 'after-mutation-form-reset-order',
+      hostTag: 'form'
+    }
+  );
+  const blocker = blockerGate.recordFormDataBlockerDiagnostic(
+    extraction,
+    resetQueueCommit,
+    {
+      explicitFormActionFormDataBlocker: true,
+      formTargetShape: {
+        targetKind: 'form',
+        hostTag: 'form',
+        methodKind: 'post'
+      },
+      submitterShape: {
+        controlKind: 'button',
+        hostTag: 'button',
+        nameKind: 'string',
+        valueKind: 'string'
+      }
+    }
+  );
+  const dispatch = dispatchGate.recordSubmitDispatchDiagnostic(blocker, {
+    explicitFormActionSubmitDispatch: true,
+    submitControlKind: 'button'
+  });
+  const record = executionGate.recordSubmitResetExecution(dispatch, {
+    explicitFormActionSubmitResetExecution: true,
+    fakeFormPath: {
+      pathId: 'fake-form-action-completion-reset-path',
+      pathKind: 'action-completion-submit-reset',
+      hostTag: 'form',
+      resetMode: 'record-only-fake-reset'
+    }
+  });
+  const summary =
+    formActions.describePrivateFormActionSubmitResetExecutionGate();
+
+  assert.equal(
+    summary.gateId,
+    formActions.privateFormActionSubmitResetExecutionGateId
+  );
+  assert.equal(
+    summary.status,
+    formActions.privateFormActionSubmitResetExecutionStatus
+  );
+  assert.equal(
+    summary.acceptedSubmitDispatchRecordType,
+    formActions.privateFormActionSubmitDispatchRecordType
+  );
+  assert.equal(
+    summary.acceptedSubmitDispatchStatus,
+    formActions.privateFormActionSubmitDispatchRecordedStatus
+  );
+  assert.equal(
+    summary.acceptedFormDataBlockerRecordType,
+    formActions.privateFormActionFormDataBlockerRecordType
+  );
+  assert.equal(
+    summary.acceptedResetOrderingKind,
+    'action-completion-reset-before-action'
+  );
+  assert.equal(summary.recordsAcceptedMetadataIds, true);
+  assert.equal(summary.consumesBlockedFormDataMetadata, true);
+  assert.equal(summary.consumesResetIntentMetadata, true);
+  assert.equal(summary.executesDeterministicFakeFormResetPath, true);
+  assert.equal(summary.admitsExactlyOneFakeFormPath, true);
+  assert.equal(summary.rejectsLiveForms, true);
+  assert.equal(summary.rejectsCallbackExecution, true);
+  assert.equal(summary.acceptsRealForms, false);
+  assert.equal(summary.constructsFormData, false);
+  assert.equal(summary.createsSyntheticEvents, false);
+  assert.equal(summary.dispatchesSubmitCallbacks, false);
+  assert.equal(summary.invokesActions, false);
+  assert.equal(summary.startsHostTransition, false);
+  assert.equal(summary.queuesReactUpdates, false);
+  assert.equal(summary.callsResetFormInstance, false);
+  assert.equal(summary.resetsForms, false);
+  assert.deepEqual(
+    summary.sideEffects,
+    formActions.formActionSubmitResetExecutionBlockedSideEffects
+  );
+  assert.equal(
+    formActions.describePrivateFormActionSubmitDispatchGate()
+      .submitResetExecutionGateAvailable,
+    true
+  );
+
+  assert.equal(Object.isFrozen(record), true);
+  assert.equal(
+    formActions.isPrivateFormActionSubmitResetExecutionRecord(record),
+    true
+  );
+  assert.equal(
+    formActions.getPrivateFormActionSubmitResetExecutionRecordPayload(record),
+    record
+  );
+  assert.equal(
+    record.status,
+    formActions.privateFormActionSubmitResetExecutionRecordedStatus
+  );
+  assert.equal(record.executionId, 'submit-reset-execution:1');
+  assert.equal(record.sourceSubmitDispatchId, dispatch.dispatchId);
+  assert.equal(record.sourceFormDataBlockerId, blocker.blockerId);
+  assert.equal(record.sourceEventExtractionId, extraction.extractionId);
+  assert.equal(
+    record.sourceResetQueueCommitRequestId,
+    resetQueueCommit.requestId
+  );
+  assert.equal(record.sourceResetIntentRequestId, resetIntent.requestId);
+  assert.deepEqual(record.acceptedMetadataIds, dispatch.acceptedMetadataIds);
+  assert.equal(record.admission.deterministicFakeFormOnly, true);
+  assert.equal(
+    record.admission.fakeFormPath.pathId,
+    'fake-form-action-completion-reset-path'
+  );
+  assert.equal(record.admission.fakeFormPath.hostTag, 'form');
+  assert.equal(record.admission.fakeFormPath.formDataBlockerConsumed, true);
+  assert.equal(
+    record.admission.fakeFormPath.resetIntentMetadataConsumed,
+    true
+  );
+  assert.equal(record.admission.fakeFormPath.realFormReset, false);
+
+  assert.equal(record.sourceSubmitDispatch.dispatchId, dispatch.dispatchId);
+  assert.equal(record.sourceSubmitDispatch.resolvedActionKind, 'function');
+  assert.equal(record.sourceSubmitDispatch.formDataConstructionBlocked, true);
+  assert.equal(record.sourceSubmitDispatch.resetStateWouldBeQueued, true);
+  assert.equal(
+    record.sourceSubmitDispatch.actionCompletionResetBeforeAction,
+    true
+  );
+  assert.equal(record.sourceSubmitDispatch.callbackDispatchExecuted, false);
+  assert.equal(record.sourceSubmitDispatch.actionInvoked, false);
+  assert.equal(record.sourceSubmitDispatch.realFormReset, false);
+
+  assert.equal(
+    record.formDataBlockerConsumption.sourceFormDataBlockerId,
+    blocker.blockerId
+  );
+  assert.equal(
+    record.formDataBlockerConsumption.formDataConstructionBlocked,
+    true
+  );
+  assert.equal(record.formDataBlockerConsumption.blockedFormDataConsumed, true);
+  assert.equal(record.formDataBlockerConsumption.formDataConstructed, false);
+  assert.equal(record.formDataBlockerConsumption.realFormInspected, false);
+
+  assert.equal(
+    record.resetIntentConsumption.sourceResetIntentRequestId,
+    resetIntent.requestId
+  );
+  assert.equal(
+    record.resetIntentConsumption.sourceResetOrderingKind,
+    'action-completion-reset-before-action'
+  );
+  assert.equal(
+    record.resetIntentConsumption.actionCompletionResetBeforeAction,
+    true
+  );
+  assert.equal(record.resetIntentConsumption.resetStateWouldBeQueued, true);
+  assert.equal(record.resetIntentConsumption.resetIntentMetadataConsumed, true);
+  assert.equal(record.resetIntentConsumption.resetStateQueued, false);
+  assert.equal(record.resetIntentConsumption.reactUpdateQueued, false);
+  assert.equal(record.resetIntentConsumption.resetFormInstanceCalled, false);
+  assert.equal(record.resetIntentConsumption.realFormReset, false);
+
+  assert.equal(
+    record.fakeFormResetExecution.status,
+    'executed-private-form-action-submit-reset-fake-form-path'
+  );
+  assert.equal(
+    record.fakeFormResetExecution.fakeFormPathId,
+    'fake-form-action-completion-reset-path'
+  );
+  assert.equal(record.fakeFormResetExecution.deterministicFakeFormOnly, true);
+  assert.equal(record.fakeFormResetExecution.blockedFormDataConsumed, true);
+  assert.equal(
+    record.fakeFormResetExecution.resetIntentMetadataConsumed,
+    true
+  );
+  assert.equal(
+    record.fakeFormResetExecution.actionCompletionResetBeforeAction,
+    true
+  );
+  assert.equal(record.fakeFormResetExecution.fakeFormResetPathExecuted, true);
+  assert.equal(record.fakeFormResetExecution.fakeFormResetRecorded, true);
+  assert.equal(record.fakeFormResetExecution.formDataConstructed, false);
+  assert.equal(record.fakeFormResetExecution.callbackDispatchExecuted, false);
+  assert.equal(record.fakeFormResetExecution.actionInvoked, false);
+  assert.equal(record.fakeFormResetExecution.hostTransitionStarted, false);
+  assert.equal(record.fakeFormResetExecution.resetStateQueued, false);
+  assert.equal(record.fakeFormResetExecution.resetFormInstanceCalled, false);
+  assert.equal(record.fakeFormResetExecution.realFormReset, false);
+  assert.equal(record.publicFormActionBoundary.publicFormActionsEnabled, false);
+  assert.equal(record.publicFormActionBoundary.submitDispatchReachable, false);
+  assert.equal(record.publicFormActionBoundary.formDataConstructed, false);
+  assert.equal(record.publicFormActionBoundary.actionInvoked, false);
+  assert.equal(record.publicFormActionBoundary.realFormReset, false);
+
+  assert.deepEqual(
+    record.sideEffects,
+    formActions.formActionSubmitResetExecutionDiagnosticSideEffects
+  );
+  assert.equal(record.sideEffects.sourceSubmitDispatchAccepted, true);
+  assert.equal(record.sideEffects.sourceFormDataBlockerAccepted, true);
+  assert.equal(record.sideEffects.sourceResetQueueIntentAccepted, true);
+  assert.equal(record.sideEffects.blockedFormDataConsumed, true);
+  assert.equal(record.sideEffects.resetIntentMetadataConsumed, true);
+  assert.equal(record.sideEffects.fakeFormResetPathExecuted, true);
+  assert.equal(record.sideEffects.formDataConstructed, false);
+  assert.equal(record.sideEffects.callbackDispatchExecuted, false);
+  assert.equal(record.sideEffects.actionInvoked, false);
+  assert.equal(record.sideEffects.resetStateQueued, false);
+  assert.equal(record.sideEffects.realFormReset, false);
+
+  const error =
+    formActions.createUnsupportedFormActionSubmitResetExecutionError(record);
+  assert.equal(
+    error.code,
+    formActions.privateFormActionSubmitResetExecutionGateErrorCode
+  );
+  assert.equal(error.executionId, 'submit-reset-execution:1');
+  assert.equal(error.sourceSubmitDispatchId, dispatch.dispatchId);
+  assert.deepEqual(
+    error.formDataBlockerConsumption,
+    record.formDataBlockerConsumption
+  );
+  assert.deepEqual(
+    error.resetIntentConsumption,
+    record.resetIntentConsumption
+  );
+  assert.match(
+    error.message,
+    /private form action submit reset execution gate records one fake form path only/u
+  );
+
+  assert.throws(
+    () =>
+      executionGate.recordSubmitResetExecution(dispatch, {
+        explicitFormActionSubmitResetExecution: true
+      }),
+    {
+      code:
+        formActions.privateFormActionSubmitResetExecutionInvalidAdmissionCode,
+      compatibilityTarget,
+      reason:
+        'fake form reset execution gate admits exactly one fake form path'
+    }
+  );
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionSubmitResetExecutionDiagnosticGate()
+        .recordSubmitResetExecution(dispatch, {
+          explicitFormActionSubmitResetExecution: true,
+          form: throwingProxy('form')
+        }),
+    {
+      code:
+        formActions.privateFormActionSubmitResetExecutionInvalidAdmissionCode,
+      compatibilityTarget,
+      reason:
+        'form must not be passed to the submit reset execution fake form gate'
+    }
+  );
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionSubmitResetExecutionDiagnosticGate()
+        .recordSubmitResetExecution(dispatch, {
+          explicitFormActionSubmitResetExecution: true,
+          callbackDispatchExecutionRequested: true
+        }),
+    {
+      code:
+        formActions.privateFormActionSubmitResetExecutionInvalidAdmissionCode,
+      compatibilityTarget,
+      reason: 'callback dispatch execution must remain blocked'
+    }
+  );
+
+  const requestResetIntent = dispatcherGate.recordResetIntent({
+    explicitIntent: true,
+    dispatcherKey: 'r',
+    resetSource: 'requestFormReset',
+    formOwnership: 'react-owned',
+    transitionContext: 'action'
+  });
+  const requestResetQueueCommit = queueCommitGate.recordResetQueueCommit(
+    requestResetIntent,
+    {
+      explicitAdmission: true,
+      queueSource: 'requestFormResetOnFiber',
+      queueKind: 'metadata-only-reset-state-queue',
+      commitKind: 'after-mutation-form-reset-order',
+      hostTag: 'form'
+    }
+  );
+  const requestResetBlocker = blockerGate.recordFormDataBlockerDiagnostic(
+    extraction,
+    requestResetQueueCommit,
+    {
+      explicitFormActionFormDataBlocker: true,
+      submitterShape: {
+        controlKind: 'button',
+        hostTag: 'button'
+      }
+    }
+  );
+  const requestResetDispatch =
+    dispatchGate.recordSubmitDispatchDiagnostic(requestResetBlocker, {
+      explicitFormActionSubmitDispatch: true,
+      submitControlKind: 'button'
+    });
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionSubmitResetExecutionDiagnosticGate()
+        .recordSubmitResetExecution(requestResetDispatch, {
+          explicitFormActionSubmitResetExecution: true
+        }),
+    {
+      code:
+        formActions.privateFormActionSubmitResetExecutionInvalidRecordCode,
+      compatibilityTarget,
+      reason:
+        'source submit dispatch must be accepted metadata-only action-completion reset dispatch'
+    }
+  );
+  assert.throws(
+    () =>
+      formActions.createUnsupportedFormActionSubmitResetExecutionError({}),
+    {
+      code:
+        formActions.privateFormActionSubmitResetExecutionInvalidRecordCode,
+      compatibilityTarget
+    }
+  );
+});
+
 
 test('private controlled input value-tracker gate records deterministic metadata only', () => {
   const first = createPrivateControlledValueTrackerScenario();
