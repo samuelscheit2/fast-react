@@ -512,13 +512,15 @@ const reactTestRendererPlaceholderVersion =
 
 const reactTestRendererEntrypoints = [
   {
+    actExport: 'function',
     fileName: 'index.js',
     keys: reactTestRendererKeys,
     resolvedFileName: 'index.js',
     specifier: '@fast-react/react-test-renderer',
-    unsupportedExport: 'create'
+    unsupportedExport: 'act'
   },
   {
+    actExport: 'function',
     fileName: path.join('cjs', 'react-test-renderer.development.js'),
     keys: reactTestRendererKeys,
     resolvedFileName: path.join('cjs', 'react-test-renderer.development.js'),
@@ -527,6 +529,7 @@ const reactTestRendererEntrypoints = [
     unsupportedExport: 'act'
   },
   {
+    actExport: 'undefined',
     fileName: path.join('cjs', 'react-test-renderer.production.js'),
     keys: reactTestRendererKeys,
     resolvedFileName: path.join('cjs', 'react-test-renderer.production.js'),
@@ -892,7 +895,11 @@ function assertReactTestRendererInventoryKeys(
   assertReactTestRendererPlaceholderMetadata(moduleExports, label);
 }
 
-function assertReactTestRendererUnimplemented(callback, label) {
+function assertReactTestRendererUnimplemented(
+  callback,
+  label,
+  expectedExportName
+) {
   assert.throws(
     callback,
     (error) => {
@@ -907,6 +914,9 @@ function assertReactTestRendererUnimplemented(callback, label) {
         'react-test-renderer@19.2.6',
         label
       );
+      if (expectedExportName !== undefined) {
+        assert.equal(error.exportName, expectedExportName, label);
+      }
       assert.match(
         error.message,
         /no React Test Renderer behavior implementation yet/,
@@ -944,10 +954,14 @@ function assertReactTestRendererShallowUnsupported(callback, label) {
   );
 }
 
-function assertReactTestRendererRootBehavior(moduleExports, label) {
+function assertReactTestRendererRootBehavior(moduleExports, label, entrypoint) {
   assert.equal(moduleExports.version, reactTestRendererPlaceholderVersion);
   assert.equal(moduleExports.create.length, 2, `${label}.create length`);
-  assert.equal(moduleExports.act.length, 1, `${label}.act length`);
+  if (entrypoint.actExport === 'undefined') {
+    assert.equal(moduleExports.act, undefined, `${label}.act`);
+  } else {
+    assert.equal(moduleExports.act.length, 1, `${label}.act length`);
+  }
   assert.equal(
     moduleExports.unstable_batchedUpdates.length,
     2,
@@ -957,7 +971,75 @@ function assertReactTestRendererRootBehavior(moduleExports, label) {
   assert.deepEqual(Reflect.ownKeys(moduleExports._Scheduler), [], label);
   assertReactTestRendererUnimplemented(
     () => moduleExports._Scheduler.unstable_scheduleCallback,
-    `${label}._Scheduler.unstable_scheduleCallback`
+    `${label}._Scheduler.unstable_scheduleCallback`,
+    '_Scheduler.unstable_scheduleCallback'
+  );
+
+  const renderer = moduleExports.create(null);
+  assert.deepEqual(
+    Object.keys(renderer),
+    [
+      '_Scheduler',
+      'root',
+      'toJSON',
+      'toTree',
+      'update',
+      'unmount',
+      'getInstance',
+      'unstable_flushSync'
+    ],
+    `${label}.create() renderer keys`
+  );
+  const rootDescriptor = Object.getOwnPropertyDescriptor(renderer, 'root');
+  assert.equal(rootDescriptor.enumerable, true, `${label}.root enumerable`);
+  assert.equal(rootDescriptor.configurable, true, `${label}.root configurable`);
+  assert.equal(rootDescriptor.get.length, 0, `${label}.root getter length`);
+  assert.equal(rootDescriptor.set, undefined, `${label}.root setter`);
+  assert.equal(renderer.toJSON.length, 0, `${label}.toJSON length`);
+  assert.equal(renderer.toTree.length, 0, `${label}.toTree length`);
+  assert.equal(renderer.update.length, 1, `${label}.update length`);
+  assert.equal(renderer.unmount.length, 0, `${label}.unmount length`);
+  assert.equal(renderer.getInstance.length, 0, `${label}.getInstance length`);
+  assert.equal(
+    renderer.unstable_flushSync.length,
+    1,
+    `${label}.unstable_flushSync length`
+  );
+  assert.deepEqual(Object.keys(renderer._Scheduler), [], `${label} renderer scheduler`);
+  assertReactTestRendererUnimplemented(
+    () => renderer.root,
+    `${label}.root`,
+    'create().root'
+  );
+  assertReactTestRendererUnimplemented(
+    () => renderer.toJSON(),
+    `${label}.toJSON`,
+    'create().toJSON'
+  );
+  assertReactTestRendererUnimplemented(
+    () => renderer.toTree(),
+    `${label}.toTree`,
+    'create().toTree'
+  );
+  assertReactTestRendererUnimplemented(
+    () => renderer.update(null),
+    `${label}.update`,
+    'create().update'
+  );
+  assertReactTestRendererUnimplemented(
+    () => renderer.unmount(),
+    `${label}.unmount`,
+    'create().unmount'
+  );
+  assertReactTestRendererUnimplemented(
+    () => renderer.getInstance(),
+    `${label}.getInstance`,
+    'create().getInstance'
+  );
+  assertReactTestRendererUnimplemented(
+    () => renderer.unstable_flushSync(() => {}),
+    `${label}.unstable_flushSync`,
+    'create().unstable_flushSync'
   );
 }
 
@@ -2211,11 +2293,23 @@ async function assertReactTestRendererFileEntrypoint(entrypoint, labelPrefix) {
   );
 
   if (entrypoint.unsupportedExport) {
-    assertReactTestRendererRootBehavior(cjsModule, labelPrefix);
-    assertReactTestRendererUnimplemented(
-      () => cjsModule[entrypoint.unsupportedExport](),
-      `${labelPrefix}.${entrypoint.unsupportedExport}`
-    );
+    assertReactTestRendererRootBehavior(cjsModule, labelPrefix, entrypoint);
+    if (
+      entrypoint.unsupportedExport === 'act' &&
+      entrypoint.actExport === 'undefined'
+    ) {
+      assert.equal(
+        cjsModule[entrypoint.unsupportedExport],
+        undefined,
+        `${labelPrefix}.${entrypoint.unsupportedExport}`
+      );
+    } else {
+      assertReactTestRendererUnimplemented(
+        () => cjsModule[entrypoint.unsupportedExport](),
+        `${labelPrefix}.${entrypoint.unsupportedExport}`,
+        entrypoint.unsupportedExport
+      );
+    }
   } else {
     assert.equal(typeof cjsModule, 'function', `${labelPrefix} CJS function`);
     assertReactTestRendererShallowUnsupported(
@@ -3089,7 +3183,7 @@ async function runReactTestRendererPackageProbe(tempRoot) {
       );
     }
 
-    function assertUnimplemented(callback, label) {
+    function assertUnimplemented(callback, label, expectedExportName) {
       assert.throws(
         callback,
         (error) => {
@@ -3104,6 +3198,9 @@ async function runReactTestRendererPackageProbe(tempRoot) {
             'react-test-renderer@19.2.6',
             label
           );
+          if (expectedExportName !== undefined) {
+            assert.equal(error.exportName, expectedExportName, label);
+          }
           assert.match(
             error.message,
             /no React Test Renderer behavior implementation yet/,
@@ -3155,6 +3252,7 @@ async function runReactTestRendererPackageProbe(tempRoot) {
       });
 
       for (const {
+        actExport,
         keys,
         resolvedFileName,
         specifier,
@@ -3176,17 +3274,69 @@ async function runReactTestRendererPackageProbe(tempRoot) {
         assertInventoryKeys(cjsModule, keys, specifier);
         assert.equal(cjsModule.version, placeholderVersion, specifier);
         assert.equal(cjsModule.create.length, 2, specifier);
-        assert.equal(cjsModule.act.length, 1, specifier);
+        if (actExport === 'undefined') {
+          assert.equal(cjsModule.act, undefined, specifier);
+        } else {
+          assert.equal(cjsModule.act.length, 1, specifier);
+        }
         assert.equal(cjsModule.unstable_batchedUpdates.length, 2, specifier);
         assert.deepEqual(Object.keys(cjsModule._Scheduler), [], specifier);
         assertUnimplemented(
           () => cjsModule._Scheduler.unstable_scheduleCallback,
-          specifier + ' _Scheduler'
+          specifier + ' _Scheduler',
+          '_Scheduler.unstable_scheduleCallback'
+        );
+        const renderer = cjsModule.create(null);
+        assert.deepEqual(
+          Object.keys(renderer),
+          [
+            '_Scheduler',
+            'root',
+            'toJSON',
+            'toTree',
+            'update',
+            'unmount',
+            'getInstance',
+            'unstable_flushSync'
+          ],
+          specifier + ' renderer keys'
+        );
+        const rootDescriptor = Object.getOwnPropertyDescriptor(renderer, 'root');
+        assert.equal(rootDescriptor.enumerable, true, specifier + ' root');
+        assert.equal(rootDescriptor.configurable, true, specifier + ' root');
+        assert.equal(rootDescriptor.get.length, 0, specifier + ' root');
+        assert.equal(rootDescriptor.set, undefined, specifier + ' root');
+        assert.equal(renderer.toJSON.length, 0, specifier);
+        assert.equal(renderer.toTree.length, 0, specifier);
+        assert.equal(renderer.update.length, 1, specifier);
+        assert.equal(renderer.unmount.length, 0, specifier);
+        assert.equal(renderer.getInstance.length, 0, specifier);
+        assert.equal(renderer.unstable_flushSync.length, 1, specifier);
+        assert.deepEqual(Object.keys(renderer._Scheduler), [], specifier);
+        assertUnimplemented(() => renderer.root, specifier + ' root', 'create().root');
+        assertUnimplemented(() => renderer.toJSON(), specifier + ' toJSON', 'create().toJSON');
+        assertUnimplemented(() => renderer.toTree(), specifier + ' toTree', 'create().toTree');
+        assertUnimplemented(() => renderer.update(null), specifier + ' update', 'create().update');
+        assertUnimplemented(() => renderer.unmount(), specifier + ' unmount', 'create().unmount');
+        assertUnimplemented(
+          () => renderer.getInstance(),
+          specifier + ' getInstance',
+          'create().getInstance'
         );
         assertUnimplemented(
-          () => cjsModule[unsupportedExport](),
-          specifier + ' ' + unsupportedExport
+          () => renderer.unstable_flushSync(() => {}),
+          specifier + ' unstable_flushSync',
+          'create().unstable_flushSync'
         );
+        if (unsupportedExport === 'act' && actExport === 'undefined') {
+          assert.equal(cjsModule[unsupportedExport], undefined, specifier);
+        } else {
+          assertUnimplemented(
+            () => cjsModule[unsupportedExport](),
+            specifier + ' ' + unsupportedExport,
+            unsupportedExport
+          );
+        }
 
         if (specifier === '@fast-react/react-test-renderer') {
           const esmModule = await import(specifier);
