@@ -179,9 +179,21 @@ sequencing belong in `MASTER_PLAN.md`.
   microtask dedupe, and non-sync callback routing through the act queue when
   active, without public `act`, task execution, continuation flushing, DOM, or
   test-renderer facade behavior.
+- Worker 178 test-renderer serialization local gate was merged, adding a
+  fail-closed conformance gate and explicit scenario admission metadata so
+  React Test Renderer serialization compatibility remains blocked until
+  committed test-renderer host output, fiber inspection, Rust serialization
+  APIs, and a public JS facade exist.
 
 ## Latest Accepted Verification
 
+- Worker 178 was verified on its integrated worktree and again on `main` with
+  the focused `test:react-test-renderer:serialization` workspace script, full
+  conformance with 437 tests, `npm run check:js` covering the package-surface
+  guard, smoke imports, benchmark gate, workspace checks, and 437 conformance
+  tests, plus `git diff --check`; after merging current `main`, the local gate
+  expectation was updated for accepted worker 153's Rust `TestRendererRoot`
+  canary while remaining closed on missing committed host output.
 - Worker 176 was verified on its integrated worktree and again on `main` with
   `cargo fmt --all --check`, focused `scheduler_bridge` and `root_scheduler`
   tests, full `fast-react-reconciler` tests with 112 unit tests plus 1 doctest,
