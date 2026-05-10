@@ -45,18 +45,49 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue 383-412 has been accepted and merged. Do not
-queue the next batch until the accepted worker sessions, worktrees, and branches
-from that queue are cleaned.
+Top-level cap: 30 workers. Queue 413-442 is assigned in isolated worktrees.
+
+| Worker | Focus |
+| --- | --- |
+| 413 | Root commit HostComponent update traversal canary |
+| 414 | Root commit deletion nearest-host-parent traversal canary |
+| 415 | Ref callback cleanup-return handle store |
+| 416 | Ref callback error routing private records |
+| 417 | Context dependency metadata on private runtime reads |
+| 418 | Provider complete/unwind traversal canary |
+| 419 | Function component committed effect ownership |
+| 420 | Passive effect traversal from committed fiber effects |
+| 421 | Passive effect error capture root records |
+| 422 | Scheduler bridge act continuation execution |
+| 423 | Test renderer native/Rust root execution bridge |
+| 424 | Test renderer `toJSON` broader host-shape diagnostics |
+| 425 | Test renderer `toTree` composite metadata diagnostics |
+| 426 | Test renderer TestInstance private bridge queries |
+| 427 | React DOM public root facade private execution preflight |
+| 428 | React DOM root commit update handoff |
+| 429 | React DOM SyntheticEvent shape private gate |
+| 430 | React DOM event propagation/error diagnostics |
+| 431 | Controlled input post-event restore queue gate |
+| 432 | Resource head clear/retain private gate |
+| 433 | Hydration dehydrated target resolution gate |
+| 434 | Portal `preparePortalMount` listener gate |
+| 435 | Native JSON transport parser gate |
+| 436 | Scheduler mock continuation execution gate |
+| 437 | React act renderer-backed private drain |
+| 438 | React DOM test-utils act flush/warning refresh |
+| 439 | Benchmark cross-root/warning timing canaries |
+| 440 | Package-surface private facade audit |
+| 441 | Root-render E2E cross-root scheduling admission |
+| 442 | DOM root marker/listener public-facade preflight |
 
 ## Near-Term Sequencing
 
-1. Clean accepted worker sessions, worktrees, and branches left from queue
-   383-412.
+1. Monitor queue 413-442 for completion and merge completed workers before
+   queuing more.
 2. Accept code workers opportunistically, resolving merge conflicts after the
    fact when overlapping work lands on different implementation surfaces.
-3. Refill up to the 30 top-level worker cap with the next narrow implementation
-   or conformance checkpoints after cleanup is complete.
+3. After the queue drains, refill up to the 30 top-level worker cap with the
+   next narrow implementation or conformance checkpoints.
 
 ## Next Queue Candidates
 
