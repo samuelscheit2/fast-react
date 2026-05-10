@@ -10,6 +10,7 @@ mod host_tokens;
 mod root_config;
 mod root_scheduler;
 mod root_updates;
+mod root_work_loop;
 mod scheduler_bridge;
 #[cfg(test)]
 mod test_support;
@@ -58,6 +59,11 @@ pub use root_updates::{
     RootScheduleUpdateRecord, RootTransitionEntanglementRecord, RootUpdateError,
     UpdateContainerResult, update_container, update_container_sync,
 };
+pub use root_work_loop::{
+    HostRootRenderPhaseRecord, RootWorkLoopError, SchedulerCallbackHostRootRenderResult,
+    SchedulerCallbackRenderStatus, SchedulerCallbackValidationRecord, render_host_root_for_lanes,
+    render_host_root_via_scheduler_callback, validate_scheduled_host_root_callback,
+};
 pub use scheduler_bridge::{
     SchedulerBridge, SchedulerCallbackRequest, SchedulerCancellationRecord,
     SchedulerMicrotaskHandle, SchedulerMicrotaskKind, SchedulerMicrotaskRequest, SchedulerPriority,
@@ -88,6 +94,7 @@ pub enum ReconcilerError {
     ConcurrentUpdate(ConcurrentUpdateError),
     RootUpdate(RootUpdateError),
     RootScheduler(RootSchedulerError),
+    RootWorkLoop(RootWorkLoopError),
     WorkInProgress(WorkInProgressError),
 }
 
@@ -113,6 +120,7 @@ impl Display for ReconcilerError {
             Self::ConcurrentUpdate(error) => Display::fmt(error, formatter),
             Self::RootUpdate(error) => Display::fmt(error, formatter),
             Self::RootScheduler(error) => Display::fmt(error, formatter),
+            Self::RootWorkLoop(error) => Display::fmt(error, formatter),
             Self::WorkInProgress(error) => Display::fmt(error, formatter),
         }
     }
@@ -133,6 +141,7 @@ impl Error for ReconcilerError {
             Self::ConcurrentUpdate(error) => Some(error),
             Self::RootUpdate(error) => Some(error),
             Self::RootScheduler(error) => Some(error),
+            Self::RootWorkLoop(error) => Some(error),
             Self::WorkInProgress(error) => Some(error),
         }
     }
@@ -210,6 +219,12 @@ impl From<RootUpdateError> for ReconcilerError {
 impl From<RootSchedulerError> for ReconcilerError {
     fn from(error: RootSchedulerError) -> Self {
         Self::RootScheduler(error)
+    }
+}
+
+impl From<RootWorkLoopError> for ReconcilerError {
+    fn from(error: RootWorkLoopError) -> Self {
+        Self::RootWorkLoop(error)
     }
 }
 
