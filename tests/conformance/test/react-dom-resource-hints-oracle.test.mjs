@@ -1070,6 +1070,10 @@ test("private resource-map commit diagnostics stay record-only", () => {
     resourceFormGate.createResourceHintStylesheetPrecedenceGate({
       requestIdPrefix: "resource-conformance-map-stylesheet"
     });
+  const loadStateGate =
+    resourceFormGate.createResourceHintStylesheetLoadErrorStateGate({
+      requestIdPrefix: "resource-conformance-map-load-state"
+    });
   const commitGate =
     resourceFormGate.createResourceHintResourceMapCommitGate({
       requestIdPrefix: "resource-conformance-map-commit"
@@ -1216,12 +1220,19 @@ test("private resource-map commit diagnostics stay record-only", () => {
       fakeHead: fakeDom.head
     }
   );
+  const loadState = loadStateGate.recordStylesheetLoadErrorStateDiagnostic(
+    stylesheet,
+    {
+      explicitStylesheetLoadErrorStateDiagnostic: true
+    }
+  );
   const diagnostic = commitGate.recordResourceMapCommitDiagnostic(
     order,
     stylesheet,
     {
       explicitResourceMapCommitDiagnostic: true
-    }
+    },
+    loadState
   );
 
   assert.equal(
@@ -1255,6 +1266,14 @@ test("private resource-map commit diagnostics stay record-only", () => {
   assert.equal(
     diagnostic.resourceMapCommitPlan.moduleResourceMapDedupeKeyCount,
     2
+  );
+  assert.equal(
+    diagnostic.resourceMapCommitPlan.stylesheetLoadStateCommitOrderRowCount,
+    1
+  );
+  assert.equal(
+    diagnostic.resourceMapCommitPlan.staleResourceMapEntryCount,
+    0
   );
   assert.equal(
     diagnostic.resourceMapCommitPlan.conflictingDuplicateRecordCount,
@@ -1374,6 +1393,26 @@ test("private resource-map commit diagnostics stay record-only", () => {
       }
     ]
   );
+  assert.deepEqual(
+    diagnostic.stylesheetLoadStateCommitOrder.rows.map((row) => ({
+      resourceKey: row.resourceKey,
+      resourceMapDedupeKey: row.resourceMapDedupeKey,
+      fakeLoadingStateBitmasks: row.fakeLoadingStateBitmasks,
+      commitOrderConsumesFakeLoadState:
+        row.commitOrderConsumesFakeLoadState,
+      publicStylesheetLoadStateDispatch:
+        row.publicStylesheetLoadStateDispatch
+    })),
+    [
+      {
+        resourceKey: "style:style-main",
+        resourceMapDedupeKey: "hoistable-styles:style:style-main",
+        fakeLoadingStateBitmasks: [0, 1, 2, 4, 5, 6],
+        commitOrderConsumesFakeLoadState: true,
+        publicStylesheetLoadStateDispatch: false
+      }
+    ]
+  );
   assert.equal(diagnostic.resourceMapCommitPlan.realResourceMapsMutated, false);
   assert.equal(diagnostic.resourceMapCommitPlan.fakeResourceMapsMutated, false);
   assert.equal(
@@ -1389,6 +1428,10 @@ test("private resource-map commit diagnostics stay record-only", () => {
     diagnostic.sideEffects.moduleResourceMapDedupeKeysRecorded,
     true
   );
+  assert.equal(
+    diagnostic.sideEffects.stylesheetLoadStateCommitOrderRowsRecorded,
+    true
+  );
   assert.equal(diagnostic.sideEffects.scriptExecutionStarted, false);
   assert.equal(diagnostic.sideEffects.publicScriptModuleResourceDispatch, false);
   assert.equal(diagnostic.sideEffects.resourceLoadStateMutated, false);
@@ -1400,6 +1443,10 @@ test("private resource-map commit diagnostics stay record-only", () => {
   assert.equal(diagnostic.resourceLifecycleBoundary.modulePreloadStarted, false);
   assert.equal(diagnostic.resourceLifecycleBoundary.scriptExecutionStarted, false);
   assert.equal(diagnostic.resourceLifecycleBoundary.loadStateMutated, false);
+  assert.equal(
+    diagnostic.resourceLifecycleBoundary.stylesheetLoadStateRecordConsumed,
+    true
+  );
   assert.equal(
     diagnostic.publicResourceBoundary.publicResourceHintCallsReachable,
     false
