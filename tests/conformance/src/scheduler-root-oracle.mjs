@@ -25,7 +25,10 @@ export function formatSchedulerRootOracleAsMarkdown(oracle) {
 
   const modeLines = oracle.probeModes.map((mode) => {
     const observationCount = oracle.schedulerObservations[mode.id]?.length ?? 0;
-    return `- ${mode.id}: ${observationCount} scheduler observations`;
+    const fastReactStatuses = countStatuses(
+      oracle.fastReactComparisons?.[mode.id] ?? []
+    );
+    return `- ${mode.id}: ${observationCount} scheduler observations; Fast React comparisons ${JSON.stringify(fastReactStatuses)}`;
   });
 
   const claimLines = Object.entries(oracle.conformanceClaims).map(
@@ -37,7 +40,7 @@ export function formatSchedulerRootOracleAsMarkdown(oracle) {
   return [
     "# Scheduler Root Oracle",
     "",
-    "Generated from the exact scheduler 0.27.0 npm artifact. This oracle records normalized public root behavior and does not claim Fast React scheduler compatibility.",
+    "Generated from the exact scheduler 0.27.0 npm artifact and the current local scheduler implementation. This oracle records normalized public root behavior and keeps broad Fast React scheduler compatibility claims false.",
     "",
     "## Scenarios",
     "",
@@ -66,4 +69,44 @@ export function findSchedulerRootObservation(oracle, modeId, scenarioId) {
     throw new Error(`Missing scheduler root observation: ${modeId}:${scenarioId}`);
   }
   return observation;
+}
+
+export function findFastReactSchedulerRootObservation(
+  oracle,
+  modeId,
+  scenarioId
+) {
+  const observation = oracle.fastReactObservations?.[modeId]?.find(
+    (candidate) => candidate.scenarioId === scenarioId
+  );
+  if (!observation) {
+    throw new Error(
+      `Missing Fast React scheduler root observation: ${modeId}:${scenarioId}`
+    );
+  }
+  return observation;
+}
+
+export function findFastReactSchedulerRootComparison(
+  oracle,
+  modeId,
+  scenarioId
+) {
+  const comparison = oracle.fastReactComparisons?.[modeId]?.find(
+    (candidate) => candidate.scenarioId === scenarioId
+  );
+  if (!comparison) {
+    throw new Error(
+      `Missing Fast React scheduler root comparison: ${modeId}:${scenarioId}`
+    );
+  }
+  return comparison;
+}
+
+function countStatuses(comparisons) {
+  const counts = {};
+  for (const comparison of comparisons) {
+    counts[comparison.status] = (counts[comparison.status] ?? 0) + 1;
+  }
+  return counts;
 }

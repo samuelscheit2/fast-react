@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+  cpSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
@@ -16,6 +17,7 @@ import {
   SCHEDULER_ROOT_SCENARIOS
 } from "./scheduler-root-scenarios.mjs";
 import {
+  SCHEDULER_ROOT_FAST_REACT_TARGET,
   SCHEDULER_ROOT_PROBE_MODES,
   SCHEDULER_ROOT_SOURCE_DOCUMENTS,
   SCHEDULER_ROOT_TARGET
@@ -36,24 +38,48 @@ export async function generateSchedulerRootOracle() {
       nodeModulesRoot,
       tempRoot
     });
+    copyFastReactSchedulerPackage({ nodeModulesRoot });
     const probeFile = writeProbeFile(projectRoot);
     const schedulerObservations = {};
+    const fastReactObservations = {};
+    const fastReactComparisons = {};
 
     for (const mode of SCHEDULER_ROOT_PROBE_MODES) {
       schedulerObservations[mode.id] = [];
+      fastReactObservations[mode.id] = [];
+      fastReactComparisons[mode.id] = [];
 
       for (const scenario of SCHEDULER_ROOT_SCENARIOS) {
-        schedulerObservations[mode.id].push(
-          runSchedulerRootProbe({
+        const schedulerObservation = runSchedulerRootProbe({
+          mode,
+          packageName: SCHEDULER_ROOT_TARGET.packageName,
+          probeFile,
+          projectRoot,
+          scenarioId: scenario.id
+        });
+        const fastReactObservation = runSchedulerRootProbe({
+          mode,
+          packageName: SCHEDULER_ROOT_FAST_REACT_TARGET.packageName,
+          probeFile,
+          projectRoot,
+          scenarioId: scenario.id
+        });
+
+        schedulerObservations[mode.id].push(schedulerObservation);
+        fastReactObservations[mode.id].push(fastReactObservation);
+        fastReactComparisons[mode.id].push(
+          compareFastReactToScheduler({
+            fastReactObservation,
             mode,
-            packageName: SCHEDULER_ROOT_TARGET.packageName,
-            probeFile,
-            projectRoot,
-            scenarioId: scenario.id
+            scenarioId: scenario.id,
+            schedulerObservation
           })
         );
       }
     }
+
+    const fastReactStatusCounts =
+      countComparisonStatuses(fastReactComparisons);
 
     return {
       schemaVersion: 1,
@@ -65,14 +91,14 @@ export async function generateSchedulerRootOracle() {
       sources: SCHEDULER_ROOT_SOURCE_DOCUMENTS,
       generation: {
         method:
-          "exact scheduler npm tarball extracted into a temporary node_modules tree",
+          "exact scheduler npm tarball plus local scheduler implementation copied under an isolated alias into a temporary node_modules tree",
         lifecycleScriptsExecuted: false,
         rootManifestsOrLockfilesMutated: false,
-        probeIsolation: "one Node child process per scheduler scenario and mode",
+        probeIsolation: "one Node child process per target, scenario, and mode",
         probeTimeoutMs: PROBE_TIMEOUT_MS,
         generatedTimestampIncluded: false,
         timingNormalization:
-          "raw wall-clock timestamps are omitted; probes record logical ordering, timeout buckets, and boolean didTimeout categories"
+          "raw wall-clock timestamps are omitted; probes record logical ordering, timeout buckets, and boolean didTimeout categories; local package metadata is observed but omitted from behavior comparison"
       },
       evidenceClaims: {
         npmMetadataResolved: true,
@@ -80,20 +106,40 @@ export async function generateSchedulerRootOracle() {
         tarballIntegrityVerified: true,
         schedulerRootBehaviorProbed: true,
         nodeSetImmediateTransportObserved: true,
-        fastReactComparedToScheduler: false
+        fastReactComparedToScheduler: true,
+        fastReactBehaviorCompatible: false
       },
       conformanceClaims: {
         realSchedulerBehaviorProbed: true,
-        fastReactComparedToScheduler: false,
+        fastReactComparedToScheduler: true,
         fastReactBehaviorCompatible: false,
         fullDualRunOracleExists: false,
         compatibilityClaimed: false
       },
+      implementationComparison: {
+        afterWorker164: {
+          source:
+            "packages/scheduler/index.js and cjs/scheduler.* are copied under fast-react-scheduler for root-entry behavior comparison",
+          generatedProbe: true,
+          statusCounts: fastReactStatusCounts,
+          compatibilityClaimed: false
+        }
+      },
       schedulerTarget: SCHEDULER_ROOT_TARGET,
+      fastReactTarget: SCHEDULER_ROOT_FAST_REACT_TARGET,
       probeModes: SCHEDULER_ROOT_PROBE_MODES,
       scenarios: SCHEDULER_ROOT_SCENARIOS,
       packages: {
-        scheduler: schedulerEvidence
+        scheduler: schedulerEvidence,
+        fastReactScheduler: {
+          packageName: SCHEDULER_ROOT_FAST_REACT_TARGET.packageName,
+          sourcePackageName:
+            SCHEDULER_ROOT_FAST_REACT_TARGET.sourcePackageName,
+          version: SCHEDULER_ROOT_FAST_REACT_TARGET.version,
+          role: SCHEDULER_ROOT_FAST_REACT_TARGET.role,
+          source: "local packages/scheduler copied for behavior comparison",
+          behaviorCompatibilityClaimed: false
+        }
       },
       coverage: {
         exportKeys: true,
@@ -108,14 +154,22 @@ export async function generateSchedulerRootOracle() {
         shouldYield: true,
         requestPaint: true,
         forceFrameRate: true,
-        nodeHostCallbackTransport: true
+        nodeHostCallbackTransport: true,
+        localPackageMetadataExcludedFromBehaviorComparison: true
       },
+      implementationRisks: [
+        "The local scheduler package metadata intentionally remains workspace-specific and is excluded from root scheduler behavior comparisons.",
+        "The oracle intentionally covers the public scheduler root entrypoint only; mock scheduler, post-task scheduler, native scheduler, reconciler lane scheduling, and renderer behavior remain separate compatibility surfaces.",
+        "Timing assertions are restricted to normalized logical values and timeout buckets, not wall-clock latency."
+      ],
       timingCaveats: [
         "The checked artifact intentionally omits raw times and absolute timestamps.",
         "The didTimeout scenario blocks the event loop for at least 400ms, comfortably beyond UserBlocking's 250ms timeout and far below Normal's 5000ms timeout.",
         "Delayed callback probes assert execution order and cancellation behavior, not precise millisecond delivery."
       ],
-      schedulerObservations
+      schedulerObservations,
+      fastReactObservations,
+      fastReactComparisons
     };
   } finally {
     rmSync(tempRoot, { force: true, recursive: true });
@@ -127,6 +181,13 @@ async function fetchAndExtractScheduler({ nodeModulesRoot, tempRoot }) {
   const dist = metadata.dist ?? {};
   if (!dist.tarball) {
     throw new Error("scheduler@0.27.0 metadata did not include a tarball URL");
+  }
+
+  if (dist.integrity !== SCHEDULER_ROOT_TARGET.expectedDistIntegrity) {
+    throw new Error("scheduler@0.27.0 dist.integrity did not match evidence");
+  }
+  if (dist.shasum !== SCHEDULER_ROOT_TARGET.expectedDistShasum) {
+    throw new Error("scheduler@0.27.0 dist.shasum did not match evidence");
   }
 
   const tarballBytes = await fetchBytes(dist.tarball);
@@ -178,6 +239,19 @@ async function fetchAndExtractScheduler({ nodeModulesRoot, tempRoot }) {
       exports: packageJson.exports ?? null
     }
   };
+}
+
+function copyFastReactSchedulerPackage({ nodeModulesRoot }) {
+  const sourceRoot = new URL("../../../packages/scheduler", import.meta.url);
+  const packageRoot = join(
+    nodeModulesRoot,
+    SCHEDULER_ROOT_FAST_REACT_TARGET.packageName
+  );
+  cpSync(sourceRoot, packageRoot, {
+    recursive: true,
+    dereference: true,
+    filter: (source) => basename(source) !== "node_modules"
+  });
 }
 
 function writeProbeFile(projectRoot) {
@@ -257,6 +331,154 @@ function normalizePathFragments(message) {
   return message
     .replace(/file:\/\/[^\s)]+/gu, "file://<path>")
     .replace(/(?:\/private\/var|\/var\/folders|\/tmp)\/[^\s)]+/gu, "<path>");
+}
+
+function compareFastReactToScheduler({
+  fastReactObservation,
+  mode,
+  scenarioId,
+  schedulerObservation
+}) {
+  const schedulerComparableResult = comparableProbeResult(
+    schedulerObservation.result
+  );
+  const fastReactComparableResult = comparableProbeResult(
+    fastReactObservation.result
+  );
+  const firstDifferencePath = findFirstDifferencePath(
+    schedulerComparableResult,
+    fastReactComparableResult
+  );
+  const equal = firstDifferencePath === null;
+  const fastReactUnsupported = containsFastReactUnimplemented(
+    fastReactObservation.result
+  );
+
+  return {
+    scenarioId,
+    nodeEnv: mode.nodeEnv,
+    condition: mode.condition,
+    status: fastReactUnsupported
+      ? "unsupported-placeholder"
+      : equal
+        ? "matched-but-compatibility-not-claimed"
+        : "known-mismatch",
+    compatibilityClaimed: false,
+    firstDifferencePath,
+    schedulerResultStatus: schedulerObservation.result.result?.status ?? null,
+    fastReactResultStatus: fastReactObservation.result.result?.status ?? null,
+    reason: fastReactUnsupported
+      ? "Fast React currently throws structured placeholder errors for this scheduler root behavior."
+      : equal
+        ? "Normalized behavior observations matched, but this oracle does not claim broad Fast React scheduler compatibility."
+        : "Fast React normalized observation differs from the scheduler@0.27.0 root oracle."
+  };
+}
+
+function countComparisonStatuses(comparisonsByMode) {
+  const counts = {};
+  for (const comparisons of Object.values(comparisonsByMode)) {
+    for (const comparison of comparisons) {
+      counts[comparison.status] = (counts[comparison.status] ?? 0) + 1;
+    }
+  }
+  return counts;
+}
+
+function comparableProbeResult(result) {
+  const { targetPackage: _targetPackage, ...behaviorResult } = result;
+  if (behaviorResult.result?.value?.packageJson) {
+    const { packageJson: _packageJson, ...value } = behaviorResult.result.value;
+    behaviorResult.result = {
+      ...behaviorResult.result,
+      value
+    };
+  }
+  return behaviorResult;
+}
+
+function containsFastReactUnimplemented(value) {
+  if (Array.isArray(value)) {
+    return value.some(containsFastReactUnimplemented);
+  }
+
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  if (
+    value.name === "FastReactSchedulerUnimplementedError" ||
+    value.name === "FastReactUnimplementedError" ||
+    value.code === "FAST_REACT_UNIMPLEMENTED"
+  ) {
+    return true;
+  }
+
+  return Object.values(value).some(containsFastReactUnimplemented);
+}
+
+function findFirstDifferencePath(left, right, path = "$") {
+  if (Object.is(left, right)) {
+    return null;
+  }
+
+  if (
+    left === null ||
+    right === null ||
+    typeof left !== "object" ||
+    typeof right !== "object"
+  ) {
+    return path;
+  }
+
+  const leftIsArray = Array.isArray(left);
+  const rightIsArray = Array.isArray(right);
+  if (leftIsArray !== rightIsArray) {
+    return path;
+  }
+
+  if (leftIsArray) {
+    if (left.length !== right.length) {
+      return `${path}.length`;
+    }
+
+    for (let index = 0; index < left.length; index += 1) {
+      const childPath = findFirstDifferencePath(
+        left[index],
+        right[index],
+        `${path}[${index}]`
+      );
+      if (childPath) {
+        return childPath;
+      }
+    }
+    return null;
+  }
+
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) {
+    return `${path}.keys`;
+  }
+
+  for (let index = 0; index < leftKeys.length; index += 1) {
+    if (leftKeys[index] !== rightKeys[index]) {
+      return `${path}.keys[${index}]`;
+    }
+  }
+
+  for (const key of leftKeys) {
+    const childPath = findFirstDifferencePath(
+      left[key],
+      right[key],
+      `${path}.${key}`
+    );
+    if (childPath) {
+      return childPath;
+    }
+  }
+
+  return null;
 }
 
 function fetchPackageMetadata(target) {
