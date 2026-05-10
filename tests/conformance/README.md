@@ -34,6 +34,12 @@ Checked-in generated artifact:
 - `oracles/react-19.2.6-context-object-oracle.json`
 - `oracles/react-19.2.6-component-class-oracle.json`
 
+Focused gate notes:
+
+- `gates/private-root-output-gate.md` records the current private React DOM
+  root-output rows that are admitted for diagnostics and the public facade rows
+  that remain blocked.
+
 Commands:
 
 ```sh
