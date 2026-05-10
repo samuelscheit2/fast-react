@@ -1035,6 +1035,173 @@ test("private input/change controlled restore execution mutates only an admitted
   componentTree.detachHostInstanceToken(eventDispatch.token);
 });
 
+test("private input/change controlled restore execution supports checkbox fake-DOM target", () => {
+  const gate =
+    controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({
+      requestIdPrefix: "controlled-oracle-checkbox-change-execution"
+    });
+  const eventDispatch = createPrivateControlledEventDispatch({
+    domEventName: "click",
+    latestProps: {
+      type: "checkbox",
+      checked: false,
+      onChange() {}
+    },
+    nodeName: "INPUT"
+  });
+  const inputPreflight =
+    pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+      eventDispatch.dispatchRecord
+    );
+  const intent = gate.recordPostEventRestoreIntentFromEventLatestProps(
+    eventDispatch.dispatchRecord,
+    {
+      explicitAdmission: true,
+      queueKind:
+        "deterministic-event-latest-props-post-event-restore-queue",
+      queueId: "oracle-checkbox-change-execution-restore",
+      eventName: "click",
+      targetKind: "controlled-input-post-event-restore-queue"
+    }
+  );
+  const writePreflight = gate.preflightRestoreQueueWrites([intent], {
+    explicitAdmission: true,
+    queueKind:
+      "deterministic-controlled-input-post-event-restore-queue-write-preflight",
+    queueId: "oracle-checkbox-change-execution-write-preflight",
+    targetKind: "controlled-input-post-event-restore-queue-write-preflight"
+  });
+  const bridge = gate.recordInputChangeEventControlledRestoreBridge(
+    inputPreflight,
+    intent,
+    writePreflight,
+    {
+      explicitAdmission: true,
+      queueKind:
+        "deterministic-input-change-event-controlled-restore-bridge",
+      queueId: "oracle-checkbox-change-execution-bridge",
+      targetKind: "controlled-input-change-event-restore-queue-bridge"
+    }
+  );
+  const writeExecution = gate.recordRestoreQueueWriteExecution(
+    writePreflight,
+    {
+      explicitAdmission: true,
+      queueKind:
+        "deterministic-controlled-input-post-event-restore-queue-write-execution",
+      queueId: "oracle-checkbox-change-execution-write",
+      targetKind: "controlled-input-post-event-restore-queue-write-execution"
+    }
+  );
+  const flushBlocker = gate.recordRestoreQueueFlushBlocker(writePreflight, {
+    explicitAdmission: true,
+    queueKind:
+      "deterministic-controlled-input-post-event-restore-queue-flush-blocker",
+    queueId: "oracle-checkbox-change-execution-flush",
+    targetKind: "controlled-input-post-event-restore-queue-flush-blocker"
+  });
+  const wrapperIntent = gate.recordRestoreQueueWrapperMutationIntent(
+    writeExecution,
+    flushBlocker,
+    {
+      explicitAdmission: true,
+      queueKind:
+        "deterministic-controlled-input-post-event-restore-wrapper-mutation-intent",
+      queueId: "oracle-checkbox-change-execution-wrapper",
+      targetKind:
+        "controlled-input-post-event-restore-wrapper-mutation-intent"
+    }
+  );
+  const fakeTarget = createPrivateControlledInputFakeDomTarget({
+    checked: true
+  });
+  const execution = gate.recordInputChangeEventControlledRestoreExecution(
+    inputPreflight,
+    bridge,
+    writeExecution,
+    flushBlocker,
+    wrapperIntent,
+    {
+      explicitAdmission: true,
+      queueKind:
+        "deterministic-input-change-event-controlled-restore-execution",
+      queueId: "oracle-checkbox-change-execution",
+      targetKind: "controlled-input-change-event-restore-queue-execution",
+      fakeDomTarget: fakeTarget
+    }
+  );
+
+  assert.equal(fakeTarget.checked, false);
+  assert.equal(execution.acceptedRestoreKinds[0], "input-checkbox-checked");
+  assert.deepEqual(
+    execution.inputChangeRestoreExecutionRows.map((row) => ({
+      acceptedRestoreKind: row.acceptedRestoreKind,
+      targetField: row.targetField,
+      valueRestoreExecuted: row.valueRestoreExecuted,
+      checkedRestoreExecuted: row.checkedRestoreExecuted,
+      beforeValueSnapshot: row.beforeValueSnapshot,
+      nextValueSnapshot: row.nextValueSnapshot,
+      afterValueSnapshot: row.afterValueSnapshot,
+      hostWrapperOperation: row.hostWrapperOperation,
+      wrapperMutationKind: row.wrapperMutationKind,
+      intendedUpdateKind: row.intendedUpdateKind,
+      restoreQueueWritten: row.restoreQueueWritten,
+      restoreQueueFlushed: row.restoreQueueFlushed,
+      hostWrapperInvoked: row.hostWrapperInvoked,
+      wrapperWritePerformed: row.wrapperWritePerformed,
+      fakeDomInputMutated: row.fakeDomInputMutated,
+      browserInputMutated: row.browserInputMutated,
+      compatibilityClaimed: row.compatibilityClaimed
+    })),
+    [
+      {
+        acceptedRestoreKind: "input-checkbox-checked",
+        targetField: "checked",
+        valueRestoreExecuted: false,
+        checkedRestoreExecuted: true,
+        beforeValueSnapshot: true,
+        nextValueSnapshot: false,
+        afterValueSnapshot: false,
+        hostWrapperOperation: "input-checked-sync",
+        wrapperMutationKind: "checked-property-sync",
+        intendedUpdateKind: "checked",
+        restoreQueueWritten: true,
+        restoreQueueFlushed: true,
+        hostWrapperInvoked: true,
+        wrapperWritePerformed: true,
+        fakeDomInputMutated: true,
+        browserInputMutated: false,
+        compatibilityClaimed: false
+      }
+    ]
+  );
+  assert.equal(
+    execution.wrapperMutationExecutionEvidence.targetField,
+    "checked"
+  );
+  assert.equal(execution.sideEffects.privateRestoreQueueWritten, true);
+  assert.equal(execution.sideEffects.privateRestoreQueueFlushed, true);
+  assert.equal(execution.sideEffects.restoreQueueWritten, false);
+  assert.equal(execution.sideEffects.restoreQueueFlushed, false);
+  assert.equal(execution.sideEffects.browserInputMutated, false);
+  assert.equal(execution.sideEffects.fakeDomInputMutated, true);
+  assert.equal(
+    execution.publicControlledBehaviorBoundary.compatibilityClaimed,
+    false
+  );
+  assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
+
+  const summary =
+    controlledRestoreQueue.describeControlledInputPostEventRestoreQueueGate();
+  assert.equal(
+    summary.inputChangeEventControlledRestoreExecution
+      .acceptsCheckboxCheckedFakeDomPath,
+    true
+  );
+
+  componentTree.detachHostInstanceToken(eventDispatch.token);
+});
+
 test("private controlled restore queue write execution records deterministic mutation intent", () => {
   const gate =
     controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({
