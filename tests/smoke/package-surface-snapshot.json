@@ -1157,6 +1157,20 @@
               "functionName": "create",
               "length": 2
             },
+            "privateRuntimeFacadeSymbols": {
+              "create": [
+                "fast.react_test_renderer.root_request_bridge"
+              ],
+              "renderer": [
+                "fast.react_test_renderer.private_test_instance_wrapper_record"
+              ],
+              "toJSON": [
+                "fast.react_test_renderer.private_tojson_serialization_facade"
+              ],
+              "toTree": [
+                "fast.react_test_renderer.private_totree_host_output_metadata"
+              ]
+            },
             "schedulerProbe": "_Scheduler.unstable_scheduleCallback",
             "rendererKeySet": "reactTestRenderer.renderer",
             "rendererSchedulerProbe": "_Scheduler.unstable_scheduleCallback",
@@ -1232,6 +1246,20 @@
               "functionName": "create",
               "length": 2
             },
+            "privateRuntimeFacadeSymbols": {
+              "create": [
+                "fast.react_test_renderer.root_request_bridge"
+              ],
+              "renderer": [
+                "fast.react_test_renderer.private_test_instance_wrapper_record"
+              ],
+              "toJSON": [
+                "fast.react_test_renderer.private_tojson_serialization_facade"
+              ],
+              "toTree": [
+                "fast.react_test_renderer.private_totree_host_output_metadata"
+              ]
+            },
             "schedulerProbe": "_Scheduler.unstable_scheduleCallback",
             "rendererKeySet": "reactTestRenderer.renderer",
             "rendererSchedulerProbe": "_Scheduler.unstable_scheduleCallback",
@@ -1304,6 +1332,20 @@
             "createFunction": {
               "functionName": "create",
               "length": 2
+            },
+            "privateRuntimeFacadeSymbols": {
+              "create": [
+                "fast.react_test_renderer.root_request_bridge"
+              ],
+              "renderer": [
+                "fast.react_test_renderer.private_test_instance_wrapper_record"
+              ],
+              "toJSON": [
+                "fast.react_test_renderer.private_tojson_serialization_facade"
+              ],
+              "toTree": [
+                "fast.react_test_renderer.private_totree_host_output_metadata"
+              ]
             },
             "schedulerProbe": "_Scheduler.unstable_scheduleCallback",
             "rendererKeySet": "reactTestRenderer.renderer",

@@ -26,11 +26,12 @@ const snapshot = JSON.parse(await readFile(snapshotPath, 'utf8'));
 const resolverFilePattern = /\.(?:cjs|js|json|mjs|node)$/;
 const declarationFilePattern = /\.(?:d\.ts|d\.mts|d\.cts)$/;
 const privateImplementationFileIgnorePatterns = [/^test\//u];
-const allowedRuntimeMetadataKeys = new Set([
-  '__FAST_REACT_ENTRYPOINT__',
+const runtimeMetadataKeys = [
   '__FAST_REACT_PLACEHOLDER__',
+  '__FAST_REACT_ENTRYPOINT__',
   'compatibilityTarget'
-]);
+];
+const allowedRuntimeMetadataKeys = new Set(runtimeMetadataKeys);
 const acceptedNativeDiagnosticRuntimeKeys = new Set([
   'createNativeRootBridgeRequestShapeGate',
   'nativeRootBridgeRequestShape'
@@ -268,6 +269,104 @@ function expectedKeysFor(entry) {
   const keys = snapshot.keySets[entry.keySet];
   assert.notEqual(keys, undefined, `${entry.file} references a known key set`);
   return keys;
+}
+
+function assertRuntimeOwnStringKeys(moduleExports, entry, label) {
+  if (
+    moduleExports === null ||
+    (typeof moduleExports !== 'object' && typeof moduleExports !== 'function')
+  ) {
+    return;
+  }
+
+  const actualOwnStringKeys = Reflect.ownKeys(moduleExports).filter(
+    (key) => typeof key === 'string'
+  );
+
+  if (typeof moduleExports === 'function') {
+    assertNoPrivateDiagnosticRuntimeExports(moduleExports, label);
+    return;
+  }
+
+  const expectedOwnStringKeys = [...expectedKeysFor(entry)];
+  if (entry.metadata.placeholder !== false) {
+    expectedOwnStringKeys.push(...runtimeMetadataKeys);
+  }
+
+  assert.deepEqual(
+    actualOwnStringKeys,
+    expectedOwnStringKeys,
+    `${label} own string keys`
+  );
+}
+
+function assertPrivateRuntimeFacadeSymbols(
+  target,
+  expectedSymbols = [],
+  label
+) {
+  assert.deepEqual(
+    [...expectedSymbols].sort(),
+    expectedSymbols,
+    `${label} private runtime facade symbols snapshot must stay sorted`
+  );
+  assert.equal(
+    new Set(expectedSymbols).size,
+    expectedSymbols.length,
+    `${label} private runtime facade symbols snapshot must stay unique`
+  );
+
+  const actualSymbols = Reflect.ownKeys(target).filter(
+    (key) => typeof key === 'symbol'
+  );
+  assert.deepEqual(
+    actualSymbols.map((symbol) => symbol.description).sort(),
+    expectedSymbols,
+    `${label} private runtime facade symbols`
+  );
+
+  for (const symbolDescription of expectedSymbols) {
+    assert.equal(
+      typeof symbolDescription,
+      'string',
+      `${label} private runtime facade symbol description`
+    );
+    assert.equal(
+      Object.keys(target).includes(symbolDescription),
+      false,
+      `${label} must not expose private runtime facade ${symbolDescription} as a public key`
+    );
+
+    const descriptor = Object.getOwnPropertyDescriptor(
+      target,
+      Symbol.for(symbolDescription)
+    );
+    assert.notEqual(
+      descriptor,
+      undefined,
+      `${label} private runtime facade ${symbolDescription} descriptor`
+    );
+    assert.equal(
+      descriptor.enumerable,
+      false,
+      `${label} private runtime facade ${symbolDescription} enumerable`
+    );
+    assert.equal(
+      descriptor.configurable,
+      false,
+      `${label} private runtime facade ${symbolDescription} configurable`
+    );
+    assert.equal(
+      descriptor.writable,
+      false,
+      `${label} private runtime facade ${symbolDescription} writable`
+    );
+    assert.notEqual(
+      descriptor.value,
+      undefined,
+      `${label} private runtime facade ${symbolDescription} value`
+    );
+  }
 }
 
 function assertPlaceholderMetadata(moduleExports, expected, label) {
@@ -682,6 +781,12 @@ function assertReactTestRendererRootBehavior(moduleExports, entry, label) {
     expectedRoot.createFunction.length,
     `${label}.create length`
   );
+  assertNoPrivateDiagnosticRuntimeExports(moduleExports.create, `${label}.create`);
+  assertPrivateRuntimeFacadeSymbols(
+    moduleExports.create,
+    expectedRoot.privateRuntimeFacadeSymbols?.create,
+    `${label}.create`
+  );
   assertReactTestRendererSchedulerPlaceholder(
     moduleExports._Scheduler,
     entry,
@@ -696,6 +801,11 @@ function assertReactTestRendererRootBehavior(moduleExports, entry, label) {
     `${label}.create() renderer keys`
   );
   assertNoPrivateDiagnosticRuntimeExports(renderer, `${label}.create()`);
+  assertPrivateRuntimeFacadeSymbols(
+    renderer,
+    expectedRoot.privateRuntimeFacadeSymbols?.renderer,
+    `${label}.create()`
+  );
   assertReactTestRendererSchedulerPlaceholder(
     renderer._Scheduler,
     entry,
@@ -740,6 +850,10 @@ function assertReactTestRendererRootBehavior(moduleExports, entry, label) {
 
   for (const expectedFunction of expectedRoot.rendererFunctions) {
     const rendererFunction = renderer[expectedFunction.property];
+    assertNoPrivateDiagnosticRuntimeExports(
+      rendererFunction,
+      `${label}.${expectedFunction.property}`
+    );
     assert.equal(
       rendererFunction.name,
       expectedFunction.functionName,
@@ -768,6 +882,17 @@ function assertReactTestRendererRootBehavior(moduleExports, entry, label) {
       `${label}.${expectedFunction.property} should remain unsupported`
     );
   }
+
+  assertPrivateRuntimeFacadeSymbols(
+    renderer.toJSON,
+    expectedRoot.privateRuntimeFacadeSymbols?.toJSON,
+    `${label}.create().toJSON`
+  );
+  assertPrivateRuntimeFacadeSymbols(
+    renderer.toTree,
+    expectedRoot.privateRuntimeFacadeSymbols?.toTree,
+    `${label}.create().toTree`
+  );
 }
 
 function assertReactTestRendererShallowBehavior(moduleExports, entry, label) {
@@ -1012,6 +1137,7 @@ async function assertRuntimeEntrypoint(packageRoot, entry, packageName) {
 
   const moduleExports = loadFresh(modulePath);
   assert.deepEqual(Object.keys(moduleExports), expectedKeysFor(entry), label);
+  assertRuntimeOwnStringKeys(moduleExports, entry, label);
   assertNoPrivateDiagnosticRuntimeExports(moduleExports, label);
   assertPlaceholderMetadata(moduleExports, entry.metadata, label);
   assertRuntimeVersion(moduleExports, entry, label);
