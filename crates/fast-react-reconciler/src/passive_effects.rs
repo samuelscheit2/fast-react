@@ -17,6 +17,7 @@ use fast_react_core::{
 };
 use fast_react_host_config::HostTypes;
 
+use crate::function_component::FunctionComponentHookRenderPhase;
 use crate::root_commit::{
     FunctionComponentCommittedPassiveEffectsSnapshot,
     FunctionComponentDeletedSubtreePassiveEffectsSnapshot,
@@ -2149,6 +2150,31 @@ pub(crate) enum PassiveEffectsFlushError {
         phase: PendingPassiveEffectPhase,
         order: PendingPassiveEffectOrder,
     },
+    CommittedPassiveCallbackInvocationMissingHandoff {
+        root: FiberRootId,
+    },
+    CommittedPassiveCallbackInvocationFiberCountMismatch {
+        root: FiberRootId,
+        expected: usize,
+        actual: usize,
+    },
+    CommittedPassiveCallbackInvocationStaleFiber {
+        root: FiberRootId,
+        finished_work: FiberId,
+        fiber: FiberId,
+    },
+    CommittedPassiveCallbackInvocationWrongRenderPhase {
+        root: FiberRootId,
+        fiber: FiberId,
+        expected: FunctionComponentHookRenderPhase,
+        actual: FunctionComponentHookRenderPhase,
+    },
+    CommittedPassiveCallbackInvocationWrongEffectPhase {
+        root: FiberRootId,
+        fiber: FiberId,
+        phase: PendingPassiveEffectPhase,
+        order: PendingPassiveEffectOrder,
+    },
 }
 
 impl Display for PassiveEffectsFlushError {
@@ -2307,6 +2333,60 @@ impl Display for PassiveEffectsFlushError {
                 fiber.slot().get(),
                 order.sequence()
             ),
+            Self::CommittedPassiveCallbackInvocationMissingHandoff { root } => write!(
+                formatter,
+                "root {} committed passive callback invocation requires a pending passive commit handoff",
+                root.raw()
+            ),
+            Self::CommittedPassiveCallbackInvocationFiberCountMismatch {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} committed passive callback invocation requires {} committed function component fiber, found {}",
+                root.raw(),
+                expected,
+                actual
+            ),
+            Self::CommittedPassiveCallbackInvocationStaleFiber {
+                root,
+                finished_work,
+                fiber,
+            } => write!(
+                formatter,
+                "root {} committed passive callback invocation rejected stale function component fiber slot {} outside finished work fiber slot {}",
+                root.raw(),
+                fiber.slot().get(),
+                finished_work.slot().get()
+            ),
+            Self::CommittedPassiveCallbackInvocationWrongRenderPhase {
+                root,
+                fiber,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} committed passive callback invocation expected {:?} function component fiber slot {}, found {:?}",
+                root.raw(),
+                expected,
+                fiber.slot().get(),
+                actual
+            ),
+            Self::CommittedPassiveCallbackInvocationWrongEffectPhase {
+                root,
+                fiber,
+                phase,
+                order,
+            } => write!(
+                formatter,
+                "root {} committed passive callback invocation rejected {:?} effect record for fiber slot {} with pending {:?} order {}",
+                root.raw(),
+                phase,
+                fiber.slot().get(),
+                order.phase(),
+                order.sequence()
+            ),
         }
     }
 }
@@ -2327,7 +2407,12 @@ impl Error for PassiveEffectsFlushError {
             | Self::PendingPassiveEffectHandoffRecordMismatch { .. }
             | Self::CommittedPassiveEffectRecordCountMismatch { .. }
             | Self::CommittedPassiveEffectDuplicateOrder { .. }
-            | Self::CommittedPassiveEffectRecordMismatch { .. } => None,
+            | Self::CommittedPassiveEffectRecordMismatch { .. }
+            | Self::CommittedPassiveCallbackInvocationMissingHandoff { .. }
+            | Self::CommittedPassiveCallbackInvocationFiberCountMismatch { .. }
+            | Self::CommittedPassiveCallbackInvocationStaleFiber { .. }
+            | Self::CommittedPassiveCallbackInvocationWrongRenderPhase { .. }
+            | Self::CommittedPassiveCallbackInvocationWrongEffectPhase { .. } => None,
         }
     }
 }
@@ -2509,6 +2594,36 @@ pub(crate) fn execute_passive_effect_callbacks_after_commit_from_committed_fiber
     commit: &HostRootCommitRecord,
     control: &mut impl PassiveEffectCallbackInvocationTestControl,
 ) -> Result<PassiveEffectCallbackInvocationGateSnapshot, PassiveEffectsFlushError> {
+    execute_update_passive_effect_callbacks_after_commit_from_accepted_committed_function_component_under_test_control_for_canary(
+        store,
+        commit,
+        control,
+    )
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private accepted committed function-component passive callback execution gate for deterministic canaries"
+)]
+pub(crate) fn execute_update_passive_effect_callbacks_after_commit_from_accepted_committed_function_component_under_test_control_for_canary<
+    H: HostTypes,
+>(
+    store: &mut FiberRootStore<H>,
+    commit: &HostRootCommitRecord,
+    control: &mut impl PassiveEffectCallbackInvocationTestControl,
+) -> Result<PassiveEffectCallbackInvocationGateSnapshot, PassiveEffectsFlushError> {
+    let handoff = commit.pending_passive_handoff().ok_or(
+        PassiveEffectsFlushError::CommittedPassiveCallbackInvocationMissingHandoff {
+            root: commit.root(),
+        },
+    )?;
+
+    validate_update_passive_callback_invocation_committed_fiber_gate(
+        store,
+        handoff,
+        commit.function_component_committed_passive_effects(),
+    )?;
+
     let flush = flush_passive_effects_after_commit_inner(
         store,
         commit,
@@ -2753,8 +2868,8 @@ fn validate_pending_passive_handoff(
         });
     }
 
-    let actual_unmounts = pending_passive.passive_unmounts().len();
-    let actual_mounts = pending_passive.passive_mounts().len();
+    let actual_unmounts = pending_passive.passive_unmount_count();
+    let actual_mounts = pending_passive.passive_mount_count();
     if actual_unmounts != handoff.pending_unmount_count()
         || actual_mounts != handoff.pending_mount_count()
     {
@@ -2770,6 +2885,81 @@ fn validate_pending_passive_handoff(
     }
 
     Ok(())
+}
+
+fn validate_update_passive_callback_invocation_committed_fiber_gate<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    handoff: PendingPassiveCommitHandoff,
+    committed_effects: &FunctionComponentCommittedPassiveEffectsSnapshot,
+) -> Result<(), PassiveEffectsFlushError> {
+    if committed_effects.fiber_count() != 1 {
+        return Err(
+            PassiveEffectsFlushError::CommittedPassiveCallbackInvocationFiberCountMismatch {
+                root: handoff.root(),
+                expected: 1,
+                actual: committed_effects.fiber_count(),
+            },
+        );
+    }
+
+    let fiber_record = &committed_effects.fibers()[0];
+    if fiber_record.phase() != FunctionComponentHookRenderPhase::Update {
+        return Err(
+            PassiveEffectsFlushError::CommittedPassiveCallbackInvocationWrongRenderPhase {
+                root: handoff.root(),
+                fiber: fiber_record.fiber(),
+                expected: FunctionComponentHookRenderPhase::Update,
+                actual: fiber_record.phase(),
+            },
+        );
+    }
+
+    if !committed_subtree_contains_fiber(store, handoff.finished_work(), fiber_record.fiber())? {
+        return Err(
+            PassiveEffectsFlushError::CommittedPassiveCallbackInvocationStaleFiber {
+                root: handoff.root(),
+                finished_work: handoff.finished_work(),
+                fiber: fiber_record.fiber(),
+            },
+        );
+    }
+
+    for record in fiber_record.records() {
+        if record.phase() != record.order().phase() {
+            return Err(
+                PassiveEffectsFlushError::CommittedPassiveCallbackInvocationWrongEffectPhase {
+                    root: handoff.root(),
+                    fiber: record.fiber(),
+                    phase: record.phase(),
+                    order: record.order(),
+                },
+            );
+        }
+    }
+
+    Ok(())
+}
+
+fn committed_subtree_contains_fiber<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    fiber: FiberId,
+    accepted: FiberId,
+) -> Result<bool, PassiveEffectsFlushError> {
+    if fiber == accepted {
+        return Ok(true);
+    }
+
+    let children = store
+        .fiber_arena()
+        .child_ids(fiber)
+        .map_err(|error| PassiveEffectsFlushError::FiberRootStore(error.into()))?;
+    for child in children {
+        if committed_subtree_contains_fiber(store, child, accepted)? {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
 }
 
 fn validate_function_component_passive_handoffs(
@@ -4868,7 +5058,7 @@ mod tests {
             .with_create_result(callback(1057), Ok(Some(callback(1059))));
 
         let gate =
-            execute_passive_effect_callbacks_after_commit_from_committed_fiber_effects_under_test_control_for_canary(
+            execute_update_passive_effect_callbacks_after_commit_from_accepted_committed_function_component_under_test_control_for_canary(
                 &mut store,
                 &commit,
                 &mut control,
@@ -4961,6 +5151,259 @@ mod tests {
                 .pending_passive()
                 .is_empty()
         );
+        assert_eq!(
+            store.scheduler_bridge().callback_requests().len(),
+            callback_request_count
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn passive_effects_committed_execution_gate_rejects_missing_handoff_before_callbacks() {
+        let (mut store, root_id, host) = root_store();
+        update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(1_060),
+            None,
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let mut control = TestPassiveEffectCallbackControl::default()
+            .with_destroy_result(callback(1_061), Ok(()))
+            .with_create_result(callback(1_062), Ok(Some(callback(1_063))));
+
+        let error =
+            execute_passive_effect_callbacks_after_commit_from_committed_fiber_effects_under_test_control_for_canary(
+                &mut store,
+                &commit,
+                &mut control,
+            )
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            PassiveEffectsFlushError::CommittedPassiveCallbackInvocationMissingHandoff { root }
+                if root == root_id
+        ));
+        assert!(control.calls().is_empty());
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .scheduling()
+                .pending_passive()
+                .is_empty()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn passive_effects_committed_execution_gate_rejects_stale_fiber_before_callbacks() {
+        let (mut store, root_id, host) = root_store();
+        let previous_current = store.root(root_id).unwrap().current();
+        let component = FiberTypeHandle::from_raw(1_070);
+        let current_function = append_function_component_child(
+            &mut store,
+            previous_current,
+            PropsHandle::from_raw(1_071),
+            component,
+        );
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        hook_store
+            .create_current_effect_metadata(
+                store.fiber_arena_mut(),
+                current_function,
+                FunctionComponentEffectPhase::Passive,
+                callback(1_072),
+                deps(1_073),
+                Some(callback(1_074)),
+            )
+            .unwrap();
+
+        update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(1_075),
+            None,
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let finished_work = render.finished_work();
+        let mode = store.fiber_arena().get(finished_work).unwrap().mode();
+        let stale_finished_function = create_function_component_fiber(
+            &mut store,
+            mode,
+            PropsHandle::from_raw(1_076),
+            component,
+        );
+        store
+            .fiber_arena_mut()
+            .link_alternates(current_function, stale_finished_function)
+            .unwrap();
+        let state = hook_store
+            .prepare_render_state(store.fiber_arena(), stale_finished_function)
+            .unwrap();
+        assert_eq!(state.phase(), FunctionComponentHookRenderPhase::Update);
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+        hook_store
+            .update_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(1_077),
+                deps(1_078),
+                FunctionComponentEffectDependencyStatus::Changed,
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(cursor).unwrap();
+        let queued = queue_function_component_pending_passive_effects(
+            &mut store,
+            root_id,
+            &hook_store,
+            state,
+            Lanes::DEFAULT,
+        )
+        .unwrap();
+
+        let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+        commit
+            .record_function_component_committed_passive_effects_for_canary(std::slice::from_ref(
+                &queued,
+            ))
+            .unwrap();
+        let callback_request_count = store.scheduler_bridge().callback_requests().len();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+        let mut control = TestPassiveEffectCallbackControl::default()
+            .with_destroy_result(callback(1_074), Ok(()))
+            .with_create_result(callback(1_077), Ok(Some(callback(1_079))));
+
+        let error =
+            execute_update_passive_effect_callbacks_after_commit_from_accepted_committed_function_component_under_test_control_for_canary(
+                &mut store,
+                &commit,
+                &mut control,
+            )
+            .unwrap_err();
+        let pending_passive = store.root(root_id).unwrap().scheduling().pending_passive();
+
+        assert!(matches!(
+            error,
+            PassiveEffectsFlushError::CommittedPassiveCallbackInvocationStaleFiber {
+                root,
+                finished_work: error_finished_work,
+                fiber,
+            } if root == root_id
+                && error_finished_work == finished_work
+                && fiber == stale_finished_function
+        ));
+        assert!(control.calls().is_empty());
+        assert_eq!(pending_passive.root(), Some(root_id));
+        assert_eq!(pending_passive.finished_work(), Some(finished_work));
+        assert!(pending_passive.has_commit_handoff());
+        assert_eq!(pending_passive.passive_unmount_count(), 1);
+        assert_eq!(pending_passive.passive_mount_count(), 1);
+        assert_eq!(pending_passive.pending_record_count(), 2);
+        assert_eq!(
+            store.scheduler_bridge().callback_requests().len(),
+            callback_request_count
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn passive_effects_committed_execution_gate_rejects_mount_phase_before_callbacks() {
+        let (mut store, root_id, host) = root_store();
+        update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(1_080),
+            None,
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let finished_work = render.finished_work();
+        let function_fiber = append_function_component_child(
+            &mut store,
+            finished_work,
+            PropsHandle::from_raw(1_081),
+            FiberTypeHandle::from_raw(1_082),
+        );
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let state = hook_store
+            .prepare_render_state(store.fiber_arena(), function_fiber)
+            .unwrap();
+        assert_eq!(state.phase(), FunctionComponentHookRenderPhase::Mount);
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+        hook_store
+            .mount_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(1_083),
+                deps(1_084),
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(cursor).unwrap();
+        let queued = queue_function_component_pending_passive_effects(
+            &mut store,
+            root_id,
+            &hook_store,
+            state,
+            Lanes::DEFAULT,
+        )
+        .unwrap();
+        let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+        let committed = commit
+            .record_function_component_committed_passive_effects_for_canary(std::slice::from_ref(
+                &queued,
+            ))
+            .unwrap()
+            .clone();
+        assert_eq!(committed.fiber_count(), 1);
+        assert_eq!(
+            committed.fibers()[0].phase(),
+            FunctionComponentHookRenderPhase::Mount
+        );
+        let callback_request_count = store.scheduler_bridge().callback_requests().len();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+        let mut control = TestPassiveEffectCallbackControl::default()
+            .with_create_result(callback(1_083), Ok(Some(callback(1_085))));
+
+        let error =
+            execute_update_passive_effect_callbacks_after_commit_from_accepted_committed_function_component_under_test_control_for_canary(
+                &mut store,
+                &commit,
+                &mut control,
+            )
+            .unwrap_err();
+        let pending_passive = store.root(root_id).unwrap().scheduling().pending_passive();
+
+        assert!(matches!(
+            error,
+            PassiveEffectsFlushError::CommittedPassiveCallbackInvocationWrongRenderPhase {
+                root,
+                fiber,
+                expected: FunctionComponentHookRenderPhase::Update,
+                actual: FunctionComponentHookRenderPhase::Mount,
+            } if root == root_id && fiber == function_fiber
+        ));
+        assert!(control.calls().is_empty());
+        assert_eq!(pending_passive.root(), Some(root_id));
+        assert_eq!(pending_passive.finished_work(), Some(finished_work));
+        assert!(pending_passive.has_commit_handoff());
+        assert_eq!(pending_passive.passive_unmount_count(), 0);
+        assert_eq!(pending_passive.passive_mount_count(), 1);
+        assert_eq!(pending_passive.pending_record_count(), 1);
         assert_eq!(
             store.scheduler_bridge().callback_requests().len(),
             callback_request_count

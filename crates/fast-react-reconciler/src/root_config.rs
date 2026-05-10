@@ -753,8 +753,23 @@ impl PendingPassiveState {
     }
 
     #[must_use]
+    pub fn passive_unmount_count(&self) -> usize {
+        self.passive_unmounts.len()
+    }
+
+    #[must_use]
     pub fn passive_mounts(&self) -> &[PendingPassiveEffectRecord] {
         &self.passive_mounts
+    }
+
+    #[must_use]
+    pub fn passive_mount_count(&self) -> usize {
+        self.passive_mounts.len()
+    }
+
+    #[must_use]
+    pub fn pending_record_count(&self) -> usize {
+        self.passive_unmount_count() + self.passive_mount_count()
     }
 
     pub fn queue_unmount(
@@ -1023,6 +1038,9 @@ mod tests {
         assert_eq!(state.lanes(), Lanes::NO);
         assert!(state.passive_unmounts().is_empty());
         assert!(state.passive_mounts().is_empty());
+        assert_eq!(state.passive_unmount_count(), 0);
+        assert_eq!(state.passive_mount_count(), 0);
+        assert_eq!(state.pending_record_count(), 0);
         assert_eq!(state.flush_ordered_records().count(), 0);
         assert_eq!(state.queue_mount(fiber_id(0), Lanes::DEFAULT), None);
         assert_eq!(
@@ -1050,6 +1068,9 @@ mod tests {
         assert!(!state.has_effects());
         assert!(state.passive_unmounts().is_empty());
         assert!(state.passive_mounts().is_empty());
+        assert_eq!(state.passive_unmount_count(), 0);
+        assert_eq!(state.passive_mount_count(), 0);
+        assert_eq!(state.pending_record_count(), 0);
         assert_eq!(state.flush_ordered_records().count(), 0);
     }
 
@@ -1099,6 +1120,9 @@ mod tests {
         assert!(unmount_order.flush_rank() < mount_order.flush_rank());
         assert_eq!(state.lanes(), Lanes::DEFAULT.merge(Lanes::SYNC));
         assert!(state.has_effects());
+        assert_eq!(state.passive_unmount_count(), 1);
+        assert_eq!(state.passive_mount_count(), 1);
+        assert_eq!(state.pending_record_count(), 2);
 
         let unmount = state.passive_unmounts()[0];
         assert_eq!(unmount.fiber(), deleted_fiber);
@@ -1142,5 +1166,8 @@ mod tests {
         assert_eq!(state.lanes(), Lanes::NO);
         assert!(state.passive_unmounts().is_empty());
         assert!(state.passive_mounts().is_empty());
+        assert_eq!(state.passive_unmount_count(), 0);
+        assert_eq!(state.passive_mount_count(), 0);
+        assert_eq!(state.pending_record_count(), 0);
     }
 }
