@@ -213,6 +213,108 @@ const reactDomPackage = require(
 }
 
 {
+  const rootOwner = {kind: 'EventListenerLookupRoot'};
+  const hostOwner = {kind: 'EventListenerLookupHost'};
+  const node = createElement('BUTTON');
+  const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
+  let clickCallCount = 0;
+  const props = {
+    disabled: false,
+    onClick() {
+      clickCallCount += 1;
+    }
+  };
+
+  componentTree.attachHostInstanceNode(node, token, props);
+  const targetRecord = componentTree.createEventTargetNormalizationRecord(node);
+  const lookupRecord = componentTree.createEventListenerTargetLookupRecord(
+    targetRecord,
+    'onClick'
+  );
+  const lookupPayload =
+    componentTree.getEventListenerTargetLookupRecordPayload(lookupRecord);
+
+  assert.equal(
+    lookupRecord.kind,
+    componentTree.EVENT_LISTENER_TARGET_LOOKUP_RECORD_KIND
+  );
+  assert.equal(Object.isFrozen(lookupRecord), true);
+  assert.equal(lookupRecord.status, 'blocked');
+  assert.equal(
+    lookupRecord.blockedReason,
+    componentTree.EVENT_LISTENER_TARGET_LOOKUP_BLOCKED_CODE
+  );
+  assert.equal(lookupRecord.componentTreeStatus, 'mounted-host-instance');
+  assert.equal(lookupRecord.registrationName, 'onClick');
+  assert.equal(lookupRecord.latestPropsStatus, 'present');
+  assert.equal(lookupRecord.listenerStatus, 'present');
+  assert.equal(lookupRecord.listenerFound, true);
+  assert.equal(lookupRecord.listenerType, 'function');
+  assert.equal(lookupRecord.listenerInvocationCount, 0);
+  assert.equal(lookupRecord.willInvokeListener, false);
+  assert.equal(lookupRecord.exposesLatestProps, false);
+  assert.equal(lookupRecord.exposesListener, false);
+  assert.equal(lookupRecord.targetHostInstanceNode, node);
+  assert.equal(lookupRecord.targetHostInstanceToken, token);
+  assert.equal(lookupRecord.hostOwner, hostOwner);
+  assert.equal(lookupRecord.rootOwner, rootOwner);
+  assert.equal(Object.hasOwn(lookupRecord, 'latestProps'), false);
+  assert.equal(Object.hasOwn(lookupRecord, 'listener'), false);
+  assert.equal(componentTree.isEventListenerTargetLookupRecord(lookupRecord), true);
+  assert.equal(lookupPayload.latestProps, props);
+  assert.equal(lookupPayload.listener, props.onClick);
+  assert.equal(lookupPayload.hostInstanceNode, node);
+  assert.equal(lookupPayload.hostInstanceToken, token);
+
+  const disabledProps = {
+    disabled: true,
+    onClick() {
+      clickCallCount += 1;
+    }
+  };
+  componentTree.updateLatestPropsForNode(node, disabledProps);
+  const disabledLookup = componentTree.createEventListenerTargetLookupRecord(
+    targetRecord,
+    'onClick'
+  );
+  const disabledPayload =
+    componentTree.getEventListenerTargetLookupRecordPayload(disabledLookup);
+
+  assert.equal(disabledLookup.listenerStatus, 'disabled-interactive-blocked');
+  assert.equal(disabledLookup.listenerFound, false);
+  assert.equal(disabledLookup.listenerType, 'blocked');
+  assert.equal(disabledPayload.latestProps, disabledProps);
+  assert.equal(disabledPayload.listener, null);
+  assert.equal(clickCallCount, 0);
+
+  const wrongNode = createElement('BUTTON');
+  const wrongTargetRecord = Object.freeze({
+    ...targetRecord,
+    closestMountedHostInstanceNode: wrongNode,
+    targetNode: wrongNode
+  });
+  assert.throws(
+    () =>
+      componentTree.createEventListenerTargetLookupRecord(
+        wrongTargetRecord,
+        'onClick'
+      ),
+    {
+      code: componentTree.EVENT_LISTENER_TARGET_LOOKUP_NODE_MISMATCH_CODE
+    }
+  );
+  assert.throws(
+    () => componentTree.createEventListenerTargetLookupRecord({}, 'onClick'),
+    {
+      code: componentTree.INVALID_EVENT_TARGET_NORMALIZATION_RECORD_CODE
+    }
+  );
+  assert.equal(clickCallCount, 0);
+  assert.equal(componentTree.getLatestPropsFromNode(node), disabledProps);
+  assert.equal(componentTree.detachHostInstanceToken(token), token);
+}
+
+{
   const rootOwner = {kind: 'CommitBatchRoot'};
   const firstHostOwner = {kind: 'CommitBatchFirst'};
   const secondHostOwner = {kind: 'CommitBatchSecond'};
