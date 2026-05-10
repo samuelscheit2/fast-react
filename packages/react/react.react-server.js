@@ -7,6 +7,11 @@ const {
   placeholderVersion
 } = require('./placeholder-utils.js');
 const {
+  use,
+  useCallback,
+  useMemo
+} = require('./hook-dispatcher.js');
+const {
   cloneElementReactServer,
   createElement,
   isValidElement
@@ -42,11 +47,11 @@ exports.forwardRef = forwardRef;
 exports.isValidElement = isValidElement;
 exports.lazy = lazy;
 exports.memo = memo;
-exports.use = createUnimplementedFunction(entrypoint, 'use');
-exports.useCallback = createUnimplementedFunction(entrypoint, 'useCallback');
+exports.use = use;
+exports.useCallback = useCallback;
 exports.useDebugValue = createUnimplementedFunction(entrypoint, 'useDebugValue');
 exports.useId = createUnimplementedFunction(entrypoint, 'useId');
-exports.useMemo = createUnimplementedFunction(entrypoint, 'useMemo');
+exports.useMemo = useMemo;
 exports.version = placeholderVersion;
 
 definePlaceholderMetadata(module.exports, `${entrypoint} react-server`);

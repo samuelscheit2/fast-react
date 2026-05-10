@@ -1,0 +1,293 @@
+{
+  "schemaVersion": 1,
+  "kind": "fast-react-benchmark-manifest",
+  "manifestId": "react-dom-host-dom",
+  "description": "Admission manifest for first DOM host output benchmark scenarios used by future React DOM timings.",
+  "timingDataPolicy": "diagnostic-until-compatible",
+  "requiredScenarioIds": [
+    "common-host-props-and-aliases",
+    "boolean-and-booleanish-attributes",
+    "data-and-aria-attributes",
+    "custom-and-unknown-attributes",
+    "custom-element-attribute-property-routing",
+    "attribute-update-and-removal",
+    "style-serialization-numeric-units-and-custom-properties",
+    "style-update-and-removal",
+    "invalid-style-development-warnings",
+    "style-prop-shape-validation",
+    "dangerously-set-inner-html-serialization",
+    "dangerously-set-inner-html-null-html",
+    "dangerously-set-inner-html-update-and-removal",
+    "dangerously-set-inner-html-shape-validation-string",
+    "dangerously-set-inner-html-shape-validation-missing-html",
+    "dangerously-set-inner-html-children-conflict",
+    "svg-common-attributes",
+    "foreignobject-html-boundary",
+    "mathml-basic-tree",
+    "client-svg-common-attributes",
+    "client-html-svg-foreignobject-html-svg",
+    "client-svg-container-child-context",
+    "client-mathml-tree"
+  ],
+  "conformanceGates": [
+    {
+      "id": "dom-attribute-property",
+      "artifact": "tests/conformance/oracles/react-19.2.6-dom-attribute-property-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ]
+    },
+    {
+      "id": "dom-style-dangerous-html",
+      "artifact": "tests/conformance/oracles/react-19.2.6-dom-style-dangerous-html-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ]
+    },
+    {
+      "id": "dom-namespace-svg",
+      "artifact": "tests/conformance/oracles/react-19.2.6-dom-namespace-svg-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "common-host-props-and-aliases",
+      "area": "DOM attributes",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": ["dom-attribute-property"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The DOM attribute/property oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "boolean-and-booleanish-attributes",
+      "area": "DOM attributes",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": ["dom-attribute-property"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The DOM attribute/property oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "data-and-aria-attributes",
+      "area": "DOM attributes",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": ["dom-attribute-property"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The DOM attribute/property oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "custom-and-unknown-attributes",
+      "area": "DOM attributes",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": ["dom-attribute-property"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The DOM attribute/property oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "custom-element-attribute-property-routing",
+      "area": "DOM attributes",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": ["dom-attribute-property"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The DOM attribute/property oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "attribute-update-and-removal",
+      "area": "DOM attributes",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": ["dom-attribute-property"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The DOM attribute/property oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "style-serialization-numeric-units-and-custom-properties",
+      "area": "DOM style",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": ["dom-style-dangerous-html"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The DOM style/dangerous HTML oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "style-update-and-removal",
+      "area": "DOM style",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": ["dom-style-dangerous-html"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The DOM style/dangerous HTML oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "invalid-style-development-warnings",
+      "area": "DOM style warnings",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": ["dom-style-dangerous-html"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The DOM style/dangerous HTML oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "style-prop-shape-validation",
+      "area": "DOM style validation",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": ["dom-style-dangerous-html"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The DOM style/dangerous HTML oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "dangerously-set-inner-html-serialization",
+      "area": "DOM innerHTML",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": ["dom-style-dangerous-html"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The DOM style/dangerous HTML oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "dangerously-set-inner-html-null-html",
+      "area": "DOM innerHTML",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": ["dom-style-dangerous-html"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The DOM style/dangerous HTML oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "dangerously-set-inner-html-update-and-removal",
+      "area": "DOM innerHTML",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": ["dom-style-dangerous-html"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The DOM style/dangerous HTML oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "dangerously-set-inner-html-shape-validation-string",
+      "area": "DOM innerHTML validation",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": ["dom-style-dangerous-html"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The DOM style/dangerous HTML oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "dangerously-set-inner-html-shape-validation-missing-html",
+      "area": "DOM innerHTML validation",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": ["dom-style-dangerous-html"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The DOM style/dangerous HTML oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "dangerously-set-inner-html-children-conflict",
+      "area": "DOM innerHTML validation",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": ["dom-style-dangerous-html"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The DOM style/dangerous HTML oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "svg-common-attributes",
+      "area": "DOM namespace",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": ["dom-namespace-svg"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The DOM namespace/SVG oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "foreignobject-html-boundary",
+      "area": "DOM namespace",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": ["dom-namespace-svg"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The DOM namespace/SVG oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "mathml-basic-tree",
+      "area": "DOM namespace",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": ["dom-namespace-svg"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The DOM namespace/SVG oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "client-svg-common-attributes",
+      "area": "DOM namespace",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": ["dom-namespace-svg"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The DOM namespace/SVG oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "client-html-svg-foreignobject-html-svg",
+      "area": "DOM namespace",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": ["dom-namespace-svg"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The DOM namespace/SVG oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "client-svg-container-child-context",
+      "area": "DOM namespace",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": ["dom-namespace-svg"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The DOM namespace/SVG oracle does not claim Fast React compatibility."
+    },
+    {
+      "id": "client-mathml-tree",
+      "area": "DOM namespace",
+      "entrypoints": ["react-dom", "react-dom/client"],
+      "conformanceGateIds": ["dom-namespace-svg"],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The DOM namespace/SVG oracle does not claim Fast React compatibility."
+    }
+  ]
+}

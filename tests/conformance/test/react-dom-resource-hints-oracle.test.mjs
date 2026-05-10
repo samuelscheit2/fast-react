@@ -19,6 +19,10 @@ import {
   readCheckedReactDomResourceHintsOracle,
   readCheckedReactDomResourceHintsOracleText
 } from "../src/react-dom-resource-hints-oracle.mjs";
+import {
+  assertFastReactResourceAndSingletonPrerequisiteGate,
+  assertFastReactResourceHintUnsupportedGate
+} from "../src/react-dom-resource-hints-unsupported-gates.mjs";
 
 const oracle = readCheckedReactDomResourceHintsOracle();
 
@@ -79,6 +83,14 @@ test("React DOM resource hint oracle keeps Fast React compatibility claims false
     ),
     true
   );
+});
+
+test("Fast React resource hints stay unsupported placeholders until resource adapters exist", () => {
+  assertFastReactResourceHintUnsupportedGate();
+});
+
+test("Fast React resource and singleton implementation gates stay fail-closed", () => {
+  assertFastReactResourceAndSingletonPrerequisiteGate();
 });
 
 test("React DOM resource hint oracle covers every scenario in every mode", () => {
