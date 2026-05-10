@@ -1403,6 +1403,35 @@ impl HostRootCommitRecord {
 
     #[doc(hidden)]
     #[must_use]
+    pub fn test_only_host_component_update_apply_count_for_canary(&self) -> usize {
+        self.mutation_apply_log
+            .records()
+            .iter()
+            .filter(|record| {
+                record.kind() == HostRootMutationApplyRecordKind::CommitHostComponentUpdate
+            })
+            .count()
+    }
+
+    #[doc(hidden)]
+    #[must_use]
+    pub fn has_test_only_host_component_update_apply_for_canary(
+        &self,
+        current_component: FiberId,
+        updated_component: FiberId,
+        component_state_node_raw: u64,
+    ) -> bool {
+        self.mutation_apply_log.records().iter().any(|record| {
+            record.kind() == HostRootMutationApplyRecordKind::CommitHostComponentUpdate
+                && record.tag() == FiberTag::HostComponent
+                && record.alternate_fiber() == Some(current_component)
+                && record.fiber() == updated_component
+                && record.state_node().raw() == component_state_node_raw
+        })
+    }
+
+    #[doc(hidden)]
+    #[must_use]
     pub fn has_test_only_host_text_update_apply_for_canary(
         &self,
         current_text: FiberId,
@@ -2789,12 +2818,13 @@ fn collect_host_root_mutation_phase_log<H: HostTypes>(
             1,
             lanes,
         )?;
-        collect_host_component_child_host_text_update_phase_records(
+        collect_host_component_child_update_phase_records(
             arena,
             &mut log,
             root,
             finished_work,
             child,
+            1,
             lanes,
         )?;
     }
@@ -2856,12 +2886,13 @@ fn collect_host_component_child_placement_phase_records(
     Ok(())
 }
 
-fn collect_host_component_child_host_text_update_phase_records(
+fn collect_host_component_child_update_phase_records(
     arena: &fast_react_core::FiberArena,
     log: &mut HostRootMutationPhaseLog,
     root: FiberRootId,
     host_root: FiberId,
     parent: FiberId,
+    host_component_depth: usize,
     lanes: Lanes,
 ) -> Result<(), RootCommitError> {
     let parent_node = arena.get(parent)?;
@@ -2876,25 +2907,43 @@ fn collect_host_component_child_host_text_update_phase_records(
         let node = arena.get(child)?;
         next_child = node.sibling();
 
-        if node.tag() != FiberTag::HostText || !node.flags().contains_all(FiberFlags::UPDATE) {
+        if !is_supported_host_root_mutation_child(node.tag()) {
             continue;
         }
 
-        log.push(host_root_mutation_phase_record(
-            arena,
-            root,
-            host_root,
-            parent,
-            child,
-            HostRootMutationPhaseRecordKind::Update,
-            lanes,
-        )?);
+        if node.flags().contains_all(FiberFlags::UPDATE) {
+            log.push(host_root_mutation_phase_record(
+                arena,
+                root,
+                host_root,
+                parent,
+                child,
+                HostRootMutationPhaseRecordKind::Update,
+                lanes,
+            )?);
+        }
+
+        if host_component_depth < HOST_PARENT_UPDATE_CANARY_MAX_HOST_COMPONENT_DEPTH
+            && node.tag() == FiberTag::HostComponent
+            && !node.flags().contains_all(FiberFlags::PLACEMENT)
+        {
+            collect_host_component_child_update_phase_records(
+                arena,
+                log,
+                root,
+                host_root,
+                child,
+                host_component_depth + 1,
+                lanes,
+            )?;
+        }
     }
 
     Ok(())
 }
 
 const HOST_PARENT_PLACEMENT_CANARY_MAX_HOST_COMPONENT_DEPTH: usize = 2;
+const HOST_PARENT_UPDATE_CANARY_MAX_HOST_COMPONENT_DEPTH: usize = 2;
 
 fn host_root_mutation_phase_record(
     arena: &fast_react_core::FiberArena,
@@ -5527,6 +5576,181 @@ mod tests {
     }
 
     #[test]
+    fn root_commit_records_host_parent_component_and_text_update_apply_records_without_host_mutation()
+     {
+        let (mut store, root_id, host) = root_store();
+        let current_root = store.root(root_id).unwrap().current();
+        let outer_state_node = StateNodeHandle::from_raw(750);
+        let inner_state_node = StateNodeHandle::from_raw(751);
+        let text_state_node = StateNodeHandle::from_raw(752);
+        let outer_props = PropsHandle::from_raw(753);
+        let old_inner_props = PropsHandle::from_raw(754);
+        let old_text_props = PropsHandle::from_raw(755);
+        let next_inner_pending_props = PropsHandle::from_raw(756);
+        let next_inner_memoized_props = PropsHandle::from_raw(757);
+        let next_text_pending_props = PropsHandle::from_raw(758);
+        let next_text_memoized_props = PropsHandle::from_raw(759);
+        let current_outer = attach_host_root_child(
+            &mut store,
+            current_root,
+            FiberTag::HostComponent,
+            FiberFlags::NO,
+            outer_state_node,
+            outer_props,
+            outer_props,
+        );
+        let current_inner =
+            create_test_fiber(&mut store, FiberTag::HostComponent, old_inner_props.raw());
+        let current_text = create_test_fiber(&mut store, FiberTag::HostText, old_text_props.raw());
+        {
+            let node = store.fiber_arena_mut().get_mut(current_inner).unwrap();
+            node.set_state_node(inner_state_node);
+            node.set_memoized_props(old_inner_props);
+        }
+        {
+            let node = store.fiber_arena_mut().get_mut(current_text).unwrap();
+            node.set_state_node(text_state_node);
+            node.set_memoized_props(old_text_props);
+        }
+        store
+            .fiber_arena_mut()
+            .set_children(current_inner, &[current_text])
+            .unwrap();
+        bubble_test_fiber(&mut store, current_inner);
+        store
+            .fiber_arena_mut()
+            .set_children(current_outer, &[current_inner])
+            .unwrap();
+        bubble_test_fiber(&mut store, current_outer);
+        bubble_test_fiber(&mut store, current_root);
+
+        update_container(&mut store, root_id, RootElementHandle::from_raw(50), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let work_outer = store
+            .fiber_arena_mut()
+            .create_work_in_progress(current_outer, outer_props)
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(work_outer).unwrap();
+            node.set_state_node(outer_state_node);
+            node.set_memoized_props(outer_props);
+            node.set_lanes(Lanes::NO);
+        }
+        let work_inner = store
+            .fiber_arena_mut()
+            .create_work_in_progress(current_inner, next_inner_pending_props)
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(work_inner).unwrap();
+            node.set_flags(FiberFlags::UPDATE);
+            node.set_state_node(inner_state_node);
+            node.set_memoized_props(next_inner_memoized_props);
+            node.set_lanes(Lanes::NO);
+        }
+        let work_text = store
+            .fiber_arena_mut()
+            .create_work_in_progress(current_text, next_text_pending_props)
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(work_text).unwrap();
+            node.set_flags(FiberFlags::UPDATE);
+            node.set_state_node(text_state_node);
+            node.set_memoized_props(next_text_memoized_props);
+            node.set_lanes(Lanes::NO);
+        }
+        store
+            .fiber_arena_mut()
+            .set_children(work_inner, &[work_text])
+            .unwrap();
+        bubble_test_fiber(&mut store, work_inner);
+        store
+            .fiber_arena_mut()
+            .set_children(work_outer, &[work_inner])
+            .unwrap();
+        bubble_test_fiber(&mut store, work_outer);
+        store
+            .fiber_arena_mut()
+            .set_children(render.finished_work(), &[work_outer])
+            .unwrap();
+        bubble_test_fiber(&mut store, render.finished_work());
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let records = commit.mutation_log().records();
+        let apply_records = commit.mutation_apply_log().records();
+
+        assert_eq!(records.len(), 2);
+        assert_eq!(records[0].parent(), work_outer);
+        assert_eq!(records[0].parent_tag(), FiberTag::HostComponent);
+        assert_eq!(records[0].parent_state_node(), outer_state_node);
+        assert_eq!(records[0].fiber(), work_inner);
+        assert_eq!(records[0].alternate_fiber(), Some(current_inner));
+        assert_eq!(records[0].tag(), FiberTag::HostComponent);
+        assert_eq!(records[0].kind(), HostRootMutationPhaseRecordKind::Update);
+        assert_eq!(records[0].state_node(), inner_state_node);
+        assert_eq!(records[0].pending_props(), next_inner_pending_props);
+        assert_eq!(records[0].memoized_props(), next_inner_memoized_props);
+        assert_eq!(records[0].alternate_memoized_props(), Some(old_inner_props));
+        assert_eq!(records[1].parent(), work_inner);
+        assert_eq!(records[1].parent_tag(), FiberTag::HostComponent);
+        assert_eq!(records[1].parent_state_node(), inner_state_node);
+        assert_eq!(records[1].fiber(), work_text);
+        assert_eq!(records[1].alternate_fiber(), Some(current_text));
+        assert_eq!(records[1].tag(), FiberTag::HostText);
+        assert_eq!(records[1].kind(), HostRootMutationPhaseRecordKind::Update);
+        assert_eq!(records[1].state_node(), text_state_node);
+        assert_eq!(records[1].pending_props(), next_text_pending_props);
+        assert_eq!(records[1].memoized_props(), next_text_memoized_props);
+        assert_eq!(records[1].alternate_memoized_props(), Some(old_text_props));
+        assert_eq!(apply_records.len(), 2);
+        assert_eq!(
+            apply_records[0].kind(),
+            HostRootMutationApplyRecordKind::CommitHostComponentUpdate
+        );
+        assert_eq!(apply_records[0].parent(), work_outer);
+        assert_eq!(apply_records[0].fiber(), work_inner);
+        assert_eq!(apply_records[0].alternate_fiber(), Some(current_inner));
+        assert_eq!(apply_records[0].state_node(), inner_state_node);
+        assert_eq!(
+            apply_records[1].kind(),
+            HostRootMutationApplyRecordKind::CommitHostTextUpdate
+        );
+        assert_eq!(apply_records[1].parent(), work_inner);
+        assert_eq!(apply_records[1].fiber(), work_text);
+        assert_eq!(apply_records[1].alternate_fiber(), Some(current_text));
+        assert_eq!(apply_records[1].state_node(), text_state_node);
+        assert_eq!(
+            commit.test_only_host_component_update_apply_count_for_canary(),
+            1
+        );
+        assert!(commit.has_test_only_host_component_update_apply_for_canary(
+            current_inner,
+            work_inner,
+            inner_state_node.raw()
+        ));
+        assert!(
+            !commit.has_test_only_host_component_update_apply_for_canary(
+                current_inner,
+                work_inner,
+                StateNodeHandle::from_raw(9999).raw()
+            )
+        );
+        assert_eq!(
+            commit.test_only_host_text_update_apply_count_for_canary(),
+            1
+        );
+        assert!(commit.has_test_only_host_text_update_apply_for_canary(
+            current_text,
+            work_text,
+            text_state_node.raw()
+        ));
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            commit.finished_work()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
     fn root_commit_skips_host_text_update_under_new_host_parent_placement_boundary() {
         let (mut store, root_id, host) = root_store();
         update_container(&mut store, root_id, RootElementHandle::from_raw(49), None).unwrap();
@@ -5583,6 +5807,68 @@ mod tests {
             text,
             text_state_node.raw()
         ));
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_skips_host_component_update_under_new_host_parent_placement_boundary() {
+        let (mut store, root_id, host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(51), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let parent_state_node = StateNodeHandle::from_raw(760);
+        let child_state_node = StateNodeHandle::from_raw(761);
+        let parent = create_test_fiber(&mut store, FiberTag::HostComponent, 762);
+        let child = create_test_fiber(&mut store, FiberTag::HostComponent, 763);
+        {
+            let node = store.fiber_arena_mut().get_mut(parent).unwrap();
+            node.set_flags(FiberFlags::PLACEMENT);
+            node.set_state_node(parent_state_node);
+            node.set_memoized_props(PropsHandle::from_raw(762));
+        }
+        {
+            let node = store.fiber_arena_mut().get_mut(child).unwrap();
+            node.set_flags(FiberFlags::UPDATE);
+            node.set_state_node(child_state_node);
+            node.set_memoized_props(PropsHandle::from_raw(763));
+        }
+        store
+            .fiber_arena_mut()
+            .set_children(parent, &[child])
+            .unwrap();
+        bubble_test_fiber(&mut store, parent);
+        store
+            .fiber_arena_mut()
+            .set_children(render.finished_work(), &[parent])
+            .unwrap();
+        bubble_test_fiber(&mut store, render.finished_work());
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let records = commit.mutation_log().records();
+        let apply_records = commit.mutation_apply_log().records();
+
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].fiber(), parent);
+        assert_eq!(
+            records[0].kind(),
+            HostRootMutationPhaseRecordKind::Placement
+        );
+        assert_eq!(apply_records.len(), 1);
+        assert_eq!(
+            apply_records[0].kind(),
+            HostRootMutationApplyRecordKind::AppendPlacementToContainer
+        );
+        assert_eq!(apply_records[0].fiber(), parent);
+        assert_eq!(
+            commit.test_only_host_component_update_apply_count_for_canary(),
+            0
+        );
+        assert!(
+            !commit.has_test_only_host_component_update_apply_for_canary(
+                child,
+                child,
+                child_state_node.raw()
+            )
+        );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
