@@ -4362,6 +4362,309 @@ test('private react-dom/client facade host-output diagnostic renders through bri
   });
 });
 
+test('private react-dom/client facade host-output update diagnostic routes root.render through fake DOM', () => {
+  const document = createDocument('private-client-facade-host-output-update');
+  const container = createElement('DIV', document);
+  const updateCallback = function afterPrivateFacadeHostOutputUpdate() {};
+  const initialElement = {
+    props: {
+      children: 'initial facade output',
+      className: 'facade-initial',
+      id: 'facade-host',
+      'data-phase': 'initial',
+      title: 'Initial private facade host'
+    },
+    type: 'main'
+  };
+  const nextElement = {
+    props: {
+      children: 'updated facade output',
+      className: 'facade-updated',
+      id: 'facade-host',
+      'data-phase': 'updated',
+      title: 'Updated private facade host'
+    },
+    type: 'main'
+  };
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    rootBridge.privateRootPublicFacadeAdapterSymbol
+  );
+  const adapter = descriptor.value({
+    createRenderAdmissionIdPrefix: 'facade-update-admission',
+    hostOutputUpdateIdPrefix: 'facade-update-handoff',
+    initialHostOutputIdPrefix: 'facade-update-initial',
+    publicFacadeHostOutputRenderIdPrefix: 'facade-update-render',
+    publicFacadeHostOutputUpdateIdPrefix: 'facade-update-diagnostic',
+    requestIdPrefix: 'facade-update-request',
+    rootIdPrefix: 'facade-update-root',
+    sideEffectIdPrefix: 'facade-update-side-effect',
+    updateIdPrefix: 'facade-update'
+  });
+  const root = adapter.createRoot(container);
+  const create = adapter.getRootCreateRecord(root);
+  const initialDiagnostic = adapter.renderHostOutput(root, initialElement);
+  const initialHidden =
+    rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(
+      initialDiagnostic
+    );
+  const initialHandoffPayload =
+    rootBridge.getPrivateRootInitialHostOutputHandoffPayload(
+      initialHidden.hostOutputHandoff
+    );
+  const updateDiagnostic = adapter.updateHostOutput(root, nextElement, {
+    callback: updateCallback
+  });
+  const updateHidden =
+    rootBridge.getPrivateRootPublicFacadeHostOutputUpdatePayload(
+      updateDiagnostic
+    );
+  const updateHandoff = updateHidden.hostOutputUpdateHandoff;
+  const updateHandoffPayload =
+    rootBridge.getPrivateRootHostOutputUpdateHandoffPayload(updateHandoff);
+  const updateRecord = updateHidden.updateRecord;
+  const hostNode = initialHandoffPayload.hostNode;
+  const textNode = initialHandoffPayload.textNode;
+  const rootPayload = rootBridge.getPrivateRootPublicFacadeRootPayload(root);
+
+  assert.equal(Object.isFrozen(updateDiagnostic), true);
+  assert.equal(
+    updateDiagnostic.$$typeof,
+    rootBridge.privateRootPublicFacadeHostOutputUpdateRecordType
+  );
+  assert.equal(
+    updateDiagnostic.kind,
+    'FastReactDomPrivateRootPublicFacadeHostOutputUpdateDiagnosticRecord'
+  );
+  assert.equal(
+    updateDiagnostic.operation,
+    'public-facade-host-output-update-diagnostic'
+  );
+  assert.equal(
+    updateDiagnostic.diagnosticStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_APPLIED
+  );
+  assert.equal(updateDiagnostic.diagnosticId, 'facade-update-diagnostic:1');
+  assert.equal(updateDiagnostic.rootId, 'facade-update-root:1');
+  assert.equal(updateDiagnostic.createRequestId, 'facade-update-request:1');
+  assert.equal(
+    updateDiagnostic.initialDiagnosticId,
+    initialDiagnostic.diagnosticId
+  );
+  assert.equal(
+    updateDiagnostic.initialHostOutputHandoffId,
+    'facade-update-initial:1'
+  );
+  assert.equal(updateDiagnostic.updateRequestId, 'facade-update-request:3');
+  assert.equal(updateDiagnostic.updateUpdateId, 'facade-update:2');
+  assert.equal(
+    updateDiagnostic.updateLifecycleStatusBefore,
+    rootBridge.ROOT_LIFECYCLE_RENDERED
+  );
+  assert.equal(
+    updateDiagnostic.updateLifecycleStatusAfter,
+    rootBridge.ROOT_LIFECYCLE_RENDERED
+  );
+  assert.equal(
+    updateDiagnostic.hostOutputUpdateHandoffId,
+    'facade-update-handoff:1'
+  );
+  assert.equal(
+    updateDiagnostic.hostOutputUpdateStatus,
+    rootBridge.ROOT_BRIDGE_HOST_OUTPUT_UPDATE_APPLIED
+  );
+  assert.equal(updateDiagnostic.hostType, 'main');
+  assert.equal(updateDiagnostic.containerChildCount, 1);
+  assert.equal(updateDiagnostic.hostChildCount, 1);
+  assert.equal(updateDiagnostic.textContent, 'updated facade output');
+  assert.deepEqual(updateDiagnostic.propertyMutation, {
+    handoffKind: domHost.DOM_PROPERTY_UPDATE_LATEST_PROPS_HANDOFF,
+    latestPropsCommitRecordKind: domHost.LATEST_PROPS_COMMIT_RECORD,
+    latestPropsCommitRecordStatus: 'safe-for-latest-props',
+    mutationRecordCount: 4,
+    payloadCount: 4,
+    propertyPayloadEvidence: {
+      propertyPayloadBacked: true,
+      rowCount: 4,
+      mutatingRowCount: 3,
+      updateRowCount: 3,
+      removalRowCount: 0,
+      setAttributeCount: 3,
+      removeAttributeCount: 0,
+      setPropertyCount: 0,
+      removePropertyCount: 0,
+      setStyleCount: 0,
+      removeStyleCount: 0,
+      nonPayloadRowCount: 1,
+      attributeRowCount: 3,
+      propertyRowCount: 0,
+      styleRowCount: 0,
+      rowKinds: ['nonPayload', 'setAttribute']
+    },
+    status: 'mutated'
+  });
+  assert.deepEqual(updateDiagnostic.textMutation, {
+    newTextLength: 21,
+    oldTextLength: 21,
+    status: 'mutated'
+  });
+  assert.equal(updateDiagnostic.latestPropsPublished, true);
+  assert.equal(
+    updateDiagnostic.latestPropsPublishOrder,
+    'after-property-and-text-mutation'
+  );
+  assert.deepEqual(
+    updateDiagnostic.acceptedCapabilities.map((capability) => capability.id),
+    [
+      'public-facade-create-root-record',
+      'public-facade-initial-host-output-render',
+      'public-facade-root-render-update-record',
+      'host-output-update-handoff',
+      'fake-dom-property-update',
+      'property-payload-evidence',
+      'fake-dom-text-update',
+      'latest-props-after-mutation',
+      'attribute-payload-rows'
+    ]
+  );
+  assert.deepEqual(
+    updateDiagnostic.blockedCapabilities.map((capability) => capability.id),
+    [
+      'public-root-execution',
+      'native-execution',
+      'reconciler-execution',
+      'browser-dom-compatibility',
+      'hydration',
+      'events',
+      'refs',
+      'compatibility-claims'
+    ]
+  );
+  assert.equal(updateDiagnostic.privateFacadeRoot, true);
+  assert.equal(updateDiagnostic.publicCreateRootEnabled, false);
+  assert.equal(updateDiagnostic.publicRootCreated, false);
+  assert.equal(updateDiagnostic.publicRootExecution, false);
+  assert.equal(updateDiagnostic.publicRootCompatibilitySurface, false);
+  assert.equal(updateDiagnostic.nativeExecution, false);
+  assert.equal(updateDiagnostic.reconcilerExecution, false);
+  assert.equal(updateDiagnostic.rootScheduled, false);
+  assert.equal(updateDiagnostic.fakeDomMutation, true);
+  assert.equal(updateDiagnostic.domMutation, true);
+  assert.equal(updateDiagnostic.browserDomMutation, false);
+  assert.equal(updateDiagnostic.markerWrites, false);
+  assert.equal(updateDiagnostic.listenerInstallation, false);
+  assert.equal(updateDiagnostic.hydration, false);
+  assert.equal(updateDiagnostic.eventDispatch, false);
+  assert.equal(updateDiagnostic.refEffects, false);
+  assert.equal(updateDiagnostic.compatibilityClaimed, false);
+  assert.equal(
+    rootBridge.isPrivateRootPublicFacadeHostOutputUpdateRecord(
+      updateDiagnostic
+    ),
+    true
+  );
+  assert.equal(
+    rootBridge.isPrivateRootPublicFacadeHostOutputUpdateRecord({}),
+    false
+  );
+  assert.equal(
+    rootBridge.getPrivateRootPublicFacadeHostOutputUpdatePayload({}),
+    null
+  );
+
+  assert.equal(updateHidden.adapter, adapter);
+  assert.equal(updateHidden.root, root);
+  assert.equal(updateHidden.createRecord, create);
+  assert.equal(updateHidden.hostOutputRenderDiagnostic, initialDiagnostic);
+  assert.equal(updateHidden.initialHostOutputPayload, initialHandoffPayload);
+  assert.equal(updateHidden.hostOutputUpdatePayload, updateHandoffPayload);
+  assert.equal(updateHidden.updateRecord, updateRecord);
+  assert.equal(updateHidden.callback, updateCallback);
+  assert.equal(updateHidden.element, nextElement);
+  assert.equal(updateHidden.normalizedUpdate.previousProps, initialElement.props);
+  assert.equal(updateHidden.normalizedUpdate.nextProps, nextElement.props);
+  assert.equal(updateHidden.normalizedUpdate.textUpdate.oldText, 'initial facade output');
+  assert.equal(updateHidden.normalizedUpdate.textUpdate.newText, 'updated facade output');
+  assert.equal(
+    rootBridge.getPrivateRootRecordPayload(updateRecord).element,
+    nextElement
+  );
+  assert.equal(
+    rootBridge.getPrivateRootRecordPayload(updateRecord).callback,
+    updateCallback
+  );
+  assert.equal(updateHandoff.sourceUpdateId, updateRecord.updateId);
+  assert.equal(updateHandoffPayload.sourceRecord, updateRecord);
+  assert.equal(updateHandoffPayload.hostInstanceNode, hostNode);
+  assert.equal(updateHandoffPayload.hostInstanceToken, initialHandoffPayload.hostToken);
+  assert.equal(updateHandoffPayload.textInstance, textNode);
+  assert.equal(updateHandoffPayload.previousProps, initialElement.props);
+  assert.equal(updateHandoffPayload.nextProps, nextElement.props);
+  assert.equal(updateHandoffPayload.latestPropsPublished, true);
+
+  assert.deepEqual(adapter.getRootRequestRecords(root), [
+    create,
+    initialHidden.renderRecord,
+    updateRecord
+  ]);
+  assert.deepEqual(adapter.getRootPayload(root).renderRecords, [
+    initialHidden.renderRecord,
+    updateRecord
+  ]);
+  assert.deepEqual(adapter.getRootHostOutputRenderDiagnostics(root), [
+    initialDiagnostic
+  ]);
+  assert.deepEqual(adapter.getRootHostOutputUpdateDiagnostics(root), [
+    updateDiagnostic
+  ]);
+  assert.deepEqual(rootPayload.hostOutputUpdateRecords, [updateDiagnostic]);
+
+  assert.equal(container.firstChild, hostNode);
+  assert.equal(hostNode.firstChild, textNode);
+  assert.equal(hostNode.textContent, 'updated facade output');
+  assert.equal(textNode.textContent, 'updated facade output');
+  assert.deepEqual(attributeEntries(hostNode), [
+    ['class', 'facade-updated'],
+    ['data-phase', 'updated'],
+    ['id', 'facade-host'],
+    ['title', 'Updated private facade host']
+  ]);
+  assert.equal(componentTree.getLatestPropsFromNode(hostNode), nextElement.props);
+  assert.equal(componentTree.getLatestPropsFromNode(textNode), null);
+  assert.equal(rootMarkers.getContainerRoot(container), null);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+  assert.equal(container.__registrations.length, 0);
+  assert.equal(document.__registrations.length, 0);
+
+  const serialized = JSON.stringify(updateDiagnostic);
+  assert.equal(serialized.includes('__mutationLog'), false);
+  assert.equal(serialized.includes('__registrations'), false);
+  assert.equal(serialized.includes('afterPrivateFacadeHostOutputUpdate'), false);
+  assert.equal(serialized.includes('updated facade output'), true);
+
+  const cleanup = initialHidden.bridge.cleanupInitialRenderHostOutput(
+    initialHidden.hostOutputHandoff
+  );
+  assert.equal(
+    cleanup.cleanupStatus,
+    rootBridge.ROOT_BRIDGE_INITIAL_HOST_OUTPUT_CLEANED
+  );
+  assert.equal(container.childNodes.length, 0);
+  assert.equal(componentTree.getRootOwnerFromNode(hostNode), null);
+  assert.equal(componentTree.getRootOwnerFromNode(textNode), null);
+
+  const publicContainer = createElement(
+    'DIV',
+    createDocument('private-client-facade-host-output-update-public')
+  );
+  assert.throws(() => reactDomClient.createRoot(publicContainer), {
+    code: 'FAST_REACT_UNIMPLEMENTED',
+    entrypoint: 'react-dom/client',
+    exportName: 'createRoot'
+  });
+});
+
 test('private react-dom/client facade host-output diagnostic fails closed', () => {
   const descriptor = Object.getOwnPropertyDescriptor(
     reactDomClient.createRoot,
@@ -4382,8 +4685,17 @@ test('private react-dom/client facade host-output diagnostic fails closed', () =
   assert.throws(() => otherAdapter.renderHostOutput(root, element), {
     code: 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE'
   });
+  assert.throws(() => otherAdapter.updateHostOutput(root, element), {
+    code: 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE'
+  });
   assert.throws(() => adapter.renderHostOutput({}, element), {
     code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_ADAPTER'
+  });
+  assert.throws(() => adapter.updateHostOutput({}, element), {
+    code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_ADAPTER'
+  });
+  assert.throws(() => adapter.updateHostOutput(root, element), {
+    code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UPDATE'
   });
 
   const unsupportedContainer = createElement('DIV', document);
@@ -4433,9 +4745,25 @@ test('private react-dom/client facade host-output diagnostic fails closed', () =
     activeDiagnostic
   ]);
   assert.equal(adapter.getRootRequestRecords(root).length, 2);
+  assert.throws(
+    () =>
+      adapter.updateHostOutput(root, {
+        props: {
+          children: 'valid child'
+        },
+        type: 'aside'
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UPDATE'
+    }
+  );
+  assert.equal(adapter.getRootRequestRecords(root).length, 2);
   activePayload.bridge.cleanupInitialRenderHostOutput(
     activePayload.hostOutputHandoff
   );
+  assert.throws(() => adapter.updateHostOutput(root, element), {
+    code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UPDATE'
+  });
 
   const unmountedDocument = createDocument(
     'private-client-facade-host-output-unmounted'
@@ -4445,6 +4773,9 @@ test('private react-dom/client facade host-output diagnostic fails closed', () =
   unmountedRoot.unmount();
   assert.throws(() => adapter.renderHostOutput(unmountedRoot, element), {
     code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_RENDER'
+  });
+  assert.throws(() => adapter.updateHostOutput(unmountedRoot, element), {
+    code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UPDATE'
   });
   assertBridgeDidNotTouchContainer(unmountedContainer, unmountedDocument);
 });
