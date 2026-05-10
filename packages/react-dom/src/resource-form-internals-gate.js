@@ -208,6 +208,45 @@ const formActionsOracleKind =
   'react-19.2.6-react-dom-form-actions-oracle';
 const controlledInputOracleKind =
   'react-19.2.6-dom-controlled-input-oracle';
+const formActionSubmissionTriggers = freezeArray([
+  'submit',
+  'requestSubmit',
+  'replay',
+  'unknown'
+]);
+const formActionActionKinds = freezeArray([
+  'function',
+  'string',
+  'none',
+  'unknown'
+]);
+const formActionActionSources = freezeArray([
+  'form',
+  'submit-control',
+  'replay',
+  'none',
+  'unknown'
+]);
+const formActionSubmitControlKinds = freezeArray([
+  'button',
+  'input',
+  'none',
+  'unknown'
+]);
+const formActionResetOrderingKinds = freezeArray([
+  'current-dispatcher-react-owned-first',
+  'action-completion-reset-before-action',
+  'previous-dispatcher-fallback',
+  'unknown'
+]);
+const formActionResetDispatcherOrderingSteps = freezeArray([
+  'public-requestFormReset-current-dispatcher',
+  'dom-dispatcher-form-ownership-check',
+  'react-owned-requestFormResetOnFiber',
+  'previous-dispatcher-fallback-after-ownership-miss',
+  'action-completion-request-reset-before-action',
+  'commit-after-mutation-resetFormInstance'
+]);
 
 const noSideEffects = freezeRecord({
   resourcesDispatched: false,
@@ -222,7 +261,9 @@ const noSideEffects = freezeRecord({
 const formActionResetDispatcherBlockedSideEffects = freezeRecord({
   formDispatcherMetadataRecorded: false,
   submissionIntentRecorded: false,
+  submitRequestSubmitActionMetadataRecorded: false,
   resetIntentRecorded: false,
+  resetDispatcherOrderingRecorded: false,
   formActionEventPluginInvoked: false,
   requestFormResetDispatcherInvoked: false,
   realFormInspected: false,
@@ -243,13 +284,15 @@ const formActionResetDispatcherBlockedSideEffects = freezeRecord({
 const formActionSubmissionIntentSideEffects = freezeRecord({
   ...formActionResetDispatcherBlockedSideEffects,
   formDispatcherMetadataRecorded: true,
-  submissionIntentRecorded: true
+  submissionIntentRecorded: true,
+  submitRequestSubmitActionMetadataRecorded: true
 });
 
 const formActionResetIntentSideEffects = freezeRecord({
   ...formActionResetDispatcherBlockedSideEffects,
   formDispatcherMetadataRecorded: true,
-  resetIntentRecorded: true
+  resetIntentRecorded: true,
+  resetDispatcherOrderingRecorded: true
 });
 
 const resourceHintDispatcherSideEffects = freezeRecord({
@@ -1734,7 +1777,15 @@ function describePrivateFormActionResetDispatcherGate() {
     acceptsRawEvents: false,
     acceptsActionFunctions: false,
     recordsSubmissionIntentMetadata: true,
+    recordsSubmitRequestSubmitActionMetadata: true,
     recordsResetIntentMetadata: true,
+    recordsResetDispatcherOrdering: true,
+    acceptedSubmissionTriggers: formActionSubmissionTriggers,
+    acceptedActionKinds: formActionActionKinds,
+    acceptedActionSources: formActionActionSources,
+    acceptedSubmitControlKinds: formActionSubmitControlKinds,
+    acceptedResetOrderingKinds: formActionResetOrderingKinds,
+    resetDispatcherOrderingSteps: formActionResetDispatcherOrderingSteps,
     invokesActions: false,
     constructsFormData: false,
     startsHostTransition: false,
@@ -5712,26 +5763,59 @@ function normalizeFormActionSubmissionIntent(contract, intent) {
     );
   }
 
+  const replayed = getIntentBooleanProperty(
+    contract,
+    intent,
+    'replayed',
+    false
+  );
+  const submissionTrigger = getIntentEnumProperty(
+    contract,
+    intent,
+    'submissionTrigger',
+    formActionSubmissionTriggers,
+    replayed ? 'replay' : 'submit'
+  );
   const actionKind = getIntentEnumProperty(
     contract,
     intent,
     'actionKind',
-    freezeArray(['function', 'string', 'none', 'unknown']),
+    formActionActionKinds,
     'unknown'
   );
   const actionSource = getIntentEnumProperty(
     contract,
     intent,
     'actionSource',
-    freezeArray(['form', 'submit-control', 'replay', 'none', 'unknown']),
+    formActionActionSources,
     'unknown'
   );
   const submitControlKind = getIntentEnumProperty(
     contract,
     intent,
     'submitControlKind',
-    freezeArray(['button', 'input', 'none', 'unknown']),
+    formActionSubmitControlKinds,
     'unknown'
+  );
+  const formActionKind = getIntentEnumProperty(
+    contract,
+    intent,
+    'formActionKind',
+    formActionActionKinds,
+    getDefaultFormActionKind(actionKind, actionSource)
+  );
+  const submitterActionKind = getIntentEnumProperty(
+    contract,
+    intent,
+    'submitterActionKind',
+    formActionActionKinds,
+    getDefaultSubmitterActionKind(actionKind, actionSource)
+  );
+  const submitterActionOverridesFormAction = getIntentBooleanProperty(
+    contract,
+    intent,
+    'submitterActionOverridesFormAction',
+    actionSource === 'submit-control' && submitterActionKind !== 'none'
   );
   const defaultPrevented = getIntentBooleanProperty(
     contract,
@@ -5745,24 +5829,37 @@ function normalizeFormActionSubmissionIntent(contract, intent) {
     'transitionScheduled',
     false
   );
-  const replayed = getIntentBooleanProperty(
-    contract,
-    intent,
-    'replayed',
-    false
-  );
   const functionAction = actionKind === 'function';
+  const actionMetadata = createFormActionSubmissionMetadata({
+    actionKind,
+    actionSource,
+    defaultPrevented,
+    eventName,
+    formActionKind,
+    functionAction,
+    replayed,
+    submissionTrigger,
+    submitControlKind,
+    submitterActionKind,
+    submitterActionOverridesFormAction,
+    transitionScheduled
+  });
 
   return freezeRecord({
     explicitIntent: true,
     intentKind: 'submission',
     eventName,
+    submissionTrigger,
     actionKind,
     actionSource,
     submitControlKind,
+    formActionKind,
+    submitterActionKind,
+    submitterActionOverridesFormAction,
     defaultPrevented,
     transitionScheduled,
     replayed,
+    actionMetadata,
     formCaptured: false,
     rawEventCaptured: false,
     rawActionCaptured: false,
@@ -5794,6 +5891,13 @@ function normalizeFormActionResetIntent(contract, intent) {
       'dispatcherKey must be r'
     );
   }
+  const orderingKind = getIntentEnumProperty(
+    contract,
+    intent,
+    'orderingKind',
+    formActionResetOrderingKinds,
+    getDefaultResetOrderingKind(intent)
+  );
 
   const resetSource = getIntentEnumProperty(
     contract,
@@ -5821,14 +5925,23 @@ function normalizeFormActionResetIntent(contract, intent) {
     freezeArray(['action', 'transition', 'none', 'unknown']),
     'unknown'
   );
+  const resetDispatcherOrdering = createFormActionResetDispatcherOrdering({
+    dispatcherKey,
+    formOwnership,
+    orderingKind,
+    resetSource,
+    transitionContext
+  });
 
   return freezeRecord({
     explicitIntent: true,
     intentKind: 'reset',
     dispatcherKey,
+    orderingKind,
     resetSource,
     formOwnership,
     transitionContext,
+    resetDispatcherOrdering,
     formCaptured: false,
     rawDispatcherArgumentCaptured: false,
     realFormInspected: false,
@@ -5837,6 +5950,122 @@ function normalizeFormActionResetIntent(contract, intent) {
     resetWouldBeRequested: true,
     resetStateWouldBeQueued: transitionContext !== 'none',
     resetCommitWouldRun: false,
+    realFormReset: false,
+    compatibilityClaimed: false
+  });
+}
+
+function getDefaultFormActionKind(actionKind, actionSource) {
+  if (actionSource === 'form') {
+    return actionKind;
+  }
+  if (actionSource === 'none') {
+    return 'none';
+  }
+  return 'unknown';
+}
+
+function getDefaultSubmitterActionKind(actionKind, actionSource) {
+  if (actionSource === 'submit-control') {
+    return actionKind;
+  }
+  if (
+    actionSource === 'form' ||
+    actionSource === 'none' ||
+    actionSource === 'replay'
+  ) {
+    return 'none';
+  }
+  return 'unknown';
+}
+
+function createFormActionSubmissionMetadata(metadata) {
+  const submitterValueWouldBeIncludedInFormData =
+    metadata.submitControlKind !== 'none' &&
+    metadata.submitterActionOverridesFormAction === false;
+
+  return freezeRecord({
+    metadataOnly: true,
+    submissionTrigger: metadata.submissionTrigger,
+    eventName: metadata.eventName,
+    requestSubmitWouldDispatchSubmitEvent:
+      metadata.submissionTrigger === 'requestSubmit',
+    replayed: metadata.replayed,
+    resolvedActionKind: metadata.actionKind,
+    formActionKind: metadata.formActionKind,
+    submitterActionKind: metadata.submitterActionKind,
+    actionSource: metadata.actionSource,
+    submitControlKind: metadata.submitControlKind,
+    submitterActionOverridesFormAction:
+      metadata.submitterActionOverridesFormAction,
+    submitterValueWouldBeIncludedInFormData,
+    nativeNavigationWouldBePrevented:
+      metadata.functionAction && !metadata.defaultPrevented,
+    pendingStatusWouldBeSet:
+      metadata.functionAction ||
+      (metadata.defaultPrevented && metadata.transitionScheduled),
+    actionInvocationWouldBeScheduled:
+      metadata.functionAction && !metadata.defaultPrevented,
+    formPropsRead: false,
+    submitterPropsRead: false,
+    submitterAttributeRead: false,
+    rawFormCaptured: false,
+    rawEventCaptured: false,
+    rawSubmitterCaptured: false,
+    realFormInspected: false,
+    submitControlInspected: false,
+    formDataConstructed: false,
+    syntheticEventCreated: false,
+    defaultPreventedByGate: false,
+    actionInvoked: false,
+    hostTransitionStarted: false,
+    compatibilityClaimed: false
+  });
+}
+
+function getDefaultResetOrderingKind(intent) {
+  if (intent && intent.resetSource === 'action-completion') {
+    return 'action-completion-reset-before-action';
+  }
+  if (intent && intent.formOwnership === 'not-react-owned') {
+    return 'previous-dispatcher-fallback';
+  }
+  if (intent && intent.resetSource === 'requestFormReset') {
+    return 'current-dispatcher-react-owned-first';
+  }
+  return 'unknown';
+}
+
+function createFormActionResetDispatcherOrdering(metadata) {
+  const actionCompletionResetBeforeAction =
+    metadata.orderingKind === 'action-completion-reset-before-action' ||
+    metadata.resetSource === 'action-completion';
+
+  return freezeRecord({
+    metadataOnly: true,
+    orderingKind: metadata.orderingKind,
+    dispatcherKey: metadata.dispatcherKey,
+    resetSource: metadata.resetSource,
+    formOwnership: metadata.formOwnership,
+    transitionContext: metadata.transitionContext,
+    steps: formActionResetDispatcherOrderingSteps,
+    publicRequestFormResetCallsCurrentDispatcherFirst:
+      metadata.resetSource === 'requestFormReset',
+    domDispatcherChecksReactFormOwnershipBeforeFallback: true,
+    previousDispatcherFallbackWouldFollowOwnershipMiss: true,
+    actionCompletionRequestsResetBeforeActionInvocation:
+      actionCompletionResetBeforeAction,
+    resetStateWouldBeQueuedBeforeCommit:
+      metadata.transitionContext !== 'none',
+    commitResetWouldRunAfterMutationEffects: true,
+    formCaptured: false,
+    rawDispatcherArgumentCaptured: false,
+    realFormInspected: false,
+    formFiberResolved: false,
+    previousDispatcherCalled: false,
+    resetStateQueued: false,
+    actionInvoked: false,
+    formResetCommitted: false,
     realFormReset: false,
     compatibilityClaimed: false
   });
@@ -5896,7 +6125,18 @@ function createFormActionResetDispatcherBoundary(contract, normalizedIntent) {
     dispatcherName: contract.dispatcherName,
     privateDispatcherKey: contract.privateDispatcherKey,
     recordsIntentMetadata: true,
+    recordsSubmitRequestSubmitActionMetadata:
+      contract.intentKind === 'submission',
+    recordsResetDispatcherOrdering: contract.intentKind === 'reset',
     formCaptured: normalizedIntent.formCaptured,
+    submissionTrigger:
+      contract.intentKind === 'submission'
+        ? normalizedIntent.submissionTrigger
+        : null,
+    resetDispatcherOrdering:
+      contract.intentKind === 'reset'
+        ? normalizedIntent.resetDispatcherOrdering
+        : null,
     acceptsRealForms: false,
     acceptsRawEvents: false,
     acceptsActionFunctions: false,
@@ -7030,6 +7270,8 @@ function formActionResetDispatcherContract(
     acceptsRealForms: false,
     acceptsRawEvents: false,
     acceptsActionFunctions: false,
+    recordsSubmitRequestSubmitActionMetadata: intentKind === 'submission',
+    recordsResetDispatcherOrdering: intentKind === 'reset',
     compatibilityClaimed: false
   });
 }

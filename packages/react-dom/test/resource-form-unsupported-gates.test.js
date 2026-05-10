@@ -329,12 +329,47 @@ test('private form action/reset dispatcher gate records intent metadata only', (
           explicitIntent: true,
           intentKind: 'submission',
           eventName: 'submit',
+          submissionTrigger: 'submit',
           actionKind: 'function',
           actionSource: 'form',
           submitControlKind: 'button',
+          formActionKind: 'function',
+          submitterActionKind: 'none',
+          submitterActionOverridesFormAction: false,
           defaultPrevented: false,
           transitionScheduled: false,
           replayed: false,
+          actionMetadata: {
+            metadataOnly: true,
+            submissionTrigger: 'submit',
+            eventName: 'submit',
+            requestSubmitWouldDispatchSubmitEvent: false,
+            replayed: false,
+            resolvedActionKind: 'function',
+            formActionKind: 'function',
+            submitterActionKind: 'none',
+            actionSource: 'form',
+            submitControlKind: 'button',
+            submitterActionOverridesFormAction: false,
+            submitterValueWouldBeIncludedInFormData: true,
+            nativeNavigationWouldBePrevented: true,
+            pendingStatusWouldBeSet: true,
+            actionInvocationWouldBeScheduled: true,
+            formPropsRead: false,
+            submitterPropsRead: false,
+            submitterAttributeRead: false,
+            rawFormCaptured: false,
+            rawEventCaptured: false,
+            rawSubmitterCaptured: false,
+            realFormInspected: false,
+            submitControlInspected: false,
+            formDataConstructed: false,
+            syntheticEventCreated: false,
+            defaultPreventedByGate: false,
+            actionInvoked: false,
+            hostTransitionStarted: false,
+            compatibilityClaimed: false
+          },
           formCaptured: false,
           rawEventCaptured: false,
           rawActionCaptured: false,
@@ -364,9 +399,42 @@ test('private form action/reset dispatcher gate records intent metadata only', (
           explicitIntent: true,
           intentKind: 'reset',
           dispatcherKey: 'r',
+          orderingKind: 'current-dispatcher-react-owned-first',
           resetSource: 'requestFormReset',
           formOwnership: 'not-inspected',
           transitionContext: 'action',
+          resetDispatcherOrdering: {
+            metadataOnly: true,
+            orderingKind: 'current-dispatcher-react-owned-first',
+            dispatcherKey: 'r',
+            resetSource: 'requestFormReset',
+            formOwnership: 'not-inspected',
+            transitionContext: 'action',
+            steps: [
+              'public-requestFormReset-current-dispatcher',
+              'dom-dispatcher-form-ownership-check',
+              'react-owned-requestFormResetOnFiber',
+              'previous-dispatcher-fallback-after-ownership-miss',
+              'action-completion-request-reset-before-action',
+              'commit-after-mutation-resetFormInstance'
+            ],
+            publicRequestFormResetCallsCurrentDispatcherFirst: true,
+            domDispatcherChecksReactFormOwnershipBeforeFallback: true,
+            previousDispatcherFallbackWouldFollowOwnershipMiss: true,
+            actionCompletionRequestsResetBeforeActionInvocation: false,
+            resetStateWouldBeQueuedBeforeCommit: true,
+            commitResetWouldRunAfterMutationEffects: true,
+            formCaptured: false,
+            rawDispatcherArgumentCaptured: false,
+            realFormInspected: false,
+            formFiberResolved: false,
+            previousDispatcherCalled: false,
+            resetStateQueued: false,
+            actionInvoked: false,
+            formResetCommitted: false,
+            realFormReset: false,
+            compatibilityClaimed: false
+          },
           formCaptured: false,
           rawDispatcherArgumentCaptured: false,
           realFormInspected: false,
@@ -385,7 +453,21 @@ test('private form action/reset dispatcher gate records intent metadata only', (
   assert.equal(summary.gateId, resourceFormGate.privateFormActionResetDispatcherGateId);
   assert.equal(summary.status, resourceFormGate.privateFormActionResetDispatcherStatus);
   assert.equal(summary.recordsSubmissionIntentMetadata, true);
+  assert.equal(summary.recordsSubmitRequestSubmitActionMetadata, true);
   assert.equal(summary.recordsResetIntentMetadata, true);
+  assert.equal(summary.recordsResetDispatcherOrdering, true);
+  assert.deepEqual(summary.acceptedSubmissionTriggers, [
+    'submit',
+    'requestSubmit',
+    'replay',
+    'unknown'
+  ]);
+  assert.deepEqual(summary.acceptedResetOrderingKinds, [
+    'current-dispatcher-react-owned-first',
+    'action-completion-reset-before-action',
+    'previous-dispatcher-fallback',
+    'unknown'
+  ]);
   assert.equal(summary.acceptsRealForms, false);
   assert.equal(summary.acceptsRawEvents, false);
   assert.equal(summary.acceptsActionFunctions, false);
@@ -405,7 +487,10 @@ test('private form action/reset dispatcher gate records intent metadata only', (
       dispatcherName: contract.dispatcherName,
       privateDispatcherKey: contract.privateDispatcherKey,
       acceptsRealForms: contract.acceptsRealForms,
-      acceptsActionFunctions: contract.acceptsActionFunctions
+      acceptsActionFunctions: contract.acceptsActionFunctions,
+      recordsSubmitRequestSubmitActionMetadata:
+        contract.recordsSubmitRequestSubmitActionMetadata,
+      recordsResetDispatcherOrdering: contract.recordsResetDispatcherOrdering
     })),
     [
       {
@@ -415,7 +500,9 @@ test('private form action/reset dispatcher gate records intent metadata only', (
         dispatcherName: 'form-action-event-plugin',
         privateDispatcherKey: null,
         acceptsRealForms: false,
-        acceptsActionFunctions: false
+        acceptsActionFunctions: false,
+        recordsSubmitRequestSubmitActionMetadata: true,
+        recordsResetDispatcherOrdering: false
       },
       {
         id: 'form-action-reset-intent',
@@ -424,7 +511,9 @@ test('private form action/reset dispatcher gate records intent metadata only', (
         dispatcherName: 'request-form-reset-dispatcher',
         privateDispatcherKey: 'r',
         acceptsRealForms: false,
-        acceptsActionFunctions: false
+        acceptsActionFunctions: false,
+        recordsSubmitRequestSubmitActionMetadata: false,
+        recordsResetDispatcherOrdering: true
       }
     ]
   );
@@ -446,6 +535,14 @@ test('private form action/reset dispatcher gate records intent metadata only', (
     assert.equal(record.compatibilityTarget, compatibilityTarget);
     assert.equal(record.unsupportedCode, unsupportedCode);
     assert.equal(record.dispatcherBoundary.recordsIntentMetadata, true);
+    assert.equal(
+      record.dispatcherBoundary.recordsSubmitRequestSubmitActionMetadata,
+      record.intentKind === 'submission'
+    );
+    assert.equal(
+      record.dispatcherBoundary.recordsResetDispatcherOrdering,
+      record.intentKind === 'reset'
+    );
     assert.equal(record.dispatcherBoundary.acceptsRealForms, false);
     assert.equal(record.dispatcherBoundary.acceptsRawEvents, false);
     assert.equal(record.dispatcherBoundary.acceptsActionFunctions, false);
@@ -469,7 +566,12 @@ test('private form action/reset dispatcher gate records intent metadata only', (
   );
   assert.equal(records[0].sideEffects.formDispatcherMetadataRecorded, true);
   assert.equal(records[0].sideEffects.submissionIntentRecorded, true);
+  assert.equal(
+    records[0].sideEffects.submitRequestSubmitActionMetadataRecorded,
+    true
+  );
   assert.equal(records[0].sideEffects.resetIntentRecorded, false);
+  assert.equal(records[0].sideEffects.resetDispatcherOrderingRecorded, false);
   assert.equal(records[0].sideEffects.formActionEventPluginInvoked, false);
   assert.equal(records[0].sideEffects.realFormInspected, false);
   assert.equal(records[0].sideEffects.submitControlInspected, false);
@@ -483,12 +585,75 @@ test('private form action/reset dispatcher gate records intent metadata only', (
   );
   assert.equal(records[1].sideEffects.formDispatcherMetadataRecorded, true);
   assert.equal(records[1].sideEffects.submissionIntentRecorded, false);
+  assert.equal(
+    records[1].sideEffects.submitRequestSubmitActionMetadataRecorded,
+    false
+  );
   assert.equal(records[1].sideEffects.resetIntentRecorded, true);
+  assert.equal(records[1].sideEffects.resetDispatcherOrderingRecorded, true);
   assert.equal(records[1].sideEffects.requestFormResetDispatcherInvoked, false);
   assert.equal(records[1].sideEffects.resetFiberResolved, false);
   assert.equal(records[1].sideEffects.resetStateQueued, false);
   assert.equal(records[1].sideEffects.formResetCommitted, false);
   assert.equal(records[1].sideEffects.realFormReset, false);
+
+  const requestSubmitRecord = gate.recordSubmissionIntent({
+    explicitIntent: true,
+    eventName: 'submit',
+    submissionTrigger: 'requestSubmit',
+    actionKind: 'function',
+    actionSource: 'submit-control',
+    submitControlKind: 'input',
+    formActionKind: 'string',
+    submitterActionKind: 'function',
+    defaultPrevented: false,
+    transitionScheduled: false
+  });
+  assert.equal(requestSubmitRecord.intent.submissionTrigger, 'requestSubmit');
+  assert.equal(
+    requestSubmitRecord.intent.actionMetadata
+      .requestSubmitWouldDispatchSubmitEvent,
+    true
+  );
+  assert.equal(
+    requestSubmitRecord.intent.actionMetadata
+      .submitterActionOverridesFormAction,
+    true
+  );
+  assert.equal(
+    requestSubmitRecord.intent.actionMetadata
+      .submitterValueWouldBeIncludedInFormData,
+    false
+  );
+  assert.equal(requestSubmitRecord.intent.realFormInspected, false);
+  assert.equal(requestSubmitRecord.intent.formDataConstructed, false);
+
+  const actionCompletionReset = gate.recordResetIntent({
+    explicitIntent: true,
+    dispatcherKey: 'r',
+    resetSource: 'action-completion',
+    formOwnership: 'react-owned',
+    transitionContext: 'action'
+  });
+  assert.equal(
+    actionCompletionReset.intent.orderingKind,
+    'action-completion-reset-before-action'
+  );
+  assert.equal(
+    actionCompletionReset.intent.resetDispatcherOrdering
+      .actionCompletionRequestsResetBeforeActionInvocation,
+    true
+  );
+  assert.equal(
+    actionCompletionReset.intent.resetDispatcherOrdering.previousDispatcherCalled,
+    false
+  );
+  assert.equal(actionCompletionReset.intent.resetStateWouldBeQueued, true);
+  assert.equal(
+    actionCompletionReset.intent.resetDispatcherOrdering.resetStateQueued,
+    false
+  );
+  assert.equal(actionCompletionReset.intent.realFormReset, false);
 });
 
 test('private controlled input value-tracker gate records deterministic metadata only', () => {
@@ -5007,6 +5172,8 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
       appliesToRequest: false,
       metadataGateAvailable: true,
       dispatcherRecordsAccepted: true,
+      submitRequestSubmitActionMetadataRecorded: true,
+      resetDispatcherOrderingRecorded: true,
       realFormAccepted: false,
       rawTargetCaptured: false,
       formInspected: false,

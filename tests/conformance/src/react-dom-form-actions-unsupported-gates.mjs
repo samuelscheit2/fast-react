@@ -160,7 +160,15 @@ export function assertPrivateFormActionResetDispatcherGate() {
     resourceFormGate.privateFormActionResetDispatcherStatus
   );
   assert.equal(summary.recordsSubmissionIntentMetadata, true);
+  assert.equal(summary.recordsSubmitRequestSubmitActionMetadata, true);
   assert.equal(summary.recordsResetIntentMetadata, true);
+  assert.equal(summary.recordsResetDispatcherOrdering, true);
+  assert.deepEqual(summary.acceptedSubmissionTriggers, [
+    "submit",
+    "requestSubmit",
+    "replay",
+    "unknown"
+  ]);
   assert.equal(summary.acceptsRealForms, false);
   assert.equal(summary.acceptsRawEvents, false);
   assert.equal(summary.acceptsActionFunctions, false);
@@ -189,19 +197,85 @@ export function assertPrivateFormActionResetDispatcherGate() {
   );
   assert.equal(submission.status, resourceFormGate.privateFormActionSubmissionIntentRecordedStatus);
   assert.equal(reset.status, resourceFormGate.privateFormActionResetIntentRecordedStatus);
+  assert.equal(submission.intent.submissionTrigger, "submit");
+  assert.equal(submission.intent.actionMetadata.metadataOnly, true);
+  assert.equal(
+    submission.intent.actionMetadata.submitterValueWouldBeIncludedInFormData,
+    true
+  );
   assert.equal(submission.intent.realFormInspected, false);
   assert.equal(submission.intent.submitControlInspected, false);
   assert.equal(submission.intent.formDataConstructed, false);
   assert.equal(submission.intent.actionInvoked, false);
   assert.equal(submission.intent.hostTransitionStarted, false);
+  assert.equal(
+    submission.sideEffects.submitRequestSubmitActionMetadataRecorded,
+    true
+  );
+  assert.equal(reset.intent.orderingKind, "current-dispatcher-react-owned-first");
+  assert.equal(reset.intent.resetDispatcherOrdering.metadataOnly, true);
+  assert.equal(
+    reset.intent.resetDispatcherOrdering
+      .publicRequestFormResetCallsCurrentDispatcherFirst,
+    true
+  );
   assert.equal(reset.intent.realFormInspected, false);
   assert.equal(reset.intent.formFiberResolved, false);
   assert.equal(reset.intent.resetCommitWouldRun, false);
   assert.equal(reset.intent.realFormReset, false);
+  assert.equal(reset.sideEffects.resetDispatcherOrderingRecorded, true);
   assert.equal(submission.sideEffects.actionInvoked, false);
   assert.equal(submission.sideEffects.formDataConstructed, false);
   assert.equal(reset.sideEffects.resetStateQueued, false);
   assert.equal(reset.sideEffects.realFormReset, false);
+
+  const requestSubmit = gate.recordSubmissionIntent({
+    explicitIntent: true,
+    eventName: "submit",
+    submissionTrigger: "requestSubmit",
+    actionKind: "function",
+    actionSource: "submit-control",
+    submitControlKind: "input",
+    formActionKind: "string",
+    submitterActionKind: "function",
+    defaultPrevented: false,
+    transitionScheduled: false
+  });
+  assert.equal(requestSubmit.intent.actionMetadata.metadataOnly, true);
+  assert.equal(
+    requestSubmit.intent.actionMetadata.requestSubmitWouldDispatchSubmitEvent,
+    true
+  );
+  assert.equal(
+    requestSubmit.intent.actionMetadata.submitterActionOverridesFormAction,
+    true
+  );
+  assert.equal(
+    requestSubmit.intent.actionMetadata.submitterValueWouldBeIncludedInFormData,
+    false
+  );
+  assert.equal(requestSubmit.intent.realFormInspected, false);
+
+  const actionCompletionReset = gate.recordResetIntent({
+    explicitIntent: true,
+    dispatcherKey: "r",
+    resetSource: "action-completion",
+    formOwnership: "react-owned",
+    transitionContext: "action"
+  });
+  assert.equal(
+    actionCompletionReset.intent.orderingKind,
+    "action-completion-reset-before-action"
+  );
+  assert.equal(
+    actionCompletionReset.intent.resetDispatcherOrdering
+      .actionCompletionRequestsResetBeforeActionInvocation,
+    true
+  );
+  assert.equal(
+    actionCompletionReset.intent.resetDispatcherOrdering.previousDispatcherCalled,
+    false
+  );
 
   let actionCalls = 0;
   const action = () => {
