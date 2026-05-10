@@ -34,12 +34,13 @@
   `fastReactBehaviorCompatible: false`, and `compatibilityClaimed: false`.
 - Current local workspace has no JS `packages/react-test-renderer` or
   `packages/fast-react-test-renderer` package facade.
-- Current `fast-react-test-renderer` is still a mutation-host crate only; it
-  has no `TestRendererRoot` facade and no dependency on
-  `fast-react-reconciler`.
-- Current reconciler root work loop explicitly stops before commit and host
-  mutation. The local gate therefore observes committed test-renderer host
-  output as absent.
+- After merging current `main`, accepted worker 153 provides a Rust
+  `TestRendererRoot` canary and reconciler dependency, but it still stops at
+  scheduled/rendered diagnostics and does not expose serialization.
+- Current reconciler root work loop and test-renderer path still stop before
+  committed host output. The local gate therefore remains closed because
+  committed test-renderer host output, committed fiber inspection, Rust
+  serialization APIs, and the public JS facade are absent.
 - The new gate does not alter oracle scenarios, generator inputs, or the
   checked JSON artifact. Scenario admission metadata lives in the separate
   local gate module.
@@ -78,14 +79,23 @@ rg -n '^(<<<<<<<|=======|>>>>>>>)' tests/conformance/src/react-test-renderer-ser
 
 ## Verification Results
 
-- `npm run test:react-test-renderer:serialization --workspace @fast-react/conformance`:
-  passed, 14/14 tests.
-- `npm run test:conformance`: passed, 419/419 tests.
-- `npm run check:js`: passed, including JS smoke checks and 419/419
-  conformance tests.
-- `git diff --check`: passed with no output.
-- Scoped trailing-whitespace and conflict-marker scans for the new gate files
-  and progress report passed with no matches.
+- Worker-local verification passed before orchestration merge:
+  - `npm run test:react-test-renderer:serialization --workspace @fast-react/conformance`: 14 tests
+  - `npm run test:conformance`: 419 tests
+  - `npm run check:js`: JS smoke checks and 419 conformance tests
+  - `git diff --check`
+  - Scoped trailing-whitespace and conflict-marker scans for the new gate files and progress report
+- Orchestrator merged current `main` into this branch without conflicts. The
+  first post-merge serialization gate run failed because accepted worker 153
+  now provides a Rust `TestRendererRoot` canary; the local gate test was
+  updated to expect that current root facade while staying closed on missing
+  committed host output.
+- Post-merge orchestrator verification passed:
+  - `npm run test:react-test-renderer:serialization --workspace @fast-react/conformance`: 14 tests
+  - `npm run test:conformance`: 437 tests
+  - `npm run check:js`: package-surface guard, smoke imports, benchmark gate, workspace checks, and 437 conformance tests
+  - `git diff --check`
+  - Scoped trailing-whitespace and conflict-marker scans for the new gate files, progress report, and conformance package script
 - npm emitted the existing `minimum-release-age` config warning during npm
   commands; it did not affect results.
 
