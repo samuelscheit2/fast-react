@@ -73,7 +73,10 @@ const {
   applyDomPropertyPayloadForLatestProps,
   applyStyleDangerousHtmlPayload,
   commitDomPropertyUpdateForLatestProps,
-  commitDomPropertyUpdate
+  commitDomPropertyUpdate,
+  getDomPropertyPayloadMutationRecordsPayload,
+  isDomPropertyPayloadMutationRecords,
+  rollbackDomPropertyPayloadMutationRecords
 } = domMutation;
 
 test("private DOM property payload preserves insertion order for ordinary attributes", () => {
@@ -693,16 +696,18 @@ test("private DOM admitted payload adapter accepts property rows and skips non-p
   const element = new FakeElement("fast-widget");
   const value = { answer: 42 };
 
+  const mutationRecords = applyAdmittedDomPropertyPayload(element, [
+    setProperty("objectProp", value),
+    nonPayload(
+      "onClick",
+      "event",
+      "event props are stored by the future event/latest-props path"
+    ),
+    removeProperty("objectProp")
+  ]);
+
   assert.deepEqual(
-    applyAdmittedDomPropertyPayload(element, [
-      setProperty("objectProp", value),
-      nonPayload(
-        "onClick",
-        "event",
-        "event props are stored by the future event/latest-props path"
-      ),
-      removeProperty("objectProp")
-    ]),
+    mutationRecords,
     [
       appliedSetProperty("objectProp", value),
       skippedNonPayload(
@@ -713,11 +718,60 @@ test("private DOM admitted payload adapter accepts property rows and skips non-p
       appliedRemoveProperty("objectProp")
     ]
   );
+  assert.equal(isDomPropertyPayloadMutationRecords(mutationRecords), true);
+  assert.equal(
+    getDomPropertyPayloadMutationRecordsPayload(mutationRecords)
+      .rollbackRecordCount,
+    2
+  );
   assert.equal(element.objectProp, null);
   assert.deepEqual(element.mutationLog, [
     ["setProperty", "objectProp", value],
     ["setProperty", "objectProp", null]
   ]);
+});
+
+test("private DOM admitted payload adapter rolls back mixed style and innerHTML rows", () => {
+  const element = new FakeElement("div");
+  const child = { nodeName: "SPAN", parentNode: element };
+  const thrownError = new Error("fake setAttribute failed after mutation");
+  const originalSetAttribute = element.setAttribute;
+
+  element.assignedInnerHTML = "<em>old</em>";
+  element.childNodes = [child];
+  element.mutationLog = [];
+  element.setAttribute = function setAttribute(name, value) {
+    originalSetAttribute.call(this, name, value);
+    if (String(name) === "data-state") {
+      throw thrownError;
+    }
+  };
+
+  assert.throws(
+    () =>
+      applyAdmittedDomPropertyPayload(element, [
+        setAttribute("id", "id", "temporary-id"),
+        setStyle("color", "propertyAssignment", "red"),
+        setInnerHTML("<span>raw</span>"),
+        setAttribute("data-state", "data-state", "ready")
+      ]),
+    (error) => error === thrownError
+  );
+  assert.deepEqual(element.mutationLog, [
+    ["setAttribute", "id", "temporary-id"],
+    ["stylePropertyAssignment", "color", "red"],
+    ["setInnerHTML", "<span>raw</span>"],
+    ["setAttribute", "data-state", "ready"],
+    ["removeAttribute", "data-state", true],
+    ["setInnerHTML", "<em>old</em>"],
+    ["stylePropertyAssignment", "color", ""],
+    ["removeAttribute", "id", true]
+  ]);
+  assert.deepEqual(element.activeAttributeEntries(), []);
+  assert.deepEqual(element.activeStyleProperties(), []);
+  assert.equal(element.assignedInnerHTML, "<em>old</em>");
+  assert.deepEqual(element.childNodes, [child]);
+  assert.equal(child.parentNode, element);
 });
 
 test("private DOM admitted payload adapter fails closed before unsupported rows mutate", () => {
@@ -1001,6 +1055,89 @@ test("private DOM style and innerHTML applier applies accepted payload records i
   ]);
   assert.equal(element.assignedInnerHTML, "<span>raw</span>");
   assert.deepEqual(element.childNodes, []);
+});
+
+test("private DOM style and innerHTML applier records rollback diagnostics", () => {
+  const element = new FakeElement("div");
+  const child = { nodeName: "SPAN", parentNode: element };
+  const initialHtml = "<em>old</em>";
+
+  element.style.color = "green";
+  element.style.setProperty("--gap", "2px");
+  element.assignedInnerHTML = initialHtml;
+  element.childNodes = [child];
+  element.mutationLog = [];
+
+  const mutationRecords = applyStyleDangerousHtmlPayload(element, [
+    setStyle("color", "propertyAssignment", "red"),
+    setStyle("--gap", "setProperty", "4px"),
+    setInnerHTML("<span>raw</span>")
+  ]);
+  const diagnostic =
+    getDomPropertyPayloadMutationRecordsPayload(mutationRecords);
+
+  assert.equal(isDomPropertyPayloadMutationRecords(mutationRecords), true);
+  assert.equal(diagnostic.status, "mutated");
+  assert.equal(diagnostic.rollbackSupported, true);
+  assert.equal(diagnostic.rollbackRecordCount, 3);
+  assert.equal(diagnostic.node, element);
+  assert.equal(Object.hasOwn(mutationRecords, "node"), false);
+  assert.equal(Object.hasOwn(mutationRecords, "rollbackRecords"), false);
+  assert.deepEqual(diagnostic.mutationRecords, mutationRecords);
+  assert.deepEqual(
+    diagnostic.rollbackRecords.map((record) => record && record.kind),
+    ["styleRollback", "styleRollback", "innerHTMLRollback"]
+  );
+  assert.deepEqual(element.activeStyleProperties(), [
+    ["--gap", "4px"],
+    ["color", "red"]
+  ]);
+  assert.equal(element.assignedInnerHTML, "<span>raw</span>");
+  assert.deepEqual(element.childNodes, []);
+
+  assert.equal(
+    rollbackDomPropertyPayloadMutationRecords(mutationRecords),
+    3
+  );
+  assert.deepEqual(element.activeStyleProperties(), [
+    ["--gap", "2px"],
+    ["color", "green"]
+  ]);
+  assert.equal(element.assignedInnerHTML, initialHtml);
+  assert.deepEqual(element.childNodes, [child]);
+  assert.equal(child.parentNode, element);
+});
+
+test("private DOM style and innerHTML applier rolls back partial thrown writes", () => {
+  const element = new FakeElement("div");
+  const child = { nodeName: "SPAN", parentNode: element };
+  const thrownError = new Error("fake innerHTML failed after mutation");
+
+  element.style.color = "green";
+  element.assignedInnerHTML = "<em>old</em>";
+  element.childNodes = [child];
+  element.throwNextInnerHTMLAfterAssign = thrownError;
+  element.mutationLog = [];
+
+  assert.throws(
+    () =>
+      applyStyleDangerousHtmlPayload(element, [
+        setStyle("color", "propertyAssignment", "red"),
+        setInnerHTML("<span>raw</span>")
+      ]),
+    (error) => error === thrownError
+  );
+
+  assert.deepEqual(element.activeStyleProperties(), [["color", "green"]]);
+  assert.equal(element.assignedInnerHTML, "<em>old</em>");
+  assert.deepEqual(element.childNodes, [child]);
+  assert.equal(child.parentNode, element);
+  assert.deepEqual(element.mutationLog, [
+    ["stylePropertyAssignment", "color", "red"],
+    ["setInnerHTML", "<span>raw</span>"],
+    ["setInnerHTML", "<em>old</em>"],
+    ["stylePropertyAssignment", "color", "green"]
+  ]);
 });
 
 test("private DOM style applier applies update and removal records deterministically", () => {
@@ -1791,6 +1928,7 @@ class FakeElement {
     this.mutationLog = [];
     this.style = new FakeStyle(this);
     this.assignedInnerHTML = null;
+    this.throwNextInnerHTMLAfterAssign = null;
   }
 
   get innerHTML() {
@@ -1802,6 +1940,11 @@ class FakeElement {
     this.mutationLog.push(["setInnerHTML", html]);
     this.childNodes = [];
     this.assignedInnerHTML = html;
+    if (this.throwNextInnerHTMLAfterAssign !== null) {
+      const error = this.throwNextInnerHTMLAfterAssign;
+      this.throwNextInnerHTMLAfterAssign = null;
+      throw error;
+    }
   }
 
   activeStyleProperties() {

@@ -48,6 +48,7 @@ const CLEAR_CONTAINER_FOR_ROOT_UNMOUNT_RECORD =
 const latestPropsCommitRecordPayloads = new WeakMap();
 const domPropertyUpdateLatestPropsHandoffPayloads = new WeakMap();
 const clearContainerForRootUnmountRecordPayloads = new WeakMap();
+const domPropertyPayloadMutationRecordsPayloads = new WeakMap();
 const latestPropsSafePayloadKinds = new Set([
   ENTRY_SET_ATTRIBUTE,
   ENTRY_REMOVE_ATTRIBUTE,
@@ -271,12 +272,35 @@ function applyAdmittedDomPropertyPayload(instance, payload) {
   const entries = payload.map((entry, index) =>
     normalizeAdmittedDomPropertyPayloadEntry(instance, entry, index)
   );
+  const rollbackRecords = createDomPropertyPayloadRollbackRecords(
+    instance,
+    entries
+  );
+  let rollbackLimit = 0;
 
-  for (const entry of entries) {
-    applyAdmittedNormalizedPropertyPayloadEntry(instance, entry);
+  try {
+    for (let index = 0; index < entries.length; index += 1) {
+      rollbackLimit = index + 1;
+      applyAdmittedNormalizedPropertyPayloadEntry(instance, entries[index]);
+    }
+  } catch (error) {
+    try {
+      rollbackDomPropertyPayloadEntries(
+        instance,
+        rollbackRecords,
+        rollbackLimit
+      );
+    } catch (rollbackError) {
+      // Preserve the original private mutation failure for callers.
+    }
+    throw error;
   }
 
-  return entries.map(createAdmittedPropertyPayloadRecord);
+  return createDomPropertyPayloadMutationRecords(
+    instance,
+    entries.map(createAdmittedPropertyPayloadRecord),
+    rollbackRecords
+  );
 }
 
 function applyDomPropertyPayloadForLatestProps(instance, payload, latestProps) {
@@ -351,12 +375,35 @@ function applyStyleDangerousHtmlPayload(instance, payload) {
   const entries = payload.map((entry) =>
     validateStyleDangerousHtmlPayloadEntry(instance, entry)
   );
+  const rollbackRecords = createDomPropertyPayloadRollbackRecords(
+    instance,
+    entries
+  );
+  let rollbackLimit = 0;
 
-  for (const entry of entries) {
-    applyStyleDangerousHtmlPayloadEntry(instance, entry);
+  try {
+    for (let index = 0; index < entries.length; index += 1) {
+      rollbackLimit = index + 1;
+      applyStyleDangerousHtmlPayloadEntry(instance, entries[index]);
+    }
+  } catch (error) {
+    try {
+      rollbackDomPropertyPayloadEntries(
+        instance,
+        rollbackRecords,
+        rollbackLimit
+      );
+    } catch (rollbackError) {
+      // Preserve the original private mutation failure for callers.
+    }
+    throw error;
   }
 
-  return entries;
+  return createDomPropertyPayloadMutationRecords(
+    instance,
+    entries,
+    rollbackRecords
+  );
 }
 
 function createLatestPropsCommitRecord(node, latestProps, payloadRecords) {
@@ -413,6 +460,17 @@ function getClearContainerForRootUnmountRecordPayload(record) {
 
 function isClearContainerForRootUnmountRecord(record) {
   return getClearContainerForRootUnmountRecordPayload(record) !== null;
+}
+
+function getDomPropertyPayloadMutationRecordsPayload(records) {
+  if (!isWeakMapKey(records)) {
+    return null;
+  }
+  return domPropertyPayloadMutationRecordsPayloads.get(records) || null;
+}
+
+function isDomPropertyPayloadMutationRecords(records) {
+  return getDomPropertyPayloadMutationRecordsPayload(records) !== null;
 }
 
 function assertAppendParent(parent, operation) {
@@ -836,6 +894,31 @@ function createDomPropertyUpdateLatestPropsHandoff(
   return handoff;
 }
 
+function createDomPropertyPayloadMutationRecords(
+  instance,
+  records,
+  rollbackRecords
+) {
+  const mutationRecords = Object.freeze(
+    records.map((record) => Object.freeze({...record}))
+  );
+  const rollbackRecordCount = rollbackRecords.filter(Boolean).length;
+
+  domPropertyPayloadMutationRecordsPayloads.set(
+    mutationRecords,
+    Object.freeze({
+      mutationRecords,
+      node: instance,
+      rollbackRecordCount,
+      rollbackRecords,
+      rollbackSupported: true,
+      status: 'mutated'
+    })
+  );
+
+  return mutationRecords;
+}
+
 function rollbackDomPropertyUpdateLatestPropsHandoff(handoff) {
   const payload = getDomPropertyUpdateLatestPropsHandoffPayload(handoff);
   if (payload === null) {
@@ -861,6 +944,75 @@ function rollbackDomPropertyUpdateLatestPropsHandoff(handoff) {
     payload.rollbackRecords.length
   );
   return payload.rollbackRecords.filter(Boolean).length;
+}
+
+function rollbackDomPropertyPayloadMutationRecords(records) {
+  const payload = getDomPropertyPayloadMutationRecordsPayload(records);
+  if (payload === null) {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_PROPERTY_PAYLOAD_MUTATION_ROLLBACK',
+      'Cannot roll back invalid DOM property payload mutation records.'
+    );
+  }
+
+  rollbackDomPropertyPayloadEntries(
+    payload.node,
+    payload.rollbackRecords,
+    payload.rollbackRecords.length
+  );
+  return payload.rollbackRecordCount;
+}
+
+function createDomPropertyPayloadRollbackRecords(instance, entries) {
+  return Object.freeze(
+    entries.map((entry) => {
+      const rollbackRecord = createDomPropertyPayloadRollbackRecord(
+        instance,
+        entry
+      );
+      return rollbackRecord === null ? null : Object.freeze(rollbackRecord);
+    })
+  );
+}
+
+function createDomPropertyPayloadRollbackRecord(instance, entry) {
+  if (entry.kind === ENTRY_SET_ATTRIBUTE) {
+    return createAttributePayloadRollbackRecord(
+      instance,
+      entry.attributeName
+    );
+  }
+
+  if (entry.kind === ENTRY_REMOVE_ATTRIBUTE) {
+    return createAttributePayloadRollbackRecord(
+      instance,
+      entry.attributeName
+    );
+  }
+
+  if (entry.kind === ENTRY_SET_PROPERTY) {
+    return createPropertyPayloadRollbackRecord(
+      instance,
+      entry.propertyName
+    );
+  }
+
+  if (entry.kind === ENTRY_REMOVE_PROPERTY) {
+    return createPropertyPayloadRollbackRecord(
+      instance,
+      entry.propertyName
+    );
+  }
+
+  if (entry.kind === ENTRY_SET_STYLE || entry.kind === ENTRY_REMOVE_STYLE) {
+    return createStylePayloadRollbackRecord(instance, entry);
+  }
+
+  if (entry.kind === ENTRY_SET_INNER_HTML) {
+    return createInnerHtmlPayloadRollbackRecord(instance);
+  }
+
+  return null;
 }
 
 function createLatestPropsSafeDomPropertyPayloadRollbackRecords(
@@ -943,6 +1095,15 @@ function createStylePayloadRollbackRecord(instance, entry) {
   };
 }
 
+function createInnerHtmlPayloadRollbackRecord(instance) {
+  return {
+    kind: 'innerHTMLRollback',
+    childNodes: getInnerHtmlRollbackChildNodes(instance),
+    propertyName: 'innerHTML',
+    value: getInnerHtmlRollbackSnapshot(instance)
+  };
+}
+
 function assertAttributeRollbackTarget(instance) {
   if (
     typeof instance.setAttribute === 'function' &&
@@ -983,7 +1144,7 @@ function getAttributeRollbackSnapshot(instance, attributeName) {
   );
 }
 
-function rollbackLatestPropsSafeDomPropertyPayloadEntries(
+function rollbackDomPropertyPayloadEntries(
   instance,
   rollbackRecords,
   rollbackLimit
@@ -995,10 +1156,7 @@ function rollbackLatestPropsSafeDomPropertyPayloadEntries(
       continue;
     }
     try {
-      applyLatestPropsSafeDomPropertyPayloadRollbackRecord(
-        instance,
-        rollbackRecord
-      );
+      applyDomPropertyPayloadRollbackRecord(instance, rollbackRecord);
     } catch (error) {
       if (firstRollbackError === null) {
         firstRollbackError = error;
@@ -1011,7 +1169,15 @@ function rollbackLatestPropsSafeDomPropertyPayloadEntries(
   }
 }
 
-function applyLatestPropsSafeDomPropertyPayloadRollbackRecord(
+function rollbackLatestPropsSafeDomPropertyPayloadEntries(
+  instance,
+  rollbackRecords,
+  rollbackLimit
+) {
+  rollbackDomPropertyPayloadEntries(instance, rollbackRecords, rollbackLimit);
+}
+
+function applyDomPropertyPayloadRollbackRecord(
   instance,
   rollbackRecord
 ) {
@@ -1045,6 +1211,14 @@ function applyLatestPropsSafeDomPropertyPayloadRollbackRecord(
       return;
     }
     applyStyleRollbackRecord(instance, rollbackRecord);
+    return;
+  }
+
+  if (rollbackRecord.kind === 'innerHTMLRollback') {
+    if (innerHtmlRollbackRecordMatchesCurrentValue(instance, rollbackRecord)) {
+      return;
+    }
+    applyInnerHtmlRollbackRecord(instance, rollbackRecord);
     return;
   }
 
@@ -1084,11 +1258,60 @@ function getStyleRollbackSnapshot(instance, entry) {
   return value == null ? '' : String(value);
 }
 
+function getInnerHtmlRollbackSnapshot(instance) {
+  if (!('innerHTML' in instance)) {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_UNSUPPORTED_PROPERTY_PAYLOAD_ROLLBACK_TARGET',
+      'Cannot roll back an innerHTML payload on a node without innerHTML.'
+    );
+  }
+
+  return String(instance.innerHTML);
+}
+
+function getInnerHtmlRollbackChildNodes(instance) {
+  if (!Array.isArray(instance.childNodes)) {
+    return null;
+  }
+
+  return Object.freeze(instance.childNodes.slice());
+}
+
 function styleRollbackRecordMatchesCurrentValue(instance, rollbackRecord) {
   return (
     getStyleRollbackSnapshot(instance, rollbackRecord) ===
     rollbackRecord.value
   );
+}
+
+function innerHtmlRollbackRecordMatchesCurrentValue(instance, rollbackRecord) {
+  if (getInnerHtmlRollbackSnapshot(instance) !== rollbackRecord.value) {
+    return false;
+  }
+
+  if (rollbackRecord.childNodes === null) {
+    return true;
+  }
+
+  return childNodeSnapshotsMatch(instance.childNodes, rollbackRecord.childNodes);
+}
+
+function childNodeSnapshotsMatch(currentChildNodes, rollbackChildNodes) {
+  if (!Array.isArray(currentChildNodes)) {
+    return false;
+  }
+
+  if (currentChildNodes.length !== rollbackChildNodes.length) {
+    return false;
+  }
+
+  for (let index = 0; index < currentChildNodes.length; index += 1) {
+    if (currentChildNodes[index] !== rollbackChildNodes[index]) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function applyStyleRollbackRecord(instance, rollbackRecord) {
@@ -1103,6 +1326,36 @@ function applyStyleRollbackRecord(instance, rollbackRecord) {
   }
 
   instance.style[rollbackRecord.styleName] = rollbackRecord.value;
+}
+
+function applyInnerHtmlRollbackRecord(instance, rollbackRecord) {
+  if (getInnerHtmlRollbackSnapshot(instance) !== rollbackRecord.value) {
+    instance.innerHTML = rollbackRecord.value;
+  }
+
+  if (
+    rollbackRecord.childNodes !== null &&
+    Array.isArray(instance.childNodes) &&
+    !childNodeSnapshotsMatch(instance.childNodes, rollbackRecord.childNodes)
+  ) {
+    const nextChildren = rollbackRecord.childNodes.slice();
+    for (const child of instance.childNodes) {
+      if (
+        child &&
+        typeof child === 'object' &&
+        child.parentNode === instance &&
+        !nextChildren.includes(child)
+      ) {
+        child.parentNode = null;
+      }
+    }
+    for (const child of nextChildren) {
+      if (child && typeof child === 'object') {
+        child.parentNode = instance;
+      }
+    }
+    instance.childNodes = nextChildren;
+  }
 }
 
 function assertChildNode(child, operation) {
@@ -1510,17 +1763,20 @@ module.exports = {
   createDomHostMutationError,
   createLatestPropsCommitRecord,
   getClearContainerForRootUnmountRecordPayload,
+  getDomPropertyPayloadMutationRecordsPayload,
   getDomPropertyUpdateLatestPropsHandoffPayload,
   getLatestPropsCommitRecordPayload,
   insertBefore,
   insertInContainerBefore,
   isClearContainerForRootUnmountRecord,
+  isDomPropertyPayloadMutationRecords,
   isDomPropertyUpdateLatestPropsHandoff,
   isLatestPropsCommitRecord,
   LATEST_PROPS_COMMIT_RECORD,
   removeChild,
   removeChildFromContainer,
   resetTextContent,
+  rollbackDomPropertyPayloadMutationRecords,
   rollbackDomPropertyUpdateLatestPropsHandoff,
   setTextContent
 };
