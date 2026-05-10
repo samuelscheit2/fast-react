@@ -4999,8 +4999,39 @@ test('private react-dom/client facade adapter routes root calls to bridge record
   assert.equal(Object.isFrozen(initialPayload.requestRecords), true);
   assertBridgeDidNotTouchContainer(container, document);
 
-  const render = root.render(element, callback);
+  const renderDiagnostic = root.render(element, callback);
+  const renderDiagnosticPayload =
+    rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(
+      renderDiagnostic
+    );
+  const render = renderDiagnosticPayload.renderRecord;
   const renderPayload = rootBridge.getPrivateRootRecordPayload(render);
+  const hostOutputPayload =
+    rootBridge.getPrivateRootInitialHostOutputHandoffPayload(
+      renderDiagnosticPayload.hostOutputHandoff
+    );
+  const hostNode = hostOutputPayload.hostNode;
+  const textNode = hostOutputPayload.textNode;
+
+  assert.equal(
+    renderDiagnostic.$$typeof,
+    rootBridge.privateRootPublicFacadeHostOutputRenderRecordType
+  );
+  assert.equal(
+    renderDiagnostic.diagnosticStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_APPLIED
+  );
+  assert.equal(renderDiagnostic.renderRequestId, 'facade-request:2');
+  assert.equal(renderDiagnostic.renderUpdateId, 'facade-update:1');
+  assert.equal(renderDiagnostic.hostType, 'span');
+  assert.equal(renderDiagnostic.textContent, 'private facade child');
+  assert.equal(renderDiagnostic.privateFacadeRoot, true);
+  assert.equal(renderDiagnostic.publicRootExecution, false);
+  assert.equal(renderDiagnostic.publicRootCompatibilitySurface, false);
+  assert.equal(renderDiagnostic.reconcilerExecution, false);
+  assert.equal(renderDiagnostic.fakeDomMutation, true);
+  assert.equal(renderDiagnostic.browserDomMutation, false);
+  assert.equal(renderDiagnostic.compatibilityClaimed, false);
   assert.equal(render.$$typeof, rootBridge.privateRootUpdateRecordType);
   assert.equal(render.requestType, 'root.render');
   assert.equal(render.updateId, 'facade-update:1');
@@ -5008,6 +5039,14 @@ test('private react-dom/client facade adapter routes root calls to bridge record
   assert.equal(render.lifecycleStatusAfter, rootBridge.ROOT_LIFECYCLE_RENDERED);
   assert.equal(renderPayload.element, element);
   assert.equal(renderPayload.callback, callback);
+  assert.equal(container.childNodes.length, 1);
+  assert.equal(container.firstChild, hostNode);
+  assert.equal(hostNode.nodeName, 'SPAN');
+  assert.equal(hostNode.firstChild, textNode);
+  assert.equal(textNode.nodeValue, 'private facade child');
+  assert.equal(componentTree.getRootOwnerFromNode(hostNode), create.owner);
+  assert.equal(componentTree.getRootOwnerFromNode(textNode), create.owner);
+  assert.equal(componentTree.getLatestPropsFromNode(hostNode), element.props);
 
   const unmount = root.unmount(unmountCallback);
   const unmountPayload = rootBridge.getPrivateRootRecordPayload(unmount);
@@ -5040,6 +5079,9 @@ test('private react-dom/client facade adapter routes root calls to bridge record
     secondUnmount
   ]);
   assert.deepEqual(adapter.getRootPayload(root).renderRecords, [render]);
+  assert.deepEqual(adapter.getRootHostOutputRenderDiagnostics(root), [
+    renderDiagnostic
+  ]);
   assert.deepEqual(adapter.getRootPayload(root).unmountRecords, [
     unmount,
     secondUnmount
@@ -5058,7 +5100,29 @@ test('private react-dom/client facade adapter routes root calls to bridge record
   assert.throws(() => adapter.getRootCreateRecord({}), {
     code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_ADAPTER'
   });
-  assertBridgeDidNotTouchContainer(container, document);
+  const cleanup = renderDiagnosticPayload.bridge.cleanupInitialRenderHostOutput(
+    renderDiagnosticPayload.hostOutputHandoff
+  );
+  assert.equal(
+    cleanup.cleanupStatus,
+    rootBridge.ROOT_BRIDGE_INITIAL_HOST_OUTPUT_CLEANED
+  );
+  assert.equal(container.childNodes.length, 0);
+  assert.equal(componentTree.getRootOwnerFromNode(hostNode), null);
+  assert.equal(componentTree.getRootOwnerFromNode(textNode), null);
+  assert.equal(rootMarkers.getContainerRoot(container), null);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+  assert.equal(container.__registrations.length, 0);
+  assert.equal(document.__registrations.length, 0);
+  assert.deepEqual(
+    container.__mutationLog.map((entry) => entry.type),
+    ['appendChild', 'removeChild']
+  );
+  assert.deepEqual(
+    document.__mutationLog.map((entry) => entry.type),
+    ['createElement', 'createTextNode']
+  );
 });
 
 test('private react-dom/client facade preflight routes root calls to accepted bridge diagnostics', () => {
@@ -7149,7 +7213,7 @@ test('private react-dom/client facade host-output diagnostic fails closed', () =
     activeDiagnostic
   ]);
   assert.equal(adapter.getRootRequestRecords(root).length, 2);
-  activePayload.root.render(element);
+  activePayload.bridge.renderContainer(activePayload.rootHandle, element);
   assert.throws(
     () => adapter.createRenderNativeHandoff(root, activeDiagnostic),
     {
