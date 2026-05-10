@@ -2059,6 +2059,51 @@ mod tests {
         diff
     }
 
+    fn update_host_parent_text_for_commit_with_payload(
+        store: &mut FiberRootStore<RecordingHost>,
+        root_id: FiberRootId,
+        host_root: FiberId,
+        current_parent: FiberId,
+        current_text: FiberId,
+        next_text: &TestHostText,
+        detached_hosts: &mut DetachedHostRecords,
+    ) -> (FiberId, HostTextUpdateDiff) {
+        let parent_node = store.fiber_arena().get(current_parent).unwrap();
+        let parent_props = parent_node.memoized_props();
+        let parent_state_node = parent_node.state_node();
+        let work_parent = store
+            .fiber_arena_mut()
+            .create_work_in_progress(current_parent, parent_props)
+            .unwrap();
+        let diff = update_test_host_text_work(
+            store,
+            root_id,
+            current_text,
+            next_text,
+            Lanes::NO,
+            detached_hosts,
+        )
+        .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(work_parent, &[diff.work_in_progress()])
+            .unwrap();
+        complete_fiber_common(
+            store,
+            work_parent,
+            parent_props,
+            parent_state_node,
+            InitialChildrenFinalization::NoCommitMount,
+        )
+        .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root, &[work_parent])
+            .unwrap();
+        complete_host_root(store, host_root).unwrap();
+        (work_parent, diff)
+    }
+
     fn update_root_text_for_commit_without_payload(
         store: &mut FiberRootStore<RecordingHost>,
         host_root: FiberId,
@@ -3371,6 +3416,88 @@ mod tests {
         assert_eq!(diff.old_text(), "before");
         assert_eq!(diff.new_text(), "after");
         assert_eq!(apply.records().len(), 1);
+        assert_eq!(
+            apply.records()[0].mutation().fiber(),
+            diff.work_in_progress()
+        );
+        assert_eq!(
+            apply.records()[0].mutation().alternate_fiber(),
+            Some(current_text)
+        );
+        assert_eq!(
+            apply.records()[0].mutation().kind(),
+            HostRootMutationApplyRecordKind::CommitHostTextUpdate
+        );
+        assert_eq!(
+            apply.records()[0].status(),
+            TestHostRootMutationApplyStatus::Applied(
+                TestHostRootMutationHostCall::CommitTextUpdate
+            )
+        );
+        assert_eq!(apply.applied_host_call_count(), 1);
+        assert_eq!(detached_hosts.text(state_node).unwrap().text(), "before");
+        let mut expected_operations = operations_before_apply;
+        expected_operations.push("commit_text_update");
+        assert_eq!(host.operations(), expected_operations);
+    }
+
+    #[test]
+    fn host_work_applies_host_parent_text_update_payload_to_fake_host_config() {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let create_render = render_test_root(&mut store, root_id, RootElementHandle::from_raw(79));
+        let (current_parent, current_text) = attach_detached_root_element_with_text_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            create_render.finished_work(),
+            "before",
+        );
+        let state_node = store.fiber_arena().get(current_text).unwrap().state_node();
+        let create_commit = commit_finished_host_root(&mut store, create_render).unwrap();
+        apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &create_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        let mut source = TestHostTree::new();
+        let next_element = source.insert_text("after");
+        let next_text = text_from_root(&source, next_element);
+        let update_render = render_test_root(&mut store, root_id, next_element);
+        let (work_parent, diff) = update_host_parent_text_for_commit_with_payload(
+            &mut store,
+            root_id,
+            update_render.finished_work(),
+            current_parent,
+            current_text,
+            next_text,
+            &mut detached_hosts,
+        );
+        let update_commit = commit_finished_host_root(&mut store, update_render).unwrap();
+        let operations_before_apply = host.operations();
+        let apply = apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &update_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        assert_eq!(diff.current(), current_text);
+        assert_eq!(diff.state_node(), state_node);
+        assert_eq!(diff.old_text(), "before");
+        assert_eq!(diff.new_text(), "after");
+        assert_eq!(apply.records().len(), 1);
+        assert_eq!(apply.records()[0].mutation().parent(), work_parent);
+        assert_eq!(
+            apply.records()[0].mutation().parent_tag(),
+            FiberTag::HostComponent
+        );
         assert_eq!(
             apply.records()[0].mutation().fiber(),
             diff.work_in_progress()

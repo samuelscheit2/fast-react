@@ -2384,6 +2384,11 @@ pub enum TestRendererRootError {
         parent_state_node_raw: u64,
         child_state_node_raw: u64,
     },
+    MissingHostTextUpdateApply {
+        current_text_slot: usize,
+        updated_text_slot: usize,
+        text_state_node_raw: u64,
+    },
     UnexpectedHostOutputUpdateKind {
         expected: TestRendererRootUpdateKind,
         actual: TestRendererRootUpdateKind,
@@ -2421,6 +2426,14 @@ impl Display for TestRendererRootError {
                 formatter,
                 "test-renderer host-output canary did not receive a host-parent placement apply record for parent state node {parent_state_node_raw} and child state node {child_state_node_raw}",
             ),
+            Self::MissingHostTextUpdateApply {
+                current_text_slot,
+                updated_text_slot,
+                text_state_node_raw,
+            } => write!(
+                formatter,
+                "test-renderer host-output canary did not receive a HostText update apply record from current text fiber slot {current_text_slot} to updated text fiber slot {updated_text_slot} for state node {text_state_node_raw}",
+            ),
             Self::UnexpectedHostOutputUpdateKind { expected, actual } => write!(
                 formatter,
                 "test-renderer host-output canary expected a {:?} update, found {:?}",
@@ -2447,6 +2460,7 @@ impl Error for TestRendererRootError {
             Self::MissingHostOutputFixture { .. }
             | Self::MissingCommittedHostOutput { .. }
             | Self::MissingHostParentPlacementApply { .. }
+            | Self::MissingHostTextUpdateApply { .. }
             | Self::UnexpectedHostOutputUpdateKind { .. } => None,
         }
     }
@@ -2988,6 +3002,21 @@ impl TestRendererRoot {
         )?;
         let commit = self.commit_host_root_render_for_canary(render)?;
         let commit_diagnostics = inspect_test_renderer_host_output_canary_commit(&commit);
+        let text_update_requested =
+            updated.text_props_changed() || current.fixture.text != next_fixture.text;
+        if text_update_requested
+            && !commit.has_test_only_host_text_update_apply_for_canary(
+                current.fibers.text(),
+                updated.current().text(),
+                Self::text_state_node_raw(current.text),
+            )
+        {
+            return Err(TestRendererRootError::MissingHostTextUpdateApply {
+                current_text_slot: current.fibers.text().slot().get(),
+                updated_text_slot: updated.current().text().slot().get(),
+                text_state_node_raw: Self::text_state_node_raw(current.text),
+            });
+        }
 
         let container = self.container;
         let mut instance = current.instance;
@@ -3008,7 +3037,7 @@ impl TestRendererRoot {
                 &next_fixture.props,
             )?;
         }
-        if updated.text_props_changed() || current.fixture.text != next_fixture.text {
+        if text_update_requested {
             self.renderer.commit_text_update(
                 &mut text,
                 &current.fixture.text,
@@ -4903,7 +4932,7 @@ mod tests {
         assert_eq!(host_storage_counts(&root), (1, 1, 1));
         assert_eq!(host_node_activity_counts(&root), (2, 0));
         assert!(diagnostics.deletion_lists().is_empty());
-        assert_eq!(diagnostics.mutation_records().len(), 1);
+        assert_eq!(diagnostics.mutation_records().len(), 2);
         let mutation = diagnostics.mutation_records()[0];
         assert_eq!(
             mutation.kind(),
@@ -4915,6 +4944,26 @@ mod tests {
         assert_eq!(mutation.pending_props_raw(), 3);
         assert_eq!(mutation.memoized_props_raw(), 3);
         assert_eq!(mutation.alternate_memoized_props_raw(), Some(1));
+        let text_mutation = diagnostics.mutation_records()[1];
+        assert_eq!(
+            text_mutation.kind(),
+            TestRendererHostOutputCanaryMutationKind::Update
+        );
+        assert_eq!(text_mutation.fiber(), fibers.current().text());
+        assert_eq!(text_mutation.host_root(), render.finished_work());
+        assert_eq!(text_mutation.state_node_raw(), 1);
+        assert_eq!(text_mutation.pending_props_raw(), 4);
+        assert_eq!(text_mutation.memoized_props_raw(), 4);
+        assert_eq!(text_mutation.alternate_memoized_props_raw(), Some(2));
+        assert_eq!(
+            commit.test_only_host_text_update_apply_count_for_canary(),
+            1
+        );
+        assert!(commit.has_test_only_host_text_update_apply_for_canary(
+            create_current.text(),
+            fibers.current().text(),
+            1
+        ));
 
         let TestNodeSnapshot::Element(previous) = &updated.previous_snapshot().children()[0] else {
             panic!("expected previous host component");
