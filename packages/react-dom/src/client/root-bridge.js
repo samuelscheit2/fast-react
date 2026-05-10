@@ -105,6 +105,8 @@ const privateRootUnmountHostOutputCleanupRecordType =
   'fast.react_dom.private_root_unmount_host_output_cleanup_record';
 const privateRootPortalFakeDomMountRecordType =
   'fast.react_dom.private_root_portal_fake_dom_mount_record';
+const privateRootPortalChildReconciliationDiagnosticRecordType =
+  'fast.react_dom.private_root_portal_child_reconciliation_diagnostic_record';
 const privateRootHostOutputUpdateHandoffRecordType =
   'fast.react_dom.private_root_host_output_update_handoff_record';
 const privateRootCommitRefMetadataRecordType =
@@ -157,6 +159,8 @@ const ROOT_BRIDGE_PORTAL_FAKE_DOM_MOUNT_APPLIED =
   'applied-private-root-portal-fake-dom-mount-diagnostic';
 const ROOT_BRIDGE_PORTAL_PUBLIC_MOUNT_BLOCKED =
   'blocked-public-root-portal-mounting';
+const ROOT_BRIDGE_PORTAL_CHILD_RECONCILIATION_ADMITTED =
+  'admitted-private-root-portal-child-reconciliation-diagnostic';
 const ROOT_BRIDGE_HOST_OUTPUT_UPDATE_APPLIED =
   'applied-private-root-host-output-update';
 const ROOT_BRIDGE_ROOT_COMMIT_REF_METADATA_ACCEPTED =
@@ -431,6 +435,12 @@ const ROOT_BRIDGE_PORTAL_FAKE_DOM_MOUNT_ACCEPTED_CAPABILITIES = freezeArray([
     accepted: true,
     reason:
       'A caller-provided HostText child was mounted under the fake-DOM HostComponent diagnostic child.'
+  }),
+  freezeRecord({
+    id: 'portal-component-tree-host-instance-map',
+    accepted: true,
+    reason:
+      'The fake-DOM portal HostComponent and HostText were attached to private component-tree host instance tokens.'
   })
 ]);
 const ROOT_BRIDGE_PORTAL_FAKE_DOM_MOUNT_BLOCKED_CAPABILITIES = freezeArray([
@@ -491,6 +501,92 @@ const ROOT_BRIDGE_PORTAL_FAKE_DOM_MOUNT_BLOCKED_CAPABILITIES = freezeArray([
     reason: 'React DOM portal compatibility remains unclaimed.'
   })
 ]);
+const ROOT_BRIDGE_PORTAL_CHILD_RECONCILIATION_ACCEPTED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'portal-accepted-boundary',
+      accepted: true,
+      reason:
+        'The diagnostic consumed a later accepted private portal boundary for the same root and portal container.'
+    }),
+    freezeRecord({
+      id: 'portal-fake-dom-host-component-update',
+      accepted: true,
+      reason:
+        'Exactly one mounted fake-DOM portal HostComponent received an admitted private property update.'
+    }),
+    freezeRecord({
+      id: 'portal-fake-dom-host-text-update',
+      accepted: true,
+      reason:
+        'Exactly one mounted fake-DOM portal HostText child received the matching text update.'
+    }),
+    freezeRecord({
+      id: 'portal-latest-props-after-mutation',
+      accepted: true,
+      reason:
+        'Latest props for the portal HostComponent were published only after property and text mutation completed.'
+    })
+  ]);
+const ROOT_BRIDGE_PORTAL_CHILD_RECONCILIATION_BLOCKED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'portal-public-container-mounting',
+      blocked: true,
+      reason: 'Public React DOM portal mounting remains blocked.'
+    }),
+    freezeRecord({
+      id: 'portal-generic-child-reconciliation',
+      blocked: true,
+      reason:
+        'Arrays, replacements, insertions, deletions, nested children, and arbitrary portal reconciliation remain blocked.'
+    }),
+    freezeRecord({
+      id: 'portal-container-replacement',
+      blocked: true,
+      reason:
+        'Replacing portal container children is not admitted by this diagnostic.'
+    }),
+    freezeRecord({
+      id: 'portal-prepare-mount-listeners',
+      blocked: true,
+      reason:
+        'preparePortalMount and portal listener installation remain blocked.'
+    }),
+    freezeRecord({
+      id: 'portal-resource-side-effects',
+      blocked: true,
+      reason:
+        'Document resource, form, and controlled input side effects remain blocked.'
+    }),
+    freezeRecord({
+      id: 'native-execution',
+      blocked: true,
+      reason: 'No native or Rust root bridge execution is admitted.'
+    }),
+    freezeRecord({
+      id: 'reconciler-execution',
+      blocked: true,
+      reason:
+        'No generic reconciler traversal, scheduling, placement, deletion, or commit execution is admitted.'
+    }),
+    freezeRecord({
+      id: 'hydration',
+      blocked: true,
+      reason:
+        'Hydration root creation, marker consumption, and replay are not admitted.'
+    }),
+    freezeRecord({
+      id: 'events',
+      blocked: true,
+      reason: 'Synthetic event extraction and dispatch are not admitted.'
+    }),
+    freezeRecord({
+      id: 'compatibility-claims',
+      blocked: true,
+      reason: 'React DOM portal compatibility remains unclaimed.'
+    })
+  ]);
 const ROOT_BRIDGE_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES = freezeArray([
   freezeRecord({
     id: 'fake-dom-property-update',
@@ -645,6 +741,7 @@ const rootPortalCommitHandoffPayloads = new WeakMap();
 const rootUnmountHostOutputCleanupPayloads = new WeakMap();
 const rootUnmountHostOutputCleanupRecords = new WeakMap();
 const rootPortalFakeDomMountPayloads = new WeakMap();
+const rootPortalChildReconciliationDiagnosticPayloads = new WeakMap();
 const rootHostOutputUpdateHandoffPayloads = new WeakMap();
 const rootHostOutputUpdateHandoffRecords = new WeakMap();
 const rootCommitRefMetadataPayloads = new WeakMap();
@@ -762,6 +859,14 @@ function createPrivateRootBridgeShell(options) {
       return createPortalFakeDomMountDiagnosticRecordWithBridge(
         bridgeState,
         record,
+        options
+      );
+    },
+    createPortalChildReconciliationDiagnostic(mountRecord, boundaryRecord, options) {
+      return createPortalChildReconciliationDiagnosticRecordWithBridge(
+        bridgeState,
+        mountRecord,
+        boundaryRecord,
         options
       );
     },
@@ -1006,6 +1111,19 @@ function createPortalFakeDomMountDiagnosticRecord(record, options) {
   return createPortalFakeDomMountDiagnosticRecordWithBridge(
     null,
     record,
+    options
+  );
+}
+
+function createPortalChildReconciliationDiagnosticRecord(
+  mountRecord,
+  boundaryRecord,
+  options
+) {
+  return createPortalChildReconciliationDiagnosticRecordWithBridge(
+    null,
+    mountRecord,
+    boundaryRecord,
     options
   );
 }
@@ -1971,6 +2089,14 @@ function getPrivateRootPortalFakeDomMountPayload(record) {
 
 function isPrivateRootPortalFakeDomMountRecord(value) {
   return rootPortalFakeDomMountPayloads.has(value);
+}
+
+function getPrivateRootPortalChildReconciliationDiagnosticPayload(record) {
+  return rootPortalChildReconciliationDiagnosticPayloads.get(record) || null;
+}
+
+function isPrivateRootPortalChildReconciliationDiagnosticRecord(value) {
+  return rootPortalChildReconciliationDiagnosticPayloads.has(value);
 }
 
 function getPrivateRootHostOutputUpdateHandoffPayload(record) {
@@ -3107,6 +3233,26 @@ function createPortalFakeDomMountDiagnosticRecordWithBridge(
   );
   const childDescriptor =
     normalizePortalFakeDomHostChildDescriptor(explicitChild);
+  const hostOwner = freezeRecord({
+    kind: 'FastReactDomPrivatePortalHostComponentOwner',
+    mountDiagnosticId,
+    hostType: childDescriptor.hostComponentType,
+    sourceUpdateId: record.sourceUpdateId
+  });
+  const textOwner = freezeRecord({
+    kind: 'FastReactDomPrivatePortalHostTextOwner',
+    mountDiagnosticId,
+    hostType: childDescriptor.hostComponentType,
+    sourceUpdateId: record.sourceUpdateId
+  });
+  const hostInstanceToken = createHostInstanceToken(
+    hostOwner,
+    validation.payload.rootHandle.owner
+  );
+  const hostTextToken = createHostInstanceToken(
+    textOwner,
+    validation.payload.rootHandle.owner
+  );
   const childCountBefore = getFakeDomChildCount(portalContainer);
   const hostComponentNode = createPortalFakeDomHostComponentNode(
     portalContainer,
@@ -3119,6 +3265,12 @@ function createPortalFakeDomMountDiagnosticRecordWithBridge(
 
   appendChild(hostComponentNode, hostTextNode);
   appendChildToContainer(portalContainer, hostComponentNode);
+  attachHostInstanceNode(
+    hostComponentNode,
+    hostInstanceToken,
+    childDescriptor.props
+  );
+  attachHostInstanceNode(hostTextNode, hostTextToken, null);
 
   const childCountAfter = getFakeDomChildCount(portalContainer);
   const hostComponentChildCountAfter =
@@ -3178,6 +3330,7 @@ function createPortalFakeDomMountDiagnosticRecordWithBridge(
     fakeDomCommitApplied: true,
     fakeDomPortalMountDiagnostic: true,
     explicitPortalHostChildMounted: true,
+    componentTreeMetadataAttached: true,
     portalContainerChildrenReplaced: false,
     portalChildReconciliation: false,
     portalMounting: false,
@@ -3199,7 +3352,9 @@ function createPortalFakeDomMountDiagnosticRecordWithBridge(
     commitHandoffRecord: record,
     explicitChild,
     hostComponentNode,
+    hostInstanceToken,
     hostTextNode,
+    hostTextToken,
     portal,
     portalContainer,
     rootContainer: validation.payload.rootContainer,
@@ -3208,6 +3363,225 @@ function createPortalFakeDomMountDiagnosticRecordWithBridge(
   });
 
   return mountRecord;
+}
+
+function createPortalChildReconciliationDiagnosticRecordWithBridge(
+  bridgeState,
+  mountRecord,
+  boundaryRecord,
+  options
+) {
+  const validation = validatePortalChildReconciliationDiagnosticRecords(
+    mountRecord,
+    boundaryRecord
+  );
+  if (
+    bridgeState !== null &&
+    validation.rootHandleState.bridgeState !== bridgeState
+  ) {
+    const error = new Error(
+      'Cannot use a private root bridge portal child reconciliation ' +
+        'diagnostic with a different root bridge shell.'
+    );
+    error.code = 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE';
+    throw error;
+  }
+
+  const portal = validation.boundaryPayload.portal;
+  const portalContainer = validation.mountPayload.portalContainer;
+  const nextChild = getExplicitPortalChildReconciliationChild(
+    validation.boundaryPayload,
+    options
+  );
+  const nextDescriptor =
+    normalizePortalChildReconciliationDescriptor(nextChild, mountRecord);
+  const previousProps = getLatestPropsFromHostInstanceToken(
+    validation.mountPayload.hostInstanceToken
+  );
+  assertPortalChildReconciliationPreviousProps(
+    previousProps,
+    mountRecord.hostText
+  );
+  const previousText = String(previousProps.children);
+  const rootBridgeState = validation.rootHandleState.bridgeState;
+  const sequence = rootBridgeState.nextPortalChildReconciliationSequence++;
+  const diagnosticId =
+    `${rootBridgeState.portalChildReconciliationIdPrefix}:${sequence}`;
+  const hostComponentNode = assertMountedHostInstanceToken(
+    validation.mountPayload.hostInstanceToken
+  );
+  const hostTextNode = assertMountedHostInstanceToken(
+    validation.mountPayload.hostTextToken
+  );
+  let latestPropsMutationHandoff = null;
+  let latestPropsMutationPayload = null;
+  let latestPropsBeforeCommit = null;
+  let latestPropsAfterCommit = null;
+
+  try {
+    latestPropsMutationHandoff = commitDomPropertyUpdateForLatestProps(
+      hostComponentNode,
+      nextDescriptor.hostComponentType,
+      previousProps,
+      nextDescriptor.props
+    );
+    latestPropsMutationPayload =
+      getDomPropertyUpdateLatestPropsHandoffPayload(
+        latestPropsMutationHandoff
+      );
+    latestPropsBeforeCommit = getLatestPropsFromNode(hostComponentNode);
+    commitTextUpdate(hostTextNode, previousText, nextDescriptor.hostText);
+    latestPropsAfterCommit = requireLatestPropsCommitResult(
+      latestPropsMutationHandoff
+    );
+  } catch (error) {
+    if (latestPropsMutationHandoff !== null) {
+      try {
+        rollbackDomPropertyUpdateLatestPropsHandoff(
+          latestPropsMutationHandoff
+        );
+      } catch (rollbackError) {
+        // Preserve the original private portal update failure.
+      }
+    }
+    throw error;
+  }
+
+  const listenerSideEffects = describePortalCommitListenerSideEffects(
+    portalContainer,
+    boundaryRecord.portalListenerGuard
+  );
+  const propertyMutationRecords =
+    latestPropsMutationPayload === null
+      ? freezeArray([])
+      : latestPropsMutationPayload.mutationRecords;
+  const latestPropsCommitRecord =
+    latestPropsMutationPayload === null
+      ? null
+      : latestPropsMutationPayload.latestPropsCommitRecord;
+
+  const diagnosticRecord = freezeRecord({
+    $$typeof: privateRootPortalChildReconciliationDiagnosticRecordType,
+    kind: 'FastReactDomPrivateRootPortalChildReconciliationDiagnosticRecord',
+    operation: 'portal-child-reconciliation-diagnostic',
+    diagnosticId,
+    diagnosticSequence: sequence,
+    reconciliationStatus: ROOT_BRIDGE_PORTAL_CHILD_RECONCILIATION_ADMITTED,
+    publicMountStatus: ROOT_BRIDGE_PORTAL_PUBLIC_MOUNT_BLOCKED,
+    sourceMountDiagnosticId: mountRecord.mountDiagnosticId,
+    sourceMountDiagnosticSequence: mountRecord.mountDiagnosticSequence,
+    sourceMountStatus: mountRecord.mountStatus,
+    sourceBoundaryId: boundaryRecord.boundaryId,
+    sourceBoundarySequence: boundaryRecord.boundarySequence,
+    sourceBoundaryStatus: boundaryRecord.boundaryStatus,
+    sourceDiagnosticStatus: boundaryRecord.diagnosticStatus,
+    sourceRequestId: boundaryRecord.sourceRequestId,
+    sourceRequestSequence: boundaryRecord.sourceRequestSequence,
+    sourceRequestType: boundaryRecord.sourceRequestType,
+    sourceUpdateId: boundaryRecord.sourceUpdateId,
+    rootId: boundaryRecord.rootId,
+    rootKind: boundaryRecord.rootKind,
+    rootTag: boundaryRecord.rootTag,
+    portalKey: portal.key,
+    hostFiberPath: freezeArray([
+      'HostRoot',
+      'HostPortal',
+      'HostComponent',
+      'HostText'
+    ]),
+    explicitChildSource: 'portal.children',
+    hostComponentType: nextDescriptor.hostComponentType,
+    previousHostText: previousText,
+    nextHostText: nextDescriptor.hostText,
+    hostComponentInfo: freezeRecord(describeContainer(hostComponentNode)),
+    hostTextInfo: freezeRecord(describeContainer(hostTextNode)),
+    portalContainerInfo: mountRecord.portalContainerInfo,
+    portalContainerChildCount: getFakeDomChildCount(portalContainer),
+    hostComponentChildCountAfter: getFakeDomChildCount(hostComponentNode),
+    propertyMutation: freezeRecord({
+      handoffKind: latestPropsMutationHandoff.kind,
+      latestPropsCommitRecordKind:
+        latestPropsCommitRecord === null ? null : latestPropsCommitRecord.kind,
+      latestPropsCommitRecordStatus:
+        latestPropsCommitRecord === null
+          ? null
+          : latestPropsCommitRecord.status,
+      mutationRecordCount: propertyMutationRecords.length,
+      payloadCount: latestPropsMutationHandoff.payloadCount,
+      status: latestPropsMutationHandoff.status
+    }),
+    textMutation: freezeRecord({
+      oldTextLength: previousText.length,
+      newTextLength: nextDescriptor.hostText.length,
+      status: 'mutated'
+    }),
+    latestPropsPublished: true,
+    latestPropsPublishOrder:
+      'after-portal-property-and-text-mutation',
+    portalContainerOwnership: describePortalContainerOwnership(
+      validation.mountPayload.rootHandle,
+      validation.rootHandleState,
+      portalContainer
+    ),
+    listenerSideEffects,
+    acceptedCapabilities:
+      ROOT_BRIDGE_PORTAL_CHILD_RECONCILIATION_ACCEPTED_CAPABILITIES,
+    blockedCapabilities:
+      ROOT_BRIDGE_PORTAL_CHILD_RECONCILIATION_BLOCKED_CAPABILITIES,
+    fakeDomCommitHandoff: true,
+    fakeDomCommitApplied: true,
+    fakeDomPortalMountDiagnostic: true,
+    explicitPortalHostChildMounted: true,
+    portalChildReconciliation: true,
+    singleHostComponentUpdate: true,
+    portalHostComponentUpdated: true,
+    portalHostTextUpdated: true,
+    latestPropsBeforeCommitInfo: describeBridgeValue(latestPropsBeforeCommit),
+    latestPropsAfterCommitInfo: describeBridgeValue(latestPropsAfterCommit),
+    portalContainerChildrenReplaced: false,
+    portalMounting: false,
+    publicPortalMounting: false,
+    preparePortalMount: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: true,
+    publicDomMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    resourceSideEffects: false,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false
+  });
+
+  rootPortalChildReconciliationDiagnosticPayloads.set(diagnosticRecord, {
+    boundaryRecord,
+    commitHandoffRecord: validation.mountPayload.commitHandoffRecord,
+    hostComponentNode,
+    hostInstanceToken: validation.mountPayload.hostInstanceToken,
+    hostTextNode,
+    hostTextToken: validation.mountPayload.hostTextToken,
+    latestPropsAfterCommit,
+    latestPropsBeforeCommit,
+    latestPropsMutationHandoff,
+    latestPropsMutationPayload,
+    mountRecord,
+    nextChild,
+    nextProps: nextDescriptor.props,
+    portal,
+    portalContainer,
+    previousChild: validation.mountPayload.explicitChild,
+    previousProps,
+    rootContainer: validation.mountPayload.rootContainer,
+    rootHandle: validation.mountPayload.rootHandle,
+    sourceRecord: validation.boundaryPayload.sourceRecord,
+    textUpdate: freezeRecord({
+      newText: nextDescriptor.hostText,
+      oldText: previousText
+    })
+  });
+
+  return diagnosticRecord;
 }
 
 function normalizeInitialHostOutputElement(element) {
@@ -3702,6 +4076,10 @@ function createBridgeState(options) {
       options && options.portalMountIdPrefix,
       'portal-mount'
     ),
+    portalChildReconciliationIdPrefix: getIdPrefix(
+      options && options.portalChildReconciliationIdPrefix,
+      'portal-child-reconciliation'
+    ),
     rootIdPrefix: getIdPrefix(options && options.rootIdPrefix, 'root'),
     rootCommitRefMetadataIdPrefix: getIdPrefix(
       options && options.rootCommitRefMetadataIdPrefix,
@@ -3726,6 +4104,7 @@ function createBridgeState(options) {
     nextPortalBoundarySequence: 1,
     nextPortalCommitSequence: 1,
     nextPortalMountSequence: 1,
+    nextPortalChildReconciliationSequence: 1,
     nextRootCommitRefMetadataSequence: 1,
     nextRootSequence: 1,
     nextSideEffectSequence: 1,
@@ -4672,6 +5051,109 @@ function getAcceptedRootCommitRefLatestPropsUpdates(
   ];
 }
 
+function validatePortalChildReconciliationDiagnosticRecords(
+  mountRecord,
+  boundaryRecord
+) {
+  const mountPayload = rootPortalFakeDomMountPayloads.get(mountRecord);
+  if (mountPayload === undefined) {
+    throwInvalidPortalChildReconciliationRecord(
+      'Expected a private React DOM portal fake-DOM mount diagnostic record.'
+    );
+  }
+
+  assertPrivatePortalMountDiagnosticStillIntact(mountRecord, mountPayload);
+
+  const boundaryPayload = rootPortalBoundaryPayloads.get(boundaryRecord);
+  if (boundaryPayload === undefined) {
+    throwInvalidPortalChildReconciliationRecord(
+      'Expected an accepted private React DOM portal boundary record.'
+    );
+  }
+
+  if (
+    boundaryRecord.$$typeof !== privateRootPortalBoundaryRecordType ||
+    boundaryRecord.kind !== 'FastReactDomPrivateRootPortalBoundaryRecord' ||
+    boundaryRecord.operation !== 'portal-root-boundary' ||
+    boundaryRecord.boundaryStatus !== ROOT_BRIDGE_PORTAL_BOUNDARY_ADMITTED ||
+    boundaryRecord.diagnosticStatus !== ROOT_BRIDGE_PORTAL_DIAGNOSTIC_BLOCKED ||
+    boundaryRecord.acceptedPortalObjectShape !== true
+  ) {
+    throwInvalidPortalChildReconciliationRecord(
+      'Expected an admitted private React DOM portal boundary record.'
+    );
+  }
+
+  assertPortalBoundaryStillBlockedForChildReconciliation(boundaryRecord);
+
+  if (boundaryPayload.rootHandle !== mountPayload.rootHandle) {
+    throwInvalidPortalChildReconciliationRecord(
+      'Portal child reconciliation requires the same private root handle.'
+    );
+  }
+  if (boundaryPayload.portalContainer !== mountPayload.portalContainer) {
+    throwInvalidPortalChildReconciliationRecord(
+      'Portal child reconciliation requires the same portal container.'
+    );
+  }
+  if (boundaryPayload.portal.key !== mountPayload.portal.key) {
+    throwInvalidPortalChildReconciliationRecord(
+      'Portal child reconciliation requires the same portal key.'
+    );
+  }
+  if (boundaryRecord.sourceRequestSequence <= mountRecord.sourceRequestSequence) {
+    throwInvalidPortalChildReconciliationRecord(
+      'Portal child reconciliation requires a later accepted portal boundary.'
+    );
+  }
+
+  const rootHandleState = getPrivateRootHandleState(mountPayload.rootHandle);
+  assertAcceptedReactDomPortalObject(boundaryPayload.portal, rootHandleState);
+  assertFakeDomPortalMountTarget(mountPayload.portalContainer);
+
+  const hostNode = assertMountedHostInstanceToken(
+    mountPayload.hostInstanceToken
+  );
+  const textNode = assertMountedHostInstanceToken(mountPayload.hostTextToken);
+  if (hostNode !== mountPayload.hostComponentNode) {
+    throwInvalidPortalChildReconciliationRecord(
+      'Portal HostComponent token no longer matches the mounted fake-DOM node.'
+    );
+  }
+  if (textNode !== mountPayload.hostTextNode) {
+    throwInvalidPortalChildReconciliationRecord(
+      'Portal HostText token no longer matches the mounted fake-DOM node.'
+    );
+  }
+  if (getRootOwnerFromHostInstanceToken(mountPayload.hostInstanceToken) !==
+    mountPayload.rootHandle.owner) {
+    throwInvalidPortalChildReconciliationRecord(
+      'Portal HostComponent must be owned by the updated private root.'
+    );
+  }
+  if (getRootOwnerFromHostInstanceToken(mountPayload.hostTextToken) !==
+    mountPayload.rootHandle.owner) {
+    throwInvalidPortalChildReconciliationRecord(
+      'Portal HostText must be owned by the updated private root.'
+    );
+  }
+  if (!isCurrentChild(mountPayload.portalContainer, hostNode)) {
+    throwInvalidPortalChildReconciliationRecord(
+      'Portal HostComponent must still be mounted in the portal container.'
+    );
+  }
+  if (!isCurrentChild(hostNode, textNode)) {
+    throwInvalidPortalChildReconciliationRecord(
+      'Portal HostText must still be mounted under the portal HostComponent.'
+    );
+  }
+
+  return {
+    boundaryPayload,
+    mountPayload,
+    rootHandleState
+  };
+}
 function validateRefCallbackHostOutputOrderingDiagnosticRequests(
   bridgeState,
   rootRequestRecords
@@ -4767,6 +5249,64 @@ function assertPortalBoundaryStillBlocked(record) {
   }
 }
 
+function assertPortalBoundaryStillBlockedForChildReconciliation(record) {
+  if (
+    record.nativeExecution !== false ||
+    record.reconcilerExecution !== false ||
+    record.portalMounting !== false ||
+    record.domMutation !== false ||
+    record.markerWrites !== false ||
+    record.listenerInstallation !== false ||
+    record.hydration !== false ||
+    record.eventDispatch !== false ||
+    record.compatibilityClaimed !== false
+  ) {
+    throwInvalidPortalChildReconciliationRecord(
+      'Private portal boundary records must remain blocked before child reconciliation diagnostics.'
+    );
+  }
+}
+
+function assertPrivatePortalMountDiagnosticStillIntact(record, payload) {
+  if (
+    record.$$typeof !== privateRootPortalFakeDomMountRecordType ||
+    record.kind !== 'FastReactDomPrivateRootPortalFakeDomMountDiagnosticRecord' ||
+    record.operation !== 'portal-fake-dom-mount-diagnostic' ||
+    record.mountStatus !== ROOT_BRIDGE_PORTAL_FAKE_DOM_MOUNT_APPLIED ||
+    record.publicMountStatus !== ROOT_BRIDGE_PORTAL_PUBLIC_MOUNT_BLOCKED ||
+    record.fakeDomCommitApplied !== true ||
+    record.fakeDomPortalMountDiagnostic !== true ||
+    record.explicitPortalHostChildMounted !== true ||
+    record.portalContainerChildrenReplaced !== false ||
+    record.portalChildReconciliation !== false ||
+    record.portalMounting !== false ||
+    record.publicPortalMounting !== false ||
+    record.preparePortalMount !== false ||
+    record.nativeExecution !== false ||
+    record.reconcilerExecution !== false ||
+    record.domMutation !== true ||
+    record.publicDomMutation !== false ||
+    record.listenerInstallation !== false ||
+    record.resourceSideEffects !== false ||
+    record.compatibilityClaimed !== false
+  ) {
+    throwInvalidPortalChildReconciliationRecord(
+      'Expected an intact private React DOM portal fake-DOM mount diagnostic record.'
+    );
+  }
+
+  if (
+    payload.hostComponentNode === undefined ||
+    payload.hostTextNode === undefined ||
+    payload.hostInstanceToken === undefined ||
+    payload.hostTextToken === undefined
+  ) {
+    throwInvalidPortalChildReconciliationRecord(
+      'Portal fake-DOM mount diagnostics must include mounted host tokens.'
+    );
+  }
+}
+
 function assertAcceptedReactDomPortalObject(portal, rootHandleState) {
   if (portal === null || typeof portal !== 'object') {
     throwInvalidPortalRootBoundaryRecord(
@@ -4856,9 +5396,32 @@ function getExplicitPortalFakeDomMountChild(payload, options) {
   return options.explicitChild;
 }
 
-function normalizePortalFakeDomHostChildDescriptor(explicitChild) {
+function getExplicitPortalChildReconciliationChild(payload, options) {
+  if (
+    options == null ||
+    typeof options !== 'object' ||
+    !Object.prototype.hasOwnProperty.call(options, 'explicitChild')
+  ) {
+    throwInvalidPortalChildReconciliationRecord(
+      'Expected an explicit portal HostComponent child for child reconciliation.'
+    );
+  }
+
+  if (options.explicitChild !== payload.portalChildren) {
+    throwInvalidPortalChildReconciliationRecord(
+      'The explicit portal child reconciliation target must be the portal children value.'
+    );
+  }
+
+  return options.explicitChild;
+}
+
+function normalizePortalFakeDomHostChildDescriptor(
+  explicitChild,
+  throwInvalid = throwInvalidPortalFakeDomMountRecord
+) {
   if (explicitChild === null || typeof explicitChild !== 'object') {
-    throwInvalidPortalFakeDomMountRecord(
+    throwInvalid(
       'Expected an explicit portal HostComponent child object.'
     );
   }
@@ -4878,15 +5441,59 @@ function normalizePortalFakeDomHostChildDescriptor(explicitChild) {
       typeof hostText === 'bigint'
     )
   ) {
-    throwInvalidPortalFakeDomMountRecord(
+    throwInvalid(
       'Expected a HostComponent child with a primitive HostText children prop.'
     );
   }
 
   return freezeRecord({
     hostComponentType,
-    hostText: String(hostText)
+    hostText: String(hostText),
+    props
   });
+}
+
+function normalizePortalChildReconciliationDescriptor(child, mountRecord) {
+  const descriptor = normalizePortalFakeDomHostChildDescriptor(
+    child,
+    throwInvalidPortalChildReconciliationRecord
+  );
+  if (descriptor.hostComponentType !== mountRecord.hostComponentType) {
+    throwInvalidPortalChildReconciliationRecord(
+      'Portal child reconciliation admits only same-type HostComponent updates.'
+    );
+  }
+  return descriptor;
+}
+
+function assertPortalChildReconciliationPreviousProps(props, expectedText) {
+  if (!isObjectOrFunction(props)) {
+    throwInvalidPortalChildReconciliationRecord(
+      'Portal child reconciliation requires mounted previous HostComponent props.'
+    );
+  }
+  if (!Object.prototype.hasOwnProperty.call(props, 'children')) {
+    throwInvalidPortalChildReconciliationRecord(
+      'Portal child reconciliation requires previous text children props.'
+    );
+  }
+
+  const children = props.children;
+  const childrenType = typeof children;
+  if (
+    childrenType !== 'string' &&
+    childrenType !== 'number' &&
+    childrenType !== 'bigint'
+  ) {
+    throwInvalidPortalChildReconciliationRecord(
+      'Portal child reconciliation requires primitive previous text children.'
+    );
+  }
+  if (String(children) !== String(expectedText)) {
+    throwInvalidPortalChildReconciliationRecord(
+      'Portal child reconciliation requires previous text to match the mounted HostText.'
+    );
+  }
 }
 
 function createPortalFakeDomHostComponentNode(
@@ -5041,6 +5648,13 @@ function throwInvalidUnmountHostOutputCleanupRecord(message) {
 function throwInvalidPortalFakeDomMountRecord(message) {
   const error = new Error(message);
   error.code = 'FAST_REACT_DOM_INVALID_PORTAL_FAKE_DOM_MOUNT_RECORD';
+  throw error;
+}
+
+function throwInvalidPortalChildReconciliationRecord(message) {
+  const error = new Error(message);
+  error.code =
+    'FAST_REACT_DOM_INVALID_PORTAL_CHILD_RECONCILIATION_RECORD';
   throw error;
 }
 
@@ -5218,6 +5832,9 @@ module.exports = {
   ROOT_BRIDGE_PORTAL_COMMIT_MUTATION_BLOCKED,
   ROOT_BRIDGE_PORTAL_CONTAINER_OWNERSHIP_VALIDATED,
   ROOT_BRIDGE_PORTAL_DIAGNOSTIC_BLOCKED,
+  ROOT_BRIDGE_PORTAL_CHILD_RECONCILIATION_ACCEPTED_CAPABILITIES,
+  ROOT_BRIDGE_PORTAL_CHILD_RECONCILIATION_ADMITTED,
+  ROOT_BRIDGE_PORTAL_CHILD_RECONCILIATION_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_PORTAL_FAKE_DOM_MOUNT_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_PORTAL_FAKE_DOM_MOUNT_APPLIED,
   ROOT_BRIDGE_PORTAL_FAKE_DOM_MOUNT_BLOCKED_CAPABILITIES,
@@ -5254,6 +5871,7 @@ module.exports = {
   createClientRootRecord,
   createHydrateRootRecord,
   createNativeRootBridgeHandoffRecord,
+  createPortalChildReconciliationDiagnosticRecord,
   createPortalCommitHandoffRecord,
   createPortalFakeDomMountDiagnosticRecord,
   createPortalRootBoundaryRecord,
@@ -5274,6 +5892,7 @@ module.exports = {
   getPrivateRootInitialHostOutputHandoffPayload,
   getPrivateRootCommitRefMetadataPayload,
   getPrivateRootPortalBoundaryPayload,
+  getPrivateRootPortalChildReconciliationDiagnosticPayload,
   getPrivateRootPortalCommitHandoffPayload,
   getPrivateRootPortalFakeDomMountPayload,
   getPrivateRootPublicFacadeAdapterPayload,
@@ -5287,6 +5906,7 @@ module.exports = {
   isPrivateRootCommitRefMetadataRecord,
   isPrivateRootCreateRenderAdmissionRecord,
   isPrivateRootInitialHostOutputHandoffRecord,
+  isPrivateRootPortalChildReconciliationDiagnosticRecord,
   isPrivateRootPortalCommitHandoffRecord,
   isPrivateRootPortalFakeDomMountRecord,
   isPrivateRootPortalBoundaryRecord,
@@ -5307,6 +5927,7 @@ module.exports = {
   privateRootNativeBridgeHandleType,
   privateRootNativeHandoffRecordType,
   privateRootPortalBoundaryRecordType,
+  privateRootPortalChildReconciliationDiagnosticRecordType,
   privateRootPortalCommitHandoffRecordType,
   privateRootPublicFacadeAdapterSymbol,
   privateRootPublicFacadeAdapterType,
