@@ -90,6 +90,8 @@ use crate::{
         mount_test_host_sibling_work, mount_test_host_work,
     },
     root_commit::{
+        HostRootFinishedWorkCommitExecutionBlockerForCanary,
+        HostRootFinishedWorkCommitExecutionStatusForCanary,
         HostRootFinishedWorkCommitHandoffErrorForCanary,
         HostRootFinishedWorkCommitHandoffRecordForCanary,
         HostRootPlacementApplyDiagnosticForCanary,
@@ -8019,8 +8021,16 @@ mod tests {
             complete_work.completed_child_tag(),
             Some(FiberTag::HostComponent)
         );
+        assert_eq!(complete_work.root_child_count(), 1);
+        assert_eq!(complete_work.completed_child_count(), 1);
         assert_eq!(complete_work.detached_instance_count(), 1);
         assert_eq!(complete_work.detached_text_count(), 1);
+        let component = complete_work.root_child().unwrap();
+        let text = store.fiber_arena().get(component).unwrap().child().unwrap();
+        assert_eq!(
+            store.fiber_arena().get(text).unwrap().tag(),
+            FiberTag::HostText
+        );
 
         let finished_work_handoff = record.finished_work_handoff();
         let pending_finished_work = finished_work_handoff.pending();
@@ -8047,6 +8057,50 @@ mod tests {
         );
         assert_eq!(pending_finished_work.handoff_order(), 1);
         assert!(pending_finished_work.records_finished_work());
+        let execution_request = *finished_work_handoff.execution_request();
+        assert_eq!(
+            execution_request.status(),
+            HostRootFinishedWorkCommitExecutionStatusForCanary::Requested
+        );
+        assert!(execution_request.execution_requested());
+        assert!(execution_request.accepted_current_finished_work_record_shape());
+        assert_eq!(execution_request.root(), root_id);
+        assert_eq!(execution_request.root_token(), root_id.state_node_handle());
+        assert_eq!(execution_request.previous_current(), current);
+        assert_eq!(
+            execution_request.pending_work(),
+            Some(render.finished_work())
+        );
+        assert_eq!(execution_request.finished_work(), render.finished_work());
+        assert_eq!(execution_request.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(execution_request.finished_lanes(), Lanes::DEFAULT);
+        assert_eq!(execution_request.remaining_lanes(), Lanes::NO);
+        assert_eq!(
+            execution_request.pending_lanes_before_commit(),
+            Lanes::DEFAULT
+        );
+        assert_eq!(execution_request.source_handoff_order(), 1);
+        assert_eq!(execution_request.request_order(), 2);
+        assert_eq!(
+            execution_request.blockers(),
+            &[
+                HostRootFinishedWorkCommitExecutionBlockerForCanary::HostMutationExecution,
+                HostRootFinishedWorkCommitExecutionBlockerForCanary::PublicRootRendering,
+                HostRootFinishedWorkCommitExecutionBlockerForCanary::RefAttachDetach,
+                HostRootFinishedWorkCommitExecutionBlockerForCanary::LayoutEffectExecution,
+                HostRootFinishedWorkCommitExecutionBlockerForCanary::PassiveEffectExecution,
+                HostRootFinishedWorkCommitExecutionBlockerForCanary::Hydration,
+                HostRootFinishedWorkCommitExecutionBlockerForCanary::PublicCompatibilityClaim,
+            ]
+        );
+        assert!(execution_request.host_mutation_execution_blocked());
+        assert!(execution_request.public_root_rendering_blocked());
+        assert!(execution_request.ref_attach_detach_blocked());
+        assert!(execution_request.layout_effect_execution_blocked());
+        assert!(execution_request.passive_effect_execution_blocked());
+        assert!(execution_request.hydration_blocked());
+        assert!(execution_request.compatibility_claim_blocked());
+        assert!(execution_request.refs_effects_and_hydration_blocked());
         assert_eq!(finished_work_handoff.commit_order(), 2);
         assert!(finished_work_handoff.commit_order_after_pending_record());
         assert_eq!(
@@ -8085,7 +8139,6 @@ mod tests {
         let diagnostics = record.placement_apply_diagnostics();
         assert_eq!(diagnostics.len(), 1);
         let diagnostic = diagnostics[0];
-        let component = complete_work.root_child().unwrap();
         let component_state_node = store.fiber_arena().get(component).unwrap().state_node();
         assert_eq!(diagnostic.root(), root_id);
         assert_eq!(diagnostic.host_root(), render.work_in_progress());
