@@ -319,6 +319,76 @@ impl RootSchedulerCallbackExecutionRecord {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RootPingedRetryExecutionStatus {
+    StaleCallback,
+    NoWork,
+    NoPingedRetryWork,
+    Rendered,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RootPingedRetryExecutionRecord {
+    callback: SchedulerCallbackRequest,
+    validation: SchedulerCallbackValidationRecord,
+    pinged_retry_lanes: Lanes,
+    selected_priority_lanes: Lanes,
+    selected_render_lanes: Lanes,
+    status: RootPingedRetryExecutionStatus,
+    render_phase: Option<HostRootRenderPhaseRecord>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private ping/retry execution metadata for future Suspense retry workers"
+)]
+impl RootPingedRetryExecutionRecord {
+    #[must_use]
+    pub(crate) const fn callback(self) -> SchedulerCallbackRequest {
+        self.callback
+    }
+
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.callback.root()
+    }
+
+    #[must_use]
+    pub(crate) const fn callback_node(self) -> RootSchedulerCallbackHandle {
+        self.callback.node()
+    }
+
+    #[must_use]
+    pub(crate) const fn validation(self) -> SchedulerCallbackValidationRecord {
+        self.validation
+    }
+
+    #[must_use]
+    pub(crate) const fn pinged_retry_lanes(self) -> Lanes {
+        self.pinged_retry_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn selected_priority_lanes(self) -> Lanes {
+        self.selected_priority_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn selected_render_lanes(self) -> Lanes {
+        self.selected_render_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn status(self) -> RootPingedRetryExecutionStatus {
+        self.status
+    }
+
+    #[must_use]
+    pub(crate) const fn render_phase(self) -> Option<HostRootRenderPhaseRecord> {
+        self.render_phase
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RootSyncFlushPlan {
     skipped_reentrant_flush: bool,
@@ -913,6 +983,94 @@ pub fn execute_scheduled_root_callback<H: HostTypes>(
         callback,
         validation: render_result.validation(),
         selected_lanes,
+        status,
+        render_phase,
+    })
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private ping/retry execution path reserved for future Suspense retry workers"
+)]
+pub(crate) fn execute_pinged_retry_root_callback<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    callback: SchedulerCallbackRequest,
+) -> Result<RootPingedRetryExecutionRecord, RootSchedulerError> {
+    let validation =
+        validate_scheduled_host_root_callback(store, callback.root(), callback.node())?;
+    if validation.is_stale() {
+        return Ok(RootPingedRetryExecutionRecord {
+            callback,
+            validation,
+            pinged_retry_lanes: Lanes::NO,
+            selected_priority_lanes: Lanes::NO,
+            selected_render_lanes: Lanes::NO,
+            status: RootPingedRetryExecutionStatus::StaleCallback,
+            render_phase: None,
+        });
+    }
+
+    let pinged_retry_lanes = store
+        .root(callback.root())?
+        .lanes()
+        .pinged_lanes()
+        .intersect(Lanes::RETRY);
+    let lane_selection = select_lanes_for_scheduled_task(store, callback.root())?;
+    let selected_priority_lanes = lane_selection.priority_lanes();
+    let selected_render_lanes = lane_selection.render_lanes();
+
+    if selected_render_lanes.is_empty() {
+        store
+            .root_mut(callback.root())?
+            .scheduling_mut()
+            .clear_callback();
+        return Ok(RootPingedRetryExecutionRecord {
+            callback,
+            validation,
+            pinged_retry_lanes,
+            selected_priority_lanes,
+            selected_render_lanes,
+            status: RootPingedRetryExecutionStatus::NoWork,
+            render_phase: None,
+        });
+    }
+
+    let selected_priority_is_pinged_retry = selected_priority_lanes.includes_only_retries()
+        && selected_priority_lanes.intersect(pinged_retry_lanes) == selected_priority_lanes;
+    let selected_render_is_pinged_retry = selected_render_lanes.includes_only_retries()
+        && selected_render_lanes.intersect(pinged_retry_lanes) == selected_render_lanes;
+
+    if !selected_priority_is_pinged_retry || !selected_render_is_pinged_retry {
+        return Ok(RootPingedRetryExecutionRecord {
+            callback,
+            validation,
+            pinged_retry_lanes,
+            selected_priority_lanes,
+            selected_render_lanes,
+            status: RootPingedRetryExecutionStatus::NoPingedRetryWork,
+            render_phase: None,
+        });
+    }
+
+    let render_result = render_host_root_via_scheduler_callback(
+        store,
+        callback.root(),
+        callback.node(),
+        selected_render_lanes,
+    )?;
+    let render_phase = render_result.render_phase();
+    let status = if render_phase.is_some() {
+        RootPingedRetryExecutionStatus::Rendered
+    } else {
+        RootPingedRetryExecutionStatus::StaleCallback
+    };
+
+    Ok(RootPingedRetryExecutionRecord {
+        callback,
+        validation: render_result.validation(),
+        pinged_retry_lanes,
+        selected_priority_lanes,
+        selected_render_lanes,
         status,
         render_phase,
     })
@@ -1724,6 +1882,109 @@ mod tests {
         assert_eq!(scheduled_roots(&store).unwrap(), vec![root_id]);
         assert_eq!(store.root(root_id).unwrap().current(), current);
         assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_pinged_retry_execution_path_reselects_and_renders_host_root_handoff() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        schedule_default_update(&mut store, root_id);
+        let retry_lanes = Lanes::from(Lane::RETRY_1).merge_lane(Lane::RETRY_2);
+        let retry_and_offscreen = retry_lanes.merge(Lanes::OFFSCREEN);
+        {
+            let lanes = store.root_mut(root_id).unwrap().lanes_mut();
+            lanes.mark_updated(Lane::RETRY_1);
+            lanes.mark_updated(Lane::RETRY_2);
+            lanes.mark_updated(Lane::OFFSCREEN);
+            lanes.mark_finished(RootFinishedLanes::new(Lanes::DEFAULT, retry_and_offscreen));
+            lanes.mark_suspended(retry_and_offscreen, Lane::NO, true);
+            lanes.mark_pinged(Lanes::from(Lane::RETRY_2));
+        }
+        let processed = process_root_schedule_in_microtask(&mut store).unwrap();
+        let callback = processed.records()[0].scheduled_callback().unwrap();
+
+        let execution = execute_pinged_retry_root_callback(&mut store, callback).unwrap();
+        let render = execution.render_phase().unwrap();
+
+        assert_eq!(execution.callback(), callback);
+        assert_eq!(execution.root(), root_id);
+        assert_eq!(execution.callback_node(), callback.node());
+        assert!(!execution.validation().is_stale());
+        assert_eq!(execution.status(), RootPingedRetryExecutionStatus::Rendered);
+        assert_eq!(execution.pinged_retry_lanes(), Lanes::from(Lane::RETRY_2));
+        assert_eq!(
+            execution.selected_priority_lanes(),
+            Lanes::from(Lane::RETRY_2)
+        );
+        assert_eq!(
+            execution.selected_render_lanes(),
+            Lanes::from(Lane::RETRY_2)
+        );
+        assert_eq!(render.root(), root_id);
+        assert_eq!(render.current(), current);
+        assert_eq!(render.render_lanes(), Lanes::from(Lane::RETRY_2));
+        assert_eq!(render.applied_update_count(), 0);
+        assert_eq!(render.skipped_update_count(), 1);
+        assert_eq!(render.resulting_element(), RootElementHandle::NONE);
+        assert_eq!(render.remaining_lanes(), Lanes::DEFAULT);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            Some(render.work_in_progress())
+        );
+        assert_eq!(
+            store
+                .root(root_id)
+                .unwrap()
+                .scheduling()
+                .work_in_progress_root_render_lanes(),
+            Lanes::from(Lane::RETRY_2)
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            retry_and_offscreen
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().suspended_lanes(),
+            retry_and_offscreen
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pinged_lanes(),
+            Lanes::from(Lane::RETRY_2)
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().warm_lanes(),
+            Lanes::from(Lane::RETRY_1).merge(Lanes::OFFSCREEN)
+        );
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_pinged_retry_execution_path_rejects_non_retry_selection() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        let callback = scheduled_callback_request(&mut store, root_id);
+
+        let execution = execute_pinged_retry_root_callback(&mut store, callback).unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootPingedRetryExecutionStatus::NoPingedRetryWork
+        );
+        assert!(!execution.validation().is_stale());
+        assert_eq!(execution.pinged_retry_lanes(), Lanes::NO);
+        assert_eq!(execution.selected_priority_lanes(), Lanes::DEFAULT);
+        assert_eq!(execution.selected_render_lanes(), Lanes::DEFAULT);
+        assert_eq!(execution.render_phase(), None);
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(store.fiber_arena().get(current).unwrap().alternate(), None);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().callback_node(),
+            callback.node()
+        );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
