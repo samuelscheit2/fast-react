@@ -47,15 +47,15 @@ Drive toward a minimal real root render/update/unmount path:
 
 Top-level cap: 30 workers. Queue 685-714 was launched from queue base commit
 `9ec6678` in isolated `worker/<slug>` branches and worktrees and has been
-accepted and cleaned up. Workers 715-730 have also been accepted and cleaned
+accepted and cleaned up. Workers 715-731 have also been accepted and cleaned
 up.
 
 No worker branches or worktrees are currently active.
 
 ## Near-Term Sequencing
 
-1. Select the next runtime queue from accepted Worker 730 cleanup evidence,
-   root-bridge identity findings, and remaining private blockers only; keep
+1. Select the next queue from accepted Worker 731 nested identity evidence,
+   Worker 730 cleanup evidence, and remaining private blockers only; keep
    public root, act, flushSync, hooks/effects, test-renderer, and React DOM
    compatibility blocked until each private gate is proven.
 2. Audit and merge completed workers one at a time or in a small non-conflicting
@@ -66,19 +66,23 @@ No worker branches or worktrees are currently active.
 
 ## Next Queue Candidates
 
-- Next narrow runtime candidate: add a Rust-only private `toJSON` nested update
-  native serialization identity gate. The gate should require accepted
-  finished-work identity for the nested update native execution path, bind that
-  identity to nested output render/commit and finished-lane evidence, prove
-  missing/stale/lane-mismatched identity fails closed, and leave CJS admission
-  plus sibling snapshot-based native serialization blocked.
+- Next static candidate: add the private-admission ledger for Workers 729-731,
+  recording Worker 729 as ledger/meta evidence, Worker 730 as private unmount
+  cleanup evidence, and Worker 731 as private nested `toJSON` update native
+  identity evidence while keeping all public/package compatibility blocked.
+- Keep first-class nested `toJSON` source-report identity generation deferred
+  until committed fiber inspection/report models nested host trees. Worker 731
+  accepts only a Rust private canary identity handoff and does not broaden CJS
+  admission.
 - Keep full unmount finished-work identity admission deferred. Worker 730 adds
   narrow Rust ref/passive/host cleanup evidence for unmount native bridge
   cleanup handoff, but no unmount finished-work identity adapter or identity
   consumption has been accepted.
-- Defer multichild/sibling serializer identity admission until the committed
-  fiber/report shape is narrow enough to prove without widening public
-  serialization.
+- Defer broad multichild/sibling serializer identity admission until the
+  committed fiber/report shape is narrow enough to prove without widening
+  public serialization. Worker 731 covers only the nested `toJSON` update
+  native canary path; sibling snapshot-based native serialization remains
+  blocked.
 - Additional private root/test-renderer bridge gates that require accepted
   `finished_work` / `finished_lanes` handoff before any wider serialization or
   native bridge execution.

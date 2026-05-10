@@ -29,6 +29,27 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 731
+
+- Worker 731 added Rust-only private react-test-renderer `toJSON` nested update
+  native execution identity admission. The nested output now carries its
+  scheduled update sequence, the native diagnostic requires finished-work
+  identity evidence, and a nested handoff validator binds route admission,
+  render/commit handles, identity handles, update sequence, and finished lanes
+  to the same nested update.
+- Acceptance audit found a test-strength gap where the initial negative cases
+  did not prove the nested identity-vs-handoff comparisons themselves. The
+  accepted follow-up added internally self-consistent identity drift cases that
+  fail specifically with `update-admission-finished-work-identity-mismatch` and
+  `update-admission-finished-work-identity-lane-mismatch`.
+- Worker 731 was accepted after focused nested `toJSON` and broader `toJSON`
+  Rust tests, formatting, clippy, package-surface guard, import smoke, conflict
+  marker scanning, and `git diff --check`; its subagent, worktree, and branch
+  were removed after merge. JS/CJS admission, sibling snapshot serialization,
+  unmount, `toTree`, public `toJSON`, native execution, and compatibility
+  claims remain blocked. First-class nested source-report identity generation
+  remains deferred until nested committed-fiber reports exist.
+
 ### Worker 730
 
 - Worker 730 added narrow Rust-only react-test-renderer unmount native cleanup
