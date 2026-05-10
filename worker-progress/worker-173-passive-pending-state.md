@@ -2,7 +2,7 @@
 
 ## Goal
 
-- Status: active
+- Status: complete
 - Objective: expand internal pending passive effect state records and tests so future commit/effect workers can queue passive unmounts before mounts, without implementing hooks or flushing passive effects
 
 ## Progress
@@ -25,11 +25,20 @@
 
 ## Verification
 
-- `cargo fmt --all --check` passed.
-- `cargo test -p fast-react-reconciler --all-features root_config` passed: 7 tests.
-- `cargo test -p fast-react-reconciler --all-features fiber_root` passed: 5 tests.
-- `cargo clippy -p fast-react-reconciler --all-targets --all-features -- -D warnings` passed.
-- `git diff --check` passed.
+- Worker-local verification passed before orchestration merge:
+  - `cargo fmt --all --check`
+  - `cargo test -p fast-react-reconciler --all-features root_config`: 7 tests
+  - `cargo test -p fast-react-reconciler --all-features fiber_root`: 5 tests
+  - `cargo clippy -p fast-react-reconciler --all-targets --all-features -- -D warnings`
+  - `git diff --check`
+- Orchestrator merged `main` into this branch and resolved `root_config.rs` by preserving worker 169 hydration handle tests plus the worker 173 pending passive metadata tests.
+- Post-merge orchestrator verification passed:
+  - `cargo fmt --all --check`
+  - `cargo test -p fast-react-reconciler --all-features root_config`: 9 tests
+  - `cargo test -p fast-react-reconciler --all-features fiber_root`: 7 tests
+  - `cargo test -p fast-react-reconciler --all-features`: 102 tests + 1 doctest
+  - `cargo clippy -p fast-react-reconciler --all-targets --all-features -- -D warnings`
+  - `git diff --check`
 
 ## Risks / Notes
 
