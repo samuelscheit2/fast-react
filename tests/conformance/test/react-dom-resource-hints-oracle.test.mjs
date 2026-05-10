@@ -1055,7 +1055,7 @@ test("private stylesheet precedence diagnostics stay record-only", () => {
   assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
 });
 
-test("private resource-map commit diagnostics stay record-only", () => {
+test("private resource-map commit diagnostics execute fake-resource ordering only", () => {
   const dispatcherGate = resourceFormGate.createResourceFormActionInternalsGate({
     requestIdPrefix: "resource-conformance-map-source"
   });
@@ -1283,6 +1283,21 @@ test("private resource-map commit diagnostics stay record-only", () => {
     1
   );
   assert.equal(
+    diagnostic.resourceMapCommitPlan
+      .scriptModuleFakeResourceOrderExecutionRowCount,
+    4
+  );
+  assert.equal(
+    diagnostic.resourceMapCommitPlan
+      .scriptModuleFakeResourceOrderPreloadPropsAdoptionCount,
+    2
+  );
+  assert.equal(
+    diagnostic.resourceMapCommitPlan
+      .scriptModuleFakeResourceOrderingExecuted,
+    true
+  );
+  assert.equal(
     diagnostic.resourceMapCommitPlan.stylesheetLoadStateCommitOrderRowCount,
     1
   );
@@ -1488,6 +1503,122 @@ test("private resource-map commit diagnostics stay record-only", () => {
     diagnostic.scriptModuleFakeDomCommitExecution.dedupeOrderBoundary
       .orderRowsMutated,
     false
+  );
+  assert.deepEqual(
+    diagnostic.scriptModuleFakeDomCommitExecution
+      .fakeResourceOrderExecution.rows.map((row) => ({
+        contractId: row.contractId,
+        recordKind: row.recordKind,
+        scriptKind: row.scriptKind,
+        dedupeKey: row.dedupeKey,
+        fakeResourceOrderOperation: row.fakeResourceOrderOperation,
+        preloadPropsRecordObservedBefore:
+          row.preloadPropsRecordObservedBefore,
+        fakePreloadPropsRecordCreated:
+          row.fakePreloadPropsRecordCreated,
+        fakeHoistableScriptResourceCreated:
+          row.fakeHoistableScriptResourceCreated,
+        fakePreloadPropsAdopted: row.fakePreloadPropsAdopted,
+        preloadPropsMapMutated: row.preloadPropsMapMutated,
+        hoistableScriptsMapMutated: row.hoistableScriptsMapMutated,
+        scriptExecutionStarted: row.scriptExecutionStarted
+      })),
+    [
+      {
+        contractId: "preload",
+        recordKind: "preload",
+        scriptKind: "classic",
+        dedupeKey: "script:script-main",
+        fakeResourceOrderOperation:
+          "execute-classic-script-preload-props-fake-resource-order",
+        preloadPropsRecordObservedBefore: false,
+        fakePreloadPropsRecordCreated: true,
+        fakeHoistableScriptResourceCreated: false,
+        fakePreloadPropsAdopted: false,
+        preloadPropsMapMutated: false,
+        hoistableScriptsMapMutated: false,
+        scriptExecutionStarted: false
+      },
+      {
+        contractId: "preinit-script",
+        recordKind: "script",
+        scriptKind: "classic",
+        dedupeKey: "script:script-main",
+        fakeResourceOrderOperation:
+          "execute-classic-script-hoistable-script-fake-resource-order",
+        preloadPropsRecordObservedBefore: true,
+        fakePreloadPropsRecordCreated: false,
+        fakeHoistableScriptResourceCreated: true,
+        fakePreloadPropsAdopted: true,
+        preloadPropsMapMutated: false,
+        hoistableScriptsMapMutated: false,
+        scriptExecutionStarted: false
+      },
+      {
+        contractId: "preload-module",
+        recordKind: "preload",
+        scriptKind: "module",
+        dedupeKey: "script:module-main",
+        fakeResourceOrderOperation:
+          "execute-modulepreload-preload-props-fake-resource-order",
+        preloadPropsRecordObservedBefore: false,
+        fakePreloadPropsRecordCreated: true,
+        fakeHoistableScriptResourceCreated: false,
+        fakePreloadPropsAdopted: false,
+        preloadPropsMapMutated: false,
+        hoistableScriptsMapMutated: false,
+        scriptExecutionStarted: false
+      },
+      {
+        contractId: "preinit-module-script",
+        recordKind: "script",
+        scriptKind: "module",
+        dedupeKey: "script:module-main",
+        fakeResourceOrderOperation:
+          "execute-module-script-hoistable-script-fake-resource-order",
+        preloadPropsRecordObservedBefore: true,
+        fakePreloadPropsRecordCreated: false,
+        fakeHoistableScriptResourceCreated: true,
+        fakePreloadPropsAdopted: true,
+        preloadPropsMapMutated: false,
+        hoistableScriptsMapMutated: false,
+        scriptExecutionStarted: false
+      }
+    ]
+  );
+  assert.deepEqual(
+    diagnostic.scriptModuleFakeDomCommitExecution
+      .fakeResourceOrderExecution.dedupeStates.map((row) => ({
+        dedupeKey: row.dedupeKey,
+        contractIdsInOrder: row.contractIdsInOrder,
+        preloadPropsRecordCreated:
+          row.preloadPropsRecordCreated,
+        hoistableScriptResourceCreated:
+          row.hoistableScriptResourceCreated,
+        preloadPropsAdoptionCount: row.preloadPropsAdoptionCount,
+        scriptExecutionStarted: row.scriptExecutionStarted
+      })),
+    [
+      {
+        dedupeKey: "script:script-main",
+        contractIdsInOrder: ["preload", "preinit-script"],
+        preloadPropsRecordCreated: true,
+        hoistableScriptResourceCreated: true,
+        preloadPropsAdoptionCount: 1,
+        scriptExecutionStarted: false
+      },
+      {
+        dedupeKey: "script:module-main",
+        contractIdsInOrder: [
+          "preload-module",
+          "preinit-module-script"
+        ],
+        preloadPropsRecordCreated: true,
+        hoistableScriptResourceCreated: true,
+        preloadPropsAdoptionCount: 1,
+        scriptExecutionStarted: false
+      }
+    ]
   );
   assert.deepEqual(
     diagnostic.moduleResourceMapOrder.dedupeKeys.map((row) => ({
@@ -1705,6 +1836,14 @@ test("private resource-map commit diagnostics stay record-only", () => {
     true
   );
   assert.equal(
+    diagnostic.sideEffects.scriptModuleFakeResourceOrderRowsRecorded,
+    true
+  );
+  assert.equal(
+    diagnostic.sideEffects.scriptModuleFakeResourceOrderingExecuted,
+    true
+  );
+  assert.equal(
     diagnostic.sideEffects.stylesheetLoadStateCommitOrderRowsRecorded,
     true
   );
@@ -1752,6 +1891,11 @@ test("private resource-map commit diagnostics stay record-only", () => {
   assert.equal(
     diagnostic.resourceLifecycleBoundary.fakeDomCommitApplied,
     false
+  );
+  assert.equal(
+    diagnostic.resourceLifecycleBoundary
+      .scriptModuleFakeResourceOrderingExecuted,
+    true
   );
   assert.equal(diagnostic.resourceLifecycleBoundary.preloadStarted, false);
   assert.equal(diagnostic.resourceLifecycleBoundary.modulePreloadStarted, false);
