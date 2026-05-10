@@ -20,10 +20,12 @@ import {
 } from "../src/react-dom-root-render-e2e-oracle.mjs";
 import {
   evaluateReactDomRootRenderE2EConformanceGate,
+  inspectReactDomRootRenderE2EPrivateActPassiveDiagnostics,
   inspectReactDomRootRenderE2EPrivateCrossRootSchedulingDiagnostics,
   inspectReactDomRootRenderE2EPrivateHostOutputDiagnostics,
   inspectReactDomRootRenderE2EPrivateWarningBoundaryDiagnostics,
   inspectReactDomRootRenderE2EPrivateBridgeRequests,
+  REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_ACCEPTED_STATUS,
   REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_STATUS,
   REACT_DOM_PORTAL_ROOT_RENDER_OBJECT_ACCEPTED_STATUS,
   REACT_DOM_PORTAL_ROOT_RENDER_RECONCILER_DIAGNOSTIC_STATUS,
@@ -370,6 +372,11 @@ test("root render e2e conformance gate records private bridge request rows separ
     result.summary.privateCrossRootSchedulingBlockedScenarioModeRowCount,
     18
   );
+  assert.equal(
+    result.summary.privateActPassiveDiagnosticScenarioModeRowCount,
+    20
+  );
+  assert.equal(result.summary.privateActPassiveBlockedScenarioModeRowCount, 0);
   assert.equal(result.summary.portalRootRenderPrerequisiteRowCount, 4);
   assert.equal(result.summary.portalRootRenderBlockedRowCount, 5);
   assert.equal(result.summary.compatibilityClaimed, false);
@@ -387,6 +394,24 @@ test("root render e2e conformance gate records private bridge request rows separ
   assert.equal(
     result.summary
       .privateCrossRootSchedulingPublicFlushSyncCompatibilityClaimed,
+    false
+  );
+  assert.equal(result.summary.privateActPassiveCompatibilityClaimed, false);
+  assert.equal(
+    result.summary.privateActPassivePublicReactActCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    result.summary
+      .privateActPassivePublicReactDomTestUtilsActCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    result.summary.privateActPassivePublicRootRenderCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    result.summary.privateActPassivePublicPassiveEffectCompatibilityClaimed,
     false
   );
   assert.equal(result.summary.portalRootRenderCompatibilityClaimed, false);
@@ -448,6 +473,32 @@ test("root render e2e conformance gate records private bridge request rows separ
     result.privateCrossRootSchedulingGate.compatibilityClaimed,
     false
   );
+  assert.deepEqual(
+    result.privateActPassiveGate.admittedPrivateActPassiveScenarioIds,
+    REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS
+  );
+  assert.deepEqual(
+    result.privateActPassiveGate.unsupportedPrivateActPassiveScenarioIds,
+    []
+  );
+  assert.equal(
+    result.privateActPassiveGate.publicReactActCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    result.privateActPassiveGate
+      .publicReactDomTestUtilsActCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    result.privateActPassiveGate.publicRootRenderCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    result.privateActPassiveGate.publicPassiveEffectCompatibilityClaimed,
+    false
+  );
+  assert.equal(result.privateActPassiveGate.compatibilityClaimed, false);
 
   for (const row of result.blockedScenarioModeRows) {
     assert.equal(row.oracleRowAccepted, true);
@@ -616,6 +667,72 @@ test("root render e2e conformance gate records private bridge request rows separ
         row.compatibilityClaimed === false &&
         row.publicFlushSyncCompatibilityClaimed === false
     )
+  );
+
+  for (const row of result.privateActPassiveDiagnosticScenarioModeRows) {
+    assert.equal(
+      row.gateStatus,
+      REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_ACCEPTED_STATUS
+    );
+    assert.equal(row.oracleRowAccepted, true);
+    assert.equal(row.comparedToReactDomOracle, false);
+    assert.equal(row.compatibilityClaimed, false);
+    assert.equal(row.publicReactActCompatibilityClaimed, false);
+    assert.equal(row.publicReactDomTestUtilsActCompatibilityClaimed, false);
+    assert.equal(row.publicRootRenderCompatibilityClaimed, false);
+    assert.equal(row.publicPassiveEffectCompatibilityClaimed, false);
+    assert.equal(row.publicRootCompatibilitySurface, false);
+    assert.equal(row.publicFacadeGateStatus, "blocked-unsupported-root-e2e");
+    assert.equal(
+      row.diagnosticKind,
+      "private-root-render-act-passive-diagnostic"
+    );
+    assert.equal(
+      row.actEvidence.reactDomTestUtilsActGate.status,
+      "blocked-public-test-utils-act-private-routing"
+    );
+    assert.equal(
+      row.actEvidence.reactDomTestUtilsActGate.sideEffectPolicy
+        .delegatesToReactAct,
+      false
+    );
+    assert.equal(
+      row.actEvidence.rendererBackedActDrainConsumption
+        .drainsPublicReactActQueue,
+      false
+    );
+    assert.equal(row.passiveEvidence.passiveEffects.executesPassiveEffects, false);
+    assert.equal(
+      row.passiveEvidence.passiveEffectCallbackHandles
+        .schedulerDrivenPassiveExecutionEnabled,
+      false
+    );
+    assert.deepEqual(row.blockedPublicPrerequisites, [
+      "public-react-act-delegation",
+      "act-queue-flushing-execution",
+      "passive-effect-callback-execution",
+      "public-react-dom-root-execution",
+      "public-react-dom-flush-sync-execution",
+      "public-react-dom-warning-boundary-compatibility"
+    ]);
+    assert.equal(
+      row.sourceDiagnostics.passiveSchedulerFlushGatePresent,
+      true
+    );
+    assert.equal(
+      row.sourceDiagnostics.passiveErrorCaptureRecordPresent,
+      true
+    );
+  }
+
+  assert.deepEqual(result.privateActPassiveBlockedScenarioModeRows, []);
+  assert.deepEqual(
+    new Set(
+      result.privateActPassiveBlockedScenarioModeRows.map(
+        (row) => row.gateStatus
+      )
+    ),
+    new Set()
   );
 
   assert.equal(result.portalRootRenderGate.ok, true);
@@ -939,6 +1056,88 @@ test("private cross-root scheduling diagnostics stay separate from public flushS
     assert.equal(
       row.evidence.schedulingEvidence.publicFlushSyncCompatibilityClaimed,
       false
+    );
+  }
+});
+
+test("private act/passive diagnostics stay separate from public root and act compatibility", () => {
+  const observations =
+    inspectReactDomRootRenderE2EPrivateActPassiveDiagnostics();
+
+  assert.equal(observations.loadError, null);
+  assert.equal(observations.rows.length, 20);
+
+  for (const row of observations.rows) {
+    assert.equal(row.status, "ok");
+    assert.equal(
+      row.evidence.diagnosticKind,
+      "private-root-render-act-passive-diagnostic"
+    );
+    assert.equal(row.evidence.comparedToReactDomOracle, false);
+    assert.equal(row.evidence.compatibilityClaimed, false);
+    assert.equal(row.evidence.publicRootCompatibilitySurface, false);
+    assert.equal(row.evidence.publicRootRenderCompatibilityClaimed, false);
+    assert.equal(row.evidence.publicReactActCompatibilityClaimed, false);
+    assert.equal(
+      row.evidence.publicReactDomTestUtilsActCompatibilityClaimed,
+      false
+    );
+    assert.equal(row.evidence.publicPassiveEffectCompatibilityClaimed, false);
+    assert.equal(
+      row.evidence.actEvidence.reactActPrivateDispatcher.status,
+      "blocked-until-renderer-roots-passive-effects-and-act-continuations"
+    );
+    assert.equal(
+      row.evidence.actEvidence.reactActQueueMetadata
+        .rendererBackedActDrainDiagnosticsReady,
+      true
+    );
+    assert.equal(
+      row.evidence.actEvidence.rendererBackedActDrainConsumption.accepted,
+      true
+    );
+    assert.equal(
+      row.evidence.actEvidence.rendererBackedActDrainConsumption
+        .drainsPublicReactActQueue,
+      false
+    );
+    assert.equal(
+      row.evidence.actEvidence.reactDomTestUtilsActGate.privateRoutingReady,
+      false
+    );
+    assert.equal(
+      row.evidence.actEvidence.reactDomTestUtilsActGate.publicReactActReady,
+      false
+    );
+    assert.equal(
+      row.evidence.actEvidence.reactDomTestUtilsActGate.publicTestUtilsActReady,
+      false
+    );
+    assert.equal(
+      row.evidence.passiveEvidence.passiveEffects.executesPassiveEffects,
+      false
+    );
+    assert.equal(
+      row.evidence.passiveEvidence.passiveEffectCallbackHandles
+        .testControlledInvocationOnly,
+      true
+    );
+    assert.equal(
+      row.evidence.passiveEvidence.passiveEffectCallbackHandles
+        .publicActCompatibilityClaimed,
+      false
+    );
+    assert.equal(
+      row.evidence.sourceDiagnostics.reactActRendererBackedDrainDiagnosticPresent,
+      true
+    );
+    assert.equal(
+      row.evidence.sourceDiagnostics.passiveCallbackInvocationGatePresent,
+      true
+    );
+    assert.equal(
+      row.evidence.sourceDiagnostics.passiveSchedulerFlushGatePresent,
+      true
     );
   }
 });

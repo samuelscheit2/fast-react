@@ -25,6 +25,7 @@ import {
   REACT_DOM_ROOT_PUBLIC_FACADE_BRIDGE_RECORD_ONLY_STATUS,
   REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS,
   REACT_DOM_ROOT_PUBLIC_FACADE_SCENARIO_ADMISSIONS,
+  REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_ACCEPTED_STATUS,
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_ACCEPTED_STATUS,
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_ACCEPTED_STATUS,
   evaluateReactDomRootRenderE2EConformanceGate,
@@ -119,6 +120,38 @@ test("React DOM public root facade gate blocks placeholders while oracle prerequ
       .privateCrossRootSchedulingPublicFlushSyncCompatibilityClaimed,
     false
   );
+  assert.equal(
+    gate.rootRenderGate.summary.privateActPassiveDiagnosticScenarioModeRowCount,
+    20
+  );
+  assert.equal(
+    gate.rootRenderGate.summary.privateActPassiveBlockedScenarioModeRowCount,
+    0
+  );
+  assert.equal(
+    gate.rootRenderGate.summary.privateActPassiveCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privateActPassivePublicReactActCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privateActPassivePublicReactDomTestUtilsActCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privateActPassivePublicRootRenderCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privateActPassivePublicPassiveEffectCompatibilityClaimed,
+    false
+  );
   assert.equal(gate.rootRenderGate.summary.portalRootRenderBlockedRowCount, 5);
   assert.equal(
     gate.rootRenderGate.summary.portalRootRenderCompatibilityClaimed,
@@ -134,6 +167,10 @@ test("React DOM public root facade gate blocks placeholders while oracle prerequ
     assert.notEqual(
       row.gateStatus,
       REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_ACCEPTED_STATUS
+    );
+    assert.notEqual(
+      row.gateStatus,
+      REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_ACCEPTED_STATUS
     );
     assert.notEqual(row.gateStatus, "blocked-portal-root-render");
     if ("compatibilityClaimed" in row) {
@@ -810,6 +847,64 @@ test("React DOM public root facade gate rejects private cross-root scheduling pr
       (failure) =>
         failure.gateStatus ===
         "root-render-private-cross-root-scheduling-row-not-private"
+    )
+  );
+});
+
+test("React DOM public root facade gate rejects private act/passive promotion to public compatibility", () => {
+  const rootRenderGate = clone(
+    evaluateReactDomRootRenderE2EConformanceGate({
+      checkedOracle: rootRenderOracle,
+      currentOracle: rootRenderOracle
+    })
+  );
+  rootRenderGate.summary.privateActPassiveCompatibilityClaimed = true;
+  rootRenderGate.summary.privateActPassivePublicReactActCompatibilityClaimed =
+    true;
+  rootRenderGate.summary
+    .privateActPassivePublicReactDomTestUtilsActCompatibilityClaimed = true;
+  rootRenderGate.summary.privateActPassivePublicRootRenderCompatibilityClaimed =
+    true;
+  rootRenderGate.summary
+    .privateActPassivePublicPassiveEffectCompatibilityClaimed = true;
+  rootRenderGate.privateActPassiveGate.compatibilityClaimed = true;
+  rootRenderGate.privateActPassiveGate.publicReactActCompatibilityClaimed = true;
+  rootRenderGate.privateActPassiveGate
+    .publicReactDomTestUtilsActCompatibilityClaimed = true;
+  rootRenderGate.privateActPassiveGate.publicRootRenderCompatibilityClaimed =
+    true;
+  rootRenderGate.privateActPassiveGate
+    .publicPassiveEffectCompatibilityClaimed = true;
+  rootRenderGate.privateActPassiveDiagnosticScenarioModeRows[0] = {
+    ...rootRenderGate.privateActPassiveDiagnosticScenarioModeRows[0],
+    comparedToReactDomOracle: true,
+    compatibilityClaimed: true,
+    publicReactActCompatibilityClaimed: true,
+    publicReactDomTestUtilsActCompatibilityClaimed: true,
+    publicRootCompatibilitySurface: true,
+    publicRootRenderCompatibilityClaimed: true,
+    publicPassiveEffectCompatibilityClaimed: true
+  };
+
+  const gate = evaluateReactDomRootPublicFacadeBlockedGate({
+    checkedOracle: rootRenderOracle,
+    currentOracle: rootRenderOracle,
+    clientRootOracle,
+    rootRenderGateResult: rootRenderGate
+  });
+
+  assert.equal(gate.ok, false);
+  assert.ok(
+    gate.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+        "root-render-private-act-passive-claims-compatibility-while-public-facade-blocked"
+    )
+  );
+  assert.ok(
+    gate.failures.some(
+      (failure) =>
+        failure.gateStatus === "root-render-private-act-passive-row-not-private"
     )
   );
 });
