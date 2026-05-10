@@ -29,6 +29,13 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Worker 504 was accepted from queue 503-533. It added private Fragment and
+  Portal deletion-subtree traversal diagnostics, explicit Suspense/Offscreen
+  blockers, and narrowed host cleanup traversal while keeping real portal DOM
+  mutation and public unmount compatibility blocked. It was verified after
+  merge with focused deletion traversal tests, root-commit deletion and
+  root_commit filters, Rust fmt, conflict-marker scanning, and
+  `git diff --check`.
 - Worker 503 was accepted from queue 503-533. It added private
   deleted-subtree passive destroy flush diagnostics that consume accepted
   deletion passive/ref cleanup ordering metadata without opening public passive

@@ -46,12 +46,11 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Queue 503-533 is assigned in isolated worktrees.
-Workers 503 and 509 have been accepted from this queue, leaving 29 active
+Workers 503, 504, and 509 have been accepted from this queue, leaving 28 active
 top-level workers.
 
 | Worker | Focus |
 | --- | --- |
-| 504 | Fragment/Portal deletion traversal diagnostics |
 | 505 | Form action event extraction metadata |
 | 506 | Form reset queue/commit metadata |
 | 507 | Resource map commit diagnostics |
