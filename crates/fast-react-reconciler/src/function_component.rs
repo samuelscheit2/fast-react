@@ -1494,6 +1494,37 @@ impl FunctionComponentContextRenderStore {
     }
 }
 
+pub(crate) struct FunctionComponentContextRenderReader<'a> {
+    store: &'a mut FunctionComponentContextRenderStore,
+    state: FunctionComponentContextRenderState,
+}
+
+impl FunctionComponentContextRenderReader<'_> {
+    #[must_use]
+    pub const fn state(&self) -> FunctionComponentContextRenderState {
+        self.state
+    }
+
+    #[must_use]
+    pub fn read_count(&self) -> usize {
+        self.store.context_reads().len() - self.state.start_read_index()
+    }
+
+    pub fn use_context(
+        &mut self,
+        context: ContextHandle,
+    ) -> Result<FunctionComponentContextReadRecord, FunctionComponentRenderError> {
+        self.store.read_context(self.state, context)
+    }
+
+    pub fn read_context(
+        &mut self,
+        context: ContextHandle,
+    ) -> Result<FunctionComponentContextReadRecord, FunctionComponentRenderError> {
+        self.use_context(context)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct FunctionComponentCurrentHookList {
     fiber: FiberId,
@@ -3229,6 +3260,14 @@ pub(crate) trait FunctionComponentInvoker {
     ) -> Result<FunctionComponentOutputHandle, FunctionComponentInvocationError>;
 }
 
+pub(crate) trait FunctionComponentContextConsumerInvoker {
+    fn invoke_function_component_context_consumer(
+        &mut self,
+        request: FunctionComponentInvocationRequest,
+        reader: &mut FunctionComponentContextRenderReader<'_>,
+    ) -> Result<FunctionComponentOutputHandle, FunctionComponentRenderError>;
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentSingleChildOutput {
     output: FunctionComponentOutputHandle,
@@ -3465,6 +3504,13 @@ pub(crate) enum FunctionComponentRenderError {
     },
     StateDispatchHandleOverflow,
     RefObjectHandleOverflow,
+    MissingUseContextRead {
+        fiber: FiberId,
+    },
+    UnsupportedUseContextReadCount {
+        fiber: FiberId,
+        read_count: usize,
+    },
     HookCursorPhaseMismatch {
         fiber: FiberId,
         expected: FunctionComponentHookRenderPhase,
@@ -3676,6 +3722,16 @@ impl Display for FunctionComponentRenderError {
             Self::RefObjectHandleOverflow => {
                 formatter.write_str("private ref object handle counter overflowed")
             }
+            Self::MissingUseContextRead { fiber } => write!(
+                formatter,
+                "function component fiber {} completed private use_context render without reading context",
+                fiber.slot().get()
+            ),
+            Self::UnsupportedUseContextReadCount { fiber, read_count } => write!(
+                formatter,
+                "function component fiber {} performed {read_count} private use_context reads; this canary admits exactly one read",
+                fiber.slot().get()
+            ),
             Self::HookCursorPhaseMismatch {
                 fiber,
                 expected,
@@ -3735,6 +3791,8 @@ impl Error for FunctionComponentRenderError {
             | Self::UnknownStateDispatch { .. }
             | Self::StateDispatchHandleOverflow
             | Self::RefObjectHandleOverflow
+            | Self::MissingUseContextRead { .. }
+            | Self::UnsupportedUseContextReadCount { .. }
             | Self::HookCursorPhaseMismatch { .. }
             | Self::Unsupported { .. }
             | Self::UnexpectedFiberTag { .. } => None,
@@ -4001,6 +4059,12 @@ pub(crate) struct FunctionComponentUseStateRenderRecord {
     state_hook: FunctionComponentUseStateHookRenderRecord,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentUseContextRenderRecord {
+    render: FunctionComponentRenderRecord,
+    context_read: FunctionComponentContextReadRecord,
+}
+
 impl FunctionComponentUseStateRenderRecord {
     #[must_use]
     pub const fn render(self) -> FunctionComponentRenderRecord {
@@ -4105,6 +4169,50 @@ impl FunctionComponentUseMemoUseRefRenderRecord {
     #[must_use]
     pub const fn hook_traversal(self) -> HookListTraversalResult {
         self.hook_result.traversal()
+    }
+}
+
+impl FunctionComponentUseContextRenderRecord {
+    #[must_use]
+    pub const fn render(self) -> FunctionComponentRenderRecord {
+        self.render
+    }
+
+    #[must_use]
+    pub const fn context_read(self) -> FunctionComponentContextReadRecord {
+        self.context_read
+    }
+
+    #[must_use]
+    pub const fn current(self) -> Option<FiberId> {
+        self.render.current()
+    }
+
+    #[must_use]
+    pub const fn work_in_progress(self) -> FiberId {
+        self.render.work_in_progress()
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.render.render_lanes()
+    }
+
+    #[must_use]
+    pub const fn output(self) -> FunctionComponentOutputHandle {
+        self.render.output()
+    }
+
+    #[must_use]
+    pub const fn context_state(self) -> FunctionComponentContextRenderState {
+        self.render
+            .context_state()
+            .expect("use_context render record must carry context state")
+    }
+
+    #[must_use]
+    pub const fn context_read_count(self) -> usize {
+        self.render.context_read_count()
     }
 }
 
@@ -4304,6 +4412,64 @@ pub(crate) fn render_function_component_with_context_reads(
         context_state: request.context_state(),
         context_read_count,
         output,
+    })
+}
+
+pub(crate) fn render_function_component_with_use_context(
+    arena: &mut FiberArena,
+    context_store: &mut FunctionComponentContextRenderStore,
+    work_in_progress: FiberId,
+    render_lanes: Lanes,
+    invoker: &mut impl FunctionComponentContextConsumerInvoker,
+) -> Result<FunctionComponentUseContextRenderRecord, FunctionComponentRenderError> {
+    let mut request = validate_function_component_render(arena, work_in_progress, render_lanes)?;
+    let context_state = context_store.prepare_render_state(work_in_progress);
+    request = request.with_context_state(context_state);
+    reset_function_component_render_state(arena, work_in_progress)?;
+
+    let output = {
+        let mut reader = FunctionComponentContextRenderReader {
+            store: context_store,
+            state: context_state,
+        };
+        invoker.invoke_function_component_context_consumer(request, &mut reader)?
+    };
+
+    let context_read_count = context_store.context_reads().len() - context_state.start_read_index();
+    let context_read = match context_read_count {
+        0 => {
+            return Err(FunctionComponentRenderError::MissingUseContextRead {
+                fiber: request.fiber(),
+            });
+        }
+        1 => context_store.context_reads()[context_state.start_read_index()],
+        read_count => {
+            return Err(
+                FunctionComponentRenderError::UnsupportedUseContextReadCount {
+                    fiber: request.fiber(),
+                    read_count,
+                },
+            );
+        }
+    };
+
+    arena
+        .get_mut(work_in_progress)?
+        .set_memoized_props(request.props());
+
+    Ok(FunctionComponentUseContextRenderRecord {
+        render: FunctionComponentRenderRecord {
+            current: arena.get(work_in_progress)?.alternate(),
+            work_in_progress,
+            component: request.component(),
+            props: request.props(),
+            render_lanes: request.render_lanes(),
+            hook_state: request.hook_state(),
+            context_state: request.context_state(),
+            context_read_count,
+            output,
+        },
+        context_read,
     })
 }
 
@@ -4561,6 +4727,91 @@ mod tests {
                         "missing test component registration",
                     ))
                 })
+        }
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    enum UseContextBehavior {
+        ReadOnce {
+            context: ContextHandle,
+        },
+        ReadNone {
+            output: FunctionComponentOutputHandle,
+        },
+        ReadTwice {
+            context: ContextHandle,
+        },
+        ReadUnknown {
+            context: ContextHandle,
+        },
+    }
+
+    #[derive(Debug)]
+    struct TestUseContextComponentRegistry {
+        component: FiberTypeHandle,
+        behavior: UseContextBehavior,
+        calls: Vec<FunctionComponentInvocationRequest>,
+        reads: Vec<FunctionComponentContextReadRecord>,
+    }
+
+    impl TestUseContextComponentRegistry {
+        fn new(component: FiberTypeHandle, behavior: UseContextBehavior) -> Self {
+            Self {
+                component,
+                behavior,
+                calls: Vec::new(),
+                reads: Vec::new(),
+            }
+        }
+
+        fn calls(&self) -> &[FunctionComponentInvocationRequest] {
+            &self.calls
+        }
+
+        fn reads(&self) -> &[FunctionComponentContextReadRecord] {
+            &self.reads
+        }
+    }
+
+    impl FunctionComponentContextConsumerInvoker for TestUseContextComponentRegistry {
+        fn invoke_function_component_context_consumer(
+            &mut self,
+            request: FunctionComponentInvocationRequest,
+            reader: &mut FunctionComponentContextRenderReader<'_>,
+        ) -> Result<FunctionComponentOutputHandle, FunctionComponentRenderError> {
+            self.calls.push(request);
+            if request.component() != self.component {
+                return Err(FunctionComponentRenderError::Invocation {
+                    fiber: request.fiber(),
+                    component: request.component(),
+                    error: FunctionComponentInvocationError::component_error(
+                        "missing use_context test component registration",
+                    ),
+                });
+            }
+
+            match self.behavior {
+                UseContextBehavior::ReadOnce { context } => {
+                    let read = reader.use_context(context)?;
+                    self.reads.push(read);
+                    Ok(FunctionComponentOutputHandle::from_raw(read.value().raw()))
+                }
+                UseContextBehavior::ReadNone { output } => Ok(output),
+                UseContextBehavior::ReadTwice { context } => {
+                    let first = reader.use_context(context)?;
+                    let second = reader.use_context(context)?;
+                    self.reads.push(first);
+                    self.reads.push(second);
+                    Ok(FunctionComponentOutputHandle::from_raw(
+                        second.value().raw(),
+                    ))
+                }
+                UseContextBehavior::ReadUnknown { context } => {
+                    let read = reader.use_context(context)?;
+                    self.reads.push(read);
+                    Ok(FunctionComponentOutputHandle::from_raw(read.value().raw()))
+                }
+            }
         }
     }
 
@@ -4928,6 +5179,172 @@ mod tests {
         assert_eq!(
             context_store.current_value(inner_context).unwrap(),
             inner_default
+        );
+    }
+
+    #[test]
+    fn function_component_use_context_render_reads_nearest_provider_during_invocation() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let default_value = context_value(700);
+        let outer_value = context_value(701);
+        let inner_value = context_value(702);
+        let context = context_store.create_context(default_value);
+        let before_outer = context_store.push_provider(context, outer_value).unwrap();
+        let before_inner = context_store.push_provider(context, inner_value).unwrap();
+        let mut registry = TestUseContextComponentRegistry::new(
+            component,
+            UseContextBehavior::ReadOnce { context },
+        );
+
+        let record = render_function_component_with_use_context(
+            &mut arena,
+            &mut context_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap();
+
+        assert_eq!(record.current(), Some(current));
+        assert_eq!(record.work_in_progress(), work_in_progress);
+        assert_eq!(
+            record.output(),
+            FunctionComponentOutputHandle::from_raw(702)
+        );
+        assert_eq!(record.context_read_count(), 1);
+        assert!(record.render().has_context_reads());
+        let state = record.context_state();
+        assert_eq!(state.render_fiber(), work_in_progress);
+        assert_eq!(state.stack_depth(), 2);
+        assert_eq!(registry.calls().len(), 1);
+        assert_eq!(registry.calls()[0].context_state(), Some(state));
+
+        let read = record.context_read();
+        assert_eq!(read.fiber(), work_in_progress);
+        assert_eq!(read.context(), context);
+        assert_eq!(read.default_value(), default_value);
+        assert_eq!(read.value(), inner_value);
+        assert_eq!(read.active_provider_count(), 2);
+        assert!(read.has_active_provider());
+        assert_eq!(registry.reads(), &[read]);
+        assert_eq!(
+            context_store.context_reads_for_record(record.render()),
+            &[read]
+        );
+        assert_eq!(context_store.current_value(context).unwrap(), inner_value);
+        assert_eq!(
+            arena.get(work_in_progress).unwrap().memoized_props(),
+            PropsHandle::from_raw(2)
+        );
+
+        context_store.restore_snapshot(before_inner).unwrap();
+        assert_eq!(context_store.current_value(context).unwrap(), outer_value);
+        context_store.restore_snapshot(before_outer).unwrap();
+        assert_eq!(context_store.current_value(context).unwrap(), default_value);
+    }
+
+    #[test]
+    fn function_component_use_context_render_fails_closed_without_a_consumer_read() {
+        let (mut arena, _current, work_in_progress, component) = function_component_pair();
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let mut registry = TestUseContextComponentRegistry::new(
+            component,
+            UseContextBehavior::ReadNone {
+                output: FunctionComponentOutputHandle::from_raw(710),
+            },
+        );
+
+        let error = render_function_component_with_use_context(
+            &mut arena,
+            &mut context_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            FunctionComponentRenderError::MissingUseContextRead {
+                fiber: work_in_progress,
+            }
+        );
+        assert_eq!(registry.calls().len(), 1);
+        assert!(registry.reads().is_empty());
+        assert!(context_store.context_reads().is_empty());
+        assert_eq!(
+            arena.get(work_in_progress).unwrap().memoized_props(),
+            PropsHandle::NONE
+        );
+    }
+
+    #[test]
+    fn function_component_use_context_render_rejects_multiple_consumer_reads() {
+        let (mut arena, _current, work_in_progress, component) = function_component_pair();
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let context = context_store.create_context(context_value(720));
+        let mut registry = TestUseContextComponentRegistry::new(
+            component,
+            UseContextBehavior::ReadTwice { context },
+        );
+
+        let error = render_function_component_with_use_context(
+            &mut arena,
+            &mut context_store,
+            work_in_progress,
+            Lanes::SYNC,
+            &mut registry,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            FunctionComponentRenderError::UnsupportedUseContextReadCount {
+                fiber: work_in_progress,
+                read_count: 2,
+            }
+        );
+        assert_eq!(registry.reads().len(), 2);
+        assert_eq!(context_store.context_reads().len(), 2);
+        assert_eq!(
+            arena.get(work_in_progress).unwrap().memoized_props(),
+            PropsHandle::NONE
+        );
+    }
+
+    #[test]
+    fn function_component_use_context_render_propagates_unknown_context_diagnostic() {
+        let (mut arena, _current, work_in_progress, component) = function_component_pair();
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let unknown = ContextHandle::from_raw(7_700);
+        let mut registry = TestUseContextComponentRegistry::new(
+            component,
+            UseContextBehavior::ReadUnknown { context: unknown },
+        );
+
+        let error = render_function_component_with_use_context(
+            &mut arena,
+            &mut context_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            FunctionComponentRenderError::ContextStack {
+                fiber: work_in_progress,
+                error: Box::new(ContextStackError::UnknownContext { context: unknown }),
+            }
+        );
+        assert_eq!(registry.calls().len(), 1);
+        assert!(registry.reads().is_empty());
+        assert!(context_store.context_reads().is_empty());
+        assert_eq!(
+            arena.get(work_in_progress).unwrap().memoized_props(),
+            PropsHandle::NONE
         );
     }
 
