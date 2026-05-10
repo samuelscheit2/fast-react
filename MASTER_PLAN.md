@@ -45,18 +45,29 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue 625-654 has been fully accepted and merged.
-No replacement workers are queued yet while accepted-worker cleanup and the next
-queue selection finish.
+Top-level cap: 30 workers. Queue 655-684 is being launched in isolated
+`worker/<slug>` branches and worktrees.
+
+- 655-666: Rust reconciler execution paths for commit mutation, effects, refs,
+  context, Suspense, Offscreen, error recovery, sync flush callbacks, and
+  reducer transition lanes.
+- 667-672: React test-renderer private native execution evidence for `toTree`,
+  TestInstance queries, error boundaries, act/passive flushing, update
+  serialization, and unmount ref/passive ordering.
+- 673-682: React DOM private root live-container preflight, root unmount
+  ref/passive cleanup, fragment/array fake-DOM rendering, controlled-input live
+  preflight, hydration recovery/replay, resource execution, and form action
+  callback preflight.
+- 683-684: Scheduler postTask act/root continuation evidence and package
+  surface/private-admission guard refresh.
 
 ## Near-Term Sequencing
 
-1. Clean accepted queue 625-654 worker tmux sessions, worktrees, and branches
-   now that their reports and merge commits are recorded.
-2. Reclassify any remaining live sessions from current tmux pane state before
-   launching replacements.
-3. Queue replacements up to the 30 top-level cap with `scripts/run-worker.sh`;
-   each prompt must require `create_goal` as the first worker action.
+1. Monitor queue 655-684 from tmux pane state and worker progress reports.
+2. Classify completions before accepting work; inspect worker reports,
+   worktree status, changed files, verification, and risks.
+3. Merge accepted completed work in batches, resolving overlap conflicts on
+   `main`, then clean accepted sessions/worktrees/branches.
 4. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
 
