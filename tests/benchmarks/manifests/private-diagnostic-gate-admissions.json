@@ -7,6 +7,10 @@
   "requiredScenarioIds": [
     "private-root-bridge-request-records",
     "private-root-bridge-native-handoff-records",
+    "private-root-host-output-create-mark-listen-diagnostics",
+    "private-root-host-output-initial-render-diagnostics",
+    "private-root-host-output-update-render-diagnostics",
+    "private-root-host-output-unmount-cleanup-diagnostics",
     "private-native-root-bridge-sequence-validation",
     "private-dom-should-set-text-content-rows",
     "private-dom-host-text-commit-rows",
@@ -48,6 +52,23 @@
         "admitted": true,
         "compatibilityClaimed": false,
         "notes": "Worker 269 proves private JS native handoff records mirror root bridge create/render/unmount metadata without native execution or compatibility claims."
+      }
+    },
+    {
+      "id": "react-dom-root-private-host-output-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-root-render-e2e-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "root-render-private-host-output-diagnostic-gate-1",
+        "status": "accepted-private-partial",
+        "command": "npm run root-render-e2e:conformance --workspace @fast-react/conformance",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Worker 352 proves 8 private host-output diagnostic scenario-mode rows for createRoot marker/listener apply-revert, initial render, update render, and unmount cleanup while public root E2E compatibility remains blocked."
       }
     },
     {
@@ -183,6 +204,68 @@
       "blockedReason": "Only private JS native handoff records are admitted for diagnostics; native execution and public APIs remain blocked."
     },
     {
+      "id": "private-root-host-output-create-mark-listen-diagnostics",
+      "area": "react-dom private root host output",
+      "entrypoints": [
+        "packages/react-dom/src/client/root-bridge.js"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-private-host-output-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "Only private createRoot marker/listener apply-and-revert diagnostics are admitted; public root creation, listener setup, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-root-host-output-initial-render-diagnostics",
+      "area": "react-dom private root host output",
+      "entrypoints": [
+        "packages/react-dom/src/client/root-bridge.js",
+        "packages/react-dom/src/dom-host/mutation.js",
+        "packages/react-dom/src/client/component-tree.js"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-private-host-output-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "Only private fake-DOM initial HostComponent/HostText output diagnostics are admitted; public createRoot render, browser DOM mutation, and compatibility remain blocked."
+    },
+    {
+      "id": "private-root-host-output-update-render-diagnostics",
+      "area": "react-dom private root host output",
+      "entrypoints": [
+        "packages/react-dom/src/client/root-bridge.js",
+        "packages/react-dom/src/dom-host/mutation.js",
+        "packages/react-dom/src/client/component-tree.js"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-private-host-output-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "Only private fake-DOM update text/property diagnostics and latest-props publication are admitted; public update rendering and comparable timing remain blocked."
+    },
+    {
+      "id": "private-root-host-output-unmount-cleanup-diagnostics",
+      "area": "react-dom private root host output",
+      "entrypoints": [
+        "packages/react-dom/src/client/root-bridge.js",
+        "packages/react-dom/src/dom-host/mutation.js",
+        "packages/react-dom/src/client/component-tree.js"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-private-host-output-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "Only private fake-DOM unmount cleanup and latest-props detach diagnostics are admitted; public root unmount and compatibility remain blocked."
+    },
+    {
       "id": "private-native-root-bridge-sequence-validation",
       "area": "native private root bridge",
       "entrypoints": [
@@ -301,6 +384,23 @@
       "timingStatus": "diagnostic-only",
       "benchmarkReadinessStatus": "diagnostic-admitted",
       "blockedReason": "Private root/native bridge diagnostics are admitted, but public root/native compatibility and comparable timing remain blocked."
+    },
+    {
+      "id": "private-root-host-output-diagnostic-admission",
+      "description": "Private React DOM root host-output diagnostics for createRoot side effects, initial render, update render, and unmount cleanup.",
+      "scenarioIds": [
+        "private-root-host-output-create-mark-listen-diagnostics",
+        "private-root-host-output-initial-render-diagnostics",
+        "private-root-host-output-update-render-diagnostics",
+        "private-root-host-output-unmount-cleanup-diagnostics"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-private-host-output-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "benchmarkReadinessStatus": "diagnostic-admitted",
+      "blockedReason": "Private root host-output diagnostics are admitted, but public React DOM roots, browser DOM mutation, and comparable timing remain blocked."
     },
     {
       "id": "private-dom-mutation-text-diagnostic-admission",
