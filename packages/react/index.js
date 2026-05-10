@@ -7,6 +7,17 @@ const {
   placeholderVersion
 } = require('./placeholder-utils.js');
 const {
+  use,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState
+} = require('./hook-dispatcher.js');
+const {
   cloneElement,
   createElement,
   isValidElement
@@ -65,19 +76,19 @@ exports.unstable_useCacheRefresh = createUnimplementedFunction(
   entrypoint,
   'unstable_useCacheRefresh'
 );
-exports.use = createUnimplementedFunction(entrypoint, 'use');
+exports.use = use;
 exports.useActionState = createUnimplementedFunction(
   entrypoint,
   'useActionState'
 );
-exports.useCallback = createUnimplementedFunction(entrypoint, 'useCallback');
-exports.useContext = createUnimplementedFunction(entrypoint, 'useContext');
+exports.useCallback = useCallback;
+exports.useContext = useContext;
 exports.useDebugValue = createUnimplementedFunction(entrypoint, 'useDebugValue');
 exports.useDeferredValue = createUnimplementedFunction(
   entrypoint,
   'useDeferredValue'
 );
-exports.useEffect = createUnimplementedFunction(entrypoint, 'useEffect');
+exports.useEffect = useEffect;
 exports.useEffectEvent = createUnimplementedFunction(
   entrypoint,
   'useEffectEvent'
@@ -91,18 +102,15 @@ exports.useInsertionEffect = createUnimplementedFunction(
   entrypoint,
   'useInsertionEffect'
 );
-exports.useLayoutEffect = createUnimplementedFunction(
-  entrypoint,
-  'useLayoutEffect'
-);
-exports.useMemo = createUnimplementedFunction(entrypoint, 'useMemo');
+exports.useLayoutEffect = useLayoutEffect;
+exports.useMemo = useMemo;
 exports.useOptimistic = createUnimplementedFunction(
   entrypoint,
   'useOptimistic'
 );
-exports.useReducer = createUnimplementedFunction(entrypoint, 'useReducer');
-exports.useRef = createUnimplementedFunction(entrypoint, 'useRef');
-exports.useState = createUnimplementedFunction(entrypoint, 'useState');
+exports.useReducer = useReducer;
+exports.useRef = useRef;
+exports.useState = useState;
 exports.useSyncExternalStore = createUnimplementedFunction(
   entrypoint,
   'useSyncExternalStore'
