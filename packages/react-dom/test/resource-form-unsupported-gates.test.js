@@ -10261,7 +10261,7 @@ test('private resource hint stylesheet precedence diagnostic records style dedup
   );
 });
 
-test('private resource hint resource-map commit diagnostic records stylesheet preload script and module rows only', () => {
+test('private resource hint resource-map commit diagnostic executes script/module fake-resource ordering only', () => {
   const gate = resourceFormGate.createResourceFormActionInternalsGate({
     requestIdPrefix: 'resource-map-commit-source'
   });
@@ -10623,6 +10623,11 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
     scriptModuleFakeDomCommitExecutionRowCount: 4,
     scriptResourceFakeDomCommitExecutionRowCount: 2,
     modulePreloadFakeDomCommitExecutionRowCount: 1,
+    scriptModuleFakeResourceOrderExecutionRowCount: 4,
+    scriptModuleFakeResourceOrderDedupeStateCount: 2,
+    scriptModuleFakeResourceOrderPreloadPropsRecordCount: 2,
+    scriptModuleFakeResourceOrderHoistableScriptRecordCount: 2,
+    scriptModuleFakeResourceOrderPreloadPropsAdoptionCount: 2,
     stylesheetLoadStateCommitOrderRowCount: 1,
     stylesheetLoadStateResourceCount: 1,
     stylesheetLoadStateCommitTransitionCount: 1,
@@ -10646,6 +10651,8 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
     preloadPropsMapMutated: false,
     scriptModuleFakeDomCommitEvidenceRecorded: true,
     fakeDomCommitApplied: false,
+    scriptModuleFakeResourceOrderingExecuted: true,
+    scriptModuleFakeResourceOrderingApplied: true,
     modulePreloadStarted: false,
     scriptPreinitStarted: false,
     moduleScriptPreinitStarted: false,
@@ -11033,11 +11040,32 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
       modulePreloadResourceMapRowCount:
         diagnostic.scriptModuleFakeDomCommitExecution
           .modulePreloadResourceMapRowCount,
+      fakeResourceOrderExecutionRowCount:
+        diagnostic.scriptModuleFakeDomCommitExecution
+          .fakeResourceOrderExecutionRowCount,
+      fakeResourceOrderDedupeStateCount:
+        diagnostic.scriptModuleFakeDomCommitExecution
+          .fakeResourceOrderDedupeStateCount,
+      fakeResourceOrderPreloadPropsRecordCount:
+        diagnostic.scriptModuleFakeDomCommitExecution
+          .fakeResourceOrderPreloadPropsRecordCount,
+      fakeResourceOrderHoistableScriptRecordCount:
+        diagnostic.scriptModuleFakeDomCommitExecution
+          .fakeResourceOrderHoistableScriptRecordCount,
+      fakeResourceOrderPreloadPropsAdoptionCount:
+        diagnostic.scriptModuleFakeDomCommitExecution
+          .fakeResourceOrderPreloadPropsAdoptionCount,
       fakeDomCommitEvidenceRecorded:
         diagnostic.scriptModuleFakeDomCommitExecution
           .fakeDomCommitEvidenceRecorded,
       fakeDomCommitApplied:
         diagnostic.scriptModuleFakeDomCommitExecution.fakeDomCommitApplied,
+      fakeResourceOrderingExecuted:
+        diagnostic.scriptModuleFakeDomCommitExecution
+          .fakeResourceOrderingExecuted,
+      fakeResourceOrderingApplied:
+        diagnostic.scriptModuleFakeDomCommitExecution
+          .fakeResourceOrderingApplied,
       publicScriptModuleResourceDispatch:
         diagnostic.scriptModuleFakeDomCommitExecution
           .publicScriptModuleResourceDispatch,
@@ -11051,8 +11079,15 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
       rowCount: 4,
       scriptResourceMapRowCount: 2,
       modulePreloadResourceMapRowCount: 1,
+      fakeResourceOrderExecutionRowCount: 4,
+      fakeResourceOrderDedupeStateCount: 2,
+      fakeResourceOrderPreloadPropsRecordCount: 2,
+      fakeResourceOrderHoistableScriptRecordCount: 2,
+      fakeResourceOrderPreloadPropsAdoptionCount: 2,
       fakeDomCommitEvidenceRecorded: true,
       fakeDomCommitApplied: false,
+      fakeResourceOrderingExecuted: true,
+      fakeResourceOrderingApplied: true,
       publicScriptModuleResourceDispatch: false,
       scriptExecutionStarted: false
     }
@@ -11193,6 +11228,226 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
       rawValuesRetained: false,
       compatibilityClaimed: false
     }
+  );
+  assert.deepEqual(
+    {
+      executionKind:
+        diagnostic.scriptModuleFakeDomCommitExecution
+          .fakeResourceOrderExecution.executionKind,
+      rowCount:
+        diagnostic.scriptModuleFakeDomCommitExecution
+          .fakeResourceOrderExecution.rowCount,
+      dedupeStateCount:
+        diagnostic.scriptModuleFakeDomCommitExecution
+          .fakeResourceOrderExecution.dedupeStateCount,
+      preloadPropsRecordCount:
+        diagnostic.scriptModuleFakeDomCommitExecution
+          .fakeResourceOrderExecution.preloadPropsRecordCount,
+      hoistableScriptResourceCount:
+        diagnostic.scriptModuleFakeDomCommitExecution
+          .fakeResourceOrderExecution.hoistableScriptResourceCount,
+      preloadPropsAdoptionCount:
+        diagnostic.scriptModuleFakeDomCommitExecution
+          .fakeResourceOrderExecution.preloadPropsAdoptionCount,
+      fakeResourceOrderingExecuted:
+        diagnostic.scriptModuleFakeDomCommitExecution
+          .fakeResourceOrderExecution.fakeResourceOrderingExecuted,
+      fakeResourceOrderingApplied:
+        diagnostic.scriptModuleFakeDomCommitExecution
+          .fakeResourceOrderExecution.fakeResourceOrderingApplied,
+      preloadPropsMapMutated:
+        diagnostic.scriptModuleFakeDomCommitExecution
+          .fakeResourceOrderExecution.preloadPropsMapMutated,
+      hoistableScriptsMapMutated:
+        diagnostic.scriptModuleFakeDomCommitExecution
+          .fakeResourceOrderExecution.hoistableScriptsMapMutated,
+      scriptExecutionStarted:
+        diagnostic.scriptModuleFakeDomCommitExecution
+          .fakeResourceOrderExecution.scriptExecutionStarted,
+      publicScriptModuleResourceDispatch:
+        diagnostic.scriptModuleFakeDomCommitExecution
+          .fakeResourceOrderExecution.publicScriptModuleResourceDispatch
+    },
+    {
+      executionKind:
+        'react-19.2.6-script-modulepreload-fake-resource-order-execution-diagnostic',
+      rowCount: 4,
+      dedupeStateCount: 2,
+      preloadPropsRecordCount: 2,
+      hoistableScriptResourceCount: 2,
+      preloadPropsAdoptionCount: 2,
+      fakeResourceOrderingExecuted: true,
+      fakeResourceOrderingApplied: true,
+      preloadPropsMapMutated: false,
+      hoistableScriptsMapMutated: false,
+      scriptExecutionStarted: false,
+      publicScriptModuleResourceDispatch: false
+    }
+  );
+  assert.deepEqual(
+    diagnostic.scriptModuleFakeDomCommitExecution
+      .fakeResourceOrderExecution.rows.map((row) => ({
+        fakeResourceOrderIndex: row.fakeResourceOrderIndex,
+        sourceScriptModuleFakeDomCommitRowId:
+          row.sourceScriptModuleFakeDomCommitRowId,
+        contractId: row.contractId,
+        recordKind: row.recordKind,
+        scriptKind: row.scriptKind,
+        dedupeKey: row.dedupeKey,
+        fakeResourceOrderOperation: row.fakeResourceOrderOperation,
+        preloadPropsRecordObservedBefore:
+          row.preloadPropsRecordObservedBefore,
+        hoistableScriptResourceObservedBefore:
+          row.hoistableScriptResourceObservedBefore,
+        fakePreloadPropsRecordCreated:
+          row.fakePreloadPropsRecordCreated,
+        fakeHoistableScriptResourceCreated:
+          row.fakeHoistableScriptResourceCreated,
+        fakePreloadPropsAdopted: row.fakePreloadPropsAdopted,
+        fakeResourceOrderingExecuted:
+          row.fakeResourceOrderingExecuted,
+        preloadPropsMapMutated: row.preloadPropsMapMutated,
+        hoistableScriptsMapMutated: row.hoistableScriptsMapMutated,
+        scriptExecutionStarted: row.scriptExecutionStarted
+      })),
+    [
+      {
+        fakeResourceOrderIndex: 0,
+        sourceScriptModuleFakeDomCommitRowId:
+          'script-module-fake-dom-commit-0',
+        contractId: 'preload',
+        recordKind: 'preload',
+        scriptKind: 'classic',
+        dedupeKey: 'script:script-main',
+        fakeResourceOrderOperation:
+          'execute-classic-script-preload-props-fake-resource-order',
+        preloadPropsRecordObservedBefore: false,
+        hoistableScriptResourceObservedBefore: false,
+        fakePreloadPropsRecordCreated: true,
+        fakeHoistableScriptResourceCreated: false,
+        fakePreloadPropsAdopted: false,
+        fakeResourceOrderingExecuted: true,
+        preloadPropsMapMutated: false,
+        hoistableScriptsMapMutated: false,
+        scriptExecutionStarted: false
+      },
+      {
+        fakeResourceOrderIndex: 1,
+        sourceScriptModuleFakeDomCommitRowId:
+          'script-module-fake-dom-commit-1',
+        contractId: 'preinit-script',
+        recordKind: 'script',
+        scriptKind: 'classic',
+        dedupeKey: 'script:script-main',
+        fakeResourceOrderOperation:
+          'execute-classic-script-hoistable-script-fake-resource-order',
+        preloadPropsRecordObservedBefore: true,
+        hoistableScriptResourceObservedBefore: false,
+        fakePreloadPropsRecordCreated: false,
+        fakeHoistableScriptResourceCreated: true,
+        fakePreloadPropsAdopted: true,
+        fakeResourceOrderingExecuted: true,
+        preloadPropsMapMutated: false,
+        hoistableScriptsMapMutated: false,
+        scriptExecutionStarted: false
+      },
+      {
+        fakeResourceOrderIndex: 2,
+        sourceScriptModuleFakeDomCommitRowId:
+          'script-module-fake-dom-commit-2',
+        contractId: 'preload-module',
+        recordKind: 'preload',
+        scriptKind: 'module',
+        dedupeKey: 'script:module-main',
+        fakeResourceOrderOperation:
+          'execute-modulepreload-preload-props-fake-resource-order',
+        preloadPropsRecordObservedBefore: false,
+        hoistableScriptResourceObservedBefore: false,
+        fakePreloadPropsRecordCreated: true,
+        fakeHoistableScriptResourceCreated: false,
+        fakePreloadPropsAdopted: false,
+        fakeResourceOrderingExecuted: true,
+        preloadPropsMapMutated: false,
+        hoistableScriptsMapMutated: false,
+        scriptExecutionStarted: false
+      },
+      {
+        fakeResourceOrderIndex: 3,
+        sourceScriptModuleFakeDomCommitRowId:
+          'script-module-fake-dom-commit-3',
+        contractId: 'preinit-module-script',
+        recordKind: 'script',
+        scriptKind: 'module',
+        dedupeKey: 'script:module-main',
+        fakeResourceOrderOperation:
+          'execute-module-script-hoistable-script-fake-resource-order',
+        preloadPropsRecordObservedBefore: true,
+        hoistableScriptResourceObservedBefore: false,
+        fakePreloadPropsRecordCreated: false,
+        fakeHoistableScriptResourceCreated: true,
+        fakePreloadPropsAdopted: true,
+        fakeResourceOrderingExecuted: true,
+        preloadPropsMapMutated: false,
+        hoistableScriptsMapMutated: false,
+        scriptExecutionStarted: false
+      }
+    ]
+  );
+  assert.deepEqual(
+    diagnostic.scriptModuleFakeDomCommitExecution
+      .fakeResourceOrderExecution.dedupeStates.map((row) => ({
+        dedupeKey: row.dedupeKey,
+        rowCount: row.rowCount,
+        sourceScriptModuleFakeDomCommitRowIds:
+          row.sourceScriptModuleFakeDomCommitRowIds,
+        contractIdsInOrder: row.contractIdsInOrder,
+        scriptKindsInOrder: row.scriptKindsInOrder,
+        preloadPropsRecordCreated:
+          row.preloadPropsRecordCreated,
+        hoistableScriptResourceCreated:
+          row.hoistableScriptResourceCreated,
+        preloadPropsAdoptionCount: row.preloadPropsAdoptionCount,
+        preloadPropsMapMutated: row.preloadPropsMapMutated,
+        hoistableScriptsMapMutated: row.hoistableScriptsMapMutated,
+        scriptExecutionStarted: row.scriptExecutionStarted
+      })),
+    [
+      {
+        dedupeKey: 'script:script-main',
+        rowCount: 2,
+        sourceScriptModuleFakeDomCommitRowIds: [
+          'script-module-fake-dom-commit-0',
+          'script-module-fake-dom-commit-1'
+        ],
+        contractIdsInOrder: ['preload', 'preinit-script'],
+        scriptKindsInOrder: ['classic', 'classic'],
+        preloadPropsRecordCreated: true,
+        hoistableScriptResourceCreated: true,
+        preloadPropsAdoptionCount: 1,
+        preloadPropsMapMutated: false,
+        hoistableScriptsMapMutated: false,
+        scriptExecutionStarted: false
+      },
+      {
+        dedupeKey: 'script:module-main',
+        rowCount: 2,
+        sourceScriptModuleFakeDomCommitRowIds: [
+          'script-module-fake-dom-commit-2',
+          'script-module-fake-dom-commit-3'
+        ],
+        contractIdsInOrder: [
+          'preload-module',
+          'preinit-module-script'
+        ],
+        scriptKindsInOrder: ['module', 'module'],
+        preloadPropsRecordCreated: true,
+        hoistableScriptResourceCreated: true,
+        preloadPropsAdoptionCount: 1,
+        preloadPropsMapMutated: false,
+        hoistableScriptsMapMutated: false,
+        scriptExecutionStarted: false
+      }
+    ]
   );
   assert.deepEqual(
     {
@@ -11457,12 +11712,47 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
   );
   assert.equal(
     diagnostic.resourceLifecycleBoundary
+      .scriptModuleFakeResourceOrderExecutionRowCount,
+    4
+  );
+  assert.equal(
+    diagnostic.resourceLifecycleBoundary
+      .scriptModuleFakeResourceOrderDedupeStateCount,
+    2
+  );
+  assert.equal(
+    diagnostic.resourceLifecycleBoundary
+      .scriptModuleFakeResourceOrderPreloadPropsRecordCount,
+    2
+  );
+  assert.equal(
+    diagnostic.resourceLifecycleBoundary
+      .scriptModuleFakeResourceOrderHoistableScriptRecordCount,
+    2
+  );
+  assert.equal(
+    diagnostic.resourceLifecycleBoundary
+      .scriptModuleFakeResourceOrderPreloadPropsAdoptionCount,
+    2
+  );
+  assert.equal(
+    diagnostic.resourceLifecycleBoundary
       .scriptModuleFakeDomCommitEvidenceRecorded,
     true
   );
   assert.equal(
     diagnostic.resourceLifecycleBoundary.fakeDomCommitApplied,
     false
+  );
+  assert.equal(
+    diagnostic.resourceLifecycleBoundary
+      .scriptModuleFakeResourceOrderingExecuted,
+    true
+  );
+  assert.equal(
+    diagnostic.resourceLifecycleBoundary
+      .scriptModuleFakeResourceOrderingApplied,
+    true
   );
   assert.equal(
     diagnostic.resourceLifecycleBoundary
@@ -11556,6 +11846,18 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
   assert.equal(summary.recordsScriptFakeDomCommitExecutionRows, true);
   assert.equal(
     summary.recordsModulePreloadFakeDomCommitExecutionRows,
+    true
+  );
+  assert.equal(
+    summary.recordsScriptModuleFakeResourceOrderExecutionRows,
+    true
+  );
+  assert.equal(
+    summary.recordsScriptModuleFakeResourceDedupeStateRows,
+    true
+  );
+  assert.equal(
+    summary.executesPrivateScriptModuleFakeResourceOrdering,
     true
   );
   assert.equal(summary.consumesStylesheetLoadErrorState, true);
@@ -13152,6 +13454,10 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
       scriptModuleFakeDomCommitRowsRecorded: false,
       scriptResourceFakeDomCommitRowsRecorded: false,
       modulePreloadFakeDomCommitRowsRecorded: false,
+      fakeScriptModuleResourceOrderingDiagnosticInvoked: false,
+      scriptModuleFakeResourceOrderRowsRecorded: false,
+      scriptModuleFakeResourceDedupeStatesRecorded: false,
+      scriptModuleFakeResourceOrderingExecuted: false,
       stylesheetLoadErrorStateRecordConsumed: false,
       stylesheetLoadStateCommitOrderRowsRecorded: false,
       stylesheetLoadStateResourceMapRowsValidated: false,
@@ -13593,6 +13899,22 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
       false
     );
     assert.equal(
+      blockedRecord.sideEffects.fakeScriptModuleResourceOrderingDiagnosticInvoked,
+      false
+    );
+    assert.equal(
+      blockedRecord.sideEffects.scriptModuleFakeResourceOrderRowsRecorded,
+      false
+    );
+    assert.equal(
+      blockedRecord.sideEffects.scriptModuleFakeResourceDedupeStatesRecorded,
+      false
+    );
+    assert.equal(
+      blockedRecord.sideEffects.scriptModuleFakeResourceOrderingExecuted,
+      false
+    );
+    assert.equal(
       blockedRecord.sideEffects.stylesheetLoadErrorStateRecordConsumed,
       false
     );
@@ -13770,6 +14092,22 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
       );
       assert.equal(
         adapterBoundary.modulePreloadFakeDomCommitRowsRecorded,
+        false
+      );
+      assert.equal(
+        adapterBoundary.fakeScriptModuleResourceOrderingDiagnosticInvoked,
+        false
+      );
+      assert.equal(
+        adapterBoundary.scriptModuleFakeResourceOrderRowsRecorded,
+        false
+      );
+      assert.equal(
+        adapterBoundary.scriptModuleFakeResourceDedupeStatesRecorded,
+        false
+      );
+      assert.equal(
+        adapterBoundary.scriptModuleFakeResourceOrderingExecuted,
         false
       );
       assert.equal(
