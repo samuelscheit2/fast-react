@@ -57,6 +57,7 @@ test("root render E2E gate admits only accepted private React DOM metadata rows"
       "worker-511-public-facade-host-output-update",
       "worker-512-public-facade-unmount-cleanup",
       "worker-674-public-facade-unmount-ref-passive-cleanup",
+      "worker-705-public-facade-unmount-ref-cleanup-passive-ordering",
       "worker-513-event-type-dispatch-canary",
       "worker-514-portal-event-error-routing",
       "worker-528-hydration-replay-error-metadata",

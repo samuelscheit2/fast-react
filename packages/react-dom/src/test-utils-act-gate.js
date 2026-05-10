@@ -34,6 +34,8 @@ const privatePassiveDiagnosticStatus =
   'accepted-private-passive-effect-diagnostic-without-public-act-passive-drain';
 const privatePassivePublicPrerequisiteStatus =
   'blocked-accepted-private-passive-diagnostics-until-public-act-passive-drain';
+const passiveEffectDeletedSubtreeRefPassiveOrderingStatus =
+  'accepted-private-deleted-subtree-ref-passive-cleanup-order-without-public-passive-drain';
 const privateRootHostOutputDiagnosticGateId =
   'root-render-private-host-output-diagnostic-gate-1';
 const privateRootHostOutputDiagnosticStatus =
@@ -322,6 +324,15 @@ const passiveEffectRootErrorRoutingRecords = freezeArray([
   'RootErrorCaptureSource::PassiveEffectDestroy',
   'RootErrorCaptureSource::PassiveEffectMountCreate',
   'capture_passive_effect_root_error'
+]);
+const passiveEffectDeletedSubtreeRefPassiveOrderingRecords = freezeArray([
+  'HostRootDeletionCleanupOrderGateSnapshot',
+  'HostRootDeletionCleanupOrderPhase::RefCleanupReturn',
+  'HostRootDeletionCleanupOrderPhase::PassiveDestroy',
+  'HostRootDeletionCleanupOrderPhase::HostCleanup',
+  'deletion_cleanup_order_gate_for_canary',
+  'deletion_ref_passive_cleanup_execution',
+  'host_work_deletion_executes_passive_destroy_before_host_cleanup_with_ref_order_evidence'
 ]);
 const privatePassiveDiagnosticEvidence = freezeArray([
   'default-flush-remains-metadata-only',
@@ -846,6 +857,24 @@ function getReactDomTestUtilsActPrivateRoutingGate(overrides = {}) {
       acceptedDiagnostics: privatePassiveDiagnosticRows,
       evidence: privatePassiveDiagnosticEvidence,
       summary: privatePassiveDiagnosticSummary,
+      deletedSubtreeRefPassiveCleanupOrder: freezeRecord({
+        status: passiveEffectDeletedSubtreeRefPassiveOrderingStatus,
+        records: passiveEffectDeletedSubtreeRefPassiveOrderingRecords,
+        source: 'crates/fast-react-reconciler/src/root_commit.rs',
+        executionSource:
+          'crates/fast-react-reconciler/src/passive_effects.rs',
+        consumesDeletionCleanupOrderGate: true,
+        consumesRefCleanupExecution: true,
+        consumesPassiveDestroyMetadata: true,
+        refCleanupBeforePassiveDestroy: true,
+        passiveDestroyBeforeHostCleanup: true,
+        hostCleanupAfterPassiveDestroy: true,
+        publicActPassiveDrain: false,
+        publicEffectExecution: false,
+        schedulerDrivenPassiveExecution: false,
+        publicRootExecution: false,
+        compatibilityClaimed: false
+      }),
       blockedPrerequisiteStatus: privatePassivePublicPrerequisiteStatus,
       blockedPrerequisites: privatePassiveBlockedPrerequisites,
       blockedPrerequisiteIds: privatePassiveBlockedPrerequisiteIds,
@@ -1062,6 +1091,7 @@ module.exports = {
   entrypoint,
   evaluateReactDomTestUtilsActPrivateRoutingGate,
   getReactDomTestUtilsActPrivateRoutingGate,
+  passiveEffectDeletedSubtreeRefPassiveOrderingStatus,
   privateRoutingGateId,
   privateRoutingGateStatus,
   publicActStatus,
