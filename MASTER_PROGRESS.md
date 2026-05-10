@@ -29,6 +29,21 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Queue 685-714
+
+- Workers 687-689, 691, and 712 were accepted from the active queue. The batch
+  added private Rust canaries for `useMemo`/`useCallback` reuse across update
+  renders, effect dependency comparison scheduling only changed passive
+  destroy/create work, layout destroy-before-throwing-create fail-closed error
+  metadata, Suspense ping retry lane proof tied to root work-loop handoff, and
+  Scheduler mock expired lane/root continuation ordering. Public hook,
+  effect, Suspense, Scheduler, act, root, and renderer compatibility remain
+  blocked.
+- The batch was verified after merge with `cargo fmt --all --check`, full
+  `fast-react-reconciler` tests, Scheduler workspace checks, focused Scheduler
+  mock conformance, `npm run check:package-surface`, full conformance checks,
+  conflict-marker scanning, and `git diff --check`.
+
 ### Queue 655-684
 
 - Workers 655, 657-658, 660, 664-665, 671, 676, 678, and 684 were accepted
