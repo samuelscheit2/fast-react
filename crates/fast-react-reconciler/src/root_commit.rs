@@ -32,6 +32,7 @@ use crate::root_config::{
     PendingPassiveEffectOrder, PendingPassiveEffectPhase, PendingPassiveUnmountOrigin,
     RootErrorOptionCallbackPhase, RootErrorOptionCallbackRecord,
 };
+use crate::unsupported_features::unsupported_reconciler_feature_for_fiber_tag;
 use crate::{
     FiberRootId, FiberRootStore, FiberRootStoreError, HostFiberTokenId,
     HostFiberTokenValidationError, HostRootRenderPhaseRecord, HostRootStateStoreError,
@@ -2604,6 +2605,329 @@ impl HostRootDeletionCleanupRecord {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct HostRootDeletionSubtreeTraversalGateSnapshot {
+    records: Vec<HostRootDeletionSubtreeTraversalGateRecord>,
+    fragment_deleted_subtree_count: usize,
+    portal_deleted_subtree_count: usize,
+    host_node_cleanup_metadata_count: usize,
+    unsupported_suspense_traversal_count: usize,
+    unsupported_offscreen_traversal_count: usize,
+    broad_traversal_blocked_count: usize,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private Fragment/Portal deletion traversal diagnostics are reserved for future deletion workers"
+)]
+impl HostRootDeletionSubtreeTraversalGateSnapshot {
+    #[must_use]
+    fn from_records(records: Vec<HostRootDeletionSubtreeTraversalGateRecord>) -> Self {
+        let mut fragment_deleted_subtree_count = 0;
+        let mut portal_deleted_subtree_count = 0;
+        let mut host_node_cleanup_metadata_count = 0;
+        let mut unsupported_suspense_traversal_count = 0;
+        let mut unsupported_offscreen_traversal_count = 0;
+        let mut broad_traversal_blocked_count = 0;
+
+        for record in &records {
+            match record.status() {
+                HostRootDeletionSubtreeTraversalGateStatus::FragmentDeletedSubtreeDiagnostic => {
+                    fragment_deleted_subtree_count += 1;
+                }
+                HostRootDeletionSubtreeTraversalGateStatus::PortalDeletedSubtreeDiagnostic => {
+                    portal_deleted_subtree_count += 1;
+                }
+                HostRootDeletionSubtreeTraversalGateStatus::HostNodeCleanupMetadata => {
+                    host_node_cleanup_metadata_count += 1;
+                }
+                HostRootDeletionSubtreeTraversalGateStatus::UnsupportedSuspenseTraversalBlocked => {
+                    unsupported_suspense_traversal_count += 1;
+                }
+                HostRootDeletionSubtreeTraversalGateStatus::UnsupportedOffscreenTraversalBlocked => {
+                    unsupported_offscreen_traversal_count += 1;
+                }
+                HostRootDeletionSubtreeTraversalGateStatus::BroadDeletionTraversalBlocked => {
+                    broad_traversal_blocked_count += 1;
+                }
+            }
+        }
+
+        Self {
+            records,
+            fragment_deleted_subtree_count,
+            portal_deleted_subtree_count,
+            host_node_cleanup_metadata_count,
+            unsupported_suspense_traversal_count,
+            unsupported_offscreen_traversal_count,
+            broad_traversal_blocked_count,
+        }
+    }
+
+    #[must_use]
+    pub(crate) fn records(&self) -> &[HostRootDeletionSubtreeTraversalGateRecord] {
+        &self.records
+    }
+
+    #[must_use]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    #[must_use]
+    pub(crate) fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    #[must_use]
+    pub(crate) const fn fragment_deleted_subtree_count(&self) -> usize {
+        self.fragment_deleted_subtree_count
+    }
+
+    #[must_use]
+    pub(crate) const fn portal_deleted_subtree_count(&self) -> usize {
+        self.portal_deleted_subtree_count
+    }
+
+    #[must_use]
+    pub(crate) const fn host_node_cleanup_metadata_count(&self) -> usize {
+        self.host_node_cleanup_metadata_count
+    }
+
+    #[must_use]
+    pub(crate) const fn unsupported_suspense_traversal_count(&self) -> usize {
+        self.unsupported_suspense_traversal_count
+    }
+
+    #[must_use]
+    pub(crate) const fn unsupported_offscreen_traversal_count(&self) -> usize {
+        self.unsupported_offscreen_traversal_count
+    }
+
+    #[must_use]
+    pub(crate) const fn broad_traversal_blocked_count(&self) -> usize {
+        self.broad_traversal_blocked_count
+    }
+
+    #[must_use]
+    pub(crate) const fn unsupported_traversal_count(&self) -> usize {
+        self.unsupported_suspense_traversal_count
+            + self.unsupported_offscreen_traversal_count
+            + self.broad_traversal_blocked_count
+    }
+
+    #[must_use]
+    pub(crate) const fn real_fragment_dom_mutation_executed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn real_portal_dom_mutation_executed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn broad_deletion_traversal_enabled(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_unmount_compatibility_claimed(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct HostRootDeletionSubtreeTraversalGateRecord {
+    sequence: usize,
+    root: FiberRootId,
+    host_root: FiberId,
+    deletion_list: DeletionListId,
+    deletion_list_index: usize,
+    deleted_index: usize,
+    parent: FiberId,
+    parent_tag: FiberTag,
+    host_parent: Option<FiberId>,
+    host_parent_tag: Option<FiberTag>,
+    host_parent_state_node: StateNodeHandle,
+    host_parent_traversal_depth: Option<usize>,
+    deleted_root: FiberId,
+    deleted_root_tag: FiberTag,
+    fiber: FiberId,
+    tag: FiberTag,
+    traversal_depth: usize,
+    state_node: StateNodeHandle,
+    portal_container_state_node: StateNodeHandle,
+    unsupported_feature: Option<&'static str>,
+    status: HostRootDeletionSubtreeTraversalGateStatus,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private Fragment/Portal deletion traversal diagnostics are reserved for future deletion workers"
+)]
+impl HostRootDeletionSubtreeTraversalGateRecord {
+    #[must_use]
+    pub(crate) const fn sequence(self) -> usize {
+        self.sequence
+    }
+
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn host_root(self) -> FiberId {
+        self.host_root
+    }
+
+    #[must_use]
+    pub(crate) const fn deletion_list(self) -> DeletionListId {
+        self.deletion_list
+    }
+
+    #[must_use]
+    pub(crate) const fn deletion_list_index(self) -> usize {
+        self.deletion_list_index
+    }
+
+    #[must_use]
+    pub(crate) const fn deleted_index(self) -> usize {
+        self.deleted_index
+    }
+
+    #[must_use]
+    pub(crate) const fn parent(self) -> FiberId {
+        self.parent
+    }
+
+    #[must_use]
+    pub(crate) const fn parent_tag(self) -> FiberTag {
+        self.parent_tag
+    }
+
+    #[must_use]
+    pub(crate) const fn parent_tag_name(self) -> &'static str {
+        host_root_fiber_tag_name(self.parent_tag)
+    }
+
+    #[must_use]
+    pub(crate) const fn host_parent(self) -> Option<FiberId> {
+        self.host_parent
+    }
+
+    #[must_use]
+    pub(crate) const fn host_parent_tag(self) -> Option<FiberTag> {
+        self.host_parent_tag
+    }
+
+    #[must_use]
+    pub(crate) const fn host_parent_state_node(self) -> StateNodeHandle {
+        self.host_parent_state_node
+    }
+
+    #[must_use]
+    pub(crate) const fn host_parent_traversal_depth(self) -> Option<usize> {
+        self.host_parent_traversal_depth
+    }
+
+    #[must_use]
+    pub(crate) const fn deleted_root(self) -> FiberId {
+        self.deleted_root
+    }
+
+    #[must_use]
+    pub(crate) const fn deleted_root_tag(self) -> FiberTag {
+        self.deleted_root_tag
+    }
+
+    #[must_use]
+    pub(crate) const fn deleted_root_tag_name(self) -> &'static str {
+        host_root_fiber_tag_name(self.deleted_root_tag)
+    }
+
+    #[must_use]
+    pub(crate) const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub(crate) const fn tag(self) -> FiberTag {
+        self.tag
+    }
+
+    #[must_use]
+    pub(crate) const fn tag_name(self) -> &'static str {
+        host_root_fiber_tag_name(self.tag)
+    }
+
+    #[must_use]
+    pub(crate) const fn traversal_depth(self) -> usize {
+        self.traversal_depth
+    }
+
+    #[must_use]
+    pub(crate) const fn state_node(self) -> StateNodeHandle {
+        self.state_node
+    }
+
+    #[must_use]
+    pub(crate) const fn portal_container_state_node(self) -> StateNodeHandle {
+        self.portal_container_state_node
+    }
+
+    #[must_use]
+    pub(crate) const fn unsupported_feature(self) -> Option<&'static str> {
+        self.unsupported_feature
+    }
+
+    #[must_use]
+    pub(crate) const fn status(self) -> HostRootDeletionSubtreeTraversalGateStatus {
+        self.status
+    }
+
+    #[must_use]
+    pub(crate) const fn status_name(self) -> &'static str {
+        host_root_deletion_subtree_traversal_gate_status_name(self.status)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum HostRootDeletionSubtreeTraversalGateStatus {
+    FragmentDeletedSubtreeDiagnostic,
+    PortalDeletedSubtreeDiagnostic,
+    HostNodeCleanupMetadata,
+    UnsupportedSuspenseTraversalBlocked,
+    UnsupportedOffscreenTraversalBlocked,
+    BroadDeletionTraversalBlocked,
+}
+
+const fn host_root_deletion_subtree_traversal_gate_status_name(
+    status: HostRootDeletionSubtreeTraversalGateStatus,
+) -> &'static str {
+    match status {
+        HostRootDeletionSubtreeTraversalGateStatus::FragmentDeletedSubtreeDiagnostic => {
+            "fragment-deleted-subtree-diagnostic"
+        }
+        HostRootDeletionSubtreeTraversalGateStatus::PortalDeletedSubtreeDiagnostic => {
+            "portal-deleted-subtree-diagnostic"
+        }
+        HostRootDeletionSubtreeTraversalGateStatus::HostNodeCleanupMetadata => {
+            "host-node-cleanup-metadata"
+        }
+        HostRootDeletionSubtreeTraversalGateStatus::UnsupportedSuspenseTraversalBlocked => {
+            "unsupported-suspense-deletion-traversal"
+        }
+        HostRootDeletionSubtreeTraversalGateStatus::UnsupportedOffscreenTraversalBlocked => {
+            "unsupported-offscreen-deletion-traversal"
+        }
+        HostRootDeletionSubtreeTraversalGateStatus::BroadDeletionTraversalBlocked => {
+            "broad-deletion-traversal-blocked"
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostRootDeletionCleanupOrderGateSnapshot {
     records: Vec<HostRootDeletionCleanupOrderGateRecord>,
     ref_cleanup_return_count: usize,
@@ -2968,6 +3292,7 @@ pub struct HostRootCommitRecord {
         FunctionComponentDeletedSubtreePassiveEffectsSnapshot,
     function_component_layout_effects: FunctionComponentLayoutEffectsSnapshot,
     deletion_lists: Vec<HostRootDeletionListRecord>,
+    deletion_subtree_traversal_gate: HostRootDeletionSubtreeTraversalGateSnapshot,
     host_node_deletion_cleanup_log: HostRootDeletionCleanupLog,
     ref_commit_metadata: HostRootRefCommitSnapshot,
     dom_ref_callback_commit_gate: HostRootDomRefCallbackCommitGateSnapshot,
@@ -3515,6 +3840,17 @@ impl HostRootCommitRecord {
         &self.deletion_lists
     }
 
+    #[allow(
+        dead_code,
+        reason = "crate-private Fragment/Portal deletion traversal diagnostics are reserved for future deletion workers"
+    )]
+    #[must_use]
+    pub(crate) const fn deletion_subtree_traversal_gate_for_canary(
+        &self,
+    ) -> &HostRootDeletionSubtreeTraversalGateSnapshot {
+        &self.deletion_subtree_traversal_gate
+    }
+
     #[must_use]
     pub const fn host_node_deletion_cleanup_log(&self) -> &HostRootDeletionCleanupLog {
         &self.host_node_deletion_cleanup_log
@@ -3689,6 +4025,12 @@ pub fn commit_finished_host_root<H: HostTypes>(
         &mutation_log,
         &deletion_lists,
     )?;
+    let deletion_subtree_traversal_gate = materialize_deletion_subtree_traversal_gate(
+        store,
+        root_id,
+        finished_work,
+        &deletion_lists,
+    )?;
     let pending_host_node_deletion_cleanup =
         collect_pending_host_node_deletion_cleanup(store, root_id, finished_work, &deletion_lists)?;
     let pending_ref_commit_metadata =
@@ -3747,6 +4089,7 @@ pub fn commit_finished_host_root<H: HostTypes>(
             FunctionComponentDeletedSubtreePassiveEffectsSnapshot::default(),
         function_component_layout_effects: FunctionComponentLayoutEffectsSnapshot::default(),
         deletion_lists,
+        deletion_subtree_traversal_gate,
         host_node_deletion_cleanup_log,
         ref_commit_metadata,
         dom_ref_callback_commit_gate,
@@ -6985,6 +7328,218 @@ fn collect_deletion_list_metadata<H: HostTypes>(
     Ok(records)
 }
 
+fn materialize_deletion_subtree_traversal_gate<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root: FiberRootId,
+    finished_work: FiberId,
+    deletion_lists: &[HostRootDeletionListRecord],
+) -> Result<HostRootDeletionSubtreeTraversalGateSnapshot, RootCommitError> {
+    let arena = store.fiber_arena();
+    let mut records = Vec::new();
+
+    for (deletion_list_index, deletion_list) in deletion_lists.iter().enumerate() {
+        let parent = arena.get(deletion_list.parent())?;
+        let host_parent = find_nearest_host_parent_for_deletion(arena, deletion_list.parent())?;
+        for (deleted_index, &deleted_root) in deletion_list.deleted().iter().enumerate() {
+            let deleted_root_tag = arena.get(deleted_root)?.tag();
+            collect_deletion_subtree_traversal_gate_records(
+                arena,
+                DeletionSubtreeTraversalGateRequest {
+                    root,
+                    host_root: finished_work,
+                    deletion_list: deletion_list.list(),
+                    deletion_list_index,
+                    deleted_index,
+                    parent: deletion_list.parent(),
+                    parent_tag: parent.tag(),
+                    host_parent,
+                    deleted_root,
+                    deleted_root_tag,
+                },
+                deleted_root,
+                0,
+                StateNodeHandle::NONE,
+                &mut records,
+            )?;
+        }
+    }
+
+    Ok(HostRootDeletionSubtreeTraversalGateSnapshot::from_records(
+        records,
+    ))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct DeletionSubtreeTraversalGateRequest {
+    root: FiberRootId,
+    host_root: FiberId,
+    deletion_list: DeletionListId,
+    deletion_list_index: usize,
+    deleted_index: usize,
+    parent: FiberId,
+    parent_tag: FiberTag,
+    host_parent: Option<HostRootDeletionHostParentRecord>,
+    deleted_root: FiberId,
+    deleted_root_tag: FiberTag,
+}
+
+fn collect_deletion_subtree_traversal_gate_records(
+    arena: &FiberArena,
+    request: DeletionSubtreeTraversalGateRequest,
+    fiber: FiberId,
+    traversal_depth: usize,
+    portal_container_state_node: StateNodeHandle,
+    records: &mut Vec<HostRootDeletionSubtreeTraversalGateRecord>,
+) -> Result<(), RootCommitError> {
+    let node = arena.get(fiber)?;
+    let tag = node.tag();
+    let portal_container_state_node = if tag == FiberTag::Portal {
+        node.state_node()
+    } else {
+        portal_container_state_node
+    };
+
+    match deletion_subtree_boundary_status(tag) {
+        Some(status @ HostRootDeletionSubtreeTraversalGateStatus::FragmentDeletedSubtreeDiagnostic)
+        | Some(status @ HostRootDeletionSubtreeTraversalGateStatus::PortalDeletedSubtreeDiagnostic) =>
+        {
+            push_deletion_subtree_traversal_gate_record(
+                records,
+                request,
+                fiber,
+                tag,
+                traversal_depth,
+                node.state_node(),
+                portal_container_state_node,
+                None,
+                status,
+            );
+        }
+        Some(
+            status @ HostRootDeletionSubtreeTraversalGateStatus::UnsupportedSuspenseTraversalBlocked,
+        )
+        | Some(
+            status @ HostRootDeletionSubtreeTraversalGateStatus::UnsupportedOffscreenTraversalBlocked,
+        )
+        | Some(status @ HostRootDeletionSubtreeTraversalGateStatus::BroadDeletionTraversalBlocked) => {
+            let unsupported_feature =
+                unsupported_reconciler_feature_for_fiber_tag(tag).map(|feature| feature.feature());
+            push_deletion_subtree_traversal_gate_record(
+                records,
+                request,
+                fiber,
+                tag,
+                traversal_depth,
+                node.state_node(),
+                portal_container_state_node,
+                unsupported_feature,
+                status,
+            );
+            return Ok(());
+        }
+        Some(HostRootDeletionSubtreeTraversalGateStatus::HostNodeCleanupMetadata) | None => {}
+    }
+
+    if deletion_subtree_should_traverse_children(tag) {
+        for child in arena.child_ids(fiber)? {
+            collect_deletion_subtree_traversal_gate_records(
+                arena,
+                request,
+                child,
+                traversal_depth + 1,
+                portal_container_state_node,
+                records,
+            )?;
+        }
+    }
+
+    if host_node_cleanup_token_target(tag).is_some() {
+        push_deletion_subtree_traversal_gate_record(
+            records,
+            request,
+            fiber,
+            tag,
+            traversal_depth,
+            node.state_node(),
+            portal_container_state_node,
+            None,
+            HostRootDeletionSubtreeTraversalGateStatus::HostNodeCleanupMetadata,
+        );
+    }
+
+    Ok(())
+}
+
+fn push_deletion_subtree_traversal_gate_record(
+    records: &mut Vec<HostRootDeletionSubtreeTraversalGateRecord>,
+    request: DeletionSubtreeTraversalGateRequest,
+    fiber: FiberId,
+    tag: FiberTag,
+    traversal_depth: usize,
+    state_node: StateNodeHandle,
+    portal_container_state_node: StateNodeHandle,
+    unsupported_feature: Option<&'static str>,
+    status: HostRootDeletionSubtreeTraversalGateStatus,
+) {
+    records.push(HostRootDeletionSubtreeTraversalGateRecord {
+        sequence: records.len(),
+        root: request.root,
+        host_root: request.host_root,
+        deletion_list: request.deletion_list,
+        deletion_list_index: request.deletion_list_index,
+        deleted_index: request.deleted_index,
+        parent: request.parent,
+        parent_tag: request.parent_tag,
+        host_parent: request.host_parent.map(|parent| parent.fiber),
+        host_parent_tag: request.host_parent.map(|parent| parent.tag),
+        host_parent_state_node: request
+            .host_parent
+            .map(|parent| parent.state_node)
+            .unwrap_or(StateNodeHandle::NONE),
+        host_parent_traversal_depth: request.host_parent.map(|parent| parent.traversal_depth),
+        deleted_root: request.deleted_root,
+        deleted_root_tag: request.deleted_root_tag,
+        fiber,
+        tag,
+        traversal_depth,
+        state_node,
+        portal_container_state_node,
+        unsupported_feature,
+        status,
+    });
+}
+
+const fn deletion_subtree_boundary_status(
+    tag: FiberTag,
+) -> Option<HostRootDeletionSubtreeTraversalGateStatus> {
+    match tag {
+        FiberTag::Fragment => {
+            Some(HostRootDeletionSubtreeTraversalGateStatus::FragmentDeletedSubtreeDiagnostic)
+        }
+        FiberTag::Portal => {
+            Some(HostRootDeletionSubtreeTraversalGateStatus::PortalDeletedSubtreeDiagnostic)
+        }
+        FiberTag::Suspense => {
+            Some(HostRootDeletionSubtreeTraversalGateStatus::UnsupportedSuspenseTraversalBlocked)
+        }
+        FiberTag::Offscreen => {
+            Some(HostRootDeletionSubtreeTraversalGateStatus::UnsupportedOffscreenTraversalBlocked)
+        }
+        FiberTag::HostComponent | FiberTag::HostText | FiberTag::FunctionComponent => None,
+        _ => Some(HostRootDeletionSubtreeTraversalGateStatus::BroadDeletionTraversalBlocked),
+    }
+}
+
+const fn deletion_subtree_should_traverse_children(tag: FiberTag) -> bool {
+    matches!(
+        tag,
+        FiberTag::HostComponent
+            | FiberTag::FunctionComponent
+            | FiberTag::Fragment
+            | FiberTag::Portal
+    )
+}
+
 fn collect_pending_host_node_deletion_cleanup<H: HostTypes>(
     store: &FiberRootStore<H>,
     root: FiberRootId,
@@ -7044,14 +7599,20 @@ fn collect_pending_deleted_subtree_host_node_cleanup(
 ) -> Result<(), RootCommitError> {
     let node = arena.get(fiber)?;
 
-    for child in arena.child_ids(fiber)? {
-        collect_pending_deleted_subtree_host_node_cleanup(
-            arena,
-            request,
-            child,
-            subtree_index,
-            records,
-        )?;
+    if deletion_subtree_traversal_blocks_children(node.tag()) {
+        return Ok(());
+    }
+
+    if deletion_subtree_should_traverse_children(node.tag()) {
+        for child in arena.child_ids(fiber)? {
+            collect_pending_deleted_subtree_host_node_cleanup(
+                arena,
+                request,
+                child,
+                subtree_index,
+                records,
+            )?;
+        }
     }
 
     if let Some(token_target) = host_node_cleanup_token_target(node.tag()) {
@@ -7075,6 +7636,17 @@ fn collect_pending_deleted_subtree_host_node_cleanup(
     }
 
     Ok(())
+}
+
+const fn deletion_subtree_traversal_blocks_children(tag: FiberTag) -> bool {
+    matches!(
+        deletion_subtree_boundary_status(tag),
+        Some(HostRootDeletionSubtreeTraversalGateStatus::UnsupportedSuspenseTraversalBlocked)
+            | Some(
+                HostRootDeletionSubtreeTraversalGateStatus::UnsupportedOffscreenTraversalBlocked
+            )
+            | Some(HostRootDeletionSubtreeTraversalGateStatus::BroadDeletionTraversalBlocked)
+    )
 }
 
 const fn host_node_cleanup_token_target(tag: FiberTag) -> Option<HostFiberTokenTarget> {
@@ -7481,6 +8053,9 @@ mod tests {
         RootUpdateCallbackInvocationStatus, RootUpdateCallbackInvocationTestControl,
     };
     use crate::test_support::{FakeContainer, RecordingHost};
+    use crate::unsupported_features::{
+        OFFSCREEN_UNSUPPORTED_FEATURE, SUSPENSE_UNSUPPORTED_FEATURE,
+    };
     use crate::{
         RootElementHandle, RootOptions, RootTaskScheduleOutcome, RootUpdateCallbackHandle,
         RootUpdateCallbackRecord, RootUpdateCallbackVisibility, ensure_root_is_scheduled,
@@ -8222,6 +8797,11 @@ mod tests {
         assert!(commit.mutation_log().is_empty());
         assert!(commit.mutation_apply_log().is_empty());
         assert!(commit.deletion_lists().is_empty());
+        assert!(
+            commit
+                .deletion_subtree_traversal_gate_for_canary()
+                .is_empty()
+        );
         assert!(commit.host_node_deletion_cleanup_log().is_empty());
         assert!(commit.ref_commit_metadata().is_empty());
         assert!(commit.dom_ref_callback_commit_gate().is_empty());
@@ -9978,6 +10558,285 @@ mod tests {
             assert_eq!(cleanup_records[0].host_parent_traversal_depth(), None);
             assert_eq!(cleanup_records[0].fiber(), deleted_text);
             assert_eq!(cleanup_records[0].state_node(), deleted_text_state_node);
+            assert_eq!(host.operations(), Vec::<&'static str>::new());
+        }
+    }
+
+    #[test]
+    fn root_commit_deletion_subtree_traversal_gate_records_fragment_and_portal_deleted_roots() {
+        let (mut store, root_id, host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(49), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let owner = create_test_fiber(&mut store, FiberTag::HostComponent, 9_500);
+        let fragment = create_test_fiber(&mut store, FiberTag::Fragment, 9_501);
+        let fragment_text = create_test_fiber(&mut store, FiberTag::HostText, 9_502);
+        let portal = create_test_fiber(&mut store, FiberTag::Portal, 9_503);
+        let portal_host = create_test_fiber(&mut store, FiberTag::HostComponent, 9_504);
+        let portal_text = create_test_fiber(&mut store, FiberTag::HostText, 9_505);
+        let owner_state_node = StateNodeHandle::from_raw(9_600);
+        let fragment_text_state_node = StateNodeHandle::from_raw(9_601);
+        let portal_container_state_node = StateNodeHandle::from_raw(9_602);
+        let portal_host_state_node = StateNodeHandle::from_raw(9_603);
+        let portal_text_state_node = StateNodeHandle::from_raw(9_604);
+
+        {
+            let node = store.fiber_arena_mut().get_mut(owner).unwrap();
+            node.set_state_node(owner_state_node);
+            node.set_memoized_props(PropsHandle::from_raw(9_500));
+        }
+        store
+            .fiber_arena_mut()
+            .get_mut(fragment_text)
+            .unwrap()
+            .set_state_node(fragment_text_state_node);
+        {
+            let node = store.fiber_arena_mut().get_mut(portal).unwrap();
+            node.set_state_node(portal_container_state_node);
+            node.set_memoized_props(PropsHandle::from_raw(9_503));
+        }
+        {
+            let node = store.fiber_arena_mut().get_mut(portal_host).unwrap();
+            node.set_state_node(portal_host_state_node);
+            node.set_memoized_props(PropsHandle::from_raw(9_504));
+        }
+        store
+            .fiber_arena_mut()
+            .get_mut(portal_text)
+            .unwrap()
+            .set_state_node(portal_text_state_node);
+        store
+            .fiber_arena_mut()
+            .set_children(fragment, &[fragment_text])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(portal_host, &[portal_text])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(portal, &[portal_host])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(owner, &[fragment, portal])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(render.finished_work(), &[owner])
+            .unwrap();
+        let deletion_list = store
+            .fiber_arena_mut()
+            .mark_child_for_deletion(owner, fragment)
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .mark_child_for_deletion(owner, portal)
+            .unwrap();
+        bubble_test_fiber(&mut store, render.finished_work());
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let apply_records = commit.mutation_apply_log().records();
+        let cleanup_records = commit.host_node_deletion_cleanup_log().records();
+        let gate = commit.deletion_subtree_traversal_gate_for_canary();
+        let traversal_records = gate.records();
+
+        assert_eq!(commit.deletion_lists().len(), 1);
+        assert_eq!(commit.deletion_lists()[0].list(), deletion_list);
+        assert_eq!(commit.deletion_lists()[0].deleted(), &[fragment, portal]);
+        assert_eq!(apply_records.len(), 2);
+        assert_eq!(
+            apply_records[0].kind(),
+            HostRootMutationApplyRecordKind::SkipDeletedNonHostFiber
+        );
+        assert_eq!(apply_records[0].fiber(), fragment);
+        assert_eq!(
+            apply_records[1].kind(),
+            HostRootMutationApplyRecordKind::SkipDeletedNonHostFiber
+        );
+        assert_eq!(apply_records[1].fiber(), portal);
+
+        assert_eq!(cleanup_records.len(), 3);
+        assert_eq!(cleanup_records[0].deleted_root(), fragment);
+        assert_eq!(cleanup_records[0].fiber(), fragment_text);
+        assert_eq!(cleanup_records[0].subtree_index(), 0);
+        assert_eq!(cleanup_records[0].host_parent(), Some(owner));
+        assert_eq!(
+            cleanup_records[0].host_parent_tag(),
+            Some(FiberTag::HostComponent)
+        );
+        assert_eq!(cleanup_records[1].deleted_root(), portal);
+        assert_eq!(cleanup_records[1].fiber(), portal_text);
+        assert_eq!(cleanup_records[1].subtree_index(), 0);
+        assert_eq!(cleanup_records[1].host_parent(), Some(owner));
+        assert_eq!(cleanup_records[2].deleted_root(), portal);
+        assert_eq!(cleanup_records[2].fiber(), portal_host);
+        assert_eq!(cleanup_records[2].subtree_index(), 1);
+        assert_eq!(cleanup_records[2].host_parent(), Some(owner));
+
+        assert_eq!(gate.len(), 5);
+        assert_eq!(gate.fragment_deleted_subtree_count(), 1);
+        assert_eq!(gate.portal_deleted_subtree_count(), 1);
+        assert_eq!(gate.host_node_cleanup_metadata_count(), 3);
+        assert_eq!(gate.unsupported_traversal_count(), 0);
+        assert!(!gate.real_fragment_dom_mutation_executed());
+        assert!(!gate.real_portal_dom_mutation_executed());
+        assert!(!gate.broad_deletion_traversal_enabled());
+        assert!(!gate.public_unmount_compatibility_claimed());
+
+        assert_eq!(traversal_records[0].sequence(), 0);
+        assert_eq!(
+            traversal_records[0].status(),
+            HostRootDeletionSubtreeTraversalGateStatus::FragmentDeletedSubtreeDiagnostic
+        );
+        assert_eq!(
+            traversal_records[0].status_name(),
+            "fragment-deleted-subtree-diagnostic"
+        );
+        assert_eq!(traversal_records[0].deleted_root(), fragment);
+        assert_eq!(traversal_records[0].fiber(), fragment);
+        assert_eq!(traversal_records[0].tag_name(), "Fragment");
+        assert_eq!(traversal_records[0].traversal_depth(), 0);
+        assert_eq!(
+            traversal_records[1].status(),
+            HostRootDeletionSubtreeTraversalGateStatus::HostNodeCleanupMetadata
+        );
+        assert_eq!(traversal_records[1].deleted_root(), fragment);
+        assert_eq!(traversal_records[1].fiber(), fragment_text);
+        assert_eq!(traversal_records[1].tag_name(), "HostText");
+        assert_eq!(traversal_records[1].traversal_depth(), 1);
+        assert_eq!(traversal_records[1].state_node(), fragment_text_state_node);
+        assert_eq!(
+            traversal_records[2].status(),
+            HostRootDeletionSubtreeTraversalGateStatus::PortalDeletedSubtreeDiagnostic
+        );
+        assert_eq!(
+            traversal_records[2].status_name(),
+            "portal-deleted-subtree-diagnostic"
+        );
+        assert_eq!(traversal_records[2].deleted_root(), portal);
+        assert_eq!(traversal_records[2].fiber(), portal);
+        assert_eq!(traversal_records[2].tag_name(), "Portal");
+        assert_eq!(
+            traversal_records[2].portal_container_state_node(),
+            portal_container_state_node
+        );
+        assert_eq!(
+            traversal_records[3].status(),
+            HostRootDeletionSubtreeTraversalGateStatus::HostNodeCleanupMetadata
+        );
+        assert_eq!(traversal_records[3].fiber(), portal_text);
+        assert_eq!(traversal_records[3].traversal_depth(), 2);
+        assert_eq!(
+            traversal_records[3].portal_container_state_node(),
+            portal_container_state_node
+        );
+        assert_eq!(
+            traversal_records[4].status(),
+            HostRootDeletionSubtreeTraversalGateStatus::HostNodeCleanupMetadata
+        );
+        assert_eq!(traversal_records[4].fiber(), portal_host);
+        assert_eq!(traversal_records[4].traversal_depth(), 1);
+        assert_eq!(
+            traversal_records[4].portal_container_state_node(),
+            portal_container_state_node
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_deletion_subtree_traversal_gate_blocks_suspense_and_offscreen_roots() {
+        for (blocked_tag, expected_status, expected_feature) in [
+            (
+                FiberTag::Suspense,
+                HostRootDeletionSubtreeTraversalGateStatus::UnsupportedSuspenseTraversalBlocked,
+                SUSPENSE_UNSUPPORTED_FEATURE,
+            ),
+            (
+                FiberTag::Offscreen,
+                HostRootDeletionSubtreeTraversalGateStatus::UnsupportedOffscreenTraversalBlocked,
+                OFFSCREEN_UNSUPPORTED_FEATURE,
+            ),
+        ] {
+            let (mut store, root_id, host) = root_store();
+            update_container(&mut store, root_id, RootElementHandle::from_raw(50), None).unwrap();
+            let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+            let owner = create_test_fiber(&mut store, FiberTag::HostComponent, 9_700);
+            let blocked = create_test_fiber(&mut store, blocked_tag, 9_701);
+            let blocked_child = create_test_fiber(&mut store, FiberTag::HostText, 9_702);
+            let owner_state_node = StateNodeHandle::from_raw(9_710);
+            let blocked_child_state_node = StateNodeHandle::from_raw(9_711);
+
+            store
+                .fiber_arena_mut()
+                .get_mut(owner)
+                .unwrap()
+                .set_state_node(owner_state_node);
+            store
+                .fiber_arena_mut()
+                .get_mut(blocked_child)
+                .unwrap()
+                .set_state_node(blocked_child_state_node);
+            store
+                .fiber_arena_mut()
+                .set_children(blocked, &[blocked_child])
+                .unwrap();
+            store
+                .fiber_arena_mut()
+                .set_children(owner, &[blocked])
+                .unwrap();
+            store
+                .fiber_arena_mut()
+                .set_children(render.finished_work(), &[owner])
+                .unwrap();
+            let deletion_list = store
+                .fiber_arena_mut()
+                .mark_child_for_deletion(owner, blocked)
+                .unwrap();
+            bubble_test_fiber(&mut store, render.finished_work());
+
+            let commit = commit_finished_host_root(&mut store, render).unwrap();
+            let apply_records = commit.mutation_apply_log().records();
+            let cleanup_records = commit.host_node_deletion_cleanup_log().records();
+            let gate = commit.deletion_subtree_traversal_gate_for_canary();
+            let records = gate.records();
+
+            assert_eq!(commit.deletion_lists().len(), 1);
+            assert_eq!(commit.deletion_lists()[0].list(), deletion_list);
+            assert_eq!(commit.deletion_lists()[0].deleted(), &[blocked]);
+            assert_eq!(apply_records.len(), 1);
+            assert_eq!(
+                apply_records[0].kind(),
+                HostRootMutationApplyRecordKind::SkipDeletedNonHostFiber
+            );
+            assert_eq!(apply_records[0].fiber(), blocked);
+            assert!(cleanup_records.is_empty());
+
+            assert_eq!(gate.len(), 1);
+            assert_eq!(gate.host_node_cleanup_metadata_count(), 0);
+            assert_eq!(gate.unsupported_traversal_count(), 1);
+            assert_eq!(
+                gate.unsupported_suspense_traversal_count(),
+                usize::from(blocked_tag == FiberTag::Suspense)
+            );
+            assert_eq!(
+                gate.unsupported_offscreen_traversal_count(),
+                usize::from(blocked_tag == FiberTag::Offscreen)
+            );
+            assert_eq!(gate.broad_traversal_blocked_count(), 0);
+            assert!(!gate.broad_deletion_traversal_enabled());
+            assert!(!gate.public_unmount_compatibility_claimed());
+
+            assert_eq!(records[0].status(), expected_status);
+            assert_eq!(records[0].deleted_root(), blocked);
+            assert_eq!(records[0].deleted_root_tag(), blocked_tag);
+            assert_eq!(records[0].fiber(), blocked);
+            assert_eq!(records[0].tag(), blocked_tag);
+            assert_eq!(records[0].traversal_depth(), 0);
+            assert_eq!(records[0].unsupported_feature(), Some(expected_feature));
+            assert_eq!(records[0].host_parent(), Some(owner));
+            assert_eq!(records[0].host_parent_tag(), Some(FiberTag::HostComponent));
+            assert_eq!(records[0].host_parent_state_node(), owner_state_node);
+            assert_eq!(records[0].host_parent_traversal_depth(), Some(0));
             assert_eq!(host.operations(), Vec::<&'static str>::new());
         }
     }
