@@ -1856,6 +1856,66 @@ const updatePrivateRoute = Object.freeze({
     'root_host_output_update_canary_fails_closed_without_committed_output'
   ])
 });
+const privateUnmountDeletionCommitHandoffDiagnosticId =
+  'react-test-renderer-unmount-deletion-commit-handoff-private-diagnostic';
+const privateUnmountDeletionCommitHandoffStatus =
+  'private-unmount-deletion-commit-handoff-public-unmount-blocked';
+const privateUnmountHostChildDetachmentBlockers = Object.freeze({
+  id: 'react-test-renderer-unmount-host-child-detachment-blockers',
+  status:
+    'blocked-public-host-child-detachment-private-cleanup-metadata-only',
+  deterministic: true,
+  knownFixtureDetachMetadataAvailable: true,
+  hostNodeCleanupInvalidationMetadataAvailable: true,
+  broadHostChildDetachmentBlocked: true,
+  publicHostTeardownCompatibilityClaimed: false,
+  publicUnmountCompatibilityClaimed: false,
+  actFlushingClaimed: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  compatibilityClaimed: false
+});
+const privateUnmountDeletionCommitHandoffGate = Object.freeze({
+  id: privateUnmountDeletionCommitHandoffDiagnosticId,
+  status: privateUnmountDeletionCommitHandoffStatus,
+  publicSurface: 'create().unmount',
+  deterministic: true,
+  acceptedRustCrate: 'fast-react-test-renderer',
+  acceptedRustRecords: Object.freeze([
+    'HostRootCommitRecord',
+    'HostRootDeletionCleanupLog',
+    'TestRendererHostNodeCleanupReport',
+    'TestRendererUnmountDeletionCommitHandoffDiagnostics',
+    'TestRendererUnmountHostChildDetachmentBlockers'
+  ]),
+  acceptedRustApis: Object.freeze([
+    'TestRendererRoot::unmount',
+    'TestRendererRoot::render_and_commit_host_output_unmount_for_canary',
+    'TestRendererRoot::describe_private_unmount_deletion_commit_handoff_for_canary'
+  ]),
+  acceptedRustTests: Object.freeze([
+    'root_host_output_canary_unmounts_committed_output_with_deletion_cleanup_diagnostics',
+    'root_private_unmount_route_rejects_stale_deletion_commit_handoff',
+    'root_host_output_unmount_canary_rejects_already_unmounted_root_record'
+  ]),
+  acceptedWorker: 'worker-575-test-renderer-unmount-deletion-commit-link',
+  lifecycleDiagnosticGate: updateUnmountRustLifecycleDiagnosticGate,
+  hostChildDetachmentBlockers: privateUnmountHostChildDetachmentBlockers,
+  deletionCommitHandoffAvailable: true,
+  hostNodeDeletionCleanupLogAvailable: true,
+  hostChildDetachmentBlockersAvailable: true,
+  lifecycleStatusMetadataAvailable: true,
+  staleRootRecordRejection: true,
+  alreadyUnmountedRootRecordRejection: true,
+  publicRouteAvailable: false,
+  publicUnmountCompatibilityClaimed: false,
+  publicHostTeardownCompatibilityClaimed: false,
+  actFlushingClaimed: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  rustExecutionFromJs: false,
+  compatibilityClaimed: false
+});
 const unmountPrivateRoute = Object.freeze({
   id: 'react-test-renderer-unmount-private-route',
   publicSurface: 'create().unmount',
@@ -1882,8 +1942,17 @@ const unmountPrivateRoute = Object.freeze({
     'TestRendererRoot::render_and_commit_host_output_unmount_for_canary'
   ]),
   acceptedRustTests: Object.freeze([
-    'root_host_output_canary_unmounts_committed_output_with_deletion_diagnostics'
-  ])
+    'root_host_output_canary_unmounts_committed_output_with_deletion_cleanup_diagnostics'
+  ]),
+  deletionCommitHandoff: privateUnmountDeletionCommitHandoffGate,
+  deletionCommitHandoffDiagnosticsAvailable: true,
+  hostChildDetachmentBlockers: privateUnmountHostChildDetachmentBlockers,
+  lifecycleStatusMetadataAvailable: true,
+  staleRootRecordRejection: true,
+  alreadyUnmountedRootRecordRejection: true,
+  publicUnmountCompatibilityClaimed: false,
+  publicHostTeardownCompatibilityClaimed: false,
+  actFlushingClaimed: false
 });
 const privateToJSONSerializationFacadeSymbol = Symbol.for(
   'fast.react_test_renderer.private_tojson_serialization_facade'
@@ -3353,6 +3422,14 @@ const currentRustTestRendererRootCanaryOperations = freezeRecord({
     rootApi: 'TestRendererRoot::unmount',
     hostOutputCommitApi:
       'TestRendererRoot::render_and_commit_host_output_unmount_for_canary',
+    deletionCommitHandoffApi:
+      'TestRendererRoot::describe_private_unmount_deletion_commit_handoff_for_canary',
+    deletionCommitHandoffDiagnosticId:
+      privateUnmountDeletionCommitHandoffDiagnosticId,
+    deletionCommitHandoffStatus:
+      privateUnmountDeletionCommitHandoffStatus,
+    hostChildDetachmentBlockers:
+      privateUnmountHostChildDetachmentBlockers,
     updateKind: 'Unmount',
     rustUpdateKind: 'TestRendererRootUpdateKind::Unmount',
     scheduledUpdateRecord: 'TestRendererRootScheduledUpdate',
@@ -3370,9 +3447,15 @@ const currentRustTestRendererRootCanaryOperations = freezeRecord({
     acceptedRustTests: freezeArray([
       'root_unmount_enqueues_sync_null_update_before_wrapper_invalidation',
       'root_unmount_commit_handoff_exposes_visible_callback_snapshot',
-      'root_host_output_canary_unmounts_committed_output_with_deletion_diagnostics',
-      'root_unmount_is_idempotent'
-    ])
+      'root_host_output_canary_unmounts_committed_output_with_deletion_cleanup_diagnostics',
+      'root_unmount_is_idempotent',
+      'root_private_unmount_route_rejects_stale_deletion_commit_handoff',
+      'root_host_output_unmount_canary_rejects_already_unmounted_root_record'
+    ]),
+    staleRootRecordRejection: true,
+    alreadyUnmountedRootRecordRejection: true,
+    publicHostTeardownCompatibilityClaimed: false,
+    actFlushingClaimed: false
   })
 });
 const currentRustTestRendererRootCanaryMetadata = freezeRecord({
@@ -3392,7 +3475,8 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     'worker-530-test-renderer-error-boundary-update-refresh',
     'worker-539-test-renderer-live-rust-root-create-preflight',
     'worker-573-test-renderer-private-root-work-loop-preflight',
-    'worker-574-test-renderer-update-via-root-work-loop'
+    'worker-574-test-renderer-update-via-root-work-loop',
+    'worker-575-test-renderer-unmount-deletion-commit-link'
   ]),
   acceptedJsBridgeWorkers: freezeArray([
     'worker-304-test-renderer-js-private-root-request-bridge',
@@ -3449,7 +3533,20 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     updateRouteRootWorkLoopGate: privateUpdateRouteRootWorkLoopGate,
     unmountApi:
       'TestRendererRoot::render_and_commit_host_output_unmount_for_canary',
+    unmountDeletionCommitHandoffApi:
+      'TestRendererRoot::describe_private_unmount_deletion_commit_handoff_for_canary',
+    unmountDeletionCommitHandoffDiagnosticId:
+      privateUnmountDeletionCommitHandoffDiagnosticId,
+    unmountDeletionCommitHandoffStatus:
+      privateUnmountDeletionCommitHandoffStatus,
+    unmountDeletionCommitHandoffGate:
+      privateUnmountDeletionCommitHandoffGate,
+    hostChildDetachmentBlockers:
+      privateUnmountHostChildDetachmentBlockers,
     diagnostics: 'TestRendererHostOutputDiagnostics',
+    hostNodeCleanupReport: 'TestRendererHostNodeCleanupReport',
+    unmountDeletionCommitHandoffDiagnostics:
+      'TestRendererUnmountDeletionCommitHandoffDiagnostics',
     fixtureShape: freezeArray(['HostRoot', 'HostComponent', 'HostText']),
     fixtureType: 'span',
     fixtureText: 'hello',
@@ -3513,6 +3610,8 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     compatibilityClaimed: false
   }),
   errorBoundaryDiagnostics: privateErrorBoundaryDiagnosticsGate,
+  unmountDeletionCommitHandoff:
+    privateUnmountDeletionCommitHandoffGate,
   privateJson: freezeRecord({
     diagnosticName:
       'fast-react-test-renderer.serialization.private-json-canary',
@@ -4180,6 +4279,20 @@ function createPrivateRootRequestRecord(state, request) {
     rustCanaryOperationMetadata: getCurrentRustCanaryOperationMetadata(
       request.operation
     ),
+    privateUnmountDeletionCommitHandoff:
+      request.updateKind === testRendererRootUpdateKindUnmount
+        ? createPrivateUnmountDeletionCommitHandoffRecord({
+            lifecycleStatusAfter: lifecycleAfter,
+            lifecycleStatusBefore: lifecycleBefore,
+            scheduled: schedulesRootUpdate,
+            scheduledElementIsNone: Boolean(
+              scheduledElement && scheduledElement.isNone
+            ),
+            updateOutcome: outcome
+          })
+        : null,
+    privateUnmountDeletionCommitHandoffAvailable:
+      request.updateKind === testRendererRootUpdateKindUnmount,
     recordOnlyPrivateBridge: false,
     privateRootExecutionBridgeAvailable: true,
     rustRootExecutionBoundaryCallable: true,
@@ -6309,6 +6422,17 @@ function createRootRequestRecord({
     rustCanaryOperationMetadata: getCurrentRustCanaryOperationMetadata(
       operation
     ),
+    privateUnmountDeletionCommitHandoff:
+      operation === 'unmount'
+        ? createPrivateUnmountDeletionCommitHandoffRecord({
+            lifecycleStatusAfter,
+            lifecycleStatusBefore,
+            scheduled,
+            scheduledElementIsNone: rootElementHandle.isNone,
+            updateOutcome: rustOutcome
+          })
+        : null,
+    privateUnmountDeletionCommitHandoffAvailable: operation === 'unmount',
     canaryShape: freezeRecord({
       rootType: 'TestRendererRoot',
       rootElementHandleType: 'RootElementHandle',
@@ -6393,6 +6517,57 @@ function createRootRequestRustLifecycleDiagnosticRecord(options) {
     rustExecutionFromJs: false,
     reconcilerExecutionFromJs: false,
     hostOutputProducedFromJs: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createPrivateUnmountDeletionCommitHandoffRecord(options) {
+  const alreadyUnmounted =
+    options.updateOutcome === testRendererRootUpdateOutcomeAlreadyUnmountScheduled;
+  const scheduledElementIsNone =
+    options.scheduledElementIsNone === undefined
+      ? true
+      : options.scheduledElementIsNone === true;
+
+  return freezeRecord({
+    id: privateUnmountDeletionCommitHandoffDiagnosticId,
+    kind: 'FastReactTestRendererPrivateUnmountDeletionCommitHandoff',
+    status: privateUnmountDeletionCommitHandoffStatus,
+    gate: privateUnmountDeletionCommitHandoffGate,
+    operation: 'unmount',
+    publicSurface: 'create().unmount',
+    updateKind: testRendererRootUpdateKindUnmount,
+    updateOutcome: options.updateOutcome,
+    expectedOutcome: options.updateOutcome,
+    lifecycleStatusBefore: options.lifecycleStatusBefore,
+    lifecycleStatusAfter: options.lifecycleStatusAfter,
+    lifecycleTransition: describeLifecycleTransition(
+      options.lifecycleStatusBefore,
+      options.lifecycleStatusAfter
+    ),
+    scheduled: options.scheduled,
+    scheduledElementIsNone,
+    sync: options.scheduled ? true : null,
+    deletionCommitHandoffAvailable: options.scheduled === true,
+    deletionCommitHandoffRejected: options.scheduled !== true,
+    rejectionReason: alreadyUnmounted ? 'already-unmounted-root-record' : null,
+    commitRecord: 'HostRootCommitRecord',
+    hostNodeDeletionCleanupLog: 'HostRootDeletionCleanupLog',
+    hostNodeCleanupReport: 'TestRendererHostNodeCleanupReport',
+    rustDiagnostic:
+      'TestRendererUnmountDeletionCommitHandoffDiagnostics',
+    hostChildDetachmentBlockers: privateUnmountHostChildDetachmentBlockers,
+    lifecycleStatusMetadataAvailable: true,
+    staleRootRecordRejection: true,
+    alreadyUnmountedRootRecordRejection: true,
+    publicRouteAvailable: false,
+    publicUnmountCompatibilityClaimed: false,
+    publicHostTeardownCompatibilityClaimed: false,
+    actFlushingClaimed: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    rustExecutionFromJs: false,
+    reconcilerExecutionFromJs: false,
     compatibilityClaimed: false
   });
 }
@@ -6633,6 +6808,10 @@ function createRootExecutionHandoff(record) {
     elementInfo: record.elementInfo,
     optionsInfo: record.optionsInfo,
     callbackInfo: record.callbackInfo,
+    privateUnmountDeletionCommitHandoff:
+      record.privateUnmountDeletionCommitHandoff,
+    privateUnmountDeletionCommitHandoffAvailable:
+      record.privateUnmountDeletionCommitHandoffAvailable,
     rustRootExecutionBoundary: 'fast-react-test-renderer.TestRendererRoot',
     rustRootExecutionBridgeStatus:
       'admitted-private-test-renderer-native-root-execution-bridge',
@@ -6714,6 +6893,10 @@ function consumeRootExecutionResult(record, result, handoff) {
     rustOutcome: record.rustOutcome,
     scheduled: record.scheduled,
     rustLifecycleDiagnostic: consumedLifecycleDiagnostic,
+    privateUnmountDeletionCommitHandoff:
+      record.privateUnmountDeletionCommitHandoff,
+    privateUnmountDeletionCommitHandoffAvailable:
+      record.privateUnmountDeletionCommitHandoffAvailable,
     privateExecutorInvoked: handoff !== undefined,
     privateRootRequestExecution: true,
     rustRootExecutionBoundary: 'fast-react-test-renderer.TestRendererRoot',

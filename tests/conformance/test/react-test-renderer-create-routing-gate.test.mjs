@@ -107,6 +107,10 @@ const privateToJSONUpdateUnmountDependencyIds = [
   "react-test-renderer-unmount-route-private-diagnostic",
   "react-test-renderer-serialization-private-json-diagnostic"
 ];
+const privateUnmountDeletionCommitHandoffDiagnosticId =
+  "react-test-renderer-unmount-deletion-commit-handoff-private-diagnostic";
+const privateUnmountDeletionCommitHandoffStatus =
+  "private-unmount-deletion-commit-handoff-public-unmount-blocked";
 const missingPrerequisites = [
   "public-react-test-renderer-root-lifecycle-routing",
   "react-test-renderer-host-output-serialization"
@@ -888,6 +892,100 @@ test("react-test-renderer private root request bridge records Rust canary-shaped
       entry.entrypoint
     );
   }
+});
+
+test("react-test-renderer CJS development private unmount route records deletion commit handoff blockers", () => {
+  const entry = entrypoints.find(
+    (candidate) => candidate.entrypoint === cjsDevelopmentEntrypoint
+  );
+  assert.notEqual(entry, undefined);
+
+  const moduleExports = loadFresh(entry.modulePath);
+  const bridge = assertPrivateRootRequestBridge(
+    moduleExports,
+    entry.entrypoint
+  );
+  const renderer = moduleExports.create({ type: "initial" });
+
+  const unmountError = captureThrown(() => renderer.unmount());
+  assertReactTestRendererUnimplemented(
+    unmountError,
+    entry.entrypoint,
+    "create().unmount"
+  );
+  assertCreateRoutingGate(unmountError, entry.entrypoint);
+  assertPrivateUnmountDeletionCommitHandoffGate(
+    unmountError.unmountPrivateRoute.deletionCommitHandoff,
+    entry.entrypoint
+  );
+  assertPrivateUnmountDeletionCommitHandoff(
+    unmountError.rootRequest.privateUnmountDeletionCommitHandoff,
+    {
+      entrypoint: entry.entrypoint,
+      lifecycleStatusAfter: "unmount-scheduled",
+      lifecycleStatusBefore: "active",
+      scheduled: true,
+      scheduledElementIsNone: true,
+      updateOutcome: rootUpdateOutcomeScheduled
+    }
+  );
+  assertPrivateUnmountDeletionCommitHandoff(
+    unmountError.privateRootRequest.privateUnmountDeletionCommitHandoff,
+    {
+      entrypoint: entry.entrypoint,
+      lifecycleStatusAfter: rootLifecycleUnmountScheduled,
+      lifecycleStatusBefore: rootLifecycleActive,
+      scheduled: true,
+      scheduledElementIsNone: true,
+      updateOutcome: rootUpdateOutcomeScheduled
+    }
+  );
+
+  const handoff = bridge.createRootExecutionHandoff(unmountError.rootRequest);
+  assert.equal(
+    handoff.privateUnmountDeletionCommitHandoff,
+    unmountError.rootRequest.privateUnmountDeletionCommitHandoff
+  );
+  const result = bridge.consumeRootExecutionResult(
+    unmountError.rootRequest,
+    createRustLifecycleDiagnosticSource(unmountError.rootRequest)
+  );
+  assert.equal(
+    result.privateUnmountDeletionCommitHandoff,
+    unmountError.rootRequest.privateUnmountDeletionCommitHandoff
+  );
+  assert.equal(result.hostOutputProduced, false);
+  assert.equal(result.publicCreateUpdateUnmountBehaviorAvailable, false);
+
+  const secondUnmountError = captureThrown(() => renderer.unmount());
+  assertReactTestRendererUnimplemented(
+    secondUnmountError,
+    entry.entrypoint,
+    "create().unmount"
+  );
+  assertPrivateUnmountDeletionCommitHandoff(
+    secondUnmountError.rootRequest.privateUnmountDeletionCommitHandoff,
+    {
+      entrypoint: entry.entrypoint,
+      lifecycleStatusAfter: "unmount-scheduled",
+      lifecycleStatusBefore: "unmount-scheduled",
+      scheduled: false,
+      scheduledElementIsNone: true,
+      updateOutcome: rootUpdateOutcomeAlreadyUnmountScheduled
+    }
+  );
+  assert.equal(
+    secondUnmountError.rootRequest.privateUnmountDeletionCommitHandoff
+      .rejectionReason,
+    "already-unmounted-root-record"
+  );
+  assert.equal(
+    secondUnmountError.rootRequest.privateUnmountDeletionCommitHandoff
+      .deletionCommitHandoffRejected,
+    true
+  );
+  assert.equal(secondUnmountError.rootRequest.hostOutputProduced, false);
+  assert.equal(secondUnmountError.rootRequest.compatibilityClaimed, false);
 });
 
 test("react-test-renderer CJS development private root-create preflight validates accepted Rust canary metadata", () => {
@@ -2762,6 +2860,11 @@ function assertRustCanaryMetadata(metadata, label) {
       "worker-574-test-renderer-update-via-root-work-loop"
     );
   }
+  if (metadata.unmountDeletionCommitHandoff !== undefined) {
+    expectedAcceptedRustWorkers.push(
+      "worker-575-test-renderer-unmount-deletion-commit-link"
+    );
+  }
   assert.deepEqual(metadata.acceptedRustWorkers, expectedAcceptedRustWorkers);
   const expectedAcceptedJsBridgeWorkers = [
     "worker-304-test-renderer-js-private-root-request-bridge",
@@ -2873,6 +2976,41 @@ function assertRustCanaryMetadata(metadata, label) {
   assert.equal(metadata.hostOutput.fixtureText, "hello", label);
   assert.equal(metadata.hostOutput.realHostOutputCanaryAvailable, true, label);
   assert.equal(metadata.hostOutput.generalMutationTraversalAvailable, false);
+  if (metadata.hostOutput.unmountDeletionCommitHandoffApi !== undefined) {
+    assert.equal(
+      metadata.hostOutput.unmountDeletionCommitHandoffApi,
+      "TestRendererRoot::describe_private_unmount_deletion_commit_handoff_for_canary",
+      label
+    );
+    assert.equal(
+      metadata.hostOutput.unmountDeletionCommitHandoffDiagnosticId,
+      privateUnmountDeletionCommitHandoffDiagnosticId,
+      label
+    );
+    assert.equal(
+      metadata.hostOutput.unmountDeletionCommitHandoffStatus,
+      privateUnmountDeletionCommitHandoffStatus,
+      label
+    );
+    assertPrivateUnmountDeletionCommitHandoffGate(
+      metadata.hostOutput.unmountDeletionCommitHandoffGate,
+      label
+    );
+    assertPrivateUnmountHostChildDetachmentBlockers(
+      metadata.hostOutput.hostChildDetachmentBlockers,
+      label
+    );
+    assert.equal(
+      metadata.hostOutput.hostNodeCleanupReport,
+      "TestRendererHostNodeCleanupReport",
+      label
+    );
+    assert.equal(
+      metadata.hostOutput.unmountDeletionCommitHandoffDiagnostics,
+      "TestRendererUnmountDeletionCommitHandoffDiagnostics",
+      label
+    );
+  }
 
   if (metadata.rootWorkLoopFinishedWorkPreflight !== undefined) {
     const rootWorkLoopFinishedWorkPreflight =
@@ -3055,6 +3193,13 @@ function assertRustCanaryMetadata(metadata, label) {
     assert.equal(rootCreatePreflight.nativeExecution, false);
     assert.equal(rootCreatePreflight.rustExecutionFromJs, false);
     assert.equal(rootCreatePreflight.compatibilityClaimed, false);
+  }
+
+  if (metadata.unmountDeletionCommitHandoff !== undefined) {
+    assertPrivateUnmountDeletionCommitHandoffGate(
+      metadata.unmountDeletionCommitHandoff,
+      label
+    );
   }
 
   assert.equal(Object.isFrozen(metadata.privateJson), true, label);
@@ -3314,6 +3459,41 @@ function assertRustCanaryOperationMetadata(metadata, expected) {
       "root_private_update_route_rejects_stale_root_update_output",
       "root_private_update_route_rejects_unmounted_root",
       "root_private_update_route_rejects_incompatible_finished_work_record"
+    );
+  }
+  if (
+    expected.operation === "unmount" &&
+    metadata.deletionCommitHandoffApi !== undefined
+  ) {
+    expectedTestsByOperation.unmount = [
+      "root_unmount_enqueues_sync_null_update_before_wrapper_invalidation",
+      "root_unmount_commit_handoff_exposes_visible_callback_snapshot",
+      "root_host_output_canary_unmounts_committed_output_with_deletion_cleanup_diagnostics",
+      "root_unmount_is_idempotent"
+    ];
+    assert.equal(
+      metadata.deletionCommitHandoffApi,
+      "TestRendererRoot::describe_private_unmount_deletion_commit_handoff_for_canary"
+    );
+    assert.equal(
+      metadata.deletionCommitHandoffDiagnosticId,
+      privateUnmountDeletionCommitHandoffDiagnosticId
+    );
+    assert.equal(
+      metadata.deletionCommitHandoffStatus,
+      privateUnmountDeletionCommitHandoffStatus
+    );
+    assertPrivateUnmountHostChildDetachmentBlockers(
+      metadata.hostChildDetachmentBlockers,
+      expected.entrypoint
+    );
+    assert.equal(metadata.staleRootRecordRejection, true);
+    assert.equal(metadata.alreadyUnmountedRootRecordRejection, true);
+    assert.equal(metadata.publicHostTeardownCompatibilityClaimed, false);
+    assert.equal(metadata.actFlushingClaimed, false);
+    expectedTestsByOperation.unmount.push(
+      "root_private_unmount_route_rejects_stale_deletion_commit_handoff",
+      "root_host_output_unmount_canary_rejects_already_unmounted_root_record"
     );
   }
   assert.deepEqual(
@@ -3577,12 +3757,29 @@ function assertPrivateRoute(privateRoute, expected) {
       : expected.acceptedRustApis
   );
   assert.equal(Object.isFrozen(privateRoute.acceptedRustTests), true);
-  assert.deepEqual(
-    privateRoute.acceptedRustTests,
+  let expectedAcceptedRustTests =
     expected.rootWorkLoopUpdateRoute && !hasRootWorkLoopUpdateRoute
       ? expected.acceptedRustTests.slice(4)
-      : expected.acceptedRustTests
-  );
+      : expected.acceptedRustTests;
+  if (privateRoute.deletionCommitHandoff !== undefined) {
+    expectedAcceptedRustTests = [
+      "root_host_output_canary_unmounts_committed_output_with_deletion_cleanup_diagnostics"
+    ];
+  }
+  assert.deepEqual(privateRoute.acceptedRustTests, expectedAcceptedRustTests);
+  if (privateRoute.deletionCommitHandoff !== undefined) {
+    assertPrivateUnmountDeletionCommitHandoffGate(
+      privateRoute.deletionCommitHandoff,
+      expected.publicSurface
+    );
+    assert.equal(privateRoute.deletionCommitHandoffDiagnosticsAvailable, true);
+    assert.equal(privateRoute.lifecycleStatusMetadataAvailable, true);
+    assert.equal(privateRoute.staleRootRecordRejection, true);
+    assert.equal(privateRoute.alreadyUnmountedRootRecordRejection, true);
+    assert.equal(privateRoute.publicUnmountCompatibilityClaimed, false);
+    assert.equal(privateRoute.publicHostTeardownCompatibilityClaimed, false);
+    assert.equal(privateRoute.actFlushingClaimed, false);
+  }
 }
 
 function assertPrivateUpdateRouteRootWorkLoopGate(gate) {
@@ -3642,6 +3839,191 @@ function assertPrivateUpdateRouteRootWorkLoopGate(gate) {
   assert.equal(gate.nativeExecution, false);
   assert.equal(gate.rustExecutionFromJs, false);
   assert.equal(gate.compatibilityClaimed, false);
+}
+
+function assertPrivateUnmountDeletionCommitHandoffGate(gate, label) {
+  assert.equal(Object.isFrozen(gate), true, label);
+  assert.equal(gate.id, privateUnmountDeletionCommitHandoffDiagnosticId, label);
+  assert.equal(gate.status, privateUnmountDeletionCommitHandoffStatus, label);
+  assert.equal(gate.publicSurface, "create().unmount", label);
+  assert.equal(gate.deterministic, true, label);
+  assert.equal(gate.acceptedRustCrate, "fast-react-test-renderer", label);
+  assert.deepEqual(gate.acceptedRustRecords, [
+    "HostRootCommitRecord",
+    "HostRootDeletionCleanupLog",
+    "TestRendererHostNodeCleanupReport",
+    "TestRendererUnmountDeletionCommitHandoffDiagnostics",
+    "TestRendererUnmountHostChildDetachmentBlockers"
+  ]);
+  assert.deepEqual(gate.acceptedRustApis, [
+    "TestRendererRoot::unmount",
+    "TestRendererRoot::render_and_commit_host_output_unmount_for_canary",
+    "TestRendererRoot::describe_private_unmount_deletion_commit_handoff_for_canary"
+  ]);
+  assert.deepEqual(gate.acceptedRustTests, [
+    "root_host_output_canary_unmounts_committed_output_with_deletion_cleanup_diagnostics",
+    "root_private_unmount_route_rejects_stale_deletion_commit_handoff",
+    "root_host_output_unmount_canary_rejects_already_unmounted_root_record"
+  ]);
+  assert.equal(
+    gate.acceptedWorker,
+    "worker-575-test-renderer-unmount-deletion-commit-link"
+  );
+  assertLifecycleDiagnosticGate(gate.lifecycleDiagnosticGate);
+  assertPrivateUnmountHostChildDetachmentBlockers(
+    gate.hostChildDetachmentBlockers,
+    label
+  );
+  assert.equal(gate.deletionCommitHandoffAvailable, true, label);
+  assert.equal(gate.hostNodeDeletionCleanupLogAvailable, true, label);
+  assert.equal(gate.hostChildDetachmentBlockersAvailable, true, label);
+  assert.equal(gate.lifecycleStatusMetadataAvailable, true, label);
+  assert.equal(gate.staleRootRecordRejection, true, label);
+  assert.equal(gate.alreadyUnmountedRootRecordRejection, true, label);
+  assert.equal(gate.publicRouteAvailable, false, label);
+  assert.equal(gate.publicUnmountCompatibilityClaimed, false, label);
+  assert.equal(gate.publicHostTeardownCompatibilityClaimed, false, label);
+  assert.equal(gate.actFlushingClaimed, false, label);
+  assert.equal(gate.nativeBridgeAvailable, false, label);
+  assert.equal(gate.nativeExecution, false, label);
+  assert.equal(gate.rustExecutionFromJs, false, label);
+  assert.equal(gate.compatibilityClaimed, false, label);
+}
+
+function assertPrivateUnmountHostChildDetachmentBlockers(blockers, label) {
+  assert.equal(Object.isFrozen(blockers), true, label);
+  assert.equal(
+    blockers.id,
+    "react-test-renderer-unmount-host-child-detachment-blockers",
+    label
+  );
+  assert.equal(
+    blockers.status,
+    "blocked-public-host-child-detachment-private-cleanup-metadata-only",
+    label
+  );
+  assert.equal(blockers.deterministic, true, label);
+  assert.equal(blockers.knownFixtureDetachMetadataAvailable, true, label);
+  assert.equal(
+    blockers.hostNodeCleanupInvalidationMetadataAvailable,
+    true,
+    label
+  );
+  assert.equal(blockers.broadHostChildDetachmentBlocked, true, label);
+  assert.equal(
+    blockers.publicHostTeardownCompatibilityClaimed,
+    false,
+    label
+  );
+  assert.equal(blockers.publicUnmountCompatibilityClaimed, false, label);
+  assert.equal(blockers.actFlushingClaimed, false, label);
+  assert.equal(blockers.nativeBridgeAvailable, false, label);
+  assert.equal(blockers.nativeExecution, false, label);
+  assert.equal(blockers.compatibilityClaimed, false, label);
+}
+
+function assertPrivateUnmountDeletionCommitHandoff(record, expected) {
+  assert.equal(Object.isFrozen(record), true, expected.entrypoint);
+  assert.equal(
+    record.id,
+    privateUnmountDeletionCommitHandoffDiagnosticId,
+    expected.entrypoint
+  );
+  assert.equal(
+    record.kind,
+    "FastReactTestRendererPrivateUnmountDeletionCommitHandoff",
+    expected.entrypoint
+  );
+  assert.equal(
+    record.status,
+    privateUnmountDeletionCommitHandoffStatus,
+    expected.entrypoint
+  );
+  assertPrivateUnmountDeletionCommitHandoffGate(
+    record.gate,
+    expected.entrypoint
+  );
+  assert.equal(record.operation, "unmount", expected.entrypoint);
+  assert.equal(record.publicSurface, "create().unmount", expected.entrypoint);
+  assert.equal(record.updateKind, "Unmount", expected.entrypoint);
+  assert.equal(
+    record.updateOutcome,
+    expected.updateOutcome,
+    expected.entrypoint
+  );
+  assert.equal(
+    record.expectedOutcome,
+    expected.updateOutcome,
+    expected.entrypoint
+  );
+  assert.equal(
+    record.lifecycleStatusBefore,
+    expected.lifecycleStatusBefore,
+    expected.entrypoint
+  );
+  assert.equal(
+    record.lifecycleStatusAfter,
+    expected.lifecycleStatusAfter,
+    expected.entrypoint
+  );
+  assert.equal(
+    record.lifecycleTransition,
+    `${expected.lifecycleStatusBefore === null ? "none" : expected.lifecycleStatusBefore}->${expected.lifecycleStatusAfter}`,
+    expected.entrypoint
+  );
+  assert.equal(record.scheduled, expected.scheduled, expected.entrypoint);
+  assert.equal(
+    record.scheduledElementIsNone,
+    expected.scheduledElementIsNone,
+    expected.entrypoint
+  );
+  assert.equal(
+    record.sync,
+    expected.scheduled ? true : null,
+    expected.entrypoint
+  );
+  assert.equal(
+    record.deletionCommitHandoffAvailable,
+    expected.scheduled,
+    expected.entrypoint
+  );
+  assert.equal(
+    record.deletionCommitHandoffRejected,
+    !expected.scheduled,
+    expected.entrypoint
+  );
+  assert.equal(record.commitRecord, "HostRootCommitRecord", expected.entrypoint);
+  assert.equal(
+    record.hostNodeDeletionCleanupLog,
+    "HostRootDeletionCleanupLog",
+    expected.entrypoint
+  );
+  assert.equal(
+    record.hostNodeCleanupReport,
+    "TestRendererHostNodeCleanupReport",
+    expected.entrypoint
+  );
+  assert.equal(
+    record.rustDiagnostic,
+    "TestRendererUnmountDeletionCommitHandoffDiagnostics",
+    expected.entrypoint
+  );
+  assertPrivateUnmountHostChildDetachmentBlockers(
+    record.hostChildDetachmentBlockers,
+    expected.entrypoint
+  );
+  assert.equal(record.lifecycleStatusMetadataAvailable, true);
+  assert.equal(record.staleRootRecordRejection, true);
+  assert.equal(record.alreadyUnmountedRootRecordRejection, true);
+  assert.equal(record.publicRouteAvailable, false);
+  assert.equal(record.publicUnmountCompatibilityClaimed, false);
+  assert.equal(record.publicHostTeardownCompatibilityClaimed, false);
+  assert.equal(record.actFlushingClaimed, false);
+  assert.equal(record.nativeBridgeAvailable, false);
+  assert.equal(record.nativeExecution, false);
+  assert.equal(record.rustExecutionFromJs, false);
+  assert.equal(record.reconcilerExecutionFromJs, false);
+  assert.equal(record.compatibilityClaimed, false);
 }
 
 function assertLifecycleDiagnosticGate(gate) {
