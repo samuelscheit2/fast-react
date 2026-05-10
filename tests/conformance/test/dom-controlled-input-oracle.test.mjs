@@ -219,6 +219,46 @@ test("private controlled post-event restore queue consumes event latest-props ev
   assert.equal(intent.hostTag, "input");
   assert.equal(intent.controlKind, "checked");
   assert.equal(intent.trackedField, "checked");
+  assert.equal(
+    intent.checkableRestoreMetadata.status,
+    controlledRestoreQueue.controlledInputPostEventRestoreQueueCheckableRestoreMetadataStatus
+  );
+  assert.equal(intent.checkableRestoreMetadata.inputType, "checkbox");
+  assert.equal(intent.checkableRestoreMetadata.checkedProp.present, true);
+  assert.equal(intent.checkableRestoreMetadata.nameProp.present, false);
+  assert.equal(
+    intent.checkableRestoreMetadata.radioGroupRestoreRequired,
+    false
+  );
+  assert.deepEqual(
+    intent.groupIntentRecords.map((record) => ({
+      status: record.status,
+      groupKind: record.groupKind,
+      skipReason: record.skipReason,
+      groupLookupRequired: record.groupLookupRequired,
+      groupLookupPerformed: record.groupLookupPerformed,
+      siblingInputRestorePerformed: record.siblingInputRestorePerformed,
+      valueTrackerRefreshed: record.valueTrackerRefreshed,
+      realDomQueried: record.realDomQueried,
+      browserInputMutated: record.browserInputMutated,
+      compatibilityClaimed: record.compatibilityClaimed
+    })),
+    [
+      {
+        status:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueRadioGroupIntentSkippedStatus,
+        groupKind: "single-checkable",
+        skipReason: "checkboxes-do-not-restore-radio-groups",
+        groupLookupRequired: false,
+        groupLookupPerformed: false,
+        siblingInputRestorePerformed: false,
+        valueTrackerRefreshed: false,
+        realDomQueried: false,
+        browserInputMutated: false,
+        compatibilityClaimed: false
+      }
+    ]
+  );
   assert.equal(intent.restoreIntent.intentRecorded, true);
   assert.equal(intent.restoreIntent.restoreTargetWouldBeQueued, true);
   assert.equal(intent.restoreIntent.latestPropsEvidenceAccepted, true);
@@ -259,6 +299,96 @@ test("private controlled post-event restore queue consumes event latest-props ev
     Object.getOwnPropertyDescriptor(eventDispatch.targetNode, "value").set,
     undefined
   );
+  assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
+
+  componentTree.detachHostInstanceToken(eventDispatch.token);
+});
+
+test("private controlled radio post-event restore queue records group intent without DOM lookup", () => {
+  const gate =
+    controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({
+      requestIdPrefix: "controlled-oracle-radio-restore"
+    });
+  const eventDispatch = createPrivateControlledEventDispatch({
+    domEventName: "click",
+    latestProps: {
+      type: "radio",
+      name: "choice",
+      checked: true,
+      onChange() {},
+      onClick() {}
+    },
+    nodeName: "INPUT"
+  });
+  const intent = gate.recordPostEventRestoreIntentFromEventLatestProps(
+    eventDispatch.dispatchRecord,
+    {
+      explicitAdmission: true,
+      queueKind:
+        "deterministic-event-latest-props-post-event-restore-queue",
+      queueId: "controlled-oracle-radio-restore-queue",
+      eventName: "click",
+      targetKind: "controlled-input-post-event-restore-queue"
+    }
+  );
+
+  assert.equal(intent.inputType, "radio");
+  assert.equal(intent.controlKind, "checked");
+  assert.equal(intent.restoreIntent.intentRecorded, true);
+  assert.equal(
+    intent.checkableRestoreMetadata.radioGroupRestoreRequired,
+    true
+  );
+  assert.equal(
+    intent.checkableRestoreMetadata.radioGroupIntentRecorded,
+    true
+  );
+  assert.deepEqual(
+    intent.groupIntentRecords.map((record) => ({
+      status: record.status,
+      groupKind: record.groupKind,
+      skipReason: record.skipReason,
+      groupRestoreRequired: record.groupRestoreRequired,
+      groupRestoreIntentRecorded: record.groupRestoreIntentRecorded,
+      groupLookupRequired: record.groupLookupRequired,
+      groupLookupPerformed: record.groupLookupPerformed,
+      siblingLatestPropsLookupPerformed:
+        record.siblingLatestPropsLookupPerformed,
+      siblingInputRestorePerformed: record.siblingInputRestorePerformed,
+      valueTrackerRefreshed: record.valueTrackerRefreshed,
+      realDomQueried: record.realDomQueried,
+      rawGroupNodesCaptured: record.rawGroupNodesCaptured,
+      rawNameRetained: record.rawNameRetained,
+      compatibilityClaimed: record.compatibilityClaimed
+    })),
+    [
+      {
+        status:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueRadioGroupIntentRecordedStatus,
+        groupKind: "radio-group",
+        skipReason: null,
+        groupRestoreRequired: true,
+        groupRestoreIntentRecorded: true,
+        groupLookupRequired: true,
+        groupLookupPerformed: false,
+        siblingLatestPropsLookupPerformed: false,
+        siblingInputRestorePerformed: false,
+        valueTrackerRefreshed: false,
+        realDomQueried: false,
+        rawGroupNodesCaptured: false,
+        rawNameRetained: false,
+        compatibilityClaimed: false
+      }
+    ]
+  );
+  assert.equal(intent.sideEffects.radioGroupRestoreIntentRecorded, true);
+  assert.equal(intent.sideEffects.radioGroupLookupPerformed, false);
+  assert.equal(intent.sideEffects.radioGroupMembersEnumerated, false);
+  assert.equal(intent.sideEffects.radioGroupValueTrackerRefreshed, false);
+  assert.equal(intent.sideEffects.hostValueRead, false);
+  assert.equal(intent.sideEffects.hostValueWritten, false);
+  assert.equal(intent.sideEffects.browserInputMutated, false);
+  assert.equal(Object.hasOwn(eventDispatch.targetNode, "_valueTracker"), false);
   assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
 
   componentTree.detachHostInstanceToken(eventDispatch.token);

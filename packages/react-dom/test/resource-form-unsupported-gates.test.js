@@ -1479,6 +1479,162 @@ test('private controlled input post-event restore queue gate records event/lates
   componentTree.detachHostInstanceToken(skippedControlled.token);
 });
 
+test('private controlled checkbox and radio restore queue gate records checkable metadata only', () => {
+  const gate =
+    controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({
+      requestIdPrefix: 'checkable-restore'
+    });
+  const rows = [
+    {
+      domEventName: 'click',
+      latestProps: {
+        type: 'checkbox',
+        checked: true,
+        name: 'accepted',
+        onChange() {},
+        onClick() {}
+      },
+      nodeName: 'INPUT',
+      queueId: 'checkbox-checkable-restore'
+    },
+    {
+      domEventName: 'click',
+      latestProps: {
+        type: 'radio',
+        checked: true,
+        name: 'choice',
+        onChange() {},
+        onClick() {}
+      },
+      nodeName: 'INPUT',
+      queueId: 'radio-checkable-restore'
+    }
+  ];
+  const records = rows.map((row) => {
+    const dispatch = createControlledInputEventDispatch(row);
+    const intent = gate.recordPostEventRestoreIntentFromEventLatestProps(
+      dispatch.dispatchRecord,
+      {
+        explicitAdmission: true,
+        queueKind:
+          'deterministic-event-latest-props-post-event-restore-queue',
+        queueId: row.queueId,
+        eventName: row.domEventName,
+        targetKind: 'controlled-input-post-event-restore-queue'
+      }
+    );
+    return {dispatch, intent};
+  });
+
+  assert.deepEqual(
+    records.map(({intent}) => ({
+      status: intent.status,
+      inputType: intent.inputType,
+      controlKind: intent.controlKind,
+      trackedField: intent.trackedField,
+      checkableStatus: intent.checkableRestoreMetadata.status,
+      radioGroupRestoreRequired:
+        intent.checkableRestoreMetadata.radioGroupRestoreRequired,
+      radioGroupIntentRecorded:
+        intent.checkableRestoreMetadata.radioGroupIntentRecorded,
+      groupIntentStatus: intent.groupIntentRecords[0].status,
+      groupKind: intent.groupIntentRecords[0].groupKind,
+      skipReason: intent.groupIntentRecords[0].skipReason,
+      groupLookupRequired:
+        intent.groupIntentRecords[0].groupLookupRequired,
+      groupLookupPerformed:
+        intent.groupIntentRecords[0].groupLookupPerformed,
+      siblingLatestPropsLookupPerformed:
+        intent.groupIntentRecords[0].siblingLatestPropsLookupPerformed,
+      siblingInputRestorePerformed:
+        intent.groupIntentRecords[0].siblingInputRestorePerformed,
+      valueTrackerRefreshed:
+        intent.groupIntentRecords[0].valueTrackerRefreshed,
+      radioGroupRestoreIntentRecorded:
+        intent.sideEffects.radioGroupRestoreIntentRecorded,
+      radioGroupLookupPerformed:
+        intent.sideEffects.radioGroupLookupPerformed,
+      radioGroupMembersEnumerated:
+        intent.sideEffects.radioGroupMembersEnumerated,
+      radioGroupValueTrackerRefreshed:
+        intent.sideEffects.radioGroupValueTrackerRefreshed
+    })),
+    [
+      {
+        status:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueIntentRecordedStatus,
+        inputType: 'checkbox',
+        controlKind: 'checked',
+        trackedField: 'checked',
+        checkableStatus:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueCheckableRestoreMetadataStatus,
+        radioGroupRestoreRequired: false,
+        radioGroupIntentRecorded: false,
+        groupIntentStatus:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueRadioGroupIntentSkippedStatus,
+        groupKind: 'single-checkable',
+        skipReason: 'checkboxes-do-not-restore-radio-groups',
+        groupLookupRequired: false,
+        groupLookupPerformed: false,
+        siblingLatestPropsLookupPerformed: false,
+        siblingInputRestorePerformed: false,
+        valueTrackerRefreshed: false,
+        radioGroupRestoreIntentRecorded: false,
+        radioGroupLookupPerformed: false,
+        radioGroupMembersEnumerated: false,
+        radioGroupValueTrackerRefreshed: false
+      },
+      {
+        status:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueIntentRecordedStatus,
+        inputType: 'radio',
+        controlKind: 'checked',
+        trackedField: 'checked',
+        checkableStatus:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueCheckableRestoreMetadataStatus,
+        radioGroupRestoreRequired: true,
+        radioGroupIntentRecorded: true,
+        groupIntentStatus:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueRadioGroupIntentRecordedStatus,
+        groupKind: 'radio-group',
+        skipReason: null,
+        groupLookupRequired: true,
+        groupLookupPerformed: false,
+        siblingLatestPropsLookupPerformed: false,
+        siblingInputRestorePerformed: false,
+        valueTrackerRefreshed: false,
+        radioGroupRestoreIntentRecorded: true,
+        radioGroupLookupPerformed: false,
+        radioGroupMembersEnumerated: false,
+        radioGroupValueTrackerRefreshed: false
+      }
+    ]
+  );
+
+  for (const {dispatch, intent} of records) {
+    assert.equal(intent.restoreIntent.intentRecorded, true);
+    assert.equal(intent.checkableRestoreMetadata.primaryInputRestorePerformed, false);
+    assert.equal(intent.checkableRestoreMetadata.checkedWritePerformed, false);
+    assert.equal(intent.checkableRestoreMetadata.radioGroupLookupPerformed, false);
+    assert.equal(intent.checkableRestoreMetadata.radioGroupMembersEnumerated, false);
+    assert.equal(intent.checkableRestoreMetadata.radioValueTrackerRefreshed, false);
+    assert.equal(intent.groupIntentRecords[0].realDomQueried, false);
+    assert.equal(intent.groupIntentRecords[0].hostValueRead, false);
+    assert.equal(intent.groupIntentRecords[0].hostValueWritten, false);
+    assert.equal(intent.groupIntentRecords[0].browserInputMutated, false);
+    assert.equal(intent.groupIntentRecords[0].rawGroupNodesCaptured, false);
+    assert.equal(intent.groupIntentRecords[0].rawNameRetained, false);
+    assert.equal(intent.groupIntentRecords[0].compatibilityClaimed, false);
+    assert.equal(intent.sideEffects.hostValueRead, false);
+    assert.equal(intent.sideEffects.hostValueWritten, false);
+    assert.equal(intent.sideEffects.browserInputMutated, false);
+    assert.equal(intent.sideEffects.publicControlledBehaviorEnabled, false);
+    assert.equal(intent.sideEffects.compatibilityClaimed, false);
+    assert.equal(Object.hasOwn(dispatch.targetNode, '_valueTracker'), false);
+    componentTree.detachHostInstanceToken(dispatch.token);
+  }
+});
+
 test('private controlled input post-event restore queue gate records select and textarea fake-DOM latest-props intent only', () => {
   const trackerGate = resourceFormGate.createControlledInputValueTrackerGate({
     requestIdPrefix: 'select-textarea-tracker'
@@ -1862,6 +2018,183 @@ test('private controlled input post-event restore queue gate records select and 
       compatibilityTarget
     }
   );
+
+  for (const token of cleanupTokens) {
+    componentTree.detachHostInstanceToken(token);
+  }
+});
+
+test('private controlled checkbox and radio fake-DOM latest-props restore records group intent only', () => {
+  const trackerGate = resourceFormGate.createControlledInputValueTrackerGate({
+    requestIdPrefix: 'checkable-fake-tracker'
+  });
+  const restoreGate =
+    controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({
+      requestIdPrefix: 'checkable-fake-restore'
+    });
+  const rows = [
+    {
+      eventName: 'click',
+      fakeInitial: {checked: false},
+      fakeNext: {checked: true},
+      inputType: 'checkbox',
+      latestProps: {
+        type: 'checkbox',
+        checked: true,
+        onChange() {},
+        onClick() {}
+      },
+      queueId: 'checkbox-fake-latest-props-restore',
+      scenarioId: 'checkbox-controlled-checked-update'
+    },
+    {
+      eventName: 'click',
+      fakeInitial: {checked: false},
+      fakeNext: {checked: true},
+      inputType: 'radio',
+      latestProps: {
+        type: 'radio',
+        name: 'choice',
+        checked: true,
+        onChange() {},
+        onClick() {}
+      },
+      queueId: 'radio-fake-latest-props-restore',
+      scenarioId: 'radio-controlled-checked-restore-diagnostic'
+    }
+  ];
+  const cleanupTokens = [];
+  const records = rows.map((row) => {
+    const fakeTarget = createControlledInputFakeDomTarget(row.fakeInitial);
+    const install = trackerGate.installFakeDomTracker(
+      {
+        scenarioId: row.scenarioId,
+        phaseId: 'post-event',
+        hostTag: 'input',
+        inputType: row.inputType,
+        props: row.latestProps
+      },
+      {
+        explicitAdmission: true,
+        adapterKind: 'deterministic-fake-dom',
+        adapterId: `${row.scenarioId}-fake-target`,
+        targetKind: 'controlled-input-value-tracker',
+        fakeTarget
+      }
+    );
+    Object.assign(fakeTarget, row.fakeNext);
+    const observation = trackerGate.observeFakeDomTracker(install);
+    const latestProps = createControlledLatestPropsLookup({
+      latestProps: row.latestProps,
+      nodeName: 'INPUT',
+      registrationName: 'onClick'
+    });
+    cleanupTokens.push(latestProps.token);
+    const intent =
+      restoreGate.recordPostEventRestoreIntentFromFakeDomObservationLatestProps(
+        observation,
+        latestProps.lookupRecord,
+        {
+          explicitAdmission: true,
+          queueKind:
+            'deterministic-fake-dom-latest-props-post-event-restore-queue',
+          queueId: row.queueId,
+          eventName: row.eventName,
+          targetKind: 'controlled-input-post-event-restore-queue'
+        }
+      );
+
+    return {fakeTarget, intent, latestProps, row};
+  });
+
+  assert.deepEqual(
+    records.map(({intent}) => ({
+      sourceKind: intent.sourceKind,
+      status: intent.status,
+      inputType: intent.inputType,
+      controlKind: intent.controlKind,
+      sourceChanged: intent.restoreIntent.sourceChanged,
+      sourceMatchesLatestPropsTarget:
+        intent.restoreIntent.sourceMatchesLatestPropsTarget,
+      checkableStatus: intent.checkableRestoreMetadata.status,
+      radioGroupRestoreRequired:
+        intent.checkableRestoreMetadata.radioGroupRestoreRequired,
+      groupIntentStatus: intent.groupIntentRecords[0].status,
+      groupKind: intent.groupIntentRecords[0].groupKind,
+      skipReason: intent.groupIntentRecords[0].skipReason,
+      groupLookupRequired:
+        intent.groupIntentRecords[0].groupLookupRequired,
+      siblingInputRestorePerformed:
+        intent.groupIntentRecords[0].siblingInputRestorePerformed,
+      valueTrackerRefreshed:
+        intent.groupIntentRecords[0].valueTrackerRefreshed,
+      eventDispatchRecordAccepted:
+        intent.restoreIntent.eventDispatchRecordAccepted,
+      fakeDomTrackerObservationAccepted:
+        intent.restoreIntent.fakeDomTrackerObservationAccepted
+    })),
+    [
+      {
+        sourceKind: 'private-fake-dom-observation-latest-props-evidence',
+        status:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueIntentRecordedStatus,
+        inputType: 'checkbox',
+        controlKind: 'checked',
+        sourceChanged: true,
+        sourceMatchesLatestPropsTarget: true,
+        checkableStatus:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueCheckableRestoreMetadataStatus,
+        radioGroupRestoreRequired: false,
+        groupIntentStatus:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueRadioGroupIntentSkippedStatus,
+        groupKind: 'single-checkable',
+        skipReason: 'checkboxes-do-not-restore-radio-groups',
+        groupLookupRequired: false,
+        siblingInputRestorePerformed: false,
+        valueTrackerRefreshed: false,
+        eventDispatchRecordAccepted: false,
+        fakeDomTrackerObservationAccepted: true
+      },
+      {
+        sourceKind: 'private-fake-dom-observation-latest-props-evidence',
+        status:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueIntentRecordedStatus,
+        inputType: 'radio',
+        controlKind: 'checked',
+        sourceChanged: true,
+        sourceMatchesLatestPropsTarget: true,
+        checkableStatus:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueCheckableRestoreMetadataStatus,
+        radioGroupRestoreRequired: true,
+        groupIntentStatus:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueRadioGroupIntentRecordedStatus,
+        groupKind: 'radio-group',
+        skipReason: null,
+        groupLookupRequired: true,
+        siblingInputRestorePerformed: false,
+        valueTrackerRefreshed: false,
+        eventDispatchRecordAccepted: false,
+        fakeDomTrackerObservationAccepted: true
+      }
+    ]
+  );
+
+  for (const {fakeTarget, intent, latestProps} of records) {
+    assert.equal(intent.eventEvidence, null);
+    assert.equal(intent.sideEffects.fakeDomTrackerObservationAccepted, true);
+    assert.equal(intent.sideEffects.checkableRestoreMetadataRecorded, true);
+    assert.equal(intent.sideEffects.radioGroupLookupPerformed, false);
+    assert.equal(intent.sideEffects.radioGroupMembersEnumerated, false);
+    assert.equal(intent.sideEffects.radioGroupValueTrackerRefreshed, false);
+    assert.equal(intent.sideEffects.hostValueRead, false);
+    assert.equal(intent.sideEffects.hostValueWritten, false);
+    assert.equal(intent.sideEffects.browserInputMutated, false);
+    assert.equal(intent.groupIntentRecords[0].realDomQueried, false);
+    assert.equal(intent.groupIntentRecords[0].rawGroupNodesCaptured, false);
+    assert.equal(intent.groupIntentRecords[0].rawNameRetained, false);
+    assert.equal(Object.hasOwn(fakeTarget, '_valueTracker'), false);
+    assert.equal(Object.hasOwn(latestProps.targetNode, '_valueTracker'), false);
+  }
 
   for (const token of cleanupTokens) {
     componentTree.detachHostInstanceToken(token);

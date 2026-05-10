@@ -21,6 +21,12 @@ const CONTROLLED_RESTORE_QUEUE_FAKE_DOM_DIAGNOSTIC_STATUS =
   resourceFormInternalsGate.controlledInputPrivateRestoreQueueDiagnosticStatus;
 const CONTROLLED_POST_EVENT_RESTORE_QUEUE_STATUS =
   'private-controlled-input-post-event-restore-queue-intent';
+const CONTROLLED_CHECKABLE_RESTORE_METADATA_STATUS =
+  'private-controlled-checkable-input-restore-metadata';
+const CONTROLLED_RADIO_GROUP_RESTORE_INTENT_RECORDED_STATUS =
+  'recorded-private-controlled-radio-group-restore-intent';
+const CONTROLLED_RADIO_GROUP_RESTORE_INTENT_SKIPPED_STATUS =
+  'skipped-private-controlled-radio-group-restore-intent';
 const CONTROLLED_PRIVATE_WRAPPER_PROPERTY_PAYLOAD_STATUS =
   resourceFormInternalsGate.controlledInputPrivateWrapperGateStatus;
 
@@ -657,6 +663,8 @@ function createControlledFormUnsupportedEntry(tag, propName, props) {
       propName,
       props
     );
+  const checkableRestoreMetadata =
+    createControlledCheckableRestoreMetadataOrNull(tag, props);
 
   return createUnsupportedEntry(
     propName,
@@ -683,6 +691,7 @@ function createControlledFormUnsupportedEntry(tag, propName, props) {
         fakeDomTrackerDiagnosticInstalled: false,
         fakeDomTrackerDiagnosticObserved: false,
         fakeDomTrackerDiagnosticDetached: false,
+        checkableRestoreMetadata,
         postEventRestoreQueueIntentRecorded: false,
         liveTrackingStarted: false,
         postEventRestoreQueued: false,
@@ -691,6 +700,136 @@ function createControlledFormUnsupportedEntry(tag, propName, props) {
       }
     }
   );
+}
+
+function createControlledCheckableRestoreMetadataOrNull(tag, props) {
+  if (tag !== 'input') {
+    return null;
+  }
+
+  const inputType = getInputTypeFromProps(props);
+  if (inputType !== 'checkbox' && inputType !== 'radio') {
+    return null;
+  }
+
+  const checkedProp = describeControlledBoundaryProp(props, 'checked');
+  const defaultCheckedProp =
+    describeControlledBoundaryProp(props, 'defaultChecked');
+  const nameProp = describeControlledBoundaryProp(props, 'name');
+  const radioGroupRestoreRequired =
+    inputType === 'radio' && nameProp.nonNull === true;
+
+  return Object.freeze({
+    status: CONTROLLED_CHECKABLE_RESTORE_METADATA_STATUS,
+    hostTag: tag,
+    inputType,
+    controlKind: 'checked',
+    trackedField: 'checked',
+    checkedProp,
+    defaultCheckedProp,
+    nameProp,
+    radioGroupRestoreIntentStatus: radioGroupRestoreRequired
+      ? CONTROLLED_RADIO_GROUP_RESTORE_INTENT_RECORDED_STATUS
+      : CONTROLLED_RADIO_GROUP_RESTORE_INTENT_SKIPPED_STATUS,
+    radioGroupRestoreIntentRecorded: false,
+    radioGroupRestoreRequired,
+    radioGroupLookupRequired: radioGroupRestoreRequired,
+    radioGroupLookupPerformed: false,
+    radioGroupMembersEnumerated: false,
+    radioSiblingMetadataRead: false,
+    radioSiblingInputRestoreRequired: radioGroupRestoreRequired,
+    radioSiblingInputRestorePerformed: false,
+    radioValueTrackerRefreshRequired: radioGroupRestoreRequired,
+    radioValueTrackerRefreshed: false,
+    latestPropsLookup: false,
+    liveTrackingStarted: false,
+    postEventRestoreQueued: false,
+    hostValueRead: false,
+    hostValueWritten: false,
+    browserInputMutated: false,
+    compatibilityClaimed: false
+  });
+}
+
+function getInputTypeFromProps(props) {
+  if (isObjectLike(props) && hasOwn.call(props, 'type')) {
+    try {
+      const type = props.type;
+      return typeof type === 'string' && type.length > 0 ? type : 'text';
+    } catch (error) {
+      return 'text';
+    }
+  }
+
+  return 'text';
+}
+
+function describeControlledBoundaryProp(props, propName) {
+  if (!isObjectLike(props) || !hasOwn.call(props, propName)) {
+    return Object.freeze({
+      propName,
+      present: false,
+      nonNull: false,
+      value: Object.freeze({type: 'missing'})
+    });
+  }
+
+  try {
+    const value = props[propName];
+    return Object.freeze({
+      propName,
+      present: true,
+      nonNull: value != null,
+      value: describeBoundaryValue(value)
+    });
+  } catch (error) {
+    return Object.freeze({
+      propName,
+      present: true,
+      nonNull: false,
+      value: Object.freeze({type: 'inaccessible'})
+    });
+  }
+}
+
+function describeBoundaryValue(value) {
+  if (value === null) {
+    return Object.freeze({type: 'null'});
+  }
+
+  const valueType = typeof value;
+  if (valueType === 'string') {
+    return Object.freeze({
+      type: 'string',
+      empty: value.length === 0
+    });
+  }
+  if (valueType === 'boolean') {
+    return Object.freeze({type: 'boolean'});
+  }
+  if (valueType === 'undefined') {
+    return Object.freeze({type: 'undefined'});
+  }
+  if (valueType === 'number') {
+    return Object.freeze({
+      type: 'number',
+      finite: Number.isFinite(value)
+    });
+  }
+  if (valueType === 'function') {
+    return Object.freeze({type: 'function'});
+  }
+  if (valueType === 'symbol') {
+    return Object.freeze({type: 'symbol'});
+  }
+  if (Array.isArray(value)) {
+    return Object.freeze({
+      type: 'array',
+      length: value.length
+    });
+  }
+
+  return Object.freeze({type: valueType});
 }
 
 function createControlledPrivateWrapperPropertyPayloadRecordOrNull(
@@ -800,9 +939,12 @@ function getStyleMutationTarget(styleName) {
 }
 
 module.exports = {
+  CONTROLLED_CHECKABLE_RESTORE_METADATA_STATUS,
   CONTROLLED_FORM_PROPERTY_PAYLOAD_STATUS,
   CONTROLLED_POST_EVENT_RESTORE_QUEUE_STATUS,
   CONTROLLED_PRIVATE_WRAPPER_PROPERTY_PAYLOAD_STATUS,
+  CONTROLLED_RADIO_GROUP_RESTORE_INTENT_RECORDED_STATUS,
+  CONTROLLED_RADIO_GROUP_RESTORE_INTENT_SKIPPED_STATUS,
   CONTROLLED_RESTORE_QUEUE_FAKE_DOM_DIAGNOSTIC_STATUS,
   CONTROLLED_VALUE_TRACKER_FAKE_DOM_DIAGNOSTIC_STATUS,
   CONTROLLED_VALUE_TRACKER_GATE_STATUS,
