@@ -29,6 +29,96 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 745
+
+- Worker 745 added a Rust-only private sibling-text `toJSON` finished-work
+  identity gate in `fast-react-test-renderer`. The dedicated gate consumes the
+  real Worker 738 sibling-text output/report and binds route admission,
+  committed fiber inspection, current snapshot evidence, render/commit handles,
+  and lanes to the same committed sibling-text update.
+- The generic `describe_private_to_json_finished_work_identity_gate_for_canary`
+  path remains fail-closed for `SiblingText` with
+  `sibling-text-finished-work-identity-gate-not-implemented`. The existing
+  snapshot-only sibling blocker also remains distinct from this real committed
+  sibling-text gate.
+- Worker 745 was accepted after focused sibling-text, `toJSON`, and sibling
+  snapshot Rust tests, formatting, clippy, private-admission conformance,
+  package-surface, import-smoke, and `git diff --check` verification. Public
+  `toJSON`, JS/CJS facades, native bridge loading/execution, package
+  compatibility, and broad multichild identity remain blocked.
+
+### Worker 744
+
+- Worker 744 added the static/read-only private-admission ledger gate for
+  Workers 737-738. It records Worker 737 as accepted ledger evidence for
+  Workers 734-736 and Worker 738 as accepted Rust-only/private prerequisite
+  evidence for the real committed sibling-text host-output row and private JSON
+  report.
+- The ledger pins the Worker 738 generic sibling-text identity fail-closed
+  guard, carries forward the 734-736 blocked public/native/package/JS claims,
+  and adds explicit sibling-text, React DOM/root/act/flushSync, and Scheduler
+  blockers. It performs manifest/source-token checks only and makes no runtime
+  execution claim.
+- Worker 744 was accepted after syntax checks, focused private-admission tests,
+  package-surface, import-smoke, conflict-marker, and `git diff --check`
+  verification. Public serialization, React DOM/root/act/flushSync, Scheduler,
+  native bridge loading/execution, JS/CJS admission, package compatibility, and
+  broad sibling identity remained blocked.
+
+### Worker 742
+
+- Worker 742 added a private `scheduler/unstable_mock` delayed act/root
+  diagnostic route behind the existing non-enumerable private flush diagnostic
+  export. The route accepts only branded internal test callbacks and accepted
+  expired act/root metadata, validates delayed handle/timing/priority metadata,
+  advances mock virtual time to the callback expiration point, and reuses the
+  accepted expired act/root drain.
+- Acceptance audit found that a branded delayed callback could return an
+  unbranded continuation. The accepted fix revalidates scheduled callbacks and
+  every returned continuation before installation/execution, rejecting delayed
+  continuation-brand failures before public Scheduler work, root record
+  consumption, or private act queue consumption can occur.
+- Worker 742 was accepted after focused delayed act/root Scheduler mock
+  conformance, Scheduler oracle and expired-lane flush tests, scheduler
+  workspace checks, package-surface, and `git diff --check` verification.
+  Public Scheduler timing, public React `act`/root behavior, renderer/effects,
+  public flush-helper compatibility, and package compatibility remain blocked.
+
+### Worker 741
+
+- Worker 741 added a distinct symbol-only private preflight on
+  `react-dom/client.hydrateRoot`. The hidden symbol records an unsupported
+  private `hydrateRoot(container, initialChildren, options)` bridge request and
+  root-bridge admission while staying separate from the existing `createRoot`
+  private symbols.
+- The preflight intentionally creates no public root object, native handoff,
+  root markers/listeners, DOM mutation, hydration execution, or event replay.
+  Public `hydrateRoot` continues to throw `FAST_REACT_UNIMPLEMENTED`, and the
+  package-surface smoke data tracks only the non-enumerable private runtime
+  facade symbol.
+- Worker 741 was accepted after focused React DOM private-bridge/conformance
+  tests, React DOM workspace checks, package-surface, and `git diff --check`
+  verification. Public hydration, recoverable error routing, events, DOM
+  mutation behavior, and compatibility remain blocked.
+
+### Worker 740
+
+- Worker 740 added an inert JS/package-surface mirror gate for the accepted
+  Rust native worker-thread teardown diagnostics under
+  `nativeRootBridgeRequestShape` in the `@fast-react/native` placeholder
+  loader. The gate records the accepted teardown status, deterministic
+  worker/peer environment ids, matched/mismatched teardown summaries, and the
+  stale worker-root/create/render plus peer-root-active diagnostic rows.
+- The mirror keeps `nativeAddonLoaded`, `nativeExecution`,
+  `rendererExecution`, `reconcilerExecution`, `reactBehaviorError`, and
+  `publicNativeCompatibility` false. It adds no public export keys, package
+  exports, native addon loading path, renderer/reconciler execution, or React
+  behavior.
+- Worker 740 was accepted after native loader checks, package-surface and
+  import-entrypoint smoke tests, JS checks, focused `fast-react-napi`
+  worker-thread teardown Rust tests, and `git diff --check` verification.
+  Public native/root compatibility remains blocked.
+
 ### Worker 738
 
 - Worker 738 added a Rust-only real committed sibling-text host-output update
