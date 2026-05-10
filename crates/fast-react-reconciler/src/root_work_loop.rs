@@ -52,7 +52,7 @@ use crate::{
 };
 #[cfg(test)]
 use crate::{
-    HostRootCommitRecord, RootCommitError,
+    HostRootCommitRecord,
     begin_work::{
         ContextProviderBeginWorkError, ContextProviderBeginWorkRecord,
         ContextProviderBeginWorkRequest, ContextProviderUseContextBeginWorkRecord,
@@ -71,7 +71,6 @@ use crate::{
         begin_work_nested_context_provider_two_consumer_use_context_children,
         begin_work_reconcile_function_component_single_child,
     },
-    commit_finished_host_root,
     complete_work::{
         ContextProviderStackRestorationError, ContextProviderStackRestorationPhase,
         ContextProviderStackRestorationRecord, HostRootOneLevelChildSetCompletionError,
@@ -89,7 +88,13 @@ use crate::{
         HostWorkError, HostWorkResult, mount_test_function_component_single_host_child_work,
         mount_test_host_sibling_work, mount_test_host_work,
     },
-    root_commit::HostRootPlacementApplyDiagnosticForCanary,
+    root_commit::{
+        HostRootFinishedWorkCommitHandoffErrorForCanary,
+        HostRootFinishedWorkCommitHandoffRecordForCanary,
+        HostRootPlacementApplyDiagnosticForCanary,
+        commit_finished_host_root_with_finished_work_handoff_for_canary,
+        record_host_root_finished_work_pending_commit_for_canary,
+    },
     test_support::{RecordingHost, TestHostNode, TestHostTree},
 };
 
@@ -833,7 +838,7 @@ impl From<HostWorkError> for HostRootCompleteWorkHandoffError {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct HostRootCompleteWorkCommitHandoffRecord {
     complete_work: HostRootCompleteWorkHandoffRecord,
-    commit: HostRootCommitRecord,
+    finished_work_handoff: HostRootFinishedWorkCommitHandoffRecordForCanary,
     placement_apply_diagnostics: Vec<HostRootPlacementApplyDiagnosticForCanary>,
     host_operation_count_after_complete_work: usize,
     host_operation_count_after_commit: usize,
@@ -848,7 +853,12 @@ impl HostRootCompleteWorkCommitHandoffRecord {
 
     #[must_use]
     const fn commit(&self) -> &HostRootCommitRecord {
-        &self.commit
+        self.finished_work_handoff.commit()
+    }
+
+    #[must_use]
+    const fn finished_work_handoff(&self) -> &HostRootFinishedWorkCommitHandoffRecordForCanary {
+        &self.finished_work_handoff
     }
 
     #[must_use]
@@ -881,7 +891,7 @@ impl HostRootCompleteWorkCommitHandoffRecord {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum HostRootCompleteWorkCommitHandoffError {
     CompleteWork(HostRootCompleteWorkHandoffError),
-    Commit(RootCommitError),
+    FinishedWorkCommitHandoff(HostRootFinishedWorkCommitHandoffErrorForCanary),
 }
 
 #[cfg(test)]
@@ -889,7 +899,7 @@ impl Display for HostRootCompleteWorkCommitHandoffError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::CompleteWork(error) => Display::fmt(error, formatter),
-            Self::Commit(error) => Display::fmt(error, formatter),
+            Self::FinishedWorkCommitHandoff(error) => Display::fmt(error, formatter),
         }
     }
 }
@@ -899,7 +909,7 @@ impl Error for HostRootCompleteWorkCommitHandoffError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::CompleteWork(error) => Some(error),
-            Self::Commit(error) => Some(error),
+            Self::FinishedWorkCommitHandoff(error) => Some(error),
         }
     }
 }
@@ -912,9 +922,11 @@ impl From<HostRootCompleteWorkHandoffError> for HostRootCompleteWorkCommitHandof
 }
 
 #[cfg(test)]
-impl From<RootCommitError> for HostRootCompleteWorkCommitHandoffError {
-    fn from(error: RootCommitError) -> Self {
-        Self::Commit(error)
+impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
+    for HostRootCompleteWorkCommitHandoffError
+{
+    fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
+        Self::FinishedWorkCommitHandoff(error)
     }
 }
 
@@ -947,13 +959,22 @@ fn handoff_completed_host_root_render_to_test_complete_work_and_commit(
     let complete_work =
         handoff_completed_host_root_render_to_test_complete_work(store, host, render, source)?;
     let host_operation_count_after_complete_work = host.operations().len();
-    let commit = commit_finished_host_root(store, render)?;
+    let pending_finished_work =
+        record_host_root_finished_work_pending_commit_for_canary(store, render, 1)?;
+    let finished_work_handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
+        store,
+        render,
+        Some(pending_finished_work),
+        2,
+    )?;
     let host_operation_count_after_commit = host.operations().len();
-    let placement_apply_diagnostics = commit.host_root_placement_apply_diagnostics_for_canary();
+    let placement_apply_diagnostics = finished_work_handoff
+        .commit()
+        .host_root_placement_apply_diagnostics_for_canary();
 
     Ok(HostRootCompleteWorkCommitHandoffRecord {
         complete_work,
-        commit,
+        finished_work_handoff,
         placement_apply_diagnostics,
         host_operation_count_after_complete_work,
         host_operation_count_after_commit,
@@ -7720,6 +7741,48 @@ mod tests {
         assert_eq!(complete_work.detached_instance_count(), 1);
         assert_eq!(complete_work.detached_text_count(), 1);
 
+        let finished_work_handoff = record.finished_work_handoff();
+        let pending_finished_work = finished_work_handoff.pending();
+        assert_eq!(pending_finished_work.root(), root_id);
+        assert_eq!(
+            pending_finished_work.root_token(),
+            root_id.state_node_handle()
+        );
+        assert_eq!(pending_finished_work.previous_current(), current);
+        assert_eq!(
+            pending_finished_work.pending_work(),
+            Some(render.finished_work())
+        );
+        assert_eq!(
+            pending_finished_work.finished_work(),
+            render.finished_work()
+        );
+        assert_eq!(pending_finished_work.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(pending_finished_work.finished_lanes(), Lanes::DEFAULT);
+        assert_eq!(pending_finished_work.remaining_lanes(), Lanes::NO);
+        assert_eq!(
+            pending_finished_work.pending_lanes_before_commit(),
+            Lanes::DEFAULT
+        );
+        assert_eq!(pending_finished_work.handoff_order(), 1);
+        assert!(pending_finished_work.records_finished_work());
+        assert_eq!(finished_work_handoff.commit_order(), 2);
+        assert!(finished_work_handoff.commit_order_after_pending_record());
+        assert_eq!(
+            finished_work_handoff.current_after_commit(),
+            render.work_in_progress()
+        );
+        assert_eq!(finished_work_handoff.finished_work_after_commit(), None);
+        assert_eq!(
+            finished_work_handoff.finished_lanes_after_commit(),
+            Lanes::NO
+        );
+        assert_eq!(finished_work_handoff.render_phase_work_after_commit(), None);
+        assert!(finished_work_handoff.consumed_finished_work_record());
+        assert!(finished_work_handoff.mutation_execution_blocked());
+        assert!(finished_work_handoff.public_root_rendering_blocked());
+        assert!(finished_work_handoff.effects_refs_and_hydration_blocked());
+
         let commit = record.commit();
         assert_eq!(commit.root(), root_id);
         assert_eq!(commit.previous_current(), current);
@@ -7809,6 +7872,19 @@ mod tests {
         assert_eq!(complete_work.detached_text_count(), 1);
         assert_eq!(record.commit().previous_current(), current);
         assert_eq!(record.commit().current(), render.work_in_progress());
+        assert_eq!(
+            record.finished_work_handoff().pending().finished_work(),
+            render.finished_work()
+        );
+        assert_eq!(
+            record.finished_work_handoff().pending().root_token(),
+            root_id.state_node_handle()
+        );
+        assert!(
+            record
+                .finished_work_handoff()
+                .commit_order_after_pending_record()
+        );
         assert_eq!(record.commit().mutation_log().len(), 1);
         assert_eq!(record.commit().mutation_apply_log().len(), 1);
         assert!(record.host_operations_unchanged_by_commit());
