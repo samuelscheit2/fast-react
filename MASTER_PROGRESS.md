@@ -216,9 +216,20 @@ sequencing belong in `MASTER_PLAN.md`.
   routing development `memo` diagnostics through it for invalid non-null
   inputs, preserving memo/lazy/forwardRef object shapes, and keeping
   compatibility claims false without regenerating wrapper-object oracles.
+- Worker 185 React DOM namespace context helper was merged, adding private
+  owner-document and namespace context helpers for HTML, SVG, MathML,
+  integration points, and namespace-aware host element creation while leaving
+  public roots, mutation commits, hydration, events, resources, forms, and
+  attributes unwired.
 
 ## Latest Accepted Verification
 
+- Worker 185 was verified on its integrated worktree and again on `main` with
+  focused React DOM namespace context helper tests, the existing DOM namespace
+  SVG oracle test, smoke entrypoint checks, `npm run check:js` covering the
+  package-surface guard, benchmark gate, workspace checks, native loader
+  probes, and 460 conformance tests, plus `git diff --check`; merging current
+  `main` into the worker branch produced no conflicts.
 - Worker 184 was verified on its integrated worktree and again on `main` with
   focused React memo element-type guard tests, the existing wrapper-object
   oracle tests, smoke entrypoint checks, `npm run check:js` covering the
