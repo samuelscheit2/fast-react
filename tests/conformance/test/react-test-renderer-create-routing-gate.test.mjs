@@ -85,6 +85,14 @@ const privateRootCreatePreflightDiagnosticName =
   "fast-react-test-renderer.root-create.private-preflight";
 const privateRootCreatePreflightStatus =
   "private-root-create-preflight-ready-public-root-blocked";
+const privateRootCreateWorkLoopFinishedWorkPreflightRowId =
+  "react-test-renderer-root-create-work-loop-finished-work-private-diagnostic";
+const privateRootCreateWorkLoopFinishedWorkPreflightStatus =
+  "private-root-create-work-loop-finished-work-preflight-public-root-blocked";
+const privateRootWorkLoopFinishedWorkPreflightMetadataId =
+  "fast-react-test-renderer-root-work-loop-finished-work-preflight-metadata";
+const privateRootWorkLoopFinishedWorkPreflightMetadataStatus =
+  "accepted-root-work-loop-finished-work-preflight-metadata";
 const privateRootCreatePreflightSymbolDescription =
   "fast.react_test_renderer.private_root_create_preflight";
 const privateRootCreatePreflightSymbol = Symbol.for(
@@ -868,8 +876,14 @@ test("react-test-renderer CJS development private root-create preflight validate
   const [createRequest] = bridge.getRendererRootRequests(renderer);
   const preflight = bridge.getRootCreatePreflight(createRequest);
   const rendererPreflight = bridge.getRendererRootCreatePreflight(renderer);
+  const workLoopPreflight =
+    bridge.getRootCreateWorkLoopFinishedWorkPreflight(createRequest);
+  const rendererWorkLoopPreflight =
+    bridge.getRendererRootCreateWorkLoopFinishedWorkPreflight(renderer);
 
   assert.equal(rendererPreflight, preflight);
+  assert.equal(workLoopPreflight, preflight.workLoopFinishedWorkPreflight);
+  assert.equal(rendererWorkLoopPreflight, workLoopPreflight);
   assertPrivateRootCreatePreflight(preflight, createRequest, {
     entrypoint: entry.entrypoint,
     ready: true,
@@ -926,6 +940,65 @@ test("react-test-renderer CJS development private root-create preflight validate
       bridge.consumeAcceptedRustRootCreatePreflight(
         createRequest,
         staleDiagnostic
+      ),
+    {
+      code: "FAST_REACT_TEST_RENDERER_INVALID_ROOT_REQUEST",
+      name: "FastReactTestRendererPrivateRootRequestError"
+    }
+  );
+
+  const missingWorkLoopDiagnostic = {
+    diagnosticName: rustDiagnostic.diagnosticName,
+    status: rustDiagnostic.status,
+    operation: rustDiagnostic.operation,
+    createInputShape: rustDiagnostic.createInputShape,
+    rootOptionsMetadata: rustDiagnostic.rootOptionsMetadata,
+    canaryApiIdentity: rustDiagnostic.canaryApiIdentity
+  };
+  assert.equal(
+    bridge.canConsumeAcceptedRustRootCreatePreflight(
+      createRequest,
+      missingWorkLoopDiagnostic
+    ),
+    false
+  );
+  assert.throws(
+    () =>
+      bridge.consumeAcceptedRustRootCreatePreflight(
+        createRequest,
+        missingWorkLoopDiagnostic
+      ),
+    {
+      code: "FAST_REACT_TEST_RENDERER_INVALID_ROOT_REQUEST",
+      name: "FastReactTestRendererPrivateRootRequestError"
+    }
+  );
+
+  const staleWorkLoopMetadata =
+    rustDiagnostic.workLoopFinishedWorkPreflight
+      .workLoopFinishedWorkMetadata;
+  const staleWorkLoopDiagnostic = {
+    ...rustDiagnostic,
+    workLoopFinishedWorkPreflight: {
+      ...rustDiagnostic.workLoopFinishedWorkPreflight,
+      workLoopFinishedWorkMetadata: {
+        ...staleWorkLoopMetadata,
+        metadataId: "fast-react-test-renderer-stale-work-loop-preflight"
+      }
+    }
+  };
+  assert.equal(
+    bridge.canConsumeAcceptedRustRootCreatePreflight(
+      createRequest,
+      staleWorkLoopDiagnostic
+    ),
+    false
+  );
+  assert.throws(
+    () =>
+      bridge.consumeAcceptedRustRootCreatePreflight(
+        createRequest,
+        staleWorkLoopDiagnostic
       ),
     {
       code: "FAST_REACT_TEST_RENDERER_INVALID_ROOT_REQUEST",
@@ -1854,6 +1927,14 @@ function assertPrivateRootRequestBridge(moduleExports, entrypoint) {
     assert.equal(typeof bridge.getRootCreatePreflight, "function");
     assert.equal(typeof bridge.getRendererRootCreatePreflight, "function");
     assert.equal(
+      typeof bridge.getRootCreateWorkLoopFinishedWorkPreflight,
+      "function"
+    );
+    assert.equal(
+      typeof bridge.getRendererRootCreateWorkLoopFinishedWorkPreflight,
+      "function"
+    );
+    assert.equal(
       typeof bridge.canConsumeAcceptedRustRootCreatePreflight,
       "function"
     );
@@ -2182,6 +2263,11 @@ function assertPrivateRootCreatePreflight(preflight, request, expected) {
     preflight.rustCanaryOperationMetadata,
     request.rustCanaryOperationMetadata
   );
+  assertPrivateRootCreateWorkLoopFinishedWorkPreflight(
+    preflight.workLoopFinishedWorkPreflight,
+    preflight,
+    expected
+  );
   assert.equal(preflight.privateRustRootCreated, expected.ready);
   assert.equal(
     preflight.privateRootCanaryBoundaryValidated,
@@ -2189,6 +2275,10 @@ function assertPrivateRootCreatePreflight(preflight, request, expected) {
   );
   assert.equal(
     preflight.consumesAcceptedRustRootCreatePreflightDiagnostics,
+    expected.ready
+  );
+  assert.equal(
+    preflight.consumesAcceptedRustRootWorkLoopFinishedWorkPreflightMetadata,
     expected.ready
   );
   assert.equal(Object.isFrozen(preflight.blockedPublicRoot), true);
@@ -2214,6 +2304,121 @@ function assertPrivateRootCreatePreflight(preflight, request, expected) {
   assert.equal(preflight.compatibilityClaimed, false);
 }
 
+function assertPrivateRootCreateWorkLoopFinishedWorkPreflight(
+  row,
+  preflight,
+  expected
+) {
+  assert.equal(Object.isFrozen(row), true, expected.entrypoint);
+  assert.equal(row.id, privateRootCreateWorkLoopFinishedWorkPreflightRowId);
+  assert.equal(row.rowKind, "private-diagnostic");
+  assert.equal(row.area, "root-create work loop");
+  assert.equal(row.diagnosticName, privateRootCreatePreflightDiagnosticName);
+  assert.equal(
+    row.status,
+    expected.ready
+      ? privateRootCreateWorkLoopFinishedWorkPreflightStatus
+      : `blocked-private-root-create-work-loop-finished-work-preflight-${expected.failureReason}`
+  );
+  assert.equal(row.ready, expected.ready);
+  assert.equal(row.failureReason, expected.failureReason);
+  assert.equal(row.entrypoint, expected.entrypoint);
+  assert.equal(row.compatibilityTarget, compatibilityTarget);
+  assert.equal(row.publicSurface, "create()");
+  assert.equal(row.rootRequest, preflight.rootRequest);
+  assert.equal(row.rootRequestId, preflight.rootRequestId);
+  assert.equal(row.operation, "create");
+  assert.equal(row.createInputShape, preflight.createInputShape);
+  assert.equal(row.acceptedInputShape, "HostComponentWithTextChild");
+  assert.equal(row.supportedChildren, expected.supportedChildren);
+  assert.equal(
+    row.rootOptionsMetadataAvailable,
+    expected.rootOptionsMetadataAvailable
+  );
+  assert.equal(row.canaryApiIdentity, preflight.canaryApiIdentity);
+  assert.equal(Object.isFrozen(row.workLoopFinishedWorkMetadata), true);
+  assert.equal(
+    row.workLoopFinishedWorkMetadata.metadataId,
+    privateRootWorkLoopFinishedWorkPreflightMetadataId
+  );
+  assert.equal(
+    row.workLoopFinishedWorkMetadata.metadataStatus,
+    privateRootWorkLoopFinishedWorkPreflightMetadataStatus
+  );
+  assert.equal(
+    row.workLoopFinishedWorkMetadata.acceptedWorker,
+    "worker-534-root-work-loop-finished-work-commit-handoff"
+  );
+  assert.equal(
+    row.workLoopFinishedWorkMetadata.acceptedRustModule,
+    "fast-react-reconciler::root_work_loop"
+  );
+  assert.equal(
+    row.workLoopFinishedWorkMetadata.renderPhaseApi,
+    "TestRendererRoot::render_latest_scheduled_host_root_for_commit_handoff"
+  );
+  assert.equal(
+    row.workLoopFinishedWorkMetadata.renderPhaseRecord,
+    "HostRootRenderPhaseRecord"
+  );
+  assert.equal(
+    row.workLoopFinishedWorkMetadata.finishedWorkRecord,
+    "HostRootRenderPhaseRecord::finished_work"
+  );
+  assert.equal(
+    row.workLoopFinishedWorkMetadata.pendingFinishedWorkRecord,
+    "HostRootFinishedWorkPendingCommitRecordForCanary"
+  );
+  assert.equal(
+    row.workLoopFinishedWorkMetadata.commitHandoffRecord,
+    "HostRootFinishedWorkCommitHandoffRecordForCanary"
+  );
+  assert.equal(
+    row.workLoopFinishedWorkMetadata.acceptedInputShape,
+    "HostComponentWithTextChild"
+  );
+  assert.equal(row.acceptedRustCrate, "fast-react-test-renderer");
+  assert.equal(
+    row.acceptedRustWorker,
+    "worker-534-root-work-loop-finished-work-commit-handoff"
+  );
+  assert.equal(
+    row.acceptedJsBridgeWorker,
+    "worker-573-test-renderer-private-root-work-loop-preflight"
+  );
+  assert.deepEqual(row.acceptedRustApis, preflight.gate.acceptedRustApis);
+  assert.deepEqual(row.acceptedRustTests, preflight.gate.acceptedRustTests);
+  assert.deepEqual(
+    row.acceptedRustFinishedWorkRecords,
+    preflight.gate.acceptedRustFinishedWorkRecords
+  );
+  assert.equal(
+    row.bridgeMetadataSource,
+    "FastReactTestRendererPrivateRootRequestRecord.rustCanaryMetadata.rootWorkLoopFinishedWorkPreflight"
+  );
+  assert.equal(row.recordsAcceptedFinishedWorkMetadata, expected.ready);
+  assert.equal(
+    row.consumesAcceptedRustWorkLoopFinishedWorkPreflightMetadata,
+    expected.ready
+  );
+  assert.equal(row.missingRustPreflightMetadataRejection, true);
+  assert.equal(row.staleRustPreflightMetadataRejection, true);
+  assert.equal(row.unsupportedChildrenRejection, true);
+  assert.equal(row.publicRendererRootCreated, false);
+  assert.equal(row.publicRootAvailable, false);
+  assert.equal(row.publicCreateBehaviorAvailable, false);
+  assert.equal(row.publicToJSONAvailable, false);
+  assert.equal(row.publicToTreeAvailable, false);
+  assert.equal(row.publicActAvailable, false);
+  assert.equal(row.nativeAddonLoaded, false);
+  assert.equal(row.nativeBridgeAvailable, false);
+  assert.equal(row.nativeExecution, false);
+  assert.equal(row.rustExecutionFromJs, false);
+  assert.equal(row.reconcilerExecutionFromJs, false);
+  assert.equal(row.hostOutputProducedFromJs, false);
+  assert.equal(row.compatibilityClaimed, false);
+}
+
 function assertPrivateRootCreatePreflightGate(gate, entrypoint) {
   assert.equal(Object.isFrozen(gate), true, entrypoint);
   assert.equal(
@@ -2229,22 +2434,46 @@ function assertPrivateRootCreatePreflightGate(gate, entrypoint) {
   assert.deepEqual(gate.acceptedRustApis, [
     "TestRendererRoot::describe_private_root_create_preflight_for_canary",
     "TestRendererRoot::create",
+    "TestRendererRoot::render_latest_scheduled_host_root_for_commit_handoff",
+    "render_host_root_for_lanes",
+    "HostRootRenderPhaseRecord::finished_work",
     "TestRendererOptions::reconciler_options",
     "update_container",
     "ensure_root_is_scheduled"
+  ]);
+  assert.deepEqual(gate.acceptedRustFinishedWorkRecords, [
+    "HostRootRenderPhaseRecord",
+    "HostRootFinishedWorkPendingCommitRecordForCanary",
+    "HostRootFinishedWorkCommitHandoffRecordForCanary"
   ]);
   assert.deepEqual(gate.acceptedRustTests, [
     "root_private_create_preflight_validates_create_canary_without_public_root",
     "root_private_create_preflight_fails_closed_for_unsupported_children",
     "root_private_create_preflight_fails_closed_for_stale_canary_metadata",
-    "root_private_create_preflight_fails_closed_without_root_options"
+    "root_private_create_preflight_fails_closed_without_root_options",
+    "root_private_create_preflight_fails_closed_without_work_loop_metadata",
+    "root_private_create_preflight_fails_closed_for_stale_work_loop_metadata",
+    "root_work_loop_complete_work_handoff_commits_host_component_tree_with_diagnostics",
+    "root_commit_finished_work_handoff_records_identity_lanes_root_token_and_order",
+    "root_commit_finished_work_handoff_rejects_missing_record_before_switching_current",
+    "root_commit_finished_work_handoff_rejects_stale_record_after_current_switch"
   ]);
   assert.deepEqual(gate.acceptedInputShapes, [
     "HostComponentWithTextChild"
   ]);
+  assert.equal(
+    gate.workLoopFinishedWorkPreflightRowId,
+    privateRootCreateWorkLoopFinishedWorkPreflightRowId
+  );
+  assert.equal(gate.workLoopFinishedWorkMetadataRequired, true);
   assert.equal(gate.requiredRootOptions, true);
   assert.equal(gate.validatesAcceptedRustRootCreateCanary, true);
+  assert.equal(
+    gate.validatesAcceptedRustWorkLoopFinishedWorkPreflight,
+    true
+  );
   assert.equal(gate.privateRustRootCreated, true);
+  assert.equal(gate.rootWorkLoopFinishedWorkPreflightReady, true);
   assert.equal(gate.publicRendererRootCreated, false);
   assert.equal(gate.publicRootAvailable, false);
   assert.equal(gate.publicCreateBehaviorAvailable, false);
@@ -2280,6 +2509,10 @@ function assertPrivateRootCreatePreflightConsumption(
     consumed.consumesAcceptedRustRootCreatePreflightDiagnostics,
     true
   );
+  assert.equal(
+    consumed.consumesAcceptedRustRootWorkLoopFinishedWorkPreflightMetadata,
+    true
+  );
   assert.equal(consumed.privateRootCanaryBoundaryValidated, true);
   assert.equal(consumed.publicRendererRootCreated, false);
   assert.equal(consumed.publicRootAvailable, false);
@@ -2297,7 +2530,8 @@ function createRustRootCreatePreflightDiagnosticSource(preflight) {
     operation: "create",
     createInputShape: preflight.createInputShape,
     rootOptionsMetadata: preflight.rootOptionsMetadata,
-    canaryApiIdentity: preflight.canaryApiIdentity
+    canaryApiIdentity: preflight.canaryApiIdentity,
+    workLoopFinishedWorkPreflight: preflight.workLoopFinishedWorkPreflight
   };
 }
 
@@ -2470,6 +2704,11 @@ function assertRustCanaryMetadata(metadata, label) {
     "worker-234-test-renderer-host-output-update-unmount-canary",
     "worker-265-test-renderer-private-json-ready-diagnostics"
   ];
+  if (metadata.rootWorkLoopFinishedWorkPreflight !== undefined) {
+    expectedAcceptedRustWorkers.push(
+      "worker-534-root-work-loop-finished-work-commit-handoff"
+    );
+  }
   if (metadata.errorBoundaryDiagnostics !== undefined) {
     expectedAcceptedRustWorkers.push(
       "worker-465-test-renderer-error-boundary-diagnostics",
@@ -2478,7 +2717,8 @@ function assertRustCanaryMetadata(metadata, label) {
   }
   if (metadata.rootCreatePreflight !== undefined) {
     expectedAcceptedRustWorkers.push(
-      "worker-539-test-renderer-live-rust-root-create-preflight"
+      "worker-539-test-renderer-live-rust-root-create-preflight",
+      "worker-573-test-renderer-private-root-work-loop-preflight"
     );
   }
   assert.deepEqual(metadata.acceptedRustWorkers, expectedAcceptedRustWorkers);
@@ -2491,7 +2731,8 @@ function assertRustCanaryMetadata(metadata, label) {
   ];
   if (metadata.rootCreatePreflight !== undefined) {
     expectedAcceptedJsBridgeWorkers.push(
-      "worker-539-test-renderer-live-rust-root-create-preflight"
+      "worker-539-test-renderer-live-rust-root-create-preflight",
+      "worker-573-test-renderer-private-root-work-loop-preflight"
     );
   }
   assert.deepEqual(
@@ -2582,6 +2823,106 @@ function assertRustCanaryMetadata(metadata, label) {
   assert.equal(metadata.hostOutput.realHostOutputCanaryAvailable, true, label);
   assert.equal(metadata.hostOutput.generalMutationTraversalAvailable, false);
 
+  if (metadata.rootWorkLoopFinishedWorkPreflight !== undefined) {
+    const rootWorkLoopFinishedWorkPreflight =
+      metadata.rootWorkLoopFinishedWorkPreflight;
+    assert.equal(
+      Object.isFrozen(rootWorkLoopFinishedWorkPreflight),
+      true,
+      label
+    );
+    assert.equal(
+      rootWorkLoopFinishedWorkPreflight.metadataId,
+      privateRootWorkLoopFinishedWorkPreflightMetadataId,
+      label
+    );
+    assert.equal(
+      rootWorkLoopFinishedWorkPreflight.metadataStatus,
+      privateRootWorkLoopFinishedWorkPreflightMetadataStatus,
+      label
+    );
+    assert.equal(
+      rootWorkLoopFinishedWorkPreflight.acceptedWorker,
+      "worker-534-root-work-loop-finished-work-commit-handoff",
+      label
+    );
+    assert.equal(
+      rootWorkLoopFinishedWorkPreflight.acceptedRustModule,
+      "fast-react-reconciler::root_work_loop",
+      label
+    );
+    assert.equal(
+      rootWorkLoopFinishedWorkPreflight.renderPhaseApi,
+      "TestRendererRoot::render_latest_scheduled_host_root_for_commit_handoff",
+      label
+    );
+    assert.equal(
+      rootWorkLoopFinishedWorkPreflight.renderPhaseRecord,
+      "HostRootRenderPhaseRecord",
+      label
+    );
+    assert.equal(
+      rootWorkLoopFinishedWorkPreflight.finishedWorkRecord,
+      "HostRootRenderPhaseRecord::finished_work",
+      label
+    );
+    assert.equal(
+      rootWorkLoopFinishedWorkPreflight.pendingFinishedWorkRecord,
+      "HostRootFinishedWorkPendingCommitRecordForCanary",
+      label
+    );
+    assert.equal(
+      rootWorkLoopFinishedWorkPreflight.commitHandoffRecord,
+      "HostRootFinishedWorkCommitHandoffRecordForCanary",
+      label
+    );
+    assert.deepEqual(rootWorkLoopFinishedWorkPreflight.acceptedFiberShape, [
+      "HostRoot",
+      "HostComponent",
+      "HostText"
+    ]);
+    assert.equal(
+      rootWorkLoopFinishedWorkPreflight.acceptedInputShape,
+      "HostComponentWithTextChild",
+      label
+    );
+    assert.equal(
+      rootWorkLoopFinishedWorkPreflight.missingMetadataRejection,
+      true,
+      label
+    );
+    assert.equal(
+      rootWorkLoopFinishedWorkPreflight.staleMetadataRejection,
+      true,
+      label
+    );
+    assert.equal(
+      rootWorkLoopFinishedWorkPreflight.unsupportedChildrenRejection,
+      true,
+      label
+    );
+    assert.equal(
+      rootWorkLoopFinishedWorkPreflight.publicCreateBehaviorAvailable,
+      false,
+      label
+    );
+    assert.equal(
+      rootWorkLoopFinishedWorkPreflight.hostMutationExecutionBlocked,
+      true,
+      label
+    );
+    assert.equal(
+      rootWorkLoopFinishedWorkPreflight.effectsRefsAndHydrationBlocked,
+      true,
+      label
+    );
+    assert.equal(
+      rootWorkLoopFinishedWorkPreflight.compatibilityClaimed,
+      false,
+      label
+    );
+  }
+
   if (metadata.rootCreatePreflight !== undefined) {
     const rootCreatePreflight = metadata.rootCreatePreflight;
     assert.equal(Object.isFrozen(rootCreatePreflight), true, label);
@@ -2612,9 +2953,33 @@ function assertRustCanaryMetadata(metadata, label) {
       rootCreatePreflight.acceptedRustTests,
       rootCreatePreflight.gate.acceptedRustTests
     );
+    assert.deepEqual(
+      rootCreatePreflight.acceptedRustFinishedWorkRecords,
+      rootCreatePreflight.gate.acceptedRustFinishedWorkRecords
+    );
     assert.deepEqual(rootCreatePreflight.acceptedInputShapes, [
       "HostComponentWithTextChild"
     ]);
+    assert.equal(
+      rootCreatePreflight.workLoopFinishedWorkPreflightRowId,
+      privateRootCreateWorkLoopFinishedWorkPreflightRowId,
+      label
+    );
+    assert.equal(
+      rootCreatePreflight.workLoopFinishedWorkPreflightStatus,
+      privateRootCreateWorkLoopFinishedWorkPreflightStatus,
+      label
+    );
+    assert.equal(
+      rootCreatePreflight.workLoopFinishedWorkMetadataRequired,
+      true,
+      label
+    );
+    assert.equal(
+      rootCreatePreflight.validatesAcceptedRustWorkLoopFinishedWorkPreflight,
+      true,
+      label
+    );
     assert.equal(rootCreatePreflight.requiredRootOptions, true, label);
     assert.equal(
       rootCreatePreflight.rootOptionsMetadataAvailable,
@@ -2622,6 +2987,14 @@ function assertRustCanaryMetadata(metadata, label) {
       label
     );
     assert.equal(rootCreatePreflight.staleCanaryMetadataRejection, true);
+    assert.equal(
+      rootCreatePreflight.staleWorkLoopFinishedWorkMetadataRejection,
+      true
+    );
+    assert.equal(
+      rootCreatePreflight.missingWorkLoopFinishedWorkMetadataRejection,
+      true
+    );
     assert.equal(rootCreatePreflight.unsupportedChildrenRejection, true);
     assert.equal(rootCreatePreflight.missingRootOptionsRejection, true);
     assert.equal(rootCreatePreflight.publicRendererRootCreated, false);
