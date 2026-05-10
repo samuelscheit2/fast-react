@@ -66,6 +66,10 @@ sequencing belong in `MASTER_PLAN.md`.
   completed WIP/root bookkeeping, marks finished lanes, switches
   `root.current`, and clears consumed render/callback state without host
   mutation or effect traversal.
+- Worker 152 host-config text content boundary was merged, adding typed text
+  content decisions, detached host child handles, detached initial child
+  helpers, and commit-mount finalization inspection without changing existing
+  renderer hook signatures.
 - Worker 166 native bridge handle table was merged, adding typed handle table
   storage and guard coverage for the N-API bridge.
 - Workers 170 and 171 React DOM event/root listener internals were merged,
@@ -81,6 +85,10 @@ sequencing belong in `MASTER_PLAN.md`.
   --all --check`, focused root commit and root work loop tests, full
   `fast-react-reconciler` tests, reconciler clippy with warnings denied, and
   `git diff --check`.
+- Worker 152 was verified on its worktree and again on `main` with `cargo fmt
+  --all --check`, full `fast-react-host-config` tests, full
+  `fast-react-test-renderer` tests, clippy for both packages with warnings
+  denied, and `git diff --check`.
 - Workers 170 and 171 were verified on `main` with focused event-priority tests,
   the root listener smoke test, `npm run check:js`, and `git diff --check`.
 - Worker 177 was verified on `main` with focused `flushSync` private guard

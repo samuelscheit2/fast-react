@@ -49,8 +49,6 @@ Drive toward a minimal real root render/update/unmount path:
   `/Users/user/Developer/Developer/fast-react-worker-150-sync-flush-execution-context`.
 - Worker 151: HostComponent/HostText complete-work skeleton in
   `/Users/user/Developer/Developer/fast-react-worker-151-host-complete-work-skeleton`.
-- Worker 152: host-config text content boundary in
-  `/Users/user/Developer/Developer/fast-react-worker-152-host-config-text-content-boundary`.
 - Worker 153: Rust test-renderer root canary in
   `/Users/user/Developer/Developer/fast-react-worker-153-test-renderer-root-canary`.
 - Worker 154: private DOM mutation adapter shell in
