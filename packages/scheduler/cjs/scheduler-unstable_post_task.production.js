@@ -99,6 +99,8 @@ function createPrivatePostTaskPriorityRecord(
     continuationFallbackDiagnostics: false,
     taskControllerAbortOrderingDiagnostics: false,
     continuationFallbackMetadataDiagnostics: false,
+    continuationSignalValidationDiagnostics: false,
+    continuationAbortOrderingDiagnostics: false,
     delayAbortOrderingDiagnostics: false,
     fallbackEnvironmentClassificationDiagnostics: false,
     browserPostTaskCompatibilityClaimed: false,
@@ -205,12 +207,24 @@ function recordPrivatePostTaskContinuationFallback(
     continuationIndex = record.continuationFallbacks.length,
     fallbackEnvironmentClassification =
       describePrivatePostTaskFallbackEnvironmentClassification(fallback),
+    signalValidation = describePrivatePostTaskContinuationSignalValidation(
+      continuationOptions,
+      node,
+      signalAtSchedule
+    ),
+    abortOrdering = createPrivatePostTaskContinuationAbortOrdering(
+      continuationIndex,
+      sourceCallbackRunIndex,
+      callbackRunCountAtSchedule,
+      signalAtSchedule
+    ),
     sourceCallbackRun =
       0 <= sourceCallbackRunIndex
         ? record.callbackRuns[sourceCallbackRunIndex]
         : null;
   record.continuationFallbackDiagnostics = true;
   record.continuationFallbackMetadataDiagnostics = true;
+  record.continuationSignalValidationDiagnostics = true;
   record.fallbackEnvironmentClassificationDiagnostics = true;
   if (sourceCallbackRun) {
     sourceCallbackRun.continuationStatus =
@@ -241,6 +255,9 @@ function recordPrivatePostTaskContinuationFallback(
       callbackRunCountAtSchedule: callbackRunCountAtSchedule,
       reusesOriginalSignal: reusesOriginalSignal,
       signalAbortedAtSchedule: signalAtSchedule.aborted,
+      signalValidationStatus: signalValidation.status,
+      signalValidationRejectionReason: signalValidation.rejectionReason,
+      abortOrderingStatus: abortOrdering.status,
       fallbackEnvironmentClassification:
         fallbackEnvironmentClassification.classification,
       fallbackEnvironmentKind:
@@ -250,6 +267,8 @@ function recordPrivatePostTaskContinuationFallback(
       compatibilityClaimed: false
     },
     fallbackEnvironmentClassification: fallbackEnvironmentClassification,
+    signalValidation: signalValidation,
+    abortOrdering: abortOrdering,
     reusesOriginalSignal: reusesOriginalSignal,
     signalAtSchedule: signalAtSchedule,
     signal: signalAtSchedule,
@@ -370,6 +389,11 @@ function recordPrivatePostTaskCancellationComplete(node, cancellation) {
     cancellation.signalAfterAbort.aborted ? "aborted" : "not-aborted";
   cancellation.delayAbortOrdering.continuationStatusAtCompletion =
     describePrivatePostTaskContinuationStatus(record);
+  recordPrivatePostTaskContinuationAbortOrdering(
+    record,
+    cancellation,
+    completionEventIndex
+  );
   cancellation.abortMetadata.signalAbortedAfterAbort =
     cancellation.signalAfterAbort.aborted;
   cancellation.abortMetadata.callbackRunCountAfterAbort =
@@ -379,6 +403,48 @@ function recordPrivatePostTaskCancellationComplete(node, cancellation) {
   cancellation.abortMetadata.abortMarkedSignalAborted =
     cancellation.signalBeforeAbort.aborted === false &&
     cancellation.signalAfterAbort.aborted === true;
+}
+function recordPrivatePostTaskContinuationAbortOrdering(
+  record,
+  cancellation,
+  completionEventIndex
+) {
+  var continuationFallbackCount = record.continuationFallbacks.length;
+  if (0 === continuationFallbackCount) {
+    return;
+  }
+  var continuation =
+      record.continuationFallbacks[continuationFallbackCount - 1],
+    abortOrdering = continuation.abortOrdering;
+  if (!abortOrdering) {
+    return;
+  }
+  record.continuationAbortOrderingDiagnostics = true;
+  abortOrdering.status =
+    "continuation-abort-ordering-observed-after-abort-call";
+  abortOrdering.requestEventIndex =
+    cancellation.abortOrdering.requestEventIndex;
+  abortOrdering.completionEventIndex = completionEventIndex;
+  abortOrdering.signalBeforeAbort = cancellation.signalBeforeAbort;
+  abortOrdering.signalAfterAbort = cancellation.signalAfterAbort;
+  abortOrdering.abortSignalStateAfterAbort = cancellation.signalAfterAbort
+    .aborted
+    ? "aborted"
+    : "not-aborted";
+  abortOrdering.callbackRunCountAtAbortRequest =
+    cancellation.abortOrdering.callbackRunCountAtRequest;
+  abortOrdering.callbackRunCountAtAbortCompletion = record.callbackRuns.length;
+  abortOrdering.continuationFallbackCountAtAbortRequest =
+    cancellation.abortOrdering.continuationFallbackCountAtRequest;
+  abortOrdering.continuationFallbackCountAtAbortCompletion =
+    record.continuationFallbacks.length;
+  abortOrdering.cancellationStatus = cancellation.status;
+  if (continuation.continuationMetadata) {
+    continuation.continuationMetadata.abortOrderingStatus =
+      abortOrdering.status;
+    continuation.continuationMetadata.abortSignalStateAfterAbort =
+      abortOrdering.abortSignalStateAfterAbort;
+  }
 }
 function describePrivatePostTaskEnvironmentCapabilities() {
   var windowValue = "object" === typeof window ? window : null,
@@ -551,6 +617,75 @@ function describePrivatePostTaskFallbackEnvironmentClassification(fallback) {
     compatibilityClaimed: false
   };
 }
+function describePrivatePostTaskContinuationSignalValidation(
+  options,
+  node,
+  signalAtSchedule
+) {
+  var hasSignalProperty = Object.prototype.hasOwnProperty.call(
+      options,
+      "signal"
+    ),
+    signal = hasSignalProperty ? options.signal : null,
+    hasSignal =
+      !!signal && ("object" === typeof signal || "function" === typeof signal),
+    signalMatchesTaskController = hasSignal && signal === node._controller.signal,
+    rejectionReason = hasSignal
+      ? signalMatchesTaskController
+        ? null
+        : "mismatched-continuation-signal"
+      : "missing-continuation-signal";
+  return {
+    status:
+      null === rejectionReason
+        ? "validated-shimmed-post-task-continuation-signal"
+        : "invalid-shimmed-post-task-continuation-signal",
+    signalSource: hasSignalProperty
+      ? "continuationOptions.signal"
+      : "missing-continuation-options-signal",
+    hasSignalProperty: hasSignalProperty,
+    hasSignal: hasSignal,
+    signalMatchesTaskController: signalMatchesTaskController,
+    signalId: signalAtSchedule.id,
+    signalPriority: signalAtSchedule.priority,
+    signalAbortedAtSchedule: signalAtSchedule.aborted,
+    signalOwnKeys: signalAtSchedule.ownKeys,
+    rejectionReason: rejectionReason,
+    browserPostTaskCompatibilityClaimed: false,
+    browserTaskOrderingCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  };
+}
+function createPrivatePostTaskContinuationAbortOrdering(
+  continuationIndex,
+  sourceCallbackRunIndex,
+  callbackRunCountAtSchedule,
+  signalAtSchedule
+) {
+  return {
+    status: "continuation-abort-ordering-pending-abort-call",
+    requestEventIndex: null,
+    completionEventIndex: null,
+    continuationIndex: continuationIndex,
+    sourceCallbackRunIndex: sourceCallbackRunIndex,
+    callbackRunCountAtSchedule: callbackRunCountAtSchedule,
+    callbackRunCountAtAbortRequest: null,
+    callbackRunCountAtAbortCompletion: null,
+    continuationFallbackCountAtSchedule: continuationIndex + 1,
+    continuationFallbackCountAtAbortRequest: null,
+    continuationFallbackCountAtAbortCompletion: null,
+    signalAtSchedule: signalAtSchedule,
+    signalBeforeAbort: null,
+    signalAfterAbort: null,
+    abortSignalStateAfterAbort: null,
+    cancellationStatus: null,
+    browserPostTaskCompatibilityClaimed: false,
+    browserTaskOrderingCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  };
+}
 function describePrivatePostTaskController(controller) {
   return {
     type: typeof controller,
@@ -612,6 +747,10 @@ function snapshotPrivatePostTaskPriorityRecord(record) {
       record.taskControllerAbortOrderingDiagnostics,
     continuationFallbackMetadataDiagnostics:
       record.continuationFallbackMetadataDiagnostics,
+    continuationSignalValidationDiagnostics:
+      record.continuationSignalValidationDiagnostics,
+    continuationAbortOrderingDiagnostics:
+      record.continuationAbortOrderingDiagnostics,
     delayAbortOrderingDiagnostics: record.delayAbortOrderingDiagnostics,
     fallbackEnvironmentClassificationDiagnostics:
       record.fallbackEnvironmentClassificationDiagnostics,

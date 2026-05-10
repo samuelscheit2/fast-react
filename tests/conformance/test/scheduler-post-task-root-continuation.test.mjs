@@ -9,9 +9,12 @@ const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const conformanceRoot = path.resolve(testDirectory, '..');
 const repoRoot = path.resolve(conformanceRoot, '..', '..');
 const {
+  ACCEPTED_ROOT_CONTINUATION_STATUS,
   ROOT_CONTINUATION_BLOCKED_STATUS,
+  ROOT_CONTINUATION_FALLBACK_STATUS,
   ROOT_CONTINUATION_METADATA_STATUS,
   ROOT_CONTINUATION_REJECTED_STATUS,
+  ROOT_CONTINUATION_SIGNAL_VALIDATION_STATUS,
   createPrivatePostTaskRootContinuationMetadataRow,
   derivePrivatePostTaskRootContinuationId
 } = require(
@@ -75,6 +78,35 @@ test('private postTask root continuation metadata links delay and abort diagnost
     true
   );
   assert.equal(row.sourceDiagnostics.taskControllerAbortOrderingDiagnostics, true);
+  assert.equal(row.sourceDiagnostics.continuationSignalValidationDiagnostics, true);
+  assert.equal(row.sourceDiagnostics.continuationAbortOrderingDiagnostics, true);
+  assert.equal(
+    row.signalValidation.status,
+    ROOT_CONTINUATION_SIGNAL_VALIDATION_STATUS
+  );
+  assert.equal(row.signalValidation.signalId, 9);
+  assert.equal(row.signalValidation.rejectionReason, null);
+  assert.equal(
+    row.signalValidation.sourceSignalValidation.status,
+    'validated-shimmed-post-task-continuation-signal'
+  );
+  assert.equal(
+    row.abortOrdering.status,
+    'continuation-abort-ordering-observed-after-abort-call'
+  );
+  assert.equal(row.abortOrdering.requestEventIndex, 3);
+  assert.equal(row.abortOrdering.completionEventIndex, 4);
+  assert.equal(row.abortOrdering.signalAfterAbort.aborted, true);
+  assert.equal(row.abortOrdering.abortSignalStateAfterAbort, 'aborted');
+  assert.equal(row.continuationFallback.status, ROOT_CONTINUATION_FALLBACK_STATUS);
+  assert.equal(row.continuationFallback.selectedFallback, 'scheduler.postTask');
+  assert.equal(row.acceptedRootContinuation.status, ACCEPTED_ROOT_CONTINUATION_STATUS);
+  assert.equal(row.acceptedRootContinuation.accepted, true);
+  assert.equal(Object.isFrozen(row.acceptedRootContinuation), true);
+  assert.equal(
+    row.acceptedRootContinuation.abortOrdering.status,
+    'continuation-abort-ordering-observed-after-abort-call'
+  );
   assert.equal(
     row.blockedRootExecution.status,
     ROOT_CONTINUATION_BLOCKED_STATUS
@@ -135,6 +167,10 @@ test('private postTask root continuation metadata rejects missing signal, stale 
   assert.equal(missingSignalRow.accepted, false);
   assert.equal(missingSignalRow.rejected, true);
   assert.equal(missingSignalRow.rejectionReason, 'missing-continuation-signal');
+  assert.equal(
+    missingSignalRow.rejectionDetails.signalValidation.rejectionReason,
+    'missing-continuation-signal'
+  );
   assert.equal(missingSignalRow.blockedRootExecution.rendererWorkExecuted, false);
   assert.equal(missingSignalRow.compatibilityClaimed, false);
 
@@ -171,6 +207,33 @@ test('private postTask root continuation metadata rejects missing signal, stale 
     'unsupported-priority-record'
   );
   assert.equal(unsupportedPriorityRow.compatibilityClaimed, false);
+
+  const publicCompatibilityClaimRecord = {
+    ...diagnostics,
+    continuationFallbacks: [
+      {
+        ...diagnostics.continuationFallbacks[0],
+        browserPostTaskCompatibilityClaimed: true
+      }
+    ]
+  };
+  const publicCompatibilityClaimRow =
+    createPrivatePostTaskRootContinuationMetadataRow(
+      publicCompatibilityClaimRecord
+    );
+  assert.equal(
+    publicCompatibilityClaimRow.status,
+    ROOT_CONTINUATION_REJECTED_STATUS
+  );
+  assert.equal(
+    publicCompatibilityClaimRow.rejectionReason,
+    'public-compatibility-claimed'
+  );
+  assert.equal(
+    publicCompatibilityClaimRow.rejectionDetails.claimPath,
+    'record.continuationFallbacks.0.browserPostTaskCompatibilityClaimed'
+  );
+  assert.equal(publicCompatibilityClaimRow.compatibilityClaimed, false);
 });
 
 function loadPostTaskOracleModule() {
