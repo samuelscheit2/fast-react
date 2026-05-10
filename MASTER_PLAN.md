@@ -101,6 +101,8 @@ Drive toward a minimal real root render/update/unmount path:
   `/Users/user/Developer/Developer/fast-react-worker-192-core-hook-list-foundation`.
 - Worker 193: root commit callback handoff in
   `/Users/user/Developer/Developer/fast-react-worker-193-root-commit-callback-handoff`.
+- Worker 194: function component begin-work handoff in
+  `/Users/user/Developer/Developer/fast-react-worker-194-function-component-begin-work-handoff`.
 
 ## Near-Term Sequencing
 
