@@ -656,6 +656,36 @@ impl FunctionComponentStateDispatchRootRescheduleRecord {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FunctionComponentReducerDispatchRootRescheduleRecord {
+    dispatch: FunctionComponentReducerDispatchRecord,
+    root: FiberRootId,
+    reschedule: RootRescheduleRequestRecord,
+    scheduled: ScheduledRootUpdateResult,
+}
+
+impl FunctionComponentReducerDispatchRootRescheduleRecord {
+    #[must_use]
+    pub(crate) const fn dispatch(&self) -> FunctionComponentReducerDispatchRecord {
+        self.dispatch
+    }
+
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn reschedule(&self) -> RootRescheduleRequestRecord {
+        self.reschedule
+    }
+
+    #[must_use]
+    pub(crate) const fn scheduled(&self) -> ScheduledRootUpdateResult {
+        self.scheduled
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum FunctionComponentReducerDispatchEagerStateBlocker {
     NoEagerStateRequested,
@@ -4607,6 +4637,38 @@ impl FunctionComponentHookRenderStore {
         })
     }
 
+    pub(crate) fn dispatch_reducer_update_and_reschedule_root<H: HostTypes>(
+        &mut self,
+        store: &mut FiberRootStore<H>,
+        request: FunctionComponentReducerDispatchRequest,
+    ) -> Result<
+        FunctionComponentReducerDispatchRootRescheduleRecord,
+        FunctionComponentStateDispatchRootRescheduleError,
+    > {
+        let dispatch = self.dispatch_reducer_update(request)?;
+        let lane = dispatch.lane().priority_lanes().highest_priority_lane();
+        if lane.is_empty() {
+            return Err(
+                FunctionComponentStateDispatchRootRescheduleError::EmptyDispatchLane {
+                    fiber: dispatch.fiber(),
+                    dispatch: dispatch.dispatch(),
+                    lane: dispatch.lane(),
+                },
+            );
+        }
+
+        let root = mark_update_lane_from_fiber_to_root(store, dispatch.fiber(), lane)?;
+        let reschedule = RootRescheduleRequestRecord::new(root, dispatch.fiber(), lane);
+        let scheduled = ensure_root_is_rescheduled(store, reschedule)?;
+
+        Ok(FunctionComponentReducerDispatchRootRescheduleRecord {
+            dispatch,
+            root,
+            reschedule,
+            scheduled,
+        })
+    }
+
     pub fn record_reducer_dispatch_queue_diagnostic(
         &mut self,
         state: FunctionComponentHookRenderState,
@@ -8150,8 +8212,16 @@ fn reset_function_component_render_state(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::root_commit::{
+        HostRootFinishedWorkCommitHandoffErrorForCanary,
+        HostRootFinishedWorkCommitHandoffRecordForCanary,
+        commit_finished_host_root_with_finished_work_handoff_for_canary,
+        record_host_root_finished_work_pending_commit_for_canary,
+    };
     use crate::test_support::{FakeContainer, RecordingHost};
-    use crate::{FiberRootStore, RootOptions};
+    use crate::{
+        FiberRootStore, HostRootRenderPhaseRecord, RootOptions, render_host_root_for_lanes,
+    };
     use fast_react_core::{DependenciesHandle, FiberMode, FiberTypeHandle, Lane, PropsHandle};
 
     #[derive(Debug, Clone)]
@@ -8304,6 +8374,28 @@ mod tests {
         }
     }
 
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    enum FunctionComponentReducerDispatchCommitHandoffCanaryError {
+        SingleChild(FunctionComponentSingleChildReconciliationError),
+        Commit(HostRootFinishedWorkCommitHandoffErrorForCanary),
+    }
+
+    impl From<FunctionComponentSingleChildReconciliationError>
+        for FunctionComponentReducerDispatchCommitHandoffCanaryError
+    {
+        fn from(error: FunctionComponentSingleChildReconciliationError) -> Self {
+            Self::SingleChild(error)
+        }
+    }
+
+    impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
+        for FunctionComponentReducerDispatchCommitHandoffCanaryError
+    {
+        fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
+            Self::Commit(error)
+        }
+    }
+
     fn function_component_pair() -> (FiberArena, FiberId, FiberId, FiberTypeHandle) {
         let mut arena = FiberArena::new();
         let current = arena.create_fiber(
@@ -8356,6 +8448,64 @@ mod tests {
             .unwrap();
 
         (current, work_in_progress, component)
+    }
+
+    fn attached_current_function_component_pair(
+        store: &mut FiberRootStore<RecordingHost>,
+        root_id: FiberRootId,
+    ) -> (FiberId, FiberId, FiberTypeHandle) {
+        let host_root = store.root(root_id).unwrap().current();
+        let current = store.fiber_arena_mut().create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(1),
+            FiberMode::NO,
+        );
+        let component = FiberTypeHandle::from_raw(100);
+        store
+            .fiber_arena_mut()
+            .get_mut(current)
+            .unwrap()
+            .set_fiber_type(component);
+        store
+            .fiber_arena_mut()
+            .set_children(host_root, &[current])
+            .unwrap();
+        let work_in_progress = store
+            .fiber_arena_mut()
+            .create_work_in_progress(current, PropsHandle::from_raw(2))
+            .unwrap();
+
+        (current, work_in_progress, component)
+    }
+
+    fn accept_function_component_reducer_render_for_commit_handoff(
+        store: &mut FiberRootStore<RecordingHost>,
+        function_render: FunctionComponentRenderRecord,
+        host_render: HostRootRenderPhaseRecord,
+        resolver: &impl FunctionComponentSingleChildOutputResolver,
+    ) -> Result<
+        (
+            FunctionComponentSingleChildReconciliationRecord,
+            HostRootFinishedWorkCommitHandoffRecordForCanary,
+        ),
+        FunctionComponentReducerDispatchCommitHandoffCanaryError,
+    > {
+        let single_child = reconcile_function_component_single_child_output(
+            store.fiber_arena_mut(),
+            function_render,
+            resolver,
+        )?;
+        let pending =
+            record_host_root_finished_work_pending_commit_for_canary(store, host_render, 1)?;
+        let handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
+            store,
+            host_render,
+            Some(pending),
+            2,
+        )?;
+
+        Ok((single_child, handoff))
     }
 
     fn opaque(raw: u64) -> HookSlotPayload {
@@ -12518,6 +12668,477 @@ mod tests {
                 .pending_updates(current_state.queue())
                 .unwrap(),
             Vec::<HookUpdateId>::new()
+        );
+    }
+
+    #[test]
+    fn private_use_reducer_dispatch_schedules_root_and_links_accepted_output_to_commit_handoff() {
+        let (mut store, root_id) = root_store();
+        let root_current = store.root(root_id).unwrap().current();
+        let (current, work_in_progress, component) =
+            attached_current_function_component_pair(&mut store, root_id);
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let reducer_id = reducer(710);
+        let current_reducer = hook_store
+            .create_current_reducer_hook(current, reducer_id, StateHandle::from_raw(100))
+            .unwrap();
+        let output = FunctionComponentOutputHandle::from_raw(810);
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+        let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+        let eager_state = FunctionComponentStateDispatchEagerState::new(
+            StateHandle::from_raw(100),
+            StateHandle::from_raw(107),
+        );
+        let request = FunctionComponentReducerDispatchRequest::new(
+            current_reducer.dispatch(),
+            action(7),
+            lane,
+        )
+        .with_eager_state(eager_state);
+
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            Lanes::NO
+        );
+        assert_eq!(
+            crate::scheduled_roots(&store).unwrap(),
+            Vec::<FiberRootId>::new()
+        );
+
+        let rescheduled = hook_store
+            .dispatch_reducer_update_and_reschedule_root(&mut store, request)
+            .unwrap();
+
+        assert_eq!(rescheduled.root(), root_id);
+        assert_eq!(rescheduled.dispatch().fiber(), current);
+        assert_eq!(rescheduled.dispatch().queue(), current_reducer.queue());
+        assert_eq!(
+            rescheduled.dispatch().dispatch(),
+            current_reducer.dispatch()
+        );
+        assert_eq!(rescheduled.dispatch().reducer(), reducer_id);
+        assert_eq!(rescheduled.dispatch().lane(), lane);
+        assert_eq!(rescheduled.dispatch().action(), action(7));
+        assert_eq!(rescheduled.dispatch().eager_state(), Some(eager_state));
+        assert_eq!(rescheduled.reschedule().root(), root_id);
+        assert_eq!(rescheduled.reschedule().fiber(), current);
+        assert_eq!(rescheduled.reschedule().lane(), Lane::DEFAULT);
+        assert_eq!(rescheduled.scheduled().root(), root_id);
+        assert!(rescheduled.scheduled().inserted());
+        assert!(rescheduled.scheduled().microtask().is_some());
+        assert_eq!(crate::scheduled_roots(&store).unwrap(), vec![root_id]);
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .lanes()
+                .pending_lanes()
+                .contains_lane(Lane::DEFAULT)
+        );
+        assert!(
+            store
+                .fiber_arena()
+                .get(current)
+                .unwrap()
+                .lanes()
+                .contains_lane(Lane::DEFAULT)
+        );
+        assert!(
+            store
+                .fiber_arena()
+                .get(work_in_progress)
+                .unwrap()
+                .lanes()
+                .contains_lane(Lane::DEFAULT)
+        );
+        assert!(
+            store
+                .fiber_arena()
+                .get(root_current)
+                .unwrap()
+                .child_lanes()
+                .contains_lane(Lane::DEFAULT)
+        );
+
+        let skipped_render = render_function_component_with_hook_state(
+            store.fiber_arena_mut(),
+            &mut hook_store,
+            work_in_progress,
+            Lanes::SYNC,
+            &mut registry,
+        )
+        .unwrap();
+        let skipped_state = skipped_render.hook_state().unwrap();
+        let diagnostic = hook_store
+            .record_reducer_dispatch_queue_diagnostic(
+                skipped_state,
+                skipped_render.render_lanes(),
+                request,
+            )
+            .unwrap();
+        assert_eq!(diagnostic.fiber(), work_in_progress);
+        assert_eq!(diagnostic.current(), Some(current));
+        assert_eq!(diagnostic.queue_owner(), current);
+        assert_eq!(diagnostic.queue(), current_reducer.queue());
+        assert_eq!(diagnostic.reducer(), reducer_id);
+        assert_eq!(diagnostic.action(), action(7));
+        assert_eq!(diagnostic.render_lanes(), Lanes::SYNC);
+        assert_eq!(diagnostic.dispatch_lane(), lane);
+        assert_eq!(diagnostic.eager_state(), Some(eager_state));
+        assert_eq!(
+            diagnostic.eager_state_blocker(),
+            FunctionComponentReducerDispatchEagerStateBlocker::ReducerExecutionBlocked
+        );
+        assert!(diagnostic.non_execution().keeps_dispatch_blocked());
+        assert!(!diagnostic.non_execution().root_scheduled());
+        assert!(!diagnostic.claims_public_hook_compatibility());
+
+        let mut skipped_cursor = hook_store.begin_render_cursor(skipped_state).unwrap();
+        let skipped_lanes = FunctionComponentStateUpdateRenderLanes::new(Lanes::SYNC, Lanes::SYNC);
+        let skipped_update = hook_store
+            .update_reducer_hook_with_queued_updates(
+                &mut skipped_cursor,
+                reducer_id,
+                skipped_lanes,
+                |_, _| panic!("skipped eager reducer update should not run the reducer"),
+            )
+            .unwrap();
+        assert_eq!(skipped_update.memoized_state(), StateHandle::from_raw(100));
+        assert_eq!(skipped_update.base_state(), StateHandle::from_raw(100));
+        assert_eq!(skipped_update.remaining_lanes(), Lanes::DEFAULT);
+        assert_eq!(skipped_update.applied_update_count(), 0);
+        assert_eq!(skipped_update.skipped_update_count(), 1);
+        assert_eq!(skipped_update.eager_update_count(), 0);
+        let rebased = hook_store
+            .state_queues()
+            .update_ring(skipped_update.base_queue())
+            .unwrap();
+        assert_eq!(rebased.len(), 1);
+        let rebased_update = hook_store.state_queues().update(rebased[0]).unwrap();
+        assert_eq!(rebased_update.lane().priority_lanes(), Lanes::DEFAULT);
+        assert_eq!(*rebased_update.action(), action(7));
+        assert_eq!(
+            rebased_update.eager_state().copied(),
+            Some(StateHandle::from_raw(107))
+        );
+        hook_store.finish_render_cursor(skipped_cursor).unwrap();
+        hook_store.bind_current_list_unchecked(current, skipped_state.work_in_progress_list());
+
+        let accepted_render = render_function_component_with_hook_state(
+            store.fiber_arena_mut(),
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap();
+        let accepted_state = accepted_render.hook_state().unwrap();
+        let mut accepted_cursor = hook_store.begin_render_cursor(accepted_state).unwrap();
+        let accepted_lanes =
+            FunctionComponentStateUpdateRenderLanes::new(Lanes::DEFAULT, Lanes::DEFAULT);
+        let mut reducer_calls = 0;
+        let accepted_update = hook_store
+            .update_reducer_hook_with_queued_updates(
+                &mut accepted_cursor,
+                reducer_id,
+                accepted_lanes,
+                |state, action| {
+                    reducer_calls += 1;
+                    StateHandle::from_raw(state.raw() + action.raw())
+                },
+            )
+            .unwrap();
+        assert_eq!(accepted_render.output(), output);
+        assert_eq!(accepted_update.memoized_state(), StateHandle::from_raw(107));
+        assert_eq!(accepted_update.base_state(), StateHandle::from_raw(107));
+        assert_eq!(accepted_update.remaining_lanes(), Lanes::NO);
+        assert_eq!(accepted_update.applied_update_count(), 1);
+        assert_eq!(accepted_update.skipped_update_count(), 0);
+        assert_eq!(accepted_update.eager_update_count(), 1);
+        assert_eq!(reducer_calls, 0);
+        hook_store.finish_render_cursor(accepted_cursor).unwrap();
+        store
+            .fiber_arena_mut()
+            .get_mut(current)
+            .unwrap()
+            .set_lanes(accepted_update.remaining_lanes());
+        store
+            .fiber_arena_mut()
+            .get_mut(current)
+            .unwrap()
+            .set_child_lanes(Lanes::NO);
+        store
+            .fiber_arena_mut()
+            .get_mut(work_in_progress)
+            .unwrap()
+            .set_lanes(accepted_update.remaining_lanes());
+        store
+            .fiber_arena_mut()
+            .get_mut(work_in_progress)
+            .unwrap()
+            .set_child_lanes(Lanes::NO);
+        store
+            .fiber_arena_mut()
+            .get_mut(root_current)
+            .unwrap()
+            .set_child_lanes(accepted_update.remaining_lanes());
+
+        let resolver =
+            StaticSingleChildResolver::new(Some(FunctionComponentSingleChildOutput::host_text(
+                output,
+                RootElementHandle::from_raw(811),
+                PropsHandle::from_raw(812),
+            )));
+        let host_render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let (single_child, commit_handoff) =
+            accept_function_component_reducer_render_for_commit_handoff(
+                &mut store,
+                accepted_render,
+                host_render,
+                &resolver,
+            )
+            .unwrap();
+
+        assert_eq!(single_child.function_component(), work_in_progress);
+        assert_eq!(single_child.current(), Some(current));
+        assert_eq!(single_child.output(), output);
+        assert_eq!(single_child.child_tag(), FiberTag::HostText);
+        assert_eq!(
+            single_child.child_element(),
+            RootElementHandle::from_raw(811)
+        );
+        assert_eq!(single_child.render_lanes(), accepted_render.render_lanes());
+        assert!(
+            store
+                .fiber_arena()
+                .get(work_in_progress)
+                .unwrap()
+                .flags()
+                .contains_all(FiberFlags::PERFORMED_WORK)
+        );
+
+        let pending = commit_handoff.pending();
+        assert_eq!(pending.root(), root_id);
+        assert_eq!(pending.previous_current(), root_current);
+        assert_eq!(pending.pending_work(), Some(host_render.finished_work()));
+        assert_eq!(pending.finished_work(), host_render.finished_work());
+        assert_eq!(pending.render_lanes(), accepted_render.render_lanes());
+        assert_eq!(pending.finished_lanes(), accepted_render.render_lanes());
+        assert_eq!(pending.pending_lanes_before_commit(), Lanes::DEFAULT);
+        assert!(pending.records_finished_work());
+        let execution = *commit_handoff.execution_request();
+        assert!(execution.execution_requested());
+        assert!(execution.accepted_current_finished_work_record_shape());
+        assert_eq!(execution.root(), root_id);
+        assert_eq!(execution.finished_work(), host_render.finished_work());
+        assert_eq!(execution.render_lanes(), accepted_render.render_lanes());
+        assert!(execution.compatibility_claim_blocked());
+        assert!(execution.refs_effects_and_hydration_blocked());
+        assert!(commit_handoff.commit_order_after_pending_record());
+        assert_eq!(commit_handoff.commit().root(), root_id);
+        assert_eq!(
+            commit_handoff.current_after_commit(),
+            host_render.finished_work()
+        );
+        assert_eq!(commit_handoff.finished_work_after_commit(), None);
+        assert_eq!(commit_handoff.finished_lanes_after_commit(), Lanes::NO);
+        assert_eq!(commit_handoff.render_phase_work_after_commit(), None);
+        assert!(commit_handoff.consumed_finished_work_record());
+        assert!(commit_handoff.public_root_rendering_blocked());
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            host_render.finished_work()
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            Lanes::NO
+        );
+    }
+
+    #[test]
+    fn private_use_reducer_dispatch_reschedule_rejects_stale_and_basic_state_before_root_mark() {
+        let (mut stale_store, stale_root) = root_store();
+        let (stale_current, _stale_work, _stale_component) =
+            attached_current_function_component_pair(&mut stale_store, stale_root);
+        let mut stale_hook_store = FunctionComponentHookRenderStore::new();
+        let stale_reducer = stale_hook_store
+            .create_current_reducer_hook(stale_current, reducer(711), StateHandle::from_raw(200))
+            .unwrap();
+        let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+        let stale_eager_state = FunctionComponentStateDispatchEagerState::new(
+            StateHandle::from_raw(199),
+            StateHandle::from_raw(207),
+        );
+
+        assert_eq!(
+            stale_hook_store.dispatch_reducer_update_and_reschedule_root(
+                &mut stale_store,
+                FunctionComponentReducerDispatchRequest::new(
+                    stale_reducer.dispatch(),
+                    action(7),
+                    lane,
+                )
+                .with_eager_state(stale_eager_state),
+            ),
+            Err(FunctionComponentStateDispatchRootRescheduleError::Render(
+                FunctionComponentRenderError::StateDispatchEagerStateMismatch {
+                    fiber: stale_current,
+                    queue: stale_reducer.queue(),
+                    expected: StateHandle::from_raw(200),
+                    actual: StateHandle::from_raw(199),
+                },
+            ))
+        );
+        assert_eq!(
+            stale_hook_store
+                .state_queues()
+                .pending_updates(stale_reducer.queue())
+                .unwrap(),
+            Vec::<HookUpdateId>::new()
+        );
+        assert_eq!(
+            stale_store
+                .root(stale_root)
+                .unwrap()
+                .lanes()
+                .pending_lanes(),
+            Lanes::NO
+        );
+        assert_eq!(
+            crate::scheduled_roots(&stale_store).unwrap(),
+            Vec::<FiberRootId>::new()
+        );
+
+        let (mut basic_store, basic_root) = root_store();
+        let (basic_current, _basic_work, _basic_component) =
+            attached_current_function_component_pair(&mut basic_store, basic_root);
+        let mut basic_hook_store = FunctionComponentHookRenderStore::new();
+        let basic_state = basic_hook_store
+            .create_current_state_hook(basic_current, StateHandle::from_raw(300))
+            .unwrap();
+
+        assert_eq!(
+            basic_hook_store.dispatch_reducer_update_and_reschedule_root(
+                &mut basic_store,
+                FunctionComponentReducerDispatchRequest::new(
+                    basic_state.dispatch(),
+                    action(8),
+                    lane,
+                ),
+            ),
+            Err(FunctionComponentStateDispatchRootRescheduleError::Render(
+                FunctionComponentRenderError::ExpectedReducerQueue {
+                    fiber: basic_current,
+                    queue: basic_state.queue(),
+                },
+            ))
+        );
+        assert_eq!(
+            basic_hook_store
+                .state_queues()
+                .pending_updates(basic_state.queue())
+                .unwrap(),
+            Vec::<HookUpdateId>::new()
+        );
+        assert_eq!(
+            basic_store
+                .root(basic_root)
+                .unwrap()
+                .lanes()
+                .pending_lanes(),
+            Lanes::NO
+        );
+        assert_eq!(
+            crate::scheduled_roots(&basic_store).unwrap(),
+            Vec::<FiberRootId>::new()
+        );
+    }
+
+    #[test]
+    fn private_use_reducer_commit_handoff_rejects_unsupported_output_before_commit() {
+        let (mut store, root_id) = root_store();
+        let root_current = store.root(root_id).unwrap().current();
+        let (current, work_in_progress, component) =
+            attached_current_function_component_pair(&mut store, root_id);
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let reducer_id = reducer(712);
+        let current_reducer = hook_store
+            .create_current_reducer_hook(current, reducer_id, StateHandle::from_raw(400))
+            .unwrap();
+        let output = FunctionComponentOutputHandle::from_raw(820);
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+        let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+        hook_store
+            .dispatch_reducer_update_and_reschedule_root(
+                &mut store,
+                FunctionComponentReducerDispatchRequest::new(
+                    current_reducer.dispatch(),
+                    action(4),
+                    lane,
+                ),
+            )
+            .unwrap();
+
+        let function_render = render_function_component_with_hook_state(
+            store.fiber_arena_mut(),
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap();
+        let hook_state = function_render.hook_state().unwrap();
+        let mut cursor = hook_store.begin_render_cursor(hook_state).unwrap();
+        let lanes = FunctionComponentStateUpdateRenderLanes::new(Lanes::DEFAULT, Lanes::DEFAULT);
+        let update = hook_store
+            .update_reducer_hook_with_queued_updates(
+                &mut cursor,
+                reducer_id,
+                lanes,
+                reducer_adds_action,
+            )
+            .unwrap();
+        assert_eq!(update.memoized_state(), StateHandle::from_raw(404));
+        hook_store.finish_render_cursor(cursor).unwrap();
+
+        let host_render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let resolver =
+            StaticSingleChildResolver::new(Some(FunctionComponentSingleChildOutput::new(
+                output,
+                RootElementHandle::from_raw(821),
+                FiberTag::Fragment,
+                ElementTypeHandle::NONE,
+                PropsHandle::from_raw(822),
+            )));
+
+        assert_eq!(
+            accept_function_component_reducer_render_for_commit_handoff(
+                &mut store,
+                function_render,
+                host_render,
+                &resolver,
+            ),
+            Err(
+                FunctionComponentReducerDispatchCommitHandoffCanaryError::SingleChild(
+                    FunctionComponentSingleChildReconciliationError::UnsupportedChildTag {
+                        fiber: work_in_progress,
+                        output,
+                        tag: FiberTag::Fragment,
+                    },
+                ),
+            )
+        );
+        assert_eq!(store.root(root_id).unwrap().current(), root_current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            Lanes::DEFAULT
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            Some(host_render.finished_work())
         );
     }
 
