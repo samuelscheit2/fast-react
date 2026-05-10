@@ -2299,6 +2299,7 @@ const fn host_node_property_update_execution_for_host_call(
         }
         TestHostRootMutationHostCall::AppendChild
         | TestHostRootMutationHostCall::AppendChildToContainer
+        | TestHostRootMutationHostCall::InsertBefore
         | TestHostRootMutationHostCall::InsertInContainerBefore
         | TestHostRootMutationHostCall::RemoveChild
         | TestHostRootMutationHostCall::RemoveChildFromContainer
