@@ -62,6 +62,26 @@ test("portal root-render boundary preserves accepted createPortal object shape a
   });
   assertPortalSummary(boundary.publicPortal, "portal-key");
   assertPortalSummary(boundary.privateRecord, "normalized-key");
+  assertPrivatePortalRootBoundary(boundary.privateRootBridgePortalBoundary);
+  assert.deepEqual(boundary.privateRootBridgePortalBoundaryPayload, {
+    portalChildrenMatches: true,
+    portalContainerMatches: true,
+    portalMatches: true,
+    rootHandleMatches: true,
+    sourceRecordMatches: true
+  });
+  assert.equal(
+    boundary.privateRootBridgePortalRequest.render.requestType,
+    "root.render"
+  );
+  assert.equal(
+    boundary.privateRootBridgePortalRequest.admission.executionStatus,
+    "blocked-private-root-bridge-execution"
+  );
+  assert.equal(
+    boundary.invalidPortalRootBoundary.thrown.code,
+    "FAST_REACT_DOM_INVALID_PORTAL_ROOT_BOUNDARY_RECORD"
+  );
   assert.equal(boundary.unsupportedImplementation.status, "throws");
   assert.equal(
     boundary.unsupportedImplementation.thrown.code,
@@ -82,6 +102,42 @@ test("portal root-render boundary preserves accepted createPortal object shape a
     portalMountingObserved: false,
     publicRootCompatibilityClaimed: false
   });
+});
+
+test("private portal root boundary records remain diagnostic-only", () => {
+  const boundary = inspectReactDomPortalRootRenderBlockedBoundary();
+  const record = boundary.privateRootBridgePortalBoundary;
+
+  assertPrivatePortalRootBoundary(record);
+  assert.equal(record.nativeExecution, false);
+  assert.equal(record.reconcilerExecution, false);
+  assert.equal(record.portalChildReconciliation, false);
+  assert.equal(record.portalMounting, false);
+  assert.equal(record.domMutation, false);
+  assert.equal(record.listenerInstallation, false);
+  assert.equal(record.eventDispatch, false);
+  assert.equal(record.compatibilityClaimed, false);
+  assert.deepEqual(
+    record.blockedCapabilities.map((capability) => capability.id),
+    [
+      "portal-child-reconciliation",
+      "portal-container-mounting",
+      "portal-container-listeners",
+      "native-execution",
+      "reconciler-execution",
+      "dom-mutation",
+      "marker-writes",
+      "listener-installation",
+      "hydration",
+      "events",
+      "compatibility-claims"
+    ]
+  );
+  assert.equal(
+    record.portalListenerGuard.action,
+    "defer-listen-to-portal-container-events-for-root-boundary"
+  );
+  assert.equal(record.portalListenerGuard.hasPortalListeningMarker, false);
 });
 
 test("portal root-render gate sees accepted reconciler fail-closed diagnostics", () => {
@@ -153,5 +209,41 @@ function assertPortalSummary(portal, expectedKey) {
   assert.deepEqual(portal.type, {
     keys: ["$$typeof", "children", "containerInfo", "implementation", "key"],
     type: "object"
+  });
+}
+
+function assertPrivatePortalRootBoundary(record) {
+  assert.equal(
+    record.kind,
+    "FastReactDomPrivateRootPortalBoundaryRecord"
+  );
+  assert.equal(record.operation, "portal-root-boundary");
+  assert.equal(
+    record.boundaryStatus,
+    "admitted-private-root-portal-boundary-record"
+  );
+  assert.equal(
+    record.diagnosticStatus,
+    "blocked-private-root-portal-diagnostic"
+  );
+  assert.equal(record.sourceRequestType, "root.render");
+  assert.equal(record.rootKind, "client");
+  assert.equal(record.rootTag, "ConcurrentRoot");
+  assert.equal(record.portalKey, "portal-key");
+  assert.deepEqual(record.portalObjectInfo, {
+    keys: ["$$typeof", "children", "containerInfo", "implementation", "key"],
+    type: "object"
+  });
+  assert.deepEqual(record.portalImplementationInfo, {
+    type: "null"
+  });
+  assert.equal(record.acceptedPortalObjectShape, true);
+  assert.deepEqual(record.reconcilerDiagnostic, {
+    beginWorkRecord: "UnsupportedPortalBeginWorkRecord",
+    failClosedBeforeChildren: true,
+    feature: "portal",
+    rootPreflightError:
+      "HostRootChildBeginWorkPreflightError::UnsupportedPortal",
+    unsupportedFeature: "PORTAL_RECONCILER_UNSUPPORTED_FEATURE"
   });
 }
