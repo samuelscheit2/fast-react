@@ -1317,14 +1317,19 @@ pub struct TestRendererUnmountNativeBridgeAdmission {
     root: FiberRootId,
     route_dependency_id: &'static str,
     deletion_commit_handoff_id: &'static str,
+    cleanup_handoff_id: &'static str,
     lifecycle: TestRendererRootLifecycle,
     scheduled_update_kind: TestRendererRootUpdateKind,
     scheduled_element_is_none: bool,
     deletion_commit_handoff_accepted: bool,
+    cleanup_handoff_accepted: bool,
     lifecycle_evidence_accepted: bool,
     cleanup_blockers_accepted: bool,
     host_node_cleanup_count: usize,
     cleanup_order_record_count: usize,
+    rust_unmount_cleanup_handoff_executed: bool,
+    host_output_produced: bool,
+    minimal_tree_cleanup_handoff: bool,
     rejects_already_unmounted_roots: bool,
     rejects_stale_deletion_handoffs: bool,
     rejects_missing_cleanup_blockers: bool,
@@ -1362,6 +1367,11 @@ impl TestRendererUnmountNativeBridgeAdmission {
     }
 
     #[must_use]
+    pub const fn cleanup_handoff_id(self) -> &'static str {
+        self.cleanup_handoff_id
+    }
+
+    #[must_use]
     pub const fn lifecycle(self) -> TestRendererRootLifecycle {
         self.lifecycle
     }
@@ -1379,6 +1389,11 @@ impl TestRendererUnmountNativeBridgeAdmission {
     #[must_use]
     pub const fn deletion_commit_handoff_accepted(self) -> bool {
         self.deletion_commit_handoff_accepted
+    }
+
+    #[must_use]
+    pub const fn cleanup_handoff_accepted(self) -> bool {
+        self.cleanup_handoff_accepted
     }
 
     #[must_use]
@@ -1402,6 +1417,21 @@ impl TestRendererUnmountNativeBridgeAdmission {
     }
 
     #[must_use]
+    pub const fn rust_unmount_cleanup_handoff_executed(self) -> bool {
+        self.rust_unmount_cleanup_handoff_executed
+    }
+
+    #[must_use]
+    pub const fn host_output_produced(self) -> bool {
+        self.host_output_produced
+    }
+
+    #[must_use]
+    pub const fn minimal_tree_cleanup_handoff(self) -> bool {
+        self.minimal_tree_cleanup_handoff
+    }
+
+    #[must_use]
     pub const fn rejects_already_unmounted_roots(self) -> bool {
         self.rejects_already_unmounted_roots
     }
@@ -1414,6 +1444,170 @@ impl TestRendererUnmountNativeBridgeAdmission {
     #[must_use]
     pub const fn rejects_missing_cleanup_blockers(self) -> bool {
         self.rejects_missing_cleanup_blockers
+    }
+
+    #[must_use]
+    pub const fn public_unmount_compatibility_claimed(self) -> bool {
+        self.public_unmount_compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn public_host_teardown_compatibility_claimed(self) -> bool {
+        self.public_host_teardown_compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn act_flushing_claimed(self) -> bool {
+        self.act_flushing_claimed
+    }
+
+    #[must_use]
+    pub const fn native_bridge_available(self) -> bool {
+        self.native_bridge_available
+    }
+
+    #[must_use]
+    pub const fn native_execution(self) -> bool {
+        self.native_execution
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererUnmountNativeBridgeCleanupHandoff {
+    diagnostic_id: &'static str,
+    status: &'static str,
+    root: FiberRootId,
+    route_outcome: &'static str,
+    route_dependency_id: &'static str,
+    deletion_commit_handoff_id: &'static str,
+    admission_diagnostic_id: &'static str,
+    lifecycle: TestRendererRootLifecycle,
+    scheduled_update_kind: TestRendererRootUpdateKind,
+    scheduled_element_is_none: bool,
+    previous_root_child_count: usize,
+    current_root_child_count: usize,
+    detached_instance: bool,
+    detached_instance_child_count: usize,
+    host_node_cleanup_count: usize,
+    cleanup_order_record_count: usize,
+    minimal_tree_cleanup_handoff: bool,
+    rust_unmount_cleanup_handoff_executed: bool,
+    host_output_produced: bool,
+    deletion_commit_handoff: TestRendererUnmountDeletionCommitHandoffDiagnostics,
+    native_bridge_admission: TestRendererUnmountNativeBridgeAdmission,
+    public_unmount_compatibility_claimed: bool,
+    public_host_teardown_compatibility_claimed: bool,
+    act_flushing_claimed: bool,
+    native_bridge_available: bool,
+    native_execution: bool,
+}
+
+impl TestRendererUnmountNativeBridgeCleanupHandoff {
+    #[must_use]
+    pub const fn diagnostic_id(self) -> &'static str {
+        self.diagnostic_id
+    }
+
+    #[must_use]
+    pub const fn status(self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn route_outcome(self) -> &'static str {
+        self.route_outcome
+    }
+
+    #[must_use]
+    pub const fn route_dependency_id(self) -> &'static str {
+        self.route_dependency_id
+    }
+
+    #[must_use]
+    pub const fn deletion_commit_handoff_id(self) -> &'static str {
+        self.deletion_commit_handoff_id
+    }
+
+    #[must_use]
+    pub const fn admission_diagnostic_id(self) -> &'static str {
+        self.admission_diagnostic_id
+    }
+
+    #[must_use]
+    pub const fn lifecycle(self) -> TestRendererRootLifecycle {
+        self.lifecycle
+    }
+
+    #[must_use]
+    pub const fn scheduled_update_kind(self) -> TestRendererRootUpdateKind {
+        self.scheduled_update_kind
+    }
+
+    #[must_use]
+    pub const fn scheduled_element_is_none(self) -> bool {
+        self.scheduled_element_is_none
+    }
+
+    #[must_use]
+    pub const fn previous_root_child_count(self) -> usize {
+        self.previous_root_child_count
+    }
+
+    #[must_use]
+    pub const fn current_root_child_count(self) -> usize {
+        self.current_root_child_count
+    }
+
+    #[must_use]
+    pub const fn detached_instance(self) -> bool {
+        self.detached_instance
+    }
+
+    #[must_use]
+    pub const fn detached_instance_child_count(self) -> usize {
+        self.detached_instance_child_count
+    }
+
+    #[must_use]
+    pub const fn host_node_cleanup_count(self) -> usize {
+        self.host_node_cleanup_count
+    }
+
+    #[must_use]
+    pub const fn cleanup_order_record_count(self) -> usize {
+        self.cleanup_order_record_count
+    }
+
+    #[must_use]
+    pub const fn minimal_tree_cleanup_handoff(self) -> bool {
+        self.minimal_tree_cleanup_handoff
+    }
+
+    #[must_use]
+    pub const fn rust_unmount_cleanup_handoff_executed(self) -> bool {
+        self.rust_unmount_cleanup_handoff_executed
+    }
+
+    #[must_use]
+    pub const fn host_output_produced(self) -> bool {
+        self.host_output_produced
+    }
+
+    #[must_use]
+    pub const fn deletion_commit_handoff(
+        self,
+    ) -> TestRendererUnmountDeletionCommitHandoffDiagnostics {
+        self.deletion_commit_handoff
+    }
+
+    #[must_use]
+    pub const fn native_bridge_admission(self) -> TestRendererUnmountNativeBridgeAdmission {
+        self.native_bridge_admission
     }
 
     #[must_use]
@@ -2815,6 +3009,10 @@ pub const TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID: &
     "react-test-renderer-unmount-native-bridge-admission-private-diagnostic";
 pub const TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_STATUS: &str =
     "private-unmount-native-bridge-admission-public-unmount-blocked";
+pub const TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_CLEANUP_HANDOFF_DIAGNOSTIC_ID: &str =
+    "react-test-renderer-unmount-native-bridge-cleanup-handoff-private-diagnostic";
+pub const TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_CLEANUP_HANDOFF_STATUS: &str =
+    "private-unmount-native-bridge-cleanup-handoff-public-unmount-blocked";
 pub const TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.serialization.private-tree-canary";
 pub const TEST_RENDERER_PRIVATE_TREE_COMMITTED_FIBER_INSPECTION_DIAGNOSTIC_NAME: &str =
@@ -9257,17 +9455,84 @@ impl TestRendererRoot {
             route_dependency_id: TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_ROUTE_DEPENDENCY_ID,
             deletion_commit_handoff_id:
                 TEST_RENDERER_PRIVATE_UNMOUNT_DELETION_COMMIT_HANDOFF_DIAGNOSTIC_ID,
+            cleanup_handoff_id:
+                TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_CLEANUP_HANDOFF_DIAGNOSTIC_ID,
             lifecycle: handoff.lifecycle(),
             scheduled_update_kind: scheduled_update.kind(),
             scheduled_element_is_none: scheduled_update.element() == RootElementHandle::NONE,
             deletion_commit_handoff_accepted: true,
+            cleanup_handoff_accepted: true,
             lifecycle_evidence_accepted: true,
             cleanup_blockers_accepted: true,
             host_node_cleanup_count: handoff.host_node_cleanup_count(),
             cleanup_order_record_count: handoff.cleanup_order_record_count(),
+            rust_unmount_cleanup_handoff_executed: true,
+            host_output_produced: true,
+            minimal_tree_cleanup_handoff: handoff.host_node_cleanup_count() == 2
+                && handoff.cleanup_order_record_count() == 2,
             rejects_already_unmounted_roots: true,
             rejects_stale_deletion_handoffs: true,
             rejects_missing_cleanup_blockers: true,
+            public_unmount_compatibility_claimed: false,
+            public_host_teardown_compatibility_claimed: false,
+            act_flushing_claimed: false,
+            native_bridge_available: false,
+            native_execution: false,
+        })
+    }
+
+    pub fn execute_private_unmount_native_bridge_cleanup_handoff_for_canary(
+        &mut self,
+    ) -> Result<TestRendererUnmountNativeBridgeCleanupHandoff, TestRendererRootError> {
+        let route_outcome = self.unmount()?;
+        let Some(unmounted) = self.render_and_commit_host_output_unmount_for_canary()? else {
+            return Err(
+                TestRendererPrivateUnmountNativeBridgeAdmissionError::MissingDeletionCommitHandoff
+                    .into(),
+            );
+        };
+        let handoff =
+            self.describe_private_unmount_deletion_commit_handoff_for_canary(&unmounted)?;
+        let admission = self.describe_private_unmount_native_bridge_admission_for_canary(
+            &route_outcome,
+            Some(&handoff),
+        )?;
+        let previous_root_child_count = unmounted.previous_snapshot().children().len();
+        let current_root_child_count = unmounted.snapshot().children().len();
+        let detached_instance = unmounted.detached_instance_snapshot().is_detached();
+        let detached_instance_child_count = unmounted.detached_instance_snapshot().children().len();
+        let minimal_tree_cleanup_handoff = previous_root_child_count == 1
+            && current_root_child_count == 0
+            && detached_instance
+            && detached_instance_child_count == 0
+            && handoff.host_node_cleanup_count() == 2
+            && handoff.cleanup_order_record_count() == 2;
+
+        Ok(TestRendererUnmountNativeBridgeCleanupHandoff {
+            diagnostic_id:
+                TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_CLEANUP_HANDOFF_DIAGNOSTIC_ID,
+            status: TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_CLEANUP_HANDOFF_STATUS,
+            root: self.root_id,
+            route_outcome: route_outcome.code(),
+            route_dependency_id: TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_ROUTE_DEPENDENCY_ID,
+            deletion_commit_handoff_id:
+                TEST_RENDERER_PRIVATE_UNMOUNT_DELETION_COMMIT_HANDOFF_DIAGNOSTIC_ID,
+            admission_diagnostic_id:
+                TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID,
+            lifecycle: handoff.lifecycle(),
+            scheduled_update_kind: handoff.scheduled_update_kind(),
+            scheduled_element_is_none: handoff.scheduled_element_is_none(),
+            previous_root_child_count,
+            current_root_child_count,
+            detached_instance,
+            detached_instance_child_count,
+            host_node_cleanup_count: handoff.host_node_cleanup_count(),
+            cleanup_order_record_count: handoff.cleanup_order_record_count(),
+            minimal_tree_cleanup_handoff,
+            rust_unmount_cleanup_handoff_executed: true,
+            host_output_produced: true,
+            deletion_commit_handoff: handoff,
+            native_bridge_admission: admission,
             public_unmount_compatibility_claimed: false,
             public_host_teardown_compatibility_claimed: false,
             act_flushing_claimed: false,
@@ -16327,6 +16592,10 @@ mod tests {
             TEST_RENDERER_PRIVATE_UNMOUNT_DELETION_COMMIT_HANDOFF_DIAGNOSTIC_ID
         );
         assert_eq!(
+            admission.cleanup_handoff_id(),
+            TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_CLEANUP_HANDOFF_DIAGNOSTIC_ID
+        );
+        assert_eq!(
             admission.lifecycle(),
             TestRendererRootLifecycle::UnmountScheduled
         );
@@ -16336,10 +16605,14 @@ mod tests {
         );
         assert!(admission.scheduled_element_is_none());
         assert!(admission.deletion_commit_handoff_accepted());
+        assert!(admission.cleanup_handoff_accepted());
         assert!(admission.lifecycle_evidence_accepted());
         assert!(admission.cleanup_blockers_accepted());
         assert_eq!(admission.host_node_cleanup_count(), 2);
         assert_eq!(admission.cleanup_order_record_count(), 2);
+        assert!(admission.rust_unmount_cleanup_handoff_executed());
+        assert!(admission.host_output_produced());
+        assert!(admission.minimal_tree_cleanup_handoff());
         assert!(admission.rejects_already_unmounted_roots());
         assert!(admission.rejects_stale_deletion_handoffs());
         assert!(admission.rejects_missing_cleanup_blockers());
@@ -16349,6 +16622,98 @@ mod tests {
         assert!(!admission.native_bridge_available());
         assert!(!admission.native_execution());
         assert_eq!(host_storage_counts(&root), (1, 1, 1));
+        assert_eq!(current_host_root_element(&root), RootElementHandle::NONE);
+        assert!(
+            root.diagnostic_container_snapshot()
+                .unwrap()
+                .children()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn root_private_unmount_native_bridge_admission_executes_minimal_cleanup_handoff() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let cleanup_handoff = root
+            .execute_private_unmount_native_bridge_cleanup_handoff_for_canary()
+            .unwrap();
+        let deletion_handoff = cleanup_handoff.deletion_commit_handoff();
+        let admission = cleanup_handoff.native_bridge_admission();
+
+        assert_eq!(
+            cleanup_handoff.diagnostic_id(),
+            TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_CLEANUP_HANDOFF_DIAGNOSTIC_ID
+        );
+        assert_eq!(
+            cleanup_handoff.status(),
+            TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_CLEANUP_HANDOFF_STATUS
+        );
+        assert_eq!(cleanup_handoff.root(), root.root_id());
+        assert_eq!(cleanup_handoff.route_outcome(), "Scheduled");
+        assert_eq!(
+            cleanup_handoff.route_dependency_id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_ROUTE_DEPENDENCY_ID
+        );
+        assert_eq!(
+            cleanup_handoff.deletion_commit_handoff_id(),
+            TEST_RENDERER_PRIVATE_UNMOUNT_DELETION_COMMIT_HANDOFF_DIAGNOSTIC_ID
+        );
+        assert_eq!(
+            cleanup_handoff.admission_diagnostic_id(),
+            TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID
+        );
+        assert_eq!(
+            cleanup_handoff.lifecycle(),
+            TestRendererRootLifecycle::UnmountScheduled
+        );
+        assert_eq!(
+            cleanup_handoff.scheduled_update_kind(),
+            TestRendererRootUpdateKind::Unmount
+        );
+        assert!(cleanup_handoff.scheduled_element_is_none());
+        assert_eq!(cleanup_handoff.previous_root_child_count(), 1);
+        assert_eq!(cleanup_handoff.current_root_child_count(), 0);
+        assert!(cleanup_handoff.detached_instance());
+        assert_eq!(cleanup_handoff.detached_instance_child_count(), 0);
+        assert_eq!(cleanup_handoff.host_node_cleanup_count(), 2);
+        assert_eq!(cleanup_handoff.cleanup_order_record_count(), 2);
+        assert!(cleanup_handoff.minimal_tree_cleanup_handoff());
+        assert!(cleanup_handoff.rust_unmount_cleanup_handoff_executed());
+        assert!(cleanup_handoff.host_output_produced());
+        assert_eq!(
+            deletion_handoff.diagnostic_id(),
+            TEST_RENDERER_PRIVATE_UNMOUNT_DELETION_COMMIT_HANDOFF_DIAGNOSTIC_ID
+        );
+        assert_eq!(
+            admission.diagnostic_id(),
+            TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID
+        );
+        assert!(admission.deletion_commit_handoff_accepted());
+        assert!(admission.cleanup_handoff_accepted());
+        assert!(admission.rust_unmount_cleanup_handoff_executed());
+        assert!(admission.host_output_produced());
+        assert!(admission.minimal_tree_cleanup_handoff());
+        assert!(!cleanup_handoff.public_unmount_compatibility_claimed());
+        assert!(!cleanup_handoff.public_host_teardown_compatibility_claimed());
+        assert!(!cleanup_handoff.act_flushing_claimed());
+        assert!(!cleanup_handoff.native_bridge_available());
+        assert!(!cleanup_handoff.native_execution());
+        assert!(!admission.public_unmount_compatibility_claimed());
+        assert!(!admission.public_host_teardown_compatibility_claimed());
+        assert!(!admission.act_flushing_claimed());
+        assert!(!admission.native_bridge_available());
+        assert!(!admission.native_execution());
+        assert_eq!(host_storage_counts(&root), (1, 1, 1));
+        assert_eq!(host_node_activity_counts(&root), (0, 2));
         assert_eq!(current_host_root_element(&root), RootElementHandle::NONE);
         assert!(
             root.diagnostic_container_snapshot()

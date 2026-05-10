@@ -1438,6 +1438,10 @@ const privateUnmountNativeBridgeAdmissionDiagnosticId =
   'react-test-renderer-unmount-native-bridge-admission-private-diagnostic';
 const privateUnmountNativeBridgeAdmissionStatus =
   'private-unmount-native-bridge-admission-public-unmount-blocked';
+const privateUnmountNativeBridgeCleanupHandoffDiagnosticId =
+  'react-test-renderer-unmount-native-bridge-cleanup-handoff-private-diagnostic';
+const privateUnmountNativeBridgeCleanupHandoffStatus =
+  'private-unmount-native-bridge-cleanup-handoff-public-unmount-blocked';
 const privateUnmountHostChildDetachmentBlockers = Object.freeze({
   id: 'react-test-renderer-unmount-host-child-detachment-blockers',
   status:
@@ -1494,41 +1498,95 @@ const privateUnmountDeletionCommitHandoffGate = Object.freeze({
   rustExecutionFromJs: false,
   compatibilityClaimed: false
 });
+const privateUnmountNativeBridgeCleanupHandoffGate = Object.freeze({
+  id: privateUnmountNativeBridgeCleanupHandoffDiagnosticId,
+  status: privateUnmountNativeBridgeCleanupHandoffStatus,
+  publicSurface: 'create().unmount',
+  deterministic: true,
+  acceptedWorker:
+    'worker-638-test-renderer-unmount-native-execution',
+  acceptedRustCrate: 'fast-react-test-renderer',
+  acceptedRustRecords: Object.freeze([
+    'TestRendererRootUpdateOutcome',
+    'TestRendererUnmountedHostOutput',
+    'TestRendererUnmountDeletionCommitHandoffDiagnostics',
+    'TestRendererUnmountNativeBridgeAdmission',
+    'TestRendererUnmountNativeBridgeCleanupHandoff'
+  ]),
+  acceptedRustApis: Object.freeze([
+    'TestRendererRoot::unmount',
+    'TestRendererRoot::render_and_commit_host_output_unmount_for_canary',
+    'TestRendererRoot::describe_private_unmount_deletion_commit_handoff_for_canary',
+    'TestRendererRoot::describe_private_unmount_native_bridge_admission_for_canary',
+    'TestRendererRoot::execute_private_unmount_native_bridge_cleanup_handoff_for_canary'
+  ]),
+  acceptedRustTests: Object.freeze([
+    'root_private_unmount_native_bridge_admission_executes_minimal_cleanup_handoff'
+  ]),
+  deletionCommitHandoffGate: privateUnmountDeletionCommitHandoffGate,
+  admissionDiagnosticId: privateUnmountNativeBridgeAdmissionDiagnosticId,
+  minimalTreeOnly: true,
+  hostOutputProduced: true,
+  rustUnmountCleanupHandoffExecuted: true,
+  publicRouteAvailable: false,
+  publicUnmountCompatibilityClaimed: false,
+  publicHostTeardownCompatibilityClaimed: false,
+  actFlushingClaimed: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  rustExecutionFromJs: false,
+  compatibilityClaimed: false
+});
 const privateUnmountNativeBridgeAdmissionGate = Object.freeze({
   id: privateUnmountNativeBridgeAdmissionDiagnosticId,
   status: privateUnmountNativeBridgeAdmissionStatus,
   publicSurface: 'create().unmount',
   deterministic: true,
   acceptedWorker:
+    'worker-638-test-renderer-unmount-native-execution',
+  acceptedWorkers: Object.freeze([
     'worker-612-test-renderer-unmount-native-bridge-admission',
+    'worker-638-test-renderer-unmount-native-execution'
+  ]),
   acceptedRustCrate: 'fast-react-test-renderer',
   acceptedRustRecords: Object.freeze([
     'TestRendererRootUpdateOutcome',
     'TestRendererRootScheduledUpdate',
     'TestRendererUnmountDeletionCommitHandoffDiagnostics',
     'TestRendererUnmountHostChildDetachmentBlockers',
-    'TestRendererUnmountNativeBridgeAdmission'
+    'TestRendererUnmountNativeBridgeAdmission',
+    'TestRendererUnmountNativeBridgeCleanupHandoff'
   ]),
   acceptedRustApis: Object.freeze([
     'TestRendererRoot::unmount',
+    'TestRendererRoot::render_and_commit_host_output_unmount_for_canary',
     'TestRendererRoot::describe_private_unmount_deletion_commit_handoff_for_canary',
-    'TestRendererRoot::describe_private_unmount_native_bridge_admission_for_canary'
+    'TestRendererRoot::describe_private_unmount_native_bridge_admission_for_canary',
+    'TestRendererRoot::execute_private_unmount_native_bridge_cleanup_handoff_for_canary'
   ]),
   acceptedRustTests: Object.freeze([
     'root_host_output_canary_unmounts_committed_output_with_deletion_cleanup_diagnostics',
     'root_private_unmount_native_bridge_admission_rejects_stale_handoff',
     'root_private_unmount_native_bridge_admission_rejects_missing_cleanup_blockers',
-    'root_private_unmount_native_bridge_admission_rejects_already_unmounted_root'
+    'root_private_unmount_native_bridge_admission_rejects_already_unmounted_root',
+    'root_private_unmount_native_bridge_admission_executes_minimal_cleanup_handoff'
   ]),
   privateRouteDependencyId:
     'react-test-renderer-unmount-route-private-diagnostic',
   deletionCommitHandoffGate: privateUnmountDeletionCommitHandoffGate,
+  cleanupHandoffGate: privateUnmountNativeBridgeCleanupHandoffGate,
   lifecycleDiagnosticGate: updateUnmountRustLifecycleDiagnosticGate,
   consumesPrivateUnmountRouteMetadata: true,
   consumesAcceptedRustLifecycleDiagnostics: true,
   consumesAcceptedDeletionCommitHandoff: true,
+  consumesActualRustCleanupHandoff: true,
+  requiresActualRustCleanupHandoff: true,
   validatesLifecycleEvidence: true,
   validatesCleanupBlockers: true,
+  validatesMinimalTreeCleanupHandoff: true,
+  rustUnmountCleanupHandoffExecuted: true,
+  hostOutputProduced: true,
+  minimalTreeCleanupHandoff: true,
   rejectsAlreadyUnmountedRoots: true,
   rejectsStaleDeletionHandoffs: true,
   rejectsMissingCleanupBlockers: true,
@@ -1568,6 +1626,8 @@ const unmountPrivateRoute = Object.freeze({
   ]),
   deletionCommitHandoff: privateUnmountDeletionCommitHandoffGate,
   deletionCommitHandoffDiagnosticsAvailable: true,
+  nativeBridgeCleanupHandoff: privateUnmountNativeBridgeCleanupHandoffGate,
+  nativeBridgeCleanupHandoffAvailable: true,
   nativeBridgeAdmission: privateUnmountNativeBridgeAdmissionGate,
   nativeBridgeAdmissionAvailable: true,
   hostChildDetachmentBlockers: privateUnmountHostChildDetachmentBlockers,
@@ -2699,6 +2759,12 @@ const currentRustTestRendererRootCanaryOperations = freezeRecord({
       privateUnmountNativeBridgeAdmissionDiagnosticId,
     nativeBridgeAdmissionStatus:
       privateUnmountNativeBridgeAdmissionStatus,
+    nativeBridgeCleanupHandoffApi:
+      'TestRendererRoot::execute_private_unmount_native_bridge_cleanup_handoff_for_canary',
+    nativeBridgeCleanupHandoffDiagnosticId:
+      privateUnmountNativeBridgeCleanupHandoffDiagnosticId,
+    nativeBridgeCleanupHandoffStatus:
+      privateUnmountNativeBridgeCleanupHandoffStatus,
     hostChildDetachmentBlockers:
       privateUnmountHostChildDetachmentBlockers,
     updateKind: 'Unmount',
@@ -2715,7 +2781,8 @@ const currentRustTestRendererRootCanaryOperations = freezeRecord({
       'worker-195-test-renderer-root-callback-snapshot',
       'worker-234-test-renderer-host-output-update-unmount-canary',
       'worker-575-test-renderer-unmount-deletion-commit-link',
-      'worker-612-test-renderer-unmount-native-bridge-admission'
+      'worker-612-test-renderer-unmount-native-bridge-admission',
+      'worker-638-test-renderer-unmount-native-execution'
     ]),
     acceptedRustTests: freezeArray([
       'root_unmount_enqueues_sync_null_update_before_wrapper_invalidation',
@@ -2726,7 +2793,8 @@ const currentRustTestRendererRootCanaryOperations = freezeRecord({
       'root_host_output_unmount_canary_rejects_already_unmounted_root_record',
       'root_private_unmount_native_bridge_admission_rejects_stale_handoff',
       'root_private_unmount_native_bridge_admission_rejects_missing_cleanup_blockers',
-      'root_private_unmount_native_bridge_admission_rejects_already_unmounted_root'
+      'root_private_unmount_native_bridge_admission_rejects_already_unmounted_root',
+      'root_private_unmount_native_bridge_admission_executes_minimal_cleanup_handoff'
     ]),
     staleRootRecordRejection: true,
     alreadyUnmountedRootRecordRejection: true,
@@ -2751,6 +2819,7 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     'worker-610-test-renderer-create-native-bridge-admission',
     'worker-636-test-renderer-create-native-execution',
     'worker-612-test-renderer-unmount-native-bridge-admission',
+    'worker-638-test-renderer-unmount-native-execution',
     'worker-637-test-renderer-update-native-execution'
   ]),
   acceptedJsBridgeWorkers: freezeArray([
@@ -2762,6 +2831,7 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     'worker-610-test-renderer-create-native-bridge-admission',
     'worker-636-test-renderer-create-native-execution',
     'worker-612-test-renderer-unmount-native-bridge-admission',
+    'worker-638-test-renderer-unmount-native-execution',
     'worker-637-test-renderer-update-native-execution'
   ]),
   root: freezeRecord({
@@ -2832,6 +2902,14 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
       privateUnmountNativeBridgeAdmissionStatus,
     unmountNativeBridgeAdmissionGate:
       privateUnmountNativeBridgeAdmissionGate,
+    unmountNativeBridgeCleanupHandoffApi:
+      'TestRendererRoot::execute_private_unmount_native_bridge_cleanup_handoff_for_canary',
+    unmountNativeBridgeCleanupHandoffDiagnosticId:
+      privateUnmountNativeBridgeCleanupHandoffDiagnosticId,
+    unmountNativeBridgeCleanupHandoffStatus:
+      privateUnmountNativeBridgeCleanupHandoffStatus,
+    unmountNativeBridgeCleanupHandoffGate:
+      privateUnmountNativeBridgeCleanupHandoffGate,
     hostChildDetachmentBlockers:
       privateUnmountHostChildDetachmentBlockers,
     diagnostics: 'TestRendererHostOutputDiagnostics',
@@ -2840,6 +2918,8 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
       'TestRendererUnmountDeletionCommitHandoffDiagnostics',
     unmountNativeBridgeAdmission:
       'TestRendererUnmountNativeBridgeAdmission',
+    unmountNativeBridgeCleanupHandoff:
+      'TestRendererUnmountNativeBridgeCleanupHandoff',
     fixtureShape: freezeArray(['HostRoot', 'HostComponent', 'HostText']),
     fixtureType: 'span',
     fixtureText: 'hello',
@@ -2977,6 +3057,8 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     privateUnmountDeletionCommitHandoffGate,
   unmountNativeBridgeAdmission:
     privateUnmountNativeBridgeAdmissionGate,
+  unmountNativeBridgeCleanupHandoff:
+    privateUnmountNativeBridgeCleanupHandoffGate,
   operations: currentRustTestRendererRootCanaryOperations,
   recordOnlyPrivateBridge: false,
   privateRootExecutionBridgeAvailable: true,
@@ -4919,6 +5001,12 @@ function createRootRequestRecord({
           })
         : null,
     privateUnmountDeletionCommitHandoffAvailable: operation === 'unmount',
+    privateUnmountNativeBridgeCleanupHandoffGate:
+      operation === 'unmount'
+        ? privateUnmountNativeBridgeCleanupHandoffGate
+        : null,
+    privateUnmountNativeBridgeCleanupHandoffAvailable:
+      operation === 'unmount',
     privateUnmountNativeBridgeAdmissionGate:
       operation === 'unmount'
         ? privateUnmountNativeBridgeAdmissionGate
@@ -5250,14 +5338,20 @@ function consumePrivateUnmountNativeBridgeAdmissionForRequest(
       record,
       readUnmountAdmissionLifecycleDiagnostic(evidence)
     );
-  const deletionCommitHandoff =
-    normalizeAcceptedRustUnmountDeletionCommitHandoff(evidence);
+  const cleanupHandoff =
+    normalizeAcceptedRustUnmountNativeBridgeCleanupHandoff(evidence);
+  const deletionCommitHandoff = cleanupHandoff.deletionCommitHandoff;
+  assertAcceptedRustUnmountNativeBridgeCleanupHandoffMatchesRequest(
+    record,
+    cleanupHandoff
+  );
   assertAcceptedRustUnmountDeletionCommitHandoffMatchesRequest(
     record,
     deletionCommitHandoff
   );
 
   return createPrivateUnmountNativeBridgeAdmissionRecord({
+    cleanupHandoff,
     deletionCommitHandoff,
     record,
     rustLifecycleDiagnostic: consumedLifecycleDiagnostic
@@ -5323,7 +5417,12 @@ function normalizeAcceptedRustUnmountDeletionCommitHandoff(evidence) {
       'requestId',
       'request_id'
     ]),
-    rootId: readDiagnosticField(handoff, ['jsRootId', 'rootId', 'root_id']),
+    rootId: readDiagnosticField(handoff, [
+      'jsRootId',
+      'rootId',
+      'root_id',
+      'root'
+    ]),
     lifecycle: normalizeRustLifecycleStatus(
       readDiagnosticField(handoff, ['lifecycle', 'lifecycleStatusAfter'])
     ),
@@ -5393,6 +5492,151 @@ function normalizeAcceptedRustUnmountDeletionCommitHandoff(evidence) {
     ]),
     hostChildDetachmentBlockers:
       normalizeAcceptedRustUnmountCleanupBlockers(blockers)
+  });
+}
+
+function normalizeAcceptedRustUnmountNativeBridgeCleanupHandoff(evidence) {
+  if (evidence === null || typeof evidence !== 'object') {
+    throwInvalidRootRequest(
+      'Expected Rust unmount native bridge cleanup handoff evidence.'
+    );
+  }
+
+  const cleanupHandoff = readDiagnosticField(evidence, [
+    'privateUnmountNativeBridgeCleanupHandoff',
+    'unmountNativeBridgeCleanupHandoff',
+    'rustUnmountCleanupHandoff',
+    'cleanupHandoff',
+    'unmount_cleanup_handoff'
+  ]);
+  if (cleanupHandoff === null || typeof cleanupHandoff !== 'object') {
+    throwInvalidRootRequest(
+      'Expected a Rust unmount native bridge cleanup handoff diagnostic object.'
+    );
+  }
+
+  const deletionCommitHandoff =
+    normalizeAcceptedRustUnmountDeletionCommitHandoff(cleanupHandoff);
+
+  return freezeRecord({
+    sourceDiagnostic: cleanupHandoff,
+    diagnosticId: readDiagnosticField(cleanupHandoff, [
+      'diagnosticId',
+      'diagnostic_id',
+      'id'
+    ]),
+    status: readDiagnosticField(cleanupHandoff, ['status']),
+    requestId: readDiagnosticField(cleanupHandoff, [
+      'rootRequestId',
+      'root_request_id',
+      'requestId',
+      'request_id'
+    ]),
+    rootId: readDiagnosticField(cleanupHandoff, [
+      'jsRootId',
+      'rootId',
+      'root_id',
+      'root'
+    ]),
+    routeOutcome: readDiagnosticField(cleanupHandoff, [
+      'routeOutcome',
+      'route_outcome'
+    ]),
+    routeDependencyId: readDiagnosticField(cleanupHandoff, [
+      'routeDependencyId',
+      'route_dependency_id'
+    ]),
+    deletionCommitHandoffId: readDiagnosticField(cleanupHandoff, [
+      'deletionCommitHandoffId',
+      'deletion_commit_handoff_id'
+    ]),
+    admissionDiagnosticId: readDiagnosticField(cleanupHandoff, [
+      'admissionDiagnosticId',
+      'admission_diagnostic_id'
+    ]),
+    lifecycle: normalizeRustLifecycleStatus(
+      readDiagnosticField(cleanupHandoff, [
+        'lifecycle',
+        'lifecycleStatusAfter'
+      ])
+    ),
+    scheduledUpdateKind: normalizeRustUpdateKind(
+      readDiagnosticField(cleanupHandoff, [
+        'scheduledUpdateKind',
+        'scheduled_update_kind',
+        'updateKind'
+      ])
+    ),
+    scheduledElementIsNone: readBooleanDiagnosticField(cleanupHandoff, [
+      'scheduledElementIsNone',
+      'scheduled_element_is_none'
+    ]),
+    previousRootChildCount: readNonNegativeDiagnosticInteger(
+      cleanupHandoff,
+      ['previousRootChildCount', 'previous_root_child_count']
+    ),
+    currentRootChildCount: readNonNegativeDiagnosticInteger(cleanupHandoff, [
+      'currentRootChildCount',
+      'current_root_child_count'
+    ]),
+    detachedInstance: readBooleanDiagnosticField(cleanupHandoff, [
+      'detachedInstance',
+      'detached_instance'
+    ]),
+    detachedInstanceChildCount: readNonNegativeDiagnosticInteger(
+      cleanupHandoff,
+      ['detachedInstanceChildCount', 'detached_instance_child_count']
+    ),
+    hostNodeCleanupCount: readNonNegativeDiagnosticInteger(cleanupHandoff, [
+      'hostNodeCleanupCount',
+      'host_node_cleanup_count'
+    ]),
+    cleanupOrderRecordCount: readNonNegativeDiagnosticInteger(
+      cleanupHandoff,
+      ['cleanupOrderRecordCount', 'cleanup_order_record_count']
+    ),
+    minimalTreeCleanupHandoff: readBooleanDiagnosticField(cleanupHandoff, [
+      'minimalTreeCleanupHandoff',
+      'minimal_tree_cleanup_handoff'
+    ]),
+    rustUnmountCleanupHandoffExecuted: readBooleanDiagnosticField(
+      cleanupHandoff,
+      [
+        'rustUnmountCleanupHandoffExecuted',
+        'rust_unmount_cleanup_handoff_executed'
+      ]
+    ),
+    hostOutputProduced: readBooleanDiagnosticField(cleanupHandoff, [
+      'hostOutputProduced',
+      'host_output_produced'
+    ]),
+    publicUnmountCompatibilityClaimed: readBooleanDiagnosticField(
+      cleanupHandoff,
+      [
+        'publicUnmountCompatibilityClaimed',
+        'public_unmount_compatibility_claimed'
+      ]
+    ),
+    publicHostTeardownCompatibilityClaimed: readBooleanDiagnosticField(
+      cleanupHandoff,
+      [
+        'publicHostTeardownCompatibilityClaimed',
+        'public_host_teardown_compatibility_claimed'
+      ]
+    ),
+    actFlushingClaimed: readBooleanDiagnosticField(cleanupHandoff, [
+      'actFlushingClaimed',
+      'act_flushing_claimed'
+    ]),
+    nativeBridgeAvailable: readBooleanDiagnosticField(cleanupHandoff, [
+      'nativeBridgeAvailable',
+      'native_bridge_available'
+    ]),
+    nativeExecution: readBooleanDiagnosticField(cleanupHandoff, [
+      'nativeExecution',
+      'native_execution'
+    ]),
+    deletionCommitHandoff
   });
 }
 
@@ -5526,6 +5770,96 @@ function assertAcceptedRustUnmountDeletionCommitHandoffMatchesRequest(
   }
 }
 
+function assertAcceptedRustUnmountNativeBridgeCleanupHandoffMatchesRequest(
+  record,
+  cleanupHandoff
+) {
+  if (
+    cleanupHandoff.diagnosticId !==
+    privateUnmountNativeBridgeCleanupHandoffDiagnosticId
+  ) {
+    throwInvalidRootRequest(
+      'Rust unmount cleanup handoff diagnostic id does not match the accepted gate.'
+    );
+  }
+  if (
+    cleanupHandoff.status !==
+    privateUnmountNativeBridgeCleanupHandoffStatus
+  ) {
+    throwInvalidRootRequest(
+      'Rust unmount cleanup handoff status does not match the accepted gate.'
+    );
+  }
+  if (
+    cleanupHandoff.requestId !== undefined &&
+    cleanupHandoff.requestId !== record.requestId
+  ) {
+    throwInvalidRootRequest(
+      'Rust unmount cleanup handoff request id does not match the private request.'
+    );
+  }
+  if (
+    cleanupHandoff.rootId !== undefined &&
+    cleanupHandoff.rootId !== record.rootId
+  ) {
+    throwInvalidRootRequest(
+      'Rust unmount cleanup handoff root id does not match the private request.'
+    );
+  }
+  if (
+    cleanupHandoff.routeOutcome !== testRendererRootUpdateOutcomeScheduled ||
+    cleanupHandoff.lifecycle !==
+      toRustLifecycleStatus(record.lifecycleStatusAfter) ||
+    cleanupHandoff.scheduledUpdateKind !==
+      testRendererRootUpdateKindUnmount ||
+    cleanupHandoff.scheduledElementIsNone !== true ||
+    cleanupHandoff.routeDependencyId !==
+      'react-test-renderer-unmount-route-private-diagnostic' ||
+    cleanupHandoff.deletionCommitHandoffId !==
+      privateUnmountDeletionCommitHandoffDiagnosticId ||
+    cleanupHandoff.admissionDiagnosticId !==
+      privateUnmountNativeBridgeAdmissionDiagnosticId
+  ) {
+    throwInvalidRootRequest(
+      'Rust unmount cleanup handoff does not describe the accepted native bridge admission.'
+    );
+  }
+  if (
+    cleanupHandoff.previousRootChildCount !== 1 ||
+    cleanupHandoff.currentRootChildCount !== 0 ||
+    cleanupHandoff.detachedInstance !== true ||
+    cleanupHandoff.detachedInstanceChildCount !== 0 ||
+    cleanupHandoff.minimalTreeCleanupHandoff !== true
+  ) {
+    throwInvalidRootRequest(
+      'Rust unmount cleanup handoff does not describe the accepted minimal tree cleanup.'
+    );
+  }
+  if (
+    cleanupHandoff.hostNodeCleanupCount !==
+      cleanupHandoff.deletionCommitHandoff.hostNodeCleanupCount ||
+    cleanupHandoff.cleanupOrderRecordCount !==
+      cleanupHandoff.deletionCommitHandoff.cleanupOrderRecordCount ||
+    cleanupHandoff.rustUnmountCleanupHandoffExecuted !== true ||
+    cleanupHandoff.hostOutputProduced !== true
+  ) {
+    throwInvalidRootRequest(
+      'Rust unmount cleanup handoff is missing actual cleanup execution evidence.'
+    );
+  }
+  if (
+    cleanupHandoff.publicUnmountCompatibilityClaimed !== false ||
+    cleanupHandoff.publicHostTeardownCompatibilityClaimed !== false ||
+    cleanupHandoff.actFlushingClaimed !== false ||
+    cleanupHandoff.nativeBridgeAvailable !== false ||
+    cleanupHandoff.nativeExecution !== false
+  ) {
+    throwInvalidRootRequest(
+      'Rust unmount cleanup handoff must not claim public unmount, host teardown, act flushing, native bridge availability, or native execution.'
+    );
+  }
+}
+
 function assertPrivateUnmountCleanupBlockersPresent(handoff) {
   if (handoff.hostNodeCleanupCount < 1) {
     throwInvalidRootRequest(
@@ -5576,6 +5910,7 @@ function assertPrivateUnmountCleanupBlockersPresent(handoff) {
 }
 
 function createPrivateUnmountNativeBridgeAdmissionRecord({
+  cleanupHandoff,
   deletionCommitHandoff,
   record,
   rustLifecycleDiagnostic
@@ -5599,18 +5934,28 @@ function createPrivateUnmountNativeBridgeAdmissionRecord({
     lifecycleStatusAfter: record.lifecycleStatusAfter,
     privateUnmountRouteMetadata: record.privateUnmountDeletionCommitHandoff,
     rustLifecycleDiagnostic,
+    cleanupHandoff,
+    cleanupHandoffDiagnosticId: cleanupHandoff.diagnosticId,
     deletionCommitHandoff,
     deletionCommitHandoffDiagnosticId: deletionCommitHandoff.diagnosticId,
     consumesPrivateUnmountRouteMetadata: true,
     consumesAcceptedRustLifecycleDiagnostics: true,
     consumesAcceptedDeletionCommitHandoff: true,
+    consumesActualRustCleanupHandoff: true,
+    requiresActualRustCleanupHandoff: true,
     validatesLifecycleEvidence: true,
     validatesCleanupBlockers: true,
+    validatesMinimalTreeCleanupHandoff: true,
     deletionCommitHandoffAccepted: true,
+    cleanupHandoffAccepted: true,
     lifecycleEvidenceAccepted: true,
     cleanupBlockersAccepted: true,
     hostNodeCleanupCount: deletionCommitHandoff.hostNodeCleanupCount,
     cleanupOrderRecordCount: deletionCommitHandoff.cleanupOrderRecordCount,
+    rustUnmountCleanupHandoffExecuted:
+      cleanupHandoff.rustUnmountCleanupHandoffExecuted,
+    hostOutputProduced: cleanupHandoff.hostOutputProduced,
+    minimalTreeCleanupHandoff: cleanupHandoff.minimalTreeCleanupHandoff,
     rejectsAlreadyUnmountedRoots: true,
     rejectsStaleDeletionHandoffs: true,
     rejectsMissingCleanupBlockers: true,
@@ -6350,6 +6695,10 @@ function createRootExecutionHandoff(record) {
       record.privateUpdateNativeBridgeAdmissionGate,
     privateUpdateNativeBridgeAdmissionAvailable:
       record.privateUpdateNativeBridgeAdmissionAvailable,
+    privateUnmountNativeBridgeCleanupHandoffGate:
+      record.privateUnmountNativeBridgeCleanupHandoffGate,
+    privateUnmountNativeBridgeCleanupHandoffAvailable:
+      record.privateUnmountNativeBridgeCleanupHandoffAvailable,
     privateUnmountNativeBridgeAdmissionGate:
       record.privateUnmountNativeBridgeAdmissionGate,
     privateUnmountNativeBridgeAdmissionAvailable:
@@ -6458,6 +6807,12 @@ function consumeRootExecutionResult(record, result, handoff) {
     privateUpdateNativeBridgeAdmission,
     privateUpdateNativeBridgeAdmissionAvailable:
       record.privateUpdateNativeBridgeAdmissionAvailable,
+    privateUnmountNativeBridgeCleanupHandoff:
+      privateUnmountNativeBridgeAdmission === null
+        ? null
+        : privateUnmountNativeBridgeAdmission.cleanupHandoff,
+    privateUnmountNativeBridgeCleanupHandoffAvailable:
+      record.privateUnmountNativeBridgeCleanupHandoffAvailable,
     privateUnmountNativeBridgeAdmission,
     privateUnmountNativeBridgeAdmissionAvailable:
       record.privateUnmountNativeBridgeAdmissionAvailable,
@@ -6472,7 +6827,10 @@ function consumeRootExecutionResult(record, result, handoff) {
     nativeExecution: result.nativeExecution === true,
     rustExecution: result.rustExecution === false ? false : true,
     reconcilerExecution: record.scheduled,
-    hostOutputProduced: privateUpdateNativeBridgeAdmission !== null,
+    hostOutputProduced:
+      privateUpdateNativeBridgeAdmission !== null ||
+      (privateUnmountNativeBridgeAdmission !== null &&
+        privateUnmountNativeBridgeAdmission.hostOutputProduced === true),
     serializationAvailable: false,
     publicRouteAvailable: false,
     publicCreateUpdateUnmountBehaviorAvailable: false,
