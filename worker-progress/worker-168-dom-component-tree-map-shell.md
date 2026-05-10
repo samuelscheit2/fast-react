@@ -69,6 +69,21 @@ commit path was modified.
 - `git add --intent-to-add packages/react-dom/src/client/component-tree.js tests/smoke/react-dom-component-tree-map-shell.mjs worker-progress/worker-168-dom-component-tree-map-shell.md && git diff --check && git reset -- packages/react-dom/src/client/component-tree.js tests/smoke/react-dom-component-tree-map-shell.mjs worker-progress/worker-168-dom-component-tree-map-shell.md`
   - Passed with no whitespace errors.
 
+## Orchestrator Acceptance Verification
+
+- Worker tmux pane reported `Goal achieved`.
+- Merged current `main` into `worker/168-dom-component-tree-map-shell`
+  without conflicts.
+- `node --check packages/react-dom/src/client/component-tree.js` passed.
+- `node --check tests/smoke/react-dom-component-tree-map-shell.mjs` passed.
+- `node tests/smoke/react-dom-component-tree-map-shell.mjs` passed.
+- `npm run check:package-surface` passed with the package-surface snapshot
+  guard.
+- `npm run check:js` passed on the integrated branch, including the package
+  surface guard, import smoke, benchmark gate, workspace checks, and 428
+  conformance tests.
+- `git diff --check main...HEAD` passed.
+
 ## Risks Or Blockers
 
 - This is intentionally a private shell. It is not wired to DOM mutation
