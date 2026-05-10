@@ -20,6 +20,7 @@ import {
 } from "../src/react-dom-root-render-e2e-oracle.mjs";
 import {
   evaluateReactDomRootRenderE2EConformanceGate,
+  inspectReactDomRootRenderE2EPrivateCrossRootSchedulingDiagnostics,
   inspectReactDomRootRenderE2EPrivateHostOutputDiagnostics,
   inspectReactDomRootRenderE2EPrivateWarningBoundaryDiagnostics,
   inspectReactDomRootRenderE2EPrivateBridgeRequests,
@@ -28,6 +29,8 @@ import {
   REACT_DOM_PORTAL_ROOT_RENDER_RECONCILER_DIAGNOSTIC_STATUS,
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_BRIDGE_BLOCKED_STATUS,
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_BRIDGE_MATCH_STATUS,
+  REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_ACCEPTED_STATUS,
+  REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_BLOCKED_STATUS,
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ACCEPTED_STATUS,
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_BLOCKED_STATUS,
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_ACCEPTED_STATUS,
@@ -359,6 +362,14 @@ test("root render e2e conformance gate records private bridge request rows separ
     result.summary.privateWarningBoundaryBlockedScenarioModeRowCount,
     18
   );
+  assert.equal(
+    result.summary.privateCrossRootSchedulingDiagnosticScenarioModeRowCount,
+    2
+  );
+  assert.equal(
+    result.summary.privateCrossRootSchedulingBlockedScenarioModeRowCount,
+    18
+  );
   assert.equal(result.summary.portalRootRenderPrerequisiteRowCount, 4);
   assert.equal(result.summary.portalRootRenderBlockedRowCount, 5);
   assert.equal(result.summary.compatibilityClaimed, false);
@@ -367,6 +378,15 @@ test("root render e2e conformance gate records private bridge request rows separ
   assert.equal(result.summary.privateWarningBoundaryCompatibilityClaimed, false);
   assert.equal(
     result.summary.privateWarningBoundaryConsoleOutputUsedAsEvidence,
+    false
+  );
+  assert.equal(
+    result.summary.privateCrossRootSchedulingCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    result.summary
+      .privateCrossRootSchedulingPublicFlushSyncCompatibilityClaimed,
     false
   );
   assert.equal(result.summary.portalRootRenderCompatibilityClaimed, false);
@@ -408,6 +428,26 @@ test("root render e2e conformance gate records private bridge request rows separ
     false
   );
   assert.equal(result.privateWarningBoundaryGate.compatibilityClaimed, false);
+  assert.deepEqual(
+    result.privateCrossRootSchedulingGate
+      .admittedPrivateCrossRootSchedulingScenarioIds,
+    ["flush-sync-cross-root-render"]
+  );
+  assert.deepEqual(
+    result.privateCrossRootSchedulingGate
+      .unsupportedPrivateCrossRootSchedulingScenarioIds,
+    REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.filter(
+      (scenarioId) => scenarioId !== "flush-sync-cross-root-render"
+    )
+  );
+  assert.equal(
+    result.privateCrossRootSchedulingGate.publicFlushSyncCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    result.privateCrossRootSchedulingGate.compatibilityClaimed,
+    false
+  );
 
   for (const row of result.blockedScenarioModeRows) {
     assert.equal(row.oracleRowAccepted, true);
@@ -527,6 +567,54 @@ test("root render e2e conformance gate records private bridge request rows separ
         row.comparedToReactDomOracle === false &&
         row.compatibilityClaimed === false &&
         row.consoleOutputUsedAsEvidence === false
+    )
+  );
+
+  for (const row of result.privateCrossRootSchedulingDiagnosticScenarioModeRows) {
+    assert.equal(
+      row.gateStatus,
+      REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_ACCEPTED_STATUS
+    );
+    assert.equal(row.scenarioId, "flush-sync-cross-root-render");
+    assert.equal(row.oracleRowAccepted, true);
+    assert.equal(row.comparedToReactDomOracle, false);
+    assert.equal(row.compatibilityClaimed, false);
+    assert.equal(row.publicFlushSyncCompatibilityClaimed, false);
+    assert.equal(row.publicRootCompatibilitySurface, false);
+    assert.equal(row.publicFacadeGateStatus, "blocked-unsupported-root-e2e");
+    assert.equal(row.diagnosticKind, "private-cross-root-scheduling-flush");
+    assert.deepEqual(row.schedulingEvidence.callbackEvents, [
+      "root.render:first",
+      "root.render:second",
+      "flushSyncWork"
+    ]);
+    assert.equal(row.schedulingEvidence.scheduledRootCount, 2);
+    assert.equal(row.schedulingEvidence.committedRootCountAfterFlush, 2);
+    assert.equal(
+      row.schedulingEvidence.privateReconcilerDiagnostics
+        .crossRootDiagnosticTestPresent,
+      true
+    );
+  }
+
+  assert.deepEqual(
+    new Set(
+      result.privateCrossRootSchedulingBlockedScenarioModeRows.map(
+        (row) => row.gateStatus
+      )
+    ),
+    new Set([
+      REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_BLOCKED_STATUS
+    ])
+  );
+  assert.ok(
+    result.privateCrossRootSchedulingBlockedScenarioModeRows.every(
+      (row) =>
+        row.scenarioId !== "flush-sync-cross-root-render" &&
+        row.publicRootCompatibilitySurface === false &&
+        row.comparedToReactDomOracle === false &&
+        row.compatibilityClaimed === false &&
+        row.publicFlushSyncCompatibilityClaimed === false
     )
   );
 
@@ -794,6 +882,65 @@ test("private host-output diagnostics admit only explicit fake-DOM evidence", ()
       .publicFlushSyncCompatibilityClaimed,
     false
   );
+});
+
+test("private cross-root scheduling diagnostics stay separate from public flushSync compatibility", () => {
+  const observations =
+    inspectReactDomRootRenderE2EPrivateCrossRootSchedulingDiagnostics();
+
+  assert.equal(observations.loadError, null);
+  assert.equal(observations.rows.length, 2);
+
+  for (const row of observations.rows) {
+    assert.equal(row.status, "ok");
+    assert.equal(row.scenarioId, "flush-sync-cross-root-render");
+    assert.equal(row.evidence.comparedToReactDomOracle, false);
+    assert.equal(row.evidence.compatibilityClaimed, false);
+    assert.equal(row.evidence.publicFlushSyncCompatibilityClaimed, false);
+    assert.equal(row.evidence.publicRootCompatibilitySurface, false);
+    assert.equal(
+      row.evidence.diagnosticKind,
+      "private-cross-root-scheduling-flush"
+    );
+    assert.deepEqual(row.evidence.rootBridgeEvidence.requestOperations, [
+      "create",
+      "create",
+      "render",
+      "render"
+    ]);
+    assert.ok(
+      row.evidence.rootBridgeEvidence.nativeHandoffs.every(
+        (handoff) =>
+          handoff.nativeExecution === false &&
+          handoff.reconcilerExecution === false &&
+          handoff.domMutation === false &&
+          handoff.compatibilityClaimed === false
+      )
+    );
+    assert.deepEqual(row.evidence.schedulingEvidence.callbackEvents, [
+      "root.render:first",
+      "root.render:second",
+      "flushSyncWork"
+    ]);
+    assert.equal(row.evidence.schedulingEvidence.scheduledRootCount, 2);
+    assert.equal(
+      row.evidence.schedulingEvidence.committedRootCountAfterFlush,
+      2
+    );
+    assert.equal(
+      row.evidence.schedulingEvidence.flushSyncWorkCallCount,
+      1
+    );
+    assert.equal(
+      row.evidence.schedulingEvidence.privateReconcilerDiagnostics
+        .crossRootDiagnosticTestPresent,
+      true
+    );
+    assert.equal(
+      row.evidence.schedulingEvidence.publicFlushSyncCompatibilityClaimed,
+      false
+    );
+  }
 });
 
 test("private warning-boundary diagnostics use root metadata rather than console output", () => {
