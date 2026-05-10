@@ -156,9 +156,20 @@ sequencing belong in `MASTER_PLAN.md`.
   reverse-map wrong-node validation, latest-props storage and cleanup, and a
   focused smoke test proving no public React DOM export, event, ref, hydration,
   portal, Rust, or DOM mutation commit wiring changed.
+- Worker 169 hydration boundary skeleton was merged, adding fail-closed
+  internal HostRoot hydration state accessors, typed hydration boundary handles
+  and Activity/Suspense placeholder records, while preserving client roots as
+  non-hydrated by default and leaving public `hydrateRoot`, DOM marker parsing,
+  host hydration traits, and event replay unsupported.
 
 ## Latest Accepted Verification
 
+- Worker 169 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused `root_config` and `fiber_root` tests, full
+  `fast-react-reconciler` tests with 98 unit tests plus 1 doctest, reconciler
+  clippy with warnings denied, and `git diff --check`; the worktree merge
+  conflict in `root_config.rs` preserved both accepted root option callback
+  records and the new hydration handles/accessors.
 - Worker 168 was verified on its integrated worktree and again on `main` with
   component-tree and smoke-test syntax checks, the focused
   `react-dom-component-tree-map-shell` smoke test,

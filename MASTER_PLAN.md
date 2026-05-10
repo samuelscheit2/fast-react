@@ -45,8 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 169: hydration boundary skeleton in
-  `/Users/user/Developer/Developer/fast-react-worker-169-hydration-boundary-skeleton`.
 - Worker 172: resource/form unsupported gates in
   `/Users/user/Developer/Developer/fast-react-worker-172-resource-form-unsupported-gates`.
 - Worker 173: passive pending state in
