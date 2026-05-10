@@ -2,61 +2,25 @@
 
 Last updated: 2026-05-10
 
-## Mission
+This file owns current and future work only. Accepted history belongs in
+`MASTER_PROGRESS.md`; durable orchestration policy belongs in `ORCHESTRATOR.md`;
+worker-facing rules belong in `WORKER_BRIEF.md`.
 
-Build an almost 1-to-1 React reimplementation in Rust that is faster than the
-JavaScript implementation while remaining generic enough for `react-dom`,
-`react-native`, and other renderer-dependent ecosystems.
+## Planning Inputs
 
-Compatibility target:
+- Compatibility target: `react` 19.2.6, `react-dom` 19.2.6,
+  `@types/react` 19.2.14.
+- Source reference: `/Users/user/Developer/Developer/react-reference`, upstream
+  `facebook/react` tag `v19.2.6`, commit
+  `eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401`.
+- Use source for internals research. Use npm tarballs and runtime oracles for
+  published behavior claims.
 
-- `react` 19.2.6
-- `react-dom` 19.2.6
-- `@types/react` 19.2.14
-
-Reference source:
-
-- `/Users/user/Developer/Developer/react-reference`
-- upstream `facebook/react` tag `v19.2.6`
-- commit `eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401`
-
-Use source for internals research. Use npm tarballs and runtime oracles for
-published behavior claims.
-
-## Operating Model
-
-- The orchestrator owns task decomposition, worker routing, merge decisions, and
-  progress tracking.
-- Workers run as real tmux Codex subprocesses in isolated worktrees when
-  possible.
-- Top-level tmux worker cap: 30. Worker-internal nested agents are allowed and
-  do not count against the cap.
-- Workers read `WORKER_BRIEF.md`, set a goal first, stay within write scope,
-  and report evidence in `worker-progress/<worker-id>.md`.
-- Coordination docs stay compact. Detailed historical evidence belongs in git
-  history and `worker-progress/*.md`.
-
-## Architecture Direction
-
-- Rust core owns renderer-agnostic React semantics: elements, fibers, lanes,
-  updates, hooks, context, effects, and scheduler-facing state.
-- Renderer integration uses host-config-style boundaries with opaque host
-  handles/tokens. DOM, native, hydration, events, resources, and security
-  behavior stay outside the core.
-- JS package facades expose React-compatible entrypoints. N-API is the primary
-  native boundary until benchmarks justify another path.
-- Compatibility is proven by black-box React 19.2.6 oracles and published
-  package probes, not by inferred source names alone.
-- Performance claims wait until the relevant conformance scenarios are green.
-
-## Milestones
+## Active And Future Milestones
 
 | Milestone | Focus | Status |
 | --- | --- | --- |
-| M0 | Orchestration foundation, worker conventions, initial repo strategy | Done |
-| M1 | Compatibility inventory and conformance strategy | Done |
-| M2 | Cargo/npm scaffold and package boundaries | Done |
-| M3 | Element/runtime model and direct React facade behavior | In progress |
+| M3 | Element/runtime model and direct React facade behavior | Active |
 | M4 | Fiber, root, update queues, lanes, scheduling, commit ordering | Active |
 | M5 | Hooks, context, effects, function component render | Active |
 | M6 | Host boundary, test renderer, DOM mutation proof renderer | Active |
@@ -64,64 +28,51 @@ published behavior claims.
 | M8 | Conformance and benchmark harness | Active |
 | M9 | Iterative compatibility closure and performance profiling | Future |
 
-## Current Focus
+## Current Objective
 
-The current project push is a minimal real root render/update/unmount path:
+Drive toward a minimal real root render/update/unmount path:
 
-1. Core data: lane-backed priorities, root lane bookkeeping, fiber flags,
-   topology, hook queues.
-2. Reconciler data and work: FiberRoot/HostRoot records, HostRoot queues,
-   function component render, sync flush/act routing, minimal commit.
-3. Host behavior: token-aware host config, test-renderer integration, minimal
-   DOM mutation/text host behavior.
-4. Public facades and oracles: React DOM roots, hydration facade boundaries,
-   test renderer root/serialization/act/error surfaces, scheduler mock.
-5. End-to-end gates: dual-run conformance tests and focused Rust tests before
-   any compatibility claim.
+1. Lane-backed priorities, root lane bookkeeping, fiber flags, topology, and
+   hook queues.
+2. FiberRoot/HostRoot records, HostRoot queues, function component render, sync
+   flush/act routing, and minimal commit.
+3. Token-aware host config, test-renderer integration, and minimal DOM
+   mutation/text host behavior.
+4. React DOM roots, hydration facade boundaries, test-renderer
+   root/serialization/act/error surfaces, and scheduler package variants.
+5. Dual-run conformance tests and focused Rust tests before any compatibility
+   claim.
 
-## Current Queue
+## Active Queue
 
-- Worker 124 is running the reconciler HostRoot update queue and
-  `update_container` internal slice.
-- Worker 125 is running the independent `scheduler/unstable_post_task`
-  implementation slice.
-- Worker 126 is running the independent scheduler native entrypoint
-  implementation slice.
+- Worker 124: reconciler HostRoot update queue plus `update_container` and
+  `update_container_sync`.
+- Worker 125: independent `scheduler/unstable_post_task` implementation.
+- Worker 126: independent scheduler native entrypoint implementation.
 
-## Near-Term Plan
+## Near-Term Sequencing
 
-1. Keep live workers running while their panes show active `Working` or
-   `Pursuing goal` state; ignore stale usage-limit text in pane scrollback
-   unless the worker process is actually stopped or blocked at a prompt.
-2. Keep worker 124 serialized around `crates/fast-react-reconciler/src/lib.rs`;
-   do not launch dependent root scheduler, work-loop, commit, DOM
-   event-dispatch, or React DOM facade source slices until its queue/API model
-   is accepted or intentionally abandoned.
-3. Keep workers 125 and 126 independent from root/reconciler work and from each
-   other; accept them through their scheduler post-task/native oracle gates.
-4. After accepting each live worker, run its scoped checks, merge
-   with a no-fast-forward commit, then update this file with the next active
-   queue and move completed facts to `MASTER_PROGRESS.md`.
-5. Queue follow-up source slices from the accepted root/reconciler/DOM/test
-   renderer sequencing reports only when their write scopes do not overlap with
-   live workers.
+1. Keep workers 124, 125, and 126 running while their tmux panes show active
+   `Working` or `Pursuing goal`; ignore stale usage-limit text unless the
+   process is stopped, idle, or blocked at a prompt.
+2. Keep worker 124 serialized around reconciler root queue/API surfaces. Do not
+   launch dependent root scheduler, work-loop, commit, DOM event-dispatch, or
+   React DOM facade source slices until worker 124 is accepted or abandoned.
+3. Keep workers 125 and 126 independent from root/reconciler work. Resolve the
+   scheduler smoke integration expectations before accepting their broad JS
+   gates as green.
+4. After worker 124 lands, queue the next non-overlapping root/reconciler slices
+   from the accepted sequencing reports.
+5. After scheduler variant smoke integration is settled, accept or follow up on
+   workers 125 and 126 through their focused oracle gates plus `npm run
+   check:js`.
 
-## Merge Policy
+## Next Queue Candidates
 
-1. Confirm worker pane is complete or intentionally stopped.
-2. Inspect worktree status, changed files, report, verification commands, and
-   goal evidence.
-3. Verify scope-specific hygiene: path leaks, conflict markers, trailing
-   whitespace, `git diff --check`, and relevant tests.
-4. Commit the worker branch with only scoped changes.
-5. Merge to `main` with a no-fast-forward merge commit.
-6. Update `MASTER_PLAN.md` and `MASTER_PROGRESS.md` concisely.
-7. Close the tmux session and remove/prune the accepted worktree unless needed
-   for immediate follow-up.
-
-## Completion Standard
-
-A milestone is not complete unless every deliverable maps to concrete evidence:
-files, command output, tests, benchmark results, or documented decisions.
-Passing tests are supporting evidence only when they cover the stated
-deliverable.
+- Root scheduler/work loop once HostRoot updates are accepted.
+- Minimal commit path after root work loop ownership is clear.
+- Function component render and hook queue slices after the root queue model is
+  stable.
+- Test renderer root serialization and act/error surfaces once commit behavior
+  exists.
+- DOM mutation/text host behavior after host token boundaries remain stable.
