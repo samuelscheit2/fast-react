@@ -94,9 +94,18 @@ sequencing belong in `MASTER_PLAN.md`.
   `packages/react-dom/src/dom-host` mutation and text-content helpers plus a
   fake-DOM smoke test for append, insert, remove, clear, text update, and
   simple text-content decisions without changing public React DOM entrypoints.
+- Worker 155 scheduler callback execution was merged, adding an internal API
+  that consumes `SchedulerCallbackRequest`, validates callback identity, and
+  returns deterministic stale/no-work/rendered records that hand matching
+  callbacks to the HostRoot render-phase path without sync flush, commit, host
+  mutation, or public Scheduler package behavior.
 
 ## Latest Accepted Verification
 
+- Worker 155 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused root-scheduler and root-work-loop tests,
+  full `fast-react-reconciler` tests with 85 unit tests plus 1 doctest,
+  reconciler clippy with warnings denied, and `git diff --check`.
 - Worker 154 was verified on its integrated worktree and again on `main` with
   the focused DOM mutation adapter smoke test, `npm run check:js` with 427
   conformance tests, and `git diff --check`.

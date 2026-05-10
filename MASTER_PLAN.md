@@ -45,8 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 155: scheduler callback execution in
-  `/Users/user/Developer/Developer/fast-react-worker-155-scheduler-callback-execution`.
 - Worker 156: root lane selection helpers in
   `/Users/user/Developer/Developer/fast-react-worker-156-root-lane-selection-helpers`.
 - Worker 157: core hook effect ring in
