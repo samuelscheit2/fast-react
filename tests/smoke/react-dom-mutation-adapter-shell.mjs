@@ -513,6 +513,27 @@ function runSmokeChecks() {
   }
 
   {
+    const document = new FakeDocument();
+    const parent = createElement('div', document);
+    const text = domHost.createDomHostTextInstance('created', parent);
+    const documentText = domHost.createDomHostTextInstance(9, document);
+
+    assert.equal(text.nodeName, '#text');
+    assert.equal(text.ownerDocument, document);
+    assert.equal(text.textContent, 'created');
+    assert.equal(documentText.textContent, '9');
+    assert.deepEqual(document.createdTextNodes, ['created', '9']);
+
+    assert.equal(domHost.appendChild(parent, text), text);
+    assert.deepEqual(childNames(parent), ['#text']);
+    assert.equal(parent.textContent, 'created');
+
+    assert.throws(() => domHost.createDomHostTextInstance('missing', {}), {
+      code: 'FAST_REACT_DOM_INVALID_TEXT_CREATION_TARGET'
+    });
+  }
+
+  {
     const parent = createElement('div');
     const text = createText('managed');
 
@@ -621,12 +642,12 @@ function runSmokeChecks() {
   console.log('React DOM private mutation adapter shell smoke checks passed.');
 }
 
-function createElement(nodeName) {
-  return new FakeElement(nodeName);
+function createElement(nodeName, ownerDocument = new FakeDocument()) {
+  return ownerDocument.createElement(nodeName);
 }
 
-function createText(text) {
-  return new FakeText(text);
+function createText(text, ownerDocument = new FakeDocument()) {
+  return ownerDocument.createTextNode(text);
 }
 
 function childNames(parent) {
@@ -717,10 +738,11 @@ function captureThrown(operation) {
 }
 
 class FakeNode {
-  constructor(nodeName, nodeType) {
+  constructor(nodeName, nodeType, ownerDocument) {
     this.childNodes = [];
     this.nodeName = nodeName;
     this.nodeType = nodeType;
+    this.ownerDocument = ownerDocument;
     this.parentNode = null;
   }
 
@@ -769,9 +791,28 @@ class FakeNode {
   }
 }
 
+class FakeDocument {
+  constructor() {
+    this.createdTextNodes = [];
+    this.nodeName = '#document';
+    this.nodeType = 9;
+    this.ownerDocument = this;
+  }
+
+  createElement(nodeName) {
+    return new FakeElement(nodeName, this);
+  }
+
+  createTextNode(text) {
+    const textNode = new FakeText(text, this);
+    this.createdTextNodes.push(String(text));
+    return textNode;
+  }
+}
+
 class FakeElement extends FakeNode {
-  constructor(nodeName) {
-    super(nodeName, 1);
+  constructor(nodeName, ownerDocument) {
+    super(nodeName, 1, ownerDocument);
     this._textContent = '';
     this._boolProp = null;
     this._objectProp = null;
@@ -898,8 +939,8 @@ class FakeStyle {
 }
 
 class FakeText extends FakeNode {
-  constructor(text) {
-    super('#text', 3);
+  constructor(text, ownerDocument) {
+    super('#text', 3, ownerDocument);
     this._data = String(text);
     this.writeLog = [];
   }

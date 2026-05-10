@@ -55,6 +55,7 @@ function createDomHostMutationError(code, message) {
 const DOM_HOST_TEXT_COMMIT_GATE_METADATA = Object.freeze({
   gateVersion: 1,
   target: 'packages/react-dom/src/dom-host/mutation.js',
+  privateTextCreationBridge: 'createDomHostTextInstance',
   publicRootsCompared: false,
   serverRenderingCompared: false,
   hydrationCompared: false,
@@ -130,6 +131,24 @@ function clearContainer(container) {
 
 function commitTextUpdate(textInstance, oldText, newText) {
   setTextNodeValue(textInstance, newText, 'commitTextUpdate');
+}
+
+function createDomHostTextInstance(text, rootContainerInstance) {
+  const ownerDocument = getOwnerDocumentForHostText(
+    rootContainerInstance,
+    'createDomHostTextInstance'
+  );
+  const createText = ownerDocument['create' + 'TextNode'];
+  if (typeof createText !== 'function') {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_TEXT_CREATION_TARGET',
+      'Cannot create HostText without an owner document text-node factory.'
+    );
+  }
+
+  const textInstance = createText.call(ownerDocument, String(text));
+  assertDomLikeObject(textInstance, 'createDomHostTextInstance', 'child');
+  return textInstance;
 }
 
 function resetTextContent(instance) {
@@ -728,6 +747,24 @@ function isTextNode(node) {
   );
 }
 
+function getOwnerDocumentForHostText(rootContainerInstance, operation) {
+  assertDomLikeObject(rootContainerInstance, operation, 'parent');
+
+  if (rootContainerInstance.nodeType === 9) {
+    return rootContainerInstance;
+  }
+
+  const ownerDocument = rootContainerInstance.ownerDocument;
+  if (ownerDocument != null && typeof ownerDocument === 'object') {
+    return ownerDocument;
+  }
+
+  throw createDomHostMutationError(
+    'FAST_REACT_DOM_INVALID_TEXT_CREATION_TARGET',
+    'Cannot create HostText from a container without an owner document.'
+  );
+}
+
 function validateStyleDangerousHtmlPayloadEntry(instance, entry) {
   if (entry == null || typeof entry !== 'object') {
     throw createDomHostMutationError(
@@ -898,6 +935,7 @@ module.exports = {
   clearContainer,
   commitTextUpdate,
   commitDomPropertyUpdate,
+  createDomHostTextInstance,
   createDomHostMutationError,
   createLatestPropsCommitRecord,
   getLatestPropsCommitRecordPayload,
