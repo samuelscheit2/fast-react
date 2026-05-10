@@ -1672,6 +1672,200 @@ test("private resource-map commit diagnostics stay record-only", () => {
   assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
 });
 
+test("private preload/preinit fake-head execution consumes resource-map metadata without public dispatch", () => {
+  const dispatcherGate = resourceFormGate.createResourceFormActionInternalsGate({
+    requestIdPrefix: "resource-conformance-fake-head-source"
+  });
+  const adapterGate = resourceFormGate.createResourceHintFakeDomAdapterGate({
+    requestIdPrefix: "resource-conformance-fake-head-adapter"
+  });
+  const orderGate =
+    resourceFormGate.createResourceHintPreloadPreinitOrderGate({
+      requestIdPrefix: "resource-conformance-fake-head-order"
+    });
+  const stylesheetGate =
+    resourceFormGate.createResourceHintStylesheetPrecedenceGate({
+      requestIdPrefix: "resource-conformance-fake-head-stylesheet"
+    });
+  const commitGate =
+    resourceFormGate.createResourceHintResourceMapCommitGate({
+      requestIdPrefix: "resource-conformance-fake-head-commit"
+    });
+  const fakeDom = createDeterministicResourceHintDom();
+  const dispatcherRecords = [
+    dispatcherGate.recordResourceHintDispatcherRequest("L", [
+      "/style.css",
+      "style",
+      {
+        crossOrigin: undefined,
+        integrity: undefined,
+        nonce: undefined,
+        type: undefined,
+        fetchPriority: "low",
+        referrerPolicy: undefined,
+        imageSrcSet: undefined,
+        imageSizes: undefined,
+        media: undefined
+      }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest("S", [
+      "/style.css",
+      "theme",
+      {
+        crossOrigin: "",
+        integrity: "sha256-style",
+        fetchPriority: "high"
+      }
+    ])
+  ];
+  const headRecord = dispatcherGate.recordSingletonRequest("head", [
+    { title: "blocked-head-singleton-props" }
+  ]);
+  const admissions = dispatcherRecords.map((record) =>
+    adapterGate.admitDispatcherRecord(record, {
+      explicitAdmission: true,
+      adapterKind: "deterministic-fake-dom",
+      targetKind: "document-head"
+    })
+  );
+  appendResourceHintFakeHeadChild(fakeDom, "link", {
+    rel: "stylesheet",
+    "data-precedence": "theme",
+    "data-fast-react-resource-key": "existing-style",
+    "data-fast-react-precedence-key": "precedence-main"
+  });
+  appendResourceHintFakeHeadChild(fakeDom, "meta", {
+    name: "description"
+  });
+
+  const order = orderGate.recordPreloadPreinitOrderDiagnostic(
+    admissions,
+    {
+      explicitOrderDiagnostic: true,
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head,
+      resourceDescriptors: [
+        {
+          sourceAdapterAdmissionId: admissions[0].adapterAdmissionId,
+          resourceKind: "style",
+          resourceKey: "style-main"
+        },
+        {
+          sourceAdapterAdmissionId: admissions[1].adapterAdmissionId,
+          resourceKind: "style",
+          resourceKey: "style-main",
+          precedenceKey: "precedence-main"
+        }
+      ]
+    }
+  );
+  const stylesheet = stylesheetGate.recordStylesheetPrecedenceDiagnostic(
+    order,
+    headRecord,
+    {
+      explicitStylesheetPrecedenceDiagnostic: true,
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head
+    }
+  );
+  const diagnostic = commitGate.recordResourceMapCommitDiagnostic(
+    order,
+    stylesheet,
+    {
+      explicitResourceMapCommitDiagnostic: true,
+      fakeHeadExecution: {
+        explicitFakeHeadExecution: true,
+        executionId: "style-preload-preinit-fake-head",
+        fakeDocument: fakeDom.document,
+        fakeHead: fakeDom.head
+      }
+    }
+  );
+
+  assert.equal(
+    diagnostic.preloadPreinitFakeHeadExecution.executionStatus,
+    resourceFormGate.privateResourceHintPreloadPreinitFakeHeadExecutionStatus
+  );
+  assert.deepEqual(
+    diagnostic.preloadPreinitFakeHeadExecution.rows.map((row) => ({
+      contractId: row.contractId,
+      recordKind: row.recordKind,
+      insertionMethod: row.insertionMethod,
+      fakeDomCommitApplied: row.fakeDomCommitApplied,
+      publicResourceHintDomInsertion: row.publicResourceHintDomInsertion,
+      publicResourceMapCommitBehavior: row.publicResourceMapCommitBehavior
+    })),
+    [
+      {
+        contractId: "preload",
+        recordKind: "preload",
+        insertionMethod: "appendChild",
+        fakeDomCommitApplied: true,
+        publicResourceHintDomInsertion: false,
+        publicResourceMapCommitBehavior: false
+      },
+      {
+        contractId: "preinit-style",
+        recordKind: "stylesheet",
+        insertionMethod: "insertBefore",
+        fakeDomCommitApplied: true,
+        publicResourceHintDomInsertion: false,
+        publicResourceMapCommitBehavior: false
+      }
+    ]
+  );
+  assert.deepEqual(
+    fakeDom.head.childNodes.map((node) => ({
+      nodeName: node.nodeName,
+      rel: node.attributes.rel || null,
+      as: node.attributes.as || null,
+      resourceKey: node.attributes["data-fast-react-resource-key"] || null,
+      precedenceKey:
+        node.attributes["data-fast-react-precedence-key"] || null
+    })),
+    [
+      {
+        nodeName: "LINK",
+        rel: "stylesheet",
+        as: null,
+        resourceKey: "existing-style",
+        precedenceKey: "precedence-main"
+      },
+      {
+        nodeName: "LINK",
+        rel: "stylesheet",
+        as: null,
+        resourceKey: "style-main",
+        precedenceKey: "precedence-main"
+      },
+      {
+        nodeName: "META",
+        rel: null,
+        as: null,
+        resourceKey: null,
+        precedenceKey: null
+      },
+      {
+        nodeName: "LINK",
+        rel: "preload",
+        as: "style",
+        resourceKey: "style-main",
+        precedenceKey: null
+      }
+    ]
+  );
+  assert.equal(diagnostic.resourceMapCommitPlan.fakeDomCommitApplied, true);
+  assert.equal(diagnostic.resourceLifecycleBoundary.fakeDomCommitApplied, true);
+  assert.equal(diagnostic.sideEffects.fakeHeadMutated, true);
+  assert.equal(diagnostic.sideEffects.fakeResourceElementInserted, true);
+  assert.equal(diagnostic.sideEffects.publicResourceHintDomInsertion, false);
+  assert.equal(diagnostic.sideEffects.publicResourceMapCommitBehavior, false);
+  assert.equal(JSON.stringify(diagnostic).includes("/style.css"), false);
+  assert.equal(JSON.stringify(diagnostic).includes("sha256-style"), false);
+  assert.equal(/"theme"/u.test(JSON.stringify(diagnostic)), false);
+  assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
+});
+
 
 test("private stylesheet load/error state diagnostics stay fake-record-only", () => {
   const dispatcherGate = resourceFormGate.createResourceFormActionInternalsGate({
@@ -2001,6 +2195,13 @@ function createDeterministicResourceHintDom() {
     childNodes: [],
     appendChild(child) {
       this.childNodes.push(child);
+      child.parentNode = this;
+      return child;
+    },
+    insertBefore(child, before) {
+      const index = this.childNodes.indexOf(before);
+      assert.notEqual(index, -1);
+      this.childNodes.splice(index, 0, child);
       child.parentNode = this;
       return child;
     }
