@@ -136,6 +136,26 @@ const nativeRootBridgeJsonTransportParseErrorCodes = Object.freeze({
   unsupportedFieldValue:
     'FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_UNSUPPORTED_FIELD_VALUE'
 });
+const nativeRootBridgeJsonTransportErrorDiagnosticRowFields = Object.freeze([
+  'id',
+  'category',
+  'phase',
+  'name',
+  'code',
+  'sourceErrorCode',
+  'boundaryErrorCode',
+  'nativeAddonLoaded',
+  'nativeExecution',
+  'rendererExecution',
+  'reconcilerExecution',
+  'reactBehaviorError'
+]);
+const nativeRootBridgeJsonTransportErrorDiagnosticCaseIds = Object.freeze([
+  'malformed-payload',
+  'wrong-environment-root-handle',
+  'stale-value-handle-generation',
+  'render-before-create-lifecycle-order'
+]);
 const nativeRootBridgeValidationErrorCodes = Object.freeze({
   createAfterRootCreated:
     'FAST_REACT_NAPI_ROOT_REQUEST_CREATE_AFTER_ROOT_CREATED',
@@ -187,6 +207,10 @@ const nativeRootBridgeJsonTransportParserGate = Object.freeze({
   jsonTransportRequestRecordFields: nativeRootBridgeRustRequestRecordFields,
   jsonTransportHandleFields: nativeRootBridgeRustHandleFields,
   parseErrorCodes: nativeRootBridgeJsonTransportParseErrorCodes,
+  jsonTransportErrorDiagnosticRowFields:
+    nativeRootBridgeJsonTransportErrorDiagnosticRowFields,
+  jsonTransportErrorDiagnosticCaseIds:
+    nativeRootBridgeJsonTransportErrorDiagnosticCaseIds,
   nativeAddonLoaded: false,
   nativeExecution: false,
   rendererExecution: false,
@@ -861,9 +885,15 @@ function createNativeRootBridgeJsonTransportParserGate(json) {
     jsonTransportRequestRecordFields: nativeRootBridgeRustRequestRecordFields,
     jsonTransportHandleFields: nativeRootBridgeRustHandleFields,
     parseErrorCodes: nativeRootBridgeJsonTransportParseErrorCodes,
+    jsonTransportErrorDiagnosticRowFields:
+      nativeRootBridgeJsonTransportErrorDiagnosticRowFields,
+    jsonTransportErrorDiagnosticCaseIds:
+      nativeRootBridgeJsonTransportErrorDiagnosticCaseIds,
     decodedRequestRecords,
     deterministicParseErrors:
       createNativeRootBridgeJsonTransportParseErrorEvidence(),
+    deterministicErrorRows:
+      createNativeRootBridgeJsonTransportErrorDiagnosticRows(),
     nativeAddonLoaded: false,
     nativeExecution: false,
     rendererExecution: false,
@@ -941,6 +971,117 @@ function createNativeRootBridgeJsonTransportParseErrorEvidence() {
         `Expected native root bridge JSON transport parser case ${id} to fail.`
       );
     })
+  );
+}
+
+function createNativeRootBridgeJsonTransportErrorDiagnosticRows() {
+  const cases = [
+    {
+      id: 'malformed-payload',
+      category: 'malformed-payload',
+      phase: 'parse',
+      expectedCode: nativeRootBridgeJsonTransportParseErrorCodes.invalidJson,
+      sourceErrorCode: null,
+      boundaryErrorCode: null,
+      json: '{'
+    },
+    {
+      id: 'wrong-environment-root-handle',
+      category: 'wrong-environment',
+      phase: 'validation',
+      expectedCode: nativeRootBridgeValidationErrorCodes.wrongEnvironment,
+      sourceErrorCode: nativeRootBridgeValidationErrorCodes.wrongEnvironment,
+      boundaryErrorCode:
+        nativeBoundaryErrorCodeMap.rootBridgeWrongEnvironment,
+      json:
+        '{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":467,"root_handle":{"environment_id":468,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"active"}]}'
+    },
+    {
+      id: 'stale-value-handle-generation',
+      category: 'stale-handle',
+      phase: 'validation',
+      expectedCode: nativeRootBridgeValidationErrorCodes.staleHandle,
+      sourceErrorCode: nativeRootBridgeValidationErrorCodes.staleHandle,
+      boundaryErrorCode: nativeBoundaryErrorCodeMap.rootBridgeStaleHandle,
+      json:
+        '{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":467,"root_handle":{"environment_id":467,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":467,"slot":2,"generation":1,"kind":"value"},"root_handle_state":"active"},{"request_id":2,"kind":"render","environment_id":467,"root_handle":{"environment_id":467,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":467,"slot":2,"generation":2,"kind":"value"},"root_handle_state":"active"}]}'
+    },
+    {
+      id: 'render-before-create-lifecycle-order',
+      category: 'lifecycle-order',
+      phase: 'validation',
+      expectedCode:
+        nativeRootBridgeValidationErrorCodes.sequenceMustStartWithCreate,
+      sourceErrorCode:
+        nativeRootBridgeValidationErrorCodes.sequenceMustStartWithCreate,
+      boundaryErrorCode:
+        nativeBoundaryErrorCodeMap.rootBridgeWrongLifecycleOrder,
+      json:
+        '{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"render","environment_id":467,"root_handle":{"environment_id":467,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"active"}]}'
+    }
+  ];
+
+  return Object.freeze(
+    cases.map((diagnosticCase) => {
+      try {
+        validateNativeRootBridgeJsonTransportDiagnosticPayload(
+          diagnosticCase.json
+        );
+      } catch (error) {
+        assertNativeRootBridgeJsonTransportDiagnosticRowError(
+          error,
+          diagnosticCase.expectedCode,
+          diagnosticCase.id
+        );
+        return Object.freeze({
+          id: diagnosticCase.id,
+          category: diagnosticCase.category,
+          phase: diagnosticCase.phase,
+          name: error.name,
+          code: error.code,
+          sourceErrorCode: diagnosticCase.sourceErrorCode,
+          boundaryErrorCode: diagnosticCase.boundaryErrorCode,
+          nativeAddonLoaded: error.nativeAddonLoaded,
+          nativeExecution: error.nativeExecution,
+          rendererExecution: error.rendererExecution,
+          reconcilerExecution: error.reconcilerExecution,
+          reactBehaviorError: false
+        });
+      }
+
+      throw new Error(
+        `Expected native root bridge JSON transport diagnostic case ${diagnosticCase.id} to fail.`
+      );
+    })
+  );
+}
+
+function validateNativeRootBridgeJsonTransportDiagnosticPayload(json) {
+  const decodedRecords = parseNativeRootBridgeJsonTransportRequestRecords(json);
+  const validationRecords =
+    validateNativeRootBridgeJsonTransportRecords(decodedRecords);
+  createNativeRootBridgeHandleAdmissionPreflight(validationRecords);
+}
+
+function assertNativeRootBridgeJsonTransportDiagnosticRowError(
+  error,
+  expectedCode,
+  id
+) {
+  if (
+    (error?.name === 'FastReactNativeJsonTransportParserError' ||
+      error?.name === 'FastReactNativeRequestShapeError') &&
+    error.code === expectedCode &&
+    error.nativeAddonLoaded === false &&
+    error.nativeExecution === false &&
+    error.rendererExecution === false &&
+    error.reconcilerExecution === false
+  ) {
+    return;
+  }
+
+  throw new Error(
+    `Unexpected native root bridge JSON transport diagnostic error for ${id}.`
   );
 }
 

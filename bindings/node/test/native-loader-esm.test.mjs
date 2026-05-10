@@ -158,6 +158,36 @@ assert.deepEqual(
       .unsupportedFieldValue
   ]
 );
+assert.deepEqual(
+  shapeGate.jsonTransportSmoke.parserGate.deterministicErrorRows.map(
+    (row) => row.id
+  ),
+  nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+    .jsonTransportErrorDiagnosticCaseIds
+);
+assert.deepEqual(
+  shapeGate.jsonTransportSmoke.parserGate.deterministicErrorRows.map(
+    (row) => row.code
+  ),
+  [
+    nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate.parseErrorCodes
+      .invalidJson,
+    'FAST_REACT_NAPI_WRONG_ENVIRONMENT',
+    'FAST_REACT_NAPI_STALE_HANDLE',
+    'FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_MUST_START_WITH_CREATE'
+  ]
+);
+assert.equal(
+  shapeGate.jsonTransportSmoke.parserGate.deterministicErrorRows.every(
+    (row) =>
+      row.nativeAddonLoaded === false &&
+      row.nativeExecution === false &&
+      row.rendererExecution === false &&
+      row.reconcilerExecution === false &&
+      row.reactBehaviorError === false
+  ),
+  true
+);
 assert.equal(shapeGate.handleAdmissionPreflight.tableEnvironmentId, 418);
 assert.equal(shapeGate.handleAdmissionPreflight.rootRetired, true);
 assert.equal(shapeGate.rustHandleTableAdmissionSmoke.tableEnvironmentId, 418);

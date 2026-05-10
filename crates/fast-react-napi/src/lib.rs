@@ -592,6 +592,7 @@ mod root_bridge_requests {
         schema_version: u32,
         request_records: Vec<NativeRootBridgeJsonTransportRecord>,
         admission_smoke: NativeRootBridgeHandleTableAdmissionSmoke,
+        error_diagnostic_rows: Vec<NativeRootBridgeJsonTransportErrorDiagnosticRow>,
         native_execution: bool,
         renderer_execution: bool,
         reconciler_execution: bool,
@@ -616,6 +617,13 @@ mod root_bridge_requests {
         #[must_use]
         pub(crate) fn admission_smoke(&self) -> &NativeRootBridgeHandleTableAdmissionSmoke {
             &self.admission_smoke
+        }
+
+        #[must_use]
+        pub(crate) fn error_diagnostic_rows(
+            &self,
+        ) -> &[NativeRootBridgeJsonTransportErrorDiagnosticRow] {
+            &self.error_diagnostic_rows
         }
 
         #[must_use]
@@ -941,6 +949,106 @@ mod root_bridge_requests {
         }
     }
 
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct NativeRootBridgeJsonTransportDiagnosticCase {
+        id: &'static str,
+        category: &'static str,
+        phase: &'static str,
+        json: &'static str,
+        boundary_error_code: Option<&'static str>,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(crate) struct NativeRootBridgeJsonTransportErrorDiagnosticRow {
+        id: &'static str,
+        category: &'static str,
+        phase: &'static str,
+        code: &'static str,
+        source_error_code: Option<&'static str>,
+        boundary_error_code: Option<&'static str>,
+        native_addon_loaded: bool,
+        native_execution: bool,
+        renderer_execution: bool,
+        reconciler_execution: bool,
+        react_behavior_error: bool,
+    }
+
+    impl NativeRootBridgeJsonTransportErrorDiagnosticRow {
+        const fn from_parse_error(
+            case: NativeRootBridgeJsonTransportDiagnosticCase,
+            error: &NativeRootBridgeJsonTransportParseError,
+        ) -> Self {
+            Self {
+                id: case.id,
+                category: case.category,
+                phase: case.phase,
+                code: error.code(),
+                source_error_code: error.source_error_code(),
+                boundary_error_code: case.boundary_error_code,
+                native_addon_loaded: false,
+                native_execution: false,
+                renderer_execution: false,
+                reconciler_execution: false,
+                react_behavior_error: false,
+            }
+        }
+
+        #[must_use]
+        pub(crate) const fn id(&self) -> &'static str {
+            self.id
+        }
+
+        #[must_use]
+        pub(crate) const fn category(&self) -> &'static str {
+            self.category
+        }
+
+        #[must_use]
+        pub(crate) const fn phase(&self) -> &'static str {
+            self.phase
+        }
+
+        #[must_use]
+        pub(crate) const fn code(&self) -> &'static str {
+            self.code
+        }
+
+        #[must_use]
+        pub(crate) const fn source_error_code(&self) -> Option<&'static str> {
+            self.source_error_code
+        }
+
+        #[must_use]
+        pub(crate) const fn boundary_error_code(&self) -> Option<&'static str> {
+            self.boundary_error_code
+        }
+
+        #[must_use]
+        pub(crate) const fn native_addon_loaded(&self) -> bool {
+            self.native_addon_loaded
+        }
+
+        #[must_use]
+        pub(crate) const fn native_execution(&self) -> bool {
+            self.native_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn renderer_execution(&self) -> bool {
+            self.renderer_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn reconciler_execution(&self) -> bool {
+            self.reconciler_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn react_behavior_error(&self) -> bool {
+            self.react_behavior_error
+        }
+    }
+
     #[derive(Debug, Clone)]
     pub(crate) struct NativeRootBridgeRequestSequenceValidator {
         root_handle: Option<BridgeHandle>,
@@ -1180,6 +1288,7 @@ mod root_bridge_requests {
         let mut root_handle_state = None;
 
         for request in requests.iter().copied() {
+            prevalidate_handoff_lifecycle(&validator, request)?;
             let admission_record =
                 admit_js_native_root_bridge_handoff_record(&mut table, request, root_handle_state)?;
             let validation_record = validator.validate_next(&table, request)?;
@@ -1215,6 +1324,41 @@ mod root_bridge_requests {
         json: &str,
     ) -> Result<NativeRootBridgeJsonTransportParserGate, NativeRootBridgeJsonTransportParseError>
     {
+        let (envelope, admission_smoke) = parse_json_transport_payload_for_gate(json)?;
+
+        Ok(NativeRootBridgeJsonTransportParserGate {
+            transport: envelope.transport,
+            schema_version: envelope.schema_version,
+            request_records: envelope.request_records,
+            admission_smoke,
+            error_diagnostic_rows: native_root_bridge_json_transport_error_diagnostic_rows(),
+            native_execution: false,
+            renderer_execution: false,
+            reconciler_execution: false,
+        })
+    }
+
+    pub(crate) fn native_root_bridge_json_transport_error_diagnostic_rows()
+    -> Vec<NativeRootBridgeJsonTransportErrorDiagnosticRow> {
+        deterministic_json_transport_diagnostic_cases()
+            .iter()
+            .copied()
+            .map(|case| {
+                let error = parse_json_transport_payload_for_gate(case.json).unwrap_err();
+                NativeRootBridgeJsonTransportErrorDiagnosticRow::from_parse_error(case, &error)
+            })
+            .collect()
+    }
+
+    fn parse_json_transport_payload_for_gate(
+        json: &str,
+    ) -> Result<
+        (
+            ParsedJsonTransportEnvelope,
+            NativeRootBridgeHandleTableAdmissionSmoke,
+        ),
+        NativeRootBridgeJsonTransportParseError,
+    > {
         let value = serde_json::from_str::<Value>(json).map_err(|error| {
             NativeRootBridgeJsonTransportParseError::InvalidJson {
                 line: error.line(),
@@ -1226,17 +1370,44 @@ mod root_bridge_requests {
             smoke_admit_js_native_root_bridge_json_transport_records(&envelope.request_records)
                 .map_err(NativeRootBridgeJsonTransportParseError::Validation)?;
 
-        Ok(NativeRootBridgeJsonTransportParserGate {
-            transport: envelope.transport,
-            schema_version: envelope.schema_version,
-            request_records: envelope.request_records,
-            admission_smoke,
-            native_execution: false,
-            renderer_execution: false,
-            reconciler_execution: false,
-        })
+        Ok((envelope, admission_smoke))
     }
 
+    fn deterministic_json_transport_diagnostic_cases()
+    -> &'static [NativeRootBridgeJsonTransportDiagnosticCase] {
+        &[
+            NativeRootBridgeJsonTransportDiagnosticCase {
+                id: "malformed-payload",
+                category: "malformed-payload",
+                phase: "parse",
+                json: "{",
+                boundary_error_code: None,
+            },
+            NativeRootBridgeJsonTransportDiagnosticCase {
+                id: "wrong-environment-root-handle",
+                category: "wrong-environment",
+                phase: "validation",
+                json: r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":467,"root_handle":{"environment_id":468,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"active"}]}"#,
+                boundary_error_code: Some("FAST_REACT_NAPI_ROOT_BRIDGE_WRONG_ENVIRONMENT"),
+            },
+            NativeRootBridgeJsonTransportDiagnosticCase {
+                id: "stale-value-handle-generation",
+                category: "stale-handle",
+                phase: "validation",
+                json: r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":467,"root_handle":{"environment_id":467,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":467,"slot":2,"generation":1,"kind":"value"},"root_handle_state":"active"},{"request_id":2,"kind":"render","environment_id":467,"root_handle":{"environment_id":467,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":467,"slot":2,"generation":2,"kind":"value"},"root_handle_state":"active"}]}"#,
+                boundary_error_code: Some("FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE"),
+            },
+            NativeRootBridgeJsonTransportDiagnosticCase {
+                id: "render-before-create-lifecycle-order",
+                category: "lifecycle-order",
+                phase: "validation",
+                json: r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"render","environment_id":467,"root_handle":{"environment_id":467,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"active"}]}"#,
+                boundary_error_code: Some("FAST_REACT_NAPI_ROOT_BRIDGE_WRONG_LIFECYCLE_ORDER"),
+            },
+        ]
+    }
+
+    #[derive(Debug)]
     struct ParsedJsonTransportEnvelope {
         transport: &'static str,
         schema_version: u32,
@@ -1375,6 +1546,42 @@ mod root_bridge_requests {
             }
             Some(NativeRootBridgeRootHandleState::Retired) => {
                 Err(NativeRootBridgeRequestError::RequestAfterUnmount {
+                    request_id: request.request_id(),
+                })
+            }
+        }
+    }
+
+    fn prevalidate_handoff_lifecycle(
+        validator: &NativeRootBridgeRequestSequenceValidator,
+        request: NativeRootBridgeRequestRecord,
+    ) -> Result<(), NativeRootBridgeRequestError> {
+        if let Some(previous_request_id) = validator.last_request_id() {
+            if request.request_id() <= previous_request_id {
+                return Err(NativeRootBridgeRequestError::RequestSequenceOutOfOrder {
+                    previous_request_id,
+                    request_id: request.request_id(),
+                });
+            }
+        }
+
+        if validator.root_retired() {
+            return Err(NativeRootBridgeRequestError::RequestAfterUnmount {
+                request_id: request.request_id(),
+            });
+        }
+
+        match (validator.root_handle(), request.kind()) {
+            (None, NativeRootBridgeRequestKind::Create)
+            | (
+                Some(_),
+                NativeRootBridgeRequestKind::Render | NativeRootBridgeRequestKind::Unmount,
+            ) => Ok(()),
+            (None, actual) => {
+                Err(NativeRootBridgeRequestError::SequenceMustStartWithCreate { actual })
+            }
+            (Some(_), NativeRootBridgeRequestKind::Create) => {
+                Err(NativeRootBridgeRequestError::CreateAfterRootCreated {
                     request_id: request.request_id(),
                 })
             }
@@ -3048,6 +3255,7 @@ mod tests {
         NativeRootBridgeRequestError, NativeRootBridgeRequestKind, NativeRootBridgeRequestRecord,
         NativeRootBridgeRequestRecorder, NativeRootBridgeRequestSequenceValidator,
         NativeRootBridgeRootHandleState, NativeRootBridgeUnmountRequest,
+        native_root_bridge_json_transport_error_diagnostic_rows,
         parse_native_root_bridge_json_transport_for_gate,
         smoke_admit_js_native_root_bridge_handoff_records,
         smoke_admit_js_native_root_bridge_json_transport_records,
@@ -3926,6 +4134,14 @@ mod tests {
             admission_records[2].retired_root_source_error_code(),
             Some("FAST_REACT_NAPI_STALE_HANDLE")
         );
+        assert_eq!(gate.error_diagnostic_rows().len(), 4);
+        assert!(gate.error_diagnostic_rows().iter().all(|row| {
+            !row.native_addon_loaded()
+                && !row.native_execution()
+                && !row.renderer_execution()
+                && !row.reconciler_execution()
+                && !row.react_behavior_error()
+        }));
     }
 
     #[test]
@@ -4038,6 +4254,73 @@ mod tests {
             "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_UNSUPPORTED_FIELD_VALUE"
         );
         assert!(!unknown_kind.to_string().contains("React behavior"));
+    }
+
+    #[test]
+    fn native_root_bridge_json_transport_parser_gate_reports_error_diagnostic_rows() {
+        let rows = native_root_bridge_json_transport_error_diagnostic_rows();
+
+        assert_eq!(rows.len(), 4);
+        assert_eq!(
+            rows.iter().map(|row| row.id()).collect::<Vec<_>>(),
+            [
+                "malformed-payload",
+                "wrong-environment-root-handle",
+                "stale-value-handle-generation",
+                "render-before-create-lifecycle-order"
+            ]
+        );
+        assert_eq!(
+            rows.iter().map(|row| row.category()).collect::<Vec<_>>(),
+            [
+                "malformed-payload",
+                "wrong-environment",
+                "stale-handle",
+                "lifecycle-order"
+            ]
+        );
+        assert_eq!(
+            rows.iter().map(|row| row.phase()).collect::<Vec<_>>(),
+            ["parse", "validation", "validation", "validation"]
+        );
+        assert_eq!(
+            rows.iter().map(|row| row.code()).collect::<Vec<_>>(),
+            [
+                "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_PARSE_INVALID_JSON",
+                "FAST_REACT_NAPI_WRONG_ENVIRONMENT",
+                "FAST_REACT_NAPI_STALE_HANDLE",
+                "FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_MUST_START_WITH_CREATE"
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.source_error_code())
+                .collect::<Vec<_>>(),
+            [
+                None,
+                Some("FAST_REACT_NAPI_WRONG_ENVIRONMENT"),
+                Some("FAST_REACT_NAPI_STALE_HANDLE"),
+                Some("FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_MUST_START_WITH_CREATE")
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.boundary_error_code())
+                .collect::<Vec<_>>(),
+            [
+                None,
+                Some("FAST_REACT_NAPI_ROOT_BRIDGE_WRONG_ENVIRONMENT"),
+                Some("FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE"),
+                Some("FAST_REACT_NAPI_ROOT_BRIDGE_WRONG_LIFECYCLE_ORDER")
+            ]
+        );
+        for row in rows {
+            assert!(!row.native_addon_loaded());
+            assert!(!row.native_execution());
+            assert!(!row.renderer_execution());
+            assert!(!row.reconciler_execution());
+            assert!(!row.react_behavior_error());
+        }
     }
 
     #[test]
