@@ -59,7 +59,7 @@
       postTaskOptions,
       controller
     ) {
-      return {
+      var record = {
         status: "private-scheduler-post-task-priority-diagnostics",
         version: 1,
         exportName: privatePostTaskPriorityDiagnosticsExport,
@@ -67,25 +67,32 @@
         entrypoint: "scheduler/unstable_post_task",
         compatibilityTarget: schedulerCompatibilityTarget,
         diagnosticKind: "shimmed-task-controller-priority",
-        schedule: {
-          status: "scheduled-shimmed-task-controller",
-          priorityLevel: priorityLevel,
-          postTaskPriority: postTaskPriority,
-          delay: describePrivatePostTaskDelay(postTaskOptions),
-          controller: describePrivatePostTaskController(controller),
-          signal: describePrivatePostTaskSignal(controller.signal)
-        },
+        diagnosticEventSequence: 0,
+        schedule: null,
         cancellation: null,
         callbackRuns: [],
         continuationFallbacks: [],
         shimmedTaskControllerScheduling: true,
         shimmedTaskControllerCancellation: false,
         continuationFallbackDiagnostics: false,
+        taskControllerAbortOrderingDiagnostics: false,
+        continuationFallbackMetadataDiagnostics: false,
         browserPostTaskCompatibilityClaimed: false,
         browserTaskOrderingCompatibilityClaimed: false,
         publicSchedulerTimingCompatibilityClaimed: false,
         compatibilityClaimed: false
       };
+      record.schedule = {
+        status: "scheduled-shimmed-task-controller",
+        diagnosticEventIndex:
+          claimPrivatePostTaskDiagnosticEventIndex(record),
+        priorityLevel: priorityLevel,
+        postTaskPriority: postTaskPriority,
+        delay: describePrivatePostTaskDelay(postTaskOptions),
+        controller: describePrivatePostTaskController(controller),
+        signal: describePrivatePostTaskSignal(controller.signal)
+      };
+      return record;
     }
     function attachPrivatePostTaskPriorityDiagnostics(node, record) {
       privatePostTaskPriorityDiagnosticsByNode.set(node, record);
@@ -109,6 +116,7 @@
       }
       record.callbackRuns.push({
         status: "ran-shimmed-post-task-callback",
+        diagnosticEventIndex: claimPrivatePostTaskDiagnosticEventIndex(record),
         runIndex: record.callbackRuns.length,
         priorityLevel: priorityLevel,
         postTaskPriority: postTaskPriority,
@@ -130,34 +138,87 @@
         return;
       }
       record.continuationFallbackDiagnostics = true;
+      record.continuationFallbackMetadataDiagnostics = true;
       record.continuationFallbacks.push({
         status: "scheduled-shimmed-post-task-continuation",
+        diagnosticEventIndex: claimPrivatePostTaskDiagnosticEventIndex(record),
         continuationIndex: record.continuationFallbacks.length,
+        sourceCallbackRunIndex: record.callbackRuns.length - 1,
+        callbackRunCountAtSchedule: record.callbackRuns.length,
         fallback: fallback,
         priorityLevel: priorityLevel,
         postTaskPriority: postTaskPriority,
+        continuationOptions:
+          describePrivatePostTaskContinuationOptions(
+            continuationOptions,
+            node
+          ),
         reusesOriginalSignal:
           continuationOptions.signal === node._controller.signal,
+        signalAtSchedule: describePrivatePostTaskSignal(
+          continuationOptions.signal
+        ),
         signal: describePrivatePostTaskSignal(continuationOptions.signal),
         browserPostTaskCompatibilityClaimed: false,
         publicSchedulerTimingCompatibilityClaimed: false,
         compatibilityClaimed: false
       });
     }
-    function recordPrivatePostTaskCancellation(node) {
+    function recordPrivatePostTaskCancellationStart(node) {
       var record = getPrivatePostTaskPriorityRecord(node);
       if (null === record) {
-        return;
+        return null;
       }
       record.shimmedTaskControllerCancellation = true;
+      record.taskControllerAbortOrderingDiagnostics = true;
       record.cancellation = {
         status: "cancelled-shimmed-task-controller",
-        signal: describePrivatePostTaskSignal(node._controller.signal),
-        abortObserved: node._controller.signal.aborted === true,
+        abortOrdering: {
+          status: "task-controller-abort-requested-before-abort-call",
+          requestEventIndex:
+            claimPrivatePostTaskDiagnosticEventIndex(record),
+          completionEventIndex: null,
+          signalAbortedBeforeAbort:
+            node._controller.signal.aborted === true,
+          signalAbortedAfterAbort: null,
+          callbackRunCountAtRequest: record.callbackRuns.length,
+          callbackRunCountAtCompletion: null,
+          continuationFallbackCountAtRequest:
+            record.continuationFallbacks.length,
+          continuationFallbackCountAtCompletion: null
+        },
+        signalBeforeAbort: describePrivatePostTaskSignal(
+          node._controller.signal
+        ),
+        signalAfterAbort: null,
+        signal: null,
+        abortObserved: false,
         browserPostTaskCompatibilityClaimed: false,
         publicSchedulerTimingCompatibilityClaimed: false,
         compatibilityClaimed: false
       };
+      return record.cancellation;
+    }
+    function recordPrivatePostTaskCancellationComplete(node, cancellation) {
+      var record = getPrivatePostTaskPriorityRecord(node);
+      if (null === record || null === cancellation) {
+        return;
+      }
+      cancellation.abortOrdering.status =
+        "task-controller-abort-observed-after-abort-call";
+      cancellation.abortOrdering.completionEventIndex =
+        claimPrivatePostTaskDiagnosticEventIndex(record);
+      cancellation.abortOrdering.signalAbortedAfterAbort =
+        node._controller.signal.aborted === true;
+      cancellation.abortOrdering.callbackRunCountAtCompletion =
+        record.callbackRuns.length;
+      cancellation.abortOrdering.continuationFallbackCountAtCompletion =
+        record.continuationFallbacks.length;
+      cancellation.signalAfterAbort = describePrivatePostTaskSignal(
+        node._controller.signal
+      );
+      cancellation.signal = cancellation.signalAfterAbort;
+      cancellation.abortObserved = node._controller.signal.aborted === true;
     }
     function describePrivatePostTaskDelay(postTaskOptions) {
       var delay = postTaskOptions.delay;
@@ -195,6 +256,28 @@
           signal && "object" === typeof signal ? Object.keys(signal) : []
       };
     }
+    function describePrivatePostTaskContinuationOptions(options, node) {
+      return {
+        hasSignalProperty: Object.prototype.hasOwnProperty.call(
+          options,
+          "signal"
+        ),
+        hasDelayProperty: Object.prototype.hasOwnProperty.call(
+          options,
+          "delay"
+        ),
+        ownKeys:
+          options && "object" === typeof options ? Object.keys(options) : [],
+        signalMatchesTaskController:
+          options.signal === node._controller.signal,
+        signalAbortedAtSchedule: options.signal
+          ? options.signal.aborted === true
+          : null
+      };
+    }
+    function claimPrivatePostTaskDiagnosticEventIndex(record) {
+      return record.diagnosticEventSequence++;
+    }
     function snapshotPrivatePostTaskPriorityRecord(record) {
       return freezePrivatePostTaskDiagnosticValue({
         status: record.status,
@@ -204,6 +287,7 @@
         entrypoint: record.entrypoint,
         compatibilityTarget: record.compatibilityTarget,
         diagnosticKind: record.diagnosticKind,
+        diagnosticEventCount: record.diagnosticEventSequence,
         schedule: record.schedule,
         cancellation: record.cancellation,
         callbackRuns: record.callbackRuns,
@@ -214,6 +298,10 @@
           record.shimmedTaskControllerCancellation,
         continuationFallbackDiagnostics:
           record.continuationFallbackDiagnostics,
+        taskControllerAbortOrderingDiagnostics:
+          record.taskControllerAbortOrderingDiagnostics,
+        continuationFallbackMetadataDiagnostics:
+          record.continuationFallbackMetadataDiagnostics,
         browserPostTaskCompatibilityClaimed:
           record.browserPostTaskCompatibilityClaimed,
         browserTaskOrderingCompatibilityClaimed:
@@ -266,8 +354,9 @@
     exports.unstable_Profiling = null;
     exports.unstable_UserBlockingPriority = 2;
     exports.unstable_cancelCallback = function (node) {
+      var cancellation = recordPrivatePostTaskCancellationStart(node);
       node._controller.abort();
-      recordPrivatePostTaskCancellation(node);
+      recordPrivatePostTaskCancellationComplete(node, cancellation);
     };
     exports.unstable_forceFrameRate = function () {};
     exports.unstable_getCurrentPriorityLevel = function () {
