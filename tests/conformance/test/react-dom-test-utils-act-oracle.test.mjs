@@ -258,6 +258,16 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     acceptedPrivateWarningBoundaryScenarioIds.map(
       (scenarioId) => `accepted-private-root-warning-boundary-${scenarioId}`
     );
+  const acceptedPrivatePassiveDiagnosticIds = [
+    "passive-effects-committed-fiber-traversal",
+    "passive-effects-scheduler-flush-diagnostic",
+    "passive-effect-mount-unmount-execution-diagnostics",
+    "passive-effect-root-error-routing-diagnostics"
+  ];
+  const blockedPrivatePassivePrerequisiteIds =
+    acceptedPrivatePassiveDiagnosticIds.map(
+      (diagnosticId) => `accepted-private-passive-diagnostic-${diagnosticId}`
+    );
 
   assert.equal(
     gate.status,
@@ -265,7 +275,7 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
   );
   assert.equal(
     gate.id,
-    "react-dom-test-utils-act-private-routing-gate-4"
+    "react-dom-test-utils-act-private-routing-gate-5"
   );
   assert.equal(gate.entrypoint, "react-dom/test-utils");
   assert.equal(gate.compatibilityTarget, "react-dom@19.2.6");
@@ -284,6 +294,10 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     "sync-flush-post-passive-continuation-execution-gate",
     "passive-effects-flush-metadata",
     "passive-effect-callback-handle-metadata",
+    "passive-effects-committed-fiber-traversal",
+    "passive-effects-scheduler-flush-diagnostic",
+    "passive-effect-mount-unmount-execution-diagnostics",
+    "passive-effect-root-error-routing-diagnostics",
     "react-dom-private-root-bridge-records",
     "react-dom-private-flush-sync-root-output-diagnostic",
     "react-dom-private-root-warning-boundary-diagnostics",
@@ -321,6 +335,41 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     gate.privateRootWarningBoundaryPrerequisitesStillBlocked,
     blockedPrivateWarningBoundaryPrerequisiteIds
   );
+  assert.deepEqual(
+    gate.blockedPrivatePassivePrerequisiteIds,
+    blockedPrivatePassivePrerequisiteIds
+  );
+  assert.deepEqual(
+    gate.privatePassivePrerequisitesStillBlocked,
+    blockedPrivatePassivePrerequisiteIds
+  );
+  const publicPassivePrerequisite = gate.blockedPublicPrerequisites.find(
+    (prerequisite) => prerequisite.id === "passive-effect-callback-execution"
+  );
+  assert.equal(
+    publicPassivePrerequisite.blockedByAcceptedPrivatePassiveDiagnostics,
+    true
+  );
+  assert.equal(
+    publicPassivePrerequisite.privatePassiveDiagnosticGateId,
+    "react-dom-test-utils-act-private-passive-diagnostic-gate-1"
+  );
+  assert.equal(
+    publicPassivePrerequisite.privatePassiveDiagnosticStatus,
+    "accepted-private-passive-effect-diagnostic-without-public-act-passive-drain"
+  );
+  assert.deepEqual(
+    publicPassivePrerequisite.acceptedPrivatePassiveDiagnosticIds,
+    acceptedPrivatePassiveDiagnosticIds
+  );
+  assert.equal(publicPassivePrerequisite.acceptedPrivatePassiveDiagnosticCount, 4);
+  assert.equal(publicPassivePrerequisite.publicEffectExecutionEnabled, false);
+  assert.equal(
+    publicPassivePrerequisite.schedulerDrivenPassiveExecutionEnabled,
+    false
+  );
+  assert.equal(publicPassivePrerequisite.publicRootErrorCallbacksInvoked, false);
+  assert.equal(publicPassivePrerequisite.publicActErrorAggregationEnabled, false);
   const publicRootPrerequisite = gate.blockedPublicPrerequisites.find(
     (prerequisite) => prerequisite.id === "public-react-dom-root-execution"
   );
@@ -519,6 +568,165 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     publicActCompatibilityClaimed: false,
     effectCallbackExecutionReady: false
   });
+  const passiveDiagnostics = gate.privatePassiveDiagnostics;
+  assert.equal(
+    passiveDiagnostics.gateId,
+    "react-dom-test-utils-act-private-passive-diagnostic-gate-1"
+  );
+  assert.equal(
+    passiveDiagnostics.status,
+    "accepted-private-passive-effect-diagnostic-without-public-act-passive-drain"
+  );
+  assert.deepEqual(
+    passiveDiagnostics.acceptedDiagnosticIds,
+    acceptedPrivatePassiveDiagnosticIds
+  );
+  assert.deepEqual(passiveDiagnostics.evidence, [
+    "default-flush-remains-metadata-only",
+    "committed-fiber-passive-effect-snapshot",
+    "scheduler-passive-flush-request-order",
+    "scheduler-flush-executes-metadata-only-passive-drain",
+    "test-controlled-passive-destroy-callback-execution",
+    "test-controlled-passive-mount-create-callback-execution",
+    "passive-callback-error-root-capture-metadata",
+    "root-error-callbacks-not-invoked",
+    "public-act-passive-drain-blocked"
+  ]);
+  assert.deepEqual(passiveDiagnostics.summary, {
+    acceptedDiagnosticIds: acceptedPrivatePassiveDiagnosticIds,
+    acceptedDiagnosticCount: 4,
+    acceptedStatus:
+      "accepted-private-passive-effect-diagnostic-without-public-act-passive-drain",
+    publicActPassiveDrain: false,
+    publicEffectExecution: false,
+    schedulerDrivenPassiveExecution: false,
+    publicRootErrorCallbacksInvoked: false,
+    publicActErrorAggregation: false,
+    compatibilityClaimed: false,
+    source: "crates/fast-react-reconciler/src/passive_effects.rs"
+  });
+  assert.equal(
+    passiveDiagnostics.blockedPrerequisiteStatus,
+    "blocked-accepted-private-passive-diagnostics-until-public-act-passive-drain"
+  );
+  assert.deepEqual(
+    passiveDiagnostics.blockedPrerequisiteIds,
+    blockedPrivatePassivePrerequisiteIds
+  );
+  assert.equal(passiveDiagnostics.blockedPrerequisites.length, 4);
+  assert.deepEqual(passiveDiagnostics.blockedPrerequisites[0], {
+    id:
+      "accepted-private-passive-diagnostic-passive-effects-committed-fiber-traversal",
+    diagnosticId: "passive-effects-committed-fiber-traversal",
+    present: false,
+    requiredBeforePublicAct: true,
+    acceptedPrivateDiagnostic: true,
+    status:
+      "blocked-accepted-private-passive-diagnostics-until-public-act-passive-drain",
+    diagnosticGateId: "react-dom-test-utils-act-private-passive-diagnostic-gate-1",
+    diagnosticStatus:
+      "accepted-private-passive-effect-diagnostic-without-public-act-passive-drain",
+    publicActExecution: false,
+    publicEffectExecution: false,
+    schedulerDrivenPassiveExecution: false,
+    publicRootErrorCallbacksInvoked: false,
+    publicActErrorAggregation: false,
+    compatibilityClaimed: false,
+    reason:
+      "Accepted only as private passive-effect diagnostics; public react-dom/test-utils.act must stay blocked until public act drains passive effects through public roots."
+  });
+  assert.equal(passiveDiagnostics.publicActPassiveDrain, false);
+  assert.equal(passiveDiagnostics.publicEffectExecution, false);
+  assert.equal(passiveDiagnostics.schedulerDrivenPassiveExecution, false);
+  assert.equal(passiveDiagnostics.publicRootExecution, false);
+  assert.equal(passiveDiagnostics.publicRootErrorCallbacksInvoked, false);
+  assert.equal(passiveDiagnostics.publicActErrorAggregation, false);
+  assert.equal(passiveDiagnostics.compatibilityClaimed, false);
+
+  const passiveCommittedFiberDiagnostic =
+    passiveDiagnostics.acceptedDiagnostics.find(
+      (diagnostic) =>
+        diagnostic.id === "passive-effects-committed-fiber-traversal"
+    );
+  assert.deepEqual(passiveCommittedFiberDiagnostic.records, [
+    "FunctionComponentCommittedPassiveEffectsSnapshot",
+    "FunctionComponentCommittedPassiveEffectFiberRecord",
+    "HostRootCommitRecord.function_component_committed_passive_effects",
+    "HostRootCommitRecord::record_function_component_committed_passive_effects_for_canary",
+    "flush_passive_effects_after_commit_from_committed_fiber_effects_for_canary",
+    "CommittedPassiveEffectRecordCountMismatch",
+    "CommittedPassiveEffectDuplicateOrder",
+    "CommittedPassiveEffectRecordMismatch"
+  ]);
+  assert.equal(passiveCommittedFiberDiagnostic.consumesCommittedFiberEffects, true);
+  assert.equal(passiveCommittedFiberDiagnostic.executesPassiveEffects, false);
+
+  const passiveSchedulerDiagnostic =
+    passiveDiagnostics.acceptedDiagnostics.find(
+      (diagnostic) =>
+        diagnostic.id === "passive-effects-scheduler-flush-diagnostic"
+    );
+  assert.deepEqual(passiveSchedulerDiagnostic.records, [
+    "SchedulerPassiveEffectsFlushRequest",
+    "PassiveEffectSchedulerFlushGateRecord",
+    "PassiveEffectSchedulerFlushGateStatus::Scheduled",
+    "schedule_passive_effects_flush_after_commit_for_canary",
+    "flush_passive_effects_after_scheduler_flush_gate_from_committed_fiber_effects_for_canary",
+    "PassiveEffectSchedulerFlushExecutionRecord",
+    "PassiveEffectSchedulerFlushExecutionRecord.did_execute_private_callback_executors",
+    "SchedulerPriority::Normal"
+  ]);
+  assert.equal(passiveSchedulerDiagnostic.schedulerPriority, "Normal");
+  assert.equal(passiveSchedulerDiagnostic.executesPublicSchedulerTasks, false);
+  assert.equal(passiveSchedulerDiagnostic.executesPublicEffects, false);
+
+  const passiveExecutionDiagnostic =
+    passiveDiagnostics.acceptedDiagnostics.find(
+      (diagnostic) =>
+        diagnostic.id === "passive-effect-mount-unmount-execution-diagnostics"
+    );
+  assert.deepEqual(passiveExecutionDiagnostic.records, [
+    "PassiveEffectDestroyCallbackExecutionRequest",
+    "PassiveEffectDestroyCallbackExecutionRecord",
+    "PassiveEffectDestroyCallbackErrorRecord",
+    "PassiveEffectMountCreateCallbackExecutionRequest",
+    "PassiveEffectMountCreateCallbackExecutionRecord",
+    "PassiveEffectMountCreateCallbackErrorRecord",
+    "PassiveEffectMountCreateCallbackExecutionGateStatus::TestControlOnly",
+    "PassiveEffectMountCreateCallbackExecutionGateBlocker",
+    "flush_passive_effects_after_commit_with_destroy_executor",
+    "flush_passive_effects_after_commit_with_mount_create_executor",
+    "flush_passive_effects_after_commit_with_callback_executors"
+  ]);
+  assert.equal(passiveExecutionDiagnostic.testControlledInvocationOnly, true);
+  assert.equal(
+    passiveExecutionDiagnostic.schedulerDrivenPassiveExecutionEnabled,
+    false
+  );
+  assert.equal(passiveExecutionDiagnostic.publicEffectExecutionEnabled, false);
+
+  const passiveRootErrorDiagnostic =
+    passiveDiagnostics.acceptedDiagnostics.find(
+      (diagnostic) =>
+        diagnostic.id === "passive-effect-root-error-routing-diagnostics"
+    );
+  assert.deepEqual(passiveRootErrorDiagnostic.records, [
+    "PassiveEffectCallbackExecutionErrorKind",
+    "PassiveEffectCallbackExecutionErrorHandle",
+    "PassiveEffectCallbackExecutionErrorRecord",
+    "PassiveEffectRootErrorCaptureRecord",
+    "PassiveEffectRootErrorPropagationRecord",
+    "PassiveEffectRootErrorPropagationStatus::CapturedForRootUpdate",
+    "PassiveEffectRootErrorPropagationBlocker",
+    "RootErrorCaptureScheduleRecord",
+    "RootErrorCaptureSource::PassiveEffectDestroy",
+    "RootErrorCaptureSource::PassiveEffectMountCreate",
+    "capture_passive_effect_root_error"
+  ]);
+  assert.equal(passiveRootErrorDiagnostic.capturesCommitPhaseErrors, true);
+  assert.equal(passiveRootErrorDiagnostic.schedulesRootErrorUpdates, true);
+  assert.equal(passiveRootErrorDiagnostic.invokesRootErrorCallbacks, false);
+  assert.equal(passiveRootErrorDiagnostic.publicActErrorAggregationEnabled, false);
   assert.deepEqual(gate.reactDomRootBridge.records, [
     "FastReactDomPrivateRootCreateRecord",
     "FastReactDomPrivateRootUpdateRecord",
@@ -859,6 +1067,24 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     {
       id:
         "private-root-warning-boundary-prerequisites-unblocked-without-new-gate"
+    }
+  ]);
+
+  const unblockedPassiveGate =
+    gateModule.evaluateReactDomTestUtilsActPrivateRoutingGate({
+      blockedPrivatePassivePrerequisites:
+        gate.blockedPrivatePassivePrerequisites.map((prerequisite) => ({
+          ...prerequisite,
+          present: true
+        }))
+    });
+  assert.deepEqual(
+    unblockedPassiveGate.privatePassivePrerequisitesStillBlocked,
+    []
+  );
+  assert.deepEqual(unblockedPassiveGate.violations, [
+    {
+      id: "private-passive-diagnostic-prerequisites-unblocked-without-new-gate"
     }
   ]);
 });
