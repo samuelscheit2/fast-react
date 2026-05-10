@@ -106,6 +106,12 @@ export const REACT_TEST_RENDERER_TOTREE_PRIVATE_METADATA_REQUIREMENTS = [
       "The private toTree metadata must be tied to the accepted HostRoot -> HostComponent -> HostText canary shape."
   },
   {
+    id: "js-totree-private-composite-function-metadata",
+    requiredBeforePrivateDiagnostics: true,
+    reason:
+      "The private toTree metadata must record the FunctionComponent tree wrapper above the accepted committed host output without exposing public toTree."
+  },
+  {
     id: "js-totree-public-tree-blocked",
     requiredBeforePrivateDiagnostics: true,
     reason:
@@ -284,6 +290,7 @@ export function evaluateReactTestRendererSerializationLocalGate({
     localChecks.privateToTreePrivateFacadeGatePresent &&
     localChecks.privateToTreePrivateFacadeConsumesRustTreeMetadata &&
     localChecks.privateToTreeHostOutputMetadataRecognizesMinimalShape &&
+    localChecks.privateToTreeCompositeFunctionMetadataPresent &&
     localChecks.privateToTreeHostOutputMetadataPubliclyBlocked;
   const requiredLocalTargetsReady =
     privateToJSONFacadeGateReady && privateToTreeMetadataGateReady;
@@ -331,6 +338,11 @@ export function evaluateReactTestRendererSerializationLocalGate({
           "js-totree-recognizes-accepted-minimal-host-output-shape"
         ) {
           return !localChecks.privateToTreeHostOutputMetadataRecognizesMinimalShape;
+        }
+        if (
+          requirement.id === "js-totree-private-composite-function-metadata"
+        ) {
+          return !localChecks.privateToTreeCompositeFunctionMetadataPresent;
         }
         if (requirement.id === "js-totree-public-tree-blocked") {
           return !localChecks.privateToTreeHostOutputMetadataPubliclyBlocked;
@@ -885,6 +897,53 @@ export function inspectReactTestRendererSerializationLocalTargets({
       publicJsReactTestRendererPackageSource,
       /\bworker-392-test-renderer-public-totree-private-facade\b/u
     );
+  const privateToTreeCompositeFunctionMetadataPresent =
+    privateToTreeHostOutputMetadataGatePresent &&
+    privateToTreePrivateFacadeGatePresent &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bTestRendererPrivateTreeFunctionComponentDiagnostic\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bTEST_RENDERER_PRIVATE_TREE_COMPOSITE_ACCEPTED_FIBER_SHAPE\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\broot_private_tree_metadata_canary_describes_function_component_above_host_output\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bacceptedCompositeFiberShape\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /HostRoot[\s\S]*FunctionComponent[\s\S]*HostComponent[\s\S]*HostText/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bprivateCompositeFunctionMetadataAvailable\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bprivateCompositeFunctionMetadataSerializable\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bfunctionComponentBehavior\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bFunctionComponent[\s\S]*nodeType[\s\S]*component\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bwrapsCommittedHostOutput\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bpublicTreeAvailable\s*:\s*false\b/u
+    );
   const privateToTreeHostOutputMetadataPubliclyBlocked =
     privateToTreeHostOutputMetadataGatePresent &&
     hasSourcePattern(
@@ -1027,6 +1086,7 @@ export function inspectReactTestRendererSerializationLocalTargets({
     privateToTreePrivateFacadeGatePresent,
     privateToTreePrivateFacadeConsumesRustTreeMetadata,
     privateToTreeHostOutputMetadataRecognizesMinimalShape,
+    privateToTreeCompositeFunctionMetadataPresent,
     privateToTreeHostOutputMetadataPubliclyBlocked,
     privateRecordOnlyTestInstanceWrapperPresent,
     privateRecordOnlyTestInstanceQueryPathPresent,

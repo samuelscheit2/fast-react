@@ -1035,6 +1035,13 @@ const privateToTreeAcceptedFiberShape = Object.freeze([
   'HostComponent',
   'HostText'
 ]);
+const privateToTreeCompositeAcceptedFiberShape = Object.freeze([
+  'HostRoot',
+  'FunctionComponent',
+  'HostComponent',
+  'HostText'
+]);
+const privateToTreeFunctionComponentType = 'CanaryFunctionComponent';
 const toTreePrivateHostOutputMetadataGate = Object.freeze({
   id: 'react-test-renderer-totree-private-host-output-metadata-gate',
   publicSurface: 'create().toTree',
@@ -1046,14 +1053,19 @@ const toTreePrivateHostOutputMetadataGate = Object.freeze({
   privateFacadeSymbol: privateToTreeFacadeSymbol.description,
   privateFacadeStatus: privateToTreeFacadeStatus,
   acceptedMinimalFiberShape: privateToTreeAcceptedFiberShape,
+  acceptedCompositeFiberShape: privateToTreeCompositeAcceptedFiberShape,
   acceptedReactSourceAlgorithm: 'ReactTestRenderer.js toTree',
   hostRootBehavior: 'childrenToTree(node.child)',
+  functionComponentBehavior:
+    "returns nodeType 'component' with function type, props, null instance, and rendered child tree",
   hostComponentBehavior:
     "returns nodeType 'host' with element type, props, null instance, and rendered children",
   hostTextBehavior: 'returns text string from the HostText state node',
   acceptedRustPrivateJsonDiagnostics: true,
   acceptedRustPrivateTreeMetadata: true,
+  acceptedRustPrivateCompositeTreeMetadata: true,
   acceptedCommittedFiberInspection: true,
+  privateCompositeFunctionMetadataAvailable: true,
   publicTreeAvailable: false,
   publicRouteAvailable: false,
   nativeBridgeAvailable: false,
@@ -1073,13 +1085,15 @@ const toTreePrivateHostOutputMetadataGate = Object.freeze({
     'TestRendererRoot::describe_private_tree_metadata_for_canary',
     'TestRendererRoot::describe_private_tree_metadata_after_update_for_canary',
     'TestRendererPrivateJsonSerializationReport',
-    'TestRendererPrivateTreeMetadataReport'
+    'TestRendererPrivateTreeMetadataReport',
+    'TestRendererPrivateTreeFunctionComponentDiagnostic'
   ]),
   acceptedRustTests: Object.freeze([
     'committed_fiber_inspection_describes_host_root_component_and_text',
     'root_private_json_serialization_canary_describes_minimal_host_component_with_text',
     'root_private_tree_metadata_canary_describes_minimal_host_component_with_text',
-    'root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit'
+    'root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit',
+    'root_private_tree_metadata_canary_describes_function_component_above_host_output'
   ]),
   blockedPublicSurfaces: Object.freeze([
     'create().toTree',
@@ -1102,11 +1116,14 @@ const toTreePrivateFacadeGate = Object.freeze({
   deterministic: true,
   privateFacadeGateAvailable: true,
   privateTreeMetadataSerializable: true,
+  privateCompositeFunctionMetadataSerializable: true,
   privateFacadeSymbol: privateToTreeFacadeSymbol.description,
   privateFacadeStatus: privateToTreeFacadeStatus,
   acceptedRustPrivateTreeMetadata: true,
+  acceptedRustPrivateCompositeTreeMetadata: true,
   acceptedRustDiagnosticName: privateToTreeAcceptedDiagnosticName,
   acceptedMinimalFiberShape: privateToTreeAcceptedFiberShape,
+  acceptedCompositeFiberShape: privateToTreeCompositeAcceptedFiberShape,
   acceptedHostOutputUpdateKinds: Object.freeze([
     'Create',
     'Update'
@@ -1124,12 +1141,14 @@ const toTreePrivateFacadeGate = Object.freeze({
     'TestRendererRoot::describe_private_tree_metadata_for_canary',
     'TestRendererRoot::describe_private_tree_metadata_after_update_for_canary',
     'TestRendererPrivateTreeMetadataReport',
+    'TestRendererPrivateTreeFunctionComponentDiagnostic',
     'TestRendererPrivateTreeHostComponentDiagnostic',
     'TestRendererPrivateTreeHostTextDiagnostic'
   ]),
   acceptedRustTests: Object.freeze([
     'root_private_tree_metadata_canary_describes_minimal_host_component_with_text',
     'root_private_tree_metadata_canary_describes_updated_host_component_text_after_commit',
+    'root_private_tree_metadata_canary_describes_function_component_above_host_output',
     'root_private_tree_metadata_canary_rejects_stale_host_output_snapshot'
   ]),
   blockedPublicSurfaces: Object.freeze([
@@ -3664,6 +3683,7 @@ function createPrivateToTreeHostOutputMetadata(rootRequest) {
     gate: toTreePrivateHostOutputMetadataGate,
     rootRequest,
     privateHostOutputTreeMetadataAvailable: true,
+    privateCompositeFunctionMetadataAvailable: true,
     publicTreeAvailable: false,
     publicRouteAvailable: false,
     nativeBridgeAvailable: false,
@@ -3694,6 +3714,7 @@ function createPrivateToTreeFacade(rootRequest) {
     metadataGate: toTreePrivateHostOutputMetadataGate,
     rootRequest,
     privateTreeMetadataSerializable: true,
+    privateCompositeFunctionMetadataSerializable: true,
     publicTreeAvailable: false,
     publicRouteAvailable: false,
     nativeBridgeAvailable: false,
@@ -3724,10 +3745,24 @@ function describePrivateToTreeHostOutputDiagnostic(report) {
     sourceDiagnostic: privateToTreeAcceptedDiagnosticName,
     acceptedMinimalFiberShape:
       toTreePrivateHostOutputMetadataGate.acceptedMinimalFiberShape,
+    acceptedCompositeFiberShape:
+      toTreePrivateHostOutputMetadataGate.acceptedCompositeFiberShape,
     traversal: freezeRecord({
       source: 'ReactTestRenderer.js toTree',
-      order: freezeArray(['HostRoot', 'HostComponent', 'HostText']),
+      order: freezeArray([
+        'HostRoot',
+        'FunctionComponent',
+        'HostComponent',
+        'HostText'
+      ]),
+      committedHostOutputOrder: freezeArray([
+        'HostRoot',
+        'HostComponent',
+        'HostText'
+      ]),
       hostRootDelegatesToChild: true,
+      functionComponentProducesComponentNodeMetadata: true,
+      functionComponentRendersCommittedHostOutput: true,
       hostComponentProducesHostNodeMetadata: true,
       hostTextProducesTextValueMetadata: true
     }),
@@ -3736,6 +3771,20 @@ function describePrivateToTreeHostOutputDiagnostic(report) {
       source: 'ReactTestRenderer.js toTree HostRoot',
       delegatesToChild: true,
       childFiberTag: 'HostComponent',
+      compositeChildFiberTag: 'FunctionComponent',
+      publicTreeObject: false
+    }),
+    functionComponent: freezeRecord({
+      fiberTag: 'FunctionComponent',
+      source: 'ReactTestRenderer.js toTree FunctionComponent',
+      treeNodeType: 'component',
+      componentType: diagnostic.componentType,
+      props: diagnostic.componentProps,
+      instanceAvailable: false,
+      renderedChildFiberTag: 'HostComponent',
+      renderedChildNodeType: 'host',
+      renderedChildCount: 1,
+      wrapsCommittedHostOutput: true,
       publicTreeObject: false
     }),
     hostComponent: freezeRecord({
@@ -3790,6 +3839,13 @@ function validatePrivateToTreeHostOutputDiagnostic(report) {
     assertPrivateToTreeAcceptedFiberShape(
       readPrivateToJSONArrayField(report, 'acceptedFiberShape', 'accepted_fiber_shape')
     );
+    assertPrivateToTreeCompositeAcceptedFiberShape(
+      readPrivateToJSONArrayField(
+        report,
+        'acceptedCompositeFiberShape',
+        'accepted_composite_fiber_shape'
+      )
+    );
 
     const hostRoot = readPrivateToJSONRecordField(report, 'hostRoot', 'host_root');
     assertPrivateToJSONStringField(hostRoot, 'fiberTag', 'fiber_tag', 'HostRoot');
@@ -3807,6 +3863,66 @@ function validatePrivateToTreeHostOutputDiagnostic(report) {
     );
     assertPrivateToJSONBooleanField(
       hostRoot,
+      'publicTreeObjectAvailable',
+      'public_tree_object_available',
+      false
+    );
+
+    const functionComponent = readPrivateToJSONRecordField(
+      report,
+      'functionComponent',
+      'function_component'
+    );
+    assertPrivateToJSONStringField(
+      functionComponent,
+      'fiberTag',
+      'fiber_tag',
+      'FunctionComponent'
+    );
+    assertPrivateToJSONStringField(
+      functionComponent,
+      'nodeType',
+      'node_type',
+      'component'
+    );
+    assertPrivateToJSONStringField(
+      functionComponent,
+      'componentType',
+      'component_type',
+      privateToTreeFunctionComponentType
+    );
+    assertPrivateToJSONBooleanField(
+      functionComponent,
+      'instanceAvailable',
+      'instance_available',
+      false
+    );
+    assertPrivateToJSONStringField(
+      functionComponent,
+      'renderedChildFiberTag',
+      'rendered_child_fiber_tag',
+      'HostComponent'
+    );
+    assertPrivateToJSONStringField(
+      functionComponent,
+      'renderedChildNodeType',
+      'rendered_child_node_type',
+      'host'
+    );
+    assertPrivateToJSONNumberField(
+      functionComponent,
+      'renderedChildCount',
+      'rendered_child_count',
+      1
+    );
+    assertPrivateToJSONBooleanField(
+      functionComponent,
+      'wrapsCommittedHostOutput',
+      'wraps_committed_host_output',
+      true
+    );
+    assertPrivateToJSONBooleanField(
+      functionComponent,
       'publicTreeObjectAvailable',
       'public_tree_object_available',
       false
@@ -3861,6 +3977,9 @@ function validatePrivateToTreeHostOutputDiagnostic(report) {
     const type = normalizePrivateToJSONElementType(
       readPrivateToJSONField(hostComponent, 'elementType', 'element_type')
     );
+    const componentProps = normalizePrivateToJSONEmptyProps(
+      readPrivateToJSONField(functionComponent, 'props')
+    );
     const props = normalizePrivateToJSONEmptyProps(
       readPrivateToJSONField(hostComponent, 'props')
     );
@@ -3890,6 +4009,12 @@ function validatePrivateToTreeHostOutputDiagnostic(report) {
         report,
         'hostOutputUpdateKind',
         'host_output_update_kind'
+      ),
+      componentProps,
+      componentType: readPrivateToJSONStringField(
+        functionComponent,
+        'componentType',
+        'component_type'
       ),
       props,
       text,
@@ -3928,15 +4053,36 @@ function assertPrivateToTreeAcceptedFiberShape(shape) {
   }
 }
 
+function assertPrivateToTreeCompositeAcceptedFiberShape(shape) {
+  if (
+    shape.length !== privateToTreeCompositeAcceptedFiberShape.length ||
+    shape.some(
+      (tag, index) => tag !== privateToTreeCompositeAcceptedFiberShape[index]
+    )
+  ) {
+    throwPrivateToTreeMetadataError(
+      'Expected private tree metadata acceptedCompositeFiberShape to be HostRoot, FunctionComponent, HostComponent, HostText.'
+    );
+  }
+}
+
 function serializePrivateToTreeMetadataDiagnostic(report) {
   const diagnostic = validatePrivateToTreeHostOutputDiagnostic(report);
 
-  return freezeRecord({
+  const renderedHostTree = freezeRecord({
     nodeType: 'host',
     type: diagnostic.type,
     props: diagnostic.props,
     instance: null,
     rendered: freezeArray([diagnostic.text])
+  });
+
+  return freezeRecord({
+    nodeType: 'component',
+    type: diagnostic.componentType,
+    props: diagnostic.componentProps,
+    instance: null,
+    rendered: renderedHostTree
   });
 }
 
@@ -4458,7 +4604,7 @@ function createPlaceholderRenderer(routingGate, element, options, createRequest)
   const toTree = createRendererUnsupportedFunction(
     'create().toTree',
     0,
-    'Fiber tree inspection is intentionally blocked for the public API. The JS facade records private toTree metadata for the accepted HostRoot, HostComponent, and HostText canary; it has no native bridge, public toTree serializer, or compatibility claim.',
+    'Fiber tree inspection is intentionally blocked for the public API. The JS facade records private toTree metadata for a FunctionComponent wrapper above the accepted HostRoot, HostComponent, and HostText canary; it has no native bridge, public toTree serializer, or compatibility claim.',
     routingGate,
     undefined,
     () => createRequest
