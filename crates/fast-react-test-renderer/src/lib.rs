@@ -4241,6 +4241,10 @@ pub struct TestRendererPrivateCreateNativeBridgeHostOutputHandoff {
     serialization_gate_status: TestRendererSerializationGateStatus,
     render_finished_work: TestRendererFiberHandleDiagnostics,
     commit_current: TestRendererFiberHandleDiagnostics,
+    work_loop_finished_work_preflight: TestRendererRootWorkLoopFinishedWorkPreflightDiagnostics,
+    render_finished_work_matches_create_route_preflight: bool,
+    commit_current_matches_render_finished_work: bool,
+    minimal_tree_host_output_consumes_root_finished_work: bool,
     create_route_admission_accepted: bool,
     host_output_handoff_accepted: bool,
     actual_rust_create_host_output_handoff: bool,
@@ -4330,6 +4334,28 @@ impl TestRendererPrivateCreateNativeBridgeHostOutputHandoff {
     #[must_use]
     pub const fn commit_current(self) -> TestRendererFiberHandleDiagnostics {
         self.commit_current
+    }
+
+    #[must_use]
+    pub const fn work_loop_finished_work_preflight(
+        self,
+    ) -> TestRendererRootWorkLoopFinishedWorkPreflightDiagnostics {
+        self.work_loop_finished_work_preflight
+    }
+
+    #[must_use]
+    pub const fn render_finished_work_matches_create_route_preflight(self) -> bool {
+        self.render_finished_work_matches_create_route_preflight
+    }
+
+    #[must_use]
+    pub const fn commit_current_matches_render_finished_work(self) -> bool {
+        self.commit_current_matches_render_finished_work
+    }
+
+    #[must_use]
+    pub const fn minimal_tree_host_output_consumes_root_finished_work(self) -> bool {
+        self.minimal_tree_host_output_consumes_root_finished_work
     }
 
     #[must_use]
@@ -9274,6 +9300,115 @@ impl TestRendererRoot {
         })
     }
 
+    pub fn describe_private_root_create_preflight_from_render_for_canary(
+        &self,
+        input_shape: TestRendererRootCreatePreflightInputShape,
+        canary_api_identity: TestRendererRootCreatePreflightCanaryApiIdentity,
+        work_loop_metadata: Option<TestRendererRootWorkLoopFinishedWorkPreflightMetadata>,
+        render: HostRootRenderPhaseRecord,
+    ) -> Result<TestRendererRootCreatePreflightDiagnostics, TestRendererRootError> {
+        if !input_shape
+            .child_shape()
+            .is_supported_for_create_preflight()
+        {
+            return Err(TestRendererRootCreatePreflightError::UnsupportedChildren {
+                child_shape: input_shape.child_shape(),
+            }
+            .into());
+        }
+
+        if !canary_api_identity.is_current() {
+            let current = TestRendererRootCreatePreflightCanaryApiIdentity::current();
+            return Err(TestRendererRootCreatePreflightError::StaleCanaryMetadata {
+                expected_metadata_id: current.metadata_id(),
+                actual_metadata_id: canary_api_identity.metadata_id(),
+                expected_root_api: current.root_api(),
+                actual_root_api: canary_api_identity.root_api(),
+            }
+            .into());
+        }
+
+        let Some(work_loop_metadata) = work_loop_metadata else {
+            return Err(
+                TestRendererRootCreatePreflightError::MissingWorkLoopFinishedWorkPreflightMetadata
+                    .into(),
+            );
+        };
+        if !work_loop_metadata.is_current() {
+            let current = TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current();
+            return Err(
+                TestRendererRootCreatePreflightError::StaleWorkLoopFinishedWorkPreflightMetadata {
+                    expected_metadata_id: current.metadata_id(),
+                    actual_metadata_id: work_loop_metadata.metadata_id(),
+                    expected_render_phase_api: current.render_phase_api(),
+                    actual_render_phase_api: work_loop_metadata.render_phase_api(),
+                }
+                .into(),
+            );
+        }
+
+        let scheduled_update = self
+            .last_scheduled_update()
+            .expect("TestRendererRoot::create schedules an initial HostRoot update");
+        let scheduled_update_kind = scheduled_update.kind();
+        let scheduled_element = scheduled_update.element();
+        let previous_current = render.current();
+        let finished_work = render.finished_work();
+        let work_loop_finished_work_preflight =
+            TestRendererRootWorkLoopFinishedWorkPreflightDiagnostics {
+                row_id: TEST_RENDERER_PRIVATE_ROOT_CREATE_WORK_LOOP_PREFLIGHT_ROW_ID,
+                status: TEST_RENDERER_PRIVATE_ROOT_CREATE_WORK_LOOP_PREFLIGHT_STATUS,
+                metadata: work_loop_metadata,
+                root: self.root_id(),
+                previous_current: TestRendererFiberHandleDiagnostics {
+                    arena_id: previous_current.arena_id().get(),
+                    slot: previous_current.slot().get(),
+                    generation: previous_current.generation().get(),
+                },
+                finished_work: TestRendererFiberHandleDiagnostics {
+                    arena_id: finished_work.arena_id().get(),
+                    slot: finished_work.slot().get(),
+                    generation: finished_work.generation().get(),
+                },
+                resulting_element: render.resulting_element(),
+                scheduled_update_kind,
+                render_lanes_empty: render.render_lanes().is_empty(),
+                remaining_lanes_empty: render.remaining_lanes().is_empty(),
+                finished_work_matches_render_phase: finished_work == render.work_in_progress(),
+                records_accepted_finished_work_metadata: true,
+                public_create_behavior_available: false,
+                host_mutation_execution_blocked: true,
+                effects_refs_and_hydration_blocked: true,
+                compatibility_claimed: false,
+            };
+
+        Ok(TestRendererRootCreatePreflightDiagnostics {
+            diagnostic_name: TEST_RENDERER_PRIVATE_ROOT_CREATE_PREFLIGHT_DIAGNOSTIC_NAME,
+            status: TEST_RENDERER_PRIVATE_ROOT_CREATE_PREFLIGHT_STATUS,
+            root: self.root_id(),
+            input_shape,
+            root_options: TestRendererRootCreatePreflightOptionsMetadata::from_options(
+                &self.options,
+            ),
+            canary_api_identity,
+            scheduled_update_kind,
+            scheduled_element,
+            container_update_api: scheduled_update_kind.container_update_api(),
+            scheduler_api: "ensure_root_is_scheduled",
+            work_loop_finished_work_preflight,
+            private_rust_root_created: true,
+            private_root_canary_boundary_validated: true,
+            public_renderer_root_created: false,
+            public_root_available: false,
+            native_addon_loaded: false,
+            native_bridge_available: false,
+            native_execution: false,
+            rust_execution_from_js: false,
+            host_output_produced_from_js: false,
+            compatibility_claimed: false,
+        })
+    }
+
     pub fn describe_private_create_route_admission_for_canary(
         root_create_preflight: Option<TestRendererRootCreatePreflightDiagnostics>,
         rust_admission_metadata: Option<TestRendererPrivateCreateRouteAdmissionMetadata>,
@@ -9407,8 +9542,19 @@ impl TestRendererRoot {
             );
         }
 
-        let render_finished_work = output.render().finished_work();
-        let commit_current = output.commit().current();
+        let render_finished_work_handle = output.render().finished_work();
+        let commit_current_handle = output.commit().current();
+        let render_finished_work = TestRendererFiberHandleDiagnostics {
+            arena_id: render_finished_work_handle.arena_id().get(),
+            slot: render_finished_work_handle.slot().get(),
+            generation: render_finished_work_handle.generation().get(),
+        };
+        let commit_current = TestRendererFiberHandleDiagnostics {
+            arena_id: commit_current_handle.arena_id().get(),
+            slot: commit_current_handle.slot().get(),
+            generation: commit_current_handle.generation().get(),
+        };
+        let work_loop_finished_work_preflight = admission.work_loop_finished_work_preflight();
 
         Ok(TestRendererPrivateCreateNativeBridgeHostOutputHandoff {
             diagnostic_id:
@@ -9425,16 +9571,13 @@ impl TestRendererRoot {
             host_output_shape: shape,
             host_output,
             serialization_gate_status: gate.status(),
-            render_finished_work: TestRendererFiberHandleDiagnostics {
-                arena_id: render_finished_work.arena_id().get(),
-                slot: render_finished_work.slot().get(),
-                generation: render_finished_work.generation().get(),
-            },
-            commit_current: TestRendererFiberHandleDiagnostics {
-                arena_id: commit_current.arena_id().get(),
-                slot: commit_current.slot().get(),
-                generation: commit_current.generation().get(),
-            },
+            render_finished_work,
+            commit_current,
+            work_loop_finished_work_preflight,
+            render_finished_work_matches_create_route_preflight: render_finished_work
+                == work_loop_finished_work_preflight.finished_work(),
+            commit_current_matches_render_finished_work: commit_current == render_finished_work,
+            minimal_tree_host_output_consumes_root_finished_work: true,
             create_route_admission_accepted: true,
             host_output_handoff_accepted: true,
             actual_rust_create_host_output_handoff: true,
@@ -9534,6 +9677,30 @@ impl TestRendererRoot {
             return Err(
                 TestRendererPrivateCreateRouteAdmissionError::StaleCreateHostOutputHandoff {
                     reason: "commit-current-finished-work-mismatch",
+                }
+                .into(),
+            );
+        }
+        let work_loop_finished_work_preflight = admission.work_loop_finished_work_preflight();
+        let render_finished_work = TestRendererFiberHandleDiagnostics {
+            arena_id: render.finished_work().arena_id().get(),
+            slot: render.finished_work().slot().get(),
+            generation: render.finished_work().generation().get(),
+        };
+        if work_loop_finished_work_preflight.finished_work() != render_finished_work {
+            return Err(
+                TestRendererPrivateCreateRouteAdmissionError::StaleCreateHostOutputHandoff {
+                    reason: "create-route-admission-finished-work-mismatch",
+                }
+                .into(),
+            );
+        }
+        if !work_loop_finished_work_preflight.finished_work_matches_render_phase()
+            || !work_loop_finished_work_preflight.records_accepted_finished_work_metadata()
+        {
+            return Err(
+                TestRendererPrivateCreateRouteAdmissionError::StaleCreateHostOutputHandoff {
+                    reason: "create-route-admission-work-loop-preflight-not-accepted",
                 }
                 .into(),
             );
@@ -15253,13 +15420,14 @@ mod tests {
             output.render().resulting_element(),
             "span",
         );
-        let preflight = TestRendererRoot::describe_private_root_create_preflight_for_canary(
-            input,
-            Some(TestRendererOptions::new()),
-            TestRendererRootCreatePreflightCanaryApiIdentity::current(),
-            Some(TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current()),
-        )
-        .unwrap();
+        let preflight = root
+            .describe_private_root_create_preflight_from_render_for_canary(
+                input,
+                TestRendererRootCreatePreflightCanaryApiIdentity::current(),
+                Some(TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current()),
+                output.render(),
+            )
+            .unwrap();
         let admission = TestRendererRoot::describe_private_create_route_admission_for_canary(
             Some(preflight),
             Some(TestRendererPrivateCreateRouteAdmissionMetadata::current()),
@@ -15324,6 +15492,13 @@ mod tests {
             handoff.commit_current().slot(),
             output.commit().current().slot().get()
         );
+        assert_eq!(
+            handoff.work_loop_finished_work_preflight(),
+            admission.work_loop_finished_work_preflight()
+        );
+        assert!(handoff.render_finished_work_matches_create_route_preflight());
+        assert!(handoff.commit_current_matches_render_finished_work());
+        assert!(handoff.minimal_tree_host_output_consumes_root_finished_work());
         assert!(handoff.create_route_admission_accepted());
         assert!(handoff.host_output_handoff_accepted());
         assert!(handoff.actual_rust_create_host_output_handoff());
@@ -15381,6 +15556,56 @@ mod tests {
             error.as_ref(),
             TestRendererPrivateCreateRouteAdmissionError::StaleCreateHostOutputHandoff {
                 reason: "scheduled-element-mismatch"
+            }
+        ));
+    }
+
+    #[test]
+    fn root_private_create_native_bridge_handoff_rejects_mismatched_finished_work_preflight() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let input = TestRendererRootCreatePreflightInputShape::host_component_with_text_child(
+            output.render().resulting_element(),
+            "span",
+        );
+        let preflight = root
+            .describe_private_root_create_preflight_from_render_for_canary(
+                input,
+                TestRendererRootCreatePreflightCanaryApiIdentity::current(),
+                Some(TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current()),
+                output.render(),
+            )
+            .unwrap();
+        let mut admission = TestRendererRoot::describe_private_create_route_admission_for_canary(
+            Some(preflight),
+            Some(TestRendererPrivateCreateRouteAdmissionMetadata::current()),
+        )
+        .unwrap();
+        admission.work_loop_finished_work_preflight.finished_work = admission
+            .work_loop_finished_work_preflight
+            .previous_current();
+
+        let error = root
+            .describe_private_create_native_bridge_host_output_handoff_for_canary(
+                &admission, &output,
+            )
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateCreateRouteAdmission(error) = error else {
+            panic!("expected create-route admission error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateCreateRouteAdmissionError::StaleCreateHostOutputHandoff {
+                reason: "create-route-admission-finished-work-mismatch"
             }
         ));
     }
@@ -18032,13 +18257,14 @@ mod tests {
             output.render().resulting_element(),
             "span",
         );
-        let preflight = TestRendererRoot::describe_private_root_create_preflight_for_canary(
-            input,
-            Some(TestRendererOptions::new()),
-            TestRendererRootCreatePreflightCanaryApiIdentity::current(),
-            Some(TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current()),
-        )
-        .unwrap();
+        let preflight = root
+            .describe_private_root_create_preflight_from_render_for_canary(
+                input,
+                TestRendererRootCreatePreflightCanaryApiIdentity::current(),
+                Some(TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current()),
+                output.render(),
+            )
+            .unwrap();
         let admission = TestRendererRoot::describe_private_create_route_admission_for_canary(
             Some(preflight),
             Some(TestRendererPrivateCreateRouteAdmissionMetadata::current()),
@@ -18167,13 +18393,14 @@ mod tests {
             output.render().resulting_element(),
             "span",
         );
-        let preflight = TestRendererRoot::describe_private_root_create_preflight_for_canary(
-            input,
-            Some(TestRendererOptions::new()),
-            TestRendererRootCreatePreflightCanaryApiIdentity::current(),
-            Some(TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current()),
-        )
-        .unwrap();
+        let preflight = root
+            .describe_private_root_create_preflight_from_render_for_canary(
+                input,
+                TestRendererRootCreatePreflightCanaryApiIdentity::current(),
+                Some(TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current()),
+                output.render(),
+            )
+            .unwrap();
         let admission = TestRendererRoot::describe_private_create_route_admission_for_canary(
             Some(preflight),
             Some(TestRendererPrivateCreateRouteAdmissionMetadata::current()),

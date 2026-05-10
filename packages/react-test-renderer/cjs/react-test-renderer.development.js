@@ -1927,6 +1927,7 @@ const privateCreateRouteAdmissionGate = Object.freeze({
   acceptedRustApis: Object.freeze([
     'TestRendererRoot::create',
     'TestRendererRoot::describe_private_root_create_preflight_for_canary',
+    'TestRendererRoot::describe_private_root_create_preflight_from_render_for_canary',
     'TestRendererRoot::describe_private_create_route_admission_for_canary',
     'TestRendererRoot::render_latest_scheduled_host_root_for_commit_handoff',
     'TestRendererRoot::render_and_commit_host_output_for_canary',
@@ -1936,6 +1937,7 @@ const privateCreateRouteAdmissionGate = Object.freeze({
     'root_private_create_route_admission_consumes_create_and_work_loop_evidence',
     'root_private_create_native_bridge_handoff_consumes_actual_host_output',
     'root_private_create_native_bridge_handoff_rejects_stale_admission',
+    'root_private_create_native_bridge_handoff_rejects_mismatched_finished_work_preflight',
     'root_private_create_route_admission_rejects_missing_rust_admission_record',
     'root_private_create_route_admission_rejects_stale_rust_admission_record',
     'root_private_create_route_admission_rejects_missing_root_create_preflight'
@@ -1952,6 +1954,8 @@ const privateCreateRouteAdmissionGate = Object.freeze({
   consumesAcceptedRustRootCreatePreflightDiagnostics: true,
   consumesAcceptedRustRootWorkLoopFinishedWorkPreflightMetadata: true,
   consumesAcceptedRustCreateHostOutputHandoff: true,
+  consumesCurrentRustRootFinishedWorkIdentity: true,
+  requiresCommitCurrentMatchesRenderFinishedWork: true,
   acceptedHostOutputShape: 'SingleHostText',
   hostOutputProducedByRust: true,
   missingRustAdmissionRecordRejection: true,
@@ -2176,6 +2180,8 @@ const createPrivateRoute = Object.freeze({
   consumesAcceptedRustRootCreatePreflightDiagnostics: true,
   consumesAcceptedRustRootWorkLoopFinishedWorkPreflightMetadata: true,
   consumesAcceptedRustCreateHostOutputHandoff: true,
+  consumesCurrentRustRootFinishedWorkIdentity: true,
+  requiresCommitCurrentMatchesRenderFinishedWork: true,
   acceptedHostOutputShape: 'SingleHostText',
   hostOutputProducedByRust: true,
   publicCreateBehaviorAvailable: false,
@@ -4502,6 +4508,8 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     consumesAcceptedRustRootCreatePreflightDiagnostics: true,
     consumesAcceptedRustRootWorkLoopFinishedWorkPreflightMetadata: true,
     consumesAcceptedRustCreateHostOutputHandoff: true,
+    consumesCurrentRustRootFinishedWorkIdentity: true,
+    requiresCommitCurrentMatchesRenderFinishedWork: true,
     acceptedHostOutputShape: 'SingleHostText',
     hostOutputProducedByRust: true,
     missingRustAdmissionRecordRejection: true,
@@ -11489,6 +11497,26 @@ function normalizeRootCreateWorkLoopFinishedWorkPreflight(row) {
       'rootOptionsMetadataAvailable',
       'root_options_metadata_available'
     ]),
+    previousCurrent: normalizeCreateRouteFiberHandle(
+      readDiagnosticField(row, ['previousCurrent', 'previous_current']),
+      'previousCurrent'
+    ),
+    finishedWork: normalizeCreateRouteFiberHandle(
+      readDiagnosticField(row, ['finishedWork', 'finished_work']),
+      'finishedWork'
+    ),
+    renderLanesEmpty: readDiagnosticField(row, [
+      'renderLanesEmpty',
+      'render_lanes_empty'
+    ]),
+    remainingLanesEmpty: readDiagnosticField(row, [
+      'remainingLanesEmpty',
+      'remaining_lanes_empty'
+    ]),
+    finishedWorkMatchesRenderPhase: readDiagnosticField(row, [
+      'finishedWorkMatchesRenderPhase',
+      'finished_work_matches_render_phase'
+    ]),
     recordsAcceptedFinishedWorkMetadata: readDiagnosticField(row, [
       'recordsAcceptedFinishedWorkMetadata',
       'records_accepted_finished_work_metadata'
@@ -11541,6 +11569,44 @@ function normalizeRootCreateWorkLoopFinishedWorkPreflight(row) {
       ])
     })
   });
+}
+
+function normalizeCreateRouteFiberHandle(handle, fieldName) {
+  if (handle === null || typeof handle !== 'object') {
+    throwInvalidRootRequest(
+      `Expected private create-route fiber handle diagnostics: ${fieldName}.`
+    );
+  }
+
+  const arenaId = readDiagnosticField(handle, ['arenaId', 'arena_id']);
+  const slot = readDiagnosticField(handle, ['slot']);
+  const generation = readDiagnosticField(handle, [
+    'generation',
+    'generation_id'
+  ]);
+  if (
+    !isNonNegativeInteger(arenaId) ||
+    !isNonNegativeInteger(slot) ||
+    !isNonNegativeInteger(generation)
+  ) {
+    throwInvalidRootRequest(
+      `Expected numeric private create-route fiber handle diagnostics: ${fieldName}.`
+    );
+  }
+
+  return freezeRecord({ arenaId, slot, generation });
+}
+
+function createRouteFiberHandlesEqual(left, right) {
+  return (
+    left !== null &&
+    right !== null &&
+    typeof left === 'object' &&
+    typeof right === 'object' &&
+    left.arenaId === right.arenaId &&
+    left.slot === right.slot &&
+    left.generation === right.generation
+  );
 }
 
 function normalizeRootCreatePreflightCanaryApiIdentity(apiIdentity) {
@@ -11671,6 +11737,19 @@ function assertAcceptedRustRootCreatePreflightMatchesRequest(
   ) {
     throwInvalidRootRequest(
       'Rust root-create work-loop finished-work preflight shape is unsupported.'
+    );
+  }
+  if (
+    createRouteFiberHandlesEqual(
+      workLoopPreflight.previousCurrent,
+      workLoopPreflight.finishedWork
+    ) ||
+    workLoopPreflight.renderLanesEmpty !== false ||
+    workLoopPreflight.remainingLanesEmpty !== true ||
+    workLoopPreflight.finishedWorkMatchesRenderPhase !== true
+  ) {
+    throwInvalidRootRequest(
+      'Rust root-create work-loop finished-work identity is not accepted.'
     );
   }
 
@@ -12148,6 +12227,13 @@ function consumePrivateCreateNativeBridgeHostOutputHandoffForRequest(
     hostOutputShape: 'SingleHostText',
     hostOutput: normalized.hostOutput,
     serializationGateStatus: normalized.serializationGateStatus,
+    workLoopFinishedWorkPreflight:
+      normalized.workLoopFinishedWorkPreflight,
+    renderFinishedWork: normalized.renderFinishedWork,
+    commitCurrent: normalized.commitCurrent,
+    renderFinishedWorkMatchesCreateRoutePreflight: true,
+    commitCurrentMatchesRenderFinishedWork: true,
+    minimalTreeHostOutputConsumesRootFinishedWork: true,
     createRouteAdmissionAccepted: true,
     hostOutputHandoffAccepted: true,
     actualRustCreateHostOutputHandoff: true,
@@ -12252,6 +12338,42 @@ function normalizePrivateCreateNativeBridgeHostOutputHandoff(handoff) {
       'serializationGateStatus',
       'serialization_gate_status'
     ]),
+    workLoopFinishedWorkPreflight: normalizeRootCreateWorkLoopFinishedWorkPreflight(
+      readDiagnosticField(handoff, [
+        'workLoopFinishedWorkPreflight',
+        'rootWorkLoopFinishedWorkPreflight',
+        'finishedWorkPreflight',
+        'work_loop_finished_work_preflight'
+      ])
+    ),
+    renderFinishedWork: normalizeCreateRouteFiberHandle(
+      readDiagnosticField(handoff, [
+        'renderFinishedWork',
+        'render_finished_work'
+      ]),
+      'renderFinishedWork'
+    ),
+    commitCurrent: normalizeCreateRouteFiberHandle(
+      readDiagnosticField(handoff, ['commitCurrent', 'commit_current']),
+      'commitCurrent'
+    ),
+    renderFinishedWorkMatchesCreateRoutePreflight:
+      readBooleanDiagnosticField(handoff, [
+        'renderFinishedWorkMatchesCreateRoutePreflight',
+        'render_finished_work_matches_create_route_preflight'
+      ]),
+    commitCurrentMatchesRenderFinishedWork: readBooleanDiagnosticField(
+      handoff,
+      [
+        'commitCurrentMatchesRenderFinishedWork',
+        'commit_current_matches_render_finished_work'
+      ]
+    ),
+    minimalTreeHostOutputConsumesRootFinishedWork:
+      readBooleanDiagnosticField(handoff, [
+        'minimalTreeHostOutputConsumesRootFinishedWork',
+        'minimal_tree_host_output_consumes_root_finished_work'
+      ]),
     createRouteAdmissionAccepted: readDiagnosticField(handoff, [
       'createRouteAdmissionAccepted',
       'create_route_admission_accepted'
@@ -12381,6 +12503,30 @@ function assertPrivateCreateNativeBridgeHostOutputHandoffMatchesRequest(
   ) {
     throwInvalidRootRequest(
       'Private create native bridge handoff host output is not the accepted minimal tree.'
+    );
+  }
+  const routeWorkLoop =
+    createRouteAdmission.sourceDiagnostic?.workLoopFinishedWorkPreflight;
+  if (
+    routeWorkLoop === undefined ||
+    !createRouteFiberHandlesEqual(
+      handoff.workLoopFinishedWorkPreflight.finishedWork,
+      routeWorkLoop.finishedWork
+    ) ||
+    !createRouteFiberHandlesEqual(
+      handoff.renderFinishedWork,
+      routeWorkLoop.finishedWork
+    ) ||
+    !createRouteFiberHandlesEqual(
+      handoff.commitCurrent,
+      handoff.renderFinishedWork
+    ) ||
+    handoff.renderFinishedWorkMatchesCreateRoutePreflight !== true ||
+    handoff.commitCurrentMatchesRenderFinishedWork !== true ||
+    handoff.minimalTreeHostOutputConsumesRootFinishedWork !== true
+  ) {
+    throwInvalidRootRequest(
+      'Private create native bridge handoff is not tied to the accepted root finished work.'
     );
   }
   if (
