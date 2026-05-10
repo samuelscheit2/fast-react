@@ -3050,6 +3050,9 @@ mod tests {
             FiberTag::Portal,
             FiberTag::Suspense,
             FiberTag::Offscreen,
+            FiberTag::Activity,
+            FiberTag::ViewTransition,
+            FiberTag::SuspenseList,
         ] {
             let mut arena = FiberArena::new();
             let fragment = arena.create_fiber(
@@ -3119,6 +3122,10 @@ mod tests {
             FiberTag::ClassComponent,
             FiberTag::ContextProvider,
             FiberTag::Suspense,
+            FiberTag::Offscreen,
+            FiberTag::Activity,
+            FiberTag::ViewTransition,
+            FiberTag::SuspenseList,
         ];
 
         for tag in unsupported_tags {
