@@ -980,6 +980,40 @@ export function inspectReactTestRendererSerializationLocalTargets({
       publicJsReactTestRendererPackageSource,
       /\bpublicQueryMethodAvailable\s*:\s*false\b/u
     );
+  const privateTestInstanceBridgeQueryDiagnosticsPresent =
+    privateRecordOnlyTestInstanceQueryPathPresent &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bgetRendererTestInstanceQueryDiagnostics\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bgetTestInstanceQueryDiagnosticsForRootRequest\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bbridgeRouted\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bconsumesRootBridgeMetadata\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bstandaloneWrapperMetadata\s*:\s*false\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\brootRequestTestInstanceQueryMetadata\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /FastReactTestRendererPrivateRootRequestRecord\.rustCanaryMetadata/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /private-test-instance-query-diagnostics-routed-through-root-bridge/u
+    );
   const publicJsFacadeRoutingPresent =
     publicJsReactTestRendererFacadePresent &&
     !publicJsReactTestRendererFacadePlaceholder &&
@@ -1030,6 +1064,7 @@ export function inspectReactTestRendererSerializationLocalTargets({
     privateToTreeHostOutputMetadataPubliclyBlocked,
     privateRecordOnlyTestInstanceWrapperPresent,
     privateRecordOnlyTestInstanceQueryPathPresent,
+    privateTestInstanceBridgeQueryDiagnosticsPresent,
     publicToJSONAvailable,
     publicToTreeAvailable,
     publicTestInstanceWrappersPresent,
@@ -1286,6 +1321,7 @@ function isErrorSurfacePrivateDiagnosticRowReady(rowId, localChecks) {
     return (
       localChecks.committedFiberInspectionPresent &&
       localChecks.privateRecordOnlyTestInstanceQueryPathPresent &&
+      localChecks.privateTestInstanceBridgeQueryDiagnosticsPresent &&
       localChecks.publicTestInstanceErrorSurfaceBlocked &&
       !localChecks.publicTestInstanceWrappersPresent
     );

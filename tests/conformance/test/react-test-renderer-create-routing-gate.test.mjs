@@ -909,6 +909,10 @@ test("react-test-renderer create routing gate feeds only private error diagnosti
     gate.localChecks.privateRecordOnlyTestInstanceWrapperPresent,
     true
   );
+  assert.equal(
+    gate.localChecks.privateTestInstanceBridgeQueryDiagnosticsPresent,
+    true
+  );
   assert.equal(gate.localChecks.privateActQueueMetadataPresent, true);
   assert.equal(gate.localChecks.passiveEffectMetadataOnly, true);
   assert.equal(gate.localChecks.publicCreateUpdateUnmountErrorSurfaceBlocked, true);
@@ -1001,7 +1005,12 @@ test("react-test-renderer TestInstance query and serialization surfaces stay pub
 test("react-test-renderer private TestInstance wrapper skeleton exposes record-only metadata", () => {
   for (const entry of entrypoints) {
     const moduleExports = loadFresh(entry.modulePath);
+    const bridge = assertPrivateRootRequestBridge(
+      moduleExports,
+      entry.entrypoint
+    );
     const renderer = moduleExports.create({ type: "private-query-record" });
+    const [createRequest] = bridge.getRendererRootRequests(renderer);
     const descriptor = Object.getOwnPropertyDescriptor(
       renderer,
       privateTestInstanceWrapperRecordSymbol
@@ -1012,17 +1021,40 @@ test("react-test-renderer private TestInstance wrapper skeleton exposes record-o
     assert.equal(descriptor.writable, false, entry.entrypoint);
     assertPrivateTestInstanceWrapperSkeleton(
       descriptor.value,
+      entry.entrypoint,
+      {
+        bridge,
+        rootRequest: createRequest
+      }
+    );
+    assert.equal(
+      bridge.getTestInstanceQueryDiagnostics(createRequest),
+      descriptor.value,
       entry.entrypoint
     );
-
+    assert.equal(
+      bridge.getRendererTestInstanceQueryDiagnostics(renderer),
+      descriptor.value,
+      entry.entrypoint
+    );
+    assert.equal(
+      bridge.getRootTestInstanceQueryDiagnostics(createRequest.rootHandle),
+      descriptor.value,
+      entry.entrypoint
+    );
     const rootError = captureThrown(() => renderer.root);
     assertReactTestRendererUnimplemented(
       rootError,
       entry.entrypoint,
       "create().root"
     );
-    assert.equal(
+    assert.notEqual(
+      descriptor.value,
       rootError.routingGate.privateTestInstanceWrapperSkeleton,
+      entry.entrypoint
+    );
+    assert.equal(
+      rootError.privateTestInstanceWrapperRecord,
       descriptor.value,
       entry.entrypoint
     );
@@ -1129,6 +1161,9 @@ function assertPrivateRootRequestBridge(moduleExports, entrypoint) {
   assert.equal(typeof bridge.getRequestPayload, "function");
   assert.equal(typeof bridge.getRustCanaryMetadata, "function");
   assert.equal(typeof bridge.getRustCanaryOperationMetadata, "function");
+  assert.equal(typeof bridge.getTestInstanceQueryDiagnostics, "function");
+  assert.equal(typeof bridge.getRootTestInstanceQueryDiagnostics, "function");
+  assert.equal(typeof bridge.getRendererTestInstanceQueryDiagnostics, "function");
   assert.equal(
     typeof bridge.canConsumeAcceptedRustLifecycleDiagnostic,
     "function"
@@ -1414,7 +1449,8 @@ function assertRustCanaryMetadata(metadata, label) {
   assert.deepEqual(metadata.acceptedJsBridgeWorkers, [
     "worker-304-test-renderer-js-private-root-request-bridge",
     "worker-306-test-renderer-testinstance-private-wrapper-skeleton",
-    "worker-307-test-renderer-update-unmount-private-js-bridge"
+    "worker-307-test-renderer-update-unmount-private-js-bridge",
+    "worker-426-test-renderer-testinstance-bridge-query"
   ]);
 
   assert.equal(Object.isFrozen(metadata.root), true, label);
@@ -1533,6 +1569,68 @@ function assertRustCanaryMetadata(metadata, label) {
   assert.equal(metadata.privateJson.hostOutputSnapshotFreshnessRequired, true);
   assert.equal(metadata.privateJson.staleSnapshotRejection, true);
   assert.equal(metadata.privateJson.publicSerializationAvailable, false);
+
+  const testInstanceQuery = metadata.testInstanceQuery;
+  assert.equal(Object.isFrozen(testInstanceQuery), true, label);
+  assert.equal(
+    testInstanceQuery.diagnosticKind,
+    "ReactTestInstancePrivateQueryMetadata",
+    label
+  );
+  assert.equal(
+    testInstanceQuery.status,
+    "private-test-instance-query-diagnostics-routed-through-root-bridge",
+    label
+  );
+  assert.equal(
+    testInstanceQuery.bridgeMetadataSource,
+    "FastReactTestRendererPrivateRootRequestRecord.rustCanaryMetadata",
+    label
+  );
+  assert.equal(
+    testInstanceQuery.wrapperRecordSymbol,
+    privateTestInstanceWrapperRecordSymbolDescription,
+    label
+  );
+  assert.deepEqual(testInstanceQuery.acceptedWorkers, [
+    "worker-235-test-renderer-private-fiber-inspection",
+    "worker-334-test-renderer-testinstance-private-query-path",
+    "worker-365-test-renderer-testinstance-multi-child-query-path"
+  ]);
+  assert.deepEqual(testInstanceQuery.acceptedRustRecords, [
+    "TestRendererCommittedFiberTreeInspection",
+    "TestRendererCommittedFiberNodeInspection"
+  ]);
+  assert.deepEqual(testInstanceQuery.acceptedQuerySurfaces, [
+    "root",
+    "find",
+    "findAll",
+    "findByType",
+    "findAllByType",
+    "findByProps",
+    "findAllByProps"
+  ]);
+  assert.deepEqual(testInstanceQuery.fixtureShape, [
+    "HostRoot",
+    "HostText",
+    "HostComponent",
+    "HostText"
+  ]);
+  assert.equal(
+    testInstanceQuery.rootWrapperMaterializedForPrivateMetadata,
+    true,
+    label
+  );
+  assert.equal(testInstanceQuery.queryCandidateCount, 2, label);
+  assert.equal(testInstanceQuery.skippedTextRecordCount, 2, label);
+  assert.equal(testInstanceQuery.publicRootAvailable, false, label);
+  assert.equal(testInstanceQuery.publicQueryMethodsAvailable, false, label);
+  assert.equal(
+    testInstanceQuery.publicTestInstanceObjectAvailable,
+    false,
+    label
+  );
+  assert.equal(testInstanceQuery.compatibilityClaimed, false, label);
 
   assert.deepEqual(Object.keys(metadata.operations), [
     "create",
@@ -2135,16 +2233,23 @@ function assertPrivateToTreeFacade(record, entrypoint) {
   );
 }
 
-function assertPrivateTestInstanceWrapperSkeleton(record, entrypoint) {
+function assertPrivateTestInstanceWrapperSkeleton(
+  record,
+  entrypoint,
+  options = {}
+) {
   assert.equal(Object.isFrozen(record), true, entrypoint);
   assert.equal(
     record.id,
     "react-test-renderer-private-test-instance-wrapper-skeleton",
     entrypoint
   );
+  const bridgeRouted = options.rootRequest !== undefined;
   assert.equal(
     record.status,
-    "private-record-ready-public-test-instance-blocked",
+    bridgeRouted
+      ? "private-bridge-query-metadata-ready-public-test-instance-blocked"
+      : "private-record-ready-public-test-instance-blocked",
     entrypoint
   );
   assert.equal(record.entrypoint, entrypoint);
@@ -2160,6 +2265,78 @@ function assertPrivateTestInstanceWrapperSkeleton(record, entrypoint) {
   assert.equal(record.nativeBridgeAvailable, false, entrypoint);
   assert.equal(record.nativeExecution, false, entrypoint);
   assert.equal(record.compatibilityClaimed, false, entrypoint);
+
+  if (bridgeRouted) {
+    assert.equal(record.bridgeRouted, true, entrypoint);
+    assert.equal(record.consumesRootBridgeMetadata, true, entrypoint);
+    assert.equal(record.standaloneWrapperMetadata, false, entrypoint);
+    assert.equal(
+      record.bridgeMetadataSource,
+      "FastReactTestRendererPrivateRootRequestRecord.rustCanaryMetadata",
+      entrypoint
+    );
+    assert.equal(record.rootRequest, options.rootRequest, entrypoint);
+    assert.equal(
+      record.rootHandle,
+      options.rootRequest.rootHandle,
+      entrypoint
+    );
+    assert.equal(record.rootId, options.rootRequest.rootId, entrypoint);
+    assert.equal(
+      record.rootRequestId,
+      options.rootRequest.requestId,
+      entrypoint
+    );
+    assert.equal(
+      record.rootRequestSequence,
+      options.rootRequest.requestSequence,
+      entrypoint
+    );
+    assert.equal(
+      record.rootRequestStatus,
+      rootRequestStatus,
+      entrypoint
+    );
+    assert.equal(
+      record.rootRequestExecutionStatus,
+      rootRequestExecutionStatus,
+      entrypoint
+    );
+    assert.equal(
+      record.rootRequestCompatibilityStatus,
+      rootRequestCompatibilityStatus,
+      entrypoint
+    );
+    assert.equal(record.rootRequestOperation, "create", entrypoint);
+    assert.equal(
+      record.rootRequestRustCanaryMetadata,
+      options.rootRequest.rustCanaryMetadata,
+      entrypoint
+    );
+    assert.equal(
+      record.rootRequestTestInstanceQueryMetadata,
+      options.rootRequest.rustCanaryMetadata.testInstanceQuery,
+      entrypoint
+    );
+    assert.equal(record.rustExecution, false, entrypoint);
+    assert.equal(record.reconcilerExecution, false, entrypoint);
+    assert.equal(record.hostOutputProducedFromJs, false, entrypoint);
+    assertPrivateTestInstanceRootBridgeMetadata(
+      record.rootBridgeMetadata,
+      options.rootRequest,
+      entrypoint
+    );
+    if (options.bridge !== undefined) {
+      assert.equal(
+        options.bridge.getTestInstanceQueryDiagnostics(options.rootRequest),
+        record,
+        entrypoint
+      );
+    }
+  } else {
+    assert.equal(Object.hasOwn(record, "rootRequest"), false, entrypoint);
+    assert.equal(Object.hasOwn(record, "rootBridgeMetadata"), false, entrypoint);
+  }
 
   const fiberInspection = record.fiberInspection;
   assert.equal(Object.isFrozen(fiberInspection), true, entrypoint);
@@ -2369,6 +2546,116 @@ function assertPrivateTestInstanceWrapperSkeleton(record, entrypoint) {
       `${entrypoint} component ${queryName}`
     );
   }
+}
+
+function assertPrivateTestInstanceRootBridgeMetadata(
+  metadata,
+  rootRequest,
+  entrypoint
+) {
+  assert.equal(Object.isFrozen(metadata), true, entrypoint);
+  assert.equal(
+    metadata.id,
+    "react-test-renderer-private-test-instance-root-bridge-metadata",
+    entrypoint
+  );
+  assert.equal(
+    metadata.bridgeKind,
+    "FastReactTestRendererPrivateRootRequestBridge",
+    entrypoint
+  );
+  assert.equal(metadata.bridgeSymbol, rootRequestBridgeSymbol.description);
+  assert.equal(
+    metadata.source,
+    "FastReactTestRendererPrivateRootRequestRecord.rustCanaryMetadata",
+    entrypoint
+  );
+  assert.equal(
+    metadata.status,
+    "private-test-instance-query-diagnostics-routed-through-root-bridge",
+    entrypoint
+  );
+  assert.equal(metadata.rootRequest, rootRequest, entrypoint);
+  assert.equal(metadata.rootHandle, rootRequest.rootHandle, entrypoint);
+  assert.equal(metadata.rootId, rootRequest.rootId, entrypoint);
+  assert.equal(metadata.rootSequence, rootRequest.rootSequence, entrypoint);
+  assert.equal(metadata.createRequestId, rootRequest.requestId, entrypoint);
+  assert.equal(
+    metadata.createRequestSequence,
+    rootRequest.requestSequence,
+    entrypoint
+  );
+  assert.equal(metadata.createRequestStatus, rootRequestStatus, entrypoint);
+  assert.equal(
+    metadata.createRequestExecutionStatus,
+    rootRequestExecutionStatus,
+    entrypoint
+  );
+  assert.equal(
+    metadata.createRequestCompatibilityStatus,
+    rootRequestCompatibilityStatus,
+    entrypoint
+  );
+  assert.equal(
+    metadata.rustCanaryMetadata,
+    rootRequest.rustCanaryMetadata,
+    entrypoint
+  );
+  assert.equal(
+    metadata.testInstanceQueryMetadata,
+    rootRequest.rustCanaryMetadata.testInstanceQuery,
+    entrypoint
+  );
+  assert.equal(metadata.recordOnlyPrivateBridge, true, entrypoint);
+  assert.equal(metadata.nativeBridgeAvailable, false, entrypoint);
+  assert.equal(metadata.nativeExecution, false, entrypoint);
+  assert.equal(metadata.rustExecution, false, entrypoint);
+  assert.equal(metadata.reconcilerExecution, false, entrypoint);
+  assert.equal(metadata.hostOutputProduced, false, entrypoint);
+  assert.equal(metadata.compatibilityClaimed, false, entrypoint);
+
+  const queryMetadata = metadata.testInstanceQueryMetadata;
+  assert.equal(Object.isFrozen(queryMetadata), true, entrypoint);
+  assert.equal(
+    queryMetadata.diagnosticKind,
+    "ReactTestInstancePrivateQueryMetadata",
+    entrypoint
+  );
+  assert.equal(
+    queryMetadata.status,
+    "private-test-instance-query-diagnostics-routed-through-root-bridge",
+    entrypoint
+  );
+  assert.equal(
+    queryMetadata.bridgeMetadataSource,
+    "FastReactTestRendererPrivateRootRequestRecord.rustCanaryMetadata",
+    entrypoint
+  );
+  assert.deepEqual(queryMetadata.acceptedQuerySurfaces, [
+    "root",
+    "find",
+    "findAll",
+    "findByType",
+    "findAllByType",
+    "findByProps",
+    "findAllByProps"
+  ]);
+  assert.deepEqual(queryMetadata.fixtureShape, [
+    "HostRoot",
+    "HostText",
+    "HostComponent",
+    "HostText"
+  ]);
+  assert.equal(queryMetadata.queryCandidateCount, 2, entrypoint);
+  assert.equal(queryMetadata.skippedTextRecordCount, 2, entrypoint);
+  assert.equal(queryMetadata.publicRootAvailable, false, entrypoint);
+  assert.equal(queryMetadata.publicQueryMethodsAvailable, false, entrypoint);
+  assert.equal(
+    queryMetadata.publicTestInstanceObjectAvailable,
+    false,
+    entrypoint
+  );
+  assert.equal(queryMetadata.compatibilityClaimed, false, entrypoint);
 }
 
 function assertMultiChildHostTree(tree, entrypoint) {
@@ -3048,6 +3335,7 @@ function assertActSchedulerGate(gate, entrypoint) {
     "worker-332-test-renderer-js-private-root-native-bridge",
     "worker-333-test-renderer-tojson-host-output-private-path",
     "worker-334-test-renderer-testinstance-private-query-path",
+    "worker-426-test-renderer-testinstance-bridge-query",
     "worker-349-hook-effect-destroy-callback-execution-private",
     "worker-377-scheduler-act-queue-flush-helper-private"
   ]);
@@ -3194,6 +3482,18 @@ function assertActSchedulerGate(gate, entrypoint) {
   );
   assert.equal(
     gate.recognizedRootActFlushRecords[4].publicTestInstanceObjectAvailable,
+    false
+  );
+  assert.equal(
+    gate.recognizedRootActFlushRecords[4].acceptedBridgeWorker,
+    "worker-426-test-renderer-testinstance-bridge-query"
+  );
+  assert.equal(
+    gate.recognizedRootActFlushRecords[4].consumesRootBridgeMetadata,
+    true
+  );
+  assert.equal(
+    gate.recognizedRootActFlushRecords[4].standaloneWrapperMetadata,
     false
   );
 }

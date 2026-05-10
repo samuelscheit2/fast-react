@@ -52,6 +52,9 @@ const ERROR_SURFACE_PUBLIC_UNBLOCK_REQUIREMENT_IDS =
 const privateTestInstanceWrapperRecordSymbol = Symbol.for(
   "fast.react_test_renderer.private_test_instance_wrapper_record"
 );
+const rootRequestBridgeSymbol = Symbol.for(
+  "fast.react_test_renderer.root_request_bridge"
+);
 const jsEntrypoints = [
   {
     entrypoint: "react-test-renderer",
@@ -225,6 +228,10 @@ test("React test renderer error surface local gate admits only private diagnosti
     gate.localChecks.privateRecordOnlyTestInstanceQueryPathPresent,
     true
   );
+  assert.equal(
+    gate.localChecks.privateTestInstanceBridgeQueryDiagnosticsPresent,
+    true
+  );
   assert.equal(gate.localChecks.privateActQueueMetadataPresent, true);
   assert.equal(gate.localChecks.passiveEffectMetadataOnly, true);
   assert.equal(gate.localChecks.actFlushExecutionPresent, false);
@@ -259,12 +266,21 @@ test("React test renderer error surface gate keeps multi-child TestInstance quer
     gate.localChecks.privateRecordOnlyTestInstanceQueryPathPresent,
     true
   );
+  assert.equal(
+    gate.localChecks.privateTestInstanceBridgeQueryDiagnosticsPresent,
+    true
+  );
   assert.equal(gate.localChecks.publicTestInstanceErrorSurfaceBlocked, true);
   assert.equal(gate.localChecks.publicTestInstanceWrappersPresent, false);
 
   for (const entry of jsEntrypoints) {
     const moduleExports = loadFresh(entry.specifier);
+    const bridge = Object.getOwnPropertyDescriptor(
+      moduleExports.create,
+      rootRequestBridgeSymbol
+    ).value;
     const renderer = moduleExports.create({ type: "multi-child-private" });
+    const [createRequest] = bridge.getRendererRootRequests(renderer);
     const descriptor = Object.getOwnPropertyDescriptor(
       renderer,
       privateTestInstanceWrapperRecordSymbol
@@ -275,6 +291,20 @@ test("React test renderer error surface gate keeps multi-child TestInstance quer
     const record = descriptor.value;
     assert.equal(record.publicRootAvailable, false, entry.entrypoint);
     assert.equal(record.publicQueryMethodsAvailable, false, entry.entrypoint);
+    assert.equal(record.bridgeRouted, true, entry.entrypoint);
+    assert.equal(record.consumesRootBridgeMetadata, true, entry.entrypoint);
+    assert.equal(record.standaloneWrapperMetadata, false, entry.entrypoint);
+    assert.equal(record.rootRequest, createRequest, entry.entrypoint);
+    assert.equal(
+      record.rootRequestTestInstanceQueryMetadata,
+      createRequest.rustCanaryMetadata.testInstanceQuery,
+      entry.entrypoint
+    );
+    assert.equal(
+      bridge.getRendererTestInstanceQueryDiagnostics(renderer),
+      record,
+      entry.entrypoint
+    );
     assert.equal(
       record.publicTestInstanceObjectAvailable,
       false,
@@ -322,6 +352,11 @@ test("React test renderer error surface gate keeps multi-child TestInstance quer
     const rootError = captureThrown(() => renderer.root);
     assert.equal(rootError.exportName, "create().root", entry.entrypoint);
     assert.equal(
+      rootError.privateTestInstanceWrapperRecord,
+      record,
+      entry.entrypoint
+    );
+    assert.notEqual(
       rootError.routingGate.privateTestInstanceWrapperSkeleton,
       record,
       entry.entrypoint
