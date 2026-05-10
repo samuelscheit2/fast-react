@@ -1266,6 +1266,52 @@ export function inspectReactTestRendererSerializationLocalTargets({
       publicJsReactTestRendererPackageSource,
       /\bfindByPredicateExecution\s*:\s*false\b/u
     );
+  const privateTestInstanceQueryBridgePreflightPresent =
+    privateTestInstanceFindByQueryDiagnosticsPresent &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bprivateTestInstanceQueryBridgePreflightGate\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /fast-react-test-renderer\.testinstance\.query-bridge-preflight/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bFastReactTestRendererPrivateTestInstanceQueryBridgePreflight\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bTestRendererRoot::describe_private_test_instance_query_bridge_preflight_for_canary\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bworker-515-test-renderer-live-query-bridge-preflight\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bconsumeAcceptedRustTestInstanceQueryDiagnosticsForRequest\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bgetTestInstanceQueryBridgePreflightForRootRequest\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bconsumesAcceptedRustFindAllDiagnostics\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bconsumesAcceptedRustFindByDiagnostics\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\brecordOnlyDiagnosticConsumption\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\brustExecutionFromJs\s*:\s*false\b/u
+    );
   const publicJsFacadeRoutingPresent =
     publicJsReactTestRendererFacadePresent &&
     !publicJsReactTestRendererFacadePlaceholder &&
@@ -1322,6 +1368,7 @@ export function inspectReactTestRendererSerializationLocalTargets({
     privateTestInstanceBridgeQueryDiagnosticsPresent,
     privateTestInstanceFindAllQueryDiagnosticsPresent,
     privateTestInstanceFindByQueryDiagnosticsPresent,
+    privateTestInstanceQueryBridgePreflightPresent,
     publicToJSONAvailable,
     publicToTreeAvailable,
     publicTestInstanceWrappersPresent,
@@ -1579,6 +1626,7 @@ function isErrorSurfacePrivateDiagnosticRowReady(rowId, localChecks) {
       localChecks.committedFiberInspectionPresent &&
       localChecks.privateRecordOnlyTestInstanceQueryPathPresent &&
       localChecks.privateTestInstanceBridgeQueryDiagnosticsPresent &&
+      localChecks.privateTestInstanceQueryBridgePreflightPresent &&
       localChecks.publicTestInstanceErrorSurfaceBlocked &&
       !localChecks.publicTestInstanceWrappersPresent
     );

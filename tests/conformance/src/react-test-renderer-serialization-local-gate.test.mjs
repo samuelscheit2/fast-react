@@ -148,6 +148,7 @@ test("react-test-renderer serialization gate is ready for private diagnostics wh
     privateTestInstanceBridgeQueryDiagnosticsPresent: true,
     privateTestInstanceFindAllQueryDiagnosticsPresent: true,
     privateTestInstanceFindByQueryDiagnosticsPresent: true,
+    privateTestInstanceQueryBridgePreflightPresent: true,
     publicToJSONAvailable: false,
     publicToTreeAvailable: false,
     publicTestInstanceWrappersPresent: false,
@@ -219,6 +220,10 @@ test("react-test-renderer serialization gate records accepted Rust-private prere
   );
   assert.equal(
     gate.localChecks.privateTestInstanceFindByQueryDiagnosticsPresent,
+    true
+  );
+  assert.equal(
+    gate.localChecks.privateTestInstanceQueryBridgePreflightPresent,
     true
   );
   assert.equal(gate.localChecks.publicTestInstanceWrappersPresent, false);

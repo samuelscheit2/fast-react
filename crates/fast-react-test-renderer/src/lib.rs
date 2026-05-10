@@ -1770,6 +1770,8 @@ pub const TEST_RENDERER_PRIVATE_TEST_INSTANCE_FIND_ALL_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.testinstance.find-all-private-query";
 pub const TEST_RENDERER_PRIVATE_TEST_INSTANCE_FIND_BY_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.testinstance.find-by-private-query";
+pub const TEST_RENDERER_PRIVATE_TEST_INSTANCE_QUERY_BRIDGE_PREFLIGHT_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.testinstance.query-bridge-preflight";
 pub const TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.error-boundary.private-root-options-canary";
 pub const TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_STATUS: &str =
@@ -3937,6 +3939,156 @@ impl TestRendererPrivateTestInstanceFindByQueryDiagnostics {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateTestInstanceQueryBridgePreflightDiagnostics {
+    diagnostic_name: &'static str,
+    source_find_all_diagnostic_name: &'static str,
+    source_find_by_diagnostic_name: &'static str,
+    bridge_status: &'static str,
+    bridge_source: &'static str,
+    wrapper_record_symbol: &'static str,
+    host_output_update_kind: TestRendererRootUpdateKind,
+    host_output_snapshot_current: bool,
+    accepted_find_all_traversal_source: &'static str,
+    accepted_find_by_source: &'static str,
+    find_all_candidate_fiber_tags: Vec<&'static str>,
+    find_all_skipped_fiber_tags: Vec<&'static str>,
+    find_by_queries: Vec<&'static str>,
+    consumes_accepted_find_all_diagnostics: bool,
+    consumes_accepted_find_by_diagnostics: bool,
+    record_only_diagnostic_consumption: bool,
+    native_bridge_available: bool,
+    native_execution: bool,
+    rust_execution_from_js: bool,
+    public_blockers: TestRendererPrivateJsonPublicSurfaceBlockers,
+    public_root_available: bool,
+    public_test_instance_object_available: bool,
+    public_query_methods_available: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererPrivateTestInstanceQueryBridgePreflightDiagnostics {
+    #[must_use]
+    pub const fn diagnostic_name(&self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn source_find_all_diagnostic_name(&self) -> &'static str {
+        self.source_find_all_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn source_find_by_diagnostic_name(&self) -> &'static str {
+        self.source_find_by_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn bridge_status(&self) -> &'static str {
+        self.bridge_status
+    }
+
+    #[must_use]
+    pub const fn bridge_source(&self) -> &'static str {
+        self.bridge_source
+    }
+
+    #[must_use]
+    pub const fn wrapper_record_symbol(&self) -> &'static str {
+        self.wrapper_record_symbol
+    }
+
+    #[must_use]
+    pub const fn host_output_update_kind(&self) -> TestRendererRootUpdateKind {
+        self.host_output_update_kind
+    }
+
+    #[must_use]
+    pub const fn host_output_snapshot_current(&self) -> bool {
+        self.host_output_snapshot_current
+    }
+
+    #[must_use]
+    pub const fn accepted_find_all_traversal_source(&self) -> &'static str {
+        self.accepted_find_all_traversal_source
+    }
+
+    #[must_use]
+    pub const fn accepted_find_by_source(&self) -> &'static str {
+        self.accepted_find_by_source
+    }
+
+    #[must_use]
+    pub fn find_all_candidate_fiber_tags(&self) -> &[&'static str] {
+        &self.find_all_candidate_fiber_tags
+    }
+
+    #[must_use]
+    pub fn find_all_skipped_fiber_tags(&self) -> &[&'static str] {
+        &self.find_all_skipped_fiber_tags
+    }
+
+    #[must_use]
+    pub fn find_by_queries(&self) -> &[&'static str] {
+        &self.find_by_queries
+    }
+
+    #[must_use]
+    pub const fn consumes_accepted_find_all_diagnostics(&self) -> bool {
+        self.consumes_accepted_find_all_diagnostics
+    }
+
+    #[must_use]
+    pub const fn consumes_accepted_find_by_diagnostics(&self) -> bool {
+        self.consumes_accepted_find_by_diagnostics
+    }
+
+    #[must_use]
+    pub const fn record_only_diagnostic_consumption(&self) -> bool {
+        self.record_only_diagnostic_consumption
+    }
+
+    #[must_use]
+    pub const fn native_bridge_available(&self) -> bool {
+        self.native_bridge_available
+    }
+
+    #[must_use]
+    pub const fn native_execution(&self) -> bool {
+        self.native_execution
+    }
+
+    #[must_use]
+    pub const fn rust_execution_from_js(&self) -> bool {
+        self.rust_execution_from_js
+    }
+
+    #[must_use]
+    pub const fn public_blockers(&self) -> TestRendererPrivateJsonPublicSurfaceBlockers {
+        self.public_blockers
+    }
+
+    #[must_use]
+    pub const fn public_root_available(&self) -> bool {
+        self.public_root_available
+    }
+
+    #[must_use]
+    pub const fn public_test_instance_object_available(&self) -> bool {
+        self.public_test_instance_object_available
+    }
+
+    #[must_use]
+    pub const fn public_query_methods_available(&self) -> bool {
+        self.public_query_methods_available
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(&self) -> bool {
+        self.compatibility_claimed
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestRendererPrivateGetInstanceFailClosedRootDiagnostic {
     root_fiber_shape: [&'static str; 2],
     root_child_fiber_tag: &'static str,
@@ -5043,6 +5195,42 @@ impl TestRendererRoot {
             self.describe_private_test_instance_find_all_query_after_update_for_canary(output)?;
 
         Ok(Self::private_test_instance_find_by_query_from_find_all_report(&find_all_report))
+    }
+
+    pub fn describe_private_test_instance_query_bridge_preflight_for_canary(
+        &self,
+        output: &TestRendererCommittedHostOutput,
+    ) -> Result<TestRendererPrivateTestInstanceQueryBridgePreflightDiagnostics, TestRendererRootError>
+    {
+        let find_all_report =
+            self.describe_private_test_instance_find_all_query_for_canary(output)?;
+        let find_by_report =
+            Self::private_test_instance_find_by_query_from_find_all_report(&find_all_report);
+
+        Ok(
+            Self::private_test_instance_query_bridge_preflight_from_query_reports(
+                &find_all_report,
+                &find_by_report,
+            ),
+        )
+    }
+
+    pub fn describe_private_test_instance_query_bridge_preflight_after_update_for_canary(
+        &self,
+        output: &TestRendererUpdatedHostOutput,
+    ) -> Result<TestRendererPrivateTestInstanceQueryBridgePreflightDiagnostics, TestRendererRootError>
+    {
+        let find_all_report =
+            self.describe_private_test_instance_find_all_query_after_update_for_canary(output)?;
+        let find_by_report =
+            Self::private_test_instance_find_by_query_from_find_all_report(&find_all_report);
+
+        Ok(
+            Self::private_test_instance_query_bridge_preflight_from_query_reports(
+                &find_all_report,
+                &find_by_report,
+            ),
+        )
     }
 
     pub fn describe_private_get_instance_class_root_for_canary(
@@ -6650,6 +6838,42 @@ impl TestRendererRoot {
                 compatibility_claimed: false,
             },
             public_blockers: find_all_report.public_blockers(),
+            public_test_instance_object_available: false,
+            public_query_methods_available: false,
+            compatibility_claimed: false,
+        }
+    }
+
+    fn private_test_instance_query_bridge_preflight_from_query_reports(
+        find_all_report: &TestRendererPrivateTestInstanceFindAllQueryDiagnostics,
+        find_by_report: &TestRendererPrivateTestInstanceFindByQueryDiagnostics,
+    ) -> TestRendererPrivateTestInstanceQueryBridgePreflightDiagnostics {
+        TestRendererPrivateTestInstanceQueryBridgePreflightDiagnostics {
+            diagnostic_name:
+                TEST_RENDERER_PRIVATE_TEST_INSTANCE_QUERY_BRIDGE_PREFLIGHT_DIAGNOSTIC_NAME,
+            source_find_all_diagnostic_name: find_all_report.diagnostic_name(),
+            source_find_by_diagnostic_name: find_by_report.diagnostic_name(),
+            bridge_status: "private-test-instance-query-bridge-preflight-ready-public-test-instance-blocked",
+            bridge_source: "FastReactTestRendererPrivateRootRequestRecord.rustCanaryMetadata.testInstanceQuery",
+            wrapper_record_symbol: "fast.react_test_renderer.private_test_instance_wrapper_record",
+            host_output_update_kind: find_by_report.host_output_update_kind(),
+            host_output_snapshot_current: find_by_report.host_output_snapshot_current(),
+            accepted_find_all_traversal_source: find_all_report.traversal_source(),
+            accepted_find_by_source: find_by_report.source(),
+            find_all_candidate_fiber_tags: find_all_report.candidate_fiber_tags().to_vec(),
+            find_all_skipped_fiber_tags: find_all_report.skipped_fiber_tags().to_vec(),
+            find_by_queries: vec![
+                find_by_report.find_by_type().query_kind().as_str(),
+                find_by_report.find_by_props().query_kind().as_str(),
+            ],
+            consumes_accepted_find_all_diagnostics: true,
+            consumes_accepted_find_by_diagnostics: true,
+            record_only_diagnostic_consumption: true,
+            native_bridge_available: false,
+            native_execution: false,
+            rust_execution_from_js: false,
+            public_blockers: find_all_report.public_blockers(),
+            public_root_available: false,
             public_test_instance_object_available: false,
             public_query_methods_available: false,
             compatibility_claimed: false,
@@ -8920,6 +9144,142 @@ mod tests {
         assert!(!diagnostics.public_query_methods_available());
         assert!(!diagnostics.public_test_instance_object_available());
         assert!(!diagnostics.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_test_instance_query_bridge_preflight_ties_find_all_and_find_by_records() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let find_all = root
+            .describe_private_test_instance_find_all_query_for_canary(&output)
+            .unwrap();
+        let find_by = root
+            .describe_private_test_instance_find_by_query_for_canary(&output)
+            .unwrap();
+        let preflight = root
+            .describe_private_test_instance_query_bridge_preflight_for_canary(&output)
+            .unwrap();
+
+        assert_eq!(
+            preflight.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TEST_INSTANCE_QUERY_BRIDGE_PREFLIGHT_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            preflight.source_find_all_diagnostic_name(),
+            find_all.diagnostic_name()
+        );
+        assert_eq!(
+            preflight.source_find_by_diagnostic_name(),
+            find_by.diagnostic_name()
+        );
+        assert_eq!(
+            preflight.bridge_status(),
+            "private-test-instance-query-bridge-preflight-ready-public-test-instance-blocked"
+        );
+        assert_eq!(
+            preflight.bridge_source(),
+            "FastReactTestRendererPrivateRootRequestRecord.rustCanaryMetadata.testInstanceQuery"
+        );
+        assert_eq!(
+            preflight.wrapper_record_symbol(),
+            "fast.react_test_renderer.private_test_instance_wrapper_record"
+        );
+        assert_eq!(
+            preflight.host_output_update_kind(),
+            TestRendererRootUpdateKind::Create
+        );
+        assert!(preflight.host_output_snapshot_current());
+        assert_eq!(
+            preflight.accepted_find_all_traversal_source(),
+            find_all.traversal_source()
+        );
+        assert_eq!(preflight.accepted_find_by_source(), find_by.source());
+        assert_eq!(
+            preflight.find_all_candidate_fiber_tags(),
+            find_all.candidate_fiber_tags()
+        );
+        assert_eq!(
+            preflight.find_all_skipped_fiber_tags(),
+            find_all.skipped_fiber_tags()
+        );
+        assert_eq!(preflight.find_by_queries(), &["findByType", "findByProps"]);
+        assert!(preflight.consumes_accepted_find_all_diagnostics());
+        assert!(preflight.consumes_accepted_find_by_diagnostics());
+        assert!(preflight.record_only_diagnostic_consumption());
+        assert!(!preflight.native_bridge_available());
+        assert!(!preflight.native_execution());
+        assert!(!preflight.rust_execution_from_js());
+        assert!(preflight.public_blockers().all_blocked());
+        assert!(!preflight.public_root_available());
+        assert!(!preflight.public_test_instance_object_available());
+        assert!(!preflight.public_query_methods_available());
+        assert!(!preflight.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_test_instance_query_bridge_preflight_follows_update_records() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let updated = root
+            .render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let find_all = root
+            .describe_private_test_instance_find_all_query_after_update_for_canary(&updated)
+            .unwrap();
+        let find_by = root
+            .describe_private_test_instance_find_by_query_after_update_for_canary(&updated)
+            .unwrap();
+        let preflight = root
+            .describe_private_test_instance_query_bridge_preflight_after_update_for_canary(&updated)
+            .unwrap();
+
+        assert_eq!(
+            preflight.host_output_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert!(preflight.host_output_snapshot_current());
+        assert_eq!(
+            preflight.source_find_all_diagnostic_name(),
+            find_all.diagnostic_name()
+        );
+        assert_eq!(
+            preflight.source_find_by_diagnostic_name(),
+            find_by.diagnostic_name()
+        );
+        assert_eq!(
+            preflight.find_all_candidate_fiber_tags(),
+            find_all.candidate_fiber_tags()
+        );
+        assert_eq!(
+            preflight.find_all_skipped_fiber_tags(),
+            find_all.skipped_fiber_tags()
+        );
+        assert_eq!(preflight.find_by_queries(), &["findByType", "findByProps"]);
+        assert!(preflight.record_only_diagnostic_consumption());
+        assert!(!preflight.rust_execution_from_js());
+        assert!(!preflight.public_root_available());
+        assert!(!preflight.public_query_methods_available());
+        assert!(!preflight.compatibility_claimed());
     }
 
     #[test]
