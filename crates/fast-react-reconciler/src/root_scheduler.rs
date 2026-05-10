@@ -14,6 +14,8 @@ use fast_react_core::{
 };
 use fast_react_host_config::HostTypes;
 
+use crate::root_commit::PendingPassiveCommitHandoff;
+use crate::scheduler_bridge::SchedulerActContinuationRecord;
 use crate::{
     ExecutionContextState, FiberRootId, FiberRootStore, FiberRootStoreError,
     HostRootRenderPhaseRecord, RootCallbackPriority, RootScheduleUpdateRecord,
@@ -387,6 +389,87 @@ impl RootSyncFlushRecord {
     #[must_use]
     pub const fn render_phase(self) -> HostRootRenderPhaseRecord {
         self.render_phase
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SyncFlushActPostPassiveContinuationGateRecord {
+    root: FiberRootId,
+    sync_flush_order: usize,
+    flushed_lanes: Lanes,
+    remaining_lanes: Lanes,
+    continuation_lanes: Lanes,
+    pending_passive_finished_work: FiberId,
+    pending_passive_lanes: Lanes,
+    pending_passive_unmount_count: usize,
+    pending_passive_mount_count: usize,
+    act_scope_depth: usize,
+    nested_act_scope: bool,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private post-passive act continuation gate metadata for future act workers"
+)]
+impl SyncFlushActPostPassiveContinuationGateRecord {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn sync_flush_order(self) -> usize {
+        self.sync_flush_order
+    }
+
+    #[must_use]
+    pub(crate) const fn flushed_lanes(self) -> Lanes {
+        self.flushed_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn remaining_lanes(self) -> Lanes {
+        self.remaining_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn continuation_lanes(self) -> Lanes {
+        self.continuation_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_passive_finished_work(self) -> FiberId {
+        self.pending_passive_finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_passive_lanes(self) -> Lanes {
+        self.pending_passive_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_passive_unmount_count(self) -> usize {
+        self.pending_passive_unmount_count
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_passive_mount_count(self) -> usize {
+        self.pending_passive_mount_count
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_passive_record_count(self) -> usize {
+        self.pending_passive_unmount_count + self.pending_passive_mount_count
+    }
+
+    #[must_use]
+    pub(crate) const fn act_scope_depth(self) -> usize {
+        self.act_scope_depth
+    }
+
+    #[must_use]
+    pub(crate) const fn nested_act_scope(self) -> bool {
+        self.nested_act_scope
     }
 }
 
@@ -813,6 +896,31 @@ pub(crate) fn sync_flush_act_continuation_lanes_for_root<H: HostTypes>(
     Ok(select_lanes_for_scheduled_task(store, root_id)?.render_lanes())
 }
 
+pub(crate) fn sync_flush_act_post_passive_continuation_gate(
+    act_continuation: Option<SchedulerActContinuationRecord>,
+    pending_passive_handoff: Option<PendingPassiveCommitHandoff>,
+) -> Option<SyncFlushActPostPassiveContinuationGateRecord> {
+    let (Some(act_continuation), Some(pending_passive_handoff)) =
+        (act_continuation, pending_passive_handoff)
+    else {
+        return None;
+    };
+
+    Some(SyncFlushActPostPassiveContinuationGateRecord {
+        root: act_continuation.root(),
+        sync_flush_order: act_continuation.sync_flush_order(),
+        flushed_lanes: act_continuation.flushed_lanes(),
+        remaining_lanes: act_continuation.remaining_lanes(),
+        continuation_lanes: act_continuation.continuation_lanes(),
+        pending_passive_finished_work: pending_passive_handoff.finished_work(),
+        pending_passive_lanes: pending_passive_handoff.lanes(),
+        pending_passive_unmount_count: pending_passive_handoff.pending_unmount_count(),
+        pending_passive_mount_count: pending_passive_handoff.pending_mount_count(),
+        act_scope_depth: act_continuation.act_scope_depth(),
+        nested_act_scope: act_continuation.nested_act_scope(),
+    })
+}
+
 /// Prepare all currently scheduled sync roots for a later commit handoff.
 ///
 /// This is the first data-producing foundation for React's
@@ -1053,7 +1161,8 @@ mod tests {
     use crate::RootOptions;
     use crate::test_support::{FakeContainer, RecordingHost};
     use crate::{
-        RootElementHandle, SchedulerActQueueTaskKind, update_container, update_container_sync,
+        RootElementHandle, SchedulerActQueueTaskKind, commit_finished_host_root, update_container,
+        update_container_sync,
     };
     use fast_react_core::{Lanes, RootFinishedLanes, RootLaneState};
 
@@ -1859,6 +1968,79 @@ mod tests {
 
         assert_eq!(continuation_lanes, Lanes::NO);
         assert!(store.scheduler_bridge().callback_requests().is_empty());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_sync_flush_act_post_passive_gate_records_pending_passive_metadata() {
+        let (mut store, root_id, host) = root_store();
+        schedule_sync_update(&mut store, root_id, RootElementHandle::from_raw(91));
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::SYNC).unwrap();
+        let finished_work = render.finished_work();
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .scheduling_mut()
+            .prepare_pending_passive(root_id, Lanes::NO);
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+
+        store.scheduler_bridge_mut().enter_act_scope();
+        store.scheduler_bridge_mut().enter_act_scope();
+        let act_continuation = store
+            .scheduler_bridge_mut()
+            .record_sync_flush_act_continuation(root_id, 7, Lanes::SYNC, Lanes::NO, Lanes::NO);
+
+        let gate = sync_flush_act_post_passive_continuation_gate(
+            act_continuation,
+            commit.pending_passive_handoff(),
+        )
+        .unwrap();
+
+        assert_eq!(gate.root(), root_id);
+        assert_eq!(gate.sync_flush_order(), 7);
+        assert_eq!(gate.flushed_lanes(), Lanes::SYNC);
+        assert_eq!(gate.remaining_lanes(), Lanes::NO);
+        assert_eq!(gate.continuation_lanes(), Lanes::NO);
+        assert_eq!(gate.pending_passive_finished_work(), finished_work);
+        assert_eq!(gate.pending_passive_lanes(), Lanes::SYNC);
+        assert_eq!(gate.pending_passive_unmount_count(), 0);
+        assert_eq!(gate.pending_passive_mount_count(), 0);
+        assert_eq!(gate.pending_passive_record_count(), 0);
+        assert_eq!(gate.act_scope_depth(), 2);
+        assert!(gate.nested_act_scope());
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .scheduling()
+                .pending_passive()
+                .has_commit_handoff()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_sync_flush_act_post_passive_gate_requires_act_and_passive_handoff() {
+        let (mut store, root_id, host) = root_store();
+        schedule_sync_update(&mut store, root_id, RootElementHandle::from_raw(92));
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::SYNC).unwrap();
+        store.scheduler_bridge_mut().enter_act_scope();
+        let act_continuation = store
+            .scheduler_bridge_mut()
+            .record_sync_flush_act_continuation(root_id, 8, Lanes::SYNC, Lanes::NO, Lanes::NO);
+        let commit_without_passive = commit_finished_host_root(&mut store, render).unwrap();
+
+        assert_eq!(
+            sync_flush_act_post_passive_continuation_gate(act_continuation, None),
+            None
+        );
+        assert_eq!(
+            sync_flush_act_post_passive_continuation_gate(
+                act_continuation,
+                commit_without_passive.pending_passive_handoff()
+            ),
+            None
+        );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
