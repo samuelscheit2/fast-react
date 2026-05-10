@@ -6,12 +6,15 @@ const {
   getOwnerDocument
 } = require('./dom-container.js');
 const {
+  ROOT_MARKER_APPLIED,
   duplicateCreateRootWarning,
+  getContainerRoot,
   getCreateRootWarning,
   hasLegacyRootMarker,
   isContainerMarkedAsRoot,
   legacyRootWarning,
   markContainerAsRootWithRevertRecord,
+  privateRootMarkerMutationRecordType,
   revertContainerRootMarkerMutation
 } = require('./root-markers.js');
 const {
@@ -22,8 +25,10 @@ const {
 } = require('./hydration-boundary-gate.js');
 const {hasListeningMarker} = require('../events/listener-registry.js');
 const {
+  ROOT_LISTENERS_REGISTERED,
   registerRootListenersForPrivateRoot,
   describePortalContainerListenerGuard,
+  privateRootListenerRegistrationRecordType,
   revertRootListenersForPrivateRoot
 } = require('../events/root-listeners.js');
 const {
@@ -44,6 +49,8 @@ const privateRootUpdateRecordType =
   'fast.react_dom.private_root_update_record';
 const privateRootAdmissionRecordType =
   'fast.react_dom.private_root_admission_record';
+const privateRootCreateRenderAdmissionRecordType =
+  'fast.react_dom.private_root_create_render_admission_record';
 const privateRootNativeHandoffRecordType =
   'fast.react_dom.private_root_native_handoff_record';
 const privateRootNativeBridgeHandleType =
@@ -72,6 +79,8 @@ const ROOT_BRIDGE_MARK_LISTEN_APPLIED =
   'applied-private-root-create-mark-listen-gate';
 const ROOT_BRIDGE_MARK_LISTEN_REVERTED =
   'reverted-private-root-create-mark-listen-gate';
+const ROOT_BRIDGE_CREATE_RENDER_ADMITTED =
+  'admitted-private-root-create-render-path';
 const ROOT_BRIDGE_PORTAL_BOUNDARY_ADMITTED =
   'admitted-private-root-portal-boundary-record';
 const ROOT_BRIDGE_PORTAL_DIAGNOSTIC_BLOCKED =
@@ -145,12 +154,61 @@ const ROOT_BRIDGE_PORTAL_BOUNDARY_BLOCKED_CAPABILITIES = freezeArray([
   }),
   ...ROOT_BRIDGE_BLOCKED_CAPABILITIES
 ]);
+const ROOT_BRIDGE_CREATE_RENDER_BLOCKED_CAPABILITIES = freezeArray([
+  freezeRecord({
+    id: 'native-execution',
+    blocked: true,
+    reason: 'No native or Rust root bridge execution is admitted.'
+  }),
+  freezeRecord({
+    id: 'reconciler-execution',
+    blocked: true,
+    reason: 'No reconciler render, schedule, or commit execution is admitted.'
+  }),
+  freezeRecord({
+    id: 'dom-mutation',
+    blocked: true,
+    reason: 'No container children, text, attributes, or HTML may be mutated.'
+  }),
+  freezeRecord({
+    id: 'hydration',
+    blocked: true,
+    reason:
+      'Hydration root creation, marker consumption, and replay are not admitted.'
+  }),
+  freezeRecord({
+    id: 'events',
+    blocked: true,
+    reason: 'Synthetic event extraction and dispatch are not admitted.'
+  }),
+  freezeRecord({
+    id: 'compatibility-claims',
+    blocked: true,
+    reason: 'React DOM root lifecycle compatibility remains unclaimed.'
+  })
+]);
+const ROOT_BRIDGE_CREATE_RENDER_ACCEPTED_CAPABILITIES = freezeArray([
+  freezeRecord({
+    id: 'create-root-marker-write',
+    accepted: true,
+    reason:
+      'The private createRoot marker mutation record was produced by the explicit mark/listen gate.'
+  }),
+  freezeRecord({
+    id: 'root-listener-installation',
+    accepted: true,
+    reason:
+      'The private root listener registration record was produced by the explicit mark/listen gate.'
+  })
+]);
 
 const rootOwnerState = new WeakMap();
 const rootHandleState = new WeakMap();
 const rootRecordPayloads = new WeakMap();
 const rootNativeHandoffPayloads = new WeakMap();
 const rootNativeHandoffRecords = new WeakMap();
+const rootCreateRenderAdmissionPayloads = new WeakMap();
+const rootCreateRenderAdmissionRecords = new WeakMap();
 const rootCreateSideEffectPayloads = new WeakMap();
 const rootCreateSideEffectRecords = new WeakMap();
 const rootCreateSideEffectCleanupRecords = new WeakMap();
@@ -210,6 +268,14 @@ function createPrivateRootBridgeShell(options) {
     },
     admitRequest(record) {
       return admitRootBridgeRequestWithBridge(bridgeState, record);
+    },
+    admitCreateRenderPath(createRecord, sideEffectRecord, renderRecord) {
+      return admitPrivateCreateRenderPathWithBridge(
+        bridgeState,
+        createRecord,
+        sideEffectRecord,
+        renderRecord
+      );
     },
     applyCreateRootSideEffects(record, options) {
       return applyPrivateCreateRootSideEffectsWithBridge(
@@ -276,6 +342,19 @@ function admitRootBridgeRequestRecord(record) {
   return admitRootBridgeRequestWithBridge(null, record);
 }
 
+function admitPrivateCreateRenderPath(
+  createRecord,
+  sideEffectRecord,
+  renderRecord
+) {
+  return admitPrivateCreateRenderPathWithBridge(
+    null,
+    createRecord,
+    sideEffectRecord,
+    renderRecord
+  );
+}
+
 function createNativeRootBridgeHandoffRecord(record) {
   return createNativeRootBridgeHandoffRecordWithBridge(null, record);
 }
@@ -303,6 +382,155 @@ function admitRootBridgeRequestWithBridge(bridgeState, record) {
   }
 
   return createRootBridgeAdmissionRecord(record, validation);
+}
+
+function admitPrivateCreateRenderPathWithBridge(
+  bridgeState,
+  createRecord,
+  sideEffectRecord,
+  renderRecord
+) {
+  const createValidation = validateRootBridgeRequestRecord(createRecord);
+  const renderValidation = validateRootBridgeRequestRecord(renderRecord);
+  if (createValidation.operation !== 'create') {
+    throwInvalidCreateRenderAdmission(
+      'Expected a private React DOM createRoot record for create/render admission.'
+    );
+  }
+  if (renderValidation.operation !== 'render') {
+    throwInvalidCreateRenderAdmission(
+      'Expected a private React DOM root.render record for create/render admission.'
+    );
+  }
+  if (bridgeState !== null && createValidation.bridgeState !== bridgeState) {
+    throwForeignRootBridgeRequest();
+  }
+  if (bridgeState !== null && renderValidation.bridgeState !== bridgeState) {
+    throwForeignRootBridgeRequest();
+  }
+  if (createValidation.bridgeState !== renderValidation.bridgeState) {
+    throwInvalidCreateRenderAdmission(
+      'Private create/render admission records must belong to the same root bridge shell.'
+    );
+  }
+
+  const sideEffectValidation = validateCreateRenderSideEffectRecord(
+    sideEffectRecord,
+    createRecord,
+    createValidation
+  );
+  if (bridgeState !== null && sideEffectValidation.bridgeState !== bridgeState) {
+    throwForeignRootBridgeRequest();
+  }
+
+  const renderPayload = rootRecordPayloads.get(renderRecord);
+  if (renderPayload.rootHandle !== createRecord.handle) {
+    throwInvalidCreateRenderAdmission(
+      'Private create/render admission requires a render record for the created root handle.'
+    );
+  }
+  if (createRecord.requestSequence >= renderRecord.requestSequence) {
+    throwInvalidCreateRenderAdmission(
+      'Private create/render admission requires createRoot before root.render.'
+    );
+  }
+
+  const existing = rootCreateRenderAdmissionRecords.get(renderRecord);
+  if (existing !== undefined) {
+    const existingPayload = rootCreateRenderAdmissionPayloads.get(existing);
+    if (
+      existingPayload !== undefined &&
+      existingPayload.sideEffectRecord === sideEffectRecord
+    ) {
+      return existing;
+    }
+  }
+
+  const rootBridgeState = createValidation.bridgeState;
+  const sequence = rootBridgeState.nextCreateRenderAdmissionSequence++;
+  const admissionId = `${rootBridgeState.createRenderAdmissionIdPrefix}:${sequence}`;
+  const createAdmission = createRootBridgeAdmissionRecord(
+    createRecord,
+    createValidation
+  );
+  const renderAdmission = createRootBridgeAdmissionRecord(
+    renderRecord,
+    renderValidation
+  );
+  const admissionRecord = freezeRecord({
+    $$typeof: privateRootCreateRenderAdmissionRecordType,
+    kind: 'FastReactDomPrivateRootCreateRenderAdmissionRecord',
+    operation: 'create-render',
+    admissionId,
+    admissionSequence: sequence,
+    admissionStatus: ROOT_BRIDGE_CREATE_RENDER_ADMITTED,
+    executionStatus: ROOT_BRIDGE_EXECUTION_BLOCKED,
+    compatibilityStatus: ROOT_BRIDGE_COMPATIBILITY_BLOCKED,
+    rootId: createRecord.rootId,
+    rootKind: createRecord.rootKind,
+    rootTag: createRecord.rootTag,
+    createRequestId: createRecord.requestId,
+    createRequestSequence: createRecord.requestSequence,
+    createRequestType: createRecord.requestType,
+    renderRequestId: renderRecord.requestId,
+    renderRequestSequence: renderRecord.requestSequence,
+    renderRequestType: renderRecord.requestType,
+    renderUpdateId: renderRecord.updateId,
+    sideEffectId: sideEffectRecord.sideEffectId,
+    sideEffectSequence: sideEffectRecord.sideEffectSequence,
+    sideEffectStatus: sideEffectRecord.sideEffectStatus,
+    createAdmission,
+    renderAdmission,
+    markerRecord: sideEffectRecord.markerRecord,
+    listenerRegistration: sideEffectRecord.listenerRegistration,
+    createRootPrerequisites: freezeRecord({
+      accepted: true,
+      createRequestAccepted: true,
+      markListenAccepted: true,
+      markerStatus: sideEffectRecord.markerRecord.markerStatus,
+      listenerRegistrationStatus:
+        sideEffectRecord.listenerRegistration.registrationStatus,
+      rootMarkerMatchesOwner: true,
+      rootListeningMarkerPresent: sideEffectValidation.rootListeningMarkerPresent,
+      ownerDocumentListeningMarkerPresent:
+        sideEffectValidation.ownerDocumentListeningMarkerPresent,
+      sideEffectActiveAtAdmission: true
+    }),
+    lifecyclePrerequisites: freezeRecord({
+      accepted: true,
+      lifecycleStatusBefore: createRecord.lifecycleStatusBefore,
+      lifecycleStatusAfter: renderRecord.lifecycleStatusAfter,
+      lifecycleTransition: 'none->created->rendered',
+      operation: 'create-render',
+      rootKind: createRecord.rootKind,
+      rootTag: createRecord.rootTag
+    }),
+    acceptedCapabilities: ROOT_BRIDGE_CREATE_RENDER_ACCEPTED_CAPABILITIES,
+    blockedCapabilities: ROOT_BRIDGE_CREATE_RENDER_BLOCKED_CAPABILITIES,
+    publicRootCreated: false,
+    publicRootObjectExposed: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    domMutation: false,
+    markerWrites: true,
+    listenerInstallation: true,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false
+  });
+
+  rootCreateRenderAdmissionRecords.set(renderRecord, admissionRecord);
+  rootCreateRenderAdmissionPayloads.set(admissionRecord, {
+    bridgeState: rootBridgeState,
+    container: sideEffectValidation.container,
+    createRecord,
+    element: renderPayload.element,
+    renderRecord,
+    sideEffectRecord
+  });
+
+  return admissionRecord;
 }
 
 function createNativeRootBridgeHandoffRecordWithBridge(bridgeState, record) {
@@ -600,6 +828,14 @@ function isNativeRootBridgeHandoffRecord(value) {
   return rootNativeHandoffPayloads.has(value);
 }
 
+function getPrivateRootCreateRenderAdmissionPayload(record) {
+  return rootCreateRenderAdmissionPayloads.get(record) || null;
+}
+
+function isPrivateRootCreateRenderAdmissionRecord(value) {
+  return rootCreateRenderAdmissionPayloads.has(value);
+}
+
 function getPrivateRootPortalBoundaryPayload(record) {
   return rootPortalBoundaryPayloads.get(record) || null;
 }
@@ -860,6 +1096,147 @@ function validateCreateRootSideEffectRequest(record) {
     );
   }
   return validation;
+}
+
+function validateCreateRenderSideEffectRecord(
+  sideEffectRecord,
+  createRecord,
+  createValidation
+) {
+  const payload = rootCreateSideEffectPayloads.get(sideEffectRecord);
+  if (payload === undefined) {
+    throwInvalidCreateRenderAdmission(
+      'Expected a private React DOM createRoot mark/listen side-effect record.'
+    );
+  }
+  if (payload.bridgeState !== createValidation.bridgeState) {
+    throwForeignRootBridgeRequest();
+  }
+  if (payload.sourceRecord !== createRecord) {
+    throwInvalidCreateRenderAdmission(
+      'Private create/render admission requires side effects for the same createRoot record.'
+    );
+  }
+  if (!payload.active) {
+    throwInvalidCreateRenderAdmission(
+      'Cannot admit a private create/render path after createRoot side effects were reverted.'
+    );
+  }
+
+  assertCreateRenderAdmissionField(
+    sideEffectRecord,
+    '$$typeof',
+    privateRootCreateSideEffectRecordType
+  );
+  assertCreateRenderAdmissionField(sideEffectRecord, 'operation', 'create');
+  assertCreateRenderAdmissionField(
+    sideEffectRecord,
+    'sideEffectStatus',
+    ROOT_BRIDGE_MARK_LISTEN_APPLIED
+  );
+  assertCreateRenderAdmissionField(
+    sideEffectRecord,
+    'requestId',
+    createRecord.requestId
+  );
+  assertCreateRenderAdmissionField(
+    sideEffectRecord,
+    'requestSequence',
+    createRecord.requestSequence
+  );
+  assertCreateRenderAdmissionField(
+    sideEffectRecord,
+    'requestType',
+    createRecord.requestType
+  );
+  assertCreateRenderAdmissionField(
+    sideEffectRecord,
+    'rootId',
+    createRecord.rootId
+  );
+  assertCreateRenderAdmissionField(
+    sideEffectRecord,
+    'rootKind',
+    createRecord.rootKind
+  );
+  assertCreateRenderAdmissionField(
+    sideEffectRecord,
+    'rootTag',
+    createRecord.rootTag
+  );
+  assertCreateRenderAdmissionField(sideEffectRecord, 'nativeExecution', false);
+  assertCreateRenderAdmissionField(
+    sideEffectRecord,
+    'reconcilerExecution',
+    false
+  );
+  assertCreateRenderAdmissionField(sideEffectRecord, 'domMutation', false);
+  assertCreateRenderAdmissionField(sideEffectRecord, 'markerWrites', true);
+  assertCreateRenderAdmissionField(
+    sideEffectRecord,
+    'listenerInstallation',
+    true
+  );
+  assertCreateRenderAdmissionField(sideEffectRecord, 'hydration', false);
+  assertCreateRenderAdmissionField(sideEffectRecord, 'eventDispatch', false);
+  assertCreateRenderAdmissionField(
+    sideEffectRecord,
+    'compatibilityClaimed',
+    false
+  );
+
+  if (
+    sideEffectRecord.markerRecord !== payload.markerRecord ||
+    sideEffectRecord.markerRecord?.$$typeof !==
+      privateRootMarkerMutationRecordType ||
+    sideEffectRecord.markerRecord.markerStatus !== ROOT_MARKER_APPLIED
+  ) {
+    throwInvalidCreateRenderAdmission(
+      'Private create/render admission requires the accepted root marker mutation record.'
+    );
+  }
+  if (
+    sideEffectRecord.listenerRegistration !== payload.listenerRegistration ||
+    sideEffectRecord.listenerRegistration?.$$typeof !==
+      privateRootListenerRegistrationRecordType ||
+    sideEffectRecord.listenerRegistration.registrationStatus !==
+      ROOT_LISTENERS_REGISTERED
+  ) {
+    throwInvalidCreateRenderAdmission(
+      'Private create/render admission requires the accepted root listener registration record.'
+    );
+  }
+  if (getContainerRoot(payload.container) !== createRecord.owner) {
+    throwInvalidCreateRenderAdmission(
+      'Private create/render admission requires the container marker to match the created root owner.'
+    );
+  }
+
+  const ownerDocument = getOwnerDocument(payload.container);
+  const rootListeningMarkerPresent = hasListeningMarker(payload.container);
+  const ownerDocumentListeningMarkerPresent =
+    ownerDocument === null ? false : hasListeningMarker(ownerDocument);
+  if (!rootListeningMarkerPresent) {
+    throwInvalidCreateRenderAdmission(
+      'Private create/render admission requires an installed root listening marker.'
+    );
+  }
+  if (
+    sideEffectRecord.listenerRegistration.ownerDocumentRegistrationCount > 0 &&
+    !ownerDocumentListeningMarkerPresent
+  ) {
+    throwInvalidCreateRenderAdmission(
+      'Private create/render admission requires the owner document listening marker.'
+    );
+  }
+
+  return {
+    bridgeState: payload.bridgeState,
+    container: payload.container,
+    ownerDocument,
+    ownerDocumentListeningMarkerPresent,
+    rootListeningMarkerPresent
+  };
 }
 
 function validateCreateRootBridgeRequestRecord(record) {
@@ -1286,6 +1663,10 @@ function createBridgeState(options) {
     hydrateIdPrefix: getIdPrefix(options && options.hydrateIdPrefix, 'hydrate'),
     hydrationBoundaryGate,
     markerOptions: options && options.markerOptions,
+    createRenderAdmissionIdPrefix: getIdPrefix(
+      options && options.createRenderAdmissionIdPrefix,
+      'create-render-admission'
+    ),
     nativeEnvironmentId: getPositiveInteger(
       options && options.nativeEnvironmentId,
       NATIVE_ROOT_BRIDGE_SYNTHETIC_ENVIRONMENT_ID
@@ -1311,6 +1692,7 @@ function createBridgeState(options) {
     updateIdPrefix: getIdPrefix(options && options.updateIdPrefix, 'update'),
     nextNativeHandleSlot: 1,
     nextNativeRootId: 1,
+    nextCreateRenderAdmissionSequence: 1,
     nextHydrateSequence: 1,
     nextPortalBoundarySequence: 1,
     nextRootSequence: 1,
@@ -1436,6 +1818,14 @@ function assertRecordField(record, field, expectedValue) {
   }
 }
 
+function assertCreateRenderAdmissionField(record, field, expectedValue) {
+  if (!Object.is(record[field], expectedValue)) {
+    throwInvalidCreateRenderAdmission(
+      `Invalid private create/render admission field ${field}.`
+    );
+  }
+}
+
 function validatePortalRootBoundaryRequestRecord(record) {
   const validation = validateRootBridgeRequestRecord(record);
   if (validation.operation !== 'render') {
@@ -1488,6 +1878,20 @@ function assertAcceptedReactDomPortalObject(portal, rootHandleState) {
 function throwInvalidRootBridgeRequest(message) {
   const error = new Error(message);
   error.code = 'FAST_REACT_DOM_INVALID_ROOT_BRIDGE_REQUEST';
+  throw error;
+}
+
+function throwInvalidCreateRenderAdmission(message) {
+  const error = new Error(message);
+  error.code = 'FAST_REACT_DOM_INVALID_CREATE_RENDER_ADMISSION';
+  throw error;
+}
+
+function throwForeignRootBridgeRequest() {
+  const error = new Error(
+    'Cannot use a private root bridge request with a different root bridge shell.'
+  );
+  error.code = 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE';
   throw error;
 }
 
@@ -1619,6 +2023,9 @@ module.exports = {
   ROOT_BRIDGE_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_COMPATIBILITY_BLOCKED,
   ROOT_BRIDGE_EXECUTION_BLOCKED,
+  ROOT_BRIDGE_CREATE_RENDER_ACCEPTED_CAPABILITIES,
+  ROOT_BRIDGE_CREATE_RENDER_ADMITTED,
+  ROOT_BRIDGE_CREATE_RENDER_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_MARK_LISTEN_APPLIED,
   ROOT_BRIDGE_MARK_LISTEN_REVERTED,
   ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED,
@@ -1638,6 +2045,7 @@ module.exports = {
   NATIVE_ROOT_BRIDGE_ROOT_HANDLE_ACTIVE,
   NATIVE_ROOT_BRIDGE_ROOT_HANDLE_RETIRED,
   NATIVE_ROOT_BRIDGE_SYNTHETIC_ENVIRONMENT_ID,
+  admitPrivateCreateRenderPath,
   admitRootBridgeRequestRecord,
   applyPrivateCreateRootSideEffects,
   createClientRootRecord,
@@ -1654,14 +2062,17 @@ module.exports = {
   describeRootListenerGuard,
   describeUnmountMarkerGuard,
   getNativeRootBridgeHandoffPayload,
+  getPrivateRootCreateRenderAdmissionPayload,
   getPrivateRootPortalBoundaryPayload,
   getPrivateRootRecordPayload,
   getRootOwnerFromHandle,
   isNativeRootBridgeHandoffRecord,
+  isPrivateRootCreateRenderAdmissionRecord,
   isPrivateRootPortalBoundaryRecord,
   isPrivateRootHandle,
   isPrivateRootOwner,
   privateRootAdmissionRecordType,
+  privateRootCreateRenderAdmissionRecordType,
   privateRootCreateSideEffectCleanupRecordType,
   privateRootCreateSideEffectRecordType,
   privateRootNativeBridgeHandleType,
