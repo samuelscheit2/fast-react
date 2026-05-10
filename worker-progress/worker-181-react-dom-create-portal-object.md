@@ -39,6 +39,14 @@
 - `node tests/smoke/import-entrypoints.mjs` passed.
 - `npm run check:js` passed.
 - `git diff --check` passed.
+- Orchestrator merged current `main` into this branch without conflicts.
+- Post-merge orchestrator verification passed:
+  - `node --test tests/conformance/test/react-dom-create-portal-object.test.mjs`
+  - `node tests/smoke/import-entrypoints.mjs`
+  - `node tests/smoke/react-dom-root-exports.mjs`
+  - `npm run check:js`: 441 conformance tests plus package surface,
+    benchmark, native loader, and workspace smoke checks
+  - `git diff --check`
 
 ## Notes
 - Invalid container errors still carry the existing Fast React internal
