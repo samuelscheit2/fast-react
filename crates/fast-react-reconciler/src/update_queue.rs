@@ -1027,6 +1027,97 @@ mod tests {
     }
 
     #[test]
+    fn update_queue_reduces_multiple_host_root_updates_in_order_and_hands_off_callbacks() {
+        let mut store = UpdateQueueStore::new();
+        let queue = store.initialize_host_root_queue(state(0));
+        let first_element = RootElementHandle::from_raw(6861);
+        let second_element = RootElementHandle::from_raw(6862);
+        let third_element = RootElementHandle::from_raw(6863);
+        let first_callback = RootUpdateCallbackHandle::from_raw(68601);
+        let second_callback = RootUpdateCallbackHandle::from_raw(68602);
+        let third_callback = RootUpdateCallbackHandle::from_raw(68603);
+        let first = update_with_element(&mut store, Lane::DEFAULT, first_element.raw());
+        let second = update_with_element(&mut store, Lane::DEFAULT, second_element.raw());
+        let third = update_with_element(&mut store, Lane::DEFAULT, third_element.raw());
+
+        for (update, callback) in [
+            (first, first_callback),
+            (second, second_callback),
+            (third, third_callback),
+        ] {
+            store.update_mut(update).unwrap().set_callback(callback);
+            store.append_pending_update(queue, update).unwrap();
+        }
+
+        assert_eq!(
+            store.pending_updates(queue).unwrap(),
+            vec![first, second, third]
+        );
+
+        let result = store
+            .process_host_root_update_queue(queue, None, Lanes::DEFAULT, Lanes::DEFAULT)
+            .unwrap();
+        let snapshot = store.peek_root_update_callback_records(queue).unwrap();
+
+        assert_eq!(result.applied_update_count(), 3);
+        assert_eq!(result.skipped_update_count(), 0);
+        assert_eq!(result.remaining_lanes(), Lanes::NO);
+        assert_eq!(result.memoized_state().element(), third_element);
+        assert_eq!(
+            store.queue(queue).unwrap().base_state().element(),
+            third_element
+        );
+        assert_eq!(
+            store.pending_updates(queue).unwrap(),
+            Vec::<UpdateId>::new()
+        );
+        assert_eq!(store.base_updates(queue).unwrap(), Vec::<UpdateId>::new());
+
+        assert_eq!(snapshot.queue(), queue);
+        assert_eq!(
+            snapshot
+                .visible()
+                .iter()
+                .map(|record| record.update())
+                .collect::<Vec<_>>(),
+            vec![first, second, third]
+        );
+        assert_eq!(
+            snapshot
+                .visible()
+                .iter()
+                .map(|record| record.callback())
+                .collect::<Vec<_>>(),
+            vec![first_callback, second_callback, third_callback]
+        );
+        assert_eq!(
+            snapshot
+                .visible()
+                .iter()
+                .map(|record| record.sequence())
+                .collect::<Vec<_>>(),
+            vec![0, 1, 2]
+        );
+        assert!(
+            snapshot
+                .visible()
+                .iter()
+                .all(|record| record.visibility().is_visible())
+        );
+        assert!(snapshot.hidden().is_empty());
+        assert!(snapshot.deferred_hidden().is_empty());
+
+        let taken = store.take_root_update_callback_records(queue).unwrap();
+        assert_eq!(taken, snapshot);
+        assert!(
+            store
+                .peek_root_update_callback_records(queue)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
     fn update_queue_preserves_skipped_callbacks_but_drops_no_lane_clone_callbacks() {
         let mut store = UpdateQueueStore::new();
         let queue = store.initialize_host_root_queue(state(0));

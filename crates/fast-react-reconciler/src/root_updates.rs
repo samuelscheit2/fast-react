@@ -1651,6 +1651,185 @@ mod tests {
     }
 
     #[test]
+    fn root_updates_multiple_host_root_updates_reduce_to_stable_commit_handoff() {
+        let (mut store, root_id, host) = root_store();
+        let first_element = RootElementHandle::from_raw(6861);
+        let second_element = RootElementHandle::from_raw(6862);
+        let third_element = RootElementHandle::from_raw(6863);
+        let first_callback = RootUpdateCallbackHandle::from_raw(68611);
+        let second_callback = RootUpdateCallbackHandle::from_raw(68612);
+        let third_callback = RootUpdateCallbackHandle::from_raw(68613);
+        let first =
+            update_container(&mut store, root_id, first_element, Some(first_callback)).unwrap();
+        let second =
+            update_container(&mut store, root_id, second_element, Some(second_callback)).unwrap();
+        let third =
+            update_container(&mut store, root_id, third_element, Some(third_callback)).unwrap();
+        let accepted = host_root_queued_callback_order_snapshot_for_canary(
+            &store,
+            root_id,
+            &[first.clone(), second.clone(), third.clone()],
+        )
+        .unwrap();
+
+        assert_eq!(accepted.len(), 3);
+        assert!(accepted.records_in_queue_order());
+        assert!(accepted.records_match_accepted_lane_and_schedule());
+        assert!(accepted.root_rendering_blocked());
+        assert!(accepted.commit_execution_blocked());
+        assert!(accepted.callback_invocation_blocked());
+        assert!(!accepted.user_callbacks_invoked());
+        assert!(!accepted.public_root_callback_behavior_exposed());
+        assert!(!accepted.public_batching_compatibility_claimed());
+        assert_eq!(
+            accepted
+                .records()
+                .iter()
+                .map(|record| record.update())
+                .collect::<Vec<_>>(),
+            vec![first.update(), second.update(), third.update()]
+        );
+
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let render_state = store
+            .host_root_states()
+            .get(render.memoized_state())
+            .unwrap();
+
+        assert_eq!(render.applied_update_count(), 3);
+        assert_eq!(render.skipped_update_count(), 0);
+        assert_eq!(render.remaining_lanes(), Lanes::NO);
+        assert_eq!(render.resulting_element(), third_element);
+        assert_eq!(render_state.element(), third_element);
+        assert_eq!(
+            store
+                .update_queues()
+                .base_updates(render.work_in_progress_update_queue())
+                .unwrap(),
+            Vec::<UpdateId>::new()
+        );
+        assert_eq!(
+            store
+                .update_queues()
+                .peek_root_update_callback_records(render.work_in_progress_update_queue())
+                .unwrap()
+                .visible()
+                .iter()
+                .map(|record| record.callback())
+                .collect::<Vec<_>>(),
+            vec![first_callback, second_callback, third_callback]
+        );
+
+        let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+        {
+            let callbacks = commit.root_update_callbacks();
+            assert_eq!(callbacks.queue(), render.work_in_progress_update_queue());
+            assert_eq!(
+                callbacks
+                    .visible()
+                    .iter()
+                    .map(|record| record.update())
+                    .collect::<Vec<_>>(),
+                vec![first.update(), second.update(), third.update()]
+            );
+            assert_eq!(
+                callbacks
+                    .visible()
+                    .iter()
+                    .map(|record| record.callback())
+                    .collect::<Vec<_>>(),
+                vec![first_callback, second_callback, third_callback]
+            );
+            assert_eq!(
+                callbacks
+                    .visible()
+                    .iter()
+                    .map(|record| record.sequence())
+                    .collect::<Vec<_>>(),
+                vec![0, 1, 2]
+            );
+            assert!(callbacks.hidden().is_empty());
+            assert!(callbacks.deferred_hidden().is_empty());
+        }
+
+        let committed_state = store
+            .host_root_states()
+            .get(
+                store
+                    .fiber_arena()
+                    .get(commit.current())
+                    .unwrap()
+                    .memoized_state(),
+            )
+            .unwrap();
+        assert_eq!(commit.previous_current(), render.current());
+        assert_eq!(commit.current(), render.finished_work());
+        assert_eq!(commit.finished_lanes(), Lanes::DEFAULT);
+        assert_eq!(commit.remaining_lanes(), Lanes::NO);
+        assert_eq!(commit.pending_lanes(), Lanes::NO);
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            render.finished_work()
+        );
+        assert_eq!(committed_state.element(), third_element);
+
+        let mut control = TestRootUpdateCallbackControl::default();
+        let invocation =
+            invoke_host_root_accepted_visible_callbacks_after_matching_commit_under_test_control_for_canary(
+                &accepted,
+                &mut commit,
+                &mut control,
+            )
+            .unwrap();
+
+        assert_eq!(invocation.root(), root_id);
+        assert_eq!(invocation.finished_work(), render.finished_work());
+        assert_eq!(invocation.finished_lanes(), Lanes::DEFAULT);
+        assert_eq!(invocation.pending_lanes_after_commit(), Lanes::NO);
+        assert_eq!(invocation.accepted_order_record_count(), 3);
+        assert_eq!(invocation.len(), 3);
+        assert_eq!(invocation.completed_count(), 3);
+        assert_eq!(invocation.error_count(), 0);
+        assert!(invocation.invoked_accepted_visible_callbacks());
+        assert!(invocation.records_in_deterministic_commit_order());
+        assert!(!invocation.public_js_callbacks_invoked());
+        assert!(!invocation.public_root_callback_behavior_exposed());
+        assert!(!invocation.hidden_callbacks_invoked());
+        assert!(!invocation.root_error_callbacks_invoked());
+
+        let records = invocation.execution().records();
+        assert_eq!(
+            records
+                .iter()
+                .map(|record| record.update())
+                .collect::<Vec<_>>(),
+            vec![first.update(), second.update(), third.update()]
+        );
+        assert_eq!(
+            records
+                .iter()
+                .map(|record| record.callback())
+                .collect::<Vec<_>>(),
+            vec![first_callback, second_callback, third_callback]
+        );
+        assert_eq!(
+            records
+                .iter()
+                .map(|record| record.accepted_sequence())
+                .collect::<Vec<_>>(),
+            vec![0, 1, 2]
+        );
+        assert_eq!(control.calls().len(), 3);
+        assert_eq!(control.calls()[0].callback(), first_callback);
+        assert_eq!(control.calls()[1].callback(), second_callback);
+        assert_eq!(control.calls()[2].callback(), third_callback);
+        assert!(commit.root_update_callback_invocation_gate().is_empty());
+        assert_eq!(store.root_scheduler().first_scheduled_root(), None);
+        assert!(store.scheduler_bridge().callback_requests().is_empty());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
     fn root_updates_callback_order_invocation_gate_rejects_hidden_callback_before_invocation() {
         let (mut store, root_id, _host) = root_store();
         let first = update_container(
