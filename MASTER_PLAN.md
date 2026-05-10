@@ -45,8 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 151: HostComponent/HostText complete-work skeleton in
-  `/Users/user/Developer/Developer/fast-react-worker-151-host-complete-work-skeleton`.
 - Worker 153: Rust test-renderer root canary in
   `/Users/user/Developer/Developer/fast-react-worker-153-test-renderer-root-canary`.
 - Worker 154: private DOM mutation adapter shell in
