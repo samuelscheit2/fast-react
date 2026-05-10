@@ -1,13 +1,35 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { createRequire } from "node:module";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { DOM_TEXT_CONTENT_SCENARIO_IDS } from "./dom-text-content-scenarios.mjs";
+import {
+  DOM_TEXT_CONTENT_SCENARIO_IDS,
+  materializeProps
+} from "./dom-text-content-scenarios.mjs";
 
-const DEFAULT_WORKSPACE_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
+const DEFAULT_WORKSPACE_ROOT = fileURLToPath(
+  new URL("../../../", import.meta.url)
+);
+const require = createRequire(import.meta.url);
+
+const SHOULD_SET_REACT_STUB = Object.freeze({
+  createElement(elementType, props) {
+    return {
+      $$typeof: "react.element.placeholder",
+      type: elementType,
+      props
+    };
+  }
+});
 
 export const DOM_TEXT_CONTENT_LOCAL_GATE_STATUS =
   "blocked-until-dom-host-text-rendering";
+
+export const DOM_TEXT_CONTENT_LOCAL_UNSUPPORTED_SHOULD_SET_SCENARIO_IDS = [
+  "should-set-textarea-special-case",
+  "should-set-noscript-special-case"
+];
 
 export const DOM_TEXT_CONTENT_LOCAL_UNBLOCKING_REQUIREMENTS = [
   {
@@ -55,7 +77,10 @@ export function evaluateDomTextContentLocalGate({
     throw new Error("A checked DOM text-content oracle is required");
   }
 
-  const localChecks = inspectDomTextContentLocalTargets({ workspaceRoot });
+  const localChecks = inspectDomTextContentLocalTargets({
+    oracle,
+    workspaceRoot
+  });
   const requiredLocalTargetsReady =
     localChecks.publicReactDomClientRootRenderPathPresent &&
     localChecks.domHostTextCreationHelperPresent &&
@@ -77,6 +102,25 @@ export function evaluateDomTextContentLocalGate({
       id: "compatibility-claimed-before-dom-host-text-rendering",
       reason:
         "DOM text-content compatibility cannot be claimed before public root rendering, DOM HostText creation, commit wiring, and dangerous HTML boundaries are ready."
+    });
+  }
+
+  if (!localChecks.privateShouldSetTextContentHelperPresent) {
+    violations.push({
+      id: "private-should-set-text-content-helper-missing",
+      reason:
+        "The DOM text-content local gate requires the private shouldSetTextContent helper to be present before local behavior can be tracked against the React DOM oracle."
+    });
+  }
+
+  if (localChecks.privateShouldSetTextContentOracleMismatches.length > 0) {
+    violations.push({
+      id: "private-should-set-text-content-helper-oracle-mismatch",
+      reason:
+        "The private shouldSetTextContent helper must match checked React DOM 19.2.6 predicate rows except for explicitly blocked local exclusions.",
+      scenarioIds: localChecks.privateShouldSetTextContentOracleMismatches.map(
+        (row) => row.scenarioId
+      )
     });
   }
 
@@ -114,9 +158,13 @@ export function evaluateDomTextContentLocalGate({
 }
 
 export function inspectDomTextContentLocalTargets({
-  workspaceRoot = DEFAULT_WORKSPACE_ROOT
+  workspaceRoot = DEFAULT_WORKSPACE_ROOT,
+  oracle = null
 } = {}) {
-  const clientSource = readWorkspaceFile(workspaceRoot, "packages/react-dom/client.js");
+  const clientSource = readWorkspaceFile(
+    workspaceRoot,
+    "packages/react-dom/client.js"
+  );
   const textContentSource = readWorkspaceFile(
     workspaceRoot,
     "packages/react-dom/src/dom-host/text-content.js"
@@ -135,7 +183,10 @@ export function inspectDomTextContentLocalTargets({
   );
 
   const publicReactDomClientRootStillUnsupported =
-    hasSourcePattern(clientSource, /createUnsupportedFunction\(entrypoint,\s*'createRoot'\)/u);
+    hasSourcePattern(
+      clientSource,
+      /createUnsupportedFunction\(entrypoint,\s*'createRoot'\)/u
+    );
   const publicReactDomClientRootRenderPathPresent =
     !publicReactDomClientRootStillUnsupported &&
     hasSourcePattern(clientSource, /\bcreateRoot\b/u) &&
@@ -144,6 +195,22 @@ export function inspectDomTextContentLocalTargets({
     textContentSource,
     /\bfunction\s+shouldSetTextContent\b/u
   );
+  const privateShouldSetTextContentOracleRows =
+    inspectPrivateShouldSetTextContentOracleRows({ oracle, workspaceRoot });
+  const privateShouldSetTextContentOracleMismatches =
+    privateShouldSetTextContentOracleRows.filter(
+      (row) => row.status === "mismatch"
+    );
+  const privateShouldSetTextContentUnsupportedRows =
+    privateShouldSetTextContentOracleRows.filter(
+      (row) => row.status === "blocked-unsupported-local-host-type"
+    );
+  const privateShouldSetTextContentUnsupportedScenarioIds =
+    privateShouldSetTextContentUnsupportedRows.map((row) => row.scenarioId);
+  const privateShouldSetTextContentOracleGatePassed =
+    privateShouldSetTextContentHelperPresent &&
+    privateShouldSetTextContentOracleRows.length > 0 &&
+    privateShouldSetTextContentOracleMismatches.length === 0;
   const privateTextMutationHelperPresent =
     hasSourcePattern(mutationSource, /\bfunction\s+commitTextUpdate\b/u) &&
     hasSourcePattern(mutationSource, /\bfunction\s+resetTextContent\b/u);
@@ -163,11 +230,110 @@ export function inspectDomTextContentLocalTargets({
     publicReactDomClientRootStillUnsupported,
     publicReactDomClientRootRenderPathPresent,
     privateShouldSetTextContentHelperPresent,
+    privateShouldSetTextContentOracleGatePassed,
+    privateShouldSetTextContentOracleRows,
+    privateShouldSetTextContentOracleMismatches,
+    privateShouldSetTextContentUnsupportedScenarioIds,
     privateTextMutationHelperPresent,
     domHostTextCreationHelperPresent,
     reconcilerHostTextCompleteAndCommitWiringPresent,
     dangerouslySetInnerHtmlPropertyBoundaryPresent
   };
+}
+
+function inspectPrivateShouldSetTextContentOracleRows({
+  oracle,
+  workspaceRoot
+}) {
+  if (!oracle?.shouldSetTextContentScenarios) {
+    return [];
+  }
+
+  let shouldSetTextContent;
+  try {
+    ({ shouldSetTextContent } = require(
+      join(workspaceRoot, "packages/react-dom/src/dom-host/text-content.js")
+    ));
+  } catch (error) {
+    return oracle.shouldSetTextContentScenarios.map((scenario) => ({
+      scenarioId: scenario.id,
+      expectedReactDomValue: readOracleShouldSetValue(oracle, scenario.id),
+      localValue: null,
+      status: "mismatch",
+      reason: `Unable to load private DOM text-content helper: ${error.message}`
+    }));
+  }
+
+  if (typeof shouldSetTextContent !== "function") {
+    return oracle.shouldSetTextContentScenarios.map((scenario) => ({
+      scenarioId: scenario.id,
+      expectedReactDomValue: readOracleShouldSetValue(oracle, scenario.id),
+      localValue: null,
+      status: "mismatch",
+      reason: "Private DOM text-content helper does not export shouldSetTextContent"
+    }));
+  }
+
+  return oracle.shouldSetTextContentScenarios.map((scenario) => {
+    const expectedReactDomValue = readOracleShouldSetValue(oracle, scenario.id);
+    const props = materializeProps(SHOULD_SET_REACT_STUB, scenario.props);
+    let localValue;
+
+    try {
+      localValue = Boolean(shouldSetTextContent(scenario.hostType, props));
+    } catch (error) {
+      return {
+        scenarioId: scenario.id,
+        expectedReactDomValue,
+        localValue: null,
+        status: "mismatch",
+        reason: `Private DOM text-content helper threw: ${error.message}`
+      };
+    }
+
+    if (localValue === expectedReactDomValue) {
+      return {
+        scenarioId: scenario.id,
+        expectedReactDomValue,
+        localValue,
+        status: "matches-react-dom"
+      };
+    }
+
+    if (
+      DOM_TEXT_CONTENT_LOCAL_UNSUPPORTED_SHOULD_SET_SCENARIO_IDS.includes(
+        scenario.id
+      ) &&
+      expectedReactDomValue === true &&
+      localValue === false
+    ) {
+      return {
+        scenarioId: scenario.id,
+        expectedReactDomValue,
+        localValue,
+        status: "blocked-unsupported-local-host-type"
+      };
+    }
+
+    return {
+      scenarioId: scenario.id,
+      expectedReactDomValue,
+      localValue,
+      status: "mismatch",
+      reason:
+        "Private DOM text-content helper result does not match the checked React DOM oracle row"
+    };
+  });
+}
+
+function readOracleShouldSetValue(oracle, scenarioId) {
+  const observation = oracle.shouldSetTextContentObservations?.find(
+    (candidate) => candidate.scenarioId === scenarioId
+  );
+  if (observation?.result?.status !== "ok") {
+    return null;
+  }
+  return Boolean(observation.result.value);
 }
 
 function readWorkspaceFile(workspaceRoot, relativePath) {
