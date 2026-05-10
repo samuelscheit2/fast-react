@@ -24,6 +24,7 @@ use crate::{
         CONTEXT_PROVIDER_SUBTREE_TRAVERSAL_MAX_FIBERS,
         ContextProviderSubtreeUseContextBeginWorkRecord,
         ContextProviderSubtreeUseContextConsumerBeginWorkRecord,
+        NestedContextProviderOuterInnerConsumerUseContextBeginWorkRecord,
         NestedContextProviderTwoConsumerUseContextBeginWorkRecord,
         SiblingContextProviderTwoConsumerUseContextBeginWorkRecord,
     },
@@ -83,6 +84,16 @@ impl ContextProviderUpdateDependencyPath {
         Self {
             first_dependency: begin_work.first_child_context_dependency(),
             second_dependency: begin_work.second_child_context_dependency(),
+        }
+    }
+
+    #[must_use]
+    pub const fn from_outer_inner_begin_work(
+        begin_work: NestedContextProviderOuterInnerConsumerUseContextBeginWorkRecord,
+    ) -> Self {
+        Self {
+            first_dependency: begin_work.outer_child_context_dependency(),
+            second_dependency: begin_work.inner_child_context_dependency(),
         }
     }
 
@@ -854,6 +865,180 @@ impl ContextProviderUpdateTwoConsumerLaneRecord {
                 && consumer.dependency_lanes_include_propagation()
                 && consumer.fiber_lanes_include_propagation()
         })
+    }
+
+    #[must_use]
+    pub const fn public_context_compatibility_blocked(self) -> bool {
+        true
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ContextProviderUpdateNestedInnerProviderLaneRecord {
+    root: FiberRootId,
+    host_root_work_in_progress: FiberId,
+    outer_provider: FiberId,
+    inner_provider: FiberId,
+    outer_consumer: FiberId,
+    inner_consumer: FiberId,
+    context: ContextHandle,
+    outer_value: ContextValueHandle,
+    previous_inner_value: ContextValueHandle,
+    next_inner_value: ContextValueHandle,
+    propagation_lanes: Lanes,
+    begin_work: NestedContextProviderOuterInnerConsumerUseContextBeginWorkRecord,
+    provider_stack_pushes: [ContextProviderUpdateProviderStackRecord; 2],
+    preserved_outer_consumer: ContextProviderUpdateConsumerLaneRecord,
+    dependent_inner_consumer: ContextProviderUpdateConsumerLaneRecord,
+    host_root_child_lanes_after: Lanes,
+    outer_provider_child_lanes_after: Lanes,
+    inner_provider_child_lanes_after: Lanes,
+    root_pending_lanes_after: Lanes,
+}
+
+impl ContextProviderUpdateNestedInnerProviderLaneRecord {
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn host_root_work_in_progress(self) -> FiberId {
+        self.host_root_work_in_progress
+    }
+
+    #[must_use]
+    pub const fn outer_provider(self) -> FiberId {
+        self.outer_provider
+    }
+
+    #[must_use]
+    pub const fn inner_provider(self) -> FiberId {
+        self.inner_provider
+    }
+
+    #[must_use]
+    pub const fn outer_consumer(self) -> FiberId {
+        self.outer_consumer
+    }
+
+    #[must_use]
+    pub const fn inner_consumer(self) -> FiberId {
+        self.inner_consumer
+    }
+
+    #[must_use]
+    pub const fn context(self) -> ContextHandle {
+        self.context
+    }
+
+    #[must_use]
+    pub const fn outer_value(self) -> ContextValueHandle {
+        self.outer_value
+    }
+
+    #[must_use]
+    pub const fn previous_inner_value(self) -> ContextValueHandle {
+        self.previous_inner_value
+    }
+
+    #[must_use]
+    pub const fn next_inner_value(self) -> ContextValueHandle {
+        self.next_inner_value
+    }
+
+    #[must_use]
+    pub const fn propagation_lanes(self) -> Lanes {
+        self.propagation_lanes
+    }
+
+    #[must_use]
+    pub const fn begin_work(
+        self,
+    ) -> NestedContextProviderOuterInnerConsumerUseContextBeginWorkRecord {
+        self.begin_work
+    }
+
+    #[must_use]
+    pub const fn provider_stack_pushes(self) -> [ContextProviderUpdateProviderStackRecord; 2] {
+        self.provider_stack_pushes
+    }
+
+    #[must_use]
+    pub const fn provider_stack_pops(self) -> [ContextProviderUpdateProviderStackRecord; 2] {
+        [self.provider_stack_pushes[1], self.provider_stack_pushes[0]]
+    }
+
+    #[must_use]
+    pub const fn preserved_outer_consumer(self) -> ContextProviderUpdateConsumerLaneRecord {
+        self.preserved_outer_consumer
+    }
+
+    #[must_use]
+    pub const fn dependent_inner_consumer(self) -> ContextProviderUpdateConsumerLaneRecord {
+        self.dependent_inner_consumer
+    }
+
+    #[must_use]
+    pub const fn host_root_child_lanes_after(self) -> Lanes {
+        self.host_root_child_lanes_after
+    }
+
+    #[must_use]
+    pub const fn outer_provider_child_lanes_after(self) -> Lanes {
+        self.outer_provider_child_lanes_after
+    }
+
+    #[must_use]
+    pub const fn inner_provider_child_lanes_after(self) -> Lanes {
+        self.inner_provider_child_lanes_after
+    }
+
+    #[must_use]
+    pub const fn root_pending_lanes_after(self) -> Lanes {
+        self.root_pending_lanes_after
+    }
+
+    #[must_use]
+    pub const fn provider_changed(self) -> bool {
+        self.previous_inner_value.raw() != self.next_inner_value.raw()
+    }
+
+    #[must_use]
+    pub const fn marked_dependency_count(self) -> usize {
+        self.preserved_outer_consumer.marked_dependency_count
+            + self.dependent_inner_consumer.marked_dependency_count
+    }
+
+    #[must_use]
+    pub fn preserves_outer_provider_value(self) -> bool {
+        self.preserved_outer_consumer.context() == self.context
+            && self.preserved_outer_consumer.memoized_value() == self.outer_value
+            && self.preserved_outer_consumer.previous_value() == self.outer_value
+            && self.preserved_outer_consumer.next_value() == self.outer_value
+            && self.preserved_outer_consumer.unchanged_provider_bailout()
+            && !self
+                .preserved_outer_consumer
+                .dependency_lanes()
+                .contains_any(self.propagation_lanes)
+            && !self
+                .preserved_outer_consumer
+                .fiber_lanes_after()
+                .contains_any(self.propagation_lanes)
+    }
+
+    #[must_use]
+    pub fn inner_subtree_only_consumer_marked(self) -> bool {
+        self.preserves_outer_provider_value()
+            && self
+                .dependent_inner_consumer
+                .marked_changed_provider_lanes()
+            && self
+                .dependent_inner_consumer
+                .dependency_lanes_include_propagation()
+            && self
+                .dependent_inner_consumer
+                .fiber_lanes_include_propagation()
     }
 
     #[must_use]
@@ -2215,6 +2400,99 @@ pub(crate) fn record_context_provider_update_two_consumer_lane_gate<H: HostTypes
     })
 }
 
+pub(crate) fn record_context_provider_update_nested_inner_provider_lane_gate<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    context_store: &mut FunctionComponentContextRenderStore,
+    begin_work: NestedContextProviderOuterInnerConsumerUseContextBeginWorkRecord,
+    request: ContextProviderUpdateTwoConsumerLaneRequest,
+) -> Result<ContextProviderUpdateNestedInnerProviderLaneRecord, ContextProviderUpdateLaneGateError>
+{
+    validate_nested_inner_provider_update_request(context_store, begin_work, request)?;
+
+    let preserved_outer_consumer = consumer_lane_record_from_unchanged_provider_bailout(
+        store,
+        context_store,
+        ContextProviderUpdateConsumerOrder::First,
+        begin_work.outer_child_render(),
+        ContextValueChange::new(
+            begin_work.outer_context(),
+            begin_work.outer_value(),
+            begin_work.outer_value(),
+        ),
+        request.propagation_lanes(),
+        request.root(),
+        begin_work.outer_child(),
+        begin_work.outer_child_context_dependency(),
+    )?;
+
+    let dependent_inner_consumer = consumer_lane_record_from_provider_decision(
+        store,
+        context_store,
+        ContextProviderUpdateConsumerOrder::Second,
+        begin_work.inner_child_render(),
+        request.change(),
+        request.propagation_lanes(),
+        request.root(),
+        begin_work.inner_child(),
+        begin_work.inner_child_context_dependency(),
+    )?;
+
+    let host_root_child_lanes_after = store
+        .fiber_arena()
+        .get(request.host_root_work_in_progress())?
+        .child_lanes();
+    let outer_provider_child_lanes_after = store
+        .fiber_arena()
+        .get(begin_work.outer_provider())?
+        .child_lanes();
+    let inner_provider_child_lanes_after = store
+        .fiber_arena()
+        .get(begin_work.inner_provider())?
+        .child_lanes();
+    let root_pending_lanes_after = store.root(request.root())?.lanes().pending_lanes();
+
+    Ok(ContextProviderUpdateNestedInnerProviderLaneRecord {
+        root: request.root(),
+        host_root_work_in_progress: request.host_root_work_in_progress(),
+        outer_provider: begin_work.outer_provider(),
+        inner_provider: begin_work.inner_provider(),
+        outer_consumer: begin_work.outer_child(),
+        inner_consumer: begin_work.inner_child(),
+        context: request.context(),
+        outer_value: begin_work.outer_value(),
+        previous_inner_value: request.previous_value(),
+        next_inner_value: request.next_value(),
+        propagation_lanes: request.propagation_lanes(),
+        begin_work,
+        provider_stack_pushes: [
+            ContextProviderUpdateProviderStackRecord {
+                provider: begin_work.outer_provider(),
+                context: begin_work.outer_context(),
+                pushed_value: begin_work.outer_value(),
+                provider_snapshot: begin_work.outer_provider_snapshot(),
+                provider_token: begin_work.outer_provider_token(),
+                pushed_stack_depth: begin_work.outer_pushed_stack_depth(),
+                restored_stack_depth: begin_work.outer_restored_stack_depth(),
+            },
+            ContextProviderUpdateProviderStackRecord {
+                provider: begin_work.inner_provider(),
+                context: begin_work.inner_context(),
+                pushed_value: begin_work.inner_value(),
+                provider_snapshot: begin_work.inner_provider_snapshot(),
+                provider_token: begin_work.inner_provider_token(),
+                pushed_stack_depth: begin_work.inner_pushed_stack_depth(),
+                restored_stack_depth: begin_work.inner_restored_stack_depth(),
+            },
+        ],
+        preserved_outer_consumer,
+        dependent_inner_consumer,
+        host_root_child_lanes_after,
+        outer_provider_child_lanes_after,
+        inner_provider_child_lanes_after,
+        root_pending_lanes_after,
+    })
+}
+
 #[derive(Debug, Clone, Copy)]
 struct ContextProviderUpdateMultiProviderBeginWorkParts {
     shape: ContextProviderUpdateShape,
@@ -2571,6 +2849,70 @@ fn validate_provider_update_request(
     )
 }
 
+fn validate_nested_inner_provider_update_request(
+    context_store: &FunctionComponentContextRenderStore,
+    begin_work: NestedContextProviderOuterInnerConsumerUseContextBeginWorkRecord,
+    request: ContextProviderUpdateTwoConsumerLaneRequest,
+) -> Result<(), ContextProviderUpdateLaneGateError> {
+    if request.propagation_lanes().is_empty() {
+        return Err(ContextProviderUpdateLaneGateError::EmptyPropagationLanes {
+            context: request.context(),
+        });
+    }
+
+    if request.context() != begin_work.inner_context()
+        || request.previous_value() != begin_work.inner_value()
+    {
+        return Err(
+            ContextProviderUpdateLaneGateError::ProviderValuePathMismatch {
+                expected_context: begin_work.inner_context(),
+                actual_context: request.context(),
+                expected_previous_value: begin_work.inner_value(),
+                actual_previous_value: request.previous_value(),
+            },
+        );
+    }
+
+    if request.outer_provider_token() != begin_work.outer_provider_token() {
+        return Err(ContextProviderUpdateLaneGateError::StaleProviderToken {
+            provider: begin_work.outer_provider(),
+            expected_token: request.outer_provider_token(),
+            actual_token: begin_work.outer_provider_token(),
+        });
+    }
+
+    if request.inner_provider_token() != begin_work.inner_provider_token() {
+        return Err(ContextProviderUpdateLaneGateError::StaleProviderToken {
+            provider: begin_work.inner_provider(),
+            expected_token: request.inner_provider_token(),
+            actual_token: begin_work.inner_provider_token(),
+        });
+    }
+
+    validate_dependency_path(
+        context_store,
+        ContextProviderUpdateConsumerOrder::First,
+        begin_work.outer_child(),
+        begin_work.outer_context(),
+        begin_work.outer_value(),
+        begin_work.outer_child_context_dependency(),
+        request
+            .dependency_path()
+            .dependency_for_order(ContextProviderUpdateConsumerOrder::First),
+    )?;
+    validate_dependency_path(
+        context_store,
+        ContextProviderUpdateConsumerOrder::Second,
+        begin_work.inner_child(),
+        begin_work.inner_context(),
+        begin_work.inner_value(),
+        begin_work.inner_child_context_dependency(),
+        request
+            .dependency_path()
+            .dependency_for_order(ContextProviderUpdateConsumerOrder::Second),
+    )
+}
+
 fn validate_dependency_path(
     context_store: &FunctionComponentContextRenderStore,
     order: ContextProviderUpdateConsumerOrder,
@@ -2845,6 +3187,7 @@ mod tests {
     use crate::begin_work::{
         ContextProviderBeginWorkRequest, NestedContextProviderBeginWorkRequest,
         SiblingContextProviderBeginWorkRequest, begin_work_context_provider_use_context_subtree,
+        begin_work_nested_context_provider_outer_inner_consumer_use_context_children,
         begin_work_nested_context_provider_two_consumer_use_context_children,
         begin_work_nested_context_provider_two_provider_use_context_children,
         begin_work_sibling_context_provider_two_consumer_use_context_children,
@@ -3023,6 +3366,84 @@ mod tests {
             first_component,
             second_work_in_progress,
             second_component,
+        )
+    }
+
+    fn attach_nested_context_provider_outer_inner_consumer_wip_children(
+        store: &mut FiberRootStore<RecordingHost>,
+        host_root_work_in_progress: FiberId,
+    ) -> (
+        FiberId,
+        FiberId,
+        FiberId,
+        FiberTypeHandle,
+        FiberId,
+        FiberTypeHandle,
+    ) {
+        let outer_provider = store.fiber_arena_mut().create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(1_309),
+            FiberMode::NO,
+        );
+        let inner_provider = store.fiber_arena_mut().create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(1_310),
+            FiberMode::NO,
+        );
+        let outer_current = store.fiber_arena_mut().create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(1_311),
+            FiberMode::NO,
+        );
+        let outer_component = FiberTypeHandle::from_raw(1_312);
+        store
+            .fiber_arena_mut()
+            .get_mut(outer_current)
+            .unwrap()
+            .set_fiber_type(outer_component);
+        let outer_work_in_progress = store
+            .fiber_arena_mut()
+            .create_work_in_progress(outer_current, PropsHandle::from_raw(1_313))
+            .unwrap();
+        let inner_current = store.fiber_arena_mut().create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(1_314),
+            FiberMode::NO,
+        );
+        let inner_component = FiberTypeHandle::from_raw(1_315);
+        store
+            .fiber_arena_mut()
+            .get_mut(inner_current)
+            .unwrap()
+            .set_fiber_type(inner_component);
+        let inner_work_in_progress = store
+            .fiber_arena_mut()
+            .create_work_in_progress(inner_current, PropsHandle::from_raw(1_316))
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(inner_provider, &[inner_work_in_progress])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(outer_provider, &[outer_work_in_progress, inner_provider])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root_work_in_progress, &[outer_provider])
+            .unwrap();
+
+        (
+            outer_provider,
+            inner_provider,
+            outer_work_in_progress,
+            outer_component,
+            inner_work_in_progress,
+            inner_component,
         )
     }
 
@@ -3872,6 +4293,231 @@ mod tests {
             assert_eq!(node.dependencies(), DependenciesHandle::NONE);
             assert!(!node.flags().contains_any(FiberFlags::NEEDS_PROPAGATION));
         }
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+    }
+
+    #[test]
+    fn nested_context_provider_update_marks_inner_consumer_without_outer_consumer() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(1_360),
+            None,
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let host_root_work_in_progress = render.work_in_progress();
+        let (
+            outer_provider,
+            inner_provider,
+            outer_function_component,
+            outer_component,
+            inner_function_component,
+            inner_component,
+        ) = attach_nested_context_provider_outer_inner_consumer_wip_children(
+            &mut store,
+            host_root_work_in_progress,
+        );
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let default_value = context_value(1_361);
+        let outer_value = context_value(1_362);
+        let previous_inner_value = context_value(1_363);
+        let next_inner_value = context_value(1_364);
+        let context = context_store.create_context(default_value);
+        let mut registry = TestUseContextComponentRegistry::new(
+            outer_component,
+            UseContextBehavior::ReadOnce { context },
+        );
+        registry.register(inner_component, UseContextBehavior::ReadOnce { context });
+        let begin_work =
+            begin_work_nested_context_provider_outer_inner_consumer_use_context_children(
+                store.fiber_arena_mut(),
+                NestedContextProviderBeginWorkRequest::new(
+                    outer_provider,
+                    Lanes::DEFAULT,
+                    context,
+                    outer_value,
+                    context,
+                    previous_inner_value,
+                ),
+                &mut context_store,
+                &mut registry,
+            )
+            .unwrap();
+        let propagation_lanes = Lanes::SYNC.merge_lane(Lane::TRANSITION_2);
+
+        let record = record_context_provider_update_nested_inner_provider_lane_gate(
+            &mut store,
+            &mut context_store,
+            begin_work,
+            ContextProviderUpdateTwoConsumerLaneRequest::new(
+                root_id,
+                host_root_work_in_progress,
+                begin_work.outer_provider_token(),
+                begin_work.inner_provider_token(),
+                context,
+                previous_inner_value,
+                next_inner_value,
+                propagation_lanes,
+                ContextProviderUpdateDependencyPath::from_outer_inner_begin_work(begin_work),
+            ),
+        )
+        .unwrap();
+
+        assert_eq!(record.root(), root_id);
+        assert_eq!(
+            record.host_root_work_in_progress(),
+            host_root_work_in_progress
+        );
+        assert_eq!(record.outer_provider(), outer_provider);
+        assert_eq!(record.inner_provider(), inner_provider);
+        assert_eq!(record.outer_consumer(), outer_function_component);
+        assert_eq!(record.inner_consumer(), inner_function_component);
+        assert_eq!(record.context(), context);
+        assert_eq!(record.outer_value(), outer_value);
+        assert_eq!(record.previous_inner_value(), previous_inner_value);
+        assert_eq!(record.next_inner_value(), next_inner_value);
+        assert_eq!(record.propagation_lanes(), propagation_lanes);
+        assert!(record.provider_changed());
+        assert_eq!(record.marked_dependency_count(), 1);
+        assert!(record.preserves_outer_provider_value());
+        assert!(record.inner_subtree_only_consumer_marked());
+        assert!(record.public_context_compatibility_blocked());
+
+        let pushes = record.provider_stack_pushes();
+        assert_eq!(pushes[0].provider(), outer_provider);
+        assert_eq!(pushes[0].context(), context);
+        assert_eq!(pushes[0].pushed_value(), outer_value);
+        assert_eq!(pushes[0].pushed_stack_depth(), 1);
+        assert_eq!(pushes[0].restored_stack_depth(), 0);
+        assert_eq!(pushes[1].provider(), inner_provider);
+        assert_eq!(pushes[1].context(), context);
+        assert_eq!(pushes[1].pushed_value(), previous_inner_value);
+        assert_eq!(pushes[1].pushed_stack_depth(), 2);
+        assert_eq!(pushes[1].restored_stack_depth(), 1);
+        assert_eq!(record.provider_stack_pops(), [pushes[1], pushes[0]]);
+
+        let outer_read = begin_work.outer_child_context_read();
+        let inner_read = begin_work.inner_child_context_read();
+        assert_eq!(outer_read.context(), context);
+        assert_eq!(outer_read.value(), outer_value);
+        assert_eq!(outer_read.active_provider_count(), 1);
+        assert_eq!(inner_read.context(), context);
+        assert_eq!(inner_read.value(), previous_inner_value);
+        assert_eq!(inner_read.active_provider_count(), 2);
+        assert_eq!(registry.reads(), &[outer_read, inner_read]);
+        assert_eq!(context_store.current_value(context).unwrap(), default_value);
+        assert_eq!(context_store.stack_depth(), 0);
+        assert_eq!(context_store.active_provider_count(context).unwrap(), 0);
+
+        let preserved_outer = record.preserved_outer_consumer();
+        assert_eq!(
+            preserved_outer.order(),
+            ContextProviderUpdateConsumerOrder::First
+        );
+        assert_eq!(preserved_outer.consumer(), outer_function_component);
+        assert_eq!(
+            preserved_outer.dependency(),
+            begin_work.outer_child_context_dependency()
+        );
+        assert_eq!(preserved_outer.context(), context);
+        assert_eq!(preserved_outer.memoized_value(), outer_value);
+        assert_eq!(preserved_outer.previous_value(), outer_value);
+        assert_eq!(preserved_outer.next_value(), outer_value);
+        assert_eq!(preserved_outer.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(preserved_outer.propagation_lanes(), propagation_lanes);
+        assert_eq!(preserved_outer.previous_dependency_lanes(), Lanes::NO);
+        assert_eq!(preserved_outer.dependency_lanes(), Lanes::NO);
+        assert_eq!(preserved_outer.marked_dependency_count(), 0);
+        assert!(preserved_outer.unchanged_provider_bailout());
+        assert!(
+            !preserved_outer
+                .fiber_lanes_after()
+                .contains_any(propagation_lanes)
+        );
+        assert_eq!(
+            context_store
+                .context_dependency(preserved_outer.dependency())
+                .unwrap()
+                .dependency_lanes(),
+            Lanes::NO
+        );
+
+        let dependent_inner = record.dependent_inner_consumer();
+        assert_eq!(
+            dependent_inner.order(),
+            ContextProviderUpdateConsumerOrder::Second
+        );
+        assert_eq!(dependent_inner.consumer(), inner_function_component);
+        assert_eq!(
+            dependent_inner.dependency(),
+            begin_work.inner_child_context_dependency()
+        );
+        assert_eq!(dependent_inner.context(), context);
+        assert_eq!(dependent_inner.memoized_value(), previous_inner_value);
+        assert_eq!(dependent_inner.previous_value(), previous_inner_value);
+        assert_eq!(dependent_inner.next_value(), next_inner_value);
+        assert_eq!(dependent_inner.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(dependent_inner.propagation_lanes(), propagation_lanes);
+        assert_eq!(dependent_inner.previous_dependency_lanes(), Lanes::NO);
+        assert_eq!(dependent_inner.dependency_lanes(), propagation_lanes);
+        assert!(
+            dependent_inner
+                .fiber_lanes_after()
+                .contains_all(propagation_lanes)
+        );
+        assert_eq!(dependent_inner.marked_dependency_count(), 1);
+        assert!(dependent_inner.marked_changed_provider_lanes());
+        assert_eq!(
+            context_store
+                .context_dependency(dependent_inner.dependency())
+                .unwrap()
+                .dependency_lanes(),
+            propagation_lanes
+        );
+
+        assert!(
+            record
+                .host_root_child_lanes_after()
+                .contains_all(propagation_lanes)
+        );
+        assert!(
+            record
+                .outer_provider_child_lanes_after()
+                .contains_all(propagation_lanes)
+        );
+        assert!(
+            record
+                .inner_provider_child_lanes_after()
+                .contains_all(propagation_lanes)
+        );
+        assert!(
+            record
+                .root_pending_lanes_after()
+                .contains_all(propagation_lanes)
+        );
+
+        let outer_node = store.fiber_arena().get(outer_function_component).unwrap();
+        assert!(!outer_node.lanes().contains_any(propagation_lanes));
+        assert_eq!(outer_node.dependencies(), DependenciesHandle::NONE);
+        assert!(
+            !outer_node
+                .flags()
+                .contains_any(FiberFlags::NEEDS_PROPAGATION)
+        );
+        let inner_node = store.fiber_arena().get(inner_function_component).unwrap();
+        assert!(inner_node.lanes().contains_all(propagation_lanes));
+        assert_eq!(inner_node.dependencies(), DependenciesHandle::NONE);
+        assert!(
+            !inner_node
+                .flags()
+                .contains_any(FiberFlags::NEEDS_PROPAGATION)
+        );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
         assert_eq!(store.root(root_id).unwrap().current(), current);
         assert_eq!(store.root(root_id).unwrap().finished_work(), None);

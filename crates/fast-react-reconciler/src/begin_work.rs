@@ -2073,6 +2073,28 @@ pub(crate) struct NestedContextProviderTwoConsumerUseContextBeginWorkRecord {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct NestedContextProviderOuterInnerConsumerUseContextBeginWorkRecord {
+    outer_provider: FiberId,
+    inner_provider: FiberId,
+    outer_child: FiberId,
+    inner_child: FiberId,
+    outer_context: ContextHandle,
+    outer_value: ContextValueHandle,
+    inner_context: ContextHandle,
+    inner_value: ContextValueHandle,
+    outer_provider_snapshot: ContextStackSnapshot,
+    inner_provider_snapshot: ContextStackSnapshot,
+    outer_provider_token: ContextFrameId,
+    inner_provider_token: ContextFrameId,
+    outer_pushed_stack_depth: usize,
+    inner_pushed_stack_depth: usize,
+    inner_restored_stack_depth: usize,
+    outer_restored_stack_depth: usize,
+    outer_child_begin_work: FunctionComponentUseContextBeginWorkRecord,
+    inner_child_begin_work: FunctionComponentUseContextBeginWorkRecord,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SiblingContextProviderTwoConsumerUseContextBeginWorkRecord {
     first_provider: FiberId,
     second_provider: FiberId,
@@ -2422,6 +2444,153 @@ impl NestedContextProviderTwoConsumerUseContextBeginWorkRecord {
     #[must_use]
     pub const fn render_lanes(self) -> Lanes {
         self.first_child_begin_work.render().render_lanes()
+    }
+}
+
+impl NestedContextProviderOuterInnerConsumerUseContextBeginWorkRecord {
+    #[must_use]
+    pub const fn outer_provider(self) -> FiberId {
+        self.outer_provider
+    }
+
+    #[must_use]
+    pub const fn inner_provider(self) -> FiberId {
+        self.inner_provider
+    }
+
+    #[must_use]
+    pub const fn outer_child(self) -> FiberId {
+        self.outer_child
+    }
+
+    #[must_use]
+    pub const fn inner_child(self) -> FiberId {
+        self.inner_child
+    }
+
+    #[must_use]
+    pub const fn outer_context(self) -> ContextHandle {
+        self.outer_context
+    }
+
+    #[must_use]
+    pub const fn outer_value(self) -> ContextValueHandle {
+        self.outer_value
+    }
+
+    #[must_use]
+    pub const fn inner_context(self) -> ContextHandle {
+        self.inner_context
+    }
+
+    #[must_use]
+    pub const fn inner_value(self) -> ContextValueHandle {
+        self.inner_value
+    }
+
+    #[must_use]
+    pub const fn outer_provider_snapshot(self) -> ContextStackSnapshot {
+        self.outer_provider_snapshot
+    }
+
+    #[must_use]
+    pub const fn inner_provider_snapshot(self) -> ContextStackSnapshot {
+        self.inner_provider_snapshot
+    }
+
+    #[must_use]
+    pub const fn outer_provider_token(self) -> ContextFrameId {
+        self.outer_provider_token
+    }
+
+    #[must_use]
+    pub const fn inner_provider_token(self) -> ContextFrameId {
+        self.inner_provider_token
+    }
+
+    #[must_use]
+    pub const fn outer_pushed_stack_depth(self) -> usize {
+        self.outer_pushed_stack_depth
+    }
+
+    #[must_use]
+    pub const fn inner_pushed_stack_depth(self) -> usize {
+        self.inner_pushed_stack_depth
+    }
+
+    #[must_use]
+    pub const fn inner_restored_stack_depth(self) -> usize {
+        self.inner_restored_stack_depth
+    }
+
+    #[must_use]
+    pub const fn outer_restored_stack_depth(self) -> usize {
+        self.outer_restored_stack_depth
+    }
+
+    #[must_use]
+    pub const fn outer_child_begin_work(self) -> FunctionComponentUseContextBeginWorkRecord {
+        self.outer_child_begin_work
+    }
+
+    #[must_use]
+    pub const fn inner_child_begin_work(self) -> FunctionComponentUseContextBeginWorkRecord {
+        self.inner_child_begin_work
+    }
+
+    #[must_use]
+    pub const fn outer_child_render(self) -> FunctionComponentRenderRecord {
+        self.outer_child_begin_work.render()
+    }
+
+    #[must_use]
+    pub const fn inner_child_render(self) -> FunctionComponentRenderRecord {
+        self.inner_child_begin_work.render()
+    }
+
+    #[must_use]
+    pub const fn outer_child_output(self) -> FunctionComponentOutputHandle {
+        self.outer_child_begin_work.output()
+    }
+
+    #[must_use]
+    pub const fn inner_child_output(self) -> FunctionComponentOutputHandle {
+        self.inner_child_begin_work.output()
+    }
+
+    #[must_use]
+    pub const fn outer_child_context_read(self) -> FunctionComponentContextReadRecord {
+        self.outer_child_begin_work.context_read()
+    }
+
+    #[must_use]
+    pub const fn inner_child_context_read(self) -> FunctionComponentContextReadRecord {
+        self.inner_child_begin_work.context_read()
+    }
+
+    #[must_use]
+    pub const fn outer_child_context_dependency(self) -> FunctionComponentContextDependencyHandle {
+        self.outer_child_begin_work.context_dependency()
+    }
+
+    #[must_use]
+    pub const fn inner_child_context_dependency(self) -> FunctionComponentContextDependencyHandle {
+        self.inner_child_begin_work.context_dependency()
+    }
+
+    #[must_use]
+    pub const fn outer_child_context_read_count(self) -> usize {
+        self.outer_child_begin_work.context_read_count()
+    }
+
+    #[must_use]
+    pub const fn inner_child_context_read_count(self) -> usize {
+        self.inner_child_begin_work.context_read_count()
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.outer_child_begin_work.render().render_lanes()
     }
 }
 
@@ -2828,11 +2997,26 @@ pub(crate) enum NestedContextProviderBeginWorkError {
         inner_provider: FiberId,
         first_child: FiberId,
     },
+    MissingInnerProvider {
+        outer_provider: FiberId,
+        outer_child: FiberId,
+    },
     TooManyConsumers {
         inner_provider: FiberId,
         first_child: FiberId,
         second_child: FiberId,
         sibling: FiberId,
+    },
+    TooManyOuterChildren {
+        outer_provider: FiberId,
+        outer_child: FiberId,
+        inner_provider: FiberId,
+        sibling: FiberId,
+    },
+    UnsupportedOuterConsumerTag {
+        outer_provider: FiberId,
+        child: FiberId,
+        tag: FiberTag,
     },
     UnsupportedOuterChildTag {
         outer_provider: FiberId,
@@ -2937,6 +3121,15 @@ impl Display for NestedContextProviderBeginWorkError {
                 inner_provider.slot().get(),
                 first_child.slot().get()
             ),
+            Self::MissingInnerProvider {
+                outer_provider,
+                outer_child,
+            } => write!(
+                formatter,
+                "outer ContextProvider fiber {} has outer FunctionComponent consumer {} but no inner ContextProvider sibling; this private nested outer/inner consumer handoff requires both",
+                outer_provider.slot().get(),
+                outer_child.slot().get()
+            ),
             Self::TooManyConsumers {
                 inner_provider,
                 first_child,
@@ -2949,6 +3142,30 @@ impl Display for NestedContextProviderBeginWorkError {
                 first_child.slot().get(),
                 second_child.slot().get(),
                 sibling.slot().get()
+            ),
+            Self::TooManyOuterChildren {
+                outer_provider,
+                outer_child,
+                inner_provider,
+                sibling,
+            } => write!(
+                formatter,
+                "outer ContextProvider fiber {} has more than the admitted outer consumer {} plus inner ContextProvider {} children; unsupported sibling {} was present",
+                outer_provider.slot().get(),
+                outer_child.slot().get(),
+                inner_provider.slot().get(),
+                sibling.slot().get()
+            ),
+            Self::UnsupportedOuterConsumerTag {
+                outer_provider,
+                child,
+                tag,
+            } => write!(
+                formatter,
+                "outer ContextProvider fiber {} first child {} has unsupported tag {:?}; this private nested outer/inner consumer handoff admits a FunctionComponent outer consumer",
+                outer_provider.slot().get(),
+                child.slot().get(),
+                tag
             ),
             Self::UnsupportedOuterChildTag {
                 outer_provider,
@@ -2990,7 +3207,10 @@ impl Error for NestedContextProviderBeginWorkError {
             | Self::ProviderSiblingUnsupported { .. }
             | Self::MultipleChildren { .. }
             | Self::MissingSecondConsumer { .. }
+            | Self::MissingInnerProvider { .. }
             | Self::TooManyConsumers { .. }
+            | Self::TooManyOuterChildren { .. }
+            | Self::UnsupportedOuterConsumerTag { .. }
             | Self::UnsupportedOuterChildTag { .. }
             | Self::UnsupportedInnerChildTag { .. } => None,
         }
@@ -5012,6 +5232,152 @@ pub(crate) fn begin_work_nested_context_provider_two_provider_use_context_childr
     )
 }
 
+pub(crate) fn begin_work_nested_context_provider_outer_inner_consumer_use_context_children(
+    arena: &mut FiberArena,
+    request: NestedContextProviderBeginWorkRequest,
+    context_store: &mut FunctionComponentContextRenderStore,
+    invoker: &mut impl FunctionComponentContextConsumerInvoker,
+) -> Result<
+    NestedContextProviderOuterInnerConsumerUseContextBeginWorkRecord,
+    NestedContextProviderBeginWorkError,
+> {
+    let shape = validate_nested_context_provider_outer_inner_consumer_handoff_shape(
+        arena,
+        request.outer_provider(),
+    )?;
+    let outer_snapshot = context_store
+        .push_provider(request.outer_context(), request.outer_value())
+        .map_err(|error| NestedContextProviderBeginWorkError::ContextStack {
+            provider: request.outer_provider(),
+            context: request.outer_context(),
+            error: Box::new(error),
+        })?;
+    let outer_provider_token = context_store.context_stack().snapshot().top_frame();
+    let outer_pushed_stack_depth = context_store.stack_depth();
+
+    let outer_child_begin_work = match begin_work_function_component_required_use_context(
+        arena,
+        BeginWorkRequest::new(shape.outer_child, request.render_lanes()),
+        context_store,
+        request.outer_context(),
+        invoker,
+    ) {
+        Ok(outer_child_begin_work) => outer_child_begin_work,
+        Err(error) => {
+            return match context_store.restore_snapshot(outer_snapshot) {
+                Ok(()) => Err(NestedContextProviderBeginWorkError::ChildBeginWork {
+                    outer_provider: request.outer_provider(),
+                    inner_provider: shape.inner_provider,
+                    child: shape.outer_child,
+                    error: Box::new(error),
+                }),
+                Err(restore_error) => Err(
+                    NestedContextProviderBeginWorkError::ContextRestoreAfterChildError {
+                        outer_provider: request.outer_provider(),
+                        inner_provider: shape.inner_provider,
+                        child: shape.outer_child,
+                        child_error: Box::new(error),
+                        inner_restore_error: None,
+                        outer_restore_error: Some(Box::new(restore_error)),
+                    },
+                ),
+            };
+        }
+    };
+
+    let inner_snapshot =
+        match context_store.push_provider(request.inner_context(), request.inner_value()) {
+            Ok(snapshot) => snapshot,
+            Err(error) => {
+                if let Err(restore_error) = context_store.restore_snapshot(outer_snapshot) {
+                    return Err(NestedContextProviderBeginWorkError::ContextRestore {
+                        provider: request.outer_provider(),
+                        context: request.outer_context(),
+                        snapshot: outer_snapshot,
+                        error: Box::new(restore_error),
+                    });
+                }
+
+                return Err(NestedContextProviderBeginWorkError::ContextStack {
+                    provider: shape.inner_provider,
+                    context: request.inner_context(),
+                    error: Box::new(error),
+                });
+            }
+        };
+    let inner_provider_token = context_store.context_stack().snapshot().top_frame();
+    let inner_pushed_stack_depth = context_store.stack_depth();
+
+    let inner_child_result = begin_work_function_component_required_use_context(
+        arena,
+        BeginWorkRequest::new(shape.inner_child, request.render_lanes()),
+        context_store,
+        request.inner_context(),
+        invoker,
+    );
+    let inner_restore_result = context_store.restore_snapshot(inner_snapshot);
+    let inner_restored_stack_depth = context_store.stack_depth();
+    let outer_restore_result = context_store.restore_snapshot(outer_snapshot);
+    let outer_restored_stack_depth = context_store.stack_depth();
+
+    match (
+        inner_child_result,
+        inner_restore_result,
+        outer_restore_result,
+    ) {
+        (Ok(inner_child_begin_work), Ok(()), Ok(())) => Ok(
+            NestedContextProviderOuterInnerConsumerUseContextBeginWorkRecord {
+                outer_provider: request.outer_provider(),
+                inner_provider: shape.inner_provider,
+                outer_child: shape.outer_child,
+                inner_child: shape.inner_child,
+                outer_context: request.outer_context(),
+                outer_value: request.outer_value(),
+                inner_context: request.inner_context(),
+                inner_value: request.inner_value(),
+                outer_provider_snapshot: outer_snapshot,
+                inner_provider_snapshot: inner_snapshot,
+                outer_provider_token,
+                inner_provider_token,
+                outer_pushed_stack_depth,
+                inner_pushed_stack_depth,
+                inner_restored_stack_depth,
+                outer_restored_stack_depth,
+                outer_child_begin_work,
+                inner_child_begin_work,
+            },
+        ),
+        (Ok(_), Err(error), _) => Err(NestedContextProviderBeginWorkError::ContextRestore {
+            provider: shape.inner_provider,
+            context: request.inner_context(),
+            snapshot: inner_snapshot,
+            error: Box::new(error),
+        }),
+        (Ok(_), Ok(()), Err(error)) => Err(NestedContextProviderBeginWorkError::ContextRestore {
+            provider: request.outer_provider(),
+            context: request.outer_context(),
+            snapshot: outer_snapshot,
+            error: Box::new(error),
+        }),
+        (Err(error), Ok(()), Ok(())) => Err(NestedContextProviderBeginWorkError::ChildBeginWork {
+            outer_provider: request.outer_provider(),
+            inner_provider: shape.inner_provider,
+            child: shape.inner_child,
+            error: Box::new(error),
+        }),
+        (Err(child_error), inner_restore_error, outer_restore_error) => Err(
+            NestedContextProviderBeginWorkError::ContextRestoreAfterChildError {
+                outer_provider: request.outer_provider(),
+                inner_provider: shape.inner_provider,
+                child: shape.inner_child,
+                child_error: Box::new(child_error),
+                inner_restore_error: inner_restore_error.err().map(Box::new),
+                outer_restore_error: outer_restore_error.err().map(Box::new),
+            },
+        ),
+    }
+}
+
 fn begin_work_nested_context_provider_two_consumer_use_context_children_with_required_contexts(
     arena: &mut FiberArena,
     request: NestedContextProviderBeginWorkRequest,
@@ -5332,6 +5698,13 @@ struct NestedContextProviderTwoConsumerHandoffShape {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct NestedContextProviderOuterInnerConsumerHandoffShape {
+    inner_provider: FiberId,
+    outer_child: FiberId,
+    inner_child: FiberId,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct SiblingContextProviderTwoConsumerHandoffShape {
     second_provider: FiberId,
     first_child: FiberId,
@@ -5508,6 +5881,104 @@ fn validate_nested_context_provider_two_consumer_handoff_shape(
         inner_provider,
         first_child,
         second_child,
+    })
+}
+
+fn validate_nested_context_provider_outer_inner_consumer_handoff_shape(
+    arena: &FiberArena,
+    outer_provider: FiberId,
+) -> Result<NestedContextProviderOuterInnerConsumerHandoffShape, NestedContextProviderBeginWorkError>
+{
+    let outer_node = arena.get(outer_provider)?;
+    let outer_tag = outer_node.tag();
+    if outer_tag != FiberTag::ContextProvider {
+        return Err(NestedContextProviderBeginWorkError::UnexpectedFiberTag {
+            fiber: outer_provider,
+            tag: outer_tag,
+        });
+    }
+    if let Some(sibling) = outer_node.sibling() {
+        return Err(
+            NestedContextProviderBeginWorkError::ProviderSiblingUnsupported {
+                provider: outer_provider,
+                sibling,
+            },
+        );
+    }
+
+    let outer_child =
+        outer_node
+            .child()
+            .ok_or(NestedContextProviderBeginWorkError::MissingChild {
+                provider: outer_provider,
+            })?;
+    let outer_child_node = arena.get(outer_child)?;
+    let outer_child_tag = outer_child_node.tag();
+    if outer_child_tag != FiberTag::FunctionComponent {
+        return Err(
+            NestedContextProviderBeginWorkError::UnsupportedOuterConsumerTag {
+                outer_provider,
+                child: outer_child,
+                tag: outer_child_tag,
+            },
+        );
+    }
+
+    let inner_provider = outer_child_node.sibling().ok_or(
+        NestedContextProviderBeginWorkError::MissingInnerProvider {
+            outer_provider,
+            outer_child,
+        },
+    )?;
+    let inner_node = arena.get(inner_provider)?;
+    let inner_tag = inner_node.tag();
+    if inner_tag != FiberTag::ContextProvider {
+        return Err(
+            NestedContextProviderBeginWorkError::UnsupportedOuterChildTag {
+                outer_provider,
+                child: inner_provider,
+                tag: inner_tag,
+            },
+        );
+    }
+    if let Some(sibling) = inner_node.sibling() {
+        return Err(NestedContextProviderBeginWorkError::TooManyOuterChildren {
+            outer_provider,
+            outer_child,
+            inner_provider,
+            sibling,
+        });
+    }
+
+    let inner_child =
+        inner_node
+            .child()
+            .ok_or(NestedContextProviderBeginWorkError::MissingChild {
+                provider: inner_provider,
+            })?;
+    let inner_child_node = arena.get(inner_child)?;
+    if let Some(sibling) = inner_child_node.sibling() {
+        return Err(NestedContextProviderBeginWorkError::MultipleChildren {
+            provider: inner_provider,
+            first_child: inner_child,
+            sibling,
+        });
+    }
+    let inner_child_tag = inner_child_node.tag();
+    if inner_child_tag != FiberTag::FunctionComponent {
+        return Err(
+            NestedContextProviderBeginWorkError::UnsupportedInnerChildTag {
+                inner_provider,
+                child: inner_child,
+                tag: inner_child_tag,
+            },
+        );
+    }
+
+    Ok(NestedContextProviderOuterInnerConsumerHandoffShape {
+        inner_provider,
+        outer_child,
+        inner_child,
     })
 }
 
@@ -6918,6 +7389,157 @@ mod tests {
             context_store.active_provider_count(inner_context).unwrap(),
             0
         );
+    }
+
+    #[test]
+    fn nested_context_provider_outer_inner_consumers_preserve_outer_value_and_unwind() {
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let default_value = context_value(516);
+        let outer_value = context_value(517);
+        let inner_value = context_value(518);
+        let context = context_store.create_context(default_value);
+        let mut arena = FiberArena::new();
+        let outer_provider = arena.create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(519),
+            FiberMode::NO,
+        );
+        let inner_provider = arena.create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(520),
+            FiberMode::NO,
+        );
+        let outer_current = arena.create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(521),
+            FiberMode::NO,
+        );
+        let outer_component = FiberTypeHandle::from_raw(522);
+        arena
+            .get_mut(outer_current)
+            .unwrap()
+            .set_fiber_type(outer_component);
+        let outer_work_in_progress = arena
+            .create_work_in_progress(outer_current, PropsHandle::from_raw(523))
+            .unwrap();
+        let inner_current = arena.create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(524),
+            FiberMode::NO,
+        );
+        let inner_component = FiberTypeHandle::from_raw(525);
+        arena
+            .get_mut(inner_current)
+            .unwrap()
+            .set_fiber_type(inner_component);
+        let inner_work_in_progress = arena
+            .create_work_in_progress(inner_current, PropsHandle::from_raw(526))
+            .unwrap();
+        arena
+            .set_children(inner_provider, &[inner_work_in_progress])
+            .unwrap();
+        arena
+            .set_children(outer_provider, &[outer_work_in_progress, inner_provider])
+            .unwrap();
+        let mut registry = TestUseContextComponentRegistry::new(
+            outer_component,
+            UseContextBehavior::ReadOnce { context },
+        );
+        registry.register(inner_component, UseContextBehavior::ReadOnce { context });
+
+        let record = begin_work_nested_context_provider_outer_inner_consumer_use_context_children(
+            &mut arena,
+            NestedContextProviderBeginWorkRequest::new(
+                outer_provider,
+                Lanes::DEFAULT,
+                context,
+                outer_value,
+                context,
+                inner_value,
+            ),
+            &mut context_store,
+            &mut registry,
+        )
+        .unwrap();
+
+        assert_eq!(record.outer_provider(), outer_provider);
+        assert_eq!(record.inner_provider(), inner_provider);
+        assert_eq!(record.outer_child(), outer_work_in_progress);
+        assert_eq!(record.inner_child(), inner_work_in_progress);
+        assert_eq!(record.outer_context(), context);
+        assert_eq!(record.inner_context(), context);
+        assert_eq!(record.outer_value(), outer_value);
+        assert_eq!(record.inner_value(), inner_value);
+        assert!(record.outer_provider_snapshot().is_root());
+        assert_eq!(record.inner_provider_snapshot().depth(), 1);
+        assert!(record.outer_provider_token().is_some());
+        assert!(record.inner_provider_token().is_some());
+        assert_ne!(record.outer_provider_token(), record.inner_provider_token());
+        assert_eq!(record.outer_pushed_stack_depth(), 1);
+        assert_eq!(record.inner_pushed_stack_depth(), 2);
+        assert_eq!(record.inner_restored_stack_depth(), 1);
+        assert_eq!(record.outer_restored_stack_depth(), 0);
+        assert_eq!(record.outer_child_context_read_count(), 1);
+        assert_eq!(record.inner_child_context_read_count(), 1);
+        assert_eq!(
+            record.outer_child_output(),
+            FunctionComponentOutputHandle::from_raw(outer_value.raw())
+        );
+        assert_eq!(
+            record.inner_child_output(),
+            FunctionComponentOutputHandle::from_raw(inner_value.raw())
+        );
+        assert_eq!(registry.calls().len(), 2);
+        assert_eq!(registry.calls()[0].fiber(), outer_work_in_progress);
+        assert_eq!(registry.calls()[1].fiber(), inner_work_in_progress);
+        assert_eq!(
+            registry.calls()[0].context_state().unwrap().stack_depth(),
+            1
+        );
+        assert_eq!(
+            registry.calls()[1].context_state().unwrap().stack_depth(),
+            2
+        );
+
+        let outer_read = record.outer_child_context_read();
+        assert_eq!(outer_read.fiber(), outer_work_in_progress);
+        assert_eq!(outer_read.context(), context);
+        assert_eq!(outer_read.default_value(), default_value);
+        assert_eq!(outer_read.value(), outer_value);
+        assert_eq!(outer_read.active_provider_count(), 1);
+        let inner_read = record.inner_child_context_read();
+        assert_eq!(inner_read.fiber(), inner_work_in_progress);
+        assert_eq!(inner_read.context(), context);
+        assert_eq!(inner_read.default_value(), default_value);
+        assert_eq!(inner_read.value(), inner_value);
+        assert_eq!(inner_read.active_provider_count(), 2);
+        assert_eq!(registry.reads(), &[outer_read, inner_read]);
+        assert_eq!(
+            context_store.context_reads_for_record(record.outer_child_render()),
+            &[outer_read]
+        );
+        assert_eq!(
+            context_store.context_reads_for_record(record.inner_child_render()),
+            &[inner_read]
+        );
+
+        let dependencies = context_store.context_dependencies();
+        assert_eq!(dependencies.len(), 2);
+        assert_eq!(dependencies[0].fiber(), outer_work_in_progress);
+        assert_eq!(dependencies[0].context(), context);
+        assert_eq!(dependencies[0].memoized_value(), outer_value);
+        assert_eq!(dependencies[0].dependency_lanes(), Lanes::NO);
+        assert_eq!(dependencies[1].fiber(), inner_work_in_progress);
+        assert_eq!(dependencies[1].context(), context);
+        assert_eq!(dependencies[1].memoized_value(), inner_value);
+        assert_eq!(dependencies[1].dependency_lanes(), Lanes::NO);
+        assert_eq!(context_store.current_value(context).unwrap(), default_value);
+        assert_eq!(context_store.stack_depth(), 0);
+        assert_eq!(context_store.active_provider_count(context).unwrap(), 0);
     }
 
     #[test]
