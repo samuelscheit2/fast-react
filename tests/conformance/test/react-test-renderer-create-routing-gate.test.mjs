@@ -72,6 +72,11 @@ const actSchedulerMissingBeforeExecution = [
   "react-test-renderer-passive-effect-callback-execution",
   "react-test-renderer-private-root-request-execution"
 ];
+const actSchedulerWarningThenableMissingBeforeExecution = [
+  "public-react-test-renderer-act-warning-emission",
+  "public-react-test-renderer-act-thenable-awaiting",
+  "public-react-test-renderer-async-act-scope-settlement"
+];
 const privateRouteStatus = "blocked-js-native-bridge-not-loaded";
 const privateRootBridgeStatus =
   "blocked-private-test-renderer-root-bridge-execution";
@@ -216,6 +221,8 @@ const actSchedulerReactQueueDiagnosticRecordIds = [
 const actSchedulerCjsDevelopmentReactQueueDiagnosticRecordIds = [
   "scheduler-private-act-queue-flush-diagnostics",
   "test-renderer-mock-scheduler-flush-helper-routing",
+  "react-test-renderer-act-warning-thenable-blockers",
+  "test-renderer-mock-scheduler-expired-work-act-route",
   "react-private-act-internal-test-queue-factories"
 ];
 const actSchedulerSyncFlushRecordIds = [
@@ -262,6 +269,11 @@ const acceptedPrivateActFlushCjsPrerequisiteIds = [
   ...acceptedPrivateActFlushPrerequisiteIds.slice(0, 8),
   "passive-effect-scheduler-flush-metadata",
   ...acceptedPrivateActFlushPrerequisiteIds.slice(8)
+];
+const acceptedPrivateActFlushCjsDevelopmentPrerequisiteIds = [
+  ...acceptedPrivateActFlushCjsPrerequisiteIds.slice(0, 4),
+  "act-warning-thenable-public-compatibility-blockers",
+  ...acceptedPrivateActFlushCjsPrerequisiteIds.slice(4)
 ];
 const blockedPrivateActFlushPrerequisiteIds = [
   "private-act-queue-drain-execution",
@@ -4335,9 +4347,11 @@ function assertActSchedulerGate(gate, entrypoint) {
   const expectedPassiveRecordIds = isCjs
     ? actSchedulerCjsPassiveRecordIds
     : actSchedulerPassiveRecordIds;
-  const expectedAcceptedPrerequisiteIds = isCjs
-    ? acceptedPrivateActFlushCjsPrerequisiteIds
-    : acceptedPrivateActFlushPrerequisiteIds;
+  const expectedAcceptedPrerequisiteIds = cjsDevelopmentOnly
+    ? acceptedPrivateActFlushCjsDevelopmentPrerequisiteIds
+    : isCjs
+      ? acceptedPrivateActFlushCjsPrerequisiteIds
+      : acceptedPrivateActFlushPrerequisiteIds;
   const expectedReactQueueDiagnosticRecordIds = cjsDevelopmentOnly
     ? actSchedulerCjsDevelopmentReactQueueDiagnosticRecordIds
     : actSchedulerReactQueueDiagnosticRecordIds;
@@ -4372,7 +4386,9 @@ function assertActSchedulerGate(gate, entrypoint) {
       "worker-404-scheduler-mock-private-callback-execution",
       "worker-436-scheduler-mock-continuation-execution",
       "worker-469-scheduler-mock-expired-continuation-gate",
-      "worker-482-test-renderer-act-scheduler-flush-gate"
+      "worker-482-test-renderer-act-scheduler-flush-gate",
+      "worker-517-test-renderer-act-warning-thenable-blockers",
+      "worker-518-scheduler-mock-expired-act-route"
     );
   }
 
@@ -4403,6 +4419,12 @@ function assertActSchedulerGate(gate, entrypoint) {
   if (cjsDevelopmentOnly) {
     assert.equal(gate.mockSchedulerFlushHelperRoutingAccepted, true);
     assert.equal(gate.privateMockSchedulerFlushHelperMetadataRouted, true);
+    assert.equal(gate.privateMockSchedulerExpiredWorkMetadataRouted, true);
+    assert.equal(
+      gate.mockSchedulerExpiredWorkActRouteDiagnosticsReady,
+      true
+    );
+    assert.equal(gate.recognizesExpiredMockSchedulerMetadata, true);
     assert.equal(gate.publicSchedulerFlushBehaviorExecuted, false);
   }
   assert.equal(gate.schedulerMockFlushHelperMetadataAccepted, true);
@@ -4472,7 +4494,12 @@ function assertActSchedulerGate(gate, entrypoint) {
   );
   assert.deepEqual(
     gate.missingBeforeExecution,
-    actSchedulerMissingBeforeExecution
+    cjsDevelopmentOnly
+      ? [
+          ...actSchedulerMissingBeforeExecution,
+          ...actSchedulerWarningThenableMissingBeforeExecution
+        ]
+      : actSchedulerMissingBeforeExecution
   );
 
   for (const record of [
