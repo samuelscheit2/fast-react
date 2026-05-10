@@ -107,6 +107,8 @@ const privateRootPortalFakeDomMountRecordType =
   'fast.react_dom.private_root_portal_fake_dom_mount_record';
 const privateRootHostOutputUpdateHandoffRecordType =
   'fast.react_dom.private_root_host_output_update_handoff_record';
+const privateRootCommitRefMetadataRecordType =
+  'fast.react_dom.private_root_commit_ref_metadata_record';
 const privateRootRefCallbackHostOutputOrderingDiagnosticRecordType =
   'fast.react_dom.private_root_ref_callback_host_output_ordering_diagnostic_record';
 const privateRootPublicFacadeAdapterType =
@@ -157,6 +159,8 @@ const ROOT_BRIDGE_PORTAL_PUBLIC_MOUNT_BLOCKED =
   'blocked-public-root-portal-mounting';
 const ROOT_BRIDGE_HOST_OUTPUT_UPDATE_APPLIED =
   'applied-private-root-host-output-update';
+const ROOT_BRIDGE_ROOT_COMMIT_REF_METADATA_ACCEPTED =
+  'accepted-private-root-commit-ref-metadata';
 const ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC_ADMITTED =
   'admitted-private-root-ref-callback-host-output-ordering-diagnostic';
 const ROOT_BRIDGE_PUBLIC_FACADE_ADAPTER_READY =
@@ -590,6 +594,38 @@ const ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_BLOCKED_CAPABILITIES = freezeArray([
       'React DOM ref compatibility is not claimed by this private diagnostic.'
   })
 ]);
+const ROOT_BRIDGE_ROOT_COMMIT_REF_METADATA_BLOCKED_CAPABILITIES = freezeArray([
+  freezeRecord({
+    id: 'public-root-execution',
+    blocked: true,
+    reason:
+      'The accepted ref metadata is associated with private root request records only.'
+  }),
+  freezeRecord({
+    id: 'callback-ref-invocation',
+    blocked: true,
+    reason:
+      'Root commit ref metadata admission does not invoke callback refs.'
+  }),
+  freezeRecord({
+    id: 'object-ref-mutation',
+    blocked: true,
+    reason:
+      'Object ref writes remain blocked at the root commit metadata boundary.'
+  }),
+  freezeRecord({
+    id: 'root-error-propagation',
+    blocked: true,
+    reason:
+      'Ref callback errors are not routed by root commit metadata admission.'
+  }),
+  freezeRecord({
+    id: 'compatibility-claims',
+    blocked: true,
+    reason:
+      'React DOM ref compatibility is not claimed by private metadata admission.'
+  })
+]);
 
 const rootOwnerState = new WeakMap();
 const rootHandleState = new WeakMap();
@@ -611,6 +647,8 @@ const rootUnmountHostOutputCleanupRecords = new WeakMap();
 const rootPortalFakeDomMountPayloads = new WeakMap();
 const rootHostOutputUpdateHandoffPayloads = new WeakMap();
 const rootHostOutputUpdateHandoffRecords = new WeakMap();
+const rootCommitRefMetadataPayloads = new WeakMap();
+const rootCommitRefMetadataRecordsByRequest = new WeakMap();
 const rootRefCallbackHostOutputOrderingDiagnosticPayloads = new WeakMap();
 const rootPublicFacadeAdapterPayloads = new WeakMap();
 const rootPublicFacadeRootPayloads = new WeakMap();
@@ -731,6 +769,14 @@ function createPrivateRootBridgeShell(options) {
       return applyPrivateRootHostOutputUpdateWithBridge(
         bridgeState,
         record,
+        options
+      );
+    },
+    admitRootCommitRefMetadata(record, rootCommitRefMetadata, options) {
+      return admitPrivateRootCommitRefMetadataWithBridge(
+        bridgeState,
+        record,
+        rootCommitRefMetadata,
         options
       );
     },
@@ -977,6 +1023,19 @@ function createRefCallbackHostOutputOrderingDiagnosticRecord(
 
 function applyPrivateRootHostOutputUpdate(record, options) {
   return applyPrivateRootHostOutputUpdateWithBridge(null, record, options);
+}
+
+function admitPrivateRootCommitRefMetadata(
+  record,
+  rootCommitRefMetadata,
+  options
+) {
+  return admitPrivateRootCommitRefMetadataWithBridge(
+    null,
+    record,
+    rootCommitRefMetadata,
+    options
+  );
 }
 function admitRootBridgeRequestWithBridge(bridgeState, record) {
   const validation = validateRootBridgeRequestRecord(record);
@@ -1920,6 +1979,14 @@ function getPrivateRootHostOutputUpdateHandoffPayload(record) {
 
 function isPrivateRootHostOutputUpdateHandoffRecord(value) {
   return rootHostOutputUpdateHandoffPayloads.has(value);
+}
+
+function getPrivateRootCommitRefMetadataPayload(record) {
+  return rootCommitRefMetadataPayloads.get(record) || null;
+}
+
+function isPrivateRootCommitRefMetadataRecord(value) {
+  return rootCommitRefMetadataPayloads.has(value);
 }
 
 function getPrivateRootRefCallbackHostOutputOrderingDiagnosticPayload(record) {
@@ -3280,6 +3347,109 @@ function getFirstChild(parent) {
     : null;
 }
 
+function admitPrivateRootCommitRefMetadataWithBridge(
+  bridgeState,
+  record,
+  rootCommitRefMetadata,
+  options
+) {
+  const validation = validateRootCommitRefMetadataRequestRecord(record);
+  if (bridgeState !== null && validation.bridgeState !== bridgeState) {
+    throwForeignRootBridgeRequest();
+  }
+
+  const existing = rootCommitRefMetadataRecordsByRequest.get(record);
+  if (existing !== undefined) {
+    return existing;
+  }
+
+  const rootCommitRefMetadataSnapshot =
+    refCallbackGate.createRefCallbackRootCommitMetadataSnapshot(
+      rootCommitRefMetadata
+    );
+  const rootCommitRefMetadataPayload =
+    refCallbackGate.getPrivateRefCallbackRootCommitMetadataSnapshotPayload(
+      rootCommitRefMetadataSnapshot
+    );
+  if (rootCommitRefMetadataPayload === null) {
+    throwInvalidRootCommitRefMetadata(
+      'Expected accepted private root commit ref metadata.'
+    );
+  }
+
+  validateRootCommitRefMetadataShapeForRequest(
+    record,
+    rootCommitRefMetadataSnapshot,
+    rootCommitRefMetadataPayload
+  );
+
+  const rootBridgeState = validation.bridgeState;
+  const sequence = rootBridgeState.nextRootCommitRefMetadataSequence++;
+  const metadataId = `${rootBridgeState.rootCommitRefMetadataIdPrefix}:${sequence}`;
+  const hostOutputCanary = getRootCommitRefMetadataHostOutputCanary(record);
+  const label = getRootCommitRefMetadataLabel(record, options);
+  const acceptedRecord = freezeRecord({
+    $$typeof: privateRootCommitRefMetadataRecordType,
+    kind: 'FastReactDomPrivateRootCommitRefMetadataRecord',
+    operation: 'root-commit-ref-metadata',
+    metadataId,
+    metadataSequence: sequence,
+    metadataStatus: ROOT_BRIDGE_ROOT_COMMIT_REF_METADATA_ACCEPTED,
+    sourceRequestId: record.requestId,
+    sourceRequestSequence: record.requestSequence,
+    sourceRequestType: record.requestType,
+    sourceOperation: record.operation,
+    sourceUpdateId: record.updateId || null,
+    sourceLifecycleStatusBefore: record.lifecycleStatusBefore,
+    sourceLifecycleStatusAfter: record.lifecycleStatusAfter,
+    rootId: record.rootId,
+    rootKind: record.rootKind,
+    rootTag: record.rootTag,
+    hostOutputCanary,
+    label,
+    rootCommitRefMetadataStatus: rootCommitRefMetadataSnapshot.status,
+    rootCommitRefMetadataRecordCount: rootCommitRefMetadataSnapshot.recordCount,
+    detachCount: rootCommitRefMetadataSnapshot.detachCount,
+    attachCount: rootCommitRefMetadataSnapshot.attachCount,
+    ordering: rootCommitRefMetadataSnapshot.ordering,
+    blockedCapabilities:
+      ROOT_BRIDGE_ROOT_COMMIT_REF_METADATA_BLOCKED_CAPABILITIES,
+    publicRootExecution: false,
+    publicRootObjectExposed: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    callbackRefsInvoked: false,
+    objectRefsMutated: false,
+    rootErrorsReported: false,
+    compatibilityClaimed: false,
+    exposesRefValue: false,
+    exposesRefCleanup: false,
+    exposesHostNode: false,
+    exposesLatestProps: false
+  });
+
+  rootCommitRefMetadataRecordsByRequest.set(record, acceptedRecord);
+  rootCommitRefMetadataPayloads.set(
+    acceptedRecord,
+    freezeRecord({
+      bridgeState: rootBridgeState,
+      hostOutputCanary,
+      label,
+      rootCommitRefMetadataPayload,
+      rootCommitRefMetadataSnapshot,
+      sourceRecord: record
+    })
+  );
+
+  return acceptedRecord;
+}
+
 function createRefCallbackHostOutputOrderingDiagnosticRecordWithBridge(
   bridgeState,
   rootRequestRecords,
@@ -3290,9 +3460,14 @@ function createRefCallbackHostOutputOrderingDiagnosticRecordWithBridge(
       bridgeState,
       rootRequestRecords
     );
+  const refOrderingInput =
+    resolveRefCallbackHostOutputOrderingDiagnosticInput(
+      requestValidation,
+      options
+    );
   const refOrderingSnapshot =
     refCallbackGate.createRefCallbackHostOutputOrderingDiagnosticSnapshot(
-      options
+      refOrderingInput.snapshotOptions
     );
   const refOrderingPayload =
     refCallbackGate.getPrivateRefCallbackHostOutputOrderingDiagnosticSnapshotPayload(
@@ -3354,6 +3529,9 @@ function createRefCallbackHostOutputOrderingDiagnosticRecordWithBridge(
     updateRenderRequestCount: requestValidation.updateRenderRequests.length,
     unmountRequestCount: requestValidation.unmountRequests.length,
     updateBeforeUnmount,
+    rootCommitRefMetadataSource: refOrderingInput.metadataSource,
+    acceptedRootCommitRefMetadataCount:
+      refOrderingInput.acceptedMetadataRecords.length,
     refOrderingStatus: refOrderingSnapshot.status,
     refOrderingStepCount: refOrderingSnapshot.stepCount,
     refOrderingRecordCount: refOrderingSnapshot.recordCount,
@@ -3390,6 +3568,8 @@ function createRefCallbackHostOutputOrderingDiagnosticRecordWithBridge(
   });
 
   rootRefCallbackHostOutputOrderingDiagnosticPayloads.set(record, {
+    acceptedRootCommitRefMetadataRecords:
+      refOrderingInput.acceptedMetadataRecords,
     bridgeState: rootBridgeState,
     refOrderingPayload,
     refOrderingSnapshot,
@@ -3523,6 +3703,10 @@ function createBridgeState(options) {
       'portal-mount'
     ),
     rootIdPrefix: getIdPrefix(options && options.rootIdPrefix, 'root'),
+    rootCommitRefMetadataIdPrefix: getIdPrefix(
+      options && options.rootCommitRefMetadataIdPrefix,
+      'root-commit-ref-metadata'
+    ),
     requestIdPrefix: getIdPrefix(options && options.requestIdPrefix, 'request'),
     sideEffectIdPrefix: getIdPrefix(
       options && options.sideEffectIdPrefix,
@@ -3542,6 +3726,7 @@ function createBridgeState(options) {
     nextPortalBoundarySequence: 1,
     nextPortalCommitSequence: 1,
     nextPortalMountSequence: 1,
+    nextRootCommitRefMetadataSequence: 1,
     nextRootSequence: 1,
     nextSideEffectSequence: 1,
     nextUnmountCleanupSequence: 1,
@@ -3692,6 +3877,85 @@ function validateHostOutputUpdateRequestRecord(record) {
     );
   }
   return validation;
+}
+
+function validateRootCommitRefMetadataRequestRecord(record) {
+  const validation = validateRootBridgeRequestRecord(record);
+  if (validation.operation !== 'render' && validation.operation !== 'unmount') {
+    throwInvalidRootCommitRefMetadata(
+      'Private root commit ref metadata requires a render or unmount request record.'
+    );
+  }
+  if (validation.operation === 'unmount' && record.noOp) {
+    throwInvalidRootCommitRefMetadata(
+      'Private root commit ref metadata cannot be admitted for a no-op unmount request.'
+    );
+  }
+  return validation;
+}
+
+function validateRootCommitRefMetadataShapeForRequest(
+  record,
+  snapshot,
+  payload
+) {
+  if (record.operation === 'render' && record.renderCount === 1) {
+    if (snapshot.detachCount !== 0) {
+      throwInvalidRootCommitRefMetadata(
+        'Initial render ref metadata cannot include detach records.'
+      );
+    }
+    return;
+  }
+
+  if (record.operation === 'unmount' && snapshot.attachCount !== 0) {
+    throwInvalidRootCommitRefMetadata(
+      'Unmount ref metadata cannot include attach records.'
+    );
+  }
+
+  const requestPayload = rootRecordPayloads.get(record);
+  const rootOwner = requestPayload?.rootHandle?.owner;
+  if (rootOwner == null) {
+    throwInvalidRootCommitRefMetadata(
+      'Private root commit ref metadata requires a root handle owner.'
+    );
+  }
+
+  for (const metadata of [...payload.detach, ...payload.attach]) {
+    if (metadata.rootOwner !== rootOwner) {
+      throwInvalidRootCommitRefMetadata(
+        'Private root commit ref metadata must belong to the source root request.'
+      );
+    }
+  }
+}
+
+function getRootCommitRefMetadataHostOutputCanary(record) {
+  if (record.operation === 'render') {
+    return record.renderCount === 1
+      ? 'initial-host-output'
+      : 'update-host-output';
+  }
+  if (record.operation === 'unmount') {
+    return 'unmount-host-output';
+  }
+  throwInvalidRootCommitRefMetadata(
+    'Private root commit ref metadata requires a render or unmount request.'
+  );
+}
+
+function getRootCommitRefMetadataLabel(record, options) {
+  if (
+    options &&
+    typeof options === 'object' &&
+    typeof options.label === 'string' &&
+    options.label.length > 0
+  ) {
+    return options.label;
+  }
+
+  return `${getRootCommitRefMetadataHostOutputCanary(record)}:${record.requestSequence}`;
 }
 
 function normalizeHostOutputUpdateOptions(options) {
@@ -4244,6 +4508,170 @@ function validatePortalFakeDomMountHandoffRecord(record) {
   };
 }
 
+function resolveRefCallbackHostOutputOrderingDiagnosticInput(
+  requestValidation,
+  options
+) {
+  const explicitSteps = getExplicitRefOrderingDiagnosticSteps(options);
+  if (explicitSteps !== null && explicitSteps.some(stepHasRefMetadata)) {
+    return {
+      acceptedMetadataRecords: freezeArray([]),
+      metadataSource: 'diagnostic-options',
+      snapshotOptions: options
+    };
+  }
+
+  const accepted = getAcceptedRootCommitRefMetadataSteps(
+    requestValidation,
+    explicitSteps
+  );
+  if (accepted.steps.length > 0) {
+    return {
+      acceptedMetadataRecords: accepted.acceptedMetadataRecords,
+      metadataSource: 'accepted-root-commit-ref-metadata',
+      snapshotOptions: freezeRecord({
+        steps: accepted.steps
+      })
+    };
+  }
+
+  return {
+    acceptedMetadataRecords: freezeArray([]),
+    metadataSource: 'diagnostic-options',
+    snapshotOptions: options
+  };
+}
+
+function getExplicitRefOrderingDiagnosticSteps(options) {
+  if (Array.isArray(options)) {
+    return options;
+  }
+
+  if (
+    options &&
+    typeof options === 'object' &&
+    Object.prototype.hasOwnProperty.call(options, 'steps')
+  ) {
+    if (!Array.isArray(options.steps)) {
+      throwInvalidRefCallbackHostOutputOrderingDiagnostic(
+        'Ref callback ordering diagnostic step options must be an array.'
+      );
+    }
+    return options.steps;
+  }
+
+  return null;
+}
+
+function stepHasRefMetadata(step) {
+  return (
+    step !== null &&
+    typeof step === 'object' &&
+    (Object.prototype.hasOwnProperty.call(step, 'rootCommitRefMetadata') ||
+      Object.prototype.hasOwnProperty.call(step, 'refMetadata'))
+  );
+}
+
+function getAcceptedRootCommitRefMetadataSteps(
+  requestValidation,
+  explicitSteps
+) {
+  const acceptedMetadataRecords = [];
+  const steps = [];
+
+  for (const requestRecord of requestValidation.records) {
+    const acceptedRecord =
+      rootCommitRefMetadataRecordsByRequest.get(requestRecord);
+    if (acceptedRecord === undefined) {
+      continue;
+    }
+
+    const payload = rootCommitRefMetadataPayloads.get(acceptedRecord);
+    if (payload === undefined) {
+      throwInvalidRefCallbackHostOutputOrderingDiagnostic(
+        'Accepted root commit ref metadata is missing its private payload.'
+      );
+    }
+
+    acceptedMetadataRecords.push(acceptedRecord);
+    const stepOptions =
+      explicitSteps === null ? null : explicitSteps[steps.length] || null;
+    steps.push(
+      createAcceptedRootCommitRefMetadataStep(
+        requestRecord,
+        payload,
+        stepOptions
+      )
+    );
+  }
+
+  if (
+    explicitSteps !== null &&
+    acceptedMetadataRecords.length > 0 &&
+    explicitSteps.length !== acceptedMetadataRecords.length
+  ) {
+    throwInvalidRefCallbackHostOutputOrderingDiagnostic(
+      'Ref callback ordering step options must match accepted root commit ref metadata records.'
+    );
+  }
+
+  return {
+    acceptedMetadataRecords: freezeArray(acceptedMetadataRecords),
+    steps: freezeArray(steps)
+  };
+}
+
+function createAcceptedRootCommitRefMetadataStep(
+  requestRecord,
+  payload,
+  stepOptions
+) {
+  return freezeRecord({
+    hostOutputCanary:
+      stepOptions !== null && stepOptions.hostOutputCanary !== undefined
+        ? stepOptions.hostOutputCanary
+        : payload.hostOutputCanary,
+    label:
+      stepOptions !== null && stepOptions.label !== undefined
+        ? stepOptions.label
+        : payload.label,
+    latestPropsUpdates: getAcceptedRootCommitRefLatestPropsUpdates(
+      requestRecord,
+      stepOptions
+    ),
+    rootCommitRefMetadata: payload.rootCommitRefMetadataSnapshot
+  });
+}
+
+function getAcceptedRootCommitRefLatestPropsUpdates(
+  requestRecord,
+  stepOptions
+) {
+  if (
+    stepOptions !== null &&
+    Object.prototype.hasOwnProperty.call(stepOptions, 'latestPropsUpdates')
+  ) {
+    return stepOptions.latestPropsUpdates;
+  }
+
+  const handoff = rootHostOutputUpdateHandoffRecords.get(requestRecord);
+  if (handoff === undefined) {
+    return [];
+  }
+
+  const payload = rootHostOutputUpdateHandoffPayloads.get(handoff);
+  if (payload === undefined) {
+    return [];
+  }
+
+  return [
+    {
+      hostInstanceToken: payload.hostInstanceToken,
+      latestProps: payload.nextProps
+    }
+  ];
+}
+
 function validateRefCallbackHostOutputOrderingDiagnosticRequests(
   bridgeState,
   rootRequestRecords
@@ -4622,6 +5050,12 @@ function throwInvalidHostOutputUpdateHandoff(message) {
   throw error;
 }
 
+function throwInvalidRootCommitRefMetadata(message) {
+  const error = new Error(message);
+  error.code = 'FAST_REACT_DOM_INVALID_ROOT_COMMIT_REF_METADATA';
+  throw error;
+}
+
 function throwInvalidRefCallbackHostOutputOrderingDiagnostic(message) {
   const error = new Error(message);
   error.code =
@@ -4792,6 +5226,8 @@ module.exports = {
   ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC_ADMITTED,
   ROOT_BRIDGE_REQUEST_ADMITTED,
+  ROOT_BRIDGE_ROOT_COMMIT_REF_METADATA_ACCEPTED,
+  ROOT_BRIDGE_ROOT_COMMIT_REF_METADATA_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_UNMOUNT_HOST_OUTPUT_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_UNMOUNT_HOST_OUTPUT_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_UNMOUNT_HOST_OUTPUT_CLEANED,
@@ -4808,6 +5244,7 @@ module.exports = {
   NATIVE_ROOT_BRIDGE_ROOT_HANDLE_RETIRED,
   NATIVE_ROOT_BRIDGE_SYNTHETIC_ENVIRONMENT_ID,
   admitPrivateCreateRenderPath,
+  admitPrivateRootCommitRefMetadata,
   admitRootBridgeRequestRecord,
   applyPrivateRootHostOutputUpdate,
   applyPrivateCreateRootSideEffects,
@@ -4835,6 +5272,7 @@ module.exports = {
   getPrivateRootCreateRenderAdmissionPayload,
   getPrivateRootHostOutputUpdateHandoffPayload,
   getPrivateRootInitialHostOutputHandoffPayload,
+  getPrivateRootCommitRefMetadataPayload,
   getPrivateRootPortalBoundaryPayload,
   getPrivateRootPortalCommitHandoffPayload,
   getPrivateRootPortalFakeDomMountPayload,
@@ -4846,6 +5284,7 @@ module.exports = {
   getRootOwnerFromHandle,
   isNativeRootBridgeHandoffRecord,
   isPrivateRootHostOutputUpdateHandoffRecord,
+  isPrivateRootCommitRefMetadataRecord,
   isPrivateRootCreateRenderAdmissionRecord,
   isPrivateRootInitialHostOutputHandoffRecord,
   isPrivateRootPortalCommitHandoffRecord,
@@ -4862,6 +5301,7 @@ module.exports = {
   privateRootCreateSideEffectCleanupRecordType,
   privateRootCreateSideEffectRecordType,
   privateRootHostOutputUpdateHandoffRecordType,
+  privateRootCommitRefMetadataRecordType,
   privateRootInitialHostOutputCleanupRecordType,
   privateRootInitialHostOutputHandoffRecordType,
   privateRootNativeBridgeHandleType,

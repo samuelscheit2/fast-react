@@ -12,6 +12,8 @@ const REF_CALLBACK_EXECUTION_HANDOFF_STATUS =
   'private-root-commit-ref-callback-execution-handoff-recorded';
 const REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC_STATUS =
   'private-ref-callback-host-output-ordering-diagnostic-recorded';
+const REF_CALLBACK_ROOT_COMMIT_METADATA_SNAPSHOT_STATUS =
+  'accepted-private-root-commit-ref-metadata-snapshot';
 const REF_CALLBACK_ERROR_PROPAGATION_STATUS =
   'blocked-until-root-error-routing';
 const REF_CALLBACK_PUBLIC_REF_COMPATIBILITY_STATUS =
@@ -47,6 +49,8 @@ const REF_TOKEN_TARGET_INSTANCE = 'instance';
 
 const privateDomRefCallbackMetadataRecordType =
   'fast.react_dom.private_ref_callback_metadata_record';
+const privateDomRefCallbackRootCommitMetadataSnapshotType =
+  'fast.react_dom.private_ref_callback_root_commit_metadata_snapshot';
 const privateDomRefCallbackComponentTreeGateSnapshotType =
   'fast.react_dom.private_ref_callback_component_tree_gate_snapshot';
 const privateDomRefCallbackComponentTreeGateRecordType =
@@ -155,6 +159,7 @@ const attachDetachOrdering = freezeRecord({
 });
 
 const metadataRecordPayloads = new WeakMap();
+const rootCommitMetadataSnapshotPayloads = new WeakMap();
 const gateSnapshotPayloads = new WeakMap();
 const gateRecordPayloads = new WeakMap();
 const attachDetachGateSnapshotPayloads = new WeakMap();
@@ -180,6 +185,33 @@ function createRefDetachMetadataRecord(options) {
     action: REF_ACTION_DETACH,
     detachReason: normalizeDetachReason(normalizedOptions.detachReason)
   });
+}
+
+function createRefCallbackRootCommitMetadataSnapshot(snapshot) {
+  const metadata = normalizeRootCommitRefMetadataSnapshot(snapshot);
+  const rootCommitSnapshot = freezeRecord({
+    $$typeof: privateDomRefCallbackRootCommitMetadataSnapshotType,
+    kind: 'FastReactDomPrivateRefCallbackRootCommitMetadataSnapshot',
+    status: REF_CALLBACK_ROOT_COMMIT_METADATA_SNAPSHOT_STATUS,
+    recordCount: metadata.detach.length + metadata.attach.length,
+    detachCount: metadata.detach.length,
+    attachCount: metadata.attach.length,
+    ordering: attachDetachOrdering,
+    exposesRefValue: false,
+    exposesRefCleanup: false,
+    exposesHostNode: false,
+    exposesLatestProps: false
+  });
+
+  rootCommitMetadataSnapshotPayloads.set(
+    rootCommitSnapshot,
+    freezeRecord({
+      attach: freezeArray(metadata.attach.slice()),
+      detach: freezeArray(metadata.detach.slice())
+    })
+  );
+
+  return rootCommitSnapshot;
 }
 
 function createRefCallbackComponentTreeGateSnapshot(snapshot) {
@@ -611,6 +643,12 @@ function getPrivateRefCallbackMetadataRecordPayload(record) {
     : null;
 }
 
+function getPrivateRefCallbackRootCommitMetadataSnapshotPayload(snapshot) {
+  return isWeakMapKey(snapshot)
+    ? rootCommitMetadataSnapshotPayloads.get(snapshot) || null
+    : null;
+}
+
 function getPrivateRefCallbackComponentTreeGateSnapshotPayload(snapshot) {
   return isWeakMapKey(snapshot)
     ? gateSnapshotPayloads.get(snapshot) || null
@@ -671,6 +709,12 @@ function getPrivateRefCallbackHostOutputOrderingDiagnosticRecordPayload(
 
 function isPrivateRefCallbackMetadataRecord(value) {
   return getPrivateRefCallbackMetadataRecordPayload(value) !== null;
+}
+
+function isPrivateRefCallbackRootCommitMetadataSnapshot(value) {
+  return (
+    getPrivateRefCallbackRootCommitMetadataSnapshotPayload(value) !== null
+  );
 }
 
 function isPrivateRefCallbackComponentTreeGateSnapshot(value) {
@@ -821,10 +865,27 @@ function unwrapRootCommitRefMetadataSnapshot(snapshot) {
     );
   }
 
+  const directPayload =
+    getPrivateRefCallbackRootCommitMetadataSnapshotPayload(snapshot);
+  if (directPayload !== null) {
+    return {
+      attach: directPayload.attach,
+      detach: directPayload.detach
+    };
+  }
+
   const metadataSnapshot =
     'rootCommitRefMetadata' in snapshot
       ? snapshot.rootCommitRefMetadata
       : snapshot;
+  const metadataPayload =
+    getPrivateRefCallbackRootCommitMetadataSnapshotPayload(metadataSnapshot);
+  if (metadataPayload !== null) {
+    return {
+      attach: metadataPayload.attach,
+      detach: metadataPayload.detach
+    };
+  }
 
   if (metadataSnapshot == null || typeof metadataSnapshot !== 'object') {
     throw createRefCallbackGateError(
@@ -2015,6 +2076,7 @@ module.exports = {
   REF_CALLBACK_INVOCATION_STATUS_SKIPPED,
   REF_CALLBACK_INVOCATION_STATUS_THROWN,
   REF_CALLBACK_PUBLIC_REF_COMPATIBILITY_STATUS,
+  REF_CALLBACK_ROOT_COMMIT_METADATA_SNAPSHOT_STATUS,
   REF_CALLBACK_RETURN_CLEANUP,
   REF_CALLBACK_RETURN_NOT_APPLICABLE,
   REF_CALLBACK_RETURN_VALUE,
@@ -2041,6 +2103,7 @@ module.exports = {
   createRefCallbackControlledInvocationGateSnapshot,
   createRefCallbackExecutionHandoffRecord,
   createRefCallbackHostOutputOrderingDiagnosticSnapshot,
+  createRefCallbackRootCommitMetadataSnapshot,
   createRefDetachMetadataRecord,
   getPrivateRefCallbackAttachDetachGateRecordPayload,
   getPrivateRefCallbackAttachDetachGateSnapshotPayload,
@@ -2052,6 +2115,7 @@ module.exports = {
   getPrivateRefCallbackHostOutputOrderingDiagnosticRecordPayload,
   getPrivateRefCallbackHostOutputOrderingDiagnosticSnapshotPayload,
   getPrivateRefCallbackMetadataRecordPayload,
+  getPrivateRefCallbackRootCommitMetadataSnapshotPayload,
   isPrivateRefCallbackAttachDetachGateRecord,
   isPrivateRefCallbackAttachDetachGateSnapshot,
   isPrivateRefCallbackComponentTreeGateRecord,
@@ -2062,6 +2126,7 @@ module.exports = {
   isPrivateRefCallbackHostOutputOrderingDiagnosticRecord,
   isPrivateRefCallbackHostOutputOrderingDiagnosticSnapshot,
   isPrivateRefCallbackMetadataRecord,
+  isPrivateRefCallbackRootCommitMetadataSnapshot,
   noSideEffects,
   privateDomRefCallbackAttachDetachGateRecordType,
   privateDomRefCallbackAttachDetachGateSnapshotType,
@@ -2072,5 +2137,6 @@ module.exports = {
   privateDomRefCallbackExecutionHandoffRecordType,
   privateDomRefCallbackHostOutputOrderingDiagnosticRecordType,
   privateDomRefCallbackHostOutputOrderingDiagnosticSnapshotType,
-  privateDomRefCallbackMetadataRecordType
+  privateDomRefCallbackMetadataRecordType,
+  privateDomRefCallbackRootCommitMetadataSnapshotType
 };

@@ -1974,6 +1974,55 @@ test('private root bridge ref ordering diagnostic wraps update and unmount canar
     sourceToken: 'deletion:second',
     detachReason: refCallbackGate.REF_DETACH_REASON_DELETED
   });
+  const initialMetadata = bridge.admitRootCommitRefMetadata(
+    initialRender,
+    {detach: [], attach: [initialAttach]},
+    {label: 'initial-ref-attach'}
+  );
+  const updateMetadata = bridge.admitRootCommitRefMetadata(
+    updateRender,
+    {
+      detach: [updateDetach],
+      attach: [updateAttach]
+    },
+    {label: 'update-ref-change'}
+  );
+  const unmountMetadata = bridge.admitRootCommitRefMetadata(
+    unmount,
+    {detach: [unmountDetach], attach: []},
+    {label: 'unmount-ref-cleanup'}
+  );
+
+  assert.equal(
+    initialMetadata.$$typeof,
+    rootBridge.privateRootCommitRefMetadataRecordType
+  );
+  assert.equal(
+    initialMetadata.metadataStatus,
+    rootBridge.ROOT_BRIDGE_ROOT_COMMIT_REF_METADATA_ACCEPTED
+  );
+  assert.equal(initialMetadata.hostOutputCanary, 'initial-host-output');
+  assert.equal(initialMetadata.attachCount, 1);
+  assert.equal(initialMetadata.detachCount, 0);
+  assert.equal(initialMetadata.callbackRefsInvoked, false);
+  assert.equal(initialMetadata.objectRefsMutated, false);
+  assert.equal(initialMetadata.compatibilityClaimed, false);
+  assert.equal(
+    rootBridge.isPrivateRootCommitRefMetadataRecord(initialMetadata),
+    true
+  );
+  assert.equal(
+    rootBridge.getPrivateRootCommitRefMetadataPayload(
+      initialMetadata
+    ).sourceRecord,
+    initialRender
+  );
+  assert.equal(
+    rootBridge.getPrivateRootCommitRefMetadataPayload(
+      initialMetadata
+    ).rootCommitRefMetadataSnapshot.status,
+    refCallbackGate.REF_CALLBACK_ROOT_COMMIT_METADATA_SNAPSHOT_STATUS
+  );
 
   const diagnostic =
     rootBridge.createRefCallbackHostOutputOrderingDiagnosticRecord(
@@ -1981,8 +2030,7 @@ test('private root bridge ref ordering diagnostic wraps update and unmount canar
       {
         steps: [
           {
-            hostOutputCanary: 'initial-host-output',
-            rootCommitRefMetadata: {detach: [], attach: [initialAttach]}
+            hostOutputCanary: 'initial-host-output'
           },
           {
             hostOutputCanary: 'update-host-output',
@@ -1991,15 +2039,10 @@ test('private root bridge ref ordering diagnostic wraps update and unmount canar
                 hostInstanceToken: token,
                 latestProps: updatedProps
               }
-            ],
-            rootCommitRefMetadata: {
-              detach: [updateDetach],
-              attach: [updateAttach]
-            }
+            ]
           },
           {
-            hostOutputCanary: 'unmount-host-output',
-            rootCommitRefMetadata: {detach: [unmountDetach], attach: []}
+            hostOutputCanary: 'unmount-host-output'
           }
         ]
       }
@@ -2018,6 +2061,11 @@ test('private root bridge ref ordering diagnostic wraps update and unmount canar
   assert.equal(diagnostic.updateRenderRequestCount, 1);
   assert.equal(diagnostic.unmountRequestCount, 1);
   assert.equal(diagnostic.updateBeforeUnmount, true);
+  assert.equal(
+    diagnostic.rootCommitRefMetadataSource,
+    'accepted-root-commit-ref-metadata'
+  );
+  assert.equal(diagnostic.acceptedRootCommitRefMetadataCount, 3);
   assert.equal(diagnostic.refOrderingRecordCount, 4);
   assert.equal(diagnostic.callbackIdentityChangedCount, 1);
   assert.equal(diagnostic.cleanupReturnMatchedCount, 2);
@@ -2041,6 +2089,11 @@ test('private root bridge ref ordering diagnostic wraps update and unmount canar
     );
   assert.equal(payload.rootRequestRecords[2], updateRender);
   assert.equal(payload.rootRequestRecords[3], unmount);
+  assert.deepEqual(payload.acceptedRootCommitRefMetadataRecords, [
+    initialMetadata,
+    updateMetadata,
+    unmountMetadata
+  ]);
   assert.equal(payload.refOrderingSnapshot, diagnostic.refOrderingSnapshot);
   assert.deepEqual(
     diagnostic.refOrderingSnapshot.records.map((record) => [
