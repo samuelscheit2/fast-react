@@ -10,6 +10,9 @@ const reactDomClient = require(path.join(packageRoot, 'client.js'));
 const resourceFormGate = require(
   path.join(packageRoot, 'src/resource-form-gates.js')
 );
+const controlledRestoreQueue = require(
+  path.join(packageRoot, 'src/client/controlled-restore-queue.js')
+);
 const rootBridge = require(path.join(packageRoot, 'src/client/root-bridge.js'));
 const componentTree = require(
   path.join(packageRoot, 'src/client/component-tree.js')
@@ -7975,6 +7978,162 @@ test('public react-dom/client root placeholders remain inert', () => {
   assertBridgeDidNotTouchContainer(container, document);
 });
 
+test('private controlled select and textarea fake-DOM restore execution remains blocked for live DOM', () => {
+  const select = createRootBridgeControlledFakeDomRestoreExecution({
+    controlKind: 'multiple',
+    eventName: 'change',
+    fakeInitial: {selectedValues: ['b']},
+    fakeObserved: {selectedValues: ['b', 'c']},
+    hostTag: 'select',
+    latestProps: {
+      multiple: true,
+      value: ['a', 'c'],
+      onChange() {}
+    },
+    multiple: true,
+    nodeName: 'SELECT',
+    scenarioId: 'private-root-select-multiple-controlled-update'
+  });
+  const textarea = createRootBridgeControlledFakeDomRestoreExecution({
+    controlKind: 'value',
+    eventName: 'input',
+    fakeInitial: {value: 'alpha'},
+    fakeObserved: {value: 'browser-mutated'},
+    hostTag: 'textarea',
+    latestProps: {
+      value: 'beta',
+      onChange() {},
+      onInput() {}
+    },
+    nodeName: 'TEXTAREA',
+    scenarioId: 'private-root-textarea-controlled-update'
+  });
+
+  assert.deepEqual(select.fakeTarget.selectedValues, ['a', 'c']);
+  assert.equal(textarea.fakeTarget.value, 'beta');
+  assert.deepEqual(
+    [select.execution, textarea.execution].map((execution) => {
+      const row = execution.fakeDomRestoreExecutionRows[0];
+      return {
+        status: execution.status,
+        acceptedRestoreKind: row.acceptedRestoreKind,
+        targetField: row.targetField,
+        nextValueSnapshot: row.nextValueSnapshot,
+        restoreQueueWritten: row.restoreQueueWritten,
+        restoreQueueFlushed: row.restoreQueueFlushed,
+        hostWrapperInvoked: row.hostWrapperInvoked,
+        wrapperWritePerformed: row.wrapperWritePerformed,
+        valueTrackerFieldWritten: row.valueTrackerFieldWritten,
+        fakeDomInputMutated: row.fakeDomInputMutated,
+        browserInputMutated: row.browserInputMutated,
+        compatibilityClaimed: row.compatibilityClaimed
+      };
+    }),
+    [
+      {
+        status:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueFakeDomExecutionStatus,
+        acceptedRestoreKind: 'select-multiple-value',
+        targetField: 'selectedValues',
+        nextValueSnapshot: ['a', 'c'],
+        restoreQueueWritten: true,
+        restoreQueueFlushed: true,
+        hostWrapperInvoked: true,
+        wrapperWritePerformed: true,
+        valueTrackerFieldWritten: false,
+        fakeDomInputMutated: true,
+        browserInputMutated: false,
+        compatibilityClaimed: false
+      },
+      {
+        status:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueFakeDomExecutionStatus,
+        acceptedRestoreKind: 'textarea-value',
+        targetField: 'value',
+        nextValueSnapshot: 'beta',
+        restoreQueueWritten: true,
+        restoreQueueFlushed: true,
+        hostWrapperInvoked: true,
+        wrapperWritePerformed: true,
+        valueTrackerFieldWritten: false,
+        fakeDomInputMutated: true,
+        browserInputMutated: false,
+        compatibilityClaimed: false
+      }
+    ]
+  );
+  assert.equal(
+    controlledRestoreQueue.isPrivateControlledInputPostEventRestoreQueueFakeDomExecutionRecord(
+      select.execution
+    ),
+    true
+  );
+  assert.equal(select.execution.sideEffects.privateRestoreQueueWritten, true);
+  assert.equal(select.execution.sideEffects.restoreQueueWritten, false);
+  assert.equal(select.execution.sideEffects.valueTrackerFieldWritten, false);
+  assert.equal(select.execution.sideEffects.browserInputMutated, false);
+  assert.equal(
+    select.execution.publicControlledBehaviorBoundary.compatibilityClaimed,
+    false
+  );
+  assert.equal(Object.hasOwn(select.fakeTarget, '_valueTracker'), false);
+  assert.equal(Object.hasOwn(textarea.fakeTarget, '_valueTracker'), false);
+
+  const liveNode = createElement('SELECT', select.latestPropsLookup.document);
+  liveNode[resourceFormGate.controlledInputValueTrackerFakeDomTargetMarker] =
+    true;
+  liveNode.value = 'browser-live';
+  const guardedReads = [];
+  const guardedWrites = [];
+  const guardedLiveNode = new Proxy(liveNode, {
+    get(target, property, receiver) {
+      if (isControlledRestoreLiveValueKey(property)) {
+        guardedReads.push(String(property));
+        throw new Error(`Unexpected live read ${String(property)}`);
+      }
+      return Reflect.get(target, property, receiver);
+    },
+    set(target, property, value, receiver) {
+      if (isControlledRestoreLiveValueKey(property)) {
+        guardedWrites.push(String(property));
+        throw new Error(`Unexpected live write ${String(property)}`);
+      }
+      return Reflect.set(target, property, value, receiver);
+    }
+  });
+
+  assert.throws(
+    () =>
+      select.restoreGate.recordFakeDomControlledRestoreExecution(
+        select.latestPropsLookup.lookupRecord,
+        select.intent,
+        select.writeExecution,
+        select.flushBlocker,
+        select.wrapperIntent,
+        {
+          explicitAdmission: true,
+          queueKind: 'deterministic-fake-dom-controlled-restore-execution',
+          queueId: 'private-root-select-live-reject',
+          targetKind:
+            'controlled-input-post-event-restore-fake-dom-execution',
+          fakeDomTarget: guardedLiveNode
+        }
+      ),
+    {
+      code:
+        controlledRestoreQueue.controlledInputPostEventRestoreQueueInvalidFakeDomExecutionCode,
+      reason: 'unsupported-live-dom-node'
+    }
+  );
+  assert.deepEqual(guardedReads, []);
+  assert.deepEqual(guardedWrites, []);
+  assert.equal(liveNode.value, 'browser-live');
+  assert.equal(Object.hasOwn(liveNode, '_valueTracker'), false);
+
+  componentTree.detachHostInstanceToken(select.latestPropsLookup.token);
+  componentTree.detachHostInstanceToken(textarea.latestPropsLookup.token);
+});
+
 function createHostOutputProps(phase) {
   if (phase === 'updated') {
     return {
@@ -8395,6 +8554,157 @@ function assertBridgeDidNotTouchContainer(container, document) {
   assert.equal(document.__registrations.length, 0);
   assert.equal(container.__mutationLog.length, 0);
   assert.equal(document.__mutationLog.length, 0);
+}
+
+function createRootBridgeControlledFakeDomRestoreExecution(options) {
+  const trackerGate = resourceFormGate.createControlledInputValueTrackerGate({
+    requestIdPrefix: `${options.scenarioId}-tracker`
+  });
+  const restoreGate =
+    controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({
+      requestIdPrefix: `${options.scenarioId}-restore`
+    });
+  const fakeTarget = {
+    [resourceFormGate.controlledInputValueTrackerFakeDomTargetMarker]: true,
+    ...options.fakeInitial
+  };
+  const install = trackerGate.installFakeDomTracker(
+    {
+      scenarioId: options.scenarioId,
+      phaseId: 'post-event-execution',
+      hostTag: options.hostTag,
+      multiple: options.multiple === true,
+      controlKind: options.controlKind,
+      props: options.latestProps
+    },
+    {
+      explicitAdmission: true,
+      adapterKind: 'deterministic-fake-dom',
+      targetKind: 'controlled-input-value-tracker',
+      fakeTarget
+    }
+  );
+  Object.assign(fakeTarget, options.fakeObserved);
+  const observation = trackerGate.observeFakeDomTracker(install);
+  const latestPropsLookup = createRootBridgeControlledLatestPropsLookup({
+    label: options.scenarioId,
+    latestProps: options.latestProps,
+    nodeName: options.nodeName,
+    registrationName: options.eventName === 'input' ? 'onInput' : 'onChange'
+  });
+  const intent =
+    restoreGate.recordPostEventRestoreIntentFromFakeDomObservationLatestProps(
+      observation,
+      latestPropsLookup.lookupRecord,
+      {
+        explicitAdmission: true,
+        queueKind:
+          'deterministic-fake-dom-latest-props-post-event-restore-queue',
+        queueId: `${options.scenarioId}-intent`,
+        eventName: options.eventName,
+        targetKind: 'controlled-input-post-event-restore-queue'
+      }
+    );
+  const writePreflight = restoreGate.preflightRestoreQueueWrites([intent], {
+    explicitAdmission: true,
+    queueKind:
+      'deterministic-controlled-input-post-event-restore-queue-write-preflight',
+    queueId: `${options.scenarioId}-write-preflight`,
+    targetKind: 'controlled-input-post-event-restore-queue-write-preflight'
+  });
+  const writeExecution = restoreGate.recordRestoreQueueWriteExecution(
+    writePreflight,
+    {
+      explicitAdmission: true,
+      queueKind:
+        'deterministic-controlled-input-post-event-restore-queue-write-execution',
+      queueId: `${options.scenarioId}-write`,
+      targetKind: 'controlled-input-post-event-restore-queue-write-execution'
+    }
+  );
+  const flushBlocker = restoreGate.recordRestoreQueueFlushBlocker(
+    writePreflight,
+    {
+      explicitAdmission: true,
+      queueKind:
+        'deterministic-controlled-input-post-event-restore-queue-flush-blocker',
+      queueId: `${options.scenarioId}-flush`,
+      targetKind: 'controlled-input-post-event-restore-queue-flush-blocker'
+    }
+  );
+  const wrapperIntent = restoreGate.recordRestoreQueueWrapperMutationIntent(
+    writeExecution,
+    flushBlocker,
+    {
+      explicitAdmission: true,
+      queueKind:
+        'deterministic-controlled-input-post-event-restore-wrapper-mutation-intent',
+      queueId: `${options.scenarioId}-wrapper`,
+      targetKind:
+        'controlled-input-post-event-restore-wrapper-mutation-intent'
+    }
+  );
+  const execution = restoreGate.recordFakeDomControlledRestoreExecution(
+    latestPropsLookup.lookupRecord,
+    intent,
+    writeExecution,
+    flushBlocker,
+    wrapperIntent,
+    {
+      explicitAdmission: true,
+      queueKind: 'deterministic-fake-dom-controlled-restore-execution',
+      queueId: `${options.scenarioId}-execution`,
+      targetKind: 'controlled-input-post-event-restore-fake-dom-execution',
+      fakeDomTarget: fakeTarget
+    }
+  );
+
+  return {
+    execution,
+    fakeTarget,
+    flushBlocker,
+    intent,
+    latestPropsLookup,
+    restoreGate,
+    wrapperIntent,
+    writeExecution
+  };
+}
+
+function createRootBridgeControlledLatestPropsLookup(options) {
+  const document = createDocument(`${options.label}-latest-props`);
+  const targetNode = createElement(options.nodeName, document);
+  const token = componentTree.createHostInstanceToken(
+    {kind: `${options.label}:host`},
+    {kind: `${options.label}:root`}
+  );
+  componentTree.attachHostInstanceNode(
+    targetNode,
+    token,
+    options.latestProps
+  );
+  const normalizationRecord =
+    componentTree.createEventTargetNormalizationRecord(targetNode);
+  const lookupRecord = componentTree.createEventListenerTargetLookupRecord(
+    normalizationRecord,
+    options.registrationName
+  );
+
+  return {
+    document,
+    lookupRecord,
+    normalizationRecord,
+    targetNode,
+    token
+  };
+}
+
+function isControlledRestoreLiveValueKey(property) {
+  return (
+    property === 'value' ||
+    property === 'selectedValues' ||
+    property === '_valueTracker'
+  );
 }
 
 function createLiveRootContainerPreflightTarget(label) {

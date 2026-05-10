@@ -59,6 +59,10 @@ const privateControlledInputPostEventRestoreQueueLiveMutationPreflightRecordType
   'fast.react_dom.private_controlled_input_post_event_restore_live_mutation_preflight_record';
 const privateControlledInputPostEventRestoreQueueLiveMutationPreflightRowType =
   'fast.react_dom.private_controlled_input_post_event_restore_live_mutation_preflight_row';
+const privateControlledInputPostEventRestoreQueueFakeDomExecutionRecordType =
+  'fast.react_dom.private_controlled_input_post_event_restore_fake_dom_execution_record';
+const privateControlledInputPostEventRestoreQueueFakeDomExecutionRowType =
+  'fast.react_dom.private_controlled_input_post_event_restore_fake_dom_execution_row';
 const controlledInputPostEventRestoreQueueStatus =
   'private-controlled-input-post-event-restore-queue-intent';
 const controlledInputPostEventRestoreQueueIntentRecordedStatus =
@@ -107,6 +111,10 @@ const controlledInputPostEventRestoreQueueLiveMutationPreflightStatus =
   'private-controlled-input-post-event-restore-live-mutation-preflight';
 const controlledInputPostEventRestoreQueueLiveMutationPreflightRowStatus =
   'blocked-private-controlled-input-post-event-restore-live-mutation-preflight-row';
+const controlledInputPostEventRestoreQueueFakeDomExecutionStatus =
+  'private-controlled-input-post-event-restore-fake-dom-execution';
+const controlledInputPostEventRestoreQueueFakeDomExecutionRowStatus =
+  'executed-private-controlled-input-post-event-restore-fake-dom-row';
 const controlledInputPostEventRestoreQueueInvalidEventCode =
   'FAST_REACT_DOM_CONTROLLED_INPUT_POST_EVENT_RESTORE_QUEUE_INVALID_EVENT';
 const controlledInputPostEventRestoreQueueInvalidFakeDomObservationCode =
@@ -127,6 +135,8 @@ const controlledInputPostEventRestoreQueueInvalidWrapperMutationIntentCode =
   'FAST_REACT_DOM_CONTROLLED_INPUT_POST_EVENT_RESTORE_QUEUE_INVALID_WRAPPER_MUTATION_INTENT';
 const controlledInputPostEventRestoreQueueInvalidLiveMutationPreflightCode =
   'FAST_REACT_DOM_CONTROLLED_INPUT_POST_EVENT_RESTORE_QUEUE_INVALID_LIVE_MUTATION_PREFLIGHT';
+const controlledInputPostEventRestoreQueueInvalidFakeDomExecutionCode =
+  'FAST_REACT_DOM_CONTROLLED_INPUT_POST_EVENT_RESTORE_QUEUE_INVALID_FAKE_DOM_EXECUTION';
 const controlledInputPostEventRestoreQueueInvalidLatestPropsCode =
   'FAST_REACT_DOM_CONTROLLED_INPUT_POST_EVENT_RESTORE_QUEUE_INVALID_LATEST_PROPS';
 const controlledInputPostEventRestoreQueueInvalidRecordCode =
@@ -160,6 +170,8 @@ const controlledInputPostEventRestoreQueueInputChangeExecutionPayloads =
 const controlledInputPostEventRestoreQueueWrapperMutationIntentPayloads =
   new WeakMap();
 const controlledInputPostEventRestoreQueueLiveMutationPreflightPayloads =
+  new WeakMap();
+const controlledInputPostEventRestoreQueueFakeDomExecutionPayloads =
   new WeakMap();
 const defaultControlledInputPostEventRestoreQueueGate =
   createControlledInputPostEventRestoreQueueGate();
@@ -196,6 +208,9 @@ const controlledInputPostEventRestoreQueueNoSideEffects = freezeRecord({
   liveMutationPreflightRowCount: 0,
   inputChangeControlledRestoreExecutionRecorded: false,
   inputChangeControlledRestoreExecutionRowsCreated: false,
+  fakeDomControlledRestoreExecutionRecorded: false,
+  fakeDomControlledRestoreExecutionRowsCreated: false,
+  fakeDomControlledRestoreExecutionRowCount: 0,
   latestPropsValidationAccepted: false,
   privateRestoreQueueWritten: false,
   privateRestoreQueueFlushed: false,
@@ -324,6 +339,24 @@ function createControlledInputPostEventRestoreQueueGate(options) {
         admission
       );
     },
+    recordFakeDomControlledRestoreExecution(
+      latestPropsRecord,
+      restoreRecord,
+      writeExecutionRecord,
+      flushBlockerRecord,
+      wrapperMutationIntentRecord,
+      admission
+    ) {
+      return recordControlledInputPostEventRestoreFakeDomExecutionWithGate(
+        gateState,
+        latestPropsRecord,
+        restoreRecord,
+        writeExecutionRecord,
+        flushBlockerRecord,
+        wrapperMutationIntentRecord,
+        admission
+      );
+    },
     recordRestoreQueueWrapperMutationIntent(
       writeExecutionRecord,
       flushBlockerRecord,
@@ -432,6 +465,25 @@ function recordControlledInputChangeEventRestoreQueueExecution(
     .recordInputChangeEventControlledRestoreExecution(
       inputChangePreflightRecord,
       bridgeRecord,
+      writeExecutionRecord,
+      flushBlockerRecord,
+      wrapperMutationIntentRecord,
+      admission
+    );
+}
+
+function recordControlledInputPostEventRestoreFakeDomExecution(
+  latestPropsRecord,
+  restoreRecord,
+  writeExecutionRecord,
+  flushBlockerRecord,
+  wrapperMutationIntentRecord,
+  admission
+) {
+  return defaultControlledInputPostEventRestoreQueueGate
+    .recordFakeDomControlledRestoreExecution(
+      latestPropsRecord,
+      restoreRecord,
       writeExecutionRecord,
       flushBlockerRecord,
       wrapperMutationIntentRecord,
@@ -1191,6 +1243,171 @@ function recordControlledInputChangeEventRestoreQueueExecutionWithGate(
   return payload;
 }
 
+function recordControlledInputPostEventRestoreFakeDomExecutionWithGate(
+  gateState,
+  latestPropsRecord,
+  restoreRecord,
+  writeExecutionRecord,
+  flushBlockerRecord,
+  wrapperMutationIntentRecord,
+  admission
+) {
+  const normalizedAdmission =
+    normalizePostEventRestoreQueueFakeDomExecutionAdmission(admission);
+  const sourceRestoreRecord =
+    assertPrivateControlledInputPostEventRestoreQueueRecord(restoreRecord);
+  const latestPropsValidation =
+    createPostEventRestoreQueueFakeDomExecutionLatestPropsValidation(
+      latestPropsRecord,
+      sourceRestoreRecord
+    );
+  const sourceWriteExecution =
+    assertPostEventRestoreQueueFakeDomExecutionWriteExecutionRecord(
+      writeExecutionRecord
+    );
+  const sourceFlushBlocker =
+    assertPostEventRestoreQueueFakeDomExecutionFlushBlockerRecord(
+      flushBlockerRecord
+    );
+  const sourceWrapperIntent =
+    assertPostEventRestoreQueueFakeDomExecutionWrapperMutationIntentRecord(
+      wrapperMutationIntentRecord
+    );
+  assertPostEventRestoreQueueFakeDomExecutionSources(
+    sourceRestoreRecord,
+    sourceWriteExecution,
+    sourceFlushBlocker,
+    sourceWrapperIntent,
+    normalizedAdmission,
+    latestPropsValidation
+  );
+
+  const requestSequence = gateState.nextRequestSequence++;
+  const requestId = `${gateState.requestIdPrefix}:${requestSequence}`;
+  const writeExecutionRow =
+    findPostEventRestoreQueueFakeDomExecutionWriteRow(
+      sourceWriteExecution,
+      sourceRestoreRecord
+    );
+  const wrapperIntentRow =
+    findPostEventRestoreQueueFakeDomExecutionWrapperRow(
+      sourceWrapperIntent,
+      sourceRestoreRecord
+    );
+  const executionResult = executePostEventRestoreOnFakeDomTarget(
+    gateState,
+    normalizedAdmission,
+    latestPropsValidation,
+    sourceWriteExecution,
+    sourceFlushBlocker,
+    sourceWrapperIntent,
+    sourceRestoreRecord,
+    writeExecutionRow,
+    wrapperIntentRow
+  );
+  const executionRows = freezeArray([
+    createPostEventRestoreQueueFakeDomExecutionRow(
+      requestId,
+      requestSequence,
+      sourceRestoreRecord,
+      sourceWriteExecution,
+      sourceFlushBlocker,
+      sourceWrapperIntent,
+      writeExecutionRow,
+      wrapperIntentRow,
+      executionResult
+    )
+  ]);
+  const restoreQueueWriteEvidence =
+    createPostEventRestoreQueueFakeDomExecutionWriteEvidence(
+      sourceWriteExecution,
+      executionRows,
+      executionResult
+    );
+  const flushIntentEvidence =
+    createPostEventRestoreQueueFakeDomExecutionFlushIntentEvidence(
+      sourceFlushBlocker,
+      executionRows,
+      executionResult
+    );
+  const wrapperMutationExecutionEvidence =
+    createPostEventRestoreQueueFakeDomExecutionWrapperEvidence(
+      sourceWrapperIntent,
+      executionRows,
+      executionResult
+    );
+  const postEventRestoreBoundary =
+    createPostEventRestoreQueueFakeDomExecutionBoundary(
+      executionRows,
+      executionResult
+    );
+  const sideEffects =
+    createPostEventRestoreQueueFakeDomExecutionSideEffects(
+      executionRows,
+      executionResult
+    );
+  const admissionRecord = normalizedAdmission.record;
+  const payload = freezeRecord({
+    schemaVersion: controlledInputPostEventRestoreQueueGateSchemaVersion,
+    $$typeof:
+      privateControlledInputPostEventRestoreQueueFakeDomExecutionRecordType,
+    kind:
+      'FastReactDomPrivateControlledInputPostEventRestoreFakeDomExecutionRecord',
+    gateId: controlledInputPostEventRestoreQueueGateId,
+    compatibilityTarget,
+    status: controlledInputPostEventRestoreQueueFakeDomExecutionStatus,
+    unsupportedCode: unimplementedCode,
+    requestId,
+    requestSequence,
+    queueKind: admissionRecord.queueKind,
+    queueId: admissionRecord.queueId,
+    admission: admissionRecord,
+    acceptedLatestPropsEvidenceRecordType:
+      EVENT_LISTENER_TARGET_LOOKUP_RECORD_KIND,
+    acceptedSourceRecordTypes: freezeArray([
+      privateControlledInputPostEventRestoreQueueRecordType,
+      privateControlledInputPostEventRestoreQueueWriteExecutionRecordType,
+      privateControlledInputPostEventRestoreQueueFlushBlockerRecordType,
+      privateControlledInputPostEventRestoreQueueWrapperMutationIntentRecordType
+    ]),
+    acceptedSourceRowTypes: freezeArray([
+      privateControlledInputPostEventRestoreQueueWriteExecutionRowType,
+      privateControlledInputPostEventRestoreQueueWrapperMutationIntentRowType
+    ]),
+    sourceRestoreRequestId: sourceRestoreRecord.requestId,
+    sourceWriteExecutionRequestId: sourceWriteExecution.requestId,
+    sourceFlushBlockerRequestId: sourceFlushBlocker.requestId,
+    sourceWrapperMutationIntentRequestId: sourceWrapperIntent.requestId,
+    sourcePreflightRequestId:
+      sourceWriteExecution.sourcePreflightRequestId,
+    sourceRestoreStatus: sourceRestoreRecord.status,
+    sourceWriteExecutionStatus: sourceWriteExecution.status,
+    sourceFlushBlockerStatus: sourceFlushBlocker.status,
+    sourceWrapperMutationIntentStatus: sourceWrapperIntent.status,
+    executionRowCount: executionRows.length,
+    acceptedRestoreKinds: freezeArray(
+      executionRows.map((row) => row.acceptedRestoreKind)
+    ),
+    sourceRequestIds: freezeArray(
+      executionRows.map((row) => row.sourceRequestId)
+    ),
+    latestPropsValidation: latestPropsValidation.record,
+    restoreQueueWriteEvidence,
+    flushIntentEvidence,
+    wrapperMutationExecutionEvidence,
+    fakeDomRestoreExecutionRows: executionRows,
+    postEventRestoreBoundary,
+    publicControlledBehaviorBoundary: createPublicControlledBehaviorBoundary(),
+    sideEffects
+  });
+
+  controlledInputPostEventRestoreQueueFakeDomExecutionPayloads.set(
+    payload,
+    payload
+  );
+  return payload;
+}
+
 function recordControlledInputPostEventRestoreQueueWrapperMutationIntentWithGate(
   gateState,
   writeExecutionRecord,
@@ -1483,6 +1700,7 @@ function describeControlledInputPostEventRestoreQueueGate() {
     recordsRestoreQueueFlushBlocker: true,
     recordsInputChangeEventControlledRestoreBridge: true,
     recordsInputChangeEventControlledRestoreExecution: true,
+    recordsFakeDomControlledRestoreExecution: true,
     recordsRestoreWrapperMutationIntent: true,
     recordsLiveControlledRestoreMutationPreflight: true,
     acceptedRestoreMetadataKinds:
@@ -1528,6 +1746,8 @@ function describeControlledInputPostEventRestoreQueueGate() {
       createInputChangeEventRestoreQueueBridgeSummary(),
     inputChangeEventControlledRestoreExecution:
       createInputChangeEventRestoreQueueExecutionSummary(),
+    fakeDomControlledRestoreExecution:
+      createPostEventRestoreQueueFakeDomExecutionSummary(),
     restoreWrapperMutationIntent:
       createPostEventRestoreQueueWrapperMutationIntentSummary(),
     liveControlledRestoreMutationPreflight:
@@ -1607,6 +1827,15 @@ function getPrivateControlledInputPostEventRestoreQueueLiveMutationPreflightReco
     controlledInputPostEventRestoreQueueLiveMutationPreflightPayloads.get(
       record
     ) || null
+  );
+}
+
+function getPrivateControlledInputPostEventRestoreQueueFakeDomExecutionRecordPayload(
+  record
+) {
+  return (
+    controlledInputPostEventRestoreQueueFakeDomExecutionPayloads.get(record) ||
+    null
   );
 }
 
@@ -1691,6 +1920,16 @@ function isPrivateControlledInputPostEventRestoreQueueLiveMutationPreflightRecor
 ) {
   return (
     getPrivateControlledInputPostEventRestoreQueueLiveMutationPreflightRecordPayload(
+      record
+    ) !== null
+  );
+}
+
+function isPrivateControlledInputPostEventRestoreQueueFakeDomExecutionRecord(
+  record
+) {
+  return (
+    getPrivateControlledInputPostEventRestoreQueueFakeDomExecutionRecordPayload(
       record
     ) !== null
   );
@@ -3173,6 +3412,57 @@ function createInputChangeEventRestoreQueueExecutionSummary() {
   });
 }
 
+function createPostEventRestoreQueueFakeDomExecutionSummary() {
+  return freezeRecord({
+    status: controlledInputPostEventRestoreQueueFakeDomExecutionStatus,
+    metadataOnly: false,
+    deterministicFakeDomOnly: true,
+    acceptedLatestPropsEvidenceRecordType:
+      EVENT_LISTENER_TARGET_LOOKUP_RECORD_KIND,
+    acceptedRestoreQueueRecordType:
+      privateControlledInputPostEventRestoreQueueRecordType,
+    acceptedWriteExecutionRecordType:
+      privateControlledInputPostEventRestoreQueueWriteExecutionRecordType,
+    acceptedFlushBlockerRecordType:
+      privateControlledInputPostEventRestoreQueueFlushBlockerRecordType,
+    acceptedWrapperMutationIntentRecordType:
+      privateControlledInputPostEventRestoreQueueWrapperMutationIntentRecordType,
+    executionRecordType:
+      privateControlledInputPostEventRestoreQueueFakeDomExecutionRecordType,
+    executionRowType:
+      privateControlledInputPostEventRestoreQueueFakeDomExecutionRowType,
+    consumesFakeDomObservationLatestPropsIntent: true,
+    validatesLatestPropsEvidence: true,
+    consumesWriteExecutionMetadata: true,
+    consumesFlushIntentMetadata: true,
+    consumesWrapperMutationIntentMetadata: true,
+    rejectsStaleLatestProps: true,
+    rejectsLiveDomNodesBeforeMutation: true,
+    rejectsMultipleRestoreTargets: true,
+    acceptedRestoreMetadataKinds: freezeArray([
+      'select-single-value',
+      'select-multiple-value',
+      'textarea-value'
+    ]),
+    acceptsSelectSingleFakeDomPath: true,
+    acceptsSelectMultipleFakeDomPath: true,
+    acceptsTextareaValueFakeDomPath: true,
+    eventDispatches: false,
+    syntheticEventCreation: false,
+    restoreQueueWrites: true,
+    restoreQueueFlushes: true,
+    hostWrapperInvocations: true,
+    wrapperWrites: true,
+    hostValueReads: true,
+    hostValueWrites: true,
+    valueTrackerWrites: false,
+    fakeDomMutations: true,
+    liveDomMutations: false,
+    publicControlledBehaviorEnabled: false,
+    compatibilityClaimed: false
+  });
+}
+
 function createPostEventRestoreQueueWrapperMutationIntentSummary() {
   return freezeRecord({
     status: controlledInputPostEventRestoreQueueWrapperMutationIntentStatus,
@@ -4519,6 +4809,808 @@ function createInputChangeEventRestoreQueueExecutionSideEffects(
     fakeDomInputMutated: executionResult.fakeDomInputMutated,
     browserInputMutated: false
   });
+}
+
+function createPostEventRestoreQueueFakeDomExecutionLatestPropsValidation(
+  latestPropsRecord,
+  restoreRecord
+) {
+  const lookupPayload =
+    getPostEventRestoreQueueFakeDomExecutionLatestPropsPayload(
+      latestPropsRecord
+    );
+  const lookupRecord = lookupPayload === null ? null : latestPropsRecord;
+  const latestProps =
+    lookupPayload === null ? null : lookupPayload.latestProps;
+  const targetNode =
+    lookupPayload === null ? null : lookupPayload.hostInstanceNode;
+  const currentLatestProps = getLatestPropsFromNode(targetNode);
+  const latestPropsObject = isObjectLike(latestProps);
+  const currentLatestPropsFresh =
+    latestPropsObject === true && currentLatestProps === latestProps;
+  const propDescription = describeLatestProps(latestProps);
+  const propKeys = normalizeBridgePropKeys(propDescription.propKeys);
+  const restorePropKeys = normalizeBridgePropKeys(
+    restoreRecord.latestPropsEvidence?.propKeys
+  );
+  const propKeysMatch = bridgeArraysEqual(propKeys, restorePropKeys);
+  const controlledPropName = restoreRecord.controlledPropName || null;
+  const controlledProp =
+    controlledPropName === null
+      ? freezeRecord({present: false, nonNull: false})
+      : describeMetadataProp(latestProps, controlledPropName);
+  const targetHostTag = getHostTagFromTargetNode(targetNode);
+  const targetInputType = getInputType(targetHostTag, latestProps);
+  const targetMultiple = getSelectMultiple(targetHostTag, latestProps);
+  const targetControlKind = inferControlKind(
+    targetHostTag,
+    targetInputType,
+    targetMultiple,
+    latestProps
+  );
+  const rejectionReason =
+    getPostEventRestoreQueueFakeDomExecutionLatestPropsRejectionReason(
+      lookupPayload,
+      latestPropsObject,
+      currentLatestPropsFresh,
+      propKeysMatch,
+      controlledProp,
+      targetHostTag,
+      targetMultiple,
+      targetControlKind,
+      restoreRecord
+    );
+  const accepted = rejectionReason === null;
+
+  return {
+    accepted,
+    latestProps,
+    targetNode,
+    record: freezeRecord({
+      status: accepted
+        ? 'validated-fake-dom-controlled-restore-latest-props'
+        : 'rejected-fake-dom-controlled-restore-latest-props',
+      sourceLatestPropsRecordKind:
+        lookupRecord === null ? null : lookupRecord.kind,
+      sourceRestoreRequestId: restoreRecord.requestId,
+      latestPropsValidationAccepted: accepted,
+      rejectionReason,
+      targetHostInstanceStatus:
+        lookupRecord === null ? null : lookupRecord.targetHostInstanceStatus,
+      targetHostTag,
+      targetInputType,
+      targetMultiple,
+      targetControlKind,
+      latestPropsObject,
+      currentLatestPropsFresh,
+      propKeys,
+      restorePropKeys,
+      propKeysMatch,
+      controlledPropName,
+      controlledProp,
+      latestPropsEvidenceLinked: lookupPayload !== null,
+      latestPropsEvidenceMatch: propKeysMatch,
+      staleLatestPropsRejected: true,
+      latestPropsExposed: false,
+      rawLatestPropsRetained: false,
+      compatibilityClaimed: false
+    })
+  };
+}
+
+function getPostEventRestoreQueueFakeDomExecutionLatestPropsPayload(record) {
+  if (
+    !isObjectLike(record) ||
+    record.kind !== EVENT_LISTENER_TARGET_LOOKUP_RECORD_KIND
+  ) {
+    return null;
+  }
+  return getEventListenerTargetLookupRecordPayload(record);
+}
+
+function getPostEventRestoreQueueFakeDomExecutionLatestPropsRejectionReason(
+  lookupPayload,
+  latestPropsObject,
+  currentLatestPropsFresh,
+  propKeysMatch,
+  controlledProp,
+  targetHostTag,
+  targetMultiple,
+  targetControlKind,
+  restoreRecord
+) {
+  if (lookupPayload === null) {
+    return 'missing-fake-dom-latest-props-lookup';
+  }
+  if (latestPropsObject !== true) {
+    return 'fake-dom-latest-props-not-object';
+  }
+  if (currentLatestPropsFresh !== true) {
+    return 'stale-latest-props-for-fake-dom-execution';
+  }
+  if (propKeysMatch !== true) {
+    return 'fake-dom-latest-props-evidence-keys-mismatch';
+  }
+  if (targetHostTag !== restoreRecord.hostTag) {
+    return 'fake-dom-latest-props-host-tag-mismatch';
+  }
+  if (
+    restoreRecord.hostTag === 'select' &&
+    targetMultiple !== restoreRecord.multiple
+  ) {
+    return 'fake-dom-latest-props-select-multiple-mismatch';
+  }
+  if (targetControlKind !== restoreRecord.controlKind) {
+    return 'fake-dom-latest-props-control-kind-mismatch';
+  }
+  if (
+    !isObjectLike(controlledProp) ||
+    controlledProp.present !== true ||
+    controlledProp.nonNull !== true
+  ) {
+    return 'fake-dom-latest-props-controlled-prop-not-accepted';
+  }
+  return null;
+}
+
+function assertPostEventRestoreQueueFakeDomExecutionSources(
+  restoreRecord,
+  writeExecutionRecord,
+  flushBlockerRecord,
+  wrapperIntentRecord,
+  admission,
+  latestPropsValidation
+) {
+  const rejectionReason =
+    getPostEventRestoreQueueFakeDomExecutionRejectionReason(
+      restoreRecord,
+      writeExecutionRecord,
+      flushBlockerRecord,
+      wrapperIntentRecord,
+      admission,
+      latestPropsValidation
+    );
+  if (rejectionReason !== null) {
+    throwPostEventRestoreQueueFakeDomExecutionError(
+      rejectionReason,
+      restoreRecord,
+      writeExecutionRecord,
+      flushBlockerRecord
+    );
+  }
+}
+
+function getPostEventRestoreQueueFakeDomExecutionRejectionReason(
+  restoreRecord,
+  writeExecutionRecord,
+  flushBlockerRecord,
+  wrapperIntentRecord,
+  admission,
+  latestPropsValidation
+) {
+  const restoreSourceKind =
+    restoreRecord.sourceKind || restoreRecord.restoreIntent?.source;
+
+  if (
+    restoreSourceKind !==
+      'private-fake-dom-observation-latest-props-evidence' ||
+    restoreRecord.status !==
+      controlledInputPostEventRestoreQueueIntentRecordedStatus ||
+    !isObjectLike(restoreRecord.restoreIntent) ||
+    restoreRecord.restoreIntent.fakeDomTrackerObservationAccepted !== true ||
+    restoreRecord.restoreIntent.eventDispatchRecordAccepted !== false ||
+    restoreRecord.restoreIntent.intentRecorded !== true ||
+    restoreRecord.restoreIntent.restoreQueueWritten !== false ||
+    restoreRecord.restoreIntent.restoreFlushed !== false ||
+    restoreRecord.restoreIntent.controlledStateRestoreInvoked !== false
+  ) {
+    return 'fake-dom-restore-intent-not-accepted';
+  }
+  if (isSupportedFakeDomRestoreExecutionTarget(restoreRecord) !== true) {
+    return 'unsupported-fake-dom-restore-target';
+  }
+  if (latestPropsValidation.accepted !== true) {
+    return latestPropsValidation.record.rejectionReason;
+  }
+  if (
+    writeExecutionRecord.sourcePreflightRequestId !==
+      flushBlockerRecord.sourcePreflightRequestId ||
+    writeExecutionRecord.sourcePreflightRequestId !==
+      wrapperIntentRecord.sourcePreflightRequestId
+  ) {
+    return 'stale-fake-dom-restore-preflight-source';
+  }
+  if (
+    wrapperIntentRecord.sourceWriteExecutionRequestId !==
+      writeExecutionRecord.requestId ||
+    wrapperIntentRecord.sourceFlushBlockerRequestId !==
+      flushBlockerRecord.requestId
+  ) {
+    return 'stale-fake-dom-wrapper-mutation-intent-source';
+  }
+  if (
+    !Array.isArray(writeExecutionRecord.writeExecutionRows) ||
+    !Array.isArray(flushBlockerRecord.queueSnapshot?.entries) ||
+    !Array.isArray(wrapperIntentRecord.wrapperMutationIntentRows) ||
+    writeExecutionRecord.writeExecutionRows.length !== 1 ||
+    flushBlockerRecord.queueSnapshot.entries.length !== 1 ||
+    wrapperIntentRecord.wrapperMutationIntentRows.length !== 1
+  ) {
+    return 'unsupported-multiple-fake-dom-restore-targets-before-mutation';
+  }
+
+  const writeExecutionRow =
+    findPostEventRestoreQueueFakeDomExecutionWriteRow(
+      writeExecutionRecord,
+      restoreRecord
+    );
+  const wrapperIntentRow =
+    findPostEventRestoreQueueFakeDomExecutionWrapperRow(
+      wrapperIntentRecord,
+      restoreRecord
+    );
+  if (writeExecutionRow === null || wrapperIntentRow === null) {
+    return 'stale-fake-dom-execution-row-source';
+  }
+  if (
+    writeExecutionRow.acceptedRestoreKind !==
+      restoreRecord.restoreQueueOrdering.acceptedRestoreKind ||
+    wrapperIntentRow.acceptedRestoreKind !==
+      restoreRecord.restoreQueueOrdering.acceptedRestoreKind ||
+    writeExecutionRow.hostTag !== restoreRecord.hostTag ||
+    wrapperIntentRow.hostTag !== restoreRecord.hostTag ||
+    writeExecutionRow.controlKind !== restoreRecord.controlKind ||
+    wrapperIntentRow.controlKind !== restoreRecord.controlKind ||
+    writeExecutionRow.controlledPropName !==
+      restoreRecord.controlledPropName ||
+    wrapperIntentRow.controlledPropName !==
+      restoreRecord.controlledPropName
+  ) {
+    return 'fake-dom-execution-row-metadata-mismatch';
+  }
+  if (
+    admission.record.fakeDomTargetAccepted !== true ||
+    writeExecutionRow.restoreQueueWritten !== false ||
+    writeExecutionRow.restoreQueueFlushed !== false ||
+    writeExecutionRow.hostWrapperInvoked !== false ||
+    wrapperIntentRow.wrapperWritePerformed !== false ||
+    wrapperIntentRow.hostValueWritten !== false ||
+    wrapperIntentRow.browserInputMutated !== false
+  ) {
+    return 'fake-dom-execution-source-already-mutated';
+  }
+  return null;
+}
+
+function isSupportedFakeDomRestoreExecutionTarget(record) {
+  const acceptedRestoreKind =
+    record.restoreQueueOrdering?.acceptedRestoreKind || null;
+  if (acceptedRestoreKind === 'select-single-value') {
+    return (
+      record.hostTag === 'select' &&
+      record.multiple === false &&
+      record.controlKind === 'single' &&
+      record.controlledPropName === 'value'
+    );
+  }
+  if (acceptedRestoreKind === 'select-multiple-value') {
+    return (
+      record.hostTag === 'select' &&
+      record.multiple === true &&
+      record.controlKind === 'multiple' &&
+      record.controlledPropName === 'value'
+    );
+  }
+  return (
+    acceptedRestoreKind === 'textarea-value' &&
+    record.hostTag === 'textarea' &&
+    record.controlKind === 'value' &&
+    record.controlledPropName === 'value'
+  );
+}
+
+function findPostEventRestoreQueueFakeDomExecutionWriteRow(
+  writeExecutionRecord,
+  restoreRecord
+) {
+  return (
+    writeExecutionRecord.writeExecutionRows.find(
+      (row) => row.sourceRequestId === restoreRecord.requestId
+    ) || null
+  );
+}
+
+function findPostEventRestoreQueueFakeDomExecutionWrapperRow(
+  wrapperIntentRecord,
+  restoreRecord
+) {
+  return (
+    wrapperIntentRecord.wrapperMutationIntentRows.find(
+      (row) => row.sourceRequestId === restoreRecord.requestId
+    ) || null
+  );
+}
+
+function executePostEventRestoreOnFakeDomTarget(
+  gateState,
+  admission,
+  latestPropsValidation,
+  writeExecutionRecord,
+  flushBlockerRecord,
+  wrapperIntentRecord,
+  restoreRecord,
+  writeExecutionRow,
+  wrapperIntentRow
+) {
+  const fakeDomTarget = admission.fakeDomTarget;
+  const targetField = getPostEventRestoreFakeDomTargetField(restoreRecord);
+  const beforeValueSnapshot = readPostEventRestoreFakeDomValue(
+    fakeDomTarget,
+    restoreRecord,
+    targetField
+  );
+  const nextValueSnapshot = getPostEventRestoreFakeDomNextValue(
+    latestPropsValidation.latestProps,
+    restoreRecord
+  );
+  const queueEntry = createPostEventRestoreFakeDomQueueEntry(
+    restoreRecord,
+    writeExecutionRow,
+    wrapperIntentRow,
+    targetField,
+    beforeValueSnapshot,
+    nextValueSnapshot
+  );
+
+  const restoreQueueLengthBeforeWrite =
+    gateState.fakeDomRestoreQueue.length;
+  gateState.fakeDomRestoreTarget = queueEntry;
+  const restoreQueueLengthAfterWrite = gateState.fakeDomRestoreQueue.length;
+  const queueSnapshot = freezeRecord({
+    status:
+      'private-fake-dom-controlled-restore-queue-snapshot-before-wrapper',
+    sourceWriteExecutionRequestId: writeExecutionRecord.requestId,
+    sourceFlushBlockerRequestId: flushBlockerRecord.requestId,
+    sourceWrapperMutationIntentRequestId: wrapperIntentRecord.requestId,
+    restoreTarget: createPostEventRestoreFakeDomQueueEntrySummary(queueEntry),
+    restoreQueue: freezeArray(
+      gateState.fakeDomRestoreQueue.map(
+        createPostEventRestoreFakeDomQueueEntrySummary
+      )
+    ),
+    restoreQueueLength: gateState.fakeDomRestoreQueue.length,
+    queueSnapshotBeforeWrapperRestore: true,
+    queueClearedBeforeWrapperRestore: true,
+    rawTargetCaptured: false,
+    liveDomNodeAccepted: false
+  });
+
+  gateState.fakeDomRestoreTarget = null;
+  gateState.fakeDomRestoreQueue = [];
+  writePostEventRestoreFakeDomValue(
+    fakeDomTarget,
+    restoreRecord,
+    targetField,
+    nextValueSnapshot
+  );
+  const afterValueSnapshot = readPostEventRestoreFakeDomValue(
+    fakeDomTarget,
+    restoreRecord,
+    targetField
+  );
+
+  return freezeRecord({
+    targetField,
+    selectRestoreExecuted: restoreRecord.hostTag === 'select',
+    textareaRestoreExecuted: restoreRecord.hostTag === 'textarea',
+    beforeValueSnapshot,
+    nextValueSnapshot,
+    afterValueSnapshot,
+    queueEntry,
+    queueSnapshot,
+    restoreQueueLengthBeforeWrite,
+    restoreQueueLengthAfterWrite,
+    restoreQueueWritten: true,
+    restoreQueueFlushed: true,
+    controlledStateRestoreInvoked: true,
+    hostWrapperInvoked: true,
+    wrapperWritePerformed: true,
+    fakeDomInputMutated: true,
+    hostValueRead: true,
+    hostValueWritten: true,
+    browserInputMutated: false,
+    valueTrackerFieldWritten: false,
+    liveDomNodeAccepted: false,
+    publicControlledBehaviorEnabled: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createPostEventRestoreQueueFakeDomExecutionRow(
+  executionRequestId,
+  executionRequestSequence,
+  restoreRecord,
+  writeExecutionRecord,
+  flushBlockerRecord,
+  wrapperIntentRecord,
+  writeExecutionRow,
+  wrapperIntentRow,
+  executionResult
+) {
+  return freezeRecord({
+    $$typeof:
+      privateControlledInputPostEventRestoreQueueFakeDomExecutionRowType,
+    kind:
+      'FastReactDomPrivateControlledInputPostEventRestoreFakeDomExecutionRow',
+    status: controlledInputPostEventRestoreQueueFakeDomExecutionRowStatus,
+    executionRequestId,
+    executionRequestSequence,
+    rowId: `${executionRequestId}:row:1`,
+    rowSequence: 1,
+    sourceRestoreRequestId: restoreRecord.requestId,
+    sourceRequestId: restoreRecord.requestId,
+    sourceWritePreflightRequestId:
+      writeExecutionRow.sourcePreflightRequestId,
+    sourceWriteIntentRowId: writeExecutionRow.sourcePreflightRowId,
+    sourceWriteExecutionRequestId: writeExecutionRecord.requestId,
+    sourceWriteExecutionRowId: writeExecutionRow.rowId,
+    sourceFlushBlockerRequestId: flushBlockerRecord.requestId,
+    sourceWrapperMutationIntentRequestId: wrapperIntentRecord.requestId,
+    sourceWrapperMutationIntentRowId: wrapperIntentRow.rowId,
+    domEventName: restoreRecord.domEventName,
+    nativeEventType: restoreRecord.nativeEventType,
+    sourceKind: restoreRecord.sourceKind,
+    hostTag: restoreRecord.hostTag,
+    inputType: restoreRecord.inputType,
+    multiple: restoreRecord.multiple,
+    controlKind: restoreRecord.controlKind,
+    trackedField: restoreRecord.trackedField,
+    controlledPropName: restoreRecord.controlledPropName,
+    acceptedRestoreKind: restoreRecord.restoreQueueOrdering.acceptedRestoreKind,
+    hostWrapperOperation: writeExecutionRow.hostWrapperOperation,
+    wrapperMutationKind: wrapperIntentRow.wrapperMutationKind,
+    intendedUpdateKind: wrapperIntentRow.intendedUpdateKind,
+    targetField: executionResult.targetField,
+    selectRestoreExecuted: executionResult.selectRestoreExecuted,
+    textareaRestoreExecuted: executionResult.textareaRestoreExecuted,
+    beforeValueSnapshot: executionResult.beforeValueSnapshot,
+    nextValueSnapshot: executionResult.nextValueSnapshot,
+    afterValueSnapshot: executionResult.afterValueSnapshot,
+    queueSlot: writeExecutionRow.queueSlot,
+    queueSlotIndex: writeExecutionRow.queueSlotIndex,
+    latestPropsEvidenceLinked: true,
+    latestPropsStale: false,
+    fakeDomTargetAccepted: true,
+    fakeDomTargetCaptured: false,
+    restoreQueueWriteExecutionAccepted: true,
+    flushIntentAccepted: true,
+    wrapperMutationIntentAccepted: true,
+    wrapperMutationExecutionRecorded: true,
+    restoreTargetMutationRecorded:
+      writeExecutionRow.restoreTargetMutationRecorded,
+    restoreQueueAppendMutationRecorded:
+      writeExecutionRow.restoreQueueAppendMutationRecorded,
+    metadataRestoreTargetWritten:
+      writeExecutionRow.metadataRestoreTargetWritten,
+    metadataRestoreQueueWritten:
+      writeExecutionRow.metadataRestoreQueueWritten,
+    eventDispatch: false,
+    syntheticEventCreated: false,
+    syntheticEventDispatched: false,
+    restoreQueueWritten: executionResult.restoreQueueWritten,
+    restoreQueueFlushed: executionResult.restoreQueueFlushed,
+    controlledStateRestoreScheduled: false,
+    controlledStateRestoreInvoked:
+      executionResult.controlledStateRestoreInvoked,
+    hostWrapperInvoked: executionResult.hostWrapperInvoked,
+    wrapperWritePerformed: executionResult.wrapperWritePerformed,
+    radioGroupLookupRequired: false,
+    radioGroupLookupPerformed: false,
+    valueTrackerFieldWritten: false,
+    hostValueRead: executionResult.hostValueRead,
+    hostValueWritten: executionResult.hostValueWritten,
+    fakeDomInputMutated: executionResult.fakeDomInputMutated,
+    browserInputMutated: false,
+    rawTargetCaptured: false,
+    rawLatestPropsRetained: false,
+    liveDomNodeAccepted: false,
+    publicControlledBehaviorEnabled: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createPostEventRestoreQueueFakeDomExecutionWriteEvidence(
+  writeExecutionRecord,
+  executionRows,
+  executionResult
+) {
+  return freezeRecord({
+    status: controlledInputPostEventRestoreQueueWriteExecutionStatus,
+    sourceWriteExecutionRequestId: writeExecutionRecord.requestId,
+    sourcePreflightRequestId: writeExecutionRecord.sourcePreflightRequestId,
+    rowCount: executionRows.length,
+    restoreQueueWriteExecutionAccepted: true,
+    restoreTarget: createPostEventRestoreFakeDomQueueEntrySummary(
+      executionResult.queueEntry
+    ),
+    restoreQueueLengthBeforeWrite:
+      executionResult.restoreQueueLengthBeforeWrite,
+    restoreQueueLengthAfterWrite:
+      executionResult.restoreQueueLengthAfterWrite,
+    metadataRestoreTargetWritten: executionRows.some(
+      (row) => row.metadataRestoreTargetWritten
+    ),
+    metadataRestoreQueueWritten: executionRows.some(
+      (row) => row.metadataRestoreQueueWritten
+    ),
+    restoreQueueWritten: executionResult.restoreQueueWritten,
+    restoreQueueFlushed: false,
+    hostWrapperInvoked: false,
+    fakeDomInputMutated: false,
+    browserInputMutated: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createPostEventRestoreQueueFakeDomExecutionFlushIntentEvidence(
+  flushBlockerRecord,
+  executionRows,
+  executionResult
+) {
+  return freezeRecord({
+    status: controlledInputPostEventRestoreQueueFlushBlockerStatus,
+    sourceFlushBlockerRequestId: flushBlockerRecord.requestId,
+    sourcePreflightRequestId: flushBlockerRecord.sourcePreflightRequestId,
+    rowCount: executionRows.length,
+    flushIntentAccepted: true,
+    intendedFlushSequence:
+      flushBlockerRecord.intendedFlushOrder.flushSequence,
+    queueSnapshot: executionResult.queueSnapshot,
+    restoreQueueFlushed: executionResult.restoreQueueFlushed,
+    controlledStateRestoreInvoked:
+      executionResult.controlledStateRestoreInvoked,
+    hostWrapperInvoked: false,
+    fakeDomInputMutated: false,
+    browserInputMutated: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createPostEventRestoreQueueFakeDomExecutionWrapperEvidence(
+  wrapperIntentRecord,
+  executionRows,
+  executionResult
+) {
+  return freezeRecord({
+    status:
+      controlledInputPostEventRestoreQueueWrapperMutationIntentStatus,
+    sourceWrapperMutationIntentRequestId: wrapperIntentRecord.requestId,
+    sourceWriteExecutionRequestId:
+      wrapperIntentRecord.sourceWriteExecutionRequestId,
+    sourceFlushBlockerRequestId:
+      wrapperIntentRecord.sourceFlushBlockerRequestId,
+    rowCount: executionRows.length,
+    wrapperMutationExecutionRecorded: executionRows.length > 0,
+    wrapperOperationNames: freezeArray(
+      executionRows.map((row) => row.hostWrapperOperation)
+    ),
+    targetField: executionResult.targetField,
+    beforeValueSnapshot: executionResult.beforeValueSnapshot,
+    nextValueSnapshot: executionResult.nextValueSnapshot,
+    afterValueSnapshot: executionResult.afterValueSnapshot,
+    hostWrapperInvoked: executionResult.hostWrapperInvoked,
+    wrapperWritePerformed: executionResult.wrapperWritePerformed,
+    hostValueRead: executionResult.hostValueRead,
+    hostValueWritten: executionResult.hostValueWritten,
+    fakeDomInputMutated: executionResult.fakeDomInputMutated,
+    browserInputMutated: false,
+    valueTrackerFieldWritten: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createPostEventRestoreQueueFakeDomExecutionBoundary(
+  executionRows,
+  executionResult
+) {
+  return freezeRecord({
+    status: 'executed-private-controlled-restore-fake-dom-queue',
+    restoreQueueGateStatus:
+      controlledInputPostEventRestoreQueueFakeDomExecutionStatus,
+    executionRowsRecorded: executionRows.length,
+    fakeDomOnly: true,
+    latestPropsValidated: executionRows.length > 0,
+    restoreQueueWriteExecutionAccepted: executionRows.length > 0,
+    flushIntentAccepted: executionRows.length > 0,
+    wrapperMutationExecutionRecorded: executionRows.length > 0,
+    restoreQueueWritten: executionResult.restoreQueueWritten,
+    restoreQueueFlushed: executionResult.restoreQueueFlushed,
+    controlledStateRestoreInvoked:
+      executionResult.controlledStateRestoreInvoked,
+    hostWrapperInvoked: executionResult.hostWrapperInvoked,
+    wrapperWritePerformed: executionResult.wrapperWritePerformed,
+    hostValueWritten: executionResult.hostValueWritten,
+    fakeDomInputMutated: executionResult.fakeDomInputMutated,
+    browserInputMutated: false,
+    publicControlledBehaviorEnabled: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createPostEventRestoreQueueFakeDomExecutionSideEffects(
+  executionRows,
+  executionResult
+) {
+  return freezeRecord({
+    ...controlledInputPostEventRestoreQueueNoSideEffects,
+    fakeDomTrackerObservationAccepted: executionRows.length > 0,
+    latestPropsEvidenceAccepted: executionRows.length > 0,
+    latestPropsMetadataRead: executionRows.length > 0,
+    latestPropsValidationAccepted: executionRows.length > 0,
+    fakeDomControlledRestoreExecutionRecorded: executionRows.length > 0,
+    fakeDomControlledRestoreExecutionRowsCreated: executionRows.length > 0,
+    fakeDomControlledRestoreExecutionRowCount: executionRows.length,
+    restoreQueueWriteExecutionRecorded: executionRows.length > 0,
+    restoreQueueMutationIntentRecorded: executionRows.length > 0,
+    restoreQueueFlushBlockerRecorded: executionRows.length > 0,
+    restoreWrapperMutationIntentRecorded: executionRows.length > 0,
+    wrapperMutationIntentRowsCreated: executionRows.length > 0,
+    wrapperMutationIntentRowCount: executionRows.length,
+    wrapperOperationNamesRecorded: executionRows.length > 0,
+    wrapperMutationExecuted: executionRows.length > 0,
+    wrapperWritePerformed: executionResult.wrapperWritePerformed,
+    metadataRestoreTargetWritten: executionRows.some(
+      (row) => row.metadataRestoreTargetWritten
+    ),
+    metadataRestoreQueueWritten: executionRows.some(
+      (row) => row.metadataRestoreQueueWritten
+    ),
+    restoreQueueWriteOrderRecorded: executionRows.length > 0,
+    restoreQueueFlushOrderRecorded: executionRows.length > 0,
+    hostWrapperRestoreOrderRecorded: executionRows.length > 0,
+    privateRestoreQueueWritten: executionResult.restoreQueueWritten,
+    privateRestoreQueueFlushed: executionResult.restoreQueueFlushed,
+    privateControlledStateRestoreInvoked:
+      executionResult.controlledStateRestoreInvoked,
+    restoreQueueWritten: false,
+    restoreQueueFlushed: false,
+    controlledStateRestoreInvoked: false,
+    hostWrapperInvoked: executionResult.hostWrapperInvoked,
+    hostValueRead: executionResult.hostValueRead,
+    hostValueWritten: executionResult.hostValueWritten,
+    fakeDomInputMutated: executionResult.fakeDomInputMutated,
+    browserInputMutated: false
+  });
+}
+
+function createPostEventRestoreFakeDomQueueEntry(
+  restoreRecord,
+  writeExecutionRow,
+  wrapperIntentRow,
+  targetField,
+  beforeValueSnapshot,
+  nextValueSnapshot
+) {
+  return freezeRecord({
+    status: 'queued-private-controlled-restore-fake-dom-target',
+    sourceRestoreRequestId: restoreRecord.requestId,
+    sourceWritePreflightRequestId:
+      writeExecutionRow.sourcePreflightRequestId,
+    sourceWriteExecutionRowId: writeExecutionRow.rowId,
+    sourceWrapperMutationIntentRowId: wrapperIntentRow.rowId,
+    queueSlot: writeExecutionRow.queueSlot,
+    queueSlotIndex: writeExecutionRow.queueSlotIndex,
+    hostTag: restoreRecord.hostTag,
+    inputType: restoreRecord.inputType,
+    multiple: restoreRecord.multiple,
+    controlKind: restoreRecord.controlKind,
+    controlledPropName: restoreRecord.controlledPropName,
+    acceptedRestoreKind: restoreRecord.restoreQueueOrdering.acceptedRestoreKind,
+    hostWrapperOperation: writeExecutionRow.hostWrapperOperation,
+    wrapperMutationKind: wrapperIntentRow.wrapperMutationKind,
+    targetField,
+    beforeValueSnapshot,
+    nextValueSnapshot,
+    fakeDomOnly: true,
+    rawTargetCaptured: false,
+    liveDomNodeAccepted: false,
+    publicControlledBehaviorEnabled: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createPostEventRestoreFakeDomQueueEntrySummary(entry) {
+  return freezeRecord({
+    status: entry.status,
+    sourceRestoreRequestId: entry.sourceRestoreRequestId,
+    sourceWritePreflightRequestId: entry.sourceWritePreflightRequestId,
+    sourceWriteExecutionRowId: entry.sourceWriteExecutionRowId,
+    sourceWrapperMutationIntentRowId:
+      entry.sourceWrapperMutationIntentRowId,
+    queueSlot: entry.queueSlot,
+    queueSlotIndex: entry.queueSlotIndex,
+    hostTag: entry.hostTag,
+    inputType: entry.inputType,
+    multiple: entry.multiple,
+    controlKind: entry.controlKind,
+    controlledPropName: entry.controlledPropName,
+    acceptedRestoreKind: entry.acceptedRestoreKind,
+    hostWrapperOperation: entry.hostWrapperOperation,
+    wrapperMutationKind: entry.wrapperMutationKind,
+    targetField: entry.targetField,
+    beforeValueSnapshot: entry.beforeValueSnapshot,
+    nextValueSnapshot: entry.nextValueSnapshot,
+    fakeDomOnly: true,
+    rawTargetCaptured: false,
+    liveDomNodeAccepted: false,
+    compatibilityClaimed: false
+  });
+}
+
+function getPostEventRestoreFakeDomTargetField(restoreRecord) {
+  if (
+    restoreRecord.restoreQueueOrdering.acceptedRestoreKind ===
+    'select-multiple-value'
+  ) {
+    return 'selectedValues';
+  }
+  return 'value';
+}
+
+function getPostEventRestoreFakeDomNextValue(latestProps, restoreRecord) {
+  const value = latestProps[restoreRecord.controlledPropName];
+  if (
+    restoreRecord.restoreQueueOrdering.acceptedRestoreKind ===
+    'select-multiple-value'
+  ) {
+    return coercePostEventRestoreFakeDomArrayValue(value);
+  }
+  return coerceInputChangeRestoreStringValue(value);
+}
+
+function readPostEventRestoreFakeDomValue(
+  fakeDomTarget,
+  restoreRecord,
+  targetField
+) {
+  try {
+    if (
+      restoreRecord.restoreQueueOrdering.acceptedRestoreKind ===
+      'select-multiple-value'
+    ) {
+      const value = hasOwnProp(fakeDomTarget, targetField)
+        ? fakeDomTarget[targetField]
+        : fakeDomTarget.value;
+      return coercePostEventRestoreFakeDomArrayValue(value);
+    }
+    return coerceInputChangeRestoreStringValue(fakeDomTarget[targetField]);
+  } catch (error) {
+    throwPostEventRestoreQueueFakeDomExecutionError(
+      'fake-dom-target-field-read-failed'
+    );
+  }
+}
+
+function writePostEventRestoreFakeDomValue(
+  fakeDomTarget,
+  restoreRecord,
+  targetField,
+  nextValue
+) {
+  try {
+    fakeDomTarget[targetField] = nextValue;
+  } catch (error) {
+    throwPostEventRestoreQueueFakeDomExecutionError(
+      'fake-dom-wrapper-mutation-failed'
+    );
+  }
+}
+
+function coercePostEventRestoreFakeDomArrayValue(value) {
+  if (!Array.isArray(value)) {
+    return freezeArray([coerceInputChangeRestoreStringValue(value)]);
+  }
+  return freezeArray(value.map(coerceInputChangeRestoreStringValue));
 }
 
 function assertInputChangeEventRestoreQueueLiveMutationPreflightSources(
@@ -6036,6 +7128,107 @@ function normalizeInputChangeEventRestoreQueueExecutionAdmission(
   };
 }
 
+function normalizePostEventRestoreQueueFakeDomExecutionAdmission(admission) {
+  if (admission == null || typeof admission !== 'object') {
+    throwPostEventRestoreQueueFakeDomExecutionError(
+      'admission metadata must be an object'
+    );
+  }
+
+  if (admission.explicitAdmission !== true) {
+    throwPostEventRestoreQueueFakeDomExecutionError(
+      'explicitAdmission must be true'
+    );
+  }
+
+  const queueKind = getAdmissionStringProperty(
+    admission,
+    'queueKind',
+    'deterministic-fake-dom-controlled-restore-execution'
+  );
+  if (queueKind !== 'deterministic-fake-dom-controlled-restore-execution') {
+    throwPostEventRestoreQueueFakeDomExecutionError(
+      'queueKind must be deterministic-fake-dom-controlled-restore-execution'
+    );
+  }
+
+  const targetKind = getAdmissionStringProperty(
+    admission,
+    'targetKind',
+    'controlled-input-post-event-restore-fake-dom-execution'
+  );
+  if (
+    targetKind !== 'controlled-input-post-event-restore-fake-dom-execution'
+  ) {
+    throwPostEventRestoreQueueFakeDomExecutionError(
+      'targetKind must be controlled-input-post-event-restore-fake-dom-execution'
+    );
+  }
+
+  const fakeDomTarget = admission.fakeDomTarget;
+  if (!isObjectLike(fakeDomTarget)) {
+    throwPostEventRestoreQueueFakeDomExecutionError(
+      'fakeDomTarget must be an object'
+    );
+  }
+  if (isExplicitControlledRestoreFakeDomTarget(fakeDomTarget) !== true) {
+    throwPostEventRestoreQueueFakeDomExecutionError(
+      'fakeDomTarget must carry the private fake DOM marker'
+    );
+  }
+  if (isLikelyLiveDomNode(fakeDomTarget)) {
+    throwPostEventRestoreQueueFakeDomExecutionError(
+      'unsupported-live-dom-node'
+    );
+  }
+
+  return {
+    fakeDomTarget,
+    record: freezeRecord({
+      queueKind,
+      queueId: getAdmissionStringProperty(
+        admission,
+        'queueId',
+        'anonymous-fake-dom-controlled-restore-execution'
+      ),
+      targetKind,
+      explicitAdmission: true,
+      deterministicFakeDomOnly: true,
+      fakeDomTargetAccepted: true,
+      fakeDomTargetCaptured: false,
+      acceptedLatestPropsEvidenceRecordType:
+        EVENT_LISTENER_TARGET_LOOKUP_RECORD_KIND,
+      acceptedSourceRecordTypes: freezeArray([
+        privateControlledInputPostEventRestoreQueueRecordType,
+        privateControlledInputPostEventRestoreQueueWriteExecutionRecordType,
+        privateControlledInputPostEventRestoreQueueFlushBlockerRecordType,
+        privateControlledInputPostEventRestoreQueueWrapperMutationIntentRecordType
+      ]),
+      recordsLatestPropsValidation: true,
+      recordsRestoreQueueWriteExecution: true,
+      recordsFlushIntent: true,
+      recordsWrapperMutationExecutionEvidence: true,
+      rejectsStaleLatestProps: true,
+      rejectsLiveDomNodesBeforeMutation: true,
+      rejectsMultipleRestoreTargets: true,
+      restoreQueueWriteAllowed: true,
+      restoreFlushAllowed: true,
+      hostWrapperInvocationAllowed: true,
+      wrapperWriteAllowed: true,
+      radioGroupLookupAllowed: false,
+      liveDescriptorInstallationAllowed: false,
+      valueTrackerFieldWriteAllowed: false,
+      hostValueReadAllowed: true,
+      hostValueWriteAllowed: true,
+      rawTargetCaptured: false,
+      rawLatestPropsRetained: false,
+      realDomNodeAccepted: false,
+      publicControlledBehaviorEnabled: false,
+      compatibilityClaimed: false
+    })
+  };
+}
+
 function normalizePostEventRestoreQueueAdmission(admission) {
   if (admission == null || typeof admission !== 'object') {
     throwInvalidAdmission('admission metadata must be an object');
@@ -6834,6 +8027,51 @@ function assertInputChangeEventRestoreQueueExecutionWrapperMutationIntentRecord(
     );
   if (payload === null) {
     throwInputChangeEventRestoreQueueExecutionError(
+      'expected a private controlled restore wrapper mutation intent record'
+    );
+  }
+  return payload;
+}
+
+function assertPostEventRestoreQueueFakeDomExecutionWriteExecutionRecord(
+  record
+) {
+  const payload =
+    getPrivateControlledInputPostEventRestoreQueueWriteExecutionRecordPayload(
+      record
+    );
+  if (payload === null) {
+    throwPostEventRestoreQueueFakeDomExecutionError(
+      'expected a private controlled restore queue write execution record'
+    );
+  }
+  return payload;
+}
+
+function assertPostEventRestoreQueueFakeDomExecutionFlushBlockerRecord(
+  record
+) {
+  const payload =
+    getPrivateControlledInputPostEventRestoreQueueFlushBlockerRecordPayload(
+      record
+    );
+  if (payload === null) {
+    throwPostEventRestoreQueueFakeDomExecutionError(
+      'expected a private controlled restore queue flush blocker record'
+    );
+  }
+  return payload;
+}
+
+function assertPostEventRestoreQueueFakeDomExecutionWrapperMutationIntentRecord(
+  record
+) {
+  const payload =
+    getPrivateControlledInputPostEventRestoreQueueWrapperMutationIntentRecordPayload(
+      record
+    );
+  if (payload === null) {
+    throwPostEventRestoreQueueFakeDomExecutionError(
       'expected a private controlled restore wrapper mutation intent record'
     );
   }
@@ -8501,6 +9739,50 @@ function throwPostEventRestoreQueueLiveMutationPreflightError(
   throw error;
 }
 
+function throwPostEventRestoreQueueFakeDomExecutionError(
+  reason,
+  restoreRecord,
+  writeExecutionRecord,
+  flushBlockerRecord
+) {
+  const error = new Error(
+    `Invalid private React DOM controlled input post-event restore fake DOM execution: ${reason}.`
+  );
+  error.name = 'FastReactDomControlledInputPostEventRestoreQueueGateError';
+  error.code = controlledInputPostEventRestoreQueueInvalidFakeDomExecutionCode;
+  error.compatibilityTarget = compatibilityTarget;
+  error.reason = reason;
+  if (restoreRecord !== undefined) {
+    error.sourceRestoreRequestId = restoreRecord.requestId || null;
+    error.sourceRestoreRequestSequence = restoreRecord.requestSequence || null;
+    error.sourceRestoreStatus = restoreRecord.status || null;
+    error.hostTag = restoreRecord.hostTag || null;
+    error.controlKind = restoreRecord.controlKind || null;
+    error.acceptedRestoreKind =
+      restoreRecord.restoreQueueOrdering?.acceptedRestoreKind || null;
+  }
+  if (writeExecutionRecord !== undefined) {
+    error.sourceWriteExecutionRequestId =
+      writeExecutionRecord.requestId || null;
+    error.sourceWriteExecutionRequestSequence =
+      writeExecutionRecord.requestSequence || null;
+    error.sourceWriteExecutionStatus =
+      writeExecutionRecord.status || null;
+    error.sourcePreflightRequestId =
+      writeExecutionRecord.sourcePreflightRequestId || null;
+  }
+  if (flushBlockerRecord !== undefined) {
+    error.sourceFlushBlockerRequestId =
+      flushBlockerRecord.requestId || null;
+    error.sourceFlushBlockerRequestSequence =
+      flushBlockerRecord.requestSequence || null;
+    error.sourceFlushBlockerStatus = flushBlockerRecord.status || null;
+    error.flushBlockerSourcePreflightRequestId =
+      flushBlockerRecord.sourcePreflightRequestId || null;
+  }
+  throw error;
+}
+
 function createGateState(options) {
   const prefix =
     options && typeof options.requestIdPrefix === 'string'
@@ -8508,6 +9790,8 @@ function createGateState(options) {
       : 'controlled-post-event-restore-queue';
 
   return {
+    fakeDomRestoreQueue: [],
+    fakeDomRestoreTarget: null,
     inputChangeRestoreQueue: [],
     inputChangeRestoreTarget: null,
     nextRequestSequence: 1,
@@ -8581,6 +9865,7 @@ module.exports = {
   controlledInputPostEventRestoreQueueInvalidEventCode,
   controlledInputPostEventRestoreQueueInvalidFlushBlockerCode,
   controlledInputPostEventRestoreQueueInvalidFakeDomObservationCode,
+  controlledInputPostEventRestoreQueueInvalidFakeDomExecutionCode,
   controlledInputPostEventRestoreQueueInvalidInputChangeBridgeCode,
   controlledInputPostEventRestoreQueueInvalidInputChangeExecutionCode,
   controlledInputPostEventRestoreQueueInvalidLiveMutationPreflightCode,
@@ -8601,6 +9886,8 @@ module.exports = {
   controlledInputPostEventRestoreQueueInputChangeBridgeStatus,
   controlledInputPostEventRestoreQueueInputChangeExecutionRowStatus,
   controlledInputPostEventRestoreQueueInputChangeExecutionStatus,
+  controlledInputPostEventRestoreQueueFakeDomExecutionRowStatus,
+  controlledInputPostEventRestoreQueueFakeDomExecutionStatus,
   controlledInputPostEventRestoreQueueLiveMutationPreflightRowStatus,
   controlledInputPostEventRestoreQueueLiveMutationPreflightStatus,
   controlledInputPostEventRestoreQueueStatus,
@@ -8615,6 +9902,7 @@ module.exports = {
   createUnsupportedControlledInputPostEventRestoreQueueError,
   describeControlledInputPostEventRestoreQueueGate,
   getPrivateControlledInputPostEventRestoreQueueFlushBlockerRecordPayload,
+  getPrivateControlledInputPostEventRestoreQueueFakeDomExecutionRecordPayload,
   getPrivateControlledInputPostEventRestoreQueueInputChangeBridgeRecordPayload,
   getPrivateControlledInputPostEventRestoreQueueInputChangeExecutionRecordPayload,
   getPrivateControlledInputPostEventRestoreQueueLiveMutationPreflightRecordPayload,
@@ -8623,6 +9911,7 @@ module.exports = {
   getPrivateControlledInputPostEventRestoreQueueWriteExecutionRecordPayload,
   getPrivateControlledInputPostEventRestoreQueueWritePreflightRecordPayload,
   isPrivateControlledInputPostEventRestoreQueueFlushBlockerRecord,
+  isPrivateControlledInputPostEventRestoreQueueFakeDomExecutionRecord,
   isPrivateControlledInputPostEventRestoreQueueInputChangeBridgeRecord,
   isPrivateControlledInputPostEventRestoreQueueInputChangeExecutionRecord,
   isPrivateControlledInputPostEventRestoreQueueLiveMutationPreflightRecord,
@@ -8631,6 +9920,8 @@ module.exports = {
   isPrivateControlledInputPostEventRestoreQueueWriteExecutionRecord,
   isPrivateControlledInputPostEventRestoreQueueWritePreflightRecord,
   privateControlledInputPostEventRestoreQueueFlushBlockerRecordType,
+  privateControlledInputPostEventRestoreQueueFakeDomExecutionRecordType,
+  privateControlledInputPostEventRestoreQueueFakeDomExecutionRowType,
   privateControlledInputPostEventRestoreQueueInputChangeBridgeRecordType,
   privateControlledInputPostEventRestoreQueueInputChangeBridgeRowType,
   privateControlledInputPostEventRestoreQueueInputChangeExecutionRecordType,
@@ -8646,6 +9937,7 @@ module.exports = {
   privateControlledInputPostEventRestoreQueueWritePreflightRecordType,
   preflightControlledInputPostEventRestoreLiveMutation,
   preflightControlledInputPostEventRestoreQueueWrites,
+  recordControlledInputPostEventRestoreFakeDomExecution,
   recordControlledInputPostEventRestoreQueueFlushBlocker,
   recordControlledInputPostEventRestoreQueueWrapperMutationIntent,
   recordControlledInputPostEventRestoreQueueWriteExecution,
