@@ -69,6 +69,7 @@ const rootBoundarySideEffects = freezeRecord({
   ...internalsGate.resourceHintHeadClearRetainBlockedSideEffects,
   ...internalsGate.resourceHintPreloadPreinitOrderBlockedSideEffects,
   ...internalsGate.resourceHintStylesheetPrecedenceBlockedSideEffects,
+  ...internalsGate.resourceHintResourceMapCommitBlockedSideEffects,
   ...internalsGate.formActionResetDispatcherBlockedSideEffects,
   ...internalsGate.formActionEventExtractionBlockedSideEffects,
   ...internalsGate.formActionResetQueueCommitBlockedSideEffects,
@@ -500,6 +501,21 @@ function describeResourceHintFakeDomAdapterBoundary(behaviorArea) {
     stylesheetPrecedenceSingletonOrderRowsRecorded: false,
     stylesheetPrecedenceResourceMapCreated: false,
     stylesheetPrecedenceResourceMapMutated: false,
+    fakeResourceMapCommitDiagnosticInvoked: false,
+    privateResourceMapCommitRecordsCreated: false,
+    resourceMapCommitRowsRecorded: false,
+    stylesheetResourceMapCommitRowsRecorded: false,
+    preloadResourceMapCommitRowsRecorded: false,
+    scriptResourceMapCommitRowsRecorded: false,
+    realResourceMapsCreated: false,
+    realResourceMapsMutated: false,
+    fakeResourceMapsCreated: false,
+    fakeResourceMapsMutated: false,
+    stylesheetRecordOwnershipClaimed: false,
+    preloadRecordStarted: false,
+    scriptRecordLoaded: false,
+    resourceLoadStateMutated: false,
+    publicResourceMapCommitBehavior: false,
     resourceFetchStarted: false,
     realDocumentMutated: false,
     publicResourceHintDomInsertion: false,
@@ -514,7 +530,9 @@ function describeResourceHintFakeDomAdapterBoundary(behaviorArea) {
     preloadPreinitOrderGate:
       internalsGate.describePrivateResourceHintPreloadPreinitOrderGate(),
     stylesheetPrecedenceGate:
-      internalsGate.describePrivateResourceHintStylesheetPrecedenceGate()
+      internalsGate.describePrivateResourceHintStylesheetPrecedenceGate(),
+    resourceMapCommitGate:
+      internalsGate.describePrivateResourceHintResourceMapCommitGate()
   });
 }
 

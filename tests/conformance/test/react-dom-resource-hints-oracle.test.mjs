@@ -883,6 +883,190 @@ test("private stylesheet precedence diagnostics stay record-only", () => {
   assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
 });
 
+test("private resource-map commit diagnostics stay record-only", () => {
+  const dispatcherGate = resourceFormGate.createResourceFormActionInternalsGate({
+    requestIdPrefix: "resource-conformance-map-source"
+  });
+  const adapterGate = resourceFormGate.createResourceHintFakeDomAdapterGate({
+    requestIdPrefix: "resource-conformance-map-adapter"
+  });
+  const orderGate =
+    resourceFormGate.createResourceHintPreloadPreinitOrderGate({
+      requestIdPrefix: "resource-conformance-map-order"
+    });
+  const stylesheetGate =
+    resourceFormGate.createResourceHintStylesheetPrecedenceGate({
+      requestIdPrefix: "resource-conformance-map-stylesheet"
+    });
+  const commitGate =
+    resourceFormGate.createResourceHintResourceMapCommitGate({
+      requestIdPrefix: "resource-conformance-map-commit"
+    });
+  const fakeDom = createDeterministicResourceHintDom();
+  const dispatcherRecords = [
+    dispatcherGate.recordResourceHintDispatcherRequest("L", [
+      "/style.css",
+      "style",
+      {
+        crossOrigin: undefined,
+        integrity: undefined,
+        nonce: undefined,
+        type: undefined,
+        fetchPriority: "low",
+        referrerPolicy: undefined,
+        imageSrcSet: undefined,
+        imageSizes: undefined,
+        media: undefined
+      }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest("S", [
+      "/style.css",
+      "theme",
+      {
+        crossOrigin: "",
+        integrity: "sha256-style",
+        fetchPriority: "high"
+      }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest("L", [
+      "/script.js",
+      "script",
+      {
+        crossOrigin: undefined,
+        integrity: "sha256-script-preload",
+        nonce: undefined,
+        type: undefined,
+        fetchPriority: undefined,
+        referrerPolicy: undefined,
+        imageSrcSet: undefined,
+        imageSizes: undefined,
+        media: undefined
+      }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest("X", [
+      "/script.js",
+      {
+        crossOrigin: undefined,
+        integrity: "sha256-script",
+        fetchPriority: "high",
+        nonce: "nonce-script"
+      }
+    ])
+  ];
+  const headRecord = dispatcherGate.recordSingletonRequest("head", [
+    { title: "blocked-head-singleton-props" }
+  ]);
+  const admissions = dispatcherRecords.map((record) =>
+    adapterGate.admitDispatcherRecord(record, {
+      explicitAdmission: true,
+      adapterKind: "deterministic-fake-dom",
+      targetKind: "document-head"
+    })
+  );
+  appendResourceHintFakeHeadChild(fakeDom, "link", {
+    rel: "stylesheet",
+    "data-precedence": "theme",
+    "data-fast-react-resource-key": "style-main",
+    "data-fast-react-precedence-key": "precedence-main"
+  });
+
+  const order = orderGate.recordPreloadPreinitOrderDiagnostic(
+    admissions,
+    {
+      explicitOrderDiagnostic: true,
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head,
+      resourceDescriptors: [
+        {
+          sourceAdapterAdmissionId: admissions[0].adapterAdmissionId,
+          resourceKind: "style",
+          resourceKey: "style-main"
+        },
+        {
+          sourceAdapterAdmissionId: admissions[1].adapterAdmissionId,
+          resourceKind: "style",
+          resourceKey: "style-main",
+          precedenceKey: "precedence-main"
+        },
+        {
+          sourceAdapterAdmissionId: admissions[2].adapterAdmissionId,
+          resourceKind: "script",
+          resourceKey: "script-main"
+        },
+        {
+          sourceAdapterAdmissionId: admissions[3].adapterAdmissionId,
+          resourceKind: "script",
+          resourceKey: "script-main"
+        }
+      ]
+    }
+  );
+  const stylesheet = stylesheetGate.recordStylesheetPrecedenceDiagnostic(
+    order,
+    headRecord,
+    {
+      explicitStylesheetPrecedenceDiagnostic: true,
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head
+    }
+  );
+  const diagnostic = commitGate.recordResourceMapCommitDiagnostic(
+    order,
+    stylesheet,
+    {
+      explicitResourceMapCommitDiagnostic: true
+    }
+  );
+
+  assert.equal(
+    diagnostic.resourceMapCommitStatus,
+    resourceFormGate.privateResourceHintResourceMapCommitStatus
+  );
+  assert.deepEqual(
+    diagnostic.privateResourceMapRecords.map((row) => row.recordKind),
+    ["preload", "stylesheet", "preload", "script"]
+  );
+  assert.deepEqual(
+    diagnostic.privateResourceMapRecords.map((row) => row.mapKind),
+    [
+      "preload-props",
+      "hoistable-styles",
+      "preload-props",
+      "hoistable-scripts"
+    ]
+  );
+  assert.equal(diagnostic.resourceMapCommitPlan.stylesheetRecordCount, 1);
+  assert.equal(diagnostic.resourceMapCommitPlan.preloadRecordCount, 2);
+  assert.equal(diagnostic.resourceMapCommitPlan.scriptRecordCount, 1);
+  assert.equal(diagnostic.resourceMapCommitPlan.realResourceMapsMutated, false);
+  assert.equal(diagnostic.resourceMapCommitPlan.fakeResourceMapsMutated, false);
+  assert.equal(diagnostic.sideEffects.fakeHeadRead, false);
+  assert.equal(diagnostic.sideEffects.realResourceMapsMutated, false);
+  assert.equal(diagnostic.sideEffects.fakeResourceMapsMutated, false);
+  assert.equal(diagnostic.sideEffects.resourceFetchStarted, false);
+  assert.equal(diagnostic.sideEffects.resourceLoadStateMutated, false);
+  assert.equal(
+    diagnostic.resourceLifecycleBoundary.singletonOwnershipClaimed,
+    false
+  );
+  assert.equal(diagnostic.resourceLifecycleBoundary.preloadStarted, false);
+  assert.equal(diagnostic.resourceLifecycleBoundary.loadStateMutated, false);
+  assert.equal(
+    diagnostic.publicResourceBoundary.publicResourceHintCallsReachable,
+    false
+  );
+  assert.deepEqual(
+    diagnostic.blockedCapabilities,
+    resourceFormGate.resourceHintResourceMapCommitBlockedCapabilities
+  );
+  assert.equal(JSON.stringify(diagnostic).includes("/style.css"), false);
+  assert.equal(JSON.stringify(diagnostic).includes("/script.js"), false);
+  assert.equal(JSON.stringify(diagnostic).includes("sha256-style"), false);
+  assert.equal(JSON.stringify(diagnostic).includes("sha256-script"), false);
+  assert.equal(/"theme"/u.test(JSON.stringify(diagnostic)), false);
+  assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
+});
+
 test("React DOM resource hint oracle artifact does not leak temporary generation paths", () => {
   const oracleText = readCheckedReactDomResourceHintsOracleText();
   assert.doesNotMatch(oracleText, /\/private\/var\/folders/u);
