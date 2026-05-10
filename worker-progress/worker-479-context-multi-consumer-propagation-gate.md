@@ -6,7 +6,7 @@
   file reads, implementation, or verification.
 - `get_goal` was available immediately after setup and again before report
   writing.
-- Latest active goal status before report writing: `active`.
+- Goal status after final pane closeout: `complete`.
 - Latest active goal objective:
   `Extend private context propagation diagnostics to multiple consumers and nested providers, proving lane marking and provider unwinding stay deterministic.`
 
