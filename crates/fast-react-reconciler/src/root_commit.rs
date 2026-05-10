@@ -3,8 +3,9 @@
 //! This module consumes a completed HostRoot render-phase record and switches
 //! `root.current` to that HostRoot work-in-progress fiber. It deliberately
 //! stops before host mutation, child/effect traversal, callback execution,
-//! deletion cleanup, public facade behavior, DOM wiring, or test-renderer
-//! serialization.
+//! public facade behavior, DOM wiring, or test-renderer serialization. Host
+//! deletion cleanup is represented only as private metadata for renderer-owned
+//! canaries.
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
@@ -1069,6 +1070,187 @@ impl HostRootDeletionListRecord {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HostRootDeletionCleanupLog {
+    root: FiberRootId,
+    finished_work: FiberId,
+    records: Vec<HostRootDeletionCleanupRecord>,
+}
+
+impl HostRootDeletionCleanupLog {
+    #[must_use]
+    const fn new(root: FiberRootId, finished_work: FiberId) -> Self {
+        Self {
+            root,
+            finished_work,
+            records: Vec::new(),
+        }
+    }
+
+    #[must_use]
+    pub const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn finished_work(&self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub fn records(&self) -> &[HostRootDeletionCleanupRecord] {
+        &self.records
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    #[must_use]
+    pub const fn ref_detach_executed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn passive_effects_flushed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn public_unmount_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    fn push(&mut self, record: HostRootDeletionCleanupRecord) {
+        self.records.push(record);
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HostRootDeletionCleanupRecord {
+    sequence: usize,
+    root: FiberRootId,
+    host_root: FiberId,
+    deletion_list: DeletionListId,
+    deletion_list_index: usize,
+    deleted_index: usize,
+    subtree_index: usize,
+    parent: FiberId,
+    parent_tag: FiberTag,
+    deleted_root: FiberId,
+    fiber: FiberId,
+    tag: FiberTag,
+    state_node: StateNodeHandle,
+    token: HostFiberTokenId,
+    token_phase: HostFiberTokenPhase,
+    token_target: HostFiberTokenTarget,
+}
+
+impl HostRootDeletionCleanupRecord {
+    #[must_use]
+    pub const fn sequence(self) -> usize {
+        self.sequence
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn host_root(self) -> FiberId {
+        self.host_root
+    }
+
+    #[must_use]
+    pub const fn deletion_list(self) -> DeletionListId {
+        self.deletion_list
+    }
+
+    #[must_use]
+    pub const fn deletion_list_index(self) -> usize {
+        self.deletion_list_index
+    }
+
+    #[must_use]
+    pub const fn deleted_index(self) -> usize {
+        self.deleted_index
+    }
+
+    #[must_use]
+    pub const fn subtree_index(self) -> usize {
+        self.subtree_index
+    }
+
+    #[must_use]
+    pub const fn parent(self) -> FiberId {
+        self.parent
+    }
+
+    #[must_use]
+    pub const fn parent_tag(self) -> FiberTag {
+        self.parent_tag
+    }
+
+    #[must_use]
+    pub const fn deleted_root(self) -> FiberId {
+        self.deleted_root
+    }
+
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn tag(self) -> FiberTag {
+        self.tag
+    }
+
+    #[must_use]
+    pub const fn state_node(self) -> StateNodeHandle {
+        self.state_node
+    }
+
+    #[must_use]
+    pub const fn token(self) -> HostFiberTokenId {
+        self.token
+    }
+
+    #[must_use]
+    pub const fn token_phase(self) -> HostFiberTokenPhase {
+        self.token_phase
+    }
+
+    #[must_use]
+    pub const fn token_target(self) -> HostFiberTokenTarget {
+        self.token_target
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PendingHostRootDeletionCleanupRecord {
+    root: FiberRootId,
+    host_root: FiberId,
+    deletion_list: DeletionListId,
+    deletion_list_index: usize,
+    deleted_index: usize,
+    subtree_index: usize,
+    parent: FiberId,
+    parent_tag: FiberTag,
+    deleted_root: FiberId,
+    fiber: FiberId,
+    tag: FiberTag,
+    state_node: StateNodeHandle,
+    token_target: HostFiberTokenTarget,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostRootCommitRecord {
     root: FiberRootId,
     previous_current: FiberId,
@@ -1082,6 +1264,7 @@ pub struct HostRootCommitRecord {
     root_update_callback_invocation_gate: RootUpdateCallbackInvocationGateSnapshot,
     pending_passive_handoff: Option<PendingPassiveCommitHandoff>,
     deletion_lists: Vec<HostRootDeletionListRecord>,
+    host_node_deletion_cleanup_log: HostRootDeletionCleanupLog,
     ref_commit_metadata: HostRootRefCommitSnapshot,
     dom_ref_callback_commit_gate: HostRootDomRefCallbackCommitGateSnapshot,
 }
@@ -1196,6 +1379,11 @@ impl HostRootCommitRecord {
     pub(crate) fn deletion_lists(&self) -> &[HostRootDeletionListRecord] {
         &self.deletion_lists
     }
+
+    #[must_use]
+    pub const fn host_node_deletion_cleanup_log(&self) -> &HostRootDeletionCleanupLog {
+        &self.host_node_deletion_cleanup_log
+    }
 }
 
 pub fn commit_finished_host_root<H: HostTypes>(
@@ -1221,6 +1409,8 @@ pub fn commit_finished_host_root<H: HostTypes>(
         &mutation_log,
         &deletion_lists,
     )?;
+    let pending_host_node_deletion_cleanup =
+        collect_pending_host_node_deletion_cleanup(store, root_id, finished_work, &deletion_lists)?;
     let pending_ref_commit_metadata =
         collect_pending_ref_commit_metadata(store.fiber_arena(), root_id, finished_work)?;
 
@@ -1245,6 +1435,12 @@ pub fn commit_finished_host_root<H: HostTypes>(
         .take_root_update_callback_records(work_in_progress_update_queue)?;
     let root_update_callback_invocation_gate =
         materialize_root_update_callback_invocation_gate(&root_update_callbacks);
+    let host_node_deletion_cleanup_log = materialize_host_node_deletion_cleanup_log(
+        store,
+        root_id,
+        finished_work,
+        pending_host_node_deletion_cleanup,
+    )?;
     let ref_commit_metadata = materialize_ref_commit_metadata(store, pending_ref_commit_metadata)?;
     let dom_ref_callback_commit_gate =
         materialize_dom_ref_callback_commit_gate(store, &ref_commit_metadata)?;
@@ -1262,6 +1458,7 @@ pub fn commit_finished_host_root<H: HostTypes>(
         root_update_callback_invocation_gate,
         pending_passive_handoff,
         deletion_lists,
+        host_node_deletion_cleanup_log,
         ref_commit_metadata,
         dom_ref_callback_commit_gate,
     })
@@ -2531,6 +2728,146 @@ fn collect_deletion_list_metadata<H: HostTypes>(
     Ok(records)
 }
 
+fn collect_pending_host_node_deletion_cleanup<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root: FiberRootId,
+    finished_work: FiberId,
+    deletion_lists: &[HostRootDeletionListRecord],
+) -> Result<Vec<PendingHostRootDeletionCleanupRecord>, RootCommitError> {
+    let arena = store.fiber_arena();
+    let mut records = Vec::new();
+
+    for (deletion_list_index, deletion_list) in deletion_lists.iter().enumerate() {
+        let parent = arena.get(deletion_list.parent())?;
+        for (deleted_index, &deleted_root) in deletion_list.deleted().iter().enumerate() {
+            let mut subtree_index = 0;
+            collect_pending_deleted_subtree_host_node_cleanup(
+                arena,
+                PendingDeletedSubtreeHostNodeCleanupRequest {
+                    root,
+                    host_root: finished_work,
+                    deletion_list: deletion_list.list(),
+                    deletion_list_index,
+                    deleted_index,
+                    parent: deletion_list.parent(),
+                    parent_tag: parent.tag(),
+                    deleted_root,
+                },
+                deleted_root,
+                &mut subtree_index,
+                &mut records,
+            )?;
+        }
+    }
+
+    Ok(records)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PendingDeletedSubtreeHostNodeCleanupRequest {
+    root: FiberRootId,
+    host_root: FiberId,
+    deletion_list: DeletionListId,
+    deletion_list_index: usize,
+    deleted_index: usize,
+    parent: FiberId,
+    parent_tag: FiberTag,
+    deleted_root: FiberId,
+}
+
+fn collect_pending_deleted_subtree_host_node_cleanup(
+    arena: &FiberArena,
+    request: PendingDeletedSubtreeHostNodeCleanupRequest,
+    fiber: FiberId,
+    subtree_index: &mut usize,
+    records: &mut Vec<PendingHostRootDeletionCleanupRecord>,
+) -> Result<(), RootCommitError> {
+    let node = arena.get(fiber)?;
+    if let Some(token_target) = host_node_cleanup_token_target(node.tag()) {
+        records.push(PendingHostRootDeletionCleanupRecord {
+            root: request.root,
+            host_root: request.host_root,
+            deletion_list: request.deletion_list,
+            deletion_list_index: request.deletion_list_index,
+            deleted_index: request.deleted_index,
+            subtree_index: *subtree_index,
+            parent: request.parent,
+            parent_tag: request.parent_tag,
+            deleted_root: request.deleted_root,
+            fiber,
+            tag: node.tag(),
+            state_node: node.state_node(),
+            token_target,
+        });
+        *subtree_index += 1;
+    }
+
+    for child in arena.child_ids(fiber)? {
+        collect_pending_deleted_subtree_host_node_cleanup(
+            arena,
+            request,
+            child,
+            subtree_index,
+            records,
+        )?;
+    }
+
+    Ok(())
+}
+
+const fn host_node_cleanup_token_target(tag: FiberTag) -> Option<HostFiberTokenTarget> {
+    match tag {
+        FiberTag::HostComponent => Some(HostFiberTokenTarget::Instance),
+        FiberTag::HostText => Some(HostFiberTokenTarget::TextInstance),
+        _ => None,
+    }
+}
+
+fn materialize_host_node_deletion_cleanup_log<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    root: FiberRootId,
+    finished_work: FiberId,
+    pending_records: Vec<PendingHostRootDeletionCleanupRecord>,
+) -> Result<HostRootDeletionCleanupLog, RootCommitError> {
+    let mut log = HostRootDeletionCleanupLog::new(root, finished_work);
+    for pending in pending_records {
+        let token_phase = HostFiberTokenPhase::Deletion;
+        let token = store.host_tokens_mut().issue(
+            pending.root,
+            pending.fiber,
+            token_phase,
+            pending.token_target,
+        );
+        store.host_tokens().validate(
+            token,
+            pending.root,
+            pending.fiber,
+            token_phase,
+            pending.token_target,
+        )?;
+        log.push(HostRootDeletionCleanupRecord {
+            sequence: log.records.len(),
+            root: pending.root,
+            host_root: pending.host_root,
+            deletion_list: pending.deletion_list,
+            deletion_list_index: pending.deletion_list_index,
+            deleted_index: pending.deleted_index,
+            subtree_index: pending.subtree_index,
+            parent: pending.parent,
+            parent_tag: pending.parent_tag,
+            deleted_root: pending.deleted_root,
+            fiber: pending.fiber,
+            tag: pending.tag,
+            state_node: pending.state_node,
+            token,
+            token_phase,
+            token_target: pending.token_target,
+        });
+    }
+
+    Ok(log)
+}
+
 fn record_pending_passive_commit_handoff<H: HostTypes>(
     scheduling: &mut RootSchedulingState<H>,
     root: FiberRootId,
@@ -2984,6 +3321,7 @@ mod tests {
         assert!(commit.mutation_log().is_empty());
         assert!(commit.mutation_apply_log().is_empty());
         assert!(commit.deletion_lists().is_empty());
+        assert!(commit.host_node_deletion_cleanup_log().is_empty());
         assert!(commit.ref_commit_metadata().is_empty());
         assert!(commit.dom_ref_callback_commit_gate().is_empty());
         assert_dom_ref_callback_gate_is_inert(commit.dom_ref_callback_commit_gate());
@@ -3356,7 +3694,7 @@ mod tests {
     }
 
     #[test]
-    fn root_commit_records_deletion_lists_in_finished_tree_order_without_cleanup() {
+    fn root_commit_records_deletion_cleanup_metadata_in_parent_owned_order() {
         let (mut store, root_id, host) = root_store();
         update_container(&mut store, root_id, RootElementHandle::from_raw(45), None).unwrap();
         let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
@@ -3365,6 +3703,8 @@ mod tests {
         let commit = commit_finished_host_root(&mut store, render).unwrap();
         let deletion_lists = commit.deletion_lists();
         let apply_records = commit.mutation_apply_log().records();
+        let cleanup_log = commit.host_node_deletion_cleanup_log();
+        let cleanup_records = cleanup_log.records();
 
         assert_eq!(deletion_lists.len(), 2);
         assert_eq!(deletion_lists[0].parent(), fixture.first_parent);
@@ -3418,6 +3758,69 @@ mod tests {
             apply_records[2].state_node(),
             fixture.third_deleted_state_node
         );
+        assert_eq!(cleanup_log.root(), root_id);
+        assert_eq!(cleanup_log.finished_work(), render.finished_work());
+        assert_eq!(cleanup_log.len(), 3);
+        assert!(!cleanup_log.ref_detach_executed());
+        assert!(!cleanup_log.passive_effects_flushed());
+        assert!(!cleanup_log.public_unmount_compatibility_claimed());
+        assert_eq!(cleanup_records[0].sequence(), 0);
+        assert_eq!(cleanup_records[0].deletion_list(), fixture.first_list);
+        assert_eq!(cleanup_records[0].deletion_list_index(), 0);
+        assert_eq!(cleanup_records[0].deleted_index(), 0);
+        assert_eq!(cleanup_records[0].subtree_index(), 0);
+        assert_eq!(cleanup_records[0].parent(), fixture.first_parent);
+        assert_eq!(cleanup_records[0].parent_tag(), FiberTag::HostComponent);
+        assert_eq!(cleanup_records[0].deleted_root(), fixture.second_deleted);
+        assert_eq!(cleanup_records[0].fiber(), fixture.second_deleted);
+        assert_eq!(cleanup_records[0].tag(), FiberTag::HostText);
+        assert_eq!(
+            cleanup_records[0].state_node(),
+            fixture.second_deleted_state_node
+        );
+        assert_eq!(
+            cleanup_records[0].token_phase(),
+            HostFiberTokenPhase::Deletion
+        );
+        assert_eq!(
+            cleanup_records[0].token_target(),
+            HostFiberTokenTarget::TextInstance
+        );
+        assert_eq!(cleanup_records[1].sequence(), 1);
+        assert_eq!(cleanup_records[1].deletion_list(), fixture.first_list);
+        assert_eq!(cleanup_records[1].deletion_list_index(), 0);
+        assert_eq!(cleanup_records[1].deleted_index(), 1);
+        assert_eq!(cleanup_records[1].subtree_index(), 0);
+        assert_eq!(cleanup_records[1].deleted_root(), fixture.first_deleted);
+        assert_eq!(cleanup_records[1].fiber(), fixture.first_deleted);
+        assert_eq!(
+            cleanup_records[1].state_node(),
+            fixture.first_deleted_state_node
+        );
+        assert_eq!(cleanup_records[2].sequence(), 2);
+        assert_eq!(cleanup_records[2].deletion_list(), fixture.second_list);
+        assert_eq!(cleanup_records[2].deletion_list_index(), 1);
+        assert_eq!(cleanup_records[2].deleted_index(), 0);
+        assert_eq!(cleanup_records[2].subtree_index(), 0);
+        assert_eq!(cleanup_records[2].parent(), fixture.second_parent);
+        assert_eq!(cleanup_records[2].deleted_root(), fixture.third_deleted);
+        assert_eq!(cleanup_records[2].fiber(), fixture.third_deleted);
+        assert_eq!(
+            cleanup_records[2].state_node(),
+            fixture.third_deleted_state_node
+        );
+        for record in cleanup_records {
+            store
+                .host_tokens()
+                .validate(
+                    record.token(),
+                    record.root(),
+                    record.fiber(),
+                    record.token_phase(),
+                    record.token_target(),
+                )
+                .unwrap();
+        }
         assert_eq!(
             store.root(root_id).unwrap().current(),
             render.finished_work()

@@ -6,8 +6,9 @@
 //! unmount scheduling to `fast-react-reconciler` and exposes a diagnostic
 //! HostRoot render/commit handoff, including callback snapshot diagnostics,
 //! plus a private committed host-output canary for one HostComponent with one
-//! HostText child. It still stops before public serialization, act, or public
-//! `react-test-renderer` compatibility.
+//! HostText child and private host-node deletion cleanup diagnostics. It still
+//! stops before public serialization, act, or public `react-test-renderer`
+//! compatibility.
 
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -774,6 +775,362 @@ struct TestRendererCurrentHostOutput {
     text: TestTextInstance,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TestRendererHostNodeCleanupTarget {
+    Instance,
+    Text,
+}
+
+impl TestRendererHostNodeCleanupTarget {
+    const fn from_host_target(target: HostFiberTokenTarget) -> Option<Self> {
+        match target {
+            HostFiberTokenTarget::Instance => Some(Self::Instance),
+            HostFiberTokenTarget::TextInstance => Some(Self::Text),
+            HostFiberTokenTarget::HydratableInstance
+            | HostFiberTokenTarget::ActivityBoundary
+            | HostFiberTokenTarget::SuspenseBoundary => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TestRendererHostNodeCleanupStatus {
+    Invalidated,
+    AlreadyInactive,
+    MissingHostNode,
+    MissingStateNode,
+    UnsupportedTarget,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererHostNodeCleanupRecord {
+    sequence: usize,
+    root: FiberRootId,
+    deletion_list_index: usize,
+    deleted_index: usize,
+    subtree_index: usize,
+    parent: TestRendererFiberHandleDiagnostics,
+    deleted_root: TestRendererFiberHandleDiagnostics,
+    fiber: TestRendererFiberHandleDiagnostics,
+    state_node_raw: u64,
+    token_raw: u64,
+    token_phase: HostFiberTokenPhase,
+    target: Option<TestRendererHostNodeCleanupTarget>,
+    status: TestRendererHostNodeCleanupStatus,
+}
+
+impl TestRendererHostNodeCleanupRecord {
+    #[must_use]
+    pub const fn sequence(self) -> usize {
+        self.sequence
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn deletion_list_index(self) -> usize {
+        self.deletion_list_index
+    }
+
+    #[must_use]
+    pub const fn deleted_index(self) -> usize {
+        self.deleted_index
+    }
+
+    #[must_use]
+    pub const fn subtree_index(self) -> usize {
+        self.subtree_index
+    }
+
+    #[must_use]
+    pub const fn parent(self) -> TestRendererFiberHandleDiagnostics {
+        self.parent
+    }
+
+    #[must_use]
+    pub const fn deleted_root(self) -> TestRendererFiberHandleDiagnostics {
+        self.deleted_root
+    }
+
+    #[must_use]
+    pub const fn fiber(self) -> TestRendererFiberHandleDiagnostics {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn state_node_raw(self) -> u64 {
+        self.state_node_raw
+    }
+
+    #[must_use]
+    pub const fn token_raw(self) -> u64 {
+        self.token_raw
+    }
+
+    #[must_use]
+    pub const fn token_phase(self) -> HostFiberTokenPhase {
+        self.token_phase
+    }
+
+    #[must_use]
+    pub const fn target(self) -> Option<TestRendererHostNodeCleanupTarget> {
+        self.target
+    }
+
+    #[must_use]
+    pub const fn status(self) -> TestRendererHostNodeCleanupStatus {
+        self.status
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererHostNodeCleanupReport {
+    root: FiberRootId,
+    records: Vec<TestRendererHostNodeCleanupRecord>,
+    active_instance_count: usize,
+    active_text_count: usize,
+    inactive_instance_count: usize,
+    inactive_text_count: usize,
+    public_unmount_compatibility_claimed: bool,
+}
+
+impl TestRendererHostNodeCleanupReport {
+    #[must_use]
+    pub const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub fn records(&self) -> &[TestRendererHostNodeCleanupRecord] {
+        &self.records
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    #[must_use]
+    pub const fn active_instance_count(&self) -> usize {
+        self.active_instance_count
+    }
+
+    #[must_use]
+    pub const fn active_text_count(&self) -> usize {
+        self.active_text_count
+    }
+
+    #[must_use]
+    pub const fn inactive_instance_count(&self) -> usize {
+        self.inactive_instance_count
+    }
+
+    #[must_use]
+    pub const fn inactive_text_count(&self) -> usize {
+        self.inactive_text_count
+    }
+
+    #[must_use]
+    pub const fn public_unmount_compatibility_claimed(&self) -> bool {
+        self.public_unmount_compatibility_claimed
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct TestRendererHostNodeStore {
+    records: Vec<TestRendererHostNodeStoreRecord>,
+}
+
+impl TestRendererHostNodeStore {
+    fn track_current(
+        &mut self,
+        current: TestRendererHostOutputCanaryCurrentFibers,
+        component_state_node_raw: u64,
+        text_state_node_raw: u64,
+    ) {
+        macro_rules! fiber_handle {
+            ($fiber:expr) => {{
+                let fiber = $fiber;
+                TestRendererFiberHandleDiagnostics {
+                    arena_id: fiber.arena_id().get(),
+                    slot: fiber.slot().get(),
+                    generation: fiber.generation().get(),
+                }
+            }};
+        }
+
+        self.records.push(TestRendererHostNodeStoreRecord {
+            root: current.root(),
+            fiber: fiber_handle!(current.component()),
+            state_node_raw: component_state_node_raw,
+            target: TestRendererHostNodeCleanupTarget::Instance,
+            active: true,
+        });
+        self.records.push(TestRendererHostNodeStoreRecord {
+            root: current.root(),
+            fiber: fiber_handle!(current.text()),
+            state_node_raw: text_state_node_raw,
+            target: TestRendererHostNodeCleanupTarget::Text,
+            active: true,
+        });
+    }
+
+    fn retarget_current(&mut self, current: TestRendererHostOutputCanaryCurrentFibers) {
+        macro_rules! fiber_handle {
+            ($fiber:expr) => {{
+                let fiber = $fiber;
+                TestRendererFiberHandleDiagnostics {
+                    arena_id: fiber.arena_id().get(),
+                    slot: fiber.slot().get(),
+                    generation: fiber.generation().get(),
+                }
+            }};
+        }
+
+        for record in &mut self.records {
+            if !record.active || record.root != current.root() {
+                continue;
+            }
+            record.fiber = match record.target {
+                TestRendererHostNodeCleanupTarget::Instance => fiber_handle!(current.component()),
+                TestRendererHostNodeCleanupTarget::Text => fiber_handle!(current.text()),
+            };
+        }
+    }
+
+    fn apply_cleanup(
+        &mut self,
+        root: FiberRootId,
+        commit: &HostRootCommitRecord,
+    ) -> TestRendererHostNodeCleanupReport {
+        let mut records = Vec::new();
+        for cleanup in commit.host_node_deletion_cleanup_log().records() {
+            macro_rules! fiber_handle {
+                ($fiber:expr) => {{
+                    let fiber = $fiber;
+                    TestRendererFiberHandleDiagnostics {
+                        arena_id: fiber.arena_id().get(),
+                        slot: fiber.slot().get(),
+                        generation: fiber.generation().get(),
+                    }
+                }};
+            }
+
+            let target =
+                TestRendererHostNodeCleanupTarget::from_host_target(cleanup.token_target());
+            let fiber = fiber_handle!(cleanup.fiber());
+            let state_node_raw = cleanup.state_node().raw();
+            let status = match target {
+                Some(_) if state_node_raw == 0 => {
+                    TestRendererHostNodeCleanupStatus::MissingStateNode
+                }
+                Some(target) => self.invalidate(root, fiber, state_node_raw, target),
+                None => TestRendererHostNodeCleanupStatus::UnsupportedTarget,
+            };
+            records.push(TestRendererHostNodeCleanupRecord {
+                sequence: cleanup.sequence(),
+                root: cleanup.root(),
+                deletion_list_index: cleanup.deletion_list_index(),
+                deleted_index: cleanup.deleted_index(),
+                subtree_index: cleanup.subtree_index(),
+                parent: fiber_handle!(cleanup.parent()),
+                deleted_root: fiber_handle!(cleanup.deleted_root()),
+                fiber,
+                state_node_raw,
+                token_raw: cleanup.token().raw(),
+                token_phase: cleanup.token_phase(),
+                target,
+                status,
+            });
+        }
+
+        TestRendererHostNodeCleanupReport {
+            root,
+            records,
+            active_instance_count: self.active_count(TestRendererHostNodeCleanupTarget::Instance),
+            active_text_count: self.active_count(TestRendererHostNodeCleanupTarget::Text),
+            inactive_instance_count: self
+                .inactive_count(TestRendererHostNodeCleanupTarget::Instance),
+            inactive_text_count: self.inactive_count(TestRendererHostNodeCleanupTarget::Text),
+            public_unmount_compatibility_claimed: commit
+                .host_node_deletion_cleanup_log()
+                .public_unmount_compatibility_claimed(),
+        }
+    }
+
+    fn invalidate(
+        &mut self,
+        root: FiberRootId,
+        fiber: TestRendererFiberHandleDiagnostics,
+        state_node_raw: u64,
+        target: TestRendererHostNodeCleanupTarget,
+    ) -> TestRendererHostNodeCleanupStatus {
+        if let Some(record) = self.records.iter_mut().find(|record| {
+            record.active
+                && record.root == root
+                && record.fiber == fiber
+                && record.state_node_raw == state_node_raw
+                && record.target == target
+        }) {
+            record.active = false;
+            return TestRendererHostNodeCleanupStatus::Invalidated;
+        }
+
+        if self.records.iter().any(|record| {
+            !record.active
+                && record.root == root
+                && record.fiber == fiber
+                && record.state_node_raw == state_node_raw
+                && record.target == target
+        }) {
+            TestRendererHostNodeCleanupStatus::AlreadyInactive
+        } else {
+            TestRendererHostNodeCleanupStatus::MissingHostNode
+        }
+    }
+
+    fn active_count(&self, target: TestRendererHostNodeCleanupTarget) -> usize {
+        self.records
+            .iter()
+            .filter(|record| record.target == target && record.active)
+            .count()
+    }
+
+    fn inactive_count(&self, target: TestRendererHostNodeCleanupTarget) -> usize {
+        self.records
+            .iter()
+            .filter(|record| record.target == target && !record.active)
+            .count()
+    }
+
+    #[cfg(test)]
+    fn active_total(&self) -> usize {
+        self.records.iter().filter(|record| record.active).count()
+    }
+
+    #[cfg(test)]
+    fn inactive_total(&self) -> usize {
+        self.records.iter().filter(|record| !record.active).count()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TestRendererHostNodeStoreRecord {
+    root: FiberRootId,
+    fiber: TestRendererFiberHandleDiagnostics,
+    state_node_raw: u64,
+    target: TestRendererHostNodeCleanupTarget,
+    active: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestRendererCommittedHostOutput {
     render: HostRootRenderPhaseRecord,
@@ -864,6 +1221,7 @@ pub struct TestRendererUnmountedHostOutput {
     deleted_fibers: TestRendererHostOutputCanaryDeletedFibers,
     commit: HostRootCommitRecord,
     commit_diagnostics: TestRendererHostOutputCanaryCommitDiagnostics,
+    host_node_cleanup: TestRendererHostNodeCleanupReport,
     previous_snapshot: TestContainerSnapshot,
     snapshot: TestContainerSnapshot,
     detached_instance_snapshot: TestElementSnapshot,
@@ -888,6 +1246,11 @@ impl TestRendererUnmountedHostOutput {
     #[must_use]
     pub const fn commit_diagnostics(&self) -> &TestRendererHostOutputCanaryCommitDiagnostics {
         &self.commit_diagnostics
+    }
+
+    #[must_use]
+    pub const fn host_node_cleanup(&self) -> &TestRendererHostNodeCleanupReport {
+        &self.host_node_cleanup
     }
 
     #[must_use]
@@ -1907,6 +2270,7 @@ pub struct TestRendererRoot {
     lifecycle: TestRendererRootLifecycle,
     scheduled_updates: Vec<TestRendererRootScheduledUpdate>,
     host_output_fixtures: Vec<TestRendererHostOutputFixture>,
+    host_nodes: TestRendererHostNodeStore,
     current_host_output: Option<TestRendererCurrentHostOutput>,
 }
 
@@ -1968,6 +2332,7 @@ impl TestRendererRoot {
             lifecycle: TestRendererRootLifecycle::Active,
             scheduled_updates: Vec::new(),
             host_output_fixtures: Vec::new(),
+            host_nodes: TestRendererHostNodeStore::default(),
             current_host_output: None,
         })
     }
@@ -2283,6 +2648,11 @@ impl TestRendererRoot {
             .append_child_to_container(&mut container, HostChild::Instance(&instance))?;
         self.renderer.reset_after_commit(&container, commit_state)?;
         let snapshot = self.diagnostic_container_snapshot()?;
+        self.host_nodes.track_current(
+            completed.current(),
+            completed.component_state_node_raw(),
+            completed.text_state_node_raw(),
+        );
         self.current_host_output = Some(TestRendererCurrentHostOutput {
             fixture,
             fibers: completed.current(),
@@ -2363,6 +2733,7 @@ impl TestRendererRoot {
         }
         self.renderer.reset_after_commit(&container, commit_state)?;
         let snapshot = self.diagnostic_container_snapshot()?;
+        self.host_nodes.retarget_current(updated.current());
         self.current_host_output = Some(TestRendererCurrentHostOutput {
             fixture: next_fixture,
             fibers: updated.current(),
@@ -2423,6 +2794,7 @@ impl TestRendererRoot {
             current.instance,
         )?;
         self.renderer.reset_after_commit(&container, commit_state)?;
+        let host_node_cleanup = self.host_nodes.apply_cleanup(self.root_id, &commit);
         let snapshot = self.diagnostic_container_snapshot()?;
         let detached_instance_snapshot = self.renderer.snapshot_instance(&current.instance)?;
         self.current_host_output = None;
@@ -2432,6 +2804,7 @@ impl TestRendererRoot {
             deleted_fibers: deleted,
             commit,
             commit_diagnostics,
+            host_node_cleanup,
             previous_snapshot,
             snapshot,
             detached_instance_snapshot,
@@ -3310,6 +3683,13 @@ mod tests {
         )
     }
 
+    fn host_node_activity_counts(root: &TestRendererRoot) -> (usize, usize) {
+        (
+            root.host_nodes.active_total(),
+            root.host_nodes.inactive_total(),
+        )
+    }
+
     fn render_and_commit_latest_host_root(
         root: &mut TestRendererRoot,
     ) -> (HostRootRenderPhaseRecord, HostRootCommitRecord) {
@@ -3578,6 +3958,7 @@ mod tests {
             render.finished_work()
         );
         assert_eq!(host_storage_counts(&root), (1, 1, 1));
+        assert_eq!(host_node_activity_counts(&root), (2, 0));
         assert_eq!(snapshot.children().len(), 1);
 
         let TestNodeSnapshot::Element(element) = &snapshot.children()[0] else {
@@ -3877,6 +4258,7 @@ mod tests {
         assert!(fibers.text_props_changed());
         assert_eq!(root.store().host_tokens().len(), 3);
         assert_eq!(host_storage_counts(&root), (1, 1, 1));
+        assert_eq!(host_node_activity_counts(&root), (2, 0));
         assert!(diagnostics.deletion_lists().is_empty());
         assert_eq!(diagnostics.mutation_records().len(), 1);
         let mutation = diagnostics.mutation_records()[0];
@@ -3908,7 +4290,7 @@ mod tests {
     }
 
     #[test]
-    fn root_host_output_canary_unmounts_committed_output_with_deletion_diagnostics() {
+    fn root_host_output_canary_unmounts_committed_output_with_deletion_cleanup_diagnostics() {
         let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
             "span",
             "hello",
@@ -3931,6 +4313,8 @@ mod tests {
         let commit = unmounted.commit();
         let deleted = unmounted.deleted_fibers();
         let diagnostics = unmounted.commit_diagnostics();
+        let cleanup = unmounted.host_node_cleanup();
+        let cleanup_records = cleanup.records();
 
         assert_eq!(scheduled.kind(), TestRendererRootUpdateKind::Unmount);
         assert_eq!(scheduled.element(), RootElementHandle::NONE);
@@ -3947,7 +4331,7 @@ mod tests {
         assert_eq!(deleted.host_root(), render.finished_work());
         assert_eq!(deleted.deleted_component(), current.component());
         assert_eq!(deleted.deleted_text(), current.text());
-        assert_eq!(root.store().host_tokens().len(), 3);
+        assert_eq!(root.store().host_tokens().len(), 5);
         assert!(diagnostics.mutation_records().is_empty());
         assert_eq!(diagnostics.deletion_lists().len(), 1);
         assert_eq!(
@@ -3958,6 +4342,67 @@ mod tests {
             diagnostics.deletion_lists()[0].deleted(),
             &[current.component()]
         );
+        assert_eq!(cleanup.root(), root.root_id());
+        assert_eq!(cleanup.len(), 2);
+        assert!(!cleanup.is_empty());
+        assert_eq!(cleanup.active_instance_count(), 0);
+        assert_eq!(cleanup.active_text_count(), 0);
+        assert_eq!(cleanup.inactive_instance_count(), 1);
+        assert_eq!(cleanup.inactive_text_count(), 1);
+        assert!(!cleanup.public_unmount_compatibility_claimed());
+        assert_eq!(cleanup_records[0].sequence(), 0);
+        assert_eq!(cleanup_records[0].deletion_list_index(), 0);
+        assert_eq!(cleanup_records[0].deleted_index(), 0);
+        assert_eq!(cleanup_records[0].subtree_index(), 0);
+        assert_eq!(
+            cleanup_records[0].target(),
+            Some(TestRendererHostNodeCleanupTarget::Instance)
+        );
+        assert_eq!(
+            cleanup_records[0].status(),
+            TestRendererHostNodeCleanupStatus::Invalidated
+        );
+        assert_eq!(
+            cleanup_records[0].parent().slot(),
+            render.finished_work().slot().get()
+        );
+        assert_eq!(
+            cleanup_records[0].deleted_root().slot(),
+            current.component().slot().get()
+        );
+        assert_eq!(
+            cleanup_records[0].fiber().slot(),
+            current.component().slot().get()
+        );
+        assert_eq!(cleanup_records[0].state_node_raw(), 1);
+        assert_eq!(cleanup_records[0].token_raw(), 4);
+        assert_eq!(
+            cleanup_records[0].token_phase(),
+            HostFiberTokenPhase::Deletion
+        );
+        assert_eq!(cleanup_records[1].sequence(), 1);
+        assert_eq!(cleanup_records[1].deletion_list_index(), 0);
+        assert_eq!(cleanup_records[1].deleted_index(), 0);
+        assert_eq!(cleanup_records[1].subtree_index(), 1);
+        assert_eq!(
+            cleanup_records[1].target(),
+            Some(TestRendererHostNodeCleanupTarget::Text)
+        );
+        assert_eq!(
+            cleanup_records[1].status(),
+            TestRendererHostNodeCleanupStatus::Invalidated
+        );
+        assert_eq!(
+            cleanup_records[1].deleted_root().slot(),
+            current.component().slot().get()
+        );
+        assert_eq!(
+            cleanup_records[1].fiber().slot(),
+            current.text().slot().get()
+        );
+        assert_eq!(cleanup_records[1].state_node_raw(), 1);
+        assert_eq!(cleanup_records[1].token_raw(), 5);
+        assert_eq!(host_node_activity_counts(&root), (0, 2));
         assert_eq!(unmounted.previous_snapshot().children().len(), 1);
         assert!(unmounted.snapshot().children().is_empty());
         assert!(unmounted.detached_instance_snapshot().is_detached());
