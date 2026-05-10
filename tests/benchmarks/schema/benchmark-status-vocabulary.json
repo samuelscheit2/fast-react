@@ -86,13 +86,39 @@
       "id": "diagnostic-admitted",
       "admittedForTiming": true,
       "claimCapable": false,
-      "description": "The benchmark milestone may collect diagnostic timing in a future runner, but cannot support a speed claim."
+      "description": "The benchmark milestone may collect diagnostic timing in a future runner only after required conformance gates are green, but cannot support a speed claim."
     },
     {
       "id": "comparable-admitted",
       "admittedForTiming": true,
       "claimCapable": true,
       "description": "The benchmark milestone may collect comparable timing only after all required compatibility gates are green."
+    }
+  ],
+  "acceptedGateStatuses": [
+    {
+      "id": "accepted-blocked",
+      "admitted": false,
+      "compatibilityClaimed": false,
+      "description": "The referenced conformance gate is accepted, but no benchmark scenario admission is allowed because the gate remains blocked."
+    },
+    {
+      "id": "accepted-private-partial",
+      "admitted": false,
+      "compatibilityClaimed": false,
+      "description": "The referenced conformance gate has a narrow private comparison slice, but public benchmark scenario admission remains blocked."
+    },
+    {
+      "id": "accepted-oracle-only",
+      "admitted": false,
+      "compatibilityClaimed": false,
+      "description": "The referenced conformance artifact records React target behavior only and has no local Fast React admission."
+    },
+    {
+      "id": "green-admitted",
+      "admitted": true,
+      "compatibilityClaimed": true,
+      "description": "The referenced conformance gate is green and explicitly admitted for benchmark readiness."
     }
   ]
 }

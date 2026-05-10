@@ -28,6 +28,13 @@ export const BENCHMARK_READINESS_STATUSES = Object.freeze([
   "comparable-admitted"
 ]);
 
+export const ACCEPTED_GATE_STATUSES = Object.freeze([
+  "accepted-blocked",
+  "accepted-private-partial",
+  "accepted-oracle-only",
+  "green-admitted"
+]);
+
 export const CLAIM_CAPABLE_TIMING_STATUSES = Object.freeze([
   "comparable",
   "noise-bound",
@@ -35,6 +42,7 @@ export const CLAIM_CAPABLE_TIMING_STATUSES = Object.freeze([
   "improvement"
 ]);
 
+export const BLOCKED_BENCHMARK_READINESS_STATUS = "blocked-by-conformance";
 export const COMPARABLE_ADMITTED_READINESS_STATUS = "comparable-admitted";
 export const GREEN_COMPATIBILITY_STATUS = "green";
 export const TIMING_DATA_POLICY = "diagnostic-until-compatible";
@@ -322,6 +330,9 @@ function validateSchemaFiles({ benchmarkRoot }, errors) {
   const benchmarkReadinessStatusIds = (
     vocabulary.benchmarkReadinessStatuses ?? []
   ).map((status) => status.id);
+  const acceptedGateStatusIds = (vocabulary.acceptedGateStatuses ?? []).map(
+    (status) => status.id
+  );
 
   requireExactArray(
     compatibilityStatusIds,
@@ -365,6 +376,18 @@ function validateSchemaFiles({ benchmarkRoot }, errors) {
     "benchmark manifest schema: benchmarkReadinessStatus enum",
     errors
   );
+  requireExactArray(
+    acceptedGateStatusIds,
+    ACCEPTED_GATE_STATUSES,
+    "benchmark status vocabulary: acceptedGateStatuses",
+    errors
+  );
+  requireExactArray(
+    manifestSchema.$defs?.acceptedConformanceGate?.properties?.status?.enum,
+    ACCEPTED_GATE_STATUSES,
+    "benchmark manifest schema: acceptedConformanceGate status enum",
+    errors
+  );
 }
 
 function validateConformanceGates(manifest, { label, repoRoot }, errors) {
@@ -385,6 +408,11 @@ function validateConformanceGates(manifest, { label, repoRoot }, errors) {
     validateStringArray(
       gate.requiredClaims,
       `${label}: conformance gate ${String(gate.id)} requiredClaims`,
+      errors
+    );
+    validateAcceptedGate(
+      gate.acceptedGate,
+      `${label}: conformance gate ${String(gate.id)} acceptedGate`,
       errors
     );
 
@@ -486,17 +514,7 @@ function validateScenario(scenario, { label, requiredScenarioIdSet, gateById }, 
   }
 
   if (scenario.compatibilityStatus === GREEN_COMPATIBILITY_STATUS) {
-    for (const gate of gates) {
-      for (const claim of gate.requiredClaims) {
-        if (gate.artifactObject?.conformanceClaims?.[claim] !== true) {
-          errors.push(
-            `${scenarioLabel}: unsupported green compatibility claim; ${gate.id} has conformanceClaims.${claim}=${String(
-              gate.artifactObject?.conformanceClaims?.[claim]
-            )}`
-          );
-        }
-      }
-    }
+    validateGateCompatibilityClaims(gates, scenarioLabel, errors);
   }
 }
 
@@ -586,27 +604,16 @@ function validateMilestones(milestones, { label, scenarioIdSet, gateById }, erro
         )}`
       );
     } else if (
-      milestone.benchmarkReadinessStatus ===
-        COMPARABLE_ADMITTED_READINESS_STATUS &&
+      milestone.benchmarkReadinessStatus !== BLOCKED_BENCHMARK_READINESS_STATUS &&
       milestone.compatibilityStatus !== GREEN_COMPATIBILITY_STATUS
     ) {
       errors.push(
-        `${milestoneLabel}: benchmarkReadinessStatus ${COMPARABLE_ADMITTED_READINESS_STATUS} requires compatibilityStatus ${GREEN_COMPATIBILITY_STATUS}`
+        `${milestoneLabel}: benchmarkReadinessStatus ${milestone.benchmarkReadinessStatus} requires compatibilityStatus ${GREEN_COMPATIBILITY_STATUS}`
       );
     }
 
     if (milestone.compatibilityStatus === GREEN_COMPATIBILITY_STATUS) {
-      for (const gate of gates) {
-        for (const claim of gate.requiredClaims) {
-          if (gate.artifactObject?.conformanceClaims?.[claim] !== true) {
-            errors.push(
-              `${milestoneLabel}: unsupported green compatibility claim; ${gate.id} has conformanceClaims.${claim}=${String(
-                gate.artifactObject?.conformanceClaims?.[claim]
-              )}`
-            );
-          }
-        }
-      }
+      validateGateCompatibilityClaims(gates, milestoneLabel, errors);
     }
   }
 }
@@ -624,6 +631,68 @@ function validateTimingCompatibilityPair(
     errors.push(
       `${label}: timingStatus ${timingStatus} requires compatibilityStatus ${GREEN_COMPATIBILITY_STATUS}`
     );
+  }
+}
+
+function validateAcceptedGate(acceptedGate, label, errors) {
+  if (acceptedGate === undefined) {
+    return;
+  }
+  if (!isPlainObject(acceptedGate)) {
+    errors.push(`${label} must be an object`);
+    return;
+  }
+
+  requireString(acceptedGate.id, `${label}.id`, errors);
+  requireString(acceptedGate.command, `${label}.command`, errors);
+  if (!ACCEPTED_GATE_STATUSES.includes(acceptedGate.status)) {
+    errors.push(`${label}: unknown status ${String(acceptedGate.status)}`);
+  }
+  if (typeof acceptedGate.admitted !== "boolean") {
+    errors.push(`${label}.admitted must be a boolean`);
+  }
+  if (typeof acceptedGate.compatibilityClaimed !== "boolean") {
+    errors.push(`${label}.compatibilityClaimed must be a boolean`);
+  }
+  if (
+    acceptedGate.status === "green-admitted" &&
+    (acceptedGate.admitted !== true ||
+      acceptedGate.compatibilityClaimed !== true)
+  ) {
+    errors.push(
+      `${label}: green-admitted requires admitted=true and compatibilityClaimed=true`
+    );
+  }
+}
+
+function validateGateCompatibilityClaims(gates, label, errors) {
+  for (const gate of gates) {
+    for (const claim of gate.requiredClaims) {
+      if (gate.artifactObject?.conformanceClaims?.[claim] !== true) {
+        errors.push(
+          `${label}: unsupported green compatibility claim; ${gate.id} has conformanceClaims.${claim}=${String(
+            gate.artifactObject?.conformanceClaims?.[claim]
+          )}`
+        );
+      }
+    }
+
+    if (gate.acceptedGate) {
+      if (gate.acceptedGate.admitted !== true) {
+        errors.push(
+          `${label}: unsupported green compatibility claim; ${gate.id} acceptedGate.admitted=${String(
+            gate.acceptedGate.admitted
+          )}`
+        );
+      }
+      if (gate.acceptedGate.compatibilityClaimed !== true) {
+        errors.push(
+          `${label}: unsupported green compatibility claim; ${gate.id} acceptedGate.compatibilityClaimed=${String(
+            gate.acceptedGate.compatibilityClaimed
+          )}`
+        );
+      }
+    }
   }
 }
 

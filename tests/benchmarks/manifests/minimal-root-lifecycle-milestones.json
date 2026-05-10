@@ -32,7 +32,15 @@
         "compatibilityClaimed",
         "fastReactBehaviorCompatible",
         "fullDualRunOracleExists"
-      ]
+      ],
+      "acceptedGate": {
+        "id": "root-render-dual-run-gate-1",
+        "status": "accepted-blocked",
+        "command": "npm run root-render-e2e:conformance --workspace @fast-react/conformance",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Worker 163 accepted this fail-closed root render E2E gate with 0 admitted scenario-mode rows."
+      }
     },
     {
       "id": "react-dom-client-root",
@@ -41,7 +49,15 @@
         "compatibilityClaimed",
         "fastReactBehaviorCompatible",
         "fullDualRunOracleExists"
-      ]
+      ],
+      "acceptedGate": {
+        "id": "react-dom-client-root-oracle",
+        "status": "accepted-oracle-only",
+        "command": "node --test tests/conformance/test/react-dom-client-root-oracle.test.mjs",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "The accepted client-root artifact records React DOM target behavior and keeps Fast React admission blocked."
+      }
     },
     {
       "id": "react-dom-container-root-markers",
@@ -50,7 +66,15 @@
         "compatibilityClaimed",
         "fastReactBehaviorCompatible",
         "fullDualRunOracleExists"
-      ]
+      ],
+      "acceptedGate": {
+        "id": "react-dom-container-root-markers-oracle",
+        "status": "accepted-oracle-only",
+        "command": "node --test tests/conformance/test/react-dom-container-root-markers-oracle.test.mjs",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "The accepted marker artifact records create/unmount marker behavior and keeps benchmark admission blocked."
+      }
     },
     {
       "id": "react-dom-root-listener-installation",
@@ -59,7 +83,15 @@
         "compatibilityClaimed",
         "fastReactBehaviorCompatible",
         "fullDualRunOracleExists"
-      ]
+      ],
+      "acceptedGate": {
+        "id": "react-dom-root-listener-installation-oracle",
+        "status": "accepted-oracle-only",
+        "command": "node --test tests/conformance/test/react-dom-root-listener-installation-oracle.test.mjs",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "The accepted root-listener artifact records React DOM listener installation only; local public root admission remains blocked."
+      }
     },
     {
       "id": "react-dom-flush-sync-batching",
@@ -68,7 +100,15 @@
         "compatibilityClaimed",
         "fastReactBehaviorCompatible",
         "fullDualRunOracleExists"
-      ]
+      ],
+      "acceptedGate": {
+        "id": "react-dom-flush-sync-batching-oracle",
+        "status": "accepted-oracle-only",
+        "command": "node --test tests/conformance/test/react-dom-flush-sync-batching-oracle.test.mjs",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "The accepted flushSync artifact records React DOM batching behavior; cross-root benchmark admission remains blocked."
+      }
     },
     {
       "id": "dom-text-content",
@@ -77,7 +117,15 @@
         "compatibilityClaimed",
         "fastReactBehaviorCompatible",
         "fullDualRunOracleExists"
-      ]
+      ],
+      "acceptedGate": {
+        "id": "dom-text-content-dual-run-gate-1",
+        "status": "accepted-private-partial",
+        "command": "npm run dom-text-content:conformance --workspace @fast-react/conformance",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Worker 230 accepted a private shouldSetTextContent comparison slice only; public root render and DOM mutation rows remain skipped."
+      }
     }
   ],
   "milestones": [
