@@ -2,6 +2,9 @@
 
 const ENTRY_SET_ATTRIBUTE = 'setAttribute';
 const ENTRY_REMOVE_ATTRIBUTE = 'removeAttribute';
+const ENTRY_SET_STYLE = 'setStyle';
+const ENTRY_REMOVE_STYLE = 'removeStyle';
+const ENTRY_SET_INNER_HTML = 'setInnerHTML';
 const ENTRY_NON_PAYLOAD = 'nonPayload';
 const ENTRY_UNSUPPORTED = 'unsupported';
 
@@ -115,18 +118,49 @@ const reservedNonPayloadProps = Object.freeze({
   }
 });
 
+const stylePropShapeValidationMessage =
+  'The `style` prop expects a mapping from style properties to values, ' +
+  "not a string. For example, style={{marginRight: spacing + 'em'}} when " +
+  'using JSX.';
+
+const dangerousHtmlShapeValidationMessage =
+  '`props.dangerouslySetInnerHTML` must be in the form `{__html: ...}`. ' +
+  'Please visit https://react.dev/link/dangerously-set-inner-html ' +
+  'for more information.';
+
+const dangerousHtmlChildrenConflictMessage =
+  'Can only set one of ' +
+  '`children` or `props.dangerouslySetInnerHTML`.';
+
+const supportedStyleNames = new Set([
+  'backgroundColor',
+  'backgroundImage',
+  'borderWidth',
+  'color',
+  'flex',
+  'height',
+  'lineHeight',
+  'marginTop',
+  'msTransition',
+  'opacity',
+  'paddingLeft',
+  'WebkitLineClamp',
+  'width',
+  'zIndex'
+]);
+
+const unitlessStyleNames = new Set([
+  'flex',
+  'lineHeight',
+  'opacity',
+  'WebkitLineClamp',
+  'zIndex'
+]);
+
 const unsupportedPropReasons = Object.freeze({
-  dangerouslySetInnerHTML: {
-    category: 'dangerouslySetInnerHTML',
-    reason: 'dangerouslySetInnerHTML diffing is intentionally outside this helper'
-  },
   innerHTML: {
     category: 'innerHTML',
     reason: 'innerHTML is reserved and is not handled as an ordinary attribute'
-  },
-  style: {
-    category: 'style',
-    reason: 'style diffing is intentionally outside this helper'
   }
 });
 
@@ -143,7 +177,10 @@ function diffDomPropertyPayload(tag, lastProps, nextProps) {
       previousValue != null &&
       !hasOwn.call(currentProps, propName)
     ) {
-      payload.push(createEntry(tag, propName, null));
+      pushPayloadEntries(
+        payload,
+        createEntries(tag, propName, null, previousValue, currentProps)
+      );
     }
   }
 
@@ -154,7 +191,10 @@ function diffDomPropertyPayload(tag, lastProps, nextProps) {
       nextValue !== previousValue &&
       (nextValue != null || previousValue != null)
     ) {
-      payload.push(createEntry(tag, propName, nextValue));
+      pushPayloadEntries(
+        payload,
+        createEntries(tag, propName, nextValue, previousValue, currentProps)
+      );
     }
   }
 
@@ -174,7 +214,17 @@ function normalizeProps(props, argumentName) {
   return props;
 }
 
-function createEntry(tag, propName, value) {
+function pushPayloadEntries(payload, entries) {
+  if (Array.isArray(entries)) {
+    for (const entry of entries) {
+      payload.push(entry);
+    }
+  } else {
+    payload.push(entries);
+  }
+}
+
+function createEntries(tag, propName, value, previousValue, props) {
   const reserved = reservedNonPayloadProps[propName];
   if (reserved !== undefined) {
     return createNonPayloadEntry(propName, reserved.category, reserved.reason);
@@ -197,6 +247,22 @@ function createEntry(tag, propName, value) {
     );
   }
 
+  if (isDocumentScopedResourceTag(tag)) {
+    return createUnsupportedEntry(
+      propName,
+      'document-resource-host',
+      'document-scoped resource host tags require dedicated React DOM handling'
+    );
+  }
+
+  if (propName === 'style') {
+    return createStyleEntries(propName, value, previousValue);
+  }
+
+  if (propName === 'dangerouslySetInnerHTML') {
+    return createDangerousHtmlEntry(propName, value, props);
+  }
+
   if (isControlledFormProp(tag, propName)) {
     return createUnsupportedEntry(
       propName,
@@ -210,14 +276,6 @@ function createEntry(tag, propName, value) {
       propName,
       'form-action',
       'form action props are intentionally outside this ordinary attribute helper'
-    );
-  }
-
-  if (isDocumentScopedResourceTag(tag)) {
-    return createUnsupportedEntry(
-      propName,
-      'document-resource-host',
-      'document-scoped resource host tags require dedicated React DOM handling'
     );
   }
 
@@ -239,6 +297,135 @@ function createEntry(tag, propName, value) {
   }
 
   return createAttributeEntry(attribute, propName, value);
+}
+
+function createStyleEntries(propName, value, previousValue) {
+  if (!isNullishStyleValue(value) && !isObjectLike(value)) {
+    return createUnsupportedEntry(
+      propName,
+      'style-shape-validation',
+      stylePropShapeValidationMessage
+    );
+  }
+
+  if (!isNullishStyleValue(previousValue) && !isObjectLike(previousValue)) {
+    return createUnsupportedEntry(
+      propName,
+      'style-previous-shape',
+      'previous style props must be an object or null before this data-only helper can diff them'
+    );
+  }
+
+  const previousStyles = isObjectLike(previousValue) ? previousValue : null;
+  const currentStyles = isObjectLike(value) ? value : null;
+  const entries = [];
+
+  if (previousStyles !== null) {
+    for (const styleName of Object.keys(previousStyles)) {
+      if (currentStyles === null || !hasOwn.call(currentStyles, styleName)) {
+        entries.push(createRemoveStyleEntryOrUnsupported(propName, styleName));
+      }
+    }
+  }
+
+  if (currentStyles !== null) {
+    const previousStyleValues =
+      previousStyles === null ? emptyProps : previousStyles;
+    for (const styleName of Object.keys(currentStyles)) {
+      const nextStyleValue = currentStyles[styleName];
+      if (previousStyleValues[styleName] !== nextStyleValue) {
+        entries.push(
+          createStyleValueEntryOrUnsupported(
+            propName,
+            styleName,
+            nextStyleValue
+          )
+        );
+      }
+    }
+  }
+
+  return entries;
+}
+
+function createStyleValueEntryOrUnsupported(propName, styleName, value) {
+  if (!isSupportedStyleName(styleName)) {
+    return createUnsupportedEntry(
+      propName,
+      'unsupported-style-name',
+      'this data-only style slice only covers oracle-backed style names and CSS custom properties',
+      {styleName}
+    );
+  }
+
+  if (shouldRemoveStyleValue(value)) {
+    return createRemoveStyleEntry(propName, styleName);
+  }
+
+  const coercedValue = coerceStyleValue(propName, styleName, value);
+  if (coercedValue.kind === ENTRY_UNSUPPORTED) {
+    return coercedValue;
+  }
+
+  return createSetStyleEntry(propName, styleName, coercedValue.value);
+}
+
+function createRemoveStyleEntryOrUnsupported(propName, styleName) {
+  if (!isSupportedStyleName(styleName)) {
+    return createUnsupportedEntry(
+      propName,
+      'unsupported-style-name',
+      'this data-only style slice only covers oracle-backed style names and CSS custom properties',
+      {styleName}
+    );
+  }
+
+  return createRemoveStyleEntry(propName, styleName);
+}
+
+function createDangerousHtmlEntry(propName, value, props) {
+  if (value == null) {
+    return createNonPayloadEntry(
+      propName,
+      'dangerouslySetInnerHTML-nullish',
+      'nullish dangerouslySetInnerHTML does not assign innerHTML; managed children and text-content paths own clearing'
+    );
+  }
+
+  if (typeof value !== 'object' || !hasOwn.call(value, '__html')) {
+    return createUnsupportedEntry(
+      propName,
+      'dangerouslySetInnerHTML-shape-validation',
+      dangerousHtmlShapeValidationMessage
+    );
+  }
+
+  const html = value.__html;
+  if (html == null) {
+    return createNonPayloadEntry(
+      propName,
+      'dangerouslySetInnerHTML-nullish-html',
+      'nullish dangerouslySetInnerHTML.__html is accepted but does not assign innerHTML'
+    );
+  }
+
+  if (props.children != null) {
+    return createUnsupportedEntry(
+      propName,
+      'dangerouslySetInnerHTML-children-conflict',
+      dangerousHtmlChildrenConflictMessage
+    );
+  }
+
+  if (typeof html !== 'string') {
+    return createUnsupportedEntry(
+      propName,
+      'dangerouslySetInnerHTML-value-type',
+      'this data-only dangerouslySetInnerHTML slice only admits string __html values'
+    );
+  }
+
+  return createSetInnerHtmlEntry(propName, html);
 }
 
 function getOrdinaryAttribute(propName) {
@@ -340,6 +527,46 @@ function coerceSetAttributeEntry(propName, attributeName, value) {
   }
 }
 
+function coerceStyleValue(propName, styleName, value) {
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      return createUnsupportedEntry(
+        propName,
+        'style-non-finite-number',
+        'non-finite numeric style values require warning diagnostics outside this data-only helper',
+        {styleName}
+      );
+    }
+
+    if (
+      value !== 0 &&
+      !isCustomStyleProperty(styleName) &&
+      !unitlessStyleNames.has(styleName)
+    ) {
+      return {
+        value: `${value}px`
+      };
+    }
+
+    return {
+      value: String(value)
+    };
+  }
+
+  if (typeof value === 'string') {
+    return {
+      value: isCustomStyleProperty(styleName) ? value : value.trim()
+    };
+  }
+
+  return createUnsupportedEntry(
+    propName,
+    'style-value-type',
+    'this data-only style slice only admits string, finite number, nullish, empty string, or boolean style values',
+    {styleName}
+  );
+}
+
 function createSetAttributeEntry(propName, attributeName, value) {
   return {
     kind: ENTRY_SET_ATTRIBUTE,
@@ -357,6 +584,35 @@ function createRemoveAttributeEntry(propName, attributeName) {
   };
 }
 
+function createSetStyleEntry(propName, styleName, value) {
+  return {
+    kind: ENTRY_SET_STYLE,
+    propName,
+    styleName,
+    mutation: getStyleMutationTarget(styleName),
+    value
+  };
+}
+
+function createRemoveStyleEntry(propName, styleName) {
+  return {
+    kind: ENTRY_REMOVE_STYLE,
+    propName,
+    styleName,
+    mutation: getStyleMutationTarget(styleName),
+    value: ''
+  };
+}
+
+function createSetInnerHtmlEntry(propName, value) {
+  return {
+    kind: ENTRY_SET_INNER_HTML,
+    propName,
+    propertyName: 'innerHTML',
+    value
+  };
+}
+
 function createNonPayloadEntry(propName, category, reason) {
   return {
     kind: ENTRY_NON_PAYLOAD,
@@ -366,13 +622,20 @@ function createNonPayloadEntry(propName, category, reason) {
   };
 }
 
-function createUnsupportedEntry(propName, category, reason) {
-  return {
+function createUnsupportedEntry(propName, category, reason, details) {
+  const entry = {
     kind: ENTRY_UNSUPPORTED,
     propName,
     category,
     reason
   };
+  if (details !== undefined) {
+    return {
+      ...entry,
+      ...details
+    };
+  }
+  return entry;
 }
 
 function isControlledFormProp(tag, propName) {
@@ -405,10 +668,42 @@ function isAttributeNameSafe(attributeName) {
   return validAttributeNamePattern.test(attributeName);
 }
 
+function isNullishStyleValue(value) {
+  return value == null;
+}
+
+function isObjectLike(value) {
+  return typeof value === 'object' && value !== null;
+}
+
+function isSupportedStyleName(styleName) {
+  return (
+    supportedStyleNames.has(styleName) ||
+    isCustomStyleProperty(styleName)
+  );
+}
+
+function isCustomStyleProperty(styleName) {
+  return styleName.startsWith('--');
+}
+
+function shouldRemoveStyleValue(value) {
+  return value == null || typeof value === 'boolean' || value === '';
+}
+
+function getStyleMutationTarget(styleName) {
+  return isCustomStyleProperty(styleName)
+    ? 'setProperty'
+    : 'propertyAssignment';
+}
+
 module.exports = {
   ENTRY_NON_PAYLOAD,
   ENTRY_REMOVE_ATTRIBUTE,
+  ENTRY_REMOVE_STYLE,
   ENTRY_SET_ATTRIBUTE,
+  ENTRY_SET_INNER_HTML,
+  ENTRY_SET_STYLE,
   ENTRY_UNSUPPORTED,
   diffDomPropertyPayload,
   isAttributeNameSafe,

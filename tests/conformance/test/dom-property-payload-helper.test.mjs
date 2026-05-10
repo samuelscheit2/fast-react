@@ -29,7 +29,10 @@ const reactDomPackageJson = require(
 const {
   ENTRY_NON_PAYLOAD,
   ENTRY_REMOVE_ATTRIBUTE,
+  ENTRY_REMOVE_STYLE,
   ENTRY_SET_ATTRIBUTE,
+  ENTRY_SET_INNER_HTML,
+  ENTRY_SET_STYLE,
   ENTRY_UNSUPPORTED,
   diffDomPropertyPayload
 } = propertyPayload;
@@ -177,32 +180,226 @@ test("private DOM property payload marks React metadata, children, and events as
   );
 });
 
-test("private DOM property payload reports unsupported style and dangerous HTML entries", () => {
+test("private DOM property payload records oracle-backed style and innerHTML entries", () => {
   assert.deepEqual(
     diffDomPropertyPayload(
       "div",
       {},
       orderedProps([
-        ["style", { color: "red" }],
+        [
+          "style",
+          orderedProps([
+            ["color", "red"],
+            ["marginTop", 4],
+            ["opacity", 0.5],
+            ["flex", 1],
+            ["--gap", "4px"],
+            ["--count", 3],
+            ["backgroundImage", 'url("x&y")']
+          ])
+        ],
         ["dangerouslySetInnerHTML", { __html: "<span>raw</span>" }],
         ["innerHTML", "<span>raw</span>"]
       ])
     ),
     [
-      unsupported(
-        "style",
-        "style",
-        "style diffing is intentionally outside this helper"
-      ),
-      unsupported(
-        "dangerouslySetInnerHTML",
-        "dangerouslySetInnerHTML",
-        "dangerouslySetInnerHTML diffing is intentionally outside this helper"
-      ),
+      setStyle("color", "propertyAssignment", "red"),
+      setStyle("marginTop", "propertyAssignment", "4px"),
+      setStyle("opacity", "propertyAssignment", "0.5"),
+      setStyle("flex", "propertyAssignment", "1"),
+      setStyle("--gap", "setProperty", "4px"),
+      setStyle("--count", "setProperty", "3"),
+      setStyle("backgroundImage", "propertyAssignment", 'url("x&y")'),
+      setInnerHTML("<span>raw</span>"),
       unsupported(
         "innerHTML",
         "innerHTML",
         "innerHTML is reserved and is not handled as an ordinary attribute"
+      )
+    ]
+  );
+});
+
+test("private DOM property payload records style update and removal order", () => {
+  assert.deepEqual(
+    diffDomPropertyPayload(
+      "div",
+      orderedProps([
+        [
+          "style",
+          orderedProps([
+            ["color", "red"],
+            ["marginTop", 4],
+            ["opacity", 0.5],
+            ["flex", 1],
+            ["--gap", "4px"],
+            ["--count", 3],
+            ["backgroundColor", "yellow"],
+            ["borderWidth", 2],
+            ["paddingLeft", "1em"]
+          ])
+        ]
+      ]),
+      orderedProps([
+        [
+          "style",
+          orderedProps([
+            ["color", null],
+            ["marginTop", 0],
+            ["opacity", null],
+            ["--gap", null],
+            ["backgroundColor", "blue"]
+          ])
+        ]
+      ])
+    ),
+    [
+      removeStyle("flex", "propertyAssignment"),
+      removeStyle("--count", "setProperty"),
+      removeStyle("borderWidth", "propertyAssignment"),
+      removeStyle("paddingLeft", "propertyAssignment"),
+      removeStyle("color", "propertyAssignment"),
+      setStyle("marginTop", "propertyAssignment", "0"),
+      removeStyle("opacity", "propertyAssignment"),
+      removeStyle("--gap", "setProperty"),
+      setStyle("backgroundColor", "propertyAssignment", "blue")
+    ]
+  );
+});
+
+test("private DOM property payload keeps invalid style behavior fail-closed", () => {
+  assert.deepEqual(
+    diffDomPropertyPayload(
+      "div",
+      {},
+      orderedProps([["style", "color:red"]])
+    ),
+    [
+      unsupported(
+        "style",
+        "style-shape-validation",
+        "The `style` prop expects a mapping from style properties to values, not a string. For example, style={{marginRight: spacing + 'em'}} when using JSX."
+      )
+    ]
+  );
+
+  assert.deepEqual(
+    diffDomPropertyPayload(
+      "div",
+      {},
+      orderedProps([
+        [
+          "style",
+          orderedProps([
+            ["width", Number.NaN],
+            ["height", Number.POSITIVE_INFINITY],
+            ["background-color", "red"],
+            ["msTransition", "all 1s"]
+          ])
+        ]
+      ])
+    ),
+    [
+      unsupported(
+        "style",
+        "style-non-finite-number",
+        "non-finite numeric style values require warning diagnostics outside this data-only helper",
+        { styleName: "width" }
+      ),
+      unsupported(
+        "style",
+        "style-non-finite-number",
+        "non-finite numeric style values require warning diagnostics outside this data-only helper",
+        { styleName: "height" }
+      ),
+      unsupported(
+        "style",
+        "unsupported-style-name",
+        "this data-only style slice only covers oracle-backed style names and CSS custom properties",
+        { styleName: "background-color" }
+      ),
+      setStyle("msTransition", "propertyAssignment", "all 1s")
+    ]
+  );
+});
+
+test("private DOM property payload validates dangerous HTML without mutating", () => {
+  assert.deepEqual(
+    diffDomPropertyPayload(
+      "div",
+      {},
+      orderedProps([
+        ["dangerouslySetInnerHTML", { __html: null }]
+      ])
+    ),
+    [
+      nonPayload(
+        "dangerouslySetInnerHTML",
+        "dangerouslySetInnerHTML-nullish-html",
+        "nullish dangerouslySetInnerHTML.__html is accepted but does not assign innerHTML"
+      )
+    ]
+  );
+
+  assert.deepEqual(
+    diffDomPropertyPayload(
+      "div",
+      orderedProps([
+        ["dangerouslySetInnerHTML", { __html: "<span>Before</span>" }]
+      ]),
+      orderedProps([
+        ["dangerouslySetInnerHTML", undefined],
+        ["children", "Managed child"]
+      ])
+    ),
+    [
+      nonPayload(
+        "dangerouslySetInnerHTML",
+        "dangerouslySetInnerHTML-nullish",
+        "nullish dangerouslySetInnerHTML does not assign innerHTML; managed children and text-content paths own clearing"
+      ),
+      nonPayload(
+        "children",
+        "children",
+        "children are handled by text-content reconciliation"
+      )
+    ]
+  );
+
+  assert.deepEqual(
+    diffDomPropertyPayload(
+      "div",
+      {},
+      orderedProps([["dangerouslySetInnerHTML", "<strong>bad</strong>"]])
+    ),
+    [
+      unsupported(
+        "dangerouslySetInnerHTML",
+        "dangerouslySetInnerHTML-shape-validation",
+        "`props.dangerouslySetInnerHTML` must be in the form `{__html: ...}`. Please visit https://react.dev/link/dangerously-set-inner-html for more information."
+      )
+    ]
+  );
+
+  assert.deepEqual(
+    diffDomPropertyPayload(
+      "div",
+      {},
+      orderedProps([
+        ["dangerouslySetInnerHTML", { __html: "<span>Raw</span>" }],
+        ["children", "Managed child"]
+      ])
+    ),
+    [
+      unsupported(
+        "dangerouslySetInnerHTML",
+        "dangerouslySetInnerHTML-children-conflict",
+        "Can only set one of `children` or `props.dangerouslySetInnerHTML`."
+      ),
+      nonPayload(
+        "children",
+        "children",
+        "children are handled by text-content reconciliation"
       )
     ]
   );
@@ -379,6 +576,35 @@ function removeAttribute(propName, attributeName) {
   };
 }
 
+function setStyle(styleName, mutation, value) {
+  return {
+    kind: ENTRY_SET_STYLE,
+    propName: "style",
+    styleName,
+    mutation,
+    value
+  };
+}
+
+function removeStyle(styleName, mutation) {
+  return {
+    kind: ENTRY_REMOVE_STYLE,
+    propName: "style",
+    styleName,
+    mutation,
+    value: ""
+  };
+}
+
+function setInnerHTML(value) {
+  return {
+    kind: ENTRY_SET_INNER_HTML,
+    propName: "dangerouslySetInnerHTML",
+    propertyName: "innerHTML",
+    value
+  };
+}
+
 function nonPayload(propName, category, reason) {
   return {
     kind: ENTRY_NON_PAYLOAD,
@@ -388,11 +614,18 @@ function nonPayload(propName, category, reason) {
   };
 }
 
-function unsupported(propName, category, reason) {
-  return {
+function unsupported(propName, category, reason, details) {
+  const entry = {
     kind: ENTRY_UNSUPPORTED,
     propName,
     category,
     reason
   };
+  if (details !== undefined) {
+    return {
+      ...entry,
+      ...details
+    };
+  }
+  return entry;
 }
