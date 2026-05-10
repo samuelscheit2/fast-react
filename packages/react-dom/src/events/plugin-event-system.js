@@ -3147,6 +3147,13 @@ function invokePrivateClickEventDelegationDispatchGate(
     pluginName: selection.dispatchQueueEntry.pluginName,
     portalOwnerRoot,
     portalOwnerRootAvailable: portalOwnerRoot.available,
+    portalOwnerRootStatus: portalOwnerRoot.status,
+    portalContainerContainsTarget:
+      portalOwnerRoot.portalContainerContainsTarget,
+    publicPortalBubblingBlocked: true,
+    publicPortalBubblingEnabled:
+      portalOwnerRoot.publicPortalBubblingEnabled,
+    rootContainerContainsTarget: portalOwnerRoot.rootContainerContainsTarget,
     privateListenerInvoked: invocationRecord.listenerInvocationCount === 1,
     privateListenerQueue: true,
     publicDispatchBlocked: true,
@@ -3160,6 +3167,10 @@ function invokePrivateClickEventDelegationDispatchGate(
     syntheticEventBlockedReason: SYNTHETIC_EVENT_BLOCKED_CODE,
     syntheticEventCount: 0,
     syntheticEventStatus: 'blocked-not-created',
+    targetDispatchPathLength:
+      normalizedDispatchRecord.targetDispatchPathLength,
+    targetDispatchPathStatus:
+      normalizedDispatchRecord.targetDispatchPathStatus,
     targetInst: normalizedDispatchRecord.targetInst,
     targetInstStatus: normalizedDispatchRecord.targetInstStatus,
     targetListenerRecordTargetInst: normalizedListenerRecord.targetInst,
@@ -4775,10 +4786,16 @@ function validatePrivateClickEventDelegationPortalOwnerRootGate(
   if (portalEventOwnerRootGateRecord === null) {
     return Object.freeze({
       available: false,
+      dispatchPathRootOwnerMatchCount: 0,
+      dispatchPathRootOwnerMismatchCount: 0,
       ownerRootMatchesTargetRoot: false,
+      portalContainerContainsTarget: false,
+      publicPortalBubblingEnabled: false,
       recordKind: null,
+      rootContainerContainsTarget: false,
       status: 'unavailable-no-portal-owner-root-gate',
       targetDispatchPathLength: 0,
+      targetDispatchPathStatus: 'unavailable-no-portal-owner-root-gate',
       targetInstStatus: 'not-applicable'
     });
   }
@@ -4798,7 +4815,12 @@ function validatePrivateClickEventDelegationPortalOwnerRootGate(
       PRIVATE_PORTAL_EVENT_OWNER_ROOT_GATE_STATUS ||
     portalEventOwnerRootGateRecord.ownerRootMatchesTargetRoot !== true ||
     portalEventOwnerRootGateRecord.dispatchPathRootOwnerMismatchCount !== 0 ||
+    portalEventOwnerRootGateRecord.portalContainerContainsTarget !== true ||
+    portalEventOwnerRootGateRecord.publicPortalBubblingEnabled !== false ||
+    portalEventOwnerRootGateRecord.publicDispatchEnabled !== false ||
     portalEventOwnerRootGateRecord.targetInst !== dispatchRecord.targetInst ||
+    portalPayload.targetDispatchPathRecord.targetInst !==
+      dispatchRecord.targetInst ||
     portalPayload.targetDispatchPathRecord.rootOwner !==
       dispatchRecord.targetDispatchPathRecord.rootOwner
   ) {
@@ -4807,6 +4829,10 @@ function validatePrivateClickEventDelegationPortalOwnerRootGate(
       'portal-owner-root-mismatch'
     );
   }
+  assertPrivateClickEventDelegationPortalDispatchPath(
+    dispatchRecord.targetDispatchPathRecord,
+    portalPayload.targetDispatchPathRecord
+  );
 
   return Object.freeze({
     available: true,
@@ -4831,6 +4857,44 @@ function validatePrivateClickEventDelegationPortalOwnerRootGate(
       portalEventOwnerRootGateRecord.targetDispatchPathStatus,
     targetInstStatus: portalEventOwnerRootGateRecord.targetInstStatus
   });
+}
+
+function assertPrivateClickEventDelegationPortalDispatchPath(
+  dispatchPathRecord,
+  portalDispatchPathRecord
+) {
+  if (
+    !isObjectLike(dispatchPathRecord) ||
+    !Array.isArray(dispatchPathRecord.entries) ||
+    !isObjectLike(portalDispatchPathRecord) ||
+    !Array.isArray(portalDispatchPathRecord.entries) ||
+    dispatchPathRecord.entries.length !==
+      portalDispatchPathRecord.entries.length
+  ) {
+    throw createPrivateClickEventDelegationDispatchGateError(
+      'Private click event delegation dispatch rejected portal owner-root metadata whose dispatch path does not match the click target.',
+      'portal-owner-root-mismatch'
+    );
+  }
+
+  for (let index = 0; index < dispatchPathRecord.entries.length; index++) {
+    const dispatchEntry = dispatchPathRecord.entries[index];
+    const portalEntry = portalDispatchPathRecord.entries[index];
+    if (
+      !isObjectLike(dispatchEntry) ||
+      !isObjectLike(portalEntry) ||
+      dispatchEntry.targetHostInstanceToken !==
+        portalEntry.targetHostInstanceToken ||
+      dispatchEntry.targetHostInstanceNode !==
+        portalEntry.targetHostInstanceNode ||
+      dispatchEntry.rootOwner !== portalEntry.rootOwner
+    ) {
+      throw createPrivateClickEventDelegationDispatchGateError(
+        'Private click event delegation dispatch rejected portal owner-root metadata whose dispatch path entries do not match the click target.',
+        'portal-owner-root-mismatch'
+      );
+    }
+  }
 }
 
 function createPrivateClickEventDelegationDispatchGateError(
