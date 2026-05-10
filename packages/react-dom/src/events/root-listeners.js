@@ -45,10 +45,14 @@ const privateRootListenerRegistrationRecordType =
   'fast.react_dom.private_root_listener_registration_record';
 const privateRootListenerCleanupRecordType =
   'fast.react_dom.private_root_listener_cleanup_record';
+const privatePortalPrepareMountListenerIntentRecordType =
+  'fast.react_dom.private_portal_prepare_mount_listener_intent_record';
 const ROOT_LISTENERS_REGISTERED =
   'registered-private-root-listeners';
 const ROOT_LISTENERS_REVERTED =
   'reverted-private-root-listeners';
+const PORTAL_PREPARE_MOUNT_LISTENER_INTENT_RECORDED =
+  'recorded-private-portal-prepare-mount-listener-intent';
 const PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CANARY_RECORD_KIND =
   'FastReactDomPrivateRootHostOutputClickDispatchCanaryRecord';
 const PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CANARY_STATUS =
@@ -61,6 +65,7 @@ const rootListenerCleanupRecords = new WeakMap();
 const rootListenerDispatchRecords = new WeakMap();
 const rootListenerInvocationCanaryRecords = new WeakMap();
 const privateRootHostOutputClickDispatchCanaryPayloads = new WeakMap();
+const portalPrepareMountListenerIntentPayloads = new WeakMap();
 
 function createEventListenerShell(target, domEventName, eventSystemFlags) {
   const priorityWrapperRecord = createEventListenerWrapperRecordWithPriority(
@@ -589,6 +594,120 @@ function listenToPortalContainerEvents(portalContainer, options) {
   listenToAllSupportedEvents(portalContainer, options);
 }
 
+function createPortalPrepareMountListenerIntentRecord(
+  portalContainer,
+  options
+) {
+  assertEventTarget(portalContainer);
+
+  const ownerDocument = getOwnerDocument(portalContainer);
+  const portalAlreadyListening = hasListeningMarker(portalContainer);
+  const ownerDocumentAlreadyListening = hasListeningMarker(ownerDocument);
+  const portalListenerIntents = portalAlreadyListening
+    ? []
+    : createAllSupportedListenerIntentRecords(
+        portalContainer,
+        'portal-container',
+        options
+      );
+  const ownerDocumentNeedsSelectionChange =
+    !portalAlreadyListening &&
+    ownerDocument !== null &&
+    ownerDocument !== portalContainer &&
+    !ownerDocumentAlreadyListening;
+  const ownerDocumentListenerIntents = ownerDocumentNeedsSelectionChange
+    ? [
+        createListenerIntentRecord(
+          ownerDocument,
+          'selectionchange',
+          false,
+          'owner-document',
+          options
+        )
+      ]
+    : [];
+
+  if (ownerDocumentNeedsSelectionChange) {
+    assertEventTarget(ownerDocument);
+  }
+
+  const listenerIntents = freezeArray([
+    ...portalListenerIntents,
+    ...ownerDocumentListenerIntents
+  ]);
+  const intentCounts = summarizeListenerIntentCounts(listenerIntents);
+  const record = freezeRecord({
+    $$typeof: privatePortalPrepareMountListenerIntentRecordType,
+    kind: 'FastReactDomPrivatePortalPrepareMountListenerIntentRecord',
+    action: 'prepare-portal-mount-listener-intent',
+    intentStatus: PORTAL_PREPARE_MOUNT_LISTENER_INTENT_RECORDED,
+    preparePortalMountIntent: true,
+    listenToAllSupportedEventsIntent: !portalAlreadyListening,
+    listenerInstallation: false,
+    eventDispatch: false,
+    compatibilityClaimed: false,
+    portalAlreadyListening,
+    ownerDocumentAlreadyListening,
+    portalListenerIntentCount: portalListenerIntents.length,
+    ownerDocumentListenerIntentCount: ownerDocumentListenerIntents.length,
+    listenerIntentCount: listenerIntents.length,
+    captureListenerIntentCount: intentCounts.captureListenerIntentCount,
+    bubbleListenerIntentCount: intentCounts.bubbleListenerIntentCount,
+    nonDelegatedListenerIntentCount:
+      intentCounts.nonDelegatedListenerIntentCount,
+    passiveListenerIntentCount: intentCounts.passiveListenerIntentCount,
+    portalEventTargetInfo: freezeRecord(describeContainer(portalContainer)),
+    ownerDocumentInfo:
+      ownerDocument === null
+        ? null
+        : freezeRecord(describeContainer(ownerDocument)),
+    targetSnapshotsBefore: freezeArray([
+      describeListenerTargetIntentSnapshot(
+        portalContainer,
+        'portal-container'
+      ),
+      ...(ownerDocument === null
+        ? []
+        : [
+            describeListenerTargetIntentSnapshot(
+              ownerDocument,
+              'owner-document'
+            )
+          ])
+    ]),
+    listenerIntents
+  });
+
+  portalPrepareMountListenerIntentPayloads.set(
+    record,
+    freezeRecord({
+      listenerIntents,
+      options,
+      ownerDocument,
+      ownerDocumentListenerIntents: freezeArray(ownerDocumentListenerIntents),
+      portalContainer,
+      portalListenerIntents: freezeArray(portalListenerIntents)
+    })
+  );
+
+  return record;
+}
+
+function getPortalPrepareMountListenerIntentPayload(record) {
+  if (
+    record === null ||
+    (typeof record !== 'object' && typeof record !== 'function')
+  ) {
+    return null;
+  }
+
+  return portalPrepareMountListenerIntentPayloads.get(record) || null;
+}
+
+function isPortalPrepareMountListenerIntentRecord(record) {
+  return getPortalPrepareMountListenerIntentPayload(record) !== null;
+}
+
 function revertRootListenersForPrivateRoot(registrationRecord) {
   const payload = rootListenerRegistrationPayloads.get(registrationRecord);
   if (payload === undefined) {
@@ -730,6 +849,105 @@ function describeListenerTargetSnapshot(target) {
       eventListenerSet instanceof Set ? eventListenerSet.size : 0,
     listeningMarker: inspectListeningMarker(target)
   });
+}
+
+function describeListenerTargetIntentSnapshot(target, targetRole) {
+  return freezeRecord({
+    ...describeListenerTargetSnapshot(target),
+    targetInfo: freezeRecord(describeContainer(target)),
+    targetRole
+  });
+}
+
+function createAllSupportedListenerIntentRecords(target, targetRole, options) {
+  const listenerIntents = [];
+  for (const domEventName of allNativeEvents) {
+    if (domEventName === 'selectionchange') {
+      continue;
+    }
+
+    if (!isNonDelegatedEvent(domEventName)) {
+      listenerIntents.push(
+        createListenerIntentRecord(
+          target,
+          domEventName,
+          false,
+          targetRole,
+          options
+        )
+      );
+    }
+
+    listenerIntents.push(
+      createListenerIntentRecord(
+        target,
+        domEventName,
+        true,
+        targetRole,
+        options
+      )
+    );
+  }
+
+  return freezeArray(listenerIntents);
+}
+
+function createListenerIntentRecord(
+  target,
+  domEventName,
+  isCapturePhaseListener,
+  targetRole,
+  options
+) {
+  let eventSystemFlags = 0;
+  if (isCapturePhaseListener) {
+    eventSystemFlags |= IS_CAPTURE_PHASE;
+  }
+
+  const listenerOptions = getAddEventListenerOptions(
+    domEventName,
+    isCapturePhaseListener,
+    options
+  );
+
+  return freezeRecord({
+    domEventName,
+    eventSystemFlags,
+    isCapturePhaseListener,
+    isNonDelegatedEvent: isNonDelegatedEvent(domEventName),
+    listenerOptions: describeListenerOptions(listenerOptions),
+    listenerSetKey: getListenerSetKey(domEventName, isCapturePhaseListener),
+    targetInfo: freezeRecord(describeContainer(target)),
+    targetRole
+  });
+}
+
+function summarizeListenerIntentCounts(listenerIntents) {
+  let captureListenerIntentCount = 0;
+  let bubbleListenerIntentCount = 0;
+  let nonDelegatedListenerIntentCount = 0;
+  let passiveListenerIntentCount = 0;
+
+  for (const intent of listenerIntents) {
+    if (intent.isCapturePhaseListener) {
+      captureListenerIntentCount++;
+    } else {
+      bubbleListenerIntentCount++;
+    }
+    if (intent.isNonDelegatedEvent) {
+      nonDelegatedListenerIntentCount++;
+    }
+    if (intent.listenerOptions.passive === true) {
+      passiveListenerIntentCount++;
+    }
+  }
+
+  return {
+    bubbleListenerIntentCount,
+    captureListenerIntentCount,
+    nonDelegatedListenerIntentCount,
+    passiveListenerIntentCount
+  };
 }
 
 function pushListenerRecord(installedListeners, listenerRecord) {
@@ -904,24 +1122,29 @@ module.exports = {
   INVALID_PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CODE,
   PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CANARY_RECORD_KIND,
   PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CANARY_STATUS,
+  PORTAL_PREPARE_MOUNT_LISTENER_INTENT_RECORDED,
   ROOT_LISTENERS_REGISTERED,
   ROOT_LISTENERS_REVERTED,
   addTrappedEventListener,
   createEventListenerShell,
+  createPortalPrepareMountListenerIntentRecord,
   describePortalContainerListenerGuard,
   describeRootListenerGuard,
   getAddEventListenerOptions,
   getLastRootListenerInvocationCanaryRecord,
   getLastRootListenerDispatchRecord,
+  getPortalPrepareMountListenerIntentPayload,
   getRootEventTargetOwnerDocument,
   getPrivateRootHostOutputClickDispatchCanaryPayload,
   invokeLastRootListenerSingleListenerCanary,
   invokePrivateRootHostOutputClickDispatchCanary,
+  isPortalPrepareMountListenerIntentRecord,
   isPrivateRootHostOutputClickDispatchCanaryRecord,
   listenToAllSupportedEvents,
   listenToNativeEvent,
   listenToNonDelegatedEvent,
   listenToPortalContainerEvents,
+  privatePortalPrepareMountListenerIntentRecordType,
   privateRootListenerCleanupRecordType,
   privateRootListenerRegistrationRecordType,
   registerRootListenersForPrivateRoot,

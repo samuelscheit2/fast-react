@@ -37,8 +37,14 @@ const {
 const {hasListeningMarker} = require('../events/listener-registry.js');
 const refCallbackGate = require('./ref-callback-gate.js');
 const {
+  PORTAL_PREPARE_MOUNT_LISTENER_INTENT_RECORDED,
   ROOT_LISTENERS_REGISTERED,
+  createPortalPrepareMountListenerIntentRecord:
+    createPortalPrepareMountEventListenerIntentRecord,
   describePortalContainerListenerGuard,
+  getPortalPrepareMountListenerIntentPayload,
+  privatePortalPrepareMountListenerIntentRecordType:
+    privateEventPortalPrepareMountListenerIntentRecordType,
   privateRootListenerRegistrationRecordType,
   registerRootListenersForPrivateRoot,
   revertRootListenersForPrivateRoot
@@ -99,6 +105,8 @@ const privateRootInitialHostOutputCleanupRecordType =
   'fast.react_dom.private_root_initial_host_output_cleanup_record';
 const privateRootPortalBoundaryRecordType =
   'fast.react_dom.private_root_portal_boundary_record';
+const privateRootPortalPrepareMountListenerIntentRecordType =
+  'fast.react_dom.private_root_portal_prepare_mount_listener_intent_record';
 const privateRootPortalCommitHandoffRecordType =
   'fast.react_dom.private_root_portal_commit_handoff_record';
 const privateRootUnmountHostOutputCleanupRecordType =
@@ -160,6 +168,10 @@ const ROOT_BRIDGE_PORTAL_BOUNDARY_ADMITTED =
   'admitted-private-root-portal-boundary-record';
 const ROOT_BRIDGE_PORTAL_DIAGNOSTIC_BLOCKED =
   'blocked-private-root-portal-diagnostic';
+const ROOT_BRIDGE_PORTAL_PREPARE_MOUNT_LISTENER_INTENT_ADMITTED =
+  'admitted-private-root-portal-prepare-mount-listener-intent';
+const ROOT_BRIDGE_PORTAL_LISTENER_INSTALLATION_BLOCKED =
+  'blocked-private-root-portal-listener-installation';
 const ROOT_BRIDGE_PORTAL_COMMIT_HANDOFF_ADMITTED =
   'admitted-private-root-portal-fake-dom-commit-handoff';
 const ROOT_BRIDGE_PORTAL_COMMIT_MUTATION_BLOCKED =
@@ -323,6 +335,91 @@ const ROOT_BRIDGE_PORTAL_BOUNDARY_BLOCKED_CAPABILITIES = freezeArray([
   }),
   ...ROOT_BRIDGE_BLOCKED_CAPABILITIES
 ]);
+const ROOT_BRIDGE_PORTAL_PREPARE_MOUNT_LISTENER_ACCEPTED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'portal-accepted-boundary',
+      accepted: true,
+      reason:
+        'The listener-intent gate consumed an accepted private portal boundary record.'
+    }),
+    freezeRecord({
+      id: 'portal-prepare-mount-listener-intent',
+      accepted: true,
+      reason:
+        'The gate recorded the preparePortalMount listener intent for the portal container without installing listeners.'
+    }),
+    freezeRecord({
+      id: 'portal-listen-to-all-supported-events-plan',
+      accepted: true,
+      reason:
+        'The event layer derived the listenToAllSupportedEvents registration plan without mutating listener state.'
+    })
+  ]);
+const ROOT_BRIDGE_PORTAL_PREPARE_MOUNT_LISTENER_BLOCKED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'portal-public-container-mounting',
+      blocked: true,
+      reason: 'Public React DOM portal mounting remains blocked.'
+    }),
+    freezeRecord({
+      id: 'portal-listener-installation',
+      blocked: true,
+      reason:
+        'The listener-intent gate records listener work but does not call listenToAllSupportedEvents.'
+    }),
+    freezeRecord({
+      id: 'portal-event-dispatch',
+      blocked: true,
+      reason:
+        'Synthetic event extraction, dispatch, and listener invocation remain blocked.'
+    }),
+    freezeRecord({
+      id: 'portal-child-reconciliation',
+      blocked: true,
+      reason: 'Portal child reconciliation is not admitted by this gate.'
+    }),
+    freezeRecord({
+      id: 'portal-container-replacement',
+      blocked: true,
+      reason:
+        'Replacing portal container children is not admitted by this gate.'
+    }),
+    freezeRecord({
+      id: 'portal-resource-side-effects',
+      blocked: true,
+      reason:
+        'Document resource, form, and controlled input side effects remain blocked.'
+    }),
+    freezeRecord({
+      id: 'native-execution',
+      blocked: true,
+      reason: 'No native or Rust root bridge execution is admitted.'
+    }),
+    freezeRecord({
+      id: 'reconciler-execution',
+      blocked: true,
+      reason:
+        'No reconciler portal complete-work or commit execution is admitted.'
+    }),
+    freezeRecord({
+      id: 'dom-mutation',
+      blocked: true,
+      reason: 'No portal container children, text, attributes, or HTML may be mutated.'
+    }),
+    freezeRecord({
+      id: 'hydration',
+      blocked: true,
+      reason:
+        'Hydration root creation, marker consumption, and replay are not admitted.'
+    }),
+    freezeRecord({
+      id: 'compatibility-claims',
+      blocked: true,
+      reason: 'React DOM portal compatibility remains unclaimed.'
+    })
+  ]);
 const ROOT_BRIDGE_CREATE_RENDER_BLOCKED_CAPABILITIES = freezeArray([
   freezeRecord({
     id: 'native-execution',
@@ -865,6 +962,7 @@ const rootInitialHostOutputHandoffPayloads = new WeakMap();
 const rootInitialHostOutputHandoffRecords = new WeakMap();
 const rootInitialHostOutputCleanupRecords = new WeakMap();
 const rootPortalBoundaryPayloads = new WeakMap();
+const rootPortalPrepareMountListenerIntentPayloads = new WeakMap();
 const rootPortalCommitHandoffPayloads = new WeakMap();
 const rootUnmountHostOutputCleanupPayloads = new WeakMap();
 const rootUnmountHostOutputCleanupRecords = new WeakMap();
@@ -974,6 +1072,13 @@ function createPrivateRootBridgeShell(options) {
     },
     createPortalRootBoundary(record) {
       return createPortalRootBoundaryRecordWithBridge(bridgeState, record);
+    },
+    createPortalPrepareMountListenerIntent(record, options) {
+      return createPortalPrepareMountListenerIntentRecordWithBridge(
+        bridgeState,
+        record,
+        options
+      );
     },
     createPortalCommitHandoff(record, options) {
       return createPortalCommitHandoffRecordWithBridge(
@@ -1492,6 +1597,14 @@ function revertPrivateCreateRootSideEffects(record) {
 
 function createPortalRootBoundaryRecord(record) {
   return createPortalRootBoundaryRecordWithBridge(null, record);
+}
+
+function createPortalPrepareMountListenerIntentRecord(record, options) {
+  return createPortalPrepareMountListenerIntentRecordWithBridge(
+    null,
+    record,
+    options
+  );
 }
 
 function createPortalCommitHandoffRecord(record, options) {
@@ -2617,6 +2730,14 @@ function isPrivateRootPortalBoundaryRecord(value) {
   return rootPortalBoundaryPayloads.has(value);
 }
 
+function getPrivateRootPortalPrepareMountListenerIntentPayload(record) {
+  return rootPortalPrepareMountListenerIntentPayloads.get(record) || null;
+}
+
+function isPrivateRootPortalPrepareMountListenerIntentRecord(value) {
+  return rootPortalPrepareMountListenerIntentPayloads.has(value);
+}
+
 function getPrivateRootPortalCommitHandoffPayload(record) {
   return rootPortalCommitHandoffPayloads.get(record) || null;
 }
@@ -3603,6 +3724,119 @@ function createPortalRootBoundaryRecordWithBridge(bridgeState, record) {
   });
 
   return boundaryRecord;
+}
+
+function createPortalPrepareMountListenerIntentRecordWithBridge(
+  bridgeState,
+  record,
+  options
+) {
+  const validation = validatePortalPrepareMountListenerBoundaryRecord(record);
+  if (
+    bridgeState !== null &&
+    validation.rootHandleState.bridgeState !== bridgeState
+  ) {
+    const error = new Error(
+      'Cannot use a private root bridge portal preparePortalMount listener ' +
+        'intent with a different root bridge shell.'
+    );
+    error.code = 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE';
+    throw error;
+  }
+
+  const rootBridgeState = validation.rootHandleState.bridgeState;
+  const sequence = rootBridgeState.nextPortalPrepareMountListenerSequence++;
+  const intentId =
+    `${rootBridgeState.portalPrepareMountListenerIdPrefix}:${sequence}`;
+  const portal = validation.payload.portal;
+  const portalContainer = validation.payload.portalContainer;
+  const listenerIntentRecord =
+    createPortalPrepareMountEventListenerIntentRecord(
+      portalContainer,
+      options
+    );
+  const listenerIntentPayload =
+    getPortalPrepareMountListenerIntentPayload(listenerIntentRecord);
+  const portalContainerOwnership = describePortalContainerOwnership(
+    validation.payload.rootHandle,
+    validation.rootHandleState,
+    portalContainer
+  );
+
+  const intentRecord = freezeRecord({
+    $$typeof: privateRootPortalPrepareMountListenerIntentRecordType,
+    kind: 'FastReactDomPrivateRootPortalPrepareMountListenerIntentRecord',
+    operation: 'portal-prepare-mount-listener-intent',
+    intentId,
+    intentSequence: sequence,
+    intentStatus: ROOT_BRIDGE_PORTAL_PREPARE_MOUNT_LISTENER_INTENT_ADMITTED,
+    listenerInstallationStatus:
+      ROOT_BRIDGE_PORTAL_LISTENER_INSTALLATION_BLOCKED,
+    sourceBoundaryId: record.boundaryId,
+    sourceBoundarySequence: record.boundarySequence,
+    sourceBoundaryStatus: record.boundaryStatus,
+    sourceDiagnosticStatus: record.diagnosticStatus,
+    sourceRequestId: record.sourceRequestId,
+    sourceRequestSequence: record.sourceRequestSequence,
+    sourceRequestType: record.sourceRequestType,
+    sourceUpdateId: record.sourceUpdateId,
+    rootId: record.rootId,
+    rootKind: record.rootKind,
+    rootTag: record.rootTag,
+    portalKey: portal.key,
+    hostFiberPath: freezeArray(['HostRoot', 'HostPortal']),
+    portalContainerInfo: record.portalContainerInfo,
+    portalContainerOwnership,
+    portalListenerGuard: describePortalContainerListenerGuard(
+      portalContainer,
+      {
+        action: 'record-prepare-portal-mount-listener-intent'
+      }
+    ),
+    listenerIntent: summarizePortalPrepareMountListenerIntentRecord(
+      listenerIntentRecord
+    ),
+    acceptedCapabilities:
+      ROOT_BRIDGE_PORTAL_PREPARE_MOUNT_LISTENER_ACCEPTED_CAPABILITIES,
+    blockedCapabilities:
+      ROOT_BRIDGE_PORTAL_PREPARE_MOUNT_LISTENER_BLOCKED_CAPABILITIES,
+    preparePortalMountIntent: true,
+    preparePortalMount: false,
+    listenToAllSupportedEventsIntent:
+      listenerIntentRecord.listenToAllSupportedEventsIntent,
+    listenToAllSupportedEvents: false,
+    portalListenerIntentRecorded: true,
+    portalContainerChildrenReplaced: false,
+    portalChildReconciliation: false,
+    portalMounting: false,
+    publicPortalMounting: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: false,
+    publicDomMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    resourceSideEffects: false,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false
+  });
+
+  rootPortalPrepareMountListenerIntentPayloads.set(
+    intentRecord,
+    freezeRecord({
+      boundaryRecord: record,
+      listenerIntentPayload,
+      listenerIntentRecord,
+      portal,
+      portalContainer,
+      rootContainer: validation.rootHandleState.container,
+      rootHandle: validation.payload.rootHandle,
+      sourceRecord: validation.payload.sourceRecord
+    })
+  );
+
+  return intentRecord;
 }
 
 function createPortalCommitHandoffRecordWithBridge(
@@ -4827,6 +5061,10 @@ function createBridgeState(options) {
       options && options.portalBoundaryIdPrefix,
       'portal-boundary'
     ),
+    portalPrepareMountListenerIdPrefix: getIdPrefix(
+      options && options.portalPrepareMountListenerIdPrefix,
+      'portal-prepare-mount-listener'
+    ),
     portalCommitIdPrefix: getIdPrefix(
       options && options.portalCommitIdPrefix,
       'portal-commit'
@@ -4862,6 +5100,7 @@ function createBridgeState(options) {
     nextHostOutputUpdateSequence: 1,
     nextRootCommitHostComponentUpdateSequence: 1,
     nextPortalBoundarySequence: 1,
+    nextPortalPrepareMountListenerSequence: 1,
     nextPortalCommitSequence: 1,
     nextPortalMountSequence: 1,
     nextPortalChildReconciliationSequence: 1,
@@ -5927,6 +6166,46 @@ function validatePortalCommitHandoffBoundaryRecord(record) {
   };
 }
 
+function validatePortalPrepareMountListenerBoundaryRecord(record) {
+  const payload = rootPortalBoundaryPayloads.get(record);
+  if (payload === undefined) {
+    throwInvalidPortalPrepareMountListenerRecord(
+      'Expected a private React DOM portal root boundary record.'
+    );
+  }
+
+  if (
+    record.$$typeof !== privateRootPortalBoundaryRecordType ||
+    record.kind !== 'FastReactDomPrivateRootPortalBoundaryRecord' ||
+    record.operation !== 'portal-root-boundary' ||
+    record.boundaryStatus !== ROOT_BRIDGE_PORTAL_BOUNDARY_ADMITTED ||
+    record.diagnosticStatus !== ROOT_BRIDGE_PORTAL_DIAGNOSTIC_BLOCKED ||
+    record.acceptedPortalObjectShape !== true
+  ) {
+    throwInvalidPortalPrepareMountListenerRecord(
+      'Expected an admitted private React DOM portal boundary record.'
+    );
+  }
+
+  assertPortalBoundaryStillBlockedForPrepareMountListener(record);
+
+  const rootHandleState = getPrivateRootHandleState(payload.rootHandle);
+  assertAcceptedReactDomPortalObject(payload.portal, rootHandleState);
+  if (
+    payload.portal.containerInfo !== payload.portalContainer ||
+    payload.portalChildren !== payload.portal.children
+  ) {
+    throwInvalidPortalPrepareMountListenerRecord(
+      'Private portal boundary payload does not match the portal object.'
+    );
+  }
+
+  return {
+    payload,
+    rootHandleState
+  };
+}
+
 function getCachedUnmountHostOutputCleanup(
   bridgeState,
   admissionRecord,
@@ -6685,6 +6964,25 @@ function assertPortalBoundaryStillBlocked(record) {
   }
 }
 
+function assertPortalBoundaryStillBlockedForPrepareMountListener(record) {
+  if (
+    record.nativeExecution !== false ||
+    record.reconcilerExecution !== false ||
+    record.portalChildReconciliation !== false ||
+    record.portalMounting !== false ||
+    record.domMutation !== false ||
+    record.markerWrites !== false ||
+    record.listenerInstallation !== false ||
+    record.hydration !== false ||
+    record.eventDispatch !== false ||
+    record.compatibilityClaimed !== false
+  ) {
+    throwInvalidPortalPrepareMountListenerRecord(
+      'Private portal boundary records must remain blocked before preparePortalMount listener intent.'
+    );
+  }
+}
+
 function assertPortalBoundaryStillBlockedForChildReconciliation(record) {
   if (
     record.nativeExecution !== false ||
@@ -7008,6 +7306,33 @@ function describePortalCommitListenerSideEffects(
   });
 }
 
+function summarizePortalPrepareMountListenerIntentRecord(record) {
+  return freezeRecord({
+    eventRecordType: privateEventPortalPrepareMountListenerIntentRecordType,
+    eventRecordKind: record.kind,
+    eventIntentStatus: record.intentStatus,
+    eventIntentMatchesPreparePortalMount:
+      record.intentStatus === PORTAL_PREPARE_MOUNT_LISTENER_INTENT_RECORDED,
+    action: record.action,
+    preparePortalMountIntent: record.preparePortalMountIntent,
+    listenToAllSupportedEventsIntent: record.listenToAllSupportedEventsIntent,
+    listenerInstallation: record.listenerInstallation,
+    portalAlreadyListening: record.portalAlreadyListening,
+    ownerDocumentAlreadyListening: record.ownerDocumentAlreadyListening,
+    portalListenerIntentCount: record.portalListenerIntentCount,
+    ownerDocumentListenerIntentCount:
+      record.ownerDocumentListenerIntentCount,
+    listenerIntentCount: record.listenerIntentCount,
+    captureListenerIntentCount: record.captureListenerIntentCount,
+    bubbleListenerIntentCount: record.bubbleListenerIntentCount,
+    nonDelegatedListenerIntentCount: record.nonDelegatedListenerIntentCount,
+    passiveListenerIntentCount: record.passiveListenerIntentCount,
+    targetSnapshotsBefore: record.targetSnapshotsBefore,
+    portalEventTargetInfo: record.portalEventTargetInfo,
+    ownerDocumentInfo: record.ownerDocumentInfo
+  });
+}
+
 function assertPrivateRootPublicFacadeRootForAdapter(root, adapterState) {
   const payload = rootPublicFacadeRootPayloads.get(root);
   if (payload === undefined) {
@@ -7106,6 +7431,13 @@ function throwInvalidPortalRootBoundaryRecord(message) {
 function throwInvalidPortalCommitHandoffRecord(message) {
   const error = new Error(message);
   error.code = 'FAST_REACT_DOM_INVALID_PORTAL_COMMIT_HANDOFF_RECORD';
+  throw error;
+}
+
+function throwInvalidPortalPrepareMountListenerRecord(message) {
+  const error = new Error(message);
+  error.code =
+    'FAST_REACT_DOM_INVALID_PORTAL_PREPARE_MOUNT_LISTENER_RECORD';
   throw error;
 }
 
@@ -7354,6 +7686,10 @@ module.exports = {
   ROOT_BRIDGE_PORTAL_COMMIT_MUTATION_BLOCKED,
   ROOT_BRIDGE_PORTAL_CONTAINER_OWNERSHIP_VALIDATED,
   ROOT_BRIDGE_PORTAL_DIAGNOSTIC_BLOCKED,
+  ROOT_BRIDGE_PORTAL_LISTENER_INSTALLATION_BLOCKED,
+  ROOT_BRIDGE_PORTAL_PREPARE_MOUNT_LISTENER_ACCEPTED_CAPABILITIES,
+  ROOT_BRIDGE_PORTAL_PREPARE_MOUNT_LISTENER_BLOCKED_CAPABILITIES,
+  ROOT_BRIDGE_PORTAL_PREPARE_MOUNT_LISTENER_INTENT_ADMITTED,
   ROOT_BRIDGE_PORTAL_CHILD_RECONCILIATION_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_PORTAL_CHILD_RECONCILIATION_ADMITTED,
   ROOT_BRIDGE_PORTAL_CHILD_RECONCILIATION_BLOCKED_CAPABILITIES,
@@ -7403,6 +7739,7 @@ module.exports = {
   createPortalChildReconciliationDiagnosticRecord,
   createPortalCommitHandoffRecord,
   createPortalFakeDomMountDiagnosticRecord,
+  createPortalPrepareMountListenerIntentRecord,
   createPortalRootBoundaryRecord,
   createPrivateRootBridgeShell,
   createPrivateRootPublicFacadeAdapter,
@@ -7427,6 +7764,7 @@ module.exports = {
   getPrivateRootPortalChildReconciliationDiagnosticPayload,
   getPrivateRootPortalCommitHandoffPayload,
   getPrivateRootPortalFakeDomMountPayload,
+  getPrivateRootPortalPrepareMountListenerIntentPayload,
   getPrivateRootPublicFacadeAdapterPayload,
   getPrivateRootPublicFacadePreflightPayload,
   getPrivateRootPublicFacadePreflightRecordPayload,
@@ -7446,6 +7784,7 @@ module.exports = {
   isPrivateRootPortalChildReconciliationDiagnosticRecord,
   isPrivateRootPortalCommitHandoffRecord,
   isPrivateRootPortalFakeDomMountRecord,
+  isPrivateRootPortalPrepareMountListenerIntentRecord,
   isPrivateRootPortalBoundaryRecord,
   isPrivateRootPublicFacadeAdapter,
   isPrivateRootPublicFacadePreflight,
@@ -7471,6 +7810,7 @@ module.exports = {
   privateRootPortalBoundaryRecordType,
   privateRootPortalChildReconciliationDiagnosticRecordType,
   privateRootPortalCommitHandoffRecordType,
+  privateRootPortalPrepareMountListenerIntentRecordType,
   privateRootPublicFacadeAdapterSymbol,
   privateRootPublicFacadeAdapterType,
   privateRootPublicFacadePreflightRecordType,

@@ -1861,6 +1861,201 @@ test('private portal fake-DOM commit handoff validates ownership and blocked sid
   assert.equal(portalContainer.__mutationLog.length, 0);
 });
 
+test('private portal preparePortalMount listener intent records without installing', () => {
+  const document = createDocument('private-portal-prepare-listener');
+  const rootContainer = createElement('DIV', document);
+  const portalContainer = createElement('SECTION', document);
+  const portalChild = {
+    props: {
+      children: 'portal child'
+    },
+    type: 'span'
+  };
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    portalBoundaryIdPrefix: 'portal-boundary',
+    portalPrepareMountListenerIdPrefix: 'portal-listener'
+  });
+  const otherBridge = rootBridge.createPrivateRootBridgeShell();
+  const create = bridge.createClientRoot(rootContainer);
+  const rootSideEffects = bridge.applyCreateRootSideEffects(create);
+  const portal = reactDom.createPortal(
+    portalChild,
+    portalContainer,
+    'portal-key'
+  );
+  const render = bridge.renderContainer(create.handle, portal);
+  const boundary = bridge.createPortalRootBoundary(render);
+
+  const intent = bridge.createPortalPrepareMountListenerIntent(boundary);
+  const hiddenIntent =
+    rootBridge.getPrivateRootPortalPrepareMountListenerIntentPayload(
+      intent
+    );
+  const eventIntentPayload =
+    rootListeners.getPortalPrepareMountListenerIntentPayload(
+      hiddenIntent.listenerIntentRecord
+    );
+
+  assert.equal(
+    intent.$$typeof,
+    rootBridge.privateRootPortalPrepareMountListenerIntentRecordType
+  );
+  assert.equal(
+    intent.kind,
+    'FastReactDomPrivateRootPortalPrepareMountListenerIntentRecord'
+  );
+  assert.equal(intent.operation, 'portal-prepare-mount-listener-intent');
+  assert.equal(intent.intentId, 'portal-listener:1');
+  assert.equal(
+    intent.intentStatus,
+    rootBridge.ROOT_BRIDGE_PORTAL_PREPARE_MOUNT_LISTENER_INTENT_ADMITTED
+  );
+  assert.equal(
+    intent.listenerInstallationStatus,
+    rootBridge.ROOT_BRIDGE_PORTAL_LISTENER_INSTALLATION_BLOCKED
+  );
+  assert.equal(intent.sourceBoundaryId, boundary.boundaryId);
+  assert.equal(intent.sourceRequestId, render.requestId);
+  assert.equal(intent.portalKey, 'portal-key');
+  assert.deepEqual(intent.hostFiberPath, ['HostRoot', 'HostPortal']);
+  assert.deepEqual(
+    intent.acceptedCapabilities.map((capability) => capability.id),
+    [
+      'portal-accepted-boundary',
+      'portal-prepare-mount-listener-intent',
+      'portal-listen-to-all-supported-events-plan'
+    ]
+  );
+  assert.deepEqual(
+    intent.blockedCapabilities.map((capability) => capability.id),
+    [
+      'portal-public-container-mounting',
+      'portal-listener-installation',
+      'portal-event-dispatch',
+      'portal-child-reconciliation',
+      'portal-container-replacement',
+      'portal-resource-side-effects',
+      'native-execution',
+      'reconciler-execution',
+      'dom-mutation',
+      'hydration',
+      'compatibility-claims'
+    ]
+  );
+  assert.equal(intent.preparePortalMountIntent, true);
+  assert.equal(intent.preparePortalMount, false);
+  assert.equal(intent.listenToAllSupportedEventsIntent, true);
+  assert.equal(intent.listenToAllSupportedEvents, false);
+  assert.equal(intent.portalListenerIntentRecorded, true);
+  assert.equal(intent.portalContainerChildrenReplaced, false);
+  assert.equal(intent.portalChildReconciliation, false);
+  assert.equal(intent.portalMounting, false);
+  assert.equal(intent.publicPortalMounting, false);
+  assert.equal(intent.nativeExecution, false);
+  assert.equal(intent.reconcilerExecution, false);
+  assert.equal(intent.domMutation, false);
+  assert.equal(intent.publicDomMutation, false);
+  assert.equal(intent.markerWrites, false);
+  assert.equal(intent.listenerInstallation, false);
+  assert.equal(intent.resourceSideEffects, false);
+  assert.equal(intent.eventDispatch, false);
+  assert.equal(intent.compatibilityClaimed, false);
+  assert.equal(
+    intent.portalListenerGuard.action,
+    'record-prepare-portal-mount-listener-intent'
+  );
+  assert.equal(intent.portalListenerGuard.hasPortalListeningMarker, false);
+  assert.equal(intent.listenerIntent.listenerIntentCount, 138);
+  assert.equal(intent.listenerIntent.portalListenerIntentCount, 138);
+  assert.equal(intent.listenerIntent.ownerDocumentListenerIntentCount, 0);
+  assert.equal(intent.listenerIntent.passiveListenerIntentCount, 6);
+  assert.equal(intent.listenerIntent.portalAlreadyListening, false);
+  assert.equal(intent.listenerIntent.ownerDocumentAlreadyListening, true);
+  assert.equal(
+    intent.listenerIntent.eventIntentMatchesPreparePortalMount,
+    true
+  );
+  assert.equal(
+    intent.listenerIntent.eventRecordType,
+    rootListeners.privatePortalPrepareMountListenerIntentRecordType
+  );
+  assert.equal(
+    intent.portalContainerOwnership.ownershipStatus,
+    rootBridge.ROOT_BRIDGE_PORTAL_CONTAINER_OWNERSHIP_VALIDATED
+  );
+  assert.equal(
+    intent.portalContainerOwnership.rootContainerOwnerMatchesHandle,
+    true
+  );
+  assert.equal(
+    intent.portalContainerOwnership.portalContainerAvailableForPortal,
+    true
+  );
+
+  assert.equal(
+    rootBridge.isPrivateRootPortalPrepareMountListenerIntentRecord(intent),
+    true
+  );
+  assert.equal(
+    rootBridge.isPrivateRootPortalPrepareMountListenerIntentRecord({}),
+    false
+  );
+  assert.equal(
+    rootBridge.getPrivateRootPortalPrepareMountListenerIntentPayload({}),
+    null
+  );
+  assert.equal(
+    rootListeners.isPortalPrepareMountListenerIntentRecord(
+      hiddenIntent.listenerIntentRecord
+    ),
+    true
+  );
+  assert.equal(hiddenIntent.boundaryRecord, boundary);
+  assert.equal(hiddenIntent.listenerIntentPayload, eventIntentPayload);
+  assert.equal(hiddenIntent.portal, portal);
+  assert.equal(hiddenIntent.portalContainer, portalContainer);
+  assert.equal(hiddenIntent.rootContainer, rootContainer);
+  assert.equal(hiddenIntent.rootHandle, create.handle);
+  assert.equal(hiddenIntent.sourceRecord, render);
+  assert.equal(eventIntentPayload.portalContainer, portalContainer);
+  assert.equal(eventIntentPayload.ownerDocument, document);
+  assert.equal(eventIntentPayload.portalListenerIntents.length, 138);
+  assert.equal(eventIntentPayload.ownerDocumentListenerIntents.length, 0);
+  assert.equal(eventIntentPayload.listenerIntents.length, 138);
+
+  assert.equal(portalContainer.__registrations.length, 0);
+  assert.equal(portalContainer.__mutationLog.length, 0);
+  assert.equal(listenerRegistry.hasListeningMarker(portalContainer), false);
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(
+      portalContainer,
+      listenerRegistry.internalEventHandlersKey
+    ),
+    false
+  );
+  assert.equal(rootContainer.__mutationLog.length, 0);
+
+  const serialized = JSON.stringify(intent);
+  assert.equal(serialized.includes('__registrations'), false);
+  assert.equal(serialized.includes('__FAST_REACT_DOM_EVENT_TARGET__'), false);
+
+  assert.throws(() => bridge.createPortalPrepareMountListenerIntent({}), {
+    code: 'FAST_REACT_DOM_INVALID_PORTAL_PREPARE_MOUNT_LISTENER_RECORD'
+  });
+  assert.throws(
+    () => otherBridge.createPortalPrepareMountListenerIntent(boundary),
+    {
+      code: 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE'
+    }
+  );
+
+  bridge.revertCreateRootSideEffects(rootSideEffects);
+  assert.equal(rootMarkers.isContainerMarkedAsRoot(rootContainer), false);
+  assert.equal(listenerRegistry.hasListeningMarker(rootContainer), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+  assert.equal(portalContainer.__registrations.length, 0);
+});
+
 test('private root unmount host-output cleanup clears fake DOM and metadata', () => {
   const document = createDocument('private-unmount-host-output');
   const container = createElement('DIV', document);
