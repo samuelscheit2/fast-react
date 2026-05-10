@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   DOM_EVENT_DELEGATION_EVENT_EXAMPLES,
@@ -19,6 +22,29 @@ import {
 import {
   DOM_EVENT_DELEGATION_SCENARIOS
 } from "../src/dom-event-delegation-scenarios.mjs";
+
+const require = createRequire(import.meta.url);
+const repoRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  ".."
+);
+const componentTree = require(
+  path.join(repoRoot, "packages/react-dom/src/client/component-tree.js")
+);
+const domContainer = require(
+  path.join(repoRoot, "packages/react-dom/src/client/dom-container.js")
+);
+const eventListener = require(
+  path.join(
+    repoRoot,
+    "packages/react-dom/src/events/react-dom-event-listener.js"
+  )
+);
+const pluginEventSystem = require(
+  path.join(repoRoot, "packages/react-dom/src/events/plugin-event-system.js")
+);
 
 const oracle = readCheckedDomEventDelegationOracle();
 
@@ -187,6 +213,101 @@ test("preventDefault updates synthetic and native default-prevented state", () =
   }
 });
 
+test("private input/change extraction preflight records target and controlled metadata without dispatch", () => {
+  const cases = [
+    {
+      controlledPropName: "value",
+      domEventName: "input",
+      expectedDomEventNames: ["input", "change"],
+      inputType: "text",
+      latestProps: {
+        onChange() {},
+        type: "text",
+        value: "delegated text"
+      },
+      targetKind: "text-input"
+    },
+    {
+      controlledPropName: "checked",
+      domEventName: "click",
+      expectedDomEventNames: ["click"],
+      inputType: "checkbox",
+      latestProps: {
+        checked: true,
+        onChange() {},
+        type: "checkbox"
+      },
+      targetKind: "checkbox-input"
+    }
+  ];
+
+  for (const testCase of cases) {
+    const { container, dispatchRecord, targetNode } =
+      createPrivateInputChangeDelegationDispatch(testCase);
+    const preflight =
+      pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+        dispatchRecord
+      );
+
+    assert.equal(
+      preflight.kind,
+      pluginEventSystem.INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_RECORD_KIND,
+      testCase.domEventName
+    );
+    assert.equal(
+      preflight.status,
+      pluginEventSystem
+        .PRIVATE_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_STATUS,
+      testCase.domEventName
+    );
+    assert.equal(preflight.pluginName, "change-event-plugin");
+    assert.equal(preflight.reactEventType, "change");
+    assert.equal(preflight.reactName, "onChange");
+    assert.equal(preflight.eventType, testCase.domEventName);
+    assert.equal(preflight.targetTag, "input");
+    assert.equal(preflight.targetType, testCase.inputType);
+    assert.equal(preflight.targetMetadata.targetKind, testCase.targetKind);
+    assert.deepEqual(
+      preflight.targetMetadata.expectedDomEventNames,
+      testCase.expectedDomEventNames
+    );
+    assert.equal(preflight.controlledMetadataAvailable, true);
+    assert.equal(
+      preflight.controlledMetadata.controlledPropName,
+      testCase.controlledPropName
+    );
+    assert.equal(preflight.controlledMetadata.controlledPropPresent, true);
+    assert.equal(preflight.controlledMetadata.onChangeListenerPresent, true);
+    assert.equal(
+      preflight.controlledMetadata.controlledStateRestoreScheduled,
+      false
+    );
+    assert.equal(
+      preflight.extractionMetadata.status,
+      "blocked-before-value-tracker-change-check"
+    );
+    assert.equal(preflight.extractionMetadata.syntheticEventCreated, false);
+    assert.equal(
+      preflight.extractionMetadata.enqueueStateRestoreScheduled,
+      false
+    );
+    assert.equal(preflight.dispatchBehavior.eventDispatch, false);
+    assert.equal(preflight.dispatchBehavior.syntheticEventDispatch, false);
+    assert.equal(preflight.dispatchBehavior.dispatchQueueMutated, false);
+    assert.equal(preflight.defaultBehavior.preventDefaultCalled, false);
+    assert.equal(preflight.defaultBehavior.defaultBehaviorChanged, false);
+    assert.equal(preflight.sideEffects.browserListenerInstallation, false);
+    assert.equal(preflight.sideEffects.controlledStateRestoreScheduled, false);
+    assert.equal(preflight.browserDomEventCompatibilityClaimed, false);
+    assert.equal(preflight.compatibilityClaimed, false);
+    assert.equal(Object.hasOwn(preflight, "nativeEvent"), false);
+    assert.equal(Object.hasOwn(preflight, "syntheticEvent"), false);
+    assert.equal(Object.hasOwn(preflight, "latestProps"), false);
+    assert.equal(container.__registrations.length, 0);
+    assert.equal(Object.hasOwn(targetNode, "_valueTracker"), false);
+  }
+});
+
 test("synthetic event shape records target/currentTarget and post-dispatch currentTarget reset", () => {
   for (const mode of DOM_EVENT_DELEGATION_PROBE_MODES) {
     const observation = findDomEventDelegationDispatch(
@@ -285,4 +406,63 @@ function assertRootBubbleAndCapture(installation, eventName) {
   );
   assert.equal(registration.captureCount, 1, eventName);
   assert.equal(registration.bubbleCount, 1, eventName);
+}
+
+function createPrivateInputChangeDelegationDispatch(options) {
+  const document = createPrivateDelegationDocument();
+  const container = createPrivateDelegationNode("DIV", document);
+  const targetNode = createPrivateDelegationNode("INPUT", document);
+  targetNode.parentNode = container;
+  targetNode.type = options.inputType;
+
+  const token = componentTree.createHostInstanceToken(
+    { kind: `${options.targetKind}:host` },
+    { kind: `${options.targetKind}:root` }
+  );
+  componentTree.attachHostInstanceNode(
+    targetNode,
+    token,
+    options.latestProps
+  );
+  const wrapperRecord =
+    eventListener.createEventListenerWrapperRecordWithPriority(
+      container,
+      options.domEventName,
+      0
+    );
+
+  return {
+    container,
+    dispatchRecord: eventListener.dispatchEvent(wrapperRecord, {
+      defaultPrevented: false,
+      preventDefaultCallCount: 0,
+      returnValue: true,
+      target: targetNode,
+      type: options.domEventName
+    }),
+    document,
+    targetNode,
+    token
+  };
+}
+
+function createPrivateDelegationDocument() {
+  const document = {
+    localName: "#document",
+    nodeName: "#document",
+    nodeType: domContainer.DOCUMENT_NODE
+  };
+  document.ownerDocument = document;
+  return document;
+}
+
+function createPrivateDelegationNode(nodeName, ownerDocument) {
+  return {
+    __registrations: [],
+    localName: nodeName.toLowerCase(),
+    nodeName,
+    nodeType: domContainer.ELEMENT_NODE,
+    ownerDocument,
+    parentNode: null
+  };
 }

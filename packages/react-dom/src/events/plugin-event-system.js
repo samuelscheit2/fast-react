@@ -43,6 +43,8 @@ const DISPATCH_QUEUE_INVOCATION_CANARY_RECORD_KIND =
   'FastReactDomDispatchQueueInvocationCanaryRecord';
 const EVENT_TYPE_DISPATCH_CANARY_RECORD_KIND =
   'FastReactDomEventTypeDispatchCanaryRecord';
+const INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_RECORD_KIND =
+  'FastReactDomInputChangeEventExtractionPreflightRecord';
 const SYNTHETIC_EVENT_SHAPE_RECORD_KIND =
   'FastReactDomSyntheticEventShapeRecord';
 const SYNTHETIC_EVENT_SHAPE_GATE_RECORD_KIND =
@@ -95,6 +97,8 @@ const HYDRATION_REPLAY_BLOCKED_CODE =
   'FAST_REACT_DOM_HYDRATION_REPLAY_BLOCKED';
 const CONTROLLED_STATE_RESTORE_BLOCKED_CODE =
   'FAST_REACT_DOM_CONTROLLED_STATE_RESTORE_BLOCKED';
+const INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_BLOCKED_CODE =
+  'FAST_REACT_DOM_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_BLOCKED';
 const INVALID_EVENT_WRAPPER_RECORD_CODE =
   'FAST_REACT_DOM_INVALID_EVENT_WRAPPER_RECORD';
 const INVALID_EVENT_DISPATCH_RECORD_CODE =
@@ -127,11 +131,14 @@ const PRIVATE_PORTAL_EVENT_OWNER_ROOT_GATE_STATUS =
   'controlled-private-portal-event-owner-root-gate';
 const PRIVATE_EVENT_TYPE_DISPATCH_CANARY_STATUS =
   'controlled-private-event-type-dispatch-canary';
+const PRIVATE_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_STATUS =
+  'controlled-private-input-change-event-extraction-preflight';
 
 const SIMPLE_EVENT_PLUGIN_NAME = 'simple-event-plugin';
+const CHANGE_EVENT_PLUGIN_NAME = 'change-event-plugin';
 const POLYFILL_EVENT_PLUGIN_NAMES = Object.freeze([
   'enter-leave-event-plugin',
-  'change-event-plugin',
+  CHANGE_EVENT_PLUGIN_NAME,
   'select-event-plugin',
   'before-input-event-plugin',
   'form-action-event-plugin'
@@ -258,12 +265,30 @@ const hydrationContinuousReplayQueueNames = Object.freeze({
   gotpointercapture: 'queuedPointerCaptures',
   lostpointercapture: 'queuedPointerCaptures'
 });
+const textInputElementTypes = new Set([
+  'color',
+  'date',
+  'datetime',
+  'datetime-local',
+  'email',
+  'month',
+  'number',
+  'password',
+  'range',
+  'search',
+  'tel',
+  'text',
+  'time',
+  'url',
+  'week'
+]);
 const simpleEventReactNames = createSimpleEventReactNameMap();
 const dispatchListenerRecordPayloads = new WeakMap();
 const dispatchQueueEntryRecordPayloads = new WeakMap();
 const dispatchListenerInvocationCanaryRecordPayloads = new WeakMap();
 const dispatchQueueInvocationCanaryRecordPayloads = new WeakMap();
 const eventTypeDispatchCanaryRecordPayloads = new WeakMap();
+const inputChangeEventExtractionPreflightRecordPayloads = new WeakMap();
 const syntheticEventShapeRecordPayloads = new WeakMap();
 const syntheticEventShapeGateRecordPayloads = new WeakMap();
 const dispatchListenerErrorRouteRecordPayloads = new WeakMap();
@@ -276,6 +301,99 @@ function isObjectLike(value) {
     value !== null &&
     (typeof value === 'object' || typeof value === 'function')
   );
+}
+
+function hasOwnProp(object, key) {
+  return Object.prototype.hasOwnProperty.call(object, key);
+}
+
+function getInputChangePreflightTargetNode(dispatchRecord) {
+  if (isObjectLike(dispatchRecord.targetHostInstanceNode)) {
+    return dispatchRecord.targetHostInstanceNode;
+  }
+
+  if (
+    isObjectLike(dispatchRecord.targetDispatchPathRecord) &&
+    isObjectLike(
+      dispatchRecord.targetDispatchPathRecord.targetHostInstanceNode
+    )
+  ) {
+    return (
+      dispatchRecord.targetDispatchPathRecord.targetHostInstanceNode
+    );
+  }
+
+  return isObjectLike(dispatchRecord.nativeEventTarget)
+    ? dispatchRecord.nativeEventTarget
+    : null;
+}
+
+function getInputChangePreflightHostTag(node) {
+  if (!isObjectLike(node)) {
+    return null;
+  }
+
+  if (typeof node.localName === 'string' && node.localName !== '') {
+    return node.localName.toLowerCase();
+  }
+
+  if (typeof node.nodeName === 'string' && node.nodeName !== '') {
+    return node.nodeName.toLowerCase();
+  }
+
+  return null;
+}
+
+function getInputChangePreflightInputType(
+  hostTag,
+  targetNode,
+  latestProps
+) {
+  if (hostTag !== 'input') {
+    return null;
+  }
+
+  const targetType = getInputChangePreflightStringProperty(
+    targetNode,
+    'type'
+  );
+  const propsType = getInputChangePreflightStringProperty(
+    latestProps,
+    'type'
+  );
+  const rawType = targetType === null ? propsType : targetType;
+  if (rawType === null || rawType.trim() === '') {
+    return 'text';
+  }
+
+  return rawType.toLowerCase();
+}
+
+function getInputChangePreflightStringProperty(source, key) {
+  if (!isObjectLike(source) || !hasOwnProp(source, key)) {
+    return null;
+  }
+
+  return typeof source[key] === 'string' ? source[key] : null;
+}
+
+function createInputChangePreflightPropSummary(props, propName) {
+  if (!isObjectLike(props) || typeof propName !== 'string') {
+    return Object.freeze({
+      nonNull: false,
+      present: false,
+      type: 'missing'
+    });
+  }
+
+  const present = hasOwnProp(props, propName);
+  const value = present ? props[propName] : undefined;
+
+  return Object.freeze({
+    nonNull: present && value != null,
+    present,
+    type: present ? typeof value : 'missing'
+  });
 }
 
 function createInvalidEventWrapperRecordError() {
@@ -932,6 +1050,395 @@ function getEventTypeDispatchCanaryRecordPayload(record) {
 
 function isEventTypeDispatchCanaryRecord(record) {
   return getEventTypeDispatchCanaryRecordPayload(record) !== null;
+}
+
+function createInputChangeEventExtractionPreflightRecord(dispatchRecord) {
+  const normalizedDispatchRecord = assertEventDispatchRecord(dispatchRecord);
+  const latestPropsEvidence =
+    createInputChangeEventPreflightLatestPropsEvidence(
+      normalizedDispatchRecord
+    );
+  const targetMetadata = createInputChangeEventPreflightTargetMetadata(
+    normalizedDispatchRecord,
+    latestPropsEvidence.latestProps
+  );
+  const controlledMetadata =
+    createInputChangeEventPreflightControlledMetadata(
+      normalizedDispatchRecord,
+      targetMetadata,
+      latestPropsEvidence
+    );
+  const extractionMetadata =
+    createInputChangeEventPreflightExtractionMetadata(
+      normalizedDispatchRecord,
+      targetMetadata,
+      controlledMetadata
+    );
+  const dispatchBehavior = createInputChangeEventPreflightDispatchBehavior(
+    normalizedDispatchRecord,
+    extractionMetadata
+  );
+  const defaultBehavior = createInputChangeEventPreflightDefaultBehavior();
+  const sideEffects = createInputChangeEventPreflightSideEffects(
+    controlledMetadata,
+    extractionMetadata
+  );
+  const record = Object.freeze({
+    admissionStatus: PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS,
+    blockedReason: INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_BLOCKED_CODE,
+    browserDomEventCompatibilityClaimed: false,
+    changeEventExtractionPreflight: true,
+    compatibilityClaimed: false,
+    controlledMetadata,
+    controlledMetadataAvailable:
+      controlledMetadata.controlledMetadataAvailable,
+    defaultBehavior,
+    defaultBehaviorChanged: false,
+    dispatchBehavior,
+    domEventName: normalizedDispatchRecord.domEventName,
+    eventDispatch: false,
+    eventSystemFlags: normalizedDispatchRecord.eventSystemFlags,
+    eventType: normalizedDispatchRecord.domEventName,
+    extractionMetadata,
+    inCapturePhase: normalizedDispatchRecord.inCapturePhase,
+    kind: INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_RECORD_KIND,
+    listenerInvocationCount: 0,
+    latestPropsEvidence: latestPropsEvidence.record,
+    metadataOnly: true,
+    nativeEventType: normalizedDispatchRecord.nativeEventType,
+    pluginName: CHANGE_EVENT_PLUGIN_NAME,
+    publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
+    publicDispatchEnabled: false,
+    publicRootBehaviorChanged: false,
+    reactEventType: 'change',
+    reactName: 'onChange',
+    sideEffects,
+    status: PRIVATE_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_STATUS,
+    syntheticEventCount: 0,
+    syntheticEventStatus: 'not-created',
+    targetInst: normalizedDispatchRecord.targetInst,
+    targetInstStatus: normalizedDispatchRecord.targetInstStatus,
+    targetMetadata,
+    targetResolutionStatus:
+      normalizedDispatchRecord.targetResolutionStatus,
+    targetTag: targetMetadata.hostTag,
+    targetType: targetMetadata.inputType,
+    willInvokeListeners: false
+  });
+
+  inputChangeEventExtractionPreflightRecordPayloads.set(
+    record,
+    Object.freeze({
+      dispatchRecord: normalizedDispatchRecord,
+      targetDispatchPathRecord:
+        normalizedDispatchRecord.targetDispatchPathRecord,
+      targetListenerLookupRecord:
+        normalizedDispatchRecord.targetListenerLookupRecord
+    })
+  );
+
+  return record;
+}
+
+function createInputChangeEventPreflightLatestPropsEvidence(
+  dispatchRecord
+) {
+  const lookupRecord = dispatchRecord.targetListenerLookupRecord;
+  if (!isObjectLike(lookupRecord)) {
+    return {
+      accepted: false,
+      latestProps: null,
+      record: Object.freeze({
+        accepted: false,
+        exposesLatestProps: false,
+        latestPropsObject: false,
+        latestPropsStatus: 'missing',
+        listenerFound: false,
+        listenerLookupStatus: 'not-applicable',
+        propKeys: Object.freeze([]),
+        rawLatestPropsRetained: false,
+        reason: 'missing-target-listener-lookup-record',
+        registrationName: null,
+        sourceRecordKind: null,
+        targetHostInstanceStatus: null,
+        targetHostTag: null,
+        targetResolved: false
+      })
+    };
+  }
+
+  const lookupPayload =
+    getEventListenerTargetLookupRecordPayload(lookupRecord);
+  const latestProps =
+    lookupPayload === null ? null : lookupPayload.latestProps;
+  const latestPropsObject = isObjectLike(latestProps);
+  const accepted =
+    lookupRecord.latestPropsStatus === 'present' && latestPropsObject;
+  const targetHostTag = getInputChangePreflightHostTag(
+    lookupRecord.targetHostInstanceNode
+  );
+
+  return {
+    accepted,
+    latestProps,
+    record: Object.freeze({
+      accepted,
+      exposesLatestProps: false,
+      latestPropsObject,
+      latestPropsStatus: lookupRecord.latestPropsStatus,
+      listenerFound: lookupRecord.listenerFound,
+      listenerLookupStatus: lookupRecord.listenerStatus,
+      propKeys: latestPropsObject
+        ? Object.freeze(Object.keys(latestProps).sort())
+        : Object.freeze([]),
+      rawLatestPropsRetained: false,
+      registrationName: lookupRecord.registrationName,
+      sourceRecordKind: lookupRecord.kind,
+      targetHostInstanceStatus:
+        lookupRecord.targetHostInstanceStatus,
+      targetHostTag,
+      targetResolved:
+        lookupRecord.targetHostInstanceStatus === 'mounted-host-instance'
+    })
+  };
+}
+
+function createInputChangeEventPreflightTargetMetadata(
+  dispatchRecord,
+  latestProps
+) {
+  const targetNode = getInputChangePreflightTargetNode(dispatchRecord);
+  const hostTag = getInputChangePreflightHostTag(targetNode);
+  const inputType = getInputChangePreflightInputType(
+    hostTag,
+    targetNode,
+    latestProps
+  );
+  const textInputTarget =
+    hostTag === 'input' && textInputElementTypes.has(inputType);
+  const checkboxTarget =
+    hostTag === 'input' && inputType === 'checkbox';
+  const supportedTarget = textInputTarget || checkboxTarget;
+  const expectedDomEventNames = textInputTarget
+    ? Object.freeze(['input', 'change'])
+    : checkboxTarget
+      ? Object.freeze(['click'])
+      : Object.freeze([]);
+  const supportedEventType = expectedDomEventNames.includes(
+    dispatchRecord.domEventName
+  );
+
+  return Object.freeze({
+    checkboxTarget,
+    changeExtractionStrategy: textInputTarget
+      ? 'input-or-change-event'
+      : checkboxTarget
+        ? 'click-event'
+        : 'unsupported-target',
+    controlledPropName: checkboxTarget
+      ? 'checked'
+      : textInputTarget
+        ? 'value'
+        : null,
+    expectedDomEventNames,
+    hostTag,
+    inputType,
+    nativeEventType: dispatchRecord.nativeEventType,
+    nodeType:
+      isObjectLike(targetNode) && typeof targetNode.nodeType === 'number'
+        ? targetNode.nodeType
+        : null,
+    supportedEventType,
+    supportedTarget,
+    targetKind: textInputTarget
+      ? 'text-input'
+      : checkboxTarget
+        ? 'checkbox-input'
+        : 'unsupported',
+    targetResolved: dispatchRecord.targetResolutionStatus === 'resolved',
+    textInputTarget
+  });
+}
+
+function createInputChangeEventPreflightControlledMetadata(
+  dispatchRecord,
+  targetMetadata,
+  latestPropsEvidence
+) {
+  const latestProps = latestPropsEvidence.latestProps;
+  const controlledProp = createInputChangePreflightPropSummary(
+    latestProps,
+    targetMetadata.controlledPropName
+  );
+  const onChangeProp = createInputChangePreflightPropSummary(
+    latestProps,
+    'onChange'
+  );
+  const controlledMetadataAvailable =
+    latestPropsEvidence.accepted === true &&
+    targetMetadata.supportedTarget === true;
+
+  return Object.freeze({
+    checkedMetadataAvailable:
+      targetMetadata.checkboxTarget === true &&
+      controlledMetadataAvailable === true,
+    controlled: controlledProp.nonNull,
+    controlledMetadataAvailable,
+    controlledPropName: targetMetadata.controlledPropName,
+    controlledPropPresent: controlledProp.present,
+    controlledPropIsNonNull: controlledProp.nonNull,
+    controlledPropType: controlledProp.type,
+    controlledRestoreBlockedReason:
+      dispatchRecord.controlledStateRestore.blockedReason,
+    controlledRestoreMetadataAvailable:
+      controlledMetadataAvailable === true && controlledProp.present,
+    controlledStateRestoreScheduled:
+      dispatchRecord.controlledStateRestore.scheduled,
+    controlledStateRestoreStatus:
+      dispatchRecord.controlledStateRestore.status,
+    latestPropsEvidenceAccepted: latestPropsEvidence.accepted,
+    onChangeListenerPresent: onChangeProp.type === 'function',
+    onChangePropPresent: onChangeProp.present,
+    onChangePropType: onChangeProp.type,
+    postEventControlledRestoreScheduled: false,
+    postEventRestoreQueueWritten: false,
+    rawLatestPropsRetained: false,
+    targetResolved: targetMetadata.targetResolved,
+    valueMetadataAvailable:
+      targetMetadata.textInputTarget === true &&
+      controlledMetadataAvailable === true
+  });
+}
+
+function createInputChangeEventPreflightExtractionMetadata(
+  dispatchRecord,
+  targetMetadata,
+  controlledMetadata
+) {
+  const targetEligible =
+    targetMetadata.targetResolved === true &&
+    targetMetadata.supportedTarget === true &&
+    targetMetadata.supportedEventType === true;
+
+  return Object.freeze({
+    blockedReason: INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_BLOCKED_CODE,
+    changeEventCouldBeAccumulatedIfValueChanged: targetEligible,
+    changeEventPluginExtractEventsCalled: false,
+    controlledMetadataAvailable:
+      controlledMetadata.controlledMetadataAvailable,
+    dispatchQueuePushAllowed: false,
+    enqueueStateRestoreRequiredIfExtracted: targetEligible,
+    enqueueStateRestoreScheduled: false,
+    getTargetInstFunctionName: targetMetadata.textInputTarget
+      ? 'getTargetInstForInputOrChangeEvent'
+      : targetMetadata.checkboxTarget
+        ? 'getTargetInstForClickEvent'
+        : null,
+    listenerAccumulationPerformed: false,
+    nativeEventType: dispatchRecord.nativeEventType,
+    pluginName: CHANGE_EVENT_PLUGIN_NAME,
+    polyfillPluginsEnabled:
+      shouldProcessPolyfillEventPlugins(
+        dispatchRecord.eventSystemFlags
+      ),
+    reactName: 'onChange',
+    registrationNames: Object.freeze(['onChangeCapture', 'onChange']),
+    status: targetEligible
+      ? 'blocked-before-value-tracker-change-check'
+      : 'blocked-unsupported-input-change-target-or-event',
+    syntheticEventConstructor: 'SyntheticEvent',
+    syntheticEventCreated: false,
+    targetEligible,
+    targetInstCandidateStatus: targetEligible
+      ? 'available-before-value-change-check'
+      : 'not-available',
+    twoPhaseListenersAccumulated: false,
+    valueChangeCheckRequired: targetEligible,
+    valueTrackerUpdated: false
+  });
+}
+
+function createInputChangeEventPreflightDispatchBehavior(
+  dispatchRecord,
+  extractionMetadata
+) {
+  return Object.freeze({
+    batchedUpdatesScheduled: false,
+    blockedReason: EVENT_DISPATCH_BLOCKED_CODE,
+    browserListenerInstallation: false,
+    changeDispatchQueueEntries: 0,
+    dispatchQueueLengthBeforePreflight: dispatchRecord.dispatchQueue.length,
+    dispatchQueueMutated: false,
+    eventDispatch: false,
+    extractionWouldRequireDispatch:
+      extractionMetadata.changeEventCouldBeAccumulatedIfValueChanged,
+    listenerInvocationCount: 0,
+    publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
+    publicDispatchEnabled: false,
+    syntheticEventCount: 0,
+    syntheticEventDispatch: false,
+    willInvokeListeners: false
+  });
+}
+
+function createInputChangeEventPreflightDefaultBehavior() {
+  return Object.freeze({
+    blockedReason: DEFAULT_PREVENTED_DIAGNOSTIC_BLOCKED_CODE,
+    defaultBehaviorChanged: false,
+    defaultPreventedDiagnosticsEnabled: false,
+    nativeDefaultPreventedAfterDispatch: null,
+    nativeDefaultPreventedBeforeDispatch: null,
+    nativeDefaultPreventedInspected: false,
+    nativePreventDefaultCallCount: 0,
+    preventDefaultCalled: false,
+    status: 'blocked-default-behavior-diagnostics-not-run',
+    willCallPreventDefault: false
+  });
+}
+
+function createInputChangeEventPreflightSideEffects(
+  controlledMetadata,
+  extractionMetadata
+) {
+  return Object.freeze({
+    browserListenerInstallation: false,
+    compatibilityClaimed: false,
+    controlledMetadataRead:
+      controlledMetadata.controlledMetadataAvailable,
+    controlledStateRestoreScheduled: false,
+    defaultBehaviorChanged: false,
+    dispatchQueueMutated: false,
+    hostValueRead: false,
+    hostValueWritten: false,
+    listenerInvocationCount: 0,
+    nativeEventPreventDefault: false,
+    postEventRestoreQueueWritten: false,
+    propertyDescriptorInstalled: false,
+    publicRootBehaviorChanged: false,
+    rawEventCaptured: false,
+    rawLatestPropsRetained: false,
+    rawTargetCaptured: false,
+    syntheticEventCreated: false,
+    syntheticEventDispatched: false,
+    valueTrackerFieldWritten: false,
+    valueTrackerUpdated: false,
+    valueTrackerUpdateRequired:
+      extractionMetadata.valueChangeCheckRequired
+  });
+}
+
+function getInputChangeEventExtractionPreflightRecordPayload(record) {
+  if (!isObjectLike(record)) {
+    return null;
+  }
+
+  return (
+    inputChangeEventExtractionPreflightRecordPayloads.get(record) || null
+  );
+}
+
+function isInputChangeEventExtractionPreflightRecord(record) {
+  return getInputChangeEventExtractionPreflightRecordPayload(record) !== null;
 }
 
 function invokeSingleListenerCanaryFromDispatchRecord(dispatchRecord, options) {
@@ -4886,6 +5393,7 @@ function getSimpleEventRegistrationName(domEventName, eventSystemFlags) {
 
 module.exports = {
   CONTROLLED_STATE_RESTORE_BLOCKED_CODE,
+  CHANGE_EVENT_PLUGIN_NAME,
   DEFAULT_PREVENTED_DIAGNOSTIC_BLOCKED_CODE,
   DISPATCH_DEFAULT_PREVENTED_DIAGNOSTIC_RECORD_KIND,
   DISPATCH_LISTENER_RECORD_KIND,
@@ -4912,6 +5420,8 @@ module.exports = {
   HYDRATION_HYDRATABLE_EVENT_TARGET_LOOKUP_RECORD_KIND,
   HYDRATION_REPLAY_BLOCKED_CODE,
   HYDRATION_REPLAY_QUEUE_DRAIN_ORDER_DIAGNOSTIC_KIND,
+  INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_BLOCKED_CODE,
+  INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_RECORD_KIND,
   INVALID_DISPATCH_LISTENER_RECORD_CODE,
   INVALID_EVENT_DISPATCH_RECORD_CODE,
   INVALID_EVENT_WRAPPER_RECORD_CODE,
@@ -4932,6 +5442,7 @@ module.exports = {
   PRIVATE_PORTAL_EVENT_OWNER_ROOT_GATE_STATUS,
   PRIVATE_PROPAGATION_STOP_DIAGNOSTIC_STATUS,
   PRIVATE_EVENT_TYPE_DISPATCH_CANARY_STATUS,
+  PRIVATE_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_STATUS,
   PRIVATE_SINGLE_LISTENER_INVOCATION_CANARY_STATUS,
   PRIVATE_SYNTHETIC_EVENT_SHAPE_GATE_STATUS,
   PRIVATE_SYNTHETIC_EVENT_SHAPE_STATUS,
@@ -4946,6 +5457,7 @@ module.exports = {
   createEventDispatchRecordFromWrapperRecord,
   createEventTypeDispatchCanaryRecord,
   createHydrationDehydratedTargetResolutionDiagnostic,
+  createInputChangeEventExtractionPreflightRecord,
   createHydrationReplayEventQueueDiagnostic,
   createPortalEventOwnerRootGateRecord,
   createPluginExtractionRecord,
@@ -4953,6 +5465,7 @@ module.exports = {
   createSyntheticEventShapeRecordForDispatchListenerRecord,
   getDispatchListenerErrorRouteRecordPayload,
   getHydrationDehydratedTargetResolutionDiagnosticPayload,
+  getInputChangeEventExtractionPreflightRecordPayload,
   getPortalEventOwnerRootGateRecordPayload,
   getDispatchListenerInvocationCanaryRecordPayload,
   getDispatchListenerRecordPayload,
@@ -4968,6 +5481,7 @@ module.exports = {
   invokeDispatchQueueCanaryFromDispatchRecords,
   invokeSingleListenerCanaryFromDispatchRecord,
   isHydrationDehydratedTargetResolutionDiagnostic,
+  isInputChangeEventExtractionPreflightRecord,
   isDispatchListenerInvocationCanaryRecord,
   isDispatchListenerErrorRouteRecord,
   isDispatchListenerRecord,
