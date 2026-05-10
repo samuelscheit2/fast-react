@@ -119,8 +119,17 @@ const privateRootPublicFacadeAdapterType =
   'fast.react_dom.private_root_public_facade_adapter';
 const privateRootPublicFacadeRootType =
   'fast.react_dom.private_root_public_facade_root';
+const privateRootPublicFacadePreflightType =
+  'fast.react_dom.private_root_public_facade_preflight';
+const privateRootPublicFacadePreflightRootType =
+  'fast.react_dom.private_root_public_facade_preflight_root';
+const privateRootPublicFacadePreflightRecordType =
+  'fast.react_dom.private_root_public_facade_preflight_record';
 const privateRootPublicFacadeAdapterSymbol = Symbol.for(
   'fast.react_dom.client.private_root_public_facade_adapter'
+);
+const privateRootPublicFacadePreflightSymbol = Symbol.for(
+  'fast.react_dom.client.private_root_public_facade_preflight'
 );
 
 const ROOT_LIFECYCLE_CREATED = 'created';
@@ -173,6 +182,10 @@ const ROOT_BRIDGE_REF_CALLBACK_ERROR_ROUTING_RECORDED =
   'recorded-private-root-ref-callback-error-routing';
 const ROOT_BRIDGE_PUBLIC_FACADE_ADAPTER_READY =
   'ready-private-react-dom-client-root-public-facade-adapter';
+const ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_READY =
+  'ready-private-react-dom-client-root-public-facade-preflight';
+const ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_ACCEPTED =
+  'accepted-private-react-dom-client-root-public-facade-preflight';
 const NATIVE_ROOT_BRIDGE_REQUEST_CREATE = 'create';
 const NATIVE_ROOT_BRIDGE_REQUEST_RENDER = 'render';
 const NATIVE_ROOT_BRIDGE_REQUEST_UNMOUNT = 'unmount';
@@ -224,6 +237,70 @@ const ROOT_BRIDGE_BLOCKED_CAPABILITIES = freezeArray([
     reason: 'React DOM root lifecycle compatibility remains unclaimed.'
   })
 ]);
+const ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_ACCEPTED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'private-root-bridge-request-admission',
+      accepted: true,
+      reason:
+        'The public-shaped private facade call produced a bridge-owned request admission record.'
+    }),
+    freezeRecord({
+      id: 'private-native-request-handoff-mirror',
+      accepted: true,
+      reason:
+        'The public-shaped private facade call produced an inert native request handoff mirror.'
+    })
+  ]);
+const ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_BLOCKED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'public-root-execution',
+      blocked: true,
+      reason:
+        'The preflight is private and does not execute public react-dom/client roots.'
+    }),
+    freezeRecord({
+      id: 'native-execution',
+      blocked: true,
+      reason: 'No native or Rust root bridge execution is admitted.'
+    }),
+    freezeRecord({
+      id: 'reconciler-execution',
+      blocked: true,
+      reason: 'No reconciler render, schedule, or commit execution is admitted.'
+    }),
+    freezeRecord({
+      id: 'dom-mutation',
+      blocked: true,
+      reason: 'No real or fake DOM mutation is performed by this preflight.'
+    }),
+    freezeRecord({
+      id: 'marker-writes',
+      blocked: true,
+      reason: 'Root marker writes and clears remain deferred.'
+    }),
+    freezeRecord({
+      id: 'listener-installation',
+      blocked: true,
+      reason: 'Root listener installation remains deferred.'
+    }),
+    freezeRecord({
+      id: 'hydration',
+      blocked: true,
+      reason: 'Hydration root creation, marker consumption, and replay are not admitted.'
+    }),
+    freezeRecord({
+      id: 'events',
+      blocked: true,
+      reason: 'Synthetic event extraction and dispatch are not admitted.'
+    }),
+    freezeRecord({
+      id: 'compatibility-claims',
+      blocked: true,
+      reason: 'React DOM root lifecycle compatibility remains unclaimed.'
+    })
+  ]);
 const ROOT_BRIDGE_PORTAL_BOUNDARY_BLOCKED_CAPABILITIES = freezeArray([
   freezeRecord({
     id: 'portal-child-reconciliation',
@@ -787,6 +864,9 @@ const rootRefCallbackHostOutputOrderingDiagnosticPayloads = new WeakMap();
 const rootRefCallbackErrorRoutingPayloads = new WeakMap();
 const rootPublicFacadeAdapterPayloads = new WeakMap();
 const rootPublicFacadeRootPayloads = new WeakMap();
+const rootPublicFacadePreflightPayloads = new WeakMap();
+const rootPublicFacadePreflightRootPayloads = new WeakMap();
+const rootPublicFacadePreflightRecordPayloads = new WeakMap();
 
 function createPrivateRootBridgeShell(options) {
   const bridgeState = createBridgeState(options);
@@ -997,6 +1077,83 @@ function createPrivateRootPublicFacadeAdapter(options) {
   return adapter;
 }
 
+function createPrivateRootPublicFacadePreflight(options) {
+  const bridge = createPrivateRootBridgeShell(options);
+  const preflightState = {
+    bridge,
+    nextPreflightSequence: 1,
+    preflight: null,
+    preflightIdPrefix: getIdPrefix(
+      options && options.publicFacadePreflightIdPrefix,
+      'public-facade-preflight'
+    ),
+    records: [],
+    roots: []
+  };
+  const preflight = freezeRecord({
+    $$typeof: privateRootPublicFacadePreflightType,
+    kind: 'FastReactDomPrivateRootPublicFacadePreflight',
+    entrypoint: 'react-dom/client',
+    preflightStatus: ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_READY,
+    executionStatus: ROOT_BRIDGE_EXECUTION_BLOCKED,
+    compatibilityStatus: ROOT_BRIDGE_COMPATIBILITY_BLOCKED,
+    acceptedPrivateBridgeDiagnostics: true,
+    publicCreateRootEnabled: false,
+    publicHydrateRootEnabled: false,
+    publicRootObjectExposed: false,
+    publicRootCompatibilitySurface: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false,
+    createRoot(container, rootOptions) {
+      return createPrivateRootPublicFacadePreflightRoot(
+        preflightState,
+        container,
+        rootOptions
+      );
+    },
+    getRootCreatePreflight(root) {
+      return assertPrivateRootPublicFacadePreflightRootForPreflight(
+        root,
+        preflightState
+      ).createPreflight;
+    },
+    getRootPreflightRecords(root) {
+      return freezeArray(
+        assertPrivateRootPublicFacadePreflightRootForPreflight(
+          root,
+          preflightState
+        ).preflightRecords
+      );
+    },
+    getRootRequestRecords(root) {
+      return freezeArray(
+        assertPrivateRootPublicFacadePreflightRootForPreflight(
+          root,
+          preflightState
+        ).requestRecords
+      );
+    },
+    getRootPayload(root) {
+      return createPrivateRootPublicFacadePreflightRootPayloadSnapshot(
+        assertPrivateRootPublicFacadePreflightRootForPreflight(
+          root,
+          preflightState
+        )
+      );
+    }
+  });
+
+  preflightState.preflight = preflight;
+  rootPublicFacadePreflightPayloads.set(preflight, preflightState);
+  return preflight;
+}
+
 function createPrivateRootPublicFacadeRoot(
   adapterState,
   container,
@@ -1057,6 +1214,175 @@ function createPrivateRootPublicFacadeRoot(
   rootPublicFacadeRootPayloads.set(root, payload);
   adapterState.roots.push(root);
   return root;
+}
+
+function createPrivateRootPublicFacadePreflightRoot(
+  preflightState,
+  container,
+  rootOptions
+) {
+  const createRecord = preflightState.bridge.createClientRoot(
+    container,
+    rootOptions
+  );
+  const payload = {
+    bridge: preflightState.bridge,
+    container,
+    createPreflight: null,
+    createRecord,
+    preflight: preflightState.preflight,
+    preflightRecords: [],
+    renderPreflights: [],
+    requestRecords: [],
+    root: null,
+    rootHandle: createRecord.handle,
+    rootOptions,
+    rootType: privateRootPublicFacadePreflightRootType,
+    unmountPreflights: []
+  };
+  const root = {};
+
+  Object.defineProperties(root, {
+    render: {
+      enumerable: true,
+      value: function render(element) {
+        const callback =
+          arguments.length > 1 ? arguments[1] : undefined;
+        const record = preflightState.bridge.renderContainer(
+          createRecord.handle,
+          element,
+          callback
+        );
+        const preflightRecord =
+          appendPrivateRootPublicFacadePreflightRecord(
+            preflightState,
+            payload,
+            record,
+            'root.render'
+          );
+        payload.renderPreflights.push(preflightRecord);
+        return preflightRecord;
+      }
+    },
+    unmount: {
+      enumerable: true,
+      value: function unmount() {
+        const callback = arguments.length > 0 ? arguments[0] : undefined;
+        const record = preflightState.bridge.unmountContainer(
+          createRecord.handle,
+          callback
+        );
+        const preflightRecord =
+          appendPrivateRootPublicFacadePreflightRecord(
+            preflightState,
+            payload,
+            record,
+            'root.unmount'
+          );
+        payload.unmountPreflights.push(preflightRecord);
+        return preflightRecord;
+      }
+    }
+  });
+
+  Object.freeze(root);
+  payload.root = root;
+  rootPublicFacadePreflightRootPayloads.set(root, payload);
+  preflightState.roots.push(root);
+  payload.createPreflight = appendPrivateRootPublicFacadePreflightRecord(
+    preflightState,
+    payload,
+    createRecord,
+    'createRoot'
+  );
+  return root;
+}
+
+function appendPrivateRootPublicFacadePreflightRecord(
+  preflightState,
+  rootPayload,
+  requestRecord,
+  facadeCall
+) {
+  const preflightRecord = createPrivateRootPublicFacadePreflightRecord(
+    preflightState,
+    rootPayload,
+    requestRecord,
+    facadeCall
+  );
+  rootPayload.requestRecords.push(requestRecord);
+  rootPayload.preflightRecords.push(preflightRecord);
+  preflightState.records.push(preflightRecord);
+  return preflightRecord;
+}
+
+function createPrivateRootPublicFacadePreflightRecord(
+  preflightState,
+  rootPayload,
+  requestRecord,
+  facadeCall
+) {
+  const requestAdmission = preflightState.bridge.admitRequest(requestRecord);
+  const nativeHandoffRecord =
+    preflightState.bridge.createNativeRequestHandoff(requestRecord);
+  const preflightSequence = preflightState.nextPreflightSequence++;
+  const preflightId =
+    `${preflightState.preflightIdPrefix}:${preflightSequence}`;
+  const record = freezeRecord({
+    $$typeof: privateRootPublicFacadePreflightRecordType,
+    kind: 'FastReactDomPrivateRootPublicFacadePreflightRecord',
+    operation: requestRecord.operation,
+    facadeCall,
+    entrypoint: 'react-dom/client',
+    preflightId,
+    preflightSequence,
+    preflightStatus: ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_ACCEPTED,
+    executionStatus: ROOT_BRIDGE_EXECUTION_BLOCKED,
+    compatibilityStatus: ROOT_BRIDGE_COMPATIBILITY_BLOCKED,
+    requestId: requestRecord.requestId,
+    requestSequence: requestRecord.requestSequence,
+    requestType: requestRecord.requestType,
+    updateId: requestRecord.updateId || null,
+    rootId: requestRecord.rootId,
+    rootKind: requestRecord.rootKind,
+    rootTag: requestRecord.rootTag,
+    lifecycleStatusBefore: requestRecord.lifecycleStatusBefore,
+    lifecycleStatusAfter: requestRecord.lifecycleStatusAfter,
+    noOp: requestRecord.noOp === true,
+    sync: requestRecord.sync === true,
+    requestAdmission,
+    nativeHandoffRecord,
+    requestAdmissionStatus: requestAdmission.admissionStatus,
+    nativeHandoffStatus: nativeHandoffRecord.handoffStatus,
+    acceptedCapabilities:
+      ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_ACCEPTED_CAPABILITIES,
+    blockedCapabilities:
+      ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_BLOCKED_CAPABILITIES,
+    acceptedPrivateBridgeDiagnostics: true,
+    publicCreateRootEnabled: false,
+    publicHydrateRootEnabled: false,
+    publicRootObjectExposed: false,
+    publicRootCompatibilitySurface: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false
+  });
+
+  rootPublicFacadePreflightRecordPayloads.set(record, {
+    bridge: preflightState.bridge,
+    nativeHandoffRecord,
+    preflight: preflightState.preflight,
+    requestAdmission,
+    requestRecord,
+    root: rootPayload.root
+  });
+  return record;
 }
 
 function createClientRootRecord(container, rootOptions) {
@@ -2215,6 +2541,59 @@ function getPrivateRootPublicFacadeRootPayload(root) {
 
 function isPrivateRootPublicFacadeRoot(value) {
   return rootPublicFacadeRootPayloads.has(value);
+}
+
+function getPrivateRootPublicFacadePreflightPayload(preflight) {
+  const payload = rootPublicFacadePreflightPayloads.get(preflight);
+  if (payload === undefined) {
+    return null;
+  }
+
+  return freezeRecord({
+    bridge: payload.bridge,
+    preflight: payload.preflight,
+    preflightRecordCount: payload.records.length,
+    preflightRecords: freezeArray(payload.records),
+    rootCount: payload.roots.length,
+    roots: freezeArray(payload.roots)
+  });
+}
+
+function isPrivateRootPublicFacadePreflight(value) {
+  return rootPublicFacadePreflightPayloads.has(value);
+}
+
+function getPrivateRootPublicFacadePreflightRootPayload(root) {
+  const payload = rootPublicFacadePreflightRootPayloads.get(root);
+  if (payload === undefined) {
+    return null;
+  }
+
+  return createPrivateRootPublicFacadePreflightRootPayloadSnapshot(payload);
+}
+
+function isPrivateRootPublicFacadePreflightRoot(value) {
+  return rootPublicFacadePreflightRootPayloads.has(value);
+}
+
+function getPrivateRootPublicFacadePreflightRecordPayload(record) {
+  const payload = rootPublicFacadePreflightRecordPayloads.get(record);
+  if (payload === undefined) {
+    return null;
+  }
+
+  return freezeRecord({
+    bridge: payload.bridge,
+    nativeHandoffRecord: payload.nativeHandoffRecord,
+    preflight: payload.preflight,
+    requestAdmission: payload.requestAdmission,
+    requestRecord: payload.requestRecord,
+    root: payload.root
+  });
+}
+
+function isPrivateRootPublicFacadePreflightRecord(value) {
+  return rootPublicFacadePreflightRecordPayloads.has(value);
 }
 
 function createClientRootRecordWithBridge(bridgeState, container, rootOptions) {
@@ -5972,6 +6351,22 @@ function assertPrivateRootPublicFacadeRootForAdapter(root, adapterState) {
   return payload;
 }
 
+function assertPrivateRootPublicFacadePreflightRootForPreflight(
+  root,
+  preflightState
+) {
+  const payload = rootPublicFacadePreflightRootPayloads.get(root);
+  if (payload === undefined) {
+    throwInvalidRootPublicFacadePreflight(
+      'Expected a private React DOM root public facade preflight root.'
+    );
+  }
+  if (payload.preflight !== preflightState.preflight) {
+    throwForeignRootBridgeRequest();
+  }
+  return payload;
+}
+
 function createPrivateRootPublicFacadeRootPayloadSnapshot(payload) {
   return freezeRecord({
     adapter: payload.adapter,
@@ -5985,6 +6380,24 @@ function createPrivateRootPublicFacadeRootPayloadSnapshot(payload) {
     rootOptions: payload.rootOptions,
     rootType: payload.rootType,
     unmountRecords: freezeArray(payload.unmountRecords)
+  });
+}
+
+function createPrivateRootPublicFacadePreflightRootPayloadSnapshot(payload) {
+  return freezeRecord({
+    bridge: payload.bridge,
+    container: payload.container,
+    createPreflight: payload.createPreflight,
+    createRecord: payload.createRecord,
+    preflight: payload.preflight,
+    preflightRecords: freezeArray(payload.preflightRecords),
+    renderPreflights: freezeArray(payload.renderPreflights),
+    requestRecords: freezeArray(payload.requestRecords),
+    root: payload.root,
+    rootHandle: payload.rootHandle,
+    rootOptions: payload.rootOptions,
+    rootType: payload.rootType,
+    unmountPreflights: freezeArray(payload.unmountPreflights)
   });
 }
 
@@ -6074,6 +6487,12 @@ function throwInvalidRefCallbackRootErrorRouting(message) {
 function throwInvalidRootPublicFacadeAdapter(message) {
   const error = new Error(message);
   error.code = 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_ADAPTER';
+  throw error;
+}
+
+function throwInvalidRootPublicFacadePreflight(message) {
+  const error = new Error(message);
+  error.code = 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT';
   throw error;
 }
 
@@ -6264,6 +6683,10 @@ module.exports = {
   ROOT_BRIDGE_PORTAL_FAKE_DOM_MOUNT_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_PORTAL_PUBLIC_MOUNT_BLOCKED,
   ROOT_BRIDGE_PUBLIC_FACADE_ADAPTER_READY,
+  ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_ACCEPTED,
+  ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_ACCEPTED_CAPABILITIES,
+  ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_BLOCKED_CAPABILITIES,
+  ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_READY,
   ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_REF_CALLBACK_ERROR_ROUTING_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_REF_CALLBACK_ERROR_ROUTING_RECORDED,
@@ -6303,6 +6726,7 @@ module.exports = {
   createPortalRootBoundaryRecord,
   createPrivateRootBridgeShell,
   createPrivateRootPublicFacadeAdapter,
+  createPrivateRootPublicFacadePreflight,
   createPrivateRootHandle,
   createPrivateRootOwner,
   createRefCallbackRootErrorRoutingRecord,
@@ -6323,6 +6747,9 @@ module.exports = {
   getPrivateRootPortalCommitHandoffPayload,
   getPrivateRootPortalFakeDomMountPayload,
   getPrivateRootPublicFacadeAdapterPayload,
+  getPrivateRootPublicFacadePreflightPayload,
+  getPrivateRootPublicFacadePreflightRecordPayload,
+  getPrivateRootPublicFacadePreflightRootPayload,
   getPrivateRootPublicFacadeRootPayload,
   getPrivateRootRefCallbackErrorRoutingPayload,
   getPrivateRootRefCallbackHostOutputOrderingDiagnosticPayload,
@@ -6339,6 +6766,9 @@ module.exports = {
   isPrivateRootPortalFakeDomMountRecord,
   isPrivateRootPortalBoundaryRecord,
   isPrivateRootPublicFacadeAdapter,
+  isPrivateRootPublicFacadePreflight,
+  isPrivateRootPublicFacadePreflightRecord,
+  isPrivateRootPublicFacadePreflightRoot,
   isPrivateRootPublicFacadeRoot,
   isPrivateRootUnmountHostOutputCleanupRecord,
   isPrivateRootRefCallbackErrorRoutingRecord,
@@ -6360,6 +6790,10 @@ module.exports = {
   privateRootPortalCommitHandoffRecordType,
   privateRootPublicFacadeAdapterSymbol,
   privateRootPublicFacadeAdapterType,
+  privateRootPublicFacadePreflightRecordType,
+  privateRootPublicFacadePreflightRootType,
+  privateRootPublicFacadePreflightSymbol,
+  privateRootPublicFacadePreflightType,
   privateRootPublicFacadeRootType,
   privateRootUnmountHostOutputCleanupRecordType,
   privateRootPortalFakeDomMountRecordType,

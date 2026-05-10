@@ -2787,6 +2787,241 @@ test('private react-dom/client facade adapter routes root calls to bridge record
   assertBridgeDidNotTouchContainer(container, document);
 });
 
+test('private react-dom/client facade preflight routes root calls to accepted bridge diagnostics', () => {
+  const document = createDocument('private-client-facade-preflight');
+  const container = createElement('DIV', document);
+  const element = {
+    props: {
+      children: 'private preflight child'
+    },
+    type: 'span'
+  };
+  const callback = function afterPrivatePreflightRender() {};
+  const unmountCallback = function afterPrivatePreflightUnmount() {};
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    rootBridge.privateRootPublicFacadePreflightSymbol
+  );
+
+  assert.equal(Object.hasOwn(reactDomClient, 'rootPublicFacadePreflight'), false);
+  assert.equal(
+    Object.hasOwn(
+      reactDomClient,
+      '__FAST_REACT_PRIVATE_ROOT_PUBLIC_FACADE_PREFLIGHT__'
+    ),
+    false
+  );
+  assert.equal(descriptor.configurable, false);
+  assert.equal(descriptor.enumerable, false);
+  assert.equal(descriptor.writable, false);
+  assert.equal(descriptor.value, rootBridge.createPrivateRootPublicFacadePreflight);
+  assert.equal(
+    Object.getOwnPropertyDescriptor(
+      reactDomClient.hydrateRoot,
+      rootBridge.privateRootPublicFacadePreflightSymbol
+    ),
+    undefined
+  );
+
+  const preflight = descriptor.value({
+    nativeEnvironmentId: 427,
+    nativeHandoffIdPrefix: 'preflight-native',
+    publicFacadePreflightIdPrefix: 'preflight',
+    requestIdPrefix: 'preflight-request',
+    rootIdPrefix: 'preflight-root',
+    updateIdPrefix: 'preflight-update'
+  });
+  assert.equal(
+    preflight.$$typeof,
+    rootBridge.privateRootPublicFacadePreflightType
+  );
+  assert.equal(preflight.kind, 'FastReactDomPrivateRootPublicFacadePreflight');
+  assert.equal(preflight.entrypoint, 'react-dom/client');
+  assert.equal(
+    preflight.preflightStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_READY
+  );
+  assert.equal(preflight.publicCreateRootEnabled, false);
+  assert.equal(preflight.publicHydrateRootEnabled, false);
+  assert.equal(preflight.acceptedPrivateBridgeDiagnostics, true);
+  assert.equal(preflight.nativeExecution, false);
+  assert.equal(preflight.reconcilerExecution, false);
+  assert.equal(preflight.domMutation, false);
+  assert.equal(preflight.markerWrites, false);
+  assert.equal(preflight.listenerInstallation, false);
+  assert.equal(preflight.compatibilityClaimed, false);
+  assert.equal(preflight.createRoot.length, 2);
+  assert.equal(rootBridge.isPrivateRootPublicFacadePreflight(preflight), true);
+  assert.equal(rootBridge.isPrivateRootPublicFacadePreflight({}), false);
+  assert.equal(Object.isFrozen(preflight), true);
+
+  const root = preflight.createRoot(container, {
+    identifierPrefix: 'private-preflight-'
+  });
+  const createPreflight = preflight.getRootCreatePreflight(root);
+  const createPayload =
+    rootBridge.getPrivateRootPublicFacadePreflightRecordPayload(
+      createPreflight
+    );
+  const rootPayload =
+    rootBridge.getPrivateRootPublicFacadePreflightRootPayload(root);
+
+  assert.equal(Object.isFrozen(root), true);
+  assert.deepEqual(Object.keys(root), ['render', 'unmount']);
+  assert.equal(root.render.length, 1);
+  assert.equal(root.unmount.length, 0);
+  assert.equal(rootBridge.isPrivateRootPublicFacadePreflightRoot(root), true);
+  assert.equal(rootBridge.isPrivateRootPublicFacadePreflightRoot({}), false);
+  assert.equal(
+    rootPayload.rootType,
+    rootBridge.privateRootPublicFacadePreflightRootType
+  );
+  assert.equal(rootPayload.root, root);
+  assert.equal(rootPayload.createPreflight, createPreflight);
+  assert.deepEqual(rootPayload.preflightRecords, [createPreflight]);
+  assert.equal(Object.isFrozen(rootPayload.preflightRecords), true);
+
+  assertPrivatePublicFacadePreflightRecord(createPreflight, {
+    facadeCall: 'createRoot',
+    nativeHandoffId: 'preflight-native:1',
+    operation: 'create',
+    preflightId: 'preflight:1',
+    requestId: 'preflight-request:1',
+    requestType: 'createRoot'
+  });
+  assert.equal(createPreflight.rootId, 'preflight-root:1');
+  assert.equal(createPayload.requestRecord, rootPayload.createRecord);
+  assert.equal(createPayload.requestAdmission, createPreflight.requestAdmission);
+  assert.equal(createPayload.nativeHandoffRecord, createPreflight.nativeHandoffRecord);
+  assert.equal(createPayload.root, root);
+  assertBridgeDidNotTouchContainer(container, document);
+
+  const renderPreflight = root.render(element, callback);
+  const renderPayload =
+    rootBridge.getPrivateRootPublicFacadePreflightRecordPayload(
+      renderPreflight
+    );
+  assertPrivatePublicFacadePreflightRecord(renderPreflight, {
+    facadeCall: 'root.render',
+    nativeHandoffId: 'preflight-native:2',
+    operation: 'render',
+    preflightId: 'preflight:2',
+    requestId: 'preflight-request:2',
+    requestType: 'root.render'
+  });
+  assert.equal(renderPreflight.updateId, 'preflight-update:1');
+  assert.equal(
+    renderPreflight.lifecycleStatusBefore,
+    rootBridge.ROOT_LIFECYCLE_CREATED
+  );
+  assert.equal(
+    renderPreflight.lifecycleStatusAfter,
+    rootBridge.ROOT_LIFECYCLE_RENDERED
+  );
+  assert.equal(renderPayload.requestRecord.updateId, 'preflight-update:1');
+  assert.equal(
+    rootBridge.getPrivateRootRecordPayload(renderPayload.requestRecord).element,
+    element
+  );
+  assert.equal(
+    rootBridge.getPrivateRootRecordPayload(renderPayload.requestRecord).callback,
+    callback
+  );
+
+  const unmountPreflight = root.unmount(unmountCallback);
+  const unmountPayload =
+    rootBridge.getPrivateRootPublicFacadePreflightRecordPayload(
+      unmountPreflight
+    );
+  assertPrivatePublicFacadePreflightRecord(unmountPreflight, {
+    facadeCall: 'root.unmount',
+    nativeHandoffId: 'preflight-native:3',
+    operation: 'unmount',
+    preflightId: 'preflight:3',
+    requestId: 'preflight-request:3',
+    requestType: 'root.unmount'
+  });
+  assert.equal(unmountPreflight.updateId, 'preflight-update:2');
+  assert.equal(unmountPreflight.noOp, false);
+  assert.equal(unmountPreflight.sync, true);
+  assert.equal(
+    unmountPreflight.lifecycleStatusBefore,
+    rootBridge.ROOT_LIFECYCLE_RENDERED
+  );
+  assert.equal(
+    unmountPreflight.lifecycleStatusAfter,
+    rootBridge.ROOT_LIFECYCLE_UNMOUNTED
+  );
+  assert.equal(
+    rootBridge.getPrivateRootRecordPayload(unmountPayload.requestRecord).callback,
+    unmountCallback
+  );
+
+  const secondUnmountPreflight = root.unmount();
+  assertPrivatePublicFacadePreflightRecord(secondUnmountPreflight, {
+    facadeCall: 'root.unmount',
+    nativeHandoffId: 'preflight-native:4',
+    operation: 'unmount',
+    preflightId: 'preflight:4',
+    requestId: 'preflight-request:4',
+    requestType: 'root.unmount'
+  });
+  assert.equal(secondUnmountPreflight.noOp, true);
+  assert.equal(secondUnmountPreflight.sync, false);
+  assert.throws(() => root.render(element), {
+    code: 'FAST_REACT_DOM_UNMOUNTED_ROOT'
+  });
+
+  assert.deepEqual(preflight.getRootPreflightRecords(root), [
+    createPreflight,
+    renderPreflight,
+    unmountPreflight,
+    secondUnmountPreflight
+  ]);
+  assert.deepEqual(preflight.getRootRequestRecords(root), [
+    rootPayload.createRecord,
+    renderPayload.requestRecord,
+    unmountPayload.requestRecord,
+    rootBridge.getPrivateRootPublicFacadePreflightRecordPayload(
+      secondUnmountPreflight
+    ).requestRecord
+  ]);
+  assert.deepEqual(preflight.getRootPayload(root).renderPreflights, [
+    renderPreflight
+  ]);
+  assert.deepEqual(preflight.getRootPayload(root).unmountPreflights, [
+    unmountPreflight,
+    secondUnmountPreflight
+  ]);
+  assert.equal(
+    rootBridge.getPrivateRootPublicFacadePreflightPayload(preflight)
+      .preflightRecordCount,
+    4
+  );
+  assert.equal(
+    rootBridge.getPrivateRootPublicFacadePreflightPayload(preflight).rootCount,
+    1
+  );
+  assert.equal(rootBridge.getPrivateRootPublicFacadePreflightPayload({}), null);
+  assert.equal(
+    rootBridge.getPrivateRootPublicFacadePreflightRecordPayload({}),
+    null
+  );
+  assert.equal(
+    rootBridge.getPrivateRootPublicFacadePreflightRootPayload({}),
+    null
+  );
+
+  const otherPreflight = descriptor.value();
+  assert.throws(() => otherPreflight.getRootCreatePreflight(root), {
+    code: 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE'
+  });
+  assert.throws(() => preflight.getRootCreatePreflight({}), {
+    code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT'
+  });
+  assertBridgeDidNotTouchContainer(container, document);
+});
+
 test('public react-dom/client root placeholders remain inert', () => {
   const document = createDocument('public-placeholder');
   const container = createElement('DIV', document);
@@ -2968,6 +3203,93 @@ function assertHiddenNativePayload(handoff) {
   assert.equal(serialized.includes('__mutationLog'), false);
   assert.equal(serialized.includes('__registrations'), false);
   assert.equal(serialized.includes('afterRootUpdate'), false);
+}
+
+function assertPrivatePublicFacadePreflightRecord(record, expected) {
+  assert.equal(Object.isFrozen(record), true);
+  assert.equal(
+    record.$$typeof,
+    rootBridge.privateRootPublicFacadePreflightRecordType
+  );
+  assert.equal(
+    record.kind,
+    'FastReactDomPrivateRootPublicFacadePreflightRecord'
+  );
+  assert.equal(record.operation, expected.operation);
+  assert.equal(record.facadeCall, expected.facadeCall);
+  assert.equal(record.entrypoint, 'react-dom/client');
+  assert.equal(record.preflightId, expected.preflightId);
+  assert.equal(
+    record.preflightStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_ACCEPTED
+  );
+  assert.equal(record.executionStatus, rootBridge.ROOT_BRIDGE_EXECUTION_BLOCKED);
+  assert.equal(
+    record.compatibilityStatus,
+    rootBridge.ROOT_BRIDGE_COMPATIBILITY_BLOCKED
+  );
+  assert.equal(record.requestId, expected.requestId);
+  assert.equal(record.requestType, expected.requestType);
+  assert.equal(
+    record.requestAdmissionStatus,
+    rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED
+  );
+  assert.equal(
+    record.requestAdmission.admissionStatus,
+    rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED
+  );
+  assert.equal(
+    record.nativeHandoffStatus,
+    rootBridge.ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED
+  );
+  assert.equal(record.nativeHandoffRecord.handoffId, expected.nativeHandoffId);
+  assert.equal(
+    record.nativeHandoffRecord.handoffStatus,
+    rootBridge.ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED
+  );
+  assert.equal(
+    record.nativeHandoffRecord.nativeRequestRecord.environmentId,
+    427
+  );
+  assert.deepEqual(
+    record.acceptedCapabilities.map((capability) => capability.id),
+    [
+      'private-root-bridge-request-admission',
+      'private-native-request-handoff-mirror'
+    ]
+  );
+  assert.deepEqual(
+    record.blockedCapabilities.map((capability) => capability.id),
+    [
+      'public-root-execution',
+      'native-execution',
+      'reconciler-execution',
+      'dom-mutation',
+      'marker-writes',
+      'listener-installation',
+      'hydration',
+      'events',
+      'compatibility-claims'
+    ]
+  );
+  assert.equal(
+    rootBridge.isPrivateRootPublicFacadePreflightRecord(record),
+    true
+  );
+  assert.equal(record.acceptedPrivateBridgeDiagnostics, true);
+  assert.equal(record.publicCreateRootEnabled, false);
+  assert.equal(record.publicHydrateRootEnabled, false);
+  assert.equal(record.publicRootObjectExposed, false);
+  assert.equal(record.publicRootCompatibilitySurface, false);
+  assert.equal(record.nativeExecution, false);
+  assert.equal(record.reconcilerExecution, false);
+  assert.equal(record.rootScheduled, false);
+  assert.equal(record.domMutation, false);
+  assert.equal(record.markerWrites, false);
+  assert.equal(record.listenerInstallation, false);
+  assert.equal(record.hydration, false);
+  assert.equal(record.eventDispatch, false);
+  assert.equal(record.compatibilityClaimed, false);
 }
 
 function assertBridgeDidNotTouchContainer(container, document) {
