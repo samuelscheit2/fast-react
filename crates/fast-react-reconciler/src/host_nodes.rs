@@ -274,6 +274,80 @@ impl HostNodeAppliedPropertyUpdate {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct HostNodeTextUpdate {
+    old_text: String,
+    new_text: String,
+}
+
+impl HostNodeTextUpdate {
+    #[must_use]
+    pub(crate) fn new(old_text: impl Into<String>, new_text: impl Into<String>) -> Self {
+        Self {
+            old_text: old_text.into(),
+            new_text: new_text.into(),
+        }
+    }
+
+    #[must_use]
+    pub(crate) fn old_text(&self) -> &str {
+        &self.old_text
+    }
+
+    #[must_use]
+    pub(crate) fn new_text(&self) -> &str {
+        &self.new_text
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct HostNodeAppliedTextUpdate {
+    sequence: usize,
+    handle: StateNodeHandle,
+    root_id: FiberRootId,
+    fiber_id: FiberId,
+    token_id: HostFiberTokenId,
+    old_text: String,
+    new_text: String,
+}
+
+impl HostNodeAppliedTextUpdate {
+    #[must_use]
+    pub(crate) const fn sequence(&self) -> usize {
+        self.sequence
+    }
+
+    #[must_use]
+    pub(crate) const fn handle(&self) -> StateNodeHandle {
+        self.handle
+    }
+
+    #[must_use]
+    pub(crate) const fn root_id(&self) -> FiberRootId {
+        self.root_id
+    }
+
+    #[must_use]
+    pub(crate) const fn fiber_id(&self) -> FiberId {
+        self.fiber_id
+    }
+
+    #[must_use]
+    pub(crate) const fn token_id(&self) -> HostFiberTokenId {
+        self.token_id
+    }
+
+    #[must_use]
+    pub(crate) fn old_text(&self) -> &str {
+        &self.old_text
+    }
+
+    #[must_use]
+    pub(crate) fn new_text(&self) -> &str {
+        &self.new_text
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum HostNodeViolation {
     InvalidHandle,
@@ -504,6 +578,36 @@ impl<H: HostTypes> HostNodeStore<H> {
             .property_updates)
     }
 
+    pub(crate) fn apply_text_update(
+        &mut self,
+        handle: StateNodeHandle,
+        scope: HostNodeScope,
+        update: HostNodeTextUpdate,
+    ) -> Result<HostNodeAppliedTextUpdate, HostNodeValidationError> {
+        let record = self.record_mut(handle, scope, HostFiberTokenTarget::TextInstance, true)?;
+        let applied = HostNodeAppliedTextUpdate {
+            sequence: record.text_updates.len(),
+            handle,
+            root_id: record.metadata.root_id,
+            fiber_id: record.metadata.fiber_id,
+            token_id: record.metadata.token_id,
+            old_text: update.old_text,
+            new_text: update.new_text,
+        };
+        record.text_updates.push(applied.clone());
+        Ok(applied)
+    }
+
+    pub(crate) fn text_updates(
+        &self,
+        handle: StateNodeHandle,
+        scope: HostNodeScope,
+    ) -> Result<&[HostNodeAppliedTextUpdate], HostNodeValidationError> {
+        Ok(&self
+            .record(handle, scope, HostFiberTokenTarget::TextInstance, true)?
+            .text_updates)
+    }
+
     pub(crate) fn invalidate_instance(
         &mut self,
         handle: StateNodeHandle,
@@ -644,6 +748,7 @@ impl<H: HostTypes> HostNodeStore<H> {
             },
             value,
             property_updates: Vec::new(),
+            text_updates: Vec::new(),
         }));
         handle
     }
@@ -881,6 +986,7 @@ struct HostNodeRecord<H: HostTypes> {
     metadata: HostNodeMetadata,
     value: HostNodeValue<H>,
     property_updates: Vec<HostNodeAppliedPropertyUpdate>,
+    text_updates: Vec<HostNodeAppliedTextUpdate>,
 }
 
 impl<H: HostTypes> HostNodeRecord<H> {
@@ -1145,6 +1251,36 @@ mod tests {
     }
 
     #[test]
+    fn host_nodes_apply_text_updates_behind_validated_handles() {
+        let mut store = HostNodeStore::<TestHost>::new();
+        let scope = text_scope();
+        let handle = store.insert_text(
+            scope,
+            TestTextInstance {
+                id: 1,
+                text: "before".to_owned(),
+            },
+        );
+        let update = HostNodeTextUpdate::new("before", "after");
+        assert_eq!(update.old_text(), "before");
+        assert_eq!(update.new_text(), "after");
+
+        let applied = store.apply_text_update(handle, scope, update).unwrap();
+
+        assert_eq!(applied.sequence(), 0);
+        assert_eq!(applied.handle(), handle);
+        assert_eq!(applied.root_id(), scope.root_id());
+        assert_eq!(applied.fiber_id(), scope.fiber_id());
+        assert_eq!(applied.token_id(), scope.token_id());
+        assert_eq!(applied.old_text(), "before");
+        assert_eq!(applied.new_text(), "after");
+
+        let updates = store.text_updates(handle, scope).unwrap();
+        assert_eq!(updates, &[applied]);
+        assert_eq!(store.text(handle, scope).unwrap().text, "before");
+    }
+
+    #[test]
     fn host_nodes_reject_property_updates_for_stale_or_wrong_targets() {
         let mut store = HostNodeStore::<TestHost>::new();
         let instance_scope = instance_scope();
@@ -1172,6 +1308,14 @@ mod tests {
 
         assert_violation(
             store.apply_instance_property_update(text_handle, text_scope, update),
+            HostNodeViolation::WrongTarget,
+        );
+        assert_violation(
+            store.apply_text_update(
+                instance_handle,
+                instance_scope,
+                HostNodeTextUpdate::new("before", "after"),
+            ),
             HostNodeViolation::WrongTarget,
         );
         store

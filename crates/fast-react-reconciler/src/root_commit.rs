@@ -1818,6 +1818,16 @@ impl HostRootTextUpdateCommitExecutionRequestForCanary {
     }
 
     #[must_use]
+    pub(crate) fn committed_current_is_finished_work(self) -> bool {
+        self.committed_current == self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) fn previous_current_was_replaced(self) -> bool {
+        self.previous_current != self.committed_current
+    }
+
+    #[must_use]
     pub(crate) const fn public_root_rendering_blocked(self) -> bool {
         true
     }
@@ -15522,6 +15532,8 @@ mod tests {
             &HOST_ROOT_TEXT_UPDATE_COMMIT_EXECUTION_BLOCKERS
         );
         assert!(request.private_test_host_text_mutation_allowed());
+        assert!(request.committed_current_is_finished_work());
+        assert!(request.previous_current_was_replaced());
         assert!(request.public_root_rendering_blocked());
         assert!(request.public_renderer_mutation_blocked());
         assert!(!request.public_renderer_compatibility_claimed());
