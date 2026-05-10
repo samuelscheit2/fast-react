@@ -147,6 +147,8 @@ const CONCURRENT_ROOT_TAG = 'ConcurrentRoot';
 const REACT_FRAGMENT_TYPE = Symbol.for('react.fragment');
 
 const INITIAL_HOST_OUTPUT_SHAPE_HOST_COMPONENT = 'host-component';
+const INITIAL_HOST_OUTPUT_SHAPE_NESTED_HOST_COMPONENT =
+  'nested-host-component';
 const INITIAL_HOST_OUTPUT_SHAPE_FRAGMENT = 'fragment';
 const INITIAL_HOST_OUTPUT_SHAPE_ARRAY = 'array';
 const INITIAL_HOST_OUTPUT_FRAGMENT_HOST_TYPE = 'Fragment';
@@ -806,13 +808,13 @@ const ROOT_BRIDGE_INITIAL_HOST_OUTPUT_ACCEPTED_CAPABILITIES = freezeArray([
     id: 'fake-dom-host-component',
     accepted: true,
     reason:
-      'A single fake-DOM HostComponent instance was created through the private DOM host adapter.'
+      'Fake-DOM HostComponent instances were created through the private DOM host adapter.'
   }),
   freezeRecord({
     id: 'fake-dom-host-text',
     accepted: true,
     reason:
-      'A single fake-DOM HostText child was created through the private DOM host adapter.'
+      'Fake-DOM HostText children were created through the private DOM host adapter.'
   }),
   freezeRecord({
     id: 'component-tree-host-instance-map',
@@ -834,6 +836,12 @@ const ROOT_BRIDGE_FRAGMENT_ARRAY_HOST_OUTPUT_ACCEPTED_CAPABILITY =
     reason:
       'An unkeyed fragment/array host-child shape was applied through private fake-DOM host output only.'
   });
+const ROOT_BRIDGE_NESTED_HOST_OUTPUT_ACCEPTED_CAPABILITY = freezeRecord({
+  id: 'fake-dom-nested-host-component-child',
+  accepted: true,
+  reason:
+    'A nested HostComponent child was attached below a private fake-DOM HostComponent root child.'
+});
 const ROOT_BRIDGE_INITIAL_HOST_OUTPUT_BLOCKED_CAPABILITIES = freezeArray([
   freezeRecord({
     id: 'public-root-object',
@@ -2019,7 +2027,7 @@ const ROOT_BRIDGE_ROOT_RENDER_HOST_OUTPUT_ACCEPTED_CAPABILITIES =
       id: 'root-work-loop-finished-work-handoff',
       accepted: true,
       reason:
-        'Accepted Rust root work-loop finished-work metadata matched the admitted HostComponent/HostText host-output shape.'
+        'Accepted Rust root work-loop finished-work metadata matched the admitted private host-output shape.'
     }),
     freezeRecord({
       id: 'fake-dom-host-output-mutation',
@@ -4137,6 +4145,8 @@ function renderPrivateRootHostOutputWithBridge(
     childTags: hostOutputHandoff.childTags,
     hostNodeInfo: hostOutputHandoff.hostNodeInfo,
     textNodeInfo: hostOutputHandoff.textNodeInfo,
+    hostNodeInfos: hostOutputHandoff.hostNodeInfos,
+    textNodeInfos: hostOutputHandoff.textNodeInfos,
     containerChildCount: hostOutputHandoff.containerChildCount,
     hostChildCount: hostOutputHandoff.hostChildCount,
     textContent: hostOutputHandoff.textContent,
@@ -4157,8 +4167,9 @@ function renderPrivateRootHostOutputWithBridge(
       rootWorkLoopFinishedWorkRecord.consumedFinishedWorkRecord,
     rootWorkLoopPublicRootRenderingBlocked:
       rootWorkLoopFinishedWorkRecord.publicRootRenderingBlocked,
-    acceptedCapabilities:
-      ROOT_BRIDGE_ROOT_RENDER_HOST_OUTPUT_ACCEPTED_CAPABILITIES,
+    acceptedCapabilities: createRootRenderHostOutputAcceptedCapabilities(
+      rootWorkLoopFinishedWorkRecord
+    ),
     blockedCapabilities:
       ROOT_BRIDGE_ROOT_RENDER_HOST_OUTPUT_BLOCKED_CAPABILITIES,
     privateRootRender: true,
@@ -6564,6 +6575,13 @@ function applyPrivateInitialRenderHostOutputWithBridge(
     for (const child of hostOutput.hostChildren) {
       const childCommit = {
         child,
+        childHostAppendedToHost: false,
+        childHostNode: null,
+        childHostToken: null,
+        childLatestPropsAfterCommit: null,
+        childLatestPropsBeforeCommit: null,
+        childLatestPropsMutationHandoff: null,
+        childLatestPropsMutationPayload: null,
         hostAppendedToContainer: false,
         hostNode: null,
         hostToken: null,
@@ -6572,21 +6590,15 @@ function applyPrivateInitialRenderHostOutputWithBridge(
         latestPropsMutationHandoff: null,
         latestPropsMutationPayload: null,
         textAppendedToHost: false,
+        textParentNode: null,
         textNode: null,
         textToken: null
       };
       childCommits.push(childCommit);
 
+      const nestedHostChild = child.nestedHostChild;
       const hostOwner = freezeRecord({
         kind: 'FastReactDomPrivateInitialHostComponentOwner',
-        handoffId,
-        hostChildIndex: child.index,
-        hostOutputShape: hostOutput.shape,
-        hostType: child.type,
-        renderUpdateId: validation.renderRecord.updateId
-      });
-      const textOwner = freezeRecord({
-        kind: 'FastReactDomPrivateInitialHostTextOwner',
         handoffId,
         hostChildIndex: child.index,
         hostOutputShape: hostOutput.shape,
@@ -6626,17 +6638,81 @@ function applyPrivateInitialRenderHostOutputWithBridge(
         childCommit.latestPropsMutationHandoff
       );
 
+      if (nestedHostChild !== null) {
+        const childHostOwner = freezeRecord({
+          kind: 'FastReactDomPrivateInitialNestedHostComponentOwner',
+          handoffId,
+          hostChildIndex: child.index,
+          hostOutputShape: hostOutput.shape,
+          hostType: nestedHostChild.type,
+          parentHostType: child.type,
+          renderUpdateId: validation.renderRecord.updateId
+        });
+
+        childCommit.childHostNode = createDomHostElementInstance(
+          nestedHostChild.type,
+          validation.container
+        );
+        childCommit.childHostToken = createHostInstanceToken(
+          childHostOwner,
+          validation.rootOwner
+        );
+        attachHostInstanceNode(
+          childCommit.childHostNode,
+          childCommit.childHostToken,
+          nestedHostChild.previousProps
+        );
+
+        childCommit.childLatestPropsMutationHandoff =
+          commitDomPropertyUpdateForLatestProps(
+            childCommit.childHostNode,
+            nestedHostChild.type,
+            nestedHostChild.previousProps,
+            nestedHostChild.nextProps
+          );
+        childCommit.childLatestPropsMutationPayload =
+          getDomPropertyUpdateLatestPropsHandoffPayload(
+            childCommit.childLatestPropsMutationHandoff
+          );
+        childCommit.childLatestPropsBeforeCommit = getLatestPropsFromNode(
+          childCommit.childHostNode
+        );
+        childCommit.childLatestPropsAfterCommit =
+          requireLatestPropsCommitResult(
+            childCommit.childLatestPropsMutationHandoff
+          );
+      }
+
+      const textHostType =
+        nestedHostChild === null ? child.type : nestedHostChild.type;
       childCommit.textNode = createDomHostTextInstance(
         child.text,
         validation.container
       );
       childCommit.textToken = createHostInstanceToken(
-        textOwner,
+        freezeRecord({
+          kind: 'FastReactDomPrivateInitialHostTextOwner',
+          handoffId,
+          hostChildIndex: child.index,
+          hostOutputShape: hostOutput.shape,
+          hostType: textHostType,
+          parentHostType:
+            nestedHostChild === null ? null : nestedHostChild.type,
+          renderUpdateId: validation.renderRecord.updateId
+        }),
         validation.rootOwner
       );
       attachHostInstanceNode(childCommit.textNode, childCommit.textToken, null);
-      appendInitialChild(childCommit.hostNode, childCommit.textNode);
+      childCommit.textParentNode =
+        childCommit.childHostNode === null
+          ? childCommit.hostNode
+          : childCommit.childHostNode;
+      appendInitialChild(childCommit.textParentNode, childCommit.textNode);
       childCommit.textAppendedToHost = true;
+      if (childCommit.childHostNode !== null) {
+        appendInitialChild(childCommit.hostNode, childCommit.childHostNode);
+        childCommit.childHostAppendedToHost = true;
+      }
       appendChildToContainer(validation.container, childCommit.hostNode);
       childCommit.hostAppendedToContainer = true;
     }
@@ -6659,21 +6735,22 @@ function applyPrivateInitialRenderHostOutputWithBridge(
     firstChildCommit.latestPropsMutationPayload;
   const latestPropsBeforeCommit = firstChildCommit.latestPropsBeforeCommit;
   const latestPropsAfterCommit = firstChildCommit.latestPropsAfterCommit;
+  const allHostCommits = getInitialHostOutputHostCommits(childCommits);
   const hostNodes = freezeArray(
-    childCommits.map((childCommit) => childCommit.hostNode)
+    allHostCommits.map((hostCommit) => hostCommit.hostNode)
   );
   const textNodes = freezeArray(
     childCommits.map((childCommit) => childCommit.textNode)
   );
   const hostTokens = freezeArray(
-    childCommits.map((childCommit) => childCommit.hostToken)
+    allHostCommits.map((hostCommit) => hostCommit.hostToken)
   );
   const textTokens = freezeArray(
     childCommits.map((childCommit) => childCommit.textToken)
   );
   const hostNodeInfos = freezeArray(
-    childCommits.map((childCommit) =>
-      freezeRecord(describeContainer(childCommit.hostNode))
+    allHostCommits.map((hostCommit) =>
+      freezeRecord(describeContainer(hostCommit.hostNode))
     )
   );
   const textNodeInfos = freezeArray(
@@ -6682,21 +6759,27 @@ function applyPrivateInitialRenderHostOutputWithBridge(
     )
   );
   const latestPropsMutationHandoffs = freezeArray(
-    childCommits.map(
-      (childCommit) => childCommit.latestPropsMutationHandoff
+    allHostCommits.map(
+      (hostCommit) => hostCommit.latestPropsMutationHandoff
     )
   );
   const latestPropsMutationPayloads = freezeArray(
-    childCommits.map(
-      (childCommit) => childCommit.latestPropsMutationPayload
+    allHostCommits.map(
+      (hostCommit) => hostCommit.latestPropsMutationPayload
     )
   );
   const latestPropsBeforeCommits = freezeArray(
-    childCommits.map((childCommit) => childCommit.latestPropsBeforeCommit)
+    allHostCommits.map((hostCommit) => hostCommit.latestPropsBeforeCommit)
   );
   const latestPropsAfterCommits = freezeArray(
-    childCommits.map((childCommit) => childCommit.latestPropsAfterCommit)
+    allHostCommits.map((hostCommit) => hostCommit.latestPropsAfterCommit)
   );
+  const childHostNode = firstChildCommit.childHostNode;
+  const childHostToken = firstChildCommit.childHostToken;
+  const childLatestPropsBeforeCommit =
+    firstChildCommit.childLatestPropsBeforeCommit;
+  const childLatestPropsAfterCommit =
+    firstChildCommit.childLatestPropsAfterCommit;
 
   const handoff = freezeRecord({
     $$typeof: privateRootInitialHostOutputHandoffRecordType,
@@ -6731,9 +6814,9 @@ function applyPrivateInitialRenderHostOutputWithBridge(
     textNodeInfos,
     containerChildCount: getChildNodeCount(validation.container),
     hostChildCount:
-      hostOutput.hostComponentCount === 1
+      hostOutput.hostChildren.length === 1
         ? getChildNodeCount(hostNode)
-        : hostOutput.hostComponentCount,
+        : hostOutput.hostChildren.length,
     textContent: hostOutput.text,
     acceptedCapabilities: createInitialHostOutputAcceptedCapabilities(
       hostOutput
@@ -6759,6 +6842,14 @@ function applyPrivateInitialRenderHostOutputWithBridge(
     active: true,
     admissionRecord,
     bridgeState: rootBridgeState,
+    childHostNode,
+    childHostToken,
+    childLatestPropsAfterCommit,
+    childLatestPropsBeforeCommit,
+    childLatestPropsMutationHandoff:
+      firstChildCommit.childLatestPropsMutationHandoff,
+    childLatestPropsMutationPayload:
+      firstChildCommit.childLatestPropsMutationPayload,
     container: validation.container,
     createRecord: validation.createRecord,
     element: validation.element,
@@ -10402,10 +10493,13 @@ function normalizeInitialHostOutputSingleHostElement(element) {
   const hostChild = normalizeInitialHostOutputHostChild(
     element,
     0,
-    false
+    false,
+    true
   );
   return createNormalizedInitialHostOutput(
-    INITIAL_HOST_OUTPUT_SHAPE_HOST_COMPONENT,
+    hostChild.nestedHostChild === null
+      ? INITIAL_HOST_OUTPUT_SHAPE_HOST_COMPONENT
+      : INITIAL_HOST_OUTPUT_SHAPE_NESTED_HOST_COMPONENT,
     [hostChild]
   );
 }
@@ -10420,7 +10514,7 @@ function normalizeInitialHostOutputHostChildArray(children, shape) {
   const hostChildren = [];
   for (let index = 0; index < children.length; index++) {
     hostChildren.push(
-      normalizeInitialHostOutputHostChild(children[index], index, true)
+      normalizeInitialHostOutputHostChild(children[index], index, true, false)
     );
   }
   return createNormalizedInitialHostOutput(shape, hostChildren);
@@ -10429,7 +10523,8 @@ function normalizeInitialHostOutputHostChildArray(children, shape) {
 function normalizeInitialHostOutputHostChild(
   element,
   index,
-  requireUnkeyed
+  requireUnkeyed,
+  allowNested
 ) {
   if (element === null || typeof element !== 'object') {
     throwInvalidInitialHostOutputHandoff(
@@ -10452,10 +10547,53 @@ function normalizeInitialHostOutputHostChild(
     element.props !== null && typeof element.props === 'object'
       ? element.props
       : {};
-  const text = getInitialHostTextChild(props.children);
+  const nestedHostChild =
+    allowNested && isInitialHostOutputNestedHostChild(props.children)
+      ? normalizeInitialHostOutputNestedHostChild(props.children)
+      : null;
+  const text =
+    nestedHostChild === null
+      ? getInitialHostTextChild(props.children)
+      : nestedHostChild.text;
 
   return freezeRecord({
     index,
+    nestedHostChild,
+    nextProps: props,
+    previousProps: freezeRecord({}),
+    text,
+    type: element.type
+  });
+}
+
+function isInitialHostOutputNestedHostChild(value) {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    typeof value.type === 'string'
+  );
+}
+
+function normalizeInitialHostOutputNestedHostChild(element) {
+  assertInitialHostOutputUnkeyedElement(
+    element,
+    'Initial host output nested HostComponent support requires an unkeyed child.'
+  );
+  if (typeof element.type !== 'string' || element.type === '') {
+    throwInvalidInitialHostOutputHandoff(
+      'Initial host output nested support requires a string child HostComponent type.'
+    );
+  }
+
+  const props =
+    element.props !== null && typeof element.props === 'object'
+      ? element.props
+      : {};
+  const text = getInitialHostTextChild(props.children);
+
+  return freezeRecord({
+    index: 0,
     nextProps: props,
     previousProps: freezeRecord({}),
     text,
@@ -10476,19 +10614,26 @@ function assertInitialHostOutputUnkeyedElement(element, message) {
 function createNormalizedInitialHostOutput(shape, hostChildren) {
   const frozenHostChildren = freezeArray(hostChildren);
   const firstHostChild = frozenHostChildren[0];
+  const hostComponentCount =
+    countInitialHostOutputHostComponents(frozenHostChildren);
   const rootChildTag = getInitialHostOutputRootWorkLoopRootChildTag({
     shape
   });
   const childTags = createInitialHostOutputRootWorkLoopChildTags(
     shape,
-    frozenHostChildren.length
+    frozenHostChildren
   );
+  const type =
+    shape === INITIAL_HOST_OUTPUT_SHAPE_FRAGMENT ||
+    shape === INITIAL_HOST_OUTPUT_SHAPE_ARRAY
+      ? INITIAL_HOST_OUTPUT_FRAGMENT_HOST_TYPE
+      : firstHostChild.type;
 
   return freezeRecord({
     childTags,
     completedChildTag: 'HostComponent',
     hostChildren: frozenHostChildren,
-    hostComponentCount: frozenHostChildren.length,
+    hostComponentCount,
     hostTextChildTag: 'HostText',
     hostTextCount: frozenHostChildren.length,
     nextProps: firstHostChild.nextProps,
@@ -10496,16 +10641,30 @@ function createNormalizedInitialHostOutput(shape, hostChildren) {
     rootChildTag,
     shape,
     text: frozenHostChildren.map((child) => child.text).join(''),
-    type:
-      shape === INITIAL_HOST_OUTPUT_SHAPE_HOST_COMPONENT
-        ? firstHostChild.type
-        : INITIAL_HOST_OUTPUT_FRAGMENT_HOST_TYPE
+    type
   });
+}
+
+function countInitialHostOutputHostComponents(hostChildren) {
+  let count = 0;
+  for (const child of hostChildren) {
+    count++;
+    if (child.nestedHostChild !== null) {
+      count++;
+    }
+  }
+  return count;
 }
 
 function createInitialHostOutputAcceptedCapabilities(hostOutput) {
   if (hostOutput.shape === INITIAL_HOST_OUTPUT_SHAPE_HOST_COMPONENT) {
     return ROOT_BRIDGE_INITIAL_HOST_OUTPUT_ACCEPTED_CAPABILITIES;
+  }
+  if (hostOutput.shape === INITIAL_HOST_OUTPUT_SHAPE_NESTED_HOST_COMPONENT) {
+    return freezeArray([
+      ...ROOT_BRIDGE_INITIAL_HOST_OUTPUT_ACCEPTED_CAPABILITIES,
+      ROOT_BRIDGE_NESTED_HOST_OUTPUT_ACCEPTED_CAPABILITY
+    ]);
   }
 
   return freezeArray([
@@ -10515,9 +10674,10 @@ function createInitialHostOutputAcceptedCapabilities(hostOutput) {
 }
 
 function getInitialHostOutputRootWorkLoopRootChildTag(normalizedInitial) {
-  return normalizedInitial.shape === INITIAL_HOST_OUTPUT_SHAPE_HOST_COMPONENT
-    ? 'HostComponent'
-    : 'Fragment';
+  return normalizedInitial.shape === INITIAL_HOST_OUTPUT_SHAPE_FRAGMENT ||
+    normalizedInitial.shape === INITIAL_HOST_OUTPUT_SHAPE_ARRAY
+    ? 'Fragment'
+    : 'HostComponent';
 }
 
 function getInitialHostOutputRootWorkLoopCompletedChildTag() {
@@ -10534,31 +10694,36 @@ function getInitialHostOutputRootWorkLoopChildTags(normalizedInitial) {
 
 function createInitialHostOutputRootWorkLoopChildTags(
   shape,
-  hostComponentCount
+  hostChildren
 ) {
   if (shape === INITIAL_HOST_OUTPUT_SHAPE_HOST_COMPONENT) {
     return freezeArray(['HostComponent', 'HostText']);
   }
+  if (shape === INITIAL_HOST_OUTPUT_SHAPE_NESTED_HOST_COMPONENT) {
+    return freezeArray(['HostComponent', 'HostComponent', 'HostText']);
+  }
 
   const childTags = ['Fragment'];
-  for (let index = 0; index < hostComponentCount; index++) {
+  for (let index = 0; index < hostChildren.length; index++) {
     childTags.push('HostComponent', 'HostText');
   }
   return freezeArray(childTags);
 }
 
 function getInitialHostOutputRootWorkLoopPlacementTag(normalizedInitial) {
-  return normalizedInitial.shape === INITIAL_HOST_OUTPUT_SHAPE_HOST_COMPONENT
-    ? 'HostComponent'
-    : 'Fragment';
+  return normalizedInitial.shape === INITIAL_HOST_OUTPUT_SHAPE_FRAGMENT ||
+    normalizedInitial.shape === INITIAL_HOST_OUTPUT_SHAPE_ARRAY
+    ? 'Fragment'
+    : 'HostComponent';
 }
 
 function getInitialHostOutputRootWorkLoopPlacementApplyKind(
   normalizedInitial
 ) {
-  return normalizedInitial.shape === INITIAL_HOST_OUTPUT_SHAPE_HOST_COMPONENT
-    ? 'append-placement-to-container'
-    : 'append-fragment-children-to-container';
+  return normalizedInitial.shape === INITIAL_HOST_OUTPUT_SHAPE_FRAGMENT ||
+    normalizedInitial.shape === INITIAL_HOST_OUTPUT_SHAPE_ARRAY
+    ? 'append-fragment-children-to-container'
+    : 'append-placement-to-container';
 }
 
 function getInitialHostTextChild(children) {
@@ -10573,6 +10738,33 @@ function getInitialHostTextChild(children) {
 
 function requireLatestPropsCommitResult(handoff) {
   return commitLatestPropsFromMutationHandoff(handoff);
+}
+
+function getInitialHostOutputHostCommits(childCommits) {
+  const hostCommits = [];
+  for (const childCommit of childCommits) {
+    hostCommits.push({
+      hostNode: childCommit.hostNode,
+      hostToken: childCommit.hostToken,
+      latestPropsAfterCommit: childCommit.latestPropsAfterCommit,
+      latestPropsBeforeCommit: childCommit.latestPropsBeforeCommit,
+      latestPropsMutationHandoff: childCommit.latestPropsMutationHandoff,
+      latestPropsMutationPayload: childCommit.latestPropsMutationPayload
+    });
+    if (childCommit.childHostNode !== null) {
+      hostCommits.push({
+        hostNode: childCommit.childHostNode,
+        hostToken: childCommit.childHostToken,
+        latestPropsAfterCommit: childCommit.childLatestPropsAfterCommit,
+        latestPropsBeforeCommit: childCommit.childLatestPropsBeforeCommit,
+        latestPropsMutationHandoff:
+          childCommit.childLatestPropsMutationHandoff,
+        latestPropsMutationPayload:
+          childCommit.childLatestPropsMutationPayload
+      });
+    }
+  }
+  return hostCommits;
 }
 
 function rollbackPartialInitialHostOutput({container, children}) {
@@ -10591,11 +10783,37 @@ function rollbackPartialInitialHostOutput({container, children}) {
     const child = children[index];
     if (
       child.textAppendedToHost &&
-      child.hostNode !== null &&
+      child.textParentNode !== null &&
       child.textNode !== null
     ) {
       try {
-        removeChild(child.hostNode, child.textNode);
+        removeChild(child.textParentNode, child.textNode);
+      } catch (error) {
+        // Preserve the original private initial host-output failure.
+      }
+    }
+  }
+
+  for (let index = children.length - 1; index >= 0; index--) {
+    const child = children[index];
+    if (
+      child.childHostAppendedToHost &&
+      child.hostNode !== null &&
+      child.childHostNode !== null
+    ) {
+      try {
+        removeChild(child.hostNode, child.childHostNode);
+      } catch (error) {
+        // Preserve the original private initial host-output failure.
+      }
+    }
+  }
+
+  for (let index = children.length - 1; index >= 0; index--) {
+    const handoff = children[index].childLatestPropsMutationHandoff;
+    if (handoff !== null) {
+      try {
+        rollbackDomPropertyUpdateLatestPropsHandoff(handoff);
       } catch (error) {
         // Preserve the original private initial host-output failure.
       }
@@ -10617,7 +10835,11 @@ function rollbackPartialInitialHostOutput({container, children}) {
     const child = children[index];
     if (child.hostNode !== null) {
       detachHostInstanceSubtree(child.hostNode, {includeRoot: true});
-    } else if (child.textNode !== null) {
+    }
+    if (child.childHostNode !== null) {
+      detachHostInstanceSubtree(child.childHostNode, {includeRoot: true});
+    }
+    if (child.textNode !== null) {
       detachHostInstanceSubtree(child.textNode, {includeRoot: true});
     }
   }
@@ -18040,16 +18262,53 @@ function createPublicFacadeHostOutputRenderAcceptedCapabilities(
   ];
   if (
     payload &&
-    payload.normalizedMetadata.hostOutputShape !==
-      INITIAL_HOST_OUTPUT_SHAPE_HOST_COMPONENT
+    (payload.normalizedMetadata.hostOutputShape ===
+      INITIAL_HOST_OUTPUT_SHAPE_FRAGMENT ||
+      payload.normalizedMetadata.hostOutputShape ===
+        INITIAL_HOST_OUTPUT_SHAPE_ARRAY)
   ) {
     capabilities.push(
       ROOT_BRIDGE_FRAGMENT_ARRAY_HOST_OUTPUT_ACCEPTED_CAPABILITY
     );
   }
+  if (
+    payload &&
+    payload.normalizedMetadata.hostOutputShape ===
+      INITIAL_HOST_OUTPUT_SHAPE_NESTED_HOST_COMPONENT
+  ) {
+    capabilities.push(ROOT_BRIDGE_NESTED_HOST_OUTPUT_ACCEPTED_CAPABILITY);
+  }
   capabilities.push(
     ROOT_BRIDGE_PUBLIC_FACADE_ROOT_WORK_LOOP_FINISHED_WORK_ACCEPTED_CAPABILITY
   );
+  return freezeArray(capabilities);
+}
+
+function createRootRenderHostOutputAcceptedCapabilities(
+  rootWorkLoopFinishedWorkRecord
+) {
+  if (
+    !isPrivateRootRenderHostOutputFinishedWorkRecord(
+      rootWorkLoopFinishedWorkRecord
+    )
+  ) {
+    throwInvalidRootRenderHostOutput(
+      'Private root host-output render requires accepted root work-loop finished-work metadata.'
+    );
+  }
+  const payload = rootRenderHostOutputFinishedWorkPayloads.get(
+    rootWorkLoopFinishedWorkRecord
+  );
+  const capabilities = [
+    ...ROOT_BRIDGE_ROOT_RENDER_HOST_OUTPUT_ACCEPTED_CAPABILITIES
+  ];
+  if (
+    payload &&
+    payload.normalizedMetadata.hostOutputShape ===
+      INITIAL_HOST_OUTPUT_SHAPE_NESTED_HOST_COMPONENT
+  ) {
+    capabilities.push(ROOT_BRIDGE_NESTED_HOST_OUTPUT_ACCEPTED_CAPABILITY);
+  }
   return freezeArray(capabilities);
 }
 

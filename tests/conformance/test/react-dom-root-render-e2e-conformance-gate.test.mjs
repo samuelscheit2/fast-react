@@ -119,6 +119,130 @@ test("root render E2E gate accepts private facade root.render fake-DOM execution
   payload.bridge.cleanupInitialRenderHostOutput(payload.hostOutputHandoff);
 });
 
+test("root render E2E gate accepts private nested initial host output below public compatibility", () => {
+  const document = createDocument();
+  const container = document.createElement("div");
+  const childElement = {
+    props: {
+      children: "conformance nested private root.render",
+      id: "conformance-nested-child"
+    },
+    type: "span"
+  };
+  const element = {
+    props: {
+      children: childElement,
+      id: "conformance-nested-parent"
+    },
+    type: "section"
+  };
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    initialHostOutputIdPrefix: "conformance-nested-initial",
+    requestIdPrefix: "conformance-nested-request",
+    rootIdPrefix: "conformance-nested-root",
+    rootRenderHostOutputIdPrefix: "conformance-nested-render",
+    updateIdPrefix: "conformance-nested-update"
+  });
+  const create = bridge.createClientRoot(container);
+  const metadata = createRootWorkLoopFinishedWorkMetadata({
+    childTags: ["HostComponent", "HostComponent", "HostText"],
+    hostComponentCount: 2,
+    hostOutputShape: "nested-host-component",
+    hostTextCount: 1,
+    hostType: "section",
+    renderUpdateId: "conformance-nested-update:1",
+    rootId: create.rootId,
+    rootTag: create.rootTag,
+    textContent: "conformance nested private root.render"
+  });
+
+  const diagnostic = bridge.renderRootHostOutput(create, element, {
+    rootWorkLoopFinishedWorkMetadata: metadata
+  });
+  const payload =
+    rootBridge.getPrivateRootRenderHostOutputPayload(diagnostic);
+  const hostOutputPayload =
+    rootBridge.getPrivateRootInitialHostOutputHandoffPayload(
+      payload.hostOutputHandoff
+    );
+  const parentNode = container.firstChild;
+  const childNode = parentNode.firstChild;
+  const textNode = childNode.firstChild;
+
+  assert.equal(
+    diagnostic.renderStatus,
+    rootBridge.ROOT_BRIDGE_ROOT_RENDER_HOST_OUTPUT_APPLIED
+  );
+  assert.equal(diagnostic.privateRootRender, true);
+  assert.equal(diagnostic.privateFacadeRoot, false);
+  assert.equal(diagnostic.hostOutputShape, "nested-host-component");
+  assert.equal(diagnostic.hostComponentCount, 2);
+  assert.equal(diagnostic.hostTextCount, 1);
+  assert.deepEqual(diagnostic.childTags, [
+    "HostComponent",
+    "HostComponent",
+    "HostText"
+  ]);
+  assert.equal(diagnostic.rootWorkLoopPublicRootRenderingBlocked, true);
+  assert.equal(diagnostic.publicRootExecution, false);
+  assert.equal(diagnostic.publicRootCompatibilitySurface, false);
+  assert.equal(diagnostic.nativeExecution, false);
+  assert.equal(diagnostic.reconcilerExecution, false);
+  assert.equal(diagnostic.browserDomMutation, false);
+  assert.equal(diagnostic.hydration, false);
+  assert.equal(diagnostic.eventDispatch, false);
+  assert.equal(diagnostic.compatibilityClaimed, false);
+  assert.equal(container.childNodes.length, 1);
+  assert.equal(parentNode.nodeName, "SECTION");
+  assert.equal(childNode.nodeName, "SPAN");
+  assert.equal(textNode.nodeValue, "conformance nested private root.render");
+  assert.equal(container.textContent, "conformance nested private root.render");
+  assert.deepEqual(attributeEntries(parentNode), [
+    ["id", "conformance-nested-parent"]
+  ]);
+  assert.deepEqual(attributeEntries(childNode), [
+    ["id", "conformance-nested-child"]
+  ]);
+  assert.equal(hostOutputPayload.hostNode, parentNode);
+  assert.equal(hostOutputPayload.childHostNode, childNode);
+  assert.equal(hostOutputPayload.textNode, textNode);
+  assert.deepEqual(hostOutputPayload.hostNodes, [parentNode, childNode]);
+  assert.equal(
+    componentTree.assertMountedHostInstanceToken(
+      hostOutputPayload.hostTokens[0]
+    ),
+    parentNode
+  );
+  assert.equal(
+    componentTree.assertMountedHostInstanceToken(
+      hostOutputPayload.hostTokens[1]
+    ),
+    childNode
+  );
+  assert.equal(
+    componentTree.assertMountedHostInstanceToken(hostOutputPayload.textToken),
+    textNode
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromNode(parentNode),
+    element.props
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromNode(childNode),
+    childElement.props
+  );
+  assert.equal(componentTree.getLatestPropsFromNode(textNode), null);
+  assert.throws(() => reactDomClient.createRoot(document.createElement("div")), {
+    code: "FAST_REACT_UNIMPLEMENTED"
+  });
+
+  const cleanup = bridge.cleanupInitialRenderHostOutput(
+    payload.hostOutputHandoff
+  );
+  assert.equal(cleanup.detachedHostInstanceCount, 3);
+  assert.equal(container.childNodes.length, 0);
+});
+
 test("root render E2E gate accepts private facade root.render unkeyed fragment array fake-DOM execution below public compatibility", () => {
   const document = createDocument();
   const container = document.createElement("div");
@@ -610,6 +734,54 @@ test("root render E2E gate consumes private root.unmount ref cleanup and passive
     code: "FAST_REACT_UNIMPLEMENTED"
   });
 });
+
+function createRootWorkLoopFinishedWorkMetadata(options) {
+  return {
+    source: rootBridge.ROOT_WORK_LOOP_FINISHED_WORK_METADATA_SOURCE,
+    status: rootBridge.ROOT_WORK_LOOP_FINISHED_WORK_METADATA_STATUS,
+    metadataRevision:
+      rootBridge.ROOT_WORK_LOOP_FINISHED_WORK_METADATA_REVISION,
+    facade: {
+      rootId: options.rootId,
+      rootTag: options.rootTag,
+      renderUpdateId: options.renderUpdateId,
+      hostType: options.hostType,
+      hostOutputShape: options.hostOutputShape,
+      hostComponentCount: options.hostComponentCount,
+      hostTextCount: options.hostTextCount,
+      textContent: options.textContent
+    },
+    completeWork: {
+      rootChildTag: options.rootChildTag || "HostComponent",
+      completedChildTag: options.completedChildTag || "HostComponent",
+      hostTextChildTag: options.hostTextChildTag || "HostText",
+      childTags: options.childTags || ["HostComponent", "HostText"]
+    },
+    pending: {
+      recordsFinishedWork: true,
+      pendingWorkMatchesFinishedWork: true,
+      renderLanes: "Default",
+      finishedLanes: "Default",
+      remainingLanes: "NoLanes"
+    },
+    commit: {
+      commitOrderAfterPendingRecord: true,
+      consumedFinishedWorkRecord: true,
+      finishedWorkAfterCommit: null,
+      finishedLanesAfterCommit: "NoLanes",
+      renderPhaseWorkAfterCommit: null,
+      mutationExecutionBlocked: true,
+      publicRootRenderingBlocked: true,
+      effectsRefsAndHydrationBlocked: true
+    },
+    placement: {
+      tag: options.placementTag || "HostComponent",
+      applyKind:
+        options.placementApplyKind || "append-placement-to-container",
+      siblingStatus: "append"
+    }
+  };
+}
 
 function createDocument() {
   const document = createEventTarget({
