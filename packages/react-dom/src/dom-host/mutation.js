@@ -81,6 +81,22 @@ const DOM_HOST_TEXT_COMMIT_GATE_METADATA = Object.freeze({
   ])
 });
 
+const DOM_TEXT_CONTENT_RESET_UPDATE_MUTATION_GATE_METADATA = Object.freeze({
+  gateVersion: 1,
+  target: 'packages/react-dom/src/dom-host/mutation.js',
+  privateTextContentBridge:
+    'setTextContent/resetTextContent/removeChild/appendChild',
+  publicRootsCompared: false,
+  serverRenderingCompared: false,
+  hydrationCompared: false,
+  browserDomCompared: false,
+  compatibilityClaimed: false,
+  supportedFakeDomRowIds: Object.freeze([
+    'text-content-reset-before-managed-child-append',
+    'managed-child-remove-before-text-content-update'
+  ])
+});
+
 function appendInitialChild(parentInstance, child) {
   return appendChild(parentInstance, child);
 }
@@ -1491,6 +1507,7 @@ function applyStylePayloadEntry(instance, entry) {
 
 module.exports = {
   DOM_HOST_TEXT_COMMIT_GATE_METADATA,
+  DOM_TEXT_CONTENT_RESET_UPDATE_MUTATION_GATE_METADATA,
   DOM_PROPERTY_UPDATE_LATEST_PROPS_HANDOFF,
   CLEAR_CONTAINER_FOR_ROOT_UNMOUNT_RECORD,
   appendChild,

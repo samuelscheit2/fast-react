@@ -31,6 +31,44 @@ export const DOM_TEXT_CONTENT_LOCAL_UNSUPPORTED_SHOULD_SET_SCENARIO_IDS = [
   "should-set-noscript-special-case"
 ];
 
+export const DOM_TEXT_CONTENT_LOCAL_TEXT_TRANSITION_ORDER_STATUS =
+  "matched-react-dom-19.2.6-private-text-content-transition-order";
+
+export const DOM_TEXT_CONTENT_LOCAL_TEXT_TRANSITION_ORDER_ROWS = Object.freeze([
+  {
+    rowId: "text-content-reset-before-managed-child-append",
+    scenarioId: "text-content-to-managed-child-boundary",
+    phaseId: "managed-child",
+    oracleExtractor: "text-content-reset-before-managed-child-append",
+    localProbe: "text-content-reset-before-managed-child-append",
+    coverage: [
+      "element-text-content-shortcut",
+      "managed-child-boundary",
+      "resetTextContent",
+      "appendChild",
+      "ordering"
+    ],
+    reason:
+      "A text-content shortcut must clear the host element before appending the first managed element child."
+  },
+  {
+    rowId: "managed-child-remove-before-text-content-update",
+    scenarioId: "text-content-to-managed-child-boundary",
+    phaseId: "text-again",
+    oracleExtractor: "managed-child-remove-before-text-content-update",
+    localProbe: "managed-child-remove-before-text-content-update",
+    coverage: [
+      "element-text-content-shortcut",
+      "managed-child-boundary",
+      "removeChild",
+      "setTextContent",
+      "ordering"
+    ],
+    reason:
+      "A managed element child must be removed before the host element receives the next text-content shortcut update."
+  }
+]);
+
 export const DOM_TEXT_CONTENT_LOCAL_UNBLOCKING_REQUIREMENTS = [
   {
     id: "public-react-dom-client-root-render-path",
@@ -124,6 +162,25 @@ export function evaluateDomTextContentLocalGate({
     });
   }
 
+  if (!localChecks.privateTextContentTransitionOrderGatePresent) {
+    violations.push({
+      id: "private-text-content-transition-order-gate-missing",
+      reason:
+        "The DOM text-content local gate requires private reset/update transition metadata from the text-content and mutation helpers."
+    });
+  }
+
+  if (localChecks.privateTextContentTransitionOrderMismatches.length > 0) {
+    violations.push({
+      id: "private-text-content-transition-order-oracle-mismatch",
+      reason:
+        "The private fake-DOM text-content transition gate must preserve React DOM 19.2.6 reset/update ordering for text-to-element and element-to-text child switches.",
+      rowIds: localChecks.privateTextContentTransitionOrderMismatches.map(
+        (row) => row.rowId
+      )
+    });
+  }
+
   if (admittedScenarios.length > 0 && !requiredLocalTargetsReady) {
     violations.push({
       id: "scenario-admitted-before-dom-host-text-rendering",
@@ -211,6 +268,26 @@ export function inspectDomTextContentLocalTargets({
     privateShouldSetTextContentHelperPresent &&
     privateShouldSetTextContentOracleRows.length > 0 &&
     privateShouldSetTextContentOracleMismatches.length === 0;
+  const privateTextContentTransitionOrderMetadata =
+    inspectPrivateTextContentTransitionOrderMetadata({ workspaceRoot });
+  const privateTextContentTransitionOrderMetadataMismatches =
+    validatePrivateTextContentTransitionOrderMetadata(
+      privateTextContentTransitionOrderMetadata
+    );
+  const privateTextContentTransitionOrderRows =
+    inspectPrivateTextContentTransitionOrderRows({ oracle, workspaceRoot });
+  const privateTextContentTransitionOrderMismatches =
+    privateTextContentTransitionOrderRows.filter(
+      (row) => row.status === "mismatch"
+    );
+  const privateTextContentTransitionOrderGatePresent =
+    privateTextContentTransitionOrderMetadata.textContentMetadataPresent &&
+    privateTextContentTransitionOrderMetadata.mutationMetadataPresent &&
+    privateTextContentTransitionOrderMetadataMismatches.length === 0;
+  const privateTextContentTransitionOrderGatePassed =
+    privateTextContentTransitionOrderGatePresent &&
+    privateTextContentTransitionOrderRows.length > 0 &&
+    privateTextContentTransitionOrderMismatches.length === 0;
   const privateTextMutationHelperPresent =
     hasSourcePattern(mutationSource, /\bfunction\s+commitTextUpdate\b/u) &&
     hasSourcePattern(mutationSource, /\bfunction\s+resetTextContent\b/u);
@@ -234,6 +311,12 @@ export function inspectDomTextContentLocalTargets({
     privateShouldSetTextContentOracleRows,
     privateShouldSetTextContentOracleMismatches,
     privateShouldSetTextContentUnsupportedScenarioIds,
+    privateTextContentTransitionOrderGatePresent,
+    privateTextContentTransitionOrderGatePassed,
+    privateTextContentTransitionOrderMetadata,
+    privateTextContentTransitionOrderMetadataMismatches,
+    privateTextContentTransitionOrderRows,
+    privateTextContentTransitionOrderMismatches,
     privateTextMutationHelperPresent,
     domHostTextCreationHelperPresent,
     reconcilerHostTextCompleteAndCommitWiringPresent,
@@ -326,6 +409,362 @@ function inspectPrivateShouldSetTextContentOracleRows({
   });
 }
 
+function inspectPrivateTextContentTransitionOrderMetadata({ workspaceRoot }) {
+  const loadResult = loadPrivateTextContentTransitionOrderHelpers({
+    workspaceRoot
+  });
+  if (loadResult.error) {
+    return {
+      loadError: loadResult.error,
+      textContentMetadata: null,
+      mutationMetadata: null,
+      textContentMetadataPresent: false,
+      mutationMetadataPresent: false
+    };
+  }
+
+  return {
+    loadError: null,
+    textContentMetadata: loadResult.textContentMetadata,
+    mutationMetadata: loadResult.mutationMetadata,
+    textContentMetadataPresent:
+      loadResult.textContentMetadata !== null &&
+      typeof loadResult.textContentMetadata === "object",
+    mutationMetadataPresent:
+      loadResult.mutationMetadata !== null &&
+      typeof loadResult.mutationMetadata === "object"
+  };
+}
+
+function validatePrivateTextContentTransitionOrderMetadata(metadata) {
+  const expectedRowIds = DOM_TEXT_CONTENT_LOCAL_TEXT_TRANSITION_ORDER_ROWS.map(
+    (row) => row.rowId
+  );
+  const mismatches = [];
+
+  if (metadata.loadError !== null) {
+    mismatches.push({
+      id: "private-text-content-transition-order-load-error",
+      reason: metadata.loadError
+    });
+    return mismatches;
+  }
+
+  for (const [metadataName, gateMetadata] of [
+    ["textContent", metadata.textContentMetadata],
+    ["mutation", metadata.mutationMetadata]
+  ]) {
+    if (gateMetadata === null || typeof gateMetadata !== "object") {
+      mismatches.push({
+        id: `private-text-content-transition-order-${metadataName}-metadata-missing`
+      });
+      continue;
+    }
+
+    const rowDifference = findFirstDifferencePath(
+      gateMetadata.supportedFakeDomRowIds,
+      expectedRowIds
+    );
+    if (rowDifference !== null) {
+      mismatches.push({
+        id: `private-text-content-transition-order-${metadataName}-row-mismatch`,
+        firstDifferencePath: rowDifference,
+        supportedFakeDomRowIds: gateMetadata.supportedFakeDomRowIds ?? null,
+        expectedRowIds
+      });
+    }
+
+    for (const key of [
+      "publicRootsCompared",
+      "serverRenderingCompared",
+      "hydrationCompared",
+      "browserDomCompared",
+      "compatibilityClaimed"
+    ]) {
+      if (gateMetadata[key] !== false) {
+        mismatches.push({
+          id: `private-text-content-transition-order-${metadataName}-${key}-claim`,
+          value: gateMetadata[key] ?? null
+        });
+      }
+    }
+  }
+
+  return mismatches;
+}
+
+function inspectPrivateTextContentTransitionOrderRows({
+  oracle,
+  workspaceRoot
+}) {
+  if (!oracle?.clientMutationObservations) {
+    return [];
+  }
+
+  const expectedRows =
+    readExpectedPrivateTextContentTransitionOrderRows(oracle);
+  const loadResult = loadPrivateTextContentTransitionOrderHelpers({
+    workspaceRoot
+  });
+  if (loadResult.error) {
+    return expectedRows.map((row) => ({
+      ...row,
+      localResult: null,
+      status: "mismatch",
+      firstDifferencePath: "$",
+      reason: `Unable to load private text-content transition helpers: ${loadResult.error}`
+    }));
+  }
+
+  let localResults;
+  try {
+    localResults = runPrivateTextContentTransitionOrderProbes(
+      loadResult.mutation
+    );
+  } catch (error) {
+    return expectedRows.map((row) => ({
+      ...row,
+      localResult: null,
+      status: "mismatch",
+      firstDifferencePath: "$",
+      reason: `Private text-content transition probe failed: ${
+        error?.message ?? String(error)
+      }`
+    }));
+  }
+
+  return expectedRows.map((row) => {
+    if (row.expectedReactDomResult === null) {
+      return {
+        ...row,
+        localResult: localResults.get(row.rowId) ?? null,
+        status: "mismatch",
+        firstDifferencePath: "$",
+        reason: row.expectedReactDomError
+      };
+    }
+
+    const localResult = localResults.get(row.rowId) ?? null;
+    const firstDifferencePath = findFirstDifferencePath(
+      row.expectedReactDomResult,
+      localResult
+    );
+    if (firstDifferencePath === null) {
+      return {
+        ...row,
+        localResult,
+        status: DOM_TEXT_CONTENT_LOCAL_TEXT_TRANSITION_ORDER_STATUS,
+        firstDifferencePath: null
+      };
+    }
+
+    return {
+      ...row,
+      localResult,
+      status: "mismatch",
+      firstDifferencePath,
+      reason:
+        "Private fake-DOM text-content transition mutations do not match the checked React DOM oracle row"
+    };
+  });
+}
+
+function loadPrivateTextContentTransitionOrderHelpers({ workspaceRoot }) {
+  try {
+    const textContent = require(
+      join(workspaceRoot, "packages/react-dom/src/dom-host/text-content.js")
+    );
+    const mutation = require(
+      join(workspaceRoot, "packages/react-dom/src/dom-host/mutation.js")
+    );
+    return {
+      textContentMetadata:
+        textContent.DOM_TEXT_CONTENT_RESET_UPDATE_GATE_METADATA ?? null,
+      mutationMetadata:
+        mutation.DOM_TEXT_CONTENT_RESET_UPDATE_MUTATION_GATE_METADATA ?? null,
+      mutation,
+      error: null
+    };
+  } catch (error) {
+    return {
+      textContentMetadata: null,
+      mutationMetadata: null,
+      mutation: null,
+      error: error?.message ?? String(error)
+    };
+  }
+}
+
+function readExpectedPrivateTextContentTransitionOrderRows(oracle) {
+  const rows = [];
+  for (const [modeId] of Object.entries(
+    oracle.clientMutationObservations ?? {}
+  )) {
+    for (const transitionRow of DOM_TEXT_CONTENT_LOCAL_TEXT_TRANSITION_ORDER_ROWS) {
+      const expected = readExpectedTextContentTransitionOrderResult({
+        oracle,
+        modeId,
+        transitionRow
+      });
+      rows.push({
+        modeId,
+        rowId: transitionRow.rowId,
+        scenarioId: transitionRow.scenarioId,
+        phaseId: transitionRow.phaseId,
+        oracleExtractor: transitionRow.oracleExtractor,
+        localProbe: transitionRow.localProbe,
+        coverage: transitionRow.coverage,
+        reason: transitionRow.reason,
+        expectedReactDomResult: expected.result,
+        expectedReactDomError: expected.error
+      });
+    }
+  }
+  return rows;
+}
+
+function readExpectedTextContentTransitionOrderResult({
+  oracle,
+  modeId,
+  transitionRow
+}) {
+  const observation = oracle.clientMutationObservations?.[modeId]?.find(
+    (candidate) =>
+      candidate.scenarioId === transitionRow.scenarioId &&
+      candidate.action === "client"
+  );
+  const phase = observation?.result?.phases?.find(
+    (candidate) => candidate.phaseId === transitionRow.phaseId
+  );
+
+  if (!phase || !Array.isArray(phase.mutations)) {
+    return {
+      result: null,
+      error: `Missing client mutation phase ${transitionRow.phaseId} for ${transitionRow.scenarioId}.`
+    };
+  }
+
+  return {
+    result: {
+      rowId: transitionRow.rowId,
+      operation: transitionRow.localProbe,
+      mutations: phase.mutations.map(normalizeTextContentTransitionMutation)
+    },
+    error: null
+  };
+}
+
+function normalizeTextContentTransitionMutation(mutation) {
+  if (mutation.type === "createElement") {
+    return {
+      type: mutation.type,
+      tagName: mutation.tagName
+    };
+  }
+
+  if (mutation.type === "setTextContent") {
+    return {
+      type: mutation.type,
+      target: mutation.target,
+      value: mutation.value
+    };
+  }
+
+  if (mutation.type === "createTextNode") {
+    return {
+      type: mutation.type,
+      value: mutation.value
+    };
+  }
+
+  if (mutation.type === "appendChild") {
+    return {
+      type: mutation.type,
+      parent: mutation.parent,
+      child: mutation.child
+    };
+  }
+
+  if (mutation.type === "removeChild") {
+    return {
+      type: mutation.type,
+      parent: mutation.parent,
+      child: mutation.child,
+      found: mutation.found
+    };
+  }
+
+  return { ...mutation };
+}
+
+function runPrivateTextContentTransitionOrderProbes(mutation) {
+  const results = new Map();
+
+  for (const transitionRow of DOM_TEXT_CONTENT_LOCAL_TEXT_TRANSITION_ORDER_ROWS) {
+    results.set(
+      transitionRow.rowId,
+      runPrivateTextContentTransitionOrderProbe({
+        mutation,
+        transitionRow
+      })
+    );
+  }
+
+  return results;
+}
+
+function runPrivateTextContentTransitionOrderProbe({
+  mutation,
+  transitionRow
+}) {
+  const document = new TextContentTransitionFakeDocument();
+
+  switch (transitionRow.localProbe) {
+    case "text-content-reset-before-managed-child-append": {
+      const section = document.createElement("section", { record: false });
+      const existingText = document.createTextNode("Plain text", {
+        record: false
+      });
+      section.appendChild(existingText, { record: false });
+      document.clearMutations();
+
+      const span = mutation.createDomHostElementInstance("span", section);
+      mutation.setTextContent(span, "Managed child");
+      mutation.resetTextContent(section);
+      mutation.appendChild(section, span);
+
+      return {
+        rowId: transitionRow.rowId,
+        operation: transitionRow.localProbe,
+        mutations: document.mutations
+      };
+    }
+    case "managed-child-remove-before-text-content-update": {
+      const section = document.createElement("section", { record: false });
+      const span = document.createElement("span", { record: false });
+      const existingText = document.createTextNode("Managed child", {
+        record: false
+      });
+      span.appendChild(existingText, { record: false });
+      section.appendChild(span, { record: false });
+      document.clearMutations();
+
+      mutation.removeChild(section, span);
+      mutation.setTextContent(section, "Plain text again");
+
+      return {
+        rowId: transitionRow.rowId,
+        operation: transitionRow.localProbe,
+        mutations: document.mutations
+      };
+    }
+    default:
+      throw new Error(
+        `Unknown text-content transition probe: ${transitionRow.localProbe}`
+      );
+  }
+}
+
 function readOracleShouldSetValue(oracle, scenarioId) {
   const observation = oracle.shouldSetTextContentObservations?.find(
     (candidate) => candidate.scenarioId === scenarioId
@@ -334,6 +773,188 @@ function readOracleShouldSetValue(oracle, scenarioId) {
     return null;
   }
   return Boolean(observation.result.value);
+}
+
+class TextContentTransitionFakeDocument {
+  constructor() {
+    this.mutations = [];
+    this.nodeName = "#document";
+    this.nodeType = 9;
+    this.ownerDocument = this;
+  }
+
+  createElement(tagName, { record = true } = {}) {
+    if (record) {
+      this.mutations.push({
+        type: "createElement",
+        tagName
+      });
+    }
+    return new TextContentTransitionFakeElement(tagName, this);
+  }
+
+  createTextNode(text, { record = true } = {}) {
+    if (record) {
+      this.mutations.push({
+        type: "createTextNode",
+        value: String(text)
+      });
+    }
+    return new TextContentTransitionFakeText(text, this);
+  }
+
+  clearMutations() {
+    this.mutations.length = 0;
+  }
+
+  recordAppendChild(parent, child) {
+    this.mutations.push({
+      type: "appendChild",
+      parent: parent.nodeName,
+      child: child.nodeName
+    });
+  }
+
+  recordRemoveChild(parent, child, found) {
+    this.mutations.push({
+      type: "removeChild",
+      parent: parent.nodeName,
+      child: child.nodeName,
+      found
+    });
+  }
+
+  recordSetTextContent(node, value) {
+    this.mutations.push({
+      type: "setTextContent",
+      target: node.nodeName,
+      value: String(value)
+    });
+  }
+
+  recordSetNodeValue(node, value) {
+    this.mutations.push({
+      type: "setNodeValue",
+      target: node.nodeName,
+      value: String(value)
+    });
+  }
+}
+
+class TextContentTransitionFakeNode {
+  constructor(nodeName, nodeType, ownerDocument) {
+    this.childNodes = [];
+    this.nodeName = nodeName;
+    this.nodeType = nodeType;
+    this.ownerDocument = ownerDocument;
+    this.parentNode = null;
+  }
+
+  get firstChild() {
+    return this.childNodes[0] || null;
+  }
+
+  get lastChild() {
+    return this.childNodes[this.childNodes.length - 1] || null;
+  }
+
+  appendChild(child, { record = true } = {}) {
+    assertTextContentTransitionFakeChild(child);
+    detachTextContentTransitionFakeNode(child);
+    this.childNodes.push(child);
+    child.parentNode = this;
+    if (record) {
+      this.ownerDocument.recordAppendChild(this, child);
+    }
+    return child;
+  }
+
+  removeChild(child) {
+    const childIndex = this.childNodes.indexOf(child);
+    if (childIndex === -1) {
+      this.ownerDocument.recordRemoveChild(this, child, false);
+      throw new Error("Cannot remove a node outside the parent.");
+    }
+    this.childNodes.splice(childIndex, 1);
+    child.parentNode = null;
+    this.ownerDocument.recordRemoveChild(this, child, true);
+    return child;
+  }
+}
+
+class TextContentTransitionFakeElement extends TextContentTransitionFakeNode {
+  constructor(tagName, ownerDocument) {
+    super(tagName.toUpperCase(), 1, ownerDocument);
+    this._textContent = "";
+  }
+
+  get textContent() {
+    if (this.childNodes.length === 0) {
+      return this._textContent;
+    }
+    return this.childNodes.map((child) => child.textContent).join("");
+  }
+
+  set textContent(value) {
+    this.ownerDocument.recordSetTextContent(this, value);
+    for (const child of [...this.childNodes]) {
+      detachTextContentTransitionFakeNode(child);
+    }
+    this._textContent = String(value);
+    if (this._textContent !== "") {
+      this.appendChild(this.ownerDocument.createTextNode(this._textContent));
+    }
+  }
+}
+
+class TextContentTransitionFakeText extends TextContentTransitionFakeNode {
+  constructor(text, ownerDocument) {
+    super("#text", 3, ownerDocument);
+    this._text = String(text);
+  }
+
+  get data() {
+    return this._text;
+  }
+
+  set data(value) {
+    this.nodeValue = value;
+  }
+
+  get nodeValue() {
+    return this._text;
+  }
+
+  set nodeValue(value) {
+    this._text = String(value);
+    this.ownerDocument.recordSetNodeValue(this, this._text);
+  }
+
+  get textContent() {
+    return this._text;
+  }
+
+  set textContent(value) {
+    this.nodeValue = value;
+  }
+}
+
+function assertTextContentTransitionFakeChild(child) {
+  if (child == null || typeof child !== "object") {
+    throw new Error("Fake DOM child must be an object.");
+  }
+}
+
+function detachTextContentTransitionFakeNode(child) {
+  if (child.parentNode === null) {
+    return;
+  }
+  const siblings = child.parentNode.childNodes;
+  const index = siblings.indexOf(child);
+  if (index !== -1) {
+    siblings.splice(index, 1);
+  }
+  child.parentNode = null;
 }
 
 function readWorkspaceFile(workspaceRoot, relativePath) {
@@ -373,4 +994,61 @@ function walkFiles(root) {
 
 function hasSourcePattern(source, pattern) {
   return pattern.test(source);
+}
+
+function findFirstDifferencePath(left, right, path = "$") {
+  if (Object.is(left, right)) {
+    return null;
+  }
+
+  if (
+    left === null ||
+    right === null ||
+    typeof left !== "object" ||
+    typeof right !== "object"
+  ) {
+    return path;
+  }
+
+  const leftIsArray = Array.isArray(left);
+  const rightIsArray = Array.isArray(right);
+  if (leftIsArray !== rightIsArray) {
+    return path;
+  }
+
+  if (leftIsArray) {
+    if (left.length !== right.length) {
+      return `${path}.length`;
+    }
+    for (let index = 0; index < left.length; index += 1) {
+      const difference = findFirstDifferencePath(
+        left[index],
+        right[index],
+        `${path}[${index}]`
+      );
+      if (difference !== null) {
+        return difference;
+      }
+    }
+    return null;
+  }
+
+  const leftKeys = Object.keys(left).sort();
+  const rightKeys = Object.keys(right).sort();
+  if (findFirstDifferencePath(leftKeys, rightKeys, `${path}{keys}`) !== null) {
+    return `${path}{keys}`;
+  }
+
+  for (const key of leftKeys) {
+    const difference = findFirstDifferencePath(
+      left[key],
+      right[key],
+      `${path}.${key}`
+    );
+    if (difference !== null) {
+      return difference;
+    }
+  }
+
+  return null;
 }

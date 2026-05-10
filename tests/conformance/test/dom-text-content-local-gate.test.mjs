@@ -4,6 +4,8 @@ import test from "node:test";
 
 import {
   DOM_TEXT_CONTENT_LOCAL_GATE_STATUS,
+  DOM_TEXT_CONTENT_LOCAL_TEXT_TRANSITION_ORDER_ROWS,
+  DOM_TEXT_CONTENT_LOCAL_TEXT_TRANSITION_ORDER_STATUS,
   DOM_TEXT_CONTENT_LOCAL_UNSUPPORTED_SHOULD_SET_SCENARIO_IDS,
   evaluateDomTextContentLocalGate
 } from "../src/dom-text-content-local-gate.mjs";
@@ -87,6 +89,77 @@ test("DOM text-content local gate remains blocked while public roots and DOM tex
   );
 });
 
+test("DOM text-content local gate compares private fake-DOM text-to-element ordering", () => {
+  const gate = evaluateDomTextContentLocalGate({ oracle });
+  const expectedRowIds = DOM_TEXT_CONTENT_LOCAL_TEXT_TRANSITION_ORDER_ROWS.map(
+    (row) => row.rowId
+  );
+  const rowsByKey = new Map(
+    gate.localChecks.privateTextContentTransitionOrderRows.map((row) => [
+      `${row.modeId}:${row.rowId}`,
+      row
+    ])
+  );
+
+  assert.equal(
+    gate.localChecks.privateTextContentTransitionOrderGatePresent,
+    true
+  );
+  assert.equal(
+    gate.localChecks.privateTextContentTransitionOrderGatePassed,
+    true
+  );
+  assert.deepEqual(
+    gate.localChecks.privateTextContentTransitionOrderMismatches,
+    []
+  );
+  assert.deepEqual(
+    gate.localChecks.privateTextContentTransitionOrderMetadata
+      .textContentMetadata.supportedFakeDomRowIds,
+    expectedRowIds
+  );
+  assert.deepEqual(
+    gate.localChecks.privateTextContentTransitionOrderMetadata.mutationMetadata
+      .supportedFakeDomRowIds,
+    expectedRowIds
+  );
+
+  assert.deepEqual(
+    rowsByKey.get(
+      "default-node-development:text-content-reset-before-managed-child-append"
+    ).localResult.mutations,
+    [
+      { type: "createElement", tagName: "span" },
+      { type: "setTextContent", target: "SPAN", value: "Managed child" },
+      { type: "createTextNode", value: "Managed child" },
+      { type: "appendChild", parent: "SPAN", child: "#text" },
+      { type: "setTextContent", target: "SECTION", value: "" },
+      { type: "appendChild", parent: "SECTION", child: "SPAN" }
+    ]
+  );
+  assert.deepEqual(
+    rowsByKey.get(
+      "default-node-development:managed-child-remove-before-text-content-update"
+    ).localResult.mutations,
+    [
+      { type: "removeChild", parent: "SECTION", child: "SPAN", found: true },
+      { type: "setTextContent", target: "SECTION", value: "Plain text again" },
+      { type: "createTextNode", value: "Plain text again" },
+      { type: "appendChild", parent: "SECTION", child: "#text" }
+    ]
+  );
+
+  for (const row of gate.localChecks.privateTextContentTransitionOrderRows) {
+    assert.equal(
+      row.status,
+      DOM_TEXT_CONTENT_LOCAL_TEXT_TRANSITION_ORDER_STATUS
+    );
+    assert.equal(row.firstDifferencePath, null);
+    assert.deepEqual(row.localResult, row.expectedReactDomResult);
+    assert.equal(expectedRowIds.includes(row.rowId), true);
+  }
+});
+
 test("DOM text-content local gate rejects private helper drift from the checked oracle", () => {
   const driftedOracle = JSON.parse(JSON.stringify(oracle));
   const stringChildObservation =
@@ -103,6 +176,37 @@ test("DOM text-content local gate rejects private helper drift from the checked 
     ["private-should-set-text-content-helper-oracle-mismatch"]
   );
   assert.deepEqual(gate.violations[0].scenarioIds, ["should-set-string-child"]);
+});
+
+test("DOM text-content local gate rejects transition ordering drift from the checked oracle", () => {
+  const driftedOracle = JSON.parse(JSON.stringify(oracle));
+  const clientObservation = driftedOracle.clientMutationObservations[
+    "default-node-development"
+  ].find(
+    (observation) =>
+      observation.scenarioId === "text-content-to-managed-child-boundary"
+  );
+  const managedChildPhase = clientObservation.result.phases.find(
+    (phase) => phase.phaseId === "managed-child"
+  );
+  managedChildPhase.mutations[4] = managedChildPhase.mutations[5];
+  managedChildPhase.mutations.length = 5;
+
+  const gate = evaluateDomTextContentLocalGate({ oracle: driftedOracle });
+
+  assert.equal(gate.status, "blocked-with-violations");
+  assert.ok(
+    gate.violations.some(
+      (violation) =>
+        violation.id === "private-text-content-transition-order-oracle-mismatch"
+    )
+  );
+  assert.deepEqual(
+    gate.localChecks.privateTextContentTransitionOrderMismatches.map(
+      (row) => `${row.modeId}:${row.rowId}`
+    ),
+    ["default-node-development:text-content-reset-before-managed-child-append"]
+  );
 });
 
 test("DOM text-content local gate CLI reports the closed local status", () => {
