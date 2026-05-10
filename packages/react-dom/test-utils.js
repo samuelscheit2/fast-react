@@ -1,12 +1,14 @@
 'use strict';
 
 const {
-  createUnsupportedFunction,
   definePlaceholderMetadata
 } = require('./placeholder-utils.js');
+const {
+  createReactDomTestUtilsActPlaceholder
+} = require('./src/test-utils-act-gate.js');
 
 const entrypoint = 'react-dom/test-utils';
 
-exports.act = createUnsupportedFunction(entrypoint, 'act', 1);
+exports.act = createReactDomTestUtilsActPlaceholder();
 
 definePlaceholderMetadata(module.exports, entrypoint);
