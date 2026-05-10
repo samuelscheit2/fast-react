@@ -45,8 +45,9 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue 383-412 is assigned in isolated worktrees with
-overlap allowed where scopes converge on the same implementation path.
+Top-level cap: 30 workers. Queue 383-412 is assigned in isolated worktrees;
+workers 388, 407, and 409 have been accepted, leaving 27 active top-level
+workers from this queue.
 
 | Worker | Focus |
 | --- | --- |
@@ -55,7 +56,6 @@ overlap allowed where scopes converge on the same implementation path.
 | 385 | Root commit ref callback execution handoff |
 | 386 | Context provider begin-work runtime read |
 | 387 | Root work-loop context provider handoff |
-| 388 | Function-component effect update queue private path |
 | 389 | Passive effects error propagation private path |
 | 390 | Sync flush act private execution |
 | 391 | Test renderer public `toJSON` private facade |
@@ -74,9 +74,7 @@ overlap allowed where scopes converge on the same implementation path.
 | 404 | Scheduler mock private callback execution |
 | 405 | React act private continuation gate |
 | 406 | React DOM test-utils act private root output |
-| 407 | Benchmark private root-output timing canaries |
 | 408 | Package surface private root-output audit |
-| 409 | Context object local gate after provider progress |
 | 410 | Root render E2E private `flushSync` admission |
 | 411 | Root render E2E private warning boundary |
 | 412 | Private root-output gate docs and smoke refresh |
