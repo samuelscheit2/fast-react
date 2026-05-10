@@ -671,7 +671,7 @@ impl HostRootFunctionComponentSingleChildCompleteWorkHandoffRecord {
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum HostRootFunctionComponentSingleChildCompleteWorkHandoffError {
-    ChildPreflight(HostRootChildBeginWorkPreflightError),
+    ChildPreflight(Box<HostRootChildBeginWorkPreflightError>),
     BeginWork(BeginWorkError),
     CompleteWork(HostRootCompleteWorkHandoffError),
     MissingFunctionComponentChild {
@@ -713,7 +713,7 @@ impl Display for HostRootFunctionComponentSingleChildCompleteWorkHandoffError {
 impl Error for HostRootFunctionComponentSingleChildCompleteWorkHandoffError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            Self::ChildPreflight(error) => Some(error),
+            Self::ChildPreflight(error) => Some(error.as_ref()),
             Self::BeginWork(error) => Some(error),
             Self::CompleteWork(error) => Some(error),
             Self::MissingFunctionComponentChild { .. } | Self::CompletedChildTagMismatch { .. } => {
@@ -728,7 +728,7 @@ impl From<HostRootChildBeginWorkPreflightError>
     for HostRootFunctionComponentSingleChildCompleteWorkHandoffError
 {
     fn from(error: HostRootChildBeginWorkPreflightError) -> Self {
-        Self::ChildPreflight(error)
+        Self::ChildPreflight(Box::new(error))
     }
 }
 
