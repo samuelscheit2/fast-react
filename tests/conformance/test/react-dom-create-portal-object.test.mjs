@@ -24,6 +24,20 @@ const React = require(path.join(repoRoot, "packages/react/index.js"));
 const { invalidContainerErrorCode } = require(
   path.join(repoRoot, "packages/react-dom/src/client/dom-container.js")
 );
+const {
+  containerMarkerPrefix,
+  inspectContainerRootMarker
+} = require(path.join(repoRoot, "packages/react-dom/src/client/root-markers.js"));
+const {
+  createPortalObject,
+  createPortalRecordFromNormalizedParts,
+  normalizePortalKey,
+  reactDomPortalImplementation,
+  unnormalizedPortalKeyErrorCode,
+  unsupportedPortalImplementationErrorCode
+} = require(
+  path.join(repoRoot, "packages/react-dom/src/shared/create-portal.js")
+);
 
 const oracle = readCheckedReactDomPortalOracle();
 const child = { marker: "child-object" };
@@ -43,6 +57,52 @@ test("Fast React createPortal export descriptors match the accepted React DOM or
     ReactDOMProfiling,
     "createPortal",
     profilingExpected
+  );
+});
+
+test("Fast React private createPortal record mirrors core normalized portal parts and fails closed", () => {
+  const container = createElement("DIV", createDocument("private-record"));
+  const privateChild = {
+    marker: "private-child"
+  };
+  const portal = createPortalRecordFromNormalizedParts(
+    "core-key",
+    privateChild,
+    container,
+    reactDomPortalImplementation
+  );
+
+  assert.deepEqual(Reflect.ownKeys(portal), [
+    "$$typeof",
+    "key",
+    "children",
+    "containerInfo",
+    "implementation"
+  ]);
+  assert.equal(portal.$$typeof, Symbol.for("react.portal"));
+  assert.equal(portal.key, "core-key");
+  assert.equal(portal.children, privateChild);
+  assert.equal(portal.containerInfo, container);
+  assert.equal(portal.implementation, null);
+
+  assert.equal(normalizePortalKey(undefined), null);
+  assert.equal(normalizePortalKey(null), null);
+  assert.equal(normalizePortalKey("already-normalized"), "already-normalized");
+  assert.equal(normalizePortalKey(12), "12");
+
+  assertFastReactPortalRecordError(
+    () =>
+      createPortalRecordFromNormalizedParts(
+        undefined,
+        privateChild,
+        container,
+        null
+      ),
+    unnormalizedPortalKeyErrorCode
+  );
+  assertFastReactPortalRecordError(
+    () => createPortalObject(privateChild, container, { renderer: "dom" }, "key"),
+    unsupportedPortalImplementationErrorCode
   );
 });
 
@@ -187,6 +247,141 @@ test("Fast React createPortal key coercion follows accepted oracle observations"
   });
 });
 
+test("Fast React createPortal preserves oracle object mutability and invocation boundaries", () => {
+  withNodeEnv("development", () => {
+    const container = createElement("DIV", createDocument("shape"));
+    const shapeExpected = scenarioValue(
+      "default-node-development",
+      "portal-object-shape"
+    );
+    const portal = ReactDOM.createPortal(child, container, "shape-key");
+
+    assertPortalMatchesOracleSlice(
+      portal,
+      shapeExpected.before,
+      child,
+      container
+    );
+    assert.equal(
+      React.isValidElement(portal),
+      shapeExpected.reactIsValidElement.value
+    );
+
+    portal.key = "mutated-key";
+    assert.equal(
+      portal.key,
+      shapeExpected.mutations.assignKey.value.selectedValues.key.value
+    );
+
+    portal.extra = "extra-value";
+    assert.deepEqual(
+      Reflect.ownKeys(portal),
+      keyValues(shapeExpected.mutations.addExtra.value.object.ownKeys)
+    );
+
+    assert.equal(
+      Reflect.deleteProperty(portal, "implementation"),
+      shapeExpected.mutations.deleteImplementation.value.deleted
+    );
+    assert.equal(portal.implementation, undefined);
+    assert.equal(
+      typeof portal.implementation,
+      shapeExpected.mutations.deleteImplementation.value.portal.selectedValues
+        .implementation.type
+    );
+
+    const invocationExpected = scenarioValue(
+      "default-node-development",
+      "portal-invocation-boundaries"
+    );
+    const invocationCases = [
+      {
+        actual: ReactDOM.createPortal.call(
+          null,
+          "call-child",
+          container,
+          "call-key"
+        ),
+        expected: invocationExpected.callNullThis.value,
+        expectedChildren: "call-child"
+      },
+      {
+        actual: ReactDOM.createPortal.apply(
+          {
+            marker: "receiver"
+          },
+          ["apply-child", container, "apply-key"]
+        ),
+        expected: invocationExpected.applyReceiver.value,
+        expectedChildren: "apply-child"
+      },
+      {
+        actual: ReactDOM.createPortal(
+          "extra-child",
+          container,
+          "extra-key",
+          "ignored"
+        ),
+        expected: invocationExpected.extraArgument.value,
+        expectedChildren: "extra-child"
+      },
+      {
+        actual: new ReactDOM.createPortal(
+          "new-child",
+          container,
+          "new-key"
+        ),
+        expected: invocationExpected.constructorInvocation.value,
+        expectedChildren: "new-child"
+      }
+    ];
+
+    for (const invocationCase of invocationCases) {
+      assertPortalMatchesOracleSlice(
+        invocationCase.actual,
+        invocationCase.expected,
+        invocationCase.expectedChildren,
+        container
+      );
+    }
+  });
+});
+
+test("Fast React createPortal constructs only a local record without DOM, root, or event side effects", () => {
+  const calls = [];
+  const ownerDocument = createInstrumentedTarget({
+    calls,
+    label: "document",
+    nodeName: "#document",
+    nodeType: 9
+  });
+  const container = createInstrumentedTarget({
+    calls,
+    extraProperties: {
+      ownerDocument
+    },
+    label: "container",
+    nodeName: "DIV",
+    nodeType: 1
+  });
+  const beforeOwnKeys = Reflect.ownKeys(container);
+
+  const portal = ReactDOM.createPortal(child, container, "side-effect-key");
+
+  assert.equal(portal.containerInfo, container);
+  assert.deepEqual(calls, []);
+  assert.deepEqual(Reflect.ownKeys(container), beforeOwnKeys);
+  assert.equal(
+    Reflect.ownKeys(container).some(
+      (key) =>
+        typeof key === "string" && key.startsWith(containerMarkerPrefix)
+    ),
+    false
+  );
+  assert.equal(inspectContainerRootMarker(container).propertyCount, 0);
+  assert.deepEqual(calls, []);
+});
+
 test("Fast React createPortal preserves the accepted invalid-container behavior", () => {
   for (const modeId of [
     "default-node-development",
@@ -283,6 +478,17 @@ function assertPortalKey(portal, expected) {
   assert.equal(portal.key, expected.value);
 }
 
+function assertFastReactPortalRecordError(callback, expectedCode) {
+  assert.throws(
+    callback,
+    (error) => {
+      assert.equal(error.name, "FastReactDomPortalRecordError");
+      assert.equal(error.code, expectedCode);
+      return true;
+    }
+  );
+}
+
 function dataDescriptorFlags(descriptor) {
   assert.equal(descriptor.kind ?? "data", "data");
   return {
@@ -296,6 +502,51 @@ function keyValues(keys) {
   return keys.map((key) => {
     assert.equal(key.type, "string");
     return key.value;
+  });
+}
+
+function createInstrumentedTarget({
+  calls,
+  extraProperties = {},
+  label,
+  nodeName,
+  nodeType
+}) {
+  const target = {
+    ...extraProperties,
+    nodeName,
+    nodeType,
+    addEventListener(eventName) {
+      calls.push(`${label}.addEventListener:${eventName}`);
+    },
+    appendChild() {
+      calls.push(`${label}.appendChild`);
+    },
+    insertBefore() {
+      calls.push(`${label}.insertBefore`);
+    },
+    removeChild() {
+      calls.push(`${label}.removeChild`);
+    },
+    removeEventListener(eventName) {
+      calls.push(`${label}.removeEventListener:${eventName}`);
+    },
+    textContent: ""
+  };
+
+  return new Proxy(target, {
+    defineProperty(proxyTarget, property, descriptor) {
+      calls.push(`${label}.defineProperty:${String(property)}`);
+      return Reflect.defineProperty(proxyTarget, property, descriptor);
+    },
+    deleteProperty(proxyTarget, property) {
+      calls.push(`${label}.deleteProperty:${String(property)}`);
+      return Reflect.deleteProperty(proxyTarget, property);
+    },
+    set(proxyTarget, property, value, receiver) {
+      calls.push(`${label}.set:${String(property)}`);
+      return Reflect.set(proxyTarget, property, value, receiver);
+    }
   });
 }
 
