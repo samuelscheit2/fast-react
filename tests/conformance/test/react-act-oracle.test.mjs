@@ -290,10 +290,24 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
   assert.equal(gate.committedHostOutputCanaryRequired, true);
   assert.equal(gate.drainsAcceptedInternalActContinuationRecords, true);
   assert.equal(gate.drainsPublicReactActQueue, false);
+  assert.equal(gate.schedulerPrivateContinuationDiagnosticsReady, true);
+  assert.equal(gate.consumesSchedulerPrivateContinuationDiagnostics, true);
   assert.equal(gate.publicSchedulerTimingCompatibilityClaimed, false);
   assert.equal(gate.publicReactActCompatibilityClaimed, false);
   assert.equal(gate.executesQueuedWork, false);
   assert.equal(gate.executesEffects, false);
+  assert.equal(
+    gate.schedulerDiagnosticsExportName,
+    privateActQueueFlushDiagnosticsExport
+  );
+  assert.equal(
+    gate.schedulerDiagnosticsStatus,
+    "private-scheduler-act-queue-flush-diagnostics"
+  );
+  assert.equal(
+    gate.schedulerContinuationConsumptionStatus,
+    "consumed-accepted-scheduler-private-continuation-diagnostics"
+  );
   assert.deepEqual(gate.requiredRecords, [
     "SchedulerActQueueRequest",
     "SchedulerActScopeBoundaryRecord",
@@ -349,6 +363,8 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
   assert.equal(metadata.committedHostOutputCanaryRequired, true);
   assert.equal(metadata.drainsAcceptedInternalActContinuationRecords, true);
   assert.equal(metadata.drainsPublicReactActQueue, false);
+  assert.equal(metadata.schedulerPrivateContinuationDiagnosticsReady, true);
+  assert.equal(metadata.consumesSchedulerPrivateContinuationDiagnostics, true);
   assert.equal(metadata.publicSchedulerTimingCompatibilityClaimed, false);
   assert.equal(metadata.publicReactActCompatibilityClaimed, false);
 
@@ -415,7 +431,76 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
     Scheduler.unstable_flushAllWithoutAsserting[
       privateActQueueFlushDiagnosticsExport
     ];
-  const drainReport = diagnostics.drainAcceptedInternalActQueue(testQueue);
+  assert.equal(
+    gate.isAcceptedSchedulerPrivateActQueueFlushDiagnostics(diagnostics),
+    true
+  );
+  const consumeReport =
+    gate.consumeSchedulerPrivateActContinuationDiagnostics(
+      diagnostics,
+      testQueue
+    );
+  assert.equal(
+    consumeReport.status,
+    gate.schedulerContinuationConsumptionStatus
+  );
+  assert.equal(consumeReport.accepted, true);
+  assert.equal(
+    consumeReport.schedulerDiagnosticsStatus,
+    gate.schedulerDiagnosticsStatus
+  );
+  assert.equal(
+    consumeReport.schedulerDiagnosticsExportName,
+    privateActQueueFlushDiagnosticsExport
+  );
+  assert.equal(
+    consumeReport.consumesSchedulerPrivateContinuationDiagnostics,
+    true
+  );
+  assert.equal(consumeReport.drainsAcceptedInternalTestQueues, true);
+  assert.equal(consumeReport.queueFlushingReady, false);
+  assert.equal(consumeReport.continuationFlushingReady, false);
+  assert.equal(consumeReport.publicCompatibilityClaimed, false);
+  assert.equal(
+    consumeReport.publicSchedulerTimingCompatibilityClaimed,
+    false
+  );
+  assert.equal(consumeReport.publicReactActCompatibilityClaimed, false);
+  assert.equal(consumeReport.drainsPublicSchedulerTaskQueue, false);
+  assert.equal(consumeReport.drainsPublicReactActQueue, false);
+  assert.equal(consumeReport.executesQueuedWork, false);
+  assert.equal(consumeReport.executesEffects, false);
+  assert.equal(consumeReport.executesRendererRoots, false);
+  assert.deepEqual(consumeReport.continuationSummary, {
+    recordCount: 2,
+    noContinuationCount: 1,
+    pendingContinuationCount: 1,
+    hasPendingContinuation: true,
+    records: [
+      {
+        index: 0,
+        label: "react-private-act-test-task",
+        recordKind: "SchedulerActQueueRequest",
+        taskKind: "SchedulerCallback",
+        continuationStatus: "PendingContinuation",
+        executesQueuedWork: false,
+        executesEffects: false
+      },
+      {
+        index: 1,
+        label: "string-normalized-task",
+        recordKind: "SchedulerActQueueRequest",
+        taskKind: "SchedulerCallback",
+        continuationStatus: "NoContinuation",
+        executesQueuedWork: false,
+        executesEffects: false
+      }
+    ]
+  });
+  assert.equal(consumeReport.schedulerDescription.accepted, true);
+  assert.equal(consumeReport.schedulerDescription.pendingCount, 2);
+
+  const drainReport = consumeReport.schedulerDrainReport;
   assert.equal(drainReport.status, "drained-accepted-internal-test-queue");
   assert.equal(drainReport.drainedCount, 2);
   assert.equal(drainReport.remainingCount, 0);
@@ -426,6 +511,41 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
   assert.equal(drainReport.executesQueuedWork, false);
   assert.equal(drainReport.executesEffects, false);
   assert.equal(testQueue.records.length, 0);
+
+  const rejectedDiagnosticsQueue = gate.createInternalActQueueTestQueue([
+    gate.createInternalActQueueTestTask("must-not-drain")
+  ]);
+  assert.equal(
+    gate.isAcceptedSchedulerPrivateActQueueFlushDiagnostics({
+      ...diagnostics
+    }),
+    false
+  );
+  assert.throws(
+    () =>
+      gate.consumeSchedulerPrivateActContinuationDiagnostics(
+        {
+          ...diagnostics
+        },
+        rejectedDiagnosticsQueue
+      ),
+    (error) => {
+      assert.equal(error.name, "FastReactUnimplementedError");
+      assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED");
+      assert.equal(error.entrypoint, "react");
+      assert.equal(
+        error.exportName,
+        `${privateActDispatcherGateExport}.consumeSchedulerPrivateActContinuationDiagnostics`
+      );
+      assert.equal(error.compatibilityTarget, "react@19.2.6");
+      assert.equal(error.reason, "scheduler-diagnostics");
+      assert.equal(error.publicCompatibilityClaimed, false);
+      assert.equal(error.publicSchedulerTimingCompatibilityClaimed, false);
+      assert.equal(error.publicReactActCompatibilityClaimed, false);
+      return true;
+    }
+  );
+  assert.equal(rejectedDiagnosticsQueue.records.length, 1);
 
   const rejectedQueue = gate.createInternalActQueueTestQueue([
     gate.createInternalActQueueTestTask("accepted-before-tamper")
@@ -445,15 +565,22 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
   });
   assert.equal(gate.isAcceptedInternalActQueueTestQueue(rejectedQueue), false);
   assert.throws(
-    () => diagnostics.drainAcceptedInternalActQueue(rejectedQueue),
+    () =>
+      gate.consumeSchedulerPrivateActContinuationDiagnostics(
+        diagnostics,
+        rejectedQueue
+      ),
     (error) => {
-      assert.equal(error.name, "FastReactSchedulerPrivateActQueueFlushError");
+      assert.equal(error.name, "FastReactUnimplementedError");
+      assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED");
+      assert.equal(error.entrypoint, "react");
       assert.equal(
-        error.code,
-        "FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_REJECTED"
+        error.exportName,
+        `${privateActDispatcherGateExport}.consumeSchedulerPrivateActContinuationDiagnostics`
       );
-      assert.equal(error.entrypoint, "scheduler/unstable_mock");
-      assert.equal(error.compatibilityTarget, "scheduler@0.27.0");
+      assert.equal(error.compatibilityTarget, "react@19.2.6");
+      assert.equal(error.reason, "internal-act-queue");
+      assert.equal(error.publicCompatibilityClaimed, false);
       assert.equal(error.publicSchedulerTimingCompatibilityClaimed, false);
       assert.equal(error.publicReactActCompatibilityClaimed, false);
       return true;
@@ -478,6 +605,12 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
     }),
     gate.createActQueueMetadata({
       drainsPublicReactActQueue: true
+    }),
+    gate.createActQueueMetadata({
+      schedulerPrivateContinuationDiagnosticsReady: false
+    }),
+    gate.createActQueueMetadata({
+      consumesSchedulerPrivateContinuationDiagnostics: false
     }),
     gate.createActQueueMetadata({
       publicSchedulerTimingCompatibilityClaimed: true

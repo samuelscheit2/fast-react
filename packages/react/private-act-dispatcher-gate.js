@@ -8,12 +8,18 @@ const {
 const entrypoint = 'react';
 const privateActDispatcherGateExport =
   '__FAST_REACT_PRIVATE_ACT_DISPATCHER_GATE__';
+const privateActQueueFlushDiagnosticsExport =
+  '__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__';
 const privateActQueueMetadataSymbol = Symbol(
   'fast-react.react.private.actQueueMetadata'
 );
 const privateActDispatchers = new WeakSet();
 const actDispatcherGateStatus =
   'blocked-until-renderer-roots-passive-effects-and-act-continuations';
+const schedulerPrivateActQueueFlushDiagnosticsStatus =
+  'private-scheduler-act-queue-flush-diagnostics';
+const schedulerPrivateActContinuationConsumptionStatus =
+  'consumed-accepted-scheduler-private-continuation-diagnostics';
 const acceptedActQueueMetadataKind =
   'fast-react.react.act-queue-metadata';
 const acceptedActQueueMetadataVersion = 1;
@@ -105,6 +111,8 @@ function isAcceptedActQueueMetadata(metadata) {
     metadata.drainsPublicReactActQueue === false &&
     metadata.executesBrandedInternalTestCallbacks === true &&
     metadata.recordsBrandedInternalTestContinuations === true &&
+    metadata.schedulerPrivateContinuationDiagnosticsReady === true &&
+    metadata.consumesSchedulerPrivateContinuationDiagnostics === true &&
     metadata.publicSchedulerTimingCompatibilityClaimed === false &&
     metadata.publicReactActCompatibilityClaimed === false &&
     metadata.executesQueuedWork === false &&
@@ -151,6 +159,8 @@ function createActQueueMetadata(overrides = {}) {
     acceptedPrivateActContinuationDrainStatuses,
     executesBrandedInternalTestCallbacks: true,
     recordsBrandedInternalTestContinuations: true,
+    schedulerPrivateContinuationDiagnosticsReady: true,
+    consumesSchedulerPrivateContinuationDiagnostics: true,
     publicSchedulerTimingCompatibilityClaimed: false,
     publicReactActCompatibilityClaimed: false,
     executesQueuedWork: false,
@@ -381,6 +391,138 @@ function createInternalActQueueTestQueue(records = []) {
   return queue;
 }
 
+function isAcceptedSchedulerPrivateActQueueFlushDiagnostics(diagnostics) {
+  return (
+    isObjectLike(diagnostics) &&
+    Object.isFrozen(diagnostics) &&
+    diagnostics.status === schedulerPrivateActQueueFlushDiagnosticsStatus &&
+    diagnostics.exportName === privateActQueueFlushDiagnosticsExport &&
+    diagnostics.queueKind === privateActQueueTestQueueKind &&
+    diagnostics.taskKind === privateActQueueTestTaskKind &&
+    diagnostics.queueVersion === privateActQueueTestQueueVersion &&
+    diagnostics.compatibilityTarget === schedulerCompatibilityTarget &&
+    diagnostics.reactCompatibilityTarget === compatibilityTarget &&
+    hasExactStringSet(
+      diagnostics.acceptedRecordKinds,
+      acceptedActQueueRecordKinds
+    ) &&
+    hasExactStringSet(
+      diagnostics.acceptedTaskKinds,
+      acceptedActQueueTaskKinds
+    ) &&
+    hasExactStringSet(
+      diagnostics.acceptedContinuationStatuses,
+      acceptedActQueueContinuationStatuses
+    ) &&
+    diagnostics.drainsAcceptedInternalTestQueues === true &&
+    diagnostics.drainsPublicSchedulerTaskQueue === false &&
+    diagnostics.drainsPublicReactActQueue === false &&
+    diagnostics.publicSchedulerTimingCompatibilityClaimed === false &&
+    diagnostics.publicReactActCompatibilityClaimed === false &&
+    diagnostics.executesQueuedWork === false &&
+    diagnostics.executesEffects === false &&
+    typeof diagnostics.describeAcceptedInternalActQueue === 'function' &&
+    typeof diagnostics.drainAcceptedInternalActQueue === 'function'
+  );
+}
+
+function isAcceptedSchedulerPrivateActQueueDescription(
+  description,
+  pendingCount
+) {
+  return (
+    isObjectLike(description) &&
+    description.status === 'accepted-internal-test-queue' &&
+    description.accepted === true &&
+    description.rejectionReason === null &&
+    description.queueKind === privateActQueueTestQueueKind &&
+    description.pendingCount === pendingCount &&
+    description.drainsAcceptedInternalTestQueues === true &&
+    description.drainsPublicSchedulerTaskQueue === false &&
+    description.drainsPublicReactActQueue === false &&
+    description.publicSchedulerTimingCompatibilityClaimed === false &&
+    description.publicReactActCompatibilityClaimed === false &&
+    description.executesQueuedWork === false &&
+    description.executesEffects === false
+  );
+}
+
+function isAcceptedSchedulerPrivateActQueueDrainedRecord(record, index) {
+  return (
+    isObjectLike(record) &&
+    record.index === index &&
+    typeof record.label === 'string' &&
+    includesString(record.recordKind, acceptedActQueueRecordKinds) &&
+    includesString(record.taskKind, acceptedActQueueTaskKinds) &&
+    includesString(
+      record.continuationStatus,
+      acceptedActQueueContinuationStatuses
+    ) &&
+    record.executesQueuedWork === false &&
+    record.executesEffects === false
+  );
+}
+
+function isAcceptedSchedulerPrivateActQueueDrainReport(report) {
+  return (
+    isObjectLike(report) &&
+    report.status === 'drained-accepted-internal-test-queue' &&
+    report.accepted === true &&
+    report.queueKind === privateActQueueTestQueueKind &&
+    Number.isInteger(report.pendingBefore) &&
+    report.pendingBefore >= 0 &&
+    Number.isInteger(report.drainedCount) &&
+    report.drainedCount === report.pendingBefore &&
+    report.remainingCount === 0 &&
+    Array.isArray(report.drainedRecords) &&
+    report.drainedRecords.length === report.drainedCount &&
+    report.drainedRecords.every(
+      isAcceptedSchedulerPrivateActQueueDrainedRecord
+    ) &&
+    typeof report.mockSchedulerPendingWorkBefore === 'boolean' &&
+    report.mockSchedulerPendingWorkAfter ===
+      report.mockSchedulerPendingWorkBefore &&
+    typeof report.mockSchedulerNowBefore === 'number' &&
+    report.mockSchedulerNowAfter === report.mockSchedulerNowBefore &&
+    report.drainsPublicSchedulerTaskQueue === false &&
+    report.drainsPublicReactActQueue === false &&
+    report.publicSchedulerTimingCompatibilityClaimed === false &&
+    report.publicReactActCompatibilityClaimed === false &&
+    report.executesQueuedWork === false &&
+    report.executesEffects === false
+  );
+}
+
+function summarizeSchedulerPrivateActQueueDrainedRecords(records) {
+  let noContinuationCount = 0;
+  let pendingContinuationCount = 0;
+  const summaries = records.map((record) => {
+    if (record.continuationStatus === 'PendingContinuation') {
+      pendingContinuationCount += 1;
+    } else {
+      noContinuationCount += 1;
+    }
+
+    return Object.freeze({
+      index: record.index,
+      label: record.label,
+      recordKind: record.recordKind,
+      taskKind: record.taskKind,
+      continuationStatus: record.continuationStatus,
+      executesQueuedWork: false,
+      executesEffects: false
+    });
+  });
+
+  return Object.freeze({
+    recordCount: summaries.length,
+    noContinuationCount,
+    pendingContinuationCount,
+    hasPendingContinuation: pendingContinuationCount > 0,
+    records: Object.freeze(summaries)
+  });
+}
+
 function getDispatcherActQueueMetadata(dispatcher) {
   if (!isObjectLike(dispatcher)) {
     return null;
@@ -396,6 +538,20 @@ function createPrivateActDispatcherGateError() {
     'rejected dispatcher metadata',
     'Only accepted data-only act queue metadata can pass this package-private gate.'
   );
+}
+
+function createSchedulerPrivateActContinuationDiagnosticsGateError(reason) {
+  const error = createUnimplementedError(
+    entrypoint,
+    `${privateActDispatcherGateExport}.consumeSchedulerPrivateActContinuationDiagnostics`,
+    'rejected Scheduler private continuation diagnostics',
+    'Only accepted Scheduler private continuation diagnostics can pass this package-private gate.'
+  );
+  error.reason = reason;
+  error.publicCompatibilityClaimed = false;
+  error.publicSchedulerTimingCompatibilityClaimed = false;
+  error.publicReactActCompatibilityClaimed = false;
+  return error;
 }
 
 function markPrivateActDispatcher(dispatcher) {
@@ -420,11 +576,83 @@ function getPrivateActQueueMetadata(dispatcher) {
   return isAcceptedActQueueMetadata(metadata) ? metadata : null;
 }
 
+function consumeSchedulerPrivateActContinuationDiagnostics(
+  diagnostics,
+  queue
+) {
+  if (!isAcceptedSchedulerPrivateActQueueFlushDiagnostics(diagnostics)) {
+    throw createSchedulerPrivateActContinuationDiagnosticsGateError(
+      'scheduler-diagnostics'
+    );
+  }
+  if (!isAcceptedInternalActQueueTestQueue(queue)) {
+    throw createSchedulerPrivateActContinuationDiagnosticsGateError(
+      'internal-act-queue'
+    );
+  }
+
+  const pendingBefore = queue.records.length;
+  const description = diagnostics.describeAcceptedInternalActQueue(queue);
+  if (
+    !isAcceptedSchedulerPrivateActQueueDescription(
+      description,
+      pendingBefore
+    )
+  ) {
+    throw createSchedulerPrivateActContinuationDiagnosticsGateError(
+      'scheduler-description'
+    );
+  }
+
+  const drainReport = diagnostics.drainAcceptedInternalActQueue(queue);
+  if (!isAcceptedSchedulerPrivateActQueueDrainReport(drainReport)) {
+    throw createSchedulerPrivateActContinuationDiagnosticsGateError(
+      'scheduler-drain-report'
+    );
+  }
+
+  const continuationSummary =
+    summarizeSchedulerPrivateActQueueDrainedRecords(
+      drainReport.drainedRecords
+    );
+
+  return Object.freeze({
+    status: schedulerPrivateActContinuationConsumptionStatus,
+    accepted: true,
+    schedulerDiagnosticsStatus: diagnostics.status,
+    schedulerDiagnosticsExportName: diagnostics.exportName,
+    queueKind: drainReport.queueKind,
+    pendingBefore: drainReport.pendingBefore,
+    drainedCount: drainReport.drainedCount,
+    remainingCount: drainReport.remainingCount,
+    continuationSummary,
+    schedulerDescription: description,
+    schedulerDrainReport: drainReport,
+    consumesSchedulerPrivateContinuationDiagnostics: true,
+    drainsAcceptedInternalTestQueues: true,
+    queueFlushingReady: false,
+    continuationFlushingReady: false,
+    publicCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    executesQueuedWork: false,
+    executesEffects: false,
+    executesRendererRoots: false
+  });
+}
+
 module.exports = Object.freeze({
   status: actDispatcherGateStatus,
   metadataKind: acceptedActQueueMetadataKind,
   metadataVersion: acceptedActQueueMetadataVersion,
   metadataSymbol: privateActQueueMetadataSymbol,
+  schedulerDiagnosticsExportName: privateActQueueFlushDiagnosticsExport,
+  schedulerDiagnosticsStatus:
+    schedulerPrivateActQueueFlushDiagnosticsStatus,
+  schedulerContinuationConsumptionStatus:
+    schedulerPrivateActContinuationConsumptionStatus,
   requiredRecords: acceptedActQueueRecordKinds,
   requiredTaskKinds: acceptedActQueueTaskKinds,
   requiredContinuationStatuses: acceptedActQueueContinuationStatuses,
@@ -449,10 +677,13 @@ module.exports = Object.freeze({
   acceptedPrivateActContinuationDrainStatuses,
   executesBrandedInternalTestCallbacks: true,
   recordsBrandedInternalTestContinuations: true,
+  schedulerPrivateContinuationDiagnosticsReady: true,
+  consumesSchedulerPrivateContinuationDiagnostics: true,
   publicSchedulerTimingCompatibilityClaimed: false,
   publicReactActCompatibilityClaimed: false,
   executesQueuedWork: false,
   executesEffects: false,
+  consumeSchedulerPrivateActContinuationDiagnostics,
   createActQueueMetadata,
   createInternalActQueueTestCallback,
   createInternalActQueueTestQueue,
@@ -462,6 +693,7 @@ module.exports = Object.freeze({
   isAcceptedInternalActQueueTestCallback,
   isAcceptedInternalActQueueTestQueue,
   isAcceptedInternalActQueueTestTask,
+  isAcceptedSchedulerPrivateActQueueFlushDiagnostics,
   isPrivateActDispatcher,
   markPrivateActDispatcher
 });
