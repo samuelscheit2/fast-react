@@ -11,6 +11,8 @@ const actWarningThenableBlockerStatus =
   'blocked-private-react-test-renderer-act-warning-thenable-diagnostics-only';
 const actNestedScopeBlockerStatus =
   'blocked-private-react-test-renderer-act-nested-scope-diagnostics-only';
+const actRootPassiveSequenceStatus =
+  'blocked-private-react-test-renderer-act-root-passive-sequence-diagnostics-only';
 const createRoutingGateStatus =
   'blocked-missing-react-test-renderer-create-routing-prerequisites';
 const publicAsyncActCompatibilityBlockerIds = Object.freeze([
@@ -98,6 +100,8 @@ const actNestedScopeBlockerIds = Object.freeze([
   'react-test-renderer-act-overlapping-async-scope-blocker',
   'react-test-renderer-act-overlapping-sync-async-scope-blocker'
 ]);
+const privateActRootPassivePrerequisiteSequenceId =
+  'react-test-renderer-act-private-root-passive-prerequisite-sequence';
 const acceptedActQueueRecordKinds = Object.freeze([
   'SchedulerActQueueRequest',
   'SchedulerActScopeBoundaryRecord',
@@ -781,6 +785,112 @@ const actNestedScopeBlockerDiagnostics = Object.freeze({
   executesPassiveEffects: false,
   compatibilityClaimed: false
 });
+const privateActRootPassiveRequiredPrerequisiteIds = Object.freeze([
+  'test-renderer-private-root-request-records',
+  'scheduler-mock-flush-helper-metadata',
+  'passive-effect-scheduler-flush-metadata',
+  'act-warning-thenable-public-compatibility-blockers',
+  'act-nested-scope-public-compatibility-blockers'
+]);
+const privateActRootPassivePrerequisiteSequenceOrder = Object.freeze([
+  Object.freeze({
+    order: 0,
+    phase: 'private-root-request',
+    prerequisiteId: 'test-renderer-private-root-request-records',
+    recordIds: Object.freeze([
+      'test-renderer-private-root-request-bridge'
+    ]),
+    recordsPrivateRootRequest: true,
+    executesRootRequests: false,
+    invokesActCallback: false
+  }),
+  Object.freeze({
+    order: 1,
+    phase: 'scheduler-flush-helper',
+    prerequisiteId: 'scheduler-mock-flush-helper-metadata',
+    recordIds: Object.freeze([
+      'test-renderer-mock-scheduler-flush-helper-routing'
+    ]),
+    routesAcceptedMockSchedulerFlushHelperMetadata: true,
+    invokesPublicSchedulerFlushHelper: false,
+    executesScheduledCallbacks: false
+  }),
+  Object.freeze({
+    order: 2,
+    phase: 'passive-scheduler-request',
+    prerequisiteId: 'passive-effect-scheduler-flush-metadata',
+    recordIds: Object.freeze([
+      'passive-effect-scheduler-flush-gate-record',
+      'scheduler-passive-effects-flush-request',
+      'passive-effect-scheduler-flush-execution-record'
+    ]),
+    consumesPendingPassiveFlushMetadata: true,
+    consumesAcceptedSchedulerFlushMetadata: true,
+    executesPassiveEffects: false,
+    invokesEffectCallbacks: false
+  }),
+  Object.freeze({
+    order: 3,
+    phase: 'public-act-warning-thenable-blocker',
+    prerequisiteId: 'act-warning-thenable-public-compatibility-blockers',
+    recordIds: Object.freeze([
+      'react-test-renderer-act-warning-thenable-blockers'
+    ]),
+    emitsActWarnings: false,
+    awaitsThenables: false,
+    invokesActCallback: false
+  }),
+  Object.freeze({
+    order: 4,
+    phase: 'public-act-nested-scope-blocker',
+    prerequisiteId: 'act-nested-scope-public-compatibility-blockers',
+    recordIds: Object.freeze([
+      'react-test-renderer-act-nested-scope-blockers'
+    ]),
+    tracksActScopeDepth: false,
+    reusesNestedActQueue: false,
+    emitsOverlappingActWarnings: false,
+    invokesActCallback: false
+  })
+]);
+const privateActRootPassivePrerequisiteSequenceDiagnostics = Object.freeze({
+  id: privateActRootPassivePrerequisiteSequenceId,
+  status: actRootPassiveSequenceStatus,
+  acceptedWorker:
+    'worker-576-test-renderer-act-private-root-passive-sequence',
+  jsPrivateExport: privateActQueueFlushDiagnosticsExport,
+  consumer: 'react-test-renderer-act-root-passive-sequence-private-gate',
+  gateStatus: actSchedulerGateStatus,
+  prerequisiteSequence: privateActRootPassivePrerequisiteSequenceOrder,
+  requiredPrerequisiteIds: privateActRootPassiveRequiredPrerequisiteIds,
+  privateRootRequestPrerequisiteMetadataAccepted: true,
+  schedulerFlushHelperPrerequisiteMetadataAccepted: true,
+  passiveSchedulerPrerequisiteMetadataAccepted: true,
+  publicActBlockerPrerequisiteRowsAccepted: true,
+  publicActWarningEmissionAvailable: false,
+  publicActScopeDepthTrackingAvailable: false,
+  publicNestedActQueueReuseAvailable: false,
+  publicOverlappingActWarningEmissionAvailable: false,
+  emitsActWarnings: false,
+  emitsOverlappingActWarnings: false,
+  awaitsThenables: false,
+  settlesAsyncActScopes: false,
+  invokesActCallback: false,
+  executesQueuedWork: false,
+  executesScheduledCallbacks: false,
+  executesPassiveEffects: false,
+  invokesEffectCallbacks: false,
+  executesRootRequests: false,
+  mutatesHostOutput: false,
+  drainsPublicSchedulerTaskQueue: false,
+  drainsPublicReactActQueue: false,
+  publicSchedulerTimingCompatibilityClaimed: false,
+  publicReactActCompatibilityClaimed: false,
+  publicActCompatibilityClaimed: false,
+  compatibilityClaimed: false,
+  describeAcceptedPrivateRootPassivePrerequisiteSequence,
+  assertAcceptedPrivateRootPassivePrerequisiteSequence
+});
 const schedulerReactActQueueDiagnosticRecords = Object.freeze([
   Object.freeze({
     id: 'scheduler-private-act-queue-flush-diagnostics',
@@ -896,6 +1006,37 @@ const schedulerReactActQueueDiagnosticRecords = Object.freeze([
     compatibilityClaimed: false
   }),
   Object.freeze({
+    id: privateActRootPassivePrerequisiteSequenceId,
+    jsPrivateExport: privateActQueueFlushDiagnosticsExport,
+    status: actRootPassiveSequenceStatus,
+    diagnostics: privateActRootPassivePrerequisiteSequenceDiagnostics,
+    acceptedWorker:
+      'worker-576-test-renderer-act-private-root-passive-sequence',
+    prerequisiteSequence: privateActRootPassivePrerequisiteSequenceOrder,
+    requiredPrerequisiteIds: privateActRootPassiveRequiredPrerequisiteIds,
+    privateRootRequestPrerequisiteMetadataAccepted: true,
+    schedulerFlushHelperPrerequisiteMetadataAccepted: true,
+    passiveSchedulerPrerequisiteMetadataAccepted: true,
+    publicActBlockerPrerequisiteRowsAccepted: true,
+    publicActWarningEmissionAvailable: false,
+    publicActScopeDepthTrackingAvailable: false,
+    publicNestedActQueueReuseAvailable: false,
+    publicOverlappingActWarningEmissionAvailable: false,
+    emitsWarnings: false,
+    emitsOverlappingActWarnings: false,
+    awaitsThenables: false,
+    settlesAsyncActScopes: false,
+    invokesActCallback: false,
+    drainsPublicReactActQueue: false,
+    drainsPublicSchedulerTaskQueue: false,
+    executesQueuedWork: false,
+    executesScheduledCallbacks: false,
+    executesPassiveEffects: false,
+    executesRootRequests: false,
+    mutatesHostOutput: false,
+    compatibilityClaimed: false
+  }),
+  Object.freeze({
     id: 'test-renderer-mock-scheduler-expired-work-act-route',
     jsPrivateExport: privateActQueueFlushDiagnosticsExport,
     schedulerStatus: 'private-scheduler-act-queue-flush-diagnostics',
@@ -971,6 +1112,8 @@ const privateActQueueFlushDiagnostics = Object.freeze({
   drainsExpiredMockSchedulerWork: false,
   warningThenableBlockerDiagnostics: actWarningThenableBlockerDiagnostics,
   nestedScopeBlockerDiagnostics: actNestedScopeBlockerDiagnostics,
+  rootPassivePrerequisiteSequenceDiagnostics:
+    privateActRootPassivePrerequisiteSequenceDiagnostics,
   publicActWarningEmissionAvailable: false,
   publicActScopeDepthTrackingAvailable: false,
   publicNestedActQueueReuseAvailable: false,
@@ -999,6 +1142,8 @@ const privateActQueueFlushDiagnostics = Object.freeze({
   routeAcceptedMockSchedulerFlushHelperMetadata,
   describeAcceptedMockSchedulerExpiredWorkMetadata,
   routeAcceptedMockSchedulerExpiredWorkMetadata,
+  describeAcceptedPrivateRootPassivePrerequisiteSequence,
+  assertAcceptedPrivateRootPassivePrerequisiteSequence,
   consumeAcceptedSchedulerActQueueDiagnostics,
   drainAcceptedInternalActQueue:
     consumeAcceptedSchedulerActQueueDiagnostics
@@ -1048,7 +1193,8 @@ const acceptedPrivateActFlushPrerequisiteIds = Object.freeze([
   'passive-effect-scheduler-flush-metadata',
   'passive-effect-private-callback-execution-metadata',
   'test-renderer-private-root-output-diagnostics',
-  'test-renderer-private-root-request-records'
+  'test-renderer-private-root-request-records',
+  privateActRootPassivePrerequisiteSequenceId
 ]);
 const blockedPrivateActFlushPrerequisiteIds = Object.freeze([
   'private-act-queue-drain-execution',
@@ -1233,6 +1379,26 @@ const acceptedPrivateActFlushPrerequisites = Object.freeze([
     records: testRendererRootActFlushRecords,
     executesRootRequests: false,
     producesHostOutput: false
+  }),
+  Object.freeze({
+    id: privateActRootPassivePrerequisiteSequenceId,
+    present: true,
+    recordOnly: true,
+    diagnostics: privateActRootPassivePrerequisiteSequenceDiagnostics,
+    prerequisiteSequence: privateActRootPassivePrerequisiteSequenceOrder,
+    requiredPrerequisiteIds: privateActRootPassiveRequiredPrerequisiteIds,
+    privateRootRequestPrerequisiteMetadataAccepted: true,
+    schedulerFlushHelperPrerequisiteMetadataAccepted: true,
+    passiveSchedulerPrerequisiteMetadataAccepted: true,
+    publicActBlockerPrerequisiteRowsAccepted: true,
+    invokesActCallback: false,
+    awaitsThenables: false,
+    emitsWarnings: false,
+    executesQueuedWork: false,
+    executesScheduledCallbacks: false,
+    executesPassiveEffects: false,
+    executesRootRequests: false,
+    compatibilityClaimed: false
   })
 ]);
 const blockedPrivateActFlushPrerequisites = Object.freeze([
@@ -1280,6 +1446,7 @@ const actSchedulerSideEffectPolicy = Object.freeze({
   consumesPrivateSchedulerActQueueDiagnostics: true,
   consumesPrivatePassiveEffectDrainDiagnostics: true,
   consumesPendingPassiveFlushMetadata: true,
+  sequencesPrivateRootPassivePrerequisites: true,
   emitsActWarnings: false,
   emitsOverlappingActWarnings: false,
   awaitsActThenables: false,
@@ -1336,7 +1503,8 @@ const actSchedulerGate = Object.freeze({
     'worker-482-test-renderer-act-scheduler-flush-gate',
     'worker-517-test-renderer-act-warning-thenable-blockers',
     'worker-518-scheduler-mock-expired-act-route',
-    'worker-541-test-renderer-act-nested-scope-blockers'
+    'worker-541-test-renderer-act-nested-scope-blockers',
+    'worker-576-test-renderer-act-private-root-passive-sequence'
   ]),
   publicActBehaviorAvailable: false,
   publicSchedulerFlushExecutionAvailable: false,
@@ -1375,6 +1543,7 @@ const actSchedulerGate = Object.freeze({
   privatePassiveEffectDrainDiagnosticsConsumed: true,
   warningThenableBlockerDiagnosticsAccepted: true,
   nestedScopeBlockerDiagnosticsAccepted: true,
+  privateRootPassivePrerequisiteSequenceAccepted: true,
   publicActWarningEmissionAvailable: false,
   publicActScopeDepthTrackingAvailable: false,
   publicNestedActQueueReuseAvailable: false,
@@ -1393,6 +1562,8 @@ const actSchedulerGate = Object.freeze({
   recognizedActWarningThenableBlockers:
     actWarningThenableBlockerDiagnostics,
   recognizedActNestedScopeBlockers: actNestedScopeBlockerDiagnostics,
+  recognizedPrivateRootPassivePrerequisiteSequence:
+    privateActRootPassivePrerequisiteSequenceDiagnostics,
   privateActQueueFlushDiagnostics,
   privateActPassiveEffectDrainDiagnostics,
   recognizedSchedulerMockFlushHelpers: schedulerMockFlushHelperMetadata,
@@ -3529,6 +3700,8 @@ function createUnsupportedError(
       recognizedActSchedulerGate.warningThenableBlockerDiagnosticsAccepted;
     error.nestedScopeBlockerDiagnosticsAccepted =
       recognizedActSchedulerGate.nestedScopeBlockerDiagnosticsAccepted;
+    error.privateRootPassivePrerequisiteSequenceAccepted =
+      recognizedActSchedulerGate.privateRootPassivePrerequisiteSequenceAccepted;
     error.publicActWarningEmissionAvailable =
       recognizedActSchedulerGate.publicActWarningEmissionAvailable;
     error.publicActScopeDepthTrackingAvailable =
@@ -4821,6 +4994,212 @@ function routeAcceptedMockSchedulerExpiredWorkMetadata(metadata) {
     rendererRootsCompatibilityClaimed: false,
     missingBeforeExecution: actSchedulerMissingBeforeExecution
   });
+}
+
+function findPrivateActFlushPrerequisite(prerequisites, id) {
+  if (!Array.isArray(prerequisites)) {
+    return undefined;
+  }
+  return prerequisites.find((prerequisite) => prerequisite.id === id);
+}
+
+function hasAcceptedPrivateRootRequestPrerequisiteMetadata(prerequisites) {
+  const prerequisite = findPrivateActFlushPrerequisite(
+    prerequisites,
+    'test-renderer-private-root-request-records'
+  );
+  return (
+    isObjectLike(prerequisite) &&
+    prerequisite.present === true &&
+    prerequisite.records === testRendererRootActFlushRecords &&
+    prerequisite.executesRootRequests === false &&
+    prerequisite.producesHostOutput === false &&
+    testRendererRootActFlushRecords.some(
+      (record) =>
+        record.id === 'test-renderer-private-root-request-bridge' &&
+        record.privateRootRequestExecution === false
+    )
+  );
+}
+
+function hasAcceptedSchedulerFlushHelperPrerequisiteMetadata(
+  prerequisites
+) {
+  const prerequisite = findPrivateActFlushPrerequisite(
+    prerequisites,
+    'scheduler-mock-flush-helper-metadata'
+  );
+  return (
+    isObjectLike(prerequisite) &&
+    prerequisite.present === true &&
+    prerequisite.records === schedulerMockFlushHelperMetadata &&
+    prerequisite.executesScheduledCallbacks === false &&
+    schedulerReactActQueueDiagnosticRecords.some(
+      (record) =>
+        record.id === 'test-renderer-mock-scheduler-flush-helper-routing' &&
+        record.routesAcceptedMockSchedulerFlushHelperMetadata === true &&
+        record.invokesPublicSchedulerFlushHelper === false
+    )
+  );
+}
+
+function hasAcceptedPassiveSchedulerPrerequisiteMetadata(prerequisites) {
+  const prerequisite = findPrivateActFlushPrerequisite(
+    prerequisites,
+    'passive-effect-scheduler-flush-metadata'
+  );
+  const records = isObjectLike(prerequisite)
+    ? prerequisite.records
+    : undefined;
+  return (
+    isObjectLike(prerequisite) &&
+    prerequisite.present === true &&
+    Array.isArray(records) &&
+    records.includes('PassiveEffectSchedulerFlushGateRecord') &&
+    records.includes('SchedulerPassiveEffectsFlushRequest') &&
+    records.includes('PassiveEffectSchedulerFlushExecutionRecord') &&
+    prerequisite.diagnostics === privateActPassiveEffectDrainDiagnostics &&
+    prerequisite.consumesPendingPassiveFlushMetadata === true &&
+    prerequisite.consumesAcceptedSchedulerFlushMetadata === true &&
+    prerequisite.executesPassiveEffects === false &&
+    prerequisite.invokesEffectCallbacks === false
+  );
+}
+
+function hasAcceptedPublicActBlockerPrerequisiteRows(prerequisites) {
+  const warningThenablePrerequisite = findPrivateActFlushPrerequisite(
+    prerequisites,
+    'act-warning-thenable-public-compatibility-blockers'
+  );
+  const nestedScopePrerequisite = findPrivateActFlushPrerequisite(
+    prerequisites,
+    'act-nested-scope-public-compatibility-blockers'
+  );
+  return (
+    isObjectLike(warningThenablePrerequisite) &&
+    warningThenablePrerequisite.present === true &&
+    warningThenablePrerequisite.diagnostics ===
+      actWarningThenableBlockerDiagnostics &&
+    warningThenablePrerequisite.emitsWarnings === false &&
+    warningThenablePrerequisite.awaitsThenables === false &&
+    warningThenablePrerequisite.invokesActCallback === false &&
+    warningThenablePrerequisite.compatibilityClaimed === false &&
+    isObjectLike(nestedScopePrerequisite) &&
+    nestedScopePrerequisite.present === true &&
+    nestedScopePrerequisite.diagnostics === actNestedScopeBlockerDiagnostics &&
+    nestedScopePrerequisite.invokesActCallback === false &&
+    nestedScopePrerequisite.executesPassiveEffects === false &&
+    nestedScopePrerequisite.compatibilityClaimed === false
+  );
+}
+
+function getRejectedPrivateRootPassivePrerequisiteSequenceReason(
+  prerequisites
+) {
+  if (!Array.isArray(prerequisites)) {
+    return 'prerequisites-not-array';
+  }
+  if (!hasAcceptedPrivateRootRequestPrerequisiteMetadata(prerequisites)) {
+    return 'missing-root-request-prerequisite-metadata';
+  }
+  if (
+    !hasAcceptedSchedulerFlushHelperPrerequisiteMetadata(prerequisites)
+  ) {
+    return 'missing-scheduler-flush-helper-prerequisite-metadata';
+  }
+  if (!hasAcceptedPassiveSchedulerPrerequisiteMetadata(prerequisites)) {
+    return 'missing-passive-scheduler-prerequisite-metadata';
+  }
+  if (!hasAcceptedPublicActBlockerPrerequisiteRows(prerequisites)) {
+    return 'missing-public-act-blocker-prerequisite-metadata';
+  }
+  return null;
+}
+
+function describeAcceptedPrivateRootPassivePrerequisiteSequence(
+  prerequisites = acceptedPrivateActFlushPrerequisites
+) {
+  const rejectionReason =
+    getRejectedPrivateRootPassivePrerequisiteSequenceReason(prerequisites);
+  const accepted = rejectionReason === null;
+
+  return freezeRecord({
+    id: privateActRootPassivePrerequisiteSequenceId,
+    status: accepted
+      ? actRootPassiveSequenceStatus
+      : 'rejected-private-react-test-renderer-act-root-passive-sequence',
+    accepted,
+    rejectionReason,
+    acceptedWorker:
+      'worker-576-test-renderer-act-private-root-passive-sequence',
+    consumer: 'react-test-renderer-act-root-passive-sequence-private-gate',
+    gateStatus: actSchedulerGateStatus,
+    prerequisiteSequence: privateActRootPassivePrerequisiteSequenceOrder,
+    requiredPrerequisiteIds: privateActRootPassiveRequiredPrerequisiteIds,
+    privateRootRequestPrerequisiteMetadataAccepted:
+      hasAcceptedPrivateRootRequestPrerequisiteMetadata(prerequisites),
+    schedulerFlushHelperPrerequisiteMetadataAccepted:
+      hasAcceptedSchedulerFlushHelperPrerequisiteMetadata(prerequisites),
+    passiveSchedulerPrerequisiteMetadataAccepted:
+      hasAcceptedPassiveSchedulerPrerequisiteMetadata(prerequisites),
+    publicActBlockerPrerequisiteRowsAccepted:
+      hasAcceptedPublicActBlockerPrerequisiteRows(prerequisites),
+    invokesActCallback: false,
+    emitsActWarnings: false,
+    emitsOverlappingActWarnings: false,
+    awaitsThenables: false,
+    settlesAsyncActScopes: false,
+    executesQueuedWork: false,
+    executesScheduledCallbacks: false,
+    executesPassiveEffects: false,
+    invokesEffectCallbacks: false,
+    executesRootRequests: false,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    publicActCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createPrivateRootPassivePrerequisiteSequenceError(reason) {
+  const error = createUnsupportedError(
+    `_Scheduler.${privateActQueueFlushDiagnosticsExport}`,
+    'rejected private act root/passive prerequisite sequence',
+    `Private react-test-renderer act root/passive sequencing requires accepted root request, scheduler flush helper, passive scheduler, and public blocker metadata. Rejection reason: ${reason}.`,
+    undefined,
+    undefined,
+    actSchedulerGate
+  );
+
+  error.name =
+    'FastReactTestRendererPrivateActRootPassiveSequenceError';
+  error.code =
+    'FAST_REACT_TEST_RENDERER_PRIVATE_ACT_ROOT_PASSIVE_SEQUENCE_REJECTED';
+  error.reason = reason;
+  error.invokesActCallback = false;
+  error.emitsActWarnings = false;
+  error.awaitsThenables = false;
+  error.executesPassiveEffects = false;
+  error.executesRootRequests = false;
+  error.publicReactActCompatibilityClaimed = false;
+  error.publicActCompatibilityClaimed = false;
+  error.compatibilityClaimed = false;
+  return error;
+}
+
+function assertAcceptedPrivateRootPassivePrerequisiteSequence(
+  prerequisites = acceptedPrivateActFlushPrerequisites
+) {
+  const report =
+    describeAcceptedPrivateRootPassivePrerequisiteSequence(prerequisites);
+  if (report.accepted !== true) {
+    throw createPrivateRootPassivePrerequisiteSequenceError(
+      report.rejectionReason
+    );
+  }
+  return report;
 }
 
 function consumeAcceptedSchedulerActQueueDiagnostics(queue) {

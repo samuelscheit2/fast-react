@@ -172,6 +172,22 @@ const ACT_NESTED_SCOPE_BLOCKER_IDS = [
   "react-test-renderer-act-overlapping-async-scope-blocker",
   "react-test-renderer-act-overlapping-sync-async-scope-blocker"
 ];
+const ACT_PRIVATE_ROOT_PASSIVE_SEQUENCE_RECORD_ID =
+  "react-test-renderer-act-private-root-passive-prerequisite-sequence";
+const ACT_PRIVATE_ROOT_PASSIVE_REQUIRED_PREREQUISITE_IDS = [
+  "test-renderer-private-root-request-records",
+  "scheduler-mock-flush-helper-metadata",
+  "passive-effect-scheduler-flush-metadata",
+  ACT_WARNING_THENABLE_BLOCKER_PREREQUISITE_ID,
+  ACT_NESTED_SCOPE_BLOCKER_PREREQUISITE_ID
+];
+const ACT_PRIVATE_ROOT_PASSIVE_SEQUENCE_PHASES = [
+  "private-root-request",
+  "scheduler-flush-helper",
+  "passive-scheduler-request",
+  "public-act-warning-thenable-blocker",
+  "public-act-nested-scope-blocker"
+];
 const ACT_SCHEDULER_FLUSH_HELPER_METADATA = [
   [
     "unstable_flushAll",
@@ -230,6 +246,7 @@ const ACT_SCHEDULER_CJS_DEVELOPMENT_REACT_QUEUE_DIAGNOSTIC_RECORD_IDS = [
   "test-renderer-mock-scheduler-flush-helper-routing",
   ACT_WARNING_THENABLE_BLOCKER_RECORD_ID,
   ACT_NESTED_SCOPE_BLOCKER_RECORD_ID,
+  ACT_PRIVATE_ROOT_PASSIVE_SEQUENCE_RECORD_ID,
   "test-renderer-mock-scheduler-expired-work-act-route",
   "react-private-act-internal-test-queue-factories"
 ];
@@ -341,7 +358,8 @@ const ACCEPTED_PRIVATE_ACT_FLUSH_CJS_DEVELOPMENT_PREREQUISITE_IDS = [
   ...ACCEPTED_PRIVATE_ACT_FLUSH_CJS_PREREQUISITE_IDS.slice(0, 4),
   ACT_WARNING_THENABLE_BLOCKER_PREREQUISITE_ID,
   ACT_NESTED_SCOPE_BLOCKER_PREREQUISITE_ID,
-  ...ACCEPTED_PRIVATE_ACT_FLUSH_CJS_PREREQUISITE_IDS.slice(4)
+  ...ACCEPTED_PRIVATE_ACT_FLUSH_CJS_PREREQUISITE_IDS.slice(4),
+  ACT_PRIVATE_ROOT_PASSIVE_SEQUENCE_RECORD_ID
 ];
 
 function acceptedPrivateActFlushPrerequisiteIds(entrypoint) {
@@ -1285,6 +1303,18 @@ function assertPrivateActQueueDiagnosticConsumer(entry, moduleExports) {
       entry,
       diagnostics.nestedScopeBlockerDiagnostics
     );
+    assert.equal(
+      diagnostics.rootPassivePrerequisiteSequenceDiagnostics.id,
+      ACT_PRIVATE_ROOT_PASSIVE_SEQUENCE_RECORD_ID
+    );
+    assert.equal(
+      typeof diagnostics.describeAcceptedPrivateRootPassivePrerequisiteSequence,
+      "function"
+    );
+    assert.equal(
+      typeof diagnostics.assertAcceptedPrivateRootPassivePrerequisiteSequence,
+      "function"
+    );
   } else {
     assert.equal(
       diagnostics.warningThenableBlockerDiagnostics,
@@ -1293,6 +1323,11 @@ function assertPrivateActQueueDiagnosticConsumer(entry, moduleExports) {
     );
     assert.equal(
       diagnostics.nestedScopeBlockerDiagnostics,
+      undefined,
+      entry.entrypoint
+    );
+    assert.equal(
+      diagnostics.rootPassivePrerequisiteSequenceDiagnostics,
       undefined,
       entry.entrypoint
     );
@@ -2459,6 +2494,10 @@ function assertActSurface(entry, moduleExports) {
   if (entry.entrypoint === CJS_DEVELOPMENT_ENTRYPOINT) {
     assert.equal(error.warningThenableBlockerDiagnosticsAccepted, true);
     assert.equal(error.nestedScopeBlockerDiagnosticsAccepted, true);
+    assert.equal(
+      error.privateRootPassivePrerequisiteSequenceAccepted,
+      true
+    );
     assert.equal(error.publicActWarningEmissionAvailable, false);
     assert.equal(error.publicActScopeDepthTrackingAvailable, false);
     assert.equal(error.publicNestedActQueueReuseAvailable, false);
@@ -2479,6 +2518,11 @@ function assertActSurface(entry, moduleExports) {
     );
     assert.equal(
       error.nestedScopeBlockerDiagnosticsAccepted,
+      undefined,
+      entry.entrypoint
+    );
+    assert.equal(
+      error.privateRootPassivePrerequisiteSequenceAccepted,
       undefined,
       entry.entrypoint
     );
@@ -2586,7 +2630,8 @@ function assertActSchedulerGate(gate, entrypoint) {
       "worker-482-test-renderer-act-scheduler-flush-gate",
       "worker-517-test-renderer-act-warning-thenable-blockers",
       "worker-518-scheduler-mock-expired-act-route",
-      "worker-541-test-renderer-act-nested-scope-blockers"
+      "worker-541-test-renderer-act-nested-scope-blockers",
+      "worker-576-test-renderer-act-private-root-passive-sequence"
     );
   }
 
@@ -2648,6 +2693,10 @@ function assertActSchedulerGate(gate, entrypoint) {
   );
   assert.equal(
     gate.nestedScopeBlockerDiagnosticsAccepted,
+    cjsDevelopmentOnly ? true : undefined
+  );
+  assert.equal(
+    gate.privateRootPassivePrerequisiteSequenceAccepted,
     cjsDevelopmentOnly ? true : undefined
   );
   assert.equal(
@@ -2728,15 +2777,34 @@ function assertActSchedulerGate(gate, entrypoint) {
       { entrypoint },
       gate.privateActQueueFlushDiagnostics.nestedScopeBlockerDiagnostics
     );
+    assertPrivateRootPassivePrerequisiteSequenceDiagnostics(
+      gate.recognizedPrivateRootPassivePrerequisiteSequence,
+      gate,
+      entrypoint
+    );
+    assert.equal(
+      gate.privateActQueueFlushDiagnostics
+        .rootPassivePrerequisiteSequenceDiagnostics,
+      gate.recognizedPrivateRootPassivePrerequisiteSequence
+    );
   } else {
     assert.equal(gate.recognizedActWarningThenableBlockers, undefined);
     assert.equal(gate.recognizedActNestedScopeBlockers, undefined);
+    assert.equal(
+      gate.recognizedPrivateRootPassivePrerequisiteSequence,
+      undefined
+    );
     assert.equal(
       gate.privateActQueueFlushDiagnostics.warningThenableBlockerDiagnostics,
       undefined
     );
     assert.equal(
       gate.privateActQueueFlushDiagnostics.nestedScopeBlockerDiagnostics,
+      undefined
+    );
+    assert.equal(
+      gate.privateActQueueFlushDiagnostics
+        .rootPassivePrerequisiteSequenceDiagnostics,
       undefined
     );
   }
@@ -2825,6 +2893,7 @@ function assertActSchedulerGate(gate, entrypoint) {
       invokesPublicSchedulerFlushHelper: false,
       publicSchedulerFlushBehaviorExecuted: false,
       drainsExpiredMockSchedulerWork: false,
+      sequencesPrivateRootPassivePrerequisites: true,
       emitsActWarnings: false,
       emitsOverlappingActWarnings: false,
       awaitsActThenables: false,
@@ -2948,6 +3017,46 @@ function assertActSchedulerGate(gate, entrypoint) {
     assert.equal(nestedScopeRecord.executesPassiveEffects, false);
     assert.equal(nestedScopeRecord.compatibilityClaimed, false);
 
+    const sequenceRecord =
+      gate.recognizedSchedulerReactActQueueDiagnostics.find(
+        (record) => record.id === ACT_PRIVATE_ROOT_PASSIVE_SEQUENCE_RECORD_ID
+      );
+    assert.notEqual(sequenceRecord, undefined);
+    assert.equal(
+      sequenceRecord.status,
+      "blocked-private-react-test-renderer-act-root-passive-sequence-diagnostics-only"
+    );
+    assertPrivateRootPassivePrerequisiteSequenceDiagnostics(
+      sequenceRecord.diagnostics,
+      gate,
+      entrypoint
+    );
+    assert.deepEqual(
+      sequenceRecord.requiredPrerequisiteIds,
+      ACT_PRIVATE_ROOT_PASSIVE_REQUIRED_PREREQUISITE_IDS
+    );
+    assert.equal(
+      sequenceRecord.privateRootRequestPrerequisiteMetadataAccepted,
+      true
+    );
+    assert.equal(
+      sequenceRecord.schedulerFlushHelperPrerequisiteMetadataAccepted,
+      true
+    );
+    assert.equal(
+      sequenceRecord.passiveSchedulerPrerequisiteMetadataAccepted,
+      true
+    );
+    assert.equal(sequenceRecord.publicActBlockerPrerequisiteRowsAccepted, true);
+    assert.equal(sequenceRecord.invokesActCallback, false);
+    assert.equal(sequenceRecord.awaitsThenables, false);
+    assert.equal(sequenceRecord.emitsWarnings, false);
+    assert.equal(sequenceRecord.executesQueuedWork, false);
+    assert.equal(sequenceRecord.executesScheduledCallbacks, false);
+    assert.equal(sequenceRecord.executesPassiveEffects, false);
+    assert.equal(sequenceRecord.executesRootRequests, false);
+    assert.equal(sequenceRecord.compatibilityClaimed, false);
+
     const expiredWorkRouteRecord =
       gate.recognizedSchedulerReactActQueueDiagnostics.find(
         (record) =>
@@ -2989,6 +3098,12 @@ function assertActSchedulerGate(gate, entrypoint) {
         (record) => record.id === ACT_NESTED_SCOPE_BLOCKER_RECORD_ID
       );
     assert.equal(nestedScopeRecord, undefined);
+
+    const sequenceRecord =
+      gate.recognizedSchedulerReactActQueueDiagnostics.find(
+        (record) => record.id === ACT_PRIVATE_ROOT_PASSIVE_SEQUENCE_RECORD_ID
+      );
+    assert.equal(sequenceRecord, undefined);
 
     const expiredWorkRouteRecord =
       gate.recognizedSchedulerReactActQueueDiagnostics.find(
@@ -3063,6 +3178,165 @@ function assertActSchedulerGate(gate, entrypoint) {
   assert.deepEqual(
     gate.missingBeforeExecution,
     actSchedulerMissingBeforeExecution(entrypoint)
+  );
+}
+
+function assertPrivateRootPassivePrerequisiteSequenceDiagnostics(
+  diagnostics,
+  gate,
+  entrypoint
+) {
+  assert.equal(Object.isFrozen(diagnostics), true, entrypoint);
+  assert.equal(
+    diagnostics.id,
+    ACT_PRIVATE_ROOT_PASSIVE_SEQUENCE_RECORD_ID
+  );
+  assert.equal(
+    diagnostics.status,
+    "blocked-private-react-test-renderer-act-root-passive-sequence-diagnostics-only"
+  );
+  assert.equal(
+    diagnostics.acceptedWorker,
+    "worker-576-test-renderer-act-private-root-passive-sequence"
+  );
+  assert.deepEqual(
+    diagnostics.requiredPrerequisiteIds,
+    ACT_PRIVATE_ROOT_PASSIVE_REQUIRED_PREREQUISITE_IDS
+  );
+  assert.deepEqual(
+    diagnostics.prerequisiteSequence.map((row) => row.phase),
+    ACT_PRIVATE_ROOT_PASSIVE_SEQUENCE_PHASES
+  );
+  assert.deepEqual(
+    diagnostics.prerequisiteSequence.map((row) => row.order),
+    [0, 1, 2, 3, 4]
+  );
+  assert.equal(
+    diagnostics.privateRootRequestPrerequisiteMetadataAccepted,
+    true
+  );
+  assert.equal(
+    diagnostics.schedulerFlushHelperPrerequisiteMetadataAccepted,
+    true
+  );
+  assert.equal(diagnostics.passiveSchedulerPrerequisiteMetadataAccepted, true);
+  assert.equal(diagnostics.publicActBlockerPrerequisiteRowsAccepted, true);
+  assert.equal(diagnostics.invokesActCallback, false);
+  assert.equal(diagnostics.emitsActWarnings, false);
+  assert.equal(diagnostics.emitsOverlappingActWarnings, false);
+  assert.equal(diagnostics.awaitsThenables, false);
+  assert.equal(diagnostics.settlesAsyncActScopes, false);
+  assert.equal(diagnostics.executesQueuedWork, false);
+  assert.equal(diagnostics.executesScheduledCallbacks, false);
+  assert.equal(diagnostics.executesPassiveEffects, false);
+  assert.equal(diagnostics.invokesEffectCallbacks, false);
+  assert.equal(diagnostics.executesRootRequests, false);
+  assert.equal(diagnostics.drainsPublicSchedulerTaskQueue, false);
+  assert.equal(diagnostics.drainsPublicReactActQueue, false);
+  assert.equal(diagnostics.publicReactActCompatibilityClaimed, false);
+  assert.equal(diagnostics.publicActCompatibilityClaimed, false);
+  assert.equal(diagnostics.compatibilityClaimed, false);
+  assert.equal(
+    typeof diagnostics.describeAcceptedPrivateRootPassivePrerequisiteSequence,
+    "function"
+  );
+  assert.equal(
+    typeof diagnostics.assertAcceptedPrivateRootPassivePrerequisiteSequence,
+    "function"
+  );
+
+  const report =
+    diagnostics.assertAcceptedPrivateRootPassivePrerequisiteSequence(
+      gate.acceptedPrivateFlushPrerequisites
+    );
+  assert.equal(Object.isFrozen(report), true, entrypoint);
+  assert.equal(report.accepted, true);
+  assert.equal(report.rejectionReason, null);
+  assert.equal(report.id, ACT_PRIVATE_ROOT_PASSIVE_SEQUENCE_RECORD_ID);
+  assert.equal(report.prerequisiteSequence, diagnostics.prerequisiteSequence);
+  assert.deepEqual(
+    report.requiredPrerequisiteIds,
+    ACT_PRIVATE_ROOT_PASSIVE_REQUIRED_PREREQUISITE_IDS
+  );
+  assert.equal(report.privateRootRequestPrerequisiteMetadataAccepted, true);
+  assert.equal(report.schedulerFlushHelperPrerequisiteMetadataAccepted, true);
+  assert.equal(report.passiveSchedulerPrerequisiteMetadataAccepted, true);
+  assert.equal(report.publicActBlockerPrerequisiteRowsAccepted, true);
+  assert.equal(report.invokesActCallback, false);
+  assert.equal(report.awaitsThenables, false);
+  assert.equal(report.emitsActWarnings, false);
+  assert.equal(report.executesPassiveEffects, false);
+  assert.equal(report.executesRootRequests, false);
+  assert.equal(report.compatibilityClaimed, false);
+
+  assertPrivateRootPassiveSequenceRejectsMissingPrerequisite(
+    diagnostics,
+    gate,
+    entrypoint,
+    "test-renderer-private-root-request-records",
+    "missing-root-request-prerequisite-metadata"
+  );
+  assertPrivateRootPassiveSequenceRejectsMissingPrerequisite(
+    diagnostics,
+    gate,
+    entrypoint,
+    "scheduler-mock-flush-helper-metadata",
+    "missing-scheduler-flush-helper-prerequisite-metadata"
+  );
+  assertPrivateRootPassiveSequenceRejectsMissingPrerequisite(
+    diagnostics,
+    gate,
+    entrypoint,
+    "passive-effect-scheduler-flush-metadata",
+    "missing-passive-scheduler-prerequisite-metadata"
+  );
+}
+
+function assertPrivateRootPassiveSequenceRejectsMissingPrerequisite(
+  diagnostics,
+  gate,
+  entrypoint,
+  missingId,
+  expectedReason
+) {
+  const missingPrerequisites =
+    gate.acceptedPrivateFlushPrerequisites.filter(
+      (prerequisite) => prerequisite.id !== missingId
+    );
+  const rejected =
+    diagnostics.describeAcceptedPrivateRootPassivePrerequisiteSequence(
+      missingPrerequisites
+    );
+  assert.equal(Object.isFrozen(rejected), true, `${entrypoint}:${missingId}`);
+  assert.equal(rejected.accepted, false, missingId);
+  assert.equal(rejected.rejectionReason, expectedReason, missingId);
+  assert.throws(
+    () =>
+      diagnostics.assertAcceptedPrivateRootPassivePrerequisiteSequence(
+        missingPrerequisites
+      ),
+    (error) => {
+      assert.equal(
+        error.name,
+        "FastReactTestRendererPrivateActRootPassiveSequenceError"
+      );
+      assert.equal(
+        error.code,
+        "FAST_REACT_TEST_RENDERER_PRIVATE_ACT_ROOT_PASSIVE_SEQUENCE_REJECTED"
+      );
+      assert.equal(error.reason, expectedReason);
+      assert.equal(error.entrypoint, entrypoint);
+      assert.equal(error.invokesActCallback, false);
+      assert.equal(error.emitsActWarnings, false);
+      assert.equal(error.awaitsThenables, false);
+      assert.equal(error.executesPassiveEffects, false);
+      assert.equal(error.executesRootRequests, false);
+      assert.equal(error.publicReactActCompatibilityClaimed, false);
+      assert.equal(error.publicActCompatibilityClaimed, false);
+      assert.equal(error.compatibilityClaimed, false);
+      return true;
+    },
+    `${entrypoint}:${missingId}`
   );
 }
 
