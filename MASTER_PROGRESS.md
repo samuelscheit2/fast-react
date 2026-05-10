@@ -29,6 +29,13 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Worker 488 was accepted from queue 473-502. It added private React DOM event
+  listener error-routing diagnostics that consume existing fake-DOM listener
+  error routes and record root option callback metadata without invoking public
+  callbacks or global error reporting. It was verified after merge with private
+  root bridge package tests, focused event dispatch/listener/priority
+  conformance, container listener smoke, React DOM workspace checks, syntax
+  checks, conflict-marker scanning, and `git diff --check`.
 - Worker 486 was accepted from queue 473-502. It added a private React DOM
   root facade host-output diagnostic that routes accepted create/render
   metadata through the bridge and fake-DOM mutation adapter while cleaning up
