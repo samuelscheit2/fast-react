@@ -396,6 +396,8 @@ pub(crate) struct ContextProviderUpdateConsumerLaneRecord {
     dependency_lanes: Lanes,
     fiber_lanes_after: Lanes,
     scanned_dependency_count: usize,
+    marked_dependency_count: usize,
+    provider_changed: bool,
     root: FiberRootId,
 }
 
@@ -466,6 +468,26 @@ impl ContextProviderUpdateConsumerLaneRecord {
     }
 
     #[must_use]
+    pub const fn marked_dependency_count(self) -> usize {
+        self.marked_dependency_count
+    }
+
+    #[must_use]
+    pub const fn provider_changed(self) -> bool {
+        self.provider_changed
+    }
+
+    #[must_use]
+    pub const fn unchanged_provider_bailout(self) -> bool {
+        !self.provider_changed && self.marked_dependency_count == 0
+    }
+
+    #[must_use]
+    pub const fn marked_changed_provider_lanes(self) -> bool {
+        self.provider_changed && self.marked_dependency_count == 1
+    }
+
+    #[must_use]
     pub const fn root(self) -> FiberRootId {
         self.root
     }
@@ -478,6 +500,7 @@ pub(crate) struct ContextProviderUpdateProviderChangeRecord {
     previous_value: ContextValueHandle,
     next_value: ContextValueHandle,
     propagation_lanes: Lanes,
+    provider_changed: bool,
 }
 
 impl ContextProviderUpdateProviderChangeRecord {
@@ -504,6 +527,16 @@ impl ContextProviderUpdateProviderChangeRecord {
     #[must_use]
     pub const fn propagation_lanes(self) -> Lanes {
         self.propagation_lanes
+    }
+
+    #[must_use]
+    pub const fn provider_changed(self) -> bool {
+        self.provider_changed
+    }
+
+    #[must_use]
+    pub const fn unchanged_provider_bailout(self) -> bool {
+        !self.provider_changed
     }
 }
 
@@ -606,6 +639,27 @@ impl ContextProviderUpdateTwoConsumerLaneRecord {
     pub const fn root_pending_lanes_after(self) -> Lanes {
         self.root_pending_lanes_after
     }
+
+    #[must_use]
+    pub const fn provider_changed(self) -> bool {
+        self.previous_value.raw() != self.next_value.raw()
+    }
+
+    #[must_use]
+    pub const fn unchanged_provider_bailout(self) -> bool {
+        !self.provider_changed()
+    }
+
+    #[must_use]
+    pub const fn marked_dependency_count(self) -> usize {
+        self.dependent_consumers[0].marked_dependency_count
+            + self.dependent_consumers[1].marked_dependency_count
+    }
+
+    #[must_use]
+    pub const fn public_context_compatibility_blocked(self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -696,6 +750,35 @@ impl ContextProviderUpdateMultiProviderLaneRecord {
     pub const fn root_pending_lanes_after(&self) -> Lanes {
         self.root_pending_lanes_after
     }
+
+    #[must_use]
+    pub const fn changed_provider_count(&self) -> usize {
+        (if self.provider_changes[0].provider_changed {
+            1
+        } else {
+            0
+        }) + (if self.provider_changes[1].provider_changed {
+            1
+        } else {
+            0
+        })
+    }
+
+    #[must_use]
+    pub const fn unchanged_provider_bailout_count(&self) -> usize {
+        2 - self.changed_provider_count()
+    }
+
+    #[must_use]
+    pub const fn marked_dependency_count(&self) -> usize {
+        self.dependent_consumers[0].marked_dependency_count
+            + self.dependent_consumers[1].marked_dependency_count
+    }
+
+    #[must_use]
+    pub const fn public_context_compatibility_blocked(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -703,6 +786,9 @@ pub(crate) enum ContextProviderUpdateLaneGateError {
     FiberRootStore(FiberRootStoreError),
     FiberTopology(FiberTopologyError),
     Propagation(FunctionComponentContextChangePropagationError),
+    EmptyPropagationLanes {
+        context: ContextHandle,
+    },
     UnchangedProviderValue {
         context: ContextHandle,
         previous_value: ContextValueHandle,
@@ -767,6 +853,11 @@ impl Display for ContextProviderUpdateLaneGateError {
             Self::FiberRootStore(error) => Display::fmt(error, formatter),
             Self::FiberTopology(error) => Display::fmt(error, formatter),
             Self::Propagation(error) => Display::fmt(error, formatter),
+            Self::EmptyPropagationLanes { context } => write!(
+                formatter,
+                "context {} provider update cannot propagate empty lanes",
+                context.raw()
+            ),
             Self::UnchangedProviderValue {
                 context,
                 previous_value,
@@ -892,7 +983,8 @@ impl Error for ContextProviderUpdateLaneGateError {
             Self::FiberRootStore(error) => Some(error),
             Self::FiberTopology(error) => Some(error),
             Self::Propagation(error) => Some(error),
-            Self::UnchangedProviderValue { .. }
+            Self::EmptyPropagationLanes { .. }
+            | Self::UnchangedProviderValue { .. }
             | Self::ProviderValuePathMismatch { .. }
             | Self::StaleProviderToken { .. }
             | Self::StaleProviderSnapshot { .. }
@@ -932,34 +1024,26 @@ pub(crate) fn record_context_provider_update_two_consumer_lane_gate<H: HostTypes
 ) -> Result<ContextProviderUpdateTwoConsumerLaneRecord, ContextProviderUpdateLaneGateError> {
     validate_provider_update_request(context_store, begin_work, request)?;
 
-    let propagation_request = FunctionComponentContextChangePropagationRequest::new(
-        request.change(),
-        request.propagation_lanes(),
-    );
-    let first_propagation = propagate_context_change_to_function_component_dependencies(
+    let first_consumer = consumer_lane_record_from_provider_decision(
         store,
         context_store,
-        begin_work.first_child_render(),
-        propagation_request,
-    )?;
-    let first_consumer = consumer_lane_record_from_propagation(
-        store,
         ContextProviderUpdateConsumerOrder::First,
-        &first_propagation,
+        begin_work.first_child_render(),
+        request.change(),
+        request.propagation_lanes(),
+        request.root(),
         begin_work.first_child(),
         begin_work.first_child_context_dependency(),
     )?;
 
-    let second_propagation = propagate_context_change_to_function_component_dependencies(
+    let second_consumer = consumer_lane_record_from_provider_decision(
         store,
         context_store,
-        begin_work.second_child_render(),
-        propagation_request,
-    )?;
-    let second_consumer = consumer_lane_record_from_propagation(
-        store,
         ContextProviderUpdateConsumerOrder::Second,
-        &second_propagation,
+        begin_work.second_child_render(),
+        request.change(),
+        request.propagation_lanes(),
+        request.root(),
         begin_work.second_child(),
         begin_work.second_child_context_dependency(),
     )?;
@@ -1147,37 +1231,27 @@ fn record_context_provider_update_multi_provider_lane_gate<H: HostTypes>(
     validate_multi_provider_update_request(context_store, begin_work, request)?;
 
     let first_request = request.provider_for_order(ContextProviderUpdateConsumerOrder::First);
-    let first_propagation = propagate_context_change_to_function_component_dependencies(
+    let first_consumer = consumer_lane_record_from_provider_decision(
         store,
         context_store,
-        begin_work.renders[0],
-        FunctionComponentContextChangePropagationRequest::new(
-            first_request.change(),
-            first_request.propagation_lanes(),
-        ),
-    )?;
-    let first_consumer = consumer_lane_record_from_propagation(
-        store,
         ContextProviderUpdateConsumerOrder::First,
-        &first_propagation,
+        begin_work.renders[0],
+        first_request.change(),
+        first_request.propagation_lanes(),
+        request.root(),
         begin_work.consumers[0],
         begin_work.dependencies[0],
     )?;
 
     let second_request = request.provider_for_order(ContextProviderUpdateConsumerOrder::Second);
-    let second_propagation = propagate_context_change_to_function_component_dependencies(
+    let second_consumer = consumer_lane_record_from_provider_decision(
         store,
         context_store,
-        begin_work.renders[1],
-        FunctionComponentContextChangePropagationRequest::new(
-            second_request.change(),
-            second_request.propagation_lanes(),
-        ),
-    )?;
-    let second_consumer = consumer_lane_record_from_propagation(
-        store,
         ContextProviderUpdateConsumerOrder::Second,
-        &second_propagation,
+        begin_work.renders[1],
+        second_request.change(),
+        second_request.propagation_lanes(),
+        request.root(),
         begin_work.consumers[1],
         begin_work.dependencies[1],
     )?;
@@ -1208,6 +1282,7 @@ fn record_context_provider_update_multi_provider_lane_gate<H: HostTypes>(
                 previous_value: first_request.previous_value(),
                 next_value: first_request.next_value(),
                 propagation_lanes: first_request.propagation_lanes(),
+                provider_changed: first_request.change().is_changed(),
             },
             ContextProviderUpdateProviderChangeRecord {
                 provider: begin_work.providers[1],
@@ -1215,6 +1290,7 @@ fn record_context_provider_update_multi_provider_lane_gate<H: HostTypes>(
                 previous_value: second_request.previous_value(),
                 next_value: second_request.next_value(),
                 propagation_lanes: second_request.propagation_lanes(),
+                provider_changed: second_request.change().is_changed(),
             },
         ],
         provider_stack_pushes: [
@@ -1256,11 +1332,9 @@ fn validate_multi_provider_update_request(
     ] {
         let index = order.index();
         let provider_request = request.provider_for_order(order);
-        if !provider_request.change().is_changed() {
-            return Err(ContextProviderUpdateLaneGateError::UnchangedProviderValue {
+        if provider_request.propagation_lanes().is_empty() {
+            return Err(ContextProviderUpdateLaneGateError::EmptyPropagationLanes {
                 context: provider_request.context(),
-                previous_value: provider_request.previous_value(),
-                next_value: provider_request.next_value(),
             });
         }
 
@@ -1323,11 +1397,9 @@ fn validate_provider_update_request(
     begin_work: NestedContextProviderTwoConsumerUseContextBeginWorkRecord,
     request: ContextProviderUpdateTwoConsumerLaneRequest,
 ) -> Result<(), ContextProviderUpdateLaneGateError> {
-    if !request.change().is_changed() {
-        return Err(ContextProviderUpdateLaneGateError::UnchangedProviderValue {
+    if request.propagation_lanes().is_empty() {
+        return Err(ContextProviderUpdateLaneGateError::EmptyPropagationLanes {
             context: request.context(),
-            previous_value: request.previous_value(),
-            next_value: request.next_value(),
         });
     }
 
@@ -1431,6 +1503,102 @@ fn validate_dependency_path(
     Ok(())
 }
 
+fn consumer_lane_record_from_provider_decision<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    context_store: &mut FunctionComponentContextRenderStore,
+    order: ContextProviderUpdateConsumerOrder,
+    render: FunctionComponentRenderRecord,
+    change: ContextValueChange,
+    propagation_lanes: Lanes,
+    root: FiberRootId,
+    expected_fiber: FiberId,
+    expected_dependency: FunctionComponentContextDependencyHandle,
+) -> Result<ContextProviderUpdateConsumerLaneRecord, ContextProviderUpdateLaneGateError> {
+    if !change.is_changed() {
+        return consumer_lane_record_from_unchanged_provider_bailout(
+            store,
+            context_store,
+            order,
+            render,
+            change,
+            propagation_lanes,
+            root,
+            expected_fiber,
+            expected_dependency,
+        );
+    }
+
+    let propagation = propagate_context_change_to_function_component_dependencies(
+        store,
+        context_store,
+        render,
+        FunctionComponentContextChangePropagationRequest::new(change, propagation_lanes),
+    )?;
+    consumer_lane_record_from_propagation(
+        store,
+        order,
+        &propagation,
+        expected_fiber,
+        expected_dependency,
+    )
+}
+
+fn consumer_lane_record_from_unchanged_provider_bailout<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    context_store: &FunctionComponentContextRenderStore,
+    order: ContextProviderUpdateConsumerOrder,
+    render: FunctionComponentRenderRecord,
+    change: ContextValueChange,
+    propagation_lanes: Lanes,
+    root: FiberRootId,
+    expected_fiber: FiberId,
+    expected_dependency: FunctionComponentContextDependencyHandle,
+) -> Result<ContextProviderUpdateConsumerLaneRecord, ContextProviderUpdateLaneGateError> {
+    let dependency = context_store
+        .context_dependency(expected_dependency)
+        .ok_or(ContextProviderUpdateLaneGateError::MissingDependency {
+            order,
+            dependency: expected_dependency,
+        })?;
+    if dependency.fiber() != expected_fiber
+        || dependency.context() != change.context()
+        || dependency.memoized_value() != change.previous_value()
+    {
+        return Err(
+            ContextProviderUpdateLaneGateError::DependencyRecordMismatch {
+                order,
+                dependency: expected_dependency,
+                expected_fiber,
+                actual_fiber: dependency.fiber(),
+                expected_context: change.context(),
+                actual_context: dependency.context(),
+                expected_memoized_value: change.previous_value(),
+                actual_memoized_value: dependency.memoized_value(),
+            },
+        );
+    }
+
+    let fiber_lanes_after = store.fiber_arena().get(expected_fiber)?.lanes();
+    Ok(ContextProviderUpdateConsumerLaneRecord {
+        order,
+        consumer: dependency.fiber(),
+        dependency: dependency.handle(),
+        context: dependency.context(),
+        memoized_value: dependency.memoized_value(),
+        previous_value: change.previous_value(),
+        next_value: change.next_value(),
+        render_lanes: render.render_lanes(),
+        propagation_lanes,
+        previous_dependency_lanes: dependency.dependency_lanes(),
+        dependency_lanes: dependency.dependency_lanes(),
+        fiber_lanes_after,
+        scanned_dependency_count: render.context_read_count(),
+        marked_dependency_count: 0,
+        provider_changed: false,
+        root,
+    })
+}
+
 fn consumer_lane_record_from_propagation<H: HostTypes>(
     store: &FiberRootStore<H>,
     order: ContextProviderUpdateConsumerOrder,
@@ -1487,6 +1655,8 @@ fn consumer_lane_record_from_propagation<H: HostTypes>(
         dependency_lanes: marked.dependency_lanes(),
         fiber_lanes_after,
         scanned_dependency_count: propagation.scanned_dependency_count(),
+        marked_dependency_count: propagation.marked_dependency_count(),
+        provider_changed: true,
         root: marked.root(),
     })
 }
@@ -2274,6 +2444,10 @@ mod tests {
         assert_eq!(record.shape(), ContextProviderUpdateShape::Sibling);
         assert_eq!(record.render_lanes(), Lanes::DEFAULT);
         assert_eq!(record.changed_contexts(), [first_context, second_context]);
+        assert_eq!(record.changed_provider_count(), 2);
+        assert_eq!(record.unchanged_provider_bailout_count(), 0);
+        assert_eq!(record.marked_dependency_count(), 2);
+        assert!(record.public_context_compatibility_blocked());
         let pushes = record.provider_stack_pushes();
         assert_eq!(pushes[0].provider(), first_provider);
         assert_eq!(
@@ -2298,12 +2472,16 @@ mod tests {
         assert_eq!(consumers[0].propagation_lanes(), first_lanes);
         assert_eq!(consumers[0].dependency_lanes(), first_lanes);
         assert_eq!(consumers[0].render_lanes(), Lanes::DEFAULT);
+        assert_eq!(consumers[0].marked_dependency_count(), 1);
+        assert!(consumers[0].marked_changed_provider_lanes());
         assert_eq!(consumers[1].consumer(), second_function_component);
         assert_eq!(consumers[1].context(), second_context);
         assert_eq!(consumers[1].memoized_value(), previous_second_value);
         assert_eq!(consumers[1].propagation_lanes(), second_lanes);
         assert_eq!(consumers[1].dependency_lanes(), second_lanes);
         assert_eq!(consumers[1].render_lanes(), Lanes::DEFAULT);
+        assert_eq!(consumers[1].marked_dependency_count(), 1);
+        assert!(consumers[1].marked_changed_provider_lanes());
 
         assert!(
             record
@@ -2353,6 +2531,342 @@ mod tests {
         assert_eq!(store.root(root_id).unwrap().current(), current);
         assert_eq!(store.root(root_id).unwrap().finished_work(), None);
         assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+    }
+
+    #[test]
+    fn context_provider_update_lane_gate_records_unchanged_provider_bailout_and_changed_mark() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(1_416),
+            None,
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let host_root_work_in_progress = render.work_in_progress();
+        let (
+            first_provider,
+            second_provider,
+            first_function_component,
+            first_component,
+            second_function_component,
+            second_component,
+        ) = attach_sibling_context_provider_wip_children(&mut store, host_root_work_in_progress);
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let first_default_value = context_value(1_417);
+        let second_default_value = context_value(1_418);
+        let previous_first_value = context_value(1_419);
+        let previous_second_value = context_value(1_420);
+        let next_second_value = context_value(1_421);
+        let first_context = context_store.create_context(first_default_value);
+        let second_context = context_store.create_context(second_default_value);
+        let mut registry = TestUseContextComponentRegistry::new(
+            first_component,
+            UseContextBehavior::ReadOnce {
+                context: first_context,
+            },
+        );
+        registry.register(
+            second_component,
+            UseContextBehavior::ReadOnce {
+                context: second_context,
+            },
+        );
+        let begin_work = begin_work_sibling_context_provider_two_consumer_use_context_children(
+            store.fiber_arena_mut(),
+            SiblingContextProviderBeginWorkRequest::new(
+                first_provider,
+                Lanes::DEFAULT,
+                first_context,
+                previous_first_value,
+                second_context,
+                previous_second_value,
+            ),
+            &mut context_store,
+            &mut registry,
+        )
+        .unwrap();
+        let unchanged_lanes = Lanes::SYNC.merge_lane(Lane::RETRY_1);
+        let changed_lanes = Lanes::DEFAULT.merge_lane(Lane::TRANSITION_2);
+
+        let record = record_context_provider_update_sibling_two_provider_lane_gate(
+            &mut store,
+            &mut context_store,
+            begin_work,
+            ContextProviderUpdateMultiProviderLaneRequest::new(
+                root_id,
+                host_root_work_in_progress,
+                ContextProviderUpdateProviderChangeRequest::new(
+                    begin_work.first_provider_snapshot(),
+                    begin_work.first_provider_token(),
+                    first_context,
+                    previous_first_value,
+                    previous_first_value,
+                    unchanged_lanes,
+                ),
+                ContextProviderUpdateProviderChangeRequest::new(
+                    begin_work.second_provider_snapshot(),
+                    begin_work.second_provider_token(),
+                    second_context,
+                    previous_second_value,
+                    next_second_value,
+                    changed_lanes,
+                ),
+                ContextProviderUpdateDependencyPath::from_sibling_begin_work(begin_work),
+            ),
+        )
+        .unwrap();
+
+        assert_eq!(record.changed_provider_count(), 1);
+        assert_eq!(record.unchanged_provider_bailout_count(), 1);
+        assert_eq!(record.marked_dependency_count(), 1);
+        assert!(record.public_context_compatibility_blocked());
+
+        let changes = record.provider_changes();
+        assert_eq!(changes[0].provider(), first_provider);
+        assert!(!changes[0].provider_changed());
+        assert!(changes[0].unchanged_provider_bailout());
+        assert_eq!(changes[0].propagation_lanes(), unchanged_lanes);
+        assert_eq!(changes[1].provider(), second_provider);
+        assert!(changes[1].provider_changed());
+        assert!(!changes[1].unchanged_provider_bailout());
+        assert_eq!(changes[1].propagation_lanes(), changed_lanes);
+
+        let consumers = record.dependent_consumers();
+        assert_eq!(
+            consumers[0].dependency(),
+            begin_work.first_child_context_dependency()
+        );
+        assert_eq!(consumers[0].consumer(), first_function_component);
+        assert_eq!(consumers[0].context(), first_context);
+        assert_eq!(consumers[0].memoized_value(), previous_first_value);
+        assert_eq!(consumers[0].previous_value(), previous_first_value);
+        assert_eq!(consumers[0].next_value(), previous_first_value);
+        assert_eq!(consumers[0].propagation_lanes(), unchanged_lanes);
+        assert_eq!(consumers[0].previous_dependency_lanes(), Lanes::NO);
+        assert_eq!(consumers[0].dependency_lanes(), Lanes::NO);
+        assert_eq!(consumers[0].marked_dependency_count(), 0);
+        assert!(consumers[0].unchanged_provider_bailout());
+        assert!(!consumers[0].provider_changed());
+        assert_eq!(consumers[0].scanned_dependency_count(), 1);
+        assert_eq!(consumers[0].root(), root_id);
+
+        assert_eq!(
+            consumers[1].dependency(),
+            begin_work.second_child_context_dependency()
+        );
+        assert_eq!(consumers[1].consumer(), second_function_component);
+        assert_eq!(consumers[1].context(), second_context);
+        assert_eq!(consumers[1].memoized_value(), previous_second_value);
+        assert_eq!(consumers[1].previous_value(), previous_second_value);
+        assert_eq!(consumers[1].next_value(), next_second_value);
+        assert_eq!(consumers[1].propagation_lanes(), changed_lanes);
+        assert_eq!(consumers[1].previous_dependency_lanes(), Lanes::NO);
+        assert_eq!(consumers[1].dependency_lanes(), changed_lanes);
+        assert_eq!(consumers[1].marked_dependency_count(), 1);
+        assert!(consumers[1].marked_changed_provider_lanes());
+        assert_eq!(consumers[1].scanned_dependency_count(), 1);
+        assert_eq!(consumers[1].root(), root_id);
+
+        assert_eq!(
+            context_store
+                .context_dependency(begin_work.first_child_context_dependency())
+                .unwrap()
+                .dependency_lanes(),
+            Lanes::NO
+        );
+        assert_eq!(
+            context_store
+                .context_dependency(begin_work.second_child_context_dependency())
+                .unwrap()
+                .dependency_lanes(),
+            changed_lanes
+        );
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(first_function_component)
+                .unwrap()
+                .lanes(),
+            Lanes::NO
+        );
+        assert!(
+            store
+                .fiber_arena()
+                .get(second_function_component)
+                .unwrap()
+                .lanes()
+                .contains_all(changed_lanes)
+        );
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(first_provider)
+                .unwrap()
+                .child_lanes(),
+            Lanes::NO
+        );
+        assert!(
+            store
+                .fiber_arena()
+                .get(second_provider)
+                .unwrap()
+                .child_lanes()
+                .contains_all(changed_lanes)
+        );
+        assert!(
+            store
+                .fiber_arena()
+                .get(host_root_work_in_progress)
+                .unwrap()
+                .child_lanes()
+                .contains_all(changed_lanes)
+        );
+        assert!(
+            !store
+                .fiber_arena()
+                .get(host_root_work_in_progress)
+                .unwrap()
+                .child_lanes()
+                .contains_any(unchanged_lanes)
+        );
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .lanes()
+                .pending_lanes()
+                .contains_all(changed_lanes)
+        );
+        assert!(
+            !store
+                .root(root_id)
+                .unwrap()
+                .lanes()
+                .pending_lanes()
+                .contains_any(unchanged_lanes)
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+    }
+
+    #[test]
+    fn context_provider_update_lane_gate_rejects_empty_lanes_before_marking_dependencies() {
+        let (mut store, root_id, _host) = root_store();
+        update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(1_422),
+            None,
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let host_root_work_in_progress = render.work_in_progress();
+        let (
+            first_provider,
+            _second_provider,
+            first_function_component,
+            first_component,
+            second_function_component,
+            second_component,
+        ) = attach_sibling_context_provider_wip_children(&mut store, host_root_work_in_progress);
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let first_context = context_store.create_context(context_value(1_423));
+        let second_context = context_store.create_context(context_value(1_424));
+        let previous_first_value = context_value(1_425);
+        let previous_second_value = context_value(1_426);
+        let mut registry = TestUseContextComponentRegistry::new(
+            first_component,
+            UseContextBehavior::ReadOnce {
+                context: first_context,
+            },
+        );
+        registry.register(
+            second_component,
+            UseContextBehavior::ReadOnce {
+                context: second_context,
+            },
+        );
+        let begin_work = begin_work_sibling_context_provider_two_consumer_use_context_children(
+            store.fiber_arena_mut(),
+            SiblingContextProviderBeginWorkRequest::new(
+                first_provider,
+                Lanes::DEFAULT,
+                first_context,
+                previous_first_value,
+                second_context,
+                previous_second_value,
+            ),
+            &mut context_store,
+            &mut registry,
+        )
+        .unwrap();
+        let first_lanes = Lanes::SYNC.merge_lane(Lane::TRANSITION_1);
+
+        let error = record_context_provider_update_sibling_two_provider_lane_gate(
+            &mut store,
+            &mut context_store,
+            begin_work,
+            ContextProviderUpdateMultiProviderLaneRequest::new(
+                root_id,
+                host_root_work_in_progress,
+                ContextProviderUpdateProviderChangeRequest::new(
+                    begin_work.first_provider_snapshot(),
+                    begin_work.first_provider_token(),
+                    first_context,
+                    previous_first_value,
+                    context_value(1_427),
+                    first_lanes,
+                ),
+                ContextProviderUpdateProviderChangeRequest::new(
+                    begin_work.second_provider_snapshot(),
+                    begin_work.second_provider_token(),
+                    second_context,
+                    previous_second_value,
+                    context_value(1_428),
+                    Lanes::NO,
+                ),
+                ContextProviderUpdateDependencyPath::from_sibling_begin_work(begin_work),
+            ),
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            ContextProviderUpdateLaneGateError::EmptyPropagationLanes {
+                context: second_context,
+            }
+        );
+        for dependency in [
+            begin_work.first_child_context_dependency(),
+            begin_work.second_child_context_dependency(),
+        ] {
+            assert_eq!(
+                context_store
+                    .context_dependency(dependency)
+                    .unwrap()
+                    .dependency_lanes(),
+                Lanes::NO
+            );
+        }
+        for consumer in [first_function_component, second_function_component] {
+            assert_eq!(
+                store.fiber_arena().get(consumer).unwrap().lanes(),
+                Lanes::NO
+            );
+        }
+        assert!(
+            !store
+                .root(root_id)
+                .unwrap()
+                .lanes()
+                .pending_lanes()
+                .contains_any(first_lanes)
+        );
     }
 
     #[test]
