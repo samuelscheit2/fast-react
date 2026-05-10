@@ -1320,6 +1320,174 @@ test('private root commit HostComponent update consumes reconciler metadata for 
   bridge.revertCreateRootSideEffects(sideEffects);
 });
 
+test('private root commit HostComponent update applies property and text before latest props', () => {
+  const document = createHostOutputDocument(
+    'private-root-commit-host-component-property-text-update'
+  );
+  const container = document.createElement('div');
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    hostOutputUpdateIdPrefix: 'root-commit-text-host-output',
+    rootCommitHostComponentUpdateIdPrefix: 'root-commit-property-text',
+    sideEffectIdPrefix: 'root-commit-text-side-effect'
+  });
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const initialProps = createHostOutputProps('initial');
+  const nextProps = createHostOutputProps('updated');
+  const initialRender = bridge.renderContainer(create.handle, {
+    props: initialProps,
+    type: 'div'
+  });
+  bridge.admitCreateRenderPath(create, sideEffects, initialRender);
+  const mounted = mountPrivateHostOutput(container, create.owner, initialProps);
+  const update = bridge.renderContainer(create.handle, {
+    props: nextProps,
+    type: 'div'
+  });
+  const rootCommitMetadata = {
+    mutationApplyRecords: [
+      createRootCommitHostComponentUpdateRecord({
+        recordIndex: 0,
+        stateNodeRaw: 901
+      }),
+      createRootCommitHostTextUpdateRecord({
+        recordIndex: 1,
+        stateNodeRaw: 902
+      })
+    ]
+  };
+
+  mounted.host.attributeLog = [];
+  mounted.text.writeLog = [];
+
+  const handoff = bridge.applyRootCommitHostComponentUpdate(
+    update,
+    rootCommitMetadata,
+    {
+      hostInstanceToken: mounted.token,
+      nextProps,
+      tag: 'div',
+      textUpdate: {
+        newText: 'goodbye',
+        oldText: 'hello',
+        textInstance: mounted.text
+      }
+    }
+  );
+  const hiddenHandoff =
+    rootBridge.getPrivateRootCommitHostComponentUpdateHandoffPayload(
+      handoff
+    );
+
+  assert.equal(handoff.handoffId, 'root-commit-property-text:1');
+  assert.equal(
+    handoff.updateStatus,
+    rootBridge.ROOT_BRIDGE_ROOT_COMMIT_HOST_COMPONENT_UPDATE_APPLIED
+  );
+  assert.equal(handoff.rootCommitMetadataRecordCount, 2);
+  assert.equal(handoff.rootCommitHostComponentUpdateRecordCount, 1);
+  assert.equal(handoff.rootCommitHostTextUpdateRecordCount, 1);
+  assert.equal(
+    handoff.rootCommitHostTextUpdate.recordKind,
+    'CommitHostTextUpdate'
+  );
+  assert.equal(
+    handoff.rootCommitHostTextUpdate.applyKind,
+    'commit-host-text-update'
+  );
+  assert.equal(handoff.rootCommitHostTextUpdate.tag, 'HostText');
+  assert.equal(handoff.rootCommitHostTextUpdate.parentTag, 'HostComponent');
+  assert.equal(handoff.rootCommitHostTextUpdate.stateNodeRaw, 902);
+  assert.equal(
+    handoff.hostOutputUpdateHandoffId,
+    'root-commit-text-host-output:1'
+  );
+  assert.deepEqual(handoff.textMutation, {
+    newTextLength: 7,
+    oldTextLength: 5,
+    status: 'mutated'
+  });
+  assert.equal(handoff.propertyMutation.mutationRecordCount, 4);
+  assert.equal(
+    handoff.propertyMutation.propertyPayloadEvidence.attributeRowCount,
+    3
+  );
+  assert.equal(
+    handoff.propertyMutation.propertyPayloadEvidence.propertyRowCount,
+    0
+  );
+  assert.equal(handoff.latestPropsPublished, true);
+  assert.equal(
+    handoff.latestPropsPublishOrder,
+    'after-property-and-text-mutation'
+  );
+  assert.equal(handoff.fakeDomMutation, true);
+  assert.equal(handoff.domMutation, true);
+  assert.equal(handoff.browserDomMutation, false);
+  assert.equal(handoff.nativeExecution, false);
+  assert.equal(handoff.reconcilerExecution, false);
+  assert.equal(handoff.compatibilityClaimed, false);
+  assert.deepEqual(
+    handoff.acceptedCapabilities.map((capability) => capability.id),
+    [
+      'root-commit-host-component-update-metadata',
+      'root-commit-host-text-update-metadata',
+      'fake-dom-property-update',
+      'property-payload-evidence',
+      'fake-dom-text-update',
+      'latest-props-after-mutation',
+      'attribute-payload-rows'
+    ]
+  );
+  assert.deepEqual(
+    handoff.blockedCapabilities.map((capability) => capability.id),
+    [
+      'native-execution',
+      'reconciler-execution',
+      'browser-dom-compatibility',
+      'hydration',
+      'events',
+      'refs',
+      'compatibility-claims'
+    ]
+  );
+  assert.equal(
+    hiddenHandoff.selectedRootCommitRecord,
+    rootCommitMetadata.mutationApplyRecords[0]
+  );
+  assert.equal(
+    hiddenHandoff.selectedRootCommitTextRecord,
+    rootCommitMetadata.mutationApplyRecords[1]
+  );
+  assert.equal(hiddenHandoff.textUpdate.oldText, 'hello');
+  assert.equal(hiddenHandoff.textUpdate.newText, 'goodbye');
+
+  assert.deepEqual(activeHostOutputAttributes(mounted.host), [
+    ['class', 'root-card updated'],
+    ['data-phase', 'updated'],
+    ['id', 'message'],
+    ['title', 'updated title']
+  ]);
+  assert.deepEqual(mounted.host.attributeLog, [
+    ['setAttribute', 'class', 'root-card updated'],
+    ['setAttribute', 'title', 'updated title'],
+    ['setAttribute', 'data-phase', 'updated']
+  ]);
+  assert.deepEqual(mounted.text.writeLog, [['nodeValue', 'goodbye']]);
+  assert.equal(container.textContent, 'goodbye');
+  assert.equal(componentTree.getLatestPropsFromNode(mounted.host), nextProps);
+
+  const serialized = JSON.stringify(handoff);
+  assert.equal(serialized.includes('goodbye'), false);
+  assert.equal(serialized.includes('updated title'), false);
+
+  assert.equal(
+    componentTree.detachHostInstanceToken(mounted.token),
+    mounted.token
+  );
+  bridge.revertCreateRootSideEffects(sideEffects);
+});
+
 test('private root commit HostComponent update validates reconciler metadata fail-closed', () => {
   const document = createHostOutputDocument(
     'private-root-commit-host-component-update-validation'
@@ -1475,6 +1643,239 @@ test('private root commit HostComponent update validates reconciler metadata fai
     mounted.token
   );
   bridge.revertCreateRootSideEffects(sideEffects);
+});
+
+test('private root commit HostComponent update rejects stale, text failure, and unsupported rows with rollback evidence', () => {
+  const staleFixture = createRootCommitPropertyTextFixture(
+    'private-root-commit-property-text-stale'
+  );
+  const staleLatestProps = {
+    ...staleFixture.initialProps,
+    title: 'stale latest props'
+  };
+  staleFixture.mounted.host.attributeLog = [];
+  staleFixture.mounted.text.writeLog = [];
+  Object.defineProperty(staleFixture.mounted.text, 'nodeValue', {
+    configurable: true,
+    get() {
+      return this.data;
+    },
+    set(value) {
+      const text = String(value);
+      if (text === 'goodbye') {
+        this.writeLog.push(['nodeValue', text, 'stale-latest-props']);
+        this._data = text;
+        componentTree.attachHostInstanceNode(
+          staleFixture.mounted.host,
+          staleFixture.mounted.token,
+          staleLatestProps
+        );
+        return;
+      }
+      this.writeLog.push(['nodeValue', text]);
+      this._data = text;
+    }
+  });
+
+  let staleError = null;
+  assert.throws(
+    () =>
+      staleFixture.bridge.applyRootCommitHostComponentUpdate(
+        staleFixture.update,
+        staleFixture.metadata,
+        {
+          hostInstanceToken: staleFixture.mounted.token,
+          nextProps: staleFixture.nextProps,
+          tag: 'div',
+          textUpdate: {
+            newText: 'goodbye',
+            oldText: 'hello',
+            textInstance: staleFixture.mounted.text
+          }
+        }
+      ),
+    (error) => {
+      staleError = error;
+      return error.code === 'FAST_REACT_DOM_INVALID_HOST_OUTPUT_UPDATE_HANDOFF';
+    }
+  );
+  assert.deepEqual(staleError.privateRootUpdateRollbackEvidence, {
+    kind: 'FastReactDomPrivateRootUpdateRollbackEvidence',
+    latestPropsPublished: false,
+    latestPropsHandoffStale: true,
+    latestPropsRestoredToPrevious: false,
+    propertyMutationAttempted: true,
+    propertyRollbackAttempted: true,
+    propertyRollbackApplied: true,
+    propertyRollbackRecordCount: 3,
+    textMutationRequested: true,
+    textMutationApplied: true,
+    textRollbackAttempted: true,
+    textRollbackApplied: true,
+    unsupportedPropertyPayloadRejected: false,
+    propertyRollbackError: null,
+    textRollbackError: null
+  });
+  assert.deepEqual(activeHostOutputAttributes(staleFixture.mounted.host), [
+    ['class', 'root-card'],
+    ['data-phase', 'initial'],
+    ['id', 'message'],
+    ['title', 'initial title']
+  ]);
+  assert.deepEqual(staleFixture.mounted.text.writeLog, [
+    ['nodeValue', 'goodbye', 'stale-latest-props'],
+    ['nodeValue', 'hello']
+  ]);
+  assert.equal(staleFixture.container.textContent, 'hello');
+  assert.equal(
+    componentTree.getLatestPropsFromNode(staleFixture.mounted.host),
+    staleLatestProps
+  );
+  cleanupRootCommitPropertyTextFixture(staleFixture);
+
+  const textFailureFixture = createRootCommitPropertyTextFixture(
+    'private-root-commit-property-text-failure'
+  );
+  const thrownError = new Error('fake root commit HostText update failed');
+  textFailureFixture.mounted.host.attributeLog = [];
+  textFailureFixture.mounted.text.writeLog = [];
+  Object.defineProperty(textFailureFixture.mounted.text, 'nodeValue', {
+    configurable: true,
+    get() {
+      return this.data;
+    },
+    set(value) {
+      this.writeLog.push(['nodeValue', String(value), 'throw']);
+      throw thrownError;
+    }
+  });
+
+  let textFailureError = null;
+  assert.throws(
+    () =>
+      textFailureFixture.bridge.applyRootCommitHostComponentUpdate(
+        textFailureFixture.update,
+        textFailureFixture.metadata,
+        {
+          hostInstanceToken: textFailureFixture.mounted.token,
+          nextProps: textFailureFixture.nextProps,
+          tag: 'div',
+          textUpdate: {
+            newText: 'goodbye',
+            oldText: 'hello',
+            textInstance: textFailureFixture.mounted.text
+          }
+        }
+      ),
+    (error) => {
+      textFailureError = error;
+      return error === thrownError;
+    }
+  );
+  assert.deepEqual(textFailureError.privateRootUpdateRollbackEvidence, {
+    kind: 'FastReactDomPrivateRootUpdateRollbackEvidence',
+    latestPropsPublished: false,
+    latestPropsHandoffStale: false,
+    latestPropsRestoredToPrevious: true,
+    propertyMutationAttempted: true,
+    propertyRollbackAttempted: true,
+    propertyRollbackApplied: true,
+    propertyRollbackRecordCount: 3,
+    textMutationRequested: true,
+    textMutationApplied: false,
+    textRollbackAttempted: false,
+    textRollbackApplied: false,
+    unsupportedPropertyPayloadRejected: false,
+    propertyRollbackError: null,
+    textRollbackError: null
+  });
+  assert.deepEqual(
+    activeHostOutputAttributes(textFailureFixture.mounted.host),
+    [
+      ['class', 'root-card'],
+      ['data-phase', 'initial'],
+      ['id', 'message'],
+      ['title', 'initial title']
+    ]
+  );
+  assert.deepEqual(textFailureFixture.mounted.text.writeLog, [
+    ['nodeValue', 'goodbye', 'throw']
+  ]);
+  assert.equal(textFailureFixture.container.textContent, 'hello');
+  assert.equal(
+    componentTree.getLatestPropsFromNode(textFailureFixture.mounted.host),
+    textFailureFixture.initialProps
+  );
+  cleanupRootCommitPropertyTextFixture(textFailureFixture);
+
+  const unsupportedProps = {
+    ...createHostOutputProps('updated'),
+    innerHTML: '<p>blocked</p>'
+  };
+  const unsupportedFixture = createRootCommitPropertyTextFixture(
+    'private-root-commit-property-text-unsupported',
+    unsupportedProps
+  );
+  unsupportedFixture.mounted.host.attributeLog = [];
+  unsupportedFixture.mounted.text.writeLog = [];
+
+  let unsupportedError = null;
+  assert.throws(
+    () =>
+      unsupportedFixture.bridge.applyRootCommitHostComponentUpdate(
+        unsupportedFixture.update,
+        unsupportedFixture.metadata,
+        {
+          hostInstanceToken: unsupportedFixture.mounted.token,
+          nextProps: unsupportedFixture.nextProps,
+          tag: 'div',
+          textUpdate: {
+            newText: 'goodbye',
+            oldText: 'hello',
+            textInstance: unsupportedFixture.mounted.text
+          }
+        }
+      ),
+    (error) => {
+      unsupportedError = error;
+      return error.code === 'FAST_REACT_DOM_BLOCKED_PROPERTY_PAYLOAD_ENTRY';
+    }
+  );
+  assert.equal(
+    unsupportedError.domPropertyRollbackEvidence
+      .unsupportedPropertyPayloadRejected,
+    true
+  );
+  assert.deepEqual(unsupportedError.privateRootUpdateRollbackEvidence, {
+    kind: 'FastReactDomPrivateRootUpdateRollbackEvidence',
+    latestPropsPublished: false,
+    latestPropsHandoffStale: false,
+    latestPropsRestoredToPrevious: true,
+    propertyMutationAttempted: false,
+    propertyRollbackAttempted: false,
+    propertyRollbackApplied: false,
+    propertyRollbackRecordCount: 0,
+    textMutationRequested: true,
+    textMutationApplied: false,
+    textRollbackAttempted: false,
+    textRollbackApplied: false,
+    unsupportedPropertyPayloadRejected: true,
+    propertyRollbackError: null,
+    textRollbackError: null
+  });
+  assert.deepEqual(unsupportedFixture.mounted.host.attributeLog, []);
+  assert.deepEqual(unsupportedFixture.mounted.text.writeLog, []);
+  assert.deepEqual(activeHostOutputAttributes(unsupportedFixture.mounted.host), [
+    ['class', 'root-card'],
+    ['data-phase', 'initial'],
+    ['id', 'message'],
+    ['title', 'initial title']
+  ]);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(unsupportedFixture.mounted.host),
+    unsupportedFixture.initialProps
+  );
+  cleanupRootCommitPropertyTextFixture(unsupportedFixture);
 });
 
 test('private root host-output update rolls back props when text mutation fails', () => {
@@ -6663,6 +7064,87 @@ function createRootCommitHostComponentUpdateRecord(options) {
     memoizedPropsRaw: 3003,
     alternateMemoizedPropsRaw: 3001
   };
+}
+
+function createRootCommitHostTextUpdateRecord(options) {
+  return {
+    kind: 'commit-host-text-update',
+    tag: 'HostText',
+    source: {
+      kind: 'Update'
+    },
+    root: {
+      slot: 3
+    },
+    hostRoot: {
+      slot: 4
+    },
+    parent: {
+      slot: 12
+    },
+    parentTag: 'HostComponent',
+    fiber: {
+      slot: 40 + (options.recordIndex || 0)
+    },
+    alternateFiber: {
+      slot: 36 + (options.recordIndex || 0)
+    },
+    stateNodeRaw: options.stateNodeRaw,
+    pendingPropsRaw: 4003,
+    memoizedPropsRaw: 4003,
+    alternateMemoizedPropsRaw: 4001
+  };
+}
+
+function createRootCommitPropertyTextFixture(label, nextProps) {
+  const document = createHostOutputDocument(label);
+  const container = document.createElement('div');
+  const bridge = rootBridge.createPrivateRootBridgeShell();
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const initialProps = createHostOutputProps('initial');
+  const updateProps = nextProps || createHostOutputProps('updated');
+  const initialRender = bridge.renderContainer(create.handle, {
+    props: initialProps,
+    type: 'div'
+  });
+  bridge.admitCreateRenderPath(create, sideEffects, initialRender);
+  const mounted = mountPrivateHostOutput(container, create.owner, initialProps);
+  const update = bridge.renderContainer(create.handle, {
+    props: updateProps,
+    type: 'div'
+  });
+
+  return {
+    bridge,
+    container,
+    create,
+    initialProps,
+    metadata: {
+      mutationApplyRecords: [
+        createRootCommitHostComponentUpdateRecord({
+          recordIndex: 0,
+          stateNodeRaw: 901
+        }),
+        createRootCommitHostTextUpdateRecord({
+          recordIndex: 1,
+          stateNodeRaw: 902
+        })
+      ]
+    },
+    mounted,
+    nextProps: updateProps,
+    sideEffects,
+    update
+  };
+}
+
+function cleanupRootCommitPropertyTextFixture(fixture) {
+  assert.equal(
+    componentTree.detachHostInstanceToken(fixture.mounted.token),
+    fixture.mounted.token
+  );
+  fixture.bridge.revertCreateRootSideEffects(fixture.sideEffects);
 }
 
 function mountPrivateHostOutput(container, rootOwner, initialProps) {

@@ -4699,6 +4699,8 @@ function applyPrivateRootHostOutputUpdateWithBridge(
   let propertyMutationEvidence = null;
   let styleObjectDiffCommit = null;
   let publishedLatestProps = null;
+  let textMutationApplied = false;
+  let latestPropsHandoffStale = false;
 
   try {
     propertyHandoff = commitDomPropertyUpdateForLatestProps(
@@ -4733,21 +4735,57 @@ function applyPrivateRootHostOutputUpdateWithBridge(
         normalized.textUpdate.oldText,
         normalized.textUpdate.newText
       );
+      textMutationApplied = true;
+    }
+
+    if (
+      getLatestPropsFromHostInstanceToken(normalized.hostInstanceToken) !==
+      previousProps
+    ) {
+      latestPropsHandoffStale = true;
+      throwInvalidHostOutputUpdateHandoff(
+        'Private root host-output updates reject stale latest-props handoffs before publication.'
+      );
     }
 
     publishedLatestProps =
       commitLatestPropsFromMutationHandoff(propertyHandoff);
   } catch (error) {
-    if (propertyHandoff !== null) {
+    let textRollbackApplied = false;
+    let textRollbackError = null;
+    if (textMutationApplied && normalized.textUpdate !== null) {
       try {
-        rollbackDomPropertyUpdateLatestPropsHandoff(propertyHandoff);
+        rollbackHostOutputTextMutation(normalized.textUpdate);
+        textRollbackApplied = true;
       } catch (rollbackError) {
-        error.rollbackError = {
-          code: rollbackError.code || null,
-          message: rollbackError.message
-        };
+        textRollbackError = rollbackError;
       }
     }
+
+    let propertyRollbackApplied = false;
+    let propertyRollbackRecordCount = 0;
+    let propertyRollbackError = null;
+    if (propertyHandoff !== null) {
+      try {
+        propertyRollbackRecordCount =
+          rollbackDomPropertyUpdateLatestPropsHandoff(propertyHandoff);
+        propertyRollbackApplied = true;
+      } catch (rollbackError) {
+        propertyRollbackError = rollbackError;
+      }
+    }
+    attachHostOutputUpdateRollbackEvidence(error, {
+      latestPropsHandoffStale,
+      normalized,
+      previousProps,
+      propertyHandoff,
+      propertyRollbackApplied,
+      propertyRollbackError,
+      propertyRollbackRecordCount,
+      textMutationApplied,
+      textRollbackApplied,
+      textRollbackError
+    });
     throw error;
   }
 
@@ -4887,7 +4925,7 @@ function applyPrivateRootCommitHostComponentUpdateWithBridge(
       hostInstanceToken: normalized.hostInstanceToken,
       nextProps: normalized.nextProps,
       tag: normalized.tag,
-      textUpdate: null
+      textUpdate: normalized.textUpdate
     }
   );
   const hostOutputPayload =
@@ -4900,10 +4938,13 @@ function applyPrivateRootCommitHostComponentUpdateWithBridge(
   if (
     hostOutputPayload.hostInstanceToken !== normalized.hostInstanceToken ||
     hostOutputPayload.nextProps !== normalized.nextProps ||
-    hostOutputPayload.textUpdate !== null
+    !hostOutputTextUpdatesMatch(
+      hostOutputPayload,
+      normalized.textUpdate
+    )
   ) {
     throwInvalidRootCommitHostComponentUpdateHandoff(
-      'Private root commit HostComponent updates require a property-only host-output update for the selected host instance.'
+      'Private root commit HostComponent updates require a matching host-output update for the selected host instance.'
     );
   }
 
@@ -4914,10 +4955,13 @@ function applyPrivateRootCommitHostComponentUpdateWithBridge(
     `${rootBridgeState.rootCommitHostComponentUpdateIdPrefix}:${sequence}`;
   const acceptedCapabilities =
     createRootCommitHostComponentUpdateAcceptedCapabilities(
-      hostOutputHandoff
+      hostOutputHandoff,
+      metadata
     );
   const latestPropsPublished =
     hostOutputHandoff.latestPropsPublished === true;
+  const textMutationApplied =
+    hostOutputHandoff.textMutation.status === 'mutated';
   const handoff = freezeRecord({
     $$typeof: privateRootCommitHostComponentUpdateHandoffRecordType,
     kind: 'FastReactDomPrivateRootCommitHostComponentUpdateHandoffRecord',
@@ -4941,6 +4985,12 @@ function applyPrivateRootCommitHostComponentUpdateWithBridge(
       metadata.hostComponentUpdateRecordCount,
     rootCommitHostComponentUpdate:
       metadata.selected.publicRecord,
+    rootCommitHostTextUpdateRecordCount:
+      metadata.hostTextUpdateRecordCount,
+    rootCommitHostTextUpdate:
+      metadata.selectedHostTextUpdate === null
+        ? null
+        : metadata.selectedHostTextUpdate.publicRecord,
     hostOutputUpdateHandoffId: hostOutputHandoff.handoffId,
     hostOutputUpdateStatus: hostOutputHandoff.updateStatus,
     propertyMutation: hostOutputHandoff.propertyMutation,
@@ -4949,7 +4999,9 @@ function applyPrivateRootCommitHostComponentUpdateWithBridge(
     latestPropsPublishOrder: hostOutputHandoff.latestPropsPublishOrder,
     acceptedCapabilities,
     blockedCapabilities:
-      ROOT_BRIDGE_ROOT_COMMIT_HOST_COMPONENT_UPDATE_BLOCKED_CAPABILITIES,
+      createRootCommitHostComponentUpdateBlockedCapabilities(
+        textMutationApplied
+      ),
     publicRootCreated: false,
     publicRootObjectExposed: false,
     nativeExecution: false,
@@ -4981,9 +5033,16 @@ function applyPrivateRootCommitHostComponentUpdateWithBridge(
     propertyMutationEvidence: hostOutputPayload.propertyMutationEvidence,
     rootCommitMetadata: rootCommitHostComponentUpdateMetadata,
     rootCommitMetadataSelection: metadata.selected,
+    rootCommitTextMetadataSelection: metadata.selectedHostTextUpdate,
     rootHandle: hostOutputPayload.rootHandle,
     selectedRootCommitRecord: metadata.selected.record,
-    sourceRecord: record
+    selectedRootCommitTextRecord:
+      metadata.selectedHostTextUpdate === null
+        ? null
+        : metadata.selectedHostTextUpdate.record,
+    sourceRecord: record,
+    textInstance: hostOutputPayload.textInstance,
+    textUpdate: hostOutputPayload.textUpdate
   });
 
   return handoff;
@@ -9066,18 +9125,37 @@ function normalizeRootCommitHostComponentUpdateOptions(options) {
     );
   }
 
-  if (options.textUpdate != null) {
-    throwInvalidRootCommitHostComponentUpdateHandoff(
-      'Private root commit HostComponent updates do not accept HostText update metadata.'
-    );
-  }
-
   return {
     hostInstanceToken,
     nextProps,
     recordIndex: normalizeRootCommitRecordIndexOption(options),
     stateNodeRaw: normalizeRootCommitStateNodeSelectorOption(options),
-    tag
+    tag,
+    textUpdate: normalizeRootCommitHostComponentTextUpdate(options.textUpdate)
+  };
+}
+
+function normalizeRootCommitHostComponentTextUpdate(textUpdate) {
+  if (textUpdate == null) {
+    return null;
+  }
+  if (typeof textUpdate !== 'object') {
+    throwInvalidRootCommitHostComponentUpdateHandoff(
+      'Private root commit HostComponent update text metadata must be an object when provided.'
+    );
+  }
+
+  const textInstance = textUpdate.textInstance;
+  if (!isObjectOrFunction(textInstance)) {
+    throwInvalidRootCommitHostComponentUpdateHandoff(
+      'Private root commit HostComponent updates require a text instance when text metadata is provided.'
+    );
+  }
+
+  return {
+    newText: textUpdate.newText,
+    oldText: textUpdate.oldText,
+    textInstance
   };
 }
 
@@ -9095,6 +9173,7 @@ function normalizeRootCommitHostComponentUpdateMetadata(
   }
 
   const hostComponentUpdateRecords = [];
+  const hostTextUpdateRecords = selector.textUpdate === null ? null : [];
   for (const entry of recordEntries.records) {
     const snapshot = createRootCommitHostComponentUpdateSnapshot(
       entry.record,
@@ -9103,6 +9182,16 @@ function normalizeRootCommitHostComponentUpdateMetadata(
     );
     if (snapshot !== null) {
       hostComponentUpdateRecords.push(snapshot);
+    }
+    if (hostTextUpdateRecords !== null) {
+      const textSnapshot = createRootCommitHostTextUpdateSnapshot(
+        entry.record,
+        entry.index,
+        recordEntries.source
+      );
+      if (textSnapshot !== null) {
+        hostTextUpdateRecords.push(textSnapshot);
+      }
     }
   }
 
@@ -9135,10 +9224,28 @@ function normalizeRootCommitHostComponentUpdateMetadata(
     );
   }
 
+  let selectedHostTextUpdate = null;
+  if (hostTextUpdateRecords !== null) {
+    if (hostTextUpdateRecords.length === 0) {
+      throwInvalidRootCommitHostComponentUpdateHandoff(
+        'Private root commit HostComponent text mutation requires accepted HostText update metadata.'
+      );
+    }
+    if (hostTextUpdateRecords.length > 1) {
+      throwInvalidRootCommitHostComponentUpdateHandoff(
+        'Private root commit HostComponent text mutation requires exactly one HostText update record.'
+      );
+    }
+    selectedHostTextUpdate = hostTextUpdateRecords[0];
+  }
+
   return {
     hostComponentUpdateRecordCount: hostComponentUpdateRecords.length,
+    hostTextUpdateRecordCount:
+      hostTextUpdateRecords === null ? null : hostTextUpdateRecords.length,
     recordCount: recordEntries.records.length,
     selected: selectedRecords[0],
+    selectedHostTextUpdate,
     source: recordEntries.source
   };
 }
@@ -9341,6 +9448,139 @@ function createRootCommitHostComponentUpdateSnapshot(
   };
 }
 
+function createRootCommitHostTextUpdateSnapshot(
+  record,
+  recordIndex,
+  metadataSource
+) {
+  if (!isObjectOrFunction(record)) {
+    return null;
+  }
+
+  const tag = normalizeRootCommitFiberTag(
+    getFirstRootCommitMetadataValue(record, [
+      'tag',
+      'fiberTag',
+      'fiber_tag',
+      'tagName',
+      'tag_name'
+    ])
+  );
+  if (tag !== 'HostText') {
+    return null;
+  }
+
+  const rawKind = getFirstRootCommitMetadataValue(record, [
+    'kind',
+    'recordKind',
+    'record_kind'
+  ]);
+  const rawApplyKind = getFirstRootCommitMetadataValue(record, [
+    'applyKind',
+    'apply_kind',
+    'mutationApplyKind',
+    'mutation_apply_kind'
+  ]);
+  let applyKind = normalizeRootCommitHostTextApplyKind(rawApplyKind);
+  if (applyKind === null) {
+    applyKind = normalizeRootCommitHostTextApplyKind(rawKind);
+  }
+  const phaseKind = normalizeRootCommitMutationPhaseKind(rawKind);
+  if (applyKind === null && phaseKind !== 'Update') {
+    return null;
+  }
+
+  const stateNodeRaw = getRootCommitRawHandle(record, [
+    ['stateNodeRaw'],
+    ['state_node_raw'],
+    ['stateNode', 'raw'],
+    ['state_node', 'raw'],
+    ['stateNode'],
+    ['state_node']
+  ]);
+  const pendingPropsRaw = getRootCommitRawHandle(record, [
+    ['pendingPropsRaw'],
+    ['pending_props_raw'],
+    ['pendingProps', 'raw'],
+    ['pending_props', 'raw'],
+    ['pendingProps'],
+    ['pending_props']
+  ]);
+  const memoizedPropsRaw = getRootCommitRawHandle(record, [
+    ['memoizedPropsRaw'],
+    ['memoized_props_raw'],
+    ['memoizedProps', 'raw'],
+    ['memoized_props_raw'],
+    ['memoizedProps'],
+    ['memoized_props']
+  ]);
+  const alternateMemoizedPropsRaw = getRootCommitRawHandle(record, [
+    ['alternateMemoizedPropsRaw'],
+    ['alternate_memoized_props_raw'],
+    ['alternateMemoizedProps', 'raw'],
+    ['alternate_memoized_props_raw'],
+    ['alternateMemoizedProps'],
+    ['alternate_memoized_props']
+  ]);
+
+  if (
+    stateNodeRaw === null ||
+    pendingPropsRaw === null ||
+    memoizedPropsRaw === null ||
+    alternateMemoizedPropsRaw === null
+  ) {
+    throwInvalidRootCommitHostComponentUpdateHandoff(
+      'Accepted root commit HostText update metadata requires state and props handles.'
+    );
+  }
+
+  const root = getFirstRootCommitMetadataValue(record, ['root']);
+  const hostRoot = getFirstRootCommitMetadataValue(record, [
+    'hostRoot',
+    'host_root'
+  ]);
+  const parent = getFirstRootCommitMetadataValue(record, ['parent']);
+  const parentTag = normalizeRootCommitFiberTag(
+    getFirstRootCommitMetadataValue(record, ['parentTag', 'parent_tag'])
+  );
+  const fiber = getFirstRootCommitMetadataValue(record, ['fiber']);
+  const alternateFiber = getFirstRootCommitMetadataValue(record, [
+    'alternateFiber',
+    'alternate_fiber'
+  ]);
+  const source = getFirstRootCommitMetadataValue(record, ['source']);
+  const recordKind = applyKind === null ? 'Update' : 'CommitHostTextUpdate';
+  const publicRecord = freezeRecord({
+    metadataSource,
+    recordIndex,
+    recordKind,
+    applyKind,
+    phaseKind,
+    tag,
+    parentTag,
+    stateNodeRaw,
+    pendingPropsRaw,
+    memoizedPropsRaw,
+    alternateMemoizedPropsRaw,
+    rootInfo: describeBridgeValue(root),
+    hostRootInfo: describeBridgeValue(hostRoot),
+    parentInfo: describeBridgeValue(parent),
+    fiberInfo: describeBridgeValue(fiber),
+    alternateFiberInfo: describeBridgeValue(alternateFiber),
+    sourceInfo: describeBridgeValue(source)
+  });
+
+  return {
+    applyKind,
+    metadataSource,
+    phaseKind,
+    publicRecord,
+    record,
+    recordIndex,
+    stateNodeRaw
+  };
+}
+
 function looksLikeRootCommitMutationRecord(value) {
   return (
     hasOwnBridgeProperty(value, 'tag') ||
@@ -9482,6 +9722,14 @@ function normalizeRootCommitHostComponentApplyKind(kind) {
   const normalized = normalizeRootCommitName(kind);
   if (normalized === 'commithostcomponentupdate') {
     return 'commit-host-component-update';
+  }
+  return null;
+}
+
+function normalizeRootCommitHostTextApplyKind(kind) {
+  const normalized = normalizeRootCommitName(kind);
+  if (normalized === 'commithosttextupdate') {
+    return 'commit-host-text-update';
   }
   return null;
 }
@@ -9795,6 +10043,76 @@ function createHostOutputTextMutationSummary(textUpdate) {
   });
 }
 
+function rollbackHostOutputTextMutation(textUpdate) {
+  commitTextUpdate(
+    textUpdate.textInstance,
+    textUpdate.newText,
+    textUpdate.oldText
+  );
+}
+
+function hostOutputTextUpdatesMatch(hostOutputPayload, right) {
+  const left = hostOutputPayload.textUpdate;
+  if (left === null || right === null) {
+    return left === right;
+  }
+  return (
+    hostOutputPayload.textInstance === right.textInstance &&
+    Object.is(left.oldText, right.oldText) &&
+    Object.is(left.newText, right.newText)
+  );
+}
+
+function attachHostOutputUpdateRollbackEvidence(error, options) {
+  if (!isObjectOrFunction(error)) {
+    return;
+  }
+
+  const propertyRollbackError = options.propertyRollbackError;
+  const textRollbackError = options.textRollbackError;
+  error.privateRootUpdateRollbackEvidence = freezeRecord({
+    kind: 'FastReactDomPrivateRootUpdateRollbackEvidence',
+    latestPropsPublished: false,
+    latestPropsHandoffStale: options.latestPropsHandoffStale,
+    latestPropsRestoredToPrevious:
+      getLatestPropsFromHostInstanceToken(
+        options.normalized.hostInstanceToken
+      ) === options.previousProps,
+    propertyMutationAttempted: options.propertyHandoff !== null,
+    propertyRollbackAttempted: options.propertyHandoff !== null,
+    propertyRollbackApplied: options.propertyRollbackApplied,
+    propertyRollbackRecordCount: options.propertyRollbackRecordCount,
+    textMutationRequested: options.normalized.textUpdate !== null,
+    textMutationApplied: options.textMutationApplied,
+    textRollbackAttempted: options.textMutationApplied,
+    textRollbackApplied: options.textRollbackApplied,
+    unsupportedPropertyPayloadRejected:
+      isUnsupportedRootPropertyPayloadError(error),
+    propertyRollbackError:
+      propertyRollbackError === null
+        ? null
+        : freezeRecord({
+            code: propertyRollbackError.code || null,
+            message: propertyRollbackError.message
+          }),
+    textRollbackError:
+      textRollbackError === null
+        ? null
+        : freezeRecord({
+            code: textRollbackError.code || null,
+            message: textRollbackError.message
+          })
+  });
+}
+
+function isUnsupportedRootPropertyPayloadError(error) {
+  return (
+    isObjectOrFunction(error) &&
+    (error.code === 'FAST_REACT_DOM_BLOCKED_PROPERTY_PAYLOAD_ENTRY' ||
+      error.code === 'FAST_REACT_DOM_UNSUPPORTED_PROPERTY_PAYLOAD_ENTRY')
+  );
+}
+
 function createHostOutputUpdateAcceptedCapabilities(
   propertyMutationEvidence,
   textMutationApplied
@@ -9834,17 +10152,39 @@ function createHostOutputUpdateAcceptedCapabilities(
 }
 
 function createRootCommitHostComponentUpdateAcceptedCapabilities(
-  hostOutputHandoff
+  hostOutputHandoff,
+  metadata
 ) {
-  return freezeArray([
+  const capabilities = [
     freezeRecord({
       id: 'root-commit-host-component-update-metadata',
       accepted: true,
       reason:
         'Accepted root commit HostComponent update metadata selected the fake-DOM host-output mutation handoff.'
-    }),
+    })
+  ];
+  if (metadata.selectedHostTextUpdate !== null) {
+    capabilities.push(
+      freezeRecord({
+        id: 'root-commit-host-text-update-metadata',
+        accepted: true,
+        reason:
+          'Accepted root commit HostText update metadata selected the fake-DOM text mutation handoff.'
+      })
+    );
+  }
+  return freezeArray([
+    ...capabilities,
     ...hostOutputHandoff.acceptedCapabilities
   ]);
+}
+
+function createRootCommitHostComponentUpdateBlockedCapabilities(
+  textMutationApplied
+) {
+  return textMutationApplied
+    ? ROOT_BRIDGE_HOST_OUTPUT_UPDATE_BLOCKED_CAPABILITIES
+    : ROOT_BRIDGE_ROOT_COMMIT_HOST_COMPONENT_UPDATE_BLOCKED_CAPABILITIES;
 }
 
 function validateDangerousHtmlTextResetCommitDiagnostic(
