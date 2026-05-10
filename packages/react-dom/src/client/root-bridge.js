@@ -192,6 +192,8 @@ const privateRootHydrationReplayErrorMetadataRecordType =
   'fast.react_dom.private_root_hydration_replay_error_metadata_record';
 const privateRootHydrationRecoverableErrorRoutingRecordType =
   'fast.react_dom.private_root_hydration_recoverable_error_routing_record';
+const privateRootHydrationRecoverableErrorCallbackInvocationRecordType =
+  'fast.react_dom.private_root_hydration_recoverable_error_callback_invocation_record';
 const privateRootPublicFacadeAdapterType =
   'fast.react_dom.private_root_public_facade_adapter';
 const privateRootPublicFacadeRootType =
@@ -289,6 +291,8 @@ const ROOT_BRIDGE_HYDRATION_REPLAY_ERROR_METADATA_RECORDED =
   'recorded-private-root-hydration-replay-error-metadata';
 const ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_ROUTING_RECORDED =
   'recorded-private-root-hydration-recoverable-error-routing';
+const ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_CALLBACK_INVOCATION_RECORDED =
+  'recorded-private-root-hydration-recoverable-error-callback-invocation';
 const ROOT_BRIDGE_ROOT_ERROR_OPTION_CALLBACK_ACCEPTED =
   'accepted-private-root-error-option-callback-record';
 const ROOT_BRIDGE_PUBLIC_FACADE_ADAPTER_READY =
@@ -1447,6 +1451,72 @@ const ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_ROUTING_BLOCKED_CAPABILITIES =
         'React DOM hydration mismatch recovery and root error callback compatibility are not claimed by this private record.'
     })
   ]);
+const ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_CALLBACK_INVOCATION_ACCEPTED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'hydration-recoverable-error-routing-record',
+      accepted: true,
+      reason:
+        'The gate consumes an accepted private hydration recoverable-error routing record.'
+    }),
+    freezeRecord({
+      id: 'root-option-ownership',
+      accepted: true,
+      reason:
+        'The invoked onRecoverableError callback must be owned by the original hydrateRoot options object.'
+    }),
+    freezeRecord({
+      id: 'private-callback-invocation',
+      accepted: true,
+      reason:
+        'The gate invokes the owned callback only under explicit private test control.'
+    })
+  ]);
+const ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_CALLBACK_INVOCATION_BLOCKED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'public-hydrate-root-execution',
+      blocked: true,
+      reason:
+        'The invocation proof starts from private hydrateRoot records and does not enable public hydrateRoot.'
+    }),
+    freezeRecord({
+      id: 'hydration-compatibility',
+      blocked: true,
+      reason:
+        'Hydratable instances, text patching, Suspense hydration, and compatibility claims remain blocked.'
+    }),
+    freezeRecord({
+      id: 'recoverable-error-queueing',
+      blocked: true,
+      reason:
+        'Recoverable hydration errors are not queued into the reconciler by this private invocation gate.'
+    }),
+    freezeRecord({
+      id: 'root-error-update-scheduling',
+      blocked: true,
+      reason:
+        'The gate does not schedule root error updates before invoking the owned callback.'
+    }),
+    freezeRecord({
+      id: 'public-root-error-callback-compatibility',
+      blocked: true,
+      reason:
+        'The callback invocation is private test-control evidence and does not claim public root error callback behavior.'
+    }),
+    freezeRecord({
+      id: 'dom-mutation',
+      blocked: true,
+      reason:
+        'The gate does not patch text, clear hydration boundaries, or mutate container children.'
+    }),
+    freezeRecord({
+      id: 'compatibility-claims',
+      blocked: true,
+      reason:
+        'React DOM hydration mismatch recovery and public hydrateRoot compatibility remain unclaimed.'
+    })
+  ]);
 const ROOT_BRIDGE_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHT_ACCEPTED_CAPABILITIES = freezeArray([
   freezeRecord({
     id: 'public-facade-create-root-record',
@@ -1972,6 +2042,7 @@ const rootRefCallbackErrorRoutingPayloads = new WeakMap();
 const rootEventListenerErrorRoutingPayloads = new WeakMap();
 const rootHydrationReplayErrorMetadataPayloads = new WeakMap();
 const rootHydrationRecoverableErrorRoutingPayloads = new WeakMap();
+const rootHydrationRecoverableErrorCallbackInvocationPayloads = new WeakMap();
 const rootPublicFacadeAdapterPayloads = new WeakMap();
 const rootPublicFacadeRootPayloads = new WeakMap();
 const rootPublicFacadePreflightPayloads = new WeakMap();
@@ -2208,6 +2279,13 @@ function createPrivateRootBridgeShell(options) {
         hydrateRootRecord,
         recoverableErrorMetadata,
         hydrationReplayErrorMetadata,
+        options
+      );
+    },
+    invokeHydrationRecoverableErrorCallbacks(routingRecord, options) {
+      return invokeHydrationRecoverableErrorCallbacksWithBridge(
+        bridgeState,
+        routingRecord,
         options
       );
     }
@@ -4306,6 +4384,14 @@ function createHydrationRecoverableErrorRoutingRecord(
   );
 }
 
+function invokeHydrationRecoverableErrorCallbacks(routingRecord, options) {
+  return invokeHydrationRecoverableErrorCallbacksWithBridge(
+    null,
+    routingRecord,
+    options
+  );
+}
+
 function applyPrivateRootHostOutputUpdate(record, options) {
   return applyPrivateRootHostOutputUpdateWithBridge(null, record, options);
 }
@@ -5742,6 +5828,16 @@ function getPrivateRootHydrationRecoverableErrorRoutingPayload(record) {
 
 function isPrivateRootHydrationRecoverableErrorRoutingRecord(value) {
   return rootHydrationRecoverableErrorRoutingPayloads.has(value);
+}
+
+function getPrivateRootHydrationRecoverableErrorCallbackInvocationPayload(record) {
+  return (
+    rootHydrationRecoverableErrorCallbackInvocationPayloads.get(record) || null
+  );
+}
+
+function isPrivateRootHydrationRecoverableErrorCallbackInvocationRecord(value) {
+  return rootHydrationRecoverableErrorCallbackInvocationPayloads.has(value);
 }
 
 function getPrivateRootPublicFacadeAdapterPayload(adapter) {
@@ -8959,6 +9055,509 @@ function createHydrationRecoverableErrorRoutingRecordWithBridge(
   );
 
   return record;
+}
+
+function invokeHydrationRecoverableErrorCallbacksWithBridge(
+  bridgeState,
+  routingRecord,
+  options
+) {
+  const routingValidation =
+    validateHydrationRecoverableErrorCallbackInvocationRouting(
+      bridgeState,
+      routingRecord
+    );
+  const invocationOptions =
+    normalizeHydrationRecoverableErrorCallbackInvocationOptions(options);
+  const callback =
+    validateHydrationRecoverableErrorCallbackInvocationOptions(
+      routingValidation,
+      invocationOptions
+    );
+  const rootOptionOwnershipRecord =
+    createHydrationRecoverableErrorRootOptionOwnershipRecord(
+      routingValidation,
+      callback
+    );
+  const invocationResults =
+    routingValidation.rootErrorOptionCallbackRecords.map(
+      (callbackRecord, index) =>
+        invokeHydrationRecoverableErrorCallbackRecord({
+          callback,
+          callbackRecord,
+          index,
+          invocationOptions,
+          recoverableErrorRow: routingValidation.recoverableErrorRows[index],
+          rootOptionOwnershipRecord
+        })
+    );
+  const callbackInvocationRecords = freezeArray(
+    invocationResults.map((invocationResult) => invocationResult.record)
+  );
+  const callbackInvocationErrorCount = invocationResults.reduce(
+    (count, invocationResult) =>
+      invocationResult.callbackErrorCaptured === true ? count + 1 : count,
+    0
+  );
+
+  const record = freezeRecord({
+    $$typeof: privateRootHydrationRecoverableErrorCallbackInvocationRecordType,
+    kind:
+      'FastReactDomPrivateRootHydrationRecoverableErrorCallbackInvocationRecord',
+    invocationStatus:
+      ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_CALLBACK_INVOCATION_RECORDED,
+    executionStatus:
+      ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_CALLBACK_INVOCATION_RECORDED,
+    compatibilityStatus: ROOT_BRIDGE_COMPATIBILITY_BLOCKED,
+    source:
+      typeof invocationOptions.source === 'string'
+        ? invocationOptions.source
+        : 'private-root-hydration-recoverable-error-callback-invocation',
+    operation: 'hydration-recoverable-error-callback-invocation',
+    sourceRoutingStatus: routingRecord.routingStatus,
+    sourceRoutingRecordKind: routingRecord.kind,
+    sourceRoutingRecordOperation: routingRecord.operation,
+    sourceRequestId: routingRecord.sourceRequestId,
+    sourceRequestSequence: routingRecord.sourceRequestSequence,
+    sourceRequestType: routingRecord.sourceRequestType,
+    sourceOperation: routingRecord.sourceOperation,
+    hydrateId: routingRecord.hydrateId,
+    rootId: routingRecord.rootId,
+    rootKind: routingRecord.rootKind,
+    rootTag: routingRecord.rootTag,
+    rootRecordId: routingRecord.rootRecordId,
+    rootOptionsHandleStatus: routingRecord.rootOptionsHandleStatus,
+    rootOptionsOwnershipStatus: rootOptionOwnershipRecord.status,
+    rootOptionOwnershipRecord,
+    rootOptionCallbackKey: 'onRecoverableError',
+    rootOptionCallbackConfigured: true,
+    rootOptionCallbackValueInfo:
+      routingValidation.rootErrorCallbacks.onRecoverableError.valueInfo,
+    rootErrorChannel: 'onRecoverableError',
+    rootErrorCallbacks: routingValidation.rootErrorCallbacks,
+    onUncaughtErrorConfigured:
+      routingValidation.rootErrorCallbacks.onUncaughtError.configured,
+    onCaughtErrorConfigured:
+      routingValidation.rootErrorCallbacks.onCaughtError.configured,
+    onRecoverableErrorConfigured: true,
+    sourceRootErrorOptionCallbackRecordCount:
+      routingValidation.rootErrorOptionCallbackRecords.length,
+    callbackInvocationRecordCount: callbackInvocationRecords.length,
+    callbackInvocationErrorCount,
+    callbackInvocationRecords,
+    textMismatchRowCount: routingRecord.textMismatchRowCount,
+    recoverableErrorMetadataCount:
+      routingRecord.recoverableErrorMetadataCount,
+    queuedRecoverableErrorCount: 0,
+    onRecoverableErrorInvocationCount: callbackInvocationRecords.length,
+    acceptedCapabilities:
+      ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_CALLBACK_INVOCATION_ACCEPTED_CAPABILITIES,
+    blockedCapabilities:
+      ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_CALLBACK_INVOCATION_BLOCKED_CAPABILITIES,
+    callbackInvocationGateEnabled: true,
+    privateRootErrorCallbacksInvoked: callbackInvocationRecords.length > 0,
+    privateOnRecoverableErrorInvoked: callbackInvocationRecords.length > 0,
+    rootErrorCallbacksInvoked: callbackInvocationRecords.length > 0,
+    onRecoverableErrorInvoked: callbackInvocationRecords.length > 0,
+    publicRootExecution: false,
+    publicRootObjectExposed: false,
+    publicRootCreated: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    rootErrorUpdatesScheduled: false,
+    hydrationRequested: true,
+    hydration: false,
+    canHydrate: false,
+    hydrationCompatibilityClaimed: false,
+    hostInstanceHydrationAttempted: false,
+    textPatched: false,
+    boundaryCleared: false,
+    suspenseHydrationScheduled: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    eventDispatch: false,
+    eventReplayInstalled: false,
+    eventsReplayed: false,
+    replayQueuesDrained: false,
+    recoverableErrorsQueued: false,
+    willQueueRecoverableErrors: false,
+    willInvokeOnRecoverableError: true,
+    publicRootErrorCallbacksInvoked: false,
+    publicOnRecoverableErrorInvoked: false,
+    rootErrorCallbackInvocationCount: callbackInvocationRecords.length,
+    reportGlobalErrorInvoked: false,
+    rootErrorsReported: false,
+    compatibilityClaimed: false,
+    browserDomEventCompatibilityClaimed: false,
+    publicRootBehaviorChanged: false,
+    exposesErrorValue: false,
+    exposesHydrationTarget: false,
+    exposesRootOptionCallback: false
+  });
+
+  rootHydrationRecoverableErrorCallbackInvocationPayloads.set(
+    record,
+    freezeRecord({
+      callback,
+      callbackInvocationResults: freezeArray(
+        invocationResults.map((invocationResult) => invocationResult.payload)
+      ),
+      container: routingValidation.routingPayload.container,
+      hydrateRootRecord: routingValidation.routingPayload.hydrateRootRecord,
+      hydrationBoundaryRecord:
+        routingValidation.routingPayload.hydrationBoundaryRecord,
+      hydrationOptions: routingValidation.rootOptions,
+      invocationOptions: invocationOptions.rawOptions,
+      recoverableErrorMetadata:
+        routingValidation.routingPayload.recoverableErrorMetadata,
+      recoverableErrorRows: routingValidation.recoverableErrorRows,
+      rootErrorCallbacks: routingValidation.rootErrorCallbacks,
+      rootOptionOwnershipRecord,
+      rootOptions: routingValidation.rootOptions,
+      routingPayload: routingValidation.routingPayload,
+      routingRecord,
+      sourceRootErrorOptionCallbackRecords:
+        routingValidation.rootErrorOptionCallbackRecords,
+      textMismatchDiagnostics:
+        routingValidation.routingPayload.textMismatchDiagnostics
+    })
+  );
+
+  return record;
+}
+
+function validateHydrationRecoverableErrorCallbackInvocationRouting(
+  bridgeState,
+  routingRecord
+) {
+  const routingPayload =
+    rootHydrationRecoverableErrorRoutingPayloads.get(routingRecord);
+  if (
+    routingPayload === undefined ||
+    !routingRecord ||
+    typeof routingRecord !== 'object' ||
+    routingRecord.$$typeof !==
+      privateRootHydrationRecoverableErrorRoutingRecordType ||
+    routingRecord.routingStatus !==
+      ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_ROUTING_RECORDED ||
+    routingRecord.compatibilityStatus !== ROOT_BRIDGE_COMPATIBILITY_BLOCKED
+  ) {
+    throwInvalidHydrationRecoverableErrorCallbackInvocation(
+      'Hydration recoverable error callback invocation requires an accepted private routing record.'
+    );
+  }
+  if (bridgeState !== null && routingPayload.bridgeState !== bridgeState) {
+    throwForeignRootBridgeRequest();
+  }
+  if (
+    routingRecord.publicRootErrorCallbacksInvoked !== false ||
+    routingRecord.publicOnRecoverableErrorInvoked !== false ||
+    routingRecord.rootErrorCallbackInvocationCount !== 0 ||
+    routingRecord.recoverableErrorsQueued !== false ||
+    routingRecord.hydration !== false ||
+    routingRecord.compatibilityClaimed !== false
+  ) {
+    throwInvalidHydrationRecoverableErrorCallbackInvocation(
+      'Hydration recoverable error callback invocation requires metadata-only routing input.'
+    );
+  }
+
+  const rootErrorOptionCallbackRecords = Array.isArray(
+    routingPayload.rootErrorOptionCallbackRecords
+  )
+    ? routingPayload.rootErrorOptionCallbackRecords
+    : [];
+  const recoverableErrorRows = Array.isArray(
+    routingPayload.recoverableErrorRows
+  )
+    ? routingPayload.recoverableErrorRows
+    : [];
+  if (
+    rootErrorOptionCallbackRecords.length === 0 ||
+    rootErrorOptionCallbackRecords.length !== recoverableErrorRows.length ||
+    rootErrorOptionCallbackRecords.length !==
+      routingRecord.rootErrorOptionCallbackRecordCount
+  ) {
+    throwInvalidHydrationRecoverableErrorCallbackInvocation(
+      'Hydration recoverable error callback invocation requires source callback records for every recoverable row.'
+    );
+  }
+  for (const callbackRecord of rootErrorOptionCallbackRecords) {
+    if (
+      callbackRecord.rootOptionCallbackKey !== 'onRecoverableError' ||
+      callbackRecord.rootOptionCallbackConfigured !== true ||
+      callbackRecord.onRecoverableErrorInvoked !== false ||
+      callbackRecord.publicOnRecoverableErrorInvoked !== false ||
+      callbackRecord.rootErrorCallbackInvocationCount !== 0 ||
+      callbackRecord.queuedRecoverableError !== false ||
+      callbackRecord.hydration !== false ||
+      callbackRecord.compatibilityClaimed !== false
+    ) {
+      throwInvalidHydrationRecoverableErrorCallbackInvocation(
+        'Hydration recoverable error callback invocation requires uninvoked onRecoverableError source records.'
+      );
+    }
+  }
+
+  return {
+    recoverableErrorRows: freezeArray(recoverableErrorRows),
+    rootErrorCallbacks: routingPayload.rootErrorCallbacks,
+    rootErrorOptionCallbackRecords: freezeArray(
+      rootErrorOptionCallbackRecords
+    ),
+    rootOptions: routingPayload.rootOptions,
+    routingPayload
+  };
+}
+
+function normalizeHydrationRecoverableErrorCallbackInvocationOptions(options) {
+  const normalizedOptions =
+    options !== null &&
+    (typeof options === 'object' || typeof options === 'function')
+      ? options
+      : {};
+  const invocationLabels = Array.isArray(normalizedOptions.invocationLabels)
+    ? normalizedOptions.invocationLabels.map((label) =>
+        typeof label === 'string' ? label : null
+      )
+    : [];
+  const hasRootOptions = Object.prototype.hasOwnProperty.call(
+    normalizedOptions,
+    'rootOptions'
+  );
+
+  return freezeRecord({
+    callbackInvocationGateEnabled:
+      normalizedOptions.enableCallbackInvocation === true,
+    hasRootOptions,
+    invocationLabels: freezeArray(invocationLabels),
+    rawOptions: options,
+    rootOptions: hasRootOptions ? normalizedOptions.rootOptions : undefined,
+    source:
+      typeof normalizedOptions.source === 'string'
+        ? normalizedOptions.source
+        : 'private-root-hydration-recoverable-error-callback-invocation'
+  });
+}
+
+function validateHydrationRecoverableErrorCallbackInvocationOptions(
+  routingValidation,
+  invocationOptions
+) {
+  if (invocationOptions.callbackInvocationGateEnabled !== true) {
+    throwInvalidHydrationRecoverableErrorCallbackInvocation(
+      'Hydration recoverable error callback invocation requires the explicit private invocation gate.'
+    );
+  }
+  if (
+    invocationOptions.hasRootOptions === true &&
+    invocationOptions.rootOptions !== routingValidation.rootOptions
+  ) {
+    throwInvalidHydrationRecoverableErrorCallbackInvocation(
+      'Hydration recoverable error callback invocation requires the current hydrateRoot options object.'
+    );
+  }
+
+  const rootOptions =
+    routingValidation.rootOptions !== null &&
+    typeof routingValidation.rootOptions === 'object'
+      ? routingValidation.rootOptions
+      : null;
+  const callback =
+    rootOptions !== null &&
+    Object.prototype.hasOwnProperty.call(rootOptions, 'onRecoverableError')
+      ? rootOptions.onRecoverableError
+      : undefined;
+  if (
+    typeof callback !== 'function' ||
+    routingValidation.rootErrorCallbacks.onRecoverableError.configured !== true
+  ) {
+    throwInvalidHydrationRecoverableErrorCallbackInvocation(
+      'Hydration recoverable error callback invocation requires an owned onRecoverableError function.'
+    );
+  }
+
+  return callback;
+}
+
+function createHydrationRecoverableErrorRootOptionOwnershipRecord(
+  routingValidation,
+  callback
+) {
+  return freezeRecord({
+    kind:
+      'FastReactDomPrivateRootHydrationRecoverableErrorRootOptionOwnershipRecord',
+    status: 'owned-by-hydrate-root-options',
+    rootOptionsSource: 'hydrateRoot-options',
+    rootOptionsHandleStatus: 'matched-hydrate-root-options',
+    ownerRequestId: routingValidation.routingPayload.hydrateRootRecord.requestId,
+    ownerRequestType:
+      routingValidation.routingPayload.hydrateRootRecord.requestType,
+    ownerHydrateId:
+      routingValidation.routingPayload.hydrateRootRecord.hydrateId,
+    ownerRootRecordId:
+      routingValidation.routingPayload.hydrateRootRecord
+        .hydrationBoundaryRecord.recordId,
+    ownerRootKind:
+      routingValidation.routingPayload.hydrateRootRecord.rootKind,
+    ownerRootTag: routingValidation.routingPayload.hydrateRootRecord.rootTag,
+    rootOptionCallbackKey: 'onRecoverableError',
+    rootOptionCallbackConfigured: true,
+    rootOptionCallbackValueInfo:
+      routingValidation.rootErrorCallbacks.onRecoverableError.valueInfo,
+    rootOptionCallbackOwnedByHydrateRoot: true,
+    callbackIdentityMatchesRootOptions:
+      routingValidation.rootOptions.onRecoverableError === callback,
+    publicHydrateRootCompatibilityClaimed: false,
+    publicRootBehaviorChanged: false,
+    compatibilityClaimed: false
+  });
+}
+
+function invokeHydrationRecoverableErrorCallbackRecord({
+  callback,
+  callbackRecord,
+  index,
+  invocationOptions,
+  recoverableErrorRow,
+  rootOptionOwnershipRecord
+}) {
+  const sourceLabel =
+    invocationOptions.invocationLabels[index] === undefined
+      ? null
+      : invocationOptions.invocationLabels[index];
+  const error = createHydrationRecoverableErrorForCallback(
+    recoverableErrorRow
+  );
+  const errorInfo =
+    createHydrationRecoverableErrorInfoForCallback(recoverableErrorRow);
+  let returnValue;
+  let callbackError = null;
+  try {
+    returnValue = callback(error, errorInfo);
+  } catch (caughtError) {
+    callbackError = caughtError;
+  }
+  const callbackErrorSummary =
+    callbackError === null
+      ? null
+      : describeCapturedErrorForDiagnostics(callbackError);
+  const callbackReturnStatus =
+    callbackError !== null
+      ? 'threw'
+      : returnValue === undefined
+        ? 'returned-undefined'
+        : 'returned-value';
+  const record = freezeRecord({
+    kind:
+      'FastReactDomPrivateRootHydrationRecoverableErrorCallbackInvocationEntry',
+    status:
+      ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_CALLBACK_INVOCATION_RECORDED,
+    phase: 'hydration-recoverable-error-callback-invocation',
+    invocationIndex: index,
+    sourceLabel,
+    sourceCallbackRecord: callbackRecord,
+    sourceCallbackRecordKind: callbackRecord.kind,
+    sourceCallbackRecordStatus: callbackRecord.status,
+    hydrateId: callbackRecord.hydrateId,
+    rootId: callbackRecord.rootId,
+    rootKind: callbackRecord.rootKind,
+    rootTag: callbackRecord.rootTag,
+    rootRecordId: callbackRecord.rootRecordId,
+    textMismatchRowId: callbackRecord.textMismatchRowId,
+    recoverableErrorMetadataId:
+      callbackRecord.recoverableErrorMetadataId,
+    textMismatchReason: callbackRecord.textMismatchReason,
+    expectedText: callbackRecord.expectedText,
+    actualText: callbackRecord.actualText,
+    errorName: error.name,
+    errorMessage: error.message,
+    errorInfoComponentStack: errorInfo.componentStack,
+    callbackReturnStatus,
+    callbackErrorCaptured: callbackError !== null,
+    callbackErrorName:
+      callbackErrorSummary === null ? null : callbackErrorSummary.name,
+    callbackErrorMessage:
+      callbackErrorSummary === null ? null : callbackErrorSummary.message,
+    callbackErrorCode:
+      callbackErrorSummary === null ? null : callbackErrorSummary.code,
+    rootOptionOwnershipStatus: rootOptionOwnershipRecord.status,
+    rootOptionCallbackKey: 'onRecoverableError',
+    rootOptionCallbackConfigured: true,
+    rootOptionCallbackOwnedByHydrateRoot: true,
+    rootErrorCallbacksInvoked: true,
+    privateRootErrorCallbacksInvoked: true,
+    publicRootErrorCallbacksInvoked: false,
+    onRecoverableErrorInvoked: true,
+    privateOnRecoverableErrorInvoked: true,
+    publicOnRecoverableErrorInvoked: false,
+    rootErrorCallbackInvocationCount: 1,
+    rootErrorUpdatesScheduled: false,
+    queuedRecoverableError: false,
+    recoverableErrorsQueued: false,
+    recoverableErrorCompatibilityClaimed: false,
+    publicErrorBoundariesEnabled: false,
+    publicRootBehaviorChanged: false,
+    compatibilityClaimed: false,
+    hydration: false,
+    canHydrate: false,
+    hydrateTextInstanceCalled: false,
+    textPatched: false,
+    domMutated: false,
+    exposesErrorValue: false,
+    exposesHydrationTarget: false,
+    exposesRootOptionCallback: false
+  });
+
+  return {
+    callbackErrorCaptured: callbackError !== null,
+    payload: freezeRecord({
+      callback,
+      callbackError,
+      callbackRecord,
+      error,
+      errorInfo,
+      returnValue,
+      rootOptionOwnershipRecord
+    }),
+    record
+  };
+}
+
+function createHydrationRecoverableErrorForCallback(recoverableErrorRow) {
+  const error = new Error(recoverableErrorRow.messageTemplate);
+  if (
+    typeof recoverableErrorRow.errorName === 'string' &&
+    recoverableErrorRow.errorName.length > 0
+  ) {
+    error.name = recoverableErrorRow.errorName;
+  }
+  const digest =
+    recoverableErrorRow.errorInfo &&
+    typeof recoverableErrorRow.errorInfo.digest === 'string'
+      ? recoverableErrorRow.errorInfo.digest
+      : null;
+  if (digest !== null) {
+    error.digest = digest;
+  }
+  return error;
+}
+
+function createHydrationRecoverableErrorInfoForCallback(recoverableErrorRow) {
+  const componentStack =
+    recoverableErrorRow.errorInfo &&
+    Object.prototype.hasOwnProperty.call(
+      recoverableErrorRow.errorInfo,
+      'componentStack'
+    )
+      ? recoverableErrorRow.errorInfo.componentStack
+      : null;
+
+  return freezeRecord({
+    componentStack
+  });
 }
 
 function createNativeBridgeHandle(bridgeState, kind) {
@@ -15054,6 +15653,13 @@ function throwInvalidHydrationRecoverableErrorRouting(message) {
   throw error;
 }
 
+function throwInvalidHydrationRecoverableErrorCallbackInvocation(message) {
+  const error = new Error(message);
+  error.code =
+    'FAST_REACT_DOM_INVALID_HYDRATION_RECOVERABLE_ERROR_CALLBACK_INVOCATION';
+  throw error;
+}
+
 function throwInvalidRootPublicFacadeAdapter(message) {
   const error = new Error(message);
   error.code = 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_ADAPTER';
@@ -15255,6 +15861,9 @@ module.exports = {
   ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_RECORDED,
+  ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_CALLBACK_INVOCATION_ACCEPTED_CAPABILITIES,
+  ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_CALLBACK_INVOCATION_BLOCKED_CAPABILITIES,
+  ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_CALLBACK_INVOCATION_RECORDED,
   ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_ROUTING_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_ROUTING_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_ROUTING_RECORDED,
@@ -15378,6 +15987,7 @@ module.exports = {
   createPrivateRootHandle,
   createPrivateRootOwner,
   createEventListenerRootErrorRoutingRecord,
+  invokeHydrationRecoverableErrorCallbacks,
   createHydrationRecoverableErrorRoutingRecord,
   createHydrationReplayErrorMetadataRecord,
   createRefCallbackRootErrorRoutingRecord,
@@ -15415,6 +16025,7 @@ module.exports = {
   getPrivateRootPublicFacadePreflightRootPayload,
   getPrivateRootPublicFacadeRootPayload,
   getPrivateRootEventListenerErrorRoutingPayload,
+  getPrivateRootHydrationRecoverableErrorCallbackInvocationPayload,
   getPrivateRootHydrationRecoverableErrorRoutingPayload,
   getPrivateRootHydrationReplayErrorMetadataPayload,
   getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload,
@@ -15453,6 +16064,7 @@ module.exports = {
   isPrivateRootUnmountAdmissionRecord,
   isPrivateRootUnmountHostOutputCleanupRecord,
   isPrivateRootEventListenerErrorRoutingRecord,
+  isPrivateRootHydrationRecoverableErrorCallbackInvocationRecord,
   isPrivateRootHydrationRecoverableErrorRoutingRecord,
   isPrivateRootHydrationReplayErrorMetadataRecord,
   isPrivateHydrationClaimedReplayTargetDispatchExecutionRecord,
@@ -15496,6 +16108,7 @@ module.exports = {
   privateRootUnmountHostOutputCleanupRecordType,
   privateRootPortalFakeDomMountRecordType,
   privateRootEventListenerErrorRoutingRecordType,
+  privateRootHydrationRecoverableErrorCallbackInvocationRecordType,
   privateRootHydrationRecoverableErrorRoutingRecordType,
   privateRootHydrationReplayErrorMetadataRecordType,
   privateHydrationClaimedReplayTargetDispatchExecutionGateId,
