@@ -45,8 +45,26 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue 473-502 has been accepted and cleaned up.
-No top-level workers are currently active.
+Top-level cap: 30 workers. Queue 503-518 is assigned in isolated worktrees.
+
+| Worker | Focus |
+| --- | --- |
+| 503 | Deleted-subtree passive flush execution gate |
+| 504 | Fragment/Portal deletion traversal diagnostics |
+| 505 | Form action event extraction metadata |
+| 506 | Form reset queue/commit metadata |
+| 507 | Resource map commit diagnostics |
+| 508 | Stylesheet load/error state diagnostics |
+| 509 | Controlled restore queue flush ordering |
+| 510 | Controlled radio sibling props metadata |
+| 511 | React DOM facade update host-output diagnostic |
+| 512 | React DOM facade unmount cleanup diagnostic |
+| 513 | Broader DOM event type dispatch canaries |
+| 514 | Portal event error routing diagnostics |
+| 515 | TestInstance query bridge preflight |
+| 516 | Test renderer committed fiber tree inspection |
+| 517 | Test renderer act warning/thenable blockers |
+| 518 | Scheduler mock expired act-route diagnostics |
 
 ## Near-Term Sequencing
 
