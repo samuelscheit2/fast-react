@@ -45,7 +45,7 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue 503-526 is assigned in isolated worktrees.
+Top-level cap: 30 workers. Queue 503-532 is assigned in isolated worktrees.
 
 | Worker | Focus |
 | --- | --- |
@@ -73,6 +73,12 @@ Top-level cap: 30 workers. Queue 503-526 is assigned in isolated worktrees.
 | 524 | Native transport worker-thread teardown |
 | 525 | React hook dispatcher public blocker refresh |
 | 526 | Conformance private admission refresh for 473-502 |
+| 527 | Worker launcher simplification and diagnostics |
+| 528 | Hydration replay error metadata gate |
+| 529 | Portal root-render public blocker refresh |
+| 530 | Test renderer error-boundary update refresh |
+| 531 | Scheduler native entry guard refresh |
+| 532 | Native package surface guard refresh |
 
 ## Near-Term Sequencing
 
