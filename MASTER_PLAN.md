@@ -45,20 +45,9 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 208: test renderer host output canary in
-  `/Users/user/Developer/Developer/fast-react-worker-208-test-renderer-host-output-canary`.
-- Worker 210: react-test-renderer JS create fail-closed surface in
-  `/Users/user/Developer/Developer/fast-react-worker-210-react-test-renderer-js-create-failclosed`.
-- Worker 213: DOM property payload style/dangerous HTML slice in
-  `/Users/user/Developer/Developer/fast-react-worker-213-dom-property-payload-style-dangerous-html`.
-- Worker 215: DOM root bridge private update path in
-  `/Users/user/Developer/Developer/fast-react-worker-215-dom-root-bridge-private-update-path`.
-- Worker 217: DOM createPortal local gate in
-  `/Users/user/Developer/Developer/fast-react-worker-217-dom-create-portal-local-gate`.
-- Worker 230: DOM text dual-run conformance gate in
-  `/Users/user/Developer/Developer/fast-react-worker-230-dom-text-dual-run-conformance-gate`.
-- Worker 231: package surface React DOM subpath tightening in
-  `/Users/user/Developer/Developer/fast-react-worker-231-package-surface-react-dom-subpath-tightening`.
+- None at this checkpoint. Completed workers 208, 210, 213, 215, 217, 230,
+  and 231 have been accepted and moved to `MASTER_PROGRESS.md`; queue
+  replacements after cleanup.
 
 ## Near-Term Sequencing
 

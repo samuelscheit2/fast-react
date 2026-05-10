@@ -433,9 +433,55 @@ sequencing belong in `MASTER_PLAN.md`.
   retry/offscreen lane-selection and unsupported child preflight coverage for
   Suspense, Offscreen, Activity, and SuspenseList without implementing those
   features or weakening existing fail-closed boundaries.
+- Worker 208 test-renderer host output canary was merged, adding a Rust-only
+  private committed host-output path for one HostComponent with one HostText
+  child through accepted root scheduling, render, and commit handoffs, while
+  keeping the JS facade, public serialization, `act`, DOM/native behavior, and
+  compatibility claims blocked.
+- Worker 210 react-test-renderer JS create fail-closed surface was merged,
+  tightening the placeholder package so `create()` returns a React-shaped
+  renderer shell whose behaviorful root, serialization, update, unmount,
+  instance, scheduler, and flush surfaces throw deterministic unimplemented
+  errors without Rust renderer wiring or compatibility claims.
+- Worker 213 DOM property payload style/dangerous HTML slice was merged,
+  adding bounded data-only `style` and `dangerouslySetInnerHTML` payload
+  records aligned to accepted oracles while leaving DOM mutation, public roots,
+  events, forms, hydration, resources, and broad style diagnostics unsupported.
+- Worker 215 DOM root bridge private update path was merged, extending the
+  private root bridge with deterministic create/render/unmount request records,
+  lifecycle metadata, hidden payloads, and read-only marker/listener guard
+  snapshots without public root behavior, native/Rust execution, DOM mutation,
+  hydration, events, controlled forms, or compatibility claims.
+- Worker 217 DOM createPortal local gate was merged, tightening the shared
+  portal helper around a normalized private portal-record boundary and expanded
+  focused tests for object mutability, key coercion, invocation boundaries, and
+  no create-only side effects while keeping portal reconciliation, mounting,
+  listener/event behavior, and compatibility claims blocked.
+- Worker 230 DOM text dual-run conformance gate was merged, adding a
+  fail-closed gate that compares only admitted private
+  `shouldSetTextContent` rows against the checked React DOM text-content
+  oracle while explicitly skipping unsupported private, server/client render,
+  root, HostText commit, and DOM mutation rows.
+- Worker 231 package surface React DOM subpath tightening was merged, extending
+  the package-surface smoke snapshot and guard for React DOM subpath version,
+  placeholder, `server.bun`, and react-server load-error boundaries without
+  changing React DOM runtime behavior.
 
 ## Latest Accepted Verification
 
+- Workers 208, 210, 213, 215, 217, 230, and 231 were verified on their
+  integrated worktrees and again on `main` after merging; worker 208 required a
+  scoped `fast-react-test-renderer` conflict resolution that preserved both the
+  accepted serialization gate and the new host-output canary. The combined
+  `main` result passed `cargo fmt --all --check`, full `fast-react-core` tests
+  with 130 unit tests and 0 doctests, full `fast-react-reconciler` tests with
+  185 unit tests plus 1 compile-fail doctest, full
+  `fast-react-test-renderer` tests with 37 unit tests and 0 doctests, workspace
+  clippy with warnings denied, focused DOM property payload, root bridge,
+  createPortal, DOM text-content dual-run/oracle, package-surface, entrypoint,
+  component-tree, hydration boundary, and context-object JS gates,
+  `npm run check:js` with 505 conformance tests plus package-surface,
+  benchmark, workspace, and native checks, and `git diff --check`.
 - Workers 206, 211, 214, 218, 221, 223, 226, and 227 were verified on their
   integrated worktrees and again on `main` after conflict resolution in
   `root_commit.rs`, `function_component.rs`, and `root_work_loop.rs`; the

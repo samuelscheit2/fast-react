@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-usage() {
-  echo "usage: scripts/run-worker.sh <worker-id> <prompt-file>" >&2
+if [ "$#" -ne 2 ]; then
+  printf 'usage: scripts/run-worker.sh <worker-id> <prompt-file>\n' >&2
   exit 2
-}
-
-[ "$#" -eq 2 ] || usage
+fi
 
 worker_id="$1"
 prompt_file="$2"
@@ -22,12 +20,7 @@ record_exit_code() {
 }
 trap record_exit_code EXIT
 
-[ -f "$prompt_file" ] || {
-  printf 'missing prompt file: %s\n' "$prompt_file" | tee "$log_file" >&2
-  exit 2
-}
-
-prompt_text="$(cat "$prompt_file")
+prompt_text="$(<"$prompt_file")
 
 Goal policy from the orchestrator:
 - Your first action must be to use /goal, the Codex create_goal tool, for this worker task using the Objective in the assigned prompt.
