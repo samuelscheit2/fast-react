@@ -7,7 +7,7 @@ Date: 2026-05-10
 - `create_goal` was called as the first action before research, file reads,
   implementation, or verification.
 - `get_goal` was available after setup and before report writing.
-- Active goal status from `get_goal`: `active`.
+- Goal status after final pane closeout: `complete`.
 - Active goal objective from `get_goal`: add private deletion cleanup
   diagnostics proving ref cleanup returns and passive destroy metadata are
   ordered deterministically for removed host subtrees.
