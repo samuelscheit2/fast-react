@@ -176,6 +176,12 @@ const expectedPackageExports = {
 
 const blockedExtensionSubpaths = [
   '@fast-react/react/index.js',
+  '@fast-react/react/act-dispatcher',
+  '@fast-react/react/act-dispatcher.js',
+  '@fast-react/react/act-queue',
+  '@fast-react/react/act-queue.js',
+  '@fast-react/react/act-queue-private-dispatcher',
+  '@fast-react/react/act-queue-private-dispatcher.js',
   '@fast-react/react/jsx-runtime.js',
   '@fast-react/react/jsx-dev-runtime.js',
   '@fast-react/react/compiler-runtime.js',
@@ -187,7 +193,10 @@ const blockedExtensionSubpaths = [
   '@fast-react/react/context-object.js',
   '@fast-react/react/element-type.js',
   '@fast-react/react/element-factory.js',
+  '@fast-react/react/hook-dispatcher',
   '@fast-react/react/hook-dispatcher.js',
+  '@fast-react/react/hook-dispatcher-private-metadata',
+  '@fast-react/react/hook-dispatcher-private-metadata.js',
   '@fast-react/react/ref-object.js',
   '@fast-react/react/wrapper-object.js',
   '@fast-react/react/placeholder-utils.js'
@@ -484,6 +493,8 @@ const blockedReactDomExtensionSubpaths = [
   '@fast-react/react-dom/react-dom.react-server.js',
   '@fast-react/react-dom/client.js',
   '@fast-react/react-dom/client.react-server.js',
+  '@fast-react/react-dom/client/root-bridge',
+  '@fast-react/react-dom/client/root-bridge.js',
   '@fast-react/react-dom/server.node.js',
   '@fast-react/react-dom/server.browser.js',
   '@fast-react/react-dom/server.edge.js',
@@ -496,7 +507,13 @@ const blockedReactDomExtensionSubpaths = [
   '@fast-react/react-dom/profiling.js',
   '@fast-react/react-dom/profiling.react-server.js',
   '@fast-react/react-dom/test-utils.js',
-  '@fast-react/react-dom/placeholder-utils.js'
+  '@fast-react/react-dom/placeholder-utils.js',
+  '@fast-react/react-dom/root-bridge',
+  '@fast-react/react-dom/root-bridge.js',
+  '@fast-react/react-dom/src/client/root-bridge',
+  '@fast-react/react-dom/src/client/root-bridge.js',
+  '@fast-react/react-dom/src/client/root-bridge-private-diagnostics',
+  '@fast-react/react-dom/src/client/root-bridge-private-diagnostics.js'
 ];
 
 const reactTestRendererKeys = [
@@ -603,6 +620,16 @@ const reactTestRendererPhysicalSubpaths = [
 
 const missingReactTestRendererPhysicalSubpaths = [
   '@fast-react/react-test-renderer/cjs/react-test-renderer',
+  '@fast-react/react-test-renderer/cjs/react-test-renderer-private-routes.development',
+  '@fast-react/react-test-renderer/cjs/react-test-renderer-private-routes.development.js',
+  '@fast-react/react-test-renderer/cjs/react-test-renderer-private-routes.production',
+  '@fast-react/react-test-renderer/cjs/react-test-renderer-private-routes.production.js',
+  '@fast-react/react-test-renderer/create-routing-gate',
+  '@fast-react/react-test-renderer/create-routing-gate.js',
+  '@fast-react/react-test-renderer/diagnostics',
+  '@fast-react/react-test-renderer/diagnostics.js',
+  '@fast-react/react-test-renderer/private-routes',
+  '@fast-react/react-test-renderer/private-routes.js',
   '@fast-react/react-test-renderer/placeholder-utils.js'
 ];
 
@@ -816,6 +843,45 @@ const schedulerEntrypoints = [
     specifier: 'scheduler/cjs/scheduler-unstable_post_task.production.js'
   }
 ];
+const missingSchedulerPrivatePhysicalSubpaths = [
+  'scheduler/cjs/scheduler-unstable_mock.flush-helpers.development',
+  'scheduler/cjs/scheduler-unstable_mock.flush-helpers.development.js',
+  'scheduler/cjs/scheduler-unstable_mock.flush-helpers.production',
+  'scheduler/cjs/scheduler-unstable_mock.flush-helpers.production.js',
+  'scheduler/src/unstable_mock',
+  'scheduler/src/unstable_mock.js',
+  'scheduler/unstable_mock-flush-helpers',
+  'scheduler/unstable_mock-flush-helpers.js'
+];
+
+const allowedRuntimeMetadataKeys = new Set([
+  '__FAST_REACT_ENTRYPOINT__',
+  '__FAST_REACT_PLACEHOLDER__',
+  'compatibilityTarget'
+]);
+const privateDiagnosticRuntimeExportPattern =
+  /(?:private|diagnostic|diagnostics|gate|bridge|dispatcher|metadata|route|routes|secret)/iu;
+
+function assertNoPrivateDiagnosticRuntimeExports(moduleExports, label) {
+  if (
+    moduleExports === null ||
+    (typeof moduleExports !== 'object' && typeof moduleExports !== 'function')
+  ) {
+    return;
+  }
+
+  for (const key of Reflect.ownKeys(moduleExports)) {
+    if (typeof key !== 'string' || allowedRuntimeMetadataKeys.has(key)) {
+      continue;
+    }
+
+    assert.equal(
+      privateDiagnosticRuntimeExportPattern.test(key),
+      false,
+      `${label} must not expose private diagnostic export ${key}`
+    );
+  }
+}
 
 function assertPlaceholderMetadata(moduleExports, label) {
   assert.equal(
@@ -842,6 +908,7 @@ function assertPlaceholderMetadata(moduleExports, label) {
 
 function assertInventoryKeys(moduleExports, expectedKeys, label) {
   assert.deepEqual(Object.keys(moduleExports), expectedKeys, `${label} keys`);
+  assertNoPrivateDiagnosticRuntimeExports(moduleExports, label);
   assertPlaceholderMetadata(moduleExports, label);
 }
 
@@ -902,6 +969,7 @@ function assertReactDomPlaceholderMetadata(moduleExports, label) {
 
 function assertReactDomInventoryKeys(moduleExports, expectedKeys, label) {
   assert.deepEqual(Object.keys(moduleExports), expectedKeys, `${label} keys`);
+  assertNoPrivateDiagnosticRuntimeExports(moduleExports, label);
   assertReactDomPlaceholderMetadata(moduleExports, label);
 }
 
@@ -1009,6 +1077,7 @@ function assertReactTestRendererInventoryKeys(
   label
 ) {
   assert.deepEqual(Object.keys(moduleExports), expectedKeys, `${label} keys`);
+  assertNoPrivateDiagnosticRuntimeExports(moduleExports, label);
   assertReactTestRendererPlaceholderMetadata(moduleExports, label);
 }
 
@@ -1052,6 +1121,7 @@ function assertReactTestRendererSchedulerShell(scheduler, label) {
     schedulerMockKeys,
     `${label} own keys`
   );
+  assertNoPrivateDiagnosticRuntimeExports(scheduler, label);
 
   for (const [key, expectedValue] of Object.entries(
     reactTestRendererSchedulerConstantValues
@@ -1148,6 +1218,7 @@ function assertReactTestRendererRootBehavior(moduleExports, label, entrypoint) {
     ],
     `${label}.create() renderer keys`
   );
+  assertNoPrivateDiagnosticRuntimeExports(renderer, `${label}.create()`);
   const rootDescriptor = Object.getOwnPropertyDescriptor(renderer, 'root');
   assert.equal(rootDescriptor.enumerable, true, `${label}.root enumerable`);
   assert.equal(rootDescriptor.configurable, true, `${label}.root configurable`);
@@ -1234,11 +1305,13 @@ function assertSchedulerPlaceholderMetadata(moduleExports, label) {
 
 function assertSchedulerInventoryKeys(moduleExports, expectedKeys, label) {
   assert.deepEqual(Object.keys(moduleExports), expectedKeys, `${label} keys`);
+  assertNoPrivateDiagnosticRuntimeExports(moduleExports, label);
   assertSchedulerPlaceholderMetadata(moduleExports, label);
 }
 
 function assertSchedulerImplementedRootKeys(moduleExports, expectedKeys, label) {
   assert.deepEqual(Object.keys(moduleExports), expectedKeys, `${label} keys`);
+  assertNoPrivateDiagnosticRuntimeExports(moduleExports, label);
   assert.equal(
     Object.hasOwn(moduleExports, '__FAST_REACT_PLACEHOLDER__'),
     false,
@@ -1253,6 +1326,7 @@ function assertSchedulerImplementedRootKeys(moduleExports, expectedKeys, label) 
 
 function assertSchedulerImplementedMockKeys(moduleExports, expectedKeys, label) {
   assert.deepEqual(Object.keys(moduleExports), expectedKeys, `${label} keys`);
+  assertNoPrivateDiagnosticRuntimeExports(moduleExports, label);
   assert.equal(
     Object.hasOwn(moduleExports, '__FAST_REACT_PLACEHOLDER__'),
     false,
@@ -1267,6 +1341,7 @@ function assertSchedulerImplementedMockKeys(moduleExports, expectedKeys, label) 
 
 function assertSchedulerImplementedNativeKeys(moduleExports, expectedKeys, label) {
   assert.deepEqual(Object.keys(moduleExports), expectedKeys, `${label} keys`);
+  assertNoPrivateDiagnosticRuntimeExports(moduleExports, label);
   assert.equal(
     Object.hasOwn(moduleExports, '__FAST_REACT_PLACEHOLDER__'),
     false,
@@ -3404,9 +3479,31 @@ async function runReactTestRendererPackageProbe(tempRoot) {
     const schedulerConstantValues = ${JSON.stringify(
       reactTestRendererSchedulerConstantValues
     )};
+    const allowedRuntimeMetadataKeys = new Set([
+      '__FAST_REACT_ENTRYPOINT__',
+      '__FAST_REACT_PLACEHOLDER__',
+      'compatibilityTarget'
+    ]);
+    const privateDiagnosticRuntimeExportPattern =
+      /(?:private|diagnostic|diagnostics|gate|bridge|dispatcher|metadata|route|routes|secret)/iu;
+
+    function assertNoPrivateDiagnosticRuntimeExports(moduleExports, label) {
+      for (const key of Reflect.ownKeys(moduleExports)) {
+        if (typeof key !== 'string' || allowedRuntimeMetadataKeys.has(key)) {
+          continue;
+        }
+
+        assert.equal(
+          privateDiagnosticRuntimeExportPattern.test(key),
+          false,
+          label + ' must not expose private diagnostic export ' + key
+        );
+      }
+    }
 
     function assertInventoryKeys(moduleExports, expectedKeys, label) {
       assert.deepEqual(Object.keys(moduleExports), expectedKeys, label);
+      assertNoPrivateDiagnosticRuntimeExports(moduleExports, label);
       assert.equal(moduleExports.__FAST_REACT_PLACEHOLDER__, true, label);
       assert.equal(
         moduleExports.compatibilityTarget,
@@ -3622,6 +3719,10 @@ async function runReactTestRendererPackageProbe(tempRoot) {
           ],
           specifier + ' renderer keys'
         );
+        assertNoPrivateDiagnosticRuntimeExports(
+          renderer,
+          specifier + ' renderer'
+        );
         const rootDescriptor = Object.getOwnPropertyDescriptor(renderer, 'root');
         assert.equal(rootDescriptor.enumerable, true, specifier + ' root');
         assert.equal(rootDescriptor.configurable, true, specifier + ' root');
@@ -3739,9 +3840,34 @@ async function runSchedulerPackageProbe(tempRoot) {
     const path = require('node:path');
 
     const entrypoints = ${JSON.stringify(schedulerEntrypoints)};
+    const missingPrivatePhysicalSubpaths = ${JSON.stringify(
+      missingSchedulerPrivatePhysicalSubpaths
+    )};
+    const allowedRuntimeMetadataKeys = new Set([
+      '__FAST_REACT_ENTRYPOINT__',
+      '__FAST_REACT_PLACEHOLDER__',
+      'compatibilityTarget'
+    ]);
+    const privateDiagnosticRuntimeExportPattern =
+      /(?:private|diagnostic|diagnostics|gate|bridge|dispatcher|metadata|route|routes|secret)/iu;
+
+    function assertNoPrivateDiagnosticRuntimeExports(moduleExports, label) {
+      for (const key of Reflect.ownKeys(moduleExports)) {
+        if (typeof key !== 'string' || allowedRuntimeMetadataKeys.has(key)) {
+          continue;
+        }
+
+        assert.equal(
+          privateDiagnosticRuntimeExportPattern.test(key),
+          false,
+          label + ' must not expose private diagnostic export ' + key
+        );
+      }
+    }
 
     function assertInventoryKeys(moduleExports, expectedKeys, label) {
       assert.deepEqual(Object.keys(moduleExports), expectedKeys, label);
+      assertNoPrivateDiagnosticRuntimeExports(moduleExports, label);
       assert.equal(moduleExports.__FAST_REACT_PLACEHOLDER__, true, label);
       assert.equal(moduleExports.compatibilityTarget, 'scheduler@0.27.0', label);
       assert.equal(
@@ -3758,6 +3884,7 @@ async function runSchedulerPackageProbe(tempRoot) {
 
     function assertImplementedRootKeys(moduleExports, expectedKeys, label) {
       assert.deepEqual(Object.keys(moduleExports), expectedKeys, label);
+      assertNoPrivateDiagnosticRuntimeExports(moduleExports, label);
       assert.equal(
         Object.hasOwn(moduleExports, '__FAST_REACT_PLACEHOLDER__'),
         false,
@@ -3772,6 +3899,7 @@ async function runSchedulerPackageProbe(tempRoot) {
 
     function assertImplementedMockKeys(moduleExports, expectedKeys, label) {
       assert.deepEqual(Object.keys(moduleExports), expectedKeys, label);
+      assertNoPrivateDiagnosticRuntimeExports(moduleExports, label);
       assert.equal(
         Object.hasOwn(moduleExports, '__FAST_REACT_PLACEHOLDER__'),
         false,
@@ -3786,6 +3914,7 @@ async function runSchedulerPackageProbe(tempRoot) {
 
     function assertImplementedNativeKeys(moduleExports, expectedKeys, label) {
       assert.deepEqual(Object.keys(moduleExports), expectedKeys, label);
+      assertNoPrivateDiagnosticRuntimeExports(moduleExports, label);
       assert.equal(
         Object.hasOwn(moduleExports, '__FAST_REACT_PLACEHOLDER__'),
         false,
@@ -4168,6 +4297,14 @@ async function runSchedulerPackageProbe(tempRoot) {
           'unstable_post_task.js'
         )
       );
+
+      for (const specifier of missingPrivatePhysicalSubpaths) {
+        assert.throws(
+          () => require.resolve(specifier),
+          (error) => error?.code === 'MODULE_NOT_FOUND',
+          specifier
+        );
+      }
     })().catch((error) => {
       console.error(error);
       process.exitCode = 1;
