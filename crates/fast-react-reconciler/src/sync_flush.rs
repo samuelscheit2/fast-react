@@ -2916,8 +2916,13 @@ mod tests {
         assert_eq!(root_execution.selected_lanes(), Lanes::SYNC);
         assert!(root_execution.routed_through_root_scheduler_and_commit_evidence_for_canary());
         let handoff = root_execution.root_commit_handoff_for_canary().unwrap();
-        assert!(handoff.proves_private_finished_work_commit_execution());
+        assert!(handoff.proves_private_root_finished_work_commit_metadata_handoff());
         assert_eq!(handoff.pending().previous_current(), previous_current);
+        assert_eq!(
+            handoff.pending().root_finished_work(),
+            Some(render_phase.finished_work())
+        );
+        assert!(handoff.execution_request().records_root_finished_work());
         assert_eq!(
             handoff.pending().finished_work(),
             render_phase.finished_work()
@@ -3691,9 +3696,14 @@ mod tests {
         assert!(record.accepted_root_scheduler_execution_evidence_for_canary());
         assert!(record.accepted_root_commit_execution_evidence_for_canary());
         let handoff = record.root_commit_handoff_for_canary().unwrap();
-        assert!(handoff.proves_private_finished_work_commit_execution());
+        assert!(handoff.proves_private_root_finished_work_commit_metadata_handoff());
         assert_eq!(handoff.pending().root(), root_id);
+        assert_eq!(
+            handoff.pending().root_finished_work(),
+            Some(handoff.pending().finished_work())
+        );
         assert_eq!(handoff.pending().render_lanes(), Lanes::DEFAULT);
+        assert!(handoff.execution_request().records_root_finished_work());
         assert_eq!(
             record.render_phase().unwrap().resulting_element(),
             default_element
