@@ -6,6 +6,9 @@ import test from "node:test";
 
 const require = createRequire(import.meta.url);
 const reactDomClient = require("../../../packages/react-dom/client.js");
+const componentTree = require(
+  "../../../packages/react-dom/src/client/component-tree.js"
+);
 const rootBridge = require(
   "../../../packages/react-dom/src/client/root-bridge.js"
 );
@@ -51,6 +54,64 @@ test("root render E2E gate keeps private render native handoff metadata below pu
     true
   );
   assert.equal(payload.nativeHandoffRecord.nativeExecution, false);
+  assert.throws(() => reactDomClient.createRoot(document.createElement("div")), {
+    code: "FAST_REACT_UNIMPLEMENTED"
+  });
+
+  payload.bridge.cleanupInitialRenderHostOutput(payload.hostOutputHandoff);
+});
+
+test("root render E2E gate accepts private facade root.render fake-DOM execution below public compatibility", () => {
+  const document = createDocument();
+  const container = document.createElement("div");
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    rootBridge.privateRootPublicFacadeAdapterSymbol
+  );
+  const adapter = descriptor.value({
+    publicFacadeHostOutputRenderIdPrefix: "conformance-root-render"
+  });
+  const root = adapter.createRoot(container);
+  const element = {
+    props: {
+      children: "conformance private root.render",
+      id: "conformance-root-render"
+    },
+    type: "main"
+  };
+  const diagnostic = root.render(element);
+  const payload =
+    rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(diagnostic);
+  const hostOutputPayload =
+    rootBridge.getPrivateRootInitialHostOutputHandoffPayload(
+      payload.hostOutputHandoff
+    );
+
+  assert.equal(
+    diagnostic.diagnosticStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_APPLIED
+  );
+  assert.equal(diagnostic.privateFacadeRoot, true);
+  assert.equal(diagnostic.publicRootExecution, false);
+  assert.equal(diagnostic.publicRootCompatibilitySurface, false);
+  assert.equal(diagnostic.publicRootCreated, false);
+  assert.equal(diagnostic.publicRootObjectExposed, false);
+  assert.equal(diagnostic.reconcilerExecution, false);
+  assert.equal(diagnostic.fakeDomMutation, true);
+  assert.equal(diagnostic.browserDomMutation, false);
+  assert.equal(diagnostic.compatibilityClaimed, false);
+  assert.equal(diagnostic.rootWorkLoopPublicRootRenderingBlocked, true);
+  assert.equal(container.childNodes.length, 1);
+  assert.equal(container.firstChild.nodeName, "MAIN");
+  assert.equal(container.textContent, "conformance private root.render");
+  assert.equal(
+    componentTree.getLatestPropsFromNode(hostOutputPayload.hostNode),
+    element.props
+  );
+  assert.deepEqual(
+    adapter.getRootRequestRecords(root).map((record) => record.requestType),
+    ["createRoot", "root.render"]
+  );
   assert.throws(() => reactDomClient.createRoot(document.createElement("div")), {
     code: "FAST_REACT_UNIMPLEMENTED"
   });

@@ -2470,14 +2470,19 @@ function createPrivateRootPublicFacadeRoot(
       value: function render(element) {
         const callback =
           arguments.length > 1 ? arguments[1] : undefined;
-        const record = adapterState.bridge.renderContainer(
-          createRecord.handle,
+        const handleState = getPrivateRootHandleState(payload.rootHandle);
+        if (handleState.lifecycleStatus === ROOT_LIFECYCLE_UNMOUNTED) {
+          return appendPrivateRootPublicFacadeRenderRecord(
+            payload,
+            element,
+            callback
+          );
+        }
+        return renderPrivateRootPublicFacadeHostOutputFromPayload(
+          payload,
           element,
-          callback
+          {callback}
         );
-        payload.requestRecords.push(record);
-        payload.renderRecords.push(record);
-        return record;
       }
     },
     unmount: {
@@ -2500,6 +2505,21 @@ function createPrivateRootPublicFacadeRoot(
   rootPublicFacadeRootPayloads.set(root, payload);
   adapterState.roots.push(root);
   return root;
+}
+
+function appendPrivateRootPublicFacadeRenderRecord(
+  payload,
+  element,
+  callback
+) {
+  const record = payload.bridge.renderContainer(
+    payload.rootHandle,
+    element,
+    callback
+  );
+  payload.requestRecords.push(record);
+  payload.renderRecords.push(record);
+  return record;
 }
 
 function createPrivateRootPublicFacadePreflightRoot(
@@ -2971,7 +2991,7 @@ function renderPrivateRootPublicFacadeHostOutputFromPayload(
       'Cannot render private public-facade host output while a previous host-output diagnostic is still active.'
     );
   }
-  assertNoActiveCreateRootSideEffectsForPublicFacadeHostOutputUpdate(
+  assertNoActiveCreateRootSideEffectsForPublicFacadeHostOutputRender(
     createRecord
   );
   const normalizedInitial = normalizeInitialHostOutputElement(element);
@@ -3005,7 +3025,11 @@ function renderPrivateRootPublicFacadeHostOutputFromPayload(
       createRecord,
       sideEffectOptions
     );
-    renderRecord = payload.root.render(element, callback);
+    renderRecord = appendPrivateRootPublicFacadeRenderRecord(
+      payload,
+      element,
+      callback
+    );
     if (rootWorkLoopMetadataOption.found) {
       normalizePublicFacadeRootWorkLoopFinishedWorkMetadata(
         rootWorkLoopMetadataOption.value,
@@ -3462,7 +3486,11 @@ function updatePrivateRootPublicFacadeHostOutputFromPayload(
     activeRender.renderPayload.hostOutputHandoff
   );
   const callback = getPublicFacadeHostOutputUpdateCallback(options);
-  const updateRecord = payload.root.render(element, callback);
+  const updateRecord = appendPrivateRootPublicFacadeRenderRecord(
+    payload,
+    element,
+    callback
+  );
   const hostOutputUpdateHandoff = payload.bridge.applyHostOutputUpdate(
     updateRecord,
     {
@@ -3636,7 +3664,11 @@ function updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
       createRecord,
       sideEffectOptions
     );
-    renderRecord = payload.root.render(initialElement, renderCallback);
+    renderRecord = appendPrivateRootPublicFacadeRenderRecord(
+      payload,
+      initialElement,
+      renderCallback
+    );
     admissionRecord = payload.bridge.admitCreateRenderPath(
       createRecord,
       sideEffectRecord,
@@ -3651,7 +3683,11 @@ function updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
     });
     sideEffectCleanup =
       payload.bridge.revertCreateRootSideEffects(sideEffectRecord);
-    updateRecord = payload.root.render(nextElement, updateCallback);
+    updateRecord = appendPrivateRootPublicFacadeRenderRecord(
+      payload,
+      nextElement,
+      updateCallback
+    );
     hostOutputUpdateHandoff = payload.bridge.applyHostOutputUpdate(
       updateRecord,
       {
@@ -3899,7 +3935,11 @@ function unmountPrivateRootPublicFacadeHostOutputFromPayload(
       createRecord,
       sideEffectOptions
     );
-    renderRecord = payload.root.render(element, renderCallback);
+    renderRecord = appendPrivateRootPublicFacadeRenderRecord(
+      payload,
+      element,
+      renderCallback
+    );
     admissionRecord = payload.bridge.admitCreateRenderPath(
       createRecord,
       sideEffectRecord,

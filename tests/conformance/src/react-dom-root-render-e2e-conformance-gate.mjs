@@ -961,6 +961,18 @@ export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ADMISSIONS =
       evidenceKind: "private-controlled-restore-queue-write-preflight",
       reason:
         "Worker 533 accepted only private controlled restore queue write preflight rows without writing or flushing queues, invoking wrappers, querying radio groups, writing value trackers, or mutating live controls."
+    }),
+    Object.freeze({
+      metadataId: "worker-641-public-facade-root-render-execution",
+      workerId: "641",
+      category: "host-output",
+      scenarioId: "initial-host-render",
+      admission: "private-react-dom-metadata-diagnostic",
+      gateStatus:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS,
+      evidenceKind: "private-root-public-facade-root-render-execution",
+      reason:
+        "Worker 641 accepted only the symbol-private react-dom/client facade root.render execution path that produces one fake-DOM HostComponent/HostText tree through the bridge while public createRoot remains blocked."
     })
   ]);
 
@@ -6673,6 +6685,13 @@ function runPrivateReactDomMetadataDiagnostic({ admission, mode, modules }) {
             modules
           });
         break;
+      case "worker-641-public-facade-root-render-execution":
+        metadataEvidence =
+          runPrivateReactDomMetadataFacadeRootRenderExecutionDiagnostic({
+            mode,
+            modules
+          });
+        break;
       default:
         throw new Error(
           `No private React DOM metadata diagnostic plan for ${admission.metadataId}.`
@@ -6780,6 +6799,82 @@ function runPrivateReactDomMetadataHostOutputDiagnostic({ mode, modules }) {
     publicRootCompatibilitySurface: diagnostic.publicRootCompatibilitySurface,
     publicRootExecution: diagnostic.publicRootExecution,
     setupSideEffectStatus: diagnostic.setupSideEffectStatus,
+    textContent: diagnostic.textContent
+  };
+}
+
+function runPrivateReactDomMetadataFacadeRootRenderExecutionDiagnostic({
+  mode,
+  modules
+}) {
+  const document = createPrivateHostOutputDocument({
+    domContainer: modules.domContainer,
+    label: `${mode.id}:metadata-facade-root-render-execution`
+  });
+  const container = document.createElement("div");
+  const descriptor = Object.getOwnPropertyDescriptor(
+    modules.reactDomClient.createRoot,
+    modules.rootBridge.privateRootPublicFacadeAdapterSymbol
+  );
+  const adapter = descriptor.value({
+    createRenderAdmissionIdPrefix: "metadata-root-render-admission",
+    initialHostOutputIdPrefix: "metadata-root-render-output",
+    publicFacadeHostOutputRenderIdPrefix: "metadata-root-render-diagnostic",
+    requestIdPrefix: "metadata-root-render-request",
+    rootIdPrefix: "metadata-root-render-root",
+    sideEffectIdPrefix: "metadata-root-render-side-effect",
+    updateIdPrefix: "metadata-root-render-update"
+  });
+  const root = adapter.createRoot(container);
+  const element = {
+    props: {
+      children: "facade root.render output",
+      id: "facade-root-render",
+      title: "Private facade root render"
+    },
+    type: "main"
+  };
+  const diagnostic = root.render(element);
+  const payload =
+    modules.rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(
+      diagnostic
+    );
+  const hostOutputPayload =
+    modules.rootBridge.getPrivateRootInitialHostOutputHandoffPayload(
+      payload.hostOutputHandoff
+    );
+  const latestPropsPublished =
+    modules.componentTree.getLatestPropsFromNode(hostOutputPayload.hostNode) ===
+    element.props;
+  const cleanup = payload.bridge.cleanupInitialRenderHostOutput(
+    payload.hostOutputHandoff
+  );
+
+  return {
+    acceptedCapabilityIds: diagnostic.acceptedCapabilities.map(
+      (capability) => capability.id
+    ),
+    blockedCapabilityIds: diagnostic.blockedCapabilities.map(
+      (capability) => capability.id
+    ),
+    browserDomMutation: diagnostic.browserDomMutation,
+    cleanupStatus: cleanup.cleanupStatus,
+    compatibilityClaimed: diagnostic.compatibilityClaimed,
+    containerChildCount: diagnostic.containerChildCount,
+    diagnosticStatus: diagnostic.diagnosticStatus,
+    fakeDomMutation: diagnostic.fakeDomMutation,
+    hostOutputHandoffStatus: diagnostic.hostOutputHandoffStatus,
+    latestPropsPublished,
+    publicRootCompatibilitySurface: diagnostic.publicRootCompatibilitySurface,
+    publicRootExecution: diagnostic.publicRootExecution,
+    reconcilerExecution: diagnostic.reconcilerExecution,
+    requestTypes: adapter
+      .getRootRequestRecords(root)
+      .map((record) => record.requestType),
+    returnedHostOutputDiagnostic:
+      modules.rootBridge.isPrivateRootPublicFacadeHostOutputRenderRecord(
+        diagnostic
+      ),
     textContent: diagnostic.textContent
   };
 }
@@ -12702,6 +12797,8 @@ function expectedPrivateReactDomMetadataEvidence(metadataId) {
           "create-render-admission",
           "fake-dom-host-output-mutation",
           "fake-dom-unmount-cleanup",
+          "root-unmount-admission-metadata",
+          "fake-dom-container-cleanup-metadata",
           "component-tree-metadata-detach",
           "latest-props-publication"
         ],
@@ -12836,6 +12933,46 @@ function expectedPrivateReactDomMetadataEvidence(metadataId) {
         valueTrackerFieldWritten: false,
         writeIntentQueueSlots: ["restore-target", "restore-queue"],
         writeWouldRunFlags: [true, true]
+      };
+    case "worker-641-public-facade-root-render-execution":
+      return {
+        acceptedCapabilityIds: [
+          "public-facade-create-root-record",
+          "public-facade-root-render-record",
+          "root-marker-setup-cleanup",
+          "root-listener-setup-cleanup",
+          "create-render-admission",
+          "fake-dom-host-output-mutation",
+          "component-tree-host-instance-map",
+          "latest-props-publication",
+          "root-work-loop-finished-work-handoff"
+        ],
+        blockedCapabilityIds: [
+          "public-root-execution",
+          "native-execution",
+          "reconciler-execution",
+          "browser-dom-compatibility",
+          "hydration",
+          "events",
+          "refs",
+          "compatibility-claims"
+        ],
+        browserDomMutation: false,
+        cleanupStatus: "cleaned-private-root-initial-host-output",
+        compatibilityClaimed: false,
+        containerChildCount: 1,
+        diagnosticStatus:
+          "applied-private-root-public-facade-host-output-render-diagnostic",
+        fakeDomMutation: true,
+        hostOutputHandoffStatus:
+          "applied-private-root-initial-host-output",
+        latestPropsPublished: true,
+        publicRootCompatibilitySurface: false,
+        publicRootExecution: false,
+        reconcilerExecution: false,
+        requestTypes: ["createRoot", "root.render"],
+        returnedHostOutputDiagnostic: true,
+        textContent: "facade root.render output"
       };
     default:
       return null;
@@ -12984,6 +13121,7 @@ function comparablePrivateReactDomMetadataEvidence(metadataId, evidence) {
     case "worker-514-portal-event-error-routing":
     case "worker-528-hydration-replay-error-metadata":
     case "worker-533-controlled-restore-queue-write-preflight":
+    case "worker-641-public-facade-root-render-execution":
       return evidence;
     default:
       return null;
