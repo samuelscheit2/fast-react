@@ -22,11 +22,12 @@ use fast_react_core::{
 use crate::{
     RootElementHandle,
     function_component::{
-        FunctionComponentContextConsumerInvoker, FunctionComponentContextReadRecord,
-        FunctionComponentContextRenderState, FunctionComponentContextRenderStore,
-        FunctionComponentHookRenderResult, FunctionComponentHookRenderStore,
-        FunctionComponentInvoker, FunctionComponentOutputHandle, FunctionComponentRenderError,
-        FunctionComponentRenderRecord, FunctionComponentSingleChildOutputResolver,
+        FunctionComponentContextConsumerInvoker, FunctionComponentContextDependencyHandle,
+        FunctionComponentContextReadRecord, FunctionComponentContextRenderState,
+        FunctionComponentContextRenderStore, FunctionComponentHookRenderResult,
+        FunctionComponentHookRenderStore, FunctionComponentInvoker, FunctionComponentOutputHandle,
+        FunctionComponentRenderError, FunctionComponentRenderRecord,
+        FunctionComponentSingleChildOutputResolver,
         FunctionComponentSingleChildReconciliationError,
         FunctionComponentSingleChildReconciliationRecord, FunctionComponentStateActionHandle,
         FunctionComponentUseContextRenderRecord, FunctionComponentUseStateHookRenderRecord,
@@ -322,6 +323,11 @@ impl FunctionComponentUseContextBeginWorkRecord {
     }
 
     #[must_use]
+    pub const fn context_dependency(self) -> FunctionComponentContextDependencyHandle {
+        self.render.context_dependency()
+    }
+
+    #[must_use]
     pub const fn current(self) -> Option<FiberId> {
         self.render.current()
     }
@@ -536,6 +542,11 @@ impl ContextProviderUseContextBeginWorkRecord {
     }
 
     #[must_use]
+    pub const fn child_context_dependency(self) -> FunctionComponentContextDependencyHandle {
+        self.child_begin_work.context_dependency()
+    }
+
+    #[must_use]
     pub const fn child_context_read_count(self) -> usize {
         self.child_begin_work.context_read_count()
     }
@@ -605,6 +616,11 @@ impl ContextProviderUseContextSingleChildBeginWorkRecord {
     #[must_use]
     pub const fn child_context_read(self) -> FunctionComponentContextReadRecord {
         self.begin_work.child_context_read()
+    }
+
+    #[must_use]
+    pub const fn child_context_dependency(self) -> FunctionComponentContextDependencyHandle {
+        self.begin_work.child_context_dependency()
     }
 
     #[must_use]
@@ -891,6 +907,11 @@ impl NestedContextProviderUseContextBeginWorkRecord {
     #[must_use]
     pub const fn child_context_read(self) -> FunctionComponentContextReadRecord {
         self.child_begin_work.context_read()
+    }
+
+    #[must_use]
+    pub const fn child_context_dependency(self) -> FunctionComponentContextDependencyHandle {
+        self.child_begin_work.context_dependency()
     }
 
     #[must_use]
@@ -2630,6 +2651,20 @@ mod tests {
         assert_eq!(read.default_value(), default_value);
         assert_eq!(read.value(), provided_value);
         assert_eq!(read.active_provider_count(), 1);
+        assert_eq!(record.child_context_dependency(), read.dependency());
+        assert_eq!(context_store.context_dependencies().len(), 1);
+        let dependency = context_store.context_dependencies()[0];
+        assert_eq!(dependency.handle(), read.dependency());
+        assert_eq!(dependency.fiber(), child_work_in_progress);
+        assert_eq!(dependency.context(), record.context());
+        assert_eq!(dependency.memoized_value(), record.value());
+        assert_eq!(dependency.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(dependency.dependency_lanes(), Lanes::NO);
+        assert_eq!(
+            dependency.next(),
+            FunctionComponentContextDependencyHandle::NONE
+        );
+        assert!(!dependency.renderer_visible_propagation());
         assert_eq!(registry.reads(), &[read]);
         assert_eq!(
             context_store.context_reads_for_record(record.child_render()),
@@ -2705,6 +2740,13 @@ mod tests {
         assert_eq!(read.value(), other_default);
         assert_eq!(read.active_provider_count(), 0);
         assert_eq!(context_store.context_reads(), &[read]);
+        assert_eq!(context_store.context_dependencies().len(), 1);
+        let dependency = context_store.context_dependencies()[0];
+        assert_eq!(dependency.handle(), read.dependency());
+        assert_eq!(dependency.context(), other_context);
+        assert_eq!(dependency.memoized_value(), other_default);
+        assert_eq!(dependency.dependency_lanes(), Lanes::NO);
+        assert!(!dependency.renderer_visible_propagation());
         assert_eq!(
             context_store.current_value(provider_context).unwrap(),
             provider_default
@@ -2901,6 +2943,14 @@ mod tests {
         assert_eq!(read.default_value(), default_value);
         assert_eq!(read.value(), inner_value);
         assert_eq!(read.active_provider_count(), 2);
+        assert_eq!(record.child_context_dependency(), read.dependency());
+        assert_eq!(context_store.context_dependencies().len(), 1);
+        let dependency = context_store.context_dependencies()[0];
+        assert_eq!(dependency.handle(), read.dependency());
+        assert_eq!(dependency.context(), context);
+        assert_eq!(dependency.memoized_value(), inner_value);
+        assert_eq!(dependency.dependency_lanes(), Lanes::NO);
+        assert!(!dependency.renderer_visible_propagation());
         assert_eq!(registry.reads(), &[read]);
         assert_eq!(
             context_store.context_reads_for_record(record.child_render()),
@@ -2975,6 +3025,13 @@ mod tests {
         );
         assert_eq!(registry.calls().len(), 1);
         assert_eq!(registry.reads().len(), 2);
+        assert_eq!(context_store.context_dependencies().len(), 2);
+        assert_eq!(
+            context_store.context_dependencies()[0].next(),
+            context_store.context_dependencies()[1].handle()
+        );
+        assert!(!context_store.context_dependencies()[0].renderer_visible_propagation());
+        assert!(!context_store.context_dependencies()[1].renderer_visible_propagation());
         assert_eq!(context_store.current_value(context).unwrap(), default_value);
         assert_eq!(context_store.stack_depth(), 0);
         assert_eq!(context_store.active_provider_count(context).unwrap(), 0);

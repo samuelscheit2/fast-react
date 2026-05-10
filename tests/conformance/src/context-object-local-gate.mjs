@@ -91,6 +91,12 @@ export const CONTEXT_OBJECT_ACCEPTED_PRIVATE_PROGRESS_REQUIREMENTS = [
       "The accepted private function-component render path can read a context value from reconciler-owned state during invocation."
   },
   {
+    id: "private-context-dependency-metadata",
+    readyCheck: "privateContextDependencyMetadataPresent",
+    reason:
+      "The accepted private function-component context read path records dependency identity and memoized value metadata without setting renderer-visible propagation."
+  },
+  {
     id: "private-context-provider-begin-work-handoff",
     readyCheck: "acceptedPrivateContextProviderProgressPresent",
     reason:
@@ -273,6 +279,25 @@ export function inspectContextObjectRuntimeLocalTargets({
   const functionComponentUseContextRenderReadPresent =
     hasSourcePattern(functionComponentSource, /\buseContext\b|\buse_context\b/u) &&
     hasSourcePattern(functionComponentSource, /\bread_context\b/u);
+  const privateContextDependencyMetadataPresent =
+    hasSourcePattern(
+      functionComponentSource,
+      /\bFunctionComponentContextDependencyRecord\b/u
+    ) &&
+    hasSourcePattern(
+      functionComponentSource,
+      /\bFunctionComponentContextDependencyHandle\b/u
+    ) &&
+    hasSourcePattern(
+      functionComponentSource,
+      /\bcontext_dependencies_for_record\b/u
+    ) &&
+    hasSourcePattern(
+      functionComponentSource,
+      /\brenderer_visible_propagation\b/u
+    ) &&
+    hasSourcePattern(functionComponentSource, /\bdependency_lanes\b/u) &&
+    hasSourcePattern(functionComponentSource, /\bFiberFlags::NO\b/u);
   const privateContextProviderBeginWorkHandoffPresent =
     hasSourcePattern(
       beginWorkSource,
@@ -321,6 +346,7 @@ export function inspectContextObjectRuntimeLocalTargets({
     privateNestedContextProviderBeginWorkHandoffPresent;
   const acceptedPrivateContextProgressPresent =
     functionComponentUseContextRenderReadPresent &&
+    privateContextDependencyMetadataPresent &&
     acceptedPrivateContextProviderProgressPresent &&
     privateRootWorkLoopContextProviderHandoffPresent;
 
@@ -332,6 +358,7 @@ export function inspectContextObjectRuntimeLocalTargets({
     runtimeContextPropagationPresent,
     reconcilerProviderBeginWorkIntegrationPresent,
     functionComponentUseContextRenderReadPresent,
+    privateContextDependencyMetadataPresent,
     privateContextProviderBeginWorkHandoffPresent,
     privateNestedContextProviderBeginWorkHandoffPresent,
     privateRootWorkLoopContextProviderHandoffPresent,
@@ -356,6 +383,9 @@ function isContextObjectRuntimeRequirementSatisfied(id, localChecks) {
 function isContextObjectAcceptedPrivateProgressReady(id, localChecks) {
   if (id === "private-function-component-use-context-render-read") {
     return localChecks.functionComponentUseContextRenderReadPresent;
+  }
+  if (id === "private-context-dependency-metadata") {
+    return localChecks.privateContextDependencyMetadataPresent;
   }
   if (id === "private-context-provider-begin-work-handoff") {
     return localChecks.acceptedPrivateContextProviderProgressPresent;

@@ -166,6 +166,34 @@ impl FunctionComponentRefObjectHandle {
     }
 }
 
+#[repr(transparent)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub(crate) struct FunctionComponentContextDependencyHandle(u64);
+
+impl FunctionComponentContextDependencyHandle {
+    pub const NONE: Self = Self(0);
+
+    #[must_use]
+    pub const fn from_raw(raw: u64) -> Self {
+        Self(raw)
+    }
+
+    #[must_use]
+    pub const fn raw(self) -> u64 {
+        self.0
+    }
+
+    #[must_use]
+    pub const fn is_none(self) -> bool {
+        self.0 == 0
+    }
+
+    #[must_use]
+    pub const fn is_some(self) -> bool {
+        self.0 != 0
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentStateDispatchEagerState {
     last_rendered_state: StateHandle,
@@ -1317,15 +1345,22 @@ impl FunctionComponentHookRenderState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentContextRenderState {
     render_fiber: FiberId,
+    render_lanes: Lanes,
     context_count: usize,
     stack_depth: usize,
     start_read_index: usize,
+    start_dependency_index: usize,
 }
 
 impl FunctionComponentContextRenderState {
     #[must_use]
     pub const fn render_fiber(self) -> FiberId {
         self.render_fiber
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.render_lanes
     }
 
     #[must_use]
@@ -1342,18 +1377,107 @@ impl FunctionComponentContextRenderState {
     pub const fn start_read_index(self) -> usize {
         self.start_read_index
     }
+
+    #[must_use]
+    pub const fn start_dependency_index(self) -> usize {
+        self.start_dependency_index
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentContextDependencyRecord {
+    handle: FunctionComponentContextDependencyHandle,
+    fiber: FiberId,
+    context: ContextHandle,
+    memoized_value: ContextValueHandle,
+    read_index: usize,
+    render_read_index: usize,
+    render_lanes: Lanes,
+    dependency_lanes: Lanes,
+    next: FunctionComponentContextDependencyHandle,
+    renderer_visible_propagation: bool,
+    propagation_flags: FiberFlags,
+}
+
+impl FunctionComponentContextDependencyRecord {
+    #[must_use]
+    pub const fn handle(self) -> FunctionComponentContextDependencyHandle {
+        self.handle
+    }
+
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn context(self) -> ContextHandle {
+        self.context
+    }
+
+    #[must_use]
+    pub const fn memoized_value(self) -> ContextValueHandle {
+        self.memoized_value
+    }
+
+    #[must_use]
+    pub const fn read_index(self) -> usize {
+        self.read_index
+    }
+
+    #[must_use]
+    pub const fn render_read_index(self) -> usize {
+        self.render_read_index
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub const fn dependency_lanes(self) -> Lanes {
+        self.dependency_lanes
+    }
+
+    #[must_use]
+    pub const fn next(self) -> FunctionComponentContextDependencyHandle {
+        self.next
+    }
+
+    #[must_use]
+    pub const fn has_next(self) -> bool {
+        self.next.is_some()
+    }
+
+    #[must_use]
+    pub const fn renderer_visible_propagation(self) -> bool {
+        self.renderer_visible_propagation
+    }
+
+    #[must_use]
+    pub const fn propagation_flags(self) -> FiberFlags {
+        self.propagation_flags
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentContextReadRecord {
+    read_index: usize,
     fiber: FiberId,
     context: ContextHandle,
     default_value: ContextValueHandle,
     value: ContextValueHandle,
     active_provider_count: usize,
+    dependency: FunctionComponentContextDependencyHandle,
 }
 
 impl FunctionComponentContextReadRecord {
+    #[must_use]
+    pub const fn read_index(self) -> usize {
+        self.read_index
+    }
+
     #[must_use]
     pub const fn fiber(self) -> FiberId {
         self.fiber
@@ -1383,12 +1507,18 @@ impl FunctionComponentContextReadRecord {
     pub const fn has_active_provider(self) -> bool {
         self.active_provider_count != 0
     }
+
+    #[must_use]
+    pub const fn dependency(self) -> FunctionComponentContextDependencyHandle {
+        self.dependency
+    }
 }
 
 #[derive(Debug, Default)]
 pub(crate) struct FunctionComponentContextRenderStore {
     stack: ContextStack,
     reads: Vec<FunctionComponentContextReadRecord>,
+    dependencies: Vec<FunctionComponentContextDependencyRecord>,
 }
 
 impl FunctionComponentContextRenderStore {
@@ -1447,12 +1577,15 @@ impl FunctionComponentContextRenderStore {
     pub fn prepare_render_state(
         &self,
         work_in_progress: FiberId,
+        render_lanes: Lanes,
     ) -> FunctionComponentContextRenderState {
         FunctionComponentContextRenderState {
             render_fiber: work_in_progress,
+            render_lanes,
             context_count: self.stack.context_count(),
             stack_depth: self.stack.stack_depth(),
             start_read_index: self.reads.len(),
+            start_dependency_index: self.dependencies.len(),
         }
     }
 
@@ -1464,20 +1597,76 @@ impl FunctionComponentContextRenderStore {
         let slot = self.stack.context_slot(context).map_err(|error| {
             FunctionComponentRenderError::context_stack(state.render_fiber(), error)
         })?;
+        let read_index = self.reads.len();
+        let dependency =
+            self.push_context_dependency(state, context, slot.current_value(), read_index);
         let record = FunctionComponentContextReadRecord {
+            read_index,
             fiber: state.render_fiber(),
             context,
             default_value: slot.default_value(),
             value: slot.current_value(),
             active_provider_count: slot.active_provider_count(),
+            dependency,
         };
         self.reads.push(record);
         Ok(record)
     }
 
+    fn push_context_dependency(
+        &mut self,
+        state: FunctionComponentContextRenderState,
+        context: ContextHandle,
+        memoized_value: ContextValueHandle,
+        read_index: usize,
+    ) -> FunctionComponentContextDependencyHandle {
+        let raw = u64::try_from(self.dependencies.len())
+            .expect("context dependency count does not fit in u64")
+            .checked_add(1)
+            .expect("context dependency handle counter wrapped");
+        let handle = FunctionComponentContextDependencyHandle::from_raw(raw);
+        if self.dependencies.len() > state.start_dependency_index()
+            && let Some(previous) = self.dependencies.last_mut()
+        {
+            previous.next = handle;
+        }
+        self.dependencies
+            .push(FunctionComponentContextDependencyRecord {
+                handle,
+                fiber: state.render_fiber(),
+                context,
+                memoized_value,
+                read_index,
+                render_read_index: read_index - state.start_read_index(),
+                render_lanes: state.render_lanes,
+                dependency_lanes: Lanes::NO,
+                next: FunctionComponentContextDependencyHandle::NONE,
+                renderer_visible_propagation: false,
+                propagation_flags: FiberFlags::NO,
+            });
+        handle
+    }
+
     #[must_use]
     pub fn context_reads(&self) -> &[FunctionComponentContextReadRecord] {
         &self.reads
+    }
+
+    #[must_use]
+    pub fn context_dependencies(&self) -> &[FunctionComponentContextDependencyRecord] {
+        &self.dependencies
+    }
+
+    #[must_use]
+    pub fn context_dependency(
+        &self,
+        handle: FunctionComponentContextDependencyHandle,
+    ) -> Option<FunctionComponentContextDependencyRecord> {
+        if handle.is_none() {
+            return None;
+        }
+        let index = usize::try_from(handle.raw().checked_sub(1)?).ok()?;
+        self.dependencies.get(index).copied()
     }
 
     #[must_use]
@@ -1491,6 +1680,19 @@ impl FunctionComponentContextRenderStore {
         let start = state.start_read_index();
         let end = start + record.context_read_count();
         &self.reads[start..end]
+    }
+
+    #[must_use]
+    pub fn context_dependencies_for_record(
+        &self,
+        record: FunctionComponentRenderRecord,
+    ) -> &[FunctionComponentContextDependencyRecord] {
+        let Some(state) = record.context_state() else {
+            return &[];
+        };
+        let start = state.start_dependency_index();
+        let end = start + record.context_read_count();
+        &self.dependencies[start..end]
     }
 }
 
@@ -4483,6 +4685,11 @@ impl FunctionComponentUseContextRenderRecord {
     }
 
     #[must_use]
+    pub const fn context_dependency(self) -> FunctionComponentContextDependencyHandle {
+        self.context_read.dependency()
+    }
+
+    #[must_use]
     pub const fn current(self) -> Option<FiberId> {
         self.render.current()
     }
@@ -4680,7 +4887,7 @@ pub(crate) fn render_function_component_with_context_reads(
     invoker: &mut impl FunctionComponentInvoker,
 ) -> Result<FunctionComponentRenderRecord, FunctionComponentRenderError> {
     let mut request = validate_function_component_render(arena, work_in_progress, render_lanes)?;
-    let context_state = context_store.prepare_render_state(work_in_progress);
+    let context_state = context_store.prepare_render_state(work_in_progress, render_lanes);
     request = request.with_context_state(context_state);
     reset_function_component_render_state(arena, work_in_progress)?;
 
@@ -4758,7 +4965,7 @@ fn render_function_component_with_use_context_impl(
     invoker: &mut impl FunctionComponentContextConsumerInvoker,
 ) -> Result<FunctionComponentUseContextRenderRecord, FunctionComponentRenderError> {
     let mut request = validate_function_component_render(arena, work_in_progress, render_lanes)?;
-    let context_state = context_store.prepare_render_state(work_in_progress);
+    let context_state = context_store.prepare_render_state(work_in_progress, render_lanes);
     request = request.with_context_state(context_state);
     reset_function_component_render_state(arena, work_in_progress)?;
 
@@ -5248,6 +5455,34 @@ mod tests {
         ContextValueHandle::from_raw(raw)
     }
 
+    fn assert_private_context_dependency_metadata(
+        arena: &FiberArena,
+        context_store: &FunctionComponentContextRenderStore,
+        render: FunctionComponentRenderRecord,
+        read: FunctionComponentContextReadRecord,
+        expected_render_read_index: usize,
+    ) -> FunctionComponentContextDependencyRecord {
+        let dependency = context_store
+            .context_dependency(read.dependency())
+            .expect("context read must carry private dependency metadata");
+        assert_eq!(dependency.handle(), read.dependency());
+        assert_eq!(dependency.fiber(), read.fiber());
+        assert_eq!(dependency.context(), read.context());
+        assert_eq!(dependency.memoized_value(), read.value());
+        assert_eq!(dependency.read_index(), read.read_index());
+        assert_eq!(dependency.render_read_index(), expected_render_read_index);
+        assert_eq!(dependency.render_lanes(), render.render_lanes());
+        assert_eq!(dependency.dependency_lanes(), Lanes::NO);
+        assert!(!dependency.renderer_visible_propagation());
+        assert_eq!(dependency.propagation_flags(), FiberFlags::NO);
+
+        let fiber = arena.get(read.fiber()).unwrap();
+        assert_eq!(fiber.dependencies(), DependenciesHandle::NONE);
+        assert!(!fiber.flags().contains_any(FiberFlags::NEEDS_PROPAGATION));
+
+        dependency
+    }
+
     fn seed_current_effect_metadata(
         arena: &mut FiberArena,
         hook_store: &mut FunctionComponentHookRenderStore,
@@ -5369,9 +5604,11 @@ mod tests {
         assert_eq!(record.context_read_count(), 1);
         assert!(record.has_context_reads());
         assert_eq!(state.render_fiber(), work_in_progress);
+        assert_eq!(state.render_lanes(), Lanes::DEFAULT);
         assert_eq!(state.context_count(), 1);
         assert_eq!(state.stack_depth(), 0);
         assert_eq!(state.start_read_index(), 0);
+        assert_eq!(state.start_dependency_index(), 0);
         assert_eq!(registry.calls().len(), 1);
         assert_eq!(registry.calls()[0].context_state(), Some(state));
 
@@ -5383,6 +5620,17 @@ mod tests {
         assert_eq!(reads[0].value(), default_value);
         assert_eq!(reads[0].active_provider_count(), 0);
         assert!(!reads[0].has_active_provider());
+        let dependency =
+            assert_private_context_dependency_metadata(&arena, &context_store, record, reads[0], 0);
+        assert_eq!(
+            context_store.context_dependencies_for_record(record),
+            &[dependency]
+        );
+        assert_eq!(
+            dependency.next(),
+            FunctionComponentContextDependencyHandle::NONE
+        );
+        assert!(!dependency.has_next());
         assert_eq!(context_store.current_value(context).unwrap(), default_value);
         assert_eq!(context_store.context_stack().stack_depth(), 0);
     }
@@ -5413,12 +5661,24 @@ mod tests {
         let provider_state = provider_record.context_state().unwrap();
         assert_eq!(provider_state.stack_depth(), 1);
         assert_eq!(provider_state.start_read_index(), 0);
+        assert_eq!(provider_state.start_dependency_index(), 0);
         assert_eq!(provider_record.context_read_count(), 1);
         let provider_reads = context_store.context_reads_for_record(provider_record);
         assert_eq!(provider_reads[0].value(), provided_value);
         assert_eq!(provider_reads[0].default_value(), default_value);
         assert_eq!(provider_reads[0].active_provider_count(), 1);
         assert!(provider_reads[0].has_active_provider());
+        let provider_dependency = assert_private_context_dependency_metadata(
+            &arena,
+            &context_store,
+            provider_record,
+            provider_reads[0],
+            0,
+        );
+        assert_eq!(
+            context_store.context_dependencies_for_record(provider_record),
+            &[provider_dependency]
+        );
         assert_eq!(
             context_store.current_value(context).unwrap(),
             provided_value
@@ -5441,11 +5701,31 @@ mod tests {
         let default_state = default_record.context_state().unwrap();
         assert_eq!(default_state.stack_depth(), 0);
         assert_eq!(default_state.start_read_index(), 1);
+        assert_eq!(default_state.start_dependency_index(), 1);
         assert_eq!(default_record.context_read_count(), 1);
         let default_reads = context_store.context_reads_for_record(default_record);
         assert_eq!(default_reads[0].value(), default_value);
         assert_eq!(default_reads[0].active_provider_count(), 0);
         assert!(!default_reads[0].has_active_provider());
+        let default_dependency = assert_private_context_dependency_metadata(
+            &arena,
+            &context_store,
+            default_record,
+            default_reads[0],
+            0,
+        );
+        assert_eq!(
+            context_store.context_dependencies_for_record(default_record),
+            &[default_dependency]
+        );
+        assert_eq!(
+            provider_dependency.next(),
+            FunctionComponentContextDependencyHandle::NONE
+        );
+        assert_eq!(
+            default_dependency.next(),
+            FunctionComponentContextDependencyHandle::NONE
+        );
         assert_eq!(registry.calls().len(), 2);
         assert_eq!(registry.calls()[0].context_state(), Some(provider_state));
         assert_eq!(registry.calls()[1].context_state(), Some(default_state));
@@ -5491,6 +5771,7 @@ mod tests {
         let state = record.context_state().unwrap();
         assert_eq!(state.stack_depth(), 2);
         assert_eq!(state.start_read_index(), 0);
+        assert_eq!(state.start_dependency_index(), 0);
         assert_eq!(record.context_read_count(), 2);
         assert_eq!(registry.calls()[0].context_state(), Some(state));
         let reads = context_store.context_reads_for_record(record);
@@ -5503,6 +5784,21 @@ mod tests {
         assert_eq!(reads[1].default_value(), inner_default);
         assert_eq!(reads[1].value(), inner_value);
         assert_eq!(reads[1].active_provider_count(), 1);
+        let first_dependency =
+            assert_private_context_dependency_metadata(&arena, &context_store, record, reads[0], 0);
+        let second_dependency =
+            assert_private_context_dependency_metadata(&arena, &context_store, record, reads[1], 1);
+        assert_eq!(first_dependency.next(), second_dependency.handle());
+        assert!(first_dependency.has_next());
+        assert_eq!(
+            second_dependency.next(),
+            FunctionComponentContextDependencyHandle::NONE
+        );
+        assert!(!second_dependency.has_next());
+        assert_eq!(
+            context_store.context_dependencies_for_record(record),
+            &[first_dependency, second_dependency]
+        );
 
         context_store.restore_snapshot(before_inner).unwrap();
         assert_eq!(context_store.stack_depth(), 1);
@@ -5558,7 +5854,9 @@ mod tests {
         assert!(record.render().has_context_reads());
         let state = record.context_state();
         assert_eq!(state.render_fiber(), work_in_progress);
+        assert_eq!(state.render_lanes(), Lanes::DEFAULT);
         assert_eq!(state.stack_depth(), 2);
+        assert_eq!(state.start_dependency_index(), 0);
         assert_eq!(registry.calls().len(), 1);
         assert_eq!(registry.calls()[0].context_state(), Some(state));
 
@@ -5569,6 +5867,22 @@ mod tests {
         assert_eq!(read.value(), inner_value);
         assert_eq!(read.active_provider_count(), 2);
         assert!(read.has_active_provider());
+        assert_eq!(record.context_dependency(), read.dependency());
+        let dependency = assert_private_context_dependency_metadata(
+            &arena,
+            &context_store,
+            record.render(),
+            read,
+            0,
+        );
+        assert_eq!(
+            context_store.context_dependencies_for_record(record.render()),
+            &[dependency]
+        );
+        assert_eq!(
+            dependency.next(),
+            FunctionComponentContextDependencyHandle::NONE
+        );
         assert_eq!(registry.reads(), &[read]);
         assert_eq!(
             context_store.context_reads_for_record(record.render()),
@@ -5615,6 +5929,7 @@ mod tests {
         assert_eq!(registry.calls().len(), 1);
         assert!(registry.reads().is_empty());
         assert!(context_store.context_reads().is_empty());
+        assert!(context_store.context_dependencies().is_empty());
         assert_eq!(
             arena.get(work_in_progress).unwrap().memoized_props(),
             PropsHandle::NONE
@@ -5647,6 +5962,15 @@ mod tests {
         );
         assert_eq!(registry.reads().len(), 2);
         assert_eq!(context_store.context_reads().len(), 2);
+        assert_eq!(context_store.context_dependencies().len(), 2);
+        assert_eq!(
+            context_store.context_dependencies()[0].next(),
+            context_store.context_dependencies()[1].handle()
+        );
+        assert_eq!(
+            context_store.context_dependencies()[1].next(),
+            FunctionComponentContextDependencyHandle::NONE
+        );
         assert_eq!(
             arena.get(work_in_progress).unwrap().memoized_props(),
             PropsHandle::NONE
@@ -5682,6 +6006,7 @@ mod tests {
         assert_eq!(registry.calls().len(), 1);
         assert!(registry.reads().is_empty());
         assert!(context_store.context_reads().is_empty());
+        assert!(context_store.context_dependencies().is_empty());
         assert_eq!(
             arena.get(work_in_progress).unwrap().memoized_props(),
             PropsHandle::NONE
@@ -5730,6 +6055,25 @@ mod tests {
         assert_eq!(read.value(), context_value(731));
         assert_eq!(read.active_provider_count(), 0);
         assert_eq!(context_store.context_reads(), &[read]);
+        assert_eq!(context_store.context_dependencies().len(), 1);
+        let dependency = context_store.context_dependencies()[0];
+        assert_eq!(dependency.handle(), read.dependency());
+        assert_eq!(dependency.fiber(), work_in_progress);
+        assert_eq!(dependency.context(), actual_context);
+        assert_eq!(dependency.memoized_value(), context_value(731));
+        assert_eq!(dependency.read_index(), read.read_index());
+        assert_eq!(dependency.render_read_index(), 0);
+        assert_eq!(dependency.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(dependency.dependency_lanes(), Lanes::NO);
+        assert_eq!(
+            dependency.next(),
+            FunctionComponentContextDependencyHandle::NONE
+        );
+        assert!(!dependency.renderer_visible_propagation());
+        assert_eq!(dependency.propagation_flags(), FiberFlags::NO);
+        let fiber = arena.get(work_in_progress).unwrap();
+        assert_eq!(fiber.dependencies(), DependenciesHandle::NONE);
+        assert!(!fiber.flags().contains_any(FiberFlags::NEEDS_PROPAGATION));
         assert_eq!(
             context_store.current_value(expected_context).unwrap(),
             context_value(732)
