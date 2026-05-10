@@ -186,6 +186,10 @@ const privateUnmountNativeBridgeCleanupHandoffDiagnosticId =
   "react-test-renderer-unmount-native-bridge-cleanup-handoff-private-diagnostic";
 const privateUnmountNativeBridgeCleanupHandoffStatus =
   "private-unmount-native-bridge-cleanup-handoff-public-unmount-blocked";
+const privateUnmountPassiveRefCleanupOrderDiagnosticId =
+  "react-test-renderer-unmount-passive-ref-cleanup-order-private-diagnostic";
+const privateUnmountPassiveRefCleanupOrderStatus =
+  "private-unmount-passive-ref-cleanup-order-public-unmount-blocked";
 const missingPrerequisites = [
   "public-react-test-renderer-root-lifecycle-routing",
   "react-test-renderer-host-output-serialization"
@@ -1459,6 +1463,20 @@ test("react-test-renderer CJS development private unmount route records deletion
             hostChildDetachmentBlockers: {
               hostNodeCleanupInvalidatedCount: 0
             }
+          }
+        }
+      )
+    ),
+    false
+  );
+  assert.equal(
+    bridge.canConsumePrivateUnmountNativeBridgeAdmission(
+      unmountError.rootRequest,
+      createRustUnmountNativeBridgeAdmissionEvidence(
+        unmountError.rootRequest,
+        {
+          passiveRefCleanupOrder: {
+            nativeCleanupAfterRefAndPassiveOrdering: false
           }
         }
       )
@@ -4276,6 +4294,16 @@ function assertRootExecutionHandoff(handoff, request) {
       true
     );
   }
+  if (request.privateUnmountPassiveRefCleanupOrderGate != null) {
+    assert.equal(
+      handoff.privateUnmountPassiveRefCleanupOrderGate,
+      request.privateUnmountPassiveRefCleanupOrderGate
+    );
+    assert.equal(
+      handoff.privateUnmountPassiveRefCleanupOrderAvailable,
+      true
+    );
+  }
   if (request.privateUnmountNativeBridgeAdmissionGate != null) {
     assert.equal(
       handoff.privateUnmountNativeBridgeAdmissionGate,
@@ -4359,6 +4387,19 @@ function assertRootExecutionResult(result, request) {
       result.privateUnmountNativeBridgeCleanupHandoffAvailable,
       true
     );
+    if (
+      result.privateUnmountNativeBridgeAdmission.passiveRefCleanupOrder !==
+      undefined
+    ) {
+      assert.equal(
+        result.privateUnmountPassiveRefCleanupOrder,
+        result.privateUnmountNativeBridgeAdmission.passiveRefCleanupOrder
+      );
+      assert.equal(
+        result.privateUnmountPassiveRefCleanupOrderAvailable,
+        true
+      );
+    }
   }
   if (result.privateCreateNativeBridgeHostOutputHandoff != null) {
     assertPrivateCreateNativeBridgeHostOutputHandoff(
@@ -5312,6 +5353,9 @@ function createRustUnmountDeletionCommitHandoffSource(request, overrides = {}) {
     publicUnmountCompatibilityClaimed: false,
     publicHostTeardownCompatibilityClaimed: false,
     actFlushingClaimed: false,
+    passiveRefCleanupOrder:
+      overrides.passiveRefCleanupOrder ??
+      createRustUnmountPassiveRefCleanupOrderSource(request),
     hostChildDetachmentBlockers: {
       detachedInstance: true,
       detachedInstanceChildCount: 0,
@@ -5324,6 +5368,37 @@ function createRustUnmountDeletionCommitHandoffSource(request, overrides = {}) {
       publicUnmountCompatibilityClaimed: false,
       actFlushingClaimed: false
     },
+    ...overrides
+  };
+}
+
+function createRustUnmountPassiveRefCleanupOrderSource(
+  request,
+  overrides = {}
+) {
+  return {
+    diagnosticId: privateUnmountPassiveRefCleanupOrderDiagnosticId,
+    status: privateUnmountPassiveRefCleanupOrderStatus,
+    rootId: request.rootId,
+    refCleanupReturnCount: 0,
+    passiveDestroyCount: 0,
+    hostNodeCleanupCount: 2,
+    cleanupOrderRecordCount: 2,
+    firstHostNodeCleanupOrder: 0,
+    lastRefCleanupReturnOrder: null,
+    firstPassiveDestroyOrder: null,
+    lastPassiveDestroyOrder: null,
+    refCleanupReturnPrecedesPassiveDestroy: true,
+    hostCleanupFollowsRefCleanupReturn: true,
+    hostCleanupFollowsPassiveDestroy: true,
+    nativeCleanupAfterRefAndPassiveOrdering: true,
+    minimalTreeOrderingIsHostCleanupOnly: true,
+    refCleanupReturnCallbacksInvoked: false,
+    passiveDestroyCallbacksInvoked: false,
+    publicEffectsFlushed: false,
+    publicRefOrEffectCompatibilityClaimed: false,
+    publicUnmountCompatibilityClaimed: false,
+    actFlushingClaimed: false,
     ...overrides
   };
 }
@@ -5365,6 +5440,10 @@ function createRustUnmountNativeBridgeCleanupHandoffSource(
     act_flushing_claimed: false,
     native_bridge_available: false,
     native_execution: false,
+    passive_ref_cleanup_order:
+      overrides.passiveRefCleanupOrder ??
+      deletionCommitHandoff.passiveRefCleanupOrder ??
+      deletionCommitHandoff.passive_ref_cleanup_order,
     deletion_commit_handoff: deletionCommitHandoff,
     ...overrides
   };
@@ -5381,6 +5460,16 @@ function createRustUnmountNativeBridgeAdmissionEvidence(
     handoffOverrides.hostNodeCleanupCount ?? 2;
   const cleanupOrderRecordCount =
     handoffOverrides.cleanupOrderRecordCount ?? hostNodeCleanupCount;
+  const passiveRefCleanupOrder =
+    handoffOverrides.passiveRefCleanupOrder ??
+    createRustUnmountPassiveRefCleanupOrderSource(
+      request,
+      {
+        hostNodeCleanupCount,
+        cleanupOrderRecordCount,
+        ...(overrides.passiveRefCleanupOrder ?? {})
+      }
+    );
   const blockers = {
     detachedInstance: true,
     detachedInstanceChildCount: 0,
@@ -5400,6 +5489,7 @@ function createRustUnmountNativeBridgeAdmissionEvidence(
       ...handoffOverrides,
       hostNodeCleanupCount,
       cleanupOrderRecordCount,
+      passiveRefCleanupOrder,
       hostChildDetachmentBlockers: blockers
     }
   );
@@ -5613,6 +5703,11 @@ function assertRustCanaryMetadata(metadata, label) {
   if (metadata.hostOutput.updateNativeBridgeAdmissionGate !== undefined) {
     expectedAcceptedRustWorkers.push(
       "worker-637-test-renderer-update-native-execution"
+    );
+  }
+  if (metadata.unmountPassiveRefCleanupOrder !== undefined) {
+    expectedAcceptedRustWorkers.push(
+      "worker-672-test-renderer-unmount-passive-ref-order"
     );
   }
   assert.deepEqual(metadata.acceptedRustWorkers, expectedAcceptedRustWorkers);
@@ -5870,6 +5965,27 @@ function assertRustCanaryMetadata(metadata, label) {
       "TestRendererUnmountNativeBridgeCleanupHandoff",
       label
     );
+    if (metadata.hostOutput.unmountPassiveRefCleanupOrderGate !== undefined) {
+      assert.equal(
+        metadata.hostOutput.unmountPassiveRefCleanupOrderDiagnosticId,
+        privateUnmountPassiveRefCleanupOrderDiagnosticId,
+        label
+      );
+      assert.equal(
+        metadata.hostOutput.unmountPassiveRefCleanupOrderStatus,
+        privateUnmountPassiveRefCleanupOrderStatus,
+        label
+      );
+      assertPrivateUnmountPassiveRefCleanupOrderGate(
+        metadata.hostOutput.unmountPassiveRefCleanupOrderGate,
+        label
+      );
+      assert.equal(
+        metadata.hostOutput.unmountPassiveRefCleanupOrder,
+        "TestRendererUnmountPassiveRefCleanupOrderEvidence",
+        label
+      );
+    }
   }
 
   if (metadata.rootWorkLoopFinishedWorkPreflight !== undefined) {
@@ -6171,6 +6287,12 @@ function assertRustCanaryMetadata(metadata, label) {
       metadata.unmountNativeBridgeCleanupHandoff,
       label
     );
+    if (metadata.unmountPassiveRefCleanupOrder !== undefined) {
+      assertPrivateUnmountPassiveRefCleanupOrderGate(
+        metadata.unmountPassiveRefCleanupOrder,
+        label
+      );
+    }
   }
 
   assert.equal(Object.isFrozen(metadata.privateJson), true, label);
@@ -6550,6 +6672,8 @@ function assertRustCanaryOperationMetadata(metadata, expected) {
     expected.operation === "unmount" &&
     metadata.nativeBridgeAdmissionApi !== undefined
   ) {
+    const hasPassiveRefCleanupOrder =
+      metadata.passiveRefCleanupOrder !== undefined;
     assert.equal(
       metadata.nativeBridgeAdmissionApi,
       "TestRendererRoot::describe_private_unmount_native_bridge_admission_for_canary"
@@ -6574,16 +6698,40 @@ function assertRustCanaryOperationMetadata(metadata, expected) {
       metadata.nativeBridgeCleanupHandoffStatus,
       privateUnmountNativeBridgeCleanupHandoffStatus
     );
+    if (hasPassiveRefCleanupOrder) {
+      assert.equal(
+        metadata.passiveRefCleanupOrderDiagnosticId,
+        privateUnmountPassiveRefCleanupOrderDiagnosticId
+      );
+      assert.equal(
+        metadata.passiveRefCleanupOrderStatus,
+        privateUnmountPassiveRefCleanupOrderStatus
+      );
+      assertPrivateUnmountPassiveRefCleanupOrderGate(
+        metadata.passiveRefCleanupOrder,
+        expected.entrypoint
+      );
+    }
     expectedWorkersByOperation.unmount.push(
       "worker-612-test-renderer-unmount-native-bridge-admission",
       "worker-638-test-renderer-unmount-native-execution"
     );
+    if (hasPassiveRefCleanupOrder) {
+      expectedWorkersByOperation.unmount.push(
+        "worker-672-test-renderer-unmount-passive-ref-order"
+      );
+    }
     expectedTestsByOperation.unmount.push(
       "root_private_unmount_native_bridge_admission_rejects_stale_handoff",
       "root_private_unmount_native_bridge_admission_rejects_missing_cleanup_blockers",
       "root_private_unmount_native_bridge_admission_rejects_already_unmounted_root",
       "root_private_unmount_native_bridge_admission_executes_minimal_cleanup_handoff"
     );
+    if (hasPassiveRefCleanupOrder) {
+      expectedTestsByOperation.unmount.push(
+        "root_private_unmount_passive_ref_order_rejects_native_cleanup_mismatch"
+      );
+    }
   }
   assert.deepEqual(
     metadata.acceptedWorkers,
@@ -7237,19 +7385,33 @@ function assertPrivateUpdateNativeBridgeAdmission(record, request) {
 }
 
 function assertPrivateUnmountDeletionCommitHandoffGate(gate, label) {
+  const hasPassiveRefCleanupOrder =
+    gate.passiveRefCleanupOrderGate !== undefined;
   assert.equal(Object.isFrozen(gate), true, label);
   assert.equal(gate.id, privateUnmountDeletionCommitHandoffDiagnosticId, label);
   assert.equal(gate.status, privateUnmountDeletionCommitHandoffStatus, label);
   assert.equal(gate.publicSurface, "create().unmount", label);
   assert.equal(gate.deterministic, true, label);
   assert.equal(gate.acceptedRustCrate, "fast-react-test-renderer", label);
-  assert.deepEqual(gate.acceptedRustRecords, [
+  const expectedRustRecords = [
     "HostRootCommitRecord",
     "HostRootDeletionCleanupLog",
     "TestRendererHostNodeCleanupReport",
     "TestRendererUnmountDeletionCommitHandoffDiagnostics",
     "TestRendererUnmountHostChildDetachmentBlockers"
-  ]);
+  ];
+  if (hasPassiveRefCleanupOrder) {
+    expectedRustRecords.splice(
+      2,
+      0,
+      "HostRootDeletionCleanupOrderGateSnapshot",
+      "HostRootDeletionCleanupOrderGateRecord"
+    );
+    expectedRustRecords.push(
+      "TestRendererUnmountPassiveRefCleanupOrderEvidence"
+    );
+  }
+  assert.deepEqual(gate.acceptedRustRecords, expectedRustRecords);
   assert.deepEqual(gate.acceptedRustApis, [
     "TestRendererRoot::unmount",
     "TestRendererRoot::render_and_commit_host_output_unmount_for_canary",
@@ -7269,8 +7431,17 @@ function assertPrivateUnmountDeletionCommitHandoffGate(gate, label) {
     gate.hostChildDetachmentBlockers,
     label
   );
+  if (hasPassiveRefCleanupOrder) {
+    assertPrivateUnmountPassiveRefCleanupOrderGate(
+      gate.passiveRefCleanupOrderGate,
+      label
+    );
+  }
   assert.equal(gate.deletionCommitHandoffAvailable, true, label);
   assert.equal(gate.hostNodeDeletionCleanupLogAvailable, true, label);
+  if (hasPassiveRefCleanupOrder) {
+    assert.equal(gate.passiveRefCleanupOrderEvidenceAvailable, true, label);
+  }
   assert.equal(gate.hostChildDetachmentBlockersAvailable, true, label);
   assert.equal(gate.lifecycleStatusMetadataAvailable, true, label);
   assert.equal(gate.staleRootRecordRejection, true, label);
@@ -7315,6 +7486,53 @@ function assertPrivateUnmountHostChildDetachmentBlockers(blockers, label) {
   assert.equal(blockers.nativeBridgeAvailable, false, label);
   assert.equal(blockers.nativeExecution, false, label);
   assert.equal(blockers.compatibilityClaimed, false, label);
+}
+
+function assertPrivateUnmountPassiveRefCleanupOrderGate(gate, label) {
+  assert.equal(Object.isFrozen(gate), true, label);
+  assert.equal(
+    gate.id,
+    privateUnmountPassiveRefCleanupOrderDiagnosticId,
+    label
+  );
+  assert.equal(gate.status, privateUnmountPassiveRefCleanupOrderStatus, label);
+  assert.equal(gate.publicSurface, "create().unmount", label);
+  assert.equal(gate.deterministic, true, label);
+  assert.equal(
+    gate.acceptedWorker,
+    "worker-672-test-renderer-unmount-passive-ref-order",
+    label
+  );
+  assert.equal(gate.acceptedRustCrate, "fast-react-test-renderer", label);
+  assert.deepEqual(gate.acceptedRustRecords, [
+    "HostRootDeletionCleanupOrderGateSnapshot",
+    "HostRootDeletionCleanupOrderGateRecord",
+    "TestRendererUnmountPassiveRefCleanupOrderEvidence"
+  ]);
+  assert.deepEqual(gate.acceptedRustApis, [
+    "TestRendererRoot::describe_private_unmount_deletion_commit_handoff_for_canary",
+    "TestRendererRoot::execute_private_unmount_native_bridge_cleanup_handoff_for_canary"
+  ]);
+  assert.deepEqual(gate.acceptedRustTests, [
+    "root_private_unmount_passive_ref_order_rejects_native_cleanup_mismatch",
+    "root_private_unmount_native_bridge_admission_executes_minimal_cleanup_handoff"
+  ]);
+  assert.equal(
+    gate.tiesNativeCleanupToRefDetachmentAndPassiveDestroyOrder,
+    true,
+    label
+  );
+  assert.equal(gate.validatesNativeCleanupAfterRefAndPassiveOrder, true, label);
+  assert.equal(gate.minimalTreeOrderEvidenceAvailable, true, label);
+  assert.equal(gate.publicRouteAvailable, false, label);
+  assert.equal(gate.publicUnmountCompatibilityClaimed, false, label);
+  assert.equal(gate.publicRefOrEffectCompatibilityClaimed, false, label);
+  assert.equal(gate.publicEffectsFlushed, false, label);
+  assert.equal(gate.actFlushingClaimed, false, label);
+  assert.equal(gate.nativeBridgeAvailable, false, label);
+  assert.equal(gate.nativeExecution, false, label);
+  assert.equal(gate.rustExecutionFromJs, false, label);
+  assert.equal(gate.compatibilityClaimed, false, label);
 }
 
 function assertPrivateUnmountDeletionCommitHandoff(record, expected) {
@@ -7407,6 +7625,16 @@ function assertPrivateUnmountDeletionCommitHandoff(record, expected) {
     record.hostChildDetachmentBlockers,
     expected.entrypoint
   );
+  if (record.passiveRefCleanupOrderGate !== undefined) {
+    assertPrivateUnmountPassiveRefCleanupOrderGate(
+      record.passiveRefCleanupOrderGate,
+      expected.entrypoint
+    );
+    assert.equal(
+      record.passiveRefCleanupOrderEvidenceAvailable,
+      expected.scheduled
+    );
+  }
   assert.equal(record.lifecycleStatusMetadataAvailable, true);
   assert.equal(record.staleRootRecordRejection, true);
   assert.equal(record.alreadyUnmountedRootRecordRejection, true);
@@ -7422,6 +7650,8 @@ function assertPrivateUnmountDeletionCommitHandoff(record, expected) {
 }
 
 function assertPrivateUnmountNativeBridgeCleanupHandoffGate(gate, label) {
+  const hasPassiveRefCleanupOrder =
+    gate.passiveRefCleanupOrderGate !== undefined;
   assert.equal(Object.isFrozen(gate), true, label);
   assert.equal(
     gate.id,
@@ -7437,17 +7667,31 @@ function assertPrivateUnmountNativeBridgeCleanupHandoffGate(gate, label) {
   assert.equal(gate.deterministic, true, label);
   assert.equal(
     gate.acceptedWorker,
-    "worker-638-test-renderer-unmount-native-execution",
+    hasPassiveRefCleanupOrder
+      ? "worker-672-test-renderer-unmount-passive-ref-order"
+      : "worker-638-test-renderer-unmount-native-execution",
     label
   );
+  if (hasPassiveRefCleanupOrder) {
+    assert.deepEqual(gate.acceptedWorkers, [
+      "worker-638-test-renderer-unmount-native-execution",
+      "worker-672-test-renderer-unmount-passive-ref-order"
+    ]);
+  }
   assert.equal(gate.acceptedRustCrate, "fast-react-test-renderer", label);
-  assert.deepEqual(gate.acceptedRustRecords, [
+  const expectedRustRecords = [
     "TestRendererRootUpdateOutcome",
     "TestRendererUnmountedHostOutput",
     "TestRendererUnmountDeletionCommitHandoffDiagnostics",
     "TestRendererUnmountNativeBridgeAdmission",
     "TestRendererUnmountNativeBridgeCleanupHandoff"
-  ]);
+  ];
+  if (hasPassiveRefCleanupOrder) {
+    expectedRustRecords.push(
+      "TestRendererUnmountPassiveRefCleanupOrderEvidence"
+    );
+  }
+  assert.deepEqual(gate.acceptedRustRecords, expectedRustRecords);
   assert.deepEqual(gate.acceptedRustApis, [
     "TestRendererRoot::unmount",
     "TestRendererRoot::render_and_commit_host_output_unmount_for_canary",
@@ -7455,13 +7699,25 @@ function assertPrivateUnmountNativeBridgeCleanupHandoffGate(gate, label) {
     "TestRendererRoot::describe_private_unmount_native_bridge_admission_for_canary",
     "TestRendererRoot::execute_private_unmount_native_bridge_cleanup_handoff_for_canary"
   ]);
-  assert.deepEqual(gate.acceptedRustTests, [
+  const expectedRustTests = [
     "root_private_unmount_native_bridge_admission_executes_minimal_cleanup_handoff"
-  ]);
+  ];
+  if (hasPassiveRefCleanupOrder) {
+    expectedRustTests.push(
+      "root_private_unmount_passive_ref_order_rejects_native_cleanup_mismatch"
+    );
+  }
+  assert.deepEqual(gate.acceptedRustTests, expectedRustTests);
   assertPrivateUnmountDeletionCommitHandoffGate(
     gate.deletionCommitHandoffGate,
     label
   );
+  if (hasPassiveRefCleanupOrder) {
+    assertPrivateUnmountPassiveRefCleanupOrderGate(
+      gate.passiveRefCleanupOrderGate,
+      label
+    );
+  }
   assert.equal(
     gate.admissionDiagnosticId,
     privateUnmountNativeBridgeAdmissionDiagnosticId,
@@ -7470,6 +7726,13 @@ function assertPrivateUnmountNativeBridgeCleanupHandoffGate(gate, label) {
   assert.equal(gate.minimalTreeOnly, true, label);
   assert.equal(gate.hostOutputProduced, true, label);
   assert.equal(gate.rustUnmountCleanupHandoffExecuted, true, label);
+  if (hasPassiveRefCleanupOrder) {
+    assert.equal(
+      gate.tiesNativeCleanupToRefDetachmentAndPassiveDestroyOrder,
+      true,
+      label
+    );
+  }
   assert.equal(gate.publicRouteAvailable, false, label);
   assert.equal(gate.publicUnmountCompatibilityClaimed, false, label);
   assert.equal(gate.publicHostTeardownCompatibilityClaimed, false, label);
@@ -7481,6 +7744,8 @@ function assertPrivateUnmountNativeBridgeCleanupHandoffGate(gate, label) {
 }
 
 function assertPrivateUnmountNativeBridgeAdmissionGate(gate, label) {
+  const hasPassiveRefCleanupOrder =
+    gate.passiveRefCleanupOrderGate !== undefined;
   assert.equal(Object.isFrozen(gate), true, label);
   assert.equal(gate.id, privateUnmountNativeBridgeAdmissionDiagnosticId, label);
   assert.equal(gate.status, privateUnmountNativeBridgeAdmissionStatus, label);
@@ -7488,22 +7753,36 @@ function assertPrivateUnmountNativeBridgeAdmissionGate(gate, label) {
   assert.equal(gate.deterministic, true, label);
   assert.equal(
     gate.acceptedWorker,
-    "worker-638-test-renderer-unmount-native-execution",
+    hasPassiveRefCleanupOrder
+      ? "worker-672-test-renderer-unmount-passive-ref-order"
+      : "worker-638-test-renderer-unmount-native-execution",
     label
   );
-  assert.deepEqual(gate.acceptedWorkers, [
+  const expectedWorkers = [
     "worker-612-test-renderer-unmount-native-bridge-admission",
     "worker-638-test-renderer-unmount-native-execution"
-  ]);
+  ];
+  if (hasPassiveRefCleanupOrder) {
+    expectedWorkers.push(
+      "worker-672-test-renderer-unmount-passive-ref-order"
+    );
+  }
+  assert.deepEqual(gate.acceptedWorkers, expectedWorkers);
   assert.equal(gate.acceptedRustCrate, "fast-react-test-renderer", label);
-  assert.deepEqual(gate.acceptedRustRecords, [
+  const expectedRustRecords = [
     "TestRendererRootUpdateOutcome",
     "TestRendererRootScheduledUpdate",
     "TestRendererUnmountDeletionCommitHandoffDiagnostics",
     "TestRendererUnmountHostChildDetachmentBlockers",
     "TestRendererUnmountNativeBridgeAdmission",
     "TestRendererUnmountNativeBridgeCleanupHandoff"
-  ]);
+  ];
+  if (hasPassiveRefCleanupOrder) {
+    expectedRustRecords.push(
+      "TestRendererUnmountPassiveRefCleanupOrderEvidence"
+    );
+  }
+  assert.deepEqual(gate.acceptedRustRecords, expectedRustRecords);
   assert.deepEqual(gate.acceptedRustApis, [
     "TestRendererRoot::unmount",
     "TestRendererRoot::render_and_commit_host_output_unmount_for_canary",
@@ -7511,13 +7790,19 @@ function assertPrivateUnmountNativeBridgeAdmissionGate(gate, label) {
     "TestRendererRoot::describe_private_unmount_native_bridge_admission_for_canary",
     "TestRendererRoot::execute_private_unmount_native_bridge_cleanup_handoff_for_canary"
   ]);
-  assert.deepEqual(gate.acceptedRustTests, [
+  const expectedRustTests = [
     "root_host_output_canary_unmounts_committed_output_with_deletion_cleanup_diagnostics",
     "root_private_unmount_native_bridge_admission_rejects_stale_handoff",
     "root_private_unmount_native_bridge_admission_rejects_missing_cleanup_blockers",
     "root_private_unmount_native_bridge_admission_rejects_already_unmounted_root",
     "root_private_unmount_native_bridge_admission_executes_minimal_cleanup_handoff"
-  ]);
+  ];
+  if (hasPassiveRefCleanupOrder) {
+    expectedRustTests.push(
+      "root_private_unmount_passive_ref_order_rejects_native_cleanup_mismatch"
+    );
+  }
+  assert.deepEqual(gate.acceptedRustTests, expectedRustTests);
   assert.equal(
     gate.privateRouteDependencyId,
     "react-test-renderer-unmount-route-private-diagnostic",
@@ -7531,6 +7816,12 @@ function assertPrivateUnmountNativeBridgeAdmissionGate(gate, label) {
     gate.cleanupHandoffGate,
     label
   );
+  if (hasPassiveRefCleanupOrder) {
+    assertPrivateUnmountPassiveRefCleanupOrderGate(
+      gate.passiveRefCleanupOrderGate,
+      label
+    );
+  }
   assertLifecycleDiagnosticGate(gate.lifecycleDiagnosticGate);
   assert.equal(gate.consumesPrivateUnmountRouteMetadata, true, label);
   assert.equal(gate.consumesAcceptedRustLifecycleDiagnostics, true, label);
@@ -7539,7 +7830,17 @@ function assertPrivateUnmountNativeBridgeAdmissionGate(gate, label) {
   assert.equal(gate.requiresActualRustCleanupHandoff, true, label);
   assert.equal(gate.validatesLifecycleEvidence, true, label);
   assert.equal(gate.validatesCleanupBlockers, true, label);
+  if (hasPassiveRefCleanupOrder) {
+    assert.equal(gate.validatesPassiveRefCleanupOrder, true, label);
+  }
   assert.equal(gate.validatesMinimalTreeCleanupHandoff, true, label);
+  if (hasPassiveRefCleanupOrder) {
+    assert.equal(
+      gate.tiesNativeCleanupToRefDetachmentAndPassiveDestroyOrder,
+      true,
+      label
+    );
+  }
   assert.equal(gate.rustUnmountCleanupHandoffExecuted, true, label);
   assert.equal(gate.hostOutputProduced, true, label);
   assert.equal(gate.minimalTreeCleanupHandoff, true, label);
@@ -7557,6 +7858,8 @@ function assertPrivateUnmountNativeBridgeAdmissionGate(gate, label) {
 }
 
 function assertPrivateUnmountNativeBridgeAdmission(record, request) {
+  const hasPassiveRefCleanupOrder =
+    record.passiveRefCleanupOrder !== undefined;
   assert.equal(Object.isFrozen(record), true, request.entrypoint);
   assert.equal(record.id, privateUnmountNativeBridgeAdmissionDiagnosticId);
   assert.equal(
@@ -7622,6 +7925,14 @@ function assertPrivateUnmountNativeBridgeAdmission(record, request) {
   assert.equal(record.cleanupHandoff.detachedInstanceChildCount, 0);
   assert.equal(record.cleanupHandoff.hostNodeCleanupCount, 2);
   assert.equal(record.cleanupHandoff.cleanupOrderRecordCount, 2);
+  if (hasPassiveRefCleanupOrder) {
+    assert.equal(record.cleanupHandoff.refCleanupReturnCount, 0);
+    assert.equal(record.cleanupHandoff.passiveDestroyCount, 0);
+    assert.equal(
+      record.cleanupHandoff.nativeCleanupAfterRefAndPassiveOrdering,
+      true
+    );
+  }
   assert.equal(record.cleanupHandoff.minimalTreeCleanupHandoff, true);
   assert.equal(
     record.cleanupHandoff.rustUnmountCleanupHandoffExecuted,
@@ -7636,6 +7947,12 @@ function assertPrivateUnmountNativeBridgeAdmission(record, request) {
   assert.equal(record.cleanupHandoff.actFlushingClaimed, false);
   assert.equal(record.cleanupHandoff.nativeBridgeAvailable, false);
   assert.equal(record.cleanupHandoff.nativeExecution, false);
+  if (hasPassiveRefCleanupOrder) {
+    assertPrivateUnmountPassiveRefCleanupOrder(
+      record.cleanupHandoff.passiveRefCleanupOrder,
+      request
+    );
+  }
   assert.equal(Object.isFrozen(record.deletionCommitHandoff), true);
   assert.equal(
     record.cleanupHandoff.deletionCommitHandoff,
@@ -7681,6 +7998,20 @@ function assertPrivateUnmountNativeBridgeAdmission(record, request) {
     false
   );
   assert.equal(record.deletionCommitHandoff.actFlushingClaimed, false);
+  if (hasPassiveRefCleanupOrder) {
+    assertPrivateUnmountPassiveRefCleanupOrder(
+      record.deletionCommitHandoff.passiveRefCleanupOrder,
+      request
+    );
+    assert.equal(
+      record.passiveRefCleanupOrder,
+      record.deletionCommitHandoff.passiveRefCleanupOrder
+    );
+    assert.equal(
+      record.passiveRefCleanupOrderDiagnosticId,
+      privateUnmountPassiveRefCleanupOrderDiagnosticId
+    );
+  }
   const blockers = record.deletionCommitHandoff.hostChildDetachmentBlockers;
   assert.equal(Object.isFrozen(blockers), true);
   assert.equal(blockers.detachedInstance, true);
@@ -7700,13 +8031,28 @@ function assertPrivateUnmountNativeBridgeAdmission(record, request) {
   assert.equal(record.requiresActualRustCleanupHandoff, true);
   assert.equal(record.validatesLifecycleEvidence, true);
   assert.equal(record.validatesCleanupBlockers, true);
+  if (hasPassiveRefCleanupOrder) {
+    assert.equal(record.validatesPassiveRefCleanupOrder, true);
+  }
   assert.equal(record.validatesMinimalTreeCleanupHandoff, true);
+  if (hasPassiveRefCleanupOrder) {
+    assert.equal(
+      record.tiesNativeCleanupToRefDetachmentAndPassiveDestroyOrder,
+      true
+    );
+  }
   assert.equal(record.deletionCommitHandoffAccepted, true);
   assert.equal(record.cleanupHandoffAccepted, true);
   assert.equal(record.lifecycleEvidenceAccepted, true);
   assert.equal(record.cleanupBlockersAccepted, true);
   assert.equal(record.hostNodeCleanupCount, 2);
   assert.equal(record.cleanupOrderRecordCount, 2);
+  if (hasPassiveRefCleanupOrder) {
+    assert.equal(record.passiveRefCleanupOrderAccepted, true);
+    assert.equal(record.refCleanupReturnCount, 0);
+    assert.equal(record.passiveDestroyCount, 0);
+    assert.equal(record.nativeCleanupAfterRefAndPassiveOrdering, true);
+  }
   assert.equal(record.rustUnmountCleanupHandoffExecuted, true);
   assert.equal(record.hostOutputProduced, true);
   assert.equal(record.minimalTreeCleanupHandoff, true);
@@ -7722,6 +8068,35 @@ function assertPrivateUnmountNativeBridgeAdmission(record, request) {
   assert.equal(record.rustExecutionFromJs, false);
   assert.equal(record.reconcilerExecutionFromJs, false);
   assert.equal(record.compatibilityClaimed, false);
+}
+
+function assertPrivateUnmountPassiveRefCleanupOrder(order, request) {
+  assert.equal(Object.isFrozen(order), true, request.entrypoint);
+  assert.equal(
+    order.diagnosticId,
+    privateUnmountPassiveRefCleanupOrderDiagnosticId
+  );
+  assert.equal(order.status, privateUnmountPassiveRefCleanupOrderStatus);
+  assert.equal(order.rootId, request.rootId);
+  assert.equal(order.refCleanupReturnCount, 0);
+  assert.equal(order.passiveDestroyCount, 0);
+  assert.equal(order.hostNodeCleanupCount, 2);
+  assert.equal(order.cleanupOrderRecordCount, 2);
+  assert.equal(order.firstHostNodeCleanupOrder, 0);
+  assert.equal(order.lastRefCleanupReturnOrder, null);
+  assert.equal(order.firstPassiveDestroyOrder, null);
+  assert.equal(order.lastPassiveDestroyOrder, null);
+  assert.equal(order.refCleanupReturnPrecedesPassiveDestroy, true);
+  assert.equal(order.hostCleanupFollowsRefCleanupReturn, true);
+  assert.equal(order.hostCleanupFollowsPassiveDestroy, true);
+  assert.equal(order.nativeCleanupAfterRefAndPassiveOrdering, true);
+  assert.equal(order.minimalTreeOrderingIsHostCleanupOnly, true);
+  assert.equal(order.refCleanupReturnCallbacksInvoked, false);
+  assert.equal(order.passiveDestroyCallbacksInvoked, false);
+  assert.equal(order.publicEffectsFlushed, false);
+  assert.equal(order.publicRefOrEffectCompatibilityClaimed, false);
+  assert.equal(order.publicUnmountCompatibilityClaimed, false);
+  assert.equal(order.actFlushingClaimed, false);
 }
 
 function assertLifecycleDiagnosticGate(gate) {
