@@ -164,7 +164,8 @@ mod tests {
     use crate::test_support::{FakeContainer, RecordingHost};
     use crate::{FiberRootStore, RootOptions};
     use fast_react_core::{
-        FiberMode, FiberTypeHandle, PropsHandle, StateHandle, UpdateQueueHandle,
+        ContextHandle, ContextStack, ContextStackSnapshot, ContextValueHandle, FiberMode,
+        FiberTypeHandle, PropsHandle, StateHandle, UpdateQueueHandle,
     };
 
     #[derive(Debug, Clone)]
@@ -212,6 +213,52 @@ mod tests {
         }
     }
 
+    #[derive(Debug)]
+    struct ContextReadingFunctionComponentRegistry<'a> {
+        stack: &'a ContextStack,
+        context: ContextHandle,
+        observed: Option<ContextValueHandle>,
+        output: FunctionComponentOutputHandle,
+    }
+
+    impl FunctionComponentInvoker for ContextReadingFunctionComponentRegistry<'_> {
+        fn invoke_function_component(
+            &mut self,
+            _request: FunctionComponentInvocationRequest,
+        ) -> Result<FunctionComponentOutputHandle, FunctionComponentInvocationError> {
+            let current = self.stack.current_value(self.context).map_err(|_| {
+                FunctionComponentInvocationError::component_error("test context read failed")
+            })?;
+            self.observed = Some(current);
+            Ok(self.output)
+        }
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    struct FakeProviderBoundary {
+        fiber: FiberId,
+        context: ContextHandle,
+        value: ContextValueHandle,
+    }
+
+    fn context_value(raw: u64) -> ContextValueHandle {
+        ContextValueHandle::from_raw(raw)
+    }
+
+    fn push_fake_provider_boundary(
+        arena: &FiberArena,
+        stack: &mut ContextStack,
+        boundary: FakeProviderBoundary,
+    ) -> ContextStackSnapshot {
+        assert_eq!(
+            arena.get(boundary.fiber).unwrap().tag(),
+            FiberTag::ContextProvider
+        );
+        stack
+            .push_provider(boundary.context, boundary.value)
+            .unwrap()
+    }
+
     fn function_component_pair() -> (FiberArena, FiberId, FiberId, FiberTypeHandle) {
         let mut arena = FiberArena::new();
         let current = arena.create_fiber(
@@ -227,6 +274,78 @@ mod tests {
             .unwrap();
 
         (arena, current, work_in_progress, component)
+    }
+
+    #[test]
+    fn begin_work_context_stack_canary_pushes_reads_and_unwinds_around_fake_provider_boundary() {
+        let mut stack = ContextStack::new();
+        let default_value = context_value(10);
+        let provided_value = context_value(20);
+        let context = stack.create_context(default_value);
+        assert_eq!(stack.current_value(context).unwrap(), default_value);
+
+        let (mut arena, _current, child_work_in_progress, component) = function_component_pair();
+        let provider_current = arena.create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(30),
+            FiberMode::NO,
+        );
+        let provider_work_in_progress = arena
+            .create_work_in_progress(provider_current, PropsHandle::from_raw(31))
+            .unwrap();
+        arena
+            .set_children(provider_work_in_progress, &[child_work_in_progress])
+            .unwrap();
+        assert_eq!(
+            arena.get(child_work_in_progress).unwrap().return_fiber(),
+            Some(provider_work_in_progress)
+        );
+
+        let before_provider = push_fake_provider_boundary(
+            &arena,
+            &mut stack,
+            FakeProviderBoundary {
+                fiber: provider_work_in_progress,
+                context,
+                value: provided_value,
+            },
+        );
+        assert!(before_provider.is_root());
+        assert_eq!(stack.current_value(context).unwrap(), provided_value);
+        assert_eq!(stack.stack_depth(), 1);
+
+        let output = FunctionComponentOutputHandle::from_raw(90);
+        let observed_value = {
+            let mut registry = ContextReadingFunctionComponentRegistry {
+                stack: &stack,
+                context,
+                observed: None,
+                output,
+            };
+
+            let result = begin_work(
+                &mut arena,
+                BeginWorkRequest::new(child_work_in_progress, Lanes::DEFAULT),
+                &mut registry,
+            )
+            .unwrap()
+            .function_component();
+
+            assert_eq!(result.output(), output);
+            assert_eq!(result.render().component(), component);
+            registry.observed
+        };
+
+        assert_eq!(observed_value, Some(provided_value));
+
+        stack.restore_snapshot(before_provider).unwrap();
+        assert_eq!(stack.current_value(context).unwrap(), default_value);
+        assert_eq!(stack.stack_depth(), 0);
+        assert_eq!(
+            stack.context_slot(context).unwrap().active_provider_count(),
+            0
+        );
     }
 
     #[test]
