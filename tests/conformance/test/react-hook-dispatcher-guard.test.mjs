@@ -299,6 +299,14 @@ test("private state-hook dispatcher metadata names match accepted hook queue rec
     "queue",
     "dispatch"
   ]);
+  assert.deepEqual(metadata.reducerHookRecordFields, [
+    "memoizedState",
+    "baseState",
+    "baseQueue",
+    "queue",
+    "dispatch",
+    "reducer"
+  ]);
   assert.deepEqual(metadata.hookQueueRecordFields, [
     "pending",
     "lanes",
@@ -314,6 +322,43 @@ test("private state-hook dispatcher metadata names match accepted hook queue rec
     "eagerState",
     "next"
   ]);
+  assert.deepEqual(metadata.stateUpdateRenderRecordFields, [
+    "fiber",
+    "hook",
+    "queue",
+    "dispatch",
+    "lanes",
+    "previousMemoizedState",
+    "previousBaseState",
+    "previousBaseQueue",
+    "memoizedState",
+    "baseState",
+    "baseQueue",
+    "remainingLanes",
+    "appliedUpdateCount",
+    "skippedUpdateCount",
+    "revertedUpdateCount",
+    "eagerUpdateCount"
+  ]);
+  assert.deepEqual(metadata.reducerUpdateRenderRecordFields, [
+    "fiber",
+    "hook",
+    "queue",
+    "dispatch",
+    "reducer",
+    "lanes",
+    "previousMemoizedState",
+    "previousBaseState",
+    "previousBaseQueue",
+    "memoizedState",
+    "baseState",
+    "baseQueue",
+    "remainingLanes",
+    "appliedUpdateCount",
+    "skippedUpdateCount",
+    "revertedUpdateCount",
+    "eagerUpdateCount"
+  ]);
   assert.deepEqual(metadata.stateDispatchRequestFields, [
     "dispatch",
     "action",
@@ -327,12 +372,34 @@ test("private state-hook dispatcher metadata names match accepted hook queue rec
     "lane",
     "action"
   ]);
+  assert.deepEqual(metadata.reducerDispatchRequestFields, [
+    "dispatch",
+    "action",
+    "lane"
+  ]);
+  assert.deepEqual(metadata.reducerDispatchRecordFields, [
+    "fiber",
+    "queue",
+    "dispatch",
+    "reducer",
+    "update",
+    "lane",
+    "action"
+  ]);
   assert.deepEqual(metadata.acceptedReconcilerRecords, [
     "HookStateSlot",
     "HookQueue",
     "HookUpdate",
+    "FunctionComponentReducerHandle",
+    "FunctionComponentStateReducerId",
+    "FunctionComponentReducerHookRecord",
+    "FunctionComponentStateUpdateRenderLanes",
+    "FunctionComponentStateUpdateRenderRecord",
+    "FunctionComponentReducerUpdateRenderRecord",
     "FunctionComponentStateDispatchRequest",
-    "FunctionComponentStateDispatchRecord"
+    "FunctionComponentStateDispatchRecord",
+    "FunctionComponentReducerDispatchRequest",
+    "FunctionComponentReducerDispatchRecord"
   ]);
   assert.equal(
     hookDispatcher.isPrivateStateHookDispatcherMetadata(metadata),

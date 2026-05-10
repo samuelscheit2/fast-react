@@ -110,6 +110,14 @@ const privateStateHookDispatcherMetadata = freezeRecord({
     'queue',
     'dispatch'
   ]),
+  reducerHookRecordFields: freezeArray([
+    'memoizedState',
+    'baseState',
+    'baseQueue',
+    'queue',
+    'dispatch',
+    'reducer'
+  ]),
   hookQueueRecordFields: freezeArray([
     'pending',
     'lanes',
@@ -125,6 +133,43 @@ const privateStateHookDispatcherMetadata = freezeRecord({
     'eagerState',
     'next'
   ]),
+  stateUpdateRenderRecordFields: freezeArray([
+    'fiber',
+    'hook',
+    'queue',
+    'dispatch',
+    'lanes',
+    'previousMemoizedState',
+    'previousBaseState',
+    'previousBaseQueue',
+    'memoizedState',
+    'baseState',
+    'baseQueue',
+    'remainingLanes',
+    'appliedUpdateCount',
+    'skippedUpdateCount',
+    'revertedUpdateCount',
+    'eagerUpdateCount'
+  ]),
+  reducerUpdateRenderRecordFields: freezeArray([
+    'fiber',
+    'hook',
+    'queue',
+    'dispatch',
+    'reducer',
+    'lanes',
+    'previousMemoizedState',
+    'previousBaseState',
+    'previousBaseQueue',
+    'memoizedState',
+    'baseState',
+    'baseQueue',
+    'remainingLanes',
+    'appliedUpdateCount',
+    'skippedUpdateCount',
+    'revertedUpdateCount',
+    'eagerUpdateCount'
+  ]),
   stateDispatchRequestFields: freezeArray(['dispatch', 'action', 'lane']),
   stateDispatchRecordFields: freezeArray([
     'fiber',
@@ -134,22 +179,45 @@ const privateStateHookDispatcherMetadata = freezeRecord({
     'lane',
     'action'
   ]),
+  reducerDispatchRequestFields: freezeArray(['dispatch', 'action', 'lane']),
+  reducerDispatchRecordFields: freezeArray([
+    'fiber',
+    'queue',
+    'dispatch',
+    'reducer',
+    'update',
+    'lane',
+    'action'
+  ]),
   acceptedReconcilerRecords: freezeArray([
     'HookStateSlot',
     'HookQueue',
     'HookUpdate',
+    'FunctionComponentReducerHandle',
+    'FunctionComponentStateReducerId',
+    'FunctionComponentReducerHookRecord',
+    'FunctionComponentStateUpdateRenderLanes',
+    'FunctionComponentStateUpdateRenderRecord',
+    'FunctionComponentReducerUpdateRenderRecord',
     'FunctionComponentStateDispatchRequest',
-    'FunctionComponentStateDispatchRecord'
+    'FunctionComponentStateDispatchRecord',
+    'FunctionComponentReducerDispatchRequest',
+    'FunctionComponentReducerDispatchRecord'
   ])
 });
 
 const privateStateHookDispatcherMetadataArrayKeys = freezeArray([
   'hookNames',
   'hookStateRecordFields',
+  'reducerHookRecordFields',
   'hookQueueRecordFields',
   'hookUpdateRecordFields',
+  'stateUpdateRenderRecordFields',
+  'reducerUpdateRenderRecordFields',
   'stateDispatchRequestFields',
   'stateDispatchRecordFields',
+  'reducerDispatchRequestFields',
+  'reducerDispatchRecordFields',
   'acceptedReconcilerRecords'
 ]);
 

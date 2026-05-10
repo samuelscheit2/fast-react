@@ -79,6 +79,34 @@ impl FunctionComponentStateActionHandle {
 
 #[repr(transparent)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub(crate) struct FunctionComponentReducerHandle(u64);
+
+impl FunctionComponentReducerHandle {
+    pub const NONE: Self = Self(0);
+
+    #[must_use]
+    pub const fn from_raw(raw: u64) -> Self {
+        Self(raw)
+    }
+
+    #[must_use]
+    pub const fn raw(self) -> u64 {
+        self.0
+    }
+
+    #[must_use]
+    pub const fn is_none(self) -> bool {
+        self.0 == 0
+    }
+
+    #[must_use]
+    pub const fn is_some(self) -> bool {
+        self.0 != 0
+    }
+}
+
+#[repr(transparent)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub(crate) struct FunctionComponentStateDispatchHandle(u64);
 
 impl FunctionComponentStateDispatchHandle {
@@ -108,6 +136,7 @@ impl FunctionComponentStateDispatchHandle {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum FunctionComponentStateReducerId {
     BasicState,
+    Reducer(FunctionComponentReducerHandle),
 }
 
 type FunctionComponentStateQueueStore = HookQueueStore<
@@ -138,6 +167,54 @@ impl FunctionComponentStateHookRecord {
     #[must_use]
     pub const fn hook(self) -> HookSlotId {
         self.hook
+    }
+
+    #[must_use]
+    pub const fn memoized_state(self) -> StateHandle {
+        self.memoized_state
+    }
+
+    #[must_use]
+    pub const fn base_state(self) -> StateHandle {
+        self.base_state
+    }
+
+    #[must_use]
+    pub const fn base_queue(self) -> Option<HookUpdateId> {
+        self.base_queue
+    }
+
+    #[must_use]
+    pub const fn queue(self) -> HookQueueId {
+        self.queue
+    }
+
+    #[must_use]
+    pub const fn dispatch(self) -> FunctionComponentStateDispatchHandle {
+        self.dispatch
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentReducerHookRecord {
+    hook: HookSlotId,
+    reducer: FunctionComponentReducerHandle,
+    memoized_state: StateHandle,
+    base_state: StateHandle,
+    base_queue: Option<HookUpdateId>,
+    queue: HookQueueId,
+    dispatch: FunctionComponentStateDispatchHandle,
+}
+
+impl FunctionComponentReducerHookRecord {
+    #[must_use]
+    pub const fn hook(self) -> HookSlotId {
+        self.hook
+    }
+
+    #[must_use]
+    pub const fn reducer(self) -> FunctionComponentReducerHandle {
+        self.reducer
     }
 
     #[must_use]
@@ -204,6 +281,43 @@ impl FunctionComponentStateDispatchRequest {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentReducerDispatchRequest {
+    dispatch: FunctionComponentStateDispatchHandle,
+    action: FunctionComponentStateActionHandle,
+    lane: HookUpdateLane,
+}
+
+impl FunctionComponentReducerDispatchRequest {
+    #[must_use]
+    pub const fn new(
+        dispatch: FunctionComponentStateDispatchHandle,
+        action: FunctionComponentStateActionHandle,
+        lane: HookUpdateLane,
+    ) -> Self {
+        Self {
+            dispatch,
+            action,
+            lane,
+        }
+    }
+
+    #[must_use]
+    pub const fn dispatch(self) -> FunctionComponentStateDispatchHandle {
+        self.dispatch
+    }
+
+    #[must_use]
+    pub const fn action(self) -> FunctionComponentStateActionHandle {
+        self.action
+    }
+
+    #[must_use]
+    pub const fn lane(self) -> HookUpdateLane {
+        self.lane
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentStateDispatchRecord {
     fiber: FiberId,
     queue: HookQueueId,
@@ -211,6 +325,54 @@ pub(crate) struct FunctionComponentStateDispatchRecord {
     update: HookUpdateId,
     lane: HookUpdateLane,
     action: FunctionComponentStateActionHandle,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentReducerDispatchRecord {
+    fiber: FiberId,
+    queue: HookQueueId,
+    dispatch: FunctionComponentStateDispatchHandle,
+    reducer: FunctionComponentReducerHandle,
+    update: HookUpdateId,
+    lane: HookUpdateLane,
+    action: FunctionComponentStateActionHandle,
+}
+
+impl FunctionComponentReducerDispatchRecord {
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn queue(self) -> HookQueueId {
+        self.queue
+    }
+
+    #[must_use]
+    pub const fn dispatch(self) -> FunctionComponentStateDispatchHandle {
+        self.dispatch
+    }
+
+    #[must_use]
+    pub const fn reducer(self) -> FunctionComponentReducerHandle {
+        self.reducer
+    }
+
+    #[must_use]
+    pub const fn update(self) -> HookUpdateId {
+        self.update
+    }
+
+    #[must_use]
+    pub const fn lane(self) -> HookUpdateLane {
+        self.lane
+    }
+
+    #[must_use]
+    pub const fn action(self) -> FunctionComponentStateActionHandle {
+        self.action
+    }
 }
 
 impl FunctionComponentStateDispatchRecord {
@@ -291,6 +453,27 @@ pub(crate) struct FunctionComponentStateUpdateRenderRecord {
     eager_update_count: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentReducerUpdateRenderRecord {
+    fiber: FiberId,
+    hook: HookSlotId,
+    queue: HookQueueId,
+    dispatch: FunctionComponentStateDispatchHandle,
+    reducer: FunctionComponentReducerHandle,
+    lanes: FunctionComponentStateUpdateRenderLanes,
+    previous_memoized_state: StateHandle,
+    previous_base_state: StateHandle,
+    previous_base_queue: Option<HookUpdateId>,
+    memoized_state: StateHandle,
+    base_state: StateHandle,
+    base_queue: Option<HookUpdateId>,
+    remaining_lanes: Lanes,
+    applied_update_count: usize,
+    skipped_update_count: usize,
+    reverted_update_count: usize,
+    eager_update_count: usize,
+}
+
 impl FunctionComponentStateUpdateRenderRecord {
     #[must_use]
     pub const fn fiber(self) -> FiberId {
@@ -310,6 +493,108 @@ impl FunctionComponentStateUpdateRenderRecord {
     #[must_use]
     pub const fn dispatch(self) -> FunctionComponentStateDispatchHandle {
         self.dispatch
+    }
+
+    #[must_use]
+    pub const fn lanes(self) -> FunctionComponentStateUpdateRenderLanes {
+        self.lanes
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.lanes.render_lanes()
+    }
+
+    #[must_use]
+    pub const fn root_render_lanes(self) -> Lanes {
+        self.lanes.root_render_lanes()
+    }
+
+    #[must_use]
+    pub const fn previous_memoized_state(self) -> StateHandle {
+        self.previous_memoized_state
+    }
+
+    #[must_use]
+    pub const fn previous_base_state(self) -> StateHandle {
+        self.previous_base_state
+    }
+
+    #[must_use]
+    pub const fn previous_base_queue(self) -> Option<HookUpdateId> {
+        self.previous_base_queue
+    }
+
+    #[must_use]
+    pub const fn memoized_state(self) -> StateHandle {
+        self.memoized_state
+    }
+
+    #[must_use]
+    pub const fn resulting_state(self) -> StateHandle {
+        self.memoized_state
+    }
+
+    #[must_use]
+    pub const fn base_state(self) -> StateHandle {
+        self.base_state
+    }
+
+    #[must_use]
+    pub const fn base_queue(self) -> Option<HookUpdateId> {
+        self.base_queue
+    }
+
+    #[must_use]
+    pub const fn remaining_lanes(self) -> Lanes {
+        self.remaining_lanes
+    }
+
+    #[must_use]
+    pub const fn applied_update_count(self) -> usize {
+        self.applied_update_count
+    }
+
+    #[must_use]
+    pub const fn skipped_update_count(self) -> usize {
+        self.skipped_update_count
+    }
+
+    #[must_use]
+    pub const fn reverted_update_count(self) -> usize {
+        self.reverted_update_count
+    }
+
+    #[must_use]
+    pub const fn eager_update_count(self) -> usize {
+        self.eager_update_count
+    }
+}
+
+impl FunctionComponentReducerUpdateRenderRecord {
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn hook(self) -> HookSlotId {
+        self.hook
+    }
+
+    #[must_use]
+    pub const fn queue(self) -> HookQueueId {
+        self.queue
+    }
+
+    #[must_use]
+    pub const fn dispatch(self) -> FunctionComponentStateDispatchHandle {
+        self.dispatch
+    }
+
+    #[must_use]
+    pub const fn reducer(self) -> FunctionComponentReducerHandle {
+        self.reducer
     }
 
     #[must_use]
@@ -1022,6 +1307,38 @@ impl FunctionComponentHookRenderStore {
         })
     }
 
+    pub fn mount_reducer_hook(
+        &mut self,
+        cursor: &mut FunctionComponentHookRenderCursor,
+        reducer: FunctionComponentReducerHandle,
+        initial_state: StateHandle,
+    ) -> Result<FunctionComponentReducerHookRecord, FunctionComponentRenderError> {
+        let state = cursor.state();
+        if state.phase() != FunctionComponentHookRenderPhase::Mount {
+            return Err(FunctionComponentRenderError::HookCursorPhaseMismatch {
+                fiber: state.render_fiber(),
+                expected: FunctionComponentHookRenderPhase::Mount,
+                actual: state.phase(),
+            });
+        }
+
+        let state_slot = self.state_queues.create_state_slot(initial_state);
+        let dispatch = self.create_state_dispatch(state.render_fiber(), state_slot.queue())?;
+        self.initialize_reducer_queue(state.render_fiber(), state_slot.queue(), dispatch, reducer)?;
+        let payload = state_payload_from_slot(&state_slot);
+        let hook = self.mount_hook_metadata(cursor, HookSlotPayload::state(payload))?;
+
+        Ok(FunctionComponentReducerHookRecord {
+            hook,
+            reducer,
+            memoized_state: payload.memoized_state(),
+            base_state: payload.base_state(),
+            base_queue: payload.base_queue(),
+            queue: payload.queue(),
+            dispatch,
+        })
+    }
+
     pub fn update_state_hook(
         &mut self,
         cursor: &mut FunctionComponentHookRenderCursor,
@@ -1037,6 +1354,30 @@ impl FunctionComponentHookRenderStore {
 
         let hook = self.update_hook_metadata(cursor)?;
         self.state_hook_record(state.render_fiber(), hook)
+    }
+
+    pub fn update_reducer_hook(
+        &mut self,
+        cursor: &mut FunctionComponentHookRenderCursor,
+        reducer_id: FunctionComponentReducerHandle,
+    ) -> Result<FunctionComponentReducerHookRecord, FunctionComponentRenderError> {
+        let state = cursor.state();
+        if state.phase() != FunctionComponentHookRenderPhase::Update {
+            return Err(FunctionComponentRenderError::HookCursorPhaseMismatch {
+                fiber: state.render_fiber(),
+                expected: FunctionComponentHookRenderPhase::Update,
+                actual: state.phase(),
+            });
+        }
+
+        let hook = self.update_hook_metadata(cursor)?;
+        let payload = self.state_payload_for_hook(state.render_fiber(), hook)?;
+        self.reducer_for_queue(state.render_fiber(), payload.queue())?;
+        self.state_queues
+            .queue_mut(payload.queue())
+            .map_err(|error| FunctionComponentRenderError::hook_queue(state.render_fiber(), error))?
+            .set_last_rendered_reducer(FunctionComponentStateReducerId::Reducer(reducer_id));
+        self.reducer_hook_record(state.render_fiber(), hook)
     }
 
     pub fn update_state_hook_with_queued_updates(
@@ -1058,6 +1399,26 @@ impl FunctionComponentHookRenderStore {
         self.process_state_hook_queue(state.render_fiber(), hook, lanes, reducer)
     }
 
+    pub fn update_reducer_hook_with_queued_updates(
+        &mut self,
+        cursor: &mut FunctionComponentHookRenderCursor,
+        reducer_id: FunctionComponentReducerHandle,
+        lanes: FunctionComponentStateUpdateRenderLanes,
+        reducer: impl FnMut(StateHandle, &FunctionComponentStateActionHandle) -> StateHandle,
+    ) -> Result<FunctionComponentReducerUpdateRenderRecord, FunctionComponentRenderError> {
+        let state = cursor.state();
+        if state.phase() != FunctionComponentHookRenderPhase::Update {
+            return Err(FunctionComponentRenderError::HookCursorPhaseMismatch {
+                fiber: state.render_fiber(),
+                expected: FunctionComponentHookRenderPhase::Update,
+                actual: state.phase(),
+            });
+        }
+
+        let hook = self.update_hook_metadata(cursor)?;
+        self.process_reducer_hook_queue(state.render_fiber(), hook, reducer_id, lanes, reducer)
+    }
+
     pub fn create_current_state_hook(
         &mut self,
         fiber: FiberId,
@@ -1077,6 +1438,35 @@ impl FunctionComponentHookRenderStore {
 
         Ok(FunctionComponentStateHookRecord {
             hook,
+            memoized_state: payload.memoized_state(),
+            base_state: payload.base_state(),
+            base_queue: payload.base_queue(),
+            queue: payload.queue(),
+            dispatch,
+        })
+    }
+
+    pub fn create_current_reducer_hook(
+        &mut self,
+        fiber: FiberId,
+        reducer: FunctionComponentReducerHandle,
+        initial_state: StateHandle,
+    ) -> Result<FunctionComponentReducerHookRecord, FunctionComponentRenderError> {
+        let list = self
+            .current_list(fiber)
+            .unwrap_or_else(|| self.create_current_list(fiber));
+        let state_slot = self.state_queues.create_state_slot(initial_state);
+        let dispatch = self.create_state_dispatch(fiber, state_slot.queue())?;
+        self.initialize_reducer_queue(fiber, state_slot.queue(), dispatch, reducer)?;
+        let payload = state_payload_from_slot(&state_slot);
+        let hook = self
+            .hook_lists
+            .append_hook(list, HookSlotPayload::state(payload))
+            .map_err(|error| FunctionComponentRenderError::hook_list(fiber, error))?;
+
+        Ok(FunctionComponentReducerHookRecord {
+            hook,
+            reducer,
             memoized_state: payload.memoized_state(),
             base_state: payload.base_state(),
             base_queue: payload.base_queue(),
@@ -1152,6 +1542,30 @@ impl FunctionComponentHookRenderStore {
         })
     }
 
+    pub fn dispatch_reducer_update(
+        &mut self,
+        request: FunctionComponentReducerDispatchRequest,
+    ) -> Result<FunctionComponentReducerDispatchRecord, FunctionComponentRenderError> {
+        let binding = self.state_dispatch_binding(request.dispatch())?;
+        let reducer = self.reducer_for_queue(binding.fiber, binding.queue)?;
+        let update = self
+            .state_queues
+            .create_update(request.lane(), request.action());
+        self.state_queues
+            .append_pending_update(binding.queue, update)
+            .map_err(|error| FunctionComponentRenderError::hook_queue(binding.fiber, error))?;
+
+        Ok(FunctionComponentReducerDispatchRecord {
+            fiber: binding.fiber,
+            queue: binding.queue,
+            dispatch: binding.handle,
+            reducer,
+            update,
+            lane: request.lane(),
+            action: request.action(),
+        })
+    }
+
     pub fn finish_render_cursor(
         &self,
         cursor: FunctionComponentHookRenderCursor,
@@ -1189,6 +1603,22 @@ impl FunctionComponentHookRenderStore {
         Ok(())
     }
 
+    fn initialize_reducer_queue(
+        &mut self,
+        fiber: FiberId,
+        queue: HookQueueId,
+        dispatch: FunctionComponentStateDispatchHandle,
+        reducer: FunctionComponentReducerHandle,
+    ) -> Result<(), FunctionComponentRenderError> {
+        let queue_record = self
+            .state_queues
+            .queue_mut(queue)
+            .map_err(|error| FunctionComponentRenderError::hook_queue(fiber, error))?;
+        queue_record.set_dispatch(dispatch);
+        queue_record.set_last_rendered_reducer(FunctionComponentStateReducerId::Reducer(reducer));
+        Ok(())
+    }
+
     fn state_hook_record(
         &self,
         fiber: FiberId,
@@ -1199,6 +1629,26 @@ impl FunctionComponentHookRenderStore {
 
         Ok(FunctionComponentStateHookRecord {
             hook,
+            memoized_state: payload.memoized_state(),
+            base_state: payload.base_state(),
+            base_queue: payload.base_queue(),
+            queue: payload.queue(),
+            dispatch,
+        })
+    }
+
+    fn reducer_hook_record(
+        &self,
+        fiber: FiberId,
+        hook: HookSlotId,
+    ) -> Result<FunctionComponentReducerHookRecord, FunctionComponentRenderError> {
+        let payload = self.state_payload_for_hook(fiber, hook)?;
+        let dispatch = self.state_dispatch_for_queue(fiber, payload.queue())?;
+        let reducer = self.reducer_for_queue(fiber, payload.queue())?;
+
+        Ok(FunctionComponentReducerHookRecord {
+            hook,
+            reducer,
             memoized_state: payload.memoized_state(),
             base_state: payload.base_state(),
             base_queue: payload.base_queue(),
@@ -1241,6 +1691,47 @@ impl FunctionComponentHookRenderStore {
         ))
     }
 
+    fn process_reducer_hook_queue(
+        &mut self,
+        fiber: FiberId,
+        hook: HookSlotId,
+        reducer_id: FunctionComponentReducerHandle,
+        lanes: FunctionComponentStateUpdateRenderLanes,
+        reducer: impl FnMut(StateHandle, &FunctionComponentStateActionHandle) -> StateHandle,
+    ) -> Result<FunctionComponentReducerUpdateRenderRecord, FunctionComponentRenderError> {
+        let previous_payload = self.state_payload_for_hook(fiber, hook)?;
+        let dispatch = self.state_dispatch_for_queue(fiber, previous_payload.queue())?;
+        self.reducer_for_queue(fiber, previous_payload.queue())?;
+        self.state_queues
+            .queue_mut(previous_payload.queue())
+            .map_err(|error| FunctionComponentRenderError::hook_queue(fiber, error))?
+            .set_last_rendered_reducer(FunctionComponentStateReducerId::Reducer(reducer_id));
+        let mut slot = state_slot_from_payload(previous_payload);
+        let result = self
+            .state_queues
+            .process_update_queue(
+                &mut slot,
+                lanes.render_lanes(),
+                lanes.root_render_lanes(),
+                reducer,
+            )
+            .map_err(|error| FunctionComponentRenderError::hook_queue(fiber, error))?;
+        let next_payload = state_payload_from_slot(&slot);
+        self.hook_lists
+            .set_hook_payload(hook, HookSlotPayload::state(next_payload))
+            .map_err(|error| FunctionComponentRenderError::hook_list(fiber, error))?;
+
+        Ok(reducer_update_render_record_from_result(
+            fiber,
+            hook,
+            dispatch,
+            reducer_id,
+            lanes,
+            previous_payload,
+            result,
+        ))
+    }
+
     fn state_payload_for_hook(
         &self,
         fiber: FiberId,
@@ -1267,6 +1758,23 @@ impl FunctionComponentHookRenderStore {
             .dispatch()
             .copied()
             .ok_or(FunctionComponentRenderError::MissingStateDispatch { fiber, queue })
+    }
+
+    fn reducer_for_queue(
+        &self,
+        fiber: FiberId,
+        queue: HookQueueId,
+    ) -> Result<FunctionComponentReducerHandle, FunctionComponentRenderError> {
+        let queue_record = self
+            .state_queues
+            .queue(queue)
+            .map_err(|error| FunctionComponentRenderError::hook_queue(fiber, error))?;
+        match queue_record.last_rendered_reducer().copied() {
+            Some(FunctionComponentStateReducerId::Reducer(reducer)) => Ok(reducer),
+            Some(FunctionComponentStateReducerId::BasicState) | None => {
+                Err(FunctionComponentRenderError::ExpectedReducerQueue { fiber, queue })
+            }
+        }
     }
 
     fn create_state_dispatch(
@@ -1404,6 +1912,36 @@ fn state_update_render_record_from_result(
         hook,
         queue: previous_payload.queue(),
         dispatch,
+        lanes,
+        previous_memoized_state: previous_payload.memoized_state(),
+        previous_base_state: previous_payload.base_state(),
+        previous_base_queue: previous_payload.base_queue(),
+        memoized_state: *result.memoized_state(),
+        base_state: *result.base_state(),
+        base_queue: result.base_queue(),
+        remaining_lanes: result.remaining_lanes(),
+        applied_update_count: result.applied_update_count(),
+        skipped_update_count: result.skipped_update_count(),
+        reverted_update_count: result.reverted_update_count(),
+        eager_update_count: result.eager_update_count(),
+    }
+}
+
+fn reducer_update_render_record_from_result(
+    fiber: FiberId,
+    hook: HookSlotId,
+    dispatch: FunctionComponentStateDispatchHandle,
+    reducer: FunctionComponentReducerHandle,
+    lanes: FunctionComponentStateUpdateRenderLanes,
+    previous_payload: HookStatePayload,
+    result: ProcessHookQueueResult<StateHandle>,
+) -> FunctionComponentReducerUpdateRenderRecord {
+    FunctionComponentReducerUpdateRenderRecord {
+        fiber,
+        hook,
+        queue: previous_payload.queue(),
+        dispatch,
+        reducer,
         lanes,
         previous_memoized_state: previous_payload.memoized_state(),
         previous_base_state: previous_payload.base_state(),
@@ -1893,6 +2431,10 @@ pub(crate) enum FunctionComponentRenderError {
         fiber: FiberId,
         queue: HookQueueId,
     },
+    ExpectedReducerQueue {
+        fiber: FiberId,
+        queue: HookQueueId,
+    },
     UnknownStateDispatch {
         dispatch: FunctionComponentStateDispatchHandle,
     },
@@ -1998,13 +2540,19 @@ impl Display for FunctionComponentRenderError {
                 fiber.slot().get(),
                 queue.raw()
             ),
+            Self::ExpectedReducerQueue { fiber, queue } => write!(
+                formatter,
+                "function component fiber {} state queue {} is not a private useReducer queue",
+                fiber.slot().get(),
+                queue.raw()
+            ),
             Self::UnknownStateDispatch { dispatch } => write!(
                 formatter,
-                "private useState dispatch handle {} is not registered",
+                "private state hook dispatch handle {} is not registered",
                 dispatch.raw()
             ),
             Self::StateDispatchHandleOverflow => {
-                formatter.write_str("private useState dispatch handle counter overflowed")
+                formatter.write_str("private state hook dispatch handle counter overflowed")
             }
             Self::HookCursorPhaseMismatch {
                 fiber,
@@ -2057,6 +2605,7 @@ impl Error for FunctionComponentRenderError {
             | Self::MissingCurrentHookList { .. }
             | Self::MissingStateHookPayload { .. }
             | Self::MissingStateDispatch { .. }
+            | Self::ExpectedReducerQueue { .. }
             | Self::UnknownStateDispatch { .. }
             | Self::StateDispatchHandleOverflow
             | Self::HookCursorPhaseMismatch { .. }
@@ -2726,11 +3275,22 @@ mod tests {
         FunctionComponentStateActionHandle::from_raw(raw)
     }
 
+    fn reducer(raw: u64) -> FunctionComponentReducerHandle {
+        FunctionComponentReducerHandle::from_raw(raw)
+    }
+
     fn action_as_state(
         _state: StateHandle,
         action: &FunctionComponentStateActionHandle,
     ) -> StateHandle {
         StateHandle::from_raw(action.raw())
+    }
+
+    fn reducer_adds_action(
+        state: StateHandle,
+        action: &FunctionComponentStateActionHandle,
+    ) -> StateHandle {
+        StateHandle::from_raw(state.raw() + action.raw())
     }
 
     #[test]
@@ -3732,6 +4292,286 @@ mod tests {
         );
 
         hook_store.finish_render_cursor(cursor).unwrap();
+    }
+
+    #[test]
+    fn private_use_reducer_mount_records_queue_reducer_dispatch_and_pending_update() {
+        let (mut arena, _current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let reducer_id = reducer(700);
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(69)));
+
+        let record = render_function_component_with_hook_state(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap();
+
+        let mut cursor = hook_store
+            .begin_render_cursor(record.hook_state().unwrap())
+            .unwrap();
+        let reducer_record = hook_store
+            .mount_reducer_hook(&mut cursor, reducer_id, StateHandle::from_raw(500))
+            .unwrap();
+        let finished = hook_store.finish_render_cursor(cursor).unwrap();
+        assert_eq!(finished.traversal().traversed_count(), 1);
+        assert_eq!(reducer_record.reducer(), reducer_id);
+        assert_eq!(reducer_record.memoized_state(), StateHandle::from_raw(500));
+        assert_eq!(reducer_record.base_state(), StateHandle::from_raw(500));
+        assert_eq!(reducer_record.base_queue(), None);
+        assert!(reducer_record.dispatch().is_some());
+        assert_eq!(FunctionComponentReducerHandle::NONE.raw(), 0);
+        assert!(FunctionComponentReducerHandle::NONE.is_none());
+
+        let queue = hook_store
+            .state_queues()
+            .queue(reducer_record.queue())
+            .unwrap();
+        assert_eq!(queue.dispatch().copied(), Some(reducer_record.dispatch()));
+        assert_eq!(
+            queue.last_rendered_reducer().copied(),
+            Some(FunctionComponentStateReducerId::Reducer(reducer_id))
+        );
+        assert_eq!(*queue.last_rendered_state(), StateHandle::from_raw(500));
+
+        let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+        let dispatch_record = hook_store
+            .dispatch_reducer_update(FunctionComponentReducerDispatchRequest::new(
+                reducer_record.dispatch(),
+                action(7),
+                lane,
+            ))
+            .unwrap();
+
+        assert_eq!(dispatch_record.fiber(), work_in_progress);
+        assert_eq!(dispatch_record.queue(), reducer_record.queue());
+        assert_eq!(dispatch_record.dispatch(), reducer_record.dispatch());
+        assert_eq!(dispatch_record.reducer(), reducer_id);
+        assert_eq!(dispatch_record.lane(), lane);
+        assert_eq!(dispatch_record.action(), action(7));
+        assert_eq!(
+            hook_store
+                .state_queues()
+                .pending_updates(reducer_record.queue())
+                .unwrap(),
+            vec![dispatch_record.update()]
+        );
+    }
+
+    #[test]
+    fn private_use_reducer_update_render_processes_queued_update_and_refreshes_reducer() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let previous_reducer = reducer(701);
+        let next_reducer = reducer(702);
+        let current_reducer = hook_store
+            .create_current_reducer_hook(current, previous_reducer, StateHandle::from_raw(10))
+            .unwrap();
+        let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+        let queued = hook_store
+            .dispatch_reducer_update(FunctionComponentReducerDispatchRequest::new(
+                current_reducer.dispatch(),
+                action(5),
+                lane,
+            ))
+            .unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(70)));
+
+        let render = render_function_component_with_hook_state(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap();
+        let mut cursor = hook_store
+            .begin_render_cursor(render.hook_state().unwrap())
+            .unwrap();
+        let lanes = FunctionComponentStateUpdateRenderLanes::new(Lanes::DEFAULT, Lanes::DEFAULT);
+        let update_render = hook_store
+            .update_reducer_hook_with_queued_updates(
+                &mut cursor,
+                next_reducer,
+                lanes,
+                reducer_adds_action,
+            )
+            .unwrap();
+        let finished = hook_store.finish_render_cursor(cursor).unwrap();
+
+        assert_eq!(finished.traversal().traversed_count(), 1);
+        assert_eq!(queued.reducer(), previous_reducer);
+        assert_eq!(update_render.fiber(), work_in_progress);
+        assert_eq!(update_render.queue(), current_reducer.queue());
+        assert_eq!(update_render.dispatch(), current_reducer.dispatch());
+        assert_eq!(update_render.reducer(), next_reducer);
+        assert_eq!(update_render.lanes(), lanes);
+        assert_eq!(
+            update_render.previous_memoized_state(),
+            StateHandle::from_raw(10)
+        );
+        assert_eq!(
+            update_render.previous_base_state(),
+            StateHandle::from_raw(10)
+        );
+        assert_eq!(update_render.previous_base_queue(), None);
+        assert_eq!(update_render.memoized_state(), StateHandle::from_raw(15));
+        assert_eq!(update_render.resulting_state(), StateHandle::from_raw(15));
+        assert_eq!(update_render.base_state(), StateHandle::from_raw(15));
+        assert_eq!(update_render.base_queue(), None);
+        assert_eq!(update_render.remaining_lanes(), Lanes::NO);
+        assert_eq!(update_render.applied_update_count(), 1);
+        assert_eq!(update_render.skipped_update_count(), 0);
+        assert_eq!(update_render.reverted_update_count(), 0);
+        assert_eq!(update_render.eager_update_count(), 0);
+
+        let work_payload = hook_store
+            .hook_lists()
+            .hook(update_render.hook())
+            .unwrap()
+            .payload()
+            .state_payload()
+            .unwrap();
+        assert_eq!(work_payload.memoized_state(), StateHandle::from_raw(15));
+        assert_eq!(work_payload.base_state(), StateHandle::from_raw(15));
+        assert_eq!(work_payload.base_queue(), None);
+        let queue = hook_store
+            .state_queues()
+            .queue(current_reducer.queue())
+            .unwrap();
+        assert_eq!(
+            queue.last_rendered_reducer().copied(),
+            Some(FunctionComponentStateReducerId::Reducer(next_reducer))
+        );
+        assert_eq!(*queue.last_rendered_state(), StateHandle::from_raw(15));
+        assert_eq!(
+            hook_store
+                .state_queues()
+                .pending_updates(current_reducer.queue())
+                .unwrap(),
+            Vec::<HookUpdateId>::new()
+        );
+    }
+
+    #[test]
+    fn private_use_reducer_update_render_rebases_skipped_lane_without_applying_action() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let previous_reducer = reducer(703);
+        let next_reducer = reducer(704);
+        let current_reducer = hook_store
+            .create_current_reducer_hook(current, previous_reducer, StateHandle::from_raw(20))
+            .unwrap();
+        let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+        hook_store
+            .dispatch_reducer_update(FunctionComponentReducerDispatchRequest::new(
+                current_reducer.dispatch(),
+                action(6),
+                lane,
+            ))
+            .unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(71)));
+
+        let render = render_function_component_with_hook_state(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::SYNC,
+            &mut registry,
+        )
+        .unwrap();
+        let mut cursor = hook_store
+            .begin_render_cursor(render.hook_state().unwrap())
+            .unwrap();
+        let lanes = FunctionComponentStateUpdateRenderLanes::new(Lanes::SYNC, Lanes::SYNC);
+        let update_render = hook_store
+            .update_reducer_hook_with_queued_updates(&mut cursor, next_reducer, lanes, |_, _| {
+                panic!("skipped reducer update should not be applied")
+            })
+            .unwrap();
+
+        assert_eq!(update_render.reducer(), next_reducer);
+        assert_eq!(update_render.memoized_state(), StateHandle::from_raw(20));
+        assert_eq!(update_render.resulting_state(), StateHandle::from_raw(20));
+        assert_eq!(update_render.base_state(), StateHandle::from_raw(20));
+        assert_eq!(update_render.remaining_lanes(), Lanes::DEFAULT);
+        assert_eq!(update_render.applied_update_count(), 0);
+        assert_eq!(update_render.skipped_update_count(), 1);
+        let base_tail = update_render.base_queue().unwrap();
+        let rebased = hook_store
+            .state_queues()
+            .update_ring(Some(base_tail))
+            .unwrap();
+        assert_eq!(rebased.len(), 1);
+        assert_eq!(
+            hook_store
+                .state_queues()
+                .update(rebased[0])
+                .unwrap()
+                .lane()
+                .priority_lanes(),
+            Lanes::DEFAULT
+        );
+        assert_eq!(
+            *hook_store
+                .state_queues()
+                .update(rebased[0])
+                .unwrap()
+                .action(),
+            action(6)
+        );
+        assert_eq!(
+            hook_store
+                .state_queues()
+                .queue(current_reducer.queue())
+                .unwrap()
+                .last_rendered_reducer()
+                .copied(),
+            Some(FunctionComponentStateReducerId::Reducer(next_reducer))
+        );
+
+        hook_store.finish_render_cursor(cursor).unwrap();
+    }
+
+    #[test]
+    fn private_use_reducer_dispatch_rejects_basic_state_queue() {
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let mut arena = FiberArena::new();
+        let current = arena.create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(1),
+            FiberMode::NO,
+        );
+        let current_state = hook_store
+            .create_current_state_hook(current, StateHandle::from_raw(30))
+            .unwrap();
+        let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+
+        assert_eq!(
+            hook_store.dispatch_reducer_update(FunctionComponentReducerDispatchRequest::new(
+                current_state.dispatch(),
+                action(8),
+                lane,
+            )),
+            Err(FunctionComponentRenderError::ExpectedReducerQueue {
+                fiber: current,
+                queue: current_state.queue(),
+            })
+        );
+        assert_eq!(
+            hook_store
+                .state_queues()
+                .pending_updates(current_state.queue())
+                .unwrap(),
+            Vec::<HookUpdateId>::new()
+        );
     }
 
     #[test]
