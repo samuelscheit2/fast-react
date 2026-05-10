@@ -12,6 +12,11 @@ const propertyOperations = require(
 const propertyPayload = require(
   path.join(packageRoot, 'src/dom-host/property-payload.js')
 );
+const domHost = require(path.join(packageRoot, 'src/dom-host/mutation.js'));
+const componentTree = require(
+  path.join(packageRoot, 'src/client/component-tree.js')
+);
+const rootBridge = require(path.join(packageRoot, 'src/client/root-bridge.js'));
 
 const {
   DOM_DANGEROUS_HTML_TEXT_RESET_GATE_METADATA,
@@ -26,6 +31,8 @@ const {
   ENTRY_UNSUPPORTED,
   PRIVATE_STYLE_OBJECT_DIFF_DIAGNOSTIC_KIND,
   PRIVATE_STYLE_OBJECT_DIFF_DIAGNOSTIC_STATUS,
+  PRIVATE_STYLE_OBJECT_DIFF_FAKE_DOM_COMMIT_METADATA_KIND,
+  PRIVATE_STYLE_OBJECT_DIFF_FAKE_DOM_COMMIT_STATUS,
   PRIVATE_STYLE_OBJECT_DIFF_PUBLIC_COMPATIBILITY_STATUS,
   PRIVATE_STYLE_OBJECT_DIFF_PUBLIC_MUTATION_STATUS,
   PRIVATE_STYLE_OBJECT_DIFF_ROW_KIND,
@@ -233,6 +240,176 @@ test('private DOM style object diff diagnostics record set/remove rows without D
     setPropertyInvoked: false,
     compatibilityClaimed: false
   });
+});
+
+test('private root host-output update records accepted style rows as fake-DOM commit metadata', () => {
+  const fixture = createPrivateStyleCommitFixture();
+  const nextProps = {
+    style: orderedStyle([
+      ['color', 'blue'],
+      ['width', 12]
+    ]),
+    children: 'stable'
+  };
+  const update = fixture.bridge.renderContainer(fixture.create.handle, {
+    props: nextProps,
+    type: 'div'
+  });
+
+  fixture.host.styleLog = [];
+
+  const handoff = fixture.bridge.applyHostOutputUpdate(update, {
+    hostInstanceToken: fixture.token,
+    nextProps,
+    tag: 'div'
+  });
+  const payload =
+    rootBridge.getPrivateRootHostOutputUpdateHandoffPayload(handoff);
+  const styleCommit = payload.styleObjectDiffCommit;
+
+  assert.equal(
+    styleCommit.publicMetadata.kind,
+    PRIVATE_STYLE_OBJECT_DIFF_FAKE_DOM_COMMIT_METADATA_KIND
+  );
+  assert.equal(
+    styleCommit.publicMetadata.status,
+    PRIVATE_STYLE_OBJECT_DIFF_FAKE_DOM_COMMIT_STATUS
+  );
+  assert.deepEqual(styleCommit.publicMetadata, {
+    kind: PRIVATE_STYLE_OBJECT_DIFF_FAKE_DOM_COMMIT_METADATA_KIND,
+    status: PRIVATE_STYLE_OBJECT_DIFF_FAKE_DOM_COMMIT_STATUS,
+    sourceDiagnosticKind: PRIVATE_STYLE_OBJECT_DIFF_DIAGNOSTIC_KIND,
+    sourceDiagnosticStatus: PRIVATE_STYLE_OBJECT_DIFF_DIAGNOSTIC_STATUS,
+    sourceRequestId: update.requestId,
+    sourceUpdateId: update.updateId,
+    propName: 'style',
+    payloadRowCount: 4,
+    commitMutationRecordCount: 4,
+    setStyleCount: 2,
+    removeStyleCount: 2,
+    propertyAssignmentCount: 3,
+    setPropertyCount: 1,
+    rowKinds: [ENTRY_REMOVE_STYLE, ENTRY_SET_STYLE],
+    propertyPayloadBacked: true,
+    payloadRowsAccepted: true,
+    fakeDomCommitHandoff: true,
+    fakeDomMutation: true,
+    realDomStyleMutation: false,
+    browserDomMutation: false,
+    publicRootCompatibility: false,
+    publicStyleCompatibility: false,
+    compatibilityClaimed: false
+  });
+  assert.deepEqual(styleCommit.payloadRows, [
+    removeStyle('marginTop', 'propertyAssignment'),
+    removeStyle('--gap', 'setProperty'),
+    setStyle('color', 'propertyAssignment', 'blue'),
+    setStyle('width', 'propertyAssignment', '12px')
+  ]);
+  assert.deepEqual(styleCommit.mutationRecords, styleCommit.payloadRows);
+  assert.equal(styleCommit.diagnostic.payloadRowsAccepted, true);
+  assert.equal(styleCommit.diagnostic.sideEffects.fakeDomMutation, false);
+  assert.equal(styleCommit.diagnostic.sideEffects.browserDomMutation, false);
+  assert.equal(styleCommit.diagnostic.sideEffects.compatibilityClaimed, false);
+  assert.equal(handoff.fakeDomMutation, true);
+  assert.equal(handoff.browserDomMutation, false);
+  assert.equal(handoff.compatibilityClaimed, false);
+  assert.deepEqual(fixture.host.styleLog, [
+    ['stylePropertyAssignment', 'marginTop', ''],
+    ['styleSetProperty', '--gap', ''],
+    ['stylePropertyAssignment', 'color', 'blue'],
+    ['stylePropertyAssignment', 'width', '12px']
+  ]);
+  assert.deepEqual(activeStyleProperties(fixture.host), [
+    ['color', 'blue'],
+    ['width', '12px']
+  ]);
+
+  const serialized = JSON.stringify(handoff);
+  assert.equal(serialized.includes('blue'), false);
+  assert.equal(serialized.includes('12px'), false);
+
+  cleanupPrivateStyleCommitFixture(fixture);
+});
+
+test('private root host-output style commit rejects stale and unsupported style rows', () => {
+  const staleFixture = createPrivateStyleCommitFixture('stale-style-commit');
+  const staleNextProps = {
+    style: orderedStyle([['color', 'blue']]),
+    children: 'stable'
+  };
+  const latestNextProps = {
+    style: orderedStyle([['height', 10]]),
+    children: 'stable'
+  };
+  const staleUpdate = staleFixture.bridge.renderContainer(
+    staleFixture.create.handle,
+    {
+      props: staleNextProps,
+      type: 'div'
+    }
+  );
+  staleFixture.bridge.renderContainer(staleFixture.create.handle, {
+    props: latestNextProps,
+    type: 'div'
+  });
+  staleFixture.host.styleLog = [];
+
+  assert.throws(
+    () =>
+      staleFixture.bridge.applyHostOutputUpdate(staleUpdate, {
+        hostInstanceToken: staleFixture.token,
+        nextProps: staleNextProps,
+        tag: 'div'
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_HOST_OUTPUT_UPDATE_HANDOFF'
+    }
+  );
+  assert.deepEqual(staleFixture.host.styleLog, []);
+  assert.deepEqual(activeStyleProperties(staleFixture.host), [
+    ['--gap', '4px'],
+    ['color', 'red'],
+    ['marginTop', '4px']
+  ]);
+  cleanupPrivateStyleCommitFixture(staleFixture);
+
+  const unsupportedFixture =
+    createPrivateStyleCommitFixture('unsupported-style-commit');
+  const unsupportedProps = {
+    style: orderedStyle([
+      ['color', 'blue'],
+      ['background-color', 'red']
+    ]),
+    children: 'stable'
+  };
+  const unsupportedUpdate = unsupportedFixture.bridge.renderContainer(
+    unsupportedFixture.create.handle,
+    {
+      props: unsupportedProps,
+      type: 'div'
+    }
+  );
+  unsupportedFixture.host.styleLog = [];
+
+  assert.throws(
+    () =>
+      unsupportedFixture.bridge.applyHostOutputUpdate(unsupportedUpdate, {
+        hostInstanceToken: unsupportedFixture.token,
+        nextProps: unsupportedProps,
+        tag: 'div'
+      }),
+    {
+      code: 'FAST_REACT_DOM_BLOCKED_PROPERTY_PAYLOAD_ENTRY'
+    }
+  );
+  assert.deepEqual(unsupportedFixture.host.styleLog, []);
+  assert.deepEqual(activeStyleProperties(unsupportedFixture.host), [
+    ['--gap', '4px'],
+    ['color', 'red'],
+    ['marginTop', '4px']
+  ]);
+  cleanupPrivateStyleCommitFixture(unsupportedFixture);
 });
 
 test('private DOM style object diff diagnostics fail closed for unsupported rows', () => {
@@ -635,5 +812,147 @@ function assertCompatibilityFalse(diagnostic) {
     assert.equal(row.realDomMutation, false, row.id);
     assert.equal(row.publicCompatibilityEnabled, false, row.id);
     assert.equal(row.compatibilityClaimed, false, row.id);
+  }
+}
+
+function createPrivateStyleCommitFixture(label = 'style-commit') {
+  const document = new PrivateStyleCommitDocument(label);
+  const container = document.createElement('div');
+  const bridge = rootBridge.createPrivateRootBridgeShell();
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const initialProps = {
+    style: orderedStyle([
+      ['color', 'red'],
+      ['marginTop', 4],
+      ['--gap', '4px']
+    ]),
+    children: 'stable'
+  };
+  const initialRender = bridge.renderContainer(create.handle, {
+    props: initialProps,
+    type: 'div'
+  });
+  bridge.admitCreateRenderPath(create, sideEffects, initialRender);
+
+  const host = document.createElement('div');
+  const token = componentTree.createHostInstanceToken(
+    {kind: 'PrivateStyleCommitHost'},
+    create.owner
+  );
+  componentTree.attachHostInstanceNode(host, token, {});
+  const propsHandoff = domHost.commitDomPropertyUpdateForLatestProps(
+    host,
+    'div',
+    {},
+    initialProps
+  );
+  componentTree.commitLatestPropsFromMutationHandoff(propsHandoff);
+
+  return {
+    bridge,
+    create,
+    document,
+    host,
+    initialProps,
+    sideEffects,
+    token
+  };
+}
+
+function cleanupPrivateStyleCommitFixture(fixture) {
+  componentTree.detachHostInstanceToken(fixture.token);
+  fixture.bridge.revertCreateRootSideEffects(fixture.sideEffects);
+}
+
+function activeStyleProperties(element) {
+  return Array.from(element.style.properties.entries())
+    .filter(([, value]) => value !== '')
+    .sort(([left], [right]) => left.localeCompare(right));
+}
+
+class PrivateStyleCommitEventTarget {
+  constructor(fields) {
+    Object.assign(this, fields);
+    this.__registrations = [];
+  }
+
+  addEventListener(type, listener, options) {
+    this.__registrations.push({listener, options, type});
+  }
+
+  removeEventListener(type, listener, options) {
+    const index = this.__registrations.findIndex(
+      (entry) =>
+        entry.type === type &&
+        entry.listener === listener &&
+        entry.options === options
+    );
+    if (index !== -1) {
+      this.__registrations.splice(index, 1);
+    }
+  }
+}
+
+class PrivateStyleCommitDocument extends PrivateStyleCommitEventTarget {
+  constructor(label) {
+    super({
+      label,
+      nodeName: '#document',
+      nodeType: 9
+    });
+    this.ownerDocument = this;
+    this.defaultView = new PrivateStyleCommitEventTarget({
+      label: `${label}-window`
+    });
+  }
+
+  createElement(nodeName) {
+    return new PrivateStyleCommitElement(String(nodeName), this);
+  }
+}
+
+class PrivateStyleCommitElement extends PrivateStyleCommitEventTarget {
+  constructor(nodeName, ownerDocument) {
+    super({
+      nodeName,
+      nodeType: 1,
+      ownerDocument
+    });
+    this.styleLog = [];
+    this.style = new PrivateStyleCommitStyle(this);
+  }
+}
+
+class PrivateStyleCommitStyle {
+  constructor(ownerElement) {
+    this.ownerElement = ownerElement;
+    this.properties = new Map();
+
+    return new Proxy(this, {
+      set(target, property, value, receiver) {
+        if (typeof property === 'string' && property !== 'ownerElement') {
+          const stringValue = String(value);
+          target.properties.set(property, stringValue);
+          target.ownerElement.styleLog.push([
+            'stylePropertyAssignment',
+            property,
+            stringValue
+          ]);
+        }
+        return Reflect.set(target, property, value, receiver);
+      }
+    });
+  }
+
+  setProperty(name, value) {
+    const propertyName = String(name);
+    const stringValue = String(value);
+    this.properties.set(propertyName, stringValue);
+    this.ownerElement.styleLog.push([
+      'styleSetProperty',
+      propertyName,
+      stringValue
+    ]);
   }
 }

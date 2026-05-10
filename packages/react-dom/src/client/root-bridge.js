@@ -96,7 +96,11 @@ const {
   ENTRY_REMOVE_STYLE,
   ENTRY_SET_ATTRIBUTE,
   ENTRY_SET_PROPERTY,
-  ENTRY_SET_STYLE
+  ENTRY_SET_STYLE,
+  PRIVATE_STYLE_OBJECT_DIFF_DIAGNOSTIC_STATUS,
+  PRIVATE_STYLE_OBJECT_DIFF_FAKE_DOM_COMMIT_METADATA_KIND,
+  PRIVATE_STYLE_OBJECT_DIFF_FAKE_DOM_COMMIT_STATUS,
+  recordPrivateDomStyleObjectDiffDiagnostics
 } = require('../dom-host/property-payload.js');
 const {
   REACT_PORTAL_TYPE,
@@ -4120,6 +4124,7 @@ function applyPrivateRootHostOutputUpdateWithBridge(
   let propertyHandoff = null;
   let propertyHandoffPayload = null;
   let propertyMutationEvidence = null;
+  let styleObjectDiffCommit = null;
   let publishedLatestProps = null;
 
   try {
@@ -4133,6 +4138,13 @@ function applyPrivateRootHostOutputUpdateWithBridge(
       getDomPropertyUpdateLatestPropsHandoffPayload(propertyHandoff);
     propertyMutationEvidence =
       createHostOutputPropertyMutationEvidence(propertyHandoffPayload);
+    styleObjectDiffCommit = createHostOutputStyleObjectDiffCommitMetadata(
+      previousProps,
+      normalized.nextProps,
+      propertyHandoffPayload,
+      propertyMutationEvidence,
+      record
+    );
     if (
       normalized.textUpdate === null &&
       propertyMutationEvidence.mutatingRowCount === 0
@@ -4254,6 +4266,7 @@ function applyPrivateRootHostOutputUpdateWithBridge(
     propertyMutationEvidence,
     rootHandle: payload.rootHandle,
     sourceRecord: record,
+    styleObjectDiffCommit,
     textInstance:
       normalized.textUpdate === null
         ? null
@@ -4276,7 +4289,10 @@ function applyPrivateRootCommitHostComponentUpdateWithBridge(
   rootCommitHostComponentUpdateMetadata,
   options
 ) {
-  const validation = validateHostOutputUpdateRequestRecord(record);
+  const validation = validateHostOutputUpdateRequestRecord(
+    record,
+    throwInvalidRootCommitHostComponentUpdateHandoff
+  );
   if (bridgeState !== null && validation.bridgeState !== bridgeState) {
     throwForeignRootBridgeRequest();
   }
@@ -7925,21 +7941,32 @@ function assertCreateRenderAdmissionField(record, field, expectedValue) {
   }
 }
 
-function validateHostOutputUpdateRequestRecord(record) {
+function validateHostOutputUpdateRequestRecord(
+  record,
+  throwInvalid = throwInvalidHostOutputUpdateHandoff
+) {
   const validation = validateRootBridgeRequestRecord(record);
   if (validation.operation !== 'render') {
-    throwInvalidHostOutputUpdateHandoff(
+    throwInvalid(
       'Expected a private root.render request record for host-output update.'
     );
   }
   if (record.lifecycleStatusBefore !== ROOT_LIFECYCLE_RENDERED) {
-    throwInvalidHostOutputUpdateHandoff(
+    throwInvalid(
       'Private root host-output updates require a later root.render after the initial render.'
     );
   }
   if (validation.rootHandleState.createRenderAdmissionRecord === null) {
-    throwInvalidHostOutputUpdateHandoff(
+    throwInvalid(
       'Private root host-output updates require an accepted create/render admission first.'
+    );
+  }
+  if (
+    validation.rootHandleState.lifecycleStatus !== ROOT_LIFECYCLE_RENDERED ||
+    record.renderCount !== validation.rootHandleState.renderCount
+  ) {
+    throwInvalid(
+      'Private root host-output updates require the latest rendered root.render request record.'
     );
   }
   return validation;
@@ -8710,6 +8737,121 @@ function createHostOutputPropertyMutationEvidence(propertyHandoffPayload) {
     styleRowCount: evidence.setStyleCount + evidence.removeStyleCount,
     rowKinds: freezeArray(rowKinds)
   });
+}
+
+function createHostOutputStyleObjectDiffCommitMetadata(
+  previousProps,
+  nextProps,
+  propertyHandoffPayload,
+  propertyMutationEvidence,
+  sourceRecord
+) {
+  if (propertyMutationEvidence.styleRowCount === 0) {
+    return null;
+  }
+
+  const diagnostic = recordPrivateDomStyleObjectDiffDiagnostics(
+    getHostOutputStyleProp(previousProps),
+    getHostOutputStyleProp(nextProps)
+  );
+  if (
+    diagnostic.status !== PRIVATE_STYLE_OBJECT_DIFF_DIAGNOSTIC_STATUS ||
+    diagnostic.payloadRowsAccepted !== true
+  ) {
+    throwInvalidHostOutputUpdateHandoff(
+      'Private root host-output style payload rows require accepted style-object diff diagnostics.'
+    );
+  }
+
+  const styleMutationRecords =
+    propertyHandoffPayload === null
+      ? []
+      : propertyHandoffPayload.mutationRecords.filter(
+          isHostOutputStyleMutationRecord
+        );
+  assertStyleObjectDiffPayloadRowsMatchCommitRecords(
+    diagnostic.payloadRows,
+    styleMutationRecords
+  );
+
+  const payloadRows = freezeArray(
+    diagnostic.payloadRows.map((row) => freezeRecord({...row}))
+  );
+  const mutationRecords = freezeArray(
+    styleMutationRecords.map((row) => freezeRecord({...row}))
+  );
+  const publicMetadata = freezeRecord({
+    kind: PRIVATE_STYLE_OBJECT_DIFF_FAKE_DOM_COMMIT_METADATA_KIND,
+    status: PRIVATE_STYLE_OBJECT_DIFF_FAKE_DOM_COMMIT_STATUS,
+    sourceDiagnosticKind: diagnostic.kind,
+    sourceDiagnosticStatus: diagnostic.status,
+    sourceRequestId: sourceRecord.requestId,
+    sourceUpdateId: sourceRecord.updateId,
+    propName: 'style',
+    payloadRowCount: payloadRows.length,
+    commitMutationRecordCount: mutationRecords.length,
+    setStyleCount: diagnostic.summary.setStyleCount,
+    removeStyleCount: diagnostic.summary.removeStyleCount,
+    propertyAssignmentCount: diagnostic.summary.propertyAssignmentCount,
+    setPropertyCount: diagnostic.summary.setPropertyCount,
+    rowKinds: diagnostic.summary.rowKinds,
+    propertyPayloadBacked: true,
+    payloadRowsAccepted: true,
+    fakeDomCommitHandoff: true,
+    fakeDomMutation: true,
+    realDomStyleMutation: false,
+    browserDomMutation: false,
+    publicRootCompatibility: false,
+    publicStyleCompatibility: false,
+    compatibilityClaimed: false
+  });
+
+  return freezeRecord({
+    diagnostic,
+    mutationRecords,
+    payloadRows,
+    publicMetadata
+  });
+}
+
+function getHostOutputStyleProp(props) {
+  if (!isObjectOrFunction(props) || !hasOwnBridgeProperty(props, 'style')) {
+    return undefined;
+  }
+  return props.style;
+}
+
+function isHostOutputStyleMutationRecord(record) {
+  return (
+    isObjectOrFunction(record) &&
+    (record.kind === ENTRY_SET_STYLE || record.kind === ENTRY_REMOVE_STYLE)
+  );
+}
+
+function assertStyleObjectDiffPayloadRowsMatchCommitRecords(
+  payloadRows,
+  mutationRecords
+) {
+  if (payloadRows.length !== mutationRecords.length) {
+    throwInvalidHostOutputUpdateHandoff(
+      'Private root host-output style payload rows must match committed fake-DOM mutation records.'
+    );
+  }
+
+  for (let index = 0; index < payloadRows.length; index += 1) {
+    const payloadRow = payloadRows[index];
+    const mutationRecord = mutationRecords[index];
+    if (
+      payloadRow.kind !== mutationRecord.kind ||
+      payloadRow.styleName !== mutationRecord.styleName ||
+      payloadRow.mutation !== mutationRecord.mutation ||
+      payloadRow.value !== mutationRecord.value
+    ) {
+      throwInvalidHostOutputUpdateHandoff(
+        'Private root host-output style payload row metadata is inconsistent with the fake-DOM commit record.'
+      );
+    }
+  }
 }
 
 function createHostOutputTextMutationSummary(textUpdate) {
