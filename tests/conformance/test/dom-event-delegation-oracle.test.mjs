@@ -648,6 +648,49 @@ test("private hydration replay target-dispatch link records dispatch path blocke
     ]
   );
   assert.equal(fixture.dispatchRecord.hydrationReplay.queued, false);
+  assert.equal(
+    fixture.clickDispatchDiagnostic.kind,
+    pluginEventSystem.HYDRATION_REPLAY_CLICK_DISPATCH_DIAGNOSTIC_KIND
+  );
+  assert.equal(
+    fixture.clickDispatchDiagnostic.status,
+    pluginEventSystem.PRIVATE_HYDRATION_REPLAY_CLICK_DISPATCH_STATUS
+  );
+  assert.equal(
+    fixture.clickDispatchDiagnostic.targetClaimingDiagnostic,
+    fixture.claim
+  );
+  assert.equal(
+    fixture.clickDispatchDiagnostic.targetClaimEvidenceAccepted,
+    true
+  );
+  assert.equal(
+    fixture.clickDispatchDiagnostic.targetDispatchLinkDiagnostic,
+    diagnostic
+  );
+  assert.equal(
+    fixture.clickDispatchDiagnostic.dispatchRecord,
+    fixture.dispatchRecord
+  );
+  assert.equal(fixture.clickDispatchDiagnostic.queueOrderPreserved, true);
+  assert.equal(fixture.clickDispatchDiagnostic.eventDispatch, false);
+  assert.equal(fixture.clickDispatchDiagnostic.publicDispatchEnabled, false);
+  assert.equal(fixture.clickDispatchDiagnostic.eventReplayInstalled, false);
+  assert.equal(
+    fixture.clickDispatchDiagnostic.liveEventListenerInstalled,
+    false
+  );
+  assert.equal(
+    fixture.clickDispatchDiagnostic.privateClickDelegationDispatchGateCalled,
+    false
+  );
+  assert.equal(fixture.clickDispatchDiagnostic.listenerInvocationCount, 0);
+  assert.equal(
+    pluginEventSystem.getHydrationReplayClickDispatchDiagnosticPayload(
+      fixture.clickDispatchDiagnostic
+    ).targetClaimingDiagnostic,
+    fixture.claim
+  );
   assert.deepEqual(fixture.container.__registrations, []);
   assert.deepEqual(fixture.document.__registrations, []);
 });
@@ -1149,8 +1192,34 @@ function createPrivateHydrationReplayTargetDispatchLinkFixture() {
         source: "dom-event-delegation-conformance-hydration-link"
       }
     );
+  const ownershipDiagnostics =
+    hydrationGate.createHydrationReplayOwnershipGateDiagnostic(
+      record,
+      dispatchRecord,
+      {
+        source: "dom-event-delegation-conformance-hydration-ownership"
+      }
+    );
+  const claim = hydrationGate.createHydrationTargetClaimingDiagnostic(
+    record,
+    ownershipDiagnostics,
+    diagnostic,
+    {
+      source: "dom-event-delegation-conformance-hydration-claim"
+    }
+  );
+  const clickDispatchDiagnostic =
+    pluginEventSystem.createHydrationReplayClickDispatchDiagnostic(
+      diagnostic,
+      {
+        source: "dom-event-delegation-conformance-hydration-click-dispatch",
+        targetClaimingDiagnostic: claim
+      }
+    );
 
   return {
+    clickDispatchDiagnostic,
+    claim,
     container,
     diagnostic,
     dispatchRecord,

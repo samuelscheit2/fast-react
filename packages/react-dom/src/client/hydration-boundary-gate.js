@@ -27,10 +27,12 @@ const {
   HYDRATION_REPLAY_BLOCKED_CODE,
   PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
   PRIVATE_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_STATUS,
+  createHydrationReplayClickDispatchDiagnostic,
   createHydrationDehydratedTargetResolutionDiagnostic,
   createHydrationReplayEventQueueDiagnostic,
   createHydrationReplayTargetDispatchLinkDiagnostic:
     createPluginHydrationReplayTargetDispatchLinkDiagnostic,
+  getHydrationReplayClickDispatchDiagnosticPayload,
   getHydrationReplayTargetDispatchLinkDiagnosticPayload:
     getPluginHydrationReplayTargetDispatchLinkDiagnosticPayload
 } = require('../events/plugin-event-system.js');
@@ -806,6 +808,23 @@ function createHydrationClaimedReplayTargetDispatchExecutionRecord(
     targetDispatchLink
   );
 
+  const clickReplayDispatchDiagnostic =
+    targetClaimingDiagnostic.domEventName === 'click'
+      ? createHydrationReplayClickDispatchDiagnostic(targetDispatchLink, {
+          source:
+            typeof normalizedOptions.clickReplayDispatchSource === 'string'
+              ? normalizedOptions.clickReplayDispatchSource
+              : 'private-hydration-claimed-replay-target-click-dispatch',
+          targetClaimingDiagnostic
+        })
+      : null;
+  const clickReplayDispatchDiagnosticPayload =
+    clickReplayDispatchDiagnostic === null
+      ? null
+      : getHydrationReplayClickDispatchDiagnosticPayload(
+          clickReplayDispatchDiagnostic
+        );
+
   const hydrationBoundaryRecord = claimValidation.hydrationBoundaryRecord;
   const recoverableErrorMetadata =
     hydrationBoundaryRecord.recoverableErrorMetadata;
@@ -927,6 +946,27 @@ function createHydrationClaimedReplayTargetDispatchExecutionRecord(
     dispatchQueueStatus: targetDispatchLink.dispatchQueueStatus,
     dispatchQueueLength: targetDispatchLink.dispatchQueueLength,
     dispatchQueueListenerCount: targetDispatchLink.dispatchQueueListenerCount,
+    clickReplayDispatchDiagnostic,
+    clickReplayDispatchDiagnosticKind:
+      clickReplayDispatchDiagnostic === null
+        ? null
+        : clickReplayDispatchDiagnostic.kind,
+    clickReplayDispatchDiagnosticStatus:
+      clickReplayDispatchDiagnostic === null
+        ? null
+        : clickReplayDispatchDiagnostic.status,
+    clickReplayDispatchDiagnosticRecorded:
+      clickReplayDispatchDiagnostic !== null,
+    clickReplayDispatchDiagnosticBlocked:
+      clickReplayDispatchDiagnostic === null
+        ? false
+        : clickReplayDispatchDiagnostic.clickReplayDispatchDiagnosticBlocked,
+    clickReplayDispatchQueueOrderPreserved:
+      clickReplayDispatchDiagnostic === null
+        ? false
+        : clickReplayDispatchDiagnostic.queueOrderPreserved,
+    blockedClickReplayDispatchDiagnosticCount:
+      clickReplayDispatchDiagnostic === null ? 0 : 1,
     executionRecordCount: 1,
     blockedReplayTargetDispatchExecutionCount: 1,
     replayTargetDispatchExecutionRecorded: true,
@@ -986,6 +1026,8 @@ function createHydrationClaimedReplayTargetDispatchExecutionRecord(
       ownershipDiagnostics: claimValidation.ownershipDiagnostics,
       ownershipRow: claimValidation.ownershipRow,
       recoverableErrorMetadata,
+      clickReplayDispatchDiagnostic,
+      clickReplayDispatchDiagnosticPayload,
       targetClaimingDiagnostic,
       targetClaimingDiagnosticPayload: claimValidation.claimPayload,
       targetDispatchLinkDiagnostic: targetDispatchLink,
