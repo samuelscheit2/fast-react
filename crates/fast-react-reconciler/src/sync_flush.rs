@@ -14,8 +14,9 @@ use fast_react_host_config::HostTypes;
 
 use crate::root_commit::PendingPassiveCommitHandoff;
 use crate::root_scheduler::{
-    SyncFlushActPostPassiveContinuationGateRecord,
+    SyncFlushActContinuationDrainRecord, SyncFlushActPostPassiveContinuationGateRecord,
     SyncFlushPostPassiveContinuationExecutionGateRecord, recompute_might_have_pending_sync_work,
+    sync_flush_act_continuation_drain_record_after_host_output_canary,
     sync_flush_act_continuation_lanes_for_root, sync_flush_act_post_passive_continuation_gate,
     sync_flush_lanes_for_root, sync_flush_post_passive_continuation_execution_gate,
 };
@@ -236,6 +237,85 @@ impl SyncFlushRootHostOutputCommitDiagnosticsForCanary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SyncFlushActPrivateExecutionDiagnosticsForCanary {
+    root: FiberRootId,
+    order: usize,
+    host_output_canary_committed: bool,
+    blocked_by_pending_post_passive_gate: bool,
+    drained_act_continuations: Vec<SyncFlushActContinuationDrainRecord>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private sync-flush/act canary execution diagnostic reserved for private act workers"
+)]
+impl SyncFlushActPrivateExecutionDiagnosticsForCanary {
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn order(&self) -> usize {
+        self.order
+    }
+
+    #[must_use]
+    pub(crate) const fn host_output_canary_committed(&self) -> bool {
+        self.host_output_canary_committed
+    }
+
+    #[must_use]
+    pub(crate) const fn blocked_by_pending_post_passive_gate(&self) -> bool {
+        self.blocked_by_pending_post_passive_gate
+    }
+
+    #[must_use]
+    pub(crate) fn drained_act_continuations(&self) -> &[SyncFlushActContinuationDrainRecord] {
+        &self.drained_act_continuations
+    }
+
+    #[must_use]
+    pub(crate) fn drained_count(&self) -> usize {
+        self.drained_act_continuations.len()
+    }
+
+    #[must_use]
+    pub(crate) fn did_drain_accepted_internal_act_continuations(&self) -> bool {
+        !self.drained_act_continuations.is_empty()
+            && self
+                .drained_act_continuations
+                .iter()
+                .all(|record| record.is_accepted_internal_act_continuation())
+    }
+
+    #[must_use]
+    pub(crate) const fn drains_public_react_act_queue(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_act_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_scheduler_timing_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn executes_queued_work(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn executes_effects(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyncFlushRootRecord {
     order: usize,
     root: FiberRootId,
@@ -383,6 +463,54 @@ impl SyncFlushRootRecord {
                 .host_root_placement_apply_diagnostics_for_canary()
                 .len(),
         })
+    }
+
+    #[doc(hidden)]
+    pub(crate) fn drain_accepted_act_continuations_after_host_output_canary(
+        &mut self,
+        diagnostics: SyncFlushRootHostOutputCommitDiagnosticsForCanary,
+    ) -> SyncFlushActPrivateExecutionDiagnosticsForCanary {
+        let host_output_canary_committed =
+            self.accepts_host_output_canary_commit_diagnostics(diagnostics);
+        let blocked_by_pending_post_passive_gate =
+            host_output_canary_committed && self.act_post_passive_continuation_gate.is_some();
+        let can_drain = host_output_canary_committed && !blocked_by_pending_post_passive_gate;
+        let mut drained_act_continuations = Vec::new();
+        if can_drain {
+            if let Some(continuation) = self.act_continuation {
+                if let Some(record) =
+                    sync_flush_act_continuation_drain_record_after_host_output_canary(
+                        continuation,
+                        true,
+                    )
+                {
+                    self.act_continuation = None;
+                    drained_act_continuations.push(record);
+                }
+            }
+        }
+
+        SyncFlushActPrivateExecutionDiagnosticsForCanary {
+            root: self.root,
+            order: self.order,
+            host_output_canary_committed,
+            blocked_by_pending_post_passive_gate,
+            drained_act_continuations,
+        }
+    }
+
+    fn accepts_host_output_canary_commit_diagnostics(
+        &self,
+        diagnostics: SyncFlushRootHostOutputCommitDiagnosticsForCanary,
+    ) -> bool {
+        diagnostics.root() == self.root
+            && diagnostics.order() == self.order
+            && diagnostics.render_lanes() == self.render_lanes
+            && diagnostics.committed_current() == self.commit.current()
+            && diagnostics.commit_handoff_state_consumed()
+            && diagnostics.recorded_host_output_mutation_metadata()
+            && diagnostics.host_root_placement_apply_count() > 0
+            && diagnostics.root_current_after_commit() == self.commit.current()
     }
 }
 
@@ -938,6 +1066,189 @@ mod tests {
         assert!(diagnostics.recorded_host_output_mutation_metadata());
         assert!(diagnostics.commit_handoff_state_consumed());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_act_private_execution_drains_pending_continuation_after_canary() {
+        let (mut store, root_id, host) = root_store();
+        let sync_element = RootElementHandle::from_raw(820);
+        let default_element = RootElementHandle::from_raw(821);
+        store.scheduler_bridge_mut().enter_act_scope();
+        schedule_sync_update(&mut store, root_id, sync_element);
+        let default_update = update_container(&mut store, root_id, default_element, None).unwrap();
+        ensure_root_is_scheduled(&mut store, default_update.schedule()).unwrap();
+
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+        let rendered_record = rendered.records()[0];
+        let render_phase = rendered_record.render_phase();
+        let prepared = prepare_test_renderer_host_output_canary_fibers(
+            &mut store,
+            render_phase,
+            TestRendererHostOutputCanaryFixture::new(822, 823, 824),
+        )
+        .unwrap();
+        let completed =
+            finish_test_renderer_host_output_canary_fibers(&mut store, prepared, 825, 826).unwrap();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+
+        let (mut committed, diagnostics) =
+            SyncFlushRootRecord::commit_rendered_sync_flush_record_with_diagnostics_for_canary(
+                &mut store,
+                rendered_record,
+            )
+            .unwrap();
+
+        let continuation = committed.act_continuation.unwrap();
+        assert_eq!(
+            continuation.status(),
+            SchedulerActContinuationStatus::PendingContinuation
+        );
+        assert_eq!(continuation.continuation_lanes(), Lanes::DEFAULT);
+
+        let private_execution =
+            committed.drain_accepted_act_continuations_after_host_output_canary(diagnostics);
+
+        assert_eq!(private_execution.root(), root_id);
+        assert_eq!(private_execution.order(), committed.order());
+        assert!(private_execution.host_output_canary_committed());
+        assert!(!private_execution.blocked_by_pending_post_passive_gate());
+        assert_eq!(private_execution.drained_count(), 1);
+        assert!(private_execution.did_drain_accepted_internal_act_continuations());
+        assert!(!private_execution.drains_public_react_act_queue());
+        assert!(!private_execution.public_act_compatibility_claimed());
+        assert!(!private_execution.public_scheduler_timing_compatibility_claimed());
+        assert!(!private_execution.executes_queued_work());
+        assert!(!private_execution.executes_effects());
+        let drained = private_execution.drained_act_continuations()[0];
+        assert_eq!(drained.root(), root_id);
+        assert_eq!(drained.sync_flush_order(), committed.order());
+        assert_eq!(drained.flushed_lanes(), Lanes::SYNC);
+        assert_eq!(drained.remaining_lanes(), Lanes::DEFAULT);
+        assert_eq!(drained.continuation_lanes(), Lanes::DEFAULT);
+        assert_eq!(drained.act_scope_depth(), 1);
+        assert!(!drained.nested_act_scope());
+        assert!(drained.host_output_canary_committed());
+        assert_eq!(
+            drained.source_status(),
+            SchedulerActContinuationStatus::PendingContinuation
+        );
+        assert!(drained.is_accepted_internal_act_continuation());
+        assert_eq!(committed.act_continuation, None);
+        assert_eq!(committed.act_post_passive_continuation_gate, None);
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            completed.host_root()
+        );
+        assert_eq!(current_host_root_element(&store, root_id), sync_element);
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            Lanes::DEFAULT
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
+        );
+        assert!(store.scheduler_bridge().callback_requests().is_empty());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_act_private_execution_requires_canary_and_passive_clearance() {
+        let (mut store, root_id, host) = root_store();
+        store.scheduler_bridge_mut().enter_act_scope();
+        schedule_sync_update(&mut store, root_id, RootElementHandle::from_raw(830));
+        let default_update =
+            update_container(&mut store, root_id, RootElementHandle::from_raw(831), None).unwrap();
+        ensure_root_is_scheduled(&mut store, default_update.schedule()).unwrap();
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+
+        let mut committed = SyncFlushRootRecord::commit_rendered_sync_flush_record(
+            &mut store,
+            rendered.records()[0],
+        )
+        .unwrap();
+        let continuation_before = committed.act_continuation;
+        let diagnostics = committed
+            .host_output_commit_diagnostics_for_canary(&store)
+            .unwrap();
+
+        let without_canary =
+            committed.drain_accepted_act_continuations_after_host_output_canary(diagnostics);
+
+        assert!(!without_canary.host_output_canary_committed());
+        assert!(!without_canary.blocked_by_pending_post_passive_gate());
+        assert_eq!(without_canary.drained_count(), 0);
+        assert!(!without_canary.did_drain_accepted_internal_act_continuations());
+        assert_eq!(committed.act_continuation, continuation_before);
+
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let host_with_passive = RecordingHost::default();
+        let passive_root = store
+            .create_client_root(FakeContainer::new(2), RootOptions::new())
+            .unwrap();
+        store.scheduler_bridge_mut().enter_act_scope();
+        schedule_sync_update(&mut store, passive_root, RootElementHandle::from_raw(832));
+        let passive_default = update_container(
+            &mut store,
+            passive_root,
+            RootElementHandle::from_raw(833),
+            None,
+        )
+        .unwrap();
+        ensure_root_is_scheduled(&mut store, passive_default.schedule()).unwrap();
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+        let rendered_record = rendered.records()[0];
+        let render_phase = rendered_record.render_phase();
+        let finished_work = render_phase.finished_work();
+        {
+            let scheduling = store.root_mut(passive_root).unwrap().scheduling_mut();
+            scheduling.prepare_pending_passive(passive_root, Lanes::NO);
+            scheduling
+                .pending_passive_mut()
+                .queue_mount(finished_work, Lanes::SYNC)
+                .unwrap();
+        }
+        let prepared = prepare_test_renderer_host_output_canary_fibers(
+            &mut store,
+            render_phase,
+            TestRendererHostOutputCanaryFixture::new(834, 835, 836),
+        )
+        .unwrap();
+        finish_test_renderer_host_output_canary_fibers(&mut store, prepared, 837, 838).unwrap();
+
+        let (mut committed_with_passive, diagnostics) =
+            SyncFlushRootRecord::commit_rendered_sync_flush_record_with_diagnostics_for_canary(
+                &mut store,
+                rendered_record,
+            )
+            .unwrap();
+        let continuation_before = committed_with_passive.act_continuation;
+
+        let blocked = committed_with_passive
+            .drain_accepted_act_continuations_after_host_output_canary(diagnostics);
+
+        assert!(blocked.host_output_canary_committed());
+        assert!(blocked.blocked_by_pending_post_passive_gate());
+        assert_eq!(blocked.drained_count(), 0);
+        assert_eq!(committed_with_passive.act_continuation, continuation_before);
+        assert!(
+            committed_with_passive
+                .act_post_passive_continuation_gate
+                .is_some()
+        );
+        assert!(
+            store
+                .root(passive_root)
+                .unwrap()
+                .scheduling()
+                .pending_passive()
+                .has_commit_handoff()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+        assert_eq!(host_with_passive.operations(), Vec::<&'static str>::new());
     }
 
     #[test]

@@ -16,7 +16,7 @@ use fast_react_host_config::HostTypes;
 
 use crate::concurrent_updates::root_for_updated_fiber;
 use crate::root_commit::PendingPassiveCommitHandoff;
-use crate::scheduler_bridge::SchedulerActContinuationRecord;
+use crate::scheduler_bridge::{SchedulerActContinuationRecord, SchedulerActContinuationStatus};
 use crate::{
     ConcurrentUpdateError, ExecutionContextState, FiberRootId, FiberRootStore, FiberRootStoreError,
     HostRootRenderPhaseRecord, RootCallbackPriority, RootErrorCallbackHandle,
@@ -571,6 +571,104 @@ impl SyncFlushActPostPassiveContinuationGateRecord {
     #[must_use]
     pub(crate) const fn nested_act_scope(self) -> bool {
         self.nested_act_scope
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SyncFlushActContinuationDrainRecord {
+    root: FiberRootId,
+    sync_flush_order: usize,
+    flushed_lanes: Lanes,
+    remaining_lanes: Lanes,
+    continuation_lanes: Lanes,
+    act_scope_depth: usize,
+    nested_act_scope: bool,
+    source_status: SchedulerActContinuationStatus,
+    host_output_canary_committed: bool,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private sync-flush/act canary drain diagnostic reserved for private act workers"
+)]
+impl SyncFlushActContinuationDrainRecord {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn sync_flush_order(self) -> usize {
+        self.sync_flush_order
+    }
+
+    #[must_use]
+    pub(crate) const fn flushed_lanes(self) -> Lanes {
+        self.flushed_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn remaining_lanes(self) -> Lanes {
+        self.remaining_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn continuation_lanes(self) -> Lanes {
+        self.continuation_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn act_scope_depth(self) -> usize {
+        self.act_scope_depth
+    }
+
+    #[must_use]
+    pub(crate) const fn nested_act_scope(self) -> bool {
+        self.nested_act_scope
+    }
+
+    #[must_use]
+    pub(crate) const fn source_status(self) -> SchedulerActContinuationStatus {
+        self.source_status
+    }
+
+    #[must_use]
+    pub(crate) const fn host_output_canary_committed(self) -> bool {
+        self.host_output_canary_committed
+    }
+
+    #[must_use]
+    pub(crate) const fn drains_public_react_act_queue(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_act_compatibility_claimed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn executes_queued_work(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn executes_effects(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn is_accepted_internal_act_continuation(self) -> bool {
+        self.host_output_canary_committed
+            && matches!(
+                self.source_status,
+                SchedulerActContinuationStatus::PendingContinuation
+            )
+            && self.continuation_lanes.is_non_empty()
+            && !self.drains_public_react_act_queue()
+            && !self.public_act_compatibility_claimed()
+            && !self.executes_queued_work()
+            && !self.executes_effects()
     }
 }
 
@@ -1370,6 +1468,27 @@ pub(crate) fn sync_flush_act_post_passive_continuation_gate(
         act_scope_depth: act_continuation.act_scope_depth(),
         nested_act_scope: act_continuation.nested_act_scope(),
     })
+}
+
+pub(crate) fn sync_flush_act_continuation_drain_record_after_host_output_canary(
+    act_continuation: SchedulerActContinuationRecord,
+    host_output_canary_committed: bool,
+) -> Option<SyncFlushActContinuationDrainRecord> {
+    let record = SyncFlushActContinuationDrainRecord {
+        root: act_continuation.root(),
+        sync_flush_order: act_continuation.sync_flush_order(),
+        flushed_lanes: act_continuation.flushed_lanes(),
+        remaining_lanes: act_continuation.remaining_lanes(),
+        continuation_lanes: act_continuation.continuation_lanes(),
+        act_scope_depth: act_continuation.act_scope_depth(),
+        nested_act_scope: act_continuation.nested_act_scope(),
+        source_status: act_continuation.status(),
+        host_output_canary_committed,
+    };
+
+    record
+        .is_accepted_internal_act_continuation()
+        .then_some(record)
 }
 
 pub(crate) fn sync_flush_post_passive_continuation_execution_gate<H: HostTypes>(
@@ -2859,6 +2978,60 @@ mod tests {
             sync_flush_act_post_passive_continuation_gate(
                 act_continuation,
                 commit_without_passive.pending_passive_handoff()
+            ),
+            None
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_act_continuation_drain_accepts_only_pending_after_canary() {
+        let (mut store, root_id, host) = root_store();
+        store.scheduler_bridge_mut().enter_act_scope();
+        let pending = store
+            .scheduler_bridge_mut()
+            .record_sync_flush_act_continuation(
+                root_id,
+                9,
+                Lanes::SYNC,
+                Lanes::DEFAULT,
+                Lanes::DEFAULT,
+            )
+            .unwrap();
+        let no_continuation = store
+            .scheduler_bridge_mut()
+            .record_sync_flush_act_continuation(root_id, 10, Lanes::SYNC, Lanes::NO, Lanes::NO)
+            .unwrap();
+
+        let drained =
+            sync_flush_act_continuation_drain_record_after_host_output_canary(pending, true)
+                .unwrap();
+
+        assert_eq!(drained.root(), root_id);
+        assert_eq!(drained.sync_flush_order(), 9);
+        assert_eq!(drained.flushed_lanes(), Lanes::SYNC);
+        assert_eq!(drained.remaining_lanes(), Lanes::DEFAULT);
+        assert_eq!(drained.continuation_lanes(), Lanes::DEFAULT);
+        assert_eq!(drained.act_scope_depth(), 1);
+        assert!(!drained.nested_act_scope());
+        assert_eq!(
+            drained.source_status(),
+            SchedulerActContinuationStatus::PendingContinuation
+        );
+        assert!(drained.host_output_canary_committed());
+        assert!(drained.is_accepted_internal_act_continuation());
+        assert!(!drained.drains_public_react_act_queue());
+        assert!(!drained.public_act_compatibility_claimed());
+        assert!(!drained.executes_queued_work());
+        assert!(!drained.executes_effects());
+        assert_eq!(
+            sync_flush_act_continuation_drain_record_after_host_output_canary(pending, false),
+            None
+        );
+        assert_eq!(
+            sync_flush_act_continuation_drain_record_after_host_output_canary(
+                no_continuation,
+                true,
             ),
             None
         );
