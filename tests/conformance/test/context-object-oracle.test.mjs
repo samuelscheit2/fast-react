@@ -13,6 +13,12 @@ import {
   CONTEXT_OBJECT_SCENARIOS
 } from "../src/context-object-scenarios.mjs";
 import {
+  CONTEXT_OBJECT_LOCAL_GATE_ROWS,
+  CONTEXT_OBJECT_LOCAL_GATE_STATUS,
+  CONTEXT_OBJECT_RUNTIME_BLOCKING_REQUIREMENTS,
+  evaluateContextObjectLocalGate
+} from "../src/context-object-local-gate.mjs";
+import {
   findContextObjectObservation,
   readCheckedContextObjectOracle,
   readCheckedContextObjectOracleText
@@ -81,6 +87,87 @@ test("context-object oracle keeps Fast React compatibility claims false", () => 
       compatibilityClaimed: false
     }
   });
+});
+
+test("context-object local gate compares live provider object shape to the accepted React oracle", () => {
+  const gate = evaluateContextObjectLocalGate({ oracle });
+
+  assert.equal(gate.status, CONTEXT_OBJECT_LOCAL_GATE_STATUS);
+  assert.equal(gate.directObjectProviderShapeMatchesOracle, true);
+  assert.equal(gate.requiredRuntimeTargetsReady, false);
+  assert.equal(gate.publicCompatibilityClaimed, false);
+  assert.deepEqual(gate.violations, []);
+  assert.deepEqual(
+    gate.localComparisonRows.map(({ modeId, scenarioId, status }) => ({
+      modeId,
+      scenarioId,
+      status
+    })),
+    CONTEXT_OBJECT_LOCAL_GATE_ROWS.map(({ modeId, scenarioId }) => ({
+      modeId,
+      scenarioId,
+      status: "matched-against-checked-react-oracle"
+    }))
+  );
+  assert.ok(gate.localChecks.jsCreateContextDirectObjectPresent);
+  assert.equal(gate.localChecks.useContextStillDispatcherOnly, true);
+  assert.equal(gate.localChecks.beginWorkRejectsContextProvider, true);
+  assert.equal(gate.localChecks.functionComponentContextUnsupported, true);
+  assert.equal(gate.localChecks.runtimeContextPropagationPresent, false);
+  assert.equal(
+    gate.localChecks.reconcilerProviderBeginWorkIntegrationPresent,
+    false
+  );
+  assert.equal(
+    gate.localChecks.functionComponentUseContextRenderReadPresent,
+    false
+  );
+});
+
+test("context-object local gate rejects premature compatibility claims", () => {
+  const prematureClaimOracle = JSON.parse(JSON.stringify(oracle));
+  prematureClaimOracle.conformanceClaims.compatibilityClaimed = true;
+
+  const gate = evaluateContextObjectLocalGate({
+    oracle: prematureClaimOracle
+  });
+
+  assert.equal(gate.status, "blocked-with-violations");
+  assert.deepEqual(
+    gate.violations.map((violation) => violation.id),
+    ["compatibility-claimed-before-context-runtime-propagation"]
+  );
+});
+
+test("context-object local gate keeps runtime unblock requirements explicit", () => {
+  assert.deepEqual(
+    CONTEXT_OBJECT_LOCAL_GATE_ROWS.map(({ scenarioId }) => scenarioId),
+    [
+      "context-object-shape",
+      "context-provider-consumer-identity",
+      "context-display-name",
+      "context-mutability-and-slots",
+      "context-object-shape",
+      "context-provider-consumer-identity",
+      "context-display-name",
+      "context-mutability-and-slots",
+      "context-export-shape",
+      "context-export-shape"
+    ]
+  );
+  assert.deepEqual(
+    CONTEXT_OBJECT_RUNTIME_BLOCKING_REQUIREMENTS.map(
+      (requirement) => requirement.id
+    ),
+    [
+      "runtime-context-value-propagation",
+      "reconciler-context-provider-begin-work",
+      "function-component-use-context-render-read"
+    ]
+  );
+  for (const requirement of CONTEXT_OBJECT_RUNTIME_BLOCKING_REQUIREMENTS) {
+    assert.equal(requirement.requiredBeforeCompatibilityClaim, true);
+  }
 });
 
 test("context-object oracle covers every scenario in every probe mode", () => {
