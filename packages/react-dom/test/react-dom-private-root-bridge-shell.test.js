@@ -4883,6 +4883,338 @@ test('private react-dom/client facade host-output update diagnostic routes root.
   });
 });
 
+test('private react-dom/client facade nested host-output update diagnostic targets child host output', () => {
+  const document = createDocument(
+    'private-client-facade-nested-host-output-update'
+  );
+  const container = createElement('DIV', document);
+  const renderCallback = function afterPrivateFacadeNestedRender() {};
+  const updateCallback = function afterPrivateFacadeNestedUpdate() {};
+  const initialElement = {
+    props: {
+      children: {
+        props: {
+          children: 'nested initial text',
+          className: 'nested-child initial',
+          id: 'nested-child',
+          'data-phase': 'initial'
+        },
+        type: 'span'
+      },
+      id: 'nested-parent',
+      'data-shell': 'stable'
+    },
+    type: 'section'
+  };
+  const nextElement = {
+    props: {
+      children: {
+        props: {
+          children: 'nested updated text',
+          className: 'nested-child updated',
+          id: 'nested-child',
+          'data-phase': 'updated',
+          title: 'Updated nested child'
+        },
+        type: 'span'
+      },
+      id: 'nested-parent',
+      'data-shell': 'stable'
+    },
+    type: 'section'
+  };
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    rootBridge.privateRootPublicFacadeAdapterSymbol
+  );
+  const adapter = descriptor.value({
+    createRenderAdmissionIdPrefix: 'facade-nested-admission',
+    hostOutputUpdateIdPrefix: 'facade-nested-handoff',
+    publicFacadeNestedHostOutputUpdateIdPrefix:
+      'facade-nested-diagnostic',
+    requestIdPrefix: 'facade-nested-request',
+    rootIdPrefix: 'facade-nested-root',
+    sideEffectIdPrefix: 'facade-nested-side-effect',
+    updateIdPrefix: 'facade-nested-update'
+  });
+  const root = adapter.createRoot(container);
+  const create = adapter.getRootCreateRecord(root);
+  const diagnostic = adapter.updateNestedHostOutput(
+    root,
+    initialElement,
+    nextElement,
+    {
+      renderCallback,
+      updateCallback
+    }
+  );
+  const hidden =
+    rootBridge.getPrivateRootPublicFacadeNestedHostOutputUpdatePayload(
+      diagnostic
+    );
+  const handoff = hidden.hostOutputUpdateHandoff;
+  const handoffPayload =
+    rootBridge.getPrivateRootHostOutputUpdateHandoffPayload(handoff);
+  const parentNode = hidden.parentHostInstanceNode;
+  const childNode = hidden.childHostInstanceNode;
+  const textNode = hidden.textInstance;
+  const rootPayload = rootBridge.getPrivateRootPublicFacadeRootPayload(root);
+
+  assert.equal(Object.isFrozen(diagnostic), true);
+  assert.equal(
+    diagnostic.$$typeof,
+    rootBridge.privateRootPublicFacadeNestedHostOutputUpdateRecordType
+  );
+  assert.equal(
+    diagnostic.kind,
+    'FastReactDomPrivateRootPublicFacadeNestedHostOutputUpdateDiagnosticRecord'
+  );
+  assert.equal(
+    diagnostic.operation,
+    'public-facade-nested-host-output-update-diagnostic'
+  );
+  assert.equal(
+    diagnostic.diagnosticStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_NESTED_HOST_OUTPUT_UPDATE_APPLIED
+  );
+  assert.equal(diagnostic.diagnosticId, 'facade-nested-diagnostic:1');
+  assert.equal(diagnostic.rootId, 'facade-nested-root:1');
+  assert.equal(diagnostic.createRequestId, 'facade-nested-request:1');
+  assert.equal(diagnostic.initialRenderRequestId, 'facade-nested-request:2');
+  assert.equal(diagnostic.initialRenderUpdateId, 'facade-nested-update:1');
+  assert.equal(diagnostic.updateRequestId, 'facade-nested-request:3');
+  assert.equal(diagnostic.updateUpdateId, 'facade-nested-update:2');
+  assert.equal(
+    diagnostic.updateLifecycleStatusBefore,
+    rootBridge.ROOT_LIFECYCLE_RENDERED
+  );
+  assert.equal(
+    diagnostic.hostOutputUpdateHandoffId,
+    'facade-nested-handoff:1'
+  );
+  assert.equal(
+    diagnostic.hostOutputUpdateStatus,
+    rootBridge.ROOT_BRIDGE_HOST_OUTPUT_UPDATE_APPLIED
+  );
+  assert.deepEqual(diagnostic.nestedHostPath, [
+    'HostRoot',
+    'HostComponent',
+    'HostComponent',
+    'HostText'
+  ]);
+  assert.equal(diagnostic.parentHostType, 'section');
+  assert.equal(diagnostic.childHostType, 'span');
+  assert.equal(diagnostic.containerChildCount, 1);
+  assert.equal(diagnostic.parentChildCount, 1);
+  assert.equal(diagnostic.childChildCount, 1);
+  assert.equal(diagnostic.previousText, 'nested initial text');
+  assert.equal(diagnostic.nextText, 'nested updated text');
+  assert.deepEqual(diagnostic.propertyMutation, {
+    handoffKind: domHost.DOM_PROPERTY_UPDATE_LATEST_PROPS_HANDOFF,
+    latestPropsCommitRecordKind: domHost.LATEST_PROPS_COMMIT_RECORD,
+    latestPropsCommitRecordStatus: 'safe-for-latest-props',
+    mutationRecordCount: 4,
+    payloadCount: 4,
+    propertyPayloadEvidence: {
+      propertyPayloadBacked: true,
+      rowCount: 4,
+      mutatingRowCount: 3,
+      updateRowCount: 3,
+      removalRowCount: 0,
+      setAttributeCount: 3,
+      removeAttributeCount: 0,
+      setPropertyCount: 0,
+      removePropertyCount: 0,
+      setStyleCount: 0,
+      removeStyleCount: 0,
+      nonPayloadRowCount: 1,
+      attributeRowCount: 3,
+      propertyRowCount: 0,
+      styleRowCount: 0,
+      rowKinds: ['nonPayload', 'setAttribute']
+    },
+    status: 'mutated'
+  });
+  assert.deepEqual(diagnostic.textMutation, {
+    newTextLength: 19,
+    oldTextLength: 19,
+    status: 'mutated'
+  });
+  assert.equal(diagnostic.latestPropsPublished, true);
+  assert.equal(
+    diagnostic.latestPropsPublishOrder,
+    'after-property-and-text-mutation'
+  );
+  assert.equal(diagnostic.parentLatestPropsPublished, true);
+  assert.equal(diagnostic.childInitialLatestPropsPublished, true);
+  assert.deepEqual(diagnostic.tokenIdentity, {
+    parentTokenAttachedToParentNode: true,
+    childTokenAttachedToChildNode: true,
+    textTokenAttachedToTextNode: true,
+    parentTokenRootOwnerMatchesRoot: true,
+    childTokenRootOwnerMatchesRoot: true,
+    textTokenRootOwnerMatchesRoot: true,
+    parentChildTokenRootOwnerMatches: true,
+    childTextTokenRootOwnerMatches: true,
+    parentTokenDistinctFromChildToken: true,
+    childTokenDistinctFromTextToken: true
+  });
+  assert.deepEqual(
+    diagnostic.acceptedCapabilities.map((capability) => capability.id),
+    [
+      'public-facade-create-root-record',
+      'public-facade-nested-host-output-render-record',
+      'public-facade-root-render-update-record',
+      'nested-host-output-path',
+      'parent-child-token-identity',
+      'host-output-update-handoff',
+      'fake-dom-property-update',
+      'property-payload-evidence',
+      'fake-dom-text-update',
+      'latest-props-after-mutation',
+      'attribute-payload-rows'
+    ]
+  );
+  assert.deepEqual(
+    diagnostic.blockedCapabilities.map((capability) => capability.id),
+    [
+      'public-root-execution',
+      'native-execution',
+      'reconciler-execution',
+      'browser-dom-compatibility',
+      'hydration',
+      'events',
+      'refs',
+      'compatibility-claims'
+    ]
+  );
+  assert.equal(diagnostic.privateFacadeRoot, true);
+  assert.equal(diagnostic.publicCreateRootEnabled, false);
+  assert.equal(diagnostic.publicRootExecution, false);
+  assert.equal(diagnostic.publicRootCompatibilitySurface, false);
+  assert.equal(diagnostic.nativeExecution, false);
+  assert.equal(diagnostic.reconcilerExecution, false);
+  assert.equal(diagnostic.rootScheduled, false);
+  assert.equal(diagnostic.fakeDomMutation, true);
+  assert.equal(diagnostic.domMutation, true);
+  assert.equal(diagnostic.browserDomMutation, false);
+  assert.equal(diagnostic.markerWrites, false);
+  assert.equal(diagnostic.listenerInstallation, false);
+  assert.equal(diagnostic.hydration, false);
+  assert.equal(diagnostic.eventDispatch, false);
+  assert.equal(diagnostic.refEffects, false);
+  assert.equal(diagnostic.compatibilityClaimed, false);
+  assert.equal(
+    rootBridge.isPrivateRootPublicFacadeNestedHostOutputUpdateRecord(
+      diagnostic
+    ),
+    true
+  );
+  assert.equal(
+    rootBridge.isPrivateRootPublicFacadeNestedHostOutputUpdateRecord({}),
+    false
+  );
+  assert.equal(
+    rootBridge.getPrivateRootPublicFacadeNestedHostOutputUpdatePayload({}),
+    null
+  );
+
+  assert.equal(hidden.adapter, adapter);
+  assert.equal(hidden.root, root);
+  assert.equal(hidden.createRecord, create);
+  assert.equal(hidden.renderCallback, renderCallback);
+  assert.equal(hidden.updateCallback, updateCallback);
+  assert.equal(hidden.initialElement, initialElement);
+  assert.equal(hidden.element, nextElement);
+  assert.equal(hidden.hostOutputUpdatePayload, handoffPayload);
+  assert.equal(handoffPayload.sourceRecord, hidden.updateRecord);
+  assert.equal(handoffPayload.hostInstanceNode, childNode);
+  assert.equal(handoffPayload.hostInstanceToken, hidden.childHostInstanceToken);
+  assert.equal(handoffPayload.textInstance, textNode);
+  assert.equal(handoffPayload.previousProps, initialElement.props.children.props);
+  assert.equal(handoffPayload.nextProps, nextElement.props.children.props);
+  assert.equal(handoffPayload.latestPropsPublished, true);
+  assert.equal(
+    componentTree.getRootOwnerFromHostInstanceToken(
+      hidden.parentHostInstanceToken
+    ),
+    create.owner
+  );
+  assert.equal(
+    componentTree.getRootOwnerFromHostInstanceToken(
+      hidden.childHostInstanceToken
+    ),
+    create.owner
+  );
+  assert.notEqual(
+    hidden.parentHostInstanceToken,
+    hidden.childHostInstanceToken
+  );
+  assert.deepEqual(adapter.getRootRequestRecords(root), [
+    create,
+    hidden.initialRenderRecord,
+    hidden.updateRecord
+  ]);
+  assert.deepEqual(adapter.getRootNestedHostOutputUpdateDiagnostics(root), [
+    diagnostic
+  ]);
+  assert.deepEqual(rootPayload.hostOutputNestedUpdateRecords, [diagnostic]);
+
+  assert.equal(container.firstChild, parentNode);
+  assert.equal(parentNode.firstChild, childNode);
+  assert.equal(childNode.firstChild, textNode);
+  assert.equal(container.textContent, 'nested updated text');
+  assert.equal(childNode.textContent, 'nested updated text');
+  assert.equal(textNode.textContent, 'nested updated text');
+  assert.deepEqual(attributeEntries(parentNode), [
+    ['data-shell', 'stable'],
+    ['id', 'nested-parent']
+  ]);
+  assert.deepEqual(attributeEntries(childNode), [
+    ['class', 'nested-child updated'],
+    ['data-phase', 'updated'],
+    ['id', 'nested-child'],
+    ['title', 'Updated nested child']
+  ]);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(parentNode),
+    initialElement.props
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromNode(childNode),
+    nextElement.props.children.props
+  );
+  assert.equal(componentTree.getLatestPropsFromNode(textNode), null);
+  assert.equal(rootMarkers.getContainerRoot(container), null);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+  assert.equal(container.__registrations.length, 0);
+  assert.equal(document.__registrations.length, 0);
+
+  const serialized = JSON.stringify(diagnostic);
+  assert.equal(serialized.includes('__mutationLog'), false);
+  assert.equal(serialized.includes('__registrations'), false);
+  assert.equal(serialized.includes('afterPrivateFacadeNestedUpdate'), false);
+  assert.equal(serialized.includes('nested updated text'), true);
+
+  domHost.removeChildFromContainer(container, parentNode);
+  const detach = componentTree.detachHostInstanceSubtree(parentNode, {
+    includeRoot: true
+  });
+  assert.equal(detach.detachedHostInstanceCount, 3);
+  assert.equal(container.childNodes.length, 0);
+
+  const publicContainer = createElement(
+    'DIV',
+    createDocument('private-client-facade-nested-host-output-public')
+  );
+  assert.throws(() => reactDomClient.createRoot(publicContainer), {
+    code: 'FAST_REACT_UNIMPLEMENTED',
+    entrypoint: 'react-dom/client',
+    exportName: 'createRoot'
+  });
+});
+
 test('private react-dom/client facade unmount cleanup diagnostic routes through bridge cleanup', () => {
   const document = createDocument('private-client-facade-unmount-cleanup');
   const container = createElement('DIV', document);

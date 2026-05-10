@@ -782,6 +782,221 @@ test("React DOM client private facade host-output update routes through private 
   assert.equal(publicBoundary.createRoot.rootObjectCreated, false);
 });
 
+test("React DOM client private facade nested host-output update stays diagnostic-only", () => {
+  const reactDomClient = require(
+    path.join(repoRoot, "packages/react-dom/client.js")
+  );
+  const rootBridge = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-bridge.js")
+  );
+  const rootMarkers = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-markers.js")
+  );
+  const listenerRegistry = require(
+    path.join(repoRoot, "packages/react-dom/src/events/listener-registry.js")
+  );
+  const componentTree = require(
+    path.join(repoRoot, "packages/react-dom/src/client/component-tree.js")
+  );
+  const domContainer = require(
+    path.join(repoRoot, "packages/react-dom/src/client/dom-container.js")
+  );
+  const symbol = rootBridge.privateRootPublicFacadeAdapterSymbol;
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    symbol
+  );
+  const document = createPrivateGateDocument(
+    "public-facade-nested-host-output-update",
+    domContainer
+  );
+  const container = createPrivateGateElement("DIV", document, domContainer);
+  const initialElement = {
+    props: {
+      children: {
+        props: {
+          children: "nested initial",
+          className: "nested initial",
+          id: "nested-child"
+        },
+        type: "span"
+      },
+      id: "nested-parent"
+    },
+    type: "section"
+  };
+  const nextElement = {
+    props: {
+      children: {
+        props: {
+          children: "nested updated",
+          className: "nested updated",
+          id: "nested-child",
+          "data-phase": "updated"
+        },
+        type: "span"
+      },
+      id: "nested-parent"
+    },
+    type: "section"
+  };
+  const adapter = descriptor.value({
+    hostOutputUpdateIdPrefix: "facade-conformance-nested-handoff",
+    publicFacadeNestedHostOutputUpdateIdPrefix:
+      "facade-conformance-nested-update",
+    requestIdPrefix: "facade-conformance-nested-request",
+    rootIdPrefix: "facade-conformance-nested-root",
+    updateIdPrefix: "facade-conformance-nested-update-id"
+  });
+  const root = adapter.createRoot(container);
+  const create = adapter.getRootCreateRecord(root);
+  const diagnostic = adapter.updateNestedHostOutput(
+    root,
+    initialElement,
+    nextElement
+  );
+  const hidden =
+    rootBridge.getPrivateRootPublicFacadeNestedHostOutputUpdatePayload(
+      diagnostic
+    );
+  const parentNode = hidden.parentHostInstanceNode;
+  const childNode = hidden.childHostInstanceNode;
+  const textNode = hidden.textInstance;
+
+  assert.equal(
+    diagnostic.$$typeof,
+    rootBridge.privateRootPublicFacadeNestedHostOutputUpdateRecordType
+  );
+  assert.equal(
+    diagnostic.diagnosticStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_NESTED_HOST_OUTPUT_UPDATE_APPLIED
+  );
+  assert.equal(diagnostic.diagnosticId, "facade-conformance-nested-update:1");
+  assert.equal(diagnostic.updateRequestType, "root.render");
+  assert.equal(
+    diagnostic.hostOutputUpdateHandoffId,
+    "facade-conformance-nested-handoff:1"
+  );
+  assert.deepEqual(diagnostic.nestedHostPath, [
+    "HostRoot",
+    "HostComponent",
+    "HostComponent",
+    "HostText"
+  ]);
+  assert.equal(diagnostic.parentHostType, "section");
+  assert.equal(diagnostic.childHostType, "span");
+  assert.equal(diagnostic.previousText, "nested initial");
+  assert.equal(diagnostic.nextText, "nested updated");
+  assert.deepEqual(diagnostic.tokenIdentity, {
+    parentTokenAttachedToParentNode: true,
+    childTokenAttachedToChildNode: true,
+    textTokenAttachedToTextNode: true,
+    parentTokenRootOwnerMatchesRoot: true,
+    childTokenRootOwnerMatchesRoot: true,
+    textTokenRootOwnerMatchesRoot: true,
+    parentChildTokenRootOwnerMatches: true,
+    childTextTokenRootOwnerMatches: true,
+    parentTokenDistinctFromChildToken: true,
+    childTokenDistinctFromTextToken: true
+  });
+  assert.equal(diagnostic.latestPropsPublished, true);
+  assert.equal(
+    diagnostic.latestPropsPublishOrder,
+    "after-property-and-text-mutation"
+  );
+  assert.equal(diagnostic.parentLatestPropsPublished, true);
+  assert.equal(diagnostic.childInitialLatestPropsPublished, true);
+  assert.deepEqual(
+    diagnostic.acceptedCapabilities.map((capability) => capability.id),
+    [
+      "public-facade-create-root-record",
+      "public-facade-nested-host-output-render-record",
+      "public-facade-root-render-update-record",
+      "nested-host-output-path",
+      "parent-child-token-identity",
+      "host-output-update-handoff",
+      "fake-dom-property-update",
+      "property-payload-evidence",
+      "fake-dom-text-update",
+      "latest-props-after-mutation",
+      "attribute-payload-rows"
+    ]
+  );
+  assert.equal(diagnostic.publicCreateRootEnabled, false);
+  assert.equal(diagnostic.publicRootExecution, false);
+  assert.equal(diagnostic.publicRootCompatibilitySurface, false);
+  assert.equal(diagnostic.nativeExecution, false);
+  assert.equal(diagnostic.reconcilerExecution, false);
+  assert.equal(diagnostic.rootScheduled, false);
+  assert.equal(diagnostic.browserDomMutation, false);
+  assert.equal(diagnostic.hydration, false);
+  assert.equal(diagnostic.eventDispatch, false);
+  assert.equal(diagnostic.refEffects, false);
+  assert.equal(diagnostic.compatibilityClaimed, false);
+  assert.equal(
+    rootBridge.isPrivateRootPublicFacadeNestedHostOutputUpdateRecord(
+      diagnostic
+    ),
+    true
+  );
+  assert.deepEqual(
+    adapter.getRootRequestRecords(root).map((record) => record.requestType),
+    ["createRoot", "root.render", "root.render"]
+  );
+  assert.deepEqual(adapter.getRootNestedHostOutputUpdateDiagnostics(root), [
+    diagnostic
+  ]);
+  assert.equal(hidden.createRecord, create);
+  assert.equal(hidden.hostOutputUpdateHandoff.latestPropsPublished, true);
+  assert.equal(
+    rootBridge.getPrivateRootRecordPayload(hidden.updateRecord).element,
+    nextElement
+  );
+  assert.equal(
+    componentTree.getRootOwnerFromHostInstanceToken(
+      hidden.parentHostInstanceToken
+    ),
+    create.owner
+  );
+  assert.equal(
+    componentTree.getRootOwnerFromHostInstanceToken(
+      hidden.childHostInstanceToken
+    ),
+    create.owner
+  );
+  assert.notEqual(
+    hidden.parentHostInstanceToken,
+    hidden.childHostInstanceToken
+  );
+  assert.equal(container.firstChild, parentNode);
+  assert.equal(parentNode.firstChild, childNode);
+  assert.equal(childNode.firstChild, textNode);
+  assert.equal(textNode.textContent, "nested updated");
+  assert.equal(container.textContent, "nested updated");
+  assert.deepEqual(attributeEntries(parentNode), [["id", "nested-parent"]]);
+  assert.deepEqual(attributeEntries(childNode), [
+    ["class", "nested updated"],
+    ["data-phase", "updated"],
+    ["id", "nested-child"]
+  ]);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(parentNode),
+    initialElement.props
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromNode(childNode),
+    nextElement.props.children.props
+  );
+  assert.equal(componentTree.getLatestPropsFromNode(textNode), null);
+  assert.equal(rootMarkers.getContainerRoot(container), null);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+
+  const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
+  assert.equal(publicBoundary.createRoot.status, "throws");
+  assert.equal(publicBoundary.createRoot.rootObjectCreated, false);
+});
+
 test("React DOM client private facade unmount cleanup stays private and non-compatible", () => {
   const reactDomClient = require(
     path.join(repoRoot, "packages/react-dom/client.js")

@@ -172,6 +172,8 @@ const privateRootPublicFacadeHostOutputRenderRecordType =
   'fast.react_dom.private_root_public_facade_host_output_render_record';
 const privateRootPublicFacadeHostOutputUpdateRecordType =
   'fast.react_dom.private_root_public_facade_host_output_update_record';
+const privateRootPublicFacadeNestedHostOutputUpdateRecordType =
+  'fast.react_dom.private_root_public_facade_nested_host_output_update_record';
 const privateRootPublicFacadeHostOutputUnmountCleanupRecordType =
   'fast.react_dom.private_root_public_facade_host_output_unmount_cleanup_record';
 const privateRootPublicFacadeAdapterSymbol = Symbol.for(
@@ -257,6 +259,8 @@ const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_APPLIED =
   'applied-private-root-public-facade-host-output-render-diagnostic';
 const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_APPLIED =
   'applied-private-root-public-facade-host-output-update-diagnostic';
+const ROOT_BRIDGE_PUBLIC_FACADE_NESTED_HOST_OUTPUT_UPDATE_APPLIED =
+  'applied-private-root-public-facade-nested-host-output-update-diagnostic';
 const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_CLEANED =
   'cleaned-private-root-public-facade-host-output-unmount-cleanup-diagnostic';
 const NATIVE_ROOT_BRIDGE_REQUEST_CREATE = 'create';
@@ -1412,6 +1416,45 @@ const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES =
         'The update request is applied through the accepted fake-DOM host-output update handoff.'
     })
   ]);
+const ROOT_BRIDGE_PUBLIC_FACADE_NESTED_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'public-facade-create-root-record',
+      accepted: true,
+      reason:
+        'The diagnostic starts from the symbol-only private public-facade createRoot record.'
+    }),
+    freezeRecord({
+      id: 'public-facade-nested-host-output-render-record',
+      accepted: true,
+      reason:
+        'The diagnostic routes the initial nested fake-DOM host tree through a bridge-owned render request record.'
+    }),
+    freezeRecord({
+      id: 'public-facade-root-render-update-record',
+      accepted: true,
+      reason:
+        'The diagnostic routes the nested child update through a bridge-owned render request record.'
+    }),
+    freezeRecord({
+      id: 'nested-host-output-path',
+      accepted: true,
+      reason:
+        'The diagnostic records the HostRoot/HostComponent/HostComponent/HostText fake-DOM path being updated.'
+    }),
+    freezeRecord({
+      id: 'parent-child-token-identity',
+      accepted: true,
+      reason:
+        'The parent and child HostComponent tokens are attached to distinct fake-DOM nodes owned by the same private root.'
+    }),
+    freezeRecord({
+      id: 'host-output-update-handoff',
+      accepted: true,
+      reason:
+        'The nested child update is applied through the accepted fake-DOM host-output update handoff.'
+    })
+  ]);
 const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_BLOCKED_CAPABILITIES =
   freezeArray([
     freezeRecord({
@@ -1616,6 +1659,7 @@ const rootPublicFacadePreflightRecordPayloads = new WeakMap();
 const rootPublicFacadeMarkerListenerPreflightPayloads = new WeakMap();
 const rootPublicFacadeHostOutputRenderPayloads = new WeakMap();
 const rootPublicFacadeHostOutputUpdatePayloads = new WeakMap();
+const rootPublicFacadeNestedHostOutputUpdatePayloads = new WeakMap();
 const rootPublicFacadeHostOutputUnmountCleanupPayloads = new WeakMap();
 
 function createPrivateRootBridgeShell(options) {
@@ -1888,6 +1932,12 @@ function createPrivateRootPublicFacadeAdapter(options) {
           .hostOutputUpdateRecords
       );
     },
+    getRootNestedHostOutputUpdateDiagnostics(root) {
+      return freezeArray(
+        assertPrivateRootPublicFacadeRootForAdapter(root, adapterState)
+          .hostOutputNestedUpdateRecords
+      );
+    },
     getRootHostOutputUnmountCleanupDiagnostics(root) {
       return freezeArray(
         assertPrivateRootPublicFacadeRootForAdapter(root, adapterState)
@@ -1914,6 +1964,15 @@ function createPrivateRootPublicFacadeAdapter(options) {
         adapterState,
         root,
         element,
+        options
+      );
+    },
+    updateNestedHostOutput(root, initialElement, nextElement, options) {
+      return updatePrivateRootPublicFacadeNestedHostOutputWithAdapter(
+        adapterState,
+        root,
+        initialElement,
+        nextElement,
         options
       );
     },
@@ -2025,6 +2084,7 @@ function createPrivateRootPublicFacadeRoot(
     createRecord,
     hostOutputRenderRecords: [],
     hostOutputUpdateRecords: [],
+    hostOutputNestedUpdateRecords: [],
     hostOutputUnmountCleanupRecords: [],
     renderRecords: [],
     markerListenerPreflightRecords: [],
@@ -2496,7 +2556,7 @@ function renderPrivateRootPublicFacadeHostOutputFromPayload(
       'Cannot render private public-facade host output while a previous host-output diagnostic is still active.'
     );
   }
-  assertNoActiveCreateRootSideEffectsForPublicFacadeHostOutputRender(
+  assertNoActiveCreateRootSideEffectsForPublicFacadeHostOutputUpdate(
     createRecord
   );
   normalizeInitialHostOutputElement(element);
@@ -2653,6 +2713,26 @@ function updatePrivateRootPublicFacadeHostOutput(root, element, options) {
   );
 }
 
+function updatePrivateRootPublicFacadeNestedHostOutput(
+  root,
+  initialElement,
+  nextElement,
+  options
+) {
+  const payload = rootPublicFacadeRootPayloads.get(root);
+  if (payload === undefined) {
+    throwInvalidRootPublicFacadeAdapter(
+      'Expected a private React DOM root public facade root.'
+    );
+  }
+  return updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
+    payload,
+    initialElement,
+    nextElement,
+    options
+  );
+}
+
 function updatePrivateRootPublicFacadeHostOutputWithAdapter(
   adapterState,
   root,
@@ -2666,6 +2746,25 @@ function updatePrivateRootPublicFacadeHostOutputWithAdapter(
   return updatePrivateRootPublicFacadeHostOutputFromPayload(
     payload,
     element,
+    options
+  );
+}
+
+function updatePrivateRootPublicFacadeNestedHostOutputWithAdapter(
+  adapterState,
+  root,
+  initialElement,
+  nextElement,
+  options
+) {
+  const payload = assertPrivateRootPublicFacadeRootForAdapter(
+    root,
+    adapterState
+  );
+  return updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
+    payload,
+    initialElement,
+    nextElement,
     options
   );
 }
@@ -2818,6 +2917,248 @@ function updatePrivateRootPublicFacadeHostOutputFromPayload(
     updateRecord
   });
   payload.hostOutputUpdateRecords.push(diagnosticRecord);
+  return diagnosticRecord;
+}
+
+function updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
+  payload,
+  initialElement,
+  nextElement,
+  options
+) {
+  const createRecord = payload.createRecord;
+  const createPayload = rootRecordPayloads.get(createRecord);
+  if (createPayload === undefined) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Expected a private React DOM createRoot record for public-facade nested host-output update.'
+    );
+  }
+
+  const handleState = getPrivateRootHandleState(payload.rootHandle);
+  if (handleState.lifecycleStatus === ROOT_LIFECYCLE_UNMOUNTED) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Cannot update private public-facade nested host output after the private facade root was unmounted.'
+    );
+  }
+  assertNoActiveCreateRootSideEffectsForPublicFacadeHostOutputRender(
+    createRecord
+  );
+  assertPublicFacadeNestedHostOutputContainerCanReceiveRootChild(
+    createPayload.container
+  );
+
+  const normalized = normalizePublicFacadeNestedHostOutputUpdateElements(
+    initialElement,
+    nextElement
+  );
+  const rootBridgeState = handleState.bridgeState;
+  const sequence =
+    rootBridgeState.nextPublicFacadeNestedHostOutputUpdateSequence++;
+  const diagnosticId =
+    `${rootBridgeState.publicFacadeNestedHostOutputUpdateIdPrefix}:${sequence}`;
+  const renderCallback =
+    getPublicFacadeNestedHostOutputRenderCallback(options);
+  const updateCallback =
+    getPublicFacadeNestedHostOutputUpdateCallback(options);
+  const sideEffectOptions =
+    getPublicFacadeHostOutputRenderSideEffectOptions(options);
+
+  let sideEffectRecord = null;
+  let sideEffectCleanup = null;
+  let renderRecord = null;
+  let admissionRecord = null;
+  let nestedMount = null;
+  let updateRecord = null;
+  let hostOutputUpdateHandoff = null;
+  let hostOutputUpdatePayload = null;
+
+  try {
+    sideEffectRecord = payload.bridge.applyCreateRootSideEffects(
+      createRecord,
+      sideEffectOptions
+    );
+    renderRecord = payload.root.render(initialElement, renderCallback);
+    admissionRecord = payload.bridge.admitCreateRenderPath(
+      createRecord,
+      sideEffectRecord,
+      renderRecord
+    );
+    nestedMount = mountPublicFacadeNestedHostOutputForUpdate({
+      container: createPayload.container,
+      diagnosticId,
+      initial: normalized.initial,
+      renderRecord,
+      rootOwner: createRecord.owner
+    });
+    sideEffectCleanup =
+      payload.bridge.revertCreateRootSideEffects(sideEffectRecord);
+    updateRecord = payload.root.render(nextElement, updateCallback);
+    hostOutputUpdateHandoff = payload.bridge.applyHostOutputUpdate(
+      updateRecord,
+      {
+        hostInstanceToken: nestedMount.childToken,
+        nextProps: normalized.next.childProps,
+        tag: normalized.next.childType,
+        textUpdate: {
+          newText: normalized.next.text,
+          oldText: normalized.initial.text,
+          textInstance: nestedMount.textNode
+        }
+      }
+    );
+    hostOutputUpdatePayload =
+      rootHostOutputUpdateHandoffPayloads.get(hostOutputUpdateHandoff);
+    if (hostOutputUpdatePayload === undefined) {
+      throwInvalidRootPublicFacadeHostOutputUpdate(
+        'Public-facade nested host-output update requires an applied host-output update handoff.'
+      );
+    }
+  } catch (error) {
+    cleanupPublicFacadeNestedHostOutputUpdateAfterFailure({
+      bridge: payload.bridge,
+      nestedMount,
+      sideEffectRecord
+    });
+    throw error;
+  }
+
+  const latestPropsAfterUpdate = getLatestPropsFromHostInstanceToken(
+    nestedMount.childToken
+  );
+  const tokenIdentity = createNestedHostOutputTokenIdentity(
+    createRecord.owner,
+    nestedMount
+  );
+  const acceptedCapabilities =
+    createPublicFacadeNestedHostOutputUpdateAcceptedCapabilities(
+      hostOutputUpdateHandoff
+    );
+  const diagnosticRecord = freezeRecord({
+    $$typeof: privateRootPublicFacadeNestedHostOutputUpdateRecordType,
+    kind:
+      'FastReactDomPrivateRootPublicFacadeNestedHostOutputUpdateDiagnosticRecord',
+    operation: 'public-facade-nested-host-output-update-diagnostic',
+    entrypoint: 'react-dom/client',
+    adapterStatus: ROOT_BRIDGE_PUBLIC_FACADE_ADAPTER_READY,
+    diagnosticId,
+    diagnosticSequence: sequence,
+    diagnosticStatus:
+      ROOT_BRIDGE_PUBLIC_FACADE_NESTED_HOST_OUTPUT_UPDATE_APPLIED,
+    rootId: createRecord.rootId,
+    rootKind: createRecord.rootKind,
+    rootTag: createRecord.rootTag,
+    createRequestId: createRecord.requestId,
+    createRequestSequence: createRecord.requestSequence,
+    createRequestType: createRecord.requestType,
+    initialRenderRequestId: renderRecord.requestId,
+    initialRenderRequestSequence: renderRecord.requestSequence,
+    initialRenderRequestType: renderRecord.requestType,
+    initialRenderUpdateId: renderRecord.updateId,
+    initialRenderLifecycleStatusBefore: renderRecord.lifecycleStatusBefore,
+    initialRenderLifecycleStatusAfter: renderRecord.lifecycleStatusAfter,
+    updateRequestId: updateRecord.requestId,
+    updateRequestSequence: updateRecord.requestSequence,
+    updateRequestType: updateRecord.requestType,
+    updateUpdateId: updateRecord.updateId,
+    updateLifecycleStatusBefore: updateRecord.lifecycleStatusBefore,
+    updateLifecycleStatusAfter: updateRecord.lifecycleStatusAfter,
+    sideEffectId: sideEffectRecord.sideEffectId,
+    sideEffectSequence: sideEffectRecord.sideEffectSequence,
+    setupSideEffectStatus: sideEffectRecord.sideEffectStatus,
+    cleanupSideEffectStatus: sideEffectCleanup.sideEffectStatus,
+    admissionId: admissionRecord.admissionId,
+    admissionSequence: admissionRecord.admissionSequence,
+    admissionStatus: admissionRecord.admissionStatus,
+    hostOutputUpdateHandoffId: hostOutputUpdateHandoff.handoffId,
+    hostOutputUpdateHandoffSequence:
+      hostOutputUpdateHandoff.handoffSequence,
+    hostOutputUpdateStatus: hostOutputUpdateHandoff.updateStatus,
+    nestedHostPath: freezeArray([
+      'HostRoot',
+      'HostComponent',
+      'HostComponent',
+      'HostText'
+    ]),
+    parentHostType: normalized.initial.parentType,
+    childHostType: normalized.initial.childType,
+    parentNodeInfo: freezeRecord(describeContainer(nestedMount.parentNode)),
+    childNodeInfo: freezeRecord(describeContainer(nestedMount.childNode)),
+    textNodeInfo: freezeRecord(describeContainer(nestedMount.textNode)),
+    containerChildCount: getChildNodeCount(createPayload.container),
+    parentChildCount: getChildNodeCount(nestedMount.parentNode),
+    childChildCount: getChildNodeCount(nestedMount.childNode),
+    previousText: normalized.initial.text,
+    nextText: normalized.next.text,
+    propertyMutation: hostOutputUpdateHandoff.propertyMutation,
+    textMutation: hostOutputUpdateHandoff.textMutation,
+    latestPropsPublished: hostOutputUpdateHandoff.latestPropsPublished,
+    latestPropsPublishOrder:
+      hostOutputUpdateHandoff.latestPropsPublishOrder,
+    latestPropsBeforeUpdateInfo: describeBridgeValue(
+      hostOutputUpdatePayload.previousProps
+    ),
+    latestPropsAfterUpdateInfo: describeBridgeValue(latestPropsAfterUpdate),
+    parentLatestPropsPublished:
+      nestedMount.parentLatestPropsAfterCommit ===
+      normalized.initial.parentProps,
+    childInitialLatestPropsPublished:
+      nestedMount.childLatestPropsAfterCommit ===
+      normalized.initial.childProps,
+    tokenIdentity,
+    acceptedCapabilities,
+    blockedCapabilities:
+      ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_BLOCKED_CAPABILITIES,
+    privateFacadeRoot: true,
+    publicCreateRootEnabled: false,
+    publicHydrateRootEnabled: false,
+    publicRootCreated: false,
+    publicRootObjectExposed: false,
+    publicRootExecution: false,
+    publicRootCompatibilitySurface: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    fakeDomMutation: true,
+    domMutation: true,
+    browserDomMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    refEffects: false,
+    compatibilityClaimed: false,
+    cleanupRequired: true
+  });
+
+  rootPublicFacadeNestedHostOutputUpdatePayloads.set(diagnosticRecord, {
+    adapter: payload.adapter,
+    admissionRecord,
+    bridge: payload.bridge,
+    childHostInstanceNode: nestedMount.childNode,
+    childHostInstanceToken: nestedMount.childToken,
+    container: createPayload.container,
+    createRecord,
+    element: nextElement,
+    hostOutputUpdateHandoff,
+    hostOutputUpdatePayload,
+    initialElement,
+    initialRenderRecord: renderRecord,
+    latestPropsAfterUpdate,
+    nestedMount,
+    normalizedUpdate: normalized,
+    parentHostInstanceNode: nestedMount.parentNode,
+    parentHostInstanceToken: nestedMount.parentToken,
+    renderCallback,
+    root: payload.root,
+    rootHandle: payload.rootHandle,
+    sideEffectCleanup,
+    sideEffectRecord,
+    textInstance: nestedMount.textNode,
+    textToken: nestedMount.textToken,
+    updateCallback,
+    updateRecord
+  });
+  payload.hostOutputNestedUpdateRecords.push(diagnosticRecord);
   return diagnosticRecord;
 }
 
@@ -4521,6 +4862,16 @@ function getPrivateRootPublicFacadeHostOutputUpdatePayload(record) {
 
 function isPrivateRootPublicFacadeHostOutputUpdateRecord(value) {
   return rootPublicFacadeHostOutputUpdatePayloads.has(value);
+}
+
+function getPrivateRootPublicFacadeNestedHostOutputUpdatePayload(record) {
+  return (
+    rootPublicFacadeNestedHostOutputUpdatePayloads.get(record) || null
+  );
+}
+
+function isPrivateRootPublicFacadeNestedHostOutputUpdateRecord(value) {
+  return rootPublicFacadeNestedHostOutputUpdatePayloads.has(value);
 }
 
 function getPrivateRootPublicFacadeHostOutputUnmountCleanupPayload(record) {
@@ -7292,6 +7643,10 @@ function createBridgeState(options) {
       options && options.publicFacadeHostOutputUpdateIdPrefix,
       'public-facade-host-output-update'
     ),
+    publicFacadeNestedHostOutputUpdateIdPrefix: getIdPrefix(
+      options && options.publicFacadeNestedHostOutputUpdateIdPrefix,
+      'public-facade-nested-host-output-update'
+    ),
     publicFacadeHostOutputUnmountCleanupIdPrefix: getIdPrefix(
       options && options.publicFacadeHostOutputUnmountCleanupIdPrefix,
       'public-facade-host-output-unmount-cleanup'
@@ -7327,6 +7682,7 @@ function createBridgeState(options) {
     nextPublicFacadePreflightSequence: 1,
     nextPublicFacadeHostOutputRenderSequence: 1,
     nextPublicFacadeHostOutputUpdateSequence: 1,
+    nextPublicFacadeNestedHostOutputUpdateSequence: 1,
     nextPublicFacadeHostOutputUnmountCleanupSequence: 1,
     nextRootCommitRefMetadataSequence: 1,
     nextRootSequence: 1,
@@ -10564,6 +10920,21 @@ function assertNoActiveCreateRootSideEffectsForPublicFacadeHostOutputRender(
   }
 }
 
+function assertNoActiveCreateRootSideEffectsForPublicFacadeHostOutputUpdate(
+  createRecord
+) {
+  const existing = rootCreateSideEffectRecords.get(createRecord);
+  if (existing === undefined) {
+    return;
+  }
+  const existingPayload = rootCreateSideEffectPayloads.get(existing);
+  if (existingPayload && existingPayload.active) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Cannot update private public-facade host output while createRoot side effects are already active.'
+    );
+  }
+}
+
 function assertNoActiveCreateRootSideEffectsForPublicFacadeHostOutputUnmount(
   createRecord
 ) {
@@ -10723,6 +11094,359 @@ function createPublicFacadeHostOutputUpdateAcceptedCapabilities(handoff) {
   ]);
 }
 
+function createPublicFacadeNestedHostOutputUpdateAcceptedCapabilities(
+  handoff
+) {
+  return freezeArray([
+    ...ROOT_BRIDGE_PUBLIC_FACADE_NESTED_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES,
+    ...handoff.acceptedCapabilities
+  ]);
+}
+
+function getPublicFacadeNestedHostOutputRenderCallback(options) {
+  if (
+    options &&
+    typeof options === 'object' &&
+    Object.prototype.hasOwnProperty.call(options, 'renderCallback')
+  ) {
+    return options.renderCallback;
+  }
+  return getPublicFacadeHostOutputRenderCallback(options);
+}
+
+function getPublicFacadeNestedHostOutputUpdateCallback(options) {
+  if (
+    options &&
+    typeof options === 'object' &&
+    Object.prototype.hasOwnProperty.call(options, 'updateCallback')
+  ) {
+    return options.updateCallback;
+  }
+  return getPublicFacadeHostOutputUpdateCallback(options);
+}
+
+function normalizePublicFacadeNestedHostOutputUpdateElements(
+  initialElement,
+  nextElement
+) {
+  const initial = normalizePublicFacadeNestedHostOutputElement(
+    initialElement,
+    'initial'
+  );
+  const next = normalizePublicFacadeNestedHostOutputElement(
+    nextElement,
+    'next'
+  );
+
+  if (initial.parentType !== next.parentType) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade nested host-output update requires a stable parent HostComponent type.'
+    );
+  }
+  if (initial.childType !== next.childType) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade nested host-output update requires a stable child HostComponent type.'
+    );
+  }
+
+  return {
+    initial,
+    next
+  };
+}
+
+function normalizePublicFacadeNestedHostOutputElement(element, phase) {
+  if (element === null || typeof element !== 'object') {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      `Public-facade nested host-output update requires a ${phase} parent HostComponent element object.`
+    );
+  }
+  if (typeof element.type !== 'string' || element.type === '') {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      `Public-facade nested host-output update requires a ${phase} string parent HostComponent type.`
+    );
+  }
+
+  const parentProps =
+    element.props !== null && typeof element.props === 'object'
+      ? element.props
+      : {};
+  const childElement = parentProps.children;
+  if (childElement === null || typeof childElement !== 'object') {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      `Public-facade nested host-output update requires a ${phase} child HostComponent element object.`
+    );
+  }
+  if (typeof childElement.type !== 'string' || childElement.type === '') {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      `Public-facade nested host-output update requires a ${phase} string child HostComponent type.`
+    );
+  }
+
+  const childProps =
+    childElement.props !== null && typeof childElement.props === 'object'
+      ? childElement.props
+      : {};
+  const text = getPublicFacadeHostOutputUpdateTextChild(
+    childProps,
+    `${phase} nested child`
+  );
+
+  return {
+    childElement,
+    childProps,
+    childType: childElement.type,
+    parentProps,
+    parentType: element.type,
+    text
+  };
+}
+
+function mountPublicFacadeNestedHostOutputForUpdate({
+  container,
+  diagnosticId,
+  initial,
+  renderRecord,
+  rootOwner
+}) {
+  let parentNode = null;
+  let childNode = null;
+  let textNode = null;
+  let parentToken = null;
+  let childToken = null;
+  let textToken = null;
+  let parentPropsHandoff = null;
+  let childPropsHandoff = null;
+  let parentLatestPropsBeforeCommit = null;
+  let parentLatestPropsAfterCommit = null;
+  let childLatestPropsBeforeCommit = null;
+  let childLatestPropsAfterCommit = null;
+  let textAppendedToChild = false;
+  let childAppendedToParent = false;
+  let parentAppendedToContainer = false;
+
+  try {
+    parentNode = createDomHostElementInstance(initial.parentType, container);
+    parentToken = createHostInstanceToken(
+      freezeRecord({
+        diagnosticId,
+        hostType: initial.parentType,
+        kind:
+          'FastReactDomPrivatePublicFacadeNestedHostOutputParentOwner',
+        renderUpdateId: renderRecord.updateId
+      }),
+      rootOwner
+    );
+    attachHostInstanceNode(parentNode, parentToken, {});
+    parentPropsHandoff = commitDomPropertyUpdateForLatestProps(
+      parentNode,
+      initial.parentType,
+      {},
+      initial.parentProps
+    );
+    parentLatestPropsBeforeCommit = getLatestPropsFromNode(parentNode);
+    parentLatestPropsAfterCommit =
+      requireLatestPropsCommitResult(parentPropsHandoff);
+
+    childNode = createDomHostElementInstance(initial.childType, container);
+    childToken = createHostInstanceToken(
+      freezeRecord({
+        diagnosticId,
+        hostType: initial.childType,
+        kind:
+          'FastReactDomPrivatePublicFacadeNestedHostOutputChildOwner',
+        renderUpdateId: renderRecord.updateId
+      }),
+      rootOwner
+    );
+    attachHostInstanceNode(childNode, childToken, {});
+    childPropsHandoff = commitDomPropertyUpdateForLatestProps(
+      childNode,
+      initial.childType,
+      {},
+      initial.childProps
+    );
+    childLatestPropsBeforeCommit = getLatestPropsFromNode(childNode);
+    childLatestPropsAfterCommit =
+      requireLatestPropsCommitResult(childPropsHandoff);
+
+    textNode = createDomHostTextInstance(initial.text, container);
+    textToken = createHostInstanceToken(
+      freezeRecord({
+        diagnosticId,
+        hostType: initial.childType,
+        kind: 'FastReactDomPrivatePublicFacadeNestedHostOutputTextOwner',
+        renderUpdateId: renderRecord.updateId
+      }),
+      rootOwner
+    );
+    attachHostInstanceNode(textNode, textToken, null);
+    appendInitialChild(childNode, textNode);
+    textAppendedToChild = true;
+    appendInitialChild(parentNode, childNode);
+    childAppendedToParent = true;
+    appendChildToContainer(container, parentNode);
+    parentAppendedToContainer = true;
+  } catch (error) {
+    rollbackPartialNestedHostOutput({
+      childAppendedToParent,
+      childNode,
+      childPropsHandoff,
+      container,
+      parentAppendedToContainer,
+      parentNode,
+      parentPropsHandoff,
+      textAppendedToChild,
+      textNode
+    });
+    throw error;
+  }
+
+  return {
+    childLatestPropsAfterCommit,
+    childLatestPropsBeforeCommit,
+    childNode,
+    childPropsHandoff,
+    childToken,
+    parentLatestPropsAfterCommit,
+    parentLatestPropsBeforeCommit,
+    parentNode,
+    parentPropsHandoff,
+    parentToken,
+    textNode,
+    textToken
+  };
+}
+
+function rollbackPartialNestedHostOutput({
+  childAppendedToParent,
+  childNode,
+  childPropsHandoff,
+  container,
+  parentAppendedToContainer,
+  parentNode,
+  parentPropsHandoff,
+  textAppendedToChild,
+  textNode
+}) {
+  if (parentAppendedToContainer) {
+    try {
+      removeChildFromContainer(container, parentNode);
+    } catch (error) {
+      // Preserve the original private nested host-output failure.
+    }
+  }
+  if (childAppendedToParent) {
+    try {
+      removeChild(parentNode, childNode);
+    } catch (error) {
+      // Preserve the original private nested host-output failure.
+    }
+  }
+  if (textAppendedToChild) {
+    try {
+      removeChild(childNode, textNode);
+    } catch (error) {
+      // Preserve the original private nested host-output failure.
+    }
+  }
+  if (childPropsHandoff !== null) {
+    try {
+      rollbackDomPropertyUpdateLatestPropsHandoff(childPropsHandoff);
+    } catch (error) {
+      // Preserve the original private nested host-output failure.
+    }
+  }
+  if (parentPropsHandoff !== null) {
+    try {
+      rollbackDomPropertyUpdateLatestPropsHandoff(parentPropsHandoff);
+    } catch (error) {
+      // Preserve the original private nested host-output failure.
+    }
+  }
+  if (parentNode !== null) {
+    detachHostInstanceSubtree(parentNode, {includeRoot: true});
+  }
+  if (childNode !== null) {
+    detachHostInstanceSubtree(childNode, {includeRoot: true});
+  }
+  if (textNode !== null) {
+    detachHostInstanceSubtree(textNode, {includeRoot: true});
+  }
+}
+
+function cleanupPublicFacadeNestedHostOutputUpdateAfterFailure({
+  bridge,
+  nestedMount,
+  sideEffectRecord
+}) {
+  if (nestedMount !== null) {
+    rollbackPartialNestedHostOutput({
+      childAppendedToParent: true,
+      childNode: nestedMount.childNode,
+      childPropsHandoff: null,
+      container:
+        nestedMount.parentNode === null
+          ? null
+          : nestedMount.parentNode.parentNode,
+      parentAppendedToContainer:
+        nestedMount.parentNode !== null &&
+        nestedMount.parentNode.parentNode !== null,
+      parentNode: nestedMount.parentNode,
+      parentPropsHandoff: null,
+      textAppendedToChild: true,
+      textNode: nestedMount.textNode
+    });
+  }
+  if (sideEffectRecord !== null) {
+    try {
+      bridge.revertCreateRootSideEffects(sideEffectRecord);
+    } catch (error) {
+      // Preserve the original private nested host-output failure.
+    }
+  }
+}
+
+function assertPublicFacadeNestedHostOutputContainerCanReceiveRootChild(
+  container
+) {
+  if (getChildNodeCount(container) !== 0 || getFirstChild(container) !== null) {
+    throwInvalidRootPublicFacadeHostOutputUpdate(
+      'Public-facade nested host-output update requires an empty fake-DOM root container.'
+    );
+  }
+}
+
+function createNestedHostOutputTokenIdentity(rootOwner, nestedMount) {
+  const parentNode = assertMountedHostInstanceToken(nestedMount.parentToken);
+  const childNode = assertMountedHostInstanceToken(nestedMount.childToken);
+  const textNode = assertMountedHostInstanceToken(nestedMount.textToken);
+  const parentRootOwner = getRootOwnerFromHostInstanceToken(
+    nestedMount.parentToken
+  );
+  const childRootOwner = getRootOwnerFromHostInstanceToken(
+    nestedMount.childToken
+  );
+  const textRootOwner = getRootOwnerFromHostInstanceToken(
+    nestedMount.textToken
+  );
+
+  return freezeRecord({
+    parentTokenAttachedToParentNode: parentNode === nestedMount.parentNode,
+    childTokenAttachedToChildNode: childNode === nestedMount.childNode,
+    textTokenAttachedToTextNode: textNode === nestedMount.textNode,
+    parentTokenRootOwnerMatchesRoot: parentRootOwner === rootOwner,
+    childTokenRootOwnerMatchesRoot: childRootOwner === rootOwner,
+    textTokenRootOwnerMatchesRoot: textRootOwner === rootOwner,
+    parentChildTokenRootOwnerMatches: parentRootOwner === childRootOwner,
+    childTextTokenRootOwnerMatches: childRootOwner === textRootOwner,
+    parentTokenDistinctFromChildToken:
+      nestedMount.parentToken !== nestedMount.childToken,
+    childTokenDistinctFromTextToken:
+      nestedMount.childToken !== nestedMount.textToken
+  });
+}
+
 function getPublicFacadeHostOutputUnmountRenderCallback(options) {
   if (
     options &&
@@ -10811,6 +11535,9 @@ function createPrivateRootPublicFacadeRootPayloadSnapshot(payload) {
     createRecord: payload.createRecord,
     hostOutputRenderRecords: freezeArray(payload.hostOutputRenderRecords),
     hostOutputUpdateRecords: freezeArray(payload.hostOutputUpdateRecords),
+    hostOutputNestedUpdateRecords: freezeArray(
+      payload.hostOutputNestedUpdateRecords
+    ),
     hostOutputUnmountCleanupRecords: freezeArray(
       payload.hostOutputUnmountCleanupRecords
     ),
@@ -11208,6 +11935,8 @@ module.exports = {
   ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_APPLIED,
   ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_BLOCKED_CAPABILITIES,
+  ROOT_BRIDGE_PUBLIC_FACADE_NESTED_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES,
+  ROOT_BRIDGE_PUBLIC_FACADE_NESTED_HOST_OUTPUT_UPDATE_APPLIED,
   ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_CLEANED,
@@ -11286,6 +12015,7 @@ module.exports = {
   getPrivateRootPublicFacadeMarkerListenerPreflightPayload,
   getPrivateRootPublicFacadeHostOutputRenderPayload,
   getPrivateRootPublicFacadeHostOutputUpdatePayload,
+  getPrivateRootPublicFacadeNestedHostOutputUpdatePayload,
   getPrivateRootPublicFacadeHostOutputUnmountCleanupPayload,
   getPrivateRootPublicFacadeAdapterPayload,
   getPrivateRootPublicFacadePreflightPayload,
@@ -11314,6 +12044,7 @@ module.exports = {
   isPrivateRootPublicFacadeMarkerListenerPreflightRecord,
   isPrivateRootPublicFacadeHostOutputRenderRecord,
   isPrivateRootPublicFacadeHostOutputUpdateRecord,
+  isPrivateRootPublicFacadeNestedHostOutputUpdateRecord,
   isPrivateRootPublicFacadeHostOutputUnmountCleanupRecord,
   isPrivateRootPublicFacadeAdapter,
   isPrivateRootPublicFacadePreflight,
@@ -11346,6 +12077,7 @@ module.exports = {
   privateRootPublicFacadeMarkerListenerPreflightRecordType,
   privateRootPublicFacadeHostOutputRenderRecordType,
   privateRootPublicFacadeHostOutputUpdateRecordType,
+  privateRootPublicFacadeNestedHostOutputUpdateRecordType,
   privateRootPublicFacadeHostOutputUnmountCleanupRecordType,
   privateRootPublicFacadeAdapterSymbol,
   privateRootPublicFacadeAdapterType,
@@ -11368,6 +12100,7 @@ module.exports = {
   preflightPrivateRootPublicFacadeMarkerListenerSetup,
   renderPrivateRootPublicFacadeHostOutput,
   updatePrivateRootPublicFacadeHostOutput,
+  updatePrivateRootPublicFacadeNestedHostOutput,
   unmountPrivateRootPublicFacadeHostOutput,
   revertPrivateCreateRootSideEffects
 };
