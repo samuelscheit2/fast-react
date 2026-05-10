@@ -11,7 +11,6 @@ prompt_file="$2"
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 log_file="$repo_root/worker-progress/${worker_id}.codex.log"
 exit_file="$repo_root/worker-progress/${worker_id}.exitcode"
-prompt_text=""
 
 cd "$repo_root" || exit 2
 rm -f "$log_file" "$exit_file"
@@ -37,16 +36,22 @@ Subagent policy from the orchestrator:
 - If nested agents affect your conclusions, summarize what you delegated and how you used their results in your report.
 "
 
+export FAST_REACT_WORKER_PROMPT_TEXT="$prompt_text"
+export FAST_REACT_WORKER_ROOT="$repo_root"
+
 # Use the interactive TUI, not `codex exec`, so the tmux pane remains readable
 # (including "Pursuing goal") while `script` also records the session log.
-script -q -F "$log_file" codex \
-  --yolo \
-  --no-alt-screen \
-  --search \
-  -m gpt-5.5 \
-  -c model_reasoning_effort=\"xhigh\" \
-  -C "$repo_root" \
-  "$prompt_text"
+script -q -F "$log_file" bash -lc '
+  cd "$FAST_REACT_WORKER_ROOT"
+  exec codex \
+    --yolo \
+    --no-alt-screen \
+    --search \
+    -m gpt-5.5 \
+    -c '\''model_reasoning_effort="xhigh"'\'' \
+    -C "$FAST_REACT_WORKER_ROOT" \
+    "$FAST_REACT_WORKER_PROMPT_TEXT"
+'
 status="$?"
 echo "$status" > "$exit_file"
 exit "$status"

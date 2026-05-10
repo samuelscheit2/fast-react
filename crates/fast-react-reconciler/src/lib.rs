@@ -4,11 +4,13 @@
 //! layout reserves the boundary where lane/update/hook semantics will be built.
 
 mod concurrent_updates;
+mod execution_context;
 mod fiber_root;
 mod fiber_store;
 mod host_tokens;
 #[cfg(test)]
 mod host_work;
+mod root_commit;
 mod root_config;
 mod root_scheduler;
 mod root_updates;
@@ -34,6 +36,9 @@ pub use concurrent_updates::{
     StagedConcurrentUpdate, enqueue_concurrent_host_root_update,
     finish_queueing_concurrent_updates, mark_update_lane_from_fiber_to_root,
 };
+pub use execution_context::{
+    ExecutionContext, ExecutionContextState, SyncFlushExecutionContextRecord,
+};
 pub use fiber_root::{
     FiberRoot, HostRootHydrationState, HostRootState, HostRootStateStore, HostRootStateStoreError,
     RootSchedulingState, create_host_root_current_fiber,
@@ -43,6 +48,7 @@ pub use host_tokens::{
     HostFiberTokenGeneration, HostFiberTokenId, HostFiberTokenMetadata, HostFiberTokenStore,
     HostFiberTokenValidationError,
 };
+pub use root_commit::{HostRootCommitRecord, RootCommitError, commit_finished_host_root};
 pub use root_config::{
     PendingChildrenHandle, PendingCommitCancelHandle, PendingCommitHandle, PendingPassiveState,
     RootCacheHandle, RootCallbackPriority, RootContextHandle, RootDefaultTransitionIndicatorHandle,
@@ -52,10 +58,11 @@ pub use root_config::{
     RootTransitionCallbacksHandle, RootWorkStatus, UnsupportedHydrationKind,
 };
 pub use root_scheduler::{
-    RootScheduleMicrotaskResult, RootSchedulerError, RootSchedulerState, RootSyncFlushPlan,
+    RootScheduleMicrotaskResult, RootSchedulerError, RootSchedulerState, RootSyncFlushExitStatus,
+    RootSyncFlushPlan, RootSyncFlushRecord, RootSyncFlushRecordStatus, RootSyncFlushResult,
     RootTaskScheduleOutcome, RootTaskScheduleRecord, ScheduledRootUpdateResult,
-    collect_sync_flush_plan, ensure_root_is_scheduled, process_root_schedule_in_microtask,
-    schedule_task_for_root_during_microtask, scheduled_roots,
+    collect_sync_flush_plan, ensure_root_is_scheduled, flush_sync_work_on_all_roots,
+    process_root_schedule_in_microtask, schedule_task_for_root_during_microtask, scheduled_roots,
 };
 pub use root_updates::{
     RootScheduleUpdateRecord, RootTransitionEntanglementRecord, RootUpdateError,
@@ -97,6 +104,7 @@ pub enum ReconcilerError {
     RootUpdate(RootUpdateError),
     RootScheduler(RootSchedulerError),
     RootWorkLoop(RootWorkLoopError),
+    RootCommit(RootCommitError),
     WorkInProgress(WorkInProgressError),
 }
 
@@ -123,6 +131,7 @@ impl Display for ReconcilerError {
             Self::RootUpdate(error) => Display::fmt(error, formatter),
             Self::RootScheduler(error) => Display::fmt(error, formatter),
             Self::RootWorkLoop(error) => Display::fmt(error, formatter),
+            Self::RootCommit(error) => Display::fmt(error, formatter),
             Self::WorkInProgress(error) => Display::fmt(error, formatter),
         }
     }
@@ -144,6 +153,7 @@ impl Error for ReconcilerError {
             Self::RootUpdate(error) => Some(error),
             Self::RootScheduler(error) => Some(error),
             Self::RootWorkLoop(error) => Some(error),
+            Self::RootCommit(error) => Some(error),
             Self::WorkInProgress(error) => Some(error),
         }
     }
@@ -227,6 +237,12 @@ impl From<RootSchedulerError> for ReconcilerError {
 impl From<RootWorkLoopError> for ReconcilerError {
     fn from(error: RootWorkLoopError) -> Self {
         Self::RootWorkLoop(error)
+    }
+}
+
+impl From<RootCommitError> for ReconcilerError {
+    fn from(error: RootCommitError) -> Self {
+        Self::RootCommit(error)
     }
 }
 
