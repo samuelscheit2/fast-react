@@ -19,6 +19,9 @@ const rootBridge = require(
 const rootMarkers = require(
   path.join(repoRoot, 'packages/react-dom/src/client/root-markers.js')
 );
+const listenerRegistry = require(
+  path.join(repoRoot, 'packages/react-dom/src/events/listener-registry.js')
+);
 const {
   DOCUMENT_NODE,
   ELEMENT_NODE,
@@ -61,17 +64,37 @@ assertPrivateRecordInvariants(second);
   const container = createElement('SECTION', document);
   const owner = rootBridge.createPrivateRootOwner('manual-root:1');
   const handle = rootBridge.createPrivateRootHandle(owner, container);
-  const update = rootBridge.createRootUpdateRecord(handle, 'manual child');
+  const update = rootBridge.createRootRenderRecord(handle, 'manual child');
   const unmount = rootBridge.createRootUnmountRecord(handle);
 
   assert.equal(rootBridge.isPrivateRootOwner(owner), true);
   assert.equal(rootBridge.isPrivateRootHandle(handle), true);
   assert.equal(rootBridge.getRootOwnerFromHandle(handle), owner);
   assert.equal(update.rootId, 'manual-root:1');
+  assert.equal(update.operation, 'render');
+  assert.equal(update.requestId, 'request:1');
+  assert.equal(update.requestType, 'root.render');
   assert.equal(update.updateId, 'update:1');
+  assert.equal(update.lifecycleStatusBefore, rootBridge.ROOT_LIFECYCLE_CREATED);
+  assert.equal(update.lifecycleStatusAfter, rootBridge.ROOT_LIFECYCLE_RENDERED);
   assert.equal(unmount.updateId, 'update:2');
+  assert.equal(unmount.requestId, 'request:2');
+  assert.equal(unmount.requestType, 'root.unmount');
   assert.equal(unmount.sync, true);
+  assert.equal(unmount.noOp, false);
+  assert.equal(
+    unmount.lifecycleStatusBefore,
+    rootBridge.ROOT_LIFECYCLE_RENDERED
+  );
+  assert.equal(
+    unmount.lifecycleStatusAfter,
+    rootBridge.ROOT_LIFECYCLE_UNMOUNTED
+  );
   assert.deepEqual(unmount.elementInfo, {type: 'null'});
+  assert.throws(() => rootBridge.createRootRenderRecord(handle, 'late child'), {
+    code: 'FAST_REACT_DOM_UNMOUNTED_ROOT',
+    message: 'Cannot update an unmounted root.'
+  });
   assertBridgeDidNotTouchContainer(container);
 }
 
@@ -101,6 +124,62 @@ assertPrivateRecordInvariants(second);
   });
 }
 
+{
+  const document = createDocument('guards');
+  const container = createElement('DIV', document);
+  const existingOwner = rootBridge.createPrivateRootOwner('existing-root:1');
+  rootMarkers.markContainerAsRoot(existingOwner, container);
+  listenerRegistry.markTargetAsListening(container);
+  listenerRegistry.markTargetAsListening(document);
+
+  const bridge = rootBridge.createPrivateRootBridgeShell();
+  const markerBefore = rootMarkers.inspectContainerRootMarker(container);
+  const containerRegistrationsBefore = container.__registrations.length;
+  const documentRegistrationsBefore = document.__registrations.length;
+  const create = bridge.createClientRoot(container);
+  const markerAfter = rootMarkers.inspectContainerRootMarker(container);
+
+  assert.deepEqual(create.markerGuard, {
+    action: 'defer-mark-container-as-root',
+    hasLegacyRootMarker: false,
+    isContainerMarkedAsRoot: true,
+    warning: {
+      message: rootMarkers.duplicateCreateRootWarning,
+      type: 'duplicate-create-root'
+    }
+  });
+  assert.equal(create.listenerGuard.hasRootListeningMarker, true);
+  assert.equal(create.listenerGuard.ownerDocumentHasSelectionChangeMarker, true);
+  assert.deepEqual(markerAfter, markerBefore);
+  assert.equal(rootMarkers.getContainerRoot(container), existingOwner);
+  assert.equal(container.__registrations.length, containerRegistrationsBefore);
+  assert.equal(document.__registrations.length, documentRegistrationsBefore);
+
+  const unmount = bridge.unmountContainer(create.handle);
+  assert.deepEqual(unmount.markerGuard, {
+    action: 'defer-unmark-container-as-root-after-sync-flush',
+    isContainerMarkedAsRoot: true
+  });
+  assert.equal(rootMarkers.getContainerRoot(container), existingOwner);
+  assertBridgeDidNotTouchRegisteredContainer(container, document);
+}
+
+{
+  const document = createDocument('legacy-warning');
+  const container = createElement('DIV', document);
+  container[rootMarkers.legacyRootContainerKey] = {};
+
+  assert.deepEqual(rootBridge.describeCreateRootMarkerGuard(container), {
+    action: 'defer-mark-container-as-root',
+    hasLegacyRootMarker: true,
+    isContainerMarkedAsRoot: false,
+    warning: {
+      message: rootMarkers.legacyRootWarning,
+      type: 'legacy-root-container'
+    }
+  });
+}
+
 console.log('React DOM private root bridge shell smoke checks passed.');
 
 function createBridgeScenario(label) {
@@ -121,8 +200,9 @@ function createBridgeScenario(label) {
   const callback = function afterRootUpdate() {};
 
   const create = bridge.createClientRoot(container, rootOptions);
-  const update = bridge.updateContainer(create.handle, element, callback);
+  const update = bridge.renderContainer(create.handle, element, callback);
   const unmount = bridge.unmountContainer(create.handle);
+  const secondUnmount = bridge.unmountContainer(create.handle);
 
   assertBridgeDidNotTouchContainer(container);
   assert.equal(rootBridge.getPrivateRootRecordPayload(create).container, container);
@@ -133,28 +213,40 @@ function createBridgeScenario(label) {
   assert.equal(rootBridge.getPrivateRootRecordPayload(update).element, element);
   assert.equal(rootBridge.getPrivateRootRecordPayload(update).callback, callback);
   assert.equal(rootBridge.getPrivateRootRecordPayload(unmount).element, null);
+  assert.equal(
+    rootBridge.getPrivateRootRecordPayload(secondUnmount).element,
+    null
+  );
+  assert.throws(() => bridge.renderContainer(create.handle, 'after unmount'), {
+    code: 'FAST_REACT_DOM_UNMOUNTED_ROOT'
+  });
 
   return {
     records: {
       create,
       update,
-      unmount
+      unmount,
+      secondUnmount
     }
   };
 }
 
 function assertPrivateRecordInvariants(scenario) {
-  const {create, update, unmount} = scenario.records;
+  const {create, update, unmount, secondUnmount} = scenario.records;
 
   assert.equal(Object.isFrozen(create), true);
   assert.equal(Object.isFrozen(create.owner), true);
   assert.equal(Object.isFrozen(create.handle), true);
   assert.equal(Object.isFrozen(update), true);
   assert.equal(Object.isFrozen(unmount), true);
+  assert.equal(Object.isFrozen(secondUnmount), true);
 
   assert.equal(create.$$typeof, rootBridge.privateRootCreateRecordType);
   assert.equal(create.kind, 'FastReactDomPrivateRootCreateRecord');
   assert.equal(create.operation, 'create');
+  assert.equal(create.requestId, 'request:1');
+  assert.equal(create.requestSequence, 1);
+  assert.equal(create.requestType, 'createRoot');
   assert.equal(create.sequence, 1);
   assert.equal(create.rootId, 'root:1');
   assert.equal(create.rootKind, rootBridge.CLIENT_ROOT_KIND);
@@ -168,6 +260,30 @@ function assertPrivateRecordInvariants(scenario) {
     keys: ['identifierPrefix', 'onRecoverableError', 'unstable_strictMode'],
     type: 'object'
   });
+  assert.deepEqual(create.markerGuard, {
+    action: 'defer-mark-container-as-root',
+    hasLegacyRootMarker: false,
+    isContainerMarkedAsRoot: false,
+    warning: null
+  });
+  assert.deepEqual(create.listenerGuard, {
+    action: 'defer-listen-to-all-supported-events',
+    canInstallRootListeners: true,
+    hasRootListeningMarker: false,
+    ownerDocumentCanInstallSelectionChange: true,
+    ownerDocumentHasSelectionChangeMarker: false,
+    ownerDocumentInfo: {
+      kind: 'object',
+      nodeName: '#document',
+      nodeType: DOCUMENT_NODE
+    },
+    rootEventTargetInfo: {
+      kind: 'object',
+      nodeName: 'DIV',
+      nodeType: ELEMENT_NODE
+    }
+  });
+  assert.equal(create.nativeExecution, false);
   assert.equal(create.owner.$$typeof, rootBridge.privateRootOwnerType);
   assert.equal(create.handle.$$typeof, rootBridge.privateRootHandleType);
   assert.equal(create.handle.owner, create.owner);
@@ -176,10 +292,25 @@ function assertPrivateRecordInvariants(scenario) {
 
   assert.equal(update.$$typeof, rootBridge.privateRootUpdateRecordType);
   assert.equal(update.kind, 'FastReactDomPrivateRootUpdateRecord');
-  assert.equal(update.operation, 'update');
+  assert.equal(update.operation, 'render');
+  assert.equal(update.requestId, 'request:2');
+  assert.equal(update.requestSequence, 2);
+  assert.equal(update.requestType, 'root.render');
   assert.equal(update.sequence, 1);
   assert.equal(update.updateId, 'update:1');
   assert.equal(update.rootId, create.rootId);
+  assert.equal(
+    update.lifecycleStatusBefore,
+    rootBridge.ROOT_LIFECYCLE_CREATED
+  );
+  assert.equal(
+    update.lifecycleStatusAfter,
+    rootBridge.ROOT_LIFECYCLE_RENDERED
+  );
+  assert.equal(update.markerGuard, null);
+  assert.equal(update.nativeExecution, false);
+  assert.equal(update.noOp, false);
+  assert.equal(update.renderCount, 1);
   assert.equal(update.sync, false);
   assert.deepEqual(update.elementInfo, {
     keys: ['props', 'type'],
@@ -192,18 +323,63 @@ function assertPrivateRecordInvariants(scenario) {
   });
 
   assert.equal(unmount.operation, 'unmount');
+  assert.equal(unmount.requestId, 'request:3');
+  assert.equal(unmount.requestSequence, 3);
+  assert.equal(unmount.requestType, 'root.unmount');
   assert.equal(unmount.sequence, 2);
   assert.equal(unmount.updateId, 'update:2');
   assert.equal(unmount.rootId, create.rootId);
+  assert.equal(
+    unmount.lifecycleStatusBefore,
+    rootBridge.ROOT_LIFECYCLE_RENDERED
+  );
+  assert.equal(
+    unmount.lifecycleStatusAfter,
+    rootBridge.ROOT_LIFECYCLE_UNMOUNTED
+  );
+  assert.deepEqual(unmount.markerGuard, {
+    action: 'defer-unmark-container-as-root-after-sync-flush',
+    isContainerMarkedAsRoot: false
+  });
+  assert.equal(unmount.nativeExecution, false);
+  assert.equal(unmount.noOp, false);
+  assert.equal(unmount.renderCount, 1);
   assert.equal(unmount.sync, true);
   assert.deepEqual(unmount.elementInfo, {type: 'null'});
   assert.deepEqual(unmount.callbackInfo, {type: 'undefined'});
+
+  assert.equal(secondUnmount.operation, 'unmount');
+  assert.equal(secondUnmount.requestId, 'request:4');
+  assert.equal(secondUnmount.requestSequence, 4);
+  assert.equal(secondUnmount.requestType, 'root.unmount');
+  assert.equal(secondUnmount.sequence, 3);
+  assert.equal(secondUnmount.updateId, 'update:3');
+  assert.equal(secondUnmount.rootId, create.rootId);
+  assert.equal(
+    secondUnmount.lifecycleStatusBefore,
+    rootBridge.ROOT_LIFECYCLE_UNMOUNTED
+  );
+  assert.equal(
+    secondUnmount.lifecycleStatusAfter,
+    rootBridge.ROOT_LIFECYCLE_UNMOUNTED
+  );
+  assert.equal(secondUnmount.noOp, true);
+  assert.equal(secondUnmount.sync, false);
+  assert.deepEqual(secondUnmount.elementInfo, {type: 'null'});
 }
 
 function assertBridgeDidNotTouchContainer(container) {
   assert.equal(rootMarkers.inspectContainerRootMarker(container).propertyCount, 0);
   assert.equal(rootMarkers.isContainerMarkedAsRoot(container), false);
   assert.equal(container.__registrations.length, 0);
+  assert.equal(container.__mutationLog.length, 0);
+}
+
+function assertBridgeDidNotTouchRegisteredContainer(container, document) {
+  assert.equal(container.__registrations.length, 0);
+  assert.equal(document.__registrations.length, 0);
+  assert.equal(container.__mutationLog.length, 0);
+  assert.equal(document.__mutationLog.length, 0);
 }
 
 function captureThrown(callback) {
@@ -238,8 +414,9 @@ function createElement(nodeName, ownerDocument) {
 }
 
 function createEventTarget(fields) {
-  return {
+  const target = {
     ...fields,
+    __mutationLog: [],
     __registrations: [],
     addEventListener(type, listener, options) {
       this.__registrations.push({
@@ -247,6 +424,28 @@ function createEventTarget(fields) {
         options,
         type
       });
+    },
+    appendChild(child) {
+      this.__mutationLog.push({child, type: 'appendChild'});
+    },
+    insertBefore(child, beforeChild) {
+      this.__mutationLog.push({beforeChild, child, type: 'insertBefore'});
+    },
+    removeChild(child) {
+      this.__mutationLog.push({child, type: 'removeChild'});
     }
   };
+  let textContent = '';
+  Object.defineProperty(target, 'textContent', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      return textContent;
+    },
+    set(value) {
+      textContent = value;
+      this.__mutationLog.push({type: 'textContent', value});
+    }
+  });
+  return target;
 }
