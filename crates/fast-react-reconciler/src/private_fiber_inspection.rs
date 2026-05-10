@@ -340,6 +340,24 @@ impl TestRendererCommittedFiberTreeInspection {
     pub const fn host_text(&self) -> TestRendererCommittedFiberNodeInspection {
         self.host_text
     }
+
+    #[must_use]
+    pub fn is_nested_host_component_shape(&self) -> bool {
+        matches!(
+            self.shape_name,
+            "HostRoot->HostComponent->HostComponent->HostText"
+                | "HostRoot->HostComponent->HostComponent->[HostText,HostText]"
+        )
+    }
+
+    #[must_use]
+    pub fn nested_host_component(&self) -> Option<TestRendererCommittedFiberNodeInspection> {
+        if self.is_nested_host_component_shape() {
+            self.host_components.get(1).copied()
+        } else {
+            None
+        }
+    }
 }
 
 pub fn inspect_test_renderer_committed_fiber_tree<H: HostTypes>(
@@ -376,8 +394,14 @@ pub fn inspect_test_renderer_committed_fiber_tree<H: HostTypes>(
             let child_node = store.fiber_arena().get(*single_child)?;
             match child_node.tag() {
                 FiberTag::HostComponent => {
-                    let component = inspect_host_component_with_text(store, *single_child)?;
-                    builder.finish_host_component_shape(component)
+                    match inspect_host_component_shape(store, *single_child)? {
+                        InspectedHostComponentShape::Text(component) => {
+                            builder.finish_host_component_shape(component)
+                        }
+                        InspectedHostComponentShape::Nested(nested) => {
+                            builder.finish_nested_host_component_shape(nested)
+                        }
+                    }
                 }
                 FiberTag::FunctionComponent => {
                     let function_component = inspect_node(child_node);
@@ -472,6 +496,34 @@ impl TestRendererCommittedFiberTreeInspectionBuilder {
         ))
     }
 
+    fn finish_nested_host_component_shape(
+        self,
+        nested: InspectedNestedHostComponent,
+    ) -> Result<TestRendererCommittedFiberTreeInspection, TestRendererCommittedFiberInspectionError>
+    {
+        let shape_name = if nested.texts.len() == 1 {
+            "HostRoot->HostComponent->HostComponent->HostText"
+        } else {
+            "HostRoot->HostComponent->HostComponent->[HostText,HostText]"
+        };
+        let mut nodes = Vec::with_capacity(2 + nested.texts.len());
+        nodes.push(nested.outer);
+        nodes.push(nested.inner);
+        nodes.extend(nested.texts.iter().copied());
+
+        Ok(self.finish(
+            shape_name,
+            nodes,
+            vec![nested.outer],
+            vec![nested.outer],
+            None,
+            vec![nested.outer, nested.inner],
+            nested.texts.clone(),
+            nested.outer,
+            nested.texts[0],
+        ))
+    }
+
     fn finish_function_component_shape(
         self,
         function_component: TestRendererCommittedFiberNodeInspection,
@@ -546,6 +598,19 @@ struct InspectedHostComponentWithText {
 }
 
 #[derive(Debug, Clone)]
+struct InspectedNestedHostComponent {
+    outer: TestRendererCommittedFiberNodeInspection,
+    inner: TestRendererCommittedFiberNodeInspection,
+    texts: Vec<TestRendererCommittedFiberNodeInspection>,
+}
+
+#[derive(Debug, Clone)]
+enum InspectedHostComponentShape {
+    Text(InspectedHostComponentWithText),
+    Nested(InspectedNestedHostComponent),
+}
+
+#[derive(Debug, Clone)]
 struct InspectedHostChildren {
     direct: Vec<TestRendererCommittedFiberNodeInspection>,
     nodes: Vec<TestRendererCommittedFiberNodeInspection>,
@@ -598,6 +663,34 @@ fn inspect_host_children<H: HostTypes>(
     }
 }
 
+fn inspect_host_component_shape<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    component_id: FiberId,
+) -> Result<InspectedHostComponentShape, TestRendererCommittedFiberInspectionError> {
+    let component_node = store.fiber_arena().get(component_id)?;
+    expect_fiber_tag(component_node, FiberTag::HostComponent)?;
+    expect_state_node_present(component_node)?;
+
+    let component_children = expect_child_count(store, component_id, 1)?;
+    let child_id = component_children[0];
+    let child_node = store.fiber_arena().get(child_id)?;
+    match child_node.tag() {
+        FiberTag::HostText => Ok(InspectedHostComponentShape::Text(
+            inspect_host_component_with_text(store, component_id)?,
+        )),
+        FiberTag::HostComponent => Ok(InspectedHostComponentShape::Nested(
+            inspect_nested_host_component_with_texts(store, component_id, child_id)?,
+        )),
+        actual => Err(
+            TestRendererCommittedFiberInspectionError::ExpectedFiberTag {
+                fiber: child_node.id(),
+                expected: FiberTag::HostText,
+                actual,
+            },
+        ),
+    }
+}
+
 fn inspect_host_component_with_text<H: HostTypes>(
     store: &FiberRootStore<H>,
     component_id: FiberId,
@@ -618,6 +711,44 @@ fn inspect_host_component_with_text<H: HostTypes>(
     Ok(InspectedHostComponentWithText {
         component: host_component,
         text: host_text,
+    })
+}
+
+fn inspect_nested_host_component_with_texts<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    outer_id: FiberId,
+    inner_id: FiberId,
+) -> Result<InspectedNestedHostComponent, TestRendererCommittedFiberInspectionError> {
+    let outer_node = store.fiber_arena().get(outer_id)?;
+    expect_fiber_tag(outer_node, FiberTag::HostComponent)?;
+    expect_state_node_present(outer_node)?;
+    let outer = inspect_node(outer_node);
+
+    let inner_node = store.fiber_arena().get(inner_id)?;
+    expect_fiber_tag(inner_node, FiberTag::HostComponent)?;
+    expect_state_node_present(inner_node)?;
+    let inner = inspect_node(inner_node);
+
+    let text_ids = expect_child_count_range(
+        store,
+        inner_id,
+        1,
+        2,
+        "nested HostComponent private inspection admits only one or two HostText children",
+    )?;
+    let mut texts = Vec::with_capacity(text_ids.len());
+    for text_id in text_ids {
+        let text_node = store.fiber_arena().get(text_id)?;
+        expect_fiber_tag(text_node, FiberTag::HostText)?;
+        expect_state_node_present(text_node)?;
+        expect_child_count(store, text_id, 0)?;
+        texts.push(inspect_node(text_node));
+    }
+
+    Ok(InspectedNestedHostComponent {
+        outer,
+        inner,
+        texts,
     })
 }
 
@@ -816,6 +947,14 @@ mod tests {
         component_text: FiberId,
     }
 
+    #[derive(Debug, Clone, Copy)]
+    struct CommittedNestedShapeFibers {
+        outer: FiberId,
+        inner: FiberId,
+        first_text: FiberId,
+        second_text: Option<FiberId>,
+    }
+
     fn prepare_render(
         store: &mut FiberRootStore<Host>,
         root_id: FiberRootId,
@@ -946,6 +1085,47 @@ mod tests {
             first_text,
             component,
             component_text,
+        }
+    }
+
+    fn commit_nested_host_shape(
+        store: &mut FiberRootStore<Host>,
+        render: HostRootRenderPhaseRecord,
+        two_text_children: bool,
+    ) -> CommittedNestedShapeFibers {
+        let host_root = render.work_in_progress();
+        let outer = create_host_component_fiber(store, host_root, 81, 82, 181);
+        let inner = create_host_component_fiber(store, host_root, 83, 84, 183);
+        let first_text = create_host_text_fiber(store, host_root, 85, 185);
+        let second_text = if two_text_children {
+            Some(create_host_text_fiber(store, host_root, 86, 186))
+        } else {
+            None
+        };
+        let inner_children = if let Some(second_text) = second_text {
+            vec![first_text, second_text]
+        } else {
+            vec![first_text]
+        };
+        store
+            .fiber_arena_mut()
+            .set_children(inner, &inner_children)
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(outer, &[inner])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root, &[outer])
+            .unwrap();
+        commit_finished_host_root(store, render).unwrap();
+
+        CommittedNestedShapeFibers {
+            outer,
+            inner,
+            first_text,
+            second_text,
         }
     }
 
@@ -1171,6 +1351,62 @@ mod tests {
             inspection.host_text().parent(),
             Some(inspection.host_component().fiber())
         );
+    }
+
+    #[test]
+    fn committed_fiber_inspection_describes_nested_host_component_shape() {
+        let (mut store, root_id) = root_store();
+        let render = prepare_render(&mut store, root_id, RootElementHandle::from_raw(80));
+        let fibers = commit_nested_host_shape(&mut store, render, true);
+
+        let inspection = inspect_test_renderer_committed_fiber_tree(&store, root_id).unwrap();
+        let outer = inspection.host_component();
+        let inner = inspection.nested_host_component().unwrap();
+        let first_text = inspection.host_texts()[0];
+        let second_text = inspection.host_texts()[1];
+
+        assert_eq!(
+            inspection.shape_name(),
+            "HostRoot->HostComponent->HostComponent->[HostText,HostText]"
+        );
+        assert_eq!(
+            inspection.fiber_tag_order(),
+            [
+                FiberTag::HostRoot,
+                FiberTag::HostComponent,
+                FiberTag::HostComponent,
+                FiberTag::HostText,
+                FiberTag::HostText
+            ]
+        );
+        assert_eq!(inspection.root_child_tags(), [FiberTag::HostComponent]);
+        assert_eq!(inspection.host_child_tags(), [FiberTag::HostComponent]);
+        assert_eq!(inspection.root_children().len(), 1);
+        assert_eq!(inspection.host_children().len(), 1);
+        assert_eq!(inspection.host_components().len(), 2);
+        assert_eq!(inspection.host_texts().len(), 2);
+        assert!(inspection.is_nested_host_component_shape());
+        assert!(inspection.function_component().is_none());
+        assert_eq!(outer.fiber(), fibers.outer);
+        assert_eq!(outer.parent(), Some(inspection.host_root().fiber()));
+        assert_eq!(outer.child(), Some(inner.fiber()));
+        assert_eq!(outer.index(), 0);
+        assert_eq!(inner.fiber(), fibers.inner);
+        assert_eq!(inner.parent(), Some(outer.fiber()));
+        assert_eq!(inner.child(), Some(first_text.fiber()));
+        assert_eq!(inner.index(), 0);
+        assert_eq!(first_text.fiber(), fibers.first_text);
+        assert_eq!(first_text.parent(), Some(inner.fiber()));
+        assert_eq!(first_text.sibling(), Some(second_text.fiber()));
+        assert_eq!(first_text.index(), 0);
+        assert_eq!(second_text.fiber(), fibers.second_text.unwrap());
+        assert_eq!(second_text.parent(), Some(inner.fiber()));
+        assert_eq!(second_text.sibling(), None);
+        assert_eq!(second_text.index(), 1);
+        assert!(outer.state_node_present());
+        assert!(inner.state_node_present());
+        assert!(first_text.state_node_present());
+        assert!(second_text.state_node_present());
     }
 
     #[test]
