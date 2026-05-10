@@ -292,10 +292,19 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
   assert.equal(gate.drainsPublicReactActQueue, false);
   assert.equal(gate.schedulerPrivateContinuationDiagnosticsReady, true);
   assert.equal(gate.consumesSchedulerPrivateContinuationDiagnostics, true);
+  assert.equal(gate.rendererBackedActDrainDiagnosticsReady, true);
+  assert.equal(gate.consumesRendererBackedActDrainDiagnostics, true);
+  assert.equal(
+    gate.rendererBackedActDrainDiagnosticKind,
+    "fast-react.react.private-renderer-backed-act-drain-diagnostic"
+  );
+  assert.equal(gate.rendererBackedActDrainDiagnosticVersion, 1);
+  assert.equal(gate.drainsAcceptedRendererBackedActDiagnostics, true);
   assert.equal(gate.publicSchedulerTimingCompatibilityClaimed, false);
   assert.equal(gate.publicReactActCompatibilityClaimed, false);
   assert.equal(gate.executesQueuedWork, false);
   assert.equal(gate.executesEffects, false);
+  assert.equal(gate.executesRendererRoots, false);
   assert.equal(
     gate.schedulerDiagnosticsExportName,
     privateActQueueFlushDiagnosticsExport
@@ -307,6 +316,14 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
   assert.equal(
     gate.schedulerContinuationConsumptionStatus,
     "consumed-accepted-scheduler-private-continuation-diagnostics"
+  );
+  assert.equal(
+    gate.rendererBackedActDrainDiagnosticsStatus,
+    "private-renderer-backed-act-drain-diagnostics"
+  );
+  assert.equal(
+    gate.rendererBackedActDrainConsumptionStatus,
+    "consumed-accepted-renderer-backed-act-drain-diagnostics"
   );
   assert.deepEqual(gate.requiredRecords, [
     "SchedulerActQueueRequest",
@@ -327,6 +344,25 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
   ]);
   assert.deepEqual(gate.acceptedPrivateActContinuationDrainStatuses, [
     "PendingContinuation"
+  ]);
+  assert.deepEqual(gate.acceptedRendererBackedActDrainRenderers, [
+    "fast-react-test-renderer"
+  ]);
+  assert.deepEqual(gate.acceptedRendererBackedActDrainSchedulerRecords, [
+    "SchedulerActQueueRequest",
+    "SchedulerActScopeBoundaryRecord",
+    "SchedulerActContinuationRecord"
+  ]);
+  assert.deepEqual(gate.acceptedRendererBackedActDrainReconcilerRecords, [
+    "SyncFlushActContinuationDrainRecord",
+    "SyncFlushActPrivateExecutionDiagnosticsForCanary",
+    "SyncFlushPostPassiveContinuationExecutionRecord",
+    "PassiveEffectsFlushWithSyncFlushContinuationResult"
+  ]);
+  assert.deepEqual(gate.acceptedRendererBackedActDrainRendererRecords, [
+    "FastReactTestRendererCurrentRustCanaryMetadata",
+    "TestRendererHostOutputDiagnostics",
+    "TestRendererCommittedFiberTreeInspection"
   ]);
   assert.equal(
     gate.internalTestQueueKind,
@@ -365,8 +401,12 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
   assert.equal(metadata.drainsPublicReactActQueue, false);
   assert.equal(metadata.schedulerPrivateContinuationDiagnosticsReady, true);
   assert.equal(metadata.consumesSchedulerPrivateContinuationDiagnostics, true);
+  assert.equal(metadata.rendererBackedActDrainDiagnosticsReady, true);
+  assert.equal(metadata.consumesRendererBackedActDrainDiagnostics, true);
+  assert.equal(metadata.drainsAcceptedRendererBackedActDiagnostics, true);
   assert.equal(metadata.publicSchedulerTimingCompatibilityClaimed, false);
   assert.equal(metadata.publicReactActCompatibilityClaimed, false);
+  assert.equal(metadata.executesRendererRoots, false);
 
   const testTask = gate.createInternalActQueueTestTask({
     label: "react-private-act-test-task",
@@ -512,6 +552,154 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
   assert.equal(drainReport.executesEffects, false);
   assert.equal(testQueue.records.length, 0);
 
+  const rendererBackedDiagnostics =
+    gate.createRendererBackedActDrainDiagnostics();
+  assert.equal(Object.isFrozen(rendererBackedDiagnostics), true);
+  assert.equal(
+    gate.isAcceptedRendererBackedActDrainDiagnostics(
+      rendererBackedDiagnostics
+    ),
+    true
+  );
+  const rendererBackedReport =
+    gate.consumeRendererBackedActDrainDiagnostics(
+      rendererBackedDiagnostics
+    );
+  assert.equal(
+    rendererBackedReport.status,
+    gate.rendererBackedActDrainConsumptionStatus
+  );
+  assert.equal(rendererBackedReport.accepted, true);
+  assert.equal(
+    rendererBackedReport.rendererBackedActDrainDiagnosticsStatus,
+    gate.rendererBackedActDrainDiagnosticsStatus
+  );
+  assert.equal(
+    rendererBackedReport.rendererBackedActDrainDiagnosticKind,
+    gate.rendererBackedActDrainDiagnosticKind
+  );
+  assert.equal(rendererBackedReport.renderer, "fast-react-test-renderer");
+  assert.equal(
+    rendererBackedReport.schedulerMetadataSource,
+    "SchedulerBridge"
+  );
+  assert.equal(
+    rendererBackedReport.reconcilerMetadataSource,
+    "fast-react-reconciler"
+  );
+  assert.deepEqual(
+    rendererBackedReport.acceptedSchedulerRecords,
+    gate.acceptedRendererBackedActDrainSchedulerRecords
+  );
+  assert.deepEqual(
+    rendererBackedReport.acceptedReconcilerRecords,
+    gate.acceptedRendererBackedActDrainReconcilerRecords
+  );
+  assert.deepEqual(
+    rendererBackedReport.acceptedRendererRecords,
+    gate.acceptedRendererBackedActDrainRendererRecords
+  );
+  assert.deepEqual(rendererBackedReport.drainSummary, {
+    pendingBefore: 1,
+    drainedCount: 1,
+    remainingCount: 0,
+    drainedContinuationCount: 1,
+    hostOutputCanaryCommitted: true,
+    blockedByPendingPostPassiveGate: false
+  });
+  assert.equal(
+    rendererBackedReport.consumesRendererBackedActDrainDiagnostics,
+    true
+  );
+  assert.equal(
+    rendererBackedReport.consumesSchedulerPrivateContinuationDiagnostics,
+    true
+  );
+  assert.equal(
+    rendererBackedReport.consumesReconcilerActDrainMetadata,
+    true
+  );
+  assert.equal(
+    rendererBackedReport.drainsAcceptedRendererBackedActDiagnostics,
+    true
+  );
+  assert.equal(rendererBackedReport.queueFlushingReady, false);
+  assert.equal(rendererBackedReport.rendererRootsReady, false);
+  assert.equal(rendererBackedReport.passiveEffectsReady, false);
+  assert.equal(rendererBackedReport.continuationFlushingReady, false);
+  assert.equal(rendererBackedReport.publicCompatibilityClaimed, false);
+  assert.equal(
+    rendererBackedReport.publicSchedulerTimingCompatibilityClaimed,
+    false
+  );
+  assert.equal(rendererBackedReport.publicReactActCompatibilityClaimed, false);
+  assert.equal(rendererBackedReport.drainsPublicSchedulerTaskQueue, false);
+  assert.equal(rendererBackedReport.drainsPublicReactActQueue, false);
+  assert.equal(rendererBackedReport.executesQueuedWork, false);
+  assert.equal(rendererBackedReport.executesEffects, false);
+  assert.equal(rendererBackedReport.executesRendererRoots, false);
+
+  for (const rejectedRendererDiagnostics of [
+    {
+      diagnostics: {
+        ...rendererBackedDiagnostics
+      },
+      reason: "renderer-backed-diagnostics"
+    },
+    {
+      diagnostics: gate.createRendererBackedActDrainDiagnostics({
+        acceptedReconcilerRecords: ["SyncFlushActContinuationDrainRecord"]
+      }),
+      reason: "renderer-backed-diagnostics"
+    },
+    {
+      diagnostics: gate.createRendererBackedActDrainDiagnostics({
+        publicReactActCompatibilityClaimed: true
+      }),
+      reason: "renderer-backed-diagnostics"
+    },
+    {
+      diagnostics: gate.createRendererBackedActDrainDiagnostics({
+        drainsPublicReactActQueue: true
+      }),
+      reason: "renderer-backed-diagnostics"
+    },
+    {
+      diagnostics: gate.createRendererBackedActDrainDiagnostics({
+        executesRendererRoots: true
+      }),
+      reason: "renderer-backed-diagnostics"
+    }
+  ]) {
+    assert.equal(
+      gate.isAcceptedRendererBackedActDrainDiagnostics(
+        rejectedRendererDiagnostics.diagnostics
+      ),
+      false
+    );
+    assert.throws(
+      () =>
+        gate.consumeRendererBackedActDrainDiagnostics(
+          rejectedRendererDiagnostics.diagnostics
+        ),
+      (error) => {
+        assert.equal(error.name, "FastReactUnimplementedError");
+        assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED");
+        assert.equal(error.entrypoint, "react");
+        assert.equal(
+          error.exportName,
+          `${privateActDispatcherGateExport}.consumeRendererBackedActDrainDiagnostics`
+        );
+        assert.equal(error.compatibilityTarget, "react@19.2.6");
+        assert.equal(error.reason, rejectedRendererDiagnostics.reason);
+        assert.equal(error.publicCompatibilityClaimed, false);
+        assert.equal(error.publicSchedulerTimingCompatibilityClaimed, false);
+        assert.equal(error.publicReactActCompatibilityClaimed, false);
+        return true;
+      }
+    );
+  }
+
   const rejectedDiagnosticsQueue = gate.createInternalActQueueTestQueue([
     gate.createInternalActQueueTestTask("must-not-drain")
   ]);
@@ -613,7 +801,19 @@ test("package-private React act dispatcher gate recognizes accepted metadata wit
       consumesSchedulerPrivateContinuationDiagnostics: false
     }),
     gate.createActQueueMetadata({
+      rendererBackedActDrainDiagnosticsReady: false
+    }),
+    gate.createActQueueMetadata({
+      consumesRendererBackedActDrainDiagnostics: false
+    }),
+    gate.createActQueueMetadata({
+      drainsAcceptedRendererBackedActDiagnostics: false
+    }),
+    gate.createActQueueMetadata({
       publicSchedulerTimingCompatibilityClaimed: true
+    }),
+    gate.createActQueueMetadata({
+      executesRendererRoots: true
     }),
     gate.createActQueueMetadata({
       passiveEffectsReady: true
