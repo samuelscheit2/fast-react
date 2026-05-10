@@ -14,10 +14,11 @@ use fast_react_core::{
 };
 use fast_react_host_config::HostTypes;
 
+use crate::concurrent_updates::root_for_updated_fiber;
 use crate::root_commit::PendingPassiveCommitHandoff;
 use crate::scheduler_bridge::SchedulerActContinuationRecord;
 use crate::{
-    ExecutionContextState, FiberRootId, FiberRootStore, FiberRootStoreError,
+    ConcurrentUpdateError, ExecutionContextState, FiberRootId, FiberRootStore, FiberRootStoreError,
     HostRootRenderPhaseRecord, RootCallbackPriority, RootScheduleUpdateRecord,
     RootSchedulerCallbackHandle, RootWorkLoopError, SchedulerActQueueRequest, SchedulerBridge,
     SchedulerCallbackRequest, SchedulerCallbackValidationRecord, SchedulerCancellationRecord,
@@ -131,6 +132,35 @@ pub struct ScheduledRootUpdateResult {
     microtask: Option<SchedulerMicrotaskRequest>,
     act_queue_task: Option<SchedulerActQueueRequest>,
     might_have_pending_sync_work: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RootRescheduleRequestRecord {
+    root: FiberRootId,
+    fiber: FiberId,
+    lane: Lane,
+}
+
+impl RootRescheduleRequestRecord {
+    #[must_use]
+    pub(crate) const fn new(root: FiberRootId, fiber: FiberId, lane: Lane) -> Self {
+        Self { root, fiber, lane }
+    }
+
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub(crate) const fn lane(self) -> Lane {
+        self.lane
+    }
 }
 
 impl ScheduledRootUpdateResult {
@@ -676,11 +706,23 @@ impl RootSyncFlushResult {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RootSchedulerError {
     FiberRootStore(FiberRootStoreError),
+    ConcurrentUpdate(ConcurrentUpdateError),
     RootWorkLoop(RootWorkLoopError),
     ScheduleRecordWrongFiber {
         root: FiberRootId,
         expected: FiberId,
         actual: FiberId,
+    },
+    RescheduleRecordWrongRoot {
+        expected: FiberRootId,
+        actual: FiberRootId,
+        fiber: FiberId,
+    },
+    RescheduleRecordMissingLane {
+        root: FiberRootId,
+        fiber: FiberId,
+        lane: Lane,
+        pending_lanes: Lanes,
     },
 }
 
@@ -688,6 +730,7 @@ impl Display for RootSchedulerError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::FiberRootStore(error) => Display::fmt(error, formatter),
+            Self::ConcurrentUpdate(error) => Display::fmt(error, formatter),
             Self::RootWorkLoop(error) => Display::fmt(error, formatter),
             Self::ScheduleRecordWrongFiber {
                 root,
@@ -700,6 +743,30 @@ impl Display for RootSchedulerError {
                 actual.slot().get(),
                 expected.slot().get()
             ),
+            Self::RescheduleRecordWrongRoot {
+                expected,
+                actual,
+                fiber,
+            } => write!(
+                formatter,
+                "reschedule record for root {} references fiber slot {} attached to root {}",
+                expected.raw(),
+                fiber.slot().get(),
+                actual.raw()
+            ),
+            Self::RescheduleRecordMissingLane {
+                root,
+                fiber,
+                lane,
+                pending_lanes,
+            } => write!(
+                formatter,
+                "reschedule record for root {} references fiber slot {} lane {}, but root pending lanes are {}",
+                root.raw(),
+                fiber.slot().get(),
+                lane.bits(),
+                pending_lanes.bits()
+            ),
         }
     }
 }
@@ -708,8 +775,11 @@ impl Error for RootSchedulerError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::FiberRootStore(error) => Some(error),
+            Self::ConcurrentUpdate(error) => Some(error),
             Self::RootWorkLoop(error) => Some(error),
-            Self::ScheduleRecordWrongFiber { .. } => None,
+            Self::ScheduleRecordWrongFiber { .. }
+            | Self::RescheduleRecordWrongRoot { .. }
+            | Self::RescheduleRecordMissingLane { .. } => None,
         }
     }
 }
@@ -717,6 +787,12 @@ impl Error for RootSchedulerError {
 impl From<FiberRootStoreError> for RootSchedulerError {
     fn from(error: FiberRootStoreError) -> Self {
         Self::FiberRootStore(error)
+    }
+}
+
+impl From<ConcurrentUpdateError> for RootSchedulerError {
+    fn from(error: ConcurrentUpdateError) -> Self {
+        Self::ConcurrentUpdate(error)
     }
 }
 
@@ -731,8 +807,21 @@ pub fn ensure_root_is_scheduled<H: HostTypes>(
     record: RootScheduleUpdateRecord,
 ) -> Result<ScheduledRootUpdateResult, RootSchedulerError> {
     validate_schedule_record(store, record)?;
+    ensure_root_schedule_entry(store, record.root())
+}
 
-    let root_id = record.root();
+pub(crate) fn ensure_root_is_rescheduled<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    record: RootRescheduleRequestRecord,
+) -> Result<ScheduledRootUpdateResult, RootSchedulerError> {
+    validate_reschedule_record(store, record)?;
+    ensure_root_schedule_entry(store, record.root())
+}
+
+fn ensure_root_schedule_entry<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    root_id: FiberRootId,
+) -> Result<ScheduledRootUpdateResult, RootSchedulerError> {
     let already_scheduled = {
         let scheduler = store.root_scheduler();
         scheduler.last_scheduled_root() == Some(root_id)
@@ -1375,6 +1464,32 @@ fn validate_schedule_record<H: HostTypes>(
     Ok(())
 }
 
+fn validate_reschedule_record<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    record: RootRescheduleRequestRecord,
+) -> Result<(), RootSchedulerError> {
+    let actual_root = root_for_updated_fiber(store, record.fiber())?;
+    if actual_root != record.root() {
+        return Err(RootSchedulerError::RescheduleRecordWrongRoot {
+            expected: record.root(),
+            actual: actual_root,
+            fiber: record.fiber(),
+        });
+    }
+
+    let pending_lanes = store.root(record.root())?.lanes().pending_lanes();
+    if !pending_lanes.contains_lane(record.lane()) {
+        return Err(RootSchedulerError::RescheduleRecordMissingLane {
+            root: record.root(),
+            fiber: record.fiber(),
+            lane: record.lane(),
+            pending_lanes,
+        });
+    }
+
+    Ok(())
+}
+
 fn append_scheduled_root<H: HostTypes>(
     store: &mut FiberRootStore<H>,
     root_id: FiberRootId,
@@ -1517,7 +1632,9 @@ mod tests {
         RootElementHandle, SchedulerActQueueTaskKind, commit_finished_host_root, update_container,
         update_container_sync,
     };
-    use fast_react_core::{Lanes, RootFinishedLanes, RootLaneState};
+    use fast_react_core::{
+        FiberMode, FiberTag, Lanes, PropsHandle, RootFinishedLanes, RootLaneState,
+    };
 
     fn root_store() -> (FiberRootStore<RecordingHost>, FiberRootId, RecordingHost) {
         let host = RecordingHost::default();
@@ -1573,6 +1690,25 @@ mod tests {
         ensure_root_is_scheduled(store, result.schedule()).unwrap()
     }
 
+    fn attach_function_component_child(
+        store: &mut FiberRootStore<RecordingHost>,
+        root_id: FiberRootId,
+        props: PropsHandle,
+    ) -> FiberId {
+        let host_root = store.root(root_id).unwrap().current();
+        let function = store.fiber_arena_mut().create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            props,
+            FiberMode::NO,
+        );
+        store
+            .fiber_arena_mut()
+            .set_children(host_root, &[function])
+            .unwrap();
+        function
+    }
+
     #[test]
     fn root_scheduler_inserts_first_scheduled_root_and_requests_microtask() {
         let (mut store, root_id, _host) = root_store();
@@ -1589,6 +1725,35 @@ mod tests {
         assert!(!store.root_scheduler().did_schedule_microtask_act());
         assert_eq!(store.scheduler_bridge().microtask_requests().len(), 1);
         assert!(store.scheduler_bridge().act_queue_requests().is_empty());
+    }
+
+    #[test]
+    fn root_scheduler_reschedules_function_component_source_after_lane_mark() {
+        let (mut store, root_id, _host) = root_store();
+        let function =
+            attach_function_component_child(&mut store, root_id, PropsHandle::from_raw(201));
+        let marked_root =
+            crate::mark_update_lane_from_fiber_to_root(&mut store, function, Lane::DEFAULT)
+                .unwrap();
+        let request = RootRescheduleRequestRecord::new(marked_root, function, Lane::DEFAULT);
+
+        let scheduled = ensure_root_is_rescheduled(&mut store, request).unwrap();
+
+        assert_eq!(request.root(), root_id);
+        assert_eq!(request.fiber(), function);
+        assert_eq!(request.lane(), Lane::DEFAULT);
+        assert_eq!(scheduled.root(), root_id);
+        assert!(scheduled.inserted());
+        assert!(scheduled.microtask().is_some());
+        assert_eq!(scheduled_roots(&store).unwrap(), vec![root_id]);
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .lanes()
+                .pending_lanes()
+                .contains_lane(Lane::DEFAULT)
+        );
     }
 
     #[test]

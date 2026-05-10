@@ -265,7 +265,7 @@ fn mark_source_fiber_lanes<H: HostTypes>(
     Ok(())
 }
 
-fn root_for_updated_fiber<H: HostTypes>(
+pub(crate) fn root_for_updated_fiber<H: HostTypes>(
     store: &FiberRootStore<H>,
     source_fiber: FiberId,
 ) -> Result<FiberRootId, ConcurrentUpdateError> {
@@ -352,6 +352,51 @@ mod tests {
         assert_eq!(
             store.update_queues().pending_updates(queue).unwrap(),
             vec![update]
+        );
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .lanes()
+                .pending_lanes()
+                .contains_lane(Lane::DEFAULT)
+        );
+    }
+
+    #[test]
+    fn concurrent_updates_mark_function_component_lane_to_root_path() {
+        let (mut store, root_id) = root_store();
+        let host_root = store.root(root_id).unwrap().current();
+        let function = store.fiber_arena_mut().create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            fast_react_core::PropsHandle::from_raw(11),
+            fast_react_core::FiberMode::NO,
+        );
+        store
+            .fiber_arena_mut()
+            .set_children(host_root, &[function])
+            .unwrap();
+
+        let root =
+            mark_update_lane_from_fiber_to_root(&mut store, function, Lane::DEFAULT).unwrap();
+
+        assert_eq!(root, root_id);
+        assert!(
+            store
+                .fiber_arena()
+                .get(function)
+                .unwrap()
+                .lanes()
+                .contains_lane(Lane::DEFAULT)
+        );
+        assert!(
+            store
+                .fiber_arena()
+                .get(host_root)
+                .unwrap()
+                .child_lanes()
+                .contains_lane(Lane::DEFAULT)
         );
         assert!(
             store
