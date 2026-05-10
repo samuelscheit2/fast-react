@@ -29,6 +29,21 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Workers 505-508 and 510-533 were accepted from queue 503-533, completing the
+  queue. The batch added private React DOM form/reset/resource/stylesheet/
+  controlled restore and public-facade diagnostics, broader DOM event and
+  portal error metadata, root-render E2E private admissions, test-renderer
+  TestInstance/query/committed-fiber/act/error-boundary diagnostics, scheduler
+  mock/postTask/native-entry guards, hook dispatcher blockers, native transport
+  teardown, package-surface/private-admission refreshes, and benchmark private
+  canaries while public compatibility remains blocked.
+- Workers 505-508 and 510-533 were verified after merge with focused React DOM,
+  controlled-input, root-render E2E, test-renderer serialization/create/act/
+  error-surface, scheduler mock, package-surface, benchmark, workspace
+  import-smoke, Rust fmt, full `fast-react-test-renderer`, and focused
+  reconciler committed-fiber checks, plus conflict-marker scanning and
+  `git diff --check`. Post-merge cleanup aligned the test-renderer
+  create-routing gate expectation for the combined worker 516/530 diagnostics.
 - Worker 504 was accepted from queue 503-533. It added private Fragment and
   Portal deletion-subtree traversal diagnostics, explicit Suspense/Offscreen
   blockers, and narrowed host cleanup traversal while keeping real portal DOM

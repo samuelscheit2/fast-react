@@ -45,47 +45,16 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue 503-533 is assigned in isolated worktrees.
-Workers 503, 504, and 509 have been accepted from this queue, leaving 28 active
-top-level workers.
-
-| Worker | Focus |
-| --- | --- |
-| 505 | Form action event extraction metadata |
-| 506 | Form reset queue/commit metadata |
-| 507 | Resource map commit diagnostics |
-| 508 | Stylesheet load/error state diagnostics |
-| 510 | Controlled radio sibling props metadata |
-| 511 | React DOM facade update host-output diagnostic |
-| 512 | React DOM facade unmount cleanup diagnostic |
-| 513 | Broader DOM event type dispatch canaries |
-| 514 | Portal event error routing diagnostics |
-| 515 | TestInstance query bridge preflight |
-| 516 | Test renderer committed fiber tree inspection |
-| 517 | Test renderer act warning/thenable blockers |
-| 518 | Scheduler mock expired act-route diagnostics |
-| 519 | Package surface private audit for 480-492 |
-| 520 | Benchmark private diagnostics canaries |
-| 521 | Root-render E2E private gate refresh |
-| 522 | SuspenseList/Activity blocker diagnostics |
-| 523 | Scheduler postTask environment diagnostics |
-| 524 | Native transport worker-thread teardown |
-| 525 | React hook dispatcher public blocker refresh |
-| 526 | Conformance private admission refresh for 473-502 |
-| 527 | Worker launcher simplification and diagnostics |
-| 528 | Hydration replay error metadata gate |
-| 529 | Portal root-render public blocker refresh |
-| 530 | Test renderer error-boundary update refresh |
-| 531 | Scheduler native entry guard refresh |
-| 532 | Native package surface guard refresh |
-| 533 | Controlled restore queue write preflight |
+Top-level cap: 30 workers. Queue 503-533 has been accepted and merged. No
+active top-level worker queue is currently assigned.
 
 ## Near-Term Sequencing
 
-1. Queue the next independent worker batch below the 30 top-level worker cap.
-2. Accept code workers opportunistically, resolving merge conflicts after the
+1. Clean accepted queue 503-533 tmux sessions, worktrees, and branches.
+2. Queue the next independent worker batch below the 30 top-level worker cap.
+3. Accept code workers opportunistically, resolving merge conflicts after the
    fact when overlapping work lands on different implementation surfaces.
-3. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
+4. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
 
 ## Next Queue Candidates
