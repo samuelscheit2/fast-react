@@ -45,8 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 175: Suspense/Offscreen fail-closed markers in
-  `/Users/user/Developer/Developer/fast-react-worker-175-suspense-offscreen-fail-closed`.
 - Worker 176: act queue routing skeleton in
   `/Users/user/Developer/Developer/fast-react-worker-176-act-queue-routing-skeleton`.
 - Worker 178: test-renderer serialization gate in

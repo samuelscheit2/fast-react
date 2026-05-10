@@ -170,9 +170,19 @@ sequencing belong in `MASTER_PLAN.md`.
   deterministic unmount-before-mount ordering and root scheduling-state
   helpers, without hook effect traversal, passive flushing, public `act`, DOM,
   or native integration.
+- Worker 175 Suspense/Offscreen fail-closed markers were merged, adding
+  internal unsupported-fiber-tag markers for Suspense, Offscreen, Activity, and
+  ViewTransition plus expanded React 19.2.6 fiber tag mapping coverage, without
+  wiring generic begin-work traversal or claiming those features.
 
 ## Latest Accepted Verification
 
+- Worker 175 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused fiber-tag and unsupported-feature tests,
+  full `fast-react-core` tests with 112 unit tests, full
+  `fast-react-reconciler` tests with 104 unit tests plus 1 doctest, core and
+  reconciler clippy with warnings denied, and `git diff --check`; merging
+  current `main` into the worker branch produced no conflicts.
 - Worker 173 was verified on its integrated worktree and again on `main` with
   `cargo fmt --all --check`, focused `root_config` and `fiber_root` tests, full
   `fast-react-reconciler` tests with 102 unit tests plus 1 doctest, reconciler
