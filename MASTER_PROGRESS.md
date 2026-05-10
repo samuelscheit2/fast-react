@@ -226,9 +226,21 @@ sequencing belong in `MASTER_PLAN.md`.
   non-payload, and unsupported entries while keeping DOM mutation, public roots,
   events, controlled forms, hydration, style, dangerous HTML, document resource
   tags, and compatibility claims unwired.
+- Worker 187 host node store boundary was merged, adding a private
+  reconciler-owned `HostNodeStore` for detached generic host instance/text
+  values behind opaque `StateNodeHandle`s, with root, fiber, host-token, phase,
+  target, active-state, lookup, mutation, invalidation, removal, and metadata
+  validation while leaving complete-work consumption and commit traversal
+  unwired.
 
 ## Latest Accepted Verification
 
+- Worker 187 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused `host_nodes` tests, adjacent `host_work`
+  tests, full `fast-react-reconciler` tests with 125 unit tests plus 1 doctest,
+  reconciler clippy with warnings denied, and `git diff --check`; the
+  `crates/fast-react-reconciler/src/lib.rs` merge conflict preserved accepted
+  main modules and added private `host_nodes`.
 - Worker 186 was verified on its integrated worktree and again on `main` with
   focused DOM property payload helper tests, React DOM resource-hint/source
   prerequisite gates, the DOM namespace SVG oracle, smoke entrypoint checks,
