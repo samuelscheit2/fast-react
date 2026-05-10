@@ -72,6 +72,23 @@ sequencing belong in `MASTER_PLAN.md`.
   `fast-react-test-renderer` tests, React DOM/test-renderer/Scheduler
   workspace checks, `npm run check:package-surface`, full conformance checks,
   conflict-marker scanning, and `git diff --check`.
+- Workers 695, 696, 698-703, 706-709, and 711 were accepted from the active
+  queue. The batch added private react-test-renderer root create/update work
+  loop and HostComponent prop/style execution evidence, `toTree` composite
+  metadata, TestInstance class-root query evidence, nested act passive-flush
+  order diagnostics, error-boundary commit recovery metadata, and production
+  CJS private metadata parity. It also added React DOM private root-render
+  HostText/HostComponent execution, root-render click delegation, controlled
+  select/textarea restore execution, hydration text-node patch execution,
+  portal owner-root event handoff, and form-action async callback execution.
+  Public test-renderer, React DOM root/event/hydration/form, and package
+  compatibility claims remain blocked.
+- The batch required overlap resolutions in test-renderer create-routing and
+  act-oracle conformance expectations plus DOM event delegation metadata. The
+  accepted state was verified after merge with `cargo fmt --all --check`, full
+  `fast-react-test-renderer` tests, React DOM and test-renderer workspace
+  checks, `npm run check:package-surface`, full conformance checks,
+  conflict-marker scanning, and `git diff --check`.
 
 ### Queue 655-684
 
