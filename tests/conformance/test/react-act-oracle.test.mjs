@@ -17,6 +17,12 @@ import {
   readCheckedReactActOracle,
   readCheckedReactActOracleText
 } from "../src/react-act-oracle.mjs";
+import {
+  REACT_ACT_PUBLIC_BLOCKED_GATE_STATUS,
+  REACT_ACT_PUBLIC_SCENARIO_ADMISSIONS,
+  REACT_ACT_PUBLIC_UNBLOCKING_REQUIREMENTS,
+  evaluateReactActPublicBlockedGate
+} from "../src/react-act-public-blocked-gate.mjs";
 
 const oracle = readCheckedReactActOracle();
 
@@ -77,6 +83,135 @@ test("React.act oracle keeps Fast React compatibility claims false", () => {
       compatibilityClaimed: false
     }
   });
+});
+
+test("public React.act gate stays blocked until act queue flushing, effects, and renderer roots are ready", () => {
+  const gate = evaluateReactActPublicBlockedGate({ oracle });
+
+  assert.equal(gate.status, REACT_ACT_PUBLIC_BLOCKED_GATE_STATUS);
+  assert.equal(gate.requiredPrerequisitesReady, false);
+  assert.equal(gate.publicCompatibilityClaimed, false);
+  assert.deepEqual(gate.violations, []);
+
+  assert.equal(gate.localChecks.publicActUnsupportedPlaceholder, true);
+  assert.equal(gate.localChecks.defaultAct.hasOwn, true);
+  assert.equal(gate.localChecks.defaultAct.exportKeysInclude, true);
+  assert.deepEqual(gate.localChecks.defaultAct.value, {
+    type: "function",
+    name: "act",
+    length: 0
+  });
+  assert.equal(gate.localChecks.defaultAct.callAttempt.status, "throws");
+  assert.equal(
+    gate.localChecks.defaultAct.callAttempt.error.name,
+    "FastReactUnimplementedError"
+  );
+  assert.equal(
+    gate.localChecks.defaultAct.callAttempt.error.code,
+    "FAST_REACT_UNIMPLEMENTED"
+  );
+  assert.equal(gate.localChecks.defaultAct.callAttempt.error.entrypoint, "react");
+  assert.equal(gate.localChecks.defaultAct.callAttempt.error.exportName, "act");
+  assert.equal(
+    gate.localChecks.defaultAct.callAttempt.error.compatibilityTarget,
+    "react@19.2.6"
+  );
+  assert.equal(gate.localChecks.defaultAct.callbackInvoked, false);
+  assert.deepEqual(gate.localChecks.reactServerAct, {
+    hasOwn: false,
+    exportKeysInclude: false,
+    value: {
+      type: "undefined"
+    }
+  });
+
+  assert.equal(
+    gate.localChecks.actQueueStatus,
+    "private-records-without-flushing"
+  );
+  assert.equal(gate.localChecks.actQueueFlushingReady, false);
+  assert.equal(
+    gate.localChecks.effectExecutionStatus,
+    "metadata-only-no-callback-execution"
+  );
+  assert.equal(gate.localChecks.effectExecutionReady, false);
+  assert.equal(
+    gate.localChecks.rendererRootStatus,
+    "public-renderer-roots-placeholder-blocked"
+  );
+  assert.equal(gate.localChecks.rendererRootsReady, false);
+  assert.equal(gate.localChecks.reactDomClientRootPlaceholder, true);
+  assert.equal(gate.localChecks.testRendererRootPlaceholder, true);
+});
+
+test("public React.act scenario admission stays explicit and closed", () => {
+  assert.deepEqual(
+    REACT_ACT_PUBLIC_UNBLOCKING_REQUIREMENTS.map(
+      (requirement) => requirement.id
+    ),
+    [
+      "reconciler-act-queue-flushing",
+      "effect-execution",
+      "renderer-roots"
+    ]
+  );
+  assert.deepEqual(
+    REACT_ACT_PUBLIC_SCENARIO_ADMISSIONS.map((scenario) => scenario.scenarioId),
+    REACT_ACT_SCENARIO_IDS
+  );
+
+  for (const scenario of REACT_ACT_PUBLIC_SCENARIO_ADMISSIONS) {
+    assert.equal(scenario.status, REACT_ACT_PUBLIC_BLOCKED_GATE_STATUS);
+    assert.equal(scenario.admittedForFastReactComparison, false);
+    assert.equal(scenario.compatibilityClaimed, false);
+    assert.deepEqual(
+      scenario.unblockRequires,
+      REACT_ACT_PUBLIC_UNBLOCKING_REQUIREMENTS.map(
+        (requirement) => requirement.id
+      )
+    );
+  }
+
+  const gate = evaluateReactActPublicBlockedGate({ oracle });
+  assert.deepEqual(gate.admittedScenarios, []);
+  assert.equal(gate.defaultActBehaviorRows.length, 10);
+  assert.equal(gate.unsupportedDefaultBehaviorRows.length, 10);
+});
+
+test("public React.act gate rejects premature compatibility claims and scenario admissions", () => {
+  const prematureClaimOracle = JSON.parse(JSON.stringify(oracle));
+  prematureClaimOracle.conformanceClaims.compatibilityClaimed = true;
+
+  const claimGate = evaluateReactActPublicBlockedGate({
+    oracle: prematureClaimOracle
+  });
+  assert.equal(claimGate.status, "blocked-with-violations");
+  assert.deepEqual(
+    claimGate.violations.map((violation) => violation.id),
+    ["compatibility-claimed-before-act-prerequisites"]
+  );
+
+  const admittedScenarios = REACT_ACT_PUBLIC_SCENARIO_ADMISSIONS.map(
+    (scenario, index) =>
+      index === 0
+        ? {
+            ...scenario,
+            admittedForFastReactComparison: true
+          }
+        : scenario
+  );
+  const admissionGate = evaluateReactActPublicBlockedGate({
+    oracle,
+    scenarioAdmissions: admittedScenarios
+  });
+  assert.equal(admissionGate.status, "blocked-with-violations");
+  assert.deepEqual(
+    admissionGate.violations.map((violation) => violation.id),
+    ["scenario-admitted-before-act-prerequisites"]
+  );
+  assert.deepEqual(admissionGate.violations[0].scenarioIds, [
+    "react-act-export-shape"
+  ]);
 });
 
 test("React.act oracle covers every scenario in every probe mode", () => {
