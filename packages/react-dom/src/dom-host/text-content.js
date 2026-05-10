@@ -10,7 +10,11 @@ function shouldSetTextContent(type, props) {
   }
 
   const children = props.children;
-  if (typeof children === 'string' || typeof children === 'number') {
+  if (
+    typeof children === 'string' ||
+    typeof children === 'number' ||
+    typeof children === 'bigint'
+  ) {
     return true;
   }
 
@@ -18,7 +22,6 @@ function shouldSetTextContent(type, props) {
   return (
     html != null &&
     typeof html === 'object' &&
-    Object.prototype.hasOwnProperty.call(html, '__html') &&
     html.__html != null
   );
 }
