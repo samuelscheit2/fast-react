@@ -34,6 +34,17 @@ const selectedDefaultHooks = [
   ["useState", 1, [0]]
 ];
 
+const statefulDefaultHooks = [
+  ["useReducer", 3, [(state) => state, 0, undefined]],
+  ["useState", 1, [0]]
+];
+
+const dispatcherForwardedDefaultHooks = selectedDefaultHooks.filter(
+  ([hookName]) => !statefulDefaultHooks.some(
+    ([statefulHookName]) => statefulHookName === hookName
+  )
+);
+
 const selectedServerHooks = [
   ["use", 1, ["usable"]],
   ["useCallback", 2, ["callback", ["dep"]]],
@@ -59,7 +70,7 @@ test("selected public React hooks preserve React 19.2.6 function names and lengt
 });
 
 test("selected public React hooks throw the invalid-hook-call boundary without a dispatcher", () => {
-  for (const [hookName, , args] of selectedDefaultHooks) {
+  for (const [hookName, , args] of dispatcherForwardedDefaultHooks) {
     assertInvalidHookCall(() => React[hookName](...args), hookName);
   }
 
@@ -68,10 +79,40 @@ test("selected public React hooks throw the invalid-hook-call boundary without a
   }
 });
 
+test("useState and useReducer fail closed without a private state-hook dispatcher", () => {
+  for (const [hookName, , args] of statefulDefaultHooks) {
+    assertStateHookDispatcherUnavailable(() => React[hookName](...args), hookName);
+  }
+
+  const calls = [];
+  const genericDispatcher = {
+    useReducer(...args) {
+      calls.push(["useReducer", args]);
+      return ["reducer"];
+    },
+    useState(...args) {
+      calls.push(["useState", args]);
+      return ["state"];
+    }
+  };
+
+  hookDispatcher.ReactCurrentDispatcher.current = genericDispatcher;
+
+  for (const [hookName, , args] of statefulDefaultHooks) {
+    assertStateHookDispatcherUnavailable(() => React[hookName](...args), hookName);
+  }
+
+  assert.deepEqual(calls, []);
+  assert.equal(
+    hookDispatcher.isPrivateStateHookDispatcher(genericDispatcher),
+    false
+  );
+});
+
 test("selected public React hooks forward to the installed dispatcher", () => {
   const calls = [];
   const dispatcher = Object.fromEntries(
-    selectedDefaultHooks.map(([hookName]) => [
+    dispatcherForwardedDefaultHooks.map(([hookName]) => [
       hookName,
       function (...args) {
         calls.push({
@@ -86,7 +127,7 @@ test("selected public React hooks forward to the installed dispatcher", () => {
 
   hookDispatcher.ReactCurrentDispatcher.current = dispatcher;
 
-  for (const [hookName, , args] of selectedDefaultHooks) {
+  for (const [hookName, , args] of dispatcherForwardedDefaultHooks) {
     assert.equal(React[hookName](...args), `return:${hookName}`, hookName);
   }
 
@@ -96,12 +137,57 @@ test("selected public React hooks forward to the installed dispatcher", () => {
       hookName,
       thisMatchesDispatcher
     })),
-    selectedDefaultHooks.map(([hookName, , args]) => ({
+    dispatcherForwardedDefaultHooks.map(([hookName, , args]) => ({
       args,
       hookName,
       thisMatchesDispatcher: true
     }))
   );
+});
+
+test("useState and useReducer forward only to a marked private state-hook dispatcher", () => {
+  const calls = [];
+  const dispatcher = hookDispatcher.markPrivateStateHookDispatcher({
+    useReducer(reducer, initialArg, init) {
+      calls.push({
+        args: [reducer, initialArg, init],
+        hookName: "useReducer",
+        thisMatchesDispatcher: this === dispatcher
+      });
+      return ["reducer", reducer(initialArg), init];
+    },
+    useState(initialState) {
+      calls.push({
+        args: [initialState],
+        hookName: "useState",
+        thisMatchesDispatcher: this === dispatcher
+      });
+      return [initialState, "dispatch"];
+    }
+  });
+
+  hookDispatcher.ReactCurrentDispatcher.current = dispatcher;
+
+  const reducer = (state) => state + 1;
+  assert.deepEqual(React.useReducer(reducer, 0, "init"), [
+    "reducer",
+    1,
+    "init"
+  ]);
+  assert.deepEqual(React.useState(5), [5, "dispatch"]);
+  assert.deepEqual(calls, [
+    {
+      args: [reducer, 0, "init"],
+      hookName: "useReducer",
+      thisMatchesDispatcher: true
+    },
+    {
+      args: [5],
+      hookName: "useState",
+      thisMatchesDispatcher: true
+    }
+  ]);
+  assert.equal(hookDispatcher.isPrivateStateHookDispatcher(dispatcher), true);
 });
 
 test("react-server hooks share the dispatcher guard with the default React entrypoint", () => {
@@ -149,6 +235,23 @@ function assertInvalidHookCall(callback, label) {
         label
       );
       assert.match(error.message, /https:\/\/react\.dev\/link\/invalid-hook-call/u, label);
+      return true;
+    },
+    label
+  );
+}
+
+function assertStateHookDispatcherUnavailable(callback, label) {
+  assert.throws(
+    callback,
+    (error) => {
+      assert.equal(error.name, "FastReactUnimplementedError", label);
+      assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED", label);
+      assert.equal(error.entrypoint, "react", label);
+      assert.equal(error.exportName, label, label);
+      assert.equal(error.compatibilityTarget, "react@19.2.6", label);
+      assert.match(error.message, /no React behavior implementation yet/u, label);
+      assert.match(error.message, /private\/native hook dispatcher/u, label);
       return true;
     },
     label
