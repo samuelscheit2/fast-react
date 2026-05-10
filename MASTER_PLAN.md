@@ -45,17 +45,27 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue 503-533 has been accepted and merged. No
-active top-level worker queue is currently assigned.
+Top-level cap: 30 workers. Queue 534-563 is active in `fr-*` tmux sessions
+from isolated `worker/<slug>` branches and worktrees.
+
+- 534-538: Root work loop, lane priority, hooks/effects, and context lanes.
+- 539-542: Test-renderer live root, serialization, act, and DOM facade updates.
+- 543-549: DOM event, hydration/resource, controlled restore, and form blockers.
+- 550-552: Scheduler and native batch response sequencing.
+- 553-556: Package surface, benchmark, conformance, and root-render audits.
+- 557-562: Hook dispatcher, Suspense, Offscreen, portal, style, and HTML gates.
+- 563: Master docs accepted-history compaction.
 
 ## Near-Term Sequencing
 
-1. Clean accepted queue 503-533 tmux sessions, worktrees, and branches.
-2. Queue the next independent worker batch below the 30 top-level worker cap.
-3. Accept code workers opportunistically, resolving merge conflicts after the
+1. Monitor queue 534-563 and classify completions from tmux pane state,
+   reports, git status, and verification evidence.
+2. Accept code workers opportunistically, resolving merge conflicts after the
    fact when overlapping work lands on different implementation surfaces.
-4. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
+3. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
+4. After accepted workers are merged, clean their tmux sessions, worktrees, and
+   branches before assigning replacement capacity.
 
 ## Next Queue Candidates
 
