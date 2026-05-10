@@ -57,6 +57,9 @@ const listenerRegistry = require(
 const rootListeners = require(
   path.join(repoRoot, "packages/react-dom/src/events/root-listeners.js")
 );
+const rootMarkers = require(
+  path.join(repoRoot, "packages/react-dom/src/client/root-markers.js")
+);
 
 const oracle = readCheckedDomEventDelegationOracle();
 
@@ -385,6 +388,79 @@ test("click dispatch gate invokes a portal child listener with owner-root metada
     componentTree.detachHostInstanceToken(fixture.parentToken),
     fixture.parentToken
   );
+});
+
+test("click dispatch gate preserves portal owner root across a secondary fake root", () => {
+  const secondaryRootOwner = {
+    kind: "ClickPortalDelegationGateConformanceSecondaryRoot"
+  };
+  const fixture = createPrivateClickPortalDelegationDispatchGateFixture({
+    secondaryRootOwner
+  });
+  const gate = fixture.gate;
+  const dispatchPath = fixture.dispatchRecord.targetDispatchPathRecord;
+
+  assert.equal(
+    dispatchPath.containerRootBoundaryNode,
+    fixture.portalContainer
+  );
+  assert.equal(dispatchPath.containerRootBoundaryOwner, secondaryRootOwner);
+  assert.equal(dispatchPath.containerRootOwnerMatchesTargetRoot, false);
+  assert.equal(dispatchPath.ownerRootPreservedAcrossContainerRoot, true);
+  assert.equal(
+    dispatchPath.ownerRootPreservedAcrossForeignContainerRoot,
+    true
+  );
+  assert.equal(dispatchPath.targetRootOwnerMatchCount, 2);
+  assert.equal(dispatchPath.targetRootOwnerMismatchCount, 0);
+
+  assert.equal(gate.portalOwnerRootAvailable, true);
+  assert.equal(gate.portalContainerContainsTarget, true);
+  assert.equal(gate.portalContainerMatchesDispatchRootBoundary, true);
+  assert.equal(gate.portalContainerOwnedBySecondaryRoot, true);
+  assert.equal(gate.portalContainerRootOwnerPresent, true);
+  assert.equal(gate.portalContainerRootOwnerMatchesPortalOwner, false);
+  assert.equal(gate.ownerRootPreservedAcrossPortalContainerRoot, true);
+  assert.equal(gate.ownerRootPreservedAcrossSecondaryPortalRoot, true);
+  assert.equal(
+    fixture.portalOwnerGate.portalContainerRootBoundary
+      .portalContainerRootOwner,
+    secondaryRootOwner
+  );
+  assert.equal(
+    fixture.portalOwnerGate.ownerRootPreservedAcrossSecondaryPortalRoot,
+    true
+  );
+  assert.equal(gate.publicPortalBubblingEnabled, false);
+  assert.equal(gate.publicDispatchEnabled, false);
+  assert.equal(gate.publicDispatchBlocked, true);
+  assert.equal(gate.eventDispatch, false);
+  assert.equal(gate.syntheticEventCount, 0);
+  assert.deepEqual(fixture.calls, [
+    {
+      currentTarget: fixture.child,
+      target: fixture.child,
+      targetInst: fixture.childToken
+    }
+  ]);
+  assert.equal(
+    rootMarkers.getContainerRoot(fixture.portalContainer),
+    secondaryRootOwner
+  );
+  assert.equal(fixture.rootContainer.__registrations.length, 0);
+  assert.equal(fixture.portalContainer.__registrations.length, 0);
+
+  listenerRegistry.removePrivateEventListenerQueueEntry(fixture.parentQueue);
+  listenerRegistry.removePrivateEventListenerQueueEntry(fixture.childQueue);
+  assert.equal(
+    componentTree.detachHostInstanceToken(fixture.childToken),
+    fixture.childToken
+  );
+  assert.equal(
+    componentTree.detachHostInstanceToken(fixture.parentToken),
+    fixture.parentToken
+  );
+  rootMarkers.unmarkContainerAsRoot(fixture.portalContainer);
 });
 
 test("delegated click capture and bubble listeners fire in React DOM order", () => {
@@ -1003,7 +1079,7 @@ function createPrivateClickDelegationDispatchGateFixture() {
   };
 }
 
-function createPrivateClickPortalDelegationDispatchGateFixture() {
+function createPrivateClickPortalDelegationDispatchGateFixture(options = {}) {
   const document = createFakeDocument(
     "click-portal-delegation-gate-conformance"
   );
@@ -1024,6 +1100,12 @@ function createPrivateClickPortalDelegationDispatchGateFixture() {
 
   appendFakeChild(portalContainer, parent);
   appendFakeChild(parent, child);
+  if (options.secondaryRootOwner !== undefined) {
+    rootMarkers.markContainerAsRoot(
+      options.secondaryRootOwner,
+      portalContainer
+    );
+  }
   componentTree.attachHostInstanceNode(parent, parentToken, {});
   componentTree.attachHostInstanceNode(child, childToken, {});
   const childQueue =
@@ -1085,10 +1167,12 @@ function createPrivateClickPortalDelegationDispatchGateFixture() {
     child,
     childQueue,
     childToken,
+    dispatchRecord,
     gate,
     parent,
     parentQueue,
     parentToken,
+    portalOwnerGate,
     portalContainer,
     rootContainer
   };
