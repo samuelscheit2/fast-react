@@ -362,6 +362,18 @@ pub enum TestRendererHostOutputCanaryError {
     FiberRootStore(FiberRootStoreError),
     FiberTopology(FiberTopologyError),
     HostFiberToken(HostFiberTokenValidationError),
+    RootMismatch {
+        expected: FiberRootId,
+        actual: FiberRootId,
+    },
+    ExpectedCurrentHostRoot {
+        expected: FiberId,
+        actual: FiberId,
+    },
+    ExpectedUnmountRender {
+        root: FiberRootId,
+        actual: RootElementHandle,
+    },
     ExpectedFiberTag {
         fiber: FiberId,
         expected: FiberTag,
@@ -379,6 +391,24 @@ impl Display for TestRendererHostOutputCanaryError {
             Self::FiberRootStore(error) => Display::fmt(error, formatter),
             Self::FiberTopology(error) => Display::fmt(error, formatter),
             Self::HostFiberToken(error) => Display::fmt(error, formatter),
+            Self::RootMismatch { expected, actual } => write!(
+                formatter,
+                "test-renderer canary root {} does not match render root {}",
+                actual.raw(),
+                expected.raw()
+            ),
+            Self::ExpectedCurrentHostRoot { expected, actual } => write!(
+                formatter,
+                "test-renderer canary committed HostRoot fiber {} does not match render current fiber {}",
+                actual.slot().get(),
+                expected.slot().get()
+            ),
+            Self::ExpectedUnmountRender { root, actual } => write!(
+                formatter,
+                "test-renderer canary unmount for root {} expected a null root element, found {}",
+                root.raw(),
+                actual.raw()
+            ),
             Self::ExpectedFiberTag {
                 fiber,
                 expected,
@@ -406,7 +436,11 @@ impl Error for TestRendererHostOutputCanaryError {
             Self::FiberRootStore(error) => Some(error),
             Self::FiberTopology(error) => Some(error),
             Self::HostFiberToken(error) => Some(error),
-            Self::ExpectedFiberTag { .. } | Self::EmptyStateNode { .. } => None,
+            Self::RootMismatch { .. }
+            | Self::ExpectedCurrentHostRoot { .. }
+            | Self::ExpectedUnmountRender { .. }
+            | Self::ExpectedFiberTag { .. }
+            | Self::EmptyStateNode { .. } => None,
         }
     }
 }
@@ -558,6 +592,322 @@ impl TestRendererHostOutputCanaryCompletedFibers {
     pub const fn text_state_node_raw(self) -> u64 {
         self.text_state_node_raw
     }
+
+    #[must_use]
+    pub const fn current(self) -> TestRendererHostOutputCanaryCurrentFibers {
+        TestRendererHostOutputCanaryCurrentFibers {
+            root: self.root(),
+            host_root: self.host_root(),
+            component: self.component(),
+            text: self.text(),
+            fixture: self.prepared.fixture(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererHostOutputCanaryCurrentFibers {
+    root: FiberRootId,
+    host_root: FiberId,
+    component: FiberId,
+    text: FiberId,
+    fixture: TestRendererHostOutputCanaryFixture,
+}
+
+impl TestRendererHostOutputCanaryCurrentFibers {
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn host_root(self) -> FiberId {
+        self.host_root
+    }
+
+    #[must_use]
+    pub const fn component(self) -> FiberId {
+        self.component
+    }
+
+    #[must_use]
+    pub const fn text(self) -> FiberId {
+        self.text
+    }
+
+    #[must_use]
+    pub const fn fixture(self) -> TestRendererHostOutputCanaryFixture {
+        self.fixture
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererHostOutputCanaryUpdatedFibers {
+    previous: TestRendererHostOutputCanaryCurrentFibers,
+    current: TestRendererHostOutputCanaryCurrentFibers,
+    render_lanes: Lanes,
+    component_state_node_raw: u64,
+    text_state_node_raw: u64,
+    component_commit_token: HostFiberTokenId,
+    component_props_changed: bool,
+    text_props_changed: bool,
+}
+
+impl TestRendererHostOutputCanaryUpdatedFibers {
+    #[must_use]
+    pub const fn previous(self) -> TestRendererHostOutputCanaryCurrentFibers {
+        self.previous
+    }
+
+    #[must_use]
+    pub const fn current(self) -> TestRendererHostOutputCanaryCurrentFibers {
+        self.current
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.current.root()
+    }
+
+    #[must_use]
+    pub const fn host_root(self) -> FiberId {
+        self.current.host_root()
+    }
+
+    #[must_use]
+    pub const fn component(self) -> FiberId {
+        self.current.component()
+    }
+
+    #[must_use]
+    pub const fn text(self) -> FiberId {
+        self.current.text()
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub const fn component_state_node_raw(self) -> u64 {
+        self.component_state_node_raw
+    }
+
+    #[must_use]
+    pub const fn text_state_node_raw(self) -> u64 {
+        self.text_state_node_raw
+    }
+
+    #[must_use]
+    pub const fn component_commit_token(self) -> HostFiberTokenId {
+        self.component_commit_token
+    }
+
+    #[must_use]
+    pub const fn component_props_changed(self) -> bool {
+        self.component_props_changed
+    }
+
+    #[must_use]
+    pub const fn text_props_changed(self) -> bool {
+        self.text_props_changed
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererHostOutputCanaryDeletedFibers {
+    current: TestRendererHostOutputCanaryCurrentFibers,
+    host_root: FiberId,
+    render_lanes: Lanes,
+    component_deletion_token: HostFiberTokenId,
+}
+
+impl TestRendererHostOutputCanaryDeletedFibers {
+    #[must_use]
+    pub const fn current(self) -> TestRendererHostOutputCanaryCurrentFibers {
+        self.current
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.current.root()
+    }
+
+    #[must_use]
+    pub const fn host_root(self) -> FiberId {
+        self.host_root
+    }
+
+    #[must_use]
+    pub const fn deleted_component(self) -> FiberId {
+        self.current.component()
+    }
+
+    #[must_use]
+    pub const fn deleted_text(self) -> FiberId {
+        self.current.text()
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub const fn component_deletion_token(self) -> HostFiberTokenId {
+        self.component_deletion_token
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TestRendererHostOutputCanaryMutationKind {
+    Placement,
+    Update,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererHostOutputCanaryMutationRecord {
+    root: FiberRootId,
+    host_root: FiberId,
+    fiber: FiberId,
+    tag: FiberTag,
+    kind: TestRendererHostOutputCanaryMutationKind,
+    state_node_raw: u64,
+    pending_props_raw: u64,
+    memoized_props_raw: u64,
+    alternate_memoized_props_raw: Option<u64>,
+}
+
+impl TestRendererHostOutputCanaryMutationRecord {
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn host_root(self) -> FiberId {
+        self.host_root
+    }
+
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn tag(self) -> FiberTag {
+        self.tag
+    }
+
+    #[must_use]
+    pub const fn kind(self) -> TestRendererHostOutputCanaryMutationKind {
+        self.kind
+    }
+
+    #[must_use]
+    pub const fn state_node_raw(self) -> u64 {
+        self.state_node_raw
+    }
+
+    #[must_use]
+    pub const fn pending_props_raw(self) -> u64 {
+        self.pending_props_raw
+    }
+
+    #[must_use]
+    pub const fn memoized_props_raw(self) -> u64 {
+        self.memoized_props_raw
+    }
+
+    #[must_use]
+    pub const fn alternate_memoized_props_raw(self) -> Option<u64> {
+        self.alternate_memoized_props_raw
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererHostOutputCanaryDeletionListRecord {
+    parent: FiberId,
+    deleted: Vec<FiberId>,
+}
+
+impl TestRendererHostOutputCanaryDeletionListRecord {
+    #[must_use]
+    pub const fn parent(&self) -> FiberId {
+        self.parent
+    }
+
+    #[must_use]
+    pub fn deleted(&self) -> &[FiberId] {
+        &self.deleted
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererHostOutputCanaryCommitDiagnostics {
+    mutation_records: Vec<TestRendererHostOutputCanaryMutationRecord>,
+    deletion_lists: Vec<TestRendererHostOutputCanaryDeletionListRecord>,
+}
+
+impl TestRendererHostOutputCanaryCommitDiagnostics {
+    #[must_use]
+    pub fn mutation_records(&self) -> &[TestRendererHostOutputCanaryMutationRecord] {
+        &self.mutation_records
+    }
+
+    #[must_use]
+    pub fn deletion_lists(&self) -> &[TestRendererHostOutputCanaryDeletionListRecord] {
+        &self.deletion_lists
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.mutation_records.is_empty() && self.deletion_lists.is_empty()
+    }
+}
+
+pub fn inspect_test_renderer_host_output_canary_commit(
+    commit: &HostRootCommitRecord,
+) -> TestRendererHostOutputCanaryCommitDiagnostics {
+    let mutation_records = commit
+        .mutation_log()
+        .records()
+        .iter()
+        .map(|record| TestRendererHostOutputCanaryMutationRecord {
+            root: record.root(),
+            host_root: record.host_root(),
+            fiber: record.fiber(),
+            tag: record.tag(),
+            kind: match record.kind() {
+                root_commit::HostRootMutationPhaseRecordKind::Placement => {
+                    TestRendererHostOutputCanaryMutationKind::Placement
+                }
+                root_commit::HostRootMutationPhaseRecordKind::Update => {
+                    TestRendererHostOutputCanaryMutationKind::Update
+                }
+            },
+            state_node_raw: record.state_node().raw(),
+            pending_props_raw: record.pending_props().raw(),
+            memoized_props_raw: record.memoized_props().raw(),
+            alternate_memoized_props_raw: record
+                .alternate_memoized_props()
+                .map(|props| props.raw()),
+        })
+        .collect();
+    let deletion_lists = commit
+        .deletion_lists()
+        .iter()
+        .map(|record| TestRendererHostOutputCanaryDeletionListRecord {
+            parent: record.parent(),
+            deleted: record.deleted().to_vec(),
+        })
+        .collect();
+
+    TestRendererHostOutputCanaryCommitDiagnostics {
+        mutation_records,
+        deletion_lists,
+    }
 }
 
 pub fn prepare_test_renderer_host_output_canary_fibers<H: HostTypes>(
@@ -675,6 +1025,134 @@ pub fn finish_test_renderer_host_output_canary_fibers<H: HostTypes>(
     })
 }
 
+pub fn prepare_test_renderer_host_output_update_canary_fibers<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    render: HostRootRenderPhaseRecord,
+    current: TestRendererHostOutputCanaryCurrentFibers,
+    next_fixture: TestRendererHostOutputCanaryFixture,
+    component_state_node_raw: u64,
+    text_state_node_raw: u64,
+) -> Result<TestRendererHostOutputCanaryUpdatedFibers, TestRendererHostOutputCanaryError> {
+    validate_test_renderer_host_output_canary_current(store, render, current)?;
+
+    let component_props_changed = current.fixture().component_props_raw()
+        != next_fixture.component_props_raw()
+        || current.fixture().element_type_raw() != next_fixture.element_type_raw();
+    let text_props_changed = current.fixture().text_props_raw() != next_fixture.text_props_raw();
+    let component = store.fiber_arena_mut().create_work_in_progress(
+        current.component(),
+        PropsHandle::from_raw(next_fixture.component_props_raw()),
+    )?;
+    {
+        let node = store.fiber_arena_mut().get_mut(component)?;
+        node.set_element_type(ElementTypeHandle::from_raw(next_fixture.element_type_raw()));
+        node.set_state_node(StateNodeHandle::from_raw(component_state_node_raw));
+        node.set_memoized_props(PropsHandle::from_raw(next_fixture.component_props_raw()));
+        node.set_lanes(Lanes::NO);
+        if component_props_changed {
+            node.merge_flags(FiberFlags::UPDATE);
+        }
+    }
+
+    let text = store.fiber_arena_mut().create_work_in_progress(
+        current.text(),
+        PropsHandle::from_raw(next_fixture.text_props_raw()),
+    )?;
+    {
+        let node = store.fiber_arena_mut().get_mut(text)?;
+        node.set_state_node(StateNodeHandle::from_raw(text_state_node_raw));
+        node.set_memoized_props(PropsHandle::from_raw(next_fixture.text_props_raw()));
+        node.set_lanes(Lanes::NO);
+        if text_props_changed {
+            node.merge_flags(FiberFlags::UPDATE);
+        }
+    }
+
+    store.fiber_arena_mut().set_children(component, &[text])?;
+    store
+        .fiber_arena_mut()
+        .set_children(render.work_in_progress(), &[component])?;
+    refresh_test_renderer_host_output_canary_bubbled_flags(store, text)?;
+    refresh_test_renderer_host_output_canary_bubbled_flags(store, component)?;
+    refresh_test_renderer_host_output_canary_bubbled_flags(store, render.work_in_progress())?;
+
+    let component_commit_token = store.host_tokens_mut().issue(
+        render.root(),
+        component,
+        HostFiberTokenPhase::Commit,
+        HostFiberTokenTarget::Instance,
+    );
+    store.host_tokens().validate(
+        component_commit_token,
+        render.root(),
+        component,
+        HostFiberTokenPhase::Commit,
+        HostFiberTokenTarget::Instance,
+    )?;
+
+    let next = TestRendererHostOutputCanaryCurrentFibers {
+        root: render.root(),
+        host_root: render.work_in_progress(),
+        component,
+        text,
+        fixture: next_fixture,
+    };
+
+    Ok(TestRendererHostOutputCanaryUpdatedFibers {
+        previous: current,
+        current: next,
+        render_lanes: render.render_lanes(),
+        component_state_node_raw,
+        text_state_node_raw,
+        component_commit_token,
+        component_props_changed,
+        text_props_changed,
+    })
+}
+
+pub fn prepare_test_renderer_host_output_unmount_canary_fibers<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    render: HostRootRenderPhaseRecord,
+    current: TestRendererHostOutputCanaryCurrentFibers,
+) -> Result<TestRendererHostOutputCanaryDeletedFibers, TestRendererHostOutputCanaryError> {
+    validate_test_renderer_host_output_canary_current(store, render, current)?;
+    if render.resulting_element().is_some() {
+        return Err(TestRendererHostOutputCanaryError::ExpectedUnmountRender {
+            root: render.root(),
+            actual: render.resulting_element(),
+        });
+    }
+
+    store
+        .fiber_arena_mut()
+        .set_children(render.work_in_progress(), &[])?;
+    store
+        .fiber_arena_mut()
+        .mark_child_for_deletion(render.work_in_progress(), current.component())?;
+    refresh_test_renderer_host_output_canary_bubbled_flags(store, render.work_in_progress())?;
+
+    let component_deletion_token = store.host_tokens_mut().issue(
+        render.root(),
+        current.component(),
+        HostFiberTokenPhase::Deletion,
+        HostFiberTokenTarget::Instance,
+    );
+    store.host_tokens().validate(
+        component_deletion_token,
+        render.root(),
+        current.component(),
+        HostFiberTokenPhase::Deletion,
+        HostFiberTokenTarget::Instance,
+    )?;
+
+    Ok(TestRendererHostOutputCanaryDeletedFibers {
+        current,
+        host_root: render.work_in_progress(),
+        render_lanes: render.render_lanes(),
+        component_deletion_token,
+    })
+}
+
 fn complete_test_renderer_host_output_canary_fiber<H: HostTypes>(
     store: &mut FiberRootStore<H>,
     fiber: FiberId,
@@ -692,6 +1170,49 @@ fn complete_test_renderer_host_output_canary_fiber<H: HostTypes>(
     let node = store.fiber_arena_mut().get_mut(fiber)?;
     node.set_state_node(state_node);
     node.set_memoized_props(props);
+    node.set_child_lanes(bubbled.child_lanes());
+    node.set_subtree_flags(bubbled.subtree_flags());
+    Ok(())
+}
+
+fn validate_test_renderer_host_output_canary_current<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    render: HostRootRenderPhaseRecord,
+    current: TestRendererHostOutputCanaryCurrentFibers,
+) -> Result<(), TestRendererHostOutputCanaryError> {
+    expect_test_renderer_host_output_canary_tag(
+        store,
+        render.work_in_progress(),
+        FiberTag::HostRoot,
+    )?;
+    if current.root() != render.root() {
+        return Err(TestRendererHostOutputCanaryError::RootMismatch {
+            expected: current.root(),
+            actual: render.root(),
+        });
+    }
+    if current.host_root() != render.current() {
+        return Err(TestRendererHostOutputCanaryError::ExpectedCurrentHostRoot {
+            expected: render.current(),
+            actual: current.host_root(),
+        });
+    }
+    expect_test_renderer_host_output_canary_tag(store, current.host_root(), FiberTag::HostRoot)?;
+    expect_test_renderer_host_output_canary_tag(
+        store,
+        current.component(),
+        FiberTag::HostComponent,
+    )?;
+    expect_test_renderer_host_output_canary_tag(store, current.text(), FiberTag::HostText)?;
+    Ok(())
+}
+
+fn refresh_test_renderer_host_output_canary_bubbled_flags<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    fiber: FiberId,
+) -> Result<(), TestRendererHostOutputCanaryError> {
+    let bubbled = bubble_properties(store.fiber_arena(), fiber)?;
+    let node = store.fiber_arena_mut().get_mut(fiber)?;
     node.set_child_lanes(bubbled.child_lanes());
     node.set_subtree_flags(bubbled.subtree_flags());
     Ok(())
