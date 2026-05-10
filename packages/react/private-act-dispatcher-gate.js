@@ -24,6 +24,8 @@ const rendererBackedActDrainDiagnosticsStatus =
   'private-renderer-backed-act-drain-diagnostics';
 const rendererBackedActDrainConsumptionStatus =
   'consumed-accepted-renderer-backed-act-drain-diagnostics';
+const schedulerPostTaskYieldActRootHandoffConsumptionStatus =
+  'consumed-accepted-scheduler-post-task-yield-act-root-handoff-diagnostics';
 const acceptedActQueueMetadataKind =
   'fast-react.react.act-queue-metadata';
 const acceptedActQueueMetadataVersion = 1;
@@ -73,6 +75,52 @@ const acceptedRendererBackedActDrainRendererRecords = Object.freeze([
   'TestRendererCommittedFiberTreeInspection'
 ]);
 const schedulerCompatibilityTarget = 'scheduler@0.27.0';
+const privatePostTaskPriorityDiagnosticsStatus =
+  'private-scheduler-post-task-priority-diagnostics';
+const privatePostTaskPriorityDiagnosticsVersion = 1;
+const privatePostTaskPriorityDiagnosticsExport =
+  '__FAST_REACT_PRIVATE_POST_TASK_PRIORITY_DIAGNOSTICS__';
+const privatePostTaskPriorityDiagnosticsSymbolDescription =
+  'fast-react.scheduler.unstable_post_task.priority-diagnostics';
+const privatePostTaskRootContinuationExecutionRouteStatus =
+  'private-scheduler-post-task-root-continuation-execution-route';
+const privatePostTaskPendingRootContinuationExecutionStatus =
+  'pending-private-root-continuation-execution-route';
+const privatePostTaskActRootWorkHandoffStatus =
+  'accepted-private-scheduler-post-task-act-root-work-handoff';
+const privatePostTaskActRootWorkHandoffKind =
+  'fast-react.scheduler.post_task.private-act-root-work-handoff';
+const privatePostTaskActRootWorkHandoffVersion = 1;
+const privatePostTaskAcceptedRootWorkRecordKinds = Object.freeze([
+  'RootLaneSchedulingSnapshot',
+  'RootTaskScheduleRecord'
+]);
+const privatePostTaskBlockedTrueKeys = Object.freeze([
+  'browserPostTaskCompatibilityClaimed',
+  'browserTaskOrderingCompatibilityClaimed',
+  'publicSchedulerTimingCompatibilityClaimed',
+  'publicReactActCompatibilityClaimed',
+  'publicRootSchedulerCompatibilityClaimed',
+  'publicRendererCompatibilityClaimed',
+  'publicCompatibilityClaimed',
+  'compatibilityClaimed',
+  'packageCompatibilityClaimed',
+  'rawTimingCaptured',
+  'drainsPublicSchedulerTaskQueue',
+  'drainsPublicReactActQueue',
+  'executesQueuedWork',
+  'executesEffects',
+  'executesRendererWork',
+  'executesRendererRoots',
+  'publicRootExecution',
+  'publicSchedulerFlush',
+  'rendererWorkExecuted',
+  'reconcilerWorkExecuted',
+  'nativeRendererWorkExecuted'
+]);
+const privatePostTaskBlockedTrueKeySet = new Set(
+  privatePostTaskBlockedTrueKeys
+);
 const privateActQueueTestQueueKind =
   'fast-react.react.private-act-queue-test-queue';
 const privateActQueueTestTaskKind =
@@ -108,6 +156,20 @@ function hasExactStringSet(value, expectedValues) {
   }
 
   return expectedValues.every((expectedValue) => valueSet.has(expectedValue));
+}
+
+function hasExactStringList(value, expectedValues) {
+  if (!Array.isArray(value) || value.length !== expectedValues.length) {
+    return false;
+  }
+
+  for (let index = 0; index < expectedValues.length; index++) {
+    if (value[index] !== expectedValues[index]) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function includesString(value, expectedValues) {
@@ -146,6 +208,8 @@ function isAcceptedActQueueMetadata(metadata) {
     metadata.rendererBackedActDrainDiagnosticVersion ===
       privateRendererBackedActDrainDiagnosticVersion &&
     metadata.drainsAcceptedRendererBackedActDiagnostics === true &&
+    metadata.schedulerPostTaskYieldActRootHandoffDiagnosticsReady === true &&
+    metadata.consumesSchedulerPostTaskYieldActRootHandoffDiagnostics === true &&
     metadata.publicSchedulerTimingCompatibilityClaimed === false &&
     metadata.publicReactActCompatibilityClaimed === false &&
     metadata.executesQueuedWork === false &&
@@ -218,6 +282,8 @@ function createActQueueMetadata(overrides = {}) {
     rendererBackedActDrainDiagnosticVersion:
       privateRendererBackedActDrainDiagnosticVersion,
     drainsAcceptedRendererBackedActDiagnostics: true,
+    schedulerPostTaskYieldActRootHandoffDiagnosticsReady: true,
+    consumesSchedulerPostTaskYieldActRootHandoffDiagnostics: true,
     acceptedRendererBackedActDrainRenderers,
     acceptedRendererBackedActDrainSchedulerRecords,
     acceptedRendererBackedActDrainReconcilerRecords,
@@ -598,6 +664,700 @@ function frozenStringArray(value, fallback) {
   return Object.freeze([...array]);
 }
 
+function findPrivatePostTaskBlockedTrueClaim(value, path, seen) {
+  if (value === null || typeof value !== 'object') {
+    return null;
+  }
+  if (seen.has(value)) {
+    return null;
+  }
+
+  seen.add(value);
+
+  const keys = Object.keys(value);
+  for (let index = 0; index < keys.length; index++) {
+    const key = keys[index];
+    const nextPath = `${path}.${key}`;
+    if (privatePostTaskBlockedTrueKeySet.has(key) && value[key] === true) {
+      return Object.freeze({
+        reason: 'public-or-execution-claim',
+        claimName: key,
+        claimPath: nextPath,
+        claimValue: true
+      });
+    }
+
+    const nested = findPrivatePostTaskBlockedTrueClaim(
+      value[key],
+      nextPath,
+      seen
+    );
+    if (nested !== null) {
+      return nested;
+    }
+  }
+
+  return null;
+}
+
+function rejectSchedulerPostTaskYieldActRootHandoffDiagnostics(
+  reason,
+  details = {}
+) {
+  return Object.freeze({
+    reason,
+    ...details
+  });
+}
+
+function rejectMutablePrivatePostTaskDiagnostics(mutablePath) {
+  return rejectSchedulerPostTaskYieldActRootHandoffDiagnostics(
+    'mutable-private-post-task-diagnostics',
+    {
+      mutablePath
+    }
+  );
+}
+
+function validateFrozenPrivatePostTaskDiagnosticValue(value, mutablePath) {
+  if (isObjectLike(value) && !Object.isFrozen(value)) {
+    return rejectMutablePrivatePostTaskDiagnostics(mutablePath);
+  }
+
+  return null;
+}
+
+function isAcceptedPrivatePostTaskPriorityTimeout(priorityTimeout) {
+  return (
+    isObjectLike(priorityTimeout) &&
+    priorityTimeout.status ===
+      'scheduler-post-task-private-priority-timeout-diagnostics' &&
+    priorityTimeout.priorityLevel === 4 &&
+    priorityTimeout.schedulerPriorityName === 'unstable_LowPriority' &&
+    priorityTimeout.recognizedPriority === true &&
+    priorityTimeout.timeoutMs === 10000 &&
+    priorityTimeout.timeoutReason === 'low-priority-timeout' &&
+    priorityTimeout.timeoutClassification === 'finite-priority-timeout' &&
+    priorityTimeout.didTimeoutArgument === false &&
+    priorityTimeout.didTimeoutSource ===
+      'scheduler-post-task-deprecated-didTimeout-is-always-false' &&
+    priorityTimeout.expiresAt === null &&
+    priorityTimeout.rawTimingCaptured === false &&
+    priorityTimeout.browserPostTaskCompatibilityClaimed === false &&
+    priorityTimeout.browserTaskOrderingCompatibilityClaimed === false &&
+    priorityTimeout.publicSchedulerTimingCompatibilityClaimed === false &&
+    priorityTimeout.compatibilityClaimed === false
+  );
+}
+
+function matchesPrivatePostTaskPriorityTimeout(priorityTimeout, expected) {
+  return (
+    isAcceptedPrivatePostTaskPriorityTimeout(priorityTimeout) &&
+    isAcceptedPrivatePostTaskPriorityTimeout(expected) &&
+    priorityTimeout.status === expected.status &&
+    priorityTimeout.priorityLevel === expected.priorityLevel &&
+    priorityTimeout.schedulerPriorityName ===
+      expected.schedulerPriorityName &&
+    priorityTimeout.recognizedPriority === expected.recognizedPriority &&
+    priorityTimeout.timeoutMs === expected.timeoutMs &&
+    priorityTimeout.timeoutReason === expected.timeoutReason &&
+    priorityTimeout.timeoutClassification ===
+      expected.timeoutClassification &&
+    priorityTimeout.didTimeoutArgument === expected.didTimeoutArgument &&
+    priorityTimeout.didTimeoutSource === expected.didTimeoutSource &&
+    priorityTimeout.expiresAt === expected.expiresAt &&
+    priorityTimeout.rawTimingCaptured === expected.rawTimingCaptured &&
+    priorityTimeout.browserPostTaskCompatibilityClaimed ===
+      expected.browserPostTaskCompatibilityClaimed &&
+    priorityTimeout.browserTaskOrderingCompatibilityClaimed ===
+      expected.browserTaskOrderingCompatibilityClaimed &&
+    priorityTimeout.publicSchedulerTimingCompatibilityClaimed ===
+      expected.publicSchedulerTimingCompatibilityClaimed &&
+    priorityTimeout.compatibilityClaimed === expected.compatibilityClaimed
+  );
+}
+
+function matchesPrivatePostTaskDelay(delay, expected) {
+  return (
+    isObjectLike(delay) &&
+    isObjectLike(expected) &&
+    delay.hasDelayProperty === expected.hasDelayProperty &&
+    delay.type === expected.type &&
+    delay.value === expected.value &&
+    delay.normalizedDelayType === expected.normalizedDelayType &&
+    delay.normalizedDelayValue === expected.normalizedDelayValue &&
+    delay.delayClassification === expected.delayClassification &&
+    delay.browserPostTaskCompatibilityClaimed === false &&
+    delay.publicSchedulerTimingCompatibilityClaimed === false &&
+    delay.compatibilityClaimed === false
+  );
+}
+
+function isAcceptedSchedulerPostTaskYieldFallbackEnvironment(
+  fallbackEnvironment
+) {
+  return (
+    isObjectLike(fallbackEnvironment) &&
+    fallbackEnvironment.status ===
+      'controlled-shim-fallback-environment-classification' &&
+    fallbackEnvironment.environmentKind ===
+      'controlled-task-scheduling-api-shim' &&
+    fallbackEnvironment.classification ===
+      'controlled-shim-scheduler-yield-continuation' &&
+    fallbackEnvironment.selectedFallback === 'scheduler.yield' &&
+    fallbackEnvironment.hasSchedulerPostTask === true &&
+    fallbackEnvironment.hasSchedulerYield === true &&
+    fallbackEnvironment.usesSchedulerYield === true &&
+    fallbackEnvironment.usesSchedulerPostTaskFallback === false &&
+    fallbackEnvironment.browserPostTaskCompatibilityClaimed === false &&
+    fallbackEnvironment.browserTaskOrderingCompatibilityClaimed === false &&
+    fallbackEnvironment.publicSchedulerTimingCompatibilityClaimed === false &&
+    fallbackEnvironment.compatibilityClaimed === false
+  );
+}
+
+function validateSchedulerPostTaskYieldCallbackRuns(diagnostics) {
+  const expectedRuns = [
+    {
+      diagnosticEventIndex: 1,
+      continuationStatus: 'scheduled-continuation-fallback',
+      returnedContinuationType: 'function',
+      callbackRunCountAtReturn: 1,
+      continuationFallbackCountAtReturn: 0,
+      continuationFallbackIndex: 0,
+      expectsFallbackEnvironment: true
+    },
+    {
+      diagnosticEventIndex: 3,
+      continuationStatus: 'completed-without-continuation',
+      returnedContinuationType: 'undefined',
+      callbackRunCountAtReturn: 2,
+      continuationFallbackCountAtReturn: 1,
+      continuationFallbackIndex: null,
+      expectsFallbackEnvironment: false
+    }
+  ];
+
+  for (let index = 0; index < diagnostics.callbackRuns.length; index++) {
+    const callbackRun = diagnostics.callbackRuns[index];
+    const expectedRun = expectedRuns[index];
+    const callbackRunPath = `diagnostics.callbackRuns.${index}`;
+    const callbackRunMutableValidation =
+      validateFrozenPrivatePostTaskDiagnosticValue(
+        callbackRun,
+        callbackRunPath
+      );
+    if (callbackRunMutableValidation !== null) {
+      return callbackRunMutableValidation;
+    }
+
+    if (
+      !isObjectLike(callbackRun) ||
+      callbackRun.status !== 'ran-shimmed-post-task-callback' ||
+      callbackRun.diagnosticEventIndex !==
+        expectedRun.diagnosticEventIndex ||
+      callbackRun.runIndex !== index ||
+      callbackRun.priorityLevel !== 4 ||
+      callbackRun.postTaskPriority !== 'user-visible' ||
+      callbackRun.currentPriorityLevel !== 4 ||
+      callbackRun.didTimeout !== false ||
+      callbackRun.didTimeoutSource !==
+        'scheduler-post-task-deprecated-didTimeout-is-always-false' ||
+      callbackRun.shouldYieldAtStart !== false ||
+      callbackRun.continuationStatus !== expectedRun.continuationStatus ||
+      callbackRun.returnedContinuationType !==
+        expectedRun.returnedContinuationType ||
+      callbackRun.callbackRunCountAtReturn !==
+        expectedRun.callbackRunCountAtReturn ||
+      callbackRun.continuationFallbackCountAtReturn !==
+        expectedRun.continuationFallbackCountAtReturn ||
+      callbackRun.continuationFallbackIndex !==
+        expectedRun.continuationFallbackIndex
+    ) {
+      return rejectSchedulerPostTaskYieldActRootHandoffDiagnostics(
+        'ambiguous-post-task-report'
+      );
+    }
+
+    for (const [value, mutablePath] of [
+      [callbackRun.scheduledDelay, `${callbackRunPath}.scheduledDelay`],
+      [callbackRun.priorityTimeout, `${callbackRunPath}.priorityTimeout`],
+      [callbackRun.signal, `${callbackRunPath}.signal`]
+    ]) {
+      const mutableValidation =
+        validateFrozenPrivatePostTaskDiagnosticValue(value, mutablePath);
+      if (mutableValidation !== null) {
+        return mutableValidation;
+      }
+    }
+
+    if (
+      !matchesPrivatePostTaskDelay(
+        callbackRun.scheduledDelay,
+        diagnostics.schedule.delay
+      ) ||
+      !matchesPrivatePostTaskPriorityTimeout(
+        callbackRun.priorityTimeout,
+        diagnostics.priorityTimeout
+      ) ||
+      !isObjectLike(callbackRun.signal) ||
+      callbackRun.signal.priority !== 'user-visible' ||
+      callbackRun.signal.aborted !== false ||
+      !hasExactStringList(callbackRun.signal.ownKeys, [
+        'id',
+        'aborted',
+        'priority'
+      ])
+    ) {
+      return rejectSchedulerPostTaskYieldActRootHandoffDiagnostics(
+        'ambiguous-post-task-report'
+      );
+    }
+
+    if (expectedRun.expectsFallbackEnvironment) {
+      const mutableValidation =
+        validateFrozenPrivatePostTaskDiagnosticValue(
+          callbackRun.fallbackEnvironmentClassification,
+          `${callbackRunPath}.fallbackEnvironmentClassification`
+        );
+      if (mutableValidation !== null) {
+        return mutableValidation;
+      }
+      if (
+        !isAcceptedSchedulerPostTaskYieldFallbackEnvironment(
+          callbackRun.fallbackEnvironmentClassification
+        )
+      ) {
+        return rejectSchedulerPostTaskYieldActRootHandoffDiagnostics(
+          'ambiguous-post-task-report'
+        );
+      }
+    } else if (callbackRun.fallbackEnvironmentClassification !== null) {
+      return rejectSchedulerPostTaskYieldActRootHandoffDiagnostics(
+        'ambiguous-post-task-report'
+      );
+    }
+  }
+
+  return null;
+}
+
+function validateSchedulerPostTaskYieldActRootHandoffDiagnostics(
+  diagnostics
+) {
+  if (
+    !isObjectLike(diagnostics) ||
+    !Object.isFrozen(diagnostics) ||
+    diagnostics.status !== privatePostTaskPriorityDiagnosticsStatus ||
+    diagnostics.version !== privatePostTaskPriorityDiagnosticsVersion ||
+    diagnostics.exportName !== privatePostTaskPriorityDiagnosticsExport ||
+    diagnostics.symbolDescription !==
+      privatePostTaskPriorityDiagnosticsSymbolDescription ||
+    diagnostics.entrypoint !== 'scheduler/unstable_post_task' ||
+    diagnostics.compatibilityTarget !== schedulerCompatibilityTarget ||
+    diagnostics.diagnosticKind !== 'shimmed-task-controller-priority'
+  ) {
+    return rejectSchedulerPostTaskYieldActRootHandoffDiagnostics(
+      'private-post-task-diagnostics-shape'
+    );
+  }
+
+  const blockedClaim = findPrivatePostTaskBlockedTrueClaim(
+    diagnostics,
+    'diagnostics',
+    new Set()
+  );
+  if (blockedClaim !== null) {
+    return blockedClaim;
+  }
+
+  for (const [value, mutablePath] of [
+    [diagnostics.priorityMapping, 'diagnostics.priorityMapping'],
+    [diagnostics.priorityTimeout, 'diagnostics.priorityTimeout'],
+    [diagnostics.schedule, 'diagnostics.schedule'],
+    [
+      diagnostics.schedule ? diagnostics.schedule.delay : null,
+      'diagnostics.schedule.delay'
+    ]
+  ]) {
+    const mutableValidation =
+      validateFrozenPrivatePostTaskDiagnosticValue(value, mutablePath);
+    if (mutableValidation !== null) {
+      return mutableValidation;
+    }
+  }
+
+  if (
+    diagnostics.environmentCapabilityDiagnostics !== true ||
+    diagnostics.priorityMappingDiagnostics !== true ||
+    diagnostics.priorityTimeoutDiagnostics !== true ||
+    diagnostics.continuationFallbackDiagnostics !== true ||
+    diagnostics.continuationFallbackMetadataDiagnostics !== true ||
+    diagnostics.continuationSignalValidationDiagnostics !== true ||
+    diagnostics.rootContinuationExecutionRouteDiagnostics !== true ||
+    diagnostics.fallbackEnvironmentClassificationDiagnostics !== true ||
+    diagnostics.actRootWorkHandoffDiagnostics !== true
+  ) {
+    return rejectSchedulerPostTaskYieldActRootHandoffDiagnostics(
+      'private-post-task-diagnostics-shape'
+    );
+  }
+
+  const environment = diagnostics.environmentCapabilities;
+  if (
+    !isObjectLike(environment) ||
+    !Object.isFrozen(environment) ||
+    environment.status !== 'controlled-task-scheduling-api-capability-snapshot' ||
+    environment.hasSchedulerPostTask !== true ||
+    environment.hasSchedulerYield !== true ||
+    !hasExactStringSet(environment.schedulerOwnKeys, ['postTask', 'yield'])
+  ) {
+    return rejectSchedulerPostTaskYieldActRootHandoffDiagnostics(
+      'scheduler-yield-not-selected'
+    );
+  }
+
+  if (
+    !isObjectLike(diagnostics.priorityMapping) ||
+    diagnostics.priorityMapping.priorityLevel !== 4 ||
+    diagnostics.priorityMapping.schedulerPriorityName !==
+      'unstable_LowPriority' ||
+    diagnostics.priorityMapping.postTaskPriority !== 'user-visible' ||
+    diagnostics.priorityMapping.taskControllerPriority !== 'user-visible' ||
+    diagnostics.priorityMapping.recognizedPriority !== true
+  ) {
+    return rejectSchedulerPostTaskYieldActRootHandoffDiagnostics(
+      'ambiguous-post-task-report'
+    );
+  }
+
+  if (
+    !isAcceptedPrivatePostTaskPriorityTimeout(diagnostics.priorityTimeout)
+  ) {
+    return rejectSchedulerPostTaskYieldActRootHandoffDiagnostics(
+      'ambiguous-post-task-report'
+    );
+  }
+
+  if (
+    !isObjectLike(diagnostics.schedule) ||
+    !isObjectLike(diagnostics.schedule.delay) ||
+    diagnostics.schedule.delay.value !== 17 ||
+    diagnostics.schedule.delay.delayClassification !== 'delayed-task'
+  ) {
+    return rejectSchedulerPostTaskYieldActRootHandoffDiagnostics(
+      'ambiguous-post-task-report'
+    );
+  }
+
+  if (
+    !Array.isArray(diagnostics.callbackRuns) ||
+    diagnostics.callbackRuns.length !== 2 ||
+    !Array.isArray(diagnostics.continuationFallbacks) ||
+    diagnostics.continuationFallbacks.length !== 1
+  ) {
+    return rejectSchedulerPostTaskYieldActRootHandoffDiagnostics(
+      'ambiguous-post-task-report'
+    );
+  }
+
+  for (const [value, mutablePath] of [
+    [diagnostics.callbackRuns, 'diagnostics.callbackRuns'],
+    [diagnostics.continuationFallbacks, 'diagnostics.continuationFallbacks']
+  ]) {
+    const mutableValidation =
+      validateFrozenPrivatePostTaskDiagnosticValue(value, mutablePath);
+    if (mutableValidation !== null) {
+      return mutableValidation;
+    }
+  }
+
+  const callbackRunsValidation =
+    validateSchedulerPostTaskYieldCallbackRuns(diagnostics);
+  if (callbackRunsValidation !== null) {
+    return callbackRunsValidation;
+  }
+
+  const continuation = diagnostics.continuationFallbacks[0];
+  const route = diagnostics.rootContinuationExecutionRoute;
+  const handoff =
+    route && isObjectLike(route) ? route.actRootWorkHandoff : null;
+
+  if (
+    !isObjectLike(continuation) ||
+    !Object.isFrozen(continuation) ||
+    !isObjectLike(route) ||
+    !Object.isFrozen(route) ||
+    !isObjectLike(handoff) ||
+    !Object.isFrozen(handoff)
+  ) {
+    return rejectSchedulerPostTaskYieldActRootHandoffDiagnostics(
+      'ambiguous-post-task-report'
+    );
+  }
+
+  if (
+    continuation.status !== 'scheduled-shimmed-post-task-continuation' ||
+    continuation.fallback !== 'scheduler.yield' ||
+    continuation.continuationStatus !== 'scheduled-continuation-fallback' ||
+    continuation.continuationIndex !== 0 ||
+    continuation.sourceCallbackRunIndex !== 0 ||
+    continuation.callbackRunCountAtSchedule !== 1
+  ) {
+    return rejectSchedulerPostTaskYieldActRootHandoffDiagnostics(
+      'stale-continuation-evidence'
+    );
+  }
+
+  const continuationMetadata = continuation.continuationMetadata;
+  const fallbackEnvironment =
+    continuation.fallbackEnvironmentClassification;
+  for (const [value, mutablePath] of [
+    [
+      continuationMetadata,
+      'diagnostics.continuationFallbacks.0.continuationMetadata'
+    ],
+    [
+      fallbackEnvironment,
+      'diagnostics.continuationFallbacks.0.fallbackEnvironmentClassification'
+    ],
+    [
+      route.privateRootContinuationExecution,
+      'diagnostics.rootContinuationExecutionRoute.privateRootContinuationExecution'
+    ],
+    [
+      handoff.priorityTimeout,
+      'diagnostics.rootContinuationExecutionRoute.actRootWorkHandoff.priorityTimeout'
+    ],
+    [
+      handoff.delay,
+      'diagnostics.rootContinuationExecutionRoute.actRootWorkHandoff.delay'
+    ],
+    [
+      handoff.actQueueHandoff,
+      'diagnostics.rootContinuationExecutionRoute.actRootWorkHandoff.actQueueHandoff'
+    ],
+    [
+      handoff.actQueueHandoff
+        ? handoff.actQueueHandoff.priorityTimeout
+        : null,
+      'diagnostics.rootContinuationExecutionRoute.actRootWorkHandoff.actQueueHandoff.priorityTimeout'
+    ],
+    [
+      handoff.rootWorkRecords,
+      'diagnostics.rootContinuationExecutionRoute.actRootWorkHandoff.rootWorkRecords'
+    ]
+  ]) {
+    const mutableValidation =
+      validateFrozenPrivatePostTaskDiagnosticValue(value, mutablePath);
+    if (mutableValidation !== null) {
+      return mutableValidation;
+    }
+  }
+
+  if (
+    !isObjectLike(continuationMetadata) ||
+    continuationMetadata.status !== 'shimmed-post-task-continuation-metadata' ||
+    continuationMetadata.selectedFallback !== 'scheduler.yield' ||
+    continuationMetadata.schedulerYieldAvailableAtSchedule !== true ||
+    continuationMetadata.schedulerPostTaskAvailableAtSchedule !== true ||
+    continuationMetadata.fallbackEnvironmentClassification !==
+      'controlled-shim-scheduler-yield-continuation' ||
+    continuationMetadata.fallbackEnvironmentKind !==
+      'controlled-task-scheduling-api-shim' ||
+    continuationMetadata.actRootWorkHandoffKind !==
+      privatePostTaskActRootWorkHandoffKind ||
+    continuationMetadata.actRootWorkHandoffStatus !==
+      privatePostTaskActRootWorkHandoffStatus ||
+    continuationMetadata.actRootWorkHandoffAccepted !== true ||
+    continuationMetadata.actRootWorkRecordCount !== 2 ||
+    continuationMetadata.delayedCallbackPathAccepted !== true ||
+    !isObjectLike(fallbackEnvironment) ||
+    fallbackEnvironment.status !==
+      'controlled-shim-fallback-environment-classification' ||
+    fallbackEnvironment.environmentKind !==
+      'controlled-task-scheduling-api-shim' ||
+    fallbackEnvironment.classification !==
+      'controlled-shim-scheduler-yield-continuation' ||
+    fallbackEnvironment.selectedFallback !== 'scheduler.yield' ||
+    fallbackEnvironment.usesSchedulerYield !== true ||
+    fallbackEnvironment.usesSchedulerPostTaskFallback !== false
+  ) {
+    return rejectSchedulerPostTaskYieldActRootHandoffDiagnostics(
+      'scheduler-yield-not-selected'
+    );
+  }
+
+  if (
+    route.status !== privatePostTaskRootContinuationExecutionRouteStatus ||
+    route.routeVersion !== 1 ||
+    route.routeStatus !==
+      privatePostTaskPendingRootContinuationExecutionStatus ||
+    route.accepted !== true ||
+    route.rejected !== false ||
+    route.continuationIndex !== continuation.continuationIndex ||
+    route.continuationDiagnosticEventIndex !==
+      continuation.diagnosticEventIndex ||
+    route.sourceCallbackRunIndex !== continuation.sourceCallbackRunIndex ||
+    route.callbackRunCountAtSchedule !==
+      continuation.callbackRunCountAtSchedule ||
+    route.fallback !== 'scheduler.yield' ||
+    route.hasActRootWorkHandoff !== true
+  ) {
+    return rejectSchedulerPostTaskYieldActRootHandoffDiagnostics(
+      'stale-continuation-evidence'
+    );
+  }
+
+  if (
+    handoff.status !== privatePostTaskActRootWorkHandoffStatus ||
+    handoff.handoffKind !== privatePostTaskActRootWorkHandoffKind ||
+    handoff.handoffVersion !== privatePostTaskActRootWorkHandoffVersion ||
+    handoff.entrypoint !== 'scheduler/unstable_post_task' ||
+    handoff.compatibilityTarget !== schedulerCompatibilityTarget ||
+    handoff.reactCompatibilityTarget !== compatibilityTarget ||
+    handoff.routeStatus !==
+      privatePostTaskPendingRootContinuationExecutionStatus ||
+    handoff.accepted !== true ||
+    handoff.rejected !== false ||
+    handoff.continuationIndex !== continuation.continuationIndex ||
+    handoff.continuationDiagnosticEventIndex !==
+      continuation.diagnosticEventIndex ||
+    handoff.sourceCallbackRunIndex !== continuation.sourceCallbackRunIndex ||
+    handoff.callbackRunCountAtSchedule !==
+      continuation.callbackRunCountAtSchedule ||
+    !matchesPrivatePostTaskPriorityTimeout(
+      handoff.priorityTimeout,
+      diagnostics.priorityTimeout
+    ) ||
+    handoff.delayedCallbackPathAccepted !== true ||
+    !isObjectLike(handoff.delay) ||
+    handoff.delay.value !== 17 ||
+    handoff.delay.delayClassification !== 'delayed-task' ||
+    handoff.actQueueHandoffOnly !== true ||
+    handoff.rootWorkMetadataOnly !== true ||
+    handoff.rendererWorkExecutionBlocked !== true
+  ) {
+    return rejectSchedulerPostTaskYieldActRootHandoffDiagnostics(
+      'private-post-task-handoff-shape'
+    );
+  }
+
+  if (
+    !isObjectLike(handoff.actQueueHandoff) ||
+    handoff.actQueueHandoff.status !==
+      'accepted-private-scheduler-post-task-act-queue-handoff' ||
+    handoff.actQueueHandoff.recordKind !== 'SchedulerActQueueRequest' ||
+    handoff.actQueueHandoff.taskKind !== 'RootSchedule' ||
+    handoff.actQueueHandoff.continuationStatus !== 'PendingContinuation' ||
+    handoff.actQueueHandoff.accepted !== true ||
+    !matchesPrivatePostTaskPriorityTimeout(
+      handoff.actQueueHandoff.priorityTimeout,
+      handoff.priorityTimeout
+    ) ||
+    handoff.actQueueHandoff.actQueueHandoffOnly !== true ||
+    handoff.actQueueHandoff.rootWorkMetadataOnly !== true
+  ) {
+    return rejectSchedulerPostTaskYieldActRootHandoffDiagnostics(
+      'private-post-task-handoff-shape'
+    );
+  }
+
+  if (
+    !Array.isArray(handoff.rootWorkRecords) ||
+    handoff.rootWorkRecords.length !==
+      privatePostTaskAcceptedRootWorkRecordKinds.length ||
+    !hasExactStringList(
+      handoff.rootWorkRecords.map((record) => record.recordKind),
+      privatePostTaskAcceptedRootWorkRecordKinds
+    )
+  ) {
+    return rejectSchedulerPostTaskYieldActRootHandoffDiagnostics(
+      'ambiguous-post-task-report'
+    );
+  }
+
+  for (let index = 0; index < handoff.rootWorkRecords.length; index++) {
+    const rootWorkRecord = handoff.rootWorkRecords[index];
+    const mutableValidation = validateFrozenPrivatePostTaskDiagnosticValue(
+      rootWorkRecord,
+      `diagnostics.rootContinuationExecutionRoute.actRootWorkHandoff.rootWorkRecords.${index}`
+    );
+    if (mutableValidation !== null) {
+      return mutableValidation;
+    }
+
+    const priorityTimeoutMutableValidation =
+      validateFrozenPrivatePostTaskDiagnosticValue(
+        rootWorkRecord ? rootWorkRecord.priorityTimeout : null,
+        `diagnostics.rootContinuationExecutionRoute.actRootWorkHandoff.rootWorkRecords.${index}.priorityTimeout`
+      );
+    if (priorityTimeoutMutableValidation !== null) {
+      return priorityTimeoutMutableValidation;
+    }
+
+    if (
+      !isObjectLike(rootWorkRecord) ||
+      rootWorkRecord.accepted !== true ||
+      rootWorkRecord.rootId !== 'post-task-delayed-continuation-root' ||
+      rootWorkRecord.rootLabel !==
+        'scheduler-post-task-delayed-continuation-root' ||
+      rootWorkRecord.lane !== 'PostTaskContinuationLane' ||
+      rootWorkRecord.laneLabel !== 'PostTaskContinuationLane' ||
+      rootWorkRecord.continuationIndex !== continuation.continuationIndex ||
+      rootWorkRecord.sourceCallbackRunIndex !==
+        continuation.sourceCallbackRunIndex ||
+      rootWorkRecord.priorityLevel !== 4 ||
+      rootWorkRecord.schedulerPriorityName !== 'unstable_LowPriority' ||
+      !matchesPrivatePostTaskPriorityTimeout(
+        rootWorkRecord.priorityTimeout,
+        handoff.priorityTimeout
+      ) ||
+      rootWorkRecord.postTaskPriority !== 'user-visible' ||
+      rootWorkRecord.delayedCallbackPath !== true ||
+      rootWorkRecord.rendererWorkExecutionBlocked !== true ||
+      rootWorkRecord.rootWorkMetadataOnly !== true
+    ) {
+      return rejectSchedulerPostTaskYieldActRootHandoffDiagnostics(
+        'private-post-task-handoff-shape',
+        {
+          rootWorkRecordIndex: index
+        }
+      );
+    }
+  }
+
+  const privateExecution = route.privateRootContinuationExecution;
+  if (
+    !isObjectLike(privateExecution) ||
+    privateExecution.status !==
+      privatePostTaskPendingRootContinuationExecutionStatus ||
+    privateExecution.routeSelected !== true ||
+    privateExecution.continuationIndex !== continuation.continuationIndex ||
+    privateExecution.sourceCallbackRunIndex !==
+      continuation.sourceCallbackRunIndex ||
+    privateExecution.callbackRunCountAtSchedule !==
+      continuation.callbackRunCountAtSchedule ||
+    privateExecution.continuationFallbackCountAtSchedule !== 1 ||
+    privateExecution.continuationCallbackExecuted !== false
+  ) {
+    return rejectSchedulerPostTaskYieldActRootHandoffDiagnostics(
+      'stale-continuation-evidence'
+    );
+  }
+
+  return null;
+}
+
+function isAcceptedSchedulerPostTaskYieldActRootHandoffDiagnostics(
+  diagnostics
+) {
+  return (
+    validateSchedulerPostTaskYieldActRootHandoffDiagnostics(diagnostics) ===
+    null
+  );
+}
+
 function isAcceptedRendererBackedActDrainDiagnostics(diagnostics) {
   return (
     isObjectLike(diagnostics) &&
@@ -777,6 +1537,28 @@ function createRendererBackedActDrainDiagnosticsGateError(reason) {
   return error;
 }
 
+function createSchedulerPostTaskYieldActRootHandoffDiagnosticsGateError(
+  reason,
+  details
+) {
+  const error = createUnimplementedError(
+    entrypoint,
+    `${privateActDispatcherGateExport}.consumeSchedulerPostTaskYieldActRootHandoffDiagnostics`,
+    'rejected Scheduler postTask scheduler.yield act/root handoff diagnostics',
+    'Only the accepted private scheduler.yield postTask act/root handoff diagnostics can pass this package-private gate.'
+  );
+  error.reason = reason;
+  error.details = details || null;
+  error.publicCompatibilityClaimed = false;
+  error.browserPostTaskCompatibilityClaimed = false;
+  error.browserTaskOrderingCompatibilityClaimed = false;
+  error.publicSchedulerTimingCompatibilityClaimed = false;
+  error.publicReactActCompatibilityClaimed = false;
+  error.publicRootSchedulerCompatibilityClaimed = false;
+  error.publicRendererCompatibilityClaimed = false;
+  return error;
+}
+
 function markPrivateActDispatcher(dispatcher) {
   if (!isAcceptedActQueueMetadata(getDispatcherActQueueMetadata(dispatcher))) {
     throw createPrivateActDispatcherGateError();
@@ -866,6 +1648,80 @@ function consumeSchedulerPrivateActContinuationDiagnostics(
   });
 }
 
+function consumeSchedulerPostTaskYieldActRootHandoffDiagnostics(
+  diagnostics
+) {
+  const validation =
+    validateSchedulerPostTaskYieldActRootHandoffDiagnostics(diagnostics);
+  if (validation !== null) {
+    throw createSchedulerPostTaskYieldActRootHandoffDiagnosticsGateError(
+      validation.reason,
+      validation
+    );
+  }
+
+  const continuation = diagnostics.continuationFallbacks[0];
+  const route = diagnostics.rootContinuationExecutionRoute;
+  const handoff = route.actRootWorkHandoff;
+  const priorityTimeout = handoff.priorityTimeout;
+  const rootWorkRecordKinds = Object.freeze(
+    handoff.rootWorkRecords.map((record) => record.recordKind)
+  );
+
+  return Object.freeze({
+    status: schedulerPostTaskYieldActRootHandoffConsumptionStatus,
+    accepted: true,
+    schedulerDiagnosticsStatus: diagnostics.status,
+    schedulerDiagnosticsExportName: diagnostics.exportName,
+    schedulerDiagnosticsSymbolDescription: diagnostics.symbolDescription,
+    schedulerCompatibilityTarget: diagnostics.compatibilityTarget,
+    reactCompatibilityTarget: handoff.reactCompatibilityTarget,
+    consumesSchedulerPostTaskYieldActRootHandoffDiagnostics: true,
+    selectedFallback: 'scheduler.yield',
+    schedulerYieldAvailable: true,
+    schedulerPostTaskAvailable: true,
+    controlledTaskSchedulingApiShim: true,
+    continuationIndex: continuation.continuationIndex,
+    callbackRunCountAtSchedule: continuation.callbackRunCountAtSchedule,
+    currentCallbackRunCount: diagnostics.callbackRuns.length,
+    controlledYieldThenContinuationAlreadyRan: true,
+    staleContinuationEvidenceRejected: true,
+    staleContinuationRejectionReason: 'stale-continuation',
+    rootContinuationExecutionAdmitted: false,
+    rootSchedulingAdmitted: false,
+    rootWorkMetadataOnly: true,
+    actQueueHandoffOnly: true,
+    rendererWorkExecutionBlocked: true,
+    rootWorkRecordKinds,
+    rootWorkRecordCount: rootWorkRecordKinds.length,
+    priorityLevel: handoff.priorityLevel,
+    schedulerPriorityName: handoff.schedulerPriorityName,
+    postTaskPriority: handoff.postTaskPriority,
+    taskControllerPriority: handoff.taskControllerPriority,
+    timeoutMs: priorityTimeout.timeoutMs,
+    timeoutReason: priorityTimeout.timeoutReason,
+    sourceCallbackDidTimeout: handoff.sourceCallbackDidTimeout,
+    queueFlushingReady: false,
+    rendererRootsReady: false,
+    passiveEffectsReady: false,
+    continuationFlushingReady: false,
+    publicCompatibilityClaimed: false,
+    browserPostTaskCompatibilityClaimed: false,
+    browserTaskOrderingCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    publicRootSchedulerCompatibilityClaimed: false,
+    publicRendererCompatibilityClaimed: false,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    executesQueuedWork: false,
+    executesEffects: false,
+    executesRendererWork: false,
+    executesRendererRoots: false,
+    packageCompatibilityClaimed: false
+  });
+}
+
 function consumeRendererBackedActDrainDiagnostics(diagnostics) {
   if (!Object.isFrozen(diagnostics)) {
     throw createRendererBackedActDrainDiagnosticsGateError(
@@ -934,6 +1790,21 @@ module.exports = Object.freeze({
     schedulerPrivateActContinuationConsumptionStatus,
   rendererBackedActDrainDiagnosticsStatus,
   rendererBackedActDrainConsumptionStatus,
+  schedulerPostTaskYieldActRootHandoffConsumptionStatus,
+  schedulerPostTaskPriorityDiagnosticsStatus:
+    privatePostTaskPriorityDiagnosticsStatus,
+  schedulerPostTaskPriorityDiagnosticsVersion:
+    privatePostTaskPriorityDiagnosticsVersion,
+  schedulerPostTaskPriorityDiagnosticsExportName:
+    privatePostTaskPriorityDiagnosticsExport,
+  schedulerPostTaskPriorityDiagnosticsSymbolDescription:
+    privatePostTaskPriorityDiagnosticsSymbolDescription,
+  schedulerPostTaskActRootWorkHandoffStatus:
+    privatePostTaskActRootWorkHandoffStatus,
+  schedulerPostTaskActRootWorkHandoffKind:
+    privatePostTaskActRootWorkHandoffKind,
+  schedulerPostTaskActRootWorkHandoffVersion:
+    privatePostTaskActRootWorkHandoffVersion,
   requiredRecords: acceptedActQueueRecordKinds,
   requiredTaskKinds: acceptedActQueueTaskKinds,
   requiredContinuationStatuses: acceptedActQueueContinuationStatuses,
@@ -967,10 +1838,14 @@ module.exports = Object.freeze({
   rendererBackedActDrainDiagnosticVersion:
     privateRendererBackedActDrainDiagnosticVersion,
   drainsAcceptedRendererBackedActDiagnostics: true,
+  schedulerPostTaskYieldActRootHandoffDiagnosticsReady: true,
+  consumesSchedulerPostTaskYieldActRootHandoffDiagnostics: true,
   acceptedRendererBackedActDrainRenderers,
   acceptedRendererBackedActDrainSchedulerRecords,
   acceptedRendererBackedActDrainReconcilerRecords,
   acceptedRendererBackedActDrainRendererRecords,
+  acceptedSchedulerPostTaskRootWorkRecordKinds:
+    privatePostTaskAcceptedRootWorkRecordKinds,
   publicSchedulerTimingCompatibilityClaimed: false,
   publicReactActCompatibilityClaimed: false,
   executesQueuedWork: false,
@@ -978,6 +1853,7 @@ module.exports = Object.freeze({
   executesRendererRoots: false,
   consumeRendererBackedActDrainDiagnostics,
   consumeSchedulerPrivateActContinuationDiagnostics,
+  consumeSchedulerPostTaskYieldActRootHandoffDiagnostics,
   createActQueueMetadata,
   createInternalActQueueTestCallback,
   createInternalActQueueTestQueue,
@@ -990,6 +1866,7 @@ module.exports = Object.freeze({
   isAcceptedInternalActQueueTestTask,
   isAcceptedRendererBackedActDrainDiagnostics,
   isAcceptedSchedulerPrivateActQueueFlushDiagnostics,
+  isAcceptedSchedulerPostTaskYieldActRootHandoffDiagnostics,
   isPrivateActDispatcher,
   markPrivateActDispatcher
 });
