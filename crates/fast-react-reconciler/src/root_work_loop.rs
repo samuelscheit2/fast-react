@@ -1071,25 +1071,31 @@ fn refresh_update_queue_for_work_in_progress<H: HostTypes>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::begin_work::{BeginWorkError, PORTAL_RECONCILER_UNSUPPORTED_FEATURE};
+    use crate::begin_work::{
+        BeginWorkError, PORTAL_RECONCILER_UNSUPPORTED_FEATURE, begin_work_with_context_reads,
+    };
     use crate::function_component::{
-        FunctionComponentInvocationError, FunctionComponentInvocationRequest,
-        FunctionComponentOutputHandle, FunctionComponentSingleChildOutput,
-        FunctionComponentSingleChildOutputResolver,
+        FunctionComponentContextRenderStore, FunctionComponentInvocationError,
+        FunctionComponentInvocationRequest, FunctionComponentOutputHandle,
+        FunctionComponentSingleChildOutput, FunctionComponentSingleChildOutputResolver,
         FunctionComponentSingleChildReconciliationError,
     };
     use crate::test_support::{FakeContainer, RecordingHost, TestHostNode, TestHostTree};
     use crate::unsupported_features::{
         ACTIVITY_UNSUPPORTED_FEATURE, OFFSCREEN_UNSUPPORTED_FEATURE,
         SUSPENSE_LIST_UNSUPPORTED_FEATURE, SUSPENSE_UNSUPPORTED_FEATURE,
+        VIEW_TRANSITION_UNSUPPORTED_FEATURE,
     };
     use crate::{
-        RootElementHandle, RootOptions, RootTaskScheduleOutcome, ensure_root_is_scheduled,
-        process_root_schedule_in_microtask, update_container, update_container_sync,
+        HostRootHydrationState, PendingChildrenHandle, PendingCommitHandle, RootContextHandle,
+        RootElementHandle, RootHydrationCallbacksHandle, RootKind, RootOptions,
+        RootSuspenseBoundarySetHandle, RootTaskScheduleOutcome, RootTransitionCallbacksHandle,
+        ensure_root_is_scheduled, process_root_schedule_in_microtask, update_container,
+        update_container_sync,
     };
     use fast_react_core::{
-        FiberFlags, FiberMode, FiberTag, FiberTypeHandle, Lane, Lanes, PropsHandle, ReactKey,
-        StateHandle, StateNodeHandle, UpdateQueueHandle,
+        ContextValueHandle, ElementTypeHandle, FiberFlags, FiberMode, FiberTag, FiberTypeHandle,
+        Lane, Lanes, PropsHandle, ReactKey, StateHandle, StateNodeHandle, UpdateQueueHandle,
     };
 
     #[derive(Debug, Clone)]
@@ -1169,6 +1175,26 @@ mod tests {
                     text.props(),
                 )),
             }
+        }
+    }
+
+    #[derive(Debug)]
+    struct StaticSingleChildOutputResolver {
+        child: FunctionComponentSingleChildOutput,
+    }
+
+    impl StaticSingleChildOutputResolver {
+        const fn new(child: FunctionComponentSingleChildOutput) -> Self {
+            Self { child }
+        }
+    }
+
+    impl FunctionComponentSingleChildOutputResolver for StaticSingleChildOutputResolver {
+        fn resolve_function_component_single_child_output(
+            &self,
+            _output: FunctionComponentOutputHandle,
+        ) -> Option<FunctionComponentSingleChildOutput> {
+            Some(self.child)
         }
     }
 
@@ -1281,6 +1307,112 @@ mod tests {
             .unwrap();
 
         (portal, portal_child)
+    }
+
+    fn attach_fragment_wip_child_with_descendant(
+        store: &mut FiberRootStore<RecordingHost>,
+        host_root_work_in_progress: FiberId,
+    ) -> (FiberId, FiberId) {
+        let fragment = store.fiber_arena_mut().create_fiber(
+            FiberTag::Fragment,
+            None,
+            PropsHandle::from_raw(801),
+            FiberMode::NO,
+        );
+        let fragment_child = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(802),
+            FiberMode::NO,
+        );
+        store
+            .fiber_arena_mut()
+            .set_children(fragment, &[fragment_child])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root_work_in_progress, &[fragment])
+            .unwrap();
+
+        (fragment, fragment_child)
+    }
+
+    fn assert_client_root_fail_closed_without_side_effects(
+        store: &FiberRootStore<RecordingHost>,
+        host: &RecordingHost,
+        root_id: FiberRootId,
+        current: FiberId,
+        render: HostRootRenderPhaseRecord,
+        root_child: FiberId,
+    ) {
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+
+        let root = store.root(root_id).unwrap();
+        assert_eq!(root.kind(), RootKind::Client);
+        assert_eq!(root.current(), current);
+        assert_eq!(root.context(), RootContextHandle::NONE);
+        assert_eq!(root.pending_context(), None);
+        assert_eq!(root.pending_children(), PendingChildrenHandle::NONE);
+        assert_eq!(root.finished_work(), None);
+        assert_eq!(root.finished_lanes(), Lanes::NO);
+        assert_eq!(root.pending_commit(), PendingCommitHandle::NONE);
+        assert_eq!(
+            root.transition_callbacks(),
+            RootTransitionCallbacksHandle::NONE
+        );
+        assert_eq!(
+            root.options().hydration_callbacks(),
+            RootHydrationCallbacksHandle::NONE
+        );
+        assert_eq!(
+            root.scheduling().work_in_progress(),
+            Some(render.work_in_progress())
+        );
+        assert_eq!(
+            root.scheduling().work_in_progress_root_render_lanes(),
+            render.render_lanes()
+        );
+        assert_eq!(
+            root.scheduling().render_exit_status(),
+            RootRenderExitStatus::Completed
+        );
+        assert!(root.scheduling().pending_passive().is_empty());
+
+        let current_node = store.fiber_arena().get(current).unwrap();
+        let current_state = store
+            .host_root_states()
+            .get(current_node.memoized_state())
+            .unwrap();
+        assert_eq!(
+            current_state.hydration(),
+            HostRootHydrationState::NotHydrated
+        );
+        assert!(!current_state.is_dehydrated());
+        assert_eq!(
+            current_state.pending_suspense_boundaries(),
+            RootSuspenseBoundarySetHandle::NONE
+        );
+
+        let work_node = store.fiber_arena().get(render.work_in_progress()).unwrap();
+        assert_eq!(work_node.child(), Some(root_child));
+        assert_eq!(work_node.child_lanes(), Lanes::NO);
+        assert_eq!(work_node.subtree_flags(), FiberFlags::NO);
+        let work_state = store
+            .host_root_states()
+            .get(work_node.memoized_state())
+            .unwrap();
+        assert_eq!(work_state.hydration(), HostRootHydrationState::NotHydrated);
+        assert!(!work_state.is_dehydrated());
+        assert_eq!(
+            work_state.pending_suspense_boundaries(),
+            RootSuspenseBoundarySetHandle::NONE
+        );
+
+        let child_node = store.fiber_arena().get(root_child).unwrap();
+        assert_eq!(child_node.return_fiber(), Some(render.work_in_progress()));
+        assert_eq!(child_node.lanes(), Lanes::NO);
+        assert_eq!(child_node.child_lanes(), Lanes::NO);
+        assert_eq!(child_node.subtree_flags(), FiberFlags::NO);
     }
 
     #[test]
@@ -1561,6 +1693,11 @@ mod tests {
                 Lanes::from(Lane::RETRY_2),
             ),
             (
+                FiberTag::ViewTransition,
+                VIEW_TRANSITION_UNSUPPORTED_FEATURE,
+                Lanes::DEFAULT,
+            ),
+            (
                 FiberTag::SuspenseList,
                 SUSPENSE_LIST_UNSUPPORTED_FEATURE,
                 Lanes::from(Lane::RETRY_3),
@@ -1593,10 +1730,14 @@ mod tests {
                 }
             );
             assert!(registry.calls().is_empty());
-            assert_eq!(host.operations(), Vec::<&'static str>::new());
-            assert_eq!(store.root(root_id).unwrap().current(), current);
-            assert_eq!(store.root(root_id).unwrap().finished_work(), None);
-            assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+            assert_client_root_fail_closed_without_side_effects(
+                &store, &host, root_id, current, render, child,
+            );
+            let child_node = store.fiber_arena().get(child).unwrap();
+            assert_eq!(child_node.memoized_props(), PropsHandle::NONE);
+            assert_eq!(child_node.memoized_state(), StateHandle::NONE);
+            assert_eq!(child_node.update_queue(), UpdateQueueHandle::NONE);
+            assert_eq!(child_node.flags(), FiberFlags::NO);
         }
     }
 
@@ -1645,10 +1786,9 @@ mod tests {
             PORTAL_RECONCILER_UNSUPPORTED_FEATURE
         );
         assert!(registry.calls().is_empty());
-        assert_eq!(host.operations(), Vec::<&'static str>::new());
-        assert_eq!(store.root(root_id).unwrap().current(), current);
-        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
-        assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+        assert_client_root_fail_closed_without_side_effects(
+            &store, &host, root_id, current, render, portal,
+        );
 
         let portal_node = store.fiber_arena().get(portal).unwrap();
         assert_eq!(portal_node.return_fiber(), Some(render.work_in_progress()));
@@ -1659,6 +1799,49 @@ mod tests {
         assert_eq!(portal_child_node.return_fiber(), Some(portal));
         assert_eq!(portal_child_node.memoized_props(), PropsHandle::NONE);
         assert_eq!(portal_child_node.lanes(), Lanes::NO);
+    }
+
+    #[test]
+    fn root_work_loop_preflight_fails_closed_for_fragment_child_without_invoking_or_mounting() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(22), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let (fragment, fragment_child) =
+            attach_fragment_wip_child_with_descendant(&mut store, render.work_in_progress());
+        let mut registry = TestFunctionComponentRegistry::default();
+
+        let error = preflight_host_root_child_begin_work(
+            &mut store,
+            root_id,
+            render.work_in_progress(),
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            HostRootChildBeginWorkPreflightError::BeginWork(BeginWorkError::UnsupportedFiberTag {
+                fiber: fragment,
+                tag: FiberTag::Fragment,
+            },)
+        );
+        assert!(registry.calls().is_empty());
+        assert_client_root_fail_closed_without_side_effects(
+            &store, &host, root_id, current, render, fragment,
+        );
+
+        let fragment_node = store.fiber_arena().get(fragment).unwrap();
+        assert_eq!(fragment_node.child(), Some(fragment_child));
+        assert_eq!(fragment_node.memoized_props(), PropsHandle::NONE);
+        assert_eq!(fragment_node.memoized_state(), StateHandle::NONE);
+        assert_eq!(fragment_node.update_queue(), UpdateQueueHandle::NONE);
+        assert_eq!(fragment_node.flags(), FiberFlags::NO);
+        let fragment_child_node = store.fiber_arena().get(fragment_child).unwrap();
+        assert_eq!(fragment_child_node.return_fiber(), Some(fragment));
+        assert_eq!(fragment_child_node.lanes(), Lanes::NO);
+        assert_eq!(fragment_child_node.flags(), FiberFlags::NO);
     }
 
     #[test]
@@ -1977,6 +2160,226 @@ mod tests {
             store.fiber_arena().get(function_component).unwrap().flags(),
             FiberFlags::NO
         );
+    }
+
+    #[test]
+    fn root_work_loop_function_component_single_child_handoff_rejects_unsupported_outputs() {
+        for (index, tag) in [
+            FiberTag::Suspense,
+            FiberTag::Offscreen,
+            FiberTag::Activity,
+            FiberTag::ViewTransition,
+            FiberTag::Fragment,
+            FiberTag::Portal,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let raw = index as u64;
+            let (mut store, root_id, mut host) = root_store();
+            let source = TestHostTree::new();
+            let original_root_element = RootElementHandle::from_raw(930 + raw);
+            let current = store.root(root_id).unwrap().current();
+            update_container(&mut store, root_id, original_root_element, None).unwrap();
+            let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+            let (_current_child, function_component, component) =
+                attach_function_component_wip_child(&mut store, render.work_in_progress());
+            let output = FunctionComponentOutputHandle::from_raw(960 + raw);
+            let mut registry = TestFunctionComponentRegistry::default();
+            registry.register(component, Ok(output));
+            let resolver =
+                StaticSingleChildOutputResolver::new(FunctionComponentSingleChildOutput::new(
+                    output,
+                    RootElementHandle::from_raw(970 + raw),
+                    tag,
+                    ElementTypeHandle::from_raw(980 + raw),
+                    PropsHandle::from_raw(990 + raw),
+                ));
+
+            let error = handoff_completed_function_component_single_child_to_test_complete_work(
+                &mut store,
+                &mut host,
+                render,
+                &source,
+                &mut registry,
+                &resolver,
+            )
+            .unwrap_err();
+
+            assert_eq!(
+                error,
+                HostRootFunctionComponentSingleChildCompleteWorkHandoffError::BeginWork(
+                    BeginWorkError::FunctionComponentSingleChild(
+                        FunctionComponentSingleChildReconciliationError::UnsupportedChildTag {
+                            fiber: function_component,
+                            output,
+                            tag,
+                        },
+                    ),
+                )
+            );
+            assert_eq!(registry.calls().len(), 1);
+            assert_client_root_fail_closed_without_side_effects(
+                &store,
+                &host,
+                root_id,
+                current,
+                render,
+                function_component,
+            );
+            let function_node = store.fiber_arena().get(function_component).unwrap();
+            assert_eq!(function_node.child(), None);
+            assert_eq!(function_node.flags(), FiberFlags::NO);
+        }
+    }
+
+    #[test]
+    fn root_work_loop_context_handoff_preserves_unsupported_child_preflight() {
+        let cases = [
+            (
+                FiberTag::Suspense,
+                Some(SUSPENSE_UNSUPPORTED_FEATURE),
+                Lanes::from(Lane::RETRY_1),
+            ),
+            (
+                FiberTag::Offscreen,
+                Some(OFFSCREEN_UNSUPPORTED_FEATURE),
+                Lanes::OFFSCREEN,
+            ),
+            (
+                FiberTag::Activity,
+                Some(ACTIVITY_UNSUPPORTED_FEATURE),
+                Lanes::from(Lane::RETRY_2),
+            ),
+            (
+                FiberTag::ViewTransition,
+                Some(VIEW_TRANSITION_UNSUPPORTED_FEATURE),
+                Lanes::DEFAULT,
+            ),
+            (FiberTag::Fragment, None, Lanes::DEFAULT),
+            (FiberTag::Portal, None, Lanes::DEFAULT),
+        ];
+
+        for (index, (tag, feature, render_lanes)) in cases.into_iter().enumerate() {
+            let raw = index as u64;
+            let (mut store, root_id, host) = root_store();
+            let current = store.root(root_id).unwrap().current();
+            update_container(
+                &mut store,
+                root_id,
+                RootElementHandle::from_raw(1_100 + raw),
+                None,
+            )
+            .unwrap();
+            let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+            let (child, descendant) = match tag {
+                FiberTag::Fragment => {
+                    let (fragment, fragment_child) = attach_fragment_wip_child_with_descendant(
+                        &mut store,
+                        render.work_in_progress(),
+                    );
+                    (fragment, Some(fragment_child))
+                }
+                FiberTag::Portal => {
+                    let (portal, portal_child) =
+                        attach_portal_wip_child(&mut store, render.work_in_progress());
+                    (portal, Some(portal_child))
+                }
+                _ => (
+                    attach_wip_child_with_tag(&mut store, render.work_in_progress(), tag),
+                    None,
+                ),
+            };
+            let mut context_store = FunctionComponentContextRenderStore::new();
+            let context = context_store.create_context(ContextValueHandle::from_raw(1_200 + raw));
+            let mut registry = TestFunctionComponentRegistry::default();
+
+            match tag {
+                FiberTag::Portal => {
+                    let error = validate_host_root_child_preflight(
+                        &store,
+                        root_id,
+                        render.work_in_progress(),
+                        render_lanes,
+                    )
+                    .unwrap_err();
+                    let portal_record = match error {
+                        HostRootChildBeginWorkPreflightError::UnsupportedPortal {
+                            root,
+                            host_root_work_in_progress,
+                            portal,
+                        } => {
+                            assert_eq!(root, root_id);
+                            assert_eq!(host_root_work_in_progress, render.work_in_progress());
+                            portal
+                        }
+                        other => panic!("expected portal preflight diagnostic, got {other:?}"),
+                    };
+                    assert_eq!(portal_record.fiber(), child);
+                    assert_eq!(portal_record.render_lanes(), render_lanes);
+                    assert_eq!(
+                        portal_record.feature(),
+                        PORTAL_RECONCILER_UNSUPPORTED_FEATURE
+                    );
+                }
+                FiberTag::Fragment => {
+                    let validated = validate_host_root_child_preflight(
+                        &store,
+                        root_id,
+                        render.work_in_progress(),
+                        render_lanes,
+                    )
+                    .unwrap();
+                    assert_eq!(validated.child, Some(child));
+                    assert_eq!(validated.child_tag, Some(FiberTag::Fragment));
+
+                    let error = begin_work_with_context_reads(
+                        store.fiber_arena_mut(),
+                        BeginWorkRequest::new(child, render_lanes),
+                        &mut context_store,
+                        &[context],
+                        &mut registry,
+                    )
+                    .unwrap_err();
+                    assert_eq!(
+                        error,
+                        BeginWorkError::UnsupportedFiberTag {
+                            fiber: child,
+                            tag: FiberTag::Fragment,
+                        }
+                    );
+                }
+                _ => {
+                    let error = validate_host_root_child_preflight(
+                        &store,
+                        root_id,
+                        render.work_in_progress(),
+                        render_lanes,
+                    )
+                    .unwrap_err();
+                    assert_eq!(
+                        error,
+                        HostRootChildBeginWorkPreflightError::UnsupportedReconcilerFiberFeature {
+                            fiber: child,
+                            tag,
+                            feature: feature.unwrap(),
+                        }
+                    );
+                }
+            }
+
+            assert!(registry.calls().is_empty());
+            assert!(context_store.context_reads().is_empty());
+            assert_client_root_fail_closed_without_side_effects(
+                &store, &host, root_id, current, render, child,
+            );
+            if let Some(descendant) = descendant {
+                let descendant_node = store.fiber_arena().get(descendant).unwrap();
+                assert_eq!(descendant_node.return_fiber(), Some(child));
+                assert_eq!(descendant_node.lanes(), Lanes::NO);
+                assert_eq!(descendant_node.flags(), FiberFlags::NO);
+            }
+        }
     }
 
     #[test]
