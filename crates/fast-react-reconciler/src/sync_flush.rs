@@ -15,8 +15,8 @@ use fast_react_host_config::HostTypes;
 use crate::root_scheduler::{recompute_might_have_pending_sync_work, sync_flush_lanes_for_root};
 use crate::{
     FiberRootId, FiberRootStore, FiberRootStoreError, HostRootCommitRecord,
-    HostRootRenderPhaseRecord, RootCommitError, RootSchedulerError, RootWorkLoopError,
-    commit_finished_host_root, render_host_root_for_lanes,
+    HostRootRenderPhaseRecord, RootCommitError, RootSchedulerError, RootUpdateCallbackSnapshot,
+    RootWorkLoopError, commit_finished_host_root, render_host_root_for_lanes,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,6 +46,11 @@ impl SyncFlushRootRecord {
     #[must_use]
     pub const fn commit(&self) -> &HostRootCommitRecord {
         &self.commit
+    }
+
+    #[must_use]
+    pub fn root_update_callbacks(&self) -> &RootUpdateCallbackSnapshot {
+        self.commit.root_update_callbacks()
     }
 
     #[must_use]
@@ -232,6 +237,7 @@ mod tests {
         RootElementHandle, RootOptions, ensure_root_is_scheduled, scheduled_roots,
         update_container, update_container_sync,
     };
+    use crate::{RootUpdateCallbackHandle, RootUpdateCallbackRecord, RootUpdateCallbackVisibility};
     use fast_react_core::{Lane, Lanes};
 
     fn root_store() -> (FiberRootStore<RecordingHost>, FiberRootId, RecordingHost) {
@@ -266,6 +272,10 @@ mod tests {
     ) {
         let result = update_container_sync(store, root_id, element, None).unwrap();
         ensure_root_is_scheduled(store, result.schedule()).unwrap();
+    }
+
+    fn callback_handles(records: &[RootUpdateCallbackRecord]) -> Vec<RootUpdateCallbackHandle> {
+        records.iter().map(|record| record.callback()).collect()
     }
 
     #[test]
@@ -407,6 +417,81 @@ mod tests {
         let result = flush_sync_commit_work_on_all_roots(&mut store).unwrap();
 
         assert_eq!(result.records().len(), 1);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_surfaces_visible_root_update_callback_snapshot() {
+        let (mut store, root_id, host) = root_store();
+        let callback = RootUpdateCallbackHandle::from_raw(177);
+        let update = update_container_sync(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(1770),
+            Some(callback),
+        )
+        .unwrap();
+        ensure_root_is_scheduled(&mut store, update.schedule()).unwrap();
+
+        let result = flush_sync_commit_work_on_all_roots(&mut store).unwrap();
+
+        assert_eq!(result.records().len(), 1);
+        let record = &result.records()[0];
+        let callbacks = record.root_update_callbacks();
+        assert_eq!(
+            callbacks.queue(),
+            record.render_phase().work_in_progress_update_queue()
+        );
+        assert_eq!(callback_handles(callbacks.visible()), vec![callback]);
+        assert_eq!(callbacks.visible()[0].update(), update.update());
+        assert_eq!(callbacks.visible()[0].sequence(), 0);
+        assert_eq!(
+            callbacks.visible()[0].visibility(),
+            RootUpdateCallbackVisibility::Visible
+        );
+        assert!(callbacks.hidden().is_empty());
+        assert!(callbacks.deferred_hidden().is_empty());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_surfaces_deferred_hidden_root_update_callback_snapshot() {
+        let (mut store, root_id, host) = root_store();
+        let callback = RootUpdateCallbackHandle::from_raw(188);
+        let update = update_container_sync(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(1880),
+            Some(callback),
+        )
+        .unwrap();
+        store
+            .update_queues_mut()
+            .mark_update_hidden(update.update())
+            .unwrap();
+        ensure_root_is_scheduled(&mut store, update.schedule()).unwrap();
+
+        let result = flush_sync_commit_work_on_all_roots(&mut store).unwrap();
+
+        assert_eq!(result.records().len(), 1);
+        let record = &result.records()[0];
+        let callbacks = record.root_update_callbacks();
+        assert_eq!(
+            callbacks.queue(),
+            record.render_phase().work_in_progress_update_queue()
+        );
+        assert!(callbacks.visible().is_empty());
+        assert!(callbacks.hidden().is_empty());
+        assert_eq!(
+            callback_handles(callbacks.deferred_hidden()),
+            vec![callback]
+        );
+        assert_eq!(callbacks.deferred_hidden()[0].update(), update.update());
+        assert_eq!(callbacks.deferred_hidden()[0].sequence(), 0);
+        assert_eq!(
+            callbacks.deferred_hidden()[0].visibility(),
+            RootUpdateCallbackVisibility::DeferredHidden
+        );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 }

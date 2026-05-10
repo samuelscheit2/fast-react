@@ -278,9 +278,84 @@ sequencing belong in `MASTER_PLAN.md`.
   render/output record, without public work-loop wiring, hooks, context
   propagation, child reconciliation, commit effects, DOM/test-renderer
   integration, or public React hook facades.
+- Worker 195 test-renderer root callback snapshot was merged, extending the
+  Rust-only `TestRendererRoot` canary with explicit callback-handle create,
+  update, and unmount helpers so returned `HostRootCommitRecord` values can
+  expose empty and visible root update callback snapshots without JS callback
+  invocation, public serialization, public `act`, host output mutation,
+  DOM/native behavior, or reconciler commit semantic changes.
+- Worker 196 sync-flush root callback snapshot was merged, adding a borrowing
+  `SyncFlushRootRecord::root_update_callbacks()` accessor that surfaces the
+  callback snapshot already owned by the accepted HostRoot commit record, with
+  visible and deferred-hidden sync-flush coverage while preserving scheduling
+  selection, callback invocation, public `flushSync`, DOM/test-renderer
+  facades, and host mutation boundaries.
+- Worker 198 host work host-node store integration was merged, routing the
+  private test-only host complete-work skeleton's detached HostComponent and
+  HostText records through the reconciler-owned `HostNodeStore` boundary, with
+  creation-token scope validation and wrong-fiber/wrong-target coverage while
+  preserving the no container commit, no public renderer output, no DOM/native
+  adapter, and no root-scheduling-change boundaries.
+- Worker 199 root work-loop begin-work preflight was merged, adding a private
+  HostRoot child canary that validates the reciprocal HostRoot WIP/current
+  link, inspects only the first WIP child, delegates FunctionComponent children
+  through the accepted private `begin_work` handoff, and fails closed for
+  unsupported or unhandled child tags without full traversal, child
+  reconciliation, host complete work, commit effects, DOM/test-renderer
+  integration, or public hook facade wiring.
+- Worker 197 root commit passive pending handoff was merged, adding inert
+  HostRoot commit metadata for already-prepared pending passive state so future
+  passive-effect workers can see the committed root, finished work, and lanes,
+  while preserving validation-before-mutation, effect traversal, passive
+  flushing, hook execution, callback invocation, and DOM/native renderer
+  boundaries.
+- Worker 200 function-component hook-list render state was merged, connecting
+  the accepted core `HookListArena` to the private function-component render
+  skeleton as optional inert metadata with mount/update cursors and request/
+  record handoff, without public hooks, a dispatcher, `renderWithHooks`,
+  context propagation, child reconciliation, effects, DOM/test-renderer
+  integration, or public React hook facades.
+- Worker 202 React test renderer package placeholder was merged, adding the
+  scoped `@fast-react/react-test-renderer` workspace package with the checked
+  React Test Renderer 19.2.6 no-exports physical file shape, placeholder root
+  and CJS exports, shallow subpath preservation, package-surface coverage, and
+  a lockfile entry while keeping serialization, `act`, create/update behavior,
+  Rust test-renderer wiring, and compatibility claims blocked.
 
 ## Latest Accepted Verification
 
+- Worker 202 was verified on its integrated worktree and again on `main` with
+  node syntax checks for new/touched JS files, `npm run check:package-surface`,
+  `node tests/smoke/import-entrypoints.mjs`, the focused
+  `react-test-renderer` serialization local gate, `npm run check:js` with 467
+  conformance tests plus benchmark/workspace/native checks, `npm install
+  --package-lock-only --ignore-scripts` for the new workspace lock entry, and
+  `git diff --check`; merging current `main` into the worker branch produced
+  no conflicts, and the merge commit applied cleanly to `main`.
+- Workers 197 and 200 were verified on their integrated worktrees and again on
+  `main` with `cargo fmt --all --check`, focused `root_commit`, `root_config`,
+  `function_component`, and core `hook_list` tests, full
+  `fast-react-reconciler` tests with 151 unit tests plus 1 compile-fail
+  doctest on the combined `main` result, reconciler clippy with warnings
+  denied, and `git diff --check`; merging current `main` into both worker
+  branches produced no conflicts, and both merge commits applied cleanly to
+  `main`.
+- Workers 198 and 199 were verified on their integrated worktrees and again on
+  `main` with `cargo fmt --all --check`, focused `host_work`, `host_nodes`,
+  `root_work_loop`, and `begin_work` tests, full `fast-react-reconciler` tests
+  with 145 unit tests plus 1 compile-fail doctest on the combined `main`
+  result, reconciler clippy with warnings denied, and `git diff --check`;
+  merging current `main` into both worker branches produced no conflicts, and
+  both merge commits applied cleanly to `main`.
+- Workers 195 and 196 were verified on their integrated worktrees and again on
+  `main` with `cargo fmt --all --check`, full
+  `fast-react-test-renderer` tests with 32 unit tests and 0 doctests, full
+  `fast-react-reconciler` tests with 140 unit tests plus 1 compile-fail
+  doctest, focused 195 root tests with 16 matching tests, focused 196
+  `sync_flush` tests with 14 matching tests, focused `root_commit` tests with
+  7 matching tests, clippy for both touched packages with warnings denied, and
+  `git diff --check`; merging current `main` into both worker branches
+  produced no conflicts, and both merge commits applied cleanly to `main`.
 - Worker 194 was verified on its integrated worktree and again on `main` with
   `cargo fmt --all --check`, focused `begin_work` tests with 4 tests, broader
   `function_component` tests with 8 matching tests, full

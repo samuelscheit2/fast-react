@@ -24,7 +24,9 @@ test("react-test-renderer serialization compatibility stays blocked until Rust T
   assert.equal(gate.publicCompatibilityClaimed, false);
   assert.deepEqual(gate.violations, []);
   assert.deepEqual(gate.localChecks, {
-    publicJsReactTestRendererFacadePresent: false,
+    publicJsReactTestRendererFacadePresent: true,
+    publicJsReactTestRendererFacadePlaceholder: true,
+    publicJsReactTestRendererFacadeStatus: "placeholder-present",
     rustTestRendererRootFacadePresent: true,
     committedTestRendererHostOutputPresent: false,
     committedFiberInspectionPresent: false,

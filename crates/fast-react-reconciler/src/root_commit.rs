@@ -17,7 +17,8 @@ use fast_react_host_config::HostTypes;
 
 use crate::{
     FiberRootId, FiberRootStore, FiberRootStoreError, HostRootRenderPhaseRecord,
-    HostRootStateStoreError, RootRenderExitStatus, RootUpdateCallbackSnapshot, UpdateQueueError,
+    HostRootStateStoreError, RootRenderExitStatus, RootSchedulingState, RootUpdateCallbackSnapshot,
+    UpdateQueueError,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -26,6 +27,10 @@ pub enum RootCommitError {
     FiberTopology(FiberTopologyError),
     HostRootStateStore(HostRootStateStoreError),
     UpdateQueue(UpdateQueueError),
+    PendingPassiveRootMismatch {
+        root: FiberRootId,
+        pending_root: FiberRootId,
+    },
     EmptyFinishedLanes {
         root: FiberRootId,
     },
@@ -92,6 +97,12 @@ impl Display for RootCommitError {
             Self::FiberTopology(error) => Display::fmt(error, formatter),
             Self::HostRootStateStore(error) => Display::fmt(error, formatter),
             Self::UpdateQueue(error) => Display::fmt(error, formatter),
+            Self::PendingPassiveRootMismatch { root, pending_root } => write!(
+                formatter,
+                "root {} pending passive metadata belongs to root {}",
+                root.raw(),
+                pending_root.raw()
+            ),
             Self::EmptyFinishedLanes { root } => {
                 write!(formatter, "root {} commit lanes are empty", root.raw())
             }
@@ -226,7 +237,8 @@ impl Error for RootCommitError {
             Self::FiberTopology(error) => Some(error),
             Self::HostRootStateStore(error) => Some(error),
             Self::UpdateQueue(error) => Some(error),
-            Self::EmptyFinishedLanes { .. }
+            Self::PendingPassiveRootMismatch { .. }
+            | Self::EmptyFinishedLanes { .. }
             | Self::CurrentMismatch { .. }
             | Self::FinishedWorkIsCurrent { .. }
             | Self::ExpectedHostRoot { .. }
@@ -266,6 +278,34 @@ impl From<UpdateQueueError> for RootCommitError {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct PendingPassiveCommitHandoff {
+    root: FiberRootId,
+    finished_work: FiberId,
+    lanes: Lanes,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private passive commit metadata for future passive-effect workers"
+)]
+impl PendingPassiveCommitHandoff {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn lanes(self) -> Lanes {
+        self.lanes
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostRootCommitRecord {
     root: FiberRootId,
@@ -275,6 +315,7 @@ pub struct HostRootCommitRecord {
     remaining_lanes: Lanes,
     pending_lanes: Lanes,
     root_update_callbacks: RootUpdateCallbackSnapshot,
+    pending_passive_handoff: Option<PendingPassiveCommitHandoff>,
 }
 
 impl HostRootCommitRecord {
@@ -322,6 +363,15 @@ impl HostRootCommitRecord {
     pub fn root_update_callbacks(&self) -> &RootUpdateCallbackSnapshot {
         &self.root_update_callbacks
     }
+
+    #[allow(
+        dead_code,
+        reason = "crate-private passive commit metadata for future passive-effect workers"
+    )]
+    #[must_use]
+    pub(crate) const fn pending_passive_handoff(&self) -> Option<PendingPassiveCommitHandoff> {
+        self.pending_passive_handoff
+    }
 }
 
 pub fn commit_finished_host_root<H: HostTypes>(
@@ -337,15 +387,21 @@ pub fn commit_finished_host_root<H: HostTypes>(
     let remaining_lanes = render.remaining_lanes();
     let work_in_progress_update_queue = render.work_in_progress_update_queue();
 
-    let pending_lanes = {
+    let (pending_lanes, pending_passive_handoff) = {
         let root = store.root_mut(root_id)?;
+        let pending_passive_handoff = record_pending_passive_commit_handoff(
+            root.scheduling_mut(),
+            root_id,
+            finished_work,
+            finished_lanes,
+        )?;
         root.lanes_mut()
             .mark_finished(RootFinishedLanes::new(finished_lanes, remaining_lanes));
         root.set_current(finished_work);
         root.clear_finished_work();
         root.scheduling_mut().clear_render_phase_work();
         root.scheduling_mut().clear_callback();
-        root.lanes().pending_lanes()
+        (root.lanes().pending_lanes(), pending_passive_handoff)
     };
     let root_update_callbacks = store
         .update_queues_mut()
@@ -359,7 +415,36 @@ pub fn commit_finished_host_root<H: HostTypes>(
         remaining_lanes,
         pending_lanes,
         root_update_callbacks,
+        pending_passive_handoff,
     })
+}
+
+fn record_pending_passive_commit_handoff<H: HostTypes>(
+    scheduling: &mut RootSchedulingState<H>,
+    root: FiberRootId,
+    finished_work: FiberId,
+    lanes: Lanes,
+) -> Result<Option<PendingPassiveCommitHandoff>, RootCommitError> {
+    let Some(pending_root) = scheduling.pending_passive().root() else {
+        return Ok(None);
+    };
+
+    if pending_root != root {
+        return Err(RootCommitError::PendingPassiveRootMismatch { root, pending_root });
+    }
+
+    if !scheduling
+        .pending_passive_mut()
+        .record_commit_handoff(root, finished_work, lanes)
+    {
+        return Err(RootCommitError::EmptyFinishedLanes { root });
+    }
+
+    Ok(Some(PendingPassiveCommitHandoff {
+        root,
+        finished_work,
+        lanes,
+    }))
 }
 
 fn validate_finished_host_root<H: HostTypes>(
@@ -565,9 +650,18 @@ mod tests {
         assert_eq!(commit.finished_lanes(), Lanes::DEFAULT);
         assert_eq!(commit.remaining_lanes(), Lanes::NO);
         assert_eq!(commit.pending_lanes(), Lanes::NO);
+        assert_eq!(commit.pending_passive_handoff(), None);
         assert!(!commit.has_remaining_work());
         assert_eq!(new_current, render.work_in_progress());
         assert_eq!(host_root_element(&store, new_current), element);
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .scheduling()
+                .pending_passive()
+                .is_empty()
+        );
         assert_eq!(
             store.fiber_arena().get(new_current).unwrap().alternate(),
             Some(previous_current)
@@ -580,6 +674,38 @@ mod tests {
                 .alternate(),
             Some(new_current)
         );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_records_pending_passive_handoff_without_effect_traversal() {
+        let (mut store, root_id, host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(44), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .scheduling_mut()
+            .prepare_pending_passive(root_id, Lanes::NO);
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let handoff = commit.pending_passive_handoff().unwrap();
+        let pending_passive = store.root(root_id).unwrap().scheduling().pending_passive();
+
+        assert_eq!(handoff.root(), root_id);
+        assert_eq!(handoff.finished_work(), render.finished_work());
+        assert_eq!(handoff.lanes(), Lanes::DEFAULT);
+        assert_eq!(pending_passive.root(), Some(root_id));
+        assert_eq!(
+            pending_passive.finished_work(),
+            Some(render.finished_work())
+        );
+        assert_eq!(pending_passive.lanes(), Lanes::DEFAULT);
+        assert!(pending_passive.has_commit_handoff());
+        assert!(!pending_passive.has_effects());
+        assert!(pending_passive.passive_unmounts().is_empty());
+        assert!(pending_passive.passive_mounts().is_empty());
+        assert!(commit.root_update_callbacks().is_empty());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
@@ -666,6 +792,34 @@ mod tests {
             error,
             RootCommitError::CurrentMismatch { root, .. } if root == root_id
         ));
+    }
+
+    #[test]
+    fn root_commit_rejects_wrong_root_pending_passive_handoff_before_switching_current() {
+        let (mut store, root_id, _host) = root_store();
+        let wrong_root = FiberRootId::new(root_id.raw() + 1).unwrap();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(6), None).unwrap();
+        let previous_current = store.root(root_id).unwrap().current();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .scheduling_mut()
+            .prepare_pending_passive(wrong_root, Lanes::DEFAULT);
+
+        let error = commit_finished_host_root(&mut store, render).unwrap_err();
+        let pending_passive = store.root(root_id).unwrap().scheduling().pending_passive();
+
+        assert!(matches!(
+            error,
+            RootCommitError::PendingPassiveRootMismatch { root, pending_root }
+                if root == root_id && pending_root == wrong_root
+        ));
+        assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+        assert_eq!(pending_passive.root(), Some(wrong_root));
+        assert_eq!(pending_passive.finished_work(), None);
+        assert_eq!(pending_passive.lanes(), Lanes::DEFAULT);
+        assert!(!pending_passive.has_commit_handoff());
     }
 
     #[test]
