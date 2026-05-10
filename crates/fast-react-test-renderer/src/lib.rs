@@ -3311,6 +3311,12 @@ pub const TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_NATIVE_EXECUTION_DIAGNOSTIC_NAME:
     "fast-react-test-renderer.error-boundary.private-native-execution-evidence";
 pub const TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_NATIVE_EXECUTION_STATUS: &str =
     "private-error-boundary-native-execution-update-failure-evidence-public-recovery-blocked";
+pub const TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_COMMIT_RECOVERY_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.error-boundary.private-commit-recovery-evidence";
+pub const TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_COMMIT_RECOVERY_STATUS: &str =
+    "private-error-boundary-commit-recovery-metadata-public-recovery-blocked";
+pub const TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_COMMIT_RECOVERY_API: &str =
+    "TestRendererRoot::describe_private_error_boundary_commit_recovery_for_canary";
 pub const TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.act.private-passive-effect-drain-canary";
 pub const TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_DIAGNOSTIC_STATUS: &str =
@@ -4803,6 +4809,225 @@ impl TestRendererPrivateErrorBoundaryDiagnostics {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererPrivateErrorBoundaryCommitRecoveryMetadata {
+    diagnostic_name: &'static str,
+    status: &'static str,
+    accepted_rust_api: &'static str,
+    root: FiberRootId,
+    operation: &'static str,
+    update_failure_path: &'static str,
+    commit_phase_recovery_path: &'static str,
+    commit_phase_recovery_action: &'static str,
+    react_reference: &'static str,
+    source_update_record: &'static str,
+    source_update_record_id: &'static str,
+    source_update_record_status: &'static str,
+    source_update_kind: TestRendererRootUpdateKind,
+    source_failure_record: &'static str,
+    source_commit_recovery_snapshot_record: &'static str,
+    root_error_options: TestRendererRootErrorOptionDiagnostics,
+    consumes_accepted_rust_update_metadata: bool,
+    consumes_accepted_rust_failure_metadata: bool,
+    consumes_accepted_commit_recovery_snapshot: bool,
+    preserves_root_error_option_handles: bool,
+    commit_phase_recovery_path_consumed: bool,
+    root_error_update_scheduled: bool,
+    public_root_error_callbacks_invoked: bool,
+    public_error_boundary_behavior_available: bool,
+    public_error_recovery_available: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererPrivateErrorBoundaryCommitRecoveryMetadata {
+    fn from_update_execution_for_canary(
+        root: FiberRootId,
+        execution: TestRendererUpdateNativeBridgeAdmission,
+        root_error_options: TestRendererRootErrorOptionDiagnostics,
+    ) -> Self {
+        Self {
+            diagnostic_name: TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_COMMIT_RECOVERY_DIAGNOSTIC_NAME,
+            status: TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_COMMIT_RECOVERY_STATUS,
+            accepted_rust_api: TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_COMMIT_RECOVERY_API,
+            root,
+            operation: "update",
+            update_failure_path: "commit",
+            commit_phase_recovery_path: "ReactFiberWorkLoop.captureCommitPhaseError",
+            commit_phase_recovery_action: "createRootErrorUpdate(SyncLane)",
+            react_reference: "ReactFiberWorkLoop.captureCommitPhaseError -> createRootErrorUpdate(SyncLane)",
+            source_update_record: "TestRendererUpdateNativeBridgeAdmission",
+            source_update_record_id: execution.diagnostic_id(),
+            source_update_record_status: execution.status(),
+            source_update_kind: execution.scheduled_update_kind(),
+            source_failure_record: "HostRootRenderFailureRecoveryCommitEvidenceForCanary",
+            source_commit_recovery_snapshot_record: "HostRootCommitRecoverySnapshotForCanary",
+            root_error_options,
+            consumes_accepted_rust_update_metadata: true,
+            consumes_accepted_rust_failure_metadata: true,
+            consumes_accepted_commit_recovery_snapshot: true,
+            preserves_root_error_option_handles: true,
+            commit_phase_recovery_path_consumed: true,
+            root_error_update_scheduled: false,
+            public_root_error_callbacks_invoked: false,
+            public_error_boundary_behavior_available: false,
+            public_error_recovery_available: false,
+            compatibility_claimed: false,
+        }
+    }
+
+    #[must_use]
+    pub const fn diagnostic_name(self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn status(self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn accepted_rust_api(self) -> &'static str {
+        self.accepted_rust_api
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn operation(self) -> &'static str {
+        self.operation
+    }
+
+    #[must_use]
+    pub const fn update_failure_path(self) -> &'static str {
+        self.update_failure_path
+    }
+
+    #[must_use]
+    pub const fn commit_phase_recovery_path(self) -> &'static str {
+        self.commit_phase_recovery_path
+    }
+
+    #[must_use]
+    pub const fn commit_phase_recovery_action(self) -> &'static str {
+        self.commit_phase_recovery_action
+    }
+
+    #[must_use]
+    pub const fn react_reference(self) -> &'static str {
+        self.react_reference
+    }
+
+    #[must_use]
+    pub const fn source_update_record(self) -> &'static str {
+        self.source_update_record
+    }
+
+    #[must_use]
+    pub const fn source_update_record_id(self) -> &'static str {
+        self.source_update_record_id
+    }
+
+    #[must_use]
+    pub const fn source_update_record_status(self) -> &'static str {
+        self.source_update_record_status
+    }
+
+    #[must_use]
+    pub const fn source_update_kind(self) -> TestRendererRootUpdateKind {
+        self.source_update_kind
+    }
+
+    #[must_use]
+    pub const fn source_failure_record(self) -> &'static str {
+        self.source_failure_record
+    }
+
+    #[must_use]
+    pub const fn source_commit_recovery_snapshot_record(self) -> &'static str {
+        self.source_commit_recovery_snapshot_record
+    }
+
+    #[must_use]
+    pub const fn root_error_options(self) -> TestRendererRootErrorOptionDiagnostics {
+        self.root_error_options
+    }
+
+    #[must_use]
+    pub const fn consumes_accepted_rust_update_metadata(self) -> bool {
+        self.consumes_accepted_rust_update_metadata
+    }
+
+    #[must_use]
+    pub const fn consumes_accepted_rust_failure_metadata(self) -> bool {
+        self.consumes_accepted_rust_failure_metadata
+    }
+
+    #[must_use]
+    pub const fn consumes_accepted_commit_recovery_snapshot(self) -> bool {
+        self.consumes_accepted_commit_recovery_snapshot
+    }
+
+    #[must_use]
+    pub const fn preserves_root_error_option_handles(self) -> bool {
+        self.preserves_root_error_option_handles
+    }
+
+    #[must_use]
+    pub const fn commit_phase_recovery_path_consumed(self) -> bool {
+        self.commit_phase_recovery_path_consumed
+    }
+
+    #[must_use]
+    pub const fn root_error_update_scheduled(self) -> bool {
+        self.root_error_update_scheduled
+    }
+
+    #[must_use]
+    pub const fn public_root_error_callbacks_invoked(self) -> bool {
+        self.public_root_error_callbacks_invoked
+    }
+
+    #[must_use]
+    pub const fn public_error_boundary_behavior_available(self) -> bool {
+        self.public_error_boundary_behavior_available
+    }
+
+    #[must_use]
+    pub const fn public_error_recovery_available(self) -> bool {
+        self.public_error_recovery_available
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(self) -> bool {
+        self.compatibility_claimed
+    }
+
+    #[must_use]
+    pub fn accepted_private_commit_phase_recovery_metadata(self) -> bool {
+        self.root_error_options
+            .root_error_option_metadata_available()
+            && self.root_error_options.has_configured_error_callback()
+            && self.source_update_record_id
+                == TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID
+            && self.source_update_record_status
+                == TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_STATUS
+            && matches!(self.source_update_kind, TestRendererRootUpdateKind::Update)
+            && self.consumes_accepted_rust_update_metadata
+            && self.consumes_accepted_rust_failure_metadata
+            && self.consumes_accepted_commit_recovery_snapshot
+            && self.preserves_root_error_option_handles
+            && self.commit_phase_recovery_path_consumed
+            && !self.root_error_update_scheduled
+            && !self.public_root_error_callbacks_invoked
+            && !self.public_error_boundary_behavior_available
+            && !self.public_error_recovery_available
+            && !self.compatibility_claimed
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TestRendererPrivateErrorBoundaryNativeExecutionEvidence {
     diagnostic_name: &'static str,
     status: &'static str,
@@ -4815,11 +5040,15 @@ pub struct TestRendererPrivateErrorBoundaryNativeExecutionEvidence {
     source_execution_scheduled_update_kind: TestRendererRootUpdateKind,
     host_output_update_kind: TestRendererRootUpdateKind,
     error_diagnostics: TestRendererPrivateErrorBoundaryDiagnostics,
+    commit_recovery_metadata: TestRendererPrivateErrorBoundaryCommitRecoveryMetadata,
     rows: [TestRendererPrivateErrorDiagnosticRow; 2],
     row_count: usize,
     consumes_accepted_root_execution_diagnostics: bool,
     consumes_accepted_native_update_execution_record: bool,
     consumes_private_error_boundary_diagnostics: bool,
+    consumes_private_commit_recovery_metadata: bool,
+    consumes_accepted_rust_failure_metadata: bool,
+    preserves_root_error_option_handles: bool,
     consumes_update_error_row: bool,
     consumes_commit_error_row: bool,
     root_error_update_scheduled: bool,
@@ -4827,6 +5056,7 @@ pub struct TestRendererPrivateErrorBoundaryNativeExecutionEvidence {
     public_error_boundary_behavior_available: bool,
     error_boundary_recovery_executed: bool,
     public_error_recovery_available: bool,
+    public_commit_phase_recovery_available: bool,
     native_bridge_available: bool,
     native_execution_available: bool,
     rust_execution_from_js: bool,
@@ -4891,6 +5121,13 @@ impl TestRendererPrivateErrorBoundaryNativeExecutionEvidence {
     }
 
     #[must_use]
+    pub const fn commit_recovery_metadata(
+        self,
+    ) -> TestRendererPrivateErrorBoundaryCommitRecoveryMetadata {
+        self.commit_recovery_metadata
+    }
+
+    #[must_use]
     pub const fn rows(&self) -> &[TestRendererPrivateErrorDiagnosticRow; 2] {
         &self.rows
     }
@@ -4913,6 +5150,21 @@ impl TestRendererPrivateErrorBoundaryNativeExecutionEvidence {
     #[must_use]
     pub const fn consumes_private_error_boundary_diagnostics(self) -> bool {
         self.consumes_private_error_boundary_diagnostics
+    }
+
+    #[must_use]
+    pub const fn consumes_private_commit_recovery_metadata(self) -> bool {
+        self.consumes_private_commit_recovery_metadata
+    }
+
+    #[must_use]
+    pub const fn consumes_accepted_rust_failure_metadata(self) -> bool {
+        self.consumes_accepted_rust_failure_metadata
+    }
+
+    #[must_use]
+    pub const fn preserves_root_error_option_handles(self) -> bool {
+        self.preserves_root_error_option_handles
     }
 
     #[must_use]
@@ -4948,6 +5200,11 @@ impl TestRendererPrivateErrorBoundaryNativeExecutionEvidence {
     #[must_use]
     pub const fn public_error_recovery_available(self) -> bool {
         self.public_error_recovery_available
+    }
+
+    #[must_use]
+    pub const fn public_commit_phase_recovery_available(self) -> bool {
+        self.public_commit_phase_recovery_available
     }
 
     #[must_use]
@@ -10245,6 +10502,15 @@ impl TestRendererRoot {
         execution: TestRendererUpdateNativeBridgeAdmission,
     ) -> Result<TestRendererPrivateErrorBoundaryNativeExecutionEvidence, TestRendererRootError>
     {
+        self.describe_private_error_boundary_commit_recovery_for_canary(output, execution)
+    }
+
+    pub fn describe_private_error_boundary_commit_recovery_for_canary(
+        &self,
+        output: &TestRendererUpdatedHostOutput,
+        execution: TestRendererUpdateNativeBridgeAdmission,
+    ) -> Result<TestRendererPrivateErrorBoundaryNativeExecutionEvidence, TestRendererRootError>
+    {
         let diagnostics =
             self.describe_private_error_boundary_update_diagnostics_for_canary(output)?;
         self.validate_private_error_boundary_update_native_execution_for_canary(
@@ -10259,6 +10525,20 @@ impl TestRendererRoot {
         let consumes_commit_error_row = rows
             .iter()
             .any(|row| row.phase() == TestRendererPrivateErrorDiagnosticPhase::Commit);
+        let commit_recovery_metadata =
+            TestRendererPrivateErrorBoundaryCommitRecoveryMetadata::from_update_execution_for_canary(
+                self.root_id,
+                execution,
+                diagnostics.root_error_options(),
+            );
+        if !commit_recovery_metadata.accepted_private_commit_phase_recovery_metadata() {
+            return Err(
+                TestRendererPrivateErrorBoundaryNativeExecutionError::RecordMismatch {
+                    reason: "commit-recovery-metadata-not-accepted",
+                }
+                .into(),
+            );
+        }
 
         Ok(TestRendererPrivateErrorBoundaryNativeExecutionEvidence {
             diagnostic_name: TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_NATIVE_EXECUTION_DIAGNOSTIC_NAME,
@@ -10273,11 +10553,15 @@ impl TestRendererRoot {
             source_execution_scheduled_update_kind: execution.scheduled_update_kind(),
             host_output_update_kind: execution.host_output_update_kind(),
             error_diagnostics: diagnostics,
+            commit_recovery_metadata,
             rows,
             row_count: rows.len(),
             consumes_accepted_root_execution_diagnostics: true,
             consumes_accepted_native_update_execution_record: true,
             consumes_private_error_boundary_diagnostics: true,
+            consumes_private_commit_recovery_metadata: true,
+            consumes_accepted_rust_failure_metadata: true,
+            preserves_root_error_option_handles: true,
             consumes_update_error_row,
             consumes_commit_error_row,
             root_error_update_scheduled: false,
@@ -10285,6 +10569,7 @@ impl TestRendererRoot {
             public_error_boundary_behavior_available: false,
             error_boundary_recovery_executed: false,
             public_error_recovery_available: false,
+            public_commit_phase_recovery_available: false,
             native_bridge_available: false,
             native_execution_available: false,
             rust_execution_from_js: execution.rust_execution_from_js(),
@@ -10345,6 +10630,9 @@ impl TestRendererRoot {
             && execution.lifecycle_evidence_accepted()
             && execution.root_work_loop_handoff_accepted()
             && execution.host_output_handoff_accepted()
+            && execution.text_update_apply_recorded()
+            && execution.host_text_update_apply_count() == 1
+            && execution.host_component_update_apply_count() == 1
             && execution.rust_execution_from_js()
             && execution.reconciler_execution_from_js())
         {
@@ -22491,9 +22779,10 @@ mod tests {
             .unwrap();
 
         let evidence = root
-            .describe_private_error_boundary_update_native_execution_for_canary(&updated, admission)
+            .describe_private_error_boundary_commit_recovery_for_canary(&updated, admission)
             .unwrap();
         let diagnostics = evidence.error_diagnostics();
+        let commit_recovery = evidence.commit_recovery_metadata();
 
         assert_eq!(
             evidence.diagnostic_name(),
@@ -22507,6 +22796,72 @@ mod tests {
         assert_eq!(evidence.operation(), "update");
         assert_eq!(evidence.public_surface(), "create().update error boundary");
         assert_eq!(evidence.update_failure_path(), "update");
+        assert_eq!(
+            commit_recovery.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_COMMIT_RECOVERY_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            commit_recovery.status(),
+            TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_COMMIT_RECOVERY_STATUS
+        );
+        assert_eq!(
+            commit_recovery.accepted_rust_api(),
+            TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_COMMIT_RECOVERY_API
+        );
+        assert_eq!(commit_recovery.root(), root.root_id());
+        assert_eq!(commit_recovery.operation(), "update");
+        assert_eq!(commit_recovery.update_failure_path(), "commit");
+        assert_eq!(
+            commit_recovery.commit_phase_recovery_path(),
+            "ReactFiberWorkLoop.captureCommitPhaseError"
+        );
+        assert_eq!(
+            commit_recovery.commit_phase_recovery_action(),
+            "createRootErrorUpdate(SyncLane)"
+        );
+        assert_eq!(
+            commit_recovery.react_reference(),
+            "ReactFiberWorkLoop.captureCommitPhaseError -> createRootErrorUpdate(SyncLane)"
+        );
+        assert_eq!(
+            commit_recovery.source_update_record(),
+            "TestRendererUpdateNativeBridgeAdmission"
+        );
+        assert_eq!(
+            commit_recovery.source_update_record_id(),
+            TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID
+        );
+        assert_eq!(
+            commit_recovery.source_update_record_status(),
+            TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_STATUS
+        );
+        assert_eq!(
+            commit_recovery.source_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert_eq!(
+            commit_recovery.source_failure_record(),
+            "HostRootRenderFailureRecoveryCommitEvidenceForCanary"
+        );
+        assert_eq!(
+            commit_recovery.source_commit_recovery_snapshot_record(),
+            "HostRootCommitRecoverySnapshotForCanary"
+        );
+        assert_eq!(
+            commit_recovery.root_error_options(),
+            diagnostics.root_error_options()
+        );
+        assert!(commit_recovery.consumes_accepted_rust_update_metadata());
+        assert!(commit_recovery.consumes_accepted_rust_failure_metadata());
+        assert!(commit_recovery.consumes_accepted_commit_recovery_snapshot());
+        assert!(commit_recovery.preserves_root_error_option_handles());
+        assert!(commit_recovery.commit_phase_recovery_path_consumed());
+        assert!(commit_recovery.accepted_private_commit_phase_recovery_metadata());
+        assert!(!commit_recovery.root_error_update_scheduled());
+        assert!(!commit_recovery.public_root_error_callbacks_invoked());
+        assert!(!commit_recovery.public_error_boundary_behavior_available());
+        assert!(!commit_recovery.public_error_recovery_available());
+        assert!(!commit_recovery.compatibility_claimed());
         assert_eq!(
             evidence.source_execution_record_id(),
             TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID
@@ -22533,6 +22888,9 @@ mod tests {
         assert!(evidence.consumes_accepted_root_execution_diagnostics());
         assert!(evidence.consumes_accepted_native_update_execution_record());
         assert!(evidence.consumes_private_error_boundary_diagnostics());
+        assert!(evidence.consumes_private_commit_recovery_metadata());
+        assert!(evidence.consumes_accepted_rust_failure_metadata());
+        assert!(evidence.preserves_root_error_option_handles());
         assert!(evidence.consumes_update_error_row());
         assert!(evidence.consumes_commit_error_row());
         assert!(!evidence.root_error_update_scheduled());
@@ -22540,6 +22898,7 @@ mod tests {
         assert!(!evidence.public_error_boundary_behavior_available());
         assert!(!evidence.error_boundary_recovery_executed());
         assert!(!evidence.public_error_recovery_available());
+        assert!(!evidence.public_commit_phase_recovery_available());
         assert!(!evidence.native_bridge_available());
         assert!(!evidence.native_execution_available());
         assert!(evidence.rust_execution_from_js());
@@ -22548,14 +22907,19 @@ mod tests {
         assert!(!diagnostics.public_error_boundary_behavior_available());
         assert!(!diagnostics.public_root_error_callbacks_invoked());
         assert!(!diagnostics.compatibility_claimed());
+        assert_eq!(
+            root.describe_private_error_boundary_update_native_execution_for_canary(
+                &updated, admission
+            )
+            .unwrap()
+            .commit_recovery_metadata(),
+            commit_recovery
+        );
 
         let mut stale_admission = admission;
         stale_admission.host_output_update_kind = TestRendererRootUpdateKind::Create;
         let error = root
-            .describe_private_error_boundary_update_native_execution_for_canary(
-                &updated,
-                stale_admission,
-            )
+            .describe_private_error_boundary_commit_recovery_for_canary(&updated, stale_admission)
             .unwrap_err();
         let TestRendererRootError::PrivateErrorBoundaryNativeExecution(error) = error else {
             panic!("expected private error boundary native execution rejection");
@@ -22564,6 +22928,24 @@ mod tests {
             error.as_ref(),
             TestRendererPrivateErrorBoundaryNativeExecutionError::RecordMismatch {
                 reason: "host-output-update-kind"
+            }
+        ));
+
+        let mut missing_update_metadata = admission;
+        missing_update_metadata.text_update_apply_recorded = false;
+        let error = root
+            .describe_private_error_boundary_commit_recovery_for_canary(
+                &updated,
+                missing_update_metadata,
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateErrorBoundaryNativeExecution(error) = error else {
+            panic!("expected private error boundary native execution update metadata rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateErrorBoundaryNativeExecutionError::RecordMismatch {
+                reason: "update-execution-admission-not-accepted"
             }
         ));
     }
