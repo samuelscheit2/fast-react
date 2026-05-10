@@ -86,6 +86,14 @@ tarball URL from checked inventory instead.
   5 tests.
 - `npm run check:js` passed, including 432 conformance tests.
 - `git diff --check` passed.
+- Orchestrator merged current `main` into this branch without conflicts.
+- Post-merge orchestrator verification passed:
+  - `node --test tests/conformance/test/react-transition-facade.test.mjs`
+  - `node --test tests/conformance/test/react-hook-dispatcher-guard.test.mjs`
+  - `node tests/smoke/import-entrypoints.mjs`
+  - `npm run check:js`: 450 conformance tests plus package surface,
+    benchmark, native loader, and workspace smoke checks
+  - `git diff --check`
 
 ## Quality Review
 
