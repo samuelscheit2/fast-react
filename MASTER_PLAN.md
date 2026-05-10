@@ -45,10 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 195: test-renderer root callback snapshot in
-  `/Users/user/Developer/Developer/fast-react-worker-195-test-renderer-root-callback-snapshot`.
-- Worker 196: sync-flush root callback snapshot in
-  `/Users/user/Developer/Developer/fast-react-worker-196-sync-flush-root-callback-snapshot`.
 - Worker 197: root commit passive pending handoff in
   `/Users/user/Developer/Developer/fast-react-worker-197-root-commit-passive-pending-handoff`.
 - Worker 198: host work host-node store integration in
