@@ -1,6 +1,9 @@
 'use strict';
 
 const {
+  createEventTargetNormalizationRecord
+} = require('../client/component-tree.js');
+const {
   getEventTarget,
   getNativeEventType
 } = require('./get-event-target.js');
@@ -136,7 +139,8 @@ function createPluginRecords(eventSystemFlags) {
 function createPluginExtractionRecord(
   wrapperRecord,
   nativeEvent,
-  nativeEventTarget
+  nativeEventTarget,
+  targetNormalizationRecord
 ) {
   const eventSystemFlags = wrapperRecord.eventSystemFlags;
   const dispatchQueue = createDispatchQueueRecord();
@@ -159,6 +163,7 @@ function createPluginExtractionRecord(
     targetContainer: wrapperRecord.targetContainer,
     targetInst: null,
     targetInstStatus: 'not-resolved',
+    targetNormalizationRecord,
     willInvokeListeners: false
   });
 }
@@ -191,10 +196,13 @@ function createEventDispatchRecordFromWrapperRecord(
     nativeEvent,
     wrapperRecord.targetContainer
   );
+  const targetNormalizationRecord =
+    createEventTargetNormalizationRecord(nativeEventTarget);
   const extractionRecord = createPluginExtractionRecord(
     wrapperRecord,
     nativeEvent,
-    nativeEventTarget
+    nativeEventTarget,
+    targetNormalizationRecord
   );
 
   return Object.freeze({
@@ -223,8 +231,14 @@ function createEventDispatchRecordFromWrapperRecord(
     status: 'blocked',
     syntheticEventCount: 0,
     targetContainer: wrapperRecord.targetContainer,
+    targetHostInstanceNode:
+      targetNormalizationRecord.closestMountedHostInstanceNode,
+    targetHostInstanceStatus: targetNormalizationRecord.status,
+    targetHostInstanceToken:
+      targetNormalizationRecord.closestMountedHostInstanceToken,
     targetInst: null,
     targetInstStatus: 'not-resolved',
+    targetNormalizationRecord,
     targetResolutionBlockedReason: EVENT_TARGET_RESOLUTION_BLOCKED_CODE,
     targetResolutionStatus: 'blocked',
     willInvokeListeners: false,

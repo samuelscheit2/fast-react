@@ -20,6 +20,12 @@ const repoRoot = path.resolve(
 const domContainer = require(
   path.join(repoRoot, "packages/react-dom/src/client/dom-container.js")
 );
+const componentTree = require(
+  path.join(repoRoot, "packages/react-dom/src/client/component-tree.js")
+);
+const eventDispatch = require(
+  path.join(repoRoot, "packages/react-dom/src/events/dispatch.js")
+);
 const eventListener = require(
   path.join(repoRoot, "packages/react-dom/src/events/react-dom-event-listener.js")
 );
@@ -45,6 +51,16 @@ const exportOracle = readCheckedReactDomExportOracle();
 test("private event dispatch skeleton creates fail-closed records from wrapper metadata", () => {
   const root = createEventTarget("root");
   const child = createNode("BUTTON", domContainer.ELEMENT_NODE, root);
+  const rootOwner = {kind: "DispatchTargetRootOwner"};
+  const hostOwner = {kind: "DispatchTargetHostOwner"};
+  let latestPropsListenerCalls = 0;
+  const latestProps = {
+    onClick() {
+      latestPropsListenerCalls++;
+    }
+  };
+  const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
+  componentTree.attachHostInstanceNode(child, token, latestProps);
   const wrapperRecord = eventListener.createEventListenerWrapperRecordWithPriority(
     root,
     "click",
@@ -53,11 +69,15 @@ test("private event dispatch skeleton creates fail-closed records from wrapper m
   const nativeEvent = createNativeEvent("click", child);
 
   const dispatchRecord =
-    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+    eventDispatch.createEventDispatchRecordFromWrapperRecord(
       wrapperRecord,
       nativeEvent
     );
 
+  assert.equal(
+    eventDispatch.createEventDispatchRecordFromWrapperRecord,
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord
+  );
   assert.equal(Object.isFrozen(dispatchRecord), true);
   assert.equal(
     dispatchRecord.kind,
@@ -78,11 +98,54 @@ test("private event dispatch skeleton creates fail-closed records from wrapper m
   assert.equal(dispatchRecord.inCapturePhase, true);
   assert.equal(dispatchRecord.isNonDelegatedEvent, false);
   assert.equal(dispatchRecord.targetInst, null);
+  assert.equal(dispatchRecord.targetInstStatus, "not-resolved");
   assert.equal(dispatchRecord.targetResolutionStatus, "blocked");
   assert.equal(
     dispatchRecord.targetResolutionBlockedReason,
     pluginEventSystem.EVENT_TARGET_RESOLUTION_BLOCKED_CODE
   );
+  assert.equal(
+    dispatchRecord.targetNormalizationRecord,
+    dispatchRecord.extractionRecord.targetNormalizationRecord
+  );
+  assert.equal(
+    dispatchRecord.targetNormalizationRecord.kind,
+    componentTree.EVENT_TARGET_NORMALIZATION_RECORD_KIND
+  );
+  assert.equal(
+    Object.isFrozen(dispatchRecord.targetNormalizationRecord),
+    true
+  );
+  assert.equal(
+    dispatchRecord.targetNormalizationRecord.status,
+    "mounted-host-instance"
+  );
+  assert.equal(
+    dispatchRecord.targetNormalizationRecord.mountedHostInstanceFound,
+    true
+  );
+  assert.equal(
+    dispatchRecord.targetNormalizationRecord.closestMountedHostInstanceToken,
+    token
+  );
+  assert.equal(
+    dispatchRecord.targetNormalizationRecord.directMountedHostInstanceToken,
+    token
+  );
+  assert.equal(
+    dispatchRecord.targetNormalizationRecord.closestMountedHostInstanceNode,
+    child
+  );
+  assert.equal(dispatchRecord.targetNormalizationRecord.hostOwner, hostOwner);
+  assert.equal(dispatchRecord.targetNormalizationRecord.rootOwner, rootOwner);
+  assert.equal(dispatchRecord.targetNormalizationRecord.targetNode, child);
+  assert.equal(
+    dispatchRecord.targetNormalizationRecord.latestPropsStatus,
+    "present"
+  );
+  assert.equal(dispatchRecord.targetHostInstanceNode, child);
+  assert.equal(dispatchRecord.targetHostInstanceToken, token);
+  assert.equal(dispatchRecord.targetHostInstanceStatus, "mounted-host-instance");
   assert.equal(dispatchRecord.willInvokeListeners, false);
   assert.equal(dispatchRecord.listenerInvocationCount, 0);
   assert.equal(dispatchRecord.syntheticEventCount, 0);
@@ -99,10 +162,13 @@ test("private event dispatch skeleton creates fail-closed records from wrapper m
   assert.equal(Object.isFrozen(dispatchRecord.dispatchQueue.entries), true);
   assert.equal(nativeEvent.stopPropagationCallCount, 0);
   assert.equal(nativeEvent.preventDefaultCallCount, 0);
+  assert.equal(latestPropsListenerCalls, 0);
 
   assert.equal(wrapperRecord.listener(nativeEvent), undefined);
   assert.equal(nativeEvent.stopPropagationCallCount, 0);
   assert.equal(nativeEvent.preventDefaultCallCount, 0);
+  assert.equal(latestPropsListenerCalls, 0);
+  assert.equal(componentTree.detachHostInstanceToken(token), token);
 });
 
 test("private listener dispatch entry points return records while installed listeners stay inert", () => {
@@ -197,10 +263,13 @@ test("plugin extraction records remain deterministic and fail closed for flag va
   );
 });
 
-test("event target normalization is record-only and does not resolve component trees", () => {
+test("event target normalization reports mounted host diagnostics without enabling dispatch", () => {
   const root = createEventTarget("target-root");
   const element = createNode("SPAN", domContainer.ELEMENT_NODE, root);
   const text = createNode("#text", domContainer.TEXT_NODE, element);
+  const rootOwner = {kind: "TargetNormalizationRoot"};
+  const hostOwner = {kind: "TargetNormalizationHost"};
+  const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
   const svgUse = {
     correspondingUseElement: element,
     nodeName: "use",
@@ -211,14 +280,41 @@ test("event target normalization is record-only and does not resolve component t
     "click",
     0
   );
+  componentTree.attachHostInstanceNode(element, token, {
+    onClick() {
+      throw new Error("latest props listener must not be invoked");
+    }
+  });
 
-  assert.equal(
+  const textDispatch =
     pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
       wrapperRecord,
       createNativeEvent("click", text)
-    ).nativeEventTarget,
+    );
+  assert.equal(
+    textDispatch.nativeEventTarget,
     element
   );
+  assert.equal(textDispatch.targetInst, null);
+  assert.equal(textDispatch.targetInstStatus, "not-resolved");
+  assert.equal(textDispatch.targetResolutionStatus, "blocked");
+  assert.equal(
+    textDispatch.targetNormalizationRecord.status,
+    "mounted-host-instance"
+  );
+  assert.equal(
+    textDispatch.targetNormalizationRecord.closestMountedHostInstanceToken,
+    token
+  );
+  assert.equal(
+    textDispatch.targetNormalizationRecord.closestMountedHostInstanceNode,
+    element
+  );
+  assert.equal(textDispatch.targetNormalizationRecord.hostOwner, hostOwner);
+  assert.equal(textDispatch.targetNormalizationRecord.rootOwner, rootOwner);
+  assert.equal(textDispatch.targetHostInstanceToken, token);
+  assert.equal(textDispatch.targetHostInstanceNode, element);
+  assert.equal(textDispatch.willInvokeListeners, false);
   assert.equal(
     pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
       wrapperRecord,
@@ -244,6 +340,14 @@ test("event target normalization is record-only and does not resolve component t
       createNativeEvent("click", text)
     ).targetInstStatus,
     "not-resolved"
+  );
+  assert.equal(componentTree.detachHostInstanceToken(token), token);
+  assert.equal(
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      wrapperRecord,
+      createNativeEvent("click", text)
+    ).targetNormalizationRecord.status,
+    "no-mounted-host-instance"
   );
 });
 
@@ -287,6 +391,7 @@ test("private dispatch skeleton does not change public React DOM exports", () =>
 
   const exportedSubpaths = Object.keys(reactDomPackageJson.exports);
   for (const subpath of [
+    "./src/events/dispatch",
     "./src/events/event-system-flags",
     "./src/events/get-event-target",
     "./src/events/plugin-event-system"

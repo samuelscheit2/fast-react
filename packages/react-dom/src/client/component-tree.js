@@ -12,6 +12,8 @@ const randomKey = Math.random().toString(36).slice(2);
 const internalHostInstanceTokenKey = hostInstanceMarkerPrefix + randomKey;
 const internalLatestPropsKey = latestPropsMarkerPrefix + randomKey;
 const hostInstanceTokenBrand = Symbol('fast.react.dom.hostInstanceToken');
+const EVENT_TARGET_NORMALIZATION_RECORD_KIND =
+  'FastReactDomEventTargetNormalizationRecord';
 
 const tokenMetadata = new WeakMap();
 const tokenToNode = new WeakMap();
@@ -180,6 +182,54 @@ function getClosestMountedHostInstanceNodeFromNode(targetNode) {
   return token === null ? null : getMountedHostInstanceNodeFromToken(token);
 }
 
+function createEventTargetNormalizationRecord(targetNode) {
+  const normalizedTargetNode = isObjectLike(targetNode) ? targetNode : null;
+  const closestMountedHostInstanceToken =
+    getClosestMountedHostInstanceTokenFromNode(normalizedTargetNode);
+  const directMountedHostInstanceToken =
+    getMountedHostInstanceTokenFromNode(normalizedTargetNode);
+  const closestMountedHostInstanceNode =
+    closestMountedHostInstanceToken === null
+      ? null
+      : getMountedHostInstanceNodeFromToken(closestMountedHostInstanceToken);
+  const hostOwner =
+    closestMountedHostInstanceToken === null
+      ? null
+      : getHostInstanceOwnerFromToken(closestMountedHostInstanceToken);
+  const rootOwner =
+    closestMountedHostInstanceToken === null
+      ? null
+      : getRootOwnerFromHostInstanceToken(closestMountedHostInstanceToken);
+  const latestProps =
+    closestMountedHostInstanceToken === null
+      ? null
+      : getLatestPropsFromHostInstanceToken(closestMountedHostInstanceToken);
+
+  return Object.freeze({
+    closestMountedHostInstanceNode,
+    closestMountedHostInstanceToken,
+    directMountedHostInstanceToken,
+    hostOwner,
+    isDirectMountedHostInstance:
+      directMountedHostInstanceToken !== null &&
+      directMountedHostInstanceToken === closestMountedHostInstanceToken,
+    kind: EVENT_TARGET_NORMALIZATION_RECORD_KIND,
+    latestPropsStatus: latestProps === null ? 'missing' : 'present',
+    mountedHostInstanceFound: closestMountedHostInstanceToken !== null,
+    rootOwner,
+    status:
+      closestMountedHostInstanceToken === null
+        ? 'no-mounted-host-instance'
+        : 'mounted-host-instance',
+    targetNode: normalizedTargetNode,
+    targetNodeType:
+      normalizedTargetNode !== null &&
+      typeof normalizedTargetNode.nodeType === 'number'
+        ? normalizedTargetNode.nodeType
+        : null
+  });
+}
+
 function getHostInstanceOwnerFromToken(token) {
   const metadata = getHostInstanceMetadata(token);
   return metadata === null ? null : metadata.hostOwner;
@@ -345,11 +395,13 @@ function detachHostInstanceToken(token) {
 }
 
 module.exports = {
+  EVENT_TARGET_NORMALIZATION_RECORD_KIND,
   assertMountedHostInstanceToken,
   assertHostInstanceNode,
   attachHostInstanceNode,
   commitLatestPropsFromMutationRecord,
   commitLatestPropsFromMutationRecords,
+  createEventTargetNormalizationRecord,
   createHostInstanceToken,
   detachHostInstanceNode,
   detachHostInstanceToken,
