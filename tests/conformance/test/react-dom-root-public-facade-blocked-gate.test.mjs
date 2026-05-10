@@ -27,6 +27,8 @@ import {
   REACT_DOM_ROOT_PUBLIC_FACADE_SCENARIO_ADMISSIONS,
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_ACCEPTED_STATUS,
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_CROSS_ROOT_SCHEDULING_ACCEPTED_STATUS,
+  REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS,
+  REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ADMISSIONS,
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_ACCEPTED_STATUS,
   evaluateReactDomRootRenderE2EConformanceGate,
   evaluateReactDomRootPublicFacadeBlockedGate,
@@ -152,6 +154,45 @@ test("React DOM public root facade gate blocks placeholders while oracle prerequ
       .privateActPassivePublicPassiveEffectCompatibilityClaimed,
     false
   );
+  assert.equal(
+    gate.rootRenderGate.summary.privateReactDomMetadataDiagnosticRowCount,
+    REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ADMISSIONS.length *
+      REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES.length
+  );
+  assert.equal(
+    gate.rootRenderGate.summary.privateReactDomMetadataCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privateReactDomMetadataPublicRootRenderCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privateReactDomMetadataPublicHydrationCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privateReactDomMetadataPublicEventCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privateReactDomMetadataPublicResourceCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privateReactDomMetadataPublicFormCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary
+      .privateReactDomMetadataPublicControlledInputCompatibilityClaimed,
+    false
+  );
   assert.equal(gate.rootRenderGate.summary.portalRootRenderBlockedRowCount, 5);
   assert.equal(
     gate.rootRenderGate.summary.privatePortalMetadataPromotesPublicRootRender,
@@ -175,6 +216,10 @@ test("React DOM public root facade gate blocks placeholders while oracle prerequ
     assert.notEqual(
       row.gateStatus,
       REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_ACCEPTED_STATUS
+    );
+    assert.notEqual(
+      row.gateStatus,
+      REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS
     );
     assert.notEqual(row.gateStatus, "blocked-portal-root-render");
     if ("compatibilityClaimed" in row) {
@@ -1201,6 +1246,76 @@ test("React DOM public root facade gate rejects private act/passive promotion to
     gate.failures.some(
       (failure) =>
         failure.gateStatus === "root-render-private-act-passive-row-not-private"
+    )
+  );
+});
+
+test("React DOM public root facade gate rejects private React DOM metadata promotion to public compatibility", () => {
+  const rootRenderGate = clone(
+    evaluateReactDomRootRenderE2EConformanceGate({
+      checkedOracle: rootRenderOracle,
+      currentOracle: rootRenderOracle
+    })
+  );
+  rootRenderGate.summary.privateReactDomMetadataCompatibilityClaimed = true;
+  rootRenderGate.summary
+    .privateReactDomMetadataPublicRootRenderCompatibilityClaimed = true;
+  rootRenderGate.summary
+    .privateReactDomMetadataPublicHydrationCompatibilityClaimed = true;
+  rootRenderGate.summary
+    .privateReactDomMetadataPublicEventCompatibilityClaimed = true;
+  rootRenderGate.summary
+    .privateReactDomMetadataPublicResourceCompatibilityClaimed = true;
+  rootRenderGate.summary
+    .privateReactDomMetadataPublicFormCompatibilityClaimed = true;
+  rootRenderGate.summary
+    .privateReactDomMetadataPublicControlledInputCompatibilityClaimed = true;
+  rootRenderGate.privateReactDomMetadataGate.compatibilityClaimed = true;
+  rootRenderGate.privateReactDomMetadataGate
+    .publicRootRenderCompatibilityClaimed = true;
+  rootRenderGate.privateReactDomMetadataGate
+    .publicHydrationCompatibilityClaimed = true;
+  rootRenderGate.privateReactDomMetadataGate
+    .publicEventCompatibilityClaimed = true;
+  rootRenderGate.privateReactDomMetadataGate
+    .publicResourceCompatibilityClaimed = true;
+  rootRenderGate.privateReactDomMetadataGate
+    .publicFormCompatibilityClaimed = true;
+  rootRenderGate.privateReactDomMetadataGate
+    .publicControlledInputCompatibilityClaimed = true;
+  rootRenderGate.privateReactDomMetadataDiagnosticRows[0] = {
+    ...rootRenderGate.privateReactDomMetadataDiagnosticRows[0],
+    comparedToReactDomOracle: true,
+    compatibilityClaimed: true,
+    publicControlledInputCompatibilityClaimed: true,
+    publicEventCompatibilityClaimed: true,
+    publicFormCompatibilityClaimed: true,
+    publicHydrationCompatibilityClaimed: true,
+    publicResourceCompatibilityClaimed: true,
+    publicRootCompatibilitySurface: true,
+    publicRootRenderCompatibilityClaimed: true
+  };
+
+  const gate = evaluateReactDomRootPublicFacadeBlockedGate({
+    checkedOracle: rootRenderOracle,
+    currentOracle: rootRenderOracle,
+    clientRootOracle,
+    rootRenderGateResult: rootRenderGate
+  });
+
+  assert.equal(gate.ok, false);
+  assert.ok(
+    gate.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+        "root-render-private-react-dom-metadata-claims-compatibility-while-public-facade-blocked"
+    )
+  );
+  assert.ok(
+    gate.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+        "root-render-private-react-dom-metadata-row-not-private"
     )
   );
 });
