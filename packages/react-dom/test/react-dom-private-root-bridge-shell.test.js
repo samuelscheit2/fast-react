@@ -5,7 +5,12 @@ const path = require('node:path');
 const test = require('node:test');
 
 const packageRoot = path.resolve(__dirname, '..');
+const reactDom = require(path.join(packageRoot, 'index.js'));
 const reactDomClient = require(path.join(packageRoot, 'client.js'));
+const resourceFormGate = require(path.join(
+  packageRoot,
+  'src/resource-form-gates.js'
+));
 const rootBridge = require(path.join(
   packageRoot,
   'src/client/root-bridge.js'
@@ -557,6 +562,226 @@ test('private create/render admission validates bridge ownership and active mark
   );
   assertBridgeDidNotTouchContainer(container, document);
   assertBridgeDidNotTouchContainer(secondContainer, secondDocument);
+});
+
+test('private portal fake-DOM commit handoff validates ownership and blocked side effects', () => {
+  const document = createDocument('private-portal-commit');
+  const rootContainer = createElement('DIV', document);
+  const portalContainer = createElement('SECTION', document);
+  const portalChild = {
+    props: {
+      children: 'portal child'
+    },
+    type: 'span'
+  };
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    portalBoundaryIdPrefix: 'portal-boundary',
+    portalCommitIdPrefix: 'portal-commit'
+  });
+  const otherBridge = rootBridge.createPrivateRootBridgeShell();
+  const create = bridge.createClientRoot(rootContainer);
+  const rootSideEffects = bridge.applyCreateRootSideEffects(create);
+  const portal = reactDom.createPortal(
+    portalChild,
+    portalContainer,
+    'portal-key'
+  );
+  const render = bridge.renderContainer(create.handle, portal);
+  const boundary = bridge.createPortalRootBoundary(render);
+  const handoff = bridge.createPortalCommitHandoff(boundary, {
+    pendingChildren: [portalChild]
+  });
+  const hiddenHandoff =
+    rootBridge.getPrivateRootPortalCommitHandoffPayload(handoff);
+  const resourceBoundary =
+    resourceFormGate.recordResourceFormPortalCommitBlockedRequest(handoff);
+  const hiddenResourceBoundary =
+    resourceFormGate.getResourceFormPortalCommitBlockedRecordPayload(
+      resourceBoundary
+    );
+
+  assert.equal(
+    handoff.$$typeof,
+    rootBridge.privateRootPortalCommitHandoffRecordType
+  );
+  assert.equal(
+    handoff.kind,
+    'FastReactDomPrivateRootPortalFakeDomCommitHandoffRecord'
+  );
+  assert.equal(
+    handoff.handoffStatus,
+    rootBridge.ROOT_BRIDGE_PORTAL_COMMIT_HANDOFF_ADMITTED
+  );
+  assert.equal(
+    handoff.commitStatus,
+    rootBridge.ROOT_BRIDGE_PORTAL_COMMIT_MUTATION_BLOCKED
+  );
+  assert.equal(handoff.commitHandoffId, 'portal-commit:1');
+  assert.equal(handoff.sourceBoundaryId, 'portal-boundary:1');
+  assert.equal(handoff.sourceRequestType, 'root.render');
+  assert.deepEqual(handoff.fakeDomCommitTarget, {
+    canAppendChild: true,
+    canRemoveChild: true,
+    hasTextContent: true,
+    portalContainerInfo: {
+      kind: 'object',
+      nodeName: 'SECTION',
+      nodeType: ELEMENT_NODE
+    }
+  });
+  assert.deepEqual(handoff.pendingChildrenInfo, {
+    length: 1,
+    type: 'array'
+  });
+  assert.deepEqual(
+    handoff.blockedCapabilities.map((capability) => capability.id),
+    [
+      'portal-fake-dom-commit-apply',
+      'portal-prepare-mount-listeners',
+      'portal-resource-side-effects',
+      'portal-child-reconciliation',
+      'portal-container-mounting',
+      'portal-container-listeners',
+      'native-execution',
+      'reconciler-execution',
+      'dom-mutation',
+      'marker-writes',
+      'listener-installation',
+      'hydration',
+      'events',
+      'compatibility-claims'
+    ]
+  );
+  assert.equal(handoff.fakeDomCommitHandoff, true);
+  assert.equal(handoff.fakeDomCommitApplied, false);
+  assert.equal(handoff.portalContainerChildrenReplaced, false);
+  assert.equal(handoff.portalChildReconciliation, false);
+  assert.equal(handoff.portalMounting, false);
+  assert.equal(handoff.preparePortalMount, false);
+  assert.equal(handoff.nativeExecution, false);
+  assert.equal(handoff.reconcilerExecution, false);
+  assert.equal(handoff.domMutation, false);
+  assert.equal(handoff.markerWrites, false);
+  assert.equal(handoff.listenerInstallation, false);
+  assert.equal(handoff.resourceSideEffects, false);
+  assert.equal(handoff.eventDispatch, false);
+  assert.equal(handoff.compatibilityClaimed, false);
+
+  assert.equal(
+    handoff.portalContainerOwnership.ownershipStatus,
+    rootBridge.ROOT_BRIDGE_PORTAL_CONTAINER_OWNERSHIP_VALIDATED
+  );
+  assert.equal(handoff.portalContainerOwnership.rootContainerMarkedAsRoot, true);
+  assert.equal(
+    handoff.portalContainerOwnership.rootContainerOwnerMatchesHandle,
+    true
+  );
+  assert.equal(
+    handoff.portalContainerOwnership.portalContainerMarkedAsRoot,
+    false
+  );
+  assert.equal(
+    handoff.portalContainerOwnership.portalContainerOwnerMatchesRoot,
+    false
+  );
+  assert.equal(
+    handoff.portalContainerOwnership.portalContainerOwnedByAnotherRoot,
+    false
+  );
+  assert.equal(
+    handoff.portalContainerOwnership.portalContainerAvailableForPortal,
+    true
+  );
+  assert.equal(handoff.portalContainerOwnership.sameContainerAsRoot, false);
+  assert.equal(handoff.portalContainerOwnership.sameOwnerDocument, true);
+  assert.equal(
+    handoff.listenerSideEffects.preparePortalMount,
+    false
+  );
+  assert.equal(
+    handoff.listenerSideEffects.listenToAllSupportedEvents,
+    false
+  );
+  assert.equal(handoff.listenerSideEffects.listenerInstallation, false);
+  assert.equal(handoff.listenerSideEffects.hasPortalListeningMarker, false);
+  assert.equal(
+    handoff.listenerSideEffects.ownerDocumentHasSelectionChangeMarker,
+    true
+  );
+
+  assert.equal(hiddenHandoff.boundaryRecord, boundary);
+  assert.equal(hiddenHandoff.pendingChildren[0], portalChild);
+  assert.equal(hiddenHandoff.portal, portal);
+  assert.equal(hiddenHandoff.portalContainer, portalContainer);
+  assert.equal(hiddenHandoff.rootContainer, rootContainer);
+  assert.equal(hiddenHandoff.rootHandle, create.handle);
+  assert.equal(hiddenHandoff.sourceRecord, render);
+
+  assert.equal(
+    resourceBoundary.$$typeof,
+    resourceFormGate.resourceFormPortalCommitBoundaryRecordType
+  );
+  assert.equal(
+    resourceBoundary.kind,
+    'FastReactDomResourceFormPortalCommitBoundaryRecord'
+  );
+  assert.equal(
+    resourceBoundary.resourceSideEffectStatus,
+    resourceFormGate.privatePortalCommitResourceBlockedStatus
+  );
+  assert.equal(
+    resourceBoundary.rootBridgeBoundary.gateStatus,
+    resourceFormGate.privateRootBridgeRecordOnlyStatus
+  );
+  assert.equal(
+    resourceBoundary.rootBridgeBoundary.commitStatus,
+    rootBridge.ROOT_BRIDGE_PORTAL_COMMIT_MUTATION_BLOCKED
+  );
+  assert.equal(
+    resourceBoundary.rootBridgeBoundary.resourceSideEffects,
+    false
+  );
+  assert.deepEqual(
+    resourceBoundary.sideEffects,
+    resourceFormGate.portalCommitResourceSideEffects
+  );
+  assert.deepEqual(
+    resourceBoundary.privateResourceDispatcherBoundary,
+    resourceFormGate.describePrivateResourceDispatcherBoundary('resource-hint')
+  );
+  assert.equal(resourceBoundary.sourceAdapterBoundary.adaptersInvoked, false);
+  assert.equal(resourceBoundary.sideEffects.resourcesDispatched, false);
+  assert.equal(resourceBoundary.sideEffects.sourceAdaptersInvoked, false);
+  assert.equal(resourceBoundary.sideEffects.portalContainerMutated, false);
+  assert.equal(hiddenResourceBoundary.portalCommitHandoff, handoff);
+
+  assert.equal(portalContainer.__registrations.length, 0);
+  assert.equal(portalContainer.__mutationLog.length, 0);
+  assert.equal(
+    listenerRegistry.hasListeningMarker(portalContainer),
+    false
+  );
+  assert.throws(() => bridge.createPortalCommitHandoff({}), {
+    code: 'FAST_REACT_DOM_INVALID_PORTAL_COMMIT_HANDOFF_RECORD'
+  });
+  assert.throws(() => otherBridge.createPortalCommitHandoff(boundary), {
+    code: 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE'
+  });
+  assert.throws(
+    () =>
+      resourceFormGate.recordResourceFormPortalCommitBlockedRequest({
+        ...handoff,
+        compatibilityClaimed: true
+      }),
+    {
+      code: resourceFormGate.rootBoundaryInvalidPortalCommitHandoffCode
+    }
+  );
+
+  bridge.revertCreateRootSideEffects(rootSideEffects);
+  assertBridgeDidNotTouchContainer(rootContainer, document);
+  assert.equal(portalContainer.__registrations.length, 0);
+  assert.equal(portalContainer.__mutationLog.length, 0);
 });
 
 test('public react-dom/client root placeholders remain inert', () => {

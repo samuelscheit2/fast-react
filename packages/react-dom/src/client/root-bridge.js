@@ -61,6 +61,8 @@ const privateRootCreateSideEffectCleanupRecordType =
   'fast.react_dom.private_root_create_side_effect_cleanup_record';
 const privateRootPortalBoundaryRecordType =
   'fast.react_dom.private_root_portal_boundary_record';
+const privateRootPortalCommitHandoffRecordType =
+  'fast.react_dom.private_root_portal_commit_handoff_record';
 
 const ROOT_LIFECYCLE_CREATED = 'created';
 const ROOT_LIFECYCLE_RENDERED = 'rendered';
@@ -85,6 +87,12 @@ const ROOT_BRIDGE_PORTAL_BOUNDARY_ADMITTED =
   'admitted-private-root-portal-boundary-record';
 const ROOT_BRIDGE_PORTAL_DIAGNOSTIC_BLOCKED =
   'blocked-private-root-portal-diagnostic';
+const ROOT_BRIDGE_PORTAL_COMMIT_HANDOFF_ADMITTED =
+  'admitted-private-root-portal-fake-dom-commit-handoff';
+const ROOT_BRIDGE_PORTAL_COMMIT_MUTATION_BLOCKED =
+  'blocked-private-root-portal-fake-dom-commit-apply';
+const ROOT_BRIDGE_PORTAL_CONTAINER_OWNERSHIP_VALIDATED =
+  'validated-private-root-portal-container-ownership';
 const NATIVE_ROOT_BRIDGE_REQUEST_CREATE = 'create';
 const NATIVE_ROOT_BRIDGE_REQUEST_RENDER = 'render';
 const NATIVE_ROOT_BRIDGE_REQUEST_UNMOUNT = 'unmount';
@@ -201,6 +209,27 @@ const ROOT_BRIDGE_CREATE_RENDER_ACCEPTED_CAPABILITIES = freezeArray([
       'The private root listener registration record was produced by the explicit mark/listen gate.'
   })
 ]);
+const ROOT_BRIDGE_PORTAL_COMMIT_BLOCKED_CAPABILITIES = freezeArray([
+  freezeRecord({
+    id: 'portal-fake-dom-commit-apply',
+    blocked: true,
+    reason:
+      'Portal fake-DOM container replacement is not admitted by this handoff.'
+  }),
+  freezeRecord({
+    id: 'portal-prepare-mount-listeners',
+    blocked: true,
+    reason:
+      'preparePortalMount and portal listener installation remain blocked.'
+  }),
+  freezeRecord({
+    id: 'portal-resource-side-effects',
+    blocked: true,
+    reason:
+      'Document resource, form, and controlled input side effects remain blocked.'
+  }),
+  ...ROOT_BRIDGE_PORTAL_BOUNDARY_BLOCKED_CAPABILITIES
+]);
 
 const rootOwnerState = new WeakMap();
 const rootHandleState = new WeakMap();
@@ -213,6 +242,7 @@ const rootCreateSideEffectPayloads = new WeakMap();
 const rootCreateSideEffectRecords = new WeakMap();
 const rootCreateSideEffectCleanupRecords = new WeakMap();
 const rootPortalBoundaryPayloads = new WeakMap();
+const rootPortalCommitHandoffPayloads = new WeakMap();
 
 function createPrivateRootBridgeShell(options) {
   const bridgeState = createBridgeState(options);
@@ -292,6 +322,13 @@ function createPrivateRootBridgeShell(options) {
     },
     createPortalRootBoundary(record) {
       return createPortalRootBoundaryRecordWithBridge(bridgeState, record);
+    },
+    createPortalCommitHandoff(record, options) {
+      return createPortalCommitHandoffRecordWithBridge(
+        bridgeState,
+        record,
+        options
+      );
     }
   });
 }
@@ -369,6 +406,10 @@ function revertPrivateCreateRootSideEffects(record) {
 
 function createPortalRootBoundaryRecord(record) {
   return createPortalRootBoundaryRecordWithBridge(null, record);
+}
+
+function createPortalCommitHandoffRecord(record, options) {
+  return createPortalCommitHandoffRecordWithBridge(null, record, options);
 }
 
 function admitRootBridgeRequestWithBridge(bridgeState, record) {
@@ -842,6 +883,14 @@ function getPrivateRootPortalBoundaryPayload(record) {
 
 function isPrivateRootPortalBoundaryRecord(value) {
   return rootPortalBoundaryPayloads.has(value);
+}
+
+function getPrivateRootPortalCommitHandoffPayload(record) {
+  return rootPortalCommitHandoffPayloads.get(record) || null;
+}
+
+function isPrivateRootPortalCommitHandoffRecord(value) {
+  return rootPortalCommitHandoffPayloads.has(value);
 }
 
 function createClientRootRecordWithBridge(bridgeState, container, rootOptions) {
@@ -1557,6 +1606,11 @@ function createPortalRootBoundaryRecordWithBridge(bridgeState, record) {
         action: 'defer-listen-to-portal-container-events-for-root-boundary'
       }
     ),
+    portalContainerOwnership: describePortalContainerOwnership(
+      validation.payload.rootHandle,
+      validation.rootHandleState,
+      portalContainer
+    ),
     reconcilerDiagnostic: freezeRecord({
       beginWorkRecord: 'UnsupportedPortalBeginWorkRecord',
       failClosedBeforeChildren: true,
@@ -1588,6 +1642,99 @@ function createPortalRootBoundaryRecordWithBridge(bridgeState, record) {
   });
 
   return boundaryRecord;
+}
+
+function createPortalCommitHandoffRecordWithBridge(
+  bridgeState,
+  record,
+  options
+) {
+  const validation = validatePortalCommitHandoffBoundaryRecord(record);
+  if (
+    bridgeState !== null &&
+    validation.rootHandleState.bridgeState !== bridgeState
+  ) {
+    const error = new Error(
+      'Cannot use a private root bridge portal commit handoff with a ' +
+        'different root bridge shell.'
+    );
+    error.code = 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE';
+    throw error;
+  }
+
+  const rootBridgeState = validation.rootHandleState.bridgeState;
+  const sequence = rootBridgeState.nextPortalCommitSequence++;
+  const commitHandoffId = `${rootBridgeState.portalCommitIdPrefix}:${sequence}`;
+  const portal = validation.payload.portal;
+  const portalContainer = validation.payload.portalContainer;
+  const pendingChildren = getPortalCommitPendingChildren(portal, options);
+  const portalContainerOwnership = describePortalContainerOwnership(
+    validation.payload.rootHandle,
+    validation.rootHandleState,
+    portalContainer
+  );
+  const listenerSideEffects = describePortalCommitListenerSideEffects(
+    portalContainer,
+    record.portalListenerGuard
+  );
+
+  const handoff = freezeRecord({
+    $$typeof: privateRootPortalCommitHandoffRecordType,
+    kind: 'FastReactDomPrivateRootPortalFakeDomCommitHandoffRecord',
+    operation: 'portal-fake-dom-commit-handoff',
+    commitHandoffId,
+    commitHandoffSequence: sequence,
+    handoffStatus: ROOT_BRIDGE_PORTAL_COMMIT_HANDOFF_ADMITTED,
+    commitStatus: ROOT_BRIDGE_PORTAL_COMMIT_MUTATION_BLOCKED,
+    sourceBoundaryId: record.boundaryId,
+    sourceBoundarySequence: record.boundarySequence,
+    sourceBoundaryStatus: record.boundaryStatus,
+    sourceDiagnosticStatus: record.diagnosticStatus,
+    sourceRequestId: record.sourceRequestId,
+    sourceRequestSequence: record.sourceRequestSequence,
+    sourceRequestType: record.sourceRequestType,
+    sourceUpdateId: record.sourceUpdateId,
+    rootId: record.rootId,
+    rootKind: record.rootKind,
+    rootTag: record.rootTag,
+    fakeDomCommitTarget: freezeRecord({
+      canAppendChild: typeof portalContainer.appendChild === 'function',
+      canRemoveChild: typeof portalContainer.removeChild === 'function',
+      hasTextContent: 'textContent' in portalContainer,
+      portalContainerInfo: record.portalContainerInfo
+    }),
+    pendingChildrenInfo: describeBridgeValue(pendingChildren),
+    portalContainerOwnership,
+    listenerSideEffects,
+    blockedCapabilities: ROOT_BRIDGE_PORTAL_COMMIT_BLOCKED_CAPABILITIES,
+    fakeDomCommitHandoff: true,
+    fakeDomCommitApplied: false,
+    portalContainerChildrenReplaced: false,
+    portalChildReconciliation: false,
+    portalMounting: false,
+    preparePortalMount: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    resourceSideEffects: false,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false
+  });
+
+  rootPortalCommitHandoffPayloads.set(handoff, {
+    boundaryRecord: record,
+    pendingChildren,
+    portal,
+    portalContainer,
+    rootContainer: validation.rootHandleState.container,
+    rootHandle: validation.payload.rootHandle,
+    sourceRecord: validation.payload.sourceRecord
+  });
+
+  return handoff;
 }
 
 function createNativeBridgeHandle(bridgeState, kind) {
@@ -1694,6 +1841,10 @@ function createBridgeState(options) {
       options && options.portalBoundaryIdPrefix,
       'portal-boundary'
     ),
+    portalCommitIdPrefix: getIdPrefix(
+      options && options.portalCommitIdPrefix,
+      'portal-commit'
+    ),
     rootIdPrefix: getIdPrefix(options && options.rootIdPrefix, 'root'),
     requestIdPrefix: getIdPrefix(
       options && options.requestIdPrefix,
@@ -1709,6 +1860,7 @@ function createBridgeState(options) {
     nextCreateRenderAdmissionSequence: 1,
     nextHydrateSequence: 1,
     nextPortalBoundarySequence: 1,
+    nextPortalCommitSequence: 1,
     nextRootSequence: 1,
     nextSideEffectSequence: 1,
     nextUpdateSequence: 1,
@@ -1859,6 +2011,67 @@ function validatePortalRootBoundaryRequestRecord(record) {
   };
 }
 
+function validatePortalCommitHandoffBoundaryRecord(record) {
+  const payload = rootPortalBoundaryPayloads.get(record);
+  if (payload === undefined) {
+    throwInvalidPortalCommitHandoffRecord(
+      'Expected a private React DOM portal root boundary record.'
+    );
+  }
+
+  if (
+    record.$$typeof !== privateRootPortalBoundaryRecordType ||
+    record.kind !== 'FastReactDomPrivateRootPortalBoundaryRecord' ||
+    record.operation !== 'portal-root-boundary' ||
+    record.boundaryStatus !== ROOT_BRIDGE_PORTAL_BOUNDARY_ADMITTED ||
+    record.diagnosticStatus !== ROOT_BRIDGE_PORTAL_DIAGNOSTIC_BLOCKED ||
+    record.acceptedPortalObjectShape !== true
+  ) {
+    throwInvalidPortalCommitHandoffRecord(
+      'Expected an admitted private React DOM portal boundary record.'
+    );
+  }
+
+  assertPortalBoundaryStillBlocked(record);
+
+  const rootHandleState = getPrivateRootHandleState(payload.rootHandle);
+  assertAcceptedReactDomPortalObject(payload.portal, rootHandleState);
+  if (
+    payload.portal.containerInfo !== payload.portalContainer ||
+    payload.portalChildren !== payload.portal.children
+  ) {
+    throwInvalidPortalCommitHandoffRecord(
+      'Private portal boundary payload does not match the portal object.'
+    );
+  }
+
+  assertFakeDomPortalCommitTarget(payload.portalContainer);
+
+  return {
+    payload,
+    rootHandleState
+  };
+}
+
+function assertPortalBoundaryStillBlocked(record) {
+  if (
+    record.nativeExecution !== false ||
+    record.reconcilerExecution !== false ||
+    record.portalChildReconciliation !== false ||
+    record.portalMounting !== false ||
+    record.domMutation !== false ||
+    record.markerWrites !== false ||
+    record.listenerInstallation !== false ||
+    record.hydration !== false ||
+    record.eventDispatch !== false ||
+    record.compatibilityClaimed !== false
+  ) {
+    throwInvalidPortalCommitHandoffRecord(
+      'Private portal boundary records must remain blocked before a commit handoff.'
+    );
+  }
+}
+
 function assertAcceptedReactDomPortalObject(portal, rootHandleState) {
   if (portal === null || typeof portal !== 'object') {
     throwInvalidPortalRootBoundaryRecord(
@@ -1889,6 +2102,75 @@ function assertAcceptedReactDomPortalObject(portal, rootHandleState) {
   );
 }
 
+function assertFakeDomPortalCommitTarget(portalContainer) {
+  if (
+    typeof portalContainer.appendChild !== 'function' ||
+    typeof portalContainer.removeChild !== 'function' ||
+    !('textContent' in portalContainer)
+  ) {
+    throwInvalidPortalCommitHandoffRecord(
+      'Expected a fake-DOM portal container that can model child replacement.'
+    );
+  }
+}
+
+function getPortalCommitPendingChildren(portal, options) {
+  if (
+    options &&
+    typeof options === 'object' &&
+    Object.prototype.hasOwnProperty.call(options, 'pendingChildren')
+  ) {
+    return options.pendingChildren;
+  }
+
+  return portal.children === undefined ? null : portal.children;
+}
+
+function describePortalContainerOwnership(
+  rootHandle,
+  rootHandleState,
+  portalContainer
+) {
+  const rootContainer = rootHandleState.container;
+  const rootContainerOwner = getContainerRoot(rootContainer);
+  const portalContainerOwner = getContainerRoot(portalContainer);
+  return freezeRecord({
+    ownershipStatus: ROOT_BRIDGE_PORTAL_CONTAINER_OWNERSHIP_VALIDATED,
+    rootId: rootHandle.rootId,
+    rootContainerInfo: rootHandleState.containerInfo,
+    portalContainerInfo: freezeRecord(describeContainer(portalContainer)),
+    rootContainerMarkedAsRoot: rootContainerOwner !== null,
+    rootContainerOwnerMatchesHandle: rootContainerOwner === rootHandle.owner,
+    portalContainerMarkedAsRoot: portalContainerOwner !== null,
+    portalContainerOwnerMatchesRoot: portalContainerOwner === rootHandle.owner,
+    portalContainerOwnedByAnotherRoot:
+      portalContainerOwner !== null && portalContainerOwner !== rootHandle.owner,
+    portalContainerAvailableForPortal:
+      portalContainerOwner === null || portalContainerOwner === rootHandle.owner,
+    sameContainerAsRoot: portalContainer === rootContainer,
+    sameOwnerDocument:
+      getOwnerDocument(portalContainer) === getOwnerDocument(rootContainer),
+    containerOwnershipValidated: true
+  });
+}
+
+function describePortalCommitListenerSideEffects(
+  portalContainer,
+  portalListenerGuard
+) {
+  const ownerDocument = getOwnerDocument(portalContainer);
+  return freezeRecord({
+    gateStatus: ROOT_BRIDGE_PORTAL_COMMIT_MUTATION_BLOCKED,
+    preparePortalMount: false,
+    listenToAllSupportedEvents: false,
+    listenerInstallation: false,
+    portalListenerGuard,
+    hasPortalListeningMarker: hasListeningMarker(portalContainer),
+    ownerDocumentHasSelectionChangeMarker: hasListeningMarker(ownerDocument),
+    compatibilityClaimed: false
+  });
+}
+
 function throwInvalidRootBridgeRequest(message) {
   const error = new Error(message);
   error.code = 'FAST_REACT_DOM_INVALID_ROOT_BRIDGE_REQUEST';
@@ -1912,6 +2194,12 @@ function throwForeignRootBridgeRequest() {
 function throwInvalidPortalRootBoundaryRecord(message) {
   const error = new Error(message);
   error.code = 'FAST_REACT_DOM_INVALID_PORTAL_ROOT_BOUNDARY_RECORD';
+  throw error;
+}
+
+function throwInvalidPortalCommitHandoffRecord(message) {
+  const error = new Error(message);
+  error.code = 'FAST_REACT_DOM_INVALID_PORTAL_COMMIT_HANDOFF_RECORD';
   throw error;
 }
 
@@ -2045,6 +2333,10 @@ module.exports = {
   ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED,
   ROOT_BRIDGE_PORTAL_BOUNDARY_ADMITTED,
   ROOT_BRIDGE_PORTAL_BOUNDARY_BLOCKED_CAPABILITIES,
+  ROOT_BRIDGE_PORTAL_COMMIT_BLOCKED_CAPABILITIES,
+  ROOT_BRIDGE_PORTAL_COMMIT_HANDOFF_ADMITTED,
+  ROOT_BRIDGE_PORTAL_COMMIT_MUTATION_BLOCKED,
+  ROOT_BRIDGE_PORTAL_CONTAINER_OWNERSHIP_VALIDATED,
   ROOT_BRIDGE_PORTAL_DIAGNOSTIC_BLOCKED,
   ROOT_BRIDGE_REQUEST_ADMITTED,
   ROOT_LIFECYCLE_CREATED,
@@ -2065,6 +2357,7 @@ module.exports = {
   createClientRootRecord,
   createHydrateRootRecord,
   createNativeRootBridgeHandoffRecord,
+  createPortalCommitHandoffRecord,
   createPortalRootBoundaryRecord,
   createPrivateRootBridgeShell,
   createPrivateRootHandle,
@@ -2078,10 +2371,12 @@ module.exports = {
   getNativeRootBridgeHandoffPayload,
   getPrivateRootCreateRenderAdmissionPayload,
   getPrivateRootPortalBoundaryPayload,
+  getPrivateRootPortalCommitHandoffPayload,
   getPrivateRootRecordPayload,
   getRootOwnerFromHandle,
   isNativeRootBridgeHandoffRecord,
   isPrivateRootCreateRenderAdmissionRecord,
+  isPrivateRootPortalCommitHandoffRecord,
   isPrivateRootPortalBoundaryRecord,
   isPrivateRootHandle,
   isPrivateRootOwner,
@@ -2092,6 +2387,7 @@ module.exports = {
   privateRootNativeBridgeHandleType,
   privateRootNativeHandoffRecordType,
   privateRootPortalBoundaryRecordType,
+  privateRootPortalCommitHandoffRecordType,
   privateRootCreateRecordType,
   privateRootHandleType,
   privateRootHydrateRecordType,
