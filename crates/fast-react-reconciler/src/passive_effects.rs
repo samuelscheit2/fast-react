@@ -27,6 +27,10 @@ use crate::root_scheduler::{
     SyncFlushPostPassiveContinuationExecutionGateRecord,
     sync_flush_post_passive_continuation_execution_gate,
 };
+use crate::sync_flush::{
+    SyncFlushError, SyncFlushPostPassiveContinuationExecutionRecord,
+    flush_sync_post_passive_continuation_after_passive_effects,
+};
 use crate::{
     ExecutionContextState, FiberRootId, FiberRootStore, FiberRootStoreError, HostRootCommitRecord,
     RootSchedulerError,
@@ -247,6 +251,42 @@ impl PassiveEffectsFlushResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PassiveEffectsFlushWithSyncFlushContinuationResult {
+    passive_effects: PassiveEffectsFlushResult,
+    sync_flush_continuation: Option<SyncFlushPostPassiveContinuationExecutionRecord>,
+}
+
+impl PassiveEffectsFlushWithSyncFlushContinuationResult {
+    #[must_use]
+    pub(crate) const fn passive_effects(&self) -> &PassiveEffectsFlushResult {
+        &self.passive_effects
+    }
+
+    #[must_use]
+    pub(crate) fn sync_flush_continuation(
+        &self,
+    ) -> Option<&SyncFlushPostPassiveContinuationExecutionRecord> {
+        self.sync_flush_continuation.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) fn did_request_follow_up_sync_flush(&self) -> bool {
+        match &self.sync_flush_continuation {
+            Some(continuation) => continuation.did_request_follow_up_sync_flush(),
+            None => false,
+        }
+    }
+
+    #[must_use]
+    pub(crate) fn did_flush_follow_up_sync_work(&self) -> bool {
+        match &self.sync_flush_continuation {
+            Some(continuation) => continuation.did_flush_follow_up_sync_work(),
+            None => false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum PassiveEffectsFlushError {
     FiberRootStore(FiberRootStoreError),
     PendingPassiveRootMismatch {
@@ -445,11 +485,73 @@ impl From<FiberRootStoreError> for PassiveEffectsFlushError {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum PassiveEffectsFlushWithSyncFlushContinuationError {
+    PassiveEffects(PassiveEffectsFlushError),
+    SyncFlush(SyncFlushError),
+}
+
+impl Display for PassiveEffectsFlushWithSyncFlushContinuationError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::PassiveEffects(error) => Display::fmt(error, formatter),
+            Self::SyncFlush(error) => Display::fmt(error, formatter),
+        }
+    }
+}
+
+impl Error for PassiveEffectsFlushWithSyncFlushContinuationError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::PassiveEffects(error) => Some(error),
+            Self::SyncFlush(error) => Some(error),
+        }
+    }
+}
+
+impl From<PassiveEffectsFlushError> for PassiveEffectsFlushWithSyncFlushContinuationError {
+    fn from(error: PassiveEffectsFlushError) -> Self {
+        Self::PassiveEffects(error)
+    }
+}
+
+impl From<SyncFlushError> for PassiveEffectsFlushWithSyncFlushContinuationError {
+    fn from(error: SyncFlushError) -> Self {
+        Self::SyncFlush(error)
+    }
+}
+
 pub(crate) fn flush_passive_effects_after_commit<H: HostTypes>(
     store: &mut FiberRootStore<H>,
     commit: &HostRootCommitRecord,
 ) -> Result<PassiveEffectsFlushResult, PassiveEffectsFlushError> {
     flush_passive_effects_after_commit_inner(store, commit, None)
+}
+
+pub(crate) fn flush_passive_effects_after_commit_and_sync_flush_continuation<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    commit: &HostRootCommitRecord,
+    execution_context: &ExecutionContextState,
+) -> Result<
+    PassiveEffectsFlushWithSyncFlushContinuationResult,
+    PassiveEffectsFlushWithSyncFlushContinuationError,
+> {
+    let pending_passive_handoff = commit.pending_passive_handoff();
+    let passive_effects = flush_passive_effects_after_commit(store, commit)?;
+    let sync_flush_continuation = if passive_effects.consumed_pending_passive() {
+        flush_sync_post_passive_continuation_after_passive_effects(
+            store,
+            execution_context,
+            pending_passive_handoff,
+        )?
+    } else {
+        None
+    };
+
+    Ok(PassiveEffectsFlushWithSyncFlushContinuationResult {
+        passive_effects,
+        sync_flush_continuation,
+    })
 }
 
 pub(crate) fn observe_sync_flush_post_passive_continuation_execution_gate_after_commit<
@@ -729,6 +831,15 @@ mod tests {
     ) {
         let update = update_container_sync(store, root_id, element, None).unwrap();
         ensure_root_is_scheduled(store, update.schedule()).unwrap();
+    }
+
+    fn current_host_root_element(
+        store: &FiberRootStore<RecordingHost>,
+        root_id: FiberRootId,
+    ) -> RootElementHandle {
+        let current = store.root(root_id).unwrap().current();
+        let state = store.fiber_arena().get(current).unwrap().memoized_state();
+        store.host_root_states().get(state).unwrap().element()
     }
 
     fn append_function_component_child(
@@ -1274,6 +1385,195 @@ mod tests {
             store.scheduler_bridge().act_queue_requests().len(),
             act_queue_request_count
         );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn passive_effects_flush_executes_private_post_passive_sync_flush_continuation() {
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let host = RecordingHost::default();
+        let passive_root = store
+            .create_client_root(FakeContainer::new(1), RootOptions::new())
+            .unwrap();
+        let continuation_root = store
+            .create_client_root(FakeContainer::new(2), RootOptions::new())
+            .unwrap();
+        let continuation_element = RootElementHandle::from_raw(65);
+        update_container(
+            &mut store,
+            passive_root,
+            RootElementHandle::from_raw(64),
+            None,
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, passive_root, Lanes::DEFAULT).unwrap();
+        let finished_work = render.finished_work();
+        {
+            let scheduling = store.root_mut(passive_root).unwrap().scheduling_mut();
+            scheduling.prepare_pending_passive(passive_root, Lanes::NO);
+            scheduling
+                .pending_passive_mut()
+                .queue_mount(finished_work, Lanes::DEFAULT)
+                .unwrap();
+        }
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        schedule_sync_update(&mut store, continuation_root, continuation_element);
+        let callback_request_count = store.scheduler_bridge().callback_requests().len();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+
+        let result = flush_passive_effects_after_commit_and_sync_flush_continuation(
+            &mut store,
+            &commit,
+            &ExecutionContextState::new(),
+        )
+        .unwrap();
+
+        let passive = result.passive_effects();
+        assert_eq!(passive.status(), PassiveEffectsFlushStatus::Flushed);
+        assert!(passive.consumed_pending_passive());
+        assert_eq!(passive.root(), passive_root);
+        assert_eq!(passive.finished_work(), Some(finished_work));
+        assert_eq!(passive.lanes(), Lanes::DEFAULT);
+        assert_eq!(passive.records().len(), 1);
+        assert_eq!(
+            passive.records()[0].phase(),
+            PendingPassiveEffectPhase::Mount
+        );
+        assert!(!passive.records()[0].create_callback_invoked());
+        assert!(!passive.records()[0].destroy_callback_invoked());
+
+        let continuation = result.sync_flush_continuation().unwrap();
+        assert!(result.did_request_follow_up_sync_flush());
+        assert!(continuation.did_execute_follow_up_sync_flush());
+        assert!(result.did_flush_follow_up_sync_work());
+        assert_eq!(
+            continuation.gate().exit_status(),
+            RootSyncFlushExitStatus::Completed
+        );
+        assert!(continuation.gate().should_execute_follow_up_sync_flush());
+        assert_eq!(continuation.gate().pending_passive_root(), passive_root);
+        assert_eq!(
+            continuation.gate().pending_passive_finished_work(),
+            finished_work
+        );
+        assert_eq!(continuation.gate().pending_passive_lanes(), Lanes::DEFAULT);
+        assert_eq!(continuation.gate().continuation_roots().len(), 1);
+        assert_eq!(
+            continuation.gate().continuation_roots()[0].root(),
+            continuation_root
+        );
+        assert_eq!(
+            continuation.gate().continuation_roots()[0].lanes(),
+            Lanes::SYNC
+        );
+
+        let sync_flush = continuation.sync_flush_result().unwrap();
+        assert!(sync_flush.did_flush_work());
+        assert_eq!(sync_flush.records().len(), 1);
+        assert_eq!(sync_flush.records()[0].root(), continuation_root);
+        assert_eq!(sync_flush.records()[0].render_lanes(), Lanes::SYNC);
+        assert_eq!(
+            current_host_root_element(&store, continuation_root),
+            continuation_element
+        );
+        assert!(
+            store
+                .root(passive_root)
+                .unwrap()
+                .scheduling()
+                .pending_passive()
+                .is_empty()
+        );
+        assert_eq!(
+            store.scheduler_bridge().callback_requests().len(),
+            callback_request_count
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn passive_effects_flush_records_blocked_post_passive_sync_flush_without_committing() {
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let host = RecordingHost::default();
+        let passive_root = store
+            .create_client_root(FakeContainer::new(1), RootOptions::new())
+            .unwrap();
+        let continuation_root = store
+            .create_client_root(FakeContainer::new(2), RootOptions::new())
+            .unwrap();
+        let continuation_current = store.root(continuation_root).unwrap().current();
+        update_container(
+            &mut store,
+            passive_root,
+            RootElementHandle::from_raw(66),
+            None,
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, passive_root, Lanes::DEFAULT).unwrap();
+        let finished_work = render.finished_work();
+        {
+            let scheduling = store.root_mut(passive_root).unwrap().scheduling_mut();
+            scheduling.prepare_pending_passive(passive_root, Lanes::NO);
+            scheduling
+                .pending_passive_mut()
+                .queue_mount(finished_work, Lanes::DEFAULT)
+                .unwrap();
+        }
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        schedule_sync_update(
+            &mut store,
+            continuation_root,
+            RootElementHandle::from_raw(67),
+        );
+        let mut execution_context = ExecutionContextState::new();
+
+        let result = execution_context
+            .with_commit_context(|execution_context| {
+                flush_passive_effects_after_commit_and_sync_flush_continuation(
+                    &mut store,
+                    &commit,
+                    execution_context,
+                )
+            })
+            .unwrap();
+
+        assert_eq!(
+            result.passive_effects().status(),
+            PassiveEffectsFlushStatus::Flushed
+        );
+        assert!(result.passive_effects().consumed_pending_passive());
+        let continuation = result.sync_flush_continuation().unwrap();
+        assert!(!result.did_request_follow_up_sync_flush());
+        assert!(!continuation.did_execute_follow_up_sync_flush());
+        assert!(!result.did_flush_follow_up_sync_work());
+        assert_eq!(
+            continuation.gate().exit_status(),
+            RootSyncFlushExitStatus::BlockedByExecutionContext
+        );
+        assert!(
+            continuation
+                .gate()
+                .execution_context()
+                .blocked_by_render_or_commit()
+        );
+        assert!(continuation.gate().continuation_roots().is_empty());
+        assert_eq!(
+            store.root(continuation_root).unwrap().current(),
+            continuation_current
+        );
+        assert!(
+            store
+                .root(passive_root)
+                .unwrap()
+                .scheduling()
+                .pending_passive()
+                .is_empty()
+        );
+        assert!(store.root_scheduler().might_have_pending_sync_work());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
