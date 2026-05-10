@@ -487,6 +487,7 @@ pub(crate) struct FunctionComponentPendingPassiveEffectCommitRecord {
     effect_index: usize,
     effect: HookEffectId,
     instance: HookEffectInstanceId,
+    lanes: Lanes,
     unmount_order: Option<PendingPassiveEffectOrder>,
     mount_order: PendingPassiveEffectOrder,
 }
@@ -517,6 +518,11 @@ impl FunctionComponentPendingPassiveEffectCommitRecord {
     }
 
     #[must_use]
+    pub(crate) const fn lanes(self) -> Lanes {
+        self.lanes
+    }
+
+    #[must_use]
     pub(crate) const fn unmount_order(self) -> Option<PendingPassiveEffectOrder> {
         self.unmount_order
     }
@@ -524,6 +530,89 @@ impl FunctionComponentPendingPassiveEffectCommitRecord {
     #[must_use]
     pub(crate) const fn mount_order(self) -> PendingPassiveEffectOrder {
         self.mount_order
+    }
+
+    #[must_use]
+    const fn unmount_phase_record(
+        self,
+    ) -> Option<FunctionComponentPendingPassiveEffectPhaseCommitRecord> {
+        match self.unmount_order {
+            Some(order) => Some(FunctionComponentPendingPassiveEffectPhaseCommitRecord {
+                fiber: self.fiber,
+                effect_index: self.effect_index,
+                effect: self.effect,
+                instance: self.instance,
+                lanes: self.lanes,
+                phase: PendingPassiveEffectPhase::Unmount,
+                order,
+            }),
+            None => None,
+        }
+    }
+
+    #[must_use]
+    const fn mount_phase_record(self) -> FunctionComponentPendingPassiveEffectPhaseCommitRecord {
+        FunctionComponentPendingPassiveEffectPhaseCommitRecord {
+            fiber: self.fiber,
+            effect_index: self.effect_index,
+            effect: self.effect,
+            instance: self.instance,
+            lanes: self.lanes,
+            phase: PendingPassiveEffectPhase::Mount,
+            order: self.mount_order,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct FunctionComponentPendingPassiveEffectPhaseCommitRecord {
+    fiber: FiberId,
+    effect_index: usize,
+    effect: HookEffectId,
+    instance: HookEffectInstanceId,
+    lanes: Lanes,
+    phase: PendingPassiveEffectPhase,
+    order: PendingPassiveEffectOrder,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private passive hook-effect phase handoff metadata for deterministic flush canaries"
+)]
+impl FunctionComponentPendingPassiveEffectPhaseCommitRecord {
+    #[must_use]
+    pub(crate) const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub(crate) const fn effect_index(self) -> usize {
+        self.effect_index
+    }
+
+    #[must_use]
+    pub(crate) const fn effect(self) -> HookEffectId {
+        self.effect
+    }
+
+    #[must_use]
+    pub(crate) const fn instance(self) -> HookEffectInstanceId {
+        self.instance
+    }
+
+    #[must_use]
+    pub(crate) const fn lanes(self) -> Lanes {
+        self.lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn phase(self) -> PendingPassiveEffectPhase {
+        self.phase
+    }
+
+    #[must_use]
+    pub(crate) const fn order(self) -> PendingPassiveEffectOrder {
+        self.order
     }
 }
 
@@ -582,6 +671,25 @@ impl FunctionComponentPendingPassiveCommitHandoff {
     #[must_use]
     pub(crate) fn queued_mount_count(&self) -> usize {
         self.records.len()
+    }
+
+    #[must_use]
+    pub(crate) fn effect_phase_records(
+        &self,
+    ) -> Vec<FunctionComponentPendingPassiveEffectPhaseCommitRecord> {
+        let mut phase_records =
+            Vec::with_capacity(self.queued_unmount_count() + self.queued_mount_count());
+
+        for record in &self.records {
+            if let Some(phase_record) = record.unmount_phase_record() {
+                phase_records.push(phase_record);
+            }
+        }
+        for record in &self.records {
+            phase_records.push(record.mount_phase_record());
+        }
+
+        phase_records
     }
 }
 
@@ -1217,6 +1325,7 @@ fn queue_function_component_passive_effect_record<H: HostTypes>(
         effect_index: passive_effect.effect_index(),
         effect: passive_effect.effect(),
         instance: passive_effect.instance(),
+        lanes: passive_effect.lanes(),
         unmount_order,
         mount_order,
     })
@@ -2921,10 +3030,31 @@ mod tests {
         assert_eq!(queued_effect.effect(), registration.effect());
         assert_eq!(queued_effect.instance(), previous.instance());
         assert_eq!(queued_effect.instance(), registration.instance());
+        assert_eq!(queued_effect.lanes(), Lanes::DEFAULT);
         assert!(
             queued_effect.unmount_order().unwrap().flush_rank()
                 < queued_effect.mount_order().flush_rank()
         );
+        let phase_records = queued.effect_phase_records();
+        assert_eq!(phase_records.len(), 2);
+        assert_eq!(phase_records[0].fiber(), finished_function);
+        assert_eq!(phase_records[0].effect_index(), 0);
+        assert_eq!(phase_records[0].effect(), registration.effect());
+        assert_eq!(phase_records[0].instance(), registration.instance());
+        assert_eq!(phase_records[0].lanes(), Lanes::DEFAULT);
+        assert_eq!(phase_records[0].phase(), PendingPassiveEffectPhase::Unmount);
+        assert_eq!(
+            phase_records[0].order(),
+            queued_effect.unmount_order().unwrap()
+        );
+        assert_eq!(phase_records[1].fiber(), finished_function);
+        assert_eq!(phase_records[1].effect_index(), 0);
+        assert_eq!(phase_records[1].effect(), registration.effect());
+        assert_eq!(phase_records[1].instance(), registration.instance());
+        assert_eq!(phase_records[1].lanes(), Lanes::DEFAULT);
+        assert_eq!(phase_records[1].phase(), PendingPassiveEffectPhase::Mount);
+        assert_eq!(phase_records[1].order(), queued_effect.mount_order());
+        assert!(phase_records[0].order() < phase_records[1].order());
 
         let pending_before_commit = store.root(root_id).unwrap().scheduling().pending_passive();
         assert_eq!(pending_before_commit.root(), Some(root_id));

@@ -10,10 +10,13 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-use fast_react_core::{FiberId, Lanes};
+use fast_react_core::{FiberId, HookEffectId, HookEffectInstanceId, Lanes};
 use fast_react_host_config::HostTypes;
 
-use crate::root_commit::PendingPassiveCommitHandoff;
+use crate::root_commit::{
+    FunctionComponentPendingPassiveCommitHandoff,
+    FunctionComponentPendingPassiveEffectPhaseCommitRecord, PendingPassiveCommitHandoff,
+};
 use crate::root_config::{
     PendingPassiveEffectOrder, PendingPassiveEffectPhase, PendingPassiveState,
     PendingPassiveUnmountOrigin,
@@ -27,6 +30,30 @@ pub(crate) enum PassiveEffectsFlushStatus {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct PassiveEffectFlushEffectRecord {
+    effect_index: usize,
+    effect: HookEffectId,
+    instance: HookEffectInstanceId,
+}
+
+impl PassiveEffectFlushEffectRecord {
+    #[must_use]
+    pub const fn effect_index(self) -> usize {
+        self.effect_index
+    }
+
+    #[must_use]
+    pub const fn effect(self) -> HookEffectId {
+        self.effect
+    }
+
+    #[must_use]
+    pub const fn instance(self) -> HookEffectInstanceId {
+        self.instance
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct PassiveEffectFlushRecord {
     flush_index: usize,
     root: FiberRootId,
@@ -37,6 +64,7 @@ pub(crate) struct PassiveEffectFlushRecord {
     phase: PendingPassiveEffectPhase,
     pending_order: PendingPassiveEffectOrder,
     unmount_origin: Option<PendingPassiveUnmountOrigin>,
+    effect: Option<PassiveEffectFlushEffectRecord>,
 }
 
 impl PassiveEffectFlushRecord {
@@ -83,6 +111,35 @@ impl PassiveEffectFlushRecord {
     #[must_use]
     pub const fn unmount_origin(&self) -> Option<PendingPassiveUnmountOrigin> {
         self.unmount_origin
+    }
+
+    #[must_use]
+    pub const fn effect_record(&self) -> Option<PassiveEffectFlushEffectRecord> {
+        self.effect
+    }
+
+    #[must_use]
+    pub const fn effect(&self) -> Option<HookEffectId> {
+        match self.effect {
+            Some(effect) => Some(effect.effect()),
+            None => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn effect_index(&self) -> Option<usize> {
+        match self.effect {
+            Some(effect) => Some(effect.effect_index()),
+            None => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn effect_instance(&self) -> Option<HookEffectInstanceId> {
+        match self.effect {
+            Some(effect) => Some(effect.instance()),
+            None => None,
+        }
     }
 }
 
@@ -156,6 +213,32 @@ pub(crate) enum PassiveEffectsFlushError {
         expected_mounts: usize,
         actual_mounts: usize,
     },
+    PendingPassiveEffectHandoffRootMismatch {
+        commit_root: FiberRootId,
+        handoff_root: FiberRootId,
+    },
+    PendingPassiveEffectHandoffLanesMismatch {
+        root: FiberRootId,
+        expected: Lanes,
+        actual: Lanes,
+    },
+    PendingPassiveEffectHandoffRecordCountMismatch {
+        root: FiberRootId,
+        expected_unmounts: usize,
+        actual_unmounts: usize,
+        expected_mounts: usize,
+        actual_mounts: usize,
+    },
+    PendingPassiveEffectHandoffDuplicateOrder {
+        root: FiberRootId,
+        order: PendingPassiveEffectOrder,
+    },
+    PendingPassiveEffectHandoffRecordMismatch {
+        root: FiberRootId,
+        fiber: FiberId,
+        phase: PendingPassiveEffectPhase,
+        order: PendingPassiveEffectOrder,
+    },
 }
 
 impl Display for PassiveEffectsFlushError {
@@ -223,6 +306,61 @@ impl Display for PassiveEffectsFlushError {
                 actual_unmounts,
                 actual_mounts
             ),
+            Self::PendingPassiveEffectHandoffRootMismatch {
+                commit_root,
+                handoff_root,
+            } => write!(
+                formatter,
+                "commit root {} cannot flush function component passive effect handoff for root {}",
+                commit_root.raw(),
+                handoff_root.raw()
+            ),
+            Self::PendingPassiveEffectHandoffLanesMismatch {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} function component passive effect handoff lanes {:?} do not match commit lanes {:?}",
+                root.raw(),
+                actual,
+                expected
+            ),
+            Self::PendingPassiveEffectHandoffRecordCountMismatch {
+                root,
+                expected_unmounts,
+                actual_unmounts,
+                expected_mounts,
+                actual_mounts,
+            } => write!(
+                formatter,
+                "root {} function component passive effect handoff counts changed after queueing: expected {} unmounts and {} mounts, found {} unmounts and {} mounts",
+                root.raw(),
+                expected_unmounts,
+                expected_mounts,
+                actual_unmounts,
+                actual_mounts
+            ),
+            Self::PendingPassiveEffectHandoffDuplicateOrder { root, order } => write!(
+                formatter,
+                "root {} function component passive effect handoff repeats pending passive {:?} order {}",
+                root.raw(),
+                order.phase(),
+                order.sequence()
+            ),
+            Self::PendingPassiveEffectHandoffRecordMismatch {
+                root,
+                fiber,
+                phase,
+                order,
+            } => write!(
+                formatter,
+                "root {} function component passive effect handoff is missing {:?} record for fiber slot {} at pending order {}",
+                root.raw(),
+                phase,
+                fiber.slot().get(),
+                order.sequence()
+            ),
         }
     }
 }
@@ -234,7 +372,12 @@ impl Error for PassiveEffectsFlushError {
             Self::PendingPassiveRootMismatch { .. }
             | Self::PendingPassiveFinishedWorkMismatch { .. }
             | Self::PendingPassiveLanesMismatch { .. }
-            | Self::PendingPassiveRecordCountMismatch { .. } => None,
+            | Self::PendingPassiveRecordCountMismatch { .. }
+            | Self::PendingPassiveEffectHandoffRootMismatch { .. }
+            | Self::PendingPassiveEffectHandoffLanesMismatch { .. }
+            | Self::PendingPassiveEffectHandoffRecordCountMismatch { .. }
+            | Self::PendingPassiveEffectHandoffDuplicateOrder { .. }
+            | Self::PendingPassiveEffectHandoffRecordMismatch { .. } => None,
         }
     }
 }
@@ -249,6 +392,26 @@ pub(crate) fn flush_passive_effects_after_commit<H: HostTypes>(
     store: &mut FiberRootStore<H>,
     commit: &HostRootCommitRecord,
 ) -> Result<PassiveEffectsFlushResult, PassiveEffectsFlushError> {
+    flush_passive_effects_after_commit_inner(store, commit, None)
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private passive hook-effect flush handoff canary for future commit traversal"
+)]
+pub(crate) fn flush_passive_effects_after_commit_with_function_component_handoffs<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    commit: &HostRootCommitRecord,
+    function_component_handoffs: &[FunctionComponentPendingPassiveCommitHandoff],
+) -> Result<PassiveEffectsFlushResult, PassiveEffectsFlushError> {
+    flush_passive_effects_after_commit_inner(store, commit, Some(function_component_handoffs))
+}
+
+fn flush_passive_effects_after_commit_inner<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    commit: &HostRootCommitRecord,
+    function_component_handoffs: Option<&[FunctionComponentPendingPassiveCommitHandoff]>,
+) -> Result<PassiveEffectsFlushResult, PassiveEffectsFlushError> {
     let root_id = commit.root();
     let Some(handoff) = commit.pending_passive_handoff() else {
         return Ok(PassiveEffectsFlushResult {
@@ -262,7 +425,13 @@ pub(crate) fn flush_passive_effects_after_commit<H: HostTypes>(
 
     let pending_passive = store.root(root_id)?.scheduling().pending_passive().clone();
     validate_pending_passive_handoff(handoff, &pending_passive)?;
-    let records = build_passive_flush_records(handoff, &pending_passive);
+    let effect_records = match function_component_handoffs {
+        Some(handoffs) => {
+            validate_function_component_passive_handoffs(handoff, &pending_passive, handoffs)?
+        }
+        None => Vec::new(),
+    };
+    let records = build_passive_flush_records(handoff, &pending_passive, &effect_records);
 
     store
         .root_mut(root_id)?
@@ -326,23 +495,127 @@ fn validate_pending_passive_handoff(
     Ok(())
 }
 
+fn validate_function_component_passive_handoffs(
+    handoff: PendingPassiveCommitHandoff,
+    pending_passive: &PendingPassiveState,
+    function_component_handoffs: &[FunctionComponentPendingPassiveCommitHandoff],
+) -> Result<Vec<FunctionComponentPendingPassiveEffectPhaseCommitRecord>, PassiveEffectsFlushError> {
+    let mut phase_records = Vec::new();
+    let mut actual_unmounts = 0;
+    let mut actual_mounts = 0;
+
+    for function_component_handoff in function_component_handoffs {
+        if function_component_handoff.root() != handoff.root() {
+            return Err(
+                PassiveEffectsFlushError::PendingPassiveEffectHandoffRootMismatch {
+                    commit_root: handoff.root(),
+                    handoff_root: function_component_handoff.root(),
+                },
+            );
+        }
+        if function_component_handoff.lanes() != handoff.lanes() {
+            return Err(
+                PassiveEffectsFlushError::PendingPassiveEffectHandoffLanesMismatch {
+                    root: handoff.root(),
+                    expected: handoff.lanes(),
+                    actual: function_component_handoff.lanes(),
+                },
+            );
+        }
+
+        actual_unmounts += function_component_handoff.queued_unmount_count();
+        actual_mounts += function_component_handoff.queued_mount_count();
+        phase_records.extend(function_component_handoff.effect_phase_records());
+    }
+
+    if actual_unmounts != handoff.pending_unmount_count()
+        || actual_mounts != handoff.pending_mount_count()
+    {
+        return Err(
+            PassiveEffectsFlushError::PendingPassiveEffectHandoffRecordCountMismatch {
+                root: handoff.root(),
+                expected_unmounts: handoff.pending_unmount_count(),
+                actual_unmounts,
+                expected_mounts: handoff.pending_mount_count(),
+                actual_mounts,
+            },
+        );
+    }
+
+    phase_records.sort_by_key(|record| record.order());
+    for pair in phase_records.windows(2) {
+        if pair[0].order() == pair[1].order() {
+            return Err(
+                PassiveEffectsFlushError::PendingPassiveEffectHandoffDuplicateOrder {
+                    root: handoff.root(),
+                    order: pair[0].order(),
+                },
+            );
+        }
+    }
+
+    for pending in pending_passive.flush_ordered_records() {
+        let Some(effect_record) = phase_records
+            .iter()
+            .find(|record| record.order() == pending.order())
+        else {
+            return Err(
+                PassiveEffectsFlushError::PendingPassiveEffectHandoffRecordMismatch {
+                    root: handoff.root(),
+                    fiber: pending.fiber(),
+                    phase: pending.order().phase(),
+                    order: pending.order(),
+                },
+            );
+        };
+
+        if effect_record.fiber() != pending.fiber()
+            || effect_record.phase() != pending.order().phase()
+            || effect_record.lanes() != pending.lanes()
+        {
+            return Err(
+                PassiveEffectsFlushError::PendingPassiveEffectHandoffRecordMismatch {
+                    root: handoff.root(),
+                    fiber: pending.fiber(),
+                    phase: pending.order().phase(),
+                    order: pending.order(),
+                },
+            );
+        }
+    }
+
+    Ok(phase_records)
+}
+
 fn build_passive_flush_records(
     handoff: PendingPassiveCommitHandoff,
     pending_passive: &PendingPassiveState,
+    effect_records: &[FunctionComponentPendingPassiveEffectPhaseCommitRecord],
 ) -> Vec<PassiveEffectFlushRecord> {
     pending_passive
         .flush_ordered_records()
         .enumerate()
-        .map(|(flush_index, pending)| PassiveEffectFlushRecord {
-            flush_index,
-            root: handoff.root(),
-            finished_work: handoff.finished_work(),
-            committed_lanes: handoff.lanes(),
-            fiber: pending.fiber(),
-            effect_lanes: pending.lanes(),
-            phase: pending.order().phase(),
-            pending_order: pending.order(),
-            unmount_origin: pending.unmount_origin(),
+        .map(|(flush_index, pending)| {
+            let effect = effect_records
+                .iter()
+                .find(|record| record.order() == pending.order())
+                .map(|record| PassiveEffectFlushEffectRecord {
+                    effect_index: record.effect_index(),
+                    effect: record.effect(),
+                    instance: record.instance(),
+                });
+            PassiveEffectFlushRecord {
+                flush_index,
+                root: handoff.root(),
+                finished_work: handoff.finished_work(),
+                committed_lanes: handoff.lanes(),
+                fiber: pending.fiber(),
+                effect_lanes: pending.lanes(),
+                phase: pending.order().phase(),
+                pending_order: pending.order(),
+                unmount_origin: pending.unmount_origin(),
+                effect,
+            }
         })
         .collect()
 }
@@ -351,8 +624,8 @@ fn build_passive_flush_records(
 mod tests {
     use super::*;
     use crate::function_component::{
-        FunctionComponentEffectPhase, FunctionComponentHookRenderPhase,
-        FunctionComponentHookRenderStore,
+        FunctionComponentEffectDependencyStatus, FunctionComponentEffectPhase,
+        FunctionComponentHookRenderPhase, FunctionComponentHookRenderStore,
     };
     use crate::root_commit::queue_function_component_pending_passive_effects;
     use crate::root_config::PendingPassiveUnmountOrigin;
@@ -549,7 +822,12 @@ mod tests {
         assert_eq!(handoff.pending_unmount_count(), 0);
         assert_eq!(handoff.pending_mount_count(), 1);
 
-        let flush = flush_passive_effects_after_commit(&mut store, &commit).unwrap();
+        let flush = flush_passive_effects_after_commit_with_function_component_handoffs(
+            &mut store,
+            &commit,
+            std::slice::from_ref(&queued),
+        )
+        .unwrap();
 
         assert_eq!(flush.status(), PassiveEffectsFlushStatus::Flushed);
         assert!(flush.consumed_pending_passive());
@@ -564,6 +842,13 @@ mod tests {
         assert_eq!(record.phase(), PendingPassiveEffectPhase::Mount);
         assert_eq!(record.pending_order(), queued.records()[0].mount_order());
         assert_eq!(record.unmount_origin(), None);
+        assert_eq!(record.effect_index(), Some(0));
+        assert_eq!(record.effect(), Some(registration.effect()));
+        assert_eq!(record.effect_instance(), Some(registration.instance()));
+        assert_eq!(
+            record.effect_record().unwrap().effect(),
+            registration.effect()
+        );
         assert_eq!(
             hook_store
                 .hook_effects()
@@ -587,6 +872,190 @@ mod tests {
                 .scheduling()
                 .pending_passive()
                 .is_empty()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn passive_effects_flush_rejects_effect_handoff_lane_drift_before_consuming() {
+        let (mut store, root_id, host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(824), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let finished_work = render.finished_work();
+        let function_fiber = append_function_component_child(
+            &mut store,
+            finished_work,
+            PropsHandle::from_raw(825),
+            FiberTypeHandle::from_raw(826),
+        );
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let state = hook_store
+            .prepare_render_state(store.fiber_arena(), function_fiber)
+            .unwrap();
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+        hook_store
+            .mount_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(827),
+                deps(828),
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(cursor).unwrap();
+        let queued = queue_function_component_pending_passive_effects(
+            &mut store,
+            root_id,
+            &hook_store,
+            state,
+            Lanes::SYNC,
+        )
+        .unwrap();
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+
+        let error = flush_passive_effects_after_commit_with_function_component_handoffs(
+            &mut store,
+            &commit,
+            std::slice::from_ref(&queued),
+        )
+        .unwrap_err();
+        let pending_passive = store.root(root_id).unwrap().scheduling().pending_passive();
+
+        assert!(matches!(
+            error,
+            PassiveEffectsFlushError::PendingPassiveEffectHandoffLanesMismatch {
+                root,
+                expected,
+                actual,
+            } if root == root_id && expected == Lanes::DEFAULT && actual == Lanes::SYNC
+        ));
+        assert_eq!(pending_passive.root(), Some(root_id));
+        assert_eq!(pending_passive.finished_work(), Some(finished_work));
+        assert_eq!(pending_passive.lanes(), Lanes::DEFAULT);
+        assert_eq!(pending_passive.passive_mounts().len(), 1);
+        assert!(pending_passive.has_commit_handoff());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn passive_effects_flush_carries_effect_ids_through_update_unmount_and_mount() {
+        let (mut store, root_id, host) = root_store();
+        let previous_current = store.root(root_id).unwrap().current();
+        let component = FiberTypeHandle::from_raw(830);
+        let current_function = append_function_component_child(
+            &mut store,
+            previous_current,
+            PropsHandle::from_raw(831),
+            component,
+        );
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let previous = hook_store
+            .create_current_effect_metadata(
+                store.fiber_arena_mut(),
+                current_function,
+                FunctionComponentEffectPhase::Passive,
+                callback(832),
+                deps(833),
+                Some(callback(834)),
+            )
+            .unwrap();
+
+        update_container(&mut store, root_id, RootElementHandle::from_raw(835), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let finished_work = render.finished_work();
+        let finished_function = append_function_component_child(
+            &mut store,
+            finished_work,
+            PropsHandle::from_raw(836),
+            component,
+        );
+        store
+            .fiber_arena_mut()
+            .link_alternates(current_function, finished_function)
+            .unwrap();
+        let state = hook_store
+            .prepare_render_state(store.fiber_arena(), finished_function)
+            .unwrap();
+        assert_eq!(state.phase(), FunctionComponentHookRenderPhase::Update);
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+        let registration = hook_store
+            .update_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(837),
+                deps(838),
+                FunctionComponentEffectDependencyStatus::Changed,
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(cursor).unwrap();
+
+        let queued = queue_function_component_pending_passive_effects(
+            &mut store,
+            root_id,
+            &hook_store,
+            state,
+            Lanes::DEFAULT,
+        )
+        .unwrap();
+        assert_eq!(queued.queued_unmount_count(), 1);
+        assert_eq!(queued.queued_mount_count(), 1);
+        let queued_effect = queued.records()[0];
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let flush = flush_passive_effects_after_commit_with_function_component_handoffs(
+            &mut store,
+            &commit,
+            std::slice::from_ref(&queued),
+        )
+        .unwrap();
+
+        assert_eq!(flush.status(), PassiveEffectsFlushStatus::Flushed);
+        assert_eq!(flush.records().len(), 2);
+        let unmount = flush.records()[0];
+        assert_eq!(unmount.flush_index(), 0);
+        assert_eq!(unmount.fiber(), finished_function);
+        assert_eq!(unmount.phase(), PendingPassiveEffectPhase::Unmount);
+        assert_eq!(
+            unmount.pending_order(),
+            queued_effect.unmount_order().unwrap()
+        );
+        assert_eq!(unmount.effect_lanes(), Lanes::DEFAULT);
+        assert_eq!(unmount.effect_index(), Some(0));
+        assert_eq!(unmount.effect(), Some(registration.effect()));
+        assert_eq!(unmount.effect_instance(), Some(previous.instance()));
+        assert_eq!(unmount.effect_instance(), Some(registration.instance()));
+        assert_eq!(
+            unmount.unmount_origin(),
+            Some(PendingPassiveUnmountOrigin::UpdatedFiber)
+        );
+
+        let mount = flush.records()[1];
+        assert_eq!(mount.flush_index(), 1);
+        assert_eq!(mount.fiber(), finished_function);
+        assert_eq!(mount.phase(), PendingPassiveEffectPhase::Mount);
+        assert_eq!(mount.pending_order(), queued_effect.mount_order());
+        assert_eq!(mount.effect_lanes(), Lanes::DEFAULT);
+        assert_eq!(mount.effect_index(), Some(0));
+        assert_eq!(mount.effect(), Some(registration.effect()));
+        assert_eq!(mount.effect_instance(), Some(registration.instance()));
+        assert_eq!(mount.unmount_origin(), None);
+        assert!(unmount.pending_order() < mount.pending_order());
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .scheduling()
+                .pending_passive()
+                .is_empty()
+        );
+        assert_eq!(
+            hook_store
+                .hook_effects()
+                .get_instance(previous.instance())
+                .unwrap()
+                .destroy(),
+            Some(callback(834))
         );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
