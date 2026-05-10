@@ -57,6 +57,9 @@ test("private event dispatch skeleton creates fail-closed records from wrapper m
   const latestProps = {
     onClick() {
       latestPropsListenerCalls++;
+    },
+    onClickCapture() {
+      latestPropsListenerCalls++;
     }
   };
   const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
@@ -143,6 +146,91 @@ test("private event dispatch skeleton creates fail-closed records from wrapper m
     dispatchRecord.targetNormalizationRecord.latestPropsStatus,
     "present"
   );
+  assert.equal(
+    dispatchRecord.targetListenerLookupRecord,
+    dispatchRecord.extractionRecord.targetListenerLookupRecord
+  );
+  assert.equal(
+    dispatchRecord.targetListenerLookupRecord.kind,
+    componentTree.EVENT_LISTENER_TARGET_LOOKUP_RECORD_KIND
+  );
+  assert.equal(
+    Object.isFrozen(dispatchRecord.targetListenerLookupRecord),
+    true
+  );
+  assert.equal(
+    dispatchRecord.targetListenerLookupRecord.blockedReason,
+    componentTree.EVENT_LISTENER_TARGET_LOOKUP_BLOCKED_CODE
+  );
+  assert.equal(
+    dispatchRecord.targetListenerLookupRecord.registrationName,
+    "onClickCapture"
+  );
+  assert.equal(
+    dispatchRecord.targetListenerLookupRecord.listenerStatus,
+    "present"
+  );
+  assert.equal(dispatchRecord.targetListenerLookupRecord.listenerFound, true);
+  assert.equal(
+    dispatchRecord.targetListenerLookupRecord.listenerInvocationCount,
+    0
+  );
+  assert.equal(
+    dispatchRecord.targetListenerLookupRecord.willInvokeListener,
+    false
+  );
+  assert.equal(
+    dispatchRecord.targetListenerLookupRecord.exposesLatestProps,
+    false
+  );
+  assert.equal(
+    dispatchRecord.targetListenerLookupRecord.exposesListener,
+    false
+  );
+  assert.equal(
+    Object.hasOwn(dispatchRecord.targetListenerLookupRecord, "latestProps"),
+    false
+  );
+  assert.equal(
+    Object.hasOwn(dispatchRecord.targetListenerLookupRecord, "listener"),
+    false
+  );
+  assert.equal(
+    dispatchRecord.targetListenerLookupStatus,
+    "present"
+  );
+  assert.equal(
+    dispatchRecord.targetListenerLookupBlockedReason,
+    componentTree.EVENT_LISTENER_TARGET_LOOKUP_BLOCKED_CODE
+  );
+  assert.equal(dispatchRecord.targetListenerFound, true);
+  assert.equal(
+    dispatchRecord.targetListenerRegistrationName,
+    "onClickCapture"
+  );
+  assert.equal(
+    dispatchRecord.extractionRecord.targetListenerLookupStatus,
+    "present"
+  );
+  assert.equal(
+    dispatchRecord.extractionRecord.targetListenerRegistrationName,
+    "onClickCapture"
+  );
+  assert.equal(dispatchRecord.extractionRecord.targetListenerFound, true);
+  assert.equal(
+    componentTree.isEventListenerTargetLookupRecord(
+      dispatchRecord.targetListenerLookupRecord
+    ),
+    true
+  );
+  const lookupPayload =
+    componentTree.getEventListenerTargetLookupRecordPayload(
+      dispatchRecord.targetListenerLookupRecord
+    );
+  assert.equal(lookupPayload.latestProps, latestProps);
+  assert.equal(lookupPayload.listener, latestProps.onClickCapture);
+  assert.equal(lookupPayload.hostInstanceToken, token);
+  assert.equal(lookupPayload.hostInstanceNode, child);
   assert.equal(dispatchRecord.targetHostInstanceNode, child);
   assert.equal(dispatchRecord.targetHostInstanceToken, token);
   assert.equal(dispatchRecord.targetHostInstanceStatus, "mounted-host-instance");
@@ -168,6 +256,57 @@ test("private event dispatch skeleton creates fail-closed records from wrapper m
   assert.equal(nativeEvent.stopPropagationCallCount, 0);
   assert.equal(nativeEvent.preventDefaultCallCount, 0);
   assert.equal(latestPropsListenerCalls, 0);
+  assert.equal(componentTree.detachHostInstanceToken(token), token);
+});
+
+test("private target listener lookup sees current latest props without dispatching", () => {
+  const root = createEventTarget("latest-props-root");
+  const child = createNode("BUTTON", domContainer.ELEMENT_NODE, root);
+  const rootOwner = {kind: "LatestPropsLookupRootOwner"};
+  const hostOwner = {kind: "LatestPropsLookupHostOwner"};
+  let firstListenerCalls = 0;
+  let secondListenerCalls = 0;
+  const firstProps = {
+    onClick() {
+      firstListenerCalls++;
+    }
+  };
+  const secondProps = {
+    onClick() {
+      secondListenerCalls++;
+    }
+  };
+  const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
+  componentTree.attachHostInstanceNode(child, token, firstProps);
+  componentTree.updateLatestPropsForNode(child, secondProps);
+  const wrapperRecord = eventListener.createEventListenerWrapperRecordWithPriority(
+    root,
+    "click",
+    0
+  );
+
+  const dispatchRecord =
+    eventDispatch.createEventDispatchRecordFromWrapperRecord(
+      wrapperRecord,
+      createNativeEvent("click", child)
+    );
+  const lookupPayload =
+    componentTree.getEventListenerTargetLookupRecordPayload(
+      dispatchRecord.targetListenerLookupRecord
+    );
+
+  assert.equal(dispatchRecord.targetListenerRegistrationName, "onClick");
+  assert.equal(dispatchRecord.targetListenerLookupStatus, "present");
+  assert.equal(dispatchRecord.targetListenerFound, true);
+  assert.equal(lookupPayload.latestProps, secondProps);
+  assert.equal(lookupPayload.listener, secondProps.onClick);
+  assert.equal(firstListenerCalls, 0);
+  assert.equal(secondListenerCalls, 0);
+  assert.equal(root.__registrations.length, 0);
+  assert.equal(dispatchRecord.dispatchQueue.length, 0);
+  assert.equal(dispatchRecord.syntheticEventCount, 0);
+  assert.equal(dispatchRecord.listenerInvocationCount, 0);
+  assert.equal(dispatchRecord.willInvokeListeners, false);
   assert.equal(componentTree.detachHostInstanceToken(token), token);
 });
 
@@ -200,6 +339,25 @@ test("private listener dispatch entry points return records while installed list
 
 test("plugin extraction records remain deterministic and fail closed for flag variants", () => {
   const root = createEventTarget("plugin-root");
+  assert.equal(
+    pluginEventSystem.getSimpleEventRegistrationName("click", 0),
+    "onClick"
+  );
+  assert.equal(
+    pluginEventSystem.getSimpleEventRegistrationName(
+      "click",
+      eventSystemFlags.IS_CAPTURE_PHASE
+    ),
+    "onClickCapture"
+  );
+  assert.equal(
+    pluginEventSystem.getSimpleEventRegistrationName("focusin", 0),
+    "onFocus"
+  );
+  assert.equal(
+    pluginEventSystem.getSimpleEventRegistrationName("change", 0),
+    null
+  );
   const bubbleRecord = eventListener.createEventListenerWrapperRecordWithPriority(
     root,
     "click",
@@ -342,13 +500,20 @@ test("event target normalization reports mounted host diagnostics without enabli
     "not-resolved"
   );
   assert.equal(componentTree.detachHostInstanceToken(token), token);
-  assert.equal(
+  const detachedDispatch =
     pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
       wrapperRecord,
       createNativeEvent("click", text)
-    ).targetNormalizationRecord.status,
+    );
+  assert.equal(
+    detachedDispatch.targetNormalizationRecord.status,
     "no-mounted-host-instance"
   );
+  assert.equal(
+    detachedDispatch.targetListenerLookupStatus,
+    "no-mounted-host-instance"
+  );
+  assert.equal(detachedDispatch.targetListenerFound, false);
 });
 
 test("invalid dispatch wrapper metadata fails before any native event side effects", () => {
@@ -369,6 +534,85 @@ test("invalid dispatch wrapper metadata fails before any native event side effec
 
   assert.equal(nativeEvent.stopPropagationCallCount, 0);
   assert.equal(nativeEvent.preventDefaultCallCount, 0);
+});
+
+test("invalid latest-props listener lookups fail before native event side effects", () => {
+  const root = createEventTarget("invalid-listener-root");
+  const child = createNode("BUTTON", domContainer.ELEMENT_NODE, root);
+  const token = componentTree.createHostInstanceToken(
+    {kind: "InvalidListenerHostOwner"},
+    {kind: "InvalidListenerRootOwner"}
+  );
+  const nativeEvent = createNativeEvent("click", child);
+  componentTree.attachHostInstanceNode(child, token, {
+    disabled: false,
+    onClick: "not-a-function"
+  });
+  const wrapperRecord = eventListener.createEventListenerWrapperRecordWithPriority(
+    root,
+    "click",
+    0
+  );
+
+  assert.throws(
+    () =>
+      pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+        wrapperRecord,
+        nativeEvent
+      ),
+    {
+      code: componentTree.INVALID_EVENT_LISTENER_CODE
+    }
+  );
+  assert.equal(nativeEvent.stopPropagationCallCount, 0);
+  assert.equal(nativeEvent.preventDefaultCallCount, 0);
+  assert.equal(root.__registrations.length, 0);
+  assert.equal(componentTree.detachHostInstanceToken(token), token);
+});
+
+test("wrong-node listener target lookups fail before native event side effects", () => {
+  const root = createEventTarget("wrong-node-listener-root");
+  const ownedNode = createNode("BUTTON", domContainer.ELEMENT_NODE, root);
+  const wrongNode = createNode("BUTTON", domContainer.ELEMENT_NODE, root);
+  const token = componentTree.createHostInstanceToken(
+    {kind: "WrongNodeListenerHostOwner"},
+    {kind: "WrongNodeListenerRootOwner"}
+  );
+  const props = {
+    onClick() {
+      throw new Error("wrong-node listener must not be invoked");
+    }
+  };
+  componentTree.attachHostInstanceNode(ownedNode, token, props);
+  wrongNode[componentTree.internalHostInstanceTokenKey] = token;
+  wrongNode[componentTree.internalLatestPropsKey] = props;
+  const nativeEvent = createNativeEvent("click", wrongNode);
+  const wrapperRecord = eventListener.createEventListenerWrapperRecordWithPriority(
+    root,
+    "click",
+    0
+  );
+
+  assert.throws(
+    () =>
+      pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+        wrapperRecord,
+        nativeEvent
+      ),
+    {
+      code: componentTree.EVENT_LISTENER_TARGET_LOOKUP_NODE_MISMATCH_CODE
+    }
+  );
+  assert.equal(nativeEvent.stopPropagationCallCount, 0);
+  assert.equal(nativeEvent.preventDefaultCallCount, 0);
+  assert.equal(root.__registrations.length, 0);
+  assert.equal(componentTree.getLatestPropsFromNode(ownedNode), props);
+  assert.equal(
+    wrongNode[componentTree.internalHostInstanceTokenKey],
+    token
+  );
+  assert.equal(componentTree.detachHostInstanceNode(wrongNode), null);
+  assert.equal(componentTree.detachHostInstanceToken(token), token);
 });
 
 test("private dispatch skeleton does not change public React DOM exports", () => {

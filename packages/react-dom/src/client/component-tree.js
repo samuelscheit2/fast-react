@@ -15,9 +15,46 @@ const internalLatestPropsKey = latestPropsMarkerPrefix + randomKey;
 const hostInstanceTokenBrand = Symbol('fast.react.dom.hostInstanceToken');
 const EVENT_TARGET_NORMALIZATION_RECORD_KIND =
   'FastReactDomEventTargetNormalizationRecord';
+const EVENT_LISTENER_TARGET_LOOKUP_RECORD_KIND =
+  'FastReactDomEventListenerTargetLookupRecord';
+const EVENT_LISTENER_TARGET_LOOKUP_BLOCKED_CODE =
+  'FAST_REACT_DOM_EVENT_LISTENER_TARGET_LOOKUP_BLOCKED';
+const INVALID_EVENT_TARGET_NORMALIZATION_RECORD_CODE =
+  'FAST_REACT_DOM_INVALID_EVENT_TARGET_NORMALIZATION_RECORD';
+const EVENT_LISTENER_TARGET_LOOKUP_NODE_MISMATCH_CODE =
+  'FAST_REACT_DOM_EVENT_LISTENER_TARGET_LOOKUP_NODE_MISMATCH';
+const EVENT_LISTENER_TARGET_LOOKUP_UNMOUNTED_CODE =
+  'FAST_REACT_DOM_EVENT_LISTENER_TARGET_LOOKUP_UNMOUNTED';
+const INVALID_EVENT_LISTENER_REGISTRATION_NAME_CODE =
+  'FAST_REACT_DOM_INVALID_EVENT_LISTENER_REGISTRATION_NAME';
+const INVALID_EVENT_LISTENER_LATEST_PROPS_CODE =
+  'FAST_REACT_DOM_INVALID_EVENT_LISTENER_LATEST_PROPS';
+const INVALID_EVENT_LISTENER_CODE =
+  'FAST_REACT_DOM_INVALID_EVENT_LISTENER';
 
 const tokenMetadata = new WeakMap();
 const tokenToNode = new WeakMap();
+const eventListenerTargetLookupRecordPayloads = new WeakMap();
+
+const disabledMouseEventRegistrationNames = new Set([
+  'onClick',
+  'onClickCapture',
+  'onDoubleClick',
+  'onDoubleClickCapture',
+  'onMouseDown',
+  'onMouseDownCapture',
+  'onMouseMove',
+  'onMouseMoveCapture',
+  'onMouseUp',
+  'onMouseUpCapture',
+  'onMouseEnter'
+]);
+const interactiveTagNames = new Set([
+  'button',
+  'input',
+  'select',
+  'textarea'
+]);
 
 function isObjectLike(value) {
   return (
@@ -229,6 +266,293 @@ function createEventTargetNormalizationRecord(targetNode) {
         ? normalizedTargetNode.nodeType
         : null
   });
+}
+
+function createEventListenerTargetLookupRecord(
+  targetNormalizationRecord,
+  registrationName
+) {
+  const normalizedTargetRecord =
+    assertEventTargetNormalizationRecord(targetNormalizationRecord);
+  const normalizedRegistrationName =
+    normalizeEventListenerRegistrationName(registrationName);
+  assertTargetNodeDoesNotHaveMismatchedHostInstanceToken(
+    normalizedTargetRecord.targetNode
+  );
+  const hostInstanceToken =
+    normalizedTargetRecord.closestMountedHostInstanceToken;
+
+  if (hostInstanceToken === null) {
+    return createEventListenerTargetLookupRecordFromPayload({
+      componentTreeStatus: normalizedTargetRecord.status,
+      hostInstanceNode: null,
+      hostInstanceToken: null,
+      latestProps: null,
+      latestPropsStatus: 'missing',
+      listener: null,
+      listenerFound: false,
+      listenerStatus:
+        normalizedRegistrationName === null
+          ? 'not-applicable'
+          : 'no-mounted-host-instance',
+      listenerType: 'missing',
+      normalizedTargetRecord,
+      registrationName: normalizedRegistrationName
+    });
+  }
+
+  const hostInstanceNode = getMountedHostInstanceNodeFromToken(
+    hostInstanceToken
+  );
+  if (hostInstanceNode === null) {
+    throw createComponentTreeError(
+      'Cannot look up a React DOM event listener for an unmounted host instance token.',
+      EVENT_LISTENER_TARGET_LOOKUP_UNMOUNTED_CODE
+    );
+  }
+
+  if (
+    hostInstanceNode !==
+    normalizedTargetRecord.closestMountedHostInstanceNode
+  ) {
+    throw createComponentTreeError(
+      'Cannot look up a React DOM event listener when the target record node does not match the mounted host instance token.',
+      EVENT_LISTENER_TARGET_LOOKUP_NODE_MISMATCH_CODE
+    );
+  }
+
+  const latestProps = getLatestPropsFromNode(hostInstanceNode);
+  if (latestProps === null) {
+    return createEventListenerTargetLookupRecordFromPayload({
+      componentTreeStatus: normalizedTargetRecord.status,
+      hostInstanceNode,
+      hostInstanceToken,
+      latestProps: null,
+      latestPropsStatus: 'missing',
+      listener: null,
+      listenerFound: false,
+      listenerStatus: 'missing-latest-props',
+      listenerType: 'missing',
+      normalizedTargetRecord,
+      registrationName: normalizedRegistrationName
+    });
+  }
+
+  if (!isObjectLike(latestProps)) {
+    throw createComponentTreeError(
+      'Cannot look up a React DOM event listener from non-object latest props.',
+      INVALID_EVENT_LISTENER_LATEST_PROPS_CODE
+    );
+  }
+
+  if (normalizedRegistrationName === null) {
+    return createEventListenerTargetLookupRecordFromPayload({
+      componentTreeStatus: normalizedTargetRecord.status,
+      hostInstanceNode,
+      hostInstanceToken,
+      latestProps,
+      latestPropsStatus: 'present',
+      listener: null,
+      listenerFound: false,
+      listenerStatus: 'not-applicable',
+      listenerType: 'missing',
+      normalizedTargetRecord,
+      registrationName: null
+    });
+  }
+
+  const listener = Object.prototype.hasOwnProperty.call(
+    latestProps,
+    normalizedRegistrationName
+  )
+    ? latestProps[normalizedRegistrationName]
+    : null;
+
+  if (
+    listener != null &&
+    shouldPreventMouseEvent(
+      normalizedRegistrationName,
+      hostInstanceNode,
+      latestProps
+    )
+  ) {
+    return createEventListenerTargetLookupRecordFromPayload({
+      componentTreeStatus: normalizedTargetRecord.status,
+      hostInstanceNode,
+      hostInstanceToken,
+      latestProps,
+      latestPropsStatus: 'present',
+      listener: null,
+      listenerFound: false,
+      listenerStatus: 'disabled-interactive-blocked',
+      listenerType: 'blocked',
+      normalizedTargetRecord,
+      registrationName: normalizedRegistrationName
+    });
+  }
+
+  if (listener != null && typeof listener !== 'function') {
+    throw createComponentTreeError(
+      `Expected \`${normalizedRegistrationName}\` listener to be a function, instead got a value of \`${typeof listener}\` type.`,
+      INVALID_EVENT_LISTENER_CODE
+    );
+  }
+
+  return createEventListenerTargetLookupRecordFromPayload({
+    componentTreeStatus: normalizedTargetRecord.status,
+    hostInstanceNode,
+    hostInstanceToken,
+    latestProps,
+    latestPropsStatus: 'present',
+    listener: listener == null ? null : listener,
+    listenerFound: listener != null,
+    listenerStatus: listener == null ? 'missing' : 'present',
+    listenerType: listener == null ? 'missing' : 'function',
+    normalizedTargetRecord,
+    registrationName: normalizedRegistrationName
+  });
+}
+
+function getEventListenerTargetLookupRecordPayload(record) {
+  if (!isObjectLike(record)) {
+    return null;
+  }
+
+  return eventListenerTargetLookupRecordPayloads.get(record) || null;
+}
+
+function isEventListenerTargetLookupRecord(record) {
+  return getEventListenerTargetLookupRecordPayload(record) !== null;
+}
+
+function createEventListenerTargetLookupRecordFromPayload(payload) {
+  const record = Object.freeze({
+    blockedReason: EVENT_LISTENER_TARGET_LOOKUP_BLOCKED_CODE,
+    componentTreeStatus: payload.componentTreeStatus,
+    exposesLatestProps: false,
+    exposesListener: false,
+    hostOwner:
+      payload.hostInstanceToken === null
+        ? null
+        : getHostInstanceOwnerFromToken(payload.hostInstanceToken),
+    kind: EVENT_LISTENER_TARGET_LOOKUP_RECORD_KIND,
+    latestPropsStatus: payload.latestPropsStatus,
+    listenerFound: payload.listenerFound,
+    listenerInvocationCount: 0,
+    listenerStatus: payload.listenerStatus,
+    listenerType: payload.listenerType,
+    publicRootBehaviorChanged: false,
+    registrationName: payload.registrationName,
+    rootOwner:
+      payload.hostInstanceToken === null
+        ? null
+        : getRootOwnerFromHostInstanceToken(payload.hostInstanceToken),
+    status: 'blocked',
+    syntheticEventCount: 0,
+    targetHostInstanceNode: payload.hostInstanceNode,
+    targetHostInstanceStatus: payload.componentTreeStatus,
+    targetHostInstanceToken: payload.hostInstanceToken,
+    targetNode: payload.normalizedTargetRecord.targetNode,
+    targetNormalizationRecord: payload.normalizedTargetRecord,
+    willInvokeListener: false
+  });
+
+  eventListenerTargetLookupRecordPayloads.set(
+    record,
+    Object.freeze({
+      hostInstanceNode: payload.hostInstanceNode,
+      hostInstanceToken: payload.hostInstanceToken,
+      latestProps: payload.latestProps,
+      listener: payload.listener,
+      targetNormalizationRecord: payload.normalizedTargetRecord
+    })
+  );
+
+  return record;
+}
+
+function assertEventTargetNormalizationRecord(record) {
+  if (
+    !isObjectLike(record) ||
+    record.kind !== EVENT_TARGET_NORMALIZATION_RECORD_KIND
+  ) {
+    throw createComponentTreeError(
+      'Cannot look up a React DOM event listener without a private target normalization record.',
+      INVALID_EVENT_TARGET_NORMALIZATION_RECORD_CODE
+    );
+  }
+
+  const hasMountedHostInstance =
+    record.closestMountedHostInstanceToken !== null;
+  if (
+    hasMountedHostInstance !==
+    (record.status === 'mounted-host-instance')
+  ) {
+    throw createComponentTreeError(
+      'Cannot look up a React DOM event listener from an inconsistent target normalization record.',
+      INVALID_EVENT_TARGET_NORMALIZATION_RECORD_CODE
+    );
+  }
+
+  return record;
+}
+
+function assertTargetNodeDoesNotHaveMismatchedHostInstanceToken(targetNode) {
+  if (
+    !isObjectLike(targetNode) ||
+    !Object.prototype.hasOwnProperty.call(
+      targetNode,
+      internalHostInstanceTokenKey
+    )
+  ) {
+    return;
+  }
+
+  if (getHostInstanceTokenFromNode(targetNode) === null) {
+    throw createComponentTreeError(
+      'Cannot look up a React DOM event listener from a target node with mismatched host instance metadata.',
+      EVENT_LISTENER_TARGET_LOOKUP_NODE_MISMATCH_CODE
+    );
+  }
+}
+
+function normalizeEventListenerRegistrationName(registrationName) {
+  if (registrationName == null) {
+    return null;
+  }
+
+  if (typeof registrationName !== 'string' || registrationName === '') {
+    throw createComponentTreeError(
+      'Cannot look up a React DOM event listener without a valid registration name.',
+      INVALID_EVENT_LISTENER_REGISTRATION_NAME_CODE
+    );
+  }
+
+  return registrationName;
+}
+
+function shouldPreventMouseEvent(registrationName, node, latestProps) {
+  return !!(
+    latestProps.disabled &&
+    disabledMouseEventRegistrationNames.has(registrationName) &&
+    interactiveTagNames.has(getHostNodeName(node))
+  );
+}
+
+function getHostNodeName(node) {
+  if (!isObjectLike(node)) {
+    return '';
+  }
+
+  if (typeof node.nodeName === 'string') {
+    return node.nodeName.toLowerCase();
+  }
+
+  if (typeof node.tagName === 'string') {
+    return node.tagName.toLowerCase();
+  }
+
+  return '';
 }
 
 function getHostInstanceOwnerFromToken(token) {
@@ -445,7 +769,15 @@ function detachHostInstanceToken(token) {
 }
 
 module.exports = {
+  EVENT_LISTENER_TARGET_LOOKUP_BLOCKED_CODE,
+  EVENT_LISTENER_TARGET_LOOKUP_NODE_MISMATCH_CODE,
+  EVENT_LISTENER_TARGET_LOOKUP_RECORD_KIND,
+  EVENT_LISTENER_TARGET_LOOKUP_UNMOUNTED_CODE,
   EVENT_TARGET_NORMALIZATION_RECORD_KIND,
+  INVALID_EVENT_LISTENER_CODE,
+  INVALID_EVENT_LISTENER_LATEST_PROPS_CODE,
+  INVALID_EVENT_LISTENER_REGISTRATION_NAME_CODE,
+  INVALID_EVENT_TARGET_NORMALIZATION_RECORD_CODE,
   assertMountedHostInstanceToken,
   assertHostInstanceNode,
   attachHostInstanceNode,
@@ -453,6 +785,7 @@ module.exports = {
   commitLatestPropsFromMutationHandoffs,
   commitLatestPropsFromMutationRecord,
   commitLatestPropsFromMutationRecords,
+  createEventListenerTargetLookupRecord,
   createEventTargetNormalizationRecord,
   createHostInstanceToken,
   detachHostInstanceNode,
@@ -460,6 +793,7 @@ module.exports = {
   getAttachedNodeFromHostInstanceToken,
   getClosestMountedHostInstanceNodeFromNode,
   getClosestMountedHostInstanceTokenFromNode,
+  getEventListenerTargetLookupRecordPayload,
   getHostInstanceOwnerFromNode,
   getHostInstanceOwnerFromToken,
   getHostInstanceTokenFromNode,
@@ -472,6 +806,7 @@ module.exports = {
   hostInstanceMarkerPrefix,
   internalHostInstanceTokenKey,
   internalLatestPropsKey,
+  isEventListenerTargetLookupRecord,
   isHostInstanceNode,
   isHostInstanceToken,
   latestPropsMarkerPrefix,

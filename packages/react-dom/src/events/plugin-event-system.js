@@ -1,6 +1,9 @@
 'use strict';
 
 const {
+  EVENT_LISTENER_TARGET_LOOKUP_BLOCKED_CODE,
+  EVENT_LISTENER_TARGET_LOOKUP_RECORD_KIND,
+  createEventListenerTargetLookupRecord,
   createEventTargetNormalizationRecord
 } = require('../client/component-tree.js');
 const {
@@ -46,6 +49,79 @@ const EVENT_PLUGIN_NAMES = Object.freeze([
   ...POLYFILL_EVENT_PLUGIN_NAMES,
   SCROLL_END_EVENT_PLUGIN_NAME
 ]);
+const simpleEventPluginEvents = Object.freeze([
+  'abort',
+  'auxClick',
+  'beforeToggle',
+  'cancel',
+  'canPlay',
+  'canPlayThrough',
+  'click',
+  'close',
+  'contextMenu',
+  'copy',
+  'cut',
+  'drag',
+  'dragEnd',
+  'dragEnter',
+  'dragExit',
+  'dragLeave',
+  'dragOver',
+  'dragStart',
+  'drop',
+  'durationChange',
+  'emptied',
+  'encrypted',
+  'ended',
+  'error',
+  'gotPointerCapture',
+  'input',
+  'invalid',
+  'keyDown',
+  'keyPress',
+  'keyUp',
+  'load',
+  'loadedData',
+  'loadedMetadata',
+  'loadStart',
+  'lostPointerCapture',
+  'mouseDown',
+  'mouseMove',
+  'mouseOut',
+  'mouseOver',
+  'mouseUp',
+  'paste',
+  'pause',
+  'play',
+  'playing',
+  'pointerCancel',
+  'pointerDown',
+  'pointerMove',
+  'pointerOut',
+  'pointerOver',
+  'pointerUp',
+  'progress',
+  'rateChange',
+  'reset',
+  'resize',
+  'seeked',
+  'seeking',
+  'stalled',
+  'submit',
+  'suspend',
+  'timeUpdate',
+  'touchCancel',
+  'touchEnd',
+  'touchMove',
+  'touchStart',
+  'volumeChange',
+  'scroll',
+  'scrollEnd',
+  'toggle',
+  'waiting',
+  'wheel'
+]);
+const simpleEventReactNames = createSimpleEventReactNameMap();
 
 function createInvalidEventWrapperRecordError() {
   const error = new Error(
@@ -140,10 +216,21 @@ function createPluginExtractionRecord(
   wrapperRecord,
   nativeEvent,
   nativeEventTarget,
-  targetNormalizationRecord
+  targetNormalizationRecord,
+  targetListenerLookupRecord
 ) {
   const eventSystemFlags = wrapperRecord.eventSystemFlags;
   const dispatchQueue = createDispatchQueueRecord();
+  const resolvedTargetListenerLookupRecord =
+    targetListenerLookupRecord === undefined
+      ? createEventListenerTargetLookupRecord(
+          targetNormalizationRecord,
+          getSimpleEventRegistrationName(
+            wrapperRecord.domEventName,
+            eventSystemFlags
+          )
+        )
+      : targetListenerLookupRecord;
 
   return Object.freeze({
     blockedReason: PLUGIN_EXTRACTION_BLOCKED_CODE,
@@ -163,6 +250,12 @@ function createPluginExtractionRecord(
     targetContainer: wrapperRecord.targetContainer,
     targetInst: null,
     targetInstStatus: 'not-resolved',
+    targetListenerFound: resolvedTargetListenerLookupRecord.listenerFound,
+    targetListenerLookupRecord: resolvedTargetListenerLookupRecord,
+    targetListenerLookupStatus:
+      resolvedTargetListenerLookupRecord.listenerStatus,
+    targetListenerRegistrationName:
+      resolvedTargetListenerLookupRecord.registrationName,
     targetNormalizationRecord,
     willInvokeListeners: false
   });
@@ -198,11 +291,19 @@ function createEventDispatchRecordFromWrapperRecord(
   );
   const targetNormalizationRecord =
     createEventTargetNormalizationRecord(nativeEventTarget);
+  const targetListenerLookupRecord = createEventListenerTargetLookupRecord(
+    targetNormalizationRecord,
+    getSimpleEventRegistrationName(
+      wrapperRecord.domEventName,
+      eventSystemFlags
+    )
+  );
   const extractionRecord = createPluginExtractionRecord(
     wrapperRecord,
     nativeEvent,
     nativeEventTarget,
-    targetNormalizationRecord
+    targetNormalizationRecord,
+    targetListenerLookupRecord
   );
 
   return Object.freeze({
@@ -238,6 +339,13 @@ function createEventDispatchRecordFromWrapperRecord(
       targetNormalizationRecord.closestMountedHostInstanceToken,
     targetInst: null,
     targetInstStatus: 'not-resolved',
+    targetListenerFound: targetListenerLookupRecord.listenerFound,
+    targetListenerLookupBlockedReason:
+      targetListenerLookupRecord.blockedReason,
+    targetListenerLookupRecord,
+    targetListenerLookupStatus: targetListenerLookupRecord.listenerStatus,
+    targetListenerRegistrationName:
+      targetListenerLookupRecord.registrationName,
     targetNormalizationRecord,
     targetResolutionBlockedReason: EVENT_TARGET_RESOLUTION_BLOCKED_CODE,
     targetResolutionStatus: 'blocked',
@@ -247,11 +355,54 @@ function createEventDispatchRecordFromWrapperRecord(
   });
 }
 
+function createSimpleEventReactNameMap() {
+  const reactNames = Object.create(null);
+
+  for (const eventName of simpleEventPluginEvents) {
+    const domEventName = eventName.toLowerCase();
+    reactNames[domEventName] =
+      'on' + eventName[0].toUpperCase() + eventName.slice(1);
+  }
+
+  reactNames.animationend = 'onAnimationEnd';
+  reactNames.animationiteration = 'onAnimationIteration';
+  reactNames.animationstart = 'onAnimationStart';
+  reactNames.dblclick = 'onDoubleClick';
+  reactNames.focusin = 'onFocus';
+  reactNames.focusout = 'onBlur';
+  reactNames.transitioncancel = 'onTransitionCancel';
+  reactNames.transitionend = 'onTransitionEnd';
+  reactNames.transitionrun = 'onTransitionRun';
+  reactNames.transitionstart = 'onTransitionStart';
+
+  return Object.freeze(reactNames);
+}
+
+function getSimpleEventReactName(domEventName) {
+  return Object.prototype.hasOwnProperty.call(
+    simpleEventReactNames,
+    domEventName
+  )
+    ? simpleEventReactNames[domEventName]
+    : null;
+}
+
+function getSimpleEventRegistrationName(domEventName, eventSystemFlags) {
+  const reactName = getSimpleEventReactName(domEventName);
+  if (reactName === null) {
+    return null;
+  }
+
+  return isCapturePhase(eventSystemFlags) ? reactName + 'Capture' : reactName;
+}
+
 module.exports = {
   CONTROLLED_STATE_RESTORE_BLOCKED_CODE,
   DISPATCH_QUEUE_RECORD_KIND,
   EVENT_DISPATCH_BLOCKED_CODE,
   EVENT_DISPATCH_RECORD_KIND,
+  EVENT_LISTENER_TARGET_LOOKUP_BLOCKED_CODE,
+  EVENT_LISTENER_TARGET_LOOKUP_RECORD_KIND,
   EVENT_PLUGIN_NAMES,
   EVENT_TARGET_RESOLUTION_BLOCKED_CODE,
   HYDRATION_REPLAY_BLOCKED_CODE,
@@ -264,5 +415,7 @@ module.exports = {
   assertEventListenerWrapperRecord,
   createEventDispatchRecordFromWrapperRecord,
   createPluginExtractionRecord,
+  getSimpleEventReactName,
+  getSimpleEventRegistrationName,
   getWrapperRecord
 };
