@@ -180,6 +180,14 @@ const privateSerializationFinishedWorkIdentityDiagnosticName =
   "fast-react-test-renderer.serialization.private-finished-work-identity";
 const privateSerializationFinishedWorkIdentityStatus =
   "private-serialization-finished-work-identity-validated-public-serialization-blocked";
+const privateToJSONSiblingTextFinishedWorkIdentityDiagnosticName =
+  "fast-react-test-renderer.tojson.sibling-text.finished-work-identity";
+const privateToJSONSiblingTextFinishedWorkIdentityStatus =
+  "private-tojson-sibling-text-finished-work-identity-validated-public-tojson-blocked";
+const privateToJSONSiblingTextJSAdmissionDiagnosticName =
+  "fast-react-test-renderer.tojson.sibling-text.private-js-cjs-admission";
+const privateToJSONSiblingTextJSAdmissionStatus =
+  "private-tojson-sibling-text-js-cjs-diagnostic-consumes-identity-public-blocked";
 const privateToTreeAcceptedDiagnosticName =
   "fast-react-test-renderer.serialization.private-tree-canary";
 const privateToTreeCommittedFiberInspectionDiagnosticName =
@@ -4540,6 +4548,74 @@ test("react-test-renderer cjs development private toJSON facade records nested u
       children: ["second sibling"]
     }
   ]);
+  assert.equal(
+    facade.privateSiblingTextFinishedWorkIdentityGateAvailable,
+    true
+  );
+  assert.equal(
+    facade.privateSiblingTextFinishedWorkIdentityDiagnosticName,
+    privateToJSONSiblingTextFinishedWorkIdentityDiagnosticName
+  );
+  assert.equal(
+    facade.privateSiblingTextFinishedWorkIdentityStatus,
+    privateToJSONSiblingTextFinishedWorkIdentityStatus
+  );
+  assert.equal(
+    facade.privateSiblingTextJSAdmissionDiagnosticName,
+    privateToJSONSiblingTextJSAdmissionDiagnosticName
+  );
+  assert.equal(
+    facade.privateSiblingTextJSAdmissionStatus,
+    privateToJSONSiblingTextJSAdmissionStatus
+  );
+  assert.equal(
+    typeof facade.createAcceptedSiblingTextDiagnosticResult,
+    "function"
+  );
+  assert.equal(
+    typeof facade.canCreateAcceptedSiblingTextDiagnosticResult,
+    "function"
+  );
+
+  const updateError = captureThrown(() =>
+    renderer.update({
+      props: { children: "second sibling" },
+      type: "span"
+    })
+  );
+  const siblingIdentity = privateSiblingTextFinishedWorkIdentityEvidence({
+    rootRequest: updateError.rootRequest
+  });
+  const siblingDiagnostic = facade.createAcceptedSiblingTextDiagnosticResult(
+    siblingReport,
+    siblingIdentity,
+    updateError.rootRequest
+  );
+  assert.equal(
+    siblingDiagnostic.diagnosticName,
+    privateToJSONSiblingTextJSAdmissionDiagnosticName
+  );
+  assert.equal(siblingDiagnostic.status, privateToJSONSiblingTextJSAdmissionStatus);
+  assert.equal(siblingDiagnostic.hostOutputShape, "SiblingText");
+  assert.equal(
+    siblingDiagnostic.hostOutputRowId,
+    privateToJSONSiblingTextHostOutputRowId
+  );
+  assert.equal(
+    siblingDiagnostic.consumesPrivateSiblingTextFinishedWorkIdentityGate,
+    true
+  );
+  assert.equal(
+    siblingDiagnostic.finishedWorkIdentity.diagnosticName,
+    privateToJSONSiblingTextFinishedWorkIdentityDiagnosticName
+  );
+  assert.equal(
+    siblingDiagnostic.finishedWorkIdentity.rootRequest,
+    updateError.rootRequest
+  );
+  assert.equal(siblingDiagnostic.publicToJSONAvailable, false);
+  assert.equal(siblingDiagnostic.nativeExecution, false);
+  assert.equal(siblingDiagnostic.compatibilityClaimed, false);
 
   const mismatchReport = privateToJSONReport({
     rowId: privateToJSONNestedUpdateHostOutputRowId,
@@ -4612,6 +4688,84 @@ function privateSerializationFinishedWorkIdentityEvidence({
     publicToTreeAvailable: false,
     publicTestInstanceAvailable: false,
     publicSerializationAvailable: false,
+    compatibilityClaimed: false
+  };
+}
+
+function privateSiblingTextFinishedWorkIdentityEvidence({
+  rootRequest
+}) {
+  const current = { arenaId: 1, slot: 20, generation: 1 };
+  const finishedWork = { arenaId: 1, slot: 21, generation: 1 };
+  return {
+    diagnosticName: privateToJSONSiblingTextFinishedWorkIdentityDiagnosticName,
+    status: privateToJSONSiblingTextFinishedWorkIdentityStatus,
+    publicSurface: "create().update -> create().toJSON",
+    sourceExecutionRecordId:
+      "react-test-renderer-update-route-root-work-loop-private-admission",
+    sourceExecutionStatus:
+      "accepted-private-update-route-root-work-loop-admission-public-update-blocked",
+    sourceSerializationDiagnosticName:
+      "fast-react-test-renderer.serialization.private-json-canary",
+    worker738ReportRowId: privateToJSONSiblingTextHostOutputRowId,
+    rootRequestId: rootRequest.requestId,
+    rootRequestSequence: rootRequest.requestSequence,
+    rootId: rootRequest.rootId,
+    hostOutputUpdateKind: "Update",
+    hostOutputShape: "SiblingText",
+    rootNodeKind: "RootArray",
+    rootChildCount: 2,
+    sourceNodeCount: 3,
+    routeRenderCurrent: current,
+    routeRenderFinishedWork: finishedWork,
+    routeCommitPreviousCurrent: current,
+    routeCommitCurrent: finishedWork,
+    renderCurrent: current,
+    renderFinishedWork: finishedWork,
+    commitPreviousCurrent: current,
+    commitCurrent: finishedWork,
+    reportFinishedWork: finishedWork,
+    routeRenderLanesBits: 1,
+    routeCommitFinishedLanesBits: 1,
+    renderLanesBits: 1,
+    commitFinishedLanesBits: 1,
+    reportFinishedLanesBits: 1,
+    commitRemainingLanesBits: 0,
+    commitPendingLanesBits: 0,
+    routeHandlesMatchCommittedUpdate: true,
+    routeLanesMatchCommittedUpdate: true,
+    commitCurrentMatchesRenderFinishedWork: true,
+    commitPreviousCurrentMatchesRenderCurrent: true,
+    commitLanesMatchRenderLanes: true,
+    reportFinishedWorkMatchesCommitCurrent: true,
+    reportLanesMatchCommitLanes: true,
+    committedFiberInspectionCurrentMatchesCommit: true,
+    committedSiblingTextFiberInspectionAvailable: true,
+    committedSiblingTextReportShapeAvailable: true,
+    committedSiblingTextInspectionMatchesOutput: true,
+    hostOutputSnapshotCurrent: true,
+    reportHostOutputRowMatchesOutput: true,
+    reportRootArraySourceNodesMatchCurrentSnapshot: true,
+    realSiblingTextHandoffAvailable: true,
+    consumesUpdateRouteAdmission: true,
+    consumesSiblingTextHostOutput: true,
+    consumesPrivateToJSONEvidence: true,
+    consumesWorker738ReportRow: true,
+    consumesCommittedHostRootFinishedWorkIdentity: true,
+    consumesCommittedHostRootFinishedWorkLanes: true,
+    identityAdmissionAvailable: true,
+    broadMultichildIdentityAvailable: false,
+    publicToJSONAvailable: false,
+    publicToTreeAvailable: false,
+    publicTestInstanceAvailable: false,
+    publicSerializationAvailable: false,
+    publicRouteAvailable: false,
+    nativeBridgeLoadingAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecutionAvailable: false,
+    jsFacadeAvailable: false,
+    cjsFacadeAvailable: false,
+    packageCompatibilityClaimed: false,
     compatibilityClaimed: false
   };
 }
