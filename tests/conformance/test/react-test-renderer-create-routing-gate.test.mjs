@@ -21,6 +21,15 @@ const missingPrerequisites = [
   "react-test-renderer-host-output-serialization"
 ];
 const privateRouteStatus = "blocked-js-native-bridge-not-loaded";
+const privateRootBridgeStatus =
+  "blocked-private-test-renderer-root-bridge-execution";
+const privateRootCompatibilityStatus =
+  "blocked-private-test-renderer-root-bridge-compatibility";
+const rootLifecycleActive = "Active";
+const rootLifecycleUnmountScheduled = "UnmountScheduled";
+const rootUpdateOutcomeScheduled = "Scheduled";
+const rootUpdateOutcomeIgnoredAfterUnmount = "IgnoredAfterUnmount";
+const rootUpdateOutcomeAlreadyUnmountScheduled = "AlreadyUnmountScheduled";
 const expectedPrivateRoutes = [
   {
     acceptedRustApis: [
@@ -283,6 +292,169 @@ test("react-test-renderer update and unmount routing metadata points at accepted
   }
 });
 
+test("react-test-renderer private root bridge records update and unmount lifecycle requests", () => {
+  for (const entry of entrypoints) {
+    const moduleExports = loadFresh(entry.modulePath);
+    const initialElement = { type: "initial" };
+    const nextElement = { type: "next" };
+    const lateElement = { type: "late" };
+    const renderer = moduleExports.create(initialElement, {
+      unstable_strictMode: true
+    });
+
+    const updateError = captureThrown(() => renderer.update(nextElement));
+    assertReactTestRendererUnimplemented(
+      updateError,
+      entry.entrypoint,
+      "create().update"
+    );
+    assertCreateRoutingGate(updateError, entry.entrypoint);
+    assertPrivateRootCreateRequest(updateError.privateRootCreateRequest);
+    assertPrivateRootRequestDiagnostics(updateError, {
+      historyLength: 2,
+      lifecycle: rootLifecycleActive,
+      operation: "update",
+      requestSequence: 2,
+      scheduledUpdateCount: 2
+    });
+    assertPrivateRootRequest(updateError.privateRootRequest, {
+      containerUpdateApi: "update_container",
+      expectedElementInfo: { type: "object" },
+      lifecycleStatusAfter: rootLifecycleActive,
+      lifecycleStatusBefore: rootLifecycleActive,
+      operation: "update",
+      requestSequence: 2,
+      requestType: "TestRendererRoot::update",
+      scheduledUpdateCountAfter: 2,
+      scheduledUpdateCountBefore: 1,
+      scheduledUpdateSequence: 2,
+      schedulesRootUpdate: true,
+      sync: false,
+      updateKind: "Update",
+      updateOutcome: rootUpdateOutcomeScheduled
+    });
+
+    const unmountError = captureThrown(() => renderer.unmount());
+    assertReactTestRendererUnimplemented(
+      unmountError,
+      entry.entrypoint,
+      "create().unmount"
+    );
+    assertCreateRoutingGate(unmountError, entry.entrypoint);
+    assertPrivateRootRequestDiagnostics(unmountError, {
+      historyLength: 3,
+      lifecycle: rootLifecycleUnmountScheduled,
+      operation: "unmount",
+      requestSequence: 3,
+      scheduledUpdateCount: 3
+    });
+    assertPrivateRootRequest(unmountError.privateRootRequest, {
+      containerUpdateApi: "update_container_sync",
+      expectedElementInfo: { type: "null" },
+      lifecycleStatusAfter: rootLifecycleUnmountScheduled,
+      lifecycleStatusBefore: rootLifecycleActive,
+      operation: "unmount",
+      requestSequence: 3,
+      requestType: "TestRendererRoot::unmount",
+      scheduledElement: {
+        isNone: true,
+        kind: "RootElementHandle::NONE"
+      },
+      scheduledUpdateCountAfter: 3,
+      scheduledUpdateCountBefore: 2,
+      scheduledUpdateSequence: 3,
+      schedulesRootUpdate: true,
+      sync: true,
+      updateKind: "Unmount",
+      updateOutcome: rootUpdateOutcomeScheduled
+    });
+
+    const secondUnmountError = captureThrown(() => renderer.unmount());
+    assertReactTestRendererUnimplemented(
+      secondUnmountError,
+      entry.entrypoint,
+      "create().unmount"
+    );
+    assertCreateRoutingGate(secondUnmountError, entry.entrypoint);
+    assertPrivateRootRequestDiagnostics(secondUnmountError, {
+      historyLength: 4,
+      lifecycle: rootLifecycleUnmountScheduled,
+      operation: "unmount",
+      requestSequence: 4,
+      scheduledUpdateCount: 3
+    });
+    assertPrivateRootRequest(secondUnmountError.privateRootRequest, {
+      containerUpdateApi: null,
+      expectedElementInfo: { type: "null" },
+      lifecycleStatusAfter: rootLifecycleUnmountScheduled,
+      lifecycleStatusBefore: rootLifecycleUnmountScheduled,
+      operation: "unmount",
+      requestSequence: 4,
+      requestType: "TestRendererRoot::unmount",
+      scheduledElement: {
+        isNone: true,
+        kind: "RootElementHandle::NONE"
+      },
+      scheduledUpdateCountAfter: 3,
+      scheduledUpdateCountBefore: 3,
+      scheduledUpdateSequence: null,
+      schedulesRootUpdate: false,
+      sync: null,
+      updateKind: "Unmount",
+      updateOutcome: rootUpdateOutcomeAlreadyUnmountScheduled
+    });
+
+    const lateUpdateError = captureThrown(() => renderer.update(lateElement));
+    assertReactTestRendererUnimplemented(
+      lateUpdateError,
+      entry.entrypoint,
+      "create().update"
+    );
+    assertCreateRoutingGate(lateUpdateError, entry.entrypoint);
+    assertPrivateRootRequestDiagnostics(lateUpdateError, {
+      historyLength: 5,
+      lifecycle: rootLifecycleUnmountScheduled,
+      operation: "update",
+      requestSequence: 5,
+      scheduledUpdateCount: 3
+    });
+    assertPrivateRootRequest(lateUpdateError.privateRootRequest, {
+      containerUpdateApi: null,
+      expectedElementInfo: { type: "object" },
+      lifecycleStatusAfter: rootLifecycleUnmountScheduled,
+      lifecycleStatusBefore: rootLifecycleUnmountScheduled,
+      operation: "update",
+      requestSequence: 5,
+      requestType: "TestRendererRoot::update",
+      scheduledElement: null,
+      scheduledUpdateCountAfter: 3,
+      scheduledUpdateCountBefore: 3,
+      scheduledUpdateSequence: null,
+      schedulesRootUpdate: false,
+      sync: null,
+      updateKind: "Update",
+      updateOutcome: rootUpdateOutcomeIgnoredAfterUnmount
+    });
+
+    assert.equal(
+      lateUpdateError.privateRootRequestHistory[0],
+      lateUpdateError.privateRootCreateRequest
+    );
+    assert.deepEqual(
+      lateUpdateError.privateRootRequestHistory.map(
+        (record) => record.updateOutcome
+      ),
+      [
+        rootUpdateOutcomeScheduled,
+        rootUpdateOutcomeScheduled,
+        rootUpdateOutcomeScheduled,
+        rootUpdateOutcomeAlreadyUnmountScheduled,
+        rootUpdateOutcomeIgnoredAfterUnmount
+      ]
+    );
+  }
+});
+
 test("react-test-renderer TestInstance query and serialization surfaces stay public fail-closed", () => {
   for (const entry of entrypoints) {
     const moduleExports = loadFresh(entry.modulePath);
@@ -515,6 +687,170 @@ function assertPrivateRoute(privateRoute, expected) {
   assert.deepEqual(privateRoute.acceptedRustApis, expected.acceptedRustApis);
   assert.equal(Object.isFrozen(privateRoute.acceptedRustTests), true);
   assert.deepEqual(privateRoute.acceptedRustTests, expected.acceptedRustTests);
+}
+
+function assertPrivateRootCreateRequest(createRequest) {
+  assertPrivateRootRequest(createRequest, {
+    containerUpdateApi: "update_container",
+    expectedElementInfo: { type: "object" },
+    lifecycleStatusAfter: rootLifecycleActive,
+    lifecycleStatusBefore: null,
+    operation: "create",
+    requestSequence: 1,
+    requestType: "TestRendererRoot::create",
+    scheduledUpdateCountAfter: 1,
+    scheduledUpdateCountBefore: 0,
+    scheduledUpdateSequence: 1,
+    schedulesRootUpdate: true,
+    sync: false,
+    updateKind: "Create",
+    updateOutcome: rootUpdateOutcomeScheduled
+  });
+  assert.deepEqual(createRequest.optionsInfo, { type: "object" });
+}
+
+function assertPrivateRootRequestDiagnostics(error, expected) {
+  assert.equal(error.privateRootBridgeStatus, privateRootBridgeStatus);
+  assert.equal(
+    error.privateRootCompatibilityStatus,
+    privateRootCompatibilityStatus
+  );
+  assert.equal(Object.isFrozen(error.privateRootBridgeState), true);
+  assert.equal(error.privateRootBridgeState.rootId, "test-renderer-root:1");
+  assert.equal(error.privateRootBridgeState.rootKind, "test-renderer");
+  assert.equal(error.privateRootBridgeState.rootTag, "ConcurrentRoot");
+  assert.equal(error.privateRootBridgeState.lifecycle, expected.lifecycle);
+  assert.equal(
+    error.privateRootBridgeState.scheduledUpdateCount,
+    expected.scheduledUpdateCount
+  );
+  assert.equal(error.privateRootBridgeState.nativeBridgeAvailable, false);
+  assert.equal(error.privateRootBridgeState.nativeExecution, false);
+  assert.equal(error.privateRootBridgeState.reconcilerExecution, false);
+  assert.equal(error.privateRootBridgeState.compatibilityClaimed, false);
+  assert.equal(Object.isFrozen(error.privateRootRequestHistory), true);
+  assert.equal(error.privateRootRequestHistory.length, expected.historyLength);
+  assert.equal(
+    error.privateRootRequest,
+    error.privateRootRequestHistory[error.privateRootRequestHistory.length - 1]
+  );
+  assert.equal(error.privateRootRequest.operation, expected.operation);
+  assert.equal(error.privateRootRequest.requestSequence, expected.requestSequence);
+  assert.equal(error.routingGate.updateRouteAvailable, false);
+  assert.equal(error.routingGate.unmountRouteAvailable, false);
+  assert.equal(error.updatePrivateRoute.publicRouteAvailable, false);
+  assert.equal(error.unmountPrivateRoute.publicRouteAvailable, false);
+}
+
+function assertPrivateRootRequest(record, expected) {
+  assert.equal(Object.isFrozen(record), true);
+  assert.equal(
+    record.$$typeof,
+    "fast.react_test_renderer.private_root_request_record"
+  );
+  assert.equal(record.kind, "FastReactTestRendererPrivateRootRequestRecord");
+  assert.equal(record.operation, expected.operation);
+  assert.equal(
+    record.requestId,
+    `test-renderer-request:${expected.requestSequence}`
+  );
+  assert.equal(record.requestSequence, expected.requestSequence);
+  assert.equal(record.requestType, expected.requestType);
+  assert.equal(record.rootId, "test-renderer-root:1");
+  assert.equal(record.rootKind, "test-renderer");
+  assert.equal(record.rootTag, "ConcurrentRoot");
+  assert.equal(record.lifecycleStatusBefore, expected.lifecycleStatusBefore);
+  assert.equal(record.lifecycleStatusAfter, expected.lifecycleStatusAfter);
+  assert.equal(
+    record.lifecycleTransition,
+    `${expected.lifecycleStatusBefore === null ? "none" : expected.lifecycleStatusBefore}->${expected.lifecycleStatusAfter}`
+  );
+  assert.equal(record.updateKind, expected.updateKind);
+  assert.equal(record.updateOutcome, expected.updateOutcome);
+  assert.equal(
+    record.scheduledUpdateCountBefore,
+    expected.scheduledUpdateCountBefore
+  );
+  assert.equal(
+    record.scheduledUpdateCountAfter,
+    expected.scheduledUpdateCountAfter
+  );
+  assert.equal(record.schedulesRootUpdate, expected.schedulesRootUpdate);
+  assert.equal(record.scheduledUpdateSequence, expected.scheduledUpdateSequence);
+  assert.equal(
+    record.scheduledUpdateId,
+    expected.scheduledUpdateSequence === null
+      ? null
+      : `root-update:${expected.scheduledUpdateSequence}`
+  );
+  assert.deepEqual(record.elementInfo, expected.expectedElementInfo);
+  assert.equal(Object.isFrozen(record.rootUpdateCallbacks), true);
+  assert.deepEqual(record.rootUpdateCallbacks, {
+    deferredHiddenCount: 0,
+    empty: true,
+    hiddenCount: 0,
+    visibleCount: 0
+  });
+  assert.equal(Object.isFrozen(record.owner), true);
+  assert.equal(Object.isFrozen(record.handle), true);
+  assert.equal(record.owner.$$typeof, "fast.react_test_renderer.private_root_owner");
+  assert.equal(record.handle.$$typeof, "fast.react_test_renderer.private_root_handle");
+  assert.equal(record.handle.owner, record.owner);
+  assert.equal(record.nativeBridgeAvailable, false);
+  assert.equal(record.nativeExecution, false);
+  assert.equal(record.reconcilerExecution, false);
+  assert.equal(record.hostOutputMutation, false);
+  assert.equal(record.serialization, false);
+  assert.equal(record.actIntegration, false);
+  assert.equal(record.compatibilityClaimed, false);
+  assert.equal(Object.isFrozen(record.blockedCapabilities), true);
+  assert.deepEqual(
+    record.blockedCapabilities.map((capability) => capability.id),
+    [
+      "native-execution",
+      "reconciler-execution",
+      "host-output-mutation",
+      "serialization",
+      "act-integration",
+      "compatibility-claims"
+    ]
+  );
+
+  if (expected.scheduledElement === undefined) {
+    assert.equal(Object.isFrozen(record.scheduledElement), true);
+    assert.equal(record.scheduledElement.kind, "OpaqueJsRootElement");
+    assert.equal(record.scheduledElement.isNone, false);
+    assert.deepEqual(
+      record.scheduledElement.valueInfo,
+      expected.expectedElementInfo
+    );
+  } else {
+    assert.deepEqual(record.scheduledElement, expected.scheduledElement);
+  }
+
+  if (expected.containerUpdateApi === null) {
+    assert.equal(record.containerUpdate, null);
+    assert.equal(record.rootSchedule, null);
+  } else {
+    assert.equal(Object.isFrozen(record.containerUpdate), true);
+    assert.equal(record.containerUpdate.api, expected.containerUpdateApi);
+    assert.equal(record.containerUpdate.includesSyncLane, expected.sync);
+    assert.equal(
+      record.containerUpdate.lane,
+      expected.sync ? "SyncLane" : "update_container-selected-lane"
+    );
+    assert.deepEqual(record.containerUpdate.callbackInfo, {
+      type: "undefined"
+    });
+    assert.equal(record.containerUpdate.nativeExecution, false);
+    assert.equal(record.containerUpdate.reconcilerExecution, false);
+    assert.equal(Object.isFrozen(record.rootSchedule), true);
+    assert.equal(record.rootSchedule.api, "ensure_root_is_scheduled");
+    assert.equal(record.rootSchedule.requested, true);
+    assert.equal(record.rootSchedule.mightHavePendingSyncWork, expected.sync);
+    assert.equal(record.rootSchedule.nativeExecution, false);
+    assert.equal(record.rootSchedule.reconcilerExecution, false);
+  }
 }
 
 function captureThrown(callback) {
