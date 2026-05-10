@@ -8,6 +8,8 @@ const REF_CALLBACK_ATTACH_DETACH_GATE_STATUS =
   'blocked-until-ref-callback-attach-detach-execution';
 const REF_CALLBACK_CONTROLLED_INVOCATION_GATE_STATUS =
   'private-controlled-ref-callback-invocation-recorded';
+const REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC_STATUS =
+  'private-ref-callback-host-output-ordering-diagnostic-recorded';
 const REF_CALLBACK_ERROR_PROPAGATION_STATUS =
   'blocked-until-root-error-routing';
 const REF_CALLBACK_PUBLIC_REF_COMPATIBILITY_STATUS =
@@ -55,6 +57,10 @@ const privateDomRefCallbackControlledInvocationGateSnapshotType =
   'fast.react_dom.private_ref_callback_controlled_invocation_gate_snapshot';
 const privateDomRefCallbackControlledInvocationGateRecordType =
   'fast.react_dom.private_ref_callback_controlled_invocation_gate_record';
+const privateDomRefCallbackHostOutputOrderingDiagnosticSnapshotType =
+  'fast.react_dom.private_ref_callback_host_output_ordering_diagnostic_snapshot';
+const privateDomRefCallbackHostOutputOrderingDiagnosticRecordType =
+  'fast.react_dom.private_ref_callback_host_output_ordering_diagnostic_record';
 
 const blockedCapabilities = freezeArray([
   blockedCapability(
@@ -151,6 +157,8 @@ const attachDetachGateSnapshotPayloads = new WeakMap();
 const attachDetachGateRecordPayloads = new WeakMap();
 const controlledInvocationGateSnapshotPayloads = new WeakMap();
 const controlledInvocationGateRecordPayloads = new WeakMap();
+const hostOutputOrderingDiagnosticSnapshotPayloads = new WeakMap();
+const hostOutputOrderingDiagnosticRecordPayloads = new WeakMap();
 
 function createRefAttachMetadataRecord(options) {
   return createRefCallbackMetadataRecord({
@@ -341,6 +349,155 @@ function createRefCallbackControlledInvocationGateSnapshot(snapshot) {
   return gateSnapshot;
 }
 
+function createRefCallbackHostOutputOrderingDiagnosticSnapshot(options) {
+  const steps = normalizeHostOutputOrderingDiagnosticSteps(options);
+  const activeRefsByToken = new Map();
+  const records = [];
+  const controlledSnapshots = [];
+  const stepSummaries = [];
+  const metrics = createHostOutputOrderingMetrics();
+  const appliedLatestPropsUpdates = [];
+
+  try {
+    for (const step of steps) {
+      appliedLatestPropsUpdates.push(
+        ...applyHostOutputLatestPropsUpdates(step.latestPropsUpdates)
+      );
+      metrics.latestPropsUpdateCount += step.latestPropsUpdates.length;
+
+      const controlledSnapshot =
+        createRefCallbackControlledInvocationGateSnapshot({
+          rootCommitRefMetadata: step.rootCommitRefMetadata
+        });
+      const controlledPayload =
+        getPrivateRefCallbackControlledInvocationGateSnapshotPayload(
+          controlledSnapshot
+        );
+
+      if (controlledPayload === null) {
+        throw createRefCallbackGateError(
+          'FAST_REACT_DOM_REF_CALLBACK_GATE_INVALID_CONTROLLED_SNAPSHOT',
+          'Cannot create host-output ref ordering diagnostics without a private controlled invocation snapshot.'
+        );
+      }
+
+      controlledSnapshots.push(controlledSnapshot);
+      const detachedRefsByToken = new Map();
+      const firstRecordSequence = records.length;
+
+      for (let index = 0; index < controlledSnapshot.records.length; index++) {
+        const controlledRecord = controlledSnapshot.records[index];
+        const controlledRecordPayload =
+          controlledPayload.invocationResults[index];
+        const diagnosticRecord = createHostOutputOrderingDiagnosticRecord({
+          activeRefsByToken,
+          controlledRecord,
+          controlledRecordPayload,
+          detachedRefsByToken,
+          metrics,
+          sequence: records.length,
+          step
+        });
+        records.push(diagnosticRecord);
+      }
+
+      stepSummaries.push(
+        freezeRecord({
+          attachCount: controlledSnapshot.attachCount,
+          detachCount: controlledSnapshot.detachCount,
+          firstRecordSequence,
+          hostOutputCanary: step.hostOutputCanary,
+          label: step.label,
+          lastRecordSequence:
+            records.length === firstRecordSequence ? null : records.length - 1,
+          latestPropsUpdateCount: step.latestPropsUpdates.length,
+          recordCount: controlledSnapshot.recordCount,
+          stepSequence: step.sequence
+        })
+      );
+
+      if (step.hostOutputCanary === 'update-host-output') {
+        metrics.updateCanaryStepCount++;
+      } else if (step.hostOutputCanary === 'unmount-host-output') {
+        metrics.unmountCanaryStepCount++;
+      }
+    }
+  } catch (error) {
+    rollbackHostOutputLatestPropsUpdates(appliedLatestPropsUpdates);
+    throw error;
+  }
+
+  const frozenRecords = freezeArray(records);
+  const snapshot = freezeRecord({
+    $$typeof: privateDomRefCallbackHostOutputOrderingDiagnosticSnapshotType,
+    kind: 'FastReactDomPrivateRefCallbackHostOutputOrderingDiagnosticSnapshot',
+    status: REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC_STATUS,
+    stepCount: steps.length,
+    updateCanaryStepCount: metrics.updateCanaryStepCount,
+    unmountCanaryStepCount: metrics.unmountCanaryStepCount,
+    recordCount: frozenRecords.length,
+    attachCount: metrics.attachCount,
+    detachCount: metrics.detachCount,
+    callbackRefRecordCount: metrics.callbackRefRecordCount,
+    objectRefRecordCount: metrics.objectRefRecordCount,
+    callbackInvocationAttemptCount: metrics.callbackInvocationAttemptCount,
+    callbackNullDetachAttemptCount: metrics.callbackNullDetachAttemptCount,
+    callbackCleanupReturnCount: metrics.callbackCleanupReturnCount,
+    cleanupInvocationAttemptCount: metrics.cleanupInvocationAttemptCount,
+    cleanupReturnMatchedCount: metrics.cleanupReturnMatchedCount,
+    cleanupReturnMismatchedCount: metrics.cleanupReturnMismatchedCount,
+    latestPropsUpdateCount: metrics.latestPropsUpdateCount,
+    callbackIdentityStableCount: metrics.callbackIdentityStableCount,
+    callbackIdentityChangedCount: metrics.callbackIdentityChangedCount,
+    callbackIdentityMissingCount: metrics.callbackIdentityMissingCount,
+    hostIdentityReusedAfterDetachCount:
+      metrics.hostIdentityReusedAfterDetachCount,
+    records: frozenRecords,
+    steps: freezeArray(stepSummaries),
+    ordering: attachDetachOrdering,
+    errorPropagation: blockedErrorPropagation,
+    errorPropagationStatus: REF_CALLBACK_ERROR_PROPAGATION_STATUS,
+    publicRefCompatibility: blockedPublicRefCompatibility,
+    publicRefCompatibilityStatus: REF_CALLBACK_PUBLIC_REF_COMPATIBILITY_STATUS,
+    blockedCapabilities: controlledInvocationBlockedCapabilities,
+    sideEffects: freezeRecord({
+      callbackRefsInvoked: metrics.callbackInvocationAttemptCount > 0,
+      callbackCleanupReturnsInvoked:
+        metrics.cleanupInvocationAttemptCount > 0,
+      objectRefsMutated: false,
+      layoutEffectsRun: false,
+      domMutated: false,
+      publicRootsTouched: false,
+      rootErrorsReported: false,
+      compatibilityClaimed: false
+    }),
+    callbackRefsInvoked: metrics.callbackInvocationAttemptCount > 0,
+    callbackCleanupReturnsInvoked:
+      metrics.cleanupInvocationAttemptCount > 0,
+    objectRefsMutated: false,
+    layoutEffectsRun: false,
+    domMutated: false,
+    publicRootsTouched: false,
+    rootErrorsReported: false,
+    compatibilityClaimed: false
+  });
+
+  hostOutputOrderingDiagnosticSnapshotPayloads.set(
+    snapshot,
+    freezeRecord({
+      controlledSnapshots: freezeArray(controlledSnapshots),
+      records: freezeArray(
+        frozenRecords.map((record) =>
+          getPrivateRefCallbackHostOutputOrderingDiagnosticRecordPayload(record)
+        )
+      ),
+      steps: freezeArray(steps)
+    })
+  );
+
+  return snapshot;
+}
+
 function getPrivateRefCallbackMetadataRecordPayload(record) {
   return isWeakMapKey(record)
     ? metadataRecordPayloads.get(record) || null
@@ -383,6 +540,22 @@ function getPrivateRefCallbackControlledInvocationGateRecordPayload(record) {
     : null;
 }
 
+function getPrivateRefCallbackHostOutputOrderingDiagnosticSnapshotPayload(
+  snapshot
+) {
+  return isWeakMapKey(snapshot)
+    ? hostOutputOrderingDiagnosticSnapshotPayloads.get(snapshot) || null
+    : null;
+}
+
+function getPrivateRefCallbackHostOutputOrderingDiagnosticRecordPayload(
+  record
+) {
+  return isWeakMapKey(record)
+    ? hostOutputOrderingDiagnosticRecordPayloads.get(record) || null
+    : null;
+}
+
 function isPrivateRefCallbackMetadataRecord(value) {
   return getPrivateRefCallbackMetadataRecordPayload(value) !== null;
 }
@@ -413,6 +586,20 @@ function isPrivateRefCallbackControlledInvocationGateSnapshot(value) {
 function isPrivateRefCallbackControlledInvocationGateRecord(value) {
   return (
     getPrivateRefCallbackControlledInvocationGateRecordPayload(value) !== null
+  );
+}
+
+function isPrivateRefCallbackHostOutputOrderingDiagnosticSnapshot(value) {
+  return (
+    getPrivateRefCallbackHostOutputOrderingDiagnosticSnapshotPayload(value) !==
+    null
+  );
+}
+
+function isPrivateRefCallbackHostOutputOrderingDiagnosticRecord(value) {
+  return (
+    getPrivateRefCallbackHostOutputOrderingDiagnosticRecordPayload(value) !==
+    null
   );
 }
 
@@ -1046,6 +1233,459 @@ function summarizeControlledInvocationResults(invocationResults) {
   return metrics;
 }
 
+function normalizeHostOutputOrderingDiagnosticSteps(options) {
+  const steps =
+    Array.isArray(options)
+      ? options
+      : options && typeof options === 'object'
+        ? options.steps
+        : null;
+
+  if (!Array.isArray(steps) || steps.length === 0) {
+    throw createRefCallbackGateError(
+      'FAST_REACT_DOM_REF_CALLBACK_GATE_INVALID_HOST_OUTPUT_STEPS',
+      'Cannot create host-output ref ordering diagnostics without a non-empty steps array.'
+    );
+  }
+
+  return freezeArray(
+    steps.map((step, sequence) => {
+      if (step == null || typeof step !== 'object') {
+        throw createRefCallbackGateError(
+          'FAST_REACT_DOM_REF_CALLBACK_GATE_INVALID_HOST_OUTPUT_STEP',
+          'Host-output ref ordering diagnostic steps must be objects.'
+        );
+      }
+
+      const rootCommitRefMetadata =
+        'rootCommitRefMetadata' in step
+          ? step.rootCommitRefMetadata
+          : step.refMetadata;
+      if (rootCommitRefMetadata == null || typeof rootCommitRefMetadata !== 'object') {
+        throw createRefCallbackGateError(
+          'FAST_REACT_DOM_REF_CALLBACK_GATE_MISSING_HOST_OUTPUT_REF_METADATA',
+          'Host-output ref ordering diagnostic steps require root commit ref metadata.'
+        );
+      }
+
+      return freezeRecord({
+        hostOutputCanary: normalizeHostOutputCanary(step.hostOutputCanary),
+        label: normalizeHostOutputStepLabel(step.label, sequence),
+        latestPropsUpdates: normalizeHostOutputLatestPropsUpdates(
+          step.latestPropsUpdates
+        ),
+        rootCommitRefMetadata,
+        sequence
+      });
+    })
+  );
+}
+
+function normalizeHostOutputLatestPropsUpdates(updates) {
+  if (updates == null) {
+    return freezeArray([]);
+  }
+
+  if (!Array.isArray(updates)) {
+    throw createRefCallbackGateError(
+      'FAST_REACT_DOM_REF_CALLBACK_GATE_INVALID_LATEST_PROPS_UPDATES',
+      'Host-output ref ordering latest-props updates must be an array.'
+    );
+  }
+
+  return freezeArray(
+    updates.map((update) => {
+      if (update == null || typeof update !== 'object') {
+        throw createRefCallbackGateError(
+          'FAST_REACT_DOM_REF_CALLBACK_GATE_INVALID_LATEST_PROPS_UPDATE',
+          'Host-output ref ordering latest-props updates must be objects.'
+        );
+      }
+
+      return freezeRecord({
+        hostInstanceToken: assertRequiredOption(
+          update.hostInstanceToken,
+          'hostInstanceToken'
+        ),
+        latestProps: assertRequiredOption(update.latestProps, 'latestProps')
+      });
+    })
+  );
+}
+
+function applyHostOutputLatestPropsUpdates(updates) {
+  const appliedUpdates = [];
+  for (const update of updates) {
+    const previousLatestProps =
+      componentTree.getLatestPropsFromHostInstanceToken(
+        update.hostInstanceToken
+      );
+    componentTree.updateLatestPropsForHostInstanceToken(
+      update.hostInstanceToken,
+      update.latestProps
+    );
+    appliedUpdates.push(
+      freezeRecord({
+        hostInstanceToken: update.hostInstanceToken,
+        previousLatestProps
+      })
+    );
+  }
+  return appliedUpdates;
+}
+
+function rollbackHostOutputLatestPropsUpdates(updates) {
+  for (let index = updates.length - 1; index >= 0; index--) {
+    try {
+      componentTree.updateLatestPropsForHostInstanceToken(
+        updates[index].hostInstanceToken,
+        updates[index].previousLatestProps
+      );
+    } catch (error) {
+      // The original private diagnostic error is more useful than rollback noise.
+    }
+  }
+}
+
+function createHostOutputOrderingMetrics() {
+  return {
+    attachCount: 0,
+    callbackCleanupReturnCount: 0,
+    callbackIdentityChangedCount: 0,
+    callbackIdentityMissingCount: 0,
+    callbackIdentityStableCount: 0,
+    callbackInvocationAttemptCount: 0,
+    callbackNullDetachAttemptCount: 0,
+    callbackRefRecordCount: 0,
+    cleanupInvocationAttemptCount: 0,
+    cleanupReturnMatchedCount: 0,
+    cleanupReturnMismatchedCount: 0,
+    detachCount: 0,
+    hostIdentityReusedAfterDetachCount: 0,
+    latestPropsUpdateCount: 0,
+    objectRefRecordCount: 0,
+    unmountCanaryStepCount: 0,
+    updateCanaryStepCount: 0
+  };
+}
+
+function createHostOutputOrderingDiagnosticRecord({
+  activeRefsByToken,
+  controlledRecord,
+  controlledRecordPayload,
+  detachedRefsByToken,
+  metrics,
+  sequence,
+  step
+}) {
+  const metadata = controlledRecordPayload.metadata;
+  const token = metadata.hostInstanceToken;
+  const activeRef = activeRefsByToken.get(token) || null;
+  const detachedRef = detachedRefsByToken.get(token) || null;
+  const refKind = controlledRecord.refKind;
+  const identity = describeHostOutputRefIdentity({
+    activeRef,
+    detachedRef,
+    metadata
+  });
+  const hostIdentityStatus = describeHostOutputHostIdentity({
+    activeRef,
+    detachedRef,
+    hostNode: controlledRecordPayload.hostNode.node,
+    metadata
+  });
+  const cleanup = describeHostOutputCleanupIdentity({
+    activeRef,
+    metadata,
+    invocation: controlledRecordPayload.invocation
+  });
+
+  updateHostOutputOrderingMetrics({
+    cleanup,
+    controlledRecord,
+    hostIdentityStatus,
+    identity,
+    metrics
+  });
+
+  if (metadata.action === REF_ACTION_DETACH) {
+    activeRefsByToken.delete(token);
+    detachedRefsByToken.set(
+      token,
+      freezeRecord({
+        cleanupReturn: activeRef === null ? null : activeRef.cleanupReturn,
+        hostNode: controlledRecordPayload.hostNode.node,
+        ref: metadata.ref
+      })
+    );
+  } else {
+    activeRefsByToken.set(
+      token,
+      freezeRecord({
+        cleanupReturn: controlledRecordPayload.cleanupReturn,
+        hostNode: controlledRecordPayload.hostNode.node,
+        ref: metadata.ref
+      })
+    );
+  }
+
+  const record = freezeRecord({
+    $$typeof: privateDomRefCallbackHostOutputOrderingDiagnosticRecordType,
+    kind: 'FastReactDomPrivateRefCallbackHostOutputOrderingDiagnosticRecord',
+    sequence,
+    stepSequence: step.sequence,
+    stepLabel: step.label,
+    hostOutputCanary: step.hostOutputCanary,
+    action: controlledRecord.action,
+    detachReason: controlledRecord.detachReason,
+    refKind,
+    operation: controlledRecord.operation,
+    status: REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC_STATUS,
+    controlledInvocationStatus: controlledRecord.status,
+    invocationKind: controlledRecord.invocationKind,
+    invocationStatus: controlledRecord.invocationStatus,
+    invocationAttempted: controlledRecord.invocationAttempted,
+    callbackRefInvocationAttempted:
+      controlledRecord.callbackRefInvocationAttempted,
+    cleanupReturnInvocationAttempted:
+      controlledRecord.cleanupReturnInvocationAttempted,
+    callbackReturnStatus: controlledRecord.callbackReturnStatus,
+    callbackCleanupReturnRecorded:
+      controlledRecord.callbackCleanupReturnRecorded,
+    cleanupReturnStatus: controlledRecord.cleanupReturnStatus,
+    callbackIdentityStatus: identity.status,
+    callbackIdentityMatchedPreviousActive:
+      identity.matchedPreviousActiveRef,
+    callbackIdentityChangedFromDetached:
+      identity.changedFromDetachedRef,
+    cleanupReturnExpectedFromPreviousAttach:
+      cleanup.expectedFromPreviousAttach,
+    cleanupReturnMatchesPreviousAttach:
+      cleanup.matchesPreviousAttach,
+    cleanupReturnInvoked: cleanup.invoked,
+    hostIdentityStatus,
+    hostIdentityReusedAfterDetach:
+      hostIdentityStatus === 'reused-from-detach',
+    ordering: controlledRecord.ordering,
+    errorPropagation: blockedErrorPropagation,
+    errorPropagationStatus: REF_CALLBACK_ERROR_PROPAGATION_STATUS,
+    publicRefCompatibility: blockedPublicRefCompatibility,
+    publicRefCompatibilityStatus: REF_CALLBACK_PUBLIC_REF_COMPATIBILITY_STATUS,
+    blockedCapabilities: controlledInvocationBlockedCapabilities,
+    callbackRefsInvoked: controlledRecord.callbackRefsInvoked,
+    callbackCleanupReturnsInvoked:
+      controlledRecord.callbackCleanupReturnsInvoked,
+    objectRefsMutated: false,
+    layoutEffectsRun: false,
+    domMutated: false,
+    publicRootsTouched: false,
+    rootErrorsReported: false,
+    compatibilityClaimed: false,
+    exposesRefValue: false,
+    exposesRefCleanup: false,
+    exposesHostNode: false,
+    exposesFakeHostNode: false,
+    exposesLatestProps: false
+  });
+
+  hostOutputOrderingDiagnosticRecordPayloads.set(
+    record,
+    freezeRecord({
+      activeRefBeforeRecord: activeRef,
+      cleanup,
+      controlledRecord,
+      controlledRecordPayload,
+      detachedRefBeforeRecord: detachedRef,
+      identity,
+      metadata,
+      step
+    })
+  );
+
+  return record;
+}
+
+function describeHostOutputRefIdentity({activeRef, detachedRef, metadata}) {
+  if (metadata.action === REF_ACTION_DETACH) {
+    if (activeRef === null) {
+      return freezeRecord({
+        changedFromDetachedRef: false,
+        matchedPreviousActiveRef: false,
+        status: 'missing-active-ref'
+      });
+    }
+
+    const matched = activeRef.ref === metadata.ref;
+    return freezeRecord({
+      changedFromDetachedRef: false,
+      matchedPreviousActiveRef: matched,
+      status: matched ? 'matches-active-ref' : 'differs-from-active-ref'
+    });
+  }
+
+  if (detachedRef !== null) {
+    const changed = detachedRef.ref !== metadata.ref;
+    return freezeRecord({
+      changedFromDetachedRef: changed,
+      matchedPreviousActiveRef: false,
+      status: changed ? 'changed-from-detached-ref' : 'same-as-detached-ref'
+    });
+  }
+
+  if (activeRef !== null) {
+    const matched = activeRef.ref === metadata.ref;
+    return freezeRecord({
+      changedFromDetachedRef: !matched,
+      matchedPreviousActiveRef: matched,
+      status: matched ? 'same-as-active-ref' : 'changed-from-active-ref'
+    });
+  }
+
+  return freezeRecord({
+    changedFromDetachedRef: false,
+    matchedPreviousActiveRef: false,
+    status: 'new-active-ref'
+  });
+}
+
+function describeHostOutputHostIdentity({activeRef, detachedRef, hostNode, metadata}) {
+  if (metadata.action === REF_ACTION_DETACH) {
+    if (activeRef === null) {
+      return 'missing-active-host';
+    }
+    return activeRef.hostNode === hostNode
+      ? 'matches-active-host'
+      : 'differs-from-active-host';
+  }
+
+  if (detachedRef !== null) {
+    return detachedRef.hostNode === hostNode
+      ? 'reused-from-detach'
+      : 'replaced-after-detach';
+  }
+
+  if (activeRef !== null) {
+    return activeRef.hostNode === hostNode
+      ? 'same-as-active-host'
+      : 'changed-from-active-host';
+  }
+
+  return 'new-host';
+}
+
+function describeHostOutputCleanupIdentity({activeRef, metadata, invocation}) {
+  if (metadata.action !== REF_ACTION_DETACH) {
+    return freezeRecord({
+      expectedFromPreviousAttach: false,
+      invoked: false,
+      matchesPreviousAttach: null
+    });
+  }
+
+  const expectedCleanup =
+    activeRef === null ? null : activeRef.cleanupReturn;
+  const expectedFromPreviousAttach = expectedCleanup !== null;
+  return freezeRecord({
+    expectedFromPreviousAttach,
+    invoked: invocation.cleanupAttempted,
+    matchesPreviousAttach:
+      expectedFromPreviousAttach && metadata.refCleanup === expectedCleanup
+  });
+}
+
+function updateHostOutputOrderingMetrics({
+  cleanup,
+  controlledRecord,
+  hostIdentityStatus,
+  identity,
+  metrics
+}) {
+  if (controlledRecord.action === REF_ACTION_ATTACH) {
+    metrics.attachCount++;
+  } else {
+    metrics.detachCount++;
+  }
+
+  if (controlledRecord.refKind === REF_KIND_CALLBACK) {
+    metrics.callbackRefRecordCount++;
+  } else if (controlledRecord.refKind === REF_KIND_OBJECT) {
+    metrics.objectRefRecordCount++;
+  }
+
+  if (controlledRecord.callbackRefInvocationAttempted) {
+    metrics.callbackInvocationAttemptCount++;
+  }
+  if (controlledRecord.cleanupReturnInvocationAttempted) {
+    metrics.cleanupInvocationAttemptCount++;
+  }
+  if (controlledRecord.callbackCleanupReturnRecorded) {
+    metrics.callbackCleanupReturnCount++;
+  }
+  if (
+    controlledRecord.invocationKind === REF_CALLBACK_INVOCATION_NULL_DETACH
+  ) {
+    metrics.callbackNullDetachAttemptCount++;
+  }
+
+  if (
+    identity.status === 'matches-active-ref' ||
+    identity.status === 'same-as-detached-ref' ||
+    identity.status === 'same-as-active-ref'
+  ) {
+    metrics.callbackIdentityStableCount++;
+  } else if (
+    identity.status === 'changed-from-detached-ref' ||
+    identity.status === 'changed-from-active-ref' ||
+    identity.status === 'differs-from-active-ref'
+  ) {
+    metrics.callbackIdentityChangedCount++;
+  } else if (identity.status === 'missing-active-ref') {
+    metrics.callbackIdentityMissingCount++;
+  }
+
+  if (cleanup.expectedFromPreviousAttach) {
+    if (cleanup.matchesPreviousAttach) {
+      metrics.cleanupReturnMatchedCount++;
+    } else {
+      metrics.cleanupReturnMismatchedCount++;
+    }
+  }
+
+  if (hostIdentityStatus === 'reused-from-detach') {
+    metrics.hostIdentityReusedAfterDetachCount++;
+  }
+}
+
+function normalizeHostOutputCanary(hostOutputCanary) {
+  if (
+    hostOutputCanary === 'initial-host-output' ||
+    hostOutputCanary === 'update-host-output' ||
+    hostOutputCanary === 'unmount-host-output'
+  ) {
+    return hostOutputCanary;
+  }
+
+  throw createRefCallbackGateError(
+    'FAST_REACT_DOM_REF_CALLBACK_GATE_INVALID_HOST_OUTPUT_CANARY',
+    'Host-output ref ordering diagnostics require an accepted host-output canary label.'
+  );
+}
+
+function normalizeHostOutputStepLabel(label, sequence) {
+  if (label === undefined) {
+    return `step:${sequence}`;
+  }
+
+  if (typeof label === 'string' && label.length > 0) {
+    return label;
+  }
+
+  throw createRefCallbackGateError(
+    'FAST_REACT_DOM_REF_CALLBACK_GATE_INVALID_HOST_OUTPUT_STEP_LABEL',
+    'Host-output ref ordering diagnostic step labels must be non-empty strings.'
+  );
+}
+
 function createOperationOrderingRecord(sequence, action) {
   return freezeRecord({
     sequence,
@@ -1203,6 +1843,7 @@ module.exports = {
   REF_CALLBACK_COMPONENT_TREE_GATE_STATUS,
   REF_CALLBACK_CONTROLLED_INVOCATION_GATE_STATUS,
   REF_CALLBACK_ERROR_PROPAGATION_STATUS,
+  REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC_STATUS,
   REF_CALLBACK_INVOCATION_ATTACH,
   REF_CALLBACK_INVOCATION_CLEANUP_RETURN,
   REF_CALLBACK_INVOCATION_NULL_DETACH,
@@ -1235,6 +1876,7 @@ module.exports = {
   createRefCallbackAttachDetachGateSnapshot,
   createRefCallbackComponentTreeGateSnapshot,
   createRefCallbackControlledInvocationGateSnapshot,
+  createRefCallbackHostOutputOrderingDiagnosticSnapshot,
   createRefDetachMetadataRecord,
   getPrivateRefCallbackAttachDetachGateRecordPayload,
   getPrivateRefCallbackAttachDetachGateSnapshotPayload,
@@ -1242,6 +1884,8 @@ module.exports = {
   getPrivateRefCallbackComponentTreeGateSnapshotPayload,
   getPrivateRefCallbackControlledInvocationGateRecordPayload,
   getPrivateRefCallbackControlledInvocationGateSnapshotPayload,
+  getPrivateRefCallbackHostOutputOrderingDiagnosticRecordPayload,
+  getPrivateRefCallbackHostOutputOrderingDiagnosticSnapshotPayload,
   getPrivateRefCallbackMetadataRecordPayload,
   isPrivateRefCallbackAttachDetachGateRecord,
   isPrivateRefCallbackAttachDetachGateSnapshot,
@@ -1249,6 +1893,8 @@ module.exports = {
   isPrivateRefCallbackComponentTreeGateSnapshot,
   isPrivateRefCallbackControlledInvocationGateRecord,
   isPrivateRefCallbackControlledInvocationGateSnapshot,
+  isPrivateRefCallbackHostOutputOrderingDiagnosticRecord,
+  isPrivateRefCallbackHostOutputOrderingDiagnosticSnapshot,
   isPrivateRefCallbackMetadataRecord,
   noSideEffects,
   privateDomRefCallbackAttachDetachGateRecordType,
@@ -1257,5 +1903,7 @@ module.exports = {
   privateDomRefCallbackComponentTreeGateSnapshotType,
   privateDomRefCallbackControlledInvocationGateRecordType,
   privateDomRefCallbackControlledInvocationGateSnapshotType,
+  privateDomRefCallbackHostOutputOrderingDiagnosticRecordType,
+  privateDomRefCallbackHostOutputOrderingDiagnosticSnapshotType,
   privateDomRefCallbackMetadataRecordType
 };

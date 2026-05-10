@@ -15,6 +15,14 @@ const rootBridge = require(path.join(
   packageRoot,
   'src/client/root-bridge.js'
 ));
+const componentTree = require(path.join(
+  packageRoot,
+  'src/client/component-tree.js'
+));
+const refCallbackGate = require(path.join(
+  packageRoot,
+  'src/client/ref-callback-gate.js'
+));
 const rootMarkers = require(path.join(
   packageRoot,
   'src/client/root-markers.js'
@@ -782,6 +790,195 @@ test('private portal fake-DOM commit handoff validates ownership and blocked sid
   assertBridgeDidNotTouchContainer(rootContainer, document);
   assert.equal(portalContainer.__registrations.length, 0);
   assert.equal(portalContainer.__mutationLog.length, 0);
+});
+
+test('private root bridge ref ordering diagnostic wraps update and unmount canary evidence', () => {
+  const document = createDocument('private-ref-ordering');
+  const container = createElement('DIV', document);
+  const hostNode = createElement('DIV', document);
+  const bridge = rootBridge.createPrivateRootBridgeShell();
+  const create = bridge.createClientRoot(container);
+  const initialRender = bridge.renderContainer(create.handle, {
+    props: {children: 'initial'},
+    type: 'div'
+  });
+  const updateRender = bridge.renderContainer(create.handle, {
+    props: {children: 'updated'},
+    type: 'div'
+  });
+  const unmount = bridge.unmountContainer(create.handle);
+  const rootOwner = rootBridge.getRootOwnerFromHandle(create.handle);
+  const hostOwner = {kind: 'PrivateRootBridgeRefOrderingHost'};
+  const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
+  const calls = [];
+
+  function firstCleanup() {
+    calls.push('first:cleanup');
+  }
+  function secondCleanup() {
+    calls.push('second:cleanup');
+  }
+  function firstRef(value) {
+    calls.push(`first:attach:${value.localName}`);
+    return firstCleanup;
+  }
+  function secondRef(value) {
+    calls.push(`second:attach:${value.localName}`);
+    return secondCleanup;
+  }
+
+  componentTree.attachHostInstanceNode(hostNode, token, {ref: firstRef});
+  const initialAttach = refCallbackGate.createRefAttachMetadataRecord({
+    rootOwner,
+    hostOwner,
+    hostInstanceToken: token,
+    fiber: {id: 'initial-fiber'},
+    stateNode: {id: 'state-node'},
+    refHandle: {id: 'first-ref'},
+    ref: firstRef,
+    sourceToken: 'commit:first'
+  });
+
+  const updatedProps = {ref: secondRef};
+  const updateDetach = refCallbackGate.createRefDetachMetadataRecord({
+    rootOwner,
+    hostOwner,
+    hostInstanceToken: token,
+    fiber: {id: 'update-current-fiber'},
+    stateNode: {id: 'state-node'},
+    refHandle: {id: 'first-ref'},
+    ref: firstRef,
+    refCleanup: firstCleanup,
+    expectedLatestRef: secondRef,
+    sourceToken: 'deletion:first',
+    detachReason: refCallbackGate.REF_DETACH_REASON_REF_CHANGED
+  });
+  const updateAttach = refCallbackGate.createRefAttachMetadataRecord({
+    rootOwner,
+    hostOwner,
+    hostInstanceToken: token,
+    fiber: {id: 'update-finished-fiber'},
+    stateNode: {id: 'state-node'},
+    refHandle: {id: 'second-ref'},
+    ref: secondRef,
+    sourceToken: 'commit:second'
+  });
+  const unmountDetach = refCallbackGate.createRefDetachMetadataRecord({
+    rootOwner,
+    hostOwner,
+    hostInstanceToken: token,
+    fiber: {id: 'unmount-current-fiber'},
+    stateNode: {id: 'state-node'},
+    refHandle: {id: 'second-ref'},
+    ref: secondRef,
+    refCleanup: secondCleanup,
+    sourceToken: 'deletion:second',
+    detachReason: refCallbackGate.REF_DETACH_REASON_DELETED
+  });
+
+  const diagnostic =
+    rootBridge.createRefCallbackHostOutputOrderingDiagnosticRecord(
+      [create, initialRender, updateRender, unmount],
+      {
+        steps: [
+          {
+            hostOutputCanary: 'initial-host-output',
+            rootCommitRefMetadata: {detach: [], attach: [initialAttach]}
+          },
+          {
+            hostOutputCanary: 'update-host-output',
+            latestPropsUpdates: [
+              {
+                hostInstanceToken: token,
+                latestProps: updatedProps
+              }
+            ],
+            rootCommitRefMetadata: {
+              detach: [updateDetach],
+              attach: [updateAttach]
+            }
+          },
+          {
+            hostOutputCanary: 'unmount-host-output',
+            rootCommitRefMetadata: {detach: [unmountDetach], attach: []}
+          }
+        ]
+      }
+    );
+
+  assert.equal(
+    rootBridge.isPrivateRootRefCallbackHostOutputOrderingDiagnosticRecord(
+      diagnostic
+    ),
+    true
+  );
+  assert.equal(
+    diagnostic.diagnosticStatus,
+    rootBridge.ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC_ADMITTED
+  );
+  assert.equal(diagnostic.updateRenderRequestCount, 1);
+  assert.equal(diagnostic.unmountRequestCount, 1);
+  assert.equal(diagnostic.updateBeforeUnmount, true);
+  assert.equal(diagnostic.refOrderingRecordCount, 4);
+  assert.equal(diagnostic.callbackIdentityChangedCount, 1);
+  assert.equal(diagnostic.cleanupReturnMatchedCount, 2);
+  assert.equal(diagnostic.cleanupInvocationAttemptCount, 2);
+  assert.equal(diagnostic.callbackNullDetachAttemptCount, 0);
+  assert.equal(diagnostic.publicRootExecution, false);
+  assert.equal(diagnostic.reconcilerExecution, false);
+  assert.equal(diagnostic.domMutation, false);
+  assert.equal(diagnostic.compatibilityClaimed, false);
+  assert.deepEqual(calls, [
+    'first:attach:div',
+    'first:cleanup',
+    'second:attach:div',
+    'second:cleanup'
+  ]);
+  assert.equal(container.__mutationLog.length, 0);
+
+  const payload =
+    rootBridge.getPrivateRootRefCallbackHostOutputOrderingDiagnosticPayload(
+      diagnostic
+    );
+  assert.equal(payload.rootRequestRecords[2], updateRender);
+  assert.equal(payload.rootRequestRecords[3], unmount);
+  assert.equal(payload.refOrderingSnapshot, diagnostic.refOrderingSnapshot);
+  assert.deepEqual(
+    diagnostic.refOrderingSnapshot.records.map((record) => [
+      record.action,
+      record.hostOutputCanary,
+      record.callbackIdentityStatus,
+      record.cleanupReturnMatchesPreviousAttach
+    ]),
+    [
+      ['attach', 'initial-host-output', 'new-active-ref', null],
+      ['detach', 'update-host-output', 'matches-active-ref', true],
+      ['attach', 'update-host-output', 'changed-from-detached-ref', null],
+      ['detach', 'unmount-host-output', 'matches-active-ref', true]
+    ]
+  );
+
+  assert.throws(
+    () =>
+      rootBridge.createRefCallbackHostOutputOrderingDiagnosticRecord(
+        [create, initialRender, unmount],
+        {
+          steps: [
+            {
+              hostOutputCanary: 'unmount-host-output',
+              rootCommitRefMetadata: {detach: [unmountDetach], attach: []}
+            }
+          ]
+        }
+      ),
+    {
+      code:
+        'FAST_REACT_DOM_INVALID_REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC'
+    }
+  );
+
+  assert.equal(componentTree.detachHostInstanceToken(token), token);
+  assertBridgeDidNotTouchContainer(container, document);
 });
 
 test('public react-dom/client root placeholders remain inert', () => {
