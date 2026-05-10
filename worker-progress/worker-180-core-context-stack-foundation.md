@@ -37,14 +37,19 @@ values for future function-component/context work.
 
 ## Verification
 
-- `cargo fmt --all --check` passed.
-- `cargo test -p fast-react-core --all-features context_stack` passed with 6
-  context stack tests.
-- `cargo test -p fast-react-core --all-features` passed with 85 unit tests and
-  0 doc tests.
-- `cargo clippy -p fast-react-core --all-targets --all-features -- -D warnings`
-  passed.
-- `git diff --check` passed.
+- Worker-local verification passed before orchestration merge:
+  - `cargo fmt --all --check`
+  - `cargo test -p fast-react-core --all-features context_stack`: 6 tests
+  - `cargo test -p fast-react-core --all-features`: 85 tests
+  - `cargo clippy -p fast-react-core --all-targets --all-features -- -D warnings`
+  - `git diff --check`
+- Orchestrator merged current `main` into this branch without conflicts.
+- Post-merge orchestrator verification passed:
+  - `cargo fmt --all --check`
+  - `cargo test -p fast-react-core --all-features context_stack`: 6 tests
+  - `cargo test -p fast-react-core --all-features`: 118 tests
+  - `cargo clippy -p fast-react-core --all-targets --all-features -- -D warnings`
+  - `git diff --check`
 
 ## Summary
 
