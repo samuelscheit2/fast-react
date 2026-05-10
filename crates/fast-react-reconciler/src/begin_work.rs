@@ -20,14 +20,16 @@ use fast_react_core::{
 };
 
 use crate::function_component::{
+    FunctionComponentContextConsumerInvoker, FunctionComponentContextReadRecord,
     FunctionComponentContextRenderState, FunctionComponentContextRenderStore,
     FunctionComponentHookRenderResult, FunctionComponentHookRenderStore, FunctionComponentInvoker,
     FunctionComponentOutputHandle, FunctionComponentRenderError, FunctionComponentRenderRecord,
     FunctionComponentSingleChildOutputResolver, FunctionComponentSingleChildReconciliationError,
     FunctionComponentSingleChildReconciliationRecord, FunctionComponentStateActionHandle,
-    FunctionComponentUseStateHookRenderRecord, FunctionComponentUseStateRenderRecord,
-    FunctionComponentUseStateRenderRequest, reconcile_function_component_single_child_output,
-    render_function_component, render_function_component_with_context_reads,
+    FunctionComponentUseContextRenderRecord, FunctionComponentUseStateHookRenderRecord,
+    FunctionComponentUseStateRenderRecord, FunctionComponentUseStateRenderRequest,
+    reconcile_function_component_single_child_output, render_function_component,
+    render_function_component_with_context_reads, render_function_component_with_use_context,
     render_function_component_with_use_state,
 };
 
@@ -187,6 +189,11 @@ pub(crate) struct FunctionComponentUseStateBeginWorkRecord {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentUseContextBeginWorkRecord {
+    render: FunctionComponentUseContextRenderRecord,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FragmentSingleHostChildBeginWorkRecord {
     fragment: FiberId,
     current: Option<FiberId>,
@@ -293,6 +300,48 @@ impl FunctionComponentUseStateBeginWorkRecord {
     }
 }
 
+impl FunctionComponentUseContextBeginWorkRecord {
+    #[must_use]
+    pub const fn render(self) -> FunctionComponentRenderRecord {
+        self.render.render()
+    }
+
+    #[must_use]
+    pub const fn use_context_render(self) -> FunctionComponentUseContextRenderRecord {
+        self.render
+    }
+
+    #[must_use]
+    pub const fn context_read(self) -> FunctionComponentContextReadRecord {
+        self.render.context_read()
+    }
+
+    #[must_use]
+    pub const fn current(self) -> Option<FiberId> {
+        self.render.current()
+    }
+
+    #[must_use]
+    pub const fn work_in_progress(self) -> FiberId {
+        self.render.work_in_progress()
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.render.render_lanes()
+    }
+
+    #[must_use]
+    pub const fn output(self) -> FunctionComponentOutputHandle {
+        self.render.output()
+    }
+
+    #[must_use]
+    pub const fn context_read_count(self) -> usize {
+        self.render.context_read_count()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ContextProviderBeginWorkRequest {
     provider: FiberId,
@@ -350,6 +399,18 @@ pub(crate) struct ContextProviderBeginWorkRecord {
     child_begin_work: FunctionComponentBeginWorkRecord,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ContextProviderUseContextBeginWorkRecord {
+    provider: FiberId,
+    child: FiberId,
+    context: ContextHandle,
+    value: ContextValueHandle,
+    provider_snapshot: ContextStackSnapshot,
+    pushed_stack_depth: usize,
+    restored_stack_depth: usize,
+    child_begin_work: FunctionComponentUseContextBeginWorkRecord,
+}
+
 impl ContextProviderBeginWorkRecord {
     #[must_use]
     pub const fn provider(self) -> FiberId {
@@ -399,6 +460,68 @@ impl ContextProviderBeginWorkRecord {
     #[must_use]
     pub const fn child_output(self) -> FunctionComponentOutputHandle {
         self.child_begin_work.output()
+    }
+
+    #[must_use]
+    pub const fn child_context_read_count(self) -> usize {
+        self.child_begin_work.context_read_count()
+    }
+}
+
+impl ContextProviderUseContextBeginWorkRecord {
+    #[must_use]
+    pub const fn provider(self) -> FiberId {
+        self.provider
+    }
+
+    #[must_use]
+    pub const fn child(self) -> FiberId {
+        self.child
+    }
+
+    #[must_use]
+    pub const fn context(self) -> ContextHandle {
+        self.context
+    }
+
+    #[must_use]
+    pub const fn value(self) -> ContextValueHandle {
+        self.value
+    }
+
+    #[must_use]
+    pub const fn provider_snapshot(self) -> ContextStackSnapshot {
+        self.provider_snapshot
+    }
+
+    #[must_use]
+    pub const fn pushed_stack_depth(self) -> usize {
+        self.pushed_stack_depth
+    }
+
+    #[must_use]
+    pub const fn restored_stack_depth(self) -> usize {
+        self.restored_stack_depth
+    }
+
+    #[must_use]
+    pub const fn child_begin_work(self) -> FunctionComponentUseContextBeginWorkRecord {
+        self.child_begin_work
+    }
+
+    #[must_use]
+    pub const fn child_render(self) -> FunctionComponentRenderRecord {
+        self.child_begin_work.render()
+    }
+
+    #[must_use]
+    pub const fn child_output(self) -> FunctionComponentOutputHandle {
+        self.child_begin_work.output()
+    }
+
+    #[must_use]
+    pub const fn child_context_read(self) -> FunctionComponentContextReadRecord {
+        self.child_begin_work.context_read()
     }
 
     #[must_use]
@@ -486,6 +609,24 @@ pub(crate) struct NestedContextProviderBeginWorkRecord {
     child_begin_work: FunctionComponentBeginWorkRecord,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct NestedContextProviderUseContextBeginWorkRecord {
+    outer_provider: FiberId,
+    inner_provider: FiberId,
+    child: FiberId,
+    outer_context: ContextHandle,
+    outer_value: ContextValueHandle,
+    inner_context: ContextHandle,
+    inner_value: ContextValueHandle,
+    outer_provider_snapshot: ContextStackSnapshot,
+    inner_provider_snapshot: ContextStackSnapshot,
+    outer_pushed_stack_depth: usize,
+    inner_pushed_stack_depth: usize,
+    inner_restored_stack_depth: usize,
+    outer_restored_stack_depth: usize,
+    child_begin_work: FunctionComponentUseContextBeginWorkRecord,
+}
+
 impl NestedContextProviderBeginWorkRecord {
     #[must_use]
     pub const fn outer_provider(self) -> FiberId {
@@ -565,6 +706,98 @@ impl NestedContextProviderBeginWorkRecord {
     #[must_use]
     pub const fn child_output(self) -> FunctionComponentOutputHandle {
         self.child_begin_work.output()
+    }
+
+    #[must_use]
+    pub const fn child_context_read_count(self) -> usize {
+        self.child_begin_work.context_read_count()
+    }
+}
+
+impl NestedContextProviderUseContextBeginWorkRecord {
+    #[must_use]
+    pub const fn outer_provider(self) -> FiberId {
+        self.outer_provider
+    }
+
+    #[must_use]
+    pub const fn inner_provider(self) -> FiberId {
+        self.inner_provider
+    }
+
+    #[must_use]
+    pub const fn child(self) -> FiberId {
+        self.child
+    }
+
+    #[must_use]
+    pub const fn outer_context(self) -> ContextHandle {
+        self.outer_context
+    }
+
+    #[must_use]
+    pub const fn outer_value(self) -> ContextValueHandle {
+        self.outer_value
+    }
+
+    #[must_use]
+    pub const fn inner_context(self) -> ContextHandle {
+        self.inner_context
+    }
+
+    #[must_use]
+    pub const fn inner_value(self) -> ContextValueHandle {
+        self.inner_value
+    }
+
+    #[must_use]
+    pub const fn outer_provider_snapshot(self) -> ContextStackSnapshot {
+        self.outer_provider_snapshot
+    }
+
+    #[must_use]
+    pub const fn inner_provider_snapshot(self) -> ContextStackSnapshot {
+        self.inner_provider_snapshot
+    }
+
+    #[must_use]
+    pub const fn outer_pushed_stack_depth(self) -> usize {
+        self.outer_pushed_stack_depth
+    }
+
+    #[must_use]
+    pub const fn inner_pushed_stack_depth(self) -> usize {
+        self.inner_pushed_stack_depth
+    }
+
+    #[must_use]
+    pub const fn inner_restored_stack_depth(self) -> usize {
+        self.inner_restored_stack_depth
+    }
+
+    #[must_use]
+    pub const fn outer_restored_stack_depth(self) -> usize {
+        self.outer_restored_stack_depth
+    }
+
+    #[must_use]
+    pub const fn child_begin_work(self) -> FunctionComponentUseContextBeginWorkRecord {
+        self.child_begin_work
+    }
+
+    #[must_use]
+    pub const fn child_render(self) -> FunctionComponentRenderRecord {
+        self.child_begin_work.render()
+    }
+
+    #[must_use]
+    pub const fn child_output(self) -> FunctionComponentOutputHandle {
+        self.child_begin_work.output()
+    }
+
+    #[must_use]
+    pub const fn child_context_read(self) -> FunctionComponentContextReadRecord {
+        self.child_begin_work.context_read()
     }
 
     #[must_use]
@@ -1332,6 +1565,39 @@ pub(crate) fn begin_work_with_context_reads(
     ))
 }
 
+pub(crate) fn begin_work_function_component_use_context(
+    arena: &mut FiberArena,
+    request: BeginWorkRequest,
+    context_store: &mut FunctionComponentContextRenderStore,
+    invoker: &mut impl FunctionComponentContextConsumerInvoker,
+) -> Result<FunctionComponentUseContextBeginWorkRecord, BeginWorkError> {
+    let work_in_progress = request.work_in_progress();
+    let tag = arena.get(work_in_progress)?.tag();
+
+    if tag != FiberTag::FunctionComponent {
+        if tag == FiberTag::Portal {
+            return Err(BeginWorkError::UnsupportedPortal(
+                unsupported_portal_begin_work_record(arena, request)?,
+            ));
+        }
+
+        return Err(BeginWorkError::UnsupportedFiberTag {
+            fiber: work_in_progress,
+            tag,
+        });
+    }
+
+    let render = render_function_component_with_use_context(
+        arena,
+        context_store,
+        work_in_progress,
+        request.render_lanes(),
+        invoker,
+    )?;
+
+    Ok(FunctionComponentUseContextBeginWorkRecord { render })
+}
+
 pub(crate) fn begin_work_context_provider_child(
     arena: &mut FiberArena,
     request: ContextProviderBeginWorkRequest,
@@ -1361,6 +1627,65 @@ pub(crate) fn begin_work_context_provider_child(
 
     match (child_result, restore_result) {
         (Ok(child_begin_work), Ok(())) => Ok(ContextProviderBeginWorkRecord {
+            provider: request.provider(),
+            child,
+            context: request.context(),
+            value: request.value(),
+            provider_snapshot,
+            pushed_stack_depth,
+            restored_stack_depth,
+            child_begin_work,
+        }),
+        (Err(error), Ok(())) => Err(ContextProviderBeginWorkError::ChildBeginWork {
+            provider: request.provider(),
+            child,
+            error: Box::new(error),
+        }),
+        (Ok(_), Err(error)) => Err(ContextProviderBeginWorkError::ContextRestore {
+            provider: request.provider(),
+            context: request.context(),
+            snapshot: provider_snapshot,
+            error: Box::new(error),
+        }),
+        (Err(child_error), Err(restore_error)) => Err(
+            ContextProviderBeginWorkError::ContextRestoreAfterChildError {
+                provider: request.provider(),
+                child,
+                context: request.context(),
+                child_error: Box::new(child_error),
+                restore_error: Box::new(restore_error),
+            },
+        ),
+    }
+}
+
+pub(crate) fn begin_work_context_provider_use_context_child(
+    arena: &mut FiberArena,
+    request: ContextProviderBeginWorkRequest,
+    context_store: &mut FunctionComponentContextRenderStore,
+    invoker: &mut impl FunctionComponentContextConsumerInvoker,
+) -> Result<ContextProviderUseContextBeginWorkRecord, ContextProviderBeginWorkError> {
+    let child = validate_context_provider_handoff_shape(arena, request.provider())?;
+    let provider_snapshot = context_store
+        .push_provider(request.context(), request.value())
+        .map_err(|error| ContextProviderBeginWorkError::ContextStack {
+            provider: request.provider(),
+            context: request.context(),
+            error: Box::new(error),
+        })?;
+    let pushed_stack_depth = context_store.stack_depth();
+
+    let child_result = begin_work_function_component_use_context(
+        arena,
+        BeginWorkRequest::new(child, request.render_lanes()),
+        context_store,
+        invoker,
+    );
+    let restore_result = context_store.restore_snapshot(provider_snapshot);
+    let restored_stack_depth = context_store.stack_depth();
+
+    match (child_result, restore_result) {
+        (Ok(child_begin_work), Ok(())) => Ok(ContextProviderUseContextBeginWorkRecord {
             provider: request.provider(),
             child,
             context: request.context(),
@@ -1462,6 +1787,105 @@ pub(crate) fn begin_work_nested_context_provider_child(
             outer_restored_stack_depth,
             child_begin_work,
         }),
+        (Ok(_), Err(error), _) => Err(NestedContextProviderBeginWorkError::ContextRestore {
+            provider: shape.inner_provider,
+            context: request.inner_context(),
+            snapshot: inner_snapshot,
+            error: Box::new(error),
+        }),
+        (Ok(_), Ok(()), Err(error)) => Err(NestedContextProviderBeginWorkError::ContextRestore {
+            provider: request.outer_provider(),
+            context: request.outer_context(),
+            snapshot: outer_snapshot,
+            error: Box::new(error),
+        }),
+        (Err(error), Ok(()), Ok(())) => Err(NestedContextProviderBeginWorkError::ChildBeginWork {
+            outer_provider: request.outer_provider(),
+            inner_provider: shape.inner_provider,
+            child: shape.child,
+            error: Box::new(error),
+        }),
+        (Err(child_error), inner_restore_error, outer_restore_error) => Err(
+            NestedContextProviderBeginWorkError::ContextRestoreAfterChildError {
+                outer_provider: request.outer_provider(),
+                inner_provider: shape.inner_provider,
+                child: shape.child,
+                child_error: Box::new(child_error),
+                inner_restore_error: inner_restore_error.err().map(Box::new),
+                outer_restore_error: outer_restore_error.err().map(Box::new),
+            },
+        ),
+    }
+}
+
+pub(crate) fn begin_work_nested_context_provider_use_context_child(
+    arena: &mut FiberArena,
+    request: NestedContextProviderBeginWorkRequest,
+    context_store: &mut FunctionComponentContextRenderStore,
+    invoker: &mut impl FunctionComponentContextConsumerInvoker,
+) -> Result<NestedContextProviderUseContextBeginWorkRecord, NestedContextProviderBeginWorkError> {
+    let shape = validate_nested_context_provider_handoff_shape(arena, request.outer_provider())?;
+    let outer_snapshot = context_store
+        .push_provider(request.outer_context(), request.outer_value())
+        .map_err(|error| NestedContextProviderBeginWorkError::ContextStack {
+            provider: request.outer_provider(),
+            context: request.outer_context(),
+            error: Box::new(error),
+        })?;
+    let outer_pushed_stack_depth = context_store.stack_depth();
+
+    let inner_snapshot =
+        match context_store.push_provider(request.inner_context(), request.inner_value()) {
+            Ok(snapshot) => snapshot,
+            Err(error) => {
+                if let Err(restore_error) = context_store.restore_snapshot(outer_snapshot) {
+                    return Err(NestedContextProviderBeginWorkError::ContextRestore {
+                        provider: request.outer_provider(),
+                        context: request.outer_context(),
+                        snapshot: outer_snapshot,
+                        error: Box::new(restore_error),
+                    });
+                }
+
+                return Err(NestedContextProviderBeginWorkError::ContextStack {
+                    provider: shape.inner_provider,
+                    context: request.inner_context(),
+                    error: Box::new(error),
+                });
+            }
+        };
+    let inner_pushed_stack_depth = context_store.stack_depth();
+
+    let child_result = begin_work_function_component_use_context(
+        arena,
+        BeginWorkRequest::new(shape.child, request.render_lanes()),
+        context_store,
+        invoker,
+    );
+    let inner_restore_result = context_store.restore_snapshot(inner_snapshot);
+    let inner_restored_stack_depth = context_store.stack_depth();
+    let outer_restore_result = context_store.restore_snapshot(outer_snapshot);
+    let outer_restored_stack_depth = context_store.stack_depth();
+
+    match (child_result, inner_restore_result, outer_restore_result) {
+        (Ok(child_begin_work), Ok(()), Ok(())) => {
+            Ok(NestedContextProviderUseContextBeginWorkRecord {
+                outer_provider: request.outer_provider(),
+                inner_provider: shape.inner_provider,
+                child: shape.child,
+                outer_context: request.outer_context(),
+                outer_value: request.outer_value(),
+                inner_context: request.inner_context(),
+                inner_value: request.inner_value(),
+                outer_provider_snapshot: outer_snapshot,
+                inner_provider_snapshot: inner_snapshot,
+                outer_pushed_stack_depth,
+                inner_pushed_stack_depth,
+                inner_restored_stack_depth,
+                outer_restored_stack_depth,
+                child_begin_work,
+            })
+        }
         (Ok(_), Err(error), _) => Err(NestedContextProviderBeginWorkError::ContextRestore {
             provider: shape.inner_provider,
             context: request.inner_context(),
@@ -1636,6 +2060,7 @@ pub(crate) fn begin_work_reconcile_function_component_single_child(
 mod tests {
     use super::*;
     use crate::function_component::{
+        FunctionComponentContextReadRecord, FunctionComponentContextRenderReader,
         FunctionComponentInvocationError, FunctionComponentInvocationRequest,
         FunctionComponentSingleChildOutput, FunctionComponentSingleChildOutputResolver,
         FunctionComponentSingleChildReconciliationError, FunctionComponentStateDispatchRequest,
@@ -1691,6 +2116,75 @@ mod tests {
                         "missing test component registration",
                     ))
                 })
+        }
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    enum UseContextBehavior {
+        ReadOnce { context: ContextHandle },
+        ReadTwice { context: ContextHandle },
+    }
+
+    #[derive(Debug)]
+    struct TestUseContextComponentRegistry {
+        component: FiberTypeHandle,
+        behavior: UseContextBehavior,
+        calls: Vec<FunctionComponentInvocationRequest>,
+        reads: Vec<FunctionComponentContextReadRecord>,
+    }
+
+    impl TestUseContextComponentRegistry {
+        fn new(component: FiberTypeHandle, behavior: UseContextBehavior) -> Self {
+            Self {
+                component,
+                behavior,
+                calls: Vec::new(),
+                reads: Vec::new(),
+            }
+        }
+
+        fn calls(&self) -> &[FunctionComponentInvocationRequest] {
+            &self.calls
+        }
+
+        fn reads(&self) -> &[FunctionComponentContextReadRecord] {
+            &self.reads
+        }
+    }
+
+    impl FunctionComponentContextConsumerInvoker for TestUseContextComponentRegistry {
+        fn invoke_function_component_context_consumer(
+            &mut self,
+            request: FunctionComponentInvocationRequest,
+            reader: &mut FunctionComponentContextRenderReader<'_>,
+        ) -> Result<FunctionComponentOutputHandle, FunctionComponentRenderError> {
+            self.calls.push(request);
+            if request.component() != self.component {
+                return Err(FunctionComponentRenderError::Invocation {
+                    fiber: request.fiber(),
+                    component: request.component(),
+                    error: FunctionComponentInvocationError::component_error(
+                        "missing use_context test component registration",
+                    ),
+                });
+            }
+
+            match self.behavior {
+                UseContextBehavior::ReadOnce { context } => {
+                    let read = reader.use_context(context)?;
+                    self.reads.push(read);
+                    Ok(FunctionComponentOutputHandle::from_raw(read.value().raw()))
+                }
+                UseContextBehavior::ReadTwice { context } => {
+                    let first = reader.use_context(context)?;
+                    let second = reader.read_context(context)?;
+                    self.reads.push(first);
+                    self.reads.push(second);
+                    Ok(FunctionComponentOutputHandle::from_raw(
+                        second.value().raw(),
+                    ))
+                }
+            }
         }
     }
 
@@ -1930,6 +2424,71 @@ mod tests {
     }
 
     #[test]
+    fn context_provider_use_context_child_reads_provider_value_during_invocation() {
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let default_value = context_value(180);
+        let provided_value = context_value(181);
+        let context = context_store.create_context(default_value);
+        let (mut arena, _current, child_work_in_progress, component) = function_component_pair();
+        let provider = arena.create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(182),
+            FiberMode::NO,
+        );
+        arena
+            .set_children(provider, &[child_work_in_progress])
+            .unwrap();
+        let mut registry = TestUseContextComponentRegistry::new(
+            component,
+            UseContextBehavior::ReadOnce { context },
+        );
+
+        let record = begin_work_context_provider_use_context_child(
+            &mut arena,
+            ContextProviderBeginWorkRequest::new(provider, Lanes::DEFAULT, context, provided_value),
+            &mut context_store,
+            &mut registry,
+        )
+        .unwrap();
+
+        assert_eq!(record.provider(), provider);
+        assert_eq!(record.child(), child_work_in_progress);
+        assert_eq!(record.context(), context);
+        assert_eq!(record.value(), provided_value);
+        assert!(record.provider_snapshot().is_root());
+        assert_eq!(record.pushed_stack_depth(), 1);
+        assert_eq!(record.restored_stack_depth(), 0);
+        assert_eq!(
+            record.child_output(),
+            FunctionComponentOutputHandle::from_raw(provided_value.raw())
+        );
+        assert_eq!(record.child_context_read_count(), 1);
+        assert_eq!(
+            record.child_begin_work().work_in_progress(),
+            child_work_in_progress
+        );
+        let read = record.child_context_read();
+        assert_eq!(read.fiber(), child_work_in_progress);
+        assert_eq!(read.context(), context);
+        assert_eq!(read.default_value(), default_value);
+        assert_eq!(read.value(), provided_value);
+        assert_eq!(read.active_provider_count(), 1);
+        assert_eq!(registry.reads(), &[read]);
+        assert_eq!(
+            context_store.context_reads_for_record(record.child_render()),
+            &[read]
+        );
+        assert_eq!(context_store.current_value(context).unwrap(), default_value);
+        assert_eq!(context_store.stack_depth(), 0);
+        assert_eq!(context_store.active_provider_count(context).unwrap(), 0);
+        assert_eq!(
+            arena.get(child_work_in_progress).unwrap().memoized_props(),
+            PropsHandle::from_raw(2)
+        );
+    }
+
+    #[test]
     fn nested_context_provider_begin_work_pushes_reads_and_unwinds_in_lifo_order() {
         let mut context_store = FunctionComponentContextRenderStore::new();
         let outer_default = context_value(150);
@@ -2032,6 +2591,157 @@ mod tests {
         );
         assert_eq!(
             arena.get(outer_provider).unwrap().memoized_props(),
+            PropsHandle::NONE
+        );
+    }
+
+    #[test]
+    fn nested_context_provider_use_context_child_reads_nearest_provider_value() {
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let default_value = context_value(430);
+        let outer_value = context_value(431);
+        let inner_value = context_value(432);
+        let context = context_store.create_context(default_value);
+        let (mut arena, _current, child_work_in_progress, component) = function_component_pair();
+        let outer_provider = arena.create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(433),
+            FiberMode::NO,
+        );
+        let inner_provider = arena.create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(434),
+            FiberMode::NO,
+        );
+        arena
+            .set_children(inner_provider, &[child_work_in_progress])
+            .unwrap();
+        arena
+            .set_children(outer_provider, &[inner_provider])
+            .unwrap();
+        let mut registry = TestUseContextComponentRegistry::new(
+            component,
+            UseContextBehavior::ReadOnce { context },
+        );
+
+        let record = begin_work_nested_context_provider_use_context_child(
+            &mut arena,
+            NestedContextProviderBeginWorkRequest::new(
+                outer_provider,
+                Lanes::DEFAULT,
+                context,
+                outer_value,
+                context,
+                inner_value,
+            ),
+            &mut context_store,
+            &mut registry,
+        )
+        .unwrap();
+
+        assert_eq!(record.outer_provider(), outer_provider);
+        assert_eq!(record.inner_provider(), inner_provider);
+        assert_eq!(record.child(), child_work_in_progress);
+        assert_eq!(record.outer_context(), context);
+        assert_eq!(record.inner_context(), context);
+        assert_eq!(record.outer_value(), outer_value);
+        assert_eq!(record.inner_value(), inner_value);
+        assert_eq!(record.outer_pushed_stack_depth(), 1);
+        assert_eq!(record.inner_pushed_stack_depth(), 2);
+        assert_eq!(record.inner_restored_stack_depth(), 1);
+        assert_eq!(record.outer_restored_stack_depth(), 0);
+        assert_eq!(
+            record.child_output(),
+            FunctionComponentOutputHandle::from_raw(inner_value.raw())
+        );
+        assert_eq!(record.child_context_read_count(), 1);
+        let read = record.child_context_read();
+        assert_eq!(read.fiber(), child_work_in_progress);
+        assert_eq!(read.context(), context);
+        assert_eq!(read.default_value(), default_value);
+        assert_eq!(read.value(), inner_value);
+        assert_eq!(read.active_provider_count(), 2);
+        assert_eq!(registry.reads(), &[read]);
+        assert_eq!(
+            context_store.context_reads_for_record(record.child_render()),
+            &[read]
+        );
+        assert_eq!(context_store.current_value(context).unwrap(), default_value);
+        assert_eq!(context_store.stack_depth(), 0);
+        assert_eq!(context_store.active_provider_count(context).unwrap(), 0);
+        assert_eq!(
+            arena.get(child_work_in_progress).unwrap().memoized_props(),
+            PropsHandle::from_raw(2)
+        );
+    }
+
+    #[test]
+    fn nested_context_provider_use_context_child_unwinds_after_unsupported_consumer_shape() {
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let default_value = context_value(440);
+        let context = context_store.create_context(default_value);
+        let (mut arena, _current, child_work_in_progress, component) = function_component_pair();
+        let outer_provider = arena.create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(441),
+            FiberMode::NO,
+        );
+        let inner_provider = arena.create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(442),
+            FiberMode::NO,
+        );
+        arena
+            .set_children(inner_provider, &[child_work_in_progress])
+            .unwrap();
+        arena
+            .set_children(outer_provider, &[inner_provider])
+            .unwrap();
+        let mut registry = TestUseContextComponentRegistry::new(
+            component,
+            UseContextBehavior::ReadTwice { context },
+        );
+
+        let error = begin_work_nested_context_provider_use_context_child(
+            &mut arena,
+            NestedContextProviderBeginWorkRequest::new(
+                outer_provider,
+                Lanes::DEFAULT,
+                context,
+                context_value(443),
+                context,
+                context_value(444),
+            ),
+            &mut context_store,
+            &mut registry,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            NestedContextProviderBeginWorkError::ChildBeginWork {
+                outer_provider,
+                inner_provider,
+                child: child_work_in_progress,
+                error: Box::new(BeginWorkError::FunctionComponent(
+                    FunctionComponentRenderError::UnsupportedUseContextReadCount {
+                        fiber: child_work_in_progress,
+                        read_count: 2,
+                    },
+                )),
+            }
+        );
+        assert_eq!(registry.calls().len(), 1);
+        assert_eq!(registry.reads().len(), 2);
+        assert_eq!(context_store.current_value(context).unwrap(), default_value);
+        assert_eq!(context_store.stack_depth(), 0);
+        assert_eq!(context_store.active_provider_count(context).unwrap(), 0);
+        assert_eq!(
+            arena.get(child_work_in_progress).unwrap().memoized_props(),
             PropsHandle::NONE
         );
     }
