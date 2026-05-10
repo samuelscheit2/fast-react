@@ -165,9 +165,20 @@ sequencing belong in `MASTER_PLAN.md`.
   conformance checks for React DOM resource hints, singletons, form actions,
   and controlled form behavior so placeholder API shape and source boundaries
   stay explicit until private adapter prerequisites exist.
+- Worker 173 passive pending state was merged, expanding internal reconciler
+  pending passive metadata into fail-closed mount/unmount queues with
+  deterministic unmount-before-mount ordering and root scheduling-state
+  helpers, without hook effect traversal, passive flushing, public `act`, DOM,
+  or native integration.
 
 ## Latest Accepted Verification
 
+- Worker 173 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused `root_config` and `fiber_root` tests, full
+  `fast-react-reconciler` tests with 102 unit tests plus 1 doctest, reconciler
+  clippy with warnings denied, and `git diff --check`; the worktree merge
+  conflict in `root_config.rs` preserved both worker 169 hydration handle tests
+  and worker 173 pending passive metadata tests.
 - Worker 172 was verified on its integrated worktree and again on `main` with
   syntax checks for the three new gate modules, focused resource/form/controlled
   conformance tests, `npm run test:conformance` with 433 tests,

@@ -45,8 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 173: passive pending state in
-  `/Users/user/Developer/Developer/fast-react-worker-173-passive-pending-state`.
 - Worker 175: Suspense/Offscreen fail-closed markers in
   `/Users/user/Developer/Developer/fast-react-worker-175-suspense-offscreen-fail-closed`.
 - Worker 176: act queue routing skeleton in
