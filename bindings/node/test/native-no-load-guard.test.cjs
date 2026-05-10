@@ -118,6 +118,21 @@ async function main() {
         .length,
       12
     );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+        .batchedRecordGate.responseSequenceGate.responseSequenceGateStatus,
+      'diagnosed-native-root-bridge-json-batch-response-sequence'
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+        .batchedRecordGate.responseSequenceGate.batchId,
+      'native-root-bridge-json-batch-552'
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+        .batchedRecordGate.responseSequenceGate.nativeExecution,
+      false
+    );
     assert.ok(Object.isFrozen(actualRootBridgeEvidence));
     for (const evidence of actualRootBridgeEvidence) {
       assert.ok(Object.isFrozen(evidence));

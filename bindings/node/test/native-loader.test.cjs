@@ -580,6 +580,47 @@ const expectedNativeRootBridgeRequestShape = {
           'batch-request-after-unmount-lifecycle-order',
           'batch-request-id-out-of-order'
         ],
+        responseSequenceGate: {
+          responseSequenceGateStatus:
+            'diagnosed-native-root-bridge-json-batch-response-sequence',
+          batchId: 'native-root-bridge-json-batch-552',
+          validationModel:
+            'fast-react-napi.NativeRootBridgeRequestSequenceValidator',
+          jsonTransportBatchResponseSequenceRowFields: [
+            'id',
+            'batchId',
+            'requestOrder',
+            'responseOrder',
+            'requestId',
+            'kind',
+            'responseStatus',
+            'errorRowStatus',
+            'teardownState',
+            'code',
+            'sourceErrorCode',
+            'boundaryErrorCode',
+            'nativeAddonLoaded',
+            'nativeExecution',
+            'rendererExecution',
+            'reconcilerExecution',
+            'reactBehaviorError'
+          ],
+          errorRowStatuses: [
+            'not-error-row',
+            'lifecycle-error-row',
+            'deterministic-error-row'
+          ],
+          teardownStates: [
+            'root-uninitialized',
+            'root-active',
+            'root-retired'
+          ],
+          nativeAddonLoaded: false,
+          nativeExecution: false,
+          rendererExecution: false,
+          reconcilerExecution: false,
+          reactBehaviorError: false
+        },
         nativeAddonLoaded: false,
         nativeExecution: false,
         rendererExecution: false,
@@ -738,6 +779,15 @@ for (const shapeValue of [
     .batchedRecordGate.jsonTransportBatchLifecycleRowFields,
   native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
     .batchedRecordGate.jsonTransportBatchErrorCaseIds,
+  native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+    .batchedRecordGate.responseSequenceGate,
+  native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+    .batchedRecordGate.responseSequenceGate
+    .jsonTransportBatchResponseSequenceRowFields,
+  native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+    .batchedRecordGate.responseSequenceGate.errorRowStatuses,
+  native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+    .batchedRecordGate.responseSequenceGate.teardownStates,
   native.nativeRootBridgeRequestShape.crossEnvironmentTeardownGate,
   native.nativeRootBridgeRequestShape.crossEnvironmentTeardownGate
     .environmentTeardownFields,
@@ -1588,6 +1638,10 @@ function assertNativeRootBridgeBatchedJsonTransportGate(batchGate) {
     native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
       .batchedRecordGate.jsonTransportBatchErrorCaseIds
   );
+  assert.equal(Object.isFrozen(batchGate.responseSequenceGate), true);
+  assertNativeRootBridgeBatchResponseSequenceGate(
+    batchGate.responseSequenceGate
+  );
   assert.deepEqual(
     batchGate.lifecycleRows.map((row) => row.id),
     ['batch-record-0-create', 'batch-record-1-render', 'batch-record-2-unmount']
@@ -1696,6 +1750,141 @@ function assertNativeRootBridgeBatchedJsonTransportGate(batchGate) {
     assert.equal(row.reconcilerExecution, false);
     assert.equal(row.reactBehaviorError, false);
   }
+}
+
+function assertNativeRootBridgeBatchResponseSequenceGate(responseGate) {
+  const staticResponseGate =
+    native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
+      .batchedRecordGate.responseSequenceGate;
+
+  assert.equal(Object.isFrozen(responseGate.rows), true);
+  assert.equal(Object.isFrozen(responseGate.errorRows), true);
+  assert.equal(
+    responseGate.responseSequenceGateStatus,
+    'diagnosed-native-root-bridge-json-batch-response-sequence'
+  );
+  assert.equal(responseGate.batchId, 'native-root-bridge-json-batch-552');
+  assert.equal(
+    responseGate.validationModel,
+    'fast-react-napi.NativeRootBridgeRequestSequenceValidator'
+  );
+  assert.equal(responseGate.requestCount, 3);
+  assert.equal(responseGate.responseCount, 3);
+  assert.equal(responseGate.errorRowCount, 5);
+  assert.equal(
+    responseGate.jsonTransportBatchResponseSequenceRowFields,
+    staticResponseGate.jsonTransportBatchResponseSequenceRowFields
+  );
+  assert.equal(
+    responseGate.errorRowStatuses,
+    staticResponseGate.errorRowStatuses
+  );
+  assert.equal(responseGate.teardownStates, staticResponseGate.teardownStates);
+  assert.deepEqual(
+    responseGate.rows.map((row) => row.id),
+    [
+      'batch-response-0-create',
+      'batch-response-1-render',
+      'batch-response-2-unmount'
+    ]
+  );
+  assert.deepEqual(
+    responseGate.rows.map((row) => row.batchId),
+    [
+      'native-root-bridge-json-batch-552',
+      'native-root-bridge-json-batch-552',
+      'native-root-bridge-json-batch-552'
+    ]
+  );
+  assert.deepEqual(
+    responseGate.rows.map((row) => row.requestOrder),
+    [0, 1, 2]
+  );
+  assert.deepEqual(
+    responseGate.rows.map((row) => row.responseOrder),
+    [0, 1, 2]
+  );
+  assert.deepEqual(
+    responseGate.rows.map((row) => row.requestId),
+    [1, 2, 3]
+  );
+  assert.deepEqual(
+    responseGate.rows.map((row) => row.responseStatus),
+    ['accepted', 'accepted', 'accepted']
+  );
+  assert.deepEqual(
+    responseGate.rows.map((row) => row.errorRowStatus),
+    ['not-error-row', 'not-error-row', 'not-error-row']
+  );
+  assert.deepEqual(
+    responseGate.rows.map((row) => row.teardownState),
+    ['root-active', 'root-active', 'root-retired']
+  );
+  assert.deepEqual(
+    responseGate.errorRows.map((row) => row.id),
+    [
+      'batch-render-before-create-lifecycle-order',
+      'batch-root-handle-state-mismatch',
+      'batch-create-after-create-lifecycle-order',
+      'batch-request-after-unmount-lifecycle-order',
+      'batch-request-id-out-of-order'
+    ]
+  );
+  assert.deepEqual(
+    responseGate.errorRows.map((row) => row.requestOrder),
+    [0, 0, 1, 2, 1]
+  );
+  assert.deepEqual(
+    responseGate.errorRows.map((row) => row.responseOrder),
+    [0, 1, 2, 3, 4]
+  );
+  assert.deepEqual(
+    responseGate.errorRows.map((row) => row.errorRowStatus),
+    [
+      'deterministic-error-row',
+      'deterministic-error-row',
+      'deterministic-error-row',
+      'deterministic-error-row',
+      'deterministic-error-row'
+    ]
+  );
+  assert.deepEqual(
+    responseGate.errorRows.map((row) => row.teardownState),
+    [
+      'root-uninitialized',
+      'root-uninitialized',
+      'root-active',
+      'root-retired',
+      'root-active'
+    ]
+  );
+  assert.deepEqual(
+    responseGate.errorRows.map((row) => row.code),
+    [
+      'FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_MUST_START_WITH_CREATE',
+      'FAST_REACT_NAPI_ROOT_REQUEST_RECORD_HANDLE_STATE_MISMATCH',
+      'FAST_REACT_NAPI_ROOT_REQUEST_CREATE_AFTER_ROOT_CREATED',
+      'FAST_REACT_NAPI_ROOT_REQUEST_AFTER_UNMOUNT',
+      'FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_OUT_OF_ORDER'
+    ]
+  );
+  for (const row of [...responseGate.rows, ...responseGate.errorRows]) {
+    assert.equal(Object.isFrozen(row), true);
+    assert.deepEqual(
+      Object.keys(row),
+      responseGate.jsonTransportBatchResponseSequenceRowFields
+    );
+    assert.equal(row.nativeAddonLoaded, false);
+    assert.equal(row.nativeExecution, false);
+    assert.equal(row.rendererExecution, false);
+    assert.equal(row.reconcilerExecution, false);
+    assert.equal(row.reactBehaviorError, false);
+  }
+  assert.equal(responseGate.nativeAddonLoaded, false);
+  assert.equal(responseGate.nativeExecution, false);
+  assert.equal(responseGate.rendererExecution, false);
+  assert.equal(responseGate.reconcilerExecution, false);
+  assert.equal(responseGate.reactBehaviorError, false);
 }
 
 function assertNativeRootBridgeCrossEnvironmentTeardownGate(teardownGate) {
