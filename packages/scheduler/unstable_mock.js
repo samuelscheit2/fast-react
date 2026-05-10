@@ -21,6 +21,28 @@ const privateSchedulerMockFrameBudgetMetadataBrand = Symbol.for(
   privateSchedulerMockFrameBudgetMetadataKind
 );
 const privateSchedulerMockFrameBudgetMetadataVersion = 1;
+const privateSchedulerMockExpiredLaneFlushMetadataKind =
+  'fast-react.scheduler.mock-expired-lane-priority-root-metadata';
+const privateSchedulerMockExpiredLaneFlushMetadataBrand = Symbol.for(
+  privateSchedulerMockExpiredLaneFlushMetadataKind
+);
+const privateSchedulerMockExpiredLaneFlushMetadataVersion = 1;
+const privateSchedulerMockExpiredLaneFlushDiagnosticsKind =
+  'fast-react.scheduler.mock-expired-lane-flush-diagnostics';
+const privateSchedulerMockExpiredLaneFlushDiagnosticsBrand = Symbol.for(
+  privateSchedulerMockExpiredLaneFlushDiagnosticsKind
+);
+const privateSchedulerMockExpiredLaneFlushDiagnosticsVersion = 1;
+const acceptedExpiredLanePriorityMetadataKinds = Object.freeze([
+  'RootLaneSchedulingSnapshot',
+  'UpdateContainerResult',
+  'RootScheduleUpdateRecord'
+]);
+const acceptedExpiredRootSchedulerMetadataKinds = Object.freeze([
+  'RootTaskScheduleRecord',
+  'SchedulerCallbackRequest',
+  'RootSchedulerCallbackExecutionRecord'
+]);
 
 const scheduler =
   process.env.NODE_ENV === 'production'
@@ -85,6 +107,41 @@ function createPrivateActQueueFlushDiagnostics(
     recordsMockSchedulerFrameBudgetDecision: true,
     recordsMockSchedulerYieldLogOrdering: true,
     recordsMockSchedulerRequestPaintFrameBudget: true,
+    mockSchedulerExpiredLaneFlushDiagnosticsReady: true,
+    recognizesExpiredLanePriorityRootSchedulerMetadata: true,
+    recordsExpiredCallbackPriorityVirtualTimeFrameBudgetAndLaneLabel: true,
+    rejectsUnsupportedExpiredCallbackPriorityLevels: true,
+    rejectsStaleExpiredCallbackHandles: true,
+    drainExpiredMockSchedulerWork(lanePriorityRootSchedulerMetadata) {
+      if (arguments.length === 0) {
+        return sourceDiagnostics.drainExpiredMockSchedulerWork();
+      }
+      return drainExpiredMockSchedulerWorkWithLaneMetadataForDiagnostics(
+        sourceScheduler,
+        shadowState,
+        sourceDiagnostics,
+        lanePriorityRootSchedulerMetadata
+      );
+    },
+    describeExpiredLanePriorityRootSchedulerMetadataForDiagnostics(
+      lanePriorityRootSchedulerMetadata
+    ) {
+      return describeExpiredLanePriorityRootSchedulerMetadataForDiagnostics(
+        sourceScheduler,
+        shadowState,
+        lanePriorityRootSchedulerMetadata
+      );
+    },
+    drainExpiredMockSchedulerWorkWithLaneMetadataForDiagnostics(
+      lanePriorityRootSchedulerMetadata
+    ) {
+      return drainExpiredMockSchedulerWorkWithLaneMetadataForDiagnostics(
+        sourceScheduler,
+        shadowState,
+        sourceDiagnostics,
+        lanePriorityRootSchedulerMetadata
+      );
+    },
     describeExpiredMockSchedulerWorkForDiagnostics() {
       return describeExpiredMockSchedulerWorkForDiagnostics(
         sourceScheduler,
@@ -323,6 +380,508 @@ function describeExpiredMockSchedulerWorkForDiagnostics(
   });
 
   return Object.freeze(metadata);
+}
+
+function describeExpiredLanePriorityRootSchedulerMetadataForDiagnostics(
+  sourceScheduler,
+  shadowState,
+  lanePriorityRootSchedulerMetadata
+) {
+  const now = sourceScheduler.unstable_now();
+  const validation = validateExpiredLanePriorityRootSchedulerMetadata(
+    sourceScheduler,
+    shadowState,
+    lanePriorityRootSchedulerMetadata,
+    now
+  );
+  const metadataSummary =
+    summarizeExpiredLanePriorityRootSchedulerMetadataForDiagnostics(
+      sourceScheduler,
+      lanePriorityRootSchedulerMetadata,
+      validation
+    );
+
+  return Object.freeze({
+    status:
+      validation.rejectionReason === null
+        ? 'accepted-expired-lane-priority-root-scheduler-metadata'
+        : 'rejected-expired-lane-priority-root-scheduler-metadata',
+    accepted: validation.rejectionReason === null,
+    rejectionReason: validation.rejectionReason,
+    compatibilityTarget: schedulerCompatibilityTarget,
+    reactCompatibilityTarget,
+    currentVirtualTime: now,
+    metadata: metadataSummary,
+    recognizesExpiredLanePriorityRootSchedulerMetadata: true,
+    recordsExpiredCallbackPriorityVirtualTimeFrameBudgetAndLaneLabel: true,
+    rejectsUnsupportedExpiredCallbackPriorityLevels: true,
+    rejectsStaleExpiredCallbackHandles: true,
+    drainsExpiredMockSchedulerWork: false,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    compatibilityClaimed: false,
+    executesQueuedWork: false,
+    executesEffects: false,
+    executesRendererWork: false
+  });
+}
+
+function drainExpiredMockSchedulerWorkWithLaneMetadataForDiagnostics(
+  sourceScheduler,
+  shadowState,
+  sourceDiagnostics,
+  lanePriorityRootSchedulerMetadata
+) {
+  const before = getMockSchedulerYieldPaintSnapshot(
+    sourceScheduler,
+    sourceDiagnostics
+  );
+  const validation = validateExpiredLanePriorityRootSchedulerMetadata(
+    sourceScheduler,
+    shadowState,
+    lanePriorityRootSchedulerMetadata,
+    before.now
+  );
+  if (validation.rejectionReason !== null) {
+    throw createExpiredLaneFlushMetadataError(validation.rejectionReason);
+  }
+
+  const yieldLogBefore = getMockSchedulerYieldLogSnapshot(shadowState, before);
+  const frameBudgetDecisionBefore = getMockSchedulerFrameBudgetDecision(
+    before,
+    yieldLogBefore
+  );
+  const taskQueueBefore = getMockSchedulerTaskQueueSnapshot(
+    shadowState,
+    before.now
+  );
+  const matchedTaskBefore = summarizeMockSchedulerTask(
+    validation.taskRecord,
+    before.now
+  );
+  const laneMetadata =
+    summarizeExpiredLanePriorityRootSchedulerMetadataForDiagnostics(
+      sourceScheduler,
+      lanePriorityRootSchedulerMetadata,
+      validation
+    );
+
+  const drainReport = sourceDiagnostics.drainExpiredMockSchedulerWork();
+
+  const after = getMockSchedulerYieldPaintSnapshot(
+    sourceScheduler,
+    sourceDiagnostics
+  );
+  const yieldLogAfter = getMockSchedulerYieldLogSnapshot(shadowState, after);
+  const frameBudgetDecisionAfter = getMockSchedulerFrameBudgetDecision(
+    after,
+    yieldLogAfter
+  );
+  const taskQueueAfter = getMockSchedulerTaskQueueSnapshot(
+    shadowState,
+    after.now
+  );
+  const matchedTaskAfter = summarizeMockSchedulerTask(
+    validation.taskRecord,
+    after.now
+  );
+  const metadata = {
+    kind: privateSchedulerMockExpiredLaneFlushDiagnosticsKind,
+    version: privateSchedulerMockExpiredLaneFlushDiagnosticsVersion,
+    status:
+      'drained-expired-mock-scheduler-work-with-lane-metadata-for-diagnostics',
+    accepted: true,
+    compatibilityTarget: schedulerCompatibilityTarget,
+    reactCompatibilityTarget,
+    schedulerDiagnosticStatus: 'private-scheduler-act-queue-flush-diagnostics',
+    lanePriorityRootSchedulerMetadata: laneMetadata,
+    expiredCallbackPriorityLevel: laneMetadata.priorityLevel,
+    expiredCallbackPriorityLabel: laneMetadata.priorityLabel,
+    expiredCallbackSchedulerPriority: laneMetadata.schedulerPriority,
+    expiredCallbackVirtualTime: before.now,
+    expiredCallbackLaneLabel: laneMetadata.laneLabel,
+    expiredCallbackFrameBudget: frameBudgetDecisionBefore,
+    frameBudgetDecisionBefore,
+    frameBudgetDecisionAfter,
+    yieldLogBefore,
+    yieldLogAfter,
+    nowBefore: before.now,
+    nowAfter: after.now,
+    pendingBefore: before.pendingWork,
+    pendingAfter: after.pendingWork,
+    requestedPaintBefore: before.needsPaint,
+    requestedPaintAfter: after.needsPaint,
+    matchedTaskBefore,
+    matchedTaskAfter,
+    taskQueueBefore,
+    taskQueueAfter,
+    taskQueueCountBefore: taskQueueBefore.length,
+    taskQueueCountAfter: taskQueueAfter.length,
+    sourceDrainReport: drainReport,
+    sourceDrainStatus: drainReport.status,
+    sourceDrainFlushedExpiredWork: drainReport.flushedExpiredWork === true,
+    sourceDrainHasMoreWorkAfterDrain: drainReport.hasMoreWorkAfterDrain,
+    recognizesExpiredLanePriorityRootSchedulerMetadata: true,
+    recordsExpiredCallbackPriorityVirtualTimeFrameBudgetAndLaneLabel: true,
+    rejectsUnsupportedExpiredCallbackPriorityLevels: true,
+    rejectsStaleExpiredCallbackHandles: true,
+    drainsExpiredMockSchedulerWork: true,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    invokesPublicSchedulerFlushHelper: false,
+    publicSchedulerFlushBehaviorExecuted: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    compatibilityClaimed: false,
+    executesAcceptedInternalTestCallbacks: true,
+    executesQueuedWork: false,
+    executesEffects: false,
+    executesRendererWork: false,
+    executesScheduledCallbacks: true
+  };
+
+  Object.defineProperty(
+    metadata,
+    privateSchedulerMockExpiredLaneFlushDiagnosticsBrand,
+    {
+      configurable: false,
+      enumerable: false,
+      value: true,
+      writable: false
+    }
+  );
+
+  return Object.freeze(metadata);
+}
+
+function validateExpiredLanePriorityRootSchedulerMetadata(
+  sourceScheduler,
+  shadowState,
+  lanePriorityRootSchedulerMetadata,
+  snapshotTime
+) {
+  const invalid = (rejectionReason) => ({
+    rejectionReason,
+    taskRecord: null,
+    priorityLabel: null,
+    schedulerPriority: null
+  });
+
+  if (!isObjectLike(lanePriorityRootSchedulerMetadata)) {
+    return invalid('metadata-not-object');
+  }
+  if (
+    lanePriorityRootSchedulerMetadata[
+      privateSchedulerMockExpiredLaneFlushMetadataBrand
+    ] !== true
+  ) {
+    return invalid('metadata-missing-internal-brand');
+  }
+  if (
+    lanePriorityRootSchedulerMetadata.kind !==
+    privateSchedulerMockExpiredLaneFlushMetadataKind
+  ) {
+    return invalid('metadata-kind');
+  }
+  if (
+    lanePriorityRootSchedulerMetadata.version !==
+    privateSchedulerMockExpiredLaneFlushMetadataVersion
+  ) {
+    return invalid('metadata-version');
+  }
+  if (
+    lanePriorityRootSchedulerMetadata.compatibilityTarget !==
+    schedulerCompatibilityTarget
+  ) {
+    return invalid('metadata-scheduler-target');
+  }
+  if (
+    lanePriorityRootSchedulerMetadata.reactCompatibilityTarget !==
+    reactCompatibilityTarget
+  ) {
+    return invalid('metadata-react-target');
+  }
+  if (
+    !includesString(
+      lanePriorityRootSchedulerMetadata.lanePriorityMetadataKind,
+      acceptedExpiredLanePriorityMetadataKinds
+    )
+  ) {
+    return invalid('lane-priority-metadata-kind');
+  }
+  if (
+    !includesString(
+      lanePriorityRootSchedulerMetadata.rootSchedulerMetadataKind,
+      acceptedExpiredRootSchedulerMetadataKinds
+    )
+  ) {
+    return invalid('root-scheduler-metadata-kind');
+  }
+  if (lanePriorityRootSchedulerMetadata.taskKind !== 'SchedulerCallback') {
+    return invalid('task-kind');
+  }
+  if (
+    typeof lanePriorityRootSchedulerMetadata.laneLabel !== 'string' ||
+    lanePriorityRootSchedulerMetadata.laneLabel.length === 0
+  ) {
+    return invalid('lane-label');
+  }
+
+  const priorityLabel = getSchedulerPriorityLevelLabel(
+    sourceScheduler,
+    lanePriorityRootSchedulerMetadata.priorityLevel
+  );
+  if (priorityLabel === null) {
+    return invalid('unsupported-priority-level');
+  }
+  const schedulerPriority =
+    getSchedulerPriorityNameForPriorityLevelLabel(priorityLabel);
+  if (
+    lanePriorityRootSchedulerMetadata.schedulerPriority !== undefined &&
+    lanePriorityRootSchedulerMetadata.schedulerPriority !== schedulerPriority
+  ) {
+    return invalid('scheduler-priority-mismatch');
+  }
+
+  if (
+    lanePriorityRootSchedulerMetadata.publicCompatibilityClaimed !== false ||
+    lanePriorityRootSchedulerMetadata.publicSchedulerTimingCompatibilityClaimed !==
+      false ||
+    lanePriorityRootSchedulerMetadata.publicReactActCompatibilityClaimed !==
+      false ||
+    lanePriorityRootSchedulerMetadata.publicRootSchedulerCompatibilityClaimed !==
+      false
+  ) {
+    return invalid('metadata-public-claim');
+  }
+  if (
+    lanePriorityRootSchedulerMetadata.drainsPublicSchedulerTaskQueue !== false ||
+    lanePriorityRootSchedulerMetadata.drainsPublicReactActQueue !== false ||
+    lanePriorityRootSchedulerMetadata.executesQueuedWork !== false ||
+    lanePriorityRootSchedulerMetadata.executesEffects !== false ||
+    lanePriorityRootSchedulerMetadata.executesRendererWork !== false
+  ) {
+    return invalid('metadata-execution-claim');
+  }
+  if (
+    lanePriorityRootSchedulerMetadata.rendererWorkExecutionBlocked !== true ||
+    lanePriorityRootSchedulerMetadata.rootSchedulerSchedulesMockCallbackOnly !==
+      true
+  ) {
+    return invalid('metadata-renderer-work-policy');
+  }
+
+  const taskRecord = findShadowTaskRecord(
+    shadowState,
+    lanePriorityRootSchedulerMetadata.callbackHandle
+  );
+  if (taskRecord === null) {
+    return invalid('stale-callback-handle');
+  }
+  if (taskRecord.cancelled === true || taskRecord.task.callback === null) {
+    return invalid('stale-callback-handle');
+  }
+  if (typeof taskRecord.task.callback !== 'function') {
+    return invalid('callback-handle-not-function');
+  }
+  if (taskRecord.task.callback[privateActQueueTestCallbackBrand] !== true) {
+    return invalid('callback-handle-not-branded-internal-test-callback');
+  }
+  if (taskRecord.task.priorityLevel !== lanePriorityRootSchedulerMetadata.priorityLevel) {
+    return invalid('callback-priority-mismatch');
+  }
+  if (
+    getSchedulerPriorityLevelLabel(sourceScheduler, taskRecord.task.priorityLevel) ===
+    null
+  ) {
+    return invalid('unsupported-callback-priority-level');
+  }
+  if (taskRecord.task.expirationTime > snapshotTime) {
+    return invalid('callback-handle-not-expired');
+  }
+
+  const expiredPendingTaskRecords = getExpiredPendingShadowTaskRecords(
+    shadowState,
+    snapshotTime
+  );
+  if (expiredPendingTaskRecords.length === 0) {
+    return invalid('no-expired-callback-handles');
+  }
+  if (expiredPendingTaskRecords.indexOf(taskRecord) === -1) {
+    return invalid('callback-handle-not-expired-pending');
+  }
+  if (expiredPendingTaskRecords.length > 1) {
+    return invalid('ambiguous-expired-callback-handles');
+  }
+
+  return {
+    rejectionReason: null,
+    taskRecord,
+    priorityLabel,
+    schedulerPriority
+  };
+}
+
+function summarizeExpiredLanePriorityRootSchedulerMetadataForDiagnostics(
+  sourceScheduler,
+  lanePriorityRootSchedulerMetadata,
+  validation
+) {
+  const isMetadataObject = isObjectLike(lanePriorityRootSchedulerMetadata);
+  const callbackHandle = isMetadataObject
+    ? lanePriorityRootSchedulerMetadata.callbackHandle
+    : null;
+  const priorityLevel = isMetadataObject
+    ? lanePriorityRootSchedulerMetadata.priorityLevel
+    : undefined;
+  const priorityLabel =
+    validation.priorityLabel ||
+    getSchedulerPriorityLevelLabel(sourceScheduler, priorityLevel);
+  const schedulerPriority =
+    validation.schedulerPriority ||
+    (priorityLabel === null
+      ? null
+      : getSchedulerPriorityNameForPriorityLevelLabel(priorityLabel));
+
+  return Object.freeze({
+    kind: isMetadataObject ? lanePriorityRootSchedulerMetadata.kind : null,
+    version: isMetadataObject
+      ? lanePriorityRootSchedulerMetadata.version
+      : null,
+    accepted: validation.rejectionReason === null,
+    rejectionReason: validation.rejectionReason,
+    compatibilityTarget: isMetadataObject
+      ? lanePriorityRootSchedulerMetadata.compatibilityTarget
+      : null,
+    reactCompatibilityTarget: isMetadataObject
+      ? lanePriorityRootSchedulerMetadata.reactCompatibilityTarget
+      : null,
+    lanePriorityMetadataKind: isMetadataObject
+      ? lanePriorityRootSchedulerMetadata.lanePriorityMetadataKind
+      : null,
+    rootSchedulerMetadataKind: isMetadataObject
+      ? lanePriorityRootSchedulerMetadata.rootSchedulerMetadataKind
+      : null,
+    taskKind: isMetadataObject
+      ? lanePriorityRootSchedulerMetadata.taskKind
+      : null,
+    rootId: isMetadataObject ? lanePriorityRootSchedulerMetadata.rootId : null,
+    rootLabel: isMetadataObject
+      ? lanePriorityRootSchedulerMetadata.rootLabel
+      : null,
+    lane: isMetadataObject ? lanePriorityRootSchedulerMetadata.lane : null,
+    laneLabel: isMetadataObject
+      ? lanePriorityRootSchedulerMetadata.laneLabel
+      : null,
+    eventPriority: isMetadataObject
+      ? lanePriorityRootSchedulerMetadata.eventPriority
+      : null,
+    sourcePriority: isMetadataObject
+      ? lanePriorityRootSchedulerMetadata.sourcePriority
+      : null,
+    selectedNextLanes: isMetadataObject
+      ? lanePriorityRootSchedulerMetadata.selectedNextLanes
+      : null,
+    pendingLanesBefore: isMetadataObject
+      ? lanePriorityRootSchedulerMetadata.pendingLanesBefore
+      : null,
+    pendingLanesAfter: isMetadataObject
+      ? lanePriorityRootSchedulerMetadata.pendingLanesAfter
+      : null,
+    priorityLevel: priorityLevel ?? null,
+    priorityLabel,
+    schedulerPriority,
+    callbackHandleMatched: validation.taskRecord !== null,
+    callbackHandleId: isObjectLike(callbackHandle)
+      ? callbackHandle.id ?? null
+      : null,
+    callbackHandleScheduleOrder:
+      validation.taskRecord === null
+        ? null
+        : validation.taskRecord.scheduleOrder,
+    rendererWorkExecutionBlocked: isMetadataObject
+      ? lanePriorityRootSchedulerMetadata.rendererWorkExecutionBlocked === true
+      : false,
+    rootSchedulerSchedulesMockCallbackOnly: isMetadataObject
+      ? lanePriorityRootSchedulerMetadata.rootSchedulerSchedulesMockCallbackOnly ===
+        true
+      : false,
+    publicCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    publicRootSchedulerCompatibilityClaimed: false,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    executesQueuedWork: false,
+    executesEffects: false,
+    executesRendererWork: false
+  });
+}
+
+function createExpiredLaneFlushMetadataError(rejectionReason) {
+  const error = new Error(
+    '[fast-react] scheduler/unstable_mock private expired lane flush ' +
+      'diagnostics rejected unsupported lane-priority/root-scheduler ' +
+      'metadata: ' +
+      rejectionReason +
+      '. Only accepted private lane metadata for the matching expired mock ' +
+      'Scheduler callback handle may be drained.'
+  );
+  error.name = 'FastReactSchedulerMockExpiredLaneFlushError';
+  error.code = 'FAST_REACT_SCHEDULER_MOCK_EXPIRED_LANE_FLUSH_REJECTED';
+  error.entrypoint = 'scheduler/unstable_mock';
+  error.compatibilityTarget = schedulerCompatibilityTarget;
+  error.publicSchedulerTimingCompatibilityClaimed = false;
+  error.publicReactActCompatibilityClaimed = false;
+  error.executesRendererWork = false;
+  return error;
+}
+
+function getExpiredPendingShadowTaskRecords(shadowState, snapshotTime) {
+  return shadowState.taskRecords.filter(function (record) {
+    return (
+      record.cancelled !== true &&
+      isObjectLike(record.task) &&
+      typeof record.task.callback === 'function' &&
+      record.task.expirationTime <= snapshotTime
+    );
+  });
+}
+
+function getSchedulerPriorityLevelLabel(sourceScheduler, priorityLevel) {
+  switch (priorityLevel) {
+    case sourceScheduler.unstable_ImmediatePriority:
+      return 'ImmediatePriority';
+    case sourceScheduler.unstable_UserBlockingPriority:
+      return 'UserBlockingPriority';
+    case sourceScheduler.unstable_NormalPriority:
+      return 'NormalPriority';
+    case sourceScheduler.unstable_LowPriority:
+      return 'LowPriority';
+    case sourceScheduler.unstable_IdlePriority:
+      return 'IdlePriority';
+    default:
+      return null;
+  }
+}
+
+function getSchedulerPriorityNameForPriorityLevelLabel(priorityLabel) {
+  switch (priorityLabel) {
+    case 'ImmediatePriority':
+      return 'Immediate';
+    case 'UserBlockingPriority':
+      return 'UserBlocking';
+    case 'NormalPriority':
+      return 'Normal';
+    case 'LowPriority':
+      return 'Low';
+    case 'IdlePriority':
+      return 'Idle';
+    default:
+      return null;
+  }
 }
 
 function describeMockSchedulerFrameBudgetForDiagnostics(
@@ -792,4 +1351,8 @@ function isObjectLike(value) {
     (typeof value === 'object' && value !== null) ||
     typeof value === 'function'
   );
+}
+
+function includesString(value, expectedValues) {
+  return typeof value === 'string' && expectedValues.includes(value);
 }
