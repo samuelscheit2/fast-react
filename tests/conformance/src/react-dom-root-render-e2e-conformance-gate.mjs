@@ -1118,6 +1118,9 @@ export function inspectReactDomPortalRootRenderBlockedBoundary({
     const domContainer = require(
       join(workspaceRoot, "packages/react-dom/src/client/dom-container.js")
     );
+    const rootBridge = require(
+      join(workspaceRoot, "packages/react-dom/src/client/root-bridge.js")
+    );
 
     const ownerDocument = createGateDocument("portal-root-render", domContainer);
     const rootContainer = createGateElement("DIV", ownerDocument, domContainer);
@@ -1157,6 +1160,36 @@ export function inspectReactDomPortalRootRenderBlockedBoundary({
           "unsupported-key"
         )
     );
+    const bridge = rootBridge.createPrivateRootBridgeShell({
+      portalBoundaryIdPrefix: "portal-boundary",
+      requestIdPrefix: "portal-request",
+      rootIdPrefix: "portal-root",
+      updateIdPrefix: "portal-update"
+    });
+    const createRootRecord = bridge.createClientRoot(rootContainer);
+    const portalRenderRecord = bridge.renderContainer(
+      createRootRecord.handle,
+      publicPortal
+    );
+    const portalRootBoundaryRecord =
+      bridge.createPortalRootBoundary(portalRenderRecord);
+    const portalRootBoundaryPayload =
+      rootBridge.getPrivateRootPortalBoundaryPayload(
+        portalRootBoundaryRecord
+      );
+    const nonPortalRenderRecord = bridge.renderContainer(
+      createRootRecord.handle,
+      {
+        props: {
+          children: "not a portal"
+        },
+        type: "div"
+      }
+    );
+    const invalidPortalRootBoundary = attemptGateOperation(
+      "private portal root boundary rejects non-portal render payload",
+      () => bridge.createPortalRootBoundary(nonPortalRenderRecord)
+    );
 
     return {
       loadError: null,
@@ -1169,6 +1202,26 @@ export function inspectReactDomPortalRootRenderBlockedBoundary({
         expectedChildren: portalChild,
         expectedContainer: portalContainer
       }),
+      privateRootBridgePortalBoundary:
+        summarizePrivateRootPortalBoundaryRecord(portalRootBoundaryRecord),
+      privateRootBridgePortalBoundaryPayload: {
+        portalChildrenMatches:
+          portalRootBoundaryPayload?.portalChildren === portalChild,
+        portalContainerMatches:
+          portalRootBoundaryPayload?.portalContainer === portalContainer,
+        portalMatches: portalRootBoundaryPayload?.portal === publicPortal,
+        rootHandleMatches:
+          portalRootBoundaryPayload?.rootHandle === createRootRecord.handle,
+        sourceRecordMatches:
+          portalRootBoundaryPayload?.sourceRecord === portalRenderRecord
+      },
+      privateRootBridgePortalRequest: {
+        admission: summarizePrivateRootBridgeAdmissionRecord(
+          bridge.admitRequest(portalRenderRecord)
+        ),
+        render: summarizePrivateRootBridgeUpdateRecord(portalRenderRecord)
+      },
+      invalidPortalRootBoundary,
       unsupportedImplementation,
       portalCreationSideEffects: summarizePortalRootRenderSideEffects({
         containers: [rootContainer, portalContainer],
@@ -2012,6 +2065,52 @@ function validatePortalCreateOnlyBoundary({
     });
   }
 
+  if (
+    !isAcceptedPrivateRootPortalBoundary(
+      portalRootRenderObservations.privateRootBridgePortalBoundary
+    )
+  ) {
+    failures.push({
+      gateStatus: "portal-private-root-boundary-record-mismatch",
+      boundary: portalRootRenderObservations.privateRootBridgePortalBoundary
+    });
+  }
+
+  if (
+    !isAcceptedPrivateRootPortalBoundaryPayload(
+      portalRootRenderObservations.privateRootBridgePortalBoundaryPayload
+    )
+  ) {
+    failures.push({
+      gateStatus: "portal-private-root-boundary-payload-mismatch",
+      payload: portalRootRenderObservations.privateRootBridgePortalBoundaryPayload
+    });
+  }
+
+  if (
+    !isAcceptedPrivateRootPortalRequest(
+      portalRootRenderObservations.privateRootBridgePortalRequest
+    )
+  ) {
+    failures.push({
+      gateStatus: "portal-private-root-boundary-request-mismatch",
+      request: portalRootRenderObservations.privateRootBridgePortalRequest
+    });
+  }
+
+  const invalidPortalBoundary =
+    portalRootRenderObservations.invalidPortalRootBoundary;
+  if (
+    invalidPortalBoundary.status !== "throws" ||
+    invalidPortalBoundary.thrown.code !==
+      "FAST_REACT_DOM_INVALID_PORTAL_ROOT_BOUNDARY_RECORD"
+  ) {
+    failures.push({
+      gateStatus: "portal-private-root-boundary-not-fail-closed",
+      invalidPortalBoundary
+    });
+  }
+
   const unsupportedImplementation =
     portalRootRenderObservations.unsupportedImplementation;
   if (
@@ -2534,6 +2633,50 @@ function summarizePrivateRootBridgeAdmissionRecord(record) {
     hydration: record.hydration,
     eventDispatch: record.eventDispatch,
     compatibilityClaimed: record.compatibilityClaimed
+  };
+}
+
+function summarizePrivateRootPortalBoundaryRecord(record) {
+  return {
+    $$typeof: record.$$typeof,
+    acceptedPortalObjectShape: record.acceptedPortalObjectShape,
+    blockedCapabilities: record.blockedCapabilities.map((capability) => ({
+      blocked: capability.blocked,
+      id: capability.id
+    })),
+    boundaryId: record.boundaryId,
+    boundarySequence: record.boundarySequence,
+    boundaryStatus: record.boundaryStatus,
+    compatibilityClaimed: record.compatibilityClaimed,
+    diagnosticStatus: record.diagnosticStatus,
+    domMutation: record.domMutation,
+    eventDispatch: record.eventDispatch,
+    hydration: record.hydration,
+    kind: record.kind,
+    listenerInstallation: record.listenerInstallation,
+    markerWrites: record.markerWrites,
+    nativeExecution: record.nativeExecution,
+    operation: record.operation,
+    portalChildReconciliation: record.portalChildReconciliation,
+    portalChildrenInfo: record.portalChildrenInfo,
+    portalContainerInfo: record.portalContainerInfo,
+    portalImplementationInfo: record.portalImplementationInfo,
+    portalKey: record.portalKey,
+    portalListenerGuard: record.portalListenerGuard,
+    portalMounting: record.portalMounting,
+    portalObjectInfo: record.portalObjectInfo,
+    reconcilerDiagnostic: record.reconcilerDiagnostic,
+    reconcilerExecution: record.reconcilerExecution,
+    rootId: record.rootId,
+    rootKind: record.rootKind,
+    rootTag: record.rootTag,
+    sourceLifecycleStatusAfter: record.sourceLifecycleStatusAfter,
+    sourceLifecycleStatusBefore: record.sourceLifecycleStatusBefore,
+    sourceOperation: record.sourceOperation,
+    sourceRequestId: record.sourceRequestId,
+    sourceRequestSequence: record.sourceRequestSequence,
+    sourceRequestType: record.sourceRequestType,
+    sourceUpdateId: record.sourceUpdateId
   };
 }
 
@@ -3337,6 +3480,131 @@ function isAcceptedPortalSummary(portal, expectedKey) {
         { type: "string", value: "implementation" }
       ]
     ) === null
+  );
+}
+
+function isAcceptedPrivateRootPortalBoundary(boundary) {
+  const blockedCapabilityIds = boundary?.blockedCapabilities?.map(
+    (capability) => capability.id
+  );
+  const allBlockedCapabilitiesAreBlocked = boundary?.blockedCapabilities?.every(
+    (capability) => capability.blocked === true
+  );
+
+  return (
+    boundary?.kind === "FastReactDomPrivateRootPortalBoundaryRecord" &&
+    boundary.operation === "portal-root-boundary" &&
+    boundary.boundaryId === "portal-boundary:1" &&
+    boundary.boundarySequence === 1 &&
+    boundary.boundaryStatus ===
+      "admitted-private-root-portal-boundary-record" &&
+    boundary.diagnosticStatus === "blocked-private-root-portal-diagnostic" &&
+    boundary.sourceOperation === "render" &&
+    boundary.sourceRequestId === "portal-request:2" &&
+    boundary.sourceRequestSequence === 2 &&
+    boundary.sourceRequestType === "root.render" &&
+    boundary.sourceUpdateId === "portal-update:1" &&
+    boundary.sourceLifecycleStatusBefore === "created" &&
+    boundary.sourceLifecycleStatusAfter === "rendered" &&
+    boundary.rootId === "portal-root:1" &&
+    boundary.rootKind === "client" &&
+    boundary.rootTag === "ConcurrentRoot" &&
+    boundary.portalKey === "portal-key" &&
+    findFirstDifferencePath(blockedCapabilityIds, [
+      "portal-child-reconciliation",
+      "portal-container-mounting",
+      "portal-container-listeners",
+      "native-execution",
+      "reconciler-execution",
+      "dom-mutation",
+      "marker-writes",
+      "listener-installation",
+      "hydration",
+      "events",
+      "compatibility-claims"
+    ]) === null &&
+    allBlockedCapabilitiesAreBlocked === true &&
+    boundary.acceptedPortalObjectShape === true &&
+    boundary.nativeExecution === false &&
+    boundary.reconcilerExecution === false &&
+    boundary.portalChildReconciliation === false &&
+    boundary.portalMounting === false &&
+    boundary.domMutation === false &&
+    boundary.markerWrites === false &&
+    boundary.listenerInstallation === false &&
+    boundary.hydration === false &&
+    boundary.eventDispatch === false &&
+    boundary.compatibilityClaimed === false &&
+    boundary.portalObjectInfo?.type === "object" &&
+    findFirstDifferencePath(boundary.portalObjectInfo.keys, [
+      "$$typeof",
+      "children",
+      "containerInfo",
+      "implementation",
+      "key"
+    ]) === null &&
+    boundary.portalChildrenInfo?.type === "object" &&
+    findFirstDifferencePath(boundary.portalChildrenInfo.keys, [
+      "props",
+      "type"
+    ]) === null &&
+    boundary.portalContainerInfo?.nodeName === "SECTION" &&
+    boundary.portalContainerInfo?.nodeType === 1 &&
+    boundary.portalImplementationInfo?.type === "null" &&
+    boundary.portalListenerGuard?.action ===
+      "defer-listen-to-portal-container-events-for-root-boundary" &&
+    boundary.portalListenerGuard.canInstallPortalListeners === true &&
+    boundary.portalListenerGuard.hasPortalListeningMarker === false &&
+    boundary.portalListenerGuard.ownerDocumentCanInstallSelectionChange ===
+      true &&
+    boundary.portalListenerGuard.ownerDocumentHasSelectionChangeMarker ===
+      false &&
+    boundary.reconcilerDiagnostic?.beginWorkRecord ===
+      "UnsupportedPortalBeginWorkRecord" &&
+    boundary.reconcilerDiagnostic?.failClosedBeforeChildren === true &&
+    boundary.reconcilerDiagnostic?.rootPreflightError ===
+      "HostRootChildBeginWorkPreflightError::UnsupportedPortal" &&
+    boundary.reconcilerDiagnostic?.unsupportedFeature ===
+      "PORTAL_RECONCILER_UNSUPPORTED_FEATURE"
+  );
+}
+
+function isAcceptedPrivateRootPortalBoundaryPayload(payload) {
+  return (
+    payload?.portalChildrenMatches === true &&
+    payload.portalContainerMatches === true &&
+    payload.portalMatches === true &&
+    payload.rootHandleMatches === true &&
+    payload.sourceRecordMatches === true
+  );
+}
+
+function isAcceptedPrivateRootPortalRequest(request) {
+  return (
+    request?.render?.kind === "FastReactDomPrivateRootUpdateRecord" &&
+    request.render.operation === "render" &&
+    request.render.requestType === "root.render" &&
+    request.render.updateId === "portal-update:1" &&
+    request.render.lifecycleStatusBefore === "created" &&
+    request.render.lifecycleStatusAfter === "rendered" &&
+    request.render.renderCount === 1 &&
+    request.render.nativeExecution === false &&
+    request.render.markerGuard === null &&
+    request.admission?.kind === "FastReactDomPrivateRootAdmissionRecord" &&
+    request.admission.operation === "render" &&
+    request.admission.requestType === "root.render" &&
+    request.admission.admissionStatus ===
+      "admitted-private-root-bridge-request-record" &&
+    request.admission.executionStatus ===
+      "blocked-private-root-bridge-execution" &&
+    request.admission.compatibilityStatus ===
+      "blocked-private-root-bridge-compatibility" &&
+    request.admission.nativeExecution === false &&
+    request.admission.reconcilerExecution === false &&
+    request.admission.domMutation === false &&
+    request.admission.listenerInstallation === false &&
+    request.admission.eventDispatch === false &&
+    request.admission.compatibilityClaimed === false
   );
 }
 

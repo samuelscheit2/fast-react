@@ -200,6 +200,25 @@ function listenToPortalContainerEvents(portalContainer, options) {
   listenToAllSupportedEvents(portalContainer, options);
 }
 
+function describePortalContainerListenerGuard(portalContainer, options) {
+  const ownerDocument = getOwnerDocument(portalContainer);
+  return freezeRecord({
+    action:
+      options && typeof options.action === 'string'
+        ? options.action
+        : 'defer-listen-to-portal-container-events',
+    canInstallPortalListeners: canInstallListener(portalContainer),
+    hasPortalListeningMarker: hasListeningMarker(portalContainer),
+    ownerDocumentCanInstallSelectionChange: canInstallListener(ownerDocument),
+    ownerDocumentHasSelectionChangeMarker: hasListeningMarker(ownerDocument),
+    ownerDocumentInfo:
+      ownerDocument === null
+        ? null
+        : freezeRecord(describeContainer(ownerDocument)),
+    portalEventTargetInfo: freezeRecord(describeContainer(portalContainer))
+  });
+}
+
 function describeRootListenerGuard(rootContainerElement, options) {
   const ownerDocument = getOwnerDocument(rootContainerElement);
   return freezeRecord({
@@ -242,6 +261,7 @@ module.exports = {
   IS_NON_DELEGATED,
   addTrappedEventListener,
   createEventListenerShell,
+  describePortalContainerListenerGuard,
   describeRootListenerGuard,
   getAddEventListenerOptions,
   getRootEventTargetOwnerDocument,
