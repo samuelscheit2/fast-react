@@ -204,6 +204,8 @@ test("act/passive local gate recognizes accepted queue diagnostics without publi
     "scheduler-mock-flush-helper-metadata",
     "sync-flush-act-continuation-records",
     "sync-flush-post-passive-continuation-execution-gate",
+    "sync-flush-nested-act-root-continuation-evidence",
+    "sync-flush-root-scheduler-finished-work-handoff-evidence",
     "passive-effects-flush-metadata",
     "passive-effect-callback-handle-metadata",
     "passive-effects-committed-fiber-traversal",
