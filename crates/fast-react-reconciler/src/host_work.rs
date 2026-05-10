@@ -21,7 +21,9 @@ use crate::host_nodes::{
     HostNodeMetadata, HostNodeScope, HostNodeStore, HostNodeValidationError, HostNodeViolation,
 };
 use crate::root_commit::{
-    HostRootDeletionCleanupRecord, HostRootMutationApplyRecord, HostRootMutationApplyRecordKind,
+    HostRootDeletionCleanupRecord, HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary,
+    HostRootDeletionSubtreeHostDetachmentPlanForCanary, HostRootMutationApplyRecord,
+    HostRootMutationApplyRecordKind,
 };
 use crate::test_support::{
     FakeHostFiberToken, FakeInstance, FakeTextInstance, RecordingHost, TestHostElement,
@@ -40,6 +42,7 @@ pub(crate) enum HostWorkError {
     Host(HostError),
     HostFiberToken(HostFiberTokenValidationError),
     HostNode(HostNodeValidationError),
+    DeletionSubtreeHostDetachmentPlan(HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary),
     MissingTestRootElement {
         handle: RootElementHandle,
     },
@@ -91,6 +94,7 @@ impl Display for HostWorkError {
             Self::Host(error) => Display::fmt(error, formatter),
             Self::HostFiberToken(error) => Display::fmt(error, formatter),
             Self::HostNode(error) => Display::fmt(error, formatter),
+            Self::DeletionSubtreeHostDetachmentPlan(error) => Display::fmt(error, formatter),
             Self::MissingTestRootElement { handle } => write!(
                 formatter,
                 "test host element handle {} is not registered",
@@ -166,6 +170,7 @@ impl Error for HostWorkError {
             Self::Host(error) => Some(error),
             Self::HostFiberToken(error) => Some(error),
             Self::HostNode(error) => Some(error),
+            Self::DeletionSubtreeHostDetachmentPlan(error) => Some(error),
             Self::MissingTestRootElement { .. }
             | Self::ExpectedFiberTag { .. }
             | Self::MissingStateNode { .. }
@@ -206,6 +211,12 @@ impl From<HostFiberTokenValidationError> for HostWorkError {
 impl From<HostNodeValidationError> for HostWorkError {
     fn from(error: HostNodeValidationError) -> Self {
         Self::HostNode(error)
+    }
+}
+
+impl From<HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary> for HostWorkError {
+    fn from(error: HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary) -> Self {
+        Self::DeletionSubtreeHostDetachmentPlan(error)
     }
 }
 
@@ -809,6 +820,46 @@ impl TestHostRootDeletionCleanupApplyResult {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct TestHostRootDeletionSubtreeHostDetachmentApplyResult {
+    root: FiberRootId,
+    finished_work: FiberId,
+    plan: HostRootDeletionSubtreeHostDetachmentPlanForCanary,
+    status: TestHostRootMutationApplyStatus,
+}
+
+impl TestHostRootDeletionSubtreeHostDetachmentApplyResult {
+    #[must_use]
+    const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    const fn finished_work(self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    const fn plan(self) -> HostRootDeletionSubtreeHostDetachmentPlanForCanary {
+        self.plan
+    }
+
+    #[must_use]
+    const fn status(self) -> TestHostRootMutationApplyStatus {
+        self.status
+    }
+
+    #[must_use]
+    const fn public_unmount_compatibility_claimed(self) -> bool {
+        self.plan.public_unmount_compatibility_claimed()
+    }
+
+    #[must_use]
+    const fn broad_host_teardown_enabled(self) -> bool {
+        self.plan.broad_host_teardown_enabled()
+    }
+}
+
 fn apply_test_host_root_commit_mutations(
     store: &mut FiberRootStore<RecordingHost>,
     host: &mut RecordingHost,
@@ -875,6 +926,50 @@ fn apply_test_host_root_deletion_cleanup(
         root: commit.root(),
         finished_work: commit.finished_work(),
         records,
+    })
+}
+
+fn apply_test_host_root_deletion_subtree_host_detachment_for_canary(
+    store: &FiberRootStore<RecordingHost>,
+    host: &mut RecordingHost,
+    commit: &HostRootCommitRecord,
+    detached_hosts: &mut DetachedHostRecords,
+) -> Result<TestHostRootDeletionSubtreeHostDetachmentApplyResult, HostWorkError> {
+    let root = store.root(commit.root())?;
+    if root.current() != commit.current() {
+        return Err(HostWorkError::CommitCurrentMismatch {
+            root: commit.root(),
+            expected: commit.current(),
+            actual: root.current(),
+        });
+    }
+
+    let plan = commit.deletion_subtree_host_detachment_plan_for_canary()?;
+    let child = owned_detached_host_child_for_fiber(
+        store,
+        detached_hosts,
+        plan.root(),
+        plan.host_child(),
+        plan.host_child_tag(),
+        plan.host_child_state_node(),
+    )?;
+    let parent_scope = detached_hosts.validated_scope_for_apply_fiber(
+        store,
+        plan.host_parent_state_node(),
+        plan.root(),
+        plan.host_parent(),
+        HostFiberTokenTarget::Instance,
+    )?;
+    let parent = detached_hosts
+        .nodes
+        .instance_mut(plan.host_parent_state_node(), parent_scope)?;
+    host.remove_child(parent, child.as_host_child())?;
+
+    Ok(TestHostRootDeletionSubtreeHostDetachmentApplyResult {
+        root: commit.root(),
+        finished_work: commit.finished_work(),
+        plan,
+        status: TestHostRootMutationApplyStatus::Applied(TestHostRootMutationHostCall::RemoveChild),
     })
 }
 
@@ -2037,7 +2132,10 @@ mod tests {
     use super::*;
     use crate::commit_finished_host_root;
     use crate::host_nodes::HostNodeViolation;
-    use crate::root_commit::{HostRootPlacementSiblingStatus, HostRootRefDetachReason};
+    use crate::root_commit::{
+        HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary, HostRootPlacementSiblingStatus,
+        HostRootRefDetachReason,
+    };
     use crate::test_support::{FakeContainer, FakeHostChild};
     use fast_react_core::RefHandle;
 
@@ -2568,6 +2666,74 @@ mod tests {
         store
             .fiber_arena_mut()
             .mark_child_for_deletion(work_parent, current_component)
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root, &[work_parent])
+            .unwrap();
+        complete_host_root(store, host_root).unwrap();
+        work_parent
+    }
+
+    fn wrap_current_host_child_in_deleted_root(
+        store: &mut FiberRootStore<RecordingHost>,
+        current_parent: FiberId,
+        current_child: FiberId,
+        wrapper_tag: FiberTag,
+        wrapper_state_node: StateNodeHandle,
+    ) -> FiberId {
+        let mode = store.fiber_arena().get(current_parent).unwrap().mode();
+        let wrapper = store.fiber_arena_mut().create_fiber(
+            wrapper_tag,
+            None,
+            PropsHandle::from_raw(9_080),
+            mode,
+        );
+        {
+            let node = store.fiber_arena_mut().get_mut(wrapper).unwrap();
+            node.set_state_node(wrapper_state_node);
+            node.set_memoized_props(PropsHandle::from_raw(9_080));
+        }
+        store
+            .fiber_arena_mut()
+            .set_children(current_parent, &[])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(wrapper, &[current_child])
+            .unwrap();
+        complete_host_root(store, wrapper).unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(current_parent, &[wrapper])
+            .unwrap();
+        complete_host_root(store, current_parent).unwrap();
+        wrapper
+    }
+
+    fn delete_non_host_root_under_host_parent_for_commit(
+        store: &mut FiberRootStore<RecordingHost>,
+        host_root: FiberId,
+        current_parent: FiberId,
+        deleted_root: FiberId,
+        parent_state_node_override: Option<StateNodeHandle>,
+    ) -> FiberId {
+        let parent_node = store.fiber_arena().get(current_parent).unwrap();
+        let parent_props = parent_node.memoized_props();
+        let parent_state_node = parent_state_node_override.unwrap_or(parent_node.state_node());
+        let work_parent = store
+            .fiber_arena_mut()
+            .create_work_in_progress(current_parent, parent_props)
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(work_parent).unwrap();
+            node.set_lanes(Lanes::NO);
+            node.set_state_node(parent_state_node);
+            node.set_memoized_props(parent_props);
+        }
+        store
+            .fiber_arena_mut()
+            .mark_child_for_deletion(work_parent, deleted_root)
             .unwrap();
         store
             .fiber_arena_mut()
@@ -4682,6 +4848,442 @@ mod tests {
         expected_operations.push("remove_child");
         expected_operations.push("detach_deleted_instance");
         assert_eq!(host.operations(), expected_operations);
+    }
+
+    #[test]
+    fn host_work_deletion_detaches_fragment_host_child_after_cleanup_order_validation() {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let create_render = render_test_root(&mut store, root_id, RootElementHandle::from_raw(86));
+        let (current_parent, current_text) = attach_detached_root_element_with_text_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            create_render.finished_work(),
+            "fragment deleted",
+        );
+        let parent_state_node = store
+            .fiber_arena()
+            .get(current_parent)
+            .unwrap()
+            .state_node();
+        let text_state_node = store.fiber_arena().get(current_text).unwrap().state_node();
+        let create_commit = commit_finished_host_root(&mut store, create_render).unwrap();
+        apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &create_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        let fragment = wrap_current_host_child_in_deleted_root(
+            &mut store,
+            current_parent,
+            current_text,
+            FiberTag::Fragment,
+            StateNodeHandle::NONE,
+        );
+        update_container(&mut store, root_id, RootElementHandle::from_raw(87), None).unwrap();
+        let delete_render =
+            render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let work_parent = delete_non_host_root_under_host_parent_for_commit(
+            &mut store,
+            delete_render.finished_work(),
+            current_parent,
+            fragment,
+            None,
+        );
+        let delete_commit = commit_finished_host_root(&mut store, delete_render).unwrap();
+        let operations_before_detach = host.operations();
+        let detach_apply = apply_test_host_root_deletion_subtree_host_detachment_for_canary(
+            &store,
+            &mut host,
+            &delete_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+        let cleanup_apply = apply_test_host_root_deletion_cleanup(
+            &store,
+            &mut host,
+            &delete_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        assert_eq!(delete_commit.deletion_lists().len(), 1);
+        assert_eq!(delete_commit.deletion_lists()[0].deleted(), &[fragment]);
+        assert_eq!(delete_commit.mutation_apply_log().records().len(), 1);
+        assert_eq!(
+            delete_commit.mutation_apply_log().records()[0].kind(),
+            HostRootMutationApplyRecordKind::SkipDeletedNonHostFiber
+        );
+        assert_eq!(
+            delete_commit
+                .deletion_cleanup_order_gate_for_canary()
+                .host_node_cleanup_count(),
+            1
+        );
+
+        assert_eq!(detach_apply.root(), root_id);
+        assert_eq!(detach_apply.finished_work(), delete_commit.finished_work());
+        assert_eq!(
+            detach_apply.status(),
+            TestHostRootMutationApplyStatus::Applied(TestHostRootMutationHostCall::RemoveChild)
+        );
+        assert!(!detach_apply.public_unmount_compatibility_claimed());
+        assert!(!detach_apply.broad_host_teardown_enabled());
+        let plan = detach_apply.plan();
+        assert_eq!(plan.deleted_root(), fragment);
+        assert_eq!(plan.deleted_root_tag(), FiberTag::Fragment);
+        assert_eq!(plan.parent(), work_parent);
+        assert_eq!(plan.host_parent(), work_parent);
+        assert_eq!(plan.host_parent_state_node(), parent_state_node);
+        assert_eq!(plan.host_child(), current_text);
+        assert_eq!(plan.host_child_tag(), FiberTag::HostText);
+        assert_eq!(plan.host_child_state_node(), text_state_node);
+        assert_eq!(plan.host_child_traversal_depth(), 1);
+        assert_eq!(plan.cleanup_sequence(), 0);
+        assert_eq!(plan.cleanup_order_sequence(), 0);
+
+        assert_eq!(cleanup_apply.records().len(), 1);
+        assert_eq!(cleanup_apply.records()[0].cleanup().fiber(), current_text);
+        assert_eq!(
+            cleanup_apply.records()[0].status(),
+            TestHostRootDeletionCleanupStatus::Applied(
+                TestHostRootDeletionCleanupAction::InvalidateDeletedText
+            )
+        );
+        assert!(
+            !detached_hosts
+                .text_metadata(text_state_node)
+                .unwrap()
+                .is_active()
+        );
+
+        let mut expected_operations = operations_before_detach;
+        expected_operations.push("remove_child");
+        assert_eq!(host.operations(), expected_operations);
+    }
+
+    #[test]
+    fn host_work_deletion_rejects_portal_and_suspense_roots_for_subtree_host_detachment() {
+        for blocked_tag in [FiberTag::Portal, FiberTag::Suspense] {
+            let (mut store, root_id) = root_store();
+            let mut host = RecordingHost::default();
+            let mut detached_hosts = DetachedHostRecords::default();
+            let create_render =
+                render_test_root(&mut store, root_id, RootElementHandle::from_raw(88));
+            let (current_parent, current_text) = attach_detached_root_element_with_text_for_commit(
+                &mut store,
+                &mut host,
+                &mut detached_hosts,
+                root_id,
+                create_render.finished_work(),
+                "blocked deleted root",
+            );
+            let create_commit = commit_finished_host_root(&mut store, create_render).unwrap();
+            apply_test_host_root_commit_mutations(
+                &mut store,
+                &mut host,
+                &create_commit,
+                &mut detached_hosts,
+            )
+            .unwrap();
+
+            let deleted_root = wrap_current_host_child_in_deleted_root(
+                &mut store,
+                current_parent,
+                current_text,
+                blocked_tag,
+                if blocked_tag == FiberTag::Portal {
+                    StateNodeHandle::from_raw(9_090)
+                } else {
+                    StateNodeHandle::NONE
+                },
+            );
+            update_container(&mut store, root_id, RootElementHandle::from_raw(89), None).unwrap();
+            let delete_render =
+                render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+            delete_non_host_root_under_host_parent_for_commit(
+                &mut store,
+                delete_render.finished_work(),
+                current_parent,
+                deleted_root,
+                None,
+            );
+            let delete_commit = commit_finished_host_root(&mut store, delete_render).unwrap();
+            let operations_before_detach = host.operations();
+
+            let error = apply_test_host_root_deletion_subtree_host_detachment_for_canary(
+                &store,
+                &mut host,
+                &delete_commit,
+                &mut detached_hosts,
+            )
+            .unwrap_err();
+
+            match (blocked_tag, error) {
+                (
+                    FiberTag::Portal,
+                    HostWorkError::DeletionSubtreeHostDetachmentPlan(
+                        HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary::PortalDeletedRootBlocked {
+                            deleted_root: actual,
+                            ..
+                        },
+                    ),
+                ) => assert_eq!(actual, deleted_root),
+                (
+                    FiberTag::Suspense,
+                    HostWorkError::DeletionSubtreeHostDetachmentPlan(
+                        HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary::SuspenseDeletedRootBlocked {
+                            deleted_root: actual,
+                            tag,
+                            ..
+                        },
+                    ),
+                ) => {
+                    assert_eq!(actual, deleted_root);
+                    assert_eq!(tag, FiberTag::Suspense);
+                }
+                (_, other) => panic!("unexpected detachment error: {other:?}"),
+            }
+            assert_eq!(host.operations(), operations_before_detach);
+        }
+    }
+
+    #[test]
+    fn host_work_deletion_rejects_nested_portal_and_suspense_boundaries_before_detachment() {
+        for blocked_tag in [FiberTag::Portal, FiberTag::Suspense] {
+            let (mut store, root_id) = root_store();
+            let mut host = RecordingHost::default();
+            let mut detached_hosts = DetachedHostRecords::default();
+            let create_render =
+                render_test_root(&mut store, root_id, RootElementHandle::from_raw(94));
+            let (current_parent, current_text) = attach_detached_root_element_with_text_for_commit(
+                &mut store,
+                &mut host,
+                &mut detached_hosts,
+                root_id,
+                create_render.finished_work(),
+                "nested blocked boundary",
+            );
+            let create_commit = commit_finished_host_root(&mut store, create_render).unwrap();
+            apply_test_host_root_commit_mutations(
+                &mut store,
+                &mut host,
+                &create_commit,
+                &mut detached_hosts,
+            )
+            .unwrap();
+
+            let blocked = wrap_current_host_child_in_deleted_root(
+                &mut store,
+                current_parent,
+                current_text,
+                blocked_tag,
+                if blocked_tag == FiberTag::Portal {
+                    StateNodeHandle::from_raw(9_091)
+                } else {
+                    StateNodeHandle::NONE
+                },
+            );
+            let fragment = wrap_current_host_child_in_deleted_root(
+                &mut store,
+                current_parent,
+                blocked,
+                FiberTag::Fragment,
+                StateNodeHandle::NONE,
+            );
+            update_container(&mut store, root_id, RootElementHandle::from_raw(95), None).unwrap();
+            let delete_render =
+                render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+            delete_non_host_root_under_host_parent_for_commit(
+                &mut store,
+                delete_render.finished_work(),
+                current_parent,
+                fragment,
+                None,
+            );
+            let delete_commit = commit_finished_host_root(&mut store, delete_render).unwrap();
+            let operations_before_detach = host.operations();
+
+            let error = apply_test_host_root_deletion_subtree_host_detachment_for_canary(
+                &store,
+                &mut host,
+                &delete_commit,
+                &mut detached_hosts,
+            )
+            .unwrap_err();
+
+            match (blocked_tag, error) {
+                (
+                    FiberTag::Portal,
+                    HostWorkError::DeletionSubtreeHostDetachmentPlan(
+                        HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary::PortalDeletedSubtreeBlocked {
+                            deleted_root,
+                            portal,
+                            ..
+                        },
+                    ),
+                ) => {
+                    assert_eq!(deleted_root, fragment);
+                    assert_eq!(portal, blocked);
+                }
+                (
+                    FiberTag::Suspense,
+                    HostWorkError::DeletionSubtreeHostDetachmentPlan(
+                        HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary::SuspenseDeletedSubtreeBlocked {
+                            deleted_root,
+                            fiber,
+                            tag,
+                            ..
+                        },
+                    ),
+                ) => {
+                    assert_eq!(deleted_root, fragment);
+                    assert_eq!(fiber, blocked);
+                    assert_eq!(tag, FiberTag::Suspense);
+                }
+                (_, other) => panic!("unexpected nested boundary error: {other:?}"),
+            }
+            assert_eq!(host.operations(), operations_before_detach);
+        }
+    }
+
+    #[test]
+    fn host_work_deletion_rejects_stale_deleted_host_child_before_detachment() {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let create_render = render_test_root(&mut store, root_id, RootElementHandle::from_raw(90));
+        let (current_parent, current_text) = attach_detached_root_element_with_text_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            create_render.finished_work(),
+            "stale deleted root",
+        );
+        let text_state_node = store.fiber_arena().get(current_text).unwrap().state_node();
+        let create_commit = commit_finished_host_root(&mut store, create_render).unwrap();
+        apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &create_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+        let fragment = wrap_current_host_child_in_deleted_root(
+            &mut store,
+            current_parent,
+            current_text,
+            FiberTag::Fragment,
+            StateNodeHandle::NONE,
+        );
+        update_container(&mut store, root_id, RootElementHandle::from_raw(91), None).unwrap();
+        let delete_render =
+            render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        delete_non_host_root_under_host_parent_for_commit(
+            &mut store,
+            delete_render.finished_work(),
+            current_parent,
+            fragment,
+            None,
+        );
+        let delete_commit = commit_finished_host_root(&mut store, delete_render).unwrap();
+        apply_test_host_root_deletion_cleanup(
+            &store,
+            &mut host,
+            &delete_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+        let operations_before_detach = host.operations();
+
+        let error = apply_test_host_root_deletion_subtree_host_detachment_for_canary(
+            &store,
+            &mut host,
+            &delete_commit,
+            &mut detached_hosts,
+        )
+        .unwrap_err();
+
+        assert!(
+            !detached_hosts
+                .text_metadata(text_state_node)
+                .unwrap()
+                .is_active()
+        );
+        assert_eq!(host.operations(), operations_before_detach);
+        match error {
+            HostWorkError::HostNode(error) => {
+                assert_eq!(error.violation(), HostNodeViolation::Stale);
+            }
+            other => panic!("unexpected stale detachment error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn host_work_deletion_rejects_wrong_parent_handle_for_subtree_host_detachment() {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let create_render = render_test_root(&mut store, root_id, RootElementHandle::from_raw(92));
+        let (current_parent, current_text) = attach_detached_root_element_with_text_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            create_render.finished_work(),
+            "wrong parent",
+        );
+        let text_state_node = store.fiber_arena().get(current_text).unwrap().state_node();
+        let create_commit = commit_finished_host_root(&mut store, create_render).unwrap();
+        apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &create_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+        let fragment = wrap_current_host_child_in_deleted_root(
+            &mut store,
+            current_parent,
+            current_text,
+            FiberTag::Fragment,
+            StateNodeHandle::NONE,
+        );
+        update_container(&mut store, root_id, RootElementHandle::from_raw(93), None).unwrap();
+        let delete_render =
+            render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        delete_non_host_root_under_host_parent_for_commit(
+            &mut store,
+            delete_render.finished_work(),
+            current_parent,
+            fragment,
+            Some(text_state_node),
+        );
+        let delete_commit = commit_finished_host_root(&mut store, delete_render).unwrap();
+        let operations_before_detach = host.operations();
+
+        let error = apply_test_host_root_deletion_subtree_host_detachment_for_canary(
+            &store,
+            &mut host,
+            &delete_commit,
+            &mut detached_hosts,
+        )
+        .unwrap_err();
+
+        assert_eq!(host.operations(), operations_before_detach);
+        match error {
+            HostWorkError::HostNode(error) => {
+                assert_eq!(error.violation(), HostNodeViolation::WrongTarget);
+            }
+            other => panic!("unexpected wrong-parent detachment error: {other:?}"),
+        }
     }
 
     #[test]
