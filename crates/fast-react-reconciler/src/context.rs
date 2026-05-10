@@ -12,13 +12,16 @@ use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::{
     ContextFrameId, ContextHandle, ContextStackSnapshot, ContextValueChange, ContextValueHandle,
-    FiberFlags, FiberId, FiberTag, FiberTopologyError, Lanes,
+    DependenciesHandle, FiberArena, FiberFlags, FiberId, FiberTag, FiberTopologyError, Lanes,
 };
 use fast_react_host_config::HostTypes;
 
 use crate::{
     FiberRootId, FiberRootStore, FiberRootStoreError,
     begin_work::{
+        CONTEXT_PROVIDER_SUBTREE_TRAVERSAL_MAX_FIBERS,
+        ContextProviderSubtreeUseContextBeginWorkRecord,
+        ContextProviderSubtreeUseContextConsumerBeginWorkRecord,
         NestedContextProviderTwoConsumerUseContextBeginWorkRecord,
         SiblingContextProviderTwoConsumerUseContextBeginWorkRecord,
     },
@@ -240,6 +243,88 @@ impl ContextProviderUpdateMultiProviderLaneRequest {
             ContextProviderUpdateConsumerOrder::First => self.first_provider,
             ContextProviderUpdateConsumerOrder::Second => self.second_provider,
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ContextProviderUpdateSubtreeLaneRequest {
+    root: FiberRootId,
+    host_root_work_in_progress: FiberId,
+    provider_snapshot: ContextStackSnapshot,
+    provider_token: ContextFrameId,
+    context: ContextHandle,
+    previous_value: ContextValueHandle,
+    next_value: ContextValueHandle,
+    propagation_lanes: Lanes,
+}
+
+impl ContextProviderUpdateSubtreeLaneRequest {
+    #[must_use]
+    pub const fn new(
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        provider_snapshot: ContextStackSnapshot,
+        provider_token: ContextFrameId,
+        context: ContextHandle,
+        previous_value: ContextValueHandle,
+        next_value: ContextValueHandle,
+        propagation_lanes: Lanes,
+    ) -> Self {
+        Self {
+            root,
+            host_root_work_in_progress,
+            provider_snapshot,
+            provider_token,
+            context,
+            previous_value,
+            next_value,
+            propagation_lanes,
+        }
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn host_root_work_in_progress(self) -> FiberId {
+        self.host_root_work_in_progress
+    }
+
+    #[must_use]
+    pub const fn provider_snapshot(self) -> ContextStackSnapshot {
+        self.provider_snapshot
+    }
+
+    #[must_use]
+    pub const fn provider_token(self) -> ContextFrameId {
+        self.provider_token
+    }
+
+    #[must_use]
+    pub const fn context(self) -> ContextHandle {
+        self.context
+    }
+
+    #[must_use]
+    pub const fn previous_value(self) -> ContextValueHandle {
+        self.previous_value
+    }
+
+    #[must_use]
+    pub const fn next_value(self) -> ContextValueHandle {
+        self.next_value
+    }
+
+    #[must_use]
+    pub const fn propagation_lanes(self) -> Lanes {
+        self.propagation_lanes
+    }
+
+    #[must_use]
+    const fn change(self) -> ContextValueChange {
+        ContextValueChange::new(self.context, self.previous_value, self.next_value)
     }
 }
 
@@ -698,6 +783,237 @@ impl ContextProviderUpdateMultiProviderLaneRecord {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ContextProviderUpdateSubtreeVisitedFiberRecord {
+    traversal_index: usize,
+    fiber: FiberId,
+    tag: FiberTag,
+    depth: usize,
+}
+
+impl ContextProviderUpdateSubtreeVisitedFiberRecord {
+    #[must_use]
+    pub const fn traversal_index(self) -> usize {
+        self.traversal_index
+    }
+
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn tag(self) -> FiberTag {
+        self.tag
+    }
+
+    #[must_use]
+    pub const fn depth(self) -> usize {
+        self.depth
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ContextProviderUpdateSubtreeDependencyBlocker {
+    MissingPrivateDependency,
+    MultiplePrivateDependencies,
+    DependencyHandleMismatch,
+    DependencyFiberMismatch,
+    DependencyContextMismatch,
+    DependencyValueMismatch,
+    LinkedDependencyUnsupported,
+    RendererVisibleDependencyUnsupported,
+    PropagationFlagsUnsupported,
+    PublicFiberDependenciesUnsupported,
+    PublicPropagationFlagUnsupported,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ContextProviderUpdateSubtreeConsumerLaneRecord {
+    traversal_index: usize,
+    consumer_index: usize,
+    depth: usize,
+    consumer: FiberId,
+    dependency: FunctionComponentContextDependencyHandle,
+    context: ContextHandle,
+    memoized_value: ContextValueHandle,
+    previous_value: ContextValueHandle,
+    next_value: ContextValueHandle,
+    render_lanes: Lanes,
+    propagation_lanes: Lanes,
+    previous_dependency_lanes: Lanes,
+    dependency_lanes: Lanes,
+    fiber_lanes_after: Lanes,
+    scanned_dependency_count: usize,
+    root: FiberRootId,
+}
+
+impl ContextProviderUpdateSubtreeConsumerLaneRecord {
+    #[must_use]
+    pub const fn traversal_index(self) -> usize {
+        self.traversal_index
+    }
+
+    #[must_use]
+    pub const fn consumer_index(self) -> usize {
+        self.consumer_index
+    }
+
+    #[must_use]
+    pub const fn depth(self) -> usize {
+        self.depth
+    }
+
+    #[must_use]
+    pub const fn consumer(self) -> FiberId {
+        self.consumer
+    }
+
+    #[must_use]
+    pub const fn dependency(self) -> FunctionComponentContextDependencyHandle {
+        self.dependency
+    }
+
+    #[must_use]
+    pub const fn context(self) -> ContextHandle {
+        self.context
+    }
+
+    #[must_use]
+    pub const fn memoized_value(self) -> ContextValueHandle {
+        self.memoized_value
+    }
+
+    #[must_use]
+    pub const fn previous_value(self) -> ContextValueHandle {
+        self.previous_value
+    }
+
+    #[must_use]
+    pub const fn next_value(self) -> ContextValueHandle {
+        self.next_value
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub const fn propagation_lanes(self) -> Lanes {
+        self.propagation_lanes
+    }
+
+    #[must_use]
+    pub const fn previous_dependency_lanes(self) -> Lanes {
+        self.previous_dependency_lanes
+    }
+
+    #[must_use]
+    pub const fn dependency_lanes(self) -> Lanes {
+        self.dependency_lanes
+    }
+
+    #[must_use]
+    pub const fn fiber_lanes_after(self) -> Lanes {
+        self.fiber_lanes_after
+    }
+
+    #[must_use]
+    pub const fn scanned_dependency_count(self) -> usize {
+        self.scanned_dependency_count
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ContextProviderUpdateSubtreeLaneRecord {
+    root: FiberRootId,
+    host_root_work_in_progress: FiberId,
+    provider: FiberId,
+    context: ContextHandle,
+    previous_value: ContextValueHandle,
+    next_value: ContextValueHandle,
+    propagation_lanes: Lanes,
+    provider_stack_push: ContextProviderUpdateProviderStackRecord,
+    visited_fibers: Vec<ContextProviderUpdateSubtreeVisitedFiberRecord>,
+    dependent_consumers: Vec<ContextProviderUpdateSubtreeConsumerLaneRecord>,
+    host_root_child_lanes_after: Lanes,
+    provider_child_lanes_after: Lanes,
+    root_pending_lanes_after: Lanes,
+}
+
+impl ContextProviderUpdateSubtreeLaneRecord {
+    #[must_use]
+    pub const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn host_root_work_in_progress(&self) -> FiberId {
+        self.host_root_work_in_progress
+    }
+
+    #[must_use]
+    pub const fn provider(&self) -> FiberId {
+        self.provider
+    }
+
+    #[must_use]
+    pub const fn context(&self) -> ContextHandle {
+        self.context
+    }
+
+    #[must_use]
+    pub const fn previous_value(&self) -> ContextValueHandle {
+        self.previous_value
+    }
+
+    #[must_use]
+    pub const fn next_value(&self) -> ContextValueHandle {
+        self.next_value
+    }
+
+    #[must_use]
+    pub const fn propagation_lanes(&self) -> Lanes {
+        self.propagation_lanes
+    }
+
+    #[must_use]
+    pub const fn provider_stack_push(&self) -> ContextProviderUpdateProviderStackRecord {
+        self.provider_stack_push
+    }
+
+    #[must_use]
+    pub fn visited_fibers(&self) -> &[ContextProviderUpdateSubtreeVisitedFiberRecord] {
+        &self.visited_fibers
+    }
+
+    #[must_use]
+    pub fn dependent_consumers(&self) -> &[ContextProviderUpdateSubtreeConsumerLaneRecord] {
+        &self.dependent_consumers
+    }
+
+    #[must_use]
+    pub const fn host_root_child_lanes_after(&self) -> Lanes {
+        self.host_root_child_lanes_after
+    }
+
+    #[must_use]
+    pub const fn provider_child_lanes_after(&self) -> Lanes {
+        self.provider_child_lanes_after
+    }
+
+    #[must_use]
+    pub const fn root_pending_lanes_after(&self) -> Lanes {
+        self.root_pending_lanes_after
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ContextProviderUpdateLaneGateError {
     FiberRootStore(FiberRootStoreError),
@@ -757,6 +1073,43 @@ pub(crate) enum ContextProviderUpdateLaneGateError {
         expected_dependency: FunctionComponentContextDependencyHandle,
         actual_dependency: FunctionComponentContextDependencyHandle,
         expected_fiber: FiberId,
+        actual_fiber: FiberId,
+    },
+    MissingSubtreeConsumers {
+        provider: FiberId,
+    },
+    SubtreeTraversalLimitExceeded {
+        provider: FiberId,
+        max_fibers: usize,
+        next_fiber: FiberId,
+    },
+    UnsupportedSubtreeFiberTag {
+        provider: FiberId,
+        fiber: FiberId,
+        tag: FiberTag,
+    },
+    MissingSubtreeRender {
+        provider: FiberId,
+        consumer: FiberId,
+    },
+    UnsupportedSubtreeDependencyRecord {
+        consumer: FiberId,
+        dependency: FunctionComponentContextDependencyHandle,
+        blocker: ContextProviderUpdateSubtreeDependencyBlocker,
+    },
+    MissingSubtreeMarkedDependency {
+        consumer: FiberId,
+        expected_dependency: FunctionComponentContextDependencyHandle,
+    },
+    UnexpectedSubtreeMarkedDependencyCount {
+        consumer: FiberId,
+        expected_dependency: FunctionComponentContextDependencyHandle,
+        marked_dependency_count: usize,
+    },
+    UnexpectedSubtreeMarkedDependency {
+        consumer: FiberId,
+        expected_dependency: FunctionComponentContextDependencyHandle,
+        actual_dependency: FunctionComponentContextDependencyHandle,
         actual_fiber: FiberId,
     },
 }
@@ -882,6 +1235,83 @@ impl Display for ContextProviderUpdateLaneGateError {
                 actual_dependency.raw(),
                 actual_fiber.slot().get()
             ),
+            Self::MissingSubtreeConsumers { provider } => write!(
+                formatter,
+                "provider {} subtree traversal found no private context consumers",
+                provider.slot().get()
+            ),
+            Self::SubtreeTraversalLimitExceeded {
+                provider,
+                max_fibers,
+                next_fiber,
+            } => write!(
+                formatter,
+                "provider {} subtree traversal exceeded {} fibers before visiting {}",
+                provider.slot().get(),
+                max_fibers,
+                next_fiber.slot().get()
+            ),
+            Self::UnsupportedSubtreeFiberTag {
+                provider,
+                fiber,
+                tag,
+            } => write!(
+                formatter,
+                "provider {} subtree traversal reached unsupported fiber {} with tag {:?}",
+                provider.slot().get(),
+                fiber.slot().get(),
+                tag
+            ),
+            Self::MissingSubtreeRender { provider, consumer } => write!(
+                formatter,
+                "provider {} subtree traversal found consumer {} without matching begin-work render",
+                provider.slot().get(),
+                consumer.slot().get()
+            ),
+            Self::UnsupportedSubtreeDependencyRecord {
+                consumer,
+                dependency,
+                blocker,
+            } => write!(
+                formatter,
+                "provider subtree consumer {} dependency {} is unsupported for private traversal: {:?}",
+                consumer.slot().get(),
+                dependency.raw(),
+                blocker
+            ),
+            Self::MissingSubtreeMarkedDependency {
+                consumer,
+                expected_dependency,
+            } => write!(
+                formatter,
+                "provider subtree consumer {} did not mark expected dependency {}",
+                consumer.slot().get(),
+                expected_dependency.raw()
+            ),
+            Self::UnexpectedSubtreeMarkedDependencyCount {
+                consumer,
+                expected_dependency,
+                marked_dependency_count,
+            } => write!(
+                formatter,
+                "provider subtree consumer {} expected exactly one mark for dependency {}, found {}",
+                consumer.slot().get(),
+                expected_dependency.raw(),
+                marked_dependency_count
+            ),
+            Self::UnexpectedSubtreeMarkedDependency {
+                consumer,
+                expected_dependency,
+                actual_dependency,
+                actual_fiber,
+            } => write!(
+                formatter,
+                "provider subtree consumer {} expected dependency {}, found dependency {} on fiber {}",
+                consumer.slot().get(),
+                expected_dependency.raw(),
+                actual_dependency.raw(),
+                actual_fiber.slot().get()
+            ),
         }
     }
 }
@@ -901,7 +1331,15 @@ impl Error for ContextProviderUpdateLaneGateError {
             | Self::DependencyRecordMismatch { .. }
             | Self::MissingMarkedDependency { .. }
             | Self::UnexpectedMarkedDependencyCount { .. }
-            | Self::UnexpectedMarkedDependency { .. } => None,
+            | Self::UnexpectedMarkedDependency { .. }
+            | Self::MissingSubtreeConsumers { .. }
+            | Self::SubtreeTraversalLimitExceeded { .. }
+            | Self::UnsupportedSubtreeFiberTag { .. }
+            | Self::MissingSubtreeRender { .. }
+            | Self::UnsupportedSubtreeDependencyRecord { .. }
+            | Self::MissingSubtreeMarkedDependency { .. }
+            | Self::UnexpectedSubtreeMarkedDependencyCount { .. }
+            | Self::UnexpectedSubtreeMarkedDependency { .. } => None,
         }
     }
 }
@@ -922,6 +1360,354 @@ impl From<FunctionComponentContextChangePropagationError> for ContextProviderUpd
     fn from(error: FunctionComponentContextChangePropagationError) -> Self {
         Self::Propagation(error)
     }
+}
+
+pub(crate) fn record_context_provider_update_subtree_lane_gate<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    context_store: &mut FunctionComponentContextRenderStore,
+    begin_work: ContextProviderSubtreeUseContextBeginWorkRecord,
+    request: ContextProviderUpdateSubtreeLaneRequest,
+) -> Result<ContextProviderUpdateSubtreeLaneRecord, ContextProviderUpdateLaneGateError> {
+    validate_context_provider_update_subtree_request(store, context_store, &begin_work, request)?;
+    let traversal = collect_context_provider_update_subtree_consumers(
+        store.fiber_arena(),
+        begin_work.provider(),
+    )?;
+
+    let propagation_request = FunctionComponentContextChangePropagationRequest::new(
+        request.change(),
+        request.propagation_lanes(),
+    );
+    let mut dependent_consumers = Vec::with_capacity(traversal.consumers.len());
+    for (consumer_index, consumer) in traversal.consumers.iter().copied().enumerate() {
+        let begin_work_consumer = subtree_begin_work_consumer_for_fiber(&begin_work, consumer)
+            .ok_or(ContextProviderUpdateLaneGateError::MissingSubtreeRender {
+                provider: begin_work.provider(),
+                consumer,
+            })?;
+        let propagation = propagate_context_change_to_function_component_dependencies(
+            store,
+            context_store,
+            begin_work_consumer.child_render(),
+            propagation_request,
+        )?;
+        dependent_consumers.push(subtree_consumer_lane_record_from_propagation(
+            store,
+            consumer_index,
+            begin_work_consumer.traversal_index(),
+            begin_work_consumer.depth(),
+            &propagation,
+            consumer,
+            begin_work_consumer.child_context_dependency(),
+        )?);
+    }
+
+    let host_root_child_lanes_after = store
+        .fiber_arena()
+        .get(request.host_root_work_in_progress())?
+        .child_lanes();
+    let provider_child_lanes_after = store
+        .fiber_arena()
+        .get(begin_work.provider())?
+        .child_lanes();
+    let root_pending_lanes_after = store.root(request.root())?.lanes().pending_lanes();
+
+    Ok(ContextProviderUpdateSubtreeLaneRecord {
+        root: request.root(),
+        host_root_work_in_progress: request.host_root_work_in_progress(),
+        provider: begin_work.provider(),
+        context: request.context(),
+        previous_value: request.previous_value(),
+        next_value: request.next_value(),
+        propagation_lanes: request.propagation_lanes(),
+        provider_stack_push: ContextProviderUpdateProviderStackRecord {
+            provider: begin_work.provider(),
+            context: begin_work.context(),
+            pushed_value: begin_work.value(),
+            provider_snapshot: begin_work.provider_snapshot(),
+            provider_token: begin_work.provider_token(),
+            pushed_stack_depth: begin_work.pushed_stack_depth(),
+            restored_stack_depth: begin_work.restored_stack_depth(),
+        },
+        visited_fibers: traversal.visited_fibers,
+        dependent_consumers,
+        host_root_child_lanes_after,
+        provider_child_lanes_after,
+        root_pending_lanes_after,
+    })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ContextProviderUpdateSubtreeTraversal {
+    visited_fibers: Vec<ContextProviderUpdateSubtreeVisitedFiberRecord>,
+    consumers: Vec<FiberId>,
+}
+
+fn collect_context_provider_update_subtree_consumers(
+    arena: &FiberArena,
+    provider: FiberId,
+) -> Result<ContextProviderUpdateSubtreeTraversal, ContextProviderUpdateLaneGateError> {
+    let mut visited_fibers = Vec::new();
+    let mut consumers = Vec::new();
+    let mut pending = arena
+        .child_ids(provider)?
+        .into_iter()
+        .rev()
+        .map(|fiber| (fiber, 1))
+        .collect::<Vec<_>>();
+
+    while let Some((fiber, depth)) = pending.pop() {
+        let traversal_index = visited_fibers.len();
+        if traversal_index >= CONTEXT_PROVIDER_SUBTREE_TRAVERSAL_MAX_FIBERS {
+            return Err(
+                ContextProviderUpdateLaneGateError::SubtreeTraversalLimitExceeded {
+                    provider,
+                    max_fibers: CONTEXT_PROVIDER_SUBTREE_TRAVERSAL_MAX_FIBERS,
+                    next_fiber: fiber,
+                },
+            );
+        }
+
+        let tag = arena.get(fiber)?.tag();
+        visited_fibers.push(ContextProviderUpdateSubtreeVisitedFiberRecord {
+            traversal_index,
+            fiber,
+            tag,
+            depth,
+        });
+
+        match tag {
+            FiberTag::FunctionComponent => consumers.push(fiber),
+            FiberTag::Fragment | FiberTag::Mode | FiberTag::HostComponent => {
+                for child in arena.child_ids(fiber)?.into_iter().rev() {
+                    pending.push((child, depth + 1));
+                }
+            }
+            FiberTag::HostText => {}
+            _ => {
+                return Err(
+                    ContextProviderUpdateLaneGateError::UnsupportedSubtreeFiberTag {
+                        provider,
+                        fiber,
+                        tag,
+                    },
+                );
+            }
+        }
+    }
+
+    if consumers.is_empty() {
+        return Err(ContextProviderUpdateLaneGateError::MissingSubtreeConsumers { provider });
+    }
+
+    Ok(ContextProviderUpdateSubtreeTraversal {
+        visited_fibers,
+        consumers,
+    })
+}
+
+fn validate_context_provider_update_subtree_request<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    context_store: &FunctionComponentContextRenderStore,
+    begin_work: &ContextProviderSubtreeUseContextBeginWorkRecord,
+    request: ContextProviderUpdateSubtreeLaneRequest,
+) -> Result<(), ContextProviderUpdateLaneGateError> {
+    if !request.change().is_changed() {
+        return Err(ContextProviderUpdateLaneGateError::UnchangedProviderValue {
+            context: request.context(),
+            previous_value: request.previous_value(),
+            next_value: request.next_value(),
+        });
+    }
+
+    if request.context() != begin_work.context() || request.previous_value() != begin_work.value() {
+        return Err(
+            ContextProviderUpdateLaneGateError::ProviderValuePathMismatch {
+                expected_context: begin_work.context(),
+                actual_context: request.context(),
+                expected_previous_value: begin_work.value(),
+                actual_previous_value: request.previous_value(),
+            },
+        );
+    }
+
+    if request.provider_token() != begin_work.provider_token() {
+        return Err(ContextProviderUpdateLaneGateError::StaleProviderToken {
+            provider: begin_work.provider(),
+            expected_token: request.provider_token(),
+            actual_token: begin_work.provider_token(),
+        });
+    }
+
+    if request.provider_snapshot() != begin_work.provider_snapshot() {
+        return Err(ContextProviderUpdateLaneGateError::StaleProviderSnapshot {
+            provider: begin_work.provider(),
+            expected_snapshot: request.provider_snapshot(),
+            actual_snapshot: begin_work.provider_snapshot(),
+        });
+    }
+
+    let traversal = collect_context_provider_update_subtree_consumers(
+        store.fiber_arena(),
+        begin_work.provider(),
+    )?;
+    for consumer in traversal.consumers {
+        let begin_work_consumer = subtree_begin_work_consumer_for_fiber(begin_work, consumer)
+            .ok_or(ContextProviderUpdateLaneGateError::MissingSubtreeRender {
+                provider: begin_work.provider(),
+                consumer,
+            })?;
+        validate_subtree_consumer_dependency_record(
+            store,
+            context_store,
+            begin_work_consumer,
+            request,
+        )?;
+    }
+
+    Ok(())
+}
+
+fn subtree_begin_work_consumer_for_fiber(
+    begin_work: &ContextProviderSubtreeUseContextBeginWorkRecord,
+    fiber: FiberId,
+) -> Option<ContextProviderSubtreeUseContextConsumerBeginWorkRecord> {
+    begin_work
+        .consumers()
+        .iter()
+        .copied()
+        .find(|consumer| consumer.fiber() == fiber)
+}
+
+fn validate_subtree_consumer_dependency_record<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    context_store: &FunctionComponentContextRenderStore,
+    consumer: ContextProviderSubtreeUseContextConsumerBeginWorkRecord,
+    request: ContextProviderUpdateSubtreeLaneRequest,
+) -> Result<(), ContextProviderUpdateLaneGateError> {
+    let fiber_node = store.fiber_arena().get(consumer.fiber())?;
+    if fiber_node.tag() != FiberTag::FunctionComponent {
+        return Err(
+            ContextProviderUpdateLaneGateError::UnsupportedSubtreeFiberTag {
+                provider: consumer.fiber(),
+                fiber: consumer.fiber(),
+                tag: fiber_node.tag(),
+            },
+        );
+    }
+    if fiber_node.dependencies() != DependenciesHandle::NONE {
+        return Err(
+            ContextProviderUpdateLaneGateError::UnsupportedSubtreeDependencyRecord {
+                consumer: consumer.fiber(),
+                dependency: consumer.child_context_dependency(),
+                blocker: ContextProviderUpdateSubtreeDependencyBlocker::PublicFiberDependenciesUnsupported,
+            },
+        );
+    }
+    if fiber_node
+        .flags()
+        .contains_any(FiberFlags::NEEDS_PROPAGATION)
+    {
+        return Err(
+            ContextProviderUpdateLaneGateError::UnsupportedSubtreeDependencyRecord {
+                consumer: consumer.fiber(),
+                dependency: consumer.child_context_dependency(),
+                blocker:
+                    ContextProviderUpdateSubtreeDependencyBlocker::PublicPropagationFlagUnsupported,
+            },
+        );
+    }
+
+    let dependencies = context_store.context_dependencies_for_record(consumer.child_render());
+    let dependency = match dependencies {
+        [] => {
+            return Err(
+                ContextProviderUpdateLaneGateError::UnsupportedSubtreeDependencyRecord {
+                    consumer: consumer.fiber(),
+                    dependency: consumer.child_context_dependency(),
+                    blocker:
+                        ContextProviderUpdateSubtreeDependencyBlocker::MissingPrivateDependency,
+                },
+            );
+        }
+        [dependency] => *dependency,
+        _ => {
+            return Err(
+                ContextProviderUpdateLaneGateError::UnsupportedSubtreeDependencyRecord {
+                    consumer: consumer.fiber(),
+                    dependency: consumer.child_context_dependency(),
+                    blocker:
+                        ContextProviderUpdateSubtreeDependencyBlocker::MultiplePrivateDependencies,
+                },
+            );
+        }
+    };
+
+    if dependency.handle() != consumer.child_context_dependency() {
+        return Err(
+            ContextProviderUpdateLaneGateError::UnsupportedSubtreeDependencyRecord {
+                consumer: consumer.fiber(),
+                dependency: dependency.handle(),
+                blocker: ContextProviderUpdateSubtreeDependencyBlocker::DependencyHandleMismatch,
+            },
+        );
+    }
+    if dependency.fiber() != consumer.fiber() {
+        return Err(
+            ContextProviderUpdateLaneGateError::UnsupportedSubtreeDependencyRecord {
+                consumer: consumer.fiber(),
+                dependency: dependency.handle(),
+                blocker: ContextProviderUpdateSubtreeDependencyBlocker::DependencyFiberMismatch,
+            },
+        );
+    }
+    if dependency.context() != request.context() {
+        return Err(
+            ContextProviderUpdateLaneGateError::UnsupportedSubtreeDependencyRecord {
+                consumer: consumer.fiber(),
+                dependency: dependency.handle(),
+                blocker: ContextProviderUpdateSubtreeDependencyBlocker::DependencyContextMismatch,
+            },
+        );
+    }
+    if dependency.memoized_value() != request.previous_value() {
+        return Err(
+            ContextProviderUpdateLaneGateError::UnsupportedSubtreeDependencyRecord {
+                consumer: consumer.fiber(),
+                dependency: dependency.handle(),
+                blocker: ContextProviderUpdateSubtreeDependencyBlocker::DependencyValueMismatch,
+            },
+        );
+    }
+    if dependency.has_next() {
+        return Err(
+            ContextProviderUpdateLaneGateError::UnsupportedSubtreeDependencyRecord {
+                consumer: consumer.fiber(),
+                dependency: dependency.handle(),
+                blocker: ContextProviderUpdateSubtreeDependencyBlocker::LinkedDependencyUnsupported,
+            },
+        );
+    }
+    if dependency.renderer_visible_propagation() {
+        return Err(
+            ContextProviderUpdateLaneGateError::UnsupportedSubtreeDependencyRecord {
+                consumer: consumer.fiber(),
+                dependency: dependency.handle(),
+                blocker: ContextProviderUpdateSubtreeDependencyBlocker::RendererVisibleDependencyUnsupported,
+            },
+        );
+    }
+    if dependency.propagation_flags() != FiberFlags::NO {
+        return Err(
+            ContextProviderUpdateLaneGateError::UnsupportedSubtreeDependencyRecord {
+                consumer: consumer.fiber(),
+                dependency: dependency.handle(),
+                blocker: ContextProviderUpdateSubtreeDependencyBlocker::PropagationFlagsUnsupported,
+            },
+        );
+    }
+
+    Ok(())
 }
 
 pub(crate) fn record_context_provider_update_two_consumer_lane_gate<H: HostTypes>(
@@ -1491,11 +2277,75 @@ fn consumer_lane_record_from_propagation<H: HostTypes>(
     })
 }
 
+fn subtree_consumer_lane_record_from_propagation<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    consumer_index: usize,
+    traversal_index: usize,
+    depth: usize,
+    propagation: &FunctionComponentContextChangePropagationRecord,
+    expected_fiber: FiberId,
+    expected_dependency: FunctionComponentContextDependencyHandle,
+) -> Result<ContextProviderUpdateSubtreeConsumerLaneRecord, ContextProviderUpdateLaneGateError> {
+    match propagation.marked_dependency_count() {
+        0 => {
+            return Err(
+                ContextProviderUpdateLaneGateError::MissingSubtreeMarkedDependency {
+                    consumer: expected_fiber,
+                    expected_dependency,
+                },
+            );
+        }
+        1 => {}
+        marked_dependency_count => {
+            return Err(
+                ContextProviderUpdateLaneGateError::UnexpectedSubtreeMarkedDependencyCount {
+                    consumer: expected_fiber,
+                    expected_dependency,
+                    marked_dependency_count,
+                },
+            );
+        }
+    }
+
+    let marked = propagation.marked_dependencies()[0];
+    if marked.dependency() != expected_dependency || marked.fiber() != expected_fiber {
+        return Err(
+            ContextProviderUpdateLaneGateError::UnexpectedSubtreeMarkedDependency {
+                consumer: expected_fiber,
+                expected_dependency,
+                actual_dependency: marked.dependency(),
+                actual_fiber: marked.fiber(),
+            },
+        );
+    }
+
+    let fiber_lanes_after = store.fiber_arena().get(expected_fiber)?.lanes();
+    Ok(ContextProviderUpdateSubtreeConsumerLaneRecord {
+        traversal_index,
+        consumer_index,
+        depth,
+        consumer: marked.fiber(),
+        dependency: marked.dependency(),
+        context: marked.context(),
+        memoized_value: marked.memoized_value(),
+        previous_value: marked.previous_value(),
+        next_value: marked.next_value(),
+        render_lanes: propagation.render().render_lanes(),
+        propagation_lanes: marked.propagation_lanes(),
+        previous_dependency_lanes: marked.previous_dependency_lanes(),
+        dependency_lanes: marked.dependency_lanes(),
+        fiber_lanes_after,
+        scanned_dependency_count: propagation.scanned_dependency_count(),
+        root: marked.root(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::begin_work::{
-        NestedContextProviderBeginWorkRequest, SiblingContextProviderBeginWorkRequest,
+        ContextProviderBeginWorkRequest, NestedContextProviderBeginWorkRequest,
+        SiblingContextProviderBeginWorkRequest, begin_work_context_provider_use_context_subtree,
         begin_work_nested_context_provider_two_consumer_use_context_children,
         begin_work_nested_context_provider_two_provider_use_context_children,
         begin_work_sibling_context_provider_two_consumer_use_context_children,
@@ -1758,8 +2608,563 @@ mod tests {
         )
     }
 
+    fn create_function_component_wip(
+        store: &mut FiberRootStore<RecordingHost>,
+        current_props: u64,
+        component_raw: u64,
+        wip_props: u64,
+    ) -> (FiberId, FiberTypeHandle) {
+        let current = store.fiber_arena_mut().create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(current_props),
+            FiberMode::NO,
+        );
+        let component = FiberTypeHandle::from_raw(component_raw);
+        store
+            .fiber_arena_mut()
+            .get_mut(current)
+            .unwrap()
+            .set_fiber_type(component);
+        let work_in_progress = store
+            .fiber_arena_mut()
+            .create_work_in_progress(current, PropsHandle::from_raw(wip_props))
+            .unwrap();
+
+        (work_in_progress, component)
+    }
+
+    fn attach_context_provider_broad_subtree_wip_children(
+        store: &mut FiberRootStore<RecordingHost>,
+        host_root_work_in_progress: FiberId,
+    ) -> (
+        FiberId,
+        FiberId,
+        FiberTypeHandle,
+        FiberId,
+        FiberTypeHandle,
+        FiberId,
+        FiberTypeHandle,
+        FiberId,
+        FiberId,
+    ) {
+        let provider = store.fiber_arena_mut().create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(1_317),
+            FiberMode::NO,
+        );
+        let (first_work_in_progress, first_component) =
+            create_function_component_wip(store, 1_318, 1_319, 1_320);
+        let fragment = store.fiber_arena_mut().create_fiber(
+            FiberTag::Fragment,
+            None,
+            PropsHandle::from_raw(1_321),
+            FiberMode::NO,
+        );
+        let (second_work_in_progress, second_component) =
+            create_function_component_wip(store, 1_322, 1_323, 1_324);
+        let host_component = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::from_raw(1_325),
+            FiberMode::NO,
+        );
+        let (third_work_in_progress, third_component) =
+            create_function_component_wip(store, 1_326, 1_327, 1_328);
+
+        store
+            .fiber_arena_mut()
+            .set_children(fragment, &[second_work_in_progress])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_component, &[third_work_in_progress])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(
+                provider,
+                &[first_work_in_progress, fragment, host_component],
+            )
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root_work_in_progress, &[provider])
+            .unwrap();
+
+        (
+            provider,
+            first_work_in_progress,
+            first_component,
+            second_work_in_progress,
+            second_component,
+            third_work_in_progress,
+            third_component,
+            fragment,
+            host_component,
+        )
+    }
+
+    fn attach_context_provider_single_consumer_wip_child(
+        store: &mut FiberRootStore<RecordingHost>,
+        host_root_work_in_progress: FiberId,
+    ) -> (FiberId, FiberId, FiberTypeHandle) {
+        let provider = store.fiber_arena_mut().create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(1_329),
+            FiberMode::NO,
+        );
+        let (consumer, component) = create_function_component_wip(store, 1_330, 1_331, 1_332);
+        store
+            .fiber_arena_mut()
+            .set_children(provider, &[consumer])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root_work_in_progress, &[provider])
+            .unwrap();
+
+        (provider, consumer, component)
+    }
+
     fn context_value(raw: u64) -> ContextValueHandle {
         ContextValueHandle::from_raw(raw)
+    }
+
+    #[test]
+    fn context_provider_update_subtree_lane_gate_discovers_consumers_across_child_shapes() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(1_500),
+            None,
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let host_root_work_in_progress = render.work_in_progress();
+        let (
+            provider,
+            first_function_component,
+            first_component,
+            second_function_component,
+            second_component,
+            third_function_component,
+            third_component,
+            fragment,
+            host_component,
+        ) = attach_context_provider_broad_subtree_wip_children(
+            &mut store,
+            host_root_work_in_progress,
+        );
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let default_value = context_value(1_510);
+        let previous_value = context_value(1_511);
+        let next_value = context_value(1_512);
+        let context = context_store.create_context(default_value);
+        let mut registry = TestUseContextComponentRegistry::new(
+            first_component,
+            UseContextBehavior::ReadOnce { context },
+        );
+        registry.register(second_component, UseContextBehavior::ReadOnce { context });
+        registry.register(third_component, UseContextBehavior::ReadOnce { context });
+        let begin_work = begin_work_context_provider_use_context_subtree(
+            store.fiber_arena_mut(),
+            ContextProviderBeginWorkRequest::new(provider, Lanes::DEFAULT, context, previous_value),
+            &mut context_store,
+            &mut registry,
+        )
+        .unwrap();
+        let propagation_lanes = Lanes::SYNC
+            .merge_lane(Lane::TRANSITION_1)
+            .merge_lane(Lane::RETRY_2);
+
+        let record = record_context_provider_update_subtree_lane_gate(
+            &mut store,
+            &mut context_store,
+            begin_work.clone(),
+            ContextProviderUpdateSubtreeLaneRequest::new(
+                root_id,
+                host_root_work_in_progress,
+                begin_work.provider_snapshot(),
+                begin_work.provider_token(),
+                context,
+                previous_value,
+                next_value,
+                propagation_lanes,
+            ),
+        )
+        .unwrap();
+
+        assert_eq!(record.root(), root_id);
+        assert_eq!(
+            record.host_root_work_in_progress(),
+            host_root_work_in_progress
+        );
+        assert_eq!(record.provider(), provider);
+        assert_eq!(record.context(), context);
+        assert_eq!(record.previous_value(), previous_value);
+        assert_eq!(record.next_value(), next_value);
+        assert_eq!(record.propagation_lanes(), propagation_lanes);
+        let provider_stack = record.provider_stack_push();
+        assert_eq!(provider_stack.provider(), provider);
+        assert_eq!(provider_stack.context(), context);
+        assert_eq!(provider_stack.pushed_value(), previous_value);
+        assert_eq!(
+            provider_stack.provider_snapshot(),
+            begin_work.provider_snapshot()
+        );
+        assert_eq!(provider_stack.provider_token(), begin_work.provider_token());
+        assert_eq!(provider_stack.pushed_stack_depth(), 1);
+        assert_eq!(provider_stack.restored_stack_depth(), 0);
+        assert_eq!(
+            record
+                .visited_fibers()
+                .iter()
+                .map(|visited| {
+                    (
+                        visited.traversal_index(),
+                        visited.fiber(),
+                        visited.tag(),
+                        visited.depth(),
+                    )
+                })
+                .collect::<Vec<_>>(),
+            vec![
+                (0, first_function_component, FiberTag::FunctionComponent, 1),
+                (1, fragment, FiberTag::Fragment, 1),
+                (2, second_function_component, FiberTag::FunctionComponent, 2),
+                (3, host_component, FiberTag::HostComponent, 1),
+                (4, third_function_component, FiberTag::FunctionComponent, 2),
+            ]
+        );
+
+        let consumers = record.dependent_consumers();
+        assert_eq!(consumers.len(), 3);
+        for (index, (consumer, traversal_index, depth)) in [
+            (first_function_component, 0, 1),
+            (second_function_component, 2, 2),
+            (third_function_component, 4, 2),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            assert_eq!(consumers[index].consumer_index(), index);
+            assert_eq!(consumers[index].consumer(), consumer);
+            assert_eq!(consumers[index].traversal_index(), traversal_index);
+            assert_eq!(consumers[index].depth(), depth);
+            assert_eq!(consumers[index].context(), context);
+            assert_eq!(consumers[index].memoized_value(), previous_value);
+            assert_eq!(consumers[index].previous_value(), previous_value);
+            assert_eq!(consumers[index].next_value(), next_value);
+            assert_eq!(consumers[index].render_lanes(), Lanes::DEFAULT);
+            assert_eq!(consumers[index].propagation_lanes(), propagation_lanes);
+            assert_eq!(consumers[index].previous_dependency_lanes(), Lanes::NO);
+            assert_eq!(consumers[index].dependency_lanes(), propagation_lanes);
+            assert!(
+                consumers[index]
+                    .fiber_lanes_after()
+                    .contains_all(propagation_lanes)
+            );
+            assert_eq!(consumers[index].scanned_dependency_count(), 1);
+            assert_eq!(consumers[index].root(), root_id);
+            assert_eq!(
+                context_store
+                    .context_dependency(consumers[index].dependency())
+                    .unwrap()
+                    .dependency_lanes(),
+                propagation_lanes
+            );
+        }
+
+        assert!(
+            record
+                .host_root_child_lanes_after()
+                .contains_all(propagation_lanes)
+        );
+        assert!(
+            record
+                .provider_child_lanes_after()
+                .contains_all(propagation_lanes)
+        );
+        assert!(
+            record
+                .root_pending_lanes_after()
+                .contains_all(propagation_lanes)
+        );
+        for consumer in [
+            first_function_component,
+            second_function_component,
+            third_function_component,
+        ] {
+            let node = store.fiber_arena().get(consumer).unwrap();
+            assert!(node.lanes().contains_all(propagation_lanes));
+            assert_eq!(node.dependencies(), DependenciesHandle::NONE);
+            assert!(!node.flags().contains_any(FiberFlags::NEEDS_PROPAGATION));
+        }
+        assert_eq!(context_store.current_value(context).unwrap(), default_value);
+        assert_eq!(context_store.stack_depth(), 0);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+    }
+
+    #[test]
+    fn context_provider_update_subtree_lane_gate_fails_closed_for_stale_provider_token() {
+        let (mut store, root_id, _host) = root_store();
+        update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(1_530),
+            None,
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let host_root_work_in_progress = render.work_in_progress();
+        let (provider, consumer, component) = attach_context_provider_single_consumer_wip_child(
+            &mut store,
+            host_root_work_in_progress,
+        );
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let context = context_store.create_context(context_value(1_531));
+        let previous_value = context_value(1_532);
+        let mut registry = TestUseContextComponentRegistry::new(
+            component,
+            UseContextBehavior::ReadOnce { context },
+        );
+        let begin_work = begin_work_context_provider_use_context_subtree(
+            store.fiber_arena_mut(),
+            ContextProviderBeginWorkRequest::new(provider, Lanes::DEFAULT, context, previous_value),
+            &mut context_store,
+            &mut registry,
+        )
+        .unwrap();
+        let propagation_lanes = Lanes::SYNC.merge_lane(Lane::TRANSITION_1);
+        let stale_token = ContextFrameId::from_raw(begin_work.provider_token().raw() + 1);
+
+        let error = record_context_provider_update_subtree_lane_gate(
+            &mut store,
+            &mut context_store,
+            begin_work.clone(),
+            ContextProviderUpdateSubtreeLaneRequest::new(
+                root_id,
+                host_root_work_in_progress,
+                begin_work.provider_snapshot(),
+                stale_token,
+                context,
+                previous_value,
+                context_value(1_533),
+                propagation_lanes,
+            ),
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            ContextProviderUpdateLaneGateError::StaleProviderToken {
+                provider,
+                expected_token: stale_token,
+                actual_token: begin_work.provider_token(),
+            }
+        );
+        assert!(
+            !store
+                .fiber_arena()
+                .get(consumer)
+                .unwrap()
+                .lanes()
+                .contains_any(propagation_lanes)
+        );
+        assert!(
+            !store
+                .root(root_id)
+                .unwrap()
+                .lanes()
+                .pending_lanes()
+                .contains_any(propagation_lanes)
+        );
+    }
+
+    #[test]
+    fn context_provider_update_subtree_lane_gate_fails_closed_for_unsupported_boundaries() {
+        for tag in [
+            FiberTag::Portal,
+            FiberTag::Suspense,
+            FiberTag::ClassComponent,
+            FiberTag::ContextConsumer,
+        ] {
+            let (mut store, root_id, _host) = root_store();
+            update_container(
+                &mut store,
+                root_id,
+                RootElementHandle::from_raw(1_540 + u64::from(tag.react_tag())),
+                None,
+            )
+            .unwrap();
+            let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+            let host_root_work_in_progress = render.work_in_progress();
+            let (provider, consumer, component) = attach_context_provider_single_consumer_wip_child(
+                &mut store,
+                host_root_work_in_progress,
+            );
+            let mut context_store = FunctionComponentContextRenderStore::new();
+            let context = context_store.create_context(context_value(1_550));
+            let previous_value = context_value(1_551);
+            let mut registry = TestUseContextComponentRegistry::new(
+                component,
+                UseContextBehavior::ReadOnce { context },
+            );
+            let begin_work = begin_work_context_provider_use_context_subtree(
+                store.fiber_arena_mut(),
+                ContextProviderBeginWorkRequest::new(
+                    provider,
+                    Lanes::DEFAULT,
+                    context,
+                    previous_value,
+                ),
+                &mut context_store,
+                &mut registry,
+            )
+            .unwrap();
+            let unsupported = store.fiber_arena_mut().create_fiber(
+                tag,
+                None,
+                PropsHandle::from_raw(1_552),
+                FiberMode::NO,
+            );
+            store
+                .fiber_arena_mut()
+                .set_children(provider, &[consumer, unsupported])
+                .unwrap();
+            let propagation_lanes = Lanes::SYNC.merge_lane(Lane::RETRY_1);
+
+            let error = record_context_provider_update_subtree_lane_gate(
+                &mut store,
+                &mut context_store,
+                begin_work.clone(),
+                ContextProviderUpdateSubtreeLaneRequest::new(
+                    root_id,
+                    host_root_work_in_progress,
+                    begin_work.provider_snapshot(),
+                    begin_work.provider_token(),
+                    context,
+                    previous_value,
+                    context_value(1_553),
+                    propagation_lanes,
+                ),
+            )
+            .unwrap_err();
+
+            assert_eq!(
+                error,
+                ContextProviderUpdateLaneGateError::UnsupportedSubtreeFiberTag {
+                    provider,
+                    fiber: unsupported,
+                    tag,
+                }
+            );
+            assert!(
+                !store
+                    .fiber_arena()
+                    .get(consumer)
+                    .unwrap()
+                    .lanes()
+                    .contains_any(propagation_lanes)
+            );
+            assert!(
+                !store
+                    .root(root_id)
+                    .unwrap()
+                    .lanes()
+                    .pending_lanes()
+                    .contains_any(propagation_lanes)
+            );
+        }
+    }
+
+    #[test]
+    fn context_provider_update_subtree_lane_gate_fails_closed_for_public_dependency_records() {
+        let (mut store, root_id, _host) = root_store();
+        update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(1_560),
+            None,
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let host_root_work_in_progress = render.work_in_progress();
+        let (provider, consumer, component) = attach_context_provider_single_consumer_wip_child(
+            &mut store,
+            host_root_work_in_progress,
+        );
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let context = context_store.create_context(context_value(1_561));
+        let previous_value = context_value(1_562);
+        let mut registry = TestUseContextComponentRegistry::new(
+            component,
+            UseContextBehavior::ReadOnce { context },
+        );
+        let begin_work = begin_work_context_provider_use_context_subtree(
+            store.fiber_arena_mut(),
+            ContextProviderBeginWorkRequest::new(provider, Lanes::DEFAULT, context, previous_value),
+            &mut context_store,
+            &mut registry,
+        )
+        .unwrap();
+        store
+            .fiber_arena_mut()
+            .get_mut(consumer)
+            .unwrap()
+            .set_dependencies(DependenciesHandle::from_raw(1_563));
+        let propagation_lanes = Lanes::SYNC.merge_lane(Lane::RETRY_2);
+
+        let error = record_context_provider_update_subtree_lane_gate(
+            &mut store,
+            &mut context_store,
+            begin_work.clone(),
+            ContextProviderUpdateSubtreeLaneRequest::new(
+                root_id,
+                host_root_work_in_progress,
+                begin_work.provider_snapshot(),
+                begin_work.provider_token(),
+                context,
+                previous_value,
+                context_value(1_564),
+                propagation_lanes,
+            ),
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            ContextProviderUpdateLaneGateError::UnsupportedSubtreeDependencyRecord {
+                consumer,
+                dependency: begin_work.consumers()[0].child_context_dependency(),
+                blocker:
+                    ContextProviderUpdateSubtreeDependencyBlocker::PublicFiberDependenciesUnsupported,
+            }
+        );
+        assert!(
+            !store
+                .fiber_arena()
+                .get(consumer)
+                .unwrap()
+                .lanes()
+                .contains_any(propagation_lanes)
+        );
+        assert!(
+            !store
+                .root(root_id)
+                .unwrap()
+                .lanes()
+                .pending_lanes()
+                .contains_any(propagation_lanes)
+        );
     }
 
     #[test]

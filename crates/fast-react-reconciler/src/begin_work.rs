@@ -46,6 +46,7 @@ use crate::{
 };
 
 pub(crate) const PORTAL_RECONCILER_UNSUPPORTED_FEATURE: &str = "Reconciler.fiber.Portal";
+pub(crate) const CONTEXT_PROVIDER_SUBTREE_TRAVERSAL_MAX_FIBERS: usize = 16;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum UnsupportedThenableIdentityClass {
@@ -1347,6 +1348,161 @@ pub(crate) struct ContextProviderUseContextOpenScopeSingleChildBeginWorkRecord {
     single_child: FunctionComponentSingleChildReconciliationRecord,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ContextProviderSubtreeVisitedFiberRecord {
+    traversal_index: usize,
+    fiber: FiberId,
+    tag: FiberTag,
+    depth: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ContextProviderSubtreeUseContextConsumerBeginWorkRecord {
+    traversal_index: usize,
+    depth: usize,
+    fiber: FiberId,
+    child_begin_work: FunctionComponentUseContextBeginWorkRecord,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ContextProviderSubtreeUseContextBeginWorkRecord {
+    provider: FiberId,
+    context: ContextHandle,
+    value: ContextValueHandle,
+    provider_snapshot: ContextStackSnapshot,
+    provider_token: ContextFrameId,
+    pushed_stack_depth: usize,
+    restored_stack_depth: usize,
+    visited_fibers: Vec<ContextProviderSubtreeVisitedFiberRecord>,
+    consumers: Vec<ContextProviderSubtreeUseContextConsumerBeginWorkRecord>,
+}
+
+impl ContextProviderSubtreeVisitedFiberRecord {
+    #[must_use]
+    pub const fn new(traversal_index: usize, fiber: FiberId, tag: FiberTag, depth: usize) -> Self {
+        Self {
+            traversal_index,
+            fiber,
+            tag,
+            depth,
+        }
+    }
+
+    #[must_use]
+    pub const fn traversal_index(self) -> usize {
+        self.traversal_index
+    }
+
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn tag(self) -> FiberTag {
+        self.tag
+    }
+
+    #[must_use]
+    pub const fn depth(self) -> usize {
+        self.depth
+    }
+}
+
+impl ContextProviderSubtreeUseContextConsumerBeginWorkRecord {
+    #[must_use]
+    pub const fn traversal_index(self) -> usize {
+        self.traversal_index
+    }
+
+    #[must_use]
+    pub const fn depth(self) -> usize {
+        self.depth
+    }
+
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn child_begin_work(self) -> FunctionComponentUseContextBeginWorkRecord {
+        self.child_begin_work
+    }
+
+    #[must_use]
+    pub const fn child_render(self) -> FunctionComponentRenderRecord {
+        self.child_begin_work.render()
+    }
+
+    #[must_use]
+    pub const fn child_output(self) -> FunctionComponentOutputHandle {
+        self.child_begin_work.output()
+    }
+
+    #[must_use]
+    pub const fn child_context_read(self) -> FunctionComponentContextReadRecord {
+        self.child_begin_work.context_read()
+    }
+
+    #[must_use]
+    pub const fn child_context_dependency(self) -> FunctionComponentContextDependencyHandle {
+        self.child_begin_work.context_dependency()
+    }
+}
+
+impl ContextProviderSubtreeUseContextBeginWorkRecord {
+    #[must_use]
+    pub const fn provider(&self) -> FiberId {
+        self.provider
+    }
+
+    #[must_use]
+    pub const fn context(&self) -> ContextHandle {
+        self.context
+    }
+
+    #[must_use]
+    pub const fn value(&self) -> ContextValueHandle {
+        self.value
+    }
+
+    #[must_use]
+    pub const fn provider_snapshot(&self) -> ContextStackSnapshot {
+        self.provider_snapshot
+    }
+
+    #[must_use]
+    pub const fn provider_token(&self) -> ContextFrameId {
+        self.provider_token
+    }
+
+    #[must_use]
+    pub const fn pushed_stack_depth(&self) -> usize {
+        self.pushed_stack_depth
+    }
+
+    #[must_use]
+    pub const fn restored_stack_depth(&self) -> usize {
+        self.restored_stack_depth
+    }
+
+    #[must_use]
+    pub fn visited_fibers(&self) -> &[ContextProviderSubtreeVisitedFiberRecord] {
+        &self.visited_fibers
+    }
+
+    #[must_use]
+    pub fn consumers(&self) -> &[ContextProviderSubtreeUseContextConsumerBeginWorkRecord] {
+        &self.consumers
+    }
+
+    #[must_use]
+    pub fn consumer_count(&self) -> usize {
+        self.consumers.len()
+    }
+}
+
 impl ContextProviderBeginWorkRecord {
     #[must_use]
     pub const fn provider(self) -> FiberId {
@@ -2421,6 +2577,19 @@ pub(crate) enum ContextProviderBeginWorkError {
         child: FiberId,
         tag: FiberTag,
     },
+    MissingSubtreeConsumer {
+        provider: FiberId,
+    },
+    SubtreeTraversalLimitExceeded {
+        provider: FiberId,
+        max_fibers: usize,
+        next_fiber: FiberId,
+    },
+    UnsupportedSubtreeFiberTag {
+        provider: FiberId,
+        fiber: FiberId,
+        tag: FiberTag,
+    },
 }
 
 impl Display for ContextProviderBeginWorkError {
@@ -2511,6 +2680,33 @@ impl Display for ContextProviderBeginWorkError {
                 child.slot().get(),
                 tag
             ),
+            Self::MissingSubtreeConsumer { provider } => write!(
+                formatter,
+                "ContextProvider fiber {} subtree traversal found no FunctionComponent consumers",
+                provider.slot().get()
+            ),
+            Self::SubtreeTraversalLimitExceeded {
+                provider,
+                max_fibers,
+                next_fiber,
+            } => write!(
+                formatter,
+                "ContextProvider fiber {} subtree traversal exceeded {} fibers before visiting {}",
+                provider.slot().get(),
+                max_fibers,
+                next_fiber.slot().get()
+            ),
+            Self::UnsupportedSubtreeFiberTag {
+                provider,
+                fiber,
+                tag,
+            } => write!(
+                formatter,
+                "ContextProvider fiber {} subtree traversal reached unsupported fiber {} with tag {:?}",
+                provider.slot().get(),
+                fiber.slot().get(),
+                tag
+            ),
         }
     }
 }
@@ -2528,7 +2724,10 @@ impl Error for ContextProviderBeginWorkError {
             | Self::MissingChild { .. }
             | Self::ProviderSiblingUnsupported { .. }
             | Self::MultipleChildren { .. }
-            | Self::UnsupportedChildTag { .. } => None,
+            | Self::UnsupportedChildTag { .. }
+            | Self::MissingSubtreeConsumer { .. }
+            | Self::SubtreeTraversalLimitExceeded { .. }
+            | Self::UnsupportedSubtreeFiberTag { .. } => None,
         }
     }
 }
@@ -4383,6 +4582,155 @@ pub(crate) fn begin_work_context_provider_use_context_single_child_for_complete_
     }
 }
 
+pub(crate) fn begin_work_context_provider_use_context_subtree(
+    arena: &mut FiberArena,
+    request: ContextProviderBeginWorkRequest,
+    context_store: &mut FunctionComponentContextRenderStore,
+    invoker: &mut impl FunctionComponentContextConsumerInvoker,
+) -> Result<ContextProviderSubtreeUseContextBeginWorkRecord, ContextProviderBeginWorkError> {
+    let provider_node = arena.get(request.provider())?;
+    let provider_tag = provider_node.tag();
+    if provider_tag != FiberTag::ContextProvider {
+        return Err(ContextProviderBeginWorkError::UnexpectedFiberTag {
+            fiber: request.provider(),
+            tag: provider_tag,
+        });
+    }
+
+    let provider_snapshot = context_store
+        .push_provider(request.context(), request.value())
+        .map_err(|error| ContextProviderBeginWorkError::ContextStack {
+            provider: request.provider(),
+            context: request.context(),
+            error: Box::new(error),
+        })?;
+    let provider_token = context_store.context_stack().snapshot().top_frame();
+    let pushed_stack_depth = context_store.stack_depth();
+
+    let traversal_result = begin_work_context_provider_use_context_subtree_children(
+        arena,
+        request,
+        context_store,
+        invoker,
+    );
+    let restore_result = context_store.restore_snapshot(provider_snapshot);
+    let restored_stack_depth = context_store.stack_depth();
+
+    match (traversal_result, restore_result) {
+        (Ok((visited_fibers, consumers)), Ok(())) => {
+            Ok(ContextProviderSubtreeUseContextBeginWorkRecord {
+                provider: request.provider(),
+                context: request.context(),
+                value: request.value(),
+                provider_snapshot,
+                provider_token,
+                pushed_stack_depth,
+                restored_stack_depth,
+                visited_fibers,
+                consumers,
+            })
+        }
+        (Ok(_), Err(error)) | (Err(_), Err(error)) => {
+            Err(ContextProviderBeginWorkError::ContextRestore {
+                provider: request.provider(),
+                context: request.context(),
+                snapshot: provider_snapshot,
+                error: Box::new(error),
+            })
+        }
+        (Err(error), Ok(())) => Err(error),
+    }
+}
+
+fn begin_work_context_provider_use_context_subtree_children(
+    arena: &mut FiberArena,
+    request: ContextProviderBeginWorkRequest,
+    context_store: &mut FunctionComponentContextRenderStore,
+    invoker: &mut impl FunctionComponentContextConsumerInvoker,
+) -> Result<
+    (
+        Vec<ContextProviderSubtreeVisitedFiberRecord>,
+        Vec<ContextProviderSubtreeUseContextConsumerBeginWorkRecord>,
+    ),
+    ContextProviderBeginWorkError,
+> {
+    let mut visited_fibers = Vec::new();
+    let mut consumers = Vec::new();
+    let mut pending = arena
+        .child_ids(request.provider())?
+        .into_iter()
+        .rev()
+        .map(|fiber| (fiber, 1))
+        .collect::<Vec<_>>();
+
+    while let Some((fiber, depth)) = pending.pop() {
+        let traversal_index = visited_fibers.len();
+        if traversal_index >= CONTEXT_PROVIDER_SUBTREE_TRAVERSAL_MAX_FIBERS {
+            return Err(
+                ContextProviderBeginWorkError::SubtreeTraversalLimitExceeded {
+                    provider: request.provider(),
+                    max_fibers: CONTEXT_PROVIDER_SUBTREE_TRAVERSAL_MAX_FIBERS,
+                    next_fiber: fiber,
+                },
+            );
+        }
+
+        let tag = arena.get(fiber)?.tag();
+        visited_fibers.push(ContextProviderSubtreeVisitedFiberRecord::new(
+            traversal_index,
+            fiber,
+            tag,
+            depth,
+        ));
+
+        match tag {
+            FiberTag::FunctionComponent => {
+                let child_begin_work = begin_work_function_component_required_use_context(
+                    arena,
+                    BeginWorkRequest::new(fiber, request.render_lanes()),
+                    context_store,
+                    request.context(),
+                    invoker,
+                )
+                .map_err(|error| {
+                    ContextProviderBeginWorkError::ChildBeginWork {
+                        provider: request.provider(),
+                        child: fiber,
+                        error: Box::new(error),
+                    }
+                })?;
+                consumers.push(ContextProviderSubtreeUseContextConsumerBeginWorkRecord {
+                    traversal_index,
+                    depth,
+                    fiber,
+                    child_begin_work,
+                });
+            }
+            FiberTag::Fragment | FiberTag::Mode | FiberTag::HostComponent => {
+                for child in arena.child_ids(fiber)?.into_iter().rev() {
+                    pending.push((child, depth + 1));
+                }
+            }
+            FiberTag::HostText => {}
+            _ => {
+                return Err(ContextProviderBeginWorkError::UnsupportedSubtreeFiberTag {
+                    provider: request.provider(),
+                    fiber,
+                    tag,
+                });
+            }
+        }
+    }
+
+    if consumers.is_empty() {
+        return Err(ContextProviderBeginWorkError::MissingSubtreeConsumer {
+            provider: request.provider(),
+        });
+    }
+
+    Ok((visited_fibers, consumers))
+}
+
 pub(crate) fn begin_work_nested_context_provider_child(
     arena: &mut FiberArena,
     request: NestedContextProviderBeginWorkRequest,
@@ -5746,6 +6094,174 @@ mod tests {
         context_store
             .restore_snapshot(record.provider_snapshot())
             .unwrap();
+        assert_eq!(context_store.current_value(context).unwrap(), default_value);
+        assert_eq!(context_store.stack_depth(), 0);
+        assert_eq!(context_store.active_provider_count(context).unwrap(), 0);
+    }
+
+    #[test]
+    fn context_provider_use_context_subtree_walks_bounded_wrappers_and_unwinds() {
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let default_value = context_value(189);
+        let provided_value = context_value(190);
+        let context = context_store.create_context(default_value);
+        let mut arena = FiberArena::new();
+        let provider = arena.create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(191),
+            FiberMode::NO,
+        );
+        let first_current = arena.create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(192),
+            FiberMode::NO,
+        );
+        let first_component = FiberTypeHandle::from_raw(193);
+        arena
+            .get_mut(first_current)
+            .unwrap()
+            .set_fiber_type(first_component);
+        let first_work_in_progress = arena
+            .create_work_in_progress(first_current, PropsHandle::from_raw(194))
+            .unwrap();
+        let fragment = arena.create_fiber(
+            FiberTag::Fragment,
+            None,
+            PropsHandle::from_raw(195),
+            FiberMode::NO,
+        );
+        let second_current = arena.create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(196),
+            FiberMode::NO,
+        );
+        let second_component = FiberTypeHandle::from_raw(197);
+        arena
+            .get_mut(second_current)
+            .unwrap()
+            .set_fiber_type(second_component);
+        let second_work_in_progress = arena
+            .create_work_in_progress(second_current, PropsHandle::from_raw(198))
+            .unwrap();
+        let host_component = arena.create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::from_raw(199),
+            FiberMode::NO,
+        );
+        let third_current = arena.create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(200),
+            FiberMode::NO,
+        );
+        let third_component = FiberTypeHandle::from_raw(201);
+        arena
+            .get_mut(third_current)
+            .unwrap()
+            .set_fiber_type(third_component);
+        let third_work_in_progress = arena
+            .create_work_in_progress(third_current, PropsHandle::from_raw(202))
+            .unwrap();
+        let text = arena.create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(203),
+            FiberMode::NO,
+        );
+        arena
+            .set_children(fragment, &[second_work_in_progress])
+            .unwrap();
+        arena
+            .set_children(host_component, &[third_work_in_progress])
+            .unwrap();
+        arena
+            .set_children(
+                provider,
+                &[first_work_in_progress, fragment, host_component, text],
+            )
+            .unwrap();
+        let mut registry = TestUseContextComponentRegistry::new(
+            first_component,
+            UseContextBehavior::ReadOnce { context },
+        );
+        registry.register(second_component, UseContextBehavior::ReadOnce { context });
+        registry.register(third_component, UseContextBehavior::ReadOnce { context });
+
+        let record = begin_work_context_provider_use_context_subtree(
+            &mut arena,
+            ContextProviderBeginWorkRequest::new(provider, Lanes::DEFAULT, context, provided_value),
+            &mut context_store,
+            &mut registry,
+        )
+        .unwrap();
+
+        assert_eq!(record.provider(), provider);
+        assert_eq!(record.context(), context);
+        assert_eq!(record.value(), provided_value);
+        assert!(record.provider_snapshot().is_root());
+        assert!(record.provider_token().is_some());
+        assert_eq!(record.pushed_stack_depth(), 1);
+        assert_eq!(record.restored_stack_depth(), 0);
+        assert_eq!(record.consumer_count(), 3);
+        assert_eq!(
+            record
+                .visited_fibers()
+                .iter()
+                .map(|visited| (
+                    visited.traversal_index(),
+                    visited.fiber(),
+                    visited.tag(),
+                    visited.depth()
+                ))
+                .collect::<Vec<_>>(),
+            vec![
+                (0, first_work_in_progress, FiberTag::FunctionComponent, 1),
+                (1, fragment, FiberTag::Fragment, 1),
+                (2, second_work_in_progress, FiberTag::FunctionComponent, 2),
+                (3, host_component, FiberTag::HostComponent, 1),
+                (4, third_work_in_progress, FiberTag::FunctionComponent, 2),
+                (5, text, FiberTag::HostText, 1),
+            ]
+        );
+        let consumers = record.consumers();
+        assert_eq!(consumers[0].fiber(), first_work_in_progress);
+        assert_eq!(consumers[0].traversal_index(), 0);
+        assert_eq!(consumers[0].depth(), 1);
+        assert_eq!(consumers[1].fiber(), second_work_in_progress);
+        assert_eq!(consumers[1].traversal_index(), 2);
+        assert_eq!(consumers[1].depth(), 2);
+        assert_eq!(consumers[2].fiber(), third_work_in_progress);
+        assert_eq!(consumers[2].traversal_index(), 4);
+        assert_eq!(consumers[2].depth(), 2);
+        assert_eq!(
+            registry
+                .calls()
+                .iter()
+                .map(|request| request.fiber())
+                .collect::<Vec<_>>(),
+            vec![
+                first_work_in_progress,
+                second_work_in_progress,
+                third_work_in_progress
+            ]
+        );
+        for (consumer, read) in consumers.iter().zip(registry.reads()) {
+            assert_eq!(consumer.child_context_read(), *read);
+            assert_eq!(read.context(), context);
+            assert_eq!(read.value(), provided_value);
+            assert_eq!(read.active_provider_count(), 1);
+        }
+        assert_eq!(context_store.context_dependencies().len(), 3);
+        for dependency in context_store.context_dependencies() {
+            assert_eq!(dependency.context(), context);
+            assert_eq!(dependency.memoized_value(), provided_value);
+            assert!(!dependency.renderer_visible_propagation());
+            assert_eq!(dependency.propagation_flags(), FiberFlags::NO);
+        }
         assert_eq!(context_store.current_value(context).unwrap(), default_value);
         assert_eq!(context_store.stack_depth(), 0);
         assert_eq!(context_store.active_provider_count(context).unwrap(), 0);
