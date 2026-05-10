@@ -84,7 +84,7 @@ test("React DOM public root facade gate blocks placeholders while oracle prerequ
     REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ADMISSIONS.filter(
       (admission) => Number(admission.workerId) >= 503
     ).length,
-    12
+    13
   );
   const privateMetadataBlockedRow = gate.blockedPublicFacadeRows.find(
     (row) =>
@@ -521,6 +521,8 @@ test("React DOM client private facade adapter is symbol-only and routes to priva
     },
     type: "span"
   });
+  const renderPayload =
+    rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(render);
   const unmount = root.unmount();
 
   assert.equal(
@@ -531,14 +533,18 @@ test("React DOM client private facade adapter is symbol-only and routes to priva
   assert.equal(adapter.publicHydrateRootEnabled, false);
   assert.equal(adapter.compatibilityClaimed, false);
   assert.equal(create.requestType, "createRoot");
-  assert.equal(render.requestType, "root.render");
+  assert.equal(
+    render.diagnosticStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_APPLIED
+  );
+  assert.equal(renderPayload.renderRecord.requestType, "root.render");
   assert.equal(unmount.requestType, "root.unmount");
   assert.equal(create.requestId, "facade-conformance-request:1");
-  assert.equal(render.updateId, "facade-conformance-update:1");
+  assert.equal(renderPayload.renderRecord.updateId, "facade-conformance-update:1");
   assert.equal(unmount.updateId, "facade-conformance-update:2");
   assert.deepEqual(adapter.getRootRequestRecords(root), [
     create,
-    render,
+    renderPayload.renderRecord,
     unmount
   ]);
   assert.equal(rootBridge.getPrivateRootPublicFacadeRootPayload(root).root, root);
@@ -551,7 +557,10 @@ test("React DOM client private facade adapter is symbol-only and routes to priva
   assert.equal(listenerRegistry.hasListeningMarker(document), false);
   assert.equal(container.__registrations.length, 0);
   assert.equal(document.__registrations.length, 0);
-  assert.equal(container.__mutationLog.length, 0);
+  assert.deepEqual(
+    container.__mutationLog.map((entry) => entry.type),
+    ["appendChild", "removeChild"]
+  );
   assert.equal(document.__mutationLog.length, 0);
 
   const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
@@ -1282,7 +1291,10 @@ test("React DOM client private facade unmount cleanup stays private and non-comp
       "create-render-admission",
       "fake-dom-host-output-mutation",
       "fake-dom-unmount-cleanup",
+      "root-unmount-admission-metadata",
+      "fake-dom-container-cleanup-metadata",
       "component-tree-metadata-detach",
+      "root-facade-metadata-clear",
       "latest-props-publication"
     ]
   );
@@ -1309,6 +1321,12 @@ test("React DOM client private facade unmount cleanup stays private and non-comp
   assert.equal(diagnostic.browserDomMutation, false);
   assert.equal(diagnostic.rootContainerChildrenCleared, true);
   assert.equal(diagnostic.componentTreeMetadataDetached, true);
+  assert.equal(
+    diagnostic.rootMetadataCleanupStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_ROOT_UNMOUNT_METADATA_CLEARED
+  );
+  assert.equal(diagnostic.rootCreateRenderAdmissionMetadataCleared, true);
+  assert.equal(diagnostic.activeHostOutputMetadataCleared, true);
   assert.equal(diagnostic.compatibilityClaimed, false);
   assert.equal(diagnostic.cleanupRequired, false);
   assert.equal(

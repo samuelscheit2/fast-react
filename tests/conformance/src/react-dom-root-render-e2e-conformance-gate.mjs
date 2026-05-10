@@ -8067,6 +8067,8 @@ function runPrivateReactDomMetadataHostOutputUnmountCleanupDiagnostic({
   const adapter = descriptor.value({
     createRenderAdmissionIdPrefix: `${mode.id}:metadata-facade-unmount-admission`,
     initialHostOutputIdPrefix: `${mode.id}:metadata-facade-unmount-initial`,
+    publicFacadeHostOutputRenderIdPrefix:
+      `${mode.id}:metadata-facade-unmount-render`,
     publicFacadeHostOutputUnmountCleanupIdPrefix:
       `${mode.id}:metadata-facade-unmount-diagnostic`,
     requestIdPrefix: `${mode.id}:metadata-facade-unmount-request`,
@@ -8076,17 +8078,21 @@ function runPrivateReactDomMetadataHostOutputUnmountCleanupDiagnostic({
     updateIdPrefix: `${mode.id}:metadata-facade-unmount-update`
   });
   const root = adapter.createRoot(container);
-  const diagnostic = adapter.unmountHostOutput(root, {
+  adapter.renderHostOutput(root, {
     props: {
       children: "facade cleanup",
       id: "facade-cleanup-host"
     },
     type: "section"
   });
+  const unmountRecord = root.unmount();
+  const [diagnostic] = adapter.getRootHostOutputUnmountCleanupDiagnostics(root);
   const payload =
     modules.rootBridge.getPrivateRootPublicFacadeHostOutputUnmountCleanupPayload(
       diagnostic
     );
+  const rootPayload =
+    modules.rootBridge.getPrivateRootPublicFacadeRootPayload(root);
 
   return {
     acceptedCapabilityIds: diagnostic.acceptedCapabilities.map(
@@ -8097,19 +8103,31 @@ function runPrivateReactDomMetadataHostOutputUnmountCleanupDiagnostic({
     ),
     browserDomMutation: diagnostic.browserDomMutation,
     cleanupRequired: diagnostic.cleanupRequired,
+    cleanupSource: diagnostic.cleanupSource,
     compatibilityClaimed: diagnostic.compatibilityClaimed,
     componentTreeMetadataDetached: diagnostic.componentTreeMetadataDetached,
     containerChildCountAfterUnmount: container.childNodes.length,
     diagnosticStatus: diagnostic.diagnosticStatus,
+    rootCreateRenderAdmissionMetadataCleared:
+      diagnostic.rootCreateRenderAdmissionMetadataCleared,
+    rootCreateRenderAdmissionActiveAfterUnmount:
+      rootPayload.rootCreateRenderAdmissionActive,
     publicRootCompatibilitySurface: diagnostic.publicRootCompatibilitySurface,
     publicRootExecution: diagnostic.publicRootExecution,
     publicRootUnmounted: diagnostic.publicRootUnmounted,
+    activeHostOutputMetadataCleared: diagnostic.activeHostOutputMetadataCleared,
+    activeHostOutputRenderRecordCountAfterUnmount:
+      rootPayload.activeHostOutputRenderRecordCount,
+    hostOutputHandoffActiveAfterCleanup:
+      diagnostic.hostOutputHandoffActiveAfterCleanup,
     rootContainerChildrenCleared: diagnostic.rootContainerChildrenCleared,
     rootMarkerCleared: modules.rootMarkers.getContainerRoot(container) === null,
     rootRegistrationsCleared:
       container.__registrations.length === 0 &&
       document.__registrations.length === 0,
+    rootMetadataCleanupStatus: diagnostic.rootMetadataCleanupStatus,
     unmountCleanupStatus: payload.unmountCleanupRecord.cleanupStatus,
+    unmountRecordNoOp: unmountRecord.noOp,
     unmountNoOp: diagnostic.unmountNoOp
   };
 }
@@ -12800,6 +12818,7 @@ function expectedPrivateReactDomMetadataEvidence(metadataId) {
           "root-unmount-admission-metadata",
           "fake-dom-container-cleanup-metadata",
           "component-tree-metadata-detach",
+          "root-facade-metadata-clear",
           "latest-props-publication"
         ],
         blockedCapabilityIds: [
@@ -12815,18 +12834,27 @@ function expectedPrivateReactDomMetadataEvidence(metadataId) {
         ],
         browserDomMutation: false,
         cleanupRequired: false,
+        cleanupSource: "root.unmount",
         compatibilityClaimed: false,
         componentTreeMetadataDetached: true,
         containerChildCountAfterUnmount: 0,
         diagnosticStatus:
           "cleaned-private-root-public-facade-host-output-unmount-cleanup-diagnostic",
+        rootCreateRenderAdmissionMetadataCleared: true,
+        rootCreateRenderAdmissionActiveAfterUnmount: false,
         publicRootCompatibilitySurface: false,
         publicRootExecution: false,
         publicRootUnmounted: false,
+        activeHostOutputMetadataCleared: true,
+        activeHostOutputRenderRecordCountAfterUnmount: 0,
+        hostOutputHandoffActiveAfterCleanup: false,
         rootContainerChildrenCleared: true,
         rootMarkerCleared: true,
         rootRegistrationsCleared: true,
+        rootMetadataCleanupStatus:
+          "cleared-private-root-public-facade-unmount-metadata",
         unmountCleanupStatus: "cleaned-private-root-unmount-host-output",
+        unmountRecordNoOp: false,
         unmountNoOp: false
       };
     case "worker-513-event-type-dispatch-canary":
