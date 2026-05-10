@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import test from "node:test";
 
 import {
@@ -28,6 +29,7 @@ import {
 } from "../src/react-test-renderer-serialization-local-gate.mjs";
 
 const oracle = readCheckedReactTestRendererErrorSurfaceOracle();
+const require = createRequire(import.meta.url);
 const DEFAULT_MODE = "default-node-development";
 const DEPRECATION_WARNING =
   "react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer";
@@ -47,6 +49,25 @@ const ERROR_SURFACE_PUBLIC_UNBLOCK_REQUIREMENT_IDS =
   REACT_TEST_RENDERER_ERROR_SURFACE_PUBLIC_UNBLOCKING_REQUIREMENTS.map(
     (requirement) => requirement.id
   );
+const privateTestInstanceWrapperRecordSymbol = Symbol.for(
+  "fast.react_test_renderer.private_test_instance_wrapper_record"
+);
+const jsEntrypoints = [
+  {
+    entrypoint: "react-test-renderer",
+    specifier: "../../../packages/react-test-renderer/index.js"
+  },
+  {
+    entrypoint: "react-test-renderer/cjs/react-test-renderer.development",
+    specifier:
+      "../../../packages/react-test-renderer/cjs/react-test-renderer.development.js"
+  },
+  {
+    entrypoint: "react-test-renderer/cjs/react-test-renderer.production",
+    specifier:
+      "../../../packages/react-test-renderer/cjs/react-test-renderer.production.js"
+  }
+];
 
 test("checked React test renderer error surface oracle artifact has the expected schema and targets", () => {
   assert.equal(
@@ -229,6 +250,83 @@ test("React test renderer error surface local gate admits only private diagnosti
   assert.equal(gate.localChecks.publicToJSONAvailable, false);
   assert.equal(gate.localChecks.publicToTreeAvailable, false);
   assert.equal(gate.localChecks.publicTestInstanceWrappersPresent, false);
+});
+
+test("React test renderer error surface gate keeps multi-child TestInstance query metadata private", () => {
+  const gate = evaluateReactTestRendererErrorSurfaceLocalGate({ oracle });
+
+  assert.equal(
+    gate.localChecks.privateRecordOnlyTestInstanceQueryPathPresent,
+    true
+  );
+  assert.equal(gate.localChecks.publicTestInstanceErrorSurfaceBlocked, true);
+  assert.equal(gate.localChecks.publicTestInstanceWrappersPresent, false);
+
+  for (const entry of jsEntrypoints) {
+    const moduleExports = loadFresh(entry.specifier);
+    const renderer = moduleExports.create({ type: "multi-child-private" });
+    const descriptor = Object.getOwnPropertyDescriptor(
+      renderer,
+      privateTestInstanceWrapperRecordSymbol
+    );
+
+    assert.notEqual(descriptor, undefined, entry.entrypoint);
+    assert.equal(descriptor.enumerable, false, entry.entrypoint);
+    const record = descriptor.value;
+    assert.equal(record.publicRootAvailable, false, entry.entrypoint);
+    assert.equal(record.publicQueryMethodsAvailable, false, entry.entrypoint);
+    assert.equal(
+      record.publicTestInstanceObjectAvailable,
+      false,
+      entry.entrypoint
+    );
+    assert.equal(record.multiChildHostTree.rootChildCount, 2, entry.entrypoint);
+    assert.equal(
+      record.multiChildHostTree.publicRootAccessAvailable,
+      false,
+      entry.entrypoint
+    );
+    assert.deepEqual(
+      record.queryPath.map((inspection) => inspection.fiberTag),
+      ["HostRoot", "HostComponent"],
+      entry.entrypoint
+    );
+    assert.deepEqual(
+      record.queryMethodRecords.findAll.skippedRecords.map(
+        (inspection) => inspection.text
+      ),
+      ["first sibling", "second sibling"],
+      entry.entrypoint
+    );
+    assert.equal(
+      record.queryMethodRecords.findAll.expectedCanaryMatchCount,
+      2,
+      entry.entrypoint
+    );
+    assert.equal(
+      record.queryMethodRecords.findAllByType.expectedCanaryMatchCount,
+      1,
+      entry.entrypoint
+    );
+    assert.deepEqual(
+      record.rootQueryRecord.result.children.map((child) => child.fiberTag),
+      ["HostText", "HostComponent"],
+      entry.entrypoint
+    );
+    assert.equal(
+      Object.hasOwn(record.rootQueryRecord.result, "findAll"),
+      false,
+      entry.entrypoint
+    );
+
+    const rootError = captureThrown(() => renderer.root);
+    assert.equal(rootError.exportName, "create().root", entry.entrypoint);
+    assert.equal(
+      rootError.routingGate.privateTestInstanceWrapperSkeleton,
+      record,
+      entry.entrypoint
+    );
+  }
 });
 
 test("React test renderer error surface local gate rejects every public compatibility claim source", () => {
@@ -516,6 +614,22 @@ function consoleMessages(modeId, scenarioId) {
     assert.equal(call.args[0].type, "string");
     return call.args[0].value;
   });
+}
+
+function loadFresh(specifier) {
+  const resolved = require.resolve(specifier);
+  delete require.cache[resolved];
+  return require(resolved);
+}
+
+function captureThrown(callback) {
+  try {
+    callback();
+  } catch (error) {
+    return error;
+  }
+
+  assert.fail("Expected callback to throw");
 }
 
 function assertThrows(operation, expectedMessage) {

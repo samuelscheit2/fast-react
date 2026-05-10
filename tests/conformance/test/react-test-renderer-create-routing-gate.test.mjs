@@ -1504,9 +1504,18 @@ function assertPrivateTestInstanceWrapperSkeleton(record, entrypoint) {
     "HostComponent",
     "HostText"
   ]);
+  assert.deepEqual(fiberInspection.privateQueryShape, [
+    "HostRoot",
+    "HostText",
+    "HostComponent",
+    "HostText"
+  ]);
+  assertMultiChildHostTree(fiberInspection.multiChildHostTree, entrypoint);
+  assert.equal(fiberInspection.multiChildHostTree, record.multiChildHostTree);
   assert.equal(fiberInspection.exposesHostNodes, false, entrypoint);
   assert.equal(fiberInspection.mutatesFibers, false, entrypoint);
 
+  assertMultiChildHostTree(record.multiChildHostTree, entrypoint);
   assertAcceptedInspectionRecords(record, entrypoint);
   assertPrivateQueryTraversal(record, entrypoint);
 
@@ -1515,31 +1524,74 @@ function assertPrivateTestInstanceWrapperSkeleton(record, entrypoint) {
     "root",
     "type",
     "props",
-    "children"
+    "children",
+    "hostComponentType",
+    "hostComponentProps",
+    "hostComponentChildren"
   ]);
   assert.equal(record.rootQueryRecord, record.queryRecords.root, entrypoint);
   assertPrivateQueryRecord(
     record.queryRecords.root,
-    "root",
-    "react-test-renderer-private-test-instance-root-query",
+    {
+      fiberTag: "HostRoot",
+      id: "react-test-renderer-private-test-instance-root-query",
+      query: "root",
+      source: "ReactTestRenderer.js create().root multi-child HostRoot branch"
+    },
     entrypoint
   );
   assertPrivateQueryRecord(
     record.queryRecords.type,
-    "type",
-    "react-test-renderer-private-test-instance-type-query",
+    {
+      fiberTag: "HostRoot",
+      id: "react-test-renderer-private-test-instance-host-root-type-query",
+      query: "type"
+    },
     entrypoint
   );
   assertPrivateQueryRecord(
     record.queryRecords.props,
-    "props",
-    "react-test-renderer-private-test-instance-props-query",
+    {
+      fiberTag: "HostRoot",
+      id: "react-test-renderer-private-test-instance-host-root-props-query",
+      query: "props"
+    },
     entrypoint
   );
   assertPrivateQueryRecord(
     record.queryRecords.children,
-    "children",
-    "react-test-renderer-private-test-instance-children-query",
+    {
+      fiberTag: "HostRoot",
+      id: "react-test-renderer-private-test-instance-host-root-children-query",
+      query: "children"
+    },
+    entrypoint
+  );
+  assertPrivateQueryRecord(
+    record.queryRecords.hostComponentType,
+    {
+      fiberTag: "HostComponent",
+      id: "react-test-renderer-private-test-instance-type-query",
+      query: "type"
+    },
+    entrypoint
+  );
+  assertPrivateQueryRecord(
+    record.queryRecords.hostComponentProps,
+    {
+      fiberTag: "HostComponent",
+      id: "react-test-renderer-private-test-instance-props-query",
+      query: "props"
+    },
+    entrypoint
+  );
+  assertPrivateQueryRecord(
+    record.queryRecords.hostComponentChildren,
+    {
+      fiberTag: "HostComponent",
+      id: "react-test-renderer-private-test-instance-children-query",
+      query: "children"
+    },
     entrypoint
   );
 
@@ -1552,25 +1604,65 @@ function assertPrivateTestInstanceWrapperSkeleton(record, entrypoint) {
   );
   assert.equal(rootRecord.kind, "ReactTestInstancePrivateRecord", entrypoint);
   assert.equal(rootRecord.publicObject, false, entrypoint);
-  assert.equal(rootRecord.fiberTag, "HostComponent", entrypoint);
+  assert.equal(rootRecord.fiberTag, "HostRoot", entrypoint);
   assert.equal(rootRecord.inspectionRecord, record.queryPath[0], entrypoint);
-  assert.equal(rootRecord.type, "span", entrypoint);
-  assert.equal(Object.isFrozen(rootRecord.props), true, entrypoint);
-  assert.deepEqual(rootRecord.props, {});
+  assert.equal(rootRecord.type, null, entrypoint);
+  assert.equal(rootRecord.props, null, entrypoint);
   assert.equal(Object.isFrozen(rootRecord.children), true, entrypoint);
-  assert.equal(rootRecord.children.length, 1, entrypoint);
+  assert.equal(rootRecord.children.length, 2, entrypoint);
   assert.equal(rootRecord.queryRecords.type, record.queryRecords.type);
   assert.equal(rootRecord.queryRecords.props, record.queryRecords.props);
   assert.equal(rootRecord.queryRecords.children, record.queryRecords.children);
 
-  const textChild = rootRecord.children[0];
-  assert.equal(Object.isFrozen(textChild), true, entrypoint);
-  assert.deepEqual(textChild, {
-    id: "react-test-renderer-private-test-instance-host-text-child",
+  const rootTextChild = rootRecord.children[0];
+  assert.equal(Object.isFrozen(rootTextChild), true, entrypoint);
+  assert.deepEqual(rootTextChild, {
+    id: "react-test-renderer-private-test-instance-root-host-text-child",
     kind: "ReactTestInstancePrivateTextChildRecord",
     fiberTag: "HostText",
     source: "TestRendererCommittedFiberTreeInspection::host_text",
-    text: "hello",
+    text: "first sibling",
+    publicObject: false
+  });
+
+  const hostComponent = rootRecord.children[1];
+  assert.equal(Object.isFrozen(hostComponent), true, entrypoint);
+  assert.equal(
+    hostComponent.id,
+    "react-test-renderer-private-test-instance-host-component-record",
+    entrypoint
+  );
+  assert.equal(hostComponent.kind, "ReactTestInstancePrivateRecord", entrypoint);
+  assert.equal(hostComponent.publicObject, false, entrypoint);
+  assert.equal(hostComponent.fiberTag, "HostComponent", entrypoint);
+  assert.equal(
+    hostComponent.inspectionRecord,
+    record.hostComponentQueryPath[0],
+    entrypoint
+  );
+  assert.equal(hostComponent.type, "span", entrypoint);
+  assert.equal(Object.isFrozen(hostComponent.props), true, entrypoint);
+  assert.deepEqual(hostComponent.props, {});
+  assert.equal(Object.isFrozen(hostComponent.children), true, entrypoint);
+  assert.equal(hostComponent.children.length, 1, entrypoint);
+  assert.equal(
+    hostComponent.queryRecords.type,
+    record.queryRecords.hostComponentType
+  );
+  assert.equal(
+    hostComponent.queryRecords.props,
+    record.queryRecords.hostComponentProps
+  );
+  assert.equal(
+    hostComponent.queryRecords.children,
+    record.queryRecords.hostComponentChildren
+  );
+  assert.deepEqual(hostComponent.children[0], {
+    id: "react-test-renderer-private-test-instance-nested-host-text-child",
+    kind: "ReactTestInstancePrivateTextChildRecord",
+    fiberTag: "HostText",
+    source: "TestRendererCommittedFiberTreeInspection::host_text",
+    text: "second sibling",
     publicObject: false
   });
 
@@ -1580,7 +1672,51 @@ function assertPrivateTestInstanceWrapperSkeleton(record, entrypoint) {
       false,
       `${entrypoint} ${queryName}`
     );
+    assert.equal(
+      Object.hasOwn(hostComponent, queryName),
+      false,
+      `${entrypoint} component ${queryName}`
+    );
   }
+}
+
+function assertMultiChildHostTree(tree, entrypoint) {
+  assert.equal(Object.isFrozen(tree), true, entrypoint);
+  assert.equal(
+    tree.id,
+    "react-test-renderer-private-test-instance-multi-child-host-tree",
+    entrypoint
+  );
+  assert.equal(
+    tree.status,
+    "private-multi-child-query-metadata-ready-public-root-blocked",
+    entrypoint
+  );
+  assert.equal(
+    tree.acceptedWorker,
+    "worker-350-root-work-loop-complete-work-multiple-child-handoff",
+    entrypoint
+  );
+  assert.equal(tree.acceptedRustModule, "host_work/root_work_loop", entrypoint);
+  assert.deepEqual(tree.acceptedRustApis, [
+    "mount_test_host_sibling_work",
+    "handoff_completed_host_root_render_to_test_complete_work_for_siblings"
+  ]);
+  assert.deepEqual(tree.acceptedRustTests, [
+    "host_work_mounts_multiple_host_root_siblings_under_host_root_wip",
+    "root_work_loop_hands_multiple_host_siblings_to_test_complete_work",
+    "root_work_loop_multiple_sibling_handoff_preserves_fragment_portal_suspense_blockers"
+  ]);
+  assert.equal(tree.rootChildCount, 2, entrypoint);
+  assert.equal(tree.completedChildCount, 2, entrypoint);
+  assert.equal(tree.queryCandidateCount, 2, entrypoint);
+  assert.equal(tree.skippedTextRecordCount, 2, entrypoint);
+  assert.equal(tree.rootWrapperMaterializedForPrivateMetadata, true, entrypoint);
+  assert.equal(tree.publicRootAccessAvailable, false, entrypoint);
+  assert.equal(tree.publicTestInstanceObjectAvailable, false, entrypoint);
+  assert.equal(tree.nativeBridgeAvailable, false, entrypoint);
+  assert.equal(tree.nativeExecution, false, entrypoint);
+  assert.equal(tree.compatibilityClaimed, false, entrypoint);
 }
 
 function assertAcceptedInspectionRecords(record, entrypoint) {
@@ -1593,30 +1729,63 @@ function assertAcceptedInspectionRecords(record, entrypoint) {
     record.acceptedInspectionRecords.map((inspection) => inspection.id),
     [
       "react-test-renderer-private-test-instance-inspection-host-root",
+      "react-test-renderer-private-test-instance-inspection-root-host-text",
       "react-test-renderer-private-test-instance-inspection-host-component",
       "react-test-renderer-private-test-instance-inspection-host-text"
     ],
     entrypoint
   );
 
-  const [hostRoot, hostComponent, hostText] = record.acceptedInspectionRecords;
+  const [hostRoot, rootText, hostComponent, hostText] =
+    record.acceptedInspectionRecords;
   assertPrivateInspectionRecord(hostRoot, {
     childRecord:
-      "react-test-renderer-private-test-instance-inspection-host-component",
+      "react-test-renderer-private-test-instance-inspection-root-host-text",
+    index: 0,
     fiberTag: "HostRoot",
     parentRecord: null,
     path: ["HostRoot"],
-    queryCandidate: false,
+    queryCandidate: true,
+    siblingRecord: null,
     source: "TestRendererCommittedFiberTreeInspection::host_root",
+    wrapperEligible: true
+  }, entrypoint);
+  assert.deepEqual(hostRoot.childRecords, [
+    "react-test-renderer-private-test-instance-inspection-root-host-text",
+    "react-test-renderer-private-test-instance-inspection-host-component"
+  ]);
+  assert.equal(hostRoot.rootChildCount, 2, entrypoint);
+  assert.equal(
+    hostRoot.wrapperEligibilityReason,
+    "ReactTestRenderer.js materializes HostRoot when root has multiple children",
+    entrypoint
+  );
+
+  assertPrivateInspectionRecord(rootText, {
+    childRecord: null,
+    index: 0,
+    fiberTag: "HostText",
+    parentRecord:
+      "react-test-renderer-private-test-instance-inspection-host-root",
+    path: ["HostRoot", "HostText[0]"],
+    queryCandidate: false,
+    siblingRecord:
+      "react-test-renderer-private-test-instance-inspection-host-component",
+    source: "TestRendererCommittedFiberTreeInspection::host_text",
     wrapperEligible: false
   }, entrypoint);
+  assert.equal(rootText.text, "first sibling", entrypoint);
+  assert.equal(rootText.skippedByQueryTraversal, true, entrypoint);
+
   assertPrivateInspectionRecord(hostComponent, {
     childRecord: "react-test-renderer-private-test-instance-inspection-host-text",
+    index: 1,
     fiberTag: "HostComponent",
     parentRecord:
       "react-test-renderer-private-test-instance-inspection-host-root",
-    path: ["HostRoot", "HostComponent"],
+    path: ["HostRoot", "HostComponent[1]"],
     queryCandidate: true,
+    siblingRecord: null,
     source: "TestRendererCommittedFiberTreeInspection::host_component",
     wrapperEligible: true
   }, entrypoint);
@@ -1631,19 +1800,25 @@ function assertAcceptedInspectionRecords(record, entrypoint) {
     entrypoint
   );
   assert.equal(hostComponent.type, "span", entrypoint);
-  assert.equal(hostComponent.props, record.queryRecords.props.value, entrypoint);
+  assert.equal(
+    hostComponent.props,
+    record.queryRecords.hostComponentProps.value,
+    entrypoint
+  );
 
   assertPrivateInspectionRecord(hostText, {
     childRecord: null,
+    index: 0,
     fiberTag: "HostText",
     parentRecord:
       "react-test-renderer-private-test-instance-inspection-host-component",
-    path: ["HostRoot", "HostComponent", "HostText"],
+    path: ["HostRoot", "HostComponent[1]", "HostText"],
     queryCandidate: false,
+    siblingRecord: null,
     source: "TestRendererCommittedFiberTreeInspection::host_text",
     wrapperEligible: false
   }, entrypoint);
-  assert.equal(hostText.text, "hello", entrypoint);
+  assert.equal(hostText.text, "second sibling", entrypoint);
   assert.equal(hostText.skippedByQueryTraversal, true, entrypoint);
 }
 
@@ -1652,10 +1827,10 @@ function assertPrivateInspectionRecord(record, expected, entrypoint) {
   assert.equal(record.kind, "TestRendererCommittedFiberNodeInspection", entrypoint);
   assert.equal(record.source, expected.source, entrypoint);
   assert.equal(record.fiberTag, expected.fiberTag, entrypoint);
-  assert.equal(record.index, 0, entrypoint);
+  assert.equal(record.index, expected.index, entrypoint);
   assert.equal(record.parentRecord, expected.parentRecord, entrypoint);
   assert.equal(record.childRecord, expected.childRecord, entrypoint);
-  assert.equal(record.siblingRecord, null, entrypoint);
+  assert.equal(record.siblingRecord, expected.siblingRecord, entrypoint);
   assert.equal(Object.isFrozen(record.path), true, entrypoint);
   assert.deepEqual(record.path, expected.path, entrypoint);
   assert.equal(record.wrapperEligible, expected.wrapperEligible, entrypoint);
@@ -1677,10 +1852,17 @@ function assertPrivateQueryTraversal(record, entrypoint) {
     entrypoint
   );
   assert.equal(traversal.traversalOrder, "self-then-descendants", entrypoint);
-  assert.equal(traversal.rootCandidateCount, 1, entrypoint);
-  assert.equal(traversal.acceptedCandidateCount, 1, entrypoint);
-  assert.equal(traversal.skippedTextChildCount, 1, entrypoint);
+  assert.equal(traversal.rootChildCount, 2, entrypoint);
+  assert.equal(traversal.rootCandidateCount, 2, entrypoint);
+  assert.equal(traversal.acceptedCandidateCount, 2, entrypoint);
+  assert.equal(traversal.skippedTextChildCount, 2, entrypoint);
   assert.equal(traversal.textChildrenSkipped, true, entrypoint);
+  assert.equal(
+    traversal.rootWrapperMaterializedForPrivateMetadata,
+    true,
+    entrypoint
+  );
+  assert.equal(traversal.multiChildHostTree, record.multiChildHostTree);
   assert.equal(traversal.publicQueryMethodsAvailable, false, entrypoint);
   assert.equal(traversal.predicateExecution, false, entrypoint);
   assert.equal(traversal.nativeBridgeAvailable, false, entrypoint);
@@ -1689,25 +1871,44 @@ function assertPrivateQueryTraversal(record, entrypoint) {
   assert.equal(Object.isFrozen(record.queryPath), true, entrypoint);
   assert.deepEqual(
     record.queryPath.map((inspection) => inspection.id),
+    [
+      "react-test-renderer-private-test-instance-inspection-host-root",
+      "react-test-renderer-private-test-instance-inspection-host-component"
+    ],
+    entrypoint
+  );
+  assert.equal(record.queryPath[0], record.acceptedInspectionRecords[0], entrypoint);
+  assert.equal(record.queryPath[1], record.acceptedInspectionRecords[2], entrypoint);
+  assert.equal(Object.isFrozen(record.hostComponentQueryPath), true, entrypoint);
+  assert.deepEqual(
+    record.hostComponentQueryPath.map((inspection) => inspection.id),
     ["react-test-renderer-private-test-instance-inspection-host-component"],
     entrypoint
   );
-  assert.equal(record.queryPath[0], record.acceptedInspectionRecords[1], entrypoint);
+  assert.equal(
+    record.hostComponentQueryPath[0],
+    record.acceptedInspectionRecords[2],
+    entrypoint
+  );
 
   assert.equal(Object.isFrozen(record.queryMethodRecords), true, entrypoint);
   assert.deepEqual(Object.keys(record.queryMethodRecords), testInstanceQuerySurfaceNames);
   assertPrivateQueryMethodRecord(record.queryMethodRecords.find, {
     basedOn: record.queryMethodRecords.findAll.id,
+    candidateRecords: record.queryPath,
     effectiveDeep: false,
     expectOne: true,
+    expectedCanaryMatchCount: 2,
     id: "react-test-renderer-private-test-instance-find-query",
     publicSurface: "ReactTestInstance.find",
     query: "find",
     resultKind: "single"
   }, record, entrypoint);
   assertPrivateQueryMethodRecord(record.queryMethodRecords.findAll, {
+    candidateRecords: record.queryPath,
     defaultDeep: true,
     effectiveDeep: true,
+    expectedCanaryMatchCount: 2,
     id: "react-test-renderer-private-test-instance-find-all-query",
     publicSurface: "ReactTestInstance.findAll",
     query: "findAll",
@@ -1715,41 +1916,59 @@ function assertPrivateQueryTraversal(record, entrypoint) {
   }, record, entrypoint);
   assertPrivateQueryMethodRecord(record.queryMethodRecords.findByType, {
     basedOn: record.queryMethodRecords.findAllByType.id,
+    candidateRecords: record.hostComponentQueryPath,
     criteria: { kind: "type", value: "span" },
     effectiveDeep: false,
     expectOne: true,
+    expectedCanaryMatchCount: 1,
     id: "react-test-renderer-private-test-instance-find-by-type-query",
     publicSurface: "ReactTestInstance.findByType",
     query: "findByType",
-    resultKind: "single"
+    resultKind: "single",
+    traversedCandidateRecords: record.queryPath
   }, record, entrypoint);
   assertPrivateQueryMethodRecord(record.queryMethodRecords.findAllByType, {
+    candidateRecords: record.hostComponentQueryPath,
     criteria: { kind: "type", value: "span" },
     defaultDeep: true,
     effectiveDeep: true,
+    expectedCanaryMatchCount: 1,
     id: "react-test-renderer-private-test-instance-find-all-by-type-query",
     publicSurface: "ReactTestInstance.findAllByType",
     query: "findAllByType",
-    resultKind: "array"
+    resultKind: "array",
+    traversedCandidateRecords: record.queryPath
   }, record, entrypoint);
   assertPrivateQueryMethodRecord(record.queryMethodRecords.findByProps, {
     basedOn: record.queryMethodRecords.findAllByProps.id,
-    criteria: { kind: "props", value: record.queryRecords.props.value },
+    candidateRecords: record.hostComponentQueryPath,
+    criteria: {
+      kind: "props",
+      value: record.queryRecords.hostComponentProps.value
+    },
     effectiveDeep: false,
     expectOne: true,
+    expectedCanaryMatchCount: 1,
     id: "react-test-renderer-private-test-instance-find-by-props-query",
     publicSurface: "ReactTestInstance.findByProps",
     query: "findByProps",
-    resultKind: "single"
+    resultKind: "single",
+    traversedCandidateRecords: record.queryPath
   }, record, entrypoint);
   assertPrivateQueryMethodRecord(record.queryMethodRecords.findAllByProps, {
-    criteria: { kind: "props", value: record.queryRecords.props.value },
+    candidateRecords: record.hostComponentQueryPath,
+    criteria: {
+      kind: "props",
+      value: record.queryRecords.hostComponentProps.value
+    },
     defaultDeep: true,
     effectiveDeep: true,
+    expectedCanaryMatchCount: 1,
     id: "react-test-renderer-private-test-instance-find-all-by-props-query",
     publicSurface: "ReactTestInstance.findAllByProps",
     query: "findAllByProps",
-    resultKind: "array"
+    resultKind: "array",
+    traversedCandidateRecords: record.queryPath
   }, record, entrypoint);
 }
 
@@ -1766,19 +1985,45 @@ function assertPrivateQueryMethodRecord(queryRecord, expected, owner, entrypoint
   assert.equal(queryRecord.deterministic, true, entrypoint);
   assert.equal(queryRecord.resultKind, expected.resultKind, entrypoint);
   assert.equal(queryRecord.effectiveDeep, expected.effectiveDeep, entrypoint);
-  assert.equal(queryRecord.expectedCanaryMatchCount, 1, entrypoint);
-  assert.equal(queryRecord.candidateRecords, owner.queryPath, entrypoint);
+  assert.equal(
+    queryRecord.expectedCanaryMatchCount,
+    expected.expectedCanaryMatchCount,
+    entrypoint
+  );
+  assert.equal(queryRecord.candidateRecords, expected.candidateRecords, entrypoint);
+  if (expected.traversedCandidateRecords !== undefined) {
+    assert.equal(
+      queryRecord.traversedCandidateRecords,
+      expected.traversedCandidateRecords,
+      entrypoint
+    );
+  } else {
+    assert.equal(
+      Object.hasOwn(queryRecord, "traversedCandidateRecords"),
+      false,
+      entrypoint
+    );
+  }
   assert.equal(Object.isFrozen(queryRecord.skippedRecords), true, entrypoint);
   assert.deepEqual(
     queryRecord.skippedRecords.map((inspection) => inspection.id),
-    ["react-test-renderer-private-test-instance-inspection-host-text"],
+    [
+      "react-test-renderer-private-test-instance-inspection-root-host-text",
+      "react-test-renderer-private-test-instance-inspection-host-text"
+    ],
     entrypoint
   );
   assert.equal(
     queryRecord.skippedRecords[0],
-    owner.acceptedInspectionRecords[2],
+    owner.acceptedInspectionRecords[1],
     entrypoint
   );
+  assert.equal(
+    queryRecord.skippedRecords[1],
+    owner.acceptedInspectionRecords[3],
+    entrypoint
+  );
+  assert.equal(queryRecord.multiChildHostTree, owner.multiChildHostTree);
   assert.equal(queryRecord.publicQueryMethodAvailable, false, entrypoint);
   assert.equal(queryRecord.nativeBridgeAvailable, false, entrypoint);
   assert.equal(queryRecord.nativeExecution, false, entrypoint);
@@ -1802,13 +2047,13 @@ function assertPrivateQueryMethodRecord(queryRecord, expected, owner, entrypoint
   }
 }
 
-function assertPrivateQueryRecord(record, query, id, label) {
-  assert.equal(Object.isFrozen(record), true, `${label} ${query}`);
-  assert.equal(record.id, id, label);
-  assert.equal(record.query, query, label);
+function assertPrivateQueryRecord(record, expected, label) {
+  assert.equal(Object.isFrozen(record), true, `${label} ${expected.query}`);
+  assert.equal(record.id, expected.id, label);
+  assert.equal(record.query, expected.query, label);
   assert.equal(record.deterministic, true, label);
 
-  if (query === "root") {
+  if (expected.query === "root") {
     assert.equal(
       record.status,
       "private-record-ready-public-root-blocked",
@@ -1816,15 +2061,11 @@ function assertPrivateQueryRecord(record, query, id, label) {
     );
     assert.equal(record.publicSurface, "create().root", label);
     assert.equal(record.publicAccessAvailable, false, label);
-    assert.equal(
-      record.source,
-      "TestRendererCommittedFiberTreeInspection::host_component",
-      label
-    );
+    assert.equal(record.source, expected.source, label);
     return;
   }
 
-  assert.equal(record.fiberTag, "HostComponent", label);
+  assert.equal(record.fiberTag, expected.fiberTag, label);
   assert.equal(record.publicQueryMethodAvailable, false, label);
 }
 
