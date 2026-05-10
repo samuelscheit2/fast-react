@@ -15,6 +15,10 @@ const rootBridge = require(path.join(
   packageRoot,
   'src/client/root-bridge.js'
 ));
+const componentTree = require(path.join(
+  packageRoot,
+  'src/client/component-tree.js'
+));
 const rootMarkers = require(path.join(
   packageRoot,
   'src/client/root-markers.js'
@@ -465,6 +469,228 @@ test('private create/render admission combines mark/listen and render records wi
   assertBridgeDidNotTouchContainer(container, document);
 });
 
+test('private initial host output handoff applies and cleans fake-DOM host nodes', () => {
+  const document = createDocument('private-initial-host-output');
+  const container = createElement('DIV', document);
+  const element = {
+    props: {
+      children: 'hello bridge',
+      id: 'root-host',
+      onClick() {
+        return 'not-invoked';
+      },
+      title: 'Initial host'
+    },
+    type: 'main'
+  };
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    createRenderAdmissionIdPrefix: 'initial-admission',
+    initialHostOutputIdPrefix: 'initial-output',
+    sideEffectIdPrefix: 'initial-side-effect'
+  });
+
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const render = bridge.renderContainer(create.handle, element);
+  const admission = bridge.admitCreateRenderPath(
+    create,
+    sideEffects,
+    render
+  );
+  const handoff = bridge.applyInitialRenderHostOutput(admission);
+  const hidden =
+    rootBridge.getPrivateRootInitialHostOutputHandoffPayload(handoff);
+
+  assert.equal(
+    rootBridge.applyPrivateInitialRenderHostOutput(admission),
+    handoff
+  );
+  assert.equal(
+    rootBridge.isPrivateRootInitialHostOutputHandoffRecord(handoff),
+    true
+  );
+  assert.equal(Object.isFrozen(handoff), true);
+  assert.equal(
+    handoff.$$typeof,
+    rootBridge.privateRootInitialHostOutputHandoffRecordType
+  );
+  assert.equal(
+    handoff.kind,
+    'FastReactDomPrivateRootInitialHostOutputHandoffRecord'
+  );
+  assert.equal(handoff.operation, 'initial-host-output');
+  assert.equal(
+    handoff.handoffStatus,
+    rootBridge.ROOT_BRIDGE_INITIAL_HOST_OUTPUT_APPLIED
+  );
+  assert.equal(handoff.handoffId, 'initial-output:1');
+  assert.equal(handoff.sourceAdmissionId, 'initial-admission:1');
+  assert.equal(handoff.rootId, create.rootId);
+  assert.equal(handoff.hostType, 'main');
+  assert.equal(handoff.containerChildCount, 1);
+  assert.equal(handoff.hostChildCount, 1);
+  assert.equal(handoff.textContent, 'hello bridge');
+  assert.deepEqual(
+    handoff.acceptedCapabilities.map((capability) => capability.id),
+    [
+      'create-render-admission',
+      'fake-dom-host-component',
+      'fake-dom-host-text',
+      'component-tree-host-instance-map',
+      'latest-props-publication'
+    ]
+  );
+  assert.deepEqual(
+    handoff.blockedCapabilities.map((capability) => capability.id),
+    [
+      'public-root-object',
+      'native-execution',
+      'reconciler-execution',
+      'hydration',
+      'events',
+      'compatibility-claims'
+    ]
+  );
+  assert.equal(handoff.publicRootCreated, false);
+  assert.equal(handoff.publicRootObjectExposed, false);
+  assert.equal(handoff.nativeExecution, false);
+  assert.equal(handoff.reconcilerExecution, false);
+  assert.equal(handoff.rootScheduled, false);
+  assert.equal(handoff.domMutation, true);
+  assert.equal(handoff.markerWrites, false);
+  assert.equal(handoff.listenerInstallation, false);
+  assert.equal(handoff.hydration, false);
+  assert.equal(handoff.eventDispatch, false);
+  assert.equal(handoff.compatibilityClaimed, false);
+
+  const hostNode = container.childNodes[0];
+  const textNode = hostNode.childNodes[0];
+  assert.equal(hidden.admissionRecord, admission);
+  assert.equal(hidden.createRecord, create);
+  assert.equal(hidden.renderRecord, render);
+  assert.equal(hidden.sideEffectRecord, sideEffects);
+  assert.equal(hidden.container, container);
+  assert.equal(hidden.element, element);
+  assert.equal(hidden.hostNode, hostNode);
+  assert.equal(hidden.textNode, textNode);
+  assert.equal(hidden.rootOwner, create.owner);
+  assert.deepEqual(hidden.latestPropsBeforeCommit, {});
+  assert.equal(hidden.latestPropsAfterCommit, element.props);
+  assert.equal(componentTree.getRootOwnerFromNode(hostNode), create.owner);
+  assert.equal(componentTree.getRootOwnerFromNode(textNode), create.owner);
+  assert.equal(componentTree.getLatestPropsFromNode(hostNode), element.props);
+  assert.equal(componentTree.getLatestPropsFromNode(textNode), null);
+  assert.deepEqual(attributeEntries(hostNode), [
+    ['id', 'root-host'],
+    ['title', 'Initial host']
+  ]);
+  assert.deepEqual(hostNode.attributeLog, [
+    ['setAttribute', 'id', 'root-host'],
+    ['setAttribute', 'title', 'Initial host']
+  ]);
+  assert.equal(textNode.nodeValue, 'hello bridge');
+  assert.deepEqual(container.mutationLog, [['appendChild', 'MAIN']]);
+  assert.deepEqual(hostNode.mutationLog, [['appendChild', '#text']]);
+  assert.equal(container.textContent, 'hello bridge');
+  assert.equal(listenerRegistry.hasListeningMarker(container), true);
+  assert.equal(listenerRegistry.hasListeningMarker(document), true);
+
+  const serialized = JSON.stringify(handoff);
+  assert.equal(serialized.includes('__mutationLog'), false);
+  assert.equal(serialized.includes('__registrations'), false);
+  assert.equal(serialized.includes('hello bridge'), true);
+  assert.equal(serialized.includes('not-invoked'), false);
+
+  const cleanup = bridge.cleanupInitialRenderHostOutput(handoff);
+  assert.equal(
+    rootBridge.cleanupPrivateInitialRenderHostOutput(handoff),
+    cleanup
+  );
+  assert.equal(
+    cleanup.$$typeof,
+    rootBridge.privateRootInitialHostOutputCleanupRecordType
+  );
+  assert.equal(
+    cleanup.cleanupStatus,
+    rootBridge.ROOT_BRIDGE_INITIAL_HOST_OUTPUT_CLEANED
+  );
+  assert.equal(cleanup.sourceHandoffId, handoff.handoffId);
+  assert.equal(cleanup.removedRootChild, true);
+  assert.equal(cleanup.detachedHostInstanceCount, 2);
+  assert.equal(cleanup.containerChildCountAfterCleanup, 0);
+  assert.equal(cleanup.domMutation, true);
+  assert.equal(cleanup.compatibilityClaimed, false);
+  assert.equal(container.childNodes.length, 0);
+  assert.equal(container.textContent, '');
+  assert.equal(componentTree.getRootOwnerFromNode(hostNode), null);
+  assert.equal(componentTree.getRootOwnerFromNode(textNode), null);
+  assert.equal(componentTree.getLatestPropsFromNode(hostNode), null);
+  assert.equal(componentTree.getLatestPropsFromNode(textNode), null);
+  assert.equal(listenerRegistry.hasListeningMarker(container), true);
+  assert.equal(listenerRegistry.hasListeningMarker(document), true);
+
+  bridge.revertCreateRootSideEffects(sideEffects);
+  assert.equal(rootMarkers.getContainerRoot(container), null);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+  assert.equal(container.childNodes.length, 0);
+});
+
+test('private initial host output handoff validates admission and rolls back unsupported children', () => {
+  const document = createDocument('private-initial-host-output-validation');
+  const container = createElement('DIV', document);
+  const bridge = rootBridge.createPrivateRootBridgeShell();
+  const otherBridge = rootBridge.createPrivateRootBridgeShell();
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const render = bridge.renderContainer(create.handle, {
+    props: {
+      children: ['unsupported']
+    },
+    type: 'section'
+  });
+  const admission = bridge.admitCreateRenderPath(
+    create,
+    sideEffects,
+    render
+  );
+
+  assert.throws(() => bridge.applyInitialRenderHostOutput(render), {
+    code: 'FAST_REACT_DOM_INVALID_INITIAL_HOST_OUTPUT_HANDOFF'
+  });
+  assert.throws(() => otherBridge.applyInitialRenderHostOutput(admission), {
+    code: 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE'
+  });
+  assert.throws(() => bridge.applyInitialRenderHostOutput(admission), {
+    code: 'FAST_REACT_DOM_INVALID_INITIAL_HOST_OUTPUT_HANDOFF'
+  });
+  assert.equal(container.childNodes.length, 0);
+  assert.equal(container.__mutationLog.length, 0);
+
+  const validContainer = createElement('DIV', document);
+  const validCreate = bridge.createClientRoot(validContainer);
+  const validSideEffects = bridge.applyCreateRootSideEffects(validCreate);
+  const validRender = bridge.renderContainer(validCreate.handle, {
+    props: {
+      children: 'after cleanup'
+    },
+    type: 'article'
+  });
+  const validAdmission = bridge.admitCreateRenderPath(
+    validCreate,
+    validSideEffects,
+    validRender
+  );
+  bridge.revertCreateRootSideEffects(validSideEffects);
+  assert.throws(() => bridge.applyInitialRenderHostOutput(validAdmission), {
+    code: 'FAST_REACT_DOM_INVALID_CREATE_RENDER_ADMISSION'
+  });
+  assert.equal(validContainer.childNodes.length, 0);
+
+  bridge.revertCreateRootSideEffects(sideEffects);
+  assert.equal(container.childNodes.length, 0);
+});
+
 test('private createRoot mark/listen gate validates records before side effects', () => {
   const document = createDocument('private-mark-listen-validation');
   const container = createElement('DIV', document);
@@ -896,6 +1122,12 @@ function createDocument(label) {
   });
   document.ownerDocument = document;
   document.defaultView = createEventTarget({label: `${label}-window`});
+  document.createElement = function createElementFromDocument(nodeName) {
+    return createElement(String(nodeName).toUpperCase(), document);
+  };
+  document.createTextNode = function createTextNodeFromDocument(text) {
+    return createTextNode(text, document);
+  };
   return document;
 }
 
@@ -907,12 +1139,63 @@ function createElement(nodeName, ownerDocument) {
   });
 }
 
+function createTextNode(text, ownerDocument) {
+  const target = createEventTarget({
+    nodeName: '#text',
+    nodeType: 3,
+    ownerDocument
+  });
+  let textValue = String(text);
+  target.writeLog = [];
+  Object.defineProperties(target, {
+    data: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return textValue;
+      },
+      set(value) {
+        textValue = String(value);
+        this.writeLog.push(['data', textValue]);
+      }
+    },
+    nodeValue: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return textValue;
+      },
+      set(value) {
+        textValue = String(value);
+        this.writeLog.push(['nodeValue', textValue]);
+      }
+    },
+    textContent: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return textValue;
+      },
+      set(value) {
+        textValue = String(value);
+        this.writeLog.push(['textContent', textValue]);
+      }
+    }
+  });
+  return target;
+}
+
 function createEventTarget(fields) {
   const target = {
     ...fields,
+    attributeLog: [],
+    attributes: new Map(),
+    childNodes: [],
     __mutationLog: [],
     __removals: [],
     __registrations: [],
+    mutationLog: [],
+    parentNode: null,
     addEventListener(type, listener, options) {
       this.__registrations.push({
         listener,
@@ -937,26 +1220,113 @@ function createEventTarget(fields) {
       });
     },
     appendChild(child) {
+      detachChildFromParent(child);
+      this.childNodes.push(child);
+      child.parentNode = this;
       this.__mutationLog.push({child, type: 'appendChild'});
+      this.mutationLog.push(['appendChild', child.nodeName]);
+      return child;
     },
     insertBefore(child, beforeChild) {
+      if (beforeChild.parentNode !== this) {
+        throw new Error('Cannot insert before a child from another parent.');
+      }
+      detachChildFromParent(child);
+      const index = this.childNodes.indexOf(beforeChild);
+      this.childNodes.splice(index, 0, child);
+      child.parentNode = this;
       this.__mutationLog.push({beforeChild, child, type: 'insertBefore'});
+      this.mutationLog.push(['insertBefore', child.nodeName, beforeChild.nodeName]);
+      return child;
     },
     removeChild(child) {
+      if (child.parentNode !== this) {
+        throw new Error('Cannot remove a child from another parent.');
+      }
+      detachChildFromParent(child);
       this.__mutationLog.push({child, type: 'removeChild'});
+      this.mutationLog.push(['removeChild', child.nodeName]);
+      return child;
+    },
+    setAttribute(name, value) {
+      const attributeName = String(name);
+      const stringValue = String(value);
+      this.attributes.set(attributeName, stringValue);
+      this.attributeLog.push(['setAttribute', attributeName, stringValue]);
+    },
+    removeAttribute(name) {
+      const attributeName = String(name);
+      const hadAttribute = this.attributes.has(attributeName);
+      this.attributes.delete(attributeName);
+      this.attributeLog.push(['removeAttribute', attributeName, hadAttribute]);
+    },
+    hasAttribute(name) {
+      return this.attributes.has(String(name));
+    },
+    getAttribute(name) {
+      const attributeName = String(name);
+      return this.attributes.has(attributeName)
+        ? this.attributes.get(attributeName)
+        : null;
     }
   };
   let textContent = '';
+  Object.defineProperties(target, {
+    firstChild: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return this.childNodes[0] || null;
+      }
+    },
+    lastChild: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return this.childNodes[this.childNodes.length - 1] || null;
+      }
+    }
+  });
   Object.defineProperty(target, 'textContent', {
     configurable: true,
     enumerable: true,
     get() {
+      if (this.childNodes.length > 0) {
+        return this.childNodes.map((child) => child.textContent).join('');
+      }
       return textContent;
     },
     set(value) {
-      textContent = value;
+      for (const child of [...this.childNodes]) {
+        detachChildFromParent(child);
+      }
+      textContent = String(value);
       this.__mutationLog.push({type: 'textContent', value});
+      this.mutationLog.push(['textContent', textContent]);
     }
   });
   return target;
+}
+
+function detachChildFromParent(child) {
+  if (child == null || typeof child !== 'object') {
+    throw new Error('Expected a fake-DOM child object.');
+  }
+  if (child.parentNode === null || child.parentNode === undefined) {
+    child.parentNode = null;
+    return;
+  }
+
+  const siblings = child.parentNode.childNodes;
+  const index = siblings.indexOf(child);
+  if (index !== -1) {
+    siblings.splice(index, 1);
+  }
+  child.parentNode = null;
+}
+
+function attributeEntries(node) {
+  return [...node.attributes.entries()].sort(([left], [right]) =>
+    left.localeCompare(right)
+  );
 }

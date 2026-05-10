@@ -1111,6 +1111,42 @@ function detachHostInstanceToken(token) {
   return token;
 }
 
+function detachHostInstanceSubtree(rootNode) {
+  const nodes = [];
+  collectHostInstanceSubtreeNodes(rootNode, nodes, new Set());
+
+  let detachedCount = 0;
+  for (let index = nodes.length - 1; index >= 0; index -= 1) {
+    if (detachHostInstanceNode(nodes[index]) !== null) {
+      detachedCount += 1;
+    }
+  }
+
+  return detachedCount;
+}
+
+function collectHostInstanceSubtreeNodes(node, nodes, visited) {
+  if (!isObjectLike(node) || visited.has(node)) {
+    return;
+  }
+
+  visited.add(node);
+  nodes.push(node);
+
+  if (Array.isArray(node.childNodes)) {
+    for (const child of node.childNodes) {
+      collectHostInstanceSubtreeNodes(child, nodes, visited);
+    }
+    return;
+  }
+
+  let child = isObjectLike(node.firstChild) ? node.firstChild : null;
+  while (child !== null) {
+    collectHostInstanceSubtreeNodes(child, nodes, visited);
+    child = isObjectLike(child.nextSibling) ? child.nextSibling : null;
+  }
+}
+
 module.exports = {
   EVENT_LISTENER_TARGET_LOOKUP_BLOCKED_CODE,
   EVENT_LISTENER_TARGET_LOOKUP_NODE_MISMATCH_CODE,
@@ -1139,6 +1175,7 @@ module.exports = {
   createMountedHostInstanceNodeRecord,
   createRefCallbackFakeHostNodeRecord,
   detachHostInstanceNode,
+  detachHostInstanceSubtree,
   detachHostInstanceToken,
   getAttachedNodeFromHostInstanceToken,
   getClosestMountedHostInstanceNodeFromNode,

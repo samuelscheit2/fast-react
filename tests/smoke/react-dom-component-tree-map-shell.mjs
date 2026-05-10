@@ -270,6 +270,35 @@ const reactDomPackage = require(
 }
 
 {
+  const rootOwner = {kind: 'SubtreeDetachRoot'};
+  const hostOwner = {kind: 'SubtreeDetachHost'};
+  const textOwner = {kind: 'SubtreeDetachText'};
+  const hostNode = createElement('DIV');
+  const textNode = createTextNode('subtree');
+  const hostToken = componentTree.createHostInstanceToken(
+    hostOwner,
+    rootOwner
+  );
+  const textToken = componentTree.createHostInstanceToken(
+    textOwner,
+    rootOwner
+  );
+
+  appendChild(hostNode, textNode);
+  componentTree.attachHostInstanceNode(hostNode, hostToken, {id: 'subtree'});
+  componentTree.attachHostInstanceNode(textNode, textToken, null);
+
+  assert.equal(componentTree.getRootOwnerFromNode(hostNode), rootOwner);
+  assert.equal(componentTree.getRootOwnerFromNode(textNode), rootOwner);
+  assert.equal(componentTree.detachHostInstanceSubtree(hostNode), 2);
+  assert.equal(componentTree.getRootOwnerFromNode(hostNode), null);
+  assert.equal(componentTree.getRootOwnerFromNode(textNode), null);
+  assert.equal(componentTree.getLatestPropsFromNode(hostNode), null);
+  assert.equal(componentTree.getLatestPropsFromNode(textNode), null);
+  assert.equal(componentTree.detachHostInstanceSubtree(hostNode), 0);
+}
+
+{
   const rootOwner = {kind: 'WrongNodeRoot'};
   const hostOwner = {kind: 'WrongNodeHost'};
   const ownedNode = createElement('DIV');
