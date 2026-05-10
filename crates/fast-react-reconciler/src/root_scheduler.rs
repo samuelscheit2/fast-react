@@ -473,6 +473,102 @@ impl SyncFlushActPostPassiveContinuationGateRecord {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SyncFlushPostPassiveContinuationRootRecord {
+    order: usize,
+    root: FiberRootId,
+    lanes: Lanes,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private post-passive sync-flush continuation metadata for future passive workers"
+)]
+impl SyncFlushPostPassiveContinuationRootRecord {
+    #[must_use]
+    pub(crate) const fn order(self) -> usize {
+        self.order
+    }
+
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn lanes(self) -> Lanes {
+        self.lanes
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SyncFlushPostPassiveContinuationExecutionGateRecord {
+    pending_passive_root: FiberRootId,
+    pending_passive_finished_work: FiberId,
+    pending_passive_lanes: Lanes,
+    pending_passive_unmount_count: usize,
+    pending_passive_mount_count: usize,
+    execution_context: SyncFlushExecutionContextRecord,
+    exit_status: RootSyncFlushExitStatus,
+    continuation_roots: Vec<SyncFlushPostPassiveContinuationRootRecord>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private post-passive sync-flush continuation metadata for future passive workers"
+)]
+impl SyncFlushPostPassiveContinuationExecutionGateRecord {
+    #[must_use]
+    pub(crate) const fn pending_passive_root(&self) -> FiberRootId {
+        self.pending_passive_root
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_passive_finished_work(&self) -> FiberId {
+        self.pending_passive_finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_passive_lanes(&self) -> Lanes {
+        self.pending_passive_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_passive_unmount_count(&self) -> usize {
+        self.pending_passive_unmount_count
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_passive_mount_count(&self) -> usize {
+        self.pending_passive_mount_count
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_passive_record_count(&self) -> usize {
+        self.pending_passive_unmount_count + self.pending_passive_mount_count
+    }
+
+    #[must_use]
+    pub(crate) const fn execution_context(&self) -> SyncFlushExecutionContextRecord {
+        self.execution_context
+    }
+
+    #[must_use]
+    pub(crate) const fn exit_status(&self) -> RootSyncFlushExitStatus {
+        self.exit_status
+    }
+
+    #[must_use]
+    pub(crate) fn continuation_roots(&self) -> &[SyncFlushPostPassiveContinuationRootRecord] {
+        &self.continuation_roots
+    }
+
+    #[must_use]
+    pub(crate) fn did_find_continuation_roots(&self) -> bool {
+        !self.continuation_roots.is_empty()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RootSyncFlushResult {
     execution_context: SyncFlushExecutionContextRecord,
@@ -919,6 +1015,95 @@ pub(crate) fn sync_flush_act_post_passive_continuation_gate(
         act_scope_depth: act_continuation.act_scope_depth(),
         nested_act_scope: act_continuation.nested_act_scope(),
     })
+}
+
+pub(crate) fn sync_flush_post_passive_continuation_execution_gate<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    execution_context: &ExecutionContextState,
+    pending_passive_handoff: Option<PendingPassiveCommitHandoff>,
+) -> Result<Option<SyncFlushPostPassiveContinuationExecutionGateRecord>, RootSchedulerError> {
+    let Some(pending_passive_handoff) = pending_passive_handoff else {
+        return Ok(None);
+    };
+
+    let execution_context_record = execution_context.sync_flush_record();
+    if !execution_context_record.can_enter_sync_flush() {
+        return Ok(Some(sync_flush_post_passive_continuation_gate_record(
+            pending_passive_handoff,
+            execution_context_record,
+            RootSyncFlushExitStatus::BlockedByExecutionContext,
+            Vec::new(),
+        )));
+    }
+
+    if store.root_scheduler().is_flushing_work() {
+        return Ok(Some(sync_flush_post_passive_continuation_gate_record(
+            pending_passive_handoff,
+            execution_context_record,
+            RootSyncFlushExitStatus::SkippedReentrantFlush,
+            Vec::new(),
+        )));
+    }
+
+    if !store.root_scheduler().might_have_pending_sync_work() {
+        return Ok(Some(sync_flush_post_passive_continuation_gate_record(
+            pending_passive_handoff,
+            execution_context_record,
+            RootSyncFlushExitStatus::SkippedNoPendingSyncWork,
+            Vec::new(),
+        )));
+    }
+
+    store.root_scheduler_mut().set_is_flushing_work(true);
+    let continuation_roots = collect_sync_flush_post_passive_continuation_roots(store);
+    store.root_scheduler_mut().set_is_flushing_work(false);
+    let continuation_roots = continuation_roots?;
+
+    Ok(Some(sync_flush_post_passive_continuation_gate_record(
+        pending_passive_handoff,
+        execution_context_record,
+        RootSyncFlushExitStatus::Completed,
+        continuation_roots,
+    )))
+}
+
+fn collect_sync_flush_post_passive_continuation_roots<H: HostTypes>(
+    store: &FiberRootStore<H>,
+) -> Result<Vec<SyncFlushPostPassiveContinuationRootRecord>, RootSchedulerError> {
+    let mut records = Vec::new();
+    let mut root = store.root_scheduler().first_scheduled_root();
+
+    while let Some(root_id) = root {
+        let lanes = sync_flush_lanes_for_root(store, root_id)?;
+        if lanes.is_non_empty() {
+            records.push(SyncFlushPostPassiveContinuationRootRecord {
+                order: records.len(),
+                root: root_id,
+                lanes,
+            });
+        }
+        root = store.root(root_id)?.scheduling().next_scheduled_root();
+    }
+
+    Ok(records)
+}
+
+fn sync_flush_post_passive_continuation_gate_record(
+    pending_passive_handoff: PendingPassiveCommitHandoff,
+    execution_context: SyncFlushExecutionContextRecord,
+    exit_status: RootSyncFlushExitStatus,
+    continuation_roots: Vec<SyncFlushPostPassiveContinuationRootRecord>,
+) -> SyncFlushPostPassiveContinuationExecutionGateRecord {
+    SyncFlushPostPassiveContinuationExecutionGateRecord {
+        pending_passive_root: pending_passive_handoff.root(),
+        pending_passive_finished_work: pending_passive_handoff.finished_work(),
+        pending_passive_lanes: pending_passive_handoff.lanes(),
+        pending_passive_unmount_count: pending_passive_handoff.pending_unmount_count(),
+        pending_passive_mount_count: pending_passive_handoff.pending_mount_count(),
+        execution_context,
+        exit_status,
+        continuation_roots,
+    }
 }
 
 /// Prepare all currently scheduled sync roots for a later commit handoff.
@@ -2040,6 +2225,168 @@ mod tests {
                 commit_without_passive.pending_passive_handoff()
             ),
             None
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_sync_flush_post_passive_gate_records_reentry_roots_data_only() {
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let host = RecordingHost::default();
+        let passive_root = store
+            .create_client_root(FakeContainer::new(1), RootOptions::new())
+            .unwrap();
+        let continuation_root = store
+            .create_client_root(FakeContainer::new(2), RootOptions::new())
+            .unwrap();
+        let continuation_current = store.root(continuation_root).unwrap().current();
+
+        schedule_sync_update(&mut store, passive_root, RootElementHandle::from_raw(93));
+        let render = render_host_root_for_lanes(&mut store, passive_root, Lanes::SYNC).unwrap();
+        let finished_work = render.finished_work();
+        store
+            .root_mut(passive_root)
+            .unwrap()
+            .scheduling_mut()
+            .prepare_pending_passive(passive_root, Lanes::NO);
+        store
+            .root_mut(passive_root)
+            .unwrap()
+            .scheduling_mut()
+            .pending_passive_mut()
+            .queue_mount(finished_work, Lanes::SYNC)
+            .unwrap();
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+
+        schedule_default_update(&mut store, continuation_root);
+        schedule_sync_update(
+            &mut store,
+            continuation_root,
+            RootElementHandle::from_raw(94),
+        );
+        let callback_request_count = store.scheduler_bridge().callback_requests().len();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+
+        let gate = sync_flush_post_passive_continuation_execution_gate(
+            &mut store,
+            &ExecutionContextState::new(),
+            commit.pending_passive_handoff(),
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(gate.exit_status(), RootSyncFlushExitStatus::Completed);
+        assert!(gate.execution_context().can_enter_sync_flush());
+        assert_eq!(gate.pending_passive_root(), passive_root);
+        assert_eq!(gate.pending_passive_finished_work(), finished_work);
+        assert_eq!(gate.pending_passive_lanes(), Lanes::SYNC);
+        assert_eq!(gate.pending_passive_unmount_count(), 0);
+        assert_eq!(gate.pending_passive_mount_count(), 1);
+        assert_eq!(gate.pending_passive_record_count(), 1);
+        assert!(gate.did_find_continuation_roots());
+        assert_eq!(gate.continuation_roots().len(), 1);
+        let continuation = gate.continuation_roots()[0];
+        assert_eq!(continuation.order(), 0);
+        assert_eq!(continuation.root(), continuation_root);
+        assert_eq!(continuation.lanes(), Lanes::SYNC);
+        assert!(
+            !continuation.lanes().contains_lane(Lane::DEFAULT),
+            "default work must not enter the post-passive sync-flush continuation gate"
+        );
+        assert_eq!(
+            store.root(continuation_root).unwrap().current(),
+            continuation_current
+        );
+        assert_eq!(store.root(continuation_root).unwrap().finished_work(), None);
+        assert!(
+            store
+                .root(passive_root)
+                .unwrap()
+                .scheduling()
+                .pending_passive()
+                .has_commit_handoff()
+        );
+        assert_eq!(
+            store.scheduler_bridge().callback_requests().len(),
+            callback_request_count
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+        assert!(!store.root_scheduler().is_flushing_work());
+    }
+
+    #[test]
+    fn root_scheduler_sync_flush_post_passive_gate_preserves_guards() {
+        let (mut store, root_id, host) = root_store();
+        schedule_sync_update(&mut store, root_id, RootElementHandle::from_raw(95));
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::SYNC).unwrap();
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .scheduling_mut()
+            .prepare_pending_passive(root_id, Lanes::NO);
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let handoff = commit.pending_passive_handoff();
+        let mut execution_context = ExecutionContextState::new();
+
+        let blocked = execution_context
+            .with_render_context(|execution_context| {
+                sync_flush_post_passive_continuation_execution_gate(
+                    &mut store,
+                    execution_context,
+                    handoff,
+                )
+            })
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(
+            blocked.exit_status(),
+            RootSyncFlushExitStatus::BlockedByExecutionContext
+        );
+        assert!(blocked.execution_context().blocked_by_render_or_commit());
+        assert!(blocked.continuation_roots().is_empty());
+        assert!(!store.root_scheduler().is_flushing_work());
+
+        store.root_scheduler_mut().set_is_flushing_work(true);
+        let reentrant = sync_flush_post_passive_continuation_execution_gate(
+            &mut store,
+            &ExecutionContextState::new(),
+            handoff,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            reentrant.exit_status(),
+            RootSyncFlushExitStatus::SkippedReentrantFlush
+        );
+        assert!(reentrant.continuation_roots().is_empty());
+        assert!(store.root_scheduler().is_flushing_work());
+        store.root_scheduler_mut().set_is_flushing_work(false);
+
+        recompute_might_have_pending_sync_work(&mut store).unwrap();
+        let no_work = sync_flush_post_passive_continuation_execution_gate(
+            &mut store,
+            &ExecutionContextState::new(),
+            handoff,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            no_work.exit_status(),
+            RootSyncFlushExitStatus::SkippedNoPendingSyncWork
+        );
+        assert!(no_work.continuation_roots().is_empty());
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .scheduling()
+                .pending_passive()
+                .has_commit_handoff()
         );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }

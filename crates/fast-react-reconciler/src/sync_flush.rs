@@ -12,14 +12,16 @@ use std::fmt::{self, Display, Formatter};
 use fast_react_core::Lanes;
 use fast_react_host_config::HostTypes;
 
+use crate::passive_effects::observe_sync_flush_post_passive_continuation_execution_gate_after_commit;
 use crate::root_scheduler::{
-    SyncFlushActPostPassiveContinuationGateRecord, recompute_might_have_pending_sync_work,
+    SyncFlushActPostPassiveContinuationGateRecord,
+    SyncFlushPostPassiveContinuationExecutionGateRecord, recompute_might_have_pending_sync_work,
     sync_flush_act_continuation_lanes_for_root, sync_flush_act_post_passive_continuation_gate,
     sync_flush_lanes_for_root,
 };
 use crate::scheduler_bridge::SchedulerActContinuationRecord;
 use crate::{
-    FiberRootId, FiberRootStore, FiberRootStoreError, HostRootCommitRecord,
+    ExecutionContextState, FiberRootId, FiberRootStore, FiberRootStoreError, HostRootCommitRecord,
     HostRootRenderPhaseRecord, RootCommitError, RootSchedulerError, RootSyncFlushRecord,
     RootUpdateCallbackSnapshot, RootWorkLoopError, commit_finished_host_root,
     render_host_root_for_lanes,
@@ -65,6 +67,23 @@ impl SyncFlushRootRecord {
     #[must_use]
     pub fn root_update_callbacks(&self) -> &RootUpdateCallbackSnapshot {
         self.commit.root_update_callbacks()
+    }
+
+    #[allow(
+        dead_code,
+        reason = "crate-private sync-flush post-passive execution gate reserved for future passive workers"
+    )]
+    pub(crate) fn post_passive_continuation_execution_gate<H: HostTypes>(
+        &self,
+        store: &mut FiberRootStore<H>,
+        execution_context: &ExecutionContextState,
+    ) -> Result<Option<SyncFlushPostPassiveContinuationExecutionGateRecord>, SyncFlushError> {
+        observe_sync_flush_post_passive_continuation_execution_gate_after_commit(
+            store,
+            &self.commit,
+            execution_context,
+        )
+        .map_err(SyncFlushError::from)
     }
 
     #[must_use]
@@ -284,9 +303,9 @@ mod tests {
     use crate::scheduler_bridge::SchedulerActContinuationStatus;
     use crate::test_support::{FakeContainer, RecordingHost};
     use crate::{
-        ExecutionContextState, RootElementHandle, RootOptions, RootSyncFlushRecordStatus,
-        ensure_root_is_scheduled, flush_sync_work_on_all_roots, scheduled_roots, update_container,
-        update_container_sync,
+        ExecutionContextState, RootElementHandle, RootOptions, RootSyncFlushExitStatus,
+        RootSyncFlushRecordStatus, ensure_root_is_scheduled, flush_sync_work_on_all_roots,
+        scheduled_roots, update_container, update_container_sync,
     };
     use crate::{RootUpdateCallbackHandle, RootUpdateCallbackRecord, RootUpdateCallbackVisibility};
     use fast_react_core::{Lane, Lanes};
@@ -552,6 +571,82 @@ mod tests {
         );
         assert!(store.scheduler_bridge().act_queue_requests().is_empty());
         assert!(store.scheduler_bridge().callback_requests().is_empty());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_handoff_observes_post_passive_reentry_gate_without_running_effects() {
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let host = RecordingHost::default();
+        let passive_root = store
+            .create_client_root(FakeContainer::new(1), RootOptions::new())
+            .unwrap();
+        let continuation_root = store
+            .create_client_root(FakeContainer::new(2), RootOptions::new())
+            .unwrap();
+        let continuation_current = store.root(continuation_root).unwrap().current();
+        schedule_sync_update(&mut store, passive_root, RootElementHandle::from_raw(701));
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+        let render_phase = rendered.records()[0].render_phase();
+        let finished_work = render_phase.finished_work();
+        {
+            let scheduling = store.root_mut(passive_root).unwrap().scheduling_mut();
+            scheduling.prepare_pending_passive(passive_root, Lanes::NO);
+            scheduling
+                .pending_passive_mut()
+                .queue_mount(finished_work, Lanes::SYNC)
+                .unwrap();
+        }
+        let committed = SyncFlushRootRecord::commit_rendered_sync_flush_record(
+            &mut store,
+            rendered.records()[0],
+        )
+        .unwrap();
+        schedule_sync_update(
+            &mut store,
+            continuation_root,
+            RootElementHandle::from_raw(702),
+        );
+        let callback_request_count = store.scheduler_bridge().callback_requests().len();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+
+        let gate = committed
+            .post_passive_continuation_execution_gate(&mut store, &ExecutionContextState::new())
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(gate.exit_status(), RootSyncFlushExitStatus::Completed);
+        assert_eq!(gate.pending_passive_root(), passive_root);
+        assert_eq!(gate.pending_passive_finished_work(), finished_work);
+        assert_eq!(gate.pending_passive_lanes(), Lanes::SYNC);
+        assert_eq!(gate.pending_passive_mount_count(), 1);
+        assert_eq!(gate.continuation_roots().len(), 1);
+        assert_eq!(gate.continuation_roots()[0].root(), continuation_root);
+        assert_eq!(gate.continuation_roots()[0].lanes(), Lanes::SYNC);
+        assert_eq!(committed.act_continuation, None);
+        assert_eq!(committed.act_post_passive_continuation_gate, None);
+        assert_eq!(
+            store.root(continuation_root).unwrap().current(),
+            continuation_current
+        );
+        assert_eq!(store.root(continuation_root).unwrap().finished_work(), None);
+        assert!(
+            store
+                .root(passive_root)
+                .unwrap()
+                .scheduling()
+                .pending_passive()
+                .has_commit_handoff()
+        );
+        assert_eq!(
+            store.scheduler_bridge().callback_requests().len(),
+            callback_request_count
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
+        );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
