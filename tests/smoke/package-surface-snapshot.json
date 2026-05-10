@@ -1276,6 +1276,7 @@
                 "fast.react_test_renderer.root_request_bridge"
               ],
               "renderer": [
+                "fast.react_test_renderer.private_error_boundary_diagnostics",
                 "fast.react_test_renderer.private_test_instance_wrapper_record"
               ],
               "toJSON": [
