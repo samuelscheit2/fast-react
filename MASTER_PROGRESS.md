@@ -29,6 +29,25 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 733
+
+- Worker 733 added Rust-only private unmount finished-work identity gates for
+  react-test-renderer `toJSON` and `toTree` native diagnostics. The gate binds
+  the unmount root, scheduled update sequence, lifecycle, render/commit fiber
+  handles, finished lanes, empty-root host-output row, deletion handoff, and
+  cleanup handoff to the same accepted unmount.
+- Acceptance audit found a validation gap where the unmount native execution
+  validators checked the deletion handoff id but not the cleanup handoff id.
+  The accepted follow-up made both `toJSON` and `toTree` validators reject
+  stale cleanup handoff ids and added focused tamper coverage for both paths.
+- Worker 733 was accepted after focused unmount, `toJSON`, `toTree`, and
+  serialization finished-work identity Rust tests, formatting, clippy,
+  package-surface guard, import smoke, independent audit, conflict-marker
+  scanning, and `git diff --check`; its subagent, worktree, and branch were
+  removed after merge. Public unmount, public serialization, native bridge
+  loading/execution, JS/CJS admission, package compatibility, nested
+  source-report identity, and sibling snapshot identity remain blocked.
+
 ### Worker 732
 
 - Worker 732 added the static private-admission ledger for Workers 729-731.

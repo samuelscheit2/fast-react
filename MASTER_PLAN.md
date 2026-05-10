@@ -47,18 +47,18 @@ Drive toward a minimal real root render/update/unmount path:
 
 Top-level cap: 30 workers. Queue 685-714 was launched from queue base commit
 `9ec6678` in isolated `worker/<slug>` branches and worktrees and has been
-accepted and cleaned up. Workers 715-732 have also been accepted and cleaned
+accepted and cleaned up. Workers 715-733 have also been accepted and cleaned
 up.
 
 No worker branches or worktrees are currently active.
 
 ## Near-Term Sequencing
 
-1. Select the next runtime or research queue from accepted Worker 732 ledger
-   evidence, Worker 731 nested identity evidence, Worker 730 cleanup evidence,
-   and remaining private blockers only; keep public root, act, flushSync,
-   hooks/effects, test-renderer, and React DOM compatibility blocked until each
-   private gate is proven.
+1. Select the next runtime or research queue from accepted Worker 733 unmount
+   identity evidence, Worker 732 ledger evidence, Worker 731 nested identity
+   evidence, Worker 730 cleanup evidence, and remaining private blockers only;
+   keep public root, act, flushSync, hooks/effects, test-renderer, and React
+   DOM compatibility blocked until each private gate is proven.
 2. Audit and merge completed workers one at a time or in a small non-conflicting
    batch, with focused reruns before each merge and full workspace checks after
    the batch.
@@ -67,18 +67,19 @@ No worker branches or worktrees are currently active.
 
 ## Next Queue Candidates
 
-- Next selection should come from remaining identity blockers: first-class
-  nested `toJSON` source-report identity generation, a narrow full-unmount
-  finished-work identity adapter, or a blocked/preflight diagnostic explaining
-  why sibling snapshot identity cannot yet be admitted.
+- Next selection should come from remaining identity blockers: a static
+  private-admission ledger for Worker 733, first-class nested `toJSON`
+  source-report identity generation, or a blocked/preflight diagnostic
+  explaining why sibling snapshot identity cannot yet be admitted.
 - Keep first-class nested `toJSON` source-report identity generation deferred
   until committed fiber inspection/report models nested host trees. Worker 731
   accepts only a Rust private canary identity handoff and does not broaden CJS
   admission.
-- Keep full unmount finished-work identity admission deferred. Worker 730 adds
-  narrow Rust ref/passive/host cleanup evidence for unmount native bridge
-  cleanup handoff, but no unmount finished-work identity adapter or identity
-  consumption has been accepted.
+- Worker 733 accepts narrow Rust-only unmount finished-work identity admission
+  for private `toJSON` and `toTree` native diagnostics, consuming Worker 730's
+  cleanup evidence. Public unmount, public serialization, native bridge
+  loading/execution, JS/CJS admission, and package compatibility remain
+  blocked.
 - Defer broad multichild/sibling serializer identity admission until the
   committed fiber/report shape is narrow enough to prove without widening
   public serialization. Worker 731 covers only the nested `toJSON` update
