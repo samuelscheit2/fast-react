@@ -198,6 +198,43 @@ const syncFlushActSchedulerRecords = Object.freeze([
     queuedWorkExecution: false,
     syncFlushExecution: false,
     passiveEffectExecution: false
+  }),
+  Object.freeze({
+    id: 'sync-flush-post-passive-continuation-execution-record',
+    rustRecord: 'SyncFlushPostPassiveContinuationExecutionRecord',
+    producer: 'flush_sync_post_passive_continuation_after_passive_effects',
+    acceptedWorker:
+      'worker-331-sync-flush-passive-continuation-execution',
+    acceptedFields: Object.freeze([
+      'gate',
+      'sync_flush_result',
+      'did_request_follow_up_sync_flush',
+      'did_execute_follow_up_sync_flush',
+      'did_flush_follow_up_sync_work'
+    ]),
+    privateFlushExecutionMetadata: true,
+    publicSchedulerTaskExecution: false,
+    publicActExecution: false,
+    passiveEffectExecution: false
+  }),
+  Object.freeze({
+    id: 'passive-effects-flush-with-sync-flush-continuation-result',
+    rustRecord: 'PassiveEffectsFlushWithSyncFlushContinuationResult',
+    producer:
+      'flush_passive_effects_after_commit_and_sync_flush_continuation',
+    acceptedWorker:
+      'worker-331-sync-flush-passive-continuation-execution',
+    acceptedFields: Object.freeze([
+      'passive_effects',
+      'sync_flush_continuation',
+      'did_request_follow_up_sync_flush',
+      'did_flush_follow_up_sync_work'
+    ]),
+    privateFlushExecutionMetadata: true,
+    publicSchedulerTaskExecution: false,
+    publicActExecution: false,
+    createCallbackInvoked: false,
+    destroyCallbackInvoked: false
   })
 ]);
 const passiveActFlushRecords = Object.freeze([
@@ -256,6 +293,62 @@ const passiveActFlushRecords = Object.freeze([
     ]),
     callbackHandleMetadata: true,
     passiveEffectExecution: false
+  }),
+  Object.freeze({
+    id: 'passive-effect-callback-invocation-gate-snapshot',
+    rustRecord: 'PassiveEffectCallbackInvocationGateSnapshot',
+    source: 'crates/fast-react-reconciler/src/passive_effects.rs',
+    acceptedWorker:
+      'worker-326-passive-effect-create-destroy-callback-invocation-gate',
+    acceptedFields: Object.freeze([
+      'root',
+      'finished_work',
+      'lanes',
+      'flush_status',
+      'flush_record_count',
+      'skipped_flush_records_without_callbacks',
+      'records',
+      'status',
+      'blockers'
+    ]),
+    acceptedRecord: 'PassiveEffectCallbackInvocationRecord',
+    acceptedRequest: 'PassiveEffectCallbackInvocationRequest',
+    acceptedKinds: Object.freeze(['Destroy', 'Create']),
+    acceptedStatuses: Object.freeze(['Completed', 'Errored']),
+    testControlOnly: true,
+    publicEffectExecution: false,
+    publicActCompatibility: false,
+    schedulerDrivenPassiveExecution: false
+  }),
+  Object.freeze({
+    id: 'passive-effect-destroy-callback-execution-records',
+    rustRecord: 'PassiveEffectDestroyCallbackExecutionRecord',
+    source: 'crates/fast-react-reconciler/src/passive_effects.rs',
+    acceptedWorker:
+      'worker-349-hook-effect-destroy-callback-execution-private',
+    acceptedFields: Object.freeze([
+      'execution_order',
+      'flush_record',
+      'flush_index',
+      'root',
+      'finished_work',
+      'committed_lanes',
+      'fiber',
+      'effect_lanes',
+      'phase',
+      'pending_order',
+      'unmount_origin',
+      'effect_index',
+      'effect',
+      'effect_instance',
+      'destroy_callback'
+    ]),
+    acceptedErrorRecord: 'PassiveEffectDestroyCallbackErrorRecord',
+    privateDestroyExecutionMetadata: true,
+    testControlOnly: true,
+    publicEffectExecution: false,
+    publicActCompatibility: false,
+    schedulerDrivenPassiveExecution: false
   })
 ]);
 const testRendererRootActFlushRecords = Object.freeze([
@@ -301,6 +394,69 @@ const testRendererRootActFlushRecords = Object.freeze([
     rustExecution: false,
     reconcilerExecution: false,
     hostOutputProduced: false
+  }),
+  Object.freeze({
+    id: 'test-renderer-private-root-native-canary-metadata',
+    jsRecord: 'FastReactTestRendererCurrentRustCanaryMetadata',
+    symbol: 'fast.react_test_renderer.root_request_bridge',
+    acceptedWorker: 'worker-332-test-renderer-js-private-root-native-bridge',
+    acceptedRustRecords: Object.freeze([
+      'TestRendererRoot',
+      'TestRendererRootUpdateKind',
+      'TestRendererRootScheduledUpdate',
+      'HostRootCommitRecord',
+      'TestRendererCommitDiagnostics',
+      'TestRendererHostOutputDiagnostics'
+    ]),
+    privateRootRequestExecution: false,
+    nativeExecution: false,
+    rustExecution: false,
+    reconcilerExecution: false,
+    hostOutputProducedFromJs: false,
+    privateHostOutputDiagnosticsAccepted: true
+  }),
+  Object.freeze({
+    id: 'test-renderer-private-tojson-host-output-diagnostic',
+    jsRecord: 'react-test-renderer-tojson-private-host-output-serializer',
+    acceptedWorker:
+      'worker-333-test-renderer-tojson-host-output-private-path',
+    acceptedRustRecords: Object.freeze([
+      'TestRendererPrivateJsonSerializationReport',
+      'TestRendererHostOutputDiagnostics'
+    ]),
+    acceptedFixtureShape: Object.freeze([
+      'HostRoot',
+      'HostComponent',
+      'HostText'
+    ]),
+    privateHostOutputDiagnosticsSerializable: true,
+    publicSerializationAvailable: false,
+    nativeExecution: false,
+    rustExecution: false,
+    hostOutputProducedFromJs: false
+  }),
+  Object.freeze({
+    id: 'test-renderer-private-testinstance-query-path',
+    jsRecord: 'ReactTestInstancePrivateQueryMetadata',
+    acceptedWorker:
+      'worker-334-test-renderer-testinstance-private-query-path',
+    acceptedRustRecords: Object.freeze([
+      'TestRendererCommittedFiberTreeInspection',
+      'TestRendererCommittedFiberNodeInspection'
+    ]),
+    acceptedQuerySurfaces: Object.freeze([
+      'find',
+      'findAll',
+      'findByType',
+      'findAllByType',
+      'findByProps',
+      'findAllByProps'
+    ]),
+    privateQueryMetadata: true,
+    publicTestInstanceObjectAvailable: false,
+    nativeExecution: false,
+    rustExecution: false,
+    hostOutputProducedFromJs: false
   })
 ]);
 const acceptedPrivateActFlushPrerequisiteIds = Object.freeze([
@@ -309,7 +465,10 @@ const acceptedPrivateActFlushPrerequisiteIds = Object.freeze([
   'scheduler-mock-flush-helper-metadata',
   'sync-flush-act-continuation-records',
   'sync-flush-post-passive-continuation-execution-gate',
+  'sync-flush-post-passive-private-execution-metadata',
   'passive-effect-flush-metadata',
+  'passive-effect-private-callback-execution-metadata',
+  'test-renderer-private-root-output-diagnostics',
   'test-renderer-private-root-request-records'
 ]);
 const blockedPrivateActFlushPrerequisiteIds = Object.freeze([
@@ -362,12 +521,57 @@ const acceptedPrivateActFlushPrerequisites = Object.freeze([
     executesPassiveEffects: false
   }),
   Object.freeze({
+    id: 'sync-flush-post-passive-private-execution-metadata',
+    present: true,
+    recordOnly: true,
+    records: Object.freeze([
+      'SyncFlushPostPassiveContinuationExecutionRecord',
+      'PassiveEffectsFlushWithSyncFlushContinuationResult',
+      'flush_sync_post_passive_continuation_after_passive_effects',
+      'flush_passive_effects_after_commit_and_sync_flush_continuation'
+    ]),
+    privateFlushExecutionMetadata: true,
+    executesPublicSchedulerTasks: false,
+    executesPublicAct: false,
+    executesPassiveEffects: false
+  }),
+  Object.freeze({
     id: 'passive-effect-flush-metadata',
     present: true,
     recordOnly: true,
     records: passiveActFlushRecords,
     executesPassiveEffects: false,
     invokesEffectCallbacks: false
+  }),
+  Object.freeze({
+    id: 'passive-effect-private-callback-execution-metadata',
+    present: true,
+    recordOnly: true,
+    records: Object.freeze([
+      'PassiveEffectCallbackInvocationGateSnapshot',
+      'PassiveEffectCallbackInvocationRecord',
+      'PassiveEffectDestroyCallbackExecutionRecord',
+      'PassiveEffectDestroyCallbackErrorRecord'
+    ]),
+    testControlOnly: true,
+    publicEffectExecution: false,
+    publicActCompatibility: false,
+    schedulerDrivenPassiveExecution: false
+  }),
+  Object.freeze({
+    id: 'test-renderer-private-root-output-diagnostics',
+    present: true,
+    recordOnly: true,
+    records: Object.freeze([
+      'FastReactTestRendererCurrentRustCanaryMetadata',
+      'TestRendererHostOutputDiagnostics',
+      'TestRendererPrivateJsonSerializationReport',
+      'TestRendererCommittedFiberTreeInspection'
+    ]),
+    privateHostOutputDiagnosticsAccepted: true,
+    publicSerializationAvailable: false,
+    publicTestInstanceObjectAvailable: false,
+    producesPublicHostOutput: false
   }),
   Object.freeze({
     id: 'test-renderer-private-root-request-records',
@@ -419,6 +623,8 @@ const actSchedulerSideEffectPolicy = Object.freeze({
   executesPassiveEffects: false,
   executesRootRequests: false,
   mutatesHostOutput: false,
+  acceptsPrivateFlushExecutionMetadata: true,
+  executesPublicSchedulerTasks: false,
   compatibilityClaimed: false
 });
 const actSchedulerGate = Object.freeze({
@@ -436,7 +642,13 @@ const actSchedulerGate = Object.freeze({
     'worker-301-hook-effect-destroy-handoff-metadata',
     'worker-303-sync-flush-passive-continuation-execution-gate',
     'worker-304-test-renderer-js-private-root-request-bridge',
-    'worker-307-test-renderer-update-unmount-private-js-bridge'
+    'worker-307-test-renderer-update-unmount-private-js-bridge',
+    'worker-326-passive-effect-create-destroy-callback-invocation-gate',
+    'worker-331-sync-flush-passive-continuation-execution',
+    'worker-332-test-renderer-js-private-root-native-bridge',
+    'worker-333-test-renderer-tojson-host-output-private-path',
+    'worker-334-test-renderer-testinstance-private-query-path',
+    'worker-349-hook-effect-destroy-callback-execution-private'
   ]),
   publicActBehaviorAvailable: false,
   publicSchedulerFlushExecutionAvailable: false,
@@ -459,6 +671,10 @@ const actSchedulerGate = Object.freeze({
   postPassiveContinuationExecutionGateAccepted: true,
   passiveActFlushMetadataAccepted: true,
   rootRequestRecordsAccepted: true,
+  privateFlushExecutionMetadataAccepted: true,
+  privateSyncFlushExecutionMetadataAccepted: true,
+  privatePassiveCallbackExecutionMetadataAccepted: true,
+  privateRootOutputDiagnosticsAccepted: true,
   privateFlushPrerequisitesPresent: true,
   privateFlushExecutionReady: false,
   recognizedReactActPrivateDispatcherRecords: reactActPrivateDispatcherRecords,
@@ -1468,6 +1684,14 @@ function createUnsupportedError(
       recognizedActSchedulerGate.passiveActFlushMetadataAccepted;
     error.rootRequestRecordsAccepted =
       recognizedActSchedulerGate.rootRequestRecordsAccepted;
+    error.privateFlushExecutionMetadataAccepted =
+      recognizedActSchedulerGate.privateFlushExecutionMetadataAccepted;
+    error.privateSyncFlushExecutionMetadataAccepted =
+      recognizedActSchedulerGate.privateSyncFlushExecutionMetadataAccepted;
+    error.privatePassiveCallbackExecutionMetadataAccepted =
+      recognizedActSchedulerGate.privatePassiveCallbackExecutionMetadataAccepted;
+    error.privateRootOutputDiagnosticsAccepted =
+      recognizedActSchedulerGate.privateRootOutputDiagnosticsAccepted;
     error.privateFlushExecutionReady =
       recognizedActSchedulerGate.privateFlushExecutionReady;
     error.publicSchedulerFlushExecutionAvailable =
