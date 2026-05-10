@@ -32,6 +32,12 @@ const controlledInputPostEventRestoreQueueIntentRecordedStatus =
   'recorded-private-controlled-input-post-event-restore-intent';
 const controlledInputPostEventRestoreQueueIntentSkippedStatus =
   'skipped-private-controlled-input-post-event-restore-intent';
+const controlledInputPostEventRestoreQueueCheckableRestoreMetadataStatus =
+  'private-controlled-checkable-input-restore-metadata';
+const controlledInputPostEventRestoreQueueRadioGroupIntentRecordedStatus =
+  'recorded-private-controlled-radio-group-restore-intent';
+const controlledInputPostEventRestoreQueueRadioGroupIntentSkippedStatus =
+  'skipped-private-controlled-radio-group-restore-intent';
 const controlledInputPostEventRestoreQueueInvalidEventCode =
   'FAST_REACT_DOM_CONTROLLED_INPUT_POST_EVENT_RESTORE_QUEUE_INVALID_EVENT';
 const controlledInputPostEventRestoreQueueInvalidFakeDomObservationCode =
@@ -64,6 +70,14 @@ const controlledInputPostEventRestoreQueueNoSideEffects = freezeRecord({
   controlledStateRestoreScheduled: false,
   controlledStateRestoreInvoked: false,
   hostWrapperInvoked: false,
+  checkableRestoreMetadataRecorded: false,
+  radioGroupRestoreIntentRecorded: false,
+  radioGroupLookupRequired: false,
+  radioGroupLookupPerformed: false,
+  radioGroupMembersEnumerated: false,
+  radioGroupSiblingMetadataRead: false,
+  radioGroupValueTrackerRefreshRequired: false,
+  radioGroupValueTrackerRefreshed: false,
   liveValueTrackerInstalled: false,
   valueTrackerFieldWritten: false,
   propertyDescriptorInstalled: false,
@@ -148,6 +162,17 @@ function recordControlledInputPostEventRestoreIntentFromEventLatestPropsWithGate
     latestPropsEvidence,
     controlledTarget
   );
+  const checkableRestoreMetadata = createCheckableRestoreMetadata(
+    controlledTarget,
+    latestPropsEvidence,
+    intentRecorded
+  );
+  const groupIntentRecords = createCheckableGroupIntentRecords(
+    controlledTarget,
+    latestPropsEvidence,
+    normalizedAdmission,
+    intentRecorded
+  );
   const requestSequence = gateState.nextRequestSequence++;
   const requestId = `${gateState.requestIdPrefix}:${requestSequence}`;
   const status = intentRecorded
@@ -178,6 +203,8 @@ function recordControlledInputPostEventRestoreIntentFromEventLatestPropsWithGate
     eventEvidence: createEventEvidenceSummary(eventEvidence),
     latestPropsEvidence: latestPropsEvidence.record,
     controlledTarget,
+    checkableRestoreMetadata,
+    groupIntentRecords,
     restoreIntent: createPostEventRestoreIntentSummary(
       eventEvidence,
       latestPropsEvidence,
@@ -193,7 +220,9 @@ function recordControlledInputPostEventRestoreIntentFromEventLatestPropsWithGate
     publicControlledBehaviorBoundary: createPublicControlledBehaviorBoundary(),
     sideEffects: createPostEventRestoreQueueSideEffects(
       latestPropsEvidence,
-      intentRecorded
+      intentRecorded,
+      controlledTarget,
+      groupIntentRecords
     )
   });
 
@@ -224,6 +253,17 @@ function recordControlledInputPostEventRestoreIntentFromFakeDomObservationLatest
     observationEvidence,
     latestPropsEvidence,
     controlledTarget
+  );
+  const checkableRestoreMetadata = createCheckableRestoreMetadata(
+    controlledTarget,
+    latestPropsEvidence,
+    intentRecorded
+  );
+  const groupIntentRecords = createCheckableGroupIntentRecords(
+    controlledTarget,
+    latestPropsEvidence,
+    normalizedAdmission,
+    intentRecorded
   );
   const requestSequence = gateState.nextRequestSequence++;
   const requestId = `${gateState.requestIdPrefix}:${requestSequence}`;
@@ -261,6 +301,8 @@ function recordControlledInputPostEventRestoreIntentFromFakeDomObservationLatest
       createFakeDomObservationEvidenceSummary(observationEvidence),
     latestPropsEvidence: latestPropsEvidence.record,
     controlledTarget,
+    checkableRestoreMetadata,
+    groupIntentRecords,
     restoreIntent:
       createPostEventRestoreIntentSummaryFromFakeDomObservation(
         observationEvidence,
@@ -279,7 +321,9 @@ function recordControlledInputPostEventRestoreIntentFromFakeDomObservationLatest
       createPostEventRestoreQueueSideEffectsFromFakeDomObservation(
         observationEvidence,
         latestPropsEvidence,
-        intentRecorded
+        intentRecorded,
+        controlledTarget,
+        groupIntentRecords
       )
   });
 
@@ -305,6 +349,8 @@ function describeControlledInputPostEventRestoreQueueGate() {
     consumesEventDispatchEvidence: true,
     consumesFakeDomTrackerObservation: true,
     consumesLatestPropsEvidence: true,
+    recordsCheckableRestoreMetadata: true,
+    recordsRadioGroupIntentMetadata: true,
     rawTargetCaptured: false,
     rawEventCaptured: false,
     rawLatestPropsRetained: false,
@@ -858,6 +904,173 @@ function createPostEventRestoreIntentSummaryFromFakeDomObservation(
   });
 }
 
+function createCheckableRestoreMetadata(
+  controlledTarget,
+  latestPropsEvidence,
+  intentRecorded
+) {
+  if (!isCheckableControlledTarget(controlledTarget)) {
+    return null;
+  }
+
+  const props = latestPropsEvidence.latestProps;
+  const checkedProp = describeMetadataProp(props, 'checked');
+  const defaultCheckedProp = describeMetadataProp(props, 'defaultChecked');
+  const nameProp = describeMetadataProp(props, 'name');
+  const radioGroupRestoreRequired =
+    controlledTarget.inputType === 'radio' && nameProp.nonNull === true;
+
+  return freezeRecord({
+    status: controlledInputPostEventRestoreQueueCheckableRestoreMetadataStatus,
+    hostTag: controlledTarget.hostTag,
+    inputType: controlledTarget.inputType,
+    controlKind: controlledTarget.controlKind,
+    trackedField: controlledTarget.trackedField,
+    controlledPropName: controlledTarget.controlledPropName,
+    checkedProp,
+    defaultCheckedProp,
+    nameProp,
+    latestPropsEvidenceAccepted: latestPropsEvidence.accepted,
+    targetResolved: controlledTarget.targetResolved,
+    restoreIntentRecorded: intentRecorded,
+    primaryInputRestoreRequired: intentRecorded,
+    primaryInputRestorePerformed: false,
+    checkedWriteWouldBeRequired: intentRecorded,
+    checkedWritePerformed: false,
+    radioGroupRestoreRequired,
+    radioGroupIntentRecorded:
+      radioGroupRestoreRequired === true && intentRecorded === true,
+    radioGroupLookupRequired: radioGroupRestoreRequired,
+    radioGroupLookupPerformed: false,
+    radioGroupMembersEnumerated: false,
+    radioSiblingMetadataRead: false,
+    radioSiblingInputRestoreRequired: radioGroupRestoreRequired,
+    radioSiblingInputRestorePerformed: false,
+    radioValueTrackerRefreshRequired: radioGroupRestoreRequired,
+    radioValueTrackerRefreshed: false,
+    liveValueTrackerInstalled: false,
+    valueTrackerFieldWritten: false,
+    propertyDescriptorInstalled: false,
+    hostValueRead: false,
+    hostValueWritten: false,
+    browserInputMutated: false,
+    rawTargetCaptured: false,
+    rawGroupNodesCaptured: false,
+    rawNameRetained: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createCheckableGroupIntentRecords(
+  controlledTarget,
+  latestPropsEvidence,
+  admission,
+  intentRecorded
+) {
+  if (!isCheckableControlledTarget(controlledTarget)) {
+    return freezeArray([]);
+  }
+
+  const props = latestPropsEvidence.latestProps;
+  const nameProp = describeMetadataProp(props, 'name');
+  const checkedProp = describeMetadataProp(props, 'checked');
+  const radioGroupRestoreRequired =
+    controlledTarget.inputType === 'radio' && nameProp.nonNull === true;
+  const radioGroupIntentRecorded =
+    radioGroupRestoreRequired === true && intentRecorded === true;
+
+  return freezeArray([
+    freezeRecord({
+      status: radioGroupIntentRecorded
+        ? controlledInputPostEventRestoreQueueRadioGroupIntentRecordedStatus
+        : controlledInputPostEventRestoreQueueRadioGroupIntentSkippedStatus,
+      source: 'private-controlled-checkable-restore-metadata',
+      queueKind: admission.queueKind,
+      queueId: admission.queueId,
+      hostTag: controlledTarget.hostTag,
+      inputType: controlledTarget.inputType,
+      controlKind: controlledTarget.controlKind,
+      trackedField: controlledTarget.trackedField,
+      groupKind:
+        controlledTarget.inputType === 'radio'
+          ? 'radio-group'
+          : 'single-checkable',
+      skipReason: getCheckableGroupIntentSkipReason(
+        controlledTarget,
+        latestPropsEvidence,
+        nameProp,
+        intentRecorded
+      ),
+      latestPropsEvidenceAccepted: latestPropsEvidence.accepted,
+      targetResolved: controlledTarget.targetResolved,
+      sourceMatchesLatestPropsTarget:
+        controlledTarget.sourceMatchesLatestPropsTarget ?? null,
+      supportedEventName: controlledTarget.supportedEventName,
+      controlledPropPresent: controlledTarget.controlledPropPresent,
+      controlledPropIsNonNull: controlledTarget.controlledPropIsNonNull,
+      checkedProp,
+      nameProp,
+      restoreIntentRecorded: intentRecorded,
+      groupRestoreRequired: radioGroupRestoreRequired,
+      groupRestoreIntentRecorded: radioGroupIntentRecorded,
+      primaryInputRestoreWouldRun: intentRecorded,
+      primaryInputRestoreRan: false,
+      groupRootWalkRequired: radioGroupRestoreRequired,
+      groupRootWalkPerformed: false,
+      groupLookupRequired: radioGroupRestoreRequired,
+      groupLookupPerformed: false,
+      groupMembersEnumerated: false,
+      siblingLatestPropsLookupRequired: radioGroupRestoreRequired,
+      siblingLatestPropsLookupPerformed: false,
+      siblingInputRestoreRequired: radioGroupRestoreRequired,
+      siblingInputRestorePerformed: false,
+      mixedReactRadioValidationRequired: radioGroupRestoreRequired,
+      mixedReactRadioValidationPerformed: false,
+      valueTrackerRefreshRequired: radioGroupRestoreRequired,
+      valueTrackerRefreshed: false,
+      formBoundaryCheckRequired: radioGroupRestoreRequired,
+      formBoundaryChecked: false,
+      realDomQueried: false,
+      hostValueRead: false,
+      hostValueWritten: false,
+      browserInputMutated: false,
+      rawGroupNodesCaptured: false,
+      rawNameRetained: false,
+      compatibilityClaimed: false
+    })
+  ]);
+}
+
+function getCheckableGroupIntentSkipReason(
+  controlledTarget,
+  latestPropsEvidence,
+  nameProp,
+  intentRecorded
+) {
+  if (controlledTarget.inputType !== 'radio') {
+    return 'checkboxes-do-not-restore-radio-groups';
+  }
+  if (latestPropsEvidence.accepted !== true) {
+    return 'latest-props-evidence-not-accepted';
+  }
+  if (controlledTarget.targetResolved !== true) {
+    return 'target-not-resolved';
+  }
+  if (controlledTarget.supportedEventName !== true) {
+    return 'unsupported-event-name';
+  }
+  if (controlledTarget.controlled !== true) {
+    return 'input-is-not-controlled';
+  }
+  if (nameProp.nonNull !== true) {
+    return 'radio-name-prop-missing';
+  }
+  if (intentRecorded !== true) {
+    return 'restore-intent-not-recorded';
+  }
+  return null;
+}
+
 function createPostEventRestoreBoundary(
   latestPropsEvidence,
   intentRecorded,
@@ -879,8 +1092,13 @@ function createPostEventRestoreBoundary(
 
 function createPostEventRestoreQueueSideEffects(
   latestPropsEvidence,
-  intentRecorded
+  intentRecorded,
+  controlledTarget,
+  groupIntentRecords
 ) {
+  const radioGroupIntent = getRecordedRadioGroupIntent(groupIntentRecords);
+  const checkable = isCheckableControlledTarget(controlledTarget);
+
   return freezeRecord({
     ...controlledInputPostEventRestoreQueueNoSideEffects,
     eventDispatchRecordAccepted: true,
@@ -888,15 +1106,30 @@ function createPostEventRestoreQueueSideEffects(
     latestPropsMetadataRead: latestPropsEvidence.accepted,
     postEventRestoreIntentRecorded: intentRecorded,
     postEventRestoreIntentSkipped: !intentRecorded,
-    restoreQueueRecordCreated: true
+    restoreQueueRecordCreated: true,
+    checkableRestoreMetadataRecorded: checkable,
+    radioGroupRestoreIntentRecorded: radioGroupIntent !== null,
+    radioGroupLookupRequired:
+      radioGroupIntent === null
+        ? false
+        : radioGroupIntent.groupLookupRequired,
+    radioGroupValueTrackerRefreshRequired:
+      radioGroupIntent === null
+        ? false
+        : radioGroupIntent.valueTrackerRefreshRequired
   });
 }
 
 function createPostEventRestoreQueueSideEffectsFromFakeDomObservation(
   observationRecord,
   latestPropsEvidence,
-  intentRecorded
+  intentRecorded,
+  controlledTarget,
+  groupIntentRecords
 ) {
+  const radioGroupIntent = getRecordedRadioGroupIntent(groupIntentRecords);
+  const checkable = isCheckableControlledTarget(controlledTarget);
+
   return freezeRecord({
     ...controlledInputPostEventRestoreQueueNoSideEffects,
     fakeDomTrackerObservationAccepted: true,
@@ -905,7 +1138,17 @@ function createPostEventRestoreQueueSideEffectsFromFakeDomObservation(
     latestPropsMetadataRead: latestPropsEvidence.accepted,
     postEventRestoreIntentRecorded: intentRecorded,
     postEventRestoreIntentSkipped: !intentRecorded,
-    restoreQueueRecordCreated: true
+    restoreQueueRecordCreated: true,
+    checkableRestoreMetadataRecorded: checkable,
+    radioGroupRestoreIntentRecorded: radioGroupIntent !== null,
+    radioGroupLookupRequired:
+      radioGroupIntent === null
+        ? false
+        : radioGroupIntent.groupLookupRequired,
+    radioGroupValueTrackerRefreshRequired:
+      radioGroupIntent === null
+        ? false
+        : radioGroupIntent.valueTrackerRefreshRequired
   });
 }
 
@@ -1227,6 +1470,62 @@ function isSupportedPostEventRestoreTrigger(domEventName, hostTag, controlKind) 
   return false;
 }
 
+function isCheckableControlledTarget(controlledTarget) {
+  return (
+    isObjectLike(controlledTarget) &&
+    controlledTarget.hostTag === 'input' &&
+    controlledTarget.controlKind === 'checked' &&
+    (controlledTarget.inputType === 'checkbox' ||
+      controlledTarget.inputType === 'radio')
+  );
+}
+
+function describeMetadataProp(props, propName) {
+  if (!isObjectLike(props) || !hasOwnProp(props, propName)) {
+    return freezeRecord({
+      propName,
+      present: false,
+      nonNull: false,
+      value: freezeRecord({type: 'missing'})
+    });
+  }
+
+  try {
+    const value = props[propName];
+    return freezeRecord({
+      propName,
+      present: true,
+      nonNull: value != null,
+      value: describeValue(value)
+    });
+  } catch (error) {
+    return freezeRecord({
+      propName,
+      present: true,
+      nonNull: false,
+      value: freezeRecord({type: 'inaccessible'})
+    });
+  }
+}
+
+function getRecordedRadioGroupIntent(groupIntentRecords) {
+  if (!Array.isArray(groupIntentRecords)) {
+    return null;
+  }
+
+  for (const record of groupIntentRecords) {
+    if (
+      isObjectLike(record) &&
+      record.status ===
+        controlledInputPostEventRestoreQueueRadioGroupIntentRecordedStatus
+    ) {
+      return record;
+    }
+  }
+
+  return null;
+}
+
 function getAdmissionStringProperty(record, key, fallback) {
   const value = record[key];
   return typeof value === 'string' && value.length > 0 ? value : fallback;
@@ -1316,6 +1615,7 @@ module.exports = {
   controlledInputPostEventRestoreQueueGateErrorCode,
   controlledInputPostEventRestoreQueueGateId,
   controlledInputPostEventRestoreQueueGateSchemaVersion,
+  controlledInputPostEventRestoreQueueCheckableRestoreMetadataStatus,
   controlledInputPostEventRestoreQueueIntentRecordedStatus,
   controlledInputPostEventRestoreQueueIntentSkippedStatus,
   controlledInputPostEventRestoreQueueInvalidAdmissionCode,
@@ -1324,6 +1624,8 @@ module.exports = {
   controlledInputPostEventRestoreQueueInvalidLatestPropsCode,
   controlledInputPostEventRestoreQueueInvalidRecordCode,
   controlledInputPostEventRestoreQueueNoSideEffects,
+  controlledInputPostEventRestoreQueueRadioGroupIntentRecordedStatus,
+  controlledInputPostEventRestoreQueueRadioGroupIntentSkippedStatus,
   controlledInputPostEventRestoreQueueStatus,
   createControlledInputPostEventRestoreQueueGate,
   createUnsupportedControlledInputPostEventRestoreQueueError,

@@ -49,9 +49,12 @@ const reactDomPackageJson = require(
 );
 
 const {
+  CONTROLLED_CHECKABLE_RESTORE_METADATA_STATUS,
   CONTROLLED_FORM_PROPERTY_PAYLOAD_STATUS,
   CONTROLLED_POST_EVENT_RESTORE_QUEUE_STATUS,
   CONTROLLED_PRIVATE_WRAPPER_PROPERTY_PAYLOAD_STATUS,
+  CONTROLLED_RADIO_GROUP_RESTORE_INTENT_RECORDED_STATUS,
+  CONTROLLED_RADIO_GROUP_RESTORE_INTENT_SKIPPED_STATUS,
   CONTROLLED_VALUE_TRACKER_FAKE_DOM_DIAGNOSTIC_STATUS,
   CONTROLLED_VALUE_TRACKER_GATE_STATUS,
   ENTRY_NON_PAYLOAD,
@@ -1474,6 +1477,54 @@ test("private DOM controlled payload rows carry wrapper metadata without live tr
       assert.equal(boundary.fakeDomTrackerDiagnosticObserved, false);
       assert.equal(boundary.fakeDomTrackerDiagnosticDetached, false);
       assert.equal(boundary.postEventRestoreQueueIntentRecorded, false);
+      if (tag === "input") {
+        assert.deepEqual(boundary.checkableRestoreMetadata, {
+          status: CONTROLLED_CHECKABLE_RESTORE_METADATA_STATUS,
+          hostTag: "input",
+          inputType: "checkbox",
+          controlKind: "checked",
+          trackedField: "checked",
+          checkedProp: {
+            propName: "checked",
+            present: true,
+            nonNull: true,
+            value: {type: "boolean"}
+          },
+          defaultCheckedProp: {
+            propName: "defaultChecked",
+            present: true,
+            nonNull: true,
+            value: {type: "boolean"}
+          },
+          nameProp: {
+            propName: "name",
+            present: true,
+            nonNull: true,
+            value: {type: "string", empty: false}
+          },
+          radioGroupRestoreIntentStatus:
+            CONTROLLED_RADIO_GROUP_RESTORE_INTENT_SKIPPED_STATUS,
+          radioGroupRestoreIntentRecorded: false,
+          radioGroupRestoreRequired: false,
+          radioGroupLookupRequired: false,
+          radioGroupLookupPerformed: false,
+          radioGroupMembersEnumerated: false,
+          radioSiblingMetadataRead: false,
+          radioSiblingInputRestoreRequired: false,
+          radioSiblingInputRestorePerformed: false,
+          radioValueTrackerRefreshRequired: false,
+          radioValueTrackerRefreshed: false,
+          latestPropsLookup: false,
+          liveTrackingStarted: false,
+          postEventRestoreQueued: false,
+          hostValueRead: false,
+          hostValueWritten: false,
+          browserInputMutated: false,
+          compatibilityClaimed: false
+        });
+      } else {
+        assert.equal(boundary.checkableRestoreMetadata, null);
+      }
       assert.equal(record.wrapperMetadata.deterministicMetadataOnly, true);
       assert.equal(record.wrapperMetadata.propertyPayloadRowAccepted, false);
       assert.equal(record.wrapperMetadata.hostWrapperInvoked, false);
@@ -1650,6 +1701,68 @@ test("private DOM controlled payload rows carry wrapper metadata without live tr
       trackedField: "value"
     }
   ]);
+});
+
+test("private DOM controlled radio rows carry group restore metadata without live lookup", () => {
+  const props = orderedProps([
+    ["type", "radio"],
+    ["name", "choice"],
+    ["checked", true],
+    ["onChange", () => {}]
+  ]);
+  const checkedEntry = diffDomPropertyPayload("input", {}, props).find(
+    (entry) => entry.propName === "checked"
+  );
+  const metadata = checkedEntry.controlledFormBoundary.checkableRestoreMetadata;
+
+  assert.deepEqual(metadata, {
+    status: CONTROLLED_CHECKABLE_RESTORE_METADATA_STATUS,
+    hostTag: "input",
+    inputType: "radio",
+    controlKind: "checked",
+    trackedField: "checked",
+    checkedProp: {
+      propName: "checked",
+      present: true,
+      nonNull: true,
+      value: {type: "boolean"}
+    },
+    defaultCheckedProp: {
+      propName: "defaultChecked",
+      present: false,
+      nonNull: false,
+      value: {type: "missing"}
+    },
+    nameProp: {
+      propName: "name",
+      present: true,
+      nonNull: true,
+      value: {type: "string", empty: false}
+    },
+    radioGroupRestoreIntentStatus:
+      CONTROLLED_RADIO_GROUP_RESTORE_INTENT_RECORDED_STATUS,
+    radioGroupRestoreIntentRecorded: false,
+    radioGroupRestoreRequired: true,
+    radioGroupLookupRequired: true,
+    radioGroupLookupPerformed: false,
+    radioGroupMembersEnumerated: false,
+    radioSiblingMetadataRead: false,
+    radioSiblingInputRestoreRequired: true,
+    radioSiblingInputRestorePerformed: false,
+    radioValueTrackerRefreshRequired: true,
+    radioValueTrackerRefreshed: false,
+    latestPropsLookup: false,
+    liveTrackingStarted: false,
+    postEventRestoreQueued: false,
+    hostValueRead: false,
+    hostValueWritten: false,
+    browserInputMutated: false,
+    compatibilityClaimed: false
+  });
+  assert.equal(
+    checkedEntry.controlledFormBoundary.postEventRestoreQueueIntentRecorded,
+    false
+  );
 });
 
 test("private DOM property payload helper remains private to the package surface", () => {
@@ -1864,6 +1977,8 @@ function unsupported(propName, category, reason, details) {
 function controlledUnsupported(hostTag, propName, props = {}) {
   const privateWrapperGateRecord =
     createExpectedPrivateWrapperGateRecordOrNull(hostTag, propName, props);
+  const checkableRestoreMetadata =
+    createExpectedCheckableRestoreMetadataOrNull(hostTag, props);
 
   return unsupported(
     propName,
@@ -1890,6 +2005,7 @@ function controlledUnsupported(hostTag, propName, props = {}) {
         fakeDomTrackerDiagnosticInstalled: false,
         fakeDomTrackerDiagnosticObserved: false,
         fakeDomTrackerDiagnosticDetached: false,
+        checkableRestoreMetadata,
         postEventRestoreQueueIntentRecorded: false,
         liveTrackingStarted: false,
         postEventRestoreQueued: false,
@@ -1898,6 +2014,123 @@ function controlledUnsupported(hostTag, propName, props = {}) {
       }
     }
   );
+}
+
+function createExpectedCheckableRestoreMetadataOrNull(hostTag, props) {
+  if (hostTag !== "input") {
+    return null;
+  }
+
+  const inputType = getExpectedInputType(props);
+  if (inputType !== "checkbox" && inputType !== "radio") {
+    return null;
+  }
+
+  const checkedProp = describeExpectedBoundaryProp(props, "checked");
+  const defaultCheckedProp =
+    describeExpectedBoundaryProp(props, "defaultChecked");
+  const nameProp = describeExpectedBoundaryProp(props, "name");
+  const radioGroupRestoreRequired =
+    inputType === "radio" && nameProp.nonNull === true;
+
+  return {
+    status: CONTROLLED_CHECKABLE_RESTORE_METADATA_STATUS,
+    hostTag,
+    inputType,
+    controlKind: "checked",
+    trackedField: "checked",
+    checkedProp,
+    defaultCheckedProp,
+    nameProp,
+    radioGroupRestoreIntentStatus: radioGroupRestoreRequired
+      ? CONTROLLED_RADIO_GROUP_RESTORE_INTENT_RECORDED_STATUS
+      : CONTROLLED_RADIO_GROUP_RESTORE_INTENT_SKIPPED_STATUS,
+    radioGroupRestoreIntentRecorded: false,
+    radioGroupRestoreRequired,
+    radioGroupLookupRequired: radioGroupRestoreRequired,
+    radioGroupLookupPerformed: false,
+    radioGroupMembersEnumerated: false,
+    radioSiblingMetadataRead: false,
+    radioSiblingInputRestoreRequired: radioGroupRestoreRequired,
+    radioSiblingInputRestorePerformed: false,
+    radioValueTrackerRefreshRequired: radioGroupRestoreRequired,
+    radioValueTrackerRefreshed: false,
+    latestPropsLookup: false,
+    liveTrackingStarted: false,
+    postEventRestoreQueued: false,
+    hostValueRead: false,
+    hostValueWritten: false,
+    browserInputMutated: false,
+    compatibilityClaimed: false
+  };
+}
+
+function getExpectedInputType(props) {
+  if (props !== null && typeof props === "object" && Object.hasOwn(props, "type")) {
+    const type = props.type;
+    return typeof type === "string" && type.length > 0 ? type : "text";
+  }
+
+  return "text";
+}
+
+function describeExpectedBoundaryProp(props, propName) {
+  if (props === null || typeof props !== "object" || !Object.hasOwn(props, propName)) {
+    return {
+      propName,
+      present: false,
+      nonNull: false,
+      value: {type: "missing"}
+    };
+  }
+
+  const value = props[propName];
+  return {
+    propName,
+    present: true,
+    nonNull: value != null,
+    value: describeExpectedBoundaryValue(value)
+  };
+}
+
+function describeExpectedBoundaryValue(value) {
+  if (value === null) {
+    return {type: "null"};
+  }
+
+  const valueType = typeof value;
+  if (valueType === "string") {
+    return {
+      type: "string",
+      empty: value.length === 0
+    };
+  }
+  if (valueType === "boolean") {
+    return {type: "boolean"};
+  }
+  if (valueType === "undefined") {
+    return {type: "undefined"};
+  }
+  if (valueType === "number") {
+    return {
+      type: "number",
+      finite: Number.isFinite(value)
+    };
+  }
+  if (valueType === "function") {
+    return {type: "function"};
+  }
+  if (valueType === "symbol") {
+    return {type: "symbol"};
+  }
+  if (Array.isArray(value)) {
+    return {
+      type: "array",
+      length: value.length
+    };
+  }
+
+  return {type: valueType};
 }
 
 function createExpectedPrivateWrapperGateRecordOrNull(
