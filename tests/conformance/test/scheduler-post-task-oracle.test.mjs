@@ -620,6 +620,25 @@ test("scheduler post-task private priority diagnostics are opt-in and preserve p
     assert.equal(report.continuation.privateDiagnosticSymbolPresent, false);
     assert.equal(report.continuation.diagnosticsBeforeFlush, null);
     assert.equal(report.continuation.diagnosticsAfterFlush, null);
+    assert.deepEqual(report.continuationAbortAfterFallback.publicNodeKeys, [
+      "_controller"
+    ]);
+    assert.equal(
+      report.continuationAbortAfterFallback.privateDiagnosticSymbolPresent,
+      false
+    );
+    assert.equal(
+      report.continuationAbortAfterFallback.diagnosticsBeforeFlush,
+      null
+    );
+    assert.equal(
+      report.continuationAbortAfterFallback.diagnosticsAfterFallback,
+      null
+    );
+    assert.equal(
+      report.continuationAbortAfterFallback.diagnosticsAfterCancel,
+      null
+    );
   }
 });
 
@@ -668,6 +687,11 @@ test("scheduler post-task private priority diagnostics capture shimmed TaskContr
         entry.diagnosticsBeforeFlush.schedule.status,
         "scheduled-shimmed-task-controller"
       );
+      assert.equal(entry.diagnosticsBeforeFlush.diagnosticEventCount, 1);
+      assert.equal(
+        entry.diagnosticsBeforeFlush.schedule.diagnosticEventIndex,
+        0
+      );
       assert.equal(
         entry.diagnosticsBeforeFlush.schedule.controller.constructorName,
         "TaskController"
@@ -682,7 +706,20 @@ test("scheduler post-task private priority diagnostics capture shimmed TaskContr
         "priority"
       ]);
       assert.equal(entry.diagnosticsBeforeFlush.callbackRuns.length, 0);
+      assert.equal(
+        entry.diagnosticsBeforeFlush.taskControllerAbortOrderingDiagnostics,
+        false
+      );
+      assert.equal(
+        entry.diagnosticsBeforeFlush.continuationFallbackMetadataDiagnostics,
+        false
+      );
+      assert.equal(entry.diagnosticsAfterFlush.diagnosticEventCount, 2);
       assert.equal(entry.diagnosticsAfterFlush.callbackRuns.length, 1);
+      assert.equal(
+        entry.diagnosticsAfterFlush.callbackRuns[0].diagnosticEventIndex,
+        1
+      );
       assert.equal(
         entry.diagnosticsAfterFlush.callbackRuns[0].priorityLevel,
         entry.priorityLevel
@@ -726,8 +763,37 @@ test("scheduler post-task private priority diagnostics capture shimmed TaskContr
       true
     );
     assert.equal(
+      report.cancellation.diagnosticsAfterCancel.taskControllerAbortOrderingDiagnostics,
+      true
+    );
+    assert.equal(report.cancellation.diagnosticsAfterCancel.diagnosticEventCount, 3);
+    assert.equal(
       report.cancellation.diagnosticsAfterCancel.cancellation.status,
       "cancelled-shimmed-task-controller"
+    );
+    assert.deepEqual(
+      report.cancellation.diagnosticsAfterCancel.cancellation.abortOrdering,
+      {
+        status: "task-controller-abort-observed-after-abort-call",
+        requestEventIndex: 1,
+        completionEventIndex: 2,
+        signalAbortedBeforeAbort: false,
+        signalAbortedAfterAbort: true,
+        callbackRunCountAtRequest: 0,
+        callbackRunCountAtCompletion: 0,
+        continuationFallbackCountAtRequest: 0,
+        continuationFallbackCountAtCompletion: 0
+      }
+    );
+    assert.equal(
+      report.cancellation.diagnosticsAfterCancel.cancellation.signalBeforeAbort
+        .aborted,
+      false
+    );
+    assert.equal(
+      report.cancellation.diagnosticsAfterCancel.cancellation.signalAfterAbort
+        .aborted,
+      true
     );
     assert.equal(
       report.cancellation.diagnosticsAfterCancel.cancellation.abortObserved,
@@ -804,28 +870,48 @@ test("scheduler post-task private priority diagnostics capture continuation fall
         false
       );
       assert.equal(diagnostics.continuationFallbackDiagnostics, true);
+      assert.equal(diagnostics.continuationFallbackMetadataDiagnostics, true);
+      assert.equal(diagnostics.taskControllerAbortOrderingDiagnostics, false);
+      assert.equal(diagnostics.diagnosticEventCount, 4);
       assert.equal(diagnostics.callbackRuns.length, 2);
       assert.deepEqual(
         diagnostics.callbackRuns.map((entry) => [
           entry.runIndex,
+          entry.diagnosticEventIndex,
           entry.priorityLevel,
           entry.postTaskPriority,
           entry.currentPriorityLevel,
           entry.signal.priority
         ]),
         [
-          [0, 3, "user-visible", 3, "user-visible"],
-          [1, 3, "user-visible", 3, "user-visible"]
+          [0, 1, 3, "user-visible", 3, "user-visible"],
+          [1, 3, 3, "user-visible", 3, "user-visible"]
         ]
       );
       assert.deepEqual(diagnostics.continuationFallbacks, [
         {
           status: "scheduled-shimmed-post-task-continuation",
+          diagnosticEventIndex: 2,
           continuationIndex: 0,
+          sourceCallbackRunIndex: 0,
+          callbackRunCountAtSchedule: 1,
           fallback: expectedFallback,
           priorityLevel: 3,
           postTaskPriority: "user-visible",
+          continuationOptions: {
+            hasSignalProperty: true,
+            hasDelayProperty: false,
+            ownKeys: ["signal"],
+            signalMatchesTaskController: true,
+            signalAbortedAtSchedule: false
+          },
           reusesOriginalSignal: true,
+          signalAtSchedule: {
+            id: 8,
+            priority: "user-visible",
+            aborted: false,
+            ownKeys: ["id", "aborted", "priority"]
+          },
           signal: {
             id: 8,
             priority: "user-visible",
@@ -838,6 +924,112 @@ test("scheduler post-task private priority diagnostics capture continuation fall
         }
       ]);
     }
+  }
+});
+
+test("scheduler post-task private priority diagnostics capture abort ordering around queued continuation fallback", () => {
+  for (const mode of SCHEDULER_POST_TASK_PROBE_MODES) {
+    const report = inspectSchedulerPostTaskPriorityDiagnostics({
+      nodeEnv: mode.nodeEnv,
+      withYield: false
+    });
+    const flow = report.continuationAbortAfterFallback;
+
+    assert.deepEqual(flow.publicNodeKeys, ["_controller"]);
+    assert.equal(flow.privateDiagnosticSymbolPresent, true);
+    assert.deepEqual(
+      flow.initialFlush.map((entry) => entry.type),
+      ["run-post-task"]
+    );
+    assert.deepEqual(flow.fallbackEvents, [
+      {
+        type: "postTask",
+        hasDelayProperty: false,
+        delay: {
+          type: "undefined",
+          value: null
+        },
+        signal: {
+          id: 9,
+          priority: "user-visible",
+          aborted: false
+        }
+      }
+    ]);
+    assert.deepEqual(flow.events, [
+      {
+        label: "start",
+        currentPriorityLevel: 3
+      }
+    ]);
+
+    const afterFallback = flow.diagnosticsAfterFallback;
+    assert.equal(afterFallback.diagnosticEventCount, 3);
+    assert.equal(afterFallback.continuationFallbackMetadataDiagnostics, true);
+    assert.equal(afterFallback.taskControllerAbortOrderingDiagnostics, false);
+    assert.deepEqual(
+      afterFallback.callbackRuns.map((entry) => [
+        entry.runIndex,
+        entry.diagnosticEventIndex
+      ]),
+      [[0, 1]]
+    );
+    assert.deepEqual(
+      afterFallback.continuationFallbacks.map((entry) => [
+        entry.continuationIndex,
+        entry.diagnosticEventIndex,
+        entry.sourceCallbackRunIndex,
+        entry.callbackRunCountAtSchedule,
+        entry.fallback,
+        entry.continuationOptions.signalMatchesTaskController,
+        entry.continuationOptions.signalAbortedAtSchedule
+      ]),
+      [[0, 2, 0, 1, "scheduler.postTask", true, false]]
+    );
+
+    const afterCancel = flow.diagnosticsAfterCancel;
+    assert.equal(afterCancel.compatibilityClaimed, false);
+    assert.equal(afterCancel.browserPostTaskCompatibilityClaimed, false);
+    assert.equal(afterCancel.browserTaskOrderingCompatibilityClaimed, false);
+    assert.equal(
+      afterCancel.publicSchedulerTimingCompatibilityClaimed,
+      false
+    );
+    assert.equal(afterCancel.taskControllerAbortOrderingDiagnostics, true);
+    assert.equal(afterCancel.continuationFallbackMetadataDiagnostics, true);
+    assert.equal(afterCancel.diagnosticEventCount, 5);
+    assert.deepEqual(afterCancel.cancellation.abortOrdering, {
+      status: "task-controller-abort-observed-after-abort-call",
+      requestEventIndex: 3,
+      completionEventIndex: 4,
+      signalAbortedBeforeAbort: false,
+      signalAbortedAfterAbort: true,
+      callbackRunCountAtRequest: 1,
+      callbackRunCountAtCompletion: 1,
+      continuationFallbackCountAtRequest: 1,
+      continuationFallbackCountAtCompletion: 1
+    });
+    assert.deepEqual(flow.cancellationEvents, [
+      {
+        type: "abort",
+        priority: "user-visible",
+        signalId: 9
+      }
+    ]);
+    assert.deepEqual(flow.finalFlush, [
+      {
+        type: "skip-aborted",
+        signal: {
+          id: 9,
+          priority: "user-visible",
+          aborted: true
+        }
+      }
+    ]);
+    assert.equal(
+      flow.diagnosticsAfterFinalFlush.callbackRuns.length,
+      1
+    );
   }
 });
 

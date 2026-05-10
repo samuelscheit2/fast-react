@@ -243,6 +243,40 @@ export function inspectSchedulerPostTaskPriorityDiagnostics({
         readSchedulerPostTaskPriorityDiagnostics(continuationNode);
       const continuationPostFlushEvents = shim.takeEvents();
 
+      const continuationAbortEvents = [];
+      const continuationAbortNode = Scheduler.unstable_scheduleCallback(
+        Scheduler.unstable_NormalPriority,
+        () => {
+          continuationAbortEvents.push({
+            label: "start",
+            currentPriorityLevel: Scheduler.unstable_getCurrentPriorityLevel()
+          });
+          return () => {
+            continuationAbortEvents.push({
+              label: "continuation",
+              currentPriorityLevel:
+                Scheduler.unstable_getCurrentPriorityLevel()
+            });
+          };
+        }
+      );
+      const continuationAbortScheduleEvents = shim.takeEvents();
+      const continuationAbortBeforeFlush =
+        readSchedulerPostTaskPriorityDiagnostics(continuationAbortNode);
+      const continuationAbortInitialFlush = shim.flushPostTasks(1);
+      const continuationAbortAfterFallback =
+        readSchedulerPostTaskPriorityDiagnostics(continuationAbortNode);
+      const continuationAbortFallbackEvents = shim.takeEvents();
+      const continuationAbortReturn = Scheduler.unstable_cancelCallback(
+        continuationAbortNode
+      );
+      const continuationAbortAfterCancel =
+        readSchedulerPostTaskPriorityDiagnostics(continuationAbortNode);
+      const continuationAbortCancellationEvents = shim.takeEvents();
+      const continuationAbortFinalFlush = shim.flushPostTasks();
+      const continuationAbortAfterFinalFlush =
+        readSchedulerPostTaskPriorityDiagnostics(continuationAbortNode);
+
       return {
         nodeEnv,
         withYield,
@@ -276,6 +310,24 @@ export function inspectSchedulerPostTaskPriorityDiagnostics({
           events: continuationEvents,
           diagnosticsAfterFlush: continuationAfterFlush,
           postFlushEvents: continuationPostFlushEvents
+        },
+        continuationAbortAfterFallback: {
+          publicNodeKeys: Object.keys(continuationAbortNode),
+          privateDiagnosticSymbolPresent:
+            Reflect.ownKeys(continuationAbortNode).includes(
+              SCHEDULER_POST_TASK_PRIORITY_DIAGNOSTICS_SYMBOL
+            ),
+          scheduleEvents: continuationAbortScheduleEvents,
+          diagnosticsBeforeFlush: continuationAbortBeforeFlush,
+          initialFlush: continuationAbortInitialFlush,
+          diagnosticsAfterFallback: continuationAbortAfterFallback,
+          fallbackEvents: continuationAbortFallbackEvents,
+          cancelReturnType: typeof continuationAbortReturn,
+          diagnosticsAfterCancel: continuationAbortAfterCancel,
+          cancellationEvents: continuationAbortCancellationEvents,
+          finalFlush: continuationAbortFinalFlush,
+          diagnosticsAfterFinalFlush: continuationAbortAfterFinalFlush,
+          events: continuationAbortEvents
         }
       };
     }
@@ -406,14 +458,19 @@ function installPostTaskPriorityDiagnosticsShim({ withYield }) {
       events.length = 0;
       return taken;
     },
-    flushPostTasks() {
+    flushPostTasks(maxTasks) {
       const flushEvents = [];
+      let flushedTaskCount = 0;
       let guard = 0;
-      while (postTaskQueue.length > 0) {
+      while (
+        postTaskQueue.length > 0 &&
+        (maxTasks === undefined || flushedTaskCount < maxTasks)
+      ) {
         if (guard++ > 20) {
           throw new Error("postTask diagnostics shim exceeded flush guard");
         }
         const next = postTaskQueue.shift();
+        flushedTaskCount++;
         if (next.options.signal?.aborted) {
           flushEvents.push({
             type: "skip-aborted",
