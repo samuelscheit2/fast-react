@@ -21,6 +21,7 @@ const {
   assertEventTarget,
   getEventListenerSet,
   getListenerSetKey,
+  getPrivateEventListenerQueueEntryPayload,
   hasListeningMarker,
   inspectListeningMarker,
   internalEventHandlersKey,
@@ -33,8 +34,12 @@ const {
 const {
   createSyntheticEventShapeGateFromDispatchRecords,
   createEventDispatchRecordFromWrapperRecord,
+  getDispatchListenerRecordPayload,
+  getDispatchQueueEntryRecordPayload,
   getDispatchQueueInvocationCanaryRecordPayload,
+  getPrivateClickEventDelegationDispatchGatePayload,
   getSyntheticEventShapeGateRecordPayload,
+  invokePrivateClickEventDelegationDispatchGate,
   invokeDispatchQueueCanaryFromDispatchRecords,
   invokeSingleListenerCanaryFromDispatchRecord
 } = require('./plugin-event-system.js');
@@ -59,18 +64,25 @@ const PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CANARY_RECORD_KIND =
   'FastReactDomPrivateRootHostOutputClickDispatchCanaryRecord';
 const PRIVATE_ROOT_HOST_OUTPUT_SYNTHETIC_EVENT_SHAPE_GATE_RECORD_KIND =
   'FastReactDomPrivateRootHostOutputSyntheticEventShapeGateRecord';
+const PRIVATE_ROOT_CLICK_EVENT_DELEGATION_DISPATCH_GATE_RECORD_KIND =
+  'FastReactDomPrivateRootClickEventDelegationDispatchGateRecord';
 const PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CANARY_STATUS =
   'controlled-private-root-host-output-click-dispatch-canary';
 const PRIVATE_ROOT_HOST_OUTPUT_SYNTHETIC_EVENT_SHAPE_GATE_STATUS =
   'controlled-private-root-host-output-synthetic-event-shape-gate';
+const PRIVATE_ROOT_CLICK_EVENT_DELEGATION_DISPATCH_GATE_STATUS =
+  'admitted-private-root-click-event-delegation-dispatch-gate';
 const INVALID_PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CODE =
   'FAST_REACT_DOM_INVALID_PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH';
+const INVALID_PRIVATE_ROOT_CLICK_EVENT_DELEGATION_DISPATCH_GATE_CODE =
+  'FAST_REACT_DOM_INVALID_PRIVATE_ROOT_CLICK_EVENT_DELEGATION_DISPATCH_GATE';
 
 const rootListenerRegistrationPayloads = new WeakMap();
 const rootListenerCleanupRecords = new WeakMap();
 const rootListenerDispatchRecords = new WeakMap();
 const rootListenerInvocationCanaryRecords = new WeakMap();
 const privateRootHostOutputClickDispatchCanaryPayloads = new WeakMap();
+const privateRootClickEventDelegationDispatchGatePayloads = new WeakMap();
 const portalPrepareMountListenerIntentPayloads = new WeakMap();
 const privateRootHostOutputSyntheticEventShapeGatePayloads = new WeakMap();
 
@@ -354,6 +366,142 @@ function invokePrivateRootHostOutputClickDispatchCanary(
   return record;
 }
 
+function invokePrivateRootClickEventDelegationDispatchGate(
+  listenerRegistrationRecord,
+  hostOutputPayloadOrTargetRecord,
+  acceptedListenerQueueEntryRecord,
+  options
+) {
+  const diagnosticOptions =
+    normalizePrivateRootClickEventDelegationDispatchGateOptions(options);
+  const registrationPayload =
+    assertActiveRootListenerRegistrationPayload(listenerRegistrationRecord);
+  const targetRecord = isPrivateRootHostOutputEventTargetRecord(
+    hostOutputPayloadOrTargetRecord
+  )
+    ? hostOutputPayloadOrTargetRecord
+    : createPrivateRootHostOutputEventTargetRecord(
+        hostOutputPayloadOrTargetRecord,
+        options
+      );
+  const targetPayload =
+    getPrivateRootHostOutputEventTargetRecordPayload(targetRecord);
+  if (targetPayload === null) {
+    throwRootClickEventDelegationDispatchGateError(
+      'Expected private React DOM root host-output event target metadata.',
+      'invalid-target-record'
+    );
+  }
+
+  assertAcceptedPrivateClickListenerQueueEntry(
+    acceptedListenerQueueEntryRecord,
+    diagnosticOptions.phase
+  );
+
+  const clickListeners = getInstalledRootListenerPair(
+    registrationPayload,
+    'click'
+  );
+  const rootListenerRecord =
+    diagnosticOptions.phase === 'capture'
+      ? clickListeners.capture
+      : clickListeners.bubble;
+  const nativeEvent = createPrivateFakeClickEvent(targetPayload.targetNode);
+  const dispatchRecord = dispatchInstalledRootListener(
+    rootListenerRecord,
+    nativeEvent
+  );
+  const dispatchListenerRecord =
+    findPrivateClickEventDelegationDispatchListenerRecord(
+      dispatchRecord,
+      acceptedListenerQueueEntryRecord,
+      diagnosticOptions.useProcessingOrder
+    );
+  const pluginGateRecord = invokePrivateClickEventDelegationDispatchGate(
+    dispatchRecord,
+    dispatchListenerRecord,
+    {
+      portalEventOwnerRootGateRecord:
+        diagnosticOptions.portalEventOwnerRootGateRecord
+    }
+  );
+  const pluginGatePayload =
+    getPrivateClickEventDelegationDispatchGatePayload(pluginGateRecord);
+  const invocationRecord =
+    pluginGatePayload === null ? null : pluginGatePayload.invocationRecord;
+  const record = freezeRecord({
+    browserDomEventCompatibilityClaimed: false,
+    clickEventDelegationDispatchGate: true,
+    compatibilityClaimed: false,
+    dispatchListenerRecordKind: dispatchListenerRecord.kind,
+    dispatchPathIndex: dispatchListenerRecord.dispatchPathIndex,
+    dispatchRecordKind: dispatchRecord.kind,
+    domEventName: 'click',
+    eventDispatch: false,
+    eventPriority: dispatchRecord.eventPriority,
+    eventPriorityLabel: dispatchRecord.eventPriorityLabel,
+    eventPriorityLane: dispatchRecord.eventPriorityLane,
+    eventPriorityName: dispatchRecord.eventPriorityName,
+    eventSystemFlags: dispatchRecord.eventSystemFlags,
+    extractionRecordKind: dispatchRecord.extractionRecord.kind,
+    inCapturePhase: dispatchRecord.inCapturePhase,
+    invocationRecordKind:
+      invocationRecord === null ? null : invocationRecord.kind,
+    invocationStatus:
+      invocationRecord === null
+        ? 'missing-invocation-record'
+        : invocationRecord.invocationStatus,
+    kind: PRIVATE_ROOT_CLICK_EVENT_DELEGATION_DISPATCH_GATE_RECORD_KIND,
+    listenerInvocationCount: pluginGateRecord.listenerInvocationCount,
+    listenerQueueIndex: dispatchListenerRecord.listenerQueueIndex,
+    listenerQueueKey: dispatchListenerRecord.listenerQueueKey,
+    listenerQueueRecordKind: dispatchListenerRecord.listenerQueueRecordKind,
+    listenerStatus: dispatchListenerRecord.listenerStatus,
+    listenerType: dispatchListenerRecord.listenerType,
+    nativeEventTarget: dispatchRecord.nativeEventTarget,
+    nativeEventType: dispatchRecord.nativeEventType,
+    phase: diagnosticOptions.phase,
+    pluginGateRecordKind: pluginGateRecord.kind,
+    pluginGateStatus: pluginGateRecord.status,
+    portalOwnerRootAvailable: pluginGateRecord.portalOwnerRootAvailable,
+    privateListenerInvoked: pluginGateRecord.privateListenerInvoked,
+    privateListenerQueue: true,
+    publicDispatchBlocked: true,
+    publicDispatchEnabled: false,
+    publicRootBehaviorChanged: false,
+    rootListenerDispatchOrder: freezeArray([diagnosticOptions.phase]),
+    rootListenerSetKey: rootListenerRecord.listenerSetKey,
+    selectedFromProcessingOrder: pluginGateRecord.selectedFromProcessingOrder,
+    status: PRIVATE_ROOT_CLICK_EVENT_DELEGATION_DISPATCH_GATE_STATUS,
+    syntheticEventCount: 0,
+    syntheticEventStatus: 'blocked-not-created',
+    targetInst: dispatchRecord.targetInst,
+    targetInstStatus: dispatchRecord.targetInstStatus,
+    targetRecordKind: PRIVATE_ROOT_HOST_OUTPUT_EVENT_TARGET_RECORD_KIND,
+    willDispatchPublicEvent: false,
+    willInvokePublicListeners: false
+  });
+
+  privateRootClickEventDelegationDispatchGatePayloads.set(
+    record,
+    freezeRecord({
+      acceptedListenerQueueEntryRecord,
+      dispatchListenerRecord,
+      dispatchRecord,
+      invocationRecord,
+      listenerRegistrationRecord,
+      nativeEvent,
+      options: diagnosticOptions,
+      pluginGateRecord,
+      rootListenerRecord,
+      targetPayload,
+      targetRecord
+    })
+  );
+
+  return record;
+}
+
 function createPrivateRootHostOutputClickSyntheticEventShapeGate(
   listenerRegistrationRecord,
   hostOutputPayloadOrTargetRecord,
@@ -493,8 +641,27 @@ function getPrivateRootHostOutputSyntheticEventShapeGatePayload(record) {
   );
 }
 
+function getPrivateRootClickEventDelegationDispatchGatePayload(record) {
+  if (
+    record === null ||
+    (typeof record !== 'object' && typeof record !== 'function')
+  ) {
+    return null;
+  }
+
+  return (
+    privateRootClickEventDelegationDispatchGatePayloads.get(record) || null
+  );
+}
+
 function isPrivateRootHostOutputClickDispatchCanaryRecord(record) {
   return getPrivateRootHostOutputClickDispatchCanaryPayload(record) !== null;
+}
+
+function isPrivateRootClickEventDelegationDispatchGateRecord(record) {
+  return (
+    getPrivateRootClickEventDelegationDispatchGatePayload(record) !== null
+  );
 }
 
 function isPrivateRootHostOutputSyntheticEventShapeGateRecord(record) {
@@ -1279,6 +1446,55 @@ function normalizePrivateRootHostOutputClickDispatchCanaryOptions(options) {
   });
 }
 
+function normalizePrivateRootClickEventDelegationDispatchGateOptions(options) {
+  const normalizedOptions =
+    options !== null &&
+    (typeof options === 'object' || typeof options === 'function')
+      ? options
+      : {};
+  const phase =
+    normalizedOptions.phase === undefined ? 'bubble' : normalizedOptions.phase;
+  if (phase !== 'bubble' && phase !== 'capture') {
+    throwRootClickEventDelegationDispatchGateError(
+      'Private root click event delegation dispatch only supports bubble and capture phases.',
+      'unsupported-event-phase'
+    );
+  }
+
+  return freezeRecord({
+    phase,
+    portalEventOwnerRootGateRecord:
+      normalizedOptions.portalEventOwnerRootGateRecord ||
+      normalizedOptions.portalOwnerRootGateRecord ||
+      null,
+    useProcessingOrder: normalizedOptions.useProcessingOrder !== false
+  });
+}
+
+function assertAcceptedPrivateClickListenerQueueEntry(record, phase) {
+  const payload = getPrivateEventListenerQueueEntryPayload(record);
+  if (payload === null || payload.active !== true) {
+    throwRootClickEventDelegationDispatchGateError(
+      'Private root click event delegation dispatch rejected a stale listener registry record.',
+      'stale-listener-record'
+    );
+  }
+  if (payload.domEventName !== 'click') {
+    throwRootClickEventDelegationDispatchGateError(
+      'Private root click event delegation dispatch only accepts click listener registry records.',
+      'unsupported-event-type'
+    );
+  }
+  if (payload.capture !== (phase === 'capture')) {
+    throwRootClickEventDelegationDispatchGateError(
+      'Private root click event delegation dispatch listener registry phase does not match the requested phase.',
+      'unsupported-event-phase'
+    );
+  }
+
+  return payload;
+}
+
 function getInstalledRootListenerPair(registrationPayload, domEventName) {
   const capture = registrationPayload.installedListeners.find(
     (listenerRecord) =>
@@ -1301,6 +1517,40 @@ function getInstalledRootListenerPair(registrationPayload, domEventName) {
     bubble,
     capture
   };
+}
+
+function findPrivateClickEventDelegationDispatchListenerRecord(
+  dispatchRecord,
+  acceptedListenerQueueEntryRecord,
+  useProcessingOrder
+) {
+  for (const dispatchQueueEntry of dispatchRecord.dispatchQueue.entries) {
+    const entryPayload =
+      getDispatchQueueEntryRecordPayload(dispatchQueueEntry);
+    const listenerRecords =
+      useProcessingOrder && entryPayload !== null
+        ? entryPayload.processingListenerRecords
+        : entryPayload === null
+          ? []
+          : entryPayload.listenerRecords;
+    const listenerRecord = listenerRecords.find((candidateRecord) => {
+      const listenerPayload =
+        getDispatchListenerRecordPayload(candidateRecord);
+      return (
+        listenerPayload !== null &&
+        listenerPayload.privateEventListenerQueueEntryRecord ===
+          acceptedListenerQueueEntryRecord
+      );
+    });
+    if (listenerRecord !== undefined) {
+      return listenerRecord;
+    }
+  }
+
+  throwRootClickEventDelegationDispatchGateError(
+    'Private root click event delegation dispatch did not find the accepted listener record in the plugin extraction queue.',
+    'accepted-listener-not-on-dispatch-path'
+  );
 }
 
 function dispatchInstalledRootListener(listenerRecord, nativeEvent) {
@@ -1347,6 +1597,13 @@ function throwRootHostOutputClickDispatchError(message) {
   throw error;
 }
 
+function throwRootClickEventDelegationDispatchGateError(message, reason) {
+  const error = new Error(message);
+  error.code = INVALID_PRIVATE_ROOT_CLICK_EVENT_DELEGATION_DISPATCH_GATE_CODE;
+  error.reason = reason;
+  throw error;
+}
+
 function freezeRecord(record) {
   return Object.freeze(record);
 }
@@ -1359,6 +1616,9 @@ module.exports = {
   IS_CAPTURE_PHASE,
   IS_NON_DELEGATED,
   INVALID_PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CODE,
+  INVALID_PRIVATE_ROOT_CLICK_EVENT_DELEGATION_DISPATCH_GATE_CODE,
+  PRIVATE_ROOT_CLICK_EVENT_DELEGATION_DISPATCH_GATE_RECORD_KIND,
+  PRIVATE_ROOT_CLICK_EVENT_DELEGATION_DISPATCH_GATE_STATUS,
   PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CANARY_RECORD_KIND,
   PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CANARY_STATUS,
   PORTAL_PREPARE_MOUNT_LISTENER_INTENT_RECORDED,
@@ -1377,11 +1637,14 @@ module.exports = {
   getLastRootListenerDispatchRecord,
   getPortalPrepareMountListenerIntentPayload,
   getRootEventTargetOwnerDocument,
+  getPrivateRootClickEventDelegationDispatchGatePayload,
   getPrivateRootHostOutputClickDispatchCanaryPayload,
   getPrivateRootHostOutputSyntheticEventShapeGatePayload,
   invokeLastRootListenerSingleListenerCanary,
+  invokePrivateRootClickEventDelegationDispatchGate,
   invokePrivateRootHostOutputClickDispatchCanary,
   isPortalPrepareMountListenerIntentRecord,
+  isPrivateRootClickEventDelegationDispatchGateRecord,
   isPrivateRootHostOutputClickDispatchCanaryRecord,
   isPrivateRootHostOutputSyntheticEventShapeGateRecord,
   listenToAllSupportedEvents,

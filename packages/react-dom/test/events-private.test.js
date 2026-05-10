@@ -17,9 +17,264 @@ const controlledRestoreQueue = require(
 const eventListener = require(
   path.join(packageRoot, 'src/events/react-dom-event-listener.js')
 );
+const listenerRegistry = require(
+  path.join(packageRoot, 'src/events/listener-registry.js')
+);
 const pluginEventSystem = require(
   path.join(packageRoot, 'src/events/plugin-event-system.js')
 );
+const rootListeners = require(
+  path.join(packageRoot, 'src/events/root-listeners.js')
+);
+
+test('private click event delegation dispatch gate routes one accepted listener record', () => {
+  const fixture = createPrivateClickDelegationFixture('click-gate-route');
+  const calls = [];
+  const listenerRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      fixture.targetNode,
+      'click',
+      false,
+      event => {
+        calls.push({
+          currentTarget: event.currentTarget,
+          event,
+          registrationName: event.registrationName,
+          target: event.target,
+          targetInst: event.targetInst,
+          type: event.type
+        });
+        return 'accepted-click';
+      },
+      {
+        listenerType: 'accepted-private-click-delegation-test'
+      }
+    );
+  const rootRegistration =
+    rootListeners.registerRootListenersForPrivateRoot(fixture.container);
+
+  try {
+    const gate =
+      rootListeners.invokePrivateRootClickEventDelegationDispatchGate(
+        rootRegistration,
+        fixture.hostOutputPayload,
+        listenerRecord
+      );
+    const payload =
+      rootListeners.getPrivateRootClickEventDelegationDispatchGatePayload(
+        gate
+      );
+    const pluginPayload =
+      pluginEventSystem.getPrivateClickEventDelegationDispatchGatePayload(
+        payload.pluginGateRecord
+      );
+
+    assert.equal(
+      gate.kind,
+      rootListeners
+        .PRIVATE_ROOT_CLICK_EVENT_DELEGATION_DISPATCH_GATE_RECORD_KIND
+    );
+    assert.equal(
+      gate.status,
+      rootListeners
+        .PRIVATE_ROOT_CLICK_EVENT_DELEGATION_DISPATCH_GATE_STATUS
+    );
+    assert.equal(
+      rootListeners.isPrivateRootClickEventDelegationDispatchGateRecord(
+        gate
+      ),
+      true
+    );
+    assert.equal(gate.domEventName, 'click');
+    assert.equal(gate.phase, 'bubble');
+    assert.equal(gate.eventPriorityName, 'DiscreteEventPriority');
+    assert.equal(gate.listenerInvocationCount, 1);
+    assert.equal(gate.privateListenerInvoked, true);
+    assert.equal(gate.publicDispatchEnabled, false);
+    assert.equal(gate.publicRootBehaviorChanged, false);
+    assert.equal(gate.browserDomEventCompatibilityClaimed, false);
+    assert.equal(gate.syntheticEventCount, 0);
+    assert.equal(
+      gate.pluginGateRecordKind,
+      pluginEventSystem
+        .PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_RECORD_KIND
+    );
+    assert.equal(
+      gate.invocationRecordKind,
+      pluginEventSystem.DISPATCH_LISTENER_INVOCATION_CANARY_RECORD_KIND
+    );
+    assert.equal(payload.acceptedListenerQueueEntryRecord, listenerRecord);
+    assert.equal(payload.dispatchRecord.domEventName, 'click');
+    assert.equal(payload.dispatchRecord.extractionRecord.domEventName, 'click');
+    assert.equal(payload.dispatchListenerRecord.privateListenerQueue, true);
+    assert.equal(pluginPayload.dispatchRecord, payload.dispatchRecord);
+    assert.equal(pluginPayload.dispatchListenerRecord, payload.dispatchListenerRecord);
+    assert.equal(pluginPayload.listenerQueueEntryRecord, listenerRecord);
+
+    assert.deepEqual(calls.map(call => [
+      call.type,
+      call.registrationName,
+      call.currentTarget,
+      call.target,
+      call.targetInst
+    ]), [
+      [
+        'click',
+        'onClick',
+        fixture.targetNode,
+        fixture.targetNode,
+        fixture.token
+      ]
+    ]);
+    assert.equal(Object.isFrozen(calls[0].event), true);
+    assert.equal(calls[0].event.syntheticEvent, false);
+    assert.equal(Object.hasOwn(calls[0].event, 'nativeEvent'), false);
+    assert.equal(fixture.targetNode.__registrations.length, 0);
+    assert.equal(fixture.container.__registrations.length, 138);
+    assert.equal(fixture.document.__registrations.length, 1);
+  } finally {
+    listenerRegistry.removePrivateEventListenerQueueEntry(listenerRecord);
+    rootListeners.revertRootListenersForPrivateRoot(rootRegistration);
+    componentTree.detachHostInstanceToken(fixture.token);
+  }
+});
+
+test('private click event delegation dispatch gate rejects stale listener records before invoking', () => {
+  const fixture = createPrivateClickDelegationFixture('click-gate-stale');
+  const calls = [];
+  const listenerRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      fixture.targetNode,
+      'click',
+      false,
+      () => {
+        calls.push('stale-listener-invoked');
+      }
+    );
+  const dispatchRecord = createPrivateClickDispatchRecord(fixture, 'bubble');
+  const dispatchListenerRecord = findPrivateQueueDispatchListenerRecord(
+    dispatchRecord,
+    listenerRecord
+  );
+
+  try {
+    listenerRegistry.removePrivateEventListenerQueueEntry(listenerRecord);
+
+    assert.throws(
+      () =>
+        pluginEventSystem.invokePrivateClickEventDelegationDispatchGate(
+          dispatchRecord,
+          dispatchListenerRecord
+        ),
+      {
+        code:
+          pluginEventSystem
+            .INVALID_PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_CODE,
+        reason: 'stale-listener-record'
+      }
+    );
+    assert.deepEqual(calls, []);
+  } finally {
+    listenerRegistry.removePrivateEventListenerQueueEntry(listenerRecord);
+    componentTree.detachHostInstanceToken(fixture.token);
+  }
+});
+
+test('private root click event delegation dispatch gate rejects unsupported phases before invoking', () => {
+  const fixture = createPrivateClickDelegationFixture('click-gate-phase');
+  const calls = [];
+  const listenerRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      fixture.targetNode,
+      'click',
+      false,
+      () => {
+        calls.push('unsupported-phase-invoked');
+      }
+    );
+  const rootRegistration =
+    rootListeners.registerRootListenersForPrivateRoot(fixture.container);
+
+  try {
+    assert.throws(
+      () =>
+        rootListeners.invokePrivateRootClickEventDelegationDispatchGate(
+          rootRegistration,
+          fixture.hostOutputPayload,
+          listenerRecord,
+          {
+            phase: 'target'
+          }
+        ),
+      {
+        code:
+          rootListeners
+            .INVALID_PRIVATE_ROOT_CLICK_EVENT_DELEGATION_DISPATCH_GATE_CODE,
+        reason: 'unsupported-event-phase'
+      }
+    );
+    assert.deepEqual(calls, []);
+  } finally {
+    listenerRegistry.removePrivateEventListenerQueueEntry(listenerRecord);
+    rootListeners.revertRootListenersForPrivateRoot(rootRegistration);
+    componentTree.detachHostInstanceToken(fixture.token);
+  }
+});
+
+test('private click event delegation dispatch gate rejects portal owner mismatch before invoking', () => {
+  const source = createPrivateClickDelegationFixture('click-gate-portal-a');
+  const foreign = createPrivateClickDelegationFixture('click-gate-portal-b');
+  const calls = [];
+  const listenerRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      source.targetNode,
+      'click',
+      false,
+      () => {
+        calls.push('portal-mismatch-invoked');
+      }
+    );
+  const sourceDispatch = createPrivateClickDispatchRecord(source, 'bubble');
+  const sourceListenerRecord = findPrivateQueueDispatchListenerRecord(
+    sourceDispatch,
+    listenerRecord
+  );
+  const foreignDispatch = createPrivateClickDispatchRecord(foreign, 'bubble');
+  const foreignPortalGate =
+    pluginEventSystem.createPortalEventOwnerRootGateRecord(
+      foreignDispatch.targetDispatchPathRecord,
+      {
+        domEventName: 'click',
+        ownerRoot: foreign.rootOwner,
+        portalContainer: foreign.container,
+        rootContainer: foreign.container
+      }
+    );
+
+  try {
+    assert.throws(
+      () =>
+        pluginEventSystem.invokePrivateClickEventDelegationDispatchGate(
+          sourceDispatch,
+          sourceListenerRecord,
+          {
+            portalEventOwnerRootGateRecord: foreignPortalGate
+          }
+        ),
+      {
+        code:
+          pluginEventSystem
+            .INVALID_PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_CODE,
+        reason: 'portal-owner-root-mismatch'
+      }
+    );
+    assert.deepEqual(calls, []);
+  } finally {
+    listenerRegistry.removePrivateEventListenerQueueEntry(listenerRecord);
+    componentTree.detachHostInstanceToken(source.token);
+    componentTree.detachHostInstanceToken(foreign.token);
+  }
+});
 
 test('private input/change extraction preflight records text input and checkbox metadata only', () => {
   const calls = [];
@@ -392,6 +647,122 @@ test('private input/change extraction preflight rejects foreign records', () => 
     false
   );
 });
+
+function createPrivateClickDelegationFixture(label) {
+  const document = installEventTargetMethods(createDocument());
+  const container = installEventTargetMethods(createNode('DIV', document));
+  const targetNode = installEventTargetMethods(createNode('BUTTON', document));
+  targetNode.parentNode = container;
+
+  const rootOwner = {kind: `${label}:root`};
+  const token = componentTree.createHostInstanceToken(
+    {kind: `${label}:host`},
+    rootOwner
+  );
+  componentTree.attachHostInstanceNode(targetNode, token, {});
+
+  return {
+    container,
+    document,
+    hostOutputPayload: {
+      hostNode: targetNode,
+      hostToken: token,
+      rootOwner
+    },
+    rootOwner,
+    targetNode,
+    token
+  };
+}
+
+function createPrivateClickDispatchRecord(fixture, phase) {
+  const eventSystemFlags =
+    phase === 'capture' ? rootListeners.IS_CAPTURE_PHASE : 0;
+  const wrapperRecord =
+    eventListener.createEventListenerWrapperRecordWithPriority(
+      fixture.container,
+      'click',
+      eventSystemFlags
+    );
+  return pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+    wrapperRecord,
+    createPrivateClickNativeEvent(fixture.targetNode)
+  );
+}
+
+function findPrivateQueueDispatchListenerRecord(
+  dispatchRecord,
+  listenerQueueEntryRecord
+) {
+  for (const entry of dispatchRecord.dispatchQueue.entries) {
+    const entryPayload =
+      pluginEventSystem.getDispatchQueueEntryRecordPayload(entry);
+    const listenerRecord = entryPayload.processingListenerRecords.find(
+      candidateRecord => {
+        const listenerPayload =
+          pluginEventSystem.getDispatchListenerRecordPayload(candidateRecord);
+        return (
+          listenerPayload !== null &&
+          listenerPayload.privateEventListenerQueueEntryRecord ===
+            listenerQueueEntryRecord
+        );
+      }
+    );
+    if (listenerRecord !== undefined) {
+      return listenerRecord;
+    }
+  }
+
+  throw new Error('Expected a private queue dispatch listener record.');
+}
+
+function createPrivateClickNativeEvent(target) {
+  return {
+    defaultPrevented: false,
+    preventDefaultCallCount: 0,
+    returnValue: true,
+    target,
+    type: 'click',
+    preventDefault() {
+      this.defaultPrevented = true;
+      this.preventDefaultCallCount++;
+      this.returnValue = false;
+    }
+  };
+}
+
+function installEventTargetMethods(target) {
+  if (!Array.isArray(target.__registrations)) {
+    target.__registrations = [];
+  }
+  target.addEventListener = function addEventListener(
+    type,
+    listener,
+    options
+  ) {
+    this.__registrations.push({
+      listener,
+      options,
+      type
+    });
+  };
+  target.removeEventListener = function removeEventListener(
+    type,
+    listener,
+    options
+  ) {
+    const index = this.__registrations.findIndex(
+      registration =>
+        registration.type === type &&
+        registration.listener === listener &&
+        registration.options === options
+    );
+    if (index !== -1) {
+      this.__registrations.splice(index, 1);
+    }
+  };
+  return target;
+}
 
 function createPrivateInputChangeDispatch(options) {
   const document = createDocument();
