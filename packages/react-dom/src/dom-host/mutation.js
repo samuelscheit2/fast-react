@@ -51,11 +51,15 @@ const ROOT_UNMOUNT_CONTAINER_CLEANUP_METADATA =
   'rootUnmountContainerCleanupMetadata';
 const ROOT_UNMOUNT_CONTAINER_CLEANUP_METADATA_STATUS =
   'accepted-fake-dom-root-container-cleanup';
+const DANGEROUS_HTML_TEXT_RESET_FAKE_DOM_MUTATION_RECORD =
+  'dangerousHtmlTextResetFakeDomMutation';
 
 const latestPropsCommitRecordPayloads = new WeakMap();
 const domPropertyUpdateLatestPropsHandoffPayloads = new WeakMap();
 const clearContainerForRootUnmountRecordPayloads = new WeakMap();
 const domPropertyPayloadMutationRecordsPayloads = new WeakMap();
+const dangerousHtmlTextResetFakeDomMutationPayloads = new WeakMap();
+const dangerousHtmlTextResetFakeDomTargets = new WeakSet();
 const latestPropsSafePayloadKinds = new Set([
   ENTRY_SET_ATTRIBUTE,
   ENTRY_REMOVE_ATTRIBUTE,
@@ -105,6 +109,27 @@ const DOM_TEXT_CONTENT_RESET_UPDATE_MUTATION_GATE_METADATA = Object.freeze({
     'managed-child-remove-before-text-content-update'
   ])
 });
+
+const DOM_DANGEROUS_HTML_TEXT_RESET_FAKE_DOM_MUTATION_GATE_METADATA =
+  Object.freeze({
+    gateVersion: 1,
+    target: 'packages/react-dom/src/dom-host/mutation.js',
+    privateTextContentBridge: 'setTextContent/resetTextContent',
+    privateDangerousHtmlBridge: 'innerHTML',
+    fakeDomOnly: true,
+    publicRootsCompared: false,
+    serverRenderingCompared: false,
+    hydrationCompared: false,
+    browserDomCompared: false,
+    publicDomMutation: false,
+    compatibilityClaimed: false,
+    supportedFakeDomRowIds: Object.freeze([
+      'dangerous-html-set-inner-html',
+      'managed-text-to-dangerous-html-set-inner-html',
+      'dangerous-html-to-managed-text-set-text-content',
+      'dangerous-html-to-managed-child-reset-text-content'
+    ])
+  });
 
 const DOM_ROOT_RENDER_HOST_OUTPUT_MUTATION_GATE_METADATA = Object.freeze({
   gateVersion: 1,
@@ -514,6 +539,68 @@ function applyStyleDangerousHtmlPayload(instance, payload) {
   );
 }
 
+function applyDangerousHtmlTextResetFakeDomRows(instance, rows) {
+  assertDomLikeObject(
+    instance,
+    'applyDangerousHtmlTextResetFakeDomRows',
+    'parent'
+  );
+  assertDangerousHtmlTextResetFakeDomTarget(instance);
+
+  let entries = null;
+  let rollbackRecords = null;
+  let rollbackLimit = 0;
+
+  try {
+    if (!Array.isArray(rows)) {
+      throw createDomHostMutationError(
+        'FAST_REACT_DOM_INVALID_DANGEROUS_HTML_TEXT_RESET_ROWS',
+        'Cannot apply dangerousHTML/text reset fake-DOM rows without an array.'
+      );
+    }
+
+    entries = rows.map((row, index) =>
+      validateDangerousHtmlTextResetFakeDomRow(instance, row, index)
+    );
+    rollbackRecords =
+      createDangerousHtmlTextResetFakeDomRollbackRecords(instance, entries);
+
+    for (let index = 0; index < entries.length; index += 1) {
+      rollbackLimit = index + 1;
+      applyDangerousHtmlTextResetFakeDomRow(instance, entries[index]);
+    }
+
+    return createDangerousHtmlTextResetFakeDomMutationRecords(
+      instance,
+      entries,
+      rollbackRecords
+    );
+  } catch (error) {
+    let rollbackApplied = false;
+    let rollbackError = null;
+    try {
+      if (rollbackRecords !== null && rollbackLimit > 0) {
+        rollbackDomPropertyPayloadEntries(
+          instance,
+          rollbackRecords,
+          rollbackLimit
+        );
+        rollbackApplied = true;
+      }
+    } catch (caughtRollbackError) {
+      rollbackError = caughtRollbackError;
+    }
+    attachDangerousHtmlTextResetRollbackEvidence(error, {
+      entries,
+      rollbackApplied,
+      rollbackError,
+      rollbackLimit,
+      rollbackRecords
+    });
+    throw error;
+  }
+}
+
 function createLatestPropsCommitRecord(node, latestProps, payloadRecords) {
   assertDomLikeObject(node, 'createLatestPropsCommitRecord', 'child');
 
@@ -579,6 +666,42 @@ function getDomPropertyPayloadMutationRecordsPayload(records) {
 
 function isDomPropertyPayloadMutationRecords(records) {
   return getDomPropertyPayloadMutationRecordsPayload(records) !== null;
+}
+
+function getDangerousHtmlTextResetFakeDomMutationPayload(records) {
+  if (!isWeakMapKey(records)) {
+    return null;
+  }
+  return dangerousHtmlTextResetFakeDomMutationPayloads.get(records) || null;
+}
+
+function isDangerousHtmlTextResetFakeDomMutationRecords(records) {
+  return getDangerousHtmlTextResetFakeDomMutationPayload(records) !== null;
+}
+
+function markDangerousHtmlTextResetFakeDomTarget(target) {
+  assertDomLikeObject(
+    target,
+    'markDangerousHtmlTextResetFakeDomTarget',
+    'parent'
+  );
+  dangerousHtmlTextResetFakeDomTargets.add(target);
+  return target;
+}
+
+function isDangerousHtmlTextResetFakeDomTarget(target) {
+  return (
+    isWeakMapKey(target) && dangerousHtmlTextResetFakeDomTargets.has(target)
+  );
+}
+
+function assertDangerousHtmlTextResetFakeDomTarget(target) {
+  if (!isDangerousHtmlTextResetFakeDomTarget(target)) {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_UNADMITTED_DANGEROUS_HTML_TEXT_RESET_FAKE_DOM_TARGET',
+      'Cannot apply dangerousHTML/text reset fake-DOM rows to an unadmitted target.'
+    );
+  }
 }
 
 function assertAppendParent(parent, operation) {
@@ -1049,6 +1172,63 @@ function createDomPropertyPayloadMutationRecords(
   return mutationRecords;
 }
 
+function createDangerousHtmlTextResetFakeDomMutationRecords(
+  instance,
+  entries,
+  rollbackRecords
+) {
+  const mutationRecords = Object.freeze(
+    entries.map((entry, index) =>
+      Object.freeze(
+        createDangerousHtmlTextResetFakeDomMutationRecord(entry, index)
+      )
+    )
+  );
+  const rollbackRecordCount = rollbackRecords.filter(Boolean).length;
+
+  dangerousHtmlTextResetFakeDomMutationPayloads.set(
+    mutationRecords,
+    Object.freeze({
+      mutationRecords,
+      node: instance,
+      rollbackRecordCount,
+      rollbackRecords,
+      rollbackSupported: true,
+      status: 'mutated',
+      textContentRowCount: entries.filter(isTextContentResetEntry).length,
+      setInnerHTMLCount: entries.filter(
+        (entry) => entry.kind === ENTRY_SET_INNER_HTML
+      ).length,
+      setTextContentCount: entries.filter(
+        (entry) => entry.kind === 'setTextContent'
+      ).length,
+      resetTextContentCount: entries.filter(
+        (entry) => entry.kind === 'resetTextContent'
+      ).length
+    })
+  );
+
+  return mutationRecords;
+}
+
+function createDangerousHtmlTextResetFakeDomMutationRecord(entry, index) {
+  return {
+    kind: DANGEROUS_HTML_TEXT_RESET_FAKE_DOM_MUTATION_RECORD,
+    rowIndex: index,
+    sourceRowId: entry.sourceRowId,
+    sourceKind: entry.kind,
+    operation: entry.operation,
+    mutation: entry.mutation,
+    propName: entry.propName || null,
+    propertyName: entry.propertyName || null,
+    valueLength: typeof entry.value === 'string' ? entry.value.length : null,
+    fakeDomMutation: true,
+    realDomMutation: false,
+    browserDomMutation: false,
+    compatibilityClaimed: false
+  };
+}
+
 function rollbackDomPropertyUpdateLatestPropsHandoff(handoff) {
   const payload = getDomPropertyUpdateLatestPropsHandoffPayload(handoff);
   if (payload === null) {
@@ -1093,6 +1273,23 @@ function rollbackDomPropertyPayloadMutationRecords(records) {
   return payload.rollbackRecordCount;
 }
 
+function rollbackDangerousHtmlTextResetFakeDomMutation(records) {
+  const payload = getDangerousHtmlTextResetFakeDomMutationPayload(records);
+  if (payload === null) {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_DANGEROUS_HTML_TEXT_RESET_ROLLBACK',
+      'Cannot roll back invalid dangerousHTML/text reset fake-DOM mutation records.'
+    );
+  }
+
+  rollbackDomPropertyPayloadEntries(
+    payload.node,
+    payload.rollbackRecords,
+    payload.rollbackRecords.length
+  );
+  return payload.rollbackRecordCount;
+}
+
 function attachLatestPropsPropertyRollbackEvidence(error, options) {
   if (!isWeakMapKey(error)) {
     return;
@@ -1120,6 +1317,36 @@ function attachLatestPropsPropertyRollbackEvidence(error, options) {
         : Object.freeze({
             code: rollbackError.code || null,
             message: rollbackError.message
+      })
+  });
+}
+
+function attachDangerousHtmlTextResetRollbackEvidence(error, options) {
+  if (!isWeakMapKey(error)) {
+    return;
+  }
+
+  const rollbackRecords = options.rollbackRecords;
+  const rollbackError = options.rollbackError;
+  error.domDangerousHtmlTextResetRollbackEvidence = Object.freeze({
+    kind: 'FastReactDomDangerousHtmlTextResetRollbackEvidence',
+    mutation: 'dangerousHtmlTextReset',
+    latestPropsPublished: false,
+    normalizedEntryCount: options.entries === null ? 0 : options.entries.length,
+    mutationAttempted: options.rollbackLimit > 0,
+    appliedMutationCount: options.rollbackLimit,
+    rollbackSupported: true,
+    rollbackAttempted: rollbackRecords !== null && options.rollbackLimit > 0,
+    rollbackApplied: options.rollbackApplied,
+    rollbackRecordCount:
+      rollbackRecords === null ? 0 : rollbackRecords.filter(Boolean).length,
+    unsupportedRowRejected: isUnsupportedDangerousHtmlTextResetRowError(error),
+    rollbackError:
+      rollbackError === null
+        ? null
+        : Object.freeze({
+            code: rollbackError.code || null,
+            message: rollbackError.message
           })
   });
 }
@@ -1130,6 +1357,14 @@ function isUnsupportedPropertyPayloadError(error) {
     typeof error === 'object' &&
     (error.code === 'FAST_REACT_DOM_BLOCKED_PROPERTY_PAYLOAD_ENTRY' ||
       error.code === 'FAST_REACT_DOM_UNSUPPORTED_PROPERTY_PAYLOAD_ENTRY')
+  );
+}
+
+function isUnsupportedDangerousHtmlTextResetRowError(error) {
+  return (
+    error !== null &&
+    typeof error === 'object' &&
+    error.code === 'FAST_REACT_DOM_UNSUPPORTED_DANGEROUS_HTML_TEXT_RESET_ROW'
   );
 }
 
@@ -1198,6 +1433,19 @@ function createLatestPropsSafeDomPropertyPayloadRollbackRecords(
   );
 }
 
+function createDangerousHtmlTextResetFakeDomRollbackRecords(
+  instance,
+  entries
+) {
+  return Object.freeze(
+    entries.map((entry) => {
+      const rollbackRecord =
+        createDangerousHtmlTextResetFakeDomRollbackRecord(instance, entry);
+      return rollbackRecord === null ? null : Object.freeze(rollbackRecord);
+    })
+  );
+}
+
 function createLatestPropsSafeDomPropertyPayloadRollbackRecord(
   instance,
   entry
@@ -1241,6 +1489,21 @@ function createLatestPropsSafeDomPropertyPayloadRollbackRecord(
   return null;
 }
 
+function createDangerousHtmlTextResetFakeDomRollbackRecord(
+  instance,
+  entry
+) {
+  if (entry.kind === ENTRY_SET_INNER_HTML) {
+    return createInnerHtmlPayloadRollbackRecord(instance);
+  }
+
+  if (isTextContentResetEntry(entry)) {
+    return createTextContentPayloadRollbackRecord(instance);
+  }
+
+  return null;
+}
+
 function createAttributePayloadRollbackRecord(instance, attributeName) {
   assertAttributeRollbackTarget(instance);
   const snapshot = getAttributeRollbackSnapshot(instance, attributeName);
@@ -1275,6 +1538,17 @@ function createInnerHtmlPayloadRollbackRecord(instance) {
     childNodes: getInnerHtmlRollbackChildNodes(instance),
     propertyName: 'innerHTML',
     value: getInnerHtmlRollbackSnapshot(instance)
+  };
+}
+
+function createTextContentPayloadRollbackRecord(instance) {
+  return {
+    kind: 'textContentRollback',
+    childNodes: getTextContentRollbackChildNodes(instance),
+    innerHTML:
+      'innerHTML' in instance ? getInnerHtmlRollbackSnapshot(instance) : null,
+    propertyName: 'textContent',
+    value: getTextContentRollbackSnapshot(instance)
   };
 }
 
@@ -1396,6 +1670,14 @@ function applyDomPropertyPayloadRollbackRecord(
     return;
   }
 
+  if (rollbackRecord.kind === 'textContentRollback') {
+    if (textContentRollbackRecordMatchesCurrentValue(instance, rollbackRecord)) {
+      return;
+    }
+    applyTextContentRollbackRecord(instance, rollbackRecord);
+    return;
+  }
+
   throw createDomHostMutationError(
     'FAST_REACT_DOM_INVALID_PROPERTY_PAYLOAD_ROLLBACK_RECORD',
     'Cannot roll back an invalid DOM property payload record.'
@@ -1451,6 +1733,25 @@ function getInnerHtmlRollbackChildNodes(instance) {
   return Object.freeze(instance.childNodes.slice());
 }
 
+function getTextContentRollbackSnapshot(instance) {
+  if (!('textContent' in instance)) {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_UNSUPPORTED_TEXT_CONTENT_ROLLBACK_TARGET',
+      'Cannot roll back a textContent mutation on a node without textContent.'
+    );
+  }
+
+  return String(instance.textContent);
+}
+
+function getTextContentRollbackChildNodes(instance) {
+  if (!Array.isArray(instance.childNodes)) {
+    return null;
+  }
+
+  return Object.freeze(instance.childNodes.slice());
+}
+
 function styleRollbackRecordMatchesCurrentValue(instance, rollbackRecord) {
   return (
     getStyleRollbackSnapshot(instance, rollbackRecord) ===
@@ -1460,6 +1761,28 @@ function styleRollbackRecordMatchesCurrentValue(instance, rollbackRecord) {
 
 function innerHtmlRollbackRecordMatchesCurrentValue(instance, rollbackRecord) {
   if (getInnerHtmlRollbackSnapshot(instance) !== rollbackRecord.value) {
+    return false;
+  }
+
+  if (rollbackRecord.childNodes === null) {
+    return true;
+  }
+
+  return childNodeSnapshotsMatch(instance.childNodes, rollbackRecord.childNodes);
+}
+
+function textContentRollbackRecordMatchesCurrentValue(
+  instance,
+  rollbackRecord
+) {
+  if (
+    shouldRollbackTextContentViaInnerHTML(rollbackRecord) &&
+    getInnerHtmlRollbackSnapshot(instance) !== rollbackRecord.innerHTML
+  ) {
+    return false;
+  }
+
+  if (getTextContentRollbackSnapshot(instance) !== rollbackRecord.value) {
     return false;
   }
 
@@ -1507,12 +1830,40 @@ function applyInnerHtmlRollbackRecord(instance, rollbackRecord) {
     instance.innerHTML = rollbackRecord.value;
   }
 
+  restoreRollbackChildNodes(instance, rollbackRecord.childNodes);
+}
+
+function applyTextContentRollbackRecord(instance, rollbackRecord) {
+  if (shouldRollbackTextContentViaInnerHTML(rollbackRecord)) {
+    if (getInnerHtmlRollbackSnapshot(instance) !== rollbackRecord.innerHTML) {
+      instance.innerHTML = rollbackRecord.innerHTML;
+    }
+  } else if (getTextContentRollbackSnapshot(instance) !== rollbackRecord.value) {
+    setNodeTextContent(
+      instance,
+      rollbackRecord.value,
+      'rollbackTextContent'
+    );
+  }
+
+  restoreRollbackChildNodes(instance, rollbackRecord.childNodes);
+}
+
+function shouldRollbackTextContentViaInnerHTML(rollbackRecord) {
+  return (
+    rollbackRecord.innerHTML !== null &&
+    rollbackRecord.innerHTML !== '' &&
+    (rollbackRecord.childNodes === null || rollbackRecord.childNodes.length === 0)
+  );
+}
+
+function restoreRollbackChildNodes(instance, rollbackChildNodes) {
   if (
-    rollbackRecord.childNodes !== null &&
+    rollbackChildNodes !== null &&
     Array.isArray(instance.childNodes) &&
-    !childNodeSnapshotsMatch(instance.childNodes, rollbackRecord.childNodes)
+    !childNodeSnapshotsMatch(instance.childNodes, rollbackChildNodes)
   ) {
-    const nextChildren = rollbackRecord.childNodes.slice();
+    const nextChildren = rollbackChildNodes.slice();
     for (const child of instance.childNodes) {
       if (
         child &&
@@ -1800,6 +2151,111 @@ function validateStyleDangerousHtmlPayloadEntry(instance, entry) {
   }
 }
 
+function validateDangerousHtmlTextResetFakeDomRow(instance, row, index) {
+  if (row == null || typeof row !== 'object') {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_DANGEROUS_HTML_TEXT_RESET_ROW',
+      `Cannot apply dangerousHTML/text reset fake-DOM row ${index} without row metadata.`
+    );
+  }
+
+  if (row.status !== 'blocked') {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_DANGEROUS_HTML_TEXT_RESET_ROW',
+      `Cannot apply dangerousHTML/text reset fake-DOM row ${index} without blocked diagnostic status.`
+    );
+  }
+
+  if (row.kind === ENTRY_UNSUPPORTED) {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_UNSUPPORTED_DANGEROUS_HTML_TEXT_RESET_ROW',
+      'Cannot apply unsupported dangerousHTML/text reset fake-DOM rows.'
+    );
+  }
+
+  if (row.kind === ENTRY_SET_INNER_HTML) {
+    const entry = validateInnerHtmlPayloadEntry(instance, row);
+    return {
+      ...entry,
+      mutation: 'innerHTML',
+      operation: 'setInnerHTML',
+      sourceRowId: normalizeDangerousHtmlTextResetSourceRowId(row, index)
+    };
+  }
+
+  if (row.kind === 'setTextContent') {
+    return validateTextContentMutationRow(instance, row, index, {
+      operation: 'setTextContent',
+      requiredValue: null
+    });
+  }
+
+  if (row.kind === 'resetTextContent') {
+    return validateTextContentMutationRow(instance, row, index, {
+      operation: 'resetTextContent',
+      requiredValue: ''
+    });
+  }
+
+  throw createDomHostMutationError(
+    'FAST_REACT_DOM_INVALID_DANGEROUS_HTML_TEXT_RESET_ROW',
+    `Cannot apply unknown dangerousHTML/text reset fake-DOM row ${index}.`
+  );
+}
+
+function validateTextContentMutationRow(
+  instance,
+  row,
+  index,
+  {operation, requiredValue}
+) {
+  if (!('textContent' in instance)) {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_TEXT_CONTENT_TARGET',
+      'Cannot apply dangerousHTML/text reset fake-DOM rows to a node without textContent.'
+    );
+  }
+
+  if (
+    row.mutation !== 'textContent' ||
+    row.propertyName !== 'textContent' ||
+    typeof row.value !== 'string'
+  ) {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_DANGEROUS_HTML_TEXT_RESET_ROW',
+      `Cannot apply malformed textContent fake-DOM row ${index}.`
+    );
+  }
+
+  if (requiredValue !== null && row.value !== requiredValue) {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_DANGEROUS_HTML_TEXT_RESET_ROW',
+      `Cannot apply resetTextContent fake-DOM row ${index} with a non-empty value.`
+    );
+  }
+
+  return {
+    kind: row.kind,
+    mutation: 'textContent',
+    operation,
+    propName: row.propName || null,
+    propertyName: 'textContent',
+    sourceRowId: normalizeDangerousHtmlTextResetSourceRowId(row, index),
+    value: row.value
+  };
+}
+
+function normalizeDangerousHtmlTextResetSourceRowId(row, index) {
+  if (typeof row.id === 'string' && row.id !== '') {
+    return row.id;
+  }
+
+  throw createDomHostMutationError(
+    'FAST_REACT_DOM_INVALID_DANGEROUS_HTML_TEXT_RESET_ROW',
+    `Cannot apply dangerousHTML/text reset fake-DOM row ${index} without a row id.`
+  );
+}
+
 function validateStylePayloadEntry(instance, entry, kind) {
   assertStyleTarget(instance);
 
@@ -1910,6 +2366,32 @@ function applyStyleDangerousHtmlPayloadEntry(instance, entry) {
   }
 }
 
+function applyDangerousHtmlTextResetFakeDomRow(instance, entry) {
+  if (entry.kind === ENTRY_SET_INNER_HTML) {
+    instance.innerHTML = entry.value;
+    return;
+  }
+
+  if (entry.kind === 'setTextContent') {
+    setTextContent(instance, entry.value);
+    return;
+  }
+
+  if (entry.kind === 'resetTextContent') {
+    resetTextContent(instance);
+    return;
+  }
+
+  throw createDomHostMutationError(
+    'FAST_REACT_DOM_INVALID_DANGEROUS_HTML_TEXT_RESET_ROW',
+    'Cannot apply an invalid dangerousHTML/text reset fake-DOM row.'
+  );
+}
+
+function isTextContentResetEntry(entry) {
+  return entry.kind === 'setTextContent' || entry.kind === 'resetTextContent';
+}
+
 function applyStylePayloadEntry(instance, entry) {
   const style = instance.style;
   if (entry.mutation === 'setProperty') {
@@ -1921,6 +2403,8 @@ function applyStylePayloadEntry(instance, entry) {
 }
 
 module.exports = {
+  DANGEROUS_HTML_TEXT_RESET_FAKE_DOM_MUTATION_RECORD,
+  DOM_DANGEROUS_HTML_TEXT_RESET_FAKE_DOM_MUTATION_GATE_METADATA,
   DOM_HOST_TEXT_COMMIT_GATE_METADATA,
   DOM_ROOT_RENDER_HOST_OUTPUT_MUTATION_GATE_METADATA,
   DOM_TEXT_CONTENT_RESET_UPDATE_MUTATION_GATE_METADATA,
@@ -1932,6 +2416,7 @@ module.exports = {
   appendChildToContainer,
   appendInitialChild,
   applyAdmittedDomPropertyPayload,
+  applyDangerousHtmlTextResetFakeDomRows,
   applyDomPropertyPayload,
   applyDomPropertyPayloadForLatestProps,
   applyStyleDangerousHtmlPayload,
@@ -1945,20 +2430,25 @@ module.exports = {
   createDomHostMutationError,
   createLatestPropsCommitRecord,
   getClearContainerForRootUnmountRecordPayload,
+  getDangerousHtmlTextResetFakeDomMutationPayload,
   getDomPropertyPayloadMutationRecordsPayload,
   getDomPropertyUpdateLatestPropsHandoffPayload,
   getLatestPropsCommitRecordPayload,
   insertBefore,
   insertInContainerBefore,
   isClearContainerForRootUnmountRecord,
+  isDangerousHtmlTextResetFakeDomTarget,
+  isDangerousHtmlTextResetFakeDomMutationRecords,
   isDomPropertyPayloadMutationRecords,
   isDomPropertyUpdateLatestPropsHandoff,
   isLatestPropsCommitRecord,
   LATEST_PROPS_COMMIT_RECORD,
+  markDangerousHtmlTextResetFakeDomTarget,
   removeChild,
   removeChildFromContainer,
   resetTextContent,
   rollbackDomPropertyPayloadMutationRecords,
   rollbackDomPropertyUpdateLatestPropsHandoff,
+  rollbackDangerousHtmlTextResetFakeDomMutation,
   setTextContent
 };

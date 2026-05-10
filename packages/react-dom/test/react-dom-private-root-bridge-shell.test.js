@@ -17,6 +17,11 @@ const rootBridge = require(path.join(packageRoot, 'src/client/root-bridge.js'));
 const componentTree = require(
   path.join(packageRoot, 'src/client/component-tree.js')
 );
+const {
+  createDangerousHtmlTextResetDiagnostic
+} = require(
+  path.join(packageRoot, 'src/client/dom-property-operations.js')
+);
 const refCallbackGate = require(
   path.join(packageRoot, 'src/client/ref-callback-gate.js')
 );
@@ -2119,6 +2124,491 @@ test('private root commit HostComponent update rejects stale, text failure, and 
     unsupportedFixture.initialProps
   );
   cleanupRootCommitPropertyTextFixture(unsupportedFixture);
+});
+
+test('private dangerousHTML/text reset commit applies admitted fake-DOM rows before latest props', () => {
+  const htmlUpdateFixture = createDangerousHtmlTextResetExecutionFixture(
+    'dangerous-html-update-execution',
+    {
+      dangerouslySetInnerHTML: {__html: '<span>Before</span>'}
+    },
+    {
+      dangerouslySetInnerHTML: {__html: '<em>After</em>'}
+    }
+  );
+
+  const htmlUpdateHandoff =
+    htmlUpdateFixture.bridge.applyDangerousHtmlTextResetCommit(
+      htmlUpdateFixture.update,
+      htmlUpdateFixture.metadata,
+      htmlUpdateFixture.diagnostic,
+      {
+        hostInstanceToken: htmlUpdateFixture.token,
+        nextProps: htmlUpdateFixture.nextProps,
+        stateNodeRaw: 901,
+        tag: 'div'
+      }
+    );
+  const hiddenHtmlUpdate =
+    rootBridge.getPrivateRootDangerousHtmlTextResetCommitHandoffPayload(
+      htmlUpdateHandoff
+    );
+
+  assert.equal(
+    htmlUpdateHandoff.$$typeof,
+    rootBridge.privateRootDangerousHtmlTextResetCommitHandoffRecordType
+  );
+  assert.equal(
+    htmlUpdateHandoff.kind,
+    'FastReactDomPrivateRootDangerousHtmlTextResetCommitHandoffRecord'
+  );
+  assert.equal(
+    htmlUpdateHandoff.handoffStatus,
+    rootBridge.ROOT_BRIDGE_DANGEROUS_HTML_TEXT_RESET_COMMIT_APPLIED
+  );
+  assert.equal(htmlUpdateHandoff.fakeDomMutation, true);
+  assert.equal(htmlUpdateHandoff.browserDomMutation, false);
+  assert.equal(htmlUpdateHandoff.realDomInnerHTMLWritten, false);
+  assert.equal(htmlUpdateHandoff.compatibilityClaimed, false);
+  assert.deepEqual(htmlUpdateHandoff.mutationEvidence, {
+    fakeDomMutationBacked: true,
+    rowCount: 1,
+    mutatingRowCount: 1,
+    setInnerHTMLCount: 1,
+    setTextContentCount: 0,
+    resetTextContentCount: 0,
+    textContentRowCount: 0,
+    dangerousHtmlRowCount: 1,
+    rowKinds: ['setInnerHTML'],
+    rollbackSupported: true,
+    rollbackRecordCount: 1,
+    gateMetadata:
+      domHost.DOM_DANGEROUS_HTML_TEXT_RESET_FAKE_DOM_MUTATION_GATE_METADATA
+  });
+  assert.deepEqual(
+    htmlUpdateHandoff.acceptedCapabilities.map((capability) => capability.id),
+    [
+      'root-commit-host-component-update-metadata',
+      'dangerous-html-text-reset-diagnostic',
+      'fake-dom-dangerous-html-text-reset-mutation',
+      'latest-props-after-dangerous-html-text-reset-mutation',
+      'fake-dom-inner-html-write'
+    ]
+  );
+  assert.deepEqual(
+    htmlUpdateHandoff.blockedCapabilities.map((capability) => capability.id),
+    [
+      'public-root-execution',
+      'native-execution',
+      'reconciler-execution',
+      'browser-dom-compatibility',
+      'public-text-content-compatibility',
+      'public-dangerous-html-compatibility',
+      'hydration',
+      'events',
+      'refs',
+      'compatibility-claims'
+    ]
+  );
+  assert.deepEqual(
+    htmlUpdateHandoff.fakeDomCommitRows.map((row) => row.commitRowKind),
+    ['setInnerHTML']
+  );
+  assert.equal(hiddenHtmlUpdate.sourceRecord, htmlUpdateFixture.update);
+  assert.equal(hiddenHtmlUpdate.hostInstanceNode, htmlUpdateFixture.host);
+  assert.equal(hiddenHtmlUpdate.previousProps, htmlUpdateFixture.previousProps);
+  assert.equal(hiddenHtmlUpdate.nextProps, htmlUpdateFixture.nextProps);
+  assert.equal(hiddenHtmlUpdate.latestPropsPublished, true);
+  assert.equal(htmlUpdateFixture.host.innerHTML, '<em>After</em>');
+  assert.deepEqual(htmlUpdateFixture.host.dangerousWriteLog, [
+    ['innerHTML', '<em>After</em>']
+  ]);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(htmlUpdateFixture.host),
+    htmlUpdateFixture.nextProps
+  );
+  assert.equal(
+    rootBridge.isPrivateRootDangerousHtmlTextResetCommitHandoffRecord(
+      htmlUpdateHandoff
+    ),
+    true
+  );
+  assert.equal(
+    rootBridge.getPrivateRootDangerousHtmlTextResetCommitHandoffPayload({}),
+    null
+  );
+
+  cleanupDangerousHtmlTextResetExecutionFixture(htmlUpdateFixture);
+
+  const htmlRemovalFixture = createDangerousHtmlTextResetExecutionFixture(
+    'dangerous-html-removal-execution',
+    {
+      dangerouslySetInnerHTML: {__html: '<em>After</em>'}
+    },
+    {
+      dangerouslySetInnerHTML: undefined,
+      children: 'Managed child'
+    }
+  );
+  const htmlRemovalHandoff =
+    htmlRemovalFixture.bridge.applyDangerousHtmlTextResetCommit(
+      htmlRemovalFixture.update,
+      htmlRemovalFixture.metadata,
+      htmlRemovalFixture.diagnostic,
+      {
+        hostInstanceToken: htmlRemovalFixture.token,
+        nextProps: htmlRemovalFixture.nextProps,
+        stateNodeRaw: 901,
+        tag: 'div'
+      }
+    );
+
+  assert.equal(htmlRemovalHandoff.latestPropsPublished, true);
+  assert.equal(htmlRemovalHandoff.fakeDomTextContentWritten, true);
+  assert.deepEqual(htmlRemovalHandoff.mutationEvidence, {
+    fakeDomMutationBacked: true,
+    rowCount: 1,
+    mutatingRowCount: 1,
+    setInnerHTMLCount: 0,
+    setTextContentCount: 1,
+    resetTextContentCount: 0,
+    textContentRowCount: 1,
+    dangerousHtmlRowCount: 0,
+    rowKinds: ['setTextContent'],
+    rollbackSupported: true,
+    rollbackRecordCount: 1,
+    gateMetadata:
+      domHost.DOM_DANGEROUS_HTML_TEXT_RESET_FAKE_DOM_MUTATION_GATE_METADATA
+  });
+  assert.deepEqual(
+    htmlRemovalHandoff.fakeDomCommitRows.map((row) => row.commitRowKind),
+    ['setTextContent']
+  );
+  assert.equal(htmlRemovalFixture.host.innerHTML, '');
+  assert.equal(htmlRemovalFixture.host.textContent, 'Managed child');
+  assert.deepEqual(htmlRemovalFixture.host.dangerousWriteLog, [
+    ['textContent', 'Managed child']
+  ]);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(htmlRemovalFixture.host),
+    htmlRemovalFixture.nextProps
+  );
+  cleanupDangerousHtmlTextResetExecutionFixture(htmlRemovalFixture);
+});
+
+test('private dangerousHTML/text reset commit admits reset rows without public text compatibility', () => {
+  const fixture = createDangerousHtmlTextResetExecutionFixture(
+    'dangerous-html-reset-execution',
+    {
+      dangerouslySetInnerHTML: {__html: '<strong>Before</strong>'}
+    },
+    {
+      children: {
+        props: {
+          children: 'Managed child'
+        },
+        type: 'span'
+      },
+      dangerouslySetInnerHTML: undefined
+    }
+  );
+
+  const handoff = fixture.bridge.applyDangerousHtmlTextResetCommit(
+    fixture.update,
+    fixture.metadata,
+    fixture.diagnostic,
+    {
+      hostInstanceToken: fixture.token,
+      nextProps: fixture.nextProps,
+      stateNodeRaw: 901,
+      tag: 'div'
+    }
+  );
+
+  assert.equal(handoff.resetTextContent, true);
+  assert.equal(handoff.fakeDomMutation, true);
+  assert.equal(handoff.fakeDomTextContentWritten, true);
+  assert.equal(handoff.browserDomMutation, false);
+  assert.equal(handoff.compatibilityClaimed, false);
+  assert.equal(
+    handoff.blockedCapabilities.some(
+      (capability) => capability.id === 'public-text-content-compatibility'
+    ),
+    true
+  );
+  assert.deepEqual(handoff.mutationEvidence, {
+    fakeDomMutationBacked: true,
+    rowCount: 1,
+    mutatingRowCount: 1,
+    setInnerHTMLCount: 0,
+    setTextContentCount: 0,
+    resetTextContentCount: 1,
+    textContentRowCount: 1,
+    dangerousHtmlRowCount: 0,
+    rowKinds: ['resetTextContent'],
+    rollbackSupported: true,
+    rollbackRecordCount: 1,
+    gateMetadata:
+      domHost.DOM_DANGEROUS_HTML_TEXT_RESET_FAKE_DOM_MUTATION_GATE_METADATA
+  });
+  assert.deepEqual(fixture.host.dangerousWriteLog, [['textContent', '']]);
+  assert.equal(fixture.host.textContent, '');
+  assert.equal(
+    componentTree.getLatestPropsFromNode(fixture.host),
+    fixture.nextProps
+  );
+
+  cleanupDangerousHtmlTextResetExecutionFixture(fixture);
+});
+
+test('private dangerousHTML/text reset commit rejects stale and unsupported rows fail-closed', () => {
+  const staleFixture = createDangerousHtmlTextResetExecutionFixture(
+    'dangerous-html-stale-execution',
+    {
+      dangerouslySetInnerHTML: {__html: '<em>After</em>'}
+    },
+    {
+      dangerouslySetInnerHTML: undefined,
+      children: 'Managed child'
+    }
+  );
+  const staleLatestProps = {
+    dangerouslySetInnerHTML: {__html: '<em>Stale</em>'}
+  };
+  staleFixture.host.onDangerousWrite = (operation) => {
+    if (operation === 'textContent') {
+      componentTree.attachHostInstanceNode(
+        staleFixture.host,
+        staleFixture.token,
+        staleLatestProps
+      );
+    }
+  };
+
+  let staleError = null;
+  assert.throws(
+    () =>
+      staleFixture.bridge.applyDangerousHtmlTextResetCommit(
+        staleFixture.update,
+        staleFixture.metadata,
+        staleFixture.diagnostic,
+        {
+          hostInstanceToken: staleFixture.token,
+          nextProps: staleFixture.nextProps,
+          stateNodeRaw: 901,
+          tag: 'div'
+        }
+      ),
+    (error) => {
+      staleError = error;
+      return (
+        error.code ===
+        'FAST_REACT_DOM_INVALID_DANGEROUS_HTML_TEXT_RESET_COMMIT_HANDOFF'
+      );
+    }
+  );
+  assert.deepEqual(
+    staleError.privateRootDangerousHtmlTextResetRollbackEvidence,
+    {
+      kind: 'FastReactDomPrivateRootDangerousHtmlTextResetRollbackEvidence',
+      latestPropsPublished: false,
+      latestPropsHandoffStale: true,
+      latestPropsRestoredToPrevious: false,
+      mutationAttempted: true,
+      mutationRollbackAttempted: true,
+      mutationRollbackApplied: true,
+      mutationRollbackRecordCount: 1,
+      unsupportedRowRejected: false,
+      mutationRollbackError: null
+    }
+  );
+  assert.deepEqual(staleFixture.host.dangerousWriteLog, [
+    ['textContent', 'Managed child'],
+    ['innerHTML', '<em>After</em>']
+  ]);
+  assert.equal(staleFixture.host.innerHTML, '<em>After</em>');
+  assert.equal(
+    componentTree.getLatestPropsFromNode(staleFixture.host),
+    staleLatestProps
+  );
+  assert.equal(
+    rootBridge.getPrivateRootDangerousHtmlTextResetCommitHandoffPayload(
+      staleFixture.update
+    ),
+    null
+  );
+  cleanupDangerousHtmlTextResetExecutionFixture(staleFixture);
+
+  const unsupportedFixture = createDangerousHtmlTextResetExecutionFixture(
+    'dangerous-html-unsupported-execution',
+    {},
+    {
+      children: 'conflict',
+      dangerouslySetInnerHTML: {__html: '<b>conflict</b>'}
+    }
+  );
+
+  assert.throws(
+    () =>
+      unsupportedFixture.bridge.applyDangerousHtmlTextResetCommit(
+        unsupportedFixture.update,
+        unsupportedFixture.metadata,
+        unsupportedFixture.diagnostic,
+        {
+          hostInstanceToken: unsupportedFixture.token,
+          nextProps: unsupportedFixture.nextProps,
+          stateNodeRaw: 901,
+          tag: 'div'
+        }
+      ),
+    {
+      code:
+        'FAST_REACT_DOM_INVALID_DANGEROUS_HTML_TEXT_RESET_COMMIT_METADATA'
+    }
+  );
+  assert.deepEqual(unsupportedFixture.host.dangerousWriteLog, []);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(unsupportedFixture.host),
+    unsupportedFixture.previousProps
+  );
+  cleanupDangerousHtmlTextResetExecutionFixture(unsupportedFixture);
+
+  const staleDiagnosticFixture = createDangerousHtmlTextResetExecutionFixture(
+    'dangerous-html-stale-diagnostic-execution',
+    {
+      dangerouslySetInnerHTML: {__html: '<span>Before</span>'}
+    },
+    {
+      dangerouslySetInnerHTML: {__html: '<em>After</em>'}
+    }
+  );
+  const staleDiagnostic = createDangerousHtmlTextResetDiagnostic(
+    'div',
+    {
+      dangerouslySetInnerHTML: {__html: '<span>Before</span>'}
+    },
+    staleDiagnosticFixture.nextProps
+  );
+
+  assert.throws(
+    () =>
+      staleDiagnosticFixture.bridge.applyDangerousHtmlTextResetCommit(
+        staleDiagnosticFixture.update,
+        staleDiagnosticFixture.metadata,
+        staleDiagnostic,
+        {
+          hostInstanceToken: staleDiagnosticFixture.token,
+          nextProps: staleDiagnosticFixture.nextProps,
+          stateNodeRaw: 901,
+          tag: 'div'
+        }
+      ),
+    {
+      code:
+        'FAST_REACT_DOM_INVALID_DANGEROUS_HTML_TEXT_RESET_COMMIT_METADATA'
+    }
+  );
+  assert.deepEqual(staleDiagnosticFixture.host.dangerousWriteLog, []);
+  assert.equal(
+    componentTree.getLatestPropsFromNode(staleDiagnosticFixture.host),
+    staleDiagnosticFixture.previousProps
+  );
+  cleanupDangerousHtmlTextResetExecutionFixture(staleDiagnosticFixture);
+});
+
+test('private dangerousHTML/text reset commit rejects unadmitted live-like host before DOM access', () => {
+  const fixture = createDangerousHtmlTextResetExecutionFixture(
+    'dangerous-html-live-like-reject',
+    {
+      dangerouslySetInnerHTML: {__html: '<span>Before</span>'}
+    },
+    {
+      dangerouslySetInnerHTML: {__html: '<em>After</em>'}
+    },
+    {admitFakeDomTarget: false}
+  );
+  const guardedReads = [];
+  const guardedWrites = [];
+
+  Object.defineProperties(fixture.host, {
+    innerHTML: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        guardedReads.push('innerHTML');
+        throw new Error('Unexpected live innerHTML read');
+      },
+      set(value) {
+        guardedWrites.push(['innerHTML', String(value)]);
+        throw new Error('Unexpected live innerHTML write');
+      }
+    },
+    textContent: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        guardedReads.push('textContent');
+        throw new Error('Unexpected live textContent read');
+      },
+      set(value) {
+        guardedWrites.push(['textContent', String(value)]);
+        throw new Error('Unexpected live textContent write');
+      }
+    }
+  });
+
+  let rejectedError = null;
+  assert.throws(
+    () =>
+      fixture.bridge.applyDangerousHtmlTextResetCommit(
+        fixture.update,
+        fixture.metadata,
+        fixture.diagnostic,
+        {
+          hostInstanceToken: fixture.token,
+          nextProps: fixture.nextProps,
+          stateNodeRaw: 901,
+          tag: 'div'
+        }
+      ),
+    (error) => {
+      rejectedError = error;
+      return (
+        error.code ===
+        'FAST_REACT_DOM_UNADMITTED_DANGEROUS_HTML_TEXT_RESET_FAKE_DOM_TARGET'
+      );
+    }
+  );
+  assert.deepEqual(guardedReads, []);
+  assert.deepEqual(guardedWrites, []);
+  assert.deepEqual(fixture.host.dangerousWriteLog, []);
+  assert.deepEqual(
+    rejectedError.privateRootDangerousHtmlTextResetRollbackEvidence,
+    {
+      kind: 'FastReactDomPrivateRootDangerousHtmlTextResetRollbackEvidence',
+      latestPropsPublished: false,
+      latestPropsHandoffStale: false,
+      latestPropsRestoredToPrevious: true,
+      mutationAttempted: false,
+      mutationRollbackAttempted: false,
+      mutationRollbackApplied: false,
+      mutationRollbackRecordCount: 0,
+      unsupportedRowRejected: false,
+      mutationRollbackError: null
+    }
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromNode(fixture.host),
+    fixture.previousProps
+  );
+  assert.equal(
+    rootBridge.getPrivateRootDangerousHtmlTextResetCommitHandoffPayload(
+      fixture.update
+    ),
+    null
+  );
+
+  cleanupDangerousHtmlTextResetExecutionFixture(fixture);
 });
 
 test('private root host-output update rolls back props when text mutation fails', () => {
@@ -8823,6 +9313,152 @@ function cleanupRootCommitPropertyTextFixture(fixture) {
     fixture.mounted.token
   );
   fixture.bridge.revertCreateRootSideEffects(fixture.sideEffects);
+}
+
+function createDangerousHtmlTextResetExecutionFixture(
+  label,
+  previousProps,
+  nextProps,
+  options
+) {
+  const document = createHostOutputDocument(label);
+  const container = document.createElement('div');
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    dangerousHtmlTextResetCommitIdPrefix: `${label}-execution`,
+    sideEffectIdPrefix: `${label}-side-effect`
+  });
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const initialRender = bridge.renderContainer(create.handle, {
+    props: previousProps,
+    type: 'div'
+  });
+  bridge.admitCreateRenderPath(create, sideEffects, initialRender);
+
+  const host = document.createElement('div');
+  installDangerousHtmlTextResetAccessors(host, previousProps);
+  if (options == null || options.admitFakeDomTarget !== false) {
+    domHost.markDangerousHtmlTextResetFakeDomTarget(host);
+  }
+  const token = componentTree.createHostInstanceToken(
+    {kind: 'PrivateRootDangerousHtmlTextResetHost'},
+    create.owner
+  );
+  componentTree.attachHostInstanceNode(host, token, previousProps);
+  domHost.appendChildToContainer(container, host);
+
+  return {
+    bridge,
+    container,
+    create,
+    diagnostic: createDangerousHtmlTextResetDiagnostic(
+      'div',
+      previousProps,
+      nextProps
+    ),
+    host,
+    metadata: {
+      mutationApplyRecords: [
+        createRootCommitHostComponentUpdateRecord({
+          recordIndex: 0,
+          stateNodeRaw: 901
+        })
+      ]
+    },
+    nextProps,
+    previousProps,
+    sideEffects,
+    token,
+    update: bridge.renderContainer(create.handle, {
+      props: nextProps,
+      type: 'div'
+    })
+  };
+}
+
+function cleanupDangerousHtmlTextResetExecutionFixture(fixture) {
+  assert.equal(
+    componentTree.detachHostInstanceToken(fixture.token),
+    fixture.token
+  );
+  fixture.bridge.revertCreateRootSideEffects(fixture.sideEffects);
+}
+
+function installDangerousHtmlTextResetAccessors(host, previousProps) {
+  let innerHTML = getDangerousHtmlFixtureInitialHtml(previousProps);
+  let textContent = getDangerousHtmlFixtureInitialText(previousProps);
+  host.dangerousWriteLog = [];
+  host.onDangerousWrite = null;
+
+  Object.defineProperties(host, {
+    innerHTML: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return innerHTML;
+      },
+      set(value) {
+        const html = String(value);
+        for (const child of [...this.childNodes]) {
+          detachHostOutputChild(child);
+        }
+        innerHTML = html;
+        textContent = '';
+        this.dangerousWriteLog.push(['innerHTML', html]);
+        this.__mutationLog.push({type: 'innerHTML', value: html});
+        if (typeof this.onDangerousWrite === 'function') {
+          this.onDangerousWrite('innerHTML', html);
+        }
+      }
+    },
+    textContent: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        if (this.childNodes.length > 0) {
+          return this.childNodes.map((child) => child.textContent).join('');
+        }
+        return textContent;
+      },
+      set(value) {
+        const text = String(value);
+        for (const child of [...this.childNodes]) {
+          detachHostOutputChild(child);
+        }
+        textContent = text;
+        innerHTML = '';
+        this.dangerousWriteLog.push(['textContent', text]);
+        this.__mutationLog.push({type: 'textContent', value: text});
+        if (typeof this.onDangerousWrite === 'function') {
+          this.onDangerousWrite('textContent', text);
+        }
+      }
+    }
+  });
+}
+
+function getDangerousHtmlFixtureInitialHtml(props) {
+  const html = props && props.dangerouslySetInnerHTML;
+  if (
+    html !== null &&
+    typeof html === 'object' &&
+    typeof html.__html === 'string'
+  ) {
+    return html.__html;
+  }
+  return '';
+}
+
+function getDangerousHtmlFixtureInitialText(props) {
+  if (props == null || typeof props !== 'object') {
+    return '';
+  }
+  const children = props.children;
+  const childrenType = typeof children;
+  if (childrenType === 'string' || childrenType === 'number') {
+    return String(children);
+  }
+  return '';
 }
 
 function mountPrivateHostOutput(container, rootOwner, initialProps) {

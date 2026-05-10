@@ -9,6 +9,7 @@ const {
   assertMountedHostInstanceToken,
   attachHostInstanceNode,
   commitLatestPropsFromMutationHandoff,
+  commitLatestPropsFromMutationRecord,
   createEventTargetDispatchPathRecord,
   createEventTargetNormalizationRecord,
   createHostInstanceToken,
@@ -93,13 +94,17 @@ const {
   appendChild,
   appendChildToContainer,
   appendInitialChild,
+  applyDangerousHtmlTextResetFakeDomRows,
   CLEAR_CONTAINER_FOR_ROOT_UNMOUNT_RECORD,
   clearContainerForRootUnmount,
   commitDomPropertyUpdateForLatestProps,
   createDomHostElementInstance,
   createDomHostTextInstance,
+  createLatestPropsCommitRecord,
+  DOM_DANGEROUS_HTML_TEXT_RESET_FAKE_DOM_MUTATION_GATE_METADATA,
   DOM_ROOT_RENDER_HOST_OUTPUT_MUTATION_GATE_METADATA,
   getClearContainerForRootUnmountRecordPayload,
+  getDangerousHtmlTextResetFakeDomMutationPayload,
   getDomPropertyUpdateLatestPropsHandoffPayload,
   isClearContainerForRootUnmountRecord,
   removeChild,
@@ -107,6 +112,7 @@ const {
   ROOT_UNMOUNT_CONTAINER_CLEANUP_METADATA,
   ROOT_UNMOUNT_CONTAINER_CLEANUP_METADATA_STATUS,
   commitTextUpdate,
+  rollbackDangerousHtmlTextResetFakeDomMutation,
   rollbackDomPropertyUpdateLatestPropsHandoff
 } = require('../dom-host/mutation.js');
 const {
@@ -191,6 +197,8 @@ const privateRootCommitHostComponentUpdateHandoffRecordType =
   'fast.react_dom.private_root_commit_host_component_update_handoff_record';
 const privateRootDangerousHtmlTextResetCommitMetadataRecordType =
   'fast.react_dom.private_root_dangerous_html_text_reset_commit_metadata_record';
+const privateRootDangerousHtmlTextResetCommitHandoffRecordType =
+  'fast.react_dom.private_root_dangerous_html_text_reset_commit_handoff_record';
 const privateRootCommitRefMetadataRecordType =
   'fast.react_dom.private_root_commit_ref_metadata_record';
 const privateRootRefCallbackHostOutputOrderingDiagnosticRecordType =
@@ -296,6 +304,8 @@ const ROOT_BRIDGE_ROOT_COMMIT_HOST_COMPONENT_UPDATE_APPLIED =
   'applied-private-root-commit-host-component-update';
 const ROOT_BRIDGE_DANGEROUS_HTML_TEXT_RESET_COMMIT_METADATA_ACCEPTED =
   'accepted-private-root-dangerous-html-text-reset-commit-metadata';
+const ROOT_BRIDGE_DANGEROUS_HTML_TEXT_RESET_COMMIT_APPLIED =
+  'applied-private-root-dangerous-html-text-reset-fake-dom-commit';
 const ROOT_BRIDGE_ROOT_COMMIT_REF_METADATA_ACCEPTED =
   'accepted-private-root-commit-ref-metadata';
 const ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC_ADMITTED =
@@ -1240,6 +1250,92 @@ const ROOT_BRIDGE_DANGEROUS_HTML_TEXT_RESET_COMMIT_BLOCKED_CAPABILITIES =
       blocked: true,
       reason:
         'Only fake-DOM host-output metadata is recorded; browser DOM behavior is not claimed.'
+    }),
+    freezeRecord({
+      id: 'compatibility-claims',
+      blocked: true,
+      reason:
+        'React DOM dangerousHTML/text reset compatibility remains unclaimed.'
+    })
+  ]);
+const ROOT_BRIDGE_DANGEROUS_HTML_TEXT_RESET_EXECUTION_ACCEPTED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'root-commit-host-component-update-metadata',
+      accepted: true,
+      reason:
+        'Accepted root commit HostComponent update metadata selected the fake-DOM host-output row.'
+    }),
+    freezeRecord({
+      id: 'dangerous-html-text-reset-diagnostic',
+      accepted: true,
+      reason:
+        'The private dangerousHTML/text-reset diagnostic was validated against current fake host-output latest props.'
+    }),
+    freezeRecord({
+      id: 'fake-dom-dangerous-html-text-reset-mutation',
+      accepted: true,
+      reason:
+        'Admitted dangerousHTML/text reset rows executed on a private fake-DOM HostComponent.'
+    }),
+    freezeRecord({
+      id: 'latest-props-after-dangerous-html-text-reset-mutation',
+      accepted: true,
+      reason:
+        'The component-tree latest-props map was published only after admitted fake-DOM mutation completed.'
+    })
+  ]);
+const ROOT_BRIDGE_DANGEROUS_HTML_TEXT_RESET_EXECUTION_BLOCKED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'public-root-execution',
+      blocked: true,
+      reason:
+        'The handoff consumes private root records and does not execute a public React DOM root.'
+    }),
+    freezeRecord({
+      id: 'native-execution',
+      blocked: true,
+      reason: 'No native or Rust root bridge execution is admitted.'
+    }),
+    freezeRecord({
+      id: 'reconciler-execution',
+      blocked: true,
+      reason:
+        'No generic reconciler render, schedule, or commit traversal is admitted.'
+    }),
+    freezeRecord({
+      id: 'browser-dom-compatibility',
+      blocked: true,
+      reason:
+        'Only deterministic fake-DOM host nodes are admitted by this private handoff.'
+    }),
+    freezeRecord({
+      id: 'public-text-content-compatibility',
+      blocked: true,
+      reason:
+        'The fake-DOM text reset evidence does not claim public React DOM text-content compatibility.'
+    }),
+    freezeRecord({
+      id: 'public-dangerous-html-compatibility',
+      blocked: true,
+      reason:
+        'The fake-DOM dangerousHTML evidence does not claim public React DOM dangerousHTML compatibility.'
+    }),
+    freezeRecord({
+      id: 'hydration',
+      blocked: true,
+      reason: 'Hydration markers and replay are not admitted by this handoff.'
+    }),
+    freezeRecord({
+      id: 'events',
+      blocked: true,
+      reason: 'Synthetic event extraction and dispatch are not admitted.'
+    }),
+    freezeRecord({
+      id: 'refs',
+      blocked: true,
+      reason: 'Ref attach/detach ordering is not admitted by this handoff.'
     }),
     freezeRecord({
       id: 'compatibility-claims',
@@ -2431,6 +2527,8 @@ const rootCommitHostComponentUpdateHandoffPayloads = new WeakMap();
 const rootCommitHostComponentUpdateHandoffRecords = new WeakMap();
 const rootDangerousHtmlTextResetCommitMetadataPayloads = new WeakMap();
 const rootDangerousHtmlTextResetCommitMetadataRecords = new WeakMap();
+const rootDangerousHtmlTextResetCommitHandoffPayloads = new WeakMap();
+const rootDangerousHtmlTextResetCommitHandoffRecords = new WeakMap();
 const rootCommitRefMetadataPayloads = new WeakMap();
 const rootCommitRefMetadataRecordsByRequest = new WeakMap();
 const rootRefCallbackHostOutputOrderingDiagnosticPayloads = new WeakMap();
@@ -2629,6 +2727,20 @@ function createPrivateRootBridgeShell(options) {
       options
     ) {
       return recordPrivateRootDangerousHtmlTextResetCommitMetadataWithBridge(
+        bridgeState,
+        record,
+        rootCommitHostComponentUpdateMetadata,
+        diagnostic,
+        options
+      );
+    },
+    applyDangerousHtmlTextResetCommit(
+      record,
+      rootCommitHostComponentUpdateMetadata,
+      diagnostic,
+      options
+    ) {
+      return applyPrivateRootDangerousHtmlTextResetCommitWithBridge(
         bridgeState,
         record,
         rootCommitHostComponentUpdateMetadata,
@@ -6005,6 +6117,21 @@ function recordPrivateRootDangerousHtmlTextResetCommitMetadata(
   );
 }
 
+function applyPrivateRootDangerousHtmlTextResetCommit(
+  record,
+  rootCommitHostComponentUpdateMetadata,
+  diagnostic,
+  options
+) {
+  return applyPrivateRootDangerousHtmlTextResetCommitWithBridge(
+    null,
+    record,
+    rootCommitHostComponentUpdateMetadata,
+    diagnostic,
+    options
+  );
+}
+
 function admitPrivateRootCommitRefMetadata(
   record,
   rootCommitRefMetadata,
@@ -7057,6 +7184,228 @@ function recordPrivateRootDangerousHtmlTextResetCommitMetadataWithBridge(
   return handoff;
 }
 
+function applyPrivateRootDangerousHtmlTextResetCommitWithBridge(
+  bridgeState,
+  record,
+  rootCommitHostComponentUpdateMetadata,
+  diagnostic,
+  options
+) {
+  const validation = validateHostOutputUpdateRequestRecord(record);
+  if (bridgeState !== null && validation.bridgeState !== bridgeState) {
+    throwForeignRootBridgeRequest();
+  }
+
+  const normalized = normalizeRootCommitHostComponentUpdateOptions(options);
+  if (normalized.textUpdate !== null) {
+    throwInvalidDangerousHtmlTextResetCommitHandoff(
+      'Private dangerousHTML/text reset commit handoffs do not accept HostText update metadata.'
+    );
+  }
+  const metadata = normalizeRootCommitHostComponentUpdateMetadata(
+    rootCommitHostComponentUpdateMetadata,
+    normalized
+  );
+  const sourcePayload = rootRecordPayloads.get(record);
+  const hostNode = assertMountedHostInstanceToken(
+    normalized.hostInstanceToken
+  );
+  const hostRootOwner = getRootOwnerFromHostInstanceToken(
+    normalized.hostInstanceToken
+  );
+  if (hostRootOwner !== sourcePayload.rootHandle.owner) {
+    throwInvalidDangerousHtmlTextResetCommitHandoff(
+      'Private dangerousHTML/text reset commit handoffs require a host instance owned by the updated root.'
+    );
+  }
+
+  const previousProps = getLatestPropsFromHostInstanceToken(
+    normalized.hostInstanceToken
+  );
+  const diagnosticValidation =
+    validateDangerousHtmlTextResetCommitDiagnostic(
+      diagnostic,
+      normalized,
+      previousProps
+    );
+
+  const existing =
+    rootDangerousHtmlTextResetCommitHandoffRecords.get(record);
+  if (existing !== undefined) {
+    const existingPayload =
+      rootDangerousHtmlTextResetCommitHandoffPayloads.get(existing);
+    if (
+      existingPayload !== undefined &&
+      existingPayload.diagnostic === diagnostic &&
+      existingPayload.hostInstanceToken === normalized.hostInstanceToken &&
+      existingPayload.nextProps === normalized.nextProps
+    ) {
+      return existing;
+    }
+    throwInvalidDangerousHtmlTextResetCommitHandoff(
+      'Private dangerousHTML/text reset commit handoff is already recorded for this root update.'
+    );
+  }
+
+  const rootBridgeState = validation.rootHandleState.bridgeState;
+  const sequence =
+    rootBridgeState.nextDangerousHtmlTextResetCommitSequence++;
+  const handoffId =
+    `${rootBridgeState.dangerousHtmlTextResetCommitIdPrefix}:${sequence}`;
+  let mutationRecords = null;
+  let mutationPayload = null;
+  let latestPropsCommitRecord = null;
+  let latestPropsHandoffStale = false;
+  let mutationRollbackApplied = false;
+  let mutationRollbackRecordCount = 0;
+  let mutationRollbackError = null;
+  let publishedLatestProps = null;
+
+  try {
+    mutationRecords = applyDangerousHtmlTextResetFakeDomRows(
+      hostNode,
+      diagnosticValidation.payload.blockedMutationRows
+    );
+    mutationPayload =
+      getDangerousHtmlTextResetFakeDomMutationPayload(mutationRecords);
+    if (mutationPayload === null) {
+      throwInvalidDangerousHtmlTextResetCommitHandoff(
+        'Private dangerousHTML/text reset commit handoffs require applied fake-DOM mutation records.'
+      );
+    }
+
+    if (
+      getLatestPropsFromHostInstanceToken(normalized.hostInstanceToken) !==
+      previousProps
+    ) {
+      latestPropsHandoffStale = true;
+      throwInvalidDangerousHtmlTextResetCommitHandoff(
+        'Private dangerousHTML/text reset commit handoffs reject stale latest-props rows before publication.'
+      );
+    }
+
+    latestPropsCommitRecord = createLatestPropsCommitRecord(
+      hostNode,
+      normalized.nextProps,
+      []
+    );
+    publishedLatestProps =
+      commitLatestPropsFromMutationRecord(latestPropsCommitRecord);
+  } catch (error) {
+    if (mutationRecords !== null) {
+      try {
+        mutationRollbackRecordCount =
+          rollbackDangerousHtmlTextResetFakeDomMutation(mutationRecords);
+        mutationRollbackApplied = true;
+      } catch (rollbackError) {
+        mutationRollbackError = rollbackError;
+      }
+    }
+    attachDangerousHtmlTextResetCommitRollbackEvidence(error, {
+      latestPropsHandoffStale,
+      mutationPayload,
+      mutationRecords,
+      mutationRollbackApplied,
+      mutationRollbackError,
+      mutationRollbackRecordCount,
+      normalized,
+      previousProps
+    });
+    throw error;
+  }
+
+  const mutationEvidence =
+    createDangerousHtmlTextResetMutationEvidence(mutationPayload);
+  const fakeDomCommitRows =
+    createDangerousHtmlTextResetFakeDomExecutionRows(mutationRecords);
+  const latestPropsPublished = publishedLatestProps === normalized.nextProps;
+  const handoff = freezeRecord({
+    $$typeof: privateRootDangerousHtmlTextResetCommitHandoffRecordType,
+    kind: 'FastReactDomPrivateRootDangerousHtmlTextResetCommitHandoffRecord',
+    operation: 'root-dangerous-html-text-reset-fake-dom-commit',
+    handoffId,
+    handoffSequence: sequence,
+    handoffStatus: ROOT_BRIDGE_DANGEROUS_HTML_TEXT_RESET_COMMIT_APPLIED,
+    sourceRequestId: record.requestId,
+    sourceRequestSequence: record.requestSequence,
+    sourceRequestType: record.requestType,
+    sourceUpdateId: record.updateId,
+    sourceLifecycleStatusBefore: record.lifecycleStatusBefore,
+    sourceLifecycleStatusAfter: record.lifecycleStatusAfter,
+    rootId: record.rootId,
+    rootKind: record.rootKind,
+    rootTag: record.rootTag,
+    hostTag: normalized.tag,
+    rootCommitMetadataSource: metadata.source,
+    rootCommitMetadataRecordCount: metadata.recordCount,
+    rootCommitHostComponentUpdateRecordCount:
+      metadata.hostComponentUpdateRecordCount,
+    rootCommitHostComponentUpdate:
+      metadata.selected.publicRecord,
+    diagnosticStatus: diagnostic.status,
+    diagnosticBlockedMutationRowCount: diagnostic.blockedMutationRowCount,
+    diagnosticPropertyPayloadRowsAccepted:
+      diagnostic.propertyPayloadRowsAccepted,
+    previousContentSource: diagnostic.previousContentSource,
+    nextContentSource: diagnostic.nextContentSource,
+    resetTextContent: diagnostic.resetDecision.shouldResetTextContent,
+    mutationEvidence,
+    fakeDomCommitRows,
+    fakeDomCommitRowCount: fakeDomCommitRows.length,
+    latestPropsPublished,
+    latestPropsPublishOrder:
+      'after-dangerous-html-text-reset-fake-dom-mutation',
+    acceptedCapabilities:
+      createDangerousHtmlTextResetExecutionAcceptedCapabilities(
+        mutationEvidence
+      ),
+    blockedCapabilities:
+      ROOT_BRIDGE_DANGEROUS_HTML_TEXT_RESET_EXECUTION_BLOCKED_CAPABILITIES,
+    publicRootCreated: false,
+    publicRootObjectExposed: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    fakeDomMutation: true,
+    domMutation: true,
+    browserDomMutation: false,
+    fakeDomInnerHTMLWritten: mutationEvidence.setInnerHTMLCount > 0,
+    fakeDomTextContentWritten: mutationEvidence.textContentRowCount > 0,
+    realDomInnerHTMLWritten: false,
+    realDomTextContentWritten: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    refEffects: false,
+    compatibilityClaimed: false
+  });
+
+  rootDangerousHtmlTextResetCommitHandoffRecords.set(record, handoff);
+  rootDangerousHtmlTextResetCommitHandoffPayloads.set(handoff, {
+    bridgeState: rootBridgeState,
+    diagnostic,
+    diagnosticPayload: diagnosticValidation.payload,
+    fakeDomCommitRows,
+    hostInstanceNode: hostNode,
+    hostInstanceToken: normalized.hostInstanceToken,
+    latestPropsCommitRecord,
+    latestPropsPublished,
+    mutationEvidence,
+    mutationPayload,
+    mutationRecords,
+    nextProps: normalized.nextProps,
+    previousProps,
+    rootCommitMetadata: rootCommitHostComponentUpdateMetadata,
+    rootCommitMetadataSelection: metadata.selected,
+    rootHandle: sourcePayload.rootHandle,
+    selectedRootCommitRecord: metadata.selected.record,
+    sourceRecord: record
+  });
+
+  return handoff;
+}
+
 function createNativeRootBridgeHandoffRecordWithBridge(bridgeState, record) {
   const validation = validateRootBridgeRequestRecord(record);
   if (bridgeState !== null && validation.bridgeState !== bridgeState) {
@@ -7465,6 +7814,14 @@ function getPrivateRootDangerousHtmlTextResetCommitMetadataPayload(record) {
 
 function isPrivateRootDangerousHtmlTextResetCommitMetadataRecord(value) {
   return rootDangerousHtmlTextResetCommitMetadataPayloads.has(value);
+}
+
+function getPrivateRootDangerousHtmlTextResetCommitHandoffPayload(record) {
+  return rootDangerousHtmlTextResetCommitHandoffPayloads.get(record) || null;
+}
+
+function isPrivateRootDangerousHtmlTextResetCommitHandoffRecord(value) {
+  return rootDangerousHtmlTextResetCommitHandoffPayloads.has(value);
 }
 
 function getPrivateRootCommitRefMetadataPayload(record) {
@@ -11649,6 +12006,10 @@ function createBridgeState(options) {
       options && options.dangerousHtmlTextResetCommitMetadataIdPrefix,
       'dangerous-html-text-reset-commit'
     ),
+    dangerousHtmlTextResetCommitIdPrefix: getIdPrefix(
+      options && options.dangerousHtmlTextResetCommitIdPrefix,
+      'dangerous-html-text-reset-execution'
+    ),
     requestIdPrefix: getIdPrefix(options && options.requestIdPrefix, 'request'),
     sideEffectIdPrefix: getIdPrefix(
       options && options.sideEffectIdPrefix,
@@ -11671,6 +12032,7 @@ function createBridgeState(options) {
     nextHostOutputUpdateSequence: 1,
     nextRootCommitHostComponentUpdateSequence: 1,
     nextDangerousHtmlTextResetCommitMetadataSequence: 1,
+    nextDangerousHtmlTextResetCommitSequence: 1,
     nextPortalBoundarySequence: 1,
     nextPortalPrepareMountListenerSequence: 1,
     nextPortalCommitSequence: 1,
@@ -13335,6 +13697,171 @@ function createDangerousHtmlTextResetFakeDomCommitRows(diagnostic) {
         compatibilityClaimed: false
       })
     )
+  );
+}
+
+function createDangerousHtmlTextResetMutationEvidence(mutationPayload) {
+  const mutationRecords =
+    mutationPayload === null ? [] : mutationPayload.mutationRecords;
+  const rowKinds = [];
+  let setInnerHTMLCount = 0;
+  let setTextContentCount = 0;
+  let resetTextContentCount = 0;
+
+  for (const record of mutationRecords) {
+    if (!rowKinds.includes(record.sourceKind)) {
+      rowKinds.push(record.sourceKind);
+    }
+    if (record.operation === 'setInnerHTML') {
+      setInnerHTMLCount += 1;
+    } else if (record.operation === 'setTextContent') {
+      setTextContentCount += 1;
+    } else if (record.operation === 'resetTextContent') {
+      resetTextContentCount += 1;
+    }
+  }
+
+  const textContentRowCount = setTextContentCount + resetTextContentCount;
+  return freezeRecord({
+    fakeDomMutationBacked: true,
+    rowCount: mutationRecords.length,
+    mutatingRowCount: mutationRecords.length,
+    setInnerHTMLCount,
+    setTextContentCount,
+    resetTextContentCount,
+    textContentRowCount,
+    dangerousHtmlRowCount: setInnerHTMLCount,
+    rowKinds: freezeArray(rowKinds),
+    rollbackSupported:
+      mutationPayload === null ? false : mutationPayload.rollbackSupported,
+    rollbackRecordCount:
+      mutationPayload === null ? 0 : mutationPayload.rollbackRecordCount,
+    gateMetadata:
+      DOM_DANGEROUS_HTML_TEXT_RESET_FAKE_DOM_MUTATION_GATE_METADATA
+  });
+}
+
+function createDangerousHtmlTextResetFakeDomExecutionRows(mutationRecords) {
+  return freezeArray(
+    mutationRecords.map((record, index) =>
+      freezeRecord({
+        kind: 'FastReactDomPrivateDangerousHtmlTextResetFakeDomExecutionRow',
+        rowIndex: index,
+        sourceRowId: record.sourceRowId,
+        commitRowId: `${record.operation}-fake-dom-execution`,
+        commitRowKind: record.operation,
+        sourceKind: record.sourceKind,
+        sourceMutation: record.mutation,
+        propName: record.propName,
+        propertyName: record.propertyName,
+        valueLength: record.valueLength,
+        metadataOnly: false,
+        fakeDomCommitMetadata: false,
+        fakeDomMutation: true,
+        realDomMutation: false,
+        browserDomMutation: false,
+        realDomInnerHTMLWritten: false,
+        realDomTextContentWritten: false,
+        compatibilityClaimed: false
+      })
+    )
+  );
+}
+
+function createDangerousHtmlTextResetExecutionAcceptedCapabilities(
+  mutationEvidence
+) {
+  const capabilities = [
+    ...ROOT_BRIDGE_DANGEROUS_HTML_TEXT_RESET_EXECUTION_ACCEPTED_CAPABILITIES
+  ];
+  if (mutationEvidence.setInnerHTMLCount > 0) {
+    capabilities.push(
+      freezeRecord({
+        id: 'fake-dom-inner-html-write',
+        accepted: true,
+        reason:
+          'The private fake-DOM host node accepted an innerHTML write from admitted dangerousHTML rows.'
+      })
+    );
+  }
+  if (mutationEvidence.setTextContentCount > 0) {
+    capabilities.push(
+      freezeRecord({
+        id: 'fake-dom-text-content-write',
+        accepted: true,
+        reason:
+          'The private fake-DOM host node accepted a textContent write from admitted removal rows.'
+      })
+    );
+  }
+  if (mutationEvidence.resetTextContentCount > 0) {
+    capabilities.push(
+      freezeRecord({
+        id: 'fake-dom-reset-text-content-write',
+        accepted: true,
+        reason:
+          'The private fake-DOM host node accepted a resetTextContent write before managed child work remains blocked.'
+      })
+    );
+  }
+  return freezeArray(capabilities);
+}
+
+function attachDangerousHtmlTextResetCommitRollbackEvidence(error, options) {
+  if (!isObjectOrFunction(error)) {
+    return;
+  }
+
+  const internalEvidence = error.domDangerousHtmlTextResetRollbackEvidence;
+  const internalMutationAttempted =
+    isObjectOrFunction(internalEvidence) &&
+    internalEvidence.mutationAttempted === true;
+  const internalRollbackAttempted =
+    isObjectOrFunction(internalEvidence) &&
+    internalEvidence.rollbackAttempted === true;
+  const internalRollbackApplied =
+    isObjectOrFunction(internalEvidence) &&
+    internalEvidence.rollbackApplied === true;
+  const internalRollbackRecordCount =
+    isObjectOrFunction(internalEvidence) &&
+    typeof internalEvidence.rollbackRecordCount === 'number'
+      ? internalEvidence.rollbackRecordCount
+      : 0;
+  const mutationRollbackError = options.mutationRollbackError;
+  error.privateRootDangerousHtmlTextResetRollbackEvidence = freezeRecord({
+    kind: 'FastReactDomPrivateRootDangerousHtmlTextResetRollbackEvidence',
+    latestPropsPublished: false,
+    latestPropsHandoffStale: options.latestPropsHandoffStale,
+    latestPropsRestoredToPrevious:
+      getLatestPropsFromHostInstanceToken(
+        options.normalized.hostInstanceToken
+      ) === options.previousProps,
+    mutationAttempted:
+      options.mutationRecords !== null || internalMutationAttempted,
+    mutationRollbackAttempted:
+      options.mutationRecords !== null || internalRollbackAttempted,
+    mutationRollbackApplied:
+      options.mutationRollbackApplied || internalRollbackApplied,
+    mutationRollbackRecordCount:
+      options.mutationRollbackRecordCount || internalRollbackRecordCount,
+    unsupportedRowRejected:
+      isUnsupportedDangerousHtmlTextResetCommitError(error) ||
+      (isObjectOrFunction(internalEvidence) &&
+        internalEvidence.unsupportedRowRejected === true),
+    mutationRollbackError:
+      mutationRollbackError === null
+        ? null
+        : freezeRecord({
+            code: mutationRollbackError.code || null,
+            message: mutationRollbackError.message
+          })
+  });
+}
+
+function isUnsupportedDangerousHtmlTextResetCommitError(error) {
+  return (
+    isObjectOrFunction(error) &&
+    error.code === 'FAST_REACT_DOM_UNSUPPORTED_DANGEROUS_HTML_TEXT_RESET_ROW'
   );
 }
 
@@ -18030,6 +18557,13 @@ function throwInvalidDangerousHtmlTextResetCommitMetadata(message) {
   throw error;
 }
 
+function throwInvalidDangerousHtmlTextResetCommitHandoff(message) {
+  const error = new Error(message);
+  error.code =
+    'FAST_REACT_DOM_INVALID_DANGEROUS_HTML_TEXT_RESET_COMMIT_HANDOFF';
+  throw error;
+}
+
 function throwInvalidRootCommitRefMetadata(message) {
   const error = new Error(message);
   error.code = 'FAST_REACT_DOM_INVALID_ROOT_COMMIT_REF_METADATA';
@@ -18483,6 +19017,7 @@ module.exports = {
   ROOT_BRIDGE_REF_CALLBACK_ERROR_ROUTING_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_REF_CALLBACK_ERROR_ROUTING_RECORDED,
   ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC_ADMITTED,
+  ROOT_BRIDGE_DANGEROUS_HTML_TEXT_RESET_COMMIT_APPLIED,
   ROOT_BRIDGE_ROOT_ERROR_OPTION_CALLBACK_ACCEPTED,
   ROOT_BRIDGE_REQUEST_ADMITTED,
   ROOT_BRIDGE_ROOT_COMMIT_REF_METADATA_ACCEPTED,
@@ -18508,6 +19043,7 @@ module.exports = {
   admitPrivateCreateRenderPath,
   admitPrivateRootCommitRefMetadata,
   admitRootBridgeRequestRecord,
+  applyPrivateRootDangerousHtmlTextResetCommit,
   applyPrivateRootCommitHostComponentUpdate,
   applyPrivateRootHostOutputUpdate,
   applyPrivateCreateRootSideEffects,
@@ -18547,6 +19083,7 @@ module.exports = {
   getPrivateRootRenderNativeHandoffPayload,
   getPrivateRootCreateRenderAdmissionPayload,
   getPrivateRootCommitHostComponentUpdateHandoffPayload,
+  getPrivateRootDangerousHtmlTextResetCommitHandoffPayload,
   getPrivateRootDangerousHtmlTextResetCommitMetadataPayload,
   getPrivateRootHostOutputUpdateHandoffPayload,
   getPrivateRootInitialHostOutputHandoffPayload,
@@ -18586,6 +19123,7 @@ module.exports = {
   isNativeRootBridgeHandoffRecord,
   isPrivateRootRenderNativeHandoffRecord,
   isPrivateRootCommitHostComponentUpdateHandoffRecord,
+  isPrivateRootDangerousHtmlTextResetCommitHandoffRecord,
   isPrivateRootDangerousHtmlTextResetCommitMetadataRecord,
   isPrivateRootHostOutputUpdateHandoffRecord,
   isPrivateRootCommitRefMetadataRecord,
@@ -18628,6 +19166,7 @@ module.exports = {
   privateRootCreateSideEffectCleanupRecordType,
   privateRootCreateSideEffectRecordType,
   privateRootCommitHostComponentUpdateHandoffRecordType,
+  privateRootDangerousHtmlTextResetCommitHandoffRecordType,
   privateRootDangerousHtmlTextResetCommitMetadataRecordType,
   privateRootHostOutputUpdateHandoffRecordType,
   privateRootCommitRefMetadataRecordType,
