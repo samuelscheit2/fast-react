@@ -1,7 +1,9 @@
 //! Phase-scoped reconciler host token metadata.
 //!
 //! Tokens created here are reconciler-owned IDs for future host creation,
-//! commit, hydration, and deletion calls. The metadata records root/fiber
+//! commit, hydration, and deletion calls. Future ref attach/detach work should
+//! validate instance tokens against those same commit/deletion phase records
+//! before public-instance lookup exists. The metadata records root/fiber
 //! ownership plus phase and target; it never exposes raw fibers or DOM nodes.
 
 use std::error::Error;
@@ -232,22 +234,7 @@ impl HostFiberTokenStore {
                 HostFiberTokenViolation::Invalid,
             ));
         }
-        if record.phase != phase {
-            return Err(HostFiberTokenValidationError::new(
-                token,
-                phase,
-                target,
-                HostFiberTokenViolation::WrongPhase,
-            ));
-        }
-        if record.target != target {
-            return Err(HostFiberTokenValidationError::new(
-                token,
-                phase,
-                target,
-                HostFiberTokenViolation::WrongTarget,
-            ));
-        }
+        Self::validate_record_scope(token, phase, target, record.phase, record.target)?;
 
         Ok(())
     }
@@ -266,6 +253,7 @@ impl HostFiberTokenStore {
                 HostFiberTokenViolation::Invalid,
             ));
         };
+        Self::validate_record_scope(token, phase, target, record.phase, record.target)?;
 
         Ok(HostFiberTokenMetadata {
             root_id: record.root_id,
@@ -290,6 +278,7 @@ impl HostFiberTokenStore {
                 HostFiberTokenViolation::Invalid,
             ));
         };
+        Self::validate_record_scope(token, phase, target, record.phase, record.target)?;
         record.active = false;
         Ok(())
     }
@@ -345,6 +334,33 @@ impl HostFiberTokenStore {
             .get_mut((token.raw() - 1) as usize)
             .and_then(Option::as_mut))
     }
+
+    fn validate_record_scope(
+        token: HostFiberTokenId,
+        phase: HostFiberTokenPhase,
+        target: HostFiberTokenTarget,
+        record_phase: HostFiberTokenPhase,
+        record_target: HostFiberTokenTarget,
+    ) -> Result<(), HostFiberTokenValidationError> {
+        if record_phase != phase {
+            return Err(HostFiberTokenValidationError::new(
+                token,
+                phase,
+                target,
+                HostFiberTokenViolation::WrongPhase,
+            ));
+        }
+        if record_target != target {
+            return Err(HostFiberTokenValidationError::new(
+                token,
+                phase,
+                target,
+                HostFiberTokenViolation::WrongTarget,
+            ));
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -366,6 +382,13 @@ mod tests {
         )
     }
 
+    fn assert_violation<T: std::fmt::Debug>(
+        result: Result<T, HostFiberTokenValidationError>,
+        violation: HostFiberTokenViolation,
+    ) {
+        assert_eq!(result.unwrap_err().violation(), violation);
+    }
+
     #[test]
     fn host_tokens_issue_phase_scoped_metadata_without_exposing_host_nodes() {
         let root_id = root_id();
@@ -378,6 +401,9 @@ mod tests {
             HostFiberTokenPhase::Creation,
             HostFiberTokenTarget::Instance,
         );
+
+        assert_eq!(store.len(), 1);
+        assert!(!store.is_empty());
 
         let metadata = store
             .metadata(
@@ -394,7 +420,173 @@ mod tests {
     }
 
     #[test]
-    fn host_tokens_reject_wrong_phase_target_root_fiber_and_stale_tokens() {
+    fn host_tokens_accept_commit_deletion_and_reserved_ref_lifecycle_tokens() {
+        let root_id = root_id();
+        let ref_attach_fiber = create_fiber_id();
+        let ref_detach_fiber = create_fiber_id();
+        let text_deletion_fiber = create_fiber_id();
+        let mut store = HostFiberTokenStore::new();
+        let ref_attach_token = store.issue(
+            root_id,
+            ref_attach_fiber,
+            HostFiberTokenPhase::Commit,
+            HostFiberTokenTarget::Instance,
+        );
+        let ref_detach_token = store.issue(
+            root_id,
+            ref_detach_fiber,
+            HostFiberTokenPhase::Deletion,
+            HostFiberTokenTarget::Instance,
+        );
+        let text_deletion_token = store.issue(
+            root_id,
+            text_deletion_fiber,
+            HostFiberTokenPhase::Deletion,
+            HostFiberTokenTarget::TextInstance,
+        );
+
+        store
+            .validate(
+                ref_attach_token,
+                root_id,
+                ref_attach_fiber,
+                HostFiberTokenPhase::Commit,
+                HostFiberTokenTarget::Instance,
+            )
+            .unwrap();
+        store
+            .validate(
+                ref_detach_token,
+                root_id,
+                ref_detach_fiber,
+                HostFiberTokenPhase::Deletion,
+                HostFiberTokenTarget::Instance,
+            )
+            .unwrap();
+        store
+            .validate(
+                text_deletion_token,
+                root_id,
+                text_deletion_fiber,
+                HostFiberTokenPhase::Deletion,
+                HostFiberTokenTarget::TextInstance,
+            )
+            .unwrap();
+
+        let attach_metadata = store
+            .metadata(
+                ref_attach_token,
+                HostFiberTokenPhase::Commit,
+                HostFiberTokenTarget::Instance,
+            )
+            .unwrap();
+        assert_eq!(attach_metadata.root_id(), root_id);
+        assert_eq!(attach_metadata.phase(), HostFiberTokenPhase::Commit);
+        assert_eq!(attach_metadata.target(), HostFiberTokenTarget::Instance);
+    }
+
+    #[test]
+    fn host_tokens_reject_wrong_phase_without_invalidation() {
+        let root_id = root_id();
+        let fiber_id = create_fiber_id();
+        let mut store = HostFiberTokenStore::new();
+        let token = store.issue(
+            root_id,
+            fiber_id,
+            HostFiberTokenPhase::Deletion,
+            HostFiberTokenTarget::Instance,
+        );
+
+        assert_violation(
+            store.validate(
+                token,
+                root_id,
+                fiber_id,
+                HostFiberTokenPhase::Commit,
+                HostFiberTokenTarget::Instance,
+            ),
+            HostFiberTokenViolation::WrongPhase,
+        );
+        assert_violation(
+            store.metadata(
+                token,
+                HostFiberTokenPhase::Commit,
+                HostFiberTokenTarget::Instance,
+            ),
+            HostFiberTokenViolation::WrongPhase,
+        );
+        assert_violation(
+            store.invalidate(
+                token,
+                HostFiberTokenPhase::Commit,
+                HostFiberTokenTarget::Instance,
+            ),
+            HostFiberTokenViolation::WrongPhase,
+        );
+
+        store
+            .validate(
+                token,
+                root_id,
+                fiber_id,
+                HostFiberTokenPhase::Deletion,
+                HostFiberTokenTarget::Instance,
+            )
+            .unwrap();
+    }
+
+    #[test]
+    fn host_tokens_reject_wrong_target_without_invalidation() {
+        let root_id = root_id();
+        let fiber_id = create_fiber_id();
+        let mut store = HostFiberTokenStore::new();
+        let token = store.issue(
+            root_id,
+            fiber_id,
+            HostFiberTokenPhase::Commit,
+            HostFiberTokenTarget::Instance,
+        );
+
+        assert_violation(
+            store.validate(
+                token,
+                root_id,
+                fiber_id,
+                HostFiberTokenPhase::Commit,
+                HostFiberTokenTarget::TextInstance,
+            ),
+            HostFiberTokenViolation::WrongTarget,
+        );
+        assert_violation(
+            store.metadata(
+                token,
+                HostFiberTokenPhase::Commit,
+                HostFiberTokenTarget::TextInstance,
+            ),
+            HostFiberTokenViolation::WrongTarget,
+        );
+        assert_violation(
+            store.invalidate(
+                token,
+                HostFiberTokenPhase::Commit,
+                HostFiberTokenTarget::TextInstance,
+            ),
+            HostFiberTokenViolation::WrongTarget,
+        );
+
+        store
+            .validate(
+                token,
+                root_id,
+                fiber_id,
+                HostFiberTokenPhase::Commit,
+                HostFiberTokenTarget::Instance,
+            )
+            .unwrap();
+    }
+
+    #[test]
+    fn host_tokens_reject_wrong_root_and_fiber_identity() {
         let root_id = root_id();
         let fiber_id = create_fiber_id();
         let other_fiber_id = create_fiber_id();
@@ -402,121 +594,104 @@ mod tests {
         let token = store.issue(
             root_id,
             fiber_id,
-            HostFiberTokenPhase::Creation,
+            HostFiberTokenPhase::Commit,
             HostFiberTokenTarget::Instance,
         );
 
-        assert_eq!(
-            store
-                .validate(
-                    token,
-                    root_id,
-                    fiber_id,
-                    HostFiberTokenPhase::Commit,
-                    HostFiberTokenTarget::Instance,
-                )
-                .unwrap_err()
-                .violation(),
-            HostFiberTokenViolation::WrongPhase
+        assert_violation(
+            store.validate(
+                token,
+                FiberRootId::new(2).unwrap(),
+                fiber_id,
+                HostFiberTokenPhase::Commit,
+                HostFiberTokenTarget::Instance,
+            ),
+            HostFiberTokenViolation::WrongRenderer,
         );
-        assert_eq!(
-            store
-                .validate(
-                    token,
-                    root_id,
-                    fiber_id,
-                    HostFiberTokenPhase::Creation,
-                    HostFiberTokenTarget::TextInstance,
-                )
-                .unwrap_err()
-                .violation(),
-            HostFiberTokenViolation::WrongTarget
+        assert_violation(
+            store.validate(
+                token,
+                root_id,
+                other_fiber_id,
+                HostFiberTokenPhase::Commit,
+                HostFiberTokenTarget::Instance,
+            ),
+            HostFiberTokenViolation::Invalid,
         );
-        assert_eq!(
-            store
-                .validate(
-                    token,
-                    FiberRootId::new(2).unwrap(),
-                    fiber_id,
-                    HostFiberTokenPhase::Creation,
-                    HostFiberTokenTarget::Instance,
-                )
-                .unwrap_err()
-                .violation(),
-            HostFiberTokenViolation::WrongRenderer
-        );
-        assert_eq!(
-            store
-                .validate(
-                    token,
-                    root_id,
-                    other_fiber_id,
-                    HostFiberTokenPhase::Creation,
-                    HostFiberTokenTarget::Instance,
-                )
-                .unwrap_err()
-                .violation(),
-            HostFiberTokenViolation::Invalid
+    }
+
+    #[test]
+    fn host_tokens_reject_stale_tokens_after_invalidation() {
+        let root_id = root_id();
+        let fiber_id = create_fiber_id();
+        let mut store = HostFiberTokenStore::new();
+        let token = store.issue(
+            root_id,
+            fiber_id,
+            HostFiberTokenPhase::Deletion,
+            HostFiberTokenTarget::Instance,
         );
 
         store
             .invalidate(
                 token,
-                HostFiberTokenPhase::Creation,
+                HostFiberTokenPhase::Deletion,
                 HostFiberTokenTarget::Instance,
             )
             .unwrap();
-        assert_eq!(
-            store
-                .validate(
-                    token,
-                    root_id,
-                    fiber_id,
-                    HostFiberTokenPhase::Creation,
-                    HostFiberTokenTarget::Instance,
-                )
-                .unwrap_err()
-                .violation(),
-            HostFiberTokenViolation::Stale
+        assert_violation(
+            store.validate(
+                token,
+                root_id,
+                fiber_id,
+                HostFiberTokenPhase::Deletion,
+                HostFiberTokenTarget::Instance,
+            ),
+            HostFiberTokenViolation::Stale,
         );
+
+        let metadata = store
+            .metadata(
+                token,
+                HostFiberTokenPhase::Deletion,
+                HostFiberTokenTarget::Instance,
+            )
+            .unwrap();
+        assert!(!metadata.is_active());
     }
 
     #[test]
-    fn host_tokens_accept_commit_and_deletion_phase_tokens() {
+    fn host_tokens_reject_none_and_missing_tokens() {
         let root_id = root_id();
-        let instance_fiber = create_fiber_id();
-        let text_fiber = create_fiber_id();
+        let fiber_id = create_fiber_id();
         let mut store = HostFiberTokenStore::new();
-        let commit_token = store.issue(
-            root_id,
-            instance_fiber,
-            HostFiberTokenPhase::Commit,
-            HostFiberTokenTarget::Instance,
-        );
-        let deletion_token = store.issue(
-            root_id,
-            text_fiber,
-            HostFiberTokenPhase::Deletion,
-            HostFiberTokenTarget::TextInstance,
-        );
+        let missing = HostFiberTokenId::new(99).unwrap();
 
-        store
-            .validate(
-                commit_token,
+        assert_violation(
+            store.validate(
+                HostFiberTokenId::NONE,
                 root_id,
-                instance_fiber,
+                fiber_id,
                 HostFiberTokenPhase::Commit,
                 HostFiberTokenTarget::Instance,
-            )
-            .unwrap();
-        store
-            .validate(
-                deletion_token,
-                root_id,
-                text_fiber,
-                HostFiberTokenPhase::Deletion,
-                HostFiberTokenTarget::TextInstance,
-            )
-            .unwrap();
+            ),
+            HostFiberTokenViolation::Invalid,
+        );
+        assert_violation(
+            store.metadata(
+                missing,
+                HostFiberTokenPhase::Commit,
+                HostFiberTokenTarget::Instance,
+            ),
+            HostFiberTokenViolation::Invalid,
+        );
+        assert_violation(
+            store.invalidate(
+                missing,
+                HostFiberTokenPhase::Commit,
+                HostFiberTokenTarget::Instance,
+            ),
+            HostFiberTokenViolation::Invalid,
+        );
     }
 }

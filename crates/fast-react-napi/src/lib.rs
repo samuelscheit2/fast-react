@@ -7,6 +7,8 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
+mod handle_table;
+
 pub const BINDING_PACKAGE_NAME: &str = "@fast-react/native";
 pub const NAPI_BOUNDARY_STATUS: &str = "placeholder";
 pub const NATIVE_ADDON_NAME: &str = "fast_react_napi";
