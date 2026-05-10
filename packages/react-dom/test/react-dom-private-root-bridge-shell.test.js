@@ -312,6 +312,154 @@ test('private createRoot mark/listen gate applies and reverts explicit side effe
   );
 });
 
+test('private create/render admission combines mark/listen and render records without DOM mutation', () => {
+  const document = createDocument('private-create-render-admission');
+  const container = createElement('DIV', document);
+  const element = {
+    props: {
+      children: 'admitted child'
+    },
+    type: 'main'
+  };
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    createRenderAdmissionIdPrefix: 'admit-create-render',
+    sideEffectIdPrefix: 'admit-side-effect'
+  });
+
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const render = bridge.renderContainer(create.handle, element);
+  const admission = bridge.admitCreateRenderPath(
+    create,
+    sideEffects,
+    render
+  );
+
+  assert.equal(
+    rootBridge.admitPrivateCreateRenderPath(create, sideEffects, render),
+    admission
+  );
+  assert.equal(
+    rootBridge.isPrivateRootCreateRenderAdmissionRecord(admission),
+    true
+  );
+  assert.equal(Object.isFrozen(admission), true);
+  assert.equal(
+    admission.$$typeof,
+    rootBridge.privateRootCreateRenderAdmissionRecordType
+  );
+  assert.equal(
+    admission.kind,
+    'FastReactDomPrivateRootCreateRenderAdmissionRecord'
+  );
+  assert.equal(admission.operation, 'create-render');
+  assert.equal(
+    admission.admissionStatus,
+    rootBridge.ROOT_BRIDGE_CREATE_RENDER_ADMITTED
+  );
+  assert.equal(
+    admission.executionStatus,
+    rootBridge.ROOT_BRIDGE_EXECUTION_BLOCKED
+  );
+  assert.equal(
+    admission.compatibilityStatus,
+    rootBridge.ROOT_BRIDGE_COMPATIBILITY_BLOCKED
+  );
+  assert.equal(admission.admissionId, 'admit-create-render:1');
+  assert.equal(admission.rootId, create.rootId);
+  assert.equal(admission.createRequestId, create.requestId);
+  assert.equal(admission.renderRequestId, render.requestId);
+  assert.equal(admission.renderUpdateId, render.updateId);
+  assert.equal(admission.sideEffectId, sideEffects.sideEffectId);
+  assert.equal(admission.createAdmission.operation, 'create');
+  assert.equal(admission.renderAdmission.operation, 'render');
+  assert.equal(admission.markerRecord, sideEffects.markerRecord);
+  assert.equal(
+    admission.listenerRegistration,
+    sideEffects.listenerRegistration
+  );
+  assert.deepEqual(admission.createRootPrerequisites, {
+    accepted: true,
+    createRequestAccepted: true,
+    markListenAccepted: true,
+    markerStatus: rootMarkers.ROOT_MARKER_APPLIED,
+    listenerRegistrationStatus: rootListeners.ROOT_LISTENERS_REGISTERED,
+    rootMarkerMatchesOwner: true,
+    rootListeningMarkerPresent: true,
+    ownerDocumentListeningMarkerPresent: true,
+    sideEffectActiveAtAdmission: true
+  });
+  assert.deepEqual(admission.lifecyclePrerequisites, {
+    accepted: true,
+    lifecycleStatusBefore: null,
+    lifecycleStatusAfter: rootBridge.ROOT_LIFECYCLE_RENDERED,
+    lifecycleTransition: 'none->created->rendered',
+    operation: 'create-render',
+    rootKind: rootBridge.CLIENT_ROOT_KIND,
+    rootTag: rootBridge.CONCURRENT_ROOT_TAG
+  });
+  assert.deepEqual(
+    admission.acceptedCapabilities.map((capability) => capability.id),
+    ['create-root-marker-write', 'root-listener-installation']
+  );
+  assert.deepEqual(
+    admission.blockedCapabilities.map((capability) => capability.id),
+    [
+      'native-execution',
+      'reconciler-execution',
+      'dom-mutation',
+      'hydration',
+      'events',
+      'compatibility-claims'
+    ]
+  );
+  assert.equal(admission.publicRootCreated, false);
+  assert.equal(admission.publicRootObjectExposed, false);
+  assert.equal(admission.nativeExecution, false);
+  assert.equal(admission.reconcilerExecution, false);
+  assert.equal(admission.rootScheduled, false);
+  assert.equal(admission.domMutation, false);
+  assert.equal(admission.markerWrites, true);
+  assert.equal(admission.listenerInstallation, true);
+  assert.equal(admission.hydration, false);
+  assert.equal(admission.eventDispatch, false);
+  assert.equal(admission.compatibilityClaimed, false);
+
+  const payload =
+    rootBridge.getPrivateRootCreateRenderAdmissionPayload(admission);
+  assert.equal(payload.createRecord, create);
+  assert.equal(payload.sideEffectRecord, sideEffects);
+  assert.equal(payload.renderRecord, render);
+  assert.equal(payload.container, container);
+  assert.equal(payload.element, element);
+  assert.equal(
+    rootBridge.getPrivateRootCreateRenderAdmissionPayload({}),
+    null
+  );
+  assert.equal(rootBridge.isPrivateRootCreateRenderAdmissionRecord({}), false);
+
+  assert.equal(rootMarkers.getContainerRoot(container), create.owner);
+  assert.equal(listenerRegistry.hasListeningMarker(container), true);
+  assert.equal(listenerRegistry.hasListeningMarker(document), true);
+  assert.equal(container.__registrations.length, 138);
+  assert.equal(document.__registrations.length, 1);
+  assert.equal(container.__mutationLog.length, 0);
+  assert.equal(document.__mutationLog.length, 0);
+
+  const serialized = JSON.stringify(admission);
+  assert.equal(serialized.includes('__mutationLog'), false);
+  assert.equal(serialized.includes('__registrations'), false);
+  assert.equal(serialized.includes('admitted child'), false);
+  assert.equal(serialized.includes('__FAST_REACT_DOM_EVENT_TARGET__'), false);
+
+  const cleanup = bridge.revertCreateRootSideEffects(sideEffects);
+  assert.equal(
+    cleanup.sideEffectStatus,
+    rootBridge.ROOT_BRIDGE_MARK_LISTEN_REVERTED
+  );
+  assertBridgeDidNotTouchContainer(container, document);
+});
+
 test('private createRoot mark/listen gate validates records before side effects', () => {
   const document = createDocument('private-mark-listen-validation');
   const container = createElement('DIV', document);
@@ -361,6 +509,54 @@ test('private createRoot mark/listen gate validates records before side effects'
   assert.equal(rootMarkers.getContainerRoot(occupiedContainer), existingOwner);
   assert.equal(occupiedContainer.__registrations.length, 0);
   assert.equal(occupiedDocument.__registrations.length, 0);
+});
+
+test('private create/render admission validates bridge ownership and active mark/listen records', () => {
+  const document = createDocument('private-create-render-validation');
+  const container = createElement('DIV', document);
+  const bridge = rootBridge.createPrivateRootBridgeShell();
+  const otherBridge = rootBridge.createPrivateRootBridgeShell();
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const render = bridge.renderContainer(create.handle, {
+    props: {},
+    type: 'section'
+  });
+
+  assert.throws(
+    () => otherBridge.admitCreateRenderPath(create, sideEffects, render),
+    {
+      code: 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE'
+    }
+  );
+  assert.throws(() => bridge.admitCreateRenderPath(create, render, render), {
+    code: 'FAST_REACT_DOM_INVALID_CREATE_RENDER_ADMISSION'
+  });
+
+  const secondDocument = createDocument('private-create-render-other-root');
+  const secondContainer = createElement('DIV', secondDocument);
+  const secondCreate = bridge.createClientRoot(secondContainer);
+  const secondRender = bridge.renderContainer(secondCreate.handle, {
+    props: {},
+    type: 'aside'
+  });
+  assert.throws(
+    () => bridge.admitCreateRenderPath(create, sideEffects, secondRender),
+    {
+      code: 'FAST_REACT_DOM_INVALID_CREATE_RENDER_ADMISSION'
+    }
+  );
+
+  bridge.revertCreateRootSideEffects(sideEffects);
+  assert.throws(() => bridge.admitCreateRenderPath(create, sideEffects, render), {
+    code: 'FAST_REACT_DOM_INVALID_CREATE_RENDER_ADMISSION'
+  });
+
+  bridge.revertCreateRootSideEffects(
+    bridge.applyCreateRootSideEffects(secondCreate)
+  );
+  assertBridgeDidNotTouchContainer(container, document);
+  assertBridgeDidNotTouchContainer(secondContainer, secondDocument);
 });
 
 test('public react-dom/client root placeholders remain inert', () => {
