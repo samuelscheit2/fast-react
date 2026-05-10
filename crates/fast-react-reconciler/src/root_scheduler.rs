@@ -9,7 +9,9 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-use fast_react_core::{EventPriority, FiberId, Lane, Lanes, lanes_to_event_priority};
+use fast_react_core::{
+    EventPriority, FiberId, Lane, Lanes, RootLaneState, lanes_to_event_priority,
+};
 use fast_react_host_config::HostTypes;
 
 use crate::{
@@ -221,6 +223,32 @@ impl RootTaskScheduleRecord {
     #[must_use]
     pub const fn canceled_callback(self) -> Option<SchedulerCancellationRecord> {
         self.canceled_callback
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RootLaneSelection {
+    priority_lanes: Lanes,
+    render_lanes: Lanes,
+}
+
+impl RootLaneSelection {
+    #[must_use]
+    const fn no_work() -> Self {
+        Self {
+            priority_lanes: Lanes::NO,
+            render_lanes: Lanes::NO,
+        }
+    }
+
+    #[must_use]
+    const fn priority_lanes(self) -> Lanes {
+        self.priority_lanes
+    }
+
+    #[must_use]
+    const fn render_lanes(self) -> Lanes {
+        self.render_lanes
     }
 }
 
@@ -536,7 +564,8 @@ pub fn schedule_task_for_root_during_microtask<H: HostTypes>(
     store: &mut FiberRootStore<H>,
     root_id: FiberRootId,
 ) -> Result<RootTaskScheduleRecord, RootSchedulerError> {
-    let next_lanes = next_lanes_for_root(store, root_id)?;
+    let lane_selection = select_lanes_for_scheduled_task(store, root_id)?;
+    let next_lanes = lane_selection.render_lanes();
     let existing_callback_node = store.root(root_id)?.scheduling().callback_node();
 
     if next_lanes.is_empty() {
@@ -557,7 +586,9 @@ pub fn schedule_task_for_root_during_microtask<H: HostTypes>(
         });
     }
 
-    if next_lanes.includes_sync_lane() {
+    if lane_selection.priority_lanes().includes_sync_lane()
+        && !root_is_prerendering(store, root_id, lane_selection.priority_lanes())?
+    {
         let canceled_callback = store
             .scheduler_bridge_mut()
             .cancel_callback(existing_callback_node);
@@ -579,7 +610,8 @@ pub fn schedule_task_for_root_during_microtask<H: HostTypes>(
         });
     }
 
-    let new_callback_priority = RootCallbackPriority::new(next_lanes.highest_priority_lane());
+    let new_callback_priority =
+        RootCallbackPriority::new(lane_selection.priority_lanes().highest_priority_lane());
     let existing_callback_priority = store.root(root_id)?.scheduling().callback_priority();
     let act_queue_active = store.scheduler_bridge().is_act_queue_active();
 
@@ -593,7 +625,9 @@ pub fn schedule_task_for_root_during_microtask<H: HostTypes>(
             outcome: RootTaskScheduleOutcome::Reused,
             callback_priority: new_callback_priority,
             callback_node: existing_callback_node,
-            scheduler_priority: Some(scheduler_priority_for_lanes(next_lanes)),
+            scheduler_priority: Some(scheduler_priority_for_lanes(
+                lane_selection.priority_lanes(),
+            )),
             scheduled_callback: None,
             scheduled_act_queue_task: None,
             canceled_callback: None,
@@ -603,7 +637,7 @@ pub fn schedule_task_for_root_during_microtask<H: HostTypes>(
     let canceled_callback = store
         .scheduler_bridge_mut()
         .cancel_callback(existing_callback_node);
-    let scheduler_priority = scheduler_priority_for_lanes(next_lanes);
+    let scheduler_priority = scheduler_priority_for_lanes(lane_selection.priority_lanes());
 
     if act_queue_active {
         let scheduled_act_queue_task = store.scheduler_bridge_mut().schedule_act_callback(
@@ -668,7 +702,7 @@ pub fn execute_scheduled_root_callback<H: HostTypes>(
         });
     }
 
-    let selected_lanes = next_lanes_for_root(store, callback.root())?;
+    let selected_lanes = select_lanes_for_scheduled_task(store, callback.root())?.render_lanes();
     if selected_lanes.is_empty() {
         store
             .root_mut(callback.root())?
@@ -943,6 +977,60 @@ fn next_lanes_for_root<H: HostTypes>(
     Ok(root.lanes().entangled_lanes_for(next_lanes))
 }
 
+fn select_lanes_for_scheduled_task<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root_id: FiberRootId,
+) -> Result<RootLaneSelection, RootSchedulerError> {
+    let root = store.root(root_id)?;
+    let wip_lanes = if root.scheduling().work_in_progress().is_some() {
+        root.scheduling().work_in_progress_root_render_lanes()
+    } else {
+        Lanes::NO
+    };
+    Ok(select_lanes_from_root_state(
+        root.lanes(),
+        wip_lanes,
+        root_has_pending_commit(store, root_id)?,
+    ))
+}
+
+fn select_lanes_from_root_state(
+    root_lanes: &RootLaneState,
+    wip_lanes: Lanes,
+    root_has_pending_commit: bool,
+) -> RootLaneSelection {
+    let priority_lanes = root_lanes.get_next_lanes(wip_lanes, root_has_pending_commit);
+    if priority_lanes.is_empty() {
+        return RootLaneSelection::no_work();
+    }
+
+    RootLaneSelection {
+        priority_lanes,
+        render_lanes: root_lanes.entangled_lanes_for(priority_lanes),
+    }
+}
+
+fn root_has_pending_commit<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root_id: FiberRootId,
+) -> Result<bool, RootSchedulerError> {
+    let root = store.root(root_id)?;
+    Ok(root.pending_commit().is_some()
+        || root.scheduling().cancel_pending_commit().is_some()
+        || root.scheduling().timeout_handle().is_some())
+}
+
+fn root_is_prerendering<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root_id: FiberRootId,
+    render_lanes: Lanes,
+) -> Result<bool, RootSchedulerError> {
+    Ok(store
+        .root(root_id)?
+        .lanes()
+        .check_if_root_is_prerendering(render_lanes))
+}
+
 fn scheduler_priority_for_lanes(lanes: Lanes) -> SchedulerPriority {
     match lanes_to_event_priority(lanes) {
         EventPriority::DISCRETE | EventPriority::CONTINUOUS => SchedulerPriority::UserBlocking,
@@ -960,7 +1048,7 @@ mod tests {
     use crate::{
         RootElementHandle, SchedulerActQueueTaskKind, update_container, update_container_sync,
     };
-    use fast_react_core::{Lanes, RootFinishedLanes};
+    use fast_react_core::{Lanes, RootFinishedLanes, RootLaneState};
 
     fn root_store() -> (FiberRootStore<RecordingHost>, FiberRootId, RecordingHost) {
         let host = RecordingHost::default();
@@ -1202,6 +1290,116 @@ mod tests {
     }
 
     #[test]
+    fn root_scheduler_suspended_unpinged_warm_lanes_do_not_schedule_async_callback() {
+        let (mut store, root_id, _host) = root_store();
+        schedule_default_update(&mut store, root_id);
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .lanes_mut()
+            .mark_suspended(Lanes::DEFAULT, Lane::NO, true);
+
+        let processed = process_root_schedule_in_microtask(&mut store).unwrap();
+
+        assert_eq!(processed.records().len(), 1);
+        assert_eq!(
+            processed.records()[0].outcome(),
+            RootTaskScheduleOutcome::NoWork
+        );
+        assert_eq!(processed.records()[0].next_lanes(), Lanes::NO);
+        assert!(store.scheduler_bridge().callback_requests().is_empty());
+        assert_eq!(scheduled_roots(&store).unwrap(), Vec::<FiberRootId>::new());
+    }
+
+    #[test]
+    fn root_scheduler_pinged_suspended_lanes_schedule_async_callback() {
+        let (mut store, root_id, _host) = root_store();
+        schedule_default_update(&mut store, root_id);
+        {
+            let lanes = store.root_mut(root_id).unwrap().lanes_mut();
+            lanes.mark_suspended(Lanes::DEFAULT, Lane::NO, true);
+            lanes.mark_pinged(Lanes::DEFAULT);
+        }
+
+        let processed = process_root_schedule_in_microtask(&mut store).unwrap();
+
+        assert_eq!(
+            processed.records()[0].outcome(),
+            RootTaskScheduleOutcome::Scheduled
+        );
+        assert_eq!(processed.records()[0].next_lanes(), Lanes::DEFAULT);
+        assert_eq!(
+            processed.records()[0].scheduler_priority(),
+            Some(SchedulerPriority::Normal)
+        );
+        assert_eq!(store.scheduler_bridge().callback_requests().len(), 1);
+        assert_eq!(
+            store.scheduler_bridge().callback_requests()[0].root(),
+            root_id
+        );
+    }
+
+    #[test]
+    fn root_scheduler_prewarm_lane_selection_fails_closed_with_pending_commit() {
+        let mut root_lanes = RootLaneState::new();
+        root_lanes.mark_updated(Lane::DEFAULT);
+        root_lanes.mark_suspended(Lanes::DEFAULT, Lane::NO, false);
+
+        let without_pending_commit = select_lanes_from_root_state(&root_lanes, Lanes::NO, false);
+        let with_pending_commit = select_lanes_from_root_state(&root_lanes, Lanes::NO, true);
+
+        assert_eq!(without_pending_commit.priority_lanes(), Lanes::DEFAULT);
+        assert_eq!(without_pending_commit.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(with_pending_commit.priority_lanes(), Lanes::NO);
+        assert_eq!(with_pending_commit.render_lanes(), Lanes::NO);
+    }
+
+    #[test]
+    fn root_scheduler_idle_work_waits_behind_suspended_non_idle_work() {
+        let (mut store, root_id, _host) = root_store();
+        schedule_default_update(&mut store, root_id);
+        {
+            let lanes = store.root_mut(root_id).unwrap().lanes_mut();
+            lanes.mark_suspended(Lanes::DEFAULT, Lane::NO, true);
+            lanes.mark_updated(Lane::IDLE);
+        }
+
+        let processed = process_root_schedule_in_microtask(&mut store).unwrap();
+
+        assert_eq!(
+            processed.records()[0].outcome(),
+            RootTaskScheduleOutcome::NoWork
+        );
+        assert_eq!(processed.records()[0].next_lanes(), Lanes::NO);
+        assert!(store.scheduler_bridge().callback_requests().is_empty());
+    }
+
+    #[test]
+    fn root_scheduler_entangled_lanes_expand_after_priority_selection() {
+        let (mut store, root_id, _host) = root_store();
+        schedule_default_update(&mut store, root_id);
+        {
+            let lanes = store.root_mut(root_id).unwrap().lanes_mut();
+            lanes.mark_updated(Lane::TRANSITION_1);
+            lanes.mark_entangled(Lanes::DEFAULT.merge_lane(Lane::TRANSITION_1));
+        }
+
+        let processed = process_root_schedule_in_microtask(&mut store).unwrap();
+        let record = processed.records()[0];
+
+        assert_eq!(record.outcome(), RootTaskScheduleOutcome::Scheduled);
+        assert_eq!(
+            record.next_lanes(),
+            Lanes::DEFAULT.merge_lane(Lane::TRANSITION_1)
+        );
+        assert_eq!(
+            record.callback_priority(),
+            RootCallbackPriority::new(Lane::DEFAULT)
+        );
+        assert_eq!(record.scheduler_priority(), Some(SchedulerPriority::Normal));
+    }
+
+    #[test]
     fn root_scheduler_execute_callback_renders_matching_host_root_callback() {
         let (mut store, root_id, host) = root_store();
         let current = store.root(root_id).unwrap().current();
@@ -1288,6 +1486,28 @@ mod tests {
         );
         assert_eq!(store.root(root_id).unwrap().current(), current);
         assert_eq!(store.fiber_arena().get(current).unwrap().alternate(), None);
+    }
+
+    #[test]
+    fn root_scheduler_execute_callback_rechecks_suspended_lane_selection() {
+        let (mut store, root_id, _host) = root_store();
+        let callback = scheduled_callback_request(&mut store, root_id);
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .lanes_mut()
+            .mark_suspended(Lanes::DEFAULT, Lane::NO, true);
+        let current = store.root(root_id).unwrap().current();
+
+        let execution = execute_scheduled_root_callback(&mut store, callback).unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootSchedulerCallbackExecutionStatus::NoWork
+        );
+        assert_eq!(execution.selected_lanes(), Lanes::NO);
+        assert_eq!(execution.render_phase(), None);
+        assert_eq!(store.root(root_id).unwrap().current(), current);
     }
 
     #[test]
