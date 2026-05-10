@@ -30,6 +30,13 @@ mod root_bridge_requests {
         PlaceholderValueRecord, bridge_handle_table_cross_environment_teardown_diagnostics,
     };
 
+    pub(crate) const NATIVE_ROOT_BRIDGE_WORKER_THREAD_TEARDOWN_EXECUTABLE_PREFLIGHT_STATUS: &str =
+        "preflighted-native-root-bridge-worker-thread-teardown-boundary";
+    const NATIVE_ROOT_BRIDGE_WORKER_THREAD_TEARDOWN_PREFLIGHT_MODEL: &str =
+        "fast-react-napi.WorkerThreadTeardownPreflight";
+    const NATIVE_ROOT_BRIDGE_WORKER_THREAD_TEARDOWN_PREFLIGHT_EXECUTION_SCOPE: &str =
+        "rust-only-handle-table-preflight-no-node-worker-thread-no-napi-cleanup-hook";
+
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub(crate) enum NativeRootBridgeRequestKind {
         Create,
@@ -1994,6 +2001,426 @@ mod root_bridge_requests {
         }
     }
 
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(crate) struct NativeRootBridgeWorkerThreadTeardownExecutablePreflight {
+        status: &'static str,
+        model: &'static str,
+        execution_scope: &'static str,
+        transport: &'static str,
+        worker_thread_id: u64,
+        worker_environment_id: BridgeEnvironmentId,
+        peer_environment_id: BridgeEnvironmentId,
+        transport_worker_thread_teardown_gate_status: &'static str,
+        batched_record_gate_status: &'static str,
+        cross_environment_teardown_gate_status: &'static str,
+        accepted_batch_record_count: usize,
+        cross_environment_teardown_row_count: usize,
+        mismatched_teardown: BridgeEnvironmentTeardown,
+        matched_teardown: BridgeEnvironmentTeardown,
+        stale_worker_handle_rejection_count: usize,
+        active_peer_handle_count: usize,
+        root_validator_state_preserved: bool,
+        rows: Vec<NativeRootBridgeWorkerThreadTeardownExecutablePreflightRow>,
+        preflight_evaluated: bool,
+        node_worker_threads_execution: bool,
+        napi_cleanup_hook_execution: bool,
+        native_addon_loaded: bool,
+        native_execution: bool,
+        renderer_execution: bool,
+        reconciler_execution: bool,
+        public_native_compatibility: bool,
+        react_behavior_error: bool,
+    }
+
+    impl NativeRootBridgeWorkerThreadTeardownExecutablePreflight {
+        #[must_use]
+        pub(crate) const fn status(&self) -> &'static str {
+            self.status
+        }
+
+        #[must_use]
+        pub(crate) const fn model(&self) -> &'static str {
+            self.model
+        }
+
+        #[must_use]
+        pub(crate) const fn execution_scope(&self) -> &'static str {
+            self.execution_scope
+        }
+
+        #[must_use]
+        pub(crate) const fn transport(&self) -> &'static str {
+            self.transport
+        }
+
+        #[must_use]
+        pub(crate) const fn worker_thread_id(&self) -> u64 {
+            self.worker_thread_id
+        }
+
+        #[must_use]
+        pub(crate) const fn worker_environment_id(&self) -> BridgeEnvironmentId {
+            self.worker_environment_id
+        }
+
+        #[must_use]
+        pub(crate) const fn peer_environment_id(&self) -> BridgeEnvironmentId {
+            self.peer_environment_id
+        }
+
+        #[must_use]
+        pub(crate) const fn transport_worker_thread_teardown_gate_status(&self) -> &'static str {
+            self.transport_worker_thread_teardown_gate_status
+        }
+
+        #[must_use]
+        pub(crate) const fn batched_record_gate_status(&self) -> &'static str {
+            self.batched_record_gate_status
+        }
+
+        #[must_use]
+        pub(crate) const fn cross_environment_teardown_gate_status(&self) -> &'static str {
+            self.cross_environment_teardown_gate_status
+        }
+
+        #[must_use]
+        pub(crate) const fn accepted_batch_record_count(&self) -> usize {
+            self.accepted_batch_record_count
+        }
+
+        #[must_use]
+        pub(crate) const fn cross_environment_teardown_row_count(&self) -> usize {
+            self.cross_environment_teardown_row_count
+        }
+
+        #[must_use]
+        pub(crate) const fn mismatched_teardown(&self) -> BridgeEnvironmentTeardown {
+            self.mismatched_teardown
+        }
+
+        #[must_use]
+        pub(crate) const fn matched_teardown(&self) -> BridgeEnvironmentTeardown {
+            self.matched_teardown
+        }
+
+        #[must_use]
+        pub(crate) const fn stale_worker_handle_rejection_count(&self) -> usize {
+            self.stale_worker_handle_rejection_count
+        }
+
+        #[must_use]
+        pub(crate) const fn active_peer_handle_count(&self) -> usize {
+            self.active_peer_handle_count
+        }
+
+        #[must_use]
+        pub(crate) const fn root_validator_state_preserved(&self) -> bool {
+            self.root_validator_state_preserved
+        }
+
+        #[must_use]
+        pub(crate) fn rows(&self) -> &[NativeRootBridgeWorkerThreadTeardownExecutablePreflightRow] {
+            &self.rows
+        }
+
+        #[must_use]
+        pub(crate) const fn preflight_evaluated(&self) -> bool {
+            self.preflight_evaluated
+        }
+
+        #[must_use]
+        pub(crate) const fn node_worker_threads_execution(&self) -> bool {
+            self.node_worker_threads_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn napi_cleanup_hook_execution(&self) -> bool {
+            self.napi_cleanup_hook_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn native_addon_loaded(&self) -> bool {
+            self.native_addon_loaded
+        }
+
+        #[must_use]
+        pub(crate) const fn native_execution(&self) -> bool {
+            self.native_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn renderer_execution(&self) -> bool {
+            self.renderer_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn reconciler_execution(&self) -> bool {
+            self.reconciler_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn public_native_compatibility(&self) -> bool {
+            self.public_native_compatibility
+        }
+
+        #[must_use]
+        pub(crate) const fn react_behavior_error(&self) -> bool {
+            self.react_behavior_error
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct NativeRootBridgeWorkerThreadTeardownExecutablePreflightRow {
+        id: &'static str,
+        operation: &'static str,
+        assertion: &'static str,
+        worker_thread_id: u64,
+        handle_kind: BridgeHandleKind,
+        table_environment_id: BridgeEnvironmentId,
+        handle_environment_id: BridgeEnvironmentId,
+        slot: u64,
+        handle_generation: u64,
+        current_generation: Option<u64>,
+        record_id: Option<u64>,
+        source_error_code: Option<&'static str>,
+        boundary_error_code: Option<&'static str>,
+        rejected_by_boundary: bool,
+        peer_invariant_preserved: bool,
+        preflight_passed: bool,
+        node_worker_threads_execution: bool,
+        napi_cleanup_hook_execution: bool,
+        native_addon_loaded: bool,
+        native_execution: bool,
+        renderer_execution: bool,
+        reconciler_execution: bool,
+        public_native_compatibility: bool,
+        react_behavior_error: bool,
+    }
+
+    impl NativeRootBridgeWorkerThreadTeardownExecutablePreflightRow {
+        fn rejected(init: NativeRootBridgeWorkerThreadTeardownPreflightRejectedRowInit) -> Self {
+            Self::new(NativeRootBridgeWorkerThreadTeardownPreflightRowInit {
+                id: init.id,
+                operation: init.operation,
+                assertion: init.assertion,
+                worker_thread_id: init.worker_thread_id,
+                handle: init.handle,
+                table_environment_id: init.table_environment_id,
+                current_generation: current_generation_for_handle_table_error(init.error),
+                record_id: None,
+                source_error_code: Some(init.error.code()),
+                boundary_error_code: Some(boundary_error_code_for_handle_table_error(init.error)),
+                rejected_by_boundary: true,
+                peer_invariant_preserved: false,
+                preflight_passed: matches!(
+                    init.error,
+                    BridgeHandleTableError::StaleHandle { .. }
+                        | BridgeHandleTableError::DisposedHandle { .. }
+                ),
+            })
+        }
+
+        fn active_peer(
+            id: &'static str,
+            operation: &'static str,
+            worker_thread_id: u64,
+            table: &BridgeHandleTable,
+            handle: BridgeHandle,
+            record_id: u64,
+        ) -> Self {
+            Self::new(NativeRootBridgeWorkerThreadTeardownPreflightRowInit {
+                id,
+                operation,
+                assertion: "peer-handle-remains-active-after-worker-teardown",
+                worker_thread_id,
+                handle,
+                table_environment_id: table.environment_id(),
+                current_generation: Some(handle.generation()),
+                record_id: Some(record_id),
+                source_error_code: None,
+                boundary_error_code: None,
+                rejected_by_boundary: false,
+                peer_invariant_preserved: true,
+                preflight_passed: true,
+            })
+        }
+
+        const fn new(init: NativeRootBridgeWorkerThreadTeardownPreflightRowInit) -> Self {
+            Self {
+                id: init.id,
+                operation: init.operation,
+                assertion: init.assertion,
+                worker_thread_id: init.worker_thread_id,
+                handle_kind: init.handle.kind(),
+                table_environment_id: init.table_environment_id,
+                handle_environment_id: init.handle.environment_id(),
+                slot: init.handle.slot(),
+                handle_generation: init.handle.generation(),
+                current_generation: init.current_generation,
+                record_id: init.record_id,
+                source_error_code: init.source_error_code,
+                boundary_error_code: init.boundary_error_code,
+                rejected_by_boundary: init.rejected_by_boundary,
+                peer_invariant_preserved: init.peer_invariant_preserved,
+                preflight_passed: init.preflight_passed,
+                node_worker_threads_execution: false,
+                napi_cleanup_hook_execution: false,
+                native_addon_loaded: false,
+                native_execution: false,
+                renderer_execution: false,
+                reconciler_execution: false,
+                public_native_compatibility: false,
+                react_behavior_error: false,
+            }
+        }
+
+        #[must_use]
+        pub(crate) const fn id(self) -> &'static str {
+            self.id
+        }
+
+        #[must_use]
+        pub(crate) const fn operation(self) -> &'static str {
+            self.operation
+        }
+
+        #[must_use]
+        pub(crate) const fn assertion(self) -> &'static str {
+            self.assertion
+        }
+
+        #[must_use]
+        pub(crate) const fn worker_thread_id(self) -> u64 {
+            self.worker_thread_id
+        }
+
+        #[must_use]
+        pub(crate) const fn handle_kind(self) -> BridgeHandleKind {
+            self.handle_kind
+        }
+
+        #[must_use]
+        pub(crate) const fn table_environment_id(self) -> BridgeEnvironmentId {
+            self.table_environment_id
+        }
+
+        #[must_use]
+        pub(crate) const fn handle_environment_id(self) -> BridgeEnvironmentId {
+            self.handle_environment_id
+        }
+
+        #[must_use]
+        pub(crate) const fn slot(self) -> u64 {
+            self.slot
+        }
+
+        #[must_use]
+        pub(crate) const fn handle_generation(self) -> u64 {
+            self.handle_generation
+        }
+
+        #[must_use]
+        pub(crate) const fn current_generation(self) -> Option<u64> {
+            self.current_generation
+        }
+
+        #[must_use]
+        pub(crate) const fn record_id(self) -> Option<u64> {
+            self.record_id
+        }
+
+        #[must_use]
+        pub(crate) const fn source_error_code(self) -> Option<&'static str> {
+            self.source_error_code
+        }
+
+        #[must_use]
+        pub(crate) const fn boundary_error_code(self) -> Option<&'static str> {
+            self.boundary_error_code
+        }
+
+        #[must_use]
+        pub(crate) const fn rejected_by_boundary(self) -> bool {
+            self.rejected_by_boundary
+        }
+
+        #[must_use]
+        pub(crate) const fn peer_invariant_preserved(self) -> bool {
+            self.peer_invariant_preserved
+        }
+
+        #[must_use]
+        pub(crate) const fn preflight_passed(self) -> bool {
+            self.preflight_passed
+        }
+
+        #[must_use]
+        pub(crate) const fn node_worker_threads_execution(self) -> bool {
+            self.node_worker_threads_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn napi_cleanup_hook_execution(self) -> bool {
+            self.napi_cleanup_hook_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn native_addon_loaded(self) -> bool {
+            self.native_addon_loaded
+        }
+
+        #[must_use]
+        pub(crate) const fn native_execution(self) -> bool {
+            self.native_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn renderer_execution(self) -> bool {
+            self.renderer_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn reconciler_execution(self) -> bool {
+            self.reconciler_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn public_native_compatibility(self) -> bool {
+            self.public_native_compatibility
+        }
+
+        #[must_use]
+        pub(crate) const fn react_behavior_error(self) -> bool {
+            self.react_behavior_error
+        }
+    }
+
+    struct NativeRootBridgeWorkerThreadTeardownPreflightRowInit {
+        id: &'static str,
+        operation: &'static str,
+        assertion: &'static str,
+        worker_thread_id: u64,
+        handle: BridgeHandle,
+        table_environment_id: BridgeEnvironmentId,
+        current_generation: Option<u64>,
+        record_id: Option<u64>,
+        source_error_code: Option<&'static str>,
+        boundary_error_code: Option<&'static str>,
+        rejected_by_boundary: bool,
+        peer_invariant_preserved: bool,
+        preflight_passed: bool,
+    }
+
+    struct NativeRootBridgeWorkerThreadTeardownPreflightRejectedRowInit<'a> {
+        id: &'static str,
+        operation: &'static str,
+        assertion: &'static str,
+        worker_thread_id: u64,
+        handle: BridgeHandle,
+        table_environment_id: BridgeEnvironmentId,
+        error: &'a BridgeHandleTableError,
+    }
+
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub(crate) struct NativeRootBridgeTransportWorkerThreadTeardownRow {
         id: &'static str,
@@ -3383,8 +3810,82 @@ mod root_bridge_requests {
         }
     }
 
+    pub(crate) fn native_root_bridge_worker_thread_teardown_executable_preflight()
+    -> NativeRootBridgeWorkerThreadTeardownExecutablePreflight {
+        let value = serde_json::from_str::<Value>(
+            worker_thread_teardown_preflight_json_transport_payload(),
+        )
+        .expect("worker-thread teardown preflight JSON payload parses");
+        let envelope = parse_json_transport_envelope(&value)
+            .expect("worker-thread teardown preflight JSON payload has valid schema");
+        let worker_thread_id = 764;
+        let worker_environment_id = BridgeEnvironmentId::from_raw(764);
+        let peer_environment_id = BridgeEnvironmentId::from_raw(1764);
+        let batched_record_gate =
+            native_root_bridge_batched_json_transport_gate(&envelope.request_records);
+        let cross_environment_teardown_gate = native_root_bridge_cross_environment_teardown_gate();
+        let (mismatched_teardown, matched_teardown, root_validator_state_preserved, rows) =
+            worker_thread_teardown_executable_preflight_rows(
+                worker_thread_id,
+                worker_environment_id,
+                peer_environment_id,
+                &envelope.request_records,
+            );
+        let stale_worker_handle_rejection_count =
+            rows.iter().filter(|row| row.rejected_by_boundary()).count();
+        let active_peer_handle_count = rows
+            .iter()
+            .filter(|row| row.peer_invariant_preserved())
+            .count();
+        let accepted_batch_record_count = batched_record_gate
+            .lifecycle_rows()
+            .iter()
+            .filter(|row| {
+                row.status() == NativeRootBridgeBatchedJsonTransportLifecycleStatus::Accepted
+            })
+            .count();
+
+        NativeRootBridgeWorkerThreadTeardownExecutablePreflight {
+            status: NATIVE_ROOT_BRIDGE_WORKER_THREAD_TEARDOWN_EXECUTABLE_PREFLIGHT_STATUS,
+            model: NATIVE_ROOT_BRIDGE_WORKER_THREAD_TEARDOWN_PREFLIGHT_MODEL,
+            execution_scope: NATIVE_ROOT_BRIDGE_WORKER_THREAD_TEARDOWN_PREFLIGHT_EXECUTION_SCOPE,
+            transport: envelope.transport,
+            worker_thread_id,
+            worker_environment_id,
+            peer_environment_id,
+            transport_worker_thread_teardown_gate_status:
+                super::NATIVE_ROOT_BRIDGE_TRANSPORT_WORKER_THREAD_TEARDOWN_GATE_STATUS,
+            batched_record_gate_status: batched_record_gate.status(),
+            cross_environment_teardown_gate_status: cross_environment_teardown_gate.status(),
+            accepted_batch_record_count,
+            cross_environment_teardown_row_count: cross_environment_teardown_gate
+                .handle_table_diagnostics()
+                .rows()
+                .len(),
+            mismatched_teardown,
+            matched_teardown,
+            stale_worker_handle_rejection_count,
+            active_peer_handle_count,
+            root_validator_state_preserved,
+            rows,
+            preflight_evaluated: true,
+            node_worker_threads_execution: false,
+            napi_cleanup_hook_execution: false,
+            native_addon_loaded: false,
+            native_execution: false,
+            renderer_execution: false,
+            reconciler_execution: false,
+            public_native_compatibility: false,
+            react_behavior_error: false,
+        }
+    }
+
     fn worker_thread_teardown_json_transport_payload() -> &'static str {
         r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":524,"root_handle":{"environment_id":524,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":524,"slot":2,"generation":1,"kind":"value"},"root_handle_state":"active"},{"request_id":2,"kind":"render","environment_id":524,"root_handle":{"environment_id":524,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":524,"slot":3,"generation":1,"kind":"value"},"root_handle_state":"active"}]}"#
+    }
+
+    fn worker_thread_teardown_preflight_json_transport_payload() -> &'static str {
+        r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":764,"root_handle":{"environment_id":764,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":764,"slot":2,"generation":1,"kind":"value"},"root_handle_state":"active"},{"request_id":2,"kind":"render","environment_id":764,"root_handle":{"environment_id":764,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":764,"slot":3,"generation":1,"kind":"value"},"root_handle_state":"active"}]}"#
     }
 
     fn transport_worker_thread_teardown_rows(
@@ -3493,6 +3994,199 @@ mod root_bridge_requests {
         );
 
         (mismatched_teardown, matched_teardown, rows)
+    }
+
+    fn worker_thread_teardown_executable_preflight_rows(
+        worker_thread_id: u64,
+        worker_environment_id: BridgeEnvironmentId,
+        peer_environment_id: BridgeEnvironmentId,
+        records: &[NativeRootBridgeJsonTransportRecord],
+    ) -> (
+        BridgeEnvironmentTeardown,
+        BridgeEnvironmentTeardown,
+        bool,
+        Vec<NativeRootBridgeWorkerThreadTeardownExecutablePreflightRow>,
+    ) {
+        let mut worker_table = BridgeHandleTable::new(worker_environment_id);
+        let mut validator = NativeRootBridgeRequestSequenceValidator::new();
+        let mut root_handle_state = None;
+        let mut root_handle = None;
+        let mut root_id = None;
+        let mut value_handles = Vec::new();
+
+        for record in records.iter().copied() {
+            let request = record
+                .decode()
+                .expect("worker-thread teardown preflight records decode");
+            prevalidate_handoff_lifecycle(&validator, request)
+                .expect("worker-thread teardown preflight lifecycle prevalidates");
+            admit_js_native_root_bridge_handoff_record(
+                &mut worker_table,
+                request,
+                root_handle_state,
+            )
+            .expect("worker-thread teardown preflight record admits into table");
+            let validation_record = validator
+                .validate_next(&worker_table, request)
+                .expect("worker-thread teardown preflight record validates after admission");
+
+            if root_handle.is_none() {
+                root_handle = Some(request.root_handle());
+                root_id = Some(request.root_id());
+            }
+
+            if let Some(value_handle) = request.value_handle() {
+                value_handles.push((
+                    match request.kind() {
+                        NativeRootBridgeRequestKind::Create => {
+                            "worker-create-value-stale-executable-preflight"
+                        }
+                        NativeRootBridgeRequestKind::Render => {
+                            "worker-render-value-stale-executable-preflight"
+                        }
+                        NativeRootBridgeRequestKind::Unmount => {
+                            "worker-unmount-value-stale-executable-preflight"
+                        }
+                    },
+                    value_handle,
+                ));
+            }
+
+            root_handle_state = Some(validation_record.root_handle_state());
+        }
+
+        let root_handle =
+            root_handle.expect("worker-thread teardown preflight records contain create root");
+        let root_id = root_id.expect("worker-thread teardown preflight records contain root id");
+        let validator_root_handle_before_teardown = validator.root_handle();
+        let validator_root_id_before_teardown = validator.root_id();
+        let validator_last_request_id_before_teardown = validator.last_request_id();
+        let validator_root_retired_before_teardown = validator.root_retired();
+
+        let mut peer_table = BridgeHandleTable::new(peer_environment_id);
+        let peer_root = peer_table.insert_root(PlaceholderRootRecord::new(176401));
+        let peer_value = peer_table.insert_value(PlaceholderValueRecord::new(176402));
+        let mismatched_teardown = peer_table.teardown_environment(worker_environment_id);
+        let matched_teardown = worker_table.teardown_environment(worker_environment_id);
+
+        let late_render = NativeRootBridgeRequestRecord::from_js_native_handoff_record(
+            validator_last_request_id_before_teardown
+                .expect("worker-thread teardown preflight records were validated")
+                .saturating_add(1),
+            NativeRootBridgeRequestKind::Render,
+            worker_environment_id,
+            root_handle,
+            root_id,
+            value_handles.last().map(|(_, handle)| *handle),
+            NativeRootBridgeRootHandleState::Active,
+        );
+        let late_render_error = validator
+            .validate_next(&worker_table, late_render)
+            .expect_err("post-teardown render must reject the stale worker root handle");
+        let root_validator_state_preserved = validator.root_handle()
+            == validator_root_handle_before_teardown
+            && validator.root_id() == validator_root_id_before_teardown
+            && validator.last_request_id() == validator_last_request_id_before_teardown
+            && validator.root_retired() == validator_root_retired_before_teardown;
+
+        let mut rows = Vec::with_capacity(value_handles.len() + 3);
+        let NativeRootBridgeRequestError::HandleTable(root_error) = &late_render_error else {
+            panic!("post-teardown render rejection must come from the handle table");
+        };
+        rows.push(
+            NativeRootBridgeWorkerThreadTeardownExecutablePreflightRow::rejected(
+                NativeRootBridgeWorkerThreadTeardownPreflightRejectedRowInit {
+                    id: "worker-render-root-stale-executable-preflight",
+                    operation: "post-teardown-render-boundary-validation",
+                    assertion: "stale-worker-root-rejected-without-mutating-validator",
+                    worker_thread_id,
+                    handle: root_handle,
+                    table_environment_id: worker_table.environment_id(),
+                    error: root_error,
+                },
+            ),
+        );
+
+        for (id, handle) in value_handles {
+            let error = worker_table
+                .get_value(handle)
+                .expect_err("worker value is stale after executable teardown preflight");
+            rows.push(
+                NativeRootBridgeWorkerThreadTeardownExecutablePreflightRow::rejected(
+                    NativeRootBridgeWorkerThreadTeardownPreflightRejectedRowInit {
+                        id,
+                        operation: "post-teardown-value-boundary-validation",
+                        assertion: "stale-worker-value-rejected-after-worker-teardown",
+                        worker_thread_id,
+                        handle,
+                        table_environment_id: worker_table.environment_id(),
+                        error: &error,
+                    },
+                ),
+            );
+        }
+
+        let peer_root_record_id = peer_table
+            .get_root(peer_root)
+            .expect("peer root survives worker-thread teardown preflight")
+            .root_id();
+        rows.push(
+            NativeRootBridgeWorkerThreadTeardownExecutablePreflightRow::active_peer(
+                "peer-root-active-executable-preflight",
+                "post-teardown-peer-root-validation",
+                worker_thread_id,
+                &peer_table,
+                peer_root,
+                peer_root_record_id,
+            ),
+        );
+        let peer_value_record_id = peer_table
+            .get_value(peer_value)
+            .expect("peer value survives worker-thread teardown preflight")
+            .value_id();
+        rows.push(
+            NativeRootBridgeWorkerThreadTeardownExecutablePreflightRow::active_peer(
+                "peer-value-active-executable-preflight",
+                "post-teardown-peer-value-validation",
+                worker_thread_id,
+                &peer_table,
+                peer_value,
+                peer_value_record_id,
+            ),
+        );
+
+        (
+            mismatched_teardown,
+            matched_teardown,
+            root_validator_state_preserved,
+            rows,
+        )
+    }
+
+    const fn current_generation_for_handle_table_error(
+        error: &BridgeHandleTableError,
+    ) -> Option<u64> {
+        match error {
+            BridgeHandleTableError::StaleHandle {
+                current_generation, ..
+            } => Some(*current_generation),
+            _ => None,
+        }
+    }
+
+    const fn boundary_error_code_for_handle_table_error(
+        error: &BridgeHandleTableError,
+    ) -> &'static str {
+        match error {
+            BridgeHandleTableError::WrongEnvironment { .. } => {
+                super::NativeBoundaryErrorKind::RootBridgeWrongEnvironment.code()
+            }
+            BridgeHandleTableError::StaleHandle { .. }
+            | BridgeHandleTableError::DisposedHandle { .. } => {
+                super::NativeBoundaryErrorKind::RootBridgeStaleHandle.code()
+            }
+            _ => super::NativeBoundaryErrorKind::RootBridgeValidationFailed.code(),
+        }
     }
 
     fn parse_json_transport_payload_for_gate(
@@ -5622,6 +6316,7 @@ mod tests {
         BridgeHandleTableError, PlaceholderRootRecord, PlaceholderValueRecord,
     };
     use crate::root_bridge_requests::{
+        NATIVE_ROOT_BRIDGE_WORKER_THREAD_TEARDOWN_EXECUTABLE_PREFLIGHT_STATUS,
         NativeRootBridgeBatchResponseErrorRowStatus, NativeRootBridgeBatchResponseTeardownState,
         NativeRootBridgeBatchedJsonTransportLifecycleState,
         NativeRootBridgeBatchedJsonTransportLifecycleStatus, NativeRootBridgeCreateRequest,
@@ -5639,6 +6334,7 @@ mod tests {
         native_root_bridge_cross_environment_teardown_gate,
         native_root_bridge_json_transport_error_diagnostic_rows,
         native_root_bridge_transport_worker_thread_teardown_gate,
+        native_root_bridge_worker_thread_teardown_executable_preflight,
         parse_native_root_bridge_json_transport_for_gate,
         smoke_admit_js_native_root_bridge_handoff_records,
         smoke_admit_js_native_root_bridge_json_transport_records,
@@ -7574,6 +8270,221 @@ mod tests {
             assert!(!row.native_execution());
             assert!(!row.renderer_execution());
             assert!(!row.reconciler_execution());
+            assert!(!row.react_behavior_error());
+        }
+    }
+
+    #[test]
+    fn native_root_bridge_worker_thread_teardown_executable_preflight_rejects_stale_handles() {
+        fn row<'a>(
+            rows: &'a [crate::root_bridge_requests::NativeRootBridgeWorkerThreadTeardownExecutablePreflightRow],
+            id: &str,
+        ) -> &'a crate::root_bridge_requests::NativeRootBridgeWorkerThreadTeardownExecutablePreflightRow
+        {
+            rows.iter()
+                .find(|row| row.id() == id)
+                .expect("worker-thread teardown preflight row exists")
+        }
+
+        let preflight = native_root_bridge_worker_thread_teardown_executable_preflight();
+        let rows = preflight.rows();
+
+        assert_eq!(
+            preflight.status(),
+            NATIVE_ROOT_BRIDGE_WORKER_THREAD_TEARDOWN_EXECUTABLE_PREFLIGHT_STATUS
+        );
+        assert_eq!(
+            preflight.model(),
+            "fast-react-napi.WorkerThreadTeardownPreflight"
+        );
+        assert_eq!(
+            preflight.execution_scope(),
+            "rust-only-handle-table-preflight-no-node-worker-thread-no-napi-cleanup-hook"
+        );
+        assert_eq!(
+            preflight.transport(),
+            NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_FORMAT
+        );
+        assert_eq!(preflight.worker_thread_id(), 764);
+        assert_eq!(
+            preflight.worker_environment_id(),
+            BridgeEnvironmentId::from_raw(764)
+        );
+        assert_eq!(
+            preflight.peer_environment_id(),
+            BridgeEnvironmentId::from_raw(1764)
+        );
+        assert_eq!(
+            preflight.transport_worker_thread_teardown_gate_status(),
+            NATIVE_ROOT_BRIDGE_TRANSPORT_WORKER_THREAD_TEARDOWN_GATE_STATUS
+        );
+        assert_eq!(
+            preflight.batched_record_gate_status(),
+            NATIVE_ROOT_BRIDGE_BATCHED_JSON_TRANSPORT_GATE_STATUS
+        );
+        assert_eq!(
+            preflight.cross_environment_teardown_gate_status(),
+            NATIVE_ROOT_BRIDGE_CROSS_ENVIRONMENT_TEARDOWN_GATE_STATUS
+        );
+        assert_eq!(preflight.accepted_batch_record_count(), 2);
+        assert_eq!(preflight.cross_environment_teardown_row_count(), 12);
+        assert!(preflight.preflight_evaluated());
+        assert!(preflight.root_validator_state_preserved());
+        assert!(!preflight.node_worker_threads_execution());
+        assert!(!preflight.napi_cleanup_hook_execution());
+        assert!(!preflight.native_addon_loaded());
+        assert!(!preflight.native_execution());
+        assert!(!preflight.renderer_execution());
+        assert!(!preflight.reconciler_execution());
+        assert!(!preflight.public_native_compatibility());
+        assert!(!preflight.react_behavior_error());
+
+        assert!(
+            !preflight.mismatched_teardown().environment_matched(),
+            "worker teardown must not invalidate peer handles"
+        );
+        assert_eq!(
+            preflight.mismatched_teardown().requested_environment_id(),
+            BridgeEnvironmentId::from_raw(764)
+        );
+        assert_eq!(
+            preflight.mismatched_teardown().table_environment_id(),
+            BridgeEnvironmentId::from_raw(1764)
+        );
+        assert_eq!(
+            preflight.mismatched_teardown().total_handles_invalidated(),
+            0
+        );
+        assert!(preflight.matched_teardown().environment_matched());
+        assert_eq!(
+            preflight.matched_teardown().requested_environment_id(),
+            BridgeEnvironmentId::from_raw(764)
+        );
+        assert_eq!(
+            preflight.matched_teardown().table_environment_id(),
+            BridgeEnvironmentId::from_raw(764)
+        );
+        assert_eq!(preflight.matched_teardown().root_handles_invalidated(), 1);
+        assert_eq!(preflight.matched_teardown().value_handles_invalidated(), 2);
+        assert_eq!(preflight.stale_worker_handle_rejection_count(), 3);
+        assert_eq!(preflight.active_peer_handle_count(), 2);
+
+        assert_eq!(rows.len(), 5);
+        assert_eq!(
+            rows.iter().map(|row| row.id()).collect::<Vec<_>>(),
+            [
+                "worker-render-root-stale-executable-preflight",
+                "worker-create-value-stale-executable-preflight",
+                "worker-render-value-stale-executable-preflight",
+                "peer-root-active-executable-preflight",
+                "peer-value-active-executable-preflight"
+            ]
+        );
+        assert!(rows.iter().all(|row| row.preflight_passed()));
+        assert_eq!(
+            rows.iter()
+                .filter(|row| row.rejected_by_boundary())
+                .map(|row| row.source_error_code())
+                .collect::<Vec<_>>(),
+            [
+                Some("FAST_REACT_NAPI_STALE_HANDLE"),
+                Some("FAST_REACT_NAPI_STALE_HANDLE"),
+                Some("FAST_REACT_NAPI_STALE_HANDLE")
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .filter(|row| row.rejected_by_boundary())
+                .map(|row| row.boundary_error_code())
+                .collect::<Vec<_>>(),
+            [
+                Some("FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE"),
+                Some("FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE"),
+                Some("FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE")
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .filter(|row| row.peer_invariant_preserved())
+                .map(|row| row.record_id())
+                .collect::<Vec<_>>(),
+            [Some(176401), Some(176402)]
+        );
+
+        let stale_root = row(rows, "worker-render-root-stale-executable-preflight");
+        assert_eq!(
+            stale_root.operation(),
+            "post-teardown-render-boundary-validation"
+        );
+        assert_eq!(
+            stale_root.assertion(),
+            "stale-worker-root-rejected-without-mutating-validator"
+        );
+        assert_eq!(stale_root.worker_thread_id(), 764);
+        assert_eq!(stale_root.handle_kind(), BridgeHandleKind::Root);
+        assert_eq!(
+            stale_root.table_environment_id(),
+            BridgeEnvironmentId::from_raw(764)
+        );
+        assert_eq!(
+            stale_root.handle_environment_id(),
+            BridgeEnvironmentId::from_raw(764)
+        );
+        assert_eq!(stale_root.slot(), 1);
+        assert_eq!(stale_root.handle_generation(), 1);
+        assert_eq!(stale_root.current_generation(), Some(2));
+        assert_eq!(stale_root.record_id(), None);
+        assert!(stale_root.rejected_by_boundary());
+        assert!(!stale_root.peer_invariant_preserved());
+
+        let create_value = row(rows, "worker-create-value-stale-executable-preflight");
+        let render_value = row(rows, "worker-render-value-stale-executable-preflight");
+        assert_eq!(create_value.handle_kind(), BridgeHandleKind::Value);
+        assert_eq!(create_value.slot(), 2);
+        assert_eq!(create_value.current_generation(), Some(2));
+        assert_eq!(render_value.handle_kind(), BridgeHandleKind::Value);
+        assert_eq!(render_value.slot(), 3);
+        assert_eq!(render_value.current_generation(), Some(2));
+
+        let peer_root = row(rows, "peer-root-active-executable-preflight");
+        let peer_value = row(rows, "peer-value-active-executable-preflight");
+        assert_eq!(peer_root.operation(), "post-teardown-peer-root-validation");
+        assert_eq!(peer_root.handle_kind(), BridgeHandleKind::Root);
+        assert_eq!(
+            peer_root.table_environment_id(),
+            BridgeEnvironmentId::from_raw(1764)
+        );
+        assert_eq!(peer_root.current_generation(), Some(1));
+        assert_eq!(peer_root.record_id(), Some(176401));
+        assert_eq!(peer_root.source_error_code(), None);
+        assert_eq!(peer_root.boundary_error_code(), None);
+        assert!(!peer_root.rejected_by_boundary());
+        assert!(peer_root.peer_invariant_preserved());
+
+        assert_eq!(
+            peer_value.operation(),
+            "post-teardown-peer-value-validation"
+        );
+        assert_eq!(peer_value.handle_kind(), BridgeHandleKind::Value);
+        assert_eq!(
+            peer_value.table_environment_id(),
+            BridgeEnvironmentId::from_raw(1764)
+        );
+        assert_eq!(peer_value.current_generation(), Some(1));
+        assert_eq!(peer_value.record_id(), Some(176402));
+        assert_eq!(peer_value.source_error_code(), None);
+        assert_eq!(peer_value.boundary_error_code(), None);
+        assert!(!peer_value.rejected_by_boundary());
+        assert!(peer_value.peer_invariant_preserved());
+
+        for row in rows {
+            assert!(!row.node_worker_threads_execution());
+            assert!(!row.napi_cleanup_hook_execution());
+            assert!(!row.native_addon_loaded());
+            assert!(!row.native_execution());
+            assert!(!row.renderer_execution());
+            assert!(!row.reconciler_execution());
+            assert!(!row.public_native_compatibility());
             assert!(!row.react_behavior_error());
         }
     }
