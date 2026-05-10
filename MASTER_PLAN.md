@@ -45,9 +45,41 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Workers 263-292 have been accepted and merged; no
-new top-level workers are queued until the merged worktrees, branches, and tmux
-sessions are cleaned up.
+Top-level cap: 30 workers. Queue workers 293-322 from current `main`, each in
+its matching `/Users/user/Developer/Developer/fast-react-worker-*` worktree.
+
+| Worker | Focus |
+| --- | --- |
+| 293 | Root commit host-parent placement apply canary |
+| 294 | Root commit host sibling insertion canary |
+| 295 | Root commit visible callback invocation gate |
+| 296 | Passive effect callback handle flush gate |
+| 297 | Begin-work Fragment single-child handoff |
+| 298 | Context provider nested stack handoff |
+| 299 | Function component useReducer render canary |
+| 300 | Function component dispatch eager-state gate |
+| 301 | Hook effect destroy handoff metadata |
+| 302 | Root scheduler ping/retry lane gate |
+| 303 | Sync flush passive continuation execution gate |
+| 304 | Test renderer JS private root request bridge |
+| 305 | Test renderer toJSON private serialization facade |
+| 306 | Test renderer TestInstance private wrapper skeleton |
+| 307 | Test renderer update/unmount private JS bridge |
+| 308 | Test renderer act scheduler private gate |
+| 309 | Test renderer error-surface local gate refresh |
+| 310 | DOM root private create mark/listen gate |
+| 311 | DOM component-tree latest-props mutation handoff |
+| 312 | DOM event listener target lookup gate |
+| 313 | DOM ref callback private attach/detach gate |
+| 314 | Hydration marker parser root bridge integration |
+| 315 | DOM portal private root boundary records |
+| 316 | Resource hint private dispatcher metadata gate |
+| 317 | Controlled input value tracker private gate |
+| 318 | Native root bridge JS request shape gate |
+| 319 | Native boundary error code mapping |
+| 320 | Benchmark private gate admission refresh |
+| 321 | Package surface private file blocklist hardening |
+| 322 | React DOM test-utils act private routing gate |
 
 ## Near-Term Sequencing
 
