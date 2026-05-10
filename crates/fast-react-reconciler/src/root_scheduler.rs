@@ -10,10 +10,12 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::{
-    EventPriority, FiberId, Lane, Lanes, RootLaneState, lanes_to_event_priority,
+    EventPriority, FiberId, FiberTag, Lane, Lanes, RootLaneState, UpdateQueueHandle,
+    lanes_to_event_priority,
 };
 use fast_react_host_config::HostTypes;
 
+use crate::begin_work::UnsupportedSuspenseChildShapeRecord;
 use crate::concurrent_updates::{mark_update_lane_from_fiber_to_root, root_for_updated_fiber};
 use crate::root_commit::{HostRootCommitRecord, PendingPassiveCommitHandoff};
 use crate::root_config::{RootErrorOptionCallbackPhase, RootErrorOptionCallbackRecord};
@@ -685,6 +687,137 @@ impl RootPingedRetryExecutionRecord {
     #[must_use]
     pub(crate) const fn render_phase(self) -> Option<HostRootRenderPhaseRecord> {
         self.render_phase
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SuspenseThenableRetryRootSchedulerStatus {
+    Accepted,
+    RejectedUnacceptedRecord,
+    RejectedOffscreenOnlyRecord,
+    RejectedStaleBoundary,
+    RejectedIncompatibleLaneSet,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SuspenseThenableRetrySchedulerCallbackBlocker {
+    SuspenseBoundaryRendering,
+    FallbackTraversal,
+    WakeableSubscription,
+    PublicSuspenseCompatibility,
+}
+
+pub(crate) const SUSPENSE_THENABLE_RETRY_SCHEDULER_CALLBACK_BLOCKERS:
+    [SuspenseThenableRetrySchedulerCallbackBlocker; 4] = [
+    SuspenseThenableRetrySchedulerCallbackBlocker::SuspenseBoundaryRendering,
+    SuspenseThenableRetrySchedulerCallbackBlocker::FallbackTraversal,
+    SuspenseThenableRetrySchedulerCallbackBlocker::WakeableSubscription,
+    SuspenseThenableRetrySchedulerCallbackBlocker::PublicSuspenseCompatibility,
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SuspenseThenableRetryRootSchedulerRequestRecord {
+    root: FiberRootId,
+    boundary: FiberId,
+    retry_queue: UpdateQueueHandle,
+    primary_offscreen_retry_queue: Option<UpdateQueueHandle>,
+    retry_lane: Lane,
+    pinged_lanes: Lanes,
+    root_pinged_lanes_before: Lanes,
+    root_pinged_lanes_after: Lanes,
+    status: SuspenseThenableRetryRootSchedulerStatus,
+    scheduled_root: Option<ScheduledRootUpdateResult>,
+    scheduler_callback_blockers: &'static [SuspenseThenableRetrySchedulerCallbackBlocker; 4],
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private Suspense retry scheduler metadata is reserved for future Suspense workers"
+)]
+impl SuspenseThenableRetryRootSchedulerRequestRecord {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn boundary(self) -> FiberId {
+        self.boundary
+    }
+
+    #[must_use]
+    pub(crate) const fn retry_queue(self) -> UpdateQueueHandle {
+        self.retry_queue
+    }
+
+    #[must_use]
+    pub(crate) const fn primary_offscreen_retry_queue(self) -> Option<UpdateQueueHandle> {
+        self.primary_offscreen_retry_queue
+    }
+
+    #[must_use]
+    pub(crate) const fn retry_lane(self) -> Lane {
+        self.retry_lane
+    }
+
+    #[must_use]
+    pub(crate) const fn pinged_lanes(self) -> Lanes {
+        self.pinged_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn root_pinged_lanes_before(self) -> Lanes {
+        self.root_pinged_lanes_before
+    }
+
+    #[must_use]
+    pub(crate) const fn root_pinged_lanes_after(self) -> Lanes {
+        self.root_pinged_lanes_after
+    }
+
+    #[must_use]
+    pub(crate) const fn status(self) -> SuspenseThenableRetryRootSchedulerStatus {
+        self.status
+    }
+
+    #[must_use]
+    pub(crate) const fn scheduled_root(self) -> Option<ScheduledRootUpdateResult> {
+        self.scheduled_root
+    }
+
+    #[must_use]
+    pub(crate) const fn accepted(self) -> bool {
+        matches!(
+            self.status,
+            SuspenseThenableRetryRootSchedulerStatus::Accepted
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn scheduler_callback_blockers(
+        self,
+    ) -> &'static [SuspenseThenableRetrySchedulerCallbackBlocker; 4] {
+        self.scheduler_callback_blockers
+    }
+
+    #[must_use]
+    pub(crate) const fn suspense_boundary_rendering_executed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn fallback_traversal_executed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn wakeable_subscription_performed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_suspense_compatibility_claimed(self) -> bool {
+        false
     }
 }
 
@@ -2040,6 +2173,138 @@ pub(crate) fn execute_pinged_retry_root_callback<H: HostTypes>(
     })
 }
 
+fn suspense_thenable_retry_root_scheduler_record(
+    root: FiberRootId,
+    suspense: &UnsupportedSuspenseChildShapeRecord,
+    status: SuspenseThenableRetryRootSchedulerStatus,
+    root_pinged_lanes_before: Lanes,
+    root_pinged_lanes_after: Lanes,
+    scheduled_root: Option<ScheduledRootUpdateResult>,
+) -> SuspenseThenableRetryRootSchedulerRequestRecord {
+    let thenable = suspense.thenable_ping_blocker();
+
+    SuspenseThenableRetryRootSchedulerRequestRecord {
+        root,
+        boundary: suspense.fiber(),
+        retry_queue: thenable.retry_queue(),
+        primary_offscreen_retry_queue: thenable.primary_offscreen_retry_queue(),
+        retry_lane: thenable.ping_lane(),
+        pinged_lanes: thenable.ping_lanes(),
+        root_pinged_lanes_before,
+        root_pinged_lanes_after,
+        status,
+        scheduled_root,
+        scheduler_callback_blockers: &SUSPENSE_THENABLE_RETRY_SCHEDULER_CALLBACK_BLOCKERS,
+    }
+}
+
+fn suspense_boundary_is_current_for_retry<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root_id: FiberRootId,
+    suspense: &UnsupportedSuspenseChildShapeRecord,
+) -> bool {
+    let thenable = suspense.thenable_ping_blocker();
+    let Ok(node) = store.fiber_arena().get(suspense.fiber()) else {
+        return false;
+    };
+
+    if node.tag() != FiberTag::Suspense || node.update_queue() != thenable.retry_queue() {
+        return false;
+    }
+
+    matches!(root_for_updated_fiber(store, suspense.fiber()), Ok(actual) if actual == root_id)
+}
+
+fn root_lane_state_accepts_suspense_retry(root_lanes: &RootLaneState, pinged_lanes: Lanes) -> bool {
+    root_lanes.pending_lanes().contains_all(pinged_lanes)
+        && root_lanes.suspended_lanes().contains_all(pinged_lanes)
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private Suspense retry scheduler request path reserved for future Suspense workers"
+)]
+pub(crate) fn request_suspense_thenable_retry_root_scheduler<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    root_id: FiberRootId,
+    suspense: &UnsupportedSuspenseChildShapeRecord,
+) -> Result<SuspenseThenableRetryRootSchedulerRequestRecord, RootSchedulerError> {
+    let thenable = suspense.thenable_ping_blocker();
+    let root_pinged_lanes_before = store.root(root_id)?.lanes().pinged_lanes();
+
+    if thenable.is_offscreen_only_retry_queue() {
+        return Ok(suspense_thenable_retry_root_scheduler_record(
+            root_id,
+            suspense,
+            SuspenseThenableRetryRootSchedulerStatus::RejectedOffscreenOnlyRecord,
+            root_pinged_lanes_before,
+            root_pinged_lanes_before,
+            None,
+        ));
+    }
+
+    if !thenable.has_suspense_boundary_retry_queue() {
+        return Ok(suspense_thenable_retry_root_scheduler_record(
+            root_id,
+            suspense,
+            SuspenseThenableRetryRootSchedulerStatus::RejectedUnacceptedRecord,
+            root_pinged_lanes_before,
+            root_pinged_lanes_before,
+            None,
+        ));
+    }
+
+    if !thenable.has_compatible_retry_ping_lanes() {
+        return Ok(suspense_thenable_retry_root_scheduler_record(
+            root_id,
+            suspense,
+            SuspenseThenableRetryRootSchedulerStatus::RejectedIncompatibleLaneSet,
+            root_pinged_lanes_before,
+            root_pinged_lanes_before,
+            None,
+        ));
+    }
+
+    if !suspense_boundary_is_current_for_retry(store, root_id, suspense) {
+        return Ok(suspense_thenable_retry_root_scheduler_record(
+            root_id,
+            suspense,
+            SuspenseThenableRetryRootSchedulerStatus::RejectedStaleBoundary,
+            root_pinged_lanes_before,
+            root_pinged_lanes_before,
+            None,
+        ));
+    }
+
+    if !root_lane_state_accepts_suspense_retry(store.root(root_id)?.lanes(), thenable.ping_lanes())
+    {
+        return Ok(suspense_thenable_retry_root_scheduler_record(
+            root_id,
+            suspense,
+            SuspenseThenableRetryRootSchedulerStatus::RejectedIncompatibleLaneSet,
+            root_pinged_lanes_before,
+            root_pinged_lanes_before,
+            None,
+        ));
+    }
+
+    store
+        .root_mut(root_id)?
+        .lanes_mut()
+        .mark_pinged(thenable.ping_lanes());
+    let scheduled_root = ensure_root_schedule_entry(store, root_id)?;
+    let root_pinged_lanes_after = store.root(root_id)?.lanes().pinged_lanes();
+
+    Ok(suspense_thenable_retry_root_scheduler_record(
+        root_id,
+        suspense,
+        SuspenseThenableRetryRootSchedulerStatus::Accepted,
+        root_pinged_lanes_before,
+        root_pinged_lanes_after,
+        Some(scheduled_root),
+    ))
+}
+
 pub fn collect_sync_flush_plan<H: HostTypes>(
     store: &mut FiberRootStore<H>,
 ) -> Result<RootSyncFlushPlan, RootSchedulerError> {
@@ -2651,6 +2916,10 @@ fn scheduler_priority_for_lanes(lanes: Lanes) -> SchedulerPriority {
 mod tests {
     use super::*;
     use crate::RootOptions;
+    use crate::begin_work::{
+        BeginWorkRequest, UnsupportedSuspenseChildShapeRecord, UnsupportedThenableRetryQueueKind,
+        unsupported_suspense_begin_work_record,
+    };
     use crate::root_config::PendingPassiveUnmountOrigin;
     use crate::test_support::{FakeContainer, RecordingHost};
     use crate::{
@@ -2659,7 +2928,8 @@ mod tests {
         update_container_sync,
     };
     use fast_react_core::{
-        FiberMode, FiberTag, Lanes, PropsHandle, RootFinishedLanes, RootLaneState,
+        FiberMode, FiberTag, Lanes, PropsHandle, ReactKey, RootFinishedLanes, RootLaneState,
+        UpdateQueueHandle,
     };
 
     fn root_store() -> (FiberRootStore<RecordingHost>, FiberRootId, RecordingHost) {
@@ -2768,6 +3038,91 @@ mod tests {
             .set_children(host_root, &[function])
             .unwrap();
         function
+    }
+
+    fn attach_suspense_retry_boundary(
+        store: &mut FiberRootStore<RecordingHost>,
+        root_id: FiberRootId,
+        render_lanes: Lanes,
+        boundary_retry_queue: UpdateQueueHandle,
+        primary_offscreen_retry_queue: Option<UpdateQueueHandle>,
+    ) -> UnsupportedSuspenseChildShapeRecord {
+        let host_root = store.root(root_id).unwrap().current();
+        let suspense = store.fiber_arena_mut().create_fiber(
+            FiberTag::Suspense,
+            Some(ReactKey::from_normalized("retry-boundary")),
+            PropsHandle::from_raw(901),
+            FiberMode::NO,
+        );
+        store
+            .fiber_arena_mut()
+            .get_mut(suspense)
+            .unwrap()
+            .set_update_queue(boundary_retry_queue);
+        let primary = store.fiber_arena_mut().create_fiber(
+            FiberTag::Offscreen,
+            None,
+            PropsHandle::from_raw(902),
+            FiberMode::NO,
+        );
+        if let Some(queue) = primary_offscreen_retry_queue {
+            store
+                .fiber_arena_mut()
+                .get_mut(primary)
+                .unwrap()
+                .set_update_queue(queue);
+        }
+        let primary_child = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::from_raw(903),
+            FiberMode::NO,
+        );
+        let fallback = store.fiber_arena_mut().create_fiber(
+            FiberTag::Fragment,
+            None,
+            PropsHandle::from_raw(904),
+            FiberMode::NO,
+        );
+        let fallback_child = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(905),
+            FiberMode::NO,
+        );
+
+        store
+            .fiber_arena_mut()
+            .set_children(primary, &[primary_child])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(fallback, &[fallback_child])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(suspense, &[primary, fallback])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root, &[suspense])
+            .unwrap();
+
+        unsupported_suspense_begin_work_record(
+            store.fiber_arena(),
+            BeginWorkRequest::new(suspense, render_lanes),
+        )
+        .unwrap()
+    }
+
+    fn mark_suspended_lane(
+        store: &mut FiberRootStore<RecordingHost>,
+        root_id: FiberRootId,
+        lane: Lane,
+    ) {
+        let lanes = store.root_mut(root_id).unwrap().lanes_mut();
+        lanes.mark_updated(lane);
+        lanes.mark_suspended(Lanes::from(lane), Lane::NO, true);
     }
 
     #[test]
@@ -3247,6 +3602,273 @@ mod tests {
         assert_eq!(store.root(root_id).unwrap().current(), current);
         assert_eq!(store.root(root_id).unwrap().finished_work(), None);
         assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_suspense_thenable_retry_request_marks_pinged_lanes_and_schedules_root() {
+        let (mut store, root_id, host) = root_store();
+        let suspense = attach_suspense_retry_boundary(
+            &mut store,
+            root_id,
+            Lanes::from(Lane::RETRY_2),
+            UpdateQueueHandle::from_raw(941),
+            Some(UpdateQueueHandle::from_raw(942)),
+        );
+        mark_suspended_lane(&mut store, root_id, Lane::RETRY_2);
+
+        let request =
+            request_suspense_thenable_retry_root_scheduler(&mut store, root_id, &suspense).unwrap();
+
+        assert_eq!(
+            suspense.thenable_ping_blocker().retry_queue_kind(),
+            UnsupportedThenableRetryQueueKind::SuspenseBoundaryAndPrimaryOffscreen
+        );
+        assert!(
+            suspense
+                .thenable_ping_blocker()
+                .is_accepted_suspense_retry_ping_blocker()
+        );
+        assert_eq!(
+            request.status(),
+            SuspenseThenableRetryRootSchedulerStatus::Accepted
+        );
+        assert!(request.accepted());
+        assert_eq!(request.root(), root_id);
+        assert_eq!(request.boundary(), suspense.fiber());
+        assert_eq!(request.retry_queue(), UpdateQueueHandle::from_raw(941));
+        assert_eq!(
+            request.primary_offscreen_retry_queue(),
+            Some(UpdateQueueHandle::from_raw(942))
+        );
+        assert_eq!(request.retry_lane(), Lane::RETRY_2);
+        assert_eq!(request.pinged_lanes(), Lanes::from(Lane::RETRY_2));
+        assert_eq!(request.root_pinged_lanes_before(), Lanes::NO);
+        assert_eq!(
+            request.root_pinged_lanes_after(),
+            Lanes::from(Lane::RETRY_2)
+        );
+        assert_eq!(
+            request.scheduler_callback_blockers(),
+            &SUSPENSE_THENABLE_RETRY_SCHEDULER_CALLBACK_BLOCKERS
+        );
+        assert_eq!(
+            request.scheduler_callback_blockers(),
+            &[
+                SuspenseThenableRetrySchedulerCallbackBlocker::SuspenseBoundaryRendering,
+                SuspenseThenableRetrySchedulerCallbackBlocker::FallbackTraversal,
+                SuspenseThenableRetrySchedulerCallbackBlocker::WakeableSubscription,
+                SuspenseThenableRetrySchedulerCallbackBlocker::PublicSuspenseCompatibility,
+            ]
+        );
+        assert!(!request.suspense_boundary_rendering_executed());
+        assert!(!request.fallback_traversal_executed());
+        assert!(!request.wakeable_subscription_performed());
+        assert!(!request.public_suspense_compatibility_claimed());
+
+        let scheduled_root = request.scheduled_root().unwrap();
+        assert_eq!(scheduled_root.root(), root_id);
+        assert!(scheduled_root.inserted());
+        assert!(scheduled_root.microtask().is_some());
+        assert_eq!(scheduled_root.act_queue_task(), None);
+        assert_eq!(scheduled_roots(&store).unwrap(), vec![root_id]);
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            Lanes::from(Lane::RETRY_2)
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().suspended_lanes(),
+            Lanes::from(Lane::RETRY_2)
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pinged_lanes(),
+            Lanes::from(Lane::RETRY_2)
+        );
+        assert!(store.scheduler_bridge().callback_requests().is_empty());
+
+        let processed = process_root_schedule_in_microtask(&mut store).unwrap();
+        let scheduled_callback = processed.records()[0].scheduled_callback().unwrap();
+        assert_eq!(
+            processed.records()[0].outcome(),
+            RootTaskScheduleOutcome::Scheduled
+        );
+        assert_eq!(
+            processed.records()[0].next_lanes(),
+            Lanes::from(Lane::RETRY_2)
+        );
+        assert_eq!(
+            scheduled_callback.callback_priority(),
+            RootCallbackPriority::new(Lane::RETRY_2)
+        );
+        assert_eq!(
+            store.scheduler_bridge().callback_requests(),
+            &[scheduled_callback]
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_suspense_thenable_retry_request_rejects_blocked_records() {
+        let (mut offscreen_store, offscreen_root, _host) = root_store();
+        let offscreen_only = attach_suspense_retry_boundary(
+            &mut offscreen_store,
+            offscreen_root,
+            Lanes::from(Lane::RETRY_1),
+            UpdateQueueHandle::NONE,
+            Some(UpdateQueueHandle::from_raw(952)),
+        );
+        mark_suspended_lane(&mut offscreen_store, offscreen_root, Lane::RETRY_1);
+
+        let offscreen_request = request_suspense_thenable_retry_root_scheduler(
+            &mut offscreen_store,
+            offscreen_root,
+            &offscreen_only,
+        )
+        .unwrap();
+
+        assert_eq!(
+            offscreen_only.thenable_ping_blocker().retry_queue_kind(),
+            UnsupportedThenableRetryQueueKind::PrimaryOffscreen
+        );
+        assert!(
+            offscreen_only
+                .thenable_ping_blocker()
+                .is_offscreen_only_retry_queue()
+        );
+        assert_eq!(
+            offscreen_request.status(),
+            SuspenseThenableRetryRootSchedulerStatus::RejectedOffscreenOnlyRecord
+        );
+        assert_eq!(offscreen_request.scheduled_root(), None);
+        assert_eq!(
+            offscreen_store
+                .root(offscreen_root)
+                .unwrap()
+                .lanes()
+                .pinged_lanes(),
+            Lanes::NO
+        );
+        assert!(
+            offscreen_store
+                .scheduler_bridge()
+                .microtask_requests()
+                .is_empty()
+        );
+
+        let (mut stale_store, stale_root, _host) = root_store();
+        let stale = attach_suspense_retry_boundary(
+            &mut stale_store,
+            stale_root,
+            Lanes::from(Lane::RETRY_2),
+            UpdateQueueHandle::from_raw(961),
+            Some(UpdateQueueHandle::from_raw(962)),
+        );
+        mark_suspended_lane(&mut stale_store, stale_root, Lane::RETRY_2);
+        let stale_host_root = stale_store.root(stale_root).unwrap().current();
+        stale_store
+            .fiber_arena_mut()
+            .set_children(stale_host_root, &[])
+            .unwrap();
+
+        let stale_request =
+            request_suspense_thenable_retry_root_scheduler(&mut stale_store, stale_root, &stale)
+                .unwrap();
+
+        assert_eq!(
+            stale_request.status(),
+            SuspenseThenableRetryRootSchedulerStatus::RejectedStaleBoundary
+        );
+        assert_eq!(stale_request.scheduled_root(), None);
+        assert_eq!(
+            stale_store.root(stale_root).unwrap().lanes().pinged_lanes(),
+            Lanes::NO
+        );
+        assert!(
+            stale_store
+                .scheduler_bridge()
+                .microtask_requests()
+                .is_empty()
+        );
+
+        let (mut lane_store, lane_root, _host) = root_store();
+        let incompatible_lanes = attach_suspense_retry_boundary(
+            &mut lane_store,
+            lane_root,
+            Lanes::DEFAULT,
+            UpdateQueueHandle::from_raw(971),
+            Some(UpdateQueueHandle::from_raw(972)),
+        );
+        mark_suspended_lane(&mut lane_store, lane_root, Lane::DEFAULT);
+
+        let lane_request = request_suspense_thenable_retry_root_scheduler(
+            &mut lane_store,
+            lane_root,
+            &incompatible_lanes,
+        )
+        .unwrap();
+
+        assert!(
+            incompatible_lanes
+                .thenable_ping_blocker()
+                .has_suspense_boundary_retry_queue()
+        );
+        assert!(
+            !incompatible_lanes
+                .thenable_ping_blocker()
+                .has_compatible_retry_ping_lanes()
+        );
+        assert_eq!(
+            lane_request.status(),
+            SuspenseThenableRetryRootSchedulerStatus::RejectedIncompatibleLaneSet
+        );
+        assert_eq!(lane_request.scheduled_root(), None);
+        assert!(
+            lane_store
+                .scheduler_bridge()
+                .microtask_requests()
+                .is_empty()
+        );
+
+        let (mut root_lane_store, root_lane_root, _host) = root_store();
+        let root_lane_mismatch = attach_suspense_retry_boundary(
+            &mut root_lane_store,
+            root_lane_root,
+            Lanes::from(Lane::RETRY_3),
+            UpdateQueueHandle::from_raw(981),
+            Some(UpdateQueueHandle::from_raw(982)),
+        );
+        mark_suspended_lane(&mut root_lane_store, root_lane_root, Lane::RETRY_2);
+
+        let root_lane_request = request_suspense_thenable_retry_root_scheduler(
+            &mut root_lane_store,
+            root_lane_root,
+            &root_lane_mismatch,
+        )
+        .unwrap();
+
+        assert!(
+            root_lane_mismatch
+                .thenable_ping_blocker()
+                .has_compatible_retry_ping_lanes()
+        );
+        assert_eq!(
+            root_lane_request.status(),
+            SuspenseThenableRetryRootSchedulerStatus::RejectedIncompatibleLaneSet
+        );
+        assert_eq!(root_lane_request.scheduled_root(), None);
+        assert_eq!(
+            root_lane_store
+                .root(root_lane_root)
+                .unwrap()
+                .lanes()
+                .pinged_lanes(),
+            Lanes::NO
+        );
+        assert!(
+            root_lane_store
+                .scheduler_bridge()
+                .microtask_requests()
+                .is_empty()
+        );
     }
 
     #[test]

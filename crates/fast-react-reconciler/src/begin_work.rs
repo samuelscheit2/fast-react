@@ -149,6 +149,38 @@ impl UnsupportedThenablePingBlockerRecord {
     pub(crate) const fn fallback_child_rendering_blocked(self) -> bool {
         self.fallback_child_rendering_blocked
     }
+
+    #[must_use]
+    pub(crate) const fn has_suspense_boundary_retry_queue(self) -> bool {
+        self.retry_queue.is_some()
+            && matches!(
+                self.retry_queue_kind,
+                UnsupportedThenableRetryQueueKind::SuspenseBoundary
+                    | UnsupportedThenableRetryQueueKind::SuspenseBoundaryAndPrimaryOffscreen
+            )
+    }
+
+    #[must_use]
+    pub(crate) const fn is_offscreen_only_retry_queue(self) -> bool {
+        matches!(
+            self.retry_queue_kind,
+            UnsupportedThenableRetryQueueKind::PrimaryOffscreen
+                | UnsupportedThenableRetryQueueKind::Offscreen
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn has_compatible_retry_ping_lanes(self) -> bool {
+        self.ping_lane.is_non_empty()
+            && self.ping_lanes.is_non_empty()
+            && self.ping_lanes.contains_lane(self.ping_lane)
+            && self.ping_lanes.includes_only_retries()
+    }
+
+    #[must_use]
+    pub(crate) const fn is_accepted_suspense_retry_ping_blocker(self) -> bool {
+        self.has_suspense_boundary_retry_queue() && self.has_compatible_retry_ping_lanes()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -7029,6 +7061,10 @@ mod tests {
         assert!(!suspense_thenable.schedule_retry_flag());
         assert!(suspense_thenable.primary_child_rendering_blocked());
         assert!(suspense_thenable.fallback_child_rendering_blocked());
+        assert!(suspense_thenable.has_suspense_boundary_retry_queue());
+        assert!(!suspense_thenable.is_offscreen_only_retry_queue());
+        assert!(suspense_thenable.has_compatible_retry_ping_lanes());
+        assert!(suspense_thenable.is_accepted_suspense_retry_ping_blocker());
         assert_eq!(suspense_record.feature(), SUSPENSE_UNSUPPORTED_FEATURE);
         assert_eq!(
             suspense_arena.get(suspense).unwrap().memoized_props(),
@@ -7131,6 +7167,10 @@ mod tests {
         assert!(offscreen_thenable.schedule_retry_flag());
         assert!(offscreen_thenable.primary_child_rendering_blocked());
         assert!(!offscreen_thenable.fallback_child_rendering_blocked());
+        assert!(!offscreen_thenable.has_suspense_boundary_retry_queue());
+        assert!(offscreen_thenable.is_offscreen_only_retry_queue());
+        assert!(!offscreen_thenable.has_compatible_retry_ping_lanes());
+        assert!(!offscreen_thenable.is_accepted_suspense_retry_ping_blocker());
         assert_eq!(offscreen_record.feature(), OFFSCREEN_UNSUPPORTED_FEATURE);
         assert_eq!(
             offscreen_arena.get(first_child).unwrap().return_fiber(),
