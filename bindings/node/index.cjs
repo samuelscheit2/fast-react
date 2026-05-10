@@ -14,6 +14,8 @@ const nativeRootBridgeRequestShapeGateStatus =
   'admitted-native-root-bridge-js-request-shape';
 const nativeRootBridgeHandleAdmissionPreflightStatus =
   'preflighted-native-root-bridge-real-handle-admission';
+const nativeRootBridgeRustHandleTableAdmissionSmokeStatus =
+  'mirrored-native-root-bridge-rust-handle-table-admission-smoke';
 const nativeRootBridgeRequestValidationModel =
   'fast-react-napi.NativeRootBridgeRequestSequenceValidator';
 const nativeRootBridgeHandleTableModel = 'fast-react-napi.BridgeHandleTable';
@@ -97,6 +99,18 @@ const nativeRootBridgeHandleAdmissionActions = Object.freeze([
   'retire-root-handle',
   'validate-retired-root-handle'
 ]);
+const nativeRootBridgeRustHandleTableAdmissionSmokeRecordFields = Object.freeze([
+  'request_id',
+  'kind',
+  'lifecycle_transition',
+  'root_handle_state_before',
+  'root_handle_state_after',
+  'root_handle_action',
+  'root_handle_current_generation',
+  'value_handle_action',
+  'value_handle_current_generation',
+  'retired_root_source_error_code'
+]);
 const nativeRootBridgeValidationErrorCodes = Object.freeze({
   createAfterRootCreated:
     'FAST_REACT_NAPI_ROOT_REQUEST_CREATE_AFTER_ROOT_CREATED',
@@ -126,6 +140,19 @@ const nativeRootBridgeHandleAdmissionPreflight = Object.freeze({
   handleTableModel: nativeRootBridgeHandleTableModel,
   validationModel: nativeRootBridgeRequestValidationModel,
   admissionActions: nativeRootBridgeHandleAdmissionActions
+});
+const nativeRootBridgeRustHandleTableAdmissionSmoke = Object.freeze({
+  smokeStatus: nativeRootBridgeRustHandleTableAdmissionSmokeStatus,
+  handleTableModel: nativeRootBridgeHandleTableModel,
+  validationModel: nativeRootBridgeRequestValidationModel,
+  rustAdmissionSmokeRecordFields:
+    nativeRootBridgeRustHandleTableAdmissionSmokeRecordFields,
+  stateTransitions: nativeRootBridgeLifecycleTransitions,
+  admissionActions: nativeRootBridgeHandleAdmissionActions,
+  nativeAddonLoaded: false,
+  nativeExecution: false,
+  rendererExecution: false,
+  reconcilerExecution: false
 });
 
 function freezeNativeTarget({ target, platform, arch, libc, toolchain }) {
@@ -255,6 +282,8 @@ const nativeRootBridgeRequestShape = Object.freeze({
   rootHandleStates: nativeRootBridgeRootHandleStates,
   lifecycleTransitions: nativeRootBridgeLifecycleTransitions,
   handleAdmissionPreflight: nativeRootBridgeHandleAdmissionPreflight,
+  rustHandleTableAdmissionSmoke:
+    nativeRootBridgeRustHandleTableAdmissionSmoke,
   validationErrorCodes: nativeRootBridgeValidationErrorCodes
 });
 
@@ -291,6 +320,10 @@ function createNativeRootBridgeRequestShapeGate(requests) {
   );
   const handleAdmissionPreflight =
     createNativeRootBridgeHandleAdmissionPreflight(validationRecords);
+  const rustHandleTableAdmissionSmoke =
+    createNativeRootBridgeRustHandleTableAdmissionSmoke(
+      handleAdmissionPreflight
+    );
 
   return Object.freeze({
     gateStatus: nativeRootBridgeRequestShapeGateStatus,
@@ -299,6 +332,7 @@ function createNativeRootBridgeRequestShapeGate(requests) {
     requestCount: validationRecords.length,
     validationRecords: Object.freeze(validationRecords),
     handleAdmissionPreflight,
+    rustHandleTableAdmissionSmoke,
     nativeAddonLoaded: false,
     nativeExecution: false,
     rendererExecution: false,
@@ -613,6 +647,73 @@ function createNativeRootBridgeHandleAdmissionPreflight(validationRecords) {
     nativeExecution: false,
     rendererExecution: false,
     reconcilerExecution: false
+  });
+}
+
+function createNativeRootBridgeRustHandleTableAdmissionSmoke(preflight) {
+  const smokeRecords = preflight.admissionRecords.map((record) =>
+    freezeNativeRootBridgeRustHandleTableAdmissionSmokeRecord(record)
+  );
+
+  return Object.freeze({
+    smokeStatus: nativeRootBridgeRustHandleTableAdmissionSmokeStatus,
+    handleTableModel: nativeRootBridgeHandleTableModel,
+    validationModel: nativeRootBridgeRequestValidationModel,
+    requestCount: smokeRecords.length,
+    tableEnvironmentId: preflight.tableEnvironmentId,
+    rootId: preflight.rootId,
+    rootHandle: preflight.rootHandle,
+    rootRetired: preflight.rootRetired,
+    rustAdmissionSmokeRecordFields:
+      nativeRootBridgeRustHandleTableAdmissionSmokeRecordFields,
+    smokeRecords: Object.freeze(smokeRecords),
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false
+  });
+}
+
+function freezeNativeRootBridgeRustHandleTableAdmissionSmokeRecord(record) {
+  const rootHandleStateBefore =
+    record.kind === nativeRootBridgeRequestKindCreate
+      ? null
+      : nativeRootBridgeRootHandleStateActive;
+  const rootHandleStateAfter =
+    record.kind === nativeRootBridgeRequestKindUnmount
+      ? nativeRootBridgeRootHandleStateRetired
+      : nativeRootBridgeRootHandleStateActive;
+  const valueHandleAction = record.valueHandleAdmission?.action ?? null;
+  const valueHandleCurrentGeneration =
+    record.valueHandleAdmission?.currentGeneration ?? null;
+  const retiredRootSourceErrorCode =
+    record.retiredRootHandleValidation?.sourceErrorCode ?? null;
+
+  return Object.freeze({
+    requestId: record.requestId,
+    kind: record.kind,
+    lifecycleTransition: record.lifecycleTransition,
+    rootHandleStateBefore,
+    rootHandleStateAfter,
+    rootHandleAction: record.rootHandleAdmission.action,
+    rootHandleCurrentGeneration:
+      record.rootHandleAdmission.currentGeneration,
+    valueHandleAction,
+    valueHandleCurrentGeneration,
+    retiredRootSourceErrorCode,
+    rustAdmissionSmokeRecord: Object.freeze({
+      request_id: record.requestId,
+      kind: record.kind,
+      lifecycle_transition: record.lifecycleTransition,
+      root_handle_state_before: rootHandleStateBefore,
+      root_handle_state_after: rootHandleStateAfter,
+      root_handle_action: record.rootHandleAdmission.action,
+      root_handle_current_generation:
+        record.rootHandleAdmission.currentGeneration,
+      value_handle_action: valueHandleAction,
+      value_handle_current_generation: valueHandleCurrentGeneration,
+      retired_root_source_error_code: retiredRootSourceErrorCode
+    })
   });
 }
 

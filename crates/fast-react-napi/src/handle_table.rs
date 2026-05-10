@@ -180,6 +180,52 @@ impl BridgeHandleEntry {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum BridgeHandleAdmissionOutcome {
+    Admitted,
+    Validated,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct BridgeHandleAdmission {
+    handle: BridgeHandle,
+    current_generation: u64,
+    outcome: BridgeHandleAdmissionOutcome,
+}
+
+impl BridgeHandleAdmission {
+    const fn admitted(handle: BridgeHandle) -> Self {
+        Self {
+            handle,
+            current_generation: handle.generation(),
+            outcome: BridgeHandleAdmissionOutcome::Admitted,
+        }
+    }
+
+    const fn validated(handle: BridgeHandle, current_generation: u64) -> Self {
+        Self {
+            handle,
+            current_generation,
+            outcome: BridgeHandleAdmissionOutcome::Validated,
+        }
+    }
+
+    #[must_use]
+    pub(crate) const fn handle(self) -> BridgeHandle {
+        self.handle
+    }
+
+    #[must_use]
+    pub(crate) const fn current_generation(self) -> u64 {
+        self.current_generation
+    }
+
+    #[must_use]
+    pub(crate) const fn outcome(self) -> BridgeHandleAdmissionOutcome {
+        self.outcome
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct BridgeEnvironmentTeardown {
     requested_environment_id: BridgeEnvironmentId,
     table_environment_id: BridgeEnvironmentId,
@@ -387,6 +433,22 @@ impl BridgeHandleTable {
         self.insert_record(BridgeRecord::Value(record))
     }
 
+    pub(crate) fn admit_root_handoff_handle(
+        &mut self,
+        handle: BridgeHandle,
+        record: PlaceholderRootRecord,
+    ) -> Result<BridgeHandleAdmission, BridgeHandleTableError> {
+        self.admit_handoff_record(handle, BridgeRecord::Root(record), BridgeHandleKind::Root)
+    }
+
+    pub(crate) fn admit_value_handoff_handle(
+        &mut self,
+        handle: BridgeHandle,
+        record: PlaceholderValueRecord,
+    ) -> Result<BridgeHandleAdmission, BridgeHandleTableError> {
+        self.admit_handoff_record(handle, BridgeRecord::Value(record), BridgeHandleKind::Value)
+    }
+
     pub(crate) fn get_root(
         &self,
         handle: BridgeHandle,
@@ -492,6 +554,35 @@ impl BridgeHandleTable {
         let handle = entry.handle(self.environment_id, self.slots.len() as u64 + 1, kind);
         self.slots.push(BridgeHandleSlot::Occupied(entry));
         handle
+    }
+
+    fn admit_handoff_record(
+        &mut self,
+        handle: BridgeHandle,
+        record: BridgeRecord,
+        expected: BridgeHandleKind,
+    ) -> Result<BridgeHandleAdmission, BridgeHandleTableError> {
+        self.validate_handle_identity(handle)?;
+
+        let slot = self.slot_for_handoff_admission_mut(handle);
+        match slot {
+            BridgeHandleSlot::Vacant { next_generation } => {
+                validate_entry_generation(handle, *next_generation)?;
+                *slot =
+                    BridgeHandleSlot::Occupied(BridgeHandleEntry::new(handle.generation(), record));
+                Ok(BridgeHandleAdmission::admitted(handle))
+            }
+            BridgeHandleSlot::Occupied(entry) => {
+                validate_entry_generation(handle, entry.generation)?;
+                validate_entry_kind(handle, expected, entry.record.kind())?;
+
+                if entry.disposed {
+                    return Err(BridgeHandleTableError::DisposedHandle { handle });
+                }
+
+                Ok(BridgeHandleAdmission::validated(handle, entry.generation))
+            }
+        }
     }
 
     fn active_record(
@@ -607,6 +698,16 @@ impl BridgeHandleTable {
         self.slots
             .get_mut((handle.slot() - 1) as usize)
             .ok_or(BridgeHandleTableError::InvalidHandle { handle })
+    }
+
+    fn slot_for_handoff_admission_mut(&mut self, handle: BridgeHandle) -> &mut BridgeHandleSlot {
+        let requested_len = handle.slot() as usize;
+        if requested_len > self.slots.len() {
+            self.slots
+                .resize(requested_len, BridgeHandleSlot::default());
+        }
+
+        &mut self.slots[(handle.slot() - 1) as usize]
     }
 }
 
@@ -995,5 +1096,48 @@ mod tests {
                 current_generation: new_handle.generation()
             }
         );
+    }
+
+    #[test]
+    fn admits_js_handoff_handles_at_explicit_slots() {
+        let mut table = environment(376);
+        let root = BridgeHandle::new(table.environment_id(), 1, 1, BridgeHandleKind::Root);
+        let container = BridgeHandle::new(table.environment_id(), 2, 1, BridgeHandleKind::Value);
+        let element = BridgeHandle::new(table.environment_id(), 3, 1, BridgeHandleKind::Value);
+
+        let root_admission = table
+            .admit_root_handoff_handle(root, PlaceholderRootRecord::new(7001))
+            .unwrap();
+        let container_admission = table
+            .admit_value_handoff_handle(container, PlaceholderValueRecord::new(1))
+            .unwrap();
+        let repeated_container = table
+            .admit_value_handoff_handle(container, PlaceholderValueRecord::new(2))
+            .unwrap();
+        let element_admission = table
+            .admit_value_handoff_handle(element, PlaceholderValueRecord::new(3))
+            .unwrap();
+
+        assert_eq!(root_admission.handle(), root);
+        assert_eq!(root_admission.current_generation(), 1);
+        assert_eq!(
+            root_admission.outcome(),
+            BridgeHandleAdmissionOutcome::Admitted
+        );
+        assert_eq!(
+            container_admission.outcome(),
+            BridgeHandleAdmissionOutcome::Admitted
+        );
+        assert_eq!(
+            repeated_container.outcome(),
+            BridgeHandleAdmissionOutcome::Validated
+        );
+        assert_eq!(
+            element_admission.outcome(),
+            BridgeHandleAdmissionOutcome::Admitted
+        );
+        assert_eq!(table.get_root(root).unwrap().root_id(), 7001);
+        assert_eq!(table.get_value(container).unwrap().value_id(), 1);
+        assert_eq!(table.get_value(element).unwrap().value_id(), 3);
     }
 }

@@ -118,8 +118,18 @@ assert.equal(
   shapeGate.handleAdmissionPreflight.handleTableModel,
   'fast-react-napi.BridgeHandleTable'
 );
+assert.equal(
+  shapeGate.rustHandleTableAdmissionSmoke.smokeStatus,
+  nativeRootBridgeRequestShape.rustHandleTableAdmissionSmoke.smokeStatus
+);
+assert.equal(
+  shapeGate.rustHandleTableAdmissionSmoke.handleTableModel,
+  'fast-react-napi.BridgeHandleTable'
+);
 assert.equal(shapeGate.handleAdmissionPreflight.tableEnvironmentId, 418);
 assert.equal(shapeGate.handleAdmissionPreflight.rootRetired, true);
+assert.equal(shapeGate.rustHandleTableAdmissionSmoke.tableEnvironmentId, 418);
+assert.equal(shapeGate.rustHandleTableAdmissionSmoke.rootRetired, true);
 assert.deepEqual(
   shapeGate.handleAdmissionPreflight.admissionRecords.map(
     (record) => record.rootHandleAdmission.action
@@ -130,10 +140,47 @@ assert.deepEqual(
     'retire-root-handle'
   ]
 );
+assert.deepEqual(
+  shapeGate.rustHandleTableAdmissionSmoke.smokeRecords.map(
+    (record) => record.rootHandleAction
+  ),
+  [
+    'admit-root-handle',
+    'validate-active-root-handle',
+    'retire-root-handle'
+  ]
+);
+assert.deepEqual(
+  shapeGate.rustHandleTableAdmissionSmoke.smokeRecords.map(
+    (record) => record.rootHandleStateAfter
+  ),
+  ['active', 'active', 'retired']
+);
 assert.equal(
   shapeGate.handleAdmissionPreflight.admissionRecords[2]
     .retiredRootHandleValidation.sourceErrorCode,
   'FAST_REACT_NAPI_STALE_HANDLE'
+);
+assert.equal(
+  shapeGate.rustHandleTableAdmissionSmoke.smokeRecords[2]
+    .retiredRootSourceErrorCode,
+  'FAST_REACT_NAPI_STALE_HANDLE'
+);
+assert.deepEqual(
+  shapeGate.rustHandleTableAdmissionSmoke.smokeRecords[2]
+    .rustAdmissionSmokeRecord,
+  {
+    kind: 'unmount',
+    lifecycle_transition: 'active->retired',
+    request_id: 3,
+    retired_root_source_error_code: 'FAST_REACT_NAPI_STALE_HANDLE',
+    root_handle_action: 'retire-root-handle',
+    root_handle_current_generation: 2,
+    root_handle_state_after: 'retired',
+    root_handle_state_before: 'active',
+    value_handle_action: null,
+    value_handle_current_generation: null
+  }
 );
 assert.deepEqual(
   shapeGate.validationRecords.map((record) => record.lifecycleTransition),
