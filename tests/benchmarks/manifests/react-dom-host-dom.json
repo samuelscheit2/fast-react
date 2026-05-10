@@ -44,7 +44,7 @@
         "command": "node --test tests/conformance/test/dom-property-payload-helper.test.mjs",
         "admitted": false,
         "compatibilityClaimed": false,
-        "notes": "Workers 238 and 259 accepted private ordinary payload application and latest-props commit records only; public roots, browser DOM, events, hydration, and compatibility remain blocked."
+        "notes": "Workers 238, 259, and 271 accepted private ordinary payload application, latest-props commit records, and fake-DOM mutation adapter rows only; public roots, browser DOM, events, hydration, and compatibility remain blocked."
       }
     },
     {
@@ -61,7 +61,7 @@
         "command": "node --test tests/conformance/test/dom-property-payload-helper.test.mjs",
         "admitted": false,
         "compatibilityClaimed": false,
-        "notes": "Worker 242 accepted private fake-DOM style and dangerouslySetInnerHTML payload application only; public roots, text-content transitions, browser DOM, and compatibility remain blocked."
+        "notes": "Workers 242 and 271 accepted private fake-DOM style and dangerouslySetInnerHTML payload application through the mutation adapter only; public roots, text-content transitions, browser DOM, and compatibility remain blocked."
       }
     },
     {

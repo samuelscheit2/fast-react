@@ -65,7 +65,7 @@
         "command": "npm run root-render-e2e:conformance --workspace @fast-react/conformance",
         "admitted": false,
         "compatibilityClaimed": false,
-        "notes": "Worker 262 compares only private root-bridge request records; public root render/update/unmount compatibility and warning rows remain blocked."
+        "notes": "Workers 262, 269, and 270 compare only private root-bridge request/native-handoff records; public root render/update/unmount compatibility and warning rows remain blocked."
       }
     },
     {
@@ -82,7 +82,7 @@
         "command": "cargo test -p fast-react-reconciler --all-features",
         "admitted": false,
         "compatibilityClaimed": false,
-        "notes": "Workers 233, 249, and 250 accepted private commit apply, function single-child, and passive handoff canaries without public renderer output or compatibility claims."
+        "notes": "Workers 233, 249, 250, 263, 264, 282, 283, and 286 accepted private root commit, deletion, context, state-update, and topology canaries without public renderer output or compatibility claims."
       }
     }
   ],

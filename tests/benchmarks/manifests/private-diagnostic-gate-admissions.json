@@ -1,0 +1,353 @@
+{
+  "schemaVersion": 1,
+  "kind": "fast-react-benchmark-manifest",
+  "manifestId": "private-diagnostic-gate-admissions",
+  "description": "Diagnostic-only private benchmark rows admitted by accepted non-public gates while public compatibility and comparable timing remain blocked.",
+  "timingDataPolicy": "diagnostic-until-compatible",
+  "requiredScenarioIds": [
+    "private-root-bridge-request-records",
+    "private-root-bridge-native-handoff-records",
+    "private-native-root-bridge-sequence-validation",
+    "private-dom-should-set-text-content-rows",
+    "private-dom-host-text-commit-rows",
+    "private-dom-property-payload-mutation-rows",
+    "private-test-renderer-json-diagnostics-ready",
+    "private-react-act-dispatcher-metadata",
+    "private-react-hook-dispatcher-metadata"
+  ],
+  "conformanceGates": [
+    {
+      "id": "react-dom-root-private-bridge-request-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-root-render-e2e-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "root-render-private-bridge-diagnostic-admission",
+        "status": "accepted-private-partial",
+        "command": "npm run root-render-e2e:conformance --workspace @fast-react/conformance",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Workers 262, 269, and 270 prove 18 private root bridge request scenario-mode rows and keep public root E2E compatibility blocked."
+      }
+    },
+    {
+      "id": "react-dom-root-private-native-handoff-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-root-render-e2e-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "root-bridge-native-handoff-diagnostic-admission",
+        "status": "accepted-private-partial",
+        "command": "node --test packages/react-dom/test/react-dom-private-root-bridge-shell.test.js",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Worker 269 proves private JS native handoff records mirror root bridge create/render/unmount metadata without native execution or compatibility claims."
+      }
+    },
+    {
+      "id": "fast-react-napi-private-native-root-bridge-validation",
+      "artifact": "tests/conformance/inventory/react-19.2.6-runtime-package-inventory.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "native-root-bridge-sequence-validation-diagnostic-admission",
+        "status": "accepted-private-partial",
+        "command": "cargo test -p fast-react-napi --all-features native_root_bridge",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Worker 281 proves private native root create/render/unmount sequence validation through handle-table records without N-API bindings or public native APIs."
+      }
+    },
+    {
+      "id": "dom-text-content-private-dual-run",
+      "artifact": "tests/conformance/oracles/react-19.2.6-dom-text-content-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "dom-text-content-private-diagnostic-admission",
+        "status": "accepted-private-partial",
+        "command": "npm run dom-text-content:conformance --workspace @fast-react/conformance",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Worker 292 proves 15 private shouldSetTextContent rows and 10 private HostText fake-DOM rows while full DOM render, hydration, and compatibility stay blocked."
+      }
+    },
+    {
+      "id": "dom-property-payload-private-adapter",
+      "artifact": "tests/conformance/oracles/react-19.2.6-dom-attribute-property-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "dom-property-payload-private-adapter-diagnostic-admission",
+        "status": "accepted-private-partial",
+        "command": "node --test tests/conformance/test/dom-property-payload-helper.test.mjs",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Worker 271 proves private fake-DOM ordinary property payload adapter rows without public roots, browser DOM, events, hydration, or compatibility claims."
+      }
+    },
+    {
+      "id": "react-test-renderer-private-serialization-ready",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-test-renderer-serialization-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-test-renderer-private-serialization-diagnostic-admission",
+        "status": "accepted-private-partial",
+        "command": "npm run test:react-test-renderer:serialization --workspace @fast-react/conformance",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Workers 265, 267, and 291 prove private serialization diagnostics are ready while public toJSON, toTree, TestInstance, JS routing, and compatibility stay blocked."
+      }
+    },
+    {
+      "id": "react-act-private-dispatcher-metadata",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-act-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-act-private-dispatcher-metadata-diagnostic-admission",
+        "status": "accepted-private-partial",
+        "command": "node --test tests/conformance/test/react-act-oracle.test.mjs tests/conformance/test/react-test-renderer-act-oracle.test.mjs",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Workers 277, 268, and 285 prove package-private act metadata records and blocked renderer act gates without executing queues, effects, roots, or public act compatibility."
+      }
+    },
+    {
+      "id": "react-hook-private-dispatcher-metadata",
+      "artifact": "tests/conformance/inventory/react-19.2.6-runtime-package-inventory.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-hook-private-dispatcher-metadata-diagnostic-admission",
+        "status": "accepted-private-partial",
+        "command": "node --test tests/conformance/test/react-hook-dispatcher-guard.test.mjs",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Workers 278 and 279 prove package-private state/effect hook dispatcher metadata names while public hooks, renderer dispatchers, effect execution, and compatibility stay blocked."
+      }
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "private-root-bridge-request-records",
+      "area": "react-dom private root bridge",
+      "entrypoints": [
+        "packages/react-dom/src/client/root-bridge.js"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-private-bridge-request-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "Only private root bridge request records are admitted for diagnostics; public root render/update/unmount compatibility remains blocked."
+    },
+    {
+      "id": "private-root-bridge-native-handoff-records",
+      "area": "react-dom private native handoff",
+      "entrypoints": [
+        "packages/react-dom/src/client/root-bridge.js"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-private-native-handoff-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "Only private JS native handoff records are admitted for diagnostics; native execution and public APIs remain blocked."
+    },
+    {
+      "id": "private-native-root-bridge-sequence-validation",
+      "area": "native private root bridge",
+      "entrypoints": [
+        "crates/fast-react-napi"
+      ],
+      "conformanceGateIds": [
+        "fast-react-napi-private-native-root-bridge-validation"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "Only private native request sequence validation is admitted for diagnostics; N-API bindings and public native behavior remain blocked."
+    },
+    {
+      "id": "private-dom-should-set-text-content-rows",
+      "area": "DOM private text-content predicate",
+      "entrypoints": [
+        "packages/react-dom/src/dom-host/text-content.js"
+      ],
+      "conformanceGateIds": [
+        "dom-text-content-private-dual-run"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "Only admitted private shouldSetTextContent rows are diagnostic-ready; full DOM render and compatibility remain blocked."
+    },
+    {
+      "id": "private-dom-host-text-commit-rows",
+      "area": "DOM private HostText mutation",
+      "entrypoints": [
+        "packages/react-dom/src/dom-host/mutation.js"
+      ],
+      "conformanceGateIds": [
+        "dom-text-content-private-dual-run"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "Only admitted private fake-DOM HostText commit rows are diagnostic-ready; public roots, hydration, and browser DOM compatibility remain blocked."
+    },
+    {
+      "id": "private-dom-property-payload-mutation-rows",
+      "area": "DOM private property payload mutation",
+      "entrypoints": [
+        "packages/react-dom/src/dom-host/property-payload.js",
+        "packages/react-dom/src/dom-host/mutation.js"
+      ],
+      "conformanceGateIds": [
+        "dom-property-payload-private-adapter"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "Only private fake-DOM property payload adapter rows are diagnostic-ready; public roots, events, hydration, and compatibility remain blocked."
+    },
+    {
+      "id": "private-test-renderer-json-diagnostics-ready",
+      "area": "test renderer private serialization",
+      "entrypoints": [
+        "crates/fast-react-test-renderer"
+      ],
+      "conformanceGateIds": [
+        "react-test-renderer-private-serialization-ready"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "Private Rust JSON diagnostics are ready, but public react-test-renderer serialization and compatibility remain blocked."
+    },
+    {
+      "id": "private-react-act-dispatcher-metadata",
+      "area": "React private act metadata",
+      "entrypoints": [
+        "packages/react/private-act-dispatcher-gate.js",
+        "packages/react-test-renderer"
+      ],
+      "conformanceGateIds": [
+        "react-act-private-dispatcher-metadata"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "Only package-private act metadata is diagnostic-ready; act queue flushing, effects, renderer roots, and public act compatibility remain blocked."
+    },
+    {
+      "id": "private-react-hook-dispatcher-metadata",
+      "area": "React private hook metadata",
+      "entrypoints": [
+        "packages/react/hook-dispatcher.js"
+      ],
+      "conformanceGateIds": [
+        "react-hook-private-dispatcher-metadata"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "Only package-private hook dispatcher metadata is diagnostic-ready; public hook execution, renderer dispatchers, effects, and compatibility remain blocked."
+    }
+  ],
+  "milestones": [
+    {
+      "id": "private-root-bridge-diagnostic-admission",
+      "description": "Private root bridge request, JS native handoff, and native sequence validation diagnostics.",
+      "scenarioIds": [
+        "private-root-bridge-request-records",
+        "private-root-bridge-native-handoff-records",
+        "private-native-root-bridge-sequence-validation"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-private-bridge-request-gate",
+        "react-dom-root-private-native-handoff-gate",
+        "fast-react-napi-private-native-root-bridge-validation"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "benchmarkReadinessStatus": "diagnostic-admitted",
+      "blockedReason": "Private root/native bridge diagnostics are admitted, but public root/native compatibility and comparable timing remain blocked."
+    },
+    {
+      "id": "private-dom-mutation-text-diagnostic-admission",
+      "description": "Private DOM text-content, HostText fake-DOM commit, and property payload mutation diagnostics.",
+      "scenarioIds": [
+        "private-dom-should-set-text-content-rows",
+        "private-dom-host-text-commit-rows",
+        "private-dom-property-payload-mutation-rows"
+      ],
+      "conformanceGateIds": [
+        "dom-text-content-private-dual-run",
+        "dom-property-payload-private-adapter"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "benchmarkReadinessStatus": "diagnostic-admitted",
+      "blockedReason": "Private DOM mutation/text diagnostics are admitted, but public DOM roots, hydration, events, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-test-renderer-serialization-diagnostic-admission",
+      "description": "Private React Test Renderer JSON diagnostic readiness.",
+      "scenarioIds": [
+        "private-test-renderer-json-diagnostics-ready"
+      ],
+      "conformanceGateIds": [
+        "react-test-renderer-private-serialization-ready"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "benchmarkReadinessStatus": "diagnostic-admitted",
+      "blockedReason": "Private serialization diagnostics are admitted, but public react-test-renderer serialization, TestInstance, act, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-react-hook-act-diagnostic-admission",
+      "description": "Private React hook dispatcher and act dispatcher metadata diagnostics.",
+      "scenarioIds": [
+        "private-react-act-dispatcher-metadata",
+        "private-react-hook-dispatcher-metadata"
+      ],
+      "conformanceGateIds": [
+        "react-act-private-dispatcher-metadata",
+        "react-hook-private-dispatcher-metadata"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "benchmarkReadinessStatus": "diagnostic-admitted",
+      "blockedReason": "Private hook/act metadata diagnostics are admitted, but public hook execution, act flushing, renderer roots, and comparable timing remain blocked."
+    }
+  ]
+}

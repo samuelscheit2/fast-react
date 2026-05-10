@@ -24,13 +24,16 @@ const rootManifest = readManifest("root-render-dual-run-gate-1.json");
 const minimalRootMilestoneManifest = readManifest(
   "minimal-root-lifecycle-milestones.json"
 );
+const privateDiagnosticManifest = readManifest(
+  "private-diagnostic-gate-admissions.json"
+);
 
 test("checked benchmark manifests pass the fail-closed gate", () => {
   const result = assertBenchmarkGate({ benchmarkRoot, repoRoot });
 
-  assert.equal(result.manifestCount, 4);
-  assert.equal(result.scenarioCount, 65);
-  assert.equal(result.milestoneCount, 12);
+  assert.equal(result.manifestCount, 5);
+  assert.equal(result.scenarioCount, 74);
+  assert.equal(result.milestoneCount, 16);
   assert.equal(result.resultCount, 0);
   assert.deepEqual(COMPATIBILITY_STATUSES, [
     "blocked-by-conformance",
@@ -74,19 +77,47 @@ test("checked benchmark manifests pass the fail-closed gate", () => {
       .filter(Boolean);
     for (const acceptedGate of acceptedGates) {
       assert.notEqual(acceptedGate.status, "green-admitted");
-      assert.equal(acceptedGate.admitted, false);
       assert.equal(acceptedGate.compatibilityClaimed, false);
+      if (acceptedGate.status !== "accepted-private-partial") {
+        assert.equal(acceptedGate.admitted, false);
+      }
     }
     for (const scenario of manifest.scenarios) {
-      assert.equal(scenario.compatibilityStatus, "blocked-by-conformance");
-      assert.equal(scenario.timingStatus, "blocked-by-conformance");
+      assert.notEqual(scenario.compatibilityStatus, "green");
+      assert.ok(!CLAIM_CAPABLE_TIMING_STATUSES.includes(scenario.timingStatus));
       assert.equal(scenario.timingDataPolicy, "diagnostic-until-compatible");
     }
     for (const milestone of manifest.milestones ?? []) {
-      assert.equal(milestone.compatibilityStatus, "blocked-by-conformance");
-      assert.equal(milestone.timingStatus, "blocked-by-conformance");
-      assert.equal(milestone.benchmarkReadinessStatus, "blocked-by-conformance");
+      assert.notEqual(milestone.compatibilityStatus, "green");
+      assert.ok(!CLAIM_CAPABLE_TIMING_STATUSES.includes(milestone.timingStatus));
+      assert.notEqual(milestone.benchmarkReadinessStatus, "comparable-admitted");
     }
+  }
+
+  const diagnosticScenarios = result.manifests
+    .flatMap((manifest) => manifest.scenarios)
+    .filter((scenario) => scenario.timingStatus === "diagnostic-only");
+  assert.equal(diagnosticScenarios.length, 9);
+  for (const scenario of diagnosticScenarios) {
+    assert.equal(
+      scenario.compatibilityStatus,
+      "matched-but-compatibility-not-claimed"
+    );
+  }
+
+  const diagnosticMilestones = result.manifests
+    .flatMap((manifest) => manifest.milestones ?? [])
+    .filter(
+      (milestone) =>
+        milestone.benchmarkReadinessStatus === "diagnostic-admitted"
+    );
+  assert.equal(diagnosticMilestones.length, 4);
+  for (const milestone of diagnosticMilestones) {
+    assert.equal(
+      milestone.compatibilityStatus,
+      "matched-but-compatibility-not-claimed"
+    );
+    assert.equal(milestone.timingStatus, "diagnostic-only");
   }
 
   const acceptedGateStatusCounts = result.manifests
@@ -99,9 +130,19 @@ test("checked benchmark manifests pass the fail-closed gate", () => {
     }, {});
   assert.deepEqual(acceptedGateStatusCounts, {
     "accepted-blocked": 5,
-    "accepted-private-partial": 8,
+    "accepted-private-partial": 16,
     "accepted-oracle-only": 5
   });
+
+  const admittedPrivateGateCount = result.manifests
+    .flatMap((manifest) => manifest.conformanceGates ?? [])
+    .map((gate) => gate.acceptedGate)
+    .filter(
+      (acceptedGate) =>
+        acceptedGate?.status === "accepted-private-partial" &&
+        acceptedGate.admitted === true
+    ).length;
+  assert.equal(admittedPrivateGateCount, 8);
 });
 
 test("benchmark manifest gate rejects missing required scenarios", () => {
@@ -177,15 +218,50 @@ test("benchmark milestone gate rejects comparable admission without green compat
   );
 });
 
-test("benchmark milestone gate rejects diagnostic admission without green compatibility", () => {
+test("benchmark milestone gate rejects diagnostic admission without private gate proof", () => {
   const manifest = clone(minimalRootMilestoneManifest);
   manifest.milestones[0].benchmarkReadinessStatus = "diagnostic-admitted";
+  manifest.milestones[0].compatibilityStatus =
+    "matched-but-compatibility-not-claimed";
+  manifest.milestones[0].timingStatus = "diagnostic-only";
 
   const errors = validateBenchmarkManifest(manifest, { repoRoot });
 
   assert.match(
     errors.join("\n"),
-    /benchmarkReadinessStatus diagnostic-admitted requires compatibilityStatus green/
+    /diagnostic private admission requires react-dom-client-root acceptedGate.status=accepted-private-partial, admitted=true, and compatibilityClaimed=false/
+  );
+});
+
+test("benchmark scenario gate admits proven private diagnostics", () => {
+  const manifest = clone(privateDiagnosticManifest);
+
+  const errors = validateBenchmarkManifest(manifest, { repoRoot });
+
+  assert.deepEqual(errors, []);
+});
+
+test("benchmark scenario gate rejects diagnostic timing without private admission", () => {
+  const manifest = clone(privateDiagnosticManifest);
+  manifest.conformanceGates[0].acceptedGate.admitted = false;
+
+  const errors = validateBenchmarkManifest(manifest, { repoRoot });
+
+  assert.match(
+    errors.join("\n"),
+    /scenario private-root-bridge-request-records: diagnostic private admission requires react-dom-root-private-bridge-request-gate acceptedGate.status=accepted-private-partial, admitted=true, and compatibilityClaimed=false/
+  );
+});
+
+test("benchmark accepted gates reject private admission compatibility claims", () => {
+  const manifest = clone(privateDiagnosticManifest);
+  manifest.conformanceGates[0].acceptedGate.compatibilityClaimed = true;
+
+  const errors = validateBenchmarkManifest(manifest, { repoRoot });
+
+  assert.match(
+    errors.join("\n"),
+    /accepted-private-partial requires compatibilityClaimed=false/
   );
 });
 

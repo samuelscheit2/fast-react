@@ -43,8 +43,12 @@ export const CLAIM_CAPABLE_TIMING_STATUSES = Object.freeze([
 ]);
 
 export const BLOCKED_BENCHMARK_READINESS_STATUS = "blocked-by-conformance";
+export const DIAGNOSTIC_ADMITTED_READINESS_STATUS = "diagnostic-admitted";
 export const COMPARABLE_ADMITTED_READINESS_STATUS = "comparable-admitted";
 export const GREEN_COMPATIBILITY_STATUS = "green";
+export const PRIVATE_DIAGNOSTIC_COMPATIBILITY_STATUS =
+  "matched-but-compatibility-not-claimed";
+export const DIAGNOSTIC_TIMING_STATUS = "diagnostic-only";
 export const TIMING_DATA_POLICY = "diagnostic-until-compatible";
 
 const DEFAULT_BENCHMARK_ROOT = path.resolve(
@@ -507,14 +511,32 @@ function validateScenario(scenario, { label, requiredScenarioIdSet, gateById }, 
       gate.scenarioIds.size > 0 &&
       !gate.scenarioIds.has(scenario.id)
     ) {
-      errors.push(
-        `${scenarioLabel}: conformance gate ${gateId} does not include scenario ${scenario.id}`
-      );
+      if (
+        !isPrivateDiagnosticScenario(scenario) ||
+        !isDiagnosticPrivateAcceptedGate(gate)
+      ) {
+        errors.push(
+          `${scenarioLabel}: conformance gate ${gateId} does not include scenario ${scenario.id}`
+        );
+      }
     }
   }
 
   if (scenario.compatibilityStatus === GREEN_COMPATIBILITY_STATUS) {
     validateGateCompatibilityClaims(gates, scenarioLabel, errors);
+  }
+
+  if (
+    scenario.timingStatus === DIAGNOSTIC_TIMING_STATUS &&
+    scenario.compatibilityStatus !== GREEN_COMPATIBILITY_STATUS
+  ) {
+    if (scenario.compatibilityStatus !== PRIVATE_DIAGNOSTIC_COMPATIBILITY_STATUS) {
+      errors.push(
+        `${scenarioLabel}: timingStatus ${DIAGNOSTIC_TIMING_STATUS} requires compatibilityStatus ${PRIVATE_DIAGNOSTIC_COMPATIBILITY_STATUS} or ${GREEN_COMPATIBILITY_STATUS}`
+      );
+    } else {
+      validateDiagnosticPrivateGateAdmission(gates, scenarioLabel, errors);
+    }
   }
 }
 
@@ -604,12 +626,31 @@ function validateMilestones(milestones, { label, scenarioIdSet, gateById }, erro
         )}`
       );
     } else if (
-      milestone.benchmarkReadinessStatus !== BLOCKED_BENCHMARK_READINESS_STATUS &&
+      milestone.benchmarkReadinessStatus === COMPARABLE_ADMITTED_READINESS_STATUS &&
       milestone.compatibilityStatus !== GREEN_COMPATIBILITY_STATUS
     ) {
       errors.push(
         `${milestoneLabel}: benchmarkReadinessStatus ${milestone.benchmarkReadinessStatus} requires compatibilityStatus ${GREEN_COMPATIBILITY_STATUS}`
       );
+    } else if (
+      milestone.benchmarkReadinessStatus === DIAGNOSTIC_ADMITTED_READINESS_STATUS
+    ) {
+      if (milestone.timingStatus !== DIAGNOSTIC_TIMING_STATUS) {
+        errors.push(
+          `${milestoneLabel}: benchmarkReadinessStatus ${DIAGNOSTIC_ADMITTED_READINESS_STATUS} requires timingStatus ${DIAGNOSTIC_TIMING_STATUS}`
+        );
+      }
+      if (
+        milestone.compatibilityStatus !== GREEN_COMPATIBILITY_STATUS &&
+        milestone.compatibilityStatus !== PRIVATE_DIAGNOSTIC_COMPATIBILITY_STATUS
+      ) {
+        errors.push(
+          `${milestoneLabel}: benchmarkReadinessStatus ${DIAGNOSTIC_ADMITTED_READINESS_STATUS} requires compatibilityStatus ${PRIVATE_DIAGNOSTIC_COMPATIBILITY_STATUS} or ${GREEN_COMPATIBILITY_STATUS}`
+        );
+      }
+      if (milestone.compatibilityStatus !== GREEN_COMPATIBILITY_STATUS) {
+        validateDiagnosticPrivateGateAdmission(gates, milestoneLabel, errors);
+      }
     }
 
     if (milestone.compatibilityStatus === GREEN_COMPATIBILITY_STATUS) {
@@ -664,7 +705,16 @@ function validateAcceptedGate(acceptedGate, label, errors) {
     );
   }
   if (
+    acceptedGate.status === "accepted-private-partial" &&
+    acceptedGate.compatibilityClaimed !== false
+  ) {
+    errors.push(
+      `${label}: accepted-private-partial requires compatibilityClaimed=false`
+    );
+  }
+  if (
     acceptedGate.status !== "green-admitted" &&
+    acceptedGate.status !== "accepted-private-partial" &&
     (acceptedGate.admitted !== false ||
       acceptedGate.compatibilityClaimed !== false)
   ) {
@@ -705,6 +755,36 @@ function validateGateCompatibilityClaims(gates, label, errors) {
       }
     }
   }
+}
+
+function validateDiagnosticPrivateGateAdmission(gates, label, errors) {
+  if (gates.length === 0) {
+    errors.push(`${label}: diagnostic private admission requires conformance gates`);
+    return;
+  }
+
+  for (const gate of gates) {
+    if (!isDiagnosticPrivateAcceptedGate(gate)) {
+      errors.push(
+        `${label}: diagnostic private admission requires ${gate.id} acceptedGate.status=accepted-private-partial, admitted=true, and compatibilityClaimed=false`
+      );
+    }
+  }
+}
+
+function isPrivateDiagnosticScenario(scenario) {
+  return (
+    scenario.compatibilityStatus === PRIVATE_DIAGNOSTIC_COMPATIBILITY_STATUS &&
+    scenario.timingStatus === DIAGNOSTIC_TIMING_STATUS
+  );
+}
+
+function isDiagnosticPrivateAcceptedGate(gate) {
+  return (
+    gate.acceptedGate?.status === "accepted-private-partial" &&
+    gate.acceptedGate?.admitted === true &&
+    gate.acceptedGate?.compatibilityClaimed === false
+  );
 }
 
 function collectOracleScenarioIds(artifact) {
