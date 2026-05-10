@@ -6729,6 +6729,31 @@ impl HostRootCommitRecord {
 
     #[allow(
         dead_code,
+        reason = "crate-private committed passive effect queue validation for traversal canaries"
+    )]
+    pub(crate) fn record_function_component_committed_passive_effects_from_committed_effect_queues_for_canary<
+        H: HostTypes,
+    >(
+        &mut self,
+        store: &FiberRootStore<H>,
+        hook_store: &FunctionComponentHookRenderStore,
+        handoffs: &[FunctionComponentPendingPassiveCommitHandoff],
+    ) -> Result<&FunctionComponentCommittedPassiveEffectsSnapshot, RootCommitError> {
+        validate_function_component_effect_list_passive_handoffs(
+            store,
+            self.root,
+            self.current,
+            self.finished_lanes,
+            self.pending_passive_handoff,
+            hook_store,
+            handoffs,
+        )?;
+
+        self.record_function_component_committed_passive_effects_for_canary(handoffs)
+    }
+
+    #[allow(
+        dead_code,
         reason = "crate-private deleted-subtree passive destroy metadata for deterministic deletion canaries"
     )]
     #[must_use]
@@ -8663,6 +8688,21 @@ fn validate_function_component_effect_list_passive_handoffs<H: HostTypes>(
                 .first()
                 .map(|record| record.effect()),
         )?;
+        if queue.accepted_passive_count() != passive_handoff.records().len() {
+            return Err(
+                RootCommitError::CommittedPassiveEffectHandoffRecordMismatch {
+                    root,
+                    fiber: passive_handoff.fiber(),
+                    effect: passive_handoff
+                        .records()
+                        .first()
+                        .map(|record| record.effect()),
+                    message:
+                        "committed queue accepted passive count does not match passive handoff"
+                            .to_owned(),
+                },
+            );
+        }
         for record in passive_handoff.records() {
             validate_function_component_effect_list_passive_record(root, queue, *record)?;
         }
