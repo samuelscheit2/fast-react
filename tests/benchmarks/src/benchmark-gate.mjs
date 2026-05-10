@@ -1,0 +1,583 @@
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+export const COMPATIBILITY_STATUSES = Object.freeze([
+  "blocked-by-conformance",
+  "oracle-only",
+  "unsupported-placeholder",
+  "known-mismatch",
+  "matched-but-compatibility-not-claimed",
+  "green"
+]);
+
+export const TIMING_STATUSES = Object.freeze([
+  "not-collected",
+  "blocked-by-conformance",
+  "diagnostic-only",
+  "compared-not-compatible",
+  "comparable",
+  "noise-bound",
+  "regression",
+  "improvement"
+]);
+
+export const CLAIM_CAPABLE_TIMING_STATUSES = Object.freeze([
+  "comparable",
+  "noise-bound",
+  "regression",
+  "improvement"
+]);
+
+export const GREEN_COMPATIBILITY_STATUS = "green";
+export const TIMING_DATA_POLICY = "diagnostic-until-compatible";
+
+const DEFAULT_BENCHMARK_ROOT = path.resolve(
+  fileURLToPath(new URL("..", import.meta.url))
+);
+const DEFAULT_REPO_ROOT = path.resolve(DEFAULT_BENCHMARK_ROOT, "../..");
+
+export function checkBenchmarkGate(options = {}) {
+  const benchmarkRoot = options.benchmarkRoot ?? DEFAULT_BENCHMARK_ROOT;
+  const repoRoot = options.repoRoot ?? DEFAULT_REPO_ROOT;
+  const errors = [];
+
+  validateSchemaFiles({ benchmarkRoot }, errors);
+
+  const manifestFiles = listJsonFiles(path.join(benchmarkRoot, "manifests"));
+  if (manifestFiles.length === 0) {
+    errors.push("No benchmark manifests found under tests/benchmarks/manifests");
+  }
+
+  const manifests = manifestFiles.map((filePath) => ({
+    filePath,
+    manifest: readJsonFile(filePath)
+  }));
+
+  const manifestById = new Map();
+  for (const { filePath, manifest } of manifests) {
+    const manifestErrors = validateBenchmarkManifest(manifest, {
+      filePath,
+      repoRoot
+    });
+    errors.push(...manifestErrors);
+
+    if (isPlainObject(manifest) && typeof manifest.manifestId === "string") {
+      if (manifestById.has(manifest.manifestId)) {
+        errors.push(`Duplicate benchmark manifest id ${manifest.manifestId}`);
+      }
+      manifestById.set(manifest.manifestId, manifest);
+    }
+  }
+
+  const resultFiles = listJsonFiles(path.join(benchmarkRoot, "results"), {
+    allowMissing: true
+  });
+  const results = resultFiles.map((filePath) => ({
+    filePath,
+    result: readJsonFile(filePath)
+  }));
+
+  for (const { filePath, result } of results) {
+    errors.push(
+      ...validateBenchmarkResult(result, {
+        filePath,
+        manifestById
+      })
+    );
+  }
+
+  return {
+    benchmarkRoot,
+    repoRoot,
+    manifestCount: manifests.length,
+    scenarioCount: manifests.reduce(
+      (count, entry) =>
+        count + (Array.isArray(entry.manifest?.scenarios) ? entry.manifest.scenarios.length : 0),
+      0
+    ),
+    resultCount: results.length,
+    errors,
+    manifests: manifests.map((entry) => entry.manifest),
+    results: results.map((entry) => entry.result)
+  };
+}
+
+export function assertBenchmarkGate(options = {}) {
+  const result = checkBenchmarkGate(options);
+  if (result.errors.length > 0) {
+    throw new Error(formatBenchmarkGateErrors(result.errors));
+  }
+  return result;
+}
+
+export function formatBenchmarkGateErrors(errors) {
+  return [
+    `Benchmark manifest gate failed with ${errors.length} error${errors.length === 1 ? "" : "s"}:`,
+    ...errors.map((error) => `- ${error}`)
+  ].join("\n");
+}
+
+export function validateBenchmarkManifest(manifest, options = {}) {
+  const errors = [];
+  const label = options.filePath ?? manifest?.manifestId ?? "benchmark manifest";
+  const repoRoot = options.repoRoot ?? DEFAULT_REPO_ROOT;
+
+  if (!isPlainObject(manifest)) {
+    return [`${label}: manifest must be a JSON object`];
+  }
+
+  requireEqual(manifest.schemaVersion, 1, `${label}: schemaVersion`, errors);
+  requireEqual(
+    manifest.kind,
+    "fast-react-benchmark-manifest",
+    `${label}: kind`,
+    errors
+  );
+  requireString(manifest.manifestId, `${label}: manifestId`, errors);
+  requireString(manifest.description, `${label}: description`, errors);
+  requireEqual(
+    manifest.timingDataPolicy,
+    TIMING_DATA_POLICY,
+    `${label}: timingDataPolicy`,
+    errors
+  );
+
+  const requiredScenarioIds = validateStringArray(
+    manifest.requiredScenarioIds,
+    `${label}: requiredScenarioIds`,
+    errors
+  );
+  const requiredScenarioIdSet = new Set(requiredScenarioIds);
+
+  const gates = validateConformanceGates(manifest, { label, repoRoot }, errors);
+  const gateById = new Map(gates.map((gate) => [gate.id, gate]));
+
+  if (!Array.isArray(manifest.scenarios)) {
+    errors.push(`${label}: scenarios must be an array`);
+    return errors;
+  }
+
+  const scenarioIds = [];
+  for (const scenario of manifest.scenarios) {
+    if (!isPlainObject(scenario)) {
+      errors.push(`${label}: every scenario must be an object`);
+      continue;
+    }
+    scenarioIds.push(scenario.id);
+    validateScenario(scenario, {
+      label,
+      requiredScenarioIdSet,
+      gateById
+    }, errors);
+  }
+
+  const scenarioIdSet = new Set();
+  for (const scenarioId of scenarioIds) {
+    if (typeof scenarioId !== "string") {
+      continue;
+    }
+    if (scenarioIdSet.has(scenarioId)) {
+      errors.push(`${label}: duplicate scenario id ${scenarioId}`);
+    }
+    scenarioIdSet.add(scenarioId);
+  }
+
+  for (const requiredScenarioId of requiredScenarioIds) {
+    if (!scenarioIdSet.has(requiredScenarioId)) {
+      errors.push(`${label}: missing required scenario ${requiredScenarioId}`);
+    }
+  }
+
+  for (const scenarioId of scenarioIdSet) {
+    if (!requiredScenarioIdSet.has(scenarioId)) {
+      errors.push(`${label}: unexpected scenario ${scenarioId}`);
+    }
+  }
+
+  return errors;
+}
+
+export function validateBenchmarkResult(result, options = {}) {
+  const errors = [];
+  const label = options.filePath ?? result?.manifestId ?? "benchmark result";
+  const manifestById = options.manifestById ?? new Map();
+
+  if (!isPlainObject(result)) {
+    return [`${label}: result must be a JSON object`];
+  }
+
+  requireEqual(result.schemaVersion, 1, `${label}: schemaVersion`, errors);
+  requireEqual(
+    result.kind,
+    "fast-react-benchmark-result",
+    `${label}: kind`,
+    errors
+  );
+  requireEqual(
+    result.generatedTimestampIncluded,
+    false,
+    `${label}: generatedTimestampIncluded`,
+    errors
+  );
+  requireString(result.manifestId, `${label}: manifestId`, errors);
+
+  const manifest = manifestById.get(result.manifestId);
+  if (!manifest) {
+    errors.push(`${label}: unknown manifestId ${String(result.manifestId)}`);
+  }
+
+  if (!Array.isArray(result.scenarioResults)) {
+    errors.push(`${label}: scenarioResults must be an array`);
+    return errors;
+  }
+
+  const scenarioById = new Map(
+    (manifest?.scenarios ?? []).map((scenario) => [scenario.id, scenario])
+  );
+
+  for (const scenarioResult of result.scenarioResults) {
+    if (!isPlainObject(scenarioResult)) {
+      errors.push(`${label}: every scenario result must be an object`);
+      continue;
+    }
+
+    requireString(
+      scenarioResult.scenarioId,
+      `${label}: scenarioResult.scenarioId`,
+      errors
+    );
+    requireString(
+      scenarioResult.implementation,
+      `${label}: scenarioResult.implementation`,
+      errors
+    );
+    requireString(scenarioResult.lane, `${label}: scenarioResult.lane`, errors);
+
+    if (!TIMING_STATUSES.includes(scenarioResult.timingStatus)) {
+      errors.push(
+        `${label}: unknown timingStatus ${String(
+          scenarioResult.timingStatus
+        )} for result scenario ${String(scenarioResult.scenarioId)}`
+      );
+      continue;
+    }
+
+    const scenario = scenarioById.get(scenarioResult.scenarioId);
+    if (!scenario) {
+      errors.push(
+        `${label}: result references unknown scenario ${String(
+          scenarioResult.scenarioId
+        )}`
+      );
+      continue;
+    }
+
+    validateTimingCompatibilityPair(
+      scenario.compatibilityStatus,
+      scenarioResult.timingStatus,
+      `${label}: result scenario ${scenarioResult.scenarioId}`,
+      errors
+    );
+  }
+
+  return errors;
+}
+
+function validateSchemaFiles({ benchmarkRoot }, errors) {
+  const vocabulary = readJsonFile(
+    path.join(benchmarkRoot, "schema/benchmark-status-vocabulary.json")
+  );
+  const manifestSchema = readJsonFile(
+    path.join(benchmarkRoot, "schema/benchmark-manifest.schema.json")
+  );
+  const resultSchema = readJsonFile(
+    path.join(benchmarkRoot, "schema/benchmark-result.schema.json")
+  );
+
+  const compatibilityStatusIds = (vocabulary.compatibilityStatuses ?? []).map(
+    (status) => status.id
+  );
+  const timingStatusIds = (vocabulary.timingStatuses ?? []).map(
+    (status) => status.id
+  );
+
+  requireExactArray(
+    compatibilityStatusIds,
+    COMPATIBILITY_STATUSES,
+    "benchmark status vocabulary: compatibilityStatuses",
+    errors
+  );
+  requireExactArray(
+    timingStatusIds,
+    TIMING_STATUSES,
+    "benchmark status vocabulary: timingStatuses",
+    errors
+  );
+  requireExactArray(
+    manifestSchema.$defs?.compatibilityStatus?.enum,
+    COMPATIBILITY_STATUSES,
+    "benchmark manifest schema: compatibilityStatus enum",
+    errors
+  );
+  requireExactArray(
+    manifestSchema.$defs?.timingStatus?.enum,
+    TIMING_STATUSES,
+    "benchmark manifest schema: timingStatus enum",
+    errors
+  );
+  requireExactArray(
+    resultSchema.$defs?.timingStatus?.enum,
+    TIMING_STATUSES,
+    "benchmark result schema: timingStatus enum",
+    errors
+  );
+}
+
+function validateConformanceGates(manifest, { label, repoRoot }, errors) {
+  if (!Array.isArray(manifest.conformanceGates)) {
+    errors.push(`${label}: conformanceGates must be an array`);
+    return [];
+  }
+
+  const gates = [];
+  const ids = new Set();
+  for (const gate of manifest.conformanceGates) {
+    if (!isPlainObject(gate)) {
+      errors.push(`${label}: every conformance gate must be an object`);
+      continue;
+    }
+    requireString(gate.id, `${label}: conformance gate id`, errors);
+    requireString(gate.artifact, `${label}: conformance gate artifact`, errors);
+    validateStringArray(
+      gate.requiredClaims,
+      `${label}: conformance gate ${String(gate.id)} requiredClaims`,
+      errors
+    );
+
+    if (typeof gate.id === "string") {
+      if (ids.has(gate.id)) {
+        errors.push(`${label}: duplicate conformance gate id ${gate.id}`);
+      }
+      ids.add(gate.id);
+    }
+
+    const resolvedArtifact = resolveRepoPath(repoRoot, gate.artifact);
+    if (!resolvedArtifact) {
+      errors.push(
+        `${label}: conformance gate ${String(
+          gate.id
+        )} artifact must stay under the repository root`
+      );
+      continue;
+    }
+    if (!existsSync(resolvedArtifact)) {
+      errors.push(
+        `${label}: conformance gate ${String(gate.id)} artifact does not exist: ${
+          gate.artifact
+        }`
+      );
+      continue;
+    }
+
+    const artifact = readJsonFile(resolvedArtifact);
+    gates.push({
+      ...gate,
+      artifactObject: artifact,
+      scenarioIds: collectOracleScenarioIds(artifact)
+    });
+  }
+
+  return gates;
+}
+
+function validateScenario(scenario, { label, requiredScenarioIdSet, gateById }, errors) {
+  const scenarioLabel = `${label}: scenario ${String(scenario.id)}`;
+  requireString(scenario.id, `${scenarioLabel} id`, errors);
+  requireString(scenario.area, `${scenarioLabel} area`, errors);
+  validateStringArray(scenario.entrypoints, `${scenarioLabel} entrypoints`, errors);
+  const gateIds = validateStringArray(
+    scenario.conformanceGateIds,
+    `${scenarioLabel} conformanceGateIds`,
+    errors
+  );
+  requireString(scenario.blockedReason, `${scenarioLabel} blockedReason`, errors);
+  requireEqual(
+    scenario.timingDataPolicy,
+    TIMING_DATA_POLICY,
+    `${scenarioLabel} timingDataPolicy`,
+    errors
+  );
+
+  if (typeof scenario.id === "string" && !requiredScenarioIdSet.has(scenario.id)) {
+    errors.push(`${scenarioLabel}: id is not listed in requiredScenarioIds`);
+  }
+
+  if (!COMPATIBILITY_STATUSES.includes(scenario.compatibilityStatus)) {
+    errors.push(
+      `${scenarioLabel}: unknown compatibilityStatus ${String(
+        scenario.compatibilityStatus
+      )}`
+    );
+  }
+  if (!TIMING_STATUSES.includes(scenario.timingStatus)) {
+    errors.push(
+      `${scenarioLabel}: unknown timingStatus ${String(scenario.timingStatus)}`
+    );
+  } else {
+    validateTimingCompatibilityPair(
+      scenario.compatibilityStatus,
+      scenario.timingStatus,
+      scenarioLabel,
+      errors
+    );
+  }
+
+  const gates = [];
+  for (const gateId of gateIds) {
+    const gate = gateById.get(gateId);
+    if (!gate) {
+      errors.push(`${scenarioLabel}: unknown conformance gate ${gateId}`);
+      continue;
+    }
+    gates.push(gate);
+    if (
+      typeof scenario.id === "string" &&
+      gate.scenarioIds.size > 0 &&
+      !gate.scenarioIds.has(scenario.id)
+    ) {
+      errors.push(
+        `${scenarioLabel}: conformance gate ${gateId} does not include scenario ${scenario.id}`
+      );
+    }
+  }
+
+  if (scenario.compatibilityStatus === GREEN_COMPATIBILITY_STATUS) {
+    for (const gate of gates) {
+      for (const claim of gate.requiredClaims) {
+        if (gate.artifactObject?.conformanceClaims?.[claim] !== true) {
+          errors.push(
+            `${scenarioLabel}: unsupported green compatibility claim; ${gate.id} has conformanceClaims.${claim}=${String(
+              gate.artifactObject?.conformanceClaims?.[claim]
+            )}`
+          );
+        }
+      }
+    }
+  }
+}
+
+function validateTimingCompatibilityPair(
+  compatibilityStatus,
+  timingStatus,
+  label,
+  errors
+) {
+  if (
+    CLAIM_CAPABLE_TIMING_STATUSES.includes(timingStatus) &&
+    compatibilityStatus !== GREEN_COMPATIBILITY_STATUS
+  ) {
+    errors.push(
+      `${label}: timingStatus ${timingStatus} requires compatibilityStatus ${GREEN_COMPATIBILITY_STATUS}`
+    );
+  }
+}
+
+function collectOracleScenarioIds(artifact) {
+  const scenarioIds = new Set();
+  for (const key of ["scenarios", "serverScenarios", "clientScenarios"]) {
+    const scenarios = artifact?.[key];
+    if (!Array.isArray(scenarios)) {
+      continue;
+    }
+    for (const scenario of scenarios) {
+      if (typeof scenario?.id === "string") {
+        scenarioIds.add(scenario.id);
+      }
+    }
+  }
+  return scenarioIds;
+}
+
+function listJsonFiles(directory, options = {}) {
+  if (!existsSync(directory)) {
+    if (options.allowMissing) {
+      return [];
+    }
+    return [];
+  }
+  return readdirSync(directory)
+    .filter((entry) => entry.endsWith(".json"))
+    .map((entry) => path.join(directory, entry))
+    .filter((filePath) => statSync(filePath).isFile())
+    .sort();
+}
+
+function readJsonFile(filePath) {
+  return JSON.parse(readFileSync(filePath, "utf8"));
+}
+
+function resolveRepoPath(repoRoot, candidatePath) {
+  if (typeof candidatePath !== "string") {
+    return null;
+  }
+  const resolved = path.resolve(repoRoot, candidatePath);
+  const relative = path.relative(repoRoot, resolved);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    return null;
+  }
+  return resolved;
+}
+
+function validateStringArray(value, label, errors) {
+  if (!Array.isArray(value)) {
+    errors.push(`${label} must be an array`);
+    return [];
+  }
+
+  const seen = new Set();
+  const strings = [];
+  for (const item of value) {
+    if (typeof item !== "string" || item.length === 0) {
+      errors.push(`${label} must contain non-empty strings`);
+      continue;
+    }
+    if (seen.has(item)) {
+      errors.push(`${label} contains duplicate value ${item}`);
+    }
+    seen.add(item);
+    strings.push(item);
+  }
+  return strings;
+}
+
+function requireString(value, label, errors) {
+  if (typeof value !== "string" || value.length === 0) {
+    errors.push(`${label} must be a non-empty string`);
+  }
+}
+
+function requireEqual(actual, expected, label, errors) {
+  if (actual !== expected) {
+    errors.push(`${label} must equal ${JSON.stringify(expected)}`);
+  }
+}
+
+function requireExactArray(actual, expected, label, errors) {
+  if (!Array.isArray(actual)) {
+    errors.push(`${label} must be an array`);
+    return;
+  }
+  if (
+    actual.length !== expected.length ||
+    actual.some((value, index) => value !== expected[index])
+  ) {
+    errors.push(
+      `${label} must equal ${JSON.stringify(expected)}; saw ${JSON.stringify(actual)}`
+    );
+  }
+}
+
+function isPlainObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}

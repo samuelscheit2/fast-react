@@ -19,6 +19,10 @@ import {
   readCheckedReactDomFormActionsOracle,
   readCheckedReactDomFormActionsOracleText
 } from "../src/react-dom-form-actions-oracle.mjs";
+import {
+  assertFastReactFormActionPrerequisiteGate,
+  assertFastReactFormActionsUnsupportedGate
+} from "../src/react-dom-form-actions-unsupported-gates.mjs";
 
 const oracle = readCheckedReactDomFormActionsOracle();
 
@@ -80,6 +84,14 @@ test("React DOM form-actions oracle keeps compatibility claims intentionally nar
     ),
     true
   );
+});
+
+test("Fast React form-action APIs stay unsupported placeholders until form adapters exist", () => {
+  assertFastReactFormActionsUnsupportedGate();
+});
+
+test("Fast React form-action implementation gates stay fail-closed", () => {
+  assertFastReactFormActionPrerequisiteGate();
 });
 
 test("React DOM form-actions oracle covers every scenario in every probe mode", () => {

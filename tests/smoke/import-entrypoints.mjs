@@ -287,7 +287,7 @@ const reactDomDefaultEntrypoints = [
     keys: defaultReactDomKeys,
     resolvedFileName: 'index.js',
     specifier: '@fast-react/react-dom',
-    unsupportedExport: 'createPortal'
+    unsupportedExport: 'flushSync'
   },
   {
     fileName: 'client.js',

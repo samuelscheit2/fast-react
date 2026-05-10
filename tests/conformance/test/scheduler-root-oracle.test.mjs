@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import test from "node:test";
 
 import {
+  SCHEDULER_ROOT_FAST_REACT_TARGET,
   SCHEDULER_ROOT_ORACLE_ARTIFACT_PATH,
   SCHEDULER_ROOT_PROBE_MODES,
   SCHEDULER_ROOT_TARGET
@@ -12,6 +13,8 @@ import {
   SCHEDULER_ROOT_SCENARIOS
 } from "../src/scheduler-root-scenarios.mjs";
 import {
+  findFastReactSchedulerRootComparison,
+  findFastReactSchedulerRootObservation,
   findSchedulerRootObservation,
   readCheckedSchedulerRootOracle,
   readCheckedSchedulerRootOracleText
@@ -49,31 +52,37 @@ test("checked scheduler root oracle artifact has the expected schema and target"
   assert.equal(oracle.deterministic, true);
   assert.deepEqual(oracle.generation, {
     method:
-      "exact scheduler npm tarball extracted into a temporary node_modules tree",
+      "exact scheduler npm tarball plus local scheduler implementation copied under an isolated alias into a temporary node_modules tree",
     lifecycleScriptsExecuted: false,
     rootManifestsOrLockfilesMutated: false,
-    probeIsolation: "one Node child process per scheduler scenario and mode",
+    probeIsolation: "one Node child process per target, scenario, and mode",
     probeTimeoutMs: 15000,
     generatedTimestampIncluded: false,
     timingNormalization:
-      "raw wall-clock timestamps are omitted; probes record logical ordering, timeout buckets, and boolean didTimeout categories"
+      "raw wall-clock timestamps are omitted; probes record logical ordering, timeout buckets, and boolean didTimeout categories; local package metadata is observed but omitted from behavior comparison"
   });
   assert.deepEqual(oracle.schedulerTarget, SCHEDULER_ROOT_TARGET);
+  assert.deepEqual(oracle.fastReactTarget, SCHEDULER_ROOT_FAST_REACT_TARGET);
   assert.equal(oracle.packages.scheduler.version, "0.27.0");
   assert.equal(oracle.packages.scheduler.tarball.integrityVerified, true);
   assert.equal(oracle.packages.scheduler.tarball.fileCount, 15);
+  assert.equal(
+    oracle.packages.fastReactScheduler.behaviorCompatibilityClaimed,
+    false
+  );
 });
 
 test("scheduler root oracle keeps compatibility claims scoped to observed scheduler behavior", () => {
   assert.deepEqual(oracle.conformanceClaims, {
     realSchedulerBehaviorProbed: true,
-    fastReactComparedToScheduler: false,
+    fastReactComparedToScheduler: true,
     fastReactBehaviorCompatible: false,
     fullDualRunOracleExists: false,
     compatibilityClaimed: false
   });
   assert.equal(oracle.evidenceClaims.schedulerRootBehaviorProbed, true);
-  assert.equal(oracle.evidenceClaims.fastReactComparedToScheduler, false);
+  assert.equal(oracle.evidenceClaims.fastReactComparedToScheduler, true);
+  assert.equal(oracle.evidenceClaims.fastReactBehaviorCompatible, false);
   assert.deepEqual(oracle.coverage, {
     exportKeys: true,
     constants: true,
@@ -87,8 +96,15 @@ test("scheduler root oracle keeps compatibility claims scoped to observed schedu
     shouldYield: true,
     requestPaint: true,
     forceFrameRate: true,
-    nodeHostCallbackTransport: true
+    nodeHostCallbackTransport: true,
+    localPackageMetadataExcludedFromBehaviorComparison: true
   });
+  assert.deepEqual(
+    oracle.implementationComparison.afterWorker164.statusCounts,
+    {
+      "matched-but-compatibility-not-claimed": 22
+    }
+  );
 });
 
 test("scheduler root oracle covers every scenario in every probe mode", () => {
@@ -117,10 +133,22 @@ test("scheduler root oracle covers every scenario in every probe mode", () => {
       oracle.schedulerObservations[mode.id].length,
       SCHEDULER_ROOT_SCENARIO_IDS.length
     );
+    assert.equal(
+      oracle.fastReactObservations[mode.id].length,
+      SCHEDULER_ROOT_SCENARIO_IDS.length
+    );
+    assert.equal(
+      oracle.fastReactComparisons[mode.id].length,
+      SCHEDULER_ROOT_SCENARIO_IDS.length
+    );
 
     for (const scenarioId of SCHEDULER_ROOT_SCENARIO_IDS) {
       assert.equal(observation(mode.id, scenarioId).scenarioId, scenarioId);
       assert.equal(observation(mode.id, scenarioId).packageName, "scheduler");
+      assert.equal(
+        fastReactObservation(mode.id, scenarioId).scenarioId,
+        scenarioId
+      );
     }
   }
 });
@@ -365,6 +393,22 @@ test("scheduler root oracle captures Node setImmediate host callback transport",
   }
 });
 
+test("scheduler root oracle records matching Fast React root behavior without claiming broad compatibility", () => {
+  for (const mode of SCHEDULER_ROOT_PROBE_MODES) {
+    for (const scenarioId of SCHEDULER_ROOT_SCENARIO_IDS) {
+      const scenarioComparison = comparison(mode.id, scenarioId);
+      assert.equal(
+        scenarioComparison.status,
+        "matched-but-compatibility-not-claimed"
+      );
+      assert.equal(scenarioComparison.compatibilityClaimed, false);
+      assert.equal(scenarioComparison.firstDifferencePath, null);
+      assert.equal(scenarioComparison.schedulerResultStatus, "returned");
+      assert.equal(scenarioComparison.fastReactResultStatus, "returned");
+    }
+  }
+});
+
 test("scheduler root oracle artifact has no local temp path leaks", () => {
   const oracleText = readCheckedSchedulerRootOracleText();
   assert.doesNotMatch(oracleText, /\/private\/var\/folders/u);
@@ -392,6 +436,14 @@ test("print-scheduler-root-oracle CLI emits the checked-in oracle", () => {
 
 function observation(modeId, scenarioId) {
   return findSchedulerRootObservation(oracle, modeId, scenarioId);
+}
+
+function fastReactObservation(modeId, scenarioId) {
+  return findFastReactSchedulerRootObservation(oracle, modeId, scenarioId);
+}
+
+function comparison(modeId, scenarioId) {
+  return findFastReactSchedulerRootComparison(oracle, modeId, scenarioId);
 }
 
 function operationValue(modeId, scenarioId) {
