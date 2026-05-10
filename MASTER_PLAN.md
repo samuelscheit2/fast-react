@@ -45,7 +45,22 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- No active workers.
+- Worker 195: test-renderer root callback snapshot in
+  `/Users/user/Developer/Developer/fast-react-worker-195-test-renderer-root-callback-snapshot`.
+- Worker 196: sync-flush root callback snapshot in
+  `/Users/user/Developer/Developer/fast-react-worker-196-sync-flush-root-callback-snapshot`.
+- Worker 197: root commit passive pending handoff in
+  `/Users/user/Developer/Developer/fast-react-worker-197-root-commit-passive-pending-handoff`.
+- Worker 198: host work host-node store integration in
+  `/Users/user/Developer/Developer/fast-react-worker-198-host-work-host-node-store-integration`.
+- Worker 199: root work-loop begin-work preflight in
+  `/Users/user/Developer/Developer/fast-react-worker-199-root-work-loop-begin-work-preflight`.
+- Worker 200: function component hook-list render state in
+  `/Users/user/Developer/Developer/fast-react-worker-200-function-component-hook-list-render-state`.
+- Worker 201: DOM text-content oracle in
+  `/Users/user/Developer/Developer/fast-react-worker-201-dom-text-content-oracle`.
+- Worker 202: React test renderer package placeholder in
+  `/Users/user/Developer/Developer/fast-react-worker-202-react-test-renderer-package-placeholder`.
 
 ## Near-Term Sequencing
 
