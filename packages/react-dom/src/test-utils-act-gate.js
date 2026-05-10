@@ -28,8 +28,14 @@ const passiveEffectsFlushMetadataStatus =
   'metadata-only-passive-flush-without-callback-execution';
 const passiveEffectCallbackHandleStatus =
   'private-passive-effect-callback-invocation-test-control-only';
+const privateRootHostOutputDiagnosticGateId =
+  'root-render-private-host-output-diagnostic-gate-1';
 const privateRootHostOutputDiagnosticStatus =
   'accepted-private-root-host-output-diagnostic-without-public-root-execution';
+const privateRootHostOutputBlockedDiagnosticStatus =
+  'blocked-private-root-host-output-diagnostic';
+const privateRootHostOutputPublicPrerequisiteStatus =
+  'blocked-accepted-private-root-host-output-until-public-root-execution';
 
 const reactActPrivateRecords = freezeArray([
   'SchedulerActQueueRequest',
@@ -66,7 +72,15 @@ const privateRootHostOutputDiagnosticScenarios = freezeArray([
   'create-root-no-render',
   'initial-host-render',
   'update-host-render',
-  'root-unmount'
+  'replace-host-tree',
+  'render-null-clears-container',
+  'root-unmount',
+  'double-unmount',
+  'render-after-unmount'
+]);
+const privateRootHostOutputBlockedScenarios = freezeArray([
+  'flush-sync-cross-root-render',
+  'development-warning-boundaries'
 ]);
 const privateRootHostOutputDiagnosticEvidence = freezeArray([
   'root-render-private-host-output-diagnostic-gate-1',
@@ -75,14 +89,45 @@ const privateRootHostOutputDiagnosticEvidence = freezeArray([
   'explicit-create-root-marker-listener-apply-revert',
   'fake-dom-host-component-host-text-output',
   'latest-props-mutation-handoff-publication',
-  'private-unmount-host-output-cleanup'
+  'private-host-tree-replacement-output',
+  'private-render-null-clear-container-output',
+  'private-unmount-host-output-cleanup',
+  'private-double-unmount-noop-host-output',
+  'private-render-after-unmount-guard-no-extra-mutation'
 ]);
 const privateRootHostOutputDiagnosticSummary = freezeRecord({
-  admittedScenarioModeRowCount: 8,
-  blockedScenarioModeRowCount: 12,
+  admittedScenarioIds: privateRootHostOutputDiagnosticScenarios,
+  blockedScenarioIds: privateRootHostOutputBlockedScenarios,
+  admittedScenarioModeRowCount: 16,
+  blockedScenarioModeRowCount: 4,
+  acceptedStatus: privateRootHostOutputDiagnosticStatus,
+  blockedStatus: privateRootHostOutputBlockedDiagnosticStatus,
   compatibilityClaimed: false,
   source: 'tests/conformance/src/react-dom-root-render-e2e-conformance-gate.mjs'
 });
+const privateRootHostOutputBlockedPrerequisites = freezeRecords(
+  privateRootHostOutputDiagnosticScenarios.map((scenarioId) => ({
+    id: `accepted-private-root-host-output-${scenarioId}`,
+    scenarioId,
+    present: false,
+    requiredBeforePublicAct: true,
+    acceptedPrivateDiagnostic: true,
+    status: privateRootHostOutputPublicPrerequisiteStatus,
+    diagnosticGateId: privateRootHostOutputDiagnosticGateId,
+    diagnosticStatus: privateRootHostOutputDiagnosticStatus,
+    publicRootExecution: false,
+    publicDomMutation: false,
+    publicActExecution: false,
+    compatibilityClaimed: false,
+    reason:
+      'Accepted only as a private fake-DOM host-output diagnostic; public react-dom/test-utils.act must stay blocked until public roots execute this scenario.'
+  }))
+);
+const privateRootHostOutputBlockedPrerequisiteIds = freezeArray(
+  privateRootHostOutputBlockedPrerequisites.map(
+    (prerequisite) => prerequisite.id
+  )
+);
 const syncFlushContinuationRecords = freezeArray([
   'SchedulerActContinuationRecord',
   'SyncFlushActPostPassiveContinuationGateRecord',
@@ -262,12 +307,19 @@ const acceptedPrivatePrerequisites = freezeRecords([
     source: 'packages/react-dom/src/client/root-bridge.js',
     recordOnly: true,
     executesRendererRoots: false,
+    privateHostOutputDiagnosticGateId:
+      privateRootHostOutputDiagnosticGateId,
     privateHostOutputDiagnostics: true,
     privateHostOutputDiagnosticStatus: privateRootHostOutputDiagnosticStatus,
     privateHostOutputDiagnosticScenarios:
       privateRootHostOutputDiagnosticScenarios,
+    privateHostOutputBlockedDiagnosticStatus:
+      privateRootHostOutputBlockedDiagnosticStatus,
+    privateHostOutputBlockedScenarios: privateRootHostOutputBlockedScenarios,
     privateHostOutputDiagnosticSummary:
       privateRootHostOutputDiagnosticSummary,
+    privateHostOutputBlockedPrerequisiteIds:
+      privateRootHostOutputBlockedPrerequisiteIds,
     fakeDomHostOutputOnly: true,
     publicRootExecution: false,
     publicDomMutation: false,
@@ -310,6 +362,16 @@ const blockedPublicPrerequisites = freezeRecords([
     id: 'public-react-dom-root-execution',
     present: false,
     requiredBeforePublicAct: true,
+    blockedByAcceptedPrivateRootHostOutputDiagnostics: true,
+    privateHostOutputDiagnosticGateId:
+      privateRootHostOutputDiagnosticGateId,
+    privateHostOutputDiagnosticStatus: privateRootHostOutputDiagnosticStatus,
+    acceptedPrivateHostOutputDiagnosticScenarios:
+      privateRootHostOutputDiagnosticScenarios,
+    unsupportedPrivateHostOutputDiagnosticScenarios:
+      privateRootHostOutputBlockedScenarios,
+    acceptedPrivateHostOutputScenarioModeRowCount: 16,
+    unsupportedPrivateHostOutputScenarioModeRowCount: 4,
     reason:
       'Private fake-DOM host-output diagnostics exist, but public React DOM roots still throw placeholders instead of routing create, render, update, or unmount work.'
   },
@@ -357,12 +419,16 @@ function getReactDomTestUtilsActPrivateRoutingGate(overrides = {}) {
     privatePrerequisitesPresent: true,
     acceptedPrivatePrerequisites,
     blockedPublicPrerequisites,
+    blockedPrivateRootHostOutputPrerequisites:
+      privateRootHostOutputBlockedPrerequisites,
     acceptedPrivatePrerequisiteIds: acceptedPrivatePrerequisites.map(
       (prerequisite) => prerequisite.id
     ),
     blockedPublicPrerequisiteIds: blockedPublicPrerequisites.map(
       (prerequisite) => prerequisite.id
     ),
+    blockedPrivateRootHostOutputPrerequisiteIds:
+      privateRootHostOutputBlockedPrerequisiteIds,
     reactActPrivateDispatcher: freezeRecord({
       status: reactActPrivateDispatcherStatus,
       requiredRecords: reactActPrivateRecords,
@@ -445,13 +511,20 @@ function getReactDomTestUtilsActPrivateRoutingGate(overrides = {}) {
       status: rootBridgeRecordOnlyStatus,
       records: rootBridgeRequestRecords,
       privateHostOutputDiagnostics: freezeRecord({
+        gateId: privateRootHostOutputDiagnosticGateId,
         status: privateRootHostOutputDiagnosticStatus,
         scenarios: privateRootHostOutputDiagnosticScenarios,
+        blockedStatus: privateRootHostOutputBlockedDiagnosticStatus,
+        blockedScenarios: privateRootHostOutputBlockedScenarios,
         evidence: privateRootHostOutputDiagnosticEvidence,
         summary: privateRootHostOutputDiagnosticSummary,
+        blockedPrerequisiteStatus: privateRootHostOutputPublicPrerequisiteStatus,
+        blockedPrerequisites: privateRootHostOutputBlockedPrerequisites,
+        blockedPrerequisiteIds: privateRootHostOutputBlockedPrerequisiteIds,
         fakeDomHostOutputOnly: true,
         publicRootExecution: false,
         publicDomMutation: false,
+        publicActExecution: false,
         compatibilityClaimed: false
       }),
       nativeExecution: false,
@@ -474,6 +547,9 @@ function evaluateReactDomTestUtilsActPrivateRoutingGate(options = {}) {
     options.acceptedPrivatePrerequisites ?? gate.acceptedPrivatePrerequisites;
   const blockedPublicPrerequisites =
     options.blockedPublicPrerequisites ?? gate.blockedPublicPrerequisites;
+  const blockedPrivateRootHostOutputPrerequisites =
+    options.blockedPrivateRootHostOutputPrerequisites ??
+    gate.blockedPrivateRootHostOutputPrerequisites;
   const publicCompatibilityClaimed =
     options.publicCompatibilityClaimed ?? gate.publicCompatibilityClaimed;
   const publicTestUtilsActReady =
@@ -488,6 +564,10 @@ function evaluateReactDomTestUtilsActPrivateRoutingGate(options = {}) {
   const publicPrerequisitesStillBlocked = blockedPublicPrerequisites
     .filter((prerequisite) => prerequisite.present !== true)
     .map((prerequisite) => prerequisite.id);
+  const privateRootHostOutputPrerequisitesStillBlocked =
+    blockedPrivateRootHostOutputPrerequisites
+      .filter((prerequisite) => prerequisite.present !== true)
+      .map((prerequisite) => prerequisite.id);
   const violations = [];
 
   if (publicCompatibilityClaimed) {
@@ -512,6 +592,13 @@ function evaluateReactDomTestUtilsActPrivateRoutingGate(options = {}) {
       createViolation('public-prerequisites-unblocked-without-new-gate')
     );
   }
+  if (privateRootHostOutputPrerequisitesStillBlocked.length === 0) {
+    violations.push(
+      createViolation(
+        'private-root-host-output-prerequisites-unblocked-without-new-gate'
+      )
+    );
+  }
 
   return freezeRecord({
     ...gate,
@@ -521,6 +608,7 @@ function evaluateReactDomTestUtilsActPrivateRoutingGate(options = {}) {
     privateRoutingReady,
     privatePrerequisitesPresent: missingPrivatePrerequisites.length === 0,
     publicPrerequisitesStillBlocked,
+    privateRootHostOutputPrerequisitesStillBlocked,
     violations,
     status:
       violations.length === 0
@@ -560,6 +648,8 @@ function freezeRecords(records) {
 
 module.exports = {
   acceptedPrivatePrerequisites,
+  blockedPrivateRootHostOutputPrerequisites:
+    privateRootHostOutputBlockedPrerequisites,
   blockedPublicPrerequisites,
   createReactDomTestUtilsActBlockedError,
   createReactDomTestUtilsActPlaceholder,

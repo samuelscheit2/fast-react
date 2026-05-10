@@ -231,6 +231,24 @@ test("Fast React test-utils act keeps the oracle-shaped package surface but fail
 test("Fast React test-utils act private routing gate records accepted prerequisites without opening public act", () => {
   const gateModule = loadFreshCjs(fastReactDomTestUtilsActGatePath);
   const gate = gateModule.evaluateReactDomTestUtilsActPrivateRoutingGate();
+  const acceptedPrivateHostOutputScenarioIds = [
+    "create-root-no-render",
+    "initial-host-render",
+    "update-host-render",
+    "replace-host-tree",
+    "render-null-clears-container",
+    "root-unmount",
+    "double-unmount",
+    "render-after-unmount"
+  ];
+  const unsupportedPrivateHostOutputScenarioIds = [
+    "flush-sync-cross-root-render",
+    "development-warning-boundaries"
+  ];
+  const blockedPrivateHostOutputPrerequisiteIds =
+    acceptedPrivateHostOutputScenarioIds.map(
+      (scenarioId) => `accepted-private-root-host-output-${scenarioId}`
+    );
 
   assert.equal(
     gate.status,
@@ -274,6 +292,37 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     "public-react-dom-root-execution",
     "public-react-dom-flush-sync-execution"
   ]);
+  assert.deepEqual(
+    gate.blockedPrivateRootHostOutputPrerequisiteIds,
+    blockedPrivateHostOutputPrerequisiteIds
+  );
+  assert.deepEqual(
+    gate.privateRootHostOutputPrerequisitesStillBlocked,
+    blockedPrivateHostOutputPrerequisiteIds
+  );
+  const publicRootPrerequisite = gate.blockedPublicPrerequisites.find(
+    (prerequisite) => prerequisite.id === "public-react-dom-root-execution"
+  );
+  assert.equal(
+    publicRootPrerequisite.blockedByAcceptedPrivateRootHostOutputDiagnostics,
+    true
+  );
+  assert.deepEqual(
+    publicRootPrerequisite.acceptedPrivateHostOutputDiagnosticScenarios,
+    acceptedPrivateHostOutputScenarioIds
+  );
+  assert.deepEqual(
+    publicRootPrerequisite.unsupportedPrivateHostOutputDiagnosticScenarios,
+    unsupportedPrivateHostOutputScenarioIds
+  );
+  assert.equal(
+    publicRootPrerequisite.acceptedPrivateHostOutputScenarioModeRowCount,
+    16
+  );
+  assert.equal(
+    publicRootPrerequisite.unsupportedPrivateHostOutputScenarioModeRowCount,
+    4
+  );
   assert.deepEqual(gate.sideEffectPolicy, {
     invokesActCallback: false,
     executesQueuedWork: false,
@@ -435,36 +484,85 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     "FastReactDomPrivateRootAdmissionRecord",
     "FastReactDomPrivateRootNativeRequestHandoffRecord"
   ]);
-  assert.deepEqual(gate.reactDomRootBridge.privateHostOutputDiagnostics, {
-    status:
+  const hostOutputDiagnostics =
+    gate.reactDomRootBridge.privateHostOutputDiagnostics;
+  assert.equal(
+    hostOutputDiagnostics.gateId,
+    "root-render-private-host-output-diagnostic-gate-1"
+  );
+  assert.equal(
+    hostOutputDiagnostics.status,
+    "accepted-private-root-host-output-diagnostic-without-public-root-execution"
+  );
+  assert.deepEqual(
+    hostOutputDiagnostics.scenarios,
+    acceptedPrivateHostOutputScenarioIds
+  );
+  assert.equal(
+    hostOutputDiagnostics.blockedStatus,
+    "blocked-private-root-host-output-diagnostic"
+  );
+  assert.deepEqual(
+    hostOutputDiagnostics.blockedScenarios,
+    unsupportedPrivateHostOutputScenarioIds
+  );
+  assert.deepEqual(hostOutputDiagnostics.evidence, [
+    "root-render-private-host-output-diagnostic-gate-1",
+    "accepted-private-root-host-output-diagnostic",
+    "private-fake-dom-root-host-output",
+    "explicit-create-root-marker-listener-apply-revert",
+    "fake-dom-host-component-host-text-output",
+    "latest-props-mutation-handoff-publication",
+    "private-host-tree-replacement-output",
+    "private-render-null-clear-container-output",
+    "private-unmount-host-output-cleanup",
+    "private-double-unmount-noop-host-output",
+    "private-render-after-unmount-guard-no-extra-mutation"
+  ]);
+  assert.deepEqual(hostOutputDiagnostics.summary, {
+    admittedScenarioIds: acceptedPrivateHostOutputScenarioIds,
+    blockedScenarioIds: unsupportedPrivateHostOutputScenarioIds,
+    admittedScenarioModeRowCount: 16,
+    blockedScenarioModeRowCount: 4,
+    acceptedStatus:
       "accepted-private-root-host-output-diagnostic-without-public-root-execution",
-    scenarios: [
-      "create-root-no-render",
-      "initial-host-render",
-      "update-host-render",
-      "root-unmount"
-    ],
-    evidence: [
-      "root-render-private-host-output-diagnostic-gate-1",
-      "accepted-private-root-host-output-diagnostic",
-      "private-fake-dom-root-host-output",
-      "explicit-create-root-marker-listener-apply-revert",
-      "fake-dom-host-component-host-text-output",
-      "latest-props-mutation-handoff-publication",
-      "private-unmount-host-output-cleanup"
-    ],
-    summary: {
-      admittedScenarioModeRowCount: 8,
-      blockedScenarioModeRowCount: 12,
-      compatibilityClaimed: false,
-      source:
-        "tests/conformance/src/react-dom-root-render-e2e-conformance-gate.mjs"
-    },
-    fakeDomHostOutputOnly: true,
+    blockedStatus: "blocked-private-root-host-output-diagnostic",
+    compatibilityClaimed: false,
+    source:
+      "tests/conformance/src/react-dom-root-render-e2e-conformance-gate.mjs"
+  });
+  assert.equal(
+    hostOutputDiagnostics.blockedPrerequisiteStatus,
+    "blocked-accepted-private-root-host-output-until-public-root-execution"
+  );
+  assert.deepEqual(
+    hostOutputDiagnostics.blockedPrerequisiteIds,
+    blockedPrivateHostOutputPrerequisiteIds
+  );
+  assert.equal(hostOutputDiagnostics.blockedPrerequisites.length, 8);
+  assert.deepEqual(hostOutputDiagnostics.blockedPrerequisites[0], {
+    id: "accepted-private-root-host-output-create-root-no-render",
+    scenarioId: "create-root-no-render",
+    present: false,
+    requiredBeforePublicAct: true,
+    acceptedPrivateDiagnostic: true,
+    status:
+      "blocked-accepted-private-root-host-output-until-public-root-execution",
+    diagnosticGateId: "root-render-private-host-output-diagnostic-gate-1",
+    diagnosticStatus:
+      "accepted-private-root-host-output-diagnostic-without-public-root-execution",
     publicRootExecution: false,
     publicDomMutation: false,
-    compatibilityClaimed: false
+    publicActExecution: false,
+    compatibilityClaimed: false,
+    reason:
+      "Accepted only as a private fake-DOM host-output diagnostic; public react-dom/test-utils.act must stay blocked until public roots execute this scenario."
   });
+  assert.equal(hostOutputDiagnostics.fakeDomHostOutputOnly, true);
+  assert.equal(hostOutputDiagnostics.publicRootExecution, false);
+  assert.equal(hostOutputDiagnostics.publicDomMutation, false);
+  assert.equal(hostOutputDiagnostics.publicActExecution, false);
+  assert.equal(hostOutputDiagnostics.compatibilityClaimed, false);
   assert.equal(gate.reactDomRootBridge.nativeExecution, false);
   assert.equal(gate.reactDomRootBridge.reconcilerExecution, false);
   assert.equal(gate.reactDomRootBridge.domMutation, false);
@@ -522,6 +620,25 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     {
       id: "accepted-private-prerequisite-missing",
       prerequisiteIds: ["react-act-private-dispatcher-gate"]
+    }
+  ]);
+
+  const unblockedHostOutputGate =
+    gateModule.evaluateReactDomTestUtilsActPrivateRoutingGate({
+      blockedPrivateRootHostOutputPrerequisites:
+        gate.blockedPrivateRootHostOutputPrerequisites.map((prerequisite) => ({
+          ...prerequisite,
+          present: true
+        }))
+    });
+  assert.deepEqual(
+    unblockedHostOutputGate.privateRootHostOutputPrerequisitesStillBlocked,
+    []
+  );
+  assert.deepEqual(unblockedHostOutputGate.violations, [
+    {
+      id:
+        "private-root-host-output-prerequisites-unblocked-without-new-gate"
     }
   ]);
 });
