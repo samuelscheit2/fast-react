@@ -61,6 +61,12 @@ export const REACT_TEST_RENDERER_TOJSON_PRIVATE_FACADE_REQUIREMENTS = [
       "The private toJSON gate must point at the accepted Rust private JSON diagnostic report, API, and canary tests."
   },
   {
+    id: "js-tojson-serializes-accepted-host-output-diagnostics",
+    requiredBeforePrivateDiagnostics: true,
+    reason:
+      "The private toJSON facade must serialize the accepted minimal committed host-output diagnostic shape without exposing public toJSON."
+  },
+  {
     id: "js-tojson-public-serialization-blocked",
     requiredBeforePrivateDiagnostics: true,
     reason:
@@ -230,6 +236,7 @@ export function evaluateReactTestRendererSerializationLocalGate({
     privateDiagnosticsReady &&
     localChecks.privateToJSONSerializationFacadeGatePresent &&
     localChecks.privateToJSONSerializationFacadeRecognizesRustDiagnostics &&
+    localChecks.privateToJSONSerializationFacadeSerializesHostOutputDiagnostics &&
     localChecks.privateToJSONSerializationFacadePubliclyBlocked;
   const requiredLocalTargetsReady = privateToJSONFacadeGateReady;
   const publicCompatibilityReady =
@@ -268,6 +275,12 @@ export function evaluateReactTestRendererSerializationLocalGate({
           requirement.id === "js-tojson-accepted-rust-private-json-diagnostics"
         ) {
           return !localChecks.privateToJSONSerializationFacadeRecognizesRustDiagnostics;
+        }
+        if (
+          requirement.id ===
+          "js-tojson-serializes-accepted-host-output-diagnostics"
+        ) {
+          return !localChecks.privateToJSONSerializationFacadeSerializesHostOutputDiagnostics;
         }
         if (requirement.id === "js-tojson-public-serialization-blocked") {
           return !localChecks.privateToJSONSerializationFacadePubliclyBlocked;
@@ -572,6 +585,32 @@ export function inspectReactTestRendererSerializationLocalTargets({
       publicJsReactTestRendererPackageSource,
       /\broot_private_json_serialization_canary_describes_minimal_host_component_with_text\b/u
     );
+  const privateToJSONSerializationFacadeSerializesHostOutputDiagnostics =
+    privateToJSONSerializationFacadeGatePresent &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bprivateHostOutputDiagnosticsSerializable\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bprivateToJSONSerializationFacadeSymbol\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /fast\.react_test_renderer\.private_tojson_serialization_facade/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bserializeAcceptedHostOutputDiagnostic\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bserializePrivateToJSONHostOutputDiagnostic\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\breact-test-renderer-tojson-private-host-output-serializer\b/u
+    );
   const privateToJSONSerializationFacadePubliclyBlocked =
     privateToJSONSerializationFacadeGatePresent &&
     hasSourcePattern(
@@ -672,6 +711,7 @@ export function inspectReactTestRendererSerializationLocalTargets({
     privateJsonDiagnosticsPresent,
     privateToJSONSerializationFacadeGatePresent,
     privateToJSONSerializationFacadeRecognizesRustDiagnostics,
+    privateToJSONSerializationFacadeSerializesHostOutputDiagnostics,
     privateToJSONSerializationFacadePubliclyBlocked,
     privateRecordOnlyTestInstanceWrapperPresent,
     publicToJSONAvailable,

@@ -237,12 +237,23 @@ const unmountPrivateRoute = Object.freeze({
     'root_host_output_canary_unmounts_committed_output_with_deletion_diagnostics'
   ])
 });
+const privateToJSONSerializationFacadeSymbol = Symbol.for(
+  'fast.react_test_renderer.private_tojson_serialization_facade'
+);
+const privateToJSONSerializationStatus =
+  'private-host-output-diagnostics-serializable-public-tojson-blocked';
+const privateToJSONAcceptedDiagnosticName =
+  'fast-react-test-renderer.serialization.private-json-canary';
 const toJSONPrivateSerializationFacadeGate = Object.freeze({
   id: 'react-test-renderer-tojson-private-serialization-facade-gate',
   publicSurface: 'create().toJSON',
   status: 'ready-for-private-diagnostics-public-tojson-blocked',
   deterministic: true,
   privateFacadeGateAvailable: true,
+  privateHostOutputDiagnosticsSerializable: true,
+  privateSerializationFacadeSymbol:
+    privateToJSONSerializationFacadeSymbol.description,
+  privateSerializationStatus: privateToJSONSerializationStatus,
   acceptedRustPrivateJsonDiagnostics: true,
   publicSerializationAvailable: false,
   publicRouteAvailable: false,
@@ -251,8 +262,7 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
   compatibilityClaimed: false,
   acceptedWorker: 'worker-265-test-renderer-private-json-ready-diagnostics',
   acceptedRustCrate: 'fast-react-test-renderer',
-  acceptedRustDiagnosticName:
-    'fast-react-test-renderer.serialization.private-json-canary',
+  acceptedRustDiagnosticName: privateToJSONAcceptedDiagnosticName,
   acceptedRustApis: Object.freeze([
     'TestRendererRoot::describe_private_json_serialization_for_canary',
     'TestRendererPrivateJsonSerializationReport',
@@ -1395,6 +1405,424 @@ function throwInvalidRootRequest(message) {
   throw error;
 }
 
+function createPrivateToJSONSerializationFacade(rootRequest) {
+  return freezeRecord({
+    id: 'react-test-renderer-tojson-private-host-output-serializer',
+    status: privateToJSONSerializationStatus,
+    entrypoint,
+    publicSurface: 'create().toJSON',
+    symbol: privateToJSONSerializationFacadeSymbol.description,
+    gate: toJSONPrivateSerializationFacadeGate,
+    rootRequest,
+    privateHostOutputDiagnosticsSerializable: true,
+    publicSerializationAvailable: false,
+    publicRouteAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    compatibilityClaimed: false,
+    canSerializeAcceptedHostOutputDiagnostic(report) {
+      try {
+        validatePrivateToJSONHostOutputDiagnostic(report);
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    },
+    serializeAcceptedHostOutputDiagnostic(report) {
+      return serializePrivateToJSONHostOutputDiagnostic(report);
+    }
+  });
+}
+
+function serializePrivateToJSONHostOutputDiagnostic(report) {
+  const diagnostic = validatePrivateToJSONHostOutputDiagnostic(report);
+
+  return freezeRecord({
+    type: diagnostic.type,
+    props: diagnostic.props,
+    children: freezeArray([diagnostic.text])
+  });
+}
+
+function validatePrivateToJSONHostOutputDiagnostic(report) {
+  assertPrivateToJSONRecord(report, 'report');
+  assertPrivateToJSONStringField(
+    report,
+    'diagnosticName',
+    'diagnostic_name',
+    privateToJSONAcceptedDiagnosticName
+  );
+  assertPrivateToJSONNumberField(report, 'rootChildCount', 'root_child_count', 1);
+  assertPrivateToJSONKindField(
+    report,
+    'rootNodeKind',
+    'root_node_kind',
+    'HostComponent'
+  );
+  assertPrivateToJSONPublicBlockers(
+    readPrivateToJSONRecordField(report, 'publicBlockers', 'public_blockers')
+  );
+  assertPrivateToJSONGateIfPresent(readPrivateToJSONField(report, 'gate'));
+
+  const nodes = readPrivateToJSONArrayField(report, 'nodes');
+  if (nodes.length !== 2) {
+    throwPrivateToJSONSerializationError(
+      `Expected exactly two private JSON diagnostic nodes, found ${nodes.length}.`
+    );
+  }
+
+  const componentNode = nodes[0];
+  const textNode = nodes[1];
+  assertPrivateToJSONRecord(componentNode, 'nodes[0]');
+  assertPrivateToJSONRecord(textNode, 'nodes[1]');
+  assertPrivateToJSONNumberField(componentNode, 'ordinal', undefined, 0);
+  assertPrivateToJSONNumberField(textNode, 'ordinal', undefined, 1);
+  assertPrivateToJSONKindField(
+    componentNode,
+    'nodeKind',
+    'node_kind',
+    'HostComponent'
+  );
+  assertPrivateToJSONKindField(textNode, 'nodeKind', 'node_kind', 'Text');
+  assertPrivateToJSONParentOrdinal(componentNode, null);
+  assertPrivateToJSONParentOrdinal(textNode, 0);
+  assertPrivateToJSONChildOrdinals(componentNode, [1]);
+  assertPrivateToJSONChildOrdinals(textNode, []);
+  assertPrivateToJSONVisibleAttached(componentNode, 'nodes[0]');
+  assertPrivateToJSONVisibleAttached(textNode, 'nodes[1]');
+
+  const component = readPrivateToJSONRecordField(report, 'component');
+  assertPrivateToJSONKindField(
+    component,
+    'nodeKind',
+    'node_kind',
+    'HostComponent'
+  );
+  assertPrivateToJSONNumberField(component, 'childCount', 'child_count', 1);
+  assertPrivateToJSONVisibleAttached(component, 'component');
+  const textChild = readPrivateToJSONRecordField(
+    component,
+    'textChild',
+    'text_child'
+  );
+  assertPrivateToJSONKindField(textChild, 'nodeKind', 'node_kind', 'Text');
+  assertPrivateToJSONVisibleAttached(textChild, 'component.textChild');
+
+  const type = readPrivateToJSONElementType(component, componentNode);
+  const props = readPrivateToJSONEmptyProps(component, componentNode);
+  const nodeText = readPrivateToJSONStringField(textNode, 'text');
+  const childText = readPrivateToJSONStringField(textChild, 'text');
+  if (nodeText !== childText) {
+    throwPrivateToJSONSerializationError(
+      'Private JSON diagnostic text node does not match component text child.'
+    );
+  }
+
+  return {
+    props,
+    text: nodeText,
+    type
+  };
+}
+
+function readPrivateToJSONField(record, camelName, snakeName) {
+  if (record !== null && typeof record === 'object') {
+    if (Object.hasOwn(record, camelName)) {
+      return record[camelName];
+    }
+    if (snakeName !== undefined && Object.hasOwn(record, snakeName)) {
+      return record[snakeName];
+    }
+  }
+
+  return undefined;
+}
+
+function readPrivateToJSONRecordField(record, camelName, snakeName) {
+  const value = readPrivateToJSONField(record, camelName, snakeName);
+  assertPrivateToJSONRecord(value, camelName);
+  return value;
+}
+
+function readPrivateToJSONArrayField(record, camelName, snakeName) {
+  const value = readPrivateToJSONField(record, camelName, snakeName);
+  if (!Array.isArray(value)) {
+    throwPrivateToJSONSerializationError(
+      `Expected private JSON diagnostic field ${camelName} to be an array.`
+    );
+  }
+
+  return value;
+}
+
+function readPrivateToJSONStringField(record, camelName, snakeName) {
+  const value = readPrivateToJSONField(record, camelName, snakeName);
+  if (typeof value !== 'string') {
+    throwPrivateToJSONSerializationError(
+      `Expected private JSON diagnostic field ${camelName} to be a string.`
+    );
+  }
+
+  return value;
+}
+
+function assertPrivateToJSONRecord(value, label) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throwPrivateToJSONSerializationError(
+      `Expected private JSON diagnostic ${label} to be an object.`
+    );
+  }
+}
+
+function assertPrivateToJSONStringField(
+  record,
+  camelName,
+  snakeName,
+  expected
+) {
+  const actual = readPrivateToJSONStringField(record, camelName, snakeName);
+  if (actual !== expected) {
+    throwPrivateToJSONSerializationError(
+      `Expected private JSON diagnostic field ${camelName} to be ${expected}.`
+    );
+  }
+}
+
+function assertPrivateToJSONNumberField(
+  record,
+  camelName,
+  snakeName,
+  expected
+) {
+  const actual = readPrivateToJSONField(record, camelName, snakeName);
+  if (actual !== expected) {
+    throwPrivateToJSONSerializationError(
+      `Expected private JSON diagnostic field ${camelName} to be ${expected}.`
+    );
+  }
+}
+
+function assertPrivateToJSONKindField(record, camelName, snakeName, expected) {
+  const actual = readPrivateToJSONStringField(record, camelName, snakeName);
+  if (actual !== expected) {
+    throwPrivateToJSONSerializationError(
+      `Expected private JSON diagnostic kind ${camelName} to be ${expected}.`
+    );
+  }
+}
+
+function assertPrivateToJSONParentOrdinal(record, expected) {
+  const actual = readPrivateToJSONField(
+    record,
+    'parentOrdinal',
+    'parent_ordinal'
+  );
+  if (actual !== expected) {
+    throwPrivateToJSONSerializationError(
+      `Expected private JSON diagnostic parent ordinal to be ${expected}.`
+    );
+  }
+}
+
+function assertPrivateToJSONChildOrdinals(record, expected) {
+  const actual = readPrivateToJSONArrayField(
+    record,
+    'childOrdinals',
+    'child_ordinals'
+  );
+  if (
+    actual.length !== expected.length ||
+    actual.some((ordinal, index) => ordinal !== expected[index])
+  ) {
+    throwPrivateToJSONSerializationError(
+      `Expected private JSON diagnostic child ordinals to be [${expected.join(',')}].`
+    );
+  }
+}
+
+function assertPrivateToJSONVisibleAttached(record, label) {
+  const hidden = readPrivateToJSONField(record, 'hidden');
+  const detached = readPrivateToJSONField(record, 'detached');
+  if (hidden === true || detached === true) {
+    throwPrivateToJSONSerializationError(
+      `Private JSON diagnostic ${label} is hidden or detached.`
+    );
+  }
+}
+
+function assertPrivateToJSONPublicBlockers(blockers) {
+  for (const [camelName, snakeName] of [
+    ['jsonMethodBlocked', 'json_method_blocked'],
+    ['treeMethodBlocked', 'tree_method_blocked'],
+    ['instanceWrapperBlocked', 'instance_wrapper_blocked'],
+    ['jsFacadeRoutingBlocked', 'js_facade_routing_blocked'],
+    ['publicActBlocked', 'public_act_blocked'],
+    ['compatibilityClaimBlocked', 'compatibility_claim_blocked']
+  ]) {
+    if (readPrivateToJSONField(blockers, camelName, snakeName) !== true) {
+      throwPrivateToJSONSerializationError(
+        `Expected private JSON public blocker ${camelName} to be true.`
+      );
+    }
+  }
+}
+
+function assertPrivateToJSONGateIfPresent(gate) {
+  if (gate === undefined) {
+    return;
+  }
+
+  assertPrivateToJSONRecord(gate, 'gate');
+  const status = readPrivateToJSONField(gate, 'status');
+  if (
+    status !== undefined &&
+    status !== 'ReadyForPrivateSerializationDiagnostics'
+  ) {
+    throwPrivateToJSONSerializationError(
+      'Private JSON diagnostic gate is not ready for private serialization diagnostics.'
+    );
+  }
+
+  const requirements = readPrivateToJSONField(gate, 'requirements');
+  if (requirements !== undefined) {
+    assertPrivateToJSONRecord(requirements, 'gate.requirements');
+    for (const [camelName, snakeName] of [
+      ['rootCommitDiagnosticsAvailable', 'root_commit_diagnostics_available'],
+      ['realHostOutputAvailable', 'real_host_output_available'],
+      [
+        'committedFiberInspectionAvailable',
+        'committed_fiber_inspection_available'
+      ]
+    ]) {
+      if (readPrivateToJSONField(requirements, camelName, snakeName) !== true) {
+        throwPrivateToJSONSerializationError(
+          `Expected private JSON gate requirement ${camelName} to be true.`
+        );
+      }
+    }
+  }
+
+  const hostOutput = readPrivateToJSONField(gate, 'hostOutput', 'host_output');
+  if (hostOutput !== undefined) {
+    assertPrivateToJSONRecord(hostOutput, 'gate.hostOutput');
+    assertPrivateToJSONNumberField(
+      hostOutput,
+      'containerChildCount',
+      'container_child_count',
+      1
+    );
+    assertPrivateToJSONNumberField(hostOutput, 'instanceCount', 'instance_count', 1);
+    assertPrivateToJSONNumberField(hostOutput, 'textCount', 'text_count', 1);
+    if (
+      readPrivateToJSONField(
+        hostOutput,
+        'realHostOutputAvailable',
+        'real_host_output_available'
+      ) !== true
+    ) {
+      throwPrivateToJSONSerializationError(
+        'Expected private JSON gate host output to be real and available.'
+      );
+    }
+  }
+}
+
+function readPrivateToJSONElementType(component, componentNode) {
+  const componentType = normalizePrivateToJSONElementType(
+    readPrivateToJSONField(component, 'elementType', 'element_type')
+  );
+  const nodeType = normalizePrivateToJSONElementType(
+    readPrivateToJSONField(componentNode, 'elementType', 'element_type')
+  );
+  if (componentType !== nodeType) {
+    throwPrivateToJSONSerializationError(
+      'Private JSON diagnostic component type does not match node type.'
+    );
+  }
+  return componentType;
+}
+
+function normalizePrivateToJSONElementType(value) {
+  if (typeof value === 'string' && value.length > 0) {
+    return value;
+  }
+
+  if (value !== null && typeof value === 'object') {
+    for (const key of ['name', 'elementType', 'element_type', 'type']) {
+      const maybeName = value[key];
+      if (typeof maybeName === 'string' && maybeName.length > 0) {
+        return maybeName;
+      }
+    }
+  }
+
+  throwPrivateToJSONSerializationError(
+    'Expected private JSON diagnostic host component element type.'
+  );
+}
+
+function readPrivateToJSONEmptyProps(component, componentNode) {
+  const componentProps = normalizePrivateToJSONEmptyProps(
+    readPrivateToJSONField(component, 'props')
+  );
+  const nodeProps = normalizePrivateToJSONEmptyProps(
+    readPrivateToJSONField(componentNode, 'props')
+  );
+  if (JSON.stringify(componentProps) !== JSON.stringify(nodeProps)) {
+    throwPrivateToJSONSerializationError(
+      'Private JSON diagnostic component props do not match node props.'
+    );
+  }
+  return componentProps;
+}
+
+function normalizePrivateToJSONEmptyProps(props) {
+  if (props === undefined || props === null) {
+    return freezeRecord({});
+  }
+
+  assertPrivateToJSONRecord(props, 'props');
+
+  const attributeMap = readPrivateToJSONField(props, 'attributes');
+  const textContent = readPrivateToJSONField(props, 'textContent', 'text_content');
+  const keys = Object.keys(props).filter(
+    (key) => key !== 'attributes' && key !== 'textContent' && key !== 'text_content'
+  );
+  const attributesEmpty =
+    attributeMap === undefined ||
+    (attributeMap !== null &&
+      typeof attributeMap === 'object' &&
+      !Array.isArray(attributeMap) &&
+      Object.keys(attributeMap).length === 0);
+  const textContentEmpty = textContent === undefined || textContent === null;
+
+  if (keys.length === 0 && attributesEmpty && textContentEmpty) {
+    return freezeRecord({});
+  }
+
+  if (Object.keys(props).length === 0) {
+    return freezeRecord({});
+  }
+
+  throwPrivateToJSONSerializationError(
+    'Only the accepted empty-props host component diagnostic can be serialized privately.'
+  );
+}
+
+function throwPrivateToJSONSerializationError(message) {
+  const error = new Error(`[fast-react] ${entrypoint}.create().toJSON private facade ${message}`);
+  error.name = 'FastReactTestRendererPrivateToJSONSerializationError';
+  error.code = 'FAST_REACT_TEST_RENDERER_PRIVATE_TOJSON_SERIALIZATION';
+  error.entrypoint = entrypoint;
+  error.exportName = 'create().toJSON';
+  error.compatibilityTarget = compatibilityTarget;
+  error.publicSerializationAvailable = false;
+  error.nativeBridgeAvailable = false;
+  error.nativeExecution = false;
+  error.compatibilityClaimed = false;
+  throw error;
+}
+
 function definePlaceholderMetadata(exportsObject) {
   Object.defineProperties(exportsObject, {
     __FAST_REACT_PLACEHOLDER__: {
@@ -1419,17 +1847,24 @@ function createPlaceholderRenderer(routingGate, element, options, createRequest)
     element,
     options
   );
+  const toJSON = createRendererUnsupportedFunction(
+    'create().toJSON',
+    0,
+    'Serialization is intentionally blocked for the public API. The JS facade records and can privately serialize accepted Rust JSON diagnostics, but it has no native bridge, public serializer, or compatibility claim.',
+    routingGate,
+    undefined,
+    () => createRequest
+  );
+  Object.defineProperty(toJSON, privateToJSONSerializationFacadeSymbol, {
+    configurable: false,
+    enumerable: false,
+    value: createPrivateToJSONSerializationFacade(createRequest),
+    writable: false
+  });
   const renderer = {
     _Scheduler: schedulerPlaceholder,
     root: undefined,
-    toJSON: createRendererUnsupportedFunction(
-      'create().toJSON',
-      0,
-      'Serialization is intentionally blocked for the public API. The JS facade only records that Rust private JSON diagnostics are accepted; it has no native bridge, public serializer, or compatibility claim.',
-      routingGate,
-      undefined,
-      () => createRequest
-    ),
+    toJSON,
     toTree: createRendererUnsupportedFunction(
       'create().toTree',
       0,
