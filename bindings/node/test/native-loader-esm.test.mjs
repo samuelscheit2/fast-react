@@ -110,6 +110,31 @@ const shapeGate = createNativeRootBridgeRequestShapeGate([
 assert.equal(shapeGate.gateStatus, nativeRootBridgeRequestShape.gateStatus);
 assert.equal(shapeGate.validationModel, nativeRootBridgeRequestShape.validationModel);
 assert.equal(shapeGate.nativeAddonLoaded, false);
+assert.equal(
+  shapeGate.handleAdmissionPreflight.preflightStatus,
+  nativeRootBridgeRequestShape.handleAdmissionPreflight.preflightStatus
+);
+assert.equal(
+  shapeGate.handleAdmissionPreflight.handleTableModel,
+  'fast-react-napi.BridgeHandleTable'
+);
+assert.equal(shapeGate.handleAdmissionPreflight.tableEnvironmentId, 418);
+assert.equal(shapeGate.handleAdmissionPreflight.rootRetired, true);
+assert.deepEqual(
+  shapeGate.handleAdmissionPreflight.admissionRecords.map(
+    (record) => record.rootHandleAdmission.action
+  ),
+  [
+    'admit-root-handle',
+    'validate-active-root-handle',
+    'retire-root-handle'
+  ]
+);
+assert.equal(
+  shapeGate.handleAdmissionPreflight.admissionRecords[2]
+    .retiredRootHandleValidation.sourceErrorCode,
+  'FAST_REACT_NAPI_STALE_HANDLE'
+);
 assert.deepEqual(
   shapeGate.validationRecords.map((record) => record.lifecycleTransition),
   ['none->active', 'active->active', 'active->retired']

@@ -104,6 +104,7 @@ const expectedPackageExports = {
 const expectedNativeRootBridgeRequestShape = {
   gateStatus: 'admitted-native-root-bridge-js-request-shape',
   validationModel: 'fast-react-napi.NativeRootBridgeRequestSequenceValidator',
+  handleTableModel: 'fast-react-napi.BridgeHandleTable',
   jsRequestRecordFields: [
     'requestId',
     'kind',
@@ -122,25 +123,57 @@ const expectedNativeRootBridgeRequestShape = {
     'value_handle',
     'root_handle_state'
   ],
+  rustValidationRecordFields: [
+    'request_id',
+    'kind',
+    'environment_id',
+    'root_handle',
+    'root_id',
+    'value_handle',
+    'root_handle_state',
+    'lifecycle_transition',
+    'root_handle_validated',
+    'value_handle_validated'
+  ],
   jsHandleFields: ['environmentId', 'slot', 'generation', 'kind'],
   rustHandleFields: ['environment_id', 'slot', 'generation', 'kind'],
   requestKinds: ['create', 'render', 'unmount'],
   handleKinds: ['root', 'value'],
   rootHandleStates: ['active', 'retired'],
   lifecycleTransitions: ['none->active', 'active->active', 'active->retired'],
+  handleAdmissionPreflight: {
+    preflightStatus:
+      'preflighted-native-root-bridge-real-handle-admission',
+    handleTableModel: 'fast-react-napi.BridgeHandleTable',
+    validationModel: 'fast-react-napi.NativeRootBridgeRequestSequenceValidator',
+    admissionActions: [
+      'admit-root-handle',
+      'admit-value-handle',
+      'validate-active-root-handle',
+      'validate-value-handle',
+      'retire-root-handle',
+      'validate-retired-root-handle'
+    ]
+  },
   validationErrorCodes: {
     createAfterRootCreated:
       'FAST_REACT_NAPI_ROOT_REQUEST_CREATE_AFTER_ROOT_CREATED',
     handleMismatch: 'FAST_REACT_NAPI_ROOT_REQUEST_RECORD_HANDLE_MISMATCH',
+    invalidHandle: 'FAST_REACT_NAPI_INVALID_HANDLE',
+    recordEnvironmentMismatch:
+      'FAST_REACT_NAPI_ROOT_REQUEST_RECORD_ENVIRONMENT_MISMATCH',
     requestAfterUnmount: 'FAST_REACT_NAPI_ROOT_REQUEST_AFTER_UNMOUNT',
     rootHandleStateMismatch:
       'FAST_REACT_NAPI_ROOT_REQUEST_RECORD_HANDLE_STATE_MISMATCH',
+    rootHandleStillActive:
+      'FAST_REACT_NAPI_ROOT_REQUEST_RETIRED_HANDLE_STILL_ACTIVE',
     rootIdMismatch: 'FAST_REACT_NAPI_ROOT_REQUEST_RECORD_ROOT_ID_MISMATCH',
     sequenceMustStartWithCreate:
       'FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_MUST_START_WITH_CREATE',
     sequenceOutOfOrder:
       'FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_OUT_OF_ORDER',
     shapeInvalid: 'FAST_REACT_NATIVE_ROOT_BRIDGE_REQUEST_SHAPE_INVALID',
+    staleHandle: 'FAST_REACT_NAPI_STALE_HANDLE',
     unexpectedValueHandle:
       'FAST_REACT_NAPI_ROOT_REQUEST_UNEXPECTED_VALUE_HANDLE',
     wrongEnvironment: 'FAST_REACT_NAPI_WRONG_ENVIRONMENT',
@@ -221,12 +254,15 @@ for (const target of native.nativeTargetMatrix) {
 for (const shapeValue of [
   native.nativeRootBridgeRequestShape.jsRequestRecordFields,
   native.nativeRootBridgeRequestShape.rustRequestRecordFields,
+  native.nativeRootBridgeRequestShape.rustValidationRecordFields,
   native.nativeRootBridgeRequestShape.jsHandleFields,
   native.nativeRootBridgeRequestShape.rustHandleFields,
   native.nativeRootBridgeRequestShape.requestKinds,
   native.nativeRootBridgeRequestShape.handleKinds,
   native.nativeRootBridgeRequestShape.rootHandleStates,
   native.nativeRootBridgeRequestShape.lifecycleTransitions,
+  native.nativeRootBridgeRequestShape.handleAdmissionPreflight,
+  native.nativeRootBridgeRequestShape.handleAdmissionPreflight.admissionActions,
   native.nativeRootBridgeRequestShape.validationErrorCodes
 ]) {
   assert.ok(Object.isFrozen(shapeValue));
@@ -267,11 +303,23 @@ assert.equal(
   nativeShapeGate.validationModel,
   native.nativeRootBridgeRequestShape.validationModel
 );
+assert.equal(
+  nativeShapeGate.handleTableModel,
+  native.nativeRootBridgeRequestShape.handleTableModel
+);
 assert.equal(nativeShapeGate.requestCount, 3);
 assert.equal(nativeShapeGate.nativeAddonLoaded, false);
 assert.equal(nativeShapeGate.nativeExecution, false);
 assert.equal(nativeShapeGate.rendererExecution, false);
 assert.equal(nativeShapeGate.reconcilerExecution, false);
+assertNativeRootBridgeHandleAdmissionPreflight(
+  nativeShapeGate.handleAdmissionPreflight,
+  {
+    environmentId: 318,
+    rootId: 1,
+    rootSlot: 1
+  }
+);
 assert.deepEqual(
   nativeShapeGate.validationRecords.map((record) => record.lifecycleTransition),
   ['none->active', 'active->active', 'active->retired']
@@ -364,6 +412,33 @@ assert.throws(
       }
     ]),
   { code: 'FAST_REACT_NAPI_ROOT_REQUEST_RECORD_HANDLE_STATE_MISMATCH' }
+);
+assert.throws(
+  () =>
+    native.createNativeRootBridgeRequestShapeGate([
+      createHandoff,
+      {
+        ...renderHandoff.nativeRequestRecord,
+        valueHandle: {
+          ...createHandoff.nativeRequestRecord.valueHandle,
+          generation: 2
+        }
+      }
+    ]),
+  { code: 'FAST_REACT_NAPI_STALE_HANDLE' }
+);
+assert.throws(
+  () =>
+    native.createNativeRootBridgeRequestShapeGate([
+      {
+        ...createHandoff.nativeRequestRecord,
+        valueHandle: {
+          ...createHandoff.nativeRequestRecord.valueHandle,
+          slot: createHandoff.nativeRequestRecord.rootHandle.slot
+        }
+      }
+    ]),
+  { code: 'FAST_REACT_NAPI_WRONG_HANDLE_KIND' }
 );
 
 for (const expectedTarget of expectedNativeTargetMatrix) {
@@ -553,6 +628,71 @@ function assertNativeRootBridgeValidationRecord(record, expected) {
       slot: expected.valueSlot
     });
   }
+}
+
+function assertNativeRootBridgeHandleAdmissionPreflight(preflight, expected) {
+  assert.equal(Object.isFrozen(preflight), true);
+  assert.equal(Object.isFrozen(preflight.admissionRecords), true);
+  assert.equal(
+    preflight.preflightStatus,
+    'preflighted-native-root-bridge-real-handle-admission'
+  );
+  assert.equal(preflight.handleTableModel, 'fast-react-napi.BridgeHandleTable');
+  assert.equal(
+    preflight.validationModel,
+    'fast-react-napi.NativeRootBridgeRequestSequenceValidator'
+  );
+  assert.equal(preflight.requestCount, 3);
+  assert.equal(preflight.tableEnvironmentId, expected.environmentId);
+  assert.equal(preflight.rootId, expected.rootId);
+  assert.equal(preflight.rootRetired, true);
+  assert.deepEqual(preflight.rootHandle, {
+    environmentId: expected.environmentId,
+    generation: 1,
+    kind: 'root',
+    slot: expected.rootSlot
+  });
+  assert.deepEqual(
+    preflight.admissionRecords.map((record) => record.rootHandleAdmission.action),
+    [
+      'admit-root-handle',
+      'validate-active-root-handle',
+      'retire-root-handle'
+    ]
+  );
+  assert.deepEqual(
+    preflight.admissionRecords.map(
+      (record) => record.valueHandleAdmission?.action ?? null
+    ),
+    ['admit-value-handle', 'admit-value-handle', null]
+  );
+  assert.equal(
+    preflight.admissionRecords[0].rustValidationRecord,
+    nativeShapeGate.validationRecords[0].rustValidationRecord
+  );
+
+  const retiredValidation =
+    preflight.admissionRecords[2].retiredRootHandleValidation;
+  assert.equal(Object.isFrozen(retiredValidation), true);
+  assert.deepEqual(retiredValidation, {
+    action: 'validate-retired-root-handle',
+    currentGeneration: 2,
+    handle: {
+      environmentId: expected.environmentId,
+      generation: 1,
+      kind: 'root',
+      slot: expected.rootSlot
+    },
+    rustHandle: {
+      environment_id: expected.environmentId,
+      generation: 1,
+      kind: 'root',
+      slot: expected.rootSlot
+    },
+    rootHandleState: 'retired',
+    rootId: expected.rootId,
+    sourceErrorCode: 'FAST_REACT_NAPI_STALE_HANDLE'
+  });
 }
 
 function assertBridgeDidNotTouchContainer(container, document) {
