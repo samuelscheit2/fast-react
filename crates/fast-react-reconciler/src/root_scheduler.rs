@@ -16,6 +16,7 @@ use fast_react_host_config::HostTypes;
 
 use crate::concurrent_updates::{mark_update_lane_from_fiber_to_root, root_for_updated_fiber};
 use crate::root_commit::{HostRootCommitRecord, PendingPassiveCommitHandoff};
+use crate::root_config::{RootErrorOptionCallbackPhase, RootErrorOptionCallbackRecord};
 use crate::scheduler_bridge::{SchedulerActContinuationRecord, SchedulerActContinuationStatus};
 use crate::{
     ConcurrentUpdateError, ExecutionContextState, FiberRootId, FiberRootStore, FiberRootStoreError,
@@ -46,9 +47,7 @@ pub(crate) struct RootErrorCaptureScheduleRecord {
     pending_lanes_before: Lanes,
     pending_lanes_after: Lanes,
     scheduled_root: ScheduledRootUpdateResult,
-    on_uncaught_error: RootErrorCallbackHandle,
-    on_caught_error: RootErrorCallbackHandle,
-    on_recoverable_error: RootRecoverableErrorCallbackHandle,
+    error_option_callbacks: RootErrorOptionCallbackRecord,
 }
 
 #[allow(
@@ -97,18 +96,23 @@ impl RootErrorCaptureScheduleRecord {
     }
 
     #[must_use]
+    pub(crate) const fn error_option_callbacks(self) -> RootErrorOptionCallbackRecord {
+        self.error_option_callbacks
+    }
+
+    #[must_use]
     pub(crate) const fn on_uncaught_error(self) -> RootErrorCallbackHandle {
-        self.on_uncaught_error
+        self.error_option_callbacks.on_uncaught_error()
     }
 
     #[must_use]
     pub(crate) const fn on_caught_error(self) -> RootErrorCallbackHandle {
-        self.on_caught_error
+        self.error_option_callbacks.on_caught_error()
     }
 
     #[must_use]
     pub(crate) const fn on_recoverable_error(self) -> RootRecoverableErrorCallbackHandle {
-        self.on_recoverable_error
+        self.error_option_callbacks.on_recoverable_error()
     }
 
     #[must_use]
@@ -130,9 +134,7 @@ impl RootErrorCaptureScheduleRecord {
 
     #[must_use]
     pub(crate) const fn has_configured_error_callback(self) -> bool {
-        self.on_uncaught_error.is_some()
-            || self.on_caught_error.is_some()
-            || self.on_recoverable_error.is_some()
+        self.error_option_callbacks.has_configured_error_callback()
     }
 }
 
@@ -417,6 +419,75 @@ pub struct RootSchedulerCallbackExecutionRecord {
     selected_lanes: Lanes,
     status: RootSchedulerCallbackExecutionStatus,
     render_phase: Option<HostRootRenderPhaseRecord>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RootRenderErrorOptionCallbackRecord {
+    root: FiberRootId,
+    render_lanes: Lanes,
+    error: RootWorkLoopError,
+    error_option_callbacks: RootErrorOptionCallbackRecord,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private render error option metadata for future root error routing"
+)]
+impl RootRenderErrorOptionCallbackRecord {
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn render_lanes(&self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn error(&self) -> &RootWorkLoopError {
+        &self.error
+    }
+
+    #[must_use]
+    pub(crate) const fn error_option_callbacks(&self) -> RootErrorOptionCallbackRecord {
+        self.error_option_callbacks
+    }
+
+    #[must_use]
+    pub(crate) const fn on_uncaught_error(&self) -> RootErrorCallbackHandle {
+        self.error_option_callbacks.on_uncaught_error()
+    }
+
+    #[must_use]
+    pub(crate) const fn on_caught_error(&self) -> RootErrorCallbackHandle {
+        self.error_option_callbacks.on_caught_error()
+    }
+
+    #[must_use]
+    pub(crate) const fn on_recoverable_error(&self) -> RootRecoverableErrorCallbackHandle {
+        self.error_option_callbacks.on_recoverable_error()
+    }
+
+    #[must_use]
+    pub(crate) const fn has_configured_error_callback(&self) -> bool {
+        self.error_option_callbacks.has_configured_error_callback()
+    }
+
+    #[must_use]
+    pub(crate) const fn root_error_callbacks_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_error_boundaries_enabled(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn recoverable_error_compatibility_claimed(&self) -> bool {
+        false
+    }
 }
 
 impl RootSchedulerCallbackExecutionRecord {
@@ -1009,9 +1080,7 @@ pub(crate) const SYNC_FLUSH_POST_PASSIVE_ROOT_ERROR_PROPAGATION_BLOCKERS:
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SyncFlushPostPassiveRootErrorPropagationRecord {
     root: FiberRootId,
-    on_uncaught_error: RootErrorCallbackHandle,
-    on_caught_error: RootErrorCallbackHandle,
-    on_recoverable_error: RootRecoverableErrorCallbackHandle,
+    error_option_callbacks: RootErrorOptionCallbackRecord,
 }
 
 #[allow(
@@ -1025,18 +1094,23 @@ impl SyncFlushPostPassiveRootErrorPropagationRecord {
     }
 
     #[must_use]
+    pub(crate) const fn error_option_callbacks(self) -> RootErrorOptionCallbackRecord {
+        self.error_option_callbacks
+    }
+
+    #[must_use]
     pub(crate) const fn on_uncaught_error(self) -> RootErrorCallbackHandle {
-        self.on_uncaught_error
+        self.error_option_callbacks.on_uncaught_error()
     }
 
     #[must_use]
     pub(crate) const fn on_caught_error(self) -> RootErrorCallbackHandle {
-        self.on_caught_error
+        self.error_option_callbacks.on_caught_error()
     }
 
     #[must_use]
     pub(crate) const fn on_recoverable_error(self) -> RootRecoverableErrorCallbackHandle {
-        self.on_recoverable_error
+        self.error_option_callbacks.on_recoverable_error()
     }
 
     #[must_use]
@@ -1068,9 +1142,7 @@ impl SyncFlushPostPassiveRootErrorPropagationRecord {
 
     #[must_use]
     pub(crate) const fn has_configured_error_callback(self) -> bool {
-        self.on_uncaught_error.is_some()
-            || self.on_caught_error.is_some()
-            || self.on_recoverable_error.is_some()
+        self.error_option_callbacks.has_configured_error_callback()
     }
 }
 
@@ -1327,26 +1399,40 @@ pub fn ensure_root_is_scheduled<H: HostTypes>(
     ensure_root_schedule_entry(store, record.root())
 }
 
+#[allow(
+    dead_code,
+    reason = "crate-private render error option metadata for future root error routing"
+)]
+pub(crate) fn record_root_render_error_option_callbacks<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root_id: FiberRootId,
+    render_lanes: Lanes,
+    error: RootWorkLoopError,
+) -> Result<RootRenderErrorOptionCallbackRecord, RootSchedulerError> {
+    let root = store.root(root_id)?;
+    Ok(RootRenderErrorOptionCallbackRecord {
+        root: root_id,
+        render_lanes,
+        error,
+        error_option_callbacks: root
+            .options()
+            .error_option_callback_record(root_id, RootErrorOptionCallbackPhase::Render),
+    })
+}
+
 pub(crate) fn capture_passive_effect_root_error<H: HostTypes>(
     store: &mut FiberRootStore<H>,
     root_id: FiberRootId,
     source_fiber: FiberId,
     source: RootErrorCaptureSource,
 ) -> Result<RootErrorCaptureScheduleRecord, RootSchedulerError> {
-    let (
-        root_fiber,
-        pending_lanes_before,
-        on_uncaught_error,
-        on_caught_error,
-        on_recoverable_error,
-    ) = {
+    let (root_fiber, pending_lanes_before, error_option_callbacks) = {
         let root = store.root(root_id)?;
         (
             root.current(),
             root.lanes().pending_lanes(),
-            root.options().on_uncaught_error(),
-            root.options().on_caught_error(),
-            root.options().on_recoverable_error(),
+            root.options()
+                .error_option_callback_record(root_id, RootErrorOptionCallbackPhase::Commit),
         )
     };
     let lane = Lane::SYNC;
@@ -1371,9 +1457,7 @@ pub(crate) fn capture_passive_effect_root_error<H: HostTypes>(
         pending_lanes_before,
         pending_lanes_after,
         scheduled_root,
-        on_uncaught_error,
-        on_caught_error,
-        on_recoverable_error,
+        error_option_callbacks,
     })
 }
 
@@ -2038,9 +2122,9 @@ fn sync_flush_post_passive_root_error_propagation_record<H: HostTypes>(
     let root = store.root(root_id)?;
     Ok(SyncFlushPostPassiveRootErrorPropagationRecord {
         root: root_id,
-        on_uncaught_error: root.options().on_uncaught_error(),
-        on_caught_error: root.options().on_caught_error(),
-        on_recoverable_error: root.options().on_recoverable_error(),
+        error_option_callbacks: root
+            .options()
+            .error_option_callback_record(root_id, RootErrorOptionCallbackPhase::Commit),
     })
 }
 
@@ -3298,6 +3382,27 @@ mod tests {
             first.on_recoverable_error(),
             RootRecoverableErrorCallbackHandle::from_raw(703)
         );
+        let first_callbacks = first.error_option_callbacks();
+        assert_eq!(first_callbacks.root(), root_id);
+        assert_eq!(
+            first_callbacks.phase(),
+            RootErrorOptionCallbackPhase::Commit
+        );
+        assert_eq!(
+            first_callbacks.on_uncaught_error(),
+            RootErrorCallbackHandle::from_raw(701)
+        );
+        assert_eq!(
+            first_callbacks.on_caught_error(),
+            RootErrorCallbackHandle::from_raw(702)
+        );
+        assert_eq!(
+            first_callbacks.on_recoverable_error(),
+            RootRecoverableErrorCallbackHandle::from_raw(703)
+        );
+        assert!(!first_callbacks.root_error_callbacks_invoked());
+        assert!(!first_callbacks.public_error_boundaries_enabled());
+        assert!(!first_callbacks.recoverable_error_compatibility_claimed());
         assert!(first.root_error_update_scheduled());
         assert!(first.has_configured_error_callback());
         assert!(!first.root_error_callbacks_invoked());
@@ -3337,6 +3442,60 @@ mod tests {
             store.scheduler_bridge().microtask_requests().len(),
             microtask_count + 1
         );
+        assert!(host.operations().is_empty());
+    }
+
+    #[test]
+    fn root_scheduler_render_error_option_callback_record_preserves_handles_without_callbacks() {
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let host = RecordingHost::default();
+        let root_id = store
+            .create_client_root(
+                FakeContainer::new(1),
+                RootOptions::new()
+                    .with_on_uncaught_error(RootErrorCallbackHandle::from_raw(711))
+                    .with_on_caught_error(RootErrorCallbackHandle::from_raw(712))
+                    .with_on_recoverable_error(RootRecoverableErrorCallbackHandle::from_raw(713)),
+            )
+            .unwrap();
+        let current = store.root(root_id).unwrap().current();
+        let error = RootWorkLoopError::MissingHostRootUpdateQueue {
+            root: root_id,
+            fiber: current,
+        };
+
+        let record =
+            record_root_render_error_option_callbacks(&store, root_id, Lanes::DEFAULT, error)
+                .unwrap();
+
+        assert_eq!(record.root(), root_id);
+        assert_eq!(record.render_lanes(), Lanes::DEFAULT);
+        assert!(matches!(
+            record.error(),
+            RootWorkLoopError::MissingHostRootUpdateQueue { root, fiber }
+                if *root == root_id && *fiber == current
+        ));
+        assert_eq!(
+            record.on_uncaught_error(),
+            RootErrorCallbackHandle::from_raw(711)
+        );
+        assert_eq!(
+            record.on_caught_error(),
+            RootErrorCallbackHandle::from_raw(712)
+        );
+        assert_eq!(
+            record.on_recoverable_error(),
+            RootRecoverableErrorCallbackHandle::from_raw(713)
+        );
+        let callbacks = record.error_option_callbacks();
+        assert_eq!(callbacks.root(), root_id);
+        assert_eq!(callbacks.phase(), RootErrorOptionCallbackPhase::Render);
+        assert!(record.has_configured_error_callback());
+        assert!(!record.root_error_callbacks_invoked());
+        assert!(!record.public_error_boundaries_enabled());
+        assert!(!record.recoverable_error_compatibility_claimed());
+        assert!(store.scheduler_bridge().callback_requests().is_empty());
+        assert!(store.scheduler_bridge().act_queue_requests().is_empty());
         assert!(host.operations().is_empty());
     }
 
