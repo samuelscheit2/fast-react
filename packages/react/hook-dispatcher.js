@@ -20,6 +20,81 @@ const privateEffectHookDispatchers = new WeakSet();
 const privateStateHookDispatchers = new WeakSet();
 const privateContextHookDispatchers = new WeakSet();
 
+const effectRegistrationFieldNames = Object.freeze([
+  'hook',
+  'effect',
+  'instance',
+  'phase',
+  'tag',
+  'dependencies',
+  'fiber_flags'
+]);
+const passiveEffectMetadataFieldNames = Object.freeze([
+  'fiber',
+  'hook_list',
+  'effect_index',
+  'effect',
+  'instance',
+  'tag',
+  'create',
+  'dependencies',
+  'lanes'
+]);
+const pendingPassiveCommitHandoffFieldNames = Object.freeze([
+  'root',
+  'fiber',
+  'phase',
+  'lanes',
+  'records'
+]);
+const pendingPassiveEffectCommitFieldNames = Object.freeze([
+  'fiber',
+  'effect_index',
+  'effect',
+  'instance',
+  'unmount_order',
+  'mount_order'
+]);
+const pendingPassivePhaseNames = Object.freeze(['Unmount', 'Mount']);
+const noPassiveFieldNames = Object.freeze([]);
+const noPassivePhaseNames = Object.freeze([]);
+
+const effectHookMetadataByHookName = Object.freeze({
+  useEffect: createEffectHookMetadata({
+    effectPhaseName: 'Passive',
+    hasPassiveHandoff: true,
+    hookEffectFlagName: 'PASSIVE',
+    hookName: 'useEffect',
+    mountFiberFlagNames: ['PASSIVE', 'PASSIVE_STATIC'],
+    updateFiberFlagNames: ['PASSIVE']
+  }),
+  useImperativeHandle: createEffectHookMetadata({
+    effectPhaseName: 'Layout',
+    hasPassiveHandoff: false,
+    hookEffectFlagName: 'LAYOUT',
+    hookName: 'useImperativeHandle',
+    mountFiberFlagNames: ['UPDATE', 'LAYOUT_STATIC'],
+    updateFiberFlagNames: ['UPDATE']
+  }),
+  useInsertionEffect: createEffectHookMetadata({
+    effectPhaseName: 'Insertion',
+    hasPassiveHandoff: false,
+    hookEffectFlagName: 'INSERTION',
+    hookName: 'useInsertionEffect',
+    mountFiberFlagNames: ['UPDATE'],
+    updateFiberFlagNames: ['UPDATE']
+  }),
+  useLayoutEffect: createEffectHookMetadata({
+    effectPhaseName: 'Layout',
+    hasPassiveHandoff: false,
+    hookEffectFlagName: 'LAYOUT',
+    hookName: 'useLayoutEffect',
+    mountFiberFlagNames: ['UPDATE', 'LAYOUT_STATIC'],
+    updateFiberFlagNames: ['UPDATE']
+  })
+});
+const effectHookNames = Object.freeze(Object.keys(effectHookMetadataByHookName));
+
 const ReactCurrentDispatcher = {};
 
 Object.defineProperty(ReactCurrentDispatcher, 'current', {
@@ -48,8 +123,64 @@ function createMissingPrivateStateHookDispatcherError(hookName) {
   );
 }
 
+function createEffectHookMetadata({
+  effectPhaseName,
+  hasPassiveHandoff,
+  hookEffectFlagName,
+  hookName,
+  mountFiberFlagNames,
+  updateFiberFlagNames
+}) {
+  return Object.freeze({
+    compatibilityStatus: 'blocked',
+    effectPhaseEnumName: 'FunctionComponentEffectPhase',
+    effectPhaseName,
+    effectRegistrationFieldNames,
+    effectRegistrationRecordName: 'FunctionComponentEffectRegistration',
+    executesEffectCallback: false,
+    fiberFlagsRecordName: 'FiberFlags',
+    hookEffectFlagName,
+    hookEffectFlagsRecordName: 'HookEffectFlags',
+    hookName,
+    mountFiberFlagNames: Object.freeze(mountFiberFlagNames.slice()),
+    passiveEffectMetadataFieldNames: hasPassiveHandoff
+      ? passiveEffectMetadataFieldNames
+      : noPassiveFieldNames,
+    passiveEffectMetadataRecordName: hasPassiveHandoff
+      ? 'FunctionComponentPassiveEffectMetadata'
+      : null,
+    pendingPassiveCommitHandoffFieldNames: hasPassiveHandoff
+      ? pendingPassiveCommitHandoffFieldNames
+      : noPassiveFieldNames,
+    pendingPassiveCommitHandoffRecordName: hasPassiveHandoff
+      ? 'FunctionComponentPendingPassiveCommitHandoff'
+      : null,
+    pendingPassiveEffectCommitFieldNames: hasPassiveHandoff
+      ? pendingPassiveEffectCommitFieldNames
+      : noPassiveFieldNames,
+    pendingPassiveEffectCommitRecordName: hasPassiveHandoff
+      ? 'FunctionComponentPendingPassiveEffectCommitRecord'
+      : null,
+    pendingPassivePhaseNames: hasPassiveHandoff
+      ? pendingPassivePhaseNames
+      : noPassivePhaseNames,
+    schedulesPublicAct: false,
+    updateFiberFlagNames: Object.freeze(updateFiberFlagNames.slice())
+  });
+}
+
 function isObjectLike(value) {
   return (typeof value === 'object' && value !== null) || typeof value === 'function';
+}
+
+function getEffectHookMetadata(hookName) {
+  if (
+    Object.prototype.hasOwnProperty.call(effectHookMetadataByHookName, hookName)
+  ) {
+    return effectHookMetadataByHookName[hookName];
+  }
+
+  return null;
 }
 
 function isPrivateStateHookDispatcher(dispatcher) {
@@ -87,12 +218,7 @@ function validatePrivateEffectHookDispatcher(dispatcher) {
     throw createInvalidHookCallError('useEffect');
   }
 
-  for (const hookName of [
-    'useEffect',
-    'useImperativeHandle',
-    'useInsertionEffect',
-    'useLayoutEffect'
-  ]) {
+  for (const hookName of effectHookNames) {
     if (typeof dispatcher[hookName] !== 'function') {
       throw createInvalidHookCallError(hookName);
     }
@@ -138,7 +264,10 @@ function getDispatcherHook(dispatcher, hookName) {
 }
 
 function getPrivateEffectDispatcherHook(dispatcher, hookName) {
-  if (!isPrivateEffectHookDispatcher(dispatcher)) {
+  if (
+    getEffectHookMetadata(hookName) === null ||
+    !isPrivateEffectHookDispatcher(dispatcher)
+  ) {
     throw createInvalidHookCallError(hookName);
   }
 
@@ -188,12 +317,7 @@ function callDispatcherHook(hookName, args) {
     return callPrivateContextDispatcherHook(hookName, args);
   }
 
-  if (
-    hookName === 'useEffect' ||
-    hookName === 'useImperativeHandle' ||
-    hookName === 'useInsertionEffect' ||
-    hookName === 'useLayoutEffect'
-  ) {
+  if (getEffectHookMetadata(hookName) !== null) {
     return callPrivateEffectDispatcherHook(hookName, args);
   }
 
@@ -211,13 +335,20 @@ function callPrivateContextDispatcherHook(hookName, args) {
 function callPrivateEffectDispatcherHook(hookName, args) {
   const dispatcher = resolveDispatcher(hookName);
   const hook = getPrivateEffectDispatcherHook(dispatcher, hookName);
-  return hook.apply(dispatcher, args);
+  const metadata = getEffectHookMetadata(hookName);
+  return hook.apply(dispatcher, createPrivateEffectHookArgs(args, metadata));
 }
 
 function callPrivateStateDispatcherHook(hookName, args) {
   const dispatcher = ReactSharedInternals.H;
   const hook = getPrivateStateDispatcherHook(dispatcher, hookName);
   return hook.apply(dispatcher, args);
+}
+
+function createPrivateEffectHookArgs(args, metadata) {
+  const privateArgs = Array.prototype.slice.call(args);
+  privateArgs.push(metadata);
+  return privateArgs;
 }
 
 function defineHookFunctionShape(fn, length) {
@@ -288,6 +419,9 @@ module.exports = {
   callPrivateStateDispatcherHook,
   createInvalidHookCallError,
   createMissingPrivateStateHookDispatcherError,
+  effectHookMetadataByHookName,
+  effectHookNames,
+  getEffectHookMetadata,
   invalidHookCallErrorCode,
   invalidHookCallMessage,
   isPrivateContextHookDispatcher,
