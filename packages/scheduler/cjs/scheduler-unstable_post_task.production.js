@@ -92,6 +92,7 @@ function createPrivatePostTaskPriorityRecord(
     cancellation: null,
     callbackRuns: [],
     continuationFallbacks: [],
+    rootContinuationExecutionRoute: null,
     environmentCapabilityDiagnostics: true,
     priorityMappingDiagnostics: true,
     shimmedTaskControllerScheduling: true,
@@ -102,6 +103,7 @@ function createPrivatePostTaskPriorityRecord(
     continuationSignalValidationDiagnostics: false,
     continuationAbortOrderingDiagnostics: false,
     delayAbortOrderingDiagnostics: false,
+    rootContinuationExecutionRouteDiagnostics: false,
     fallbackEnvironmentClassificationDiagnostics: false,
     browserPostTaskCompatibilityClaimed: false,
     browserTaskOrderingCompatibilityClaimed: false,
@@ -222,18 +224,7 @@ function recordPrivatePostTaskContinuationFallback(
       0 <= sourceCallbackRunIndex
         ? record.callbackRuns[sourceCallbackRunIndex]
         : null;
-  record.continuationFallbackDiagnostics = true;
-  record.continuationFallbackMetadataDiagnostics = true;
-  record.continuationSignalValidationDiagnostics = true;
-  record.fallbackEnvironmentClassificationDiagnostics = true;
-  if (sourceCallbackRun) {
-    sourceCallbackRun.continuationStatus =
-      "scheduled-continuation-fallback";
-    sourceCallbackRun.continuationFallbackIndex = continuationIndex;
-    sourceCallbackRun.fallbackEnvironmentClassification =
-      fallbackEnvironmentClassification;
-  }
-  record.continuationFallbacks.push({
+  var continuationRecord = {
     status: "scheduled-shimmed-post-task-continuation",
     diagnosticEventIndex: claimPrivatePostTaskDiagnosticEventIndex(record),
     continuationIndex: continuationIndex,
@@ -262,6 +253,8 @@ function recordPrivatePostTaskContinuationFallback(
         fallbackEnvironmentClassification.classification,
       fallbackEnvironmentKind:
         fallbackEnvironmentClassification.environmentKind,
+      rootContinuationExecutionRouteStatus:
+        "pending-private-root-continuation-execution-route",
       browserPostTaskCompatibilityClaimed: false,
       publicSchedulerTimingCompatibilityClaimed: false,
       compatibilityClaimed: false
@@ -275,7 +268,25 @@ function recordPrivatePostTaskContinuationFallback(
     browserPostTaskCompatibilityClaimed: false,
     publicSchedulerTimingCompatibilityClaimed: false,
     compatibilityClaimed: false
-  });
+  };
+  record.continuationFallbackDiagnostics = true;
+  record.continuationFallbackMetadataDiagnostics = true;
+  record.continuationSignalValidationDiagnostics = true;
+  record.rootContinuationExecutionRouteDiagnostics = true;
+  record.fallbackEnvironmentClassificationDiagnostics = true;
+  if (sourceCallbackRun) {
+    sourceCallbackRun.continuationStatus =
+      "scheduled-continuation-fallback";
+    sourceCallbackRun.continuationFallbackIndex = continuationIndex;
+    sourceCallbackRun.fallbackEnvironmentClassification =
+      fallbackEnvironmentClassification;
+  }
+  record.continuationFallbacks.push(continuationRecord);
+  record.rootContinuationExecutionRoute =
+    createPrivatePostTaskRootContinuationExecutionRoute(
+      record,
+      continuationRecord
+    );
 }
 function recordPrivatePostTaskCancellationStart(node) {
   var record = getPrivatePostTaskPriorityRecord(node);
@@ -444,7 +455,128 @@ function recordPrivatePostTaskContinuationAbortOrdering(
       abortOrdering.status;
     continuation.continuationMetadata.abortSignalStateAfterAbort =
       abortOrdering.abortSignalStateAfterAbort;
+    continuation.continuationMetadata.rootContinuationExecutionRouteStatus =
+      "aborted-before-private-root-continuation-execution";
   }
+  recordPrivatePostTaskRootContinuationExecutionRouteAbort(
+    record,
+    continuation,
+    cancellation
+  );
+}
+function createPrivatePostTaskRootContinuationExecutionRoute(
+  record,
+  continuation
+) {
+  return {
+    status: "private-scheduler-post-task-root-continuation-execution-route",
+    routeVersion: 1,
+    routeName: "post-task-delay-abort-root-continuation",
+    routeStatus: "pending-private-root-continuation-execution-route",
+    accepted: true,
+    rejected: false,
+    rejectionReason: null,
+    continuationIndex: continuation.continuationIndex,
+    continuationDiagnosticEventIndex: continuation.diagnosticEventIndex,
+    sourceCallbackRunIndex: continuation.sourceCallbackRunIndex,
+    callbackRunCountAtSchedule: continuation.callbackRunCountAtSchedule,
+    continuationFallbackCountAtSchedule: continuation.continuationIndex + 1,
+    priorityLevel: continuation.priorityLevel,
+    schedulerPriorityName: record.priorityMapping
+      ? record.priorityMapping.schedulerPriorityName
+      : null,
+    postTaskPriority: continuation.postTaskPriority,
+    taskControllerPriority: record.priorityMapping
+      ? record.priorityMapping.taskControllerPriority
+      : null,
+    delay: record.schedule ? record.schedule.delay : null,
+    fallback: continuation.fallback,
+    fallbackEnvironmentClassification:
+      continuation.fallbackEnvironmentClassification,
+    signalAtSchedule: continuation.signalAtSchedule,
+    signalValidation: continuation.signalValidation,
+    abortOrdering: continuation.abortOrdering,
+    delayAbortOrdering: null,
+    abortSignal: null,
+    privateRootContinuationExecution:
+      createPrivatePostTaskRootContinuationExecutionRecord(
+        "pending-private-root-continuation-execution-route",
+        continuation,
+        null,
+        null
+      ),
+    browserPostTaskCompatibilityClaimed: false,
+    browserTaskOrderingCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  };
+}
+function createPrivatePostTaskRootContinuationExecutionRecord(
+  status,
+  continuation,
+  cancellation,
+  abortSignal
+) {
+  return {
+    status: status,
+    routeName: "post-task-delay-abort-root-continuation",
+    routeSelected: true,
+    continuationIndex: continuation.continuationIndex,
+    sourceCallbackRunIndex: continuation.sourceCallbackRunIndex,
+    callbackRunCountAtSchedule: continuation.callbackRunCountAtSchedule,
+    callbackRunCountAtAbortRequest: cancellation
+      ? cancellation.abortOrdering.callbackRunCountAtRequest
+      : null,
+    callbackRunCountAtAbortCompletion: cancellation
+      ? cancellation.abortOrdering.callbackRunCountAtCompletion
+      : null,
+    continuationFallbackCountAtSchedule: continuation.continuationIndex + 1,
+    continuationFallbackCountAtAbortRequest: cancellation
+      ? cancellation.abortOrdering.continuationFallbackCountAtRequest
+      : null,
+    continuationFallbackCountAtAbortCompletion: cancellation
+      ? cancellation.abortOrdering.continuationFallbackCountAtCompletion
+      : null,
+    abortSignalState:
+      abortSignal && abortSignal.aborted === true
+        ? "aborted"
+        : abortSignal
+          ? "not-aborted"
+          : null,
+    abortSemanticsPreserved:
+      cancellation && abortSignal ? abortSignal.aborted === true : null,
+    continuationCallbackExecuted: false,
+    rendererWorkExecuted: false,
+    reconcilerWorkExecuted: false,
+    nativeRendererWorkExecuted: false,
+    publicRootExecution: false,
+    publicSchedulerFlush: false,
+    browserPostTaskCompatibilityClaimed: false,
+    browserTaskOrderingCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  };
+}
+function recordPrivatePostTaskRootContinuationExecutionRouteAbort(
+  record,
+  continuation,
+  cancellation
+) {
+  var route = record.rootContinuationExecutionRoute;
+  if (!route || route.continuationIndex !== continuation.continuationIndex) {
+    return;
+  }
+  route.routeStatus = "aborted-before-private-root-continuation-execution";
+  route.delayAbortOrdering = cancellation.delayAbortOrdering;
+  route.abortOrdering = continuation.abortOrdering;
+  route.abortSignal = cancellation.signalAfterAbort;
+  route.privateRootContinuationExecution =
+    createPrivatePostTaskRootContinuationExecutionRecord(
+      "aborted-before-private-root-continuation-execution",
+      continuation,
+      cancellation,
+      cancellation.signalAfterAbort
+    );
 }
 function describePrivatePostTaskEnvironmentCapabilities() {
   var windowValue = "object" === typeof window ? window : null,
@@ -737,6 +869,7 @@ function snapshotPrivatePostTaskPriorityRecord(record) {
     cancellation: record.cancellation,
     callbackRuns: record.callbackRuns,
     continuationFallbacks: record.continuationFallbacks,
+    rootContinuationExecutionRoute: record.rootContinuationExecutionRoute,
     environmentCapabilityDiagnostics:
       record.environmentCapabilityDiagnostics,
     priorityMappingDiagnostics: record.priorityMappingDiagnostics,
@@ -752,6 +885,8 @@ function snapshotPrivatePostTaskPriorityRecord(record) {
     continuationAbortOrderingDiagnostics:
       record.continuationAbortOrderingDiagnostics,
     delayAbortOrderingDiagnostics: record.delayAbortOrderingDiagnostics,
+    rootContinuationExecutionRouteDiagnostics:
+      record.rootContinuationExecutionRouteDiagnostics,
     fallbackEnvironmentClassificationDiagnostics:
       record.fallbackEnvironmentClassificationDiagnostics,
     browserPostTaskCompatibilityClaimed:

@@ -1153,6 +1153,8 @@ test("scheduler post-task private priority diagnostics capture continuation fall
               expectedFallbackEnvironmentClassification(withYield)
                 .classification,
             fallbackEnvironmentKind: "controlled-task-scheduling-api-shim",
+            rootContinuationExecutionRouteStatus:
+              "pending-private-root-continuation-execution-route",
             browserPostTaskCompatibilityClaimed: false,
             publicSchedulerTimingCompatibilityClaimed: false,
             compatibilityClaimed: false
@@ -1230,6 +1232,7 @@ test("scheduler post-task private priority diagnostics capture abort ordering ar
     assert.equal(afterFallback.continuationFallbackMetadataDiagnostics, true);
     assert.equal(afterFallback.continuationSignalValidationDiagnostics, true);
     assert.equal(afterFallback.continuationAbortOrderingDiagnostics, false);
+    assert.equal(afterFallback.rootContinuationExecutionRouteDiagnostics, true);
     assert.equal(afterFallback.taskControllerAbortOrderingDiagnostics, false);
     assert.deepEqual(
       afterFallback.callbackRuns.map((entry) => [
@@ -1264,6 +1267,44 @@ test("scheduler post-task private priority diagnostics capture abort ordering ar
         ]
       ]
     );
+    assert.equal(
+      afterFallback.rootContinuationExecutionRoute.status,
+      "private-scheduler-post-task-root-continuation-execution-route"
+    );
+    assert.equal(
+      afterFallback.rootContinuationExecutionRoute.routeStatus,
+      "pending-private-root-continuation-execution-route"
+    );
+    assert.equal(afterFallback.rootContinuationExecutionRoute.accepted, true);
+    assert.equal(afterFallback.rootContinuationExecutionRoute.rejected, false);
+    assert.equal(
+      afterFallback.rootContinuationExecutionRoute.continuationIndex,
+      0
+    );
+    assert.equal(
+      afterFallback.rootContinuationExecutionRoute.continuationDiagnosticEventIndex,
+      2
+    );
+    assert.deepEqual(
+      afterFallback.rootContinuationExecutionRoute.delay,
+      expectedPostTaskDelayDiagnostic("number", 0, "zero-delay-task")
+    );
+    assert.deepEqual(
+      afterFallback.rootContinuationExecutionRoute.signalAtSchedule,
+      expectedPostTaskSignal(9, "user-visible", false)
+    );
+    assert.deepEqual(
+      afterFallback.rootContinuationExecutionRoute.privateRootContinuationExecution,
+      expectedPrivateRootContinuationExecution({
+        status: "pending-private-root-continuation-execution-route",
+        abortSignalState: null,
+        abortSemanticsPreserved: null,
+        callbackRunCountAtAbortRequest: null,
+        callbackRunCountAtAbortCompletion: null,
+        continuationFallbackCountAtAbortRequest: null,
+        continuationFallbackCountAtAbortCompletion: null
+      })
+    );
 
     const afterCancel = flow.diagnosticsAfterCancel;
     assert.equal(afterCancel.compatibilityClaimed, false);
@@ -1278,6 +1319,7 @@ test("scheduler post-task private priority diagnostics capture abort ordering ar
     assert.equal(afterCancel.continuationSignalValidationDiagnostics, true);
     assert.equal(afterCancel.continuationAbortOrderingDiagnostics, true);
     assert.equal(afterCancel.delayAbortOrderingDiagnostics, true);
+    assert.equal(afterCancel.rootContinuationExecutionRouteDiagnostics, true);
     assert.equal(
       afterCancel.fallbackEnvironmentClassificationDiagnostics,
       true
@@ -1346,6 +1388,38 @@ test("scheduler post-task private priority diagnostics capture abort ordering ar
     assert.deepEqual(
       afterCancel.continuationFallbacks[0].signalValidation,
       expectedContinuationSignalValidation(9, "user-visible")
+    );
+    assert.equal(
+      afterCancel.rootContinuationExecutionRoute.routeStatus,
+      "aborted-before-private-root-continuation-execution"
+    );
+    assert.equal(
+      afterCancel.rootContinuationExecutionRoute.continuationIndex,
+      0
+    );
+    assert.deepEqual(
+      afterCancel.rootContinuationExecutionRoute.abortSignal,
+      expectedPostTaskSignal(9, "user-visible", true)
+    );
+    assert.deepEqual(
+      afterCancel.rootContinuationExecutionRoute.delayAbortOrdering,
+      afterCancel.cancellation.delayAbortOrdering
+    );
+    assert.deepEqual(
+      afterCancel.rootContinuationExecutionRoute.abortOrdering,
+      afterCancel.continuationFallbacks[0].abortOrdering
+    );
+    assert.deepEqual(
+      afterCancel.rootContinuationExecutionRoute.privateRootContinuationExecution,
+      expectedPrivateRootContinuationExecution({
+        status: "aborted-before-private-root-continuation-execution",
+        abortSignalState: "aborted",
+        abortSemanticsPreserved: true,
+        callbackRunCountAtAbortRequest: 1,
+        callbackRunCountAtAbortCompletion: 1,
+        continuationFallbackCountAtAbortRequest: 1,
+        continuationFallbackCountAtAbortCompletion: 1
+      })
     );
     assert.deepEqual(flow.cancellationEvents, [
       {
@@ -1525,6 +1599,42 @@ function expectedContinuationStatus({
     lastCallbackContinuationStatus,
     lastContinuationFallbackIndex,
     browserPostTaskCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  };
+}
+
+function expectedPrivateRootContinuationExecution({
+  status,
+  abortSignalState,
+  abortSemanticsPreserved,
+  callbackRunCountAtAbortRequest,
+  callbackRunCountAtAbortCompletion,
+  continuationFallbackCountAtAbortRequest,
+  continuationFallbackCountAtAbortCompletion
+}) {
+  return {
+    status,
+    routeName: "post-task-delay-abort-root-continuation",
+    routeSelected: true,
+    continuationIndex: 0,
+    sourceCallbackRunIndex: 0,
+    callbackRunCountAtSchedule: 1,
+    callbackRunCountAtAbortRequest,
+    callbackRunCountAtAbortCompletion,
+    continuationFallbackCountAtSchedule: 1,
+    continuationFallbackCountAtAbortRequest,
+    continuationFallbackCountAtAbortCompletion,
+    abortSignalState,
+    abortSemanticsPreserved,
+    continuationCallbackExecuted: false,
+    rendererWorkExecuted: false,
+    reconcilerWorkExecuted: false,
+    nativeRendererWorkExecuted: false,
+    publicRootExecution: false,
+    publicSchedulerFlush: false,
+    browserPostTaskCompatibilityClaimed: false,
+    browserTaskOrderingCompatibilityClaimed: false,
     publicSchedulerTimingCompatibilityClaimed: false,
     compatibilityClaimed: false
   };

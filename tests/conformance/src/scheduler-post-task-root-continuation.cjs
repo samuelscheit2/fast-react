@@ -16,6 +16,10 @@ const ROOT_CONTINUATION_FALLBACK_STATUS =
   'private-scheduler-post-task-root-continuation-fallback';
 const ROOT_CONTINUATION_SIGNAL_VALIDATION_STATUS =
   'validated-private-scheduler-post-task-root-continuation-signal';
+const ROOT_CONTINUATION_EXECUTION_ROUTE_STATUS =
+  'private-scheduler-post-task-root-continuation-execution-route';
+const ROOT_CONTINUATION_ABORTED_EXECUTION_STATUS =
+  'aborted-before-private-root-continuation-execution';
 const SCHEDULER_COMPATIBILITY_TARGET = 'scheduler@0.27.0';
 const publicCompatibilityClaimKeys = new Set([
   'browserPostTaskCompatibilityClaimed',
@@ -92,6 +96,19 @@ function createPrivatePostTaskRootContinuationMetadataRow(record, options) {
     signal,
     abortSignal
   );
+  const executionRouteValidation = readRootContinuationExecutionRoute(
+    record,
+    continuationValidation,
+    continuation
+  );
+  if (executionRouteValidation.reason) {
+    return createRejectedRow(
+      base,
+      executionRouteValidation.reason,
+      executionRouteValidation
+    );
+  }
+  const rootContinuationExecutionRoute = executionRouteValidation.route;
   const continuationFallback = createRootContinuationFallbackMetadata(
     continuation
   );
@@ -100,7 +117,8 @@ function createPrivatePostTaskRootContinuationMetadataRow(record, options) {
     continuation,
     signalValidation,
     abortOrdering,
-    continuationFallback
+    continuationFallback,
+    rootContinuationExecutionRoute
   });
 
   return freezeRecord({
@@ -133,6 +151,12 @@ function createPrivatePostTaskRootContinuationMetadataRow(record, options) {
     fallback: continuation.fallback,
     signalValidation: cloneDiagnosticValue(signalValidation),
     abortOrdering: cloneDiagnosticValue(abortOrdering),
+    rootContinuationExecutionRoute: cloneDiagnosticValue(
+      rootContinuationExecutionRoute
+    ),
+    privateRootContinuationExecution: cloneDiagnosticValue(
+      rootContinuationExecutionRoute.privateRootContinuationExecution
+    ),
     continuationFallback: cloneDiagnosticValue(continuationFallback),
     acceptedRootContinuation: cloneDiagnosticValue(acceptedRootContinuation),
     fallbackEnvironmentClassification: cloneDiagnosticValue(
@@ -158,6 +182,8 @@ function createPrivatePostTaskRootContinuationMetadataRow(record, options) {
         record.continuationSignalValidationDiagnostics === true,
       continuationAbortOrderingDiagnostics:
         record.continuationAbortOrderingDiagnostics === true,
+      rootContinuationExecutionRouteDiagnostics:
+        record.rootContinuationExecutionRouteDiagnostics === true,
       fallbackEnvironmentClassificationDiagnostics:
         record.fallbackEnvironmentClassificationDiagnostics === true
     }),
@@ -368,6 +394,90 @@ function createRootContinuationSignalValidation(continuation, signal) {
   });
 }
 
+function readRootContinuationExecutionRoute(
+  record,
+  continuationValidation,
+  continuation
+) {
+  const route =
+    record &&
+    record.rootContinuationExecutionRoute &&
+    typeof record.rootContinuationExecutionRoute === 'object'
+      ? record.rootContinuationExecutionRoute
+      : null;
+  if (route === null) {
+    return {
+      reason: 'missing-root-continuation-execution-route',
+      continuationIndex: continuationValidation.continuationIndex
+    };
+  }
+  if (route.status !== ROOT_CONTINUATION_EXECUTION_ROUTE_STATUS) {
+    return {
+      reason: 'unsupported-root-continuation-execution-route',
+      status: route.status || null
+    };
+  }
+  if (route.accepted !== true || route.rejected === true) {
+    return {
+      reason: 'rejected-root-continuation-execution-route',
+      accepted: route.accepted === true,
+      rejected: route.rejected === true,
+      rejectionReason: route.rejectionReason || null
+    };
+  }
+  if (
+    route.continuationIndex !== continuationValidation.continuationIndex ||
+    route.continuationDiagnosticEventIndex !==
+      continuation.diagnosticEventIndex ||
+    route.sourceCallbackRunIndex !== continuation.sourceCallbackRunIndex
+  ) {
+    return {
+      reason: 'stale-root-continuation-execution-route',
+      routeContinuationIndex: route.continuationIndex,
+      continuationIndex: continuationValidation.continuationIndex,
+      routeContinuationDiagnosticEventIndex:
+        route.continuationDiagnosticEventIndex,
+      continuationDiagnosticEventIndex: continuation.diagnosticEventIndex,
+      routeSourceCallbackRunIndex: route.sourceCallbackRunIndex,
+      sourceCallbackRunIndex: continuation.sourceCallbackRunIndex
+    };
+  }
+  if (route.routeStatus !== ROOT_CONTINUATION_ABORTED_EXECUTION_STATUS) {
+    return {
+      reason: 'pending-root-continuation-execution-route',
+      routeStatus: route.routeStatus || null
+    };
+  }
+  const privateExecution =
+    route.privateRootContinuationExecution &&
+    typeof route.privateRootContinuationExecution === 'object'
+      ? route.privateRootContinuationExecution
+      : null;
+  if (privateExecution === null) {
+    return {
+      reason: 'missing-private-root-continuation-execution',
+      continuationIndex: continuationValidation.continuationIndex
+    };
+  }
+  if (
+    privateExecution.status !== ROOT_CONTINUATION_ABORTED_EXECUTION_STATUS ||
+    privateExecution.rendererWorkExecuted !== false ||
+    privateExecution.reconcilerWorkExecuted !== false ||
+    privateExecution.nativeRendererWorkExecuted !== false ||
+    privateExecution.publicRootExecution !== false ||
+    privateExecution.publicSchedulerFlush !== false
+  ) {
+    return {
+      reason: 'unsupported-private-root-continuation-execution-route',
+      privateExecution: cloneDiagnosticValue(privateExecution)
+    };
+  }
+  return {
+    reason: null,
+    route
+  };
+}
+
 function readContinuationAbortOrdering(
   continuation,
   cancellation,
@@ -461,7 +571,8 @@ function createAcceptedRootContinuationRecord({
   continuation,
   signalValidation,
   abortOrdering,
-  continuationFallback
+  continuationFallback,
+  rootContinuationExecutionRoute
 }) {
   return freezeRecord({
     status: ACCEPTED_ROOT_CONTINUATION_STATUS,
@@ -472,6 +583,12 @@ function createAcceptedRootContinuationRecord({
     signalValidation: cloneDiagnosticValue(signalValidation),
     abortOrdering: cloneDiagnosticValue(abortOrdering),
     continuationFallback: cloneDiagnosticValue(continuationFallback),
+    rootContinuationExecutionRoute: cloneDiagnosticValue(
+      rootContinuationExecutionRoute
+    ),
+    privateRootContinuationExecution: cloneDiagnosticValue(
+      rootContinuationExecutionRoute.privateRootContinuationExecution
+    ),
     rootContinuationMetadataOnly: true,
     rendererWorkExecuted: false,
     reconcilerWorkExecuted: false,
@@ -561,6 +678,8 @@ module.exports = {
   POST_TASK_PRIORITY_DIAGNOSTIC_STATUS,
   ROOT_CONTINUATION_BLOCKED_STATUS,
   ROOT_CONTINUATION_FALLBACK_STATUS,
+  ROOT_CONTINUATION_ABORTED_EXECUTION_STATUS,
+  ROOT_CONTINUATION_EXECUTION_ROUTE_STATUS,
   ROOT_CONTINUATION_METADATA_STATUS,
   ROOT_CONTINUATION_RECORD_TYPE,
   ROOT_CONTINUATION_REJECTED_STATUS,
