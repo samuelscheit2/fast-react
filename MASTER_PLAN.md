@@ -46,11 +46,12 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Queue 413-442 is assigned in isolated worktrees.
+Workers 414, 437, 438, and 439 have been accepted, leaving 26 active top-level
+workers from this queue.
 
 | Worker | Focus |
 | --- | --- |
 | 413 | Root commit HostComponent update traversal canary |
-| 414 | Root commit deletion nearest-host-parent traversal canary |
 | 415 | Ref callback cleanup-return handle store |
 | 416 | Ref callback error routing private records |
 | 417 | Context dependency metadata on private runtime reads |
@@ -73,9 +74,6 @@ Top-level cap: 30 workers. Queue 413-442 is assigned in isolated worktrees.
 | 434 | Portal `preparePortalMount` listener gate |
 | 435 | Native JSON transport parser gate |
 | 436 | Scheduler mock continuation execution gate |
-| 437 | React act renderer-backed private drain |
-| 438 | React DOM test-utils act flush/warning refresh |
-| 439 | Benchmark cross-root/warning timing canaries |
 | 440 | Package-surface private facade audit |
 | 441 | Root-render E2E cross-root scheduling admission |
 | 442 | DOM root marker/listener public-facade preflight |

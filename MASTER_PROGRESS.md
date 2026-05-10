@@ -29,6 +29,18 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Workers 414, 437, 438, and 439 were accepted from queue 413-442. This subset
+  added a private nearest-host-parent deletion traversal canary through
+  FunctionComponent owners, a package-private React act renderer-backed drain
+  metadata consumer, React DOM test-utils act awareness for private flushSync
+  and warning-boundary prerequisites, and diagnostic-only benchmark canaries for
+  private cross-root flushSync and warning-boundary timing while public
+  compatibility remains blocked.
+- Workers 414, 437, 438, and 439 were verified after merge with focused
+  root-commit deletion tests, React act and React DOM test-utils act oracle
+  tests, React and React DOM workspace checks, package-surface, benchmark,
+  root-render E2E and public-facade conformance checks, conflict-marker
+  scanning, and `git diff --check`.
 - Workers 383-412 were accepted as a complete implementation batch. The batch
   added root commit HostComponent update/deletion and ref-callback handoff
   canaries, context provider begin-work/root-work-loop handoffs, passive error
