@@ -6612,6 +6612,253 @@ mod tests {
     }
 
     #[test]
+    fn passive_effects_dependency_comparison_executes_changed_update_and_skips_equal() {
+        let (mut store, root_id, host) = root_store();
+        let previous_current = store.root(root_id).unwrap().current();
+        let component = FiberTypeHandle::from_raw(11_200);
+        let current_function = append_function_component_child(
+            &mut store,
+            previous_current,
+            PropsHandle::from_raw(11_201),
+            component,
+        );
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let previous_changed = hook_store
+            .create_current_effect_metadata(
+                store.fiber_arena_mut(),
+                current_function,
+                FunctionComponentEffectPhase::Passive,
+                callback(11_202),
+                deps(11_203),
+                Some(callback(11_204)),
+            )
+            .unwrap();
+        let previous_unchanged = hook_store
+            .create_current_effect_metadata(
+                store.fiber_arena_mut(),
+                current_function,
+                FunctionComponentEffectPhase::Passive,
+                callback(11_205),
+                deps(11_206),
+                Some(callback(11_207)),
+            )
+            .unwrap();
+
+        update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(11_208),
+            None,
+        )
+        .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let finished_work = render.finished_work();
+        let finished_function = append_function_component_child(
+            &mut store,
+            finished_work,
+            PropsHandle::from_raw(11_209),
+            component,
+        );
+        store
+            .fiber_arena_mut()
+            .link_alternates(current_function, finished_function)
+            .unwrap();
+        let state = hook_store
+            .prepare_render_state(store.fiber_arena(), finished_function)
+            .unwrap();
+        assert_eq!(state.phase(), FunctionComponentHookRenderPhase::Update);
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+        let changed = hook_store
+            .update_effect_metadata_with_dependency_check(
+                store.fiber_arena_mut(),
+                &mut cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(11_210),
+                deps(11_211),
+            )
+            .unwrap();
+        let unchanged = hook_store
+            .update_effect_metadata_with_dependency_check(
+                store.fiber_arena_mut(),
+                &mut cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(11_212),
+                deps(11_206),
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(cursor).unwrap();
+
+        let update_queue = hook_store.effect_update_queue(state).unwrap().unwrap();
+        assert_eq!(update_queue.len(), 2);
+        assert_eq!(update_queue.changed_dependency_count(), 1);
+        assert_eq!(update_queue.unchanged_dependency_count(), 1);
+        assert_eq!(update_queue.accepted_passive_count(), 1);
+        assert_eq!(update_queue.accepted_layout_count(), 0);
+
+        let records = update_queue.records();
+        assert_eq!(
+            records[0].dependency_status(),
+            FunctionComponentEffectDependencyStatus::Changed
+        );
+        assert_eq!(records[0].previous_effect(), previous_changed.effect());
+        assert_eq!(records[0].effect(), changed.effect());
+        assert_eq!(records[0].previous_dependencies(), deps(11_203));
+        assert_eq!(records[0].dependencies(), deps(11_211));
+        assert_eq!(records[0].destroy(), Some(callback(11_204)));
+        assert!(records[0].accepted_for_pending_passive());
+        assert_eq!(
+            records[1].dependency_status(),
+            FunctionComponentEffectDependencyStatus::Unchanged
+        );
+        assert_eq!(records[1].previous_effect(), previous_unchanged.effect());
+        assert_eq!(records[1].effect(), unchanged.effect());
+        assert_eq!(records[1].previous_dependencies(), deps(11_206));
+        assert_eq!(records[1].dependencies(), deps(11_206));
+        assert_eq!(records[1].destroy(), Some(callback(11_207)));
+        assert!(!records[1].accepted_for_pending_passive());
+        assert_eq!(
+            store.fiber_arena().get(finished_function).unwrap().flags(),
+            FiberFlags::PASSIVE
+        );
+
+        let queued = queue_function_component_pending_passive_effects(
+            &mut store,
+            root_id,
+            &hook_store,
+            state,
+            Lanes::DEFAULT,
+        )
+        .unwrap();
+        assert_eq!(queued.records().len(), 1);
+        assert_eq!(queued.queued_unmount_count(), 1);
+        assert_eq!(queued.queued_mount_count(), 1);
+        assert_eq!(queued.records()[0].effect(), changed.effect());
+        assert_ne!(queued.records()[0].effect(), unchanged.effect());
+        assert_eq!(queued.records()[0].destroy(), Some(callback(11_204)));
+        assert_eq!(queued.records()[0].create(), callback(11_210));
+
+        let pending = store.root(root_id).unwrap().scheduling().pending_passive();
+        assert_eq!(pending.passive_unmounts().len(), 1);
+        assert_eq!(pending.passive_mounts().len(), 1);
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let callback_request_count = store.scheduler_bridge().callback_requests().len();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+        let mut destroy_executor = RecordingDestroyExecutor::default();
+        let mut mount_create_executor = RecordingMountCreateExecutor::default()
+            .with_returned_destroy(callback(11_210), Some(callback(11_213)));
+        let flush = flush_passive_effects_after_commit_with_callback_executors(
+            &mut store,
+            &commit,
+            std::slice::from_ref(&queued),
+            &mut destroy_executor,
+            &mut mount_create_executor,
+        )
+        .unwrap();
+
+        assert_eq!(flush.status(), PassiveEffectsFlushStatus::Flushed);
+        assert!(flush.consumed_pending_passive());
+        assert_eq!(flush.root(), root_id);
+        assert_eq!(flush.finished_work(), Some(finished_work));
+        assert_eq!(flush.lanes(), Lanes::DEFAULT);
+        assert_eq!(flush.records().len(), 2);
+        assert!(flush.did_execute_destroy_callbacks());
+        assert!(flush.did_execute_mount_create_callbacks());
+        assert!(!flush.did_record_destroy_callback_errors());
+        assert!(!flush.did_record_mount_create_callback_errors());
+        assert!(flush.destroy_callback_errors().is_empty());
+        assert!(flush.mount_create_callback_errors().is_empty());
+        assert_eq!(
+            flush.mount_create_callback_execution_gate_status(),
+            PassiveEffectMountCreateCallbackExecutionGateStatus::TestControlOnly
+        );
+        assert_eq!(
+            flush.mount_create_callback_execution_gate_blockers(),
+            &PASSIVE_EFFECT_MOUNT_CREATE_CALLBACK_EXECUTION_GATE_BLOCKERS
+        );
+        assert!(!flush.public_effect_execution_enabled());
+        assert!(!flush.public_act_compatibility_claimed());
+        assert!(!flush.scheduler_driven_passive_execution_enabled());
+
+        let unmount = flush.records()[0];
+        let mount = flush.records()[1];
+        assert_eq!(unmount.phase(), PendingPassiveEffectPhase::Unmount);
+        assert_eq!(mount.phase(), PendingPassiveEffectPhase::Mount);
+        assert_eq!(
+            unmount.pending_order(),
+            queued.records()[0].unmount_order().unwrap()
+        );
+        assert_eq!(mount.pending_order(), queued.records()[0].mount_order());
+        assert!(unmount.pending_order() < mount.pending_order());
+        assert_eq!(unmount.effect(), Some(changed.effect()));
+        assert_eq!(mount.effect(), Some(changed.effect()));
+        assert_eq!(unmount.effect_instance(), Some(previous_changed.instance()));
+        assert_eq!(mount.effect_instance(), Some(changed.instance()));
+        assert_eq!(unmount.destroy_callback(), Some(callback(11_204)));
+        assert_eq!(unmount.create_callback(), None);
+        assert_eq!(mount.create_callback(), Some(callback(11_210)));
+        assert_eq!(mount.destroy_callback(), None);
+        assert!(unmount.destroy_callback_invoked());
+        assert!(!unmount.create_callback_invoked());
+        assert!(mount.create_callback_invoked());
+        assert!(!mount.destroy_callback_invoked());
+        assert_eq!(
+            unmount.unmount_origin(),
+            Some(PendingPassiveUnmountOrigin::UpdatedFiber)
+        );
+        assert_eq!(mount.unmount_origin(), None);
+
+        let destroy_execution = flush.destroy_callback_executions()[0];
+        assert_eq!(destroy_execution.execution_order(), 0);
+        assert_eq!(destroy_execution.flush_index(), unmount.flush_index());
+        assert_eq!(destroy_execution.destroy_callback(), callback(11_204));
+        assert_eq!(destroy_executor.calls(), &[destroy_execution.request()]);
+        let create_execution = flush.mount_create_callback_executions()[0];
+        assert_eq!(create_execution.execution_order(), 0);
+        assert_eq!(create_execution.flush_index(), mount.flush_index());
+        assert_eq!(create_execution.create_callback(), callback(11_210));
+        assert_eq!(create_execution.returned_destroy(), Some(callback(11_213)));
+        assert_eq!(mount_create_executor.calls(), &[create_execution.request()]);
+        assert!(
+            destroy_executor
+                .calls()
+                .iter()
+                .all(|request| request.destroy_callback() != callback(11_207))
+        );
+        assert!(
+            mount_create_executor
+                .calls()
+                .iter()
+                .all(|request| request.create_callback() != callback(11_212))
+        );
+        assert_eq!(
+            hook_store
+                .hook_effects()
+                .get_instance(previous_unchanged.instance())
+                .unwrap()
+                .destroy(),
+            Some(callback(11_207))
+        );
+        assert!(
+            store
+                .root(root_id)
+                .unwrap()
+                .scheduling()
+                .pending_passive()
+                .is_empty()
+        );
+        assert_eq!(
+            store.scheduler_bridge().callback_requests().len(),
+            callback_request_count
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
     fn passive_effects_flush_consumes_committed_fiber_records_without_handoff_argument() {
         let (mut store, root_id, host) = root_store();
         let previous_current = store.root(root_id).unwrap().current();
