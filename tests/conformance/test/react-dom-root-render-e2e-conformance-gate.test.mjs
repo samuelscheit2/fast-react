@@ -58,6 +58,128 @@ test("root render E2E gate keeps private render native handoff metadata below pu
   payload.bridge.cleanupInitialRenderHostOutput(payload.hostOutputHandoff);
 });
 
+test("private facade root.render update mutates one fake DOM property and text path below public compatibility", () => {
+  const document = createDocument();
+  const container = document.createElement("div");
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    rootBridge.privateRootPublicFacadeAdapterSymbol
+  );
+  const adapter = descriptor.value({
+    hostOutputUpdateIdPrefix: "conformance-update-handoff",
+    publicFacadeHostOutputRenderIdPrefix: "conformance-update-render",
+    publicFacadeHostOutputUpdateIdPrefix: "conformance-update-diagnostic",
+    requestIdPrefix: "conformance-update-request",
+    rootIdPrefix: "conformance-update-root",
+    updateIdPrefix: "conformance-update"
+  });
+  const root = adapter.createRoot(container);
+  const initialElement = {
+    props: {
+      children: "initial conformance update",
+      className: "conformance-initial",
+      "data-phase": "stable",
+      id: "conformance-host"
+    },
+    type: "main"
+  };
+  const nextElement = {
+    props: {
+      children: "updated conformance update",
+      className: "conformance-updated",
+      "data-phase": "stable",
+      id: "conformance-host"
+    },
+    type: "main"
+  };
+
+  const initialDiagnostic = adapter.renderHostOutput(root, initialElement);
+  const updateDiagnostic = adapter.updateHostOutput(root, nextElement);
+  const updatePayload =
+    rootBridge.getPrivateRootPublicFacadeHostOutputUpdatePayload(
+      updateDiagnostic
+    );
+  const updateHandoffPayload =
+    rootBridge.getPrivateRootHostOutputUpdateHandoffPayload(
+      updatePayload.hostOutputUpdateHandoff
+    );
+
+  assert.equal(
+    updateDiagnostic.diagnosticStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_APPLIED
+  );
+  assert.equal(
+    updateDiagnostic.hostOutputUpdateStatus,
+    rootBridge.ROOT_BRIDGE_HOST_OUTPUT_UPDATE_APPLIED
+  );
+  assert.deepEqual(
+    updateDiagnostic.acceptedCapabilities.map((capability) => capability.id),
+    [
+      "public-facade-create-root-record",
+      "public-facade-initial-host-output-render",
+      "public-facade-root-render-update-record",
+      "host-output-update-handoff",
+      "fake-dom-property-update",
+      "property-payload-evidence",
+      "fake-dom-text-update",
+      "latest-props-after-mutation",
+      "attribute-payload-rows"
+    ]
+  );
+  assert.equal(updateDiagnostic.propertyMutation.mutationRecordCount, 2);
+  assert.equal(
+    updateDiagnostic.propertyMutation.propertyPayloadEvidence.mutatingRowCount,
+    1
+  );
+  assert.equal(
+    updateDiagnostic.propertyMutation.propertyPayloadEvidence.setAttributeCount,
+    1
+  );
+  assert.deepEqual(updateDiagnostic.textMutation, {
+    newTextLength: 26,
+    oldTextLength: 26,
+    status: "mutated"
+  });
+  assert.equal(updateDiagnostic.latestPropsPublished, true);
+  assert.equal(
+    updateDiagnostic.latestPropsPublishOrder,
+    "after-property-and-text-mutation"
+  );
+  assert.equal(updateDiagnostic.publicRootExecution, false);
+  assert.equal(updateDiagnostic.publicRootCompatibilitySurface, false);
+  assert.equal(updateDiagnostic.nativeExecution, false);
+  assert.equal(updateDiagnostic.reconcilerExecution, false);
+  assert.equal(updateDiagnostic.browserDomMutation, false);
+  assert.equal(updateDiagnostic.compatibilityClaimed, false);
+
+  assert.equal(updatePayload.updateRecord.requestType, "root.render");
+  assert.deepEqual(
+    adapter.getRootRequestRecords(root).map((record) => record.requestType),
+    ["createRoot", "root.render", "root.render"]
+  );
+  assert.equal(updateHandoffPayload.previousProps, initialElement.props);
+  assert.equal(updateHandoffPayload.nextProps, nextElement.props);
+  assert.equal(updateHandoffPayload.latestPropsPublished, true);
+  assert.equal(container.childNodes.length, 1);
+  assert.equal(container.firstChild.textContent, "updated conformance update");
+  assert.deepEqual(attributeEntries(container.firstChild), [
+    ["class", "conformance-updated"],
+    ["data-phase", "stable"],
+    ["id", "conformance-host"]
+  ]);
+  assert.throws(() => reactDomClient.createRoot(document.createElement("div")), {
+    code: "FAST_REACT_UNIMPLEMENTED"
+  });
+
+  const initialPayload =
+    rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(
+      initialDiagnostic
+    );
+  initialPayload.bridge.cleanupInitialRenderHostOutput(
+    initialPayload.hostOutputHandoff
+  );
+});
+
 function createDocument() {
   const document = createEventTarget({
     nodeName: "#document",
@@ -138,6 +260,12 @@ function createTextNode(text, ownerDocument) {
       this.nodeValue = String(value);
     }
   };
+}
+
+function attributeEntries(element) {
+  return Array.from(element.attributes.entries()).sort(([left], [right]) =>
+    left.localeCompare(right)
+  );
 }
 
 function createEventTarget(target) {

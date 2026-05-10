@@ -12702,6 +12702,8 @@ function expectedPrivateReactDomMetadataEvidence(metadataId) {
           "create-render-admission",
           "fake-dom-host-output-mutation",
           "fake-dom-unmount-cleanup",
+          "root-unmount-admission-metadata",
+          "fake-dom-container-cleanup-metadata",
           "component-tree-metadata-detach",
           "latest-props-publication"
         ],
