@@ -10572,6 +10572,23 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
     diagnostic.sideEffects.fakeStylesheetResourceCommitTransitionRecorded,
     true
   );
+  assert.equal(
+    diagnostic.sideEffects
+      .fakeStylesheetLoadStateCommitExecutionDiagnosticInvoked,
+    true
+  );
+  assert.equal(
+    diagnostic.sideEffects.stylesheetLoadStateCommitExecutionRowsRecorded,
+    true
+  );
+  assert.equal(
+    diagnostic.sideEffects.stylesheetLoadStateChangeRowsRecorded,
+    true
+  );
+  assert.equal(
+    diagnostic.sideEffects.deterministicStylesheetLoadStateChangesRecorded,
+    true
+  );
   assert.equal(diagnostic.sideEffects.scriptExecutionStarted, false);
   assert.equal(
     diagnostic.sideEffects.publicScriptModuleResourceDispatch,
@@ -10627,6 +10644,8 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
     stylesheetLoadStateResourceCount: 1,
     stylesheetLoadStateCommitTransitionCount: 1,
     stylesheetLoadStateCommitTransitionResourceCount: 1,
+    stylesheetLoadStateCommitExecutionRowCount: 1,
+    stylesheetLoadStateChangeRowCount: 3,
     unmatchedStylesheetLoadStateResourceCount: 0,
     malformedModuleRowCount: 0,
     conflictingDuplicateRecordCount: 0,
@@ -10645,6 +10664,8 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
     preloadPropsMapCreated: false,
     preloadPropsMapMutated: false,
     scriptModuleFakeDomCommitEvidenceRecorded: true,
+    stylesheetLoadStateCommitExecutionRecorded: true,
+    deterministicStylesheetLoadStateChangesRecorded: true,
     fakeDomCommitApplied: false,
     modulePreloadStarted: false,
     scriptPreinitStarted: false,
@@ -11243,10 +11264,23 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
       precedenceKey: row.precedenceKey,
       fakeLoadingStateLabels: row.fakeLoadingStateLabels,
       fakeLoadingStateBitmasks: row.fakeLoadingStateBitmasks,
+      beforeCommitLoadingStateLabel: row.beforeCommitLoadingStateLabel,
+      beforeCommitLoadingStateBitmask:
+        row.beforeCommitLoadingStateBitmask,
+      afterCommitInsertionLoadingStateLabel:
+        row.afterCommitInsertionLoadingStateLabel,
+      afterCommitInsertionLoadingStateBitmask:
+        row.afterCommitInsertionLoadingStateBitmask,
+      afterLoadLoadingStateLabel: row.afterLoadLoadingStateLabel,
+      afterLoadLoadingStateBitmask: row.afterLoadLoadingStateBitmask,
+      afterErrorLoadingStateLabel: row.afterErrorLoadingStateLabel,
+      afterErrorLoadingStateBitmask: row.afterErrorLoadingStateBitmask,
       preloadWouldBeTracked: row.preloadWouldBeTracked,
       preinitSeenBefore: row.preinitSeenBefore,
       commitOrderConsumesFakeLoadState:
         row.commitOrderConsumesFakeLoadState,
+      deterministicLoadStateChangesRecorded:
+        row.deterministicLoadStateChangesRecorded,
       publicStylesheetLoadStateDispatch:
         row.publicStylesheetLoadStateDispatch
     })),
@@ -11266,9 +11300,18 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
           'inserted-errored'
         ],
         fakeLoadingStateBitmasks: [0, 1, 2, 4, 5, 6],
+        beforeCommitLoadingStateLabel: 'not-loaded',
+        beforeCommitLoadingStateBitmask: 0,
+        afterCommitInsertionLoadingStateLabel: 'inserted-not-settled',
+        afterCommitInsertionLoadingStateBitmask: 4,
+        afterLoadLoadingStateLabel: 'inserted-loaded',
+        afterLoadLoadingStateBitmask: 5,
+        afterErrorLoadingStateLabel: 'inserted-errored',
+        afterErrorLoadingStateBitmask: 6,
         preloadWouldBeTracked: true,
         preinitSeenBefore: true,
         commitOrderConsumesFakeLoadState: true,
+        deterministicLoadStateChangesRecorded: true,
         publicStylesheetLoadStateDispatch: false
       }
     ]
@@ -11290,12 +11333,24 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
       commitTransitionResourceCount:
         diagnostic.stylesheetLoadStateCommitOrder
           .commitTransitionResourceCount,
+      commitTransitionExecutionRowCount:
+        diagnostic.stylesheetLoadStateCommitOrder
+          .commitTransitionExecutionRowCount,
+      loadingStateChangeRowCount:
+        diagnostic.stylesheetLoadStateCommitOrder
+          .loadingStateChangeRowCount,
       commitTransitionRecorded:
         diagnostic.stylesheetLoadStateCommitOrder
           .commitTransitionRecorded,
       fakeResourceCommitTransitionRecorded:
         diagnostic.stylesheetLoadStateCommitOrder
           .fakeResourceCommitTransitionRecorded,
+      commitTransitionExecutionRecorded:
+        diagnostic.stylesheetLoadStateCommitOrder
+          .commitTransitionExecutionRecorded,
+      deterministicLoadStateChangesRecorded:
+        diagnostic.stylesheetLoadStateCommitOrder
+          .deterministicLoadStateChangesRecorded,
       publicStylesheetLoadStateDispatch:
         diagnostic.stylesheetLoadStateCommitOrder
           .publicStylesheetLoadStateDispatch
@@ -11307,8 +11362,12 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
       staleResourceMapEntryCount: 0,
       commitTransitionCount: 1,
       commitTransitionResourceCount: 1,
+      commitTransitionExecutionRowCount: 1,
+      loadingStateChangeRowCount: 3,
       commitTransitionRecorded: true,
       fakeResourceCommitTransitionRecorded: true,
+      commitTransitionExecutionRecorded: true,
+      deterministicLoadStateChangesRecorded: true,
       publicStylesheetLoadStateDispatch: false
     }
   );
@@ -11426,6 +11485,213 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
       publicStylesheetLoadStateDispatch: false
     }
   );
+  assert.deepEqual(
+    {
+      executionKind:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransitionExecution
+          .executionKind,
+      executionStatus:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransitionExecution
+          .executionStatus,
+      sourceTransitionId:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransitionExecution
+          .sourceTransitionId,
+      rowCount:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransitionExecution
+          .rowCount,
+      loadingStateChangeCount:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransitionExecution
+          .loadingStateChangeCount,
+      fakeResourceKeys:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransitionExecution
+          .fakeResourceKeys,
+      deterministicLoadStateChangesRecorded:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransitionExecution
+          .deterministicLoadStateChangesRecorded,
+      fakeResourceCommitTransitionExecuted:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransitionExecution
+          .fakeResourceCommitTransitionExecuted,
+      stylesheetElementInserted:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransitionExecution
+          .stylesheetElementInserted,
+      loadEventSubscribed:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransitionExecution
+          .loadEventSubscribed,
+      loadEventDispatched:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransitionExecution
+          .loadEventDispatched,
+      loadingStateMutated:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransitionExecution
+          .loadingStateMutated,
+      publicStylesheetLoadStateDispatch:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransitionExecution
+          .publicStylesheetLoadStateDispatch
+    },
+    {
+      executionKind:
+        'react-19.2.6-stylesheet-load-state-fake-dom-commit-execution-diagnostic',
+      executionStatus:
+        resourceFormGate
+          .privateResourceHintStylesheetLoadStateCommitExecutionStatus,
+      sourceTransitionId:
+        'resource-map-commit-load-state:1:resource-map-commit-transition',
+      rowCount: 1,
+      loadingStateChangeCount: 3,
+      fakeResourceKeys: ['style:style-main'],
+      deterministicLoadStateChangesRecorded: true,
+      fakeResourceCommitTransitionExecuted: true,
+      stylesheetElementInserted: false,
+      loadEventSubscribed: false,
+      loadEventDispatched: false,
+      loadingStateMutated: false,
+      publicStylesheetLoadStateDispatch: false
+    }
+  );
+  assert.deepEqual(
+    diagnostic.stylesheetLoadStateCommitOrder.commitTransitionExecution
+      .rows.map((row) => ({
+        sourceStylesheetLoadStateCommitOrderRowId:
+          row.sourceStylesheetLoadStateCommitOrderRowId,
+        sourceResourceMapCommitRowId: row.sourceResourceMapCommitRowId,
+        resourceKey: row.resourceKey,
+        beforeCommitLoadingState: row.beforeCommitLoadingState,
+        afterCommitInsertionLoadingState:
+          row.afterCommitInsertionLoadingState,
+        afterLoadLoadingState: row.afterLoadLoadingState,
+        afterErrorLoadingState: row.afterErrorLoadingState,
+        loadingStateChangeCount: row.loadingStateChangeCount,
+        deterministicLoadStateChangesRecorded:
+          row.deterministicLoadStateChangesRecorded,
+        loadingStateMutated: row.loadingStateMutated,
+        publicStylesheetLoadStateDispatch:
+          row.publicStylesheetLoadStateDispatch
+      })),
+    [
+      {
+        sourceStylesheetLoadStateCommitOrderRowId:
+          'stylesheet-load-state-commit-order-0',
+        sourceResourceMapCommitRowId: 'resource-map-commit-1',
+        resourceKey: 'style:style-main',
+        beforeCommitLoadingState: {
+          label: 'not-loaded',
+          bitmask: 0,
+          notLoaded: true,
+          loaded: false,
+          errored: false,
+          settled: false,
+          inserted: false,
+          loadListenerInstalled: false,
+          errorListenerInstalled: false,
+          promiseCreated: false,
+          eventDispatched: false,
+          compatibilityClaimed: false
+        },
+        afterCommitInsertionLoadingState: {
+          label: 'inserted-not-settled',
+          bitmask: 4,
+          notLoaded: false,
+          loaded: false,
+          errored: false,
+          settled: false,
+          inserted: true,
+          loadListenerInstalled: false,
+          errorListenerInstalled: false,
+          promiseCreated: false,
+          eventDispatched: false,
+          compatibilityClaimed: false
+        },
+        afterLoadLoadingState: {
+          label: 'inserted-loaded',
+          bitmask: 5,
+          notLoaded: false,
+          loaded: true,
+          errored: false,
+          settled: true,
+          inserted: true,
+          loadListenerInstalled: false,
+          errorListenerInstalled: false,
+          promiseCreated: false,
+          eventDispatched: false,
+          compatibilityClaimed: false
+        },
+        afterErrorLoadingState: {
+          label: 'inserted-errored',
+          bitmask: 6,
+          notLoaded: false,
+          loaded: false,
+          errored: true,
+          settled: true,
+          inserted: true,
+          loadListenerInstalled: false,
+          errorListenerInstalled: false,
+          promiseCreated: false,
+          eventDispatched: false,
+          compatibilityClaimed: false
+        },
+        loadingStateChangeCount: 3,
+        deterministicLoadStateChangesRecorded: true,
+        loadingStateMutated: false,
+        publicStylesheetLoadStateDispatch: false
+      }
+    ]
+  );
+  assert.deepEqual(
+    diagnostic.stylesheetLoadStateCommitOrder.commitTransitionExecution
+      .loadingStateChanges.map((row) => ({
+        triggerKind: row.triggerKind,
+        fromLoadingStateLabel: row.fromLoadingStateLabel,
+        fromLoadingStateBitmask: row.fromLoadingStateBitmask,
+        toLoadingStateLabel: row.toLoadingStateLabel,
+        toLoadingStateBitmask: row.toLoadingStateBitmask,
+        insertedBitSet: row.insertedBitSet,
+        loadedBitSet: row.loadedBitSet,
+        erroredBitSet: row.erroredBitSet,
+        loadEventDispatched: row.loadEventDispatched,
+        errorEventDispatched: row.errorEventDispatched,
+        loadingStateMutated: row.loadingStateMutated
+      })),
+    [
+      {
+        triggerKind: 'commit-insertion',
+        fromLoadingStateLabel: 'not-loaded',
+        fromLoadingStateBitmask: 0,
+        toLoadingStateLabel: 'inserted-not-settled',
+        toLoadingStateBitmask: 4,
+        insertedBitSet: true,
+        loadedBitSet: false,
+        erroredBitSet: false,
+        loadEventDispatched: false,
+        errorEventDispatched: false,
+        loadingStateMutated: false
+      },
+      {
+        triggerKind: 'load-event',
+        fromLoadingStateLabel: 'inserted-not-settled',
+        fromLoadingStateBitmask: 4,
+        toLoadingStateLabel: 'inserted-loaded',
+        toLoadingStateBitmask: 5,
+        insertedBitSet: false,
+        loadedBitSet: true,
+        erroredBitSet: false,
+        loadEventDispatched: false,
+        errorEventDispatched: false,
+        loadingStateMutated: false
+      },
+      {
+        triggerKind: 'error-event',
+        fromLoadingStateLabel: 'inserted-not-settled',
+        fromLoadingStateBitmask: 4,
+        toLoadingStateLabel: 'inserted-errored',
+        toLoadingStateBitmask: 6,
+        insertedBitSet: false,
+        loadedBitSet: false,
+        erroredBitSet: true,
+        loadEventDispatched: false,
+        errorEventDispatched: false,
+        loadingStateMutated: false
+      }
+    ]
+  );
   assert.equal(
     diagnostic.stylesheetPrecedenceBoundary.status,
     resourceFormGate.privateResourceHintHeadStylesheetPrecedenceBlockedStatus
@@ -11475,6 +11741,15 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
     1
   );
   assert.equal(
+    diagnostic.resourceLifecycleBoundary
+      .stylesheetLoadStateCommitExecutionRowCount,
+    1
+  );
+  assert.equal(
+    diagnostic.resourceLifecycleBoundary.stylesheetLoadStateChangeRowCount,
+    3
+  );
+  assert.equal(
     diagnostic.resourceLifecycleBoundary.stylesheetLoadStateRecordConsumed,
     true
   );
@@ -11486,6 +11761,16 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
   assert.equal(
     diagnostic.resourceLifecycleBoundary
       .stylesheetLoadStateCommitTransitionRecorded,
+    true
+  );
+  assert.equal(
+    diagnostic.resourceLifecycleBoundary
+      .stylesheetLoadStateCommitExecutionRecorded,
+    true
+  );
+  assert.equal(
+    diagnostic.resourceLifecycleBoundary
+      .deterministicStylesheetLoadStateChangesRecorded,
     true
   );
   assert.equal(diagnostic.resourceLifecycleBoundary.fetchStarted, false);
@@ -11566,6 +11851,15 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
   );
   assert.equal(summary.recordsStylesheetLoadStateCommitTransition, true);
   assert.equal(summary.recordsOneFakeResourceMapCommitTransition, true);
+  assert.equal(
+    summary.recordsStylesheetLoadStateCommitExecutionRows,
+    true
+  );
+  assert.equal(summary.recordsStylesheetLoadStateChangeRows, true);
+  assert.equal(
+    summary.recordsDeterministicStylesheetLoadStateChanges,
+    true
+  );
   assert.equal(summary.rejectsMalformedModuleRows, true);
   assert.equal(summary.rejectsConflictingDuplicateRecords, true);
   assert.equal(summary.rejectsDuplicateStylesheetPrecedenceRows, true);
@@ -13157,6 +13451,10 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
       stylesheetLoadStateResourceMapRowsValidated: false,
       stylesheetLoadStateCommitTransitionRecorded: false,
       fakeStylesheetResourceCommitTransitionRecorded: false,
+      fakeStylesheetLoadStateCommitExecutionDiagnosticInvoked: false,
+      stylesheetLoadStateCommitExecutionRowsRecorded: false,
+      stylesheetLoadStateChangeRowsRecorded: false,
+      deterministicStylesheetLoadStateChangesRecorded: false,
       duplicateStylesheetPrecedenceRowsRejected: false,
       staleStylesheetResourceMapEntriesRejected: false,
       realResourceMapsCreated: false,
@@ -13609,6 +13907,25 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
       false
     );
     assert.equal(
+      blockedRecord.sideEffects
+        .fakeStylesheetLoadStateCommitExecutionDiagnosticInvoked,
+      false
+    );
+    assert.equal(
+      blockedRecord.sideEffects
+        .stylesheetLoadStateCommitExecutionRowsRecorded,
+      false
+    );
+    assert.equal(
+      blockedRecord.sideEffects.stylesheetLoadStateChangeRowsRecorded,
+      false
+    );
+    assert.equal(
+      blockedRecord.sideEffects
+        .deterministicStylesheetLoadStateChangesRecorded,
+      false
+    );
+    assert.equal(
       blockedRecord.sideEffects.fakeStylesheetLoadErrorStateDiagnosticInvoked,
       false
     );
@@ -13790,6 +14107,23 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
       );
       assert.equal(
         adapterBoundary.fakeStylesheetResourceCommitTransitionRecorded,
+        false
+      );
+      assert.equal(
+        adapterBoundary
+          .fakeStylesheetLoadStateCommitExecutionDiagnosticInvoked,
+        false
+      );
+      assert.equal(
+        adapterBoundary.stylesheetLoadStateCommitExecutionRowsRecorded,
+        false
+      );
+      assert.equal(
+        adapterBoundary.stylesheetLoadStateChangeRowsRecorded,
+        false
+      );
+      assert.equal(
+        adapterBoundary.deterministicStylesheetLoadStateChangesRecorded,
         false
       );
       assert.equal(adapterBoundary.realResourceMapsMutated, false);

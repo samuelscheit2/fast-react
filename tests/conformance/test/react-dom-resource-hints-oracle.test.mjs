@@ -1296,6 +1296,15 @@ test("private resource-map commit diagnostics stay record-only", () => {
     1
   );
   assert.equal(
+    diagnostic.resourceMapCommitPlan
+      .stylesheetLoadStateCommitExecutionRowCount,
+    1
+  );
+  assert.equal(
+    diagnostic.resourceMapCommitPlan.stylesheetLoadStateChangeRowCount,
+    3
+  );
+  assert.equal(
     diagnostic.resourceMapCommitPlan.staleResourceMapEntryCount,
     0
   );
@@ -1513,8 +1522,16 @@ test("private resource-map commit diagnostics stay record-only", () => {
       resourceKey: row.resourceKey,
       resourceMapDedupeKey: row.resourceMapDedupeKey,
       fakeLoadingStateBitmasks: row.fakeLoadingStateBitmasks,
+      beforeCommitLoadingStateBitmask:
+        row.beforeCommitLoadingStateBitmask,
+      afterCommitInsertionLoadingStateBitmask:
+        row.afterCommitInsertionLoadingStateBitmask,
+      afterLoadLoadingStateBitmask: row.afterLoadLoadingStateBitmask,
+      afterErrorLoadingStateBitmask: row.afterErrorLoadingStateBitmask,
       commitOrderConsumesFakeLoadState:
         row.commitOrderConsumesFakeLoadState,
+      deterministicLoadStateChangesRecorded:
+        row.deterministicLoadStateChangesRecorded,
       publicStylesheetLoadStateDispatch:
         row.publicStylesheetLoadStateDispatch
     })),
@@ -1523,7 +1540,12 @@ test("private resource-map commit diagnostics stay record-only", () => {
         resourceKey: "style:style-main",
         resourceMapDedupeKey: "hoistable-styles:style:style-main",
         fakeLoadingStateBitmasks: [0, 1, 2, 4, 5, 6],
+        beforeCommitLoadingStateBitmask: 0,
+        afterCommitInsertionLoadingStateBitmask: 4,
+        afterLoadLoadingStateBitmask: 5,
+        afterErrorLoadingStateBitmask: 6,
         commitOrderConsumesFakeLoadState: true,
+        deterministicLoadStateChangesRecorded: true,
         publicStylesheetLoadStateDispatch: false
       }
     ]
@@ -1578,6 +1600,83 @@ test("private resource-map commit diagnostics stay record-only", () => {
       publicStylesheetLoadStateDispatch: false
     }
   );
+  assert.deepEqual(
+    {
+      executionStatus:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransitionExecution
+          .executionStatus,
+      rowCount:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransitionExecution
+          .rowCount,
+      loadingStateChangeCount:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransitionExecution
+          .loadingStateChangeCount,
+      fakeResourceKeys:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransitionExecution
+          .fakeResourceKeys,
+      deterministicLoadStateChangesRecorded:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransitionExecution
+          .deterministicLoadStateChangesRecorded,
+      loadEventDispatched:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransitionExecution
+          .loadEventDispatched,
+      loadingStateMutated:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransitionExecution
+          .loadingStateMutated,
+      publicStylesheetLoadStateDispatch:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransitionExecution
+          .publicStylesheetLoadStateDispatch
+    },
+    {
+      executionStatus:
+        resourceFormGate
+          .privateResourceHintStylesheetLoadStateCommitExecutionStatus,
+      rowCount: 1,
+      loadingStateChangeCount: 3,
+      fakeResourceKeys: ["style:style-main"],
+      deterministicLoadStateChangesRecorded: true,
+      loadEventDispatched: false,
+      loadingStateMutated: false,
+      publicStylesheetLoadStateDispatch: false
+    }
+  );
+  assert.deepEqual(
+    diagnostic.stylesheetLoadStateCommitOrder.commitTransitionExecution
+      .loadingStateChanges.map((row) => ({
+        triggerKind: row.triggerKind,
+        fromLoadingStateBitmask: row.fromLoadingStateBitmask,
+        toLoadingStateBitmask: row.toLoadingStateBitmask,
+        insertedBitSet: row.insertedBitSet,
+        loadedBitSet: row.loadedBitSet,
+        erroredBitSet: row.erroredBitSet
+      })),
+    [
+      {
+        triggerKind: "commit-insertion",
+        fromLoadingStateBitmask: 0,
+        toLoadingStateBitmask: 4,
+        insertedBitSet: true,
+        loadedBitSet: false,
+        erroredBitSet: false
+      },
+      {
+        triggerKind: "load-event",
+        fromLoadingStateBitmask: 4,
+        toLoadingStateBitmask: 5,
+        insertedBitSet: false,
+        loadedBitSet: true,
+        erroredBitSet: false
+      },
+      {
+        triggerKind: "error-event",
+        fromLoadingStateBitmask: 4,
+        toLoadingStateBitmask: 6,
+        insertedBitSet: false,
+        loadedBitSet: false,
+        erroredBitSet: true
+      }
+    ]
+  );
   assert.equal(diagnostic.resourceMapCommitPlan.realResourceMapsMutated, false);
   assert.equal(diagnostic.resourceMapCommitPlan.fakeResourceMapsMutated, false);
   assert.equal(
@@ -1617,6 +1716,23 @@ test("private resource-map commit diagnostics stay record-only", () => {
     diagnostic.sideEffects.fakeStylesheetResourceCommitTransitionRecorded,
     true
   );
+  assert.equal(
+    diagnostic.sideEffects
+      .fakeStylesheetLoadStateCommitExecutionDiagnosticInvoked,
+    true
+  );
+  assert.equal(
+    diagnostic.sideEffects.stylesheetLoadStateCommitExecutionRowsRecorded,
+    true
+  );
+  assert.equal(
+    diagnostic.sideEffects.stylesheetLoadStateChangeRowsRecorded,
+    true
+  );
+  assert.equal(
+    diagnostic.sideEffects.deterministicStylesheetLoadStateChangesRecorded,
+    true
+  );
   assert.equal(diagnostic.sideEffects.scriptExecutionStarted, false);
   assert.equal(diagnostic.sideEffects.publicScriptModuleResourceDispatch, false);
   assert.equal(diagnostic.sideEffects.resourceLoadStateMutated, false);
@@ -1648,6 +1764,16 @@ test("private resource-map commit diagnostics stay record-only", () => {
   assert.equal(
     diagnostic.resourceLifecycleBoundary
       .stylesheetLoadStateCommitTransitionRecorded,
+    true
+  );
+  assert.equal(
+    diagnostic.resourceLifecycleBoundary
+      .stylesheetLoadStateCommitExecutionRecorded,
+    true
+  );
+  assert.equal(
+    diagnostic.resourceLifecycleBoundary
+      .deterministicStylesheetLoadStateChangesRecorded,
     true
   );
   assert.equal(
