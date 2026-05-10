@@ -418,6 +418,82 @@ test("React DOM public root facade gate blocks placeholders while oracle prerequ
   }
 });
 
+test("React DOM private act/passive diagnostics are recognized as private rows", () => {
+  const rootRenderGate = evaluateReactDomRootRenderE2EConformanceGate({
+    checkedOracle: rootRenderOracle,
+    currentOracle: rootRenderOracle
+  });
+  const expectedRowCount =
+    REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.length *
+    REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES.length;
+
+  assert.equal(rootRenderGate.ok, true);
+  assert.equal(
+    rootRenderGate.summary.privateActPassiveDiagnosticScenarioModeRowCount,
+    expectedRowCount
+  );
+  assert.equal(
+    rootRenderGate.privateActPassiveDiagnosticScenarioModeRows.length,
+    expectedRowCount
+  );
+  assert.equal(rootRenderGate.privateActPassiveBlockedScenarioModeRows.length, 0);
+  assert.equal(
+    rootRenderGate.summary.privateActPassiveCompatibilityClaimed,
+    false
+  );
+
+  const representativeRow =
+    rootRenderGate.privateActPassiveDiagnosticScenarioModeRows.find(
+      (row) =>
+        row.modeId === "default-node-development" &&
+        row.scenarioId === "initial-host-render"
+    );
+
+  assert.ok(representativeRow);
+  assert.equal(
+    representativeRow.gateStatus,
+    REACT_DOM_ROOT_RENDER_E2E_PRIVATE_ACT_PASSIVE_ACCEPTED_STATUS
+  );
+  assert.equal(representativeRow.compatibilityClaimed, false);
+  assert.equal(representativeRow.publicReactActCompatibilityClaimed, false);
+  assert.equal(
+    representativeRow.publicReactDomTestUtilsActCompatibilityClaimed,
+    false
+  );
+  assert.equal(representativeRow.publicRootRenderCompatibilityClaimed, false);
+  assert.equal(representativeRow.publicPassiveEffectCompatibilityClaimed, false);
+  assert.deepEqual(
+    representativeRow.actEvidence.reactDomTestUtilsActGate.sideEffectPolicy,
+    {
+      invokesActCallback: false,
+      executesQueuedWork: false,
+      executesPassiveEffects: false,
+      executesRendererWork: false,
+      executesRendererRoots: false,
+      executesPublicRendererRoots: false,
+      executesPublicDomMutation: false,
+      executesSyncFlush: false,
+      executesPublicFlushSync: false,
+      emitsDeprecationWarning: false,
+      delegatesToReactAct: false
+    }
+  );
+  assert.equal(
+    representativeRow.passiveEvidence.passiveEffectCallbackHandles
+      .schedulerDrivenPassiveExecutionEnabled,
+    false
+  );
+  assert.equal(
+    representativeRow.passiveEvidence.passiveEffectCallbackHandles
+      .publicEffectExecutionEnabled,
+    false
+  );
+  assert.equal(
+    representativeRow.passiveEvidence.passiveEffects.executesPassiveEffects,
+    false
+  );
+});
+
 test("React DOM public root facade scenario admission is explicit and non-compatible", () => {
   assert.deepEqual(
     REACT_DOM_ROOT_PUBLIC_FACADE_SCENARIO_ADMISSIONS.map(

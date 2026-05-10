@@ -14266,10 +14266,12 @@ function expectedPrivateActEvidence() {
         invokesActCallback: false,
         executesQueuedWork: false,
         executesPassiveEffects: false,
+        executesRendererWork: false,
         executesRendererRoots: false,
         executesPublicRendererRoots: false,
         executesPublicDomMutation: false,
         executesSyncFlush: false,
+        executesPublicFlushSync: false,
         emitsDeprecationWarning: false,
         delegatesToReactAct: false
       }
