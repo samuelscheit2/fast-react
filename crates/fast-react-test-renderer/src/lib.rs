@@ -1075,6 +1075,236 @@ impl TestRendererHostNodeCleanupReport {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererUnmountHostChildDetachmentBlockers {
+    detached_instance: bool,
+    detached_instance_child_count: usize,
+    host_node_cleanup_invalidated_count: usize,
+    host_node_cleanup_already_inactive_count: usize,
+    host_node_cleanup_missing_host_node_count: usize,
+    host_node_cleanup_missing_state_node_count: usize,
+    broad_host_child_detachment_blocked: bool,
+    public_host_teardown_compatibility_claimed: bool,
+    public_unmount_compatibility_claimed: bool,
+    act_flushing_claimed: bool,
+}
+
+impl TestRendererUnmountHostChildDetachmentBlockers {
+    #[must_use]
+    pub const fn detached_instance(self) -> bool {
+        self.detached_instance
+    }
+
+    #[must_use]
+    pub const fn detached_instance_child_count(self) -> usize {
+        self.detached_instance_child_count
+    }
+
+    #[must_use]
+    pub const fn host_node_cleanup_invalidated_count(self) -> usize {
+        self.host_node_cleanup_invalidated_count
+    }
+
+    #[must_use]
+    pub const fn host_node_cleanup_already_inactive_count(self) -> usize {
+        self.host_node_cleanup_already_inactive_count
+    }
+
+    #[must_use]
+    pub const fn host_node_cleanup_missing_host_node_count(self) -> usize {
+        self.host_node_cleanup_missing_host_node_count
+    }
+
+    #[must_use]
+    pub const fn host_node_cleanup_missing_state_node_count(self) -> usize {
+        self.host_node_cleanup_missing_state_node_count
+    }
+
+    #[must_use]
+    pub const fn broad_host_child_detachment_blocked(self) -> bool {
+        self.broad_host_child_detachment_blocked
+    }
+
+    #[must_use]
+    pub const fn public_host_teardown_compatibility_claimed(self) -> bool {
+        self.public_host_teardown_compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn public_unmount_compatibility_claimed(self) -> bool {
+        self.public_unmount_compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn act_flushing_claimed(self) -> bool {
+        self.act_flushing_claimed
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererUnmountDeletionCommitHandoffDiagnostics {
+    diagnostic_id: &'static str,
+    status: &'static str,
+    root: FiberRootId,
+    lifecycle: TestRendererRootLifecycle,
+    scheduled_update_kind: TestRendererRootUpdateKind,
+    scheduled_element: RootElementHandle,
+    scheduled_element_is_none: bool,
+    render_current: TestRendererFiberHandleDiagnostics,
+    commit_previous_current: TestRendererFiberHandleDiagnostics,
+    commit_current: TestRendererFiberHandleDiagnostics,
+    render_finished_work: TestRendererFiberHandleDiagnostics,
+    deleted_root: TestRendererFiberHandleDiagnostics,
+    deleted_component: TestRendererFiberHandleDiagnostics,
+    deleted_text: TestRendererFiberHandleDiagnostics,
+    commit_current_is_store_current: bool,
+    render_current_matches_commit_previous_current: bool,
+    render_finished_work_matches_commit_current: bool,
+    deletion_list_count: usize,
+    deleted_root_count: usize,
+    host_node_cleanup_count: usize,
+    cleanup_records_match_deletion_commit: bool,
+    cleanup_order_record_count: usize,
+    public_unmount_compatibility_claimed: bool,
+    public_host_teardown_compatibility_claimed: bool,
+    act_flushing_claimed: bool,
+    host_child_detachment_blockers: TestRendererUnmountHostChildDetachmentBlockers,
+}
+
+impl TestRendererUnmountDeletionCommitHandoffDiagnostics {
+    #[must_use]
+    pub const fn diagnostic_id(self) -> &'static str {
+        self.diagnostic_id
+    }
+
+    #[must_use]
+    pub const fn status(self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn lifecycle(self) -> TestRendererRootLifecycle {
+        self.lifecycle
+    }
+
+    #[must_use]
+    pub const fn scheduled_update_kind(self) -> TestRendererRootUpdateKind {
+        self.scheduled_update_kind
+    }
+
+    #[must_use]
+    pub const fn scheduled_element(self) -> RootElementHandle {
+        self.scheduled_element
+    }
+
+    #[must_use]
+    pub const fn scheduled_element_is_none(self) -> bool {
+        self.scheduled_element_is_none
+    }
+
+    #[must_use]
+    pub const fn render_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.render_current
+    }
+
+    #[must_use]
+    pub const fn commit_previous_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.commit_previous_current
+    }
+
+    #[must_use]
+    pub const fn commit_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.commit_current
+    }
+
+    #[must_use]
+    pub const fn render_finished_work(self) -> TestRendererFiberHandleDiagnostics {
+        self.render_finished_work
+    }
+
+    #[must_use]
+    pub const fn deleted_root(self) -> TestRendererFiberHandleDiagnostics {
+        self.deleted_root
+    }
+
+    #[must_use]
+    pub const fn deleted_component(self) -> TestRendererFiberHandleDiagnostics {
+        self.deleted_component
+    }
+
+    #[must_use]
+    pub const fn deleted_text(self) -> TestRendererFiberHandleDiagnostics {
+        self.deleted_text
+    }
+
+    #[must_use]
+    pub const fn commit_current_is_store_current(self) -> bool {
+        self.commit_current_is_store_current
+    }
+
+    #[must_use]
+    pub const fn render_current_matches_commit_previous_current(self) -> bool {
+        self.render_current_matches_commit_previous_current
+    }
+
+    #[must_use]
+    pub const fn render_finished_work_matches_commit_current(self) -> bool {
+        self.render_finished_work_matches_commit_current
+    }
+
+    #[must_use]
+    pub const fn deletion_list_count(self) -> usize {
+        self.deletion_list_count
+    }
+
+    #[must_use]
+    pub const fn deleted_root_count(self) -> usize {
+        self.deleted_root_count
+    }
+
+    #[must_use]
+    pub const fn host_node_cleanup_count(self) -> usize {
+        self.host_node_cleanup_count
+    }
+
+    #[must_use]
+    pub const fn cleanup_records_match_deletion_commit(self) -> bool {
+        self.cleanup_records_match_deletion_commit
+    }
+
+    #[must_use]
+    pub const fn cleanup_order_record_count(self) -> usize {
+        self.cleanup_order_record_count
+    }
+
+    #[must_use]
+    pub const fn public_unmount_compatibility_claimed(self) -> bool {
+        self.public_unmount_compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn public_host_teardown_compatibility_claimed(self) -> bool {
+        self.public_host_teardown_compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn act_flushing_claimed(self) -> bool {
+        self.act_flushing_claimed
+    }
+
+    #[must_use]
+    pub const fn host_child_detachment_blockers(
+        self,
+    ) -> TestRendererUnmountHostChildDetachmentBlockers {
+        self.host_child_detachment_blockers
+    }
+}
+
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 struct TestRendererHostNodeStore {
     records: Vec<TestRendererHostNodeStoreRecord>,
@@ -1776,6 +2006,10 @@ pub const TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_ROUTE_DEPENDENCY_ID: &str =
     "react-test-renderer-unmount-route-private-diagnostic";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_SERIALIZATION_DEPENDENCY_ID: &str =
     "react-test-renderer-serialization-private-json-diagnostic";
+pub const TEST_RENDERER_PRIVATE_UNMOUNT_DELETION_COMMIT_HANDOFF_DIAGNOSTIC_ID: &str =
+    "react-test-renderer-unmount-deletion-commit-handoff-private-diagnostic";
+pub const TEST_RENDERER_PRIVATE_UNMOUNT_DELETION_COMMIT_HANDOFF_STATUS: &str =
+    "private-unmount-deletion-commit-handoff-public-unmount-blocked";
 pub const TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.serialization.private-tree-canary";
 pub const TEST_RENDERER_PRIVATE_TREE_COMMITTED_FIBER_INSPECTION_DIAGNOSTIC_NAME: &str =
@@ -6143,6 +6377,146 @@ impl TestRendererRoot {
             output.previous_snapshot(),
             output.snapshot(),
         )
+    }
+
+    pub fn describe_private_unmount_deletion_commit_handoff_for_canary(
+        &self,
+        output: &TestRendererUnmountedHostOutput,
+    ) -> Result<TestRendererUnmountDeletionCommitHandoffDiagnostics, TestRendererRootError> {
+        self.validate_serialization_gate_commit(output.commit())?;
+
+        let Some(last_update) = self.scheduled_updates.last() else {
+            return Err(TestRendererRootError::UnexpectedHostOutputUpdateKind {
+                expected: TestRendererRootUpdateKind::Unmount,
+                actual: TestRendererRootUpdateKind::Create,
+            });
+        };
+        if last_update.kind() != TestRendererRootUpdateKind::Unmount {
+            return Err(TestRendererRootError::UnexpectedHostOutputUpdateKind {
+                expected: TestRendererRootUpdateKind::Unmount,
+                actual: last_update.kind(),
+            });
+        }
+
+        let current_snapshot = self.diagnostic_container_snapshot()?;
+        if current_snapshot != *output.snapshot() {
+            return Err(TestRendererPrivateJsonSerializationError::HostOutputSnapshotStale.into());
+        }
+
+        macro_rules! fiber_handle {
+            ($fiber:expr) => {{
+                let fiber = $fiber;
+                TestRendererFiberHandleDiagnostics {
+                    arena_id: fiber.arena_id().get(),
+                    slot: fiber.slot().get(),
+                    generation: fiber.generation().get(),
+                }
+            }};
+        }
+
+        let commit = output.commit();
+        let render = output.render();
+        let deleted = output.deleted_fibers();
+        let commit_current = commit.current();
+        let commit_previous_current = commit.previous_current();
+        let render_finished_work = render.finished_work();
+        let store_current = self.store.root(self.root_id)?.current();
+        let cleanup_log = commit.host_node_deletion_cleanup_log();
+        let cleanup_report = output.host_node_cleanup();
+        let cleanup_records_match_deletion_commit = cleanup_report.root() == commit.root()
+            && cleanup_report.len() == cleanup_log.len()
+            && cleanup_report
+                .records()
+                .iter()
+                .zip(cleanup_log.records())
+                .all(|(report_record, commit_record)| {
+                    report_record.sequence() == commit_record.sequence()
+                        && report_record.root() == commit_record.root()
+                        && report_record.deletion_list_index()
+                            == commit_record.deletion_list_index()
+                        && report_record.deleted_index() == commit_record.deleted_index()
+                        && report_record.subtree_index() == commit_record.subtree_index()
+                        && report_record.parent() == fiber_handle!(commit_record.parent())
+                        && report_record.deleted_root()
+                            == fiber_handle!(commit_record.deleted_root())
+                        && report_record.fiber() == fiber_handle!(commit_record.fiber())
+                        && report_record.state_node_raw() == commit_record.state_node().raw()
+                        && report_record.token_raw() == commit_record.token().raw()
+                        && report_record.token_phase() == commit_record.token_phase()
+                });
+        let deletion_list_count = output.commit_diagnostics().deletion_lists().len();
+        let deleted_root_count = output
+            .commit_diagnostics()
+            .deletion_lists()
+            .iter()
+            .map(|record| record.deleted().len())
+            .sum();
+        let host_child_detachment_blockers = TestRendererUnmountHostChildDetachmentBlockers {
+            detached_instance: output.detached_instance_snapshot().is_detached(),
+            detached_instance_child_count: output.detached_instance_snapshot().children().len(),
+            host_node_cleanup_invalidated_count: cleanup_report
+                .records()
+                .iter()
+                .filter(|record| record.status() == TestRendererHostNodeCleanupStatus::Invalidated)
+                .count(),
+            host_node_cleanup_already_inactive_count: cleanup_report
+                .records()
+                .iter()
+                .filter(|record| {
+                    record.status() == TestRendererHostNodeCleanupStatus::AlreadyInactive
+                })
+                .count(),
+            host_node_cleanup_missing_host_node_count: cleanup_report
+                .records()
+                .iter()
+                .filter(|record| {
+                    record.status() == TestRendererHostNodeCleanupStatus::MissingHostNode
+                })
+                .count(),
+            host_node_cleanup_missing_state_node_count: cleanup_report
+                .records()
+                .iter()
+                .filter(|record| {
+                    record.status() == TestRendererHostNodeCleanupStatus::MissingStateNode
+                })
+                .count(),
+            broad_host_child_detachment_blocked: true,
+            public_host_teardown_compatibility_claimed: false,
+            public_unmount_compatibility_claimed: cleanup_report
+                .public_unmount_compatibility_claimed(),
+            act_flushing_claimed: false,
+        };
+
+        Ok(TestRendererUnmountDeletionCommitHandoffDiagnostics {
+            diagnostic_id: TEST_RENDERER_PRIVATE_UNMOUNT_DELETION_COMMIT_HANDOFF_DIAGNOSTIC_ID,
+            status: TEST_RENDERER_PRIVATE_UNMOUNT_DELETION_COMMIT_HANDOFF_STATUS,
+            root: commit.root(),
+            lifecycle: self.lifecycle,
+            scheduled_update_kind: last_update.kind(),
+            scheduled_element: last_update.element(),
+            scheduled_element_is_none: last_update.element() == RootElementHandle::NONE,
+            render_current: fiber_handle!(render.current()),
+            commit_previous_current: fiber_handle!(commit_previous_current),
+            commit_current: fiber_handle!(commit_current),
+            render_finished_work: fiber_handle!(render_finished_work),
+            deleted_root: fiber_handle!(deleted.host_root()),
+            deleted_component: fiber_handle!(deleted.deleted_component()),
+            deleted_text: fiber_handle!(deleted.deleted_text()),
+            commit_current_is_store_current: commit_current == store_current,
+            render_current_matches_commit_previous_current: render.current()
+                == commit_previous_current,
+            render_finished_work_matches_commit_current: render_finished_work == commit_current,
+            deletion_list_count,
+            deleted_root_count,
+            host_node_cleanup_count: cleanup_report.len(),
+            cleanup_records_match_deletion_commit,
+            cleanup_order_record_count: commit.deletion_cleanup_order_gate_for_canary().len(),
+            public_unmount_compatibility_claimed: cleanup_report
+                .public_unmount_compatibility_claimed(),
+            public_host_teardown_compatibility_claimed: false,
+            act_flushing_claimed: false,
+            host_child_detachment_blockers,
+        })
     }
 
     pub fn describe_private_to_json_facade_result_for_canary(
@@ -11485,6 +11859,10 @@ mod tests {
         let cleanup_records = cleanup.records();
         let order_gate = commit.deletion_cleanup_order_gate_for_canary();
         let order_records = order_gate.records();
+        let handoff = root
+            .describe_private_unmount_deletion_commit_handoff_for_canary(&unmounted)
+            .unwrap();
+        let detachment_blockers = handoff.host_child_detachment_blockers();
 
         assert_eq!(scheduled.kind(), TestRendererRootUpdateKind::Unmount);
         assert_eq!(scheduled.element(), RootElementHandle::NONE);
@@ -11607,6 +11985,80 @@ mod tests {
         assert!(unmounted.snapshot().children().is_empty());
         assert!(unmounted.detached_instance_snapshot().is_detached());
         assert!(unmounted.detached_instance_snapshot().children().is_empty());
+        assert_eq!(
+            handoff.diagnostic_id(),
+            TEST_RENDERER_PRIVATE_UNMOUNT_DELETION_COMMIT_HANDOFF_DIAGNOSTIC_ID
+        );
+        assert_eq!(
+            handoff.status(),
+            TEST_RENDERER_PRIVATE_UNMOUNT_DELETION_COMMIT_HANDOFF_STATUS
+        );
+        assert_eq!(handoff.root(), root.root_id());
+        assert_eq!(
+            handoff.lifecycle(),
+            TestRendererRootLifecycle::UnmountScheduled
+        );
+        assert_eq!(
+            handoff.scheduled_update_kind(),
+            TestRendererRootUpdateKind::Unmount
+        );
+        assert_eq!(handoff.scheduled_element(), RootElementHandle::NONE);
+        assert!(handoff.scheduled_element_is_none());
+        assert_eq!(
+            handoff.render_current().slot(),
+            render.current().slot().get()
+        );
+        assert_eq!(
+            handoff.commit_previous_current().slot(),
+            commit.previous_current().slot().get()
+        );
+        assert_eq!(
+            handoff.commit_current().slot(),
+            commit.current().slot().get()
+        );
+        assert_eq!(
+            handoff.render_finished_work().slot(),
+            render.finished_work().slot().get()
+        );
+        assert_eq!(
+            handoff.deleted_root().slot(),
+            render.finished_work().slot().get()
+        );
+        assert_eq!(
+            handoff.deleted_component().slot(),
+            current.component().slot().get()
+        );
+        assert_eq!(handoff.deleted_text().slot(), current.text().slot().get());
+        assert!(handoff.commit_current_is_store_current());
+        assert!(handoff.render_current_matches_commit_previous_current());
+        assert!(handoff.render_finished_work_matches_commit_current());
+        assert_eq!(handoff.deletion_list_count(), 1);
+        assert_eq!(handoff.deleted_root_count(), 1);
+        assert_eq!(handoff.host_node_cleanup_count(), 2);
+        assert!(handoff.cleanup_records_match_deletion_commit());
+        assert_eq!(handoff.cleanup_order_record_count(), 2);
+        assert!(!handoff.public_unmount_compatibility_claimed());
+        assert!(!handoff.public_host_teardown_compatibility_claimed());
+        assert!(!handoff.act_flushing_claimed());
+        assert!(detachment_blockers.detached_instance());
+        assert_eq!(detachment_blockers.detached_instance_child_count(), 0);
+        assert_eq!(detachment_blockers.host_node_cleanup_invalidated_count(), 2);
+        assert_eq!(
+            detachment_blockers.host_node_cleanup_already_inactive_count(),
+            0
+        );
+        assert_eq!(
+            detachment_blockers.host_node_cleanup_missing_host_node_count(),
+            0
+        );
+        assert_eq!(
+            detachment_blockers.host_node_cleanup_missing_state_node_count(),
+            0
+        );
+        assert!(detachment_blockers.broad_host_child_detachment_blocked());
+        assert!(!detachment_blockers.public_host_teardown_compatibility_claimed());
+        assert!(!detachment_blockers.public_unmount_compatibility_claimed());
+        assert!(!detachment_blockers.act_flushing_claimed());
         assert_eq!(host_storage_counts(&root), (1, 1, 1));
         assert_eq!(current_host_root_element(&root), RootElementHandle::NONE);
         assert!(
@@ -11615,6 +12067,72 @@ mod tests {
                 .children()
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn root_private_unmount_route_rejects_stale_deletion_commit_handoff() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let created = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+
+        root.unmount().unwrap();
+        let mut unmounted = root
+            .render_and_commit_host_output_unmount_for_canary()
+            .unwrap()
+            .unwrap();
+        unmounted.commit = created.commit().clone();
+
+        let error = root
+            .describe_private_unmount_deletion_commit_handoff_for_canary(&unmounted)
+            .unwrap_err();
+
+        let TestRendererRootError::SerializationGate(error) = error else {
+            panic!("expected serialization gate stale commit rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererSerializationGateError::CommitIsNotCurrent { root: error_root, .. }
+                if *error_root == root.root_id()
+        ));
+    }
+
+    #[test]
+    fn root_host_output_unmount_canary_rejects_already_unmounted_root_record() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.unmount().unwrap();
+        root.render_and_commit_host_output_unmount_for_canary()
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(
+            root.unmount().unwrap(),
+            TestRendererRootUpdateOutcome::AlreadyUnmountScheduled
+        );
+        let error = root
+            .render_and_commit_host_output_unmount_for_canary()
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            TestRendererRootError::MissingCommittedHostOutput {
+                operation: TestRendererRootUpdateKind::Unmount
+            }
+        ));
     }
 
     #[test]
