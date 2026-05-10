@@ -185,6 +185,37 @@ const expectedNativeRootBridgeRequestShape = {
     rendererExecution: false,
     reconcilerExecution: false
   },
+  jsonTransportSmoke: {
+    smokeStatus: 'smoked-native-root-bridge-js-to-rust-json-transport',
+    transport: 'json',
+    schemaVersion: 1,
+    handleTableModel: 'fast-react-napi.BridgeHandleTable',
+    validationModel: 'fast-react-napi.NativeRootBridgeRequestSequenceValidator',
+    jsonTransportEnvelopeFields: [
+      'transport',
+      'schemaVersion',
+      'requestRecords'
+    ],
+    jsonTransportRequestRecordFields: [
+      'request_id',
+      'kind',
+      'environment_id',
+      'root_handle',
+      'root_id',
+      'value_handle',
+      'root_handle_state'
+    ],
+    jsonTransportHandleFields: [
+      'environment_id',
+      'slot',
+      'generation',
+      'kind'
+    ],
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false
+  },
   validationErrorCodes: {
     createAfterRootCreated:
       'FAST_REACT_NAPI_ROOT_REQUEST_CREATE_AFTER_ROOT_CREATED',
@@ -300,6 +331,13 @@ for (const shapeValue of [
     .stateTransitions,
   native.nativeRootBridgeRequestShape.rustHandleTableAdmissionSmoke
     .admissionActions,
+  native.nativeRootBridgeRequestShape.jsonTransportSmoke,
+  native.nativeRootBridgeRequestShape.jsonTransportSmoke
+    .jsonTransportEnvelopeFields,
+  native.nativeRootBridgeRequestShape.jsonTransportSmoke
+    .jsonTransportRequestRecordFields,
+  native.nativeRootBridgeRequestShape.jsonTransportSmoke
+    .jsonTransportHandleFields,
   native.nativeRootBridgeRequestShape.validationErrorCodes
 ]) {
   assert.ok(Object.isFrozen(shapeValue));
@@ -365,6 +403,11 @@ assertNativeRootBridgeRustHandleTableAdmissionSmoke(
     rootSlot: 1
   }
 );
+assertNativeRootBridgeJsonTransportSmoke(nativeShapeGate.jsonTransportSmoke, {
+  environmentId: 318,
+  rootId: 1,
+  rootSlot: 1
+});
 assert.deepEqual(
   nativeShapeGate.validationRecords.map((record) => record.lifecycleTransition),
   ['none->active', 'active->active', 'active->retired']
@@ -824,6 +867,112 @@ function assertNativeRootBridgeRustHandleTableAdmissionSmoke(smoke, expected) {
         .rustAdmissionSmokeRecordFields
     );
   }
+}
+
+function assertNativeRootBridgeJsonTransportSmoke(smoke, expected) {
+  assert.equal(Object.isFrozen(smoke), true);
+  assert.equal(Object.isFrozen(smoke.decodedRequestRecords), true);
+  assert.equal(
+    smoke.smokeStatus,
+    'smoked-native-root-bridge-js-to-rust-json-transport'
+  );
+  assert.equal(smoke.transport, 'json');
+  assert.equal(smoke.schemaVersion, 1);
+  assert.equal(smoke.handleTableModel, 'fast-react-napi.BridgeHandleTable');
+  assert.equal(
+    smoke.validationModel,
+    'fast-react-napi.NativeRootBridgeRequestSequenceValidator'
+  );
+  assert.equal(smoke.requestCount, 3);
+  assert.equal(smoke.nativeAddonLoaded, false);
+  assert.equal(smoke.nativeExecution, false);
+  assert.equal(smoke.rendererExecution, false);
+  assert.equal(smoke.reconcilerExecution, false);
+  assert.equal(smoke.byteLength, smoke.json.length);
+  assert.equal(
+    smoke.jsonTransportEnvelopeFields,
+    native.nativeRootBridgeRequestShape.jsonTransportSmoke
+      .jsonTransportEnvelopeFields
+  );
+  assert.equal(
+    smoke.jsonTransportRequestRecordFields,
+    native.nativeRootBridgeRequestShape.jsonTransportSmoke
+      .jsonTransportRequestRecordFields
+  );
+  assert.equal(
+    smoke.jsonTransportHandleFields,
+    native.nativeRootBridgeRequestShape.jsonTransportSmoke
+      .jsonTransportHandleFields
+  );
+
+  const envelope = JSON.parse(smoke.json);
+  assert.deepEqual(Object.keys(envelope), [
+    'transport',
+    'schemaVersion',
+    'requestRecords'
+  ]);
+  assert.equal(envelope.transport, 'json');
+  assert.equal(envelope.schemaVersion, 1);
+  assert.deepEqual(
+    envelope.requestRecords,
+    smoke.decodedRequestRecords.map((record) => ({
+      environment_id: record.environmentId,
+      kind: record.kind,
+      request_id: record.requestId,
+      root_handle: {
+        environment_id: record.rootHandle.environmentId,
+        generation: record.rootHandle.generation,
+        kind: record.rootHandle.kind,
+        slot: record.rootHandle.slot
+      },
+      root_handle_state: record.rootHandleState,
+      root_id: record.rootId,
+      value_handle:
+        record.valueHandle === null
+          ? null
+          : {
+              environment_id: record.valueHandle.environmentId,
+              generation: record.valueHandle.generation,
+              kind: record.valueHandle.kind,
+              slot: record.valueHandle.slot
+            }
+    }))
+  );
+  assert.deepEqual(
+    smoke.decodedRequestRecords.map((record) => record.kind),
+    ['create', 'render', 'unmount']
+  );
+  assert.deepEqual(
+    smoke.decodedRequestRecords.map((record) => record.rootHandleState),
+    ['active', 'active', 'retired']
+  );
+  assert.deepEqual(smoke.decodedRequestRecords[0], {
+    requestId: 1,
+    kind: 'create',
+    environmentId: expected.environmentId,
+    rootHandle: {
+      environmentId: expected.environmentId,
+      generation: 1,
+      kind: 'root',
+      slot: expected.rootSlot
+    },
+    rootId: expected.rootId,
+    valueHandle: {
+      environmentId: expected.environmentId,
+      generation: 1,
+      kind: 'value',
+      slot: 2
+    },
+    rootHandleState: 'active'
+  });
+  assert.deepEqual(
+    smoke.rustHandleTableAdmissionSmoke,
+    nativeShapeGate.rustHandleTableAdmissionSmoke
+  );
+  assertNativeRootBridgeRustHandleTableAdmissionSmoke(
+    smoke.rustHandleTableAdmissionSmoke,
+    expected
+  );
 }
 
 function assertBridgeDidNotTouchContainer(container, document) {

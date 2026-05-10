@@ -123,13 +123,39 @@ assert.equal(
   nativeRootBridgeRequestShape.rustHandleTableAdmissionSmoke.smokeStatus
 );
 assert.equal(
+  shapeGate.jsonTransportSmoke.smokeStatus,
+  nativeRootBridgeRequestShape.jsonTransportSmoke.smokeStatus
+);
+assert.equal(
   shapeGate.rustHandleTableAdmissionSmoke.handleTableModel,
   'fast-react-napi.BridgeHandleTable'
 );
+assert.equal(shapeGate.jsonTransportSmoke.transport, 'json');
+assert.equal(shapeGate.jsonTransportSmoke.schemaVersion, 1);
 assert.equal(shapeGate.handleAdmissionPreflight.tableEnvironmentId, 418);
 assert.equal(shapeGate.handleAdmissionPreflight.rootRetired, true);
 assert.equal(shapeGate.rustHandleTableAdmissionSmoke.tableEnvironmentId, 418);
 assert.equal(shapeGate.rustHandleTableAdmissionSmoke.rootRetired, true);
+assert.equal(
+  shapeGate.jsonTransportSmoke.rustHandleTableAdmissionSmoke.tableEnvironmentId,
+  418
+);
+assert.equal(
+  shapeGate.jsonTransportSmoke.rustHandleTableAdmissionSmoke.rootRetired,
+  true
+);
+assert.deepEqual(
+  JSON.parse(shapeGate.jsonTransportSmoke.json).requestRecords.map(
+    (record) => record.kind
+  ),
+  ['create', 'render', 'unmount']
+);
+assert.deepEqual(
+  shapeGate.jsonTransportSmoke.decodedRequestRecords.map(
+    (record) => record.kind
+  ),
+  ['create', 'render', 'unmount']
+);
 assert.deepEqual(
   shapeGate.handleAdmissionPreflight.admissionRecords.map(
     (record) => record.rootHandleAdmission.action
@@ -181,6 +207,12 @@ assert.deepEqual(
     value_handle_action: null,
     value_handle_current_generation: null
   }
+);
+assert.deepEqual(
+  shapeGate.jsonTransportSmoke.rustHandleTableAdmissionSmoke.smokeRecords[2]
+    .rustAdmissionSmokeRecord,
+  shapeGate.rustHandleTableAdmissionSmoke.smokeRecords[2]
+    .rustAdmissionSmokeRecord
 );
 assert.deepEqual(
   shapeGate.validationRecords.map((record) => record.lifecycleTransition),

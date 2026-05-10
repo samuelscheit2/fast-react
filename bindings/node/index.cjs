@@ -16,6 +16,10 @@ const nativeRootBridgeHandleAdmissionPreflightStatus =
   'preflighted-native-root-bridge-real-handle-admission';
 const nativeRootBridgeRustHandleTableAdmissionSmokeStatus =
   'mirrored-native-root-bridge-rust-handle-table-admission-smoke';
+const nativeRootBridgeJsonTransportSmokeStatus =
+  'smoked-native-root-bridge-js-to-rust-json-transport';
+const nativeRootBridgeJsonTransportFormat = 'json';
+const nativeRootBridgeJsonTransportSchemaVersion = 1;
 const nativeRootBridgeRequestValidationModel =
   'fast-react-napi.NativeRootBridgeRequestSequenceValidator';
 const nativeRootBridgeHandleTableModel = 'fast-react-napi.BridgeHandleTable';
@@ -111,6 +115,11 @@ const nativeRootBridgeRustHandleTableAdmissionSmokeRecordFields = Object.freeze(
   'value_handle_current_generation',
   'retired_root_source_error_code'
 ]);
+const nativeRootBridgeJsonTransportEnvelopeFields = Object.freeze([
+  'transport',
+  'schemaVersion',
+  'requestRecords'
+]);
 const nativeRootBridgeValidationErrorCodes = Object.freeze({
   createAfterRootCreated:
     'FAST_REACT_NAPI_ROOT_REQUEST_CREATE_AFTER_ROOT_CREATED',
@@ -149,6 +158,20 @@ const nativeRootBridgeRustHandleTableAdmissionSmoke = Object.freeze({
     nativeRootBridgeRustHandleTableAdmissionSmokeRecordFields,
   stateTransitions: nativeRootBridgeLifecycleTransitions,
   admissionActions: nativeRootBridgeHandleAdmissionActions,
+  nativeAddonLoaded: false,
+  nativeExecution: false,
+  rendererExecution: false,
+  reconcilerExecution: false
+});
+const nativeRootBridgeJsonTransportSmoke = Object.freeze({
+  smokeStatus: nativeRootBridgeJsonTransportSmokeStatus,
+  transport: nativeRootBridgeJsonTransportFormat,
+  schemaVersion: nativeRootBridgeJsonTransportSchemaVersion,
+  handleTableModel: nativeRootBridgeHandleTableModel,
+  validationModel: nativeRootBridgeRequestValidationModel,
+  jsonTransportEnvelopeFields: nativeRootBridgeJsonTransportEnvelopeFields,
+  jsonTransportRequestRecordFields: nativeRootBridgeRustRequestRecordFields,
+  jsonTransportHandleFields: nativeRootBridgeRustHandleFields,
   nativeAddonLoaded: false,
   nativeExecution: false,
   rendererExecution: false,
@@ -284,6 +307,7 @@ const nativeRootBridgeRequestShape = Object.freeze({
   handleAdmissionPreflight: nativeRootBridgeHandleAdmissionPreflight,
   rustHandleTableAdmissionSmoke:
     nativeRootBridgeRustHandleTableAdmissionSmoke,
+  jsonTransportSmoke: nativeRootBridgeJsonTransportSmoke,
   validationErrorCodes: nativeRootBridgeValidationErrorCodes
 });
 
@@ -324,6 +348,8 @@ function createNativeRootBridgeRequestShapeGate(requests) {
     createNativeRootBridgeRustHandleTableAdmissionSmoke(
       handleAdmissionPreflight
     );
+  const jsonTransportSmoke =
+    createNativeRootBridgeJsonTransportSmoke(validationRecords);
 
   return Object.freeze({
     gateStatus: nativeRootBridgeRequestShapeGateStatus,
@@ -333,6 +359,7 @@ function createNativeRootBridgeRequestShapeGate(requests) {
     validationRecords: Object.freeze(validationRecords),
     handleAdmissionPreflight,
     rustHandleTableAdmissionSmoke,
+    jsonTransportSmoke,
     nativeAddonLoaded: false,
     nativeExecution: false,
     rendererExecution: false,
@@ -715,6 +742,233 @@ function freezeNativeRootBridgeRustHandleTableAdmissionSmokeRecord(record) {
       retired_root_source_error_code: retiredRootSourceErrorCode
     })
   });
+}
+
+function createNativeRootBridgeJsonTransportSmoke(validationRecords) {
+  const requestRecords = Object.freeze(
+    validationRecords.map((record) =>
+      freezeNativeRootBridgeJsonTransportRequestRecord(record)
+    )
+  );
+  const envelope = Object.freeze({
+    transport: nativeRootBridgeJsonTransportFormat,
+    schemaVersion: nativeRootBridgeJsonTransportSchemaVersion,
+    requestRecords
+  });
+  const json = JSON.stringify(envelope);
+  const decodedRequestRecords =
+    parseNativeRootBridgeJsonTransportRequestRecords(json);
+  const decodedValidationRecords =
+    validateNativeRootBridgeJsonTransportRecords(decodedRequestRecords);
+  const handleAdmissionPreflight =
+    createNativeRootBridgeHandleAdmissionPreflight(decodedValidationRecords);
+  const rustHandleTableAdmissionSmoke =
+    createNativeRootBridgeRustHandleTableAdmissionSmoke(
+      handleAdmissionPreflight
+    );
+
+  return Object.freeze({
+    smokeStatus: nativeRootBridgeJsonTransportSmokeStatus,
+    transport: nativeRootBridgeJsonTransportFormat,
+    schemaVersion: nativeRootBridgeJsonTransportSchemaVersion,
+    handleTableModel: nativeRootBridgeHandleTableModel,
+    validationModel: nativeRootBridgeRequestValidationModel,
+    requestCount: decodedRequestRecords.length,
+    json,
+    byteLength: json.length,
+    jsonTransportEnvelopeFields: nativeRootBridgeJsonTransportEnvelopeFields,
+    jsonTransportRequestRecordFields: nativeRootBridgeRustRequestRecordFields,
+    jsonTransportHandleFields: nativeRootBridgeRustHandleFields,
+    decodedRequestRecords: Object.freeze(decodedRequestRecords),
+    rustHandleTableAdmissionSmoke,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false
+  });
+}
+
+function freezeNativeRootBridgeJsonTransportRequestRecord(record) {
+  const rustRecord = record.rustValidationRecord;
+
+  return Object.freeze({
+    request_id: rustRecord.request_id,
+    kind: rustRecord.kind,
+    environment_id: rustRecord.environment_id,
+    root_handle: freezeNativeRootBridgeJsonTransportHandle(
+      rustRecord.root_handle
+    ),
+    root_id: rustRecord.root_id,
+    value_handle:
+      rustRecord.value_handle === null
+        ? null
+        : freezeNativeRootBridgeJsonTransportHandle(rustRecord.value_handle),
+    root_handle_state: rustRecord.root_handle_state
+  });
+}
+
+function freezeNativeRootBridgeJsonTransportHandle(handle) {
+  return Object.freeze({
+    environment_id: handle.environment_id,
+    slot: handle.slot,
+    generation: handle.generation,
+    kind: handle.kind
+  });
+}
+
+function parseNativeRootBridgeJsonTransportRequestRecords(json) {
+  let envelope;
+  try {
+    envelope = JSON.parse(json);
+  } catch (cause) {
+    throwNativeRootBridgeRequestShapeError(
+      'Native root bridge JSON transport payload could not be parsed.',
+      nativeRootBridgeRequestShapeErrorCode,
+      { cause: String(cause?.message ?? cause) }
+    );
+  }
+
+  assertPlainObject(
+    envelope,
+    'Expected a native root bridge JSON transport envelope.'
+  );
+  if (envelope.transport !== nativeRootBridgeJsonTransportFormat) {
+    throwNativeRootBridgeRequestShapeError(
+      `Native root bridge JSON transport must use ${nativeRootBridgeJsonTransportFormat} transport.`,
+      nativeRootBridgeRequestShapeErrorCode,
+      {
+        actual: envelope.transport,
+        expected: nativeRootBridgeJsonTransportFormat
+      }
+    );
+  }
+  if (envelope.schemaVersion !== nativeRootBridgeJsonTransportSchemaVersion) {
+    throwNativeRootBridgeRequestShapeError(
+      `Native root bridge JSON transport schema version ${String(
+        envelope.schemaVersion
+      )} is unsupported.`,
+      nativeRootBridgeRequestShapeErrorCode,
+      {
+        actual: envelope.schemaVersion,
+        expected: nativeRootBridgeJsonTransportSchemaVersion
+      }
+    );
+  }
+  if (!Array.isArray(envelope.requestRecords)) {
+    throwNativeRootBridgeRequestShapeError(
+      'Native root bridge JSON transport requestRecords must be an array.',
+      nativeRootBridgeRequestShapeErrorCode
+    );
+  }
+
+  return Object.freeze(
+    envelope.requestRecords.map((record, index) =>
+      normalizeNativeRootBridgeJsonTransportRequestRecord(record, index)
+    )
+  );
+}
+
+function normalizeNativeRootBridgeJsonTransportRequestRecord(record, index) {
+  assertPlainObject(
+    record,
+    'Expected a native root bridge JSON transport request record.'
+  );
+
+  const environmentId = assertPositiveSafeInteger(
+    record.environment_id,
+    `requestRecords[${index}].environment_id`
+  );
+  const kind = assertNativeRootBridgeRequestKind(record.kind, index);
+  const rootHandle = normalizeNativeRootBridgeJsonTransportHandle(
+    record.root_handle,
+    nativeRootBridgeHandleKindRoot,
+    environmentId,
+    `requestRecords[${index}].root_handle`
+  );
+  const valueHandle =
+    record.value_handle === null
+      ? null
+      : normalizeNativeRootBridgeJsonTransportHandle(
+          record.value_handle,
+          nativeRootBridgeHandleKindValue,
+          environmentId,
+          `requestRecords[${index}].value_handle`
+        );
+
+  return Object.freeze({
+    requestId: assertPositiveSafeInteger(
+      record.request_id,
+      `requestRecords[${index}].request_id`
+    ),
+    kind,
+    environmentId,
+    rootHandle,
+    rootId: assertPositiveSafeInteger(
+      record.root_id,
+      `requestRecords[${index}].root_id`
+    ),
+    valueHandle,
+    rootHandleState: record.root_handle_state
+  });
+}
+
+function normalizeNativeRootBridgeJsonTransportHandle(
+  handle,
+  expectedKind,
+  expectedEnvironmentId,
+  field
+) {
+  assertPlainObject(
+    handle,
+    `Expected ${field} to be a native bridge JSON transport handle.`
+  );
+
+  const environmentId = assertPositiveSafeInteger(
+    handle.environment_id,
+    `${field}.environment_id`
+  );
+  if (environmentId !== expectedEnvironmentId) {
+    throwNativeRootBridgeRequestShapeError(
+      `Native root bridge ${field} belongs to environment ${environmentId}, expected ${expectedEnvironmentId}.`,
+      nativeRootBridgeValidationErrorCodes.wrongEnvironment,
+      { environmentId, expectedEnvironmentId, field }
+    );
+  }
+
+  if (handle.kind !== expectedKind) {
+    throwNativeRootBridgeRequestShapeError(
+      `Native root bridge ${field} has kind ${String(
+        handle.kind
+      )}, expected ${expectedKind}.`,
+      nativeRootBridgeValidationErrorCodes.wrongHandleKind,
+      { actual: handle.kind, expected: expectedKind, field }
+    );
+  }
+
+  return Object.freeze({
+    environmentId,
+    slot: assertPositiveSafeInteger(handle.slot, `${field}.slot`),
+    generation: assertPositiveSafeInteger(
+      handle.generation,
+      `${field}.generation`
+    ),
+    kind: expectedKind
+  });
+}
+
+function validateNativeRootBridgeJsonTransportRecords(records) {
+  const sequenceState = {
+    lastRequestId: null,
+    rootHandle: null,
+    rootId: null,
+    rootRetired: false
+  };
+
+  return Object.freeze(
+    records.map((record, index) =>
+      validateNativeRootBridgeRequestShapeRecord(record, sequenceState, index)
+    )
+  );
 }
 
 function createNativeRootBridgeHandleAdmissionTable() {
