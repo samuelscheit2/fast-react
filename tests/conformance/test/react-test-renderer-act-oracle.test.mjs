@@ -48,6 +48,13 @@ const privateFlushSyncActRoutingDiagnosticsStatus =
   "private-flushsync-act-routing-diagnostics-public-flushsync-blocked";
 const privateActPassiveEffectDrainDiagnosticsExport =
   REACT_TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_DIAGNOSTICS_EXPORT;
+const privateSchedulerMockExpiredWorkMetadataKind =
+  "fast-react.scheduler.mock-expired-work-diagnostics";
+const privateSchedulerMockExpiredWorkMetadataBrand = Symbol.for(
+  privateSchedulerMockExpiredWorkMetadataKind
+);
+const mockSchedulerExpiredWorkRoutingStatus =
+  "react-test-renderer-routed-accepted-mock-scheduler-expired-work-metadata";
 const actUnblockingRequirements = [
   {
     id: "react-test-renderer-act-queue-flushing",
@@ -198,6 +205,7 @@ const ACT_SCHEDULER_REACT_QUEUE_DIAGNOSTIC_RECORD_IDS = [
 const ACT_SCHEDULER_CJS_DEVELOPMENT_REACT_QUEUE_DIAGNOSTIC_RECORD_IDS = [
   "scheduler-private-act-queue-flush-diagnostics",
   "test-renderer-mock-scheduler-flush-helper-routing",
+  "test-renderer-mock-scheduler-expired-work-act-route",
   "react-private-act-internal-test-queue-factories"
 ];
 const CJS_DEVELOPMENT_ENTRYPOINT =
@@ -1187,6 +1195,15 @@ function assertPrivateActQueueDiagnosticConsumer(entry, moduleExports) {
     assert.equal(diagnostics.invokesPublicSchedulerFlushHelper, false);
     assert.equal(diagnostics.publicSchedulerFlushBehaviorExecuted, false);
     assert.equal(diagnostics.mockSchedulerExpiredWorkDiagnosticsReady, true);
+    assert.equal(
+      diagnostics.mockSchedulerExpiredWorkActRouteDiagnosticsReady,
+      true
+    );
+    assert.equal(diagnostics.recognizesExpiredMockSchedulerMetadata, true);
+    assert.equal(
+      diagnostics.describesExpiredMockSchedulerWorkWithoutFlushing,
+      true
+    );
     assert.equal(diagnostics.drainsExpiredMockSchedulerWork, false);
     assert.equal(
       typeof diagnostics.describeAcceptedMockSchedulerFlushHelperMetadata,
@@ -1194,6 +1211,14 @@ function assertPrivateActQueueDiagnosticConsumer(entry, moduleExports) {
     );
     assert.equal(
       typeof diagnostics.routeAcceptedMockSchedulerFlushHelperMetadata,
+      "function"
+    );
+    assert.equal(
+      typeof diagnostics.describeAcceptedMockSchedulerExpiredWorkMetadata,
+      "function"
+    );
+    assert.equal(
+      typeof diagnostics.routeAcceptedMockSchedulerExpiredWorkMetadata,
       "function"
     );
   }
@@ -1349,6 +1374,7 @@ function assertPrivateActQueueDiagnosticConsumer(entry, moduleExports) {
 
   if (entry.entrypoint === CJS_DEVELOPMENT_ENTRYPOINT) {
     assertMockSchedulerFlushHelperRoute(entry, diagnostics, reactGate);
+    assertMockSchedulerExpiredWorkActRoute(entry, diagnostics);
   }
 }
 
@@ -1380,6 +1406,9 @@ function assertMockSchedulerFlushHelperRoute(entry, diagnostics, reactGate) {
       invokesPublicSchedulerFlushHelper: false,
       publicSchedulerFlushBehaviorExecuted: false,
       mockSchedulerExpiredWorkDiagnosticsReady: true,
+      mockSchedulerExpiredWorkActRouteDiagnosticsReady: true,
+      recognizesExpiredMockSchedulerMetadata: true,
+      describesExpiredMockSchedulerWorkWithoutFlushing: true,
       drainsExpiredMockSchedulerWork: false,
       drainsPublicSchedulerTaskQueue: false,
       drainsPublicReactActQueue: false,
@@ -1477,6 +1506,15 @@ function assertMockSchedulerFlushHelperRoute(entry, diagnostics, reactGate) {
   assert.equal(report.invokesPublicSchedulerFlushHelper, false);
   assert.equal(report.publicSchedulerFlushBehaviorExecuted, false);
   assert.equal(report.mockSchedulerExpiredWorkDiagnosticsReady, true);
+  assert.equal(
+    report.mockSchedulerExpiredWorkActRouteDiagnosticsReady,
+    true
+  );
+  assert.equal(report.recognizesExpiredMockSchedulerMetadata, true);
+  assert.equal(
+    report.describesExpiredMockSchedulerWorkWithoutFlushing,
+    true
+  );
   assert.equal(report.drainsExpiredMockSchedulerWork, false);
   assert.equal(report.drainsAcceptedInternalTestQueues, true);
   assert.equal(report.drainsPublicSchedulerTaskQueue, false);
@@ -1543,6 +1581,204 @@ function assertMockSchedulerFlushHelperRoute(entry, diagnostics, reactGate) {
     },
     entry.entrypoint
   );
+}
+
+function assertMockSchedulerExpiredWorkActRoute(entry, diagnostics) {
+  const Scheduler = loadFreshWorkspaceModule("packages/scheduler/unstable_mock.js");
+  Scheduler.reset();
+  const publicSchedulerEvents = [];
+  function cancelledExpiredPublicTask() {
+    publicSchedulerEvents.push("cancelled-expired-public-task");
+  }
+  function expiredPublicTask() {
+    publicSchedulerEvents.push("expired-public-task");
+  }
+  function normalPublicTask() {
+    publicSchedulerEvents.push("normal-public-task");
+  }
+
+  const cancelledTask = Scheduler.unstable_scheduleCallback(
+    Scheduler.unstable_UserBlockingPriority,
+    cancelledExpiredPublicTask
+  );
+  Scheduler.unstable_scheduleCallback(
+    Scheduler.unstable_UserBlockingPriority,
+    expiredPublicTask
+  );
+  Scheduler.unstable_scheduleCallback(
+    Scheduler.unstable_NormalPriority,
+    normalPublicTask
+  );
+  Scheduler.unstable_cancelCallback(cancelledTask);
+  Scheduler.unstable_advanceTime(251);
+
+  const schedulerDiagnostics =
+    Scheduler.unstable_flushExpired[privateActQueueFlushDiagnosticsExport];
+  const expiredWorkMetadata =
+    schedulerDiagnostics.describeExpiredMockSchedulerWorkForDiagnostics();
+  assert.equal(
+    expiredWorkMetadata[privateSchedulerMockExpiredWorkMetadataBrand],
+    true,
+    entry.entrypoint
+  );
+
+  assert.deepEqual(
+    diagnostics.describeAcceptedMockSchedulerExpiredWorkMetadata(
+      expiredWorkMetadata
+    ),
+    {
+      status: "accepted-mock-scheduler-expired-work-metadata",
+      accepted: true,
+      rejectionReason: null,
+      metadataKind: privateSchedulerMockExpiredWorkMetadataKind,
+      metadataVersion: 1,
+      schedulerDiagnosticStatus:
+        "private-scheduler-act-queue-flush-diagnostics",
+      consumer: "react-test-renderer-act-scheduler-private-gate",
+      gateStatus: actSchedulerGateStatus,
+      pendingWork: true,
+      hasExpiredMockSchedulerWork: true,
+      expiredCallbackCount: 1,
+      cancelledTombstoneCount: 1,
+      taskQueueCount: 3,
+      recognizesExpiredMockSchedulerMetadata: true,
+      routesAcceptedMockSchedulerExpiredWorkMetadata: true,
+      describesExpiredMockSchedulerWorkWithoutFlushing: true,
+      invokesPublicSchedulerFlushHelper: false,
+      publicSchedulerFlushBehaviorExecuted: false,
+      drainsExpiredMockSchedulerWork: false,
+      drainsPublicSchedulerTaskQueue: false,
+      drainsPublicReactActQueue: false,
+      publicSchedulerTimingCompatibilityClaimed: false,
+      publicReactActCompatibilityClaimed: false,
+      compatibilityClaimed: false,
+      invokesActCallback: false,
+      executesQueuedWork: false,
+      executesEffects: false,
+      executesScheduledCallbacks: false
+    },
+    entry.entrypoint
+  );
+
+  const report =
+    diagnostics.routeAcceptedMockSchedulerExpiredWorkMetadata(
+      expiredWorkMetadata
+    );
+  assert.equal(report.status, mockSchedulerExpiredWorkRoutingStatus);
+  assert.equal(report.accepted, true);
+  assert.equal(report.metadataKind, privateSchedulerMockExpiredWorkMetadataKind);
+  assert.equal(report.metadataVersion, 1);
+  assert.equal(
+    report.schedulerDiagnosticStatus,
+    "private-scheduler-act-queue-flush-diagnostics"
+  );
+  assert.equal(report.consumer, "react-test-renderer-act-scheduler-private-gate");
+  assert.equal(report.gateStatus, actSchedulerGateStatus);
+  assert.equal(report.now, 251);
+  assert.equal(report.pendingWork, true);
+  assert.equal(report.hasExpiredMockSchedulerWork, true);
+  assert.equal(report.expiredCallbackCount, 1);
+  assert.equal(report.cancelledTombstoneCount, 1);
+  assert.equal(report.taskQueueCount, 3);
+  assert.deepEqual(
+    report.taskQueue.map((task) => [
+      task.callbackStatus,
+      task.callback.name ?? null,
+      task.priorityLevel,
+      task.expired
+    ]),
+    [
+      [
+        "cancelled-tombstone",
+        null,
+        Scheduler.unstable_UserBlockingPriority,
+        true
+      ],
+      [
+        "pending-callback",
+        "expiredPublicTask",
+        Scheduler.unstable_UserBlockingPriority,
+        true
+      ],
+      [
+        "pending-callback",
+        "normalPublicTask",
+        Scheduler.unstable_NormalPriority,
+        false
+      ]
+    ],
+    entry.entrypoint
+  );
+  assert.equal(report.privateSchedulerActQueueDiagnosticsConsumed, true);
+  assert.equal(report.recognizesExpiredMockSchedulerMetadata, true);
+  assert.equal(
+    report.routesAcceptedMockSchedulerExpiredWorkMetadata,
+    true
+  );
+  assert.equal(
+    report.describesExpiredMockSchedulerWorkWithoutFlushing,
+    true
+  );
+  assert.equal(report.invokesPublicSchedulerFlushHelper, false);
+  assert.equal(report.publicSchedulerFlushBehaviorExecuted, false);
+  assert.equal(report.drainsExpiredMockSchedulerWork, false);
+  assert.equal(report.drainsAcceptedInternalTestQueues, false);
+  assert.equal(report.drainsPublicSchedulerTaskQueue, false);
+  assert.equal(report.drainsPublicReactActQueue, false);
+  assert.equal(report.publicSchedulerTimingCompatibilityClaimed, false);
+  assert.equal(report.publicReactActCompatibilityClaimed, false);
+  assert.equal(report.publicActCompatibilityClaimed, false);
+  assert.equal(report.compatibilityClaimed, false);
+  assert.equal(report.invokesActCallback, false);
+  assert.equal(report.executesQueuedWork, false);
+  assert.equal(report.executesEffects, false);
+  assert.equal(report.executesScheduledCallbacks, false);
+  assert.equal(report.publicSchedulerFlushExecutionAvailable, false);
+  assert.equal(report.publicActBehaviorAvailable, false);
+  assert.equal(report.rendererRootsCompatibilityClaimed, false);
+  assert.deepEqual(
+    report.missingBeforeExecution,
+    ACT_SCHEDULER_MISSING_BEFORE_EXECUTION
+  );
+  assert.deepEqual(publicSchedulerEvents, [], entry.entrypoint);
+  assert.equal(Scheduler.unstable_hasPendingWork(), true, entry.entrypoint);
+
+  assert.equal(
+    diagnostics.describeAcceptedMockSchedulerExpiredWorkMetadata({})
+      .accepted,
+    false,
+    entry.entrypoint
+  );
+  assert.throws(
+    () => diagnostics.routeAcceptedMockSchedulerExpiredWorkMetadata({}),
+    (error) => {
+      assert.equal(
+        error.name,
+        "FastReactTestRendererMockSchedulerExpiredWorkRoutingError"
+      );
+      assert.equal(
+        error.code,
+        "FAST_REACT_TEST_RENDERER_MOCK_SCHEDULER_EXPIRED_WORK_ROUTING_REJECTED"
+      );
+      assert.equal(error.entrypoint, entry.entrypoint);
+      assert.equal(
+        error.exportName,
+        `_Scheduler.${privateActQueueFlushDiagnosticsExport}`
+      );
+      assert.equal(error.recognizesExpiredMockSchedulerMetadata, false);
+      assert.equal(error.invokesPublicSchedulerFlushHelper, false);
+      assert.equal(error.publicSchedulerFlushBehaviorExecuted, false);
+      assert.equal(error.drainsExpiredMockSchedulerWork, false);
+      assert.equal(error.publicSchedulerTimingCompatibilityClaimed, false);
+      assert.equal(error.publicReactActCompatibilityClaimed, false);
+      assert.equal(error.executesQueuedWork, false);
+      assert.equal(error.executesEffects, false);
+      return true;
+    },
+    entry.entrypoint
+  );
+
+  Scheduler.reset();
 }
 
 function assertPrivateFlushSyncActRoutingDiagnostics(
@@ -2069,7 +2305,8 @@ function assertActSchedulerGate(gate, entrypoint) {
       "worker-404-scheduler-mock-private-callback-execution",
       "worker-436-scheduler-mock-continuation-execution",
       "worker-469-scheduler-mock-expired-continuation-gate",
-      "worker-482-test-renderer-act-scheduler-flush-gate"
+      "worker-482-test-renderer-act-scheduler-flush-gate",
+      "worker-518-scheduler-mock-expired-act-route"
     );
   }
 
@@ -2100,6 +2337,12 @@ function assertActSchedulerGate(gate, entrypoint) {
   if (cjsDevelopmentOnly) {
     assert.equal(gate.mockSchedulerFlushHelperRoutingAccepted, true);
     assert.equal(gate.privateMockSchedulerFlushHelperMetadataRouted, true);
+    assert.equal(gate.privateMockSchedulerExpiredWorkMetadataRouted, true);
+    assert.equal(
+      gate.mockSchedulerExpiredWorkActRouteDiagnosticsReady,
+      true
+    );
+    assert.equal(gate.recognizesExpiredMockSchedulerMetadata, true);
     assert.equal(gate.publicSchedulerFlushBehaviorExecuted, false);
   }
   assert.equal(gate.schedulerMockFlushHelperMetadataAccepted, true);
@@ -2211,6 +2454,9 @@ function assertActSchedulerGate(gate, entrypoint) {
     Object.assign(expectedSideEffectPolicy, {
       routesAcceptedMockSchedulerFlushHelperMetadata: true,
       delegatesToPrivateSchedulerDiagnostics: true,
+      recognizesExpiredMockSchedulerMetadata: true,
+      routesAcceptedMockSchedulerExpiredWorkMetadata: true,
+      describesExpiredMockSchedulerWorkWithoutFlushing: true,
       invokesPublicSchedulerFlushHelper: false,
       publicSchedulerFlushBehaviorExecuted: false,
       drainsExpiredMockSchedulerWork: false
@@ -2254,6 +2500,45 @@ function assertActSchedulerGate(gate, entrypoint) {
       .drainsPublicReactActQueue,
     false
   );
+  const expiredWorkRouteRecord =
+    gate.recognizedSchedulerReactActQueueDiagnostics.find(
+      (record) =>
+        record.id === "test-renderer-mock-scheduler-expired-work-act-route"
+    );
+  if (entrypoint === CJS_DEVELOPMENT_ENTRYPOINT) {
+    assert.equal(
+      expiredWorkRouteRecord.routeStatus,
+      mockSchedulerExpiredWorkRoutingStatus
+    );
+    assert.equal(
+      expiredWorkRouteRecord.metadataKind,
+      privateSchedulerMockExpiredWorkMetadataKind
+    );
+    assert.equal(expiredWorkRouteRecord.metadataVersion, 1);
+    assert.deepEqual(expiredWorkRouteRecord.buildsOnWorkers, [
+      "worker-469-scheduler-mock-expired-continuation-gate",
+      "worker-482-test-renderer-act-scheduler-flush-gate"
+    ]);
+    assert.equal(
+      expiredWorkRouteRecord.recognizesExpiredMockSchedulerMetadata,
+      true
+    );
+    assert.equal(
+      expiredWorkRouteRecord.describesExpiredMockSchedulerWorkWithoutFlushing,
+      true
+    );
+    assert.equal(
+      expiredWorkRouteRecord.routesAcceptedMockSchedulerExpiredWorkMetadata,
+      true
+    );
+    assert.equal(expiredWorkRouteRecord.drainsExpiredMockSchedulerWork, false);
+    assert.equal(
+      expiredWorkRouteRecord.publicSchedulerFlushBehaviorExecuted,
+      false
+    );
+  } else {
+    assert.equal(expiredWorkRouteRecord, undefined);
+  }
   assert.equal(
     gate.recognizedSyncFlushActRecords[2].syncFlushExecution,
     false

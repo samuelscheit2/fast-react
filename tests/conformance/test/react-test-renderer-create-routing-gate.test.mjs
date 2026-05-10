@@ -212,6 +212,7 @@ const actSchedulerReactQueueDiagnosticRecordIds = [
 const actSchedulerCjsDevelopmentReactQueueDiagnosticRecordIds = [
   "scheduler-private-act-queue-flush-diagnostics",
   "test-renderer-mock-scheduler-flush-helper-routing",
+  "test-renderer-mock-scheduler-expired-work-act-route",
   "react-private-act-internal-test-queue-factories"
 ];
 const actSchedulerSyncFlushRecordIds = [
@@ -4100,7 +4101,8 @@ function assertActSchedulerGate(gate, entrypoint) {
       "worker-404-scheduler-mock-private-callback-execution",
       "worker-436-scheduler-mock-continuation-execution",
       "worker-469-scheduler-mock-expired-continuation-gate",
-      "worker-482-test-renderer-act-scheduler-flush-gate"
+      "worker-482-test-renderer-act-scheduler-flush-gate",
+      "worker-518-scheduler-mock-expired-act-route"
     );
   }
 
@@ -4131,6 +4133,12 @@ function assertActSchedulerGate(gate, entrypoint) {
   if (cjsDevelopmentOnly) {
     assert.equal(gate.mockSchedulerFlushHelperRoutingAccepted, true);
     assert.equal(gate.privateMockSchedulerFlushHelperMetadataRouted, true);
+    assert.equal(gate.privateMockSchedulerExpiredWorkMetadataRouted, true);
+    assert.equal(
+      gate.mockSchedulerExpiredWorkActRouteDiagnosticsReady,
+      true
+    );
+    assert.equal(gate.recognizesExpiredMockSchedulerMetadata, true);
     assert.equal(gate.publicSchedulerFlushBehaviorExecuted, false);
   }
   assert.equal(gate.schedulerMockFlushHelperMetadataAccepted, true);

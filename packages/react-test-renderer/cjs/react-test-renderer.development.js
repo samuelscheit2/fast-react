@@ -54,6 +54,14 @@ const privateActPassiveEffectDrainRecordBrand = Symbol.for(
 );
 const mockSchedulerFlushHelperRoutingStatus =
   'react-test-renderer-routed-accepted-mock-scheduler-flush-helper-metadata';
+const mockSchedulerExpiredWorkRoutingStatus =
+  'react-test-renderer-routed-accepted-mock-scheduler-expired-work-metadata';
+const privateSchedulerMockExpiredWorkMetadataKind =
+  'fast-react.scheduler.mock-expired-work-diagnostics';
+const privateSchedulerMockExpiredWorkMetadataBrand = Symbol.for(
+  privateSchedulerMockExpiredWorkMetadataKind
+);
+const privateSchedulerMockExpiredWorkMetadataVersion = 1;
 const acceptedActQueueRecordKinds = Object.freeze([
   'SchedulerActQueueRequest',
   'SchedulerActScopeBoundaryRecord',
@@ -644,6 +652,9 @@ const schedulerReactActQueueDiagnosticRecords = Object.freeze([
     recordsBrandedInternalTestContinuations: true,
     executesBrandedInternalTestContinuations: true,
     mockSchedulerExpiredWorkDiagnosticsReady: true,
+    mockSchedulerExpiredWorkActRouteDiagnosticsReady: true,
+    recognizesExpiredMockSchedulerMetadata: true,
+    describesExpiredMockSchedulerWorkWithoutFlushing: true,
     routesAcceptedMockSchedulerFlushHelperMetadata: true,
     invokesPublicSchedulerFlushHelper: false,
     publicSchedulerFlushBehaviorExecuted: false,
@@ -671,6 +682,31 @@ const schedulerReactActQueueDiagnosticRecords = Object.freeze([
     acceptedContinuationStatuses: acceptedActQueueContinuationStatuses,
     routesAcceptedMockSchedulerFlushHelperMetadata: true,
     delegatesToPrivateSchedulerDiagnostics: true,
+    invokesPublicSchedulerFlushHelper: false,
+    publicSchedulerFlushBehaviorExecuted: false,
+    drainsExpiredMockSchedulerWork: false,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    executesQueuedWork: false,
+    executesEffects: false
+  }),
+  Object.freeze({
+    id: 'test-renderer-mock-scheduler-expired-work-act-route',
+    jsPrivateExport: privateActQueueFlushDiagnosticsExport,
+    schedulerStatus: 'private-scheduler-act-queue-flush-diagnostics',
+    routeStatus: mockSchedulerExpiredWorkRoutingStatus,
+    acceptedWorker: 'worker-518-scheduler-mock-expired-act-route',
+    buildsOnWorkers: Object.freeze([
+      'worker-469-scheduler-mock-expired-continuation-gate',
+      'worker-482-test-renderer-act-scheduler-flush-gate'
+    ]),
+    metadataKind: privateSchedulerMockExpiredWorkMetadataKind,
+    metadataVersion: privateSchedulerMockExpiredWorkMetadataVersion,
+    recognizesExpiredMockSchedulerMetadata: true,
+    describesExpiredMockSchedulerWorkWithoutFlushing: true,
+    routesAcceptedMockSchedulerExpiredWorkMetadata: true,
     invokesPublicSchedulerFlushHelper: false,
     publicSchedulerFlushBehaviorExecuted: false,
     drainsExpiredMockSchedulerWork: false,
@@ -726,6 +762,9 @@ const privateActQueueFlushDiagnostics = Object.freeze({
   invokesPublicSchedulerFlushHelper: false,
   publicSchedulerFlushBehaviorExecuted: false,
   mockSchedulerExpiredWorkDiagnosticsReady: true,
+  mockSchedulerExpiredWorkActRouteDiagnosticsReady: true,
+  recognizesExpiredMockSchedulerMetadata: true,
+  describesExpiredMockSchedulerWorkWithoutFlushing: true,
   drainsExpiredMockSchedulerWork: false,
   drainsPublicSchedulerTaskQueue: false,
   drainsPublicReactActQueue: false,
@@ -741,6 +780,8 @@ const privateActQueueFlushDiagnostics = Object.freeze({
   describeAcceptedInternalActQueue,
   describeAcceptedMockSchedulerFlushHelperMetadata,
   routeAcceptedMockSchedulerFlushHelperMetadata,
+  describeAcceptedMockSchedulerExpiredWorkMetadata,
+  routeAcceptedMockSchedulerExpiredWorkMetadata,
   consumeAcceptedSchedulerActQueueDiagnostics,
   drainAcceptedInternalActQueue:
     consumeAcceptedSchedulerActQueueDiagnostics
@@ -981,6 +1022,9 @@ const actSchedulerSideEffectPolicy = Object.freeze({
   drainsAcceptedInternalTestQueues: true,
   routesAcceptedMockSchedulerFlushHelperMetadata: true,
   delegatesToPrivateSchedulerDiagnostics: true,
+  recognizesExpiredMockSchedulerMetadata: true,
+  routesAcceptedMockSchedulerExpiredWorkMetadata: true,
+  describesExpiredMockSchedulerWorkWithoutFlushing: true,
   invokesPublicSchedulerFlushHelper: false,
   publicSchedulerFlushBehaviorExecuted: false,
   drainsExpiredMockSchedulerWork: false,
@@ -1020,7 +1064,8 @@ const actSchedulerGate = Object.freeze({
     'worker-404-scheduler-mock-private-callback-execution',
     'worker-436-scheduler-mock-continuation-execution',
     'worker-469-scheduler-mock-expired-continuation-gate',
-    'worker-482-test-renderer-act-scheduler-flush-gate'
+    'worker-482-test-renderer-act-scheduler-flush-gate',
+    'worker-518-scheduler-mock-expired-act-route'
   ]),
   publicActBehaviorAvailable: false,
   publicSchedulerFlushExecutionAvailable: false,
@@ -1042,7 +1087,10 @@ const actSchedulerGate = Object.freeze({
   privateActQueueDiagnosticConsumptionReady: true,
   mockSchedulerFlushHelperRoutingAccepted: true,
   privateMockSchedulerFlushHelperMetadataRouted: true,
+  privateMockSchedulerExpiredWorkMetadataRouted: true,
   publicSchedulerFlushBehaviorExecuted: false,
+  mockSchedulerExpiredWorkActRouteDiagnosticsReady: true,
+  recognizesExpiredMockSchedulerMetadata: true,
   schedulerMockFlushHelperMetadataAccepted: true,
   rootActRecordsAccepted: true,
   syncFlushActRecordsAccepted: true,
@@ -2849,6 +2897,12 @@ function createUnsupportedError(
       recognizedActSchedulerGate.mockSchedulerFlushHelperRoutingAccepted;
     error.privateMockSchedulerFlushHelperMetadataRouted =
       recognizedActSchedulerGate.privateMockSchedulerFlushHelperMetadataRouted;
+    error.privateMockSchedulerExpiredWorkMetadataRouted =
+      recognizedActSchedulerGate.privateMockSchedulerExpiredWorkMetadataRouted;
+    error.mockSchedulerExpiredWorkActRouteDiagnosticsReady =
+      recognizedActSchedulerGate.mockSchedulerExpiredWorkActRouteDiagnosticsReady;
+    error.recognizesExpiredMockSchedulerMetadata =
+      recognizedActSchedulerGate.recognizesExpiredMockSchedulerMetadata;
     error.publicSchedulerFlushBehaviorExecuted =
       recognizedActSchedulerGate.publicSchedulerFlushBehaviorExecuted;
     error.rootActRecordsAccepted =
@@ -3532,7 +3586,10 @@ function getRejectedSchedulerMockFlushDiagnosticsReason(diagnostics) {
   }
   if (
     diagnostics.mockSchedulerExpiredWorkDiagnosticsReady !== true ||
-    diagnostics.drainsExpiredMockSchedulerWork !== true
+    diagnostics.drainsExpiredMockSchedulerWork !== true ||
+    diagnostics.mockSchedulerExpiredWorkActRouteDiagnosticsReady !== true ||
+    diagnostics.recognizesExpiredMockSchedulerMetadata !== true ||
+    diagnostics.describesExpiredMockSchedulerWorkWithoutFlushing !== true
   ) {
     return 'scheduler-diagnostics-expired-work-policy';
   }
@@ -3549,9 +3606,132 @@ function getRejectedSchedulerMockFlushDiagnosticsReason(diagnostics) {
   if (
     typeof diagnostics.describeAcceptedInternalActQueue !== 'function' ||
     typeof diagnostics.drainAcceptedInternalActQueue !== 'function' ||
-    typeof diagnostics.drainExpiredMockSchedulerWork !== 'function'
+    typeof diagnostics.drainExpiredMockSchedulerWork !== 'function' ||
+    typeof diagnostics.describeExpiredMockSchedulerWorkForDiagnostics !==
+      'function'
   ) {
     return 'scheduler-diagnostics-methods';
+  }
+  return null;
+}
+
+function getRejectedSchedulerMockExpiredWorkMetadataReason(metadata) {
+  if (!isObjectLike(metadata)) {
+    return 'expired-work-metadata-not-object';
+  }
+  if (!Object.isFrozen(metadata)) {
+    return 'expired-work-metadata-not-frozen';
+  }
+  if (metadata[privateSchedulerMockExpiredWorkMetadataBrand] !== true) {
+    return 'expired-work-metadata-missing-internal-brand';
+  }
+  if (metadata.kind !== privateSchedulerMockExpiredWorkMetadataKind) {
+    return 'expired-work-metadata-kind';
+  }
+  if (metadata.version !== privateSchedulerMockExpiredWorkMetadataVersion) {
+    return 'expired-work-metadata-version';
+  }
+  if (
+    metadata.status !==
+      'described-expired-mock-scheduler-work-for-diagnostics' ||
+    metadata.accepted !== true
+  ) {
+    return 'expired-work-metadata-status';
+  }
+  if (metadata.compatibilityTarget !== schedulerCompatibilityTarget) {
+    return 'expired-work-metadata-scheduler-target';
+  }
+  if (metadata.reactCompatibilityTarget !== reactCompatibilityTarget) {
+    return 'expired-work-metadata-react-target';
+  }
+  if (
+    metadata.schedulerDiagnosticStatus !==
+    'private-scheduler-act-queue-flush-diagnostics'
+  ) {
+    return 'expired-work-metadata-scheduler-status';
+  }
+  if (
+    typeof metadata.now !== 'number' ||
+    typeof metadata.pendingWork !== 'boolean' ||
+    typeof metadata.hasExpiredMockSchedulerWork !== 'boolean' ||
+    !isNonNegativeInteger(metadata.expiredCallbackCount) ||
+    !isNonNegativeInteger(metadata.cancelledTombstoneCount) ||
+    !isNonNegativeInteger(metadata.taskQueueCount)
+  ) {
+    return 'expired-work-metadata-counts';
+  }
+  if (
+    !Array.isArray(metadata.taskQueue) ||
+    metadata.taskQueue.length !== metadata.taskQueueCount ||
+    !Object.isFrozen(metadata.taskQueue)
+  ) {
+    return 'expired-work-metadata-task-queue';
+  }
+
+  let expiredCallbackCount = 0;
+  let cancelledTombstoneCount = 0;
+  for (let index = 0; index < metadata.taskQueue.length; index++) {
+    const task = metadata.taskQueue[index];
+    const rejectedTaskReason =
+      getRejectedSchedulerMockExpiredWorkTaskReason(task, index);
+    if (rejectedTaskReason !== null) {
+      return rejectedTaskReason;
+    }
+    if (task.expired === true && task.callbackStatus === 'pending-callback') {
+      expiredCallbackCount++;
+    }
+    if (task.callbackStatus === 'cancelled-tombstone') {
+      cancelledTombstoneCount++;
+    }
+  }
+  if (
+    expiredCallbackCount !== metadata.expiredCallbackCount ||
+    cancelledTombstoneCount !== metadata.cancelledTombstoneCount ||
+    metadata.hasExpiredMockSchedulerWork !== (expiredCallbackCount > 0)
+  ) {
+    return 'expired-work-metadata-summary-counts';
+  }
+  if (
+    metadata.recognizesExpiredMockSchedulerMetadata !== true ||
+    metadata.describesExpiredMockSchedulerWorkWithoutFlushing !== true ||
+    metadata.invokesPublicSchedulerFlushHelper !== false ||
+    metadata.publicSchedulerFlushBehaviorExecuted !== false ||
+    metadata.drainsExpiredMockSchedulerWork !== false ||
+    metadata.drainsPublicSchedulerTaskQueue !== false ||
+    metadata.drainsPublicReactActQueue !== false ||
+    metadata.publicSchedulerTimingCompatibilityClaimed !== false ||
+    metadata.publicReactActCompatibilityClaimed !== false ||
+    metadata.compatibilityClaimed !== false ||
+    metadata.executesQueuedWork !== false ||
+    metadata.executesEffects !== false
+  ) {
+    return 'expired-work-metadata-policy';
+  }
+  return null;
+}
+
+function getRejectedSchedulerMockExpiredWorkTaskReason(task, index) {
+  if (!isObjectLike(task) || !Object.isFrozen(task)) {
+    return `expired-work-task-${index}-not-frozen-object`;
+  }
+  if (
+    !(task.id === null || isNonNegativeInteger(task.id)) ||
+    !isNonNegativeInteger(task.scheduleOrder) ||
+    typeof task.priorityLevel !== 'number' ||
+    typeof task.startTime !== 'number' ||
+    typeof task.expirationTime !== 'number' ||
+    typeof task.sortIndex !== 'number' ||
+    typeof task.expired !== 'boolean' ||
+    !includesString(task.callbackStatus, [
+      'pending-callback',
+      'cancelled-tombstone',
+      'unknown-callback'
+    ])
+  ) {
+    return `expired-work-task-${index}-shape`;
+  }
+  if (!isObjectLike(task.callback) || !Object.isFrozen(task.callback)) {
+    return `expired-work-task-${index}-callback`;
   }
   return null;
 }
@@ -3637,6 +3817,31 @@ function createMockSchedulerFlushHelperRoutingError(reason) {
   return error;
 }
 
+function createMockSchedulerExpiredWorkRoutingError(reason) {
+  const error = createUnsupportedError(
+    `_Scheduler.${privateActQueueFlushDiagnosticsExport}`,
+    'rejected mock Scheduler expired-work metadata',
+    `Only accepted private scheduler/unstable_mock expired-work metadata can be routed through this act scheduler gate. Rejection reason: ${reason}.`,
+    undefined,
+    undefined,
+    actSchedulerGate
+  );
+
+  error.name = 'FastReactTestRendererMockSchedulerExpiredWorkRoutingError';
+  error.code =
+    'FAST_REACT_TEST_RENDERER_MOCK_SCHEDULER_EXPIRED_WORK_ROUTING_REJECTED';
+  error.reason = reason;
+  error.recognizesExpiredMockSchedulerMetadata = false;
+  error.invokesPublicSchedulerFlushHelper = false;
+  error.publicSchedulerFlushBehaviorExecuted = false;
+  error.drainsExpiredMockSchedulerWork = false;
+  error.publicSchedulerTimingCompatibilityClaimed = false;
+  error.publicReactActCompatibilityClaimed = false;
+  error.executesQueuedWork = false;
+  error.executesEffects = false;
+  return error;
+}
+
 function describeAcceptedInternalActQueue(queue) {
   const rejectionReason = getRejectedPrivateActQueueReason(queue);
   const pendingCount =
@@ -3698,6 +3903,15 @@ function describeAcceptedMockSchedulerFlushHelperMetadata(
     mockSchedulerExpiredWorkDiagnosticsReady:
       rejectionReason === null &&
       diagnostics.mockSchedulerExpiredWorkDiagnosticsReady === true,
+    mockSchedulerExpiredWorkActRouteDiagnosticsReady:
+      rejectionReason === null &&
+      diagnostics.mockSchedulerExpiredWorkActRouteDiagnosticsReady === true,
+    recognizesExpiredMockSchedulerMetadata:
+      rejectionReason === null &&
+      diagnostics.recognizesExpiredMockSchedulerMetadata === true,
+    describesExpiredMockSchedulerWorkWithoutFlushing:
+      rejectionReason === null &&
+      diagnostics.describesExpiredMockSchedulerWorkWithoutFlushing === true,
     drainsExpiredMockSchedulerWork: false,
     drainsPublicSchedulerTaskQueue: false,
     drainsPublicReactActQueue: false,
@@ -3706,6 +3920,51 @@ function describeAcceptedMockSchedulerFlushHelperMetadata(
     compatibilityClaimed: false,
     executesQueuedWork: false,
     executesEffects: false
+  });
+}
+
+function describeAcceptedMockSchedulerExpiredWorkMetadata(metadata) {
+  const rejectionReason =
+    getRejectedSchedulerMockExpiredWorkMetadataReason(metadata);
+  const accepted = rejectionReason === null;
+
+  return freezeRecord({
+    status: accepted
+      ? 'accepted-mock-scheduler-expired-work-metadata'
+      : 'rejected-mock-scheduler-expired-work-metadata',
+    accepted,
+    rejectionReason,
+    metadataKind: isObjectLike(metadata) ? metadata.kind : null,
+    metadataVersion: isObjectLike(metadata) ? metadata.version : null,
+    schedulerDiagnosticStatus: isObjectLike(metadata)
+      ? metadata.schedulerDiagnosticStatus
+      : null,
+    consumer: 'react-test-renderer-act-scheduler-private-gate',
+    gateStatus: actSchedulerGateStatus,
+    pendingWork: accepted ? metadata.pendingWork : false,
+    hasExpiredMockSchedulerWork: accepted
+      ? metadata.hasExpiredMockSchedulerWork
+      : false,
+    expiredCallbackCount: accepted ? metadata.expiredCallbackCount : 0,
+    cancelledTombstoneCount: accepted
+      ? metadata.cancelledTombstoneCount
+      : 0,
+    taskQueueCount: accepted ? metadata.taskQueueCount : 0,
+    recognizesExpiredMockSchedulerMetadata: accepted,
+    routesAcceptedMockSchedulerExpiredWorkMetadata: accepted,
+    describesExpiredMockSchedulerWorkWithoutFlushing: accepted,
+    invokesPublicSchedulerFlushHelper: false,
+    publicSchedulerFlushBehaviorExecuted: false,
+    drainsExpiredMockSchedulerWork: false,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    compatibilityClaimed: false,
+    invokesActCallback: false,
+    executesQueuedWork: false,
+    executesEffects: false,
+    executesScheduledCallbacks: false
   });
 }
 
@@ -3864,8 +4123,61 @@ function routeAcceptedMockSchedulerFlushHelperMetadata(
     publicSchedulerFlushBehaviorExecuted: false,
     mockSchedulerExpiredWorkDiagnosticsReady:
       diagnostics.mockSchedulerExpiredWorkDiagnosticsReady === true,
+    mockSchedulerExpiredWorkActRouteDiagnosticsReady:
+      diagnostics.mockSchedulerExpiredWorkActRouteDiagnosticsReady === true,
+    recognizesExpiredMockSchedulerMetadata:
+      diagnostics.recognizesExpiredMockSchedulerMetadata === true,
+    describesExpiredMockSchedulerWorkWithoutFlushing:
+      diagnostics.describesExpiredMockSchedulerWorkWithoutFlushing === true,
     drainsExpiredMockSchedulerWork: false,
     drainsAcceptedInternalTestQueues: true,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    publicActCompatibilityClaimed: false,
+    compatibilityClaimed: false,
+    invokesActCallback: false,
+    executesQueuedWork: false,
+    executesEffects: false,
+    executesScheduledCallbacks: false,
+    publicSchedulerFlushExecutionAvailable: false,
+    publicActBehaviorAvailable: false,
+    rendererRootsCompatibilityClaimed: false,
+    missingBeforeExecution: actSchedulerMissingBeforeExecution
+  });
+}
+
+function routeAcceptedMockSchedulerExpiredWorkMetadata(metadata) {
+  const rejectionReason =
+    getRejectedSchedulerMockExpiredWorkMetadataReason(metadata);
+  if (rejectionReason !== null) {
+    throw createMockSchedulerExpiredWorkRoutingError(rejectionReason);
+  }
+
+  return freezeRecord({
+    status: mockSchedulerExpiredWorkRoutingStatus,
+    accepted: true,
+    metadataKind: metadata.kind,
+    metadataVersion: metadata.version,
+    schedulerDiagnosticStatus: metadata.schedulerDiagnosticStatus,
+    consumer: 'react-test-renderer-act-scheduler-private-gate',
+    gateStatus: actSchedulerGateStatus,
+    now: metadata.now,
+    pendingWork: metadata.pendingWork,
+    hasExpiredMockSchedulerWork: metadata.hasExpiredMockSchedulerWork,
+    expiredCallbackCount: metadata.expiredCallbackCount,
+    cancelledTombstoneCount: metadata.cancelledTombstoneCount,
+    taskQueueCount: metadata.taskQueueCount,
+    taskQueue: metadata.taskQueue,
+    privateSchedulerActQueueDiagnosticsConsumed: true,
+    recognizesExpiredMockSchedulerMetadata: true,
+    routesAcceptedMockSchedulerExpiredWorkMetadata: true,
+    describesExpiredMockSchedulerWorkWithoutFlushing: true,
+    invokesPublicSchedulerFlushHelper: false,
+    publicSchedulerFlushBehaviorExecuted: false,
+    drainsExpiredMockSchedulerWork: false,
+    drainsAcceptedInternalTestQueues: false,
     drainsPublicSchedulerTaskQueue: false,
     drainsPublicReactActQueue: false,
     publicSchedulerTimingCompatibilityClaimed: false,

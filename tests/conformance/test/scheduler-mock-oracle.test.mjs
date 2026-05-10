@@ -41,6 +41,11 @@ const schedulerMockWorkspaceEntrypoints = [
 ];
 const privateActDispatcherGateModule =
   "packages/react/private-act-dispatcher-gate.js";
+const privateSchedulerMockExpiredWorkMetadataKind =
+  "fast-react.scheduler.mock-expired-work-diagnostics";
+const privateSchedulerMockExpiredWorkMetadataBrand = Symbol.for(
+  privateSchedulerMockExpiredWorkMetadataKind
+);
 
 const EXPECTED_MOCK_EXPORT_KEYS = [
   "log",
@@ -922,6 +927,135 @@ test("scheduler mock private diagnostics drain expired callbacks and continuatio
   }
 });
 
+test("scheduler mock private diagnostics describe expired work without flushing", () => {
+  for (const nodeEnv of ["development", "production"]) {
+    const Scheduler = loadFreshSchedulerMock(nodeEnv);
+    const diagnostics = readSchedulerMockPrivateActQueueFlushDiagnostics(
+      Scheduler,
+      "unstable_flushExpired"
+    );
+    assertPrivateActQueueFlushDiagnostics(diagnostics, nodeEnv);
+
+    Scheduler.reset();
+    const publicSchedulerEvents = [];
+    function cancelledExpiredPublicTask() {
+      publicSchedulerEvents.push("cancelled-expired-public-task");
+    }
+    function expiredPublicTask() {
+      publicSchedulerEvents.push("expired-public-task");
+    }
+    function normalPublicTask() {
+      publicSchedulerEvents.push("normal-public-task");
+    }
+
+    const cancelledTask = Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_UserBlockingPriority,
+      cancelledExpiredPublicTask
+    );
+    Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_UserBlockingPriority,
+      expiredPublicTask
+    );
+    Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_NormalPriority,
+      normalPublicTask
+    );
+    Scheduler.unstable_cancelCallback(cancelledTask);
+    Scheduler.unstable_advanceTime(251);
+
+    const metadata =
+      diagnostics.describeExpiredMockSchedulerWorkForDiagnostics();
+    assert.equal(
+      metadata[privateSchedulerMockExpiredWorkMetadataBrand],
+      true,
+      nodeEnv
+    );
+    assert.equal(
+      metadata.kind,
+      privateSchedulerMockExpiredWorkMetadataKind,
+      nodeEnv
+    );
+    assert.equal(metadata.version, 1, nodeEnv);
+    assert.equal(
+      metadata.status,
+      "described-expired-mock-scheduler-work-for-diagnostics",
+      nodeEnv
+    );
+    assert.equal(metadata.accepted, true, nodeEnv);
+    assert.equal(metadata.compatibilityTarget, "scheduler@0.27.0", nodeEnv);
+    assert.equal(metadata.reactCompatibilityTarget, "react@19.2.6", nodeEnv);
+    assert.equal(
+      metadata.schedulerDiagnosticStatus,
+      "private-scheduler-act-queue-flush-diagnostics",
+      nodeEnv
+    );
+    assert.equal(metadata.now, 251, nodeEnv);
+    assert.equal(metadata.pendingWork, true, nodeEnv);
+    assert.equal(metadata.hasExpiredMockSchedulerWork, true, nodeEnv);
+    assert.equal(metadata.expiredCallbackCount, 1, nodeEnv);
+    assert.equal(metadata.cancelledTombstoneCount, 1, nodeEnv);
+    assert.equal(metadata.taskQueueCount, 3, nodeEnv);
+    assert.equal(Object.isFrozen(metadata), true, nodeEnv);
+    assert.equal(Object.isFrozen(metadata.taskQueue), true, nodeEnv);
+    assert.deepEqual(
+      metadata.taskQueue.map((task) => [
+        task.callbackStatus,
+        task.callback.name ?? null,
+        task.priorityLevel,
+        task.expired
+      ]),
+      [
+        [
+          "cancelled-tombstone",
+          null,
+          Scheduler.unstable_UserBlockingPriority,
+          true
+        ],
+        [
+          "pending-callback",
+          "expiredPublicTask",
+          Scheduler.unstable_UserBlockingPriority,
+          true
+        ],
+        [
+          "pending-callback",
+          "normalPublicTask",
+          Scheduler.unstable_NormalPriority,
+          false
+        ]
+      ],
+      nodeEnv
+    );
+    assert.equal(metadata.recognizesExpiredMockSchedulerMetadata, true, nodeEnv);
+    assert.equal(
+      metadata.describesExpiredMockSchedulerWorkWithoutFlushing,
+      true,
+      nodeEnv
+    );
+    assert.equal(metadata.invokesPublicSchedulerFlushHelper, false, nodeEnv);
+    assert.equal(
+      metadata.publicSchedulerFlushBehaviorExecuted,
+      false,
+      nodeEnv
+    );
+    assert.equal(metadata.drainsExpiredMockSchedulerWork, false, nodeEnv);
+    assert.equal(metadata.drainsPublicSchedulerTaskQueue, false, nodeEnv);
+    assert.equal(metadata.drainsPublicReactActQueue, false, nodeEnv);
+    assert.equal(
+      metadata.publicSchedulerTimingCompatibilityClaimed,
+      false,
+      nodeEnv
+    );
+    assert.equal(metadata.publicReactActCompatibilityClaimed, false, nodeEnv);
+    assert.equal(metadata.compatibilityClaimed, false, nodeEnv);
+    assert.equal(metadata.executesQueuedWork, false, nodeEnv);
+    assert.equal(metadata.executesEffects, false, nodeEnv);
+    assert.deepEqual(publicSchedulerEvents, [], nodeEnv);
+    assert.equal(Scheduler.unstable_hasPendingWork(), true, nodeEnv);
+    Scheduler.reset();
+  }
+});
+
 test("scheduler mock private diagnostics record yields, paint, and continuation order", () => {
   const reactGate = loadFreshWorkspaceModule(privateActDispatcherGateModule);
 
@@ -1699,6 +1833,21 @@ function assertPrivateActQueueFlushDiagnostics(diagnostics, label) {
   );
   assert.equal(diagnostics.drainsExpiredMockSchedulerWork, true, label);
   assert.equal(
+    diagnostics.mockSchedulerExpiredWorkActRouteDiagnosticsReady,
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.recognizesExpiredMockSchedulerMetadata,
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.describesExpiredMockSchedulerWorkWithoutFlushing,
+    true,
+    label
+  );
+  assert.equal(
     diagnostics.mockSchedulerYieldPaintDiagnosticsReady,
     true,
     label
@@ -1731,6 +1880,10 @@ function assertPrivateActQueueFlushDiagnostics(diagnostics, label) {
   assert.equal(typeof diagnostics.describeAcceptedInternalActQueue, "function");
   assert.equal(typeof diagnostics.drainAcceptedInternalActQueue, "function");
   assert.equal(typeof diagnostics.drainExpiredMockSchedulerWork, "function");
+  assert.equal(
+    typeof diagnostics.describeExpiredMockSchedulerWorkForDiagnostics,
+    "function"
+  );
   assert.equal(
     typeof diagnostics.describeMockSchedulerYieldPaintState,
     "function"
