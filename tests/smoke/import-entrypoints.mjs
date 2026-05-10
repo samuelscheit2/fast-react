@@ -14,6 +14,11 @@ const repoRoot = path.resolve(
 );
 const reactPackageRoot = path.join(repoRoot, 'packages', 'react');
 const reactDomPackageRoot = path.join(repoRoot, 'packages', 'react-dom');
+const reactTestRendererPackageRoot = path.join(
+  repoRoot,
+  'packages',
+  'react-test-renderer'
+);
 const schedulerPackageRoot = path.join(repoRoot, 'packages', 'scheduler');
 
 process.env.NODE_ENV = 'development';
@@ -494,6 +499,58 @@ const blockedReactDomExtensionSubpaths = [
   '@fast-react/react-dom/placeholder-utils.js'
 ];
 
+const reactTestRendererKeys = [
+  '_Scheduler',
+  'act',
+  'create',
+  'unstable_batchedUpdates',
+  'version'
+];
+const reactTestRendererShallowKeys = [];
+const reactTestRendererPlaceholderVersion =
+  '0.0.0-fast-react-test-renderer-placeholder';
+
+const reactTestRendererEntrypoints = [
+  {
+    fileName: 'index.js',
+    keys: reactTestRendererKeys,
+    resolvedFileName: 'index.js',
+    specifier: '@fast-react/react-test-renderer',
+    unsupportedExport: 'create'
+  },
+  {
+    fileName: path.join('cjs', 'react-test-renderer.development.js'),
+    keys: reactTestRendererKeys,
+    resolvedFileName: path.join('cjs', 'react-test-renderer.development.js'),
+    specifier:
+      '@fast-react/react-test-renderer/cjs/react-test-renderer.development.js',
+    unsupportedExport: 'act'
+  },
+  {
+    fileName: path.join('cjs', 'react-test-renderer.production.js'),
+    keys: reactTestRendererKeys,
+    resolvedFileName: path.join('cjs', 'react-test-renderer.production.js'),
+    specifier:
+      '@fast-react/react-test-renderer/cjs/react-test-renderer.production.js',
+    unsupportedExport: 'unstable_batchedUpdates'
+  }
+];
+
+const reactTestRendererShallowEntrypoints = [
+  {
+    fileName: 'shallow.js',
+    keys: reactTestRendererShallowKeys,
+    resolvedFileName: 'shallow.js',
+    specifier: '@fast-react/react-test-renderer/shallow'
+  },
+  {
+    fileName: 'shallow.js',
+    keys: reactTestRendererShallowKeys,
+    resolvedFileName: 'shallow.js',
+    specifier: '@fast-react/react-test-renderer/shallow.js'
+  }
+];
+
 const schedulerImplementedRootKeys = [
   'unstable_now',
   'unstable_IdlePriority',
@@ -800,6 +857,107 @@ function assertReactServerUnsupported(callback, label) {
       return true;
     },
     label
+  );
+}
+
+function assertReactTestRendererPlaceholderMetadata(moduleExports, label) {
+  assert.equal(
+    moduleExports.__FAST_REACT_PLACEHOLDER__,
+    true,
+    `${label} should expose non-enumerable placeholder metadata`
+  );
+  assert.equal(
+    moduleExports.compatibilityTarget,
+    'react-test-renderer@19.2.6',
+    `${label} should expose the React Test Renderer inventory target`
+  );
+  assert.equal(
+    Object.keys(moduleExports).includes('__FAST_REACT_PLACEHOLDER__'),
+    false,
+    `${label} placeholder marker must not be enumerable`
+  );
+  assert.equal(
+    Object.keys(moduleExports).includes('compatibilityTarget'),
+    false,
+    `${label} compatibility metadata must not be enumerable`
+  );
+}
+
+function assertReactTestRendererInventoryKeys(
+  moduleExports,
+  expectedKeys,
+  label
+) {
+  assert.deepEqual(Object.keys(moduleExports), expectedKeys, `${label} keys`);
+  assertReactTestRendererPlaceholderMetadata(moduleExports, label);
+}
+
+function assertReactTestRendererUnimplemented(callback, label) {
+  assert.throws(
+    callback,
+    (error) => {
+      assert.equal(
+        error.name,
+        'FastReactTestRendererUnimplementedError',
+        label
+      );
+      assert.equal(error.code, 'FAST_REACT_UNIMPLEMENTED', label);
+      assert.equal(
+        error.compatibilityTarget,
+        'react-test-renderer@19.2.6',
+        label
+      );
+      assert.match(
+        error.message,
+        /no React Test Renderer behavior implementation yet/,
+        label
+      );
+      return true;
+    },
+    label
+  );
+}
+
+function assertReactTestRendererShallowUnsupported(callback, label) {
+  assert.throws(
+    callback,
+    (error) => {
+      assert.equal(
+        error.name,
+        'FastReactTestRendererShallowUnsupportedError',
+        label
+      );
+      assert.equal(
+        error.code,
+        'FAST_REACT_TEST_RENDERER_SHALLOW_UNSUPPORTED',
+        label
+      );
+      assert.equal(
+        error.compatibilityTarget,
+        'react-test-renderer@19.2.6',
+        label
+      );
+      assert.match(error.message, /preserve the public package subpath/, label);
+      return true;
+    },
+    label
+  );
+}
+
+function assertReactTestRendererRootBehavior(moduleExports, label) {
+  assert.equal(moduleExports.version, reactTestRendererPlaceholderVersion);
+  assert.equal(moduleExports.create.length, 2, `${label}.create length`);
+  assert.equal(moduleExports.act.length, 1, `${label}.act length`);
+  assert.equal(
+    moduleExports.unstable_batchedUpdates.length,
+    2,
+    `${label}.unstable_batchedUpdates length`
+  );
+  assert.deepEqual(Object.keys(moduleExports._Scheduler), [], label);
+  assert.deepEqual(Reflect.ownKeys(moduleExports._Scheduler), [], label);
+  assertReactTestRendererUnimplemented(
+    () => moduleExports._Scheduler.unstable_scheduleCallback,
+    `${label}._Scheduler.unstable_scheduleCallback`
   );
 }
 
@@ -2040,6 +2198,48 @@ async function assertReactDomFileEntrypoint(entrypoint, labelPrefix) {
   }
 }
 
+async function assertReactTestRendererFileEntrypoint(entrypoint, labelPrefix) {
+  const absolutePath = path.join(
+    reactTestRendererPackageRoot,
+    entrypoint.fileName
+  );
+  const cjsModule = require(absolutePath);
+  assertReactTestRendererInventoryKeys(
+    cjsModule,
+    entrypoint.keys,
+    `${labelPrefix} CJS`
+  );
+
+  if (entrypoint.unsupportedExport) {
+    assertReactTestRendererRootBehavior(cjsModule, labelPrefix);
+    assertReactTestRendererUnimplemented(
+      () => cjsModule[entrypoint.unsupportedExport](),
+      `${labelPrefix}.${entrypoint.unsupportedExport}`
+    );
+  } else {
+    assert.equal(typeof cjsModule, 'function', `${labelPrefix} CJS function`);
+    assertReactTestRendererShallowUnsupported(
+      () => cjsModule(),
+      `${labelPrefix}.call`
+    );
+    assertReactTestRendererShallowUnsupported(
+      () => new cjsModule(),
+      `${labelPrefix}.construct`
+    );
+  }
+
+  const esmModule = await import(pathToFileURL(absolutePath).href);
+  assert.equal(esmModule.default, cjsModule, `${labelPrefix} ESM default`);
+
+  for (const key of entrypoint.keys) {
+    assert.equal(
+      esmModule[key],
+      cjsModule[key],
+      `${labelPrefix} should expose ${key} through Node CJS named import interop`
+    );
+  }
+}
+
 async function assertSchedulerFileEntrypoint(entrypoint, labelPrefix) {
   const absolutePath = path.join(schedulerPackageRoot, entrypoint.resolvedFileName);
   if (entrypoint.requiresPostTaskWindow) {
@@ -2123,6 +2323,20 @@ async function assertReactDomDirectFileEntrypoints() {
       `${specifier} direct file`
     );
   }
+}
+
+async function assertReactTestRendererDirectFileEntrypoints() {
+  for (const entrypoint of reactTestRendererEntrypoints) {
+    await assertReactTestRendererFileEntrypoint(
+      entrypoint,
+      `react-test-renderer ${entrypoint.fileName}`
+    );
+  }
+
+  await assertReactTestRendererFileEntrypoint(
+    reactTestRendererShallowEntrypoints[0],
+    'react-test-renderer shallow.js'
+  );
 }
 
 async function assertSchedulerDirectFileEntrypoints() {
@@ -2231,6 +2445,7 @@ async function assertDirectFileEntrypoints() {
   assertUnimplemented(() => compilerRuntime.c(0), 'react/compiler-runtime.c');
   await assertProductionJsxDevUndefined();
   await assertReactDomDirectFileEntrypoints();
+  await assertReactTestRendererDirectFileEntrypoints();
   await assertSchedulerDirectFileEntrypoints();
 }
 
@@ -2528,6 +2743,20 @@ async function assertPackageMetadata() {
     '@fast-react/react': '0.0.0'
   });
 
+  const reactTestRendererPackageJson = require(
+    path.join(reactTestRendererPackageRoot, 'package.json')
+  );
+  assert.equal(reactTestRendererPackageJson.name, '@fast-react/react-test-renderer');
+  assert.equal(reactTestRendererPackageJson.version, '0.0.0');
+  assert.equal(reactTestRendererPackageJson.main, 'index.js');
+  assert.equal(Object.hasOwn(reactTestRendererPackageJson, 'exports'), false);
+  assert.deepEqual(reactTestRendererPackageJson.dependencies, {
+    scheduler: '^0.27.0'
+  });
+  assert.deepEqual(reactTestRendererPackageJson.peerDependencies, {
+    '@fast-react/react': '0.0.0'
+  });
+
   const schedulerPackageJson = require(
     path.join(schedulerPackageRoot, 'package.json')
   );
@@ -2546,6 +2775,10 @@ async function assertPackageSpecifierEntrypoints() {
   );
   const tempReactPackageRoot = path.join(scopedPackageRoot, 'react');
   const tempReactDomPackageRoot = path.join(scopedPackageRoot, 'react-dom');
+  const tempReactTestRendererPackageRoot = path.join(
+    scopedPackageRoot,
+    'react-test-renderer'
+  );
   const tempSchedulerPackageRoot = path.join(tempRoot, 'node_modules', 'scheduler');
 
   try {
@@ -2555,6 +2788,10 @@ async function assertPackageSpecifierEntrypoints() {
       verbatimSymlinks: false
     });
     await cp(reactDomPackageRoot, tempReactDomPackageRoot, {
+      recursive: true,
+      verbatimSymlinks: false
+    });
+    await cp(reactTestRendererPackageRoot, tempReactTestRendererPackageRoot, {
       recursive: true,
       verbatimSymlinks: false
     });
@@ -2595,6 +2832,7 @@ async function assertPackageSpecifierEntrypoints() {
       ['@fast-react/react-dom/server', 'server.node.js'],
       ['@fast-react/react-dom/static', 'static.node.js']
     ]);
+    await runReactTestRendererPackageProbe(tempRoot);
     await runSchedulerPackageProbe(tempRoot);
   } finally {
     await rm(tempRoot, { force: true, recursive: true });
@@ -2812,6 +3050,208 @@ async function runReactDomConditionProbe(tempRoot, nodeArgs, expectedResolutions
     result.status,
     0,
     `react-dom condition probe failed:\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+  );
+}
+
+async function runReactTestRendererPackageProbe(tempRoot) {
+  const probePath = path.join(tempRoot, 'react-test-renderer-probe.cjs');
+  const probeSource = `
+    'use strict';
+
+    const assert = require('node:assert/strict');
+    const path = require('node:path');
+
+    const rootEntrypoints = ${JSON.stringify(reactTestRendererEntrypoints)};
+    const shallowEntrypoints = ${JSON.stringify(
+      reactTestRendererShallowEntrypoints
+    )};
+    const placeholderVersion = ${JSON.stringify(
+      reactTestRendererPlaceholderVersion
+    )};
+
+    function assertInventoryKeys(moduleExports, expectedKeys, label) {
+      assert.deepEqual(Object.keys(moduleExports), expectedKeys, label);
+      assert.equal(moduleExports.__FAST_REACT_PLACEHOLDER__, true, label);
+      assert.equal(
+        moduleExports.compatibilityTarget,
+        'react-test-renderer@19.2.6',
+        label
+      );
+      assert.equal(
+        Object.keys(moduleExports).includes('__FAST_REACT_PLACEHOLDER__'),
+        false,
+        label
+      );
+      assert.equal(
+        Object.keys(moduleExports).includes('compatibilityTarget'),
+        false,
+        label
+      );
+    }
+
+    function assertUnimplemented(callback, label) {
+      assert.throws(
+        callback,
+        (error) => {
+          assert.equal(
+            error.name,
+            'FastReactTestRendererUnimplementedError',
+            label
+          );
+          assert.equal(error.code, 'FAST_REACT_UNIMPLEMENTED', label);
+          assert.equal(
+            error.compatibilityTarget,
+            'react-test-renderer@19.2.6',
+            label
+          );
+          assert.match(
+            error.message,
+            /no React Test Renderer behavior implementation yet/,
+            label
+          );
+          return true;
+        },
+        label
+      );
+    }
+
+    function assertShallowUnsupported(callback, label) {
+      assert.throws(
+        callback,
+        (error) => {
+          assert.equal(
+            error.name,
+            'FastReactTestRendererShallowUnsupportedError',
+            label
+          );
+          assert.equal(
+            error.code,
+            'FAST_REACT_TEST_RENDERER_SHALLOW_UNSUPPORTED',
+            label
+          );
+          assert.equal(
+            error.compatibilityTarget,
+            'react-test-renderer@19.2.6',
+            label
+          );
+          assert.match(error.message, /public package subpath/, label);
+          return true;
+        },
+        label
+      );
+    }
+
+    (async () => {
+      const packageJson = require('@fast-react/react-test-renderer/package.json');
+      assert.equal(packageJson.name, '@fast-react/react-test-renderer');
+      assert.equal(packageJson.version, '0.0.0');
+      assert.equal(packageJson.main, 'index.js');
+      assert.equal(Object.hasOwn(packageJson, 'exports'), false);
+      assert.deepEqual(packageJson.dependencies, {
+        scheduler: '^0.27.0'
+      });
+      assert.deepEqual(packageJson.peerDependencies, {
+        '@fast-react/react': '0.0.0'
+      });
+
+      for (const {
+        keys,
+        resolvedFileName,
+        specifier,
+        unsupportedExport
+      } of rootEntrypoints) {
+        assert.equal(
+          require.resolve(specifier),
+          path.join(
+            process.cwd(),
+            'node_modules',
+            '@fast-react',
+            'react-test-renderer',
+            resolvedFileName
+          ),
+          specifier
+        );
+
+        const cjsModule = require(specifier);
+        assertInventoryKeys(cjsModule, keys, specifier);
+        assert.equal(cjsModule.version, placeholderVersion, specifier);
+        assert.equal(cjsModule.create.length, 2, specifier);
+        assert.equal(cjsModule.act.length, 1, specifier);
+        assert.equal(cjsModule.unstable_batchedUpdates.length, 2, specifier);
+        assert.deepEqual(Object.keys(cjsModule._Scheduler), [], specifier);
+        assertUnimplemented(
+          () => cjsModule._Scheduler.unstable_scheduleCallback,
+          specifier + ' _Scheduler'
+        );
+        assertUnimplemented(
+          () => cjsModule[unsupportedExport](),
+          specifier + ' ' + unsupportedExport
+        );
+
+        if (specifier === '@fast-react/react-test-renderer') {
+          const esmModule = await import(specifier);
+          assert.equal(esmModule.default, cjsModule, specifier);
+          for (const key of keys) {
+            assert.equal(esmModule[key], cjsModule[key], specifier + ' ' + key);
+          }
+        } else {
+          const esmModule = await import(specifier);
+          assert.equal(esmModule.default, cjsModule, specifier);
+        }
+      }
+
+      for (const { keys, resolvedFileName, specifier } of shallowEntrypoints) {
+        assert.equal(
+          require.resolve(specifier),
+          path.join(
+            process.cwd(),
+            'node_modules',
+            '@fast-react',
+            'react-test-renderer',
+            resolvedFileName
+          ),
+          specifier
+        );
+        const shallow = require(specifier);
+        assertInventoryKeys(shallow, keys, specifier);
+        assert.equal(typeof shallow, 'function', specifier);
+        assertShallowUnsupported(() => shallow(), specifier + ' call');
+        assertShallowUnsupported(() => new shallow(), specifier + ' construct');
+
+        if (specifier.endsWith('.js')) {
+          const esmModule = await import(specifier);
+          assert.equal(esmModule.default, shallow, specifier);
+        }
+      }
+
+      assert.equal(
+        require.resolve('@fast-react/react-test-renderer/index.js'),
+        path.join(
+          process.cwd(),
+          'node_modules',
+          '@fast-react',
+          'react-test-renderer',
+          'index.js'
+        )
+      );
+    })().catch((error) => {
+      console.error(error);
+      process.exitCode = 1;
+    });
+  `;
+
+  await writeFile(probePath, probeSource);
+
+  const result = spawnSync(process.execPath, [probePath], {
+    cwd: tempRoot,
+    encoding: 'utf8',
+    stdio: 'pipe'
+  });
+
+  assert.equal(
+    result.status,
+    0,
+    `react-test-renderer package probe failed:\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
   );
 }
 
@@ -3578,4 +4018,4 @@ await assertPackageMetadata();
 await assertDirectFileEntrypoints();
 await assertPackageSpecifierEntrypoints();
 
-console.log('Fast React entrypoints match the accepted inventory and element/context/ref/Children/memo/lazy/forwardRef/component-class smoke checks.');
+console.log('Fast React entrypoints match the accepted inventory and element/context/ref/Children/memo/lazy/forwardRef/component-class/test-renderer smoke checks.');
