@@ -45,47 +45,17 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue 413-442 is assigned in isolated worktrees.
-Workers 414, 437, 438, and 439 have been accepted, leaving 26 active top-level
-workers from this queue.
-
-| Worker | Focus |
-| --- | --- |
-| 413 | Root commit HostComponent update traversal canary |
-| 415 | Ref callback cleanup-return handle store |
-| 416 | Ref callback error routing private records |
-| 417 | Context dependency metadata on private runtime reads |
-| 418 | Provider complete/unwind traversal canary |
-| 419 | Function component committed effect ownership |
-| 420 | Passive effect traversal from committed fiber effects |
-| 421 | Passive effect error capture root records |
-| 422 | Scheduler bridge act continuation execution |
-| 423 | Test renderer native/Rust root execution bridge |
-| 424 | Test renderer `toJSON` broader host-shape diagnostics |
-| 425 | Test renderer `toTree` composite metadata diagnostics |
-| 426 | Test renderer TestInstance private bridge queries |
-| 427 | React DOM public root facade private execution preflight |
-| 428 | React DOM root commit update handoff |
-| 429 | React DOM SyntheticEvent shape private gate |
-| 430 | React DOM event propagation/error diagnostics |
-| 431 | Controlled input post-event restore queue gate |
-| 432 | Resource head clear/retain private gate |
-| 433 | Hydration dehydrated target resolution gate |
-| 434 | Portal `preparePortalMount` listener gate |
-| 435 | Native JSON transport parser gate |
-| 436 | Scheduler mock continuation execution gate |
-| 440 | Package-surface private facade audit |
-| 441 | Root-render E2E cross-root scheduling admission |
-| 442 | DOM root marker/listener public-facade preflight |
+Top-level cap: 30 workers. No active top-level workers are currently queued
+after accepting queue 413-442.
 
 ## Near-Term Sequencing
 
-1. Monitor queue 413-442 for completion and merge completed workers before
-   queuing more.
+1. Clean up accepted queue 413-442 tmux sessions, worktrees, and merged local
+   branches before refilling the queue.
 2. Accept code workers opportunistically, resolving merge conflicts after the
    fact when overlapping work lands on different implementation surfaces.
-3. After the queue drains, refill up to the 30 top-level worker cap with the
-   next narrow implementation or conformance checkpoints.
+3. Refill up to the 30 top-level worker cap with the next narrow
+   implementation or conformance checkpoints.
 
 ## Next Queue Candidates
 

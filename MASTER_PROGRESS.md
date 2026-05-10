@@ -29,18 +29,25 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
-- Workers 414, 437, 438, and 439 were accepted from queue 413-442. This subset
-  added a private nearest-host-parent deletion traversal canary through
-  FunctionComponent owners, a package-private React act renderer-backed drain
-  metadata consumer, React DOM test-utils act awareness for private flushSync
-  and warning-boundary prerequisites, and diagnostic-only benchmark canaries for
-  private cross-root flushSync and warning-boundary timing while public
-  compatibility remains blocked.
-- Workers 414, 437, 438, and 439 were verified after merge with focused
-  root-commit deletion tests, React act and React DOM test-utils act oracle
-  tests, React and React DOM workspace checks, package-surface, benchmark,
-  root-render E2E and public-facade conformance checks, conflict-marker
-  scanning, and `git diff --check`.
+- Workers 413-442 were accepted as a complete implementation batch. The batch
+  added root commit HostComponent update traversal and deletion-parent
+  traversal canaries, ref cleanup/error routing metadata, context dependency
+  and provider unwind records, committed/passive effect ownership and error
+  capture paths, scheduler act and mock continuation execution, test-renderer
+  native execution/serialization/tree/TestInstance diagnostics, React DOM root
+  facade, commit update, SyntheticEvent, propagation/error, hydration, portal,
+  controlled-input, resource, native JSON transport, package-surface, benchmark,
+  and root-render E2E admissions while public compatibility remains blocked.
+- Workers 413-442 were verified after merge with focused Rust, N-API,
+  scheduler, React act, test-renderer, React DOM, native, package-surface,
+  root-render E2E, benchmark, public-facade, event, hydration, controlled, and
+  resource checks. Final broad verification passed `cargo fmt --all --check`,
+  full `fast-react-reconciler`, `fast-react-test-renderer`, and
+  `fast-react-napi` tests, workspace clippy with `-D warnings`,
+  `npm run check:js`, conflict-marker scanning, and `git diff --check`.
+  Post-merge cleanup fixed test-renderer and scheduler act expectations and
+  refreshed package-surface snapshots for the accepted private facade files and
+  symbols.
 - Workers 383-412 were accepted as a complete implementation batch. The batch
   added root commit HostComponent update/deletion and ref-callback handoff
   canaries, context provider begin-work/root-work-loop handoffs, passive error
