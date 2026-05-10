@@ -640,6 +640,40 @@ const schedulerMockKeys = [
   'unstable_shouldYield',
   'unstable_wrapCallback'
 ];
+const reactTestRendererSchedulerFunctionShapes = {
+  log: { length: 1, name: '' },
+  reset: { length: 0, name: '' },
+  unstable_advanceTime: { length: 1, name: '' },
+  unstable_cancelCallback: { length: 1, name: '' },
+  unstable_clearLog: { length: 0, name: '' },
+  unstable_flushAll: { length: 0, name: '' },
+  unstable_flushAllWithoutAsserting: {
+    length: 0,
+    name: 'unstable_flushAllWithoutAsserting'
+  },
+  unstable_flushExpired: { length: 0, name: '' },
+  unstable_flushNumberOfYields: { length: 1, name: '' },
+  unstable_flushUntilNextPaint: { length: 0, name: '' },
+  unstable_forceFrameRate: { length: 0, name: '' },
+  unstable_getCurrentPriorityLevel: { length: 0, name: '' },
+  unstable_hasPendingWork: { length: 0, name: '' },
+  unstable_next: { length: 1, name: '' },
+  unstable_now: { length: 0, name: '' },
+  unstable_requestPaint: { length: 0, name: '' },
+  unstable_runWithPriority: { length: 2, name: '' },
+  unstable_scheduleCallback: { length: 3, name: '' },
+  unstable_setDisableYieldValue: { length: 1, name: '' },
+  unstable_shouldYield: { length: 0, name: 'shouldYieldToHost' },
+  unstable_wrapCallback: { length: 1, name: '' }
+};
+const reactTestRendererSchedulerConstantValues = {
+  unstable_IdlePriority: 5,
+  unstable_ImmediatePriority: 1,
+  unstable_LowPriority: 4,
+  unstable_NormalPriority: 3,
+  unstable_Profiling: null,
+  unstable_UserBlockingPriority: 2
+};
 
 const schedulerEntrypoints = [
   {
@@ -928,6 +962,50 @@ function assertReactTestRendererUnimplemented(
   );
 }
 
+function assertReactTestRendererSchedulerShell(scheduler, label) {
+  assert.deepEqual(Object.keys(scheduler), schedulerMockKeys, `${label} keys`);
+  assert.deepEqual(
+    Reflect.ownKeys(scheduler),
+    schedulerMockKeys,
+    `${label} own keys`
+  );
+
+  for (const [key, expectedValue] of Object.entries(
+    reactTestRendererSchedulerConstantValues
+  )) {
+    const descriptor = Object.getOwnPropertyDescriptor(scheduler, key);
+    assert.equal(descriptor.enumerable, true, `${label}.${key} enumerable`);
+    assert.equal(descriptor.configurable, true, `${label}.${key} configurable`);
+    assert.equal(descriptor.writable, true, `${label}.${key} writable`);
+    assert.equal(scheduler[key], expectedValue, `${label}.${key}`);
+  }
+
+  for (const [key, expectedShape] of Object.entries(
+    reactTestRendererSchedulerFunctionShapes
+  )) {
+    const descriptor = Object.getOwnPropertyDescriptor(scheduler, key);
+    assert.equal(descriptor.enumerable, true, `${label}.${key} enumerable`);
+    assert.equal(descriptor.configurable, true, `${label}.${key} configurable`);
+    assert.equal(descriptor.writable, true, `${label}.${key} writable`);
+    assert.equal(typeof scheduler[key], 'function', `${label}.${key} type`);
+    assert.equal(
+      scheduler[key].length,
+      expectedShape.length,
+      `${label}.${key} length`
+    );
+    assert.equal(
+      scheduler[key].name,
+      expectedShape.name,
+      `${label}.${key} name`
+    );
+    assertReactTestRendererUnimplemented(
+      () => scheduler[key](),
+      `${label}.${key}`,
+      `_Scheduler.${key}`
+    );
+  }
+}
+
 function assertReactTestRendererShallowUnsupported(callback, label) {
   assert.throws(
     callback,
@@ -967,12 +1045,9 @@ function assertReactTestRendererRootBehavior(moduleExports, label, entrypoint) {
     2,
     `${label}.unstable_batchedUpdates length`
   );
-  assert.deepEqual(Object.keys(moduleExports._Scheduler), [], label);
-  assert.deepEqual(Reflect.ownKeys(moduleExports._Scheduler), [], label);
-  assertReactTestRendererUnimplemented(
-    () => moduleExports._Scheduler.unstable_scheduleCallback,
-    `${label}._Scheduler.unstable_scheduleCallback`,
-    '_Scheduler.unstable_scheduleCallback'
+  assertReactTestRendererSchedulerShell(
+    moduleExports._Scheduler,
+    `${label}._Scheduler`
   );
 
   const renderer = moduleExports.create(null);
@@ -1005,7 +1080,15 @@ function assertReactTestRendererRootBehavior(moduleExports, label, entrypoint) {
     1,
     `${label}.unstable_flushSync length`
   );
-  assert.deepEqual(Object.keys(renderer._Scheduler), [], `${label} renderer scheduler`);
+  assert.equal(
+    renderer._Scheduler,
+    moduleExports._Scheduler,
+    `${label}.create()._Scheduler identity`
+  );
+  assertReactTestRendererSchedulerShell(
+    renderer._Scheduler,
+    `${label}.create()._Scheduler`
+  );
   assertReactTestRendererUnimplemented(
     () => renderer.root,
     `${label}.root`,
@@ -3162,6 +3245,13 @@ async function runReactTestRendererPackageProbe(tempRoot) {
     const placeholderVersion = ${JSON.stringify(
       reactTestRendererPlaceholderVersion
     )};
+    const schedulerMockKeys = ${JSON.stringify(schedulerMockKeys)};
+    const schedulerFunctionShapes = ${JSON.stringify(
+      reactTestRendererSchedulerFunctionShapes
+    )};
+    const schedulerConstantValues = ${JSON.stringify(
+      reactTestRendererSchedulerConstantValues
+    )};
 
     function assertInventoryKeys(moduleExports, expectedKeys, label) {
       assert.deepEqual(Object.keys(moduleExports), expectedKeys, label);
@@ -3210,6 +3300,46 @@ async function runReactTestRendererPackageProbe(tempRoot) {
         },
         label
       );
+    }
+
+    function assertSchedulerShell(scheduler, label) {
+      assert.deepEqual(Object.keys(scheduler), schedulerMockKeys, label);
+      assert.deepEqual(Reflect.ownKeys(scheduler), schedulerMockKeys, label);
+
+      for (const [key, expectedValue] of Object.entries(
+        schedulerConstantValues
+      )) {
+        const descriptor = Object.getOwnPropertyDescriptor(scheduler, key);
+        assert.equal(descriptor.enumerable, true, label + ' ' + key);
+        assert.equal(descriptor.configurable, true, label + ' ' + key);
+        assert.equal(descriptor.writable, true, label + ' ' + key);
+        assert.equal(scheduler[key], expectedValue, label + ' ' + key);
+      }
+
+      for (const [key, expectedShape] of Object.entries(
+        schedulerFunctionShapes
+      )) {
+        const descriptor = Object.getOwnPropertyDescriptor(scheduler, key);
+        assert.equal(descriptor.enumerable, true, label + ' ' + key);
+        assert.equal(descriptor.configurable, true, label + ' ' + key);
+        assert.equal(descriptor.writable, true, label + ' ' + key);
+        assert.equal(typeof scheduler[key], 'function', label + ' ' + key);
+        assert.equal(
+          scheduler[key].length,
+          expectedShape.length,
+          label + ' ' + key
+        );
+        assert.equal(
+          scheduler[key].name,
+          expectedShape.name,
+          label + ' ' + key
+        );
+        assertUnimplemented(
+          () => scheduler[key](),
+          label + ' ' + key,
+          '_Scheduler.' + key
+        );
+      }
     }
 
     function assertShallowUnsupported(callback, label) {
@@ -3280,12 +3410,7 @@ async function runReactTestRendererPackageProbe(tempRoot) {
           assert.equal(cjsModule.act.length, 1, specifier);
         }
         assert.equal(cjsModule.unstable_batchedUpdates.length, 2, specifier);
-        assert.deepEqual(Object.keys(cjsModule._Scheduler), [], specifier);
-        assertUnimplemented(
-          () => cjsModule._Scheduler.unstable_scheduleCallback,
-          specifier + ' _Scheduler',
-          '_Scheduler.unstable_scheduleCallback'
-        );
+        assertSchedulerShell(cjsModule._Scheduler, specifier + ' _Scheduler');
         const renderer = cjsModule.create(null);
         assert.deepEqual(
           Object.keys(renderer),
@@ -3312,7 +3437,11 @@ async function runReactTestRendererPackageProbe(tempRoot) {
         assert.equal(renderer.unmount.length, 0, specifier);
         assert.equal(renderer.getInstance.length, 0, specifier);
         assert.equal(renderer.unstable_flushSync.length, 1, specifier);
-        assert.deepEqual(Object.keys(renderer._Scheduler), [], specifier);
+        assert.equal(renderer._Scheduler, cjsModule._Scheduler, specifier);
+        assertSchedulerShell(
+          renderer._Scheduler,
+          specifier + ' renderer _Scheduler'
+        );
         assertUnimplemented(() => renderer.root, specifier + ' root', 'create().root');
         assertUnimplemented(() => renderer.toJSON(), specifier + ' toJSON', 'create().toJSON');
         assertUnimplemented(() => renderer.toTree(), specifier + ' toTree', 'create().toTree');

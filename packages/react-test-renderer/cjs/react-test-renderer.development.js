@@ -44,6 +44,71 @@ const createRoutingGate = Object.freeze({
   missingPrerequisites: createRoutingMissingPrerequisites,
   prerequisites: createRoutingPrerequisites
 });
+const schedulerMockKeys = [
+  'log',
+  'reset',
+  'unstable_IdlePriority',
+  'unstable_ImmediatePriority',
+  'unstable_LowPriority',
+  'unstable_NormalPriority',
+  'unstable_Profiling',
+  'unstable_UserBlockingPriority',
+  'unstable_advanceTime',
+  'unstable_cancelCallback',
+  'unstable_clearLog',
+  'unstable_flushAll',
+  'unstable_flushAllWithoutAsserting',
+  'unstable_flushExpired',
+  'unstable_flushNumberOfYields',
+  'unstable_flushUntilNextPaint',
+  'unstable_forceFrameRate',
+  'unstable_getCurrentPriorityLevel',
+  'unstable_hasPendingWork',
+  'unstable_next',
+  'unstable_now',
+  'unstable_requestPaint',
+  'unstable_runWithPriority',
+  'unstable_scheduleCallback',
+  'unstable_setDisableYieldValue',
+  'unstable_shouldYield',
+  'unstable_wrapCallback'
+];
+
+const schedulerFunctionShapes = {
+  log: ['', 1],
+  reset: ['', 0],
+  unstable_advanceTime: ['', 1],
+  unstable_cancelCallback: ['', 1],
+  unstable_clearLog: ['', 0],
+  unstable_flushAll: ['', 0],
+  unstable_flushAllWithoutAsserting: [
+    'unstable_flushAllWithoutAsserting',
+    0
+  ],
+  unstable_flushExpired: ['', 0],
+  unstable_flushNumberOfYields: ['', 1],
+  unstable_flushUntilNextPaint: ['', 0],
+  unstable_forceFrameRate: ['', 0],
+  unstable_getCurrentPriorityLevel: ['', 0],
+  unstable_hasPendingWork: ['', 0],
+  unstable_next: ['', 1],
+  unstable_now: ['', 0],
+  unstable_requestPaint: ['', 0],
+  unstable_runWithPriority: ['', 2],
+  unstable_scheduleCallback: ['', 3],
+  unstable_setDisableYieldValue: ['', 1],
+  unstable_shouldYield: ['shouldYieldToHost', 0],
+  unstable_wrapCallback: ['', 1]
+};
+
+const schedulerConstantValues = {
+  unstable_IdlePriority: 5,
+  unstable_ImmediatePriority: 1,
+  unstable_LowPriority: 4,
+  unstable_NormalPriority: 3,
+  unstable_Profiling: null,
+  unstable_UserBlockingPriority: 2
+};
 
 function createUnsupportedError(exportName, action, detail, routingGate) {
   const suffix = detail === undefined ? '' : ` ${detail}`;
@@ -96,6 +161,18 @@ function createUnsupportedFunction(exportName, length) {
   return defineFunctionShape(fn, exportName, length);
 }
 
+function createSchedulerUnsupportedFunction(exportName, name, length) {
+  const fn = function fastReactTestRendererSchedulerPlaceholder() {
+    throw createUnsupportedError(
+      `_Scheduler.${exportName}`,
+      'was called',
+      'The public Scheduler exposure is intentionally a throwing shape shell until react-test-renderer act and scheduling behavior are wired.'
+    );
+  };
+
+  return defineFunctionShape(fn, name, length);
+}
+
 function createRendererUnsupportedFunction(
   exportName,
   length,
@@ -114,51 +191,22 @@ function createRendererUnsupportedFunction(
   return defineFunctionShape(fn, exportName.split('.').pop(), length);
 }
 
-function createSchedulerPlaceholder(routingGate) {
-  const target = Object.create(null);
+function createSchedulerPlaceholder() {
+  const scheduler = {};
 
-  Object.defineProperty(target, Symbol.toStringTag, {
-    configurable: true,
-    value: 'FastReactTestRendererUnimplementedScheduler'
-  });
-
-  return new Proxy(target, {
-    get(_target, property) {
-      if (property === Symbol.toStringTag) {
-        return 'FastReactTestRendererUnimplementedScheduler';
-      }
-
-      throw createUnsupportedError(
-        `_Scheduler.${String(property)}`,
-        'was accessed',
-        'The public Scheduler exposure is intentionally blocked until react-test-renderer act and scheduling behavior are wired.',
-        routingGate
-      );
-    },
-    getOwnPropertyDescriptor() {
-      return undefined;
-    },
-    has(_target, property) {
-      throw createUnsupportedError(
-        `_Scheduler.${String(property)}`,
-        'was checked',
-        'The public Scheduler exposure is intentionally blocked until react-test-renderer act and scheduling behavior are wired.',
-        routingGate
-      );
-    },
-    ownKeys() {
-      return [];
-    },
-    set(_target, property) {
-      throw createUnsupportedError(
-        `_Scheduler.${String(property)}`,
-        'was assigned',
-        'The public Scheduler exposure is intentionally blocked until react-test-renderer act and scheduling behavior are wired.',
-        routingGate
-      );
+  for (const key of schedulerMockKeys) {
+    if (Object.hasOwn(schedulerConstantValues, key)) {
+      scheduler[key] = schedulerConstantValues[key];
+    } else {
+      const [name, length] = schedulerFunctionShapes[key];
+      scheduler[key] = createSchedulerUnsupportedFunction(key, name, length);
     }
-  });
+  }
+
+  return scheduler;
 }
+
+const schedulerPlaceholder = createSchedulerPlaceholder();
 
 function definePlaceholderMetadata(exportsObject) {
   Object.defineProperties(exportsObject, {
@@ -181,7 +229,7 @@ function definePlaceholderMetadata(exportsObject) {
 
 function createPlaceholderRenderer(routingGate) {
   const renderer = {
-    _Scheduler: createSchedulerPlaceholder(routingGate),
+    _Scheduler: schedulerPlaceholder,
     root: undefined,
     toJSON: createRendererUnsupportedFunction(
       'create().toJSON',
@@ -241,7 +289,7 @@ function create() {
   return createPlaceholderRenderer(createRoutingGate);
 }
 
-exports._Scheduler = createSchedulerPlaceholder();
+exports._Scheduler = schedulerPlaceholder;
 exports.act = createUnsupportedFunction('act', 1);
 exports.create = defineFunctionShape(create, 'create', 2);
 exports.unstable_batchedUpdates = createUnsupportedFunction(

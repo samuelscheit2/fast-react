@@ -37,6 +37,35 @@ const rendererKeys = [
   "getInstance",
   "unstable_flushSync"
 ];
+const schedulerMockKeys = [
+  "log",
+  "reset",
+  "unstable_IdlePriority",
+  "unstable_ImmediatePriority",
+  "unstable_LowPriority",
+  "unstable_NormalPriority",
+  "unstable_Profiling",
+  "unstable_UserBlockingPriority",
+  "unstable_advanceTime",
+  "unstable_cancelCallback",
+  "unstable_clearLog",
+  "unstable_flushAll",
+  "unstable_flushAllWithoutAsserting",
+  "unstable_flushExpired",
+  "unstable_flushNumberOfYields",
+  "unstable_flushUntilNextPaint",
+  "unstable_forceFrameRate",
+  "unstable_getCurrentPriorityLevel",
+  "unstable_hasPendingWork",
+  "unstable_next",
+  "unstable_now",
+  "unstable_requestPaint",
+  "unstable_runWithPriority",
+  "unstable_scheduleCallback",
+  "unstable_setDisableYieldValue",
+  "unstable_shouldYield",
+  "unstable_wrapCallback"
+];
 const entrypoints = [
   {
     entrypoint: "react-test-renderer",
@@ -129,10 +158,6 @@ test("react-test-renderer create shell keeps every behaviorful renderer surface 
         run: () => renderer.unstable_flushSync(() => {
           throw new Error("must not run flushSync callback");
         })
-      },
-      {
-        exportName: "_Scheduler.unstable_scheduleCallback",
-        run: () => renderer._Scheduler.unstable_scheduleCallback
       }
     ];
 
@@ -158,8 +183,8 @@ test("react-test-renderer create shell keeps every behaviorful renderer surface 
       assert.equal(Object.hasOwn(actError, "routingGate"), false);
     }
 
-    const schedulerError = captureThrown(
-      () => moduleExports._Scheduler.unstable_scheduleCallback
+    const schedulerError = captureThrown(() =>
+      moduleExports._Scheduler.unstable_scheduleCallback()
     );
     assertReactTestRendererUnimplemented(
       schedulerError,
@@ -211,10 +236,6 @@ test("react-test-renderer create routing gate does not load native bridge artifa
         captureThrown(() => renderer.unmount()),
         entry.entrypoint
       );
-      assertCreateRoutingGate(
-        captureThrown(() => renderer._Scheduler.unstable_scheduleCallback),
-        entry.entrypoint
-      );
     }
   } finally {
     Module._load = originalLoad;
@@ -249,7 +270,7 @@ function assertRendererShape(renderer, label) {
   assert.equal(renderer.unmount.length, 0, label);
   assert.equal(renderer.getInstance.length, 0, label);
   assert.equal(renderer.unstable_flushSync.length, 1, label);
-  assert.deepEqual(Object.keys(renderer._Scheduler), [], label);
+  assert.deepEqual(Object.keys(renderer._Scheduler), schedulerMockKeys, label);
 }
 
 function assertReactTestRendererUnimplemented(error, entrypoint, exportName) {
