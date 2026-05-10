@@ -131,6 +131,7 @@ test("react-test-renderer serialization gate is ready for private diagnostics wh
     privateToTreeHostOutputMetadataPubliclyBlocked: true,
     privateRecordOnlyTestInstanceWrapperPresent: true,
     privateRecordOnlyTestInstanceQueryPathPresent: true,
+    privateTestInstanceBridgeQueryDiagnosticsPresent: true,
     publicToJSONAvailable: false,
     publicToTreeAvailable: false,
     publicTestInstanceWrappersPresent: false,
@@ -189,6 +190,10 @@ test("react-test-renderer serialization gate records accepted Rust-private prere
   assert.equal(gate.localChecks.privateRecordOnlyTestInstanceWrapperPresent, true);
   assert.equal(
     gate.localChecks.privateRecordOnlyTestInstanceQueryPathPresent,
+    true
+  );
+  assert.equal(
+    gate.localChecks.privateTestInstanceBridgeQueryDiagnosticsPresent,
     true
   );
   assert.equal(gate.localChecks.publicTestInstanceWrappersPresent, false);

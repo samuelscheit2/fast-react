@@ -480,6 +480,12 @@ const testRendererRootActFlushRecords = Object.freeze([
       'findByProps',
       'findAllByProps'
     ]),
+    bridgeMetadataSource:
+      'FastReactTestRendererPrivateRootRequestRecord.rustCanaryMetadata',
+    acceptedBridgeWorker:
+      'worker-426-test-renderer-testinstance-bridge-query',
+    consumesRootBridgeMetadata: true,
+    standaloneWrapperMetadata: false,
     privateQueryMetadata: true,
     publicTestInstanceObjectAvailable: false,
     nativeExecution: false,
@@ -770,6 +776,7 @@ const actSchedulerGate = Object.freeze({
     'worker-332-test-renderer-js-private-root-native-bridge',
     'worker-333-test-renderer-tojson-host-output-private-path',
     'worker-334-test-renderer-testinstance-private-query-path',
+    'worker-426-test-renderer-testinstance-bridge-query',
     'worker-349-hook-effect-destroy-callback-execution-private',
     'worker-377-scheduler-act-queue-flush-helper-private'
   ]),
@@ -1882,7 +1889,8 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     'worker-304-test-renderer-js-private-root-request-bridge',
     'worker-306-test-renderer-testinstance-private-wrapper-skeleton',
     'worker-307-test-renderer-update-unmount-private-js-bridge',
-    'worker-423-test-renderer-native-root-execution-bridge'
+    'worker-423-test-renderer-native-root-execution-bridge',
+    'worker-426-test-renderer-testinstance-bridge-query'
   ]),
   root: freezeRecord({
     rustType: 'TestRendererRoot',
@@ -1951,6 +1959,46 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     hostOutputSnapshotFreshnessRequired: true,
     staleSnapshotRejection: true,
     publicSerializationAvailable: false
+  }),
+  testInstanceQuery: freezeRecord({
+    diagnosticKind: 'ReactTestInstancePrivateQueryMetadata',
+    status:
+      'private-test-instance-query-diagnostics-routed-through-root-bridge',
+    bridgeMetadataSource:
+      'FastReactTestRendererPrivateRootRequestRecord.rustCanaryMetadata',
+    wrapperRecordSymbol:
+      'fast.react_test_renderer.private_test_instance_wrapper_record',
+    acceptedWorkers: freezeArray([
+      'worker-235-test-renderer-private-fiber-inspection',
+      'worker-334-test-renderer-testinstance-private-query-path',
+      'worker-365-test-renderer-testinstance-multi-child-query-path'
+    ]),
+    acceptedRustRecords: freezeArray([
+      'TestRendererCommittedFiberTreeInspection',
+      'TestRendererCommittedFiberNodeInspection'
+    ]),
+    acceptedQuerySurfaces: freezeArray([
+      'root',
+      'find',
+      'findAll',
+      'findByType',
+      'findAllByType',
+      'findByProps',
+      'findAllByProps'
+    ]),
+    fixtureShape: freezeArray([
+      'HostRoot',
+      'HostText',
+      'HostComponent',
+      'HostText'
+    ]),
+    rootWrapperMaterializedForPrivateMetadata: true,
+    queryCandidateCount: 2,
+    skippedTextRecordCount: 2,
+    publicRootAvailable: false,
+    publicQueryMethodsAvailable: false,
+    publicTestInstanceObjectAvailable: false,
+    compatibilityClaimed: false
   }),
   operations: currentRustTestRendererRootCanaryOperations,
   recordOnlyPrivateBridge: false,
@@ -2144,6 +2192,10 @@ function createUnsupportedError(
     error.rootRequestStatus = rootRequest.status;
     error.rootRequestExecutionStatus = rootRequest.executionStatus;
     error.rootRequestCompatibilityStatus = rootRequest.compatibilityStatus;
+    if (isRootRequestRecord(rootRequest)) {
+      error.privateTestInstanceWrapperRecord =
+        getTestInstanceQueryDiagnosticsForRootRequest(rootRequest);
+    }
   }
 
   return error;
@@ -2817,6 +2869,7 @@ function getIdPrefix(value, fallback) {
 const rootRequestPayloads = new WeakMap();
 const rootHandleStates = new WeakMap();
 const rendererRootHandles = new WeakMap();
+const rootRequestTestInstanceQueryDiagnostics = new WeakMap();
 
 function createTestRendererRootRequestBridge(options) {
   const bridgeState = {
@@ -2911,6 +2964,25 @@ function createTestRendererRootRequestBridge(options) {
     },
     getRustCanaryOperationMetadata(record) {
       return getRustCanaryOperationMetadataForRequestRecord(record);
+    },
+    getTestInstanceQueryDiagnostics(record) {
+      return getTestInstanceQueryDiagnosticsForRootRequest(record);
+    },
+    getRootTestInstanceQueryDiagnostics(rootHandle) {
+      const requests = getRootRequestsForHandle(rootHandle);
+      return requests.length === 0
+        ? null
+        : getTestInstanceQueryDiagnosticsForRootRequest(requests[0]);
+    },
+    getRendererTestInstanceQueryDiagnostics(renderer) {
+      const rootHandle = rendererRootHandles.get(renderer);
+      if (rootHandle === undefined) {
+        return null;
+      }
+      const requests = getRootRequestsForHandle(rootHandle);
+      return requests.length === 0
+        ? null
+        : getTestInstanceQueryDiagnosticsForRootRequest(requests[0]);
     },
     canConsumeAcceptedRustLifecycleDiagnostic(record, diagnostic) {
       try {
@@ -3810,6 +3882,83 @@ function getRustCanaryOperationMetadataForRequestRecord(record) {
   }
 
   return record.rustCanaryOperationMetadata;
+}
+
+function getTestInstanceQueryDiagnosticsForRootRequest(record) {
+  if (!isRootRequestRecord(record)) {
+    throwInvalidRootRequest(
+      'Expected a private react-test-renderer root request record.'
+    );
+  }
+
+  let diagnostics = rootRequestTestInstanceQueryDiagnostics.get(record);
+  if (diagnostics === undefined) {
+    diagnostics = createPrivateTestInstanceWrapperRecordForRootRequest(record);
+    rootRequestTestInstanceQueryDiagnostics.set(record, diagnostics);
+  }
+  return diagnostics;
+}
+
+function createPrivateTestInstanceWrapperRecordForRootRequest(rootRequest) {
+  const rootBridgeMetadata = freezeRecord({
+    id: 'react-test-renderer-private-test-instance-root-bridge-metadata',
+    bridgeKind: 'FastReactTestRendererPrivateRootRequestBridge',
+    bridgeSymbol: rootRequestBridgeSymbol.description,
+    source:
+      currentRustTestRendererRootCanaryMetadata.testInstanceQuery
+        .bridgeMetadataSource,
+    status:
+      'private-test-instance-query-diagnostics-routed-through-root-bridge',
+    rootRequest,
+    rootHandle: rootRequest.rootHandle,
+    rootId: rootRequest.rootId,
+    rootSequence: rootRequest.rootSequence,
+    createRequestId: rootRequest.requestId,
+    createRequestSequence: rootRequest.requestSequence,
+    createRequestStatus: rootRequest.status,
+    createRequestExecutionStatus: rootRequest.executionStatus,
+    createRequestCompatibilityStatus: rootRequest.compatibilityStatus,
+    rustCanaryMetadata: rootRequest.rustCanaryMetadata,
+    testInstanceQueryMetadata: rootRequest.rustCanaryMetadata.testInstanceQuery,
+    recordOnlyPrivateBridge: rootRequest.rustCanaryMetadata.recordOnlyPrivateBridge,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    rustExecution: false,
+    reconcilerExecution: false,
+    hostOutputProduced: false,
+    compatibilityClaimed: false
+  });
+
+  return freezeRecord({
+    ...privateTestInstanceWrapperSkeleton,
+    status:
+      'private-bridge-query-metadata-ready-public-test-instance-blocked',
+    bridgeRouted: true,
+    bridgeMetadataSource:
+      rootRequest.rustCanaryMetadata.testInstanceQuery.bridgeMetadataSource,
+    rootBridgeMetadata,
+    rootRequest,
+    rootHandle: rootRequest.rootHandle,
+    rootId: rootRequest.rootId,
+    rootSequence: rootRequest.rootSequence,
+    rootRequestId: rootRequest.requestId,
+    rootRequestSequence: rootRequest.requestSequence,
+    rootRequestStatus: rootRequest.status,
+    rootRequestExecutionStatus: rootRequest.executionStatus,
+    rootRequestCompatibilityStatus: rootRequest.compatibilityStatus,
+    rootRequestOperation: rootRequest.operation,
+    rootRequestRustCanaryMetadata: rootRequest.rustCanaryMetadata,
+    rootRequestTestInstanceQueryMetadata:
+      rootRequest.rustCanaryMetadata.testInstanceQuery,
+    consumesRootBridgeMetadata: true,
+    standaloneWrapperMetadata: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    rustExecution: false,
+    reconcilerExecution: false,
+    hostOutputProducedFromJs: false,
+    compatibilityClaimed: false
+  });
 }
 
 function throwInvalidRootRequest(message) {
@@ -5108,7 +5257,7 @@ function createPlaceholderRenderer(routingGate, element, options, createRequest)
   Object.defineProperty(renderer, privateTestInstanceWrapperRecordSymbol, {
     configurable: false,
     enumerable: false,
-    value: routingGate.privateTestInstanceWrapperSkeleton,
+    value: getTestInstanceQueryDiagnosticsForRootRequest(createRequest),
     writable: false
   });
 
