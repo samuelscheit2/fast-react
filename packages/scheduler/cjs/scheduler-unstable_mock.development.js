@@ -487,6 +487,137 @@ function summarizePrivateActQueueRecordedContinuation(continuation) {
   });
 }
 
+function summarizeMockSchedulerCallback(callback) {
+  if (callback === null) {
+    return Object.freeze({
+      status: 'cancelled-tombstone'
+    });
+  }
+  if (typeof callback === 'function') {
+    if (callback[privateActQueueTestCallbackBrand] === true) {
+      return Object.freeze({
+        status: 'branded-internal-test-callback',
+        kind: callback.kind,
+        label: callback.label,
+        executesQueuedWork: false,
+        executesEffects: false
+      });
+    }
+    return Object.freeze({
+      status: 'function',
+      name: callback.name,
+      length: callback.length
+    });
+  }
+  return Object.freeze({
+    status: 'unknown',
+    type: typeof callback
+  });
+}
+
+function summarizeMockSchedulerTask(task, snapshotTime) {
+  var callback = task.callback;
+  var callbackStatus =
+    callback === null
+      ? 'cancelled-tombstone'
+      : typeof callback === 'function'
+        ? 'pending-callback'
+        : 'unknown-callback';
+  return Object.freeze({
+    id: task.id,
+    priorityLevel: task.priorityLevel,
+    startTime: task.startTime,
+    expirationTime: task.expirationTime,
+    sortIndex: task.sortIndex,
+    expired: task.expirationTime <= snapshotTime,
+    callbackStatus: callbackStatus,
+    callback: summarizeMockSchedulerCallback(callback)
+  });
+}
+
+function getMockSchedulerTaskQueueSnapshot(snapshotTime) {
+  return Object.freeze(
+    taskQueue
+      .slice()
+      .sort(compare)
+      .map(function (task) {
+        return summarizeMockSchedulerTask(task, snapshotTime);
+      })
+  );
+}
+
+function countMockSchedulerTasksByCallbackStatus(tasks, callbackStatus) {
+  return tasks.filter(function (task) {
+    return task.callbackStatus === callbackStatus;
+  }).length;
+}
+
+function countExpiredMockSchedulerCallbacks(tasks) {
+  return tasks.filter(function (task) {
+    return task.expired && task.callbackStatus === 'pending-callback';
+  }).length;
+}
+
+function drainExpiredMockSchedulerWork() {
+  if (isFlushing) {
+    throw new Error('Already flushing work.');
+  }
+
+  var pendingBefore = scheduledCallback !== null;
+  var nowBefore = currentMockTime;
+  var priorityLevelBefore = currentPriorityLevel;
+  var taskQueueBefore = getMockSchedulerTaskQueueSnapshot(nowBefore);
+  var hasMoreWorkAfterDrain = false;
+  var flushedExpiredWork = false;
+
+  if (scheduledCallback !== null) {
+    isFlushing = true;
+    try {
+      hasMoreWorkAfterDrain = scheduledCallback(false, currentMockTime);
+      flushedExpiredWork = true;
+      if (!hasMoreWorkAfterDrain) {
+        scheduledCallback = null;
+      }
+    } finally {
+      isFlushing = false;
+    }
+  }
+
+  var nowAfter = currentMockTime;
+  var taskQueueAfter = getMockSchedulerTaskQueueSnapshot(nowAfter);
+  return Object.freeze({
+    status: 'drained-expired-mock-scheduler-work-for-diagnostics',
+    pendingBefore: pendingBefore,
+    pendingAfter: scheduledCallback !== null,
+    flushedExpiredWork: flushedExpiredWork,
+    hasMoreWorkAfterDrain: hasMoreWorkAfterDrain,
+    nowBefore: nowBefore,
+    nowAfter: nowAfter,
+    priorityLevelBefore: priorityLevelBefore,
+    priorityLevelAfter: currentPriorityLevel,
+    expiredCallbackCountBefore:
+      countExpiredMockSchedulerCallbacks(taskQueueBefore),
+    expiredCallbackCountAfter:
+      countExpiredMockSchedulerCallbacks(taskQueueAfter),
+    cancelledTombstoneCountBefore:
+      countMockSchedulerTasksByCallbackStatus(
+        taskQueueBefore,
+        'cancelled-tombstone'
+      ),
+    cancelledTombstoneCountAfter:
+      countMockSchedulerTasksByCallbackStatus(
+        taskQueueAfter,
+        'cancelled-tombstone'
+      ),
+    taskQueueBefore: taskQueueBefore,
+    taskQueueAfter: taskQueueAfter,
+    drainsExpiredMockSchedulerWork: true,
+    drainsPublicReactActQueue: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false
+  });
+}
+
 function executePrivateActQueueContinuation(task, index, continuation) {
   var returnedContinuation = continuation(false);
   var returnedContinuationSummary = null;
@@ -658,6 +789,8 @@ var privateActQueueFlushDiagnostics = Object.freeze({
   executesBrandedInternalTestCallbacks: true,
   recordsBrandedInternalTestContinuations: true,
   executesBrandedInternalTestContinuations: true,
+  mockSchedulerExpiredWorkDiagnosticsReady: true,
+  drainsExpiredMockSchedulerWork: true,
   drainsPublicSchedulerTaskQueue: false,
   drainsPublicReactActQueue: false,
   publicSchedulerTimingCompatibilityClaimed: false,
@@ -665,7 +798,8 @@ var privateActQueueFlushDiagnostics = Object.freeze({
   executesQueuedWork: false,
   executesEffects: false,
   describeAcceptedInternalActQueue: describeAcceptedInternalActQueue,
-  drainAcceptedInternalActQueue: drainAcceptedInternalActQueue
+  drainAcceptedInternalActQueue: drainAcceptedInternalActQueue,
+  drainExpiredMockSchedulerWork: drainExpiredMockSchedulerWork
 });
 
 function attachPrivateActQueueFlushDiagnostics(fn) {
