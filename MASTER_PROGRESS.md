@@ -250,9 +250,21 @@ sequencing belong in `MASTER_PLAN.md`.
   generations, with wrong-environment isolation and stale-handle behavior,
   without N-API dependencies, JS package wiring, reconciler integration, raw JS
   values, raw pointers, Node-API types, or public native APIs.
+- Worker 191 root scheduler lane-selection integration was merged, routing the
+  microtask and scheduled-callback selection path through core
+  `RootLaneState::get_next_lanes`, keeping priority lanes distinct from
+  entangled render lanes while preserving accepted act-queue routing,
+  sync-flush commit behavior, callback reuse/cancel behavior, and no host
+  mutation or current switching.
 
 ## Latest Accepted Verification
 
+- Worker 191 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused `root_scheduler` and `root_work_loop`
+  tests, full `fast-react-reconciler` tests with 131 unit tests plus 1 doctest,
+  reconciler clippy with warnings denied, and `git diff --check`; the
+  `root_scheduler.rs` merge conflict preserved accepted act-queue routing and
+  sync-flush commit behavior while applying the new priority-lane selection.
 - Worker 190 was verified on its integrated worktree and again on `main` with
   `cargo fmt --all --check`, focused handle-table tests, full
   `fast-react-napi` tests with 17 unit tests and 0 doctests, native clippy with

@@ -45,8 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 191: root scheduler lane-selection integration in
-  `/Users/user/Developer/Developer/fast-react-worker-191-root-scheduler-lane-selection-integration`.
 - Worker 192: core hook list foundation in
   `/Users/user/Developer/Developer/fast-react-worker-192-core-hook-list-foundation`.
 - Worker 193: root commit callback handoff in
