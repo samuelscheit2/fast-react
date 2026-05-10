@@ -329,6 +329,11 @@ impl SyncFlushActPrivateExecutionDiagnosticsForCanary {
     }
 
     #[must_use]
+    pub(crate) const fn public_flush_sync_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
     pub(crate) const fn public_scheduler_timing_compatibility_claimed(&self) -> bool {
         false
     }
@@ -2568,7 +2573,9 @@ mod tests {
         RootSyncSchedulerContinuationExecutionStatus,
         SchedulerBridgeActContinuationExecutionStatus, root_sync_flush_record_for_canary,
     };
-    use crate::root_updates::host_root_queued_callback_order_snapshot_for_canary;
+    use crate::root_updates::{
+        host_root_queued_callback_order_snapshot_for_canary, update_container_transition_for_canary,
+    };
     use crate::scheduler_bridge::SchedulerActContinuationStatus;
     use crate::test_support::{FakeContainer, RecordingHost};
     use crate::{
@@ -3571,6 +3578,7 @@ mod tests {
         assert!(private_execution.did_drain_accepted_internal_act_continuations());
         assert!(!private_execution.drains_public_react_act_queue());
         assert!(!private_execution.public_act_compatibility_claimed());
+        assert!(!private_execution.public_flush_sync_compatibility_claimed());
         assert!(!private_execution.public_scheduler_timing_compatibility_claimed());
         assert!(!private_execution.executes_queued_work());
         assert!(!private_execution.executes_effects());
@@ -3588,6 +3596,7 @@ mod tests {
             SchedulerActContinuationStatus::PendingContinuation
         );
         assert!(drained.is_accepted_internal_act_continuation());
+        assert!(!drained.public_flush_sync_compatibility_claimed());
         assert_eq!(committed.act_continuation, None);
         assert_eq!(committed.act_post_passive_continuation_gate, None);
         assert_eq!(
@@ -3656,11 +3665,14 @@ mod tests {
         assert_eq!(continuation_execution.rejected_count(), 0);
         assert_eq!(continuation_execution.blocked_count(), 0);
         assert!(continuation_execution.did_execute_accepted_internal_act_continuations());
+        assert!(continuation_execution.records_preserve_sync_flush_order());
         assert!(!continuation_execution.drains_public_react_act_queue());
         assert!(!continuation_execution.public_act_compatibility_claimed());
+        assert!(!continuation_execution.public_flush_sync_compatibility_claimed());
         assert!(!continuation_execution.public_scheduler_timing_compatibility_claimed());
         assert!(!continuation_execution.executes_effects());
         let record = &continuation_execution.records()[0];
+        assert_eq!(record.execution_order(), 0);
         assert_eq!(
             record.status(),
             SchedulerBridgeActContinuationExecutionStatus::RenderedAndCommitted
@@ -3668,6 +3680,9 @@ mod tests {
         assert_eq!(record.root(), root_id);
         assert_eq!(record.requested_lanes(), Lanes::DEFAULT);
         assert_eq!(record.selected_lanes(), Lanes::DEFAULT);
+        assert_eq!(record.pending_lanes_before_execution(), Lanes::DEFAULT);
+        assert_eq!(record.pending_lanes_after_execution(), Lanes::NO);
+        assert!(record.consumed_continuation_lanes_and_preserved_remaining_lanes_for_canary());
         assert!(record.routed_through_root_scheduler_and_commit_evidence_for_canary());
         assert!(record.accepted_root_scheduler_execution_evidence_for_canary());
         assert!(record.accepted_root_commit_execution_evidence_for_canary());
@@ -3687,6 +3702,273 @@ mod tests {
             Lanes::NO
         );
         assert!(!store.root_scheduler().might_have_pending_sync_work());
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
+        );
+        assert!(store.scheduler_bridge().callback_requests().is_empty());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_nested_act_root_continuations_preserve_callback_order_and_lanes() {
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let host = RecordingHost::default();
+        let first = store
+            .create_client_root(FakeContainer::new(1), RootOptions::new())
+            .unwrap();
+        let second = store
+            .create_client_root(FakeContainer::new(2), RootOptions::new())
+            .unwrap();
+        let first_sync_element = RootElementHandle::from_raw(850);
+        let first_default_element = RootElementHandle::from_raw(851);
+        let first_transition_element = RootElementHandle::from_raw(852);
+        let second_sync_element = RootElementHandle::from_raw(853);
+        let second_default_element = RootElementHandle::from_raw(854);
+        let first_sync_callback = RootUpdateCallbackHandle::from_raw(855);
+        let first_default_callback = RootUpdateCallbackHandle::from_raw(856);
+        let second_sync_callback = RootUpdateCallbackHandle::from_raw(857);
+        let second_default_callback = RootUpdateCallbackHandle::from_raw(858);
+
+        let enter_outer = store.scheduler_bridge_mut().enter_act_scope();
+        let enter_nested = store.scheduler_bridge_mut().enter_act_scope();
+        let first_sync = update_container_sync(
+            &mut store,
+            first,
+            first_sync_element,
+            Some(first_sync_callback),
+        )
+        .unwrap();
+        ensure_root_is_scheduled(&mut store, first_sync.schedule()).unwrap();
+        let first_default = update_container(
+            &mut store,
+            first,
+            first_default_element,
+            Some(first_default_callback),
+        )
+        .unwrap();
+        ensure_root_is_scheduled(&mut store, first_default.schedule()).unwrap();
+        let first_transition = update_container_transition_for_canary(
+            &mut store,
+            first,
+            Lane::TRANSITION_1,
+            first_transition_element,
+            None,
+        )
+        .unwrap();
+        ensure_root_is_scheduled(&mut store, first_transition.schedule()).unwrap();
+        let second_sync = update_container_sync(
+            &mut store,
+            second,
+            second_sync_element,
+            Some(second_sync_callback),
+        )
+        .unwrap();
+        ensure_root_is_scheduled(&mut store, second_sync.schedule()).unwrap();
+        let second_default = update_container(
+            &mut store,
+            second,
+            second_default_element,
+            Some(second_default_callback),
+        )
+        .unwrap();
+        ensure_root_is_scheduled(&mut store, second_default.schedule()).unwrap();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+
+        assert_eq!(rendered.records().len(), 2);
+        assert_eq!(rendered.records()[0].root(), first);
+        assert_eq!(rendered.records()[1].root(), second);
+        assert_eq!(rendered.records()[0].order(), 0);
+        assert_eq!(rendered.records()[1].order(), 1);
+
+        let first_render_phase = rendered.records()[0].render_phase();
+        let second_render_phase = rendered.records()[1].render_phase();
+        let first_prepared = prepare_test_renderer_host_output_canary_fibers(
+            &mut store,
+            first_render_phase,
+            TestRendererHostOutputCanaryFixture::new(859, 860, 861),
+        )
+        .unwrap();
+        let first_completed =
+            finish_test_renderer_host_output_canary_fibers(&mut store, first_prepared, 862, 863)
+                .unwrap();
+        let second_prepared = prepare_test_renderer_host_output_canary_fibers(
+            &mut store,
+            second_render_phase,
+            TestRendererHostOutputCanaryFixture::new(864, 865, 866),
+        )
+        .unwrap();
+        let second_completed =
+            finish_test_renderer_host_output_canary_fibers(&mut store, second_prepared, 867, 868)
+                .unwrap();
+
+        let (mut first_committed, first_diagnostics) =
+            SyncFlushRootRecord::commit_rendered_sync_flush_record_with_diagnostics_for_canary(
+                &mut store,
+                rendered.records()[0],
+            )
+            .unwrap();
+        let (mut second_committed, second_diagnostics) =
+            SyncFlushRootRecord::commit_rendered_sync_flush_record_with_diagnostics_for_canary(
+                &mut store,
+                rendered.records()[1],
+            )
+            .unwrap();
+
+        assert_eq!(first_committed.order(), 0);
+        assert_eq!(second_committed.order(), 1);
+        assert_eq!(
+            callback_handles(first_committed.root_update_callbacks().visible()),
+            vec![first_sync_callback]
+        );
+        assert_eq!(
+            callback_handles(second_committed.root_update_callbacks().visible()),
+            vec![second_sync_callback]
+        );
+        assert_eq!(
+            first_committed
+                .act_continuation
+                .as_ref()
+                .unwrap()
+                .act_scope_depth(),
+            2
+        );
+        assert!(
+            first_committed
+                .act_continuation
+                .as_ref()
+                .unwrap()
+                .nested_act_scope()
+        );
+        assert!(
+            second_committed
+                .act_continuation
+                .as_ref()
+                .unwrap()
+                .nested_act_scope()
+        );
+
+        let first_private = first_committed
+            .drain_accepted_act_continuations_after_host_output_canary(first_diagnostics);
+        let second_private = second_committed
+            .drain_accepted_act_continuations_after_host_output_canary(second_diagnostics);
+
+        assert!(first_private.did_drain_accepted_internal_act_continuations());
+        assert!(second_private.did_drain_accepted_internal_act_continuations());
+        assert!(!first_private.public_act_compatibility_claimed());
+        assert!(!first_private.public_flush_sync_compatibility_claimed());
+        assert!(!second_private.public_act_compatibility_claimed());
+        assert!(!second_private.public_flush_sync_compatibility_claimed());
+        let drained = [
+            first_private.drained_act_continuations()[0],
+            second_private.drained_act_continuations()[0],
+        ];
+
+        let continuation_execution =
+            execute_scheduler_bridge_act_continuations(&mut store, &drained).unwrap();
+
+        assert_eq!(continuation_execution.records().len(), 2);
+        assert_eq!(continuation_execution.executed_count(), 2);
+        assert_eq!(continuation_execution.rejected_count(), 0);
+        assert_eq!(continuation_execution.blocked_count(), 0);
+        assert!(continuation_execution.did_execute_accepted_internal_act_continuations());
+        assert!(continuation_execution.records_preserve_sync_flush_order());
+        assert!(
+            continuation_execution
+                .preserves_nested_act_root_continuation_order_and_lanes_for_canary()
+        );
+        assert!(!continuation_execution.drains_public_react_act_queue());
+        assert!(!continuation_execution.public_act_compatibility_claimed());
+        assert!(!continuation_execution.public_flush_sync_compatibility_claimed());
+        assert!(!continuation_execution.public_scheduler_timing_compatibility_claimed());
+        assert!(!continuation_execution.executes_effects());
+
+        let first_record = &continuation_execution.records()[0];
+        assert_eq!(first_record.execution_order(), 0);
+        assert_eq!(first_record.root(), first);
+        assert_eq!(first_record.continuation().sync_flush_order(), 0);
+        assert!(first_record.continuation().nested_act_scope());
+        assert_eq!(first_record.requested_lanes(), Lanes::DEFAULT);
+        assert_eq!(first_record.selected_lanes(), Lanes::DEFAULT);
+        assert_eq!(
+            first_record.pending_lanes_before_execution(),
+            Lanes::DEFAULT.merge_lane(Lane::TRANSITION_1)
+        );
+        assert_eq!(
+            first_record.pending_lanes_after_execution(),
+            Lanes::from(Lane::TRANSITION_1)
+        );
+        assert!(
+            first_record.consumed_continuation_lanes_and_preserved_remaining_lanes_for_canary()
+        );
+        assert_eq!(
+            callback_handles(
+                first_record
+                    .commit()
+                    .unwrap()
+                    .root_update_callbacks()
+                    .visible()
+            ),
+            vec![first_default_callback]
+        );
+        assert_eq!(
+            current_host_root_element(&store, first),
+            first_default_element
+        );
+
+        let second_record = &continuation_execution.records()[1];
+        assert_eq!(second_record.execution_order(), 1);
+        assert_eq!(second_record.root(), second);
+        assert_eq!(second_record.continuation().sync_flush_order(), 1);
+        assert!(second_record.continuation().nested_act_scope());
+        assert_eq!(second_record.requested_lanes(), Lanes::DEFAULT);
+        assert_eq!(second_record.selected_lanes(), Lanes::DEFAULT);
+        assert_eq!(
+            second_record.pending_lanes_before_execution(),
+            Lanes::DEFAULT
+        );
+        assert_eq!(second_record.pending_lanes_after_execution(), Lanes::NO);
+        assert!(
+            second_record.consumed_continuation_lanes_and_preserved_remaining_lanes_for_canary()
+        );
+        assert_eq!(
+            callback_handles(
+                second_record
+                    .commit()
+                    .unwrap()
+                    .root_update_callbacks()
+                    .visible()
+            ),
+            vec![second_default_callback]
+        );
+        assert_eq!(
+            current_host_root_element(&store, second),
+            second_default_element
+        );
+
+        assert_eq!(
+            store.root(first).unwrap().lanes().pending_lanes(),
+            Lanes::from(Lane::TRANSITION_1)
+        );
+        assert_eq!(
+            store.root(second).unwrap().lanes().pending_lanes(),
+            Lanes::NO
+        );
+        assert_eq!(
+            first_completed.host_root(),
+            first_committed.commit().current()
+        );
+        assert_eq!(
+            second_completed.host_root(),
+            second_committed.commit().current()
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_scope_boundary_records(),
+            &[enter_outer, enter_nested]
+        );
         assert_eq!(
             store.scheduler_bridge().act_queue_requests().len(),
             act_queue_request_count

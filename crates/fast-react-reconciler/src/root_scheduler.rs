@@ -1788,6 +1788,11 @@ impl SyncFlushActContinuationDrainRecord {
     }
 
     #[must_use]
+    pub(crate) const fn public_flush_sync_compatibility_claimed(self) -> bool {
+        false
+    }
+
+    #[must_use]
     pub(crate) const fn executes_queued_work(self) -> bool {
         false
     }
@@ -1807,6 +1812,7 @@ impl SyncFlushActContinuationDrainRecord {
             && self.continuation_lanes.is_non_empty()
             && !self.drains_public_react_act_queue()
             && !self.public_act_compatibility_claimed()
+            && !self.public_flush_sync_compatibility_claimed()
             && !self.executes_queued_work()
             && !self.executes_effects()
     }
@@ -1823,7 +1829,10 @@ pub(crate) enum SchedulerBridgeActContinuationExecutionStatus {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SchedulerBridgeActContinuationExecutionRecord {
     continuation: SyncFlushActContinuationDrainRecord,
+    execution_order: usize,
     selected_lanes: Lanes,
+    pending_lanes_before_execution: Lanes,
+    pending_lanes_after_execution: Lanes,
     status: SchedulerBridgeActContinuationExecutionStatus,
     render_phase: Option<HostRootRenderPhaseRecord>,
     commit: Option<HostRootCommitRecord>,
@@ -1842,6 +1851,11 @@ impl SchedulerBridgeActContinuationExecutionRecord {
     }
 
     #[must_use]
+    pub(crate) const fn execution_order(&self) -> usize {
+        self.execution_order
+    }
+
+    #[must_use]
     pub(crate) const fn root(&self) -> FiberRootId {
         self.continuation.root()
     }
@@ -1854,6 +1868,16 @@ impl SchedulerBridgeActContinuationExecutionRecord {
     #[must_use]
     pub(crate) const fn selected_lanes(&self) -> Lanes {
         self.selected_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_lanes_before_execution(&self) -> Lanes {
+        self.pending_lanes_before_execution
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_lanes_after_execution(&self) -> Lanes {
+        self.pending_lanes_after_execution
     }
 
     #[must_use]
@@ -1914,6 +1938,11 @@ impl SchedulerBridgeActContinuationExecutionRecord {
     }
 
     #[must_use]
+    pub(crate) const fn public_flush_sync_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
     pub(crate) const fn public_scheduler_timing_compatibility_claimed(&self) -> bool {
         false
     }
@@ -1932,6 +1961,24 @@ impl SchedulerBridgeActContinuationExecutionRecord {
             && self.selected_lanes == self.continuation.continuation_lanes()
     }
 
+    #[must_use]
+    pub(crate) fn consumed_continuation_lanes_and_preserved_remaining_lanes_for_canary(
+        &self,
+    ) -> bool {
+        self.did_execute_accepted_internal_act_continuation()
+            && self
+                .pending_lanes_before_execution
+                .contains_all(self.continuation.continuation_lanes())
+            && !self
+                .pending_lanes_after_execution
+                .contains_any(self.continuation.continuation_lanes())
+            && self.commit.as_ref().is_some_and(|commit| {
+                commit.finished_lanes() == self.continuation.continuation_lanes()
+                    && commit.remaining_lanes() == self.pending_lanes_after_execution
+                    && commit.pending_lanes() == self.pending_lanes_after_execution
+            })
+    }
+
     #[cfg(test)]
     #[must_use]
     pub(crate) fn accepted_root_commit_execution_evidence_for_canary(&self) -> bool {
@@ -1947,6 +1994,7 @@ impl SchedulerBridgeActContinuationExecutionRecord {
             && self.accepted_root_commit_execution_evidence_for_canary()
             && !self.drains_public_react_act_queue()
             && !self.public_act_compatibility_claimed()
+            && !self.public_flush_sync_compatibility_claimed()
             && !self.public_scheduler_timing_compatibility_claimed()
             && !self.executes_effects()
     }
@@ -2009,12 +2057,52 @@ impl SchedulerBridgeActContinuationExecutionResult {
     }
 
     #[must_use]
+    pub(crate) fn records_preserve_sync_flush_order(&self) -> bool {
+        self.records
+            .iter()
+            .enumerate()
+            .all(|(order, record)| record.execution_order() == order)
+            && self.records.windows(2).all(|records| {
+                records[0].continuation().sync_flush_order()
+                    <= records[1].continuation().sync_flush_order()
+            })
+    }
+
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) fn preserves_nested_act_root_continuation_order_and_lanes_for_canary(&self) -> bool {
+        !self.records.is_empty()
+            && self.records_preserve_sync_flush_order()
+            && self.records.iter().all(|record| {
+                record.did_execute_accepted_internal_act_continuation()
+                    && record.continuation().nested_act_scope()
+                    && record.consumed_continuation_lanes_and_preserved_remaining_lanes_for_canary()
+                    && record.routed_through_root_scheduler_and_commit_evidence_for_canary()
+                    && !record.drains_public_react_act_queue()
+                    && !record.public_act_compatibility_claimed()
+                    && !record.public_flush_sync_compatibility_claimed()
+                    && !record.public_scheduler_timing_compatibility_claimed()
+                    && !record.executes_effects()
+            })
+            && !self.drains_public_react_act_queue()
+            && !self.public_act_compatibility_claimed()
+            && !self.public_flush_sync_compatibility_claimed()
+            && !self.public_scheduler_timing_compatibility_claimed()
+            && !self.executes_effects()
+    }
+
+    #[must_use]
     pub(crate) const fn drains_public_react_act_queue(&self) -> bool {
         false
     }
 
     #[must_use]
     pub(crate) const fn public_act_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_flush_sync_compatibility_claimed(&self) -> bool {
         false
     }
 
@@ -3485,9 +3573,10 @@ pub(crate) fn execute_scheduler_bridge_act_continuations<H: HostTypes>(
     SchedulerBridgeActContinuationExecutionError,
 > {
     let mut records = Vec::with_capacity(continuations.len());
-    for continuation in continuations {
+    for (execution_order, continuation) in continuations.iter().enumerate() {
         records.push(execute_scheduler_bridge_act_continuation(
             store,
+            execution_order,
             *continuation,
         )?);
     }
@@ -3497,6 +3586,7 @@ pub(crate) fn execute_scheduler_bridge_act_continuations<H: HostTypes>(
 
 fn execute_scheduler_bridge_act_continuation<H: HostTypes>(
     store: &mut FiberRootStore<H>,
+    execution_order: usize,
     continuation: SyncFlushActContinuationDrainRecord,
 ) -> Result<
     SchedulerBridgeActContinuationExecutionRecord,
@@ -3505,6 +3595,9 @@ fn execute_scheduler_bridge_act_continuation<H: HostTypes>(
     if !continuation.is_accepted_internal_act_continuation() {
         return Ok(scheduler_bridge_act_continuation_execution_record(
             continuation,
+            execution_order,
+            Lanes::NO,
+            Lanes::NO,
             Lanes::NO,
             SchedulerBridgeActContinuationExecutionStatus::RejectedContinuation,
             None,
@@ -3512,11 +3605,19 @@ fn execute_scheduler_bridge_act_continuation<H: HostTypes>(
         ));
     }
 
+    let pending_lanes_before_execution = store
+        .root(continuation.root())
+        .map_err(RootSchedulerError::from)?
+        .lanes()
+        .pending_lanes();
     let selected_lanes = sync_flush_act_continuation_lanes_for_root(store, continuation.root())?;
     if selected_lanes.is_empty() {
         return Ok(scheduler_bridge_act_continuation_execution_record(
             continuation,
+            execution_order,
             selected_lanes,
+            pending_lanes_before_execution,
+            pending_lanes_before_execution,
             SchedulerBridgeActContinuationExecutionStatus::NoContinuationWork,
             None,
             None,
@@ -3526,7 +3627,10 @@ fn execute_scheduler_bridge_act_continuation<H: HostTypes>(
     if selected_lanes != continuation.continuation_lanes() {
         return Ok(scheduler_bridge_act_continuation_execution_record(
             continuation,
+            execution_order,
             selected_lanes,
+            pending_lanes_before_execution,
+            pending_lanes_before_execution,
             SchedulerBridgeActContinuationExecutionStatus::BlockedByLaneMismatch,
             None,
             None,
@@ -3554,10 +3658,18 @@ fn execute_scheduler_bridge_act_continuation<H: HostTypes>(
     #[cfg(not(test))]
     let commit = crate::commit_finished_host_root(store, render_phase)?;
     recompute_might_have_pending_sync_work(store)?;
+    let pending_lanes_after_execution = store
+        .root(continuation.root())
+        .map_err(RootSchedulerError::from)?
+        .lanes()
+        .pending_lanes();
 
     let mut record = scheduler_bridge_act_continuation_execution_record(
         continuation,
+        execution_order,
         selected_lanes,
+        pending_lanes_before_execution,
+        pending_lanes_after_execution,
         SchedulerBridgeActContinuationExecutionStatus::RenderedAndCommitted,
         Some(render_phase),
         Some(commit),
@@ -3572,14 +3684,20 @@ fn execute_scheduler_bridge_act_continuation<H: HostTypes>(
 
 fn scheduler_bridge_act_continuation_execution_record(
     continuation: SyncFlushActContinuationDrainRecord,
+    execution_order: usize,
     selected_lanes: Lanes,
+    pending_lanes_before_execution: Lanes,
+    pending_lanes_after_execution: Lanes,
     status: SchedulerBridgeActContinuationExecutionStatus,
     render_phase: Option<HostRootRenderPhaseRecord>,
     commit: Option<HostRootCommitRecord>,
 ) -> SchedulerBridgeActContinuationExecutionRecord {
     SchedulerBridgeActContinuationExecutionRecord {
         continuation,
+        execution_order,
         selected_lanes,
+        pending_lanes_before_execution,
+        pending_lanes_after_execution,
         status,
         render_phase,
         commit,
@@ -6581,6 +6699,7 @@ mod tests {
         assert!(drained.is_accepted_internal_act_continuation());
         assert!(!drained.drains_public_react_act_queue());
         assert!(!drained.public_act_compatibility_claimed());
+        assert!(!drained.public_flush_sync_compatibility_claimed());
         assert!(!drained.executes_queued_work());
         assert!(!drained.executes_effects());
         assert_eq!(
@@ -6624,12 +6743,15 @@ mod tests {
         assert_eq!(result.rejected_count(), 0);
         assert_eq!(result.blocked_count(), 0);
         assert!(result.did_execute_accepted_internal_act_continuations());
+        assert!(result.records_preserve_sync_flush_order());
         assert!(!result.drains_public_react_act_queue());
         assert!(!result.public_act_compatibility_claimed());
+        assert!(!result.public_flush_sync_compatibility_claimed());
         assert!(!result.public_scheduler_timing_compatibility_claimed());
         assert!(!result.executes_effects());
 
         let record = &result.records()[0];
+        assert_eq!(record.execution_order(), 0);
         assert_eq!(
             record.status(),
             SchedulerBridgeActContinuationExecutionStatus::RenderedAndCommitted
@@ -6637,12 +6759,16 @@ mod tests {
         assert_eq!(record.root(), root_id);
         assert_eq!(record.requested_lanes(), Lanes::DEFAULT);
         assert_eq!(record.selected_lanes(), Lanes::DEFAULT);
+        assert_eq!(record.pending_lanes_before_execution(), Lanes::DEFAULT);
+        assert_eq!(record.pending_lanes_after_execution(), Lanes::NO);
         assert!(record.did_execute_accepted_internal_act_continuation());
         assert!(record.accepted_root_scheduler_execution_evidence_for_canary());
         assert!(record.accepted_root_commit_execution_evidence_for_canary());
         assert!(record.routed_through_root_scheduler_and_commit_evidence_for_canary());
+        assert!(record.consumed_continuation_lanes_and_preserved_remaining_lanes_for_canary());
         assert!(!record.drains_public_react_act_queue());
         assert!(!record.public_act_compatibility_claimed());
+        assert!(!record.public_flush_sync_compatibility_claimed());
         assert!(!record.public_scheduler_timing_compatibility_claimed());
         assert!(!record.executes_effects());
         let handoff = record.root_commit_handoff_for_canary().unwrap();
@@ -6668,6 +6794,149 @@ mod tests {
             Lanes::NO
         );
         assert!(!store.root_scheduler().might_have_pending_sync_work());
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
+        );
+        assert!(store.scheduler_bridge().callback_requests().is_empty());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_nested_act_continuations_preserve_order_and_remaining_lanes() {
+        let host = RecordingHost::default();
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let first = store
+            .create_client_root(FakeContainer::new(1), RootOptions::new())
+            .unwrap();
+        let second = store
+            .create_client_root(FakeContainer::new(2), RootOptions::new())
+            .unwrap();
+        store.scheduler_bridge_mut().enter_act_scope();
+        store.scheduler_bridge_mut().enter_act_scope();
+
+        let first_default =
+            update_container(&mut store, first, RootElementHandle::from_raw(21), None).unwrap();
+        ensure_root_is_scheduled(&mut store, first_default.schedule()).unwrap();
+        let first_transition = update_container_transition_for_canary(
+            &mut store,
+            first,
+            Lane::TRANSITION_1,
+            RootElementHandle::from_raw(22),
+            None,
+        )
+        .unwrap();
+        ensure_root_is_scheduled(&mut store, first_transition.schedule()).unwrap();
+        let second_default =
+            update_container(&mut store, second, RootElementHandle::from_raw(23), None).unwrap();
+        ensure_root_is_scheduled(&mut store, second_default.schedule()).unwrap();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+
+        let first_continuation = store
+            .scheduler_bridge_mut()
+            .record_sync_flush_act_continuation(
+                first,
+                0,
+                Lanes::SYNC,
+                Lanes::DEFAULT.merge_lane(Lane::TRANSITION_1),
+                Lanes::DEFAULT,
+            )
+            .unwrap();
+        let second_continuation = store
+            .scheduler_bridge_mut()
+            .record_sync_flush_act_continuation(
+                second,
+                1,
+                Lanes::SYNC,
+                Lanes::DEFAULT,
+                Lanes::DEFAULT,
+            )
+            .unwrap();
+        let first_accepted = sync_flush_act_continuation_drain_record_after_host_output_canary(
+            first_continuation,
+            true,
+        )
+        .unwrap();
+        let second_accepted = sync_flush_act_continuation_drain_record_after_host_output_canary(
+            second_continuation,
+            true,
+        )
+        .unwrap();
+
+        let result = execute_scheduler_bridge_act_continuations(
+            &mut store,
+            &[first_accepted, second_accepted],
+        )
+        .unwrap();
+
+        assert_eq!(result.records().len(), 2);
+        assert_eq!(result.executed_count(), 2);
+        assert_eq!(result.rejected_count(), 0);
+        assert_eq!(result.blocked_count(), 0);
+        assert!(result.did_execute_accepted_internal_act_continuations());
+        assert!(result.records_preserve_sync_flush_order());
+        assert!(result.preserves_nested_act_root_continuation_order_and_lanes_for_canary());
+        assert!(!result.drains_public_react_act_queue());
+        assert!(!result.public_act_compatibility_claimed());
+        assert!(!result.public_flush_sync_compatibility_claimed());
+        assert!(!result.public_scheduler_timing_compatibility_claimed());
+        assert!(!result.executes_effects());
+
+        let first_record = &result.records()[0];
+        assert_eq!(first_record.execution_order(), 0);
+        assert_eq!(first_record.root(), first);
+        assert_eq!(first_record.continuation().sync_flush_order(), 0);
+        assert!(first_record.continuation().nested_act_scope());
+        assert_eq!(first_record.requested_lanes(), Lanes::DEFAULT);
+        assert_eq!(first_record.selected_lanes(), Lanes::DEFAULT);
+        assert_eq!(
+            first_record.pending_lanes_before_execution(),
+            Lanes::DEFAULT.merge_lane(Lane::TRANSITION_1)
+        );
+        assert_eq!(
+            first_record.pending_lanes_after_execution(),
+            Lanes::from(Lane::TRANSITION_1)
+        );
+        assert!(
+            first_record.consumed_continuation_lanes_and_preserved_remaining_lanes_for_canary()
+        );
+        assert_eq!(
+            first_record.render_phase().unwrap().resulting_element(),
+            RootElementHandle::from_raw(21)
+        );
+        assert_eq!(
+            first_record.commit().unwrap().pending_lanes(),
+            Lanes::from(Lane::TRANSITION_1)
+        );
+
+        let second_record = &result.records()[1];
+        assert_eq!(second_record.execution_order(), 1);
+        assert_eq!(second_record.root(), second);
+        assert_eq!(second_record.continuation().sync_flush_order(), 1);
+        assert!(second_record.continuation().nested_act_scope());
+        assert_eq!(second_record.requested_lanes(), Lanes::DEFAULT);
+        assert_eq!(second_record.selected_lanes(), Lanes::DEFAULT);
+        assert_eq!(
+            second_record.pending_lanes_before_execution(),
+            Lanes::DEFAULT
+        );
+        assert_eq!(second_record.pending_lanes_after_execution(), Lanes::NO);
+        assert!(
+            second_record.consumed_continuation_lanes_and_preserved_remaining_lanes_for_canary()
+        );
+        assert_eq!(
+            second_record.render_phase().unwrap().resulting_element(),
+            RootElementHandle::from_raw(23)
+        );
+
+        assert_eq!(
+            store.root(first).unwrap().lanes().pending_lanes(),
+            Lanes::from(Lane::TRANSITION_1)
+        );
+        assert_eq!(
+            store.root(second).unwrap().lanes().pending_lanes(),
+            Lanes::NO
+        );
         assert_eq!(
             store.scheduler_bridge().act_queue_requests().len(),
             act_queue_request_count
