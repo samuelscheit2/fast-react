@@ -512,7 +512,60 @@
             "placeholder": true,
             "compatibilityTarget": "react-dom@19.2.6",
             "entrypoint": "react-dom"
-          }
+          },
+          "version": "19.2.6",
+          "unsupportedExports": [
+            {
+              "exportName": "flushSync",
+              "functionName": "",
+              "length": 1
+            },
+            {
+              "exportName": "preconnect",
+              "functionName": "",
+              "length": 2
+            },
+            {
+              "exportName": "prefetchDNS",
+              "functionName": "",
+              "length": 1
+            },
+            {
+              "exportName": "preinit",
+              "functionName": "",
+              "length": 2
+            },
+            {
+              "exportName": "preinitModule",
+              "functionName": "",
+              "length": 2
+            },
+            {
+              "exportName": "preload",
+              "functionName": "",
+              "length": 2
+            },
+            {
+              "exportName": "preloadModule",
+              "functionName": "",
+              "length": 2
+            },
+            {
+              "exportName": "requestFormReset",
+              "functionName": "",
+              "length": 1
+            },
+            {
+              "exportName": "useFormState",
+              "functionName": "",
+              "length": 3
+            },
+            {
+              "exportName": "useFormStatus",
+              "functionName": "",
+              "length": 0
+            }
+          ]
         },
         {
           "file": "react-dom.react-server.js",
@@ -521,7 +574,40 @@
             "placeholder": true,
             "compatibilityTarget": "react-dom@19.2.6",
             "entrypoint": "react-dom"
-          }
+          },
+          "version": "0.0.0-fast-react-dom-placeholder",
+          "unsupportedExports": [
+            {
+              "exportName": "preconnect",
+              "functionName": "preconnect",
+              "length": 0
+            },
+            {
+              "exportName": "prefetchDNS",
+              "functionName": "prefetchDNS",
+              "length": 0
+            },
+            {
+              "exportName": "preinit",
+              "functionName": "preinit",
+              "length": 0
+            },
+            {
+              "exportName": "preinitModule",
+              "functionName": "preinitModule",
+              "length": 0
+            },
+            {
+              "exportName": "preload",
+              "functionName": "preload",
+              "length": 0
+            },
+            {
+              "exportName": "preloadModule",
+              "functionName": "preloadModule",
+              "length": 0
+            }
+          ]
         },
         {
           "file": "client.js",
@@ -530,14 +616,29 @@
             "placeholder": true,
             "compatibilityTarget": "react-dom@19.2.6",
             "entrypoint": "react-dom/client"
-          }
+          },
+          "version": "0.0.0-fast-react-dom-placeholder",
+          "unsupportedExports": [
+            {
+              "exportName": "createRoot",
+              "functionName": "createRoot",
+              "length": 0
+            },
+            {
+              "exportName": "hydrateRoot",
+              "functionName": "hydrateRoot",
+              "length": 0
+            }
+          ]
         },
         {
           "file": "client.react-server.js",
           "error": {
             "name": "FastReactDomReactServerUnsupportedError",
             "code": "FAST_REACT_REACT_SERVER_UNSUPPORTED",
-            "compatibilityTarget": "react-dom@19.2.6"
+            "compatibilityTarget": "react-dom@19.2.6",
+            "entrypoint": "react-dom/client",
+            "message": "react-dom/client is not supported in React Server Components."
           }
         },
         {
@@ -547,7 +648,40 @@
             "placeholder": true,
             "compatibilityTarget": "react-dom@19.2.6",
             "entrypoint": "react-dom/server.node"
-          }
+          },
+          "version": "0.0.0-fast-react-dom-placeholder",
+          "unsupportedExports": [
+            {
+              "exportName": "renderToString",
+              "functionName": "renderToString",
+              "length": 0
+            },
+            {
+              "exportName": "renderToStaticMarkup",
+              "functionName": "renderToStaticMarkup",
+              "length": 0
+            },
+            {
+              "exportName": "renderToPipeableStream",
+              "functionName": "renderToPipeableStream",
+              "length": 0
+            },
+            {
+              "exportName": "renderToReadableStream",
+              "functionName": "renderToReadableStream",
+              "length": 0
+            },
+            {
+              "exportName": "resumeToPipeableStream",
+              "functionName": "resumeToPipeableStream",
+              "length": 0
+            },
+            {
+              "exportName": "resume",
+              "functionName": "resume",
+              "length": 0
+            }
+          ]
         },
         {
           "file": "server.browser.js",
@@ -556,7 +690,30 @@
             "placeholder": true,
             "compatibilityTarget": "react-dom@19.2.6",
             "entrypoint": "react-dom/server.browser"
-          }
+          },
+          "version": "0.0.0-fast-react-dom-placeholder",
+          "unsupportedExports": [
+            {
+              "exportName": "renderToString",
+              "functionName": "renderToString",
+              "length": 0
+            },
+            {
+              "exportName": "renderToStaticMarkup",
+              "functionName": "renderToStaticMarkup",
+              "length": 0
+            },
+            {
+              "exportName": "renderToReadableStream",
+              "functionName": "renderToReadableStream",
+              "length": 0
+            },
+            {
+              "exportName": "resume",
+              "functionName": "resume",
+              "length": 0
+            }
+          ]
         },
         {
           "file": "server.edge.js",
@@ -565,7 +722,30 @@
             "placeholder": true,
             "compatibilityTarget": "react-dom@19.2.6",
             "entrypoint": "react-dom/server.edge"
-          }
+          },
+          "version": "0.0.0-fast-react-dom-placeholder",
+          "unsupportedExports": [
+            {
+              "exportName": "renderToReadableStream",
+              "functionName": "renderToReadableStream",
+              "length": 0
+            },
+            {
+              "exportName": "renderToString",
+              "functionName": "renderToString",
+              "length": 0
+            },
+            {
+              "exportName": "renderToStaticMarkup",
+              "functionName": "renderToStaticMarkup",
+              "length": 0
+            },
+            {
+              "exportName": "resume",
+              "functionName": "resume",
+              "length": 0
+            }
+          ]
         },
         {
           "file": "server.bun.js",
@@ -574,14 +754,37 @@
             "placeholder": true,
             "compatibilityTarget": "react-dom@19.2.6",
             "entrypoint": "react-dom/server.bun"
-          }
+          },
+          "version": "0.0.0-fast-react-dom-placeholder",
+          "undefinedExports": [
+            "resume"
+          ],
+          "unsupportedExports": [
+            {
+              "exportName": "renderToReadableStream",
+              "functionName": "renderToReadableStream",
+              "length": 0
+            },
+            {
+              "exportName": "renderToString",
+              "functionName": "renderToString",
+              "length": 0
+            },
+            {
+              "exportName": "renderToStaticMarkup",
+              "functionName": "renderToStaticMarkup",
+              "length": 0
+            }
+          ]
         },
         {
           "file": "server.react-server.js",
           "error": {
             "name": "FastReactDomReactServerUnsupportedError",
             "code": "FAST_REACT_REACT_SERVER_UNSUPPORTED",
-            "compatibilityTarget": "react-dom@19.2.6"
+            "compatibilityTarget": "react-dom@19.2.6",
+            "entrypoint": "react-dom/server",
+            "message": "react-dom/server is not supported in React Server Components."
           }
         },
         {
@@ -591,7 +794,30 @@
             "placeholder": true,
             "compatibilityTarget": "react-dom@19.2.6",
             "entrypoint": "react-dom/static.node"
-          }
+          },
+          "version": "0.0.0-fast-react-dom-placeholder",
+          "unsupportedExports": [
+            {
+              "exportName": "prerenderToNodeStream",
+              "functionName": "prerenderToNodeStream",
+              "length": 0
+            },
+            {
+              "exportName": "prerender",
+              "functionName": "prerender",
+              "length": 0
+            },
+            {
+              "exportName": "resumeAndPrerenderToNodeStream",
+              "functionName": "resumeAndPrerenderToNodeStream",
+              "length": 0
+            },
+            {
+              "exportName": "resumeAndPrerender",
+              "functionName": "resumeAndPrerender",
+              "length": 0
+            }
+          ]
         },
         {
           "file": "static.browser.js",
@@ -600,7 +826,20 @@
             "placeholder": true,
             "compatibilityTarget": "react-dom@19.2.6",
             "entrypoint": "react-dom/static.browser"
-          }
+          },
+          "version": "0.0.0-fast-react-dom-placeholder",
+          "unsupportedExports": [
+            {
+              "exportName": "prerender",
+              "functionName": "prerender",
+              "length": 0
+            },
+            {
+              "exportName": "resumeAndPrerender",
+              "functionName": "resumeAndPrerender",
+              "length": 0
+            }
+          ]
         },
         {
           "file": "static.edge.js",
@@ -609,14 +848,29 @@
             "placeholder": true,
             "compatibilityTarget": "react-dom@19.2.6",
             "entrypoint": "react-dom/static.edge"
-          }
+          },
+          "version": "0.0.0-fast-react-dom-placeholder",
+          "unsupportedExports": [
+            {
+              "exportName": "prerender",
+              "functionName": "prerender",
+              "length": 0
+            },
+            {
+              "exportName": "resumeAndPrerender",
+              "functionName": "resumeAndPrerender",
+              "length": 0
+            }
+          ]
         },
         {
           "file": "static.react-server.js",
           "error": {
             "name": "FastReactDomReactServerUnsupportedError",
             "code": "FAST_REACT_REACT_SERVER_UNSUPPORTED",
-            "compatibilityTarget": "react-dom@19.2.6"
+            "compatibilityTarget": "react-dom@19.2.6",
+            "entrypoint": "react-dom/static",
+            "message": "react-dom/static is not supported in React Server Components."
           }
         },
         {
@@ -626,14 +880,79 @@
             "placeholder": true,
             "compatibilityTarget": "react-dom@19.2.6",
             "entrypoint": "react-dom/profiling"
-          }
+          },
+          "version": "19.2.6",
+          "unsupportedExports": [
+            {
+              "exportName": "createRoot",
+              "functionName": "",
+              "length": 2
+            },
+            {
+              "exportName": "flushSync",
+              "functionName": "",
+              "length": 1
+            },
+            {
+              "exportName": "hydrateRoot",
+              "functionName": "",
+              "length": 3
+            },
+            {
+              "exportName": "preconnect",
+              "functionName": "",
+              "length": 2
+            },
+            {
+              "exportName": "prefetchDNS",
+              "functionName": "",
+              "length": 1
+            },
+            {
+              "exportName": "preinit",
+              "functionName": "",
+              "length": 2
+            },
+            {
+              "exportName": "preinitModule",
+              "functionName": "",
+              "length": 2
+            },
+            {
+              "exportName": "preload",
+              "functionName": "",
+              "length": 2
+            },
+            {
+              "exportName": "preloadModule",
+              "functionName": "",
+              "length": 2
+            },
+            {
+              "exportName": "requestFormReset",
+              "functionName": "",
+              "length": 1
+            },
+            {
+              "exportName": "useFormState",
+              "functionName": "",
+              "length": 3
+            },
+            {
+              "exportName": "useFormStatus",
+              "functionName": "",
+              "length": 0
+            }
+          ]
         },
         {
           "file": "profiling.react-server.js",
           "error": {
             "name": "FastReactDomReactServerUnsupportedError",
             "code": "FAST_REACT_REACT_SERVER_UNSUPPORTED",
-            "compatibilityTarget": "react-dom@19.2.6"
+            "compatibilityTarget": "react-dom@19.2.6",
+            "entrypoint": "react-dom/profiling",
+            "message": "react-dom/profiling is not supported in React Server Components."
           }
         },
         {
@@ -643,7 +962,14 @@
             "placeholder": true,
             "compatibilityTarget": "react-dom@19.2.6",
             "entrypoint": "react-dom/test-utils"
-          }
+          },
+          "unsupportedExports": [
+            {
+              "exportName": "act",
+              "functionName": "",
+              "length": 1
+            }
+          ]
         }
       ]
     },
