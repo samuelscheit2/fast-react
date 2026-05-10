@@ -661,6 +661,124 @@ test("private controlled restore queue write preflight records intent rows witho
   assert.equal(preflight.sideEffects.radioGroupLookupPerformed, false);
   assert.equal(preflight.sideEffects.valueTrackerFieldWritten, false);
   assert.equal(preflight.sideEffects.browserInputMutated, false);
+
+  const flushBlocker = gate.recordRestoreQueueFlushBlocker(preflight, {
+    explicitAdmission: true,
+    queueKind:
+      "deterministic-controlled-input-post-event-restore-queue-flush-blocker",
+    queueId: "oracle-controlled-flush-blocker-queue",
+    targetKind: "controlled-input-post-event-restore-queue-flush-blocker"
+  });
+
+  assert.equal(
+    flushBlocker.status,
+    controlledRestoreQueue.controlledInputPostEventRestoreQueueFlushBlockerStatus
+  );
+  assert.equal(
+    controlledRestoreQueue.isPrivateControlledInputPostEventRestoreQueueFlushBlockerRecord(
+      flushBlocker
+    ),
+    true
+  );
+  assert.equal(flushBlocker.requestId, "controlled-oracle-write-preflight:4");
+  assert.deepEqual(flushBlocker.queueSnapshot.wrapperOperationNames, [
+    "input-value-sync",
+    "input-checked-sync"
+  ]);
+  assert.deepEqual(
+    flushBlocker.queueSnapshot.entries.map((entry) => ({
+      sourceRequestId: entry.sourceRequestId,
+      acceptedRestoreKind: entry.acceptedRestoreKind,
+      queueSlot: entry.queueSlot,
+      hostWrapperOperation: entry.hostWrapperOperation,
+      restoreQueueWritten: entry.restoreQueueWritten,
+      restoreQueueFlushed: entry.restoreQueueFlushed,
+      hostWrapperInvoked: entry.hostWrapperInvoked,
+      radioGroupLookupPerformed: entry.radioGroupLookupPerformed,
+      browserInputMutated: entry.browserInputMutated
+    })),
+    [
+      {
+        sourceRequestId: "controlled-oracle-write-preflight:1",
+        acceptedRestoreKind: "input-text-value",
+        queueSlot: "restore-target",
+        hostWrapperOperation: "input-value-sync",
+        restoreQueueWritten: false,
+        restoreQueueFlushed: false,
+        hostWrapperInvoked: false,
+        radioGroupLookupPerformed: false,
+        browserInputMutated: false
+      },
+      {
+        sourceRequestId: "controlled-oracle-write-preflight:2",
+        acceptedRestoreKind: "input-radio-checked",
+        queueSlot: "restore-queue",
+        hostWrapperOperation: "input-checked-sync",
+        restoreQueueWritten: false,
+        restoreQueueFlushed: false,
+        hostWrapperInvoked: false,
+        radioGroupLookupPerformed: false,
+        browserInputMutated: false
+      }
+    ]
+  );
+  assert.deepEqual(flushBlocker.intendedFlushOrder.flushSequence, [
+    "event-batch-exit",
+    "pending-restore-check",
+    "synchronous-work-flush",
+    "snapshot-and-clear-private-queue",
+    "restore-primary-target",
+    "restore-additional-targets-in-order",
+    "host-wrapper-restore-dispatch"
+  ]);
+  assert.deepEqual(
+    flushBlocker.wrapperRestoreBlocker.wrapperRows.map((row) => ({
+      acceptedRestoreKind: row.acceptedRestoreKind,
+      hostWrapperOperation: row.hostWrapperOperation,
+      wrapperInvocationBlocked: row.wrapperInvocationBlocked,
+      hostWrapperInvoked: row.hostWrapperInvoked,
+      wrapperWritePerformed: row.wrapperWritePerformed,
+      radioGroupLookupPerformed: row.radioGroupLookupPerformed,
+      valueTrackerFieldWritten: row.valueTrackerFieldWritten,
+      hostValueWritten: row.hostValueWritten,
+      browserInputMutated: row.browserInputMutated
+    })),
+    [
+      {
+        acceptedRestoreKind: "input-text-value",
+        hostWrapperOperation: "input-value-sync",
+        wrapperInvocationBlocked: true,
+        hostWrapperInvoked: false,
+        wrapperWritePerformed: false,
+        radioGroupLookupPerformed: false,
+        valueTrackerFieldWritten: false,
+        hostValueWritten: false,
+        browserInputMutated: false
+      },
+      {
+        acceptedRestoreKind: "input-radio-checked",
+        hostWrapperOperation: "input-checked-sync",
+        wrapperInvocationBlocked: true,
+        hostWrapperInvoked: false,
+        wrapperWritePerformed: false,
+        radioGroupLookupPerformed: false,
+        valueTrackerFieldWritten: false,
+        hostValueWritten: false,
+        browserInputMutated: false
+      }
+    ]
+  );
+  assert.equal(
+    flushBlocker.wrapperRestoreBlocker.actualWrapperRestoreBlockedReason,
+    "controlled-restore-flush-execution-remains-blocked"
+  );
+  assert.equal(flushBlocker.sideEffects.restoreQueueFlushBlockerRecorded, true);
+  assert.equal(flushBlocker.sideEffects.restoreQueueWritten, false);
+  assert.equal(flushBlocker.sideEffects.restoreQueueFlushed, false);
+  assert.equal(flushBlocker.sideEffects.hostWrapperInvoked, false);
+  assert.equal(flushBlocker.sideEffects.radioGroupLookupPerformed, false);
+  assert.equal(flushBlocker.sideEffects.valueTrackerFieldWritten, false);
+  assert.equal(flushBlocker.sideEffects.browserInputMutated, false);
   assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
 
   for (const {dispatch} of records) {

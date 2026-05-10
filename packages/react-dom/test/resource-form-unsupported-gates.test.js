@@ -3616,9 +3616,258 @@ test('private controlled restore queue write preflight records deterministic wri
   assert.equal(preflight.sideEffects.valueTrackerFieldWritten, false);
   assert.equal(preflight.sideEffects.browserInputMutated, false);
 
+  const flushBlocker = gate.recordRestoreQueueFlushBlocker(preflight, {
+    explicitAdmission: true,
+    queueKind:
+      'deterministic-controlled-input-post-event-restore-queue-flush-blocker',
+    queueId: 'controlled-flush-blocker-queue',
+    targetKind: 'controlled-input-post-event-restore-queue-flush-blocker'
+  });
+
+  assert.equal(Object.isFrozen(flushBlocker), true);
+  assert.equal(
+    controlledRestoreQueue.isPrivateControlledInputPostEventRestoreQueueFlushBlockerRecord(
+      flushBlocker
+    ),
+    true
+  );
+  assert.equal(
+    controlledRestoreQueue.getPrivateControlledInputPostEventRestoreQueueFlushBlockerRecordPayload(
+      flushBlocker
+    ),
+    flushBlocker
+  );
+  assert.equal(
+    flushBlocker.$$typeof,
+    controlledRestoreQueue.privateControlledInputPostEventRestoreQueueFlushBlockerRecordType
+  );
+  assert.equal(
+    flushBlocker.status,
+    controlledRestoreQueue.controlledInputPostEventRestoreQueueFlushBlockerStatus
+  );
+  assert.equal(flushBlocker.requestId, 'write-preflight:8');
+  assert.equal(flushBlocker.sourcePreflightRequestId, 'write-preflight:7');
+  assert.equal(flushBlocker.acceptedRecordCount, 6);
+  assert.deepEqual(
+    flushBlocker.queueSnapshot.wrapperOperationNames,
+    rows.map((row) => row.expectedWrapperOperation)
+  );
+  assert.deepEqual(
+    {
+      status: flushBlocker.queueSnapshot.status,
+      metadataOnly: flushBlocker.queueSnapshot.metadataOnly,
+      snapshotSource: flushBlocker.queueSnapshot.snapshotSource,
+      snapshotEntryCount: flushBlocker.queueSnapshot.snapshotEntryCount,
+      restoreQueueLength: flushBlocker.queueSnapshot.restoreQueueLength,
+      restoreTargetKind:
+        flushBlocker.queueSnapshot.restoreTarget.acceptedRestoreKind,
+      restoreTargetWrapper:
+        flushBlocker.queueSnapshot.restoreTarget.hostWrapperOperation,
+      restoreQueueKinds: flushBlocker.queueSnapshot.restoreQueue.map(
+        (entry) => entry.acceptedRestoreKind
+      ),
+      actualRestoreQueueRead:
+        flushBlocker.queueSnapshot.actualRestoreQueueRead,
+      actualRestoreQueueCleared:
+        flushBlocker.queueSnapshot.actualRestoreQueueCleared,
+      restoreQueueWritten: flushBlocker.queueSnapshot.restoreQueueWritten,
+      restoreQueueFlushed: flushBlocker.queueSnapshot.restoreQueueFlushed,
+      hostWrapperInvoked: flushBlocker.queueSnapshot.hostWrapperInvoked,
+      radioGroupLookupPerformed:
+        flushBlocker.queueSnapshot.radioGroupLookupPerformed,
+      browserInputMutated: flushBlocker.queueSnapshot.browserInputMutated
+    },
+    {
+      status: 'blocked-post-event-controlled-restore-queue-snapshot',
+      metadataOnly: true,
+      snapshotSource: 'accepted-write-preflight-metadata',
+      snapshotEntryCount: 6,
+      restoreQueueLength: 5,
+      restoreTargetKind: 'input-text-value',
+      restoreTargetWrapper: 'input-value-sync',
+      restoreQueueKinds: [
+        'input-checkbox-checked',
+        'input-radio-checked',
+        'select-single-value',
+        'select-multiple-value',
+        'textarea-value'
+      ],
+      actualRestoreQueueRead: false,
+      actualRestoreQueueCleared: false,
+      restoreQueueWritten: false,
+      restoreQueueFlushed: false,
+      hostWrapperInvoked: false,
+      radioGroupLookupPerformed: false,
+      browserInputMutated: false
+    }
+  );
+  assert.deepEqual(
+    flushBlocker.intendedFlushOrder.targetFlushOrder.map((entry) => ({
+      flushIndex: entry.flushIndex,
+      sourceRequestId: entry.sourceRequestId,
+      acceptedRestoreKind: entry.acceptedRestoreKind,
+      hostWrapperOperation: entry.hostWrapperOperation,
+      flushStep: entry.flushStep,
+      hostWrapperInvoked: entry.hostWrapperInvoked,
+      wrapperWritePerformed: entry.wrapperWritePerformed,
+      radioGroupLookupPerformed: entry.radioGroupLookupPerformed,
+      browserInputMutated: entry.browserInputMutated
+    })),
+    [
+      {
+        flushIndex: 0,
+        sourceRequestId: 'write-preflight:1',
+        acceptedRestoreKind: 'input-text-value',
+        hostWrapperOperation: 'input-value-sync',
+        flushStep: 'restore-primary-target',
+        hostWrapperInvoked: false,
+        wrapperWritePerformed: false,
+        radioGroupLookupPerformed: false,
+        browserInputMutated: false
+      },
+      {
+        flushIndex: 1,
+        sourceRequestId: 'write-preflight:2',
+        acceptedRestoreKind: 'input-checkbox-checked',
+        hostWrapperOperation: 'input-checked-sync',
+        flushStep: 'restore-additional-target',
+        hostWrapperInvoked: false,
+        wrapperWritePerformed: false,
+        radioGroupLookupPerformed: false,
+        browserInputMutated: false
+      },
+      {
+        flushIndex: 2,
+        sourceRequestId: 'write-preflight:3',
+        acceptedRestoreKind: 'input-radio-checked',
+        hostWrapperOperation: 'input-checked-sync',
+        flushStep: 'restore-additional-target',
+        hostWrapperInvoked: false,
+        wrapperWritePerformed: false,
+        radioGroupLookupPerformed: false,
+        browserInputMutated: false
+      },
+      {
+        flushIndex: 3,
+        sourceRequestId: 'write-preflight:4',
+        acceptedRestoreKind: 'select-single-value',
+        hostWrapperOperation: 'select-single-options-sync',
+        flushStep: 'restore-additional-target',
+        hostWrapperInvoked: false,
+        wrapperWritePerformed: false,
+        radioGroupLookupPerformed: false,
+        browserInputMutated: false
+      },
+      {
+        flushIndex: 4,
+        sourceRequestId: 'write-preflight:5',
+        acceptedRestoreKind: 'select-multiple-value',
+        hostWrapperOperation: 'select-multiple-options-sync',
+        flushStep: 'restore-additional-target',
+        hostWrapperInvoked: false,
+        wrapperWritePerformed: false,
+        radioGroupLookupPerformed: false,
+        browserInputMutated: false
+      },
+      {
+        flushIndex: 5,
+        sourceRequestId: 'write-preflight:6',
+        acceptedRestoreKind: 'textarea-value',
+        hostWrapperOperation: 'textarea-value-sync',
+        flushStep: 'restore-additional-target',
+        hostWrapperInvoked: false,
+        wrapperWritePerformed: false,
+        radioGroupLookupPerformed: false,
+        browserInputMutated: false
+      }
+    ]
+  );
+  assert.deepEqual(flushBlocker.intendedFlushOrder.flushSequence, [
+    'event-batch-exit',
+    'pending-restore-check',
+    'synchronous-work-flush',
+    'snapshot-and-clear-private-queue',
+    'restore-primary-target',
+    'restore-additional-targets-in-order',
+    'host-wrapper-restore-dispatch'
+  ]);
+  assert.deepEqual(flushBlocker.wrapperRestoreBlocker.blockerReasons, [
+    'metadata-only-diagnostic',
+    'accepted-write-metadata-did-not-write-live-queue',
+    'restore-flush-execution-disabled',
+    'host-wrapper-invocation-disabled',
+    'live-host-node-not-accepted',
+    'public-controlled-behavior-disabled',
+    'radio-group-lookup-disabled'
+  ]);
+  assert.deepEqual(
+    flushBlocker.wrapperRestoreBlocker.wrapperRows.map((row) => ({
+      sourceRequestId: row.sourceRequestId,
+      acceptedRestoreKind: row.acceptedRestoreKind,
+      hostWrapperOperation: row.hostWrapperOperation,
+      wrapperInvocationBlocked: row.wrapperInvocationBlocked,
+      actualWrapperRestoreBlockedReason:
+        row.actualWrapperRestoreBlockedReason,
+      hostWrapperInvoked: row.hostWrapperInvoked,
+      wrapperWritePerformed: row.wrapperWritePerformed,
+      radioGroupLookupPerformed: row.radioGroupLookupPerformed,
+      valueTrackerFieldWritten: row.valueTrackerFieldWritten,
+      hostValueWritten: row.hostValueWritten,
+      browserInputMutated: row.browserInputMutated
+    })),
+    rows.map((row, index) => ({
+      sourceRequestId: `write-preflight:${index + 1}`,
+      acceptedRestoreKind: row.expectedRestoreKind,
+      hostWrapperOperation: row.expectedWrapperOperation,
+      wrapperInvocationBlocked: true,
+      actualWrapperRestoreBlockedReason:
+        'controlled-restore-flush-execution-remains-blocked',
+      hostWrapperInvoked: false,
+      wrapperWritePerformed: false,
+      radioGroupLookupPerformed: false,
+      valueTrackerFieldWritten: false,
+      hostValueWritten: false,
+      browserInputMutated: false
+    }))
+  );
+  assert.equal(
+    flushBlocker.wrapperRestoreBlocker.restoreFlushExecutionAllowed,
+    false
+  );
+  assert.equal(
+    flushBlocker.wrapperRestoreBlocker.hostWrapperInvocationAllowed,
+    false
+  );
+  assert.equal(flushBlocker.wrapperRestoreBlocker.radioGroupLookupAllowed, false);
+  assert.equal(flushBlocker.postEventRestoreBoundary.restoreQueueWritten, false);
+  assert.equal(flushBlocker.postEventRestoreBoundary.restoreQueueFlushed, false);
+  assert.equal(flushBlocker.postEventRestoreBoundary.hostWrapperInvoked, false);
+  assert.equal(
+    flushBlocker.postEventRestoreBoundary.radioGroupLookupPerformed,
+    false
+  );
+  assert.equal(flushBlocker.sideEffects.restoreQueueFlushBlockerRecorded, true);
+  assert.equal(flushBlocker.sideEffects.restoreQueueSnapshotRecorded, true);
+  assert.equal(
+    flushBlocker.sideEffects.restoreQueueIntendedFlushOrderRecorded,
+    true
+  );
+  assert.equal(flushBlocker.sideEffects.restoreQueueWritten, false);
+  assert.equal(flushBlocker.sideEffects.restoreQueueFlushed, false);
+  assert.equal(flushBlocker.sideEffects.hostWrapperInvoked, false);
+  assert.equal(flushBlocker.sideEffects.radioGroupLookupPerformed, false);
+  assert.equal(flushBlocker.sideEffects.valueTrackerFieldWritten, false);
+  assert.equal(flushBlocker.sideEffects.hostValueWritten, false);
+  assert.equal(flushBlocker.sideEffects.browserInputMutated, false);
+  assert.equal(
+    flushBlocker.publicControlledBehaviorBoundary.compatibilityClaimed,
+    false
+  );
+
   const summary =
     controlledRestoreQueue.describeControlledInputPostEventRestoreQueueGate();
   assert.equal(summary.recordsRestoreQueueWritePreflight, true);
+  assert.equal(summary.recordsRestoreQueueFlushBlocker, true);
   assert.equal(
     summary.restoreQueueWritePreflight.recordsWriteIntentRows,
     true
@@ -3637,6 +3886,26 @@ test('private controlled restore queue write preflight records deterministic wri
   );
   assert.equal(summary.restoreQueueWritePreflight.radioGroupQueries, false);
   assert.equal(summary.restoreQueueWritePreflight.liveDomMutations, false);
+  assert.equal(
+    summary.restoreQueueFlushBlocker.recordsQueueSnapshot,
+    true
+  );
+  assert.equal(
+    summary.restoreQueueFlushBlocker.recordsIntendedFlushOrder,
+    true
+  );
+  assert.equal(
+    summary.restoreQueueFlushBlocker.recordsWrapperOperationNames,
+    true
+  );
+  assert.equal(
+    summary.restoreQueueFlushBlocker.recordsWrapperBlockerReasons,
+    true
+  );
+  assert.equal(summary.restoreQueueFlushBlocker.actualQueueFlushes, false);
+  assert.equal(summary.restoreQueueFlushBlocker.hostWrapperInvocations, false);
+  assert.equal(summary.restoreQueueFlushBlocker.radioGroupQueries, false);
+  assert.equal(summary.restoreQueueFlushBlocker.liveDomMutations, false);
 
   const skippedDispatch = createControlledInputEventDispatch({
     domEventName: 'click',
@@ -3666,7 +3935,7 @@ test('private controlled restore queue write preflight records deterministic wri
         controlledRestoreQueue.controlledInputPostEventRestoreQueueInvalidWritePreflightCode,
       compatibilityTarget,
       reason: 'restore-intent-not-recorded',
-      sourceRequestId: 'write-preflight:8'
+      sourceRequestId: 'write-preflight:9'
     }
   );
 
