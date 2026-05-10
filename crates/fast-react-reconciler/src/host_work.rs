@@ -4317,44 +4317,44 @@ mod tests {
         assert_eq!(diff.old_text(), "before");
         assert_eq!(diff.new_text(), "after");
         assert_eq!(apply.records().len(), 2);
-        assert_eq!(apply.records()[0].mutation().parent(), work_outer);
+        assert_eq!(
+            apply.records()[0].mutation().parent(),
+            payload.work_in_progress()
+        );
         assert_eq!(
             apply.records()[0].mutation().fiber(),
-            payload.work_in_progress()
-        );
-        assert_eq!(
-            apply.records()[0].mutation().alternate_fiber(),
-            Some(current_inner)
-        );
-        assert_eq!(
-            apply.records()[0].mutation().kind(),
-            HostRootMutationApplyRecordKind::CommitHostComponentUpdate
-        );
-        assert_eq!(
-            apply.records()[0].status(),
-            TestHostRootMutationApplyStatus::Applied(TestHostRootMutationHostCall::CommitUpdate)
-        );
-        assert_eq!(
-            apply.records()[1].mutation().parent(),
-            payload.work_in_progress()
-        );
-        assert_eq!(
-            apply.records()[1].mutation().fiber(),
             diff.work_in_progress()
         );
         assert_eq!(
-            apply.records()[1].mutation().alternate_fiber(),
+            apply.records()[0].mutation().alternate_fiber(),
             Some(current_text)
         );
         assert_eq!(
-            apply.records()[1].mutation().kind(),
+            apply.records()[0].mutation().kind(),
             HostRootMutationApplyRecordKind::CommitHostTextUpdate
         );
         assert_eq!(
-            apply.records()[1].status(),
+            apply.records()[0].status(),
             TestHostRootMutationApplyStatus::Applied(
                 TestHostRootMutationHostCall::CommitTextUpdate
             )
+        );
+        assert_eq!(apply.records()[1].mutation().parent(), work_outer);
+        assert_eq!(
+            apply.records()[1].mutation().fiber(),
+            payload.work_in_progress()
+        );
+        assert_eq!(
+            apply.records()[1].mutation().alternate_fiber(),
+            Some(current_inner)
+        );
+        assert_eq!(
+            apply.records()[1].mutation().kind(),
+            HostRootMutationApplyRecordKind::CommitHostComponentUpdate
+        );
+        assert_eq!(
+            apply.records()[1].status(),
+            TestHostRootMutationApplyStatus::Applied(TestHostRootMutationHostCall::CommitUpdate)
         );
         assert_eq!(apply.applied_host_call_count(), 2);
         assert_eq!(store.host_tokens().len(), token_count_before_apply + 1);
@@ -4367,8 +4367,8 @@ mod tests {
             "before"
         );
         let mut expected_operations = operations_before_apply;
-        expected_operations.push("commit_update");
         expected_operations.push("commit_text_update");
+        expected_operations.push("commit_update");
         assert_eq!(host.operations(), expected_operations);
     }
 
