@@ -14,6 +14,9 @@ import {
   REACT_TEST_RENDERER_ERROR_SURFACE_SCENARIOS
 } from "../src/react-test-renderer-error-surface-scenarios.mjs";
 import {
+  REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_NAME,
+  REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_ROWS,
+  REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_STATUS,
   findReactTestRendererErrorSurfaceObservation,
   readCheckedReactTestRendererErrorSurfaceOracle,
   readCheckedReactTestRendererErrorSurfaceOracleText
@@ -51,6 +54,9 @@ const ERROR_SURFACE_PUBLIC_UNBLOCK_REQUIREMENT_IDS =
   );
 const privateTestInstanceWrapperRecordSymbol = Symbol.for(
   "fast.react_test_renderer.private_test_instance_wrapper_record"
+);
+const privateErrorBoundaryDiagnosticsSymbol = Symbol.for(
+  "fast.react_test_renderer.private_error_boundary_diagnostics"
 );
 const rootRequestBridgeSymbol = Symbol.for(
   "fast.react_test_renderer.root_request_bridge"
@@ -257,6 +263,117 @@ test("React test renderer error surface local gate admits only private diagnosti
   assert.equal(gate.localChecks.publicToJSONAvailable, false);
   assert.equal(gate.localChecks.publicToTreeAvailable, false);
   assert.equal(gate.localChecks.publicTestInstanceWrappersPresent, false);
+});
+
+test("React test renderer private render and commit error rows stay root-option metadata only", () => {
+  assert.equal(
+    REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_NAME,
+    "fast-react-test-renderer.error-boundary.private-root-options-canary"
+  );
+  assert.equal(
+    REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_STATUS,
+    "private-error-boundary-diagnostics-root-options-metadata-public-boundary-blocked"
+  );
+  assert.deepEqual(
+    REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_ROWS.map(
+      (row) => row.id
+    ),
+    [
+      "react-test-renderer-render-error-root-option-private-diagnostic",
+      "react-test-renderer-commit-error-root-option-private-diagnostic"
+    ]
+  );
+
+  const calls = [];
+  const developmentEntry = jsEntrypoints.find((entry) =>
+    entry.entrypoint.endsWith("development")
+  );
+  const moduleExports = loadFresh(developmentEntry.specifier);
+  const bridge = Object.getOwnPropertyDescriptor(
+    moduleExports.create,
+    rootRequestBridgeSymbol
+  ).value;
+  const renderer = moduleExports.create(
+    { type: "private-error-boundary-diagnostics" },
+    {
+      onUncaughtError(error) {
+        calls.push(["uncaught", error.message]);
+      },
+      onCaughtError(error) {
+        calls.push(["caught", error.message]);
+      },
+      onRecoverableError(error) {
+        calls.push(["recoverable", error.message]);
+      }
+    }
+  );
+  const [createRequest] = bridge.getRendererRootRequests(renderer);
+  const descriptor = Object.getOwnPropertyDescriptor(
+    renderer,
+    privateErrorBoundaryDiagnosticsSymbol
+  );
+
+  assert.notEqual(descriptor, undefined);
+  assert.equal(descriptor.enumerable, false);
+  const diagnostics = descriptor.value;
+  assert.equal(
+    bridge.getRendererErrorBoundaryDiagnostics(renderer),
+    diagnostics
+  );
+  assert.equal(
+    bridge.getRootErrorBoundaryDiagnostics(createRequest),
+    diagnostics
+  );
+  assert.equal(diagnostics.diagnosticName, REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_NAME);
+  assert.equal(diagnostics.status, REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_STATUS);
+  assert.equal(diagnostics.rowCount, 2);
+  assert.deepEqual(
+    diagnostics.rows.map((row) => row.id),
+    REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_ROWS.map(
+      (row) => row.id
+    )
+  );
+  assert.deepEqual(
+    diagnostics.rows.map((row) => row.phase),
+    ["Render", "Commit"]
+  );
+  assert.equal(
+    diagnostics.rootErrorOptions.onUncaughtErrorConfigured,
+    true
+  );
+  assert.equal(diagnostics.rootErrorOptions.onCaughtErrorConfigured, true);
+  assert.equal(
+    diagnostics.rootErrorOptions.onRecoverableErrorConfigured,
+    true
+  );
+  assert.equal(
+    createRequest.optionsInfo.rootErrorOptions,
+    diagnostics.rootErrorOptions
+  );
+  assert.equal(diagnostics.publicErrorBoundaryBehaviorAvailable, false);
+  assert.equal(diagnostics.publicRootErrorCallbacksInvoked, false);
+  assert.equal(diagnostics.compatibilityClaimed, false);
+
+  for (const row of diagnostics.rows) {
+    assert.equal(row.diagnosticName, diagnostics.diagnosticName);
+    assert.equal(row.status, diagnostics.status);
+    assert.equal(row.rootErrorOptions, diagnostics.rootErrorOptions);
+    assert.equal(row.capturesRootErrorOptions, true);
+    assert.equal(row.rootErrorUpdateScheduled, false);
+    assert.equal(row.publicRootErrorCallbacksInvoked, false);
+    assert.equal(row.publicErrorBoundaryBehaviorAvailable, false);
+    assert.equal(row.compatibilityClaimed, false);
+  }
+
+  const updateError = captureThrown(() =>
+    renderer.update({ type: "still-blocked" })
+  );
+  assert.equal(updateError.name, "FastReactTestRendererUnimplementedError");
+  assert.equal(
+    updateError.privateErrorBoundaryDiagnostics.status,
+    REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_STATUS
+  );
+  assert.deepEqual(calls, []);
 });
 
 test("React test renderer error surface gate keeps multi-child TestInstance query metadata private", () => {
