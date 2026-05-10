@@ -17,7 +17,10 @@ use fast_react_core::{
 use crate::function_component::{
     FunctionComponentContextRenderState, FunctionComponentContextRenderStore,
     FunctionComponentInvoker, FunctionComponentOutputHandle, FunctionComponentRenderError,
-    FunctionComponentRenderRecord, render_function_component,
+    FunctionComponentRenderRecord, FunctionComponentSingleChildOutputResolver,
+    FunctionComponentSingleChildReconciliationError,
+    FunctionComponentSingleChildReconciliationRecord,
+    reconcile_function_component_single_child_output, render_function_component,
     render_function_component_with_context_reads,
 };
 
@@ -153,10 +156,44 @@ impl FunctionComponentBeginWorkRecord {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentSingleChildBeginWorkRecord {
+    begin_work: FunctionComponentBeginWorkRecord,
+    single_child: FunctionComponentSingleChildReconciliationRecord,
+}
+
+impl FunctionComponentSingleChildBeginWorkRecord {
+    #[must_use]
+    pub const fn begin_work(self) -> FunctionComponentBeginWorkRecord {
+        self.begin_work
+    }
+
+    #[must_use]
+    pub const fn single_child(self) -> FunctionComponentSingleChildReconciliationRecord {
+        self.single_child
+    }
+
+    #[must_use]
+    pub const fn render(self) -> FunctionComponentRenderRecord {
+        self.begin_work.render()
+    }
+
+    #[must_use]
+    pub const fn work_in_progress(self) -> FiberId {
+        self.begin_work.work_in_progress()
+    }
+
+    #[must_use]
+    pub const fn output(self) -> FunctionComponentOutputHandle {
+        self.begin_work.output()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum BeginWorkError {
     FiberTopology(FiberTopologyError),
     FunctionComponent(FunctionComponentRenderError),
+    FunctionComponentSingleChild(FunctionComponentSingleChildReconciliationError),
     UnsupportedPortal(UnsupportedPortalBeginWorkRecord),
     UnsupportedFiberTag { fiber: FiberId, tag: FiberTag },
 }
@@ -166,6 +203,7 @@ impl Display for BeginWorkError {
         match self {
             Self::FiberTopology(error) => Display::fmt(error, formatter),
             Self::FunctionComponent(error) => Display::fmt(error, formatter),
+            Self::FunctionComponentSingleChild(error) => Display::fmt(error, formatter),
             Self::UnsupportedPortal(record) => write!(
                 formatter,
                 "portal fiber {} reached begin-work but {feature} is unsupported; key {:?}, child {:?}, pending props {:?}, state node {:?}",
@@ -191,6 +229,7 @@ impl Error for BeginWorkError {
         match self {
             Self::FiberTopology(error) => Some(error),
             Self::FunctionComponent(error) => Some(error),
+            Self::FunctionComponentSingleChild(error) => Some(error),
             Self::UnsupportedPortal(_) | Self::UnsupportedFiberTag { .. } => None,
         }
     }
@@ -205,6 +244,12 @@ impl From<FiberTopologyError> for BeginWorkError {
 impl From<FunctionComponentRenderError> for BeginWorkError {
     fn from(error: FunctionComponentRenderError) -> Self {
         Self::FunctionComponent(error)
+    }
+}
+
+impl From<FunctionComponentSingleChildReconciliationError> for BeginWorkError {
+    fn from(error: FunctionComponentSingleChildReconciliationError) -> Self {
+        Self::FunctionComponentSingleChild(error)
     }
 }
 
@@ -297,17 +342,35 @@ pub(crate) fn begin_work_with_context_reads(
     ))
 }
 
+pub(crate) fn begin_work_reconcile_function_component_single_child(
+    arena: &mut FiberArena,
+    request: BeginWorkRequest,
+    invoker: &mut impl FunctionComponentInvoker,
+    resolver: &impl FunctionComponentSingleChildOutputResolver,
+) -> Result<FunctionComponentSingleChildBeginWorkRecord, BeginWorkError> {
+    let begin_work = begin_work(arena, request, invoker)?.function_component();
+    let single_child =
+        reconcile_function_component_single_child_output(arena, begin_work.render(), resolver)?;
+
+    Ok(FunctionComponentSingleChildBeginWorkRecord {
+        begin_work,
+        single_child,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::function_component::{
         FunctionComponentInvocationError, FunctionComponentInvocationRequest,
+        FunctionComponentSingleChildOutput, FunctionComponentSingleChildOutputResolver,
+        FunctionComponentSingleChildReconciliationError,
     };
     use crate::test_support::{FakeContainer, RecordingHost};
-    use crate::{FiberRootStore, RootOptions};
+    use crate::{FiberRootStore, RootElementHandle, RootOptions};
     use fast_react_core::{
-        ContextHandle, ContextStackSnapshot, ContextValueHandle, FiberMode, FiberTypeHandle,
-        PropsHandle, ReactKey, StateHandle, StateNodeHandle, UpdateQueueHandle,
+        ContextHandle, ContextStackSnapshot, ContextValueHandle, ElementTypeHandle, FiberMode,
+        FiberTypeHandle, PropsHandle, ReactKey, StateHandle, StateNodeHandle, UpdateQueueHandle,
     };
 
     #[derive(Debug, Clone)]
@@ -352,6 +415,26 @@ mod tests {
                         "missing test component registration",
                     ))
                 })
+        }
+    }
+
+    #[derive(Debug)]
+    struct StaticSingleChildResolver {
+        child: Option<FunctionComponentSingleChildOutput>,
+    }
+
+    impl StaticSingleChildResolver {
+        const fn new(child: Option<FunctionComponentSingleChildOutput>) -> Self {
+            Self { child }
+        }
+    }
+
+    impl FunctionComponentSingleChildOutputResolver for StaticSingleChildResolver {
+        fn resolve_function_component_single_child_output(
+            &self,
+            _output: FunctionComponentOutputHandle,
+        ) -> Option<FunctionComponentSingleChildOutput> {
+            self.child
         }
     }
 
@@ -529,6 +612,105 @@ mod tests {
             arena.get(existing_child).unwrap().return_fiber(),
             Some(work_in_progress)
         );
+    }
+
+    #[test]
+    fn begin_work_reconciles_function_component_host_text_single_child() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let output = FunctionComponentOutputHandle::from_raw(91);
+        let child_element = RootElementHandle::from_raw(91);
+        let child_props = PropsHandle::from_raw(911);
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+        let resolver = StaticSingleChildResolver::new(Some(
+            FunctionComponentSingleChildOutput::host_text(output, child_element, child_props),
+        ));
+
+        let record = begin_work_reconcile_function_component_single_child(
+            &mut arena,
+            BeginWorkRequest::new(work_in_progress, Lanes::DEFAULT),
+            &mut registry,
+            &resolver,
+        )
+        .unwrap();
+
+        assert_eq!(record.begin_work().current(), Some(current));
+        assert_eq!(record.work_in_progress(), work_in_progress);
+        assert_eq!(record.output(), output);
+        assert_eq!(record.render().component(), component);
+        assert_eq!(record.single_child().function_component(), work_in_progress);
+        assert_eq!(record.single_child().child_element(), child_element);
+        assert_eq!(record.single_child().child_tag(), FiberTag::HostText);
+        assert_eq!(record.single_child().child_props(), child_props);
+        assert_eq!(record.single_child().render_lanes(), Lanes::DEFAULT);
+        assert_eq!(registry.calls().len(), 1);
+        assert!(
+            arena
+                .get(work_in_progress)
+                .unwrap()
+                .flags()
+                .contains_all(fast_react_core::FiberFlags::PERFORMED_WORK)
+        );
+    }
+
+    #[test]
+    fn begin_work_reconciles_function_component_host_component_single_child() {
+        let (mut arena, _current, work_in_progress, component) = function_component_pair();
+        let output = FunctionComponentOutputHandle::from_raw(92);
+        let child_element = RootElementHandle::from_raw(92);
+        let child_type = ElementTypeHandle::from_raw(920);
+        let child_props = PropsHandle::from_raw(921);
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+        let resolver = StaticSingleChildResolver::new(Some(
+            FunctionComponentSingleChildOutput::host_component(
+                output,
+                child_element,
+                child_type,
+                child_props,
+            ),
+        ));
+
+        let record = begin_work_reconcile_function_component_single_child(
+            &mut arena,
+            BeginWorkRequest::new(work_in_progress, Lanes::SYNC),
+            &mut registry,
+            &resolver,
+        )
+        .unwrap();
+
+        assert_eq!(record.single_child().child_tag(), FiberTag::HostComponent);
+        assert_eq!(record.single_child().child_element_type(), child_type);
+        assert_eq!(record.single_child().child_props(), child_props);
+        assert_eq!(record.single_child().render_lanes(), Lanes::SYNC);
+    }
+
+    #[test]
+    fn begin_work_single_child_reconciliation_fails_closed_for_unknown_output() {
+        let (mut arena, _current, work_in_progress, component) = function_component_pair();
+        let output = FunctionComponentOutputHandle::from_raw(93);
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+        let resolver = StaticSingleChildResolver::new(None);
+
+        let error = begin_work_reconcile_function_component_single_child(
+            &mut arena,
+            BeginWorkRequest::new(work_in_progress, Lanes::DEFAULT),
+            &mut registry,
+            &resolver,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            BeginWorkError::FunctionComponentSingleChild(
+                FunctionComponentSingleChildReconciliationError::UnknownOutput {
+                    fiber: work_in_progress,
+                    output,
+                }
+            )
+        );
+        assert_eq!(registry.calls().len(), 1);
     }
 
     #[test]
