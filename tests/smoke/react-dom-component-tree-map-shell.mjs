@@ -473,6 +473,8 @@ const reactDomPackage = require(
     componentTree.getLatestPropsFromNode(secondNode),
     secondHandoffProps
   );
+  assert.deepEqual(attributeEntries(firstNode), [['id', 'first-handoff']]);
+  assert.deepEqual(attributeEntries(secondNode), [['id', 'second-handoff']]);
 
   const firstBlockedProps = {id: 'first-blocked'};
   const invalidBatchRecord = {kind: 'latestPropsCommit'};
@@ -492,6 +494,7 @@ const reactDomPackage = require(
     componentTree.getLatestPropsFromNode(firstNode),
     firstHandoffProps
   );
+  assert.deepEqual(attributeEntries(firstNode), [['id', 'first-handoff']]);
 
   const firstBlockedHandoffProps = {id: 'first-blocked-handoff'};
   assert.throws(
@@ -513,6 +516,7 @@ const reactDomPackage = require(
     componentTree.getLatestPropsFromNode(firstNode),
     firstHandoffProps
   );
+  assert.deepEqual(attributeEntries(firstNode), [['id', 'first-handoff']]);
 
   assert.equal(componentTree.detachHostInstanceToken(firstToken), firstToken);
   assert.equal(componentTree.detachHostInstanceToken(secondToken), secondToken);
@@ -1311,6 +1315,12 @@ function createElement(nodeName) {
       this.attributes.set(attributeName, stringValue);
     }
   };
+}
+
+function attributeEntries(node) {
+  return Array.from(node.attributes.entries()).sort(([left], [right]) =>
+    left.localeCompare(right)
+  );
 }
 
 function createTextNode(data) {

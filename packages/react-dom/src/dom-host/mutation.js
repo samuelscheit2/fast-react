@@ -235,29 +235,47 @@ function applyDomPropertyPayloadForLatestProps(instance, payload, latestProps) {
   const entries = payload.map((entry, index) =>
     normalizeLatestPropsSafeDomPropertyPayloadEntry(instance, entry, index)
   );
+  const rollbackRecords =
+    createLatestPropsSafeDomPropertyPayloadRollbackRecords(instance, entries);
+  let rollbackLimit = 0;
 
-  for (const entry of entries) {
-    applyLatestPropsSafeDomPropertyPayloadEntry(instance, entry);
+  try {
+    for (let index = 0; index < entries.length; index += 1) {
+      rollbackLimit = index + 1;
+      applyLatestPropsSafeDomPropertyPayloadEntry(instance, entries[index]);
+    }
+
+    const mutationRecords = Object.freeze(
+      entries.map((entry) =>
+        Object.freeze(createAdmittedPropertyPayloadRecord(entry))
+      )
+    );
+    const latestPropsPayloadRecords = Object.freeze(
+      entries.map(createLatestPropsPayloadRecord)
+    );
+    const latestPropsCommitRecord = createLatestPropsCommitRecord(
+      instance,
+      latestProps,
+      latestPropsPayloadRecords
+    );
+
+    return createDomPropertyUpdateLatestPropsHandoff(
+      mutationRecords,
+      latestPropsCommitRecord,
+      rollbackRecords
+    );
+  } catch (error) {
+    try {
+      rollbackLatestPropsSafeDomPropertyPayloadEntries(
+        instance,
+        rollbackRecords,
+        rollbackLimit
+      );
+    } catch (rollbackError) {
+      // Preserve the original private mutation failure for callers.
+    }
+    throw error;
   }
-
-  const mutationRecords = Object.freeze(
-    entries.map((entry) =>
-      Object.freeze(createAdmittedPropertyPayloadRecord(entry))
-    )
-  );
-  const latestPropsPayloadRecords = Object.freeze(
-    entries.map(createLatestPropsPayloadRecord)
-  );
-  const latestPropsCommitRecord = createLatestPropsCommitRecord(
-    instance,
-    latestProps,
-    latestPropsPayloadRecords
-  );
-
-  return createDomPropertyUpdateLatestPropsHandoff(
-    mutationRecords,
-    latestPropsCommitRecord
-  );
 }
 
 function applyStyleDangerousHtmlPayload(instance, payload) {
@@ -706,7 +724,8 @@ function createLatestPropsPayloadRecord(entry) {
 
 function createDomPropertyUpdateLatestPropsHandoff(
   mutationRecords,
-  latestPropsCommitRecord
+  latestPropsCommitRecord,
+  rollbackRecords
 ) {
   const handoff = Object.freeze({
     kind: DOM_PROPERTY_UPDATE_LATEST_PROPS_HANDOFF,
@@ -719,11 +738,220 @@ function createDomPropertyUpdateLatestPropsHandoff(
     handoff,
     Object.freeze({
       latestPropsCommitRecord,
-      mutationRecords
+      mutationRecords,
+      rollbackRecords
     })
   );
 
   return handoff;
+}
+
+function rollbackDomPropertyUpdateLatestPropsHandoff(handoff) {
+  const payload = getDomPropertyUpdateLatestPropsHandoffPayload(handoff);
+  if (payload === null) {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_LATEST_PROPS_MUTATION_HANDOFF_ROLLBACK',
+      'Cannot roll back an invalid DOM property latest-props mutation handoff.'
+    );
+  }
+
+  const latestPropsPayload = getLatestPropsCommitRecordPayload(
+    payload.latestPropsCommitRecord
+  );
+  if (latestPropsPayload === null) {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_LATEST_PROPS_COMMIT_ROLLBACK',
+      'Cannot roll back a latest-props mutation handoff without a commit payload.'
+    );
+  }
+
+  rollbackLatestPropsSafeDomPropertyPayloadEntries(
+    latestPropsPayload.node,
+    payload.rollbackRecords,
+    payload.rollbackRecords.length
+  );
+  return payload.rollbackRecords.filter(Boolean).length;
+}
+
+function createLatestPropsSafeDomPropertyPayloadRollbackRecords(
+  instance,
+  entries
+) {
+  return Object.freeze(
+    entries.map((entry) => {
+      const rollbackRecord =
+        createLatestPropsSafeDomPropertyPayloadRollbackRecord(instance, entry);
+      return rollbackRecord === null ? null : Object.freeze(rollbackRecord);
+    })
+  );
+}
+
+function createLatestPropsSafeDomPropertyPayloadRollbackRecord(
+  instance,
+  entry
+) {
+  if (entry.kind === ENTRY_SET_ATTRIBUTE) {
+    return createAttributePayloadRollbackRecord(
+      instance,
+      entry.attributeName
+    );
+  }
+
+  if (entry.kind === ENTRY_REMOVE_ATTRIBUTE) {
+    return createAttributePayloadRollbackRecord(
+      instance,
+      entry.attributeName
+    );
+  }
+
+  if (entry.kind === ENTRY_SET_PROPERTY) {
+    return createPropertyPayloadRollbackRecord(
+      instance,
+      entry.propertyName
+    );
+  }
+
+  if (entry.kind === ENTRY_REMOVE_PROPERTY) {
+    return createPropertyPayloadRollbackRecord(
+      instance,
+      entry.propertyName
+    );
+  }
+
+  return null;
+}
+
+function createAttributePayloadRollbackRecord(instance, attributeName) {
+  assertAttributeRollbackTarget(instance);
+  const snapshot = getAttributeRollbackSnapshot(instance, attributeName);
+  return {
+    kind: 'attributeRollback',
+    attributeName,
+    hadAttribute: snapshot.hadAttribute,
+    value: snapshot.value
+  };
+}
+
+function createPropertyPayloadRollbackRecord(instance, propertyName) {
+  return {
+    kind: 'propertyRollback',
+    propertyName,
+    value: instance[propertyName]
+  };
+}
+
+function assertAttributeRollbackTarget(instance) {
+  if (
+    typeof instance.setAttribute === 'function' &&
+    typeof instance.removeAttribute === 'function'
+  ) {
+    return;
+  }
+
+  throw createDomHostMutationError(
+    'FAST_REACT_DOM_UNSUPPORTED_PROPERTY_PAYLOAD_ROLLBACK_TARGET',
+    'Cannot publish latest props from a node without reversible attribute mutation methods.'
+  );
+}
+
+function getAttributeRollbackSnapshot(instance, attributeName) {
+  if (
+    typeof instance.hasAttribute === 'function' &&
+    typeof instance.getAttribute === 'function'
+  ) {
+    const hadAttribute = !!instance.hasAttribute(attributeName);
+    return {
+      hadAttribute,
+      value: hadAttribute ? String(instance.getAttribute(attributeName)) : null
+    };
+  }
+
+  if (instance.attributes instanceof Map) {
+    const hadAttribute = instance.attributes.has(attributeName);
+    return {
+      hadAttribute,
+      value: hadAttribute ? String(instance.attributes.get(attributeName)) : null
+    };
+  }
+
+  throw createDomHostMutationError(
+    'FAST_REACT_DOM_UNSUPPORTED_PROPERTY_PAYLOAD_ROLLBACK_TARGET',
+    'Cannot publish latest props from a node without attribute snapshot support.'
+  );
+}
+
+function rollbackLatestPropsSafeDomPropertyPayloadEntries(
+  instance,
+  rollbackRecords,
+  rollbackLimit
+) {
+  let firstRollbackError = null;
+  for (let index = rollbackLimit - 1; index >= 0; index -= 1) {
+    const rollbackRecord = rollbackRecords[index];
+    if (rollbackRecord === null) {
+      continue;
+    }
+    try {
+      applyLatestPropsSafeDomPropertyPayloadRollbackRecord(
+        instance,
+        rollbackRecord
+      );
+    } catch (error) {
+      if (firstRollbackError === null) {
+        firstRollbackError = error;
+      }
+    }
+  }
+
+  if (firstRollbackError !== null) {
+    throw firstRollbackError;
+  }
+}
+
+function applyLatestPropsSafeDomPropertyPayloadRollbackRecord(
+  instance,
+  rollbackRecord
+) {
+  if (rollbackRecord.kind === 'attributeRollback') {
+    if (attributeRollbackRecordMatchesCurrentValue(instance, rollbackRecord)) {
+      return;
+    }
+
+    if (rollbackRecord.hadAttribute) {
+      instance.setAttribute(
+        rollbackRecord.attributeName,
+        rollbackRecord.value
+      );
+    } else {
+      instance.removeAttribute(rollbackRecord.attributeName);
+    }
+    return;
+  }
+
+  if (rollbackRecord.kind === 'propertyRollback') {
+    if (instance[rollbackRecord.propertyName] === rollbackRecord.value) {
+      return;
+    }
+
+    instance[rollbackRecord.propertyName] = rollbackRecord.value;
+    return;
+  }
+
+  throw createDomHostMutationError(
+    'FAST_REACT_DOM_INVALID_PROPERTY_PAYLOAD_ROLLBACK_RECORD',
+    'Cannot roll back an invalid DOM property payload record.'
+  );
+}
+
+function attributeRollbackRecordMatchesCurrentValue(instance, rollbackRecord) {
+  const snapshot = getAttributeRollbackSnapshot(
+    instance,
+    rollbackRecord.attributeName
+  );
+  return (
+    snapshot.hadAttribute === rollbackRecord.hadAttribute &&
+    snapshot.value === rollbackRecord.value
+  );
 }
 
 function assertChildNode(child, operation) {
@@ -1132,5 +1360,6 @@ module.exports = {
   removeChild,
   removeChildFromContainer,
   resetTextContent,
+  rollbackDomPropertyUpdateLatestPropsHandoff,
   setTextContent
 };

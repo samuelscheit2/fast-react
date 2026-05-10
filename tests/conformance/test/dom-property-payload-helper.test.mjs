@@ -787,6 +787,54 @@ test("private DOM latest-props handoff keeps failed payloads out of the componen
   );
 });
 
+test("private DOM latest-props handoff rolls back partial fake-DOM mutations on failure", () => {
+  const element = new FakeElement("div");
+  const token = componentTree.createHostInstanceToken(
+    { kind: "LatestPropsRollbackHost" },
+    { kind: "LatestPropsRollbackRoot" }
+  );
+  const initialProps = orderedProps([["title", "old-title"]]);
+  const nextProps = orderedProps([
+    ["id", "temporary-id"],
+    ["data-state", "ready"]
+  ]);
+  const thrownError = new Error("fake setAttribute failed after mutation");
+  const originalSetAttribute = element.setAttribute;
+
+  element.setAttribute("title", "old-title");
+  element.mutationLog = [];
+  element.setAttribute = function setAttribute(name, value) {
+    originalSetAttribute.call(this, name, value);
+    if (String(name) === "data-state") {
+      throw thrownError;
+    }
+  };
+
+  componentTree.attachHostInstanceNode(element, token, initialProps);
+
+  assert.throws(
+    () =>
+      commitDomPropertyUpdateForLatestProps(
+        element,
+        "div",
+        initialProps,
+        nextProps
+      ),
+    (error) => error === thrownError
+  );
+  assert.deepEqual(element.activeAttributeEntries(), [["title", "old-title"]]);
+  assert.deepEqual(element.mutationLog, [
+    ["removeAttribute", "title", true],
+    ["setAttribute", "id", "temporary-id"],
+    ["setAttribute", "data-state", "ready"],
+    ["removeAttribute", "data-state", true],
+    ["removeAttribute", "id", true],
+    ["setAttribute", "title", "old-title"]
+  ]);
+  assert.equal(componentTree.getLatestPropsFromNode(element), initialProps);
+  assert.equal(componentTree.detachHostInstanceToken(token), token);
+});
+
 test("private DOM style and innerHTML applier applies accepted payload records in order", () => {
   const element = new FakeElement("div");
   const payload = diffDomPropertyPayload(

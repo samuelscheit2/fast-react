@@ -502,6 +502,52 @@ function runSmokeChecks() {
   }
 
   {
+    const element = createElement('div');
+    const rootOwner = {kind: 'LatestPropsRollbackRoot'};
+    const hostOwner = {kind: 'LatestPropsRollbackHost'};
+    const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
+    const initialProps = orderedProps([['title', 'old-title']]);
+    const nextProps = orderedProps([
+      ['id', 'temporary-id'],
+      ['data-state', 'ready']
+    ]);
+    const thrownError = new Error('fake setAttribute failed after mutation');
+    const originalSetAttribute = element.setAttribute;
+
+    element.setAttribute('title', 'old-title');
+    element.attributeLog = [];
+    element.setAttribute = function setAttribute(name, value) {
+      originalSetAttribute.call(this, name, value);
+      if (String(name) === 'data-state') {
+        throw thrownError;
+      }
+    };
+    componentTree.attachHostInstanceNode(element, token, initialProps);
+
+    assert.throws(
+      () =>
+        domHost.commitDomPropertyUpdateForLatestProps(
+          element,
+          'div',
+          initialProps,
+          nextProps
+        ),
+      (error) => error === thrownError
+    );
+    assert.deepEqual(attributeEntries(element), [['title', 'old-title']]);
+    assert.deepEqual(element.attributeLog, [
+      ['removeAttribute', 'title', true],
+      ['setAttribute', 'id', 'temporary-id'],
+      ['setAttribute', 'data-state', 'ready'],
+      ['removeAttribute', 'data-state', true],
+      ['removeAttribute', 'id', true],
+      ['setAttribute', 'title', 'old-title']
+    ]);
+    assert.equal(componentTree.getLatestPropsFromNode(element), initialProps);
+    assert.equal(componentTree.detachHostInstanceToken(token), token);
+  }
+
+  {
     const parent = createElement('section');
     const first = createElement('p');
     const second = createElement('span');
