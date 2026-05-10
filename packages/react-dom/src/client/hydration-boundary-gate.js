@@ -20,6 +20,7 @@ const {
   EVENT_DISPATCH_BLOCKED_CODE,
   EVENT_TARGET_RESOLUTION_BLOCKED_CODE,
   HYDRATION_REPLAY_BLOCKED_CODE,
+  createHydrationDehydratedTargetResolutionDiagnostic,
   createHydrationReplayEventQueueDiagnostic
 } = require('../events/plugin-event-system.js');
 
@@ -438,8 +439,20 @@ function createUnsupportedHydrateRootRecordWithGate(
     markerGuard,
     markerParserEvidence
   });
+  const targetResolutionDiagnostics =
+    createHydrationDehydratedTargetResolutionDiagnostic([], {
+      markerDiagnostics,
+      markerReplayTargetCandidates:
+        replayQueueDiagnostics.markerReplayTargetCandidates,
+      rootContainer: container,
+      rootKind: UNSUPPORTED_HYDRATION_ROOT_KIND,
+      rootRecordId: recordId,
+      rootTag: CONCURRENT_ROOT_TAG,
+      source: 'unsupported-hydrate-root-boundary-record'
+    });
   const eventReplayQueueDiagnostics =
     createHydrationReplayEventQueueDiagnostic([], {
+      dehydratedTargetResolution: targetResolutionDiagnostics,
       markerReplayTargetCandidates:
         replayQueueDiagnostics.markerReplayTargetCandidates,
       source: 'unsupported-hydrate-root-boundary-record'
@@ -449,7 +462,8 @@ function createUnsupportedHydrateRootRecordWithGate(
     listenerGuard,
     markerDiagnostics,
     markerParserEvidence,
-    replayQueueDiagnostics
+    replayQueueDiagnostics,
+    targetResolutionDiagnostics
   });
   const record = freezeRecord({
     $$typeof: privateHydrationBoundaryRecordType,
@@ -471,6 +485,7 @@ function createUnsupportedHydrateRootRecordWithGate(
     markerParserEvidence,
     markerEvidence,
     replayQueueDiagnostics,
+    targetResolutionDiagnostics,
     eventReplayQueueDiagnostics,
     eventReplayBlockers,
     canHydrate: false,
@@ -727,7 +742,8 @@ function createHydrationEventReplayBlockers({
   listenerGuard,
   markerDiagnostics,
   markerParserEvidence,
-  replayQueueDiagnostics
+  replayQueueDiagnostics,
+  targetResolutionDiagnostics
 }) {
   return freezeRecord({
     kind: 'FastReactDomHydrationEventReplayBlockers',
@@ -749,6 +765,18 @@ function createHydrationEventReplayBlockers({
     markerParserEvidenceAccepted:
       markerParserEvidence.status ===
       'accepted-marker-parser-evidence-recorded',
+    targetResolutionDiagnostics,
+    targetResolutionDiagnosticsAccepted:
+      targetResolutionDiagnostics.status ===
+        'blocked-no-hydratable-event-targets-recorded' ||
+      targetResolutionDiagnostics.status ===
+        'blocked-hydratable-event-targets-recorded',
+    dehydratedRootOwnerStatus:
+      targetResolutionDiagnostics.dehydratedRootOwnerStatus,
+    dehydratedBoundaryOwnerCount:
+      targetResolutionDiagnostics.dehydratedBoundaryOwnerCount,
+    hydratableEventTargetLookupCount:
+      targetResolutionDiagnostics.hydratableEventTargetLookupCount,
     eventReplayQueueDiagnostics,
     eventReplayQueueDiagnosticsAccepted:
       eventReplayQueueDiagnostics.status ===

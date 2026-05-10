@@ -38,6 +38,14 @@ const HYDRATION_REPLAY_EVENT_QUEUE_DIAGNOSTIC_KIND =
   'FastReactDomHydrationReplayEventQueueDiagnostic';
 const HYDRATION_REPLAY_EVENT_QUEUE_ENTRY_RECORD_KIND =
   'FastReactDomHydrationReplayEventQueueEntryRecord';
+const HYDRATION_DEHYDRATED_TARGET_RESOLUTION_DIAGNOSTIC_KIND =
+  'FastReactDomHydrationDehydratedTargetResolutionDiagnostic';
+const HYDRATION_DEHYDRATED_ROOT_OWNER_RECORD_KIND =
+  'FastReactDomHydrationDehydratedRootOwnerRecord';
+const HYDRATION_DEHYDRATED_BOUNDARY_OWNER_RECORD_KIND =
+  'FastReactDomHydrationDehydratedBoundaryOwnerRecord';
+const HYDRATION_HYDRATABLE_EVENT_TARGET_LOOKUP_RECORD_KIND =
+  'FastReactDomHydrationHydratableEventTargetLookupRecord';
 
 const EVENT_DISPATCH_BLOCKED_CODE = 'FAST_REACT_DOM_EVENT_DISPATCH_BLOCKED';
 const PLUGIN_EXTRACTION_BLOCKED_CODE =
@@ -200,6 +208,8 @@ const dispatchListenerRecordPayloads = new WeakMap();
 const dispatchQueueEntryRecordPayloads = new WeakMap();
 const dispatchListenerInvocationCanaryRecordPayloads = new WeakMap();
 const dispatchQueueInvocationCanaryRecordPayloads = new WeakMap();
+const hydrationDehydratedTargetResolutionDiagnosticPayloads =
+  new WeakMap();
 
 function isObjectLike(value) {
   return (
@@ -1198,6 +1208,10 @@ function createControlledStateRestoreRecord() {
 
 function createHydrationReplayEventQueueDiagnostic(dispatchRecords, options) {
   const normalizedOptions = isObjectLike(options) ? options : {};
+  const source =
+    typeof normalizedOptions.source === 'string'
+      ? normalizedOptions.source
+      : 'private-event-dispatch-records';
   const normalizedDispatchRecords =
     normalizeHydrationReplayDispatchRecords(dispatchRecords);
   const blockedEventReplayTargets = Object.freeze(
@@ -1210,6 +1224,24 @@ function createHydrationReplayEventQueueDiagnostic(dispatchRecords, options) {
       ? normalizedOptions.markerReplayTargetCandidates.slice()
       : []
   );
+  const sourceDehydratedTargetResolution =
+    normalizedOptions.dehydratedTargetResolution ||
+    normalizedOptions.targetResolutionDiagnostics;
+  const dehydratedTargetResolutionDiagnostics =
+    normalizedDispatchRecords.length === 0 &&
+    sourceDehydratedTargetResolution !== undefined &&
+    sourceDehydratedTargetResolution !== null
+      ? getSourceDehydratedTargetResolutionDiagnostic({
+          dehydratedTargetResolution: sourceDehydratedTargetResolution
+        })
+      : createHydrationDehydratedTargetResolutionDiagnostic(
+          normalizedDispatchRecords,
+          {
+            dehydratedTargetResolution: sourceDehydratedTargetResolution,
+            markerReplayTargetCandidates,
+            source
+          }
+        );
 
   return Object.freeze({
     kind: HYDRATION_REPLAY_EVENT_QUEUE_DIAGNOSTIC_KIND,
@@ -1218,9 +1250,7 @@ function createHydrationReplayEventQueueDiagnostic(dispatchRecords, options) {
         ? 'blocked-no-event-replay-targets-recorded'
         : 'blocked-event-replay-targets-recorded',
     source:
-      typeof normalizedOptions.source === 'string'
-        ? normalizedOptions.source
-        : 'private-event-dispatch-records',
+      source,
     diagnosticOnly: true,
     readOnly: true,
     compatibilityClaimed: false,
@@ -1240,6 +1270,16 @@ function createHydrationReplayEventQueueDiagnostic(dispatchRecords, options) {
     eventTargetResolutionBlockedReason: EVENT_TARGET_RESOLUTION_BLOCKED_CODE,
     markerReplayTargetCandidateCount: markerReplayTargetCandidates.length,
     markerReplayTargetCandidates,
+    dehydratedTargetResolutionDiagnostics,
+    targetResolutionDiagnosticsAccepted:
+      dehydratedTargetResolutionDiagnostics.kind ===
+      HYDRATION_DEHYDRATED_TARGET_RESOLUTION_DIAGNOSTIC_KIND,
+    dehydratedRootOwnerStatus:
+      dehydratedTargetResolutionDiagnostics.dehydratedRootOwner.status,
+    dehydratedBoundaryOwnerCount:
+      dehydratedTargetResolutionDiagnostics.dehydratedBoundaryOwnerCount,
+    hydratableEventTargetLookupCount:
+      dehydratedTargetResolutionDiagnostics.hydratableEventTargetLookupCount,
     eventDispatchRecordCount: normalizedDispatchRecords.length,
     blockedEventReplayTargetCount: blockedEventReplayTargets.length,
     queuedEventReplayTargetCount: 0,
@@ -1264,6 +1304,696 @@ function normalizeHydrationReplayDispatchRecords(dispatchRecords) {
   return dispatchRecords.map((dispatchRecord) =>
     assertEventDispatchRecord(dispatchRecord)
   );
+}
+
+function createHydrationDehydratedTargetResolutionDiagnostic(
+  dispatchRecords,
+  options
+) {
+  const normalizedOptions = isObjectLike(options) ? options : {};
+  const normalizedDispatchRecords =
+    normalizeHydrationReplayDispatchRecords(dispatchRecords);
+  const sourceDiagnostic = getSourceDehydratedTargetResolutionDiagnostic(
+    normalizedOptions
+  );
+  const sourcePayload =
+    sourceDiagnostic === null
+      ? null
+      : hydrationDehydratedTargetResolutionDiagnosticPayloads.get(
+          sourceDiagnostic
+        ) || null;
+  const markerReplayTargetCandidates =
+    normalizeMarkerReplayTargetCandidates(normalizedOptions, sourcePayload);
+  const rootContainer = normalizeTargetResolutionRootContainer(
+    normalizedOptions,
+    sourcePayload
+  );
+  const markerDiagnostics = normalizeTargetResolutionMarkerDiagnostics(
+    normalizedOptions,
+    sourcePayload
+  );
+  const rootRecordId = normalizeTargetResolutionStringOption(
+    normalizedOptions.rootRecordId,
+    sourcePayload && sourcePayload.rootRecordId,
+    sourceDiagnostic && sourceDiagnostic.rootRecordId
+  );
+  const rootKind = normalizeTargetResolutionStringOption(
+    normalizedOptions.rootKind,
+    sourcePayload && sourcePayload.rootKind,
+    sourceDiagnostic && sourceDiagnostic.rootKind
+  );
+  const rootTag = normalizeTargetResolutionStringOption(
+    normalizedOptions.rootTag,
+    sourcePayload && sourcePayload.rootTag,
+    sourceDiagnostic && sourceDiagnostic.rootTag
+  );
+  const rootOwner = createHydrationDehydratedRootOwnerRecord({
+    rootContainer,
+    rootKind,
+    rootRecordId,
+    rootTag
+  });
+  const boundaryOwners = createHydrationDehydratedBoundaryOwnerRecords(
+    markerReplayTargetCandidates,
+    {
+      rootRecordId
+    }
+  );
+  const targetLookups = Object.freeze(
+    normalizedDispatchRecords.map((dispatchRecord, inputOrder) =>
+      createHydratableEventTargetLookupRecord(dispatchRecord, inputOrder, {
+        boundaryOwners,
+        markerDiagnostics,
+        rootContainer,
+        rootOwner
+      })
+    )
+  );
+  const record = Object.freeze({
+    kind: HYDRATION_DEHYDRATED_TARGET_RESOLUTION_DIAGNOSTIC_KIND,
+    status:
+      targetLookups.length === 0
+        ? 'blocked-no-hydratable-event-targets-recorded'
+        : 'blocked-hydratable-event-targets-recorded',
+    source:
+      typeof normalizedOptions.source === 'string'
+        ? normalizedOptions.source
+        : 'private-hydration-target-resolution',
+    diagnosticOnly: true,
+    readOnly: true,
+    compatibilityClaimed: false,
+    browserDomEventCompatibilityClaimed: false,
+    publicRootBehaviorChanged: false,
+    eventTargetResolutionSupported: false,
+    hydrationReplaySupported: false,
+    eventReplaySupported: false,
+    queueMutationAllowed: false,
+    replayQueuesDrained: false,
+    willDrainReplayQueues: false,
+    eventsReplayed: false,
+    willDispatchEvents: false,
+    willHydrateHostInstances: false,
+    blockedReason: EVENT_TARGET_RESOLUTION_BLOCKED_CODE,
+    hydrationReplayBlockedReason: HYDRATION_REPLAY_BLOCKED_CODE,
+    eventDispatchBlockedReason: EVENT_DISPATCH_BLOCKED_CODE,
+    rootRecordId,
+    rootKind,
+    rootTag,
+    dehydratedRootOwner: rootOwner,
+    dehydratedRootOwnerStatus: rootOwner.status,
+    markerReplayTargetCandidateCount: markerReplayTargetCandidates.length,
+    markerReplayTargetCandidates,
+    dehydratedBoundaryOwnerCount: boundaryOwners.length,
+    dehydratedBoundaryOwners: boundaryOwners,
+    eventDispatchRecordCount: normalizedDispatchRecords.length,
+    hydratableEventTargetLookupCount: targetLookups.length,
+    hydratableEventTargetLookups: targetLookups,
+    queuedEventReplayTargetCount: 0,
+    replayedEventCount: 0
+  });
+
+  hydrationDehydratedTargetResolutionDiagnosticPayloads.set(
+    record,
+    Object.freeze({
+      markerDiagnostics,
+      markerReplayTargetCandidates,
+      rootContainer,
+      rootKind,
+      rootRecordId,
+      rootTag
+    })
+  );
+
+  return record;
+}
+
+function getSourceDehydratedTargetResolutionDiagnostic(options) {
+  const sourceDiagnostic =
+    options.dehydratedTargetResolution ||
+    options.targetResolutionDiagnostics ||
+    null;
+  if (sourceDiagnostic === null || sourceDiagnostic === undefined) {
+    return null;
+  }
+
+  if (!isHydrationDehydratedTargetResolutionDiagnostic(sourceDiagnostic)) {
+    throw createPluginEventSystemError(
+      'Cannot resolve hydration event targets without a private dehydrated target-resolution diagnostic.',
+      INVALID_EVENT_DISPATCH_RECORD_CODE
+    );
+  }
+
+  return sourceDiagnostic;
+}
+
+function getHydrationDehydratedTargetResolutionDiagnosticPayload(record) {
+  if (!isObjectLike(record)) {
+    return null;
+  }
+
+  return (
+    hydrationDehydratedTargetResolutionDiagnosticPayloads.get(record) ||
+    null
+  );
+}
+
+function isHydrationDehydratedTargetResolutionDiagnostic(record) {
+  return (
+    isObjectLike(record) &&
+    record.kind === HYDRATION_DEHYDRATED_TARGET_RESOLUTION_DIAGNOSTIC_KIND &&
+    hydrationDehydratedTargetResolutionDiagnosticPayloads.has(record)
+  );
+}
+
+function normalizeMarkerReplayTargetCandidates(options, sourcePayload) {
+  if (Array.isArray(options.markerReplayTargetCandidates)) {
+    return Object.freeze(options.markerReplayTargetCandidates.slice());
+  }
+
+  if (
+    sourcePayload !== null &&
+    Array.isArray(sourcePayload.markerReplayTargetCandidates)
+  ) {
+    return Object.freeze(sourcePayload.markerReplayTargetCandidates.slice());
+  }
+
+  return Object.freeze([]);
+}
+
+function normalizeTargetResolutionRootContainer(options, sourcePayload) {
+  if (Object.prototype.hasOwnProperty.call(options, 'rootContainer')) {
+    return isObjectLike(options.rootContainer) ? options.rootContainer : null;
+  }
+
+  return sourcePayload === null ? null : sourcePayload.rootContainer;
+}
+
+function normalizeTargetResolutionMarkerDiagnostics(options, sourcePayload) {
+  if (
+    Object.prototype.hasOwnProperty.call(options, 'markerDiagnostics') &&
+    isObjectLike(options.markerDiagnostics)
+  ) {
+    return options.markerDiagnostics;
+  }
+
+  return sourcePayload === null ? null : sourcePayload.markerDiagnostics;
+}
+
+function normalizeTargetResolutionStringOption(
+  optionValue,
+  payloadValue,
+  recordValue
+) {
+  if (typeof optionValue === 'string') {
+    return optionValue;
+  }
+  if (typeof payloadValue === 'string') {
+    return payloadValue;
+  }
+  if (typeof recordValue === 'string') {
+    return recordValue;
+  }
+  return null;
+}
+
+function createHydrationDehydratedRootOwnerRecord({
+  rootContainer,
+  rootKind,
+  rootRecordId,
+  rootTag
+}) {
+  return Object.freeze({
+    kind: HYDRATION_DEHYDRATED_ROOT_OWNER_RECORD_KIND,
+    status:
+      rootContainer === null
+        ? 'blocked-no-dehydrated-root-container-payload'
+        : 'recorded-unsupported-dehydrated-root-owner',
+    rootRecordId,
+    rootKind,
+    rootTag,
+    dehydrated: true,
+    unsupported: true,
+    canHydrate: false,
+    hydrationRootSupported: false,
+    targetResolutionSupported: false,
+    containerInfo: describeHydrationReplayEventTargetInfo(rootContainer)
+  });
+}
+
+function createHydrationDehydratedBoundaryOwnerRecords(
+  markerReplayTargetCandidates,
+  options
+) {
+  return Object.freeze(
+    markerReplayTargetCandidates.map((candidate, index) =>
+      Object.freeze({
+        kind: HYDRATION_DEHYDRATED_BOUNDARY_OWNER_RECORD_KIND,
+        status: 'recorded-marker-derived-dehydrated-boundary-owner',
+        ownerId: createHydrationBoundaryOwnerId(
+          options.rootRecordId,
+          index
+        ),
+        index,
+        rootRecordId: options.rootRecordId,
+        area: candidate.area || null,
+        boundaryKind:
+          typeof candidate.replayTargetKind === 'string'
+            ? candidate.replayTargetKind
+            : inferHydrationReplayTargetKind(candidate.contractId),
+        contractId:
+          typeof candidate.contractId === 'string'
+            ? candidate.contractId
+            : null,
+        markerKind: typeof candidate.kind === 'string' ? candidate.kind : null,
+        path: typeof candidate.path === 'string' ? candidate.path : null,
+        dehydrated: true,
+        rootOwned: true,
+        canHydrate: false,
+        queueEligible: false,
+        queued: false,
+        blockedReason: HYDRATION_REPLAY_BLOCKED_CODE
+      })
+    )
+  );
+}
+
+function createHydrationBoundaryOwnerId(rootRecordId, index) {
+  const prefix =
+    typeof rootRecordId === 'string' && rootRecordId !== ''
+      ? rootRecordId
+      : 'hydration-target-resolution';
+  return `${prefix}:boundary:${index}`;
+}
+
+function inferHydrationReplayTargetKind(contractId) {
+  if (typeof contractId !== 'string') {
+    return 'unknown';
+  }
+  if (contractId.startsWith('activity-')) {
+    return 'activity-boundary';
+  }
+  if (contractId.startsWith('suspense-')) {
+    return 'suspense-boundary';
+  }
+  if (contractId.startsWith('form-state-')) {
+    return 'form-state';
+  }
+  return 'unknown';
+}
+
+function createHydratableEventTargetLookupRecord(
+  dispatchRecord,
+  inputOrder,
+  options
+) {
+  const nativeEventTarget = dispatchRecord.nativeEventTarget;
+  const rootContainer = options.rootContainer;
+  const targetPathRecord = findHydrationTargetPath(
+    rootContainer,
+    nativeEventTarget
+  );
+  const targetWithinRootContainer =
+    rootContainer !== null &&
+    (targetPathRecord.found ||
+      isHydrationTargetDescendantOfRoot(rootContainer, nativeEventTarget));
+  const targetContainerMatchesRoot =
+    rootContainer !== null && dispatchRecord.targetContainer === rootContainer;
+  const rootOwned = targetContainerMatchesRoot || targetWithinRootContainer;
+  const boundaryOwner = rootOwned
+    ? findDehydratedBoundaryOwnerForTargetPath(
+        targetPathRecord.path,
+        options.boundaryOwners,
+        options.markerDiagnostics
+      )
+    : null;
+  const queueInfo = getHydrationReplayEventQueueInfo(
+    dispatchRecord.domEventName
+  );
+  const targetInstResolved = dispatchRecord.targetInst !== null;
+  const lookupStatus = getHydratableEventTargetLookupStatus({
+    boundaryOwner,
+    rootOwned,
+    targetInstResolved,
+    targetPathRecord
+  });
+
+  return Object.freeze({
+    kind: HYDRATION_HYDRATABLE_EVENT_TARGET_LOOKUP_RECORD_KIND,
+    status: lookupStatus,
+    inputOrder,
+    diagnosticOnly: true,
+    readOnly: true,
+    compatibilityClaimed: false,
+    browserDomEventCompatibilityClaimed: false,
+    publicRootBehaviorChanged: false,
+    domEventName: dispatchRecord.domEventName,
+    nativeEventType: dispatchRecord.nativeEventType,
+    eventPriorityLabel: dispatchRecord.eventPriorityLabel,
+    eventPriorityLane: dispatchRecord.eventPriorityLane,
+    eventPriorityName: dispatchRecord.eventPriorityName,
+    queueCategory: queueInfo.queueCategory,
+    queueName: queueInfo.queueName,
+    replayableEvent: queueInfo.replayableEvent,
+    targetContainerMatchesRoot,
+    targetWithinRootContainer,
+    rootOwnershipStatus: getHydrationRootOwnershipStatus({
+      rootContainer,
+      rootOwned
+    }),
+    dehydratedRootOwnerStatus: options.rootOwner.status,
+    dehydratedBoundaryOwner: boundaryOwner,
+    dehydratedBoundaryOwnerId:
+      boundaryOwner === null ? null : boundaryOwner.ownerId,
+    dehydratedBoundaryOwnerStatus:
+      boundaryOwner === null ? 'not-found' : boundaryOwner.status,
+    blockedOnKind:
+      boundaryOwner === null
+        ? rootOwned
+          ? 'dehydrated-root'
+          : null
+        : boundaryOwner.boundaryKind,
+    blockedOnStatus:
+      boundaryOwner === null
+        ? rootOwned
+          ? 'blocked-on-dehydrated-root'
+          : 'unavailable-no-dehydrated-owner'
+        : 'blocked-on-dehydrated-boundary',
+    targetPath: targetPathRecord.path,
+    targetPathStatus: targetPathRecord.status,
+    targetNodeInfo: describeHydrationReplayEventTargetInfo(nativeEventTarget),
+    targetContainerInfo: describeHydrationReplayEventTargetInfo(
+      dispatchRecord.targetContainer
+    ),
+    targetDispatchPathLength: dispatchRecord.targetDispatchPathLength,
+    targetDispatchPathStatus: dispatchRecord.targetDispatchPathStatus,
+    targetHostInstanceStatus: dispatchRecord.targetHostInstanceStatus,
+    targetInstStatus: dispatchRecord.targetInstStatus,
+    targetListenerFound: dispatchRecord.targetListenerFound,
+    targetListenerLookupCount: dispatchRecord.targetListenerLookupCount,
+    targetListenerLookupStatus: dispatchRecord.targetListenerLookupStatus,
+    targetResolutionBlockedReason:
+      dispatchRecord.targetResolutionBlockedReason,
+    targetResolutionStatus: dispatchRecord.targetResolutionStatus,
+    targetResolutionSupported: false,
+    queued: false,
+    queueMutationAllowed: false,
+    replayQueueDrained: false,
+    willDrainReplayQueues: false,
+    willDispatch: false,
+    willHydrate: false,
+    willReplay: false,
+    blockedReason: EVENT_TARGET_RESOLUTION_BLOCKED_CODE,
+    hydrationReplayBlockedReason: HYDRATION_REPLAY_BLOCKED_CODE
+  });
+}
+
+function getHydratableEventTargetLookupStatus({
+  boundaryOwner,
+  rootOwned,
+  targetInstResolved,
+  targetPathRecord
+}) {
+  if (targetInstResolved) {
+    return 'skipped-mounted-host-instance-target';
+  }
+  if (!rootOwned) {
+    return 'blocked-no-dehydrated-owner';
+  }
+  if (boundaryOwner !== null) {
+    return 'blocked-on-dehydrated-boundary';
+  }
+  if (targetPathRecord.found) {
+    return 'blocked-on-dehydrated-root';
+  }
+  return 'blocked-on-dehydrated-root-unlisted-target';
+}
+
+function getHydrationRootOwnershipStatus({rootContainer, rootOwned}) {
+  if (rootContainer === null) {
+    return 'unavailable-no-dehydrated-root-container-payload';
+  }
+  return rootOwned
+    ? 'owned-by-dehydrated-root'
+    : 'not-owned-by-dehydrated-root';
+}
+
+function findHydrationTargetPath(rootContainer, targetNode) {
+  if (rootContainer === null) {
+    return Object.freeze({
+      found: false,
+      path: null,
+      status: 'unavailable-no-root-container'
+    });
+  }
+  if (!isObjectLike(targetNode)) {
+    return Object.freeze({
+      found: false,
+      path: null,
+      status: 'unavailable-non-object-target'
+    });
+  }
+  if (targetNode === rootContainer) {
+    return Object.freeze({
+      found: true,
+      path: 'container',
+      status: 'found-container-target'
+    });
+  }
+
+  const visitedNodes = new Set();
+  const path = findHydrationTargetPathInChildren(
+    rootContainer,
+    'container',
+    targetNode,
+    visitedNodes
+  );
+  if (path !== null) {
+    return Object.freeze({
+      found: true,
+      path,
+      status: 'found-in-container-child-list'
+    });
+  }
+  if (isHydrationTargetDescendantOfRoot(rootContainer, targetNode)) {
+    return Object.freeze({
+      found: false,
+      path: null,
+      status: 'owned-by-parent-chain-not-child-list'
+    });
+  }
+
+  return Object.freeze({
+    found: false,
+    path: null,
+    status: 'not-contained-in-dehydrated-root'
+  });
+}
+
+function findHydrationTargetPathInChildren(
+  parentNode,
+  parentPath,
+  targetNode,
+  visitedNodes
+) {
+  if (!isObjectLike(parentNode) || visitedNodes.has(parentNode)) {
+    return null;
+  }
+  visitedNodes.add(parentNode);
+
+  const childNodes = getHydrationChildNodesSnapshot(parentNode);
+  for (let index = 0; index < childNodes.length; index++) {
+    const childNode = childNodes[index];
+    if (!isObjectLike(childNode)) {
+      continue;
+    }
+
+    const path = `${parentPath}.childNodes[${index}]`;
+    if (childNode === targetNode) {
+      return path;
+    }
+
+    const childPath = findHydrationTargetPathInChildren(
+      childNode,
+      path,
+      targetNode,
+      visitedNodes
+    );
+    if (childPath !== null) {
+      return childPath;
+    }
+  }
+
+  return null;
+}
+
+function isHydrationTargetDescendantOfRoot(rootContainer, targetNode) {
+  let currentNode = isObjectLike(targetNode) ? targetNode : null;
+  while (currentNode !== null) {
+    if (currentNode === rootContainer) {
+      return true;
+    }
+    currentNode = isObjectLike(currentNode.parentNode)
+      ? currentNode.parentNode
+      : null;
+  }
+  return false;
+}
+
+function getHydrationChildNodesSnapshot(node) {
+  if (!isObjectLike(node)) {
+    return [];
+  }
+
+  const childNodes = node.childNodes;
+  if (Array.isArray(childNodes)) {
+    return childNodes.slice();
+  }
+  if (
+    isObjectLike(childNodes) &&
+    Number.isSafeInteger(childNodes.length) &&
+    childNodes.length >= 0
+  ) {
+    const snapshot = [];
+    for (let index = 0; index < childNodes.length; index += 1) {
+      snapshot.push(childNodes[index]);
+    }
+    return snapshot;
+  }
+
+  return [];
+}
+
+function findDehydratedBoundaryOwnerForTargetPath(
+  targetPath,
+  boundaryOwners,
+  markerDiagnostics
+) {
+  const targetPositions = getHydrationTargetPathPositions(targetPath);
+  if (targetPositions.length === 0) {
+    return null;
+  }
+
+  const boundaryOwnersByPath = new Map();
+  for (const boundaryOwner of boundaryOwners) {
+    if (typeof boundaryOwner.path === 'string') {
+      boundaryOwnersByPath.set(boundaryOwner.path, boundaryOwner);
+    }
+  }
+
+  const markerRows =
+    markerDiagnostics !== null && Array.isArray(markerDiagnostics.markers)
+      ? markerDiagnostics.markers
+      : [];
+  let selectedOwner = null;
+  for (const targetPosition of targetPositions) {
+    const boundaryStack = [];
+    const sameParentMarkers = markerRows
+      .map((marker) => ({
+        marker,
+        pathParts: parseHydrationContainerPath(marker.path)
+      }))
+      .filter(
+        ({pathParts}) =>
+          pathParts !== null &&
+          pathParts.parentPath === targetPosition.parentPath &&
+          pathParts.index < targetPosition.index
+      )
+      .sort((a, b) => a.pathParts.index - b.pathParts.index);
+
+    for (const {marker} of sameParentMarkers) {
+      const owner = boundaryOwnersByPath.get(marker.path) || null;
+      if (owner !== null) {
+        boundaryStack.push(owner);
+      } else if (isHydrationBoundaryEndMarker(marker.contractId)) {
+        popHydrationBoundaryOwnerForEndMarker(
+          boundaryStack,
+          marker.contractId
+        );
+      }
+    }
+
+    if (boundaryStack.length > 0) {
+      selectedOwner = boundaryStack[boundaryStack.length - 1];
+    }
+  }
+
+  return selectedOwner;
+}
+
+function getHydrationTargetPathPositions(targetPath) {
+  const segments = parseHydrationContainerPathSegments(targetPath);
+  if (segments === null || segments.length === 0) {
+    return [];
+  }
+
+  const positions = [];
+  let parentPath = 'container';
+  for (let depth = 0; depth < segments.length; depth++) {
+    positions.push({
+      index: segments[depth],
+      parentPath
+    });
+    parentPath += `.childNodes[${segments[depth]}]`;
+  }
+  return positions;
+}
+
+function parseHydrationContainerPath(path) {
+  const segments = parseHydrationContainerPathSegments(path);
+  if (segments === null || segments.length === 0) {
+    return null;
+  }
+
+  const index = segments[segments.length - 1];
+  let parentPath = 'container';
+  for (let depth = 0; depth < segments.length - 1; depth++) {
+    parentPath += `.childNodes[${segments[depth]}]`;
+  }
+
+  return {
+    index,
+    parentPath
+  };
+}
+
+function parseHydrationContainerPathSegments(path) {
+  if (typeof path !== 'string' || !path.startsWith('container')) {
+    return null;
+  }
+
+  const suffix = path.slice('container'.length);
+  if (suffix === '') {
+    return [];
+  }
+
+  const segments = [];
+  const pathPattern = /\.childNodes\[(\d+)\]/g;
+  let offset = 0;
+  let match;
+  while ((match = pathPattern.exec(suffix)) !== null) {
+    if (match.index !== offset) {
+      return null;
+    }
+    segments.push(Number(match[1]));
+    offset = match.index + match[0].length;
+  }
+
+  return offset === suffix.length ? segments : null;
+}
+
+function isHydrationBoundaryEndMarker(contractId) {
+  return contractId === 'suspense-end' || contractId === 'activity-end';
+}
+
+function popHydrationBoundaryOwnerForEndMarker(boundaryStack, contractId) {
+  const expectedBoundaryKind =
+    contractId === 'activity-end' ? 'activity-boundary' : 'suspense-boundary';
+  for (let index = boundaryStack.length - 1; index >= 0; index -= 1) {
+    if (boundaryStack[index].boundaryKind === expectedBoundaryKind) {
+      boundaryStack.splice(index, 1);
+      return;
+    }
+  }
 }
 
 function createHydrationReplayEventQueueEntryRecord(
@@ -1586,6 +2316,10 @@ module.exports = {
   EVENT_TARGET_RESOLUTION_BLOCKED_CODE,
   HYDRATION_REPLAY_EVENT_QUEUE_DIAGNOSTIC_KIND,
   HYDRATION_REPLAY_EVENT_QUEUE_ENTRY_RECORD_KIND,
+  HYDRATION_DEHYDRATED_BOUNDARY_OWNER_RECORD_KIND,
+  HYDRATION_DEHYDRATED_ROOT_OWNER_RECORD_KIND,
+  HYDRATION_DEHYDRATED_TARGET_RESOLUTION_DIAGNOSTIC_KIND,
+  HYDRATION_HYDRATABLE_EVENT_TARGET_LOOKUP_RECORD_KIND,
   HYDRATION_REPLAY_BLOCKED_CODE,
   INVALID_DISPATCH_LISTENER_RECORD_CODE,
   INVALID_EVENT_DISPATCH_RECORD_CODE,
@@ -1602,8 +2336,10 @@ module.exports = {
   SYNTHETIC_EVENT_BLOCKED_CODE,
   assertEventListenerWrapperRecord,
   createEventDispatchRecordFromWrapperRecord,
+  createHydrationDehydratedTargetResolutionDiagnostic,
   createHydrationReplayEventQueueDiagnostic,
   createPluginExtractionRecord,
+  getHydrationDehydratedTargetResolutionDiagnosticPayload,
   getDispatchListenerInvocationCanaryRecordPayload,
   getDispatchListenerRecordPayload,
   getDispatchQueueEntryRecordPayload,
@@ -1614,6 +2350,7 @@ module.exports = {
   invokeDispatchListenerRecordForCanary,
   invokeDispatchQueueCanaryFromDispatchRecords,
   invokeSingleListenerCanaryFromDispatchRecord,
+  isHydrationDehydratedTargetResolutionDiagnostic,
   isDispatchListenerInvocationCanaryRecord,
   isDispatchListenerRecord,
   isDispatchQueueEntryRecord,
