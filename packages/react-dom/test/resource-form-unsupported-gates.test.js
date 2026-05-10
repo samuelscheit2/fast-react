@@ -716,6 +716,273 @@ test('private resource hint dispatcher metadata gate validates normalized shapes
   assert.equal(JSON.stringify(records).includes('sha256-script'), false);
 });
 
+test('private resource hint fake-DOM adapter gate admits normalized dispatcher records without side effects', () => {
+  const dispatcherGate = resourceFormGate.createResourceFormActionInternalsGate({
+    requestIdPrefix: 'resource-dispatcher-adapter-source'
+  });
+  const adapterGate = resourceFormGate.createResourceHintFakeDomAdapterGate({
+    requestIdPrefix: 'fake-dom-adapter'
+  });
+  const fakeDomLog = [];
+  const fakeDocument = createThrowingFakeResourceDocument(fakeDomLog);
+  const fakeHead = createThrowingFakeResourceHead(fakeDomLog);
+  const records = [
+    dispatcherGate.recordResourceHintDispatcherRequest('C', [
+      'https://connect.example.test',
+      null
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest('L', [
+      '/font.woff2',
+      'font',
+      {
+        crossOrigin: '',
+        integrity: 'sha256-font',
+        nonce: undefined,
+        type: 'font/woff2',
+        fetchPriority: 'high',
+        referrerPolicy: undefined,
+        imageSrcSet: undefined,
+        imageSizes: undefined,
+        media: 'print'
+      }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest('S', [
+      '/style.css',
+      'theme',
+      {
+        crossOrigin: '',
+        integrity: 'sha256-style',
+        fetchPriority: 'low'
+      }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest('X', [
+      '/script.js',
+      {
+        crossOrigin: 'use-credentials',
+        integrity: 'sha256-script',
+        fetchPriority: 'high',
+        nonce: 'nonce-script'
+      }
+    ])
+  ];
+  const admissions = records.map((record) =>
+    adapterGate.admitDispatcherRecord(record, {
+      explicitAdmission: true,
+      adapterKind: 'deterministic-fake-dom',
+      adapterId: 'resource-hint-test-adapter',
+      targetKind: 'document-head',
+      fakeDocument,
+      fakeHead
+    })
+  );
+  const summary = resourceFormGate.describePrivateResourceHintFakeDomAdapterGate();
+
+  assert.deepEqual(admissions.map(summarizeFakeDomAdapterAdmission), [
+    {
+      adapterAdmissionId: 'fake-dom-adapter:1',
+      sourceRequestId: 'resource-dispatcher-adapter-source:1',
+      requestType: 'resource-hint-fake-dom-adapter.preconnect',
+      contractId: 'preconnect',
+      privateDispatcherKey: 'C',
+      admissionStatus:
+        resourceFormGate.privateResourceHintFakeDomAdapterAdmissionStatus,
+      executionStatus:
+        resourceFormGate.privateResourceHintFakeDomAdapterExecutionBlockedStatus,
+      elementPlan: {
+        elementTag: 'link',
+        relationship: 'preconnect',
+        attributeNames: ['rel', 'href', 'crossOrigin']
+      }
+    },
+    {
+      adapterAdmissionId: 'fake-dom-adapter:2',
+      sourceRequestId: 'resource-dispatcher-adapter-source:2',
+      requestType: 'resource-hint-fake-dom-adapter.preload',
+      contractId: 'preload',
+      privateDispatcherKey: 'L',
+      admissionStatus:
+        resourceFormGate.privateResourceHintFakeDomAdapterAdmissionStatus,
+      executionStatus:
+        resourceFormGate.privateResourceHintFakeDomAdapterExecutionBlockedStatus,
+      elementPlan: {
+        elementTag: 'link',
+        relationship: 'preload',
+        attributeNames: [
+          'rel',
+          'href',
+          'as',
+          'crossOrigin',
+          'integrity',
+          'nonce',
+          'type',
+          'fetchPriority',
+          'referrerPolicy',
+          'imageSrcSet',
+          'imageSizes',
+          'media'
+        ]
+      }
+    },
+    {
+      adapterAdmissionId: 'fake-dom-adapter:3',
+      sourceRequestId: 'resource-dispatcher-adapter-source:3',
+      requestType: 'resource-hint-fake-dom-adapter.preinit-style',
+      contractId: 'preinit-style',
+      privateDispatcherKey: 'S',
+      admissionStatus:
+        resourceFormGate.privateResourceHintFakeDomAdapterAdmissionStatus,
+      executionStatus:
+        resourceFormGate.privateResourceHintFakeDomAdapterExecutionBlockedStatus,
+      elementPlan: {
+        elementTag: 'link',
+        relationship: 'stylesheet',
+        attributeNames: [
+          'rel',
+          'href',
+          'precedence',
+          'crossOrigin',
+          'integrity',
+          'fetchPriority'
+        ]
+      }
+    },
+    {
+      adapterAdmissionId: 'fake-dom-adapter:4',
+      sourceRequestId: 'resource-dispatcher-adapter-source:4',
+      requestType: 'resource-hint-fake-dom-adapter.preinit-script',
+      contractId: 'preinit-script',
+      privateDispatcherKey: 'X',
+      admissionStatus:
+        resourceFormGate.privateResourceHintFakeDomAdapterAdmissionStatus,
+      executionStatus:
+        resourceFormGate.privateResourceHintFakeDomAdapterExecutionBlockedStatus,
+      elementPlan: {
+        elementTag: 'script',
+        relationship: 'script',
+        attributeNames: [
+          'src',
+          'async',
+          'crossOrigin',
+          'integrity',
+          'fetchPriority',
+          'nonce'
+        ]
+      }
+    }
+  ]);
+
+  for (let index = 0; index < admissions.length; index++) {
+    const admission = admissions[index];
+    assert.equal(Object.isFrozen(admission), true, admission.requestType);
+    assert.equal(
+      resourceFormGate.isPrivateResourceHintFakeDomAdapterAdmissionRecord(
+        admission
+      ),
+      true,
+      admission.requestType
+    );
+    assert.equal(
+      resourceFormGate.getPrivateResourceHintFakeDomAdapterAdmissionRecordPayload(
+        admission
+      ),
+      admission,
+      admission.requestType
+    );
+    assert.equal(admission.status, resourceFormGate.unsupportedStatus);
+    assert.equal(admission.unsupportedCode, unsupportedCode);
+    assert.equal(admission.compatibilityTarget, compatibilityTarget);
+    assert.equal(
+      admission.compatibilityStatus,
+      resourceFormGate.privateResourceHintFakeDomAdapterCompatibilityBlockedStatus
+    );
+    assert.deepEqual(
+      admission.dispatcherShape,
+      records[index].dispatcherShape
+    );
+    assert.deepEqual(
+      admission.sideEffects,
+      resourceFormGate.resourceHintFakeDomAdapterSideEffects
+    );
+    assert.equal(admission.sideEffects.fakeDomAdapterInvoked, false);
+    assert.equal(admission.sideEffects.fakeDocumentRead, false);
+    assert.equal(admission.sideEffects.fakeDocumentMutated, false);
+    assert.equal(admission.sideEffects.fakeHeadRead, false);
+    assert.equal(admission.sideEffects.fakeHeadMutated, false);
+    assert.equal(admission.sideEffects.fakeResourceElementCreated, false);
+    assert.equal(admission.sideEffects.fakeResourceElementInserted, false);
+    assert.equal(admission.sideEffects.resourceFetchStarted, false);
+    assert.equal(admission.sideEffects.resourceRecordCommitted, false);
+    assert.equal(admission.sideEffects.compatibilityClaimed, false);
+    assert.equal(admission.adapterAdmission.explicitAdmission, true);
+    assert.equal(admission.adapterAdmission.deterministicFakeDomOnly, true);
+    assert.equal(admission.adapterAdmission.rawAdapterCaptured, false);
+    assert.equal(admission.adapterAdmission.rawDocumentCaptured, false);
+    assert.equal(admission.adapterAdmission.rawHeadCaptured, false);
+    assert.equal(admission.adapterAdmission.mutationMethodsCalled, false);
+    assert.equal(admission.resourceElementPlan.rawValuesRetained, false);
+    assert.equal(admission.resourceElementPlan.elementCreated, false);
+    assert.equal(admission.resourceElementPlan.elementInserted, false);
+    assert.equal(admission.resourceElementPlan.resourceFetchStarted, false);
+    assert.equal(
+      admission.resourceElementPlan.stylesheetPrecedenceApplied,
+      false
+    );
+  }
+
+  assert.equal(fakeDomLog.length, 0);
+  assert.equal(summary.gateId, resourceFormGate.privateResourceHintFakeDomAdapterGateId);
+  assert.equal(summary.status, resourceFormGate.unsupportedStatus);
+  assert.equal(
+    summary.admissionStatus,
+    resourceFormGate.privateResourceHintFakeDomAdapterAdmissionRequiredStatus
+  );
+  assert.equal(
+    summary.executionStatus,
+    resourceFormGate.privateResourceHintFakeDomAdapterExecutionBlockedStatus
+  );
+  assert.deepEqual(
+    summary.sideEffects,
+    resourceFormGate.resourceHintFakeDomAdapterSideEffects
+  );
+  assert.deepEqual(
+    summary.contracts.map((contract) => ({
+      id: contract.id,
+      privateDispatcherKey: contract.privateDispatcherKey,
+      elementTag: contract.elementTag,
+      relationship: contract.relationship
+    })),
+    [
+      {
+        id: 'preconnect',
+        privateDispatcherKey: 'C',
+        elementTag: 'link',
+        relationship: 'preconnect'
+      },
+      {
+        id: 'preload',
+        privateDispatcherKey: 'L',
+        elementTag: 'link',
+        relationship: 'preload'
+      },
+      {
+        id: 'preinit-style',
+        privateDispatcherKey: 'S',
+        elementTag: 'link',
+        relationship: 'stylesheet'
+      },
+      {
+        id: 'preinit-script',
+        privateDispatcherKey: 'X',
+        elementTag: 'script',
+        relationship: 'script'
+      }
+    ]
+  );
+  assert.equal(JSON.stringify(admissions).includes('/font.woff2'), false);
+  assert.equal(JSON.stringify(admissions).includes('sha256-style'), false);
+  assert.equal(JSON.stringify(admissions).includes('nonce-script'), false);
+});
+
 test('private resource hint dispatcher metadata rejects malformed or dispatching shapes', () => {
   const gate = resourceFormGate.createResourceFormActionInternalsGate({
     requestIdPrefix: 'resource-dispatcher-error-gate'
@@ -743,6 +1010,47 @@ test('private resource hint dispatcher metadata rejects malformed or dispatching
   assert.equal(error.contractId, 'preconnect');
   assert.equal(error.privateDispatcherKey, 'C');
   assert.deepEqual(error.sideEffects, resourceFormGate.resourceHintDispatcherSideEffects);
+
+  const adapterGate = resourceFormGate.createResourceHintFakeDomAdapterGate({
+    requestIdPrefix: 'fake-dom-adapter-error-gate'
+  });
+  const adapterAdmission = adapterGate.admitDispatcherRecord(record, {
+    explicitAdmission: true,
+    adapterKind: 'deterministic-fake-dom',
+    adapterId: 'resource-hint-error-adapter',
+    targetKind: 'document-head'
+  });
+  const adapterError =
+    resourceFormGate.createUnsupportedResourceHintFakeDomAdapterError(
+      adapterAdmission
+    );
+
+  assert.equal(adapterError.name, 'FastReactDomUnimplementedError');
+  assert.equal(
+    adapterError.code,
+    resourceFormGate.privateResourceHintFakeDomAdapterGateErrorCode
+  );
+  assert.equal(adapterError.entrypoint, 'react-dom/private-internals');
+  assert.equal(adapterError.exportName, 'resource-hint-fake-dom-adapter.preconnect');
+  assert.equal(adapterError.compatibilityTarget, compatibilityTarget);
+  assert.equal(adapterError.adapterAdmissionId, 'fake-dom-adapter-error-gate:1');
+  assert.equal(adapterError.adapterAdmissionSequence, 1);
+  assert.equal(adapterError.sourceRequestId, 'resource-dispatcher-error-gate:1');
+  assert.equal(adapterError.sourceRequestSequence, 1);
+  assert.equal(adapterError.contractId, 'preconnect');
+  assert.equal(adapterError.privateDispatcherKey, 'C');
+  assert.equal(
+    adapterError.admissionStatus,
+    resourceFormGate.privateResourceHintFakeDomAdapterAdmissionStatus
+  );
+  assert.equal(
+    adapterError.executionStatus,
+    resourceFormGate.privateResourceHintFakeDomAdapterExecutionBlockedStatus
+  );
+  assert.deepEqual(
+    adapterError.sideEffects,
+    resourceFormGate.resourceHintFakeDomAdapterSideEffects
+  );
 
   assert.throws(
     () => gate.recordResourceHintDispatcherRequest('L', ['/asset.js', 'script']),
@@ -816,11 +1124,56 @@ test('private resource hint dispatcher metadata rejects malformed or dispatching
     }
   );
   assert.throws(
+    () => adapterGate.admitDispatcherRecord(record, {
+      adapterKind: 'deterministic-fake-dom'
+    }),
+    {
+      code: resourceFormGate.privateResourceHintFakeDomAdapterInvalidAdmissionCode,
+      compatibilityTarget,
+      reason: 'explicitAdmission must be true'
+    }
+  );
+  assert.throws(
+    () => adapterGate.admitDispatcherRecord(record, {
+      explicitAdmission: true,
+      adapterKind: 'real-dom',
+      targetKind: 'document-head'
+    }),
+    {
+      code: resourceFormGate.privateResourceHintFakeDomAdapterInvalidAdmissionCode,
+      compatibilityTarget,
+      reason: 'adapterKind must be deterministic-fake-dom'
+    }
+  );
+  assert.throws(
+    () =>
+      adapterGate.admitDispatcherRecord(
+        gate.recordResourceHintRequest('preload', []),
+        {
+          explicitAdmission: true,
+          adapterKind: 'deterministic-fake-dom',
+          targetKind: 'document-head'
+        }
+      ),
+    {
+      code: resourceFormGate.privateResourceHintFakeDomAdapterInvalidRecordCode,
+      compatibilityTarget
+    }
+  );
+  assert.throws(
     () =>
       resourceFormGate.createUnsupportedResourceHintDispatcherMetadataError({}),
     {
       code:
         'FAST_REACT_DOM_RESOURCE_HINT_DISPATCHER_METADATA_INVALID_RECORD',
+      compatibilityTarget
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate.createUnsupportedResourceHintFakeDomAdapterError({}),
+    {
+      code: resourceFormGate.privateResourceHintFakeDomAdapterInvalidRecordCode,
       compatibilityTarget
     }
   );
@@ -973,6 +1326,11 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
   assert.equal(summary.sideEffects.headMutated, false);
   assert.equal(summary.sideEffects.stylesheetPrecedenceApplied, false);
   assert.equal(summary.sideEffects.fizzInstructionEmitted, false);
+  assert.equal(summary.sideEffects.fakeDomAdapterInvoked, false);
+  assert.equal(summary.sideEffects.fakeDocumentRead, false);
+  assert.equal(summary.sideEffects.fakeHeadRead, false);
+  assert.equal(summary.sideEffects.fakeResourceElementCreated, false);
+  assert.equal(summary.sideEffects.fakeResourceElementInserted, false);
   assert.deepEqual(
     summary.privateResourceDispatcherBoundary,
     resourceFormGate.describePrivateResourceDispatcherBoundary(null)
@@ -1027,6 +1385,26 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
     rawTargetCaptured: false,
     publicRootTouched: false,
     compatibilityClaimed: false,
+    resourceHintFakeDomAdapterBoundary: {
+      gateStatus: resourceFormGate.privateSourceAdapterBlockedStatus,
+      behaviorArea: null,
+      metadataGateAvailable: true,
+      adapterAdmissionRequired: true,
+      adapterRecordsAccepted: true,
+      fakeDomOnly: true,
+      rawTargetCaptured: false,
+      adapterInvoked: false,
+      fakeDocumentRead: false,
+      fakeHeadRead: false,
+      fakeDocumentMutated: false,
+      fakeHeadMutated: false,
+      resourceElementCreated: false,
+      resourceElementInserted: false,
+      resourceFetchStarted: false,
+      publicResourceHintDomInsertion: false,
+      compatibilityClaimed: false,
+      adapterGate: resourceFormGate.describePrivateResourceHintFakeDomAdapterGate()
+    },
     controlledValueTrackerBoundary: {
       gateStatus: resourceFormGate.privateControlledValueTrackerBlockedStatus,
       behaviorArea: null,
@@ -1078,6 +1456,9 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
       publicRootStatus: record.publicRootBoundary.gateStatus,
       rootBridgeStatus: record.rootBridgeBoundary.gateStatus,
       sourceAdapterStatus: record.sourceAdapterBoundary.gateStatus,
+      resourceHintAdapterApplies:
+        record.sourceAdapterBoundary.resourceHintFakeDomAdapterBoundary !==
+        null,
       trackerBoundaryApplies:
         record.sourceAdapterBoundary.controlledValueTrackerBoundary
           .appliesToRequest
@@ -1090,6 +1471,7 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
         publicRootStatus: resourceFormGate.publicRootFacadeBlockedStatus,
         rootBridgeStatus: resourceFormGate.privateRootBridgeRecordOnlyStatus,
         sourceAdapterStatus: resourceFormGate.privateSourceAdapterBlockedStatus,
+        resourceHintAdapterApplies: true,
         trackerBoundaryApplies: false
       },
       {
@@ -1099,6 +1481,7 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
         publicRootStatus: resourceFormGate.publicRootFacadeBlockedStatus,
         rootBridgeStatus: resourceFormGate.privateRootBridgeRecordOnlyStatus,
         sourceAdapterStatus: resourceFormGate.privateSourceAdapterBlockedStatus,
+        resourceHintAdapterApplies: false,
         trackerBoundaryApplies: false
       },
       {
@@ -1108,6 +1491,7 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
         publicRootStatus: resourceFormGate.publicRootFacadeBlockedStatus,
         rootBridgeStatus: resourceFormGate.privateRootBridgeRecordOnlyStatus,
         sourceAdapterStatus: resourceFormGate.privateSourceAdapterBlockedStatus,
+        resourceHintAdapterApplies: false,
         trackerBoundaryApplies: true
       }
     ]
@@ -1168,6 +1552,13 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
       false
     );
     assert.equal(blockedRecord.sideEffects.fizzInstructionEmitted, false);
+    assert.equal(blockedRecord.sideEffects.fakeDomAdapterInvoked, false);
+    assert.equal(blockedRecord.sideEffects.fakeDocumentRead, false);
+    assert.equal(blockedRecord.sideEffects.fakeDocumentMutated, false);
+    assert.equal(blockedRecord.sideEffects.fakeHeadRead, false);
+    assert.equal(blockedRecord.sideEffects.fakeHeadMutated, false);
+    assert.equal(blockedRecord.sideEffects.fakeResourceElementCreated, false);
+    assert.equal(blockedRecord.sideEffects.fakeResourceElementInserted, false);
     assert.equal(blockedRecord.sourceAdapterBoundary.adaptersInvoked, false);
     assert.equal(blockedRecord.sourceAdapterBoundary.rawTargetCaptured, false);
     assert.equal(blockedRecord.sourceAdapterBoundary.publicRootTouched, false);
@@ -1175,6 +1566,31 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
       blockedRecord.sourceAdapterBoundary.compatibilityClaimed,
       false
     );
+    if (blockedRecord.behaviorArea === 'resource-hint') {
+      const adapterBoundary =
+        blockedRecord.sourceAdapterBoundary
+          .resourceHintFakeDomAdapterBoundary;
+      assert.equal(adapterBoundary.adapterAdmissionRequired, true);
+      assert.equal(adapterBoundary.adapterRecordsAccepted, true);
+      assert.equal(adapterBoundary.adapterInvoked, false);
+      assert.equal(adapterBoundary.fakeDocumentRead, false);
+      assert.equal(adapterBoundary.fakeHeadRead, false);
+      assert.equal(adapterBoundary.fakeDocumentMutated, false);
+      assert.equal(adapterBoundary.fakeHeadMutated, false);
+      assert.equal(adapterBoundary.resourceElementCreated, false);
+      assert.equal(adapterBoundary.resourceElementInserted, false);
+      assert.equal(adapterBoundary.resourceFetchStarted, false);
+      assert.equal(adapterBoundary.publicResourceHintDomInsertion, false);
+      assert.deepEqual(
+        adapterBoundary.adapterGate,
+        resourceFormGate.describePrivateResourceHintFakeDomAdapterGate()
+      );
+    } else {
+      assert.equal(
+        blockedRecord.sourceAdapterBoundary.resourceHintFakeDomAdapterBoundary,
+        null
+      );
+    }
     assert.equal(
       blockedRecord.sourceAdapterBoundary.controlledValueTrackerBoundary
         .gateStatus,
@@ -1628,6 +2044,40 @@ function createRootBridgeElement(nodeName, ownerDocument) {
   };
 }
 
+function createThrowingFakeResourceDocument(log) {
+  return {
+    get head() {
+      log.push('document.head');
+      throw new Error('Unexpected fake resource document head read');
+    },
+    createElement(tagName) {
+      log.push(`document.createElement:${tagName}`);
+      throw new Error('Unexpected fake resource element creation');
+    },
+    querySelector(selector) {
+      log.push(`document.querySelector:${selector}`);
+      throw new Error('Unexpected fake resource document query');
+    }
+  };
+}
+
+function createThrowingFakeResourceHead(log) {
+  return {
+    appendChild(child) {
+      log.push(['head.appendChild', child]);
+      throw new Error('Unexpected fake resource head append');
+    },
+    insertBefore(child, before) {
+      log.push(['head.insertBefore', child, before]);
+      throw new Error('Unexpected fake resource head insert');
+    },
+    querySelector(selector) {
+      log.push(`head.querySelector:${selector}`);
+      throw new Error('Unexpected fake resource head query');
+    }
+  };
+}
+
 function throwingProxy(label) {
   return new Proxy(Object.create(null), {
     get(_target, property) {
@@ -1688,6 +2138,23 @@ function summarizeDispatcherArgument(argument) {
   }
 
   return summary;
+}
+
+function summarizeFakeDomAdapterAdmission(admission) {
+  return {
+    adapterAdmissionId: admission.adapterAdmissionId,
+    sourceRequestId: admission.sourceRequestId,
+    requestType: admission.requestType,
+    contractId: admission.contractId,
+    privateDispatcherKey: admission.privateDispatcherKey,
+    admissionStatus: admission.admissionStatus,
+    executionStatus: admission.executionStatus,
+    elementPlan: {
+      elementTag: admission.resourceElementPlan.elementTag,
+      relationship: admission.resourceElementPlan.relationship,
+      attributeNames: admission.resourceElementPlan.attributeNames
+    }
+  };
 }
 
 function requireFresh(fileName) {

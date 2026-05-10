@@ -58,6 +58,7 @@ const sourceAdapterBehaviorAreas = freezeArray([
 const rootBoundarySideEffects = freezeRecord({
   ...internalsGate.noSideEffects,
   ...internalsGate.resourceHintDispatcherSideEffects,
+  ...internalsGate.resourceHintFakeDomAdapterSideEffects,
   ...internalsGate.controlledInputValueTrackerSideEffects,
   privateRootBridgeExecuted: false,
   publicRootFacadeCreated: false,
@@ -317,8 +318,38 @@ function describeSourceAdapterBoundary(behaviorArea) {
     rawTargetCaptured: false,
     publicRootTouched: false,
     compatibilityClaimed: false,
+    resourceHintFakeDomAdapterBoundary:
+      describeResourceHintFakeDomAdapterBoundary(behaviorArea),
     controlledValueTrackerBoundary:
       describeControlledValueTrackerBoundary(behaviorArea)
+  });
+}
+
+function describeResourceHintFakeDomAdapterBoundary(behaviorArea) {
+  if (behaviorArea !== null && behaviorArea !== 'resource-hint') {
+    return null;
+  }
+
+  return freezeRecord({
+    gateStatus: privateSourceAdapterBlockedStatus,
+    behaviorArea,
+    metadataGateAvailable: true,
+    adapterAdmissionRequired: true,
+    adapterRecordsAccepted:
+      behaviorArea === null || behaviorArea === 'resource-hint',
+    fakeDomOnly: true,
+    rawTargetCaptured: false,
+    adapterInvoked: false,
+    fakeDocumentRead: false,
+    fakeHeadRead: false,
+    fakeDocumentMutated: false,
+    fakeHeadMutated: false,
+    resourceElementCreated: false,
+    resourceElementInserted: false,
+    resourceFetchStarted: false,
+    publicResourceHintDomInsertion: false,
+    compatibilityClaimed: false,
+    adapterGate: internalsGate.describePrivateResourceHintFakeDomAdapterGate()
   });
 }
 
