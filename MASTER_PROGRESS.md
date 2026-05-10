@@ -90,9 +90,16 @@ sequencing belong in `MASTER_PLAN.md`.
   `FiberRootStore<TestRenderer>`, routes create/update/unmount through shared
   reconciler root APIs, and stops at scheduled/rendered HostRoot diagnostics
   without JS facade, serialization, act, or committed host-output claims.
+- Worker 154 private DOM mutation adapter shell was merged, adding private
+  `packages/react-dom/src/dom-host` mutation and text-content helpers plus a
+  fake-DOM smoke test for append, insert, remove, clear, text update, and
+  simple text-content decisions without changing public React DOM entrypoints.
 
 ## Latest Accepted Verification
 
+- Worker 154 was verified on its integrated worktree and again on `main` with
+  the focused DOM mutation adapter smoke test, `npm run check:js` with 427
+  conformance tests, and `git diff --check`.
 - Worker 153 was verified on its integrated worktree and again on `main` with
   `cargo fmt --all --check`, full `fast-react-test-renderer` tests, focused
   `root_work_loop` and `host_work` reconciler tests, test-renderer clippy with
