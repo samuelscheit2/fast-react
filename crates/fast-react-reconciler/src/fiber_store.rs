@@ -3,12 +3,13 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-use fast_react_core::{FiberArena, FiberTopologyError, StateNodeHandle};
+use fast_react_core::{FiberArena, FiberTopologyError, StateNodeHandle, UpdateQueueHandle};
 use fast_react_host_config::HostTypes;
 
 use crate::{
-    FiberRoot, HostFiberTokenStore, HostRootState, HostRootStateStore, HostRootStateStoreError,
-    RootElementHandle, RootOptions, RootTag, create_host_root_current_fiber,
+    ConcurrentUpdateStaging, FiberRoot, HostFiberTokenStore, HostRootState, HostRootStateStore,
+    HostRootStateStoreError, RootElementHandle, RootOptions, RootTag, UpdateQueueStore,
+    create_host_root_current_fiber,
 };
 
 const ROOT_ID_SLOT_BITS: u64 = 32;
@@ -150,6 +151,8 @@ pub struct FiberRootStore<H: HostTypes> {
     fiber_arena: FiberArena,
     host_root_states: HostRootStateStore,
     host_tokens: HostFiberTokenStore,
+    update_queues: UpdateQueueStore,
+    concurrent_updates: ConcurrentUpdateStaging,
 }
 
 impl<H: HostTypes> FiberRootStore<H> {
@@ -161,6 +164,8 @@ impl<H: HostTypes> FiberRootStore<H> {
             fiber_arena: FiberArena::new(),
             host_root_states: HostRootStateStore::new(),
             host_tokens: HostFiberTokenStore::new(),
+            update_queues: UpdateQueueStore::new(),
+            concurrent_updates: ConcurrentUpdateStaging::new(),
         }
     }
 
@@ -224,6 +229,49 @@ impl<H: HostTypes> FiberRootStore<H> {
     #[must_use]
     pub fn host_tokens_mut(&mut self) -> &mut HostFiberTokenStore {
         &mut self.host_tokens
+    }
+
+    #[must_use]
+    pub const fn update_queues(&self) -> &UpdateQueueStore {
+        &self.update_queues
+    }
+
+    #[must_use]
+    pub fn update_queues_mut(&mut self) -> &mut UpdateQueueStore {
+        &mut self.update_queues
+    }
+
+    #[must_use]
+    pub const fn concurrent_updates(&self) -> &ConcurrentUpdateStaging {
+        &self.concurrent_updates
+    }
+
+    #[must_use]
+    pub(crate) fn concurrent_updates_mut(&mut self) -> &mut ConcurrentUpdateStaging {
+        &mut self.concurrent_updates
+    }
+
+    pub fn ensure_host_root_update_queue(
+        &mut self,
+        root_id: FiberRootId,
+    ) -> Result<UpdateQueueHandle, FiberRootStoreError> {
+        let current = self.root(root_id)?.current();
+        let current_queue = self.fiber_arena.get(current)?.update_queue();
+        if current_queue.is_some() {
+            return Ok(current_queue);
+        }
+
+        let state = *self
+            .host_root_states
+            .get(self.fiber_arena.get(current)?.memoized_state())?;
+        let queue = self.update_queues.initialize_host_root_queue(state);
+        self.fiber_arena.get_mut(current)?.set_update_queue(queue);
+
+        if let Some(alternate) = self.fiber_arena.get(current)?.alternate() {
+            self.fiber_arena.get_mut(alternate)?.set_update_queue(queue);
+        }
+
+        Ok(queue)
     }
 
     #[must_use]
