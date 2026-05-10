@@ -95,7 +95,7 @@ npm run check:js
 git diff --check
 ```
 
-Focused scheduler conformance passed 62 tests. `npm run check:js` passed with 416 conformance tests. npm emitted only the existing `minimum-release-age` warnings.
+Focused scheduler conformance passed 62 tests. `npm run check:js` passed with 428 conformance tests and the benchmark gate. npm emitted only the existing `minimum-release-age` warnings.
 
 ## Quality Review
 
