@@ -9314,6 +9314,118 @@ impl<H: HostTypes> FiberRootStore<H> {
 
         Ok(())
     }
+
+    pub fn prepare_test_renderer_sibling_text_host_output_update_canary_fibers(
+        &mut self,
+        render: HostRootRenderPhaseRecord,
+        stable: crate::TestRendererHostOutputCanaryCurrentFibers,
+        root_text_props_raw: u64,
+        component_state_node_raw: u64,
+        component_text_state_node_raw: u64,
+    ) -> Result<
+        (
+            crate::TestRendererHostOutputCanaryUpdatedFibers,
+            FiberId,
+            HostFiberTokenId,
+        ),
+        TestRendererHostOutputCanaryError,
+    > {
+        let stable = crate::prepare_test_renderer_host_output_update_canary_fibers(
+            self,
+            render,
+            stable,
+            stable.fixture(),
+            component_state_node_raw,
+            component_text_state_node_raw,
+        )?;
+
+        let mode = self.fiber_arena().get(render.work_in_progress())?.mode();
+        let root_text = self.fiber_arena_mut().create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(root_text_props_raw),
+            mode,
+        );
+        {
+            let node = self.fiber_arena_mut().get_mut(root_text)?;
+            node.set_lanes(Lanes::NO);
+            node.merge_flags(FiberFlags::PLACEMENT);
+        }
+
+        self.fiber_arena_mut()
+            .set_children(render.work_in_progress(), &[root_text, stable.component()])?;
+        refresh_test_renderer_host_parent_placement_canary_bubbled_flags(self, root_text)?;
+        refresh_test_renderer_host_parent_placement_canary_bubbled_flags(self, stable.text())?;
+        refresh_test_renderer_host_parent_placement_canary_bubbled_flags(self, stable.component())?;
+        refresh_test_renderer_host_parent_placement_canary_bubbled_flags(
+            self,
+            render.work_in_progress(),
+        )?;
+
+        let root_text_token = self.host_tokens_mut().issue(
+            render.root(),
+            root_text,
+            HostFiberTokenPhase::Creation,
+            HostFiberTokenTarget::TextInstance,
+        );
+        self.host_tokens().validate(
+            root_text_token,
+            render.root(),
+            root_text,
+            HostFiberTokenPhase::Creation,
+            HostFiberTokenTarget::TextInstance,
+        )?;
+
+        Ok((stable, root_text, root_text_token))
+    }
+
+    pub fn finish_test_renderer_sibling_text_host_output_update_canary_fibers(
+        &mut self,
+        stable: crate::TestRendererHostOutputCanaryUpdatedFibers,
+        root_text: FiberId,
+        root_text_state_node_raw: u64,
+        root_text_props_raw: u64,
+    ) -> Result<(), TestRendererHostOutputCanaryError> {
+        expect_test_renderer_host_parent_placement_canary_tag(
+            self,
+            stable.host_root(),
+            FiberTag::HostRoot,
+        )?;
+        expect_test_renderer_host_parent_placement_canary_tag(self, root_text, FiberTag::HostText)?;
+        expect_test_renderer_host_parent_placement_canary_tag(
+            self,
+            stable.component(),
+            FiberTag::HostComponent,
+        )?;
+        expect_test_renderer_host_parent_placement_canary_tag(
+            self,
+            stable.text(),
+            FiberTag::HostText,
+        )?;
+
+        let root_child_ids = self.fiber_arena().child_ids(stable.host_root())?;
+        if root_child_ids.as_slice() != [root_text, stable.component()] {
+            return Err(FiberTopologyError::MixedParentSiblingChain {
+                parent: stable.host_root(),
+                child: root_text,
+                actual_parent: self.fiber_arena().get(root_text)?.return_fiber(),
+            }
+            .into());
+        }
+
+        complete_test_renderer_nested_host_output_canary_fiber(
+            self,
+            root_text,
+            FiberTag::HostText,
+            root_text_props_raw,
+            root_text_state_node_raw,
+        )?;
+        refresh_test_renderer_host_parent_placement_canary_bubbled_flags(self, stable.text())?;
+        refresh_test_renderer_host_parent_placement_canary_bubbled_flags(self, stable.component())?;
+        refresh_test_renderer_host_parent_placement_canary_bubbled_flags(self, stable.host_root())?;
+
+        Ok(())
+    }
 }
 
 #[allow(

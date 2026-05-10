@@ -932,6 +932,11 @@ enum TestRendererPrivateJsonCurrentFibersForCanary {
         outer: TestRendererHostOutputCanaryCurrentFibers,
         inner: TestRendererHostOutputCanaryCurrentFibers,
     },
+    SiblingText {
+        root_text: TestRendererFiberHandleDiagnostics,
+        root_text_props_raw: u64,
+        component: TestRendererHostOutputCanaryCurrentFibers,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2189,6 +2194,96 @@ impl TestRendererUpdatedHostOutput {
     #[must_use]
     pub const fn snapshot(&self) -> &TestContainerSnapshot {
         &self.snapshot
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererSiblingTextHostOutput {
+    scheduled_update_sequence: usize,
+    render: HostRootRenderPhaseRecord,
+    stable_fibers: TestRendererHostOutputCanaryUpdatedFibers,
+    root_text_fiber: TestRendererFiberHandleDiagnostics,
+    root_text_props_raw: u64,
+    root_text_state_node_raw: u64,
+    component_state_node_raw: u64,
+    component_text_state_node_raw: u64,
+    commit: HostRootCommitRecord,
+    fiber_inspection: TestRendererCommittedFiberTreeInspection,
+    commit_diagnostics: TestRendererHostOutputCanaryCommitDiagnostics,
+    previous_snapshot: TestContainerSnapshot,
+    snapshot: TestContainerSnapshot,
+    root_text_snapshot: TestTextSnapshot,
+}
+
+impl TestRendererSiblingTextHostOutput {
+    #[must_use]
+    pub const fn scheduled_update_sequence(&self) -> usize {
+        self.scheduled_update_sequence
+    }
+
+    #[must_use]
+    pub const fn render(&self) -> HostRootRenderPhaseRecord {
+        self.render
+    }
+
+    #[must_use]
+    pub const fn stable_fibers(&self) -> TestRendererHostOutputCanaryUpdatedFibers {
+        self.stable_fibers
+    }
+
+    #[must_use]
+    pub const fn root_text_fiber(&self) -> TestRendererFiberHandleDiagnostics {
+        self.root_text_fiber
+    }
+
+    #[must_use]
+    pub const fn root_text_props_raw(&self) -> u64 {
+        self.root_text_props_raw
+    }
+
+    #[must_use]
+    pub const fn root_text_state_node_raw(&self) -> u64 {
+        self.root_text_state_node_raw
+    }
+
+    #[must_use]
+    pub const fn component_state_node_raw(&self) -> u64 {
+        self.component_state_node_raw
+    }
+
+    #[must_use]
+    pub const fn component_text_state_node_raw(&self) -> u64 {
+        self.component_text_state_node_raw
+    }
+
+    #[must_use]
+    pub const fn commit(&self) -> &HostRootCommitRecord {
+        &self.commit
+    }
+
+    #[must_use]
+    pub const fn fiber_inspection(&self) -> &TestRendererCommittedFiberTreeInspection {
+        &self.fiber_inspection
+    }
+
+    #[must_use]
+    pub const fn commit_diagnostics(&self) -> &TestRendererHostOutputCanaryCommitDiagnostics {
+        &self.commit_diagnostics
+    }
+
+    #[must_use]
+    pub const fn previous_snapshot(&self) -> &TestContainerSnapshot {
+        &self.previous_snapshot
+    }
+
+    #[must_use]
+    pub const fn snapshot(&self) -> &TestContainerSnapshot {
+        &self.snapshot
+    }
+
+    #[must_use]
+    pub const fn root_text_snapshot(&self) -> &TestTextSnapshot {
+        &self.root_text_snapshot
     }
 }
 
@@ -6054,6 +6149,7 @@ impl TestRendererSerializationGateReport {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TestRendererPrivateJsonNodeKind {
+    RootArray,
     HostComponent,
     Text,
 }
@@ -7542,6 +7638,7 @@ pub struct TestRendererPrivateJsonSerializationReport {
     root_child_count: usize,
     root_node_kind: TestRendererPrivateJsonNodeKind,
     nodes: Vec<TestRendererPrivateJsonNodeDiagnostic>,
+    rendered_root: TestRendererPrivateJsonRenderedRoot,
     component: TestRendererPrivateJsonHostComponentDiagnostic,
     public_blockers: TestRendererPrivateJsonPublicSurfaceBlockers,
 }
@@ -7595,6 +7692,11 @@ impl TestRendererPrivateJsonSerializationReport {
     #[must_use]
     pub fn node_count(&self) -> usize {
         self.nodes.len()
+    }
+
+    #[must_use]
+    pub const fn rendered_root(&self) -> &TestRendererPrivateJsonRenderedRoot {
+        &self.rendered_root
     }
 
     #[must_use]
@@ -12230,6 +12332,26 @@ impl TestRendererRoot {
         )
     }
 
+    pub fn describe_private_json_serialization_after_sibling_text_update_for_canary(
+        &self,
+        output: &TestRendererSiblingTextHostOutput,
+    ) -> Result<TestRendererPrivateJsonSerializationReport, TestRendererRootError> {
+        let host_output_row =
+            self.describe_private_to_json_sibling_text_host_output_row_for_canary(output)?;
+        self.describe_private_json_serialization_from_current_fibers_for_canary(
+            output.commit(),
+            Some(output.fiber_inspection()),
+            TestRendererPrivateJsonCurrentFibersForCanary::SiblingText {
+                root_text: output.root_text_fiber(),
+                root_text_props_raw: output.root_text_props_raw(),
+                component: output.stable_fibers().current(),
+            },
+            output.snapshot(),
+            TestRendererRootUpdateKind::Update,
+            Some(host_output_row),
+        )
+    }
+
     pub fn describe_private_to_json_host_output_update_row_for_canary(
         &self,
         output: &TestRendererUpdatedHostOutput,
@@ -12288,6 +12410,48 @@ impl TestRendererRoot {
             Some(TestRendererPrivateToJsonHostOutputShape::SiblingText),
             previous_snapshot,
             current_snapshot,
+        )
+    }
+
+    pub fn describe_private_to_json_sibling_text_host_output_row_for_canary(
+        &self,
+        output: &TestRendererSiblingTextHostOutput,
+    ) -> Result<TestRendererPrivateToJsonHostOutputRow, TestRendererRootError> {
+        self.validate_serialization_gate_commit(output.commit())?;
+
+        let Some(last_update) = self.scheduled_updates.last() else {
+            return Err(TestRendererRootError::UnexpectedHostOutputUpdateKind {
+                expected: TestRendererRootUpdateKind::Update,
+                actual: TestRendererRootUpdateKind::Create,
+            });
+        };
+        if last_update.kind() != TestRendererRootUpdateKind::Update {
+            return Err(TestRendererRootError::UnexpectedHostOutputUpdateKind {
+                expected: TestRendererRootUpdateKind::Update,
+                actual: last_update.kind(),
+            });
+        }
+
+        let current_snapshot = self.diagnostic_container_snapshot()?;
+        if current_snapshot != *output.snapshot() {
+            return Err(TestRendererPrivateJsonSerializationError::HostOutputSnapshotStale.into());
+        }
+        if output.fiber_inspection().shape_name() != "HostRoot->[HostText,HostComponent->HostText]"
+        {
+            return Err(
+                TestRendererPrivateJsonSerializationError::CommittedFiberMismatch {
+                    node_kind: TestRendererPrivateJsonNodeKind::RootArray,
+                }
+                .into(),
+            );
+        }
+
+        Self::private_to_json_host_output_row_with_shape(
+            TestRendererRootUpdateKind::Update,
+            TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_HOST_OUTPUT_ROW_ID,
+            Some(TestRendererPrivateToJsonHostOutputShape::SiblingText),
+            output.previous_snapshot(),
+            output.snapshot(),
         )
     }
 
@@ -13540,6 +13704,14 @@ impl TestRendererRoot {
                 .into(),
             );
         };
+        if report.host_output_shape() == TestRendererPrivateToJsonHostOutputShape::SiblingText {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "sibling-text-finished-work-identity-gate-not-implemented",
+                }
+                .into(),
+            );
+        }
 
         self.describe_private_serialization_finished_work_identity_gate_for_canary(
             "create().toJSON",
@@ -13876,9 +14048,26 @@ impl TestRendererRoot {
         )?;
 
         Self::validate_private_json_canary_current_fibers(&fiber_inspection, current_fibers)?;
-        let component = Self::private_json_component_from_snapshot(snapshot)?;
-        let nodes =
-            Self::private_json_nodes_from_component_and_fibers(&component, &fiber_inspection);
+        let component = Self::private_json_component_from_snapshot_for_shape(
+            snapshot,
+            host_output_shape.shape(),
+        )?;
+        let nodes = Self::private_json_nodes_from_component_and_fibers_for_shape(
+            snapshot,
+            &component,
+            &fiber_inspection,
+            host_output_shape.shape(),
+        );
+        let rendered_root = Self::private_json_rendered_root_from_snapshot_for_shape(
+            snapshot,
+            &component,
+            host_output_shape.shape(),
+        );
+        let root_node_kind = if rendered_root.as_array().is_some() {
+            TestRendererPrivateJsonNodeKind::RootArray
+        } else {
+            component.node_kind()
+        };
 
         Ok(TestRendererPrivateJsonSerializationReport {
             diagnostic_name: TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME,
@@ -13888,8 +14077,9 @@ impl TestRendererRoot {
             host_output_row,
             host_output_snapshot_current: true,
             root_child_count: snapshot.children().len(),
-            root_node_kind: component.node_kind(),
+            root_node_kind,
             nodes,
+            rendered_root,
             component,
             public_blockers: TestRendererPrivateJsonPublicSurfaceBlockers::blocked(),
         })
@@ -14133,7 +14323,7 @@ impl TestRendererRoot {
                 .iter()
                 .map(|text| text.text().to_owned())
                 .collect(),
-            rendered_root: Self::private_json_rendered_root_from_component(component),
+            rendered_root: report.rendered_root().clone(),
             source_node_count: report.node_count(),
             public_blockers: report.public_blockers(),
             public_serialization_available: false,
@@ -15430,6 +15620,127 @@ impl TestRendererRoot {
         }))
     }
 
+    pub fn render_and_commit_sibling_text_host_output_update_for_canary(
+        &mut self,
+        text: impl Into<String>,
+    ) -> Result<Option<TestRendererSiblingTextHostOutput>, TestRendererRootError> {
+        let current = self.current_host_output.clone().ok_or(
+            TestRendererRootError::MissingCommittedHostOutput {
+                operation: TestRendererRootUpdateKind::Update,
+            },
+        )?;
+        let scheduled = self.schedule_root_update(
+            TestRendererRootUpdateKind::Update,
+            current.fixture.element,
+            None,
+        )?;
+        self.scheduled_updates.push(scheduled);
+        let scheduled_update_sequence = self.scheduled_updates.len();
+        let Some(render) = self.render_latest_scheduled_host_root_for_commit_handoff()? else {
+            return Ok(None);
+        };
+        let previous_snapshot = self.diagnostic_container_snapshot()?;
+        let root_text = text.into();
+        let root_text_props_raw = self.next_sibling_text_props_raw_for_canary(&current);
+        let (stable_fibers, root_text_fiber, root_text_token) = self
+            .store
+            .prepare_test_renderer_sibling_text_host_output_update_canary_fibers(
+                render,
+                current.fibers,
+                root_text_props_raw,
+                Self::instance_state_node_raw(current.instance),
+                Self::text_state_node_raw(current.text),
+            )?;
+
+        let container = self.container;
+        let root_context = self.renderer.root_host_context(&container)?;
+        let root_text_token_raw = root_text_token.raw();
+        let root_text_instance = self.renderer.create_text_instance(
+            HostFiberTokenRef::new(
+                &root_text_token_raw,
+                HostFiberTokenPhase::Creation,
+                HostFiberTokenTarget::TextInstance,
+            ),
+            &root_text,
+            &container,
+            &root_context,
+        )?;
+        let root_text_state_node_raw = Self::text_state_node_raw(root_text_instance);
+        self.store
+            .finish_test_renderer_sibling_text_host_output_update_canary_fibers(
+                stable_fibers,
+                root_text_fiber,
+                root_text_state_node_raw,
+                root_text_props_raw,
+            )?;
+
+        let commit = self.commit_host_root_render_for_canary(render)?;
+        let fiber_inspection = self.describe_committed_fiber_tree_for_canary(&commit)?;
+        let commit_diagnostics = inspect_test_renderer_host_output_canary_commit(&commit);
+        let placement_records = commit.host_root_placement_apply_diagnostics_for_canary();
+        if placement_records.len() != 1 {
+            return Err(
+                TestRendererStableSiblingInsertionCanaryError::MultiplePlacementRecords {
+                    actual: placement_records.len(),
+                }
+                .into(),
+            );
+        }
+        let placement = placement_records[0];
+        if placement.fiber() != root_text_fiber
+            || placement.tag_name() != "HostText"
+            || placement.sibling() != Some(stable_fibers.component())
+            || placement.apply_kind() != "insert-placement-in-container-before"
+            || !placement.can_insert_before()
+        {
+            return Err(
+                TestRendererStableSiblingInsertionCanaryError::UnexpectedInsertedFiber.into(),
+            );
+        }
+
+        let mut container = self.container;
+        let commit_state = self.renderer.prepare_for_commit(&container)?;
+        self.renderer.insert_in_container_before(
+            &mut container,
+            HostChild::Text(&root_text_instance),
+            HostChild::Instance(&current.instance),
+        )?;
+        self.renderer.reset_after_commit(&container, commit_state)?;
+        let snapshot = self.diagnostic_container_snapshot()?;
+        let root_text_snapshot = self.renderer.snapshot_text(&root_text_instance)?;
+        self.host_nodes.retarget_current(stable_fibers.current());
+        self.current_host_output = None;
+        self.current_nested_host_output = None;
+
+        macro_rules! fiber_handle {
+            ($fiber:expr) => {{
+                let fiber = $fiber;
+                TestRendererFiberHandleDiagnostics {
+                    arena_id: fiber.arena_id().get(),
+                    slot: fiber.slot().get(),
+                    generation: fiber.generation().get(),
+                }
+            }};
+        }
+
+        Ok(Some(TestRendererSiblingTextHostOutput {
+            scheduled_update_sequence,
+            render,
+            stable_fibers,
+            root_text_fiber: fiber_handle!(root_text_fiber),
+            root_text_props_raw,
+            root_text_state_node_raw,
+            component_state_node_raw: Self::instance_state_node_raw(current.instance),
+            component_text_state_node_raw: Self::text_state_node_raw(current.text),
+            commit,
+            fiber_inspection,
+            commit_diagnostics,
+            previous_snapshot,
+            snapshot,
+            root_text_snapshot,
+        }))
+    }
+
     pub fn render_and_commit_host_parent_text_placement_for_canary(
         &mut self,
         text: impl Into<String>,
@@ -16077,6 +16388,18 @@ impl TestRendererRoot {
             .saturating_add(1000)
     }
 
+    fn next_sibling_text_props_raw_for_canary(
+        &self,
+        current: &TestRendererCurrentHostOutput,
+    ) -> u64 {
+        current
+            .fixture
+            .canary_fixture
+            .text_props_raw()
+            .saturating_add(self.renderer.texts.len() as u64)
+            .saturating_add(2000)
+    }
+
     fn next_nested_host_parent_placement_text_props_raw_for_canary(
         &self,
         current: &TestRendererCurrentNestedHostOutput,
@@ -16228,6 +16551,16 @@ impl TestRendererRoot {
                     inner,
                 )
             }
+            TestRendererPrivateJsonCurrentFibersForCanary::SiblingText {
+                root_text,
+                root_text_props_raw,
+                component,
+            } => Self::validate_private_json_sibling_text_canary_current_fibers(
+                fiber_inspection,
+                root_text,
+                root_text_props_raw,
+                component,
+            ),
         }
     }
 
@@ -16385,6 +16718,97 @@ impl TestRendererRoot {
         Ok(())
     }
 
+    fn validate_private_json_sibling_text_canary_current_fibers(
+        fiber_inspection: &TestRendererCommittedFiberTreeInspection,
+        root_text: TestRendererFiberHandleDiagnostics,
+        root_text_props_raw: u64,
+        component: TestRendererHostOutputCanaryCurrentFibers,
+    ) -> Result<(), TestRendererPrivateJsonSerializationError> {
+        if fiber_inspection.shape_name() != "HostRoot->[HostText,HostComponent->HostText]"
+            || fiber_inspection.root_children().len() != 2
+            || fiber_inspection.host_components().len() != 1
+            || fiber_inspection.host_texts().len() != 2
+        {
+            return Err(
+                TestRendererPrivateJsonSerializationError::CommittedFiberMismatch {
+                    node_kind: TestRendererPrivateJsonNodeKind::RootArray,
+                },
+            );
+        }
+
+        macro_rules! fiber_handle {
+            ($fiber:expr) => {{
+                let fiber = $fiber;
+                TestRendererFiberHandleDiagnostics {
+                    arena_id: fiber.arena_id().get(),
+                    slot: fiber.slot().get(),
+                    generation: fiber.generation().get(),
+                }
+            }};
+        }
+
+        let text_sibling = fiber_inspection.host_texts()[0];
+        let host_component = fiber_inspection.host_components()[0];
+        let component_text = fiber_inspection.host_texts()[1];
+        if fiber_handle!(text_sibling.fiber()) != root_text
+            || host_component.fiber() != component.component()
+            || component_text.fiber() != component.text()
+        {
+            return Err(
+                TestRendererPrivateJsonSerializationError::CommittedFiberMismatch {
+                    node_kind: TestRendererPrivateJsonNodeKind::RootArray,
+                },
+            );
+        }
+
+        Self::validate_private_json_raw_handle(
+            TestRendererPrivateJsonNodeKind::Text,
+            "pending_props",
+            root_text_props_raw,
+            text_sibling.pending_props().raw(),
+        )?;
+        Self::validate_private_json_raw_handle(
+            TestRendererPrivateJsonNodeKind::Text,
+            "memoized_props",
+            root_text_props_raw,
+            text_sibling.memoized_props().raw(),
+        )?;
+
+        let fixture = component.fixture();
+        Self::validate_private_json_raw_handle(
+            TestRendererPrivateJsonNodeKind::HostComponent,
+            "element_type",
+            fixture.element_type_raw(),
+            host_component.element_type().raw(),
+        )?;
+        Self::validate_private_json_raw_handle(
+            TestRendererPrivateJsonNodeKind::HostComponent,
+            "pending_props",
+            fixture.component_props_raw(),
+            host_component.pending_props().raw(),
+        )?;
+        Self::validate_private_json_raw_handle(
+            TestRendererPrivateJsonNodeKind::HostComponent,
+            "memoized_props",
+            fixture.component_props_raw(),
+            host_component.memoized_props().raw(),
+        )?;
+        Self::validate_private_json_raw_handle(
+            TestRendererPrivateJsonNodeKind::Text,
+            "pending_props",
+            fixture.text_props_raw(),
+            component_text.pending_props().raw(),
+        )?;
+        Self::validate_private_json_raw_handle(
+            TestRendererPrivateJsonNodeKind::Text,
+            "memoized_props",
+            fixture.text_props_raw(),
+            component_text.memoized_props().raw(),
+        )?;
+
+        Ok(())
+    }
+
     fn validate_private_json_raw_handle(
         node_kind: TestRendererPrivateJsonNodeKind,
         field: &'static str,
@@ -16486,6 +16910,28 @@ impl TestRendererRoot {
         }
     }
 
+    fn private_json_nodes_from_component_and_fibers_for_shape(
+        snapshot: &TestContainerSnapshot,
+        component: &TestRendererPrivateJsonHostComponentDiagnostic,
+        fiber_inspection: &TestRendererCommittedFiberTreeInspection,
+        shape: TestRendererPrivateToJsonHostOutputShape,
+    ) -> Vec<TestRendererPrivateJsonNodeDiagnostic> {
+        match shape {
+            TestRendererPrivateToJsonHostOutputShape::SiblingText => {
+                Self::private_json_sibling_text_nodes_from_snapshot_and_fibers(
+                    snapshot,
+                    component,
+                    fiber_inspection,
+                )
+            }
+            TestRendererPrivateToJsonHostOutputShape::EmptyRoot
+            | TestRendererPrivateToJsonHostOutputShape::SingleHostText
+            | TestRendererPrivateToJsonHostOutputShape::NestedHostText => {
+                Self::private_json_nodes_from_component_and_fibers(component, fiber_inspection)
+            }
+        }
+    }
+
     fn private_json_nodes_from_component_and_fibers(
         component: &TestRendererPrivateJsonHostComponentDiagnostic,
         fiber_inspection: &TestRendererCommittedFiberTreeInspection,
@@ -16517,6 +16963,59 @@ impl TestRendererRoot {
                 parent_ordinal: Some(0),
                 child_ordinals: Vec::new(),
                 fiber: Self::private_json_fiber_diagnostic(fiber_inspection.host_text()),
+                element_type: None,
+                props: None,
+                text: Some(component.text_child().text().to_owned()),
+                hidden: component.text_child().is_hidden(),
+                detached: false,
+            },
+        ]
+    }
+
+    fn private_json_sibling_text_nodes_from_snapshot_and_fibers(
+        snapshot: &TestContainerSnapshot,
+        component: &TestRendererPrivateJsonHostComponentDiagnostic,
+        fiber_inspection: &TestRendererCommittedFiberTreeInspection,
+    ) -> Vec<TestRendererPrivateJsonNodeDiagnostic> {
+        let host_texts = fiber_inspection.host_texts();
+        let host_component = fiber_inspection.host_component();
+        let root_text = match &snapshot.children()[0] {
+            TestNodeSnapshot::Text(text) => text,
+            TestNodeSnapshot::Element(_) => {
+                unreachable!("SiblingText shape validation requires a root text child")
+            }
+        };
+        vec![
+            TestRendererPrivateJsonNodeDiagnostic {
+                ordinal: 0,
+                node_kind: TestRendererPrivateJsonNodeKind::Text,
+                parent_ordinal: None,
+                child_ordinals: Vec::new(),
+                fiber: Self::private_json_fiber_diagnostic(host_texts[0]),
+                element_type: None,
+                props: None,
+                text: Some(root_text.text().to_owned()),
+                hidden: root_text.is_hidden(),
+                detached: false,
+            },
+            TestRendererPrivateJsonNodeDiagnostic {
+                ordinal: 1,
+                node_kind: TestRendererPrivateJsonNodeKind::HostComponent,
+                parent_ordinal: None,
+                child_ordinals: vec![2],
+                fiber: Self::private_json_fiber_diagnostic(host_component),
+                element_type: Some(component.element_type().clone()),
+                props: Some(component.props().clone()),
+                text: None,
+                hidden: component.is_hidden(),
+                detached: component.is_detached(),
+            },
+            TestRendererPrivateJsonNodeDiagnostic {
+                ordinal: 2,
+                node_kind: TestRendererPrivateJsonNodeKind::Text,
+                parent_ordinal: Some(1),
+                child_ordinals: Vec::new(),
+                fiber: Self::private_json_fiber_diagnostic(host_texts[1]),
                 element_type: None,
                 props: None,
                 text: Some(component.text_child().text().to_owned()),
@@ -16577,6 +17076,23 @@ impl TestRendererRoot {
         }
 
         nodes
+    }
+
+    fn private_json_rendered_root_from_snapshot_for_shape(
+        snapshot: &TestContainerSnapshot,
+        component: &TestRendererPrivateJsonHostComponentDiagnostic,
+        shape: TestRendererPrivateToJsonHostOutputShape,
+    ) -> TestRendererPrivateJsonRenderedRoot {
+        match shape {
+            TestRendererPrivateToJsonHostOutputShape::SiblingText => {
+                Self::describe_private_to_json_host_shape_from_snapshot_for_diagnostics(snapshot)
+            }
+            TestRendererPrivateToJsonHostOutputShape::EmptyRoot
+            | TestRendererPrivateToJsonHostOutputShape::SingleHostText
+            | TestRendererPrivateToJsonHostOutputShape::NestedHostText => {
+                Self::private_json_rendered_root_from_component(component)
+            }
+        }
     }
 
     fn private_json_rendered_root_from_component(
@@ -16807,6 +17323,67 @@ impl TestRendererRoot {
             subtree_flags_bits: node.subtree_flags().bits(),
             state_node_present: node.state_node_present(),
         }
+    }
+
+    fn private_json_component_from_snapshot_for_shape(
+        snapshot: &TestContainerSnapshot,
+        shape: TestRendererPrivateToJsonHostOutputShape,
+    ) -> Result<
+        TestRendererPrivateJsonHostComponentDiagnostic,
+        TestRendererPrivateJsonSerializationError,
+    > {
+        match shape {
+            TestRendererPrivateToJsonHostOutputShape::SiblingText => {
+                Self::private_json_component_from_sibling_text_snapshot(snapshot)
+            }
+            TestRendererPrivateToJsonHostOutputShape::EmptyRoot
+            | TestRendererPrivateToJsonHostOutputShape::SingleHostText
+            | TestRendererPrivateToJsonHostOutputShape::NestedHostText => {
+                Self::private_json_component_from_snapshot(snapshot)
+            }
+        }
+    }
+
+    fn private_json_component_from_sibling_text_snapshot(
+        snapshot: &TestContainerSnapshot,
+    ) -> Result<
+        TestRendererPrivateJsonHostComponentDiagnostic,
+        TestRendererPrivateJsonSerializationError,
+    > {
+        if snapshot.children().len() != 2 {
+            return Err(TestRendererPrivateJsonSerializationError::RootChildCount {
+                actual: snapshot.children().len(),
+            });
+        }
+
+        let TestNodeSnapshot::Text(_) = &snapshot.children()[0] else {
+            return Err(TestRendererPrivateJsonSerializationError::RootChildCount {
+                actual: snapshot.children().len(),
+            });
+        };
+        let TestNodeSnapshot::Element(element) = &snapshot.children()[1] else {
+            return Err(TestRendererPrivateJsonSerializationError::RootChildIsText);
+        };
+        if element.children().len() != 1 {
+            return Err(
+                TestRendererPrivateJsonSerializationError::HostComponentChildCount {
+                    element_type: element.element_type().clone(),
+                    actual: element.children().len(),
+                },
+            );
+        }
+        let TestNodeSnapshot::Text(text) = &element.children()[0] else {
+            return Err(
+                TestRendererPrivateJsonSerializationError::HostComponentChildIsElement {
+                    element_type: element.element_type().clone(),
+                },
+            );
+        };
+
+        Ok(Self::private_json_component_from_text_children(
+            element,
+            vec![Self::private_json_text_from_snapshot(text)],
+        ))
     }
 
     fn private_json_component_from_snapshot(
@@ -21298,6 +21875,280 @@ mod tests {
             component.children().unwrap()[0].as_text(),
             Some("second sibling")
         );
+    }
+
+    #[test]
+    fn root_sibling_text_host_output_update_commits_real_root_text_before_component() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "second sibling",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let output = root
+            .render_and_commit_sibling_text_host_output_update_for_canary("first sibling")
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(output.previous_snapshot().children().len(), 1);
+        assert_eq!(
+            container_element_texts(output.previous_snapshot()),
+            vec!["second sibling"]
+        );
+        assert_eq!(output.snapshot().children().len(), 2);
+        let TestNodeSnapshot::Text(root_text) = &output.snapshot().children()[0] else {
+            panic!("expected root text sibling");
+        };
+        assert_eq!(root_text.text(), "first sibling");
+        let TestNodeSnapshot::Element(component) = &output.snapshot().children()[1] else {
+            panic!("expected stable component sibling");
+        };
+        assert_eq!(component.element_type().as_str(), "span");
+        assert_eq!(child_texts(component), vec!["second sibling"]);
+        assert_eq!(output.root_text_snapshot().text(), "first sibling");
+        assert_eq!(output.root_text_state_node_raw(), 2);
+        assert_eq!(output.component_state_node_raw(), 1);
+        assert_eq!(output.component_text_state_node_raw(), 1);
+        assert_eq!(
+            root.diagnostic_container_snapshot().unwrap(),
+            *output.snapshot()
+        );
+
+        let placement_records = output
+            .commit()
+            .host_root_placement_apply_diagnostics_for_canary();
+        assert_eq!(placement_records.len(), 1);
+        let placement = placement_records[0];
+        assert_eq!(
+            placement.apply_kind(),
+            "insert-placement-in-container-before"
+        );
+        assert_eq!(placement.sibling_status(), "insert-before");
+        assert_eq!(
+            placement.state_node_raw(),
+            output.root_text_state_node_raw()
+        );
+        assert_eq!(
+            placement.sibling_state_node_raw(),
+            output.component_state_node_raw()
+        );
+        assert!(placement.can_insert_before());
+
+        let mutation_records = output.commit_diagnostics().mutation_records();
+        assert_eq!(mutation_records.len(), 1);
+        assert_eq!(
+            mutation_records[0].kind(),
+            TestRendererHostOutputCanaryMutationKind::Placement
+        );
+        assert_eq!(
+            mutation_records[0].state_node_raw(),
+            output.root_text_state_node_raw()
+        );
+    }
+
+    #[test]
+    fn root_sibling_text_host_output_update_exposes_committed_fiber_inspection() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "second sibling",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let output = root
+            .render_and_commit_sibling_text_host_output_update_for_canary("first sibling")
+            .unwrap()
+            .unwrap();
+        let inspection = output.fiber_inspection();
+
+        assert_eq!(
+            inspection.shape_name(),
+            "HostRoot->[HostText,HostComponent->HostText]"
+        );
+        assert_eq!(inspection.root_children().len(), 2);
+        assert_eq!(inspection.host_children().len(), 2);
+        assert_eq!(inspection.host_components().len(), 1);
+        assert_eq!(inspection.host_texts().len(), 2);
+        assert_eq!(
+            inspection.host_texts()[0].sibling(),
+            Some(inspection.host_component().fiber())
+        );
+        assert_eq!(inspection.host_texts()[0].index(), 0);
+        assert_eq!(inspection.host_component().index(), 1);
+        assert_eq!(
+            inspection.host_component().child(),
+            Some(inspection.host_text().fiber())
+        );
+        assert_eq!(inspection.host_text().index(), 0);
+        assert!(inspection.host_texts()[0].state_node_present());
+        assert!(inspection.host_component().state_node_present());
+        assert!(inspection.host_text().state_node_present());
+        assert_eq!(
+            output.root_text_fiber(),
+            TestRendererFiberHandleDiagnostics {
+                arena_id: inspection.host_texts()[0].fiber().arena_id().get(),
+                slot: inspection.host_texts()[0].fiber().slot().get(),
+                generation: inspection.host_texts()[0].fiber().generation().get(),
+            }
+        );
+    }
+
+    #[test]
+    fn root_private_to_json_sibling_text_host_output_row_uses_real_committed_output() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "second sibling",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let output = root
+            .render_and_commit_sibling_text_host_output_update_for_canary("first sibling")
+            .unwrap()
+            .unwrap();
+
+        let row = root
+            .describe_private_to_json_sibling_text_host_output_row_for_canary(&output)
+            .unwrap();
+
+        assert_eq!(
+            row.id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_HOST_OUTPUT_ROW_ID
+        );
+        assert_eq!(
+            row.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::SiblingText
+        );
+        assert_eq!(row.previous_root_child_count(), 1);
+        assert_eq!(row.current_root_child_count(), 2);
+        assert_eq!(row.previous_host_component_count(), 1);
+        assert_eq!(row.current_host_component_count(), 1);
+        assert_eq!(row.previous_host_text_count(), 1);
+        assert_eq!(row.current_host_text_count(), 2);
+        assert_eq!(row.current_root_text_count(), 1);
+        assert_eq!(row.current_max_host_component_depth(), 1);
+        assert!(row.dependency_diagnostics().host_output_snapshot_current());
+        assert!(row.dependency_diagnostics().public_surfaces_blocked());
+        assert!(row.public_blockers().all_blocked());
+    }
+
+    #[test]
+    fn root_private_json_sibling_text_report_records_root_array_source_nodes() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "second sibling",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let output = root
+            .render_and_commit_sibling_text_host_output_update_for_canary("first sibling")
+            .unwrap()
+            .unwrap();
+
+        let report = root
+            .describe_private_json_serialization_after_sibling_text_update_for_canary(&output)
+            .unwrap();
+
+        assert_eq!(
+            report.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::SiblingText
+        );
+        assert_eq!(
+            report.host_output_row().unwrap().id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_HOST_OUTPUT_ROW_ID
+        );
+        assert!(report.host_output_snapshot_current());
+        assert_eq!(report.root_child_count(), 2);
+        assert_eq!(
+            report.root_node_kind(),
+            TestRendererPrivateJsonNodeKind::RootArray
+        );
+        assert_eq!(report.node_count(), 3);
+
+        let nodes = report.nodes();
+        assert_eq!(nodes[0].node_kind(), TestRendererPrivateJsonNodeKind::Text);
+        assert_eq!(nodes[0].parent_ordinal(), None);
+        assert_eq!(nodes[0].text(), Some("first sibling"));
+        assert_eq!(
+            nodes[0].fiber().pending_props_raw(),
+            output.root_text_props_raw()
+        );
+        assert_eq!(
+            nodes[0].fiber().memoized_props_raw(),
+            output.root_text_props_raw()
+        );
+        assert!(nodes[0].fiber().state_node_present());
+        assert_eq!(
+            nodes[1].node_kind(),
+            TestRendererPrivateJsonNodeKind::HostComponent
+        );
+        assert_eq!(nodes[1].parent_ordinal(), None);
+        assert_eq!(nodes[1].child_ordinals(), [2]);
+        assert_eq!(nodes[1].element_type().unwrap().as_str(), "span");
+        assert_eq!(nodes[2].node_kind(), TestRendererPrivateJsonNodeKind::Text);
+        assert_eq!(nodes[2].parent_ordinal(), Some(1));
+        assert_eq!(nodes[2].text(), Some("second sibling"));
+
+        let rendered = report.rendered_root().as_array().unwrap();
+        assert_eq!(rendered.len(), 2);
+        assert_eq!(rendered[0].as_text(), Some("first sibling"));
+        let component = rendered[1].as_host_component().unwrap();
+        assert_eq!(component.element_type().as_str(), "span");
+        assert_eq!(
+            component.children().unwrap()[0].as_text(),
+            Some("second sibling")
+        );
+    }
+
+    #[test]
+    fn root_private_to_json_sibling_text_report_fails_closed_in_generic_finished_work_identity_gate()
+     {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "second sibling",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let output = root
+            .render_and_commit_sibling_text_host_output_update_for_canary("first sibling")
+            .unwrap()
+            .unwrap();
+        let report = root
+            .describe_private_json_serialization_after_sibling_text_update_for_canary(&output)
+            .unwrap();
+
+        let error = root
+            .describe_private_to_json_finished_work_identity_gate_for_canary(
+                Some(output.render()),
+                Some(output.commit()),
+                Some(&report),
+            )
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateSerializationFinishedWorkIdentity(error) = error else {
+            panic!("expected private serialization finished-work identity error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                reason: "sibling-text-finished-work-identity-gate-not-implemented"
+            }
+        ));
     }
 
     #[test]
