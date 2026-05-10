@@ -1346,6 +1346,7 @@ function assertActSchedulerGate(gate, entrypoint) {
     "worker-332-test-renderer-js-private-root-native-bridge",
     "worker-333-test-renderer-tojson-host-output-private-path",
     "worker-334-test-renderer-testinstance-private-query-path",
+    "worker-426-test-renderer-testinstance-bridge-query",
     "worker-349-hook-effect-destroy-callback-execution-private",
     "worker-377-scheduler-act-queue-flush-helper-private"
   ]);
