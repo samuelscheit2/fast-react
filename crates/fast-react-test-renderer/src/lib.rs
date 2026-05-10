@@ -12530,15 +12530,15 @@ impl TestRendererRoot {
             self.describe_private_test_instance_find_by_query_after_update_for_canary(output)?;
         let class_root =
             self.describe_private_get_instance_class_root_after_update_for_canary(output)?;
-        let previous_child_text =
-            Self::first_host_component_text_from_snapshot(output.previous_snapshot()).ok_or_else(
-                || {
-                    TestRendererPrivateTestInstanceNativeQueryExecutionError::NativeExecutionRecordMismatch {
-                        operation: "update",
-                        reason: "updated-host-child-previous-text-missing",
-                    }
-                },
-            )?;
+        let previous_child_text = Self::first_host_component_text_from_snapshot(
+            output.previous_snapshot(),
+        )
+        .ok_or(
+            TestRendererPrivateTestInstanceNativeQueryExecutionError::NativeExecutionRecordMismatch {
+                operation: "update",
+                reason: "updated-host-child-previous-text-missing",
+            },
+        )?;
 
         self.private_test_instance_class_root_query_execution_evidence_from_reports(
             TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID,
@@ -12987,6 +12987,10 @@ impl TestRendererRoot {
         }
     }
 
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "private test-renderer evidence builder mirrors the native execution report shape"
+    )]
     fn private_to_json_native_execution_evidence_from_facade_result(
         &self,
         operation: &'static str,
@@ -15251,6 +15255,10 @@ impl TestRendererRoot {
         }
     }
 
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "private test-instance evidence builder mirrors the native query report shape"
+    )]
     fn private_test_instance_native_query_execution_evidence_from_reports(
         &self,
         operation: &'static str,
@@ -15265,12 +15273,12 @@ impl TestRendererRoot {
     ) -> Result<TestRendererPrivateTestInstanceNativeQueryExecutionEvidence, TestRendererRootError>
     {
         let query = find_by_report.find_by_type();
-        let expected_type = query.expected_type().cloned().ok_or_else(|| {
+        let expected_type = query.expected_type().cloned().ok_or(
             TestRendererPrivateTestInstanceNativeQueryExecutionError::NativeExecutionRecordMismatch {
                 operation,
                 reason: "find-by-type-query-type-missing",
-            }
-        })?;
+            },
+        )?;
         let minimal_host_component_query_path = preflight.host_output_snapshot_current()
             && preflight.host_output_update_kind() == expected_host_output_update_kind
             && preflight.find_all_candidate_fiber_tags() == ["HostComponent"]
@@ -15344,12 +15352,12 @@ impl TestRendererRoot {
     ) -> Result<TestRendererPrivateTestInstanceClassRootQueryExecutionEvidence, TestRendererRootError>
     {
         let query = find_by_report.find_by_type();
-        let child_element_type = query.expected_type().cloned().ok_or_else(|| {
+        let child_element_type = query.expected_type().cloned().ok_or(
             TestRendererPrivateTestInstanceNativeQueryExecutionError::NativeExecutionRecordMismatch {
                 operation: "update",
                 reason: "find-by-type-query-type-missing",
-            }
-        })?;
+            },
+        )?;
         let rendered_host_component = class_root.rendered_host_component();
         let class_component = class_root.class_component();
         let current_child_text = class_root.rendered_host_text().text().to_owned();

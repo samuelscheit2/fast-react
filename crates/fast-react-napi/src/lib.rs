@@ -1002,36 +1002,36 @@ mod root_bridge_requests {
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub(crate) enum NativeRootBridgeBatchResponseErrorRowStatus {
-        NotErrorRow,
-        LifecycleErrorRow,
-        DeterministicErrorRow,
+        NotError,
+        Lifecycle,
+        Deterministic,
     }
 
     impl NativeRootBridgeBatchResponseErrorRowStatus {
         #[must_use]
         pub(crate) const fn code(self) -> &'static str {
             match self {
-                Self::NotErrorRow => "not-error-row",
-                Self::LifecycleErrorRow => "lifecycle-error-row",
-                Self::DeterministicErrorRow => "deterministic-error-row",
+                Self::NotError => "not-error-row",
+                Self::Lifecycle => "lifecycle-error-row",
+                Self::Deterministic => "deterministic-error-row",
             }
         }
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub(crate) enum NativeRootBridgeBatchResponseTeardownState {
-        RootUninitialized,
-        RootActive,
-        RootRetired,
+        Uninitialized,
+        Active,
+        Retired,
     }
 
     impl NativeRootBridgeBatchResponseTeardownState {
         #[must_use]
         pub(crate) const fn code(self) -> &'static str {
             match self {
-                Self::RootUninitialized => "root-uninitialized",
-                Self::RootActive => "root-active",
-                Self::RootRetired => "root-retired",
+                Self::Uninitialized => "root-uninitialized",
+                Self::Active => "root-active",
+                Self::Retired => "root-retired",
             }
         }
     }
@@ -1065,9 +1065,9 @@ mod root_bridge_requests {
             let response_status = row.status();
             let error_row_status =
                 if response_status == NativeRootBridgeBatchedJsonTransportLifecycleStatus::Error {
-                    NativeRootBridgeBatchResponseErrorRowStatus::LifecycleErrorRow
+                    NativeRootBridgeBatchResponseErrorRowStatus::Lifecycle
                 } else {
-                    NativeRootBridgeBatchResponseErrorRowStatus::NotErrorRow
+                    NativeRootBridgeBatchResponseErrorRowStatus::NotError
                 };
             let id =
                 if response_status == NativeRootBridgeBatchedJsonTransportLifecycleStatus::Error {
@@ -1102,8 +1102,7 @@ mod root_bridge_requests {
                 request_id: row.request_id(),
                 kind: row.kind(),
                 response_status: row.status(),
-                error_row_status:
-                    NativeRootBridgeBatchResponseErrorRowStatus::DeterministicErrorRow,
+                error_row_status: NativeRootBridgeBatchResponseErrorRowStatus::Deterministic,
                 teardown_state: teardown_state_for_batch_lifecycle_row(row),
                 code: row.code(),
                 source_error_code: row.source_error_code(),
@@ -1446,7 +1445,7 @@ mod root_bridge_requests {
                 NativeRootBridgeJsonTransportStreamAssemblyState::Partial
             };
             let teardown_blocker = if assembled_response
-                && chunk.teardown_state == NativeRootBridgeBatchResponseTeardownState::RootRetired
+                && chunk.teardown_state == NativeRootBridgeBatchResponseTeardownState::Retired
             {
                 NativeRootBridgeJsonTransportStreamTeardownBlocker::RootRetiredAfterAssembly
             } else {
@@ -3073,7 +3072,7 @@ mod root_bridge_requests {
         let teardown_state = if row.kind() == NativeRootBridgeRequestKind::Unmount.code()
             && chunk_kind == NativeRootBridgeJsonTransportStreamChunkKind::Metadata
         {
-            NativeRootBridgeBatchResponseTeardownState::RootActive
+            NativeRootBridgeBatchResponseTeardownState::Active
         } else {
             row.teardown_state()
         };
@@ -3090,6 +3089,10 @@ mod root_bridge_requests {
         }
     }
 
+    #[allow(
+        clippy::result_large_err,
+        reason = "private stream validator returns the rejected chunk row as diagnostic evidence"
+    )]
     fn validate_native_root_bridge_json_transport_stream_batch_roundtrip_chunks(
         chunks: &[NativeRootBridgeJsonTransportStreamBatchRoundtripChunk],
     ) -> Result<
@@ -3151,7 +3154,7 @@ mod root_bridge_requests {
                 expected_response_order += 1;
                 expected_chunk_order = 0;
 
-                if chunk.teardown_state == NativeRootBridgeBatchResponseTeardownState::RootRetired {
+                if chunk.teardown_state == NativeRootBridgeBatchResponseTeardownState::Retired {
                     teardown_seen = true;
                 }
             } else {
@@ -3204,7 +3207,7 @@ mod root_bridge_requests {
         let last_response_row = response_rows.last().unwrap_or(first_response_row);
         if !accepted_chunks.iter().any(|chunk| {
             chunk.chunk_kind == NativeRootBridgeJsonTransportStreamChunkKind::Payload
-                && chunk.teardown_state == NativeRootBridgeBatchResponseTeardownState::RootRetired
+                && chunk.teardown_state == NativeRootBridgeBatchResponseTeardownState::Retired
         }) {
             let synthetic_response_order = last_response_row.response_order().saturating_add(1);
             let synthetic_request_order = last_response_row.request_order().saturating_add(1);
@@ -3217,7 +3220,7 @@ mod root_bridge_requests {
                 batch_sequence: accepted_chunks.len(),
                 chunk_kind: NativeRootBridgeJsonTransportStreamChunkKind::Metadata,
                 response_status: NativeRootBridgeBatchedJsonTransportLifecycleStatus::Accepted,
-                teardown_state: NativeRootBridgeBatchResponseTeardownState::RootActive,
+                teardown_state: NativeRootBridgeBatchResponseTeardownState::Active,
             });
             accepted_chunks.push(NativeRootBridgeJsonTransportStreamBatchRoundtripChunk {
                 request_id: synthetic_request_id,
@@ -3227,7 +3230,7 @@ mod root_bridge_requests {
                 batch_sequence: accepted_chunks.len(),
                 chunk_kind: NativeRootBridgeJsonTransportStreamChunkKind::Payload,
                 response_status: NativeRootBridgeBatchedJsonTransportLifecycleStatus::Accepted,
-                teardown_state: NativeRootBridgeBatchResponseTeardownState::RootRetired,
+                teardown_state: NativeRootBridgeBatchResponseTeardownState::Retired,
             });
         }
         let mut post_teardown_chunk =
@@ -3239,8 +3242,7 @@ mod root_bridge_requests {
             |chunk| chunk.response_order.saturating_add(1),
         );
         post_teardown_chunk.batch_sequence = accepted_chunks.len();
-        post_teardown_chunk.teardown_state =
-            NativeRootBridgeBatchResponseTeardownState::RootRetired;
+        post_teardown_chunk.teardown_state = NativeRootBridgeBatchResponseTeardownState::Retired;
         accepted_chunks.push(post_teardown_chunk);
 
         [
@@ -3307,13 +3309,13 @@ mod root_bridge_requests {
 
         match lifecycle {
             NativeRootBridgeBatchedJsonTransportLifecycleState::None => {
-                NativeRootBridgeBatchResponseTeardownState::RootUninitialized
+                NativeRootBridgeBatchResponseTeardownState::Uninitialized
             }
             NativeRootBridgeBatchedJsonTransportLifecycleState::Active => {
-                NativeRootBridgeBatchResponseTeardownState::RootActive
+                NativeRootBridgeBatchResponseTeardownState::Active
             }
             NativeRootBridgeBatchedJsonTransportLifecycleState::Retired => {
-                NativeRootBridgeBatchResponseTeardownState::RootRetired
+                NativeRootBridgeBatchResponseTeardownState::Retired
             }
         }
     }
@@ -7821,17 +7823,17 @@ mod tests {
         assert_eq!(
             NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_BATCH_RESPONSE_ERROR_ROW_STATUSES,
             &[
-                NativeRootBridgeBatchResponseErrorRowStatus::NotErrorRow.code(),
-                NativeRootBridgeBatchResponseErrorRowStatus::LifecycleErrorRow.code(),
-                NativeRootBridgeBatchResponseErrorRowStatus::DeterministicErrorRow.code()
+                NativeRootBridgeBatchResponseErrorRowStatus::NotError.code(),
+                NativeRootBridgeBatchResponseErrorRowStatus::Lifecycle.code(),
+                NativeRootBridgeBatchResponseErrorRowStatus::Deterministic.code()
             ]
         );
         assert_eq!(
             NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_BATCH_RESPONSE_TEARDOWN_STATES,
             &[
-                NativeRootBridgeBatchResponseTeardownState::RootUninitialized.code(),
-                NativeRootBridgeBatchResponseTeardownState::RootActive.code(),
-                NativeRootBridgeBatchResponseTeardownState::RootRetired.code()
+                NativeRootBridgeBatchResponseTeardownState::Uninitialized.code(),
+                NativeRootBridgeBatchResponseTeardownState::Active.code(),
+                NativeRootBridgeBatchResponseTeardownState::Retired.code()
             ]
         );
         assert_eq!(

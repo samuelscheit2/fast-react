@@ -748,6 +748,10 @@ impl From<FiberTopologyError> for OffscreenVisibilityTransitionCompleteWorkBlock
     }
 }
 
+#[allow(
+    clippy::result_large_err,
+    reason = "private Offscreen canary diagnostics intentionally return complete begin/complete-work evidence"
+)]
 pub(crate) fn complete_offscreen_visibility_transition_blocker_for_test(
     arena: &FiberArena,
     offscreen: FiberId,
@@ -1299,6 +1303,10 @@ mod tests {
         (arena, context_store, begin_work, default_value)
     }
 
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "test fixture builder spells out each transition lane/state dimension"
+    )]
     fn offscreen_complete_transition_pair(
         key: &'static str,
         previous_hidden_state: StateHandle,
@@ -1375,7 +1383,7 @@ mod tests {
         )
         .unwrap_err()
         {
-            BeginWorkError::UnsupportedOffscreenChildShape(record) => record,
+            BeginWorkError::UnsupportedOffscreenChildShape(record) => *record,
             other => panic!("expected Offscreen begin-work visibility record, got {other:?}"),
         }
     }

@@ -1519,7 +1519,7 @@ impl TestHostRootHostUpdateExecutionDiagnosticForCanary {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum TestHostRootHostUpdateExecutionErrorForCanary {
-    FinishedWorkHandoff(HostRootFinishedWorkCommitHandoffErrorForCanary),
+    FinishedWorkHandoff(Box<HostRootFinishedWorkCommitHandoffErrorForCanary>),
     HostUpdateRecord(HostRootSingleHostUpdateApplyRecordErrorForCanary),
     UnsupportedPayload {
         root: FiberRootId,
@@ -1574,7 +1574,7 @@ impl Display for TestHostRootHostUpdateExecutionErrorForCanary {
 impl Error for TestHostRootHostUpdateExecutionErrorForCanary {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            Self::FinishedWorkHandoff(error) => Some(error),
+            Self::FinishedWorkHandoff(error) => Some(error.as_ref()),
             Self::HostUpdateRecord(error) => Some(error),
             Self::HostWork(error) => Some(error),
             Self::UnsupportedPayload { .. } | Self::HostUpdateNotApplied { .. } => None,
@@ -1586,7 +1586,7 @@ impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
     for TestHostRootHostUpdateExecutionErrorForCanary
 {
     fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
-        Self::FinishedWorkHandoff(error)
+        Self::FinishedWorkHandoff(Box::new(error))
     }
 }
 
@@ -7667,13 +7667,15 @@ mod tests {
 
         assert!(matches!(
             error,
-            TestHostRootHostUpdateExecutionErrorForCanary::FinishedWorkHandoff(
-                HostRootFinishedWorkCommitHandoffErrorForCanary::StaleFinishedWorkRecord {
-                    root,
-                    finished_work,
-                    ..
-                }
-            ) if root == root_id && finished_work == update_render.finished_work()
+            TestHostRootHostUpdateExecutionErrorForCanary::FinishedWorkHandoff(error)
+                if matches!(
+                    error.as_ref(),
+                    HostRootFinishedWorkCommitHandoffErrorForCanary::StaleFinishedWorkRecord {
+                        root,
+                        finished_work,
+                        ..
+                    } if *root == root_id && *finished_work == update_render.finished_work()
+                )
         ));
         assert_eq!(store.root(root_id).unwrap().current(), previous_current);
         assert_eq!(
@@ -7824,13 +7826,15 @@ mod tests {
 
         assert!(matches!(
             error,
-            TestHostRootHostUpdateExecutionErrorForCanary::FinishedWorkHandoff(
-                HostRootFinishedWorkCommitHandoffErrorForCanary::ForeignFinishedWorkRecord {
-                    expected_root,
-                    actual_root,
-                    ..
-                }
-            ) if expected_root == first_root && actual_root == second_root
+            TestHostRootHostUpdateExecutionErrorForCanary::FinishedWorkHandoff(error)
+                if matches!(
+                    error.as_ref(),
+                    HostRootFinishedWorkCommitHandoffErrorForCanary::ForeignFinishedWorkRecord {
+                        expected_root,
+                        actual_root,
+                        ..
+                    } if *expected_root == first_root && *actual_root == second_root
+                )
         ));
         assert_eq!(store.root(first_root).unwrap().current(), previous_current);
         assert_eq!(

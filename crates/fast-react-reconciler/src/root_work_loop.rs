@@ -962,7 +962,7 @@ impl HostRootCompleteWorkCommitHandoffRecord {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum HostRootCompleteWorkCommitHandoffError {
     CompleteWork(HostRootCompleteWorkHandoffError),
-    FinishedWorkCommitHandoff(HostRootFinishedWorkCommitHandoffErrorForCanary),
+    FinishedWorkCommitHandoff(Box<HostRootFinishedWorkCommitHandoffErrorForCanary>),
 }
 
 #[cfg(test)]
@@ -980,7 +980,7 @@ impl Error for HostRootCompleteWorkCommitHandoffError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::CompleteWork(error) => Some(error),
-            Self::FinishedWorkCommitHandoff(error) => Some(error),
+            Self::FinishedWorkCommitHandoff(error) => Some(error.as_ref()),
         }
     }
 }
@@ -997,7 +997,7 @@ impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
     for HostRootCompleteWorkCommitHandoffError
 {
     fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
-        Self::FinishedWorkCommitHandoff(error)
+        Self::FinishedWorkCommitHandoff(Box::new(error))
     }
 }
 
@@ -1100,7 +1100,7 @@ enum HostRootRenderFinishedWorkCommitMetadataHandoffError {
         root: FiberRootId,
         status: RootRenderExitStatus,
     },
-    FinishedWorkCommitHandoff(HostRootFinishedWorkCommitHandoffErrorForCanary),
+    FinishedWorkCommitHandoff(Box<HostRootFinishedWorkCommitHandoffErrorForCanary>),
 }
 
 #[cfg(test)]
@@ -1146,7 +1146,7 @@ impl Error for HostRootRenderFinishedWorkCommitMetadataHandoffError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::FiberRootStore(error) => Some(error),
-            Self::FinishedWorkCommitHandoff(error) => Some(error),
+            Self::FinishedWorkCommitHandoff(error) => Some(error.as_ref()),
             Self::RenderPhaseWorkMismatch { .. }
             | Self::RenderPhaseLanesMismatch { .. }
             | Self::RenderPhaseNotCompleted { .. } => None,
@@ -1166,7 +1166,7 @@ impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
     for HostRootRenderFinishedWorkCommitMetadataHandoffError
 {
     fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
-        Self::FinishedWorkCommitHandoff(error)
+        Self::FinishedWorkCommitHandoff(Box::new(error))
     }
 }
 
@@ -1280,7 +1280,7 @@ enum OffscreenHiddenLaneRevealCommitGateError {
     FiberRootStore(FiberRootStoreError),
     FiberTopology(FiberTopologyError),
     BeginWork(BeginWorkError),
-    CompleteWork(OffscreenVisibilityTransitionCompleteWorkBlockerError),
+    CompleteWork(Box<OffscreenVisibilityTransitionCompleteWorkBlockerError>),
     RevealCommit(OffscreenRevealCommitMetadataError),
     UpdateQueue(UpdateQueueError),
     ExpectedHostRootWorkInProgress {
@@ -1380,7 +1380,7 @@ impl Error for OffscreenHiddenLaneRevealCommitGateError {
             Self::FiberRootStore(error) => Some(error),
             Self::FiberTopology(error) => Some(error),
             Self::BeginWork(error) => Some(error),
-            Self::CompleteWork(error) => Some(error),
+            Self::CompleteWork(error) => Some(error.as_ref()),
             Self::RevealCommit(error) => Some(error),
             Self::UpdateQueue(error) => Some(error),
             Self::ExpectedHostRootWorkInProgress { .. }
@@ -1419,7 +1419,7 @@ impl From<OffscreenVisibilityTransitionCompleteWorkBlockerError>
     for OffscreenHiddenLaneRevealCommitGateError
 {
     fn from(error: OffscreenVisibilityTransitionCompleteWorkBlockerError) -> Self {
-        Self::CompleteWork(error)
+        Self::CompleteWork(Box::new(error))
     }
 }
 
@@ -2406,7 +2406,7 @@ enum HostRootFunctionComponentUseStateHostChildCommitHandoffError {
     BeginWork(BeginWorkError),
     CompleteWork(HostRootCompleteWorkHandoffError),
     FunctionComponentSingleChild(FunctionComponentSingleChildReconciliationError),
-    FinishedWorkCommitHandoff(HostRootFinishedWorkCommitHandoffErrorForCanary),
+    FinishedWorkCommitHandoff(Box<HostRootFinishedWorkCommitHandoffErrorForCanary>),
     MissingFunctionComponentChild {
         root: FiberRootId,
         host_root_work_in_progress: FiberId,
@@ -2488,7 +2488,7 @@ impl Error for HostRootFunctionComponentUseStateHostChildCommitHandoffError {
             Self::BeginWork(error) => Some(error),
             Self::CompleteWork(error) => Some(error),
             Self::FunctionComponentSingleChild(error) => Some(error),
-            Self::FinishedWorkCommitHandoff(error) => Some(error),
+            Self::FinishedWorkCommitHandoff(error) => Some(error.as_ref()),
             Self::MissingFunctionComponentChild { .. }
             | Self::ExpectedFunctionComponentChild { .. }
             | Self::UnexpectedFunctionComponentSibling { .. }
@@ -2527,7 +2527,7 @@ impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
     for HostRootFunctionComponentUseStateHostChildCommitHandoffError
 {
     fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
-        Self::FinishedWorkCommitHandoff(error)
+        Self::FinishedWorkCommitHandoff(Box::new(error))
     }
 }
 
@@ -2537,7 +2537,7 @@ enum HostRootFunctionComponentUseReducerSingleChildCommitHandoffError {
     CompleteWork(HostRootCompleteWorkHandoffError),
     FunctionComponentRender(FunctionComponentRenderError),
     FunctionComponentSingleChild(FunctionComponentSingleChildReconciliationError),
-    FinishedWorkCommitHandoff(HostRootFinishedWorkCommitHandoffErrorForCanary),
+    FinishedWorkCommitHandoff(Box<HostRootFinishedWorkCommitHandoffErrorForCanary>),
     MissingFunctionComponentChild {
         root: FiberRootId,
         host_root_work_in_progress: FiberId,
@@ -2619,7 +2619,7 @@ impl Error for HostRootFunctionComponentUseReducerSingleChildCommitHandoffError 
             Self::CompleteWork(error) => Some(error),
             Self::FunctionComponentRender(error) => Some(error),
             Self::FunctionComponentSingleChild(error) => Some(error),
-            Self::FinishedWorkCommitHandoff(error) => Some(error),
+            Self::FinishedWorkCommitHandoff(error) => Some(error.as_ref()),
             Self::MissingFunctionComponentChild { .. }
             | Self::ExpectedFunctionComponentChild { .. }
             | Self::UnexpectedFunctionComponentSibling { .. }
@@ -2660,7 +2660,7 @@ impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
     for HostRootFunctionComponentUseReducerSingleChildCommitHandoffError
 {
     fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
-        Self::FinishedWorkCommitHandoff(error)
+        Self::FinishedWorkCommitHandoff(Box::new(error))
     }
 }
 
@@ -2671,10 +2671,10 @@ enum HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffError {
     FunctionComponentRender(FunctionComponentRenderError),
     FunctionComponentSingleChildUpdate(FunctionComponentSingleChildUpdateReconciliationError),
     SingleHostUpdateApply(HostRootSingleHostUpdateApplyRecordErrorForCanary),
-    FinishedWorkCommitHandoff(HostRootFinishedWorkCommitHandoffErrorForCanary),
+    FinishedWorkCommitHandoff(Box<HostRootFinishedWorkCommitHandoffErrorForCanary>),
     CommittedHostUpdateMismatch {
-        expected: HostRootSingleHostUpdateApplyRecordForCanary,
-        actual: HostRootSingleHostUpdateApplyRecordForCanary,
+        expected: Box<HostRootSingleHostUpdateApplyRecordForCanary>,
+        actual: Box<HostRootSingleHostUpdateApplyRecordForCanary>,
     },
     MissingFunctionComponentChild {
         root: FiberRootId,
@@ -2758,7 +2758,7 @@ impl Error for HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffE
             Self::FunctionComponentRender(error) => Some(error),
             Self::FunctionComponentSingleChildUpdate(error) => Some(error),
             Self::SingleHostUpdateApply(error) => Some(error),
-            Self::FinishedWorkCommitHandoff(error) => Some(error),
+            Self::FinishedWorkCommitHandoff(error) => Some(error.as_ref()),
             Self::CommittedHostUpdateMismatch { .. }
             | Self::MissingFunctionComponentChild { .. }
             | Self::ExpectedFunctionComponentChild { .. }
@@ -2808,7 +2808,7 @@ impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
     for HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffError
 {
     fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
-        Self::FinishedWorkCommitHandoff(error)
+        Self::FinishedWorkCommitHandoff(Box::new(error))
     }
 }
 
@@ -2913,6 +2913,10 @@ fn handoff_completed_function_component_single_child_to_test_complete_work(
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "private useState handoff helper mirrors the canary render/commit evidence shape"
+)]
 fn handoff_completed_function_component_use_state_host_child_to_test_complete_work_and_commit(
     store: &mut FiberRootStore<RecordingHost>,
     host: &mut RecordingHost,
@@ -3046,6 +3050,10 @@ fn handoff_completed_function_component_use_state_host_child_to_test_complete_wo
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "private useReducer handoff helper mirrors the canary render/commit evidence shape"
+)]
 fn handoff_completed_function_component_use_reducer_single_child_to_test_complete_work_and_commit(
     store: &mut FiberRootStore<RecordingHost>,
     host: &mut RecordingHost,
@@ -3273,8 +3281,8 @@ fn handoff_completed_function_component_use_reducer_single_host_update_to_commit
     if committed_host_update != pending_host_update {
         return Err(
             HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffError::CommittedHostUpdateMismatch {
-                expected: pending_host_update,
-                actual: committed_host_update,
+                expected: Box::new(pending_host_update),
+                actual: Box::new(committed_host_update),
             },
         );
     }
@@ -3653,6 +3661,10 @@ struct HostRootNestedContextProviderTwoConsumerPropagationGateRequest {
 #[cfg(test)]
 impl HostRootNestedContextProviderTwoConsumerPropagationGateRequest {
     #[must_use]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "test propagation request constructor mirrors the two-provider evidence shape"
+    )]
     const fn new(
         root: FiberRootId,
         host_root_work_in_progress: FiberId,
@@ -4355,7 +4367,7 @@ enum HostRootContextProviderUpdateRenderCommitTraversalError {
     ContextProviderUpdate(ContextProviderUpdateLaneGateError),
     CompleteWork(HostRootCompleteWorkHandoffError),
     ProviderStackRestoration(ContextProviderStackRestorationError),
-    FinishedWorkCommitHandoff(HostRootFinishedWorkCommitHandoffErrorForCanary),
+    FinishedWorkCommitHandoff(Box<HostRootFinishedWorkCommitHandoffErrorForCanary>),
     ProviderStackUnwindAfterCompleteWorkError {
         complete_error: Box<HostRootCompleteWorkHandoffError>,
         unwind_error: Box<ContextProviderStackRestorationError>,
@@ -4433,7 +4445,7 @@ impl Error for HostRootContextProviderUpdateRenderCommitTraversalError {
             Self::ContextProviderUpdate(error) => Some(error),
             Self::CompleteWork(error) => Some(error),
             Self::ProviderStackRestoration(error) => Some(error),
-            Self::FinishedWorkCommitHandoff(error) => Some(error),
+            Self::FinishedWorkCommitHandoff(error) => Some(error.as_ref()),
             Self::ProviderStackUnwindAfterCompleteWorkError { complete_error, .. } => {
                 Some(complete_error.as_ref())
             }
@@ -4494,7 +4506,7 @@ impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
     for HostRootContextProviderUpdateRenderCommitTraversalError
 {
     fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
-        Self::FinishedWorkCommitHandoff(error)
+        Self::FinishedWorkCommitHandoff(Box::new(error))
     }
 }
 
@@ -4505,7 +4517,7 @@ enum HostRootNestedContextProviderUpdateRenderCommitHandoffError {
     NestedContextProvider(Box<NestedContextProviderBeginWorkError>),
     ContextProviderUpdate(ContextProviderUpdateLaneGateError),
     CompleteWork(HostRootCompleteWorkHandoffError),
-    FinishedWorkCommitHandoff(HostRootFinishedWorkCommitHandoffErrorForCanary),
+    FinishedWorkCommitHandoff(Box<HostRootFinishedWorkCommitHandoffErrorForCanary>),
     ContextUpdateCommitHandoff(HostRootContextProviderUpdateCommitHandoffErrorForCanary),
     MissingContextProviderChild {
         root: FiberRootId,
@@ -4563,7 +4575,7 @@ impl Error for HostRootNestedContextProviderUpdateRenderCommitHandoffError {
             Self::NestedContextProvider(error) => Some(error.as_ref()),
             Self::ContextProviderUpdate(error) => Some(error),
             Self::CompleteWork(error) => Some(error),
-            Self::FinishedWorkCommitHandoff(error) => Some(error),
+            Self::FinishedWorkCommitHandoff(error) => Some(error.as_ref()),
             Self::ContextUpdateCommitHandoff(error) => Some(error),
             Self::MissingContextProviderChild { .. }
             | Self::ExpectedContextProviderChild { .. } => None,
@@ -4612,7 +4624,7 @@ impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
     for HostRootNestedContextProviderUpdateRenderCommitHandoffError
 {
     fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
-        Self::FinishedWorkCommitHandoff(error)
+        Self::FinishedWorkCommitHandoff(Box::new(error))
     }
 }
 
