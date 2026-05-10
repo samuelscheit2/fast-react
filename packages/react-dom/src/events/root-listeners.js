@@ -16,9 +16,10 @@ const {
 const {
   createEventListenerWrapperRecordWithPriority
 } = require('./react-dom-event-listener.js');
-
-const IS_CAPTURE_PHASE = 1 << 2;
-const IS_NON_DELEGATED = 1 << 1;
+const {
+  IS_CAPTURE_PHASE,
+  IS_NON_DELEGATED
+} = require('./event-system-flags.js');
 
 function createEventListenerShell(target, domEventName, eventSystemFlags) {
   const wrapperRecord = createEventListenerWrapperRecordWithPriority(

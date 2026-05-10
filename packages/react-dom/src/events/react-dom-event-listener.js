@@ -10,22 +10,34 @@ const {
   getEventPriorityLabel,
   getEventPriorityName
 } = require('./event-priorities.js');
+const {
+  createEventDispatchRecordFromWrapperRecord
+} = require('./plugin-event-system.js');
 
 const DISCRETE_EVENT_WRAPPER = 'discrete';
 const CONTINUOUS_EVENT_WRAPPER = 'continuous';
 const DEFAULT_EVENT_WRAPPER = 'default';
 const EVENT_WRAPPER_RECORD_KIND = 'FastReactDomEventPriorityWrapperRecord';
 
-function dispatchEvent() {
-  return undefined;
+function dispatchEvent(wrapperRecord, nativeEvent) {
+  return createEventDispatchRecordFromWrapperRecord(
+    wrapperRecord,
+    nativeEvent
+  );
 }
 
-function dispatchDiscreteEvent() {
-  return undefined;
+function dispatchDiscreteEvent(wrapperRecord, nativeEvent) {
+  return createEventDispatchRecordFromWrapperRecord(
+    wrapperRecord,
+    nativeEvent
+  );
 }
 
-function dispatchContinuousEvent() {
-  return undefined;
+function dispatchContinuousEvent(wrapperRecord, nativeEvent) {
+  return createEventDispatchRecordFromWrapperRecord(
+    wrapperRecord,
+    nativeEvent
+  );
 }
 
 function createEventListenerWrapper(
@@ -121,19 +133,16 @@ function createInertEventListenerWrapperRecord(
   domEventName,
   eventSystemFlags
 ) {
+  let record;
   const listener = function reactDomEventListenerWrapper(nativeEvent) {
-    return dispatcher(
-      domEventName,
-      eventSystemFlags,
-      targetContainer,
-      nativeEvent
-    );
+    dispatcher(record, nativeEvent);
+    return undefined;
   };
   const priorityRecord = createEventPriorityRecordFromPriority(
     domEventName,
     eventPriority
   );
-  const record = Object.freeze({
+  record = Object.freeze({
     dispatcherName,
     domEventName,
     eventPriority,
