@@ -285,6 +285,169 @@ test("private portal fake-DOM commit handoff records blocked listener and resour
   assert.equal(portalContainer.__mutationLog.length, 0);
 });
 
+test("private portal fake-DOM mount diagnostic admits one explicit HostComponent and HostText child only", () => {
+  const document = createPortalGateDocument("portal-fake-dom-mount");
+  const rootContainer = createPortalGateElement("DIV", document);
+  const portalContainer = createPortalGateElement("SECTION", document);
+  const portalChild = {
+    props: {
+      children: "portal child"
+    },
+    type: "span"
+  };
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    portalBoundaryIdPrefix: "portal-boundary",
+    portalCommitIdPrefix: "portal-commit",
+    portalMountIdPrefix: "portal-mount"
+  });
+  const create = bridge.createClientRoot(rootContainer);
+  const rootSideEffects = bridge.applyCreateRootSideEffects(create);
+  const portal = reactDom.createPortal(
+    portalChild,
+    portalContainer,
+    "portal-key"
+  );
+  const render = bridge.renderContainer(create.handle, portal);
+  const boundary = bridge.createPortalRootBoundary(render);
+  const handoff = bridge.createPortalCommitHandoff(boundary, {
+    pendingChildren: [portalChild]
+  });
+  const mount = bridge.createPortalFakeDomMountDiagnostic(handoff, {
+    explicitChild: portalChild
+  });
+  const hiddenMount =
+    rootBridge.getPrivateRootPortalFakeDomMountPayload(mount);
+  const resourceBoundary =
+    resourceFormGate.recordResourceFormPortalFakeDomMountBlockedRequest(
+      mount
+    );
+
+  assert.equal(
+    mount.kind,
+    "FastReactDomPrivateRootPortalFakeDomMountDiagnosticRecord"
+  );
+  assert.equal(
+    mount.mountStatus,
+    "applied-private-root-portal-fake-dom-mount-diagnostic"
+  );
+  assert.equal(
+    mount.publicMountStatus,
+    "blocked-public-root-portal-mounting"
+  );
+  assert.deepEqual(mount.hostFiberPath, [
+    "HostRoot",
+    "HostPortal",
+    "HostComponent",
+    "HostText"
+  ]);
+  assert.equal(mount.hostComponentType, "span");
+  assert.equal(mount.hostText, "portal child");
+  assert.equal(mount.fakeDomCommitApplied, true);
+  assert.equal(mount.fakeDomPortalMountDiagnostic, true);
+  assert.equal(mount.explicitPortalHostChildMounted, true);
+  assert.equal(mount.portalContainerChildrenReplaced, false);
+  assert.equal(mount.portalChildReconciliation, false);
+  assert.equal(mount.portalMounting, false);
+  assert.equal(mount.publicPortalMounting, false);
+  assert.equal(mount.preparePortalMount, false);
+  assert.equal(mount.nativeExecution, false);
+  assert.equal(mount.reconcilerExecution, false);
+  assert.equal(mount.domMutation, true);
+  assert.equal(mount.publicDomMutation, false);
+  assert.equal(mount.listenerInstallation, false);
+  assert.equal(mount.resourceSideEffects, false);
+  assert.equal(mount.compatibilityClaimed, false);
+  assert.deepEqual(
+    mount.acceptedCapabilities.map((capability) => capability.id),
+    [
+      "portal-explicit-host-component-mount",
+      "portal-explicit-host-text-mount"
+    ]
+  );
+  assert.deepEqual(
+    mount.blockedCapabilities.map((capability) => capability.id),
+    [
+      "portal-public-container-mounting",
+      "portal-child-reconciliation",
+      "portal-container-replacement",
+      "portal-prepare-mount-listeners",
+      "portal-resource-side-effects",
+      "native-execution",
+      "reconciler-execution",
+      "hydration",
+      "events",
+      "compatibility-claims"
+    ]
+  );
+  assert.equal(hiddenMount.explicitChild, portalChild);
+  assert.equal(hiddenMount.hostComponentNode, portalContainer.firstChild);
+  assert.equal(hiddenMount.hostTextNode, hiddenMount.hostComponentNode.firstChild);
+  assert.equal(portalContainer.childNodes.length, 1);
+  assert.equal(portalContainer.firstChild.nodeName, "SPAN");
+  assert.equal(portalContainer.firstChild.textContent, "portal child");
+  assert.equal(portalContainer.textContent, "portal child");
+  assert.deepEqual(
+    document.__mutationLog.map((entry) => entry.type),
+    ["createElement", "createTextNode"]
+  );
+  assert.deepEqual(
+    portalContainer.__mutationLog.map((entry) => entry.type),
+    ["appendChild"]
+  );
+  assert.equal(portalContainer.__registrations.length, 0);
+  assert.equal(listenerRegistry.hasListeningMarker(portalContainer), false);
+
+  assert.equal(
+    resourceBoundary.kind,
+    "FastReactDomResourceFormPortalFakeDomMountBoundaryRecord"
+  );
+  assert.equal(
+    resourceBoundary.resourceSideEffectStatus,
+    resourceFormGate.privatePortalFakeDomMountResourceBlockedStatus
+  );
+  assert.equal(
+    resourceBoundary.rootBridgeBoundary.fakeDomCommitApplied,
+    true
+  );
+  assert.equal(
+    resourceBoundary.rootBridgeBoundary.resourceSideEffects,
+    false
+  );
+  assert.equal(resourceBoundary.sideEffects.portalContainerMutated, true);
+  assert.equal(
+    resourceBoundary.sideEffects.portalFakeDomMountDiagnosticApplied,
+    true
+  );
+  assert.equal(resourceBoundary.sideEffects.resourcesDispatched, false);
+  assert.equal(resourceBoundary.sideEffects.sourceAdaptersInvoked, false);
+  assert.equal(resourceBoundary.sideEffects.portalListenersInstalled, false);
+  assert.equal(
+    resourceFormGate.isResourceFormPortalFakeDomMountBlockedRecord(
+      resourceBoundary
+    ),
+    true
+  );
+
+  assert.throws(() => bridge.createPortalFakeDomMountDiagnostic(handoff), {
+    code: "FAST_REACT_DOM_INVALID_PORTAL_FAKE_DOM_MOUNT_RECORD"
+  });
+  assert.throws(
+    () =>
+      resourceFormGate.recordResourceFormPortalFakeDomMountBlockedRequest({
+        ...mount,
+        compatibilityClaimed: true
+      }),
+    {
+      code: resourceFormGate.rootBoundaryInvalidPortalCommitHandoffCode
+    }
+  );
+
+  bridge.revertCreateRootSideEffects(rootSideEffects);
+  assert.equal(rootContainer.__registrations.length, 0);
+  assert.equal(document.__registrations.length, 0);
+  assert.equal(portalContainer.__registrations.length, 0);
+});
+
 test("portal root-render gate sees accepted reconciler fail-closed diagnostics", () => {
   const boundary = inspectReactDomPortalRootRenderBlockedBoundary();
   const diagnostics = boundary.reconcilerDiagnostics;
@@ -403,6 +566,22 @@ function createPortalGateDocument(label) {
   document.defaultView = createPortalGateEventTarget({
     label: `${label}-window`
   });
+  document.createElement = function createFakeElement(tagName) {
+    const nodeName = String(tagName).toUpperCase();
+    this.__mutationLog.push({
+      nodeName,
+      type: "createElement"
+    });
+    return createPortalGateElement(nodeName, this);
+  };
+  document.createTextNode = function createFakeTextNode(text) {
+    const value = String(text);
+    this.__mutationLog.push({
+      type: "createTextNode",
+      value
+    });
+    return createPortalGateText(value, this);
+  };
   return document;
 }
 
@@ -417,8 +596,10 @@ function createPortalGateElement(nodeName, ownerDocument) {
 function createPortalGateEventTarget(fields) {
   const target = {
     ...fields,
+    childNodes: [],
     __mutationLog: [],
     __registrations: [],
+    parentNode: null,
     addEventListener(type, listener, options) {
       this.__registrations.push({
         listener,
@@ -438,26 +619,128 @@ function createPortalGateEventTarget(fields) {
       }
     },
     appendChild(child) {
+      detachPortalGateNode(child);
+      this.childNodes.push(child);
+      child.parentNode = this;
       this.__mutationLog.push({ child, type: "appendChild" });
+      return child;
     },
     insertBefore(child, beforeChild) {
+      detachPortalGateNode(child);
+      const beforeIndex = this.childNodes.indexOf(beforeChild);
+      if (beforeIndex === -1) {
+        this.childNodes.push(child);
+      } else {
+        this.childNodes.splice(beforeIndex, 0, child);
+      }
+      child.parentNode = this;
       this.__mutationLog.push({ beforeChild, child, type: "insertBefore" });
+      return child;
     },
     removeChild(child) {
+      const childIndex = this.childNodes.indexOf(child);
+      if (childIndex !== -1) {
+        this.childNodes.splice(childIndex, 1);
+        child.parentNode = null;
+      }
       this.__mutationLog.push({ child, type: "removeChild" });
+      return child;
     }
   };
+  Object.defineProperties(target, {
+    firstChild: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return this.childNodes[0] || null;
+      }
+    },
+    lastChild: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return this.childNodes[this.childNodes.length - 1] || null;
+      }
+    }
+  });
   let textContent = "";
   Object.defineProperty(target, "textContent", {
     configurable: true,
     enumerable: true,
     get() {
+      if (this.childNodes.length > 0) {
+        return this.childNodes.map((child) => child.textContent).join("");
+      }
       return textContent;
     },
     set(value) {
+      for (const child of [...this.childNodes]) {
+        detachPortalGateNode(child);
+      }
       textContent = value;
       this.__mutationLog.push({ type: "textContent", value });
     }
   });
   return target;
+}
+
+function createPortalGateText(text, ownerDocument) {
+  const node = createPortalGateEventTarget({
+    nodeName: "#text",
+    nodeType: domContainer.TEXT_NODE,
+    ownerDocument
+  });
+  let value = String(text);
+  Object.defineProperties(node, {
+    data: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return value;
+      },
+      set(nextValue) {
+        this.nodeValue = nextValue;
+      }
+    },
+    nodeValue: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return value;
+      },
+      set(nextValue) {
+        value = String(nextValue);
+        this.__mutationLog.push({
+          type: "nodeValue",
+          value
+        });
+      }
+    },
+    textContent: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return value;
+      },
+      set(nextValue) {
+        this.nodeValue = nextValue;
+      }
+    }
+  });
+  return node;
+}
+
+function detachPortalGateNode(child) {
+  if (child == null || typeof child !== "object" || child.parentNode == null) {
+    return;
+  }
+
+  const siblings = child.parentNode.childNodes;
+  if (Array.isArray(siblings)) {
+    const index = siblings.indexOf(child);
+    if (index !== -1) {
+      siblings.splice(index, 1);
+    }
+  }
+  child.parentNode = null;
 }

@@ -14,6 +14,8 @@ const resourceFormRootBoundaryRecordType =
   'fast.react_dom.resource_form_root_boundary_record';
 const resourceFormPortalCommitBoundaryRecordType =
   'fast.react_dom.resource_form_portal_commit_boundary_record';
+const resourceFormPortalFakeDomMountBoundaryRecordType =
+  'fast.react_dom.resource_form_portal_fake_dom_mount_boundary_record';
 const publicRootFacadeBlockedGateId =
   'react-dom-root-public-facade-blocked-gate-1';
 const publicRootFacadeBlockedStatus =
@@ -26,6 +28,8 @@ const privateControlledValueTrackerBlockedStatus =
   'blocked-private-controlled-value-tracker-metadata-only';
 const privatePortalCommitResourceBlockedStatus =
   'blocked-private-portal-commit-resource-side-effects';
+const privatePortalFakeDomMountResourceBlockedStatus =
+  'blocked-private-portal-fake-dom-mount-resource-side-effects';
 const rootBoundaryInvalidRecordCode =
   'FAST_REACT_DOM_RESOURCE_FORM_ROOT_BOUNDARY_INVALID_RECORD';
 const rootBoundaryInvalidPortalCommitHandoffCode =
@@ -37,6 +41,7 @@ const rootBoundaryInvalidPublicMetadataCode =
 
 const boundaryRecordPayloads = new WeakMap();
 const portalCommitBoundaryRecordPayloads = new WeakMap();
+const portalFakeDomMountBoundaryRecordPayloads = new WeakMap();
 
 const rootBlockedFlagFields = freezeArray([
   'nativeExecution',
@@ -69,6 +74,16 @@ const portalCommitResourceSideEffects = freezeRecord({
   ...rootBoundarySideEffects,
   portalContainerMutated: false,
   portalContainerChildrenReplaced: false,
+  portalFakeDomMountDiagnosticApplied: false,
+  portalPrepareMountCalled: false,
+  portalListenersInstalled: false
+});
+
+const portalFakeDomMountResourceSideEffects = freezeRecord({
+  ...rootBoundarySideEffects,
+  portalContainerMutated: true,
+  portalContainerChildrenReplaced: false,
+  portalFakeDomMountDiagnosticApplied: true,
   portalPrepareMountCalled: false,
   portalListenersInstalled: false
 });
@@ -165,6 +180,47 @@ function recordResourceFormPortalCommitBlockedRequest(portalCommitHandoff) {
   return payload;
 }
 
+function recordResourceFormPortalFakeDomMountBlockedRequest(mountRecord) {
+  assertPortalFakeDomMountDiagnosticIsResourceBlocked(mountRecord);
+
+  const payload = freezeRecord({
+    $$typeof: resourceFormPortalFakeDomMountBoundaryRecordType,
+    kind: 'FastReactDomResourceFormPortalFakeDomMountBoundaryRecord',
+    schemaVersion: resourceFormRootBridgeGateSchemaVersion,
+    gateId: resourceFormRootBridgeBlockedGateId,
+    compatibilityTarget,
+    status: internalsGate.unsupportedStatus,
+    unsupportedCode: unimplementedCode,
+    resourceSideEffectStatus: privatePortalFakeDomMountResourceBlockedStatus,
+    portalFakeDomMountDiagnosticId: mountRecord.mountDiagnosticId,
+    portalFakeDomMountStatus: mountRecord.mountStatus,
+    portalPublicMountStatus: mountRecord.publicMountStatus,
+    portalCommitHandoffId: mountRecord.sourceCommitHandoffId,
+    portalCommitStatus: mountRecord.sourceCommitStatus,
+    portalBoundaryId: mountRecord.sourceBoundaryId,
+    sourceRequestId: mountRecord.sourceRequestId,
+    sourceRequestSequence: mountRecord.sourceRequestSequence,
+    sourceRequestType: mountRecord.sourceRequestType,
+    rootId: mountRecord.rootId,
+    rootKind: mountRecord.rootKind,
+    rootTag: mountRecord.rootTag,
+    rootBridgeBoundary:
+      describePrivatePortalFakeDomMountRootBridgeBoundary(mountRecord),
+    privateResourceDispatcherBoundary:
+      describePrivateResourceDispatcherBoundary('resource-hint'),
+    sourceAdapterBoundary: describeSourceAdapterBoundary('resource-hint'),
+    sideEffects: portalFakeDomMountResourceSideEffects
+  });
+
+  portalFakeDomMountBoundaryRecordPayloads.set(
+    payload,
+    freezeRecord({
+      mountRecord
+    })
+  );
+  return payload;
+}
+
 function getResourceFormRootBridgeBlockedRecordPayload(record) {
   return boundaryRecordPayloads.get(record) || null;
 }
@@ -179,6 +235,14 @@ function getResourceFormPortalCommitBlockedRecordPayload(record) {
 
 function isResourceFormPortalCommitBlockedRecord(value) {
   return portalCommitBoundaryRecordPayloads.has(value);
+}
+
+function getResourceFormPortalFakeDomMountBlockedRecordPayload(record) {
+  return portalFakeDomMountBoundaryRecordPayloads.get(record) || null;
+}
+
+function isResourceFormPortalFakeDomMountBlockedRecord(value) {
+  return portalFakeDomMountBoundaryRecordPayloads.has(value);
 }
 
 function describePublicRootBoundary(options) {
@@ -300,6 +364,41 @@ function describePrivatePortalCommitRootBridgeBoundary(portalCommitHandoff) {
     nativeExecution: false,
     reconcilerExecution: false,
     domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    resourceSideEffects: false,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false
+  });
+}
+
+function describePrivatePortalFakeDomMountRootBridgeBoundary(mountRecord) {
+  return freezeRecord({
+    gateStatus: privateRootBridgeRecordOnlyStatus,
+    admittedPortalFakeDomMountDiagnostic: true,
+    mountStatus: mountRecord.mountStatus,
+    publicMountStatus: mountRecord.publicMountStatus,
+    portalCommitHandoffStatus: mountRecord.sourceCommitHandoffStatus,
+    portalCommitStatus: mountRecord.sourceCommitStatus,
+    portalContainerOwnershipStatus:
+      mountRecord.portalContainerOwnership.ownershipStatus,
+    sourceRequestType: mountRecord.sourceRequestType,
+    rootKind: mountRecord.rootKind,
+    rootTag: mountRecord.rootTag,
+    blockedCapabilities: summarizeBlockedCapabilities(
+      mountRecord.blockedCapabilities,
+      rootBridge.ROOT_BRIDGE_PORTAL_FAKE_DOM_MOUNT_BLOCKED_CAPABILITIES
+    ),
+    fakeDomCommitApplied: true,
+    fakeDomPortalMountDiagnostic: true,
+    explicitPortalHostChildMounted: true,
+    portalContainerChildrenReplaced: false,
+    preparePortalMount: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: true,
+    publicDomMutation: false,
     markerWrites: false,
     listenerInstallation: false,
     resourceSideEffects: false,
@@ -471,6 +570,55 @@ function assertPortalCommitHandoffIsRecordOnly(portalCommitHandoff) {
   );
 }
 
+function assertPortalFakeDomMountDiagnosticIsResourceBlocked(mountRecord) {
+  if (
+    !rootBridge.isPrivateRootPortalFakeDomMountRecord(mountRecord) ||
+    mountRecord.mountStatus !==
+      rootBridge.ROOT_BRIDGE_PORTAL_FAKE_DOM_MOUNT_APPLIED ||
+    mountRecord.publicMountStatus !==
+      rootBridge.ROOT_BRIDGE_PORTAL_PUBLIC_MOUNT_BLOCKED ||
+    mountRecord.rootKind !== rootBridge.CLIENT_ROOT_KIND ||
+    mountRecord.rootTag !== rootBridge.CONCURRENT_ROOT_TAG ||
+    mountRecord.portalContainerOwnership?.ownershipStatus !==
+      rootBridge.ROOT_BRIDGE_PORTAL_CONTAINER_OWNERSHIP_VALIDATED ||
+    mountRecord.listenerSideEffects?.preparePortalMount !== false ||
+    mountRecord.listenerSideEffects?.listenerInstallation !== false
+  ) {
+    throwInvalidPortalCommitHandoff();
+  }
+
+  if (
+    mountRecord.nativeExecution !== false ||
+    mountRecord.reconcilerExecution !== false ||
+    mountRecord.domMutation !== true ||
+    mountRecord.publicDomMutation !== false ||
+    mountRecord.markerWrites !== false ||
+    mountRecord.listenerInstallation !== false ||
+    mountRecord.hydration !== false ||
+    mountRecord.eventDispatch !== false ||
+    mountRecord.compatibilityClaimed !== false
+  ) {
+    throwInvalidPortalCommitHandoff();
+  }
+
+  if (
+    mountRecord.fakeDomCommitApplied !== true ||
+    mountRecord.fakeDomPortalMountDiagnostic !== true ||
+    mountRecord.explicitPortalHostChildMounted !== true ||
+    mountRecord.portalContainerChildrenReplaced !== false ||
+    mountRecord.preparePortalMount !== false ||
+    mountRecord.resourceSideEffects !== false ||
+    mountRecord.compatibilityClaimed !== false
+  ) {
+    throwInvalidPortalCommitHandoff();
+  }
+
+  assertBlockedCapabilities(
+    mountRecord.blockedCapabilities,
+    rootBridge.ROOT_BRIDGE_PORTAL_FAKE_DOM_MOUNT_BLOCKED_CAPABILITIES
+  );
+}
+
 function assertBlockedCapabilities(
   capabilities,
   expectedCapabilities = rootBridge.ROOT_BRIDGE_BLOCKED_CAPABILITIES
@@ -574,19 +722,25 @@ module.exports = Object.assign({}, internalsGate, {
   describeResourceFormRootBridgeBlockedGate,
   describePrivateResourceDispatcherBoundary,
   getResourceFormPortalCommitBlockedRecordPayload,
+  getResourceFormPortalFakeDomMountBlockedRecordPayload,
   getResourceFormRootBridgeBlockedRecordPayload,
   isResourceFormPortalCommitBlockedRecord,
+  isResourceFormPortalFakeDomMountBlockedRecord,
   isResourceFormRootBridgeBlockedRecord,
   privatePortalCommitResourceBlockedStatus,
+  privatePortalFakeDomMountResourceBlockedStatus,
   privateControlledValueTrackerBlockedStatus,
   privateRootBridgeRecordOnlyStatus,
   privateSourceAdapterBlockedStatus,
   portalCommitResourceSideEffects,
+  portalFakeDomMountResourceSideEffects,
   publicRootFacadeBlockedGateId,
   publicRootFacadeBlockedStatus,
   recordResourceFormPortalCommitBlockedRequest,
+  recordResourceFormPortalFakeDomMountBlockedRequest,
   recordResourceFormRootBridgeBlockedRequest,
   resourceFormPortalCommitBoundaryRecordType,
+  resourceFormPortalFakeDomMountBoundaryRecordType,
   resourceFormRootBoundaryRecordType,
   resourceFormRootBridgeBlockedGateId,
   resourceFormRootBridgeGateSchemaVersion,
