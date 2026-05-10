@@ -20,7 +20,9 @@ use fast_react_host_config::{
 use crate::host_nodes::{
     HostNodeMetadata, HostNodeScope, HostNodeStore, HostNodeValidationError, HostNodeViolation,
 };
-use crate::root_commit::{HostRootMutationApplyRecord, HostRootMutationApplyRecordKind};
+use crate::root_commit::{
+    HostRootDeletionCleanupRecord, HostRootMutationApplyRecord, HostRootMutationApplyRecordKind,
+};
 use crate::test_support::{
     FakeHostFiberToken, FakeInstance, FakeTextInstance, RecordingHost, TestHostElement,
     TestHostNode, TestHostText, TestHostTree,
@@ -721,6 +723,92 @@ impl TestHostRootMutationApplyResult {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TestHostRootDeletionCleanupAction {
+    DetachDeletedInstance,
+    InvalidateDeletedText,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TestHostRootDeletionCleanupStatus {
+    Applied(TestHostRootDeletionCleanupAction),
+    RecordedOnly,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct TestHostRootDeletionCleanupApplyRecord {
+    cleanup: HostRootDeletionCleanupRecord,
+    status: TestHostRootDeletionCleanupStatus,
+    previous_metadata: Option<HostNodeMetadata>,
+}
+
+impl TestHostRootDeletionCleanupApplyRecord {
+    #[must_use]
+    const fn cleanup(self) -> HostRootDeletionCleanupRecord {
+        self.cleanup
+    }
+
+    #[must_use]
+    const fn status(self) -> TestHostRootDeletionCleanupStatus {
+        self.status
+    }
+
+    #[must_use]
+    const fn previous_metadata(self) -> Option<HostNodeMetadata> {
+        self.previous_metadata
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TestHostRootDeletionCleanupApplyResult {
+    root: FiberRootId,
+    finished_work: FiberId,
+    records: Vec<TestHostRootDeletionCleanupApplyRecord>,
+}
+
+impl TestHostRootDeletionCleanupApplyResult {
+    #[must_use]
+    const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    const fn finished_work(&self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    fn records(&self) -> &[TestHostRootDeletionCleanupApplyRecord] {
+        &self.records
+    }
+
+    #[must_use]
+    fn applied_record_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| {
+                matches!(
+                    record.status(),
+                    TestHostRootDeletionCleanupStatus::Applied(_)
+                )
+            })
+            .count()
+    }
+
+    #[must_use]
+    fn detached_instance_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| {
+                record.status()
+                    == TestHostRootDeletionCleanupStatus::Applied(
+                        TestHostRootDeletionCleanupAction::DetachDeletedInstance,
+                    )
+            })
+            .count()
+    }
+}
+
 fn apply_test_host_root_commit_mutations(
     store: &mut FiberRootStore<RecordingHost>,
     host: &mut RecordingHost,
@@ -755,6 +843,120 @@ fn apply_test_host_root_commit_mutations(
         finished_work: commit.finished_work(),
         records,
     })
+}
+
+fn apply_test_host_root_deletion_cleanup(
+    store: &FiberRootStore<RecordingHost>,
+    host: &mut RecordingHost,
+    commit: &HostRootCommitRecord,
+    detached_hosts: &mut DetachedHostRecords,
+) -> Result<TestHostRootDeletionCleanupApplyResult, HostWorkError> {
+    let root = store.root(commit.root())?;
+    if root.current() != commit.current() {
+        return Err(HostWorkError::CommitCurrentMismatch {
+            root: commit.root(),
+            expected: commit.current(),
+            actual: root.current(),
+        });
+    }
+
+    let mut records = Vec::new();
+    for &cleanup in commit.host_node_deletion_cleanup_log().records() {
+        let (status, previous_metadata) =
+            apply_test_host_root_deletion_cleanup_record(store, host, cleanup, detached_hosts)?;
+        records.push(TestHostRootDeletionCleanupApplyRecord {
+            cleanup,
+            status,
+            previous_metadata,
+        });
+    }
+
+    Ok(TestHostRootDeletionCleanupApplyResult {
+        root: commit.root(),
+        finished_work: commit.finished_work(),
+        records,
+    })
+}
+
+fn apply_test_host_root_deletion_cleanup_record(
+    store: &FiberRootStore<RecordingHost>,
+    host: &mut RecordingHost,
+    cleanup: HostRootDeletionCleanupRecord,
+    detached_hosts: &mut DetachedHostRecords,
+) -> Result<(TestHostRootDeletionCleanupStatus, Option<HostNodeMetadata>), HostWorkError> {
+    if cleanup.state_node().is_none() {
+        return Ok((TestHostRootDeletionCleanupStatus::RecordedOnly, None));
+    }
+
+    store.host_tokens().validate(
+        cleanup.token(),
+        cleanup.root(),
+        cleanup.fiber(),
+        cleanup.token_phase(),
+        cleanup.token_target(),
+    )?;
+
+    match cleanup.token_target() {
+        HostFiberTokenTarget::Instance => {
+            let previous_metadata =
+                apply_deleted_instance_cleanup_record(host, cleanup, detached_hosts)?;
+            Ok((
+                TestHostRootDeletionCleanupStatus::Applied(
+                    TestHostRootDeletionCleanupAction::DetachDeletedInstance,
+                ),
+                Some(previous_metadata),
+            ))
+        }
+        HostFiberTokenTarget::TextInstance => {
+            let previous_metadata = apply_deleted_text_cleanup_record(cleanup, detached_hosts)?;
+            Ok((
+                TestHostRootDeletionCleanupStatus::Applied(
+                    TestHostRootDeletionCleanupAction::InvalidateDeletedText,
+                ),
+                Some(previous_metadata),
+            ))
+        }
+        HostFiberTokenTarget::HydratableInstance
+        | HostFiberTokenTarget::ActivityBoundary
+        | HostFiberTokenTarget::SuspenseBoundary => {
+            Ok((TestHostRootDeletionCleanupStatus::RecordedOnly, None))
+        }
+    }
+}
+
+fn apply_deleted_instance_cleanup_record(
+    host: &mut RecordingHost,
+    cleanup: HostRootDeletionCleanupRecord,
+    detached_hosts: &mut DetachedHostRecords,
+) -> Result<HostNodeMetadata, HostWorkError> {
+    let scope = detached_hosts.scope(cleanup.state_node(), HostFiberTokenTarget::Instance)?;
+    let instance = detached_hosts
+        .nodes
+        .instance(cleanup.state_node(), scope)?
+        .clone();
+    let fake_token = FakeHostFiberToken(cleanup.token().raw());
+    host.detach_deleted_instance(
+        HostFiberTokenRef::new(&fake_token, cleanup.token_phase(), cleanup.token_target()),
+        instance,
+    )?;
+    Ok(detached_hosts.nodes.invalidate_deleted_instance(
+        cleanup.state_node(),
+        cleanup.root(),
+        cleanup.fiber(),
+    )?)
+}
+
+fn apply_deleted_text_cleanup_record(
+    cleanup: HostRootDeletionCleanupRecord,
+    detached_hosts: &mut DetachedHostRecords,
+) -> Result<HostNodeMetadata, HostWorkError> {
+    let scope = detached_hosts.scope(cleanup.state_node(), HostFiberTokenTarget::TextInstance)?;
+    detached_hosts.nodes.text(cleanup.state_node(), scope)?;
+    Ok(detached_hosts.nodes.invalidate_deleted_text(
+        cleanup.state_node(),
+        cleanup.root(),
+        cleanup.fiber(),
+    )?)
 }
 
 fn apply_test_host_root_mutation_record(
@@ -1835,8 +2037,9 @@ mod tests {
     use super::*;
     use crate::commit_finished_host_root;
     use crate::host_nodes::HostNodeViolation;
-    use crate::root_commit::HostRootPlacementSiblingStatus;
+    use crate::root_commit::{HostRootPlacementSiblingStatus, HostRootRefDetachReason};
     use crate::test_support::{FakeContainer, FakeHostChild};
+    use fast_react_core::RefHandle;
 
     fn root_store() -> (FiberRootStore<RecordingHost>, FiberRootId) {
         let mut store = FiberRootStore::<RecordingHost>::new();
@@ -2250,6 +2453,38 @@ mod tests {
         store
             .fiber_arena_mut()
             .mark_child_for_deletion(work_parent, current_text)
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root, &[work_parent])
+            .unwrap();
+        complete_host_root(store, host_root).unwrap();
+        work_parent
+    }
+
+    fn delete_host_component_under_host_parent_for_commit(
+        store: &mut FiberRootStore<RecordingHost>,
+        host_root: FiberId,
+        current_parent: FiberId,
+        current_component: FiberId,
+    ) -> FiberId {
+        let parent_props = store
+            .fiber_arena()
+            .get(current_parent)
+            .unwrap()
+            .memoized_props();
+        let work_parent = store
+            .fiber_arena_mut()
+            .create_work_in_progress(current_parent, parent_props)
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(work_parent).unwrap();
+            node.set_lanes(Lanes::NO);
+            node.set_memoized_props(parent_props);
+        }
+        store
+            .fiber_arena_mut()
+            .mark_child_for_deletion(work_parent, current_component)
             .unwrap();
         store
             .fiber_arena_mut()
@@ -4010,6 +4245,235 @@ mod tests {
             host.operations()
                 .ends_with(&["append_child_to_container", "remove_child"])
         );
+    }
+
+    #[test]
+    fn host_work_applies_host_component_subtree_deletion_cleanup_with_ref_evidence() {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let create_render = render_test_root(&mut store, root_id, RootElementHandle::from_raw(84));
+        let (current_outer, current_inner, current_text) =
+            attach_detached_nested_root_element_with_text_for_commit(
+                &mut store,
+                &mut host,
+                &mut detached_hosts,
+                root_id,
+                create_render.finished_work(),
+                "deleted subtree",
+            );
+        let outer_state_node = store.fiber_arena().get(current_outer).unwrap().state_node();
+        let inner_state_node = store.fiber_arena().get(current_inner).unwrap().state_node();
+        let text_state_node = store.fiber_arena().get(current_text).unwrap().state_node();
+        let inner_host_child =
+            FakeHostChild::Instance(detached_hosts.instance(inner_state_node).unwrap().id());
+        let create_commit = commit_finished_host_root(&mut store, create_render).unwrap();
+        apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &create_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        let deleted_ref = RefHandle::from_raw(9_500);
+        store
+            .fiber_arena_mut()
+            .get_mut(current_inner)
+            .unwrap()
+            .set_ref_handle(deleted_ref);
+
+        update_container(&mut store, root_id, RootElementHandle::from_raw(85), None).unwrap();
+        let delete_render =
+            render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let work_outer = delete_host_component_under_host_parent_for_commit(
+            &mut store,
+            delete_render.finished_work(),
+            current_outer,
+            current_inner,
+        );
+        let delete_commit = commit_finished_host_root(&mut store, delete_render).unwrap();
+        let operations_before_apply = host.operations();
+        let mutation_apply = apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &delete_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+        let cleanup_apply = apply_test_host_root_deletion_cleanup(
+            &store,
+            &mut host,
+            &delete_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        assert_eq!(mutation_apply.records().len(), 1);
+        assert_eq!(mutation_apply.records()[0].mutation().parent(), work_outer);
+        assert_eq!(
+            mutation_apply.records()[0].mutation().parent_state_node(),
+            outer_state_node
+        );
+        assert_eq!(
+            mutation_apply.records()[0].mutation().fiber(),
+            current_inner
+        );
+        assert_eq!(
+            mutation_apply.records()[0].mutation().state_node(),
+            inner_state_node
+        );
+        assert_eq!(
+            mutation_apply.records()[0].mutation().kind(),
+            HostRootMutationApplyRecordKind::RemoveDeletedFromHostParent
+        );
+        assert_eq!(
+            mutation_apply.records()[0].status(),
+            TestHostRootMutationApplyStatus::Applied(TestHostRootMutationHostCall::RemoveChild)
+        );
+
+        assert_eq!(cleanup_apply.root(), root_id);
+        assert_eq!(cleanup_apply.finished_work(), delete_commit.finished_work());
+        assert_eq!(cleanup_apply.records().len(), 2);
+        assert_eq!(cleanup_apply.applied_record_count(), 2);
+        assert_eq!(cleanup_apply.detached_instance_count(), 1);
+        assert_eq!(cleanup_apply.records()[0].cleanup().fiber(), current_text);
+        assert_eq!(
+            cleanup_apply.records()[0].cleanup().token_target(),
+            HostFiberTokenTarget::TextInstance
+        );
+        assert_eq!(
+            cleanup_apply.records()[0].status(),
+            TestHostRootDeletionCleanupStatus::Applied(
+                TestHostRootDeletionCleanupAction::InvalidateDeletedText
+            )
+        );
+        assert_eq!(
+            cleanup_apply.records()[0]
+                .previous_metadata()
+                .unwrap()
+                .fiber_id(),
+            current_text
+        );
+        assert_eq!(
+            cleanup_apply.records()[0]
+                .previous_metadata()
+                .unwrap()
+                .target(),
+            HostFiberTokenTarget::TextInstance
+        );
+        assert_eq!(cleanup_apply.records()[1].cleanup().fiber(), current_inner);
+        assert_eq!(
+            cleanup_apply.records()[1].cleanup().token_target(),
+            HostFiberTokenTarget::Instance
+        );
+        assert_eq!(
+            cleanup_apply.records()[1].status(),
+            TestHostRootDeletionCleanupStatus::Applied(
+                TestHostRootDeletionCleanupAction::DetachDeletedInstance
+            )
+        );
+        assert_eq!(
+            cleanup_apply.records()[1]
+                .previous_metadata()
+                .unwrap()
+                .fiber_id(),
+            current_inner
+        );
+        assert_eq!(
+            cleanup_apply.records()[1]
+                .previous_metadata()
+                .unwrap()
+                .target(),
+            HostFiberTokenTarget::Instance
+        );
+
+        assert!(
+            !detached_hosts
+                .text_metadata(text_state_node)
+                .unwrap()
+                .is_active()
+        );
+        assert!(
+            !detached_hosts
+                .instance_metadata(inner_state_node)
+                .unwrap()
+                .is_active()
+        );
+        assert_eq!(
+            detached_hosts
+                .nodes
+                .text(
+                    text_state_node,
+                    detached_hosts
+                        .scope(text_state_node, HostFiberTokenTarget::TextInstance)
+                        .unwrap()
+                )
+                .unwrap_err()
+                .violation(),
+            HostNodeViolation::Stale
+        );
+        assert_eq!(
+            detached_hosts
+                .nodes
+                .instance(
+                    inner_state_node,
+                    detached_hosts
+                        .scope(inner_state_node, HostFiberTokenTarget::Instance)
+                        .unwrap()
+                )
+                .unwrap_err()
+                .violation(),
+            HostNodeViolation::Stale
+        );
+        assert!(
+            detached_hosts
+                .instance(outer_state_node)
+                .unwrap()
+                .children()
+                .contains(&inner_host_child)
+        );
+
+        let refs = delete_commit.ref_commit_metadata();
+        assert_eq!(refs.attach().len(), 0);
+        assert_eq!(refs.detach().len(), 1);
+        assert_eq!(refs.detach()[0].fiber(), current_inner);
+        assert_eq!(refs.detach()[0].ref_handle(), deleted_ref);
+        assert_eq!(
+            refs.detach()[0].detach_reason(),
+            Some(HostRootRefDetachReason::Deleted)
+        );
+        assert_eq!(
+            refs.detach()[0].token_phase(),
+            HostFiberTokenPhase::Deletion
+        );
+        assert_eq!(
+            refs.detach()[0].token_target(),
+            HostFiberTokenTarget::Instance
+        );
+        store
+            .host_tokens()
+            .validate(
+                refs.detach()[0].token(),
+                refs.detach()[0].root(),
+                refs.detach()[0].fiber(),
+                refs.detach()[0].token_phase(),
+                refs.detach()[0].token_target(),
+            )
+            .unwrap();
+
+        let gate = delete_commit.dom_ref_callback_commit_gate();
+        assert_eq!(gate.len(), 1);
+        assert_eq!(gate.records()[0].fiber(), current_inner);
+        assert_eq!(gate.records()[0].token(), refs.detach()[0].token());
+        assert!(!gate.callback_refs_invoked());
+        assert!(!gate.object_refs_mutated());
+        assert!(!gate.react_dom_ref_compatibility_claimed());
+
+        let mut expected_operations = operations_before_apply;
+        expected_operations.push("remove_child");
+        expected_operations.push("detach_deleted_instance");
+        assert_eq!(host.operations(), expected_operations);
     }
 
     #[test]
