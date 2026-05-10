@@ -922,6 +922,368 @@ test("scheduler mock private diagnostics drain expired callbacks and continuatio
   }
 });
 
+test("scheduler mock private diagnostics record yields, paint, and continuation order", () => {
+  const reactGate = loadFreshWorkspaceModule(privateActDispatcherGateModule);
+
+  for (const nodeEnv of ["development", "production"]) {
+    const Scheduler = loadFreshSchedulerMock(nodeEnv);
+    const diagnostics = readSchedulerMockPrivateActQueueFlushDiagnostics(
+      Scheduler,
+      "unstable_flushNumberOfYields"
+    );
+    assertPrivateActQueueFlushDiagnostics(diagnostics, nodeEnv);
+
+    Scheduler.reset();
+    assert.deepEqual(
+      diagnostics.describeMockSchedulerYieldPaintState(),
+      {
+        status: "mock-scheduler-yield-paint-state-for-diagnostics",
+        now: 0,
+        pendingWork: false,
+        yieldedValues: [],
+        yieldedValueCount: 0,
+        expectedNumberOfYields: -1,
+        didStop: false,
+        needsPaint: false,
+        shouldYieldForPaint: false,
+        recordsMockSchedulerYieldedValues: true,
+        recordsMockSchedulerRequestPaint: true,
+        recordsMockSchedulerContinuationOrdering: true,
+        drainsPublicReactActQueue: false,
+        publicSchedulerTimingCompatibilityClaimed: false,
+        publicReactActCompatibilityClaimed: false
+      },
+      nodeEnv
+    );
+
+    const yieldEvents = [];
+    const createCallback = (label, continuation = null) =>
+      reactGate.createInternalActQueueTestCallback(
+        (didTimeout) => {
+          yieldEvents.push([
+            label,
+            didTimeout,
+            Scheduler.unstable_getCurrentPriorityLevel(),
+            Scheduler.unstable_now()
+          ]);
+          Scheduler.log(label);
+          return continuation;
+        },
+        { label }
+      );
+
+    const normalContinuation = createCallback("normal-continuation");
+    const normalStart = createCallback(
+      "normal-start",
+      normalContinuation
+    );
+    const low = createCallback("low");
+
+    Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_NormalPriority,
+      normalStart
+    );
+    Scheduler.unstable_scheduleCallback(Scheduler.unstable_LowPriority, low);
+
+    const firstYieldReport =
+      diagnostics.flushNumberOfYieldsForDiagnostics(1);
+    assert.equal(
+      firstYieldReport.status,
+      "flushed-number-of-yields-for-diagnostics",
+      nodeEnv
+    );
+    assert.equal(firstYieldReport.count, 1, nodeEnv);
+    assert.equal(firstYieldReport.flushReturnedUndefined, true, nodeEnv);
+    assert.equal(firstYieldReport.pendingBefore, true, nodeEnv);
+    assert.equal(firstYieldReport.pendingAfter, true, nodeEnv);
+    assert.deepEqual(firstYieldReport.yieldedValuesBefore, [], nodeEnv);
+    assert.deepEqual(firstYieldReport.yieldedValuesAfter, [
+      "normal-start"
+    ]);
+    assert.deepEqual(firstYieldReport.yieldedValuesAdded, [
+      "normal-start"
+    ]);
+    assert.equal(firstYieldReport.needsPaintBefore, false, nodeEnv);
+    assert.equal(firstYieldReport.needsPaintAfter, false, nodeEnv);
+    assert.deepEqual(
+      firstYieldReport.taskQueueBefore.map((task) => [
+        task.callbackStatus,
+        task.callback.label ?? null,
+        task.priorityLevel,
+        task.expired
+      ]),
+      [
+        [
+          "pending-callback",
+          "normal-start",
+          Scheduler.unstable_NormalPriority,
+          false
+        ],
+        [
+          "pending-callback",
+          "low",
+          Scheduler.unstable_LowPriority,
+          false
+        ]
+      ],
+      nodeEnv
+    );
+    assert.deepEqual(
+      firstYieldReport.taskQueueAfter.map((task) => [
+        task.callbackStatus,
+        task.callback.label ?? null,
+        task.priorityLevel,
+        task.expired
+      ]),
+      [
+        [
+          "pending-callback",
+          "normal-continuation",
+          Scheduler.unstable_NormalPriority,
+          false
+        ],
+        [
+          "pending-callback",
+          "low",
+          Scheduler.unstable_LowPriority,
+          false
+        ]
+      ],
+      nodeEnv
+    );
+    assert.deepEqual(
+      yieldEvents,
+      [["normal-start", false, Scheduler.unstable_NormalPriority, 0]],
+      nodeEnv
+    );
+    assert.equal(
+      firstYieldReport.recordsMockSchedulerYieldedValues,
+      true,
+      nodeEnv
+    );
+    assert.equal(
+      firstYieldReport.recordsMockSchedulerContinuationOrdering,
+      true,
+      nodeEnv
+    );
+    assert.equal(firstYieldReport.drainsPublicReactActQueue, false, nodeEnv);
+    assert.equal(
+      firstYieldReport.publicSchedulerTimingCompatibilityClaimed,
+      false,
+      nodeEnv
+    );
+    assert.equal(
+      firstYieldReport.publicReactActCompatibilityClaimed,
+      false,
+      nodeEnv
+    );
+    assert.deepEqual(Scheduler.unstable_clearLog(), ["normal-start"]);
+
+    const secondYieldReport =
+      diagnostics.flushNumberOfYieldsForDiagnostics(1);
+    assert.deepEqual(secondYieldReport.yieldedValuesAdded, [
+      "normal-continuation"
+    ]);
+    assert.deepEqual(
+      secondYieldReport.taskQueueBefore.map((task) => [
+        task.callback.label ?? null,
+        task.priorityLevel
+      ]),
+      [
+        ["normal-continuation", Scheduler.unstable_NormalPriority],
+        ["low", Scheduler.unstable_LowPriority]
+      ],
+      nodeEnv
+    );
+    assert.deepEqual(
+      secondYieldReport.taskQueueAfter.map((task) => [
+        task.callback.label ?? null,
+        task.priorityLevel
+      ]),
+      [["low", Scheduler.unstable_LowPriority]],
+      nodeEnv
+    );
+    assert.deepEqual(
+      yieldEvents,
+      [
+        ["normal-start", false, Scheduler.unstable_NormalPriority, 0],
+        ["normal-continuation", false, Scheduler.unstable_NormalPriority, 0]
+      ],
+      nodeEnv
+    );
+    assert.deepEqual(Scheduler.unstable_clearLog(), [
+      "normal-continuation"
+    ]);
+
+    const finalYieldReport =
+      diagnostics.flushNumberOfYieldsForDiagnostics(1);
+    assert.deepEqual(finalYieldReport.yieldedValuesAdded, ["low"]);
+    assert.deepEqual(finalYieldReport.taskQueueAfter, [], nodeEnv);
+    assert.equal(finalYieldReport.pendingAfter, false, nodeEnv);
+    assert.deepEqual(
+      yieldEvents,
+      [
+        ["normal-start", false, Scheduler.unstable_NormalPriority, 0],
+        ["normal-continuation", false, Scheduler.unstable_NormalPriority, 0],
+        ["low", false, Scheduler.unstable_LowPriority, 0]
+      ],
+      nodeEnv
+    );
+    assert.deepEqual(Scheduler.unstable_clearLog(), ["low"]);
+
+    Scheduler.reset();
+    const paintEvents = [];
+    const requestPaintReports = [];
+    const paintContinuation = reactGate.createInternalActQueueTestCallback(
+      (didTimeout) => {
+        paintEvents.push([
+          "paint-continuation",
+          didTimeout,
+          Scheduler.unstable_getCurrentPriorityLevel(),
+          Scheduler.unstable_now()
+        ]);
+        Scheduler.log("paint-continuation");
+      },
+      { label: "paint-continuation" }
+    );
+    const paintStart = reactGate.createInternalActQueueTestCallback(
+      (didTimeout) => {
+        paintEvents.push([
+          "paint-start",
+          didTimeout,
+          Scheduler.unstable_getCurrentPriorityLevel(),
+          Scheduler.unstable_now()
+        ]);
+        Scheduler.log("paint-start");
+        requestPaintReports.push(diagnostics.requestPaintForDiagnostics());
+        return paintContinuation;
+      },
+      { label: "paint-start" }
+    );
+    const afterPaint = reactGate.createInternalActQueueTestCallback(
+      (didTimeout) => {
+        paintEvents.push([
+          "after-paint",
+          didTimeout,
+          Scheduler.unstable_getCurrentPriorityLevel(),
+          Scheduler.unstable_now()
+        ]);
+        Scheduler.log("after-paint");
+      },
+      { label: "after-paint" }
+    );
+
+    Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_NormalPriority,
+      paintStart
+    );
+    Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_NormalPriority,
+      afterPaint
+    );
+
+    const paintReport = diagnostics.flushUntilNextPaintForDiagnostics();
+    assert.equal(
+      paintReport.status,
+      "flushed-until-next-paint-for-diagnostics",
+      nodeEnv
+    );
+    assert.equal(paintReport.flushReturnValue, false, nodeEnv);
+    assert.equal(paintReport.pendingBefore, true, nodeEnv);
+    assert.equal(paintReport.pendingAfter, true, nodeEnv);
+    assert.equal(paintReport.needsPaintBefore, false, nodeEnv);
+    assert.equal(paintReport.needsPaintAfter, true, nodeEnv);
+    assert.equal(paintReport.shouldYieldForPaintBefore, false, nodeEnv);
+    assert.equal(paintReport.shouldYieldForPaintAfter, false, nodeEnv);
+    assert.deepEqual(paintReport.yieldedValuesAdded, ["paint-start"]);
+    assert.deepEqual(
+      paintReport.taskQueueBefore.map((task) => task.callback.label),
+      ["paint-start", "after-paint"],
+      nodeEnv
+    );
+    assert.deepEqual(
+      paintReport.taskQueueAfter.map((task) => task.callback.label),
+      ["paint-continuation", "after-paint"],
+      nodeEnv
+    );
+    assert.equal(
+      paintReport.recordsMockSchedulerRequestPaint,
+      true,
+      nodeEnv
+    );
+    assert.equal(
+      paintReport.recordsMockSchedulerContinuationOrdering,
+      true,
+      nodeEnv
+    );
+    assert.equal(paintReport.drainsPublicReactActQueue, false, nodeEnv);
+    assert.equal(
+      paintReport.publicSchedulerTimingCompatibilityClaimed,
+      false,
+      nodeEnv
+    );
+    assert.equal(
+      paintReport.publicReactActCompatibilityClaimed,
+      false,
+      nodeEnv
+    );
+
+    assert.equal(requestPaintReports.length, 1, nodeEnv);
+    assert.deepEqual(
+      requestPaintReports[0],
+      {
+        status: "requested-paint-for-diagnostics",
+        requestPaintReturnedUndefined: true,
+        nowBefore: 0,
+        nowAfter: 0,
+        pendingBefore: true,
+        pendingAfter: true,
+        yieldedValuesBefore: ["paint-start"],
+        yieldedValuesAfter: ["paint-start"],
+        yieldedValuesAdded: [],
+        yieldedValueCountBefore: 1,
+        yieldedValueCountAfter: 1,
+        needsPaintBefore: false,
+        needsPaintAfter: true,
+        shouldYieldForPaintBefore: true,
+        shouldYieldForPaintAfter: true,
+        drainsMockSchedulerWork: false,
+        drainsPublicReactActQueue: false,
+        publicSchedulerTimingCompatibilityClaimed: false,
+        publicReactActCompatibilityClaimed: false
+      },
+      nodeEnv
+    );
+    assert.deepEqual(
+      paintEvents,
+      [["paint-start", false, Scheduler.unstable_NormalPriority, 0]],
+      nodeEnv
+    );
+    assert.deepEqual(Scheduler.unstable_clearLog(), ["paint-start"], nodeEnv);
+
+    assert.equal(Scheduler.unstable_flushAllWithoutAsserting(), true, nodeEnv);
+    assert.deepEqual(
+      paintEvents,
+      [
+        ["paint-start", false, Scheduler.unstable_NormalPriority, 0],
+        [
+          "paint-continuation",
+          false,
+          Scheduler.unstable_NormalPriority,
+          0
+        ],
+        ["after-paint", false, Scheduler.unstable_NormalPriority, 0]
+      ],
+      nodeEnv
+    );
+    assert.deepEqual(Scheduler.unstable_clearLog(), [
+      "paint-continuation",
+      "after-paint"
+    ]);
+    assert.equal(Scheduler.unstable_hasPendingWork(), false, nodeEnv);
+  }
+});
+
 test("scheduler mock oracle captures virtual time, log, and disable-yield-value behavior", () => {
   for (const mode of SCHEDULER_MOCK_PROBE_MODES) {
     const value = operationValue(mode.id, "scheduler-mock-virtual-time-and-logs");
@@ -1336,6 +1698,26 @@ function assertPrivateActQueueFlushDiagnostics(diagnostics, label) {
     label
   );
   assert.equal(diagnostics.drainsExpiredMockSchedulerWork, true, label);
+  assert.equal(
+    diagnostics.mockSchedulerYieldPaintDiagnosticsReady,
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.recordsMockSchedulerYieldedValues,
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.recordsMockSchedulerRequestPaint,
+    true,
+    label
+  );
+  assert.equal(
+    diagnostics.recordsMockSchedulerContinuationOrdering,
+    true,
+    label
+  );
   assert.equal(diagnostics.drainsPublicSchedulerTaskQueue, false, label);
   assert.equal(diagnostics.drainsPublicReactActQueue, false, label);
   assert.equal(
@@ -1349,4 +1731,17 @@ function assertPrivateActQueueFlushDiagnostics(diagnostics, label) {
   assert.equal(typeof diagnostics.describeAcceptedInternalActQueue, "function");
   assert.equal(typeof diagnostics.drainAcceptedInternalActQueue, "function");
   assert.equal(typeof diagnostics.drainExpiredMockSchedulerWork, "function");
+  assert.equal(
+    typeof diagnostics.describeMockSchedulerYieldPaintState,
+    "function"
+  );
+  assert.equal(typeof diagnostics.requestPaintForDiagnostics, "function");
+  assert.equal(
+    typeof diagnostics.flushNumberOfYieldsForDiagnostics,
+    "function"
+  );
+  assert.equal(
+    typeof diagnostics.flushUntilNextPaintForDiagnostics,
+    "function"
+  );
 }
