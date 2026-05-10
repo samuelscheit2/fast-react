@@ -831,12 +831,17 @@ struct TestRendererHostOutputFixture {
 }
 
 impl TestRendererHostOutputFixture {
-    fn new(element: RootElementHandle, element_type: TestElementType, text: String) -> Self {
+    fn new_with_props(
+        element: RootElementHandle,
+        element_type: TestElementType,
+        props: TestProps,
+        text: String,
+    ) -> Self {
         let base_raw = element.raw();
         Self {
             element,
             element_type,
-            props: TestProps::new(),
+            props,
             text,
             canary_fixture: TestRendererHostOutputCanaryFixture::new(
                 base_raw,
@@ -2606,6 +2611,168 @@ impl TestRendererPrivateUpdateRouteDiagnostics {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererUpdateNativeBridgeAdmission {
+    diagnostic_id: &'static str,
+    status: &'static str,
+    root: FiberRootId,
+    route_dependency_id: &'static str,
+    update_route_admission_id: &'static str,
+    lifecycle: TestRendererRootLifecycle,
+    scheduled_update_kind: TestRendererRootUpdateKind,
+    host_output_update_kind: TestRendererRootUpdateKind,
+    update_route_admission_accepted: bool,
+    lifecycle_evidence_accepted: bool,
+    root_work_loop_handoff_accepted: bool,
+    host_output_handoff_accepted: bool,
+    text_update_apply_recorded: bool,
+    host_text_update_apply_count: usize,
+    host_component_update_apply_count: usize,
+    rejects_stale_update_handoffs: bool,
+    rejects_unmounted_roots: bool,
+    rejects_missing_host_output_handoff: bool,
+    public_update_compatibility_claimed: bool,
+    public_serialization_available: bool,
+    act_flushing_claimed: bool,
+    native_bridge_available: bool,
+    native_execution: bool,
+    rust_execution_from_js: bool,
+    reconciler_execution_from_js: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererUpdateNativeBridgeAdmission {
+    #[must_use]
+    pub const fn diagnostic_id(self) -> &'static str {
+        self.diagnostic_id
+    }
+
+    #[must_use]
+    pub const fn status(self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn route_dependency_id(self) -> &'static str {
+        self.route_dependency_id
+    }
+
+    #[must_use]
+    pub const fn update_route_admission_id(self) -> &'static str {
+        self.update_route_admission_id
+    }
+
+    #[must_use]
+    pub const fn lifecycle(self) -> TestRendererRootLifecycle {
+        self.lifecycle
+    }
+
+    #[must_use]
+    pub const fn scheduled_update_kind(self) -> TestRendererRootUpdateKind {
+        self.scheduled_update_kind
+    }
+
+    #[must_use]
+    pub const fn host_output_update_kind(self) -> TestRendererRootUpdateKind {
+        self.host_output_update_kind
+    }
+
+    #[must_use]
+    pub const fn update_route_admission_accepted(self) -> bool {
+        self.update_route_admission_accepted
+    }
+
+    #[must_use]
+    pub const fn lifecycle_evidence_accepted(self) -> bool {
+        self.lifecycle_evidence_accepted
+    }
+
+    #[must_use]
+    pub const fn root_work_loop_handoff_accepted(self) -> bool {
+        self.root_work_loop_handoff_accepted
+    }
+
+    #[must_use]
+    pub const fn host_output_handoff_accepted(self) -> bool {
+        self.host_output_handoff_accepted
+    }
+
+    #[must_use]
+    pub const fn text_update_apply_recorded(self) -> bool {
+        self.text_update_apply_recorded
+    }
+
+    #[must_use]
+    pub const fn host_text_update_apply_count(self) -> usize {
+        self.host_text_update_apply_count
+    }
+
+    #[must_use]
+    pub const fn host_component_update_apply_count(self) -> usize {
+        self.host_component_update_apply_count
+    }
+
+    #[must_use]
+    pub const fn rejects_stale_update_handoffs(self) -> bool {
+        self.rejects_stale_update_handoffs
+    }
+
+    #[must_use]
+    pub const fn rejects_unmounted_roots(self) -> bool {
+        self.rejects_unmounted_roots
+    }
+
+    #[must_use]
+    pub const fn rejects_missing_host_output_handoff(self) -> bool {
+        self.rejects_missing_host_output_handoff
+    }
+
+    #[must_use]
+    pub const fn public_update_compatibility_claimed(self) -> bool {
+        self.public_update_compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn public_serialization_available(self) -> bool {
+        self.public_serialization_available
+    }
+
+    #[must_use]
+    pub const fn act_flushing_claimed(self) -> bool {
+        self.act_flushing_claimed
+    }
+
+    #[must_use]
+    pub const fn native_bridge_available(self) -> bool {
+        self.native_bridge_available
+    }
+
+    #[must_use]
+    pub const fn native_execution(self) -> bool {
+        self.native_execution
+    }
+
+    #[must_use]
+    pub const fn rust_execution_from_js(self) -> bool {
+        self.rust_execution_from_js
+    }
+
+    #[must_use]
+    pub const fn reconciler_execution_from_js(self) -> bool {
+        self.reconciler_execution_from_js
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(self) -> bool {
+        self.compatibility_claimed
+    }
+}
+
 pub const TEST_RENDERER_SERIALIZATION_CANARY_GATE_NAME: &str =
     "fast-react-test-renderer.serialization.private-canary";
 pub const TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME: &str =
@@ -2634,6 +2801,10 @@ pub const TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID: &str =
     "react-test-renderer-update-route-root-work-loop-private-admission";
 pub const TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS: &str =
     "accepted-private-update-route-root-work-loop-admission-public-update-blocked";
+pub const TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID: &str =
+    "react-test-renderer-update-native-bridge-admission-private-diagnostic";
+pub const TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_STATUS: &str =
+    "private-update-native-bridge-admission-host-output-handoff-public-update-blocked";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_SERIALIZATION_DEPENDENCY_ID: &str =
     "react-test-renderer-serialization-private-json-diagnostic";
 pub const TEST_RENDERER_PRIVATE_UNMOUNT_DELETION_COMMIT_HANDOFF_DIAGNOSTIC_ID: &str =
@@ -6845,6 +7016,37 @@ impl Display for TestRendererPrivateUpdateRouteError {
 impl Error for TestRendererPrivateUpdateRouteError {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TestRendererPrivateUpdateNativeBridgeAdmissionError {
+    MissingHostOutputHandoff,
+    UnexpectedRouteOutcome { actual: &'static str },
+    UnexpectedScheduledUpdateKind { actual: TestRendererRootUpdateKind },
+    StaleRouteOutcome,
+}
+
+impl Display for TestRendererPrivateUpdateNativeBridgeAdmissionError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MissingHostOutputHandoff => formatter.write_str(
+                "private update native bridge admission requires update host-output handoff evidence",
+            ),
+            Self::UnexpectedRouteOutcome { actual } => write!(
+                formatter,
+                "private update native bridge admission expected a scheduled update route outcome, found {actual}",
+            ),
+            Self::UnexpectedScheduledUpdateKind { actual } => write!(
+                formatter,
+                "private update native bridge admission expected a scheduled update, found {actual:?}",
+            ),
+            Self::StaleRouteOutcome => formatter.write_str(
+                "private update native bridge admission route outcome is not the latest scheduled update",
+            ),
+        }
+    }
+}
+
+impl Error for TestRendererPrivateUpdateNativeBridgeAdmissionError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TestRendererPrivateUnmountNativeBridgeAdmissionError {
     AlreadyUnmountedRoot,
     MissingDeletionCommitHandoff,
@@ -7243,6 +7445,7 @@ pub enum TestRendererRootError {
     RootCommit(RootCommitError),
     SerializationGate(Box<TestRendererSerializationGateError>),
     PrivateUpdateRoute(Box<TestRendererPrivateUpdateRouteError>),
+    PrivateUpdateNativeBridgeAdmission(Box<TestRendererPrivateUpdateNativeBridgeAdmissionError>),
     PrivateUnmountNativeBridgeAdmission(Box<TestRendererPrivateUnmountNativeBridgeAdmissionError>),
     PrivateJsonSerialization(Box<TestRendererPrivateJsonSerializationError>),
     StableSiblingInsertionCanary(Box<TestRendererStableSiblingInsertionCanaryError>),
@@ -7282,6 +7485,7 @@ impl Display for TestRendererRootError {
             Self::RootCommit(error) => Display::fmt(error, formatter),
             Self::SerializationGate(error) => Display::fmt(error, formatter),
             Self::PrivateUpdateRoute(error) => Display::fmt(error, formatter),
+            Self::PrivateUpdateNativeBridgeAdmission(error) => Display::fmt(error, formatter),
             Self::PrivateUnmountNativeBridgeAdmission(error) => Display::fmt(error, formatter),
             Self::PrivateJsonSerialization(error) => Display::fmt(error, formatter),
             Self::StableSiblingInsertionCanary(error) => Display::fmt(error, formatter),
@@ -7334,6 +7538,7 @@ impl Error for TestRendererRootError {
             Self::RootCommit(error) => Some(error),
             Self::SerializationGate(error) => Some(error),
             Self::PrivateUpdateRoute(error) => Some(error),
+            Self::PrivateUpdateNativeBridgeAdmission(error) => Some(error),
             Self::PrivateUnmountNativeBridgeAdmission(error) => Some(error),
             Self::PrivateJsonSerialization(error) => Some(error),
             Self::StableSiblingInsertionCanary(error) => Some(error),
@@ -7395,6 +7600,12 @@ impl From<TestRendererSerializationGateError> for TestRendererRootError {
 impl From<TestRendererPrivateUpdateRouteError> for TestRendererRootError {
     fn from(error: TestRendererPrivateUpdateRouteError) -> Self {
         Self::PrivateUpdateRoute(Box::new(error))
+    }
+}
+
+impl From<TestRendererPrivateUpdateNativeBridgeAdmissionError> for TestRendererRootError {
+    fn from(error: TestRendererPrivateUpdateNativeBridgeAdmissionError) -> Self {
+        Self::PrivateUpdateNativeBridgeAdmission(Box::new(error))
     }
 }
 
@@ -7482,8 +7693,26 @@ impl TestRendererRoot {
         text: impl Into<String>,
         options: TestRendererOptions,
     ) -> Result<Self, TestRendererRootError> {
+        Self::create_host_component_with_props_and_text_for_canary(
+            element_type,
+            TestProps::new(),
+            text,
+            options,
+        )
+    }
+
+    pub fn create_host_component_with_props_and_text_for_canary(
+        element_type: impl Into<TestElementType>,
+        props: TestProps,
+        text: impl Into<String>,
+        options: TestRendererOptions,
+    ) -> Result<Self, TestRendererRootError> {
         let mut root = Self::new_without_initial_update(options)?;
-        let element = root.push_host_output_fixture_for_canary(element_type.into(), text.into());
+        let element = root.push_host_output_fixture_with_props_for_canary(
+            element_type.into(),
+            props,
+            text.into(),
+        );
         let record =
             root.schedule_root_update(TestRendererRootUpdateKind::Create, element, None)?;
         root.scheduled_updates.push(record);
@@ -7564,11 +7793,28 @@ impl TestRendererRoot {
         element_type: impl Into<TestElementType>,
         text: impl Into<String>,
     ) -> Result<TestRendererRootUpdateOutcome, TestRendererRootError> {
+        self.update_host_component_with_props_and_text_for_canary(
+            element_type,
+            TestProps::new(),
+            text,
+        )
+    }
+
+    pub fn update_host_component_with_props_and_text_for_canary(
+        &mut self,
+        element_type: impl Into<TestElementType>,
+        props: TestProps,
+        text: impl Into<String>,
+    ) -> Result<TestRendererRootUpdateOutcome, TestRendererRootError> {
         if !matches!(self.lifecycle, TestRendererRootLifecycle::Active) {
             return Ok(TestRendererRootUpdateOutcome::IgnoredAfterUnmount);
         }
 
-        let element = self.push_host_output_fixture_for_canary(element_type.into(), text.into());
+        let element = self.push_host_output_fixture_with_props_for_canary(
+            element_type.into(),
+            props,
+            text.into(),
+        );
         let record =
             self.schedule_root_update(TestRendererRootUpdateKind::Update, element, None)?;
         self.scheduled_updates.push(record.clone());
@@ -8583,6 +8829,101 @@ impl TestRendererRoot {
         Ok(self
             .describe_private_update_route_via_root_work_loop_for_canary(output)?
             .admission())
+    }
+
+    pub fn describe_private_update_native_bridge_admission_for_canary(
+        &self,
+        route_outcome: &TestRendererRootUpdateOutcome,
+        handoff: Option<&TestRendererUpdatedHostOutput>,
+    ) -> Result<TestRendererUpdateNativeBridgeAdmission, TestRendererRootError> {
+        let Some(scheduled_update) = route_outcome.scheduled() else {
+            return Err(
+                TestRendererPrivateUpdateNativeBridgeAdmissionError::UnexpectedRouteOutcome {
+                    actual: route_outcome.code(),
+                }
+                .into(),
+            );
+        };
+        if scheduled_update.kind() != TestRendererRootUpdateKind::Update {
+            return Err(
+                TestRendererPrivateUpdateNativeBridgeAdmissionError::UnexpectedScheduledUpdateKind {
+                    actual: scheduled_update.kind(),
+                }
+                .into(),
+            );
+        }
+        if self.scheduled_updates.last() != Some(scheduled_update) {
+            return Err(
+                TestRendererPrivateUpdateNativeBridgeAdmissionError::StaleRouteOutcome.into(),
+            );
+        }
+
+        let Some(handoff) = handoff else {
+            return Err(
+                TestRendererPrivateUpdateNativeBridgeAdmissionError::MissingHostOutputHandoff
+                    .into(),
+            );
+        };
+        let route = self.describe_private_update_route_via_root_work_loop_for_canary(handoff)?;
+        let host_text_update = route.host_text_update();
+
+        Ok(TestRendererUpdateNativeBridgeAdmission {
+            diagnostic_id: TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID,
+            status: TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_STATUS,
+            root: self.root_id,
+            route_dependency_id: TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_ROUTE_DEPENDENCY_ID,
+            update_route_admission_id: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID,
+            lifecycle: self.lifecycle,
+            scheduled_update_kind: scheduled_update.kind(),
+            host_output_update_kind: route.host_output_update_kind(),
+            update_route_admission_accepted: route.admission().record_id()
+                == TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID,
+            lifecycle_evidence_accepted: true,
+            root_work_loop_handoff_accepted: true,
+            host_output_handoff_accepted: true,
+            text_update_apply_recorded: host_text_update.text_update_apply_recorded(),
+            host_text_update_apply_count: host_text_update.host_text_update_apply_count(),
+            host_component_update_apply_count: host_text_update.host_component_update_apply_count(),
+            rejects_stale_update_handoffs: true,
+            rejects_unmounted_roots: true,
+            rejects_missing_host_output_handoff: true,
+            public_update_compatibility_claimed: false,
+            public_serialization_available: false,
+            act_flushing_claimed: false,
+            native_bridge_available: false,
+            native_execution: false,
+            rust_execution_from_js: true,
+            reconciler_execution_from_js: true,
+            compatibility_claimed: false,
+        })
+    }
+
+    pub fn render_and_admit_private_update_native_bridge_handoff_for_canary(
+        &mut self,
+        element_type: impl Into<TestElementType>,
+        props: TestProps,
+        text: impl Into<String>,
+    ) -> Result<
+        (
+            TestRendererRootUpdateOutcome,
+            TestRendererUpdatedHostOutput,
+            TestRendererUpdateNativeBridgeAdmission,
+        ),
+        TestRendererRootError,
+    > {
+        let route_outcome =
+            self.update_host_component_with_props_and_text_for_canary(element_type, props, text)?;
+        let Some(handoff) = self.render_and_commit_host_output_update_for_canary()? else {
+            return Err(
+                TestRendererPrivateUpdateNativeBridgeAdmissionError::MissingHostOutputHandoff
+                    .into(),
+            );
+        };
+        let admission = self.describe_private_update_native_bridge_admission_for_canary(
+            &route_outcome,
+            Some(&handoff),
+        )?;
+        Ok((route_outcome, handoff, admission))
     }
 
     pub fn describe_private_json_serialization_for_canary(
@@ -10232,11 +10573,21 @@ impl TestRendererRoot {
         element_type: TestElementType,
         text: String,
     ) -> RootElementHandle {
+        self.push_host_output_fixture_with_props_for_canary(element_type, TestProps::new(), text)
+    }
+
+    fn push_host_output_fixture_with_props_for_canary(
+        &mut self,
+        element_type: TestElementType,
+        props: TestProps,
+        text: String,
+    ) -> RootElementHandle {
         let element = RootElementHandle::from_raw(self.host_output_fixtures.len() as u64 + 1);
         self.host_output_fixtures
-            .push(TestRendererHostOutputFixture::new(
+            .push(TestRendererHostOutputFixture::new_with_props(
                 element,
                 element_type,
+                props,
                 text,
             ));
         element
@@ -15416,6 +15767,168 @@ mod tests {
             TestRendererPrivateUpdateRouteError::IncompatibleFinishedWork {
                 reason: "commit-current-finished-work-mismatch"
             }
+        ));
+    }
+
+    #[test]
+    fn root_private_update_native_bridge_admission_consumes_actual_update_host_output_handoff() {
+        let initial_props = props().with_attribute("data-state", "old");
+        let updated_props = props().with_attribute("data-state", "new");
+        let mut root = TestRendererRoot::create_host_component_with_props_and_text_for_canary(
+            "span",
+            initial_props.clone(),
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let (outcome, updated, admission) = root
+            .render_and_admit_private_update_native_bridge_handoff_for_canary(
+                "span",
+                updated_props.clone(),
+                "goodbye",
+            )
+            .unwrap();
+
+        assert!(matches!(
+            outcome,
+            TestRendererRootUpdateOutcome::Scheduled(_)
+        ));
+        assert!(updated.updated_fibers().component_props_changed());
+        assert!(updated.updated_fibers().text_props_changed());
+        let TestNodeSnapshot::Element(previous) = &updated.previous_snapshot().children()[0] else {
+            panic!("expected previous host component");
+        };
+        assert_eq!(previous.props(), &initial_props);
+        assert_eq!(child_texts(previous), vec!["hello"]);
+        let TestNodeSnapshot::Element(current) = &updated.snapshot().children()[0] else {
+            panic!("expected updated host component");
+        };
+        assert_eq!(current.props(), &updated_props);
+        assert_eq!(child_texts(current), vec!["goodbye"]);
+        assert_eq!(
+            root.diagnostic_container_snapshot().unwrap(),
+            *updated.snapshot()
+        );
+
+        assert_eq!(
+            admission.diagnostic_id(),
+            TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID
+        );
+        assert_eq!(
+            admission.status(),
+            TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_STATUS
+        );
+        assert_eq!(admission.root(), root.root_id());
+        assert_eq!(
+            admission.route_dependency_id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_ROUTE_DEPENDENCY_ID
+        );
+        assert_eq!(
+            admission.update_route_admission_id(),
+            TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID
+        );
+        assert_eq!(admission.lifecycle(), TestRendererRootLifecycle::Active);
+        assert_eq!(
+            admission.scheduled_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert_eq!(
+            admission.host_output_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert!(admission.update_route_admission_accepted());
+        assert!(admission.lifecycle_evidence_accepted());
+        assert!(admission.root_work_loop_handoff_accepted());
+        assert!(admission.host_output_handoff_accepted());
+        assert!(admission.text_update_apply_recorded());
+        assert_eq!(admission.host_text_update_apply_count(), 1);
+        assert_eq!(admission.host_component_update_apply_count(), 1);
+        assert!(admission.rejects_stale_update_handoffs());
+        assert!(admission.rejects_unmounted_roots());
+        assert!(admission.rejects_missing_host_output_handoff());
+        assert!(!admission.public_update_compatibility_claimed());
+        assert!(!admission.public_serialization_available());
+        assert!(!admission.act_flushing_claimed());
+        assert!(!admission.native_bridge_available());
+        assert!(!admission.native_execution());
+        assert!(admission.rust_execution_from_js());
+        assert!(admission.reconciler_execution_from_js());
+        assert!(!admission.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_update_native_bridge_admission_rejects_missing_handoff() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let outcome = root
+            .update_host_component_with_props_and_text_for_canary(
+                "span",
+                props().with_attribute("data-state", "new"),
+                "goodbye",
+            )
+            .unwrap();
+
+        let error = root
+            .describe_private_update_native_bridge_admission_for_canary(&outcome, None)
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateUpdateNativeBridgeAdmission(error) = error else {
+            panic!("expected private update native bridge admission rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateUpdateNativeBridgeAdmissionError::MissingHostOutputHandoff
+        ));
+    }
+
+    #[test]
+    fn root_private_update_native_bridge_admission_rejects_stale_route_outcome() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let stale_outcome = root
+            .update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let stale_handoff = root
+            .render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "later")
+            .unwrap();
+        root.render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let error = root
+            .describe_private_update_native_bridge_admission_for_canary(
+                &stale_outcome,
+                Some(&stale_handoff),
+            )
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateUpdateNativeBridgeAdmission(error) = error else {
+            panic!("expected private update native bridge admission rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateUpdateNativeBridgeAdmissionError::StaleRouteOutcome
         ));
     }
 
