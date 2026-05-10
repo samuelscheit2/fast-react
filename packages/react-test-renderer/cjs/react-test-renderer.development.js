@@ -48,6 +48,14 @@ function createUnsupportedFunction(exportName, length) {
   return defineFunctionShape(fn, exportName, length);
 }
 
+function createRendererUnsupportedFunction(exportName, length, detail) {
+  const fn = function fastReactTestRendererRendererPlaceholder() {
+    throw createUnsupportedError(exportName, 'was called', detail);
+  };
+
+  return defineFunctionShape(fn, exportName.split('.').pop(), length);
+}
+
 function createSchedulerPlaceholder() {
   const target = Object.create(null);
 
@@ -110,9 +118,64 @@ function definePlaceholderMetadata(exportsObject) {
   return exportsObject;
 }
 
+function createPlaceholderRenderer() {
+  const renderer = {
+    _Scheduler: createSchedulerPlaceholder(),
+    root: undefined,
+    toJSON: createRendererUnsupportedFunction(
+      'create().toJSON',
+      0,
+      'Serialization is intentionally blocked until committed test-renderer host output and serializer APIs exist.'
+    ),
+    toTree: createRendererUnsupportedFunction(
+      'create().toTree',
+      0,
+      'Fiber tree inspection is intentionally blocked until a committed-fiber inspection API exists.'
+    ),
+    update: createRendererUnsupportedFunction(
+      'create().update',
+      1,
+      'Root updates are intentionally blocked until the JavaScript facade can route through the Rust TestRendererRoot.'
+    ),
+    unmount: createRendererUnsupportedFunction(
+      'create().unmount',
+      0,
+      'Root unmount is intentionally blocked until the JavaScript facade can route through the Rust TestRendererRoot.'
+    ),
+    getInstance: createRendererUnsupportedFunction(
+      'create().getInstance',
+      0,
+      'Public instance lookup is intentionally blocked until TestInstance and createNodeMock behavior are implemented.'
+    ),
+    unstable_flushSync: createRendererUnsupportedFunction(
+      'create().unstable_flushSync',
+      1,
+      'Synchronous flushing is intentionally blocked until react-test-renderer act and scheduler integration are wired.'
+    )
+  };
+
+  Object.defineProperty(renderer, 'root', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      throw createUnsupportedError(
+        'create().root',
+        'was accessed',
+        'TestInstance root access is intentionally blocked until committed fiber inspection is implemented.'
+      );
+    }
+  });
+
+  return renderer;
+}
+
+function create() {
+  return createPlaceholderRenderer();
+}
+
 exports._Scheduler = createSchedulerPlaceholder();
 exports.act = createUnsupportedFunction('act', 1);
-exports.create = createUnsupportedFunction('create', 2);
+exports.create = defineFunctionShape(create, 'create', 2);
 exports.unstable_batchedUpdates = createUnsupportedFunction(
   'unstable_batchedUpdates',
   2
