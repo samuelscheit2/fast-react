@@ -4538,6 +4538,7 @@ impl FunctionComponentHookRenderStore {
         request: FunctionComponentStateDispatchRequest,
     ) -> Result<FunctionComponentStateDispatchRecord, FunctionComponentRenderError> {
         let binding = self.state_dispatch_binding(request.dispatch())?;
+        self.validate_basic_state_dispatch_binding(binding)?;
         self.validate_dispatch_eager_state(binding, request.eager_state())?;
         let update = self
             .state_queues
@@ -4605,6 +4606,7 @@ impl FunctionComponentHookRenderStore {
         request: FunctionComponentReducerDispatchRequest,
     ) -> Result<FunctionComponentReducerDispatchRecord, FunctionComponentRenderError> {
         let binding = self.state_dispatch_binding(request.dispatch())?;
+        self.validate_live_dispatch_binding(binding)?;
         let reducer = self.reducer_for_queue(binding.fiber, binding.queue)?;
         self.validate_dispatch_eager_state(binding, request.eager_state())?;
         let update = self
@@ -4676,6 +4678,7 @@ impl FunctionComponentHookRenderStore {
         request: FunctionComponentReducerDispatchRequest,
     ) -> Result<FunctionComponentReducerDispatchQueueRecord, FunctionComponentRenderError> {
         let binding = self.state_dispatch_binding(request.dispatch())?;
+        self.validate_live_dispatch_binding(binding)?;
         let reducer = self.reducer_for_queue(binding.fiber, binding.queue)?;
         self.validate_dispatch_eager_state(binding, request.eager_state())?;
         self.validate_reducer_dispatch_render_context(state, binding)?;
@@ -5001,6 +5004,53 @@ impl FunctionComponentHookRenderStore {
                 },
             );
         }
+        Ok(())
+    }
+
+    fn validate_live_dispatch_binding(
+        &self,
+        binding: FunctionComponentStateDispatchBinding,
+    ) -> Result<(), FunctionComponentRenderError> {
+        let queue = self
+            .state_queues
+            .queue(binding.queue)
+            .map_err(|error| FunctionComponentRenderError::hook_queue(binding.fiber, error))?;
+        let Some(queue_dispatch) = queue.dispatch().copied() else {
+            return Err(FunctionComponentRenderError::MissingStateDispatch {
+                fiber: binding.fiber,
+                queue: binding.queue,
+            });
+        };
+        if queue_dispatch != binding.handle {
+            return Err(FunctionComponentRenderError::StaleStateDispatch {
+                fiber: binding.fiber,
+                queue: binding.queue,
+                expected: queue_dispatch,
+                actual: binding.handle,
+            });
+        }
+
+        Ok(())
+    }
+
+    fn validate_basic_state_dispatch_binding(
+        &self,
+        binding: FunctionComponentStateDispatchBinding,
+    ) -> Result<(), FunctionComponentRenderError> {
+        self.validate_live_dispatch_binding(binding)?;
+        let queue = self
+            .state_queues
+            .queue(binding.queue)
+            .map_err(|error| FunctionComponentRenderError::hook_queue(binding.fiber, error))?;
+        let actual = queue.last_rendered_reducer().copied();
+        if actual != Some(FunctionComponentStateReducerId::BasicState) {
+            return Err(FunctionComponentRenderError::ExpectedBasicStateQueue {
+                fiber: binding.fiber,
+                queue: binding.queue,
+                actual,
+            });
+        }
+
         Ok(())
     }
 
@@ -6392,6 +6442,17 @@ pub(crate) enum FunctionComponentRenderError {
         expected: StateHandle,
         actual: StateHandle,
     },
+    StaleStateDispatch {
+        fiber: FiberId,
+        queue: HookQueueId,
+        expected: FunctionComponentStateDispatchHandle,
+        actual: FunctionComponentStateDispatchHandle,
+    },
+    ExpectedBasicStateQueue {
+        fiber: FiberId,
+        queue: HookQueueId,
+        actual: Option<FunctionComponentStateReducerId>,
+    },
     ReducerDispatchOutsideRenderContext {
         dispatch: FunctionComponentStateDispatchHandle,
         fiber: FiberId,
@@ -6619,6 +6680,30 @@ impl Display for FunctionComponentRenderError {
                 actual.raw(),
                 expected.raw()
             ),
+            Self::StaleStateDispatch {
+                fiber,
+                queue,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "function component fiber {} state queue {} rejected stale private dispatch handle {}; current queue dispatch is {}",
+                fiber.slot().get(),
+                queue.raw(),
+                actual.raw(),
+                expected.raw()
+            ),
+            Self::ExpectedBasicStateQueue {
+                fiber,
+                queue,
+                actual,
+            } => write!(
+                formatter,
+                "function component fiber {} state queue {} expected a useState basic-state queue for private dispatch, found {:?}",
+                fiber.slot().get(),
+                queue.raw(),
+                actual
+            ),
             Self::ReducerDispatchOutsideRenderContext {
                 dispatch,
                 fiber,
@@ -6727,6 +6812,8 @@ impl Error for FunctionComponentRenderError {
             | Self::ExpectedReducerQueue { .. }
             | Self::MissingStateDispatchReducer { .. }
             | Self::StateDispatchEagerStateMismatch { .. }
+            | Self::StaleStateDispatch { .. }
+            | Self::ExpectedBasicStateQueue { .. }
             | Self::ReducerDispatchOutsideRenderContext { .. }
             | Self::UnknownStateDispatch { .. }
             | Self::StateDispatchHandleOverflow
@@ -12705,7 +12792,6 @@ mod tests {
             crate::scheduled_roots(&store).unwrap(),
             Vec::<FiberRootId>::new()
         );
-
         let rescheduled = hook_store
             .dispatch_reducer_update_and_reschedule_root(&mut store, request)
             .unwrap();
@@ -13139,6 +13225,132 @@ mod tests {
         assert_eq!(
             store.root(root_id).unwrap().scheduling().work_in_progress(),
             Some(host_render.finished_work())
+        );
+    }
+
+    #[test]
+    fn private_use_state_dispatch_reschedule_rejects_stale_queue_dispatch_before_scheduling() {
+        let (mut store, root_id) = root_store();
+        let root_current = store.root(root_id).unwrap().current();
+        let (_current, work_in_progress, _component) =
+            attached_function_component_pair(&mut store, root_id);
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let first_state = hook_store
+            .create_current_state_hook(work_in_progress, StateHandle::from_raw(32))
+            .unwrap();
+        let second_state = hook_store
+            .create_current_state_hook(work_in_progress, StateHandle::from_raw(33))
+            .unwrap();
+        hook_store
+            .state_queues_mut()
+            .queue_mut(first_state.queue())
+            .unwrap()
+            .set_dispatch(second_state.dispatch());
+        let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+
+        let error = hook_store
+            .dispatch_state_update_and_reschedule_root(
+                &mut store,
+                FunctionComponentStateDispatchRequest::new(
+                    first_state.dispatch(),
+                    action(903),
+                    lane,
+                ),
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            FunctionComponentStateDispatchRootRescheduleError::Render(
+                FunctionComponentRenderError::StaleStateDispatch {
+                    fiber: work_in_progress,
+                    queue: first_state.queue(),
+                    expected: second_state.dispatch(),
+                    actual: first_state.dispatch(),
+                },
+            )
+        );
+        assert_eq!(
+            hook_store
+                .state_queues()
+                .pending_updates(first_state.queue())
+                .unwrap(),
+            Vec::<HookUpdateId>::new()
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            Lanes::NO
+        );
+        assert_eq!(
+            crate::scheduled_roots(&store).unwrap(),
+            Vec::<FiberRootId>::new()
+        );
+        assert_eq!(
+            store.fiber_arena().get(work_in_progress).unwrap().lanes(),
+            Lanes::NO
+        );
+        assert_eq!(
+            store.fiber_arena().get(root_current).unwrap().child_lanes(),
+            Lanes::NO
+        );
+    }
+
+    #[test]
+    fn private_use_state_dispatch_reschedule_rejects_reducer_queue_before_scheduling() {
+        let (mut store, root_id) = root_store();
+        let root_current = store.root(root_id).unwrap().current();
+        let (_current, work_in_progress, _component) =
+            attached_function_component_pair(&mut store, root_id);
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let reducer_id = reducer(904);
+        let reducer_state = hook_store
+            .create_current_reducer_hook(work_in_progress, reducer_id, StateHandle::from_raw(34))
+            .unwrap();
+        let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+
+        let error = hook_store
+            .dispatch_state_update_and_reschedule_root(
+                &mut store,
+                FunctionComponentStateDispatchRequest::new(
+                    reducer_state.dispatch(),
+                    action(905),
+                    lane,
+                ),
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            FunctionComponentStateDispatchRootRescheduleError::Render(
+                FunctionComponentRenderError::ExpectedBasicStateQueue {
+                    fiber: work_in_progress,
+                    queue: reducer_state.queue(),
+                    actual: Some(FunctionComponentStateReducerId::Reducer(reducer_id)),
+                },
+            )
+        );
+        assert_eq!(
+            hook_store
+                .state_queues()
+                .pending_updates(reducer_state.queue())
+                .unwrap(),
+            Vec::<HookUpdateId>::new()
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            Lanes::NO
+        );
+        assert_eq!(
+            crate::scheduled_roots(&store).unwrap(),
+            Vec::<FiberRootId>::new()
+        );
+        assert_eq!(
+            store.fiber_arena().get(work_in_progress).unwrap().lanes(),
+            Lanes::NO
+        );
+        assert_eq!(
+            store.fiber_arena().get(root_current).unwrap().child_lanes(),
+            Lanes::NO
         );
     }
 
