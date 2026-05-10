@@ -248,6 +248,94 @@ mod root_bridge_requests {
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct NativeRootBridgeJsonTransportHandle {
+        environment_id: u64,
+        slot: u64,
+        generation: u64,
+        kind: &'static str,
+    }
+
+    impl NativeRootBridgeJsonTransportHandle {
+        #[must_use]
+        pub(crate) const fn new(
+            environment_id: u64,
+            slot: u64,
+            generation: u64,
+            kind: &'static str,
+        ) -> Self {
+            Self {
+                environment_id,
+                slot,
+                generation,
+                kind,
+            }
+        }
+
+        fn decode(self, field: &'static str) -> Result<BridgeHandle, NativeRootBridgeRequestError> {
+            Ok(BridgeHandle::new(
+                BridgeEnvironmentId::from_raw(self.environment_id),
+                self.slot,
+                self.generation,
+                decode_json_transport_handle_kind(field, self.kind)?,
+            ))
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct NativeRootBridgeJsonTransportRecord {
+        request_id: u64,
+        kind: &'static str,
+        environment_id: u64,
+        root_handle: NativeRootBridgeJsonTransportHandle,
+        root_id: u64,
+        value_handle: Option<NativeRootBridgeJsonTransportHandle>,
+        root_handle_state: &'static str,
+    }
+
+    impl NativeRootBridgeJsonTransportRecord {
+        #[allow(clippy::too_many_arguments)]
+        #[must_use]
+        pub(crate) const fn new(
+            request_id: u64,
+            kind: &'static str,
+            environment_id: u64,
+            root_handle: NativeRootBridgeJsonTransportHandle,
+            root_id: u64,
+            value_handle: Option<NativeRootBridgeJsonTransportHandle>,
+            root_handle_state: &'static str,
+        ) -> Self {
+            Self {
+                request_id,
+                kind,
+                environment_id,
+                root_handle,
+                root_id,
+                value_handle,
+                root_handle_state,
+            }
+        }
+
+        fn decode(self) -> Result<NativeRootBridgeRequestRecord, NativeRootBridgeRequestError> {
+            Ok(
+                NativeRootBridgeRequestRecord::from_js_native_handoff_record(
+                    self.request_id,
+                    decode_json_transport_request_kind("kind", self.kind)?,
+                    BridgeEnvironmentId::from_raw(self.environment_id),
+                    self.root_handle.decode("root_handle.kind")?,
+                    self.root_id,
+                    self.value_handle
+                        .map(|handle| handle.decode("value_handle.kind"))
+                        .transpose()?,
+                    decode_json_transport_root_handle_state(
+                        "root_handle_state",
+                        self.root_handle_state,
+                    )?,
+                ),
+            )
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub(crate) struct NativeRootBridgeRequestValidationRecord {
         request_id: u64,
         kind: NativeRootBridgeRequestKind,
@@ -536,6 +624,10 @@ mod root_bridge_requests {
             request_id: u64,
         },
         RequestSequenceExhausted,
+        JsonTransportRecordInvalid {
+            field: &'static str,
+            value: &'static str,
+        },
     }
 
     impl NativeRootBridgeRequestError {
@@ -572,6 +664,9 @@ mod root_bridge_requests {
                     "FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_OUT_OF_ORDER"
                 }
                 Self::RequestSequenceExhausted => "FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_EXHAUSTED",
+                Self::JsonTransportRecordInvalid { .. } => {
+                    "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_RECORD_INVALID"
+                }
             }
         }
     }
@@ -642,6 +737,10 @@ mod root_bridge_requests {
                 ),
                 Self::RequestSequenceExhausted => formatter
                     .write_str("native root bridge request sequence cannot allocate another id"),
+                Self::JsonTransportRecordInvalid { field, value } => write!(
+                    formatter,
+                    "native root bridge JSON transport record has unsupported {field} value {value}"
+                ),
             }
         }
     }
@@ -906,6 +1005,18 @@ mod root_bridge_requests {
         })
     }
 
+    pub(crate) fn smoke_admit_js_native_root_bridge_json_transport_records(
+        records: &[NativeRootBridgeJsonTransportRecord],
+    ) -> Result<NativeRootBridgeHandleTableAdmissionSmoke, NativeRootBridgeRequestError> {
+        let requests = records
+            .iter()
+            .copied()
+            .map(NativeRootBridgeJsonTransportRecord::decode)
+            .collect::<Result<Vec<_>, _>>()?;
+
+        smoke_admit_js_native_root_bridge_handoff_records(&requests)
+    }
+
     fn admit_js_native_root_bridge_handoff_record(
         table: &mut BridgeHandleTable,
         request: NativeRootBridgeRequestRecord,
@@ -1163,6 +1274,40 @@ mod root_bridge_requests {
         table.get_value(value_handle)?;
         Ok(true)
     }
+
+    fn decode_json_transport_request_kind(
+        field: &'static str,
+        value: &'static str,
+    ) -> Result<NativeRootBridgeRequestKind, NativeRootBridgeRequestError> {
+        match value {
+            "create" => Ok(NativeRootBridgeRequestKind::Create),
+            "render" => Ok(NativeRootBridgeRequestKind::Render),
+            "unmount" => Ok(NativeRootBridgeRequestKind::Unmount),
+            _ => Err(NativeRootBridgeRequestError::JsonTransportRecordInvalid { field, value }),
+        }
+    }
+
+    fn decode_json_transport_handle_kind(
+        field: &'static str,
+        value: &'static str,
+    ) -> Result<crate::handle_table::BridgeHandleKind, NativeRootBridgeRequestError> {
+        match value {
+            "root" => Ok(crate::handle_table::BridgeHandleKind::Root),
+            "value" => Ok(crate::handle_table::BridgeHandleKind::Value),
+            _ => Err(NativeRootBridgeRequestError::JsonTransportRecordInvalid { field, value }),
+        }
+    }
+
+    fn decode_json_transport_root_handle_state(
+        field: &'static str,
+        value: &'static str,
+    ) -> Result<NativeRootBridgeRootHandleState, NativeRootBridgeRequestError> {
+        match value {
+            "active" => Ok(NativeRootBridgeRootHandleState::Active),
+            "retired" => Ok(NativeRootBridgeRootHandleState::Retired),
+            _ => Err(NativeRootBridgeRequestError::JsonTransportRecordInvalid { field, value }),
+        }
+    }
 }
 
 pub const BINDING_PACKAGE_NAME: &str = "@fast-react/native";
@@ -1179,6 +1324,10 @@ pub const NATIVE_ROOT_BRIDGE_HANDLE_ADMISSION_PREFLIGHT_STATUS: &str =
     "preflighted-native-root-bridge-real-handle-admission";
 pub const NATIVE_ROOT_BRIDGE_RUST_HANDLE_TABLE_ADMISSION_SMOKE_STATUS: &str =
     "mirrored-native-root-bridge-rust-handle-table-admission-smoke";
+pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_SMOKE_STATUS: &str =
+    "smoked-native-root-bridge-js-to-rust-json-transport";
+pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_FORMAT: &str = "json";
+pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_SCHEMA_VERSION: u32 = 1;
 pub const NATIVE_ROOT_BRIDGE_REQUEST_VALIDATION_MODEL: &str =
     "fast-react-napi.NativeRootBridgeRequestSequenceValidator";
 pub const NATIVE_ROOT_BRIDGE_HANDLE_TABLE_MODEL: &str = "fast-react-napi.BridgeHandleTable";
@@ -1241,6 +1390,8 @@ pub const NATIVE_ROOT_BRIDGE_RUST_HANDLE_TABLE_ADMISSION_SMOKE_RECORD_FIELDS: &[
     "value_handle_current_generation",
     "retired_root_source_error_code",
 ];
+pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_ENVELOPE_FIELDS: &[&str] =
+    &["transport", "schemaVersion", "requestRecords"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NativeTargetMetadata {
@@ -1618,9 +1769,10 @@ fn native_boundary_kind_for_root_bridge_request_error(
         root_bridge_requests::NativeRootBridgeRequestError::HandleTable(_)
         | root_bridge_requests::NativeRootBridgeRequestError::RecordRootHandleMismatch { .. }
         | root_bridge_requests::NativeRootBridgeRequestError::RecordRootIdMismatch { .. }
-        | root_bridge_requests::NativeRootBridgeRequestError::UnexpectedValueHandle { .. } => {
-            NativeBoundaryErrorKind::RootBridgeValidationFailed
-        }
+        | root_bridge_requests::NativeRootBridgeRequestError::UnexpectedValueHandle { .. }
+        | root_bridge_requests::NativeRootBridgeRequestError::JsonTransportRecordInvalid {
+            ..
+        } => NativeBoundaryErrorKind::RootBridgeValidationFailed,
     }
 }
 
@@ -1633,11 +1785,13 @@ mod tests {
     };
     use crate::root_bridge_requests::{
         NativeRootBridgeCreateRequest, NativeRootBridgeHandleAdmissionAction,
+        NativeRootBridgeJsonTransportHandle, NativeRootBridgeJsonTransportRecord,
         NativeRootBridgeLifecycleTransition, NativeRootBridgeRenderRequest,
         NativeRootBridgeRequestError, NativeRootBridgeRequestKind, NativeRootBridgeRequestRecord,
         NativeRootBridgeRequestRecorder, NativeRootBridgeRequestSequenceValidator,
         NativeRootBridgeRootHandleState, NativeRootBridgeUnmountRequest,
         smoke_admit_js_native_root_bridge_handoff_records,
+        smoke_admit_js_native_root_bridge_json_transport_records,
     };
     use std::path::Path;
 
@@ -2343,6 +2497,121 @@ mod tests {
     }
 
     #[test]
+    fn native_root_bridge_json_transport_records_smoke_admit_through_handle_table() {
+        let records = [
+            NativeRootBridgeJsonTransportRecord::new(
+                1,
+                "create",
+                403,
+                NativeRootBridgeJsonTransportHandle::new(403, 1, 1, "root"),
+                1,
+                Some(NativeRootBridgeJsonTransportHandle::new(403, 2, 1, "value")),
+                "active",
+            ),
+            NativeRootBridgeJsonTransportRecord::new(
+                2,
+                "render",
+                403,
+                NativeRootBridgeJsonTransportHandle::new(403, 1, 1, "root"),
+                1,
+                Some(NativeRootBridgeJsonTransportHandle::new(403, 3, 1, "value")),
+                "active",
+            ),
+            NativeRootBridgeJsonTransportRecord::new(
+                3,
+                "unmount",
+                403,
+                NativeRootBridgeJsonTransportHandle::new(403, 1, 1, "root"),
+                1,
+                None,
+                "retired",
+            ),
+        ];
+
+        let smoke = smoke_admit_js_native_root_bridge_json_transport_records(&records).unwrap();
+        let admission_records = smoke.admission_records();
+        let validation_records = smoke.validation_records();
+
+        assert_eq!(smoke.environment_id(), BridgeEnvironmentId::from_raw(403));
+        assert_eq!(smoke.root_id(), Some(1));
+        assert!(smoke.root_retired());
+        assert_eq!(admission_records.len(), 3);
+        assert_eq!(
+            admission_records
+                .iter()
+                .map(|record| record.lifecycle_transition().code())
+                .collect::<Vec<_>>(),
+            ["none->active", "active->active", "active->retired"]
+        );
+        assert_eq!(
+            admission_records
+                .iter()
+                .map(|record| record.root_handle_action().code())
+                .collect::<Vec<_>>(),
+            [
+                "admit-root-handle",
+                "validate-active-root-handle",
+                "retire-root-handle"
+            ]
+        );
+        assert_eq!(
+            admission_records
+                .iter()
+                .map(|record| record.root_handle_current_generation())
+                .collect::<Vec<_>>(),
+            [1, 1, 2]
+        );
+        assert_eq!(
+            admission_records
+                .iter()
+                .map(|record| record.value_handle_action().map(|action| action.code()))
+                .collect::<Vec<_>>(),
+            [Some("admit-value-handle"), Some("admit-value-handle"), None]
+        );
+        assert_eq!(
+            admission_records[2].retired_root_source_error_code(),
+            Some("FAST_REACT_NAPI_STALE_HANDLE")
+        );
+        assert_eq!(
+            validation_records
+                .iter()
+                .map(|record| record.kind().code())
+                .collect::<Vec<_>>(),
+            ["create", "render", "unmount"]
+        );
+        assert!(validation_records[0].value_handle_validated());
+        assert!(validation_records[1].value_handle_validated());
+        assert!(!validation_records[2].value_handle_validated());
+    }
+
+    #[test]
+    fn native_root_bridge_json_transport_records_reject_unknown_codes() {
+        let records = [NativeRootBridgeJsonTransportRecord::new(
+            1,
+            "update",
+            403,
+            NativeRootBridgeJsonTransportHandle::new(403, 1, 1, "root"),
+            1,
+            None,
+            "active",
+        )];
+
+        let error = smoke_admit_js_native_root_bridge_json_transport_records(&records).unwrap_err();
+
+        assert_eq!(
+            error,
+            NativeRootBridgeRequestError::JsonTransportRecordInvalid {
+                field: "kind",
+                value: "update"
+            }
+        );
+        assert_eq!(
+            error.code(),
+            "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_RECORD_INVALID"
+        );
+    }
+
+    #[test]
     fn native_root_bridge_js_request_shape_metadata_matches_handle_validation_model() {
         assert_eq!(
             NATIVE_ROOT_BRIDGE_JS_REQUEST_SHAPE_GATE_STATUS,
@@ -2356,6 +2625,12 @@ mod tests {
             NATIVE_ROOT_BRIDGE_RUST_HANDLE_TABLE_ADMISSION_SMOKE_STATUS,
             "mirrored-native-root-bridge-rust-handle-table-admission-smoke"
         );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_SMOKE_STATUS,
+            "smoked-native-root-bridge-js-to-rust-json-transport"
+        );
+        assert_eq!(NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_FORMAT, "json");
+        assert_eq!(NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_SCHEMA_VERSION, 1);
         assert_eq!(
             NATIVE_ROOT_BRIDGE_REQUEST_VALIDATION_MODEL,
             "fast-react-napi.NativeRootBridgeRequestSequenceValidator"
@@ -2462,6 +2737,10 @@ mod tests {
                 "value_handle_current_generation",
                 "retired_root_source_error_code"
             ]
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_ENVELOPE_FIELDS,
+            &["transport", "schemaVersion", "requestRecords"]
         );
     }
 
