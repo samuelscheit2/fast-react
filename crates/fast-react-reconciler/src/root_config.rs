@@ -582,6 +582,7 @@ impl PendingPassiveEffectRecord {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PendingPassiveState {
     root: Option<FiberRootId>,
+    finished_work: Option<FiberId>,
     lanes: Lanes,
     passive_unmounts: Vec<PendingPassiveEffectRecord>,
     passive_mounts: Vec<PendingPassiveEffectRecord>,
@@ -591,6 +592,7 @@ pub struct PendingPassiveState {
 impl PendingPassiveState {
     pub const NONE: Self = Self {
         root: None,
+        finished_work: None,
         lanes: Lanes::NO,
         passive_unmounts: Vec::new(),
         passive_mounts: Vec::new(),
@@ -601,6 +603,7 @@ impl PendingPassiveState {
     pub const fn new(root: Option<FiberRootId>, lanes: Lanes) -> Self {
         Self {
             root,
+            finished_work: None,
             lanes,
             passive_unmounts: Vec::new(),
             passive_mounts: Vec::new(),
@@ -614,6 +617,11 @@ impl PendingPassiveState {
     }
 
     #[must_use]
+    pub const fn finished_work(&self) -> Option<FiberId> {
+        self.finished_work
+    }
+
+    #[must_use]
     pub const fn lanes(&self) -> Lanes {
         self.lanes
     }
@@ -621,9 +629,15 @@ impl PendingPassiveState {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.root.is_none()
+            && self.finished_work.is_none()
             && self.lanes.is_empty()
             && self.passive_unmounts.is_empty()
             && self.passive_mounts.is_empty()
+    }
+
+    #[must_use]
+    pub fn has_commit_handoff(&self) -> bool {
+        self.root.is_some() && self.finished_work.is_some() && self.lanes.is_non_empty()
     }
 
     #[must_use]
@@ -677,6 +691,21 @@ impl PendingPassiveState {
         self.passive_unmounts
             .iter()
             .chain(self.passive_mounts.iter())
+    }
+
+    pub(crate) fn record_commit_handoff(
+        &mut self,
+        root: FiberRootId,
+        finished_work: FiberId,
+        lanes: Lanes,
+    ) -> bool {
+        if self.root != Some(root) || lanes.is_empty() {
+            return false;
+        }
+
+        self.finished_work = Some(finished_work);
+        self.lanes = lanes;
+        true
     }
 
     fn next_order(
@@ -858,7 +887,9 @@ mod tests {
 
         assert!(state.is_empty());
         assert!(!state.has_effects());
+        assert!(!state.has_commit_handoff());
         assert_eq!(state.root(), None);
+        assert_eq!(state.finished_work(), None);
         assert_eq!(state.lanes(), Lanes::NO);
         assert!(state.passive_unmounts().is_empty());
         assert!(state.passive_mounts().is_empty());
@@ -873,6 +904,44 @@ mod tests {
             None
         );
         assert!(state.is_empty());
+    }
+
+    #[test]
+    fn root_config_pending_passive_commit_handoff_records_only_root_finished_work_and_lanes() {
+        let mut state = PendingPassiveState::new(Some(root_id()), Lanes::SYNC);
+        let finished_work = fiber_id(4);
+
+        assert!(state.record_commit_handoff(root_id(), finished_work, Lanes::DEFAULT));
+
+        assert_eq!(state.root(), Some(root_id()));
+        assert_eq!(state.finished_work(), Some(finished_work));
+        assert_eq!(state.lanes(), Lanes::DEFAULT);
+        assert!(state.has_commit_handoff());
+        assert!(!state.has_effects());
+        assert!(state.passive_unmounts().is_empty());
+        assert!(state.passive_mounts().is_empty());
+        assert_eq!(state.flush_ordered_records().count(), 0);
+    }
+
+    #[test]
+    fn root_config_pending_passive_commit_handoff_rejects_empty_or_wrong_root() {
+        let finished_work = fiber_id(5);
+        let mut empty = PendingPassiveState::default();
+        let mut state = PendingPassiveState::new(Some(root_id()), Lanes::SYNC);
+        let wrong_root = FiberRootId::new(2).unwrap();
+
+        assert!(!empty.record_commit_handoff(root_id(), finished_work, Lanes::DEFAULT));
+        assert!(empty.is_empty());
+
+        assert!(!state.record_commit_handoff(root_id(), finished_work, Lanes::NO));
+        assert_eq!(state.finished_work(), None);
+        assert_eq!(state.lanes(), Lanes::SYNC);
+        assert!(!state.has_commit_handoff());
+
+        assert!(!state.record_commit_handoff(wrong_root, finished_work, Lanes::DEFAULT));
+        assert_eq!(state.finished_work(), None);
+        assert_eq!(state.lanes(), Lanes::SYNC);
+        assert!(!state.has_commit_handoff());
     }
 
     #[test]

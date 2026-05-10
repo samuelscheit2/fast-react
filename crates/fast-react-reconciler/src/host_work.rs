@@ -2,8 +2,8 @@
 //!
 //! This module intentionally uses the tiny `test_support` element source. It
 //! exercises reconciler-owned topology, detached host creation, state-node
-//! handles, and bubbling without exposing a public renderer or committing to a
-//! root container.
+//! handles owned by the private host-node store, and bubbling without exposing
+//! a public renderer or committing to a root container.
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
@@ -17,13 +17,15 @@ use fast_react_host_config::{
     HostFiberTokenTarget, HostIdentityAndContext, InitialChildrenFinalization,
 };
 
+use crate::host_nodes::{HostNodeMetadata, HostNodeScope, HostNodeStore, HostNodeValidationError};
 use crate::test_support::{
     FakeHostFiberToken, FakeInstance, FakeTextInstance, RecordingHost, TestHostElement,
     TestHostNode, TestHostText, TestHostTree,
 };
 use crate::{
-    FiberRootId, FiberRootStore, FiberRootStoreError, HostRootRenderPhaseRecord, RootElementHandle,
-    RootOptions, render_host_root_for_lanes, update_container,
+    FiberRootId, FiberRootStore, FiberRootStoreError, HostFiberTokenStore,
+    HostFiberTokenValidationError, HostRootRenderPhaseRecord, RootElementHandle, RootOptions,
+    render_host_root_for_lanes, update_container,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,6 +33,8 @@ enum HostWorkError {
     FiberRootStore(FiberRootStoreError),
     FiberTopology(FiberTopologyError),
     Host(HostError),
+    HostFiberToken(HostFiberTokenValidationError),
+    HostNode(HostNodeValidationError),
     MissingTestRootElement {
         handle: RootElementHandle,
     },
@@ -57,6 +61,8 @@ impl Display for HostWorkError {
             Self::FiberRootStore(error) => Display::fmt(error, formatter),
             Self::FiberTopology(error) => Display::fmt(error, formatter),
             Self::Host(error) => Display::fmt(error, formatter),
+            Self::HostFiberToken(error) => Display::fmt(error, formatter),
+            Self::HostNode(error) => Display::fmt(error, formatter),
             Self::MissingTestRootElement { handle } => write!(
                 formatter,
                 "test host element handle {} is not registered",
@@ -99,6 +105,8 @@ impl Error for HostWorkError {
             Self::FiberRootStore(error) => Some(error),
             Self::FiberTopology(error) => Some(error),
             Self::Host(error) => Some(error),
+            Self::HostFiberToken(error) => Some(error),
+            Self::HostNode(error) => Some(error),
             Self::MissingTestRootElement { .. }
             | Self::ExpectedFiberTag { .. }
             | Self::MissingStateNode { .. }
@@ -126,57 +134,84 @@ impl From<HostError> for HostWorkError {
     }
 }
 
-#[derive(Debug, Default)]
+impl From<HostFiberTokenValidationError> for HostWorkError {
+    fn from(error: HostFiberTokenValidationError) -> Self {
+        Self::HostFiberToken(error)
+    }
+}
+
+impl From<HostNodeValidationError> for HostWorkError {
+    fn from(error: HostNodeValidationError) -> Self {
+        Self::HostNode(error)
+    }
+}
+
+#[derive(Default)]
 struct DetachedHostRecords {
-    instances: Vec<FakeInstance>,
-    texts: Vec<FakeTextInstance>,
+    nodes: HostNodeStore<RecordingHost>,
+    scopes: Vec<Option<HostNodeScope>>,
+}
+
+impl fmt::Debug for DetachedHostRecords {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("DetachedHostRecords")
+            .field("instance_count", &self.instance_count())
+            .field("text_count", &self.text_count())
+            .finish()
+    }
 }
 
 impl DetachedHostRecords {
-    fn insert_instance(&mut self, instance: FakeInstance) -> StateNodeHandle {
-        let handle = StateNodeHandle::from_raw(self.instances.len() as u64 + 1);
-        self.instances.push(instance);
+    fn insert_instance(&mut self, scope: HostNodeScope, instance: FakeInstance) -> StateNodeHandle {
+        let handle = self.nodes.insert_instance(scope, instance);
+        self.remember_scope(handle, scope);
         handle
     }
 
-    fn insert_text(&mut self, text: FakeTextInstance) -> StateNodeHandle {
-        let handle = StateNodeHandle::from_raw(self.texts.len() as u64 + 1);
-        self.texts.push(text);
+    fn insert_text(&mut self, scope: HostNodeScope, text: FakeTextInstance) -> StateNodeHandle {
+        let handle = self.nodes.insert_text(scope, text);
+        self.remember_scope(handle, scope);
         handle
     }
 
     fn instance(&self, handle: StateNodeHandle) -> Result<&FakeInstance, HostWorkError> {
-        if handle.is_none() {
-            return Err(HostWorkError::InvalidDetachedInstance { handle });
-        }
-
-        self.instances
-            .get((handle.raw() - 1) as usize)
-            .ok_or(HostWorkError::InvalidDetachedInstance { handle })
+        let scope = self.scope(handle, HostFiberTokenTarget::Instance)?;
+        Ok(self.nodes.instance(handle, scope)?)
     }
 
     fn text(&self, handle: StateNodeHandle) -> Result<&FakeTextInstance, HostWorkError> {
-        if handle.is_none() {
-            return Err(HostWorkError::InvalidDetachedText { handle });
-        }
+        let scope = self.scope(handle, HostFiberTokenTarget::TextInstance)?;
+        Ok(self.nodes.text(handle, scope)?)
+    }
 
-        self.texts
-            .get((handle.raw() - 1) as usize)
-            .ok_or(HostWorkError::InvalidDetachedText { handle })
+    fn instance_metadata(
+        &self,
+        handle: StateNodeHandle,
+    ) -> Result<HostNodeMetadata, HostWorkError> {
+        let scope = self.scope(handle, HostFiberTokenTarget::Instance)?;
+        Ok(self.nodes.instance_metadata(handle, scope)?)
+    }
+
+    fn text_metadata(&self, handle: StateNodeHandle) -> Result<HostNodeMetadata, HostWorkError> {
+        let scope = self.scope(handle, HostFiberTokenTarget::TextInstance)?;
+        Ok(self.nodes.text_metadata(handle, scope)?)
     }
 
     fn instance_count(&self) -> usize {
-        self.instances.len()
+        self.nodes.instance_count()
     }
 
     fn text_count(&self) -> usize {
-        self.texts.len()
+        self.nodes.text_count()
     }
 
     fn append_initial_child(
         &self,
+        tokens: &HostFiberTokenStore,
         host: &mut RecordingHost,
         parent: &mut FakeInstance,
+        root_id: FiberRootId,
         child_fiber: &fast_react_core::FiberNode,
     ) -> Result<(), HostWorkError> {
         let state_node = child_fiber.state_node();
@@ -189,11 +224,25 @@ impl DetachedHostRecords {
 
         match child_fiber.tag() {
             FiberTag::HostComponent => {
-                let child = self.instance(state_node)?;
+                let scope = self.validated_child_scope(
+                    tokens,
+                    state_node,
+                    root_id,
+                    child_fiber.id(),
+                    HostFiberTokenTarget::Instance,
+                )?;
+                let child = self.nodes.instance(state_node, scope)?;
                 host.append_initial_child(parent, HostChild::Instance(child))?;
             }
             FiberTag::HostText => {
-                let child = self.text(state_node)?;
+                let scope = self.validated_child_scope(
+                    tokens,
+                    state_node,
+                    root_id,
+                    child_fiber.id(),
+                    HostFiberTokenTarget::TextInstance,
+                )?;
+                let child = self.nodes.text(state_node, scope)?;
                 host.append_initial_child(parent, HostChild::Text(child))?;
             }
             actual => {
@@ -206,6 +255,63 @@ impl DetachedHostRecords {
         }
 
         Ok(())
+    }
+
+    fn remember_scope(&mut self, handle: StateNodeHandle, scope: HostNodeScope) {
+        let index = (handle.raw() - 1) as usize;
+        if self.scopes.len() <= index {
+            self.scopes.resize(index + 1, None);
+        }
+        self.scopes[index] = Some(scope);
+    }
+
+    fn validated_child_scope(
+        &self,
+        tokens: &HostFiberTokenStore,
+        handle: StateNodeHandle,
+        root_id: FiberRootId,
+        fiber_id: FiberId,
+        target: HostFiberTokenTarget,
+    ) -> Result<HostNodeScope, HostWorkError> {
+        let stored_scope = self.scope(handle, target)?;
+        let lookup_scope = HostNodeScope::new(
+            root_id,
+            fiber_id,
+            stored_scope.token_id(),
+            stored_scope.phase(),
+        );
+        tokens.validate(
+            lookup_scope.token_id(),
+            lookup_scope.root_id(),
+            lookup_scope.fiber_id(),
+            lookup_scope.phase(),
+            target,
+        )?;
+        Ok(lookup_scope)
+    }
+
+    fn scope(
+        &self,
+        handle: StateNodeHandle,
+        target: HostFiberTokenTarget,
+    ) -> Result<HostNodeScope, HostWorkError> {
+        if handle.is_none() {
+            return Err(Self::invalid_handle(handle, target));
+        }
+
+        self.scopes
+            .get((handle.raw() - 1) as usize)
+            .copied()
+            .flatten()
+            .ok_or_else(|| Self::invalid_handle(handle, target))
+    }
+
+    fn invalid_handle(handle: StateNodeHandle, target: HostFiberTokenTarget) -> HostWorkError {
+        match target {
+            HostFiberTokenTarget::Instance => HostWorkError::InvalidDetachedInstance { handle },
+            HostFiberTokenTarget::TextInstance => HostWorkError::InvalidDetachedText { handle },
+            _ => HostWorkError::InvalidDetachedInstance { handle },
+        }
     }
 }
 
@@ -428,13 +534,9 @@ fn complete_host_component(
     parent_context: &(),
     detached_hosts: &mut DetachedHostRecords,
 ) -> Result<(), HostWorkError> {
-    let token_id = store.host_tokens_mut().issue(
-        root_id,
-        fiber,
-        HostFiberTokenPhase::Creation,
-        HostFiberTokenTarget::Instance,
-    );
-    let token = FakeHostFiberToken(token_id.raw());
+    let scope =
+        issue_creation_host_node_scope(store, root_id, fiber, HostFiberTokenTarget::Instance)?;
+    let token = FakeHostFiberToken(scope.token_id().raw());
     let mut instance = host.create_instance(
         HostFiberTokenRef::new(
             &token,
@@ -449,7 +551,13 @@ fn complete_host_component(
 
     for child in store.fiber_arena().child_ids(fiber)? {
         let child_fiber = store.fiber_arena().get(child)?;
-        detached_hosts.append_initial_child(host, &mut instance, child_fiber)?;
+        detached_hosts.append_initial_child(
+            store.host_tokens(),
+            host,
+            &mut instance,
+            root_id,
+            child_fiber,
+        )?;
     }
 
     let finalization = host.finalize_initial_children(
@@ -459,7 +567,7 @@ fn complete_host_component(
         container,
         parent_context,
     )?;
-    let state_node = detached_hosts.insert_instance(instance);
+    let state_node = detached_hosts.insert_instance(scope, instance);
     complete_fiber_common(store, fiber, element.props(), state_node, finalization)
 }
 
@@ -474,13 +582,9 @@ fn complete_host_text(
     parent_context: &(),
     detached_hosts: &mut DetachedHostRecords,
 ) -> Result<(), HostWorkError> {
-    let token_id = store.host_tokens_mut().issue(
-        root_id,
-        fiber,
-        HostFiberTokenPhase::Creation,
-        HostFiberTokenTarget::TextInstance,
-    );
-    let token = FakeHostFiberToken(token_id.raw());
+    let scope =
+        issue_creation_host_node_scope(store, root_id, fiber, HostFiberTokenTarget::TextInstance)?;
+    let token = FakeHostFiberToken(scope.token_id().raw());
     let text_instance = host.create_text_instance(
         HostFiberTokenRef::new(
             &token,
@@ -491,7 +595,7 @@ fn complete_host_text(
         container,
         parent_context,
     )?;
-    let state_node = detached_hosts.insert_text(text_instance);
+    let state_node = detached_hosts.insert_text(scope, text_instance);
     complete_fiber_common(
         store,
         fiber,
@@ -499,6 +603,31 @@ fn complete_host_text(
         state_node,
         InitialChildrenFinalization::NoCommitMount,
     )
+}
+
+fn issue_creation_host_node_scope(
+    store: &mut FiberRootStore<RecordingHost>,
+    root_id: FiberRootId,
+    fiber: FiberId,
+    target: HostFiberTokenTarget,
+) -> Result<HostNodeScope, HostWorkError> {
+    let token_id =
+        store
+            .host_tokens_mut()
+            .issue(root_id, fiber, HostFiberTokenPhase::Creation, target);
+    store.host_tokens().validate(
+        token_id,
+        root_id,
+        fiber,
+        HostFiberTokenPhase::Creation,
+        target,
+    )?;
+    Ok(HostNodeScope::new(
+        root_id,
+        fiber,
+        token_id,
+        HostFiberTokenPhase::Creation,
+    ))
 }
 
 fn complete_fiber_common(
@@ -551,6 +680,7 @@ fn expect_tag(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::host_nodes::HostNodeViolation;
     use crate::test_support::{FakeContainer, FakeHostChild};
 
     fn root_store() -> (FiberRootStore<RecordingHost>, FiberRootId) {
@@ -639,6 +769,96 @@ mod tests {
                 "append_initial_child",
                 "finalize_initial_children",
             ]
+        );
+    }
+
+    #[test]
+    fn host_work_detached_records_validate_through_host_node_store_scopes() {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut source = TestHostTree::new();
+        let element = source.insert_host_element_with_text("article", "stored");
+        let render = render_test_root(&mut store, root_id, element);
+
+        let result = mount_test_host_work(&mut store, &mut host, render, &source).unwrap();
+
+        let component = result.root_child.unwrap();
+        let component_node = store.fiber_arena().get(component).unwrap();
+        let text = component_node.child().unwrap();
+        let text_node = store.fiber_arena().get(text).unwrap();
+        let instance_handle = component_node.state_node();
+        let text_handle = text_node.state_node();
+        assert_ne!(instance_handle, text_handle);
+
+        let instance_metadata = result
+            .detached_hosts()
+            .instance_metadata(instance_handle)
+            .unwrap();
+        assert_eq!(instance_metadata.handle(), instance_handle);
+        assert_eq!(instance_metadata.root_id(), root_id);
+        assert_eq!(instance_metadata.fiber_id(), component);
+        assert_eq!(instance_metadata.phase(), HostFiberTokenPhase::Creation);
+        assert_eq!(instance_metadata.target(), HostFiberTokenTarget::Instance);
+        assert!(instance_metadata.is_active());
+        store
+            .host_tokens()
+            .validate(
+                instance_metadata.token_id(),
+                root_id,
+                component,
+                HostFiberTokenPhase::Creation,
+                HostFiberTokenTarget::Instance,
+            )
+            .unwrap();
+
+        let text_metadata = result.detached_hosts().text_metadata(text_handle).unwrap();
+        assert_eq!(text_metadata.handle(), text_handle);
+        assert_eq!(text_metadata.root_id(), root_id);
+        assert_eq!(text_metadata.fiber_id(), text);
+        assert_eq!(text_metadata.phase(), HostFiberTokenPhase::Creation);
+        assert_eq!(text_metadata.target(), HostFiberTokenTarget::TextInstance);
+        assert!(text_metadata.is_active());
+        store
+            .host_tokens()
+            .validate(
+                text_metadata.token_id(),
+                root_id,
+                text,
+                HostFiberTokenPhase::Creation,
+                HostFiberTokenTarget::TextInstance,
+            )
+            .unwrap();
+
+        let wrong_fiber_scope = HostNodeScope::new(
+            root_id,
+            text,
+            instance_metadata.token_id(),
+            HostFiberTokenPhase::Creation,
+        );
+        assert_eq!(
+            result
+                .detached_hosts()
+                .nodes
+                .instance(instance_handle, wrong_fiber_scope)
+                .unwrap_err()
+                .violation(),
+            HostNodeViolation::WrongFiber
+        );
+
+        let instance_scope = HostNodeScope::new(
+            root_id,
+            component,
+            instance_metadata.token_id(),
+            HostFiberTokenPhase::Creation,
+        );
+        assert_eq!(
+            result
+                .detached_hosts()
+                .nodes
+                .text(instance_handle, instance_scope)
+                .unwrap_err()
+                .violation(),
+            HostNodeViolation::WrongTarget
         );
     }
 
