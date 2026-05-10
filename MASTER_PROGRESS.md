@@ -52,6 +52,14 @@ sequencing belong in `MASTER_PLAN.md`.
 - The batch was verified after merge with `cargo fmt --all --check`, full
   `fast-react-reconciler` tests, conflict-marker scanning, and `git diff
   --check`.
+- Workers 685 and 694 were accepted from the active queue. The batch added
+  private root work-loop finished-work-to-commit handoff metadata and nested
+  sync-flush/act root continuation ordering with lane preservation, while
+  public render, act, flushSync, Scheduler, and renderer compatibility remain
+  blocked.
+- The batch was verified after merge with `cargo fmt --all --check`, full
+  `fast-react-reconciler` tests, conflict-marker scanning, and `git diff
+  --check`.
 
 ### Queue 655-684
 
