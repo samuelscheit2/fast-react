@@ -330,6 +330,36 @@ const scenarios = {
     });
   },
 
+  "clone-key-ref-warning-access": (target) => {
+    const React = loadReact(target);
+    const sourceRef = function sourceRef() {};
+    const cloneRef = function cloneRef() {};
+    return captureOperation("cloneElement key/ref warning access", () => {
+      const element = React.createElement("div", {
+        key: "source-key",
+        ref: sourceRef
+      });
+      const clone = React.cloneElement(element, {
+        key: "clone-key",
+        ref: cloneRef
+      });
+      const before = describeElement(clone);
+      const keyAccess = captureOperation("read cloned props.key", () =>
+        describeValue(clone.props.key)
+      );
+      const refAccess = captureOperation("read cloned element.ref", () =>
+        describeValue(clone.ref)
+      );
+      return {
+        original: describeElement(element),
+        before,
+        keyAccess,
+        refAccess,
+        after: describeElement(clone)
+      };
+    });
+  },
+
   "jsx-no-key-reuses-config": (target) => {
     const { jsx } = loadJsxRuntime(target);
     const symbolKey = Symbol.for("fast-react.probe.jsx.identity-symbol");
@@ -426,6 +456,29 @@ const scenarios = {
     );
   },
 
+  "jsx-key-ref-warning-access": (target) => {
+    const { jsx } = loadJsxRuntime(target);
+    const refFn = function jsxRef() {};
+    return captureOperation("jsx key/ref warning access", () => {
+      const config = { ref: refFn, children: "child" };
+      const element = jsx("div", config, "jsx-key");
+      const before = describeElement(element);
+      const keyAccess = captureOperation("read jsx props.key", () =>
+        describeValue(element.props.key)
+      );
+      const refAccess = captureOperation("read jsx element.ref", () =>
+        describeValue(element.ref)
+      );
+      return {
+        before,
+        keyAccess,
+        refAccess,
+        after: describeElement(element),
+        propsIsConfig: element.props === config
+      };
+    });
+  },
+
   "jsxs-static-children-array": (target) => {
     const { jsxs } = loadJsxRuntime(target);
     const children = ["first", "second"];
@@ -447,6 +500,32 @@ const scenarios = {
     return captureOperation("jsxs static non-array warning", () =>
       describeElement(jsxs("div", { children: "single" }))
     );
+  },
+
+  "jsxs-key-ref-warning-access": (target) => {
+    const { jsxs } = loadJsxRuntime(target);
+    const refFn = function jsxsRef() {};
+    return captureOperation("jsxs key/ref warning access", () => {
+      const children = ["first", "second"];
+      const config = { ref: refFn, children };
+      const element = jsxs("div", config, "jsxs-key");
+      const before = describeElement(element);
+      const keyAccess = captureOperation("read jsxs props.key", () =>
+        describeValue(element.props.key)
+      );
+      const refAccess = captureOperation("read jsxs element.ref", () =>
+        describeValue(element.ref)
+      );
+      return {
+        before,
+        keyAccess,
+        refAccess,
+        after: describeElement(element),
+        propsIsConfig: element.props === config,
+        childrenInput: describeObject(children),
+        childrenIsInput: element.props.children === children
+      };
+    });
   },
 
   "jsxdev-basic": (target) => {
@@ -494,6 +573,44 @@ const scenarios = {
           undefined
         )
       );
+    });
+  },
+
+  "jsxdev-key-ref-warning-access": (target) => {
+    const { jsxDEV } = loadJsxDevRuntime(target);
+    return captureOperation("jsxDEV key/ref warning access", () => {
+      if (typeof jsxDEV !== "function") {
+        return {
+          jsxDEV: describeValue(jsxDEV),
+          callSkippedBecauseNotFunction: true
+        };
+      }
+
+      const refFn = function jsxDEVRef() {};
+      const config = { ref: refFn, children: "child" };
+      const element = jsxDEV(
+        "div",
+        config,
+        "jsxdev-key",
+        false,
+        { fileName: "source-file.js", lineNumber: 30, columnNumber: 6 },
+        undefined
+      );
+      const before = describeElement(element);
+      const keyAccess = captureOperation("read jsxDEV props.key", () =>
+        describeValue(element.props.key)
+      );
+      const refAccess = captureOperation("read jsxDEV element.ref", () =>
+        describeValue(element.ref)
+      );
+      return {
+        jsxDEV: describeValue(jsxDEV),
+        before,
+        keyAccess,
+        refAccess,
+        after: describeElement(element),
+        propsIsConfig: element.props === config
+      };
     });
   }
 };
