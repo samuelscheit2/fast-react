@@ -1966,6 +1966,18 @@ function createPortalEventOwnerRootGateRecord(
     normalizedDispatchPathRecord.targetHostInstanceNode ||
     normalizedDispatchPathRecord.targetNode ||
     null;
+  const portalOwnerRootEventPath = createPortalOwnerRootEventPath(
+    normalizedDispatchPathRecord,
+    ownerRoot
+  );
+  const portalContainerPathDiagnostic = createPortalContainerPathDiagnostic(
+    normalizedOptions.portalContainer,
+    normalizedOptions.rootContainer,
+    targetNode,
+    entries,
+    ownerRoot
+  );
+  const portalContainerPath = portalContainerPathDiagnostic.record;
   const portalContainerContainsTarget = isInclusiveAncestor(
     normalizedOptions.portalContainer,
     targetNode
@@ -1986,6 +1998,7 @@ function createPortalEventOwnerRootGateRecord(
     hostFiberPath: Object.freeze(normalizedOptions.hostFiberPath.slice()),
     kind: PORTAL_EVENT_OWNER_ROOT_GATE_RECORD_KIND,
     listenerInvocationCount: 0,
+    ownerRootInfo: Object.freeze(describePortalOwnerRoot(ownerRoot)),
     ownerRootMatchesTargetRoot,
     ownerRootRequired: true,
     portalContainerContainsTarget,
@@ -1996,10 +2009,25 @@ function createPortalEventOwnerRootGateRecord(
     portalContainerIsRootContainer:
       normalizedOptions.portalContainer !== null &&
       normalizedOptions.portalContainer === normalizedOptions.rootContainer,
+    portalContainerListenerDispatchBlocked: true,
+    portalContainerPath,
+    portalContainerPathLength: portalContainerPath.length,
+    portalContainerPathStatus: portalContainerPath.status,
+    portalContainerPathRootOwnerMatchCount:
+      portalContainerPath.rootOwnerMatchCount,
+    portalContainerPathRootOwnerMismatchCount:
+      portalContainerPath.rootOwnerMismatchCount,
+    portalContainerNestedInRootContainer:
+      portalContainerPath.portalContainerNestedInRootContainer,
     portalEventPathDiagnostic: true,
     portalKey: normalizedOptions.portalKey,
+    portalOwnerRootEventPath,
+    portalOwnerRootEventPathLength: portalOwnerRootEventPath.length,
+    portalOwnerRootEventPathStatus: normalizedDispatchPathRecord.status,
+    publicDispatchBlocked: true,
     publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
     publicDispatchEnabled: false,
+    publicPortalBubblingBlocked: true,
     publicPortalBubblingEnabled: false,
     publicRootBehaviorChanged: false,
     rootContainerContainsTarget,
@@ -2028,6 +2056,7 @@ function createPortalEventOwnerRootGateRecord(
       options: normalizedOptions.rawOptions,
       ownerRoot,
       portalContainer: normalizedOptions.portalContainer,
+      portalContainerPathNodes: portalContainerPathDiagnostic.nodes,
       rootContainer: normalizedOptions.rootContainer,
       targetDispatchPathEntries: entries,
       targetDispatchPathRecord: normalizedDispatchPathRecord,
@@ -3797,6 +3826,213 @@ function normalizePortalEventOwnerRootGateOptions(options) {
     sourceGateId:
       typeof normalizedOptions.sourceGateId === 'string'
         ? normalizedOptions.sourceGateId
+        : null
+  };
+}
+
+function createPortalOwnerRootEventPath(targetDispatchPathRecord, ownerRoot) {
+  return Object.freeze(
+    targetDispatchPathRecord.entries.map((entry) =>
+      Object.freeze({
+        kind: 'FastReactDomPortalOwnerRootEventPathEntryRecord',
+        index: entry.index,
+        componentTreeStatus: entry.componentTreeStatus,
+        eventDispatch: false,
+        isDirectEventTarget: entry.isDirectEventTarget,
+        isTargetHostInstance: entry.isTargetHostInstance,
+        latestPropsStatus: entry.latestPropsStatus,
+        listenerInvocationCount: 0,
+        nodeType: entry.nodeType,
+        publicDispatchEnabled: false,
+        publicPortalBubblingEnabled: false,
+        rootOwnerMatchesPortalOwner: entry.rootOwner === ownerRoot,
+        syntheticEventCount: 0,
+        targetHostInstanceStatus: entry.targetHostInstanceStatus
+      })
+    )
+  );
+}
+
+function createPortalContainerPathDiagnostic(
+  portalContainer,
+  rootContainer,
+  targetNode,
+  targetDispatchPathEntries,
+  ownerRoot
+) {
+  const pathNodes = [];
+  const visitedNodes = new Set();
+  let current = isObjectLike(targetNode) ? targetNode : null;
+  let portalContainerPathIndex = -1;
+  let rootContainerPathIndex = -1;
+
+  while (current !== null && !visitedNodes.has(current)) {
+    visitedNodes.add(current);
+    const index = pathNodes.length;
+    pathNodes.push(current);
+
+    if (current === portalContainer && portalContainerPathIndex === -1) {
+      portalContainerPathIndex = index;
+    }
+    if (current === rootContainer && rootContainerPathIndex === -1) {
+      rootContainerPathIndex = index;
+      break;
+    }
+
+    current = isObjectLike(current.parentNode) ? current.parentNode : null;
+  }
+
+  const pathEntries = Object.freeze(
+    pathNodes.map((node, index) =>
+      createPortalContainerPathEntry(
+        node,
+        index,
+        portalContainer,
+        rootContainer,
+        targetNode,
+        targetDispatchPathEntries,
+        ownerRoot
+      )
+    )
+  );
+  const rootOwnerMatchCount = pathEntries.filter(
+    (entry) => entry.rootOwnerMatchesPortalOwner
+  ).length;
+  const rootOwnerMismatchCount = pathEntries.filter(
+    (entry) => entry.rootOwnerMatchesPortalOwner === false
+  ).length;
+  const portalContainerFound = portalContainerPathIndex !== -1;
+  const rootContainerFound = rootContainerPathIndex !== -1;
+  const portalContainerNestedInRootContainer =
+    portalContainerFound &&
+    rootContainerFound &&
+    portalContainer !== rootContainer &&
+    portalContainerPathIndex < rootContainerPathIndex;
+
+  return {
+    nodes: Object.freeze(pathNodes.slice()),
+    record: Object.freeze({
+      kind: 'FastReactDomPortalContainerEventPathRecord',
+      entries: pathEntries,
+      length: pathEntries.length,
+      ownerRootPathIntersectsPortalContainerPath:
+        rootOwnerMatchCount + rootOwnerMismatchCount > 0,
+      portalContainerFound,
+      portalContainerInfo: isObjectLike(portalContainer)
+        ? Object.freeze(describeContainer(portalContainer))
+        : null,
+      portalContainerNestedInRootContainer,
+      portalContainerParentInfo:
+        isObjectLike(portalContainer) &&
+        isObjectLike(portalContainer.parentNode)
+          ? Object.freeze(describeContainer(portalContainer.parentNode))
+          : null,
+      portalContainerPathIndex,
+      publicDispatchEnabled: false,
+      publicPortalBubblingEnabled: false,
+      rootContainerFound,
+      rootContainerPathIndex,
+      rootOwnerMatchCount,
+      rootOwnerMismatchCount,
+      status: getPortalContainerPathStatus({
+        portalContainer,
+        portalContainerFound,
+        portalContainerPathIndex,
+        rootContainer,
+        rootContainerFound,
+        rootContainerPathIndex,
+        targetNode
+      }),
+      targetNodeInfo: isObjectLike(targetNode)
+        ? Object.freeze(describeContainer(targetNode))
+        : null
+    })
+  };
+}
+
+function createPortalContainerPathEntry(
+  node,
+  index,
+  portalContainer,
+  rootContainer,
+  targetNode,
+  targetDispatchPathEntries,
+  ownerRoot
+) {
+  const ownerRootPathEntry =
+    targetDispatchPathEntries.find(
+      (pathEntry) => pathEntry.targetHostInstanceNode === node
+    ) || null;
+
+  return Object.freeze({
+    kind: 'FastReactDomPortalContainerEventPathEntryRecord',
+    index,
+    nodeInfo: Object.freeze(describeContainer(node)),
+    isEventTarget: node === targetNode,
+    isPortalContainer: node === portalContainer,
+    isRootContainer: node === rootContainer,
+    ownerRootDispatchPathIndex:
+      ownerRootPathEntry === null ? null : ownerRootPathEntry.index,
+    ownerRootPathEntryFound: ownerRootPathEntry !== null,
+    publicDispatchEnabled: false,
+    publicPortalBubblingEnabled: false,
+    rootOwnerMatchesPortalOwner:
+      ownerRootPathEntry === null
+        ? null
+        : ownerRootPathEntry.rootOwner === ownerRoot
+  });
+}
+
+function getPortalContainerPathStatus({
+  portalContainer,
+  portalContainerFound,
+  portalContainerPathIndex,
+  rootContainer,
+  rootContainerFound,
+  rootContainerPathIndex,
+  targetNode
+}) {
+  if (!isObjectLike(targetNode)) {
+    return 'no-event-target-node';
+  }
+  if (!isObjectLike(portalContainer)) {
+    return 'no-portal-container';
+  }
+  if (!portalContainerFound) {
+    return 'portal-container-not-on-target-path';
+  }
+  if (portalContainer === rootContainer) {
+    return 'portal-container-is-root-container';
+  }
+  if (
+    rootContainerFound &&
+    portalContainerPathIndex < rootContainerPathIndex
+  ) {
+    return 'portal-container-path-to-root-container';
+  }
+  return 'portal-container-path-without-root-container';
+}
+
+function describePortalOwnerRoot(ownerRoot) {
+  if (!isObjectLike(ownerRoot)) {
+    return {
+      kind: String(ownerRoot),
+      rootId: null,
+      rootKind: null,
+      rootTag: null
+    };
+  }
+
+  return {
+    kind: typeof ownerRoot.kind === 'string' ? ownerRoot.kind : 'object',
+    rootId:
+      typeof ownerRoot.rootId === 'string' ? ownerRoot.rootId : null,
+    rootKind:
+      typeof ownerRoot.rootKind === 'string' ? ownerRoot.rootKind : null,
+    rootTag:
+      typeof ownerRoot.rootTag === 'string' ||
+      typeof ownerRoot.rootTag === 'number'
+        ? ownerRoot.rootTag
         : null
   };
 }

@@ -2621,11 +2621,28 @@ test('private portal event owner-root gate records portal child event path owner
   assert.equal(ownerGate.portalContainerContainsEventTarget, true);
   assert.equal(ownerGate.rootContainerContainsEventTarget, false);
   assert.equal(ownerGate.portalContainerIsRootContainer, false);
+  assert.equal(ownerGate.portalContainerNestedInRootContainer, false);
+  assert.equal(ownerGate.portalContainerPathLength, 2);
+  assert.equal(
+    ownerGate.portalContainerPathStatus,
+    'portal-container-path-without-root-container'
+  );
+  assert.equal(ownerGate.portalContainerPathRootOwnerMatchCount, 1);
+  assert.equal(ownerGate.portalOwnerRootEventPathLength, 1);
+  assert.deepEqual(ownerGate.ownerRootInfo, {
+    kind: 'FastReactDomPrivateRootOwner',
+    rootId: create.rootId,
+    rootKind: rootBridge.CLIENT_ROOT_KIND,
+    rootTag: rootBridge.CONCURRENT_ROOT_TAG
+  });
   assert.equal(ownerGate.portalOwnerRootAttached, true);
   assert.equal(ownerGate.portalEventPathDiagnostic, true);
   assert.equal(ownerGate.portalEventBubbling, false);
   assert.equal(ownerGate.publicPortalBubbling, false);
+  assert.equal(ownerGate.publicPortalBubblingBlocked, true);
   assert.equal(ownerGate.eventDispatch, false);
+  assert.equal(ownerGate.publicDispatchBlocked, true);
+  assert.equal(ownerGate.portalContainerListenerDispatchBlocked, true);
   assert.equal(ownerGate.listenerInvocationCount, 0);
   assert.equal(ownerGate.syntheticEventCount, 0);
   assert.equal(ownerGate.browserDomEventCompatibilityClaimed, false);
@@ -2650,8 +2667,22 @@ test('private portal event owner-root gate records portal child event path owner
     eventRecordStatus:
       pluginEventSystem.PRIVATE_PORTAL_EVENT_OWNER_ROOT_GATE_STATUS,
     listenerInvocationCount: 0,
+    ownerRootInfo: {
+      kind: 'FastReactDomPrivateRootOwner',
+      rootId: create.rootId,
+      rootKind: rootBridge.CLIENT_ROOT_KIND,
+      rootTag: rootBridge.CONCURRENT_ROOT_TAG
+    },
     ownerRootMatchesTargetRoot: true,
     portalContainerContainsTarget: true,
+    portalContainerNestedInRootContainer: false,
+    portalContainerPathLength: 2,
+    portalContainerPathStatus:
+      'portal-container-path-without-root-container',
+    portalContainerPathRootOwnerMatchCount: 1,
+    portalOwnerRootEventPathLength: 1,
+    publicDispatchBlocked: true,
+    publicPortalBubblingBlocked: true,
     publicPortalBubblingEnabled: false,
     rootContainerContainsTarget: false,
     syntheticEventCount: 0,
@@ -2695,6 +2726,35 @@ test('private portal event owner-root gate records portal child event path owner
   assert.equal(
     hiddenGate.targetDispatchPathRecord.entries[0].targetHostInstanceNode,
     hiddenGate.hostComponentNode
+  );
+  assert.equal(hiddenGate.eventOwnerRootGatePayload.ownerRoot, create.owner);
+  assert.deepEqual(
+    eventGate.portalOwnerRootEventPath.map((entry) => [
+      entry.index,
+      entry.isTargetHostInstance,
+      entry.rootOwnerMatchesPortalOwner,
+      entry.publicPortalBubblingEnabled,
+      entry.publicDispatchEnabled
+    ]),
+    [[0, true, true, false, false]]
+  );
+  assert.deepEqual(
+    eventGate.portalContainerPath.entries.map((entry) => [
+      entry.index,
+      entry.isEventTarget,
+      entry.isPortalContainer,
+      entry.isRootContainer,
+      entry.ownerRootDispatchPathIndex,
+      entry.rootOwnerMatchesPortalOwner
+    ]),
+    [
+      [0, true, false, false, 0, true],
+      [1, false, true, false, null, null]
+    ]
+  );
+  assert.deepEqual(
+    hiddenGate.eventOwnerRootGatePayload.portalContainerPathNodes,
+    [hiddenGate.hostComponentNode, portalContainer]
   );
   assert.equal(portalContainer.__registrations.length, 0);
   assert.equal(listenerRegistry.hasListeningMarker(portalContainer), false);
@@ -2957,6 +3017,136 @@ test('private focus/blur blocker gate records phase metadata and portal ownershi
 
   assert.equal(componentTree.detachHostInstanceToken(childToken), childToken);
   assert.equal(componentTree.detachHostInstanceToken(parentToken), parentToken);
+});
+
+test('private nested portal event owner-root gate records owner and container paths only', () => {
+  const document = createDocument('private-nested-portal-event-owner-root');
+  const rootContainer = createElement('DIV', document);
+  const portalHost = createElement('DIV', document);
+  const portalContainer = createElement('SECTION', document);
+  rootContainer.appendChild(portalHost);
+  portalHost.appendChild(portalContainer);
+  const portalChild = {
+    props: {
+      children: 'nested portal child',
+      onClick() {
+        throw new Error('nested portal listener should not run');
+      }
+    },
+    type: 'button'
+  };
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    portalBoundaryIdPrefix: 'nested-portal-boundary',
+    portalCommitIdPrefix: 'nested-portal-commit',
+    portalEventOwnerRootIdPrefix: 'nested-portal-owner',
+    portalMountIdPrefix: 'nested-portal-mount'
+  });
+  const create = bridge.createClientRoot(rootContainer);
+  const rootSideEffects = bridge.applyCreateRootSideEffects(create);
+  const portalHostToken = componentTree.createHostInstanceToken(
+    {kind: 'NestedPortalContainerHostOwner'},
+    create.owner
+  );
+  componentTree.attachHostInstanceNode(portalHost, portalHostToken, {});
+  const portal = reactDom.createPortal(
+    portalChild,
+    portalContainer,
+    'nested-portal-key'
+  );
+  const render = bridge.renderContainer(create.handle, portal);
+  const boundary = bridge.createPortalRootBoundary(render);
+  const handoff = bridge.createPortalCommitHandoff(boundary, {
+    pendingChildren: [portalChild]
+  });
+  const mount = bridge.createPortalFakeDomMountDiagnostic(handoff, {
+    explicitChild: portalChild
+  });
+  const ownerGate = bridge.createPortalEventOwnerRootGate(mount);
+  const hiddenGate =
+    rootBridge.getPrivateRootPortalEventOwnerRootGatePayload(ownerGate);
+  const eventGate = hiddenGate.eventOwnerRootGateRecord;
+  const eventGatePayload =
+    pluginEventSystem.getPortalEventOwnerRootGateRecordPayload(eventGate);
+
+  assert.equal(ownerGate.targetDispatchPathLength, 2);
+  assert.equal(ownerGate.dispatchPathRootOwnerMatchCount, 2);
+  assert.equal(ownerGate.dispatchPathRootOwnerMismatchCount, 0);
+  assert.equal(ownerGate.portalContainerContainsEventTarget, true);
+  assert.equal(ownerGate.rootContainerContainsEventTarget, true);
+  assert.equal(ownerGate.portalContainerNestedInRootContainer, true);
+  assert.equal(ownerGate.portalContainerPathLength, 4);
+  assert.equal(
+    ownerGate.portalContainerPathStatus,
+    'portal-container-path-to-root-container'
+  );
+  assert.equal(ownerGate.portalContainerPathRootOwnerMatchCount, 2);
+  assert.equal(ownerGate.portalOwnerRootEventPathLength, 2);
+  assert.equal(ownerGate.portalEventBubbling, false);
+  assert.equal(ownerGate.publicPortalBubbling, false);
+  assert.equal(ownerGate.publicPortalBubblingBlocked, true);
+  assert.equal(ownerGate.eventDispatch, false);
+  assert.equal(ownerGate.publicDispatchBlocked, true);
+  assert.equal(ownerGate.portalContainerListenerDispatchBlocked, true);
+  assert.equal(ownerGate.listenerInvocationCount, 0);
+  assert.equal(ownerGate.syntheticEventCount, 0);
+  assert.equal(ownerGate.compatibilityClaimed, false);
+  assert.deepEqual(
+    eventGate.portalOwnerRootEventPath.map((entry) => [
+      entry.index,
+      entry.isTargetHostInstance,
+      entry.rootOwnerMatchesPortalOwner,
+      entry.publicPortalBubblingEnabled,
+      entry.publicDispatchEnabled
+    ]),
+    [
+      [0, true, true, false, false],
+      [1, false, true, false, false]
+    ]
+  );
+  assert.deepEqual(
+    eventGate.portalContainerPath.entries.map((entry) => [
+      entry.index,
+      entry.isEventTarget,
+      entry.isPortalContainer,
+      entry.isRootContainer,
+      entry.ownerRootDispatchPathIndex,
+      entry.rootOwnerMatchesPortalOwner
+    ]),
+    [
+      [0, true, false, false, 0, true],
+      [1, false, true, false, null, null],
+      [2, false, false, false, 1, true],
+      [3, false, false, true, null, null]
+    ]
+  );
+  assert.equal(eventGate.portalContainerPath.portalContainerPathIndex, 1);
+  assert.equal(eventGate.portalContainerPath.rootContainerPathIndex, 3);
+  assert.equal(
+    eventGate.portalContainerPath.ownerRootPathIntersectsPortalContainerPath,
+    true
+  );
+  assert.deepEqual(eventGatePayload.portalContainerPathNodes, [
+    hiddenGate.hostComponentNode,
+    portalContainer,
+    portalHost,
+    rootContainer
+  ]);
+  assert.equal(
+    hiddenGate.targetDispatchPathRecord.entries[1].targetHostInstanceNode,
+    portalHost
+  );
+  assert.equal(portalContainer.__registrations.length, 0);
+  assert.equal(portalHost.__registrations.length, 0);
+  assert.equal(hiddenGate.hostComponentNode.__registrations.length, 0);
+
+  assert.equal(
+    componentTree.detachHostInstanceToken(portalHostToken),
+    portalHostToken
+  );
+  bridge.revertCreateRootSideEffects(rootSideEffects);
+  assert.equal(rootMarkers.isContainerMarkedAsRoot(rootContainer), false);
+  assert.equal(listenerRegistry.hasListeningMarker(rootContainer), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
 });
 
 test('private portal child reconciliation diagnostic updates one mounted fake-DOM HostComponent', () => {
@@ -3944,7 +4134,9 @@ test('private portal event listener error routing links owner-root metadata with
   assert.equal(routing.rootContainerContainsEventTarget, false);
   assert.equal(routing.portalEventBubbling, false);
   assert.equal(routing.publicPortalBubbling, false);
+  assert.equal(routing.publicPortalBubblingBlocked, true);
   assert.equal(routing.portalEventDispatch, false);
+  assert.equal(routing.publicDispatchBlocked, true);
   assert.equal(routing.portalListenerInstallation, false);
   assert.equal(routing.eventDispatch, false);
   assert.equal(routing.publicDispatchEnabled, false);
@@ -3987,7 +4179,9 @@ test('private portal event listener error routing links owner-root metadata with
   assert.equal(callbackRecord.rootContainerContainsEventTarget, false);
   assert.equal(callbackRecord.portalEventBubbling, false);
   assert.equal(callbackRecord.publicPortalBubbling, false);
+  assert.equal(callbackRecord.publicPortalBubblingBlocked, true);
   assert.equal(callbackRecord.portalEventDispatch, false);
+  assert.equal(callbackRecord.publicDispatchBlocked, true);
   assert.equal(callbackRecord.errorMessage, thrown.message);
   assert.equal(callbackRecord.errorCode, 'BRIDGE_PORTAL_EVENT_LISTENER_ROUTE');
   assert.equal(callbackRecord.reportGlobalErrorInvoked, false);
