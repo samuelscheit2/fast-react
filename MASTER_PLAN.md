@@ -46,39 +46,29 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Queue 473-502 is assigned in isolated worktrees.
-Workers 475 and 497 have been accepted, leaving 28 active top-level workers
-from this queue.
+Workers 474, 475, 476, 483, 487, 489, 493, 496, 497, 498, 501, and 502 have
+been accepted, leaving 18 active top-level workers from this queue.
 
 | Worker | Focus |
 | --- | --- |
 | 473 | Test renderer act passive-effect drain gate |
-| 474 | Passive effect mount/unmount execution gate |
-| 476 | Root commit effect ordering canary |
 | 477 | Function component `useMemo` bailout gate |
 | 478 | Function component `useEffect` update gate |
 | 479 | Context multi-consumer propagation gate |
 | 480 | Suspense/Offscreen blocker diagnostics |
 | 481 | Deletion passive/ref cleanup order gate |
 | 482 | Test renderer act Scheduler flush gate |
-| 483 | Test renderer `flushSync` act routing gate |
 | 484 | TestInstance `findBy*` private query gate |
 | 485 | Test renderer `toTree` multi-child gate |
 | 486 | React DOM root render private host output |
-| 487 | DOM event `preventDefault` gate |
 | 488 | DOM event error routing gate |
-| 489 | Hydration event replay ownership gate |
 | 490 | Controlled checkbox/radio restore gate |
 | 491 | Resource stylesheet precedence gate |
 | 492 | Form submit action metadata gate |
-| 493 | Scheduler mock yield/paint gate |
 | 494 | Scheduler postTask abort diagnostics |
 | 495 | Native batched JSON transport gate |
-| 496 | Native cross-environment teardown gate |
-| 498 | Benchmark act/passive timing canaries |
 | 499 | Root-render E2E act/passive admission |
 | 500 | Conformance act/passive local gate refresh |
-| 501 | Root commit callback lane-order gate |
-| 502 | React DOM test-utils act passive gate |
 
 ## Near-Term Sequencing
 

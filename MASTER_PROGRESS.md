@@ -29,6 +29,22 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Workers 474, 476, 483, 487, 489, 493, 496, 498, 501, and 502 were accepted
+  from queue 473-502. The batch added private passive mount/unmount callback
+  execution, root commit effect ordering, react-test-renderer `flushSync` act
+  routing metadata, DOM `preventDefault` diagnostics, hydration replay
+  ownership, Scheduler mock yield/paint diagnostics, native cross-environment
+  teardown diagnostics, act/passive benchmark canaries, root callback lane-order
+  diagnostics, and React DOM test-utils act passive metadata while keeping
+  public compatibility blocked.
+- Workers 474, 476, 483, 487, 489, 493, 496, 498, 501, and 502 were verified
+  after merge with full `fast-react-reconciler` and `fast-react-napi` Rust
+  tests, Rust fmt and clippy, React DOM/test-renderer/scheduler/native
+  workspace checks, benchmark checks, `npm run check:js`, conflict-marker
+  scanning, and `git diff --check`. Post-merge cleanup collapsed a
+  commit-order canary helper for strict clippy and refreshed the React act
+  conformance expectation for the accepted React DOM test-utils passive
+  prerequisite ids.
 - Workers 475 and 497 were accepted from queue 473-502. Worker 475 added
   private passive effect root error routing diagnostics for passive destroy and
   mount-create failures, preserving commit-phase root option callback metadata
