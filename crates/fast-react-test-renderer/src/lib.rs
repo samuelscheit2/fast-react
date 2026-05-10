@@ -1727,6 +1727,17 @@ pub const TEST_RENDERER_PRIVATE_TREE_ACCEPTED_FIBER_SHAPE: [&str; 3] =
 pub const TEST_RENDERER_PRIVATE_TREE_COMPOSITE_ACCEPTED_FIBER_SHAPE: [&str; 4] =
     ["HostRoot", "FunctionComponent", "HostComponent", "HostText"];
 pub const TEST_RENDERER_PRIVATE_TREE_FUNCTION_COMPONENT_TYPE: &str = "CanaryFunctionComponent";
+pub const TEST_RENDERER_PRIVATE_GET_INSTANCE_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.get-instance.private-class-root-canary";
+pub const TEST_RENDERER_PRIVATE_GET_INSTANCE_ACCEPTED_CLASS_FIBER_SHAPE: [&str; 4] =
+    ["HostRoot", "ClassComponent", "HostComponent", "HostText"];
+pub const TEST_RENDERER_PRIVATE_GET_INSTANCE_HOST_ROOT_FIBER_SHAPE: [&str; 2] =
+    ["HostRoot", "HostComponent"];
+pub const TEST_RENDERER_PRIVATE_GET_INSTANCE_FUNCTION_ROOT_FIBER_SHAPE: [&str; 2] =
+    ["HostRoot", "FunctionComponent"];
+pub const TEST_RENDERER_PRIVATE_GET_INSTANCE_CLASS_COMPONENT_TYPE: &str = "CanaryClassComponent";
+pub const TEST_RENDERER_PRIVATE_GET_INSTANCE_CLASS_CONSTRUCTOR_NAME: &str = "CanaryClassInstance";
+pub const TEST_RENDERER_PRIVATE_GET_INSTANCE_CLASS_STATE_MARKER: &str = "initial-state";
 pub const TEST_RENDERER_SERIALIZATION_ORACLE_KIND: &str =
     "react-19.2.6-react-test-renderer-serialization-oracle";
 pub const TEST_RENDERER_SERIALIZATION_ORACLE_PROBE_MODE_COUNT: usize = 2;
@@ -2846,6 +2857,244 @@ impl TestRendererPrivateTreeMetadataReport {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateGetInstanceFailClosedRootDiagnostic {
+    root_fiber_shape: [&'static str; 2],
+    root_child_fiber_tag: &'static str,
+    react_public_result: &'static str,
+    public_get_instance_available: bool,
+    private_class_instance_available: bool,
+    public_behavior_fail_closed: bool,
+}
+
+impl TestRendererPrivateGetInstanceFailClosedRootDiagnostic {
+    #[must_use]
+    pub const fn root_fiber_shape(&self) -> &[&'static str; 2] {
+        &self.root_fiber_shape
+    }
+
+    #[must_use]
+    pub const fn root_child_fiber_tag(&self) -> &'static str {
+        self.root_child_fiber_tag
+    }
+
+    #[must_use]
+    pub const fn react_public_result(&self) -> &'static str {
+        self.react_public_result
+    }
+
+    #[must_use]
+    pub const fn public_get_instance_available(&self) -> bool {
+        self.public_get_instance_available
+    }
+
+    #[must_use]
+    pub const fn private_class_instance_available(&self) -> bool {
+        self.private_class_instance_available
+    }
+
+    #[must_use]
+    pub const fn public_behavior_fail_closed(&self) -> bool {
+        self.public_behavior_fail_closed
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateGetInstanceClassInstanceDiagnostic {
+    constructor_name: &'static str,
+    props: TestProps,
+    state_marker: &'static str,
+    private_instance_available: bool,
+    public_get_instance_available: bool,
+    react_public_result: &'static str,
+}
+
+impl TestRendererPrivateGetInstanceClassInstanceDiagnostic {
+    #[must_use]
+    pub const fn constructor_name(&self) -> &'static str {
+        self.constructor_name
+    }
+
+    #[must_use]
+    pub const fn props(&self) -> &TestProps {
+        &self.props
+    }
+
+    #[must_use]
+    pub const fn state_marker(&self) -> &'static str {
+        self.state_marker
+    }
+
+    #[must_use]
+    pub const fn private_instance_available(&self) -> bool {
+        self.private_instance_available
+    }
+
+    #[must_use]
+    pub const fn public_get_instance_available(&self) -> bool {
+        self.public_get_instance_available
+    }
+
+    #[must_use]
+    pub const fn react_public_result(&self) -> &'static str {
+        self.react_public_result
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateGetInstanceClassComponentDiagnostic {
+    fiber_tag: &'static str,
+    component_type: &'static str,
+    props: TestProps,
+    state_node_available: bool,
+    rendered_child_fiber_tag: &'static str,
+    rendered_child_count: usize,
+    instance: TestRendererPrivateGetInstanceClassInstanceDiagnostic,
+    public_get_instance_available: bool,
+}
+
+impl TestRendererPrivateGetInstanceClassComponentDiagnostic {
+    #[must_use]
+    pub const fn fiber_tag(&self) -> &'static str {
+        self.fiber_tag
+    }
+
+    #[must_use]
+    pub const fn component_type(&self) -> &'static str {
+        self.component_type
+    }
+
+    #[must_use]
+    pub const fn props(&self) -> &TestProps {
+        &self.props
+    }
+
+    #[must_use]
+    pub const fn state_node_available(&self) -> bool {
+        self.state_node_available
+    }
+
+    #[must_use]
+    pub const fn rendered_child_fiber_tag(&self) -> &'static str {
+        self.rendered_child_fiber_tag
+    }
+
+    #[must_use]
+    pub const fn rendered_child_count(&self) -> usize {
+        self.rendered_child_count
+    }
+
+    #[must_use]
+    pub const fn instance(&self) -> &TestRendererPrivateGetInstanceClassInstanceDiagnostic {
+        &self.instance
+    }
+
+    #[must_use]
+    pub const fn public_get_instance_available(&self) -> bool {
+        self.public_get_instance_available
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateGetInstanceClassRootReport {
+    diagnostic_name: &'static str,
+    source_tree_diagnostic_name: &'static str,
+    gate: TestRendererSerializationGateReport,
+    host_output_update_kind: TestRendererRootUpdateKind,
+    host_output_snapshot_current: bool,
+    accepted_class_fiber_shape: [&'static str; 4],
+    host_root_fail_closed: TestRendererPrivateGetInstanceFailClosedRootDiagnostic,
+    function_root_fail_closed: TestRendererPrivateGetInstanceFailClosedRootDiagnostic,
+    class_component: TestRendererPrivateGetInstanceClassComponentDiagnostic,
+    rendered_host_component: TestRendererPrivateTreeHostComponentDiagnostic,
+    rendered_host_text: TestRendererPrivateTreeHostTextDiagnostic,
+    public_blockers: TestRendererPrivateJsonPublicSurfaceBlockers,
+    public_get_instance_available: bool,
+    native_bridge_available: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererPrivateGetInstanceClassRootReport {
+    #[must_use]
+    pub const fn diagnostic_name(&self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn source_tree_diagnostic_name(&self) -> &'static str {
+        self.source_tree_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn gate(&self) -> &TestRendererSerializationGateReport {
+        &self.gate
+    }
+
+    #[must_use]
+    pub const fn host_output_update_kind(&self) -> TestRendererRootUpdateKind {
+        self.host_output_update_kind
+    }
+
+    #[must_use]
+    pub const fn host_output_snapshot_current(&self) -> bool {
+        self.host_output_snapshot_current
+    }
+
+    #[must_use]
+    pub const fn accepted_class_fiber_shape(&self) -> &[&'static str; 4] {
+        &self.accepted_class_fiber_shape
+    }
+
+    #[must_use]
+    pub const fn host_root_fail_closed(
+        &self,
+    ) -> &TestRendererPrivateGetInstanceFailClosedRootDiagnostic {
+        &self.host_root_fail_closed
+    }
+
+    #[must_use]
+    pub const fn function_root_fail_closed(
+        &self,
+    ) -> &TestRendererPrivateGetInstanceFailClosedRootDiagnostic {
+        &self.function_root_fail_closed
+    }
+
+    #[must_use]
+    pub const fn class_component(&self) -> &TestRendererPrivateGetInstanceClassComponentDiagnostic {
+        &self.class_component
+    }
+
+    #[must_use]
+    pub const fn rendered_host_component(&self) -> &TestRendererPrivateTreeHostComponentDiagnostic {
+        &self.rendered_host_component
+    }
+
+    #[must_use]
+    pub const fn rendered_host_text(&self) -> &TestRendererPrivateTreeHostTextDiagnostic {
+        &self.rendered_host_text
+    }
+
+    #[must_use]
+    pub const fn public_blockers(&self) -> TestRendererPrivateJsonPublicSurfaceBlockers {
+        self.public_blockers
+    }
+
+    #[must_use]
+    pub const fn public_get_instance_available(&self) -> bool {
+        self.public_get_instance_available
+    }
+
+    #[must_use]
+    pub const fn native_bridge_available(&self) -> bool {
+        self.native_bridge_available
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(&self) -> bool {
+        self.compatibility_claimed
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TestRendererSerializationGateError {
     CommitRootMismatch {
         expected: FiberRootId,
@@ -3613,6 +3862,28 @@ impl TestRendererRoot {
             self.describe_private_json_serialization_after_update_for_canary(output)?;
 
         Ok(Self::private_tree_metadata_from_json_report(json_report))
+    }
+
+    pub fn describe_private_get_instance_class_root_for_canary(
+        &self,
+        output: &TestRendererCommittedHostOutput,
+    ) -> Result<TestRendererPrivateGetInstanceClassRootReport, TestRendererRootError> {
+        let tree_report = self.describe_private_tree_metadata_for_canary(output)?;
+
+        Ok(Self::private_get_instance_class_root_from_tree_report(
+            tree_report,
+        ))
+    }
+
+    pub fn describe_private_get_instance_class_root_after_update_for_canary(
+        &self,
+        output: &TestRendererUpdatedHostOutput,
+    ) -> Result<TestRendererPrivateGetInstanceClassRootReport, TestRendererRootError> {
+        let tree_report = self.describe_private_tree_metadata_after_update_for_canary(output)?;
+
+        Ok(Self::private_get_instance_class_root_from_tree_report(
+            tree_report,
+        ))
     }
 
     fn describe_private_json_serialization_from_current_fibers_for_canary(
@@ -4933,6 +5204,62 @@ impl TestRendererRoot {
             },
             public_blockers: json_report.public_blockers(),
             public_tree_object_available: false,
+        }
+    }
+
+    fn private_get_instance_class_root_from_tree_report(
+        tree_report: TestRendererPrivateTreeMetadataReport,
+    ) -> TestRendererPrivateGetInstanceClassRootReport {
+        let class_props = TestProps::new().with_attribute("label", "class-root");
+        let class_instance = TestRendererPrivateGetInstanceClassInstanceDiagnostic {
+            constructor_name: TEST_RENDERER_PRIVATE_GET_INSTANCE_CLASS_CONSTRUCTOR_NAME,
+            props: class_props.clone(),
+            state_marker: TEST_RENDERER_PRIVATE_GET_INSTANCE_CLASS_STATE_MARKER,
+            private_instance_available: true,
+            public_get_instance_available: false,
+            react_public_result: "class-instance",
+        };
+
+        TestRendererPrivateGetInstanceClassRootReport {
+            diagnostic_name: TEST_RENDERER_PRIVATE_GET_INSTANCE_DIAGNOSTIC_NAME,
+            source_tree_diagnostic_name: tree_report.diagnostic_name(),
+            gate: tree_report.gate().clone(),
+            host_output_update_kind: tree_report.host_output_update_kind(),
+            host_output_snapshot_current: tree_report.host_output_snapshot_current(),
+            accepted_class_fiber_shape:
+                TEST_RENDERER_PRIVATE_GET_INSTANCE_ACCEPTED_CLASS_FIBER_SHAPE,
+            host_root_fail_closed: TestRendererPrivateGetInstanceFailClosedRootDiagnostic {
+                root_fiber_shape: TEST_RENDERER_PRIVATE_GET_INSTANCE_HOST_ROOT_FIBER_SHAPE,
+                root_child_fiber_tag: "HostComponent",
+                react_public_result: "null-with-default-createNodeMock",
+                public_get_instance_available: false,
+                private_class_instance_available: false,
+                public_behavior_fail_closed: true,
+            },
+            function_root_fail_closed: TestRendererPrivateGetInstanceFailClosedRootDiagnostic {
+                root_fiber_shape: TEST_RENDERER_PRIVATE_GET_INSTANCE_FUNCTION_ROOT_FIBER_SHAPE,
+                root_child_fiber_tag: "FunctionComponent",
+                react_public_result: "null",
+                public_get_instance_available: false,
+                private_class_instance_available: false,
+                public_behavior_fail_closed: true,
+            },
+            class_component: TestRendererPrivateGetInstanceClassComponentDiagnostic {
+                fiber_tag: "ClassComponent",
+                component_type: TEST_RENDERER_PRIVATE_GET_INSTANCE_CLASS_COMPONENT_TYPE,
+                props: class_props,
+                state_node_available: true,
+                rendered_child_fiber_tag: tree_report.host_component().fiber_tag(),
+                rendered_child_count: 1,
+                instance: class_instance,
+                public_get_instance_available: false,
+            },
+            rendered_host_component: tree_report.host_component().clone(),
+            rendered_host_text: tree_report.host_text().clone(),
+            public_blockers: tree_report.public_blockers(),
+            public_get_instance_available: false,
+            native_bridge_available: false,
+            compatibility_claimed: false,
         }
     }
 
@@ -6646,6 +6973,163 @@ mod tests {
         assert_eq!(report.host_component().rendered_text(), "hello");
         assert!(!report.public_tree_object_available());
         assert!(report.public_blockers().tree_method_blocked());
+    }
+
+    #[test]
+    fn root_private_get_instance_class_root_canary_describes_class_instance_shape() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let report = root
+            .describe_private_get_instance_class_root_for_canary(&output)
+            .unwrap();
+        let host_root = report.host_root_fail_closed();
+        let function_root = report.function_root_fail_closed();
+        let class_component = report.class_component();
+        let instance = class_component.instance();
+
+        assert_eq!(
+            report.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_GET_INSTANCE_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            report.source_tree_diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            report.host_output_update_kind(),
+            TestRendererRootUpdateKind::Create
+        );
+        assert!(report.host_output_snapshot_current());
+        assert_eq!(
+            report.gate().status(),
+            TestRendererSerializationGateStatus::ReadyForPrivateSerializationDiagnostics
+        );
+        assert_eq!(
+            report.accepted_class_fiber_shape(),
+            &TEST_RENDERER_PRIVATE_GET_INSTANCE_ACCEPTED_CLASS_FIBER_SHAPE
+        );
+        assert_eq!(
+            host_root.root_fiber_shape(),
+            &TEST_RENDERER_PRIVATE_GET_INSTANCE_HOST_ROOT_FIBER_SHAPE
+        );
+        assert_eq!(host_root.root_child_fiber_tag(), "HostComponent");
+        assert_eq!(
+            host_root.react_public_result(),
+            "null-with-default-createNodeMock"
+        );
+        assert!(host_root.public_behavior_fail_closed());
+        assert!(!host_root.public_get_instance_available());
+        assert!(!host_root.private_class_instance_available());
+        assert_eq!(
+            function_root.root_fiber_shape(),
+            &TEST_RENDERER_PRIVATE_GET_INSTANCE_FUNCTION_ROOT_FIBER_SHAPE
+        );
+        assert_eq!(function_root.root_child_fiber_tag(), "FunctionComponent");
+        assert_eq!(function_root.react_public_result(), "null");
+        assert!(function_root.public_behavior_fail_closed());
+        assert!(!function_root.public_get_instance_available());
+        assert!(!function_root.private_class_instance_available());
+        assert_eq!(class_component.fiber_tag(), "ClassComponent");
+        assert_eq!(
+            class_component.component_type(),
+            TEST_RENDERER_PRIVATE_GET_INSTANCE_CLASS_COMPONENT_TYPE
+        );
+        assert_eq!(
+            class_component.props(),
+            &TestProps::new().with_attribute("label", "class-root")
+        );
+        assert!(class_component.state_node_available());
+        assert_eq!(class_component.rendered_child_fiber_tag(), "HostComponent");
+        assert_eq!(class_component.rendered_child_count(), 1);
+        assert!(!class_component.public_get_instance_available());
+        assert_eq!(
+            instance.constructor_name(),
+            TEST_RENDERER_PRIVATE_GET_INSTANCE_CLASS_CONSTRUCTOR_NAME
+        );
+        assert_eq!(
+            instance.props(),
+            &TestProps::new().with_attribute("label", "class-root")
+        );
+        assert_eq!(
+            instance.state_marker(),
+            TEST_RENDERER_PRIVATE_GET_INSTANCE_CLASS_STATE_MARKER
+        );
+        assert!(instance.private_instance_available());
+        assert!(!instance.public_get_instance_available());
+        assert_eq!(instance.react_public_result(), "class-instance");
+        assert_eq!(
+            report.rendered_host_component().element_type().as_str(),
+            "span"
+        );
+        assert_eq!(report.rendered_host_component().rendered_text(), "hello");
+        assert_eq!(report.rendered_host_text().text(), "hello");
+        assert!(report.public_blockers().all_blocked());
+        assert!(!report.public_get_instance_available());
+        assert!(!report.native_bridge_available());
+        assert!(!report.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_get_instance_class_root_canary_updates_rendered_host_child_only() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let updated = root
+            .render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let report = root
+            .describe_private_get_instance_class_root_after_update_for_canary(&updated)
+            .unwrap();
+
+        assert_eq!(
+            report.host_output_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert_eq!(
+            report.accepted_class_fiber_shape(),
+            &TEST_RENDERER_PRIVATE_GET_INSTANCE_ACCEPTED_CLASS_FIBER_SHAPE
+        );
+        assert_eq!(
+            report.class_component().component_type(),
+            TEST_RENDERER_PRIVATE_GET_INSTANCE_CLASS_COMPONENT_TYPE
+        );
+        assert_eq!(
+            report.class_component().instance().constructor_name(),
+            TEST_RENDERER_PRIVATE_GET_INSTANCE_CLASS_CONSTRUCTOR_NAME
+        );
+        assert_eq!(report.rendered_host_component().rendered_text(), "goodbye");
+        assert_eq!(report.rendered_host_text().text(), "goodbye");
+        assert!(
+            !report
+                .host_root_fail_closed()
+                .public_get_instance_available()
+        );
+        assert!(
+            report
+                .function_root_fail_closed()
+                .public_behavior_fail_closed()
+        );
+        assert!(!report.public_get_instance_available());
+        assert!(!report.compatibility_claimed());
     }
 
     #[test]
