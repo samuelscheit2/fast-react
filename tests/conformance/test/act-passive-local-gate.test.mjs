@@ -60,6 +60,8 @@ test("act/passive local gate recognizes accepted queue diagnostics without publi
       "worker-475-passive-effect-error-routing-gate"
     ];
   assert.deepEqual(errorRouting.optionalFutureDiagnosticIds, [
+    "PassiveEffectRootErrorRoutingRecord",
+    "PassiveEffectRootErrorRoutingStatus",
     "PassiveEffectCallbackExecutionErrorRecord",
     "PassiveEffectCallbackExecutionErrorHandle",
     "PassiveEffectMountCreateCallbackErrorRecord"
@@ -138,6 +140,10 @@ test("act/passive local gate recognizes accepted queue diagnostics without publi
     "sync-flush-post-passive-continuation-execution-gate",
     "passive-effects-flush-metadata",
     "passive-effect-callback-handle-metadata",
+    "passive-effects-committed-fiber-traversal",
+    "passive-effects-scheduler-flush-diagnostic",
+    "passive-effect-mount-unmount-execution-diagnostics",
+    "passive-effect-root-error-routing-diagnostics",
     "react-dom-private-root-bridge-records",
     "react-dom-private-flush-sync-root-output-diagnostic",
     "react-dom-private-root-warning-boundary-diagnostics",

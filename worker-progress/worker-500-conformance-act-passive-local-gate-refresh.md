@@ -5,7 +5,7 @@
 - Active goal objective: refresh conformance local gates so accepted private
   act/passive diagnostics from this queue are recognized without broad
   compatibility claims.
-- Active goal status from `get_goal`: active.
+- Goal status after final pane closeout: complete.
 
 ## Summary
 
