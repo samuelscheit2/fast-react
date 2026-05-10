@@ -1011,6 +1011,22 @@ impl RootSyncFlushRecord {
     }
 }
 
+#[cfg(test)]
+pub(crate) const fn root_sync_flush_record_for_canary(
+    order: usize,
+    root: FiberRootId,
+    lanes: Lanes,
+    render_phase: HostRootRenderPhaseRecord,
+) -> RootSyncFlushRecord {
+    RootSyncFlushRecord {
+        order,
+        root,
+        lanes,
+        status: RootSyncFlushRecordStatus::RenderedAwaitingCommit,
+        render_phase,
+    }
+}
+
 #[allow(
     dead_code,
     reason = "crate-private sync-flush recovery diagnostics are reserved for private error workers"

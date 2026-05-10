@@ -11,7 +11,7 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-use fast_react_core::{FiberId, Lanes, UpdateQueueHandle};
+use fast_react_core::{FiberId, Lanes, StateNodeHandle, UpdateQueueHandle};
 use fast_react_host_config::HostTypes;
 
 use crate::root_callbacks::{
@@ -23,8 +23,9 @@ use crate::root_commit::{
     host_root_commit_recovery_snapshot_for_canary,
 };
 use crate::root_scheduler::{
-    SchedulerBridgeActContinuationExecutionError, SchedulerBridgeActContinuationExecutionResult,
-    SyncFlushActContinuationDrainRecord, SyncFlushActPostPassiveContinuationGateRecord,
+    SYNC_FLUSH_LANES, SchedulerBridgeActContinuationExecutionError,
+    SchedulerBridgeActContinuationExecutionResult, SyncFlushActContinuationDrainRecord,
+    SyncFlushActPostPassiveContinuationGateRecord,
     SyncFlushPostPassiveContinuationExecutionGateRecord, SyncFlushRootRecoverySnapshotForCanary,
     execute_scheduler_bridge_act_continuations, recompute_might_have_pending_sync_work,
     sync_flush_act_continuation_drain_record_after_host_output_canary,
@@ -36,8 +37,9 @@ use crate::scheduler_bridge::SchedulerActContinuationRecord;
 use crate::{
     ExecutionContextState, FiberRootId, FiberRootStore, FiberRootStoreError, HostRootCommitRecord,
     HostRootRenderPhaseRecord, RootCallbackPriority, RootCommitError, RootSchedulerCallbackHandle,
-    RootSchedulerError, RootSyncFlushRecord, RootUpdateCallbackSnapshot, RootWorkLoopError,
-    commit_finished_host_root, render_host_root_for_lanes,
+    RootSchedulerError, RootSyncFlushRecord, RootSyncFlushRecordStatus, RootUpdateCallbackSnapshot,
+    RootWorkLoopError, SyncFlushExecutionContextRecord, commit_finished_host_root,
+    render_host_root_for_lanes,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -334,6 +336,325 @@ impl SyncFlushActPrivateExecutionDiagnosticsForCanary {
         SchedulerBridgeActContinuationExecutionError,
     > {
         execute_scheduler_bridge_act_continuations(store, &self.drained_act_continuations)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SyncFlushRootCommitContinuationStatusForCanary {
+    Committed,
+    BlockedByExecutionContext,
+    SkippedReentrantFlush,
+    RejectedNonSyncLanes,
+    RejectedStaleFinishedWorkHandoff,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SyncFlushFinishedWorkHandoffIdentityForCanary {
+    root: FiberRootId,
+    render_phase_root: FiberRootId,
+    order: usize,
+    selected_lanes: Lanes,
+    root_token: StateNodeHandle,
+    previous_current: FiberId,
+    current_before_commit: FiberId,
+    pending_work_before_commit: Option<FiberId>,
+    finished_work: FiberId,
+    render_lanes: Lanes,
+    finished_lanes: Lanes,
+    remaining_lanes: Lanes,
+    pending_lanes_before_commit: Lanes,
+    render_phase_lanes_before_commit: Lanes,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private sync-flush root commit continuation diagnostics are reserved for private finished-work workers"
+)]
+impl SyncFlushFinishedWorkHandoffIdentityForCanary {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn render_phase_root(self) -> FiberRootId {
+        self.render_phase_root
+    }
+
+    #[must_use]
+    pub(crate) const fn order(self) -> usize {
+        self.order
+    }
+
+    #[must_use]
+    pub(crate) const fn selected_lanes(self) -> Lanes {
+        self.selected_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn root_token(self) -> StateNodeHandle {
+        self.root_token
+    }
+
+    #[must_use]
+    pub(crate) const fn previous_current(self) -> FiberId {
+        self.previous_current
+    }
+
+    #[must_use]
+    pub(crate) const fn current_before_commit(self) -> FiberId {
+        self.current_before_commit
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_work_before_commit(self) -> Option<FiberId> {
+        self.pending_work_before_commit
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_lanes(self) -> Lanes {
+        self.finished_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn remaining_lanes(self) -> Lanes {
+        self.remaining_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_lanes_before_commit(self) -> Lanes {
+        self.pending_lanes_before_commit
+    }
+
+    #[must_use]
+    pub(crate) const fn render_phase_lanes_before_commit(self) -> Lanes {
+        self.render_phase_lanes_before_commit
+    }
+
+    #[must_use]
+    pub(crate) fn accepted_current_finished_work_record_shape(self) -> bool {
+        self.root == self.render_phase_root
+            && self.current_before_commit == self.previous_current
+            && self.pending_work_before_commit == Some(self.finished_work)
+            && self.render_lanes == self.selected_lanes
+            && self.finished_lanes == self.selected_lanes
+            && self.render_phase_lanes_before_commit == self.render_lanes
+            && self
+                .pending_lanes_before_commit
+                .contains_all(self.selected_lanes)
+            && selected_lanes_are_sync_flush_lanes(self.selected_lanes)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SyncFlushCommitResultIdentityForCanary {
+    root: FiberRootId,
+    order: usize,
+    selected_lanes: Lanes,
+    previous_current: FiberId,
+    committed_current: FiberId,
+    finished_work: FiberId,
+    finished_lanes: Lanes,
+    remaining_lanes: Lanes,
+    pending_lanes: Lanes,
+    root_current_after_commit: FiberId,
+    root_finished_work_after_commit: Option<FiberId>,
+    root_finished_lanes_after_commit: Lanes,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private sync-flush root commit continuation diagnostics are reserved for private finished-work workers"
+)]
+impl SyncFlushCommitResultIdentityForCanary {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn order(self) -> usize {
+        self.order
+    }
+
+    #[must_use]
+    pub(crate) const fn selected_lanes(self) -> Lanes {
+        self.selected_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn previous_current(self) -> FiberId {
+        self.previous_current
+    }
+
+    #[must_use]
+    pub(crate) const fn committed_current(self) -> FiberId {
+        self.committed_current
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_lanes(self) -> Lanes {
+        self.finished_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn remaining_lanes(self) -> Lanes {
+        self.remaining_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_lanes(self) -> Lanes {
+        self.pending_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn root_current_after_commit(self) -> FiberId {
+        self.root_current_after_commit
+    }
+
+    #[must_use]
+    pub(crate) const fn root_finished_work_after_commit(self) -> Option<FiberId> {
+        self.root_finished_work_after_commit
+    }
+
+    #[must_use]
+    pub(crate) const fn root_finished_lanes_after_commit(self) -> Lanes {
+        self.root_finished_lanes_after_commit
+    }
+
+    #[must_use]
+    pub(crate) fn matches_finished_work_handoff(
+        self,
+        handoff: SyncFlushFinishedWorkHandoffIdentityForCanary,
+    ) -> bool {
+        self.root == handoff.root()
+            && self.order == handoff.order()
+            && self.selected_lanes == handoff.selected_lanes()
+            && self.previous_current == handoff.previous_current()
+            && self.finished_work == handoff.finished_work()
+            && self.committed_current == self.finished_work
+            && self.root_current_after_commit == self.committed_current
+            && self.root_finished_work_after_commit.is_none()
+            && self.root_finished_lanes_after_commit.is_empty()
+            && self.finished_lanes.contains_all(self.selected_lanes)
+            && !self.pending_lanes.contains_any(self.selected_lanes)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SyncFlushRootCommitContinuationRecordForCanary {
+    execution_context: SyncFlushExecutionContextRecord,
+    status: SyncFlushRootCommitContinuationStatusForCanary,
+    root: FiberRootId,
+    order: usize,
+    selected_lanes: Lanes,
+    handoff_identity: Option<SyncFlushFinishedWorkHandoffIdentityForCanary>,
+    commit_result_identity: Option<SyncFlushCommitResultIdentityForCanary>,
+    commit: Option<SyncFlushRootRecord>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private sync-flush root commit continuation diagnostics are reserved for private finished-work workers"
+)]
+impl SyncFlushRootCommitContinuationRecordForCanary {
+    #[must_use]
+    pub(crate) const fn execution_context(&self) -> SyncFlushExecutionContextRecord {
+        self.execution_context
+    }
+
+    #[must_use]
+    pub(crate) const fn status(&self) -> SyncFlushRootCommitContinuationStatusForCanary {
+        self.status
+    }
+
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn order(&self) -> usize {
+        self.order
+    }
+
+    #[must_use]
+    pub(crate) const fn selected_lanes(&self) -> Lanes {
+        self.selected_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn handoff_identity(
+        &self,
+    ) -> Option<SyncFlushFinishedWorkHandoffIdentityForCanary> {
+        self.handoff_identity
+    }
+
+    #[must_use]
+    pub(crate) const fn commit_result_identity(
+        &self,
+    ) -> Option<SyncFlushCommitResultIdentityForCanary> {
+        self.commit_result_identity
+    }
+
+    #[must_use]
+    pub(crate) fn commit(&self) -> Option<&SyncFlushRootRecord> {
+        self.commit.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) const fn committed(&self) -> bool {
+        matches!(
+            self.status,
+            SyncFlushRootCommitContinuationStatusForCanary::Committed
+        )
+    }
+
+    #[must_use]
+    pub(crate) fn accepted_finished_work_handoff(&self) -> bool {
+        matches!(
+            (self.status, self.handoff_identity, self.commit_result_identity),
+            (
+                SyncFlushRootCommitContinuationStatusForCanary::Committed,
+                Some(handoff),
+                Some(commit)
+            ) if handoff.accepted_current_finished_work_record_shape()
+                && commit.matches_finished_work_handoff(handoff)
+        )
+    }
+
+    #[must_use]
+    pub(crate) fn produced_one_inert_commit_record(&self) -> bool {
+        self.committed()
+            && self.commit.is_some()
+            && self.commit_result_identity.is_some()
+            && !self.executes_passive_effects()
+            && !self.public_flush_sync_compatibility_claimed()
+    }
+
+    #[must_use]
+    pub(crate) const fn executes_passive_effects(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_flush_sync_compatibility_claimed(&self) -> bool {
+        false
     }
 }
 
@@ -1245,6 +1566,168 @@ impl From<RootCommitError> for SyncFlushError {
     }
 }
 
+#[allow(
+    dead_code,
+    reason = "crate-private sync-flush root commit continuation diagnostics are reserved for private finished-work workers"
+)]
+pub(crate) fn commit_sync_flush_root_finished_work_continuation_for_canary<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    execution_context: &ExecutionContextState,
+    record: RootSyncFlushRecord,
+) -> Result<SyncFlushRootCommitContinuationRecordForCanary, SyncFlushError> {
+    let execution_context = execution_context.sync_flush_record();
+    let root = record.root();
+    let order = record.order();
+    let selected_lanes = record.lanes();
+
+    if !execution_context.can_enter_sync_flush() {
+        return Ok(sync_flush_root_commit_continuation_record(
+            execution_context,
+            SyncFlushRootCommitContinuationStatusForCanary::BlockedByExecutionContext,
+            root,
+            order,
+            selected_lanes,
+            None,
+            None,
+            None,
+        ));
+    }
+
+    if store.root_scheduler().is_flushing_work() {
+        return Ok(sync_flush_root_commit_continuation_record(
+            execution_context,
+            SyncFlushRootCommitContinuationStatusForCanary::SkippedReentrantFlush,
+            root,
+            order,
+            selected_lanes,
+            None,
+            None,
+            None,
+        ));
+    }
+
+    if !selected_lanes_are_sync_flush_lanes(selected_lanes) {
+        return Ok(sync_flush_root_commit_continuation_record(
+            execution_context,
+            SyncFlushRootCommitContinuationStatusForCanary::RejectedNonSyncLanes,
+            root,
+            order,
+            selected_lanes,
+            None,
+            None,
+            None,
+        ));
+    }
+
+    let handoff_identity = sync_flush_finished_work_handoff_identity_for_canary(store, record)?;
+    if record.status() != RootSyncFlushRecordStatus::RenderedAwaitingCommit
+        || !handoff_identity.accepted_current_finished_work_record_shape()
+    {
+        return Ok(sync_flush_root_commit_continuation_record(
+            execution_context,
+            SyncFlushRootCommitContinuationStatusForCanary::RejectedStaleFinishedWorkHandoff,
+            root,
+            order,
+            selected_lanes,
+            Some(handoff_identity),
+            None,
+            None,
+        ));
+    }
+
+    store.root_scheduler_mut().set_is_flushing_work(true);
+    let committed = SyncFlushRootRecord::commit_rendered_sync_flush_record(store, record);
+    store.root_scheduler_mut().set_is_flushing_work(false);
+    let committed = committed?;
+    let commit_identity = sync_flush_commit_result_identity_for_canary(store, &committed)?;
+
+    Ok(sync_flush_root_commit_continuation_record(
+        execution_context,
+        SyncFlushRootCommitContinuationStatusForCanary::Committed,
+        root,
+        order,
+        selected_lanes,
+        Some(handoff_identity),
+        Some(commit_identity),
+        Some(committed),
+    ))
+}
+
+fn sync_flush_root_commit_continuation_record(
+    execution_context: SyncFlushExecutionContextRecord,
+    status: SyncFlushRootCommitContinuationStatusForCanary,
+    root: FiberRootId,
+    order: usize,
+    selected_lanes: Lanes,
+    handoff_identity: Option<SyncFlushFinishedWorkHandoffIdentityForCanary>,
+    commit_result_identity: Option<SyncFlushCommitResultIdentityForCanary>,
+    commit: Option<SyncFlushRootRecord>,
+) -> SyncFlushRootCommitContinuationRecordForCanary {
+    SyncFlushRootCommitContinuationRecordForCanary {
+        execution_context,
+        status,
+        root,
+        order,
+        selected_lanes,
+        handoff_identity,
+        commit_result_identity,
+        commit,
+    }
+}
+
+fn sync_flush_finished_work_handoff_identity_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    record: RootSyncFlushRecord,
+) -> Result<SyncFlushFinishedWorkHandoffIdentityForCanary, SyncFlushError> {
+    let root = store.root(record.root())?;
+    let scheduling = root.scheduling();
+    let render_phase = record.render_phase();
+
+    Ok(SyncFlushFinishedWorkHandoffIdentityForCanary {
+        root: record.root(),
+        render_phase_root: render_phase.root(),
+        order: record.order(),
+        selected_lanes: record.lanes(),
+        root_token: record.root().state_node_handle(),
+        previous_current: render_phase.current(),
+        current_before_commit: root.current(),
+        pending_work_before_commit: scheduling.work_in_progress(),
+        finished_work: render_phase.finished_work(),
+        render_lanes: render_phase.render_lanes(),
+        finished_lanes: render_phase.render_lanes(),
+        remaining_lanes: render_phase.remaining_lanes(),
+        pending_lanes_before_commit: root.lanes().pending_lanes(),
+        render_phase_lanes_before_commit: scheduling.work_in_progress_root_render_lanes(),
+    })
+}
+
+fn sync_flush_commit_result_identity_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    record: &SyncFlushRootRecord,
+) -> Result<SyncFlushCommitResultIdentityForCanary, SyncFlushError> {
+    let root = store.root(record.root())?;
+    let commit = record.commit();
+
+    Ok(SyncFlushCommitResultIdentityForCanary {
+        root: record.root(),
+        order: record.order(),
+        selected_lanes: record.render_lanes(),
+        previous_current: commit.previous_current(),
+        committed_current: commit.current(),
+        finished_work: commit.finished_work(),
+        finished_lanes: commit.finished_lanes(),
+        remaining_lanes: commit.remaining_lanes(),
+        pending_lanes: commit.pending_lanes(),
+        root_current_after_commit: root.current(),
+        root_finished_work_after_commit: root.finished_work(),
+        root_finished_lanes_after_commit: root.finished_lanes(),
+    })
+}
+
+fn selected_lanes_are_sync_flush_lanes(lanes: Lanes) -> bool {
+    lanes.is_non_empty() && SYNC_FLUSH_LANES.contains_all(lanes)
+}
+
 pub(crate) fn flush_sync_post_passive_continuation_after_passive_effects<H: HostTypes>(
     store: &mut FiberRootStore<H>,
     execution_context: &ExecutionContextState,
@@ -1523,7 +2006,9 @@ mod tests {
         RootUpdateCallbackInvocationRequest, RootUpdateCallbackInvocationStatus,
         RootUpdateCallbackInvocationTestControl,
     };
-    use crate::root_scheduler::SchedulerBridgeActContinuationExecutionStatus;
+    use crate::root_scheduler::{
+        SchedulerBridgeActContinuationExecutionStatus, root_sync_flush_record_for_canary,
+    };
     use crate::scheduler_bridge::SchedulerActContinuationStatus;
     use crate::test_support::{FakeContainer, RecordingHost};
     use crate::{
@@ -1718,6 +2203,279 @@ mod tests {
         assert!(callbacks.hidden().is_empty());
         assert!(callbacks.deferred_hidden().is_empty());
         assert!(!store.root_scheduler().might_have_pending_sync_work());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_root_commit_continuation_consumes_finished_work_handoff_metadata() {
+        let (mut store, root_id, host) = root_store();
+        let element = RootElementHandle::from_raw(66_100);
+        let callback = RootUpdateCallbackHandle::from_raw(66_101);
+        let previous_current = store.root(root_id).unwrap().current();
+        let update = update_container_sync(&mut store, root_id, element, Some(callback)).unwrap();
+        ensure_root_is_scheduled(&mut store, update.schedule()).unwrap();
+
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+        let rendered_record = rendered.records()[0];
+        let render_phase = rendered_record.render_phase();
+
+        let continuation = commit_sync_flush_root_finished_work_continuation_for_canary(
+            &mut store,
+            &ExecutionContextState::new(),
+            rendered_record,
+        )
+        .unwrap();
+
+        assert_eq!(
+            continuation.status(),
+            SyncFlushRootCommitContinuationStatusForCanary::Committed
+        );
+        assert!(continuation.execution_context().can_enter_sync_flush());
+        assert_eq!(continuation.root(), root_id);
+        assert_eq!(continuation.order(), 0);
+        assert_eq!(continuation.selected_lanes(), Lanes::SYNC);
+        assert!(continuation.accepted_finished_work_handoff());
+        assert!(continuation.produced_one_inert_commit_record());
+        assert!(!continuation.executes_passive_effects());
+        assert!(!continuation.public_flush_sync_compatibility_claimed());
+
+        let handoff = continuation.handoff_identity().unwrap();
+        assert_eq!(handoff.root(), root_id);
+        assert_eq!(handoff.render_phase_root(), root_id);
+        assert_eq!(handoff.order(), 0);
+        assert_eq!(handoff.selected_lanes(), Lanes::SYNC);
+        assert_eq!(handoff.root_token(), root_id.state_node_handle());
+        assert_eq!(handoff.previous_current(), previous_current);
+        assert_eq!(handoff.current_before_commit(), previous_current);
+        assert_eq!(
+            handoff.pending_work_before_commit(),
+            Some(render_phase.finished_work())
+        );
+        assert_eq!(handoff.finished_work(), render_phase.finished_work());
+        assert_eq!(handoff.render_lanes(), Lanes::SYNC);
+        assert_eq!(handoff.finished_lanes(), Lanes::SYNC);
+        assert_eq!(handoff.remaining_lanes(), Lanes::NO);
+        assert_eq!(handoff.pending_lanes_before_commit(), Lanes::SYNC);
+        assert_eq!(handoff.render_phase_lanes_before_commit(), Lanes::SYNC);
+        assert!(handoff.accepted_current_finished_work_record_shape());
+
+        let commit_identity = continuation.commit_result_identity().unwrap();
+        assert_eq!(commit_identity.root(), root_id);
+        assert_eq!(commit_identity.order(), 0);
+        assert_eq!(commit_identity.selected_lanes(), Lanes::SYNC);
+        assert_eq!(commit_identity.previous_current(), previous_current);
+        assert_eq!(
+            commit_identity.committed_current(),
+            render_phase.finished_work()
+        );
+        assert_eq!(
+            commit_identity.finished_work(),
+            render_phase.finished_work()
+        );
+        assert_eq!(commit_identity.finished_lanes(), Lanes::SYNC);
+        assert_eq!(commit_identity.remaining_lanes(), Lanes::NO);
+        assert_eq!(commit_identity.pending_lanes(), Lanes::NO);
+        assert_eq!(
+            commit_identity.root_current_after_commit(),
+            render_phase.finished_work()
+        );
+        assert_eq!(commit_identity.root_finished_work_after_commit(), None);
+        assert_eq!(
+            commit_identity.root_finished_lanes_after_commit(),
+            Lanes::NO
+        );
+        assert!(commit_identity.matches_finished_work_handoff(handoff));
+
+        let commit = continuation.commit().unwrap();
+        assert_eq!(commit.order(), 0);
+        assert_eq!(commit.root(), root_id);
+        assert_eq!(commit.render_lanes(), Lanes::SYNC);
+        assert_eq!(commit.commit().previous_current(), previous_current);
+        assert_eq!(commit.commit().current(), render_phase.finished_work());
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            render_phase.finished_work()
+        );
+        assert_eq!(current_host_root_element(&store, root_id), element);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+        assert!(!store.root_scheduler().is_flushing_work());
+        assert!(!store.root_scheduler().might_have_pending_sync_work());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_root_commit_continuation_rejects_render_commit_and_reentry() {
+        let (mut store, root_id, host) = root_store();
+        let previous_current = store.root(root_id).unwrap().current();
+        schedule_sync_update(&mut store, root_id, RootElementHandle::from_raw(66_200));
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+        let rendered_record = rendered.records()[0];
+        let render_phase = rendered_record.render_phase();
+        let mut execution_context = ExecutionContextState::new();
+
+        let render_reentry = execution_context
+            .with_render_context(|execution_context| {
+                commit_sync_flush_root_finished_work_continuation_for_canary(
+                    &mut store,
+                    execution_context,
+                    rendered_record,
+                )
+            })
+            .unwrap();
+
+        assert_eq!(
+            render_reentry.status(),
+            SyncFlushRootCommitContinuationStatusForCanary::BlockedByExecutionContext
+        );
+        assert!(
+            render_reentry
+                .execution_context()
+                .blocked_by_render_or_commit()
+        );
+        assert_eq!(render_reentry.commit(), None);
+        assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            Some(render_phase.finished_work())
+        );
+
+        let commit_reentry = execution_context
+            .with_commit_context(|execution_context| {
+                commit_sync_flush_root_finished_work_continuation_for_canary(
+                    &mut store,
+                    execution_context,
+                    rendered_record,
+                )
+            })
+            .unwrap();
+
+        assert_eq!(
+            commit_reentry.status(),
+            SyncFlushRootCommitContinuationStatusForCanary::BlockedByExecutionContext
+        );
+        assert!(
+            commit_reentry
+                .execution_context()
+                .blocked_by_render_or_commit()
+        );
+        assert_eq!(commit_reentry.commit(), None);
+        assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+
+        store.root_scheduler_mut().set_is_flushing_work(true);
+        let scheduler_reentry = commit_sync_flush_root_finished_work_continuation_for_canary(
+            &mut store,
+            &ExecutionContextState::new(),
+            rendered_record,
+        )
+        .unwrap();
+        store.root_scheduler_mut().set_is_flushing_work(false);
+
+        assert_eq!(
+            scheduler_reentry.status(),
+            SyncFlushRootCommitContinuationStatusForCanary::SkippedReentrantFlush
+        );
+        assert!(scheduler_reentry.execution_context().can_enter_sync_flush());
+        assert_eq!(scheduler_reentry.commit(), None);
+        assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            Some(render_phase.finished_work())
+        );
+        assert!(store.root_scheduler().might_have_pending_sync_work());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_root_commit_continuation_rejects_stale_finished_work_handoff() {
+        let (mut store, root_id, host) = root_store();
+        let previous_current = store.root(root_id).unwrap().current();
+        schedule_sync_update(&mut store, root_id, RootElementHandle::from_raw(66_300));
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+        let rendered_record = rendered.records()[0];
+        let render_phase = rendered_record.render_phase();
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .scheduling_mut()
+            .clear_render_phase_work();
+
+        let continuation = commit_sync_flush_root_finished_work_continuation_for_canary(
+            &mut store,
+            &ExecutionContextState::new(),
+            rendered_record,
+        )
+        .unwrap();
+
+        assert_eq!(
+            continuation.status(),
+            SyncFlushRootCommitContinuationStatusForCanary::RejectedStaleFinishedWorkHandoff
+        );
+        assert_eq!(continuation.root(), root_id);
+        assert_eq!(continuation.order(), 0);
+        assert_eq!(continuation.selected_lanes(), Lanes::SYNC);
+        assert!(!continuation.accepted_finished_work_handoff());
+        assert!(!continuation.produced_one_inert_commit_record());
+        assert_eq!(continuation.commit(), None);
+        let handoff = continuation.handoff_identity().unwrap();
+        assert_eq!(handoff.root(), root_id);
+        assert_eq!(handoff.finished_work(), render_phase.finished_work());
+        assert_eq!(handoff.current_before_commit(), previous_current);
+        assert_eq!(handoff.pending_work_before_commit(), None);
+        assert!(!handoff.accepted_current_finished_work_record_shape());
+        assert_eq!(continuation.commit_result_identity(), None);
+        assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert!(store.root_scheduler().might_have_pending_sync_work());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_root_commit_continuation_rejects_non_sync_lanes() {
+        let (mut store, root_id, host) = root_store();
+        let previous_current = store.root(root_id).unwrap().current();
+        let update = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(66_400),
+            None,
+        )
+        .unwrap();
+        ensure_root_is_scheduled(&mut store, update.schedule()).unwrap();
+        let render_phase = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let non_sync_record =
+            root_sync_flush_record_for_canary(0, root_id, Lanes::DEFAULT, render_phase);
+
+        let continuation = commit_sync_flush_root_finished_work_continuation_for_canary(
+            &mut store,
+            &ExecutionContextState::new(),
+            non_sync_record,
+        )
+        .unwrap();
+
+        assert_eq!(
+            continuation.status(),
+            SyncFlushRootCommitContinuationStatusForCanary::RejectedNonSyncLanes
+        );
+        assert_eq!(continuation.root(), root_id);
+        assert_eq!(continuation.order(), 0);
+        assert_eq!(continuation.selected_lanes(), Lanes::DEFAULT);
+        assert_eq!(continuation.handoff_identity(), None);
+        assert_eq!(continuation.commit_result_identity(), None);
+        assert_eq!(continuation.commit(), None);
+        assert!(!continuation.produced_one_inert_commit_record());
+        assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            Some(render_phase.finished_work())
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            Lanes::DEFAULT
+        );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
