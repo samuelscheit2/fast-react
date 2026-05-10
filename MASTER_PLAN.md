@@ -45,27 +45,20 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue 685-714 is launched from queue base commit
-`9ec6678` in isolated `worker/<slug>` branches and worktrees. Workers 685-704
-and 706-714 have been accepted from this queue. Worker 705 remains active and
-must be checked for completion before replacement workers are launched.
+Top-level cap: 30 workers. Queue 685-714 was launched from queue base commit
+`9ec6678` in isolated `worker/<slug>` branches and worktrees and has been
+accepted. Do not queue replacement workers; let the current cycle settle and
+continue with verification, cleanup, and coordination only.
 
-- 705: React DOM root unmount ref/passive cleanup execution.
+- No top-level worker queue is active.
 
 ## Near-Term Sequencing
 
-1. Clean accepted worker sessions/worktrees/branches, then re-check worker 705
-   for completion.
-2. If worker 705 is complete, audit and merge it before launching replacement
-   workers.
-3. Launch replacement workers up to the 30 top-level cap from the queue prompt
-   commit after all completed work has been merged.
-4. Monitor tmux pane state and worker progress reports, then classify
-   completions before accepting work.
-5. Merge accepted completed work in batches, resolving overlap conflicts on
-   `main`, then clean accepted sessions/worktrees/branches.
-6. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
+1. Clean the final accepted worker session/worktree/branch and confirm no
+   queue 685-714 worker state remains live.
+2. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
+3. Continue coordination and planning without launching replacement workers.
 
 ## Next Queue Candidates
 

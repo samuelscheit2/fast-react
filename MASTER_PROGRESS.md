@@ -89,6 +89,16 @@ sequencing belong in `MASTER_PLAN.md`.
   `fast-react-test-renderer` tests, React DOM and test-renderer workspace
   checks, `npm run check:package-surface`, full conformance checks,
   conflict-marker scanning, and `git diff --check`.
+- Worker 705 was accepted, completing queue 685-714. It added private React DOM
+  root-unmount evidence that consumes callback-ref cleanup-return execution and
+  deleted-subtree passive destroy ordering metadata before fake-DOM host
+  cleanup, while public root unmount, public refs, scheduler-driven passive
+  execution, and compatibility claims remain blocked.
+- The completed queue 685-714 state was verified after merge with `cargo fmt
+  --all --check`, full `fast-react-test-renderer` tests, React DOM and
+  test-renderer workspace checks, `npm run check:package-surface`, full
+  conformance checks, focused React DOM root facade/root-render/test-utils act
+  gates, conflict-marker scanning, and `git diff --check`.
 
 ### Queue 655-684
 
