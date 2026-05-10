@@ -665,6 +665,7 @@ impl HostRootFinishedWorkPendingCommitRecordForCanary {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct HostRootFinishedWorkCommitHandoffRecordForCanary {
     pending: HostRootFinishedWorkPendingCommitRecordForCanary,
+    execution_request: HostRootFinishedWorkCommitExecutionRequestForCanary,
     commit_order: usize,
     commit: HostRootCommitRecord,
     current_after_commit: FiberId,
@@ -678,6 +679,13 @@ impl HostRootFinishedWorkCommitHandoffRecordForCanary {
     #[must_use]
     pub(crate) const fn pending(&self) -> HostRootFinishedWorkPendingCommitRecordForCanary {
         self.pending
+    }
+
+    #[must_use]
+    pub(crate) const fn execution_request(
+        &self,
+    ) -> &HostRootFinishedWorkCommitExecutionRequestForCanary {
+        &self.execution_request
     }
 
     #[must_use]
@@ -724,19 +732,197 @@ impl HostRootFinishedWorkCommitHandoffRecordForCanary {
 
     #[must_use]
     pub(crate) const fn mutation_execution_blocked(&self) -> bool {
-        true
+        self.execution_request.host_mutation_execution_blocked()
     }
 
     #[must_use]
     pub(crate) const fn public_root_rendering_blocked(&self) -> bool {
-        true
+        self.execution_request.public_root_rendering_blocked()
     }
 
     #[must_use]
     pub(crate) const fn effects_refs_and_hydration_blocked(&self) -> bool {
-        true
+        self.execution_request.refs_effects_and_hydration_blocked()
     }
 }
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct HostRootFinishedWorkCommitExecutionRequestForCanary {
+    pending: HostRootFinishedWorkPendingCommitRecordForCanary,
+    request_order: usize,
+    status: HostRootFinishedWorkCommitExecutionStatusForCanary,
+    blockers: [HostRootFinishedWorkCommitExecutionBlockerForCanary; 7],
+}
+
+#[cfg(test)]
+impl HostRootFinishedWorkCommitExecutionRequestForCanary {
+    #[must_use]
+    const fn new(
+        pending: HostRootFinishedWorkPendingCommitRecordForCanary,
+        request_order: usize,
+    ) -> Self {
+        Self {
+            pending,
+            request_order,
+            status: HostRootFinishedWorkCommitExecutionStatusForCanary::Requested,
+            blockers: HOST_ROOT_FINISHED_WORK_COMMIT_EXECUTION_BLOCKERS,
+        }
+    }
+
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.pending.root
+    }
+
+    #[must_use]
+    pub(crate) const fn root_token(self) -> StateNodeHandle {
+        self.pending.root_token
+    }
+
+    #[must_use]
+    pub(crate) const fn previous_current(self) -> FiberId {
+        self.pending.previous_current
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_work(self) -> Option<FiberId> {
+        self.pending.pending_work
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(self) -> FiberId {
+        self.pending.finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn render_lanes(self) -> Lanes {
+        self.pending.render_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_lanes(self) -> Lanes {
+        self.pending.finished_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn remaining_lanes(self) -> Lanes {
+        self.pending.remaining_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_lanes_before_commit(self) -> Lanes {
+        self.pending.pending_lanes_before_commit
+    }
+
+    #[must_use]
+    pub(crate) const fn source_handoff_order(self) -> usize {
+        self.pending.handoff_order
+    }
+
+    #[must_use]
+    pub(crate) const fn request_order(self) -> usize {
+        self.request_order
+    }
+
+    #[must_use]
+    pub(crate) const fn status(self) -> HostRootFinishedWorkCommitExecutionStatusForCanary {
+        self.status
+    }
+
+    #[must_use]
+    pub(crate) const fn execution_requested(self) -> bool {
+        matches!(
+            self.status,
+            HostRootFinishedWorkCommitExecutionStatusForCanary::Requested
+        )
+    }
+
+    #[must_use]
+    pub(crate) fn accepted_current_finished_work_record_shape(self) -> bool {
+        self.pending.records_finished_work()
+    }
+
+    #[must_use]
+    pub(crate) const fn blockers(
+        &self,
+    ) -> &[HostRootFinishedWorkCommitExecutionBlockerForCanary; 7] {
+        &self.blockers
+    }
+
+    #[must_use]
+    pub(crate) const fn host_mutation_execution_blocked(self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_rendering_blocked(self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn ref_attach_detach_blocked(self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn layout_effect_execution_blocked(self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn passive_effect_execution_blocked(self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn hydration_blocked(self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn compatibility_claim_blocked(self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn refs_effects_and_hydration_blocked(self) -> bool {
+        self.ref_attach_detach_blocked()
+            && self.layout_effect_execution_blocked()
+            && self.passive_effect_execution_blocked()
+            && self.hydration_blocked()
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum HostRootFinishedWorkCommitExecutionStatusForCanary {
+    Requested,
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum HostRootFinishedWorkCommitExecutionBlockerForCanary {
+    HostMutationExecution,
+    PublicRootRendering,
+    RefAttachDetach,
+    LayoutEffectExecution,
+    PassiveEffectExecution,
+    Hydration,
+    PublicCompatibilityClaim,
+}
+
+#[cfg(test)]
+const HOST_ROOT_FINISHED_WORK_COMMIT_EXECUTION_BLOCKERS:
+    [HostRootFinishedWorkCommitExecutionBlockerForCanary; 7] = [
+    HostRootFinishedWorkCommitExecutionBlockerForCanary::HostMutationExecution,
+    HostRootFinishedWorkCommitExecutionBlockerForCanary::PublicRootRendering,
+    HostRootFinishedWorkCommitExecutionBlockerForCanary::RefAttachDetach,
+    HostRootFinishedWorkCommitExecutionBlockerForCanary::LayoutEffectExecution,
+    HostRootFinishedWorkCommitExecutionBlockerForCanary::PassiveEffectExecution,
+    HostRootFinishedWorkCommitExecutionBlockerForCanary::Hydration,
+    HostRootFinishedWorkCommitExecutionBlockerForCanary::PublicCompatibilityClaim,
+];
 
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -758,6 +944,13 @@ pub(crate) enum HostRootFinishedWorkCommitHandoffErrorForCanary {
         expected_pending_work: Option<FiberId>,
         actual_pending_work: Option<FiberId>,
         finished_work: FiberId,
+    },
+    AlreadyCommittedFinishedWorkRecord {
+        root: FiberRootId,
+        current: FiberId,
+        finished_work: FiberId,
+        pending_work_after_commit: Option<FiberId>,
+        handoff_order: usize,
     },
     FinishedWorkRecordLanesMismatch {
         root: FiberRootId,
@@ -814,6 +1007,21 @@ impl Display for HostRootFinishedWorkCommitHandoffErrorForCanary {
                 actual_current.slot().get(),
                 actual_pending_work.map(|fiber| fiber.slot().get())
             ),
+            Self::AlreadyCommittedFinishedWorkRecord {
+                root,
+                current,
+                finished_work,
+                pending_work_after_commit,
+                handoff_order,
+            } => write!(
+                formatter,
+                "root {} finished-work-to-commit record order {} for fiber slot {} was already committed as current fiber slot {}; pending work after commit is {:?}",
+                root.raw(),
+                handoff_order,
+                finished_work.slot().get(),
+                current.slot().get(),
+                pending_work_after_commit.map(|fiber| fiber.slot().get())
+            ),
             Self::FinishedWorkRecordLanesMismatch {
                 root,
                 expected_render_lanes,
@@ -846,6 +1054,7 @@ impl Error for HostRootFinishedWorkCommitHandoffErrorForCanary {
             Self::MissingFinishedWorkRecord { .. }
             | Self::ForeignFinishedWorkRecord { .. }
             | Self::StaleFinishedWorkRecord { .. }
+            | Self::AlreadyCommittedFinishedWorkRecord { .. }
             | Self::FinishedWorkRecordLanesMismatch { .. } => None,
         }
     }
@@ -4806,11 +5015,14 @@ pub(crate) fn commit_finished_host_root_with_finished_work_handoff_for_canary<H:
     };
 
     validate_host_root_finished_work_pending_commit_for_canary(store, render, pending)?;
+    let execution_request =
+        HostRootFinishedWorkCommitExecutionRequestForCanary::new(pending, commit_order);
     let commit = commit_finished_host_root(store, render)?;
     let root = store.root(render.root()).map_err(RootCommitError::from)?;
 
     Ok(HostRootFinishedWorkCommitHandoffRecordForCanary {
         pending,
+        execution_request,
         commit_order,
         commit,
         current_after_commit: root.current(),
@@ -4843,6 +5055,18 @@ fn validate_host_root_finished_work_pending_commit_for_canary<H: HostTypes>(
     let actual_current = root.current();
     let actual_pending_work = root.scheduling().work_in_progress();
     let expected_pending_work = Some(render.finished_work());
+
+    if actual_current == pending.finished_work && actual_pending_work.is_none() {
+        return Err(
+            HostRootFinishedWorkCommitHandoffErrorForCanary::AlreadyCommittedFinishedWorkRecord {
+                root: expected_root,
+                current: actual_current,
+                finished_work: pending.finished_work,
+                pending_work_after_commit: actual_pending_work,
+                handoff_order: pending.handoff_order,
+            },
+        );
+    }
 
     if pending.previous_current != render.current()
         || pending.finished_work != render.finished_work()
@@ -13910,6 +14134,36 @@ mod tests {
         assert_eq!(handoff.pending(), pending);
         assert_eq!(handoff.commit_order(), 4);
         assert!(handoff.commit_order_after_pending_record());
+        let request = *handoff.execution_request();
+        assert_eq!(
+            request.status(),
+            HostRootFinishedWorkCommitExecutionStatusForCanary::Requested
+        );
+        assert!(request.execution_requested());
+        assert!(request.accepted_current_finished_work_record_shape());
+        assert_eq!(request.source_handoff_order(), pending.handoff_order());
+        assert_eq!(request.request_order(), 4);
+        assert_eq!(request.root(), root_id);
+        assert_eq!(request.root_token(), root_id.state_node_handle());
+        assert_eq!(request.previous_current(), render.current());
+        assert_eq!(request.pending_work(), Some(render.finished_work()));
+        assert_eq!(request.finished_work(), render.finished_work());
+        assert_eq!(request.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(request.finished_lanes(), Lanes::DEFAULT);
+        assert_eq!(request.remaining_lanes(), Lanes::NO);
+        assert_eq!(request.pending_lanes_before_commit(), Lanes::DEFAULT);
+        assert_eq!(
+            request.blockers(),
+            &HOST_ROOT_FINISHED_WORK_COMMIT_EXECUTION_BLOCKERS
+        );
+        assert!(request.host_mutation_execution_blocked());
+        assert!(request.public_root_rendering_blocked());
+        assert!(request.ref_attach_detach_blocked());
+        assert!(request.layout_effect_execution_blocked());
+        assert!(request.passive_effect_execution_blocked());
+        assert!(request.hydration_blocked());
+        assert!(request.compatibility_claim_blocked());
+        assert!(request.refs_effects_and_hydration_blocked());
         assert_eq!(handoff.commit().root(), root_id);
         assert_eq!(handoff.commit().finished_work(), render.finished_work());
         assert_eq!(handoff.current_after_commit(), render.finished_work());
@@ -14016,11 +14270,52 @@ mod tests {
     }
 
     #[test]
-    fn root_commit_finished_work_handoff_rejects_stale_record_after_current_switch() {
+    fn root_commit_finished_work_handoff_rejects_stale_record_before_switching_current() {
         let (mut store, root_id, host) = root_store();
         update_container(&mut store, root_id, RootElementHandle::from_raw(514), None).unwrap();
         let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
         let previous_current = render.current();
+        let mut pending =
+            record_host_root_finished_work_pending_commit_for_canary(&store, render, 1).unwrap();
+        pending.previous_current = render.finished_work();
+
+        let error = commit_finished_host_root_with_finished_work_handoff_for_canary(
+            &mut store,
+            render,
+            Some(pending),
+            2,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            HostRootFinishedWorkCommitHandoffErrorForCanary::StaleFinishedWorkRecord {
+                root,
+                expected_current,
+                actual_current,
+                expected_pending_work,
+                actual_pending_work,
+                finished_work
+            } if root == root_id
+                && expected_current == render.finished_work()
+                && actual_current == previous_current
+                && expected_pending_work == Some(render.finished_work())
+                && actual_pending_work == Some(render.finished_work())
+                && finished_work == render.finished_work()
+        ));
+        assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            Some(render.finished_work())
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_finished_work_handoff_rejects_already_committed_record_deterministically() {
+        let (mut store, root_id, host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(515), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
         let pending =
             record_host_root_finished_work_pending_commit_for_canary(&store, render, 1).unwrap();
         commit_finished_host_root_with_finished_work_handoff_for_canary(
@@ -14041,19 +14336,17 @@ mod tests {
 
         assert!(matches!(
             error,
-            HostRootFinishedWorkCommitHandoffErrorForCanary::StaleFinishedWorkRecord {
+            HostRootFinishedWorkCommitHandoffErrorForCanary::AlreadyCommittedFinishedWorkRecord {
                 root,
-                expected_current,
-                actual_current,
-                expected_pending_work,
-                actual_pending_work,
-                finished_work
+                current,
+                finished_work,
+                pending_work_after_commit,
+                handoff_order,
             } if root == root_id
-                && expected_current == previous_current
-                && actual_current == render.finished_work()
-                && expected_pending_work == Some(render.finished_work())
-                && actual_pending_work == None
                 && finished_work == render.finished_work()
+                && current == render.finished_work()
+                && pending_work_after_commit == None
+                && handoff_order == 1
         ));
         assert_eq!(
             store.root(root_id).unwrap().current(),
