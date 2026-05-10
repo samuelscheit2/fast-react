@@ -8,8 +8,10 @@ import { fileURLToPath } from "node:url";
 
 import {
   findReactTestRendererActObservation,
+  inspectReactTestRendererPrivateActPassiveEffectDrainDiagnostics,
   readCheckedReactTestRendererActOracle,
-  readCheckedReactTestRendererActOracleText
+  readCheckedReactTestRendererActOracleText,
+  REACT_TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_DIAGNOSTICS_EXPORT
 } from "../src/react-test-renderer-act-oracle.mjs";
 import {
   REACT_TEST_RENDERER_ACT_ORACLE_ARTIFACT_PATH,
@@ -39,6 +41,8 @@ const privateActDispatcherGateModule =
   "packages/react/private-act-dispatcher-gate.js";
 const privateActQueueFlushDiagnosticsExport =
   "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__";
+const privateActPassiveEffectDrainDiagnosticsExport =
+  REACT_TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_DIAGNOSTICS_EXPORT;
 const actUnblockingRequirements = [
   {
     id: "react-test-renderer-act-queue-flushing",
@@ -200,6 +204,18 @@ const ACT_SCHEDULER_PASSIVE_RECORD_IDS = [
   "passive-effect-callback-invocation-gate-snapshot",
   "passive-effect-destroy-callback-execution-records"
 ];
+const ACT_SCHEDULER_CJS_PASSIVE_RECORD_IDS = [
+  ...ACT_SCHEDULER_PASSIVE_RECORD_IDS,
+  "passive-effect-scheduler-flush-gate-record",
+  "scheduler-passive-effects-flush-request",
+  "passive-effect-scheduler-flush-execution-record"
+];
+
+function actSchedulerPassiveRecordIds(entrypoint) {
+  return entrypoint.startsWith("react-test-renderer/cjs/")
+    ? ACT_SCHEDULER_CJS_PASSIVE_RECORD_IDS
+    : ACT_SCHEDULER_PASSIVE_RECORD_IDS;
+}
 const ACT_SCHEDULER_ROOT_FLUSH_RECORD_IDS = [
   "test-renderer-private-root-request-bridge",
   "test-renderer-private-root-update-unmount-lifecycle",
@@ -230,6 +246,17 @@ const ACCEPTED_PRIVATE_ACT_FLUSH_PREREQUISITE_IDS = [
   "test-renderer-private-root-output-diagnostics",
   "test-renderer-private-root-request-records"
 ];
+const ACCEPTED_PRIVATE_ACT_FLUSH_CJS_PREREQUISITE_IDS = [
+  ...ACCEPTED_PRIVATE_ACT_FLUSH_PREREQUISITE_IDS.slice(0, 8),
+  "passive-effect-scheduler-flush-metadata",
+  ...ACCEPTED_PRIVATE_ACT_FLUSH_PREREQUISITE_IDS.slice(8)
+];
+
+function acceptedPrivateActFlushPrerequisiteIds(entrypoint) {
+  return entrypoint.startsWith("react-test-renderer/cjs/")
+    ? ACCEPTED_PRIVATE_ACT_FLUSH_CJS_PREREQUISITE_IDS
+    : ACCEPTED_PRIVATE_ACT_FLUSH_PREREQUISITE_IDS;
+}
 const BLOCKED_PRIVATE_ACT_FLUSH_PREREQUISITE_IDS = [
   "private-act-queue-drain-execution",
   "private-scheduler-flush-helper-execution",
@@ -571,6 +598,7 @@ test("Fast React react-test-renderer act stays blocked behind accepted package a
   assert.equal(localGate.privateSyncFlushExecutionMetadataPresent, true);
   assert.equal(localGate.privatePassiveCallbackExecutionMetadataPresent, true);
   assert.equal(localGate.privatePassiveDestroyExecutionMetadataPresent, true);
+  assert.equal(localGate.privatePassiveSchedulerFlushMetadataPresent, true);
   assert.equal(localGate.passiveActFlushMetadataAccepted, true);
   assert.equal(localGate.rootRequestRecordsAccepted, true);
   assert.equal(localGate.privateRootOutputDiagnosticsAccepted, true);
@@ -630,6 +658,7 @@ test("Fast React react-test-renderer act stays blocked behind accepted package a
       flushSyncError.actSchedulerGate
     );
     assertPrivateActQueueDiagnosticConsumer(entry, moduleExports);
+    assertPrivateActPassiveEffectDrainDiagnosticConsumer(entry, moduleExports);
     assertActSurface(entry, moduleExports);
     assertSchedulerSurfaceBlocked(entry, moduleExports._Scheduler);
   }
@@ -912,6 +941,18 @@ function inspectLocalReactTestRendererActBlockedGate() {
     /\bflush_passive_effects_after_commit_with_destroy_executor\b/u.test(
       passiveEffectsSource
     );
+  const privatePassiveSchedulerFlushMetadataPresent =
+    /\bPassiveEffectSchedulerFlushGateRecord\b/u.test(rootSchedulerSource) &&
+    /\bSchedulerPassiveEffectsFlushRequest\b/u.test(schedulerBridgeSource) &&
+    /\bPassiveEffectSchedulerFlushExecutionRecord\b/u.test(
+      passiveEffectsSource
+    ) &&
+    /\bschedule_passive_effects_flush_after_commit_for_canary\b/u.test(
+      rootSchedulerSource
+    ) &&
+    /\bflush_passive_effects_after_scheduler_flush_gate_from_committed_fiber_effects_for_canary\b/u.test(
+      passiveEffectsSource
+    );
   const publicEffectCallbackExecutionPresent =
     /\bpublic_effect_execution_enabled\(&self\) -> bool \{\s*true\s*\}/u.test(
       passiveEffectsSource
@@ -1020,6 +1061,7 @@ function inspectLocalReactTestRendererActBlockedGate() {
     privateSyncFlushExecutionMetadataPresent,
     privatePassiveCallbackExecutionMetadataPresent,
     privatePassiveDestroyExecutionMetadataPresent,
+    privatePassiveSchedulerFlushMetadataPresent,
     actSchedulerPrivateGatePresent,
     reactActPrivateDispatcherGateAccepted,
     privateActQueueDiagnosticConsumptionPresent,
@@ -1036,6 +1078,7 @@ function inspectLocalReactTestRendererActBlockedGate() {
     privateRootOutputDiagnosticsAccepted,
     privateFlushExecutionMetadataAccepted:
       privateSyncFlushExecutionMetadataPresent &&
+      privatePassiveSchedulerFlushMetadataPresent &&
       (privatePassiveCallbackExecutionMetadataPresent ||
         privatePassiveDestroyExecutionMetadataPresent) &&
       privateRootOutputDiagnosticsAccepted,
@@ -1238,6 +1281,224 @@ function assertPrivateActQueueDiagnosticConsumer(entry, moduleExports) {
   );
 }
 
+function assertPrivateActPassiveEffectDrainDiagnosticConsumer(
+  entry,
+  moduleExports
+) {
+  const inspection =
+    inspectReactTestRendererPrivateActPassiveEffectDrainDiagnostics(
+      moduleExports
+    );
+
+  if (!entry.entrypoint.startsWith("react-test-renderer/cjs/")) {
+    assert.equal(inspection.available, false, entry.entrypoint);
+    return;
+  }
+
+  assert.equal(inspection.available, true, entry.entrypoint);
+  assert.equal(
+    Object.keys(moduleExports._Scheduler).includes(
+      privateActPassiveEffectDrainDiagnosticsExport
+    ),
+    false,
+    entry.entrypoint
+  );
+  assert.equal(
+    Reflect.ownKeys(moduleExports._Scheduler).includes(
+      privateActPassiveEffectDrainDiagnosticsExport
+    ),
+    false,
+    entry.entrypoint
+  );
+
+  const diagnostics = inspection.helperDiagnostics[0].diagnostics;
+  assert.equal(Object.isFrozen(diagnostics), true, entry.entrypoint);
+  assert.equal(
+    diagnostics.status,
+    "private-react-test-renderer-act-passive-effect-drain-diagnostic-consumer"
+  );
+  assert.equal(
+    diagnostics.exportName,
+    privateActPassiveEffectDrainDiagnosticsExport
+  );
+  assert.equal(
+    diagnostics.metadataKind,
+    "fast-react.react-test-renderer.private-act-passive-effect-drain-metadata"
+  );
+  assert.equal(
+    diagnostics.consumer,
+    "react-test-renderer-act-passive-effect-drain-private-gate"
+  );
+  assert.deepEqual(diagnostics.acceptedRecordKinds, [
+    "PendingPassiveCommitHandoff",
+    "PassiveEffectSchedulerFlushGateRecord",
+    "SchedulerPassiveEffectsFlushRequest",
+    "PassiveEffectSchedulerFlushExecutionRecord",
+    "PassiveEffectsFlushResult"
+  ]);
+  assert.equal(diagnostics.consumesPendingPassiveFlushMetadata, true);
+  assert.equal(diagnostics.consumesAcceptedSchedulerFlushMetadata, true);
+  assert.equal(diagnostics.privatePassiveEffectDrainDiagnosticsConsumed, true);
+  assert.equal(diagnostics.drainsPublicSchedulerTaskQueue, false);
+  assert.equal(diagnostics.drainsPublicReactActQueue, false);
+  assert.equal(diagnostics.publicReactActCompatibilityClaimed, false);
+  assert.equal(diagnostics.publicActCompatibilityClaimed, false);
+  assert.equal(diagnostics.compatibilityClaimed, false);
+  assert.equal(diagnostics.executesPassiveEffects, false);
+  assert.equal(diagnostics.invokesEffectCallbacks, false);
+  assert.equal(diagnostics.invokesActCallback, false);
+
+  for (const row of inspection.helperDiagnostics) {
+    assert.equal(row.diagnostics, diagnostics, `${entry.entrypoint}:${row.key}`);
+    assert.deepEqual(
+      row.descriptor,
+      {
+        enumerable: false,
+        writable: false,
+        configurable: false
+      },
+      `${entry.entrypoint}:${row.key}`
+    );
+  }
+
+  const metadata = diagnostics.createAcceptedPendingPassiveFlushMetadata([
+    diagnostics.createAcceptedPendingPassiveFlushRecord({
+      label: "scheduler-gate",
+      recordKind: "PassiveEffectSchedulerFlushGateRecord",
+      root: "root-1",
+      finishedWork: "fiber-2",
+      lanes: "Default",
+      pendingUnmountCount: 1,
+      pendingMountCount: 2
+    }),
+    {
+      label: "scheduler-request",
+      recordKind: "SchedulerPassiveEffectsFlushRequest",
+      root: "root-1",
+      finishedWork: "fiber-2",
+      lanes: "Default",
+      pendingUnmountCount: 0,
+      pendingMountCount: 1,
+      schedulerRequestOrder: 1
+    }
+  ]);
+  assert.deepEqual(
+    diagnostics.describeAcceptedPendingPassiveFlushMetadata(metadata),
+    {
+      status: "accepted-pending-passive-flush-metadata",
+      accepted: true,
+      rejectionReason: null,
+      metadataKind:
+        "fast-react.react-test-renderer.private-act-passive-effect-drain-metadata",
+      pendingCount: 2,
+      consumer: "react-test-renderer-act-passive-effect-drain-private-gate",
+      gateStatus: actSchedulerGateStatus,
+      consumesPendingPassiveFlushMetadata: true,
+      consumesAcceptedSchedulerFlushMetadata: true,
+      drainsPublicSchedulerTaskQueue: false,
+      drainsPublicReactActQueue: false,
+      publicReactActCompatibilityClaimed: false,
+      publicActCompatibilityClaimed: false,
+      compatibilityClaimed: false,
+      executesPassiveEffects: false,
+      invokesEffectCallbacks: false
+    }
+  );
+
+  const report =
+    diagnostics.consumeAcceptedPendingPassiveFlushMetadata(metadata);
+  assert.equal(
+    report.status,
+    "react-test-renderer-consumed-accepted-pending-passive-flush-metadata"
+  );
+  assert.equal(
+    report.passiveEffectDrainStatus,
+    "drained-accepted-pending-passive-flush-metadata"
+  );
+  assert.equal(report.pendingBefore, 2);
+  assert.equal(report.drainedCount, 2);
+  assert.equal(report.remainingCount, 0);
+  assert.deepEqual(
+    report.drainedRecords.map((record) => [
+      record.index,
+      record.label,
+      record.recordKind,
+      record.pendingUnmountCount,
+      record.pendingMountCount,
+      record.pendingRecordCount,
+      record.schedulerRequestOrder,
+      record.schedulerPriority,
+      record.executesPassiveEffects,
+      record.invokesEffectCallbacks
+    ]),
+    [
+      [
+        0,
+        "scheduler-gate",
+        "PassiveEffectSchedulerFlushGateRecord",
+        1,
+        2,
+        3,
+        0,
+        "Normal",
+        false,
+        false
+      ],
+      [
+        1,
+        "scheduler-request",
+        "SchedulerPassiveEffectsFlushRequest",
+        0,
+        1,
+        1,
+        1,
+        "Normal",
+        false,
+        false
+      ]
+    ],
+    entry.entrypoint
+  );
+  assert.equal(report.privatePassiveEffectDrainDiagnosticsConsumed, true);
+  assert.equal(report.consumesPendingPassiveFlushMetadata, true);
+  assert.equal(report.drainsPublicSchedulerTaskQueue, false);
+  assert.equal(report.drainsPublicReactActQueue, false);
+  assert.equal(report.publicReactActCompatibilityClaimed, false);
+  assert.equal(report.publicActCompatibilityClaimed, false);
+  assert.equal(report.compatibilityClaimed, false);
+  assert.equal(report.invokesActCallback, false);
+  assert.equal(report.executesPassiveEffects, false);
+  assert.equal(report.invokesEffectCallbacks, false);
+  assert.equal(metadata.records.length, 0, entry.entrypoint);
+
+  const rejected = diagnostics.describeAcceptedPendingPassiveFlushMetadata([]);
+  assert.equal(rejected.accepted, false, entry.entrypoint);
+  assert.throws(
+    () => diagnostics.consumeAcceptedPendingPassiveFlushMetadata([]),
+    (error) => {
+      assert.equal(
+        error.name,
+        "FastReactTestRendererPrivateActPassiveEffectDrainError"
+      );
+      assert.equal(
+        error.code,
+        "FAST_REACT_TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_REJECTED"
+      );
+      assert.equal(error.entrypoint, entry.entrypoint);
+      assert.equal(
+        error.exportName,
+        `_Scheduler.${privateActPassiveEffectDrainDiagnosticsExport}`
+      );
+      assert.equal(error.publicReactActCompatibilityClaimed, false);
+      assert.equal(error.publicActCompatibilityClaimed, false);
+      assert.equal(error.executesPassiveEffects, false);
+      assert.equal(error.invokesEffectCallbacks, false);
+      return true;
+    },
+    entry.entrypoint
+  );
+}
+
 function assertActSurface(entry, moduleExports) {
   if (entry.actExport === "undefined") {
     assert.equal(moduleExports.act, undefined, entry.entrypoint);
@@ -1335,12 +1596,8 @@ function assertSchedulerSurfaceBlocked(entry, scheduler) {
 }
 
 function assertActSchedulerGate(gate, entrypoint) {
-  assert.equal(Object.isFrozen(gate), true, entrypoint);
-  assert.equal(gate.id, "react-test-renderer-act-scheduler-private-gate");
-  assert.equal(gate.status, actSchedulerGateStatus);
-  assert.equal(gate.entrypoint, entrypoint);
-  assert.equal(gate.deterministic, true);
-  assert.deepEqual(gate.acceptedWorkers, [
+  const isCjs = entrypoint.startsWith("react-test-renderer/cjs/");
+  const expectedAcceptedWorkers = [
     "worker-176-act-queue-routing-skeleton",
     "worker-252-sync-flush-act-continuation-skeleton",
     "worker-277-react-act-queue-private-dispatcher-gate",
@@ -1359,7 +1616,20 @@ function assertActSchedulerGate(gate, entrypoint) {
     "worker-426-test-renderer-testinstance-bridge-query",
     "worker-349-hook-effect-destroy-callback-execution-private",
     "worker-377-scheduler-act-queue-flush-helper-private"
-  ]);
+  ];
+  if (isCjs) {
+    expectedAcceptedWorkers.push(
+      "worker-449-passive-effect-scheduler-flush-gate",
+      "worker-473-test-renderer-act-passive-effect-drain"
+    );
+  }
+
+  assert.equal(Object.isFrozen(gate), true, entrypoint);
+  assert.equal(gate.id, "react-test-renderer-act-scheduler-private-gate");
+  assert.equal(gate.status, actSchedulerGateStatus);
+  assert.equal(gate.entrypoint, entrypoint);
+  assert.equal(gate.deterministic, true);
+  assert.deepEqual(gate.acceptedWorkers, expectedAcceptedWorkers);
   assert.equal(gate.publicActBehaviorAvailable, false);
   assert.equal(gate.publicSchedulerFlushExecutionAvailable, false);
   assert.equal(gate.publicRootSyncFlushRouteAvailable, false);
@@ -1387,6 +1657,14 @@ function assertActSchedulerGate(gate, entrypoint) {
   assert.equal(gate.privateFlushExecutionMetadataAccepted, true);
   assert.equal(gate.privateSyncFlushExecutionMetadataAccepted, true);
   assert.equal(gate.privatePassiveCallbackExecutionMetadataAccepted, true);
+  assert.equal(
+    gate.privatePassiveSchedulerFlushMetadataAccepted,
+    isCjs ? true : undefined
+  );
+  assert.equal(
+    gate.privatePassiveEffectDrainDiagnosticsConsumed,
+    isCjs ? true : undefined
+  );
   assert.equal(gate.privateRootOutputDiagnosticsAccepted, true);
   assert.equal(gate.privateFlushPrerequisitesPresent, true);
   assert.equal(gate.privateFlushExecutionReady, false);
@@ -1404,6 +1682,14 @@ function assertActSchedulerGate(gate, entrypoint) {
     gate.privateActQueueFlushDiagnostics.status,
     "private-react-test-renderer-act-queue-diagnostic-consumer"
   );
+  if (isCjs) {
+    assert.equal(
+      gate.privateActPassiveEffectDrainDiagnostics.exportName,
+      privateActPassiveEffectDrainDiagnosticsExport
+    );
+  } else {
+    assert.equal(gate.privateActPassiveEffectDrainDiagnostics, undefined);
+  }
   assert.deepEqual(
     gate.recognizedSchedulerMockFlushHelpers.map((record) => [
       record.key,
@@ -1421,7 +1707,7 @@ function assertActSchedulerGate(gate, entrypoint) {
   );
   assert.deepEqual(
     gate.recognizedPassiveActFlushRecords.map((record) => record.id),
-    ACT_SCHEDULER_PASSIVE_RECORD_IDS
+    actSchedulerPassiveRecordIds(entrypoint)
   );
   assert.deepEqual(
     gate.recognizedRootActFlushRecords.map((record) => record.id),
@@ -1429,7 +1715,7 @@ function assertActSchedulerGate(gate, entrypoint) {
   );
   assert.deepEqual(
     gate.acceptedPrivateFlushPrerequisiteIds,
-    ACCEPTED_PRIVATE_ACT_FLUSH_PREREQUISITE_IDS
+    acceptedPrivateActFlushPrerequisiteIds(entrypoint)
   );
   assert.deepEqual(
     gate.blockedPrivateFlushPrerequisiteIds,
@@ -1437,7 +1723,7 @@ function assertActSchedulerGate(gate, entrypoint) {
   );
   assert.deepEqual(
     gate.acceptedPrivateFlushPrerequisites.map((record) => record.id),
-    ACCEPTED_PRIVATE_ACT_FLUSH_PREREQUISITE_IDS
+    acceptedPrivateActFlushPrerequisiteIds(entrypoint)
   );
   assert.deepEqual(
     gate.blockedPrivateFlushPrerequisites.map((record) => record.id),
@@ -1453,6 +1739,12 @@ function assertActSchedulerGate(gate, entrypoint) {
     mutatesHostOutput: false,
     acceptsPrivateFlushExecutionMetadata: true,
     consumesPrivateSchedulerActQueueDiagnostics: true,
+    ...(isCjs
+      ? {
+          consumesPrivatePassiveEffectDrainDiagnostics: true,
+          consumesPendingPassiveFlushMetadata: true
+        }
+      : {}),
     drainsAcceptedInternalTestQueues: true,
     drainsPublicSchedulerTaskQueue: false,
     drainsPublicReactActQueue: false,
@@ -1526,6 +1818,24 @@ function assertActSchedulerGate(gate, entrypoint) {
     gate.recognizedPassiveActFlushRecords[4].privateDestroyExecutionMetadata,
     true
   );
+  if (isCjs) {
+    assert.equal(
+      gate.recognizedPassiveActFlushRecords[5].consumesPendingPassiveMetadata,
+      true
+    );
+    assert.equal(
+      gate.recognizedPassiveActFlushRecords[6].schedulerPriority,
+      "Normal"
+    );
+    assert.equal(
+      gate.recognizedPassiveActFlushRecords[7].metadataOnlyFlush,
+      true
+    );
+    assert.equal(
+      gate.recognizedPassiveActFlushRecords[7].invokesEffectCallbacks,
+      false
+    );
+  }
   assert.equal(
     gate.recognizedRootActFlushRecords[0].privateRootRequestExecution,
     false

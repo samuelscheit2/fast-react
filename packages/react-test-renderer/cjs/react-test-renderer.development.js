@@ -19,6 +19,8 @@ const actSchedulerMissingBeforeExecution = Object.freeze([
 ]);
 const privateActQueueFlushDiagnosticsExport =
   '__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__';
+const privateActPassiveEffectDrainDiagnosticsExport =
+  '__FAST_REACT_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_DIAGNOSTICS__';
 const reactCompatibilityTarget = 'react@19.2.6';
 const schedulerCompatibilityTarget = 'scheduler@0.27.0';
 const privateActQueueTestQueueKind =
@@ -26,11 +28,22 @@ const privateActQueueTestQueueKind =
 const privateActQueueTestTaskKind =
   'fast-react.react.private-act-queue-test-task';
 const privateActQueueTestQueueVersion = 1;
+const privateActPassiveEffectDrainMetadataKind =
+  'fast-react.react-test-renderer.private-act-passive-effect-drain-metadata';
+const privateActPassiveEffectDrainRecordKind =
+  'fast-react.react-test-renderer.private-act-passive-effect-drain-record';
+const privateActPassiveEffectDrainVersion = 1;
 const privateActQueueTestQueueBrand = Symbol.for(
   'fast-react.react.private-act-queue-test-queue'
 );
 const privateActQueueTestTaskBrand = Symbol.for(
   'fast-react.react.private-act-queue-test-task'
+);
+const privateActPassiveEffectDrainMetadataBrand = Symbol.for(
+  'fast.react_test_renderer.private_act_passive_effect_drain_metadata'
+);
+const privateActPassiveEffectDrainRecordBrand = Symbol.for(
+  'fast.react_test_renderer.private_act_passive_effect_drain_record'
 );
 const acceptedActQueueRecordKinds = Object.freeze([
   'SchedulerActQueueRequest',
@@ -44,6 +57,13 @@ const acceptedActQueueTaskKinds = Object.freeze([
 const acceptedActQueueContinuationStatuses = Object.freeze([
   'NoContinuation',
   'PendingContinuation'
+]);
+const acceptedPassiveEffectDrainRecordKinds = Object.freeze([
+  'PendingPassiveCommitHandoff',
+  'PassiveEffectSchedulerFlushGateRecord',
+  'SchedulerPassiveEffectsFlushRequest',
+  'PassiveEffectSchedulerFlushExecutionRecord',
+  'PassiveEffectsFlushResult'
 ]);
 const schedulerMockFlushHelperMetadata = Object.freeze([
   Object.freeze({
@@ -377,6 +397,68 @@ const passiveActFlushRecords = Object.freeze([
     publicEffectExecution: false,
     publicActCompatibility: false,
     schedulerDrivenPassiveExecution: false
+  }),
+  Object.freeze({
+    id: 'passive-effect-scheduler-flush-gate-record',
+    rustRecord: 'PassiveEffectSchedulerFlushGateRecord',
+    source: 'crates/fast-react-reconciler/src/root_scheduler.rs',
+    acceptedWorker: 'worker-449-passive-effect-scheduler-flush-gate',
+    acceptedFields: Object.freeze([
+      'root',
+      'finished_work',
+      'lanes',
+      'pending_unmount_count',
+      'pending_mount_count',
+      'scheduler_request',
+      'status'
+    ]),
+    consumesPendingPassiveMetadata: true,
+    schedulesPrivateFlushRequest: true,
+    executesPassiveEffects: false,
+    invokesEffectCallbacks: false,
+    publicActCompatibility: false,
+    publicSchedulerPackageBehaviorChanged: false
+  }),
+  Object.freeze({
+    id: 'scheduler-passive-effects-flush-request',
+    rustRecord: 'SchedulerPassiveEffectsFlushRequest',
+    source: 'crates/fast-react-reconciler/src/scheduler_bridge.rs',
+    acceptedWorker: 'worker-449-passive-effect-scheduler-flush-gate',
+    acceptedFields: Object.freeze([
+      'order',
+      'node',
+      'root',
+      'finished_work',
+      'lanes',
+      'pending_unmount_count',
+      'pending_mount_count',
+      'scheduler_priority'
+    ]),
+    schedulerPriority: 'Normal',
+    recordsPrivateSchedulerRequest: true,
+    drainsPublicSchedulerTaskQueue: false,
+    executesPassiveEffects: false,
+    invokesEffectCallbacks: false,
+    publicActCompatibility: false,
+    publicSchedulerPackageBehaviorChanged: false
+  }),
+  Object.freeze({
+    id: 'passive-effect-scheduler-flush-execution-record',
+    rustRecord: 'PassiveEffectSchedulerFlushExecutionRecord',
+    source: 'crates/fast-react-reconciler/src/passive_effects.rs',
+    acceptedWorker: 'worker-449-passive-effect-scheduler-flush-gate',
+    acceptedFields: Object.freeze([
+      'execution_order',
+      'scheduler_gate',
+      'scheduler_request',
+      'passive_effects'
+    ]),
+    consumesPendingPassiveMetadata: true,
+    metadataOnlyFlush: true,
+    executesPassiveEffects: false,
+    invokesEffectCallbacks: false,
+    publicActCompatibility: false,
+    publicSchedulerPackageBehaviorChanged: false
   })
 ]);
 const testRendererRootActFlushRecords = Object.freeze([
@@ -563,6 +645,7 @@ const schedulerReactActQueueDiagnosticRecords = Object.freeze([
     executesEffects: false
   })
 ]);
+let privateActPassiveEffectDrainDiagnostics;
 const privateActQueueFlushDiagnostics = Object.freeze({
   status: 'private-react-test-renderer-act-queue-diagnostic-consumer',
   schedulerDiagnosticStatus: 'private-scheduler-act-queue-flush-diagnostics',
@@ -587,10 +670,44 @@ const privateActQueueFlushDiagnostics = Object.freeze({
   executesQueuedWork: false,
   executesEffects: false,
   invokesActCallback: false,
+  get privateActPassiveEffectDrainDiagnostics() {
+    return privateActPassiveEffectDrainDiagnostics;
+  },
   describeAcceptedInternalActQueue,
   consumeAcceptedSchedulerActQueueDiagnostics,
   drainAcceptedInternalActQueue:
     consumeAcceptedSchedulerActQueueDiagnostics
+});
+privateActPassiveEffectDrainDiagnostics = Object.freeze({
+  status:
+    'private-react-test-renderer-act-passive-effect-drain-diagnostic-consumer',
+  exportName: privateActPassiveEffectDrainDiagnosticsExport,
+  metadataKind: privateActPassiveEffectDrainMetadataKind,
+  recordKind: privateActPassiveEffectDrainRecordKind,
+  version: privateActPassiveEffectDrainVersion,
+  consumer: 'react-test-renderer-act-passive-effect-drain-private-gate',
+  gateStatus: actSchedulerGateStatus,
+  compatibilityTarget,
+  schedulerCompatibilityTarget,
+  acceptedRecordKinds: acceptedPassiveEffectDrainRecordKinds,
+  consumesPendingPassiveFlushMetadata: true,
+  consumesAcceptedSchedulerFlushMetadata: true,
+  privatePassiveEffectDrainDiagnosticsConsumed: true,
+  drainsPublicSchedulerTaskQueue: false,
+  drainsPublicReactActQueue: false,
+  publicSchedulerTimingCompatibilityClaimed: false,
+  publicReactActCompatibilityClaimed: false,
+  publicActCompatibilityClaimed: false,
+  compatibilityClaimed: false,
+  executesPassiveEffects: false,
+  invokesEffectCallbacks: false,
+  invokesActCallback: false,
+  createAcceptedPendingPassiveFlushMetadata,
+  createAcceptedPendingPassiveFlushRecord,
+  describeAcceptedPendingPassiveFlushMetadata,
+  consumeAcceptedPendingPassiveFlushMetadata,
+  drainAcceptedPendingPassiveFlushMetadata:
+    consumeAcceptedPendingPassiveFlushMetadata
 });
 const acceptedPrivateActFlushPrerequisiteIds = Object.freeze([
   'react-act-private-dispatcher-gate',
@@ -601,6 +718,7 @@ const acceptedPrivateActFlushPrerequisiteIds = Object.freeze([
   'sync-flush-post-passive-continuation-execution-gate',
   'sync-flush-post-passive-private-execution-metadata',
   'passive-effect-flush-metadata',
+  'passive-effect-scheduler-flush-metadata',
   'passive-effect-private-callback-execution-metadata',
   'test-renderer-private-root-output-diagnostics',
   'test-renderer-private-root-request-records'
@@ -693,6 +811,23 @@ const acceptedPrivateActFlushPrerequisites = Object.freeze([
     invokesEffectCallbacks: false
   }),
   Object.freeze({
+    id: 'passive-effect-scheduler-flush-metadata',
+    present: true,
+    recordOnly: false,
+    records: Object.freeze([
+      'PassiveEffectSchedulerFlushGateRecord',
+      'SchedulerPassiveEffectsFlushRequest',
+      'PassiveEffectSchedulerFlushExecutionRecord'
+    ]),
+    diagnostics: privateActPassiveEffectDrainDiagnostics,
+    consumesPendingPassiveFlushMetadata: true,
+    consumesAcceptedSchedulerFlushMetadata: true,
+    executesPassiveEffects: false,
+    invokesEffectCallbacks: false,
+    publicActCompatibility: false,
+    publicSchedulerPackageBehaviorChanged: false
+  }),
+  Object.freeze({
     id: 'passive-effect-private-callback-execution-metadata',
     present: true,
     recordOnly: true,
@@ -774,6 +909,8 @@ const actSchedulerSideEffectPolicy = Object.freeze({
   mutatesHostOutput: false,
   acceptsPrivateFlushExecutionMetadata: true,
   consumesPrivateSchedulerActQueueDiagnostics: true,
+  consumesPrivatePassiveEffectDrainDiagnostics: true,
+  consumesPendingPassiveFlushMetadata: true,
   drainsAcceptedInternalTestQueues: true,
   drainsPublicSchedulerTaskQueue: false,
   drainsPublicReactActQueue: false,
@@ -805,7 +942,9 @@ const actSchedulerGate = Object.freeze({
     'worker-334-test-renderer-testinstance-private-query-path',
     'worker-426-test-renderer-testinstance-bridge-query',
     'worker-349-hook-effect-destroy-callback-execution-private',
-    'worker-377-scheduler-act-queue-flush-helper-private'
+    'worker-377-scheduler-act-queue-flush-helper-private',
+    'worker-449-passive-effect-scheduler-flush-gate',
+    'worker-473-test-renderer-act-passive-effect-drain'
   ]),
   publicActBehaviorAvailable: false,
   publicSchedulerFlushExecutionAvailable: false,
@@ -834,6 +973,8 @@ const actSchedulerGate = Object.freeze({
   privateFlushExecutionMetadataAccepted: true,
   privateSyncFlushExecutionMetadataAccepted: true,
   privatePassiveCallbackExecutionMetadataAccepted: true,
+  privatePassiveSchedulerFlushMetadataAccepted: true,
+  privatePassiveEffectDrainDiagnosticsConsumed: true,
   privateRootOutputDiagnosticsAccepted: true,
   privateFlushPrerequisitesPresent: true,
   privateFlushExecutionReady: false,
@@ -841,6 +982,7 @@ const actSchedulerGate = Object.freeze({
   recognizedSchedulerReactActQueueDiagnostics:
     schedulerReactActQueueDiagnosticRecords,
   privateActQueueFlushDiagnostics,
+  privateActPassiveEffectDrainDiagnostics,
   recognizedSchedulerMockFlushHelpers: schedulerMockFlushHelperMetadata,
   recognizedRootActRecords: rootActSchedulerRecords,
   recognizedSyncFlushActRecords: syncFlushActSchedulerRecords,
@@ -2901,6 +3043,14 @@ function includesString(value, expectedValues) {
   return typeof value === 'string' && expectedValues.includes(value);
 }
 
+function isNonNegativeInteger(value) {
+  return Number.isInteger(value) && value >= 0;
+}
+
+function normalizeNonNegativeInteger(value, fallback) {
+  return isNonNegativeInteger(value) ? value : fallback;
+}
+
 function getRejectedPrivateActQueueTaskReason(task, index) {
   if (!isObjectLike(task)) {
     return `record-${index}-not-object`;
@@ -3105,6 +3255,361 @@ function consumeAcceptedSchedulerActQueueDiagnostics(queue) {
     executesQueuedWork: false,
     executesEffects: false,
     executesScheduledCallbacks: false,
+    publicSchedulerFlushExecutionAvailable: false,
+    publicActBehaviorAvailable: false,
+    rendererRootsCompatibilityClaimed: false
+  });
+}
+
+function createAcceptedPendingPassiveFlushRecord(options = {}) {
+  const normalizedOptions =
+    typeof options === 'string'
+      ? {
+          label: options
+        }
+      : options ?? {};
+  const pendingUnmountCount = normalizeNonNegativeInteger(
+    normalizedOptions.pendingUnmountCount,
+    0
+  );
+  const pendingMountCount = normalizeNonNegativeInteger(
+    normalizedOptions.pendingMountCount,
+    0
+  );
+  const record = {
+    kind: privateActPassiveEffectDrainRecordKind,
+    version: privateActPassiveEffectDrainVersion,
+    compatibilityTarget,
+    schedulerCompatibilityTarget,
+    recordKind:
+      normalizedOptions.recordKind ?? 'PassiveEffectSchedulerFlushGateRecord',
+    label: String(
+      normalizedOptions.label ?? 'pending-passive-flush-metadata'
+    ),
+    root: String(normalizedOptions.root ?? 'test-renderer-root'),
+    finishedWork: String(
+      normalizedOptions.finishedWork ?? 'test-renderer-finished-work'
+    ),
+    lanes: String(normalizedOptions.lanes ?? 'Default'),
+    pendingUnmountCount,
+    pendingMountCount,
+    pendingRecordCount: pendingUnmountCount + pendingMountCount,
+    schedulerRequestOrder: normalizeNonNegativeInteger(
+      normalizedOptions.schedulerRequestOrder,
+      0
+    ),
+    schedulerPriority: normalizedOptions.schedulerPriority ?? 'Normal',
+    consumesPendingPassiveFlushMetadata: true,
+    consumesAcceptedSchedulerFlushMetadata: true,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    publicActCompatibilityClaimed: false,
+    publicSchedulerPackageBehaviorChanged: false,
+    compatibilityClaimed: false,
+    executesPassiveEffects: false,
+    invokesEffectCallbacks: false,
+    invokesActCallback: false
+  };
+
+  Object.defineProperty(record, privateActPassiveEffectDrainRecordBrand, {
+    value: true
+  });
+
+  return Object.freeze(record);
+}
+
+function normalizeAcceptedPendingPassiveFlushRecord(record) {
+  if (isAcceptedPendingPassiveFlushRecord(record)) {
+    return record;
+  }
+
+  return createAcceptedPendingPassiveFlushRecord(record);
+}
+
+function createAcceptedPendingPassiveFlushMetadata(records = []) {
+  const normalizedRecords = Array.isArray(records) ? records : [];
+  const metadata = {
+    kind: privateActPassiveEffectDrainMetadataKind,
+    version: privateActPassiveEffectDrainVersion,
+    compatibilityTarget,
+    schedulerCompatibilityTarget,
+    publicCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    publicActCompatibilityClaimed: false,
+    publicSchedulerPackageBehaviorChanged: false,
+    consumesPendingPassiveFlushMetadata: true,
+    consumesAcceptedSchedulerFlushMetadata: true,
+    privatePassiveEffectDrainDiagnosticsReady: true,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    executesPassiveEffects: false,
+    invokesEffectCallbacks: false,
+    invokesActCallback: false,
+    records: normalizedRecords.map(normalizeAcceptedPendingPassiveFlushRecord)
+  };
+
+  Object.defineProperty(metadata, privateActPassiveEffectDrainMetadataBrand, {
+    value: true
+  });
+
+  return metadata;
+}
+
+function isAcceptedPendingPassiveFlushRecord(record) {
+  return getRejectedPendingPassiveFlushRecordReason(record, 0) === null;
+}
+
+function getRejectedPendingPassiveFlushRecordReason(record, index) {
+  if (!isObjectLike(record)) {
+    return `record-${index}-not-object`;
+  }
+  if (record[privateActPassiveEffectDrainRecordBrand] !== true) {
+    return `record-${index}-missing-internal-brand`;
+  }
+  if (record.kind !== privateActPassiveEffectDrainRecordKind) {
+    return `record-${index}-kind`;
+  }
+  if (record.version !== privateActPassiveEffectDrainVersion) {
+    return `record-${index}-version`;
+  }
+  if (record.compatibilityTarget !== compatibilityTarget) {
+    return `record-${index}-target`;
+  }
+  if (record.schedulerCompatibilityTarget !== schedulerCompatibilityTarget) {
+    return `record-${index}-scheduler-target`;
+  }
+  if (!includesString(record.recordKind, acceptedPassiveEffectDrainRecordKinds)) {
+    return `record-${index}-record-kind`;
+  }
+  if (
+    typeof record.label !== 'string' ||
+    typeof record.root !== 'string' ||
+    typeof record.finishedWork !== 'string' ||
+    typeof record.lanes !== 'string'
+  ) {
+    return `record-${index}-identity-fields`;
+  }
+  if (
+    !isNonNegativeInteger(record.pendingUnmountCount) ||
+    !isNonNegativeInteger(record.pendingMountCount) ||
+    !isNonNegativeInteger(record.pendingRecordCount) ||
+    record.pendingRecordCount !==
+      record.pendingUnmountCount + record.pendingMountCount
+  ) {
+    return `record-${index}-pending-counts`;
+  }
+  if (
+    !isNonNegativeInteger(record.schedulerRequestOrder) ||
+    record.schedulerPriority !== 'Normal'
+  ) {
+    return `record-${index}-scheduler-request`;
+  }
+  if (
+    record.consumesPendingPassiveFlushMetadata !== true ||
+    record.consumesAcceptedSchedulerFlushMetadata !== true
+  ) {
+    return `record-${index}-consume-policy`;
+  }
+  if (
+    record.drainsPublicSchedulerTaskQueue !== false ||
+    record.drainsPublicReactActQueue !== false ||
+    record.publicSchedulerTimingCompatibilityClaimed !== false ||
+    record.publicReactActCompatibilityClaimed !== false ||
+    record.publicActCompatibilityClaimed !== false ||
+    record.publicSchedulerPackageBehaviorChanged !== false ||
+    record.compatibilityClaimed !== false
+  ) {
+    return `record-${index}-public-claim`;
+  }
+  if (
+    record.executesPassiveEffects !== false ||
+    record.invokesEffectCallbacks !== false ||
+    record.invokesActCallback !== false
+  ) {
+    return `record-${index}-execution-claim`;
+  }
+  return null;
+}
+
+function getRejectedPendingPassiveFlushMetadataReason(metadata) {
+  if (!isObjectLike(metadata)) {
+    return 'metadata-not-object';
+  }
+  if (metadata[privateActPassiveEffectDrainMetadataBrand] !== true) {
+    return 'metadata-missing-internal-brand';
+  }
+  if (metadata.kind !== privateActPassiveEffectDrainMetadataKind) {
+    return 'metadata-kind';
+  }
+  if (metadata.version !== privateActPassiveEffectDrainVersion) {
+    return 'metadata-version';
+  }
+  if (metadata.compatibilityTarget !== compatibilityTarget) {
+    return 'metadata-target';
+  }
+  if (metadata.schedulerCompatibilityTarget !== schedulerCompatibilityTarget) {
+    return 'metadata-scheduler-target';
+  }
+  if (
+    metadata.publicCompatibilityClaimed !== false ||
+    metadata.publicSchedulerTimingCompatibilityClaimed !== false ||
+    metadata.publicReactActCompatibilityClaimed !== false ||
+    metadata.publicActCompatibilityClaimed !== false ||
+    metadata.publicSchedulerPackageBehaviorChanged !== false
+  ) {
+    return 'metadata-public-claim';
+  }
+  if (
+    metadata.consumesPendingPassiveFlushMetadata !== true ||
+    metadata.consumesAcceptedSchedulerFlushMetadata !== true ||
+    metadata.privatePassiveEffectDrainDiagnosticsReady !== true
+  ) {
+    return 'metadata-consume-policy';
+  }
+  if (
+    metadata.drainsPublicSchedulerTaskQueue !== false ||
+    metadata.drainsPublicReactActQueue !== false ||
+    metadata.executesPassiveEffects !== false ||
+    metadata.invokesEffectCallbacks !== false ||
+    metadata.invokesActCallback !== false
+  ) {
+    return 'metadata-execution-claim';
+  }
+  if (!Array.isArray(metadata.records)) {
+    return 'metadata-records-not-array';
+  }
+
+  for (let index = 0; index < metadata.records.length; index++) {
+    const rejectedRecordReason = getRejectedPendingPassiveFlushRecordReason(
+      metadata.records[index],
+      index
+    );
+    if (rejectedRecordReason !== null) {
+      return rejectedRecordReason;
+    }
+  }
+  return null;
+}
+
+function createPrivateActPassiveEffectDrainDiagnosticError(reason) {
+  const error = createUnsupportedError(
+    `_Scheduler.${privateActPassiveEffectDrainDiagnosticsExport}`,
+    'rejected private act passive-effect drain diagnostics',
+    `Only accepted branded pending-passive flush metadata can be consumed by this private gate. Rejection reason: ${reason}.`,
+    undefined,
+    undefined,
+    actSchedulerGate
+  );
+
+  error.name = 'FastReactTestRendererPrivateActPassiveEffectDrainError';
+  error.code =
+    'FAST_REACT_TEST_RENDERER_PRIVATE_ACT_PASSIVE_EFFECT_DRAIN_REJECTED';
+  error.reason = reason;
+  error.publicReactActCompatibilityClaimed = false;
+  error.publicActCompatibilityClaimed = false;
+  error.executesPassiveEffects = false;
+  error.invokesEffectCallbacks = false;
+  return error;
+}
+
+function describeAcceptedPendingPassiveFlushMetadata(metadata) {
+  const rejectionReason =
+    getRejectedPendingPassiveFlushMetadataReason(metadata);
+  const pendingCount =
+    isObjectLike(metadata) && Array.isArray(metadata.records)
+      ? metadata.records.length
+      : 0;
+
+  return freezeRecord({
+    status:
+      rejectionReason === null
+        ? 'accepted-pending-passive-flush-metadata'
+        : 'rejected-pending-passive-flush-metadata',
+    accepted: rejectionReason === null,
+    rejectionReason,
+    metadataKind: isObjectLike(metadata) ? metadata.kind : null,
+    pendingCount,
+    consumer: 'react-test-renderer-act-passive-effect-drain-private-gate',
+    gateStatus: actSchedulerGateStatus,
+    consumesPendingPassiveFlushMetadata: rejectionReason === null,
+    consumesAcceptedSchedulerFlushMetadata: rejectionReason === null,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    publicReactActCompatibilityClaimed: false,
+    publicActCompatibilityClaimed: false,
+    compatibilityClaimed: false,
+    executesPassiveEffects: false,
+    invokesEffectCallbacks: false
+  });
+}
+
+function summarizePendingPassiveFlushRecord(record, index) {
+  return freezeRecord({
+    index,
+    label: record.label,
+    recordKind: record.recordKind,
+    root: record.root,
+    finishedWork: record.finishedWork,
+    lanes: record.lanes,
+    pendingUnmountCount: record.pendingUnmountCount,
+    pendingMountCount: record.pendingMountCount,
+    pendingRecordCount: record.pendingRecordCount,
+    schedulerRequestOrder: record.schedulerRequestOrder,
+    schedulerPriority: record.schedulerPriority,
+    consumesPendingPassiveFlushMetadata: true,
+    consumesAcceptedSchedulerFlushMetadata: true,
+    executesPassiveEffects: false,
+    invokesEffectCallbacks: false
+  });
+}
+
+function consumeAcceptedPendingPassiveFlushMetadata(metadata) {
+  const rejectionReason =
+    getRejectedPendingPassiveFlushMetadataReason(metadata);
+  if (rejectionReason !== null) {
+    throw createPrivateActPassiveEffectDrainDiagnosticError(rejectionReason);
+  }
+
+  const pendingBefore = metadata.records.length;
+  const drainedRecords = [];
+
+  while (metadata.records.length > 0) {
+    drainedRecords.push(
+      summarizePendingPassiveFlushRecord(
+        metadata.records.shift(),
+        drainedRecords.length
+      )
+    );
+  }
+
+  return freezeRecord({
+    status:
+      'react-test-renderer-consumed-accepted-pending-passive-flush-metadata',
+    passiveEffectDrainStatus:
+      'drained-accepted-pending-passive-flush-metadata',
+    accepted: true,
+    metadataKind: metadata.kind,
+    pendingBefore,
+    drainedCount: drainedRecords.length,
+    remainingCount: metadata.records.length,
+    drainedRecords: freezeArray(drainedRecords),
+    consumer: 'react-test-renderer-act-passive-effect-drain-private-gate',
+    gateStatus: actSchedulerGateStatus,
+    privatePassiveEffectDrainDiagnosticsConsumed: true,
+    consumesPendingPassiveFlushMetadata: true,
+    consumesAcceptedSchedulerFlushMetadata: true,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    publicActCompatibilityClaimed: false,
+    compatibilityClaimed: false,
+    invokesActCallback: false,
+    executesPassiveEffects: false,
+    invokesEffectCallbacks: false,
     publicSchedulerFlushExecutionAvailable: false,
     publicActBehaviorAvailable: false,
     rendererRootsCompatibilityClaimed: false
