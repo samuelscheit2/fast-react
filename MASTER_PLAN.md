@@ -45,32 +45,16 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 206: root commit deletion metadata in
-  `/Users/user/Developer/Developer/fast-react-worker-206-root-commit-deletion-metadata`.
 - Worker 208: test renderer host output canary in
   `/Users/user/Developer/Developer/fast-react-worker-208-test-renderer-host-output-canary`.
 - Worker 210: react-test-renderer JS create fail-closed surface in
   `/Users/user/Developer/Developer/fast-react-worker-210-react-test-renderer-js-create-failclosed`.
-- Worker 211: DOM host text-content local gate integration in
-  `/Users/user/Developer/Developer/fast-react-worker-211-dom-host-text-content-local-gate`.
 - Worker 213: DOM property payload style/dangerous HTML slice in
   `/Users/user/Developer/Developer/fast-react-worker-213-dom-property-payload-style-dangerous-html`.
-- Worker 214: DOM component tree mounted map helpers in
-  `/Users/user/Developer/Developer/fast-react-worker-214-dom-component-tree-mounted-map`.
 - Worker 215: DOM root bridge private update path in
   `/Users/user/Developer/Developer/fast-react-worker-215-dom-root-bridge-private-update-path`.
 - Worker 217: DOM createPortal local gate in
   `/Users/user/Developer/Developer/fast-react-worker-217-dom-create-portal-local-gate`.
-- Worker 218: hydration boundary fail-closed gate in
-  `/Users/user/Developer/Developer/fast-react-worker-218-hydration-boundary-failclosed`.
-- Worker 221: React context provider object coverage in
-  `/Users/user/Developer/Developer/fast-react-worker-221-react-context-provider-object-coverage`.
-- Worker 223: function component useState private dispatch in
-  `/Users/user/Developer/Developer/fast-react-worker-223-function-component-usestate-private-dispatch`.
-- Worker 226: ref attach/detach commit metadata in
-  `/Users/user/Developer/Developer/fast-react-worker-226-ref-attach-detach-commit-metadata`.
-- Worker 227: Suspense/Offscreen fail-closed lane tests in
-  `/Users/user/Developer/Developer/fast-react-worker-227-suspense-offscreen-failclosed-lane-tests`.
 - Worker 230: DOM text dual-run conformance gate in
   `/Users/user/Developer/Developer/fast-react-worker-230-dom-text-dual-run-conformance-gate`.
 - Worker 231: package surface React DOM subpath tightening in

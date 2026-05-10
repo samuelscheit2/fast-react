@@ -398,9 +398,54 @@ sequencing belong in `MASTER_PLAN.md`.
   lifecycle admissions while keeping every new milestone blocked by
   conformance and avoiding benchmark runners, timing results, browser
   artifacts, source implementation, or speed claims.
+- Worker 206 root commit deletion metadata was merged, adding deterministic
+  data-only HostRoot deletion-list records to the private commit record while
+  preserving validation before current switching, callback draining, host
+  removal, ref cleanup, passive flushing, renderer packages, and public API
+  behavior.
+- Worker 211 DOM host text-content local gate integration was merged, adding
+  a checked private React DOM text-content gate and CLI/test coverage that
+  keeps local admission closed until public roots and DOM text commit
+  prerequisites exist.
+- Worker 214 DOM component tree mounted map helpers was merged, adding private
+  mounted host-component/text mapping coverage without public roots, event
+  dispatch, hydration replay, ref behavior, DOM mutation commits, or renderer
+  compatibility claims.
+- Worker 218 hydration boundary fail-closed gate was merged, adding private
+  React DOM hydration boundary records and tests that keep `hydrateRoot`
+  unsupported without container markers, listener installation, DOM mutation,
+  replay, or compatibility claims.
+- Worker 221 React context provider object coverage was merged, adding the
+  checked React context-object oracle and local gate coverage while keeping
+  Fast React context compatibility claims false and runtime unblock
+  requirements explicit.
+- Worker 223 function-component `useState` private dispatch was merged,
+  connecting the private function-component hook render store to inert core
+  hook state queue and dispatch metadata without public hooks, dispatcher
+  integration, effect execution, child reconciliation, renderer integration,
+  or compatibility claims.
+- Worker 226 ref attach/detach commit metadata was merged, adding
+  reconciler-private HostRoot ref attach/detach metadata with phase-scoped host
+  instance tokens while preserving callback refs, object refs, public instance
+  lookup, layout effects, host mutation, DOM/native output, and public renderer
+  behavior.
+- Worker 227 Suspense/Offscreen fail-closed lane tests was merged, expanding
+  retry/offscreen lane-selection and unsupported child preflight coverage for
+  Suspense, Offscreen, Activity, and SuspenseList without implementing those
+  features or weakening existing fail-closed boundaries.
 
 ## Latest Accepted Verification
 
+- Workers 206, 211, 214, 218, 221, 223, 226, and 227 were verified on their
+  integrated worktrees and again on `main` after conflict resolution in
+  `root_commit.rs`, `function_component.rs`, and `root_work_loop.rs`; the
+  combined `main` result passed `cargo fmt --all --check`, full
+  `fast-react-core` tests with 130 unit tests and 0 doctests, full
+  `fast-react-reconciler` tests with 185 unit tests plus 1 compile-fail
+  doctest, reconciler clippy with warnings denied, focused DOM text-content,
+  DOM component-tree map, hydration boundary, and context-object JS gates,
+  `npm run check:js` with 496 conformance tests plus package-surface,
+  benchmark, workspace, and native checks, and `git diff --check`.
 - Workers 204, 205, 209, 216, 219, 220, 222, 224, 225, and 229 were verified
   on their integrated worktrees and again on `main` with focused host-work,
   root-commit, test-renderer, event-priority, resource/form, hook-dispatcher,
