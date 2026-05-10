@@ -735,11 +735,45 @@ pub enum TestRendererRootLifecycle {
     UnmountScheduled,
 }
 
+impl TestRendererRootLifecycle {
+    #[must_use]
+    pub const fn code(self) -> &'static str {
+        match self {
+            Self::Active => "Active",
+            Self::UnmountScheduled => "UnmountScheduled",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TestRendererRootUpdateKind {
     Create,
     Update,
     Unmount,
+}
+
+impl TestRendererRootUpdateKind {
+    #[must_use]
+    pub const fn code(self) -> &'static str {
+        match self {
+            Self::Create => "Create",
+            Self::Update => "Update",
+            Self::Unmount => "Unmount",
+        }
+    }
+
+    #[must_use]
+    pub const fn container_update_api(self) -> &'static str {
+        match self {
+            Self::Create | Self::Update => "update_container",
+            Self::Unmount => "update_container_sync",
+        }
+    }
+
+    #[must_use]
+    pub const fn sync(self) -> bool {
+        matches!(self, Self::Unmount)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1666,6 +1700,15 @@ impl TestRendererRootUpdateOutcome {
         match self {
             Self::Scheduled(record) => Some(record),
             Self::IgnoredAfterUnmount | Self::AlreadyUnmountScheduled => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn code(&self) -> &'static str {
+        match self {
+            Self::Scheduled(_) => "Scheduled",
+            Self::IgnoredAfterUnmount => "IgnoredAfterUnmount",
+            Self::AlreadyUnmountScheduled => "AlreadyUnmountScheduled",
         }
     }
 }
@@ -5188,6 +5231,53 @@ mod tests {
 
     fn root_element(raw: u64) -> RootElementHandle {
         RootElementHandle::from_raw(raw)
+    }
+
+    #[test]
+    fn root_lifecycle_update_and_outcome_codes_are_stable_for_private_bridges() {
+        assert_eq!(TestRendererRootLifecycle::Active.code(), "Active");
+        assert_eq!(
+            TestRendererRootLifecycle::UnmountScheduled.code(),
+            "UnmountScheduled"
+        );
+
+        assert_eq!(TestRendererRootUpdateKind::Create.code(), "Create");
+        assert_eq!(TestRendererRootUpdateKind::Update.code(), "Update");
+        assert_eq!(TestRendererRootUpdateKind::Unmount.code(), "Unmount");
+        assert_eq!(
+            TestRendererRootUpdateKind::Create.container_update_api(),
+            "update_container"
+        );
+        assert_eq!(
+            TestRendererRootUpdateKind::Update.container_update_api(),
+            "update_container"
+        );
+        assert_eq!(
+            TestRendererRootUpdateKind::Unmount.container_update_api(),
+            "update_container_sync"
+        );
+        assert!(!TestRendererRootUpdateKind::Create.sync());
+        assert!(!TestRendererRootUpdateKind::Update.sync());
+        assert!(TestRendererRootUpdateKind::Unmount.sync());
+
+        let scheduled = TestRendererRoot::create(root_element(1), TestRendererOptions::new())
+            .unwrap()
+            .last_scheduled_update()
+            .cloned()
+            .expect("create schedules a root update");
+
+        assert_eq!(
+            TestRendererRootUpdateOutcome::Scheduled(scheduled).code(),
+            "Scheduled"
+        );
+        assert_eq!(
+            TestRendererRootUpdateOutcome::IgnoredAfterUnmount.code(),
+            "IgnoredAfterUnmount"
+        );
+        assert_eq!(
+            TestRendererRootUpdateOutcome::AlreadyUnmountScheduled.code(),
+            "AlreadyUnmountScheduled"
+        );
     }
 
     fn current_host_root_element(root: &TestRendererRoot) -> RootElementHandle {

@@ -1310,6 +1310,386 @@ mod root_bridge_requests {
     }
 }
 
+#[allow(dead_code)]
+mod test_renderer_root_execution_bridge {
+    //! Private test-renderer root execution bridge.
+    //!
+    //! This is a Rust-owned bridge shape for the future native boundary. It
+    //! deliberately has no Node-API dependency and is not exported as a `.node`
+    //! binding, but it does call the accepted `TestRendererRoot` create/update/
+    //! unmount execution boundary so JS private request records have a concrete
+    //! Rust target to hand off to later.
+
+    use std::error::Error;
+    use std::fmt::{self, Display, Formatter};
+
+    use fast_react_reconciler::{FiberRootId, RootElementHandle};
+    use fast_react_test_renderer::{
+        TestRendererOptions, TestRendererRoot, TestRendererRootError, TestRendererRootLifecycle,
+        TestRendererRootScheduledUpdate, TestRendererRootUpdateKind,
+    };
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct TestRendererNativeRootScheduledExecution {
+        kind: TestRendererRootUpdateKind,
+        element: RootElementHandle,
+        container_update_api: &'static str,
+        root_schedule_api: &'static str,
+        sync: bool,
+    }
+
+    impl TestRendererNativeRootScheduledExecution {
+        #[must_use]
+        pub(crate) fn from_scheduled_update(update: &TestRendererRootScheduledUpdate) -> Self {
+            let kind = update.kind();
+            Self {
+                kind,
+                element: update.element(),
+                container_update_api: kind.container_update_api(),
+                root_schedule_api: "ensure_root_is_scheduled",
+                sync: kind.sync(),
+            }
+        }
+
+        #[must_use]
+        pub(crate) const fn kind(self) -> TestRendererRootUpdateKind {
+            self.kind
+        }
+
+        #[must_use]
+        pub(crate) const fn element(self) -> RootElementHandle {
+            self.element
+        }
+
+        #[must_use]
+        pub(crate) const fn container_update_api(self) -> &'static str {
+            self.container_update_api
+        }
+
+        #[must_use]
+        pub(crate) const fn root_schedule_api(self) -> &'static str {
+            self.root_schedule_api
+        }
+
+        #[must_use]
+        pub(crate) const fn sync(self) -> bool {
+            self.sync
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(crate) struct TestRendererNativeRootExecutionRecord {
+        request_id: u64,
+        operation: TestRendererRootUpdateKind,
+        root_id: FiberRootId,
+        lifecycle_before: Option<TestRendererRootLifecycle>,
+        lifecycle_after: TestRendererRootLifecycle,
+        update_outcome: &'static str,
+        scheduled_update: Option<TestRendererNativeRootScheduledExecution>,
+        private_root_request_execution: bool,
+        rust_root_execution_boundary_called: bool,
+        native_addon_loaded: bool,
+        native_execution: bool,
+        reconciler_execution: bool,
+        host_output_produced: bool,
+        public_create_update_unmount_available: bool,
+        compatibility_claimed: bool,
+    }
+
+    impl TestRendererNativeRootExecutionRecord {
+        fn new(
+            request_id: u64,
+            operation: TestRendererRootUpdateKind,
+            root_id: FiberRootId,
+            lifecycle_before: Option<TestRendererRootLifecycle>,
+            lifecycle_after: TestRendererRootLifecycle,
+            update_outcome: &'static str,
+            scheduled_update: Option<TestRendererNativeRootScheduledExecution>,
+        ) -> Self {
+            Self {
+                request_id,
+                operation,
+                root_id,
+                lifecycle_before,
+                lifecycle_after,
+                update_outcome,
+                scheduled_update,
+                private_root_request_execution: true,
+                rust_root_execution_boundary_called: true,
+                native_addon_loaded: false,
+                native_execution: false,
+                reconciler_execution: scheduled_update.is_some(),
+                host_output_produced: false,
+                public_create_update_unmount_available: false,
+                compatibility_claimed: false,
+            }
+        }
+
+        #[must_use]
+        pub(crate) const fn request_id(&self) -> u64 {
+            self.request_id
+        }
+
+        #[must_use]
+        pub(crate) const fn operation(&self) -> TestRendererRootUpdateKind {
+            self.operation
+        }
+
+        #[must_use]
+        pub(crate) const fn root_id(&self) -> FiberRootId {
+            self.root_id
+        }
+
+        #[must_use]
+        pub(crate) const fn lifecycle_before(&self) -> Option<TestRendererRootLifecycle> {
+            self.lifecycle_before
+        }
+
+        #[must_use]
+        pub(crate) const fn lifecycle_after(&self) -> TestRendererRootLifecycle {
+            self.lifecycle_after
+        }
+
+        #[must_use]
+        pub(crate) const fn update_outcome(&self) -> &'static str {
+            self.update_outcome
+        }
+
+        #[must_use]
+        pub(crate) const fn scheduled_update(
+            &self,
+        ) -> Option<TestRendererNativeRootScheduledExecution> {
+            self.scheduled_update
+        }
+
+        #[must_use]
+        pub(crate) const fn private_root_request_execution(&self) -> bool {
+            self.private_root_request_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn rust_root_execution_boundary_called(&self) -> bool {
+            self.rust_root_execution_boundary_called
+        }
+
+        #[must_use]
+        pub(crate) const fn native_addon_loaded(&self) -> bool {
+            self.native_addon_loaded
+        }
+
+        #[must_use]
+        pub(crate) const fn native_execution(&self) -> bool {
+            self.native_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn reconciler_execution(&self) -> bool {
+            self.reconciler_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn host_output_produced(&self) -> bool {
+            self.host_output_produced
+        }
+
+        #[must_use]
+        pub(crate) const fn public_create_update_unmount_available(&self) -> bool {
+            self.public_create_update_unmount_available
+        }
+
+        #[must_use]
+        pub(crate) const fn compatibility_claimed(&self) -> bool {
+            self.compatibility_claimed
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(crate) enum TestRendererNativeRootExecutionBridgeError {
+        RootAlreadyCreated,
+        MissingRoot,
+        MissingScheduledUpdate {
+            operation: TestRendererRootUpdateKind,
+        },
+        RequestSequenceExhausted,
+        Root(TestRendererRootError),
+    }
+
+    impl Display for TestRendererNativeRootExecutionBridgeError {
+        fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+            match self {
+                Self::RootAlreadyCreated => formatter.write_str(
+                    "test-renderer native root execution bridge already owns a root",
+                ),
+                Self::MissingRoot => formatter.write_str(
+                    "test-renderer native root execution bridge has no root to update or unmount",
+                ),
+                Self::MissingScheduledUpdate { operation } => write!(
+                    formatter,
+                    "test-renderer native root execution bridge did not receive a scheduled {:?} update from TestRendererRoot",
+                    operation
+                ),
+                Self::RequestSequenceExhausted => formatter.write_str(
+                    "test-renderer native root execution bridge request sequence cannot allocate another id",
+                ),
+                Self::Root(error) => Display::fmt(error, formatter),
+            }
+        }
+    }
+
+    impl Error for TestRendererNativeRootExecutionBridgeError {
+        fn source(&self) -> Option<&(dyn Error + 'static)> {
+            match self {
+                Self::Root(error) => Some(error),
+                Self::RootAlreadyCreated
+                | Self::MissingRoot
+                | Self::MissingScheduledUpdate { .. }
+                | Self::RequestSequenceExhausted => None,
+            }
+        }
+    }
+
+    impl From<TestRendererRootError> for TestRendererNativeRootExecutionBridgeError {
+        fn from(error: TestRendererRootError) -> Self {
+            Self::Root(error)
+        }
+    }
+
+    pub(crate) struct TestRendererNativeRootExecutionBridge {
+        root: Option<TestRendererRoot>,
+        next_request_id: u64,
+    }
+
+    impl Default for TestRendererNativeRootExecutionBridge {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
+    impl TestRendererNativeRootExecutionBridge {
+        #[must_use]
+        pub(crate) const fn new() -> Self {
+            Self {
+                root: None,
+                next_request_id: 1,
+            }
+        }
+
+        pub(crate) fn execute_create(
+            &mut self,
+            element: RootElementHandle,
+            options: TestRendererOptions,
+        ) -> Result<TestRendererNativeRootExecutionRecord, TestRendererNativeRootExecutionBridgeError>
+        {
+            if self.root.is_some() {
+                return Err(TestRendererNativeRootExecutionBridgeError::RootAlreadyCreated);
+            }
+
+            let request_id = self.allocate_request_id()?;
+            let root = TestRendererRoot::create(element, options)?;
+            let scheduled_update = root
+                .last_scheduled_update()
+                .map(TestRendererNativeRootScheduledExecution::from_scheduled_update)
+                .ok_or(
+                    TestRendererNativeRootExecutionBridgeError::MissingScheduledUpdate {
+                        operation: TestRendererRootUpdateKind::Create,
+                    },
+                )?;
+            let root_id = root.root_id();
+            let lifecycle_after = root.lifecycle();
+            self.root = Some(root);
+
+            Ok(TestRendererNativeRootExecutionRecord::new(
+                request_id,
+                TestRendererRootUpdateKind::Create,
+                root_id,
+                None,
+                lifecycle_after,
+                "Scheduled",
+                Some(scheduled_update),
+            ))
+        }
+
+        pub(crate) fn execute_update(
+            &mut self,
+            element: RootElementHandle,
+        ) -> Result<TestRendererNativeRootExecutionRecord, TestRendererNativeRootExecutionBridgeError>
+        {
+            if self.root.is_none() {
+                return Err(TestRendererNativeRootExecutionBridgeError::MissingRoot);
+            }
+            let request_id = self.allocate_request_id()?;
+            let root = self
+                .root
+                .as_mut()
+                .expect("root presence checked before request id allocation");
+            let root_id = root.root_id();
+            let lifecycle_before = root.lifecycle();
+            let outcome = root.update(element)?;
+            let scheduled_update = outcome
+                .scheduled()
+                .map(TestRendererNativeRootScheduledExecution::from_scheduled_update);
+            let lifecycle_after = root.lifecycle();
+
+            Ok(TestRendererNativeRootExecutionRecord::new(
+                request_id,
+                TestRendererRootUpdateKind::Update,
+                root_id,
+                Some(lifecycle_before),
+                lifecycle_after,
+                outcome.code(),
+                scheduled_update,
+            ))
+        }
+
+        pub(crate) fn execute_unmount(
+            &mut self,
+        ) -> Result<TestRendererNativeRootExecutionRecord, TestRendererNativeRootExecutionBridgeError>
+        {
+            if self.root.is_none() {
+                return Err(TestRendererNativeRootExecutionBridgeError::MissingRoot);
+            }
+            let request_id = self.allocate_request_id()?;
+            let root = self
+                .root
+                .as_mut()
+                .expect("root presence checked before request id allocation");
+            let root_id = root.root_id();
+            let lifecycle_before = root.lifecycle();
+            let outcome = root.unmount()?;
+            let scheduled_update = outcome
+                .scheduled()
+                .map(TestRendererNativeRootScheduledExecution::from_scheduled_update);
+            let lifecycle_after = root.lifecycle();
+
+            Ok(TestRendererNativeRootExecutionRecord::new(
+                request_id,
+                TestRendererRootUpdateKind::Unmount,
+                root_id,
+                Some(lifecycle_before),
+                lifecycle_after,
+                outcome.code(),
+                scheduled_update,
+            ))
+        }
+
+        #[must_use]
+        pub(crate) fn root(&self) -> Option<&TestRendererRoot> {
+            self.root.as_ref()
+        }
+
+        fn allocate_request_id(
+            &mut self,
+        ) -> Result<u64, TestRendererNativeRootExecutionBridgeError> {
+            let request_id = self.next_request_id;
+            self.next_request_id = self
+                .next_request_id
+                .checked_add(1)
+                .ok_or(TestRendererNativeRootExecutionBridgeError::RequestSequenceExhausted)?;
+            Ok(request_id)
+        }
+    }
+}
+
 pub const BINDING_PACKAGE_NAME: &str = "@fast-react/native";
 pub const NAPI_BOUNDARY_STATUS: &str = "placeholder";
 pub const NATIVE_ADDON_NAME: &str = "fast_react_napi";
@@ -1328,6 +1708,12 @@ pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_SMOKE_STATUS: &str =
     "smoked-native-root-bridge-js-to-rust-json-transport";
 pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_FORMAT: &str = "json";
 pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_SCHEMA_VERSION: u32 = 1;
+pub const TEST_RENDERER_NATIVE_ROOT_EXECUTION_BRIDGE_STATUS: &str =
+    "admitted-private-test-renderer-native-root-execution-bridge";
+pub const TEST_RENDERER_NATIVE_ROOT_EXECUTION_BOUNDARY: &str =
+    "fast-react-test-renderer.TestRendererRoot";
+pub const TEST_RENDERER_NATIVE_ROOT_EXECUTION_PUBLIC_STATUS: &str =
+    "blocked-public-react-test-renderer-create-update-unmount";
 pub const NATIVE_ROOT_BRIDGE_REQUEST_VALIDATION_MODEL: &str =
     "fast-react-napi.NativeRootBridgeRequestSequenceValidator";
 pub const NATIVE_ROOT_BRIDGE_HANDLE_TABLE_MODEL: &str = "fast-react-napi.BridgeHandleTable";
@@ -1392,6 +1778,23 @@ pub const NATIVE_ROOT_BRIDGE_RUST_HANDLE_TABLE_ADMISSION_SMOKE_RECORD_FIELDS: &[
 ];
 pub const NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_ENVELOPE_FIELDS: &[&str] =
     &["transport", "schemaVersion", "requestRecords"];
+pub const TEST_RENDERER_NATIVE_ROOT_EXECUTION_RECORD_FIELDS: &[&str] = &[
+    "request_id",
+    "operation",
+    "root_id",
+    "lifecycle_before",
+    "lifecycle_after",
+    "update_outcome",
+    "scheduled_update",
+    "private_root_request_execution",
+    "rust_root_execution_boundary_called",
+    "native_addon_loaded",
+    "native_execution",
+    "reconciler_execution",
+    "host_output_produced",
+    "public_create_update_unmount_available",
+    "compatibility_claimed",
+];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NativeTargetMetadata {
@@ -1792,6 +2195,13 @@ mod tests {
         NativeRootBridgeRootHandleState, NativeRootBridgeUnmountRequest,
         smoke_admit_js_native_root_bridge_handoff_records,
         smoke_admit_js_native_root_bridge_json_transport_records,
+    };
+    use crate::test_renderer_root_execution_bridge::{
+        TestRendererNativeRootExecutionBridge, TestRendererNativeRootExecutionBridgeError,
+    };
+    use fast_react_reconciler::RootElementHandle;
+    use fast_react_test_renderer::{
+        TestRendererOptions, TestRendererRootLifecycle, TestRendererRootUpdateKind,
     };
     use std::path::Path;
 
@@ -2742,6 +3152,192 @@ mod tests {
             NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_ENVELOPE_FIELDS,
             &["transport", "schemaVersion", "requestRecords"]
         );
+        assert_eq!(
+            TEST_RENDERER_NATIVE_ROOT_EXECUTION_BRIDGE_STATUS,
+            "admitted-private-test-renderer-native-root-execution-bridge"
+        );
+        assert_eq!(
+            TEST_RENDERER_NATIVE_ROOT_EXECUTION_BOUNDARY,
+            "fast-react-test-renderer.TestRendererRoot"
+        );
+        assert_eq!(
+            TEST_RENDERER_NATIVE_ROOT_EXECUTION_PUBLIC_STATUS,
+            "blocked-public-react-test-renderer-create-update-unmount"
+        );
+        assert_eq!(
+            TEST_RENDERER_NATIVE_ROOT_EXECUTION_RECORD_FIELDS,
+            &[
+                "request_id",
+                "operation",
+                "root_id",
+                "lifecycle_before",
+                "lifecycle_after",
+                "update_outcome",
+                "scheduled_update",
+                "private_root_request_execution",
+                "rust_root_execution_boundary_called",
+                "native_addon_loaded",
+                "native_execution",
+                "reconciler_execution",
+                "host_output_produced",
+                "public_create_update_unmount_available",
+                "compatibility_claimed"
+            ]
+        );
+    }
+
+    #[test]
+    fn test_renderer_native_root_execution_bridge_calls_create_update_unmount_boundary() {
+        let mut bridge = TestRendererNativeRootExecutionBridge::new();
+        let create = bridge
+            .execute_create(RootElementHandle::from_raw(11), TestRendererOptions::new())
+            .unwrap();
+        let create_scheduled = create
+            .scheduled_update()
+            .expect("create schedules a TestRendererRoot update");
+
+        assert_eq!(create.request_id(), 1);
+        assert_eq!(create.operation(), TestRendererRootUpdateKind::Create);
+        assert_eq!(create.lifecycle_before(), None);
+        assert_eq!(create.lifecycle_after(), TestRendererRootLifecycle::Active);
+        assert_eq!(create.update_outcome(), "Scheduled");
+        assert_eq!(create_scheduled.kind(), TestRendererRootUpdateKind::Create);
+        assert_eq!(create_scheduled.element(), RootElementHandle::from_raw(11));
+        assert_eq!(create_scheduled.container_update_api(), "update_container");
+        assert_eq!(
+            create_scheduled.root_schedule_api(),
+            "ensure_root_is_scheduled"
+        );
+        assert!(!create_scheduled.sync());
+        assert!(create.private_root_request_execution());
+        assert!(create.rust_root_execution_boundary_called());
+        assert!(!create.native_addon_loaded());
+        assert!(!create.native_execution());
+        assert!(create.reconciler_execution());
+        assert!(!create.host_output_produced());
+        assert!(!create.public_create_update_unmount_available());
+        assert!(!create.compatibility_claimed());
+
+        let update = bridge
+            .execute_update(RootElementHandle::from_raw(12))
+            .unwrap();
+        let update_scheduled = update
+            .scheduled_update()
+            .expect("update schedules a TestRendererRoot update");
+
+        assert_eq!(update.request_id(), 2);
+        assert_eq!(update.root_id(), create.root_id());
+        assert_eq!(update.operation(), TestRendererRootUpdateKind::Update);
+        assert_eq!(
+            update.lifecycle_before(),
+            Some(TestRendererRootLifecycle::Active)
+        );
+        assert_eq!(update.lifecycle_after(), TestRendererRootLifecycle::Active);
+        assert_eq!(update.update_outcome(), "Scheduled");
+        assert_eq!(update_scheduled.kind(), TestRendererRootUpdateKind::Update);
+        assert_eq!(update_scheduled.element(), RootElementHandle::from_raw(12));
+        assert_eq!(update_scheduled.container_update_api(), "update_container");
+        assert!(!update_scheduled.sync());
+        assert!(update.private_root_request_execution());
+        assert!(update.rust_root_execution_boundary_called());
+        assert!(!update.native_execution());
+        assert!(update.reconciler_execution());
+        assert!(!update.public_create_update_unmount_available());
+
+        let unmount = bridge.execute_unmount().unwrap();
+        let unmount_scheduled = unmount
+            .scheduled_update()
+            .expect("unmount schedules a sync TestRendererRoot update");
+
+        assert_eq!(unmount.request_id(), 3);
+        assert_eq!(unmount.root_id(), create.root_id());
+        assert_eq!(unmount.operation(), TestRendererRootUpdateKind::Unmount);
+        assert_eq!(
+            unmount.lifecycle_before(),
+            Some(TestRendererRootLifecycle::Active)
+        );
+        assert_eq!(
+            unmount.lifecycle_after(),
+            TestRendererRootLifecycle::UnmountScheduled
+        );
+        assert_eq!(unmount.update_outcome(), "Scheduled");
+        assert_eq!(
+            unmount_scheduled.kind(),
+            TestRendererRootUpdateKind::Unmount
+        );
+        assert_eq!(unmount_scheduled.element(), RootElementHandle::NONE);
+        assert_eq!(
+            unmount_scheduled.container_update_api(),
+            "update_container_sync"
+        );
+        assert!(unmount_scheduled.sync());
+        assert!(unmount.rust_root_execution_boundary_called());
+        assert!(!unmount.native_execution());
+        assert!(unmount.reconciler_execution());
+        assert!(!unmount.host_output_produced());
+        assert!(!unmount.compatibility_claimed());
+    }
+
+    #[test]
+    fn test_renderer_native_root_execution_bridge_preserves_fail_closed_lifecycle_outcomes() {
+        let mut bridge = TestRendererNativeRootExecutionBridge::new();
+        let missing_root = bridge
+            .execute_update(RootElementHandle::from_raw(21))
+            .unwrap_err();
+
+        assert_eq!(
+            missing_root,
+            TestRendererNativeRootExecutionBridgeError::MissingRoot
+        );
+
+        let create = bridge
+            .execute_create(RootElementHandle::from_raw(21), TestRendererOptions::new())
+            .unwrap();
+        let create_again = bridge
+            .execute_create(RootElementHandle::from_raw(22), TestRendererOptions::new())
+            .unwrap_err();
+
+        assert_eq!(
+            create_again,
+            TestRendererNativeRootExecutionBridgeError::RootAlreadyCreated
+        );
+
+        let first_unmount = bridge.execute_unmount().unwrap();
+        let second_unmount = bridge.execute_unmount().unwrap();
+        let late_update = bridge
+            .execute_update(RootElementHandle::from_raw(23))
+            .unwrap();
+
+        assert_eq!(first_unmount.root_id(), create.root_id());
+        assert_eq!(first_unmount.update_outcome(), "Scheduled");
+        assert!(first_unmount.scheduled_update().is_some());
+        assert_eq!(second_unmount.request_id(), 3);
+        assert_eq!(
+            second_unmount.lifecycle_before(),
+            Some(TestRendererRootLifecycle::UnmountScheduled)
+        );
+        assert_eq!(
+            second_unmount.lifecycle_after(),
+            TestRendererRootLifecycle::UnmountScheduled
+        );
+        assert_eq!(second_unmount.update_outcome(), "AlreadyUnmountScheduled");
+        assert!(second_unmount.rust_root_execution_boundary_called());
+        assert!(!second_unmount.reconciler_execution());
+        assert_eq!(second_unmount.scheduled_update(), None);
+        assert_eq!(late_update.request_id(), 4);
+        assert_eq!(
+            late_update.lifecycle_before(),
+            Some(TestRendererRootLifecycle::UnmountScheduled)
+        );
+        assert_eq!(
+            late_update.lifecycle_after(),
+            TestRendererRootLifecycle::UnmountScheduled
+        );
+        assert_eq!(late_update.update_outcome(), "IgnoredAfterUnmount");
+        assert!(late_update.rust_root_execution_boundary_called());
+        assert!(!late_update.native_execution());
+        assert!(!late_update.reconciler_execution());
+        assert_eq!(late_update.scheduled_update(), None);
     }
 
     #[test]

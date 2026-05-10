@@ -820,16 +820,23 @@ const actSchedulerGate = Object.freeze({
   missingBeforeExecution: actSchedulerMissingBeforeExecution
 });
 const createRoutingMissingPrerequisites = Object.freeze([
-  'rust-native-test-renderer-create-bridge',
+  'public-react-test-renderer-root-lifecycle-routing',
   'react-test-renderer-host-output-serialization'
 ]);
 const createRoutingPrerequisites = Object.freeze([
   Object.freeze({
-    id: 'rust-native-test-renderer-create-bridge',
+    id: 'private-rust-native-test-renderer-root-execution-bridge',
+    present: true,
+    requiredBeforeCreateRouting: false,
+    reason:
+      'The private bridge shape can hand create, update, and unmount requests to the Rust TestRendererRoot execution boundary without opening public behavior.'
+  }),
+  Object.freeze({
+    id: 'public-react-test-renderer-root-lifecycle-routing',
     present: false,
     requiredBeforeCreateRouting: true,
     reason:
-      'The JS package has no native/Rust bridge entrypoint for TestRendererRoot create, update, or unmount requests.'
+      'Public create, update, and unmount still intentionally return or throw through the placeholder facade.'
   }),
   Object.freeze({
     id: 'react-test-renderer-host-output-serialization',
@@ -850,7 +857,7 @@ const updateUnmountRustLifecycleDiagnosticGate = Object.freeze({
     'TestRendererRootUpdateOutcome',
     'TestRendererRootScheduledUpdate'
   ]),
-  acceptedOperations: Object.freeze(['update', 'unmount']),
+  acceptedOperations: Object.freeze(['create', 'update', 'unmount']),
   acceptedLifecycleStates: Object.freeze(['Active', 'UnmountScheduled']),
   acceptedOutcomes: Object.freeze([
     'Scheduled',
@@ -1675,8 +1682,10 @@ const createRoutingGate = Object.freeze({
   privateRootRequestBridgeStatus:
     'admitted-private-test-renderer-root-request-record',
   privateRootRequestBridgeExecutionStatus:
-    'blocked-private-test-renderer-root-request-execution',
-  rootRequestRecordOnly: true,
+    'admitted-private-test-renderer-root-execution-bridge',
+  rootRequestRecordOnly: false,
+  privateRootExecutionBridgeAvailable: true,
+  rustRootExecutionBoundaryCallable: true,
   createRouteAvailable: false,
   updateRouteAvailable: false,
   unmountRouteAvailable: false,
@@ -1705,7 +1714,7 @@ const rootRequestBridgeSymbol = Symbol.for(
 const rootRequestStatus =
   'admitted-private-test-renderer-root-request-record';
 const rootRequestExecutionStatus =
-  'blocked-private-test-renderer-root-request-execution';
+  'admitted-private-test-renderer-root-execution-bridge';
 const rootRequestCompatibilityStatus =
   'blocked-private-test-renderer-root-compatibility';
 const rootRequestLifecycleActive = 'active';
@@ -1825,7 +1834,7 @@ const currentRustTestRendererRootCanaryOperations = freezeRecord({
 });
 const currentRustTestRendererRootCanaryMetadata = freezeRecord({
   id: 'fast-react-test-renderer-current-root-canary-metadata',
-  status: 'record-only-current-rust-canary-metadata',
+  status: 'private-root-execution-bridge-current-rust-canary-metadata',
   compatibilityTarget,
   acceptedRustCrate: 'fast-react-test-renderer',
   acceptedRustWorkers: freezeArray([
@@ -1839,7 +1848,8 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
   acceptedJsBridgeWorkers: freezeArray([
     'worker-304-test-renderer-js-private-root-request-bridge',
     'worker-306-test-renderer-testinstance-private-wrapper-skeleton',
-    'worker-307-test-renderer-update-unmount-private-js-bridge'
+    'worker-307-test-renderer-update-unmount-private-js-bridge',
+    'worker-423-test-renderer-native-root-execution-bridge'
   ]),
   root: freezeRecord({
     rustType: 'TestRendererRoot',
@@ -1901,7 +1911,12 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     publicSerializationAvailable: false
   }),
   operations: currentRustTestRendererRootCanaryOperations,
-  recordOnlyPrivateBridge: true,
+  recordOnlyPrivateBridge: false,
+  privateRootExecutionBridgeAvailable: true,
+  rustRootExecutionBoundaryCallable: true,
+  rustRootExecutionBoundary: 'fast-react-test-renderer.TestRendererRoot',
+  rustRootExecutionBridgeStatus:
+    'admitted-private-test-renderer-native-root-execution-bridge',
   nativeAddonLoaded: false,
   nativeBridgeAvailable: false,
   nativeExecution: false,
@@ -2337,6 +2352,9 @@ function createPrivateRootRequestRecord(state, request) {
     rustCanaryOperationMetadata: getCurrentRustCanaryOperationMetadata(
       request.operation
     ),
+    recordOnlyPrivateBridge: false,
+    privateRootExecutionBridgeAvailable: true,
+    rustRootExecutionBoundaryCallable: true,
     owner: state.owner,
     handle: state.handle,
     nativeBridgeAvailable: false,
@@ -2354,8 +2372,6 @@ function createPrivateRootRequestRecord(state, request) {
 }
 
 function createRustLifecycleDiagnosticConsumptionRecord(options) {
-  const acceptsUpdateUnmountDiagnostic =
-    options.operation === 'update' || options.operation === 'unmount';
   const scheduledElementKind =
     options.scheduledElement === null
       ? null
@@ -2399,9 +2415,8 @@ function createRustLifecycleDiagnosticConsumptionRecord(options) {
       : null,
     sync: options.schedulesRootUpdate ? options.sync : null,
     schedulesRootUpdate: options.schedulesRootUpdate,
-    consumesAcceptedRustLifecycleDiagnostics:
-      acceptsUpdateUnmountDiagnostic,
-    privateDiagnosticConsumed: acceptsUpdateUnmountDiagnostic,
+    consumesAcceptedRustLifecycleDiagnostics: true,
+    privateDiagnosticConsumed: true,
     publicRouteAvailable: false,
     publicCreateUpdateUnmountBehaviorAvailable: false,
     nativeBridgeAvailable: false,
@@ -2446,7 +2461,9 @@ function describePrivateRootDiagnostics(state, request) {
       rootTag: testRendererRootTag,
       scheduledUpdateCount: state.scheduledUpdateCount,
       rustCanaryMetadata: currentRustTestRendererRootCanaryMetadata,
-      recordOnlyPrivateBridge: true,
+      recordOnlyPrivateBridge: false,
+      privateRootExecutionBridgeAvailable: true,
+      rustRootExecutionBoundaryCallable: true,
       nativeBridgeAvailable: false,
       nativeExecution: false,
       reconcilerExecution: false,
@@ -2782,7 +2799,12 @@ function createTestRendererRootRequestBridge(options) {
     nativeBridgeAvailable: false,
     nativeExecution: false,
     rustExecution: false,
-    recordOnlyBridge: true,
+    recordOnlyBridge: false,
+    privateRootExecutionBridgeAvailable: true,
+    rustRootExecutionBoundaryCallable: true,
+    rustRootExecutionBoundary: 'fast-react-test-renderer.TestRendererRoot',
+    rustRootExecutionBridgeStatus:
+      'admitted-private-test-renderer-native-root-execution-bridge',
     rustCanaryMetadata: currentRustTestRendererRootCanaryMetadata,
     createRootRequest(element, rootOptions) {
       return createRootRequestRecordWithBridge(
@@ -2861,6 +2883,23 @@ function createTestRendererRootRequestBridge(options) {
         record,
         diagnostic
       );
+    },
+    createRootExecutionHandoff(record) {
+      return createRootExecutionHandoff(record);
+    },
+    canConsumeRootExecutionResult(record, result) {
+      try {
+        consumeRootExecutionResult(record, result);
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    },
+    consumeRootExecutionResult(record, result) {
+      return consumeRootExecutionResult(record, result);
+    },
+    executeRootRequest(record, executor) {
+      return executeRootRequestWithBridge(record, executor);
     },
     isRootRequestRecord(record) {
       return isRootRequestRecord(record);
@@ -3058,7 +3097,9 @@ function createRootRequestRecord({
       expectedOutcome: rustOutcome,
       currentRustCanaryMetadataId:
         currentRustTestRendererRootCanaryMetadata.id,
-      recordOnlyPrivateBridge: true,
+      recordOnlyPrivateBridge: false,
+      privateRootExecutionBridgeAvailable: true,
+      rustRootExecutionBoundaryCallable: true,
       nativeBridgeAvailable: false
     }),
     blockedCapabilities: rootRequestBlockedCapabilities
@@ -3075,8 +3116,6 @@ function createRootRequestRecord({
 }
 
 function createRootRequestRustLifecycleDiagnosticRecord(options) {
-  const consumesUpdateUnmountDiagnostic =
-    options.operation === 'update' || options.operation === 'unmount';
   const rustLifecycleStatusBefore = toRustLifecycleStatus(
     options.lifecycleStatusBefore
   );
@@ -3118,9 +3157,8 @@ function createRootRequestRustLifecycleDiagnosticRecord(options) {
     schedulerApi: options.scheduled ? 'ensure_root_is_scheduled' : null,
     sync: options.scheduled ? options.sync : null,
     schedulesRootUpdate: options.scheduled,
-    consumesAcceptedRustLifecycleDiagnostics:
-      consumesUpdateUnmountDiagnostic,
-    privateDiagnosticConsumed: consumesUpdateUnmountDiagnostic,
+    consumesAcceptedRustLifecycleDiagnostics: true,
+    privateDiagnosticConsumed: true,
     publicRouteAvailable: false,
     publicCreateUpdateUnmountBehaviorAvailable: false,
     nativeBridgeAvailable: false,
@@ -3136,11 +3174,6 @@ function consumeAcceptedRustLifecycleDiagnosticForRequest(record, diagnostic) {
   if (!isRootRequestRecord(record)) {
     throwInvalidRootRequest(
       'Expected a private react-test-renderer root request record.'
-    );
-  }
-  if (record.operation !== 'update' && record.operation !== 'unmount') {
-    throwInvalidRootRequest(
-      'Only private update and unmount requests consume accepted Rust lifecycle diagnostics.'
     );
   }
 
@@ -3338,6 +3371,139 @@ function assertAcceptedRustLifecycleDiagnosticMatchesRequest(
       'Rust lifecycle diagnostic scheduled element NONE flag does not match the private request.'
     );
   }
+}
+
+function createRootExecutionHandoff(record) {
+  if (!isRootRequestRecord(record)) {
+    throwInvalidRootRequest(
+      'Expected a private react-test-renderer root request record.'
+    );
+  }
+
+  const payload = rootRequestPayloads.get(record);
+
+  return freezeRecord({
+    kind: 'FastReactTestRendererPrivateRootExecutionHandoff',
+    status: rootRequestExecutionStatus,
+    compatibilityStatus: rootRequestCompatibilityStatus,
+    entrypoint,
+    compatibilityTarget,
+    operation: record.operation,
+    requestId: record.requestId,
+    requestSequence: record.requestSequence,
+    rootId: record.rootId,
+    rootHandle: record.rootHandle,
+    rootElementHandle: record.rootElementHandle,
+    updateKind: record.updateKind,
+    rustUpdateKind: record.rustUpdateKind,
+    rootApi: record.rootApi,
+    containerUpdateApi: record.scheduled ? record.containerUpdateApi : null,
+    schedulerApi: record.scheduled ? record.schedulerApi : null,
+    sync: record.scheduled ? record.sync : null,
+    scheduled: record.scheduled,
+    expectedOutcome: record.rustOutcome,
+    payloadAvailable: payload !== undefined,
+    elementInfo: record.elementInfo,
+    optionsInfo: record.optionsInfo,
+    callbackInfo: record.callbackInfo,
+    rustRootExecutionBoundary: 'fast-react-test-renderer.TestRendererRoot',
+    rustRootExecutionBridgeStatus:
+      'admitted-private-test-renderer-native-root-execution-bridge',
+    rustRootExecutionBoundaryCallable: true,
+    nativeAddonLoaded: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    publicRouteAvailable: false,
+    publicCreateUpdateUnmountBehaviorAvailable: false,
+    compatibilityClaimed: false
+  });
+}
+
+function executeRootRequestWithBridge(record, executor) {
+  const handoff = createRootExecutionHandoff(record);
+  const execute = resolveRootExecutionExecutor(executor);
+  const result = execute(handoff);
+
+  return consumeRootExecutionResult(record, result, handoff);
+}
+
+function resolveRootExecutionExecutor(executor) {
+  if (typeof executor === 'function') {
+    return executor;
+  }
+
+  if (
+    executor !== null &&
+    typeof executor === 'object' &&
+    typeof executor.executeTestRendererRootRequest === 'function'
+  ) {
+    return (handoff) => executor.executeTestRendererRootRequest(handoff);
+  }
+
+  throwInvalidRootRequest(
+    'Expected a private native/Rust test-renderer root execution function.'
+  );
+}
+
+function consumeRootExecutionResult(record, result, handoff) {
+  if (!isRootRequestRecord(record)) {
+    throwInvalidRootRequest(
+      'Expected a private react-test-renderer root request record.'
+    );
+  }
+  if (result === null || typeof result !== 'object') {
+    throwInvalidRootRequest(
+      'Expected a private Rust test-renderer root execution result object.'
+    );
+  }
+
+  const rustLifecycleDiagnostic =
+    readDiagnosticField(result, [
+      'rustLifecycleDiagnostic',
+      'lifecycleDiagnostic',
+      'diagnostic'
+    ]) ?? result;
+  const consumedLifecycleDiagnostic =
+    consumeAcceptedRustLifecycleDiagnosticForRequest(
+      record,
+      rustLifecycleDiagnostic
+    );
+  const executionHandoff =
+    handoff === undefined ? createRootExecutionHandoff(record) : handoff;
+
+  return freezeRecord({
+    kind: 'FastReactTestRendererPrivateRootExecutionResult',
+    status: 'accepted-private-test-renderer-root-execution-result',
+    executionStatus: rootRequestExecutionStatus,
+    compatibilityStatus: rootRequestCompatibilityStatus,
+    entrypoint,
+    compatibilityTarget,
+    request: record,
+    handoff: executionHandoff,
+    operation: record.operation,
+    requestId: record.requestId,
+    requestSequence: record.requestSequence,
+    updateKind: record.updateKind,
+    rustOutcome: record.rustOutcome,
+    scheduled: record.scheduled,
+    rustLifecycleDiagnostic: consumedLifecycleDiagnostic,
+    privateExecutorInvoked: handoff !== undefined,
+    privateRootRequestExecution: true,
+    rustRootExecutionBoundary: 'fast-react-test-renderer.TestRendererRoot',
+    rustRootExecutionBridgeStatus:
+      'admitted-private-test-renderer-native-root-execution-bridge',
+    rustRootExecutionBoundaryCalled: true,
+    nativeAddonLoaded: result.nativeAddonLoaded === true,
+    nativeBridgeAvailable: result.nativeBridgeAvailable === true,
+    nativeExecution: result.nativeExecution === true,
+    rustExecution: result.rustExecution === false ? false : true,
+    reconcilerExecution: record.scheduled,
+    hostOutputProduced: false,
+    serializationAvailable: false,
+    publicRouteAvailable: false,
+    publicCreateUpdateUnmountBehaviorAvailable: false,
+    compatibilityClaimed: false
+  });
 }
 
 function readDiagnosticField(record, names) {

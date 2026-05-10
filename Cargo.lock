@@ -16,6 +16,10 @@ dependencies = [
 [[package]]
 name = "fast-react-napi"
 version = "0.0.0"
+dependencies = [
+ "fast-react-reconciler",
+ "fast-react-test-renderer",
+]
 
 [[package]]
 name = "fast-react-reconciler"
