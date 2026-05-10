@@ -9907,6 +9907,14 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
     diagnostic.sideEffects.stylesheetLoadStateResourceMapRowsValidated,
     true
   );
+  assert.equal(
+    diagnostic.sideEffects.stylesheetLoadStateCommitTransitionRecorded,
+    true
+  );
+  assert.equal(
+    diagnostic.sideEffects.fakeStylesheetResourceCommitTransitionRecorded,
+    true
+  );
   assert.equal(diagnostic.sideEffects.scriptExecutionStarted, false);
   assert.equal(
     diagnostic.sideEffects.publicScriptModuleResourceDispatch,
@@ -9914,6 +9922,10 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
   );
   assert.equal(diagnostic.sideEffects.resourceLoadStateMutated, false);
   assert.equal(diagnostic.sideEffects.resourceFetchStarted, false);
+  assert.equal(
+    diagnostic.sideEffects.preloadOrStyleDomWorkDispatched,
+    false
+  );
   assert.equal(diagnostic.commitAdmission.rawResourceMapCaptured, false);
   assert.equal(
     diagnostic.commitAdmission.realResourceMapMutationAllowed,
@@ -9953,6 +9965,8 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
     moduleResourceMapDedupeKeyCount: 2,
     stylesheetLoadStateCommitOrderRowCount: 1,
     stylesheetLoadStateResourceCount: 1,
+    stylesheetLoadStateCommitTransitionCount: 1,
+    stylesheetLoadStateCommitTransitionResourceCount: 1,
     unmatchedStylesheetLoadStateResourceCount: 0,
     malformedModuleRowCount: 0,
     conflictingDuplicateRecordCount: 0,
@@ -9975,6 +9989,7 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
     moduleScriptPreinitStarted: false,
     scriptExecutionStarted: false,
     publicScriptModuleResourceDispatch: false,
+    preloadOrStyleDomWorkDispatched: false,
     rawValuesRetained: false,
     compatibilityClaimed: false
   });
@@ -10435,6 +10450,18 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
       staleResourceMapEntryCount:
         diagnostic.stylesheetLoadStateCommitOrder
           .staleResourceMapEntryCount,
+      commitTransitionCount:
+        diagnostic.stylesheetLoadStateCommitOrder
+          .commitTransitionCount,
+      commitTransitionResourceCount:
+        diagnostic.stylesheetLoadStateCommitOrder
+          .commitTransitionResourceCount,
+      commitTransitionRecorded:
+        diagnostic.stylesheetLoadStateCommitOrder
+          .commitTransitionRecorded,
+      fakeResourceCommitTransitionRecorded:
+        diagnostic.stylesheetLoadStateCommitOrder
+          .fakeResourceCommitTransitionRecorded,
       publicStylesheetLoadStateDispatch:
         diagnostic.stylesheetLoadStateCommitOrder
           .publicStylesheetLoadStateDispatch
@@ -10444,6 +10471,124 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
       resourceMapEntriesValidated: true,
       rowCount: 1,
       staleResourceMapEntryCount: 0,
+      commitTransitionCount: 1,
+      commitTransitionResourceCount: 1,
+      commitTransitionRecorded: true,
+      fakeResourceCommitTransitionRecorded: true,
+      publicStylesheetLoadStateDispatch: false
+    }
+  );
+  assert.deepEqual(
+    {
+      transitionKind:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .transitionKind,
+      transitionStatus:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .transitionStatus,
+      sourceStylesheetLoadErrorStateId:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .sourceStylesheetLoadErrorStateId,
+      sourceResourceMapCommitRowIds:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .sourceResourceMapCommitRowIds,
+      sourceStylesheetLoadErrorStateRowIds:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .sourceStylesheetLoadErrorStateRowIds,
+      fakeResourceKeys:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .fakeResourceKeys,
+      fakeResourceMapDedupeKeys:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .fakeResourceMapDedupeKeys,
+      fakeResourceRows:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .fakeResourceRows,
+      transitionCount:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .transitionCount,
+      fakeResourceCount:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .fakeResourceCount,
+      fakeResourceCommitTransitionRecorded:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .fakeResourceCommitTransitionRecorded,
+      preloadElementCreated:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .preloadElementCreated,
+      preloadElementInserted:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .preloadElementInserted,
+      preloadFetchStarted:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .preloadFetchStarted,
+      stylesheetElementCreated:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .stylesheetElementCreated,
+      stylesheetElementInserted:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .stylesheetElementInserted,
+      loadEventSubscribed:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .loadEventSubscribed,
+      errorEventSubscribed:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .errorEventSubscribed,
+      loadingStateMutated:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .loadingStateMutated,
+      publicStylesheetLoadStateDispatch:
+        diagnostic.stylesheetLoadStateCommitOrder.commitTransition
+          .publicStylesheetLoadStateDispatch
+    },
+    {
+      transitionKind:
+        'react-19.2.6-stylesheet-load-state-fake-resource-map-commit-transition',
+      transitionStatus:
+        resourceFormGate
+          .privateResourceHintStylesheetLoadStateCommitTransitionStatus,
+      sourceStylesheetLoadErrorStateId:
+        'resource-map-commit-load-state:1',
+      sourceResourceMapCommitRowIds: ['resource-map-commit-1'],
+      sourceStylesheetLoadErrorStateRowIds: [
+        'stylesheet-resource-state-0'
+      ],
+      fakeResourceKeys: ['style:style-main'],
+      fakeResourceMapDedupeKeys: [
+        'hoistable-styles:style:style-main'
+      ],
+      fakeResourceRows: [
+        {
+          sourceResourceMapCommitRowId: 'resource-map-commit-1',
+          sourceStylesheetLoadErrorStateRowId:
+            'stylesheet-resource-state-0',
+          resourceKey: 'style:style-main',
+          resourceMapDedupeKey: 'hoistable-styles:style:style-main',
+          precedenceKey: 'precedence-main',
+          fakeLoadingStateLabels: [
+            'not-loaded',
+            'loaded',
+            'errored',
+            'inserted-not-settled',
+            'inserted-loaded',
+            'inserted-errored'
+          ],
+          fakeLoadingStateBitmasks: [0, 1, 2, 4, 5, 6],
+          preloadWouldBeTracked: true,
+          commitOrderConsumesFakeLoadState: true
+        }
+      ],
+      transitionCount: 1,
+      fakeResourceCount: 1,
+      fakeResourceCommitTransitionRecorded: true,
+      preloadElementCreated: false,
+      preloadElementInserted: false,
+      preloadFetchStarted: false,
+      stylesheetElementCreated: false,
+      stylesheetElementInserted: false,
+      loadEventSubscribed: false,
+      errorEventSubscribed: false,
+      loadingStateMutated: false,
       publicStylesheetLoadStateDispatch: false
     }
   );
@@ -10467,12 +10612,22 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
     1
   );
   assert.equal(
+    diagnostic.resourceLifecycleBoundary
+      .stylesheetLoadStateCommitTransitionCount,
+    1
+  );
+  assert.equal(
     diagnostic.resourceLifecycleBoundary.stylesheetLoadStateRecordConsumed,
     true
   );
   assert.equal(
     diagnostic.resourceLifecycleBoundary
       .stylesheetLoadStateResourceMapRowsValidated,
+    true
+  );
+  assert.equal(
+    diagnostic.resourceLifecycleBoundary
+      .stylesheetLoadStateCommitTransitionRecorded,
     true
   );
   assert.equal(diagnostic.resourceLifecycleBoundary.fetchStarted, false);
@@ -10489,6 +10644,10 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
   );
   assert.equal(
     diagnostic.resourceLifecycleBoundary.loadStateMutated,
+    false
+  );
+  assert.equal(
+    diagnostic.resourceLifecycleBoundary.preloadOrStyleDomWorkDispatched,
     false
   );
   assert.equal(
@@ -10538,12 +10697,15 @@ test('private resource hint resource-map commit diagnostic records stylesheet pr
     summary.validatesStylesheetLoadStateResourceMapRows,
     true
   );
+  assert.equal(summary.recordsStylesheetLoadStateCommitTransition, true);
+  assert.equal(summary.recordsOneFakeResourceMapCommitTransition, true);
   assert.equal(summary.rejectsMalformedModuleRows, true);
   assert.equal(summary.rejectsConflictingDuplicateRecords, true);
   assert.equal(summary.rejectsDuplicateStylesheetPrecedenceRows, true);
   assert.equal(summary.rejectsStaleStylesheetResourceMapEntries, true);
   assert.equal(summary.rejectsPublicResourceDispatchClaims, true);
   assert.equal(summary.publicScriptModuleResourceDispatch, false);
+  assert.equal(summary.dispatchesPreloadOrStyleDomWork, false);
   assert.equal(summary.publicStylesheetLoadStateDispatch, false);
   assert.deepEqual(
     summary.sideEffects,
@@ -12122,6 +12284,8 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
       stylesheetLoadErrorStateRecordConsumed: false,
       stylesheetLoadStateCommitOrderRowsRecorded: false,
       stylesheetLoadStateResourceMapRowsValidated: false,
+      stylesheetLoadStateCommitTransitionRecorded: false,
+      fakeStylesheetResourceCommitTransitionRecorded: false,
       duplicateStylesheetPrecedenceRowsRejected: false,
       staleStylesheetResourceMapEntriesRejected: false,
       realResourceMapsCreated: false,
@@ -12132,6 +12296,7 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
       preloadRecordStarted: false,
       scriptRecordLoaded: false,
       resourceLoadStateMutated: false,
+      preloadOrStyleDomWorkDispatched: false,
       publicStylesheetLoadStateDispatch: false,
       publicResourceMapCommitBehavior: false,
       fakeStylesheetLoadErrorStateDiagnosticInvoked: false,
@@ -12548,6 +12713,14 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
       false
     );
     assert.equal(
+      blockedRecord.sideEffects.stylesheetLoadStateCommitTransitionRecorded,
+      false
+    );
+    assert.equal(
+      blockedRecord.sideEffects.fakeStylesheetResourceCommitTransitionRecorded,
+      false
+    );
+    assert.equal(
       blockedRecord.sideEffects.fakeStylesheetLoadErrorStateDiagnosticInvoked,
       false
     );
@@ -12565,6 +12738,10 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
     );
     assert.equal(
       blockedRecord.sideEffects.publicResourceMapCommitBehavior,
+      false
+    );
+    assert.equal(
+      blockedRecord.sideEffects.preloadOrStyleDomWorkDispatched,
       false
     );
     assert.equal(blockedRecord.sideEffects.headSingletonResolved, false);
@@ -12703,6 +12880,14 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
         adapterBoundary.stylesheetLoadStateResourceMapRowsValidated,
         false
       );
+      assert.equal(
+        adapterBoundary.stylesheetLoadStateCommitTransitionRecorded,
+        false
+      );
+      assert.equal(
+        adapterBoundary.fakeStylesheetResourceCommitTransitionRecorded,
+        false
+      );
       assert.equal(adapterBoundary.realResourceMapsMutated, false);
       assert.equal(adapterBoundary.fakeResourceMapsMutated, false);
       assert.equal(adapterBoundary.resourceLoadStateMutated, false);
@@ -12724,6 +12909,7 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
         adapterBoundary.publicStylesheetLoadStateDispatch,
         false
       );
+      assert.equal(adapterBoundary.preloadOrStyleDomWorkDispatched, false);
       assert.equal(adapterBoundary.resourceFetchStarted, false);
       assert.equal(adapterBoundary.realDocumentMutated, false);
       assert.equal(adapterBoundary.publicResourceHintDomInsertion, false);

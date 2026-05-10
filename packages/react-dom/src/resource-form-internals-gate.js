@@ -149,6 +149,8 @@ const privateResourceHintStylesheetLoadErrorStateExecutionStatus =
   'diagnosed-private-resource-hint-fake-dom-stylesheet-load-error-state';
 const privateResourceHintStylesheetLoadErrorStateCompatibilityBlockedStatus =
   'blocked-private-resource-hint-stylesheet-load-error-state-compatibility';
+const privateResourceHintStylesheetLoadStateCommitTransitionStatus =
+  'recorded-private-resource-hint-fake-resource-map-stylesheet-load-state-transition';
 const privateFormActionResetDispatcherStatus =
   'private-form-action-reset-dispatcher-metadata-only';
 const privateFormActionResetQueueCommitStatus =
@@ -667,6 +669,8 @@ const resourceHintResourceMapCommitBlockedSideEffects = freezeRecord({
   stylesheetLoadErrorStateRecordConsumed: false,
   stylesheetLoadStateCommitOrderRowsRecorded: false,
   stylesheetLoadStateResourceMapRowsValidated: false,
+  stylesheetLoadStateCommitTransitionRecorded: false,
+  fakeStylesheetResourceCommitTransitionRecorded: false,
   duplicateStylesheetPrecedenceRowsRejected: false,
   staleStylesheetResourceMapEntriesRejected: false,
   realResourceMapsCreated: false,
@@ -682,6 +686,7 @@ const resourceHintResourceMapCommitBlockedSideEffects = freezeRecord({
   scriptExecutionStarted: false,
   publicScriptModuleResourceDispatch: false,
   resourceLoadStateMutated: false,
+  preloadOrStyleDomWorkDispatched: false,
   publicStylesheetLoadStateDispatch: false,
   publicResourceMapCommitBehavior: false
 });
@@ -701,6 +706,8 @@ const resourceHintResourceMapCommitSideEffects = freezeRecord({
   stylesheetLoadErrorStateRecordConsumed: true,
   stylesheetLoadStateCommitOrderRowsRecorded: true,
   stylesheetLoadStateResourceMapRowsValidated: true,
+  stylesheetLoadStateCommitTransitionRecorded: true,
+  fakeStylesheetResourceCommitTransitionRecorded: true,
   duplicateStylesheetPrecedenceRowsRejected: true,
   staleStylesheetResourceMapEntriesRejected: true,
   realResourceMapsCreated: false,
@@ -716,6 +723,7 @@ const resourceHintResourceMapCommitSideEffects = freezeRecord({
   scriptExecutionStarted: false,
   publicScriptModuleResourceDispatch: false,
   resourceLoadStateMutated: false,
+  preloadOrStyleDomWorkDispatched: false,
   publicStylesheetLoadStateDispatch: false,
   publicResourceMapCommitBehavior: false
 });
@@ -1290,6 +1298,10 @@ const resourceHintResourceMapCommitBlockedCapabilities = freezeArray([
   blockedCapability(
     'resource-fetch-load-state',
     'Fetch, load, error, and suspended commit state are not started or mutated.'
+  ),
+  blockedCapability(
+    'preload-style-dom-work',
+    'No real preload or stylesheet DOM element is created, inserted, fetched, or subscribed.'
   ),
   blockedCapability(
     'public-resource-compatibility',
@@ -2992,6 +3004,8 @@ function describePrivateResourceHintResourceMapCommitGate() {
     consumesStylesheetLoadErrorState: true,
     recordsStylesheetLoadStateCommitOrderRows: true,
     validatesStylesheetLoadStateResourceMapRows: true,
+    recordsStylesheetLoadStateCommitTransition: true,
+    recordsOneFakeResourceMapCommitTransition: true,
     rejectsMalformedModuleRows: true,
     rejectsConflictingDuplicateRecords: true,
     rejectsDuplicateStylesheetPrecedenceRows: true,
@@ -3005,6 +3019,7 @@ function describePrivateResourceHintResourceMapCommitGate() {
     startsFetchOrPreload: false,
     startsScriptExecution: false,
     mutatesLoadState: false,
+    dispatchesPreloadOrStyleDomWork: false,
     rawValuesRetained: false,
     publicResourceHintDomInsertion: false,
     publicScriptModuleResourceDispatch: false,
@@ -4330,13 +4345,34 @@ function recordResourceHintResourceMapCommitWithGate(
     publicResourceBoundary: createPublicResourceHintDomInsertionBoundary(),
     publicHeadBoundary: createPublicHeadSingletonBoundary(),
     blockedCapabilities: resourceHintResourceMapCommitBlockedCapabilities,
-    sideEffects: resourceHintResourceMapCommitSideEffects,
+    sideEffects: createResourceHintResourceMapCommitSideEffects(
+      commitPlan.stylesheetLoadStateCommitOrder
+    ),
     missingPrerequisites:
       resourceHintResourceMapCommitMissingPrerequisites
   });
 
   resourceHintResourceMapCommitPayloads.set(payload, payload);
   return payload;
+}
+
+function createResourceHintResourceMapCommitSideEffects(
+  stylesheetLoadStateCommitOrder
+) {
+  const transitionRecorded =
+    stylesheetLoadStateCommitOrder.commitTransitionRecorded === true;
+
+  return freezeRecord({
+    ...resourceHintResourceMapCommitSideEffects,
+    stylesheetLoadErrorStateRecordConsumed:
+      stylesheetLoadStateCommitOrder.loadStateConsumed === true,
+    stylesheetLoadStateCommitOrderRowsRecorded:
+      stylesheetLoadStateCommitOrder.rowCount > 0,
+    stylesheetLoadStateResourceMapRowsValidated:
+      stylesheetLoadStateCommitOrder.resourceMapEntriesValidated === true,
+    stylesheetLoadStateCommitTransitionRecorded: transitionRecorded,
+    fakeStylesheetResourceCommitTransitionRecorded: transitionRecorded
+  });
 }
 
 
@@ -9808,9 +9844,14 @@ function createResourceMapCommitStylesheetLoadStateOrder(
       unmatchedLoadStateResourceCount: 0,
       staleResourceMapEntryCount: 0,
       duplicateStylesheetPrecedenceRowCount: 0,
+      commitTransitionCount: 0,
+      commitTransitionResourceCount: 0,
       rows: freezeArray([]),
+      commitTransition: null,
       loadStateConsumed: false,
       resourceMapEntriesValidated: false,
+      commitTransitionRecorded: false,
+      fakeResourceCommitTransitionRecorded: false,
       loadEventSubscribed: false,
       errorEventSubscribed: false,
       loadingStateMutated: false,
@@ -9850,6 +9891,11 @@ function createResourceMapCommitStylesheetLoadStateOrder(
       );
     })
   );
+  const commitTransition =
+    createResourceMapCommitStylesheetLoadStateTransition(
+      stylesheetLoadErrorState,
+      rows
+    );
   const matchedResourceKeys = new Set(rows.map((row) => row.resourceKey));
   const unmatchedLoadStateResourceCount =
     stylesheetLoadErrorState.resourceStateRows.filter(
@@ -9873,9 +9919,14 @@ function createResourceMapCommitStylesheetLoadStateOrder(
     unmatchedLoadStateResourceCount,
     staleResourceMapEntryCount: 0,
     duplicateStylesheetPrecedenceRowCount: 0,
+    commitTransitionCount: 1,
+    commitTransitionResourceCount: rows.length,
     rows,
+    commitTransition,
     loadStateConsumed: true,
     resourceMapEntriesValidated: true,
+    commitTransitionRecorded: true,
+    fakeResourceCommitTransitionRecorded: true,
     loadEventSubscribed: false,
     errorEventSubscribed: false,
     loadingStateMutated: false,
@@ -9950,6 +10001,92 @@ function createResourceMapCommitStylesheetLoadStateOrderRow(
   });
 }
 
+function createResourceMapCommitStylesheetLoadStateTransition(
+  stylesheetLoadErrorState,
+  rows
+) {
+  return freezeRecord({
+    transitionId:
+      `${stylesheetLoadErrorState.stylesheetLoadErrorStateId}:resource-map-commit-transition`,
+    transitionKind:
+      'react-19.2.6-stylesheet-load-state-fake-resource-map-commit-transition',
+    transitionStatus:
+      privateResourceHintStylesheetLoadStateCommitTransitionStatus,
+    targetKind: 'document-head',
+    hostTag: 'head',
+    sourceStylesheetLoadErrorStateId:
+      stylesheetLoadErrorState.stylesheetLoadErrorStateId,
+    sourceStylesheetLoadErrorStateSequence:
+      stylesheetLoadErrorState.stylesheetLoadErrorStateSequence,
+    sourceResourceMapCommitRowIds: freezeArray(
+      rows.map((row) => row.sourceResourceMapCommitRowId)
+    ),
+    sourceStylesheetLoadErrorStateRowIds: freezeArray(
+      rows.map((row) => row.sourceStylesheetLoadErrorStateRowId)
+    ),
+    sourcePreloadStateRowIds: freezeArray(
+      rows
+        .map((row) => row.sourcePreloadStateRowId)
+        .filter((rowId) => rowId !== null)
+    ),
+    sourceCommitSuspensionRowIds: freezeArray(
+      rows
+        .map((row) => row.sourceCommitSuspensionRowId)
+        .filter((rowId) => rowId !== null)
+    ),
+    fakeResourceRows: freezeArray(
+      rows.map((row) =>
+        freezeRecord({
+          sourceResourceMapCommitRowId:
+            row.sourceResourceMapCommitRowId,
+          sourceStylesheetLoadErrorStateRowId:
+            row.sourceStylesheetLoadErrorStateRowId,
+          resourceKey: row.resourceKey,
+          resourceMapDedupeKey: row.resourceMapDedupeKey,
+          precedenceKey: row.precedenceKey,
+          fakeLoadingStateLabels: row.fakeLoadingStateLabels,
+          fakeLoadingStateBitmasks: row.fakeLoadingStateBitmasks,
+          preloadWouldBeTracked: row.preloadWouldBeTracked,
+          commitOrderConsumesFakeLoadState:
+            row.commitOrderConsumesFakeLoadState
+        })
+      )
+    ),
+    fakeResourceKeys: freezeArray(
+      uniqueStrings(rows.map((row) => row.resourceKey))
+    ),
+    fakeResourceMapDedupeKeys: freezeArray(
+      uniqueStrings(rows.map((row) => row.resourceMapDedupeKey))
+    ),
+    transitionCount: 1,
+    fakeResourceCount: rows.length,
+    matchedResourceCount: rows.length,
+    commitOrderRowCount: rows.length,
+    consumesStylesheetLoadErrorStateRecord: true,
+    consumesFakeLoadStateRows: true,
+    validatesResourceMapRows: true,
+    fakeResourceCommitTransitionRecorded: true,
+    realResourceMapCreated: false,
+    realResourceMapMutated: false,
+    fakeResourceMapCreated: false,
+    fakeResourceMapMutated: false,
+    preloadElementCreated: false,
+    preloadElementInserted: false,
+    preloadFetchStarted: false,
+    stylesheetElementCreated: false,
+    stylesheetElementInserted: false,
+    stylesheetFetchStarted: false,
+    loadEventSubscribed: false,
+    errorEventSubscribed: false,
+    loadingStateMutated: false,
+    commitSuspended: false,
+    publicResourceDispatchBlocked: true,
+    publicStylesheetLoadStateDispatch: false,
+    rawValuesRetained: false,
+    compatibilityClaimed: false
+  });
+}
+
 function createResourceMapCommitPlanSummary(
   privateResourceMapRecords,
   moduleResourceMapOrder,
@@ -9995,6 +10132,10 @@ function createResourceMapCommitPlanSummary(
       stylesheetLoadStateCommitOrder.rowCount,
     stylesheetLoadStateResourceCount:
       stylesheetLoadStateCommitOrder.loadStateResourceCount,
+    stylesheetLoadStateCommitTransitionCount:
+      stylesheetLoadStateCommitOrder.commitTransitionCount,
+    stylesheetLoadStateCommitTransitionResourceCount:
+      stylesheetLoadStateCommitOrder.commitTransitionResourceCount,
     unmatchedStylesheetLoadStateResourceCount:
       stylesheetLoadStateCommitOrder.unmatchedLoadStateResourceCount,
     malformedModuleRowCount:
@@ -10026,6 +10167,7 @@ function createResourceMapCommitPlanSummary(
     moduleScriptPreinitStarted: false,
     scriptExecutionStarted: false,
     publicScriptModuleResourceDispatch: false,
+    preloadOrStyleDomWorkDispatched: false,
     rawValuesRetained: false,
     compatibilityClaimed: false
   });
@@ -10071,10 +10213,15 @@ function createResourceMapCommitLifecycleBoundary(commitPlan) {
     stylesheetLoadStateCommitOrderRowCount:
       commitPlan.resourceMapCommitPlan
         .stylesheetLoadStateCommitOrderRowCount,
+    stylesheetLoadStateCommitTransitionCount:
+      commitPlan.resourceMapCommitPlan
+        .stylesheetLoadStateCommitTransitionCount,
     stylesheetLoadStateRecordConsumed:
       commitPlan.stylesheetLoadStateCommitOrder.loadStateConsumed,
     stylesheetLoadStateResourceMapRowsValidated:
       commitPlan.stylesheetLoadStateCommitOrder.resourceMapEntriesValidated,
+    stylesheetLoadStateCommitTransitionRecorded:
+      commitPlan.stylesheetLoadStateCommitOrder.commitTransitionRecorded,
     singletonOwnershipClaimed: false,
     resourceCountIncremented: false,
     resourceInstanceCreated: false,
@@ -10088,6 +10235,7 @@ function createResourceMapCommitLifecycleBoundary(commitPlan) {
     loadEventSubscribed: false,
     loadStateMutated: false,
     suspendedCommitWaitStarted: false,
+    preloadOrStyleDomWorkDispatched: false,
     publicScriptModuleResourceDispatch: false,
     publicResourceApisReachable: false,
     compatibilityClaimed: false,
@@ -12634,6 +12782,7 @@ module.exports = {
   privateResourceHintStylesheetLoadErrorStateInvalidRecordCode,
   privateResourceHintStylesheetLoadErrorStateRecordType,
   privateResourceHintStylesheetLoadErrorStateStatus,
+  privateResourceHintStylesheetLoadStateCommitTransitionStatus,
   privateResourceHintDispatcherMetadataGateErrorCode,
   privateResourceHintDispatcherMetadataGateId,
   privateResourceHintDispatcherMetadataInvalidShapeCode,
