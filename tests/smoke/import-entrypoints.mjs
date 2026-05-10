@@ -529,7 +529,8 @@ const reactDomPrivateDirectFiles = [
   'src/resource-form-gates.js',
   'src/resource-form-internals-gate.js',
   'src/shared/create-portal.js',
-  'src/shared/flush-sync-guard.js'
+  'src/shared/flush-sync-guard.js',
+  'src/test-utils-act-gate.js'
 ];
 
 const blockedReactDomExtensionSubpaths = [
