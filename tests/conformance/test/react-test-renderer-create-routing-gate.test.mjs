@@ -20,6 +20,32 @@ const missingPrerequisites = [
   "rust-native-test-renderer-create-bridge",
   "react-test-renderer-host-output-serialization"
 ];
+const privateRouteStatus = "blocked-js-native-bridge-not-loaded";
+const expectedPrivateRoutes = [
+  {
+    acceptedRustApis: [
+      "TestRendererRoot::update_host_component_with_text_for_canary",
+      "TestRendererRoot::render_and_commit_host_output_update_for_canary"
+    ],
+    acceptedRustTests: [
+      "root_host_output_canary_updates_committed_text_with_update_diagnostics",
+      "root_host_output_update_canary_fails_closed_without_committed_output"
+    ],
+    id: "react-test-renderer-update-private-route",
+    publicSurface: "create().update"
+  },
+  {
+    acceptedRustApis: [
+      "TestRendererRoot::unmount",
+      "TestRendererRoot::render_and_commit_host_output_unmount_for_canary"
+    ],
+    acceptedRustTests: [
+      "root_host_output_canary_unmounts_committed_output_with_deletion_diagnostics"
+    ],
+    id: "react-test-renderer-unmount-private-route",
+    publicSurface: "create().unmount"
+  }
+];
 const moduleKeys = [
   "_Scheduler",
   "act",
@@ -195,6 +221,42 @@ test("react-test-renderer create shell keeps every behaviorful renderer surface 
   }
 });
 
+test("react-test-renderer update and unmount routing metadata points at accepted Rust canaries", () => {
+  for (const entry of entrypoints) {
+    const moduleExports = loadFresh(entry.modulePath);
+    const renderer = moduleExports.create("child");
+    const updateError = captureThrown(() => renderer.update("next"));
+    const unmountError = captureThrown(() => renderer.unmount());
+
+    assertReactTestRendererUnimplemented(
+      updateError,
+      entry.entrypoint,
+      "create().update"
+    );
+    assertReactTestRendererUnimplemented(
+      unmountError,
+      entry.entrypoint,
+      "create().unmount"
+    );
+    assertCreateRoutingGate(updateError, entry.entrypoint);
+    assertCreateRoutingGate(unmountError, entry.entrypoint);
+    assert.equal(
+      updateError.updatePrivateRoute.publicSurface,
+      "create().update"
+    );
+    assert.equal(
+      unmountError.unmountPrivateRoute.publicSurface,
+      "create().unmount"
+    );
+    assert.equal(updateError.privateRoutes, updateError.routingGate.privateRoutes);
+    assert.equal(
+      unmountError.privateRoutes,
+      unmountError.routingGate.privateRoutes
+    );
+    assert.deepEqual(updateError.privateRoutes, unmountError.privateRoutes);
+  }
+});
+
 test("react-test-renderer create routing gate does not load native bridge artifacts", () => {
   const originalLoad = Module._load;
   const originalNodeExtension = Module._extensions[".node"];
@@ -321,6 +383,40 @@ function assertCreateRoutingGate(error, entrypoint) {
     assert.equal(prerequisite.requiredBeforeCreateRouting, true);
     assert.match(prerequisite.reason, /JS package/u);
   }
+
+  assert.equal(error.privateRoutes, gate.privateRoutes);
+  assert.equal(error.updatePrivateRoute, gate.updatePrivateRoute);
+  assert.equal(error.unmountPrivateRoute, gate.unmountPrivateRoute);
+  assert.equal(Object.isFrozen(gate.privateRoutes), true);
+  assert.deepEqual(
+    gate.privateRoutes.map((privateRoute) => privateRoute.id),
+    expectedPrivateRoutes.map((privateRoute) => privateRoute.id)
+  );
+  assert.equal(gate.privateRoutes[0], gate.updatePrivateRoute);
+  assert.equal(gate.privateRoutes[1], gate.unmountPrivateRoute);
+  assertPrivateRoute(gate.updatePrivateRoute, expectedPrivateRoutes[0]);
+  assertPrivateRoute(gate.unmountPrivateRoute, expectedPrivateRoutes[1]);
+}
+
+function assertPrivateRoute(privateRoute, expected) {
+  assert.equal(Object.isFrozen(privateRoute), true);
+  assert.equal(privateRoute.id, expected.id);
+  assert.equal(privateRoute.publicSurface, expected.publicSurface);
+  assert.equal(privateRoute.status, privateRouteStatus);
+  assert.equal(privateRoute.deterministic, true);
+  assert.equal(privateRoute.publicRouteAvailable, false);
+  assert.equal(privateRoute.privateRustCanaryAccepted, true);
+  assert.equal(privateRoute.nativeBridgeAvailable, false);
+  assert.equal(privateRoute.nativeExecution, false);
+  assert.equal(
+    privateRoute.acceptedWorker,
+    "worker-234-test-renderer-host-output-update-unmount-canary"
+  );
+  assert.equal(privateRoute.acceptedRustCrate, "fast-react-test-renderer");
+  assert.equal(Object.isFrozen(privateRoute.acceptedRustApis), true);
+  assert.deepEqual(privateRoute.acceptedRustApis, expected.acceptedRustApis);
+  assert.equal(Object.isFrozen(privateRoute.acceptedRustTests), true);
+  assert.deepEqual(privateRoute.acceptedRustTests, expected.acceptedRustTests);
 }
 
 function captureThrown(callback) {
