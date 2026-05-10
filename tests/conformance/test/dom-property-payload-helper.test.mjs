@@ -40,9 +40,15 @@ const {
   ENTRY_SET_STYLE,
   ENTRY_UNSUPPORTED,
   diffDomPropertyPayload,
-  isOrdinaryPropertyPayloadEntry
+  isNonPayloadPropertyPayloadEntry,
+  isOrdinaryPropertyPayloadEntry,
+  isStyleDangerousHtmlPayloadEntry
 } = propertyPayload;
-const { applyStyleDangerousHtmlPayload } = domMutation;
+const {
+  applyAdmittedDomPropertyPayload,
+  applyStyleDangerousHtmlPayload,
+  commitDomPropertyUpdate
+} = domMutation;
 
 test("private DOM property payload preserves insertion order for ordinary attributes", () => {
   assert.deepEqual(
@@ -410,6 +416,146 @@ test("private DOM property payload validates dangerous HTML without mutating", (
       )
     ]
   );
+});
+
+test("private DOM mutation adapter commits diffed admitted property rows in order", () => {
+  const element = new FakeElement("button");
+  element.setAttribute("title", "old-title");
+  element.setAttribute("hidden", "");
+  element.mutationLog = [];
+
+  assert.deepEqual(
+    commitDomPropertyUpdate(
+      element,
+      "button",
+      orderedProps([
+        ["title", "old-title"],
+        ["hidden", true],
+        ["children", "Old label"]
+      ]),
+      orderedProps([
+        ["id", "next-id"],
+        ["title", "new-title"],
+        ["children", "New label"],
+        ["style", orderedProps([["color", "red"]])],
+        ["data-state", "ready"]
+      ])
+    ),
+    [
+      appliedRemoveAttribute("hidden"),
+      appliedSetAttribute("id", "next-id"),
+      appliedSetAttribute("title", "new-title"),
+      skippedNonPayload(
+        "children",
+        "children",
+        "children are handled by text-content reconciliation"
+      ),
+      setStyle("color", "propertyAssignment", "red"),
+      appliedSetAttribute("data-state", "ready")
+    ]
+  );
+  assert.deepEqual(element.activeAttributeEntries(), [
+    ["data-state", "ready"],
+    ["id", "next-id"],
+    ["title", "new-title"]
+  ]);
+  assert.deepEqual(element.mutationLog, [
+    ["removeAttribute", "hidden", true],
+    ["setAttribute", "id", "next-id"],
+    ["setAttribute", "title", "new-title"],
+    ["stylePropertyAssignment", "color", "red"],
+    ["setAttribute", "data-state", "ready"]
+  ]);
+});
+
+test("private DOM admitted payload adapter accepts property rows and skips non-payload rows", () => {
+  const element = new FakeElement("fast-widget");
+  const value = { answer: 42 };
+
+  assert.deepEqual(
+    applyAdmittedDomPropertyPayload(element, [
+      setProperty("objectProp", value),
+      nonPayload(
+        "onClick",
+        "event",
+        "event props are stored by the future event/latest-props path"
+      ),
+      removeProperty("objectProp")
+    ]),
+    [
+      appliedSetProperty("objectProp", value),
+      skippedNonPayload(
+        "onClick",
+        "event",
+        "event props are stored by the future event/latest-props path"
+      ),
+      appliedRemoveProperty("objectProp")
+    ]
+  );
+  assert.equal(element.objectProp, null);
+  assert.deepEqual(element.mutationLog, [
+    ["setProperty", "objectProp", value],
+    ["setProperty", "objectProp", null]
+  ]);
+});
+
+test("private DOM admitted payload adapter fails closed before unsupported rows mutate", () => {
+  const controlled = new FakeElement("input");
+  assert.throws(
+    () =>
+      commitDomPropertyUpdate(
+        controlled,
+        "input",
+        {},
+        orderedProps([
+          ["id", "must-not-apply"],
+          ["value", "Ada"]
+        ])
+      ),
+    {
+      code: "FAST_REACT_DOM_BLOCKED_PROPERTY_PAYLOAD_ENTRY"
+    }
+  );
+  assert.deepEqual(controlled.mutationLog, []);
+  assert.deepEqual(controlled.activeAttributeEntries(), []);
+
+  const invalidStyle = new FakeElement("div");
+  assert.throws(
+    () =>
+      commitDomPropertyUpdate(
+        invalidStyle,
+        "div",
+        {},
+        orderedProps([
+          ["id", "must-not-apply"],
+          ["style", orderedProps([["width", Number.NaN]])]
+        ])
+      ),
+    {
+      code: "FAST_REACT_DOM_BLOCKED_PROPERTY_PAYLOAD_ENTRY"
+    }
+  );
+  assert.deepEqual(invalidStyle.mutationLog, []);
+  assert.deepEqual(invalidStyle.activeAttributeEntries(), []);
+
+  const resource = new FakeElement("link");
+  assert.throws(
+    () =>
+      commitDomPropertyUpdate(
+        resource,
+        "link",
+        {},
+        orderedProps([
+          ["rel", "stylesheet"],
+          ["href", "/app.css"]
+        ])
+      ),
+    {
+      code: "FAST_REACT_DOM_BLOCKED_PROPERTY_PAYLOAD_ENTRY"
+    }
+  );
+  assert.deepEqual(resource.mutationLog, []);
+  assert.deepEqual(resource.activeAttributeEntries(), []);
 });
 
 test("private DOM style and innerHTML applier applies accepted payload records in order", () => {
@@ -797,6 +943,30 @@ test("private DOM property payload classifies only ordinary application records"
     ),
     false
   );
+
+  assert.equal(
+    isStyleDangerousHtmlPayloadEntry(
+      setStyle("color", "propertyAssignment", "red")
+    ),
+    true
+  );
+  assert.equal(isStyleDangerousHtmlPayloadEntry(setInnerHTML("<b>x</b>")), true);
+  assert.equal(
+    isStyleDangerousHtmlPayloadEntry(setAttribute("id", "id", "alpha")),
+    false
+  );
+  assert.equal(
+    isNonPayloadPropertyPayloadEntry(
+      nonPayload("children", "children", "handled elsewhere")
+    ),
+    true
+  );
+  assert.equal(
+    isNonPayloadPropertyPayloadEntry(
+      unsupported("value", "controlled-input", "handled elsewhere")
+    ),
+    false
+  );
 });
 
 function orderedProps(entries) {
@@ -824,6 +994,21 @@ function removeAttribute(propName, attributeName) {
   };
 }
 
+function appliedSetAttribute(attributeName, value) {
+  return {
+    kind: ENTRY_SET_ATTRIBUTE,
+    attributeName,
+    value
+  };
+}
+
+function appliedRemoveAttribute(attributeName) {
+  return {
+    kind: ENTRY_REMOVE_ATTRIBUTE,
+    attributeName
+  };
+}
+
 function setProperty(propertyName, value) {
   return {
     kind: ENTRY_SET_PROPERTY,
@@ -838,6 +1023,22 @@ function removeProperty(propertyName) {
     kind: ENTRY_REMOVE_PROPERTY,
     propName: propertyName,
     propertyName
+  };
+}
+
+function appliedSetProperty(propertyName, value) {
+  return {
+    kind: ENTRY_SET_PROPERTY,
+    propertyName,
+    value
+  };
+}
+
+function appliedRemoveProperty(propertyName) {
+  return {
+    kind: ENTRY_REMOVE_PROPERTY,
+    propertyName,
+    value: null
   };
 }
 
@@ -879,6 +1080,16 @@ function nonPayload(propName, category, reason) {
   };
 }
 
+function skippedNonPayload(propName, category, reason) {
+  return {
+    kind: ENTRY_NON_PAYLOAD,
+    propName,
+    category,
+    reason,
+    status: "skipped"
+  };
+}
+
 function unsupported(propName, category, reason, details) {
   const entry = {
     kind: ENTRY_UNSUPPORTED,
@@ -900,6 +1111,8 @@ class FakeElement {
     this.nodeName = nodeName.toUpperCase();
     this.nodeType = 1;
     this.childNodes = [];
+    this.attributes = new Map();
+    this._objectProp = null;
     this.mutationLog = [];
     this.style = new FakeStyle(this);
     this.assignedInnerHTML = null;
@@ -920,6 +1133,38 @@ class FakeElement {
     return Array.from(this.style.properties.entries())
       .filter(([, value]) => value !== "")
       .sort(([left], [right]) => left.localeCompare(right));
+  }
+
+  activeAttributeEntries() {
+    return Array.from(this.attributes.entries()).sort(([left], [right]) =>
+      left.localeCompare(right)
+    );
+  }
+
+  get objectProp() {
+    return this._objectProp;
+  }
+
+  set objectProp(value) {
+    this.mutationLog.push(["setProperty", "objectProp", value]);
+    this._objectProp = value;
+  }
+
+  setAttribute(name, value) {
+    const attributeName = String(name);
+    const stringValue = String(value);
+    this.mutationLog.push(["setAttribute", attributeName, stringValue]);
+    this.attributes.set(attributeName, stringValue);
+  }
+
+  removeAttribute(name) {
+    const attributeName = String(name);
+    this.mutationLog.push([
+      "removeAttribute",
+      attributeName,
+      this.attributes.has(attributeName)
+    ]);
+    this.attributes.delete(attributeName);
   }
 }
 

@@ -10,9 +10,12 @@ const {
   ENTRY_SET_PROPERTY,
   ENTRY_SET_STYLE,
   ENTRY_UNSUPPORTED,
+  diffDomPropertyPayload,
   isAttributeNameSafe,
   isEventLikeProp,
-  isOrdinaryPropertyPayloadEntry
+  isNonPayloadPropertyPayloadEntry,
+  isOrdinaryPropertyPayloadEntry,
+  isStyleDangerousHtmlPayloadEntry
 } = require('./property-payload.js');
 
 const blockedPayloadEntryKinds = new Set([
@@ -157,6 +160,31 @@ function applyDomPropertyPayload(instance, payload) {
   return entries.map(createAppliedPropertyPayloadRecord);
 }
 
+function commitDomPropertyUpdate(instance, tag, lastProps, nextProps) {
+  const payload = diffDomPropertyPayload(tag, lastProps, nextProps);
+  return applyAdmittedDomPropertyPayload(instance, payload);
+}
+
+function applyAdmittedDomPropertyPayload(instance, payload) {
+  assertDomLikeObject(instance, 'applyAdmittedDomPropertyPayload', 'parent');
+  if (!Array.isArray(payload)) {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_PROPERTY_PAYLOAD',
+      'Cannot apply an admitted DOM property payload that is not an array.'
+    );
+  }
+
+  const entries = payload.map((entry, index) =>
+    normalizeAdmittedDomPropertyPayloadEntry(instance, entry, index)
+  );
+
+  for (const entry of entries) {
+    applyAdmittedNormalizedPropertyPayloadEntry(instance, entry);
+  }
+
+  return entries.map(createAdmittedPropertyPayloadRecord);
+}
+
 function applyStyleDangerousHtmlPayload(instance, payload) {
   assertDomLikeObject(instance, 'applyStyleDangerousHtmlPayload', 'parent');
 
@@ -261,6 +289,22 @@ function normalizePropertyPayloadEntry(instance, entry, index) {
   }
 }
 
+function normalizeAdmittedDomPropertyPayloadEntry(instance, entry, index) {
+  if (isOrdinaryPropertyPayloadEntry(entry)) {
+    return normalizePropertyPayloadEntry(instance, entry, index);
+  }
+
+  if (isStyleDangerousHtmlPayloadEntry(entry)) {
+    return validateStyleDangerousHtmlPayloadEntry(instance, entry);
+  }
+
+  if (isNonPayloadPropertyPayloadEntry(entry)) {
+    return normalizeNonPayloadPropertyPayloadEntry(entry, index);
+  }
+
+  throw createBlockedAdmittedPayloadEntryError(entry, index);
+}
+
 function normalizeSetAttributePayloadEntry(instance, entry, index) {
   assertAttributePayloadTarget(instance, 'setAttribute');
   const attributeName = normalizePayloadAttributeName(entry, index);
@@ -306,6 +350,27 @@ function normalizeRemovePropertyPayloadEntry(instance, entry, index) {
     kind: ENTRY_REMOVE_PROPERTY,
     propertyName,
     value: null
+  };
+}
+
+function normalizeNonPayloadPropertyPayloadEntry(entry, index) {
+  if (
+    typeof entry.propName !== 'string' ||
+    typeof entry.category !== 'string' ||
+    typeof entry.reason !== 'string'
+  ) {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_PROPERTY_PAYLOAD_ENTRY',
+      `Cannot skip non-payload DOM property payload entry ${index} without string metadata.`
+    );
+  }
+
+  return {
+    kind: ENTRY_NON_PAYLOAD,
+    propName: entry.propName,
+    category: entry.category,
+    reason: entry.reason,
+    status: 'skipped'
   };
 }
 
@@ -386,6 +451,18 @@ function createUnsupportedPayloadEntryError(entry, index) {
   );
 }
 
+function createBlockedAdmittedPayloadEntryError(entry, index) {
+  const kind = entry && typeof entry === 'object' ? entry.kind : undefined;
+  const code =
+    kind === ENTRY_UNSUPPORTED
+      ? 'FAST_REACT_DOM_BLOCKED_PROPERTY_PAYLOAD_ENTRY'
+      : 'FAST_REACT_DOM_UNSUPPORTED_PROPERTY_PAYLOAD_ENTRY';
+  return createDomHostMutationError(
+    code,
+    `Cannot apply unsupported admitted DOM property payload entry ${index}.`
+  );
+}
+
 function applyNormalizedPropertyPayloadEntry(instance, entry) {
   switch (entry.kind) {
     case ENTRY_SET_ATTRIBUTE:
@@ -401,6 +478,27 @@ function applyNormalizedPropertyPayloadEntry(instance, entry) {
       instance[entry.propertyName] = null;
       return;
   }
+}
+
+function applyAdmittedNormalizedPropertyPayloadEntry(instance, entry) {
+  if (isOrdinaryPropertyPayloadEntry(entry)) {
+    applyNormalizedPropertyPayloadEntry(instance, entry);
+    return;
+  }
+
+  if (isStyleDangerousHtmlPayloadEntry(entry)) {
+    applyStyleDangerousHtmlPayloadEntry(instance, entry);
+    return;
+  }
+
+  if (isNonPayloadPropertyPayloadEntry(entry)) {
+    return;
+  }
+
+  throw createDomHostMutationError(
+    'FAST_REACT_DOM_UNSUPPORTED_PROPERTY_PAYLOAD_ENTRY',
+    'Cannot apply an unrecognized admitted DOM property payload entry.'
+  );
 }
 
 function createAppliedPropertyPayloadRecord(entry) {
@@ -424,6 +522,14 @@ function createAppliedPropertyPayloadRecord(entry) {
     propertyName: entry.propertyName,
     value: entry.value
   };
+}
+
+function createAdmittedPropertyPayloadRecord(entry) {
+  if (isOrdinaryPropertyPayloadEntry(entry)) {
+    return createAppliedPropertyPayloadRecord(entry);
+  }
+
+  return {...entry};
 }
 
 function assertChildNode(child, operation) {
@@ -786,10 +892,12 @@ module.exports = {
   appendChild,
   appendChildToContainer,
   appendInitialChild,
+  applyAdmittedDomPropertyPayload,
   applyDomPropertyPayload,
   applyStyleDangerousHtmlPayload,
   clearContainer,
   commitTextUpdate,
+  commitDomPropertyUpdate,
   createDomHostMutationError,
   createLatestPropsCommitRecord,
   getLatestPropsCommitRecordPayload,
