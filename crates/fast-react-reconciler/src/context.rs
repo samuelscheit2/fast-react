@@ -16,6 +16,8 @@ use fast_react_core::{
 };
 use fast_react_host_config::HostTypes;
 
+#[cfg(test)]
+use crate::begin_work::ContextProviderUseContextOpenScopeSingleChildBeginWorkRecord;
 use crate::{
     FiberRootId, FiberRootStore, FiberRootStoreError,
     begin_work::{
@@ -418,6 +420,90 @@ impl ContextProviderUpdateTwoConsumerLaneRequest {
     }
 }
 
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ContextProviderUpdateSingleConsumerLaneRequest {
+    root: FiberRootId,
+    host_root_work_in_progress: FiberId,
+    provider_snapshot: ContextStackSnapshot,
+    provider_token: ContextFrameId,
+    context: ContextHandle,
+    previous_value: ContextValueHandle,
+    next_value: ContextValueHandle,
+    propagation_lanes: Lanes,
+}
+
+#[cfg(test)]
+impl ContextProviderUpdateSingleConsumerLaneRequest {
+    #[must_use]
+    pub const fn new(
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        provider_snapshot: ContextStackSnapshot,
+        provider_token: ContextFrameId,
+        context: ContextHandle,
+        previous_value: ContextValueHandle,
+        next_value: ContextValueHandle,
+        propagation_lanes: Lanes,
+    ) -> Self {
+        Self {
+            root,
+            host_root_work_in_progress,
+            provider_snapshot,
+            provider_token,
+            context,
+            previous_value,
+            next_value,
+            propagation_lanes,
+        }
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn host_root_work_in_progress(self) -> FiberId {
+        self.host_root_work_in_progress
+    }
+
+    #[must_use]
+    pub const fn provider_snapshot(self) -> ContextStackSnapshot {
+        self.provider_snapshot
+    }
+
+    #[must_use]
+    pub const fn provider_token(self) -> ContextFrameId {
+        self.provider_token
+    }
+
+    #[must_use]
+    pub const fn context(self) -> ContextHandle {
+        self.context
+    }
+
+    #[must_use]
+    pub const fn previous_value(self) -> ContextValueHandle {
+        self.previous_value
+    }
+
+    #[must_use]
+    pub const fn next_value(self) -> ContextValueHandle {
+        self.next_value
+    }
+
+    #[must_use]
+    pub const fn propagation_lanes(self) -> Lanes {
+        self.propagation_lanes
+    }
+
+    #[must_use]
+    const fn change(self) -> ContextValueChange {
+        ContextValueChange::new(self.context, self.previous_value, self.next_value)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ContextProviderUpdateProviderStackRecord {
     provider: FiberId,
@@ -739,6 +825,113 @@ impl ContextProviderUpdateTwoConsumerLaneRecord {
     pub const fn marked_dependency_count(self) -> usize {
         self.dependent_consumers[0].marked_dependency_count
             + self.dependent_consumers[1].marked_dependency_count
+    }
+
+    #[must_use]
+    pub const fn public_context_compatibility_blocked(self) -> bool {
+        true
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ContextProviderUpdateSingleConsumerLaneRecord {
+    root: FiberRootId,
+    host_root_work_in_progress: FiberId,
+    provider: FiberId,
+    consumer: FiberId,
+    context: ContextHandle,
+    previous_value: ContextValueHandle,
+    next_value: ContextValueHandle,
+    propagation_lanes: Lanes,
+    begin_work: ContextProviderUseContextOpenScopeSingleChildBeginWorkRecord,
+    provider_stack_push: ContextProviderUpdateProviderStackRecord,
+    dependent_consumer: ContextProviderUpdateConsumerLaneRecord,
+    host_root_child_lanes_after: Lanes,
+    provider_child_lanes_after: Lanes,
+    root_pending_lanes_after: Lanes,
+}
+
+#[cfg(test)]
+impl ContextProviderUpdateSingleConsumerLaneRecord {
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn host_root_work_in_progress(self) -> FiberId {
+        self.host_root_work_in_progress
+    }
+
+    #[must_use]
+    pub const fn provider(self) -> FiberId {
+        self.provider
+    }
+
+    #[must_use]
+    pub const fn consumer(self) -> FiberId {
+        self.consumer
+    }
+
+    #[must_use]
+    pub const fn context(self) -> ContextHandle {
+        self.context
+    }
+
+    #[must_use]
+    pub const fn previous_value(self) -> ContextValueHandle {
+        self.previous_value
+    }
+
+    #[must_use]
+    pub const fn next_value(self) -> ContextValueHandle {
+        self.next_value
+    }
+
+    #[must_use]
+    pub const fn propagation_lanes(self) -> Lanes {
+        self.propagation_lanes
+    }
+
+    #[must_use]
+    pub const fn begin_work(self) -> ContextProviderUseContextOpenScopeSingleChildBeginWorkRecord {
+        self.begin_work
+    }
+
+    #[must_use]
+    pub const fn provider_stack_push(self) -> ContextProviderUpdateProviderStackRecord {
+        self.provider_stack_push
+    }
+
+    #[must_use]
+    pub const fn dependent_consumer(self) -> ContextProviderUpdateConsumerLaneRecord {
+        self.dependent_consumer
+    }
+
+    #[must_use]
+    pub const fn host_root_child_lanes_after(self) -> Lanes {
+        self.host_root_child_lanes_after
+    }
+
+    #[must_use]
+    pub const fn provider_child_lanes_after(self) -> Lanes {
+        self.provider_child_lanes_after
+    }
+
+    #[must_use]
+    pub const fn root_pending_lanes_after(self) -> Lanes {
+        self.root_pending_lanes_after
+    }
+
+    #[must_use]
+    pub const fn provider_changed(self) -> bool {
+        self.previous_value.raw() != self.next_value.raw()
+    }
+
+    #[must_use]
+    pub const fn marked_dependency_count(self) -> usize {
+        self.dependent_consumer.marked_dependency_count()
     }
 
     #[must_use]
@@ -1800,6 +1993,113 @@ fn validate_subtree_consumer_dependency_record<H: HostTypes>(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+pub(crate) fn record_context_provider_update_single_consumer_lane_gate<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    context_store: &mut FunctionComponentContextRenderStore,
+    begin_work: ContextProviderUseContextOpenScopeSingleChildBeginWorkRecord,
+    request: ContextProviderUpdateSingleConsumerLaneRequest,
+) -> Result<ContextProviderUpdateSingleConsumerLaneRecord, ContextProviderUpdateLaneGateError> {
+    validate_single_consumer_provider_update_request(context_store, begin_work, request)?;
+
+    let dependent_consumer = consumer_lane_record_from_provider_decision(
+        store,
+        context_store,
+        ContextProviderUpdateConsumerOrder::First,
+        begin_work.child_render(),
+        request.change(),
+        request.propagation_lanes(),
+        request.root(),
+        begin_work.child(),
+        begin_work.child_context_dependency(),
+    )?;
+
+    let host_root_child_lanes_after = store
+        .fiber_arena()
+        .get(request.host_root_work_in_progress())?
+        .child_lanes();
+    let provider_child_lanes_after = store
+        .fiber_arena()
+        .get(begin_work.provider())?
+        .child_lanes();
+    let root_pending_lanes_after = store.root(request.root())?.lanes().pending_lanes();
+
+    Ok(ContextProviderUpdateSingleConsumerLaneRecord {
+        root: request.root(),
+        host_root_work_in_progress: request.host_root_work_in_progress(),
+        provider: begin_work.provider(),
+        consumer: begin_work.child(),
+        context: request.context(),
+        previous_value: request.previous_value(),
+        next_value: request.next_value(),
+        propagation_lanes: request.propagation_lanes(),
+        begin_work,
+        provider_stack_push: ContextProviderUpdateProviderStackRecord {
+            provider: begin_work.provider(),
+            context: begin_work.context(),
+            pushed_value: begin_work.value(),
+            provider_snapshot: begin_work.provider_snapshot(),
+            provider_token: begin_work.provider_token(),
+            pushed_stack_depth: begin_work.pushed_stack_depth(),
+            restored_stack_depth: 0,
+        },
+        dependent_consumer,
+        host_root_child_lanes_after,
+        provider_child_lanes_after,
+        root_pending_lanes_after,
+    })
+}
+
+#[cfg(test)]
+fn validate_single_consumer_provider_update_request(
+    context_store: &FunctionComponentContextRenderStore,
+    begin_work: ContextProviderUseContextOpenScopeSingleChildBeginWorkRecord,
+    request: ContextProviderUpdateSingleConsumerLaneRequest,
+) -> Result<(), ContextProviderUpdateLaneGateError> {
+    if request.propagation_lanes().is_empty() {
+        return Err(ContextProviderUpdateLaneGateError::EmptyPropagationLanes {
+            context: request.context(),
+        });
+    }
+
+    if request.context() != begin_work.context() || request.previous_value() != begin_work.value() {
+        return Err(
+            ContextProviderUpdateLaneGateError::ProviderValuePathMismatch {
+                expected_context: begin_work.context(),
+                actual_context: request.context(),
+                expected_previous_value: begin_work.value(),
+                actual_previous_value: request.previous_value(),
+            },
+        );
+    }
+
+    if request.provider_token() != begin_work.provider_token() {
+        return Err(ContextProviderUpdateLaneGateError::StaleProviderToken {
+            provider: begin_work.provider(),
+            expected_token: request.provider_token(),
+            actual_token: begin_work.provider_token(),
+        });
+    }
+
+    if request.provider_snapshot() != begin_work.provider_snapshot() {
+        return Err(ContextProviderUpdateLaneGateError::StaleProviderSnapshot {
+            provider: begin_work.provider(),
+            expected_snapshot: request.provider_snapshot(),
+            actual_snapshot: begin_work.provider_snapshot(),
+        });
+    }
+
+    validate_dependency_path(
+        context_store,
+        ContextProviderUpdateConsumerOrder::First,
+        begin_work.child(),
+        begin_work.context(),
+        begin_work.value(),
+        begin_work.child_context_dependency(),
+        begin_work.child_context_dependency(),
+    )
 }
 
 pub(crate) fn record_context_provider_update_two_consumer_lane_gate<H: HostTypes>(
