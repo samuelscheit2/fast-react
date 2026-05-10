@@ -377,6 +377,18 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
     const expectedRustApis = expectedToJSONFacadeRustApis.slice();
     const expectedRustTests = expectedToJSONFacadeRustTests.slice();
     const expectedHostOutputUpdateKinds = ["Create", "Update"];
+    if (
+      entry.entrypoint.includes("/cjs/") &&
+      !entry.entrypoint.endsWith(".development")
+    ) {
+      expectedRustTests.splice(
+        expectedRustTests.indexOf(
+          "root_private_serialization_finished_work_identity_gate_rejects_stale_update_evidence"
+        ),
+        0,
+        "root_private_to_json_update_native_execution_requires_finished_work_identity_gate"
+      );
+    }
     if (entry.entrypoint.endsWith(".development")) {
       const expectedFinishedWorkIdentityTests = [
         "root_private_to_json_serialization_finished_work_identity_gate_accepts_committed_handoff",
@@ -422,7 +434,9 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
         "root_private_to_json_unmount_host_output_row_records_empty_snapshot_blockers",
         "root_private_to_json_unmount_host_output_row_rejects_stale_snapshot",
         "root_private_to_json_update_host_output_row_rejects_mismatched_row_kind",
-        ...expectedFinishedWorkIdentityTests
+        ...expectedFinishedWorkIdentityTests.slice(0, 2),
+        "root_private_to_json_update_native_execution_requires_finished_work_identity_gate",
+        ...expectedFinishedWorkIdentityTests.slice(2)
       );
       expectedHostOutputUpdateKinds.push("Unmount");
       assert.equal(
@@ -466,6 +480,19 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
         facadeGate.multiChildNativeExecutionEvidenceWorker,
         "worker-697-test-renderer-tojson-multichild-native-execution"
       );
+      assert.equal(
+        facadeGate.updateNativeExecutionFinishedWorkIdentityAdmissionWorker,
+        "worker-726-test-renderer-update-native-serialization-identity-admission"
+      );
+      assert.equal(
+        facadeGate.updateNativeExecutionRequiresFinishedWorkIdentity,
+        true
+      );
+      assert.equal(facadeGate.rejectsStaleUpdateFinishedWorkIdentity, true);
+      assert.equal(
+        facadeGate.rejectsMultichildUpdateNativeExecutionIdentityAdmission,
+        true
+      );
       assert.deepEqual(facadeGate.nativeExecutionAcceptedRustApis, [
         "TestRendererRoot::describe_private_to_json_after_create_native_execution_for_canary",
         "TestRendererRoot::describe_private_to_json_after_update_native_execution_for_canary",
@@ -477,6 +504,7 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
       ]);
       assert.deepEqual(facadeGate.nativeExecutionAcceptedRustTests, [
         "root_private_to_json_native_execution_evidence_consumes_create_update_unmount_records",
+        "root_private_to_json_update_native_execution_requires_finished_work_identity_gate",
         "root_private_to_json_nested_update_native_execution_evidence_consumes_multichild_row",
         "root_private_to_json_sibling_text_native_execution_evidence_consumes_sibling_row",
         "root_private_to_json_native_execution_evidence_rejects_row_id_shape_mismatch",
@@ -1200,6 +1228,7 @@ test("react-test-renderer JS toTree private metadata records the accepted minima
       ...(nativeToTreeEvidence
         ? [
             "root_private_to_tree_native_execution_evidence_consumes_create_update_unmount_records",
+            "root_private_to_tree_update_native_execution_requires_finished_work_identity_gate",
             ...(compositeNativeToTreeEvidence
               ? [
                   "root_private_to_tree_native_execution_evidence_records_composite_host_shape"
