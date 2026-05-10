@@ -103,6 +103,8 @@ Drive toward a minimal real root render/update/unmount path:
   `/Users/user/Developer/Developer/fast-react-worker-185-dom-namespace-context-helper`.
 - Worker 186: DOM property payload helper in
   `/Users/user/Developer/Developer/fast-react-worker-186-dom-property-payload-helper`.
+- Worker 187: host node store boundary in
+  `/Users/user/Developer/Developer/fast-react-worker-187-host-node-store-boundary`.
 
 ## Near-Term Sequencing
 
