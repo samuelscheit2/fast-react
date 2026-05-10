@@ -3473,6 +3473,10 @@ pub const TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_SNAPSHOT_IDENTITY_BLOCKER_STATUS
     "private-tojson-sibling-snapshot-finished-work-identity-blocked";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_SNAPSHOT_IDENTITY_BLOCKER_REASON: &str =
     "missing-committed-sibling-text-fiber-inspection-and-handoff";
+pub const TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_IDENTITY_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.tojson.sibling-text.finished-work-identity";
+pub const TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_IDENTITY_STATUS: &str =
+    "private-tojson-sibling-text-finished-work-identity-validated-public-tojson-blocked";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_HOST_OUTPUT_ROW_ID: &str =
     "react-test-renderer-tojson-update-host-output-private-diagnostic";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_NESTED_UPDATE_HOST_OUTPUT_ROW_ID: &str =
@@ -7624,6 +7628,418 @@ impl TestRendererPrivateToJsonSiblingSnapshotFinishedWorkIdentityBlocker {
             && !self.native_bridge_available()
             && !self.native_execution_available()
             && !self.package_compatibility_claimed()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererPrivateToJsonSiblingTextFinishedWorkIdentityGate {
+    diagnostic_name: &'static str,
+    status: &'static str,
+    root: FiberRootId,
+    root_scheduled_update_sequence: usize,
+    public_surface: &'static str,
+    source_execution_record_id: &'static str,
+    source_execution_status: &'static str,
+    source_serialization_diagnostic_name: &'static str,
+    worker_738_report_row_id: &'static str,
+    host_output_update_kind: TestRendererRootUpdateKind,
+    host_output_shape: TestRendererPrivateToJsonHostOutputShape,
+    root_node_kind: TestRendererPrivateJsonNodeKind,
+    root_child_count: usize,
+    source_node_count: usize,
+    route_render_current: TestRendererFiberHandleDiagnostics,
+    route_render_finished_work: TestRendererFiberHandleDiagnostics,
+    route_commit_previous_current: TestRendererFiberHandleDiagnostics,
+    route_commit_current: TestRendererFiberHandleDiagnostics,
+    render_current: TestRendererFiberHandleDiagnostics,
+    render_finished_work: TestRendererFiberHandleDiagnostics,
+    commit_previous_current: TestRendererFiberHandleDiagnostics,
+    commit_current: TestRendererFiberHandleDiagnostics,
+    report_finished_work: TestRendererFiberHandleDiagnostics,
+    route_render_lanes_bits: u32,
+    route_commit_finished_lanes_bits: u32,
+    render_lanes_bits: u32,
+    commit_finished_lanes_bits: u32,
+    report_finished_lanes_bits: u32,
+    commit_remaining_lanes_bits: u32,
+    commit_pending_lanes_bits: u32,
+    route_handles_match_committed_update: bool,
+    route_lanes_match_committed_update: bool,
+    commit_current_matches_render_finished_work: bool,
+    commit_previous_current_matches_render_current: bool,
+    commit_lanes_match_render_lanes: bool,
+    report_finished_work_matches_commit_current: bool,
+    report_lanes_match_commit_lanes: bool,
+    committed_fiber_inspection_current_matches_commit: bool,
+    committed_sibling_text_fiber_inspection_available: bool,
+    committed_sibling_text_report_shape_available: bool,
+    committed_sibling_text_inspection_matches_output: bool,
+    host_output_snapshot_current: bool,
+    report_host_output_row_matches_output: bool,
+    report_root_array_source_nodes_match_current_snapshot: bool,
+    real_sibling_text_handoff_available: bool,
+    consumes_update_route_admission: bool,
+    consumes_sibling_text_host_output: bool,
+    consumes_private_to_json_evidence: bool,
+    consumes_worker_738_report_row: bool,
+    consumes_committed_host_root_finished_work_identity: bool,
+    consumes_committed_host_root_finished_work_lanes: bool,
+    identity_admission_available: bool,
+    broad_multichild_identity_available: bool,
+    public_to_json_available: bool,
+    public_to_tree_available: bool,
+    public_test_instance_available: bool,
+    public_serialization_available: bool,
+    public_route_available: bool,
+    native_bridge_loading_available: bool,
+    native_bridge_available: bool,
+    native_execution_available: bool,
+    js_facade_available: bool,
+    cjs_facade_available: bool,
+    package_compatibility_claimed: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererPrivateToJsonSiblingTextFinishedWorkIdentityGate {
+    #[must_use]
+    pub const fn diagnostic_name(self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn status(self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn root_scheduled_update_sequence(self) -> usize {
+        self.root_scheduled_update_sequence
+    }
+
+    #[must_use]
+    pub const fn public_surface(self) -> &'static str {
+        self.public_surface
+    }
+
+    #[must_use]
+    pub const fn source_execution_record_id(self) -> &'static str {
+        self.source_execution_record_id
+    }
+
+    #[must_use]
+    pub const fn source_execution_status(self) -> &'static str {
+        self.source_execution_status
+    }
+
+    #[must_use]
+    pub const fn source_serialization_diagnostic_name(self) -> &'static str {
+        self.source_serialization_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn worker_738_report_row_id(self) -> &'static str {
+        self.worker_738_report_row_id
+    }
+
+    #[must_use]
+    pub const fn host_output_update_kind(self) -> TestRendererRootUpdateKind {
+        self.host_output_update_kind
+    }
+
+    #[must_use]
+    pub const fn host_output_shape(self) -> TestRendererPrivateToJsonHostOutputShape {
+        self.host_output_shape
+    }
+
+    #[must_use]
+    pub const fn root_node_kind(self) -> TestRendererPrivateJsonNodeKind {
+        self.root_node_kind
+    }
+
+    #[must_use]
+    pub const fn root_child_count(self) -> usize {
+        self.root_child_count
+    }
+
+    #[must_use]
+    pub const fn source_node_count(self) -> usize {
+        self.source_node_count
+    }
+
+    #[must_use]
+    pub const fn route_render_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.route_render_current
+    }
+
+    #[must_use]
+    pub const fn route_render_finished_work(self) -> TestRendererFiberHandleDiagnostics {
+        self.route_render_finished_work
+    }
+
+    #[must_use]
+    pub const fn route_commit_previous_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.route_commit_previous_current
+    }
+
+    #[must_use]
+    pub const fn route_commit_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.route_commit_current
+    }
+
+    #[must_use]
+    pub const fn render_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.render_current
+    }
+
+    #[must_use]
+    pub const fn render_finished_work(self) -> TestRendererFiberHandleDiagnostics {
+        self.render_finished_work
+    }
+
+    #[must_use]
+    pub const fn commit_previous_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.commit_previous_current
+    }
+
+    #[must_use]
+    pub const fn commit_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.commit_current
+    }
+
+    #[must_use]
+    pub const fn report_finished_work(self) -> TestRendererFiberHandleDiagnostics {
+        self.report_finished_work
+    }
+
+    #[must_use]
+    pub const fn route_render_lanes_bits(self) -> u32 {
+        self.route_render_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn route_commit_finished_lanes_bits(self) -> u32 {
+        self.route_commit_finished_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn render_lanes_bits(self) -> u32 {
+        self.render_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn commit_finished_lanes_bits(self) -> u32 {
+        self.commit_finished_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn report_finished_lanes_bits(self) -> u32 {
+        self.report_finished_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn commit_remaining_lanes_bits(self) -> u32 {
+        self.commit_remaining_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn commit_pending_lanes_bits(self) -> u32 {
+        self.commit_pending_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn route_handles_match_committed_update(self) -> bool {
+        self.route_handles_match_committed_update
+    }
+
+    #[must_use]
+    pub const fn route_lanes_match_committed_update(self) -> bool {
+        self.route_lanes_match_committed_update
+    }
+
+    #[must_use]
+    pub const fn commit_current_matches_render_finished_work(self) -> bool {
+        self.commit_current_matches_render_finished_work
+    }
+
+    #[must_use]
+    pub const fn commit_previous_current_matches_render_current(self) -> bool {
+        self.commit_previous_current_matches_render_current
+    }
+
+    #[must_use]
+    pub const fn commit_lanes_match_render_lanes(self) -> bool {
+        self.commit_lanes_match_render_lanes
+    }
+
+    #[must_use]
+    pub const fn report_finished_work_matches_commit_current(self) -> bool {
+        self.report_finished_work_matches_commit_current
+    }
+
+    #[must_use]
+    pub const fn report_lanes_match_commit_lanes(self) -> bool {
+        self.report_lanes_match_commit_lanes
+    }
+
+    #[must_use]
+    pub const fn committed_fiber_inspection_current_matches_commit(self) -> bool {
+        self.committed_fiber_inspection_current_matches_commit
+    }
+
+    #[must_use]
+    pub const fn committed_sibling_text_fiber_inspection_available(self) -> bool {
+        self.committed_sibling_text_fiber_inspection_available
+    }
+
+    #[must_use]
+    pub const fn committed_sibling_text_report_shape_available(self) -> bool {
+        self.committed_sibling_text_report_shape_available
+    }
+
+    #[must_use]
+    pub const fn committed_sibling_text_inspection_matches_output(self) -> bool {
+        self.committed_sibling_text_inspection_matches_output
+    }
+
+    #[must_use]
+    pub const fn host_output_snapshot_current(self) -> bool {
+        self.host_output_snapshot_current
+    }
+
+    #[must_use]
+    pub const fn report_host_output_row_matches_output(self) -> bool {
+        self.report_host_output_row_matches_output
+    }
+
+    #[must_use]
+    pub const fn report_root_array_source_nodes_match_current_snapshot(self) -> bool {
+        self.report_root_array_source_nodes_match_current_snapshot
+    }
+
+    #[must_use]
+    pub const fn real_sibling_text_handoff_available(self) -> bool {
+        self.real_sibling_text_handoff_available
+    }
+
+    #[must_use]
+    pub const fn consumes_update_route_admission(self) -> bool {
+        self.consumes_update_route_admission
+    }
+
+    #[must_use]
+    pub const fn consumes_sibling_text_host_output(self) -> bool {
+        self.consumes_sibling_text_host_output
+    }
+
+    #[must_use]
+    pub const fn consumes_private_to_json_evidence(self) -> bool {
+        self.consumes_private_to_json_evidence
+    }
+
+    #[must_use]
+    pub const fn consumes_worker_738_report_row(self) -> bool {
+        self.consumes_worker_738_report_row
+    }
+
+    #[must_use]
+    pub const fn consumes_committed_host_root_finished_work_identity(self) -> bool {
+        self.consumes_committed_host_root_finished_work_identity
+    }
+
+    #[must_use]
+    pub const fn consumes_committed_host_root_finished_work_lanes(self) -> bool {
+        self.consumes_committed_host_root_finished_work_lanes
+    }
+
+    #[must_use]
+    pub const fn identity_admission_available(self) -> bool {
+        self.identity_admission_available
+    }
+
+    #[must_use]
+    pub const fn broad_multichild_identity_available(self) -> bool {
+        self.broad_multichild_identity_available
+    }
+
+    #[must_use]
+    pub const fn public_to_json_available(self) -> bool {
+        self.public_to_json_available
+    }
+
+    #[must_use]
+    pub const fn public_to_tree_available(self) -> bool {
+        self.public_to_tree_available
+    }
+
+    #[must_use]
+    pub const fn public_test_instance_available(self) -> bool {
+        self.public_test_instance_available
+    }
+
+    #[must_use]
+    pub const fn public_serialization_available(self) -> bool {
+        self.public_serialization_available
+    }
+
+    #[must_use]
+    pub const fn public_route_available(self) -> bool {
+        self.public_route_available
+    }
+
+    #[must_use]
+    pub const fn native_bridge_loading_available(self) -> bool {
+        self.native_bridge_loading_available
+    }
+
+    #[must_use]
+    pub const fn native_bridge_available(self) -> bool {
+        self.native_bridge_available
+    }
+
+    #[must_use]
+    pub const fn native_execution_available(self) -> bool {
+        self.native_execution_available
+    }
+
+    #[must_use]
+    pub const fn js_facade_available(self) -> bool {
+        self.js_facade_available
+    }
+
+    #[must_use]
+    pub const fn cjs_facade_available(self) -> bool {
+        self.cjs_facade_available
+    }
+
+    #[must_use]
+    pub const fn package_compatibility_claimed(self) -> bool {
+        self.package_compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(self) -> bool {
+        self.compatibility_claimed
+    }
+
+    #[must_use]
+    pub fn public_native_package_js_surfaces_blocked(self) -> bool {
+        !self.public_to_json_available()
+            && !self.public_to_tree_available()
+            && !self.public_test_instance_available()
+            && !self.public_serialization_available()
+            && !self.public_route_available()
+            && !self.native_bridge_loading_available()
+            && !self.native_bridge_available()
+            && !self.native_execution_available()
+            && !self.js_facade_available()
+            && !self.cjs_facade_available()
+            && !self.package_compatibility_claimed()
+            && !self.compatibility_claimed()
     }
 }
 
@@ -12179,6 +12595,130 @@ impl TestRendererRoot {
             .admission())
     }
 
+    pub fn describe_private_sibling_text_update_route_admission_for_canary(
+        &self,
+        output: &TestRendererSiblingTextHostOutput,
+    ) -> Result<TestRendererPrivateUpdateRouteAdmissionRecord, TestRendererRootError> {
+        if self.lifecycle != TestRendererRootLifecycle::Active {
+            return Err(TestRendererPrivateUpdateRouteError::RootNotActive {
+                lifecycle: self.lifecycle,
+            }
+            .into());
+        }
+        let Some(scheduled_update) = self.scheduled_updates.last() else {
+            return Err(TestRendererPrivateUpdateRouteError::MissingScheduledUpdate.into());
+        };
+        if scheduled_update.kind() != TestRendererRootUpdateKind::Update {
+            return Err(
+                TestRendererPrivateUpdateRouteError::UnexpectedScheduledUpdateKind {
+                    actual: scheduled_update.kind(),
+                }
+                .into(),
+            );
+        }
+        if output.scheduled_update_sequence() != self.scheduled_updates.len() {
+            return Err(
+                TestRendererPrivateUpdateRouteError::IncompatibleFinishedWork {
+                    reason: "sibling-text-handoff-update-sequence-stale",
+                }
+                .into(),
+            );
+        }
+
+        self.validate_serialization_gate_commit(output.commit())?;
+        let current_snapshot = self.diagnostic_container_snapshot()?;
+        if current_snapshot != *output.snapshot() {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "host-output-snapshot-stale",
+                }
+                .into(),
+            );
+        }
+        if output.fiber_inspection().shape_name() != "HostRoot->[HostText,HostComponent->HostText]"
+        {
+            return Err(
+                TestRendererPrivateUpdateRouteError::IncompatibleFinishedWork {
+                    reason: "sibling-text-committed-fiber-inspection-shape-mismatch",
+                }
+                .into(),
+            );
+        }
+
+        let render = output.render();
+        let commit = output.commit();
+        if render.root() != self.root_id || commit.root() != self.root_id {
+            return Err(
+                TestRendererPrivateUpdateRouteError::IncompatibleFinishedWork {
+                    reason: "sibling-text-route-root-mismatch",
+                }
+                .into(),
+            );
+        }
+        if commit.current() != render.finished_work()
+            || commit.previous_current() != render.current()
+        {
+            return Err(
+                TestRendererPrivateUpdateRouteError::IncompatibleFinishedWork {
+                    reason: "sibling-text-route-finished-work-mismatch",
+                }
+                .into(),
+            );
+        }
+        if commit.finished_lanes() != render.render_lanes()
+            || commit.remaining_lanes().bits() != 0
+            || commit.pending_lanes().bits() != 0
+        {
+            return Err(
+                TestRendererPrivateUpdateRouteError::IncompatibleFinishedWork {
+                    reason: "sibling-text-route-lane-mismatch",
+                }
+                .into(),
+            );
+        }
+
+        macro_rules! fiber_handle {
+            ($fiber:expr) => {{
+                let fiber = $fiber;
+                TestRendererFiberHandleDiagnostics {
+                    arena_id: fiber.arena_id().get(),
+                    slot: fiber.slot().get(),
+                    generation: fiber.generation().get(),
+                }
+            }};
+        }
+
+        Ok(TestRendererPrivateUpdateRouteAdmissionRecord {
+            record_id: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID,
+            status: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS,
+            public_surface: "create().update",
+            root: self.root_id,
+            scheduled_update_sequence: output.scheduled_update_sequence(),
+            request_api: "TestRendererRoot::update",
+            source_diagnostic_name: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_DIAGNOSTIC_NAME,
+            source_diagnostic_status: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_STATUS,
+            lifecycle: self.lifecycle,
+            scheduled_update_kind: scheduled_update.kind(),
+            host_output_update_kind: TestRendererRootUpdateKind::Update,
+            render_current: fiber_handle!(render.current()),
+            render_finished_work: fiber_handle!(render.finished_work()),
+            commit_previous_current: fiber_handle!(commit.previous_current()),
+            commit_current: fiber_handle!(commit.current()),
+            render_lanes_bits: render.render_lanes().bits(),
+            commit_finished_lanes_bits: commit.finished_lanes().bits(),
+            consumes_accepted_host_root_update_queue_metadata: true,
+            consumes_accepted_root_work_loop_metadata: true,
+            consumes_accepted_host_output_metadata: true,
+            rejects_stale_root_lifecycle: true,
+            rejects_stale_host_output: true,
+            rejects_missing_update_queue_evidence: true,
+            public_root_update_available: false,
+            public_serialization_available: false,
+            native_execution_available: false,
+            compatibility_claimed: false,
+        })
+    }
+
     pub fn describe_private_update_native_bridge_admission_for_canary(
         &self,
         route_outcome: &TestRendererRootUpdateOutcome,
@@ -13727,6 +14267,143 @@ impl TestRendererRoot {
         )
     }
 
+    pub fn describe_private_to_json_sibling_text_finished_work_identity_gate_for_canary(
+        &self,
+        output: &TestRendererSiblingTextHostOutput,
+        route: TestRendererPrivateUpdateRouteAdmissionRecord,
+        report: Option<&TestRendererPrivateJsonSerializationReport>,
+    ) -> Result<TestRendererPrivateToJsonSiblingTextFinishedWorkIdentityGate, TestRendererRootError>
+    {
+        let Some(report) = report else {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::MissingSerializationEvidence {
+                    public_surface: "create().update -> create().toJSON",
+                }
+                .into(),
+            );
+        };
+
+        self.validate_private_to_json_sibling_text_update_route_admission_record_for_identity(
+            route,
+        )?;
+
+        let current_snapshot = self.diagnostic_container_snapshot()?;
+        if current_snapshot != *output.snapshot() {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "host-output-snapshot-stale",
+                }
+                .into(),
+            );
+        }
+
+        let row = self.describe_private_to_json_sibling_text_host_output_row_for_canary(output)?;
+        self.validate_private_to_json_sibling_text_report_for_identity(output, row, report)?;
+
+        let identity = self.describe_private_serialization_finished_work_identity_gate_for_canary(
+            "create().toJSON",
+            TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME,
+            report.host_output_update_kind(),
+            report.host_output_snapshot_current(),
+            report.public_blockers(),
+            Some(output.render()),
+            Some(output.commit()),
+            true,
+            false,
+            report.gate(),
+        )?;
+        self.validate_private_sibling_text_update_route_matches_handoff_for_canary(
+            output, route, identity,
+        )
+        .map_err(|reason| {
+            TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                reason,
+            }
+        })?;
+
+        let gate = TestRendererPrivateToJsonSiblingTextFinishedWorkIdentityGate {
+            diagnostic_name: TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_IDENTITY_DIAGNOSTIC_NAME,
+            status: TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_IDENTITY_STATUS,
+            root: self.root_id,
+            root_scheduled_update_sequence: output.scheduled_update_sequence(),
+            public_surface: "create().update -> create().toJSON",
+            source_execution_record_id: route.record_id(),
+            source_execution_status: route.status(),
+            source_serialization_diagnostic_name: report.diagnostic_name(),
+            worker_738_report_row_id: row.id(),
+            host_output_update_kind: report.host_output_update_kind(),
+            host_output_shape: report.host_output_shape(),
+            root_node_kind: report.root_node_kind(),
+            root_child_count: report.root_child_count(),
+            source_node_count: report.node_count(),
+            route_render_current: route.render_current(),
+            route_render_finished_work: route.render_finished_work(),
+            route_commit_previous_current: route.commit_previous_current(),
+            route_commit_current: route.commit_current(),
+            render_current: identity.render_current(),
+            render_finished_work: identity.render_finished_work(),
+            commit_previous_current: identity.commit_previous_current(),
+            commit_current: identity.commit_current(),
+            report_finished_work: identity.report_finished_work(),
+            route_render_lanes_bits: route.render_lanes_bits(),
+            route_commit_finished_lanes_bits: route.commit_finished_lanes_bits(),
+            render_lanes_bits: identity.render_lanes_bits(),
+            commit_finished_lanes_bits: identity.commit_finished_lanes_bits(),
+            report_finished_lanes_bits: identity.report_finished_lanes_bits(),
+            commit_remaining_lanes_bits: identity.commit_remaining_lanes_bits(),
+            commit_pending_lanes_bits: identity.commit_pending_lanes_bits(),
+            route_handles_match_committed_update: true,
+            route_lanes_match_committed_update: true,
+            commit_current_matches_render_finished_work: identity
+                .commit_current_matches_render_finished_work(),
+            commit_previous_current_matches_render_current: identity
+                .commit_previous_current_matches_render_current(),
+            commit_lanes_match_render_lanes: identity.commit_lanes_match_render_lanes(),
+            report_finished_work_matches_commit_current: identity
+                .report_finished_work_matches_commit_current(),
+            report_lanes_match_commit_lanes: identity.report_lanes_match_commit_lanes(),
+            committed_fiber_inspection_current_matches_commit: identity
+                .committed_fiber_inspection_current_matches_commit(),
+            committed_sibling_text_fiber_inspection_available: true,
+            committed_sibling_text_report_shape_available: true,
+            committed_sibling_text_inspection_matches_output: true,
+            host_output_snapshot_current: report.host_output_snapshot_current(),
+            report_host_output_row_matches_output: true,
+            report_root_array_source_nodes_match_current_snapshot: true,
+            real_sibling_text_handoff_available: true,
+            consumes_update_route_admission: true,
+            consumes_sibling_text_host_output: true,
+            consumes_private_to_json_evidence: true,
+            consumes_worker_738_report_row: true,
+            consumes_committed_host_root_finished_work_identity: identity
+                .consumes_committed_host_root_finished_work_identity(),
+            consumes_committed_host_root_finished_work_lanes: identity
+                .consumes_committed_host_root_finished_work_lanes(),
+            identity_admission_available: true,
+            broad_multichild_identity_available: false,
+            public_to_json_available: false,
+            public_to_tree_available: false,
+            public_test_instance_available: false,
+            public_serialization_available: false,
+            public_route_available: false,
+            native_bridge_loading_available: false,
+            native_bridge_available: false,
+            native_execution_available: false,
+            js_facade_available: false,
+            cjs_facade_available: false,
+            package_compatibility_claimed: false,
+            compatibility_claimed: false,
+        };
+        Self::validate_private_to_json_sibling_text_finished_work_identity_gate_for_canary(gate)
+            .map_err(|reason| {
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason,
+                }
+            })?;
+
+        Ok(gate)
+    }
+
     pub fn describe_private_to_json_nested_finished_work_identity_gate_for_canary(
         &self,
         output: &TestRendererNestedHostParentPlacedHostOutput,
@@ -14790,6 +15467,417 @@ impl TestRendererRoot {
         }
 
         Ok(identity)
+    }
+
+    fn validate_private_to_json_sibling_text_update_route_admission_record_for_identity(
+        &self,
+        route: TestRendererPrivateUpdateRouteAdmissionRecord,
+    ) -> Result<(), TestRendererRootError> {
+        if route.record_id() != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID
+            || route.status() != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS
+            || route.root() != self.root_id
+            || route.public_surface() != "create().update"
+            || route.request_api() != "TestRendererRoot::update"
+            || route.source_diagnostic_name() != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_DIAGNOSTIC_NAME
+            || route.source_diagnostic_status() != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_STATUS
+            || route.lifecycle() != self.lifecycle
+            || route.lifecycle() != TestRendererRootLifecycle::Active
+            || route.scheduled_update_kind() != TestRendererRootUpdateKind::Update
+            || route.host_output_update_kind() != TestRendererRootUpdateKind::Update
+        {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "sibling-text-route-metadata-stale",
+                }
+                .into(),
+            );
+        }
+        if route.scheduled_update_sequence() != self.scheduled_updates.len() {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::StaleFinishedWorkIdentity {
+                    reason: "sibling-text-route-update-sequence-stale",
+                }
+                .into(),
+            );
+        }
+        if !route.consumes_accepted_host_root_update_queue_metadata()
+            || !route.consumes_accepted_root_work_loop_metadata()
+            || !route.consumes_accepted_host_output_metadata()
+            || !route.rejects_stale_root_lifecycle()
+            || !route.rejects_stale_host_output()
+            || !route.rejects_missing_update_queue_evidence()
+        {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "sibling-text-route-accepted-evidence-missing",
+                }
+                .into(),
+            );
+        }
+        if route.public_root_update_available()
+            || route.public_serialization_available()
+            || route.native_execution_available()
+            || route.compatibility_claimed()
+        {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::PublicCompatibilityOpened {
+                    reason: "public-or-native-compatibility-claim",
+                }
+                .into(),
+            );
+        }
+
+        Ok(())
+    }
+
+    fn validate_private_to_json_sibling_text_report_for_identity(
+        &self,
+        output: &TestRendererSiblingTextHostOutput,
+        expected_row: TestRendererPrivateToJsonHostOutputRow,
+        report: &TestRendererPrivateJsonSerializationReport,
+    ) -> Result<(), TestRendererRootError> {
+        if report.diagnostic_name() != TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "sibling-text-report-diagnostic-mismatch",
+                }
+                .into(),
+            );
+        }
+        if report.host_output_update_kind() != TestRendererRootUpdateKind::Update
+            || report.host_output_shape() != TestRendererPrivateToJsonHostOutputShape::SiblingText
+            || report.root_node_kind() != TestRendererPrivateJsonNodeKind::RootArray
+        {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "sibling-text-report-shape-mismatch",
+                }
+                .into(),
+            );
+        }
+        if !report.host_output_snapshot_current() {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "host-output-snapshot-stale",
+                }
+                .into(),
+            );
+        }
+        let Some(report_row) = report.host_output_row() else {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "sibling-text-report-row-missing",
+                }
+                .into(),
+            );
+        };
+        if report_row != expected_row
+            || report_row.id() != TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_HOST_OUTPUT_ROW_ID
+            || report_row.host_output_shape()
+                != TestRendererPrivateToJsonHostOutputShape::SiblingText
+            || report_row.host_output_update_kind() != TestRendererRootUpdateKind::Update
+        {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "sibling-text-report-row-mismatch",
+                }
+                .into(),
+            );
+        }
+        if !report_row.public_blockers().all_blocked()
+            || !report_row
+                .dependency_diagnostics()
+                .public_surfaces_blocked()
+            || !report.public_blockers().all_blocked()
+        {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::PublicCompatibilityOpened {
+                    reason: "public-blockers-not-all-closed",
+                }
+                .into(),
+            );
+        }
+        if report.root_child_count() != 2
+            || report.node_count() != 3
+            || !Self::private_to_json_sibling_text_report_root_array_source_nodes_match_output(
+                report, output,
+            )
+        {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "sibling-text-root-array-source-nodes-missing",
+                }
+                .into(),
+            );
+        }
+
+        let Some(fiber_inspection) = report.gate().fiber_inspection() else {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "missing-committed-fiber-inspection",
+                }
+                .into(),
+            );
+        };
+        if fiber_inspection != output.fiber_inspection() {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::StaleFinishedWorkIdentity {
+                    reason: "committed-fiber-inspection-stale",
+                }
+                .into(),
+            );
+        }
+        if fiber_inspection.shape_name() != "HostRoot->[HostText,HostComponent->HostText]"
+            || fiber_inspection.root_children().len() != 2
+            || fiber_inspection.host_components().len() != 1
+            || fiber_inspection.host_texts().len() != 2
+        {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "sibling-text-committed-fiber-inspection-shape-mismatch",
+                }
+                .into(),
+            );
+        }
+        if fiber_inspection.current() != output.commit().current() {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::StaleFinishedWorkIdentity {
+                    reason: "committed-fiber-inspection-current-mismatch",
+                }
+                .into(),
+            );
+        }
+
+        Ok(())
+    }
+
+    fn private_to_json_sibling_text_report_root_array_source_nodes_match_output(
+        report: &TestRendererPrivateJsonSerializationReport,
+        output: &TestRendererSiblingTextHostOutput,
+    ) -> bool {
+        let output_children = output.snapshot().children();
+        if output_children.len() != 2 {
+            return false;
+        }
+        let (TestNodeSnapshot::Text(root_text), TestNodeSnapshot::Element(component)) =
+            (&output_children[0], &output_children[1])
+        else {
+            return false;
+        };
+        let [TestNodeSnapshot::Text(component_text)] = component.children() else {
+            return false;
+        };
+        let nodes = report.nodes();
+        if nodes.len() != 3 {
+            return false;
+        }
+
+        macro_rules! fiber_handle {
+            ($fiber:expr) => {{
+                let fiber = $fiber;
+                TestRendererFiberHandleDiagnostics {
+                    arena_id: fiber.arena_id().get(),
+                    slot: fiber.slot().get(),
+                    generation: fiber.generation().get(),
+                }
+            }};
+        }
+
+        let stable = output.stable_fibers().current();
+        let root_text_node = &nodes[0];
+        let component_node = &nodes[1];
+        let component_text_node = &nodes[2];
+        if root_text_node.node_kind() != TestRendererPrivateJsonNodeKind::Text
+            || root_text_node.parent_ordinal().is_some()
+            || !root_text_node.child_ordinals().is_empty()
+            || root_text_node.text() != Some(root_text.text())
+            || root_text_node.fiber().fiber() != output.root_text_fiber()
+            || root_text_node.fiber().pending_props_raw() != output.root_text_props_raw()
+            || root_text_node.fiber().memoized_props_raw() != output.root_text_props_raw()
+            || !root_text_node.fiber().state_node_present()
+        {
+            return false;
+        }
+        if component_node.node_kind() != TestRendererPrivateJsonNodeKind::HostComponent
+            || component_node.parent_ordinal().is_some()
+            || component_node.child_ordinals() != [2]
+            || component_node.element_type() != Some(component.element_type())
+            || component_node.props() != Some(component.props())
+            || component_node.fiber().fiber() != fiber_handle!(stable.component())
+            || !component_node.fiber().state_node_present()
+        {
+            return false;
+        }
+        if component_text_node.node_kind() != TestRendererPrivateJsonNodeKind::Text
+            || component_text_node.parent_ordinal() != Some(1)
+            || !component_text_node.child_ordinals().is_empty()
+            || component_text_node.text() != Some(component_text.text())
+            || component_text_node.fiber().fiber() != fiber_handle!(stable.text())
+            || !component_text_node.fiber().state_node_present()
+        {
+            return false;
+        }
+
+        let Some(rendered) = report.rendered_root().as_array() else {
+            return false;
+        };
+        if rendered.len() != 2 || rendered[0].as_text() != Some(root_text.text()) {
+            return false;
+        }
+        let Some(rendered_component) = rendered[1].as_host_component() else {
+            return false;
+        };
+        let Some(rendered_children) = rendered_component.children() else {
+            return false;
+        };
+        rendered_component.element_type() == component.element_type()
+            && rendered_children.len() == 1
+            && rendered_children[0].as_text() == Some(component_text.text())
+    }
+
+    fn validate_private_sibling_text_update_route_matches_handoff_for_canary(
+        &self,
+        output: &TestRendererSiblingTextHostOutput,
+        route: TestRendererPrivateUpdateRouteAdmissionRecord,
+        identity: TestRendererPrivateSerializationFinishedWorkIdentityGate,
+    ) -> Result<(), &'static str> {
+        macro_rules! fiber_handle {
+            ($fiber:expr) => {{
+                let fiber = $fiber;
+                TestRendererFiberHandleDiagnostics {
+                    arena_id: fiber.arena_id().get(),
+                    slot: fiber.slot().get(),
+                    generation: fiber.generation().get(),
+                }
+            }};
+        }
+
+        let render = output.render();
+        let commit = output.commit();
+        if route.scheduled_update_sequence() != output.scheduled_update_sequence()
+            || identity.root_scheduled_update_sequence() != output.scheduled_update_sequence()
+            || output.scheduled_update_sequence() != self.scheduled_updates.len()
+        {
+            return Err("sibling-text-route-handoff-mismatch");
+        }
+
+        if route.render_current() != fiber_handle!(render.current())
+            || route.render_finished_work() != fiber_handle!(render.finished_work())
+            || route.commit_previous_current() != fiber_handle!(commit.previous_current())
+            || route.commit_current() != fiber_handle!(commit.current())
+        {
+            return Err("sibling-text-route-handoff-mismatch");
+        }
+
+        if route.render_current() != identity.render_current()
+            || route.render_finished_work() != identity.render_finished_work()
+            || route.commit_previous_current() != identity.commit_previous_current()
+            || route.commit_current() != identity.commit_current()
+        {
+            return Err("sibling-text-route-finished-work-identity-mismatch");
+        }
+
+        if route.render_lanes_bits() == 0
+            || route.render_lanes_bits() != render.render_lanes().bits()
+            || route.commit_finished_lanes_bits() != commit.finished_lanes().bits()
+            || render.render_lanes().bits() != commit.finished_lanes().bits()
+        {
+            return Err("sibling-text-route-lane-mismatch");
+        }
+
+        if route.render_lanes_bits() != identity.render_lanes_bits()
+            || route.commit_finished_lanes_bits() != identity.commit_finished_lanes_bits()
+        {
+            return Err("sibling-text-route-finished-work-identity-lane-mismatch");
+        }
+
+        Ok(())
+    }
+
+    fn validate_private_to_json_sibling_text_finished_work_identity_gate_for_canary(
+        gate: TestRendererPrivateToJsonSiblingTextFinishedWorkIdentityGate,
+    ) -> Result<(), &'static str> {
+        if gate.diagnostic_name()
+            != TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_IDENTITY_DIAGNOSTIC_NAME
+            || gate.status() != TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_IDENTITY_STATUS
+        {
+            return Err("sibling-text-finished-work-identity-diagnostic-mismatch");
+        }
+        if gate.public_surface() != "create().update -> create().toJSON"
+            || gate.source_execution_record_id()
+                != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID
+            || gate.source_execution_status() != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS
+            || gate.source_serialization_diagnostic_name()
+                != TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME
+        {
+            return Err("sibling-text-finished-work-identity-source-mismatch");
+        }
+        if gate.worker_738_report_row_id()
+            != TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_HOST_OUTPUT_ROW_ID
+            || gate.host_output_update_kind() != TestRendererRootUpdateKind::Update
+            || gate.host_output_shape() != TestRendererPrivateToJsonHostOutputShape::SiblingText
+            || gate.root_node_kind() != TestRendererPrivateJsonNodeKind::RootArray
+            || gate.root_child_count() != 2
+            || gate.source_node_count() != 3
+        {
+            return Err("sibling-text-report-row-or-shape-mismatch");
+        }
+        if !gate.route_handles_match_committed_update()
+            || gate.route_render_current() != gate.render_current()
+            || gate.route_render_finished_work() != gate.render_finished_work()
+            || gate.route_commit_previous_current() != gate.commit_previous_current()
+            || gate.route_commit_current() != gate.commit_current()
+        {
+            return Err("sibling-text-route-finished-work-identity-mismatch");
+        }
+        if !gate.commit_current_matches_render_finished_work()
+            || !gate.commit_previous_current_matches_render_current()
+            || !gate.report_finished_work_matches_commit_current()
+            || !gate.committed_fiber_inspection_current_matches_commit()
+            || gate.render_finished_work() != gate.commit_current()
+            || gate.report_finished_work() != gate.commit_current()
+            || gate.commit_previous_current() != gate.render_current()
+        {
+            return Err("sibling-text-finished-work-identity-mismatch");
+        }
+        if gate.render_lanes_bits() == 0
+            || gate.route_render_lanes_bits() != gate.render_lanes_bits()
+            || gate.route_commit_finished_lanes_bits() != gate.commit_finished_lanes_bits()
+            || gate.render_lanes_bits() != gate.commit_finished_lanes_bits()
+            || gate.report_finished_lanes_bits() != gate.commit_finished_lanes_bits()
+            || gate.commit_remaining_lanes_bits() != 0
+            || gate.commit_pending_lanes_bits() != 0
+            || !gate.route_lanes_match_committed_update()
+            || !gate.commit_lanes_match_render_lanes()
+            || !gate.report_lanes_match_commit_lanes()
+        {
+            return Err("sibling-text-finished-work-identity-lane-mismatch");
+        }
+        if !gate.committed_sibling_text_fiber_inspection_available()
+            || !gate.committed_sibling_text_report_shape_available()
+            || !gate.committed_sibling_text_inspection_matches_output()
+            || !gate.host_output_snapshot_current()
+            || !gate.report_host_output_row_matches_output()
+            || !gate.report_root_array_source_nodes_match_current_snapshot()
+            || !gate.real_sibling_text_handoff_available()
+            || !gate.consumes_update_route_admission()
+            || !gate.consumes_sibling_text_host_output()
+            || !gate.consumes_private_to_json_evidence()
+            || !gate.consumes_worker_738_report_row()
+            || !gate.consumes_committed_host_root_finished_work_identity()
+            || !gate.consumes_committed_host_root_finished_work_lanes()
+            || !gate.identity_admission_available()
+        {
+            return Err("sibling-text-finished-work-evidence-not-consumed");
+        }
+        if gate.broad_multichild_identity_available() {
+            return Err("broad-multichild-identity-unexpectedly-open");
+        }
+        if !gate.public_native_package_js_surfaces_blocked() {
+            return Err("public-or-native-package-js-compatibility-claim");
+        }
+
+        Ok(())
     }
 
     fn validate_private_to_json_sibling_snapshot_finished_work_identity_blocker_for_diagnostics(
@@ -19179,6 +20267,62 @@ mod tests {
         (previous_snapshot, current_snapshot)
     }
 
+    fn sibling_text_identity_inputs_for_canary() -> (
+        TestRendererRoot,
+        TestRendererSiblingTextHostOutput,
+        TestRendererPrivateUpdateRouteAdmissionRecord,
+        TestRendererPrivateJsonSerializationReport,
+    ) {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "second sibling",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let output = root
+            .render_and_commit_sibling_text_host_output_update_for_canary("first sibling")
+            .unwrap()
+            .unwrap();
+        let route = root
+            .describe_private_sibling_text_update_route_admission_for_canary(&output)
+            .unwrap();
+        let report = root
+            .describe_private_json_serialization_after_sibling_text_update_for_canary(&output)
+            .unwrap();
+
+        (root, output, route, report)
+    }
+
+    fn assert_sibling_text_identity_error_reason(
+        error: TestRendererRootError,
+        expected_reason: &'static str,
+    ) {
+        let TestRendererRootError::PrivateSerializationFinishedWorkIdentity(error) = error else {
+            panic!("expected sibling-text private finished-work identity error");
+        };
+        match error.as_ref() {
+            TestRendererPrivateSerializationFinishedWorkIdentityError::ForeignFinishedWorkIdentity {
+                reason,
+            }
+            | TestRendererPrivateSerializationFinishedWorkIdentityError::StaleFinishedWorkIdentity {
+                reason,
+            }
+            | TestRendererPrivateSerializationFinishedWorkIdentityError::NonCommittedFinishedWorkIdentity {
+                reason,
+            }
+            | TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                reason,
+            }
+            | TestRendererPrivateSerializationFinishedWorkIdentityError::PublicCompatibilityOpened {
+                reason,
+            } => assert_eq!(*reason, expected_reason),
+            other => panic!("unexpected sibling-text identity error: {other:?}"),
+        }
+    }
+
     fn accepted_nested_update_route_admission_for_root(
         root: &TestRendererRoot,
         output: &TestRendererNestedHostParentPlacedHostOutput,
@@ -22110,6 +23254,244 @@ mod tests {
             component.children().unwrap()[0].as_text(),
             Some("second sibling")
         );
+    }
+
+    #[test]
+    fn root_private_to_json_sibling_text_finished_work_identity_gate_consumes_real_output_report_and_route()
+     {
+        let (root, output, route, report) = sibling_text_identity_inputs_for_canary();
+
+        let gate = root
+            .describe_private_to_json_sibling_text_finished_work_identity_gate_for_canary(
+                &output,
+                route,
+                Some(&report),
+            )
+            .unwrap();
+
+        assert_eq!(
+            gate.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_IDENTITY_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            gate.status(),
+            TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_IDENTITY_STATUS
+        );
+        assert_eq!(gate.root(), root.root_id());
+        assert_eq!(
+            gate.root_scheduled_update_sequence(),
+            output.scheduled_update_sequence()
+        );
+        assert_eq!(gate.public_surface(), "create().update -> create().toJSON");
+        assert_eq!(
+            gate.source_execution_record_id(),
+            TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID
+        );
+        assert_eq!(
+            gate.source_serialization_diagnostic_name(),
+            TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            gate.worker_738_report_row_id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_SIBLING_TEXT_HOST_OUTPUT_ROW_ID
+        );
+        assert_eq!(
+            gate.host_output_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert_eq!(
+            gate.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::SiblingText
+        );
+        assert_eq!(
+            gate.root_node_kind(),
+            TestRendererPrivateJsonNodeKind::RootArray
+        );
+        assert_eq!(gate.root_child_count(), 2);
+        assert_eq!(gate.source_node_count(), 3);
+        assert_eq!(gate.route_render_current(), gate.render_current());
+        assert_eq!(
+            gate.route_render_finished_work(),
+            gate.render_finished_work()
+        );
+        assert_eq!(
+            gate.route_commit_previous_current(),
+            gate.commit_previous_current()
+        );
+        assert_eq!(gate.route_commit_current(), gate.commit_current());
+        assert_eq!(gate.render_finished_work(), gate.commit_current());
+        assert_eq!(gate.report_finished_work(), gate.commit_current());
+        assert_eq!(gate.route_render_lanes_bits(), gate.render_lanes_bits());
+        assert_eq!(
+            gate.route_commit_finished_lanes_bits(),
+            gate.commit_finished_lanes_bits()
+        );
+        assert_eq!(gate.render_lanes_bits(), gate.commit_finished_lanes_bits());
+        assert_eq!(
+            gate.report_finished_lanes_bits(),
+            gate.commit_finished_lanes_bits()
+        );
+        assert_eq!(gate.commit_remaining_lanes_bits(), 0);
+        assert_eq!(gate.commit_pending_lanes_bits(), 0);
+        assert!(gate.route_handles_match_committed_update());
+        assert!(gate.route_lanes_match_committed_update());
+        assert!(gate.commit_current_matches_render_finished_work());
+        assert!(gate.commit_previous_current_matches_render_current());
+        assert!(gate.commit_lanes_match_render_lanes());
+        assert!(gate.report_finished_work_matches_commit_current());
+        assert!(gate.report_lanes_match_commit_lanes());
+        assert!(gate.committed_fiber_inspection_current_matches_commit());
+        assert!(gate.committed_sibling_text_fiber_inspection_available());
+        assert!(gate.committed_sibling_text_report_shape_available());
+        assert!(gate.committed_sibling_text_inspection_matches_output());
+        assert!(gate.host_output_snapshot_current());
+        assert!(gate.report_host_output_row_matches_output());
+        assert!(gate.report_root_array_source_nodes_match_current_snapshot());
+        assert!(gate.real_sibling_text_handoff_available());
+        assert!(gate.consumes_update_route_admission());
+        assert!(gate.consumes_sibling_text_host_output());
+        assert!(gate.consumes_private_to_json_evidence());
+        assert!(gate.consumes_worker_738_report_row());
+        assert!(gate.consumes_committed_host_root_finished_work_identity());
+        assert!(gate.consumes_committed_host_root_finished_work_lanes());
+        assert!(gate.identity_admission_available());
+        assert!(!gate.broad_multichild_identity_available());
+        assert!(gate.public_native_package_js_surfaces_blocked());
+        assert!(!gate.public_to_json_available());
+        assert!(!gate.native_bridge_loading_available());
+        assert!(!gate.native_bridge_available());
+        assert!(!gate.native_execution_available());
+        assert!(!gate.js_facade_available());
+        assert!(!gate.cjs_facade_available());
+        assert!(!gate.package_compatibility_claimed());
+        assert!(!gate.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_to_json_sibling_text_finished_work_identity_gate_rejects_mismatched_or_stale_evidence()
+     {
+        let (root, output, route, report) = sibling_text_identity_inputs_for_canary();
+
+        let mut wrong_shape_report = report.clone();
+        wrong_shape_report.host_output_shape =
+            TestRendererPrivateToJsonHostOutputShape::SingleHostText;
+        let error = root
+            .describe_private_to_json_sibling_text_finished_work_identity_gate_for_canary(
+                &output,
+                route,
+                Some(&wrong_shape_report),
+            )
+            .unwrap_err();
+        assert_sibling_text_identity_error_reason(error, "sibling-text-report-shape-mismatch");
+
+        let mut missing_inspection_report = report.clone();
+        missing_inspection_report.gate.fiber_inspection = None;
+        let error = root
+            .describe_private_to_json_sibling_text_finished_work_identity_gate_for_canary(
+                &output,
+                route,
+                Some(&missing_inspection_report),
+            )
+            .unwrap_err();
+        assert_sibling_text_identity_error_reason(error, "missing-committed-fiber-inspection");
+
+        let mut stale_report = report.clone();
+        stale_report.gate.commit.current.slot += 1;
+        let error = root
+            .describe_private_to_json_sibling_text_finished_work_identity_gate_for_canary(
+                &output,
+                route,
+                Some(&stale_report),
+            )
+            .unwrap_err();
+        assert_sibling_text_identity_error_reason(
+            error,
+            "serialization-report-current-finished-work-mismatch",
+        );
+
+        let mut lane_drift_route = route;
+        lane_drift_route.commit_finished_lanes_bits += 1;
+        let error = root
+            .describe_private_to_json_sibling_text_finished_work_identity_gate_for_canary(
+                &output,
+                lane_drift_route,
+                Some(&report),
+            )
+            .unwrap_err();
+        assert_sibling_text_identity_error_reason(error, "sibling-text-route-lane-mismatch");
+
+        let mut mismatched_route = route;
+        mismatched_route.commit_current.slot += 1;
+        let error = root
+            .describe_private_to_json_sibling_text_finished_work_identity_gate_for_canary(
+                &output,
+                mismatched_route,
+                Some(&report),
+            )
+            .unwrap_err();
+        assert_sibling_text_identity_error_reason(error, "sibling-text-route-handoff-mismatch");
+
+        let mut stale_output = output.clone();
+        stale_output.snapshot.children.clear();
+        let error = root
+            .describe_private_to_json_sibling_text_finished_work_identity_gate_for_canary(
+                &stale_output,
+                route,
+                Some(&report),
+            )
+            .unwrap_err();
+        assert_sibling_text_identity_error_reason(error, "host-output-snapshot-stale");
+    }
+
+    #[test]
+    fn root_private_to_json_sibling_text_finished_work_identity_gate_blocks_public_native_package_js_and_broad_multichild()
+     {
+        let (root, output, route, report) = sibling_text_identity_inputs_for_canary();
+        let gate = root
+            .describe_private_to_json_sibling_text_finished_work_identity_gate_for_canary(
+                &output,
+                route,
+                Some(&report),
+            )
+            .unwrap();
+
+        let mut public_route = route;
+        public_route.public_serialization_available = true;
+        let error = root
+            .describe_private_to_json_sibling_text_finished_work_identity_gate_for_canary(
+                &output,
+                public_route,
+                Some(&report),
+            )
+            .unwrap_err();
+        assert_sibling_text_identity_error_reason(error, "public-or-native-compatibility-claim");
+
+        let mut js_gate = gate;
+        js_gate.js_facade_available = true;
+        let reason =
+            TestRendererRoot::validate_private_to_json_sibling_text_finished_work_identity_gate_for_canary(
+                js_gate,
+            )
+            .unwrap_err();
+        assert_eq!(reason, "public-or-native-package-js-compatibility-claim");
+
+        let mut package_gate = gate;
+        package_gate.package_compatibility_claimed = true;
+        let reason =
+            TestRendererRoot::validate_private_to_json_sibling_text_finished_work_identity_gate_for_canary(
+                package_gate,
+            )
+            .unwrap_err();
+        assert_eq!(reason, "public-or-native-package-js-compatibility-claim");
+
+        let mut broad_gate = gate;
+        broad_gate.broad_multichild_identity_available = true;
+        let reason =
+            TestRendererRoot::validate_private_to_json_sibling_text_finished_work_identity_gate_for_canary(
+                broad_gate,
+            )
+            .unwrap_err();
+        assert_eq!(reason, "broad-multichild-identity-unexpectedly-open");
     }
 
     #[test]
