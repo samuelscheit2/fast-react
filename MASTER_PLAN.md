@@ -46,14 +46,12 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Queue 685-714 is launched from queue base commit
-`9ec6678` in isolated `worker/<slug>` branches and worktrees. Workers 687,
-688, 689, 691, and 712 have been accepted from this queue; after cleanup,
-fill open slots only after checking for additional completed workers.
+`9ec6678` in isolated `worker/<slug>` branches and worktrees. Workers 686-690,
+691-693, and 712 have been accepted from this queue; after cleanup, fill open
+slots only after checking for additional completed workers.
 
-- 685-686, 690, and 692-694 remain active for Rust reconciler execution paths
-  covering root work-loop finished-work handoff, HostRoot update queues,
-  context, Offscreen, deletion cleanup order, and nested sync flush/act
-  continuations.
+- 685 and 694 remain active for Rust reconciler root work-loop finished-work
+  handoff and nested sync flush/act continuations.
 - 695-702: React test-renderer private native execution and metadata parity for
   root create/update, `toJSON`, `toTree`, TestInstance queries, act, error
   boundaries, and production private metadata.

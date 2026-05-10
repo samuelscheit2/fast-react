@@ -43,6 +43,15 @@ sequencing belong in `MASTER_PLAN.md`.
   `fast-react-reconciler` tests, Scheduler workspace checks, focused Scheduler
   mock conformance, `npm run check:package-surface`, full conformance checks,
   conflict-marker scanning, and `git diff --check`.
+- Workers 686, 690, 692, and 693 were accepted from the active queue. The batch
+  added private HostRoot multiple-update reduction and callback-order handoff,
+  nested context provider/consumer begin-work and lane-propagation evidence,
+  Offscreen hidden-update reveal lane metadata, and nested deletion subtree
+  ref/passive/host cleanup ordering. Public root rendering, context, Offscreen,
+  unmount, passive, ref, and host mutation compatibility remain blocked.
+- The batch was verified after merge with `cargo fmt --all --check`, full
+  `fast-react-reconciler` tests, conflict-marker scanning, and `git diff
+  --check`.
 
 ### Queue 655-684
 
