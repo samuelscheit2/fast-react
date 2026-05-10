@@ -1929,6 +1929,162 @@ test('private root bridge ref ordering diagnostic wraps update and unmount canar
   assertBridgeDidNotTouchContainer(container, document);
 });
 
+test('private react-dom/client facade adapter routes root calls to bridge records', () => {
+  const document = createDocument('private-client-facade-adapter');
+  const container = createElement('DIV', document);
+  const element = {
+    props: {
+      children: 'private facade child'
+    },
+    type: 'span'
+  };
+  const callback = function afterPrivateFacadeRender() {};
+  const unmountCallback = function afterPrivateFacadeUnmount() {};
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    rootBridge.privateRootPublicFacadeAdapterSymbol
+  );
+
+  assert.equal(Object.hasOwn(reactDomClient, 'rootPublicFacadeAdapter'), false);
+  assert.equal(
+    Object.hasOwn(
+      reactDomClient,
+      '__FAST_REACT_PRIVATE_ROOT_PUBLIC_FACADE_ADAPTER__'
+    ),
+    false
+  );
+  assert.equal(descriptor.configurable, false);
+  assert.equal(descriptor.enumerable, false);
+  assert.equal(descriptor.writable, false);
+  assert.equal(descriptor.value, rootBridge.createPrivateRootPublicFacadeAdapter);
+  assert.equal(
+    Object.getOwnPropertyDescriptor(
+      reactDomClient.hydrateRoot,
+      rootBridge.privateRootPublicFacadeAdapterSymbol
+    ),
+    undefined
+  );
+
+  const adapter = descriptor.value({
+    requestIdPrefix: 'facade-request',
+    rootIdPrefix: 'facade-root',
+    updateIdPrefix: 'facade-update'
+  });
+  assert.equal(
+    adapter.$$typeof,
+    rootBridge.privateRootPublicFacadeAdapterType
+  );
+  assert.equal(adapter.kind, 'FastReactDomPrivateRootPublicFacadeAdapter');
+  assert.equal(adapter.entrypoint, 'react-dom/client');
+  assert.equal(
+    adapter.adapterStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_ADAPTER_READY
+  );
+  assert.equal(adapter.recordOnlyBridge, true);
+  assert.equal(adapter.publicCreateRootEnabled, false);
+  assert.equal(adapter.publicHydrateRootEnabled, false);
+  assert.equal(adapter.nativeExecution, false);
+  assert.equal(adapter.reconcilerExecution, false);
+  assert.equal(adapter.domMutation, false);
+  assert.equal(adapter.compatibilityClaimed, false);
+  assert.equal(adapter.createRoot.length, 2);
+  assert.equal(rootBridge.isPrivateRootPublicFacadeAdapter(adapter), true);
+  assert.equal(rootBridge.isPrivateRootPublicFacadeAdapter({}), false);
+  assert.equal(Object.isFrozen(adapter), true);
+
+  const root = adapter.createRoot(container, {
+    identifierPrefix: 'private-facade-'
+  });
+  const create = adapter.getRootCreateRecord(root);
+  const initialPayload = rootBridge.getPrivateRootPublicFacadeRootPayload(root);
+
+  assert.equal(Object.isFrozen(root), true);
+  assert.deepEqual(Object.keys(root), ['render', 'unmount']);
+  assert.equal(root.render.length, 1);
+  assert.equal(root.unmount.length, 0);
+  assert.equal(rootBridge.isPrivateRootPublicFacadeRoot(root), true);
+  assert.equal(rootBridge.isPrivateRootPublicFacadeRoot({}), false);
+  assert.equal(create.$$typeof, rootBridge.privateRootCreateRecordType);
+  assert.equal(create.requestId, 'facade-request:1');
+  assert.equal(create.rootId, 'facade-root:1');
+  assert.equal(create.requestType, 'createRoot');
+  assert.equal(create.nativeExecution, false);
+  assert.equal(create.domMutation, false);
+  assert.equal(create.markerWrites, false);
+  assert.equal(create.listenerInstallation, false);
+  assert.equal(create.compatibilityClaimed, false);
+  assert.equal(initialPayload.root, root);
+  assert.equal(
+    initialPayload.rootType,
+    rootBridge.privateRootPublicFacadeRootType
+  );
+  assert.equal(initialPayload.createRecord, create);
+  assert.equal(initialPayload.requestRecords.length, 1);
+  assert.equal(Object.isFrozen(initialPayload.requestRecords), true);
+  assertBridgeDidNotTouchContainer(container, document);
+
+  const render = root.render(element, callback);
+  const renderPayload = rootBridge.getPrivateRootRecordPayload(render);
+  assert.equal(render.$$typeof, rootBridge.privateRootUpdateRecordType);
+  assert.equal(render.requestType, 'root.render');
+  assert.equal(render.updateId, 'facade-update:1');
+  assert.equal(render.lifecycleStatusBefore, rootBridge.ROOT_LIFECYCLE_CREATED);
+  assert.equal(render.lifecycleStatusAfter, rootBridge.ROOT_LIFECYCLE_RENDERED);
+  assert.equal(renderPayload.element, element);
+  assert.equal(renderPayload.callback, callback);
+
+  const unmount = root.unmount(unmountCallback);
+  const unmountPayload = rootBridge.getPrivateRootRecordPayload(unmount);
+  assert.equal(unmount.requestType, 'root.unmount');
+  assert.equal(unmount.updateId, 'facade-update:2');
+  assert.equal(
+    unmount.lifecycleStatusBefore,
+    rootBridge.ROOT_LIFECYCLE_RENDERED
+  );
+  assert.equal(
+    unmount.lifecycleStatusAfter,
+    rootBridge.ROOT_LIFECYCLE_UNMOUNTED
+  );
+  assert.equal(unmount.sync, true);
+  assert.equal(unmount.noOp, false);
+  assert.equal(unmountPayload.callback, unmountCallback);
+
+  const secondUnmount = root.unmount();
+  assert.equal(secondUnmount.requestType, 'root.unmount');
+  assert.equal(secondUnmount.noOp, true);
+  assert.equal(secondUnmount.sync, false);
+  assert.throws(() => root.render(element), {
+    code: 'FAST_REACT_DOM_UNMOUNTED_ROOT'
+  });
+
+  assert.deepEqual(adapter.getRootRequestRecords(root), [
+    create,
+    render,
+    unmount,
+    secondUnmount
+  ]);
+  assert.deepEqual(adapter.getRootPayload(root).renderRecords, [render]);
+  assert.deepEqual(adapter.getRootPayload(root).unmountRecords, [
+    unmount,
+    secondUnmount
+  ]);
+  assert.equal(
+    rootBridge.getPrivateRootPublicFacadeAdapterPayload(adapter).rootCount,
+    1
+  );
+  assert.equal(rootBridge.getPrivateRootPublicFacadeRootPayload({}), null);
+  assert.equal(rootBridge.getPrivateRootPublicFacadeAdapterPayload({}), null);
+
+  const otherAdapter = descriptor.value();
+  assert.throws(() => otherAdapter.getRootCreateRecord(root), {
+    code: 'FAST_REACT_DOM_FOREIGN_ROOT_HANDLE'
+  });
+  assert.throws(() => adapter.getRootCreateRecord({}), {
+    code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_ADAPTER'
+  });
+  assertBridgeDidNotTouchContainer(container, document);
+});
+
 test('public react-dom/client root placeholders remain inert', () => {
   const document = createDocument('public-placeholder');
   const container = createElement('DIV', document);
