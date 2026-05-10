@@ -17,8 +17,8 @@ use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::{
     ContextHandle, ContextStackError, ContextStackSnapshot, ContextValueHandle, FiberArena,
-    FiberId, FiberTag, FiberTopologyError, Lanes, PropsHandle, ReactKey, StateHandle,
-    StateNodeHandle,
+    FiberFlags, FiberId, FiberTag, FiberTopologyError, Lane, Lanes, PropsHandle, ReactKey,
+    StateHandle, StateNodeHandle, UpdateQueueHandle,
 };
 
 use crate::{
@@ -46,6 +46,110 @@ use crate::{
 };
 
 pub(crate) const PORTAL_RECONCILER_UNSUPPORTED_FEATURE: &str = "Reconciler.fiber.Portal";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum UnsupportedThenableIdentityClass {
+    NoThenable,
+    OpaqueWakeable,
+    SuspenseyCommitResource,
+    OpaqueWakeableAndSuspenseyCommitResource,
+}
+
+impl UnsupportedThenableIdentityClass {
+    #[must_use]
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::NoThenable => "no-thenable",
+            Self::OpaqueWakeable => "opaque-wakeable",
+            Self::SuspenseyCommitResource => "suspensey-commit-resource",
+            Self::OpaqueWakeableAndSuspenseyCommitResource => {
+                "opaque-wakeable-and-suspensey-commit-resource"
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum UnsupportedThenableRetryQueueKind {
+    None,
+    SuspenseBoundary,
+    PrimaryOffscreen,
+    SuspenseBoundaryAndPrimaryOffscreen,
+    Offscreen,
+}
+
+impl UnsupportedThenableRetryQueueKind {
+    #[must_use]
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::SuspenseBoundary => "suspense-boundary",
+            Self::PrimaryOffscreen => "primary-offscreen",
+            Self::SuspenseBoundaryAndPrimaryOffscreen => "suspense-boundary-and-primary-offscreen",
+            Self::Offscreen => "offscreen",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct UnsupportedThenablePingBlockerRecord {
+    thenable_identity_class: UnsupportedThenableIdentityClass,
+    ping_lane: Lane,
+    ping_lanes: Lanes,
+    retry_queue_kind: UnsupportedThenableRetryQueueKind,
+    retry_queue: UpdateQueueHandle,
+    primary_offscreen_retry_queue: Option<UpdateQueueHandle>,
+    schedule_retry_flag: bool,
+    primary_child_rendering_blocked: bool,
+    fallback_child_rendering_blocked: bool,
+}
+
+impl UnsupportedThenablePingBlockerRecord {
+    #[must_use]
+    pub(crate) const fn thenable_identity_class(self) -> UnsupportedThenableIdentityClass {
+        self.thenable_identity_class
+    }
+
+    #[must_use]
+    pub(crate) const fn ping_lane(self) -> Lane {
+        self.ping_lane
+    }
+
+    #[must_use]
+    pub(crate) const fn ping_lanes(self) -> Lanes {
+        self.ping_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn retry_queue_kind(self) -> UnsupportedThenableRetryQueueKind {
+        self.retry_queue_kind
+    }
+
+    #[must_use]
+    pub(crate) const fn retry_queue(self) -> UpdateQueueHandle {
+        self.retry_queue
+    }
+
+    #[must_use]
+    pub(crate) const fn primary_offscreen_retry_queue(self) -> Option<UpdateQueueHandle> {
+        self.primary_offscreen_retry_queue
+    }
+
+    #[must_use]
+    pub(crate) const fn schedule_retry_flag(self) -> bool {
+        self.schedule_retry_flag
+    }
+
+    #[must_use]
+    pub(crate) const fn primary_child_rendering_blocked(self) -> bool {
+        self.primary_child_rendering_blocked
+    }
+
+    #[must_use]
+    pub(crate) const fn fallback_child_rendering_blocked(self) -> bool {
+        self.fallback_child_rendering_blocked
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct BeginWorkRequest {
@@ -178,6 +282,7 @@ pub(crate) struct UnsupportedSuspenseChildShapeRecord {
     fallback_child: Option<FiberId>,
     fallback_child_tag: Option<FiberTag>,
     render_lanes: Lanes,
+    thenable_ping_blocker: UnsupportedThenablePingBlockerRecord,
     shape: UnsupportedSuspenseChildShapeKind,
     feature: &'static str,
 }
@@ -229,6 +334,11 @@ impl UnsupportedSuspenseChildShapeRecord {
     }
 
     #[must_use]
+    pub(crate) const fn thenable_ping_blocker(&self) -> UnsupportedThenablePingBlockerRecord {
+        self.thenable_ping_blocker
+    }
+
+    #[must_use]
     pub(crate) const fn shape(&self) -> UnsupportedSuspenseChildShapeKind {
         self.shape
     }
@@ -270,6 +380,7 @@ pub(crate) struct UnsupportedOffscreenChildShapeRecord {
     child_sibling: Option<FiberId>,
     child_sibling_tag: Option<FiberTag>,
     render_lanes: Lanes,
+    thenable_ping_blocker: UnsupportedThenablePingBlockerRecord,
     shape: UnsupportedOffscreenChildShapeKind,
     feature: &'static str,
 }
@@ -328,6 +439,11 @@ impl UnsupportedOffscreenChildShapeRecord {
     #[must_use]
     pub(crate) const fn render_lanes(&self) -> Lanes {
         self.render_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn thenable_ping_blocker(&self) -> UnsupportedThenablePingBlockerRecord {
+        self.thenable_ping_blocker
     }
 
     #[must_use]
@@ -2207,7 +2323,7 @@ impl Display for BeginWorkError {
             ),
             Self::UnsupportedSuspenseChildShape(record) => write!(
                 formatter,
-                "Suspense fiber {} reached begin-work with unsupported {} child shape {}; key {:?}, primary child {:?} ({:?}), fallback child {:?} ({:?}), pending props {:?}, memoized state {:?}, lanes {:?}",
+                "Suspense fiber {} reached begin-work with unsupported {} child shape {}; key {:?}, primary child {:?} ({:?}), fallback child {:?} ({:?}), pending props {:?}, memoized state {:?}, lanes {:?}, thenable {}, ping lane {:?}, retry queue {}, primary blocked {}, fallback blocked {}",
                 record.fiber().slot().get(),
                 record.feature(),
                 record.shape().as_str(),
@@ -2218,11 +2334,23 @@ impl Display for BeginWorkError {
                 record.fallback_child_tag(),
                 record.pending_props(),
                 record.memoized_state(),
-                record.render_lanes()
+                record.render_lanes(),
+                record
+                    .thenable_ping_blocker()
+                    .thenable_identity_class()
+                    .as_str(),
+                record.thenable_ping_blocker().ping_lane(),
+                record.thenable_ping_blocker().retry_queue_kind().as_str(),
+                record
+                    .thenable_ping_blocker()
+                    .primary_child_rendering_blocked(),
+                record
+                    .thenable_ping_blocker()
+                    .fallback_child_rendering_blocked()
             ),
             Self::UnsupportedOffscreenChildShape(record) => write!(
                 formatter,
-                "Offscreen fiber {} reached begin-work with unsupported {} child shape {}; key {:?}, first child {:?} ({:?}), first child sibling {:?} ({:?}), pending props {:?}, memoized props {:?}, memoized state {:?}, state node {:?}, lanes {:?}",
+                "Offscreen fiber {} reached begin-work with unsupported {} child shape {}; key {:?}, first child {:?} ({:?}), first child sibling {:?} ({:?}), pending props {:?}, memoized props {:?}, memoized state {:?}, state node {:?}, lanes {:?}, thenable {}, ping lane {:?}, retry queue {}, child rendering blocked {}",
                 record.fiber().slot().get(),
                 record.feature(),
                 record.shape().as_str(),
@@ -2235,7 +2363,16 @@ impl Display for BeginWorkError {
                 record.memoized_props(),
                 record.memoized_state(),
                 record.state_node(),
-                record.render_lanes()
+                record.render_lanes(),
+                record
+                    .thenable_ping_blocker()
+                    .thenable_identity_class()
+                    .as_str(),
+                record.thenable_ping_blocker().ping_lane(),
+                record.thenable_ping_blocker().retry_queue_kind().as_str(),
+                record
+                    .thenable_ping_blocker()
+                    .primary_child_rendering_blocked()
             ),
             Self::UnsupportedSuspenseListChildShape(record) => write!(
                 formatter,
@@ -2569,6 +2706,98 @@ pub(crate) fn unsupported_portal_begin_work_record(
     })
 }
 
+fn unsupported_thenable_identity_class(
+    has_retry_queue: bool,
+    schedule_retry_flag: bool,
+) -> UnsupportedThenableIdentityClass {
+    match (has_retry_queue, schedule_retry_flag) {
+        (false, false) => UnsupportedThenableIdentityClass::NoThenable,
+        (true, false) => UnsupportedThenableIdentityClass::OpaqueWakeable,
+        (false, true) => UnsupportedThenableIdentityClass::SuspenseyCommitResource,
+        (true, true) => UnsupportedThenableIdentityClass::OpaqueWakeableAndSuspenseyCommitResource,
+    }
+}
+
+fn unsupported_suspense_retry_queue_kind(
+    boundary_retry_queue: UpdateQueueHandle,
+    primary_offscreen_retry_queue: Option<UpdateQueueHandle>,
+) -> UnsupportedThenableRetryQueueKind {
+    match (
+        boundary_retry_queue.is_some(),
+        primary_offscreen_retry_queue.is_some(),
+    ) {
+        (false, false) => UnsupportedThenableRetryQueueKind::None,
+        (true, false) => UnsupportedThenableRetryQueueKind::SuspenseBoundary,
+        (false, true) => UnsupportedThenableRetryQueueKind::PrimaryOffscreen,
+        (true, true) => UnsupportedThenableRetryQueueKind::SuspenseBoundaryAndPrimaryOffscreen,
+    }
+}
+
+fn unsupported_suspense_thenable_ping_blocker_record(
+    arena: &FiberArena,
+    boundary_update_queue: UpdateQueueHandle,
+    boundary_flags: FiberFlags,
+    child: Option<FiberId>,
+    fallback_child: Option<FiberId>,
+    render_lanes: Lanes,
+) -> Result<UnsupportedThenablePingBlockerRecord, BeginWorkError> {
+    let primary_offscreen_retry_queue = match child {
+        Some(primary) if arena.get(primary)?.tag() == FiberTag::Offscreen => {
+            let retry_queue = arena.get(primary)?.update_queue();
+            retry_queue.is_some().then_some(retry_queue)
+        }
+        Some(_) | None => None,
+    };
+    let retry_queue_kind =
+        unsupported_suspense_retry_queue_kind(boundary_update_queue, primary_offscreen_retry_queue);
+    let has_retry_queue = retry_queue_kind != UnsupportedThenableRetryQueueKind::None;
+    let schedule_retry_flag = boundary_flags.contains_all(FiberFlags::SCHEDULE_RETRY);
+
+    Ok(UnsupportedThenablePingBlockerRecord {
+        thenable_identity_class: unsupported_thenable_identity_class(
+            has_retry_queue,
+            schedule_retry_flag,
+        ),
+        ping_lane: render_lanes.highest_priority_lane(),
+        ping_lanes: render_lanes,
+        retry_queue_kind,
+        retry_queue: boundary_update_queue,
+        primary_offscreen_retry_queue,
+        schedule_retry_flag,
+        primary_child_rendering_blocked: child.is_some(),
+        fallback_child_rendering_blocked: fallback_child.is_some(),
+    })
+}
+
+fn unsupported_offscreen_thenable_ping_blocker_record(
+    update_queue: UpdateQueueHandle,
+    flags: FiberFlags,
+    child: Option<FiberId>,
+    render_lanes: Lanes,
+) -> UnsupportedThenablePingBlockerRecord {
+    let has_retry_queue = update_queue.is_some();
+    let schedule_retry_flag = flags.contains_all(FiberFlags::SCHEDULE_RETRY);
+
+    UnsupportedThenablePingBlockerRecord {
+        thenable_identity_class: unsupported_thenable_identity_class(
+            has_retry_queue,
+            schedule_retry_flag,
+        ),
+        ping_lane: render_lanes.highest_priority_lane(),
+        ping_lanes: render_lanes,
+        retry_queue_kind: if has_retry_queue {
+            UnsupportedThenableRetryQueueKind::Offscreen
+        } else {
+            UnsupportedThenableRetryQueueKind::None
+        },
+        retry_queue: update_queue,
+        primary_offscreen_retry_queue: None,
+        schedule_retry_flag,
+        primary_child_rendering_blocked: child.is_some(),
+        fallback_child_rendering_blocked: false,
+    }
+}
+
 pub(crate) fn unsupported_suspense_begin_work_record(
     arena: &FiberArena,
     request: BeginWorkRequest,
@@ -2614,6 +2843,14 @@ pub(crate) fn unsupported_suspense_begin_work_record(
         fallback_child,
         fallback_child_tag,
         render_lanes: request.render_lanes(),
+        thenable_ping_blocker: unsupported_suspense_thenable_ping_blocker_record(
+            arena,
+            node.update_queue(),
+            node.flags(),
+            child,
+            fallback_child,
+            request.render_lanes(),
+        )?,
         shape,
         feature: SUSPENSE_UNSUPPORTED_FEATURE,
     })
@@ -2662,6 +2899,12 @@ pub(crate) fn unsupported_offscreen_begin_work_record(
         child_sibling,
         child_sibling_tag,
         render_lanes: request.render_lanes(),
+        thenable_ping_blocker: unsupported_offscreen_thenable_ping_blocker_record(
+            node.update_queue(),
+            node.flags(),
+            child,
+            request.render_lanes(),
+        ),
         shape,
         feature: OFFSCREEN_UNSUPPORTED_FEATURE,
     })
@@ -3948,9 +4191,9 @@ mod tests {
     use crate::test_support::{FakeContainer, RecordingHost};
     use crate::{FiberRootStore, RootElementHandle, RootOptions};
     use fast_react_core::{
-        ContextHandle, ContextStackSnapshot, ContextValueHandle, ElementTypeHandle, FiberMode,
-        FiberTypeHandle, HookUpdateLane, Lane, PropsHandle, ReactKey, StateHandle, StateNodeHandle,
-        UpdateQueueHandle,
+        ContextHandle, ContextStackSnapshot, ContextValueHandle, ElementTypeHandle, FiberFlags,
+        FiberMode, FiberTypeHandle, HookUpdateLane, Lane, PropsHandle, ReactKey, StateHandle,
+        StateNodeHandle, UpdateQueueHandle,
     };
 
     #[derive(Debug, Clone)]
@@ -6389,16 +6632,21 @@ mod tests {
             PropsHandle::from_raw(840),
             FiberMode::NO,
         );
-        suspense_arena
-            .get_mut(suspense)
-            .unwrap()
-            .set_memoized_state(StateHandle::from_raw(841));
+        {
+            let node = suspense_arena.get_mut(suspense).unwrap();
+            node.set_memoized_state(StateHandle::from_raw(841));
+            node.set_update_queue(UpdateQueueHandle::from_raw(846));
+        }
         let primary = suspense_arena.create_fiber(
             FiberTag::Offscreen,
             None,
             PropsHandle::from_raw(842),
             FiberMode::NO,
         );
+        suspense_arena
+            .get_mut(primary)
+            .unwrap()
+            .set_update_queue(UpdateQueueHandle::from_raw(847));
         let primary_child = suspense_arena.create_fiber(
             FiberTag::HostComponent,
             None,
@@ -6457,6 +6705,28 @@ mod tests {
             UnsupportedSuspenseChildShapeKind::PrimaryOffscreenWithFallback
         );
         assert_eq!(suspense_record.render_lanes(), Lanes::from(Lane::RETRY_1));
+        let suspense_thenable = suspense_record.thenable_ping_blocker();
+        assert_eq!(
+            suspense_thenable.thenable_identity_class(),
+            UnsupportedThenableIdentityClass::OpaqueWakeable
+        );
+        assert_eq!(suspense_thenable.ping_lane(), Lane::RETRY_1);
+        assert_eq!(suspense_thenable.ping_lanes(), Lanes::from(Lane::RETRY_1));
+        assert_eq!(
+            suspense_thenable.retry_queue_kind(),
+            UnsupportedThenableRetryQueueKind::SuspenseBoundaryAndPrimaryOffscreen
+        );
+        assert_eq!(
+            suspense_thenable.retry_queue(),
+            UpdateQueueHandle::from_raw(846)
+        );
+        assert_eq!(
+            suspense_thenable.primary_offscreen_retry_queue(),
+            Some(UpdateQueueHandle::from_raw(847))
+        );
+        assert!(!suspense_thenable.schedule_retry_flag());
+        assert!(suspense_thenable.primary_child_rendering_blocked());
+        assert!(suspense_thenable.fallback_child_rendering_blocked());
         assert_eq!(suspense_record.feature(), SUSPENSE_UNSUPPORTED_FEATURE);
         assert_eq!(
             suspense_arena.get(suspense).unwrap().memoized_props(),
@@ -6483,6 +6753,8 @@ mod tests {
             node.set_memoized_props(PropsHandle::from_raw(851));
             node.set_memoized_state(StateHandle::from_raw(852));
             node.set_state_node(StateNodeHandle::from_raw(853));
+            node.set_update_queue(UpdateQueueHandle::from_raw(856));
+            node.merge_flags(FiberFlags::SCHEDULE_RETRY);
         }
         let first_child = offscreen_arena.create_fiber(
             FiberTag::HostText,
@@ -6538,6 +6810,25 @@ mod tests {
             UnsupportedOffscreenChildShapeKind::MultipleChildren
         );
         assert_eq!(offscreen_record.render_lanes(), Lanes::OFFSCREEN);
+        let offscreen_thenable = offscreen_record.thenable_ping_blocker();
+        assert_eq!(
+            offscreen_thenable.thenable_identity_class(),
+            UnsupportedThenableIdentityClass::OpaqueWakeableAndSuspenseyCommitResource
+        );
+        assert_eq!(offscreen_thenable.ping_lane(), Lane::OFFSCREEN);
+        assert_eq!(offscreen_thenable.ping_lanes(), Lanes::OFFSCREEN);
+        assert_eq!(
+            offscreen_thenable.retry_queue_kind(),
+            UnsupportedThenableRetryQueueKind::Offscreen
+        );
+        assert_eq!(
+            offscreen_thenable.retry_queue(),
+            UpdateQueueHandle::from_raw(856)
+        );
+        assert_eq!(offscreen_thenable.primary_offscreen_retry_queue(), None);
+        assert!(offscreen_thenable.schedule_retry_flag());
+        assert!(offscreen_thenable.primary_child_rendering_blocked());
+        assert!(!offscreen_thenable.fallback_child_rendering_blocked());
         assert_eq!(offscreen_record.feature(), OFFSCREEN_UNSUPPORTED_FEATURE);
         assert_eq!(
             offscreen_arena.get(first_child).unwrap().return_fiber(),
