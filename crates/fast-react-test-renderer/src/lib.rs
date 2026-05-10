@@ -1305,6 +1305,138 @@ impl TestRendererUnmountDeletionCommitHandoffDiagnostics {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererUnmountNativeBridgeAdmission {
+    diagnostic_id: &'static str,
+    status: &'static str,
+    root: FiberRootId,
+    route_dependency_id: &'static str,
+    deletion_commit_handoff_id: &'static str,
+    lifecycle: TestRendererRootLifecycle,
+    scheduled_update_kind: TestRendererRootUpdateKind,
+    scheduled_element_is_none: bool,
+    deletion_commit_handoff_accepted: bool,
+    lifecycle_evidence_accepted: bool,
+    cleanup_blockers_accepted: bool,
+    host_node_cleanup_count: usize,
+    cleanup_order_record_count: usize,
+    rejects_already_unmounted_roots: bool,
+    rejects_stale_deletion_handoffs: bool,
+    rejects_missing_cleanup_blockers: bool,
+    public_unmount_compatibility_claimed: bool,
+    public_host_teardown_compatibility_claimed: bool,
+    act_flushing_claimed: bool,
+    native_bridge_available: bool,
+    native_execution: bool,
+}
+
+impl TestRendererUnmountNativeBridgeAdmission {
+    #[must_use]
+    pub const fn diagnostic_id(self) -> &'static str {
+        self.diagnostic_id
+    }
+
+    #[must_use]
+    pub const fn status(self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn route_dependency_id(self) -> &'static str {
+        self.route_dependency_id
+    }
+
+    #[must_use]
+    pub const fn deletion_commit_handoff_id(self) -> &'static str {
+        self.deletion_commit_handoff_id
+    }
+
+    #[must_use]
+    pub const fn lifecycle(self) -> TestRendererRootLifecycle {
+        self.lifecycle
+    }
+
+    #[must_use]
+    pub const fn scheduled_update_kind(self) -> TestRendererRootUpdateKind {
+        self.scheduled_update_kind
+    }
+
+    #[must_use]
+    pub const fn scheduled_element_is_none(self) -> bool {
+        self.scheduled_element_is_none
+    }
+
+    #[must_use]
+    pub const fn deletion_commit_handoff_accepted(self) -> bool {
+        self.deletion_commit_handoff_accepted
+    }
+
+    #[must_use]
+    pub const fn lifecycle_evidence_accepted(self) -> bool {
+        self.lifecycle_evidence_accepted
+    }
+
+    #[must_use]
+    pub const fn cleanup_blockers_accepted(self) -> bool {
+        self.cleanup_blockers_accepted
+    }
+
+    #[must_use]
+    pub const fn host_node_cleanup_count(self) -> usize {
+        self.host_node_cleanup_count
+    }
+
+    #[must_use]
+    pub const fn cleanup_order_record_count(self) -> usize {
+        self.cleanup_order_record_count
+    }
+
+    #[must_use]
+    pub const fn rejects_already_unmounted_roots(self) -> bool {
+        self.rejects_already_unmounted_roots
+    }
+
+    #[must_use]
+    pub const fn rejects_stale_deletion_handoffs(self) -> bool {
+        self.rejects_stale_deletion_handoffs
+    }
+
+    #[must_use]
+    pub const fn rejects_missing_cleanup_blockers(self) -> bool {
+        self.rejects_missing_cleanup_blockers
+    }
+
+    #[must_use]
+    pub const fn public_unmount_compatibility_claimed(self) -> bool {
+        self.public_unmount_compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn public_host_teardown_compatibility_claimed(self) -> bool {
+        self.public_host_teardown_compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn act_flushing_claimed(self) -> bool {
+        self.act_flushing_claimed
+    }
+
+    #[must_use]
+    pub const fn native_bridge_available(self) -> bool {
+        self.native_bridge_available
+    }
+
+    #[must_use]
+    pub const fn native_execution(self) -> bool {
+        self.native_execution
+    }
+}
+
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 struct TestRendererHostNodeStore {
     records: Vec<TestRendererHostNodeStoreRecord>,
@@ -2508,6 +2640,10 @@ pub const TEST_RENDERER_PRIVATE_UNMOUNT_DELETION_COMMIT_HANDOFF_DIAGNOSTIC_ID: &
     "react-test-renderer-unmount-deletion-commit-handoff-private-diagnostic";
 pub const TEST_RENDERER_PRIVATE_UNMOUNT_DELETION_COMMIT_HANDOFF_STATUS: &str =
     "private-unmount-deletion-commit-handoff-public-unmount-blocked";
+pub const TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID: &str =
+    "react-test-renderer-unmount-native-bridge-admission-private-diagnostic";
+pub const TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_STATUS: &str =
+    "private-unmount-native-bridge-admission-public-unmount-blocked";
 pub const TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.serialization.private-tree-canary";
 pub const TEST_RENDERER_PRIVATE_TREE_COMMITTED_FIBER_INSPECTION_DIAGNOSTIC_NAME: &str =
@@ -6531,6 +6667,51 @@ impl Display for TestRendererPrivateUpdateRouteError {
 impl Error for TestRendererPrivateUpdateRouteError {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TestRendererPrivateUnmountNativeBridgeAdmissionError {
+    AlreadyUnmountedRoot,
+    MissingDeletionCommitHandoff,
+    UnexpectedRouteOutcome { actual: &'static str },
+    UnexpectedScheduledUpdateKind { actual: TestRendererRootUpdateKind },
+    StaleRouteOutcome,
+    StaleDeletionCommitHandoff { reason: &'static str },
+    MissingCleanupBlockers { reason: &'static str },
+}
+
+impl Display for TestRendererPrivateUnmountNativeBridgeAdmissionError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::AlreadyUnmountedRoot => formatter.write_str(
+                "private unmount native bridge admission rejects already-unmounted roots",
+            ),
+            Self::MissingDeletionCommitHandoff => formatter.write_str(
+                "private unmount native bridge admission requires deletion commit handoff evidence",
+            ),
+            Self::UnexpectedRouteOutcome { actual } => write!(
+                formatter,
+                "private unmount native bridge admission expected a scheduled unmount route outcome, found {actual}",
+            ),
+            Self::UnexpectedScheduledUpdateKind { actual } => write!(
+                formatter,
+                "private unmount native bridge admission expected a scheduled unmount update, found {actual:?}",
+            ),
+            Self::StaleRouteOutcome => formatter.write_str(
+                "private unmount native bridge admission route outcome is not the latest scheduled update",
+            ),
+            Self::StaleDeletionCommitHandoff { reason } => write!(
+                formatter,
+                "private unmount native bridge admission deletion handoff is stale: {reason}",
+            ),
+            Self::MissingCleanupBlockers { reason } => write!(
+                formatter,
+                "private unmount native bridge admission cleanup blockers are missing: {reason}",
+            ),
+        }
+    }
+}
+
+impl Error for TestRendererPrivateUnmountNativeBridgeAdmissionError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TestRendererSerializationGateError {
     CommitRootMismatch {
         expected: FiberRootId,
@@ -6867,6 +7048,7 @@ pub enum TestRendererRootError {
     RootCommit(RootCommitError),
     SerializationGate(Box<TestRendererSerializationGateError>),
     PrivateUpdateRoute(Box<TestRendererPrivateUpdateRouteError>),
+    PrivateUnmountNativeBridgeAdmission(Box<TestRendererPrivateUnmountNativeBridgeAdmissionError>),
     PrivateJsonSerialization(Box<TestRendererPrivateJsonSerializationError>),
     StableSiblingInsertionCanary(Box<TestRendererStableSiblingInsertionCanaryError>),
     RootCreatePreflight(Box<TestRendererRootCreatePreflightError>),
@@ -6905,6 +7087,7 @@ impl Display for TestRendererRootError {
             Self::RootCommit(error) => Display::fmt(error, formatter),
             Self::SerializationGate(error) => Display::fmt(error, formatter),
             Self::PrivateUpdateRoute(error) => Display::fmt(error, formatter),
+            Self::PrivateUnmountNativeBridgeAdmission(error) => Display::fmt(error, formatter),
             Self::PrivateJsonSerialization(error) => Display::fmt(error, formatter),
             Self::StableSiblingInsertionCanary(error) => Display::fmt(error, formatter),
             Self::RootCreatePreflight(error) => Display::fmt(error, formatter),
@@ -6956,6 +7139,7 @@ impl Error for TestRendererRootError {
             Self::RootCommit(error) => Some(error),
             Self::SerializationGate(error) => Some(error),
             Self::PrivateUpdateRoute(error) => Some(error),
+            Self::PrivateUnmountNativeBridgeAdmission(error) => Some(error),
             Self::PrivateJsonSerialization(error) => Some(error),
             Self::StableSiblingInsertionCanary(error) => Some(error),
             Self::RootCreatePreflight(error) => Some(error),
@@ -7016,6 +7200,12 @@ impl From<TestRendererSerializationGateError> for TestRendererRootError {
 impl From<TestRendererPrivateUpdateRouteError> for TestRendererRootError {
     fn from(error: TestRendererPrivateUpdateRouteError) -> Self {
         Self::PrivateUpdateRoute(Box::new(error))
+    }
+}
+
+impl From<TestRendererPrivateUnmountNativeBridgeAdmissionError> for TestRendererRootError {
+    fn from(error: TestRendererPrivateUnmountNativeBridgeAdmissionError) -> Self {
+        Self::PrivateUnmountNativeBridgeAdmission(Box::new(error))
     }
 }
 
@@ -8306,6 +8496,221 @@ impl TestRendererRoot {
             act_flushing_claimed: false,
             host_child_detachment_blockers,
         })
+    }
+
+    pub fn describe_private_unmount_native_bridge_admission_for_canary(
+        &self,
+        route_outcome: &TestRendererRootUpdateOutcome,
+        handoff: Option<&TestRendererUnmountDeletionCommitHandoffDiagnostics>,
+    ) -> Result<TestRendererUnmountNativeBridgeAdmission, TestRendererRootError> {
+        let Some(scheduled_update) = route_outcome.scheduled() else {
+            return Err(match route_outcome {
+                TestRendererRootUpdateOutcome::AlreadyUnmountScheduled => {
+                    TestRendererPrivateUnmountNativeBridgeAdmissionError::AlreadyUnmountedRoot
+                }
+                TestRendererRootUpdateOutcome::IgnoredAfterUnmount => {
+                    TestRendererPrivateUnmountNativeBridgeAdmissionError::UnexpectedRouteOutcome {
+                        actual: route_outcome.code(),
+                    }
+                }
+                TestRendererRootUpdateOutcome::Scheduled(_) => unreachable!(),
+            }
+            .into());
+        };
+        if scheduled_update.kind() != TestRendererRootUpdateKind::Unmount {
+            return Err(
+                TestRendererPrivateUnmountNativeBridgeAdmissionError::UnexpectedScheduledUpdateKind {
+                    actual: scheduled_update.kind(),
+                }
+                .into(),
+            );
+        }
+        if self.scheduled_updates.last() != Some(scheduled_update) {
+            return Err(
+                TestRendererPrivateUnmountNativeBridgeAdmissionError::StaleRouteOutcome.into(),
+            );
+        }
+
+        let Some(handoff) = handoff.copied() else {
+            return Err(
+                TestRendererPrivateUnmountNativeBridgeAdmissionError::MissingDeletionCommitHandoff
+                    .into(),
+            );
+        };
+        self.validate_private_unmount_native_bridge_handoff_for_canary(scheduled_update, handoff)?;
+
+        Ok(TestRendererUnmountNativeBridgeAdmission {
+            diagnostic_id: TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID,
+            status: TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_STATUS,
+            root: self.root_id,
+            route_dependency_id: TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_ROUTE_DEPENDENCY_ID,
+            deletion_commit_handoff_id:
+                TEST_RENDERER_PRIVATE_UNMOUNT_DELETION_COMMIT_HANDOFF_DIAGNOSTIC_ID,
+            lifecycle: handoff.lifecycle(),
+            scheduled_update_kind: scheduled_update.kind(),
+            scheduled_element_is_none: scheduled_update.element() == RootElementHandle::NONE,
+            deletion_commit_handoff_accepted: true,
+            lifecycle_evidence_accepted: true,
+            cleanup_blockers_accepted: true,
+            host_node_cleanup_count: handoff.host_node_cleanup_count(),
+            cleanup_order_record_count: handoff.cleanup_order_record_count(),
+            rejects_already_unmounted_roots: true,
+            rejects_stale_deletion_handoffs: true,
+            rejects_missing_cleanup_blockers: true,
+            public_unmount_compatibility_claimed: false,
+            public_host_teardown_compatibility_claimed: false,
+            act_flushing_claimed: false,
+            native_bridge_available: false,
+            native_execution: false,
+        })
+    }
+
+    fn validate_private_unmount_native_bridge_handoff_for_canary(
+        &self,
+        scheduled_update: &TestRendererRootScheduledUpdate,
+        handoff: TestRendererUnmountDeletionCommitHandoffDiagnostics,
+    ) -> Result<(), TestRendererRootError> {
+        if handoff.diagnostic_id()
+            != TEST_RENDERER_PRIVATE_UNMOUNT_DELETION_COMMIT_HANDOFF_DIAGNOSTIC_ID
+        {
+            return Err(
+                TestRendererPrivateUnmountNativeBridgeAdmissionError::StaleDeletionCommitHandoff {
+                    reason: "diagnostic-id-mismatch",
+                }
+                .into(),
+            );
+        }
+        if handoff.status() != TEST_RENDERER_PRIVATE_UNMOUNT_DELETION_COMMIT_HANDOFF_STATUS {
+            return Err(
+                TestRendererPrivateUnmountNativeBridgeAdmissionError::StaleDeletionCommitHandoff {
+                    reason: "diagnostic-status-mismatch",
+                }
+                .into(),
+            );
+        }
+        if handoff.root() != self.root_id {
+            return Err(
+                TestRendererPrivateUnmountNativeBridgeAdmissionError::StaleDeletionCommitHandoff {
+                    reason: "root-mismatch",
+                }
+                .into(),
+            );
+        }
+        if handoff.lifecycle() != self.lifecycle
+            || handoff.lifecycle() != TestRendererRootLifecycle::UnmountScheduled
+        {
+            return Err(
+                TestRendererPrivateUnmountNativeBridgeAdmissionError::StaleDeletionCommitHandoff {
+                    reason: "lifecycle-mismatch",
+                }
+                .into(),
+            );
+        }
+        if handoff.scheduled_update_kind() != TestRendererRootUpdateKind::Unmount
+            || scheduled_update.kind() != handoff.scheduled_update_kind()
+        {
+            return Err(
+                TestRendererPrivateUnmountNativeBridgeAdmissionError::StaleDeletionCommitHandoff {
+                    reason: "scheduled-update-kind-mismatch",
+                }
+                .into(),
+            );
+        }
+        if scheduled_update.element() != RootElementHandle::NONE
+            || handoff.scheduled_element() != RootElementHandle::NONE
+            || !handoff.scheduled_element_is_none()
+        {
+            return Err(
+                TestRendererPrivateUnmountNativeBridgeAdmissionError::StaleDeletionCommitHandoff {
+                    reason: "scheduled-element-mismatch",
+                }
+                .into(),
+            );
+        }
+        if !handoff.commit_current_is_store_current()
+            || !handoff.render_current_matches_commit_previous_current()
+            || !handoff.render_finished_work_matches_commit_current()
+        {
+            return Err(
+                TestRendererPrivateUnmountNativeBridgeAdmissionError::StaleDeletionCommitHandoff {
+                    reason: "commit-handoff-identity-mismatch",
+                }
+                .into(),
+            );
+        }
+        if handoff.deletion_list_count() == 0 || handoff.deleted_root_count() == 0 {
+            return Err(
+                TestRendererPrivateUnmountNativeBridgeAdmissionError::StaleDeletionCommitHandoff {
+                    reason: "missing-deletion-list",
+                }
+                .into(),
+            );
+        }
+        if handoff.host_node_cleanup_count() == 0 {
+            return Err(
+                TestRendererPrivateUnmountNativeBridgeAdmissionError::MissingCleanupBlockers {
+                    reason: "missing-host-node-cleanup-records",
+                }
+                .into(),
+            );
+        }
+        if !handoff.cleanup_records_match_deletion_commit() {
+            return Err(
+                TestRendererPrivateUnmountNativeBridgeAdmissionError::MissingCleanupBlockers {
+                    reason: "cleanup-records-do-not-match-commit",
+                }
+                .into(),
+            );
+        }
+        if handoff.cleanup_order_record_count() != handoff.host_node_cleanup_count() {
+            return Err(
+                TestRendererPrivateUnmountNativeBridgeAdmissionError::MissingCleanupBlockers {
+                    reason: "cleanup-order-count-mismatch",
+                }
+                .into(),
+            );
+        }
+
+        let blockers = handoff.host_child_detachment_blockers();
+        if !blockers.detached_instance()
+            || blockers.detached_instance_child_count() != 0
+            || !blockers.broad_host_child_detachment_blocked()
+        {
+            return Err(
+                TestRendererPrivateUnmountNativeBridgeAdmissionError::MissingCleanupBlockers {
+                    reason: "host-child-detachment-blockers-missing",
+                }
+                .into(),
+            );
+        }
+        if blockers.host_node_cleanup_invalidated_count() != handoff.host_node_cleanup_count()
+            || blockers.host_node_cleanup_already_inactive_count() != 0
+            || blockers.host_node_cleanup_missing_host_node_count() != 0
+            || blockers.host_node_cleanup_missing_state_node_count() != 0
+        {
+            return Err(
+                TestRendererPrivateUnmountNativeBridgeAdmissionError::MissingCleanupBlockers {
+                    reason: "host-node-cleanup-blockers-mismatch",
+                }
+                .into(),
+            );
+        }
+        if handoff.public_unmount_compatibility_claimed()
+            || handoff.public_host_teardown_compatibility_claimed()
+            || handoff.act_flushing_claimed()
+            || blockers.public_unmount_compatibility_claimed()
+            || blockers.public_host_teardown_compatibility_claimed()
+            || blockers.act_flushing_claimed()
+        {
+            return Err(
+                TestRendererPrivateUnmountNativeBridgeAdmissionError::StaleDeletionCommitHandoff {
+                    reason: "public-or-act-claim",
+                }
+                .into(),
+            );
+        }
+
+        Ok(())
     }
 
     pub fn describe_private_to_json_facade_result_for_canary(
@@ -14673,6 +15078,9 @@ mod tests {
         let handoff = root
             .describe_private_unmount_deletion_commit_handoff_for_canary(&unmounted)
             .unwrap();
+        let admission = root
+            .describe_private_unmount_native_bridge_admission_for_canary(&outcome, Some(&handoff))
+            .unwrap();
         let detachment_blockers = handoff.host_child_detachment_blockers();
 
         assert_eq!(scheduled.kind(), TestRendererRootUpdateKind::Unmount);
@@ -14870,6 +15278,45 @@ mod tests {
         assert!(!detachment_blockers.public_host_teardown_compatibility_claimed());
         assert!(!detachment_blockers.public_unmount_compatibility_claimed());
         assert!(!detachment_blockers.act_flushing_claimed());
+        assert_eq!(
+            admission.diagnostic_id(),
+            TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID
+        );
+        assert_eq!(
+            admission.status(),
+            TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_STATUS
+        );
+        assert_eq!(admission.root(), root.root_id());
+        assert_eq!(
+            admission.route_dependency_id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_ROUTE_DEPENDENCY_ID
+        );
+        assert_eq!(
+            admission.deletion_commit_handoff_id(),
+            TEST_RENDERER_PRIVATE_UNMOUNT_DELETION_COMMIT_HANDOFF_DIAGNOSTIC_ID
+        );
+        assert_eq!(
+            admission.lifecycle(),
+            TestRendererRootLifecycle::UnmountScheduled
+        );
+        assert_eq!(
+            admission.scheduled_update_kind(),
+            TestRendererRootUpdateKind::Unmount
+        );
+        assert!(admission.scheduled_element_is_none());
+        assert!(admission.deletion_commit_handoff_accepted());
+        assert!(admission.lifecycle_evidence_accepted());
+        assert!(admission.cleanup_blockers_accepted());
+        assert_eq!(admission.host_node_cleanup_count(), 2);
+        assert_eq!(admission.cleanup_order_record_count(), 2);
+        assert!(admission.rejects_already_unmounted_roots());
+        assert!(admission.rejects_stale_deletion_handoffs());
+        assert!(admission.rejects_missing_cleanup_blockers());
+        assert!(!admission.public_unmount_compatibility_claimed());
+        assert!(!admission.public_host_teardown_compatibility_claimed());
+        assert!(!admission.act_flushing_claimed());
+        assert!(!admission.native_bridge_available());
+        assert!(!admission.native_execution());
         assert_eq!(host_storage_counts(&root), (1, 1, 1));
         assert_eq!(current_host_root_element(&root), RootElementHandle::NONE);
         assert!(
@@ -14911,6 +15358,115 @@ mod tests {
             error.as_ref(),
             TestRendererSerializationGateError::CommitIsNotCurrent { root: error_root, .. }
                 if *error_root == root.root_id()
+        ));
+    }
+
+    #[test]
+    fn root_private_unmount_native_bridge_admission_rejects_stale_handoff() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let outcome = root.unmount().unwrap();
+        let unmounted = root
+            .render_and_commit_host_output_unmount_for_canary()
+            .unwrap()
+            .unwrap();
+        let mut handoff = root
+            .describe_private_unmount_deletion_commit_handoff_for_canary(&unmounted)
+            .unwrap();
+        handoff.commit_current_is_store_current = false;
+
+        let error = root
+            .describe_private_unmount_native_bridge_admission_for_canary(&outcome, Some(&handoff))
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateUnmountNativeBridgeAdmission(error) = error else {
+            panic!("expected private unmount native bridge admission rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateUnmountNativeBridgeAdmissionError::StaleDeletionCommitHandoff {
+                reason: "commit-handoff-identity-mismatch"
+            }
+        ));
+    }
+
+    #[test]
+    fn root_private_unmount_native_bridge_admission_rejects_missing_cleanup_blockers() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let outcome = root.unmount().unwrap();
+        let unmounted = root
+            .render_and_commit_host_output_unmount_for_canary()
+            .unwrap()
+            .unwrap();
+        let mut handoff = root
+            .describe_private_unmount_deletion_commit_handoff_for_canary(&unmounted)
+            .unwrap();
+        handoff.host_node_cleanup_count = 0;
+
+        let error = root
+            .describe_private_unmount_native_bridge_admission_for_canary(&outcome, Some(&handoff))
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateUnmountNativeBridgeAdmission(error) = error else {
+            panic!("expected private unmount native bridge admission rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateUnmountNativeBridgeAdmissionError::MissingCleanupBlockers {
+                reason: "missing-host-node-cleanup-records"
+            }
+        ));
+    }
+
+    #[test]
+    fn root_private_unmount_native_bridge_admission_rejects_already_unmounted_root() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.unmount().unwrap();
+        let unmounted = root
+            .render_and_commit_host_output_unmount_for_canary()
+            .unwrap()
+            .unwrap();
+        let handoff = root
+            .describe_private_unmount_deletion_commit_handoff_for_canary(&unmounted)
+            .unwrap();
+        let second_outcome = root.unmount().unwrap();
+
+        let error = root
+            .describe_private_unmount_native_bridge_admission_for_canary(
+                &second_outcome,
+                Some(&handoff),
+            )
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateUnmountNativeBridgeAdmission(error) = error else {
+            panic!("expected private unmount native bridge admission rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateUnmountNativeBridgeAdmissionError::AlreadyUnmountedRoot
         ));
     }
 
