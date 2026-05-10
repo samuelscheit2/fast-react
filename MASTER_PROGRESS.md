@@ -29,6 +29,13 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Worker 478 was accepted from queue 473-502. It added private function
+  component `useEffect` mount/update render metadata, passive render-phase
+  records, and dependency handling without executing effect callbacks or
+  opening public `useEffect` compatibility. It was verified after merge with
+  focused function-component and passive-effect reconciler tests, hook
+  dispatcher conformance tests, the React workspace smoke check, Rust fmt,
+  conflict-marker scanning, and `git diff --check`.
 - Worker 477 was accepted from queue 473-502. It added private function
   component `useMemo` update diagnostics for dependency reuse versus recompute,
   plus a private React hook dispatcher memo gate that keeps public `useMemo`
