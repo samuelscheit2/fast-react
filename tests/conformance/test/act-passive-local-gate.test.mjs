@@ -132,6 +132,60 @@ test("act/passive local gate recognizes accepted queue diagnostics without publi
     );
   }
 
+  const cjsDevelopmentRendererGate = gate.testRendererActSchedulerGates.find(
+    (rendererGate) =>
+      rendererGate.entrypoint ===
+      "react-test-renderer/cjs/react-test-renderer.development"
+  );
+  assert.notEqual(cjsDevelopmentRendererGate, undefined);
+  assert.ok(
+    cjsDevelopmentRendererGate.acceptedPrivateFlushPrerequisiteIds.includes(
+      "act-warning-thenable-public-compatibility-blockers"
+    )
+  );
+  assert.equal(
+    cjsDevelopmentRendererGate.sideEffectPolicy.emitsActWarnings,
+    false
+  );
+  assert.equal(
+    cjsDevelopmentRendererGate.sideEffectPolicy.awaitsActThenables,
+    false
+  );
+  assert.equal(
+    cjsDevelopmentRendererGate.sideEffectPolicy.resolvesActThenables,
+    false
+  );
+  assert.equal(
+    cjsDevelopmentRendererGate.sideEffectPolicy.settlesAsyncActScopes,
+    false
+  );
+  assert.equal(
+    cjsDevelopmentRendererGate.sideEffectPolicy.publicAsyncActCompatibilityClaimed,
+    false
+  );
+
+  for (const rendererGate of gate.testRendererActSchedulerGates.filter(
+    (candidate) => candidate !== cjsDevelopmentRendererGate
+  )) {
+    assert.equal(
+      rendererGate.acceptedPrivateFlushPrerequisiteIds.includes(
+        "act-warning-thenable-public-compatibility-blockers"
+      ),
+      false,
+      rendererGate.entrypoint
+    );
+    assert.equal(
+      rendererGate.sideEffectPolicy.emitsActWarnings,
+      undefined,
+      rendererGate.entrypoint
+    );
+    assert.equal(
+      rendererGate.sideEffectPolicy.awaitsActThenables,
+      undefined,
+      rendererGate.entrypoint
+    );
+  }
+
   assert.deepEqual(gate.reactDomTestUtilsActGate.acceptedPrivatePrerequisiteIds, [
     "react-act-private-dispatcher-gate",
     "scheduler-act-queue-routing-records",

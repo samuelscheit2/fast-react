@@ -142,6 +142,15 @@ const ACT_SCHEDULER_MISSING_BEFORE_EXECUTION = [
   "react-test-renderer-passive-effect-callback-execution",
   "react-test-renderer-private-root-request-execution"
 ];
+const ACT_SCHEDULER_WARNING_THENABLE_MISSING_BEFORE_EXECUTION = [
+  "public-react-test-renderer-act-warning-emission",
+  "public-react-test-renderer-act-thenable-awaiting",
+  "public-react-test-renderer-async-act-scope-settlement"
+];
+const ACT_WARNING_THENABLE_BLOCKER_PREREQUISITE_ID =
+  "act-warning-thenable-public-compatibility-blockers";
+const ACT_WARNING_THENABLE_BLOCKER_RECORD_ID =
+  "react-test-renderer-act-warning-thenable-blockers";
 const ACT_SCHEDULER_FLUSH_HELPER_METADATA = [
   [
     "unstable_flushAll",
@@ -198,10 +207,20 @@ const ACT_SCHEDULER_REACT_QUEUE_DIAGNOSTIC_RECORD_IDS = [
 const ACT_SCHEDULER_CJS_DEVELOPMENT_REACT_QUEUE_DIAGNOSTIC_RECORD_IDS = [
   "scheduler-private-act-queue-flush-diagnostics",
   "test-renderer-mock-scheduler-flush-helper-routing",
+  ACT_WARNING_THENABLE_BLOCKER_RECORD_ID,
   "react-private-act-internal-test-queue-factories"
 ];
 const CJS_DEVELOPMENT_ENTRYPOINT =
   "react-test-renderer/cjs/react-test-renderer.development";
+
+function actSchedulerMissingBeforeExecution(entrypoint) {
+  return entrypoint === CJS_DEVELOPMENT_ENTRYPOINT
+    ? [
+        ...ACT_SCHEDULER_MISSING_BEFORE_EXECUTION,
+        ...ACT_SCHEDULER_WARNING_THENABLE_MISSING_BEFORE_EXECUTION
+      ]
+    : ACT_SCHEDULER_MISSING_BEFORE_EXECUTION;
+}
 const ACT_SCHEDULER_SYNC_FLUSH_RECORD_IDS = [
   "sync-flush-act-continuation-record",
   "sync-flush-act-post-passive-continuation-gate",
@@ -294,8 +313,16 @@ const ACCEPTED_PRIVATE_ACT_FLUSH_CJS_PREREQUISITE_IDS = [
   "passive-effect-scheduler-flush-metadata",
   ...ACCEPTED_PRIVATE_ACT_FLUSH_PREREQUISITE_IDS.slice(8)
 ];
+const ACCEPTED_PRIVATE_ACT_FLUSH_CJS_DEVELOPMENT_PREREQUISITE_IDS = [
+  ...ACCEPTED_PRIVATE_ACT_FLUSH_CJS_PREREQUISITE_IDS.slice(0, 4),
+  ACT_WARNING_THENABLE_BLOCKER_PREREQUISITE_ID,
+  ...ACCEPTED_PRIVATE_ACT_FLUSH_CJS_PREREQUISITE_IDS.slice(4)
+];
 
 function acceptedPrivateActFlushPrerequisiteIds(entrypoint) {
+  if (entrypoint === CJS_DEVELOPMENT_ENTRYPOINT) {
+    return ACCEPTED_PRIVATE_ACT_FLUSH_CJS_DEVELOPMENT_PREREQUISITE_IDS;
+  }
   return entrypoint.startsWith("react-test-renderer/cjs/")
     ? ACCEPTED_PRIVATE_ACT_FLUSH_CJS_PREREQUISITE_IDS
     : ACCEPTED_PRIVATE_ACT_FLUSH_PREREQUISITE_IDS;
@@ -508,6 +535,37 @@ test("deterministic act warning surfaces are captured without timers", () => {
       value: "then"
     }
   ]);
+  assert.deepEqual(result.unawaitedThenableShape.objectKeys, ["then"]);
+  assert.deepEqual(
+    dataDescriptorFields(
+      result.unawaitedThenableShape.ownProperties[0].descriptor
+    ),
+    {
+      configurable: true,
+      enumerable: true,
+      writable: true
+    }
+  );
+  assert.deepEqual(result.unawaitedThenableShape.ownProperties[0].descriptor.value, {
+    type: "function",
+    name: "then",
+    length: 2,
+    isAsync: false,
+    ownKeys: [
+      {
+        type: "string",
+        value: "length"
+      },
+      {
+        type: "string",
+        value: "name"
+      },
+      {
+        type: "string",
+        value: "prototype"
+      }
+    ]
+  });
   assertConsoleMessageIncludes(
     result.unawaitedConsoleCalls,
     "You called act(async () => ...) without await"
@@ -1179,6 +1237,24 @@ function assertPrivateActQueueDiagnosticConsumer(entry, moduleExports) {
   assert.equal(diagnostics.executesEffects, false);
   assert.equal(diagnostics.invokesActCallback, false);
   if (entry.entrypoint === CJS_DEVELOPMENT_ENTRYPOINT) {
+    assert.equal(diagnostics.publicActWarningEmissionAvailable, false);
+    assert.equal(diagnostics.publicActThenableAwaitingAvailable, false);
+    assert.equal(diagnostics.publicActThenableResolutionAvailable, false);
+    assert.equal(diagnostics.publicAsyncActCompatibilityClaimed, false);
+    assert.equal(diagnostics.emitsActWarnings, false);
+    assert.equal(diagnostics.awaitsActThenables, false);
+    assertActWarningThenableBlockerDiagnostics(
+      entry,
+      diagnostics.warningThenableBlockerDiagnostics
+    );
+  } else {
+    assert.equal(
+      diagnostics.warningThenableBlockerDiagnostics,
+      undefined,
+      entry.entrypoint
+    );
+  }
+  if (entry.entrypoint === CJS_DEVELOPMENT_ENTRYPOINT) {
     assert.equal(
       diagnostics.routesAcceptedMockSchedulerFlushHelperMetadata,
       true
@@ -1352,6 +1428,56 @@ function assertPrivateActQueueDiagnosticConsumer(entry, moduleExports) {
   }
 }
 
+function assertActWarningThenableBlockerDiagnostics(entry, diagnostics) {
+  assert.equal(Object.isFrozen(diagnostics), true, entry.entrypoint);
+  assert.deepEqual(
+    diagnostics,
+    {
+      id: ACT_WARNING_THENABLE_BLOCKER_RECORD_ID,
+      status:
+        "blocked-private-react-test-renderer-act-warning-thenable-diagnostics-only",
+      acceptedWorker:
+        "worker-517-test-renderer-act-warning-thenable-blockers",
+      acceptedOracle: "react-19.2.6-react-test-renderer-act-oracle",
+      acceptedScenario: "react-test-renderer-act-warning-surfaces",
+      acceptedReactSources: [
+        "packages/react/src/ReactAct.js",
+        "packages/react-reconciler/src/ReactFiberAct.js"
+      ],
+      observedPublicWarningSurfaces: [
+        "missing-IS_REACT_ACT_ENVIRONMENT-warning",
+        "unawaited-async-act-warning"
+      ],
+      observedPublicThenableShape: {
+        type: "object",
+        ownKeys: ["then"],
+        thenName: "then",
+        thenLength: 2
+      },
+      blockedPublicPrerequisiteIds:
+        ACT_SCHEDULER_WARNING_THENABLE_MISSING_BEFORE_EXECUTION,
+      publicActWarningEmissionAvailable: false,
+      publicMissingEnvironmentWarningEmissionAvailable: false,
+      publicUnawaitedAsyncActWarningEmissionAvailable: false,
+      publicActThenableAwaitingAvailable: false,
+      publicActThenableResolutionAvailable: false,
+      publicAsyncActScopeSettlementAvailable: false,
+      publicAsyncActCompatibilityClaimed: false,
+      returnsPublicActThenable: false,
+      tracksDidAwaitActCall: false,
+      queuesWarningMicrotasks: false,
+      awaitsReturnedThenables: false,
+      invokesActCallback: false,
+      drainsPublicReactActQueue: false,
+      drainsPublicSchedulerTaskQueue: false,
+      executesQueuedWork: false,
+      executesEffects: false,
+      compatibilityClaimed: false
+    },
+    entry.entrypoint
+  );
+}
+
 function assertMockSchedulerFlushHelperRoute(entry, diagnostics, reactGate) {
   const Scheduler = loadFreshWorkspaceModule("packages/scheduler/unstable_mock.js");
   Scheduler.reset();
@@ -1494,7 +1620,7 @@ function assertMockSchedulerFlushHelperRoute(entry, diagnostics, reactGate) {
   assert.equal(report.rendererRootsCompatibilityClaimed, false);
   assert.deepEqual(
     report.missingBeforeExecution,
-    ACT_SCHEDULER_MISSING_BEFORE_EXECUTION
+    actSchedulerMissingBeforeExecution(entry.entrypoint)
   );
   assert.equal(queue.records.length, 0);
   assert.deepEqual(publicSchedulerEvents, []);
@@ -1969,6 +2095,20 @@ function assertActSurface(entry, moduleExports) {
   assert.equal(error.privateFlushExecutionMetadataAccepted, true);
   assert.equal(error.privateSyncFlushExecutionMetadataAccepted, true);
   assert.equal(error.privatePassiveCallbackExecutionMetadataAccepted, true);
+  if (entry.entrypoint === CJS_DEVELOPMENT_ENTRYPOINT) {
+    assert.equal(error.warningThenableBlockerDiagnosticsAccepted, true);
+    assert.equal(error.publicActWarningEmissionAvailable, false);
+    assert.equal(error.publicActThenableAwaitingAvailable, false);
+    assert.equal(error.publicActThenableResolutionAvailable, false);
+    assert.equal(error.publicAsyncActScopeSettlementAvailable, false);
+    assert.equal(error.publicAsyncActCompatibilityClaimed, false);
+  } else {
+    assert.equal(
+      error.warningThenableBlockerDiagnosticsAccepted,
+      undefined,
+      entry.entrypoint
+    );
+  }
   assert.equal(error.privateRootOutputDiagnosticsAccepted, true);
   assert.equal(error.privateFlushExecutionReady, false);
   assert.equal(error.publicSchedulerFlushExecutionAvailable, false);
@@ -2069,7 +2209,8 @@ function assertActSchedulerGate(gate, entrypoint) {
       "worker-404-scheduler-mock-private-callback-execution",
       "worker-436-scheduler-mock-continuation-execution",
       "worker-469-scheduler-mock-expired-continuation-gate",
-      "worker-482-test-renderer-act-scheduler-flush-gate"
+      "worker-482-test-renderer-act-scheduler-flush-gate",
+      "worker-517-test-renderer-act-warning-thenable-blockers"
     );
   }
 
@@ -2119,6 +2260,30 @@ function assertActSchedulerGate(gate, entrypoint) {
     gate.privatePassiveEffectDrainDiagnosticsConsumed,
     isCjs ? true : undefined
   );
+  assert.equal(
+    gate.warningThenableBlockerDiagnosticsAccepted,
+    cjsDevelopmentOnly ? true : undefined
+  );
+  assert.equal(
+    gate.publicActWarningEmissionAvailable,
+    cjsDevelopmentOnly ? false : undefined
+  );
+  assert.equal(
+    gate.publicActThenableAwaitingAvailable,
+    cjsDevelopmentOnly ? false : undefined
+  );
+  assert.equal(
+    gate.publicActThenableResolutionAvailable,
+    cjsDevelopmentOnly ? false : undefined
+  );
+  assert.equal(
+    gate.publicAsyncActScopeSettlementAvailable,
+    cjsDevelopmentOnly ? false : undefined
+  );
+  assert.equal(
+    gate.publicAsyncActCompatibilityClaimed,
+    cjsDevelopmentOnly ? false : undefined
+  );
   assert.equal(gate.privateRootOutputDiagnosticsAccepted, true);
   assert.equal(gate.privateFlushPrerequisitesPresent, true);
   assert.equal(gate.privateFlushExecutionReady, false);
@@ -2143,6 +2308,22 @@ function assertActSchedulerGate(gate, entrypoint) {
     );
   } else {
     assert.equal(gate.privateActPassiveEffectDrainDiagnostics, undefined);
+  }
+  if (cjsDevelopmentOnly) {
+    assertActWarningThenableBlockerDiagnostics(
+      { entrypoint },
+      gate.recognizedActWarningThenableBlockers
+    );
+    assertActWarningThenableBlockerDiagnostics(
+      { entrypoint },
+      gate.privateActQueueFlushDiagnostics.warningThenableBlockerDiagnostics
+    );
+  } else {
+    assert.equal(gate.recognizedActWarningThenableBlockers, undefined);
+    assert.equal(
+      gate.privateActQueueFlushDiagnostics.warningThenableBlockerDiagnostics,
+      undefined
+    );
   }
   assert.deepEqual(
     gate.recognizedSchedulerMockFlushHelpers.map((record) => [
@@ -2174,6 +2355,12 @@ function assertActSchedulerGate(gate, entrypoint) {
   assert.deepEqual(
     gate.blockedPrivateFlushPrerequisiteIds,
     BLOCKED_PRIVATE_ACT_FLUSH_PREREQUISITE_IDS
+  );
+  assert.deepEqual(
+    gate.blockedPublicAsyncActCompatibilityPrerequisiteIds,
+    cjsDevelopmentOnly
+      ? ACT_SCHEDULER_WARNING_THENABLE_MISSING_BEFORE_EXECUTION
+      : undefined
   );
   assert.deepEqual(
     gate.acceptedPrivateFlushPrerequisites.map((record) => record.id),
@@ -2213,7 +2400,12 @@ function assertActSchedulerGate(gate, entrypoint) {
       delegatesToPrivateSchedulerDiagnostics: true,
       invokesPublicSchedulerFlushHelper: false,
       publicSchedulerFlushBehaviorExecuted: false,
-      drainsExpiredMockSchedulerWork: false
+      drainsExpiredMockSchedulerWork: false,
+      emitsActWarnings: false,
+      awaitsActThenables: false,
+      resolvesActThenables: false,
+      settlesAsyncActScopes: false,
+      publicAsyncActCompatibilityClaimed: false
     });
   }
   assert.deepEqual(gate.sideEffectPolicy, expectedSideEffectPolicy);
@@ -2254,6 +2446,38 @@ function assertActSchedulerGate(gate, entrypoint) {
       .drainsPublicReactActQueue,
     false
   );
+  if (cjsDevelopmentOnly) {
+    const warningThenableRecord =
+      gate.recognizedSchedulerReactActQueueDiagnostics.find(
+        (record) => record.id === ACT_WARNING_THENABLE_BLOCKER_RECORD_ID
+      );
+    assert.notEqual(warningThenableRecord, undefined);
+    assert.equal(
+      warningThenableRecord.status,
+      "blocked-private-react-test-renderer-act-warning-thenable-diagnostics-only"
+    );
+    assert.equal(
+      warningThenableRecord.publicActWarningEmissionAvailable,
+      false
+    );
+    assert.equal(
+      warningThenableRecord.publicActThenableAwaitingAvailable,
+      false
+    );
+    assert.equal(
+      warningThenableRecord.publicActThenableResolutionAvailable,
+      false
+    );
+    assert.equal(
+      warningThenableRecord.publicAsyncActCompatibilityClaimed,
+      false
+    );
+    assert.equal(warningThenableRecord.emitsWarnings, false);
+    assert.equal(warningThenableRecord.awaitsThenables, false);
+    assert.equal(warningThenableRecord.invokesActCallback, false);
+    assert.equal(warningThenableRecord.executesQueuedWork, false);
+    assert.equal(warningThenableRecord.executesEffects, false);
+  }
   assert.equal(
     gate.recognizedSyncFlushActRecords[2].syncFlushExecution,
     false
@@ -2319,7 +2543,7 @@ function assertActSchedulerGate(gate, entrypoint) {
   assert.equal(Object.isFrozen(gate.missingBeforeExecution), true);
   assert.deepEqual(
     gate.missingBeforeExecution,
-    ACT_SCHEDULER_MISSING_BEFORE_EXECUTION
+    actSchedulerMissingBeforeExecution(entrypoint)
   );
 }
 
