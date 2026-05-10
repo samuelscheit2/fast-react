@@ -238,7 +238,7 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
   );
   assert.equal(
     gate.id,
-    "react-dom-test-utils-act-private-routing-gate-2"
+    "react-dom-test-utils-act-private-routing-gate-3"
   );
   assert.equal(gate.entrypoint, "react-dom/test-utils");
   assert.equal(gate.compatibilityTarget, "react-dom@19.2.6");
@@ -279,6 +279,8 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     executesQueuedWork: false,
     executesPassiveEffects: false,
     executesRendererRoots: false,
+    executesPublicRendererRoots: false,
+    executesPublicDomMutation: false,
     executesSyncFlush: false,
     emitsDeprecationWarning: false,
     delegatesToReactAct: false
@@ -306,7 +308,7 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     executesEffects: false
   });
   assert.deepEqual(gate.schedulerMockFlushHelpers, {
-    status: "accepted-scheduler-mock-flush-helper-metadata",
+    status: "accepted-scheduler-mock-flush-helper-and-continuation-evidence",
     helpers: [
       "unstable_flushAll",
       "unstable_flushAllWithoutAsserting",
@@ -314,6 +316,15 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
       "unstable_flushNumberOfYields",
       "unstable_flushUntilNextPaint"
     ],
+    evidenceScenarios: [
+      "scheduler-mock-export-shape",
+      "scheduler-mock-flush-helpers",
+      "scheduler-mock-continuations-and-paint"
+    ],
+    deterministicMockFlushEvidence: true,
+    mockContinuationEvidence: true,
+    executesActQueueTasks: false,
+    executesRendererWork: false,
     executesScheduledCallbacks: false
   });
   assert.deepEqual(gate.syncFlushActContinuation.records, [
@@ -324,20 +335,27 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
   ]);
   assert.deepEqual(gate.syncFlushPostPassiveContinuationExecution, {
     status:
-      "private-sync-flush-post-passive-continuation-execution-gate-record-only",
+      "private-sync-flush-post-passive-continuation-executes-follow-up-sync-flush",
     records: [
       "SyncFlushPostPassiveContinuationExecutionGateRecord",
+      "SyncFlushPostPassiveContinuationExecutionRecord",
       "SyncFlushPostPassiveContinuationRootRecord",
       "sync_flush_post_passive_continuation_execution_gate",
-      "observe_sync_flush_post_passive_continuation_execution_gate_after_commit",
-      "SyncFlushRootRecord.post_passive_continuation_execution_gate"
+      "SyncFlushPostPassiveContinuationExecutionGateRecord.should_execute_follow_up_sync_flush",
+      "flush_sync_post_passive_continuation_after_passive_effects",
+      "flush_passive_effects_after_commit_and_sync_flush_continuation",
+      "PassiveEffectsFlushWithSyncFlushContinuationResult",
+      "SyncFlushPostPassiveContinuationExecutionRecord.did_execute_follow_up_sync_flush",
+      "SyncFlushPostPassiveContinuationExecutionRecord.did_flush_follow_up_sync_work",
+      "SyncFlushRootRecord::post_passive_continuation_execution_gate"
     ],
     observesPendingPassiveHandoff: true,
     collectsContinuationRoots: true,
-    consumesPendingPassive: false,
-    rendersContinuationRoots: false,
-    commitsContinuationRoots: false,
-    executesSyncFlush: false,
+    consumesPendingPassive: true,
+    privateExecution: true,
+    rendersContinuationRoots: true,
+    commitsContinuationRoots: true,
+    executesSyncFlush: true,
     executesPassiveEffects: false,
     invokesCallbacks: false
   });
@@ -347,17 +365,19 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
       "PendingPassiveCommitHandoff",
       "PassiveEffectsFlushResult",
       "PassiveEffectFlushRecord",
+      "PassiveEffectsFlushWithSyncFlushContinuationResult",
       "FunctionComponentPendingPassiveCommitHandoff",
       "FunctionComponentPendingPassiveEffectPhaseCommitRecord"
     ],
     consumesPendingPassiveMetadata: true,
+    hasSyncFlushContinuationWrapper: true,
     discoversCommittedFiberEffects: false,
     executesPassiveEffects: false,
     invokesCreateCallbacks: false,
     invokesDestroyCallbacks: false
   });
   assert.deepEqual(gate.passiveEffectCallbackHandles, {
-    status: "data-only-passive-effect-callback-handles-without-invocation",
+    status: "private-passive-effect-callback-invocation-test-control-only",
     records: [
       "FunctionComponentPendingPassiveEffectCommitRecord.create",
       "FunctionComponentPendingPassiveEffectCommitRecord.destroy",
@@ -370,15 +390,43 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
       "PassiveEffectFlushRecord.create_callback_invoked",
       "PassiveEffectFlushRecord.destroy_callback_invoked"
     ],
+    invocationRecords: [
+      "PassiveEffectCallbackInvocationGateSnapshot",
+      "PassiveEffectCallbackInvocationRecord",
+      "PassiveEffectCallbackInvocationRequest",
+      "PassiveEffectCallbackInvocationKind",
+      "PassiveEffectCallbackInvocationStatus",
+      "PassiveEffectCallbackInvocationTestControl",
+      "PassiveEffectCallbackInvocationGateBlocker",
+      "invoke_passive_effect_callbacks_under_test_control",
+      "PassiveEffectDestroyCallbackExecutionRecord",
+      "PassiveEffectDestroyCallbackErrorRecord",
+      "flush_passive_effects_after_commit_with_destroy_executor"
+    ],
+    invocationBlockers: [
+      "PublicEffectExecution",
+      "PublicActCompatibility",
+      "SchedulerDrivenPassiveExecution"
+    ],
     phaseRules: [
       "unmount-phase-carries-destroy-handle-without-create-handle",
       "mount-phase-carries-create-handle-without-destroy-handle",
-      "callback-invoked-accessors-return-false"
+      "default-flush-callback-invoked-accessors-return-false",
+      "test-controlled-invocation-runs-destroy-before-create",
+      "scheduler-driven-passive-execution-remains-disabled"
     ],
     carriesCreateCallbackHandles: true,
     carriesDestroyCallbackHandles: true,
+    testControlledInvocationOnly: true,
+    invokesCreateCallbacksUnderTestControl: true,
+    invokesDestroyCallbacksUnderTestControl: true,
+    recordsReturnedDestroyHandles: true,
+    recordsCallbackErrors: true,
     invokesCreateCallbacks: false,
     invokesDestroyCallbacks: false,
+    publicEffectExecutionEnabled: false,
+    schedulerDrivenPassiveExecutionEnabled: false,
+    publicActCompatibilityClaimed: false,
     effectCallbackExecutionReady: false
   });
   assert.deepEqual(gate.reactDomRootBridge.records, [
@@ -387,6 +435,36 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     "FastReactDomPrivateRootAdmissionRecord",
     "FastReactDomPrivateRootNativeRequestHandoffRecord"
   ]);
+  assert.deepEqual(gate.reactDomRootBridge.privateHostOutputDiagnostics, {
+    status:
+      "accepted-private-root-host-output-diagnostic-without-public-root-execution",
+    scenarios: [
+      "create-root-no-render",
+      "initial-host-render",
+      "update-host-render",
+      "root-unmount"
+    ],
+    evidence: [
+      "root-render-private-host-output-diagnostic-gate-1",
+      "accepted-private-root-host-output-diagnostic",
+      "private-fake-dom-root-host-output",
+      "explicit-create-root-marker-listener-apply-revert",
+      "fake-dom-host-component-host-text-output",
+      "latest-props-mutation-handoff-publication",
+      "private-unmount-host-output-cleanup"
+    ],
+    summary: {
+      admittedScenarioModeRowCount: 8,
+      blockedScenarioModeRowCount: 12,
+      compatibilityClaimed: false,
+      source:
+        "tests/conformance/src/react-dom-root-render-e2e-conformance-gate.mjs"
+    },
+    fakeDomHostOutputOnly: true,
+    publicRootExecution: false,
+    publicDomMutation: false,
+    compatibilityClaimed: false
+  });
   assert.equal(gate.reactDomRootBridge.nativeExecution, false);
   assert.equal(gate.reactDomRootBridge.reconcilerExecution, false);
   assert.equal(gate.reactDomRootBridge.domMutation, false);
