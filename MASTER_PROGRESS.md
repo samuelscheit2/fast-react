@@ -29,6 +29,25 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Workers 353-382 were accepted as a complete implementation batch. The batch
+  added private root commit HostText update, nested placement, deletion cleanup,
+  root-work-loop and sync-flush host-output commit handoffs, function-component
+  `useMemo`/`useRef`, state dispatch, and context consumer render propagation,
+  passive effect mount/unmount execution gates, react-test-renderer
+  update/toJSON/toTree/TestInstance/act host-output paths, React DOM private
+  initial/update/unmount host output, event/ref/hydration/portal/resource/
+  controlled-input/native/scheduler/test-utils private gates, package-surface
+  and benchmark refreshes, and root-render E2E private update/unmount
+  admissions while public compatibility remains blocked.
+- Workers 353-382 were verified after merge with focused Rust, React DOM,
+  native, scheduler, act, resource/form, root-render E2E, public facade, and
+  oracle checks. Final broad verification passed `cargo fmt --all --check`,
+  full `fast-react-reconciler`, `fast-react-test-renderer`, and
+  `fast-react-napi` tests, workspace clippy with `-D warnings`, React
+  test-renderer/React DOM/native workspace checks, package-surface,
+  benchmarks, `npm run check:js`, and `git diff --check`. Post-merge cleanup
+  updated the context-object gate expectation for the accepted private
+  `useContext` read path and fixed strict clippy naming/argument warnings.
 - Workers 323-325, 333-335, 338, 339, 342-345, and 350-352 were accepted from
   queue 323-352. The batch added private root commit host-parent placement,
   stable sibling insertion, and host deletion cleanup apply canaries; private
