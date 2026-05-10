@@ -17,11 +17,14 @@ const DOM_DANGEROUS_HTML_TEXT_RESET_GATE_METADATA = Object.freeze({
     'packages/react-dom/src/dom-host/property-payload.js#diffDomPropertyPayload',
   privateTextContentBridge:
     'packages/react-dom/src/dom-host/text-content.js#shouldSetTextContent',
+  privateFakeDomCommitMetadataBridge:
+    'packages/react-dom/src/client/root-bridge.js#recordPrivateRootDangerousHtmlTextResetCommitMetadata',
   publicRootsCompared: false,
   serverRenderingCompared: false,
   hydrationCompared: false,
   browserDomCompared: false,
   realDomInnerHTMLWrites: false,
+  fakeDomCommitMetadata: true,
   publicDomMutation: false,
   compatibilityClaimed: false,
   supportedBlockedRowIds: Object.freeze([
@@ -31,6 +34,8 @@ const DOM_DANGEROUS_HTML_TEXT_RESET_GATE_METADATA = Object.freeze({
     'managed-text-to-dangerous-html-set-inner-html-blocked'
   ])
 });
+
+const dangerousHtmlTextResetDiagnosticPayloads = new WeakMap();
 
 function createDangerousHtmlTextResetDiagnostic(
   tag,
@@ -53,8 +58,11 @@ function createDangerousHtmlTextResetDiagnostic(
   const blockedMutationRows = freezeArray(
     createBlockedHostUpdateRows(next, resetDecision, propertyPayloadRows)
   );
+  const propertyPayloadRowsAccepted = propertyPayloadRows.every(
+    (row) => row.kind !== ENTRY_UNSUPPORTED
+  );
 
-  return freezeRecord({
+  const diagnostic = freezeRecord({
     kind: 'FastReactDomDangerousHtmlTextResetDiagnostic',
     status: 'blocked-host-update',
     hostTag: tag,
@@ -68,8 +76,11 @@ function createDangerousHtmlTextResetDiagnostic(
     nextShouldSetTextContent: next.shouldSetTextContent,
     resetDecision,
     propertyPayloadRows,
+    propertyPayloadRowsAccepted,
     blockedMutationRows,
     blockedMutationRowCount: blockedMutationRows.length,
+    fakeDomCommitMetadataAvailable:
+      propertyPayloadRowsAccepted && blockedMutationRows.length > 0,
     sideEffects: freezeRecord({
       realDomMutated: false,
       realDomInnerHTMLWritten: false,
@@ -81,6 +92,21 @@ function createDangerousHtmlTextResetDiagnostic(
     publicCompatibilityEnabled: false,
     compatibilityClaimed: false
   });
+
+  dangerousHtmlTextResetDiagnosticPayloads.set(
+    diagnostic,
+    freezeRecord({
+      blockedMutationRows,
+      hostTag: tag,
+      nextProps: next.props,
+      previousProps: previous.props,
+      propertyPayloadRows,
+      propertyPayloadRowsAccepted,
+      resetDecision
+    })
+  );
+
+  return diagnostic;
 }
 
 function describeTextOrHtmlProps(tag, props, phase) {
@@ -289,7 +315,20 @@ function createDomPropertyOperationsError(code, message) {
   return error;
 }
 
+function getDangerousHtmlTextResetDiagnosticPayload(record) {
+  if (record === null || typeof record !== 'object') {
+    return null;
+  }
+  return dangerousHtmlTextResetDiagnosticPayloads.get(record) || null;
+}
+
+function isDangerousHtmlTextResetDiagnostic(record) {
+  return getDangerousHtmlTextResetDiagnosticPayload(record) !== null;
+}
+
 module.exports = {
   DOM_DANGEROUS_HTML_TEXT_RESET_GATE_METADATA,
-  createDangerousHtmlTextResetDiagnostic
+  createDangerousHtmlTextResetDiagnostic,
+  getDangerousHtmlTextResetDiagnosticPayload,
+  isDangerousHtmlTextResetDiagnostic
 };
