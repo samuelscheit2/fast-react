@@ -135,6 +135,12 @@ const testUtilsActGate = require('../test-utils-act-gate.js');
 
 const CLIENT_ROOT_KIND = 'client';
 const CONCURRENT_ROOT_TAG = 'ConcurrentRoot';
+const REACT_FRAGMENT_TYPE = Symbol.for('react.fragment');
+
+const INITIAL_HOST_OUTPUT_SHAPE_HOST_COMPONENT = 'host-component';
+const INITIAL_HOST_OUTPUT_SHAPE_FRAGMENT = 'fragment';
+const INITIAL_HOST_OUTPUT_SHAPE_ARRAY = 'array';
+const INITIAL_HOST_OUTPUT_FRAGMENT_HOST_TYPE = 'Fragment';
 
 const privateRootOwnerType = 'fast.react_dom.private_root_owner';
 const privateRootHandleType = 'fast.react_dom.private_root_handle';
@@ -710,6 +716,13 @@ const ROOT_BRIDGE_INITIAL_HOST_OUTPUT_ACCEPTED_CAPABILITIES = freezeArray([
       'Latest props were published only after the private mutation handoff was accepted.'
   })
 ]);
+const ROOT_BRIDGE_FRAGMENT_ARRAY_HOST_OUTPUT_ACCEPTED_CAPABILITY =
+  freezeRecord({
+    id: 'fake-dom-fragment-array-host-children',
+    accepted: true,
+    reason:
+      'An unkeyed fragment/array host-child shape was applied through private fake-DOM host output only.'
+  });
 const ROOT_BRIDGE_INITIAL_HOST_OUTPUT_BLOCKED_CAPABILITIES = freezeArray([
   freezeRecord({
     id: 'public-root-object',
@@ -1724,7 +1737,7 @@ const ROOT_BRIDGE_PUBLIC_FACADE_ROOT_WORK_LOOP_FINISHED_WORK_ACCEPTED_CAPABILITY
     id: 'root-work-loop-finished-work-handoff',
     accepted: true,
     reason:
-      'Accepted root work-loop finished-work handoff metadata was linked to the private HostComponent/HostText facade render diagnostic.'
+      'Accepted root work-loop finished-work handoff metadata was linked to the private facade render diagnostic.'
   });
 const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_BLOCKED_CAPABILITIES =
   freezeArray([
@@ -3513,6 +3526,7 @@ function renderPrivateRootPublicFacadeHostOutputFromPayload(
             : createDefaultPublicFacadeRootWorkLoopFinishedWorkMetadata({
                 createRecord,
                 hostOutputHandoff,
+                normalizedInitial,
                 renderRecord
               }),
         metadataProvided: rootWorkLoopMetadataOption.found,
@@ -3577,8 +3591,16 @@ function renderPrivateRootPublicFacadeHostOutputFromPayload(
     hostOutputHandoffSequence: hostOutputHandoff.handoffSequence,
     hostOutputHandoffStatus: hostOutputHandoff.handoffStatus,
     hostType: hostOutputHandoff.hostType,
+    hostOutputShape: hostOutputHandoff.hostOutputShape,
+    hostComponentCount: hostOutputHandoff.hostComponentCount,
+    hostTextCount: hostOutputHandoff.hostTextCount,
+    rootChildTag: hostOutputHandoff.rootChildTag,
+    completedChildTag: hostOutputHandoff.completedChildTag,
+    childTags: hostOutputHandoff.childTags,
     hostNodeInfo: hostOutputHandoff.hostNodeInfo,
     textNodeInfo: hostOutputHandoff.textNodeInfo,
+    hostNodeInfos: hostOutputHandoff.hostNodeInfos,
+    textNodeInfos: hostOutputHandoff.textNodeInfos,
     containerChildCount: hostOutputHandoff.containerChildCount,
     hostChildCount: hostOutputHandoff.hostChildCount,
     textContent: hostOutputHandoff.textContent,
@@ -5433,73 +5455,145 @@ function applyPrivateInitialRenderHostOutputWithBridge(
   const sequence = rootBridgeState.nextInitialHostOutputSequence++;
   const handoffId = `${rootBridgeState.initialHostOutputIdPrefix}:${sequence}`;
   const hostOutput = normalizeInitialHostOutputElement(validation.element);
-  const hostOwner = freezeRecord({
-    kind: 'FastReactDomPrivateInitialHostComponentOwner',
-    handoffId,
-    hostType: hostOutput.type,
-    renderUpdateId: validation.renderRecord.updateId
-  });
-  const textOwner = freezeRecord({
-    kind: 'FastReactDomPrivateInitialHostTextOwner',
-    handoffId,
-    hostType: hostOutput.type,
-    renderUpdateId: validation.renderRecord.updateId
-  });
-  let hostNode = null;
-  let textNode = null;
-  let hostToken = null;
-  let textToken = null;
-  let latestPropsMutationHandoff = null;
-  let latestPropsMutationPayload = null;
-  let latestPropsBeforeCommit = null;
-  let latestPropsAfterCommit = null;
-  let hostAppendedToContainer = false;
-  let textAppendedToHost = false;
+  const childCommits = [];
 
   try {
-    hostNode = createDomHostElementInstance(
-      hostOutput.type,
-      validation.container
-    );
-    hostToken = createHostInstanceToken(hostOwner, validation.rootOwner);
-    attachHostInstanceNode(hostNode, hostToken, hostOutput.previousProps);
+    for (const child of hostOutput.hostChildren) {
+      const childCommit = {
+        child,
+        hostAppendedToContainer: false,
+        hostNode: null,
+        hostToken: null,
+        latestPropsAfterCommit: null,
+        latestPropsBeforeCommit: null,
+        latestPropsMutationHandoff: null,
+        latestPropsMutationPayload: null,
+        textAppendedToHost: false,
+        textNode: null,
+        textToken: null
+      };
+      childCommits.push(childCommit);
 
-    latestPropsMutationHandoff = commitDomPropertyUpdateForLatestProps(
-      hostNode,
-      hostOutput.type,
-      hostOutput.previousProps,
-      hostOutput.nextProps
-    );
-    latestPropsMutationPayload =
-      getDomPropertyUpdateLatestPropsHandoffPayload(
-        latestPropsMutationHandoff
+      const hostOwner = freezeRecord({
+        kind: 'FastReactDomPrivateInitialHostComponentOwner',
+        handoffId,
+        hostChildIndex: child.index,
+        hostOutputShape: hostOutput.shape,
+        hostType: child.type,
+        renderUpdateId: validation.renderRecord.updateId
+      });
+      const textOwner = freezeRecord({
+        kind: 'FastReactDomPrivateInitialHostTextOwner',
+        handoffId,
+        hostChildIndex: child.index,
+        hostOutputShape: hostOutput.shape,
+        hostType: child.type,
+        renderUpdateId: validation.renderRecord.updateId
+      });
+
+      childCommit.hostNode = createDomHostElementInstance(
+        child.type,
+        validation.container
       );
-    latestPropsBeforeCommit = getLatestPropsFromNode(hostNode);
-    latestPropsAfterCommit = requireLatestPropsCommitResult(
-      latestPropsMutationHandoff
-    );
+      childCommit.hostToken = createHostInstanceToken(
+        hostOwner,
+        validation.rootOwner
+      );
+      attachHostInstanceNode(
+        childCommit.hostNode,
+        childCommit.hostToken,
+        child.previousProps
+      );
 
-    textNode = createDomHostTextInstance(
-      hostOutput.text,
-      validation.container
-    );
-    textToken = createHostInstanceToken(textOwner, validation.rootOwner);
-    attachHostInstanceNode(textNode, textToken, null);
-    appendInitialChild(hostNode, textNode);
-    textAppendedToHost = true;
-    appendChildToContainer(validation.container, hostNode);
-    hostAppendedToContainer = true;
+      childCommit.latestPropsMutationHandoff =
+        commitDomPropertyUpdateForLatestProps(
+          childCommit.hostNode,
+          child.type,
+          child.previousProps,
+          child.nextProps
+        );
+      childCommit.latestPropsMutationPayload =
+        getDomPropertyUpdateLatestPropsHandoffPayload(
+          childCommit.latestPropsMutationHandoff
+        );
+      childCommit.latestPropsBeforeCommit = getLatestPropsFromNode(
+        childCommit.hostNode
+      );
+      childCommit.latestPropsAfterCommit = requireLatestPropsCommitResult(
+        childCommit.latestPropsMutationHandoff
+      );
+
+      childCommit.textNode = createDomHostTextInstance(
+        child.text,
+        validation.container
+      );
+      childCommit.textToken = createHostInstanceToken(
+        textOwner,
+        validation.rootOwner
+      );
+      attachHostInstanceNode(childCommit.textNode, childCommit.textToken, null);
+      appendInitialChild(childCommit.hostNode, childCommit.textNode);
+      childCommit.textAppendedToHost = true;
+      appendChildToContainer(validation.container, childCommit.hostNode);
+      childCommit.hostAppendedToContainer = true;
+    }
   } catch (error) {
     rollbackPartialInitialHostOutput({
       container: validation.container,
-      hostAppendedToContainer,
-      hostNode,
-      latestPropsMutationHandoff,
-      textAppendedToHost,
-      textNode
+      children: childCommits
     });
     throw error;
   }
+
+  const firstChildCommit = childCommits[0];
+  const hostNode = firstChildCommit.hostNode;
+  const textNode = firstChildCommit.textNode;
+  const hostToken = firstChildCommit.hostToken;
+  const textToken = firstChildCommit.textToken;
+  const latestPropsMutationHandoff =
+    firstChildCommit.latestPropsMutationHandoff;
+  const latestPropsMutationPayload =
+    firstChildCommit.latestPropsMutationPayload;
+  const latestPropsBeforeCommit = firstChildCommit.latestPropsBeforeCommit;
+  const latestPropsAfterCommit = firstChildCommit.latestPropsAfterCommit;
+  const hostNodes = freezeArray(
+    childCommits.map((childCommit) => childCommit.hostNode)
+  );
+  const textNodes = freezeArray(
+    childCommits.map((childCommit) => childCommit.textNode)
+  );
+  const hostTokens = freezeArray(
+    childCommits.map((childCommit) => childCommit.hostToken)
+  );
+  const textTokens = freezeArray(
+    childCommits.map((childCommit) => childCommit.textToken)
+  );
+  const hostNodeInfos = freezeArray(
+    childCommits.map((childCommit) =>
+      freezeRecord(describeContainer(childCommit.hostNode))
+    )
+  );
+  const textNodeInfos = freezeArray(
+    childCommits.map((childCommit) =>
+      freezeRecord(describeContainer(childCommit.textNode))
+    )
+  );
+  const latestPropsMutationHandoffs = freezeArray(
+    childCommits.map(
+      (childCommit) => childCommit.latestPropsMutationHandoff
+    )
+  );
+  const latestPropsMutationPayloads = freezeArray(
+    childCommits.map(
+      (childCommit) => childCommit.latestPropsMutationPayload
+    )
+  );
+  const latestPropsBeforeCommits = freezeArray(
+    childCommits.map((childCommit) => childCommit.latestPropsBeforeCommit)
+  );
+  const latestPropsAfterCommits = freezeArray(
+    childCommits.map((childCommit) => childCommit.latestPropsAfterCommit)
+  );
 
   const handoff = freezeRecord({
     $$typeof: privateRootInitialHostOutputHandoffRecordType,
@@ -5521,12 +5615,26 @@ function applyPrivateInitialRenderHostOutputWithBridge(
     rootKind: admissionRecord.rootKind,
     rootTag: admissionRecord.rootTag,
     hostType: hostOutput.type,
-    hostNodeInfo: freezeRecord(describeContainer(hostNode)),
-    textNodeInfo: freezeRecord(describeContainer(textNode)),
+    hostOutputShape: hostOutput.shape,
+    hostComponentCount: hostOutput.hostComponentCount,
+    hostTextCount: hostOutput.hostTextCount,
+    rootChildTag: hostOutput.rootChildTag,
+    completedChildTag: hostOutput.completedChildTag,
+    hostTextChildTag: hostOutput.hostTextChildTag,
+    childTags: hostOutput.childTags,
+    hostNodeInfo: hostNodeInfos[0],
+    textNodeInfo: textNodeInfos[0],
+    hostNodeInfos,
+    textNodeInfos,
     containerChildCount: getChildNodeCount(validation.container),
-    hostChildCount: getChildNodeCount(hostNode),
+    hostChildCount:
+      hostOutput.hostComponentCount === 1
+        ? getChildNodeCount(hostNode)
+        : hostOutput.hostComponentCount,
     textContent: hostOutput.text,
-    acceptedCapabilities: ROOT_BRIDGE_INITIAL_HOST_OUTPUT_ACCEPTED_CAPABILITIES,
+    acceptedCapabilities: createInitialHostOutputAcceptedCapabilities(
+      hostOutput
+    ),
     blockedCapabilities: ROOT_BRIDGE_INITIAL_HOST_OUTPUT_BLOCKED_CAPABILITIES,
     cleanupRequired: true,
     cleanupApplied: false,
@@ -5551,18 +5659,29 @@ function applyPrivateInitialRenderHostOutputWithBridge(
     container: validation.container,
     createRecord: validation.createRecord,
     element: validation.element,
+    hostChildren: hostOutput.hostChildren,
     hostNode,
+    hostNodes,
     hostToken,
+    hostTokens,
+    hostOutputShape: hostOutput.shape,
     latestPropsAfterCommit,
+    latestPropsAfterCommits,
     latestPropsBeforeCommit,
+    latestPropsBeforeCommits,
     latestPropsMutationHandoff,
+    latestPropsMutationHandoffs,
     latestPropsMutationPayload,
+    latestPropsMutationPayloads,
     nextProps: hostOutput.nextProps,
+    previousProps: hostOutput.previousProps,
     renderRecord: validation.renderRecord,
     rootOwner: validation.rootOwner,
     sideEffectRecord: validation.sideEffectRecord,
     textNode,
-    textToken
+    textNodes,
+    textToken,
+    textTokens
   });
 
   return handoff;
@@ -5604,6 +5723,7 @@ function cleanupPrivateInitialRenderHostOutputWithBridge(
     rootKind: handoffRecord.rootKind,
     rootTag: handoffRecord.rootTag,
     removedRootChild: cleanupResult.removedRootChild,
+    removedRootChildCount: cleanupResult.removedRootChildCount,
     detachedHostInstanceCount: cleanupResult.detachedHostInstanceCount,
     containerChildCountAfterCleanup:
       cleanupResult.containerChildCountAfterCleanup,
@@ -8854,9 +8974,78 @@ function createPortalEventOwnerRootGateRecordWithBridge(
 }
 
 function normalizeInitialHostOutputElement(element) {
+  if (Array.isArray(element)) {
+    return normalizeInitialHostOutputHostChildArray(
+      element,
+      INITIAL_HOST_OUTPUT_SHAPE_ARRAY
+    );
+  }
+
   if (element === null || typeof element !== 'object') {
     throwInvalidInitialHostOutputHandoff(
       'Initial host output requires a private HostComponent element object.'
+    );
+  }
+  if (element.type === REACT_FRAGMENT_TYPE) {
+    assertInitialHostOutputUnkeyedElement(
+      element,
+      'Initial host output supports only unkeyed Fragment elements.'
+    );
+    const props =
+      element.props !== null && typeof element.props === 'object'
+        ? element.props
+        : {};
+    return normalizeInitialHostOutputHostChildArray(
+      props.children,
+      INITIAL_HOST_OUTPUT_SHAPE_FRAGMENT
+    );
+  }
+
+  return normalizeInitialHostOutputSingleHostElement(element);
+}
+
+function normalizeInitialHostOutputSingleHostElement(element) {
+  const hostChild = normalizeInitialHostOutputHostChild(
+    element,
+    0,
+    false
+  );
+  return createNormalizedInitialHostOutput(
+    INITIAL_HOST_OUTPUT_SHAPE_HOST_COMPONENT,
+    [hostChild]
+  );
+}
+
+function normalizeInitialHostOutputHostChildArray(children, shape) {
+  if (!Array.isArray(children) || children.length === 0) {
+    throwInvalidInitialHostOutputHandoff(
+      'Initial host output fragment/array support requires at least one HostComponent child.'
+    );
+  }
+
+  const hostChildren = [];
+  for (let index = 0; index < children.length; index++) {
+    hostChildren.push(
+      normalizeInitialHostOutputHostChild(children[index], index, true)
+    );
+  }
+  return createNormalizedInitialHostOutput(shape, hostChildren);
+}
+
+function normalizeInitialHostOutputHostChild(
+  element,
+  index,
+  requireUnkeyed
+) {
+  if (element === null || typeof element !== 'object') {
+    throwInvalidInitialHostOutputHandoff(
+      'Initial host output requires a private HostComponent element object.'
+    );
+  }
+  if (requireUnkeyed) {
+    assertInitialHostOutputUnkeyedElement(
+      element,
+      'Initial host output fragment/array support requires unkeyed HostComponent children.'
     );
   }
   if (typeof element.type !== 'string' || element.type === '') {
@@ -8871,12 +9060,111 @@ function normalizeInitialHostOutputElement(element) {
       : {};
   const text = getInitialHostTextChild(props.children);
 
-  return {
+  return freezeRecord({
+    index,
     nextProps: props,
     previousProps: freezeRecord({}),
     text,
     type: element.type
-  };
+  });
+}
+
+function assertInitialHostOutputUnkeyedElement(element, message) {
+  if (
+    hasOwnBridgeProperty(element, 'key') &&
+    element.key !== null &&
+    element.key !== undefined
+  ) {
+    throwInvalidInitialHostOutputHandoff(message);
+  }
+}
+
+function createNormalizedInitialHostOutput(shape, hostChildren) {
+  const frozenHostChildren = freezeArray(hostChildren);
+  const firstHostChild = frozenHostChildren[0];
+  const rootChildTag = getInitialHostOutputRootWorkLoopRootChildTag({
+    shape
+  });
+  const childTags = createInitialHostOutputRootWorkLoopChildTags(
+    shape,
+    frozenHostChildren.length
+  );
+
+  return freezeRecord({
+    childTags,
+    completedChildTag: 'HostComponent',
+    hostChildren: frozenHostChildren,
+    hostComponentCount: frozenHostChildren.length,
+    hostTextChildTag: 'HostText',
+    hostTextCount: frozenHostChildren.length,
+    nextProps: firstHostChild.nextProps,
+    previousProps: firstHostChild.previousProps,
+    rootChildTag,
+    shape,
+    text: frozenHostChildren.map((child) => child.text).join(''),
+    type:
+      shape === INITIAL_HOST_OUTPUT_SHAPE_HOST_COMPONENT
+        ? firstHostChild.type
+        : INITIAL_HOST_OUTPUT_FRAGMENT_HOST_TYPE
+  });
+}
+
+function createInitialHostOutputAcceptedCapabilities(hostOutput) {
+  if (hostOutput.shape === INITIAL_HOST_OUTPUT_SHAPE_HOST_COMPONENT) {
+    return ROOT_BRIDGE_INITIAL_HOST_OUTPUT_ACCEPTED_CAPABILITIES;
+  }
+
+  return freezeArray([
+    ...ROOT_BRIDGE_INITIAL_HOST_OUTPUT_ACCEPTED_CAPABILITIES,
+    ROOT_BRIDGE_FRAGMENT_ARRAY_HOST_OUTPUT_ACCEPTED_CAPABILITY
+  ]);
+}
+
+function getInitialHostOutputRootWorkLoopRootChildTag(normalizedInitial) {
+  return normalizedInitial.shape === INITIAL_HOST_OUTPUT_SHAPE_HOST_COMPONENT
+    ? 'HostComponent'
+    : 'Fragment';
+}
+
+function getInitialHostOutputRootWorkLoopCompletedChildTag() {
+  return 'HostComponent';
+}
+
+function getInitialHostOutputRootWorkLoopHostTextChildTag() {
+  return 'HostText';
+}
+
+function getInitialHostOutputRootWorkLoopChildTags(normalizedInitial) {
+  return normalizedInitial.childTags;
+}
+
+function createInitialHostOutputRootWorkLoopChildTags(
+  shape,
+  hostComponentCount
+) {
+  if (shape === INITIAL_HOST_OUTPUT_SHAPE_HOST_COMPONENT) {
+    return freezeArray(['HostComponent', 'HostText']);
+  }
+
+  const childTags = ['Fragment'];
+  for (let index = 0; index < hostComponentCount; index++) {
+    childTags.push('HostComponent', 'HostText');
+  }
+  return freezeArray(childTags);
+}
+
+function getInitialHostOutputRootWorkLoopPlacementTag(normalizedInitial) {
+  return normalizedInitial.shape === INITIAL_HOST_OUTPUT_SHAPE_HOST_COMPONENT
+    ? 'HostComponent'
+    : 'Fragment';
+}
+
+function getInitialHostOutputRootWorkLoopPlacementApplyKind(
+  normalizedInitial
+) {
+  return normalizedInitial.shape === INITIAL_HOST_OUTPUT_SHAPE_HOST_COMPONENT
+    ? 'append-placement-to-container'
+    : 'append-fragment-children-to-container';
 }
 
 function getInitialHostTextChild(children) {
@@ -8893,67 +9181,92 @@ function requireLatestPropsCommitResult(handoff) {
   return commitLatestPropsFromMutationHandoff(handoff);
 }
 
-function rollbackPartialInitialHostOutput({
-  container,
-  hostAppendedToContainer,
-  hostNode,
-  latestPropsMutationHandoff,
-  textAppendedToHost,
-  textNode
-}) {
-  if (hostAppendedToContainer) {
-    try {
-      removeChildFromContainer(container, hostNode);
-    } catch (error) {
-      // Preserve the original private initial host-output failure.
+function rollbackPartialInitialHostOutput({container, children}) {
+  for (let index = children.length - 1; index >= 0; index--) {
+    const child = children[index];
+    if (child.hostAppendedToContainer && child.hostNode !== null) {
+      try {
+        removeChildFromContainer(container, child.hostNode);
+      } catch (error) {
+        // Preserve the original private initial host-output failure.
+      }
     }
   }
-  if (textAppendedToHost) {
-    try {
-      removeChild(hostNode, textNode);
-    } catch (error) {
-      // Preserve the original private initial host-output failure.
+
+  for (let index = children.length - 1; index >= 0; index--) {
+    const child = children[index];
+    if (
+      child.textAppendedToHost &&
+      child.hostNode !== null &&
+      child.textNode !== null
+    ) {
+      try {
+        removeChild(child.hostNode, child.textNode);
+      } catch (error) {
+        // Preserve the original private initial host-output failure.
+      }
     }
   }
-  if (latestPropsMutationHandoff !== null) {
-    try {
-      rollbackDomPropertyUpdateLatestPropsHandoff(latestPropsMutationHandoff);
-    } catch (error) {
-      // Preserve the original private initial host-output failure.
+
+  for (let index = children.length - 1; index >= 0; index--) {
+    const handoff = children[index].latestPropsMutationHandoff;
+    if (handoff !== null) {
+      try {
+        rollbackDomPropertyUpdateLatestPropsHandoff(handoff);
+      } catch (error) {
+        // Preserve the original private initial host-output failure.
+      }
     }
   }
-  if (hostNode !== null) {
-    detachHostInstanceSubtree(hostNode, {includeRoot: true});
-  } else if (textNode !== null) {
-    detachHostInstanceSubtree(textNode, {includeRoot: true});
+
+  for (let index = children.length - 1; index >= 0; index--) {
+    const child = children[index];
+    if (child.hostNode !== null) {
+      detachHostInstanceSubtree(child.hostNode, {includeRoot: true});
+    } else if (child.textNode !== null) {
+      detachHostInstanceSubtree(child.textNode, {includeRoot: true});
+    }
   }
 }
 
 function cleanupInitialHostOutputPayload(payload) {
-  const removedRootChild = removeInitialHostOutputRootChild(
+  const removedRootChildCount = removeInitialHostOutputRootChildren(
     payload.container,
-    payload.hostNode
+    getInitialHostOutputPayloadHostNodes(payload)
   );
-  const componentTreeDetachRecord = detachHostInstanceSubtree(
-    payload.hostNode,
-    {includeRoot: true}
-  );
+  let detachedHostInstanceCount = 0;
+  for (const hostNode of getInitialHostOutputPayloadHostNodes(payload)) {
+    const componentTreeDetachRecord = detachHostInstanceSubtree(hostNode, {
+      includeRoot: true
+    });
+    detachedHostInstanceCount +=
+      componentTreeDetachRecord.detachedHostInstanceCount;
+  }
 
   return {
     containerChildCountAfterCleanup: getChildNodeCount(payload.container),
-    detachedHostInstanceCount:
-      componentTreeDetachRecord.detachedHostInstanceCount,
-    removedRootChild
+    detachedHostInstanceCount,
+    removedRootChild: removedRootChildCount > 0,
+    removedRootChildCount
   };
 }
 
-function removeInitialHostOutputRootChild(container, hostNode) {
-  if (!isCurrentChild(container, hostNode)) {
-    return false;
-  }
+function getInitialHostOutputPayloadHostNodes(payload) {
+  return Array.isArray(payload.hostNodes)
+    ? payload.hostNodes
+    : [payload.hostNode];
+}
 
-  removeChildFromContainer(container, hostNode);
-  return true;
+function removeInitialHostOutputRootChildren(container, hostNodes) {
+  let removedRootChildCount = 0;
+  for (const hostNode of hostNodes) {
+    if (!isCurrentChild(container, hostNode)) {
+      continue;
+    }
+    removeChildFromContainer(container, hostNode);
+    removedRootChildCount++;
+  }
+  return removedRootChildCount;
 }
 
 function assertInitialHostOutputContainerCanReceiveRootChild(container) {
@@ -11504,6 +11817,9 @@ function normalizeRootCommitFiberTag(tag) {
   if (tag === 6) {
     return 'HostText';
   }
+  if (tag === 7) {
+    return 'Fragment';
+  }
 
   const normalized = normalizeRootCommitName(tag);
   if (normalized === 'hostroot') {
@@ -11514,6 +11830,9 @@ function normalizeRootCommitFiberTag(tag) {
   }
   if (normalized === 'hosttext') {
     return 'HostText';
+  }
+  if (normalized === 'fragment') {
+    return 'Fragment';
   }
   return null;
 }
@@ -15123,8 +15442,22 @@ function getPublicFacadeRootWorkLoopFinishedWorkMetadataOption(options) {
 function createDefaultPublicFacadeRootWorkLoopFinishedWorkMetadata({
   createRecord,
   hostOutputHandoff,
+  normalizedInitial,
   renderRecord
 }) {
+  const rootChildTag =
+    getInitialHostOutputRootWorkLoopRootChildTag(normalizedInitial);
+  const completedChildTag =
+    getInitialHostOutputRootWorkLoopCompletedChildTag(normalizedInitial);
+  const hostTextChildTag =
+    getInitialHostOutputRootWorkLoopHostTextChildTag(normalizedInitial);
+  const childTags =
+    getInitialHostOutputRootWorkLoopChildTags(normalizedInitial);
+  const placementTag =
+    getInitialHostOutputRootWorkLoopPlacementTag(normalizedInitial);
+  const placementApplyKind =
+    getInitialHostOutputRootWorkLoopPlacementApplyKind(normalizedInitial);
+
   return freezeRecord({
     source: ROOT_WORK_LOOP_FINISHED_WORK_METADATA_SOURCE,
     status: ROOT_WORK_LOOP_FINISHED_WORK_METADATA_STATUS,
@@ -15137,15 +15470,18 @@ function createDefaultPublicFacadeRootWorkLoopFinishedWorkMetadata({
       renderRequestId: renderRecord.requestId,
       renderUpdateId: renderRecord.updateId,
       hostType: hostOutputHandoff.hostType,
+      hostOutputShape: normalizedInitial.shape,
+      hostComponentCount: normalizedInitial.hostComponentCount,
+      hostTextCount: normalizedInitial.hostTextCount,
       textContent: hostOutputHandoff.textContent
     }),
     completeWork: freezeRecord({
-      rootChildTag: 'HostComponent',
-      completedChildTag: 'HostComponent',
-      hostTextChildTag: 'HostText',
-      childTags: freezeArray(['HostComponent', 'HostText']),
-      detachedInstanceCount: 1,
-      detachedTextCount: 1
+      rootChildTag,
+      completedChildTag,
+      hostTextChildTag,
+      childTags,
+      detachedInstanceCount: normalizedInitial.hostComponentCount,
+      detachedTextCount: normalizedInitial.hostTextCount
     }),
     pending: freezeRecord({
       recordsFinishedWork: true,
@@ -15169,9 +15505,9 @@ function createDefaultPublicFacadeRootWorkLoopFinishedWorkMetadata({
       effectsRefsAndHydrationBlocked: true
     }),
     placement: freezeRecord({
-      diagnosticCount: 1,
-      tag: 'HostComponent',
-      applyKind: 'append-placement-to-container',
+      diagnosticCount: normalizedInitial.hostComponentCount,
+      tag: placementTag,
+      applyKind: placementApplyKind,
       siblingStatus: 'append',
       canInsertBefore: false
     })
@@ -15224,6 +15560,9 @@ function createPrivateRootPublicFacadeRootWorkLoopFinishedWorkRecord({
     renderLanes: normalized.renderLanes,
     finishedLanes: normalized.finishedLanes,
     remainingLanes: normalized.remainingLanes,
+    hostOutputShape: normalized.hostOutputShape,
+    hostComponentCount: normalized.hostComponentCount,
+    hostTextCount: normalized.hostTextCount,
     recordsFinishedWork: true,
     pendingWorkMatchesFinishedWork: true,
     consumedFinishedWorkRecord: true,
@@ -15366,6 +15705,19 @@ function normalizePublicFacadeRootWorkLoopFinishedWorkMetadata(
     throwForeignRootWorkLoopFinishedWorkMetadata();
   }
 
+  const facadeHostOutputShape = getFirstRootWorkLoopMetadataValue(metadata, [
+    ['facade', 'hostOutputShape'],
+    ['facade', 'host_output_shape'],
+    ['hostOutputShape'],
+    ['host_output_shape']
+  ]);
+  if (
+    facadeHostOutputShape !== undefined &&
+    facadeHostOutputShape !== expected.normalizedInitial.shape
+  ) {
+    throwStaleRootWorkLoopFinishedWorkMetadata();
+  }
+
   const facadeTextContent = getFirstRootWorkLoopMetadataValue(metadata, [
     ['facade', 'textContent'],
     ['facade', 'text_content'],
@@ -15380,6 +15732,25 @@ function normalizePublicFacadeRootWorkLoopFinishedWorkMetadata(
   ) {
     throwStaleRootWorkLoopFinishedWorkMetadata();
   }
+
+  const expectedRootChildTag =
+    getInitialHostOutputRootWorkLoopRootChildTag(expected.normalizedInitial);
+  const expectedCompletedChildTag =
+    getInitialHostOutputRootWorkLoopCompletedChildTag(
+      expected.normalizedInitial
+    );
+  const expectedHostTextChildTag =
+    getInitialHostOutputRootWorkLoopHostTextChildTag(
+      expected.normalizedInitial
+    );
+  const expectedChildTags =
+    getInitialHostOutputRootWorkLoopChildTags(expected.normalizedInitial);
+  const expectedPlacementTag =
+    getInitialHostOutputRootWorkLoopPlacementTag(expected.normalizedInitial);
+  const expectedPlacementApplyKind =
+    getInitialHostOutputRootWorkLoopPlacementApplyKind(
+      expected.normalizedInitial
+    );
 
   const rootChildTag = normalizeRootWorkLoopFiberTag(
     getFirstRootWorkLoopMetadataValue(metadata, [
@@ -15406,12 +15777,12 @@ function normalizePublicFacadeRootWorkLoopFinishedWorkMetadata(
     ])
   );
   if (
-    rootChildTag !== 'HostComponent' ||
-    completedChildTag !== 'HostComponent' ||
-    hostTextChildTag !== 'HostText'
+    rootChildTag !== expectedRootChildTag ||
+    completedChildTag !== expectedCompletedChildTag ||
+    hostTextChildTag !== expectedHostTextChildTag
   ) {
     throwInvalidRootPublicFacadeHostOutputRender(
-      'Accepted root work-loop finished-work metadata must describe one HostComponent with one HostText child.'
+      'Accepted root work-loop finished-work metadata must describe the admitted private host-output shape.'
     );
   }
 
@@ -15423,13 +15794,9 @@ function normalizePublicFacadeRootWorkLoopFinishedWorkMetadata(
       ['child_tags']
     ])
   );
-  if (
-    childTags.length !== 2 ||
-    childTags[0] !== 'HostComponent' ||
-    childTags[1] !== 'HostText'
-  ) {
+  if (!rootWorkLoopChildTagsEqual(childTags, expectedChildTags)) {
     throwInvalidRootPublicFacadeHostOutputRender(
-      'Accepted root work-loop finished-work metadata must keep the HostComponent/HostText child path.'
+      'Accepted root work-loop finished-work metadata must keep the admitted host-output child path.'
     );
   }
 
@@ -15576,8 +15943,8 @@ function normalizePublicFacadeRootWorkLoopFinishedWorkMetadata(
     ['placement_sibling_status']
   ]);
   if (
-    placementTag !== 'HostComponent' ||
-    placementApplyKind !== 'append-placement-to-container' ||
+    placementTag !== expectedPlacementTag ||
+    placementApplyKind !== expectedPlacementApplyKind ||
     placementSiblingStatus !== 'append'
   ) {
     throwStaleRootWorkLoopFinishedWorkMetadata();
@@ -15588,6 +15955,9 @@ function normalizePublicFacadeRootWorkLoopFinishedWorkMetadata(
     completedChildTag,
     finishedLanes,
     finishedLanesAfterCommit,
+    hostComponentCount: expected.normalizedInitial.hostComponentCount,
+    hostOutputShape: expected.normalizedInitial.shape,
+    hostTextCount: expected.normalizedInitial.hostTextCount,
     hostTextChildTag,
     placementApplyKind,
     placementSiblingStatus,
@@ -15599,6 +15969,9 @@ function normalizePublicFacadeRootWorkLoopFinishedWorkMetadata(
       effectsRefsAndHydrationBlocked: true,
       finishedLanes,
       finishedLanesAfterCommit,
+      hostComponentCount: expected.normalizedInitial.hostComponentCount,
+      hostOutputShape: expected.normalizedInitial.shape,
+      hostTextCount: expected.normalizedInitial.hostTextCount,
       hostTextChildTag,
       metadataRevision: revision,
       pendingWorkMatchesFinishedWork: true,
@@ -15638,6 +16011,21 @@ function normalizeRootWorkLoopChildTags(value) {
     return [];
   }
   return freezeArray(value.map((tag) => normalizeRootWorkLoopFiberTag(tag)));
+}
+
+function rootWorkLoopChildTagsEqual(actual, expected) {
+  if (!Array.isArray(actual) || !Array.isArray(expected)) {
+    return false;
+  }
+  if (actual.length !== expected.length) {
+    return false;
+  }
+  for (let index = 0; index < actual.length; index++) {
+    if (actual[index] !== expected[index]) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function normalizeRootWorkLoopFiberTag(value) {
@@ -15779,10 +16167,25 @@ function createPublicFacadeHostOutputRenderAcceptedCapabilities(
       'Public-facade host-output render requires accepted root work-loop finished-work metadata.'
     );
   }
-  return freezeArray([
-    ...ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_ACCEPTED_CAPABILITIES,
+  const payload = rootPublicFacadeRootWorkLoopFinishedWorkPayloads.get(
+    rootWorkLoopFinishedWorkRecord
+  );
+  const capabilities = [
+    ...ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_ACCEPTED_CAPABILITIES
+  ];
+  if (
+    payload &&
+    payload.normalizedMetadata.hostOutputShape !==
+      INITIAL_HOST_OUTPUT_SHAPE_HOST_COMPONENT
+  ) {
+    capabilities.push(
+      ROOT_BRIDGE_FRAGMENT_ARRAY_HOST_OUTPUT_ACCEPTED_CAPABILITY
+    );
+  }
+  capabilities.push(
     ROOT_BRIDGE_PUBLIC_FACADE_ROOT_WORK_LOOP_FINISHED_WORK_ACCEPTED_CAPABILITY
-  ]);
+  );
+  return freezeArray(capabilities);
 }
 
 function createPublicFacadeHostOutputUpdateAcceptedCapabilities(handoff) {
