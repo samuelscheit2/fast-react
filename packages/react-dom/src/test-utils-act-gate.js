@@ -22,6 +22,14 @@ const syncFlushRecordOnlyStatus =
   'private-sync-flush-act-continuation-records-without-execution';
 const syncFlushPostPassiveExecutionGateStatus =
   'private-sync-flush-post-passive-continuation-executes-follow-up-sync-flush';
+const privateNestedActRootContinuationStatus =
+  'accepted-private-sync-flush-nested-act-root-continuation-without-public-act-flushsync';
+const privateSyncFlushFinishedWorkHandoffStatus =
+  'accepted-private-sync-flush-root-scheduler-finished-work-handoff-without-public-root-execution';
+const privateSyncFlushRootHandoffDiagnosticGateId =
+  'react-dom-test-utils-act-private-sync-flush-root-handoff-gate-1';
+const privateSyncFlushRootHandoffDiagnosticStatus =
+  'accepted-private-test-utils-act-sync-flush-root-handoff-diagnostics-without-public-act-routing';
 const schedulerMockFlushHelperStatus =
   'accepted-scheduler-mock-flush-helper-and-continuation-evidence';
 const passiveEffectsFlushMetadataStatus =
@@ -227,6 +235,138 @@ const syncFlushPostPassiveContinuationExecutionRecords = freezeArray([
   'SyncFlushPostPassiveContinuationExecutionRecord.did_execute_follow_up_sync_flush',
   'SyncFlushPostPassiveContinuationExecutionRecord.did_flush_follow_up_sync_work',
   'SyncFlushRootRecord::post_passive_continuation_execution_gate'
+]);
+const privateNestedActRootContinuationPrerequisiteId =
+  'sync-flush-nested-act-root-continuation-evidence';
+const privateSyncFlushFinishedWorkHandoffPrerequisiteId =
+  'sync-flush-root-scheduler-finished-work-handoff-evidence';
+const privateSyncFlushRootHandoffPrerequisiteIds = freezeArray([
+  privateNestedActRootContinuationPrerequisiteId,
+  privateSyncFlushFinishedWorkHandoffPrerequisiteId
+]);
+const privateSyncFlushRootHandoffWorkerIds = freezeArray([
+  'worker-694-sync-flush-nested-act-root-continuation',
+  'worker-718-sync-flush-root-scheduler-finished-work-handoff'
+]);
+const privateNestedActRootContinuationRecords = freezeArray([
+  'SchedulerBridgeActContinuationExecutionRecord.execution_order',
+  'SchedulerBridgeActContinuationExecutionRecord.pending_lanes_before_execution',
+  'SchedulerBridgeActContinuationExecutionRecord.pending_lanes_after_execution',
+  'SyncFlushActPrivateExecutionDiagnosticsForCanary',
+  'root_scheduler_nested_act_continuations_preserve_order_and_remaining_lanes',
+  'sync_flush_nested_act_root_continuations_preserve_callback_order_and_lanes'
+]);
+const privateSyncFlushFinishedWorkHandoffRecords = freezeArray([
+  'RootSchedulerSyncContinuationFinishedWorkHandoff',
+  'SyncFlushRootRecord.finished_work',
+  'SyncFlushRootRecord.finished_lanes',
+  'FiberRoot.finished_work',
+  'FiberRoot.finished_lanes',
+  'root_scheduler_finished_work_handoff_rejects_missing_record',
+  'root_scheduler_finished_work_handoff_rejects_stale_record',
+  'sync_flush_finished_work_handoff_rejects_foreign_record'
+]);
+const privateSyncFlushRootHandoffEvidence = freezeArray([
+  'worker-694-nested-act-continuation-order-and-lane-preservation',
+  'worker-718-sync-flush-root-scheduler-finished-work-finished-lanes-handoff',
+  'nested-act-continuations-preserve-sync-flush-order',
+  'remaining-lanes-survive-nested-act-continuation',
+  'finished-work-and-finished-lanes-required-before-private-commit',
+  'missing-stale-and-foreign-finished-work-handoffs-rejected',
+  'public-act-flushsync-root-execution-remains-blocked'
+]);
+const privateSyncFlushRootHandoffDiagnosticSummary = freezeRecord({
+  gateId: privateSyncFlushRootHandoffDiagnosticGateId,
+  status: privateSyncFlushRootHandoffDiagnosticStatus,
+  workerIds: privateSyncFlushRootHandoffWorkerIds,
+  prerequisiteIds: privateSyncFlushRootHandoffPrerequisiteIds,
+  consumesNestedActContinuationEvidence: true,
+  consumesFinishedWorkHandoffEvidence: true,
+  requiresFinishedWork: true,
+  requiresFinishedLanes: true,
+  rejectsMissingEvidence: true,
+  rejectsStaleEvidence: true,
+  rejectsForeignFinishedWorkHandoff: true,
+  publicActExecution: false,
+  publicFlushSyncExecution: false,
+  publicRootExecution: false,
+  publicEffectExecution: false,
+  executesRendererWork: false,
+  compatibilityClaimed: false
+});
+const privateSyncFlushRootHandoffEvidenceRequirements = freezeRecords([
+  {
+    id: privateNestedActRootContinuationPrerequisiteId,
+    workerId: 'worker-694-sync-flush-nested-act-root-continuation',
+    status: privateNestedActRootContinuationStatus,
+    source:
+      'worker-progress/worker-694-sync-flush-nested-act-root-continuation.md',
+    requiredTrueFields: freezeArray([
+      'evidenceFresh',
+      'staleEvidenceRejected',
+      'consumesNestedActContinuationEvidence',
+      'preservesNestedActContinuationOrder',
+      'preservesRemainingLanes',
+      'restoresLaneStateAfterContinuation'
+    ]),
+    requiredFalseFields: freezeArray([
+      'staleEvidence',
+      'publicActExecution',
+      'publicFlushSyncExecution',
+      'publicRootExecution',
+      'publicEffectExecution',
+      'executesRendererWork',
+      'publicActCompatibilityClaimed',
+      'publicFlushSyncCompatibilityClaimed',
+      'compatibilityClaimed'
+    ])
+  },
+  {
+    id: privateSyncFlushFinishedWorkHandoffPrerequisiteId,
+    workerId: 'worker-718-sync-flush-root-scheduler-finished-work-handoff',
+    status: privateSyncFlushFinishedWorkHandoffStatus,
+    source:
+      'worker-progress/worker-718-sync-flush-root-scheduler-finished-work-handoff.md',
+    requiredTrueFields: freezeArray([
+      'evidenceFresh',
+      'staleEvidenceRejected',
+      'consumesFinishedWorkHandoffEvidence',
+      'requiresFinishedWork',
+      'requiresFinishedLanes',
+      'rejectsMissingFinishedWorkHandoff',
+      'rejectsStaleFinishedWorkHandoff',
+      'rejectsForeignFinishedWorkHandoff'
+    ]),
+    requiredFalseFields: freezeArray([
+      'staleEvidence',
+      'publicActExecution',
+      'publicFlushSyncExecution',
+      'publicRootExecution',
+      'publicEffectExecution',
+      'executesRendererWork',
+      'publicActCompatibilityClaimed',
+      'publicFlushSyncCompatibilityClaimed',
+      'publicRootCompatibilityClaimed',
+      'compatibilityClaimed'
+    ])
+  }
+]);
+const acceptedPrivatePrerequisitePublicClaimFields = freezeArray([
+  'compatibilityClaimed',
+  'publicCompatibilityClaimed',
+  'publicActCompatibilityClaimed',
+  'publicFlushSyncCompatibilityClaimed',
+  'publicRootCompatibilityClaimed',
+  'publicRenderCompatibilityClaimed',
+  'publicEffectCompatibilityClaimed',
+  'publicActExecution',
+  'publicFlushSyncExecution',
+  'publicRootExecution',
+  'publicDomMutation',
+  'publicEffectExecution',
+  'publicRendererWork',
+  'executesPublicRendererRoots',
+  'executesPublicFlushSync'
 ]);
 const passiveEffectsFlushRecords = freezeArray([
   'PendingPassiveCommitHandoff',
@@ -517,6 +657,67 @@ const acceptedPrivatePrerequisites = freezeRecords([
     records: syncFlushPostPassiveContinuationExecutionRecords
   },
   {
+    id: privateNestedActRootContinuationPrerequisiteId,
+    present: true,
+    status: privateNestedActRootContinuationStatus,
+    source:
+      'worker-progress/worker-694-sync-flush-nested-act-root-continuation.md',
+    workerId: 'worker-694-sync-flush-nested-act-root-continuation',
+    recordOnly: false,
+    privateDiagnostic: true,
+    evidenceFresh: true,
+    staleEvidence: false,
+    staleEvidenceRejected: true,
+    diagnosticGateId: privateSyncFlushRootHandoffDiagnosticGateId,
+    diagnosticStatus: privateSyncFlushRootHandoffDiagnosticStatus,
+    consumesNestedActContinuationEvidence: true,
+    preservesNestedActContinuationOrder: true,
+    preservesRemainingLanes: true,
+    restoresLaneStateAfterContinuation: true,
+    executesPrivateSyncFlushContinuation: true,
+    publicActExecution: false,
+    publicFlushSyncExecution: false,
+    publicRootExecution: false,
+    publicEffectExecution: false,
+    executesRendererWork: false,
+    publicActCompatibilityClaimed: false,
+    publicFlushSyncCompatibilityClaimed: false,
+    compatibilityClaimed: false,
+    records: privateNestedActRootContinuationRecords
+  },
+  {
+    id: privateSyncFlushFinishedWorkHandoffPrerequisiteId,
+    present: true,
+    status: privateSyncFlushFinishedWorkHandoffStatus,
+    source:
+      'worker-progress/worker-718-sync-flush-root-scheduler-finished-work-handoff.md',
+    workerId: 'worker-718-sync-flush-root-scheduler-finished-work-handoff',
+    recordOnly: false,
+    privateDiagnostic: true,
+    evidenceFresh: true,
+    staleEvidence: false,
+    staleEvidenceRejected: true,
+    diagnosticGateId: privateSyncFlushRootHandoffDiagnosticGateId,
+    diagnosticStatus: privateSyncFlushRootHandoffDiagnosticStatus,
+    consumesFinishedWorkHandoffEvidence: true,
+    requiresFinishedWork: true,
+    requiresFinishedLanes: true,
+    rejectsMissingFinishedWorkHandoff: true,
+    rejectsStaleFinishedWorkHandoff: true,
+    rejectsForeignFinishedWorkHandoff: true,
+    executesPrivateRootSchedulerCommit: true,
+    publicActExecution: false,
+    publicFlushSyncExecution: false,
+    publicRootExecution: false,
+    publicEffectExecution: false,
+    executesRendererWork: false,
+    publicActCompatibilityClaimed: false,
+    publicFlushSyncCompatibilityClaimed: false,
+    publicRootCompatibilityClaimed: false,
+    compatibilityClaimed: false,
+    records: privateSyncFlushFinishedWorkHandoffRecords
+  },
+  {
     id: 'passive-effects-flush-metadata',
     present: true,
     status: passiveEffectsFlushMetadataStatus,
@@ -658,7 +859,10 @@ const blockedPublicPrerequisites = freezeRecords([
     present: false,
     requiredBeforePublicAct: true,
     reason:
-      'Accepted act queue records still do not drain queued work or act scheduler continuations, even though private scheduler and sync-flush evidence exists.'
+      'Accepted act queue records still do not drain queued work or act scheduler continuations, even though private scheduler, nested continuation, and sync-flush root handoff evidence exists.',
+    blockedByAcceptedPrivateSyncFlushRootHandoffDiagnostics: true,
+    acceptedPrivateSyncFlushRootHandoffPrerequisiteIds:
+      privateSyncFlushRootHandoffPrerequisiteIds
   },
   {
     id: 'passive-effect-callback-execution',
@@ -702,14 +906,20 @@ const blockedPublicPrerequisites = freezeRecords([
     acceptedPrivateWarningBoundaryScenarioModeRowCount: 2,
     unsupportedPrivateWarningBoundaryScenarioModeRowCount: 18,
     reason:
-      'Private fake-DOM host-output and warning-boundary diagnostics exist, but public React DOM roots still throw placeholders instead of routing create, render, update, unmount, or warning behavior.'
+      'Private fake-DOM host-output, warning-boundary, and sync-flush finished-work handoff diagnostics exist, but public React DOM roots still throw placeholders instead of routing create, render, update, unmount, or warning behavior.',
+    blockedByAcceptedPrivateSyncFlushRootHandoffDiagnostics: true,
+    acceptedPrivateSyncFlushRootHandoffPrerequisiteIds:
+      privateSyncFlushRootHandoffPrerequisiteIds
   },
   {
     id: 'public-react-dom-flush-sync-execution',
     present: false,
     requiredBeforePublicAct: true,
+    blockedByAcceptedPrivateSyncFlushRootHandoffDiagnostics: true,
+    acceptedPrivateSyncFlushRootHandoffPrerequisiteIds:
+      privateSyncFlushRootHandoffPrerequisiteIds,
     reason:
-      'Public React DOM flushSync remains an unsupported placeholder even though private sync-flush metadata exists.'
+      'Public React DOM flushSync remains an unsupported placeholder even though private nested act continuation and finished-work/finished-lanes handoff metadata exists.'
   },
   {
     id: 'public-react-dom-warning-boundary-compatibility',
@@ -724,10 +934,12 @@ const sideEffectPolicy = Object.freeze({
   invokesActCallback: false,
   executesQueuedWork: false,
   executesPassiveEffects: false,
+  executesRendererWork: false,
   executesRendererRoots: false,
   executesPublicRendererRoots: false,
   executesPublicDomMutation: false,
   executesSyncFlush: false,
+  executesPublicFlushSync: false,
   emitsDeprecationWarning: false,
   delegatesToReactAct: false
 });
@@ -819,6 +1031,60 @@ function getReactDomTestUtilsActPrivateRoutingGate(overrides = {}) {
       executesSyncFlush: true,
       executesPassiveEffects: false,
       invokesCallbacks: false
+    }),
+    privateSyncFlushRootHandoffDiagnostics: freezeRecord({
+      gateId: privateSyncFlushRootHandoffDiagnosticGateId,
+      status: privateSyncFlushRootHandoffDiagnosticStatus,
+      workerIds: privateSyncFlushRootHandoffWorkerIds,
+      prerequisiteIds: privateSyncFlushRootHandoffPrerequisiteIds,
+      acceptedPrerequisiteIds: privateSyncFlushRootHandoffPrerequisiteIds,
+      evidence: privateSyncFlushRootHandoffEvidence,
+      evidenceRequirements: privateSyncFlushRootHandoffEvidenceRequirements,
+      summary: privateSyncFlushRootHandoffDiagnosticSummary,
+      nestedActContinuation: freezeRecord({
+        id: privateNestedActRootContinuationPrerequisiteId,
+        status: privateNestedActRootContinuationStatus,
+        workerId: 'worker-694-sync-flush-nested-act-root-continuation',
+        records: privateNestedActRootContinuationRecords,
+        evidenceFresh: true,
+        staleEvidenceRejected: true,
+        consumesNestedActContinuationEvidence: true,
+        preservesNestedActContinuationOrder: true,
+        preservesRemainingLanes: true,
+        restoresLaneStateAfterContinuation: true,
+        publicActExecution: false,
+        publicFlushSyncExecution: false,
+        publicRootExecution: false,
+        publicEffectExecution: false,
+        executesRendererWork: false,
+        compatibilityClaimed: false
+      }),
+      finishedWorkHandoff: freezeRecord({
+        id: privateSyncFlushFinishedWorkHandoffPrerequisiteId,
+        status: privateSyncFlushFinishedWorkHandoffStatus,
+        workerId: 'worker-718-sync-flush-root-scheduler-finished-work-handoff',
+        records: privateSyncFlushFinishedWorkHandoffRecords,
+        evidenceFresh: true,
+        staleEvidenceRejected: true,
+        consumesFinishedWorkHandoffEvidence: true,
+        requiresFinishedWork: true,
+        requiresFinishedLanes: true,
+        rejectsMissingFinishedWorkHandoff: true,
+        rejectsStaleFinishedWorkHandoff: true,
+        rejectsForeignFinishedWorkHandoff: true,
+        publicActExecution: false,
+        publicFlushSyncExecution: false,
+        publicRootExecution: false,
+        publicEffectExecution: false,
+        executesRendererWork: false,
+        compatibilityClaimed: false
+      }),
+      publicActExecution: false,
+      publicFlushSyncExecution: false,
+      publicRootExecution: false,
+      publicEffectExecution: false,
+      executesRendererWork: false,
+      compatibilityClaimed: false
     }),
     passiveEffects: freezeRecord({
       status: passiveEffectsFlushMetadataStatus,
@@ -969,6 +1235,30 @@ function evaluateReactDomTestUtilsActPrivateRoutingGate(options = {}) {
   const missingPrivatePrerequisites = acceptedPrivatePrerequisites
     .filter((prerequisite) => prerequisite.present !== true)
     .map((prerequisite) => prerequisite.id);
+  const acceptedPrivatePrerequisiteIds = acceptedPrivatePrerequisites.map(
+    (prerequisite) => prerequisite.id
+  );
+  const expectedAcceptedPrivatePrerequisiteIds =
+    gate.acceptedPrivatePrerequisiteIds;
+  const missingExpectedPrivatePrerequisiteIds =
+    expectedAcceptedPrivatePrerequisiteIds.filter(
+      (prerequisiteId) =>
+        !acceptedPrivatePrerequisiteIds.includes(prerequisiteId)
+    );
+  const unexpectedAcceptedPrivatePrerequisiteIds =
+    acceptedPrivatePrerequisiteIds.filter(
+      (prerequisiteId) =>
+        !expectedAcceptedPrivatePrerequisiteIds.includes(prerequisiteId)
+    );
+  const duplicateAcceptedPrivatePrerequisiteIds =
+    acceptedPrivatePrerequisiteIds.filter(
+      (prerequisiteId, index) =>
+        acceptedPrivatePrerequisiteIds.indexOf(prerequisiteId) !== index
+    );
+  const stalePrivatePrerequisites =
+    collectStaleAcceptedPrivatePrerequisites(acceptedPrivatePrerequisites);
+  const privatePrerequisitePublicClaims =
+    collectAcceptedPrivatePrerequisitePublicClaims(acceptedPrivatePrerequisites);
   const publicPrerequisitesStillBlocked = blockedPublicPrerequisites
     .filter((prerequisite) => prerequisite.present !== true)
     .map((prerequisite) => prerequisite.id);
@@ -1000,6 +1290,33 @@ function evaluateReactDomTestUtilsActPrivateRoutingGate(options = {}) {
     violations.push(
       createViolation('accepted-private-prerequisite-missing', {
         prerequisiteIds: missingPrivatePrerequisites
+      })
+    );
+  }
+  if (
+    missingExpectedPrivatePrerequisiteIds.length > 0 ||
+    unexpectedAcceptedPrivatePrerequisiteIds.length > 0 ||
+    duplicateAcceptedPrivatePrerequisiteIds.length > 0
+  ) {
+    violations.push(
+      createViolation('accepted-private-prerequisite-manifest-mismatch', {
+        missingPrerequisiteIds: missingExpectedPrivatePrerequisiteIds,
+        unexpectedPrerequisiteIds: unexpectedAcceptedPrivatePrerequisiteIds,
+        duplicatePrerequisiteIds: duplicateAcceptedPrivatePrerequisiteIds
+      })
+    );
+  }
+  if (stalePrivatePrerequisites.length > 0) {
+    violations.push(
+      createViolation('accepted-private-prerequisite-stale-evidence', {
+        prerequisites: stalePrivatePrerequisites
+      })
+    );
+  }
+  if (privatePrerequisitePublicClaims.length > 0) {
+    violations.push(
+      createViolation('accepted-private-prerequisite-public-claim-detected', {
+        claims: privatePrerequisitePublicClaims
       })
     );
   }
@@ -1041,12 +1358,79 @@ function evaluateReactDomTestUtilsActPrivateRoutingGate(options = {}) {
     privateRootHostOutputPrerequisitesStillBlocked,
     privateRootWarningBoundaryPrerequisitesStillBlocked,
     privatePassivePrerequisitesStillBlocked,
+    stalePrivatePrerequisites,
+    privatePrerequisitePublicClaims,
     violations,
     status:
       violations.length === 0
         ? gate.status
         : 'blocked-public-test-utils-act-private-routing-with-violations'
   });
+}
+
+function collectStaleAcceptedPrivatePrerequisites(prerequisites) {
+  const prerequisitesById = new Map(
+    prerequisites.map((prerequisite) => [prerequisite.id, prerequisite])
+  );
+  const stalePrerequisites = [];
+
+  for (const requirement of privateSyncFlushRootHandoffEvidenceRequirements) {
+    const prerequisite = prerequisitesById.get(requirement.id);
+    if (!prerequisite) {
+      continue;
+    }
+
+    const reasons = [];
+    if (prerequisite.workerId !== requirement.workerId) {
+      reasons.push('worker-id-mismatch');
+    }
+    if (prerequisite.status !== requirement.status) {
+      reasons.push('status-mismatch');
+    }
+    if (prerequisite.source !== requirement.source) {
+      reasons.push('source-mismatch');
+    }
+    for (const field of requirement.requiredTrueFields) {
+      if (prerequisite[field] !== true) {
+        reasons.push(`${field}-not-true`);
+      }
+    }
+    for (const field of requirement.requiredFalseFields) {
+      if (prerequisite[field] !== false) {
+        reasons.push(`${field}-not-false`);
+      }
+    }
+
+    if (reasons.length > 0) {
+      stalePrerequisites.push(
+        freezeRecord({
+          prerequisiteId: requirement.id,
+          reasons: freezeArray(reasons)
+        })
+      );
+    }
+  }
+
+  return freezeArray(stalePrerequisites);
+}
+
+function collectAcceptedPrivatePrerequisitePublicClaims(prerequisites) {
+  const claims = [];
+
+  for (const prerequisite of prerequisites) {
+    for (const field of acceptedPrivatePrerequisitePublicClaimFields) {
+      if (prerequisite[field] === true) {
+        claims.push(
+          freezeRecord({
+            prerequisiteId: prerequisite.id,
+            field
+          })
+        );
+      }
+    }
+  }
+
+  return freezeArray(claims);
 }
 
 function createViolation(id, extra = {}) {

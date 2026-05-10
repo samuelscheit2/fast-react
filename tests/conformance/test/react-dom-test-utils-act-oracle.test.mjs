@@ -268,6 +268,10 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     acceptedPrivatePassiveDiagnosticIds.map(
       (diagnosticId) => `accepted-private-passive-diagnostic-${diagnosticId}`
     );
+  const privateSyncFlushRootHandoffPrerequisiteIds = [
+    "sync-flush-nested-act-root-continuation-evidence",
+    "sync-flush-root-scheduler-finished-work-handoff-evidence"
+  ];
 
   assert.equal(
     gate.status,
@@ -286,12 +290,15 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
   assert.equal(gate.publicReactActReady, false);
   assert.equal(gate.publicTestUtilsActReady, false);
   assert.deepEqual(gate.violations, []);
+  assert.deepEqual(gate.stalePrivatePrerequisites, []);
+  assert.deepEqual(gate.privatePrerequisitePublicClaims, []);
   assert.deepEqual(gate.acceptedPrivatePrerequisiteIds, [
     "react-act-private-dispatcher-gate",
     "scheduler-act-queue-routing-records",
     "scheduler-mock-flush-helper-metadata",
     "sync-flush-act-continuation-records",
     "sync-flush-post-passive-continuation-execution-gate",
+    ...privateSyncFlushRootHandoffPrerequisiteIds,
     "passive-effects-flush-metadata",
     "passive-effect-callback-handle-metadata",
     "passive-effects-committed-fiber-traversal",
@@ -350,6 +357,17 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     publicPassivePrerequisite.blockedByAcceptedPrivatePassiveDiagnostics,
     true
   );
+  const actQueuePrerequisite = gate.blockedPublicPrerequisites.find(
+    (prerequisite) => prerequisite.id === "act-queue-flushing-execution"
+  );
+  assert.equal(
+    actQueuePrerequisite.blockedByAcceptedPrivateSyncFlushRootHandoffDiagnostics,
+    true
+  );
+  assert.deepEqual(
+    actQueuePrerequisite.acceptedPrivateSyncFlushRootHandoffPrerequisiteIds,
+    privateSyncFlushRootHandoffPrerequisiteIds
+  );
   assert.equal(
     publicPassivePrerequisite.privatePassiveDiagnosticGateId,
     "react-dom-test-utils-act-private-passive-diagnostic-gate-1"
@@ -380,6 +398,15 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
   assert.equal(
     publicRootPrerequisite.blockedByAcceptedPrivateRootWarningBoundaryDiagnostics,
     true
+  );
+  assert.equal(
+    publicRootPrerequisite
+      .blockedByAcceptedPrivateSyncFlushRootHandoffDiagnostics,
+    true
+  );
+  assert.deepEqual(
+    publicRootPrerequisite.acceptedPrivateSyncFlushRootHandoffPrerequisiteIds,
+    privateSyncFlushRootHandoffPrerequisiteIds
   );
   assert.deepEqual(
     publicRootPrerequisite.acceptedPrivateHostOutputDiagnosticScenarios,
@@ -413,14 +440,28 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     publicRootPrerequisite.unsupportedPrivateWarningBoundaryScenarioModeRowCount,
     18
   );
+  const publicFlushSyncPrerequisite = gate.blockedPublicPrerequisites.find(
+    (prerequisite) => prerequisite.id === "public-react-dom-flush-sync-execution"
+  );
+  assert.equal(
+    publicFlushSyncPrerequisite
+      .blockedByAcceptedPrivateSyncFlushRootHandoffDiagnostics,
+    true
+  );
+  assert.deepEqual(
+    publicFlushSyncPrerequisite.acceptedPrivateSyncFlushRootHandoffPrerequisiteIds,
+    privateSyncFlushRootHandoffPrerequisiteIds
+  );
   assert.deepEqual(gate.sideEffectPolicy, {
     invokesActCallback: false,
     executesQueuedWork: false,
     executesPassiveEffects: false,
+    executesRendererWork: false,
     executesRendererRoots: false,
     executesPublicRendererRoots: false,
     executesPublicDomMutation: false,
     executesSyncFlush: false,
+    executesPublicFlushSync: false,
     emitsDeprecationWarning: false,
     delegatesToReactAct: false
   });
@@ -498,6 +539,198 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     executesPassiveEffects: false,
     invokesCallbacks: false
   });
+  assert.deepEqual(gate.privateSyncFlushRootHandoffDiagnostics, {
+    gateId: "react-dom-test-utils-act-private-sync-flush-root-handoff-gate-1",
+    status:
+      "accepted-private-test-utils-act-sync-flush-root-handoff-diagnostics-without-public-act-routing",
+    workerIds: [
+      "worker-694-sync-flush-nested-act-root-continuation",
+      "worker-718-sync-flush-root-scheduler-finished-work-handoff"
+    ],
+    prerequisiteIds: privateSyncFlushRootHandoffPrerequisiteIds,
+    acceptedPrerequisiteIds: privateSyncFlushRootHandoffPrerequisiteIds,
+    evidence: [
+      "worker-694-nested-act-continuation-order-and-lane-preservation",
+      "worker-718-sync-flush-root-scheduler-finished-work-finished-lanes-handoff",
+      "nested-act-continuations-preserve-sync-flush-order",
+      "remaining-lanes-survive-nested-act-continuation",
+      "finished-work-and-finished-lanes-required-before-private-commit",
+      "missing-stale-and-foreign-finished-work-handoffs-rejected",
+      "public-act-flushsync-root-execution-remains-blocked"
+    ],
+    evidenceRequirements: [
+      {
+        id: "sync-flush-nested-act-root-continuation-evidence",
+        workerId: "worker-694-sync-flush-nested-act-root-continuation",
+        status:
+          "accepted-private-sync-flush-nested-act-root-continuation-without-public-act-flushsync",
+        source:
+          "worker-progress/worker-694-sync-flush-nested-act-root-continuation.md",
+        requiredTrueFields: [
+          "evidenceFresh",
+          "staleEvidenceRejected",
+          "consumesNestedActContinuationEvidence",
+          "preservesNestedActContinuationOrder",
+          "preservesRemainingLanes",
+          "restoresLaneStateAfterContinuation"
+        ],
+        requiredFalseFields: [
+          "staleEvidence",
+          "publicActExecution",
+          "publicFlushSyncExecution",
+          "publicRootExecution",
+          "publicEffectExecution",
+          "executesRendererWork",
+          "publicActCompatibilityClaimed",
+          "publicFlushSyncCompatibilityClaimed",
+          "compatibilityClaimed"
+        ]
+      },
+      {
+        id: "sync-flush-root-scheduler-finished-work-handoff-evidence",
+        workerId: "worker-718-sync-flush-root-scheduler-finished-work-handoff",
+        status:
+          "accepted-private-sync-flush-root-scheduler-finished-work-handoff-without-public-root-execution",
+        source:
+          "worker-progress/worker-718-sync-flush-root-scheduler-finished-work-handoff.md",
+        requiredTrueFields: [
+          "evidenceFresh",
+          "staleEvidenceRejected",
+          "consumesFinishedWorkHandoffEvidence",
+          "requiresFinishedWork",
+          "requiresFinishedLanes",
+          "rejectsMissingFinishedWorkHandoff",
+          "rejectsStaleFinishedWorkHandoff",
+          "rejectsForeignFinishedWorkHandoff"
+        ],
+        requiredFalseFields: [
+          "staleEvidence",
+          "publicActExecution",
+          "publicFlushSyncExecution",
+          "publicRootExecution",
+          "publicEffectExecution",
+          "executesRendererWork",
+          "publicActCompatibilityClaimed",
+          "publicFlushSyncCompatibilityClaimed",
+          "publicRootCompatibilityClaimed",
+          "compatibilityClaimed"
+        ]
+      }
+    ],
+    summary: {
+      gateId: "react-dom-test-utils-act-private-sync-flush-root-handoff-gate-1",
+      status:
+        "accepted-private-test-utils-act-sync-flush-root-handoff-diagnostics-without-public-act-routing",
+      workerIds: [
+        "worker-694-sync-flush-nested-act-root-continuation",
+        "worker-718-sync-flush-root-scheduler-finished-work-handoff"
+      ],
+      prerequisiteIds: privateSyncFlushRootHandoffPrerequisiteIds,
+      consumesNestedActContinuationEvidence: true,
+      consumesFinishedWorkHandoffEvidence: true,
+      requiresFinishedWork: true,
+      requiresFinishedLanes: true,
+      rejectsMissingEvidence: true,
+      rejectsStaleEvidence: true,
+      rejectsForeignFinishedWorkHandoff: true,
+      publicActExecution: false,
+      publicFlushSyncExecution: false,
+      publicRootExecution: false,
+      publicEffectExecution: false,
+      executesRendererWork: false,
+      compatibilityClaimed: false
+    },
+    nestedActContinuation: {
+      id: "sync-flush-nested-act-root-continuation-evidence",
+      status:
+        "accepted-private-sync-flush-nested-act-root-continuation-without-public-act-flushsync",
+      workerId: "worker-694-sync-flush-nested-act-root-continuation",
+      records: [
+        "SchedulerBridgeActContinuationExecutionRecord.execution_order",
+        "SchedulerBridgeActContinuationExecutionRecord.pending_lanes_before_execution",
+        "SchedulerBridgeActContinuationExecutionRecord.pending_lanes_after_execution",
+        "SyncFlushActPrivateExecutionDiagnosticsForCanary",
+        "root_scheduler_nested_act_continuations_preserve_order_and_remaining_lanes",
+        "sync_flush_nested_act_root_continuations_preserve_callback_order_and_lanes"
+      ],
+      evidenceFresh: true,
+      staleEvidenceRejected: true,
+      consumesNestedActContinuationEvidence: true,
+      preservesNestedActContinuationOrder: true,
+      preservesRemainingLanes: true,
+      restoresLaneStateAfterContinuation: true,
+      publicActExecution: false,
+      publicFlushSyncExecution: false,
+      publicRootExecution: false,
+      publicEffectExecution: false,
+      executesRendererWork: false,
+      compatibilityClaimed: false
+    },
+    finishedWorkHandoff: {
+      id: "sync-flush-root-scheduler-finished-work-handoff-evidence",
+      status:
+        "accepted-private-sync-flush-root-scheduler-finished-work-handoff-without-public-root-execution",
+      workerId: "worker-718-sync-flush-root-scheduler-finished-work-handoff",
+      records: [
+        "RootSchedulerSyncContinuationFinishedWorkHandoff",
+        "SyncFlushRootRecord.finished_work",
+        "SyncFlushRootRecord.finished_lanes",
+        "FiberRoot.finished_work",
+        "FiberRoot.finished_lanes",
+        "root_scheduler_finished_work_handoff_rejects_missing_record",
+        "root_scheduler_finished_work_handoff_rejects_stale_record",
+        "sync_flush_finished_work_handoff_rejects_foreign_record"
+      ],
+      evidenceFresh: true,
+      staleEvidenceRejected: true,
+      consumesFinishedWorkHandoffEvidence: true,
+      requiresFinishedWork: true,
+      requiresFinishedLanes: true,
+      rejectsMissingFinishedWorkHandoff: true,
+      rejectsStaleFinishedWorkHandoff: true,
+      rejectsForeignFinishedWorkHandoff: true,
+      publicActExecution: false,
+      publicFlushSyncExecution: false,
+      publicRootExecution: false,
+      publicEffectExecution: false,
+      executesRendererWork: false,
+      compatibilityClaimed: false
+    },
+    publicActExecution: false,
+    publicFlushSyncExecution: false,
+    publicRootExecution: false,
+    publicEffectExecution: false,
+    executesRendererWork: false,
+    compatibilityClaimed: false
+  });
+  const nestedActPrerequisite = gate.acceptedPrivatePrerequisites.find(
+    (prerequisite) =>
+      prerequisite.id === "sync-flush-nested-act-root-continuation-evidence"
+  );
+  assert.equal(
+    nestedActPrerequisite.workerId,
+    "worker-694-sync-flush-nested-act-root-continuation"
+  );
+  assert.equal(nestedActPrerequisite.preservesNestedActContinuationOrder, true);
+  assert.equal(nestedActPrerequisite.preservesRemainingLanes, true);
+  assert.equal(nestedActPrerequisite.publicActCompatibilityClaimed, false);
+  assert.equal(nestedActPrerequisite.publicFlushSyncCompatibilityClaimed, false);
+  assert.equal(nestedActPrerequisite.executesRendererWork, false);
+
+  const finishedWorkPrerequisite = gate.acceptedPrivatePrerequisites.find(
+    (prerequisite) =>
+      prerequisite.id ===
+      "sync-flush-root-scheduler-finished-work-handoff-evidence"
+  );
+  assert.equal(
+    finishedWorkPrerequisite.workerId,
+    "worker-718-sync-flush-root-scheduler-finished-work-handoff"
+  );
+  assert.equal(finishedWorkPrerequisite.requiresFinishedWork, true);
+  assert.equal(finishedWorkPrerequisite.requiresFinishedLanes, true);
+  assert.equal(finishedWorkPrerequisite.rejectsStaleFinishedWorkHandoff, true);
+  assert.equal(finishedWorkPrerequisite.publicRootExecution, false);
+  assert.equal(finishedWorkPrerequisite.executesRendererWork, false);
   assert.deepEqual(gate.passiveEffects, {
     status: "metadata-only-passive-flush-without-callback-execution",
     records: [
@@ -1056,6 +1289,72 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     {
       id: "accepted-private-prerequisite-missing",
       prerequisiteIds: ["react-act-private-dispatcher-gate"]
+    }
+  ]);
+
+  const removedPrivatePrerequisiteGate =
+    gateModule.evaluateReactDomTestUtilsActPrivateRoutingGate({
+      acceptedPrivatePrerequisites: gate.acceptedPrivatePrerequisites.filter(
+        (prerequisite) =>
+          prerequisite.id !==
+          "sync-flush-root-scheduler-finished-work-handoff-evidence"
+      )
+    });
+  assert.deepEqual(removedPrivatePrerequisiteGate.violations, [
+    {
+      id: "accepted-private-prerequisite-manifest-mismatch",
+      missingPrerequisiteIds: [
+        "sync-flush-root-scheduler-finished-work-handoff-evidence"
+      ],
+      unexpectedPrerequisiteIds: [],
+      duplicatePrerequisiteIds: []
+    }
+  ]);
+
+  const stalePrivatePrerequisiteGate =
+    gateModule.evaluateReactDomTestUtilsActPrivateRoutingGate({
+      acceptedPrivatePrerequisites: gate.acceptedPrivatePrerequisites.map(
+        (prerequisite) =>
+          prerequisite.id ===
+          "sync-flush-nested-act-root-continuation-evidence"
+            ? {
+                ...prerequisite,
+                workerId: "worker-694-stale-nested-act-root-continuation",
+                evidenceFresh: false
+              }
+            : prerequisite
+      )
+    });
+  assert.deepEqual(stalePrivatePrerequisiteGate.violations, [
+    {
+      id: "accepted-private-prerequisite-stale-evidence",
+      prerequisites: [
+        {
+          prerequisiteId: "sync-flush-nested-act-root-continuation-evidence",
+          reasons: ["worker-id-mismatch", "evidenceFresh-not-true"]
+        }
+      ]
+    }
+  ]);
+
+  const privatePublicClaimGate =
+    gateModule.evaluateReactDomTestUtilsActPrivateRoutingGate({
+      acceptedPrivatePrerequisites: gate.acceptedPrivatePrerequisites.map(
+        (prerequisite) =>
+          prerequisite.id === "react-act-private-dispatcher-gate"
+            ? { ...prerequisite, publicCompatibilityClaimed: true }
+            : prerequisite
+      )
+    });
+  assert.deepEqual(privatePublicClaimGate.violations, [
+    {
+      id: "accepted-private-prerequisite-public-claim-detected",
+      claims: [
+        {
+          prerequisiteId: "react-act-private-dispatcher-gate",
+          field: "publicCompatibilityClaimed"
+        }
+      ]
     }
   ]);
 

@@ -399,10 +399,12 @@ function collectPublicCompatibilityChecks({
         "invokesActCallback",
         "executesQueuedWork",
         "executesPassiveEffects",
+        "executesRendererWork",
         "executesRendererRoots",
         "executesPublicRendererRoots",
         "executesPublicDomMutation",
         "executesSyncFlush",
+        "executesPublicFlushSync",
         "emitsDeprecationWarning",
         "delegatesToReactAct"
       ]
