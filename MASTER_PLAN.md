@@ -45,10 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 197: root commit passive pending handoff in
-  `/Users/user/Developer/Developer/fast-react-worker-197-root-commit-passive-pending-handoff`.
-- Worker 200: function component hook-list render state in
-  `/Users/user/Developer/Developer/fast-react-worker-200-function-component-hook-list-render-state`.
 - Worker 201: DOM text-content oracle in
   `/Users/user/Developer/Developer/fast-react-worker-201-dom-text-content-oracle`.
 - Worker 202: React test renderer package placeholder in

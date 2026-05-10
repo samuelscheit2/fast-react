@@ -303,9 +303,29 @@ sequencing belong in `MASTER_PLAN.md`.
   unsupported or unhandled child tags without full traversal, child
   reconciliation, host complete work, commit effects, DOM/test-renderer
   integration, or public hook facade wiring.
+- Worker 197 root commit passive pending handoff was merged, adding inert
+  HostRoot commit metadata for already-prepared pending passive state so future
+  passive-effect workers can see the committed root, finished work, and lanes,
+  while preserving validation-before-mutation, effect traversal, passive
+  flushing, hook execution, callback invocation, and DOM/native renderer
+  boundaries.
+- Worker 200 function-component hook-list render state was merged, connecting
+  the accepted core `HookListArena` to the private function-component render
+  skeleton as optional inert metadata with mount/update cursors and request/
+  record handoff, without public hooks, a dispatcher, `renderWithHooks`,
+  context propagation, child reconciliation, effects, DOM/test-renderer
+  integration, or public React hook facades.
 
 ## Latest Accepted Verification
 
+- Workers 197 and 200 were verified on their integrated worktrees and again on
+  `main` with `cargo fmt --all --check`, focused `root_commit`, `root_config`,
+  `function_component`, and core `hook_list` tests, full
+  `fast-react-reconciler` tests with 151 unit tests plus 1 compile-fail
+  doctest on the combined `main` result, reconciler clippy with warnings
+  denied, and `git diff --check`; merging current `main` into both worker
+  branches produced no conflicts, and both merge commits applied cleanly to
+  `main`.
 - Workers 198 and 199 were verified on their integrated worktrees and again on
   `main` with `cargo fmt --all --check`, focused `host_work`, `host_nodes`,
   `root_work_loop`, and `begin_work` tests, full `fast-react-reconciler` tests
