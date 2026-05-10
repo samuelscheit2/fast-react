@@ -29,6 +29,13 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Worker 482 was accepted from queue 473-502. It added the CJS-development
+  private react-test-renderer act Scheduler route for accepted
+  `scheduler/unstable_mock` flush-helper metadata while preserving public act
+  and Scheduler flush blockers. It was verified after merge with the focused
+  react-test-renderer act, create-routing, and Scheduler mock conformance
+  gates, scheduler and react-test-renderer workspace checks, node syntax
+  checks, conflict-marker scanning, and `git diff --check`.
 - Worker 481 was accepted from queue 473-502. It added private deletion
   cleanup-order diagnostics proving deleted ref cleanup-return metadata is
   recorded before deleted-subtree passive destroy metadata and host cleanup
