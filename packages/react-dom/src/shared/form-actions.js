@@ -10,24 +10,40 @@ const internalsGate = require('../resource-form-internals-gate.js');
 const hasOwn = Object.prototype.hasOwnProperty;
 
 const formActionFormDataBlockerGateSchemaVersion = 1;
+const formActionSubmitDispatchGateSchemaVersion = 1;
 const privateFormActionFormDataBlockerGateId =
   'form-action-formdata-blocker-private-gate-1';
+const privateFormActionSubmitDispatchGateId =
+  'form-action-submit-dispatch-private-gate-1';
 const privateFormActionFormDataBlockerRecordType =
   'fast.react_dom.private_form_action_formdata_blocker_record';
+const privateFormActionSubmitDispatchRecordType =
+  'fast.react_dom.private_form_action_submit_dispatch_record';
 const privateFormActionFormDataBlockerStatus =
   'private-form-action-formdata-blocker-metadata-only';
+const privateFormActionSubmitDispatchStatus =
+  'private-form-action-submit-dispatch-metadata-only';
 const privateFormActionFormDataBlockerRecordedStatus =
   'recorded-private-form-action-formdata-blocker';
+const privateFormActionSubmitDispatchRecordedStatus =
+  'recorded-private-form-action-submit-dispatch-boundary';
 const privateFormActionFormDataBlockerGateErrorCode =
   'FAST_REACT_DOM_FORM_ACTION_FORMDATA_BLOCKER_GATE';
+const privateFormActionSubmitDispatchGateErrorCode =
+  'FAST_REACT_DOM_FORM_ACTION_SUBMIT_DISPATCH_GATE';
 const privateFormActionFormDataBlockerInvalidAdmissionCode =
   'FAST_REACT_DOM_FORM_ACTION_FORMDATA_BLOCKER_INVALID_ADMISSION';
+const privateFormActionSubmitDispatchInvalidAdmissionCode =
+  'FAST_REACT_DOM_FORM_ACTION_SUBMIT_DISPATCH_INVALID_ADMISSION';
 const privateFormActionFormDataBlockerInvalidRecordCode =
   'FAST_REACT_DOM_FORM_ACTION_FORMDATA_BLOCKER_INVALID_RECORD';
+const privateFormActionSubmitDispatchInvalidRecordCode =
+  'FAST_REACT_DOM_FORM_ACTION_SUBMIT_DISPATCH_INVALID_RECORD';
 const formActionsOracleKind =
   'react-19.2.6-react-dom-form-actions-oracle';
 
 const formActionFormDataBlockerRecordPayloads = new WeakMap();
+const formActionSubmitDispatchRecordPayloads = new WeakMap();
 
 const blockedRawAdmissionFields = freezeArray([
   'form',
@@ -51,6 +67,22 @@ const blockedRawAdmissionFields = freezeArray([
   'instance',
   'domNode',
   'root'
+]);
+
+const blockedSubmitDispatchAdmissionFields = freezeArray([
+  ...blockedRawAdmissionFields,
+  'callback',
+  'dispatchCallback',
+  'submitCallback',
+  'listener',
+  'listeners',
+  'dispatchQueue',
+  'pendingState',
+  'pendingStatus',
+  'formInst',
+  'targetInst',
+  'nativeEventTarget',
+  'startHost' + 'Transition'
 ]);
 
 const formActionFormDataBlockerBlockedSideEffects = freezeRecord({
@@ -97,6 +129,52 @@ const formActionFormDataBlockerDiagnosticSideEffects = freezeRecord({
   submitterShapeRecorded: true
 });
 
+const formActionSubmitDispatchBlockedSideEffects = freezeRecord({
+  sourceFormDataBlockerAccepted: false,
+  sourceEventExtractionAccepted: false,
+  sourceResetQueueIntentAccepted: false,
+  actionIdentityRecorded: false,
+  dispatchQueueRowRecorded: false,
+  resetQueueIntentLinked: false,
+  rawTargetCaptured: false,
+  rawEventCaptured: false,
+  rawActionCaptured: false,
+  rawSubmitControlCaptured: false,
+  liveFormAccepted: false,
+  nativeEventInspected: false,
+  realFormInspected: false,
+  submitControlInspected: false,
+  unsupportedSubmitControlAccepted: false,
+  formPropsRead: false,
+  submitControlPropsRead: false,
+  formDataConstructed: false,
+  syntheticEventCreated: false,
+  nativeDefaultPrevented: false,
+  callbackDispatchExecuted: false,
+  submitCallbackInvoked: false,
+  actionFunctionCaptured: false,
+  actionInvoked: false,
+  hostTransitionStarted: false,
+  previousDispatcherCalled: false,
+  resetStateQueued: false,
+  reactUpdateQueued: false,
+  resetFormInstanceCalled: false,
+  formResetCommitted: false,
+  realFormReset: false,
+  publicRootTouched: false,
+  compatibilityClaimed: false
+});
+
+const formActionSubmitDispatchDiagnosticSideEffects = freezeRecord({
+  ...formActionSubmitDispatchBlockedSideEffects,
+  sourceFormDataBlockerAccepted: true,
+  sourceEventExtractionAccepted: true,
+  sourceResetQueueIntentAccepted: true,
+  actionIdentityRecorded: true,
+  dispatchQueueRowRecorded: true,
+  resetQueueIntentLinked: true
+});
+
 const formActionFormDataBlockerMissingPrerequisites = freezeArray([
   prerequisite(
     'no-live-form-target-read',
@@ -130,8 +208,43 @@ const formActionFormDataBlockerMissingPrerequisites = freezeArray([
   )
 ]);
 
+const formActionSubmitDispatchMissingPrerequisites = freezeArray([
+  prerequisite(
+    'no-live-form-submit-dispatch',
+    'react-dom-events',
+    'Submit dispatch diagnostics accept only private blocker metadata; no live form, event, or control is captured.'
+  ),
+  prerequisite(
+    'no-unsupported-submit-control-dispatch',
+    'react-dom-events',
+    'Submit controls must already be classified as button, input, or none before dispatch metadata can be recorded.'
+  ),
+  prerequisite(
+    'no-submit-listener-execution',
+    'react-dom-events',
+    'The submit dispatch callback row remains blocked and is not invoked.'
+  ),
+  prerequisite(
+    'no-action-function-invocation',
+    'react-dom-form',
+    'Action function capture and invocation remain blocked after dispatch metadata is accepted.'
+  ),
+  prerequisite(
+    'no-reset-queue-execution',
+    'react-dom-form',
+    'Reset queue intent is linked as metadata only; no reset update or commit is executed.'
+  ),
+  prerequisite(
+    'no-public-form-action-compatibility',
+    'react-dom-client',
+    'Public form action compatibility remains unclaimed.'
+  )
+]);
+
 const defaultFormActionFormDataBlockerGate =
   createFormActionFormDataBlockerDiagnosticGate();
+const defaultFormActionSubmitDispatchGate =
+  createFormActionSubmitDispatchDiagnosticGate();
 
 function createFormActionFormDataBlockerDiagnosticGate(options) {
   const gateState = createGateStateWithDefaultPrefix(
@@ -155,6 +268,23 @@ function createFormActionFormDataBlockerDiagnosticGate(options) {
   });
 }
 
+function createFormActionSubmitDispatchDiagnosticGate(options) {
+  const gateState = createGateStateWithDefaultPrefix(
+    options,
+    'form-action-submit-dispatch'
+  );
+
+  return Object.freeze({
+    recordSubmitDispatchDiagnostic(formDataBlockerRecord, admission) {
+      return recordFormActionSubmitDispatchWithGate(
+        gateState,
+        formDataBlockerRecord,
+        admission
+      );
+    }
+  });
+}
+
 function recordFormActionFormDataBlockerDiagnostic(
   eventExtractionRecord,
   resetQueueCommitRecord,
@@ -166,6 +296,14 @@ function recordFormActionFormDataBlockerDiagnostic(
       resetQueueCommitRecord,
       admission
     );
+}
+
+function recordFormActionSubmitDispatchDiagnostic(
+  formDataBlockerRecord,
+  admission
+) {
+  return defaultFormActionSubmitDispatchGate
+    .recordSubmitDispatchDiagnostic(formDataBlockerRecord, admission);
 }
 
 function describePrivateFormActionFormDataBlockerGate() {
@@ -220,6 +358,57 @@ function describePrivateFormActionFormDataBlockerGate() {
   });
 }
 
+function describePrivateFormActionSubmitDispatchGate() {
+  return freezeRecord({
+    schemaVersion: formActionSubmitDispatchGateSchemaVersion,
+    gateId: privateFormActionSubmitDispatchGateId,
+    compatibilityTarget,
+    status: privateFormActionSubmitDispatchStatus,
+    unsupportedCode: unimplementedCode,
+    oracleEvidence: freezeRecord({
+      oracleKind: formActionsOracleKind,
+      schemaVersion: 1,
+      compatibilityClaimed: false,
+      fastReactComparedToReactDom: false,
+      contractCount: 1
+    }),
+    acceptedFormDataBlockerRecordType:
+      privateFormActionFormDataBlockerRecordType,
+    acceptedFormDataBlockerGateId:
+      privateFormActionFormDataBlockerGateId,
+    acceptedFormDataBlockerStatus:
+      privateFormActionFormDataBlockerRecordedStatus,
+    acceptedEventExtractionRecordType:
+      internalsGate.privateFormActionEventExtractionRecordType,
+    acceptedResetQueueCommitRecordType:
+      internalsGate.privateFormActionResetQueueCommitRecordType,
+    recordsActionIdentity: true,
+    recordsFormDataBlockerRows: true,
+    recordsResetQueueIntent: true,
+    recordsDispatchQueueRow: true,
+    rejectsLiveForms: true,
+    rejectsUnsupportedSubmitControls: true,
+    blocksCallbackDispatchExecution: true,
+    acceptsRealForms: false,
+    acceptsRawEvents: false,
+    acceptsActionFunctions: false,
+    readsFormProps: false,
+    readsSubmitControlProps: false,
+    constructsFormData: false,
+    createsSyntheticEvents: false,
+    dispatchesSubmitCallbacks: false,
+    invokesActions: false,
+    startsHostTransition: false,
+    callsPreviousDispatchers: false,
+    queuesReactUpdates: false,
+    commitsFormResets: false,
+    resetsForms: false,
+    sideEffects: formActionSubmitDispatchBlockedSideEffects,
+    missingPrerequisites: formActionSubmitDispatchMissingPrerequisites,
+    formDataBlockerGate: describePrivateFormActionFormDataBlockerGate()
+  });
+}
+
 function createUnsupportedFormActionFormDataBlockerError(record) {
   const payload = assertPrivateFormActionFormDataBlockerRecord(record);
   const error = createUnsupportedError(
@@ -243,12 +432,43 @@ function createUnsupportedFormActionFormDataBlockerError(record) {
   return error;
 }
 
+function createUnsupportedFormActionSubmitDispatchError(record) {
+  const payload = assertPrivateFormActionSubmitDispatchRecord(record);
+  const error = createUnsupportedError(
+    'react-dom/private-internals',
+    payload.requestType,
+    'was recorded',
+    'The private form action submit dispatch gate records identity and blocker metadata only.'
+  );
+
+  error.code = privateFormActionSubmitDispatchGateErrorCode;
+  error.dispatchId = payload.dispatchId;
+  error.dispatchSequence = payload.dispatchSequence;
+  error.requestType = payload.requestType;
+  error.status = payload.status;
+  error.actionIdentity = payload.actionIdentity;
+  error.formDataBlockerLink = payload.formDataBlockerLink;
+  error.resetQueueIntentLink = payload.resetQueueIntentLink;
+  error.submitDispatchQueue = payload.submitDispatchQueue;
+  error.sideEffects = payload.sideEffects;
+
+  return error;
+}
+
 function getPrivateFormActionFormDataBlockerRecordPayload(record) {
   return formActionFormDataBlockerRecordPayloads.get(record) || null;
 }
 
+function getPrivateFormActionSubmitDispatchRecordPayload(record) {
+  return formActionSubmitDispatchRecordPayloads.get(record) || null;
+}
+
 function isPrivateFormActionFormDataBlockerRecord(value) {
   return formActionFormDataBlockerRecordPayloads.has(value);
+}
+
+function isPrivateFormActionSubmitDispatchRecord(value) {
+  return formActionSubmitDispatchRecordPayloads.has(value);
 }
 
 function recordFormActionFormDataBlockerWithGate(
@@ -337,6 +557,68 @@ function recordFormActionFormDataBlockerWithGate(
   return payload;
 }
 
+function recordFormActionSubmitDispatchWithGate(
+  gateState,
+  formDataBlockerRecord,
+  admission
+) {
+  const blocker =
+    assertAcceptedFormActionFormDataBlockerRecord(formDataBlockerRecord);
+  const normalizedAdmission =
+    normalizeFormActionSubmitDispatchAdmission(blocker, admission);
+  const dispatchSequence = gateState.nextRequestSequence++;
+  const dispatchId = `${gateState.requestIdPrefix}:${dispatchSequence}`;
+  const actionIdentity = createSubmitActionIdentity(blocker);
+  const formDataBlockerLink = createFormDataBlockerLink(blocker);
+  const resetQueueIntentLink = createResetQueueIntentLink(blocker);
+  const submitDispatchQueue = createSubmitDispatchQueueBoundary(
+    blocker,
+    actionIdentity
+  );
+
+  const payload = freezeRecord({
+    schemaVersion: formActionSubmitDispatchGateSchemaVersion,
+    $$typeof: privateFormActionSubmitDispatchRecordType,
+    kind: 'FastReactDomPrivateFormActionSubmitDispatchRecord',
+    gateId: privateFormActionSubmitDispatchGateId,
+    compatibilityTarget,
+    status: privateFormActionSubmitDispatchRecordedStatus,
+    unsupportedCode: unimplementedCode,
+    dispatchId,
+    dispatchSequence,
+    requestType: 'form-action-submit-dispatch.diagnostic',
+    contractId: 'form-action-submit-dispatch',
+    oracleKind: formActionsOracleKind,
+    oracleSchemaVersion: 1,
+    sourceFormDataBlockerId: blocker.blockerId,
+    sourceFormDataBlockerSequence: blocker.blockerSequence,
+    sourceEventExtractionId: blocker.sourceEventExtractionId,
+    sourceEventExtractionSequence: blocker.sourceEventExtractionSequence,
+    sourceSubmissionRequestId: blocker.sourceSubmissionRequestId,
+    sourceSubmissionRequestSequence: blocker.sourceSubmissionRequestSequence,
+    sourceResetQueueCommitRequestId:
+      blocker.sourceResetQueueCommitRequestId,
+    sourceResetQueueCommitRequestSequence:
+      blocker.sourceResetQueueCommitRequestSequence,
+    sourceResetIntentRequestId: blocker.sourceResetIntentRequestId,
+    sourceResetIntentRequestSequence:
+      blocker.sourceResetIntentRequestSequence,
+    admission: normalizedAdmission,
+    acceptedMetadataIds: blocker.acceptedMetadataIds,
+    actionIdentity,
+    formDataBlockerLink,
+    resetQueueIntentLink,
+    submitDispatchQueue,
+    publicFormActionBoundary:
+      createPublicFormActionSubmitDispatchBoundary(),
+    sideEffects: formActionSubmitDispatchDiagnosticSideEffects,
+    missingPrerequisites: formActionSubmitDispatchMissingPrerequisites
+  });
+
+  formActionSubmitDispatchRecordPayloads.set(payload, payload);
+  return payload;
+}
+
 function assertAcceptedFormActionEventExtractionRecord(record) {
   const payload =
     internalsGate.getPrivateFormActionEventExtractionRecordPayload(record);
@@ -385,6 +667,53 @@ function assertAcceptedFormActionResetQueueCommitRecord(record) {
   );
 }
 
+function assertAcceptedFormActionFormDataBlockerRecord(record) {
+  const payload = getPrivateFormActionFormDataBlockerRecordPayload(record);
+  if (
+    payload !== null &&
+    payload.status === privateFormActionFormDataBlockerRecordedStatus &&
+    payload.admission?.metadataOnly === true &&
+    payload.sourceEventExtraction?.consumedSubmitRequestSubmitActionMetadata ===
+      true &&
+    payload.sourceEventExtraction?.formDataConstructed === false &&
+    payload.formDataConstructionBlocker?.constructorCallBlocked === true &&
+    payload.formDataConstructionBlocker?.formDataConstructed === false &&
+    payload.actionInvocationBlocker?.actionFunctionCaptured === false &&
+    payload.actionInvocationBlocker?.actionInvoked === false &&
+    payload.actionInvocationBlocker?.hostTransitionStarted === false &&
+    payload.resetExecutionBlocker?.reactUpdateQueued === false &&
+    payload.resetExecutionBlocker?.resetFormInstanceCalled === false &&
+    payload.resetExecutionBlocker?.realFormReset === false &&
+    payload.sideEffects?.sourceEventExtractionAccepted === true &&
+    payload.sideEffects?.sourceResetQueueCommitAccepted === true &&
+    payload.sideEffects?.formDataConstructed === false &&
+    payload.sideEffects?.actionInvoked === false &&
+    payload.sideEffects?.realFormReset === false
+  ) {
+    assertSupportedSubmitControlForDispatch(payload);
+    return payload;
+  }
+
+  throwInvalidSubmitDispatchRecord(
+    'source data blocker must be accepted metadata-only submit blocker'
+  );
+}
+
+function assertSupportedSubmitControlForDispatch(blocker) {
+  const controlKind = blocker.submitterShape?.controlKind;
+  if (
+    controlKind === 'button' ||
+    controlKind === 'input' ||
+    controlKind === 'none'
+  ) {
+    return;
+  }
+
+  throwInvalidSubmitDispatchRecord(
+    'source submit control kind must be button, input, or none'
+  );
+}
+
 function assertPrivateFormActionFormDataBlockerRecord(record) {
   const payload = getPrivateFormActionFormDataBlockerRecordPayload(record);
   if (payload !== null) {
@@ -393,6 +722,17 @@ function assertPrivateFormActionFormDataBlockerRecord(record) {
 
   throwInvalidRecord(
     'expected a private form action data blocker diagnostic record'
+  );
+}
+
+function assertPrivateFormActionSubmitDispatchRecord(record) {
+  const payload = getPrivateFormActionSubmitDispatchRecordPayload(record);
+  if (payload !== null) {
+    return payload;
+  }
+
+  throwInvalidSubmitDispatchRecord(
+    'expected a private form action submit dispatch diagnostic record'
   );
 }
 
@@ -445,11 +785,96 @@ function normalizeFormActionFormDataBlockerAdmission(
   });
 }
 
+function normalizeFormActionSubmitDispatchAdmission(blocker, admission) {
+  if (admission == null || typeof admission !== 'object') {
+    throwInvalidSubmitDispatchAdmission('admission metadata must be an object');
+  }
+
+  if (admission.explicitFormActionSubmitDispatch !== true) {
+    throwInvalidSubmitDispatchAdmission(
+      'explicitFormActionSubmitDispatch must be true'
+    );
+  }
+
+  assertNoSubmitDispatchRawAdmissionFields(admission);
+
+  if (admission.callbackDispatchExecutionRequested === true) {
+    throwInvalidSubmitDispatchAdmission(
+      'callback dispatch execution must remain blocked'
+    );
+  }
+
+  const sourceSubmitControlKind = blocker.submitterShape.controlKind;
+  const submitControlKind = getSubmitDispatchStringProperty(
+    admission,
+    'submitControlKind',
+    sourceSubmitControlKind
+  );
+  if (submitControlKind !== sourceSubmitControlKind) {
+    throwInvalidSubmitDispatchAdmission(
+      'submitControlKind must match the source blocker metadata'
+    );
+  }
+  if (
+    submitControlKind !== 'button' &&
+    submitControlKind !== 'input' &&
+    submitControlKind !== 'none'
+  ) {
+    throwInvalidSubmitDispatchAdmission(
+      'submitControlKind must be button, input, or none'
+    );
+  }
+
+  return freezeRecord({
+    explicitFormActionSubmitDispatch: true,
+    metadataOnly: true,
+    diagnosticKind:
+      getSubmitDispatchStringProperty(
+        admission,
+        'diagnosticKind',
+        'metadata-only-submit-action-dispatch'
+      ),
+    sourceFormDataBlockerId: blocker.blockerId,
+    sourceEventExtractionId: blocker.sourceEventExtractionId,
+    sourceResetQueueCommitRequestId:
+      blocker.sourceResetQueueCommitRequestId,
+    submitControlKind,
+    callbackDispatchExecutionRequested: false,
+    dispatchQueueCaptured: false,
+    rawTargetCaptured: false,
+    rawEventCaptured: false,
+    rawActionCaptured: false,
+    rawSubmitControlCaptured: false,
+    liveFormAccepted: false,
+    realFormInspected: false,
+    unsupportedSubmitControlAccepted: false,
+    formDataConstructed: false,
+    syntheticEventCreated: false,
+    submitCallbackInvoked: false,
+    actionInvoked: false,
+    hostTransitionStarted: false,
+    previousDispatcherCalled: false,
+    resetStateQueued: false,
+    publicRootTouched: false,
+    compatibilityClaimed: false
+  });
+}
+
 function assertNoRawAdmissionFields(admission) {
   for (const field of blockedRawAdmissionFields) {
     if (hasOwnProp(admission, field)) {
       throwInvalidAdmission(
         `${field} must not be passed to the form action data blocker gate`
+      );
+    }
+  }
+}
+
+function assertNoSubmitDispatchRawAdmissionFields(admission) {
+  for (const field of blockedSubmitDispatchAdmissionFields) {
+    if (hasOwnProp(admission, field)) {
+      throwInvalidSubmitDispatchAdmission(
+        `${field} must not be passed to the submit dispatch metadata gate`
       );
     }
   }
@@ -729,6 +1154,133 @@ function createResetExecutionBlocker(resetQueueCommit) {
   });
 }
 
+function createSubmitActionIdentity(blocker) {
+  const source = blocker.sourceEventExtraction;
+  const invocation = blocker.actionInvocationBlocker;
+  return freezeRecord({
+    metadataOnly: true,
+    sourceFormDataBlockerId: blocker.blockerId,
+    sourceEventExtractionId: blocker.sourceEventExtractionId,
+    sourceSubmissionRequestId: blocker.sourceSubmissionRequestId,
+    eventName: source.eventName,
+    submissionTrigger: source.submissionTrigger,
+    resolvedActionKind: source.actionKind,
+    actionSource: source.actionSource,
+    formActionKind: source.formActionKind,
+    submitControlActionKind: source.submitterActionKind,
+    submitControlOverridesFormAction:
+      source.submitterActionOverridesFormAction,
+    nativeNavigationWouldBePrevented:
+      invocation.nativeNavigationWouldBePrevented,
+    pendingStatusWouldBeSet: invocation.pendingStatusWouldBeSet,
+    actionInvocationWouldBeScheduled:
+      invocation.actionInvocationWouldBeScheduled,
+    formDataBlockerId: blocker.blockerId,
+    rawActionCaptured: false,
+    actionFunctionCaptured: false,
+    callbackCaptured: false,
+    actionInvoked: false,
+    hostTransitionStarted: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createFormDataBlockerLink(blocker) {
+  return freezeRecord({
+    metadataOnly: true,
+    blockerId: blocker.blockerId,
+    blockerSequence: blocker.blockerSequence,
+    blockerStatus: blocker.status,
+    sourceEventExtractionId: blocker.sourceEventExtractionId,
+    sourceResetQueueCommitRequestId:
+      blocker.sourceResetQueueCommitRequestId,
+    targetKind: blocker.formTargetShape.targetKind,
+    submitControlKind: blocker.submitterShape.controlKind,
+    formDataConstructionStatus:
+      blocker.formDataConstructionBlocker.status,
+    formDataConstructionBlocked:
+      blocker.formDataConstructionBlocker.constructorCallBlocked,
+    wouldConstructForPendingStatus:
+      blocker.formDataConstructionBlocker
+        .wouldConstructForPendingStatus,
+    wouldConstructForActionInvocation:
+      blocker.formDataConstructionBlocker
+        .wouldConstructForActionInvocation,
+    formDataConstructed: false,
+    realFormInspected: false,
+    submitControlInspected: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createResetQueueIntentLink(blocker) {
+  const sourceReset = blocker.sourceResetQueueCommit;
+  const resetExecution = blocker.resetExecutionBlocker;
+  return freezeRecord({
+    metadataOnly: true,
+    sourceFormDataBlockerId: blocker.blockerId,
+    sourceResetQueueCommitRequestId:
+      blocker.sourceResetQueueCommitRequestId,
+    sourceResetQueueCommitRequestSequence:
+      blocker.sourceResetQueueCommitRequestSequence,
+    sourceResetIntentRequestId: blocker.sourceResetIntentRequestId,
+    sourceResetIntentRequestSequence:
+      blocker.sourceResetIntentRequestSequence,
+    sourceResetOrderingKind: sourceReset.sourceResetOrderingKind,
+    sourceResetSource: sourceReset.sourceResetSource,
+    sourceTransitionContext: sourceReset.sourceTransitionContext,
+    resetStateWouldBeQueued:
+      resetExecution.resetStateWouldBeQueued,
+    resetTraversalWouldRunAfterMutationEffects:
+      resetExecution.resetTraversalWouldRunAfterMutationEffects,
+    actionCompletionResetBeforeAction:
+      sourceReset.sourceResetOrderingKind ===
+      'action-completion-reset-before-action',
+    previousDispatcherCalled: false,
+    resetFiberResolved: false,
+    resetStateQueued: false,
+    reactUpdateQueued: false,
+    resetFormInstanceCalled: false,
+    formResetCommitted: false,
+    realFormReset: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createSubmitDispatchQueueBoundary(blocker, actionIdentity) {
+  return freezeRecord({
+    status: 'blocked-private-form-action-submit-dispatch',
+    sourceFormDataBlockerId: blocker.blockerId,
+    sourceEventExtractionId: blocker.sourceEventExtractionId,
+    eventName: actionIdentity.eventName,
+    submissionTrigger: actionIdentity.submissionTrigger,
+    actionIdentityRecorded: true,
+    dispatchQueueEntryWouldBeCreated: true,
+    listenerWouldRunAfterSyntheticEvent: true,
+    nativeNavigationWouldBePrevented:
+      actionIdentity.nativeNavigationWouldBePrevented,
+    pendingStatusWouldBeSet:
+      actionIdentity.pendingStatusWouldBeSet,
+    actionInvocationWouldBeScheduled:
+      actionIdentity.actionInvocationWouldBeScheduled,
+    callbackDispatchBlocked: true,
+    dispatchQueueCaptured: false,
+    syntheticEventCreated: false,
+    listenerDispatchStarted: false,
+    callbackDispatchExecuted: false,
+    submitCallbackInvoked: false,
+    defaultPreventedByGate: false,
+    nativeDefaultPrevented: false,
+    formDataConstructed: false,
+    actionFunctionCaptured: false,
+    actionInvoked: false,
+    hostTransitionStarted: false,
+    publicRootTouched: false,
+    compatibilityClaimed: false,
+    blockedReason: 'no-submit-listener-execution'
+  });
+}
+
 function createPublicFormActionBlockerBoundary() {
   return freezeRecord({
     status: 'blocked-public-form-action-formdata-compatibility',
@@ -737,6 +1289,25 @@ function createPublicFormActionBlockerBoundary() {
     publicRootTouched: false,
     realFormAccepted: false,
     realFormInspected: false,
+    formDataConstructed: false,
+    actionInvoked: false,
+    reactUpdateQueued: false,
+    formResetCommitted: false,
+    realFormReset: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createPublicFormActionSubmitDispatchBoundary() {
+  return freezeRecord({
+    status: 'blocked-public-form-action-submit-dispatch-compatibility',
+    publicFormActionsEnabled: false,
+    publicRequestFormResetReachable: false,
+    publicRootTouched: false,
+    realFormAccepted: false,
+    realFormInspected: false,
+    submitDispatchReachable: false,
+    callbackDispatchExecuted: false,
     formDataConstructed: false,
     actionInvoked: false,
     reactUpdateQueued: false,
@@ -782,6 +1353,19 @@ function getShapeStringProperty(record, key, fallback) {
   throwInvalidAdmission(`${key} must be a non-empty string`);
 }
 
+function getSubmitDispatchStringProperty(record, key, fallback) {
+  if (!hasOwnProp(record, key)) {
+    return fallback;
+  }
+
+  const value = record[key];
+  if (typeof value === 'string' && value.length > 0) {
+    return value;
+  }
+
+  throwInvalidSubmitDispatchAdmission(`${key} must be a non-empty string`);
+}
+
 function throwInvalidAdmission(reason) {
   const error = new Error(
     `Invalid private React DOM form action data blocker admission: ${reason}.`
@@ -799,6 +1383,28 @@ function throwInvalidRecord(reason) {
   );
   error.name = 'FastReactDomFormActionFormDataBlockerGateError';
   error.code = privateFormActionFormDataBlockerInvalidRecordCode;
+  error.compatibilityTarget = compatibilityTarget;
+  error.reason = reason;
+  throw error;
+}
+
+function throwInvalidSubmitDispatchAdmission(reason) {
+  const error = new Error(
+    `Invalid private React DOM form action submit dispatch admission: ${reason}.`
+  );
+  error.name = 'FastReactDomFormActionSubmitDispatchGateError';
+  error.code = privateFormActionSubmitDispatchInvalidAdmissionCode;
+  error.compatibilityTarget = compatibilityTarget;
+  error.reason = reason;
+  throw error;
+}
+
+function throwInvalidSubmitDispatchRecord(reason) {
+  const error = new Error(
+    `Invalid private React DOM form action submit dispatch record: ${reason}.`
+  );
+  error.name = 'FastReactDomFormActionSubmitDispatchGateError';
+  error.code = privateFormActionSubmitDispatchInvalidRecordCode;
   error.compatibilityTarget = compatibilityTarget;
   error.reason = reason;
   throw error;
@@ -834,14 +1440,23 @@ function freezeRecord(value) {
 
 module.exports = {
   createFormActionFormDataBlockerDiagnosticGate,
+  createFormActionSubmitDispatchDiagnosticGate,
   createUnsupportedFormActionFormDataBlockerError,
+  createUnsupportedFormActionSubmitDispatchError,
   describePrivateFormActionFormDataBlockerGate,
+  describePrivateFormActionSubmitDispatchGate,
   formActionFormDataBlockerBlockedSideEffects,
   formActionFormDataBlockerDiagnosticSideEffects,
   formActionFormDataBlockerGateSchemaVersion,
   formActionFormDataBlockerMissingPrerequisites,
+  formActionSubmitDispatchBlockedSideEffects,
+  formActionSubmitDispatchDiagnosticSideEffects,
+  formActionSubmitDispatchGateSchemaVersion,
+  formActionSubmitDispatchMissingPrerequisites,
   getPrivateFormActionFormDataBlockerRecordPayload,
+  getPrivateFormActionSubmitDispatchRecordPayload,
   isPrivateFormActionFormDataBlockerRecord,
+  isPrivateFormActionSubmitDispatchRecord,
   privateFormActionFormDataBlockerGateErrorCode,
   privateFormActionFormDataBlockerGateId,
   privateFormActionFormDataBlockerInvalidAdmissionCode,
@@ -849,5 +1464,13 @@ module.exports = {
   privateFormActionFormDataBlockerRecordedStatus,
   privateFormActionFormDataBlockerRecordType,
   privateFormActionFormDataBlockerStatus,
-  recordFormActionFormDataBlockerDiagnostic
+  privateFormActionSubmitDispatchGateErrorCode,
+  privateFormActionSubmitDispatchGateId,
+  privateFormActionSubmitDispatchInvalidAdmissionCode,
+  privateFormActionSubmitDispatchInvalidRecordCode,
+  privateFormActionSubmitDispatchRecordedStatus,
+  privateFormActionSubmitDispatchRecordType,
+  privateFormActionSubmitDispatchStatus,
+  recordFormActionFormDataBlockerDiagnostic,
+  recordFormActionSubmitDispatchDiagnostic
 };
