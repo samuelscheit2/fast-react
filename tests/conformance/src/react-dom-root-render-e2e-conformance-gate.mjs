@@ -138,6 +138,7 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_BOUNDARY_ROWS =
       expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
       compatibilityClaimed: false,
       privateHostOutputEvidence: "separate",
+      privatePortalMetadataPromotesPublicRootRender: false,
       portalRootRenderEvidence: "separate"
     }),
     Object.freeze({
@@ -274,7 +275,7 @@ export const REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_BOUNDARY_ROWS =
       expectedGateStatus: REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_STATUS,
       compatibilityClaimed: false,
       reason:
-        "Portal container mounting is not implemented; the accepted reconciler diagnostic must fail closed before mounting portal children."
+        "Public portal container mounting is not implemented; accepted private fake-DOM portal mount diagnostics remain separate from public root.render compatibility."
     }),
     Object.freeze({
       id: "portal-listener-setup",
@@ -282,7 +283,7 @@ export const REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_BOUNDARY_ROWS =
       expectedGateStatus: REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_STATUS,
       compatibilityClaimed: false,
       reason:
-        "Portal listener setup and preparePortalMount behavior remain unsupported and must not be inferred from createPortal object construction."
+        "Portal listener setup and preparePortalMount behavior remain unsupported publicly and must not be inferred from private listener-intent or event owner-root metadata."
     }),
     Object.freeze({
       id: "portal-dom-mutation",
@@ -290,7 +291,7 @@ export const REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_BOUNDARY_ROWS =
       expectedGateStatus: REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_STATUS,
       compatibilityClaimed: false,
       reason:
-        "Portal DOM mutation remains blocked; the local gate checks only create-only object behavior and fail-closed diagnostics."
+        "Browser/public portal DOM mutation remains blocked; private fake-DOM mount and child reconciliation diagnostics cannot promote public root rendering compatibility."
     }),
     Object.freeze({
       id: "portal-compatibility-claim",
@@ -1400,6 +1401,8 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
       privateActPassivePublicReactDomTestUtilsActCompatibilityClaimed: false,
       privateActPassivePublicRootRenderCompatibilityClaimed: false,
       privateActPassivePublicPassiveEffectCompatibilityClaimed: false,
+      privatePortalMetadataPromotesPublicRootRender:
+        portalRootRenderGate.summary.privatePortalMetadataPromotesPublicRootRender,
       portalRootRenderCompatibilityClaimed: false,
       compatibilityClaimed: false
     }
@@ -1524,6 +1527,10 @@ export function evaluateReactDomPortalRootRenderBlockedGate({
     prerequisiteRows,
     failures
   });
+  validatePortalPrivateRootBridgeDiagnostics({
+    portalRootRenderObservations,
+    failures
+  });
   validatePortalReconcilerFailClosedDiagnostics({
     portalRootRenderObservations,
     prerequisiteRows,
@@ -1557,6 +1564,7 @@ export function evaluateReactDomPortalRootRenderBlockedGate({
         REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.length *
         REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES.length,
       failureCount: failures.length,
+      privatePortalMetadataPromotesPublicRootRender: false,
       compatibilityClaimed: false
     }
   };
@@ -2181,6 +2189,14 @@ export function inspectReactDomPortalRootRenderBlockedBoundary({
       "private portal root boundary rejects non-portal render payload",
       () => bridge.createPortalRootBoundary(nonPortalRenderRecord)
     );
+    const privatePortalDiagnostics =
+      inspectPrivateRootBridgePortalDiagnostics({
+        domContainer,
+        reactDom,
+        rootBridge,
+        rootMarkers,
+        listenerRegistry
+      });
 
     return {
       loadError: null,
@@ -2213,6 +2229,7 @@ export function inspectReactDomPortalRootRenderBlockedBoundary({
         render: summarizePrivateRootBridgeUpdateRecord(portalRenderRecord)
       },
       invalidPortalRootBoundary,
+      privateRootBridgePortalDiagnostics: privatePortalDiagnostics,
       unsupportedImplementation,
       portalCreationSideEffects: summarizePortalRootRenderSideEffects({
         containers: [rootContainer, portalContainer],
@@ -2229,6 +2246,150 @@ export function inspectReactDomPortalRootRenderBlockedBoundary({
       loadError: serializeGateError(error)
     };
   }
+}
+
+function inspectPrivateRootBridgePortalDiagnostics({
+  domContainer,
+  listenerRegistry,
+  reactDom,
+  rootBridge,
+  rootMarkers
+}) {
+  const document = createPrivateHostOutputDocument({
+    domContainer,
+    label: "portal-root-render-private-diagnostics"
+  });
+  const rootContainer = document.createElement("div");
+  const portalContainer = document.createElement("section");
+  const portalChild = {
+    props: {
+      children: "portal child"
+    },
+    type: "span"
+  };
+  const updatedPortalChild = {
+    props: {
+      children: "updated portal child",
+      "data-phase": "updated",
+      title: "updated title"
+    },
+    type: "span"
+  };
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    portalBoundaryIdPrefix: "portal-diagnostic-boundary",
+    portalChildReconciliationIdPrefix: "portal-diagnostic-child",
+    portalCommitIdPrefix: "portal-diagnostic-commit",
+    portalEventOwnerRootIdPrefix: "portal-diagnostic-owner",
+    portalMountIdPrefix: "portal-diagnostic-mount",
+    portalPrepareMountListenerIdPrefix: "portal-diagnostic-listener",
+    requestIdPrefix: "portal-diagnostic-request",
+    rootIdPrefix: "portal-diagnostic-root",
+    sideEffectIdPrefix: "portal-diagnostic-side-effect",
+    updateIdPrefix: "portal-diagnostic-update"
+  });
+
+  const createRootRecord = bridge.createClientRoot(rootContainer);
+  const sideEffects = bridge.applyCreateRootSideEffects(createRootRecord);
+  const portal = reactDom.createPortal(
+    portalChild,
+    portalContainer,
+    "portal-key"
+  );
+  const renderRecord = bridge.renderContainer(
+    createRootRecord.handle,
+    portal
+  );
+  const boundaryRecord = bridge.createPortalRootBoundary(renderRecord);
+  const prepareMountListenerIntent =
+    bridge.createPortalPrepareMountListenerIntent(boundaryRecord);
+  const commitHandoff = bridge.createPortalCommitHandoff(boundaryRecord, {
+    pendingChildren: [portalChild]
+  });
+  const fakeDomMount = bridge.createPortalFakeDomMountDiagnostic(
+    commitHandoff,
+    {
+      explicitChild: portalChild
+    }
+  );
+  const eventOwnerRootGate =
+    bridge.createPortalEventOwnerRootGate(fakeDomMount);
+  const updatedPortal = reactDom.createPortal(
+    updatedPortalChild,
+    portalContainer,
+    "portal-key"
+  );
+  const updateRenderRecord = bridge.renderContainer(
+    createRootRecord.handle,
+    updatedPortal
+  );
+  const updateBoundaryRecord =
+    bridge.createPortalRootBoundary(updateRenderRecord);
+  const childReconciliation =
+    bridge.createPortalChildReconciliationDiagnostic(
+      fakeDomMount,
+      updateBoundaryRecord,
+      {
+        explicitChild: updatedPortalChild
+      }
+    );
+  const sideEffectCleanup = bridge.revertCreateRootSideEffects(sideEffects);
+
+  const prepareMountListenerPayload =
+    rootBridge.getPrivateRootPortalPrepareMountListenerIntentPayload(
+      prepareMountListenerIntent
+    );
+  const fakeDomMountPayload =
+    rootBridge.getPrivateRootPortalFakeDomMountPayload(fakeDomMount);
+  const eventOwnerRootPayload =
+    rootBridge.getPrivateRootPortalEventOwnerRootGatePayload(
+      eventOwnerRootGate
+    );
+  const childReconciliationPayload =
+    rootBridge.getPrivateRootPortalChildReconciliationDiagnosticPayload(
+      childReconciliation
+    );
+
+  return {
+    status: "ok",
+    prepareMountListenerIntent:
+      summarizePrivateRootPortalPrepareMountListenerIntentRecord(
+        prepareMountListenerIntent
+      ),
+    fakeDomMount:
+      summarizePrivateRootPortalFakeDomMountRecord(fakeDomMount),
+    eventOwnerRootGate:
+      summarizePrivateRootPortalEventOwnerRootGateRecord(eventOwnerRootGate),
+    childReconciliation:
+      summarizePrivateRootPortalChildReconciliationRecord(
+        childReconciliation
+      ),
+    payloadsHidden: {
+      childBoundaryMatches:
+        childReconciliationPayload?.boundaryRecord === updateBoundaryRecord,
+      childMountMatches:
+        childReconciliationPayload?.mountRecord === fakeDomMount,
+      childNextChildMatches:
+        childReconciliationPayload?.nextChild === updatedPortalChild,
+      eventMountMatches:
+        eventOwnerRootPayload?.mountRecord === fakeDomMount,
+      mountCommitMatches:
+        fakeDomMountPayload?.commitHandoffRecord === commitHandoff,
+      mountPortalContainerMatches:
+        fakeDomMountPayload?.portalContainer === portalContainer,
+      prepareBoundaryMatches:
+        prepareMountListenerPayload?.boundaryRecord === boundaryRecord,
+      preparePortalContainerMatches:
+        prepareMountListenerPayload?.portalContainer === portalContainer
+    },
+    sideEffects: summarizePrivateRootPortalDiagnosticSideEffects({
+      document,
+      listenerRegistry,
+      portalContainer,
+      rootContainer,
+      rootMarkers,
+      sideEffectCleanup
+    })
+  };
 }
 
 function validateClientRootOraclePrerequisites({
@@ -2985,7 +3146,11 @@ function validateRootRenderPortalBlockers({ rootRenderGateResult, failures }) {
     rootRenderGateResult.summary.portalRootRenderCompatibilityClaimed !==
       false ||
     rootRenderGateResult.portalRootRenderGate?.summary?.compatibilityClaimed !==
-      false
+      false ||
+    rootRenderGateResult.summary.privatePortalMetadataPromotesPublicRootRender !==
+      false ||
+    rootRenderGateResult.portalRootRenderGate?.summary
+      ?.privatePortalMetadataPromotesPublicRootRender !== false
   ) {
     failures.push({
       gateStatus:
@@ -2995,7 +3160,13 @@ function validateRootRenderPortalBlockers({ rootRenderGateResult, failures }) {
         null,
       gateClaim:
         rootRenderGateResult.portalRootRenderGate?.summary
-          ?.compatibilityClaimed ?? null
+          ?.compatibilityClaimed ?? null,
+      privatePortalMetadataPromotion:
+        rootRenderGateResult.summary
+          .privatePortalMetadataPromotesPublicRootRender ?? null,
+      gatePrivatePortalMetadataPromotion:
+        rootRenderGateResult.portalRootRenderGate?.summary
+          ?.privatePortalMetadataPromotesPublicRootRender ?? null
     });
   }
 
@@ -3023,6 +3194,7 @@ function validateRootRenderPortalBlockers({ rootRenderGateResult, failures }) {
     if (
       row.gateStatus !== REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_STATUS ||
       row.publicRootCompatibilitySurface !== false ||
+      row.privatePortalMetadataPromotesPublicRootRender !== false ||
       row.compatibilityClaimed !== false
     ) {
       failures.push({
@@ -3234,6 +3406,7 @@ function validatePublicFacadeBoundary({
       "createPortal object construction remains separate from mounting a portal through blocked public root.render.",
     compatibilityClaimed: false,
     privateHostOutputEvidence: "separate",
+    privatePortalMetadataPromotesPublicRootRender: false,
     portalRootRenderEvidence: "separate"
   });
 
@@ -3867,6 +4040,28 @@ function validatePortalCreateOnlyBoundary({
   }
 }
 
+function validatePortalPrivateRootBridgeDiagnostics({
+  portalRootRenderObservations,
+  failures
+}) {
+  if (portalRootRenderObservations.loadError) {
+    return;
+  }
+
+  if (
+    !isAcceptedPrivateRootBridgePortalDiagnostics(
+      portalRootRenderObservations.privateRootBridgePortalDiagnostics
+    )
+  ) {
+    failures.push({
+      gateStatus:
+        "portal-private-root-diagnostics-promoted-public-root-render",
+      diagnostics:
+        portalRootRenderObservations.privateRootBridgePortalDiagnostics
+    });
+  }
+}
+
 function validatePortalReconcilerFailClosedDiagnostics({
   portalRootRenderObservations,
   prerequisiteRows,
@@ -3944,6 +4139,11 @@ function validatePortalUnsupportedRows({
       gateStatus: row.expectedGateStatus,
       admission: row.admission,
       compatibilityClaimed: false,
+      privatePortalDiagnosticsAccepted:
+        isAcceptedPrivateRootBridgePortalDiagnostics(
+          portalRootRenderObservations.privateRootBridgePortalDiagnostics
+        ),
+      privatePortalMetadataPromotesPublicRootRender: false,
       portalRootRenderSurface: "react-dom-createPortal-through-root-render",
       publicRootCompatibilitySurface: false,
       rootRenderE2EScenarioModeRowCount:
@@ -5993,6 +6193,13 @@ function summarizePrivateRootPortalBoundaryRecord(record) {
     portalListenerGuard: record.portalListenerGuard,
     portalMounting: record.portalMounting,
     portalObjectInfo: record.portalObjectInfo,
+    privatePortalMetadataPromotesPublicRootRender:
+      record.privatePortalMetadataPromotesPublicRootRender,
+    publicDomMutation: record.publicDomMutation,
+    publicPortalMounting: record.publicPortalMounting,
+    publicRootCompatibilitySurface: record.publicRootCompatibilitySurface,
+    publicRootRenderCompatibilityClaimed:
+      record.publicRootRenderCompatibilityClaimed,
     reconcilerDiagnostic: record.reconcilerDiagnostic,
     reconcilerExecution: record.reconcilerExecution,
     rootId: record.rootId,
@@ -6005,6 +6212,166 @@ function summarizePrivateRootPortalBoundaryRecord(record) {
     sourceRequestSequence: record.sourceRequestSequence,
     sourceRequestType: record.sourceRequestType,
     sourceUpdateId: record.sourceUpdateId
+  };
+}
+
+function summarizePrivateRootPortalPrepareMountListenerIntentRecord(record) {
+  return {
+    acceptedCapabilities: record.acceptedCapabilities.map((capability) => ({
+      accepted: capability.accepted,
+      id: capability.id
+    })),
+    blockedCapabilities: record.blockedCapabilities.map((capability) => ({
+      blocked: capability.blocked,
+      id: capability.id
+    })),
+    compatibilityClaimed: record.compatibilityClaimed,
+    domMutation: record.domMutation,
+    eventDispatch: record.eventDispatch,
+    intentId: record.intentId,
+    intentStatus: record.intentStatus,
+    kind: record.kind,
+    listenerInstallation: record.listenerInstallation,
+    listenerInstallationStatus: record.listenerInstallationStatus,
+    operation: record.operation,
+    preparePortalMount: record.preparePortalMount,
+    preparePortalMountIntent: record.preparePortalMountIntent,
+    privatePortalMetadataPromotesPublicRootRender:
+      record.privatePortalMetadataPromotesPublicRootRender,
+    publicDomMutation: record.publicDomMutation,
+    publicPortalMounting: record.publicPortalMounting,
+    publicRootCompatibilitySurface: record.publicRootCompatibilitySurface,
+    publicRootRenderCompatibilityClaimed:
+      record.publicRootRenderCompatibilityClaimed,
+    reconcilerExecution: record.reconcilerExecution,
+    rootId: record.rootId,
+    sourceBoundaryId: record.sourceBoundaryId
+  };
+}
+
+function summarizePrivateRootPortalFakeDomMountRecord(record) {
+  return {
+    acceptedCapabilities: record.acceptedCapabilities.map((capability) => ({
+      accepted: capability.accepted,
+      id: capability.id
+    })),
+    blockedCapabilities: record.blockedCapabilities.map((capability) => ({
+      blocked: capability.blocked,
+      id: capability.id
+    })),
+    compatibilityClaimed: record.compatibilityClaimed,
+    componentTreeMetadataAttached: record.componentTreeMetadataAttached,
+    domMutation: record.domMutation,
+    eventDispatch: record.eventDispatch,
+    fakeDomCommitApplied: record.fakeDomCommitApplied,
+    fakeDomPortalMountDiagnostic: record.fakeDomPortalMountDiagnostic,
+    hostComponentType: record.hostComponentType,
+    kind: record.kind,
+    listenerInstallation: record.listenerInstallation,
+    mountDiagnosticId: record.mountDiagnosticId,
+    mountStatus: record.mountStatus,
+    operation: record.operation,
+    portalChildReconciliation: record.portalChildReconciliation,
+    portalContainerChildCountAfter: record.portalContainerChildCountAfter,
+    portalContainerChildrenReplaced: record.portalContainerChildrenReplaced,
+    portalMounting: record.portalMounting,
+    privatePortalMetadataPromotesPublicRootRender:
+      record.privatePortalMetadataPromotesPublicRootRender,
+    publicDomMutation: record.publicDomMutation,
+    publicMountStatus: record.publicMountStatus,
+    publicPortalMounting: record.publicPortalMounting,
+    publicRootCompatibilitySurface: record.publicRootCompatibilitySurface,
+    publicRootRenderCompatibilityClaimed:
+      record.publicRootRenderCompatibilityClaimed,
+    reconcilerExecution: record.reconcilerExecution,
+    rootId: record.rootId,
+    sourceCommitHandoffId: record.sourceCommitHandoffId
+  };
+}
+
+function summarizePrivateRootPortalEventOwnerRootGateRecord(record) {
+  return {
+    acceptedCapabilities: record.acceptedCapabilities.map((capability) => ({
+      accepted: capability.accepted,
+      id: capability.id
+    })),
+    blockedCapabilities: record.blockedCapabilities.map((capability) => ({
+      blocked: capability.blocked,
+      id: capability.id
+    })),
+    browserDomEventCompatibilityClaimed:
+      record.browserDomEventCompatibilityClaimed,
+    compatibilityClaimed: record.compatibilityClaimed,
+    domMutation: record.domMutation,
+    eventBubblingStatus: record.eventBubblingStatus,
+    eventDispatch: record.eventDispatch,
+    fakeDomEventCompatibilityClaimed: record.fakeDomEventCompatibilityClaimed,
+    gateId: record.gateId,
+    gateStatus: record.gateStatus,
+    kind: record.kind,
+    listenerInstallation: record.listenerInstallation,
+    operation: record.operation,
+    ownerRootAttachment: record.ownerRootAttachment,
+    portalEventBubbling: record.portalEventBubbling,
+    portalEventPathDiagnostic: record.portalEventPathDiagnostic,
+    portalOwnerRootAttached: record.portalOwnerRootAttached,
+    privatePortalMetadataPromotesPublicRootRender:
+      record.privatePortalMetadataPromotesPublicRootRender,
+    publicDomMutation: record.publicDomMutation,
+    publicPortalBubbling: record.publicPortalBubbling,
+    publicPortalMounting: record.publicPortalMounting,
+    publicRootCompatibilitySurface: record.publicRootCompatibilitySurface,
+    publicRootRenderCompatibilityClaimed:
+      record.publicRootRenderCompatibilityClaimed,
+    reconcilerExecution: record.reconcilerExecution,
+    rootId: record.rootId,
+    syntheticEventCount: record.syntheticEventCount
+  };
+}
+
+function summarizePrivateRootPortalChildReconciliationRecord(record) {
+  return {
+    acceptedCapabilities: record.acceptedCapabilities.map((capability) => ({
+      accepted: capability.accepted,
+      id: capability.id
+    })),
+    blockedCapabilities: record.blockedCapabilities.map((capability) => ({
+      blocked: capability.blocked,
+      id: capability.id
+    })),
+    compatibilityClaimed: record.compatibilityClaimed,
+    diagnosticId: record.diagnosticId,
+    domMutation: record.domMutation,
+    eventDispatch: record.eventDispatch,
+    fakeDomCommitApplied: record.fakeDomCommitApplied,
+    fakeDomPortalMountDiagnostic: record.fakeDomPortalMountDiagnostic,
+    hostComponentType: record.hostComponentType,
+    kind: record.kind,
+    latestPropsPublished: record.latestPropsPublished,
+    latestPropsPublishOrder: record.latestPropsPublishOrder,
+    listenerInstallation: record.listenerInstallation,
+    operation: record.operation,
+    portalChildReconciliation: record.portalChildReconciliation,
+    portalContainerChildrenReplaced: record.portalContainerChildrenReplaced,
+    portalHostComponentUpdated: record.portalHostComponentUpdated,
+    portalHostTextUpdated: record.portalHostTextUpdated,
+    portalMounting: record.portalMounting,
+    privatePortalMetadataPromotesPublicRootRender:
+      record.privatePortalMetadataPromotesPublicRootRender,
+    propertyMutation: record.propertyMutation,
+    publicDomMutation: record.publicDomMutation,
+    publicMountStatus: record.publicMountStatus,
+    publicPortalMounting: record.publicPortalMounting,
+    publicRootCompatibilitySurface: record.publicRootCompatibilitySurface,
+    publicRootRenderCompatibilityClaimed:
+      record.publicRootRenderCompatibilityClaimed,
+    reconcilerExecution: record.reconcilerExecution,
+    reconciliationStatus: record.reconciliationStatus,
+    rootId: record.rootId,
+    singleHostComponentUpdate: record.singleHostComponentUpdate,
+    sourceBoundaryId: record.sourceBoundaryId,
+    sourceMountDiagnosticId: record.sourceMountDiagnosticId,
+    textMutation: record.textMutation
   };
 }
 
@@ -6459,6 +6826,43 @@ function summarizePortalRootRenderSideEffects({
     ownerDocumentMutationCount,
     portalMountingObserved: false,
     publicRootCompatibilityClaimed: false
+  };
+}
+
+function summarizePrivateRootPortalDiagnosticSideEffects({
+  document,
+  listenerRegistry,
+  portalContainer,
+  rootContainer,
+  rootMarkers,
+  sideEffectCleanup
+}) {
+  return {
+    compatibilityClaimed: false,
+    fakeDomPortalMutationObserved: portalContainer.__mutationLog.length > 0,
+    ownerDocumentListenerRegistrationCount: document.__registrations.length,
+    ownerDocumentListeningMarkerPropertyCount:
+      listenerRegistry.inspectListeningMarker(document).propertyCount,
+    ownerDocumentMutationCount: document.__mutationLog.length,
+    portalContainerListenerRegistrationCount:
+      portalContainer.__registrations.length,
+    portalContainerListeningMarkerPropertyCount:
+      listenerRegistry.inspectListeningMarker(portalContainer).propertyCount,
+    portalContainerMutationCount: portalContainer.__mutationLog.length,
+    privatePortalMetadataPromotesPublicRootRender: false,
+    publicDomMutationObserved: false,
+    publicPortalMountingObserved: false,
+    publicRootCompatibilityClaimed: false,
+    publicRootCompatibilitySurface: false,
+    publicRootRenderCompatibilityClaimed: false,
+    rootContainerListenerRegistrationCount:
+      rootContainer.__registrations.length,
+    rootContainerListeningMarkerPropertyCount:
+      listenerRegistry.inspectListeningMarker(rootContainer).propertyCount,
+    rootContainerMarkerPropertyCount:
+      rootMarkers.inspectContainerRootMarker(rootContainer).propertyCount,
+    rootContainerMutationCount: rootContainer.__mutationLog.length,
+    sideEffectCleanupStatus: sideEffectCleanup.sideEffectStatus
   };
 }
 
@@ -7241,11 +7645,16 @@ function isAcceptedPrivateRootPortalBoundary(boundary) {
     boundary.reconcilerExecution === false &&
     boundary.portalChildReconciliation === false &&
     boundary.portalMounting === false &&
+    boundary.publicPortalMounting === false &&
+    boundary.publicRootCompatibilitySurface === false &&
+    boundary.publicRootRenderCompatibilityClaimed === false &&
     boundary.domMutation === false &&
+    boundary.publicDomMutation === false &&
     boundary.markerWrites === false &&
     boundary.listenerInstallation === false &&
     boundary.hydration === false &&
     boundary.eventDispatch === false &&
+    boundary.privatePortalMetadataPromotesPublicRootRender === false &&
     boundary.compatibilityClaimed === false &&
     boundary.portalObjectInfo?.type === "object" &&
     findFirstDifferencePath(boundary.portalObjectInfo.keys, [
@@ -7278,6 +7687,113 @@ function isAcceptedPrivateRootPortalBoundary(boundary) {
       "HostRootChildBeginWorkPreflightError::UnsupportedPortal" &&
     boundary.reconcilerDiagnostic?.unsupportedFeature ===
       "PORTAL_RECONCILER_UNSUPPORTED_FEATURE"
+  );
+}
+
+function isAcceptedPrivateRootBridgePortalDiagnostics(diagnostics) {
+  if (diagnostics?.status !== "ok") {
+    return false;
+  }
+
+  const prepare = diagnostics.prepareMountListenerIntent;
+  const mount = diagnostics.fakeDomMount;
+  const eventOwner = diagnostics.eventOwnerRootGate;
+  const child = diagnostics.childReconciliation;
+  const sideEffects = diagnostics.sideEffects;
+
+  return (
+    prepare?.kind ===
+      "FastReactDomPrivateRootPortalPrepareMountListenerIntentRecord" &&
+    prepare.intentStatus ===
+      "admitted-private-root-portal-prepare-mount-listener-intent" &&
+    prepare.listenerInstallationStatus ===
+      "blocked-private-root-portal-listener-installation" &&
+    prepare.preparePortalMountIntent === true &&
+    prepare.preparePortalMount === false &&
+    prepare.domMutation === false &&
+    privatePortalRecordDoesNotPromotePublicRootRender(prepare) &&
+    mount?.kind ===
+      "FastReactDomPrivateRootPortalFakeDomMountDiagnosticRecord" &&
+    mount.mountStatus === "applied-private-root-portal-fake-dom-mount-diagnostic" &&
+    mount.publicMountStatus === "blocked-public-root-portal-mounting" &&
+    mount.fakeDomCommitApplied === true &&
+    mount.fakeDomPortalMountDiagnostic === true &&
+    mount.componentTreeMetadataAttached === true &&
+    mount.portalChildReconciliation === false &&
+    mount.portalContainerChildrenReplaced === false &&
+    mount.portalMounting === false &&
+    mount.domMutation === true &&
+    privatePortalRecordDoesNotPromotePublicRootRender(mount) &&
+    eventOwner?.kind ===
+      "FastReactDomPrivateRootPortalEventOwnerRootGateRecord" &&
+    eventOwner.gateStatus ===
+      "recorded-private-root-portal-event-owner-root-gate" &&
+    eventOwner.eventBubblingStatus ===
+      "blocked-private-root-portal-event-bubbling" &&
+    eventOwner.portalOwnerRootAttached === true &&
+    eventOwner.portalEventPathDiagnostic === true &&
+    eventOwner.portalEventBubbling === false &&
+    eventOwner.publicPortalBubbling === false &&
+    eventOwner.browserDomEventCompatibilityClaimed === false &&
+    eventOwner.fakeDomEventCompatibilityClaimed === false &&
+    eventOwner.syntheticEventCount === 0 &&
+    eventOwner.domMutation === false &&
+    privatePortalRecordDoesNotPromotePublicRootRender(eventOwner) &&
+    child?.kind ===
+      "FastReactDomPrivateRootPortalChildReconciliationDiagnosticRecord" &&
+    child.reconciliationStatus ===
+      "admitted-private-root-portal-child-reconciliation-diagnostic" &&
+    child.publicMountStatus === "blocked-public-root-portal-mounting" &&
+    child.fakeDomCommitApplied === true &&
+    child.fakeDomPortalMountDiagnostic === true &&
+    child.portalChildReconciliation === true &&
+    child.singleHostComponentUpdate === true &&
+    child.portalHostComponentUpdated === true &&
+    child.portalHostTextUpdated === true &&
+    child.latestPropsPublished === true &&
+    child.latestPropsPublishOrder ===
+      "after-portal-property-and-text-mutation" &&
+    child.domMutation === true &&
+    privatePortalRecordDoesNotPromotePublicRootRender(child) &&
+    diagnostics.payloadsHidden?.prepareBoundaryMatches === true &&
+    diagnostics.payloadsHidden.preparePortalContainerMatches === true &&
+    diagnostics.payloadsHidden.mountCommitMatches === true &&
+    diagnostics.payloadsHidden.mountPortalContainerMatches === true &&
+    diagnostics.payloadsHidden.eventMountMatches === true &&
+    diagnostics.payloadsHidden.childMountMatches === true &&
+    diagnostics.payloadsHidden.childBoundaryMatches === true &&
+    diagnostics.payloadsHidden.childNextChildMatches === true &&
+    sideEffects?.privatePortalMetadataPromotesPublicRootRender === false &&
+    sideEffects.publicRootCompatibilitySurface === false &&
+    sideEffects.publicRootRenderCompatibilityClaimed === false &&
+    sideEffects.publicRootCompatibilityClaimed === false &&
+    sideEffects.publicPortalMountingObserved === false &&
+    sideEffects.publicDomMutationObserved === false &&
+    sideEffects.fakeDomPortalMutationObserved === true &&
+    sideEffects.rootContainerMutationCount === 0 &&
+    sideEffects.rootContainerMarkerPropertyCount === 0 &&
+    sideEffects.rootContainerListenerRegistrationCount === 0 &&
+    sideEffects.rootContainerListeningMarkerPropertyCount === 0 &&
+    sideEffects.portalContainerListenerRegistrationCount === 0 &&
+    sideEffects.portalContainerListeningMarkerPropertyCount === 0 &&
+    sideEffects.ownerDocumentListenerRegistrationCount === 0 &&
+    sideEffects.ownerDocumentListeningMarkerPropertyCount === 0 &&
+    sideEffects.sideEffectCleanupStatus ===
+      "reverted-private-root-create-mark-listen-gate"
+  );
+}
+
+function privatePortalRecordDoesNotPromotePublicRootRender(record) {
+  return (
+    record.compatibilityClaimed === false &&
+    record.eventDispatch === false &&
+    record.listenerInstallation === false &&
+    record.privatePortalMetadataPromotesPublicRootRender === false &&
+    record.publicDomMutation === false &&
+    record.publicPortalMounting === false &&
+    record.publicRootCompatibilitySurface === false &&
+    record.publicRootRenderCompatibilityClaimed === false &&
+    record.reconcilerExecution === false
   );
 }
 

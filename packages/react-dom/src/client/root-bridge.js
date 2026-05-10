@@ -5083,11 +5083,16 @@ function createPortalRootBoundaryRecordWithBridge(bridgeState, record) {
     reconcilerExecution: false,
     portalChildReconciliation: false,
     portalMounting: false,
+    publicPortalMounting: false,
+    publicRootCompatibilitySurface: false,
+    publicRootRenderCompatibilityClaimed: false,
     domMutation: false,
+    publicDomMutation: false,
     markerWrites: false,
     listenerInstallation: false,
     hydration: false,
     eventDispatch: false,
+    privatePortalMetadataPromotesPublicRootRender: false,
     compatibilityClaimed: false
   });
 
@@ -5186,6 +5191,8 @@ function createPortalPrepareMountListenerIntentRecordWithBridge(
     portalChildReconciliation: false,
     portalMounting: false,
     publicPortalMounting: false,
+    publicRootCompatibilitySurface: false,
+    publicRootRenderCompatibilityClaimed: false,
     nativeExecution: false,
     reconcilerExecution: false,
     domMutation: false,
@@ -5195,6 +5202,7 @@ function createPortalPrepareMountListenerIntentRecordWithBridge(
     resourceSideEffects: false,
     hydration: false,
     eventDispatch: false,
+    privatePortalMetadataPromotesPublicRootRender: false,
     compatibilityClaimed: false
   });
 
@@ -5283,15 +5291,20 @@ function createPortalCommitHandoffRecordWithBridge(
     portalContainerChildrenReplaced: false,
     portalChildReconciliation: false,
     portalMounting: false,
+    publicPortalMounting: false,
     preparePortalMount: false,
+    publicRootCompatibilitySurface: false,
+    publicRootRenderCompatibilityClaimed: false,
     nativeExecution: false,
     reconcilerExecution: false,
     domMutation: false,
+    publicDomMutation: false,
     markerWrites: false,
     listenerInstallation: false,
     resourceSideEffects: false,
     hydration: false,
     eventDispatch: false,
+    privatePortalMetadataPromotesPublicRootRender: false,
     compatibilityClaimed: false
   });
 
@@ -5564,6 +5577,8 @@ function createPortalFakeDomMountDiagnosticRecordWithBridge(
     portalChildReconciliation: false,
     portalMounting: false,
     publicPortalMounting: false,
+    publicRootCompatibilitySurface: false,
+    publicRootRenderCompatibilityClaimed: false,
     preparePortalMount: false,
     nativeExecution: false,
     reconcilerExecution: false,
@@ -5574,6 +5589,7 @@ function createPortalFakeDomMountDiagnosticRecordWithBridge(
     resourceSideEffects: false,
     hydration: false,
     eventDispatch: false,
+    privatePortalMetadataPromotesPublicRootRender: false,
     compatibilityClaimed: false
   });
 
@@ -5770,6 +5786,8 @@ function createPortalChildReconciliationDiagnosticRecordWithBridge(
     portalContainerChildrenReplaced: false,
     portalMounting: false,
     publicPortalMounting: false,
+    publicRootCompatibilitySurface: false,
+    publicRootRenderCompatibilityClaimed: false,
     preparePortalMount: false,
     nativeExecution: false,
     reconcilerExecution: false,
@@ -5780,6 +5798,7 @@ function createPortalChildReconciliationDiagnosticRecordWithBridge(
     resourceSideEffects: false,
     hydration: false,
     eventDispatch: false,
+    privatePortalMetadataPromotesPublicRootRender: false,
     compatibilityClaimed: false
   });
 
@@ -5955,6 +5974,8 @@ function createPortalEventOwnerRootGateRecordWithBridge(
     portalEventBubbling: false,
     publicPortalBubbling: false,
     publicPortalMounting: false,
+    publicRootCompatibilitySurface: false,
+    publicRootRenderCompatibilityClaimed: false,
     preparePortalMount: false,
     nativeExecution: false,
     reconcilerExecution: false,
@@ -5969,6 +5990,7 @@ function createPortalEventOwnerRootGateRecordWithBridge(
     syntheticEventCount: 0,
     browserDomEventCompatibilityClaimed: false,
     fakeDomEventCompatibilityClaimed: false,
+    privatePortalMetadataPromotesPublicRootRender: false,
     compatibilityClaimed: false
   });
 
@@ -8292,12 +8314,17 @@ function validatePortalFakeDomMountHandoffRecord(record) {
     record.portalContainerChildrenReplaced !== false ||
     record.portalChildReconciliation !== false ||
     record.portalMounting !== false ||
+    record.publicPortalMounting !== false ||
     record.preparePortalMount !== false ||
+    record.publicRootCompatibilitySurface !== false ||
+    record.publicRootRenderCompatibilityClaimed !== false ||
     record.nativeExecution !== false ||
     record.reconcilerExecution !== false ||
     record.domMutation !== false ||
+    record.publicDomMutation !== false ||
     record.listenerInstallation !== false ||
     record.resourceSideEffects !== false ||
+    record.privatePortalMetadataPromotesPublicRootRender !== false ||
     record.compatibilityClaimed !== false
   ) {
     throwInvalidPortalFakeDomMountRecord(
@@ -9652,11 +9679,16 @@ function assertPortalBoundaryStillBlocked(record) {
     record.reconcilerExecution !== false ||
     record.portalChildReconciliation !== false ||
     record.portalMounting !== false ||
+    record.publicPortalMounting !== false ||
+    record.publicRootCompatibilitySurface !== false ||
+    record.publicRootRenderCompatibilityClaimed !== false ||
     record.domMutation !== false ||
+    record.publicDomMutation !== false ||
     record.markerWrites !== false ||
     record.listenerInstallation !== false ||
     record.hydration !== false ||
     record.eventDispatch !== false ||
+    record.privatePortalMetadataPromotesPublicRootRender !== false ||
     record.compatibilityClaimed !== false
   ) {
     throwInvalidPortalCommitHandoffRecord(
@@ -9671,11 +9703,16 @@ function assertPortalBoundaryStillBlockedForPrepareMountListener(record) {
     record.reconcilerExecution !== false ||
     record.portalChildReconciliation !== false ||
     record.portalMounting !== false ||
+    record.publicPortalMounting !== false ||
+    record.publicRootCompatibilitySurface !== false ||
+    record.publicRootRenderCompatibilityClaimed !== false ||
     record.domMutation !== false ||
+    record.publicDomMutation !== false ||
     record.markerWrites !== false ||
     record.listenerInstallation !== false ||
     record.hydration !== false ||
     record.eventDispatch !== false ||
+    record.privatePortalMetadataPromotesPublicRootRender !== false ||
     record.compatibilityClaimed !== false
   ) {
     throwInvalidPortalPrepareMountListenerRecord(
@@ -9688,12 +9725,18 @@ function assertPortalBoundaryStillBlockedForChildReconciliation(record) {
   if (
     record.nativeExecution !== false ||
     record.reconcilerExecution !== false ||
+    record.portalChildReconciliation !== false ||
     record.portalMounting !== false ||
+    record.publicPortalMounting !== false ||
+    record.publicRootCompatibilitySurface !== false ||
+    record.publicRootRenderCompatibilityClaimed !== false ||
     record.domMutation !== false ||
+    record.publicDomMutation !== false ||
     record.markerWrites !== false ||
     record.listenerInstallation !== false ||
     record.hydration !== false ||
     record.eventDispatch !== false ||
+    record.privatePortalMetadataPromotesPublicRootRender !== false ||
     record.compatibilityClaimed !== false
   ) {
     throwInvalidPortalChildReconciliationRecord(
@@ -9716,6 +9759,8 @@ function assertPrivatePortalMountDiagnosticStillIntact(record, payload) {
     record.portalChildReconciliation !== false ||
     record.portalMounting !== false ||
     record.publicPortalMounting !== false ||
+    record.publicRootCompatibilitySurface !== false ||
+    record.publicRootRenderCompatibilityClaimed !== false ||
     record.preparePortalMount !== false ||
     record.nativeExecution !== false ||
     record.reconcilerExecution !== false ||
@@ -9723,6 +9768,7 @@ function assertPrivatePortalMountDiagnosticStillIntact(record, payload) {
     record.publicDomMutation !== false ||
     record.listenerInstallation !== false ||
     record.resourceSideEffects !== false ||
+    record.privatePortalMetadataPromotesPublicRootRender !== false ||
     record.compatibilityClaimed !== false
   ) {
     throwInvalidPortalChildReconciliationRecord(
@@ -9759,6 +9805,8 @@ function assertPrivatePortalMountDiagnosticStillIntactForEventOwnerRoot(
     record.portalChildReconciliation !== false ||
     record.portalMounting !== false ||
     record.publicPortalMounting !== false ||
+    record.publicRootCompatibilitySurface !== false ||
+    record.publicRootRenderCompatibilityClaimed !== false ||
     record.preparePortalMount !== false ||
     record.nativeExecution !== false ||
     record.reconcilerExecution !== false ||
@@ -9766,6 +9814,7 @@ function assertPrivatePortalMountDiagnosticStillIntactForEventOwnerRoot(
     record.publicDomMutation !== false ||
     record.listenerInstallation !== false ||
     record.resourceSideEffects !== false ||
+    record.privatePortalMetadataPromotesPublicRootRender !== false ||
     record.compatibilityClaimed !== false
   ) {
     throwInvalidPortalEventOwnerRootGateRecord(

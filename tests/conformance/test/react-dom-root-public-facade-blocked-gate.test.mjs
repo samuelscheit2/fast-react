@@ -154,6 +154,10 @@ test("React DOM public root facade gate blocks placeholders while oracle prerequ
   );
   assert.equal(gate.rootRenderGate.summary.portalRootRenderBlockedRowCount, 5);
   assert.equal(
+    gate.rootRenderGate.summary.privatePortalMetadataPromotesPublicRootRender,
+    false
+  );
+  assert.equal(
     gate.rootRenderGate.summary.portalRootRenderCompatibilityClaimed,
     false
   );
@@ -1069,10 +1073,14 @@ test("React DOM public root facade gate rejects portal root-render compatibility
     })
   );
   rootRenderGate.summary.portalRootRenderCompatibilityClaimed = true;
+  rootRenderGate.summary.privatePortalMetadataPromotesPublicRootRender = true;
   rootRenderGate.portalRootRenderGate.summary.compatibilityClaimed = true;
+  rootRenderGate.portalRootRenderGate.summary
+    .privatePortalMetadataPromotesPublicRootRender = true;
   rootRenderGate.portalRootRenderBlockedRows[0] = {
     ...rootRenderGate.portalRootRenderBlockedRows[0],
     compatibilityClaimed: true,
+    privatePortalMetadataPromotesPublicRootRender: true,
     publicRootCompatibilitySurface: true
   };
 

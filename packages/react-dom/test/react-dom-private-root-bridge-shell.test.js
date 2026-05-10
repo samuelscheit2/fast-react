@@ -1754,6 +1754,14 @@ test('private portal fake-DOM commit handoff validates ownership and blocked sid
   assert.equal(handoff.listenerInstallation, false);
   assert.equal(handoff.resourceSideEffects, false);
   assert.equal(handoff.eventDispatch, false);
+  assert.equal(handoff.publicPortalMounting, false);
+  assert.equal(handoff.publicDomMutation, false);
+  assert.equal(handoff.publicRootCompatibilitySurface, false);
+  assert.equal(handoff.publicRootRenderCompatibilityClaimed, false);
+  assert.equal(
+    handoff.privatePortalMetadataPromotesPublicRootRender,
+    false
+  );
   assert.equal(handoff.compatibilityClaimed, false);
 
   assert.equal(
@@ -1962,6 +1970,12 @@ test('private portal preparePortalMount listener intent records without installi
   assert.equal(intent.listenerInstallation, false);
   assert.equal(intent.resourceSideEffects, false);
   assert.equal(intent.eventDispatch, false);
+  assert.equal(intent.publicRootCompatibilitySurface, false);
+  assert.equal(intent.publicRootRenderCompatibilityClaimed, false);
+  assert.equal(
+    intent.privatePortalMetadataPromotesPublicRootRender,
+    false
+  );
   assert.equal(intent.compatibilityClaimed, false);
   assert.equal(
     intent.portalListenerGuard.action,
@@ -2350,6 +2364,12 @@ test('private portal fake-DOM mount diagnostic appends one explicit HostComponen
   assert.equal(mount.listenerInstallation, false);
   assert.equal(mount.resourceSideEffects, false);
   assert.equal(mount.eventDispatch, false);
+  assert.equal(mount.publicRootCompatibilitySurface, false);
+  assert.equal(mount.publicRootRenderCompatibilityClaimed, false);
+  assert.equal(
+    mount.privatePortalMetadataPromotesPublicRootRender,
+    false
+  );
   assert.equal(mount.compatibilityClaimed, false);
   assert.equal(mount.listenerSideEffects.preparePortalMount, false);
   assert.equal(mount.listenerSideEffects.listenToAllSupportedEvents, false);
@@ -2610,6 +2630,12 @@ test('private portal event owner-root gate records portal child event path owner
   assert.equal(ownerGate.syntheticEventCount, 0);
   assert.equal(ownerGate.browserDomEventCompatibilityClaimed, false);
   assert.equal(ownerGate.fakeDomEventCompatibilityClaimed, false);
+  assert.equal(ownerGate.publicRootCompatibilitySurface, false);
+  assert.equal(ownerGate.publicRootRenderCompatibilityClaimed, false);
+  assert.equal(
+    ownerGate.privatePortalMetadataPromotesPublicRootRender,
+    false
+  );
   assert.equal(ownerGate.compatibilityClaimed, false);
   assert.equal(ownerGate.listenerSideEffects.listenerInstallation, false);
   assert.equal(ownerGate.listenerSideEffects.hasPortalListeningMarker, false);
@@ -2902,6 +2928,12 @@ test('private portal child reconciliation diagnostic updates one mounted fake-DO
   assert.equal(diagnostic.listenerInstallation, false);
   assert.equal(diagnostic.resourceSideEffects, false);
   assert.equal(diagnostic.eventDispatch, false);
+  assert.equal(diagnostic.publicRootCompatibilitySurface, false);
+  assert.equal(diagnostic.publicRootRenderCompatibilityClaimed, false);
+  assert.equal(
+    diagnostic.privatePortalMetadataPromotesPublicRootRender,
+    false
+  );
   assert.equal(diagnostic.compatibilityClaimed, false);
   assert.equal(diagnostic.listenerSideEffects.preparePortalMount, false);
   assert.equal(diagnostic.listenerSideEffects.listenerInstallation, false);
