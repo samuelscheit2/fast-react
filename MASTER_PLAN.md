@@ -45,8 +45,8 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue 685-714 is prepared for launch from the
-current `main` commit after the queue prompt commit.
+Top-level cap: 30 workers. Queue 685-714 is launched from queue base commit
+`9ec6678` in isolated `worker/<slug>` branches and worktrees.
 
 - 685-694: Rust reconciler execution paths for root work-loop finished-work
   handoff, HostRoot update queues, function-component hooks/effects, layout
