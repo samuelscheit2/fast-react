@@ -45,38 +45,24 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue 323-352 is ready to launch in isolated
-worktrees with overlapping implementation allowed where write scopes differ.
+Top-level cap: 30 workers. Remaining workers from queue 323-352 are running in
+isolated worktrees with overlapping implementation allowed where write scopes
+differ.
 
 | Worker | Focus |
 | --- | --- |
 | 323 | Root commit host-parent placement apply |
 | 324 | Root commit stable-sibling insertion apply |
 | 325 | Root commit host deletion cleanup apply |
-| 326 | Passive effect create/destroy callback invocation gate |
-| 327 | Function component `useState` render path |
-| 328 | Function component `useReducer` eager update path |
-| 329 | Context provider propagation through root work loop |
-| 330 | Root scheduler ping/retry execution path |
-| 331 | Sync flush passive continuation execution |
-| 332 | Test renderer JS private root native bridge |
 | 333 | Test renderer `toJSON` host output private path |
 | 334 | Test renderer TestInstance private query path |
 | 335 | Test renderer act scheduler flush private path |
-| 336 | Test renderer error-surface public blockers refresh |
-| 337 | React DOM root private create/render admission |
 | 338 | DOM mutation latest-props commit handoff |
 | 339 | DOM event plugin target dispatch path |
-| 340 | DOM ref callback private invocation gate |
-| 341 | Hydration marker root bridge replay boundary |
 | 342 | DOM portal private commit boundary |
 | 343 | Resource hint private dispatcher DOM adapter gate |
 | 344 | Controlled input private wrapper metadata gate |
 | 345 | Native root bridge real handle admission preflight |
-| 346 | Package-surface new private gates audit |
-| 347 | Benchmark private admissions after new gates |
-| 348 | React DOM test-utils act gate after passive sync |
-| 349 | Hook effect destroy callback execution private |
 | 350 | Root work loop complete-work multiple-child handoff |
 | 351 | Suspense/Offscreen preflight after child handoff |
 | 352 | Root render E2E private admissions after host output |

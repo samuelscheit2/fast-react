@@ -29,6 +29,22 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Workers 326-332, 336, 337, 340, 341, and 346-349 were accepted from queue
+  323-352. The batch added private passive callback invocation and destroy
+  executor paths, function-component `useState` and `useReducer` render/eager
+  update paths, root work-loop context provider propagation, pinged retry
+  scheduler execution, sync-flush post-passive continuation execution,
+  react-test-renderer private root bridge and error-surface guard refreshes,
+  React DOM private root create/render admission, ref callback invocation,
+  hydration marker replay blockers, test-utils act gate refresh, package-surface
+  hardening, and benchmark private-admission regression coverage.
+- Workers 326-332, 336, 337, 340, 341, and 346-349 were verified after merge
+  with Rust fmt, full `fast-react-core` and `fast-react-reconciler` tests,
+  react-test-renderer and React DOM workspace checks, focused
+  react-test-renderer, ref, act, test-utils act, component-tree, package-surface
+  checks, and `git diff --check`. A React act local gate detector was updated
+  to recognize the new passive metadata-only wording while keeping public act
+  blocked.
 - Workers 293-322 were accepted as a complete implementation batch. The batch
   added root commit placement canaries, callback and passive-effect metadata,
   function-component, context, hook, root-scheduler, and sync-flush gates,
