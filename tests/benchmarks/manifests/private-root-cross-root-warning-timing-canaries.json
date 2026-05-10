@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "kind": "fast-react-benchmark-manifest",
+  "manifestId": "private-root-cross-root-warning-timing-canaries",
+  "description": "Diagnostic-only timing canary manifest for private cross-root flushSync and warning-boundary root-output rows; public comparable timing remains blocked until public compatibility gates are green.",
+  "timingDataPolicy": "diagnostic-until-compatible",
+  "requiredScenarioIds": [
+    "private-root-host-output-cross-root-flushsync-timing-canary",
+    "private-root-warning-boundary-root-output-timing-canary"
+  ],
+  "conformanceGates": [
+    {
+      "id": "react-dom-root-private-host-output-flushsync-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-root-render-e2e-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "root-render-private-host-output-diagnostic-gate-1",
+        "status": "accepted-private-partial",
+        "command": "npm run root-render-e2e:conformance --workspace @fast-react/conformance",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Worker 410 proves the flush-sync-cross-root-render private host-output diagnostic rows across probe modes using the private flushSync guard, fake-DOM host output, and Rust cross-root sync-flush diagnostics while public flushSync and public root compatibility remain blocked."
+      }
+    },
+    {
+      "id": "react-dom-root-private-warning-boundary-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-root-render-e2e-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "root-render-private-warning-boundary-diagnostic-gate-1",
+        "status": "accepted-private-partial",
+        "command": "npm run root-render-e2e:conformance --workspace @fast-react/conformance",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Worker 411 proves the development-warning-boundaries private warning-boundary diagnostic rows across probe modes using root record metadata and duplicate createRoot marker checks; console output and public warning compatibility remain blocked."
+      }
+    },
+    {
+      "id": "react-dom-root-render-e2e-public-compatibility",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-root-render-e2e-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "root-render-dual-run-gate-1",
+        "status": "accepted-blocked",
+        "command": "npm run root-render-e2e:conformance --workspace @fast-react/conformance",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "The public root render E2E gate still admits 0 public scenario-mode rows, so private cross-root flushSync and warning-boundary timing canaries cannot become public comparable timing evidence."
+      }
+    },
+    {
+      "id": "react-dom-root-public-facade-blocked-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-root-render-e2e-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-dom-root-public-facade-blocked-gate-1",
+        "status": "accepted-blocked",
+        "command": "npm run root-public-facade:conformance --workspace @fast-react/conformance",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "The public facade gate keeps root rendering, public flushSync, development warning console compatibility, browser DOM mutation, and compatibility claims blocked despite private diagnostics."
+      }
+    }
+  ],
+  "milestones": [
+    {
+      "id": "private-root-cross-root-warning-timing-canaries-diagnostic-admission",
+      "description": "Private cross-root flushSync and warning-boundary timing canaries may collect diagnostic timing for the admitted private rows only.",
+      "scenarioIds": [
+        "private-root-host-output-cross-root-flushsync-timing-canary",
+        "private-root-warning-boundary-root-output-timing-canary"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-private-host-output-flushsync-gate",
+        "react-dom-root-private-warning-boundary-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "benchmarkReadinessStatus": "diagnostic-admitted",
+      "blockedReason": "Private cross-root flushSync and warning-boundary timing canaries are admitted only for diagnostic private timing; public React DOM root compatibility, public warning compatibility, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-root-cross-root-warning-public-timing-promotion-blocked",
+      "description": "Public comparable timing promotion remains blocked until public root render, public facade, public flushSync, and public warning gates become green.",
+      "scenarioIds": [
+        "private-root-host-output-cross-root-flushsync-timing-canary",
+        "private-root-warning-boundary-root-output-timing-canary"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-render-e2e-public-compatibility",
+        "react-dom-root-public-facade-blocked-gate"
+      ],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "benchmarkReadinessStatus": "blocked-by-conformance",
+      "blockedReason": "Comparable public timing remains blocked until public root render E2E and public facade gates are green-admitted and claim compatibility; private cross-root flushSync and warning-boundary timing canaries do not satisfy public behavior."
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "private-root-host-output-cross-root-flushsync-timing-canary",
+      "area": "react-dom private cross-root flushSync timing canary",
+      "entrypoints": [
+        "packages/react-dom/src/client/root-bridge.js",
+        "packages/react-dom/src/dom-host/mutation.js",
+        "packages/react-dom/src/flush-sync-guard.js",
+        "crates/fast-react-reconciler/src/sync_flush.rs"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-private-host-output-flushsync-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The cross-root flushSync timing canary covers only private fake-DOM host output and Rust sync-flush diagnostics; public flushSync, public root compatibility, browser DOM mutation, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-root-warning-boundary-root-output-timing-canary",
+      "area": "react-dom private warning-boundary timing canary",
+      "entrypoints": [
+        "packages/react-dom/src/client/root-bridge.js",
+        "packages/react-dom/src/client/root-markers.js"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-private-warning-boundary-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The warning-boundary timing canary covers only private root record metadata and duplicate createRoot marker diagnostics; console output, public warning compatibility, public root behavior, and comparable timing remain blocked."
+    }
+  ]
+}
