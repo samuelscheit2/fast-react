@@ -77,6 +77,12 @@ const createRoutingGate = Object.freeze({
   deterministic: true,
   nativeBridgeAvailable: false,
   nativeExecution: false,
+  privateRootRequestBridgeAvailable: true,
+  privateRootRequestBridgeStatus:
+    'admitted-private-test-renderer-root-request-record',
+  privateRootRequestBridgeExecutionStatus:
+    'blocked-private-test-renderer-root-request-execution',
+  rootRequestRecordOnly: true,
   createRouteAvailable: false,
   updateRouteAvailable: false,
   unmountRouteAvailable: false,
@@ -90,6 +96,52 @@ const createRoutingGate = Object.freeze({
   updatePrivateRoute,
   unmountPrivateRoute
 });
+const rootRequestBridgeSymbol = Symbol.for(
+  'fast.react_test_renderer.root_request_bridge'
+);
+const privateRootHandleType =
+  'fast.react_test_renderer.private_root_handle';
+const privateRootRequestRecordType =
+  'fast.react_test_renderer.private_root_request_record';
+const rootRequestStatus =
+  'admitted-private-test-renderer-root-request-record';
+const rootRequestExecutionStatus =
+  'blocked-private-test-renderer-root-request-execution';
+const rootRequestCompatibilityStatus =
+  'blocked-private-test-renderer-root-compatibility';
+const rootLifecycleActive = 'active';
+const rootLifecycleUnmountScheduled = 'unmount-scheduled';
+const rootElementHandleNone = freezeRecord({
+  $$typeof: 'fast.react_test_renderer.root_element_handle',
+  kind: 'RootElementHandle',
+  raw: 0,
+  isNone: true
+});
+const rootRequestBlockedCapabilities = freezeArray([
+  freezeRecord({
+    id: 'native-execution',
+    blocked: true,
+    reason: 'No native or Rust TestRendererRoot bridge is loaded.'
+  }),
+  freezeRecord({
+    id: 'reconciler-execution',
+    blocked: true,
+    reason:
+      'No update_container, update_container_sync, or root scheduling call is executed from JavaScript.'
+  }),
+  freezeRecord({
+    id: 'host-output',
+    blocked: true,
+    reason:
+      'No in-memory test-renderer host output, serialization, or TestInstance wrapper is produced.'
+  }),
+  freezeRecord({
+    id: 'public-compatibility',
+    blocked: true,
+    reason:
+      'React Test Renderer public create, update, unmount, act, and serialization compatibility remains unclaimed.'
+  })
+]);
 const schedulerMockKeys = [
   'log',
   'reset',
@@ -156,7 +208,13 @@ const schedulerConstantValues = {
   unstable_UserBlockingPriority: 2
 };
 
-function createUnsupportedError(exportName, action, detail, routingGate) {
+function createUnsupportedError(
+  exportName,
+  action,
+  detail,
+  routingGate,
+  rootRequest
+) {
   const suffix = detail === undefined ? '' : ` ${detail}`;
   const error = new Error(
     `[fast-react] ${entrypoint}.${exportName} ${action}, but this ` +
@@ -182,6 +240,13 @@ function createUnsupportedError(exportName, action, detail, routingGate) {
     error.privateRoutes = routingGate.privateRoutes;
     error.updatePrivateRoute = routingGate.updatePrivateRoute;
     error.unmountPrivateRoute = routingGate.unmountPrivateRoute;
+  }
+
+  if (rootRequest !== undefined) {
+    error.rootRequest = rootRequest;
+    error.rootRequestStatus = rootRequest.status;
+    error.rootRequestExecutionStatus = rootRequest.executionStatus;
+    error.rootRequestCompatibilityStatus = rootRequest.compatibilityStatus;
   }
 
   return error;
@@ -226,14 +291,21 @@ function createRendererUnsupportedFunction(
   exportName,
   length,
   detail,
-  routingGate
+  routingGate,
+  rootRequestFactory
 ) {
   const fn = function fastReactTestRendererRendererPlaceholder() {
+    const rootRequest =
+      rootRequestFactory === undefined
+        ? undefined
+        : rootRequestFactory(arguments);
+
     throw createUnsupportedError(
       exportName,
       'was called',
       detail,
-      routingGate
+      routingGate,
+      rootRequest
     );
   };
 
@@ -256,6 +328,412 @@ function createSchedulerPlaceholder() {
 }
 
 const schedulerPlaceholder = createSchedulerPlaceholder();
+const testRendererRootRequestBridge = createTestRendererRootRequestBridge();
+
+function freezeRecord(record) {
+  return Object.freeze(record);
+}
+
+function freezeArray(values) {
+  return Object.freeze(values);
+}
+
+function getIdPrefix(value, fallback) {
+  return typeof value === 'string' && value.length > 0 ? value : fallback;
+}
+
+const rootRequestPayloads = new WeakMap();
+const rootHandleStates = new WeakMap();
+const rendererRootHandles = new WeakMap();
+
+function createTestRendererRootRequestBridge(options) {
+  const bridgeState = {
+    nextRequestSequence: 1,
+    nextRootSequence: 1,
+    requestIdPrefix: getIdPrefix(
+      options && options.requestIdPrefix,
+      'test-renderer-request'
+    ),
+    rootIdPrefix: getIdPrefix(
+      options && options.rootIdPrefix,
+      'test-renderer-root'
+    )
+  };
+
+  return freezeRecord({
+    bridgeKind: 'FastReactTestRendererPrivateRootRequestBridge',
+    entrypoint,
+    status: rootRequestStatus,
+    executionStatus: rootRequestExecutionStatus,
+    compatibilityStatus: rootRequestCompatibilityStatus,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    rustExecution: false,
+    createRootRequest(element, rootOptions) {
+      return createRootRequestRecordWithBridge(
+        bridgeState,
+        element,
+        rootOptions
+      );
+    },
+    updateRootRequest(rootHandle, element, callback) {
+      return createRootUpdateRequestRecordWithBridge(
+        bridgeState,
+        rootHandle,
+        'update',
+        element,
+        callback
+      );
+    },
+    unmountRootRequest(rootHandle, callback) {
+      return createRootUpdateRequestRecordWithBridge(
+        bridgeState,
+        rootHandle,
+        'unmount',
+        null,
+        callback
+      );
+    },
+    updateRendererRootRequest(renderer, element, callback) {
+      return createRootUpdateRequestRecordWithBridge(
+        bridgeState,
+        assertRendererRootHandle(renderer),
+        'update',
+        element,
+        callback
+      );
+    },
+    unmountRendererRootRequest(renderer, callback) {
+      return createRootUpdateRequestRecordWithBridge(
+        bridgeState,
+        assertRendererRootHandle(renderer),
+        'unmount',
+        null,
+        callback
+      );
+    },
+    getRendererRootHandle(renderer) {
+      return rendererRootHandles.get(renderer) || null;
+    },
+    getRootRequests(rootHandle) {
+      return getRootRequestsForHandle(rootHandle);
+    },
+    getRendererRootRequests(renderer) {
+      const rootHandle = rendererRootHandles.get(renderer);
+      return rootHandle === undefined
+        ? freezeArray([])
+        : getRootRequestsForHandle(rootHandle);
+    },
+    getRequestPayload(record) {
+      return rootRequestPayloads.get(record) || null;
+    },
+    isRootRequestRecord(record) {
+      return isRootRequestRecord(record);
+    }
+  });
+}
+
+function createRootRequestRecordWithBridge(bridgeState, element, rootOptions) {
+  const rootSequence = bridgeState.nextRootSequence++;
+  const rootHandle = freezeRecord({
+    $$typeof: privateRootHandleType,
+    kind: 'FastReactTestRendererPrivateRootHandle',
+    entrypoint,
+    rootId: `${bridgeState.rootIdPrefix}:${rootSequence}`,
+    rootSequence,
+    lifecycleStatus: rootLifecycleActive,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    rustExecution: false,
+    compatibilityClaimed: false
+  });
+  const handleState = {
+    bridgeState,
+    lifecycleStatus: rootLifecycleActive,
+    nextElementHandleRaw: 1,
+    requests: []
+  };
+
+  rootHandleStates.set(rootHandle, handleState);
+
+  const request = createRootRequestRecord({
+    bridgeState,
+    callback: undefined,
+    element,
+    handleState,
+    lifecycleStatusAfter: rootLifecycleActive,
+    lifecycleStatusBefore: null,
+    operation: 'create',
+    rootHandle,
+    rootOptions,
+    rustOutcome: 'Scheduled',
+    scheduled: true
+  });
+  handleState.requests.push(request);
+  return request;
+}
+
+function createRootUpdateRequestRecordWithBridge(
+  bridgeState,
+  rootHandle,
+  operation,
+  element,
+  callback
+) {
+  const handleState = assertPrivateRootHandle(rootHandle);
+  if (handleState.bridgeState !== bridgeState) {
+    throwInvalidRootRequest(
+      'Cannot use a test-renderer root request with a different bridge shell.'
+    );
+  }
+
+  const lifecycleStatusBefore = handleState.lifecycleStatus;
+  let lifecycleStatusAfter = lifecycleStatusBefore;
+  let rustOutcome = 'Scheduled';
+  let scheduled = true;
+
+  if (operation === 'update') {
+    if (lifecycleStatusBefore !== rootLifecycleActive) {
+      rustOutcome = 'IgnoredAfterUnmount';
+      scheduled = false;
+    }
+  } else if (operation === 'unmount') {
+    if (lifecycleStatusBefore === rootLifecycleUnmountScheduled) {
+      rustOutcome = 'AlreadyUnmountScheduled';
+      scheduled = false;
+    } else {
+      lifecycleStatusAfter = rootLifecycleUnmountScheduled;
+    }
+  } else {
+    throwInvalidRootRequest(
+      `Unsupported test-renderer root request operation: ${String(operation)}.`
+    );
+  }
+
+  const request = createRootRequestRecord({
+    bridgeState,
+    callback,
+    element,
+    handleState,
+    lifecycleStatusAfter,
+    lifecycleStatusBefore,
+    operation,
+    rootHandle,
+    rootOptions: undefined,
+    rustOutcome,
+    scheduled
+  });
+
+  handleState.lifecycleStatus = lifecycleStatusAfter;
+  handleState.requests.push(request);
+  return request;
+}
+
+function createRootRequestRecord({
+  bridgeState,
+  callback,
+  element,
+  handleState,
+  lifecycleStatusAfter,
+  lifecycleStatusBefore,
+  operation,
+  rootHandle,
+  rootOptions,
+  rustOutcome,
+  scheduled
+}) {
+  const requestSequence = bridgeState.nextRequestSequence++;
+  const requestType = getRootRequestType(operation);
+  const updateKind = getRustUpdateKind(operation);
+  const rootElementHandle =
+    operation === 'unmount' || scheduled === false
+      ? rootElementHandleNone
+      : createRootElementHandle(handleState);
+  const containerUpdateApi =
+    operation === 'unmount' ? 'update_container_sync' : 'update_container';
+  const rootApi = `TestRendererRoot::${operation}`;
+
+  const record = freezeRecord({
+    $$typeof: privateRootRequestRecordType,
+    kind: 'FastReactTestRendererPrivateRootRequestRecord',
+    entrypoint,
+    compatibilityTarget,
+    operation,
+    requestId: `${bridgeState.requestIdPrefix}:${requestSequence}`,
+    requestSequence,
+    requestType,
+    status: rootRequestStatus,
+    executionStatus: rootRequestExecutionStatus,
+    compatibilityStatus: rootRequestCompatibilityStatus,
+    rootId: rootHandle.rootId,
+    rootSequence: rootHandle.rootSequence,
+    lifecycleStatusBefore,
+    lifecycleStatusAfter,
+    scheduled,
+    rustOutcome,
+    rootHandle,
+    rootElementHandle,
+    updateKind,
+    rustUpdateKind: `TestRendererRootUpdateKind::${updateKind}`,
+    rootApi,
+    containerUpdateApi,
+    schedulerApi: 'ensure_root_is_scheduled',
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    rustExecution: false,
+    reconcilerExecution: false,
+    hostOutputProduced: false,
+    serializationAvailable: false,
+    compatibilityClaimed: false,
+    sync: operation === 'unmount' && scheduled === true,
+    elementInfo: describeBridgeValue(element),
+    optionsInfo:
+      operation === 'create' ? describeCreateOptions(rootOptions) : null,
+    callbackInfo: describeBridgeValue(callback),
+    canaryShape: freezeRecord({
+      rootType: 'TestRendererRoot',
+      rootElementHandleType: 'RootElementHandle',
+      updateKindEnum: 'TestRendererRootUpdateKind',
+      updateKind,
+      rootApi,
+      containerUpdateApi,
+      schedulerApi: 'ensure_root_is_scheduled',
+      expectedOutcome: rustOutcome
+    }),
+    blockedCapabilities: rootRequestBlockedCapabilities
+  });
+
+  rootRequestPayloads.set(record, {
+    callback,
+    element,
+    rootHandle,
+    rootOptions
+  });
+
+  return record;
+}
+
+function createRootElementHandle(handleState) {
+  const raw = handleState.nextElementHandleRaw++;
+  return freezeRecord({
+    $$typeof: 'fast.react_test_renderer.root_element_handle',
+    kind: 'RootElementHandle',
+    raw,
+    isNone: false
+  });
+}
+
+function getRootRequestType(operation) {
+  switch (operation) {
+    case 'create':
+      return 'TestRendererRoot.create';
+    case 'update':
+      return 'TestRendererRoot.update';
+    case 'unmount':
+      return 'TestRendererRoot.unmount';
+    default:
+      throwInvalidRootRequest(
+        `Unsupported test-renderer root request operation: ${String(operation)}.`
+      );
+  }
+}
+
+function getRustUpdateKind(operation) {
+  switch (operation) {
+    case 'create':
+      return 'Create';
+    case 'update':
+      return 'Update';
+    case 'unmount':
+      return 'Unmount';
+    default:
+      throwInvalidRootRequest(
+        `Unsupported test-renderer root request operation: ${String(operation)}.`
+      );
+  }
+}
+
+function describeCreateOptions(rootOptions) {
+  const isObject =
+    rootOptions !== null &&
+    (typeof rootOptions === 'object' || typeof rootOptions === 'function');
+
+  return freezeRecord({
+    type: rootOptions === null ? 'null' : typeof rootOptions,
+    strictMode: Boolean(isObject && rootOptions.unstable_strictMode),
+    hasCreateNodeMock: Boolean(
+      isObject && typeof rootOptions.createNodeMock === 'function'
+    ),
+    concurrentModeRequested: Boolean(
+      isObject && rootOptions.unstable_isConcurrent
+    )
+  });
+}
+
+function describeBridgeValue(value) {
+  const valueType = value === null ? 'null' : typeof value;
+
+  if (valueType === 'object' || valueType === 'function') {
+    return freezeRecord({
+      type: valueType,
+      objectTag: Object.prototype.toString.call(value),
+      keyCount: Object.keys(value).length
+    });
+  }
+
+  return freezeRecord({
+    type: valueType,
+    value:
+      valueType === 'string' ||
+      valueType === 'number' ||
+      valueType === 'boolean'
+        ? value
+        : null
+  });
+}
+
+function assertRendererRootHandle(renderer) {
+  const rootHandle = rendererRootHandles.get(renderer);
+  if (rootHandle === undefined) {
+    throwInvalidRootRequest(
+      'Expected a react-test-renderer placeholder created by this root request bridge.'
+    );
+  }
+  return rootHandle;
+}
+
+function assertPrivateRootHandle(rootHandle) {
+  const handleState = rootHandleStates.get(rootHandle);
+  if (handleState === undefined) {
+    throwInvalidRootRequest(
+      'Expected a private react-test-renderer root handle.'
+    );
+  }
+  return handleState;
+}
+
+function getRootRequestsForHandle(rootHandle) {
+  const handleState = assertPrivateRootHandle(rootHandle);
+  return freezeArray(handleState.requests.slice());
+}
+
+function isRootRequestRecord(record) {
+  return (
+    record !== null &&
+    typeof record === 'object' &&
+    record.$$typeof === privateRootRequestRecordType &&
+    rootRequestPayloads.has(record)
+  );
+}
+
+function throwInvalidRootRequest(message) {
+  const error = new Error(message);
+  error.name = 'FastReactTestRendererPrivateRootRequestError';
+  error.code = 'FAST_REACT_TEST_RENDERER_INVALID_ROOT_REQUEST';
+  error.entrypoint = entrypoint;
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
 
 function definePlaceholderMetadata(exportsObject) {
   Object.defineProperties(exportsObject, {
@@ -276,47 +754,60 @@ function definePlaceholderMetadata(exportsObject) {
   return exportsObject;
 }
 
-function createPlaceholderRenderer(routingGate) {
-  const renderer = {
+function createPlaceholderRenderer(routingGate, createRequest) {
+  let renderer;
+  renderer = {
     _Scheduler: schedulerPlaceholder,
     root: undefined,
     toJSON: createRendererUnsupportedFunction(
       'create().toJSON',
       0,
       'Serialization is intentionally blocked until committed test-renderer host output and serializer APIs exist.',
-      routingGate
+      routingGate,
+      () => createRequest
     ),
     toTree: createRendererUnsupportedFunction(
       'create().toTree',
       0,
       'Fiber tree inspection is intentionally blocked until a committed-fiber inspection API exists.',
-      routingGate
+      routingGate,
+      () => createRequest
     ),
     update: createRendererUnsupportedFunction(
       'create().update',
       1,
       'Root updates are intentionally blocked until the JavaScript facade can route through the Rust TestRendererRoot.',
-      routingGate
+      routingGate,
+      (args) =>
+        testRendererRootRequestBridge.updateRendererRootRequest(
+          renderer,
+          args[0]
+        )
     ),
     unmount: createRendererUnsupportedFunction(
       'create().unmount',
       0,
       'Root unmount is intentionally blocked until the JavaScript facade can route through the Rust TestRendererRoot.',
-      routingGate
+      routingGate,
+      () => testRendererRootRequestBridge.unmountRendererRootRequest(renderer)
     ),
     getInstance: createRendererUnsupportedFunction(
       'create().getInstance',
       0,
       'Public instance lookup is intentionally blocked until TestInstance and createNodeMock behavior are implemented.',
-      routingGate
+      routingGate,
+      () => createRequest
     ),
     unstable_flushSync: createRendererUnsupportedFunction(
       'create().unstable_flushSync',
       1,
       'Synchronous flushing is intentionally blocked until react-test-renderer act and scheduler integration are wired.',
-      routingGate
+      routingGate,
+      () => createRequest
     )
   };
+
+  rendererRootHandles.set(renderer, createRequest.rootHandle);
 
   Object.defineProperty(renderer, 'root', {
     configurable: true,
@@ -326,7 +817,8 @@ function createPlaceholderRenderer(routingGate) {
         'create().root',
         'was accessed',
         'TestInstance root access is intentionally blocked until committed fiber inspection is implemented.',
-        routingGate
+        routingGate,
+        createRequest
       );
     }
   });
@@ -334,13 +826,24 @@ function createPlaceholderRenderer(routingGate) {
   return renderer;
 }
 
-function create() {
-  return createPlaceholderRenderer(createRoutingGate);
+function create(element, options) {
+  const createRequest = testRendererRootRequestBridge.createRootRequest(
+    element,
+    options
+  );
+  return createPlaceholderRenderer(createRoutingGate, createRequest);
 }
 
 exports._Scheduler = schedulerPlaceholder;
 exports.act = createUnsupportedFunction('act', 1);
-exports.create = defineFunctionShape(create, 'create', 2);
+const createExport = defineFunctionShape(create, 'create', 2);
+Object.defineProperty(createExport, rootRequestBridgeSymbol, {
+  configurable: false,
+  enumerable: false,
+  value: testRendererRootRequestBridge,
+  writable: false
+});
+exports.create = createExport;
 exports.unstable_batchedUpdates = createUnsupportedFunction(
   'unstable_batchedUpdates',
   2

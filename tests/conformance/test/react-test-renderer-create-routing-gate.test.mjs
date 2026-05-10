@@ -16,6 +16,15 @@ const repoRoot = path.resolve(
 const compatibilityTarget = "react-test-renderer@19.2.6";
 const routingGateStatus =
   "blocked-missing-react-test-renderer-create-routing-prerequisites";
+const rootRequestBridgeSymbol = Symbol.for(
+  "fast.react_test_renderer.root_request_bridge"
+);
+const rootRequestStatus =
+  "admitted-private-test-renderer-root-request-record";
+const rootRequestExecutionStatus =
+  "blocked-private-test-renderer-root-request-execution";
+const rootRequestCompatibilityStatus =
+  "blocked-private-test-renderer-root-compatibility";
 const missingPrerequisites = [
   "rust-native-test-renderer-create-bridge",
   "react-test-renderer-host-output-serialization"
@@ -283,6 +292,152 @@ test("react-test-renderer update and unmount routing metadata points at accepted
   }
 });
 
+test("react-test-renderer private root request bridge records Rust canary-shaped requests", () => {
+  for (const entry of entrypoints) {
+    const moduleExports = loadFresh(entry.modulePath);
+    const bridge = assertPrivateRootRequestBridge(
+      moduleExports,
+      entry.entrypoint
+    );
+    const element = { props: { children: "hello" }, type: "div" };
+    const options = {
+      createNodeMock() {
+        throw new Error("must not run createNodeMock");
+      },
+      unstable_isConcurrent: true,
+      unstable_strictMode: true
+    };
+    const renderer = moduleExports.create(element, options);
+    const rootHandle = bridge.getRendererRootHandle(renderer);
+
+    assert.deepEqual(Object.keys(moduleExports), moduleKeys, entry.entrypoint);
+    assertRendererShape(renderer, entry.entrypoint, moduleExports._Scheduler);
+    assert.equal(Object.isFrozen(rootHandle), true, entry.entrypoint);
+    assert.equal(rootHandle.lifecycleStatus, "active", entry.entrypoint);
+
+    const [createRequest] = bridge.getRendererRootRequests(renderer);
+    assertRootRequest(createRequest, {
+      entrypoint: entry.entrypoint,
+      lifecycleStatusAfter: "active",
+      lifecycleStatusBefore: null,
+      operation: "create",
+      requestSequence: 1,
+      requestType: "TestRendererRoot.create",
+      rootElementHandleRaw: 1,
+      rootHandle,
+      rustOutcome: "Scheduled",
+      scheduled: true,
+      sync: false,
+      updateKind: "Create"
+    });
+    assert.equal(createRequest.optionsInfo.strictMode, true);
+    assert.equal(createRequest.optionsInfo.hasCreateNodeMock, true);
+    assert.equal(createRequest.optionsInfo.concurrentModeRequested, true);
+    assert.equal(bridge.getRequestPayload(createRequest).element, element);
+    assert.equal(bridge.getRequestPayload(createRequest).rootOptions, options);
+
+    const nextElement = { props: { children: "goodbye" }, type: "span" };
+    const updateError = captureThrown(() => renderer.update(nextElement));
+    assertReactTestRendererUnimplemented(
+      updateError,
+      entry.entrypoint,
+      "create().update"
+    );
+    assertRootRequest(updateError.rootRequest, {
+      entrypoint: entry.entrypoint,
+      lifecycleStatusAfter: "active",
+      lifecycleStatusBefore: "active",
+      operation: "update",
+      requestSequence: 2,
+      requestType: "TestRendererRoot.update",
+      rootElementHandleRaw: 2,
+      rootHandle,
+      rustOutcome: "Scheduled",
+      scheduled: true,
+      sync: false,
+      updateKind: "Update"
+    });
+    assert.equal(
+      bridge.getRequestPayload(updateError.rootRequest).element,
+      nextElement
+    );
+
+    const unmountError = captureThrown(() => renderer.unmount());
+    assertReactTestRendererUnimplemented(
+      unmountError,
+      entry.entrypoint,
+      "create().unmount"
+    );
+    assertRootRequest(unmountError.rootRequest, {
+      entrypoint: entry.entrypoint,
+      lifecycleStatusAfter: "unmount-scheduled",
+      lifecycleStatusBefore: "active",
+      operation: "unmount",
+      requestSequence: 3,
+      requestType: "TestRendererRoot.unmount",
+      rootElementHandleRaw: 0,
+      rootHandle,
+      rustOutcome: "Scheduled",
+      scheduled: true,
+      sync: true,
+      updateKind: "Unmount"
+    });
+
+    const ignoredUpdateError = captureThrown(() =>
+      renderer.update("ignored after unmount")
+    );
+    assertRootRequest(ignoredUpdateError.rootRequest, {
+      entrypoint: entry.entrypoint,
+      lifecycleStatusAfter: "unmount-scheduled",
+      lifecycleStatusBefore: "unmount-scheduled",
+      operation: "update",
+      requestSequence: 4,
+      requestType: "TestRendererRoot.update",
+      rootElementHandleRaw: 0,
+      rootHandle,
+      rustOutcome: "IgnoredAfterUnmount",
+      scheduled: false,
+      sync: false,
+      updateKind: "Update"
+    });
+
+    const secondUnmountError = captureThrown(() => renderer.unmount());
+    assertRootRequest(secondUnmountError.rootRequest, {
+      entrypoint: entry.entrypoint,
+      lifecycleStatusAfter: "unmount-scheduled",
+      lifecycleStatusBefore: "unmount-scheduled",
+      operation: "unmount",
+      requestSequence: 5,
+      requestType: "TestRendererRoot.unmount",
+      rootElementHandleRaw: 0,
+      rootHandle,
+      rustOutcome: "AlreadyUnmountScheduled",
+      scheduled: false,
+      sync: false,
+      updateKind: "Unmount"
+    });
+
+    const requests = bridge.getRendererRootRequests(renderer);
+    assert.equal(Object.isFrozen(requests), true, entry.entrypoint);
+    assert.deepEqual(
+      requests.map((request) => request.operation),
+      ["create", "update", "unmount", "update", "unmount"],
+      entry.entrypoint
+    );
+    assert.deepEqual(
+      requests.map((request) => request.rustUpdateKind),
+      [
+        "TestRendererRootUpdateKind::Create",
+        "TestRendererRootUpdateKind::Update",
+        "TestRendererRootUpdateKind::Unmount",
+        "TestRendererRootUpdateKind::Update",
+        "TestRendererRootUpdateKind::Unmount"
+      ],
+      entry.entrypoint
+    );
+  }
+});
+
 test("react-test-renderer TestInstance query and serialization surfaces stay public fail-closed", () => {
   for (const entry of entrypoints) {
     const moduleExports = loadFresh(entry.modulePath);
@@ -404,6 +559,122 @@ function loadFresh(relativePath) {
   return require(resolved);
 }
 
+function assertPrivateRootRequestBridge(moduleExports, entrypoint) {
+  assert.equal(Object.hasOwn(moduleExports, "rootRequestBridge"), false);
+  assert.equal(
+    Object.hasOwn(
+      moduleExports,
+      "__FAST_REACT_PRIVATE_ROOT_REQUEST_BRIDGE__"
+    ),
+    false
+  );
+  assert.equal(Object.keys(moduleExports.create).length, 0, entrypoint);
+
+  const descriptor = Object.getOwnPropertyDescriptor(
+    moduleExports.create,
+    rootRequestBridgeSymbol
+  );
+  assert.notEqual(descriptor, undefined, entrypoint);
+  assert.equal(descriptor.enumerable, false, entrypoint);
+  assert.equal(descriptor.configurable, false, entrypoint);
+  assert.equal(descriptor.writable, false, entrypoint);
+
+  const bridge = descriptor.value;
+  assert.equal(Object.isFrozen(bridge), true, entrypoint);
+  assert.equal(
+    bridge.bridgeKind,
+    "FastReactTestRendererPrivateRootRequestBridge",
+    entrypoint
+  );
+  assert.equal(bridge.entrypoint, entrypoint);
+  assert.equal(bridge.status, rootRequestStatus);
+  assert.equal(bridge.executionStatus, rootRequestExecutionStatus);
+  assert.equal(bridge.compatibilityStatus, rootRequestCompatibilityStatus);
+  assert.equal(bridge.nativeBridgeAvailable, false);
+  assert.equal(bridge.nativeExecution, false);
+  assert.equal(bridge.rustExecution, false);
+  assert.equal(typeof bridge.createRootRequest, "function");
+  assert.equal(typeof bridge.updateRootRequest, "function");
+  assert.equal(typeof bridge.unmountRootRequest, "function");
+  assert.equal(typeof bridge.getRendererRootRequests, "function");
+  assert.equal(typeof bridge.getRequestPayload, "function");
+
+  return bridge;
+}
+
+function assertRootRequest(request, expected) {
+  assert.equal(Object.isFrozen(request), true, expected.entrypoint);
+  assert.equal(
+    request.kind,
+    "FastReactTestRendererPrivateRootRequestRecord",
+    expected.entrypoint
+  );
+  assert.equal(request.entrypoint, expected.entrypoint);
+  assert.equal(request.compatibilityTarget, compatibilityTarget);
+  assert.equal(request.operation, expected.operation);
+  assert.equal(request.requestSequence, expected.requestSequence);
+  assert.equal(request.requestType, expected.requestType);
+  assert.equal(request.status, rootRequestStatus);
+  assert.equal(request.executionStatus, rootRequestExecutionStatus);
+  assert.equal(request.compatibilityStatus, rootRequestCompatibilityStatus);
+  assert.equal(request.lifecycleStatusBefore, expected.lifecycleStatusBefore);
+  assert.equal(request.lifecycleStatusAfter, expected.lifecycleStatusAfter);
+  assert.equal(request.scheduled, expected.scheduled);
+  assert.equal(request.rustOutcome, expected.rustOutcome);
+  assert.equal(request.rootHandle, expected.rootHandle);
+  assert.equal(request.rootElementHandle.raw, expected.rootElementHandleRaw);
+  assert.equal(
+    request.rootElementHandle.isNone,
+    expected.rootElementHandleRaw === 0
+  );
+  assert.equal(request.updateKind, expected.updateKind);
+  assert.equal(
+    request.rustUpdateKind,
+    `TestRendererRootUpdateKind::${expected.updateKind}`
+  );
+  assert.equal(request.rootApi, `TestRendererRoot::${expected.operation}`);
+  assert.equal(
+    request.containerUpdateApi,
+    expected.operation === "unmount"
+      ? "update_container_sync"
+      : "update_container"
+  );
+  assert.equal(request.schedulerApi, "ensure_root_is_scheduled");
+  assert.equal(request.nativeBridgeAvailable, false);
+  assert.equal(request.nativeExecution, false);
+  assert.equal(request.rustExecution, false);
+  assert.equal(request.reconcilerExecution, false);
+  assert.equal(request.hostOutputProduced, false);
+  assert.equal(request.serializationAvailable, false);
+  assert.equal(request.compatibilityClaimed, false);
+  assert.equal(request.sync, expected.sync);
+  assert.equal(Object.isFrozen(request.canaryShape), true);
+  assert.equal(request.canaryShape.rootType, "TestRendererRoot");
+  assert.equal(request.canaryShape.rootElementHandleType, "RootElementHandle");
+  assert.equal(
+    request.canaryShape.updateKindEnum,
+    "TestRendererRootUpdateKind"
+  );
+  assert.equal(request.canaryShape.updateKind, expected.updateKind);
+  assert.equal(request.canaryShape.rootApi, request.rootApi);
+  assert.equal(
+    request.canaryShape.containerUpdateApi,
+    request.containerUpdateApi
+  );
+  assert.equal(request.canaryShape.schedulerApi, "ensure_root_is_scheduled");
+  assert.equal(request.canaryShape.expectedOutcome, expected.rustOutcome);
+  assert.equal(Object.isFrozen(request.blockedCapabilities), true);
+  assert.deepEqual(
+    request.blockedCapabilities.map((capability) => capability.id),
+    [
+      "native-execution",
+      "reconciler-execution",
+      "host-output",
+      "public-compatibility"
+    ]
+  );
+}
+
 function assertRendererShape(renderer, label, moduleScheduler) {
   assert.deepEqual(Object.keys(renderer), rendererKeys, label);
   assert.deepEqual(Object.getOwnPropertyNames(renderer), rendererKeys, label);
@@ -460,6 +731,13 @@ function assertCreateRoutingGate(error, entrypoint) {
   assert.equal(gate.deterministic, true);
   assert.equal(gate.nativeBridgeAvailable, false);
   assert.equal(gate.nativeExecution, false);
+  assert.equal(gate.privateRootRequestBridgeAvailable, true);
+  assert.equal(gate.privateRootRequestBridgeStatus, rootRequestStatus);
+  assert.equal(
+    gate.privateRootRequestBridgeExecutionStatus,
+    rootRequestExecutionStatus
+  );
+  assert.equal(gate.rootRequestRecordOnly, true);
   assert.equal(gate.createRouteAvailable, false);
   assert.equal(gate.updateRouteAvailable, false);
   assert.equal(gate.unmountRouteAvailable, false);
