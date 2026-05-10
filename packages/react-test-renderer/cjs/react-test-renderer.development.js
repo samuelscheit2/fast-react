@@ -2563,6 +2563,18 @@ const privateToJSONHostOutputShapes = Object.freeze([
   'NestedHostText',
   'SiblingText'
 ]);
+const privateToJSONNativeExecutionHostOutputShapes = Object.freeze([
+  'SingleHostText',
+  'NestedHostText',
+  'SiblingText',
+  'EmptyRoot'
+]);
+const privateToJSONNativeExecutionHostOutputRowIds = Object.freeze([
+  privateToJSONUpdateHostOutputRowId,
+  privateToJSONNestedUpdateHostOutputRowId,
+  privateToJSONSiblingTextHostOutputRowId,
+  privateToJSONUnmountHostOutputRowId
+]);
 const privateToJSONUpdateUnmountDependencyIds = Object.freeze([
   'react-test-renderer-update-route-private-diagnostic',
   'react-test-renderer-unmount-route-private-diagnostic',
@@ -2660,6 +2672,26 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
   acceptedNativeExecutionOperations:
     privateToJSONNativeExecutionAcceptedOperations,
   consumesAcceptedNativeCreateUpdateUnmountExecutionRecords: true,
+  privateNativeExecutionHostOutputRowEvidenceAvailable: true,
+  privateNativeExecutionHostOutputShapes:
+    privateToJSONNativeExecutionHostOutputShapes,
+  privateNativeExecutionHostOutputRowIds:
+    privateToJSONNativeExecutionHostOutputRowIds,
+  nativeExecutionAcceptedRustApis: Object.freeze([
+    'TestRendererRoot::describe_private_to_json_after_create_native_execution_for_canary',
+    'TestRendererRoot::describe_private_to_json_after_update_native_execution_for_canary',
+    'TestRendererRoot::describe_private_to_json_after_nested_update_native_execution_for_canary',
+    'TestRendererRoot::describe_private_to_json_sibling_text_update_native_execution_from_snapshot_for_diagnostics',
+    'TestRendererRoot::describe_private_to_json_after_unmount_native_execution_for_canary',
+    'TestRendererPrivateToJsonNativeExecutionEvidence'
+  ]),
+  nativeExecutionAcceptedRustTests: Object.freeze([
+    'root_private_to_json_native_execution_evidence_consumes_create_update_unmount_records',
+    'root_private_to_json_nested_update_native_execution_evidence_consumes_multichild_row',
+    'root_private_to_json_sibling_text_native_execution_evidence_consumes_sibling_row',
+    'root_private_to_json_native_execution_evidence_rejects_row_id_shape_mismatch',
+    'root_private_to_json_native_execution_evidence_rejects_stale_update_record'
+  ]),
   acceptedRustPrivateJsonDiagnostics: true,
   acceptedRustPrivateToJSONFacadeResult: true,
   privateUpdateUnmountHostOutputRows:
@@ -2764,6 +2796,8 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
     'worker-577-test-renderer-nested-tojson-update-refresh',
   nativeExecutionEvidenceWorker:
     'worker-639-test-renderer-tojson-after-native-execution',
+  multiChildNativeExecutionEvidenceWorker:
+    'worker-697-test-renderer-tojson-multichild-native-execution',
   blockedPublicSurfaces: Object.freeze([
     'create().toJSON',
     'create().toTree',
@@ -13401,6 +13435,19 @@ function createPrivateToJSONSerializationFacade(rootRequest) {
     acceptedNativeExecutionRecordKind: privateToJSONNativeExecutionRecordKind,
     acceptedNativeExecutionOperations:
       privateToJSONNativeExecutionAcceptedOperations,
+    privateNativeExecutionHostOutputRowEvidenceAvailable: true,
+    privateNativeExecutionHostOutputShapes:
+      privateToJSONNativeExecutionHostOutputShapes,
+    privateNativeExecutionHostOutputRowIds:
+      privateToJSONNativeExecutionHostOutputRowIds,
+    nativeExecutionAcceptedRustApis:
+      toJSONPrivateSerializationFacadeGate.nativeExecutionAcceptedRustApis,
+    nativeExecutionAcceptedRustTests:
+      toJSONPrivateSerializationFacadeGate.nativeExecutionAcceptedRustTests,
+    nativeExecutionEvidenceWorker:
+      toJSONPrivateSerializationFacadeGate.nativeExecutionEvidenceWorker,
+    multiChildNativeExecutionEvidenceWorker:
+      toJSONPrivateSerializationFacadeGate.multiChildNativeExecutionEvidenceWorker,
     mismatchedUpdateUnmountRecordRejection: true,
     mismatchedUpdateShapeRejection: true,
     publicSerializationAvailable: false,
@@ -15353,11 +15400,8 @@ function createPrivateToJSONNativeExecutionDiagnosticResult(
       `Expected private native ${execution.operation} execution to consume ${expectedHostOutputUpdateKind} toJSON evidence.`
     );
   }
-  if (!isMinimalToJSONNativeExecutionShape(diagnostic)) {
-    throwPrivateToJSONSerializationError(
-      'Expected private native execution toJSON evidence to describe the minimal host tree.'
-    );
-  }
+  const acceptedShape =
+    assertAcceptedToJSONNativeExecutionShape(execution.operation, diagnostic);
 
   const diagnosticResult =
     createPrivateToJSONHostOutputDiagnosticResult(report);
@@ -15397,7 +15441,10 @@ function createPrivateToJSONNativeExecutionDiagnosticResult(
     consumesAcceptedRustLifecycleDiagnostic: true,
     consumesPrivateToJSONEvidence: true,
     consumesAcceptedHostOutputRow: diagnostic.hostOutputRow !== null,
-    minimalTreeShape: true,
+    minimalTreeShape: acceptedShape.minimalTreeShape,
+    acceptedHostOutputRowShape: acceptedShape.acceptedHostOutputRowShape,
+    nestedHostOutputRowShape: acceptedShape.nestedHostOutputRowShape,
+    siblingTextHostOutputRowShape: acceptedShape.siblingTextHostOutputRowShape,
     publicSerializationAvailable: false,
     publicRouteAvailable: false,
     nativeBridgeAvailable: false,
@@ -15552,6 +15599,149 @@ function isMinimalToJSONNativeExecutionShape(diagnostic) {
     Array.isArray(result.children) &&
     result.children.length === 1 &&
     typeof result.children[0] === 'string'
+  );
+}
+
+function assertAcceptedToJSONNativeExecutionShape(operation, diagnostic) {
+  if (operation === 'create') {
+    if (
+      diagnostic.hostOutputRow !== null ||
+      !isMinimalToJSONNativeExecutionShape(diagnostic)
+    ) {
+      throwPrivateToJSONSerializationError(
+        'Expected private native create toJSON evidence to describe the minimal host tree without row metadata.'
+      );
+    }
+    return {
+      minimalTreeShape: true,
+      acceptedHostOutputRowShape: false,
+      nestedHostOutputRowShape: false,
+      siblingTextHostOutputRowShape: false
+    };
+  }
+
+  if (operation === 'unmount') {
+    if (
+      diagnostic.hostOutputRow === null ||
+      diagnostic.hostOutputRow.id !== privateToJSONUnmountHostOutputRowId ||
+      !isMinimalToJSONNativeExecutionShape(diagnostic)
+    ) {
+      throwPrivateToJSONSerializationError(
+        'Expected private native unmount toJSON evidence to consume the empty-root host output row.'
+      );
+    }
+    return {
+      minimalTreeShape: true,
+      acceptedHostOutputRowShape: true,
+      nestedHostOutputRowShape: false,
+      siblingTextHostOutputRowShape: false
+    };
+  }
+
+  if (operation !== 'update') {
+    throwPrivateToJSONSerializationError(
+      'Expected native execution operation to be create, update, or unmount.'
+    );
+  }
+
+  const row = diagnostic.hostOutputRow;
+  if (row === null) {
+    throwPrivateToJSONSerializationError(
+      'Expected private native update toJSON evidence to include host output row metadata.'
+    );
+  }
+  switch (row.id) {
+    case privateToJSONUpdateHostOutputRowId:
+      if (!isMinimalToJSONNativeExecutionShape(diagnostic)) {
+        throwPrivateToJSONSerializationError(
+          'Expected private native update toJSON evidence to describe the minimal host tree for the single-text row.'
+        );
+      }
+      return {
+        minimalTreeShape: true,
+        acceptedHostOutputRowShape: true,
+        nestedHostOutputRowShape: false,
+        siblingTextHostOutputRowShape: false
+      };
+    case privateToJSONNestedUpdateHostOutputRowId:
+      if (!isNestedToJSONNativeExecutionShape(diagnostic)) {
+        throwPrivateToJSONSerializationError(
+          'Expected private native update toJSON evidence to describe the nested multi-child host output row.'
+        );
+      }
+      return {
+        minimalTreeShape: false,
+        acceptedHostOutputRowShape: true,
+        nestedHostOutputRowShape: true,
+        siblingTextHostOutputRowShape: false
+      };
+    case privateToJSONSiblingTextHostOutputRowId:
+      if (!isSiblingTextToJSONNativeExecutionShape(diagnostic)) {
+        throwPrivateToJSONSerializationError(
+          'Expected private native update toJSON evidence to describe the sibling text host output row.'
+        );
+      }
+      return {
+        minimalTreeShape: false,
+        acceptedHostOutputRowShape: true,
+        nestedHostOutputRowShape: false,
+        siblingTextHostOutputRowShape: true
+      };
+  }
+
+  throwPrivateToJSONSerializationError(
+    'Expected private native update toJSON evidence to consume an accepted host output row.'
+  );
+}
+
+function isNestedToJSONNativeExecutionShape(diagnostic) {
+  if (
+    diagnostic.hostOutputShape !== 'NestedHostText' ||
+    diagnostic.rootChildCount !== 1 ||
+    diagnostic.sourceNodeCount !== 4
+  ) {
+    return false;
+  }
+  const result = diagnostic.result;
+  if (
+    result === null ||
+    typeof result !== 'object' ||
+    Array.isArray(result) ||
+    !Array.isArray(result.children) ||
+    result.children.length !== 1
+  ) {
+    return false;
+  }
+  const nested = result.children[0];
+  return (
+    nested !== null &&
+    typeof nested === 'object' &&
+    !Array.isArray(nested) &&
+    Array.isArray(nested.children) &&
+    nested.children.length === 2 &&
+    nested.children.every((child) => typeof child === 'string')
+  );
+}
+
+function isSiblingTextToJSONNativeExecutionShape(diagnostic) {
+  if (
+    diagnostic.hostOutputShape !== 'SiblingText' ||
+    diagnostic.rootChildCount !== 2 ||
+    diagnostic.sourceNodeCount !== 3 ||
+    !Array.isArray(diagnostic.result) ||
+    diagnostic.result.length !== 2 ||
+    typeof diagnostic.result[0] !== 'string'
+  ) {
+    return false;
+  }
+  const sibling = diagnostic.result[1];
+  return (
+    sibling !== null &&
+    typeof sibling === 'object' &&
+    !Array.isArray(sibling) &&
+    Array.isArray(sibling.children) &&
+    sibling.children.length === 1 &&
+    typeof sibling.children[0] === 'string'
   );
 }
 
@@ -16040,6 +16230,12 @@ function validatePrivateToJSONUpdateUnmountRowMetadata(
     readPrivateToJSONField(row, 'hostOutputShape', 'host_output_shape') ??
       expectedPrivateToJSONHostOutputShapeForRowId(rowId)
   );
+  const expectedShape = expectedPrivateToJSONHostOutputShapeForRowId(rowId);
+  if (hostOutputShape !== expectedShape) {
+    throwPrivateToJSONSerializationError(
+      `Expected private JSON ${rowId} row shape to be ${expectedShape}.`
+    );
+  }
   assertPrivateToJSONStringField(
     row,
     'status',
