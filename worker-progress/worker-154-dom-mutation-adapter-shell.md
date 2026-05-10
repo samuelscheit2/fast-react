@@ -1,7 +1,7 @@
 # Worker 154 - DOM Mutation Adapter Shell
 
 ## Goal
-- Status: active
+- Status: complete
 - Objective: add a private DOM mutation adapter shell and tests for primitive mutation operations without wiring public createRoot, events, hydration, or resource/form behavior
 - `create_goal` was called before research, file reads, implementation, or verification.
 - `get_goal` was available and returned status `active` for the objective above.
@@ -42,7 +42,8 @@
 
 ## Verification Results
 - Focused smoke test passed: `React DOM private mutation adapter shell smoke checks passed.`
-- `npm run check:js` passed, including the public entrypoint smoke checks and 415 conformance tests.
+- `npm run check:js` passed after integration with current `main`, including
+  the public entrypoint smoke checks and 427 conformance tests.
 - `git diff --check` passed.
 - No-index whitespace checks over all new files passed after removing a trailing blank line from this report.
 
