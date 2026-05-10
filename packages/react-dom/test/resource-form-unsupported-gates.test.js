@@ -5978,6 +5978,256 @@ test('private input/change controlled restore execution consumes fake-DOM text p
     summary.inputChangeEventControlledRestoreExecution.liveDomMutations,
     false
   );
+  assert.equal(
+    summary.recordsLiveControlledRestoreMutationPreflight,
+    true
+  );
+  assert.equal(
+    summary.liveControlledRestoreMutationPreflight
+      .acceptsLiveDomNodePreflight,
+    true
+  );
+  assert.equal(
+    summary.liveControlledRestoreMutationPreflight
+      .liveDomTargetCaptured,
+    false
+  );
+  assert.equal(
+    summary.liveControlledRestoreMutationPreflight.restoreQueueWrites,
+    false
+  );
+  assert.equal(
+    summary.liveControlledRestoreMutationPreflight.hostValueReads,
+    false
+  );
+  assert.equal(
+    summary.liveControlledRestoreMutationPreflight.hostValueWrites,
+    false
+  );
+  assert.equal(
+    summary.liveControlledRestoreMutationPreflight.valueTrackerWrites,
+    false
+  );
+  assert.equal(
+    summary.liveControlledRestoreMutationPreflight.liveDomMutations,
+    false
+  );
+
+  const restoreDiagnosticSummary =
+    resourceFormGate.describeControlledInputPrivateRestoreQueueDiagnosticGate();
+  assert.equal(
+    restoreDiagnosticSummary.liveRestoreMutationPreflight
+      .acceptsLiveDomNodePreflight,
+    true
+  );
+  assert.equal(
+    restoreDiagnosticSummary.liveRestoreMutationPreflight
+      .liveDomTargetCaptured,
+    false
+  );
+  assert.equal(
+    restoreDiagnosticSummary.liveRestoreMutationPreflight
+      .valueTrackerFieldWritten,
+    false
+  );
+  assert.equal(
+    restoreDiagnosticSummary.liveRestoreMutationPreflight
+      .browserInputMutated,
+    false
+  );
+
+  const preflightDocument = createRootBridgeDocument();
+  preflightDocument.defaultView = {};
+  const preflightLiveNode = createRootBridgeElement(
+    'INPUT',
+    preflightDocument
+  );
+  const guardedReads = [];
+  const guardedWrites = [];
+  const guardedLiveNode = new Proxy(preflightLiveNode, {
+    defineProperty(target, property, descriptor) {
+      if (
+        property === 'value' ||
+        property === 'checked' ||
+        property === '_valueTracker'
+      ) {
+        guardedWrites.push(String(property));
+        throw new Error(`Unexpected live preflight define ${String(property)}`);
+      }
+      return Reflect.defineProperty(target, property, descriptor);
+    },
+    get(target, property, receiver) {
+      if (
+        property === 'value' ||
+        property === 'checked' ||
+        property === '_valueTracker'
+      ) {
+        guardedReads.push(String(property));
+        throw new Error(`Unexpected live preflight read ${String(property)}`);
+      }
+      return Reflect.get(target, property, receiver);
+    },
+    set(target, property, value, receiver) {
+      if (
+        property === 'value' ||
+        property === 'checked' ||
+        property === '_valueTracker'
+      ) {
+        guardedWrites.push(String(property));
+        throw new Error(`Unexpected live preflight write ${String(property)}`);
+      }
+      return Reflect.set(target, property, value, receiver);
+    }
+  });
+  const livePreflight =
+    gate.preflightLiveControlledInputRestoreMutation(
+      inputPreflight,
+      bridge,
+      execution,
+      flushBlocker,
+      wrapperIntent,
+      {
+        explicitAdmission: true,
+        queueKind:
+          'deterministic-controlled-input-post-event-restore-live-mutation-preflight',
+        queueId: 'input-change-live-preflight',
+        targetKind:
+          'controlled-input-post-event-restore-live-mutation-preflight',
+        liveDomTarget: guardedLiveNode
+      }
+    );
+
+  assert.deepEqual(guardedReads, []);
+  assert.deepEqual(guardedWrites, []);
+  assert.equal(Object.hasOwn(preflightLiveNode, '_valueTracker'), false);
+  assert.equal(Object.isFrozen(livePreflight), true);
+  assert.equal(
+    controlledRestoreQueue.isPrivateControlledInputPostEventRestoreQueueLiveMutationPreflightRecord(
+      livePreflight
+    ),
+    true
+  );
+  assert.equal(
+    controlledRestoreQueue.getPrivateControlledInputPostEventRestoreQueueLiveMutationPreflightRecordPayload(
+      livePreflight
+    ),
+    livePreflight
+  );
+  assert.equal(
+    livePreflight.$$typeof,
+    controlledRestoreQueue.privateControlledInputPostEventRestoreQueueLiveMutationPreflightRecordType
+  );
+  assert.equal(
+    livePreflight.status,
+    controlledRestoreQueue.controlledInputPostEventRestoreQueueLiveMutationPreflightStatus
+  );
+  assert.equal(livePreflight.admission.liveDomNodeAccepted, true);
+  assert.equal(livePreflight.admission.liveDomTargetCaptured, false);
+  assert.equal(livePreflight.admission.realDomMutationAllowed, false);
+  assert.equal(livePreflight.admission.hostValueReadAllowed, false);
+  assert.equal(livePreflight.admission.hostValueWriteAllowed, false);
+  assert.equal(
+    livePreflight.admission.valueTrackerFieldWriteAllowed,
+    false
+  );
+  assert.deepEqual(
+    livePreflight.liveMutationPreflightRows.map((row) => ({
+      status: row.status,
+      acceptedRestoreKind: row.acceptedRestoreKind,
+      targetField: row.targetField,
+      nextValueSnapshot: row.nextValueSnapshot,
+      liveDomNodeAccepted: row.liveDomNodeAccepted,
+      liveDomTargetCaptured: row.liveDomTargetCaptured,
+      liveMutationBlocked: row.liveMutationBlocked,
+      restoreQueueWritten: row.restoreQueueWritten,
+      restoreQueueFlushed: row.restoreQueueFlushed,
+      hostWrapperInvoked: row.hostWrapperInvoked,
+      wrapperWritePerformed: row.wrapperWritePerformed,
+      valueTrackerFieldWritten: row.valueTrackerFieldWritten,
+      propertyDescriptorInstalled: row.propertyDescriptorInstalled,
+      hostValueRead: row.hostValueRead,
+      hostValueWritten: row.hostValueWritten,
+      browserInputMutated: row.browserInputMutated
+    })),
+    [
+      {
+        status:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueLiveMutationPreflightRowStatus,
+        acceptedRestoreKind: 'input-text-value',
+        targetField: 'value',
+        nextValueSnapshot: 'alpha',
+        liveDomNodeAccepted: true,
+        liveDomTargetCaptured: false,
+        liveMutationBlocked: true,
+        restoreQueueWritten: false,
+        restoreQueueFlushed: false,
+        hostWrapperInvoked: false,
+        wrapperWritePerformed: false,
+        valueTrackerFieldWritten: false,
+        propertyDescriptorInstalled: false,
+        hostValueRead: false,
+        hostValueWritten: false,
+        browserInputMutated: false
+      }
+    ]
+  );
+  assert.deepEqual(livePreflight.blockerEvidence.blockerReasons, [
+    'live-host-node-admitted-for-preflight-only',
+    'accepted-write-execution-did-not-write-live-queue',
+    'accepted-flush-blocker-kept-queue-flush-disabled',
+    'host-wrapper-invocation-disabled',
+    'wrapper-property-write-disabled',
+    'host-value-read-disabled',
+    'host-value-write-disabled',
+    'live-descriptor-installation-disabled',
+    'value-tracker-write-disabled',
+    'browser-input-mutation-disabled',
+    'public-controlled-behavior-disabled'
+  ]);
+  assert.equal(
+    livePreflight.blockerEvidence.liveDomNodeAcceptedForPreflight,
+    true
+  );
+  assert.equal(livePreflight.blockerEvidence.liveDomTargetCaptured, false);
+  assert.equal(
+    livePreflight.blockerEvidence.liveMutationExecutionBlocked,
+    true
+  );
+  assert.equal(livePreflight.blockerEvidence.hostValueRead, false);
+  assert.equal(livePreflight.blockerEvidence.hostValueWritten, false);
+  assert.equal(
+    livePreflight.blockerEvidence.valueTrackerFieldWritten,
+    false
+  );
+  assert.equal(
+    livePreflight.blockerEvidence.propertyDescriptorInstalled,
+    false
+  );
+  assert.equal(livePreflight.blockerEvidence.browserInputMutated, false);
+  assert.equal(
+    livePreflight.postEventRestoreBoundary.liveMutationExecutionBlocked,
+    true
+  );
+  assert.equal(
+    livePreflight.postEventRestoreBoundary.restoreQueueWritten,
+    false
+  );
+  assert.equal(livePreflight.postEventRestoreBoundary.hostValueRead, false);
+  assert.equal(livePreflight.postEventRestoreBoundary.hostValueWritten, false);
+  assert.equal(livePreflight.sideEffects.liveMutationPreflightRecorded, true);
+  assert.equal(livePreflight.sideEffects.liveMutationPreflightRowCount, 1);
+  assert.equal(livePreflight.sideEffects.restoreQueueWritten, false);
+  assert.equal(livePreflight.sideEffects.restoreQueueFlushed, false);
+  assert.equal(livePreflight.sideEffects.hostWrapperInvoked, false);
+  assert.equal(livePreflight.sideEffects.valueTrackerFieldWritten, false);
+  assert.equal(livePreflight.sideEffects.propertyDescriptorInstalled, false);
+  assert.equal(livePreflight.sideEffects.hostValueRead, false);
+  assert.equal(livePreflight.sideEffects.hostValueWritten, false);
+  assert.equal(livePreflight.sideEffects.browserInputMutated, false);
+  assert.equal(
+    livePreflight.publicControlledBehaviorBoundary.compatibilityClaimed,
+    false
+  );
 
   const liveDocument = createRootBridgeDocument();
   liveDocument.defaultView = {};

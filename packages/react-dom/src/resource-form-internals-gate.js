@@ -1350,6 +1350,11 @@ const controlledInputValueTrackerMissingPrerequisites = freezeArray([
     'Post-event restore is not queued or flushed for controlled controls.'
   ),
   prerequisite(
+    'no-live-controlled-restore-execution',
+    'react-dom-events',
+    'Live controlled restore has preflight metadata only; host wrappers and value-tracker writes remain blocked.'
+  ),
+  prerequisite(
     'no-public-controlled-root-behavior',
     'react-dom-client',
     'Public roots remain placeholder-gated for controlled form behavior.'
@@ -3144,6 +3149,8 @@ function describeControlledInputPrivateRestoreQueueDiagnosticGate() {
     eventPluginDispatch: false,
     liveDomDescriptorInstallation: false,
     realDomNodeAccepted: false,
+    liveRestoreMutationPreflight:
+      createControlledInputLiveRestorePreflightBoundary(),
     publicControlledBehaviorBoundary:
       createPublicControlledBehaviorBoundary(),
     sideEffects: controlledInputPrivateRestoreQueueDiagnosticNoSideEffects,
@@ -11847,6 +11854,28 @@ function createPostEventRestoreBoundary() {
     eventPluginDispatch: false,
     restoreQueued: false,
     restoreFlushed: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createControlledInputLiveRestorePreflightBoundary() {
+  return freezeRecord({
+    status: 'blocked-live-controlled-restore-mutation-preflight',
+    preflightOnly: true,
+    acceptsLiveDomNodePreflight: true,
+    liveDomTargetCaptured: false,
+    latestPropsLookup: false,
+    restoreQueueWritten: false,
+    restoreQueueFlushed: false,
+    controlledStateRestoreInvoked: false,
+    hostWrapperInvoked: false,
+    wrapperWritePerformed: false,
+    valueTrackerFieldWritten: false,
+    propertyDescriptorInstalled: false,
+    hostValueRead: false,
+    hostValueWritten: false,
+    browserInputMutated: false,
+    publicControlledBehaviorEnabled: false,
     compatibilityClaimed: false
   });
 }
