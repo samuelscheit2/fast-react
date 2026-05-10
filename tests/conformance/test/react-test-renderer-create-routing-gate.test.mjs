@@ -152,6 +152,10 @@ const privateRootCompatibilityStatus =
   "blocked-private-test-renderer-root-bridge-compatibility";
 const lifecycleDiagnosticGateStatus =
   "accepted-private-update-unmount-lifecycle-diagnostics-public-root-blocked";
+const privateUpdateRouteRootWorkLoopDiagnosticName =
+  "fast-react-test-renderer.update-route.private-root-work-loop";
+const privateUpdateRouteRootWorkLoopStatus =
+  "private-update-route-root-work-loop-metadata-ready-public-update-blocked";
 const rootLifecycleActive = "Active";
 const rootLifecycleUnmountScheduled = "UnmountScheduled";
 const rootUpdateOutcomeScheduled = "Scheduled";
@@ -177,13 +181,23 @@ const errorSurfacePrivateDiagnosticRowIds = [
 const expectedPrivateRoutes = [
   {
     acceptedRustApis: [
+      "TestRendererRoot::describe_private_update_route_via_root_work_loop_for_canary",
       "TestRendererRoot::update_host_component_with_text_for_canary",
       "TestRendererRoot::render_and_commit_host_output_update_for_canary"
     ],
     acceptedRustTests: [
+      "root_private_update_route_consumes_root_work_loop_update_queue_and_text_update_metadata",
+      "root_private_update_route_rejects_stale_root_update_output",
+      "root_private_update_route_rejects_unmounted_root",
+      "root_private_update_route_rejects_incompatible_finished_work_record",
       "root_host_output_canary_updates_committed_text_with_update_diagnostics",
       "root_host_output_update_canary_fails_closed_without_committed_output"
     ],
+    acceptedWorkers: [
+      "worker-234-test-renderer-host-output-update-unmount-canary",
+      "worker-574-test-renderer-update-via-root-work-loop"
+    ],
+    rootWorkLoopUpdateRoute: true,
     acceptedOutcomes: [
       rootUpdateOutcomeScheduled,
       rootUpdateOutcomeIgnoredAfterUnmount
@@ -199,6 +213,10 @@ const expectedPrivateRoutes = [
     acceptedRustTests: [
       "root_host_output_canary_unmounts_committed_output_with_deletion_diagnostics"
     ],
+    acceptedWorkers: [
+      "worker-234-test-renderer-host-output-update-unmount-canary"
+    ],
+    rootWorkLoopUpdateRoute: false,
     acceptedOutcomes: [
       rootUpdateOutcomeScheduled,
       rootUpdateOutcomeAlreadyUnmountScheduled
@@ -2739,6 +2757,11 @@ function assertRustCanaryMetadata(metadata, label) {
       "worker-573-test-renderer-private-root-work-loop-preflight"
     );
   }
+  if (metadata.hostOutput.updateRouteRootWorkLoopGate !== undefined) {
+    expectedAcceptedRustWorkers.push(
+      "worker-574-test-renderer-update-via-root-work-loop"
+    );
+  }
   assert.deepEqual(metadata.acceptedRustWorkers, expectedAcceptedRustWorkers);
   const expectedAcceptedJsBridgeWorkers = [
     "worker-304-test-renderer-js-private-root-request-bridge",
@@ -2826,6 +2849,16 @@ function assertRustCanaryMetadata(metadata, label) {
     "TestRendererRoot::render_and_commit_host_output_update_for_canary",
     label
   );
+  if (metadata.hostOutput.updateRouteRootWorkLoopGate !== undefined) {
+    assert.equal(
+      metadata.hostOutput.updateRouteDiagnosticApi,
+      "TestRendererRoot::describe_private_update_route_via_root_work_loop_for_canary",
+      label
+    );
+    assertPrivateUpdateRouteRootWorkLoopGate(
+      metadata.hostOutput.updateRouteRootWorkLoopGate
+    );
+  }
   assert.equal(
     metadata.hostOutput.unmountApi,
     "TestRendererRoot::render_and_commit_host_output_unmount_for_canary",
@@ -3265,6 +3298,24 @@ function assertRustCanaryOperationMetadata(metadata, expected) {
       "root_unmount_is_idempotent"
     ]
   };
+  const actualUpdateOperationHasRootWorkLoopMetadata =
+    expected.operation === "update" &&
+    metadata.acceptedWorkers.includes(
+      "worker-574-test-renderer-update-via-root-work-loop"
+    );
+  if (actualUpdateOperationHasRootWorkLoopMetadata) {
+    expectedWorkersByOperation.update.push(
+      "worker-574-test-renderer-update-via-root-work-loop"
+    );
+    expectedTestsByOperation.update.splice(
+      3,
+      0,
+      "root_private_update_route_consumes_root_work_loop_update_queue_and_text_update_metadata",
+      "root_private_update_route_rejects_stale_root_update_output",
+      "root_private_update_route_rejects_unmounted_root",
+      "root_private_update_route_rejects_incompatible_finished_work_record"
+    );
+  }
   assert.deepEqual(
     metadata.acceptedWorkers,
     expectedWorkersByOperation[expected.operation]
@@ -3490,11 +3541,107 @@ function assertPrivateRoute(privateRoute, expected) {
     privateRoute.acceptedWorker,
     "worker-234-test-renderer-host-output-update-unmount-canary"
   );
+  if (privateRoute.acceptedWorkers === undefined) {
+    assert.equal(privateRoute.acceptedWorker, expected.acceptedWorkers[0]);
+  } else {
+    assert.equal(Object.isFrozen(privateRoute.acceptedWorkers), true);
+    assert.deepEqual(privateRoute.acceptedWorkers, expected.acceptedWorkers);
+  }
   assert.equal(privateRoute.acceptedRustCrate, "fast-react-test-renderer");
+  const hasRootWorkLoopUpdateRoute =
+    privateRoute.rootWorkLoopUpdateRouteGate !== undefined;
+  if (hasRootWorkLoopUpdateRoute) {
+    assert.equal(
+      privateRoute.rootWorkLoopUpdateRouteGate.status,
+      privateUpdateRouteRootWorkLoopStatus
+    );
+    assertPrivateUpdateRouteRootWorkLoopGate(
+      privateRoute.rootWorkLoopUpdateRouteGate
+    );
+    assert.equal(
+      privateRoute.consumesAcceptedHostRootUpdateQueueMetadata,
+      true
+    );
+    assert.equal(privateRoute.consumesAcceptedRootWorkLoopMetadata, true);
+    assert.equal(privateRoute.hostTextUpdateMetadataAvailable, true);
+    assert.equal(privateRoute.publicSerializationAvailable, false);
+    assert.equal(privateRoute.compatibilityClaimed, false);
+  } else {
+    assert.equal(privateRoute.rootWorkLoopUpdateRouteGate, undefined);
+  }
   assert.equal(Object.isFrozen(privateRoute.acceptedRustApis), true);
-  assert.deepEqual(privateRoute.acceptedRustApis, expected.acceptedRustApis);
+  assert.deepEqual(
+    privateRoute.acceptedRustApis,
+    expected.rootWorkLoopUpdateRoute && !hasRootWorkLoopUpdateRoute
+      ? expected.acceptedRustApis.slice(1)
+      : expected.acceptedRustApis
+  );
   assert.equal(Object.isFrozen(privateRoute.acceptedRustTests), true);
-  assert.deepEqual(privateRoute.acceptedRustTests, expected.acceptedRustTests);
+  assert.deepEqual(
+    privateRoute.acceptedRustTests,
+    expected.rootWorkLoopUpdateRoute && !hasRootWorkLoopUpdateRoute
+      ? expected.acceptedRustTests.slice(4)
+      : expected.acceptedRustTests
+  );
+}
+
+function assertPrivateUpdateRouteRootWorkLoopGate(gate) {
+  assert.equal(Object.isFrozen(gate), true);
+  assert.equal(
+    gate.id,
+    "react-test-renderer-update-route-root-work-loop-private-gate"
+  );
+  assert.equal(gate.status, privateUpdateRouteRootWorkLoopStatus);
+  assert.equal(gate.publicSurface, "create().update");
+  assert.equal(gate.diagnosticName, privateUpdateRouteRootWorkLoopDiagnosticName);
+  assert.equal(gate.acceptedRustCrate, "fast-react-test-renderer");
+  assert.equal(
+    gate.acceptedWorker,
+    "worker-574-test-renderer-update-via-root-work-loop"
+  );
+  assert.deepEqual(gate.acceptedRustRecords, [
+    "TestRendererRootScheduledUpdate",
+    "UpdateContainerResult",
+    "RootScheduleUpdateRecord",
+    "ScheduledRootUpdateResult",
+    "HostRootRenderPhaseRecord",
+    "HostRootCommitRecord",
+    "TestRendererUpdatedHostOutput"
+  ]);
+  assert.deepEqual(gate.acceptedHostRootUpdateQueueRecords, [
+    "UpdateContainerResult",
+    "RootScheduleUpdateRecord",
+    "UpdateId",
+    "UpdateQueueHandle"
+  ]);
+  assert.deepEqual(gate.acceptedRootWorkLoopRecords, [
+    "HostRootRenderPhaseRecord",
+    "HostRootCommitRecord"
+  ]);
+  assert.deepEqual(gate.acceptedRustApis, [
+    "TestRendererRoot::describe_private_update_route_via_root_work_loop_for_canary",
+    "TestRendererRoot::update_host_component_with_text_for_canary",
+    "TestRendererRoot::render_and_commit_host_output_update_for_canary"
+  ]);
+  assert.deepEqual(gate.acceptedRustTests, [
+    "root_private_update_route_consumes_root_work_loop_update_queue_and_text_update_metadata",
+    "root_private_update_route_rejects_stale_root_update_output",
+    "root_private_update_route_rejects_unmounted_root",
+    "root_private_update_route_rejects_incompatible_finished_work_record"
+  ]);
+  assert.equal(gate.consumesAcceptedHostRootUpdateQueueMetadata, true);
+  assert.equal(gate.consumesAcceptedRootWorkLoopMetadata, true);
+  assert.equal(gate.consumesManualHostOutputCanary, true);
+  assert.equal(gate.staleRootRejection, true);
+  assert.equal(gate.unmountedRootRejection, true);
+  assert.equal(gate.incompatibleFinishedWorkRejection, true);
+  assert.equal(gate.publicRootUpdateAvailable, false);
+  assert.equal(gate.publicSerializationAvailable, false);
+  assert.equal(gate.publicRendererRootCreated, false);
+  assert.equal(gate.nativeBridgeAvailable, false);
+  assert.equal(gate.nativeExecution, false);
+  assert.equal(gate.rustExecutionFromJs, false);
+  assert.equal(gate.compatibilityClaimed, false);
 }
 
 function assertLifecycleDiagnosticGate(gate) {
@@ -5251,6 +5398,112 @@ function assertPrivateRootRequestDiagnostics(error, expected) {
   assert.equal(error.routingGate.unmountRouteAvailable, false);
   assert.equal(error.updatePrivateRoute.publicRouteAvailable, false);
   assert.equal(error.unmountPrivateRoute.publicRouteAvailable, false);
+  if (
+    expected.operation === "update" &&
+    error.privateRootRequest.updateOutcome === rootUpdateOutcomeScheduled &&
+    error.privateUpdateRouteRootWorkLoopDiagnostic != null
+  ) {
+    assertPrivateUpdateRouteRootWorkLoopDiagnostic(
+      error.privateUpdateRouteRootWorkLoopDiagnostic,
+      error.privateRootRequest
+    );
+  } else {
+    assert.equal(
+      error.privateUpdateRouteRootWorkLoopDiagnostic == null,
+      true
+    );
+  }
+}
+
+function assertPrivateUpdateRouteRootWorkLoopDiagnostic(diagnostic, request) {
+  assert.equal(Object.isFrozen(diagnostic), true);
+  assert.equal(
+    diagnostic.id,
+    "react-test-renderer-update-route-root-work-loop-private-diagnostic"
+  );
+  assert.equal(
+    diagnostic.diagnosticName,
+    privateUpdateRouteRootWorkLoopDiagnosticName
+  );
+  assert.equal(diagnostic.status, privateUpdateRouteRootWorkLoopStatus);
+  assert.equal(diagnostic.publicSurface, "create().update");
+  assertPrivateUpdateRouteRootWorkLoopGate(diagnostic.gate);
+  assert.equal(diagnostic.rootRequest, request);
+  assert.equal(diagnostic.rootRequestId, request.requestId);
+  assert.equal(diagnostic.rootRequestSequence, request.requestSequence);
+  assert.equal(diagnostic.rootOperation, "update");
+  assert.equal(diagnostic.hostOutputUpdateKind, "Update");
+  assert.equal(Object.isFrozen(diagnostic.updateQueueMetadata), true);
+  assert.equal(diagnostic.updateQueueMetadata.record, "UpdateContainerResult");
+  assert.equal(
+    diagnostic.updateQueueMetadata.scheduleRecord,
+    "RootScheduleUpdateRecord"
+  );
+  assert.equal(
+    diagnostic.updateQueueMetadata.scheduledUpdateRecord,
+    "TestRendererRootScheduledUpdate"
+  );
+  assert.equal(diagnostic.updateQueueMetadata.laneSource, "update_container");
+  assert.equal(
+    diagnostic.updateQueueMetadata.queueMatchesRenderCurrentQueue,
+    true
+  );
+  assert.equal(
+    diagnostic.updateQueueMetadata.selectedLanesMatchRenderLanes,
+    true
+  );
+  assert.equal(
+    diagnostic.updateQueueMetadata.pendingLanesAfterEnqueueMatchRenderLanes,
+    true
+  );
+  assert.equal(Object.isFrozen(diagnostic.rootWorkLoopMetadata), true);
+  assert.equal(
+    diagnostic.rootWorkLoopMetadata.renderPhaseRecord,
+    "HostRootRenderPhaseRecord"
+  );
+  assert.equal(
+    diagnostic.rootWorkLoopMetadata.commitRecord,
+    "HostRootCommitRecord"
+  );
+  assert.equal(diagnostic.rootWorkLoopMetadata.appliedUpdateCount, 1);
+  assert.equal(diagnostic.rootWorkLoopMetadata.skippedUpdateCount, 0);
+  assert.equal(
+    diagnostic.rootWorkLoopMetadata.commitCurrentMatchesRenderFinishedWork,
+    true
+  );
+  assert.equal(
+    diagnostic.rootWorkLoopMetadata.commitPreviousCurrentMatchesRenderCurrent,
+    true
+  );
+  assert.equal(diagnostic.rootWorkLoopMetadata.commitLanesMatchRenderLanes, true);
+  assert.equal(Object.isFrozen(diagnostic.hostTextUpdateMetadata), true);
+  assert.equal(
+    diagnostic.hostTextUpdateMetadata.hostOutputUpdateRecord,
+    "TestRendererUpdatedHostOutput"
+  );
+  assert.equal(
+    diagnostic.hostTextUpdateMetadata.hostTextUpdateApplyRequired,
+    true
+  );
+  assert.equal(diagnostic.hostTextUpdateMetadata.hostTextUpdateApplyCount, 1);
+  assert.equal(
+    diagnostic.hostTextUpdateMetadata.hostComponentUpdateApplyCount,
+    1
+  );
+  assert.equal(
+    diagnostic.consumesAcceptedHostRootUpdateQueueMetadata,
+    true
+  );
+  assert.equal(diagnostic.consumesAcceptedRootWorkLoopMetadata, true);
+  assert.equal(diagnostic.consumesManualHostOutputCanary, true);
+  assert.equal(diagnostic.staleRootRejection, true);
+  assert.equal(diagnostic.unmountedRootRejection, true);
+  assert.equal(diagnostic.incompatibleFinishedWorkRejection, true);
+  assert.equal(diagnostic.publicRootUpdateAvailable, false);
+  assert.equal(diagnostic.publicSerializationAvailable, false);
+  assert.equal(diagnostic.nativeExecution, false);
+  assert.equal(diagnostic.rustExecutionFromJs, false);
+  assert.equal(diagnostic.compatibilityClaimed, false);
 }
 
 function assertPrivateRootRequest(record, expected) {

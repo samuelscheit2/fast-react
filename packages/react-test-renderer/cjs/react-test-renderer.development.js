@@ -1758,6 +1758,62 @@ const updateUnmountRustLifecycleDiagnosticGate = Object.freeze({
   hostOutputProducedFromJs: false,
   compatibilityClaimed: false
 });
+const privateUpdateRouteRootWorkLoopDiagnosticName =
+  'fast-react-test-renderer.update-route.private-root-work-loop';
+const privateUpdateRouteRootWorkLoopStatus =
+  'private-update-route-root-work-loop-metadata-ready-public-update-blocked';
+const privateUpdateRouteRootWorkLoopGate = Object.freeze({
+  id: 'react-test-renderer-update-route-root-work-loop-private-gate',
+  status: privateUpdateRouteRootWorkLoopStatus,
+  publicSurface: 'create().update',
+  deterministic: true,
+  diagnosticName: privateUpdateRouteRootWorkLoopDiagnosticName,
+  acceptedRustCrate: 'fast-react-test-renderer',
+  acceptedWorker: 'worker-574-test-renderer-update-via-root-work-loop',
+  acceptedRustRecords: Object.freeze([
+    'TestRendererRootScheduledUpdate',
+    'UpdateContainerResult',
+    'RootScheduleUpdateRecord',
+    'ScheduledRootUpdateResult',
+    'HostRootRenderPhaseRecord',
+    'HostRootCommitRecord',
+    'TestRendererUpdatedHostOutput'
+  ]),
+  acceptedHostRootUpdateQueueRecords: Object.freeze([
+    'UpdateContainerResult',
+    'RootScheduleUpdateRecord',
+    'UpdateId',
+    'UpdateQueueHandle'
+  ]),
+  acceptedRootWorkLoopRecords: Object.freeze([
+    'HostRootRenderPhaseRecord',
+    'HostRootCommitRecord'
+  ]),
+  acceptedRustApis: Object.freeze([
+    'TestRendererRoot::describe_private_update_route_via_root_work_loop_for_canary',
+    'TestRendererRoot::update_host_component_with_text_for_canary',
+    'TestRendererRoot::render_and_commit_host_output_update_for_canary'
+  ]),
+  acceptedRustTests: Object.freeze([
+    'root_private_update_route_consumes_root_work_loop_update_queue_and_text_update_metadata',
+    'root_private_update_route_rejects_stale_root_update_output',
+    'root_private_update_route_rejects_unmounted_root',
+    'root_private_update_route_rejects_incompatible_finished_work_record'
+  ]),
+  consumesAcceptedHostRootUpdateQueueMetadata: true,
+  consumesAcceptedRootWorkLoopMetadata: true,
+  consumesManualHostOutputCanary: true,
+  staleRootRejection: true,
+  unmountedRootRejection: true,
+  incompatibleFinishedWorkRejection: true,
+  publicRootUpdateAvailable: false,
+  publicSerializationAvailable: false,
+  publicRendererRootCreated: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  rustExecutionFromJs: false,
+  compatibilityClaimed: false
+});
 const updatePrivateRoute = Object.freeze({
   id: 'react-test-renderer-update-private-route',
   publicSurface: 'create().update',
@@ -1775,12 +1831,27 @@ const updatePrivateRoute = Object.freeze({
   nativeBridgeAvailable: false,
   nativeExecution: false,
   acceptedWorker: 'worker-234-test-renderer-host-output-update-unmount-canary',
+  acceptedWorkers: Object.freeze([
+    'worker-234-test-renderer-host-output-update-unmount-canary',
+    'worker-574-test-renderer-update-via-root-work-loop'
+  ]),
   acceptedRustCrate: 'fast-react-test-renderer',
+  rootWorkLoopUpdateRouteGate: privateUpdateRouteRootWorkLoopGate,
+  consumesAcceptedHostRootUpdateQueueMetadata: true,
+  consumesAcceptedRootWorkLoopMetadata: true,
+  hostTextUpdateMetadataAvailable: true,
+  publicSerializationAvailable: false,
+  compatibilityClaimed: false,
   acceptedRustApis: Object.freeze([
+    'TestRendererRoot::describe_private_update_route_via_root_work_loop_for_canary',
     'TestRendererRoot::update_host_component_with_text_for_canary',
     'TestRendererRoot::render_and_commit_host_output_update_for_canary'
   ]),
   acceptedRustTests: Object.freeze([
+    'root_private_update_route_consumes_root_work_loop_update_queue_and_text_update_metadata',
+    'root_private_update_route_rejects_stale_root_update_output',
+    'root_private_update_route_rejects_unmounted_root',
+    'root_private_update_route_rejects_incompatible_finished_work_record',
     'root_host_output_canary_updates_committed_text_with_update_diagnostics',
     'root_host_output_update_canary_fails_closed_without_committed_output'
   ])
@@ -1802,6 +1873,9 @@ const unmountPrivateRoute = Object.freeze({
   nativeBridgeAvailable: false,
   nativeExecution: false,
   acceptedWorker: 'worker-234-test-renderer-host-output-update-unmount-canary',
+  acceptedWorkers: Object.freeze([
+    'worker-234-test-renderer-host-output-update-unmount-canary'
+  ]),
   acceptedRustCrate: 'fast-react-test-renderer',
   acceptedRustApis: Object.freeze([
     'TestRendererRoot::unmount',
@@ -3260,12 +3334,17 @@ const currentRustTestRendererRootCanaryOperations = freezeRecord({
     acceptedWorkers: freezeArray([
       'worker-153-test-renderer-root-canary',
       'worker-195-test-renderer-root-callback-snapshot',
-      'worker-234-test-renderer-host-output-update-unmount-canary'
+      'worker-234-test-renderer-host-output-update-unmount-canary',
+      'worker-574-test-renderer-update-via-root-work-loop'
     ]),
     acceptedRustTests: freezeArray([
       'root_update_reuses_same_fiber_root_and_shared_scheduler_record',
       'root_update_commit_handoff_exposes_visible_callback_snapshot',
       'root_host_output_canary_updates_committed_text_with_update_diagnostics',
+      'root_private_update_route_consumes_root_work_loop_update_queue_and_text_update_metadata',
+      'root_private_update_route_rejects_stale_root_update_output',
+      'root_private_update_route_rejects_unmounted_root',
+      'root_private_update_route_rejects_incompatible_finished_work_record',
       'root_update_after_unmount_does_not_mutate_or_reschedule'
     ])
   }),
@@ -3312,7 +3391,8 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     'worker-465-test-renderer-error-boundary-diagnostics',
     'worker-530-test-renderer-error-boundary-update-refresh',
     'worker-539-test-renderer-live-rust-root-create-preflight',
-    'worker-573-test-renderer-private-root-work-loop-preflight'
+    'worker-573-test-renderer-private-root-work-loop-preflight',
+    'worker-574-test-renderer-update-via-root-work-loop'
   ]),
   acceptedJsBridgeWorkers: freezeArray([
     'worker-304-test-renderer-js-private-root-request-bridge',
@@ -3364,6 +3444,9 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
     createApi: 'TestRendererRoot::render_and_commit_host_output_for_canary',
     updateApi:
       'TestRendererRoot::render_and_commit_host_output_update_for_canary',
+    updateRouteDiagnosticApi:
+      'TestRendererRoot::describe_private_update_route_via_root_work_loop_for_canary',
+    updateRouteRootWorkLoopGate: privateUpdateRouteRootWorkLoopGate,
     unmountApi:
       'TestRendererRoot::render_and_commit_host_output_unmount_for_canary',
     diagnostics: 'TestRendererHostOutputDiagnostics',
@@ -3773,6 +3856,8 @@ function createUnsupportedError(
     error.privateRootCreateRequest = privateRootDiagnostics.createRequest;
     error.privateRootRequest = privateRootDiagnostics.request;
     error.privateRootRequestHistory = privateRootDiagnostics.requestHistory;
+    error.privateUpdateRouteRootWorkLoopDiagnostic =
+      privateRootDiagnostics.privateUpdateRouteRootWorkLoopDiagnostic;
   }
 
   if (rootRequest !== undefined) {
@@ -3928,6 +4013,63 @@ function createPrivateRootUnmountDiagnostics(state) {
   });
 
   return describePrivateRootDiagnostics(state, request);
+}
+
+function createPrivateUpdateRouteRootWorkLoopDiagnostic(rootRequest) {
+  if (
+    rootRequest.operation !== 'update' ||
+    rootRequest.updateOutcome !== testRendererRootUpdateOutcomeScheduled
+  ) {
+    return null;
+  }
+
+  return Object.freeze({
+    id: 'react-test-renderer-update-route-root-work-loop-private-diagnostic',
+    diagnosticName: privateUpdateRouteRootWorkLoopDiagnosticName,
+    status: privateUpdateRouteRootWorkLoopStatus,
+    publicSurface: 'create().update',
+    gate: privateUpdateRouteRootWorkLoopGate,
+    rootRequest,
+    rootRequestId: rootRequest.requestId,
+    rootRequestSequence: rootRequest.requestSequence,
+    rootOperation: rootRequest.operation,
+    hostOutputUpdateKind: testRendererRootUpdateKindUpdate,
+    updateQueueMetadata: Object.freeze({
+      record: 'UpdateContainerResult',
+      scheduleRecord: 'RootScheduleUpdateRecord',
+      scheduledUpdateRecord: 'TestRendererRootScheduledUpdate',
+      laneSource: 'update_container',
+      queueMatchesRenderCurrentQueue: true,
+      selectedLanesMatchRenderLanes: true,
+      pendingLanesAfterEnqueueMatchRenderLanes: true
+    }),
+    rootWorkLoopMetadata: Object.freeze({
+      renderPhaseRecord: 'HostRootRenderPhaseRecord',
+      commitRecord: 'HostRootCommitRecord',
+      appliedUpdateCount: 1,
+      skippedUpdateCount: 0,
+      commitCurrentMatchesRenderFinishedWork: true,
+      commitPreviousCurrentMatchesRenderCurrent: true,
+      commitLanesMatchRenderLanes: true
+    }),
+    hostTextUpdateMetadata: Object.freeze({
+      hostOutputUpdateRecord: 'TestRendererUpdatedHostOutput',
+      hostTextUpdateApplyRequired: true,
+      hostTextUpdateApplyCount: 1,
+      hostComponentUpdateApplyCount: 1
+    }),
+    consumesAcceptedHostRootUpdateQueueMetadata: true,
+    consumesAcceptedRootWorkLoopMetadata: true,
+    consumesManualHostOutputCanary: true,
+    staleRootRejection: true,
+    unmountedRootRejection: true,
+    incompatibleFinishedWorkRejection: true,
+    publicRootUpdateAvailable: false,
+    publicSerializationAvailable: false,
+    nativeExecution: false,
+    rustExecutionFromJs: false,
+    compatibilityClaimed: false
+  });
 }
 
 function createPrivateRootRequestRecord(state, request) {
@@ -4157,7 +4299,9 @@ function describePrivateRootDiagnostics(state, request) {
     }),
     createRequest: state.createRequest,
     request,
-    requestHistory: Object.freeze(state.history.slice())
+    requestHistory: Object.freeze(state.history.slice()),
+    privateUpdateRouteRootWorkLoopDiagnostic:
+      createPrivateUpdateRouteRootWorkLoopDiagnostic(request)
   });
 }
 

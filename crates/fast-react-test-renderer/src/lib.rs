@@ -1758,6 +1758,360 @@ impl TestRendererRootUpdateOutcome {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererPrivateUpdateRouteQueueDiagnostics {
+    root: FiberRootId,
+    scheduled_update_kind: TestRendererRootUpdateKind,
+    scheduled_element: RootElementHandle,
+    update_raw: u64,
+    queue_raw: u64,
+    schedule_fiber: TestRendererFiberHandleDiagnostics,
+    lane_bits: u32,
+    pending_lanes_before_enqueue_bits: u32,
+    pending_lanes_after_enqueue_bits: u32,
+    selected_next_lanes_bits: u32,
+    render_lanes_bits: u32,
+    queue_matches_render_current_queue: bool,
+    selected_lanes_match_render_lanes: bool,
+    pending_lanes_after_enqueue_match_render_lanes: bool,
+    root_schedule_inserted: bool,
+    root_schedule_microtask_requested: bool,
+    root_schedule_might_have_pending_sync_work: bool,
+}
+
+impl TestRendererPrivateUpdateRouteQueueDiagnostics {
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn scheduled_update_kind(self) -> TestRendererRootUpdateKind {
+        self.scheduled_update_kind
+    }
+
+    #[must_use]
+    pub const fn scheduled_element(self) -> RootElementHandle {
+        self.scheduled_element
+    }
+
+    #[must_use]
+    pub const fn update_raw(self) -> u64 {
+        self.update_raw
+    }
+
+    #[must_use]
+    pub const fn queue_raw(self) -> u64 {
+        self.queue_raw
+    }
+
+    #[must_use]
+    pub const fn schedule_fiber(self) -> TestRendererFiberHandleDiagnostics {
+        self.schedule_fiber
+    }
+
+    #[must_use]
+    pub const fn lane_bits(self) -> u32 {
+        self.lane_bits
+    }
+
+    #[must_use]
+    pub const fn pending_lanes_before_enqueue_bits(self) -> u32 {
+        self.pending_lanes_before_enqueue_bits
+    }
+
+    #[must_use]
+    pub const fn pending_lanes_after_enqueue_bits(self) -> u32 {
+        self.pending_lanes_after_enqueue_bits
+    }
+
+    #[must_use]
+    pub const fn selected_next_lanes_bits(self) -> u32 {
+        self.selected_next_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn render_lanes_bits(self) -> u32 {
+        self.render_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn queue_matches_render_current_queue(self) -> bool {
+        self.queue_matches_render_current_queue
+    }
+
+    #[must_use]
+    pub const fn selected_lanes_match_render_lanes(self) -> bool {
+        self.selected_lanes_match_render_lanes
+    }
+
+    #[must_use]
+    pub const fn pending_lanes_after_enqueue_match_render_lanes(self) -> bool {
+        self.pending_lanes_after_enqueue_match_render_lanes
+    }
+
+    #[must_use]
+    pub const fn root_schedule_inserted(self) -> bool {
+        self.root_schedule_inserted
+    }
+
+    #[must_use]
+    pub const fn root_schedule_microtask_requested(self) -> bool {
+        self.root_schedule_microtask_requested
+    }
+
+    #[must_use]
+    pub const fn root_schedule_might_have_pending_sync_work(self) -> bool {
+        self.root_schedule_might_have_pending_sync_work
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererPrivateUpdateRouteWorkLoopDiagnostics {
+    root: FiberRootId,
+    render_current: TestRendererFiberHandleDiagnostics,
+    render_finished_work: TestRendererFiberHandleDiagnostics,
+    commit_current: TestRendererFiberHandleDiagnostics,
+    current_update_queue_raw: u64,
+    work_in_progress_update_queue_raw: u64,
+    committed_current_update_queue_raw: u64,
+    applied_update_count: usize,
+    skipped_update_count: usize,
+    remaining_lanes_empty: bool,
+    commit_finished_lanes_bits: u32,
+    commit_remaining_lanes_empty: bool,
+    commit_pending_lanes_empty: bool,
+    commit_current_matches_render_finished_work: bool,
+    commit_previous_current_matches_render_current: bool,
+    commit_lanes_match_render_lanes: bool,
+    committed_current_queue_matches_work_in_progress: bool,
+    root_current_matches_commit_current: bool,
+}
+
+impl TestRendererPrivateUpdateRouteWorkLoopDiagnostics {
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn render_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.render_current
+    }
+
+    #[must_use]
+    pub const fn render_finished_work(self) -> TestRendererFiberHandleDiagnostics {
+        self.render_finished_work
+    }
+
+    #[must_use]
+    pub const fn commit_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.commit_current
+    }
+
+    #[must_use]
+    pub const fn current_update_queue_raw(self) -> u64 {
+        self.current_update_queue_raw
+    }
+
+    #[must_use]
+    pub const fn work_in_progress_update_queue_raw(self) -> u64 {
+        self.work_in_progress_update_queue_raw
+    }
+
+    #[must_use]
+    pub const fn committed_current_update_queue_raw(self) -> u64 {
+        self.committed_current_update_queue_raw
+    }
+
+    #[must_use]
+    pub const fn applied_update_count(self) -> usize {
+        self.applied_update_count
+    }
+
+    #[must_use]
+    pub const fn skipped_update_count(self) -> usize {
+        self.skipped_update_count
+    }
+
+    #[must_use]
+    pub const fn remaining_lanes_empty(self) -> bool {
+        self.remaining_lanes_empty
+    }
+
+    #[must_use]
+    pub const fn commit_finished_lanes_bits(self) -> u32 {
+        self.commit_finished_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn commit_remaining_lanes_empty(self) -> bool {
+        self.commit_remaining_lanes_empty
+    }
+
+    #[must_use]
+    pub const fn commit_pending_lanes_empty(self) -> bool {
+        self.commit_pending_lanes_empty
+    }
+
+    #[must_use]
+    pub const fn commit_current_matches_render_finished_work(self) -> bool {
+        self.commit_current_matches_render_finished_work
+    }
+
+    #[must_use]
+    pub const fn commit_previous_current_matches_render_current(self) -> bool {
+        self.commit_previous_current_matches_render_current
+    }
+
+    #[must_use]
+    pub const fn commit_lanes_match_render_lanes(self) -> bool {
+        self.commit_lanes_match_render_lanes
+    }
+
+    #[must_use]
+    pub const fn committed_current_queue_matches_work_in_progress(self) -> bool {
+        self.committed_current_queue_matches_work_in_progress
+    }
+
+    #[must_use]
+    pub const fn root_current_matches_commit_current(self) -> bool {
+        self.root_current_matches_commit_current
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererPrivateUpdateRouteHostTextDiagnostics {
+    previous_text_fiber: TestRendererFiberHandleDiagnostics,
+    updated_text_fiber: TestRendererFiberHandleDiagnostics,
+    text_state_node_raw: u64,
+    text_update_apply_recorded: bool,
+    host_text_update_apply_count: usize,
+    host_component_update_apply_count: usize,
+}
+
+impl TestRendererPrivateUpdateRouteHostTextDiagnostics {
+    #[must_use]
+    pub const fn previous_text_fiber(self) -> TestRendererFiberHandleDiagnostics {
+        self.previous_text_fiber
+    }
+
+    #[must_use]
+    pub const fn updated_text_fiber(self) -> TestRendererFiberHandleDiagnostics {
+        self.updated_text_fiber
+    }
+
+    #[must_use]
+    pub const fn text_state_node_raw(self) -> u64 {
+        self.text_state_node_raw
+    }
+
+    #[must_use]
+    pub const fn text_update_apply_recorded(self) -> bool {
+        self.text_update_apply_recorded
+    }
+
+    #[must_use]
+    pub const fn host_text_update_apply_count(self) -> usize {
+        self.host_text_update_apply_count
+    }
+
+    #[must_use]
+    pub const fn host_component_update_apply_count(self) -> usize {
+        self.host_component_update_apply_count
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateUpdateRouteDiagnostics {
+    diagnostic_name: &'static str,
+    status: &'static str,
+    root: FiberRootId,
+    host_output_update_kind: TestRendererRootUpdateKind,
+    update_queue: TestRendererPrivateUpdateRouteQueueDiagnostics,
+    root_work_loop: TestRendererPrivateUpdateRouteWorkLoopDiagnostics,
+    host_text_update: TestRendererPrivateUpdateRouteHostTextDiagnostics,
+    consumes_accepted_host_root_update_queue_metadata: bool,
+    consumes_accepted_root_work_loop_metadata: bool,
+    consumes_manual_host_output_canary: bool,
+    public_root_update_available: bool,
+    public_serialization_available: bool,
+    native_execution_available: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererPrivateUpdateRouteDiagnostics {
+    #[must_use]
+    pub const fn diagnostic_name(&self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn status(&self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn host_output_update_kind(&self) -> TestRendererRootUpdateKind {
+        self.host_output_update_kind
+    }
+
+    #[must_use]
+    pub const fn update_queue(&self) -> TestRendererPrivateUpdateRouteQueueDiagnostics {
+        self.update_queue
+    }
+
+    #[must_use]
+    pub const fn root_work_loop(&self) -> TestRendererPrivateUpdateRouteWorkLoopDiagnostics {
+        self.root_work_loop
+    }
+
+    #[must_use]
+    pub const fn host_text_update(&self) -> TestRendererPrivateUpdateRouteHostTextDiagnostics {
+        self.host_text_update
+    }
+
+    #[must_use]
+    pub const fn consumes_accepted_host_root_update_queue_metadata(&self) -> bool {
+        self.consumes_accepted_host_root_update_queue_metadata
+    }
+
+    #[must_use]
+    pub const fn consumes_accepted_root_work_loop_metadata(&self) -> bool {
+        self.consumes_accepted_root_work_loop_metadata
+    }
+
+    #[must_use]
+    pub const fn consumes_manual_host_output_canary(&self) -> bool {
+        self.consumes_manual_host_output_canary
+    }
+
+    #[must_use]
+    pub const fn public_root_update_available(&self) -> bool {
+        self.public_root_update_available
+    }
+
+    #[must_use]
+    pub const fn public_serialization_available(&self) -> bool {
+        self.public_serialization_available
+    }
+
+    #[must_use]
+    pub const fn native_execution_available(&self) -> bool {
+        self.native_execution_available
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(&self) -> bool {
+        self.compatibility_claimed
+    }
+}
+
 pub const TEST_RENDERER_SERIALIZATION_CANARY_GATE_NAME: &str =
     "fast-react-test-renderer.serialization.private-canary";
 pub const TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME: &str =
@@ -1774,6 +2128,10 @@ pub const TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_ROUTE_DEPENDENCY_ID: &str =
     "react-test-renderer-update-route-private-diagnostic";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_ROUTE_DEPENDENCY_ID: &str =
     "react-test-renderer-unmount-route-private-diagnostic";
+pub const TEST_RENDERER_PRIVATE_UPDATE_ROUTE_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.update-route.private-root-work-loop";
+pub const TEST_RENDERER_PRIVATE_UPDATE_ROUTE_STATUS: &str =
+    "private-update-route-root-work-loop-metadata-ready-public-update-blocked";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_SERIALIZATION_DEPENDENCY_ID: &str =
     "react-test-renderer-serialization-private-json-diagnostic";
 pub const TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME: &str =
@@ -5331,6 +5689,48 @@ impl TestRendererPrivateGetInstanceClassRootReport {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TestRendererPrivateUpdateRouteError {
+    RootNotActive {
+        lifecycle: TestRendererRootLifecycle,
+    },
+    MissingScheduledUpdate,
+    UnexpectedScheduledUpdateKind {
+        actual: TestRendererRootUpdateKind,
+    },
+    IncompatibleFinishedWork {
+        reason: &'static str,
+    },
+    MissingHostTextUpdateApply,
+}
+
+impl Display for TestRendererPrivateUpdateRouteError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::RootNotActive { lifecycle } => write!(
+                formatter,
+                "private update route requires an active root, found {lifecycle:?}"
+            ),
+            Self::MissingScheduledUpdate => {
+                formatter.write_str("private update route found no scheduled HostRoot update")
+            }
+            Self::UnexpectedScheduledUpdateKind { actual } => write!(
+                formatter,
+                "private update route expected a scheduled update, found {actual:?}"
+            ),
+            Self::IncompatibleFinishedWork { reason } => write!(
+                formatter,
+                "private update route finished-work record is incompatible: {reason}"
+            ),
+            Self::MissingHostTextUpdateApply => formatter.write_str(
+                "private update route expected one accepted HostText update apply record",
+            ),
+        }
+    }
+}
+
+impl Error for TestRendererPrivateUpdateRouteError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TestRendererSerializationGateError {
     CommitRootMismatch {
         expected: FiberRootId,
@@ -5585,6 +5985,7 @@ pub enum TestRendererRootError {
     RootWorkLoop(RootWorkLoopError),
     RootCommit(RootCommitError),
     SerializationGate(Box<TestRendererSerializationGateError>),
+    PrivateUpdateRoute(Box<TestRendererPrivateUpdateRouteError>),
     PrivateJsonSerialization(Box<TestRendererPrivateJsonSerializationError>),
     StableSiblingInsertionCanary(Box<TestRendererStableSiblingInsertionCanaryError>),
     RootCreatePreflight(Box<TestRendererRootCreatePreflightError>),
@@ -5621,6 +6022,7 @@ impl Display for TestRendererRootError {
             Self::RootWorkLoop(error) => Display::fmt(error, formatter),
             Self::RootCommit(error) => Display::fmt(error, formatter),
             Self::SerializationGate(error) => Display::fmt(error, formatter),
+            Self::PrivateUpdateRoute(error) => Display::fmt(error, formatter),
             Self::PrivateJsonSerialization(error) => Display::fmt(error, formatter),
             Self::StableSiblingInsertionCanary(error) => Display::fmt(error, formatter),
             Self::RootCreatePreflight(error) => Display::fmt(error, formatter),
@@ -5670,6 +6072,7 @@ impl Error for TestRendererRootError {
             Self::RootWorkLoop(error) => Some(error),
             Self::RootCommit(error) => Some(error),
             Self::SerializationGate(error) => Some(error),
+            Self::PrivateUpdateRoute(error) => Some(error),
             Self::PrivateJsonSerialization(error) => Some(error),
             Self::StableSiblingInsertionCanary(error) => Some(error),
             Self::RootCreatePreflight(error) => Some(error),
@@ -5723,6 +6126,12 @@ impl From<RootCommitError> for TestRendererRootError {
 impl From<TestRendererSerializationGateError> for TestRendererRootError {
     fn from(error: TestRendererSerializationGateError) -> Self {
         Self::SerializationGate(Box::new(error))
+    }
+}
+
+impl From<TestRendererPrivateUpdateRouteError> for TestRendererRootError {
+    fn from(error: TestRendererPrivateUpdateRouteError) -> Self {
+        Self::PrivateUpdateRoute(Box::new(error))
     }
 }
 
@@ -6355,6 +6764,251 @@ impl TestRendererRoot {
         } else {
             Err(TestRendererSerializationGateError::Closed(report).into())
         }
+    }
+
+    pub fn describe_private_update_route_via_root_work_loop_for_canary(
+        &self,
+        output: &TestRendererUpdatedHostOutput,
+    ) -> Result<TestRendererPrivateUpdateRouteDiagnostics, TestRendererRootError> {
+        if self.lifecycle != TestRendererRootLifecycle::Active {
+            return Err(TestRendererPrivateUpdateRouteError::RootNotActive {
+                lifecycle: self.lifecycle,
+            }
+            .into());
+        }
+        self.validate_serialization_gate_commit(output.commit())?;
+
+        let Some(scheduled_update) = self.scheduled_updates.last() else {
+            return Err(TestRendererPrivateUpdateRouteError::MissingScheduledUpdate.into());
+        };
+        if scheduled_update.kind() != TestRendererRootUpdateKind::Update {
+            return Err(
+                TestRendererPrivateUpdateRouteError::UnexpectedScheduledUpdateKind {
+                    actual: scheduled_update.kind(),
+                }
+                .into(),
+            );
+        }
+
+        let render = output.render();
+        let commit = output.commit();
+        if render.root() != self.root_id {
+            return Err(
+                TestRendererPrivateUpdateRouteError::IncompatibleFinishedWork {
+                    reason: "render-root-mismatch",
+                }
+                .into(),
+            );
+        }
+        if commit.current() != render.finished_work() {
+            return Err(
+                TestRendererPrivateUpdateRouteError::IncompatibleFinishedWork {
+                    reason: "commit-current-finished-work-mismatch",
+                }
+                .into(),
+            );
+        }
+        if commit.previous_current() != render.current() {
+            return Err(
+                TestRendererPrivateUpdateRouteError::IncompatibleFinishedWork {
+                    reason: "commit-previous-current-mismatch",
+                }
+                .into(),
+            );
+        }
+        if commit.finished_lanes() != render.render_lanes() {
+            return Err(
+                TestRendererPrivateUpdateRouteError::IncompatibleFinishedWork {
+                    reason: "commit-finished-lanes-mismatch",
+                }
+                .into(),
+            );
+        }
+        if render.applied_update_count() != 1 || render.skipped_update_count() != 0 {
+            return Err(
+                TestRendererPrivateUpdateRouteError::IncompatibleFinishedWork {
+                    reason: "unexpected-render-update-counts",
+                }
+                .into(),
+            );
+        }
+        if scheduled_update.element() != render.resulting_element() {
+            return Err(
+                TestRendererPrivateUpdateRouteError::IncompatibleFinishedWork {
+                    reason: "scheduled-element-mismatch",
+                }
+                .into(),
+            );
+        }
+        if scheduled_update.container_update().queue() != render.current_update_queue() {
+            return Err(
+                TestRendererPrivateUpdateRouteError::IncompatibleFinishedWork {
+                    reason: "update-queue-mismatch",
+                }
+                .into(),
+            );
+        }
+        if scheduled_update
+            .container_update()
+            .pending_lanes_after_enqueue()
+            != render.render_lanes()
+        {
+            return Err(
+                TestRendererPrivateUpdateRouteError::IncompatibleFinishedWork {
+                    reason: "pending-lanes-mismatch",
+                }
+                .into(),
+            );
+        }
+        if scheduled_update.container_update().selected_next_lanes() != render.render_lanes() {
+            return Err(
+                TestRendererPrivateUpdateRouteError::IncompatibleFinishedWork {
+                    reason: "selected-lanes-mismatch",
+                }
+                .into(),
+            );
+        }
+
+        let committed_current_update_queue = self
+            .store
+            .fiber_arena()
+            .get(commit.current())
+            .map_err(FiberRootStoreError::from)?
+            .update_queue();
+        if committed_current_update_queue != render.work_in_progress_update_queue() {
+            return Err(
+                TestRendererPrivateUpdateRouteError::IncompatibleFinishedWork {
+                    reason: "committed-current-queue-mismatch",
+                }
+                .into(),
+            );
+        }
+
+        let updated_fibers = output.updated_fibers();
+        let text_update_apply_recorded = commit.has_test_only_host_text_update_apply_for_canary(
+            updated_fibers.previous().text(),
+            updated_fibers.current().text(),
+            updated_fibers.text_state_node_raw(),
+        );
+        if !text_update_apply_recorded {
+            return Err(TestRendererPrivateUpdateRouteError::MissingHostTextUpdateApply.into());
+        }
+
+        let schedule_fiber = scheduled_update.container_update().schedule().fiber();
+        let render_current = render.current();
+        let render_finished_work = render.finished_work();
+        let commit_current = commit.current();
+        Ok(TestRendererPrivateUpdateRouteDiagnostics {
+            diagnostic_name: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_DIAGNOSTIC_NAME,
+            status: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_STATUS,
+            root: self.root_id,
+            host_output_update_kind: TestRendererRootUpdateKind::Update,
+            update_queue: TestRendererPrivateUpdateRouteQueueDiagnostics {
+                root: scheduled_update.container_update().schedule().root(),
+                scheduled_update_kind: scheduled_update.kind(),
+                scheduled_element: scheduled_update.element(),
+                update_raw: scheduled_update.container_update().update().raw(),
+                queue_raw: scheduled_update.container_update().queue().raw(),
+                schedule_fiber: TestRendererFiberHandleDiagnostics {
+                    arena_id: schedule_fiber.arena_id().get(),
+                    slot: schedule_fiber.slot().get(),
+                    generation: schedule_fiber.generation().get(),
+                },
+                lane_bits: scheduled_update.container_update().lane().bits(),
+                pending_lanes_before_enqueue_bits: scheduled_update
+                    .container_update()
+                    .pending_lanes_before_enqueue()
+                    .bits(),
+                pending_lanes_after_enqueue_bits: scheduled_update
+                    .container_update()
+                    .pending_lanes_after_enqueue()
+                    .bits(),
+                selected_next_lanes_bits: scheduled_update
+                    .container_update()
+                    .selected_next_lanes()
+                    .bits(),
+                render_lanes_bits: render.render_lanes().bits(),
+                queue_matches_render_current_queue: scheduled_update.container_update().queue()
+                    == render.current_update_queue(),
+                selected_lanes_match_render_lanes: scheduled_update
+                    .container_update()
+                    .selected_next_lanes()
+                    == render.render_lanes(),
+                pending_lanes_after_enqueue_match_render_lanes: scheduled_update
+                    .container_update()
+                    .pending_lanes_after_enqueue()
+                    == render.render_lanes(),
+                root_schedule_inserted: scheduled_update.root_schedule().inserted(),
+                root_schedule_microtask_requested: scheduled_update
+                    .root_schedule()
+                    .microtask()
+                    .is_some(),
+                root_schedule_might_have_pending_sync_work: scheduled_update
+                    .root_schedule()
+                    .might_have_pending_sync_work(),
+            },
+            root_work_loop: TestRendererPrivateUpdateRouteWorkLoopDiagnostics {
+                root: render.root(),
+                render_current: TestRendererFiberHandleDiagnostics {
+                    arena_id: render_current.arena_id().get(),
+                    slot: render_current.slot().get(),
+                    generation: render_current.generation().get(),
+                },
+                render_finished_work: TestRendererFiberHandleDiagnostics {
+                    arena_id: render_finished_work.arena_id().get(),
+                    slot: render_finished_work.slot().get(),
+                    generation: render_finished_work.generation().get(),
+                },
+                commit_current: TestRendererFiberHandleDiagnostics {
+                    arena_id: commit_current.arena_id().get(),
+                    slot: commit_current.slot().get(),
+                    generation: commit_current.generation().get(),
+                },
+                current_update_queue_raw: render.current_update_queue().raw(),
+                work_in_progress_update_queue_raw: render.work_in_progress_update_queue().raw(),
+                committed_current_update_queue_raw: committed_current_update_queue.raw(),
+                applied_update_count: render.applied_update_count(),
+                skipped_update_count: render.skipped_update_count(),
+                remaining_lanes_empty: render.remaining_lanes().is_empty(),
+                commit_finished_lanes_bits: commit.finished_lanes().bits(),
+                commit_remaining_lanes_empty: commit.remaining_lanes().is_empty(),
+                commit_pending_lanes_empty: commit.pending_lanes().is_empty(),
+                commit_current_matches_render_finished_work: commit.current()
+                    == render.finished_work(),
+                commit_previous_current_matches_render_current: commit.previous_current()
+                    == render.current(),
+                commit_lanes_match_render_lanes: commit.finished_lanes() == render.render_lanes(),
+                committed_current_queue_matches_work_in_progress: committed_current_update_queue
+                    == render.work_in_progress_update_queue(),
+                root_current_matches_commit_current: self.store.root(self.root_id)?.current()
+                    == commit.current(),
+            },
+            host_text_update: TestRendererPrivateUpdateRouteHostTextDiagnostics {
+                previous_text_fiber: TestRendererFiberHandleDiagnostics {
+                    arena_id: updated_fibers.previous().text().arena_id().get(),
+                    slot: updated_fibers.previous().text().slot().get(),
+                    generation: updated_fibers.previous().text().generation().get(),
+                },
+                updated_text_fiber: TestRendererFiberHandleDiagnostics {
+                    arena_id: updated_fibers.current().text().arena_id().get(),
+                    slot: updated_fibers.current().text().slot().get(),
+                    generation: updated_fibers.current().text().generation().get(),
+                },
+                text_state_node_raw: updated_fibers.text_state_node_raw(),
+                text_update_apply_recorded,
+                host_text_update_apply_count: commit
+                    .test_only_host_text_update_apply_count_for_canary(),
+                host_component_update_apply_count: commit
+                    .test_only_host_component_update_apply_count_for_canary(),
+            },
+            consumes_accepted_host_root_update_queue_metadata: true,
+            consumes_accepted_root_work_loop_metadata: true,
+            consumes_manual_host_output_canary: true,
+            public_root_update_available: false,
+            public_serialization_available: false,
+            native_execution_available: false,
+            compatibility_claimed: false,
+        })
     }
 
     pub fn describe_private_json_serialization_for_canary(
@@ -11715,6 +12369,264 @@ mod tests {
             updated.snapshot().clone()
         );
         assert_eq!(current_host_root_element(&root), root_element(2));
+    }
+
+    #[test]
+    fn root_private_update_route_consumes_root_work_loop_update_queue_and_text_update_metadata() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let scheduled = root.last_scheduled_update().unwrap().clone();
+        let updated = root
+            .render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let diagnostics = root
+            .describe_private_update_route_via_root_work_loop_for_canary(&updated)
+            .unwrap();
+        let queue = diagnostics.update_queue();
+        let work_loop = diagnostics.root_work_loop();
+        let host_text = diagnostics.host_text_update();
+
+        assert_eq!(
+            diagnostics.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_UPDATE_ROUTE_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            diagnostics.status(),
+            TEST_RENDERER_PRIVATE_UPDATE_ROUTE_STATUS
+        );
+        assert_eq!(diagnostics.root(), root.root_id());
+        assert_eq!(
+            diagnostics.host_output_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert!(diagnostics.consumes_accepted_host_root_update_queue_metadata());
+        assert!(diagnostics.consumes_accepted_root_work_loop_metadata());
+        assert!(diagnostics.consumes_manual_host_output_canary());
+        assert!(!diagnostics.public_root_update_available());
+        assert!(!diagnostics.public_serialization_available());
+        assert!(!diagnostics.native_execution_available());
+        assert!(!diagnostics.compatibility_claimed());
+
+        assert_eq!(queue.root(), root.root_id());
+        assert_eq!(
+            queue.scheduled_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert_eq!(queue.scheduled_element(), root_element(2));
+        assert_eq!(
+            queue.update_raw(),
+            scheduled.container_update().update().raw()
+        );
+        assert_eq!(
+            queue.queue_raw(),
+            scheduled.container_update().queue().raw()
+        );
+        assert_eq!(
+            queue.schedule_fiber().slot(),
+            updated.render().current().slot().get()
+        );
+        assert_eq!(
+            queue.lane_bits(),
+            scheduled.container_update().lane().bits()
+        );
+        assert_eq!(queue.pending_lanes_before_enqueue_bits(), 0);
+        assert_eq!(
+            queue.pending_lanes_after_enqueue_bits(),
+            updated.render().render_lanes().bits()
+        );
+        assert_eq!(
+            queue.selected_next_lanes_bits(),
+            updated.render().render_lanes().bits()
+        );
+        assert_eq!(
+            queue.render_lanes_bits(),
+            updated.render().render_lanes().bits()
+        );
+        assert!(queue.queue_matches_render_current_queue());
+        assert!(queue.selected_lanes_match_render_lanes());
+        assert!(queue.pending_lanes_after_enqueue_match_render_lanes());
+        assert_eq!(
+            queue.root_schedule_inserted(),
+            scheduled.root_schedule().inserted()
+        );
+        assert_eq!(
+            queue.root_schedule_microtask_requested(),
+            scheduled.root_schedule().microtask().is_some()
+        );
+        assert_eq!(
+            queue.root_schedule_might_have_pending_sync_work(),
+            scheduled.root_schedule().might_have_pending_sync_work()
+        );
+
+        assert_eq!(work_loop.root(), root.root_id());
+        assert_eq!(
+            work_loop.render_current().slot(),
+            updated.render().current().slot().get()
+        );
+        assert_eq!(
+            work_loop.render_finished_work().slot(),
+            updated.render().finished_work().slot().get()
+        );
+        assert_eq!(
+            work_loop.commit_current().slot(),
+            updated.commit().current().slot().get()
+        );
+        assert_eq!(
+            work_loop.current_update_queue_raw(),
+            updated.render().current_update_queue().raw()
+        );
+        assert_eq!(
+            work_loop.work_in_progress_update_queue_raw(),
+            updated.render().work_in_progress_update_queue().raw()
+        );
+        assert_eq!(
+            work_loop.committed_current_update_queue_raw(),
+            updated.render().work_in_progress_update_queue().raw()
+        );
+        assert_eq!(work_loop.applied_update_count(), 1);
+        assert_eq!(work_loop.skipped_update_count(), 0);
+        assert!(work_loop.remaining_lanes_empty());
+        assert_eq!(
+            work_loop.commit_finished_lanes_bits(),
+            updated.render().render_lanes().bits()
+        );
+        assert!(work_loop.commit_remaining_lanes_empty());
+        assert!(work_loop.commit_pending_lanes_empty());
+        assert!(work_loop.commit_current_matches_render_finished_work());
+        assert!(work_loop.commit_previous_current_matches_render_current());
+        assert!(work_loop.commit_lanes_match_render_lanes());
+        assert!(work_loop.committed_current_queue_matches_work_in_progress());
+        assert!(work_loop.root_current_matches_commit_current());
+
+        assert_eq!(
+            host_text.previous_text_fiber().slot(),
+            updated.updated_fibers().previous().text().slot().get()
+        );
+        assert_eq!(
+            host_text.updated_text_fiber().slot(),
+            updated.updated_fibers().current().text().slot().get()
+        );
+        assert_eq!(host_text.text_state_node_raw(), 1);
+        assert!(host_text.text_update_apply_recorded());
+        assert_eq!(host_text.host_text_update_apply_count(), 1);
+        assert_eq!(host_text.host_component_update_apply_count(), 1);
+    }
+
+    #[test]
+    fn root_private_update_route_rejects_stale_root_update_output() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let stale = root
+            .render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "later")
+            .unwrap();
+        root.render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let error = root
+            .describe_private_update_route_via_root_work_loop_for_canary(&stale)
+            .unwrap_err();
+
+        let TestRendererRootError::SerializationGate(error) = error else {
+            panic!("expected stale commit rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererSerializationGateError::CommitIsNotCurrent { root: error_root, .. }
+                if *error_root == root.root_id()
+        ));
+    }
+
+    #[test]
+    fn root_private_update_route_rejects_unmounted_root() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let updated = root
+            .render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+        root.unmount().unwrap();
+
+        let error = root
+            .describe_private_update_route_via_root_work_loop_for_canary(&updated)
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateUpdateRoute(error) = error else {
+            panic!("expected private update route rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateUpdateRouteError::RootNotActive {
+                lifecycle: TestRendererRootLifecycle::UnmountScheduled
+            }
+        ));
+    }
+
+    #[test]
+    fn root_private_update_route_rejects_incompatible_finished_work_record() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let created = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let mut incompatible = root
+            .render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+        incompatible.render = created.render();
+
+        let error = root
+            .describe_private_update_route_via_root_work_loop_for_canary(&incompatible)
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateUpdateRoute(error) = error else {
+            panic!("expected private update route rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateUpdateRouteError::IncompatibleFinishedWork {
+                reason: "commit-current-finished-work-mismatch"
+            }
+        ));
     }
 
     #[test]
