@@ -283,6 +283,7 @@ const expectedPrivateRoutes = [
       "root_private_create_route_admission_consumes_create_and_work_loop_evidence",
       "root_private_create_native_bridge_handoff_consumes_actual_host_output",
       "root_private_create_native_bridge_handoff_rejects_stale_admission",
+      "root_private_create_native_bridge_handoff_rejects_mismatched_finished_work_preflight",
       "root_private_create_route_admission_rejects_missing_rust_admission_record",
       "root_private_create_route_admission_rejects_stale_rust_admission_record",
       "root_private_create_route_admission_rejects_missing_root_create_preflight"
@@ -1812,6 +1813,19 @@ test("react-test-renderer CJS development private root-create preflight validate
         hostOutput: {
           ...createHostOutputHandoff.hostOutput,
           textCount: 0
+        }
+      }
+    ),
+    false
+  );
+  assert.equal(
+    bridge.canConsumePrivateCreateNativeBridgeHostOutputHandoff(
+      createRequest,
+      {
+        ...createHostOutputHandoff,
+        commitCurrent: {
+          ...createHostOutputHandoff.commitCurrent,
+          slot: createHostOutputHandoff.commitCurrent.slot + 1
         }
       }
     ),
@@ -4943,6 +4957,13 @@ function assertPrivateCreateRouteAdmissionGate(gate, label) {
     "TestRendererRoot::describe_private_create_route_admission_for_canary",
     "TestRendererRoot::render_latest_scheduled_host_root_for_commit_handoff"
   ];
+  if (gate.consumesCurrentRustRootFinishedWorkIdentity === true) {
+    expectedAcceptedRustApis.splice(
+      2,
+      0,
+      "TestRendererRoot::describe_private_root_create_preflight_from_render_for_canary"
+    );
+  }
   if (supportsCreateHostOutputHandoff) {
     expectedAcceptedRustApis.push(
       "TestRendererRoot::render_and_commit_host_output_for_canary",
@@ -4958,6 +4979,11 @@ function assertPrivateCreateRouteAdmissionGate(gate, label) {
       "root_private_create_native_bridge_handoff_consumes_actual_host_output",
       "root_private_create_native_bridge_handoff_rejects_stale_admission"
     );
+    if (gate.consumesCurrentRustRootFinishedWorkIdentity === true) {
+      expectedAcceptedRustTests.push(
+        "root_private_create_native_bridge_handoff_rejects_mismatched_finished_work_preflight"
+      );
+    }
   }
   expectedAcceptedRustTests.push(
     "root_private_create_route_admission_rejects_missing_rust_admission_record",
@@ -4999,6 +5025,18 @@ function assertPrivateCreateRouteAdmissionGate(gate, label) {
       true,
       label
     );
+    if (gate.consumesCurrentRustRootFinishedWorkIdentity !== undefined) {
+      assert.equal(
+        gate.consumesCurrentRustRootFinishedWorkIdentity,
+        true,
+        label
+      );
+      assert.equal(
+        gate.requiresCommitCurrentMatchesRenderFinishedWork,
+        true,
+        label
+      );
+    }
     assert.equal(gate.acceptedHostOutputShape, "SingleHostText", label);
     assert.equal(gate.hostOutputProducedByRust, true, label);
   }
@@ -5039,6 +5077,16 @@ function assertPrivateRootCreatePreflightConsumption(
   assert.equal(consumed.rootRequest, request);
   assert.equal(consumed.preflight, preflight);
   assert.equal(Object.isFrozen(consumed.sourceDiagnostic), true);
+  assert.equal(
+    Object.isFrozen(
+      consumed.sourceDiagnostic.workLoopFinishedWorkPreflight.finishedWork
+    ),
+    true
+  );
+  assert.notDeepEqual(
+    consumed.sourceDiagnostic.workLoopFinishedWorkPreflight.previousCurrent,
+    consumed.sourceDiagnostic.workLoopFinishedWorkPreflight.finishedWork
+  );
   assert.equal(
     consumed.consumesAcceptedRustRootCreatePreflightDiagnostics,
     true
@@ -5221,6 +5269,12 @@ function assertPrivateCreateRouteAdmissionConsumption(
   assert.equal(consumed.admission, admission);
   assert.equal(consumed.rootCreatePreflight, admission.rootCreatePreflight);
   assert.equal(Object.isFrozen(consumed.sourceDiagnostic), true);
+  assert.equal(
+    Object.isFrozen(
+      consumed.sourceDiagnostic.workLoopFinishedWorkPreflight.finishedWork
+    ),
+    true
+  );
   assert.equal(consumed.consumesJsFacadeCreateMetadata, true);
   assert.equal(
     consumed.consumesAcceptedRustRootCreateExecutionEvidence,
@@ -5277,6 +5331,20 @@ function assertPrivateCreateNativeBridgeHostOutputHandoff(handoff, request) {
   assert.equal(handoff.hostOutput.instanceCount, 1);
   assert.equal(handoff.hostOutput.textCount, 1);
   assert.equal(handoff.hostOutput.realHostOutputAvailable, true);
+  assert.equal(Object.isFrozen(handoff.workLoopFinishedWorkPreflight), true);
+  assert.equal(Object.isFrozen(handoff.renderFinishedWork), true);
+  assert.equal(Object.isFrozen(handoff.commitCurrent), true);
+  assert.deepEqual(
+    handoff.renderFinishedWork,
+    handoff.workLoopFinishedWorkPreflight.finishedWork
+  );
+  assert.deepEqual(handoff.commitCurrent, handoff.renderFinishedWork);
+  assert.equal(handoff.renderFinishedWorkMatchesCreateRoutePreflight, true);
+  assert.equal(handoff.commitCurrentMatchesRenderFinishedWork, true);
+  assert.equal(
+    handoff.minimalTreeHostOutputConsumesRootFinishedWork,
+    true
+  );
   assert.equal(handoff.createRouteAdmissionAccepted, true);
   assert.equal(handoff.hostOutputHandoffAccepted, true);
   assert.equal(handoff.actualRustCreateHostOutputHandoff, true);
@@ -5300,7 +5368,37 @@ function createRustRootCreatePreflightDiagnosticSource(preflight) {
     createInputShape: preflight.createInputShape,
     rootOptionsMetadata: preflight.rootOptionsMetadata,
     canaryApiIdentity: preflight.canaryApiIdentity,
-    workLoopFinishedWorkPreflight: preflight.workLoopFinishedWorkPreflight
+    workLoopFinishedWorkPreflight:
+      createRustRootCreateWorkLoopFinishedWorkPreflightSource(
+        preflight.workLoopFinishedWorkPreflight
+      )
+  };
+}
+
+function createRustRootCreateWorkLoopFinishedWorkPreflightSource(row) {
+  return {
+    ...row,
+    previousCurrent: createRustRootCreatePreviousCurrentHandle(),
+    finishedWork: createRustRootCreateFinishedWorkHandle(),
+    renderLanesEmpty: false,
+    remainingLanesEmpty: true,
+    finishedWorkMatchesRenderPhase: true
+  };
+}
+
+function createRustRootCreatePreviousCurrentHandle() {
+  return {
+    arenaId: 1,
+    slot: 1,
+    generation: 1
+  };
+}
+
+function createRustRootCreateFinishedWorkHandle() {
+  return {
+    arenaId: 1,
+    slot: 2,
+    generation: 1
   };
 }
 
@@ -5315,7 +5413,9 @@ function createRustCreateRouteAdmissionDiagnosticSource(admission) {
     rustAdmissionMetadata: admission.rustAdmissionMetadata,
     rootCreatePreflight: admission.rootCreatePreflight,
     workLoopFinishedWorkPreflight:
-      admission.workLoopFinishedWorkPreflight,
+      createRustRootCreateWorkLoopFinishedWorkPreflightSource(
+        admission.workLoopFinishedWorkPreflight
+      ),
     rootCreateExecutionEvidence: admission.rootCreateExecutionEvidence,
     consumesJsFacadeCreateMetadata: true,
     consumesAcceptedRustRootCreateExecutionEvidence: true,
@@ -5328,6 +5428,8 @@ function createRustCreateNativeBridgeHostOutputHandoffSource(
   request,
   admission
 ) {
+  const finishedWork = createRustRootCreateFinishedWorkHandle();
+
   return {
     id: privateCreateNativeBridgeHostOutputHandoffDiagnosticId,
     status: privateCreateNativeBridgeHostOutputHandoffStatus,
@@ -5354,6 +5456,15 @@ function createRustCreateNativeBridgeHostOutputHandoffSource(
     },
     serializationGateStatus:
       "ReadyForPrivateSerializationDiagnostics",
+    workLoopFinishedWorkPreflight:
+      createRustRootCreateWorkLoopFinishedWorkPreflightSource(
+        admission.workLoopFinishedWorkPreflight
+      ),
+    renderFinishedWork: finishedWork,
+    commitCurrent: finishedWork,
+    renderFinishedWorkMatchesCreateRoutePreflight: true,
+    commitCurrentMatchesRenderFinishedWork: true,
+    minimalTreeHostOutputConsumesRootFinishedWork: true,
     createRouteAdmissionAccepted: true,
     hostOutputHandoffAccepted: true,
     actualRustCreateHostOutputHandoff: true,
@@ -6397,6 +6508,18 @@ function assertRustCanaryMetadata(metadata, label) {
         admission.consumesAcceptedRustCreateHostOutputHandoff,
         true
       );
+      if (
+        admission.consumesCurrentRustRootFinishedWorkIdentity !== undefined
+      ) {
+        assert.equal(
+          admission.consumesCurrentRustRootFinishedWorkIdentity,
+          true
+        );
+        assert.equal(
+          admission.requiresCommitCurrentMatchesRenderFinishedWork,
+          true
+        );
+      }
       assert.equal(admission.acceptedHostOutputShape, "SingleHostText");
       assert.equal(admission.hostOutputProducedByRust, true);
     }
@@ -7220,6 +7343,19 @@ function assertPrivateRoute(privateRoute, expected) {
         privateRoute.consumesAcceptedRustCreateHostOutputHandoff,
         true
       );
+      if (
+        privateRoute.consumesCurrentRustRootFinishedWorkIdentity !==
+        undefined
+      ) {
+        assert.equal(
+          privateRoute.consumesCurrentRustRootFinishedWorkIdentity,
+          true
+        );
+        assert.equal(
+          privateRoute.requiresCommitCurrentMatchesRenderFinishedWork,
+          true
+        );
+      }
       assert.equal(privateRoute.acceptedHostOutputShape, "SingleHostText");
       assert.equal(privateRoute.hostOutputProducedByRust, true);
     }
@@ -7254,6 +7390,13 @@ function assertPrivateRoute(privateRoute, expected) {
       "TestRendererRoot::render_and_admit_private_update_native_bridge_handoff_for_canary"
     ];
   }
+  if (privateRoute.consumesCurrentRustRootFinishedWorkIdentity === true) {
+    expectedAcceptedRustApis = [
+      ...expectedAcceptedRustApis.slice(0, 2),
+      "TestRendererRoot::describe_private_root_create_preflight_from_render_for_canary",
+      ...expectedAcceptedRustApis.slice(2)
+    ];
+  }
   assert.deepEqual(privateRoute.acceptedRustApis, expectedAcceptedRustApis);
   assert.equal(Object.isFrozen(privateRoute.acceptedRustTests), true);
   let expectedAcceptedRustTests =
@@ -7267,6 +7410,13 @@ function assertPrivateRoute(privateRoute, expected) {
           "root_private_create_native_bridge_handoff_consumes_actual_host_output" &&
         testName !==
           "root_private_create_native_bridge_handoff_rejects_stale_admission"
+    );
+  }
+  if (privateRoute.consumesCurrentRustRootFinishedWorkIdentity !== true) {
+    expectedAcceptedRustTests = expectedAcceptedRustTests.filter(
+      (testName) =>
+        testName !==
+        "root_private_create_native_bridge_handoff_rejects_mismatched_finished_work_preflight"
     );
   }
   if (privateRoute.deletionCommitHandoff !== undefined) {
