@@ -54,6 +54,9 @@ const pluginEventSystem = require(
 const listenerRegistry = require(
   path.join(repoRoot, "packages/react-dom/src/events/listener-registry.js")
 );
+const rootBridge = require(
+  path.join(repoRoot, "packages/react-dom/src/client/root-bridge.js")
+);
 const rootListeners = require(
   path.join(repoRoot, "packages/react-dom/src/events/root-listeners.js")
 );
@@ -385,6 +388,104 @@ test("click dispatch gate invokes a portal child listener with owner-root metada
     componentTree.detachHostInstanceToken(fixture.parentToken),
     fixture.parentToken
   );
+});
+
+test("root-render host-output click delegation invokes accepted private listener order without widening the delegation oracle", () => {
+  const fixture =
+    createPrivateRootRenderClickDelegationAcceptedOrderFixture();
+  const orderRecord = fixture.orderRecord;
+
+  try {
+    assert.equal(
+      orderRecord.kind,
+      pluginEventSystem
+        .PRIVATE_CLICK_EVENT_DELEGATION_ACCEPTED_LISTENER_ORDER_RECORD_KIND
+    );
+    assert.equal(
+      orderRecord.status,
+      pluginEventSystem
+        .PRIVATE_CLICK_EVENT_DELEGATION_ACCEPTED_LISTENER_ORDER_STATUS
+    );
+    assert.equal(
+      pluginEventSystem
+        .isPrivateClickEventDelegationAcceptedListenerOrderRecord(
+          orderRecord
+        ),
+      true
+    );
+    assert.equal(orderRecord.acceptedListenerCount, 2);
+    assert.equal(orderRecord.listenerInvocationCount, 2);
+    assert.deepEqual(orderRecord.phases, ["capture", "bubble"]);
+    assert.deepEqual(orderRecord.registrationNames, [
+      "onClickCapture",
+      "onClick"
+    ]);
+    assert.equal(orderRecord.selectedFromProcessingOrder, true);
+    assert.equal(orderRecord.targetInst, fixture.hostOutputPayload.hostToken);
+    assert.equal(orderRecord.rootRenderMetadataAvailable, true);
+    assert.equal(orderRecord.rootRenderHostOutputActive, true);
+    assert.equal(
+      orderRecord.rootRenderMetadataStatus,
+      "active-private-root-render-host-output"
+    );
+    assert.equal(orderRecord.publicDispatchEnabled, false);
+    assert.equal(orderRecord.publicDispatchBlocked, true);
+    assert.equal(orderRecord.browserDomEventCompatibilityClaimed, false);
+    assert.equal(orderRecord.compatibilityClaimed, false);
+    assert.equal(orderRecord.syntheticEventCount, 0);
+    assert.equal(orderRecord.willDispatchPublicEvent, false);
+    assert.deepEqual(
+      orderRecord.acceptedListenerOrder.map((entry) => [
+        entry.phase,
+        entry.registrationName,
+        entry.currentTarget,
+        entry.targetInst
+      ]),
+      [
+        [
+          "capture",
+          "onClickCapture",
+          fixture.targetNode,
+          fixture.hostOutputPayload.hostToken
+        ],
+        [
+          "bubble",
+          "onClick",
+          fixture.targetNode,
+          fixture.hostOutputPayload.hostToken
+        ]
+      ]
+    );
+    assert.deepEqual(fixture.calls, [
+      {
+        currentTarget: fixture.targetNode,
+        phase: "capture",
+        registrationName: "onClickCapture",
+        target: fixture.targetNode,
+        targetInst: fixture.hostOutputPayload.hostToken,
+        type: "click"
+      },
+      {
+        currentTarget: fixture.targetNode,
+        phase: "bubble",
+        registrationName: "onClick",
+        target: fixture.targetNode,
+        targetInst: fixture.hostOutputPayload.hostToken,
+        type: "click"
+      }
+    ]);
+    assert.equal(fixture.container.__registrations.length, 138);
+    assert.equal(fixture.document.__registrations.length, 1);
+    assert.equal(fixture.targetNode.__registrations.length, 0);
+  } finally {
+    listenerRegistry.removePrivateEventListenerQueueEntry(
+      fixture.captureQueue
+    );
+    listenerRegistry.removePrivateEventListenerQueueEntry(
+      fixture.bubbleQueue
+    );
+    cleanupPrivateRootRenderClickDelegationAcceptedOrderFixture(fixture);
+  }
 });
 
 test("delegated click capture and bubble listeners fire in React DOM order", () => {
@@ -930,6 +1031,20 @@ function createPrivateFocusBlurDispatch(
   );
 }
 
+function createPrivateClickDispatch(rootContainer, eventSystemFlags, target) {
+  return pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+    eventListener.createEventListenerWrapperRecordWithPriority(
+      rootContainer,
+      "click",
+      eventSystemFlags
+    ),
+    {
+      target,
+      type: "click"
+    }
+  );
+}
+
 function createPrivateClickDelegationDispatchGateFixture() {
   const document = createFakeDocument("click-delegation-gate-conformance");
   const rootContainer = createFakeElement("DIV", document);
@@ -1094,6 +1209,118 @@ function createPrivateClickPortalDelegationDispatchGateFixture() {
   };
 }
 
+function createPrivateRootRenderClickDelegationAcceptedOrderFixture() {
+  const document = createFakeDocument(
+    "click-root-render-delegation-order-conformance"
+  );
+  const container = createFakeElement("DIV", document);
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    createRenderAdmissionIdPrefix: "click-root-render-admission",
+    initialHostOutputIdPrefix: "click-root-render-output",
+    requestIdPrefix: "click-root-render-request",
+    rootIdPrefix: "click-root-render-root",
+    sideEffectIdPrefix: "click-root-render-side-effect",
+    updateIdPrefix: "click-root-render-update"
+  });
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const element = {
+    props: {
+      children: "root-render delegated click target",
+      id: "root-render-click-target"
+    },
+    type: "button"
+  };
+  const render = bridge.renderContainer(create.handle, element);
+  const admission = bridge.admitCreateRenderPath(
+    create,
+    sideEffects,
+    render
+  );
+  const handoff = bridge.applyInitialRenderHostOutput(admission);
+  const hostOutputPayload =
+    rootBridge.getPrivateRootInitialHostOutputHandoffPayload(handoff);
+  const targetNode = hostOutputPayload.hostNode;
+  const calls = [];
+  const captureQueue =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      targetNode,
+      "click",
+      true,
+      event => {
+        calls.push({
+          currentTarget: event.currentTarget,
+          phase: "capture",
+          registrationName: event.registrationName,
+          target: event.target,
+          targetInst: event.targetInst,
+          type: event.type
+        });
+      }
+    );
+  const bubbleQueue =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      targetNode,
+      "click",
+      false,
+      event => {
+        calls.push({
+          currentTarget: event.currentTarget,
+          phase: "bubble",
+          registrationName: event.registrationName,
+          target: event.target,
+          targetInst: event.targetInst,
+          type: event.type
+        });
+      }
+    );
+  const targetRecord =
+    componentTree.createPrivateRootHostOutputEventTargetRecord(
+      hostOutputPayload
+    );
+  const captureDispatchRecord = createPrivateClickDispatch(
+    container,
+    rootListeners.IS_CAPTURE_PHASE,
+    targetNode
+  );
+  const bubbleDispatchRecord = createPrivateClickDispatch(
+    container,
+    0,
+    targetNode
+  );
+  const orderRecord =
+    pluginEventSystem.invokePrivateClickEventDelegationAcceptedListenerOrder(
+      [captureDispatchRecord, bubbleDispatchRecord],
+      [bubbleQueue, captureQueue],
+      {
+        requireRootRenderMetadata: true,
+        rootHostOutputEventTargetRecord: targetRecord
+      }
+    );
+
+  return {
+    bridge,
+    bubbleQueue,
+    calls,
+    captureQueue,
+    container,
+    document,
+    handoff,
+    hostOutputPayload,
+    orderRecord,
+    sideEffects,
+    targetNode,
+    targetRecord
+  };
+}
+
+function cleanupPrivateRootRenderClickDelegationAcceptedOrderFixture(
+  fixture
+) {
+  fixture.bridge.cleanupInitialRenderHostOutput(fixture.handoff);
+  fixture.bridge.revertCreateRootSideEffects(fixture.sideEffects);
+}
+
 function createFocusBlurProps(listenerCalls) {
   return {
     onBlur() {
@@ -1237,6 +1464,56 @@ function createFakeDocument(label) {
     nodeType: domContainer.DOCUMENT_NODE
   });
   document.ownerDocument = document;
+  document.defaultView = createFakeEventTarget({
+    label: `${label}:window`,
+    nodeName: "Window",
+    nodeType: null
+  });
+  document.createElement = function createElement(tagName) {
+    return createFakeElement(String(tagName).toUpperCase(), document);
+  };
+  document.createTextNode = function createTextNode(text) {
+    const node = createFakeEventTarget({
+      localName: "#text",
+      nodeName: "#text",
+      nodeType: domContainer.TEXT_NODE,
+      ownerDocument: document
+    });
+    let textValue = String(text);
+    Object.defineProperties(node, {
+      data: {
+        configurable: true,
+        enumerable: true,
+        get() {
+          return textValue;
+        },
+        set(value) {
+          textValue = String(value);
+        }
+      },
+      nodeValue: {
+        configurable: true,
+        enumerable: true,
+        get() {
+          return textValue;
+        },
+        set(value) {
+          textValue = String(value);
+        }
+      },
+      textContent: {
+        configurable: true,
+        enumerable: true,
+        get() {
+          return textValue;
+        },
+        set(value) {
+          textValue = String(value);
+        }
+      }
+    });
+    return node;
+  };
   return document;
 }
 
@@ -1254,15 +1531,86 @@ function createFakeElement(nodeName, ownerDocument) {
 }
 
 function createFakeEventTarget(fields) {
-  return {
+  const target = {
     ...fields,
     __registrations: [],
+    attributes: new Map(),
     childNodes: [],
     parentNode: null,
     addEventListener(type, listener, options) {
       this.__registrations.push({ listener, options, type });
+    },
+    removeEventListener(type, listener, options) {
+      const index = this.__registrations.findIndex(
+        (entry) =>
+          entry.type === type &&
+          entry.listener === listener &&
+          entry.options === options
+      );
+      if (index !== -1) {
+        this.__registrations.splice(index, 1);
+      }
+    },
+    appendChild(child) {
+      appendFakeChild(this, child);
+      return child;
+    },
+    removeChild(child) {
+      if (child.parentNode !== this) {
+        throw new Error("Cannot remove a child from another parent.");
+      }
+      detachFakeChild(child);
+      return child;
+    },
+    setAttribute(name, value) {
+      this.attributes.set(String(name), String(value));
+    },
+    removeAttribute(name) {
+      this.attributes.delete(String(name));
+    },
+    hasAttribute(name) {
+      return this.attributes.has(String(name));
+    },
+    getAttribute(name) {
+      const attributeName = String(name);
+      return this.attributes.has(attributeName)
+        ? this.attributes.get(attributeName)
+        : null;
     }
   };
+  Object.defineProperties(target, {
+    firstChild: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return this.childNodes[0] || null;
+      }
+    },
+    lastChild: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return this.childNodes[this.childNodes.length - 1] || null;
+      }
+    },
+    textContent: {
+      configurable: true,
+      enumerable: true,
+      get() {
+        if (this.childNodes.length > 0) {
+          return this.childNodes.map((child) => child.textContent).join("");
+        }
+        return this._textContent || "";
+      },
+      set(value) {
+        for (const child of [...this.childNodes]) {
+          detachFakeChild(child);
+        }
+        this._textContent = String(value);
+      }
+    }
+  });
+  return target;
 }
 
 function createFakeComment(data) {
@@ -1274,9 +1622,25 @@ function createFakeComment(data) {
 }
 
 function appendFakeChild(parent, child) {
+  detachFakeChild(child);
   parent.childNodes.push(child);
   child.parentNode = parent;
   return child;
+}
+
+function detachFakeChild(child) {
+  if (child?.parentNode == null) {
+    if (child && typeof child === "object") {
+      child.parentNode = null;
+    }
+    return;
+  }
+  const siblings = child.parentNode.childNodes;
+  const index = Array.isArray(siblings) ? siblings.indexOf(child) : -1;
+  if (index !== -1) {
+    siblings.splice(index, 1);
+  }
+  child.parentNode = null;
 }
 
 function createPrivateDelegationNode(nodeName, ownerDocument) {
