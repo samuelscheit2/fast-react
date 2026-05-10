@@ -29,6 +29,14 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Worker 485 was accepted from queue 473-502. It added private
+  react-test-renderer `toTree` diagnostics for minimal multi-child host output
+  and function-component-above-host shapes in Rust and the CJS-development
+  private facade while public `toTree` remains blocked. It was verified after
+  merge with focused Rust `toTree` diagnostics, serialization local and full
+  serialization conformance gates, full `fast-react-test-renderer` tests, Rust
+  fmt, react-test-renderer workspace checks, create-routing checks,
+  conflict-marker scanning, and `git diff --check`.
 - Worker 484 was accepted from queue 473-502. It added private
   react-test-renderer TestInstance `findByType` and `findByProps` diagnostics
   derived from the accepted `findAll` metadata, including CJS-development
