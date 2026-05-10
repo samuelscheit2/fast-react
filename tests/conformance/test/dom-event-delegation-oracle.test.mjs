@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   DOM_EVENT_DELEGATION_EVENT_EXAMPLES,
@@ -21,6 +24,25 @@ import {
 } from "../src/dom-event-delegation-scenarios.mjs";
 
 const oracle = readCheckedDomEventDelegationOracle();
+const require = createRequire(import.meta.url);
+const repoRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  ".."
+);
+const componentTree = require(
+  path.join(repoRoot, "packages/react-dom/src/client/component-tree.js")
+);
+const domContainer = require(
+  path.join(repoRoot, "packages/react-dom/src/client/dom-container.js")
+);
+const pluginEventSystem = require(
+  path.join(repoRoot, "packages/react-dom/src/events/plugin-event-system.js")
+);
+const rootListeners = require(
+  path.join(repoRoot, "packages/react-dom/src/events/root-listeners.js")
+);
 
 test("checked DOM event delegation oracle artifact has the expected schema and targets", () => {
   assert.equal(
@@ -101,6 +123,93 @@ test("React DOM createRoot installs delegated root listeners and owner-document 
     assert.equal(selectionChange.captureCount, 0, mode.id);
     assert.equal(selectionChange.bubbleCount, 1, mode.id);
   }
+});
+
+test("focus and blur blocker gate records private metadata without widening the delegation oracle", () => {
+  for (const mode of DOM_EVENT_DELEGATION_PROBE_MODES) {
+    const installation = findDomEventDelegationInstallation(oracle, mode.id);
+    const focusIn = findRegisteredEvent(installation.rootContainer, "focusin");
+    const focusOut = findRegisteredEvent(installation.rootContainer, "focusout");
+
+    assert.equal(focusIn.captureCount, 1, mode.id);
+    assert.equal(focusIn.bubbleCount, 1, mode.id);
+    assert.equal(focusIn.passiveTrueCount, 0, mode.id);
+    assert.equal(focusOut.captureCount, 1, mode.id);
+    assert.equal(focusOut.bubbleCount, 1, mode.id);
+    assert.equal(focusOut.passiveTrueCount, 0, mode.id);
+  }
+
+  const fixture = createPrivateFocusBlurBlockerFixture();
+  const blocker = fixture.blocker;
+
+  assert.equal(
+    blocker.kind,
+    pluginEventSystem.FOCUS_BLUR_EVENT_BLOCKER_GATE_RECORD_KIND
+  );
+  assert.equal(
+    blocker.status,
+    pluginEventSystem.PRIVATE_FOCUS_BLUR_EVENT_BLOCKER_GATE_STATUS
+  );
+  assert.deepEqual(
+    blocker.nativeEventMappings.map((mapping) => [
+      mapping.nativeEventName,
+      mapping.reactName,
+      mapping.captureRegistrationName,
+      mapping.bubbleRegistrationName,
+      mapping.syntheticEventType
+    ]),
+    [
+      ["focusin", "onFocus", "onFocusCapture", "onFocus", "focus"],
+      ["focusout", "onBlur", "onBlurCapture", "onBlur", "blur"]
+    ]
+  );
+  assert.deepEqual(
+    blocker.phaseRecords.map((record) => [
+      record.domEventName,
+      record.phase,
+      record.registrationName,
+      record.processingListenerMetadata.map((listener) => listener.currentTarget)
+    ]),
+    [
+      ["focusin", "capture", "onFocusCapture", [
+        fixture.parent,
+        fixture.child
+      ]],
+      ["focusin", "bubble", "onFocus", [fixture.child, fixture.parent]],
+      ["focusout", "capture", "onBlurCapture", [
+        fixture.parent,
+        fixture.child
+      ]],
+      ["focusout", "bubble", "onBlur", [fixture.child, fixture.parent]]
+    ]
+  );
+  assert.equal(blocker.dispatchRecordCount, 4);
+  assert.equal(blocker.listenerMetadataCount, 8);
+  assert.equal(blocker.targetCurrentTargetBlockerCount, 8);
+  assert.equal(blocker.listenerInstallation, false);
+  assert.equal(blocker.eventObjectCreation, false);
+  assert.equal(blocker.eventDispatch, false);
+  assert.equal(blocker.syntheticFocusEventCreation, false);
+  assert.equal(blocker.syntheticEventCount, 0);
+  assert.equal(blocker.listenerInvocationCount, 0);
+  assert.equal(blocker.publicDispatchEnabled, false);
+  assert.equal(blocker.browserDomEventCompatibilityClaimed, false);
+  assert.equal(blocker.compatibilityClaimed, false);
+  assert.equal(blocker.portalOwnerRootAvailable, true);
+  assert.equal(
+    blocker.portalOwnerRootStatus,
+    pluginEventSystem.PRIVATE_PORTAL_EVENT_OWNER_ROOT_GATE_STATUS
+  );
+  assert.equal(blocker.portalOwnerRoot.ownerRootMatchesTargetRoot, true);
+  assert.equal(blocker.portalOwnerRoot.portalContainerContainsTarget, true);
+  assert.equal(blocker.portalOwnerRoot.rootContainerContainsTarget, false);
+  assert.equal(fixture.listenerCalls.count, 0);
+  assert.equal(fixture.rootContainer.__registrations.length, 0);
+  assert.equal(fixture.portalContainer.__registrations.length, 0);
+  assert.equal(fixture.child.__registrations.length, 0);
+
+  componentTree.detachHostInstanceToken(fixture.childToken);
+  componentTree.detachHostInstanceToken(fixture.parentToken);
 });
 
 test("delegated click capture and bubble listeners fire in React DOM order", () => {
@@ -285,4 +394,156 @@ function assertRootBubbleAndCapture(installation, eventName) {
   );
   assert.equal(registration.captureCount, 1, eventName);
   assert.equal(registration.bubbleCount, 1, eventName);
+}
+
+function createPrivateFocusBlurBlockerFixture() {
+  const document = createFakeDocument("focus-blur-conformance");
+  const rootContainer = createFakeElement("DIV", document);
+  const portalContainer = createFakeElement("SECTION", document);
+  const parent = createFakeElement("DIV", document);
+  const child = createFakeElement("INPUT", document);
+  const rootOwner = { kind: "FocusBlurConformanceRoot" };
+  const parentToken = componentTree.createHostInstanceToken(
+    { kind: "FocusBlurConformanceParent" },
+    rootOwner
+  );
+  const childToken = componentTree.createHostInstanceToken(
+    { kind: "FocusBlurConformanceChild" },
+    rootOwner
+  );
+  const listenerCalls = { count: 0 };
+  const parentProps = createFocusBlurProps(listenerCalls);
+  const childProps = createFocusBlurProps(listenerCalls);
+
+  appendFakeChild(portalContainer, parent);
+  appendFakeChild(parent, child);
+  componentTree.attachHostInstanceNode(parent, parentToken, parentProps);
+  componentTree.attachHostInstanceNode(child, childToken, childProps);
+
+  const focusCapture = createPrivateFocusBlurDispatch(
+    rootContainer,
+    "focusin",
+    rootListeners.IS_CAPTURE_PHASE,
+    child
+  );
+  const focusBubble = createPrivateFocusBlurDispatch(
+    rootContainer,
+    "focusin",
+    0,
+    child
+  );
+  const blurCapture = createPrivateFocusBlurDispatch(
+    rootContainer,
+    "focusout",
+    rootListeners.IS_CAPTURE_PHASE,
+    child
+  );
+  const blurBubble = createPrivateFocusBlurDispatch(
+    rootContainer,
+    "focusout",
+    0,
+    child
+  );
+  const portalOwnerGate =
+    pluginEventSystem.createPortalEventOwnerRootGateRecord(
+      focusCapture.targetDispatchPathRecord,
+      {
+        domEventName: "focusin",
+        ownerRoot: rootOwner,
+        portalContainer,
+        portalKey: "focus-blur-conformance",
+        rootContainer
+      }
+    );
+  const blocker =
+    pluginEventSystem.createFocusBlurEventBlockerGateFromDispatchRecords(
+      [focusCapture, focusBubble, blurCapture, blurBubble],
+      {
+        portalEventOwnerRootGateRecord: portalOwnerGate
+      }
+    );
+
+  return {
+    blocker,
+    child,
+    childToken,
+    listenerCalls,
+    parent,
+    parentToken,
+    portalContainer,
+    rootContainer
+  };
+}
+
+function createPrivateFocusBlurDispatch(
+  rootContainer,
+  domEventName,
+  eventSystemFlags,
+  target
+) {
+  const listener = rootListeners.createEventListenerShell(
+    rootContainer,
+    domEventName,
+    eventSystemFlags
+  );
+  return pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+    listener,
+    {
+      target,
+      type: domEventName
+    }
+  );
+}
+
+function createFocusBlurProps(listenerCalls) {
+  return {
+    onBlur() {
+      listenerCalls.count++;
+    },
+    onBlurCapture() {
+      listenerCalls.count++;
+    },
+    onFocus() {
+      listenerCalls.count++;
+    },
+    onFocusCapture() {
+      listenerCalls.count++;
+    }
+  };
+}
+
+function createFakeDocument(label) {
+  const document = createFakeEventTarget({
+    label,
+    nodeName: "#document",
+    nodeType: domContainer.DOCUMENT_NODE
+  });
+  document.ownerDocument = document;
+  return document;
+}
+
+function createFakeElement(nodeName, ownerDocument) {
+  return createFakeEventTarget({
+    nodeName,
+    nodeType: domContainer.ELEMENT_NODE,
+    ownerDocument
+  });
+}
+
+function createFakeEventTarget(fields) {
+  return {
+    ...fields,
+    __registrations: [],
+    childNodes: [],
+    parentNode: null,
+    addEventListener(type, listener, options) {
+      this.__registrations.push({ listener, options, type });
+    }
+  };
+}
+
+function appendFakeChild(parent, child) {
+  parent.childNodes.push(child);
+  child.parentNode = parent;
+  return child;
 }
