@@ -573,6 +573,12 @@ const reactTestRendererKeys = [
 const reactTestRendererShallowKeys = [];
 const reactTestRendererPlaceholderVersion =
   '0.0.0-fast-react-test-renderer-placeholder';
+const reactTestRendererPrivateRuntimeFacadeSymbols = {
+  create: ['fast.react_test_renderer.root_request_bridge'],
+  renderer: ['fast.react_test_renderer.private_test_instance_wrapper_record'],
+  toJSON: ['fast.react_test_renderer.private_tojson_serialization_facade'],
+  toTree: ['fast.react_test_renderer.private_totree_host_output_metadata']
+};
 
 const reactTestRendererEntrypoints = [
   {
@@ -978,6 +984,52 @@ function assertNoPrivateDiagnosticRuntimeExports(moduleExports, label) {
   }
 }
 
+function assertPrivateRuntimeFacadeSymbols(target, expectedSymbols, label) {
+  const actualSymbols = Reflect.ownKeys(target).filter(
+    (key) => typeof key === 'symbol'
+  );
+
+  assert.deepEqual(
+    actualSymbols.map((symbol) => symbol.description).sort(),
+    expectedSymbols,
+    `${label} private runtime facade symbols`
+  );
+
+  for (const symbolDescription of expectedSymbols) {
+    assert.equal(
+      Object.keys(target).includes(symbolDescription),
+      false,
+      `${label} must not expose ${symbolDescription} as a public key`
+    );
+
+    const descriptor = Object.getOwnPropertyDescriptor(
+      target,
+      Symbol.for(symbolDescription)
+    );
+    assert.notEqual(descriptor, undefined, `${label} ${symbolDescription}`);
+    assert.equal(
+      descriptor.enumerable,
+      false,
+      `${label} ${symbolDescription} enumerable`
+    );
+    assert.equal(
+      descriptor.configurable,
+      false,
+      `${label} ${symbolDescription} configurable`
+    );
+    assert.equal(
+      descriptor.writable,
+      false,
+      `${label} ${symbolDescription} writable`
+    );
+    assert.notEqual(
+      descriptor.value,
+      undefined,
+      `${label} ${symbolDescription} value`
+    );
+  }
+}
+
 function assertPlaceholderMetadata(moduleExports, label) {
   assert.equal(
     moduleExports.__FAST_REACT_PLACEHOLDER__,
@@ -1283,6 +1335,12 @@ function assertReactTestRendererShallowUnsupported(callback, label) {
 function assertReactTestRendererRootBehavior(moduleExports, label, entrypoint) {
   assert.equal(moduleExports.version, reactTestRendererPlaceholderVersion);
   assert.equal(moduleExports.create.length, 2, `${label}.create length`);
+  assertNoPrivateDiagnosticRuntimeExports(moduleExports.create, `${label}.create`);
+  assertPrivateRuntimeFacadeSymbols(
+    moduleExports.create,
+    reactTestRendererPrivateRuntimeFacadeSymbols.create,
+    `${label}.create`
+  );
   if (entrypoint.actExport === 'undefined') {
     assert.equal(moduleExports.act, undefined, `${label}.act`);
   } else {
@@ -1314,6 +1372,11 @@ function assertReactTestRendererRootBehavior(moduleExports, label, entrypoint) {
     `${label}.create() renderer keys`
   );
   assertNoPrivateDiagnosticRuntimeExports(renderer, `${label}.create()`);
+  assertPrivateRuntimeFacadeSymbols(
+    renderer,
+    reactTestRendererPrivateRuntimeFacadeSymbols.renderer,
+    `${label}.create()`
+  );
   const rootDescriptor = Object.getOwnPropertyDescriptor(renderer, 'root');
   assert.equal(rootDescriptor.enumerable, true, `${label}.root enumerable`);
   assert.equal(rootDescriptor.configurable, true, `${label}.root configurable`);
@@ -1321,6 +1384,18 @@ function assertReactTestRendererRootBehavior(moduleExports, label, entrypoint) {
   assert.equal(rootDescriptor.set, undefined, `${label}.root setter`);
   assert.equal(renderer.toJSON.length, 0, `${label}.toJSON length`);
   assert.equal(renderer.toTree.length, 0, `${label}.toTree length`);
+  assertNoPrivateDiagnosticRuntimeExports(renderer.toJSON, `${label}.toJSON`);
+  assertNoPrivateDiagnosticRuntimeExports(renderer.toTree, `${label}.toTree`);
+  assertPrivateRuntimeFacadeSymbols(
+    renderer.toJSON,
+    reactTestRendererPrivateRuntimeFacadeSymbols.toJSON,
+    `${label}.create().toJSON`
+  );
+  assertPrivateRuntimeFacadeSymbols(
+    renderer.toTree,
+    reactTestRendererPrivateRuntimeFacadeSymbols.toTree,
+    `${label}.create().toTree`
+  );
   assert.equal(renderer.update.length, 1, `${label}.update length`);
   assert.equal(renderer.unmount.length, 0, `${label}.unmount length`);
   assert.equal(renderer.getInstance.length, 0, `${label}.getInstance length`);
@@ -3611,6 +3686,9 @@ async function runReactTestRendererPackageProbe(tempRoot) {
     const schedulerConstantValues = ${JSON.stringify(
       reactTestRendererSchedulerConstantValues
     )};
+    const privateRuntimeFacadeSymbols = ${JSON.stringify(
+      reactTestRendererPrivateRuntimeFacadeSymbols
+    )};
     const allowedRuntimeMetadataKeys = new Set([
       '__FAST_REACT_ENTRYPOINT__',
       '__FAST_REACT_PLACEHOLDER__',
@@ -3629,6 +3707,52 @@ async function runReactTestRendererPackageProbe(tempRoot) {
           privateDiagnosticRuntimeExportPattern.test(key),
           false,
           label + ' must not expose private diagnostic export ' + key
+        );
+      }
+    }
+
+    function assertPrivateRuntimeFacadeSymbols(target, expectedSymbols, label) {
+      const actualSymbols = Reflect.ownKeys(target).filter(
+        (key) => typeof key === 'symbol'
+      );
+
+      assert.deepEqual(
+        actualSymbols.map((symbol) => symbol.description).sort(),
+        expectedSymbols,
+        label + ' private runtime facade symbols'
+      );
+
+      for (const symbolDescription of expectedSymbols) {
+        assert.equal(
+          Object.keys(target).includes(symbolDescription),
+          false,
+          label + ' must not expose ' + symbolDescription + ' as a public key'
+        );
+
+        const descriptor = Object.getOwnPropertyDescriptor(
+          target,
+          Symbol.for(symbolDescription)
+        );
+        assert.notEqual(descriptor, undefined, label + ' ' + symbolDescription);
+        assert.equal(
+          descriptor.enumerable,
+          false,
+          label + ' ' + symbolDescription + ' enumerable'
+        );
+        assert.equal(
+          descriptor.configurable,
+          false,
+          label + ' ' + symbolDescription + ' configurable'
+        );
+        assert.equal(
+          descriptor.writable,
+          false,
+          label + ' ' + symbolDescription + ' writable'
+        );
+        assert.notEqual(
+          descriptor.value,
+          undefined,
+          label + ' ' + symbolDescription + ' value'
         );
       }
     }
@@ -3829,6 +3953,15 @@ async function runReactTestRendererPackageProbe(tempRoot) {
         assertInventoryKeys(cjsModule, keys, specifier);
         assert.equal(cjsModule.version, placeholderVersion, specifier);
         assert.equal(cjsModule.create.length, 2, specifier);
+        assertNoPrivateDiagnosticRuntimeExports(
+          cjsModule.create,
+          specifier + ' create'
+        );
+        assertPrivateRuntimeFacadeSymbols(
+          cjsModule.create,
+          privateRuntimeFacadeSymbols.create,
+          specifier + ' create'
+        );
         if (actExport === 'undefined') {
           assert.equal(cjsModule.act, undefined, specifier);
         } else {
@@ -3855,6 +3988,11 @@ async function runReactTestRendererPackageProbe(tempRoot) {
           renderer,
           specifier + ' renderer'
         );
+        assertPrivateRuntimeFacadeSymbols(
+          renderer,
+          privateRuntimeFacadeSymbols.renderer,
+          specifier + ' renderer'
+        );
         const rootDescriptor = Object.getOwnPropertyDescriptor(renderer, 'root');
         assert.equal(rootDescriptor.enumerable, true, specifier + ' root');
         assert.equal(rootDescriptor.configurable, true, specifier + ' root');
@@ -3862,6 +4000,24 @@ async function runReactTestRendererPackageProbe(tempRoot) {
         assert.equal(rootDescriptor.set, undefined, specifier + ' root');
         assert.equal(renderer.toJSON.length, 0, specifier);
         assert.equal(renderer.toTree.length, 0, specifier);
+        assertNoPrivateDiagnosticRuntimeExports(
+          renderer.toJSON,
+          specifier + ' toJSON'
+        );
+        assertNoPrivateDiagnosticRuntimeExports(
+          renderer.toTree,
+          specifier + ' toTree'
+        );
+        assertPrivateRuntimeFacadeSymbols(
+          renderer.toJSON,
+          privateRuntimeFacadeSymbols.toJSON,
+          specifier + ' toJSON'
+        );
+        assertPrivateRuntimeFacadeSymbols(
+          renderer.toTree,
+          privateRuntimeFacadeSymbols.toTree,
+          specifier + ' toTree'
+        );
         assert.equal(renderer.update.length, 1, specifier);
         assert.equal(renderer.unmount.length, 0, specifier);
         assert.equal(renderer.getInstance.length, 0, specifier);
