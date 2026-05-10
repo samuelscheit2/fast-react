@@ -145,9 +145,7 @@ const expectedEffectHookMetadata = {
   }
 };
 
-const invalidHookCallDefaultHooks = selectedDefaultHooks.filter(
-  ([hookName]) => !hasHookName(statefulDefaultHooks, hookName)
-);
+const invalidHookCallDefaultHooks = selectedDefaultHooks;
 
 const dispatcherForwardedDefaultHooks = selectedDefaultHooks.filter(
   ([hookName]) =>
@@ -254,11 +252,7 @@ test("selected public React hooks throw the invalid-hook-call boundary without a
   }
 });
 
-test("useState and useReducer fail closed without a private state-hook dispatcher", () => {
-  for (const [hookName, , args] of statefulDefaultHooks) {
-    assertStateHookDispatcherUnavailable(() => React[hookName](...args), hookName);
-  }
-
+test("useState and useReducer fail closed without a marked private state-hook dispatcher", () => {
   const calls = [];
   const genericDispatcher = {
     useReducer(...args) {
@@ -277,11 +271,109 @@ test("useState and useReducer fail closed without a private state-hook dispatche
     assertStateHookDispatcherUnavailable(() => React[hookName](...args), hookName);
   }
 
+  assertStateHookDispatcherUnavailable(
+    () => hookDispatcher.markPrivateStateHookDispatcher(genericDispatcher),
+    "useState"
+  );
+
   assert.deepEqual(calls, []);
   assert.equal(
     hookDispatcher.isPrivateStateHookDispatcher(genericDispatcher),
     false
   );
+});
+
+test("private state-hook dispatcher metadata names match accepted hook queue records", () => {
+  const metadata = hookDispatcher.privateStateHookDispatcherMetadata;
+
+  assert.equal(metadata.capability, "fast-react.private.state_hook_dispatcher");
+  assert.equal(metadata.compatibilityTarget, "react@19.2.6");
+  assert.equal(metadata.compatibilityClaimed, false);
+  assert.equal(metadata.exposesPublicHookImplementation, false);
+  assert.equal(metadata.rendererIntegration, false);
+  assert.deepEqual(metadata.hookNames, ["useReducer", "useState"]);
+  assert.deepEqual(metadata.hookStateRecordFields, [
+    "memoizedState",
+    "baseState",
+    "baseQueue",
+    "queue",
+    "dispatch"
+  ]);
+  assert.deepEqual(metadata.hookQueueRecordFields, [
+    "pending",
+    "lanes",
+    "dispatch",
+    "lastRenderedReducer",
+    "lastRenderedState"
+  ]);
+  assert.deepEqual(metadata.hookUpdateRecordFields, [
+    "lane",
+    "revertLane",
+    "action",
+    "hasEagerState",
+    "eagerState",
+    "next"
+  ]);
+  assert.deepEqual(metadata.stateDispatchRequestFields, [
+    "dispatch",
+    "action",
+    "lane"
+  ]);
+  assert.deepEqual(metadata.stateDispatchRecordFields, [
+    "fiber",
+    "queue",
+    "dispatch",
+    "update",
+    "lane",
+    "action"
+  ]);
+  assert.deepEqual(metadata.acceptedReconcilerRecords, [
+    "HookStateSlot",
+    "HookQueue",
+    "HookUpdate",
+    "FunctionComponentStateDispatchRequest",
+    "FunctionComponentStateDispatchRecord"
+  ]);
+  assert.equal(
+    hookDispatcher.isPrivateStateHookDispatcherMetadata(metadata),
+    true
+  );
+  assert.equal(Object.isFrozen(metadata), true);
+
+  for (const value of Object.values(metadata)) {
+    if (Array.isArray(value)) {
+      assert.equal(Object.isFrozen(value), true);
+    }
+  }
+
+  assert.equal(React.privateStateHookDispatcherMetadata, undefined);
+  assert.equal(React.markPrivateStateHookDispatcher, undefined);
+});
+
+test("private state-hook dispatcher marker rejects lane and update metadata drift", () => {
+  const dispatcher = {
+    useReducer() {
+      throw new Error("unreachable reducer dispatch");
+    },
+    useState() {
+      throw new Error("unreachable state dispatch");
+    }
+  };
+  const driftedMetadata = {
+    ...hookDispatcher.privateStateHookDispatcherMetadata,
+    hookUpdateRecordFields: ["lane", "action", "next"]
+  };
+
+  assert.equal(
+    hookDispatcher.isPrivateStateHookDispatcherMetadata(driftedMetadata),
+    false
+  );
+  assertStateHookDispatcherUnavailable(
+    () =>
+      hookDispatcher.markPrivateStateHookDispatcher(dispatcher, driftedMetadata),
+    "useState"
+  );
+  assert.equal(hookDispatcher.isPrivateStateHookDispatcher(dispatcher), false);
 });
 
 test("useContext fails closed without a marked private context dispatcher", () => {
@@ -370,24 +462,28 @@ test("selected public React hooks forward to the installed dispatcher", () => {
 
 test("useState and useReducer forward only to a marked private state-hook dispatcher", () => {
   const calls = [];
-  const dispatcher = hookDispatcher.markPrivateStateHookDispatcher({
-    useReducer(reducer, initialArg, init) {
-      calls.push({
-        args: [reducer, initialArg, init],
-        hookName: "useReducer",
-        thisMatchesDispatcher: this === dispatcher
-      });
-      return ["reducer", reducer(initialArg), init];
+  const metadata = hookDispatcher.privateStateHookDispatcherMetadata;
+  const dispatcher = hookDispatcher.markPrivateStateHookDispatcher(
+    {
+      useReducer(reducer, initialArg, init) {
+        calls.push({
+          args: [reducer, initialArg, init],
+          hookName: "useReducer",
+          thisMatchesDispatcher: this === dispatcher
+        });
+        return ["reducer", reducer(initialArg), init];
+      },
+      useState(initialState) {
+        calls.push({
+          args: [initialState],
+          hookName: "useState",
+          thisMatchesDispatcher: this === dispatcher
+        });
+        return [initialState, "dispatch"];
+      }
     },
-    useState(initialState) {
-      calls.push({
-        args: [initialState],
-        hookName: "useState",
-        thisMatchesDispatcher: this === dispatcher
-      });
-      return [initialState, "dispatch"];
-    }
-  });
+    metadata
+  );
 
   hookDispatcher.ReactCurrentDispatcher.current = dispatcher;
 
@@ -411,6 +507,10 @@ test("useState and useReducer forward only to a marked private state-hook dispat
     }
   ]);
   assert.equal(hookDispatcher.isPrivateStateHookDispatcher(dispatcher), true);
+  assert.equal(
+    hookDispatcher.getPrivateStateHookDispatcherMetadata(dispatcher),
+    metadata
+  );
 });
 
 test("useContext forwards only to a marked private context dispatcher", () => {

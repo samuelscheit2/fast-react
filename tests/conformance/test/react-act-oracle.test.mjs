@@ -751,17 +751,12 @@ function assertReactHookDispatcherGuardUnchanged(React, label) {
   const useStateError = captureThrown(() => React.useState(null));
   assert.equal(
     useStateError.name,
-    "FastReactUnimplementedError",
+    "Error",
     `${label}.useState error name`
   );
   assert.equal(
     useStateError.code,
-    "FAST_REACT_UNIMPLEMENTED",
+    "FAST_REACT_INVALID_HOOK_CALL",
     `${label}.useState code`
-  );
-  assert.equal(
-    useStateError.exportName,
-    "useState",
-    `${label}.useState export`
   );
 }
