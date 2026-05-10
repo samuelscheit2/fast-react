@@ -204,6 +204,8 @@ const privateRootPublicFacadePreflightRootType =
   'fast.react_dom.private_root_public_facade_preflight_root';
 const privateRootPublicFacadePreflightRecordType =
   'fast.react_dom.private_root_public_facade_preflight_record';
+const privateRootLiveContainerPreflightRecordType =
+  'fast.react_dom.private_root_live_container_preflight_record';
 const privateRootPublicFacadeMarkerListenerPreflightRecordType =
   'fast.react_dom.private_root_public_facade_marker_listener_preflight_record';
 const privateRootPublicFacadeHostOutputRenderRecordType =
@@ -301,6 +303,8 @@ const ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_READY =
   'ready-private-react-dom-client-root-public-facade-preflight';
 const ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_ACCEPTED =
   'accepted-private-react-dom-client-root-public-facade-preflight';
+const ROOT_BRIDGE_LIVE_CONTAINER_PREFLIGHT_BLOCKED =
+  'blocked-private-root-live-container-preflight';
 const ROOT_BRIDGE_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHTED =
   'preflighted-private-root-public-facade-marker-listener-gate';
 const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_APPLIED =
@@ -426,6 +430,84 @@ const ROOT_BRIDGE_PUBLIC_FACADE_PREFLIGHT_BLOCKED_CAPABILITIES =
       id: 'hydration',
       blocked: true,
       reason: 'Hydration root creation, marker consumption, and replay are not admitted.'
+    }),
+    freezeRecord({
+      id: 'events',
+      blocked: true,
+      reason: 'Synthetic event extraction and dispatch are not admitted.'
+    }),
+    freezeRecord({
+      id: 'compatibility-claims',
+      blocked: true,
+      reason: 'React DOM root lifecycle compatibility remains unclaimed.'
+    })
+  ]);
+const ROOT_BRIDGE_LIVE_CONTAINER_PREFLIGHT_ACCEPTED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'dom-like-live-container-shape',
+      accepted: true,
+      reason:
+        'The preflight accepted a DOM-like live container shape as metadata only.'
+    }),
+    freezeRecord({
+      id: 'root-marker-listener-state-snapshot',
+      accepted: true,
+      reason:
+        'The preflight captured marker/listener state snapshots without applying marker or listener writes.'
+    }),
+    freezeRecord({
+      id: 'blocked-live-container-evidence',
+      accepted: true,
+      reason:
+        'The preflight recorded explicit blocker evidence before any browser DOM mutation is admitted.'
+    })
+  ]);
+const ROOT_BRIDGE_LIVE_CONTAINER_PREFLIGHT_BLOCKED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'public-root-execution',
+      blocked: true,
+      reason:
+        'The live-container preflight is private and never calls public createRoot, render, or unmount behavior.'
+    }),
+    freezeRecord({
+      id: 'native-execution',
+      blocked: true,
+      reason: 'No native or Rust root bridge execution is admitted.'
+    }),
+    freezeRecord({
+      id: 'reconciler-execution',
+      blocked: true,
+      reason: 'No reconciler scheduling, render, or commit execution is admitted.'
+    }),
+    freezeRecord({
+      id: 'marker-writes',
+      blocked: true,
+      reason: 'Root marker writes and clears remain disabled.'
+    }),
+    freezeRecord({
+      id: 'listener-installation',
+      blocked: true,
+      reason: 'Root listener installation remains disabled.'
+    }),
+    freezeRecord({
+      id: 'browser-dom-mutation',
+      blocked: true,
+      reason:
+        'Real browser container children, text, attributes, and HTML are not mutated.'
+    }),
+    freezeRecord({
+      id: 'fake-dom-mutation',
+      blocked: true,
+      reason:
+        'The live-container preflight does not route through fake-DOM render, update, or unmount execution.'
+    }),
+    freezeRecord({
+      id: 'hydration',
+      blocked: true,
+      reason:
+        'Hydration root creation, marker consumption, and replay are not admitted.'
     }),
     freezeRecord({
       id: 'events',
@@ -2056,6 +2138,7 @@ const rootPublicFacadeRootPayloads = new WeakMap();
 const rootPublicFacadePreflightPayloads = new WeakMap();
 const rootPublicFacadePreflightRootPayloads = new WeakMap();
 const rootPublicFacadePreflightRecordPayloads = new WeakMap();
+const rootLiveContainerPreflightPayloads = new WeakMap();
 const rootPublicFacadeMarkerListenerPreflightPayloads = new WeakMap();
 const rootPublicFacadeHostOutputRenderPayloads = new WeakMap();
 const rootPublicFacadeRootWorkLoopFinishedWorkPayloads = new WeakMap();
@@ -2147,6 +2230,13 @@ function createPrivateRootBridgeShell(options) {
     },
     createNativeRequestHandoff(record) {
       return createNativeRootBridgeHandoffRecordWithBridge(bridgeState, record);
+    },
+    preflightLiveContainer(container, admission) {
+      return preflightPrivateRootLiveContainerWithBridge(
+        bridgeState,
+        container,
+        admission
+      );
     },
     revertCreateRootSideEffects(record) {
       return revertPrivateCreateRootSideEffectsWithBridge(bridgeState, record);
@@ -2452,6 +2542,7 @@ function createPrivateRootPublicFacadePreflight(options) {
   const bridge = createPrivateRootBridgeShell(options);
   const preflightState = {
     bridge,
+    liveContainerPreflightRecords: [],
     nextPreflightSequence: 1,
     preflight: null,
     preflightIdPrefix: getIdPrefix(
@@ -2487,6 +2578,17 @@ function createPrivateRootPublicFacadePreflight(options) {
         container,
         rootOptions
       );
+    },
+    preflightLiveContainer(container, admission) {
+      const record = preflightState.bridge.preflightLiveContainer(
+        container,
+        admission
+      );
+      preflightState.liveContainerPreflightRecords.push(record);
+      return record;
+    },
+    getLiveContainerPreflightRecords() {
+      return freezeArray(preflightState.liveContainerPreflightRecords);
     },
     getRootCreatePreflight(root) {
       return assertPrivateRootPublicFacadePreflightRootForPreflight(
@@ -2789,6 +2891,161 @@ function createPrivateRootPublicFacadePreflightRecord(
     requestRecord,
     root: rootPayload.root
   });
+  return record;
+}
+
+function preflightPrivateRootLiveContainer(container, admission) {
+  return defaultBridgeShell.preflightLiveContainer(container, admission);
+}
+
+function preflightPrivateRootLiveContainerWithBridge(
+  bridgeState,
+  container,
+  admission
+) {
+  const normalizedAdmission =
+    normalizeRootLiveContainerPreflightAdmission(admission);
+  assertValidContainer(container, bridgeState.validationOptions);
+  if (!isLikelyDomLiveContainer(container)) {
+    throwInvalidRootLiveContainerPreflight(
+      'Expected a DOM-like live container for private root live-container preflight.'
+    );
+  }
+
+  const sequence = bridgeState.nextRootLiveContainerPreflightSequence++;
+  const preflightId =
+    `${bridgeState.rootLiveContainerPreflightIdPrefix}:${sequence}`;
+  const beforeState =
+    inspectPublicFacadeMarkerListenerPreflightState(container);
+  const markerGuard = describeCreateRootMarkerGuard(
+    container,
+    bridgeState.markerOptions
+  );
+  const listenerGuard = describeRootListenerGuard(container);
+  const afterState =
+    inspectPublicFacadeMarkerListenerPreflightState(container);
+  const stateUnchanged = markerListenerStateMatches(beforeState, afterState);
+
+  if (!stateUnchanged) {
+    throwInvalidRootLiveContainerPreflight(
+      'Live container marker/listener state changed while collecting preflight evidence.'
+    );
+  }
+
+  const blockerReasons = freezeArray([
+    'live-container-admitted-for-preflight-only',
+    'public-create-root-disabled',
+    'root-marker-write-disabled',
+    'root-listener-installation-disabled',
+    'browser-dom-mutation-disabled',
+    'fake-dom-render-update-unmount-path-not-entered',
+    'native-root-execution-disabled',
+    'reconciler-root-execution-disabled',
+    'public-root-compatibility-unclaimed'
+  ]);
+  const blockerEvidence = freezeRecord({
+    status: ROOT_BRIDGE_LIVE_CONTAINER_PREFLIGHT_BLOCKED,
+    blockerReasons,
+    liveContainerAcceptedForPreflight: true,
+    liveContainerCaptured: false,
+    markerStateUnchanged: stateUnchanged,
+    rootMarkerPropertyCountBefore:
+      beforeState.containerMarker.propertyCount,
+    rootMarkerPropertyCountAfter:
+      afterState.containerMarker.propertyCount,
+    rootListeningMarkerCountBefore:
+      beforeState.rootListeningMarker.trueValueCount,
+    rootListeningMarkerCountAfter:
+      afterState.rootListeningMarker.trueValueCount,
+    ownerDocumentListeningMarkerCountBefore:
+      beforeState.ownerDocumentListeningMarker === null
+        ? 0
+        : beforeState.ownerDocumentListeningMarker.trueValueCount,
+    ownerDocumentListeningMarkerCountAfter:
+      afterState.ownerDocumentListeningMarker === null
+        ? 0
+        : afterState.ownerDocumentListeningMarker.trueValueCount,
+    rootListenerRegistrationCountBefore:
+      beforeState.rootListenerRegistrationCount,
+    rootListenerRegistrationCountAfter:
+      afterState.rootListenerRegistrationCount,
+    ownerDocumentListenerRegistrationCountBefore:
+      beforeState.ownerDocumentListenerRegistrationCount,
+    ownerDocumentListenerRegistrationCountAfter:
+      afterState.ownerDocumentListenerRegistrationCount,
+    rootMutationCountBefore: beforeState.rootMutationCount,
+    rootMutationCountAfter: afterState.rootMutationCount,
+    ownerDocumentMutationCountBefore:
+      beforeState.ownerDocumentMutationCount,
+    ownerDocumentMutationCountAfter:
+      afterState.ownerDocumentMutationCount,
+    markerWritesBlocked: true,
+    listenerInstallationBlocked: true,
+    browserDomMutationBlocked: true,
+    fakeDomMutationBlocked: true,
+    publicRootExecutionBlocked: true,
+    compatibilityClaimed: false
+  });
+
+  const record = freezeRecord({
+    $$typeof: privateRootLiveContainerPreflightRecordType,
+    kind: 'FastReactDomPrivateRootLiveContainerPreflightRecord',
+    operation: 'root-live-container-preflight',
+    entrypoint: 'react-dom/client',
+    preflightId,
+    preflightSequence: sequence,
+    preflightStatus: ROOT_BRIDGE_LIVE_CONTAINER_PREFLIGHT_BLOCKED,
+    executionStatus: ROOT_BRIDGE_EXECUTION_BLOCKED,
+    compatibilityStatus: ROOT_BRIDGE_COMPATIBILITY_BLOCKED,
+    admission: normalizedAdmission.record,
+    containerInfo: beforeState.containerInfo,
+    ownerDocumentInfo: beforeState.ownerDocumentInfo,
+    markerGuard,
+    listenerGuard,
+    beforeState,
+    afterState,
+    blockerEvidence,
+    acceptedCapabilities:
+      ROOT_BRIDGE_LIVE_CONTAINER_PREFLIGHT_ACCEPTED_CAPABILITIES,
+    blockedCapabilities:
+      ROOT_BRIDGE_LIVE_CONTAINER_PREFLIGHT_BLOCKED_CAPABILITIES,
+    acceptedPrivateBridgeDiagnostics: true,
+    deterministicMetadataOnly: true,
+    liveContainerPreflightOnly: true,
+    liveContainerAcceptedForPreflight: true,
+    liveContainerCaptured: false,
+    publicCreateRootEnabled: false,
+    publicHydrateRootEnabled: false,
+    publicRootObjectExposed: false,
+    publicRootCompatibilitySurface: false,
+    publicRootExecution: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    domMutation: false,
+    fakeDomMutation: false,
+    browserDomMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    compatibilityClaimed: false
+  });
+
+  rootLiveContainerPreflightPayloads.set(
+    record,
+    freezeRecord({
+      admission: normalizedAdmission.record,
+      afterState,
+      beforeState,
+      blockerEvidence,
+      containerInfo: beforeState.containerInfo,
+      listenerGuard,
+      markerGuard,
+      ownerDocumentInfo: beforeState.ownerDocumentInfo,
+      record
+    })
+  );
   return record;
 }
 
@@ -6029,6 +6286,11 @@ function getPrivateRootPublicFacadePreflightPayload(preflight) {
 
   return freezeRecord({
     bridge: payload.bridge,
+    liveContainerPreflightRecordCount:
+      payload.liveContainerPreflightRecords.length,
+    liveContainerPreflightRecords: freezeArray(
+      payload.liveContainerPreflightRecords
+    ),
     preflight: payload.preflight,
     preflightRecordCount: payload.records.length,
     preflightRecords: freezeArray(payload.records),
@@ -6072,6 +6334,14 @@ function getPrivateRootPublicFacadePreflightRecordPayload(record) {
 
 function isPrivateRootPublicFacadePreflightRecord(value) {
   return rootPublicFacadePreflightRecordPayloads.has(value);
+}
+
+function getPrivateRootLiveContainerPreflightPayload(record) {
+  return rootLiveContainerPreflightPayloads.get(record) || null;
+}
+
+function isPrivateRootLiveContainerPreflightRecord(value) {
+  return rootLiveContainerPreflightPayloads.has(value);
 }
 
 function getPrivateRootPublicFacadeMarkerListenerPreflightPayload(record) {
@@ -9849,6 +10119,10 @@ function createBridgeState(options) {
       options && options.portalEventOwnerRootIdPrefix,
       'portal-event-owner-root'
     ),
+    rootLiveContainerPreflightIdPrefix: getIdPrefix(
+      options && options.rootLiveContainerPreflightIdPrefix,
+      'root-live-container-preflight'
+    ),
     publicFacadePreflightIdPrefix: getIdPrefix(
       options && options.publicFacadePreflightIdPrefix,
       'public-facade-preflight'
@@ -9910,6 +10184,7 @@ function createBridgeState(options) {
     nextPortalMountSequence: 1,
     nextPortalChildReconciliationSequence: 1,
     nextPortalEventOwnerRootSequence: 1,
+    nextRootLiveContainerPreflightSequence: 1,
     nextPublicFacadePreflightSequence: 1,
     nextPublicFacadeHostOutputRenderSequence: 1,
     nextRootRenderNativeHandoffSequence: 1,
@@ -15900,6 +16175,12 @@ function throwInvalidRootPublicFacadePreflight(message) {
   throw error;
 }
 
+function throwInvalidRootLiveContainerPreflight(message) {
+  const error = new Error(message);
+  error.code = 'FAST_REACT_DOM_INVALID_ROOT_LIVE_CONTAINER_PREFLIGHT';
+  throw error;
+}
+
 function throwInvalidRootPublicFacadeHostOutputRender(message) {
   const error = new Error(message);
   error.code =
@@ -16065,6 +16346,105 @@ function describeRootErrorCallback(rootOptions, key) {
   });
 }
 
+function normalizeRootLiveContainerPreflightAdmission(admission) {
+  if (admission === null || typeof admission !== 'object') {
+    throwInvalidRootLiveContainerPreflight(
+      'Live-container preflight admission metadata must be an object.'
+    );
+  }
+
+  if (admission.explicitAdmission !== true) {
+    throwInvalidRootLiveContainerPreflight(
+      'Live-container preflight admission requires explicitAdmission: true.'
+    );
+  }
+
+  const preflightKind = getRootLiveContainerPreflightStringProperty(
+    admission,
+    'preflightKind',
+    'deterministic-react-dom-root-live-container-preflight'
+  );
+  if (
+    preflightKind !==
+    'deterministic-react-dom-root-live-container-preflight'
+  ) {
+    throwInvalidRootLiveContainerPreflight(
+      'preflightKind must be deterministic-react-dom-root-live-container-preflight.'
+    );
+  }
+
+  const containerKind = getRootLiveContainerPreflightStringProperty(
+    admission,
+    'containerKind',
+    'react-dom-root-live-container-preflight'
+  );
+  if (containerKind !== 'react-dom-root-live-container-preflight') {
+    throwInvalidRootLiveContainerPreflight(
+      'containerKind must be react-dom-root-live-container-preflight.'
+    );
+  }
+
+  return {
+    record: freezeRecord({
+      preflightKind,
+      containerKind,
+      containerId: getRootLiveContainerPreflightStringProperty(
+        admission,
+        'containerId',
+        'anonymous-root-live-container-preflight'
+      ),
+      explicitAdmission: true,
+      deterministicMetadataOnly: true,
+      liveContainerPreflightOnly: true,
+      liveContainerAcceptedForPreflight: true,
+      liveContainerCaptured: false,
+      markerWritesAllowed: false,
+      listenerInstallationAllowed: false,
+      browserDomMutationAllowed: false,
+      fakeDomMutationAllowed: false,
+      publicCreateRootEnabled: false,
+      publicRootExecutionEnabled: false,
+      compatibilityClaimed: false
+    })
+  };
+}
+
+function getRootLiveContainerPreflightStringProperty(
+  admission,
+  key,
+  fallback
+) {
+  const value = admission[key];
+  if (value === undefined) {
+    return fallback;
+  }
+  if (typeof value !== 'string' || value.length === 0) {
+    throwInvalidRootLiveContainerPreflight(
+      `${key} must be a non-empty string when provided.`
+    );
+  }
+  return value;
+}
+
+function isLikelyDomLiveContainer(value) {
+  if (!isObjectOrFunction(value)) {
+    return false;
+  }
+
+  try {
+    return (
+      typeof value.nodeType === 'number' &&
+      (value.ownerDocument != null ||
+        typeof value.addEventListener === 'function' ||
+        typeof value.removeEventListener === 'function' ||
+        typeof value.appendChild === 'function' ||
+        'textContent' in value)
+    );
+  } catch (error) {
+    return true;
+  }
+}
+
 function freezeRecord(record) {
   return Object.freeze(record);
 }
@@ -16140,6 +16520,9 @@ module.exports = {
   ROOT_BRIDGE_PORTAL_FAKE_DOM_MOUNT_APPLIED,
   ROOT_BRIDGE_PORTAL_FAKE_DOM_MOUNT_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_PORTAL_PUBLIC_MOUNT_BLOCKED,
+  ROOT_BRIDGE_LIVE_CONTAINER_PREFLIGHT_ACCEPTED_CAPABILITIES,
+  ROOT_BRIDGE_LIVE_CONTAINER_PREFLIGHT_BLOCKED,
+  ROOT_BRIDGE_LIVE_CONTAINER_PREFLIGHT_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_PUBLIC_FACADE_ADAPTER_READY,
   ROOT_BRIDGE_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHTED,
   ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_ACCEPTED_CAPABILITIES,
@@ -16211,6 +16594,7 @@ module.exports = {
   createPortalPrepareMountListenerIntentRecord,
   createPortalRootBoundaryRecord,
   createPrivateRootBridgeShell,
+  preflightPrivateRootLiveContainer,
   createPrivateRootPublicFacadeAdapter,
   createPrivateRootPublicFacadePreflight,
   createPrivateRootHandle,
@@ -16242,6 +16626,7 @@ module.exports = {
   getPrivateRootPortalEventOwnerRootGatePayload,
   getPrivateRootPortalFakeDomMountPayload,
   getPrivateRootPortalPrepareMountListenerIntentPayload,
+  getPrivateRootLiveContainerPreflightPayload,
   getPrivateRootPublicFacadeMarkerListenerPreflightPayload,
   getPrivateRootPublicFacadeHostOutputRenderPayload,
   getPrivateRootPublicFacadeRootWorkLoopFinishedWorkPayload,
@@ -16279,6 +16664,7 @@ module.exports = {
   isPrivateRootPortalFakeDomMountRecord,
   isPrivateRootPortalPrepareMountListenerIntentRecord,
   isPrivateRootPortalBoundaryRecord,
+  isPrivateRootLiveContainerPreflightRecord,
   isPrivateRootPublicFacadeMarkerListenerPreflightRecord,
   isPrivateRootPublicFacadeHostOutputRenderRecord,
   isPrivateRootPublicFacadeRootWorkLoopFinishedWorkRecord,
@@ -16320,6 +16706,7 @@ module.exports = {
   privateRootPortalCommitHandoffRecordType,
   privateRootPortalEventOwnerRootGateRecordType,
   privateRootPortalPrepareMountListenerIntentRecordType,
+  privateRootLiveContainerPreflightRecordType,
   privateRootPublicFacadeMarkerListenerPreflightRecordType,
   privateRootPublicFacadeHostOutputRenderRecordType,
   privateRootPublicFacadeRootWorkLoopFinishedWorkRecordType,

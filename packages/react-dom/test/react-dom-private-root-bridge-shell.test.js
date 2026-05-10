@@ -5360,6 +5360,186 @@ test('private react-dom/client facade preflight routes root calls to accepted br
   assertBridgeDidNotTouchContainer(container, document);
 });
 
+test('private react-dom/client facade preflight accepts live container only as blocked evidence', () => {
+  const {container, document} = createLiveRootContainerPreflightTarget(
+    'private-client-live-container-preflight'
+  );
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    rootBridge.privateRootPublicFacadePreflightSymbol
+  );
+  const preflight = descriptor.value({
+    rootLiveContainerPreflightIdPrefix: 'live-container-preflight'
+  });
+
+  const record = preflight.preflightLiveContainer(container, {
+    containerId: 'live-container:1',
+    explicitAdmission: true
+  });
+  const payload =
+    rootBridge.getPrivateRootLiveContainerPreflightPayload(record);
+
+  assert.equal(Object.isFrozen(record), true);
+  assert.equal(
+    record.$$typeof,
+    rootBridge.privateRootLiveContainerPreflightRecordType
+  );
+  assert.equal(
+    record.kind,
+    'FastReactDomPrivateRootLiveContainerPreflightRecord'
+  );
+  assert.equal(record.operation, 'root-live-container-preflight');
+  assert.equal(record.entrypoint, 'react-dom/client');
+  assert.equal(record.preflightId, 'live-container-preflight:1');
+  assert.equal(
+    record.preflightStatus,
+    rootBridge.ROOT_BRIDGE_LIVE_CONTAINER_PREFLIGHT_BLOCKED
+  );
+  assert.equal(record.executionStatus, rootBridge.ROOT_BRIDGE_EXECUTION_BLOCKED);
+  assert.equal(
+    record.compatibilityStatus,
+    rootBridge.ROOT_BRIDGE_COMPATIBILITY_BLOCKED
+  );
+  assert.deepEqual(record.admission, {
+    preflightKind: 'deterministic-react-dom-root-live-container-preflight',
+    containerKind: 'react-dom-root-live-container-preflight',
+    containerId: 'live-container:1',
+    explicitAdmission: true,
+    deterministicMetadataOnly: true,
+    liveContainerPreflightOnly: true,
+    liveContainerAcceptedForPreflight: true,
+    liveContainerCaptured: false,
+    markerWritesAllowed: false,
+    listenerInstallationAllowed: false,
+    browserDomMutationAllowed: false,
+    fakeDomMutationAllowed: false,
+    publicCreateRootEnabled: false,
+    publicRootExecutionEnabled: false,
+    compatibilityClaimed: false
+  });
+  assert.equal(record.containerInfo.nodeType, ELEMENT_NODE);
+  assert.equal(record.ownerDocumentInfo.nodeType, DOCUMENT_NODE);
+  assert.equal(record.markerGuard.action, 'defer-mark-container-as-root');
+  assert.equal(record.listenerGuard.action, 'defer-listen-to-all-supported-events');
+  assert.equal(record.listenerGuard.canInstallRootListeners, true);
+  assert.equal(record.listenerGuard.ownerDocumentCanInstallSelectionChange, true);
+  assert.deepEqual(
+    record.acceptedCapabilities.map((capability) => capability.id),
+    [
+      'dom-like-live-container-shape',
+      'root-marker-listener-state-snapshot',
+      'blocked-live-container-evidence'
+    ]
+  );
+  assert.deepEqual(
+    record.blockedCapabilities.map((capability) => capability.id),
+    [
+      'public-root-execution',
+      'native-execution',
+      'reconciler-execution',
+      'marker-writes',
+      'listener-installation',
+      'browser-dom-mutation',
+      'fake-dom-mutation',
+      'hydration',
+      'events',
+      'compatibility-claims'
+    ]
+  );
+  assert.deepEqual(record.blockerEvidence.blockerReasons, [
+    'live-container-admitted-for-preflight-only',
+    'public-create-root-disabled',
+    'root-marker-write-disabled',
+    'root-listener-installation-disabled',
+    'browser-dom-mutation-disabled',
+    'fake-dom-render-update-unmount-path-not-entered',
+    'native-root-execution-disabled',
+    'reconciler-root-execution-disabled',
+    'public-root-compatibility-unclaimed'
+  ]);
+  assert.equal(record.blockerEvidence.liveContainerAcceptedForPreflight, true);
+  assert.equal(record.blockerEvidence.liveContainerCaptured, false);
+  assert.equal(record.blockerEvidence.markerStateUnchanged, true);
+  assert.equal(record.blockerEvidence.rootMarkerPropertyCountBefore, 0);
+  assert.equal(record.blockerEvidence.rootMarkerPropertyCountAfter, 0);
+  assert.equal(record.blockerEvidence.rootListenerRegistrationCountBefore, 0);
+  assert.equal(record.blockerEvidence.rootListenerRegistrationCountAfter, 0);
+  assert.equal(
+    record.blockerEvidence.ownerDocumentListenerRegistrationCountBefore,
+    0
+  );
+  assert.equal(
+    record.blockerEvidence.ownerDocumentListenerRegistrationCountAfter,
+    0
+  );
+  assert.equal(record.blockerEvidence.rootMutationCountBefore, 0);
+  assert.equal(record.blockerEvidence.rootMutationCountAfter, 0);
+  assert.equal(record.blockerEvidence.ownerDocumentMutationCountBefore, 0);
+  assert.equal(record.blockerEvidence.ownerDocumentMutationCountAfter, 0);
+  assert.equal(record.liveContainerAcceptedForPreflight, true);
+  assert.equal(record.liveContainerCaptured, false);
+  assert.equal(record.publicCreateRootEnabled, false);
+  assert.equal(record.publicRootExecution, false);
+  assert.equal(record.nativeExecution, false);
+  assert.equal(record.reconcilerExecution, false);
+  assert.equal(record.rootScheduled, false);
+  assert.equal(record.domMutation, false);
+  assert.equal(record.fakeDomMutation, false);
+  assert.equal(record.browserDomMutation, false);
+  assert.equal(record.markerWrites, false);
+  assert.equal(record.listenerInstallation, false);
+  assert.equal(record.hydration, false);
+  assert.equal(record.eventDispatch, false);
+  assert.equal(record.compatibilityClaimed, false);
+
+  assert.equal(
+    rootBridge.isPrivateRootLiveContainerPreflightRecord(record),
+    true
+  );
+  assert.equal(
+    rootBridge.isPrivateRootLiveContainerPreflightRecord({}),
+    false
+  );
+  assert.equal(payload.record, record);
+  assert.equal(payload.container, undefined);
+  assert.equal(payload.ownerDocument, undefined);
+  assert.equal(payload.containerInfo.nodeType, ELEMENT_NODE);
+  assert.equal(payload.ownerDocumentInfo.nodeType, DOCUMENT_NODE);
+  assert.equal(
+    rootBridge.getPrivateRootLiveContainerPreflightPayload({}),
+    null
+  );
+  assert.deepEqual(preflight.getLiveContainerPreflightRecords(), [record]);
+  assert.deepEqual(
+    rootBridge.getPrivateRootPublicFacadePreflightPayload(preflight)
+      .liveContainerPreflightRecords,
+    [record]
+  );
+  assert.equal(
+    rootBridge.getPrivateRootPublicFacadePreflightPayload(preflight)
+      .liveContainerPreflightRecordCount,
+    1
+  );
+
+  const serialized = JSON.stringify(record);
+  assert.equal(serialized.includes('__registrations'), false);
+  assert.equal(serialized.includes('__mutationLog'), false);
+  assert.equal(serialized.includes('__reactContainer$'), false);
+  assert.equal(serialized.includes('_reactListening'), false);
+  assertBridgeDidNotTouchContainer(container, document);
+
+  assert.throws(
+    () =>
+      preflight.preflightLiveContainer(container, {
+        explicitAdmission: false
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_LIVE_CONTAINER_PREFLIGHT'
+    }
+  );
+  assertBridgeDidNotTouchContainer(container, document);
+});
+
 test('private react-dom/client facade preflights root marker/listener setup and cleanup', () => {
   const document = createDocument('private-client-facade-preflight');
   const container = createElement('DIV', document);
@@ -7877,6 +8057,89 @@ function assertBridgeDidNotTouchContainer(container, document) {
   assert.equal(document.__registrations.length, 0);
   assert.equal(container.__mutationLog.length, 0);
   assert.equal(document.__mutationLog.length, 0);
+}
+
+function createLiveRootContainerPreflightTarget(label) {
+  const rawDocument = createDocument(`${label}-document`);
+  const document = guardLiveRootPreflightTarget(
+    rawDocument,
+    `${label}-document`
+  );
+  rawDocument.ownerDocument = document;
+  const rawContainer = createElement('DIV', document);
+  const container = guardLiveRootPreflightTarget(
+    rawContainer,
+    `${label}-container`
+  );
+  return {container, document};
+}
+
+function guardLiveRootPreflightTarget(target, label) {
+  function fail(operation) {
+    throw new Error(`Unexpected live root preflight ${operation} on ${label}`);
+  }
+
+  target.addEventListener = function addEventListener() {
+    fail('addEventListener');
+  };
+  target.removeEventListener = function removeEventListener() {
+    fail('removeEventListener');
+  };
+  target.appendChild = function appendChild() {
+    fail('appendChild');
+  };
+  target.insertBefore = function insertBefore() {
+    fail('insertBefore');
+  };
+  target.removeChild = function removeChild() {
+    fail('removeChild');
+  };
+  target.createElement = function createElement() {
+    fail('createElement');
+  };
+  target.createTextNode = function createTextNode() {
+    fail('createTextNode');
+  };
+  Object.defineProperty(target, 'textContent', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      return '';
+    },
+    set() {
+      fail('textContent write');
+    }
+  });
+
+  return new Proxy(target, {
+    defineProperty(source, property, descriptor) {
+      if (isLiveRootPreflightWriteKey(property)) {
+        fail(`define ${String(property)}`);
+      }
+      return Reflect.defineProperty(source, property, descriptor);
+    },
+    deleteProperty(source, property) {
+      if (isLiveRootPreflightWriteKey(property)) {
+        fail(`delete ${String(property)}`);
+      }
+      return Reflect.deleteProperty(source, property);
+    },
+    set(source, property, value, receiver) {
+      if (isLiveRootPreflightWriteKey(property)) {
+        fail(`write ${String(property)}`);
+      }
+      return Reflect.set(source, property, value, receiver);
+    }
+  });
+}
+
+function isLiveRootPreflightWriteKey(property) {
+  const key = String(property);
+  return (
+    key.startsWith('__reactContainer$') ||
+    key.startsWith('__reactEvents$') ||
+    key.startsWith('_reactListening')
+  );
 }
 
 function createHostOutputDocument(label) {
