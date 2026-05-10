@@ -3058,6 +3058,7 @@ pub(crate) struct FunctionComponentPendingPassiveEffectCommitRecord {
     fiber: FiberId,
     effect_index: usize,
     effect: HookEffectId,
+    previous_effect: Option<HookEffectId>,
     instance: HookEffectInstanceId,
     create: HookEffectCallbackHandle,
     destroy: Option<HookEffectCallbackHandle>,
@@ -3084,6 +3085,11 @@ impl FunctionComponentPendingPassiveEffectCommitRecord {
     #[must_use]
     pub(crate) const fn effect(self) -> HookEffectId {
         self.effect
+    }
+
+    #[must_use]
+    pub(crate) const fn previous_effect(self) -> Option<HookEffectId> {
+        self.previous_effect
     }
 
     #[must_use]
@@ -3125,6 +3131,7 @@ impl FunctionComponentPendingPassiveEffectCommitRecord {
                 fiber: self.fiber,
                 effect_index: self.effect_index,
                 effect: self.effect,
+                previous_effect: self.previous_effect,
                 instance: self.instance,
                 create: None,
                 destroy: self.destroy,
@@ -3142,6 +3149,7 @@ impl FunctionComponentPendingPassiveEffectCommitRecord {
             fiber: self.fiber,
             effect_index: self.effect_index,
             effect: self.effect,
+            previous_effect: self.previous_effect,
             instance: self.instance,
             create: Some(self.create),
             destroy: None,
@@ -3157,6 +3165,7 @@ pub(crate) struct FunctionComponentPendingPassiveEffectPhaseCommitRecord {
     fiber: FiberId,
     effect_index: usize,
     effect: HookEffectId,
+    previous_effect: Option<HookEffectId>,
     instance: HookEffectInstanceId,
     create: Option<HookEffectCallbackHandle>,
     destroy: Option<HookEffectCallbackHandle>,
@@ -3183,6 +3192,11 @@ impl FunctionComponentPendingPassiveEffectPhaseCommitRecord {
     #[must_use]
     pub(crate) const fn effect(self) -> HookEffectId {
         self.effect
+    }
+
+    #[must_use]
+    pub(crate) const fn previous_effect(self) -> Option<HookEffectId> {
+        self.previous_effect
     }
 
     #[must_use]
@@ -3502,6 +3516,7 @@ impl FunctionComponentDeletedSubtreePendingPassiveEffectCommitRecord {
             fiber: self.fiber,
             effect_index: self.effect_index,
             effect: self.effect,
+            previous_effect: None,
             instance: self.instance,
             create: None,
             destroy: self.destroy,
@@ -10548,6 +10563,7 @@ fn validate_function_component_effect_list_passive_record(
     };
 
     if !committed_record.accepted_for_pending_passive()
+        || committed_record.previous_effect() != record.previous_effect()
         || committed_record.instance() != record.instance()
         || committed_record.create() != record.create()
         || committed_record.destroy() != record.destroy()
@@ -10689,7 +10705,7 @@ fn build_function_component_effect_list_commit_phase_order_snapshot<H: HostTypes
             lanes: record.lanes(),
             effect_index: Some(record.effect_index()),
             effect: Some(record.effect()),
-            previous_effect: None,
+            previous_effect: record.previous_effect(),
             create: record.create(),
             destroy: record.destroy(),
             source_order: host_root_commit_order_passive_source_order(record.order()),
@@ -10850,6 +10866,7 @@ fn queue_function_component_passive_effect_record<H: HostTypes>(
         fiber: passive_effect.fiber(),
         effect_index: passive_effect.effect_index(),
         effect: passive_effect.effect(),
+        previous_effect: passive_effect.previous_effect(),
         instance: passive_effect.instance(),
         create: passive_effect.create(),
         destroy: passive_effect.destroy(),
@@ -19718,6 +19735,7 @@ mod tests {
         assert_eq!(queued_effect.fiber(), finished_function);
         assert_eq!(queued_effect.effect_index(), 0);
         assert_eq!(queued_effect.effect(), registration.effect());
+        assert_eq!(queued_effect.previous_effect(), Some(previous.effect()));
         assert_eq!(queued_effect.instance(), previous.instance());
         assert_eq!(queued_effect.instance(), registration.instance());
         assert_eq!(queued_effect.create(), callback(716));
@@ -19732,6 +19750,7 @@ mod tests {
         assert_eq!(phase_records[0].fiber(), finished_function);
         assert_eq!(phase_records[0].effect_index(), 0);
         assert_eq!(phase_records[0].effect(), registration.effect());
+        assert_eq!(phase_records[0].previous_effect(), Some(previous.effect()));
         assert_eq!(phase_records[0].instance(), registration.instance());
         assert_eq!(phase_records[0].create(), None);
         assert_eq!(phase_records[0].destroy(), Some(callback(714)));
@@ -19744,6 +19763,7 @@ mod tests {
         assert_eq!(phase_records[1].fiber(), finished_function);
         assert_eq!(phase_records[1].effect_index(), 0);
         assert_eq!(phase_records[1].effect(), registration.effect());
+        assert_eq!(phase_records[1].previous_effect(), Some(previous.effect()));
         assert_eq!(phase_records[1].instance(), registration.instance());
         assert_eq!(phase_records[1].create(), Some(callback(716)));
         assert_eq!(phase_records[1].destroy(), None);
@@ -20825,10 +20845,18 @@ mod tests {
 
         assert_eq!(records[3].fiber(), finished_function);
         assert_eq!(records[3].effect(), Some(passive.effect()));
+        assert_eq!(
+            records[3].previous_effect(),
+            Some(previous_passive.effect())
+        );
         assert_eq!(records[3].create(), None);
         assert_eq!(records[3].destroy(), Some(callback(7_907)));
         assert_eq!(records[4].fiber(), finished_function);
         assert_eq!(records[4].effect(), Some(passive.effect()));
+        assert_eq!(
+            records[4].previous_effect(),
+            Some(previous_passive.effect())
+        );
         assert_eq!(records[4].create(), Some(callback(7_912)));
         assert_eq!(records[4].destroy(), None);
         assert!(records[3].source_order() < records[4].source_order());

@@ -3236,6 +3236,147 @@ impl FunctionComponentEffectUpdateQueueRecord {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentEffectDestroyHandlePersistenceRecord {
+    update_index: usize,
+    fiber: FiberId,
+    hook_list: HookListId,
+    hook: HookSlotId,
+    previous_effect: HookEffectId,
+    effect: HookEffectId,
+    previous_instance: HookEffectInstanceId,
+    retained_instance: HookEffectInstanceId,
+    phase: FunctionComponentEffectPhase,
+    tag: HookEffectFlags,
+    recorded_destroy: Option<HookEffectCallbackHandle>,
+    previous_destroy: Option<HookEffectCallbackHandle>,
+    retained_destroy: Option<HookEffectCallbackHandle>,
+    dependency_status: FunctionComponentEffectDependencyStatus,
+    accepted_for_pending_passive: bool,
+    accepted_for_layout_commit: bool,
+}
+
+#[allow(
+    dead_code,
+    reason = "private effect destroy-handle provenance canary for update lifecycle ordering"
+)]
+impl FunctionComponentEffectDestroyHandlePersistenceRecord {
+    #[must_use]
+    pub const fn update_index(self) -> usize {
+        self.update_index
+    }
+
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn hook_list(self) -> HookListId {
+        self.hook_list
+    }
+
+    #[must_use]
+    pub const fn hook(self) -> HookSlotId {
+        self.hook
+    }
+
+    #[must_use]
+    pub const fn previous_effect(self) -> HookEffectId {
+        self.previous_effect
+    }
+
+    #[must_use]
+    pub const fn effect(self) -> HookEffectId {
+        self.effect
+    }
+
+    #[must_use]
+    pub const fn previous_instance(self) -> HookEffectInstanceId {
+        self.previous_instance
+    }
+
+    #[must_use]
+    pub const fn retained_instance(self) -> HookEffectInstanceId {
+        self.retained_instance
+    }
+
+    #[must_use]
+    pub const fn phase(self) -> FunctionComponentEffectPhase {
+        self.phase
+    }
+
+    #[must_use]
+    pub const fn tag(self) -> HookEffectFlags {
+        self.tag
+    }
+
+    #[must_use]
+    pub const fn recorded_destroy(self) -> Option<HookEffectCallbackHandle> {
+        self.recorded_destroy
+    }
+
+    #[must_use]
+    pub const fn previous_destroy(self) -> Option<HookEffectCallbackHandle> {
+        self.previous_destroy
+    }
+
+    #[must_use]
+    pub const fn retained_destroy(self) -> Option<HookEffectCallbackHandle> {
+        self.retained_destroy
+    }
+
+    #[must_use]
+    pub const fn dependency_status(self) -> FunctionComponentEffectDependencyStatus {
+        self.dependency_status
+    }
+
+    #[must_use]
+    pub const fn accepted_for_pending_passive(self) -> bool {
+        self.accepted_for_pending_passive
+    }
+
+    #[must_use]
+    pub const fn accepted_for_layout_commit(self) -> bool {
+        self.accepted_for_layout_commit
+    }
+
+    #[must_use]
+    pub fn instance_reused(self) -> bool {
+        self.previous_instance == self.retained_instance
+    }
+
+    #[must_use]
+    pub fn destroy_handle_matches_recorded_update_metadata(self) -> bool {
+        self.recorded_destroy == self.previous_destroy
+            && self.recorded_destroy == self.retained_destroy
+    }
+
+    #[must_use]
+    pub fn proves_destroy_handle_persisted(self) -> bool {
+        self.instance_reused() && self.destroy_handle_matches_recorded_update_metadata()
+    }
+
+    #[must_use]
+    pub fn proves_update_unmount_metadata_consumes_previous_destroy(self) -> bool {
+        self.proves_destroy_handle_persisted()
+            && self.recorded_destroy.is_some()
+            && (self.accepted_for_pending_passive || self.accepted_for_layout_commit)
+    }
+
+    #[must_use]
+    pub fn proves_removed_effect_retains_previous_destroy(self) -> bool {
+        self.proves_destroy_handle_persisted()
+            && self.recorded_destroy.is_some()
+            && matches!(
+                self.dependency_status,
+                FunctionComponentEffectDependencyStatus::Unchanged
+            )
+            && !self.accepted_for_pending_passive
+            && !self.accepted_for_layout_commit
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentCommittedEffectRecord {
     effect_index: usize,
     hook_list: HookListId,
@@ -3428,6 +3569,7 @@ impl FunctionComponentCommittedEffectQueue {
                 hook_list: record.hook_list(),
                 effect_index: accepted.len(),
                 effect: record.effect(),
+                previous_effect: record.previous_effect(),
                 instance: record.instance(),
                 tag: record.tag(),
                 create: record.create(),
@@ -3599,6 +3741,65 @@ impl FunctionComponentHookRenderStore {
             Some(queue) => Ok(queue.records()),
             None => Ok(&[]),
         }
+    }
+
+    pub fn effect_destroy_handle_persistence_records(
+        &self,
+        state: FunctionComponentHookRenderState,
+    ) -> Result<
+        Vec<FunctionComponentEffectDestroyHandlePersistenceRecord>,
+        FunctionComponentRenderError,
+    > {
+        let records = self.effect_update_queue_records(state)?;
+        let mut persistence = Vec::with_capacity(records.len());
+
+        for record in records {
+            let previous_effect = self
+                .hook_effects
+                .get_effect(record.previous_effect())
+                .map_err(|error| {
+                    FunctionComponentRenderError::hook_effect(state.render_fiber(), error)
+                })?;
+            let retained_effect =
+                self.hook_effects
+                    .get_effect(record.effect())
+                    .map_err(|error| {
+                        FunctionComponentRenderError::hook_effect(state.render_fiber(), error)
+                    })?;
+            let previous_destroy = self
+                .hook_effects
+                .effect_destroy(record.previous_effect())
+                .map_err(|error| {
+                    FunctionComponentRenderError::hook_effect(state.render_fiber(), error)
+                })?;
+            let retained_destroy =
+                self.hook_effects
+                    .effect_destroy(record.effect())
+                    .map_err(|error| {
+                        FunctionComponentRenderError::hook_effect(state.render_fiber(), error)
+                    })?;
+
+            persistence.push(FunctionComponentEffectDestroyHandlePersistenceRecord {
+                update_index: record.update_index(),
+                fiber: record.fiber(),
+                hook_list: record.hook_list(),
+                hook: record.hook(),
+                previous_effect: record.previous_effect(),
+                effect: record.effect(),
+                previous_instance: previous_effect.instance(),
+                retained_instance: retained_effect.instance(),
+                phase: record.phase(),
+                tag: record.tag(),
+                recorded_destroy: record.destroy(),
+                previous_destroy,
+                retained_destroy,
+                dependency_status: record.dependency_status(),
+                accepted_for_pending_passive: record.accepted_for_pending_passive(),
+                accepted_for_layout_commit: record.accepted_for_layout_commit(),
+            });
+        }
+
+        Ok(persistence)
     }
 
     pub fn memo_update_diagnostics(
@@ -3819,6 +4020,7 @@ impl FunctionComponentHookRenderStore {
                 hook_list: list,
                 effect_index,
                 effect: effect.id(),
+                previous_effect: None,
                 instance: effect.instance(),
                 tag: effect.tag(),
                 create: effect.create(),
@@ -3850,6 +4052,7 @@ impl FunctionComponentHookRenderStore {
                 hook_list: record.hook_list(),
                 effect_index: accepted.len(),
                 effect: record.effect(),
+                previous_effect: Some(record.previous_effect()),
                 instance: record.instance(),
                 tag: record.tag(),
                 create: record.create(),
@@ -6082,6 +6285,7 @@ pub(crate) struct FunctionComponentPassiveEffectMetadata {
     hook_list: HookListId,
     effect_index: usize,
     effect: HookEffectId,
+    previous_effect: Option<HookEffectId>,
     instance: HookEffectInstanceId,
     tag: HookEffectFlags,
     create: HookEffectCallbackHandle,
@@ -6114,6 +6318,11 @@ impl FunctionComponentPassiveEffectMetadata {
     #[must_use]
     pub const fn effect(self) -> HookEffectId {
         self.effect
+    }
+
+    #[must_use]
+    pub const fn previous_effect(self) -> Option<HookEffectId> {
+        self.previous_effect
     }
 
     #[must_use]
@@ -14918,6 +15127,42 @@ mod tests {
         assert!(records[1].dependencies_unchanged());
         assert!(!records[1].accepted_for_pending_passive());
 
+        let persistence = hook_store
+            .effect_destroy_handle_persistence_records(state)
+            .unwrap();
+        assert_eq!(persistence.len(), 2);
+        assert_eq!(persistence[0].update_index(), 0);
+        assert_eq!(persistence[0].previous_effect(), previous_changed.effect());
+        assert_eq!(persistence[0].effect(), changed.effect());
+        assert_eq!(
+            persistence[0].previous_instance(),
+            previous_changed.instance()
+        );
+        assert_eq!(persistence[0].retained_instance(), changed.instance());
+        assert_eq!(persistence[0].recorded_destroy(), Some(callback(1002)));
+        assert_eq!(persistence[0].previous_destroy(), Some(callback(1002)));
+        assert_eq!(persistence[0].retained_destroy(), Some(callback(1002)));
+        assert!(persistence[0].proves_destroy_handle_persisted());
+        assert!(persistence[0].proves_update_unmount_metadata_consumes_previous_destroy());
+        assert!(!persistence[0].proves_removed_effect_retains_previous_destroy());
+        assert_eq!(persistence[1].update_index(), 1);
+        assert_eq!(
+            persistence[1].previous_effect(),
+            previous_unchanged.effect()
+        );
+        assert_eq!(persistence[1].effect(), unchanged.effect());
+        assert_eq!(
+            persistence[1].previous_instance(),
+            previous_unchanged.instance()
+        );
+        assert_eq!(persistence[1].retained_instance(), unchanged.instance());
+        assert_eq!(persistence[1].recorded_destroy(), Some(callback(1012)));
+        assert_eq!(persistence[1].previous_destroy(), Some(callback(1012)));
+        assert_eq!(persistence[1].retained_destroy(), Some(callback(1012)));
+        assert!(persistence[1].proves_destroy_handle_persisted());
+        assert!(!persistence[1].proves_update_unmount_metadata_consumes_previous_destroy());
+        assert!(persistence[1].proves_removed_effect_retains_previous_destroy());
+
         let passive = hook_store
             .passive_effect_metadata(state, Lanes::DEFAULT)
             .unwrap();
@@ -14926,6 +15171,10 @@ mod tests {
         assert_eq!(passive[0].hook_list(), state.work_in_progress_list());
         assert_eq!(passive[0].effect_index(), 0);
         assert_eq!(passive[0].effect(), changed.effect());
+        assert_eq!(
+            passive[0].previous_effect(),
+            Some(previous_changed.effect())
+        );
         assert_eq!(passive[0].instance(), changed.instance());
         assert_eq!(passive[0].tag(), HookEffectFlags::PASSIVE_EFFECT);
         assert_eq!(passive[0].create(), callback(1003));
@@ -14980,12 +15229,89 @@ mod tests {
             .committed_passive_effect_metadata(work_in_progress, HookEffectFlags::PASSIVE_EFFECT);
         assert_eq!(firing_passive.len(), 1);
         assert_eq!(firing_passive[0].effect(), changed.effect());
+        assert_eq!(
+            firing_passive[0].previous_effect(),
+            Some(previous_changed.effect())
+        );
         assert_eq!(firing_passive[0].destroy(), Some(callback(1002)));
         let all_passive = hook_store
             .committed_passive_effect_metadata(work_in_progress, HookEffectFlags::PASSIVE);
         assert_eq!(all_passive.len(), 2);
         assert_eq!(all_passive[0].effect(), changed.effect());
+        assert_eq!(
+            all_passive[0].previous_effect(),
+            Some(previous_changed.effect())
+        );
         assert_eq!(all_passive[1].effect(), unchanged.effect());
+        assert_eq!(
+            all_passive[1].previous_effect(),
+            Some(previous_unchanged.effect())
+        );
+    }
+
+    #[test]
+    fn function_component_effect_destroy_persistence_evidence_detects_foreign_handle_drift() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let previous = hook_store
+            .create_current_effect_metadata(
+                &mut arena,
+                current,
+                FunctionComponentEffectPhase::Passive,
+                callback(1040),
+                deps(1041),
+                Some(callback(1042)),
+            )
+            .unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(52)));
+
+        let record = render_function_component_with_hook_state(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &mut registry,
+        )
+        .unwrap();
+        let state = record.hook_state().unwrap();
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+        let changed = hook_store
+            .update_effect_metadata(
+                &mut arena,
+                &mut cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(1043),
+                deps(1044),
+                FunctionComponentEffectDependencyStatus::Changed,
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(cursor).unwrap();
+
+        let evidence = hook_store
+            .effect_destroy_handle_persistence_records(state)
+            .unwrap();
+        assert_eq!(evidence.len(), 1);
+        assert_eq!(evidence[0].previous_effect(), previous.effect());
+        assert_eq!(evidence[0].effect(), changed.effect());
+        assert_eq!(evidence[0].recorded_destroy(), Some(callback(1042)));
+        assert!(evidence[0].proves_update_unmount_metadata_consumes_previous_destroy());
+
+        hook_store
+            .hook_effects_mut()
+            .get_instance_mut(changed.instance())
+            .unwrap()
+            .set_destroy(Some(callback(1049)));
+
+        let drifted = hook_store
+            .effect_destroy_handle_persistence_records(state)
+            .unwrap();
+        assert_eq!(drifted.len(), 1);
+        assert_eq!(drifted[0].recorded_destroy(), Some(callback(1042)));
+        assert_eq!(drifted[0].previous_destroy(), Some(callback(1049)));
+        assert_eq!(drifted[0].retained_destroy(), Some(callback(1049)));
+        assert!(!drifted[0].destroy_handle_matches_recorded_update_metadata());
+        assert!(!drifted[0].proves_update_unmount_metadata_consumes_previous_destroy());
     }
 
     #[test]
@@ -15093,6 +15419,26 @@ mod tests {
         );
         assert!(!records[1].accepted_for_layout_commit());
         assert!(!records[1].accepted_for_pending_passive());
+
+        let persistence = hook_store
+            .effect_destroy_handle_persistence_records(state)
+            .unwrap();
+        assert_eq!(persistence.len(), 2);
+        assert_eq!(persistence[0].previous_effect(), previous_changed.effect());
+        assert_eq!(persistence[0].effect(), changed.effect());
+        assert_eq!(persistence[0].recorded_destroy(), Some(callback(1022)));
+        assert_eq!(persistence[0].previous_destroy(), Some(callback(1022)));
+        assert_eq!(persistence[0].retained_destroy(), Some(callback(1022)));
+        assert!(persistence[0].proves_update_unmount_metadata_consumes_previous_destroy());
+        assert_eq!(
+            persistence[1].previous_effect(),
+            previous_unchanged.effect()
+        );
+        assert_eq!(persistence[1].effect(), unchanged.effect());
+        assert_eq!(persistence[1].recorded_destroy(), Some(callback(1032)));
+        assert_eq!(persistence[1].previous_destroy(), Some(callback(1032)));
+        assert_eq!(persistence[1].retained_destroy(), Some(callback(1032)));
+        assert!(persistence[1].proves_removed_effect_retains_previous_destroy());
 
         let layout = hook_store
             .layout_effect_metadata(state, Lanes::DEFAULT)
