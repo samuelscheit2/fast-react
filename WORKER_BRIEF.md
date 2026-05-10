@@ -29,6 +29,9 @@ for published package behavior and exact runtime output.
 - Work only on your assigned objective and write scope.
 - Record progress in `worker-progress/<worker-id>.md`.
 - You are running as a managed Codex subagent launched by the orchestrator.
+- Use the assigned git worktree path from your prompt for all reads (except for the react repo), edits, and
+  verification commands. Do not edit the root checkout or another worker's
+  worktree unless the prompt explicitly assigns that location.
 - The orchestrator monitors your lifecycle through subagent status, progress
   messages, and your `worker-progress/<worker-id>.md` report. There is no tmux
   pane, `.codex.log`, `.exitcode`, or numeric process status for subagent

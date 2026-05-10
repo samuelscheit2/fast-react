@@ -21,16 +21,24 @@ The orchestrator goal is continuous. Do not call
 ## Worker Model
 
 - Top-level workers are managed Codex subagents launched with the
-  `spawn_agent` tool, usually from isolated git worktrees.
+  `spawn_agent` tool from isolated git worktrees. Writable implementation
+  workers must not share the root checkout or another worker's worktree.
 - Launch implementation workers with `agent_type: "worker"`, `goal: true`,
   `fork_turns: "none"`, `model: "gpt-5.5"`, and
   `reasoning_effort: "xhigh"`. Put the full worker prompt in `message`.
+- Before spawning a writable worker, create or assign an isolated git worktree
+  and branch for that worker. Include the absolute worktree path in the worker
+  prompt and require all reads, edits, and verification commands to target that
+  worktree.
+- Read-only explorers and research-only subagents may inspect the main checkout
+  when no writes or generated artifacts are expected.
 - Keep at most 30 concurrent top-level worker subagents.
 - Workers may spawn their own managed subagents, explorers, or nested agents.
   Nested agents do not count against the 30 top-level worker limit.
 - Workers read `WORKER_BRIEF.md`, not this file.
-- Worker prompts must include all context needed to work independently, explicit
-  write scope, verification expectations, and non-overlap boundaries.
+- Worker prompts must include all context needed to work independently, the
+  assigned worktree path, explicit write scope, verification expectations, and
+  non-overlap boundaries.
 - Use `task_name` as the stable subagent id. It must use lowercase letters,
   digits, and underscores; map it to the hyphenated
   `worker-progress/<worker-id>.md` filename in the worker prompt when needed.

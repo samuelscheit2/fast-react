@@ -15,9 +15,13 @@ Objective:
 Write scope:
 <paths>
 
+Assigned worktree:
+<absolute worktree path>
+
 Constraints:
 - Do not modify files outside your write scope.
 - Do not overlap with other workers.
+- Run commands from the assigned worktree and make edits only in that worktree.
 - You may spawn managed Codex subagents, explorers, nested agents, or parallel agent tools inside this worker when they help test hypotheses. Summarize delegated checks and results in your report.
 - Worker-internal nested agents do not count against the orchestrator's 30 top-level worker limit.
 - Find root causes; do not patch symptoms.
