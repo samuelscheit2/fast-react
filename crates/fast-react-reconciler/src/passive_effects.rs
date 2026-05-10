@@ -10,7 +10,9 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-use fast_react_core::{FiberId, HookEffectId, HookEffectInstanceId, Lanes};
+use fast_react_core::{
+    FiberId, HookEffectCallbackHandle, HookEffectId, HookEffectInstanceId, Lanes,
+};
 use fast_react_host_config::HostTypes;
 
 use crate::root_commit::{
@@ -34,6 +36,7 @@ pub(crate) struct PassiveEffectFlushEffectRecord {
     effect_index: usize,
     effect: HookEffectId,
     instance: HookEffectInstanceId,
+    destroy: Option<HookEffectCallbackHandle>,
 }
 
 impl PassiveEffectFlushEffectRecord {
@@ -50,6 +53,11 @@ impl PassiveEffectFlushEffectRecord {
     #[must_use]
     pub const fn instance(self) -> HookEffectInstanceId {
         self.instance
+    }
+
+    #[must_use]
+    pub const fn destroy(self) -> Option<HookEffectCallbackHandle> {
+        self.destroy
     }
 }
 
@@ -138,6 +146,14 @@ impl PassiveEffectFlushRecord {
     pub const fn effect_instance(&self) -> Option<HookEffectInstanceId> {
         match self.effect {
             Some(effect) => Some(effect.instance()),
+            None => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn effect_destroy(&self) -> Option<HookEffectCallbackHandle> {
+        match self.effect {
+            Some(effect) => effect.destroy(),
             None => None,
         }
     }
@@ -603,6 +619,7 @@ fn build_passive_flush_records(
                     effect_index: record.effect_index(),
                     effect: record.effect(),
                     instance: record.instance(),
+                    destroy: record.destroy(),
                 });
             PassiveEffectFlushRecord {
                 flush_index,
@@ -845,10 +862,12 @@ mod tests {
         assert_eq!(record.effect_index(), Some(0));
         assert_eq!(record.effect(), Some(registration.effect()));
         assert_eq!(record.effect_instance(), Some(registration.instance()));
+        assert_eq!(record.effect_destroy(), None);
         assert_eq!(
             record.effect_record().unwrap().effect(),
             registration.effect()
         );
+        assert_eq!(record.effect_record().unwrap().destroy(), None);
         assert_eq!(
             hook_store
                 .hook_effects()
@@ -1025,6 +1044,11 @@ mod tests {
         assert_eq!(unmount.effect(), Some(registration.effect()));
         assert_eq!(unmount.effect_instance(), Some(previous.instance()));
         assert_eq!(unmount.effect_instance(), Some(registration.instance()));
+        assert_eq!(unmount.effect_destroy(), Some(callback(834)));
+        assert_eq!(
+            unmount.effect_record().unwrap().destroy(),
+            Some(callback(834))
+        );
         assert_eq!(
             unmount.unmount_origin(),
             Some(PendingPassiveUnmountOrigin::UpdatedFiber)
@@ -1039,6 +1063,7 @@ mod tests {
         assert_eq!(mount.effect_index(), Some(0));
         assert_eq!(mount.effect(), Some(registration.effect()));
         assert_eq!(mount.effect_instance(), Some(registration.instance()));
+        assert_eq!(mount.effect_destroy(), None);
         assert_eq!(mount.unmount_origin(), None);
         assert!(unmount.pending_order() < mount.pending_order());
         assert!(

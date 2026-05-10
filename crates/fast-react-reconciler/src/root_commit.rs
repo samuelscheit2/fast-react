@@ -10,9 +10,9 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::{
-    DeletionListId, FiberArena, FiberFlags, FiberId, FiberTag, FiberTopologyError, HookEffectId,
-    HookEffectInstanceId, Lanes, PropsHandle, RefHandle, RootFinishedLanes, StateHandle,
-    StateNodeHandle, UpdateQueueHandle,
+    DeletionListId, FiberArena, FiberFlags, FiberId, FiberTag, FiberTopologyError,
+    HookEffectCallbackHandle, HookEffectId, HookEffectInstanceId, Lanes, PropsHandle, RefHandle,
+    RootFinishedLanes, StateHandle, StateNodeHandle, UpdateQueueHandle,
 };
 use fast_react_host_config::{HostFiberTokenPhase, HostFiberTokenTarget, HostTypes};
 
@@ -487,6 +487,7 @@ pub(crate) struct FunctionComponentPendingPassiveEffectCommitRecord {
     effect_index: usize,
     effect: HookEffectId,
     instance: HookEffectInstanceId,
+    destroy: Option<HookEffectCallbackHandle>,
     lanes: Lanes,
     unmount_order: Option<PendingPassiveEffectOrder>,
     mount_order: PendingPassiveEffectOrder,
@@ -518,6 +519,11 @@ impl FunctionComponentPendingPassiveEffectCommitRecord {
     }
 
     #[must_use]
+    pub(crate) const fn destroy(self) -> Option<HookEffectCallbackHandle> {
+        self.destroy
+    }
+
+    #[must_use]
     pub(crate) const fn lanes(self) -> Lanes {
         self.lanes
     }
@@ -542,6 +548,7 @@ impl FunctionComponentPendingPassiveEffectCommitRecord {
                 effect_index: self.effect_index,
                 effect: self.effect,
                 instance: self.instance,
+                destroy: self.destroy,
                 lanes: self.lanes,
                 phase: PendingPassiveEffectPhase::Unmount,
                 order,
@@ -557,6 +564,7 @@ impl FunctionComponentPendingPassiveEffectCommitRecord {
             effect_index: self.effect_index,
             effect: self.effect,
             instance: self.instance,
+            destroy: None,
             lanes: self.lanes,
             phase: PendingPassiveEffectPhase::Mount,
             order: self.mount_order,
@@ -570,6 +578,7 @@ pub(crate) struct FunctionComponentPendingPassiveEffectPhaseCommitRecord {
     effect_index: usize,
     effect: HookEffectId,
     instance: HookEffectInstanceId,
+    destroy: Option<HookEffectCallbackHandle>,
     lanes: Lanes,
     phase: PendingPassiveEffectPhase,
     order: PendingPassiveEffectOrder,
@@ -598,6 +607,11 @@ impl FunctionComponentPendingPassiveEffectPhaseCommitRecord {
     #[must_use]
     pub(crate) const fn instance(self) -> HookEffectInstanceId {
         self.instance
+    }
+
+    #[must_use]
+    pub(crate) const fn destroy(self) -> Option<HookEffectCallbackHandle> {
+        self.destroy
     }
 
     #[must_use]
@@ -1325,6 +1339,7 @@ fn queue_function_component_passive_effect_record<H: HostTypes>(
         effect_index: passive_effect.effect_index(),
         effect: passive_effect.effect(),
         instance: passive_effect.instance(),
+        destroy: passive_effect.destroy(),
         lanes: passive_effect.lanes(),
         unmount_order,
         mount_order,
@@ -3113,6 +3128,7 @@ mod tests {
         assert_eq!(queued_effect.effect(), registration.effect());
         assert_eq!(queued_effect.instance(), previous.instance());
         assert_eq!(queued_effect.instance(), registration.instance());
+        assert_eq!(queued_effect.destroy(), Some(callback(714)));
         assert_eq!(queued_effect.lanes(), Lanes::DEFAULT);
         assert!(
             queued_effect.unmount_order().unwrap().flush_rank()
@@ -3124,6 +3140,7 @@ mod tests {
         assert_eq!(phase_records[0].effect_index(), 0);
         assert_eq!(phase_records[0].effect(), registration.effect());
         assert_eq!(phase_records[0].instance(), registration.instance());
+        assert_eq!(phase_records[0].destroy(), Some(callback(714)));
         assert_eq!(phase_records[0].lanes(), Lanes::DEFAULT);
         assert_eq!(phase_records[0].phase(), PendingPassiveEffectPhase::Unmount);
         assert_eq!(
@@ -3134,6 +3151,7 @@ mod tests {
         assert_eq!(phase_records[1].effect_index(), 0);
         assert_eq!(phase_records[1].effect(), registration.effect());
         assert_eq!(phase_records[1].instance(), registration.instance());
+        assert_eq!(phase_records[1].destroy(), None);
         assert_eq!(phase_records[1].lanes(), Lanes::DEFAULT);
         assert_eq!(phase_records[1].phase(), PendingPassiveEffectPhase::Mount);
         assert_eq!(phase_records[1].order(), queued_effect.mount_order());
