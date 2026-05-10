@@ -417,6 +417,201 @@ test('private click event delegation dispatch gate rejects portal owner mismatch
   }
 });
 
+test('private focus/blur dispatch execution routes one accepted fake focus listener', () => {
+  const fixture = createPrivateFocusBlurDelegationFixture(
+    'focus-blur-execution-route'
+  );
+  const calls = [];
+  const listenerRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      fixture.targetNode,
+      'focusin',
+      false,
+      event => {
+        calls.push({
+          currentTarget: event.currentTarget,
+          event,
+          registrationName: event.registrationName,
+          syntheticEvent: event.syntheticEvent,
+          target: event.target,
+          targetInst: event.targetInst,
+          type: event.type
+        });
+        return 'accepted-focus';
+      },
+      {
+        listenerType: 'accepted-private-focus-blur-execution-test'
+      }
+    );
+  const rootRegistration =
+    rootListeners.registerRootListenersForPrivateRoot(fixture.container);
+
+  try {
+    const execution =
+      rootListeners.invokePrivateRootFocusBlurEventDispatchExecution(
+        rootRegistration,
+        fixture.hostOutputPayload,
+        listenerRecord,
+        {
+          domEventName: 'focusin'
+        }
+      );
+    const payload =
+      rootListeners.getPrivateRootFocusBlurEventDispatchExecutionPayload(
+        execution
+      );
+    const pluginPayload =
+      pluginEventSystem.getPrivateFocusBlurEventDispatchExecutionPayload(
+        payload.pluginExecutionRecord
+      );
+
+    assert.equal(
+      execution.kind,
+      rootListeners
+        .PRIVATE_ROOT_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_RECORD_KIND
+    );
+    assert.equal(
+      execution.status,
+      rootListeners.PRIVATE_ROOT_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_STATUS
+    );
+    assert.equal(
+      rootListeners.isPrivateRootFocusBlurEventDispatchExecutionRecord(
+        execution
+      ),
+      true
+    );
+    assert.equal(execution.domEventName, 'focusin');
+    assert.equal(execution.phase, 'bubble');
+    assert.equal(execution.reactName, 'onFocus');
+    assert.equal(execution.registrationName, 'onFocus');
+    assert.equal(execution.syntheticEventType, 'focus');
+    assert.equal(execution.eventPriorityName, 'DiscreteEventPriority');
+    assert.equal(execution.listenerInvocationCount, 1);
+    assert.equal(execution.privateListenerInvoked, true);
+    assert.equal(execution.publicDispatchEnabled, false);
+    assert.equal(execution.publicRootBehaviorChanged, false);
+    assert.equal(execution.browserDomEventCompatibilityClaimed, false);
+    assert.equal(execution.syntheticEventCount, 0);
+    assert.equal(execution.syntheticFocusEventCreation, false);
+    assert.equal(
+      execution.pluginExecutionRecordKind,
+      pluginEventSystem
+        .PRIVATE_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_RECORD_KIND
+    );
+    assert.equal(
+      execution.invocationRecordKind,
+      pluginEventSystem.DISPATCH_LISTENER_INVOCATION_CANARY_RECORD_KIND
+    );
+    assert.equal(payload.acceptedListenerQueueEntryRecord, listenerRecord);
+    assert.equal(payload.dispatchRecord.domEventName, 'focusin');
+    assert.equal(
+      payload.dispatchRecord.extractionRecord.domEventName,
+      'focusin'
+    );
+    assert.equal(payload.dispatchListenerRecord.privateListenerQueue, true);
+    assert.equal(pluginPayload.dispatchRecord, payload.dispatchRecord);
+    assert.equal(
+      pluginPayload.dispatchListenerRecord,
+      payload.dispatchListenerRecord
+    );
+    assert.equal(pluginPayload.listenerQueueEntryRecord, listenerRecord);
+
+    assert.deepEqual(calls.map(call => [
+      call.type,
+      call.registrationName,
+      call.syntheticEvent,
+      call.currentTarget,
+      call.target,
+      call.targetInst
+    ]), [
+      [
+        'focusin',
+        'onFocus',
+        false,
+        fixture.targetNode,
+        fixture.targetNode,
+        fixture.token
+      ]
+    ]);
+    assert.equal(Object.isFrozen(calls[0].event), true);
+    assert.equal(Object.hasOwn(calls[0].event, 'nativeEvent'), false);
+    assert.equal(fixture.targetNode.__registrations.length, 0);
+    assert.equal(fixture.container.__registrations.length, 138);
+    assert.equal(fixture.document.__registrations.length, 1);
+  } finally {
+    listenerRegistry.removePrivateEventListenerQueueEntry(listenerRecord);
+    rootListeners.revertRootListenersForPrivateRoot(rootRegistration);
+    componentTree.detachHostInstanceToken(fixture.token);
+  }
+});
+
+test('private focus/blur dispatch execution rejects portal owner mismatch before invoking', () => {
+  const source = createPrivateFocusBlurDelegationFixture(
+    'focus-blur-execution-portal-a'
+  );
+  const foreign = createPrivateFocusBlurDelegationFixture(
+    'focus-blur-execution-portal-b'
+  );
+  const calls = [];
+  const listenerRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      source.targetNode,
+      'focusout',
+      false,
+      () => {
+        calls.push('portal-mismatch-invoked');
+      }
+    );
+  const sourceDispatch = createPrivateFocusBlurDispatchRecord(
+    source,
+    'focusout',
+    'bubble'
+  );
+  const sourceListenerRecord = findPrivateQueueDispatchListenerRecord(
+    sourceDispatch,
+    listenerRecord
+  );
+  const foreignDispatch = createPrivateFocusBlurDispatchRecord(
+    foreign,
+    'focusout',
+    'bubble'
+  );
+  const foreignPortalGate =
+    pluginEventSystem.createPortalEventOwnerRootGateRecord(
+      foreignDispatch.targetDispatchPathRecord,
+      {
+        domEventName: 'focusout',
+        ownerRoot: foreign.rootOwner,
+        portalContainer: foreign.container,
+        rootContainer: foreign.container
+      }
+    );
+
+  try {
+    assert.throws(
+      () =>
+        pluginEventSystem.invokePrivateFocusBlurEventDispatchExecutionRecord(
+          sourceDispatch,
+          sourceListenerRecord,
+          {
+            portalEventOwnerRootGateRecord: foreignPortalGate
+          }
+        ),
+      {
+        code:
+          pluginEventSystem
+            .INVALID_PRIVATE_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_CODE,
+        reason: 'portal-owner-root-mismatch'
+      }
+    );
+    assert.deepEqual(calls, []);
+  } finally {
+    listenerRegistry.removePrivateEventListenerQueueEntry(listenerRecord);
+    componentTree.detachHostInstanceToken(source.token);
+    componentTree.detachHostInstanceToken(foreign.token);
+  }
+});
+
 test('private input/change extraction preflight records text input and checkbox metadata only', () => {
   const calls = [];
   const cases = [
@@ -1239,6 +1434,48 @@ function createPrivateClickDispatchRecord(fixture, phase) {
   );
 }
 
+function createPrivateFocusBlurDelegationFixture(label) {
+  const document = installEventTargetMethods(createDocument());
+  const container = installEventTargetMethods(createNode('DIV', document));
+  const targetNode = installEventTargetMethods(createNode('INPUT', document));
+  targetNode.parentNode = container;
+
+  const rootOwner = {kind: `${label}:root`};
+  const token = componentTree.createHostInstanceToken(
+    {kind: `${label}:host`},
+    rootOwner
+  );
+  componentTree.attachHostInstanceNode(targetNode, token, {});
+
+  return {
+    container,
+    document,
+    hostOutputPayload: {
+      hostNode: targetNode,
+      hostToken: token,
+      rootOwner
+    },
+    rootOwner,
+    targetNode,
+    token
+  };
+}
+
+function createPrivateFocusBlurDispatchRecord(fixture, domEventName, phase) {
+  const eventSystemFlags =
+    phase === 'capture' ? rootListeners.IS_CAPTURE_PHASE : 0;
+  const wrapperRecord =
+    eventListener.createEventListenerWrapperRecordWithPriority(
+      fixture.container,
+      domEventName,
+      eventSystemFlags
+    );
+  return pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+    wrapperRecord,
+    createPrivateFocusBlurNativeEvent(fixture.targetNode, domEventName)
+  );
+}
+
 function findPrivateQueueDispatchListenerRecord(
   dispatchRecord,
   listenerQueueEntryRecord
@@ -1272,6 +1509,22 @@ function createPrivateClickNativeEvent(target) {
     returnValue: true,
     target,
     type: 'click',
+    preventDefault() {
+      this.defaultPrevented = true;
+      this.preventDefaultCallCount++;
+      this.returnValue = false;
+    }
+  };
+}
+
+function createPrivateFocusBlurNativeEvent(target, domEventName) {
+  return {
+    defaultPrevented: false,
+    preventDefaultCallCount: 0,
+    relatedTarget: null,
+    returnValue: true,
+    target,
+    type: domEventName,
     preventDefault() {
       this.defaultPrevented = true;
       this.preventDefaultCallCount++;
