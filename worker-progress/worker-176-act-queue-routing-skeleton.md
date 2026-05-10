@@ -91,14 +91,22 @@ crate has no separate `tests` directory; unit tests live under `src`.
 
 ## Verification Results
 
-- `cargo fmt --all --check`: passed.
-- `cargo test -p fast-react-reconciler --all-features scheduler_bridge`:
-  passed, 7 tests.
-- `cargo test -p fast-react-reconciler --all-features root_scheduler`:
-  passed, 14 tests.
-- `cargo clippy -p fast-react-reconciler --all-targets --all-features -- -D warnings`:
-  passed.
-- `git diff --check`: passed.
+- Worker-local verification passed before orchestration merge:
+  - `cargo fmt --all --check`
+  - `cargo test -p fast-react-reconciler --all-features scheduler_bridge`: 7 tests
+  - `cargo test -p fast-react-reconciler --all-features root_scheduler`: 14 tests
+  - `cargo clippy -p fast-react-reconciler --all-targets --all-features -- -D warnings`
+  - `git diff --check`
+- Orchestrator merged current `main` into this branch and resolved
+  `root_scheduler.rs` by preserving accepted scheduler callback/sync-flush
+  execution helpers plus the act queue routing records and tests.
+- Post-merge orchestrator verification passed:
+  - `cargo fmt --all --check`
+  - `cargo test -p fast-react-reconciler --all-features scheduler_bridge`: 7 tests
+  - `cargo test -p fast-react-reconciler --all-features root_scheduler`: 21 tests
+  - `cargo test -p fast-react-reconciler --all-features`: 112 tests + 1 doctest
+  - `cargo clippy -p fast-react-reconciler --all-targets --all-features -- -D warnings`
+  - `git diff --check`
 
 ## Risks Or Blockers
 
