@@ -17,6 +17,34 @@ const actSchedulerMissingBeforeExecution = Object.freeze([
   'react-test-renderer-passive-effect-callback-execution',
   'react-test-renderer-private-root-request-execution'
 ]);
+const privateActQueueFlushDiagnosticsExport =
+  '__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__';
+const reactCompatibilityTarget = 'react@19.2.6';
+const schedulerCompatibilityTarget = 'scheduler@0.27.0';
+const privateActQueueTestQueueKind =
+  'fast-react.react.private-act-queue-test-queue';
+const privateActQueueTestTaskKind =
+  'fast-react.react.private-act-queue-test-task';
+const privateActQueueTestQueueVersion = 1;
+const privateActQueueTestQueueBrand = Symbol.for(
+  'fast-react.react.private-act-queue-test-queue'
+);
+const privateActQueueTestTaskBrand = Symbol.for(
+  'fast-react.react.private-act-queue-test-task'
+);
+const acceptedActQueueRecordKinds = Object.freeze([
+  'SchedulerActQueueRequest',
+  'SchedulerActScopeBoundaryRecord',
+  'SyncFlushActContinuationRecord'
+]);
+const acceptedActQueueTaskKinds = Object.freeze([
+  'RootSchedule',
+  'SchedulerCallback'
+]);
+const acceptedActQueueContinuationStatuses = Object.freeze([
+  'NoContinuation',
+  'PendingContinuation'
+]);
 const schedulerMockFlushHelperMetadata = Object.freeze([
   Object.freeze({
     key: 'unstable_flushAll',
@@ -459,8 +487,81 @@ const testRendererRootActFlushRecords = Object.freeze([
     hostOutputProducedFromJs: false
   })
 ]);
+const schedulerReactActQueueDiagnosticRecords = Object.freeze([
+  Object.freeze({
+    id: 'scheduler-private-act-queue-flush-diagnostics',
+    jsPrivateExport: privateActQueueFlushDiagnosticsExport,
+    schedulerStatus: 'private-scheduler-act-queue-flush-diagnostics',
+    acceptedWorker: 'worker-377-scheduler-act-queue-flush-helper-private',
+    queueKind: privateActQueueTestQueueKind,
+    taskKind: privateActQueueTestTaskKind,
+    queueVersion: privateActQueueTestQueueVersion,
+    acceptedRecordKinds: acceptedActQueueRecordKinds,
+    acceptedTaskKinds: acceptedActQueueTaskKinds,
+    acceptedContinuationStatuses: acceptedActQueueContinuationStatuses,
+    drainsAcceptedInternalTestQueues: true,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    executesQueuedWork: false,
+    executesEffects: false
+  }),
+  Object.freeze({
+    id: 'react-private-act-internal-test-queue-factories',
+    jsExport: '__FAST_REACT_PRIVATE_ACT_DISPATCHER_GATE__',
+    acceptedWorker: 'worker-377-scheduler-act-queue-flush-helper-private',
+    factories: Object.freeze([
+      'createInternalActQueueTestQueue',
+      'createInternalActQueueTestTask'
+    ]),
+    validators: Object.freeze([
+      'isAcceptedInternalActQueueTestQueue',
+      'isAcceptedInternalActQueueTestTask'
+    ]),
+    queueKind: privateActQueueTestQueueKind,
+    taskKind: privateActQueueTestTaskKind,
+    queueVersion: privateActQueueTestQueueVersion,
+    publicCompatibilityClaimed: false,
+    queueFlushingReady: false,
+    privateTestQueueFlushDiagnosticsReady: true,
+    drainsAcceptedInternalTestQueues: true,
+    executesQueuedWork: false,
+    executesEffects: false
+  })
+]);
+const privateActQueueFlushDiagnostics = Object.freeze({
+  status: 'private-react-test-renderer-act-queue-diagnostic-consumer',
+  schedulerDiagnosticStatus: 'private-scheduler-act-queue-flush-diagnostics',
+  exportName: privateActQueueFlushDiagnosticsExport,
+  consumer: 'react-test-renderer-act-scheduler-private-gate',
+  gateStatus: actSchedulerGateStatus,
+  queueKind: privateActQueueTestQueueKind,
+  taskKind: privateActQueueTestTaskKind,
+  queueVersion: privateActQueueTestQueueVersion,
+  compatibilityTarget,
+  reactCompatibilityTarget,
+  schedulerCompatibilityTarget,
+  acceptedRecordKinds: acceptedActQueueRecordKinds,
+  acceptedTaskKinds: acceptedActQueueTaskKinds,
+  acceptedContinuationStatuses: acceptedActQueueContinuationStatuses,
+  drainsAcceptedInternalTestQueues: true,
+  drainsPublicSchedulerTaskQueue: false,
+  drainsPublicReactActQueue: false,
+  publicSchedulerTimingCompatibilityClaimed: false,
+  publicReactActCompatibilityClaimed: false,
+  compatibilityClaimed: false,
+  executesQueuedWork: false,
+  executesEffects: false,
+  invokesActCallback: false,
+  describeAcceptedInternalActQueue,
+  consumeAcceptedSchedulerActQueueDiagnostics,
+  drainAcceptedInternalActQueue:
+    consumeAcceptedSchedulerActQueueDiagnostics
+});
 const acceptedPrivateActFlushPrerequisiteIds = Object.freeze([
   'react-act-private-dispatcher-gate',
+  'scheduler-react-act-queue-diagnostic-consumption',
   'scheduler-act-queue-routing-records',
   'scheduler-mock-flush-helper-metadata',
   'sync-flush-act-continuation-records',
@@ -484,6 +585,21 @@ const acceptedPrivateActFlushPrerequisites = Object.freeze([
     present: true,
     recordOnly: true,
     records: reactActPrivateDispatcherRecords,
+    executesQueuedWork: false,
+    executesEffects: false
+  }),
+  Object.freeze({
+    id: 'scheduler-react-act-queue-diagnostic-consumption',
+    present: true,
+    recordOnly: false,
+    records: schedulerReactActQueueDiagnosticRecords,
+    diagnostics: privateActQueueFlushDiagnostics,
+    privateDiagnosticConsumption: true,
+    drainsAcceptedInternalTestQueues: true,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
     executesQueuedWork: false,
     executesEffects: false
   }),
@@ -624,7 +740,13 @@ const actSchedulerSideEffectPolicy = Object.freeze({
   executesRootRequests: false,
   mutatesHostOutput: false,
   acceptsPrivateFlushExecutionMetadata: true,
+  consumesPrivateSchedulerActQueueDiagnostics: true,
+  drainsAcceptedInternalTestQueues: true,
+  drainsPublicSchedulerTaskQueue: false,
+  drainsPublicReactActQueue: false,
   executesPublicSchedulerTasks: false,
+  publicSchedulerTimingCompatibilityClaimed: false,
+  publicReactActCompatibilityClaimed: false,
   compatibilityClaimed: false
 });
 const actSchedulerGate = Object.freeze({
@@ -648,7 +770,8 @@ const actSchedulerGate = Object.freeze({
     'worker-332-test-renderer-js-private-root-native-bridge',
     'worker-333-test-renderer-tojson-host-output-private-path',
     'worker-334-test-renderer-testinstance-private-query-path',
-    'worker-349-hook-effect-destroy-callback-execution-private'
+    'worker-349-hook-effect-destroy-callback-execution-private',
+    'worker-377-scheduler-act-queue-flush-helper-private'
   ]),
   publicActBehaviorAvailable: false,
   publicSchedulerFlushExecutionAvailable: false,
@@ -665,6 +788,9 @@ const actSchedulerGate = Object.freeze({
   rendererRootsCompatibilityClaimed: false,
   compatibilityClaimed: false,
   reactActPrivateDispatcherGateAccepted: true,
+  schedulerReactActQueueDiagnosticsAccepted: true,
+  privateSchedulerActQueueDiagnosticsConsumed: true,
+  privateActQueueDiagnosticConsumptionReady: true,
   schedulerMockFlushHelperMetadataAccepted: true,
   rootActRecordsAccepted: true,
   syncFlushActRecordsAccepted: true,
@@ -678,6 +804,9 @@ const actSchedulerGate = Object.freeze({
   privateFlushPrerequisitesPresent: true,
   privateFlushExecutionReady: false,
   recognizedReactActPrivateDispatcherRecords: reactActPrivateDispatcherRecords,
+  recognizedSchedulerReactActQueueDiagnostics:
+    schedulerReactActQueueDiagnosticRecords,
+  privateActQueueFlushDiagnostics,
   recognizedSchedulerMockFlushHelpers: schedulerMockFlushHelperMetadata,
   recognizedRootActRecords: rootActSchedulerRecords,
   recognizedSyncFlushActRecords: syncFlushActSchedulerRecords,
@@ -1736,6 +1865,12 @@ function createUnsupportedError(
       recognizedActSchedulerGate.schedulerMockFlushHelperMetadataAccepted;
     error.reactActPrivateDispatcherGateAccepted =
       recognizedActSchedulerGate.reactActPrivateDispatcherGateAccepted;
+    error.schedulerReactActQueueDiagnosticsAccepted =
+      recognizedActSchedulerGate.schedulerReactActQueueDiagnosticsAccepted;
+    error.privateSchedulerActQueueDiagnosticsConsumed =
+      recognizedActSchedulerGate.privateSchedulerActQueueDiagnosticsConsumed;
+    error.privateActQueueDiagnosticConsumptionReady =
+      recognizedActSchedulerGate.privateActQueueDiagnosticConsumptionReady;
     error.rootActRecordsAccepted =
       recognizedActSchedulerGate.rootActRecordsAccepted;
     error.syncFlushActRecordsAccepted =
@@ -2124,6 +2259,242 @@ function describeBridgeValue(value) {
   return Object.freeze({type: typeof value});
 }
 
+function isObjectLike(value) {
+  return (
+    (typeof value === 'object' && value !== null) ||
+    typeof value === 'function'
+  );
+}
+
+function includesString(value, expectedValues) {
+  return typeof value === 'string' && expectedValues.includes(value);
+}
+
+function getRejectedPrivateActQueueTaskReason(task, index) {
+  if (!isObjectLike(task)) {
+    return `record-${index}-not-object`;
+  }
+  if (task[privateActQueueTestTaskBrand] !== true) {
+    return `record-${index}-missing-internal-brand`;
+  }
+  if (task.kind !== privateActQueueTestTaskKind) {
+    return `record-${index}-kind`;
+  }
+  if (task.version !== privateActQueueTestQueueVersion) {
+    return `record-${index}-version`;
+  }
+  if (task.compatibilityTarget !== reactCompatibilityTarget) {
+    return `record-${index}-react-target`;
+  }
+  if (task.schedulerCompatibilityTarget !== schedulerCompatibilityTarget) {
+    return `record-${index}-scheduler-target`;
+  }
+  if (!includesString(task.recordKind, acceptedActQueueRecordKinds)) {
+    return `record-${index}-record-kind`;
+  }
+  if (!includesString(task.taskKind, acceptedActQueueTaskKinds)) {
+    return `record-${index}-task-kind`;
+  }
+  if (
+    !includesString(
+      task.continuationStatus,
+      acceptedActQueueContinuationStatuses
+    )
+  ) {
+    return `record-${index}-continuation-status`;
+  }
+  if (typeof task.label !== 'string') {
+    return `record-${index}-label`;
+  }
+  if (
+    task.publicCompatibilityClaimed !== false ||
+    task.publicSchedulerTimingCompatibilityClaimed !== false ||
+    task.publicReactActCompatibilityClaimed !== false
+  ) {
+    return `record-${index}-public-claim`;
+  }
+  if (task.executesQueuedWork !== false || task.executesEffects !== false) {
+    return `record-${index}-execution-claim`;
+  }
+  return null;
+}
+
+function getRejectedPrivateActQueueReason(queue) {
+  if (!isObjectLike(queue)) {
+    return 'queue-not-object';
+  }
+  if (queue[privateActQueueTestQueueBrand] !== true) {
+    return 'queue-missing-internal-brand';
+  }
+  if (queue.kind !== privateActQueueTestQueueKind) {
+    return 'queue-kind';
+  }
+  if (queue.version !== privateActQueueTestQueueVersion) {
+    return 'queue-version';
+  }
+  if (queue.compatibilityTarget !== reactCompatibilityTarget) {
+    return 'queue-react-target';
+  }
+  if (queue.schedulerCompatibilityTarget !== schedulerCompatibilityTarget) {
+    return 'queue-scheduler-target';
+  }
+  if (
+    queue.publicCompatibilityClaimed !== false ||
+    queue.publicSchedulerTimingCompatibilityClaimed !== false ||
+    queue.publicReactActCompatibilityClaimed !== false
+  ) {
+    return 'queue-public-claim';
+  }
+  if (
+    queue.queueFlushingReady !== false ||
+    queue.privateTestQueueFlushDiagnosticsReady !== true ||
+    queue.drainsAcceptedInternalTestQueues !== true
+  ) {
+    return 'queue-drain-policy';
+  }
+  if (queue.executesQueuedWork !== false || queue.executesEffects !== false) {
+    return 'queue-execution-claim';
+  }
+  if (!Array.isArray(queue.records)) {
+    return 'queue-records-not-array';
+  }
+
+  for (let index = 0; index < queue.records.length; index++) {
+    const rejectedTaskReason = getRejectedPrivateActQueueTaskReason(
+      queue.records[index],
+      index
+    );
+    if (rejectedTaskReason !== null) {
+      return rejectedTaskReason;
+    }
+  }
+  return null;
+}
+
+function createPrivateActQueueDiagnosticError(reason) {
+  const error = createUnsupportedError(
+    `_Scheduler.${privateActQueueFlushDiagnosticsExport}`,
+    'rejected private act queue diagnostics',
+    `Only accepted branded internal React act test queues can be consumed by this private gate. Rejection reason: ${reason}.`,
+    undefined,
+    undefined,
+    actSchedulerGate
+  );
+
+  error.name = 'FastReactTestRendererPrivateActQueueDiagnosticError';
+  error.code = 'FAST_REACT_TEST_RENDERER_PRIVATE_ACT_QUEUE_DIAGNOSTIC_REJECTED';
+  error.reason = reason;
+  error.publicSchedulerTimingCompatibilityClaimed = false;
+  error.publicReactActCompatibilityClaimed = false;
+  error.executesQueuedWork = false;
+  error.executesEffects = false;
+  return error;
+}
+
+function describeAcceptedInternalActQueue(queue) {
+  const rejectionReason = getRejectedPrivateActQueueReason(queue);
+  const pendingCount =
+    isObjectLike(queue) && Array.isArray(queue.records)
+      ? queue.records.length
+      : 0;
+
+  return freezeRecord({
+    status:
+      rejectionReason === null
+        ? 'accepted-internal-test-queue'
+        : 'rejected-internal-test-queue',
+    accepted: rejectionReason === null,
+    rejectionReason,
+    queueKind: isObjectLike(queue) ? queue.kind : null,
+    pendingCount,
+    consumer: 'react-test-renderer-act-scheduler-private-gate',
+    gateStatus: actSchedulerGateStatus,
+    drainsAcceptedInternalTestQueues: rejectionReason === null,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    compatibilityClaimed: false,
+    executesQueuedWork: false,
+    executesEffects: false
+  });
+}
+
+function summarizePrivateActQueueTask(task, index) {
+  return freezeRecord({
+    index,
+    label: task.label,
+    recordKind: task.recordKind,
+    taskKind: task.taskKind,
+    continuationStatus: task.continuationStatus,
+    executesQueuedWork: false,
+    executesEffects: false
+  });
+}
+
+function consumeAcceptedSchedulerActQueueDiagnostics(queue) {
+  const rejectionReason = getRejectedPrivateActQueueReason(queue);
+  if (rejectionReason !== null) {
+    throw createPrivateActQueueDiagnosticError(rejectionReason);
+  }
+
+  const pendingBefore = queue.records.length;
+  const drainedRecords = [];
+
+  while (queue.records.length > 0) {
+    drainedRecords.push(
+      summarizePrivateActQueueTask(
+        queue.records.shift(),
+        drainedRecords.length
+      )
+    );
+  }
+
+  return freezeRecord({
+    status:
+      'react-test-renderer-consumed-accepted-scheduler-act-queue-diagnostics',
+    schedulerDiagnosticStatus: 'drained-accepted-internal-test-queue',
+    accepted: true,
+    queueKind: queue.kind,
+    pendingBefore,
+    drainedCount: drainedRecords.length,
+    remainingCount: queue.records.length,
+    drainedRecords: freezeArray(drainedRecords),
+    consumer: 'react-test-renderer-act-scheduler-private-gate',
+    gateStatus: actSchedulerGateStatus,
+    privateSchedulerActQueueDiagnosticsConsumed: true,
+    drainsAcceptedInternalTestQueues: true,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    publicActCompatibilityClaimed: false,
+    compatibilityClaimed: false,
+    invokesActCallback: false,
+    executesQueuedWork: false,
+    executesEffects: false,
+    executesScheduledCallbacks: false,
+    publicSchedulerFlushExecutionAvailable: false,
+    publicActBehaviorAvailable: false,
+    rendererRootsCompatibilityClaimed: false
+  });
+}
+
+function shouldAttachPrivateActQueueFlushDiagnostics(key) {
+  return schedulerMockFlushHelperMetadata.some((helper) => helper.key === key);
+}
+
+function attachPrivateActQueueFlushDiagnostics(fn) {
+  Object.defineProperty(fn, privateActQueueFlushDiagnosticsExport, {
+    configurable: false,
+    enumerable: false,
+    value: privateActQueueFlushDiagnostics,
+    writable: false
+  });
+
+  return fn;
+}
+
 function createSchedulerPlaceholder() {
   const scheduler = {};
 
@@ -2132,7 +2503,14 @@ function createSchedulerPlaceholder() {
       scheduler[key] = schedulerConstantValues[key];
     } else {
       const [name, length] = schedulerFunctionShapes[key];
-      scheduler[key] = createSchedulerUnsupportedFunction(key, name, length);
+      const schedulerFunction = createSchedulerUnsupportedFunction(
+        key,
+        name,
+        length
+      );
+      scheduler[key] = shouldAttachPrivateActQueueFlushDiagnostics(key)
+        ? attachPrivateActQueueFlushDiagnostics(schedulerFunction)
+        : schedulerFunction;
     }
   }
 

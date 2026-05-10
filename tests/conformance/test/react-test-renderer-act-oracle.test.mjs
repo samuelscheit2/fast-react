@@ -35,6 +35,10 @@ const actBlockedGateStatus =
   "blocked-until-react-test-renderer-act-queue-effects-and-renderer-roots";
 const actSchedulerGateStatus =
   "blocked-private-react-test-renderer-act-scheduler-metadata-only";
+const privateActDispatcherGateModule =
+  "packages/react/private-act-dispatcher-gate.js";
+const privateActQueueFlushDiagnosticsExport =
+  "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__";
 const actUnblockingRequirements = [
   {
     id: "react-test-renderer-act-queue-flushing",
@@ -178,6 +182,10 @@ const ACT_SCHEDULER_ROOT_RECORD_IDS = [
 const ACT_SCHEDULER_REACT_DISPATCHER_RECORD_IDS = [
   "react-act-private-dispatcher-gate"
 ];
+const ACT_SCHEDULER_REACT_QUEUE_DIAGNOSTIC_RECORD_IDS = [
+  "scheduler-private-act-queue-flush-diagnostics",
+  "react-private-act-internal-test-queue-factories"
+];
 const ACT_SCHEDULER_SYNC_FLUSH_RECORD_IDS = [
   "sync-flush-act-continuation-record",
   "sync-flush-act-post-passive-continuation-gate",
@@ -201,6 +209,7 @@ const ACT_SCHEDULER_ROOT_FLUSH_RECORD_IDS = [
 ];
 const ACCEPTED_PRIVATE_ACT_FLUSH_PREREQUISITE_IDS = [
   "react-act-private-dispatcher-gate",
+  "scheduler-react-act-queue-diagnostic-consumption",
   "scheduler-act-queue-routing-records",
   "scheduler-mock-flush-helper-metadata",
   "sync-flush-act-continuation-records",
@@ -544,6 +553,7 @@ test("Fast React react-test-renderer act stays blocked behind accepted package a
   assert.equal(localGate.rendererRootsReady, false);
   assert.equal(localGate.actSchedulerPrivateGatePresent, true);
   assert.equal(localGate.reactActPrivateDispatcherGateAccepted, true);
+  assert.equal(localGate.privateActQueueDiagnosticConsumptionPresent, true);
   assert.equal(localGate.schedulerMockFlushHelperMetadataAccepted, true);
   assert.equal(localGate.rootActRecordsAccepted, true);
   assert.equal(localGate.syncFlushActRecordsAccepted, true);
@@ -609,6 +619,7 @@ test("Fast React react-test-renderer act stays blocked behind accepted package a
       moduleExports._Scheduler,
       flushSyncError.actSchedulerGate
     );
+    assertPrivateActQueueDiagnosticConsumer(entry, moduleExports);
     assertActSurface(entry, moduleExports);
     assertSchedulerSurfaceBlocked(entry, moduleExports._Scheduler);
   }
@@ -800,6 +811,18 @@ function loadFreshLocalEntrypoint(entry) {
   }
 }
 
+function loadFreshWorkspaceModule(relativeModulePath) {
+  const absolutePath = path.join(repoRoot, relativeModulePath);
+  const resolved = require.resolve(absolutePath);
+  delete require.cache[resolved];
+
+  try {
+    return require(resolved);
+  } finally {
+    delete require.cache[resolved];
+  }
+}
+
 function inspectLocalReactTestRendererActBlockedGate() {
   const schedulerBridgeSource = readWorkspaceFile(
     "crates/fast-react-reconciler/src/scheduler_bridge.rs"
@@ -908,6 +931,15 @@ function inspectLocalReactTestRendererActBlockedGate() {
     /fast-react\.react\.act-queue-metadata/u.test(
       reactPrivateActDispatcherSource
     );
+  const privateActQueueDiagnosticConsumptionPresent =
+    actSchedulerPrivateGatePresent &&
+    /__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__/u.test(
+      testRendererSource
+    ) &&
+    /consumeAcceptedSchedulerActQueueDiagnostics/u.test(testRendererSource) &&
+    /worker-377-scheduler-act-queue-flush-helper-private/u.test(
+      testRendererSource
+    );
   const rootActRecordsAccepted =
     actSchedulerPrivateGatePresent &&
     /SchedulerActQueueRequest/u.test(testRendererSource) &&
@@ -980,6 +1012,7 @@ function inspectLocalReactTestRendererActBlockedGate() {
     privatePassiveDestroyExecutionMetadataPresent,
     actSchedulerPrivateGatePresent,
     reactActPrivateDispatcherGateAccepted,
+    privateActQueueDiagnosticConsumptionPresent,
     schedulerMockFlushHelperMetadataAccepted,
     rootActRecordsAccepted,
     syncFlushActRecordsAccepted,
@@ -1003,6 +1036,198 @@ function inspectLocalReactTestRendererActBlockedGate() {
   };
 }
 
+function assertPrivateActQueueDiagnosticConsumer(entry, moduleExports) {
+  const reactGate = loadFreshWorkspaceModule(privateActDispatcherGateModule);
+  const diagnostics =
+    moduleExports._Scheduler.unstable_flushAllWithoutAsserting[
+      privateActQueueFlushDiagnosticsExport
+    ];
+
+  assert.equal(
+    Object.keys(moduleExports._Scheduler).includes(
+      privateActQueueFlushDiagnosticsExport
+    ),
+    false,
+    entry.entrypoint
+  );
+  assert.equal(
+    Reflect.ownKeys(moduleExports._Scheduler).includes(
+      privateActQueueFlushDiagnosticsExport
+    ),
+    false,
+    entry.entrypoint
+  );
+  assert.equal(Object.isFrozen(diagnostics), true, entry.entrypoint);
+  assert.equal(
+    diagnostics.status,
+    "private-react-test-renderer-act-queue-diagnostic-consumer"
+  );
+  assert.equal(
+    diagnostics.schedulerDiagnosticStatus,
+    "private-scheduler-act-queue-flush-diagnostics"
+  );
+  assert.equal(diagnostics.exportName, privateActQueueFlushDiagnosticsExport);
+  assert.equal(
+    diagnostics.consumer,
+    "react-test-renderer-act-scheduler-private-gate"
+  );
+  assert.equal(diagnostics.compatibilityClaimed, false);
+  assert.equal(diagnostics.publicSchedulerTimingCompatibilityClaimed, false);
+  assert.equal(diagnostics.publicReactActCompatibilityClaimed, false);
+  assert.equal(diagnostics.executesQueuedWork, false);
+  assert.equal(diagnostics.executesEffects, false);
+  assert.equal(diagnostics.invokesActCallback, false);
+
+  for (const [key] of ACT_SCHEDULER_FLUSH_HELPER_METADATA) {
+    assert.equal(
+      moduleExports._Scheduler[key][privateActQueueFlushDiagnosticsExport],
+      diagnostics,
+      `${entry.entrypoint}:${key}`
+    );
+    const descriptor = Object.getOwnPropertyDescriptor(
+      moduleExports._Scheduler[key],
+      privateActQueueFlushDiagnosticsExport
+    );
+    assert.equal(descriptor.enumerable, false, `${entry.entrypoint}:${key}`);
+    assert.equal(descriptor.writable, false, `${entry.entrypoint}:${key}`);
+    assert.equal(descriptor.configurable, false, `${entry.entrypoint}:${key}`);
+  }
+
+  const queue = reactGate.createInternalActQueueTestQueue([
+    reactGate.createInternalActQueueTestTask({
+      label: "test-renderer-root-schedule",
+      recordKind: "SchedulerActQueueRequest",
+      taskKind: "RootSchedule"
+    }),
+    reactGate.createInternalActQueueTestTask({
+      label: "test-renderer-scheduler-callback",
+      recordKind: "SchedulerActQueueRequest",
+      taskKind: "SchedulerCallback",
+      continuationStatus: "PendingContinuation"
+    })
+  ]);
+  assert.equal(reactGate.isAcceptedInternalActQueueTestQueue(queue), true);
+
+  assert.deepEqual(diagnostics.describeAcceptedInternalActQueue(queue), {
+    status: "accepted-internal-test-queue",
+    accepted: true,
+    rejectionReason: null,
+    queueKind: reactGate.internalTestQueueKind,
+    pendingCount: 2,
+    consumer: "react-test-renderer-act-scheduler-private-gate",
+    gateStatus: actSchedulerGateStatus,
+    drainsAcceptedInternalTestQueues: true,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    compatibilityClaimed: false,
+    executesQueuedWork: false,
+    executesEffects: false
+  });
+
+  const report =
+    diagnostics.consumeAcceptedSchedulerActQueueDiagnostics(queue);
+  assert.equal(
+    report.status,
+    "react-test-renderer-consumed-accepted-scheduler-act-queue-diagnostics"
+  );
+  assert.equal(
+    report.schedulerDiagnosticStatus,
+    "drained-accepted-internal-test-queue"
+  );
+  assert.equal(report.pendingBefore, 2);
+  assert.equal(report.drainedCount, 2);
+  assert.equal(report.remainingCount, 0);
+  assert.deepEqual(
+    report.drainedRecords.map((record) => [
+      record.index,
+      record.label,
+      record.recordKind,
+      record.taskKind,
+      record.continuationStatus,
+      record.executesQueuedWork,
+      record.executesEffects
+    ]),
+    [
+      [
+        0,
+        "test-renderer-root-schedule",
+        "SchedulerActQueueRequest",
+        "RootSchedule",
+        "NoContinuation",
+        false,
+        false
+      ],
+      [
+        1,
+        "test-renderer-scheduler-callback",
+        "SchedulerActQueueRequest",
+        "SchedulerCallback",
+        "PendingContinuation",
+        false,
+        false
+      ]
+    ],
+    entry.entrypoint
+  );
+  assert.equal(report.privateSchedulerActQueueDiagnosticsConsumed, true);
+  assert.equal(report.drainsAcceptedInternalTestQueues, true);
+  assert.equal(report.drainsPublicSchedulerTaskQueue, false);
+  assert.equal(report.drainsPublicReactActQueue, false);
+  assert.equal(report.publicSchedulerTimingCompatibilityClaimed, false);
+  assert.equal(report.publicReactActCompatibilityClaimed, false);
+  assert.equal(report.publicActCompatibilityClaimed, false);
+  assert.equal(report.compatibilityClaimed, false);
+  assert.equal(report.invokesActCallback, false);
+  assert.equal(report.executesQueuedWork, false);
+  assert.equal(report.executesEffects, false);
+  assert.equal(report.executesScheduledCallbacks, false);
+  assert.equal(report.publicSchedulerFlushExecutionAvailable, false);
+  assert.equal(report.publicActBehaviorAvailable, false);
+  assert.equal(report.rendererRootsCompatibilityClaimed, false);
+  assert.equal(queue.records.length, 0, entry.entrypoint);
+
+  const aliasQueue = reactGate.createInternalActQueueTestQueue([
+    "alias-consumed-task"
+  ]);
+  assert.equal(
+    diagnostics.drainAcceptedInternalActQueue(aliasQueue).drainedCount,
+    1,
+    entry.entrypoint
+  );
+
+  const rejected = diagnostics.describeAcceptedInternalActQueue([]);
+  assert.equal(rejected.accepted, false, entry.entrypoint);
+  assert.throws(
+    () => diagnostics.consumeAcceptedSchedulerActQueueDiagnostics([]),
+    (error) => {
+      assert.equal(
+        error.name,
+        "FastReactTestRendererPrivateActQueueDiagnosticError"
+      );
+      assert.equal(
+        error.code,
+        "FAST_REACT_TEST_RENDERER_PRIVATE_ACT_QUEUE_DIAGNOSTIC_REJECTED"
+      );
+      assert.equal(error.entrypoint, entry.entrypoint);
+      assert.equal(
+        error.exportName,
+        `_Scheduler.${privateActQueueFlushDiagnosticsExport}`
+      );
+      assert.equal(error.schedulerReactActQueueDiagnosticsAccepted, true);
+      assert.equal(error.privateSchedulerActQueueDiagnosticsConsumed, true);
+      assert.equal(error.privateActQueueDiagnosticConsumptionReady, true);
+      assert.equal(error.publicSchedulerTimingCompatibilityClaimed, false);
+      assert.equal(error.publicReactActCompatibilityClaimed, false);
+      assert.equal(error.executesQueuedWork, false);
+      assert.equal(error.executesEffects, false);
+      return true;
+    },
+    entry.entrypoint
+  );
+}
+
 function assertActSurface(entry, moduleExports) {
   if (entry.actExport === "undefined") {
     assert.equal(moduleExports.act, undefined, entry.entrypoint);
@@ -1024,6 +1249,9 @@ function assertActSurface(entry, moduleExports) {
   assertActSchedulerGate(error.actSchedulerGate, entry.entrypoint);
   assert.equal(error.queuedWorkExecution, false);
   assert.equal(error.reactActPrivateDispatcherGateAccepted, true);
+  assert.equal(error.schedulerReactActQueueDiagnosticsAccepted, true);
+  assert.equal(error.privateSchedulerActQueueDiagnosticsConsumed, true);
+  assert.equal(error.privateActQueueDiagnosticConsumptionReady, true);
   assert.equal(error.postPassiveContinuationExecutionGateAccepted, true);
   assert.equal(error.passiveActFlushMetadataAccepted, true);
   assert.equal(error.rootRequestRecordsAccepted, true);
@@ -1118,7 +1346,8 @@ function assertActSchedulerGate(gate, entrypoint) {
     "worker-332-test-renderer-js-private-root-native-bridge",
     "worker-333-test-renderer-tojson-host-output-private-path",
     "worker-334-test-renderer-testinstance-private-query-path",
-    "worker-349-hook-effect-destroy-callback-execution-private"
+    "worker-349-hook-effect-destroy-callback-execution-private",
+    "worker-377-scheduler-act-queue-flush-helper-private"
   ]);
   assert.equal(gate.publicActBehaviorAvailable, false);
   assert.equal(gate.publicSchedulerFlushExecutionAvailable, false);
@@ -1135,6 +1364,9 @@ function assertActSchedulerGate(gate, entrypoint) {
   assert.equal(gate.rendererRootsCompatibilityClaimed, false);
   assert.equal(gate.compatibilityClaimed, false);
   assert.equal(gate.reactActPrivateDispatcherGateAccepted, true);
+  assert.equal(gate.schedulerReactActQueueDiagnosticsAccepted, true);
+  assert.equal(gate.privateSchedulerActQueueDiagnosticsConsumed, true);
+  assert.equal(gate.privateActQueueDiagnosticConsumptionReady, true);
   assert.equal(gate.schedulerMockFlushHelperMetadataAccepted, true);
   assert.equal(gate.rootActRecordsAccepted, true);
   assert.equal(gate.syncFlushActRecordsAccepted, true);
@@ -1150,6 +1382,16 @@ function assertActSchedulerGate(gate, entrypoint) {
   assert.deepEqual(
     gate.recognizedReactActPrivateDispatcherRecords.map((record) => record.id),
     ACT_SCHEDULER_REACT_DISPATCHER_RECORD_IDS
+  );
+  assert.deepEqual(
+    gate.recognizedSchedulerReactActQueueDiagnostics.map(
+      (record) => record.id
+    ),
+    ACT_SCHEDULER_REACT_QUEUE_DIAGNOSTIC_RECORD_IDS
+  );
+  assert.equal(
+    gate.privateActQueueFlushDiagnostics.status,
+    "private-react-test-renderer-act-queue-diagnostic-consumer"
   );
   assert.deepEqual(
     gate.recognizedSchedulerMockFlushHelpers.map((record) => [
@@ -1199,12 +1441,19 @@ function assertActSchedulerGate(gate, entrypoint) {
     executesRootRequests: false,
     mutatesHostOutput: false,
     acceptsPrivateFlushExecutionMetadata: true,
+    consumesPrivateSchedulerActQueueDiagnostics: true,
+    drainsAcceptedInternalTestQueues: true,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
     executesPublicSchedulerTasks: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
     compatibilityClaimed: false
   });
 
   for (const record of [
     ...gate.recognizedReactActPrivateDispatcherRecords,
+    ...gate.recognizedSchedulerReactActQueueDiagnostics,
     ...gate.recognizedRootActRecords,
     ...gate.recognizedSyncFlushActRecords,
     ...gate.recognizedPassiveActFlushRecords,
@@ -1221,6 +1470,21 @@ function assertActSchedulerGate(gate, entrypoint) {
 
   assert.equal(
     gate.recognizedSyncFlushActRecords[1].passiveEffectExecution,
+    false
+  );
+  assert.equal(
+    gate.recognizedSchedulerReactActQueueDiagnostics[0]
+      .drainsAcceptedInternalTestQueues,
+    true
+  );
+  assert.equal(
+    gate.recognizedSchedulerReactActQueueDiagnostics[0]
+      .drainsPublicSchedulerTaskQueue,
+    false
+  );
+  assert.equal(
+    gate.recognizedSchedulerReactActQueueDiagnostics[0]
+      .drainsPublicReactActQueue,
     false
   );
   assert.equal(
