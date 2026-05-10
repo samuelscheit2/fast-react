@@ -8,6 +8,7 @@ mod execution_context;
 mod fiber_root;
 mod fiber_store;
 mod function_component;
+mod host_nodes;
 mod host_tokens;
 #[cfg(test)]
 mod host_work;
