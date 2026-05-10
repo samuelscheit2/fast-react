@@ -6,8 +6,12 @@ const REF_CALLBACK_COMPONENT_TREE_GATE_STATUS =
   'blocked-until-ref-callback-execution-boundary';
 const REF_CALLBACK_ATTACH_DETACH_GATE_STATUS =
   'blocked-until-ref-callback-attach-detach-execution';
+const REF_CALLBACK_CONTROLLED_INVOCATION_GATE_STATUS =
+  'private-controlled-ref-callback-invocation-recorded';
 const REF_CALLBACK_ERROR_PROPAGATION_STATUS =
   'blocked-until-root-error-routing';
+const REF_CALLBACK_PUBLIC_REF_COMPATIBILITY_STATUS =
+  'blocked-until-public-root-ref-commit-integration';
 const REF_ACTION_ATTACH = 'attach';
 const REF_ACTION_DETACH = 'detach';
 const REF_DETACH_REASON_DELETED = 'deleted';
@@ -21,6 +25,18 @@ const REF_OPERATION_CALLBACK_DETACH =
 const REF_OPERATION_OBJECT_ATTACH =
   'set-object-ref-current-to-host-instance';
 const REF_OPERATION_OBJECT_DETACH = 'clear-object-ref-current-to-null';
+const REF_CALLBACK_INVOCATION_ATTACH = 'callback-attach';
+const REF_CALLBACK_INVOCATION_NULL_DETACH = 'callback-null-detach';
+const REF_CALLBACK_INVOCATION_CLEANUP_RETURN = 'callback-cleanup-return';
+const REF_CALLBACK_INVOCATION_SKIPPED_OBJECT_REF =
+  'object-ref-not-invoked';
+const REF_CALLBACK_INVOCATION_STATUS_OK = 'ok';
+const REF_CALLBACK_INVOCATION_STATUS_THROWN = 'threw';
+const REF_CALLBACK_INVOCATION_STATUS_SKIPPED = 'skipped';
+const REF_CALLBACK_RETURN_CLEANUP = 'cleanup-function';
+const REF_CALLBACK_RETURN_VALUE = 'non-function-value';
+const REF_CALLBACK_RETURN_VOID = 'void';
+const REF_CALLBACK_RETURN_NOT_APPLICABLE = 'not-applicable';
 const REF_TOKEN_PHASE_COMMIT = 'commit';
 const REF_TOKEN_PHASE_DELETION = 'deletion';
 const REF_TOKEN_TARGET_INSTANCE = 'instance';
@@ -35,6 +51,10 @@ const privateDomRefCallbackAttachDetachGateSnapshotType =
   'fast.react_dom.private_ref_callback_attach_detach_gate_snapshot';
 const privateDomRefCallbackAttachDetachGateRecordType =
   'fast.react_dom.private_ref_callback_attach_detach_gate_record';
+const privateDomRefCallbackControlledInvocationGateSnapshotType =
+  'fast.react_dom.private_ref_callback_controlled_invocation_gate_snapshot';
+const privateDomRefCallbackControlledInvocationGateRecordType =
+  'fast.react_dom.private_ref_callback_controlled_invocation_gate_record';
 
 const blockedCapabilities = freezeArray([
   blockedCapability(
@@ -67,6 +87,33 @@ const blockedCapabilities = freezeArray([
   )
 ]);
 
+const controlledInvocationBlockedCapabilities = freezeArray([
+  blockedCapability(
+    'object-ref-mutation',
+    'Object ref writes require a ref store and commit-phase mutation boundary.'
+  ),
+  blockedCapability(
+    'layout-effect-execution',
+    'Ref attach ordering must stay separate from layout effect execution.'
+  ),
+  blockedCapability(
+    'dom-mutation',
+    'Controlled callback attempts receive fake host nodes, not mounted DOM nodes.'
+  ),
+  blockedCapability(
+    'public-root-integration',
+    'Public React DOM roots remain placeholder-gated and do not route refs.'
+  ),
+  blockedCapability(
+    'root-error-propagation',
+    'Ref callback errors require root error callback routing before reporting.'
+  ),
+  blockedCapability(
+    'react-dom-ref-compatibility-claim',
+    'React DOM ref compatibility is not claimed by this private gate.'
+  )
+]);
+
 const noSideEffects = freezeRecord({
   callbackRefsInvoked: false,
   objectRefsMutated: false,
@@ -83,6 +130,14 @@ const blockedErrorPropagation = freezeRecord({
   reason: 'Root error callback routing is not connected to this private gate.'
 });
 
+const blockedPublicRefCompatibility = freezeRecord({
+  status: REF_CALLBACK_PUBLIC_REF_COMPATIBILITY_STATUS,
+  publicRootsTouched: false,
+  compatibilityClaimed: false,
+  reason:
+    'Controlled private callback attempts are not wired to public React DOM roots.'
+});
+
 const attachDetachOrdering = freezeRecord({
   source: 'root-commit-ref-metadata',
   deterministic: true,
@@ -94,6 +149,8 @@ const gateSnapshotPayloads = new WeakMap();
 const gateRecordPayloads = new WeakMap();
 const attachDetachGateSnapshotPayloads = new WeakMap();
 const attachDetachGateRecordPayloads = new WeakMap();
+const controlledInvocationGateSnapshotPayloads = new WeakMap();
+const controlledInvocationGateRecordPayloads = new WeakMap();
 
 function createRefAttachMetadataRecord(options) {
   return createRefCallbackMetadataRecord({
@@ -211,6 +268,79 @@ function createRefCallbackAttachDetachGateSnapshot(snapshot) {
   return gateSnapshot;
 }
 
+function createRefCallbackControlledInvocationGateSnapshot(snapshot) {
+  const metadata = normalizeRootCommitRefMetadataSnapshot(snapshot);
+  const validatedRecords = validateMetadataSnapshotAgainstComponentTree(
+    metadata
+  );
+  const invocationResults = validatedRecords.map((validatedRecord, sequence) =>
+    createControlledInvocationGateRecord(sequence, validatedRecord)
+  );
+  const records = freezeArray(
+    invocationResults.map((invocationResult) => invocationResult.record)
+  );
+  const metrics = summarizeControlledInvocationResults(invocationResults);
+
+  const gateSnapshot = freezeRecord({
+    $$typeof: privateDomRefCallbackControlledInvocationGateSnapshotType,
+    kind: 'FastReactDomPrivateRefCallbackControlledInvocationGateSnapshot',
+    status: REF_CALLBACK_CONTROLLED_INVOCATION_GATE_STATUS,
+    recordCount: records.length,
+    detachCount: metadata.detach.length,
+    attachCount: metadata.attach.length,
+    callbackRefRecordCount: metrics.callbackRefRecordCount,
+    objectRefRecordCount: metrics.objectRefRecordCount,
+    callbackInvocationAttemptCount: metrics.callbackInvocationAttemptCount,
+    callbackInvocationErrorCount: metrics.callbackInvocationErrorCount,
+    callbackCleanupReturnCount: metrics.callbackCleanupReturnCount,
+    cleanupInvocationAttemptCount: metrics.cleanupInvocationAttemptCount,
+    cleanupInvocationErrorCount: metrics.cleanupInvocationErrorCount,
+    callbackNullDetachAttemptCount: metrics.callbackNullDetachAttemptCount,
+    objectRefSkippedCount: metrics.objectRefSkippedCount,
+    fakeHostNodeRecordCount: metrics.fakeHostNodeRecordCount,
+    records,
+    ordering: attachDetachOrdering,
+    errorPropagation: blockedErrorPropagation,
+    errorPropagationStatus: REF_CALLBACK_ERROR_PROPAGATION_STATUS,
+    publicRefCompatibility: blockedPublicRefCompatibility,
+    publicRefCompatibilityStatus: REF_CALLBACK_PUBLIC_REF_COMPATIBILITY_STATUS,
+    blockedCapabilities: controlledInvocationBlockedCapabilities,
+    sideEffects: freezeRecord({
+      callbackRefsInvoked: metrics.callbackInvocationAttemptCount > 0,
+      callbackCleanupReturnsInvoked: metrics.cleanupInvocationAttemptCount > 0,
+      objectRefsMutated: false,
+      layoutEffectsRun: false,
+      domMutated: false,
+      publicRootsTouched: false,
+      rootErrorsReported: false,
+      compatibilityClaimed: false
+    }),
+    callbackRefsInvoked: metrics.callbackInvocationAttemptCount > 0,
+    callbackCleanupReturnsInvoked:
+      metrics.cleanupInvocationAttemptCount > 0,
+    objectRefsMutated: false,
+    layoutEffectsRun: false,
+    domMutated: false,
+    publicRootsTouched: false,
+    rootErrorsReported: false,
+    compatibilityClaimed: false
+  });
+
+  controlledInvocationGateSnapshotPayloads.set(
+    gateSnapshot,
+    freezeRecord({
+      detach: metadata.detach,
+      attach: metadata.attach,
+      records: validatedRecords,
+      invocationResults: freezeArray(
+        invocationResults.map((invocationResult) => invocationResult.payload)
+      )
+    })
+  );
+
+  return gateSnapshot;
+}
+
 function getPrivateRefCallbackMetadataRecordPayload(record) {
   return isWeakMapKey(record)
     ? metadataRecordPayloads.get(record) || null
@@ -239,6 +369,20 @@ function getPrivateRefCallbackAttachDetachGateRecordPayload(record) {
     : null;
 }
 
+function getPrivateRefCallbackControlledInvocationGateSnapshotPayload(
+  snapshot
+) {
+  return isWeakMapKey(snapshot)
+    ? controlledInvocationGateSnapshotPayloads.get(snapshot) || null
+    : null;
+}
+
+function getPrivateRefCallbackControlledInvocationGateRecordPayload(record) {
+  return isWeakMapKey(record)
+    ? controlledInvocationGateRecordPayloads.get(record) || null
+    : null;
+}
+
 function isPrivateRefCallbackMetadataRecord(value) {
   return getPrivateRefCallbackMetadataRecordPayload(value) !== null;
 }
@@ -259,6 +403,19 @@ function isPrivateRefCallbackAttachDetachGateRecord(value) {
   return getPrivateRefCallbackAttachDetachGateRecordPayload(value) !== null;
 }
 
+function isPrivateRefCallbackControlledInvocationGateSnapshot(value) {
+  return (
+    getPrivateRefCallbackControlledInvocationGateSnapshotPayload(value) !==
+    null
+  );
+}
+
+function isPrivateRefCallbackControlledInvocationGateRecord(value) {
+  return (
+    getPrivateRefCallbackControlledInvocationGateRecordPayload(value) !== null
+  );
+}
+
 function createRefCallbackMetadataRecord(options) {
   const action = normalizeAction(options.action);
   const expectedPhase = tokenPhaseForAction(action);
@@ -266,11 +423,27 @@ function createRefCallbackMetadataRecord(options) {
     action === REF_ACTION_DETACH
       ? normalizeDetachReason(options.detachReason)
       : null;
+  const ref = normalizeRefValue(options.ref);
+  const refCleanup = normalizeRefCleanupValue(options.refCleanup);
 
   if (action === REF_ACTION_ATTACH && options.detachReason != null) {
     throw createRefCallbackGateError(
       'FAST_REACT_DOM_REF_CALLBACK_GATE_ATTACH_DETACH_REASON',
       'Ref attach metadata must not include a detach reason.'
+    );
+  }
+
+  if (action === REF_ACTION_ATTACH && refCleanup !== null) {
+    throw createRefCallbackGateError(
+      'FAST_REACT_DOM_REF_CALLBACK_GATE_ATTACH_REF_CLEANUP',
+      'Ref attach metadata must not include a cleanup return.'
+    );
+  }
+
+  if (refCleanup !== null && typeof ref !== 'function') {
+    throw createRefCallbackGateError(
+      'FAST_REACT_DOM_REF_CALLBACK_GATE_OBJECT_REF_CLEANUP',
+      'Object ref metadata must not include a callback cleanup return.'
     );
   }
 
@@ -286,9 +459,10 @@ function createRefCallbackMetadataRecord(options) {
     fiber: assertRequiredOption(options.fiber, 'fiber'),
     stateNode: assertRequiredOption(options.stateNode, 'stateNode'),
     refHandle: assertRequiredOption(options.refHandle, 'refHandle'),
-    ref: normalizeRefValue(options.ref),
+    ref,
+    refCleanup,
     expectedLatestRef:
-      'expectedLatestRef' in options ? options.expectedLatestRef : options.ref,
+      'expectedLatestRef' in options ? options.expectedLatestRef : ref,
     sourceToken: assertRequiredOption(options.sourceToken, 'sourceToken'),
     tokenPhase:
       options.tokenPhase === undefined ? expectedPhase : options.tokenPhase,
@@ -306,7 +480,9 @@ function createRefCallbackMetadataRecord(options) {
     tokenPhase: payload.tokenPhase,
     tokenTarget: payload.tokenTarget,
     status: 'accepted-private-root-commit-ref-metadata',
+    hasRefCleanup: payload.refCleanup !== null,
     exposesRefValue: false,
+    exposesRefCleanup: false,
     exposesHostNode: false,
     exposesLatestProps: false
   });
@@ -613,6 +789,263 @@ function createAttachDetachGateRecord(sequence, validatedRecord) {
   return record;
 }
 
+function createControlledInvocationGateRecord(sequence, validatedRecord) {
+  const {payload, componentTreeRecord, hostNodeRecord, hostNodePayload} =
+    validatedRecord;
+  const refKind = refKindForValue(payload.ref);
+  const operation = operationForRefAction(refKind, payload.action);
+  const ordering = createOperationOrderingRecord(sequence, payload.action);
+  const fakeHostNodeRecord =
+    refKind === REF_KIND_CALLBACK
+      ? componentTree.createRefCallbackFakeHostNodeRecord(hostNodeRecord)
+      : null;
+  const fakeHostNodePayload =
+    fakeHostNodeRecord === null
+      ? null
+      : componentTree.getPrivateRefCallbackFakeHostNodeRecordPayload(
+          fakeHostNodeRecord
+        );
+
+  if (fakeHostNodeRecord !== null && fakeHostNodePayload === null) {
+    throw createRefCallbackGateError(
+      'FAST_REACT_DOM_REF_CALLBACK_GATE_INVALID_FAKE_HOST_NODE_RECORD',
+      'Cannot run controlled ref callback invocation without a private fake host node record.'
+    );
+  }
+
+  const invocation = runControlledInvocation(payload, fakeHostNodePayload);
+  const record = freezeRecord({
+    $$typeof: privateDomRefCallbackControlledInvocationGateRecordType,
+    kind: 'FastReactDomPrivateRefCallbackControlledInvocationGateRecord',
+    sequence,
+    action: payload.action,
+    detachReason: payload.detachReason,
+    refKind,
+    operation,
+    status: REF_CALLBACK_CONTROLLED_INVOCATION_GATE_STATUS,
+    rootCommitMetadataStatus: 'accepted-private-root-commit-ref-metadata',
+    componentTreeStatus: componentTreeRecord.status,
+    hostNodeRecord,
+    hostNodeRecordKind: hostNodeRecord.kind,
+    fakeHostNodeRecord,
+    fakeHostNodeRecordKind:
+      fakeHostNodeRecord === null ? null : fakeHostNodeRecord.kind,
+    fakeHostNodeStatus:
+      fakeHostNodeRecord === null ? 'not-applicable' : fakeHostNodeRecord.status,
+    latestRefStatus: 'matches-private-metadata',
+    tokenPhase: payload.tokenPhase,
+    tokenTarget: payload.tokenTarget,
+    ordering,
+    invocationKind: invocation.kind,
+    invocationStatus: invocation.status,
+    invocationAttempted: invocation.attempted,
+    callbackRefInvocationAttempted: invocation.callbackAttempted,
+    cleanupReturnInvocationAttempted: invocation.cleanupAttempted,
+    callbackReturnStatus: invocation.callbackReturnStatus,
+    callbackCleanupReturnRecorded: invocation.cleanupReturnRecorded,
+    cleanupReturnStatus: invocation.cleanupReturnStatus,
+    invocationErrorCaptured: invocation.error !== null,
+    errorPropagation: blockedErrorPropagation,
+    errorPropagationStatus: REF_CALLBACK_ERROR_PROPAGATION_STATUS,
+    publicRefCompatibility: blockedPublicRefCompatibility,
+    publicRefCompatibilityStatus: REF_CALLBACK_PUBLIC_REF_COMPATIBILITY_STATUS,
+    blockedCapabilities: controlledInvocationBlockedCapabilities,
+    callbackRefsInvoked: invocation.callbackAttempted,
+    callbackCleanupReturnsInvoked: invocation.cleanupAttempted,
+    objectRefsMutated: false,
+    layoutEffectsRun: false,
+    domMutated: false,
+    publicRootsTouched: false,
+    rootErrorsReported: false,
+    compatibilityClaimed: false,
+    exposesRefValue: false,
+    exposesRefCleanup: false,
+    exposesHostNode: false,
+    exposesFakeHostNode: false,
+    exposesLatestProps: false
+  });
+
+  const hiddenPayload = freezeRecord({
+    metadata: payload,
+    componentTree: componentTreeRecord,
+    hostNode: hostNodePayload,
+    fakeHostNode:
+      fakeHostNodePayload === null ? null : fakeHostNodePayload.fakeHostNode,
+    fakeHostNodeRecord,
+    ref: payload.ref,
+    refCleanup: payload.refCleanup,
+    callbackReturn: invocation.returnValue,
+    cleanupReturn: invocation.cleanupReturn,
+    error: invocation.error,
+    invocation
+  });
+
+  controlledInvocationGateRecordPayloads.set(record, hiddenPayload);
+  return {
+    record,
+    payload: hiddenPayload,
+    invocation,
+    refKind,
+    fakeHostNodeRecord
+  };
+}
+
+function runControlledInvocation(payload, fakeHostNodePayload) {
+  if (typeof payload.ref !== 'function') {
+    return freezeRecord({
+      kind: REF_CALLBACK_INVOCATION_SKIPPED_OBJECT_REF,
+      status: REF_CALLBACK_INVOCATION_STATUS_SKIPPED,
+      attempted: false,
+      callbackAttempted: false,
+      cleanupAttempted: false,
+      callbackReturnStatus: REF_CALLBACK_RETURN_NOT_APPLICABLE,
+      cleanupReturnStatus: REF_CALLBACK_RETURN_NOT_APPLICABLE,
+      cleanupReturnRecorded: false,
+      returnValue: undefined,
+      cleanupReturn: null,
+      error: null
+    });
+  }
+
+  if (payload.action === REF_ACTION_DETACH && payload.refCleanup !== null) {
+    return runControlledCleanupReturn(payload.refCleanup);
+  }
+
+  const invocationKind =
+    payload.action === REF_ACTION_ATTACH
+      ? REF_CALLBACK_INVOCATION_ATTACH
+      : REF_CALLBACK_INVOCATION_NULL_DETACH;
+  const argument =
+    payload.action === REF_ACTION_ATTACH
+      ? fakeHostNodePayload.fakeHostNode
+      : null;
+
+  try {
+    const returnValue = payload.ref(argument);
+    const cleanupReturnRecorded =
+      payload.action === REF_ACTION_ATTACH &&
+      typeof returnValue === 'function';
+    return freezeRecord({
+      kind: invocationKind,
+      status: REF_CALLBACK_INVOCATION_STATUS_OK,
+      attempted: true,
+      callbackAttempted: true,
+      cleanupAttempted: false,
+      callbackReturnStatus: callbackReturnStatusForValue(returnValue),
+      cleanupReturnStatus: cleanupReturnRecorded
+        ? REF_CALLBACK_RETURN_CLEANUP
+        : REF_CALLBACK_RETURN_NOT_APPLICABLE,
+      cleanupReturnRecorded,
+      returnValue,
+      cleanupReturn: cleanupReturnRecorded ? returnValue : null,
+      error: null
+    });
+  } catch (error) {
+    return freezeRecord({
+      kind: invocationKind,
+      status: REF_CALLBACK_INVOCATION_STATUS_THROWN,
+      attempted: true,
+      callbackAttempted: true,
+      cleanupAttempted: false,
+      callbackReturnStatus: REF_CALLBACK_RETURN_NOT_APPLICABLE,
+      cleanupReturnStatus: REF_CALLBACK_RETURN_NOT_APPLICABLE,
+      cleanupReturnRecorded: false,
+      returnValue: undefined,
+      cleanupReturn: null,
+      error
+    });
+  }
+}
+
+function runControlledCleanupReturn(refCleanup) {
+  try {
+    const returnValue = refCleanup();
+    return freezeRecord({
+      kind: REF_CALLBACK_INVOCATION_CLEANUP_RETURN,
+      status: REF_CALLBACK_INVOCATION_STATUS_OK,
+      attempted: true,
+      callbackAttempted: false,
+      cleanupAttempted: true,
+      callbackReturnStatus: REF_CALLBACK_RETURN_NOT_APPLICABLE,
+      cleanupReturnStatus: callbackReturnStatusForValue(returnValue),
+      cleanupReturnRecorded: false,
+      returnValue,
+      cleanupReturn: refCleanup,
+      error: null
+    });
+  } catch (error) {
+    return freezeRecord({
+      kind: REF_CALLBACK_INVOCATION_CLEANUP_RETURN,
+      status: REF_CALLBACK_INVOCATION_STATUS_THROWN,
+      attempted: true,
+      callbackAttempted: false,
+      cleanupAttempted: true,
+      callbackReturnStatus: REF_CALLBACK_RETURN_NOT_APPLICABLE,
+      cleanupReturnStatus: REF_CALLBACK_RETURN_NOT_APPLICABLE,
+      cleanupReturnRecorded: false,
+      returnValue: undefined,
+      cleanupReturn: refCleanup,
+      error
+    });
+  }
+}
+
+function summarizeControlledInvocationResults(invocationResults) {
+  const metrics = {
+    callbackRefRecordCount: 0,
+    objectRefRecordCount: 0,
+    callbackInvocationAttemptCount: 0,
+    callbackInvocationErrorCount: 0,
+    callbackCleanupReturnCount: 0,
+    cleanupInvocationAttemptCount: 0,
+    cleanupInvocationErrorCount: 0,
+    callbackNullDetachAttemptCount: 0,
+    objectRefSkippedCount: 0,
+    fakeHostNodeRecordCount: 0
+  };
+
+  for (const result of invocationResults) {
+    if (result.refKind === REF_KIND_CALLBACK) {
+      metrics.callbackRefRecordCount++;
+    } else if (result.refKind === REF_KIND_OBJECT) {
+      metrics.objectRefRecordCount++;
+    }
+
+    if (result.fakeHostNodeRecord !== null) {
+      metrics.fakeHostNodeRecordCount++;
+    }
+
+    const invocation = result.invocation;
+    if (invocation.callbackAttempted) {
+      metrics.callbackInvocationAttemptCount++;
+      if (invocation.status === REF_CALLBACK_INVOCATION_STATUS_THROWN) {
+        metrics.callbackInvocationErrorCount++;
+      }
+    }
+
+    if (invocation.cleanupAttempted) {
+      metrics.cleanupInvocationAttemptCount++;
+      if (invocation.status === REF_CALLBACK_INVOCATION_STATUS_THROWN) {
+        metrics.cleanupInvocationErrorCount++;
+      }
+    }
+
+    if (invocation.cleanupReturnRecorded) {
+      metrics.callbackCleanupReturnCount++;
+    }
+
+    if (invocation.kind === REF_CALLBACK_INVOCATION_NULL_DETACH) {
+      metrics.callbackNullDetachAttemptCount++;
+    }
+
+    if (invocation.kind === REF_CALLBACK_INVOCATION_SKIPPED_OBJECT_REF) {
+      metrics.objectRefSkippedCount++;
+    }
+  }
+
+  return metrics;
+}
+
 function createOperationOrderingRecord(sequence, action) {
   return freezeRecord({
     sequence,
@@ -684,8 +1117,35 @@ function normalizeRefValue(ref) {
   );
 }
 
+function normalizeRefCleanupValue(refCleanup) {
+  if (refCleanup == null) {
+    return null;
+  }
+
+  if (typeof refCleanup === 'function') {
+    return refCleanup;
+  }
+
+  throw createRefCallbackGateError(
+    'FAST_REACT_DOM_REF_CALLBACK_GATE_INVALID_REF_CLEANUP',
+    'Ref detach metadata cleanup return must be a function.'
+  );
+}
+
 function refKindForValue(ref) {
   return typeof ref === 'function' ? REF_KIND_CALLBACK : REF_KIND_OBJECT;
+}
+
+function callbackReturnStatusForValue(value) {
+  if (typeof value === 'function') {
+    return REF_CALLBACK_RETURN_CLEANUP;
+  }
+
+  if (value === undefined) {
+    return REF_CALLBACK_RETURN_VOID;
+  }
+
+  return REF_CALLBACK_RETURN_VALUE;
 }
 
 function operationForRefAction(refKind, action) {
@@ -741,7 +1201,20 @@ module.exports = {
   REF_ACTION_DETACH,
   REF_CALLBACK_ATTACH_DETACH_GATE_STATUS,
   REF_CALLBACK_COMPONENT_TREE_GATE_STATUS,
+  REF_CALLBACK_CONTROLLED_INVOCATION_GATE_STATUS,
   REF_CALLBACK_ERROR_PROPAGATION_STATUS,
+  REF_CALLBACK_INVOCATION_ATTACH,
+  REF_CALLBACK_INVOCATION_CLEANUP_RETURN,
+  REF_CALLBACK_INVOCATION_NULL_DETACH,
+  REF_CALLBACK_INVOCATION_SKIPPED_OBJECT_REF,
+  REF_CALLBACK_INVOCATION_STATUS_OK,
+  REF_CALLBACK_INVOCATION_STATUS_SKIPPED,
+  REF_CALLBACK_INVOCATION_STATUS_THROWN,
+  REF_CALLBACK_PUBLIC_REF_COMPATIBILITY_STATUS,
+  REF_CALLBACK_RETURN_CLEANUP,
+  REF_CALLBACK_RETURN_NOT_APPLICABLE,
+  REF_CALLBACK_RETURN_VALUE,
+  REF_CALLBACK_RETURN_VOID,
   REF_DETACH_REASON_DELETED,
   REF_DETACH_REASON_REF_CHANGED,
   REF_KIND_CALLBACK,
@@ -755,25 +1228,34 @@ module.exports = {
   REF_TOKEN_TARGET_INSTANCE,
   attachDetachOrdering,
   blockedErrorPropagation,
+  blockedPublicRefCompatibility,
   blockedCapabilities,
+  controlledInvocationBlockedCapabilities,
   createRefAttachMetadataRecord,
   createRefCallbackAttachDetachGateSnapshot,
   createRefCallbackComponentTreeGateSnapshot,
+  createRefCallbackControlledInvocationGateSnapshot,
   createRefDetachMetadataRecord,
   getPrivateRefCallbackAttachDetachGateRecordPayload,
   getPrivateRefCallbackAttachDetachGateSnapshotPayload,
   getPrivateRefCallbackComponentTreeGateRecordPayload,
   getPrivateRefCallbackComponentTreeGateSnapshotPayload,
+  getPrivateRefCallbackControlledInvocationGateRecordPayload,
+  getPrivateRefCallbackControlledInvocationGateSnapshotPayload,
   getPrivateRefCallbackMetadataRecordPayload,
   isPrivateRefCallbackAttachDetachGateRecord,
   isPrivateRefCallbackAttachDetachGateSnapshot,
   isPrivateRefCallbackComponentTreeGateRecord,
   isPrivateRefCallbackComponentTreeGateSnapshot,
+  isPrivateRefCallbackControlledInvocationGateRecord,
+  isPrivateRefCallbackControlledInvocationGateSnapshot,
   isPrivateRefCallbackMetadataRecord,
   noSideEffects,
   privateDomRefCallbackAttachDetachGateRecordType,
   privateDomRefCallbackAttachDetachGateSnapshotType,
   privateDomRefCallbackComponentTreeGateRecordType,
   privateDomRefCallbackComponentTreeGateSnapshotType,
+  privateDomRefCallbackControlledInvocationGateRecordType,
+  privateDomRefCallbackControlledInvocationGateSnapshotType,
   privateDomRefCallbackMetadataRecordType
 };

@@ -439,6 +439,244 @@ test("private DOM ref callback attach/detach gate records callback and object re
   assert.equal(componentTree.detachHostInstanceToken(token), token);
 });
 
+test("private controlled DOM ref callback invocation gate records fake host callbacks and cleanup returns", () => {
+  const rootOwner = {kind: "PrivateControlledInvocationRoot"};
+  const hostOwner = {kind: "PrivateControlledInvocationHost"};
+  const node = createElement("DIV");
+  const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
+  const callbackArguments = [];
+  let cleanupCallCount = 0;
+
+  function cleanupReturn() {
+    cleanupCallCount++;
+    return "cleanup-result";
+  }
+
+  function callbackRef(value) {
+    callbackArguments.push(value);
+    return cleanupReturn;
+  }
+
+  const latestProps = {id: "controlled", ref: callbackRef};
+  componentTree.attachHostInstanceNode(node, token, latestProps);
+
+  const attachRecord = refCallbackGate.createRefAttachMetadataRecord({
+    rootOwner,
+    hostOwner,
+    hostInstanceToken: token,
+    fiber: {id: "controlled-attach-fiber"},
+    stateNode: {id: "state-node"},
+    refHandle: {id: "callback-ref-handle"},
+    ref: callbackRef,
+    sourceToken: "commit-token:controlled-callback",
+    tokenPhase: refCallbackGate.REF_TOKEN_PHASE_COMMIT,
+    tokenTarget: refCallbackGate.REF_TOKEN_TARGET_INSTANCE
+  });
+  const attachSnapshot =
+    refCallbackGate.createRefCallbackControlledInvocationGateSnapshot({
+      rootCommitRefMetadata: {
+        detach: [],
+        attach: [attachRecord]
+      }
+    });
+
+  assert.equal(
+    attachSnapshot.$$typeof,
+    refCallbackGate.privateDomRefCallbackControlledInvocationGateSnapshotType
+  );
+  assert.equal(
+    attachSnapshot.status,
+    refCallbackGate.REF_CALLBACK_CONTROLLED_INVOCATION_GATE_STATUS
+  );
+  assert.equal(attachSnapshot.recordCount, 1);
+  assert.equal(attachSnapshot.callbackRefRecordCount, 1);
+  assert.equal(attachSnapshot.objectRefRecordCount, 0);
+  assert.equal(attachSnapshot.callbackInvocationAttemptCount, 1);
+  assert.equal(attachSnapshot.callbackCleanupReturnCount, 1);
+  assert.equal(attachSnapshot.cleanupInvocationAttemptCount, 0);
+  assert.equal(attachSnapshot.fakeHostNodeRecordCount, 1);
+  assert.equal(attachSnapshot.callbackRefsInvoked, true);
+  assert.equal(attachSnapshot.objectRefsMutated, false);
+  assert.equal(attachSnapshot.publicRootsTouched, false);
+  assert.equal(attachSnapshot.rootErrorsReported, false);
+  assert.equal(attachSnapshot.compatibilityClaimed, false);
+  assert.equal(
+    attachSnapshot.publicRefCompatibilityStatus,
+    refCallbackGate.REF_CALLBACK_PUBLIC_REF_COMPATIBILITY_STATUS
+  );
+  assert.deepEqual(
+    attachSnapshot.blockedCapabilities.map((capability) => capability.id),
+    [
+      "object-ref-mutation",
+      "layout-effect-execution",
+      "dom-mutation",
+      "public-root-integration",
+      "root-error-propagation",
+      "react-dom-ref-compatibility-claim"
+    ]
+  );
+  assert.equal(callbackArguments.length, 1);
+  assert.notEqual(callbackArguments[0], node);
+  assert.deepEqual(callbackArguments[0], {
+    isConnected: true,
+    localName: "div",
+    namespaceURI: null,
+    nodeName: "DIV",
+    nodeType: 1,
+    tagName: "DIV"
+  });
+  assert.equal(Object.isFrozen(callbackArguments[0]), true);
+  assert.equal(cleanupCallCount, 0);
+
+  const attachGateRecord = attachSnapshot.records[0];
+  assert.equal(
+    refCallbackGate.isPrivateRefCallbackControlledInvocationGateRecord(
+      attachGateRecord
+    ),
+    true
+  );
+  assert.equal(
+    componentTree.isPrivateRefCallbackFakeHostNodeRecord(
+      attachGateRecord.fakeHostNodeRecord
+    ),
+    true
+  );
+  assert.equal(
+    attachGateRecord.invocationKind,
+    refCallbackGate.REF_CALLBACK_INVOCATION_ATTACH
+  );
+  assert.equal(
+    attachGateRecord.invocationStatus,
+    refCallbackGate.REF_CALLBACK_INVOCATION_STATUS_OK
+  );
+  assert.equal(
+    attachGateRecord.callbackReturnStatus,
+    refCallbackGate.REF_CALLBACK_RETURN_CLEANUP
+  );
+  assert.equal(attachGateRecord.callbackCleanupReturnRecorded, true);
+  assert.equal(attachGateRecord.exposesRefValue, false);
+  assert.equal(attachGateRecord.exposesRefCleanup, false);
+  assert.equal(attachGateRecord.exposesHostNode, false);
+  assert.equal(attachGateRecord.exposesFakeHostNode, false);
+  assert.equal(Object.hasOwn(attachGateRecord, "ref"), false);
+  assert.equal(Object.hasOwn(attachGateRecord, "node"), false);
+  assert.equal(Object.hasOwn(attachGateRecord, "latestProps"), false);
+
+  const attachPayload =
+    refCallbackGate.getPrivateRefCallbackControlledInvocationGateRecordPayload(
+      attachGateRecord
+    );
+  assert.equal(attachPayload.hostNode.node, node);
+  assert.equal(attachPayload.fakeHostNode, callbackArguments[0]);
+  assert.equal(attachPayload.callbackReturn, cleanupReturn);
+  assert.equal(attachPayload.cleanupReturn, cleanupReturn);
+  assert.equal(attachPayload.error, null);
+
+  const detachRecord = refCallbackGate.createRefDetachMetadataRecord({
+    rootOwner,
+    hostOwner,
+    hostInstanceToken: token,
+    fiber: {id: "controlled-detach-fiber"},
+    stateNode: {id: "state-node"},
+    refHandle: {id: "callback-ref-handle"},
+    ref: callbackRef,
+    refCleanup: cleanupReturn,
+    sourceToken: "deletion-token:controlled-cleanup",
+    tokenPhase: refCallbackGate.REF_TOKEN_PHASE_DELETION,
+    tokenTarget: refCallbackGate.REF_TOKEN_TARGET_INSTANCE,
+    detachReason: refCallbackGate.REF_DETACH_REASON_DELETED
+  });
+  const detachSnapshot =
+    refCallbackGate.createRefCallbackControlledInvocationGateSnapshot({
+      rootCommitRefMetadata: {
+        detach: [detachRecord],
+        attach: []
+      }
+    });
+
+  assert.equal(detachSnapshot.callbackInvocationAttemptCount, 0);
+  assert.equal(detachSnapshot.cleanupInvocationAttemptCount, 1);
+  assert.equal(detachSnapshot.callbackCleanupReturnsInvoked, true);
+  assert.equal(detachSnapshot.callbackRefsInvoked, false);
+  assert.equal(detachSnapshot.publicRootsTouched, false);
+  assert.equal(detachSnapshot.compatibilityClaimed, false);
+  assert.equal(cleanupCallCount, 1);
+  assert.equal(
+    callbackArguments.length,
+    1,
+    "cleanup detach must replace the callback(null) detach call"
+  );
+  assert.equal(
+    detachSnapshot.records[0].invocationKind,
+    refCallbackGate.REF_CALLBACK_INVOCATION_CLEANUP_RETURN
+  );
+  assert.equal(
+    detachSnapshot.records[0].cleanupReturnStatus,
+    refCallbackGate.REF_CALLBACK_RETURN_VALUE
+  );
+  assert.equal(detachSnapshot.records[0].callbackRefsInvoked, false);
+  assert.equal(detachSnapshot.records[0].callbackCleanupReturnsInvoked, true);
+  const detachPayload =
+    refCallbackGate.getPrivateRefCallbackControlledInvocationGateRecordPayload(
+      detachSnapshot.records[0]
+    );
+  assert.equal(detachPayload.refCleanup, cleanupReturn);
+  assert.equal(detachPayload.cleanupReturn, cleanupReturn);
+  assert.equal(detachPayload.error, null);
+
+  assert.equal(componentTree.detachHostInstanceToken(token), token);
+});
+
+test("private controlled DOM ref callback invocation gate records errors without root reporting", () => {
+  const rootOwner = {kind: "PrivateControlledErrorRoot"};
+  const hostOwner = {kind: "PrivateControlledErrorHost"};
+  const node = createElement("SPAN");
+  const token = componentTree.createHostInstanceToken(hostOwner, rootOwner);
+  const thrownError = new Error("private controlled ref error");
+
+  function throwingRef() {
+    throw thrownError;
+  }
+
+  componentTree.attachHostInstanceNode(node, token, {ref: throwingRef});
+  const attachRecord = refCallbackGate.createRefAttachMetadataRecord({
+    rootOwner,
+    hostOwner,
+    hostInstanceToken: token,
+    fiber: {id: "throwing-attach-fiber"},
+    stateNode: {id: "state-node"},
+    refHandle: {id: "throwing-ref-handle"},
+    ref: throwingRef,
+    sourceToken: "commit-token:throwing-callback"
+  });
+  const snapshot =
+    refCallbackGate.createRefCallbackControlledInvocationGateSnapshot({
+      rootCommitRefMetadata: {
+        detach: [],
+        attach: [attachRecord]
+      }
+    });
+
+  assert.equal(snapshot.callbackInvocationAttemptCount, 1);
+  assert.equal(snapshot.callbackInvocationErrorCount, 1);
+  assert.equal(snapshot.rootErrorsReported, false);
+  assert.equal(
+    snapshot.errorPropagationStatus,
+    refCallbackGate.REF_CALLBACK_ERROR_PROPAGATION_STATUS
+  );
+  assert.equal(
+    snapshot.records[0].invocationStatus,
+    refCallbackGate.REF_CALLBACK_INVOCATION_STATUS_THROWN
+  );
+  assert.equal(snapshot.records[0].invocationErrorCaptured, true);
+  const payload =
+    refCallbackGate.getPrivateRefCallbackControlledInvocationGateRecordPayload(
+      snapshot.records[0]
+    );
+  assert.equal(payload.error, thrownError);
+  assert.equal(componentTree.detachHostInstanceToken(token), token);
+});
+
 test("React DOM ref callback oracle artifact has no temp or local path leaks", () => {
   const oracleText = readCheckedDomRefCallbackOracleText();
   assert.doesNotMatch(oracleText, /\/private\/var\/folders/u);
