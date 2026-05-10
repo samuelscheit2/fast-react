@@ -45,8 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 129: HostRoot render-phase foundation in
-  `/Users/user/Developer/Developer/fast-react-worker-129-host-root-render-phase-foundation`.
 - Worker 130: minimal commit slice readiness refresh in
   `/Users/user/Developer/Developer/fast-react-worker-130-commit-readiness-refresh`.
 - Worker 131: sync flush and act integration refresh in
@@ -88,14 +86,13 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Near-Term Sequencing
 
-1. Keep worker 129 limited to HostRoot render-phase queue processing and
-   scheduler callback identity validation.
-2. Keep worker 129 out of commit, host mutation, JS packages, React DOM,
-   test-renderer facades, scheduler-native files, and smoke/conformance tests.
-3. Keep workers 130-148 report-only with one progress file each; use them to
-   refine the next source slices without touching active implementation files.
-4. After worker 129 is accepted, queue the minimal commit/root-current switch
-   slice or a sync-flush integration slice depending on the worker's risks.
+1. Inspect and merge useful report-only outputs from workers 130-148 as they
+   finish.
+2. Keep total active top-level worker sessions at or below 20 while queueing
+   overlapping code workers with explicit file ownership.
+3. Queue the minimal commit/root-current switch slice first, then sync flush,
+   host complete-work, test-renderer canary, and DOM mutation canary slices as
+   separate code worktrees even if later merges require conflict resolution.
 
 ## Next Queue Candidates
 

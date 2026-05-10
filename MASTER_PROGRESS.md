@@ -52,9 +52,18 @@ sequencing belong in `MASTER_PLAN.md`.
   worker 127's integration branch.
 - Worker 127 scheduler native smoke integration was merged.
 - Worker 128 reconciler root scheduler foundation was merged.
+- Worker 129 HostRoot render-phase foundation was merged, adding scheduler
+  callback identity validation, selected-lane HostRoot update processing into
+  WIP state, WIP queue refresh from current, and render-phase records without
+  commit, host mutation, or `root.current` switching.
 
 ## Latest Accepted Verification
 
+- Worker 129 was verified on `main` with `cargo fmt --all --check`, focused
+  root work loop, work-in-progress, update queue, and root scheduler tests,
+  full `fast-react-reconciler` tests, reconciler clippy, `git diff --check`,
+  and a scoped changed-path audit before merge; the Rust gates were repeated on
+  `main` after merge.
 - Worker 128 was verified on `main` with `cargo fmt --all --check`, focused
   root scheduler and scheduler bridge tests, full `fast-react-reconciler`
   tests, reconciler clippy, `git diff --check`, and a scoped changed-path
