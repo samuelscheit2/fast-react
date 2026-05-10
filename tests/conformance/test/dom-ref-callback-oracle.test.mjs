@@ -714,6 +714,49 @@ test("private root bridge ref ordering diagnostic proves update identity and unm
     sourceToken: "deletion-token:second-cleanup",
     detachReason: refCallbackGate.REF_DETACH_REASON_DELETED
   });
+  const initialMetadata = bridge.admitRootCommitRefMetadata(
+    initialRender,
+    {
+      detach: [],
+      attach: [initialAttach]
+    },
+    {label: "initial-ref-attach"}
+  );
+  const updateMetadata = bridge.admitRootCommitRefMetadata(
+    updateRender,
+    {
+      detach: [updateDetach],
+      attach: [updateAttach]
+    },
+    {label: "update-ref-change"}
+  );
+  const unmountMetadata = bridge.admitRootCommitRefMetadata(
+    unmount,
+    {
+      detach: [unmountDetach],
+      attach: []
+    },
+    {label: "unmount-ref-cleanup"}
+  );
+
+  assert.equal(
+    initialMetadata.$$typeof,
+    rootBridge.privateRootCommitRefMetadataRecordType
+  );
+  assert.equal(
+    initialMetadata.metadataStatus,
+    rootBridge.ROOT_BRIDGE_ROOT_COMMIT_REF_METADATA_ACCEPTED
+  );
+  assert.equal(initialMetadata.hostOutputCanary, "initial-host-output");
+  assert.equal(initialMetadata.attachCount, 1);
+  assert.equal(initialMetadata.detachCount, 0);
+  assert.equal(initialMetadata.callbackRefsInvoked, false);
+  assert.equal(initialMetadata.objectRefsMutated, false);
+  assert.equal(initialMetadata.compatibilityClaimed, false);
+  assert.equal(
+    rootBridge.isPrivateRootCommitRefMetadataRecord(initialMetadata),
+    true
+  );
 
   const diagnostic =
     bridge.createRefCallbackHostOutputOrderingDiagnostic(
@@ -722,11 +765,7 @@ test("private root bridge ref ordering diagnostic proves update identity and unm
         steps: [
           {
             hostOutputCanary: "initial-host-output",
-            label: "initial-ref-attach",
-            rootCommitRefMetadata: {
-              detach: [],
-              attach: [initialAttach]
-            }
+            label: "initial-ref-attach"
           },
           {
             hostOutputCanary: "update-host-output",
@@ -736,19 +775,11 @@ test("private root bridge ref ordering diagnostic proves update identity and unm
                 latestProps: updateProps
               }
             ],
-            label: "update-ref-change",
-            rootCommitRefMetadata: {
-              detach: [updateDetach],
-              attach: [updateAttach]
-            }
+            label: "update-ref-change"
           },
           {
             hostOutputCanary: "unmount-host-output",
-            label: "unmount-ref-cleanup",
-            rootCommitRefMetadata: {
-              detach: [unmountDetach],
-              attach: []
-            }
+            label: "unmount-ref-cleanup"
           }
         ]
       }
@@ -783,6 +814,11 @@ test("private root bridge ref ordering diagnostic proves update identity and unm
   assert.equal(diagnostic.updateRenderRequestCount, 1);
   assert.equal(diagnostic.unmountRequestCount, 1);
   assert.equal(diagnostic.updateBeforeUnmount, true);
+  assert.equal(
+    diagnostic.rootCommitRefMetadataSource,
+    "accepted-root-commit-ref-metadata"
+  );
+  assert.equal(diagnostic.acceptedRootCommitRefMetadataCount, 3);
   assert.equal(diagnostic.refOrderingStepCount, 3);
   assert.equal(diagnostic.refOrderingRecordCount, 4);
   assert.equal(diagnostic.callbackIdentityChangedCount, 1);
@@ -812,6 +848,11 @@ test("private root bridge ref ordering diagnostic proves update identity and unm
   assert.equal(diagnosticPayload.rootRequestRecords[0], create);
   assert.equal(diagnosticPayload.rootRequestRecords[2], updateRender);
   assert.equal(diagnosticPayload.rootRequestRecords[3], unmount);
+  assert.deepEqual(diagnosticPayload.acceptedRootCommitRefMetadataRecords, [
+    initialMetadata,
+    updateMetadata,
+    unmountMetadata
+  ]);
   assert.equal(
     diagnosticPayload.refOrderingSnapshot,
     diagnostic.refOrderingSnapshot
