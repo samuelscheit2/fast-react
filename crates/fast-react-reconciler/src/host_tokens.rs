@@ -3,8 +3,10 @@
 //! Tokens created here are reconciler-owned IDs for future host creation,
 //! commit, hydration, and deletion calls. Future ref attach/detach work should
 //! validate instance tokens against those same commit/deletion phase records
-//! before public-instance lookup exists. The metadata records root/fiber
-//! ownership plus phase and target; it never exposes raw fibers or DOM nodes.
+//! before public-instance lookup exists. Private callback-ref execution handoff
+//! records reuse that same validation boundary instead of creating a public ref
+//! capability. The metadata records root/fiber ownership plus phase and target;
+//! it never exposes raw fibers or DOM nodes.
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};

@@ -8,6 +8,8 @@ const REF_CALLBACK_ATTACH_DETACH_GATE_STATUS =
   'blocked-until-ref-callback-attach-detach-execution';
 const REF_CALLBACK_CONTROLLED_INVOCATION_GATE_STATUS =
   'private-controlled-ref-callback-invocation-recorded';
+const REF_CALLBACK_EXECUTION_HANDOFF_STATUS =
+  'private-root-commit-ref-callback-execution-handoff-recorded';
 const REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC_STATUS =
   'private-ref-callback-host-output-ordering-diagnostic-recorded';
 const REF_CALLBACK_ERROR_PROPAGATION_STATUS =
@@ -57,6 +59,8 @@ const privateDomRefCallbackControlledInvocationGateSnapshotType =
   'fast.react_dom.private_ref_callback_controlled_invocation_gate_snapshot';
 const privateDomRefCallbackControlledInvocationGateRecordType =
   'fast.react_dom.private_ref_callback_controlled_invocation_gate_record';
+const privateDomRefCallbackExecutionHandoffRecordType =
+  'fast.react_dom.private_ref_callback_execution_handoff_record';
 const privateDomRefCallbackHostOutputOrderingDiagnosticSnapshotType =
   'fast.react_dom.private_ref_callback_host_output_ordering_diagnostic_snapshot';
 const privateDomRefCallbackHostOutputOrderingDiagnosticRecordType =
@@ -157,6 +161,7 @@ const attachDetachGateSnapshotPayloads = new WeakMap();
 const attachDetachGateRecordPayloads = new WeakMap();
 const controlledInvocationGateSnapshotPayloads = new WeakMap();
 const controlledInvocationGateRecordPayloads = new WeakMap();
+const executionHandoffRecordPayloads = new WeakMap();
 const hostOutputOrderingDiagnosticSnapshotPayloads = new WeakMap();
 const hostOutputOrderingDiagnosticRecordPayloads = new WeakMap();
 
@@ -347,6 +352,108 @@ function createRefCallbackControlledInvocationGateSnapshot(snapshot) {
   );
 
   return gateSnapshot;
+}
+
+function createRefCallbackExecutionHandoffRecord(snapshot) {
+  const rootCommitRefMetadata = unwrapRootCommitRefMetadataSnapshot(snapshot);
+  const metadata = normalizeMetadataSnapshot(rootCommitRefMetadata);
+  const controlledSnapshot =
+    createRefCallbackControlledInvocationGateSnapshot({
+      rootCommitRefMetadata
+    });
+  const controlledPayload =
+    getPrivateRefCallbackControlledInvocationGateSnapshotPayload(
+      controlledSnapshot
+    );
+
+  if (controlledPayload === null) {
+    throw createRefCallbackGateError(
+      'FAST_REACT_DOM_REF_CALLBACK_GATE_INVALID_EXECUTION_HANDOFF',
+      'Cannot create a ref callback execution handoff without a private controlled invocation snapshot.'
+    );
+  }
+
+  const ordering = describeExecutionHandoffOrdering(
+    controlledSnapshot.records
+  );
+  const cleanupReturnDetachCount =
+    controlledSnapshot.records.filter(
+      (record) =>
+        record.invocationKind === REF_CALLBACK_INVOCATION_CLEANUP_RETURN
+    ).length;
+  const callbackAttachInvocationCount =
+    controlledSnapshot.records.filter(
+      (record) => record.invocationKind === REF_CALLBACK_INVOCATION_ATTACH
+    ).length;
+  const record = freezeRecord({
+    $$typeof: privateDomRefCallbackExecutionHandoffRecordType,
+    kind: 'FastReactDomPrivateRootCommitRefCallbackExecutionHandoffRecord',
+    status: REF_CALLBACK_EXECUTION_HANDOFF_STATUS,
+    handoffStatus: REF_CALLBACK_EXECUTION_HANDOFF_STATUS,
+    source: attachDetachOrdering.source,
+    rootCommitMetadataStatus: 'accepted-private-root-commit-ref-metadata',
+    controlledInvocationStatus: controlledSnapshot.status,
+    recordCount: controlledSnapshot.recordCount,
+    detachCount: controlledSnapshot.detachCount,
+    attachCount: controlledSnapshot.attachCount,
+    callbackRefRecordCount: controlledSnapshot.callbackRefRecordCount,
+    objectRefRecordCount: controlledSnapshot.objectRefRecordCount,
+    callbackInvocationAttemptCount:
+      controlledSnapshot.callbackInvocationAttemptCount,
+    callbackInvocationErrorCount:
+      controlledSnapshot.callbackInvocationErrorCount,
+    callbackCleanupReturnCount:
+      controlledSnapshot.callbackCleanupReturnCount,
+    cleanupInvocationAttemptCount:
+      controlledSnapshot.cleanupInvocationAttemptCount,
+    cleanupInvocationErrorCount:
+      controlledSnapshot.cleanupInvocationErrorCount,
+    callbackNullDetachAttemptCount:
+      controlledSnapshot.callbackNullDetachAttemptCount,
+    objectRefSkippedCount: controlledSnapshot.objectRefSkippedCount,
+    fakeHostNodeRecordCount: controlledSnapshot.fakeHostNodeRecordCount,
+    callbackAttachInvocationCount,
+    cleanupReturnDetachCount,
+    changedRefDetachBeforeAttach: ordering.changedRefDetachBeforeAttach,
+    changedRefDetachSequence: ordering.changedRefDetachSequence,
+    changedRefAttachSequence: ordering.changedRefAttachSequence,
+    executionSnapshot: controlledSnapshot,
+    executionRecords: controlledSnapshot.records,
+    ordering,
+    errorPropagation: blockedErrorPropagation,
+    errorPropagationStatus: REF_CALLBACK_ERROR_PROPAGATION_STATUS,
+    publicRefCompatibility: blockedPublicRefCompatibility,
+    publicRefCompatibilityStatus: REF_CALLBACK_PUBLIC_REF_COMPATIBILITY_STATUS,
+    blockedCapabilities: controlledInvocationBlockedCapabilities,
+    sideEffects: controlledSnapshot.sideEffects,
+    callbackRefsInvoked: controlledSnapshot.callbackRefsInvoked,
+    callbackCleanupReturnsInvoked:
+      controlledSnapshot.callbackCleanupReturnsInvoked,
+    objectRefsMutated: false,
+    layoutEffectsRun: false,
+    domMutated: false,
+    publicRootsTouched: false,
+    rootErrorsReported: false,
+    compatibilityClaimed: false,
+    exposesRefValue: false,
+    exposesRefCleanup: false,
+    exposesHostNode: false,
+    exposesFakeHostNode: false,
+    exposesLatestProps: false
+  });
+
+  executionHandoffRecordPayloads.set(
+    record,
+    freezeRecord({
+      attach: metadata.attach,
+      controlledInvocationPayload: controlledPayload,
+      controlledInvocationSnapshot: controlledSnapshot,
+      detach: metadata.detach,
+      rootCommitRefMetadata
+    })
+  );
+
+  return record;
 }
 
 function createRefCallbackHostOutputOrderingDiagnosticSnapshot(options) {
@@ -540,6 +647,12 @@ function getPrivateRefCallbackControlledInvocationGateRecordPayload(record) {
     : null;
 }
 
+function getPrivateRefCallbackExecutionHandoffRecordPayload(record) {
+  return isWeakMapKey(record)
+    ? executionHandoffRecordPayloads.get(record) || null
+    : null;
+}
+
 function getPrivateRefCallbackHostOutputOrderingDiagnosticSnapshotPayload(
   snapshot
 ) {
@@ -587,6 +700,10 @@ function isPrivateRefCallbackControlledInvocationGateRecord(value) {
   return (
     getPrivateRefCallbackControlledInvocationGateRecordPayload(value) !== null
   );
+}
+
+function isPrivateRefCallbackExecutionHandoffRecord(value) {
+  return getPrivateRefCallbackExecutionHandoffRecordPayload(value) !== null;
 }
 
 function isPrivateRefCallbackHostOutputOrderingDiagnosticSnapshot(value) {
@@ -693,6 +810,10 @@ function normalizeMetadataSnapshot(snapshot) {
 }
 
 function normalizeRootCommitRefMetadataSnapshot(snapshot) {
+  return normalizeMetadataSnapshot(unwrapRootCommitRefMetadataSnapshot(snapshot));
+}
+
+function unwrapRootCommitRefMetadataSnapshot(snapshot) {
   if (snapshot == null || typeof snapshot !== 'object') {
     throw createRefCallbackGateError(
       'FAST_REACT_DOM_REF_CALLBACK_GATE_INVALID_SNAPSHOT',
@@ -705,7 +826,14 @@ function normalizeRootCommitRefMetadataSnapshot(snapshot) {
       ? snapshot.rootCommitRefMetadata
       : snapshot;
 
-  return normalizeMetadataSnapshot(metadataSnapshot);
+  if (metadataSnapshot == null || typeof metadataSnapshot !== 'object') {
+    throw createRefCallbackGateError(
+      'FAST_REACT_DOM_REF_CALLBACK_GATE_INVALID_SNAPSHOT',
+      'Cannot validate root commit ref metadata without a metadata object.'
+    );
+  }
+
+  return metadataSnapshot;
 }
 
 function normalizeMetadataRecordList(records, expectedAction) {
@@ -1701,6 +1829,40 @@ function createOperationOrderingRecord(sequence, action) {
   });
 }
 
+function describeExecutionHandoffOrdering(records) {
+  let sawChangedRefDetach = false;
+  let changedRefDetachSequence = null;
+  let changedRefAttachSequence = null;
+
+  for (const record of records) {
+    if (
+      record.action === REF_ACTION_DETACH &&
+      record.detachReason === REF_DETACH_REASON_REF_CHANGED
+    ) {
+      sawChangedRefDetach = true;
+      if (changedRefDetachSequence === null) {
+        changedRefDetachSequence = record.sequence;
+      }
+    } else if (record.action === REF_ACTION_ATTACH && sawChangedRefDetach) {
+      if (changedRefAttachSequence === null) {
+        changedRefAttachSequence = record.sequence;
+      }
+      break;
+    }
+  }
+
+  return freezeRecord({
+    source: attachDetachOrdering.source,
+    deterministic: attachDetachOrdering.deterministic,
+    detachRecordsBeforeAttachRecords:
+      attachDetachOrdering.detachRecordsBeforeAttachRecords,
+    changedRefDetachBeforeAttach:
+      changedRefDetachSequence !== null && changedRefAttachSequence !== null,
+    changedRefDetachSequence,
+    changedRefAttachSequence
+  });
+}
+
 function assertOptionsObject(options, label) {
   if (options == null || typeof options !== 'object') {
     throw createRefCallbackGateError(
@@ -1842,6 +2004,7 @@ module.exports = {
   REF_CALLBACK_ATTACH_DETACH_GATE_STATUS,
   REF_CALLBACK_COMPONENT_TREE_GATE_STATUS,
   REF_CALLBACK_CONTROLLED_INVOCATION_GATE_STATUS,
+  REF_CALLBACK_EXECUTION_HANDOFF_STATUS,
   REF_CALLBACK_ERROR_PROPAGATION_STATUS,
   REF_CALLBACK_HOST_OUTPUT_ORDERING_DIAGNOSTIC_STATUS,
   REF_CALLBACK_INVOCATION_ATTACH,
@@ -1876,6 +2039,7 @@ module.exports = {
   createRefCallbackAttachDetachGateSnapshot,
   createRefCallbackComponentTreeGateSnapshot,
   createRefCallbackControlledInvocationGateSnapshot,
+  createRefCallbackExecutionHandoffRecord,
   createRefCallbackHostOutputOrderingDiagnosticSnapshot,
   createRefDetachMetadataRecord,
   getPrivateRefCallbackAttachDetachGateRecordPayload,
@@ -1884,6 +2048,7 @@ module.exports = {
   getPrivateRefCallbackComponentTreeGateSnapshotPayload,
   getPrivateRefCallbackControlledInvocationGateRecordPayload,
   getPrivateRefCallbackControlledInvocationGateSnapshotPayload,
+  getPrivateRefCallbackExecutionHandoffRecordPayload,
   getPrivateRefCallbackHostOutputOrderingDiagnosticRecordPayload,
   getPrivateRefCallbackHostOutputOrderingDiagnosticSnapshotPayload,
   getPrivateRefCallbackMetadataRecordPayload,
@@ -1893,6 +2058,7 @@ module.exports = {
   isPrivateRefCallbackComponentTreeGateSnapshot,
   isPrivateRefCallbackControlledInvocationGateRecord,
   isPrivateRefCallbackControlledInvocationGateSnapshot,
+  isPrivateRefCallbackExecutionHandoffRecord,
   isPrivateRefCallbackHostOutputOrderingDiagnosticRecord,
   isPrivateRefCallbackHostOutputOrderingDiagnosticSnapshot,
   isPrivateRefCallbackMetadataRecord,
@@ -1903,6 +2069,7 @@ module.exports = {
   privateDomRefCallbackComponentTreeGateSnapshotType,
   privateDomRefCallbackControlledInvocationGateRecordType,
   privateDomRefCallbackControlledInvocationGateSnapshotType,
+  privateDomRefCallbackExecutionHandoffRecordType,
   privateDomRefCallbackHostOutputOrderingDiagnosticRecordType,
   privateDomRefCallbackHostOutputOrderingDiagnosticSnapshotType,
   privateDomRefCallbackMetadataRecordType

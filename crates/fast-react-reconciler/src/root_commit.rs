@@ -991,6 +991,201 @@ const DOM_REF_CALLBACK_GATE_BLOCKERS: [HostRootDomRefCallbackCommitGateBlocker; 
 ];
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(crate) struct HostRootRefCallbackExecutionHandoffSnapshot {
+    records: Vec<HostRootRefCallbackExecutionHandoffRecord>,
+    detach_count: usize,
+    attach_count: usize,
+    changed_ref_detach_before_attach_count: usize,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private ref callback execution handoff is reserved for future DOM commit workers"
+)]
+impl HostRootRefCallbackExecutionHandoffSnapshot {
+    #[must_use]
+    pub(crate) fn records(&self) -> &[HostRootRefCallbackExecutionHandoffRecord] {
+        &self.records
+    }
+
+    #[must_use]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    #[must_use]
+    pub(crate) fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    #[must_use]
+    pub(crate) const fn detach_count(&self) -> usize {
+        self.detach_count
+    }
+
+    #[must_use]
+    pub(crate) const fn attach_count(&self) -> usize {
+        self.attach_count
+    }
+
+    #[must_use]
+    pub(crate) const fn changed_ref_detach_before_attach_count(&self) -> usize {
+        self.changed_ref_detach_before_attach_count
+    }
+
+    #[must_use]
+    pub(crate) const fn callback_refs_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn object_refs_mutated(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_roots_touched(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn root_errors_reported(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn react_dom_ref_compatibility_claimed(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct HostRootRefCallbackExecutionHandoffRecord {
+    sequence: usize,
+    source_gate_sequence: usize,
+    root: FiberRootId,
+    fiber: FiberId,
+    state_node: StateNodeHandle,
+    ref_handle: RefHandle,
+    token: HostFiberTokenId,
+    token_phase: HostFiberTokenPhase,
+    token_target: HostFiberTokenTarget,
+    action: HostRootRefCommitAction,
+    detach_reason: Option<HostRootRefDetachReason>,
+    execution_phase: HostRootRefCallbackExecutionPhase,
+    changed_ref_detach_before_attach: bool,
+    status: HostRootRefCallbackExecutionHandoffStatus,
+    blockers: [HostRootRefCallbackExecutionHandoffBlocker; 4],
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private ref callback execution handoff is reserved for future DOM commit workers"
+)]
+impl HostRootRefCallbackExecutionHandoffRecord {
+    #[must_use]
+    pub(crate) const fn sequence(&self) -> usize {
+        self.sequence
+    }
+
+    #[must_use]
+    pub(crate) const fn source_gate_sequence(&self) -> usize {
+        self.source_gate_sequence
+    }
+
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn fiber(&self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub(crate) const fn state_node(&self) -> StateNodeHandle {
+        self.state_node
+    }
+
+    #[must_use]
+    pub(crate) const fn ref_handle(&self) -> RefHandle {
+        self.ref_handle
+    }
+
+    #[must_use]
+    pub(crate) const fn token(&self) -> HostFiberTokenId {
+        self.token
+    }
+
+    #[must_use]
+    pub(crate) const fn token_phase(&self) -> HostFiberTokenPhase {
+        self.token_phase
+    }
+
+    #[must_use]
+    pub(crate) const fn token_target(&self) -> HostFiberTokenTarget {
+        self.token_target
+    }
+
+    #[must_use]
+    pub(crate) const fn action(&self) -> HostRootRefCommitAction {
+        self.action
+    }
+
+    #[must_use]
+    pub(crate) const fn detach_reason(&self) -> Option<HostRootRefDetachReason> {
+        self.detach_reason
+    }
+
+    #[must_use]
+    pub(crate) const fn execution_phase(&self) -> HostRootRefCallbackExecutionPhase {
+        self.execution_phase
+    }
+
+    #[must_use]
+    pub(crate) const fn changed_ref_detach_before_attach(&self) -> bool {
+        self.changed_ref_detach_before_attach
+    }
+
+    #[must_use]
+    pub(crate) const fn status(&self) -> HostRootRefCallbackExecutionHandoffStatus {
+        self.status
+    }
+
+    #[must_use]
+    pub(crate) const fn blockers(&self) -> &[HostRootRefCallbackExecutionHandoffBlocker; 4] {
+        &self.blockers
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum HostRootRefCallbackExecutionPhase {
+    CallbackDetachCleanupOrNull,
+    CallbackAttach,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum HostRootRefCallbackExecutionHandoffStatus {
+    PrivateExecutionHandoff,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum HostRootRefCallbackExecutionHandoffBlocker {
+    ObjectRefMutation,
+    PublicRootExecution,
+    PublicRootErrorRouting,
+    ReactDomRefCompatibilityClaim,
+}
+
+const REF_CALLBACK_EXECUTION_HANDOFF_BLOCKERS: [HostRootRefCallbackExecutionHandoffBlocker; 4] = [
+    HostRootRefCallbackExecutionHandoffBlocker::ObjectRefMutation,
+    HostRootRefCallbackExecutionHandoffBlocker::PublicRootExecution,
+    HostRootRefCallbackExecutionHandoffBlocker::PublicRootErrorRouting,
+    HostRootRefCallbackExecutionHandoffBlocker::ReactDomRefCompatibilityClaim,
+];
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 struct PendingRefCommitSnapshot {
     detach: Vec<PendingRefCommitRecord>,
     attach: Vec<PendingRefCommitRecord>,
@@ -1269,6 +1464,7 @@ pub struct HostRootCommitRecord {
     host_node_deletion_cleanup_log: HostRootDeletionCleanupLog,
     ref_commit_metadata: HostRootRefCommitSnapshot,
     dom_ref_callback_commit_gate: HostRootDomRefCallbackCommitGateSnapshot,
+    ref_callback_execution_handoff: HostRootRefCallbackExecutionHandoffSnapshot,
 }
 
 impl HostRootCommitRecord {
@@ -1344,6 +1540,17 @@ impl HostRootCommitRecord {
     )]
     pub(crate) fn dom_ref_callback_commit_gate(&self) -> &HostRootDomRefCallbackCommitGateSnapshot {
         &self.dom_ref_callback_commit_gate
+    }
+
+    #[must_use]
+    #[allow(
+        dead_code,
+        reason = "crate-private ref callback execution handoff records are reserved for future DOM commit workers"
+    )]
+    pub(crate) fn ref_callback_execution_handoff(
+        &self,
+    ) -> &HostRootRefCallbackExecutionHandoffSnapshot {
+        &self.ref_callback_execution_handoff
     }
 
     #[allow(
@@ -1603,6 +1810,8 @@ pub fn commit_finished_host_root<H: HostTypes>(
     let ref_commit_metadata = materialize_ref_commit_metadata(store, pending_ref_commit_metadata)?;
     let dom_ref_callback_commit_gate =
         materialize_dom_ref_callback_commit_gate(store, &ref_commit_metadata)?;
+    let ref_callback_execution_handoff =
+        materialize_ref_callback_execution_handoff(store, &dom_ref_callback_commit_gate)?;
 
     Ok(HostRootCommitRecord {
         root: root_id,
@@ -1620,6 +1829,7 @@ pub fn commit_finished_host_root<H: HostTypes>(
         host_node_deletion_cleanup_log,
         ref_commit_metadata,
         dom_ref_callback_commit_gate,
+        ref_callback_execution_handoff,
     })
 }
 
@@ -2082,6 +2292,87 @@ fn dom_ref_callback_commit_gate_record<H: HostTypes>(
         status: HostRootDomRefCallbackCommitGateStatus::Blocked,
         blockers: DOM_REF_CALLBACK_GATE_BLOCKERS,
     })
+}
+
+fn materialize_ref_callback_execution_handoff<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    gate: &HostRootDomRefCallbackCommitGateSnapshot,
+) -> Result<HostRootRefCallbackExecutionHandoffSnapshot, RootCommitError> {
+    let mut handoff = HostRootRefCallbackExecutionHandoffSnapshot::default();
+    let mut saw_changed_ref_detach = false;
+
+    for gate_record in gate.records() {
+        let mut changed_ref_detach_before_attach = false;
+        match gate_record.action() {
+            HostRootRefCommitAction::Detach => {
+                handoff.detach_count += 1;
+                if gate_record.detach_reason() == Some(HostRootRefDetachReason::RefChanged) {
+                    saw_changed_ref_detach = true;
+                }
+            }
+            HostRootRefCommitAction::Attach => {
+                handoff.attach_count += 1;
+                if saw_changed_ref_detach {
+                    changed_ref_detach_before_attach = true;
+                    handoff.changed_ref_detach_before_attach_count += 1;
+                    saw_changed_ref_detach = false;
+                }
+            }
+        }
+
+        handoff.records.push(ref_callback_execution_handoff_record(
+            store,
+            handoff.records.len(),
+            gate_record,
+            changed_ref_detach_before_attach,
+        )?);
+    }
+
+    Ok(handoff)
+}
+
+fn ref_callback_execution_handoff_record<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    sequence: usize,
+    gate_record: &HostRootDomRefCallbackCommitGateRecord,
+    changed_ref_detach_before_attach: bool,
+) -> Result<HostRootRefCallbackExecutionHandoffRecord, RootCommitError> {
+    store.host_tokens().validate(
+        gate_record.token(),
+        gate_record.root(),
+        gate_record.fiber(),
+        gate_record.token_phase(),
+        gate_record.token_target(),
+    )?;
+
+    Ok(HostRootRefCallbackExecutionHandoffRecord {
+        sequence,
+        source_gate_sequence: gate_record.sequence(),
+        root: gate_record.root(),
+        fiber: gate_record.fiber(),
+        state_node: gate_record.state_node(),
+        ref_handle: gate_record.ref_handle(),
+        token: gate_record.token(),
+        token_phase: gate_record.token_phase(),
+        token_target: gate_record.token_target(),
+        action: gate_record.action(),
+        detach_reason: gate_record.detach_reason(),
+        execution_phase: ref_callback_execution_phase(gate_record.action()),
+        changed_ref_detach_before_attach,
+        status: HostRootRefCallbackExecutionHandoffStatus::PrivateExecutionHandoff,
+        blockers: REF_CALLBACK_EXECUTION_HANDOFF_BLOCKERS,
+    })
+}
+
+const fn ref_callback_execution_phase(
+    action: HostRootRefCommitAction,
+) -> HostRootRefCallbackExecutionPhase {
+    match action {
+        HostRootRefCommitAction::Detach => {
+            HostRootRefCallbackExecutionPhase::CallbackDetachCleanupOrNull
+        }
+        HostRootRefCommitAction::Attach => HostRootRefCallbackExecutionPhase::CallbackAttach,
+    }
 }
 
 const fn dom_ref_callback_gate_token_phase(action: HostRootRefCommitAction) -> HostFiberTokenPhase {
@@ -4890,6 +5181,10 @@ mod tests {
         assert!(commit.ref_commit_metadata().is_empty());
         assert!(commit.dom_ref_callback_commit_gate().is_empty());
         assert_dom_ref_callback_gate_is_inert(commit.dom_ref_callback_commit_gate());
+        assert!(commit.ref_callback_execution_handoff().is_empty());
+        assert_ref_callback_execution_handoff_keeps_public_blockers(
+            commit.ref_callback_execution_handoff(),
+        );
         assert!(commit.root_update_callback_invocation_gate().is_empty());
         assert_root_update_callback_invocation_gate_is_inert(
             commit.root_update_callback_invocation_gate(),
@@ -6334,6 +6629,7 @@ mod tests {
         assert!(commit.root_update_callbacks().is_empty());
         assert!(commit.ref_commit_metadata().is_empty());
         assert!(commit.dom_ref_callback_commit_gate().is_empty());
+        assert!(commit.ref_callback_execution_handoff().is_empty());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
@@ -6509,6 +6805,7 @@ mod tests {
         let commit = commit_finished_host_root(&mut store, render).unwrap();
         let refs = commit.ref_commit_metadata();
         let gate = commit.dom_ref_callback_commit_gate();
+        let handoff = commit.ref_callback_execution_handoff();
 
         assert!(refs.detach().is_empty());
         assert_eq!(refs.attach().len(), 1);
@@ -6536,6 +6833,28 @@ mod tests {
         assert_eq!(gate_record.token_target(), HostFiberTokenTarget::Instance);
         assert_eq!(gate_record.action(), HostRootRefCommitAction::Attach);
         assert_eq!(gate_record.detach_reason(), None);
+        assert_ref_callback_execution_handoff_keeps_public_blockers(handoff);
+        assert_eq!(handoff.len(), 1);
+        assert_eq!(handoff.detach_count(), 0);
+        assert_eq!(handoff.attach_count(), 1);
+        assert_eq!(handoff.changed_ref_detach_before_attach_count(), 0);
+        let handoff_record = handoff.records()[0];
+        assert_eq!(handoff_record.sequence(), 0);
+        assert_eq!(
+            handoff_record.source_gate_sequence(),
+            gate_record.sequence()
+        );
+        assert_eq!(handoff_record.root(), root_id);
+        assert_eq!(handoff_record.fiber(), child);
+        assert_eq!(handoff_record.state_node(), state_node);
+        assert_eq!(handoff_record.ref_handle(), ref_handle);
+        assert_eq!(handoff_record.token(), attach.token());
+        assert_eq!(handoff_record.action(), HostRootRefCommitAction::Attach);
+        assert_eq!(
+            handoff_record.execution_phase(),
+            HostRootRefCallbackExecutionPhase::CallbackAttach
+        );
+        assert!(!handoff_record.changed_ref_detach_before_attach());
         assert_eq!(
             store.root(root_id).unwrap().current(),
             render.work_in_progress()
@@ -6576,6 +6895,7 @@ mod tests {
         let commit = commit_finished_host_root(&mut store, render).unwrap();
         let refs = commit.ref_commit_metadata();
         let gate = commit.dom_ref_callback_commit_gate();
+        let handoff = commit.ref_callback_execution_handoff();
 
         assert_eq!(refs.detach().len(), 1);
         assert_eq!(refs.attach().len(), 1);
@@ -6614,6 +6934,37 @@ mod tests {
         assert_eq!(gate.records()[1].token(), attach.token());
         assert_eq!(gate.records()[1].action(), HostRootRefCommitAction::Attach);
         assert_eq!(gate.records()[1].detach_reason(), None);
+        assert_ref_callback_execution_handoff_keeps_public_blockers(handoff);
+        assert_eq!(handoff.len(), 2);
+        assert_eq!(handoff.detach_count(), 1);
+        assert_eq!(handoff.attach_count(), 1);
+        assert_eq!(handoff.changed_ref_detach_before_attach_count(), 1);
+        assert_eq!(handoff.records()[0].sequence(), 0);
+        assert_eq!(handoff.records()[0].source_gate_sequence(), 0);
+        assert_eq!(handoff.records()[0].fiber(), current_child);
+        assert_eq!(handoff.records()[0].token(), detach.token());
+        assert_eq!(
+            handoff.records()[0].action(),
+            HostRootRefCommitAction::Detach
+        );
+        assert_eq!(
+            handoff.records()[0].execution_phase(),
+            HostRootRefCallbackExecutionPhase::CallbackDetachCleanupOrNull
+        );
+        assert!(!handoff.records()[0].changed_ref_detach_before_attach());
+        assert_eq!(handoff.records()[1].sequence(), 1);
+        assert_eq!(handoff.records()[1].source_gate_sequence(), 1);
+        assert_eq!(handoff.records()[1].fiber(), finished_child);
+        assert_eq!(handoff.records()[1].token(), attach.token());
+        assert_eq!(
+            handoff.records()[1].action(),
+            HostRootRefCommitAction::Attach
+        );
+        assert_eq!(
+            handoff.records()[1].execution_phase(),
+            HostRootRefCallbackExecutionPhase::CallbackAttach
+        );
+        assert!(handoff.records()[1].changed_ref_detach_before_attach());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
@@ -6646,6 +6997,7 @@ mod tests {
         let commit = commit_finished_host_root(&mut store, render).unwrap();
         let refs = commit.ref_commit_metadata();
         let gate = commit.dom_ref_callback_commit_gate();
+        let handoff = commit.ref_callback_execution_handoff();
 
         assert_eq!(refs.attach().len(), 0);
         assert_eq!(refs.detach().len(), 2);
@@ -6686,6 +7038,25 @@ mod tests {
         assert_eq!(gate.records()[1].action(), HostRootRefCommitAction::Detach);
         assert_eq!(
             gate.records()[1].detach_reason(),
+            Some(HostRootRefDetachReason::Deleted)
+        );
+        assert_ref_callback_execution_handoff_keeps_public_blockers(handoff);
+        assert_eq!(handoff.len(), 2);
+        assert_eq!(handoff.detach_count(), 2);
+        assert_eq!(handoff.attach_count(), 0);
+        assert_eq!(handoff.changed_ref_detach_before_attach_count(), 0);
+        assert_eq!(handoff.records()[0].source_gate_sequence(), 0);
+        assert_eq!(handoff.records()[0].fiber(), deleted_parent);
+        assert_eq!(handoff.records()[0].token(), refs.detach()[0].token());
+        assert_eq!(
+            handoff.records()[0].detach_reason(),
+            Some(HostRootRefDetachReason::Deleted)
+        );
+        assert_eq!(handoff.records()[1].source_gate_sequence(), 1);
+        assert_eq!(handoff.records()[1].fiber(), deleted_child);
+        assert_eq!(handoff.records()[1].token(), refs.detach()[1].token());
+        assert_eq!(
+            handoff.records()[1].detach_reason(),
             Some(HostRootRefDetachReason::Deleted)
         );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
@@ -6759,6 +7130,44 @@ mod tests {
             .unwrap();
 
         let error = materialize_dom_ref_callback_commit_gate(&store, &metadata).unwrap_err();
+
+        assert!(matches!(
+            error,
+            RootCommitError::HostFiberToken(error)
+                if error.violation() == HostFiberTokenViolation::Stale
+                    && error.phase() == HostFiberTokenPhase::Commit
+                    && error.target() == HostFiberTokenTarget::Instance
+        ));
+    }
+
+    #[test]
+    fn ref_callback_execution_handoff_revalidates_root_commit_source_tokens() {
+        let (mut store, root_id, _host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(50), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let ref_handle = RefHandle::from_raw(142);
+        let state_node = StateNodeHandle::from_raw(242);
+        append_host_ref_child(
+            &mut store,
+            render.work_in_progress(),
+            ref_handle,
+            state_node,
+            FiberFlags::REF,
+        );
+        store
+            .fiber_arena_mut()
+            .get_mut(render.work_in_progress())
+            .unwrap()
+            .set_subtree_flags(FiberFlags::REF);
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let gate = commit.dom_ref_callback_commit_gate().clone();
+        let attach = commit.ref_commit_metadata().attach()[0];
+        store
+            .host_tokens_mut()
+            .invalidate(attach.token(), attach.token_phase(), attach.token_target())
+            .unwrap();
+
+        let error = materialize_ref_callback_execution_handoff(&store, &gate).unwrap_err();
 
         assert!(matches!(
             error,
@@ -7213,6 +7622,23 @@ mod tests {
                 HostRootDomRefCallbackCommitGateStatus::Blocked
             );
             assert_eq!(record.blockers(), &DOM_REF_CALLBACK_GATE_BLOCKERS);
+        }
+    }
+
+    fn assert_ref_callback_execution_handoff_keeps_public_blockers(
+        handoff: &HostRootRefCallbackExecutionHandoffSnapshot,
+    ) {
+        assert!(!handoff.callback_refs_invoked());
+        assert!(!handoff.object_refs_mutated());
+        assert!(!handoff.public_roots_touched());
+        assert!(!handoff.root_errors_reported());
+        assert!(!handoff.react_dom_ref_compatibility_claimed());
+        for record in handoff.records() {
+            assert_eq!(
+                record.status(),
+                HostRootRefCallbackExecutionHandoffStatus::PrivateExecutionHandoff
+            );
+            assert_eq!(record.blockers(), &REF_CALLBACK_EXECUTION_HANDOFF_BLOCKERS);
         }
     }
 
