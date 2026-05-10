@@ -1028,6 +1028,10 @@ pub fn native_target_metadata(native_target: &str) -> Option<&'static NativeTarg
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NativeBoundaryErrorKind {
     NativeExportsNotBuilt,
+    RootBridgeWrongEnvironment,
+    RootBridgeStaleHandle,
+    RootBridgeWrongLifecycleOrder,
+    RootBridgeValidationFailed,
 }
 
 impl NativeBoundaryErrorKind {
@@ -1035,6 +1039,12 @@ impl NativeBoundaryErrorKind {
     pub const fn code(self) -> &'static str {
         match self {
             Self::NativeExportsNotBuilt => "FAST_REACT_NAPI_EXPORTS_NOT_BUILT",
+            Self::RootBridgeWrongEnvironment => "FAST_REACT_NAPI_ROOT_BRIDGE_WRONG_ENVIRONMENT",
+            Self::RootBridgeStaleHandle => "FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE",
+            Self::RootBridgeWrongLifecycleOrder => {
+                "FAST_REACT_NAPI_ROOT_BRIDGE_WRONG_LIFECYCLE_ORDER"
+            }
+            Self::RootBridgeValidationFailed => "FAST_REACT_NAPI_ROOT_BRIDGE_VALIDATION_FAILED",
         }
     }
 
@@ -1044,6 +1054,18 @@ impl NativeBoundaryErrorKind {
             Self::NativeExportsNotBuilt => {
                 "Fast React native exports are intentionally unavailable until N-API dependencies are added"
             }
+            Self::RootBridgeWrongEnvironment => {
+                "A native root bridge request referenced the wrong bridge environment"
+            }
+            Self::RootBridgeStaleHandle => {
+                "A native root bridge request referenced a stale or retired bridge handle"
+            }
+            Self::RootBridgeWrongLifecycleOrder => {
+                "A native root bridge request arrived in an invalid root lifecycle order"
+            }
+            Self::RootBridgeValidationFailed => {
+                "A native root bridge request failed private boundary validation"
+            }
         }
     }
 }
@@ -1052,7 +1074,7 @@ impl NativeBoundaryErrorKind {
 pub struct NativeBoundaryError {
     export_name: &'static str,
     kind: NativeBoundaryErrorKind,
-    metadata: NativeBoundaryMetadata,
+    source_error_code: Option<&'static str>,
 }
 
 impl NativeBoundaryError {
@@ -1061,7 +1083,20 @@ impl NativeBoundaryError {
         Self {
             export_name,
             kind: NativeBoundaryErrorKind::NativeExportsNotBuilt,
-            metadata: boundary_metadata(),
+            source_error_code: None,
+        }
+    }
+
+    #[must_use]
+    pub(crate) const fn root_bridge_validation_failure(
+        export_name: &'static str,
+        kind: NativeBoundaryErrorKind,
+        source_error_code: &'static str,
+    ) -> Self {
+        Self {
+            export_name,
+            kind,
+            source_error_code: Some(source_error_code),
         }
     }
 
@@ -1086,8 +1121,13 @@ impl NativeBoundaryError {
     }
 
     #[must_use]
+    pub const fn source_error_code(&self) -> Option<&'static str> {
+        self.source_error_code
+    }
+
+    #[must_use]
     pub const fn metadata(&self) -> NativeBoundaryMetadata {
-        self.metadata
+        boundary_metadata()
     }
 }
 
@@ -1095,14 +1135,20 @@ impl Display for NativeBoundaryError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
-            "{}: {} ({}, package={}, addon={}, node_api_floor={})",
+            "{}: {} ({}, package={}, addon={}, node_api_floor={}",
             self.export_name,
             self.reason(),
             self.code(),
-            self.metadata.package_name(),
-            self.metadata.native_addon_name(),
-            self.metadata.node_api_version_floor()
-        )
+            self.metadata().package_name(),
+            self.metadata().native_addon_name(),
+            self.metadata().node_api_version_floor()
+        )?;
+
+        if let Some(source_error_code) = self.source_error_code {
+            write!(formatter, ", source={source_error_code}")?;
+        }
+
+        formatter.write_str(")")
     }
 }
 
@@ -1110,6 +1156,56 @@ impl Error for NativeBoundaryError {}
 
 pub fn native_export_placeholder(export_name: &'static str) -> Result<(), NativeBoundaryError> {
     Err(NativeBoundaryError::native_exports_not_built(export_name))
+}
+
+#[allow(dead_code)]
+pub(crate) fn native_root_bridge_validation_placeholder(
+    export_name: &'static str,
+    error: &root_bridge_requests::NativeRootBridgeRequestError,
+) -> NativeBoundaryError {
+    NativeBoundaryError::root_bridge_validation_failure(
+        export_name,
+        native_boundary_kind_for_root_bridge_request_error(error),
+        error.code(),
+    )
+}
+
+fn native_boundary_kind_for_root_bridge_request_error(
+    error: &root_bridge_requests::NativeRootBridgeRequestError,
+) -> NativeBoundaryErrorKind {
+    match error {
+        root_bridge_requests::NativeRootBridgeRequestError::HandleTable(
+            handle_table::BridgeHandleTableError::WrongEnvironment { .. },
+        )
+        | root_bridge_requests::NativeRootBridgeRequestError::RecordEnvironmentMismatch {
+            ..
+        } => NativeBoundaryErrorKind::RootBridgeWrongEnvironment,
+        root_bridge_requests::NativeRootBridgeRequestError::HandleTable(
+            handle_table::BridgeHandleTableError::StaleHandle { .. }
+            | handle_table::BridgeHandleTableError::DisposedHandle { .. },
+        ) => NativeBoundaryErrorKind::RootBridgeStaleHandle,
+        root_bridge_requests::NativeRootBridgeRequestError::RecordRootHandleStateMismatch {
+            ..
+        }
+        | root_bridge_requests::NativeRootBridgeRequestError::RootHandleStillActive { .. }
+        | root_bridge_requests::NativeRootBridgeRequestError::SequenceMustStartWithCreate {
+            ..
+        }
+        | root_bridge_requests::NativeRootBridgeRequestError::CreateAfterRootCreated { .. }
+        | root_bridge_requests::NativeRootBridgeRequestError::RequestAfterUnmount { .. }
+        | root_bridge_requests::NativeRootBridgeRequestError::RequestSequenceOutOfOrder {
+            ..
+        }
+        | root_bridge_requests::NativeRootBridgeRequestError::RequestSequenceExhausted => {
+            NativeBoundaryErrorKind::RootBridgeWrongLifecycleOrder
+        }
+        root_bridge_requests::NativeRootBridgeRequestError::HandleTable(_)
+        | root_bridge_requests::NativeRootBridgeRequestError::RecordRootHandleMismatch { .. }
+        | root_bridge_requests::NativeRootBridgeRequestError::RecordRootIdMismatch { .. }
+        | root_bridge_requests::NativeRootBridgeRequestError::UnexpectedValueHandle { .. } => {
+            NativeBoundaryErrorKind::RootBridgeValidationFailed
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1209,9 +1305,33 @@ mod tests {
         assert_eq!(error.export_name(), "native.createElement");
         assert_eq!(error.kind(), NativeBoundaryErrorKind::NativeExportsNotBuilt);
         assert_eq!(error.code(), "FAST_REACT_NAPI_EXPORTS_NOT_BUILT");
+        assert_eq!(error.source_error_code(), None);
         assert!(error.reason().contains("N-API dependencies"));
         assert!(error.to_string().contains("@fast-react/native"));
         assert!(error.to_string().contains("fast_react_napi"));
+    }
+
+    #[test]
+    fn native_boundary_unsupported_native_execution_stays_distinct_from_root_validation() {
+        let error = native_export_placeholder("native.root.render").unwrap_err();
+
+        assert_eq!(error.kind(), NativeBoundaryErrorKind::NativeExportsNotBuilt);
+        assert_eq!(error.code(), "FAST_REACT_NAPI_EXPORTS_NOT_BUILT");
+        assert_eq!(error.source_error_code(), None);
+        assert!(!error.to_string().contains("FAST_REACT_UNIMPLEMENTED"));
+        assert!(!error.to_string().contains("React behavior"));
+        assert_ne!(
+            error.code(),
+            NativeBoundaryErrorKind::RootBridgeWrongEnvironment.code()
+        );
+        assert_ne!(
+            error.code(),
+            NativeBoundaryErrorKind::RootBridgeStaleHandle.code()
+        );
+        assert_ne!(
+            error.code(),
+            NativeBoundaryErrorKind::RootBridgeWrongLifecycleOrder.code()
+        );
     }
 
     #[test]
@@ -1220,6 +1340,122 @@ mod tests {
 
         assert!(!error.to_string().contains("React behavior"));
         assert_eq!(error.metadata(), boundary_metadata());
+    }
+
+    #[test]
+    fn native_root_bridge_boundary_maps_wrong_environment_and_stale_handles() {
+        let mut first = BridgeHandleTable::new(BridgeEnvironmentId::from_raw(319));
+        let second = BridgeHandleTable::new(BridgeEnvironmentId::from_raw(320));
+        let mut first_recorder = NativeRootBridgeRequestRecorder::new();
+        let mut second_recorder = NativeRootBridgeRequestRecorder::new();
+        let create = first_recorder
+            .record_create_root(&mut first, NativeRootBridgeCreateRequest::new(7901))
+            .unwrap();
+
+        let wrong_environment = second_recorder
+            .record_render(
+                &second,
+                NativeRootBridgeRenderRequest::new(create.root_handle()),
+            )
+            .unwrap_err();
+        let wrong_environment_boundary =
+            native_root_bridge_validation_placeholder("native.root.render", &wrong_environment);
+
+        assert_eq!(
+            wrong_environment_boundary.kind(),
+            NativeBoundaryErrorKind::RootBridgeWrongEnvironment
+        );
+        assert_eq!(
+            wrong_environment_boundary.code(),
+            "FAST_REACT_NAPI_ROOT_BRIDGE_WRONG_ENVIRONMENT"
+        );
+        assert_eq!(
+            wrong_environment_boundary.source_error_code(),
+            Some("FAST_REACT_NAPI_WRONG_ENVIRONMENT")
+        );
+        assert!(
+            wrong_environment_boundary
+                .reason()
+                .contains("wrong bridge environment")
+        );
+        assert!(
+            wrong_environment_boundary
+                .to_string()
+                .contains("source=FAST_REACT_NAPI_WRONG_ENVIRONMENT")
+        );
+        assert!(
+            !wrong_environment_boundary
+                .to_string()
+                .contains("React behavior")
+        );
+
+        let unmount = first_recorder
+            .record_unmount(
+                &mut first,
+                NativeRootBridgeUnmountRequest::new(create.root_handle()),
+            )
+            .unwrap();
+        let stale = first_recorder
+            .record_render(
+                &first,
+                NativeRootBridgeRenderRequest::new(unmount.root_handle()),
+            )
+            .unwrap_err();
+        let stale_boundary =
+            native_root_bridge_validation_placeholder("native.root.render", &stale);
+
+        assert_eq!(
+            stale_boundary.kind(),
+            NativeBoundaryErrorKind::RootBridgeStaleHandle
+        );
+        assert_eq!(
+            stale_boundary.code(),
+            "FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE"
+        );
+        assert_eq!(
+            stale_boundary.source_error_code(),
+            Some("FAST_REACT_NAPI_STALE_HANDLE")
+        );
+        assert!(stale_boundary.reason().contains("stale or retired"));
+        assert!(!stale_boundary.to_string().contains("React behavior"));
+    }
+
+    #[test]
+    fn native_root_bridge_boundary_maps_wrong_lifecycle_order() {
+        let mut table = BridgeHandleTable::new(BridgeEnvironmentId::from_raw(319));
+        let manual_root = table.insert_root(PlaceholderRootRecord::new(7902));
+        let mut recorder = NativeRootBridgeRequestRecorder::new();
+        let mut validator = NativeRootBridgeRequestSequenceValidator::new();
+        let render_before_create = recorder
+            .record_render(&table, NativeRootBridgeRenderRequest::new(manual_root))
+            .unwrap();
+
+        let missing_create = validator
+            .validate_next(&table, render_before_create)
+            .unwrap_err();
+        let boundary =
+            native_root_bridge_validation_placeholder("native.root.render", &missing_create);
+
+        assert_eq!(
+            boundary.kind(),
+            NativeBoundaryErrorKind::RootBridgeWrongLifecycleOrder
+        );
+        assert_eq!(
+            boundary.code(),
+            "FAST_REACT_NAPI_ROOT_BRIDGE_WRONG_LIFECYCLE_ORDER"
+        );
+        assert_eq!(
+            boundary.source_error_code(),
+            Some("FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_MUST_START_WITH_CREATE")
+        );
+        assert!(boundary.reason().contains("invalid root lifecycle order"));
+        assert!(
+            boundary
+                .to_string()
+                .contains("source=FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_MUST_START_WITH_CREATE")
+        );
+        assert!(!boundary.to_string().contains("FAST_REACT_UNIMPLEMENTED"));
+        assert!(!boundary.to_string().contains("React behavior"));
     }
 
     #[test]
