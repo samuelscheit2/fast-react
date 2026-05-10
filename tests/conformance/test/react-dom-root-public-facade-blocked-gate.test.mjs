@@ -800,10 +800,60 @@ test("React DOM client private facade host-output update routes through private 
   });
   const root = adapter.createRoot(container);
   const initial = adapter.renderHostOutput(root, initialElement);
+  const initialHidden =
+    rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(initial);
   const update = adapter.updateHostOutput(root, nextElement);
   const hidden =
     rootBridge.getPrivateRootPublicFacadeHostOutputUpdatePayload(update);
+  const rootWorkLoopRecord = initial.rootWorkLoopFinishedWorkRecord;
+  const rootWorkLoopPayload =
+    rootBridge.getPrivateRootPublicFacadeRootWorkLoopFinishedWorkPayload(
+      rootWorkLoopRecord
+    );
 
+  assert.equal(
+    initial.rootWorkLoopFinishedWorkStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_ROOT_WORK_LOOP_FINISHED_WORK_ACCEPTED
+  );
+  assert.equal(
+    rootWorkLoopRecord.$$typeof,
+    rootBridge.privateRootPublicFacadeRootWorkLoopFinishedWorkRecordType
+  );
+  assert.deepEqual(rootWorkLoopRecord.childTags, [
+    "HostComponent",
+    "HostText"
+  ]);
+  assert.equal(rootWorkLoopRecord.recordsFinishedWork, true);
+  assert.equal(rootWorkLoopRecord.consumedFinishedWorkRecord, true);
+  assert.equal(rootWorkLoopRecord.publicRootRenderingBlocked, true);
+  assert.equal(rootWorkLoopRecord.publicRootExecution, false);
+  assert.equal(rootWorkLoopRecord.reconcilerExecution, false);
+  assert.equal(rootWorkLoopRecord.compatibilityClaimed, false);
+  assert.equal(
+    rootWorkLoopRecord.metadataEvidence.status,
+    rootBridge.ROOT_WORK_LOOP_FINISHED_WORK_METADATA_STATUS
+  );
+  assert.equal(rootWorkLoopPayload.renderRecord, initialHidden.renderRecord);
+  assert.equal(
+    rootBridge.isPrivateRootPublicFacadeRootWorkLoopFinishedWorkRecord(
+      rootWorkLoopRecord
+    ),
+    true
+  );
+  assert.deepEqual(
+    initial.acceptedCapabilities.map((capability) => capability.id),
+    [
+      "public-facade-create-root-record",
+      "public-facade-root-render-record",
+      "root-marker-setup-cleanup",
+      "root-listener-setup-cleanup",
+      "create-render-admission",
+      "fake-dom-host-output-mutation",
+      "component-tree-host-instance-map",
+      "latest-props-publication",
+      "root-work-loop-finished-work-handoff"
+    ]
+  );
   assert.equal(
     update.$$typeof,
     rootBridge.privateRootPublicFacadeHostOutputUpdateRecordType

@@ -4831,6 +4831,11 @@ test('private react-dom/client facade host-output diagnostic renders through bri
     rootBridge.getPrivateRootInitialHostOutputHandoffPayload(handoff);
   const hostNode = handoffPayload.hostNode;
   const textNode = handoffPayload.textNode;
+  const rootWorkLoopRecord = diagnostic.rootWorkLoopFinishedWorkRecord;
+  const rootWorkLoopPayload =
+    rootBridge.getPrivateRootPublicFacadeRootWorkLoopFinishedWorkPayload(
+      rootWorkLoopRecord
+    );
 
   assert.equal(Object.isFrozen(diagnostic), true);
   assert.equal(
@@ -4882,6 +4887,29 @@ test('private react-dom/client facade host-output diagnostic renders through bri
   assert.equal(diagnostic.containerChildCount, 1);
   assert.equal(diagnostic.hostChildCount, 1);
   assert.equal(diagnostic.textContent, 'facade host output');
+  assert.equal(
+    diagnostic.rootWorkLoopFinishedWorkHandoffId,
+    'facade-host-update:1:root-work-loop-finished-work'
+  );
+  assert.equal(
+    diagnostic.rootWorkLoopFinishedWorkStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_ROOT_WORK_LOOP_FINISHED_WORK_ACCEPTED
+  );
+  assert.equal(diagnostic.rootWorkLoopFinishedWorkRecord, rootWorkLoopRecord);
+  assert.equal(
+    diagnostic.rootWorkLoopFinishedWorkMetadata.status,
+    rootBridge.ROOT_WORK_LOOP_FINISHED_WORK_METADATA_STATUS
+  );
+  assert.equal(
+    diagnostic.rootWorkLoopFinishedWorkRootChildTag,
+    'HostComponent'
+  );
+  assert.equal(
+    diagnostic.rootWorkLoopFinishedWorkHostTextChildTag,
+    'HostText'
+  );
+  assert.equal(diagnostic.rootWorkLoopFinishedWorkConsumed, true);
+  assert.equal(diagnostic.rootWorkLoopPublicRootRenderingBlocked, true);
   assert.deepEqual(
     diagnostic.acceptedCapabilities.map((capability) => capability.id),
     [
@@ -4892,7 +4920,8 @@ test('private react-dom/client facade host-output diagnostic renders through bri
       'create-render-admission',
       'fake-dom-host-output-mutation',
       'component-tree-host-instance-map',
-      'latest-props-publication'
+      'latest-props-publication',
+      'root-work-loop-finished-work-handoff'
     ]
   );
   assert.deepEqual(
@@ -4947,6 +4976,16 @@ test('private react-dom/client facade host-output diagnostic renders through bri
   assert.equal(hidden.admissionRecord.renderRequestId, render.requestId);
   assert.equal(hidden.hostOutputHandoff, handoff);
   assert.equal(hidden.hostOutputPayload, handoffPayload);
+  assert.equal(hidden.rootWorkLoopFinishedWorkRecord, rootWorkLoopRecord);
+  assert.equal(
+    hidden.rootWorkLoopFinishedWorkPayload,
+    rootWorkLoopPayload
+  );
+  assert.equal(rootWorkLoopPayload.createRecord, create);
+  assert.equal(rootWorkLoopPayload.renderRecord, render);
+  assert.equal(rootWorkLoopPayload.hostOutputHandoff, handoff);
+  assert.equal(rootWorkLoopPayload.hostOutputPayload, handoffPayload);
+  assert.equal(rootWorkLoopPayload.normalizedMetadata.rootChildTag, 'HostComponent');
   assert.equal(hidden.sideEffectRecord.sideEffectStatus, rootBridge.ROOT_BRIDGE_MARK_LISTEN_APPLIED);
   assert.equal(hidden.sideEffectCleanup.sideEffectStatus, rootBridge.ROOT_BRIDGE_MARK_LISTEN_REVERTED);
   assert.equal(hidden.callback, callback);
@@ -4958,6 +4997,54 @@ test('private react-dom/client facade host-output diagnostic renders through bri
     diagnostic
   ]);
   assert.deepEqual(rootPayload.hostOutputRenderRecords, [diagnostic]);
+  assert.equal(Object.isFrozen(rootWorkLoopRecord), true);
+  assert.equal(
+    rootWorkLoopRecord.$$typeof,
+    rootBridge.privateRootPublicFacadeRootWorkLoopFinishedWorkRecordType
+  );
+  assert.equal(
+    rootWorkLoopRecord.kind,
+    'FastReactDomPrivateRootPublicFacadeRootWorkLoopFinishedWorkRecord'
+  );
+  assert.equal(rootWorkLoopRecord.metadataProvided, false);
+  assert.deepEqual(rootWorkLoopRecord.childTags, [
+    'HostComponent',
+    'HostText'
+  ]);
+  assert.equal(rootWorkLoopRecord.renderLanes, 'Default');
+  assert.equal(rootWorkLoopRecord.finishedLanes, 'Default');
+  assert.equal(rootWorkLoopRecord.remainingLanes, 'NoLanes');
+  assert.equal(rootWorkLoopRecord.recordsFinishedWork, true);
+  assert.equal(rootWorkLoopRecord.pendingWorkMatchesFinishedWork, true);
+  assert.equal(rootWorkLoopRecord.consumedFinishedWorkRecord, true);
+  assert.equal(rootWorkLoopRecord.commitOrderAfterPendingRecord, true);
+  assert.equal(rootWorkLoopRecord.finishedWorkAfterCommit, null);
+  assert.equal(rootWorkLoopRecord.finishedLanesAfterCommit, 'NoLanes');
+  assert.equal(rootWorkLoopRecord.mutationExecutionBlocked, true);
+  assert.equal(rootWorkLoopRecord.publicRootRenderingBlocked, true);
+  assert.equal(rootWorkLoopRecord.effectsRefsAndHydrationBlocked, true);
+  assert.equal(rootWorkLoopRecord.placementTag, 'HostComponent');
+  assert.equal(
+    rootWorkLoopRecord.placementApplyKind,
+    'append-placement-to-container'
+  );
+  assert.equal(rootWorkLoopRecord.publicRootExecution, false);
+  assert.equal(rootWorkLoopRecord.reconcilerExecution, false);
+  assert.equal(rootWorkLoopRecord.compatibilityClaimed, false);
+  assert.equal(
+    rootBridge.isPrivateRootPublicFacadeRootWorkLoopFinishedWorkRecord(
+      rootWorkLoopRecord
+    ),
+    true
+  );
+  assert.equal(
+    rootBridge.isPrivateRootPublicFacadeRootWorkLoopFinishedWorkRecord({}),
+    false
+  );
+  assert.equal(
+    rootBridge.getPrivateRootPublicFacadeRootWorkLoopFinishedWorkPayload({}),
+    null
+  );
 
   assert.equal(container.childNodes.length, 1);
   assert.equal(container.firstChild, hostNode);
@@ -6020,6 +6107,73 @@ test('private react-dom/client facade host-output diagnostic fails closed', () =
   assert.equal(occupiedContainer.__registrations.length, 0);
   assert.equal(occupiedDocument.__registrations.length, 0);
 
+  const staleMetadataDocument = createDocument(
+    'private-client-facade-host-output-stale-work-loop'
+  );
+  const staleMetadataContainer = createElement('DIV', staleMetadataDocument);
+  const staleMetadataRoot = adapter.createRoot(staleMetadataContainer);
+  const staleMetadataCreate =
+    adapter.getRootCreateRecord(staleMetadataRoot);
+  assert.throws(
+    () =>
+      adapter.renderHostOutput(staleMetadataRoot, element, {
+        rootWorkLoopFinishedWorkMetadata:
+          createRootWorkLoopFinishedWorkMetadata({
+            hostType: 'section',
+            metadataRevision: 'root-work-loop-finished-work-handoff-stale',
+            renderUpdateId: 'stale-work-loop-update:1',
+            rootId: staleMetadataCreate.rootId,
+            rootTag: staleMetadataCreate.rootTag,
+            textContent: 'valid child'
+          })
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_RENDER',
+      message: /Stale root work-loop finished-work metadata/
+    }
+  );
+  assertBridgeDidNotTouchContainer(
+    staleMetadataContainer,
+    staleMetadataDocument
+  );
+  assert.deepEqual(
+    adapter.getRootHostOutputRenderDiagnostics(staleMetadataRoot),
+    []
+  );
+
+  const foreignMetadataDocument = createDocument(
+    'private-client-facade-host-output-foreign-work-loop'
+  );
+  const foreignMetadataContainer = createElement('DIV', foreignMetadataDocument);
+  const foreignMetadataRoot = adapter.createRoot(foreignMetadataContainer);
+  const foreignMetadataCreate =
+    adapter.getRootCreateRecord(foreignMetadataRoot);
+  assert.throws(
+    () =>
+      adapter.renderHostOutput(foreignMetadataRoot, element, {
+        rootWorkLoopFinishedWorkMetadata:
+          createRootWorkLoopFinishedWorkMetadata({
+            hostType: 'section',
+            renderUpdateId: 'foreign-work-loop-update:1',
+            rootId: `${foreignMetadataCreate.rootId}:foreign`,
+            rootTag: foreignMetadataCreate.rootTag,
+            textContent: 'valid child'
+          })
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_RENDER',
+      message: /Foreign root work-loop finished-work metadata/
+    }
+  );
+  assertBridgeDidNotTouchContainer(
+    foreignMetadataContainer,
+    foreignMetadataDocument
+  );
+  assert.deepEqual(
+    adapter.getRootHostOutputRenderDiagnostics(foreignMetadataRoot),
+    []
+  );
+
   const activeDiagnostic = adapter.renderHostOutput(root, element);
   const activePayload =
     rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(
@@ -6172,6 +6326,51 @@ function createHostOutputAttributeStyleProps(phase) {
     },
     'data-phase': 'initial',
     children: 'stable'
+  };
+}
+
+function createRootWorkLoopFinishedWorkMetadata(options) {
+  return {
+    source: rootBridge.ROOT_WORK_LOOP_FINISHED_WORK_METADATA_SOURCE,
+    status: rootBridge.ROOT_WORK_LOOP_FINISHED_WORK_METADATA_STATUS,
+    metadataRevision:
+      options.metadataRevision ||
+      rootBridge.ROOT_WORK_LOOP_FINISHED_WORK_METADATA_REVISION,
+    facade: {
+      rootId: options.rootId,
+      rootTag: options.rootTag,
+      renderUpdateId: options.renderUpdateId,
+      hostType: options.hostType,
+      textContent: options.textContent
+    },
+    completeWork: {
+      rootChildTag: 'HostComponent',
+      completedChildTag: 'HostComponent',
+      hostTextChildTag: 'HostText',
+      childTags: ['HostComponent', 'HostText']
+    },
+    pending: {
+      recordsFinishedWork: true,
+      pendingWorkMatchesFinishedWork: true,
+      renderLanes: 'Default',
+      finishedLanes: 'Default',
+      remainingLanes: 'NoLanes'
+    },
+    commit: {
+      commitOrderAfterPendingRecord: true,
+      consumedFinishedWorkRecord: true,
+      finishedWorkAfterCommit: null,
+      finishedLanesAfterCommit: 'NoLanes',
+      renderPhaseWorkAfterCommit: null,
+      mutationExecutionBlocked: true,
+      publicRootRenderingBlocked: true,
+      effectsRefsAndHydrationBlocked: true
+    },
+    placement: {
+      tag: 'HostComponent',
+      applyKind: 'append-placement-to-container',
+      siblingStatus: 'append'
+    }
   };
 }
 

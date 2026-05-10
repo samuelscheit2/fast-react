@@ -170,6 +170,8 @@ const privateRootPublicFacadeMarkerListenerPreflightRecordType =
   'fast.react_dom.private_root_public_facade_marker_listener_preflight_record';
 const privateRootPublicFacadeHostOutputRenderRecordType =
   'fast.react_dom.private_root_public_facade_host_output_render_record';
+const privateRootPublicFacadeRootWorkLoopFinishedWorkRecordType =
+  'fast.react_dom.private_root_public_facade_root_work_loop_finished_work_record';
 const privateRootPublicFacadeHostOutputUpdateRecordType =
   'fast.react_dom.private_root_public_facade_host_output_update_record';
 const privateRootPublicFacadeNestedHostOutputUpdateRecordType =
@@ -257,12 +259,20 @@ const ROOT_BRIDGE_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHTED =
   'preflighted-private-root-public-facade-marker-listener-gate';
 const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_APPLIED =
   'applied-private-root-public-facade-host-output-render-diagnostic';
+const ROOT_BRIDGE_PUBLIC_FACADE_ROOT_WORK_LOOP_FINISHED_WORK_ACCEPTED =
+  'accepted-private-root-public-facade-root-work-loop-finished-work';
 const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_APPLIED =
   'applied-private-root-public-facade-host-output-update-diagnostic';
 const ROOT_BRIDGE_PUBLIC_FACADE_NESTED_HOST_OUTPUT_UPDATE_APPLIED =
   'applied-private-root-public-facade-nested-host-output-update-diagnostic';
 const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_CLEANED =
   'cleaned-private-root-public-facade-host-output-unmount-cleanup-diagnostic';
+const ROOT_WORK_LOOP_FINISHED_WORK_METADATA_SOURCE =
+  'fast-react-reconciler.root-work-loop.finished-work-handoff';
+const ROOT_WORK_LOOP_FINISHED_WORK_METADATA_STATUS =
+  'accepted-private-root-work-loop-finished-work-handoff-metadata';
+const ROOT_WORK_LOOP_FINISHED_WORK_METADATA_REVISION =
+  'root-work-loop-finished-work-handoff-2026-05-10';
 const NATIVE_ROOT_BRIDGE_REQUEST_CREATE = 'create';
 const NATIVE_ROOT_BRIDGE_REQUEST_RENDER = 'render';
 const NATIVE_ROOT_BRIDGE_REQUEST_UNMOUNT = 'unmount';
@@ -1342,6 +1352,13 @@ const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_ACCEPTED_CAPABILITIES =
         'Latest props were published only after the private fake-DOM mutation handoff was accepted.'
     })
   ]);
+const ROOT_BRIDGE_PUBLIC_FACADE_ROOT_WORK_LOOP_FINISHED_WORK_ACCEPTED_CAPABILITY =
+  freezeRecord({
+    id: 'root-work-loop-finished-work-handoff',
+    accepted: true,
+    reason:
+      'Accepted root work-loop finished-work handoff metadata was linked to the private HostComponent/HostText facade render diagnostic.'
+  });
 const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_BLOCKED_CAPABILITIES =
   freezeArray([
     freezeRecord({
@@ -1658,6 +1675,7 @@ const rootPublicFacadePreflightRootPayloads = new WeakMap();
 const rootPublicFacadePreflightRecordPayloads = new WeakMap();
 const rootPublicFacadeMarkerListenerPreflightPayloads = new WeakMap();
 const rootPublicFacadeHostOutputRenderPayloads = new WeakMap();
+const rootPublicFacadeRootWorkLoopFinishedWorkPayloads = new WeakMap();
 const rootPublicFacadeHostOutputUpdatePayloads = new WeakMap();
 const rootPublicFacadeNestedHostOutputUpdatePayloads = new WeakMap();
 const rootPublicFacadeHostOutputUnmountCleanupPayloads = new WeakMap();
@@ -2559,12 +2577,27 @@ function renderPrivateRootPublicFacadeHostOutputFromPayload(
   assertNoActiveCreateRootSideEffectsForPublicFacadeHostOutputUpdate(
     createRecord
   );
-  normalizeInitialHostOutputElement(element);
+  const normalizedInitial = normalizeInitialHostOutputElement(element);
+  const rootWorkLoopMetadataOption =
+    getPublicFacadeRootWorkLoopFinishedWorkMetadataOption(options);
+  if (rootWorkLoopMetadataOption.found) {
+    normalizePublicFacadeRootWorkLoopFinishedWorkMetadata(
+      rootWorkLoopMetadataOption.value,
+      {
+        createRecord,
+        hostOutputHandoff: null,
+        normalizedInitial,
+        renderRecord: null
+      }
+    );
+  }
 
   let sideEffectRecord = null;
   let renderRecord = null;
   let admissionRecord = null;
   let hostOutputHandoff = null;
+  let hostOutputPayload = null;
+  let rootWorkLoopFinishedWorkRecord = null;
   let sideEffectCleanup = null;
   const callback = getPublicFacadeHostOutputRenderCallback(options);
   const sideEffectOptions =
@@ -2583,6 +2616,30 @@ function renderPrivateRootPublicFacadeHostOutputFromPayload(
     );
     hostOutputHandoff =
       payload.bridge.applyInitialRenderHostOutput(admissionRecord);
+    hostOutputPayload =
+      rootInitialHostOutputHandoffPayloads.get(hostOutputHandoff);
+    if (hostOutputPayload === undefined) {
+      throwInvalidRootPublicFacadeHostOutputRender(
+        'Public-facade host-output render requires an applied initial host-output handoff.'
+      );
+    }
+    rootWorkLoopFinishedWorkRecord =
+      createPrivateRootPublicFacadeRootWorkLoopFinishedWorkRecord({
+        createRecord,
+        hostOutputHandoff,
+        hostOutputPayload,
+        metadata:
+          rootWorkLoopMetadataOption.found
+            ? rootWorkLoopMetadataOption.value
+            : createDefaultPublicFacadeRootWorkLoopFinishedWorkMetadata({
+                createRecord,
+                hostOutputHandoff,
+                renderRecord
+              }),
+        metadataProvided: rootWorkLoopMetadataOption.found,
+        normalizedInitial,
+        renderRecord
+      });
     sideEffectCleanup =
       payload.bridge.revertCreateRootSideEffects(sideEffectRecord);
   } catch (error) {
@@ -2595,18 +2652,14 @@ function renderPrivateRootPublicFacadeHostOutputFromPayload(
     throw error;
   }
 
-  const hostOutputPayload =
-    rootInitialHostOutputHandoffPayloads.get(hostOutputHandoff);
-  if (hostOutputPayload === undefined) {
-    throwInvalidRootPublicFacadeHostOutputRender(
-      'Public-facade host-output render requires an applied initial host-output handoff.'
-    );
-  }
-
   const rootBridgeState = handleState.bridgeState;
   const sequence = rootBridgeState.nextPublicFacadeHostOutputRenderSequence++;
   const diagnosticId =
     `${rootBridgeState.publicFacadeHostOutputRenderIdPrefix}:${sequence}`;
+  const acceptedCapabilities =
+    createPublicFacadeHostOutputRenderAcceptedCapabilities(
+      rootWorkLoopFinishedWorkRecord
+    );
   const diagnosticRecord = freezeRecord({
     $$typeof: privateRootPublicFacadeHostOutputRenderRecordType,
     kind: 'FastReactDomPrivateRootPublicFacadeHostOutputRenderDiagnosticRecord',
@@ -2650,8 +2703,22 @@ function renderPrivateRootPublicFacadeHostOutputFromPayload(
     containerChildCount: hostOutputHandoff.containerChildCount,
     hostChildCount: hostOutputHandoff.hostChildCount,
     textContent: hostOutputHandoff.textContent,
-    acceptedCapabilities:
-      ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_ACCEPTED_CAPABILITIES,
+    rootWorkLoopFinishedWorkHandoffId:
+      rootWorkLoopFinishedWorkRecord.handoffId,
+    rootWorkLoopFinishedWorkStatus:
+      rootWorkLoopFinishedWorkRecord.handoffStatus,
+    rootWorkLoopFinishedWorkRecord,
+    rootWorkLoopFinishedWorkMetadata:
+      rootWorkLoopFinishedWorkRecord.metadataEvidence,
+    rootWorkLoopFinishedWorkRootChildTag:
+      rootWorkLoopFinishedWorkRecord.rootChildTag,
+    rootWorkLoopFinishedWorkHostTextChildTag:
+      rootWorkLoopFinishedWorkRecord.hostTextChildTag,
+    rootWorkLoopFinishedWorkConsumed:
+      rootWorkLoopFinishedWorkRecord.consumedFinishedWorkRecord,
+    rootWorkLoopPublicRootRenderingBlocked:
+      rootWorkLoopFinishedWorkRecord.publicRootRenderingBlocked,
+    acceptedCapabilities,
     blockedCapabilities:
       ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_BLOCKED_CAPABILITIES,
     privateFacadeRoot: true,
@@ -2691,6 +2758,11 @@ function renderPrivateRootPublicFacadeHostOutputFromPayload(
     hostOutputPayload,
     renderRecord,
     root: payload.root,
+    rootWorkLoopFinishedWorkPayload:
+      rootPublicFacadeRootWorkLoopFinishedWorkPayloads.get(
+        rootWorkLoopFinishedWorkRecord
+      ),
+    rootWorkLoopFinishedWorkRecord,
     rootHandle: payload.rootHandle,
     sideEffectCleanup,
     sideEffectRecord
@@ -4854,6 +4926,14 @@ function getPrivateRootPublicFacadeHostOutputRenderPayload(record) {
 
 function isPrivateRootPublicFacadeHostOutputRenderRecord(value) {
   return rootPublicFacadeHostOutputRenderPayloads.has(value);
+}
+
+function getPrivateRootPublicFacadeRootWorkLoopFinishedWorkPayload(record) {
+  return rootPublicFacadeRootWorkLoopFinishedWorkPayloads.get(record) || null;
+}
+
+function isPrivateRootPublicFacadeRootWorkLoopFinishedWorkRecord(value) {
+  return rootPublicFacadeRootWorkLoopFinishedWorkPayloads.has(value);
 }
 
 function getPrivateRootPublicFacadeHostOutputUpdatePayload(record) {
@@ -11059,7 +11139,617 @@ function getPublicFacadeHostOutputRenderSideEffectOptions(options) {
   if (Object.prototype.hasOwnProperty.call(options, 'sideEffectOptions')) {
     return options.sideEffectOptions;
   }
+  if (
+    Object.prototype.hasOwnProperty.call(
+      options,
+      'rootWorkLoopFinishedWorkMetadata'
+    ) ||
+    Object.prototype.hasOwnProperty.call(
+      options,
+      'rootWorkLoopFinishedWorkHandoffMetadata'
+    )
+  ) {
+    if (Object.prototype.hasOwnProperty.call(options, 'listenerOptions')) {
+      return {
+        listenerOptions: options.listenerOptions
+      };
+    }
+    return undefined;
+  }
   return options;
+}
+
+function getPublicFacadeRootWorkLoopFinishedWorkMetadataOption(options) {
+  if (!options || typeof options !== 'object') {
+    return {
+      found: false,
+      value: undefined
+    };
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(
+      options,
+      'rootWorkLoopFinishedWorkMetadata'
+    )
+  ) {
+    return {
+      found: true,
+      value: options.rootWorkLoopFinishedWorkMetadata
+    };
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(
+      options,
+      'rootWorkLoopFinishedWorkHandoffMetadata'
+    )
+  ) {
+    return {
+      found: true,
+      value: options.rootWorkLoopFinishedWorkHandoffMetadata
+    };
+  }
+  return {
+    found: false,
+    value: undefined
+  };
+}
+
+function createDefaultPublicFacadeRootWorkLoopFinishedWorkMetadata({
+  createRecord,
+  hostOutputHandoff,
+  renderRecord
+}) {
+  return freezeRecord({
+    source: ROOT_WORK_LOOP_FINISHED_WORK_METADATA_SOURCE,
+    status: ROOT_WORK_LOOP_FINISHED_WORK_METADATA_STATUS,
+    metadataRevision: ROOT_WORK_LOOP_FINISHED_WORK_METADATA_REVISION,
+    recordKind: 'HostRootCompleteWorkCommitHandoffRecordForCanary',
+    facade: freezeRecord({
+      rootId: createRecord.rootId,
+      rootKind: createRecord.rootKind,
+      rootTag: createRecord.rootTag,
+      renderRequestId: renderRecord.requestId,
+      renderUpdateId: renderRecord.updateId,
+      hostType: hostOutputHandoff.hostType,
+      textContent: hostOutputHandoff.textContent
+    }),
+    completeWork: freezeRecord({
+      rootChildTag: 'HostComponent',
+      completedChildTag: 'HostComponent',
+      hostTextChildTag: 'HostText',
+      childTags: freezeArray(['HostComponent', 'HostText']),
+      detachedInstanceCount: 1,
+      detachedTextCount: 1
+    }),
+    pending: freezeRecord({
+      recordsFinishedWork: true,
+      pendingWorkMatchesFinishedWork: true,
+      renderLanes: 'Default',
+      finishedLanes: 'Default',
+      remainingLanes: 'NoLanes',
+      pendingLanesBeforeCommit: 'Default',
+      handoffOrder: 1
+    }),
+    commit: freezeRecord({
+      commitOrder: 2,
+      commitOrderAfterPendingRecord: true,
+      consumedFinishedWorkRecord: true,
+      currentAfterCommitMatchesFinishedWork: true,
+      finishedWorkAfterCommit: null,
+      finishedLanesAfterCommit: 'NoLanes',
+      renderPhaseWorkAfterCommit: null,
+      mutationExecutionBlocked: true,
+      publicRootRenderingBlocked: true,
+      effectsRefsAndHydrationBlocked: true
+    }),
+    placement: freezeRecord({
+      diagnosticCount: 1,
+      tag: 'HostComponent',
+      applyKind: 'append-placement-to-container',
+      siblingStatus: 'append',
+      canInsertBefore: false
+    })
+  });
+}
+
+function createPrivateRootPublicFacadeRootWorkLoopFinishedWorkRecord({
+  createRecord,
+  hostOutputHandoff,
+  hostOutputPayload,
+  metadata,
+  metadataProvided,
+  normalizedInitial,
+  renderRecord
+}) {
+  const normalized =
+    normalizePublicFacadeRootWorkLoopFinishedWorkMetadata(metadata, {
+      createRecord,
+      hostOutputHandoff,
+      normalizedInitial,
+      renderRecord
+    });
+  const handoffId =
+    `${renderRecord.updateId}:root-work-loop-finished-work`;
+  const record = freezeRecord({
+    $$typeof: privateRootPublicFacadeRootWorkLoopFinishedWorkRecordType,
+    kind:
+      'FastReactDomPrivateRootPublicFacadeRootWorkLoopFinishedWorkRecord',
+    operation: 'public-facade-root-work-loop-finished-work-handoff',
+    handoffId,
+    handoffStatus:
+      ROOT_BRIDGE_PUBLIC_FACADE_ROOT_WORK_LOOP_FINISHED_WORK_ACCEPTED,
+    metadataSource: normalized.source,
+    metadataStatus: normalized.status,
+    metadataRevision: normalized.revision,
+    metadataProvided,
+    rootId: createRecord.rootId,
+    rootKind: createRecord.rootKind,
+    rootTag: createRecord.rootTag,
+    renderRequestId: renderRecord.requestId,
+    renderRequestSequence: renderRecord.requestSequence,
+    renderRequestType: renderRecord.requestType,
+    renderUpdateId: renderRecord.updateId,
+    hostType: hostOutputHandoff.hostType,
+    textContent: hostOutputHandoff.textContent,
+    rootChildTag: normalized.rootChildTag,
+    completedChildTag: normalized.completedChildTag,
+    hostTextChildTag: normalized.hostTextChildTag,
+    childTags: normalized.childTags,
+    renderLanes: normalized.renderLanes,
+    finishedLanes: normalized.finishedLanes,
+    remainingLanes: normalized.remainingLanes,
+    recordsFinishedWork: true,
+    pendingWorkMatchesFinishedWork: true,
+    consumedFinishedWorkRecord: true,
+    commitOrderAfterPendingRecord: true,
+    finishedWorkAfterCommit: null,
+    finishedLanesAfterCommit: normalized.finishedLanesAfterCommit,
+    renderPhaseWorkAfterCommit: null,
+    mutationExecutionBlocked: true,
+    publicRootRenderingBlocked: true,
+    effectsRefsAndHydrationBlocked: true,
+    placementApplyKind: normalized.placementApplyKind,
+    placementTag: normalized.placementTag,
+    placementSiblingStatus: normalized.placementSiblingStatus,
+    metadataEvidence: normalized.publicRecord,
+    privateFacadeRoot: true,
+    publicCreateRootEnabled: false,
+    publicHydrateRootEnabled: false,
+    publicRootExecution: false,
+    publicRootCompatibilitySurface: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    rootScheduled: false,
+    fakeDomMutation: false,
+    domMutation: false,
+    browserDomMutation: false,
+    hydration: false,
+    eventDispatch: false,
+    refEffects: false,
+    compatibilityClaimed: false
+  });
+
+  rootPublicFacadeRootWorkLoopFinishedWorkPayloads.set(record, {
+    createRecord,
+    hostOutputHandoff,
+    hostOutputPayload,
+    metadata,
+    normalizedMetadata: normalized,
+    renderRecord,
+    sourceRecord: renderRecord
+  });
+  return record;
+}
+
+function normalizePublicFacadeRootWorkLoopFinishedWorkMetadata(
+  metadata,
+  expected
+) {
+  if (!isObjectOrFunction(metadata)) {
+    throwInvalidRootPublicFacadeHostOutputRender(
+      'Public-facade host-output render requires accepted root work-loop finished-work metadata.'
+    );
+  }
+
+  const source = getFirstRootWorkLoopMetadataValue(metadata, [
+    ['source'],
+    ['metadataSource'],
+    ['metadata_source']
+  ]);
+  if (source !== ROOT_WORK_LOOP_FINISHED_WORK_METADATA_SOURCE) {
+    throwStaleRootWorkLoopFinishedWorkMetadata();
+  }
+
+  const status = getFirstRootWorkLoopMetadataValue(metadata, [
+    ['status'],
+    ['metadataStatus'],
+    ['metadata_status']
+  ]);
+  if (status !== ROOT_WORK_LOOP_FINISHED_WORK_METADATA_STATUS) {
+    throwStaleRootWorkLoopFinishedWorkMetadata();
+  }
+
+  const revision = getFirstRootWorkLoopMetadataValue(metadata, [
+    ['metadataRevision'],
+    ['metadata_revision'],
+    ['revision']
+  ]);
+  if (revision !== ROOT_WORK_LOOP_FINISHED_WORK_METADATA_REVISION) {
+    throwStaleRootWorkLoopFinishedWorkMetadata();
+  }
+
+  const facadeRootId = getFirstRootWorkLoopMetadataValue(metadata, [
+    ['facade', 'rootId'],
+    ['facade', 'root_id'],
+    ['facadeRootId'],
+    ['facade_root_id'],
+    ['rootId'],
+    ['root_id']
+  ]);
+  if (facadeRootId !== expected.createRecord.rootId) {
+    throwForeignRootWorkLoopFinishedWorkMetadata();
+  }
+
+  const facadeRootTag = getFirstRootWorkLoopMetadataValue(metadata, [
+    ['facade', 'rootTag'],
+    ['facade', 'root_tag'],
+    ['facadeRootTag'],
+    ['facade_root_tag'],
+    ['rootTag'],
+    ['root_tag']
+  ]);
+  if (
+    facadeRootTag !== undefined &&
+    facadeRootTag !== expected.createRecord.rootTag
+  ) {
+    throwForeignRootWorkLoopFinishedWorkMetadata();
+  }
+
+  const renderUpdateId = getFirstRootWorkLoopMetadataValue(metadata, [
+    ['facade', 'renderUpdateId'],
+    ['facade', 'render_update_id'],
+    ['facadeRenderUpdateId'],
+    ['facade_render_update_id'],
+    ['renderUpdateId'],
+    ['render_update_id']
+  ]);
+  if (typeof renderUpdateId !== 'string' || renderUpdateId === '') {
+    throwInvalidRootPublicFacadeHostOutputRender(
+      'Accepted root work-loop finished-work metadata requires a render update id.'
+    );
+  }
+  if (
+    expected.renderRecord !== null &&
+    renderUpdateId !== expected.renderRecord.updateId
+  ) {
+    throwStaleRootWorkLoopFinishedWorkMetadata();
+  }
+
+  const facadeHostType = getFirstRootWorkLoopMetadataValue(metadata, [
+    ['facade', 'hostType'],
+    ['facade', 'host_type'],
+    ['facadeHostType'],
+    ['facade_host_type'],
+    ['hostType'],
+    ['host_type']
+  ]);
+  if (
+    facadeHostType !== undefined &&
+    facadeHostType !== expected.normalizedInitial.type
+  ) {
+    throwForeignRootWorkLoopFinishedWorkMetadata();
+  }
+
+  const facadeTextContent = getFirstRootWorkLoopMetadataValue(metadata, [
+    ['facade', 'textContent'],
+    ['facade', 'text_content'],
+    ['facadeTextContent'],
+    ['facade_text_content'],
+    ['textContent'],
+    ['text_content']
+  ]);
+  if (
+    facadeTextContent !== undefined &&
+    String(facadeTextContent) !== expected.normalizedInitial.text
+  ) {
+    throwStaleRootWorkLoopFinishedWorkMetadata();
+  }
+
+  const rootChildTag = normalizeRootWorkLoopFiberTag(
+    getFirstRootWorkLoopMetadataValue(metadata, [
+      ['completeWork', 'rootChildTag'],
+      ['complete_work', 'root_child_tag'],
+      ['rootChildTag'],
+      ['root_child_tag']
+    ])
+  );
+  const completedChildTag = normalizeRootWorkLoopFiberTag(
+    getFirstRootWorkLoopMetadataValue(metadata, [
+      ['completeWork', 'completedChildTag'],
+      ['complete_work', 'completed_child_tag'],
+      ['completedChildTag'],
+      ['completed_child_tag']
+    ])
+  );
+  const hostTextChildTag = normalizeRootWorkLoopFiberTag(
+    getFirstRootWorkLoopMetadataValue(metadata, [
+      ['completeWork', 'hostTextChildTag'],
+      ['complete_work', 'host_text_child_tag'],
+      ['hostTextChildTag'],
+      ['host_text_child_tag']
+    ])
+  );
+  if (
+    rootChildTag !== 'HostComponent' ||
+    completedChildTag !== 'HostComponent' ||
+    hostTextChildTag !== 'HostText'
+  ) {
+    throwInvalidRootPublicFacadeHostOutputRender(
+      'Accepted root work-loop finished-work metadata must describe one HostComponent with one HostText child.'
+    );
+  }
+
+  const childTags = normalizeRootWorkLoopChildTags(
+    getFirstRootWorkLoopMetadataValue(metadata, [
+      ['completeWork', 'childTags'],
+      ['complete_work', 'child_tags'],
+      ['childTags'],
+      ['child_tags']
+    ])
+  );
+  if (
+    childTags.length !== 2 ||
+    childTags[0] !== 'HostComponent' ||
+    childTags[1] !== 'HostText'
+  ) {
+    throwInvalidRootPublicFacadeHostOutputRender(
+      'Accepted root work-loop finished-work metadata must keep the HostComponent/HostText child path.'
+    );
+  }
+
+  const renderLanes = normalizeRootWorkLoopLaneName(
+    getFirstRootWorkLoopMetadataValue(metadata, [
+      ['pending', 'renderLanes'],
+      ['pending', 'render_lanes'],
+      ['renderLanes'],
+      ['render_lanes']
+    ])
+  );
+  const finishedLanes = normalizeRootWorkLoopLaneName(
+    getFirstRootWorkLoopMetadataValue(metadata, [
+      ['pending', 'finishedLanes'],
+      ['pending', 'finished_lanes'],
+      ['finishedLanes'],
+      ['finished_lanes']
+    ])
+  );
+  const remainingLanes = normalizeRootWorkLoopLaneName(
+    getFirstRootWorkLoopMetadataValue(metadata, [
+      ['pending', 'remainingLanes'],
+      ['pending', 'remaining_lanes'],
+      ['remainingLanes'],
+      ['remaining_lanes']
+    ])
+  );
+  if (
+    renderLanes !== 'Default' ||
+    finishedLanes !== 'Default' ||
+    remainingLanes !== 'NoLanes'
+  ) {
+    throwStaleRootWorkLoopFinishedWorkMetadata();
+  }
+
+  requireRootWorkLoopMetadataTrue(
+    getFirstRootWorkLoopMetadataValue(metadata, [
+      ['pending', 'recordsFinishedWork'],
+      ['pending', 'records_finished_work'],
+      ['recordsFinishedWork'],
+      ['records_finished_work']
+    ])
+  );
+  requireRootWorkLoopMetadataTrue(
+    getFirstRootWorkLoopMetadataValue(metadata, [
+      ['pending', 'pendingWorkMatchesFinishedWork'],
+      ['pending', 'pending_work_matches_finished_work'],
+      ['pendingWorkMatchesFinishedWork'],
+      ['pending_work_matches_finished_work']
+    ])
+  );
+  requireRootWorkLoopMetadataTrue(
+    getFirstRootWorkLoopMetadataValue(metadata, [
+      ['commit', 'commitOrderAfterPendingRecord'],
+      ['commit', 'commit_order_after_pending_record'],
+      ['commitOrderAfterPendingRecord'],
+      ['commit_order_after_pending_record']
+    ])
+  );
+  requireRootWorkLoopMetadataTrue(
+    getFirstRootWorkLoopMetadataValue(metadata, [
+      ['commit', 'consumedFinishedWorkRecord'],
+      ['commit', 'consumed_finished_work_record'],
+      ['consumedFinishedWorkRecord'],
+      ['consumed_finished_work_record']
+    ])
+  );
+  requireRootWorkLoopMetadataTrue(
+    getFirstRootWorkLoopMetadataValue(metadata, [
+      ['commit', 'mutationExecutionBlocked'],
+      ['commit', 'mutation_execution_blocked'],
+      ['mutationExecutionBlocked'],
+      ['mutation_execution_blocked']
+    ])
+  );
+  requireRootWorkLoopMetadataTrue(
+    getFirstRootWorkLoopMetadataValue(metadata, [
+      ['commit', 'publicRootRenderingBlocked'],
+      ['commit', 'public_root_rendering_blocked'],
+      ['publicRootRenderingBlocked'],
+      ['public_root_rendering_blocked']
+    ])
+  );
+  requireRootWorkLoopMetadataTrue(
+    getFirstRootWorkLoopMetadataValue(metadata, [
+      ['commit', 'effectsRefsAndHydrationBlocked'],
+      ['commit', 'effects_refs_and_hydration_blocked'],
+      ['effectsRefsAndHydrationBlocked'],
+      ['effects_refs_and_hydration_blocked']
+    ])
+  );
+
+  const finishedWorkAfterCommit = getFirstRootWorkLoopMetadataValue(
+    metadata,
+    [
+      ['commit', 'finishedWorkAfterCommit'],
+      ['commit', 'finished_work_after_commit'],
+      ['finishedWorkAfterCommit'],
+      ['finished_work_after_commit']
+    ]
+  );
+  const renderPhaseWorkAfterCommit = getFirstRootWorkLoopMetadataValue(
+    metadata,
+    [
+      ['commit', 'renderPhaseWorkAfterCommit'],
+      ['commit', 'render_phase_work_after_commit'],
+      ['renderPhaseWorkAfterCommit'],
+      ['render_phase_work_after_commit']
+    ]
+  );
+  const finishedLanesAfterCommit = normalizeRootWorkLoopLaneName(
+    getFirstRootWorkLoopMetadataValue(metadata, [
+      ['commit', 'finishedLanesAfterCommit'],
+      ['commit', 'finished_lanes_after_commit'],
+      ['finishedLanesAfterCommit'],
+      ['finished_lanes_after_commit']
+    ])
+  );
+  if (
+    finishedWorkAfterCommit !== null ||
+    renderPhaseWorkAfterCommit !== null ||
+    finishedLanesAfterCommit !== 'NoLanes'
+  ) {
+    throwStaleRootWorkLoopFinishedWorkMetadata();
+  }
+
+  const placementTag = normalizeRootWorkLoopFiberTag(
+    getFirstRootWorkLoopMetadataValue(metadata, [
+      ['placement', 'tag'],
+      ['placementTag'],
+      ['placement_tag']
+    ])
+  );
+  const placementApplyKind = getFirstRootWorkLoopMetadataValue(metadata, [
+    ['placement', 'applyKind'],
+    ['placement', 'apply_kind'],
+    ['placementApplyKind'],
+    ['placement_apply_kind']
+  ]);
+  const placementSiblingStatus = getFirstRootWorkLoopMetadataValue(metadata, [
+    ['placement', 'siblingStatus'],
+    ['placement', 'sibling_status'],
+    ['placementSiblingStatus'],
+    ['placement_sibling_status']
+  ]);
+  if (
+    placementTag !== 'HostComponent' ||
+    placementApplyKind !== 'append-placement-to-container' ||
+    placementSiblingStatus !== 'append'
+  ) {
+    throwStaleRootWorkLoopFinishedWorkMetadata();
+  }
+
+  return {
+    childTags,
+    completedChildTag,
+    finishedLanes,
+    finishedLanesAfterCommit,
+    hostTextChildTag,
+    placementApplyKind,
+    placementSiblingStatus,
+    placementTag,
+    publicRecord: freezeRecord({
+      childTags,
+      completedChildTag,
+      consumedFinishedWorkRecord: true,
+      effectsRefsAndHydrationBlocked: true,
+      finishedLanes,
+      finishedLanesAfterCommit,
+      hostTextChildTag,
+      metadataRevision: revision,
+      pendingWorkMatchesFinishedWork: true,
+      placementApplyKind,
+      placementSiblingStatus,
+      placementTag,
+      publicRootRenderingBlocked: true,
+      remainingLanes,
+      renderLanes,
+      renderUpdateId,
+      rootChildTag,
+      rootId: facadeRootId,
+      source,
+      status
+    }),
+    remainingLanes,
+    renderLanes,
+    revision,
+    rootChildTag,
+    source,
+    status
+  };
+}
+
+function getFirstRootWorkLoopMetadataValue(metadata, paths) {
+  for (const path of paths) {
+    const pathValue = getRootCommitMetadataPathValue(metadata, path);
+    if (pathValue.found) {
+      return pathValue.value;
+    }
+  }
+  return undefined;
+}
+
+function normalizeRootWorkLoopChildTags(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return freezeArray(value.map((tag) => normalizeRootWorkLoopFiberTag(tag)));
+}
+
+function normalizeRootWorkLoopFiberTag(value) {
+  return normalizeRootCommitFiberTag(value);
+}
+
+function normalizeRootWorkLoopLaneName(value) {
+  const normalized = normalizeRootCommitName(value);
+  if (normalized === 'default' || normalized === 'lanesdefault') {
+    return 'Default';
+  }
+  if (
+    normalized === 'no' ||
+    normalized === 'none' ||
+    normalized === 'nolanes' ||
+    normalized === 'lanesno'
+  ) {
+    return 'NoLanes';
+  }
+  return null;
+}
+
+function requireRootWorkLoopMetadataTrue(value) {
+  if (value !== true) {
+    throwStaleRootWorkLoopFinishedWorkMetadata();
+  }
+}
+
+function throwStaleRootWorkLoopFinishedWorkMetadata() {
+  throwInvalidRootPublicFacadeHostOutputRender(
+    'Stale root work-loop finished-work metadata cannot be linked to the private public-facade host-output render.'
+  );
+}
+
+function throwForeignRootWorkLoopFinishedWorkMetadata() {
+  throwInvalidRootPublicFacadeHostOutputRender(
+    'Foreign root work-loop finished-work metadata cannot be linked to this private public-facade root.'
+  );
 }
 
 function getPublicFacadeHostOutputUpdateCallback(options) {
@@ -11149,6 +11839,24 @@ function getPublicFacadeHostOutputUpdateTextChild(props, phase) {
     );
   }
   return String(children);
+}
+
+function createPublicFacadeHostOutputRenderAcceptedCapabilities(
+  rootWorkLoopFinishedWorkRecord
+) {
+  if (
+    !isPrivateRootPublicFacadeRootWorkLoopFinishedWorkRecord(
+      rootWorkLoopFinishedWorkRecord
+    )
+  ) {
+    throwInvalidRootPublicFacadeHostOutputRender(
+      'Public-facade host-output render requires accepted root work-loop finished-work metadata.'
+    );
+  }
+  return freezeArray([
+    ...ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_ACCEPTED_CAPABILITIES,
+    ROOT_BRIDGE_PUBLIC_FACADE_ROOT_WORK_LOOP_FINISHED_WORK_ACCEPTED_CAPABILITY
+  ]);
 }
 
 function createPublicFacadeHostOutputUpdateAcceptedCapabilities(handoff) {
@@ -11996,6 +12704,10 @@ module.exports = {
   ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_APPLIED,
   ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_RENDER_BLOCKED_CAPABILITIES,
+  ROOT_BRIDGE_PUBLIC_FACADE_ROOT_WORK_LOOP_FINISHED_WORK_ACCEPTED,
+  ROOT_WORK_LOOP_FINISHED_WORK_METADATA_REVISION,
+  ROOT_WORK_LOOP_FINISHED_WORK_METADATA_SOURCE,
+  ROOT_WORK_LOOP_FINISHED_WORK_METADATA_STATUS,
   ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_APPLIED,
   ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_BLOCKED_CAPABILITIES,
@@ -12078,6 +12790,7 @@ module.exports = {
   getPrivateRootPortalPrepareMountListenerIntentPayload,
   getPrivateRootPublicFacadeMarkerListenerPreflightPayload,
   getPrivateRootPublicFacadeHostOutputRenderPayload,
+  getPrivateRootPublicFacadeRootWorkLoopFinishedWorkPayload,
   getPrivateRootPublicFacadeHostOutputUpdatePayload,
   getPrivateRootPublicFacadeNestedHostOutputUpdatePayload,
   getPrivateRootPublicFacadeHostOutputUnmountCleanupPayload,
@@ -12107,6 +12820,7 @@ module.exports = {
   isPrivateRootPortalBoundaryRecord,
   isPrivateRootPublicFacadeMarkerListenerPreflightRecord,
   isPrivateRootPublicFacadeHostOutputRenderRecord,
+  isPrivateRootPublicFacadeRootWorkLoopFinishedWorkRecord,
   isPrivateRootPublicFacadeHostOutputUpdateRecord,
   isPrivateRootPublicFacadeNestedHostOutputUpdateRecord,
   isPrivateRootPublicFacadeHostOutputUnmountCleanupRecord,
@@ -12140,6 +12854,7 @@ module.exports = {
   privateRootPortalPrepareMountListenerIntentRecordType,
   privateRootPublicFacadeMarkerListenerPreflightRecordType,
   privateRootPublicFacadeHostOutputRenderRecordType,
+  privateRootPublicFacadeRootWorkLoopFinishedWorkRecordType,
   privateRootPublicFacadeHostOutputUpdateRecordType,
   privateRootPublicFacadeNestedHostOutputUpdateRecordType,
   privateRootPublicFacadeHostOutputUnmountCleanupRecordType,
