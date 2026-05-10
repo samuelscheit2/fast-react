@@ -45,29 +45,18 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue 625-654 is active in isolated
-`worker/<slug>` branches and worktrees.
-
-- 625-635: Rust reconciler execution paths for root scheduling, sync flush,
-  function components, effects, context, Suspense, Offscreen, host placement,
-  deletion cleanup, and host payload commit handoff.
-- 636-640: React test-renderer private native-bridge execution, serialization,
-  and act/scheduler flush handoffs.
-- 641-652: React DOM private facade, controlled input, event, hydration,
-  resource, and form execution gates.
-- 653-654: Scheduler mock and postTask private execution routes.
-- Accepted so far: 626-627, 629, 631-633, 635, 641-642, 644, 646-651, and
-  653-654.
-- Remaining active: 625, 628, 630, 634, 636-640, 643, 645, and 652.
+Top-level cap: 30 workers. Queue 625-654 has been fully accepted and merged.
+No replacement workers are queued yet while accepted-worker cleanup and the next
+queue selection finish.
 
 ## Near-Term Sequencing
 
-1. Monitor live workers and classify completions from tmux pane state, worker
-   reports, worktree status, and verification evidence.
-2. Before queueing further replacements, merge and clean all completed accepted
-   work already available so replacement capacity starts from current `main`.
-3. Accept overlapping implementation work when scopes are different enough;
-   resolve merge conflicts on `main` after merge attempts.
+1. Clean accepted queue 625-654 worker tmux sessions, worktrees, and branches
+   now that their reports and merge commits are recorded.
+2. Reclassify any remaining live sessions from current tmux pane state before
+   launching replacements.
+3. Queue replacements up to the 30 top-level cap with `scripts/run-worker.sh`;
+   each prompt must require `create_goal` as the first worker action.
 4. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
 

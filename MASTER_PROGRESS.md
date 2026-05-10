@@ -31,6 +31,21 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ### Queue 625-654
 
+- Workers 625, 628, 630, 634, 636-640, 643, 645, and 652 were accepted,
+  completing queue 625-654. The final batch added root scheduler lane
+  expiration execution, function-component `useReducer` and context propagation
+  execution, deletion ref/passive cleanup execution, test-renderer
+  create/update/unmount native execution, private toJSON native-execution
+  evidence, private act/scheduler flush evidence, React DOM private root
+  unmount facade cleanup, live controlled-input preflight evidence, and private
+  form-action submit reset fake-path execution while keeping public
+  compatibility blocked.
+- The completed queue 625-654 state was verified with `cargo fmt --all
+  --check`, full `fast-react-reconciler` tests, full
+  `fast-react-test-renderer` tests, React DOM/test-renderer/Scheduler workspace
+  checks, `npm run check:package-surface`, focused test-renderer create-routing
+  and serialization checks, focused React DOM root facade/control/form/resource
+  checks, conflict-marker scanning, and `git diff --check`.
 - Workers 644 and 647 were accepted from the active queue. The batch added
   private checkbox input/change controlled-restore execution for an admitted
   fake-DOM checked path, and broadened private portal click delegation execution
