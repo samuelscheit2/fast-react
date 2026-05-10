@@ -10,15 +10,15 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::{
-    FiberId, FiberTag, FiberTopologyError, Lanes, RootFinishedLanes, StateHandle, StateNodeHandle,
-    UpdateQueueHandle,
+    FiberArena, FiberFlags, FiberId, FiberTag, FiberTopologyError, Lanes, RefHandle,
+    RootFinishedLanes, StateHandle, StateNodeHandle, UpdateQueueHandle,
 };
-use fast_react_host_config::HostTypes;
+use fast_react_host_config::{HostFiberTokenPhase, HostFiberTokenTarget, HostTypes};
 
 use crate::{
-    FiberRootId, FiberRootStore, FiberRootStoreError, HostRootRenderPhaseRecord,
-    HostRootStateStoreError, RootRenderExitStatus, RootSchedulingState, RootUpdateCallbackSnapshot,
-    UpdateQueueError,
+    FiberRootId, FiberRootStore, FiberRootStoreError, HostFiberTokenId,
+    HostFiberTokenValidationError, HostRootRenderPhaseRecord, HostRootStateStoreError,
+    RootRenderExitStatus, RootSchedulingState, RootUpdateCallbackSnapshot, UpdateQueueError,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -26,10 +26,15 @@ pub enum RootCommitError {
     FiberRootStore(FiberRootStoreError),
     FiberTopology(FiberTopologyError),
     HostRootStateStore(HostRootStateStoreError),
+    HostFiberToken(HostFiberTokenValidationError),
     UpdateQueue(UpdateQueueError),
     PendingPassiveRootMismatch {
         root: FiberRootId,
         pending_root: FiberRootId,
+    },
+    RefHostInstanceMissing {
+        root: FiberRootId,
+        fiber: FiberId,
     },
     EmptyFinishedLanes {
         root: FiberRootId,
@@ -96,12 +101,19 @@ impl Display for RootCommitError {
             Self::FiberRootStore(error) => Display::fmt(error, formatter),
             Self::FiberTopology(error) => Display::fmt(error, formatter),
             Self::HostRootStateStore(error) => Display::fmt(error, formatter),
+            Self::HostFiberToken(error) => Display::fmt(error, formatter),
             Self::UpdateQueue(error) => Display::fmt(error, formatter),
             Self::PendingPassiveRootMismatch { root, pending_root } => write!(
                 formatter,
                 "root {} pending passive metadata belongs to root {}",
                 root.raw(),
                 pending_root.raw()
+            ),
+            Self::RefHostInstanceMissing { root, fiber } => write!(
+                formatter,
+                "root {} ref metadata for HostComponent fiber slot {} requires a host instance state node",
+                root.raw(),
+                fiber.slot().get()
             ),
             Self::EmptyFinishedLanes { root } => {
                 write!(formatter, "root {} commit lanes are empty", root.raw())
@@ -236,8 +248,10 @@ impl Error for RootCommitError {
             Self::FiberRootStore(error) => Some(error),
             Self::FiberTopology(error) => Some(error),
             Self::HostRootStateStore(error) => Some(error),
+            Self::HostFiberToken(error) => Some(error),
             Self::UpdateQueue(error) => Some(error),
             Self::PendingPassiveRootMismatch { .. }
+            | Self::RefHostInstanceMissing { .. }
             | Self::EmptyFinishedLanes { .. }
             | Self::CurrentMismatch { .. }
             | Self::FinishedWorkIsCurrent { .. }
@@ -269,6 +283,12 @@ impl From<FiberTopologyError> for RootCommitError {
 impl From<HostRootStateStoreError> for RootCommitError {
     fn from(error: HostRootStateStoreError) -> Self {
         Self::HostRootStateStore(error)
+    }
+}
+
+impl From<HostFiberTokenValidationError> for RootCommitError {
+    fn from(error: HostFiberTokenValidationError) -> Self {
+        Self::HostFiberToken(error)
     }
 }
 
@@ -306,6 +326,167 @@ impl PendingPassiveCommitHandoff {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum HostRootRefCommitAction {
+    Detach,
+    Attach,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum HostRootRefDetachReason {
+    RefChanged,
+    Deleted,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct HostRootRefCommitRecord {
+    root: FiberRootId,
+    fiber: FiberId,
+    state_node: StateNodeHandle,
+    ref_handle: RefHandle,
+    token: HostFiberTokenId,
+    token_phase: HostFiberTokenPhase,
+    token_target: HostFiberTokenTarget,
+    action: HostRootRefCommitAction,
+    detach_reason: Option<HostRootRefDetachReason>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private ref commit metadata for future ref lifecycle workers"
+)]
+impl HostRootRefCommitRecord {
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn fiber(&self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub(crate) const fn state_node(&self) -> StateNodeHandle {
+        self.state_node
+    }
+
+    #[must_use]
+    pub(crate) const fn ref_handle(&self) -> RefHandle {
+        self.ref_handle
+    }
+
+    #[must_use]
+    pub(crate) const fn token(&self) -> HostFiberTokenId {
+        self.token
+    }
+
+    #[must_use]
+    pub(crate) const fn token_phase(&self) -> HostFiberTokenPhase {
+        self.token_phase
+    }
+
+    #[must_use]
+    pub(crate) const fn token_target(&self) -> HostFiberTokenTarget {
+        self.token_target
+    }
+
+    #[must_use]
+    pub(crate) const fn action(&self) -> HostRootRefCommitAction {
+        self.action
+    }
+
+    #[must_use]
+    pub(crate) const fn detach_reason(&self) -> Option<HostRootRefDetachReason> {
+        self.detach_reason
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(crate) struct HostRootRefCommitSnapshot {
+    detach: Vec<HostRootRefCommitRecord>,
+    attach: Vec<HostRootRefCommitRecord>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private ref commit metadata for future ref lifecycle workers"
+)]
+impl HostRootRefCommitSnapshot {
+    #[must_use]
+    pub(crate) fn detach(&self) -> &[HostRootRefCommitRecord] {
+        &self.detach
+    }
+
+    #[must_use]
+    pub(crate) fn attach(&self) -> &[HostRootRefCommitRecord] {
+        &self.attach
+    }
+
+    #[must_use]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.detach.is_empty() && self.attach.is_empty()
+    }
+
+    #[must_use]
+    pub(crate) fn len(&self) -> usize {
+        self.detach.len() + self.attach.len()
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct PendingRefCommitSnapshot {
+    detach: Vec<PendingRefCommitRecord>,
+    attach: Vec<PendingRefCommitRecord>,
+}
+
+impl PendingRefCommitSnapshot {
+    fn push_attach(
+        &mut self,
+        root: FiberRootId,
+        fiber: FiberId,
+        state_node: StateNodeHandle,
+        ref_handle: RefHandle,
+    ) {
+        self.attach.push(PendingRefCommitRecord {
+            root,
+            fiber,
+            state_node,
+            ref_handle,
+            action: HostRootRefCommitAction::Attach,
+            detach_reason: None,
+        });
+    }
+
+    fn push_detach(
+        &mut self,
+        root: FiberRootId,
+        fiber: FiberId,
+        state_node: StateNodeHandle,
+        ref_handle: RefHandle,
+        reason: HostRootRefDetachReason,
+    ) {
+        self.detach.push(PendingRefCommitRecord {
+            root,
+            fiber,
+            state_node,
+            ref_handle,
+            action: HostRootRefCommitAction::Detach,
+            detach_reason: Some(reason),
+        });
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PendingRefCommitRecord {
+    root: FiberRootId,
+    fiber: FiberId,
+    state_node: StateNodeHandle,
+    ref_handle: RefHandle,
+    action: HostRootRefCommitAction,
+    detach_reason: Option<HostRootRefDetachReason>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostRootCommitRecord {
     root: FiberRootId,
@@ -316,6 +497,7 @@ pub struct HostRootCommitRecord {
     pending_lanes: Lanes,
     root_update_callbacks: RootUpdateCallbackSnapshot,
     pending_passive_handoff: Option<PendingPassiveCommitHandoff>,
+    ref_commit_metadata: HostRootRefCommitSnapshot,
 }
 
 impl HostRootCommitRecord {
@@ -364,6 +546,15 @@ impl HostRootCommitRecord {
         &self.root_update_callbacks
     }
 
+    #[must_use]
+    #[allow(
+        dead_code,
+        reason = "crate-private ref commit metadata for future ref lifecycle workers"
+    )]
+    pub(crate) fn ref_commit_metadata(&self) -> &HostRootRefCommitSnapshot {
+        &self.ref_commit_metadata
+    }
+
     #[allow(
         dead_code,
         reason = "crate-private passive commit metadata for future passive-effect workers"
@@ -386,6 +577,8 @@ pub fn commit_finished_host_root<H: HostTypes>(
     let finished_lanes = render.render_lanes();
     let remaining_lanes = render.remaining_lanes();
     let work_in_progress_update_queue = render.work_in_progress_update_queue();
+    let pending_ref_commit_metadata =
+        collect_pending_ref_commit_metadata(store.fiber_arena(), root_id, finished_work)?;
 
     let (pending_lanes, pending_passive_handoff) = {
         let root = store.root_mut(root_id)?;
@@ -416,6 +609,183 @@ pub fn commit_finished_host_root<H: HostTypes>(
         pending_lanes,
         root_update_callbacks,
         pending_passive_handoff,
+        ref_commit_metadata: materialize_ref_commit_metadata(store, pending_ref_commit_metadata)?,
+    })
+}
+
+fn collect_pending_ref_commit_metadata(
+    arena: &FiberArena,
+    root: FiberRootId,
+    finished_work: FiberId,
+) -> Result<PendingRefCommitSnapshot, RootCommitError> {
+    let mut metadata = PendingRefCommitSnapshot::default();
+    collect_ref_detach_metadata(arena, root, finished_work, &mut metadata)?;
+    collect_ref_attach_metadata(arena, root, finished_work, &mut metadata)?;
+    Ok(metadata)
+}
+
+fn collect_ref_detach_metadata(
+    arena: &FiberArena,
+    root: FiberRootId,
+    finished_work: FiberId,
+    metadata: &mut PendingRefCommitSnapshot,
+) -> Result<(), RootCommitError> {
+    let node = arena.get(finished_work)?;
+
+    if let Some(deletions) = node.deletions() {
+        let deletion_list = arena
+            .deletion_list(deletions)
+            .ok_or(FiberTopologyError::InvalidDeletionList { id: deletions })?;
+        if deletion_list.parent() != finished_work {
+            return Err(FiberTopologyError::InvalidDeletionList { id: deletions }.into());
+        }
+        for &deleted in deletion_list {
+            collect_deleted_ref_detach_metadata(arena, root, deleted, metadata)?;
+        }
+    }
+
+    if node
+        .subtree_flags()
+        .contains_any(FiberFlags::MUTATION_MASK | FiberFlags::CLONED)
+    {
+        for child in arena.child_ids(finished_work)? {
+            collect_ref_detach_metadata(arena, root, child, metadata)?;
+        }
+    }
+
+    if node.tag() == FiberTag::HostComponent
+        && node.flags().contains_all(FiberFlags::REF)
+        && let Some(current) = node.alternate()
+    {
+        let current_node = arena.get(current)?;
+        if current_node.ref_handle().is_some() {
+            let state_node =
+                ref_host_state_node(root, current, current_node, HostRootRefCommitAction::Detach)?;
+            metadata.push_detach(
+                root,
+                current,
+                state_node,
+                current_node.ref_handle(),
+                HostRootRefDetachReason::RefChanged,
+            );
+        }
+    }
+
+    Ok(())
+}
+
+fn collect_deleted_ref_detach_metadata(
+    arena: &FiberArena,
+    root: FiberRootId,
+    deleted: FiberId,
+    metadata: &mut PendingRefCommitSnapshot,
+) -> Result<(), RootCommitError> {
+    let node = arena.get(deleted)?;
+    if node.tag() == FiberTag::HostComponent && node.ref_handle().is_some() {
+        let state_node = ref_host_state_node(root, deleted, node, HostRootRefCommitAction::Detach)?;
+        metadata.push_detach(
+            root,
+            deleted,
+            state_node,
+            node.ref_handle(),
+            HostRootRefDetachReason::Deleted,
+        );
+    }
+
+    for child in arena.child_ids(deleted)? {
+        collect_deleted_ref_detach_metadata(arena, root, child, metadata)?;
+    }
+
+    Ok(())
+}
+
+fn collect_ref_attach_metadata(
+    arena: &FiberArena,
+    root: FiberRootId,
+    finished_work: FiberId,
+    metadata: &mut PendingRefCommitSnapshot,
+) -> Result<(), RootCommitError> {
+    let node = arena.get(finished_work)?;
+    if node.subtree_flags().contains_any(FiberFlags::LAYOUT_MASK) {
+        for child in arena.child_ids(finished_work)? {
+            collect_ref_attach_metadata(arena, root, child, metadata)?;
+        }
+    }
+
+    if node.tag() == FiberTag::HostComponent
+        && node.flags().contains_all(FiberFlags::REF)
+        && node.ref_handle().is_some()
+    {
+        let state_node =
+            ref_host_state_node(root, finished_work, node, HostRootRefCommitAction::Attach)?;
+        metadata.push_attach(root, finished_work, state_node, node.ref_handle());
+    }
+
+    Ok(())
+}
+
+fn ref_host_state_node(
+    root: FiberRootId,
+    fiber: FiberId,
+    node: &fast_react_core::FiberNode,
+    _action: HostRootRefCommitAction,
+) -> Result<StateNodeHandle, RootCommitError> {
+    let state_node = node.state_node();
+    if state_node.is_none() {
+        return Err(RootCommitError::RefHostInstanceMissing { root, fiber });
+    }
+    Ok(state_node)
+}
+
+fn materialize_ref_commit_metadata<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    pending: PendingRefCommitSnapshot,
+) -> Result<HostRootRefCommitSnapshot, RootCommitError> {
+    let mut metadata = HostRootRefCommitSnapshot::default();
+    for pending_detach in pending.detach {
+        metadata
+            .detach
+            .push(issue_ref_commit_record(store, pending_detach)?);
+    }
+    for pending_attach in pending.attach {
+        metadata
+            .attach
+            .push(issue_ref_commit_record(store, pending_attach)?);
+    }
+    Ok(metadata)
+}
+
+fn issue_ref_commit_record<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    pending: PendingRefCommitRecord,
+) -> Result<HostRootRefCommitRecord, RootCommitError> {
+    let token_phase = match pending.action {
+        HostRootRefCommitAction::Detach => HostFiberTokenPhase::Deletion,
+        HostRootRefCommitAction::Attach => HostFiberTokenPhase::Commit,
+    };
+    let token_target = HostFiberTokenTarget::Instance;
+    let token =
+        store
+            .host_tokens_mut()
+            .issue(pending.root, pending.fiber, token_phase, token_target);
+    store.host_tokens().validate(
+        token,
+        pending.root,
+        pending.fiber,
+        token_phase,
+        token_target,
+    )?;
+
+    Ok(HostRootRefCommitRecord {
+        root: pending.root,
+        fiber: pending.fiber,
+        state_node: pending.state_node,
+        ref_handle: pending.ref_handle,
+        token,
+        token_phase,
+        token_target,
+        action: pending.action,
+        detach_reason: pending.detach_reason,
     })
 }
 
@@ -598,7 +968,7 @@ mod tests {
         process_root_schedule_in_microtask, render_host_root_for_lanes,
         render_host_root_via_scheduler_callback, update_container,
     };
-    use fast_react_core::{Lane, Lanes};
+    use fast_react_core::{FiberFlags, FiberMode, Lane, Lanes, PropsHandle, RefHandle};
 
     fn root_store() -> (FiberRootStore<RecordingHost>, FiberRootId, RecordingHost) {
         let host = RecordingHost::default();
@@ -651,6 +1021,7 @@ mod tests {
         assert_eq!(commit.remaining_lanes(), Lanes::NO);
         assert_eq!(commit.pending_lanes(), Lanes::NO);
         assert_eq!(commit.pending_passive_handoff(), None);
+        assert!(commit.ref_commit_metadata().is_empty());
         assert!(!commit.has_remaining_work());
         assert_eq!(new_current, render.work_in_progress());
         assert_eq!(host_root_element(&store, new_current), element);
@@ -706,7 +1077,204 @@ mod tests {
         assert!(pending_passive.passive_unmounts().is_empty());
         assert!(pending_passive.passive_mounts().is_empty());
         assert!(commit.root_update_callbacks().is_empty());
+        assert!(commit.ref_commit_metadata().is_empty());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_records_ref_attach_metadata_with_commit_instance_token() {
+        let (mut store, root_id, host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(45), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let ref_handle = RefHandle::from_raw(101);
+        let state_node = StateNodeHandle::from_raw(201);
+        let child = append_host_ref_child(
+            &mut store,
+            render.work_in_progress(),
+            ref_handle,
+            state_node,
+            FiberFlags::REF,
+        );
+        store
+            .fiber_arena_mut()
+            .get_mut(render.work_in_progress())
+            .unwrap()
+            .set_subtree_flags(FiberFlags::REF);
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let refs = commit.ref_commit_metadata();
+
+        assert!(refs.detach().is_empty());
+        assert_eq!(refs.attach().len(), 1);
+        assert_eq!(refs.len(), 1);
+        let attach = refs.attach()[0];
+        assert_eq!(attach.root(), root_id);
+        assert_eq!(attach.fiber(), child);
+        assert_eq!(attach.state_node(), state_node);
+        assert_eq!(attach.ref_handle(), ref_handle);
+        assert_eq!(attach.action(), HostRootRefCommitAction::Attach);
+        assert_eq!(attach.detach_reason(), None);
+        assert_eq!(attach.token_phase(), HostFiberTokenPhase::Commit);
+        assert_eq!(attach.token_target(), HostFiberTokenTarget::Instance);
+        assert_active_ref_token(&store, &attach);
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            render.work_in_progress()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_records_changed_ref_detach_before_new_ref_attach_metadata() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        let old_ref = RefHandle::from_raw(111);
+        let new_ref = RefHandle::from_raw(112);
+        let old_state_node = StateNodeHandle::from_raw(211);
+        let new_state_node = StateNodeHandle::from_raw(212);
+        let current_child =
+            append_host_ref_child(&mut store, current, old_ref, old_state_node, FiberFlags::NO);
+
+        update_container(&mut store, root_id, RootElementHandle::from_raw(46), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let finished_child = append_host_ref_child(
+            &mut store,
+            render.work_in_progress(),
+            new_ref,
+            new_state_node,
+            FiberFlags::REF,
+        );
+        store
+            .fiber_arena_mut()
+            .link_alternates(current_child, finished_child)
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .get_mut(render.work_in_progress())
+            .unwrap()
+            .set_subtree_flags(FiberFlags::REF);
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let refs = commit.ref_commit_metadata();
+
+        assert_eq!(refs.detach().len(), 1);
+        assert_eq!(refs.attach().len(), 1);
+        let detach = refs.detach()[0];
+        assert_eq!(detach.fiber(), current_child);
+        assert_eq!(detach.state_node(), old_state_node);
+        assert_eq!(detach.ref_handle(), old_ref);
+        assert_eq!(detach.action(), HostRootRefCommitAction::Detach);
+        assert_eq!(
+            detach.detach_reason(),
+            Some(HostRootRefDetachReason::RefChanged)
+        );
+        assert_eq!(detach.token_phase(), HostFiberTokenPhase::Deletion);
+        assert_eq!(detach.token_target(), HostFiberTokenTarget::Instance);
+        assert_active_ref_token(&store, &detach);
+
+        let attach = refs.attach()[0];
+        assert_eq!(attach.fiber(), finished_child);
+        assert_eq!(attach.state_node(), new_state_node);
+        assert_eq!(attach.ref_handle(), new_ref);
+        assert_eq!(attach.action(), HostRootRefCommitAction::Attach);
+        assert_eq!(attach.token_phase(), HostFiberTokenPhase::Commit);
+        assert_active_ref_token(&store, &attach);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_records_deleted_ref_detach_metadata_in_parent_before_child_order() {
+        let (mut store, root_id, host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(47), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let deleted_parent = create_host_ref_fiber(
+            &mut store,
+            RefHandle::from_raw(121),
+            StateNodeHandle::from_raw(221),
+            FiberFlags::NO,
+        );
+        let deleted_child = create_host_ref_fiber(
+            &mut store,
+            RefHandle::from_raw(122),
+            StateNodeHandle::from_raw(222),
+            FiberFlags::NO,
+        );
+        store
+            .fiber_arena_mut()
+            .set_children(deleted_parent, &[deleted_child])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .mark_child_for_deletion(render.work_in_progress(), deleted_parent)
+            .unwrap();
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let refs = commit.ref_commit_metadata();
+
+        assert_eq!(refs.attach().len(), 0);
+        assert_eq!(refs.detach().len(), 2);
+        assert_eq!(refs.detach()[0].fiber(), deleted_parent);
+        assert_eq!(refs.detach()[0].ref_handle(), RefHandle::from_raw(121));
+        assert_eq!(
+            refs.detach()[0].detach_reason(),
+            Some(HostRootRefDetachReason::Deleted)
+        );
+        assert_eq!(
+            refs.detach()[0].token_phase(),
+            HostFiberTokenPhase::Deletion
+        );
+        assert_eq!(refs.detach()[1].fiber(), deleted_child);
+        assert_eq!(refs.detach()[1].ref_handle(), RefHandle::from_raw(122));
+        assert_eq!(
+            refs.detach()[1].detach_reason(),
+            Some(HostRootRefDetachReason::Deleted)
+        );
+        for record in refs.detach() {
+            assert_eq!(record.action(), HostRootRefCommitAction::Detach);
+            assert_eq!(record.token_target(), HostFiberTokenTarget::Instance);
+            assert_active_ref_token(&store, record);
+        }
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_rejects_ref_metadata_without_host_state_node_before_switching_current() {
+        let (mut store, root_id, _host) = root_store();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(48), None).unwrap();
+        let previous_current = store.root(root_id).unwrap().current();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let child = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::NONE,
+            FiberMode::NO,
+        );
+        {
+            let node = store.fiber_arena_mut().get_mut(child).unwrap();
+            node.set_ref_handle(RefHandle::from_raw(131));
+            node.set_flags(FiberFlags::REF);
+        }
+        store
+            .fiber_arena_mut()
+            .set_children(render.work_in_progress(), &[child])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .get_mut(render.work_in_progress())
+            .unwrap()
+            .set_subtree_flags(FiberFlags::REF);
+
+        let error = commit_finished_host_root(&mut store, render).unwrap_err();
+
+        assert!(matches!(
+            error,
+            RootCommitError::RefHostInstanceMissing {
+                root,
+                fiber
+            } if root == root_id && fiber == child
+        ));
+        assert_eq!(store.root(root_id).unwrap().current(), previous_current);
+        assert!(store.host_tokens().is_empty());
     }
 
     #[test]
@@ -951,5 +1519,63 @@ mod tests {
 
     fn callback_handles(records: &[RootUpdateCallbackRecord]) -> Vec<RootUpdateCallbackHandle> {
         records.iter().map(|record| record.callback()).collect()
+    }
+
+    fn create_host_ref_fiber(
+        store: &mut FiberRootStore<RecordingHost>,
+        ref_handle: RefHandle,
+        state_node: StateNodeHandle,
+        flags: FiberFlags,
+    ) -> FiberId {
+        let fiber = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::NONE,
+            FiberMode::NO,
+        );
+        let node = store.fiber_arena_mut().get_mut(fiber).unwrap();
+        node.set_state_node(state_node);
+        node.set_ref_handle(ref_handle);
+        node.set_flags(flags);
+        fiber
+    }
+
+    fn append_host_ref_child(
+        store: &mut FiberRootStore<RecordingHost>,
+        parent: FiberId,
+        ref_handle: RefHandle,
+        state_node: StateNodeHandle,
+        flags: FiberFlags,
+    ) -> FiberId {
+        let child = create_host_ref_fiber(store, ref_handle, state_node, flags);
+        store
+            .fiber_arena_mut()
+            .set_children(parent, &[child])
+            .unwrap();
+        child
+    }
+
+    fn assert_active_ref_token(
+        store: &FiberRootStore<RecordingHost>,
+        record: &HostRootRefCommitRecord,
+    ) {
+        store
+            .host_tokens()
+            .validate(
+                record.token(),
+                record.root(),
+                record.fiber(),
+                record.token_phase(),
+                record.token_target(),
+            )
+            .unwrap();
+        let metadata = store
+            .host_tokens()
+            .metadata(record.token(), record.token_phase(), record.token_target())
+            .unwrap();
+        assert_eq!(metadata.root_id(), record.root());
+        assert_eq!(metadata.phase(), record.token_phase());
+        assert_eq!(metadata.target(), record.token_target());
+        assert!(metadata.is_active());
     }
 }
