@@ -45,8 +45,8 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Replacement queue 595-624 is prepared from current
-`main` and should run in isolated `worker/<slug>` worktrees.
+Top-level cap: 30 workers. Replacement queue 595-624 is active in `fr-*` tmux
+sessions from isolated `worker/<slug>` branches and worktrees.
 
 - 595-609: Rust root commit/scheduler/sync-flush/callback, hook dispatch,
   passive/layout effect, context, Suspense, Offscreen, host update, and
@@ -61,15 +61,13 @@ Top-level cap: 30 workers. Replacement queue 595-624 is prepared from current
 
 ## Near-Term Sequencing
 
-1. Launch workers 595-624 with `scripts/run-worker.sh`, keeping at most 30
-   top-level tmux sessions.
-2. Monitor workers 595-624 and classify completions from tmux pane state,
+1. Monitor workers 595-624 and classify completions from tmux pane state,
    worker reports, worktree status, and verification evidence.
-3. Before queueing further replacements, merge and clean all completed accepted
+2. Before queueing further replacements, merge and clean all completed accepted
    work already available so replacement capacity starts from current `main`.
-4. Accept overlapping implementation work when scopes are different enough;
+3. Accept overlapping implementation work when scopes are different enough;
    resolve merge conflicts on `main` after merge attempts.
-5. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
+4. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
 
 ## Next Queue Candidates
