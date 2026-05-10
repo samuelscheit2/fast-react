@@ -163,6 +163,7 @@ export function assertPrivateFormActionResetDispatcherGate() {
   assert.equal(summary.recordsSubmitRequestSubmitActionMetadata, true);
   assert.equal(summary.recordsResetIntentMetadata, true);
   assert.equal(summary.recordsResetDispatcherOrdering, true);
+  assert.equal(summary.resetQueueCommitMetadataGateAvailable, true);
   assert.deepEqual(summary.acceptedSubmissionTriggers, [
     "submit",
     "requestSubmit",
@@ -180,6 +181,7 @@ export function assertPrivateFormActionResetDispatcherGate() {
     summary.sideEffects,
     resourceFormGate.formActionResetDispatcherBlockedSideEffects
   );
+  assertPrivateFormResetQueueCommitGate(resourceFormGate, reset);
 
   assert.equal(
     resourceFormGate.isPrivateFormActionResetDispatcherRecord(submission),
@@ -389,6 +391,129 @@ export function assertPrivateFormActionResetDispatcherGate() {
       code: resourceFormGate.privateFormActionEventExtractionInvalidRecordCode,
       compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
       reason: "source record must be a recorded submit action intent"
+    }
+  );
+}
+
+export function assertPrivateFormResetQueueCommitGate(
+  resourceFormGate,
+  reset
+) {
+  const summary =
+    resourceFormGate.describePrivateFormActionResetQueueCommitGate();
+  const gate = resourceFormGate.createFormActionResetQueueCommitGate({
+    requestIdPrefix: "conformance-form-reset-queue"
+  });
+  const record = gate.recordResetQueueCommit(reset, {
+    explicitAdmission: true,
+    queueSource: "requestFormResetOnFiber",
+    queueKind: "metadata-only-reset-state-queue",
+    commitKind: "after-mutation-form-reset-order",
+    hostTag: "form"
+  });
+
+  assert.equal(
+    summary.gateId,
+    resourceFormGate.privateFormActionResetQueueCommitGateId
+  );
+  assert.equal(
+    summary.status,
+    resourceFormGate.privateFormActionResetQueueCommitStatus
+  );
+  assert.equal(summary.recordsResetQueueMetadata, true);
+  assert.equal(summary.recordsResetCommitOrderMetadata, true);
+  assert.equal(summary.recordsRenderFlagHandoffMetadata, true);
+  assert.equal(summary.acceptsRealForms, false);
+  assert.equal(summary.acceptsFormFibers, false);
+  assert.equal(summary.acceptsResetQueues, false);
+  assert.equal(summary.acceptsHostInstances, false);
+  assert.equal(summary.callsPreviousDispatchers, false);
+  assert.equal(summary.queuesReactUpdates, false);
+  assert.equal(summary.marksFiberFlags, false);
+  assert.equal(summary.commitsFormResets, false);
+  assert.equal(summary.callsResetFormInstance, false);
+  assert.equal(summary.callsFormReset, false);
+  assert.deepEqual(
+    summary.sideEffects,
+    resourceFormGate.formActionResetQueueCommitBlockedSideEffects
+  );
+
+  assert.equal(
+    resourceFormGate.isPrivateFormActionResetQueueCommitRecord(record),
+    true
+  );
+  assert.equal(
+    resourceFormGate.getPrivateFormActionResetQueueCommitRecordPayload(record),
+    record
+  );
+  assert.equal(
+    record.status,
+    resourceFormGate.privateFormActionResetQueueCommitRecordedStatus
+  );
+  assert.equal(record.sourceResetRequestId, reset.requestId);
+  assert.equal(record.sourceResetOrderingKind, reset.intent.orderingKind);
+  assert.equal(record.queueBoundary.resetStateWouldBeQueued, true);
+  assert.equal(record.queueBoundary.updateLaneWouldBeRequested, true);
+  assert.equal(record.queueBoundary.renderWouldDetectResetStateChange, true);
+  assert.equal(record.queueBoundary.formResetFlagWouldBeMarked, true);
+  assert.equal(record.queueBoundary.realFormInspected, false);
+  assert.equal(record.queueBoundary.formFiberResolved, false);
+  assert.equal(record.queueBoundary.resetStateQueueResolved, false);
+  assert.equal(record.queueBoundary.resetUpdateEnqueued, false);
+  assert.equal(record.queueBoundary.reactUpdateQueued, false);
+  assert.equal(record.queueBoundary.renderFormResetFlagMarked, false);
+  assert.equal(record.queueBoundary.previousDispatcherCalled, false);
+  assert.equal(
+    record.commitBoundary.resetTraversalWouldRunAfterMutationEffects,
+    true
+  );
+  assert.equal(record.commitBoundary.defaultValueUpdatesWouldPrecedeReset, true);
+  assert.equal(record.commitBoundary.resetFormInstanceWouldCallFormReset, true);
+  assert.equal(record.commitBoundary.afterMutationEffectsVisited, false);
+  assert.equal(record.commitBoundary.resetFormInstanceCalled, false);
+  assert.equal(record.commitBoundary.formResetCommitted, false);
+  assert.equal(record.commitBoundary.realFormReset, false);
+  assert.equal(record.publicFormActionBoundary.publicFormActionsEnabled, false);
+  assert.equal(
+    record.publicFormActionBoundary.publicRequestFormResetReachable,
+    false
+  );
+  assert.equal(record.publicFormActionBoundary.reactUpdateQueued, false);
+  assert.equal(record.publicFormActionBoundary.realFormReset, false);
+  assert.deepEqual(
+    record.sideEffects,
+    resourceFormGate.formActionResetQueueCommitDiagnosticSideEffects
+  );
+  assert.equal(record.sideEffects.resetQueueCommitMetadataRecorded, true);
+  assert.equal(record.sideEffects.resetQueueBoundaryRecorded, true);
+  assert.equal(record.sideEffects.resetCommitOrderRecorded, true);
+  assert.equal(record.sideEffects.realFormInspected, false);
+  assert.equal(record.sideEffects.resetUpdateEnqueued, false);
+  assert.equal(record.sideEffects.reactUpdateQueued, false);
+  assert.equal(record.sideEffects.resetFormInstanceCalled, false);
+  assert.equal(record.sideEffects.formResetCommitted, false);
+  assert.equal(record.sideEffects.realFormReset, false);
+
+  assert.throws(
+    () =>
+      gate.recordResetQueueCommit(reset, {
+        explicitAdmission: true,
+        form: throwingProxy("form")
+      }),
+    {
+      code:
+        resourceFormGate.privateFormActionResetQueueCommitInvalidAdmissionCode,
+      compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
+      reason: "form must not be passed to the queue/commit metadata gate"
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate.createUnsupportedFormActionResetQueueCommitError({}),
+    {
+      code:
+        resourceFormGate.privateFormActionResetQueueCommitInvalidRecordCode,
+      compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET
     }
   );
 }
