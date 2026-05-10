@@ -45,8 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 172: resource/form unsupported gates in
-  `/Users/user/Developer/Developer/fast-react-worker-172-resource-form-unsupported-gates`.
 - Worker 173: passive pending state in
   `/Users/user/Developer/Developer/fast-react-worker-173-passive-pending-state`.
 - Worker 175: Suspense/Offscreen fail-closed markers in

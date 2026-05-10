@@ -161,9 +161,18 @@ sequencing belong in `MASTER_PLAN.md`.
   and Activity/Suspense placeholder records, while preserving client roots as
   non-hydrated by default and leaving public `hydrateRoot`, DOM marker parsing,
   host hydration traits, and event replay unsupported.
+- Worker 172 resource/form unsupported gates were merged, adding fail-closed
+  conformance checks for React DOM resource hints, singletons, form actions,
+  and controlled form behavior so placeholder API shape and source boundaries
+  stay explicit until private adapter prerequisites exist.
 
 ## Latest Accepted Verification
 
+- Worker 172 was verified on its integrated worktree and again on `main` with
+  syntax checks for the three new gate modules, focused resource/form/controlled
+  conformance tests, `npm run test:conformance` with 433 tests,
+  `npm run check:js` covering the package guard, smoke imports, benchmark gate,
+  workspace checks, and 433 conformance tests, plus `git diff --check`.
 - Worker 169 was verified on its integrated worktree and again on `main` with
   `cargo fmt --all --check`, focused `root_config` and `fiber_root` tests, full
   `fast-react-reconciler` tests with 98 unit tests plus 1 doctest, reconciler
