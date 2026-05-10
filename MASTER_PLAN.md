@@ -50,13 +50,18 @@ Top-level cap: 30 workers. Queue 685-714 was launched from queue base commit
 accepted and cleaned up. Workers 715-721 have also been accepted and cleaned
 up.
 
-No worker branches or worktrees are currently active.
+Workers 722-723 were launched from queue base commit `bf5440e` in isolated
+`worker/<slug>` branches and worktrees.
+
+- Worker 722: package/private-admission ledger for Workers 715-721.
+- Worker 723: test-renderer native serialization identity gate consuming
+  Worker 720 evidence.
 
 ## Near-Term Sequencing
 
-1. Finish post-worker-720 `main` verification and record any accepted follow-up
-   evidence in `MASTER_PROGRESS.md`.
-2. Select the next queue from accepted private blockers only; keep public root,
+1. Monitor workers 722 and 723, accepting only scoped private evidence with
+   public package behavior and compatibility claims still blocked.
+2. Select later work from accepted private blockers only; keep public root,
    act, flushSync, hooks/effects, test-renderer, and React DOM compatibility
    blocked until each private gate is proven.
 3. Audit and merge completed workers one at a time or in a small non-conflicting
