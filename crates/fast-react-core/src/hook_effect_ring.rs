@@ -639,6 +639,14 @@ impl HookEffectArena {
             .as_mut()
             .expect("validated hook effect instance slot is occupied"))
     }
+
+    pub fn effect_destroy(
+        &self,
+        id: HookEffectId,
+    ) -> Result<Option<HookEffectCallbackHandle>, HookEffectArenaError> {
+        let instance = self.get_effect(id)?.instance();
+        Ok(self.get_instance(instance)?.destroy())
+    }
 }
 
 impl Default for HookEffectArena {
@@ -1027,11 +1035,13 @@ mod tests {
 
         assert_eq!(arena.get_effect(effect).unwrap().instance(), instance);
         assert_eq!(arena.get_effect(effect).unwrap().create(), callback(10));
+        assert_eq!(arena.effect_destroy(effect).unwrap(), Some(callback(11)));
         assert_eq!(
             arena.get_instance_mut(instance).unwrap().take_destroy(),
             Some(callback(11))
         );
         assert_eq!(arena.get_instance(instance).unwrap().destroy(), None);
+        assert_eq!(arena.effect_destroy(effect).unwrap(), None);
         assert_eq!(arena.get_effect(effect).unwrap().create(), callback(10));
     }
 

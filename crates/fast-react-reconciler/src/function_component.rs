@@ -732,11 +732,10 @@ impl FunctionComponentHookRenderStore {
             })?;
             let destroy = self
                 .hook_effects
-                .get_instance(effect.instance())
+                .effect_destroy(effect.id())
                 .map_err(|error| {
                     FunctionComponentRenderError::hook_effect(state.render_fiber(), error)
-                })?
-                .destroy();
+                })?;
             records.push(FunctionComponentPassiveEffectMetadata {
                 fiber: state.render_fiber(),
                 hook_list: list,
