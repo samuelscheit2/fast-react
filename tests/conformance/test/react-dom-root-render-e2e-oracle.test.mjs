@@ -21,6 +21,9 @@ import {
 import {
   evaluateReactDomRootRenderE2EConformanceGate,
   inspectReactDomRootRenderE2EPrivateBridgeRequests,
+  REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_STATUS,
+  REACT_DOM_PORTAL_ROOT_RENDER_OBJECT_ACCEPTED_STATUS,
+  REACT_DOM_PORTAL_ROOT_RENDER_RECONCILER_DIAGNOSTIC_STATUS,
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_BRIDGE_BLOCKED_STATUS,
   REACT_DOM_ROOT_RENDER_E2E_PRIVATE_BRIDGE_MATCH_STATUS
 } from "../src/react-dom-root-render-e2e-conformance-gate.mjs";
@@ -337,8 +340,11 @@ test("root render e2e conformance gate records private bridge request rows separ
   assert.equal(result.summary.blockedScenarioModeRowCount, 20);
   assert.equal(result.summary.privateBridgeComparableScenarioModeRowCount, 18);
   assert.equal(result.summary.privateBridgeBlockedScenarioModeRowCount, 2);
+  assert.equal(result.summary.portalRootRenderPrerequisiteRowCount, 4);
+  assert.equal(result.summary.portalRootRenderBlockedRowCount, 5);
   assert.equal(result.summary.compatibilityClaimed, false);
   assert.equal(result.summary.privateBridgeCompatibilityClaimed, false);
+  assert.equal(result.summary.portalRootRenderCompatibilityClaimed, false);
   assert.equal(result.summary.compatibilityAdmitted, false);
   assert.deepEqual(result.privateBridgeGate.admittedPrivateRequestScenarioIds, [
     "create-root-no-render",
@@ -391,6 +397,33 @@ test("root render e2e conformance gate records private bridge request rows separ
     assert.equal(row.gateStatus, REACT_DOM_ROOT_RENDER_E2E_PRIVATE_BRIDGE_BLOCKED_STATUS);
     assert.equal(row.comparedToReactDomOracle, false);
     assert.equal(row.compatibilityClaimed, false);
+  }
+
+  assert.equal(result.portalRootRenderGate.ok, true);
+  assert.deepEqual(
+    result.portalRootRenderPrerequisiteRows.map((row) => row.gateStatus),
+    [
+      REACT_DOM_PORTAL_ROOT_RENDER_OBJECT_ACCEPTED_STATUS,
+      REACT_DOM_PORTAL_ROOT_RENDER_OBJECT_ACCEPTED_STATUS,
+      REACT_DOM_PORTAL_ROOT_RENDER_RECONCILER_DIAGNOSTIC_STATUS,
+      REACT_DOM_PORTAL_ROOT_RENDER_RECONCILER_DIAGNOSTIC_STATUS
+    ]
+  );
+  assert.deepEqual(
+    result.portalRootRenderBlockedRows.map((row) => row.id),
+    [
+      "portal-public-root-render",
+      "portal-mounting",
+      "portal-listener-setup",
+      "portal-dom-mutation",
+      "portal-compatibility-claim"
+    ]
+  );
+  for (const row of result.portalRootRenderBlockedRows) {
+    assert.equal(row.gateStatus, REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_STATUS);
+    assert.equal(row.compatibilityClaimed, false);
+    assert.equal(row.publicRootCompatibilitySurface, false);
+    assert.equal(row.rootRenderE2EScenarioModeRowCount, 20);
   }
 });
 
