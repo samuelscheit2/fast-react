@@ -29,26 +29,23 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
-- Workers 447, 453, 455, 459, 467, and 468 were accepted from queue 443-472.
-  This subset added a private function-component `useCallback` render path and
-  hook-dispatcher gate, private DOM style/`dangerouslySetInnerHTML` rollback
-  diagnostics, private event `currentTarget` progression/reset diagnostics,
-  hydration text-mismatch and inert recoverable-error metadata, native JSON
-  transport error diagnostic rows, and native handle-table teardown sequence
-  gates while public compatibility remains blocked.
-- Workers 447, 453, 455, 459, 467, and 468 were verified after merge with
-  focused hook, React DOM mutation/event/hydration, native, React package, and
-  N-API checks, plus `cargo fmt --all --check`, conflict-marker scanning, and
-  `git diff --check`. The native merge kept both lifecycle prevalidation paths:
-  direct handoff admission rejects invalid sequence states before mutation, and
-  parser/sequence validation records deterministic JSON transport errors.
-- Worker 448 from queue 443-472 was accepted. It added private
-  function-component layout-effect metadata for mount and update render paths,
-  kept layout and passive metadata phase-separated, added committed layout
-  metadata lookup/counters, and kept callbacks, scheduling, and public
-  `useLayoutEffect` exposure blocked.
-- Worker 448 was verified after merge with focused function-component Rust
-  tests, `cargo fmt --all --check`, and `git diff --check`.
+- Workers 443-465 and 467-472 were accepted from queue 443-472. Worker 466
+  exited with no mergeable changes and was removed as a stale empty branch.
+  The accepted batch added private layout-effect handoff and committed metadata
+  canaries, ref cleanup-return execution, root error option callbacks, context
+  propagation lane records, passive scheduler and sync-flush recovery gates,
+  HostRoot fragment/array reconciliation, DOM text/style/event/hydration/
+  resource/form/controlled-input diagnostics, test-renderer `findAll`,
+  `getInstance`, error-boundary, serialization, scheduler continuation and
+  post-task diagnostics, native transport/teardown gates, package-surface
+  privacy refreshes, and benchmark timing canaries while public compatibility
+  remains blocked.
+- Workers 443-465 and 467-472 were verified after merge with focused Rust,
+  React DOM, react-test-renderer, scheduler, native, benchmark, package-surface,
+  import-smoke, and conformance checks, plus conflict-marker scanning and
+  `git diff --check`. Post-merge cleanup refreshed the CJS development
+  react-test-renderer package-surface snapshot for the accepted private
+  error-boundary diagnostic symbol.
 - Workers 413-442 were accepted as a complete implementation batch. The batch
   added root commit HostComponent update traversal and deletion-parent
   traversal canaries, ref cleanup/error routing metadata, context dependency

@@ -45,47 +45,22 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue 443-472 is assigned in isolated worktrees.
-Workers 447, 448, 453, 455, 459, 467, and 468 have been accepted, leaving 23
-active top-level workers from this queue.
-
-| Worker | Focus |
-| --- | --- |
-| 443 | Root commit layout-effect handoff canary |
-| 444 | Ref cleanup-return execution gate |
-| 445 | Root error option callback records |
-| 446 | Context change propagation lane gate |
-| 449 | Passive effect scheduler flush gate |
-| 450 | Sync flush error recovery diagnostics |
-| 451 | Root callback invocation execution gate |
-| 452 | HostRoot fragment/array reconciliation canary |
-| 454 | DOM text-content reset/update gate |
-| 456 | DOM event stop-immediate-propagation gate |
-| 457 | DOM portal event owner-root gate |
-| 458 | Hydration replay queue drain-order gate |
-| 460 | Resource preload dedupe/order gate |
-| 461 | Form action reset dispatcher gate |
-| 462 | Controlled select/textarea restore gate |
-| 463 | TestInstance `findAll` private query gate |
-| 464 | Test renderer `getInstance` class diagnostic |
-| 465 | Test renderer error-boundary diagnostics |
-| 466 | Test renderer act passive-effect drain gate |
-| 469 | Scheduler mock expired continuation gate |
-| 470 | Scheduler post-task priority diagnostics |
-| 471 | Package-surface private diagnostics audit |
-| 472 | Root update benchmark timing canaries |
+Top-level cap: 30 workers. No top-level workers are currently live after the
+443-472 merge batch. Worker 466 produced no mergeable changes and should be
+requeued if the test-renderer act passive-effect drain gate remains relevant.
 
 ## Near-Term Sequencing
 
-1. Monitor queue 443-472 for completion and merge completed workers before
-   queuing more.
+1. Refill up to the 30 top-level worker cap with narrow implementation or
+   conformance checkpoints that can overlap by subsystem.
 2. Accept code workers opportunistically, resolving merge conflicts after the
    fact when overlapping work lands on different implementation surfaces.
-3. After the queue drains, refill up to the 30 top-level worker cap with the
-   next narrow implementation or conformance checkpoints.
+3. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
+   after each accepted merge batch.
 
 ## Next Queue Candidates
 
+- Test-renderer act passive-effect drain gate, replacing stale worker 466.
 - Minimal commit path after root work loop ownership is clear.
 - Sync flush integration once HostRoot render work can produce finished work.
 - Function component render and hook queue slices after the root queue model is
