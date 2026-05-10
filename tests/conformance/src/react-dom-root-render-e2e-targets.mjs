@@ -1,3 +1,7 @@
+import {
+  REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS
+} from "./react-dom-root-render-e2e-scenarios.mjs";
+
 export const REACT_DOM_ROOT_RENDER_E2E_ORACLE_ARTIFACT_PATH =
   "oracles/react-19.2.6-react-dom-root-render-e2e-oracle.json";
 
@@ -28,6 +32,37 @@ export const REACT_DOM_ROOT_RENDER_E2E_FAST_REACT_TARGET = {
   version: "0.0.0",
   role: "workspace-fast-react-react-dom-placeholder",
   expectedStatus: "unsupported-placeholder-or-known-mismatch"
+};
+
+export const REACT_DOM_ROOT_RENDER_E2E_CONFORMANCE_GATE_ID =
+  "root-render-dual-run-gate-1";
+
+export const REACT_DOM_ROOT_RENDER_E2E_FAST_REACT_BLOCKED_STATUS =
+  "blocked-unsupported-root-e2e";
+
+export const REACT_DOM_ROOT_RENDER_E2E_ADMITTED_SCENARIO_IDS = Object.freeze([]);
+
+export const REACT_DOM_ROOT_RENDER_E2E_LOCAL_FAST_REACT_BEHAVIOR =
+  REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.map((scenarioId) => ({
+    scenarioId,
+    admission: "unsupported",
+    gateStatus: REACT_DOM_ROOT_RENDER_E2E_FAST_REACT_BLOCKED_STATUS,
+    expectedComparisonStatus: "unsupported-placeholder",
+    comparedToReactDomOracle: false,
+    reason:
+      "Fast React has no admitted public root render/update/unmount E2E behavior until the internal reconciler commit and DOM mutation path exists."
+  }));
+
+export const REACT_DOM_ROOT_RENDER_E2E_CONFORMANCE_GATE = {
+  id: REACT_DOM_ROOT_RENDER_E2E_CONFORMANCE_GATE_ID,
+  reactDomOracle: `${REACT_DOM_ROOT_RENDER_E2E_TARGET.packageName}@${REACT_DOM_ROOT_RENDER_E2E_TARGET.version}`,
+  localTargetPackageName: REACT_DOM_ROOT_RENDER_E2E_FAST_REACT_TARGET.packageName,
+  admittedScenarioIds: REACT_DOM_ROOT_RENDER_E2E_ADMITTED_SCENARIO_IDS,
+  unsupportedBehavior: {
+    gateStatus: REACT_DOM_ROOT_RENDER_E2E_FAST_REACT_BLOCKED_STATUS,
+    expectedComparisonStatus: "unsupported-placeholder",
+    compatibilityClaimed: false
+  }
 };
 
 export const REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES = [
