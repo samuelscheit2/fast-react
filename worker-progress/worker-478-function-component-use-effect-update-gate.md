@@ -5,7 +5,7 @@
 - `create_goal` was called as the first action before research, file reads,
   implementation, or verification.
 - `get_goal` was available after setup and before this report.
-- Active status from `get_goal`: `active`.
+- Goal status after final pane closeout: `complete`.
 - Active objective from `get_goal`: add private render metadata proving
   `useEffect` mount/update dependency handling records passive effect phase data
   without public effect execution.
