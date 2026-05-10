@@ -39,7 +39,9 @@ use crate::{
     begin_work::{
         ContextProviderBeginWorkError, ContextProviderBeginWorkRecord,
         ContextProviderBeginWorkRequest, FunctionComponentSingleChildBeginWorkRecord,
-        begin_work_context_provider_child, begin_work_reconcile_function_component_single_child,
+        NestedContextProviderBeginWorkRequest, begin_work_context_provider_child,
+        begin_work_nested_context_provider_child,
+        begin_work_reconcile_function_component_single_child,
     },
     function_component::{
         FunctionComponentContextRenderStore, FunctionComponentSingleChildOutputResolver,
@@ -1639,6 +1641,54 @@ mod tests {
         (provider, work_in_progress, component)
     }
 
+    fn attach_nested_context_provider_wip_child(
+        store: &mut FiberRootStore<RecordingHost>,
+        host_root_work_in_progress: FiberId,
+    ) -> (FiberId, FiberId, FiberId, FiberTypeHandle) {
+        let outer_provider = store.fiber_arena_mut().create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(821),
+            FiberMode::NO,
+        );
+        let inner_provider = store.fiber_arena_mut().create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(822),
+            FiberMode::NO,
+        );
+        let current = store.fiber_arena_mut().create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(823),
+            FiberMode::NO,
+        );
+        let component = FiberTypeHandle::from_raw(824);
+        store
+            .fiber_arena_mut()
+            .get_mut(current)
+            .unwrap()
+            .set_fiber_type(component);
+        let work_in_progress = store
+            .fiber_arena_mut()
+            .create_work_in_progress(current, PropsHandle::from_raw(825))
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(inner_provider, &[work_in_progress])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(outer_provider, &[inner_provider])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root_work_in_progress, &[outer_provider])
+            .unwrap();
+
+        (outer_provider, inner_provider, work_in_progress, component)
+    }
+
     fn context_value(raw: u64) -> ContextValueHandle {
         ContextValueHandle::from_raw(raw)
     }
@@ -2133,6 +2183,113 @@ mod tests {
                 .unwrap()
                 .return_fiber(),
             Some(provider)
+        );
+    }
+
+    #[test]
+    fn root_work_loop_nested_context_provider_handoff_pushes_child_reads_and_unwinds() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(128), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let (outer_provider, inner_provider, function_component, component) =
+            attach_nested_context_provider_wip_child(&mut store, render.work_in_progress());
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let outer_default = context_value(930);
+        let inner_default = context_value(940);
+        let outer_value = context_value(931);
+        let inner_value = context_value(941);
+        let outer_context = context_store.create_context(outer_default);
+        let inner_context = context_store.create_context(inner_default);
+        let output = FunctionComponentOutputHandle::from_raw(942);
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+
+        let preflight = validate_host_root_child_preflight(
+            &store,
+            root_id,
+            render.work_in_progress(),
+            Lanes::DEFAULT,
+        )
+        .unwrap();
+        assert_eq!(preflight.child, Some(outer_provider));
+        assert_eq!(preflight.child_tag, Some(FiberTag::ContextProvider));
+
+        let record = begin_work_nested_context_provider_child(
+            store.fiber_arena_mut(),
+            NestedContextProviderBeginWorkRequest::new(
+                outer_provider,
+                Lanes::DEFAULT,
+                outer_context,
+                outer_value,
+                inner_context,
+                inner_value,
+            ),
+            &mut context_store,
+            &mut registry,
+        )
+        .unwrap();
+
+        assert_eq!(record.outer_provider(), outer_provider);
+        assert_eq!(record.inner_provider(), inner_provider);
+        assert_eq!(record.child(), function_component);
+        assert_eq!(record.child_output(), output);
+        assert_eq!(record.child_context_read_count(), 2);
+        assert_eq!(record.outer_pushed_stack_depth(), 1);
+        assert_eq!(record.inner_pushed_stack_depth(), 2);
+        assert_eq!(record.inner_restored_stack_depth(), 1);
+        assert_eq!(record.outer_restored_stack_depth(), 0);
+        assert_eq!(registry.calls().len(), 1);
+        let context_state = registry.calls()[0].context_state().unwrap();
+        assert_eq!(context_state.render_fiber(), function_component);
+        assert_eq!(context_state.stack_depth(), 2);
+
+        let reads = context_store.context_reads_for_record(record.child_render());
+        assert_eq!(reads.len(), 2);
+        assert_eq!(reads[0].fiber(), function_component);
+        assert_eq!(reads[0].context(), outer_context);
+        assert_eq!(reads[0].default_value(), outer_default);
+        assert_eq!(reads[0].value(), outer_value);
+        assert_eq!(reads[1].fiber(), function_component);
+        assert_eq!(reads[1].context(), inner_context);
+        assert_eq!(reads[1].default_value(), inner_default);
+        assert_eq!(reads[1].value(), inner_value);
+        assert_eq!(
+            context_store.current_value(outer_context).unwrap(),
+            outer_default
+        );
+        assert_eq!(
+            context_store.current_value(inner_context).unwrap(),
+            inner_default
+        );
+        assert_eq!(context_store.stack_depth(), 0);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(outer_provider)
+                .unwrap()
+                .return_fiber(),
+            Some(render.work_in_progress())
+        );
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(inner_provider)
+                .unwrap()
+                .return_fiber(),
+            Some(outer_provider)
+        );
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(function_component)
+                .unwrap()
+                .return_fiber(),
+            Some(inner_provider)
         );
     }
 

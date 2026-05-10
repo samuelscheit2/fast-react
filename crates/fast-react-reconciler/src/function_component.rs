@@ -2910,6 +2910,73 @@ mod tests {
     }
 
     #[test]
+    fn function_component_context_read_canary_records_nested_provider_reads_in_order() {
+        let (mut arena, _current, work_in_progress, component) = function_component_pair();
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let outer_default = context_value(31);
+        let inner_default = context_value(41);
+        let outer_value = context_value(32);
+        let inner_value = context_value(42);
+        let outer_context = context_store.create_context(outer_default);
+        let inner_context = context_store.create_context(inner_default);
+        let before_outer = context_store
+            .push_provider(outer_context, outer_value)
+            .unwrap();
+        let before_inner = context_store
+            .push_provider(inner_context, inner_value)
+            .unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(63)));
+
+        let record = render_function_component_with_context_reads(
+            &mut arena,
+            &mut context_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            &[outer_context, inner_context],
+            &mut registry,
+        )
+        .unwrap();
+
+        let state = record.context_state().unwrap();
+        assert_eq!(state.stack_depth(), 2);
+        assert_eq!(state.start_read_index(), 0);
+        assert_eq!(record.context_read_count(), 2);
+        assert_eq!(registry.calls()[0].context_state(), Some(state));
+        let reads = context_store.context_reads_for_record(record);
+        assert_eq!(reads.len(), 2);
+        assert_eq!(reads[0].context(), outer_context);
+        assert_eq!(reads[0].default_value(), outer_default);
+        assert_eq!(reads[0].value(), outer_value);
+        assert_eq!(reads[0].active_provider_count(), 1);
+        assert_eq!(reads[1].context(), inner_context);
+        assert_eq!(reads[1].default_value(), inner_default);
+        assert_eq!(reads[1].value(), inner_value);
+        assert_eq!(reads[1].active_provider_count(), 1);
+
+        context_store.restore_snapshot(before_inner).unwrap();
+        assert_eq!(context_store.stack_depth(), 1);
+        assert_eq!(
+            context_store.current_value(outer_context).unwrap(),
+            outer_value
+        );
+        assert_eq!(
+            context_store.current_value(inner_context).unwrap(),
+            inner_default
+        );
+        context_store.restore_snapshot(before_outer).unwrap();
+        assert_eq!(context_store.stack_depth(), 0);
+        assert_eq!(
+            context_store.current_value(outer_context).unwrap(),
+            outer_default
+        );
+        assert_eq!(
+            context_store.current_value(inner_context).unwrap(),
+            inner_default
+        );
+    }
+
+    #[test]
     fn function_component_single_child_reconciliation_records_host_component_handoff() {
         let (mut arena, current, work_in_progress, component) = function_component_pair();
         let output = FunctionComponentOutputHandle::from_raw(56);

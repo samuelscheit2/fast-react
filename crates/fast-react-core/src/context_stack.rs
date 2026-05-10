@@ -430,6 +430,35 @@ mod tests {
     }
 
     #[test]
+    fn context_stack_nested_providers_across_contexts_restore_lifo_order() {
+        let mut stack = ContextStack::new();
+        let outer_context = stack.create_context(value(10));
+        let inner_context = stack.create_context(value(20));
+
+        let before_outer = stack.push_provider(outer_context, value(11)).unwrap();
+        assert!(before_outer.is_root());
+        assert_eq!(stack.stack_depth(), 1);
+        assert_eq!(stack.current_value(outer_context).unwrap(), value(11));
+        assert_eq!(stack.current_value(inner_context).unwrap(), value(20));
+
+        let before_inner = stack.push_provider(inner_context, value(21)).unwrap();
+        assert_eq!(before_inner.depth(), 1);
+        assert_eq!(stack.stack_depth(), 2);
+        assert_eq!(stack.current_value(outer_context).unwrap(), value(11));
+        assert_eq!(stack.current_value(inner_context).unwrap(), value(21));
+
+        stack.restore_snapshot(before_inner).unwrap();
+        assert_eq!(stack.stack_depth(), 1);
+        assert_eq!(stack.current_value(outer_context).unwrap(), value(11));
+        assert_eq!(stack.current_value(inner_context).unwrap(), value(20));
+
+        stack.restore_snapshot(before_outer).unwrap();
+        assert_eq!(stack.stack_depth(), 0);
+        assert_eq!(stack.current_value(outer_context).unwrap(), value(10));
+        assert_eq!(stack.current_value(inner_context).unwrap(), value(20));
+    }
+
+    #[test]
     fn context_stack_sibling_restore_reuses_parent_snapshot() {
         let mut stack = ContextStack::new();
         let context = stack.create_context(value(100));
