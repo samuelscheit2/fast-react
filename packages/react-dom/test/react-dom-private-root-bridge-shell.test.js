@@ -24,6 +24,9 @@ const rootMarkers = require(
 const listenerRegistry = require(
   path.join(packageRoot, 'src/events/listener-registry.js')
 );
+const eventListener = require(
+  path.join(packageRoot, 'src/events/react-dom-event-listener.js')
+);
 const rootListeners = require(
   path.join(packageRoot, 'src/events/root-listeners.js')
 );
@@ -4625,6 +4628,103 @@ test('private root bridge event listener error routing records root option metad
 
   bridge.cleanupInitialRenderHostOutput(handoff);
   bridge.revertCreateRootSideEffects(sideEffects);
+});
+
+test('private click delegation dispatch gate routes one accepted listener record without public DOM compatibility', () => {
+  const document = createDocument('private-click-delegation-gate');
+  const root = createElement('DIV', document);
+  const parent = createElement('DIV', document);
+  const child = createElement('BUTTON', document);
+  root.appendChild(parent);
+  parent.appendChild(child);
+  const rootOwner = {kind: 'PrivateClickDelegationRootOwner'};
+  const parentHostOwner = {kind: 'PrivateClickDelegationParentHostOwner'};
+  const childHostOwner = {kind: 'PrivateClickDelegationChildHostOwner'};
+  const parentToken = componentTree.createHostInstanceToken(
+    parentHostOwner,
+    rootOwner
+  );
+  const childToken = componentTree.createHostInstanceToken(
+    childHostOwner,
+    rootOwner
+  );
+  const calls = [];
+
+  componentTree.attachHostInstanceNode(parent, parentToken, {});
+  componentTree.attachHostInstanceNode(child, childToken, {});
+  const childQueue =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      child,
+      'click',
+      false,
+      (event) => {
+        calls.push({
+          currentTarget: event.currentTarget,
+          target: event.target,
+          targetInst: event.targetInst
+        });
+      }
+    );
+  const parentQueue =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      parent,
+      'click',
+      false,
+      () => {
+        calls.push('parent');
+      }
+    );
+  const wrapperRecord =
+    eventListener.createEventListenerWrapperRecordWithPriority(
+      root,
+      'click',
+      0
+    );
+  const dispatchRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      wrapperRecord,
+      {
+        target: child,
+        type: 'click'
+      }
+    );
+
+  const gate =
+    pluginEventSystem.createPrivateClickEventDelegationDispatchGate(
+      dispatchRecord,
+      childQueue
+    );
+
+  assert.equal(
+    pluginEventSystem.isPrivateClickEventDelegationDispatchGateRecord(gate),
+    true
+  );
+  assert.equal(
+    gate.kind,
+    pluginEventSystem.PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_RECORD_KIND
+  );
+  assert.equal(
+    gate.status,
+    pluginEventSystem.PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_STATUS
+  );
+  assert.equal(gate.listenerInvocationCount, 1);
+  assert.equal(gate.listenerQueueIndex, childQueue.listenerQueueIndex);
+  assert.equal(gate.publicDispatchEnabled, false);
+  assert.equal(gate.browserDomEventCompatibilityClaimed, false);
+  assert.equal(gate.compatibilityClaimed, false);
+  assert.equal(gate.syntheticEventCount, 0);
+  assert.deepEqual(calls, [
+    {
+      currentTarget: child,
+      target: child,
+      targetInst: childToken
+    }
+  ]);
+
+  listenerRegistry.removePrivateEventListenerQueueEntry(parentQueue);
+  listenerRegistry.removePrivateEventListenerQueueEntry(childQueue);
+  assert.equal(componentTree.detachHostInstanceToken(childToken), childToken);
+  assert.equal(componentTree.detachHostInstanceToken(parentToken), parentToken);
 });
 
 test('private portal event listener error routing links owner-root metadata without public portal compatibility', () => {

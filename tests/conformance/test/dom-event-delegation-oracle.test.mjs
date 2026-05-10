@@ -51,6 +51,9 @@ const eventListener = require(
 const pluginEventSystem = require(
   path.join(repoRoot, "packages/react-dom/src/events/plugin-event-system.js")
 );
+const listenerRegistry = require(
+  path.join(repoRoot, "packages/react-dom/src/events/listener-registry.js")
+);
 const rootListeners = require(
   path.join(repoRoot, "packages/react-dom/src/events/root-listeners.js")
 );
@@ -223,6 +226,49 @@ test("focus and blur blocker gate records private metadata without widening the 
 
   componentTree.detachHostInstanceToken(fixture.childToken);
   componentTree.detachHostInstanceToken(fixture.parentToken);
+});
+
+test("click dispatch gate records one private listener route without widening the delegation oracle", () => {
+  const fixture = createPrivateClickDelegationDispatchGateFixture();
+  const gate = fixture.gate;
+
+  assert.equal(
+    gate.kind,
+    pluginEventSystem.PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_RECORD_KIND
+  );
+  assert.equal(
+    gate.status,
+    pluginEventSystem.PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_STATUS
+  );
+  assert.equal(gate.domEventName, "click");
+  assert.equal(gate.listenerInvocationCount, 1);
+  assert.equal(gate.listenerQueueIndex, fixture.childQueue.listenerQueueIndex);
+  assert.equal(gate.privateListenerQueue, true);
+  assert.equal(gate.publicDispatchEnabled, false);
+  assert.equal(gate.publicDispatchBlocked, true);
+  assert.equal(gate.browserDomEventCompatibilityClaimed, false);
+  assert.equal(gate.compatibilityClaimed, false);
+  assert.equal(gate.syntheticEventCount, 0);
+  assert.equal(gate.willInvokePublicListeners, false);
+  assert.deepEqual(fixture.calls, [
+    {
+      currentTarget: fixture.child,
+      target: fixture.child,
+      targetInst: fixture.childToken
+    }
+  ]);
+  assert.equal(fixture.rootContainer.__registrations.length, 0);
+
+  listenerRegistry.removePrivateEventListenerQueueEntry(fixture.parentQueue);
+  listenerRegistry.removePrivateEventListenerQueueEntry(fixture.childQueue);
+  assert.equal(
+    componentTree.detachHostInstanceToken(fixture.childToken),
+    fixture.childToken
+  );
+  assert.equal(
+    componentTree.detachHostInstanceToken(fixture.parentToken),
+    fixture.parentToken
+  );
 });
 
 test("delegated click capture and bubble listeners fire in React DOM order", () => {
@@ -687,6 +733,79 @@ function createPrivateFocusBlurDispatch(
       type: domEventName
     }
   );
+}
+
+function createPrivateClickDelegationDispatchGateFixture() {
+  const document = createFakeDocument("click-delegation-gate-conformance");
+  const rootContainer = createFakeElement("DIV", document);
+  const parent = createFakeElement("DIV", document);
+  const child = createFakeElement("BUTTON", document);
+  const rootOwner = { kind: "ClickDelegationGateConformanceRoot" };
+  const parentToken = componentTree.createHostInstanceToken(
+    { kind: "ClickDelegationGateConformanceParent" },
+    rootOwner
+  );
+  const childToken = componentTree.createHostInstanceToken(
+    { kind: "ClickDelegationGateConformanceChild" },
+    rootOwner
+  );
+  const calls = [];
+
+  appendFakeChild(rootContainer, parent);
+  appendFakeChild(parent, child);
+  componentTree.attachHostInstanceNode(parent, parentToken, {});
+  componentTree.attachHostInstanceNode(child, childToken, {});
+  const childQueue =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      child,
+      "click",
+      false,
+      event => {
+        calls.push({
+          currentTarget: event.currentTarget,
+          target: event.target,
+          targetInst: event.targetInst
+        });
+      }
+    );
+  const parentQueue =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      parent,
+      "click",
+      false,
+      () => {
+        calls.push("parent");
+      }
+    );
+  const dispatchRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      eventListener.createEventListenerWrapperRecordWithPriority(
+        rootContainer,
+        "click",
+        0
+      ),
+      {
+        target: child,
+        type: "click"
+      }
+    );
+  const gate =
+    pluginEventSystem.createPrivateClickEventDelegationDispatchGate(
+      dispatchRecord,
+      childQueue
+    );
+
+  return {
+    calls,
+    child,
+    childQueue,
+    childToken,
+    gate,
+    parent,
+    parentQueue,
+    parentToken,
+    rootContainer
+  };
 }
 
 function createFocusBlurProps(listenerCalls) {

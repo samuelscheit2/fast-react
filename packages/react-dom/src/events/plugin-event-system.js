@@ -44,6 +44,8 @@ const DISPATCH_QUEUE_INVOCATION_CANARY_RECORD_KIND =
   'FastReactDomDispatchQueueInvocationCanaryRecord';
 const EVENT_TYPE_DISPATCH_CANARY_RECORD_KIND =
   'FastReactDomEventTypeDispatchCanaryRecord';
+const PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_RECORD_KIND =
+  'FastReactDomPrivateClickEventDelegationDispatchGateRecord';
 const INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_RECORD_KIND =
   'FastReactDomInputChangeEventExtractionPreflightRecord';
 const SYNTHETIC_EVENT_SHAPE_RECORD_KIND =
@@ -124,6 +126,8 @@ const INVALID_PORTAL_EVENT_OWNER_ROOT_GATE_CODE =
   'FAST_REACT_DOM_INVALID_PORTAL_EVENT_OWNER_ROOT_GATE';
 const INVALID_FOCUS_BLUR_EVENT_BLOCKER_GATE_CODE =
   'FAST_REACT_DOM_INVALID_FOCUS_BLUR_EVENT_BLOCKER_GATE';
+const INVALID_PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_CODE =
+  'FAST_REACT_DOM_INVALID_PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE';
 const INVALID_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_CODE =
   'FAST_REACT_DOM_INVALID_HYDRATION_REPLAY_TARGET_DISPATCH_LINK';
 const PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS =
@@ -152,6 +156,8 @@ const PRIVATE_EVENT_TYPE_DISPATCH_CANARY_STATUS =
   'controlled-private-event-type-dispatch-canary';
 const PRIVATE_FOCUS_BLUR_EVENT_BLOCKER_GATE_STATUS =
   'controlled-private-focus-blur-event-blocker-gate';
+const PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_STATUS =
+  'admitted-private-click-event-delegation-dispatch-gate';
 const PRIVATE_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_STATUS =
   'controlled-private-input-change-event-extraction-preflight';
 const PRIVATE_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_STATUS =
@@ -323,6 +329,7 @@ const syntheticEventShapeGateRecordPayloads = new WeakMap();
 const dispatchListenerErrorRouteRecordPayloads = new WeakMap();
 const portalEventOwnerRootGateRecordPayloads = new WeakMap();
 const focusBlurEventBlockerGateRecordPayloads = new WeakMap();
+const privateClickEventDelegationDispatchGatePayloads = new WeakMap();
 const hydrationReplayEventQueueDiagnosticPayloads = new WeakMap();
 const hydrationDehydratedTargetResolutionDiagnosticPayloads =
   new WeakMap();
@@ -3020,6 +3027,216 @@ function createFocusBlurPortalOwnerRootSummary(
   });
 }
 
+function createPrivateClickEventDelegationDispatchGate(
+  dispatchRecords,
+  listenerQueueEntryRecord,
+  options
+) {
+  const queueEntryPayload = getPrivateEventListenerQueueEntryPayload(
+    listenerQueueEntryRecord
+  );
+  if (queueEntryPayload === null || queueEntryPayload.active !== true) {
+    throw createPrivateClickEventDelegationDispatchGateError(
+      'Private click event delegation dispatch requires an active accepted private listener queue entry record.',
+      'stale-listener-record'
+    );
+  }
+  if (queueEntryPayload.domEventName !== 'click') {
+    throw createPrivateClickEventDelegationDispatchGateError(
+      'Private click event delegation dispatch only accepts click listener queue entries.',
+      'unsupported-event-type'
+    );
+  }
+
+  const normalizedOptions =
+    normalizePrivateClickEventDelegationDispatchGateOptions(options);
+  const useProcessingOrder =
+    isObjectLike(options) && options.useProcessingOrder === true;
+  const match =
+    findPrivateClickEventDelegationDispatchListenerRecordForQueueEntry(
+      normalizeDispatchRecordList(dispatchRecords),
+      listenerQueueEntryRecord,
+      useProcessingOrder
+    );
+  if (match === null) {
+    throw createPrivateClickEventDelegationDispatchGateError(
+      'Private click event delegation dispatch could not route the accepted listener record through the click dispatch queue.',
+      'accepted-listener-not-on-dispatch-path'
+    );
+  }
+
+  return invokePrivateClickEventDelegationDispatchGate(
+    match.dispatchRecord,
+    match.dispatchListenerRecord,
+    {
+      portalEventOwnerRootGateRecord:
+        normalizedOptions.portalEventOwnerRootGateRecord
+    }
+  );
+}
+
+function invokePrivateClickEventDelegationDispatchGate(
+  dispatchRecord,
+  dispatchListenerRecord,
+  options
+) {
+  const normalizedDispatchRecord =
+    assertPrivateClickEventDelegationDispatchRecord(dispatchRecord);
+  const normalizedOptions =
+    normalizePrivateClickEventDelegationDispatchGateOptions(options);
+  const normalizedListenerRecord =
+    assertPrivateClickEventDelegationDispatchListenerRecord(
+      dispatchListenerRecord,
+      normalizedDispatchRecord
+    );
+  const freshness =
+    assertFreshPrivateClickEventDelegationListenerRecord(
+      normalizedListenerRecord
+    );
+  const selection =
+    findPrivateClickEventDelegationDispatchListenerSelection(
+      normalizedDispatchRecord,
+      normalizedListenerRecord
+    );
+  const portalOwnerRoot =
+    validatePrivateClickEventDelegationPortalOwnerRootGate(
+      normalizedDispatchRecord,
+      normalizedOptions.portalEventOwnerRootGateRecord
+    );
+  const invocationRecord = invokeDispatchListenerRecordForCanary(
+    normalizedListenerRecord,
+    {
+      dispatchQueueEntry: selection.dispatchQueueEntry,
+      dispatchRecord: normalizedDispatchRecord,
+      listenerIndex: selection.listenerIndex,
+      selectedFromProcessingOrder: selection.selectedFromProcessingOrder
+    }
+  );
+  const record = Object.freeze({
+    admissionStatus: PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS,
+    browserDomEventCompatibilityClaimed: false,
+    clickEventDelegationDispatchGate: true,
+    compatibilityClaimed: false,
+    currentTarget: normalizedListenerRecord.currentTarget,
+    dispatchPathIndex: normalizedListenerRecord.dispatchPathIndex,
+    dispatchQueueEntryKind: selection.dispatchQueueEntry.kind,
+    dispatchRecordKind: normalizedDispatchRecord.kind,
+    domEventName: 'click',
+    eventDispatch: false,
+    eventPriority: normalizedDispatchRecord.eventPriority,
+    eventPriorityLabel: normalizedDispatchRecord.eventPriorityLabel,
+    eventPriorityLane: normalizedDispatchRecord.eventPriorityLane,
+    eventPriorityName: normalizedDispatchRecord.eventPriorityName,
+    eventSystemFlags: normalizedDispatchRecord.eventSystemFlags,
+    extractionRecordKind: normalizedDispatchRecord.extractionRecord.kind,
+    inCapturePhase: normalizedDispatchRecord.inCapturePhase,
+    invocationRecordKind: invocationRecord.kind,
+    invocationStatus: invocationRecord.invocationStatus,
+    kind: PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_RECORD_KIND,
+    listenerIndex: selection.listenerIndex,
+    listenerInvocationCount: invocationRecord.listenerInvocationCount,
+    listenerQueueIndex: normalizedListenerRecord.listenerQueueIndex,
+    listenerQueueKey: normalizedListenerRecord.listenerQueueKey,
+    listenerQueueRecordKind:
+      normalizedListenerRecord.listenerQueueRecordKind,
+    listenerStatus: normalizedListenerRecord.listenerStatus,
+    listenerType: normalizedListenerRecord.listenerType,
+    nativeEventTarget: normalizedDispatchRecord.nativeEventTarget,
+    nativeEventType: normalizedDispatchRecord.nativeEventType,
+    phase: normalizedListenerRecord.phase,
+    pluginName: selection.dispatchQueueEntry.pluginName,
+    portalOwnerRoot,
+    portalOwnerRootAvailable: portalOwnerRoot.available,
+    privateListenerInvoked: invocationRecord.listenerInvocationCount === 1,
+    privateListenerQueue: true,
+    publicDispatchBlocked: true,
+    publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
+    publicDispatchEnabled: false,
+    publicRootBehaviorChanged: false,
+    registrationName: normalizedListenerRecord.registrationName,
+    rootOwner: normalizedListenerRecord.rootOwner,
+    selectedFromProcessingOrder: selection.selectedFromProcessingOrder,
+    status: PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_STATUS,
+    syntheticEventBlockedReason: SYNTHETIC_EVENT_BLOCKED_CODE,
+    syntheticEventCount: 0,
+    syntheticEventStatus: 'blocked-not-created',
+    targetInst: normalizedDispatchRecord.targetInst,
+    targetInstStatus: normalizedDispatchRecord.targetInstStatus,
+    targetListenerRecordTargetInst: normalizedListenerRecord.targetInst,
+    willDispatchPublicEvent: false,
+    willInvokeListeners: false,
+    willInvokePublicListeners: false
+  });
+
+  privateClickEventDelegationDispatchGatePayloads.set(
+    record,
+    Object.freeze({
+      dispatchListenerRecord: normalizedListenerRecord,
+      dispatchQueueEntry: selection.dispatchQueueEntry,
+      dispatchRecord: normalizedDispatchRecord,
+      invocationRecord,
+      listener: freshness.listenerPayload.listener,
+      listenerQueueEntryPayload: freshness.queueEntryPayload,
+      listenerQueueEntryRecord: freshness.queueEntryRecord,
+      options: normalizedOptions.rawOptions,
+      portalEventOwnerRootGateRecord:
+        normalizedOptions.portalEventOwnerRootGateRecord
+    })
+  );
+
+  return record;
+}
+
+function findPrivateClickEventDelegationDispatchListenerRecordForQueueEntry(
+  dispatchRecords,
+  listenerQueueEntryRecord,
+  useProcessingOrder
+) {
+  for (const dispatchRecord of dispatchRecords) {
+    const normalizedDispatchRecord =
+      assertPrivateClickEventDelegationDispatchRecord(dispatchRecord);
+    for (const dispatchQueueEntry of normalizedDispatchRecord.dispatchQueue
+      .entries) {
+      const entryPayload =
+        getDispatchQueueEntryRecordPayload(dispatchQueueEntry);
+      const listenerRecords =
+        useProcessingOrder && entryPayload !== null
+          ? entryPayload.processingListenerRecords
+          : entryPayload === null
+            ? []
+            : entryPayload.listenerRecords;
+      for (const dispatchListenerRecord of listenerRecords) {
+        const listenerPayload =
+          getDispatchListenerRecordPayload(dispatchListenerRecord);
+        if (
+          listenerPayload !== null &&
+          listenerPayload.privateEventListenerQueueEntryRecord ===
+            listenerQueueEntryRecord
+        ) {
+          return {
+            dispatchListenerRecord,
+            dispatchRecord: normalizedDispatchRecord
+          };
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+function getPrivateClickEventDelegationDispatchGatePayload(record) {
+  if (!isObjectLike(record)) {
+    return null;
+  }
+
+  return privateClickEventDelegationDispatchGatePayloads.get(record) || null;
+}
+
+function isPrivateClickEventDelegationDispatchGateRecord(record) {
+  return getPrivateClickEventDelegationDispatchGatePayload(record) !== null;
+}
+
 function invokeDispatchListenerRecordForCanary(dispatchListenerRecord, options) {
   const normalizedListenerRecord =
     assertDispatchListenerRecord(dispatchListenerRecord);
@@ -4346,6 +4563,286 @@ function getFocusBlurSyntheticEventType(domEventName) {
   )
     ? focusBlurSyntheticEventTypes[domEventName]
     : null;
+}
+
+function normalizePrivateClickEventDelegationDispatchGateOptions(options) {
+  const normalizedOptions = isObjectLike(options) ? options : {};
+  const sourcePortalGate =
+    normalizedOptions.portalEventOwnerRootGateRecord ||
+    normalizedOptions.portalOwnerRootGateRecord ||
+    null;
+
+  if (
+    sourcePortalGate !== null &&
+    !isPortalEventOwnerRootGateRecord(sourcePortalGate)
+  ) {
+    throw createPrivateClickEventDelegationDispatchGateError(
+      'Private click event delegation dispatch requires a private portal owner-root gate record when portal metadata is provided.',
+      'invalid-portal-owner-root-gate-record'
+    );
+  }
+
+  return {
+    portalEventOwnerRootGateRecord: sourcePortalGate,
+    rawOptions: options
+  };
+}
+
+function assertPrivateClickEventDelegationDispatchRecord(dispatchRecord) {
+  const normalizedDispatchRecord = assertEventDispatchRecord(dispatchRecord);
+  if (
+    normalizedDispatchRecord.domEventName !== 'click' ||
+    normalizedDispatchRecord.nativeEventType !== 'click'
+  ) {
+    throw createPrivateClickEventDelegationDispatchGateError(
+      'Private click event delegation dispatch only supports click dispatch records.',
+      'unsupported-event-type'
+    );
+  }
+  if (
+    normalizedDispatchRecord.isNonDelegatedEvent ||
+    normalizedDispatchRecord.isEventHandleNonManagedNode
+  ) {
+    throw createPrivateClickEventDelegationDispatchGateError(
+      'Private click event delegation dispatch requires delegated root-listener event flags.',
+      'unsupported-event-system-flags'
+    );
+  }
+  const phase = normalizedDispatchRecord.inCapturePhase
+    ? 'capture'
+    : 'bubble';
+  if (phase !== 'capture' && phase !== 'bubble') {
+    throw createPrivateClickEventDelegationDispatchGateError(
+      'Private click event delegation dispatch received an unsupported event phase.',
+      'unsupported-event-phase'
+    );
+  }
+
+  return normalizedDispatchRecord;
+}
+
+function assertPrivateClickEventDelegationDispatchListenerRecord(
+  dispatchListenerRecord,
+  dispatchRecord
+) {
+  const normalizedListenerRecord =
+    assertDispatchListenerRecord(dispatchListenerRecord);
+  const payload =
+    getDispatchListenerRecordPayload(normalizedListenerRecord);
+  if (
+    payload === null ||
+    normalizedListenerRecord.privateListenerQueue !== true ||
+    payload.privateEventListenerQueueEntryRecord === undefined ||
+    payload.privateEventListenerQueueEntryRecord === null
+  ) {
+    throw createPrivateClickEventDelegationDispatchGateError(
+      'Private click event delegation dispatch requires a private accepted listener queue record.',
+      'unsupported-listener-record'
+    );
+  }
+  if (
+    normalizedListenerRecord.domEventName !== 'click' ||
+    normalizedListenerRecord.nativeEventType !== 'click'
+  ) {
+    throw createPrivateClickEventDelegationDispatchGateError(
+      'Private click event delegation dispatch only supports click listener records.',
+      'unsupported-event-type'
+    );
+  }
+  if (
+    normalizedListenerRecord.inCapturePhase !==
+      dispatchRecord.inCapturePhase ||
+    normalizedListenerRecord.phase !==
+      (dispatchRecord.inCapturePhase ? 'capture' : 'bubble')
+  ) {
+    throw createPrivateClickEventDelegationDispatchGateError(
+      'Private click event delegation dispatch listener phase must match the root listener phase.',
+      'unsupported-event-phase'
+    );
+  }
+  if (
+    dispatchRecord.targetDispatchPathRecord.rootOwner !== null &&
+    normalizedListenerRecord.rootOwner !==
+      dispatchRecord.targetDispatchPathRecord.rootOwner
+  ) {
+    throw createPrivateClickEventDelegationDispatchGateError(
+      'Private click event delegation dispatch listener belongs to a different owner root.',
+      'portal-owner-root-mismatch'
+    );
+  }
+
+  return normalizedListenerRecord;
+}
+
+function assertFreshPrivateClickEventDelegationListenerRecord(
+  dispatchListenerRecord
+) {
+  const listenerPayload =
+    getDispatchListenerRecordPayload(dispatchListenerRecord);
+  const queueEntryRecord =
+    listenerPayload === null
+      ? null
+      : listenerPayload.privateEventListenerQueueEntryRecord;
+  const queueEntryPayload =
+    getPrivateEventListenerQueueEntryPayload(queueEntryRecord);
+
+  if (
+    listenerPayload === null ||
+    queueEntryPayload === null ||
+    queueEntryPayload.active !== true
+  ) {
+    throw createPrivateClickEventDelegationDispatchGateError(
+      'Private click event delegation dispatch rejected a stale listener record.',
+      'stale-listener-record'
+    );
+  }
+  if (
+    queueEntryPayload.target !== dispatchListenerRecord.currentTarget ||
+    queueEntryPayload.listener !== listenerPayload.listener
+  ) {
+    throw createPrivateClickEventDelegationDispatchGateError(
+      'Private click event delegation dispatch listener metadata no longer matches the accepted registry record.',
+      'stale-listener-record'
+    );
+  }
+  if (queueEntryPayload.domEventName !== 'click') {
+    throw createPrivateClickEventDelegationDispatchGateError(
+      'Private click event delegation dispatch only accepts click listener registry records.',
+      'unsupported-event-type'
+    );
+  }
+  if (queueEntryPayload.capture !== dispatchListenerRecord.inCapturePhase) {
+    throw createPrivateClickEventDelegationDispatchGateError(
+      'Private click event delegation dispatch listener registry phase does not match the dispatch phase.',
+      'unsupported-event-phase'
+    );
+  }
+
+  return {
+    listenerPayload,
+    queueEntryPayload,
+    queueEntryRecord
+  };
+}
+
+function findPrivateClickEventDelegationDispatchListenerSelection(
+  dispatchRecord,
+  dispatchListenerRecord
+) {
+  for (
+    let dispatchQueueEntryIndex = 0;
+    dispatchQueueEntryIndex < dispatchRecord.dispatchQueue.entries.length;
+    dispatchQueueEntryIndex++
+  ) {
+    const dispatchQueueEntry = assertDispatchQueueEntryRecord(
+      dispatchRecord.dispatchQueue.entries[dispatchQueueEntryIndex]
+    );
+    const entryPayload =
+      getDispatchQueueEntryRecordPayload(dispatchQueueEntry);
+    const processingIndex =
+      entryPayload.processingListenerRecords.indexOf(dispatchListenerRecord);
+    if (processingIndex !== -1) {
+      return {
+        dispatchQueueEntry,
+        dispatchQueueEntryIndex,
+        listenerIndex: processingIndex,
+        selectedFromProcessingOrder: true
+      };
+    }
+
+    const listenerIndex =
+      entryPayload.listenerRecords.indexOf(dispatchListenerRecord);
+    if (listenerIndex !== -1) {
+      return {
+        dispatchQueueEntry,
+        dispatchQueueEntryIndex,
+        listenerIndex,
+        selectedFromProcessingOrder: false
+      };
+    }
+  }
+
+  throw createPrivateClickEventDelegationDispatchGateError(
+    'Private click event delegation dispatch rejected a listener record that is no longer part of the plugin extraction queue.',
+    'stale-listener-record'
+  );
+}
+
+function validatePrivateClickEventDelegationPortalOwnerRootGate(
+  dispatchRecord,
+  portalEventOwnerRootGateRecord
+) {
+  if (portalEventOwnerRootGateRecord === null) {
+    return Object.freeze({
+      available: false,
+      ownerRootMatchesTargetRoot: false,
+      recordKind: null,
+      status: 'unavailable-no-portal-owner-root-gate',
+      targetDispatchPathLength: 0,
+      targetInstStatus: 'not-applicable'
+    });
+  }
+
+  const portalPayload = getPortalEventOwnerRootGateRecordPayload(
+    portalEventOwnerRootGateRecord
+  );
+  if (portalPayload === null) {
+    throw createPrivateClickEventDelegationDispatchGateError(
+      'Private click event delegation dispatch requires a known portal owner-root gate record.',
+      'invalid-portal-owner-root-gate-record'
+    );
+  }
+
+  if (
+    portalEventOwnerRootGateRecord.status !==
+      PRIVATE_PORTAL_EVENT_OWNER_ROOT_GATE_STATUS ||
+    portalEventOwnerRootGateRecord.ownerRootMatchesTargetRoot !== true ||
+    portalEventOwnerRootGateRecord.dispatchPathRootOwnerMismatchCount !== 0 ||
+    portalEventOwnerRootGateRecord.targetInst !== dispatchRecord.targetInst ||
+    portalPayload.targetDispatchPathRecord.rootOwner !==
+      dispatchRecord.targetDispatchPathRecord.rootOwner
+  ) {
+    throw createPrivateClickEventDelegationDispatchGateError(
+      'Private click event delegation dispatch rejected portal owner-root metadata that does not match the click target.',
+      'portal-owner-root-mismatch'
+    );
+  }
+
+  return Object.freeze({
+    available: true,
+    blockedReason: portalEventOwnerRootGateRecord.blockedReason,
+    dispatchPathRootOwnerMatchCount:
+      portalEventOwnerRootGateRecord.dispatchPathRootOwnerMatchCount,
+    dispatchPathRootOwnerMismatchCount:
+      portalEventOwnerRootGateRecord.dispatchPathRootOwnerMismatchCount,
+    ownerRootMatchesTargetRoot:
+      portalEventOwnerRootGateRecord.ownerRootMatchesTargetRoot,
+    portalContainerContainsTarget:
+      portalEventOwnerRootGateRecord.portalContainerContainsTarget,
+    publicPortalBubblingEnabled:
+      portalEventOwnerRootGateRecord.publicPortalBubblingEnabled,
+    recordKind: portalEventOwnerRootGateRecord.kind,
+    rootContainerContainsTarget:
+      portalEventOwnerRootGateRecord.rootContainerContainsTarget,
+    status: portalEventOwnerRootGateRecord.status,
+    targetDispatchPathLength:
+      portalEventOwnerRootGateRecord.targetDispatchPathLength,
+    targetDispatchPathStatus:
+      portalEventOwnerRootGateRecord.targetDispatchPathStatus,
+    targetInstStatus: portalEventOwnerRootGateRecord.targetInstStatus
+  });
+}
+
+function createPrivateClickEventDelegationDispatchGateError(
+  message,
+  reason
+) {
+  const error = createPluginEventSystemError(
+    message,
+    INVALID_PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_CODE
+  );
+  error.reason = reason;
+  return error;
 }
 
 function assertDispatchQueueEntryRecord(record) {
@@ -6612,6 +7109,7 @@ module.exports = {
   DISPATCH_QUEUE_RECORD_KIND,
   DISPATCH_PROPAGATION_STOP_DIAGNOSTIC_RECORD_KIND,
   EVENT_TYPE_DISPATCH_CANARY_RECORD_KIND,
+  PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_RECORD_KIND,
   EVENT_DISPATCH_BLOCKED_CODE,
   EVENT_DISPATCH_RECORD_KIND,
   EVENT_LISTENER_TARGET_LOOKUP_BLOCKED_CODE,
@@ -6640,6 +7138,7 @@ module.exports = {
   INVALID_EVENT_WRAPPER_RECORD_CODE,
   INVALID_FOCUS_BLUR_EVENT_BLOCKER_GATE_CODE,
   INVALID_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_CODE,
+  INVALID_PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_CODE,
   INVALID_PORTAL_EVENT_OWNER_ROOT_GATE_CODE,
   LISTENER_ERROR_ROUTING_BLOCKED_CODE,
   NATIVE_STOP_IMMEDIATE_PROPAGATION_DIAGNOSTIC_BLOCKED_CODE,
@@ -6657,6 +7156,7 @@ module.exports = {
   PRIVATE_PORTAL_EVENT_OWNER_ROOT_GATE_STATUS,
   PRIVATE_PROPAGATION_STOP_DIAGNOSTIC_STATUS,
   PRIVATE_EVENT_TYPE_DISPATCH_CANARY_STATUS,
+  PRIVATE_CLICK_EVENT_DELEGATION_DISPATCH_GATE_STATUS,
   PRIVATE_FOCUS_BLUR_EVENT_BLOCKER_GATE_STATUS,
   PRIVATE_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_STATUS,
   PRIVATE_INPUT_CHANGE_EVENT_EXTRACTION_PREFLIGHT_STATUS,
@@ -6678,6 +7178,7 @@ module.exports = {
   createHydrationReplayTargetDispatchLinkDiagnostic,
   createInputChangeEventExtractionPreflightRecord,
   createHydrationReplayEventQueueDiagnostic,
+  createPrivateClickEventDelegationDispatchGate,
   createPortalEventOwnerRootGateRecord,
   createPluginExtractionRecord,
   createSyntheticEventShapeGateFromDispatchRecords,
@@ -6693,11 +7194,13 @@ module.exports = {
   getEventTypeDispatchCanaryRecordPayload,
   getHydrationReplayTargetDispatchLinkDiagnosticPayload,
   getFocusBlurEventBlockerGateRecordPayload,
+  getPrivateClickEventDelegationDispatchGatePayload,
   getSimpleEventReactName,
   getSimpleEventRegistrationName,
   getSyntheticEventShapeGateRecordPayload,
   getSyntheticEventShapeRecordPayload,
   getWrapperRecord,
+  invokePrivateClickEventDelegationDispatchGate,
   invokeDispatchListenerRecordForCanary,
   invokeDispatchQueueCanaryFromDispatchRecords,
   invokeSingleListenerCanaryFromDispatchRecord,
@@ -6710,6 +7213,7 @@ module.exports = {
   isDispatchQueueInvocationCanaryRecord,
   isEventTypeDispatchCanaryRecord,
   isFocusBlurEventBlockerGateRecord,
+  isPrivateClickEventDelegationDispatchGateRecord,
   isPortalEventOwnerRootGateRecord,
   isSyntheticEventShapeGateRecord,
   isSyntheticEventShapeRecord
