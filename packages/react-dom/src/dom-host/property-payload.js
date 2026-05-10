@@ -751,6 +751,13 @@ function isStyleDangerousHtmlPayloadEntry(entry) {
   );
 }
 
+function isStylePropertyPayloadEntry(entry) {
+  return (
+    isObjectLike(entry) &&
+    (entry.kind === ENTRY_SET_STYLE || entry.kind === ENTRY_REMOVE_STYLE)
+  );
+}
+
 function isNonPayloadPropertyPayloadEntry(entry) {
   return isObjectLike(entry) && entry.kind === ENTRY_NON_PAYLOAD;
 }
@@ -803,5 +810,6 @@ module.exports = {
   isEventLikeProp,
   isNonPayloadPropertyPayloadEntry,
   isOrdinaryPropertyPayloadEntry,
+  isStylePropertyPayloadEntry,
   isStyleDangerousHtmlPayloadEntry
 };

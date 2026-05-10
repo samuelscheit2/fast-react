@@ -59,6 +59,15 @@ const {
   rollbackDomPropertyUpdateLatestPropsHandoff
 } = require('../dom-host/mutation.js');
 const {
+  ENTRY_NON_PAYLOAD,
+  ENTRY_REMOVE_ATTRIBUTE,
+  ENTRY_REMOVE_PROPERTY,
+  ENTRY_REMOVE_STYLE,
+  ENTRY_SET_ATTRIBUTE,
+  ENTRY_SET_PROPERTY,
+  ENTRY_SET_STYLE
+} = require('../dom-host/property-payload.js');
+const {
   REACT_PORTAL_TYPE,
   reactDomPortalImplementation
 } = require('../shared/create-portal.js');
@@ -474,7 +483,13 @@ const ROOT_BRIDGE_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES = freezeArray([
     id: 'fake-dom-property-update',
     accepted: true,
     reason:
-      'The private DOM property payload helper mutated the attached fake HostComponent.'
+      'The private DOM property payload helper mutated admitted attribute, property, or style rows on the attached fake HostComponent.'
+  }),
+  freezeRecord({
+    id: 'property-payload-evidence',
+    accepted: true,
+    reason:
+      'The update handoff carries sanitized property-payload row counts without exposing raw props or fake-DOM nodes.'
   }),
   freezeRecord({
     id: 'fake-dom-text-update',
@@ -486,7 +501,7 @@ const ROOT_BRIDGE_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES = freezeArray([
     id: 'latest-props-after-mutation',
     accepted: true,
     reason:
-      'The component-tree latest-props map was published only after property and text mutation completed.'
+      'The component-tree latest-props map was published only after admitted property mutation and any requested text mutation completed.'
   })
 ]);
 const ROOT_BRIDGE_HOST_OUTPUT_UPDATE_BLOCKED_CAPABILITIES = freezeArray([
@@ -1244,23 +1259,37 @@ function applyPrivateRootHostOutputUpdateWithBridge(
     );
   }
 
-  assertHostOutputTextInstanceBelongsToHost(hostNode, normalized.textInstance);
-
   const previousProps = getLatestPropsFromHostInstanceToken(
     normalized.hostInstanceToken
   );
-  assertHostOutputTextPropsMatch(previousProps, normalized.oldText, 'previous');
-  assertHostOutputTextPropsMatch(
-    normalized.nextProps,
-    normalized.newText,
-    'next'
-  );
+  if (normalized.textUpdate === null) {
+    assertHostOutputChildrenStableWithoutTextUpdate(
+      previousProps,
+      normalized.nextProps
+    );
+  } else {
+    assertHostOutputTextInstanceBelongsToHost(
+      hostNode,
+      normalized.textUpdate.textInstance
+    );
+    assertHostOutputTextPropsMatch(
+      previousProps,
+      normalized.textUpdate.oldText,
+      'previous'
+    );
+    assertHostOutputTextPropsMatch(
+      normalized.nextProps,
+      normalized.textUpdate.newText,
+      'next'
+    );
+  }
 
   const rootBridgeState = validation.rootHandleState.bridgeState;
   const sequence = rootBridgeState.nextHostOutputUpdateSequence++;
   const handoffId = `${rootBridgeState.hostOutputUpdateIdPrefix}:${sequence}`;
   let propertyHandoff = null;
   let propertyHandoffPayload = null;
+  let propertyMutationEvidence = null;
   let publishedLatestProps = null;
 
   try {
@@ -1272,12 +1301,24 @@ function applyPrivateRootHostOutputUpdateWithBridge(
     );
     propertyHandoffPayload =
       getDomPropertyUpdateLatestPropsHandoffPayload(propertyHandoff);
+    propertyMutationEvidence =
+      createHostOutputPropertyMutationEvidence(propertyHandoffPayload);
+    if (
+      normalized.textUpdate === null &&
+      propertyMutationEvidence.mutatingRowCount === 0
+    ) {
+      throwInvalidHostOutputUpdateHandoff(
+        'Private root host-output updates without a text update require at least one mutating property-payload row.'
+      );
+    }
 
-    commitTextUpdate(
-      normalized.textInstance,
-      normalized.oldText,
-      normalized.newText
-    );
+    if (normalized.textUpdate !== null) {
+      commitTextUpdate(
+        normalized.textUpdate.textInstance,
+        normalized.textUpdate.oldText,
+        normalized.textUpdate.newText
+      );
+    }
 
     publishedLatestProps =
       commitLatestPropsFromMutationHandoff(propertyHandoff);
@@ -1300,6 +1341,18 @@ function applyPrivateRootHostOutputUpdateWithBridge(
     propertyHandoffPayload === null
       ? null
       : propertyHandoffPayload.latestPropsCommitRecord;
+  if (propertyMutationEvidence === null) {
+    propertyMutationEvidence =
+      createHostOutputPropertyMutationEvidence(propertyHandoffPayload);
+  }
+  const textMutation = createHostOutputTextMutationSummary(
+    normalized.textUpdate
+  );
+  const acceptedCapabilities =
+    createHostOutputUpdateAcceptedCapabilities(
+      propertyMutationEvidence,
+      normalized.textUpdate !== null
+    );
   const handoff = freezeRecord({
     $$typeof: privateRootHostOutputUpdateHandoffRecordType,
     kind: 'FastReactDomPrivateRootHostOutputUpdateHandoffRecord',
@@ -1330,16 +1383,16 @@ function applyPrivateRootHostOutputUpdateWithBridge(
           ? 0
           : propertyHandoffPayload.mutationRecords.length,
       payloadCount: propertyHandoff.payloadCount,
+      propertyPayloadEvidence: propertyMutationEvidence,
       status: propertyHandoff.status
     }),
-    textMutation: freezeRecord({
-      newTextLength: String(normalized.newText).length,
-      oldTextLength: String(normalized.oldText).length,
-      status: 'mutated'
-    }),
+    textMutation,
     latestPropsPublished,
-    latestPropsPublishOrder: 'after-property-and-text-mutation',
-    acceptedCapabilities: ROOT_BRIDGE_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES,
+    latestPropsPublishOrder:
+      normalized.textUpdate === null
+        ? 'after-property-mutation'
+        : 'after-property-and-text-mutation',
+    acceptedCapabilities,
     blockedCapabilities: ROOT_BRIDGE_HOST_OUTPUT_UPDATE_BLOCKED_CAPABILITIES,
     publicRootCreated: false,
     publicRootObjectExposed: false,
@@ -1368,13 +1421,20 @@ function applyPrivateRootHostOutputUpdateWithBridge(
     previousProps,
     propertyHandoff,
     propertyHandoffPayload,
+    propertyMutationEvidence,
     rootHandle: payload.rootHandle,
     sourceRecord: record,
-    textInstance: normalized.textInstance,
-    textUpdate: {
-      newText: normalized.newText,
-      oldText: normalized.oldText
-    }
+    textInstance:
+      normalized.textUpdate === null
+        ? null
+        : normalized.textUpdate.textInstance,
+    textUpdate:
+      normalized.textUpdate === null
+        ? null
+        : {
+            newText: normalized.textUpdate.newText,
+            oldText: normalized.textUpdate.oldText
+          }
   });
 
   return handoff;
@@ -3504,25 +3564,35 @@ function normalizeHostOutputUpdateOptions(options) {
   }
 
   const textUpdate = options.textUpdate;
-  if (textUpdate === null || typeof textUpdate !== 'object') {
+
+  return {
+    hostInstanceToken,
+    nextProps,
+    tag,
+    textUpdate: normalizeHostOutputTextUpdate(textUpdate)
+  };
+}
+
+function normalizeHostOutputTextUpdate(textUpdate) {
+  if (textUpdate == null) {
+    return null;
+  }
+  if (typeof textUpdate !== 'object') {
     throwInvalidHostOutputUpdateHandoff(
-      'Private root host-output updates require a text update object.'
+      'Private root host-output update text metadata must be an object when provided.'
     );
   }
 
   const textInstance = textUpdate.textInstance;
   if (!isObjectOrFunction(textInstance)) {
     throwInvalidHostOutputUpdateHandoff(
-      'Private root host-output updates require a text instance.'
+      'Private root host-output updates require a text instance when text metadata is provided.'
     );
   }
 
   return {
-    hostInstanceToken,
     newText: textUpdate.newText,
-    nextProps,
     oldText: textUpdate.oldText,
-    tag,
     textInstance
   };
 }
@@ -3539,6 +3609,27 @@ function assertHostOutputTextInstanceBelongsToHost(hostNode, textInstance) {
   }
   throwInvalidHostOutputUpdateHandoff(
     'Private root host-output updates require the text instance to belong to the host node.'
+  );
+}
+
+function assertHostOutputChildrenStableWithoutTextUpdate(
+  previousProps,
+  nextProps
+) {
+  const previousText = getHostOutputPrimitiveTextChild(
+    previousProps,
+    'previous'
+  );
+  const nextText = getHostOutputPrimitiveTextChild(nextProps, 'next');
+  if (previousText === null && nextText === null) {
+    return;
+  }
+  if (previousText !== null && nextText !== null && previousText === nextText) {
+    return;
+  }
+
+  throwInvalidHostOutputUpdateHandoff(
+    'Private root host-output updates without a text update require stable primitive children.'
   );
 }
 
@@ -3566,6 +3657,159 @@ function assertHostOutputTextPropsMatch(props, text, phase) {
       `Private root host-output updates require ${phase} text to match props.children.`
     );
   }
+}
+
+function getHostOutputPrimitiveTextChild(props, phase) {
+  if (!isObjectOrFunction(props)) {
+    throwInvalidHostOutputUpdateHandoff(
+      `Private root host-output updates require ${phase} host props.`
+    );
+  }
+  if (!Object.prototype.hasOwnProperty.call(props, 'children')) {
+    return null;
+  }
+
+  const children = props.children;
+  if (children == null) {
+    return null;
+  }
+
+  const childrenType = typeof children;
+  if (childrenType !== 'string' && childrenType !== 'number') {
+    throwInvalidHostOutputUpdateHandoff(
+      `Private root host-output updates require primitive ${phase} text children.`
+    );
+  }
+  return String(children);
+}
+
+function createHostOutputPropertyMutationEvidence(propertyHandoffPayload) {
+  const mutationRecords =
+    propertyHandoffPayload === null
+      ? []
+      : propertyHandoffPayload.mutationRecords;
+  const rowKinds = [];
+  const evidence = {
+    propertyPayloadBacked: true,
+    rowCount: mutationRecords.length,
+    mutatingRowCount: 0,
+    updateRowCount: 0,
+    removalRowCount: 0,
+    setAttributeCount: 0,
+    removeAttributeCount: 0,
+    setPropertyCount: 0,
+    removePropertyCount: 0,
+    setStyleCount: 0,
+    removeStyleCount: 0,
+    nonPayloadRowCount: 0
+  };
+
+  for (const record of mutationRecords) {
+    const kind = record.kind;
+    if (!rowKinds.includes(kind)) {
+      rowKinds.push(kind);
+    }
+
+    switch (kind) {
+      case ENTRY_SET_ATTRIBUTE:
+        evidence.setAttributeCount += 1;
+        evidence.updateRowCount += 1;
+        evidence.mutatingRowCount += 1;
+        break;
+      case ENTRY_REMOVE_ATTRIBUTE:
+        evidence.removeAttributeCount += 1;
+        evidence.removalRowCount += 1;
+        evidence.mutatingRowCount += 1;
+        break;
+      case ENTRY_SET_PROPERTY:
+        evidence.setPropertyCount += 1;
+        evidence.updateRowCount += 1;
+        evidence.mutatingRowCount += 1;
+        break;
+      case ENTRY_REMOVE_PROPERTY:
+        evidence.removePropertyCount += 1;
+        evidence.removalRowCount += 1;
+        evidence.mutatingRowCount += 1;
+        break;
+      case ENTRY_SET_STYLE:
+        evidence.setStyleCount += 1;
+        evidence.updateRowCount += 1;
+        evidence.mutatingRowCount += 1;
+        break;
+      case ENTRY_REMOVE_STYLE:
+        evidence.removeStyleCount += 1;
+        evidence.removalRowCount += 1;
+        evidence.mutatingRowCount += 1;
+        break;
+      case ENTRY_NON_PAYLOAD:
+        evidence.nonPayloadRowCount += 1;
+        break;
+    }
+  }
+
+  return freezeRecord({
+    ...evidence,
+    attributeRowCount:
+      evidence.setAttributeCount + evidence.removeAttributeCount,
+    propertyRowCount:
+      evidence.setPropertyCount + evidence.removePropertyCount,
+    styleRowCount: evidence.setStyleCount + evidence.removeStyleCount,
+    rowKinds: freezeArray(rowKinds)
+  });
+}
+
+function createHostOutputTextMutationSummary(textUpdate) {
+  if (textUpdate === null) {
+    return freezeRecord({
+      newTextLength: null,
+      oldTextLength: null,
+      status: 'not-requested'
+    });
+  }
+
+  return freezeRecord({
+    newTextLength: String(textUpdate.newText).length,
+    oldTextLength: String(textUpdate.oldText).length,
+    status: 'mutated'
+  });
+}
+
+function createHostOutputUpdateAcceptedCapabilities(
+  propertyMutationEvidence,
+  textMutationApplied
+) {
+  const capabilities = [
+    ...ROOT_BRIDGE_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES
+  ];
+  if (propertyMutationEvidence.attributeRowCount > 0) {
+    capabilities.push(
+      freezeRecord({
+        id: 'attribute-payload-rows',
+        accepted: true,
+        reason:
+          'Ordinary attribute update and removal rows were admitted from property-payload evidence.'
+      })
+    );
+  }
+  if (propertyMutationEvidence.styleRowCount > 0) {
+    capabilities.push(
+      freezeRecord({
+        id: 'style-payload-rows',
+        accepted: true,
+        reason:
+          'Style update and removal rows were admitted from property-payload evidence.'
+      })
+    );
+  }
+  if (!textMutationApplied) {
+    return freezeArray(
+      capabilities.filter(
+        (capability) => capability.id !== 'fake-dom-text-update'
+      )
+    );
+  }
+
+  return freezeArray(capabilities);
 }
 
 function isObjectOrFunction(value) {

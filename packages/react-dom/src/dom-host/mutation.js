@@ -15,6 +15,7 @@ const {
   isEventLikeProp,
   isNonPayloadPropertyPayloadEntry,
   isOrdinaryPropertyPayloadEntry,
+  isStylePropertyPayloadEntry,
   isStyleDangerousHtmlPayloadEntry
 } = require('./property-payload.js');
 
@@ -52,6 +53,8 @@ const latestPropsSafePayloadKinds = new Set([
   ENTRY_REMOVE_ATTRIBUTE,
   ENTRY_SET_PROPERTY,
   ENTRY_REMOVE_PROPERTY,
+  ENTRY_SET_STYLE,
+  ENTRY_REMOVE_STYLE,
   ENTRY_NON_PAYLOAD
 ]);
 function createDomHostMutationError(code, message) {
@@ -686,6 +689,10 @@ function normalizeLatestPropsSafeDomPropertyPayloadEntry(instance, entry, index)
     return normalizePropertyPayloadEntry(instance, entry, index);
   }
 
+  if (isStylePropertyPayloadEntry(entry)) {
+    return validateStylePayloadEntry(instance, entry, entry.kind);
+  }
+
   if (isNonPayloadPropertyPayloadEntry(entry)) {
     return normalizeNonPayloadPropertyPayloadEntry(entry, index);
   }
@@ -696,6 +703,11 @@ function normalizeLatestPropsSafeDomPropertyPayloadEntry(instance, entry, index)
 function applyLatestPropsSafeDomPropertyPayloadEntry(instance, entry) {
   if (isOrdinaryPropertyPayloadEntry(entry)) {
     applyNormalizedPropertyPayloadEntry(instance, entry);
+    return;
+  }
+
+  if (isStylePropertyPayloadEntry(entry)) {
+    applyStylePayloadEntry(instance, entry);
   }
 }
 
@@ -784,6 +796,16 @@ function createLatestPropsPayloadRecord(entry) {
       propertyName: entry.propertyName,
       propName: entry.propName,
       value: null
+    });
+  }
+
+  if (entry.kind === ENTRY_SET_STYLE || entry.kind === ENTRY_REMOVE_STYLE) {
+    return Object.freeze({
+      kind: entry.kind,
+      mutation: entry.mutation,
+      propName: entry.propName,
+      styleName: entry.styleName,
+      value: entry.value
     });
   }
 
@@ -886,6 +908,10 @@ function createLatestPropsSafeDomPropertyPayloadRollbackRecord(
     );
   }
 
+  if (entry.kind === ENTRY_SET_STYLE || entry.kind === ENTRY_REMOVE_STYLE) {
+    return createStylePayloadRollbackRecord(instance, entry);
+  }
+
   return null;
 }
 
@@ -905,6 +931,15 @@ function createPropertyPayloadRollbackRecord(instance, propertyName) {
     kind: 'propertyRollback',
     propertyName,
     value: instance[propertyName]
+  };
+}
+
+function createStylePayloadRollbackRecord(instance, entry) {
+  return {
+    kind: 'styleRollback',
+    mutation: entry.mutation,
+    styleName: entry.styleName,
+    value: getStyleRollbackSnapshot(instance, entry)
   };
 }
 
@@ -1005,6 +1040,14 @@ function applyLatestPropsSafeDomPropertyPayloadRollbackRecord(
     return;
   }
 
+  if (rollbackRecord.kind === 'styleRollback') {
+    if (styleRollbackRecordMatchesCurrentValue(instance, rollbackRecord)) {
+      return;
+    }
+    applyStyleRollbackRecord(instance, rollbackRecord);
+    return;
+  }
+
   throw createDomHostMutationError(
     'FAST_REACT_DOM_INVALID_PROPERTY_PAYLOAD_ROLLBACK_RECORD',
     'Cannot roll back an invalid DOM property payload record.'
@@ -1020,6 +1063,46 @@ function attributeRollbackRecordMatchesCurrentValue(instance, rollbackRecord) {
     snapshot.hadAttribute === rollbackRecord.hadAttribute &&
     snapshot.value === rollbackRecord.value
   );
+}
+
+function getStyleRollbackSnapshot(instance, entry) {
+  assertStyleTarget(instance);
+
+  const style = instance.style;
+  if (entry.mutation === 'setProperty') {
+    if (typeof style.getPropertyValue === 'function') {
+      return String(style.getPropertyValue(entry.styleName) || '');
+    }
+    if (style.properties instanceof Map) {
+      return style.properties.has(entry.styleName)
+        ? String(style.properties.get(entry.styleName))
+        : '';
+    }
+  }
+
+  const value = style[entry.styleName];
+  return value == null ? '' : String(value);
+}
+
+function styleRollbackRecordMatchesCurrentValue(instance, rollbackRecord) {
+  return (
+    getStyleRollbackSnapshot(instance, rollbackRecord) ===
+    rollbackRecord.value
+  );
+}
+
+function applyStyleRollbackRecord(instance, rollbackRecord) {
+  assertStyleTarget(instance);
+  if (rollbackRecord.mutation === 'setProperty') {
+    assertStyleSetPropertyTarget(instance);
+    instance.style.setProperty(
+      rollbackRecord.styleName,
+      rollbackRecord.value
+    );
+    return;
+  }
+
+  instance.style[rollbackRecord.styleName] = rollbackRecord.value;
 }
 
 function assertChildNode(child, operation) {
@@ -1093,6 +1176,11 @@ function cloneSafeLatestPropsPayloadRecord(payloadRecord, index) {
   } else if (kind === 'removeProperty') {
     assertStringPayloadField(payloadRecord, 'propName', index);
     assertStringPayloadField(payloadRecord, 'propertyName', index);
+  } else if (kind === 'setStyle' || kind === 'removeStyle') {
+    assertStringPayloadField(payloadRecord, 'propName', index);
+    assertStringPayloadField(payloadRecord, 'styleName', index);
+    assertStringPayloadField(payloadRecord, 'mutation', index);
+    assertStringPayloadField(payloadRecord, 'value', index);
   } else {
     assertStringPayloadField(payloadRecord, 'propName', index);
     assertStringPayloadField(payloadRecord, 'category', index);
