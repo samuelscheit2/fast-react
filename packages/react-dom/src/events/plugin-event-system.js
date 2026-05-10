@@ -3,11 +3,13 @@
 const {
   EVENT_LISTENER_TARGET_LOOKUP_BLOCKED_CODE,
   EVENT_LISTENER_TARGET_LOOKUP_RECORD_KIND,
+  EVENT_TARGET_DISPATCH_PATH_RECORD_KIND,
   createEventListenerTargetLookupRecord,
   createEventTargetDispatchPathRecord,
   createEventTargetNormalizationRecord,
   getEventListenerTargetLookupRecordPayload
 } = require('../client/component-tree.js');
+const {describeContainer} = require('../client/dom-container.js');
 const {
   getEventTarget,
   getNativeEventType
@@ -49,6 +51,8 @@ const DISPATCH_NATIVE_STOP_IMMEDIATE_PROPAGATION_DIAGNOSTIC_RECORD_KIND =
   'FastReactDomDispatchNativeStopImmediatePropagationDiagnosticRecord';
 const DISPATCH_LISTENER_ERROR_ROUTE_RECORD_KIND =
   'FastReactDomDispatchListenerErrorRouteRecord';
+const PORTAL_EVENT_OWNER_ROOT_GATE_RECORD_KIND =
+  'FastReactDomPortalEventOwnerRootGateRecord';
 const HYDRATION_REPLAY_EVENT_QUEUE_DIAGNOSTIC_KIND =
   'FastReactDomHydrationReplayEventQueueDiagnostic';
 const HYDRATION_REPLAY_EVENT_QUEUE_ENTRY_RECORD_KIND =
@@ -77,6 +81,8 @@ const NATIVE_STOP_IMMEDIATE_PROPAGATION_DIAGNOSTIC_BLOCKED_CODE =
   'FAST_REACT_DOM_NATIVE_STOP_IMMEDIATE_PROPAGATION_DIAGNOSTIC_BLOCKED';
 const LISTENER_ERROR_ROUTING_BLOCKED_CODE =
   'FAST_REACT_DOM_LISTENER_ERROR_ROUTING_BLOCKED';
+const PORTAL_EVENT_BUBBLING_BLOCKED_CODE =
+  'FAST_REACT_DOM_PORTAL_EVENT_BUBBLING_BLOCKED';
 const HYDRATION_REPLAY_BLOCKED_CODE =
   'FAST_REACT_DOM_HYDRATION_REPLAY_BLOCKED';
 const CONTROLLED_STATE_RESTORE_BLOCKED_CODE =
@@ -87,6 +93,8 @@ const INVALID_EVENT_DISPATCH_RECORD_CODE =
   'FAST_REACT_DOM_INVALID_EVENT_DISPATCH_RECORD';
 const INVALID_DISPATCH_LISTENER_RECORD_CODE =
   'FAST_REACT_DOM_INVALID_DISPATCH_LISTENER_RECORD';
+const INVALID_PORTAL_EVENT_OWNER_ROOT_GATE_CODE =
+  'FAST_REACT_DOM_INVALID_PORTAL_EVENT_OWNER_ROOT_GATE';
 const PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS =
   'admitted-private-fake-dom-event-dispatch-metadata';
 const PRIVATE_SINGLE_LISTENER_INVOCATION_CANARY_STATUS =
@@ -105,6 +113,8 @@ const PRIVATE_LISTENER_ERROR_ROUTING_DIAGNOSTIC_STATUS =
   'controlled-private-listener-error-routing-diagnostic';
 const PRIVATE_CURRENT_TARGET_PROGRESSION_DIAGNOSTIC_STATUS =
   'validated-private-current-target-progression';
+const PRIVATE_PORTAL_EVENT_OWNER_ROOT_GATE_STATUS =
+  'controlled-private-portal-event-owner-root-gate';
 
 const SIMPLE_EVENT_PLUGIN_NAME = 'simple-event-plugin';
 const POLYFILL_EVENT_PLUGIN_NAMES = Object.freeze([
@@ -244,6 +254,7 @@ const dispatchQueueInvocationCanaryRecordPayloads = new WeakMap();
 const syntheticEventShapeRecordPayloads = new WeakMap();
 const syntheticEventShapeGateRecordPayloads = new WeakMap();
 const dispatchListenerErrorRouteRecordPayloads = new WeakMap();
+const portalEventOwnerRootGateRecordPayloads = new WeakMap();
 const hydrationDehydratedTargetResolutionDiagnosticPayloads =
   new WeakMap();
 
@@ -1522,6 +1533,116 @@ function createDispatchListenerErrorRouteRecord(
   return record;
 }
 
+function createPortalEventOwnerRootGateRecord(
+  targetDispatchPathRecord,
+  options
+) {
+  const normalizedDispatchPathRecord =
+    assertPortalEventOwnerRootDispatchPathRecord(targetDispatchPathRecord);
+  const normalizedOptions =
+    normalizePortalEventOwnerRootGateOptions(options);
+  const ownerRoot = normalizedOptions.ownerRoot;
+  const entries = normalizedDispatchPathRecord.entries;
+  let rootOwnerMatchCount = 0;
+  let rootOwnerMismatchCount = 0;
+
+  for (const entry of entries) {
+    if (entry.rootOwner === ownerRoot) {
+      rootOwnerMatchCount++;
+    } else {
+      rootOwnerMismatchCount++;
+    }
+  }
+
+  const ownerRootMatchesTargetRoot =
+    normalizedDispatchPathRecord.rootOwner === ownerRoot;
+  if (
+    !ownerRootMatchesTargetRoot ||
+    rootOwnerMismatchCount !== 0 ||
+    entries.length === 0
+  ) {
+    throw createPluginEventSystemError(
+      'Portal event owner-root diagnostics require every dispatch path entry to belong to the portal owner root.',
+      INVALID_PORTAL_EVENT_OWNER_ROOT_GATE_CODE
+    );
+  }
+
+  const targetNode =
+    normalizedDispatchPathRecord.targetHostInstanceNode ||
+    normalizedDispatchPathRecord.targetNode ||
+    null;
+  const portalContainerContainsTarget = isInclusiveAncestor(
+    normalizedOptions.portalContainer,
+    targetNode
+  );
+  const rootContainerContainsTarget = isInclusiveAncestor(
+    normalizedOptions.rootContainer,
+    targetNode
+  );
+  const record = Object.freeze({
+    blockedReason: PORTAL_EVENT_BUBBLING_BLOCKED_CODE,
+    browserDomEventCompatibilityClaimed: false,
+    compatibilityClaimed: false,
+    diagnosticOnly: true,
+    dispatchPathRootOwnerMatchCount: rootOwnerMatchCount,
+    dispatchPathRootOwnerMismatchCount: rootOwnerMismatchCount,
+    domEventName: normalizedOptions.domEventName,
+    eventDispatch: false,
+    hostFiberPath: Object.freeze(normalizedOptions.hostFiberPath.slice()),
+    kind: PORTAL_EVENT_OWNER_ROOT_GATE_RECORD_KIND,
+    listenerInvocationCount: 0,
+    ownerRootMatchesTargetRoot,
+    ownerRootRequired: true,
+    portalContainerContainsTarget,
+    portalContainerInfo:
+      normalizedOptions.portalContainer === null
+        ? null
+        : Object.freeze(describeContainer(normalizedOptions.portalContainer)),
+    portalContainerIsRootContainer:
+      normalizedOptions.portalContainer !== null &&
+      normalizedOptions.portalContainer === normalizedOptions.rootContainer,
+    portalEventPathDiagnostic: true,
+    portalKey: normalizedOptions.portalKey,
+    publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
+    publicDispatchEnabled: false,
+    publicPortalBubblingEnabled: false,
+    publicRootBehaviorChanged: false,
+    rootContainerContainsTarget,
+    rootContainerInfo:
+      normalizedOptions.rootContainer === null
+        ? null
+        : Object.freeze(describeContainer(normalizedOptions.rootContainer)),
+    sourceGateId: normalizedOptions.sourceGateId,
+    status: PRIVATE_PORTAL_EVENT_OWNER_ROOT_GATE_STATUS,
+    syntheticEventCount: 0,
+    targetDispatchPathLength: normalizedDispatchPathRecord.length,
+    targetDispatchPathStatus: normalizedDispatchPathRecord.status,
+    targetHostInstanceStatus:
+      normalizedDispatchPathRecord.targetHostInstanceStatus,
+    targetInst: normalizedDispatchPathRecord.targetInst,
+    targetInstStatus: normalizedDispatchPathRecord.targetInstStatus,
+    targetNodeType:
+      targetNode !== null && typeof targetNode.nodeType === 'number'
+        ? targetNode.nodeType
+        : null
+  });
+
+  portalEventOwnerRootGateRecordPayloads.set(
+    record,
+    Object.freeze({
+      options: normalizedOptions.rawOptions,
+      ownerRoot,
+      portalContainer: normalizedOptions.portalContainer,
+      rootContainer: normalizedOptions.rootContainer,
+      targetDispatchPathEntries: entries,
+      targetDispatchPathRecord: normalizedDispatchPathRecord,
+      targetNode
+    })
+  );
+
+  return record;
+}
+
 function invokeDispatchListenerRecordForCanary(dispatchListenerRecord, options) {
   const normalizedListenerRecord =
     assertDispatchListenerRecord(dispatchListenerRecord);
@@ -2558,6 +2679,18 @@ function isDispatchListenerErrorRouteRecord(record) {
   return getDispatchListenerErrorRouteRecordPayload(record) !== null;
 }
 
+function getPortalEventOwnerRootGateRecordPayload(record) {
+  if (!isObjectLike(record)) {
+    return null;
+  }
+
+  return portalEventOwnerRootGateRecordPayloads.get(record) || null;
+}
+
+function isPortalEventOwnerRootGateRecord(record) {
+  return getPortalEventOwnerRootGateRecordPayload(record) !== null;
+}
+
 function assertEventDispatchRecord(record) {
   if (
     !isObjectLike(record) ||
@@ -2569,6 +2702,21 @@ function assertEventDispatchRecord(record) {
     throw createPluginEventSystemError(
       'Cannot invoke a React DOM event listener canary without a private event dispatch record.',
       INVALID_EVENT_DISPATCH_RECORD_CODE
+    );
+  }
+
+  return record;
+}
+
+function assertPortalEventOwnerRootDispatchPathRecord(record) {
+  if (
+    !isObjectLike(record) ||
+    record.kind !== EVENT_TARGET_DISPATCH_PATH_RECORD_KIND ||
+    !Array.isArray(record.entries)
+  ) {
+    throw createPluginEventSystemError(
+      'Cannot create a portal event owner-root gate without a private event target dispatch path record.',
+      INVALID_PORTAL_EVENT_OWNER_ROOT_GATE_CODE
     );
   }
 
@@ -2595,6 +2743,62 @@ function assertDispatchListenerRecord(record) {
   }
 
   return record;
+}
+
+function normalizePortalEventOwnerRootGateOptions(options) {
+  const normalizedOptions = isObjectLike(options) ? options : {};
+  const ownerRoot = normalizedOptions.ownerRoot;
+  if (!isObjectLike(ownerRoot)) {
+    throw createPluginEventSystemError(
+      'Portal event owner-root diagnostics require an owner root.',
+      INVALID_PORTAL_EVENT_OWNER_ROOT_GATE_CODE
+    );
+  }
+
+  const hostFiberPath = Array.isArray(normalizedOptions.hostFiberPath)
+    ? normalizedOptions.hostFiberPath.map((part) => String(part))
+    : ['HostRoot', 'HostPortal', 'HostComponent'];
+
+  return {
+    domEventName:
+      typeof normalizedOptions.domEventName === 'string'
+        ? normalizedOptions.domEventName
+        : 'click',
+    hostFiberPath,
+    ownerRoot,
+    portalContainer: isObjectLike(normalizedOptions.portalContainer)
+      ? normalizedOptions.portalContainer
+      : null,
+    portalKey:
+      normalizedOptions.portalKey === null ||
+      typeof normalizedOptions.portalKey === 'string'
+        ? normalizedOptions.portalKey
+        : null,
+    rawOptions: options,
+    rootContainer: isObjectLike(normalizedOptions.rootContainer)
+      ? normalizedOptions.rootContainer
+      : null,
+    sourceGateId:
+      typeof normalizedOptions.sourceGateId === 'string'
+        ? normalizedOptions.sourceGateId
+        : null
+  };
+}
+
+function isInclusiveAncestor(ancestor, targetNode) {
+  if (!isObjectLike(ancestor) || !isObjectLike(targetNode)) {
+    return false;
+  }
+
+  let current = targetNode;
+  while (isObjectLike(current)) {
+    if (current === ancestor) {
+      return true;
+    }
+    current = isObjectLike(current.parentNode) ? current.parentNode : null;
+  }
+
+  return false;
 }
 
 function normalizeSingleListenerCanaryOptions(options) {
@@ -3860,16 +4064,20 @@ module.exports = {
   INVALID_DISPATCH_LISTENER_RECORD_CODE,
   INVALID_EVENT_DISPATCH_RECORD_CODE,
   INVALID_EVENT_WRAPPER_RECORD_CODE,
+  INVALID_PORTAL_EVENT_OWNER_ROOT_GATE_CODE,
   LISTENER_ERROR_ROUTING_BLOCKED_CODE,
   NATIVE_STOP_IMMEDIATE_PROPAGATION_DIAGNOSTIC_BLOCKED_CODE,
   PLUGIN_EXTRACTION_BLOCKED_CODE,
   PLUGIN_EXTRACTION_RECORD_KIND,
+  PORTAL_EVENT_BUBBLING_BLOCKED_CODE,
+  PORTAL_EVENT_OWNER_ROOT_GATE_RECORD_KIND,
   POLYFILL_EVENT_PLUGIN_NAMES,
   PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS,
   PRIVATE_CURRENT_TARGET_PROGRESSION_DIAGNOSTIC_STATUS,
   PRIVATE_DISPATCH_QUEUE_INVOCATION_CANARY_STATUS,
   PRIVATE_LISTENER_ERROR_ROUTING_DIAGNOSTIC_STATUS,
   PRIVATE_NATIVE_STOP_IMMEDIATE_PROPAGATION_DIAGNOSTIC_STATUS,
+  PRIVATE_PORTAL_EVENT_OWNER_ROOT_GATE_STATUS,
   PRIVATE_PROPAGATION_STOP_DIAGNOSTIC_STATUS,
   PRIVATE_SINGLE_LISTENER_INVOCATION_CANARY_STATUS,
   PRIVATE_SYNTHETIC_EVENT_SHAPE_GATE_STATUS,
@@ -3885,11 +4093,13 @@ module.exports = {
   createEventDispatchRecordFromWrapperRecord,
   createHydrationDehydratedTargetResolutionDiagnostic,
   createHydrationReplayEventQueueDiagnostic,
+  createPortalEventOwnerRootGateRecord,
   createPluginExtractionRecord,
   createSyntheticEventShapeGateFromDispatchRecords,
   createSyntheticEventShapeRecordForDispatchListenerRecord,
   getDispatchListenerErrorRouteRecordPayload,
   getHydrationDehydratedTargetResolutionDiagnosticPayload,
+  getPortalEventOwnerRootGateRecordPayload,
   getDispatchListenerInvocationCanaryRecordPayload,
   getDispatchListenerRecordPayload,
   getDispatchQueueEntryRecordPayload,
@@ -3908,6 +4118,7 @@ module.exports = {
   isDispatchListenerRecord,
   isDispatchQueueEntryRecord,
   isDispatchQueueInvocationCanaryRecord,
+  isPortalEventOwnerRootGateRecord,
   isSyntheticEventShapeGateRecord,
   isSyntheticEventShapeRecord
 };
