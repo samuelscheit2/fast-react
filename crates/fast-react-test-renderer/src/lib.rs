@@ -3031,6 +3031,9 @@ pub const TEST_RENDERER_PRIVATE_TEST_INSTANCE_FIND_BY_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.testinstance.find-by-private-query";
 pub const TEST_RENDERER_PRIVATE_TEST_INSTANCE_QUERY_BRIDGE_PREFLIGHT_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.testinstance.query-bridge-preflight";
+pub const TEST_RENDERER_PRIVATE_TEST_INSTANCE_NATIVE_QUERY_EXECUTION_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.testinstance.private-native-query-execution-evidence";
+pub const TEST_RENDERER_PRIVATE_TEST_INSTANCE_NATIVE_QUERY_EXECUTION_STATUS: &str = "private-test-instance-native-create-update-execution-records-consumed-public-test-instance-blocked";
 pub const TEST_RENDERER_CURRENT_ROOT_CANARY_METADATA_ID: &str =
     "fast-react-test-renderer-current-root-canary-metadata";
 pub const TEST_RENDERER_PRIVATE_ROOT_CREATE_PREFLIGHT_DIAGNOSTIC_NAME: &str =
@@ -7272,6 +7275,204 @@ impl TestRendererPrivateTestInstanceQueryBridgePreflightDiagnostics {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererPrivateTestInstanceNativeQueryExecutionEvidence {
+    diagnostic_name: &'static str,
+    status: &'static str,
+    root: FiberRootId,
+    operation: &'static str,
+    public_surface: &'static str,
+    source_execution_record_id: &'static str,
+    source_execution_status: &'static str,
+    source_query_diagnostic_name: &'static str,
+    query_bridge_preflight_status: &'static str,
+    host_output_update_kind: TestRendererRootUpdateKind,
+    host_output_snapshot_current: bool,
+    query_surface: &'static str,
+    query_kind: TestRendererPrivateTestInstanceFindByQueryKind,
+    expected_type: TestElementType,
+    result_fiber_tag: &'static str,
+    result_kind: &'static str,
+    matched_candidate_count: usize,
+    query_path_candidate_count: usize,
+    skipped_text_child_count: usize,
+    consumes_accepted_native_create_execution_record: bool,
+    consumes_accepted_native_update_execution_record: bool,
+    consumes_private_test_instance_query_diagnostics: bool,
+    consumes_query_bridge_preflight: bool,
+    consumes_accepted_find_all_diagnostics: bool,
+    consumes_accepted_find_by_diagnostics: bool,
+    minimal_host_component_query_path: bool,
+    public_root_available: bool,
+    public_query_methods_available: bool,
+    public_test_instance_object_available: bool,
+    native_bridge_available: bool,
+    native_execution_available: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererPrivateTestInstanceNativeQueryExecutionEvidence {
+    #[must_use]
+    pub const fn diagnostic_name(&self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn status(&self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn operation(&self) -> &'static str {
+        self.operation
+    }
+
+    #[must_use]
+    pub const fn public_surface(&self) -> &'static str {
+        self.public_surface
+    }
+
+    #[must_use]
+    pub const fn source_execution_record_id(&self) -> &'static str {
+        self.source_execution_record_id
+    }
+
+    #[must_use]
+    pub const fn source_execution_status(&self) -> &'static str {
+        self.source_execution_status
+    }
+
+    #[must_use]
+    pub const fn source_query_diagnostic_name(&self) -> &'static str {
+        self.source_query_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn query_bridge_preflight_status(&self) -> &'static str {
+        self.query_bridge_preflight_status
+    }
+
+    #[must_use]
+    pub const fn host_output_update_kind(&self) -> TestRendererRootUpdateKind {
+        self.host_output_update_kind
+    }
+
+    #[must_use]
+    pub const fn host_output_snapshot_current(&self) -> bool {
+        self.host_output_snapshot_current
+    }
+
+    #[must_use]
+    pub const fn query_surface(&self) -> &'static str {
+        self.query_surface
+    }
+
+    #[must_use]
+    pub const fn query_kind(&self) -> TestRendererPrivateTestInstanceFindByQueryKind {
+        self.query_kind
+    }
+
+    #[must_use]
+    pub const fn expected_type(&self) -> &TestElementType {
+        &self.expected_type
+    }
+
+    #[must_use]
+    pub const fn result_fiber_tag(&self) -> &'static str {
+        self.result_fiber_tag
+    }
+
+    #[must_use]
+    pub const fn result_kind(&self) -> &'static str {
+        self.result_kind
+    }
+
+    #[must_use]
+    pub const fn matched_candidate_count(&self) -> usize {
+        self.matched_candidate_count
+    }
+
+    #[must_use]
+    pub const fn query_path_candidate_count(&self) -> usize {
+        self.query_path_candidate_count
+    }
+
+    #[must_use]
+    pub const fn skipped_text_child_count(&self) -> usize {
+        self.skipped_text_child_count
+    }
+
+    #[must_use]
+    pub const fn consumes_accepted_native_create_execution_record(&self) -> bool {
+        self.consumes_accepted_native_create_execution_record
+    }
+
+    #[must_use]
+    pub const fn consumes_accepted_native_update_execution_record(&self) -> bool {
+        self.consumes_accepted_native_update_execution_record
+    }
+
+    #[must_use]
+    pub const fn consumes_private_test_instance_query_diagnostics(&self) -> bool {
+        self.consumes_private_test_instance_query_diagnostics
+    }
+
+    #[must_use]
+    pub const fn consumes_query_bridge_preflight(&self) -> bool {
+        self.consumes_query_bridge_preflight
+    }
+
+    #[must_use]
+    pub const fn consumes_accepted_find_all_diagnostics(&self) -> bool {
+        self.consumes_accepted_find_all_diagnostics
+    }
+
+    #[must_use]
+    pub const fn consumes_accepted_find_by_diagnostics(&self) -> bool {
+        self.consumes_accepted_find_by_diagnostics
+    }
+
+    #[must_use]
+    pub const fn minimal_host_component_query_path(&self) -> bool {
+        self.minimal_host_component_query_path
+    }
+
+    #[must_use]
+    pub const fn public_root_available(&self) -> bool {
+        self.public_root_available
+    }
+
+    #[must_use]
+    pub const fn public_query_methods_available(&self) -> bool {
+        self.public_query_methods_available
+    }
+
+    #[must_use]
+    pub const fn public_test_instance_object_available(&self) -> bool {
+        self.public_test_instance_object_available
+    }
+
+    #[must_use]
+    pub const fn native_bridge_available(&self) -> bool {
+        self.native_bridge_available
+    }
+
+    #[must_use]
+    pub const fn native_execution_available(&self) -> bool {
+        self.native_execution_available
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(&self) -> bool {
+        self.compatibility_claimed
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestRendererPrivateGetInstanceFailClosedRootDiagnostic {
     root_fiber_shape: [&'static str; 2],
     root_child_fiber_tag: &'static str,
@@ -7626,6 +7827,27 @@ impl Display for TestRendererPrivateUnmountNativeBridgeAdmissionError {
 }
 
 impl Error for TestRendererPrivateUnmountNativeBridgeAdmissionError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TestRendererPrivateTestInstanceNativeQueryExecutionError {
+    NativeExecutionRecordMismatch {
+        operation: &'static str,
+        reason: &'static str,
+    },
+}
+
+impl Display for TestRendererPrivateTestInstanceNativeQueryExecutionError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NativeExecutionRecordMismatch { operation, reason } => write!(
+                formatter,
+                "private TestInstance native query execution evidence rejected {operation} execution record: {reason}",
+            ),
+        }
+    }
+}
+
+impl Error for TestRendererPrivateTestInstanceNativeQueryExecutionError {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TestRendererSerializationGateError {
@@ -7999,6 +8221,9 @@ pub enum TestRendererRootError {
     PrivateUpdateRoute(Box<TestRendererPrivateUpdateRouteError>),
     PrivateUpdateNativeBridgeAdmission(Box<TestRendererPrivateUpdateNativeBridgeAdmissionError>),
     PrivateUnmountNativeBridgeAdmission(Box<TestRendererPrivateUnmountNativeBridgeAdmissionError>),
+    PrivateTestInstanceNativeQueryExecution(
+        Box<TestRendererPrivateTestInstanceNativeQueryExecutionError>,
+    ),
     PrivateJsonSerialization(Box<TestRendererPrivateJsonSerializationError>),
     StableSiblingInsertionCanary(Box<TestRendererStableSiblingInsertionCanaryError>),
     RootCreatePreflight(Box<TestRendererRootCreatePreflightError>),
@@ -8039,6 +8264,7 @@ impl Display for TestRendererRootError {
             Self::PrivateUpdateRoute(error) => Display::fmt(error, formatter),
             Self::PrivateUpdateNativeBridgeAdmission(error) => Display::fmt(error, formatter),
             Self::PrivateUnmountNativeBridgeAdmission(error) => Display::fmt(error, formatter),
+            Self::PrivateTestInstanceNativeQueryExecution(error) => Display::fmt(error, formatter),
             Self::PrivateJsonSerialization(error) => Display::fmt(error, formatter),
             Self::StableSiblingInsertionCanary(error) => Display::fmt(error, formatter),
             Self::RootCreatePreflight(error) => Display::fmt(error, formatter),
@@ -8092,6 +8318,7 @@ impl Error for TestRendererRootError {
             Self::PrivateUpdateRoute(error) => Some(error),
             Self::PrivateUpdateNativeBridgeAdmission(error) => Some(error),
             Self::PrivateUnmountNativeBridgeAdmission(error) => Some(error),
+            Self::PrivateTestInstanceNativeQueryExecution(error) => Some(error),
             Self::PrivateJsonSerialization(error) => Some(error),
             Self::StableSiblingInsertionCanary(error) => Some(error),
             Self::RootCreatePreflight(error) => Some(error),
@@ -8164,6 +8391,12 @@ impl From<TestRendererPrivateUpdateNativeBridgeAdmissionError> for TestRendererR
 impl From<TestRendererPrivateUnmountNativeBridgeAdmissionError> for TestRendererRootError {
     fn from(error: TestRendererPrivateUnmountNativeBridgeAdmissionError) -> Self {
         Self::PrivateUnmountNativeBridgeAdmission(Box::new(error))
+    }
+}
+
+impl From<TestRendererPrivateTestInstanceNativeQueryExecutionError> for TestRendererRootError {
+    fn from(error: TestRendererPrivateTestInstanceNativeQueryExecutionError) -> Self {
+        Self::PrivateTestInstanceNativeQueryExecution(Box::new(error))
     }
 }
 
@@ -10333,6 +10566,57 @@ impl TestRendererRoot {
                 &find_all_report,
                 &find_by_report,
             ),
+        )
+    }
+
+    pub fn describe_private_test_instance_query_after_create_native_execution_for_canary(
+        &self,
+        output: &TestRendererCommittedHostOutput,
+        execution: TestRendererPrivateCreateNativeBridgeHostOutputHandoff,
+    ) -> Result<TestRendererPrivateTestInstanceNativeQueryExecutionEvidence, TestRendererRootError>
+    {
+        self.validate_private_test_instance_create_native_execution_record_for_canary(execution)?;
+        let preflight =
+            self.describe_private_test_instance_query_bridge_preflight_for_canary(output)?;
+        let find_by = self.describe_private_test_instance_find_by_query_for_canary(output)?;
+
+        self.private_test_instance_native_query_execution_evidence_from_reports(
+            "create",
+            "create().root/ReactTestInstance.findByType",
+            TEST_RENDERER_PRIVATE_CREATE_NATIVE_BRIDGE_HOST_OUTPUT_HANDOFF_DIAGNOSTIC_ID,
+            TEST_RENDERER_PRIVATE_CREATE_NATIVE_BRIDGE_HOST_OUTPUT_HANDOFF_STATUS,
+            TestRendererRootUpdateKind::Create,
+            true,
+            false,
+            &preflight,
+            &find_by,
+        )
+    }
+
+    pub fn describe_private_test_instance_query_after_update_native_execution_for_canary(
+        &self,
+        output: &TestRendererUpdatedHostOutput,
+        execution: TestRendererUpdateNativeBridgeAdmission,
+    ) -> Result<TestRendererPrivateTestInstanceNativeQueryExecutionEvidence, TestRendererRootError>
+    {
+        self.validate_private_test_instance_update_native_execution_record_for_canary(execution)?;
+        let preflight = self
+            .describe_private_test_instance_query_bridge_preflight_after_update_for_canary(
+                output,
+            )?;
+        let find_by =
+            self.describe_private_test_instance_find_by_query_after_update_for_canary(output)?;
+
+        self.private_test_instance_native_query_execution_evidence_from_reports(
+            "update",
+            "create().update -> create().root/ReactTestInstance.findByType",
+            TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID,
+            TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_STATUS,
+            TestRendererRootUpdateKind::Update,
+            false,
+            true,
+            &preflight,
+            &find_by,
         )
     }
 
@@ -12834,6 +13118,232 @@ impl TestRendererRoot {
             public_query_methods_available: false,
             compatibility_claimed: false,
         }
+    }
+
+    fn private_test_instance_native_query_execution_evidence_from_reports(
+        &self,
+        operation: &'static str,
+        public_surface: &'static str,
+        source_execution_record_id: &'static str,
+        source_execution_status: &'static str,
+        expected_host_output_update_kind: TestRendererRootUpdateKind,
+        consumes_create: bool,
+        consumes_update: bool,
+        preflight: &TestRendererPrivateTestInstanceQueryBridgePreflightDiagnostics,
+        find_by_report: &TestRendererPrivateTestInstanceFindByQueryDiagnostics,
+    ) -> Result<TestRendererPrivateTestInstanceNativeQueryExecutionEvidence, TestRendererRootError>
+    {
+        let query = find_by_report.find_by_type();
+        let expected_type = query.expected_type().cloned().ok_or_else(|| {
+            TestRendererPrivateTestInstanceNativeQueryExecutionError::NativeExecutionRecordMismatch {
+                operation,
+                reason: "find-by-type-query-type-missing",
+            }
+        })?;
+        let minimal_host_component_query_path = preflight.host_output_snapshot_current()
+            && preflight.host_output_update_kind() == expected_host_output_update_kind
+            && preflight.find_all_candidate_fiber_tags() == ["HostComponent"]
+            && preflight.find_all_skipped_fiber_tags() == ["HostText"]
+            && preflight.find_by_queries() == ["findByType", "findByProps"]
+            && query.query_kind() == TestRendererPrivateTestInstanceFindByQueryKind::Type
+            && query.result_kind() == "single"
+            && query.matched_candidate_count() == 1
+            && query.candidate_fiber_tags() == ["HostComponent"]
+            && query.skipped_fiber_tags() == ["HostText"]
+            && !query.public_query_method_available()
+            && !query.public_test_instance_object_available()
+            && !query.compatibility_claimed();
+
+        if !minimal_host_component_query_path {
+            return self.private_test_instance_native_query_execution_record_error(
+                operation,
+                "minimal-host-component-query-path-missing",
+            );
+        }
+
+        Ok(
+            TestRendererPrivateTestInstanceNativeQueryExecutionEvidence {
+                diagnostic_name:
+                    TEST_RENDERER_PRIVATE_TEST_INSTANCE_NATIVE_QUERY_EXECUTION_DIAGNOSTIC_NAME,
+                status: TEST_RENDERER_PRIVATE_TEST_INSTANCE_NATIVE_QUERY_EXECUTION_STATUS,
+                root: self.root_id,
+                operation,
+                public_surface,
+                source_execution_record_id,
+                source_execution_status,
+                source_query_diagnostic_name: preflight.diagnostic_name(),
+                query_bridge_preflight_status: preflight.bridge_status(),
+                host_output_update_kind: preflight.host_output_update_kind(),
+                host_output_snapshot_current: preflight.host_output_snapshot_current(),
+                query_surface: query.public_surface(),
+                query_kind: query.query_kind(),
+                expected_type,
+                result_fiber_tag: "HostComponent",
+                result_kind: query.result_kind(),
+                matched_candidate_count: query.matched_candidate_count(),
+                query_path_candidate_count: preflight.find_all_candidate_fiber_tags().len(),
+                skipped_text_child_count: preflight.find_all_skipped_fiber_tags().len(),
+                consumes_accepted_native_create_execution_record: consumes_create,
+                consumes_accepted_native_update_execution_record: consumes_update,
+                consumes_private_test_instance_query_diagnostics: true,
+                consumes_query_bridge_preflight: true,
+                consumes_accepted_find_all_diagnostics: preflight
+                    .consumes_accepted_find_all_diagnostics(),
+                consumes_accepted_find_by_diagnostics: preflight
+                    .consumes_accepted_find_by_diagnostics(),
+                minimal_host_component_query_path,
+                public_root_available: false,
+                public_query_methods_available: false,
+                public_test_instance_object_available: false,
+                native_bridge_available: false,
+                native_execution_available: false,
+                compatibility_claimed: false,
+            },
+        )
+    }
+
+    fn validate_private_test_instance_create_native_execution_record_for_canary(
+        &self,
+        execution: TestRendererPrivateCreateNativeBridgeHostOutputHandoff,
+    ) -> Result<(), TestRendererRootError> {
+        if execution.diagnostic_id()
+            != TEST_RENDERER_PRIVATE_CREATE_NATIVE_BRIDGE_HOST_OUTPUT_HANDOFF_DIAGNOSTIC_ID
+        {
+            return self.private_test_instance_native_query_execution_record_error(
+                "create",
+                "record-id-mismatch",
+            );
+        }
+        if execution.status()
+            != TEST_RENDERER_PRIVATE_CREATE_NATIVE_BRIDGE_HOST_OUTPUT_HANDOFF_STATUS
+        {
+            return self.private_test_instance_native_query_execution_record_error(
+                "create",
+                "status-mismatch",
+            );
+        }
+        if execution.root() != self.root_id
+            || execution.operation() != "create"
+            || execution.public_surface() != "create()"
+            || execution.scheduled_update_kind() != TestRendererRootUpdateKind::Create
+            || execution.host_output_update_kind() != TestRendererRootUpdateKind::Create
+            || execution.host_output_shape()
+                != TestRendererPrivateToJsonHostOutputShape::SingleHostText
+            || execution.serialization_gate_status()
+                != TestRendererSerializationGateStatus::ReadyForPrivateSerializationDiagnostics
+        {
+            return self.private_test_instance_native_query_execution_record_error(
+                "create",
+                "route-metadata-stale",
+            );
+        }
+        let host_output = execution.host_output();
+        if host_output.container_child_count() != 1
+            || host_output.instance_count() != 1
+            || host_output.text_count() != 1
+            || !host_output.real_host_output_available()
+            || !execution.create_route_admission_accepted()
+            || !execution.host_output_handoff_accepted()
+            || !execution.actual_rust_create_host_output_handoff()
+            || !execution.host_output_produced_by_rust()
+        {
+            return self.private_test_instance_native_query_execution_record_error(
+                "create",
+                "accepted-create-host-output-evidence-missing",
+            );
+        }
+        if execution.public_create_behavior_available()
+            || execution.public_serialization_available()
+            || execution.public_test_instance_available()
+            || execution.native_addon_loaded()
+            || execution.native_bridge_available()
+            || execution.native_execution()
+            || execution.rust_execution_from_js()
+            || execution.host_output_produced_from_js()
+            || execution.compatibility_claimed()
+        {
+            return self.private_test_instance_native_query_execution_record_error(
+                "create",
+                "public-or-native-compatibility-claim",
+            );
+        }
+
+        Ok(())
+    }
+
+    fn validate_private_test_instance_update_native_execution_record_for_canary(
+        &self,
+        execution: TestRendererUpdateNativeBridgeAdmission,
+    ) -> Result<(), TestRendererRootError> {
+        if execution.diagnostic_id()
+            != TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID
+        {
+            return self.private_test_instance_native_query_execution_record_error(
+                "update",
+                "record-id-mismatch",
+            );
+        }
+        if execution.status() != TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_STATUS {
+            return self.private_test_instance_native_query_execution_record_error(
+                "update",
+                "status-mismatch",
+            );
+        }
+        if execution.root() != self.root_id
+            || execution.route_dependency_id()
+                != TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_ROUTE_DEPENDENCY_ID
+            || execution.update_route_admission_id()
+                != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID
+            || execution.lifecycle() != TestRendererRootLifecycle::Active
+            || execution.scheduled_update_kind() != TestRendererRootUpdateKind::Update
+            || execution.host_output_update_kind() != TestRendererRootUpdateKind::Update
+        {
+            return self.private_test_instance_native_query_execution_record_error(
+                "update",
+                "route-metadata-stale",
+            );
+        }
+        if !execution.update_route_admission_accepted()
+            || !execution.lifecycle_evidence_accepted()
+            || !execution.root_work_loop_handoff_accepted()
+            || !execution.host_output_handoff_accepted()
+            || !execution.text_update_apply_recorded()
+            || execution.host_text_update_apply_count() != 1
+            || execution.host_component_update_apply_count() != 1
+        {
+            return self.private_test_instance_native_query_execution_record_error(
+                "update",
+                "accepted-update-host-output-evidence-missing",
+            );
+        }
+        if execution.public_update_compatibility_claimed()
+            || execution.public_serialization_available()
+            || execution.act_flushing_claimed()
+            || execution.native_bridge_available()
+            || execution.native_execution()
+            || execution.compatibility_claimed()
+        {
+            return self.private_test_instance_native_query_execution_record_error(
+                "update",
+                "public-or-native-compatibility-claim",
+            );
+        }
+
+        Ok(())
+    }
+
+    fn private_test_instance_native_query_execution_record_error<T>(
+        &self,
+        operation: &'static str,
+        reason: &'static str,
+    ) -> Result<T, TestRendererRootError> {
+        Err(
+            TestRendererPrivateTestInstanceNativeQueryExecutionError::NativeExecutionRecordMismatch {
+                operation,
+                reason,
+            }
+            .into(),
+        )
     }
 
     fn private_get_instance_class_root_from_tree_report(
@@ -16712,6 +17222,195 @@ mod tests {
         assert!(!preflight.public_root_available());
         assert!(!preflight.public_query_methods_available());
         assert!(!preflight.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_test_instance_native_query_execution_consumes_create_and_update_records() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let input = TestRendererRootCreatePreflightInputShape::host_component_with_text_child(
+            output.render().resulting_element(),
+            "span",
+        );
+        let preflight = TestRendererRoot::describe_private_root_create_preflight_for_canary(
+            input,
+            Some(TestRendererOptions::new()),
+            TestRendererRootCreatePreflightCanaryApiIdentity::current(),
+            Some(TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current()),
+        )
+        .unwrap();
+        let admission = TestRendererRoot::describe_private_create_route_admission_for_canary(
+            Some(preflight),
+            Some(TestRendererPrivateCreateRouteAdmissionMetadata::current()),
+        )
+        .unwrap();
+        let create_handoff = root
+            .describe_private_create_native_bridge_host_output_handoff_for_canary(
+                &admission, &output,
+            )
+            .unwrap();
+
+        let create_evidence = root
+            .describe_private_test_instance_query_after_create_native_execution_for_canary(
+                &output,
+                create_handoff,
+            )
+            .unwrap();
+
+        assert_eq!(
+            create_evidence.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TEST_INSTANCE_NATIVE_QUERY_EXECUTION_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            create_evidence.status(),
+            TEST_RENDERER_PRIVATE_TEST_INSTANCE_NATIVE_QUERY_EXECUTION_STATUS
+        );
+        assert_eq!(create_evidence.root(), root.root_id());
+        assert_eq!(create_evidence.operation(), "create");
+        assert_eq!(
+            create_evidence.source_execution_record_id(),
+            TEST_RENDERER_PRIVATE_CREATE_NATIVE_BRIDGE_HOST_OUTPUT_HANDOFF_DIAGNOSTIC_ID
+        );
+        assert_eq!(
+            create_evidence.source_execution_status(),
+            TEST_RENDERER_PRIVATE_CREATE_NATIVE_BRIDGE_HOST_OUTPUT_HANDOFF_STATUS
+        );
+        assert_eq!(
+            create_evidence.source_query_diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TEST_INSTANCE_QUERY_BRIDGE_PREFLIGHT_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            create_evidence.host_output_update_kind(),
+            TestRendererRootUpdateKind::Create
+        );
+        assert_eq!(
+            create_evidence.query_surface(),
+            "ReactTestInstance.findByType"
+        );
+        assert_eq!(
+            create_evidence.query_kind(),
+            TestRendererPrivateTestInstanceFindByQueryKind::Type
+        );
+        assert_eq!(create_evidence.expected_type().as_str(), "span");
+        assert_eq!(create_evidence.result_fiber_tag(), "HostComponent");
+        assert_eq!(create_evidence.result_kind(), "single");
+        assert_eq!(create_evidence.matched_candidate_count(), 1);
+        assert_eq!(create_evidence.query_path_candidate_count(), 1);
+        assert_eq!(create_evidence.skipped_text_child_count(), 1);
+        assert!(create_evidence.host_output_snapshot_current());
+        assert!(create_evidence.consumes_accepted_native_create_execution_record());
+        assert!(!create_evidence.consumes_accepted_native_update_execution_record());
+        assert!(create_evidence.consumes_private_test_instance_query_diagnostics());
+        assert!(create_evidence.consumes_query_bridge_preflight());
+        assert!(create_evidence.consumes_accepted_find_all_diagnostics());
+        assert!(create_evidence.consumes_accepted_find_by_diagnostics());
+        assert!(create_evidence.minimal_host_component_query_path());
+        assert!(!create_evidence.public_root_available());
+        assert!(!create_evidence.public_query_methods_available());
+        assert!(!create_evidence.public_test_instance_object_available());
+        assert!(!create_evidence.native_bridge_available());
+        assert!(!create_evidence.native_execution_available());
+        assert!(!create_evidence.compatibility_claimed());
+
+        let (_route, updated, update_admission) = root
+            .render_and_admit_private_update_native_bridge_handoff_for_canary(
+                "span",
+                TestProps::new(),
+                "goodbye",
+            )
+            .unwrap();
+        let update_evidence = root
+            .describe_private_test_instance_query_after_update_native_execution_for_canary(
+                &updated,
+                update_admission,
+            )
+            .unwrap();
+
+        assert_eq!(update_evidence.operation(), "update");
+        assert_eq!(
+            update_evidence.source_execution_record_id(),
+            TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_DIAGNOSTIC_ID
+        );
+        assert_eq!(
+            update_evidence.source_execution_status(),
+            TEST_RENDERER_PRIVATE_UPDATE_NATIVE_BRIDGE_ADMISSION_STATUS
+        );
+        assert_eq!(
+            update_evidence.host_output_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert_eq!(update_evidence.expected_type().as_str(), "span");
+        assert!(!update_evidence.consumes_accepted_native_create_execution_record());
+        assert!(update_evidence.consumes_accepted_native_update_execution_record());
+        assert!(update_evidence.consumes_private_test_instance_query_diagnostics());
+        assert!(update_evidence.minimal_host_component_query_path());
+        assert!(!update_evidence.public_root_available());
+        assert!(!update_evidence.public_query_methods_available());
+        assert!(!update_evidence.public_test_instance_object_available());
+        assert!(!update_evidence.native_execution_available());
+        assert!(!update_evidence.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_test_instance_native_query_execution_rejects_public_testinstance_claim() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let input = TestRendererRootCreatePreflightInputShape::host_component_with_text_child(
+            output.render().resulting_element(),
+            "span",
+        );
+        let preflight = TestRendererRoot::describe_private_root_create_preflight_for_canary(
+            input,
+            Some(TestRendererOptions::new()),
+            TestRendererRootCreatePreflightCanaryApiIdentity::current(),
+            Some(TestRendererRootWorkLoopFinishedWorkPreflightMetadata::current()),
+        )
+        .unwrap();
+        let admission = TestRendererRoot::describe_private_create_route_admission_for_canary(
+            Some(preflight),
+            Some(TestRendererPrivateCreateRouteAdmissionMetadata::current()),
+        )
+        .unwrap();
+        let mut create_handoff = root
+            .describe_private_create_native_bridge_host_output_handoff_for_canary(
+                &admission, &output,
+            )
+            .unwrap();
+        create_handoff.public_test_instance_available = true;
+
+        let error = root
+            .describe_private_test_instance_query_after_create_native_execution_for_canary(
+                &output,
+                create_handoff,
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateTestInstanceNativeQueryExecution(error) = error else {
+            panic!("expected private TestInstance native query execution rejection");
+        };
+
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateTestInstanceNativeQueryExecutionError::NativeExecutionRecordMismatch {
+                operation: "create",
+                reason: "public-or-native-compatibility-claim",
+            }
+        ));
     }
 
     #[test]
