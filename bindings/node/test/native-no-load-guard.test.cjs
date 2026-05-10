@@ -161,6 +161,67 @@ async function main() {
       true
     );
     assert.equal(
+      native.nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+        .preflightStatus,
+      'preflighted-native-root-bridge-worker-thread-teardown-boundary'
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+        .workerThreadId,
+      764
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+        .nodeWorkerThreadsExecution,
+      false
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+        .napiCleanupHookExecution,
+      false
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+        .nativeAddonLoaded,
+      false
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+        .nativeExecution,
+      false
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+        .publicNativeCompatibility,
+      false
+    );
+    assert.deepEqual(
+      native.nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+        .rows.map((row) => row.id),
+      [
+        'worker-render-root-stale-executable-preflight',
+        'worker-create-value-stale-executable-preflight',
+        'worker-render-value-stale-executable-preflight',
+        'peer-root-active-executable-preflight',
+        'peer-value-active-executable-preflight'
+      ]
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight.rows
+        .every(
+          (row) =>
+            row.nodeWorkerThreadsExecution === false &&
+            row.napiCleanupHookExecution === false &&
+            row.nativeAddonLoaded === false &&
+            row.nativeExecution === false &&
+            row.rendererExecution === false &&
+            row.reconcilerExecution === false &&
+            row.publicNativeCompatibility === false &&
+            row.reactBehaviorError === false
+        ),
+      true
+    );
+    assert.equal(
       native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
         .batchedRecordGate.responseSequenceGate.responseSequenceGateStatus,
       'diagnosed-native-root-bridge-json-batch-response-sequence'

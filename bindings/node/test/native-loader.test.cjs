@@ -527,6 +527,222 @@ const expectedNativeRootBridgeTransportWorkerThreadTeardownGate = {
   reactBehaviorError: false
 };
 
+const expectedNativeRootBridgeWorkerThreadTeardownExecutablePreflightRowFields =
+  [
+    'id',
+    'operation',
+    'assertion',
+    'workerThreadId',
+    'handleKind',
+    'tableEnvironmentId',
+    'handleEnvironmentId',
+    'slot',
+    'handleGeneration',
+    'currentGeneration',
+    'recordId',
+    'sourceErrorCode',
+    'boundaryErrorCode',
+    'rejectedByBoundary',
+    'peerInvariantPreserved',
+    'preflightPassed',
+    'nodeWorkerThreadsExecution',
+    'napiCleanupHookExecution',
+    'nativeAddonLoaded',
+    'nativeExecution',
+    'rendererExecution',
+    'reconcilerExecution',
+    'publicNativeCompatibility',
+    'reactBehaviorError'
+  ];
+const expectedNativeRootBridgeWorkerThreadTeardownExecutablePreflightRows = [
+  {
+    id: 'worker-render-root-stale-executable-preflight',
+    operation: 'post-teardown-render-boundary-validation',
+    assertion: 'stale-worker-root-rejected-without-mutating-validator',
+    workerThreadId: 764,
+    handleKind: 'root',
+    tableEnvironmentId: 764,
+    handleEnvironmentId: 764,
+    slot: 1,
+    handleGeneration: 1,
+    currentGeneration: 2,
+    recordId: null,
+    sourceErrorCode: 'FAST_REACT_NAPI_STALE_HANDLE',
+    boundaryErrorCode: 'FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE',
+    rejectedByBoundary: true,
+    peerInvariantPreserved: false,
+    preflightPassed: true,
+    nodeWorkerThreadsExecution: false,
+    napiCleanupHookExecution: false,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    publicNativeCompatibility: false,
+    reactBehaviorError: false
+  },
+  {
+    id: 'worker-create-value-stale-executable-preflight',
+    operation: 'post-teardown-value-boundary-validation',
+    assertion: 'stale-worker-value-rejected-after-worker-teardown',
+    workerThreadId: 764,
+    handleKind: 'value',
+    tableEnvironmentId: 764,
+    handleEnvironmentId: 764,
+    slot: 2,
+    handleGeneration: 1,
+    currentGeneration: 2,
+    recordId: null,
+    sourceErrorCode: 'FAST_REACT_NAPI_STALE_HANDLE',
+    boundaryErrorCode: 'FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE',
+    rejectedByBoundary: true,
+    peerInvariantPreserved: false,
+    preflightPassed: true,
+    nodeWorkerThreadsExecution: false,
+    napiCleanupHookExecution: false,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    publicNativeCompatibility: false,
+    reactBehaviorError: false
+  },
+  {
+    id: 'worker-render-value-stale-executable-preflight',
+    operation: 'post-teardown-value-boundary-validation',
+    assertion: 'stale-worker-value-rejected-after-worker-teardown',
+    workerThreadId: 764,
+    handleKind: 'value',
+    tableEnvironmentId: 764,
+    handleEnvironmentId: 764,
+    slot: 3,
+    handleGeneration: 1,
+    currentGeneration: 2,
+    recordId: null,
+    sourceErrorCode: 'FAST_REACT_NAPI_STALE_HANDLE',
+    boundaryErrorCode: 'FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE',
+    rejectedByBoundary: true,
+    peerInvariantPreserved: false,
+    preflightPassed: true,
+    nodeWorkerThreadsExecution: false,
+    napiCleanupHookExecution: false,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    publicNativeCompatibility: false,
+    reactBehaviorError: false
+  },
+  {
+    id: 'peer-root-active-executable-preflight',
+    operation: 'post-teardown-peer-root-validation',
+    assertion: 'peer-handle-remains-active-after-worker-teardown',
+    workerThreadId: 764,
+    handleKind: 'root',
+    tableEnvironmentId: 1764,
+    handleEnvironmentId: 1764,
+    slot: 1,
+    handleGeneration: 1,
+    currentGeneration: 1,
+    recordId: 176401,
+    sourceErrorCode: null,
+    boundaryErrorCode: null,
+    rejectedByBoundary: false,
+    peerInvariantPreserved: true,
+    preflightPassed: true,
+    nodeWorkerThreadsExecution: false,
+    napiCleanupHookExecution: false,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    publicNativeCompatibility: false,
+    reactBehaviorError: false
+  },
+  {
+    id: 'peer-value-active-executable-preflight',
+    operation: 'post-teardown-peer-value-validation',
+    assertion: 'peer-handle-remains-active-after-worker-teardown',
+    workerThreadId: 764,
+    handleKind: 'value',
+    tableEnvironmentId: 1764,
+    handleEnvironmentId: 1764,
+    slot: 2,
+    handleGeneration: 1,
+    currentGeneration: 1,
+    recordId: 176402,
+    sourceErrorCode: null,
+    boundaryErrorCode: null,
+    rejectedByBoundary: false,
+    peerInvariantPreserved: true,
+    preflightPassed: true,
+    nodeWorkerThreadsExecution: false,
+    napiCleanupHookExecution: false,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    publicNativeCompatibility: false,
+    reactBehaviorError: false
+  }
+];
+const expectedNativeRootBridgeWorkerThreadTeardownExecutablePreflight = {
+  preflightStatus:
+    'preflighted-native-root-bridge-worker-thread-teardown-boundary',
+  model: 'fast-react-napi.WorkerThreadTeardownPreflight',
+  executionScope:
+    'rust-only-handle-table-preflight-no-node-worker-thread-no-napi-cleanup-hook',
+  transport: 'json',
+  workerThreadId: 764,
+  workerEnvironmentId: 764,
+  peerEnvironmentId: 1764,
+  validationModel: 'fast-react-napi.NativeRootBridgeRequestSequenceValidator',
+  handleTableModel: 'fast-react-napi.BridgeHandleTable',
+  transportWorkerThreadTeardownGateStatus:
+    'diagnosed-native-root-bridge-transport-worker-thread-teardown',
+  batchedRecordGateStatus:
+    'validated-native-root-bridge-batched-json-transport-records',
+  crossEnvironmentTeardownGateStatus:
+    'diagnosed-native-root-bridge-cross-environment-teardown-isolation',
+  acceptedBatchRecordCount: 2,
+  crossEnvironmentTeardownRowCount: 12,
+  environmentTeardownFields:
+    expectedNativeRootBridgeEnvironmentTeardownFields,
+  executablePreflightRowFields:
+    expectedNativeRootBridgeWorkerThreadTeardownExecutablePreflightRowFields,
+  mismatchedTeardown: {
+    requestedEnvironmentId: 764,
+    tableEnvironmentId: 1764,
+    environmentMatched: false,
+    rootHandlesInvalidated: 0,
+    valueHandlesInvalidated: 0,
+    totalHandlesInvalidated: 0,
+    toreDownHandles: false
+  },
+  matchedTeardown: {
+    requestedEnvironmentId: 764,
+    tableEnvironmentId: 764,
+    environmentMatched: true,
+    rootHandlesInvalidated: 1,
+    valueHandlesInvalidated: 2,
+    totalHandlesInvalidated: 3,
+    toreDownHandles: true
+  },
+  staleWorkerHandleRejectionCount: 3,
+  activePeerHandleCount: 2,
+  rootValidatorStatePreserved: true,
+  rows: expectedNativeRootBridgeWorkerThreadTeardownExecutablePreflightRows,
+  preflightEvaluated: true,
+  nodeWorkerThreadsExecution: false,
+  napiCleanupHookExecution: false,
+  nativeAddonLoaded: false,
+  nativeExecution: false,
+  rendererExecution: false,
+  reconcilerExecution: false,
+  publicNativeCompatibility: false,
+  reactBehaviorError: false
+};
+
 const expectedPackageExports = {
   '.': {
     import: './index.mjs',
@@ -852,6 +1068,8 @@ const expectedNativeRootBridgeRequestShape = {
     expectedNativeRootBridgeCrossEnvironmentTeardownGate,
   transportWorkerThreadTeardownGate:
     expectedNativeRootBridgeTransportWorkerThreadTeardownGate,
+  workerThreadTeardownExecutablePreflight:
+    expectedNativeRootBridgeWorkerThreadTeardownExecutablePreflight,
   validationErrorCodes: {
     createAfterRootCreated:
       'FAST_REACT_NAPI_ROOT_REQUEST_CREATE_AFTER_ROOT_CREATED',
@@ -1038,6 +1256,17 @@ for (const shapeValue of [
   native.nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate
     .matchedTeardown,
   native.nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate.rows,
+  native.nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight,
+  native.nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+    .environmentTeardownFields,
+  native.nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+    .executablePreflightRowFields,
+  native.nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+    .mismatchedTeardown,
+  native.nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+    .matchedTeardown,
+  native.nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+    .rows,
   native.nativeRootBridgeRequestShape.validationErrorCodes
 ]) {
   assert.ok(Object.isFrozen(shapeValue));
@@ -1047,6 +1276,12 @@ assertNativeRootBridgeCrossEnvironmentTeardownGate(
 );
 assertNativeRootBridgeTransportWorkerThreadTeardownGate(
   native.nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate
+);
+assertNativeRootBridgeWorkerThreadTeardownExecutablePreflight(
+  native.nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+);
+assertNativeRootBridgeWorkerThreadTeardownExecutablePreflightRejectsForgery(
+  native.nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
 );
 
 const document = createDocument('native-request-shape');
@@ -2569,6 +2804,202 @@ function assertNativeRootBridgeTransportWorkerThreadTeardownGate(workerGate) {
   assert.equal(workerGate.reconcilerExecution, false);
   assert.equal(workerGate.publicNativeCompatibility, false);
   assert.equal(workerGate.reactBehaviorError, false);
+}
+
+function assertNativeRootBridgeWorkerThreadTeardownExecutablePreflight(
+  preflight
+) {
+  assert.equal(Object.isFrozen(preflight), true);
+  assert.equal(Object.isFrozen(preflight.environmentTeardownFields), true);
+  assert.equal(Object.isFrozen(preflight.executablePreflightRowFields), true);
+  assert.equal(Object.isFrozen(preflight.mismatchedTeardown), true);
+  assert.equal(Object.isFrozen(preflight.matchedTeardown), true);
+  assert.equal(Object.isFrozen(preflight.rows), true);
+  assert.deepEqual(
+    preflight,
+    expectedNativeRootBridgeWorkerThreadTeardownExecutablePreflight
+  );
+  assert.equal(
+    preflight.preflightStatus,
+    'preflighted-native-root-bridge-worker-thread-teardown-boundary'
+  );
+  assert.equal(
+    preflight.model,
+    'fast-react-napi.WorkerThreadTeardownPreflight'
+  );
+  assert.equal(
+    preflight.executionScope,
+    'rust-only-handle-table-preflight-no-node-worker-thread-no-napi-cleanup-hook'
+  );
+  assert.equal(preflight.transport, 'json');
+  assert.equal(preflight.workerThreadId, 764);
+  assert.equal(preflight.workerEnvironmentId, 764);
+  assert.equal(preflight.peerEnvironmentId, 1764);
+  assert.equal(
+    preflight.transportWorkerThreadTeardownGateStatus,
+    native.nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate
+      .workerThreadTeardownGateStatus
+  );
+  assert.equal(
+    preflight.batchedRecordGateStatus,
+    'validated-native-root-bridge-batched-json-transport-records'
+  );
+  assert.equal(
+    preflight.crossEnvironmentTeardownGateStatus,
+    native.nativeRootBridgeRequestShape.crossEnvironmentTeardownGate
+      .teardownGateStatus
+  );
+  assert.equal(
+    preflight.crossEnvironmentTeardownRowCount,
+    native.nativeRootBridgeRequestShape.crossEnvironmentTeardownGate.rows.length
+  );
+  assert.deepEqual(
+    preflight.environmentTeardownFields,
+    expectedNativeRootBridgeEnvironmentTeardownFields
+  );
+  assert.deepEqual(
+    preflight.executablePreflightRowFields,
+    expectedNativeRootBridgeWorkerThreadTeardownExecutablePreflightRowFields
+  );
+  assert.deepEqual(preflight.mismatchedTeardown, {
+    requestedEnvironmentId: 764,
+    tableEnvironmentId: 1764,
+    environmentMatched: false,
+    rootHandlesInvalidated: 0,
+    valueHandlesInvalidated: 0,
+    totalHandlesInvalidated: 0,
+    toreDownHandles: false
+  });
+  assert.deepEqual(preflight.matchedTeardown, {
+    requestedEnvironmentId: 764,
+    tableEnvironmentId: 764,
+    environmentMatched: true,
+    rootHandlesInvalidated: 1,
+    valueHandlesInvalidated: 2,
+    totalHandlesInvalidated: 3,
+    toreDownHandles: true
+  });
+  assert.equal(preflight.acceptedBatchRecordCount, 2);
+  assert.equal(preflight.staleWorkerHandleRejectionCount, 3);
+  assert.equal(preflight.activePeerHandleCount, 2);
+  assert.equal(preflight.rootValidatorStatePreserved, true);
+  assert.equal(preflight.preflightEvaluated, true);
+
+  const rejectedRows = preflight.rows.filter((row) => row.rejectedByBoundary);
+  const peerRows = preflight.rows.filter((row) => row.peerInvariantPreserved);
+  assert.equal(rejectedRows.length, preflight.staleWorkerHandleRejectionCount);
+  assert.equal(peerRows.length, preflight.activePeerHandleCount);
+  assert.deepEqual(
+    preflight.rows.map((row) => row.id),
+    [
+      'worker-render-root-stale-executable-preflight',
+      'worker-create-value-stale-executable-preflight',
+      'worker-render-value-stale-executable-preflight',
+      'peer-root-active-executable-preflight',
+      'peer-value-active-executable-preflight'
+    ]
+  );
+  assert.deepEqual(
+    rejectedRows.map((row) => row.sourceErrorCode),
+    [
+      'FAST_REACT_NAPI_STALE_HANDLE',
+      'FAST_REACT_NAPI_STALE_HANDLE',
+      'FAST_REACT_NAPI_STALE_HANDLE'
+    ]
+  );
+  assert.deepEqual(
+    rejectedRows.map((row) => row.boundaryErrorCode),
+    [
+      'FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE',
+      'FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE',
+      'FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE'
+    ]
+  );
+  assert.deepEqual(
+    rejectedRows.map((row) => row.preflightPassed),
+    [true, true, true]
+  );
+  assert.deepEqual(
+    peerRows.map((row) => row.recordId),
+    [176401, 176402]
+  );
+  assert.deepEqual(
+    peerRows.map((row) => row.slot),
+    [1, 2]
+  );
+  assert.deepEqual(
+    peerRows.map((row) => row.rejectedByBoundary),
+    [false, false]
+  );
+  assert.deepEqual(
+    preflight.rows[0],
+    expectedNativeRootBridgeWorkerThreadTeardownExecutablePreflightRows[0]
+  );
+
+  for (const row of preflight.rows) {
+    assert.equal(Object.isFrozen(row), true);
+    assert.deepEqual(Object.keys(row), preflight.executablePreflightRowFields);
+    assert.equal(row.nodeWorkerThreadsExecution, false);
+    assert.equal(row.napiCleanupHookExecution, false);
+    assert.equal(row.nativeAddonLoaded, false);
+    assert.equal(row.nativeExecution, false);
+    assert.equal(row.rendererExecution, false);
+    assert.equal(row.reconcilerExecution, false);
+    assert.equal(row.publicNativeCompatibility, false);
+    assert.equal(row.reactBehaviorError, false);
+  }
+  assert.equal(preflight.nodeWorkerThreadsExecution, false);
+  assert.equal(preflight.napiCleanupHookExecution, false);
+  assert.equal(preflight.nativeAddonLoaded, false);
+  assert.equal(preflight.nativeExecution, false);
+  assert.equal(preflight.rendererExecution, false);
+  assert.equal(preflight.reconcilerExecution, false);
+  assert.equal(preflight.publicNativeCompatibility, false);
+  assert.equal(preflight.reactBehaviorError, false);
+}
+
+function assertNativeRootBridgeWorkerThreadTeardownExecutablePreflightRejectsForgery(
+  preflight
+) {
+  assert.throws(
+    () => {
+      preflight.rows[0].sourceErrorCode = null;
+    },
+    {
+      name: 'TypeError'
+    }
+  );
+  assert.throws(
+    () =>
+      assertNativeRootBridgeWorkerThreadTeardownExecutablePreflight(
+        Object.freeze({
+          ...preflight,
+          rows: Object.freeze([
+            Object.freeze({
+              ...preflight.rows[0],
+              rejectedByBoundary: false,
+              sourceErrorCode: null
+            }),
+            ...preflight.rows.slice(1)
+          ])
+        })
+      ),
+    {
+      name: 'AssertionError'
+    }
+  );
+  assert.throws(
+    () =>
+      assertNativeRootBridgeWorkerThreadTeardownExecutablePreflight(
+        Object.freeze({
+          ...preflight,
+          publicNativeCompatibility: true
+        })
+      ),
+    {
+      name: 'AssertionError'
+    }
+  );
 }
 
 function assertBridgeDidNotTouchContainer(container, document) {

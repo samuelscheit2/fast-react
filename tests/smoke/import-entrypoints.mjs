@@ -4583,6 +4583,8 @@ async function runNativePackageProbe(tempRoot) {
       const teardownGate = requestShape.crossEnvironmentTeardownGate;
       const workerThreadTeardownGate =
         requestShape.transportWorkerThreadTeardownGate;
+      const workerThreadExecutablePreflight =
+        requestShape.workerThreadTeardownExecutablePreflight;
 
       assert.equal(
         batchMetadata.batchGateStatus,
@@ -4767,6 +4769,126 @@ async function runNativePackageProbe(tempRoot) {
         workerThreadTeardownGate.publicNativeCompatibility,
         false,
         label + ' worker-thread teardown public compatibility'
+      );
+
+      assert.equal(
+        workerThreadExecutablePreflight.preflightStatus,
+        'preflighted-native-root-bridge-worker-thread-teardown-boundary',
+        label + ' worker-thread executable preflight status'
+      );
+      assert.equal(
+        workerThreadExecutablePreflight.executionScope,
+        'rust-only-handle-table-preflight-no-node-worker-thread-no-napi-cleanup-hook',
+        label + ' worker-thread executable preflight scope'
+      );
+      assert.equal(
+        workerThreadExecutablePreflight.workerThreadId,
+        764,
+        label + ' worker-thread executable preflight worker id'
+      );
+      assert.equal(
+        workerThreadExecutablePreflight.peerEnvironmentId,
+        1764,
+        label + ' worker-thread executable preflight peer environment'
+      );
+      assert.equal(
+        workerThreadExecutablePreflight.transportWorkerThreadTeardownGateStatus,
+        workerThreadTeardownGate.workerThreadTeardownGateStatus,
+        label + ' worker-thread executable preflight transport mirror'
+      );
+      assert.equal(
+        workerThreadExecutablePreflight.crossEnvironmentTeardownRowCount,
+        teardownGate.rows.length,
+        label + ' worker-thread executable preflight teardown row count'
+      );
+      assert.deepEqual(
+        workerThreadExecutablePreflight.rows.map((row) => row.id),
+        [
+          'worker-render-root-stale-executable-preflight',
+          'worker-create-value-stale-executable-preflight',
+          'worker-render-value-stale-executable-preflight',
+          'peer-root-active-executable-preflight',
+          'peer-value-active-executable-preflight'
+        ],
+        label + ' worker-thread executable preflight row ids'
+      );
+      assert.deepEqual(
+        workerThreadExecutablePreflight.rows.map((row) => row.sourceErrorCode),
+        [
+          'FAST_REACT_NAPI_STALE_HANDLE',
+          'FAST_REACT_NAPI_STALE_HANDLE',
+          'FAST_REACT_NAPI_STALE_HANDLE',
+          null,
+          null
+        ],
+        label + ' worker-thread executable preflight stale evidence'
+      );
+      assert.deepEqual(
+        workerThreadExecutablePreflight.rows.map(
+          (row) => row.rejectedByBoundary
+        ),
+        [true, true, true, false, false],
+        label + ' worker-thread executable preflight rejected rows'
+      );
+      assert.deepEqual(
+        workerThreadExecutablePreflight.rows.map(
+          (row) => row.peerInvariantPreserved
+        ),
+        [false, false, false, true, true],
+        label + ' worker-thread executable preflight peer rows'
+      );
+      assert.deepEqual(
+        workerThreadExecutablePreflight.rows.map((row) => row.slot),
+        [1, 2, 3, 1, 2],
+        label + ' worker-thread executable preflight slots'
+      );
+      for (const row of workerThreadExecutablePreflight.rows) {
+        assert.deepEqual(
+          Object.keys(row),
+          workerThreadExecutablePreflight.executablePreflightRowFields,
+          label + ' worker-thread executable preflight row fields ' + row.id
+        );
+        assert.equal(
+          row.nodeWorkerThreadsExecution,
+          false,
+          label + ' worker-thread executable preflight worker execution ' + row.id
+        );
+        assert.equal(
+          row.napiCleanupHookExecution,
+          false,
+          label + ' worker-thread executable preflight cleanup hook ' + row.id
+        );
+        assertNoExecution(
+          row,
+          label + ' worker-thread executable preflight ' + row.id
+        );
+        assert.equal(
+          row.publicNativeCompatibility,
+          false,
+          label + ' worker-thread executable preflight compatibility ' + row.id
+        );
+      }
+      assert.equal(workerThreadExecutablePreflight.preflightEvaluated, true);
+      assert.equal(
+        workerThreadExecutablePreflight.rootValidatorStatePreserved,
+        true
+      );
+      assert.equal(
+        workerThreadExecutablePreflight.nodeWorkerThreadsExecution,
+        false
+      );
+      assert.equal(
+        workerThreadExecutablePreflight.napiCleanupHookExecution,
+        false
+      );
+      assertNoExecution(
+        workerThreadExecutablePreflight,
+        label + ' worker-thread executable preflight'
+      );
+      assert.equal(
+        workerThreadExecutablePreflight.publicNativeCompatibility,
+        false,
+        label + ' worker-thread executable preflight compatibility'
       );
     }
 

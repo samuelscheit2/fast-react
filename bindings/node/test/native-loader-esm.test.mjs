@@ -219,6 +219,126 @@ assert.equal(
     .publicNativeCompatibility,
   false
 );
+assert.equal(
+  nativeBindingManifest.nativeRootBridgeRequestShape
+    .workerThreadTeardownExecutablePreflight,
+  nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+);
+assert.equal(
+  nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+    .preflightStatus,
+  'preflighted-native-root-bridge-worker-thread-teardown-boundary'
+);
+assert.equal(
+  nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight.model,
+  'fast-react-napi.WorkerThreadTeardownPreflight'
+);
+assert.equal(
+  nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+    .executionScope,
+  'rust-only-handle-table-preflight-no-node-worker-thread-no-napi-cleanup-hook'
+);
+assert.equal(
+  nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+    .workerThreadId,
+  764
+);
+assert.equal(
+  nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+    .peerEnvironmentId,
+  1764
+);
+assert.equal(
+  nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+    .transportWorkerThreadTeardownGateStatus,
+  nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate
+    .workerThreadTeardownGateStatus
+);
+assert.equal(
+  nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+    .acceptedBatchRecordCount,
+  2
+);
+assert.equal(
+  nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+    .crossEnvironmentTeardownRowCount,
+  nativeRootBridgeRequestShape.crossEnvironmentTeardownGate.rows.length
+);
+assert.deepEqual(
+  nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight.rows.map(
+    (row) => row.id
+  ),
+  [
+    'worker-render-root-stale-executable-preflight',
+    'worker-create-value-stale-executable-preflight',
+    'worker-render-value-stale-executable-preflight',
+    'peer-root-active-executable-preflight',
+    'peer-value-active-executable-preflight'
+  ]
+);
+assert.deepEqual(
+  nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight.rows.map(
+    (row) => row.sourceErrorCode
+  ),
+  [
+    'FAST_REACT_NAPI_STALE_HANDLE',
+    'FAST_REACT_NAPI_STALE_HANDLE',
+    'FAST_REACT_NAPI_STALE_HANDLE',
+    null,
+    null
+  ]
+);
+assert.deepEqual(
+  nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight.rows.map(
+    (row) => row.rejectedByBoundary
+  ),
+  [true, true, true, false, false]
+);
+assert.deepEqual(
+  nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight.rows.map(
+    (row) => row.peerInvariantPreserved
+  ),
+  [false, false, false, true, true]
+);
+assert.deepEqual(
+  nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight.rows.map(
+    (row) => row.recordId
+  ),
+  [null, null, null, 176401, 176402]
+);
+assert.deepEqual(
+  nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight.rows.map(
+    (row) => row.slot
+  ),
+  [1, 2, 3, 1, 2]
+);
+assert.equal(
+  nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight.rows.every(
+    (row) =>
+      row.preflightPassed === true &&
+      row.nodeWorkerThreadsExecution === false &&
+      row.napiCleanupHookExecution === false &&
+      row.nativeAddonLoaded === false &&
+      row.nativeExecution === false &&
+      row.rendererExecution === false &&
+      row.reconcilerExecution === false &&
+      row.publicNativeCompatibility === false &&
+      row.reactBehaviorError === false
+  ),
+  true
+);
+assert.equal(
+  nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+    .publicNativeCompatibility,
+  false
+);
+assert.throws(
+  () => {
+    nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight.rows[0]
+      .sourceErrorCode = null;
+  },
+  { name: 'TypeError' }
+);
 assert.deepEqual(
   shapeGate.jsonTransportSmoke.parserGate.batchedRecordGate.lifecycleRows.map(
     (row) => row.lifecycleTransition
