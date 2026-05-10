@@ -16,11 +16,13 @@ import {
   SCHEDULER_MOCK_SCENARIOS
 } from "../src/scheduler-mock-scenarios.mjs";
 import {
+  SCHEDULER_MOCK_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS_EXPORT,
   findFastReactSchedulerMockComparison,
   findFastReactSchedulerMockObservation,
   findSchedulerMockObservation,
   readCheckedSchedulerMockOracle,
-  readCheckedSchedulerMockOracleText
+  readCheckedSchedulerMockOracleText,
+  readSchedulerMockPrivateActQueueFlushDiagnostics
 } from "../src/scheduler-mock-oracle.mjs";
 
 const oracle = readCheckedSchedulerMockOracle();
@@ -31,8 +33,6 @@ const repoRoot = path.resolve(
   "..",
   ".."
 );
-const privateActQueueFlushDiagnosticsExport =
-  "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__";
 const schedulerMockWorkspaceEntrypoint = "packages/scheduler/unstable_mock.js";
 const schedulerMockWorkspaceEntrypoints = [
   schedulerMockWorkspaceEntrypoint,
@@ -318,32 +318,37 @@ test("scheduler mock private act queue diagnostics drain only accepted internal 
   for (const nodeEnv of ["development", "production"]) {
     const Scheduler = loadFreshSchedulerMock(nodeEnv);
     assert.equal(
-      Object.keys(Scheduler).includes(privateActQueueFlushDiagnosticsExport),
+      Object.keys(Scheduler).includes(
+        SCHEDULER_MOCK_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS_EXPORT
+      ),
       false,
       nodeEnv
     );
     assert.equal(
-      Reflect.ownKeys(Scheduler).includes(privateActQueueFlushDiagnosticsExport),
+      Reflect.ownKeys(Scheduler).includes(
+        SCHEDULER_MOCK_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS_EXPORT
+      ),
       false,
       nodeEnv
     );
 
-    const diagnostics =
-      Scheduler.unstable_flushAllWithoutAsserting[
-        privateActQueueFlushDiagnosticsExport
-      ];
+    const diagnostics = readSchedulerMockPrivateActQueueFlushDiagnostics(
+      Scheduler
+    );
     assertPrivateActQueueFlushDiagnostics(diagnostics, nodeEnv);
 
     for (const [key] of REACT_TEST_RENDERER_SCHEDULER_FLUSH_HELPER_METADATA) {
       assert.equal(
-        Scheduler[key][privateActQueueFlushDiagnosticsExport],
+        Scheduler[key][
+          SCHEDULER_MOCK_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS_EXPORT
+        ],
         diagnostics,
         `${nodeEnv}:${key}`
       );
       assert.equal(
         Object.getOwnPropertyDescriptor(
           Scheduler[key],
-          privateActQueueFlushDiagnosticsExport
+          SCHEDULER_MOCK_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS_EXPORT
         ).enumerable,
         false,
         `${nodeEnv}:${key}`
@@ -722,6 +727,201 @@ test("scheduler mock private act queue diagnostics drain only accepted internal 
   }
 });
 
+test("scheduler mock private diagnostics drain expired callbacks and continuations in React order", () => {
+  const reactGate = loadFreshWorkspaceModule(privateActDispatcherGateModule);
+
+  for (const nodeEnv of ["development", "production"]) {
+    const Scheduler = loadFreshSchedulerMock(nodeEnv);
+    const diagnostics = readSchedulerMockPrivateActQueueFlushDiagnostics(
+      Scheduler,
+      "unstable_flushExpired"
+    );
+    assertPrivateActQueueFlushDiagnostics(diagnostics, nodeEnv);
+
+    Scheduler.reset();
+    const events = [];
+    const createCallback = (label, continuation = null) =>
+      reactGate.createInternalActQueueTestCallback(
+        (didTimeout) => {
+          events.push([
+            label,
+            didTimeout,
+            Scheduler.unstable_getCurrentPriorityLevel(),
+            Scheduler.unstable_now()
+          ]);
+          Scheduler.log(label);
+          return continuation;
+        },
+        { label }
+      );
+
+    const expiredNested = createCallback("expired-a-nested");
+    const expiredContinuation = createCallback(
+      "expired-a-continuation",
+      expiredNested
+    );
+    const expiredStart = createCallback(
+      "expired-a-start",
+      expiredContinuation
+    );
+    const expiredSecond = createCallback("expired-b");
+    const normalReady = createCallback("normal-ready");
+    const cancelledExpired = createCallback("cancelled-expired");
+
+    const cancelledTask = Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_UserBlockingPriority,
+      cancelledExpired
+    );
+    Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_UserBlockingPriority,
+      expiredStart
+    );
+    Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_UserBlockingPriority,
+      expiredSecond
+    );
+    Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_NormalPriority,
+      normalReady
+    );
+    Scheduler.unstable_cancelCallback(cancelledTask);
+    Scheduler.unstable_advanceTime(251);
+
+    const report = Scheduler.unstable_runWithPriority(
+      Scheduler.unstable_LowPriority,
+      () => diagnostics.drainExpiredMockSchedulerWork()
+    );
+
+    assert.equal(
+      report.status,
+      "drained-expired-mock-scheduler-work-for-diagnostics",
+      nodeEnv
+    );
+    assert.equal(report.pendingBefore, true, nodeEnv);
+    assert.equal(report.pendingAfter, true, nodeEnv);
+    assert.equal(report.flushedExpiredWork, true, nodeEnv);
+    assert.equal(report.hasMoreWorkAfterDrain, true, nodeEnv);
+    assert.equal(report.nowBefore, 251, nodeEnv);
+    assert.equal(report.nowAfter, 251, nodeEnv);
+    assert.equal(
+      report.priorityLevelBefore,
+      Scheduler.unstable_LowPriority,
+      nodeEnv
+    );
+    assert.equal(
+      report.priorityLevelAfter,
+      Scheduler.unstable_LowPriority,
+      nodeEnv
+    );
+    assert.equal(report.expiredCallbackCountBefore, 2, nodeEnv);
+    assert.equal(report.expiredCallbackCountAfter, 0, nodeEnv);
+    assert.equal(report.cancelledTombstoneCountBefore, 1, nodeEnv);
+    assert.equal(report.cancelledTombstoneCountAfter, 0, nodeEnv);
+    assert.deepEqual(
+      report.taskQueueBefore.map((task) => [
+        task.callbackStatus,
+        task.callback.label ?? null,
+        task.priorityLevel,
+        task.expired
+      ]),
+      [
+        [
+          "cancelled-tombstone",
+          null,
+          Scheduler.unstable_UserBlockingPriority,
+          true
+        ],
+        [
+          "pending-callback",
+          "expired-a-start",
+          Scheduler.unstable_UserBlockingPriority,
+          true
+        ],
+        [
+          "pending-callback",
+          "expired-b",
+          Scheduler.unstable_UserBlockingPriority,
+          true
+        ],
+        [
+          "pending-callback",
+          "normal-ready",
+          Scheduler.unstable_NormalPriority,
+          false
+        ]
+      ],
+      nodeEnv
+    );
+    assert.deepEqual(
+      report.taskQueueAfter.map((task) => [
+        task.callbackStatus,
+        task.callback.label ?? null,
+        task.priorityLevel,
+        task.expired
+      ]),
+      [
+        [
+          "pending-callback",
+          "normal-ready",
+          Scheduler.unstable_NormalPriority,
+          false
+        ]
+      ],
+      nodeEnv
+    );
+    assert.equal(report.drainsExpiredMockSchedulerWork, true, nodeEnv);
+    assert.equal(report.drainsPublicReactActQueue, false, nodeEnv);
+    assert.equal(
+      report.publicSchedulerTimingCompatibilityClaimed,
+      false,
+      nodeEnv
+    );
+    assert.equal(report.publicReactActCompatibilityClaimed, false, nodeEnv);
+
+    assert.deepEqual(
+      events,
+      [
+        ["expired-a-start", true, Scheduler.unstable_UserBlockingPriority, 251],
+        [
+          "expired-a-continuation",
+          true,
+          Scheduler.unstable_UserBlockingPriority,
+          251
+        ],
+        [
+          "expired-a-nested",
+          true,
+          Scheduler.unstable_UserBlockingPriority,
+          251
+        ],
+        ["expired-b", true, Scheduler.unstable_UserBlockingPriority, 251]
+      ],
+      nodeEnv
+    );
+    assert.deepEqual(Scheduler.unstable_clearLog(), [
+      "expired-a-start",
+      "expired-a-continuation",
+      "expired-a-nested",
+      "expired-b"
+    ]);
+    assert.equal(
+      Scheduler.unstable_getCurrentPriorityLevel(),
+      Scheduler.unstable_NormalPriority,
+      nodeEnv
+    );
+
+    assert.equal(Scheduler.unstable_flushAllWithoutAsserting(), true, nodeEnv);
+    assert.deepEqual(events.at(-1), [
+      "normal-ready",
+      false,
+      Scheduler.unstable_NormalPriority,
+      251
+    ]);
+    assert.deepEqual(Scheduler.unstable_clearLog(), ["normal-ready"], nodeEnv);
+    assert.equal(Scheduler.unstable_hasPendingWork(), false, nodeEnv);
+  }
+});
+
 test("scheduler mock oracle captures virtual time, log, and disable-yield-value behavior", () => {
   for (const mode of SCHEDULER_MOCK_PROBE_MODES) {
     const value = operationValue(mode.id, "scheduler-mock-virtual-time-and-logs");
@@ -1079,7 +1279,10 @@ function assertPrivateActQueueFlushDiagnostics(diagnostics, label) {
     "private-scheduler-act-queue-flush-diagnostics",
     label
   );
-  assert.equal(diagnostics.exportName, privateActQueueFlushDiagnosticsExport);
+  assert.equal(
+    diagnostics.exportName,
+    SCHEDULER_MOCK_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS_EXPORT
+  );
   assert.equal(
     diagnostics.queueKind,
     "fast-react.react.private-act-queue-test-queue",
@@ -1127,6 +1330,12 @@ function assertPrivateActQueueFlushDiagnostics(diagnostics, label) {
     true,
     label
   );
+  assert.equal(
+    diagnostics.mockSchedulerExpiredWorkDiagnosticsReady,
+    true,
+    label
+  );
+  assert.equal(diagnostics.drainsExpiredMockSchedulerWork, true, label);
   assert.equal(diagnostics.drainsPublicSchedulerTaskQueue, false, label);
   assert.equal(diagnostics.drainsPublicReactActQueue, false, label);
   assert.equal(
@@ -1139,4 +1348,5 @@ function assertPrivateActQueueFlushDiagnostics(diagnostics, label) {
   assert.equal(diagnostics.executesEffects, false, label);
   assert.equal(typeof diagnostics.describeAcceptedInternalActQueue, "function");
   assert.equal(typeof diagnostics.drainAcceptedInternalActQueue, "function");
+  assert.equal(typeof diagnostics.drainExpiredMockSchedulerWork, "function");
 }

@@ -2,8 +2,30 @@ import { readFileSync } from "node:fs";
 
 import { SCHEDULER_MOCK_ORACLE_ARTIFACT_PATH } from "./scheduler-mock-targets.mjs";
 
+export const SCHEDULER_MOCK_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS_EXPORT =
+  "__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__";
+
 export function stringifySchedulerMockOracle(oracle) {
   return `${JSON.stringify(oracle, null, 2)}\n`;
+}
+
+export function readSchedulerMockPrivateActQueueFlushDiagnostics(
+  Scheduler,
+  helperName = "unstable_flushAllWithoutAsserting"
+) {
+  const helper = Scheduler?.[helperName];
+  if (typeof helper !== "function") {
+    throw new Error(`Missing scheduler mock flush helper: ${helperName}`);
+  }
+
+  const diagnostics =
+    helper[SCHEDULER_MOCK_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS_EXPORT];
+  if (!diagnostics || typeof diagnostics !== "object") {
+    throw new Error(
+      `Missing private scheduler mock diagnostics on ${helperName}`
+    );
+  }
+  return diagnostics;
 }
 
 export function readCheckedSchedulerMockOracle(baseUrl = import.meta.url) {
