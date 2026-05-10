@@ -25,6 +25,7 @@ import {
   REACT_DOM_ROOT_PUBLIC_FACADE_BRIDGE_RECORD_ONLY_STATUS,
   REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS,
   REACT_DOM_ROOT_PUBLIC_FACADE_SCENARIO_ADMISSIONS,
+  evaluateReactDomRootRenderE2EConformanceGate,
   evaluateReactDomRootPublicFacadeBlockedGate,
   inspectReactDomPrivateRootBridgeBoundary,
   inspectReactDomRootPublicFacadeBoundary
@@ -81,6 +82,19 @@ test("React DOM public root facade gate blocks placeholders while oracle prerequ
     gate.rootRenderGate.summary.privateHostOutputCompatibilityClaimed,
     false
   );
+  assert.equal(gate.rootRenderGate.summary.portalRootRenderBlockedRowCount, 5);
+  assert.equal(
+    gate.rootRenderGate.summary.portalRootRenderCompatibilityClaimed,
+    false
+  );
+  for (const row of gate.blockedPublicFacadeRows) {
+    assert.equal(row.gateStatus, REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS);
+    assert.notEqual(row.gateStatus, "accepted-private-root-host-output-diagnostic");
+    assert.notEqual(row.gateStatus, "blocked-portal-root-render");
+    if ("compatibilityClaimed" in row) {
+      assert.equal(row.compatibilityClaimed, false);
+    }
+  }
 });
 
 test("React DOM public root facade scenario admission is explicit and non-compatible", () => {
@@ -121,6 +135,8 @@ test("React DOM public root facade inspection records current placeholder bounda
   assert.equal(publicBoundary.hydrateRoot.status, "throws");
   assert.equal(publicBoundary.hydrateRoot.thrown.code, "FAST_REACT_UNIMPLEMENTED");
   assert.equal(publicBoundary.hydrateRoot.rootObjectCreated, false);
+  assert.equal(publicBoundary.hydrateRoot.thrown.exportName, "hydrateRoot");
+  assert.equal(publicBoundary.hydrateRoot.thrown.entrypoint, "react-dom/client");
   assert.equal(publicBoundary.createRoot.sideEffects.mutationCount, 0);
   assert.equal(publicBoundary.createRoot.sideEffects.listenerRegistrationCount, 0);
   assert.equal(publicBoundary.createRoot.sideEffects.containerMarker.propertyCount, 0);
@@ -235,6 +251,121 @@ test("React DOM public root facade gate rejects premature public createRoot beha
       (failure) =>
         failure.gateStatus ===
         "public-root-object-created-while-facade-blocked"
+    )
+  );
+});
+
+test("React DOM public root facade gate rejects premature public hydrateRoot behavior", () => {
+  const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
+  const prematurePublicBoundary = clone(publicBoundary);
+  prematurePublicBoundary.hydrateRoot = {
+    ...prematurePublicBoundary.hydrateRoot,
+    status: "ok",
+    value: {
+      keys: ["render", "unmount"],
+      type: "object"
+    },
+    rootObjectCreated: true
+  };
+
+  const gate = evaluateReactDomRootPublicFacadeBlockedGate({
+    checkedOracle: rootRenderOracle,
+    currentOracle: rootRenderOracle,
+    clientRootOracle,
+    localPublicFacadeBoundary: prematurePublicBoundary,
+    privateRootBridgeBoundary: inspectReactDomPrivateRootBridgeBoundary()
+  });
+
+  assert.equal(gate.ok, false);
+  assert.ok(
+    gate.failures.some(
+      (failure) =>
+        failure.gateStatus === "public-root-export-not-placeholder-blocked" &&
+        failure.exportName === "hydrateRoot"
+    )
+  );
+  assert.ok(
+    gate.failures.some(
+      (failure) =>
+        failure.gateStatus === "public-hydration-not-placeholder-blocked"
+    )
+  );
+});
+
+test("React DOM public root facade gate rejects private host-output promotion to public compatibility", () => {
+  const rootRenderGate = clone(
+    evaluateReactDomRootRenderE2EConformanceGate({
+      checkedOracle: rootRenderOracle,
+      currentOracle: rootRenderOracle
+    })
+  );
+  rootRenderGate.summary.privateHostOutputCompatibilityClaimed = true;
+  rootRenderGate.privateHostOutputGate.compatibilityClaimed = true;
+  rootRenderGate.privateHostOutputDiagnosticScenarioModeRows[0] = {
+    ...rootRenderGate.privateHostOutputDiagnosticScenarioModeRows[0],
+    comparedToReactDomOracle: true,
+    compatibilityClaimed: true,
+    publicRootCompatibilitySurface: true
+  };
+
+  const gate = evaluateReactDomRootPublicFacadeBlockedGate({
+    checkedOracle: rootRenderOracle,
+    currentOracle: rootRenderOracle,
+    clientRootOracle,
+    rootRenderGateResult: rootRenderGate
+  });
+
+  assert.equal(gate.ok, false);
+  assert.ok(
+    gate.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+        "root-render-private-host-output-claims-compatibility-while-public-facade-blocked"
+    )
+  );
+  assert.ok(
+    gate.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+        "root-render-private-host-output-row-not-private-blocked"
+    )
+  );
+});
+
+test("React DOM public root facade gate rejects portal root-render compatibility leaks", () => {
+  const rootRenderGate = clone(
+    evaluateReactDomRootRenderE2EConformanceGate({
+      checkedOracle: rootRenderOracle,
+      currentOracle: rootRenderOracle
+    })
+  );
+  rootRenderGate.summary.portalRootRenderCompatibilityClaimed = true;
+  rootRenderGate.portalRootRenderGate.summary.compatibilityClaimed = true;
+  rootRenderGate.portalRootRenderBlockedRows[0] = {
+    ...rootRenderGate.portalRootRenderBlockedRows[0],
+    compatibilityClaimed: true,
+    publicRootCompatibilitySurface: true
+  };
+
+  const gate = evaluateReactDomRootPublicFacadeBlockedGate({
+    checkedOracle: rootRenderOracle,
+    currentOracle: rootRenderOracle,
+    clientRootOracle,
+    rootRenderGateResult: rootRenderGate
+  });
+
+  assert.equal(gate.ok, false);
+  assert.ok(
+    gate.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+        "root-render-portal-claims-compatibility-while-public-facade-blocked"
+    )
+  );
+  assert.ok(
+    gate.failures.some(
+      (failure) =>
+        failure.gateStatus === "root-render-portal-blocked-row-not-fail-closed"
     )
   );
 });

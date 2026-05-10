@@ -425,6 +425,7 @@ test("root render e2e conformance gate records private bridge request rows separ
     assert.equal(row.oracleRowAccepted, true);
     assert.equal(row.comparedToReactDomOracle, false);
     assert.equal(row.compatibilityClaimed, false);
+    assert.equal(row.publicRootCompatibilitySurface, false);
     assert.equal(row.publicFacadeGateStatus, "blocked-unsupported-root-e2e");
     assert.equal(row.diagnosticKind, "private-fake-dom-root-host-output");
     assert.equal(
@@ -444,6 +445,14 @@ test("root render e2e conformance gate records private bridge request rows separ
       )
     ),
     new Set([REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_BLOCKED_STATUS])
+  );
+  assert.ok(
+    result.privateHostOutputBlockedScenarioModeRows.every(
+      (row) =>
+        row.publicRootCompatibilitySurface === false &&
+        row.comparedToReactDomOracle === false &&
+        row.compatibilityClaimed === false
+    )
   );
 
   assert.equal(result.portalRootRenderGate.ok, true);
