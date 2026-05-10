@@ -29,6 +29,15 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Worker 500 was accepted from queue 473-502. It added a fail-closed
+  act/passive local conformance gate for the accepted private diagnostics from
+  workers 473, 474, 475, 482, 483, and 498 while rejecting public act,
+  Scheduler, passive-effect, sync-flush, and benchmark compatibility claims.
+  Post-merge cleanup refreshed the expected passive root-error and test-utils
+  act prerequisite rows from already accepted workers. It was verified after
+  merge with focused act/passive tests, the focused act/root-render bundle,
+  full conformance workspace checks, conflict-marker scanning, and
+  `git diff --check`.
 - Worker 499 was accepted from queue 473-502. It added private root-render E2E
   act/passive diagnostic admissions and a public facade blocker so accepted
   act/passive metadata remains separate from public root, act, passive-effect,

@@ -46,8 +46,8 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Queue 473-502 is assigned in isolated worktrees.
-Workers 474, 475, 476, 483, 487, 489, 493, 494, 495, 496, 497, 498, 499, 501,
-and 502 have been accepted, leaving 15 active top-level workers from this
+Workers 474, 475, 476, 483, 487, 489, 493, 494, 495, 496, 497, 498, 499, 500,
+501, and 502 have been accepted, leaving 14 active top-level workers from this
 queue.
 
 | Worker | Focus |
@@ -66,7 +66,6 @@ queue.
 | 490 | Controlled checkbox/radio restore gate |
 | 491 | Resource stylesheet precedence gate |
 | 492 | Form submit action metadata gate |
-| 500 | Conformance act/passive local gate refresh |
 
 ## Near-Term Sequencing
 
