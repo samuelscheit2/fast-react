@@ -13,6 +13,7 @@ use fast_react_core::FiberTag;
 use crate::{ReconcilerError, ReconcilerResult};
 
 pub(crate) const SUSPENSE_UNSUPPORTED_FEATURE: &str = "Reconciler.fiber.Suspense";
+pub(crate) const SUSPENSE_LIST_UNSUPPORTED_FEATURE: &str = "Reconciler.fiber.SuspenseList";
 pub(crate) const OFFSCREEN_UNSUPPORTED_FEATURE: &str = "Reconciler.fiber.Offscreen";
 pub(crate) const ACTIVITY_UNSUPPORTED_FEATURE: &str = "Reconciler.fiber.Activity";
 pub(crate) const VIEW_TRANSITION_UNSUPPORTED_FEATURE: &str = "Reconciler.fiber.ViewTransition";
@@ -27,6 +28,10 @@ impl UnsupportedReconcilerFiberFeature {
     const SUSPENSE: Self = Self {
         tag: FiberTag::Suspense,
         feature: SUSPENSE_UNSUPPORTED_FEATURE,
+    };
+    const SUSPENSE_LIST: Self = Self {
+        tag: FiberTag::SuspenseList,
+        feature: SUSPENSE_LIST_UNSUPPORTED_FEATURE,
     };
     const OFFSCREEN: Self = Self {
         tag: FiberTag::Offscreen,
@@ -58,6 +63,7 @@ pub(crate) const fn unsupported_reconciler_feature_for_fiber_tag(
 ) -> Option<UnsupportedReconcilerFiberFeature> {
     match tag {
         FiberTag::Suspense => Some(UnsupportedReconcilerFiberFeature::SUSPENSE),
+        FiberTag::SuspenseList => Some(UnsupportedReconcilerFiberFeature::SUSPENSE_LIST),
         FiberTag::Offscreen => Some(UnsupportedReconcilerFiberFeature::OFFSCREEN),
         FiberTag::Activity => Some(UnsupportedReconcilerFiberFeature::ACTIVITY),
         FiberTag::ViewTransition => Some(UnsupportedReconcilerFiberFeature::VIEW_TRANSITION),
@@ -83,6 +89,11 @@ mod tests {
                 FiberTag::Suspense,
                 SUSPENSE_UNSUPPORTED_FEATURE,
                 FiberTag::Suspense.react_tag(),
+            ),
+            (
+                FiberTag::SuspenseList,
+                SUSPENSE_LIST_UNSUPPORTED_FEATURE,
+                FiberTag::SuspenseList.react_tag(),
             ),
             (
                 FiberTag::Offscreen,

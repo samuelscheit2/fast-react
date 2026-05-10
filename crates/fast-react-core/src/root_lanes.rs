@@ -1101,6 +1101,34 @@ mod tests {
     }
 
     #[test]
+    fn suspended_boundary_retry_lanes_fail_closed_for_render_and_sync_flush_until_pinged() {
+        let mut state = RootLaneState::new();
+        let retry_lanes = lanes(&[Lane::RETRY_1, Lane::RETRY_2, Lane::RETRY_3]);
+        state.mark_updated(Lane::RETRY_1);
+        state.mark_updated(Lane::RETRY_2);
+        state.mark_updated(Lane::RETRY_3);
+
+        // Suspense, Activity, and SuspenseList retries need boundary wakeable
+        // oracles before retry lanes are safe to render. Suspended unpinged
+        // retry lanes must therefore stay out of render and sync-flush picks.
+        state.mark_suspended(retry_lanes, Lane::NO, true);
+        assert_eq!(state.get_next_lanes(Lanes::NO, false), Lanes::NO);
+        assert_eq!(state.get_next_lanes_to_flush_sync(retry_lanes), Lanes::NO);
+        assert!(state.check_if_root_is_prerendering(retry_lanes));
+
+        state.mark_pinged(Lanes::from(Lane::RETRY_2));
+        assert_eq!(
+            state.get_next_lanes(Lanes::NO, false),
+            Lanes::from(Lane::RETRY_2)
+        );
+        assert_eq!(
+            state.get_next_lanes_to_flush_sync(Lanes::from(Lane::RETRY_2)),
+            lanes(&[Lane::SYNC, Lane::RETRY_2])
+        );
+        assert!(!state.check_if_root_is_prerendering(Lanes::from(Lane::RETRY_2)));
+    }
+
+    #[test]
     fn get_next_lanes_groups_sync_updates_like_react_source() {
         let mut state = RootLaneState::new();
         state.mark_updated(Lane::SYNC);
@@ -1224,10 +1252,18 @@ mod tests {
         // fully warm suspended Offscreen work stays unscheduled until a ping or
         // a future update changes the lane state.
         assert_eq!(state.get_next_lanes(Lanes::NO, false), Lanes::NO);
+        assert_eq!(
+            state.get_next_lanes_to_flush_sync(Lanes::OFFSCREEN),
+            Lanes::NO
+        );
         assert!(state.check_if_root_is_prerendering(Lanes::OFFSCREEN));
 
         state.mark_pinged(Lanes::OFFSCREEN);
         assert_eq!(state.get_next_lanes(Lanes::NO, false), Lanes::OFFSCREEN);
+        assert_eq!(
+            state.get_next_lanes_to_flush_sync(Lanes::OFFSCREEN),
+            lanes(&[Lane::SYNC, Lane::OFFSCREEN])
+        );
         assert!(!state.check_if_root_is_prerendering(Lanes::OFFSCREEN));
     }
 

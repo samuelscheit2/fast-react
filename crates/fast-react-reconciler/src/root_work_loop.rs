@@ -810,7 +810,10 @@ mod tests {
         FunctionComponentOutputHandle,
     };
     use crate::test_support::{FakeContainer, RecordingHost, TestHostTree};
-    use crate::unsupported_features::SUSPENSE_UNSUPPORTED_FEATURE;
+    use crate::unsupported_features::{
+        ACTIVITY_UNSUPPORTED_FEATURE, OFFSCREEN_UNSUPPORTED_FEATURE,
+        SUSPENSE_LIST_UNSUPPORTED_FEATURE, SUSPENSE_UNSUPPORTED_FEATURE,
+    };
     use crate::{
         RootElementHandle, RootOptions, RootTaskScheduleOutcome, ensure_root_is_scheduled,
         process_root_schedule_in_microtask, update_container, update_container_sync,
@@ -1204,31 +1207,60 @@ mod tests {
 
     #[test]
     fn root_work_loop_preflight_fails_closed_for_explicit_unsupported_child_tags() {
-        let (mut store, root_id, _host) = root_store();
-        update_container(&mut store, root_id, RootElementHandle::from_raw(19), None).unwrap();
-        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
-        let child =
-            attach_wip_child_with_tag(&mut store, render.work_in_progress(), FiberTag::Suspense);
-        let mut registry = TestFunctionComponentRegistry::default();
+        let cases = [
+            (
+                FiberTag::Suspense,
+                SUSPENSE_UNSUPPORTED_FEATURE,
+                Lanes::from(Lane::RETRY_1),
+            ),
+            (
+                FiberTag::Offscreen,
+                OFFSCREEN_UNSUPPORTED_FEATURE,
+                Lanes::OFFSCREEN,
+            ),
+            (
+                FiberTag::Activity,
+                ACTIVITY_UNSUPPORTED_FEATURE,
+                Lanes::from(Lane::RETRY_2),
+            ),
+            (
+                FiberTag::SuspenseList,
+                SUSPENSE_LIST_UNSUPPORTED_FEATURE,
+                Lanes::from(Lane::RETRY_3),
+            ),
+        ];
 
-        let error = preflight_host_root_child_begin_work(
-            &mut store,
-            root_id,
-            render.work_in_progress(),
-            Lanes::DEFAULT,
-            &mut registry,
-        )
-        .unwrap_err();
+        for (tag, feature, render_lanes) in cases {
+            let (mut store, root_id, host) = root_store();
+            let current = store.root(root_id).unwrap().current();
+            update_container(&mut store, root_id, RootElementHandle::from_raw(19), None).unwrap();
+            let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+            let child = attach_wip_child_with_tag(&mut store, render.work_in_progress(), tag);
+            let mut registry = TestFunctionComponentRegistry::default();
 
-        assert_eq!(
-            error,
-            HostRootChildBeginWorkPreflightError::UnsupportedReconcilerFiberFeature {
-                fiber: child,
-                tag: FiberTag::Suspense,
-                feature: SUSPENSE_UNSUPPORTED_FEATURE,
-            }
-        );
-        assert!(registry.calls().is_empty());
+            let error = preflight_host_root_child_begin_work(
+                &mut store,
+                root_id,
+                render.work_in_progress(),
+                render_lanes,
+                &mut registry,
+            )
+            .unwrap_err();
+
+            assert_eq!(
+                error,
+                HostRootChildBeginWorkPreflightError::UnsupportedReconcilerFiberFeature {
+                    fiber: child,
+                    tag,
+                    feature,
+                }
+            );
+            assert!(registry.calls().is_empty());
+            assert_eq!(host.operations(), Vec::<&'static str>::new());
+            assert_eq!(store.root(root_id).unwrap().current(), current);
+            assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+            assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+        }
     }
 
     #[test]
