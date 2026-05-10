@@ -45,58 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 150: sync flush execution context in
-  `/Users/user/Developer/Developer/fast-react-worker-150-sync-flush-execution-context`.
-- Worker 151: HostComponent/HostText complete-work skeleton in
-  `/Users/user/Developer/Developer/fast-react-worker-151-host-complete-work-skeleton`.
-- Worker 152: host-config text content boundary in
-  `/Users/user/Developer/Developer/fast-react-worker-152-host-config-text-content-boundary`.
-- Worker 153: Rust test-renderer root canary in
-  `/Users/user/Developer/Developer/fast-react-worker-153-test-renderer-root-canary`.
-- Worker 154: private DOM mutation adapter shell in
-  `/Users/user/Developer/Developer/fast-react-worker-154-dom-mutation-adapter-shell`.
-- Worker 155: scheduler callback execution in
-  `/Users/user/Developer/Developer/fast-react-worker-155-scheduler-callback-execution`.
-- Worker 156: root lane selection helpers in
-  `/Users/user/Developer/Developer/fast-react-worker-156-root-lane-selection-helpers`.
-- Worker 157: core hook effect ring in
-  `/Users/user/Developer/Developer/fast-react-worker-157-core-hook-effect-ring`.
-- Worker 158: core hook state queue in
-  `/Users/user/Developer/Developer/fast-react-worker-158-core-hook-state-queue`.
-- Worker 159: function component render skeleton in
-  `/Users/user/Developer/Developer/fast-react-worker-159-function-component-render-skeleton`.
-- Worker 160: root update callback commit prep in
-  `/Users/user/Developer/Developer/fast-react-worker-160-root-update-callback-commit-prep`.
-- Worker 161: root error option handles in
-  `/Users/user/Developer/Developer/fast-react-worker-161-root-error-option-handles`.
-- Worker 162: benchmark manifest gate in
-  `/Users/user/Developer/Developer/fast-react-worker-162-benchmark-manifest-gate`.
-- Worker 163: root E2E conformance gate in
-  `/Users/user/Developer/Developer/fast-react-worker-163-root-e2e-conformance-gate`.
-- Worker 164: scheduler regression tests in
-  `/Users/user/Developer/Developer/fast-react-worker-164-scheduler-regression-tests`.
-- Worker 165: package surface guard in
-  `/Users/user/Developer/Developer/fast-react-worker-165-package-surface-guard`.
-- Worker 167: React DOM private root bridge in
-  `/Users/user/Developer/Developer/fast-react-worker-167-react-dom-private-root-bridge`.
-- Worker 168: DOM component tree map shell in
-  `/Users/user/Developer/Developer/fast-react-worker-168-dom-component-tree-map-shell`.
-- Worker 169: hydration boundary skeleton in
-  `/Users/user/Developer/Developer/fast-react-worker-169-hydration-boundary-skeleton`.
-- Worker 172: resource/form unsupported gates in
-  `/Users/user/Developer/Developer/fast-react-worker-172-resource-form-unsupported-gates`.
-- Worker 173: passive pending state in
-  `/Users/user/Developer/Developer/fast-react-worker-173-passive-pending-state`.
-- Worker 174: ref token lifecycle in
-  `/Users/user/Developer/Developer/fast-react-worker-174-ref-token-lifecycle`.
-- Worker 175: Suspense/Offscreen fail-closed markers in
-  `/Users/user/Developer/Developer/fast-react-worker-175-suspense-offscreen-fail-closed`.
-- Worker 176: act queue routing skeleton in
-  `/Users/user/Developer/Developer/fast-react-worker-176-act-queue-routing-skeleton`.
-- Worker 178: test-renderer serialization gate in
-  `/Users/user/Developer/Developer/fast-react-worker-178-test-renderer-serialization-gate`.
-- Worker 179: sync flush commit integration in
-  `/Users/user/Developer/Developer/fast-react-worker-179-sync-flush-commit-integration`.
 - Worker 180: core context stack foundation in
   `/Users/user/Developer/Developer/fast-react-worker-180-core-context-stack-foundation`.
 - Worker 181: React DOM createPortal object in
@@ -105,6 +53,28 @@ Drive toward a minimal real root render/update/unmount path:
   `/Users/user/Developer/Developer/fast-react-worker-182-react-hook-dispatcher-guard`.
 - Worker 183: React transition facade in
   `/Users/user/Developer/Developer/fast-react-worker-183-react-transition-facade`.
+- Worker 184: React memo element type guard in
+  `/Users/user/Developer/Developer/fast-react-worker-184-react-memo-element-type-guard`.
+- Worker 185: DOM namespace context helper in
+  `/Users/user/Developer/Developer/fast-react-worker-185-dom-namespace-context-helper`.
+- Worker 186: DOM property payload helper in
+  `/Users/user/Developer/Developer/fast-react-worker-186-dom-property-payload-helper`.
+- Worker 187: host node store boundary in
+  `/Users/user/Developer/Developer/fast-react-worker-187-host-node-store-boundary`.
+- Worker 188: test-renderer commit handoff canary in
+  `/Users/user/Developer/Developer/fast-react-worker-188-test-renderer-commit-handoff-canary`.
+- Worker 189: core portal record foundation in
+  `/Users/user/Developer/Developer/fast-react-worker-189-core-portal-record-foundation`.
+- Worker 190: native handle environment teardown in
+  `/Users/user/Developer/Developer/fast-react-worker-190-native-handle-environment-teardown`.
+- Worker 191: root scheduler lane-selection integration in
+  `/Users/user/Developer/Developer/fast-react-worker-191-root-scheduler-lane-selection-integration`.
+- Worker 192: core hook list foundation in
+  `/Users/user/Developer/Developer/fast-react-worker-192-core-hook-list-foundation`.
+- Worker 193: root commit callback handoff in
+  `/Users/user/Developer/Developer/fast-react-worker-193-root-commit-callback-handoff`.
+- Worker 194: function component begin-work handoff in
+  `/Users/user/Developer/Developer/fast-react-worker-194-function-component-begin-work-handoff`.
 
 ## Near-Term Sequencing
 
