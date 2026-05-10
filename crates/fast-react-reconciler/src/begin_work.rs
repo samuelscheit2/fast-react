@@ -9,12 +9,17 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-use fast_react_core::{FiberArena, FiberId, FiberTag, FiberTopologyError, Lanes};
+use fast_react_core::{
+    FiberArena, FiberId, FiberTag, FiberTopologyError, Lanes, PropsHandle, ReactKey,
+    StateNodeHandle,
+};
 
 use crate::function_component::{
     FunctionComponentInvoker, FunctionComponentOutputHandle, FunctionComponentRenderError,
     FunctionComponentRenderRecord, render_function_component,
 };
+
+pub(crate) const PORTAL_RECONCILER_UNSUPPORTED_FEATURE: &str = "Reconciler.fiber.Portal";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct BeginWorkRequest {
@@ -56,6 +61,54 @@ impl BeginWorkResult {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct UnsupportedPortalBeginWorkRecord {
+    fiber: FiberId,
+    key: Option<ReactKey>,
+    pending_props: PropsHandle,
+    state_node: StateNodeHandle,
+    child: Option<FiberId>,
+    render_lanes: Lanes,
+    feature: &'static str,
+}
+
+impl UnsupportedPortalBeginWorkRecord {
+    #[must_use]
+    pub(crate) const fn fiber(&self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub(crate) fn key(&self) -> Option<&ReactKey> {
+        self.key.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_props(&self) -> PropsHandle {
+        self.pending_props
+    }
+
+    #[must_use]
+    pub(crate) const fn state_node(&self) -> StateNodeHandle {
+        self.state_node
+    }
+
+    #[must_use]
+    pub(crate) const fn child(&self) -> Option<FiberId> {
+        self.child
+    }
+
+    #[must_use]
+    pub(crate) const fn render_lanes(&self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn feature(&self) -> &'static str {
+        self.feature
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentBeginWorkRecord {
     render: FunctionComponentRenderRecord,
@@ -92,6 +145,7 @@ impl FunctionComponentBeginWorkRecord {
 pub(crate) enum BeginWorkError {
     FiberTopology(FiberTopologyError),
     FunctionComponent(FunctionComponentRenderError),
+    UnsupportedPortal(UnsupportedPortalBeginWorkRecord),
     UnsupportedFiberTag { fiber: FiberId, tag: FiberTag },
 }
 
@@ -100,6 +154,16 @@ impl Display for BeginWorkError {
         match self {
             Self::FiberTopology(error) => Display::fmt(error, formatter),
             Self::FunctionComponent(error) => Display::fmt(error, formatter),
+            Self::UnsupportedPortal(record) => write!(
+                formatter,
+                "portal fiber {} reached begin-work but {feature} is unsupported; key {:?}, child {:?}, pending props {:?}, state node {:?}",
+                record.fiber().slot().get(),
+                record.key().map(ReactKey::as_str),
+                record.child().map(|fiber| fiber.slot().get()),
+                record.pending_props(),
+                record.state_node(),
+                feature = record.feature()
+            ),
             Self::UnsupportedFiberTag { fiber, tag } => write!(
                 formatter,
                 "fiber {} has unsupported begin-work tag {:?}; only FunctionComponent is delegated by this private handoff",
@@ -115,7 +179,7 @@ impl Error for BeginWorkError {
         match self {
             Self::FiberTopology(error) => Some(error),
             Self::FunctionComponent(error) => Some(error),
-            Self::UnsupportedFiberTag { .. } => None,
+            Self::UnsupportedPortal(_) | Self::UnsupportedFiberTag { .. } => None,
         }
     }
 }
@@ -132,6 +196,29 @@ impl From<FunctionComponentRenderError> for BeginWorkError {
     }
 }
 
+pub(crate) fn unsupported_portal_begin_work_record(
+    arena: &FiberArena,
+    request: BeginWorkRequest,
+) -> Result<UnsupportedPortalBeginWorkRecord, BeginWorkError> {
+    let fiber = request.work_in_progress();
+    let node = arena.get(fiber)?;
+    let tag = node.tag();
+
+    if tag != FiberTag::Portal {
+        return Err(BeginWorkError::UnsupportedFiberTag { fiber, tag });
+    }
+
+    Ok(UnsupportedPortalBeginWorkRecord {
+        fiber,
+        key: node.key().cloned(),
+        pending_props: node.pending_props(),
+        state_node: node.state_node(),
+        child: node.child(),
+        render_lanes: request.render_lanes(),
+        feature: PORTAL_RECONCILER_UNSUPPORTED_FEATURE,
+    })
+}
+
 pub(crate) fn begin_work(
     arena: &mut FiberArena,
     request: BeginWorkRequest,
@@ -141,6 +228,12 @@ pub(crate) fn begin_work(
     let tag = arena.get(work_in_progress)?.tag();
 
     if tag != FiberTag::FunctionComponent {
+        if tag == FiberTag::Portal {
+            return Err(BeginWorkError::UnsupportedPortal(
+                unsupported_portal_begin_work_record(arena, request)?,
+            ));
+        }
+
         return Err(BeginWorkError::UnsupportedFiberTag {
             fiber: work_in_progress,
             tag,
@@ -165,7 +258,7 @@ mod tests {
     use crate::{FiberRootStore, RootOptions};
     use fast_react_core::{
         ContextHandle, ContextStack, ContextStackSnapshot, ContextValueHandle, FiberMode,
-        FiberTypeHandle, PropsHandle, StateHandle, UpdateQueueHandle,
+        FiberTypeHandle, PropsHandle, ReactKey, StateHandle, StateNodeHandle, UpdateQueueHandle,
     };
 
     #[derive(Debug, Clone)]
@@ -427,6 +520,58 @@ mod tests {
             );
             assert!(registry.calls().is_empty());
         }
+    }
+
+    #[test]
+    fn begin_work_fails_closed_for_portal_fibers_without_invoking_or_scheduling_children() {
+        let mut arena = FiberArena::new();
+        let portal = arena.create_fiber(
+            FiberTag::Portal,
+            Some(ReactKey::from_normalized("portal-key")),
+            PropsHandle::from_raw(303),
+            FiberMode::NO,
+        );
+        arena
+            .get_mut(portal)
+            .unwrap()
+            .set_state_node(StateNodeHandle::from_raw(404));
+        let portal_child = arena.create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(505),
+            FiberMode::NO,
+        );
+        arena.set_children(portal, &[portal_child]).unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+
+        let error = begin_work(
+            &mut arena,
+            BeginWorkRequest::new(portal, Lanes::DEFAULT),
+            &mut registry,
+        )
+        .unwrap_err();
+
+        let record = match error {
+            BeginWorkError::UnsupportedPortal(record) => record,
+            other => panic!("expected portal diagnostic, got {other:?}"),
+        };
+        assert_eq!(record.fiber(), portal);
+        assert_eq!(record.key().map(ReactKey::as_str), Some("portal-key"));
+        assert_eq!(record.pending_props(), PropsHandle::from_raw(303));
+        assert_eq!(record.state_node(), StateNodeHandle::from_raw(404));
+        assert_eq!(record.child(), Some(portal_child));
+        assert_eq!(record.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(record.feature(), PORTAL_RECONCILER_UNSUPPORTED_FEATURE);
+        assert!(registry.calls().is_empty());
+
+        let portal_node = arena.get(portal).unwrap();
+        assert_eq!(portal_node.child(), Some(portal_child));
+        assert_eq!(portal_node.memoized_props(), PropsHandle::NONE);
+        assert_eq!(portal_node.lanes(), Lanes::NO);
+        let child_node = arena.get(portal_child).unwrap();
+        assert_eq!(child_node.return_fiber(), Some(portal));
+        assert_eq!(child_node.memoized_props(), PropsHandle::NONE);
+        assert_eq!(child_node.lanes(), Lanes::NO);
     }
 
     #[test]
