@@ -554,6 +554,14 @@ test("react-test-renderer private root request bridge records Rust canary-shaped
       sync: false,
       updateKind: "Create"
     });
+    assert.equal(
+      bridge.getRustCanaryMetadata(createRequest),
+      createRequest.rustCanaryMetadata
+    );
+    assert.equal(
+      bridge.getRustCanaryOperationMetadata(createRequest),
+      createRequest.rustCanaryOperationMetadata
+    );
     assert.equal(createRequest.optionsInfo.strictMode, true);
     assert.equal(createRequest.optionsInfo.hasCreateNodeMock, true);
     assert.equal(createRequest.optionsInfo.concurrentModeRequested, true);
@@ -582,6 +590,10 @@ test("react-test-renderer private root request bridge records Rust canary-shaped
       updateKind: "Update"
     });
     assert.equal(
+      bridge.getRustCanaryOperationMetadata(updateError.rootRequest),
+      updateError.rootRequest.rustCanaryMetadata.operations.update
+    );
+    assert.equal(
       bridge.getRequestPayload(updateError.rootRequest).element,
       nextElement
     );
@@ -606,6 +618,10 @@ test("react-test-renderer private root request bridge records Rust canary-shaped
       sync: true,
       updateKind: "Unmount"
     });
+    assert.equal(
+      bridge.getRustCanaryOperationMetadata(unmountError.rootRequest),
+      unmountError.rootRequest.rustCanaryMetadata.operations.unmount
+    );
 
     const ignoredUpdateError = captureThrown(() =>
       renderer.update("ignored after unmount")
@@ -886,11 +902,16 @@ function assertPrivateRootRequestBridge(moduleExports, entrypoint) {
   assert.equal(bridge.nativeBridgeAvailable, false);
   assert.equal(bridge.nativeExecution, false);
   assert.equal(bridge.rustExecution, false);
+  assert.equal(bridge.recordOnlyBridge, true);
+  assertRustCanaryMetadata(bridge.rustCanaryMetadata, entrypoint);
   assert.equal(typeof bridge.createRootRequest, "function");
   assert.equal(typeof bridge.updateRootRequest, "function");
   assert.equal(typeof bridge.unmountRootRequest, "function");
   assert.equal(typeof bridge.getRendererRootRequests, "function");
   assert.equal(typeof bridge.getRequestPayload, "function");
+  assert.equal(typeof bridge.getRustCanaryMetadata, "function");
+  assert.equal(typeof bridge.getRustCanaryOperationMetadata, "function");
+  assert.equal(bridge.getRustCanaryMetadata(), bridge.rustCanaryMetadata);
 
   return bridge;
 }
@@ -941,6 +962,15 @@ function assertRootRequest(request, expected) {
   assert.equal(request.serializationAvailable, false);
   assert.equal(request.compatibilityClaimed, false);
   assert.equal(request.sync, expected.sync);
+  assertRustCanaryMetadata(request.rustCanaryMetadata, expected.entrypoint);
+  assert.equal(
+    request.rustCanaryOperationMetadata,
+    request.rustCanaryMetadata.operations[expected.operation]
+  );
+  assertRustCanaryOperationMetadata(
+    request.rustCanaryOperationMetadata,
+    expected
+  );
   assert.equal(Object.isFrozen(request.canaryShape), true);
   assert.equal(request.canaryShape.rootType, "TestRendererRoot");
   assert.equal(request.canaryShape.rootElementHandleType, "RootElementHandle");
@@ -956,6 +986,12 @@ function assertRootRequest(request, expected) {
   );
   assert.equal(request.canaryShape.schedulerApi, "ensure_root_is_scheduled");
   assert.equal(request.canaryShape.expectedOutcome, expected.rustOutcome);
+  assert.equal(
+    request.canaryShape.currentRustCanaryMetadataId,
+    request.rustCanaryMetadata.id
+  );
+  assert.equal(request.canaryShape.recordOnlyPrivateBridge, true);
+  assert.equal(request.canaryShape.nativeBridgeAvailable, false);
   assert.equal(Object.isFrozen(request.blockedCapabilities), true);
   assert.deepEqual(
     request.blockedCapabilities.map((capability) => capability.id),
@@ -965,6 +1001,237 @@ function assertRootRequest(request, expected) {
       "host-output",
       "public-compatibility"
     ]
+  );
+}
+
+function assertRustCanaryMetadata(metadata, label) {
+  assert.equal(Object.isFrozen(metadata), true, label);
+  assert.equal(
+    metadata.id,
+    "fast-react-test-renderer-current-root-canary-metadata",
+    label
+  );
+  assert.equal(
+    metadata.status,
+    "record-only-current-rust-canary-metadata",
+    label
+  );
+  assert.equal(metadata.compatibilityTarget, compatibilityTarget, label);
+  assert.equal(metadata.acceptedRustCrate, "fast-react-test-renderer", label);
+  assert.deepEqual(metadata.acceptedRustWorkers, [
+    "worker-153-test-renderer-root-canary",
+    "worker-188-test-renderer-commit-handoff-canary",
+    "worker-195-test-renderer-root-callback-snapshot",
+    "worker-208-test-renderer-host-output-canary",
+    "worker-234-test-renderer-host-output-update-unmount-canary",
+    "worker-265-test-renderer-private-json-ready-diagnostics"
+  ]);
+  assert.deepEqual(metadata.acceptedJsBridgeWorkers, [
+    "worker-304-test-renderer-js-private-root-request-bridge",
+    "worker-306-test-renderer-testinstance-private-wrapper-skeleton",
+    "worker-307-test-renderer-update-unmount-private-js-bridge"
+  ]);
+
+  assert.equal(Object.isFrozen(metadata.root), true, label);
+  assert.equal(metadata.root.rustType, "TestRendererRoot", label);
+  assert.equal(metadata.root.rendererType, "TestRenderer", label);
+  assert.equal(
+    metadata.root.rootStoreType,
+    "FiberRootStore<TestRenderer>",
+    label
+  );
+  assert.equal(metadata.root.lifecycleEnum, "TestRendererRootLifecycle", label);
+  assert.deepEqual(metadata.root.lifecycleValues, [
+    "Active",
+    "UnmountScheduled"
+  ]);
+
+  assert.equal(Object.isFrozen(metadata.requests), true, label);
+  assert.equal(
+    metadata.requests.updateKindEnum,
+    "TestRendererRootUpdateKind",
+    label
+  );
+  assert.deepEqual(metadata.requests.updateKindValues, [
+    "Create",
+    "Update",
+    "Unmount"
+  ]);
+  assert.equal(
+    metadata.requests.updateOutcomeEnum,
+    "TestRendererRootUpdateOutcome",
+    label
+  );
+  assert.deepEqual(metadata.requests.updateOutcomeValues, [
+    "Scheduled",
+    "IgnoredAfterUnmount",
+    "AlreadyUnmountScheduled"
+  ]);
+  assert.equal(
+    metadata.requests.scheduledUpdateRecord,
+    "TestRendererRootScheduledUpdate",
+    label
+  );
+  assert.equal(metadata.requests.noneElement, "RootElementHandle::NONE", label);
+
+  assert.equal(Object.isFrozen(metadata.commit), true, label);
+  assert.equal(
+    metadata.commit.renderPhaseApi,
+    "TestRendererRoot::render_latest_scheduled_host_root_for_commit_handoff",
+    label
+  );
+  assert.equal(
+    metadata.commit.commitApi,
+    "TestRendererRoot::commit_host_root_render_for_canary",
+    label
+  );
+  assert.equal(metadata.commit.commitRecord, "HostRootCommitRecord", label);
+  assert.equal(metadata.commit.rootUpdateCallbacksAvailable, true, label);
+  assert.equal(metadata.commit.hostMutationGeneralized, false, label);
+
+  assert.equal(Object.isFrozen(metadata.hostOutput), true, label);
+  assert.equal(
+    metadata.hostOutput.createApi,
+    "TestRendererRoot::render_and_commit_host_output_for_canary",
+    label
+  );
+  assert.equal(
+    metadata.hostOutput.updateApi,
+    "TestRendererRoot::render_and_commit_host_output_update_for_canary",
+    label
+  );
+  assert.equal(
+    metadata.hostOutput.unmountApi,
+    "TestRendererRoot::render_and_commit_host_output_unmount_for_canary",
+    label
+  );
+  assert.deepEqual(metadata.hostOutput.fixtureShape, [
+    "HostRoot",
+    "HostComponent",
+    "HostText"
+  ]);
+  assert.equal(metadata.hostOutput.fixtureType, "span", label);
+  assert.equal(metadata.hostOutput.fixtureText, "hello", label);
+  assert.equal(metadata.hostOutput.realHostOutputCanaryAvailable, true, label);
+  assert.equal(metadata.hostOutput.generalMutationTraversalAvailable, false);
+
+  assert.equal(Object.isFrozen(metadata.privateJson), true, label);
+  assert.equal(
+    metadata.privateJson.diagnosticName,
+    "fast-react-test-renderer.serialization.private-json-canary",
+    label
+  );
+  assert.equal(
+    metadata.privateJson.report,
+    "TestRendererPrivateJsonSerializationReport",
+    label
+  );
+  assert.equal(
+    metadata.privateJson.api,
+    "TestRendererRoot::describe_private_json_serialization_for_canary",
+    label
+  );
+  assert.equal(metadata.privateJson.publicSerializationAvailable, false);
+
+  assert.deepEqual(Object.keys(metadata.operations), [
+    "create",
+    "update",
+    "unmount"
+  ]);
+  assert.equal(metadata.recordOnlyPrivateBridge, true, label);
+  assert.equal(metadata.nativeAddonLoaded, false, label);
+  assert.equal(metadata.nativeBridgeAvailable, false, label);
+  assert.equal(metadata.nativeExecution, false, label);
+  assert.equal(metadata.rustExecution, false, label);
+  assert.equal(metadata.reconcilerExecutionFromJs, false, label);
+  assert.equal(metadata.hostOutputMutationFromJs, false, label);
+  assert.equal(
+    metadata.publicCreateUpdateUnmountBehaviorAvailable,
+    false,
+    label
+  );
+  assert.equal(metadata.compatibilityClaimed, false, label);
+}
+
+function assertRustCanaryOperationMetadata(metadata, expected) {
+  assert.equal(Object.isFrozen(metadata), true, expected.entrypoint);
+  assert.equal(metadata.operation, expected.operation);
+  assert.equal(metadata.rootApi, `TestRendererRoot::${expected.operation}`);
+  assert.equal(metadata.updateKind, expected.updateKind);
+  assert.equal(
+    metadata.rustUpdateKind,
+    `TestRendererRootUpdateKind::${expected.updateKind}`
+  );
+  assert.equal(
+    metadata.scheduledUpdateRecord,
+    "TestRendererRootScheduledUpdate"
+  );
+  assert.equal(
+    metadata.scheduledElement,
+    expected.operation === "unmount"
+      ? "RootElementHandle::NONE"
+      : "RootElementHandle"
+  );
+  assert.equal(
+    metadata.containerUpdateApi,
+    expected.operation === "unmount"
+      ? "update_container_sync"
+      : "update_container"
+  );
+  assert.equal(metadata.schedulerApi, "ensure_root_is_scheduled");
+  assert.equal(metadata.sync, expected.operation === "unmount");
+  assert.equal(
+    metadata.lifecycleAfterScheduled,
+    expected.operation === "unmount" ? "UnmountScheduled" : "Active"
+  );
+  assert.equal(Object.isFrozen(metadata.outcomeVariants), true);
+  assert.equal(metadata.outcomeVariants.includes(expected.rustOutcome), true);
+  assert.equal(Object.isFrozen(metadata.acceptedWorkers), true);
+  assert.equal(Object.isFrozen(metadata.acceptedRustTests), true);
+  const expectedWorkersByOperation = {
+    create: [
+      "worker-153-test-renderer-root-canary",
+      "worker-195-test-renderer-root-callback-snapshot",
+      "worker-208-test-renderer-host-output-canary"
+    ],
+    update: [
+      "worker-153-test-renderer-root-canary",
+      "worker-195-test-renderer-root-callback-snapshot",
+      "worker-234-test-renderer-host-output-update-unmount-canary"
+    ],
+    unmount: [
+      "worker-153-test-renderer-root-canary",
+      "worker-195-test-renderer-root-callback-snapshot",
+      "worker-234-test-renderer-host-output-update-unmount-canary"
+    ]
+  };
+  const expectedTestsByOperation = {
+    create: [
+      "root_create_enqueues_host_root_update_without_host_mutation",
+      "root_options_store_strict_mode_and_create_node_mock_without_invocation",
+      "root_create_commit_handoff_exposes_visible_callback_snapshot",
+      "root_host_output_canary_commits_minimal_host_component_with_text"
+    ],
+    update: [
+      "root_update_reuses_same_fiber_root_and_shared_scheduler_record",
+      "root_update_commit_handoff_exposes_visible_callback_snapshot",
+      "root_host_output_canary_updates_committed_text_with_update_diagnostics",
+      "root_update_after_unmount_does_not_mutate_or_reschedule"
+    ],
+    unmount: [
+      "root_unmount_enqueues_sync_null_update_before_wrapper_invalidation",
+      "root_unmount_commit_handoff_exposes_visible_callback_snapshot",
+      "root_host_output_canary_unmounts_committed_output_with_deletion_diagnostics",
+      "root_unmount_is_idempotent"
+    ]
+  };
+  assert.deepEqual(
+    metadata.acceptedWorkers,
+    expectedWorkersByOperation[expected.operation]
+  );
+  assert.deepEqual(
+    metadata.acceptedRustTests,
+    expectedTestsByOperation[expected.operation]
   );
 }
 
@@ -1316,6 +1583,11 @@ function assertPrivateRootRequestDiagnostics(error, expected) {
   assert.equal(error.privateRootBridgeState.nativeExecution, false);
   assert.equal(error.privateRootBridgeState.reconcilerExecution, false);
   assert.equal(error.privateRootBridgeState.compatibilityClaimed, false);
+  assert.equal(error.privateRootBridgeState.recordOnlyPrivateBridge, true);
+  assertRustCanaryMetadata(
+    error.privateRootBridgeState.rustCanaryMetadata,
+    "private root bridge state"
+  );
   assert.equal(Object.isFrozen(error.privateRootRequestHistory), true);
   assert.equal(error.privateRootRequestHistory.length, expected.historyLength);
   assert.equal(
@@ -1391,6 +1663,17 @@ function assertPrivateRootRequest(record, expected) {
   assert.equal(record.serialization, false);
   assert.equal(record.actIntegration, false);
   assert.equal(record.compatibilityClaimed, false);
+  assertRustCanaryMetadata(record.rustCanaryMetadata, "private root request");
+  assert.equal(
+    record.rustCanaryOperationMetadata,
+    record.rustCanaryMetadata.operations[expected.operation]
+  );
+  assertRustCanaryOperationMetadata(record.rustCanaryOperationMetadata, {
+    entrypoint: "private root request",
+    operation: expected.operation,
+    rustOutcome: expected.updateOutcome,
+    updateKind: expected.updateKind
+  });
   assert.equal(Object.isFrozen(record.blockedCapabilities), true);
   assert.deepEqual(
     record.blockedCapabilities.map((capability) => capability.id),

@@ -521,6 +521,170 @@ const rootRequestBlockedCapabilities = freezeArray([
       'React Test Renderer public create, update, unmount, act, and serialization compatibility remains unclaimed.'
   })
 ]);
+const currentRustTestRendererRootCanaryOperations = freezeRecord({
+  create: freezeRecord({
+    operation: 'create',
+    rootApi: 'TestRendererRoot::create',
+    hostOutputCanaryApi:
+      'TestRendererRoot::create_host_component_with_text_for_canary',
+    updateKind: 'Create',
+    rustUpdateKind: 'TestRendererRootUpdateKind::Create',
+    scheduledUpdateRecord: 'TestRendererRootScheduledUpdate',
+    scheduledElement: 'RootElementHandle',
+    containerUpdateApi: 'update_container',
+    schedulerApi: 'ensure_root_is_scheduled',
+    sync: false,
+    lifecycleAfterScheduled: 'Active',
+    outcomeVariants: freezeArray(['Scheduled']),
+    acceptedWorkers: freezeArray([
+      'worker-153-test-renderer-root-canary',
+      'worker-195-test-renderer-root-callback-snapshot',
+      'worker-208-test-renderer-host-output-canary'
+    ]),
+    acceptedRustTests: freezeArray([
+      'root_create_enqueues_host_root_update_without_host_mutation',
+      'root_options_store_strict_mode_and_create_node_mock_without_invocation',
+      'root_create_commit_handoff_exposes_visible_callback_snapshot',
+      'root_host_output_canary_commits_minimal_host_component_with_text'
+    ])
+  }),
+  update: freezeRecord({
+    operation: 'update',
+    rootApi: 'TestRendererRoot::update',
+    hostOutputCanaryApi:
+      'TestRendererRoot::update_host_component_with_text_for_canary',
+    hostOutputCommitApi:
+      'TestRendererRoot::render_and_commit_host_output_update_for_canary',
+    updateKind: 'Update',
+    rustUpdateKind: 'TestRendererRootUpdateKind::Update',
+    scheduledUpdateRecord: 'TestRendererRootScheduledUpdate',
+    scheduledElement: 'RootElementHandle',
+    containerUpdateApi: 'update_container',
+    schedulerApi: 'ensure_root_is_scheduled',
+    sync: false,
+    lifecycleAfterScheduled: 'Active',
+    outcomeVariants: freezeArray(['Scheduled', 'IgnoredAfterUnmount']),
+    acceptedWorkers: freezeArray([
+      'worker-153-test-renderer-root-canary',
+      'worker-195-test-renderer-root-callback-snapshot',
+      'worker-234-test-renderer-host-output-update-unmount-canary'
+    ]),
+    acceptedRustTests: freezeArray([
+      'root_update_reuses_same_fiber_root_and_shared_scheduler_record',
+      'root_update_commit_handoff_exposes_visible_callback_snapshot',
+      'root_host_output_canary_updates_committed_text_with_update_diagnostics',
+      'root_update_after_unmount_does_not_mutate_or_reschedule'
+    ])
+  }),
+  unmount: freezeRecord({
+    operation: 'unmount',
+    rootApi: 'TestRendererRoot::unmount',
+    hostOutputCommitApi:
+      'TestRendererRoot::render_and_commit_host_output_unmount_for_canary',
+    updateKind: 'Unmount',
+    rustUpdateKind: 'TestRendererRootUpdateKind::Unmount',
+    scheduledUpdateRecord: 'TestRendererRootScheduledUpdate',
+    scheduledElement: 'RootElementHandle::NONE',
+    containerUpdateApi: 'update_container_sync',
+    schedulerApi: 'ensure_root_is_scheduled',
+    sync: true,
+    lifecycleAfterScheduled: 'UnmountScheduled',
+    outcomeVariants: freezeArray(['Scheduled', 'AlreadyUnmountScheduled']),
+    acceptedWorkers: freezeArray([
+      'worker-153-test-renderer-root-canary',
+      'worker-195-test-renderer-root-callback-snapshot',
+      'worker-234-test-renderer-host-output-update-unmount-canary'
+    ]),
+    acceptedRustTests: freezeArray([
+      'root_unmount_enqueues_sync_null_update_before_wrapper_invalidation',
+      'root_unmount_commit_handoff_exposes_visible_callback_snapshot',
+      'root_host_output_canary_unmounts_committed_output_with_deletion_diagnostics',
+      'root_unmount_is_idempotent'
+    ])
+  })
+});
+const currentRustTestRendererRootCanaryMetadata = freezeRecord({
+  id: 'fast-react-test-renderer-current-root-canary-metadata',
+  status: 'record-only-current-rust-canary-metadata',
+  compatibilityTarget,
+  acceptedRustCrate: 'fast-react-test-renderer',
+  acceptedRustWorkers: freezeArray([
+    'worker-153-test-renderer-root-canary',
+    'worker-188-test-renderer-commit-handoff-canary',
+    'worker-195-test-renderer-root-callback-snapshot',
+    'worker-208-test-renderer-host-output-canary',
+    'worker-234-test-renderer-host-output-update-unmount-canary',
+    'worker-265-test-renderer-private-json-ready-diagnostics'
+  ]),
+  acceptedJsBridgeWorkers: freezeArray([
+    'worker-304-test-renderer-js-private-root-request-bridge',
+    'worker-306-test-renderer-testinstance-private-wrapper-skeleton',
+    'worker-307-test-renderer-update-unmount-private-js-bridge'
+  ]),
+  root: freezeRecord({
+    rustType: 'TestRendererRoot',
+    rendererType: 'TestRenderer',
+    rootStoreType: 'FiberRootStore<TestRenderer>',
+    rootTag: 'ConcurrentRoot',
+    lifecycleEnum: 'TestRendererRootLifecycle',
+    lifecycleValues: freezeArray(['Active', 'UnmountScheduled']),
+    optionsType: 'TestRendererOptions',
+    rootOptionsType: 'RootOptions'
+  }),
+  requests: freezeRecord({
+    updateKindEnum: 'TestRendererRootUpdateKind',
+    updateKindValues: freezeArray(['Create', 'Update', 'Unmount']),
+    updateOutcomeEnum: 'TestRendererRootUpdateOutcome',
+    updateOutcomeValues: freezeArray([
+      'Scheduled',
+      'IgnoredAfterUnmount',
+      'AlreadyUnmountScheduled'
+    ]),
+    scheduledUpdateRecord: 'TestRendererRootScheduledUpdate',
+    rootElementHandleType: 'RootElementHandle',
+    noneElement: 'RootElementHandle::NONE',
+    callbackSnapshot: 'RootUpdateCallbackSnapshot'
+  }),
+  commit: freezeRecord({
+    renderPhaseApi:
+      'TestRendererRoot::render_latest_scheduled_host_root_for_commit_handoff',
+    commitApi: 'TestRendererRoot::commit_host_root_render_for_canary',
+    commitRecord: 'HostRootCommitRecord',
+    commitDiagnostics: 'TestRendererCommitDiagnostics',
+    rootUpdateCallbacksAvailable: true,
+    hostMutationGeneralized: false
+  }),
+  hostOutput: freezeRecord({
+    createApi: 'TestRendererRoot::render_and_commit_host_output_for_canary',
+    updateApi:
+      'TestRendererRoot::render_and_commit_host_output_update_for_canary',
+    unmountApi:
+      'TestRendererRoot::render_and_commit_host_output_unmount_for_canary',
+    diagnostics: 'TestRendererHostOutputDiagnostics',
+    fixtureShape: freezeArray(['HostRoot', 'HostComponent', 'HostText']),
+    fixtureType: 'span',
+    fixtureText: 'hello',
+    realHostOutputCanaryAvailable: true,
+    generalMutationTraversalAvailable: false
+  }),
+  privateJson: freezeRecord({
+    diagnosticName:
+      'fast-react-test-renderer.serialization.private-json-canary',
+    report: 'TestRendererPrivateJsonSerializationReport',
+    api: 'TestRendererRoot::describe_private_json_serialization_for_canary',
+    publicSerializationAvailable: false
+  }),
+  operations: currentRustTestRendererRootCanaryOperations,
+  recordOnlyPrivateBridge: true,
+  nativeAddonLoaded: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  rustExecution: false,
+  reconcilerExecutionFromJs: false,
+  hostOutputMutationFromJs: false,
+  publicCreateUpdateUnmountBehaviorAvailable: false,
+  compatibilityClaimed: false
+});
 const schedulerMockKeys = [
   'log',
   'reset',
@@ -889,6 +1053,10 @@ function createPrivateRootRequestRecord(state, request) {
       hiddenCount: 0,
       deferredHiddenCount: 0
     }),
+    rustCanaryMetadata: currentRustTestRendererRootCanaryMetadata,
+    rustCanaryOperationMetadata: getCurrentRustCanaryOperationMetadata(
+      request.operation
+    ),
     owner: state.owner,
     handle: state.handle,
     nativeBridgeAvailable: false,
@@ -937,6 +1105,8 @@ function describePrivateRootDiagnostics(state, request) {
       rootKind: testRendererRootKind,
       rootTag: testRendererRootTag,
       scheduledUpdateCount: state.scheduledUpdateCount,
+      rustCanaryMetadata: currentRustTestRendererRootCanaryMetadata,
+      recordOnlyPrivateBridge: true,
       nativeBridgeAvailable: false,
       nativeExecution: false,
       reconcilerExecution: false,
@@ -1029,6 +1199,8 @@ function createTestRendererRootRequestBridge(options) {
     nativeBridgeAvailable: false,
     nativeExecution: false,
     rustExecution: false,
+    recordOnlyBridge: true,
+    rustCanaryMetadata: currentRustTestRendererRootCanaryMetadata,
     createRootRequest(element, rootOptions) {
       return createRootRequestRecordWithBridge(
         bridgeState,
@@ -1086,6 +1258,12 @@ function createTestRendererRootRequestBridge(options) {
     },
     getRequestPayload(record) {
       return rootRequestPayloads.get(record) || null;
+    },
+    getRustCanaryMetadata(record) {
+      return getRustCanaryMetadataForRequestRecord(record);
+    },
+    getRustCanaryOperationMetadata(record) {
+      return getRustCanaryOperationMetadataForRequestRecord(record);
     },
     isRootRequestRecord(record) {
       return isRootRequestRecord(record);
@@ -1250,6 +1428,10 @@ function createRootRequestRecord({
     optionsInfo:
       operation === 'create' ? describeCreateOptions(rootOptions) : null,
     callbackInfo: describeRootRequestValue(callback),
+    rustCanaryMetadata: currentRustTestRendererRootCanaryMetadata,
+    rustCanaryOperationMetadata: getCurrentRustCanaryOperationMetadata(
+      operation
+    ),
     canaryShape: freezeRecord({
       rootType: 'TestRendererRoot',
       rootElementHandleType: 'RootElementHandle',
@@ -1258,7 +1440,11 @@ function createRootRequestRecord({
       rootApi,
       containerUpdateApi,
       schedulerApi: 'ensure_root_is_scheduled',
-      expectedOutcome: rustOutcome
+      expectedOutcome: rustOutcome,
+      currentRustCanaryMetadataId:
+        currentRustTestRendererRootCanaryMetadata.id,
+      recordOnlyPrivateBridge: true,
+      nativeBridgeAvailable: false
     }),
     blockedCapabilities: rootRequestBlockedCapabilities
   });
@@ -1384,6 +1570,41 @@ function isRootRequestRecord(record) {
     record.$$typeof === privateRootRequestRecordType &&
     rootRequestPayloads.has(record)
   );
+}
+
+function getCurrentRustCanaryOperationMetadata(operation) {
+  const metadata =
+    currentRustTestRendererRootCanaryMetadata.operations[operation];
+  if (metadata === undefined) {
+    throwInvalidRootRequest(
+      `Unsupported test-renderer root canary metadata operation: ${String(operation)}.`
+    );
+  }
+  return metadata;
+}
+
+function getRustCanaryMetadataForRequestRecord(record) {
+  if (record === undefined) {
+    return currentRustTestRendererRootCanaryMetadata;
+  }
+
+  if (!isRootRequestRecord(record)) {
+    throwInvalidRootRequest(
+      'Expected a private react-test-renderer root request record.'
+    );
+  }
+
+  return record.rustCanaryMetadata;
+}
+
+function getRustCanaryOperationMetadataForRequestRecord(record) {
+  if (!isRootRequestRecord(record)) {
+    throwInvalidRootRequest(
+      'Expected a private react-test-renderer root request record.'
+    );
+  }
+
+  return record.rustCanaryOperationMetadata;
 }
 
 function throwInvalidRootRequest(message) {
