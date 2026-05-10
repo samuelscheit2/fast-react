@@ -49,6 +49,13 @@ or rendering.
 - `node tests/smoke/import-entrypoints.mjs` passed.
 - `npm run check:js` passed.
 - `git diff --check` passed.
+- Orchestrator merged current `main` into this branch without conflicts.
+- Post-merge orchestrator verification passed:
+  - `node --test tests/conformance/test/react-hook-dispatcher-guard.test.mjs`
+  - `node tests/smoke/import-entrypoints.mjs`
+  - `npm run check:js`: 445 conformance tests plus package surface,
+    benchmark, native loader, and workspace smoke checks
+  - `git diff --check`
 
 ## Risks And Notes
 
