@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
 import test from "node:test";
 
 import {
@@ -10,13 +11,42 @@ import {
 import {
   REACT_TEST_RENDERER_SERIALIZATION_LOCAL_GATE_STATUS,
   REACT_TEST_RENDERER_SERIALIZATION_PRIVATE_DIAGNOSTIC_REQUIREMENTS,
+  REACT_TEST_RENDERER_TOJSON_PRIVATE_FACADE_REQUIREMENTS,
   REACT_TEST_RENDERER_SERIALIZATION_PUBLIC_COMPATIBILITY_STATUS,
   REACT_TEST_RENDERER_SERIALIZATION_LOCAL_SCENARIO_ADMISSIONS,
   REACT_TEST_RENDERER_SERIALIZATION_LOCAL_UNBLOCKING_REQUIREMENTS,
   evaluateReactTestRendererSerializationLocalGate
 } from "./react-test-renderer-serialization-local-gate.mjs";
 
+const require = createRequire(import.meta.url);
 const oracle = readCheckedReactTestRendererSerializationOracle();
+const jsEntrypoints = [
+  {
+    entrypoint: "react-test-renderer",
+    specifier: "../../../packages/react-test-renderer/index.js"
+  },
+  {
+    entrypoint: "react-test-renderer/cjs/react-test-renderer.development",
+    specifier:
+      "../../../packages/react-test-renderer/cjs/react-test-renderer.development.js"
+  },
+  {
+    entrypoint: "react-test-renderer/cjs/react-test-renderer.production",
+    specifier:
+      "../../../packages/react-test-renderer/cjs/react-test-renderer.production.js"
+  }
+];
+const expectedToJSONFacadeRustApis = [
+  "TestRendererRoot::describe_private_json_serialization_for_canary",
+  "TestRendererPrivateJsonSerializationReport",
+  "TestRendererPrivateJsonPublicSurfaceBlockers"
+];
+const expectedToJSONFacadeRustTests = [
+  "root_private_json_serialization_canary_describes_minimal_host_component_with_text",
+  "root_private_json_serialization_canary_rejects_stale_host_output_snapshot",
+  "root_private_json_serialization_canary_rejects_stale_commit_after_same_shape_update",
+  "root_private_json_serialization_canary_rejects_non_minimal_snapshot_shapes"
+];
 
 test("react-test-renderer serialization gate is ready for private diagnostics while public compatibility stays blocked", () => {
   const gate = evaluateReactTestRendererSerializationLocalGate({ oracle });
@@ -25,6 +55,8 @@ test("react-test-renderer serialization gate is ready for private diagnostics wh
   assert.equal(gate.requiredLocalTargetsReady, true);
   assert.equal(gate.privateDiagnosticsReady, true);
   assert.deepEqual(gate.privateDiagnosticBlockers, []);
+  assert.equal(gate.privateToJSONFacadeGateReady, true);
+  assert.deepEqual(gate.privateToJSONFacadeBlockers, []);
   assert.equal(gate.publicCompatibilityReady, false);
   assert.equal(gate.publicCompatibilityClaimed, false);
   assert.deepEqual(gate.publicCompatibilityBlockers, [
@@ -42,6 +74,9 @@ test("react-test-renderer serialization gate is ready for private diagnostics wh
     committedTestRendererHostOutputPresent: true,
     committedFiberInspectionPresent: true,
     privateJsonDiagnosticsPresent: true,
+    privateToJSONSerializationFacadeGatePresent: true,
+    privateToJSONSerializationFacadeRecognizesRustDiagnostics: true,
+    privateToJSONSerializationFacadePubliclyBlocked: true,
     publicToJSONAvailable: false,
     publicToTreeAvailable: false,
     publicTestInstanceWrappersPresent: false,
@@ -66,10 +101,99 @@ test("react-test-renderer serialization gate records accepted Rust-private prere
   assert.equal(gate.requiredLocalTargetsReady, true);
   assert.equal(gate.privateDiagnosticsReady, true);
   assert.deepEqual(gate.privateDiagnosticBlockers, []);
+  assert.deepEqual(
+    REACT_TEST_RENDERER_TOJSON_PRIVATE_FACADE_REQUIREMENTS.map(
+      (requirement) => requirement.id
+    ),
+    [
+      "js-tojson-private-serialization-facade-gate",
+      "js-tojson-accepted-rust-private-json-diagnostics",
+      "js-tojson-public-serialization-blocked"
+    ]
+  );
+  assert.equal(gate.privateToJSONFacadeGateReady, true);
+  assert.deepEqual(gate.privateToJSONFacadeBlockers, []);
   assert.equal(gate.publicCompatibilityReady, false);
   assert.equal(gate.localChecks.publicTestInstanceWrappersPresent, false);
   assert.equal(gate.localChecks.publicJsFacadeRoutingPresent, false);
   assert.deepEqual(gate.admittedScenarios, []);
+});
+
+test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics without public serialization", () => {
+  for (const entry of jsEntrypoints) {
+    const moduleExports = loadFresh(entry.specifier);
+    const renderer = moduleExports.create({
+      type: "span",
+      props: {},
+      children: ["hello"]
+    });
+    const error = captureThrown(() => renderer.toJSON());
+
+    assert.equal(error.name, "FastReactTestRendererUnimplementedError");
+    assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED");
+    assert.equal(error.entrypoint, entry.entrypoint);
+    assert.equal(error.exportName, "create().toJSON");
+    assert.equal(error.compatibilityTarget, "react-test-renderer@19.2.6");
+    assert.match(error.message, /Serialization is intentionally blocked/u);
+    assert.match(error.message, /no native bridge/u);
+    assert.equal(error.serializationAvailable, false);
+    assert.equal(error.nativeBridgeAvailable, false);
+    assert.equal(error.compatibilityClaimed, false);
+
+    const facadeGate = error.toJSONSerializationFacadeGate;
+    assert.equal(facadeGate, error.routingGate.toJSONSerializationFacadeGate);
+    assert.equal(Object.isFrozen(facadeGate), true);
+    assert.equal(
+      facadeGate.id,
+      "react-test-renderer-tojson-private-serialization-facade-gate"
+    );
+    assert.equal(facadeGate.publicSurface, "create().toJSON");
+    assert.equal(
+      facadeGate.status,
+      "ready-for-private-diagnostics-public-tojson-blocked"
+    );
+    assert.equal(facadeGate.privateFacadeGateAvailable, true);
+    assert.equal(facadeGate.acceptedRustPrivateJsonDiagnostics, true);
+    assert.equal(facadeGate.publicSerializationAvailable, false);
+    assert.equal(facadeGate.publicRouteAvailable, false);
+    assert.equal(facadeGate.nativeBridgeAvailable, false);
+    assert.equal(facadeGate.nativeExecution, false);
+    assert.equal(facadeGate.compatibilityClaimed, false);
+    assert.equal(
+      facadeGate.acceptedWorker,
+      "worker-265-test-renderer-private-json-ready-diagnostics"
+    );
+    assert.equal(facadeGate.acceptedRustCrate, "fast-react-test-renderer");
+    assert.equal(
+      facadeGate.acceptedRustDiagnosticName,
+      "fast-react-test-renderer.serialization.private-json-canary"
+    );
+    assert.deepEqual(
+      facadeGate.acceptedRustApis,
+      expectedToJSONFacadeRustApis
+    );
+    assert.deepEqual(
+      facadeGate.acceptedRustNodeKinds,
+      ["HostComponent", "Text"]
+    );
+    assert.deepEqual(
+      facadeGate.acceptedRustTests,
+      expectedToJSONFacadeRustTests
+    );
+    assert.deepEqual(facadeGate.blockedPublicSurfaces, [
+      "create().toJSON",
+      "create().toTree",
+      "create().root",
+      "ReactTestInstance",
+      "public-js-react-test-renderer-routing",
+      "compatibility-claim"
+    ]);
+    assert.deepEqual(facadeGate.missingPrerequisites, [
+      "rust-native-test-renderer-create-bridge",
+      "public-react-test-renderer-tojson-bridge",
+      "public-test-instance-and-totree-serialization-contract"
+    ]);
+  }
 });
 
 test("react-test-renderer serialization scenario admission is explicit and blocked for public rows", () => {
@@ -126,6 +250,22 @@ test("react-test-renderer serialization gate rejects premature public compatibil
     ]
   );
 });
+
+function loadFresh(specifier) {
+  const resolved = require.resolve(specifier);
+  delete require.cache[resolved];
+  return require(resolved);
+}
+
+function captureThrown(callback) {
+  try {
+    callback();
+  } catch (error) {
+    return error;
+  }
+
+  assert.fail("Expected callback to throw");
+}
 
 test("react-test-renderer serialization React oracle generation remains React-only while public compatibility is blocked", () => {
   assert.deepEqual(oracle.conformanceClaims, {
