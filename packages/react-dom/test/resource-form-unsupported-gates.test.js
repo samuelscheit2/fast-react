@@ -13,6 +13,11 @@ const resourceFormGate = require(path.join(
   sourceRoot,
   'resource-form-gates.js'
 ));
+const propertyPayload = require(path.join(
+  sourceRoot,
+  'dom-host',
+  'property-payload.js'
+));
 const rootBridge = require(path.join(sourceRoot, 'client', 'root-bridge.js'));
 
 const resourceOracle = require(path.join(
@@ -701,6 +706,260 @@ test('private controlled input fake-DOM value-tracker diagnostic installs observ
   });
 });
 
+test('private controlled input restore queue diagnostic records fake-DOM observation intent only', () => {
+  const gate = resourceFormGate.createControlledInputValueTrackerGate({
+    requestIdPrefix: 'fake-restore'
+  });
+  const fakeInput = createControlledInputFakeDomTarget({
+    value: 'alpha'
+  });
+  const descriptorBefore = Object.getOwnPropertyDescriptor(fakeInput, 'value');
+  const install = gate.installFakeDomTracker(
+    {
+      scenarioId: 'input-text-controlled-value-update',
+      phaseId: 'update',
+      hostTag: 'input',
+      inputType: 'text',
+      props: {
+        type: 'text',
+        value: 'alpha',
+        onChange() {}
+      }
+    },
+    {
+      explicitAdmission: true,
+      adapterKind: 'deterministic-fake-dom',
+      adapterId: 'fake-input-restore-diagnostic',
+      targetKind: 'controlled-input-value-tracker',
+      fakeTarget: fakeInput
+    }
+  );
+
+  fakeInput.value = 'beta';
+  const changedObservation = gate.observeFakeDomTracker(install);
+  const changedIntent =
+    gate.recordPostEventRestoreIntentFromFakeDomObservation(
+      changedObservation,
+      {
+        explicitAdmission: true,
+        queueKind: 'deterministic-fake-dom-post-event-restore-queue',
+        queueId: 'fake-input-restore-queue',
+        eventName: 'input',
+        targetKind: 'controlled-input-restore-queue'
+      }
+    );
+  const unchangedObservation = gate.observeFakeDomTracker(changedObservation);
+  const unchangedIntent =
+    gate.recordPostEventRestoreIntentFromFakeDomObservation(
+      unchangedObservation,
+      {
+        explicitAdmission: true,
+        queueKind: 'deterministic-fake-dom-post-event-restore-queue',
+        targetKind: 'controlled-input-restore-queue'
+      }
+    );
+  const detach = gate.detachFakeDomTracker(unchangedObservation);
+  const summary =
+    resourceFormGate.describeControlledInputPrivateRestoreQueueDiagnosticGate();
+
+  assert.equal(
+    propertyPayload.CONTROLLED_RESTORE_QUEUE_FAKE_DOM_DIAGNOSTIC_STATUS,
+    resourceFormGate.controlledInputPrivateRestoreQueueDiagnosticStatus
+  );
+  assert.deepEqual(
+    [changedIntent, unchangedIntent].map((record) => ({
+      requestId: record.requestId,
+      requestSequence: record.requestSequence,
+      sourceTrackerRequestId: record.sourceTrackerRequestId,
+      sourceTrackerOperation: record.sourceTrackerOperation,
+      status: record.status,
+      sourceChanged: record.restoreIntent.sourceChanged,
+      intentRecorded: record.restoreIntent.intentRecorded,
+      restoreTargetWouldBeQueued:
+        record.restoreIntent.restoreTargetWouldBeQueued,
+      queuePosition: record.restoreIntent.queuePosition,
+      latestPropsLookupRequired:
+        record.restoreIntent.latestPropsLookupRequired,
+      eventPluginDispatchRequired:
+        record.restoreIntent.eventPluginDispatchRequired,
+      previousValueSnapshot:
+        record.trackerObservation.previousValueSnapshot,
+      currentValueSnapshot: record.trackerObservation.currentValueSnapshot,
+      fakeDomRestoreIntentRecorded:
+        record.sideEffects.fakeDomRestoreIntentRecorded,
+      fakeDomRestoreIntentSkipped:
+        record.sideEffects.fakeDomRestoreIntentSkipped,
+      restoreQueueRecordCreated:
+        record.sideEffects.restoreQueueRecordCreated
+    })),
+    [
+      {
+        requestId: 'fake-restore:3',
+        requestSequence: 3,
+        sourceTrackerRequestId: 'fake-restore:2',
+        sourceTrackerOperation: 'observe',
+        status:
+          resourceFormGate.controlledInputPrivateRestoreQueueIntentRecordedStatus,
+        sourceChanged: true,
+        intentRecorded: true,
+        restoreTargetWouldBeQueued: true,
+        queuePosition: 'primary',
+        latestPropsLookupRequired: true,
+        eventPluginDispatchRequired: true,
+        previousValueSnapshot: 'alpha',
+        currentValueSnapshot: 'beta',
+        fakeDomRestoreIntentRecorded: true,
+        fakeDomRestoreIntentSkipped: false,
+        restoreQueueRecordCreated: true
+      },
+      {
+        requestId: 'fake-restore:5',
+        requestSequence: 5,
+        sourceTrackerRequestId: 'fake-restore:4',
+        sourceTrackerOperation: 'observe',
+        status:
+          resourceFormGate.controlledInputPrivateRestoreQueueIntentSkippedStatus,
+        sourceChanged: false,
+        intentRecorded: false,
+        restoreTargetWouldBeQueued: false,
+        queuePosition: null,
+        latestPropsLookupRequired: false,
+        eventPluginDispatchRequired: false,
+        previousValueSnapshot: 'beta',
+        currentValueSnapshot: 'beta',
+        fakeDomRestoreIntentRecorded: false,
+        fakeDomRestoreIntentSkipped: true,
+        restoreQueueRecordCreated: true
+      }
+    ]
+  );
+
+  for (const record of [changedIntent, unchangedIntent]) {
+    assert.equal(Object.isFrozen(record), true, record.requestId);
+    assert.equal(
+      resourceFormGate.isPrivateControlledInputRestoreQueueDiagnosticRecord(
+        record
+      ),
+      true,
+      record.requestId
+    );
+    assert.equal(
+      resourceFormGate.getPrivateControlledInputRestoreQueueDiagnosticRecordPayload(
+        record
+      ),
+      record,
+      record.requestId
+    );
+    assert.equal(
+      record.gateId,
+      resourceFormGate.controlledInputPrivateRestoreQueueDiagnosticGateId
+    );
+    assert.equal(record.compatibilityTarget, compatibilityTarget);
+    assert.equal(record.unsupportedCode, unsupportedCode);
+    assert.equal(record.trackerObservation.fakeDomOnly, true);
+    assert.equal(record.trackerObservation.propertyDescriptorInstalled, false);
+    assert.equal(record.trackerObservation.rawTargetCaptured, false);
+    assert.equal(record.trackerObservation.realDomNodeTouched, false);
+    assert.equal(record.restoreIntent.latestPropsLookupPerformed, false);
+    assert.equal(record.restoreIntent.eventPluginDispatchPerformed, false);
+    assert.equal(record.restoreIntent.restoreQueueWritten, false);
+    assert.equal(record.restoreIntent.restoreStateIfNeededInvoked, false);
+    assert.equal(record.restoreIntent.restoreControlledStateInvoked, false);
+    assert.equal(record.restoreIntent.restoreFlushed, false);
+    assert.equal(record.restoreIntent.rawTargetCaptured, false);
+    assert.equal(record.restoreIntent.rawEventCaptured, false);
+    assert.equal(record.restoreIntent.realDomNodeTouched, false);
+    assert.equal(
+      record.restoreIntent.publicControlledBehaviorEnabled,
+      false
+    );
+    assert.equal(record.restoreIntent.compatibilityClaimed, false);
+    assert.equal(record.postEventRestoreBoundary.latestPropsLookup, false);
+    assert.equal(record.postEventRestoreBoundary.eventPluginDispatch, false);
+    assert.equal(record.postEventRestoreBoundary.restoreQueued, false);
+    assert.equal(record.postEventRestoreBoundary.restoreFlushed, false);
+    assert.equal(record.sideEffects.changeEventsObserved, false);
+    assert.equal(record.sideEffects.postEventRestoreQueued, false);
+    assert.equal(record.sideEffects.restoreQueueWritten, false);
+    assert.equal(record.sideEffects.latestPropsLookup, false);
+    assert.equal(record.sideEffects.eventPluginDispatch, false);
+    assert.equal(record.sideEffects.restoreStateIfNeededInvoked, false);
+    assert.equal(record.sideEffects.restoreControlledStateInvoked, false);
+    assert.equal(record.sideEffects.restoreFlushed, false);
+    assert.equal(record.sideEffects.hostWrapperInvoked, false);
+    assert.equal(record.sideEffects.hostValueWritten, false);
+    assert.equal(record.sideEffects.propertyDescriptorInstalled, false);
+    assert.equal(
+      record.sideEffects.publicControlledBehaviorEnabled,
+      false
+    );
+    assert.equal(record.sideEffects.compatibilityClaimed, false);
+    assert.equal(
+      record.publicControlledBehaviorBoundary.compatibilityClaimed,
+      false
+    );
+  }
+
+  assert.equal(changedIntent.admission.queueId, 'fake-input-restore-queue');
+  assert.equal(changedIntent.admission.eventName, 'input');
+  assert.equal(changedIntent.admission.rawTargetCaptured, false);
+  assert.equal(changedIntent.admission.rawEventCaptured, false);
+  assert.equal(changedIntent.admission.restoreQueueWriteAllowed, false);
+  assert.equal(Object.hasOwn(fakeInput, '_valueTracker'), false);
+  assert.equal(descriptorBefore.get, undefined);
+  assert.equal(descriptorBefore.set, undefined);
+  assert.equal(
+    Object.getOwnPropertyDescriptor(fakeInput, 'value').get,
+    undefined
+  );
+  assert.equal(
+    Object.getOwnPropertyDescriptor(fakeInput, 'value').set,
+    undefined
+  );
+  assert.equal(detach.status, resourceFormGate.controlledInputValueTrackerFakeDomDetachedStatus);
+
+  assert.equal(
+    summary.gateId,
+    resourceFormGate.controlledInputPrivateRestoreQueueDiagnosticGateId
+  );
+  assert.equal(
+    summary.status,
+    resourceFormGate.controlledInputPrivateRestoreQueueDiagnosticStatus
+  );
+  assert.equal(
+    summary.acceptedSourceRecordType,
+    resourceFormGate.privateControlledInputValueTrackerFakeDomDiagnosticRecordType
+  );
+  assert.equal(summary.acceptedSourceOperation, 'observe');
+  assert.equal(summary.recordsPostEventRestoreIntent, true);
+  assert.equal(summary.deterministicFakeDomOnly, true);
+  assert.equal(summary.writesRestoreQueue, false);
+  assert.equal(summary.flushesRestoreQueue, false);
+  assert.equal(summary.latestPropsLookup, false);
+  assert.equal(summary.eventPluginDispatch, false);
+  assert.equal(summary.liveDomDescriptorInstallation, false);
+  assert.equal(summary.realDomNodeAccepted, false);
+  assert.deepEqual(
+    summary.sideEffects,
+    resourceFormGate.controlledInputPrivateRestoreQueueDiagnosticNoSideEffects
+  );
+
+  const error =
+    resourceFormGate.createUnsupportedControlledInputRestoreQueueDiagnosticError(
+      changedIntent
+    );
+  assert.equal(error.name, 'FastReactDomUnimplementedError');
+  assert.equal(
+    error.code,
+    resourceFormGate.privateControlledInputRestoreQueueDiagnosticGateErrorCode
+  );
+  assert.equal(error.exportName, 'controlled-restore-queue.input');
+  assert.equal(error.requestId, 'fake-restore:3');
+  assert.equal(error.sourceTrackerRequestId, 'fake-restore:2');
+  assert.equal(error.restoreIntent.intentRecorded, true);
+  assert.deepEqual(error.sideEffects, changedIntent.sideEffects);
+});
+
 test('private controlled input fake-DOM value-tracker diagnostic rejects live DOM-like or inactive records', () => {
   const gate = resourceFormGate.createControlledInputValueTrackerGate({
     requestIdPrefix: 'fake-tracker-error'
@@ -796,6 +1055,66 @@ test('private controlled input fake-DOM value-tracker diagnostic rejects live DO
       resourceFormGate.privateControlledInputValueTrackerFakeDomDiagnosticInactiveRecordCode,
     compatibilityTarget
   });
+  assert.throws(
+    () =>
+      gate.recordPostEventRestoreIntentFromFakeDomObservation(install, {
+        explicitAdmission: true
+      }),
+    {
+      code:
+        resourceFormGate.privateControlledInputRestoreQueueDiagnosticInvalidObservationCode,
+      compatibilityTarget,
+      operation: 'install',
+      reason: 'source record must be an observed fake DOM tracker record'
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordPostEventRestoreIntentFromFakeDomObservation({}, {
+        explicitAdmission: true
+      }),
+    {
+      code:
+        resourceFormGate.privateControlledInputRestoreQueueDiagnosticInvalidRecordCode,
+      compatibilityTarget
+    }
+  );
+  const freshInstall = gate.installFakeDomTracker(
+    {hostTag: 'input', inputType: 'text'},
+    {
+      explicitAdmission: true,
+      adapterKind: 'deterministic-fake-dom',
+      targetKind: 'controlled-input-value-tracker',
+      fakeTarget: createControlledInputFakeDomTarget({value: 'fresh'})
+    }
+  );
+  const freshObservation = gate.observeFakeDomTracker(freshInstall);
+  assert.throws(
+    () =>
+      gate.recordPostEventRestoreIntentFromFakeDomObservation(
+        freshObservation,
+        {
+          queueKind: 'deterministic-fake-dom-post-event-restore-queue'
+        }
+      ),
+    {
+      code:
+        resourceFormGate.privateControlledInputRestoreQueueDiagnosticInvalidAdmissionCode,
+      compatibilityTarget,
+      reason: 'explicitAdmission must be true'
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate.createUnsupportedControlledInputRestoreQueueDiagnosticError(
+        {}
+      ),
+    {
+      code:
+        resourceFormGate.privateControlledInputRestoreQueueDiagnosticInvalidRecordCode,
+      compatibilityTarget
+    }
+  );
 });
 
 test('private controlled input wrapper property-payload gate records blocked rows only', () => {

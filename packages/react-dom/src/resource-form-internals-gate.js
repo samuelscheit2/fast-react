@@ -14,6 +14,7 @@ const resourceHintFakeDomAdapterGateSchemaVersion = 1;
 const resourceHintFakeDomInsertionGateSchemaVersion = 1;
 const controlledInputValueTrackerGateSchemaVersion = 1;
 const controlledInputValueTrackerFakeDomDiagnosticGateSchemaVersion = 1;
+const controlledInputPrivateRestoreQueueDiagnosticGateSchemaVersion = 1;
 const controlledInputPrivateWrapperGateSchemaVersion = 1;
 const privateResourceFormActionGateRecordType =
   'fast.react_dom.private_resource_form_action_gate_record';
@@ -27,6 +28,8 @@ const privateControlledInputValueTrackerGateRecordType =
   'fast.react_dom.private_controlled_input_value_tracker_gate_record';
 const privateControlledInputValueTrackerFakeDomDiagnosticRecordType =
   'fast.react_dom.private_controlled_input_value_tracker_fake_dom_diagnostic_record';
+const privateControlledInputRestoreQueueDiagnosticRecordType =
+  'fast.react_dom.private_controlled_input_restore_queue_diagnostic_record';
 const privateControlledInputWrapperPropertyPayloadRecordType =
   'fast.react_dom.private_controlled_input_wrapper_property_payload_record';
 const privateResourceHintDispatcherMetadataGateId =
@@ -85,19 +88,35 @@ const privateControlledInputValueTrackerFakeDomDiagnosticInvalidRecordCode =
   'FAST_REACT_DOM_CONTROLLED_INPUT_VALUE_TRACKER_FAKE_DOM_DIAGNOSTIC_INVALID_RECORD';
 const privateControlledInputValueTrackerFakeDomDiagnosticInactiveRecordCode =
   'FAST_REACT_DOM_CONTROLLED_INPUT_VALUE_TRACKER_FAKE_DOM_DIAGNOSTIC_INACTIVE_RECORD';
+const privateControlledInputRestoreQueueDiagnosticGateErrorCode =
+  'FAST_REACT_DOM_CONTROLLED_INPUT_RESTORE_QUEUE_DIAGNOSTIC_GATE';
+const privateControlledInputRestoreQueueDiagnosticInvalidAdmissionCode =
+  'FAST_REACT_DOM_CONTROLLED_INPUT_RESTORE_QUEUE_DIAGNOSTIC_INVALID_ADMISSION';
+const privateControlledInputRestoreQueueDiagnosticInvalidObservationCode =
+  'FAST_REACT_DOM_CONTROLLED_INPUT_RESTORE_QUEUE_DIAGNOSTIC_INVALID_OBSERVATION';
+const privateControlledInputRestoreQueueDiagnosticInvalidRecordCode =
+  'FAST_REACT_DOM_CONTROLLED_INPUT_RESTORE_QUEUE_DIAGNOSTIC_INVALID_RECORD';
 const unsupportedStatus = 'unsupported';
 const controlledInputValueTrackerGateId =
   'controlled-input-value-tracker-private-gate-1';
 const controlledInputValueTrackerFakeDomDiagnosticGateId =
   'controlled-input-value-tracker-fake-dom-diagnostic-gate-1';
+const controlledInputPrivateRestoreQueueDiagnosticGateId =
+  'controlled-input-private-restore-queue-diagnostic-gate-1';
 const controlledInputValueTrackerFakeDomDiagnosticStatus =
   'private-fake-dom-controlled-value-tracker-diagnostic';
+const controlledInputPrivateRestoreQueueDiagnosticStatus =
+  'private-fake-dom-controlled-restore-queue-diagnostic';
 const controlledInputValueTrackerFakeDomInstalledStatus =
   'installed-private-fake-dom-controlled-value-tracker-record';
 const controlledInputValueTrackerFakeDomObservedStatus =
   'observed-private-fake-dom-controlled-value-tracker-record';
 const controlledInputValueTrackerFakeDomDetachedStatus =
   'detached-private-fake-dom-controlled-value-tracker-record';
+const controlledInputPrivateRestoreQueueIntentRecordedStatus =
+  'recorded-private-fake-dom-controlled-restore-intent';
+const controlledInputPrivateRestoreQueueIntentSkippedStatus =
+  'skipped-private-fake-dom-controlled-restore-intent';
 const controlledInputValueTrackerFakeDomTargetMarker =
   '__FAST_REACT_CONTROLLED_INPUT_VALUE_TRACKER_FAKE_DOM__';
 const controlledInputPrivateWrapperGateId =
@@ -220,6 +239,22 @@ const controlledInputValueTrackerFakeDomDiagnosticNoSideEffects = freezeRecord({
   fakeDomValueWritten: false,
   fakeDomDescriptorInstalled: false,
   fakeDomTargetCaptured: false,
+  realDomNodeTouched: false
+});
+
+const controlledInputPrivateRestoreQueueDiagnosticNoSideEffects = freezeRecord({
+  ...controlledInputValueTrackerSideEffects,
+  fakeDomTrackerObservationAccepted: false,
+  fakeDomRestoreIntentRecorded: false,
+  fakeDomRestoreIntentSkipped: false,
+  restoreQueueRecordCreated: false,
+  restoreQueueWritten: false,
+  latestPropsLookup: false,
+  eventPluginDispatch: false,
+  restoreStateIfNeededInvoked: false,
+  restoreControlledStateInvoked: false,
+  restoreFlushed: false,
+  hostWrapperInvoked: false,
   realDomNodeTouched: false
 });
 
@@ -708,6 +743,7 @@ const controlledInputValueTrackerRecordPayloads = new WeakMap();
 const controlledInputValueTrackerFakeDomDiagnosticPayloads = new WeakMap();
 const controlledInputValueTrackerFakeDomDiagnosticStates = new WeakMap();
 const controlledInputValueTrackerFakeDomStateByTarget = new WeakMap();
+const controlledInputPrivateRestoreQueueDiagnosticPayloads = new WeakMap();
 const controlledInputPrivateWrapperPropertyPayloadRecordPayloads =
   new WeakMap();
 const defaultGate = createResourceFormActionInternalsGate();
@@ -715,6 +751,8 @@ const defaultResourceHintFakeDomAdapterGate =
   createResourceHintFakeDomAdapterGate();
 const defaultControlledInputValueTrackerGate =
   createControlledInputValueTrackerGate();
+const defaultControlledInputPrivateRestoreQueueDiagnosticGate =
+  createControlledInputPrivateRestoreQueueDiagnosticGate();
 
 function createResourceFormActionInternalsGate(options) {
   const gateState = createGateState(options);
@@ -789,6 +827,30 @@ function createControlledInputValueTrackerGate(options) {
       return detachControlledInputValueTrackerFakeDomDiagnosticWithGate(
         gateState,
         record
+      );
+    },
+    recordPostEventRestoreIntentFromFakeDomObservation(record, admission) {
+      return recordControlledInputPrivateRestoreQueueIntentWithGate(
+        gateState,
+        record,
+        admission
+      );
+    }
+  });
+}
+
+function createControlledInputPrivateRestoreQueueDiagnosticGate(options) {
+  const gateState = createGateStateWithDefaultPrefix(
+    options,
+    'controlled-input-restore-queue'
+  );
+
+  return Object.freeze({
+    recordPostEventRestoreIntentFromFakeDomObservation(record, admission) {
+      return recordControlledInputPrivateRestoreQueueIntentWithGate(
+        gateState,
+        record,
+        admission
       );
     }
   });
@@ -876,6 +938,14 @@ function observeControlledInputValueTrackerFakeDomDiagnostic(record) {
 
 function detachControlledInputValueTrackerFakeDomDiagnostic(record) {
   return defaultControlledInputValueTrackerGate.detachFakeDomTracker(record);
+}
+
+function recordControlledInputPostEventRestoreIntentFromFakeDomObservation(
+  record,
+  admission
+) {
+  return defaultControlledInputPrivateRestoreQueueDiagnosticGate
+    .recordPostEventRestoreIntentFromFakeDomObservation(record, admission);
 }
 
 function createControlledInputPrivateWrapperPropertyPayloadRecord(row) {
@@ -980,6 +1050,14 @@ function getPrivateControlledInputValueTrackerFakeDomDiagnosticRecordPayload(
 
 function isPrivateControlledInputValueTrackerFakeDomDiagnosticRecord(value) {
   return controlledInputValueTrackerFakeDomDiagnosticPayloads.has(value);
+}
+
+function getPrivateControlledInputRestoreQueueDiagnosticRecordPayload(record) {
+  return controlledInputPrivateRestoreQueueDiagnosticPayloads.get(record) || null;
+}
+
+function isPrivateControlledInputRestoreQueueDiagnosticRecord(value) {
+  return controlledInputPrivateRestoreQueueDiagnosticPayloads.has(value);
 }
 
 function getPrivateControlledInputWrapperPropertyPayloadRecordPayload(record) {
@@ -1105,6 +1183,8 @@ function describeControlledInputValueTrackerGate() {
     contracts: controlledInputValueTrackerContracts,
     fakeDomDiagnostic:
       describeControlledInputValueTrackerFakeDomDiagnosticGate(),
+    privateRestoreQueueDiagnostic:
+      describeControlledInputPrivateRestoreQueueDiagnosticGate(),
     privateWrapperPropertyPayload:
       describeControlledInputPrivateWrapperPropertyPayloadGate(),
     postEventRestoreBoundary: createPostEventRestoreBoundary(),
@@ -1134,9 +1214,43 @@ function describeControlledInputValueTrackerFakeDomDiagnosticGate() {
     fakeDomTargetMarker: controlledInputValueTrackerFakeDomTargetMarker,
     liveDomDescriptorInstallation: false,
     realDomNodeAccepted: false,
+    restoreQueueDiagnostic:
+      describeControlledInputPrivateRestoreQueueDiagnosticGate(),
     publicControlledBehaviorBoundary:
       createPublicControlledBehaviorBoundary(),
     sideEffects: controlledInputValueTrackerFakeDomDiagnosticNoSideEffects,
+    missingPrerequisites: controlledInputValueTrackerMissingPrerequisites
+  });
+}
+
+function describeControlledInputPrivateRestoreQueueDiagnosticGate() {
+  return freezeRecord({
+    schemaVersion:
+      controlledInputPrivateRestoreQueueDiagnosticGateSchemaVersion,
+    gateId: controlledInputPrivateRestoreQueueDiagnosticGateId,
+    compatibilityTarget,
+    status: controlledInputPrivateRestoreQueueDiagnosticStatus,
+    unsupportedCode: unimplementedCode,
+    oracleEvidence: freezeArray([
+      oracleEvidence(
+        controlledInputOracleKind,
+        controlledInputValueTrackerContracts.length
+      )
+    ]),
+    acceptedSourceRecordType:
+      privateControlledInputValueTrackerFakeDomDiagnosticRecordType,
+    acceptedSourceOperation: 'observe',
+    recordsPostEventRestoreIntent: true,
+    deterministicFakeDomOnly: true,
+    writesRestoreQueue: false,
+    flushesRestoreQueue: false,
+    latestPropsLookup: false,
+    eventPluginDispatch: false,
+    liveDomDescriptorInstallation: false,
+    realDomNodeAccepted: false,
+    publicControlledBehaviorBoundary:
+      createPublicControlledBehaviorBoundary(),
+    sideEffects: controlledInputPrivateRestoreQueueDiagnosticNoSideEffects,
     missingPrerequisites: controlledInputValueTrackerMissingPrerequisites
   });
 }
@@ -1202,6 +1316,33 @@ function createUnsupportedControlledInputValueTrackerError(record) {
   error.hostTag = payload.hostTag;
   error.controlKind = payload.controlKind;
   error.status = payload.status;
+  error.sideEffects = payload.sideEffects;
+
+  return error;
+}
+
+function createUnsupportedControlledInputRestoreQueueDiagnosticError(record) {
+  const payload = assertPrivateControlledInputRestoreQueueDiagnosticRecord(
+    record
+  );
+  const error = createUnsupportedError(
+    'react-dom/private-internals',
+    `controlled-restore-queue.${payload.hostTag}`,
+    'was requested',
+    'The private controlled input restore queue diagnostic records fake-DOM intent only.'
+  );
+
+  error.code = privateControlledInputRestoreQueueDiagnosticGateErrorCode;
+  error.requestId = payload.requestId;
+  error.requestSequence = payload.requestSequence;
+  error.sourceTrackerRequestId = payload.sourceTrackerRequestId;
+  error.sourceTrackerRequestSequence = payload.sourceTrackerRequestSequence;
+  error.scenarioId = payload.scenarioId;
+  error.phaseId = payload.phaseId;
+  error.hostTag = payload.hostTag;
+  error.controlKind = payload.controlKind;
+  error.status = payload.status;
+  error.restoreIntent = payload.restoreIntent;
   error.sideEffects = payload.sideEffects;
 
   return error;
@@ -1723,6 +1864,72 @@ function createControlledInputValueTrackerFakeDomDiagnosticRecord(options) {
   return payload;
 }
 
+function recordControlledInputPrivateRestoreQueueIntentWithGate(
+  gateState,
+  record,
+  admission
+) {
+  const observation =
+    assertControlledInputFakeDomTrackerObservationForRestoreQueue(record);
+  const normalizedAdmission =
+    normalizeControlledInputPrivateRestoreQueueAdmission(admission);
+  const requestSequence = gateState.nextRequestSequence++;
+  const requestId = `${gateState.requestIdPrefix}:${requestSequence}`;
+  const intentRecorded = observation.trackerRecord.changed === true;
+  const status = intentRecorded
+    ? controlledInputPrivateRestoreQueueIntentRecordedStatus
+    : controlledInputPrivateRestoreQueueIntentSkippedStatus;
+
+  const payload = freezeRecord({
+    schemaVersion:
+      controlledInputPrivateRestoreQueueDiagnosticGateSchemaVersion,
+    $$typeof: privateControlledInputRestoreQueueDiagnosticRecordType,
+    kind: 'FastReactDomPrivateControlledInputRestoreQueueDiagnosticRecord',
+    gateId: controlledInputPrivateRestoreQueueDiagnosticGateId,
+    compatibilityTarget,
+    status,
+    unsupportedCode: unimplementedCode,
+    requestId,
+    requestSequence,
+    sourceTrackerLifecycleId: observation.lifecycleId,
+    sourceTrackerLifecycleSequence: observation.lifecycleSequence,
+    sourceTrackerRequestId: observation.requestId,
+    sourceTrackerRequestSequence: observation.requestSequence,
+    sourceTrackerStatus: observation.status,
+    sourceTrackerOperation: observation.operation,
+    scenarioId: observation.scenarioId,
+    phaseId: observation.phaseId,
+    hostTag: observation.hostTag,
+    inputType: observation.inputType,
+    multiple: observation.multiple,
+    controlKind: observation.controlKind,
+    contractId: observation.contractId,
+    oracleKind: observation.oracleKind,
+    oracleSchemaVersion: observation.oracleSchemaVersion,
+    admission: normalizedAdmission,
+    trackerObservation:
+      createControlledInputPrivateRestoreQueueObservationSummary(observation),
+    restoreIntent:
+      createControlledInputPrivateRestoreQueueIntentSummary(
+        observation,
+        normalizedAdmission,
+        intentRecorded
+      ),
+    postEventRestoreBoundary:
+      createPostEventRestoreQueueDiagnosticBoundary(status, intentRecorded),
+    publicControlledBehaviorBoundary:
+      createPublicControlledBehaviorBoundary(),
+    sideEffects:
+      createControlledInputPrivateRestoreQueueDiagnosticSideEffects(
+        intentRecorded
+      ),
+    missingPrerequisites: controlledInputValueTrackerMissingPrerequisites
+  });
+
+  controlledInputPrivateRestoreQueueDiagnosticPayloads.set(payload, payload);
+  return payload;
+}
+
 function getAcceptedContract(behaviorArea, requestName) {
   const key = `${behaviorArea}:${requestName}`;
   const contract = contractByAreaAndName.get(key);
@@ -1824,6 +2031,56 @@ function assertPrivateControlledInputValueTrackerFakeDomDiagnosticRecord(record)
   error.code =
     privateControlledInputValueTrackerFakeDomDiagnosticInvalidRecordCode;
   error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
+function assertPrivateControlledInputRestoreQueueDiagnosticRecord(record) {
+  const payload =
+    getPrivateControlledInputRestoreQueueDiagnosticRecordPayload(record);
+  if (payload !== null) {
+    return payload;
+  }
+
+  const error = new Error(
+    'Expected a private React DOM controlled input restore queue diagnostic record.'
+  );
+  error.name = 'FastReactDomControlledInputRestoreQueueDiagnosticGateError';
+  error.code = privateControlledInputRestoreQueueDiagnosticInvalidRecordCode;
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
+function assertControlledInputFakeDomTrackerObservationForRestoreQueue(record) {
+  const payload =
+    getPrivateControlledInputValueTrackerFakeDomDiagnosticRecordPayload(record);
+  if (payload === null) {
+    const error = new Error(
+      'Expected a private React DOM controlled input fake DOM tracker observation record.'
+    );
+    error.name = 'FastReactDomControlledInputRestoreQueueDiagnosticGateError';
+    error.code = privateControlledInputRestoreQueueDiagnosticInvalidRecordCode;
+    error.compatibilityTarget = compatibilityTarget;
+    throw error;
+  }
+
+  if (
+    payload.operation === 'observe' &&
+    payload.status === controlledInputValueTrackerFakeDomObservedStatus &&
+    payload.trackerRecord.fakeDomOnly === true
+  ) {
+    return payload;
+  }
+
+  const error = new Error(
+    'The private controlled input restore queue diagnostic accepts observed fake DOM tracker records only.'
+  );
+  error.name = 'FastReactDomControlledInputRestoreQueueDiagnosticGateError';
+  error.code =
+    privateControlledInputRestoreQueueDiagnosticInvalidObservationCode;
+  error.compatibilityTarget = compatibilityTarget;
+  error.operation = payload.operation;
+  error.status = payload.status;
+  error.reason = 'source record must be an observed fake DOM tracker record';
   throw error;
 }
 
@@ -2875,6 +3132,80 @@ function throwInvalidControlledInputValueTrackerFakeDomAdmission(reason) {
   throw error;
 }
 
+function normalizeControlledInputPrivateRestoreQueueAdmission(admission) {
+  if (admission == null || typeof admission !== 'object') {
+    throwInvalidControlledInputPrivateRestoreQueueAdmission(
+      'admission metadata must be an object'
+    );
+  }
+
+  if (admission.explicitAdmission !== true) {
+    throwInvalidControlledInputPrivateRestoreQueueAdmission(
+      'explicitAdmission must be true'
+    );
+  }
+
+  const queueKind = getAdmissionStringProperty(
+    admission,
+    'queueKind',
+    'deterministic-fake-dom-post-event-restore-queue'
+  );
+  if (queueKind !== 'deterministic-fake-dom-post-event-restore-queue') {
+    throwInvalidControlledInputPrivateRestoreQueueAdmission(
+      'queueKind must be deterministic-fake-dom-post-event-restore-queue'
+    );
+  }
+
+  const targetKind = getAdmissionStringProperty(
+    admission,
+    'targetKind',
+    'controlled-input-restore-queue'
+  );
+  if (targetKind !== 'controlled-input-restore-queue') {
+    throwInvalidControlledInputPrivateRestoreQueueAdmission(
+      'targetKind must be controlled-input-restore-queue'
+    );
+  }
+
+  return freezeRecord({
+    queueKind,
+    queueId: getAdmissionStringProperty(
+      admission,
+      'queueId',
+      'anonymous-fake-dom-controlled-restore-queue'
+    ),
+    eventName: getAdmissionStringProperty(
+      admission,
+      'eventName',
+      'change'
+    ),
+    targetKind,
+    explicitAdmission: true,
+    deterministicFakeDomOnly: true,
+    sourceObservationRequired: true,
+    rawTargetCaptured: false,
+    rawEventCaptured: false,
+    realDomNodeAccepted: false,
+    latestPropsLookupAllowed: false,
+    eventDispatchAllowed: false,
+    restoreQueueWriteAllowed: false,
+    restoreFlushAllowed: false,
+    publicControlledBehaviorEnabled: false,
+    compatibilityClaimed: false
+  });
+}
+
+function throwInvalidControlledInputPrivateRestoreQueueAdmission(reason) {
+  const error = new Error(
+    `Invalid private React DOM controlled input restore queue diagnostic admission: ${reason}.`
+  );
+  error.name = 'FastReactDomControlledInputRestoreQueueDiagnosticGateError';
+  error.code = privateControlledInputRestoreQueueDiagnosticInvalidAdmissionCode;
+  error.compatibilityTarget = compatibilityTarget;
+  error.reason = reason;
+  throw error;
+}
+
 function normalizeControlledInputValueTrackerScenario(scenario) {
   if (scenario == null || typeof scenario !== 'object') {
     throwInvalidControlledInputValueTrackerScenario(
@@ -3185,6 +3516,96 @@ function createControlledInputPrivateWrapperMetadata(
     wrapperPropertyWritten: false,
     trackerAttached: false,
     currentValueSnapshot: null
+  });
+}
+
+function createControlledInputPrivateRestoreQueueObservationSummary(
+  observation
+) {
+  return freezeRecord({
+    sourceGateId: observation.gateId,
+    sourceRecordType:
+      privateControlledInputValueTrackerFakeDomDiagnosticRecordType,
+    lifecycleId: observation.lifecycleId,
+    lifecycleSequence: observation.lifecycleSequence,
+    operation: observation.operation,
+    operationStatus: observation.status,
+    operationRequestId: observation.requestId,
+    operationRequestSequence: observation.requestSequence,
+    fakeDomOnly: observation.trackerRecord.fakeDomOnly,
+    trackerAttached: observation.trackerRecord.attachedAfter,
+    propertyDescriptorInstalled:
+      observation.trackerRecord.propertyDescriptorInstalled,
+    changed: observation.trackerRecord.changed,
+    observedCount: observation.trackerRecord.observedCount,
+    trackedField: observation.trackerMetadata.trackedField,
+    valueKind: observation.trackerMetadata.valueKind,
+    previousValueSnapshot: observation.trackerRecord.previousValueSnapshot,
+    currentValueSnapshot: observation.trackerRecord.currentValueSnapshot,
+    rawTargetCaptured: false,
+    realDomNodeTouched: false
+  });
+}
+
+function createControlledInputPrivateRestoreQueueIntentSummary(
+  observation,
+  admission,
+  intentRecorded
+) {
+  return freezeRecord({
+    source: 'fake-dom-tracker-observation',
+    queueKind: admission.queueKind,
+    queueId: admission.queueId,
+    eventName: admission.eventName,
+    hostTag: observation.hostTag,
+    controlKind: observation.controlKind,
+    trackedField: observation.trackerMetadata.trackedField,
+    sourceChanged: observation.trackerRecord.changed,
+    intentRecorded,
+    restoreTargetWouldBeQueued: intentRecorded,
+    queuePosition: intentRecorded ? 'primary' : null,
+    latestPropsLookupRequired: intentRecorded,
+    latestPropsLookupPerformed: false,
+    eventPluginDispatchRequired: intentRecorded,
+    eventPluginDispatchPerformed: false,
+    restoreQueueWritten: false,
+    restoreStateIfNeededInvoked: false,
+    restoreControlledStateInvoked: false,
+    restoreFlushed: false,
+    fakeDomOnly: true,
+    rawTargetCaptured: false,
+    rawEventCaptured: false,
+    realDomNodeTouched: false,
+    publicControlledBehaviorEnabled: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createPostEventRestoreQueueDiagnosticBoundary(
+  status,
+  intentRecorded
+) {
+  return freezeRecord({
+    status: 'blocked-post-event-controlled-restore',
+    restoreQueueDiagnosticStatus: status,
+    restoreIntentRecorded: intentRecorded,
+    latestPropsLookup: false,
+    eventPluginDispatch: false,
+    restoreQueued: false,
+    restoreFlushed: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createControlledInputPrivateRestoreQueueDiagnosticSideEffects(
+  intentRecorded
+) {
+  return freezeRecord({
+    ...controlledInputPrivateRestoreQueueDiagnosticNoSideEffects,
+    fakeDomTrackerObservationAccepted: true,
+    fakeDomRestoreIntentRecorded: intentRecorded,
+    fakeDomRestoreIntentSkipped: !intentRecorded,
+    restoreQueueRecordCreated: true
   });
 }
 
@@ -3538,6 +3959,12 @@ module.exports = {
   controlledInputPrivateWrapperGateStatus,
   controlledInputPrivateWrapperPropertyPayloadContracts,
   controlledInputPrivateWrapperSideEffects,
+  controlledInputPrivateRestoreQueueDiagnosticGateId,
+  controlledInputPrivateRestoreQueueDiagnosticGateSchemaVersion,
+  controlledInputPrivateRestoreQueueDiagnosticNoSideEffects,
+  controlledInputPrivateRestoreQueueDiagnosticStatus,
+  controlledInputPrivateRestoreQueueIntentRecordedStatus,
+  controlledInputPrivateRestoreQueueIntentSkippedStatus,
   controlledInputValueTrackerContracts,
   controlledInputValueTrackerFakeDomDetachedStatus,
   controlledInputValueTrackerFakeDomDiagnosticGateId,
@@ -3553,17 +3980,20 @@ module.exports = {
   controlledInputValueTrackerOracleCoverage,
   controlledInputValueTrackerSideEffects,
   createControlledInputPrivateWrapperPropertyPayloadRecord,
+  createControlledInputPrivateRestoreQueueDiagnosticGate,
   createControlledInputValueTrackerGate,
   createResourceHintFakeDomAdapterGate,
   createResourceHintFakeDomInsertionGate,
   createResourceFormActionInternalsGate,
   createUnsupportedControlledInputValueTrackerError,
+  createUnsupportedControlledInputRestoreQueueDiagnosticError,
   createUnsupportedResourceHintFakeDomAdapterError,
   createUnsupportedResourceHintFakeDomInsertionError,
   createUnsupportedResourceFormActionInternalsError,
   createUnsupportedResourceHintDispatcherMetadataError,
   describeControlledInputValueTrackerGate,
   describeControlledInputValueTrackerFakeDomDiagnosticGate,
+  describeControlledInputPrivateRestoreQueueDiagnosticGate,
   describeControlledInputPrivateWrapperPropertyPayloadGate,
   describePrivateResourceHintFakeDomAdapterGate,
   describePrivateResourceHintFakeDomInsertionGate,
@@ -3573,6 +4003,7 @@ module.exports = {
   detachControlledInputValueTrackerFakeDomDiagnostic,
   getPrivateControlledInputValueTrackerRecordPayload,
   getPrivateControlledInputValueTrackerFakeDomDiagnosticRecordPayload,
+  getPrivateControlledInputRestoreQueueDiagnosticRecordPayload,
   getPrivateControlledInputWrapperPropertyPayloadRecordPayload,
   getPrivateResourceHintFakeDomAdapterAdmissionRecordPayload,
   getPrivateResourceHintFakeDomInsertionRecordPayload,
@@ -3582,6 +4013,7 @@ module.exports = {
   isPrivateResourceHintFakeDomInsertionRecord,
   isPrivateControlledInputValueTrackerRecord,
   isPrivateControlledInputValueTrackerFakeDomDiagnosticRecord,
+  isPrivateControlledInputRestoreQueueDiagnosticRecord,
   isPrivateControlledInputWrapperPropertyPayloadRecord,
   isPrivateResourceFormActionGateRecord,
   isPrivateResourceHintDispatcherMetadataRecord,
@@ -3592,6 +4024,11 @@ module.exports = {
   privateControlledInputValueTrackerFakeDomDiagnosticInvalidRecordCode,
   privateControlledInputValueTrackerFakeDomDiagnosticInactiveRecordCode,
   privateControlledInputValueTrackerFakeDomDiagnosticRecordType,
+  privateControlledInputRestoreQueueDiagnosticGateErrorCode,
+  privateControlledInputRestoreQueueDiagnosticInvalidAdmissionCode,
+  privateControlledInputRestoreQueueDiagnosticInvalidObservationCode,
+  privateControlledInputRestoreQueueDiagnosticInvalidRecordCode,
+  privateControlledInputRestoreQueueDiagnosticRecordType,
   privateControlledInputValueTrackerGateInvalidScenarioCode,
   privateControlledInputValueTrackerGateRecordType,
   privateControlledInputValueTrackerGateUnknownScenarioCode,
@@ -3624,6 +4061,7 @@ module.exports = {
   privateResourceHintDispatcherMetadataUnknownRequestCode,
   installControlledInputValueTrackerFakeDomDiagnostic,
   observeControlledInputValueTrackerFakeDomDiagnostic,
+  recordControlledInputPostEventRestoreIntentFromFakeDomObservation,
   recordControlledInputValueTrackerScenario,
   recordUnsupportedControlledFormRequest,
   recordUnsupportedFormActionRequest,
