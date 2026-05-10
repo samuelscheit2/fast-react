@@ -183,13 +183,25 @@ const expectedPackageExports = {
   './package.json': './package.json'
 };
 
+const reactPrivateDirectFiles = [
+  'children-helper.js',
+  'cjs/react.development.js',
+  'cjs/react.production.js',
+  'component-class.js',
+  'context-object.js',
+  'element-factory.js',
+  'element-type.js',
+  'hook-dispatcher.js',
+  'placeholder-utils.js',
+  'private-act-dispatcher-gate.js',
+  'ref-object.js',
+  'transition.js',
+  'wrapper-object.js'
+];
+
 const blockedExtensionSubpaths = [
   '@fast-react/react/index.js',
-  ...packageFileSubpaths('@fast-react/react', [
-    'cjs/react.development.js',
-    'cjs/react.production.js',
-    'private-act-dispatcher-gate.js'
-  ]),
+  ...packageFileSubpaths('@fast-react/react', reactPrivateDirectFiles),
   '@fast-react/react/act-dispatcher',
   '@fast-react/react/act-dispatcher.js',
   '@fast-react/react/act-queue',
@@ -202,19 +214,8 @@ const blockedExtensionSubpaths = [
   '@fast-react/react/react.react-server.js',
   '@fast-react/react/jsx-runtime.react-server.js',
   '@fast-react/react/jsx-dev-runtime.react-server.js',
-  '@fast-react/react/children-helper.js',
-  '@fast-react/react/component-class.js',
-  '@fast-react/react/context-object.js',
-  '@fast-react/react/element-type.js',
-  '@fast-react/react/element-factory.js',
-  '@fast-react/react/hook-dispatcher',
-  '@fast-react/react/hook-dispatcher.js',
   '@fast-react/react/hook-dispatcher-private-metadata',
-  '@fast-react/react/hook-dispatcher-private-metadata.js',
-  '@fast-react/react/ref-object.js',
-  '@fast-react/react/transition.js',
-  '@fast-react/react/wrapper-object.js',
-  '@fast-react/react/placeholder-utils.js'
+  '@fast-react/react/hook-dispatcher-private-metadata.js'
 ];
 
 const defaultReactDomKeys = [

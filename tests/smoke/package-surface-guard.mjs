@@ -61,11 +61,19 @@ const privateDiagnosticPublicFileGuards = {
 };
 const exactPrivatePublicFileGuards = {
   react: [
+    'children-helper.js',
     'cjs/react.development.js',
     'cjs/react.production.js',
+    'component-class.js',
+    'context-object.js',
+    'element-factory.js',
+    'element-type.js',
     'hook-dispatcher.js',
+    'placeholder-utils.js',
     'private-act-dispatcher-gate.js',
-    'transition.js'
+    'ref-object.js',
+    'transition.js',
+    'wrapper-object.js'
   ],
   'react-dom': [
     'placeholder-utils.js',
