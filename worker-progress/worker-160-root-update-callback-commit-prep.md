@@ -1,7 +1,7 @@
 # Worker 160 - Root Update Callback Commit Prep
 
 ## Goal
-- status: active
+- status: complete
 - objective: prepare HostRoot update callback collection for commit-time invocation with deterministic records, without invoking JS callbacks, adding error boundaries, or wiring public facades
 
 ## Progress
@@ -107,7 +107,15 @@ cargo clippy -p fast-react-reconciler --all-targets --all-features -- -D warning
 git diff --check
 ```
 
-Full reconciler result: 67 unit tests passed plus 1 doctest.
+Full reconciler result: 94 unit tests passed plus 1 doctest after integrating
+current `main`.
+
+## Integration With Current Main
+
+- Merged current `main` after implementation, resolving the reconciler
+  `lib.rs` module/export conflict by keeping root callback exports alongside
+  accepted function-component, host-work, root-commit, and scheduler exports.
+- Reran the full verification set above on the integrated worker branch.
 
 ## Risks Or Blockers
 
