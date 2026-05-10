@@ -23,6 +23,7 @@
     "inventory:generate": "node scripts/generate-runtime-inventory.mjs --write",
     "inventory:print": "node scripts/print-inventory.mjs --format=json",
     "inventory:print:markdown": "node scripts/print-inventory.mjs --format=markdown",
+    "root-render-e2e:conformance": "node scripts/check-react-dom-root-render-e2e-conformance.mjs",
     "ref-object:generate": "node scripts/generate-ref-object-oracle.mjs --write",
     "ref-object:print": "node scripts/print-ref-object-oracle.mjs --format=json",
     "ref-object:print:markdown": "node scripts/print-ref-object-oracle.mjs --format=markdown",
