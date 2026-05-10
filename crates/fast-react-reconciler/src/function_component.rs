@@ -5338,7 +5338,7 @@ impl FunctionComponentHookRenderStore {
         }
     }
 
-    fn bind_current_list_unchecked(&mut self, fiber: FiberId, list: HookListId) {
+    pub(crate) fn bind_current_list_unchecked(&mut self, fiber: FiberId, list: HookListId) {
         if let Some(binding) = self
             .current_lists
             .iter_mut()
@@ -13946,6 +13946,135 @@ mod tests {
         assert_eq!(
             store.root(root_id).unwrap().lanes().pending_lanes(),
             Lanes::NO
+        );
+    }
+
+    #[test]
+    fn private_use_reducer_transition_lane_rebase_then_accepts_matching_lane() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let reducer_id = reducer(715);
+        let current_reducer = hook_store
+            .create_current_reducer_hook(current, reducer_id, StateHandle::from_raw(1_200))
+            .unwrap();
+        let output = FunctionComponentOutputHandle::from_raw(1_216);
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+        let transition_lanes = Lanes::from(Lane::TRANSITION_1);
+        let transition_lane = HookUpdateLane::from_lane(Lane::TRANSITION_1).unwrap();
+        let dispatch_request = FunctionComponentReducerDispatchRequest::new(
+            current_reducer.dispatch(),
+            action(16),
+            transition_lane,
+        );
+        hook_store
+            .dispatch_reducer_update(dispatch_request)
+            .unwrap();
+
+        let skipped_render = render_function_component_with_use_reducer(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::SYNC,
+            FunctionComponentUseReducerRenderRequest::new(
+                reducer_id,
+                StateHandle::from_raw(9_999),
+                FunctionComponentStateUpdateRenderLanes::new(Lanes::SYNC, Lanes::SYNC),
+            ),
+            &mut registry,
+            |_, _| panic!("transition useReducer update should be rebased on sync render"),
+        )
+        .unwrap();
+        let skipped_update = skipped_render.reducer_hook().update_record().unwrap();
+
+        assert_eq!(skipped_render.render_lanes(), Lanes::SYNC);
+        assert_eq!(skipped_render.output(), output);
+        assert_eq!(
+            skipped_update.memoized_state(),
+            StateHandle::from_raw(1_200)
+        );
+        assert_eq!(skipped_update.base_state(), StateHandle::from_raw(1_200));
+        assert_eq!(skipped_update.remaining_lanes(), transition_lanes);
+        assert_eq!(skipped_update.applied_update_count(), 0);
+        assert_eq!(skipped_update.skipped_update_count(), 1);
+        assert_eq!(skipped_update.eager_update_count(), 0);
+        let diagnostic = hook_store
+            .record_reducer_dispatch_queue_diagnostic(
+                skipped_render.hook_state(),
+                skipped_render.render_lanes(),
+                dispatch_request,
+            )
+            .unwrap();
+        assert_eq!(diagnostic.dispatch_lane(), transition_lane);
+        assert!(diagnostic.non_execution().keeps_dispatch_blocked());
+        assert!(!diagnostic.claims_public_hook_compatibility());
+        let skipped_base_tail = skipped_update.base_queue().unwrap();
+        let rebased = hook_store
+            .state_queues()
+            .update_ring(Some(skipped_base_tail))
+            .unwrap();
+        assert_eq!(rebased.len(), 1);
+        let rebased_update = hook_store.state_queues().update(rebased[0]).unwrap();
+        assert_eq!(rebased_update.lane(), transition_lane);
+        assert_eq!(*rebased_update.action(), action(16));
+        hook_store.bind_current_list_unchecked(
+            current,
+            skipped_render.hook_state().work_in_progress_list(),
+        );
+
+        let mut reducer_calls = 0;
+        let accepted_render = render_function_component_with_use_reducer(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            transition_lanes,
+            FunctionComponentUseReducerRenderRequest::new(
+                reducer_id,
+                StateHandle::from_raw(9_999),
+                FunctionComponentStateUpdateRenderLanes::new(transition_lanes, transition_lanes),
+            ),
+            &mut registry,
+            |state, action| {
+                reducer_calls += 1;
+                StateHandle::from_raw(state.raw() + action.raw())
+            },
+        )
+        .unwrap();
+        let accepted_update = accepted_render.reducer_hook().update_record().unwrap();
+
+        assert_eq!(accepted_render.render_lanes(), transition_lanes);
+        assert_eq!(accepted_render.output(), output);
+        assert_eq!(
+            accepted_update.previous_base_queue(),
+            Some(skipped_base_tail)
+        );
+        assert_eq!(
+            accepted_update.memoized_state(),
+            StateHandle::from_raw(1_216)
+        );
+        assert_eq!(
+            accepted_update.resulting_state(),
+            StateHandle::from_raw(1_216)
+        );
+        assert_eq!(accepted_update.base_state(), StateHandle::from_raw(1_216));
+        assert_eq!(accepted_update.base_queue(), None);
+        assert_eq!(accepted_update.remaining_lanes(), Lanes::NO);
+        assert_eq!(accepted_update.applied_update_count(), 1);
+        assert_eq!(accepted_update.skipped_update_count(), 0);
+        assert_eq!(accepted_update.eager_update_count(), 0);
+        assert_eq!(reducer_calls, 1);
+        assert_eq!(registry.calls().len(), 2);
+        let queue = hook_store
+            .state_queues()
+            .queue(current_reducer.queue())
+            .unwrap();
+        assert_eq!(*queue.last_rendered_state(), StateHandle::from_raw(1_216));
+        assert_eq!(
+            hook_store
+                .state_queues()
+                .pending_updates(current_reducer.queue())
+                .unwrap(),
+            Vec::<HookUpdateId>::new()
         );
     }
 
