@@ -17,6 +17,7 @@ mod fiber_handles;
 mod fiber_id;
 mod hook_effect_flags;
 mod hook_effect_ring;
+mod hook_state_queue;
 mod lane;
 mod root_lanes;
 mod symbols;
@@ -56,6 +57,11 @@ pub use hook_effect_ring::{
     HookEffectDependencies, HookEffectFilteredIter, HookEffectGeneration, HookEffectId,
     HookEffectInstance, HookEffectInstanceGeneration, HookEffectInstanceId, HookEffectInstanceSlot,
     HookEffectIter, HookEffectNode, HookEffectRing, HookEffectSlot,
+};
+pub use hook_state_queue::{
+    HookQueue, HookQueueError, HookQueueId, HookQueueStore, HookRevertLane, HookStateSlot,
+    HookUpdate, HookUpdateId, HookUpdateLane, HookUpdateStaging, ProcessHookQueueResult,
+    RenderPhaseHookQueueResult, RenderPhaseHookUpdates, StagedHookUpdate,
 };
 pub use lane::{Lane, LaneIndex, LaneMap, Lanes, TOTAL_LANES, VALID_LANE_BITS};
 pub use root_lanes::{
