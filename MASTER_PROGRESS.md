@@ -29,6 +29,14 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Worker 484 was accepted from queue 473-502. It added private
+  react-test-renderer TestInstance `findByType` and `findByProps` diagnostics
+  derived from the accepted `findAll` metadata, including CJS-development
+  record-only bridge evidence while public query methods remain blocked. It
+  was verified after merge with focused Rust `findBy` tests, create-routing,
+  serialization-local, and error-surface conformance gates, full
+  `fast-react-test-renderer` tests, Rust fmt, react-test-renderer workspace
+  checks, conflict-marker scanning, and `git diff --check`.
 - Worker 482 was accepted from queue 473-502. It added the CJS-development
   private react-test-renderer act Scheduler route for accepted
   `scheduler/unstable_mock` flush-helper metadata while preserving public act
