@@ -973,6 +973,257 @@ test('private hydration recoverable error routing links mismatch rows to root op
   );
 });
 
+test('private hydration recoverable error callback invocation gate uses owned root option only', () => {
+  const privateInvocationCalls = [];
+
+  function onUncaughtError(error) {
+    privateInvocationCalls.push(['uncaught', error.message]);
+  }
+  function onCaughtError(error) {
+    privateInvocationCalls.push(['caught', error.message]);
+  }
+  function onRecoverableError(error, errorInfo) {
+    privateInvocationCalls.push({
+      error,
+      errorInfo,
+      message: error.message,
+      name: error.name
+    });
+  }
+
+  const scenario = createHydrationRecoverableRoutingScenario({
+    actualText: 'server heading',
+    expectedText: 'client heading',
+    label: 'recoverable-callback',
+    hydrationOptions: {
+      identifierPrefix: 'recoverable-callback-',
+      onCaughtError,
+      onRecoverableError,
+      onUncaughtError
+    }
+  });
+  const routing = scenario.bridge.createHydrationRecoverableErrorRouting(
+    scenario.hydrateRecord,
+    scenario.hydrateRecord.recoverableErrorMetadata,
+    scenario.replayMetadata,
+    {
+      mismatchLabels: ['heading-text'],
+      rootOptions: scenario.hydrationOptions,
+      source: 'hydration-boundary-test-recoverable-callback-routing'
+    }
+  );
+
+  assert.throws(
+    () =>
+      scenario.bridge.invokeHydrationRecoverableErrorCallbacks(routing, {
+        rootOptions: scenario.hydrationOptions
+      }),
+    {
+      code:
+        'FAST_REACT_DOM_INVALID_HYDRATION_RECOVERABLE_ERROR_CALLBACK_INVOCATION'
+    }
+  );
+  assert.throws(
+    () =>
+      scenario.bridge.invokeHydrationRecoverableErrorCallbacks(routing, {
+        enableCallbackInvocation: true,
+        rootOptions: {
+          onRecoverableError
+        }
+      }),
+    {
+      code:
+        'FAST_REACT_DOM_INVALID_HYDRATION_RECOVERABLE_ERROR_CALLBACK_INVOCATION'
+    }
+  );
+  assert.deepEqual(privateInvocationCalls, []);
+
+  const invocation =
+    scenario.bridge.invokeHydrationRecoverableErrorCallbacks(routing, {
+      enableCallbackInvocation: true,
+      invocationLabels: ['heading-callback'],
+      rootOptions: scenario.hydrationOptions,
+      source: 'hydration-boundary-test-recoverable-callback-invocation'
+    });
+
+  assert.equal(
+    rootBridge.isPrivateRootHydrationRecoverableErrorCallbackInvocationRecord(
+      invocation
+    ),
+    true
+  );
+  assert.equal(
+    invocation.$$typeof,
+    rootBridge
+      .privateRootHydrationRecoverableErrorCallbackInvocationRecordType
+  );
+  assert.equal(
+    invocation.invocationStatus,
+    rootBridge
+      .ROOT_BRIDGE_HYDRATION_RECOVERABLE_ERROR_CALLBACK_INVOCATION_RECORDED
+  );
+  assert.equal(invocation.sourceRequestId, 'recoverable-callback-request:1');
+  assert.equal(invocation.hydrateId, 'recoverable-callback-hydrate:1');
+  assert.equal(invocation.rootRecordId, 'recoverable-callback-boundary:1');
+  assert.equal(invocation.rootOptionsHandleStatus, 'matched-hydrate-root-options');
+  assert.equal(invocation.rootOptionsOwnershipStatus, 'owned-by-hydrate-root-options');
+  assert.equal(invocation.rootOptionCallbackKey, 'onRecoverableError');
+  assert.equal(invocation.rootOptionCallbackConfigured, true);
+  assert.equal(invocation.onRecoverableErrorConfigured, true);
+  assert.equal(invocation.callbackInvocationGateEnabled, true);
+  assert.equal(invocation.callbackInvocationRecordCount, 1);
+  assert.equal(invocation.callbackInvocationErrorCount, 0);
+  assert.equal(invocation.onRecoverableErrorInvocationCount, 1);
+  assert.equal(invocation.rootErrorCallbackInvocationCount, 1);
+  assert.equal(invocation.privateRootErrorCallbacksInvoked, true);
+  assert.equal(invocation.privateOnRecoverableErrorInvoked, true);
+  assert.equal(invocation.onRecoverableErrorInvoked, true);
+  assert.equal(invocation.publicRootErrorCallbacksInvoked, false);
+  assert.equal(invocation.publicOnRecoverableErrorInvoked, false);
+  assert.equal(invocation.publicRootExecution, false);
+  assert.equal(invocation.publicRootCreated, false);
+  assert.equal(invocation.hydration, false);
+  assert.equal(invocation.canHydrate, false);
+  assert.equal(invocation.hydrationCompatibilityClaimed, false);
+  assert.equal(invocation.domMutation, false);
+  assert.equal(invocation.recoverableErrorsQueued, false);
+  assert.equal(invocation.compatibilityClaimed, false);
+  assert.equal(invocation.publicRootBehaviorChanged, false);
+  assert.deepEqual(
+    invocation.rootOptionOwnershipRecord,
+    {
+      callbackIdentityMatchesRootOptions: true,
+      compatibilityClaimed: false,
+      kind:
+        'FastReactDomPrivateRootHydrationRecoverableErrorRootOptionOwnershipRecord',
+      ownerHydrateId: 'recoverable-callback-hydrate:1',
+      ownerRequestId: 'recoverable-callback-request:1',
+      ownerRequestType: 'hydrateRoot',
+      ownerRootKind: hydrationGate.UNSUPPORTED_HYDRATION_ROOT_KIND,
+      ownerRootRecordId: 'recoverable-callback-boundary:1',
+      ownerRootTag: rootBridge.CONCURRENT_ROOT_TAG,
+      publicHydrateRootCompatibilityClaimed: false,
+      publicRootBehaviorChanged: false,
+      rootOptionCallbackConfigured: true,
+      rootOptionCallbackKey: 'onRecoverableError',
+      rootOptionCallbackOwnedByHydrateRoot: true,
+      rootOptionCallbackValueInfo: {
+        length: 2,
+        name: 'onRecoverableError',
+        type: 'function'
+      },
+      rootOptionsHandleStatus: 'matched-hydrate-root-options',
+      rootOptionsSource: 'hydrateRoot-options',
+      status: 'owned-by-hydrate-root-options'
+    }
+  );
+
+  assert.equal(privateInvocationCalls.length, 1);
+  assert.equal(privateInvocationCalls[0].message, 'Hydration failed because the server rendered text did not match the client.');
+  assert.equal(privateInvocationCalls[0].name, 'Error');
+  assert.equal(privateInvocationCalls[0].error instanceof Error, true);
+  assert.deepEqual(privateInvocationCalls[0].errorInfo, {
+    componentStack: null
+  });
+  assert.equal(Object.hasOwn(privateInvocationCalls[0].errorInfo, 'digest'), false);
+  assert.deepEqual(
+    invocation.callbackInvocationRecords.map((record) => [
+      record.phase,
+      record.sourceLabel,
+      record.sourceCallbackRecord,
+      record.textMismatchRowId,
+      record.recoverableErrorMetadataId,
+      record.expectedText,
+      record.actualText,
+      record.errorName,
+      record.errorMessage,
+      record.errorInfoComponentStack,
+      record.callbackReturnStatus,
+      record.callbackErrorCaptured,
+      record.rootOptionOwnershipStatus,
+      record.rootOptionCallbackOwnedByHydrateRoot,
+      record.onRecoverableErrorInvoked,
+      record.publicOnRecoverableErrorInvoked,
+      record.queuedRecoverableError,
+      record.compatibilityClaimed
+    ]),
+    [
+      [
+        'hydration-recoverable-error-callback-invocation',
+        'heading-callback',
+        routing.rootErrorOptionCallbackRecords[0],
+        'recoverable-callback-boundary:1:text-mismatch:0',
+        'recoverable-callback-boundary:1:recoverable-error:0',
+        'client heading',
+        'server heading',
+        'Error',
+        'Hydration failed because the server rendered text did not match the client.',
+        null,
+        'returned-undefined',
+        false,
+        'owned-by-hydrate-root-options',
+        true,
+        true,
+        false,
+        false,
+        false
+      ]
+    ]
+  );
+
+  const payload =
+    rootBridge
+      .getPrivateRootHydrationRecoverableErrorCallbackInvocationPayload(
+        invocation
+      );
+  assert.equal(payload.callback, onRecoverableError);
+  assert.equal(payload.routingRecord, routing);
+  assert.equal(payload.rootOptions, scenario.hydrationOptions);
+  assert.equal(payload.hydrationOptions, scenario.hydrationOptions);
+  assert.equal(payload.hydrateRootRecord, scenario.hydrateRecord);
+  assert.equal(payload.rootOptionOwnershipRecord, invocation.rootOptionOwnershipRecord);
+  assert.equal(payload.sourceRootErrorOptionCallbackRecords[0], routing.rootErrorOptionCallbackRecords[0]);
+  assert.equal(payload.callbackInvocationResults[0].callback, onRecoverableError);
+  assert.equal(payload.callbackInvocationResults[0].error, privateInvocationCalls[0].error);
+  assert.equal(payload.callbackInvocationResults[0].errorInfo, privateInvocationCalls[0].errorInfo);
+  assert.equal(payload.callbackInvocationResults[0].returnValue, undefined);
+  assert.equal(payload.callbackInvocationResults[0].callbackError, null);
+  assert.deepEqual(scenario.container.__registrations, []);
+  assert.deepEqual(scenario.document.__registrations, []);
+
+  const noCallback = createHydrationRecoverableRoutingScenario({
+    actualText: 'server no callback',
+    expectedText: 'client no callback',
+    label: 'recoverable-callback-missing',
+    hydrationOptions: {
+      identifierPrefix: 'recoverable-callback-missing-'
+    }
+  });
+  const noCallbackRouting =
+    noCallback.bridge.createHydrationRecoverableErrorRouting(
+      noCallback.hydrateRecord,
+      noCallback.hydrateRecord.recoverableErrorMetadata,
+      noCallback.replayMetadata,
+      {
+        rootOptions: noCallback.hydrationOptions
+      }
+    );
+  assert.throws(
+    () =>
+      noCallback.bridge.invokeHydrationRecoverableErrorCallbacks(
+        noCallbackRouting,
+        {
+          enableCallbackInvocation: true,
+          rootOptions: noCallback.hydrationOptions
+        }
+      ),
+    {
+      code:
+        'FAST_REACT_DOM_INVALID_HYDRATION_RECOVERABLE_ERROR_CALLBACK_INVOCATION'
+    }
+  );
+});
+
 test('private hydration replay queue drain-order diagnostics sort blocked targets by dehydrated metadata', () => {
   const document = createDocument('drain-order');
   const container = createElement('DIV', document);
