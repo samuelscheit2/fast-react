@@ -46,8 +46,8 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Queue 443-472 is assigned in isolated worktrees.
-Worker 448 has been accepted, leaving 29 active top-level workers from this
-queue.
+Workers 447, 448, 453, 455, 459, 467, and 468 have been accepted, leaving 23
+active top-level workers from this queue.
 
 | Worker | Focus |
 | --- | --- |
@@ -55,18 +55,14 @@ queue.
 | 444 | Ref cleanup-return execution gate |
 | 445 | Root error option callback records |
 | 446 | Context change propagation lane gate |
-| 447 | Function component `useCallback` private path |
 | 449 | Passive effect scheduler flush gate |
 | 450 | Sync flush error recovery diagnostics |
 | 451 | Root callback invocation execution gate |
 | 452 | HostRoot fragment/array reconciliation canary |
-| 453 | DOM style and `dangerouslySetInnerHTML` mutation gate |
 | 454 | DOM text-content reset/update gate |
-| 455 | DOM event currentTarget bubbling gate |
 | 456 | DOM event stop-immediate-propagation gate |
 | 457 | DOM portal event owner-root gate |
 | 458 | Hydration replay queue drain-order gate |
-| 459 | Hydration text mismatch boundary gate |
 | 460 | Resource preload dedupe/order gate |
 | 461 | Form action reset dispatcher gate |
 | 462 | Controlled select/textarea restore gate |
@@ -74,8 +70,6 @@ queue.
 | 464 | Test renderer `getInstance` class diagnostic |
 | 465 | Test renderer error-boundary diagnostics |
 | 466 | Test renderer act passive-effect drain gate |
-| 467 | Native JSON transport error diagnostics |
-| 468 | Native handle-table sequence teardown gate |
 | 469 | Scheduler mock expired continuation gate |
 | 470 | Scheduler post-task priority diagnostics |
 | 471 | Package-surface private diagnostics audit |

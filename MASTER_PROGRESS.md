@@ -29,6 +29,19 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Workers 447, 453, 455, 459, 467, and 468 were accepted from queue 443-472.
+  This subset added a private function-component `useCallback` render path and
+  hook-dispatcher gate, private DOM style/`dangerouslySetInnerHTML` rollback
+  diagnostics, private event `currentTarget` progression/reset diagnostics,
+  hydration text-mismatch and inert recoverable-error metadata, native JSON
+  transport error diagnostic rows, and native handle-table teardown sequence
+  gates while public compatibility remains blocked.
+- Workers 447, 453, 455, 459, 467, and 468 were verified after merge with
+  focused hook, React DOM mutation/event/hydration, native, React package, and
+  N-API checks, plus `cargo fmt --all --check`, conflict-marker scanning, and
+  `git diff --check`. The native merge kept both lifecycle prevalidation paths:
+  direct handoff admission rejects invalid sequence states before mutation, and
+  parser/sequence validation records deterministic JSON transport errors.
 - Worker 448 from queue 443-472 was accepted. It added private
   function-component layout-effect metadata for mount and update render paths,
   kept layout and passive metadata phase-separated, added committed layout
