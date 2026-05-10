@@ -2472,27 +2472,29 @@ impl HostRootCommitOrderDiagnosticsForCanary {
         false
     }
 
-    fn push(
-        &mut self,
-        phase: HostRootCommitOrderPhaseForCanary,
-        metadata_kind: HostRootCommitOrderMetadataKindForCanary,
-        root: FiberRootId,
-        finished_work: FiberId,
-        fiber: FiberId,
-        tag: FiberTag,
-        source_order: u64,
-    ) {
+    fn push(&mut self, record: HostRootCommitOrderRecordInputForCanary) {
         self.records.push(HostRootCommitOrderRecordForCanary {
             sequence: self.records.len(),
-            phase,
-            metadata_kind,
-            root,
-            finished_work,
-            fiber,
-            tag,
-            source_order,
+            phase: record.phase,
+            metadata_kind: record.metadata_kind,
+            root: record.root,
+            finished_work: record.finished_work,
+            fiber: record.fiber,
+            tag: record.tag,
+            source_order: record.source_order,
         });
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct HostRootCommitOrderRecordInputForCanary {
+    phase: HostRootCommitOrderPhaseForCanary,
+    metadata_kind: HostRootCommitOrderMetadataKindForCanary,
+    root: FiberRootId,
+    finished_work: FiberId,
+    fiber: FiberId,
+    tag: FiberTag,
+    source_order: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -3087,66 +3089,66 @@ impl HostRootCommitRecord {
         let mut diagnostics = HostRootCommitOrderDiagnosticsForCanary::default();
 
         for record in self.host_node_deletion_cleanup_log.records() {
-            diagnostics.push(
-                HostRootCommitOrderPhaseForCanary::Mutation,
-                HostRootCommitOrderMetadataKindForCanary::DeletionCleanup,
-                record.root(),
-                self.current,
-                record.fiber(),
-                record.tag(),
-                record.sequence() as u64,
-            );
+            diagnostics.push(HostRootCommitOrderRecordInputForCanary {
+                phase: HostRootCommitOrderPhaseForCanary::Mutation,
+                metadata_kind: HostRootCommitOrderMetadataKindForCanary::DeletionCleanup,
+                root: record.root(),
+                finished_work: self.current,
+                fiber: record.fiber(),
+                tag: record.tag(),
+                source_order: record.sequence() as u64,
+            });
         }
 
         for record in self.ref_callback_execution_handoff.records() {
-            diagnostics.push(
-                HostRootCommitOrderPhaseForCanary::Layout,
-                host_root_commit_order_ref_kind(record.action()),
-                record.root(),
-                self.current,
-                record.fiber(),
-                FiberTag::HostComponent,
-                record.sequence() as u64,
-            );
+            diagnostics.push(HostRootCommitOrderRecordInputForCanary {
+                phase: HostRootCommitOrderPhaseForCanary::Layout,
+                metadata_kind: host_root_commit_order_ref_kind(record.action()),
+                root: record.root(),
+                finished_work: self.current,
+                fiber: record.fiber(),
+                tag: FiberTag::HostComponent,
+                source_order: record.sequence() as u64,
+            });
         }
 
         for record in self.function_component_layout_effects.records() {
-            diagnostics.push(
-                HostRootCommitOrderPhaseForCanary::Layout,
-                HostRootCommitOrderMetadataKindForCanary::LayoutEffect,
-                self.root,
-                self.current,
-                record.fiber(),
-                FiberTag::FunctionComponent,
-                record.commit_order() as u64,
-            );
+            diagnostics.push(HostRootCommitOrderRecordInputForCanary {
+                phase: HostRootCommitOrderPhaseForCanary::Layout,
+                metadata_kind: HostRootCommitOrderMetadataKindForCanary::LayoutEffect,
+                root: self.root,
+                finished_work: self.current,
+                fiber: record.fiber(),
+                tag: FiberTag::FunctionComponent,
+                source_order: record.commit_order() as u64,
+            });
         }
 
         for record in self.root_update_callback_invocation_gate.records() {
-            diagnostics.push(
-                HostRootCommitOrderPhaseForCanary::Layout,
-                HostRootCommitOrderMetadataKindForCanary::RootUpdateCallback,
-                self.root,
-                self.current,
-                self.current,
-                FiberTag::HostRoot,
-                record.invocation_order() as u64,
-            );
+            diagnostics.push(HostRootCommitOrderRecordInputForCanary {
+                phase: HostRootCommitOrderPhaseForCanary::Layout,
+                metadata_kind: HostRootCommitOrderMetadataKindForCanary::RootUpdateCallback,
+                root: self.root,
+                finished_work: self.current,
+                fiber: self.current,
+                tag: FiberTag::HostRoot,
+                source_order: record.invocation_order() as u64,
+            });
         }
 
         for record in self
             .function_component_committed_passive_effects
             .phase_records()
         {
-            diagnostics.push(
-                HostRootCommitOrderPhaseForCanary::Passive,
-                host_root_commit_order_passive_kind(record.phase()),
-                self.root,
-                self.current,
-                record.fiber(),
-                FiberTag::FunctionComponent,
-                host_root_commit_order_passive_source_order(record.order()),
-            );
+            diagnostics.push(HostRootCommitOrderRecordInputForCanary {
+                phase: HostRootCommitOrderPhaseForCanary::Passive,
+                metadata_kind: host_root_commit_order_passive_kind(record.phase()),
+                root: self.root,
+                finished_work: self.current,
+                fiber: record.fiber(),
+                tag: FiberTag::FunctionComponent,
+                source_order: host_root_commit_order_passive_source_order(record.order()),
+            });
         }
 
         diagnostics
