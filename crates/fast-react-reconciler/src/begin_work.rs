@@ -29,8 +29,9 @@ use crate::function_component::{
     FunctionComponentUseContextRenderRecord, FunctionComponentUseStateHookRenderRecord,
     FunctionComponentUseStateRenderRecord, FunctionComponentUseStateRenderRequest,
     reconcile_function_component_single_child_output, render_function_component,
-    render_function_component_with_context_reads, render_function_component_with_use_context,
-    render_function_component_with_use_state,
+    render_function_component_with_context_reads,
+    render_function_component_with_required_use_context,
+    render_function_component_with_use_context, render_function_component_with_use_state,
 };
 
 pub(crate) const PORTAL_RECONCILER_UNSUPPORTED_FEATURE: &str = "Reconciler.fiber.Portal";
@@ -1571,6 +1572,32 @@ pub(crate) fn begin_work_function_component_use_context(
     context_store: &mut FunctionComponentContextRenderStore,
     invoker: &mut impl FunctionComponentContextConsumerInvoker,
 ) -> Result<FunctionComponentUseContextBeginWorkRecord, BeginWorkError> {
+    begin_work_function_component_use_context_impl(arena, request, context_store, None, invoker)
+}
+
+fn begin_work_function_component_required_use_context(
+    arena: &mut FiberArena,
+    request: BeginWorkRequest,
+    context_store: &mut FunctionComponentContextRenderStore,
+    expected_context: ContextHandle,
+    invoker: &mut impl FunctionComponentContextConsumerInvoker,
+) -> Result<FunctionComponentUseContextBeginWorkRecord, BeginWorkError> {
+    begin_work_function_component_use_context_impl(
+        arena,
+        request,
+        context_store,
+        Some(expected_context),
+        invoker,
+    )
+}
+
+fn begin_work_function_component_use_context_impl(
+    arena: &mut FiberArena,
+    request: BeginWorkRequest,
+    context_store: &mut FunctionComponentContextRenderStore,
+    expected_context: Option<ContextHandle>,
+    invoker: &mut impl FunctionComponentContextConsumerInvoker,
+) -> Result<FunctionComponentUseContextBeginWorkRecord, BeginWorkError> {
     let work_in_progress = request.work_in_progress();
     let tag = arena.get(work_in_progress)?.tag();
 
@@ -1587,13 +1614,23 @@ pub(crate) fn begin_work_function_component_use_context(
         });
     }
 
-    let render = render_function_component_with_use_context(
-        arena,
-        context_store,
-        work_in_progress,
-        request.render_lanes(),
-        invoker,
-    )?;
+    let render = match expected_context {
+        Some(context) => render_function_component_with_required_use_context(
+            arena,
+            context_store,
+            work_in_progress,
+            request.render_lanes(),
+            context,
+            invoker,
+        )?,
+        None => render_function_component_with_use_context(
+            arena,
+            context_store,
+            work_in_progress,
+            request.render_lanes(),
+            invoker,
+        )?,
+    };
 
     Ok(FunctionComponentUseContextBeginWorkRecord { render })
 }
@@ -1675,10 +1712,11 @@ pub(crate) fn begin_work_context_provider_use_context_child(
         })?;
     let pushed_stack_depth = context_store.stack_depth();
 
-    let child_result = begin_work_function_component_use_context(
+    let child_result = begin_work_function_component_required_use_context(
         arena,
         BeginWorkRequest::new(child, request.render_lanes()),
         context_store,
+        request.context(),
         invoker,
     );
     let restore_result = context_store.restore_snapshot(provider_snapshot);
@@ -2485,6 +2523,88 @@ mod tests {
         assert_eq!(
             arena.get(child_work_in_progress).unwrap().memoized_props(),
             PropsHandle::from_raw(2)
+        );
+    }
+
+    #[test]
+    fn context_provider_use_context_child_rejects_other_context_read_and_unwinds() {
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let provider_default = context_value(190);
+        let provided_value = context_value(191);
+        let other_default = context_value(192);
+        let provider_context = context_store.create_context(provider_default);
+        let other_context = context_store.create_context(other_default);
+        let (mut arena, _current, child_work_in_progress, component) = function_component_pair();
+        let provider = arena.create_fiber(
+            FiberTag::ContextProvider,
+            None,
+            PropsHandle::from_raw(193),
+            FiberMode::NO,
+        );
+        arena
+            .set_children(provider, &[child_work_in_progress])
+            .unwrap();
+        let mut registry = TestUseContextComponentRegistry::new(
+            component,
+            UseContextBehavior::ReadOnce {
+                context: other_context,
+            },
+        );
+
+        let error = begin_work_context_provider_use_context_child(
+            &mut arena,
+            ContextProviderBeginWorkRequest::new(
+                provider,
+                Lanes::DEFAULT,
+                provider_context,
+                provided_value,
+            ),
+            &mut context_store,
+            &mut registry,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            ContextProviderBeginWorkError::ChildBeginWork {
+                provider,
+                child: child_work_in_progress,
+                error: Box::new(BeginWorkError::FunctionComponent(
+                    FunctionComponentRenderError::UnexpectedUseContextContext {
+                        fiber: child_work_in_progress,
+                        expected: provider_context,
+                        actual: other_context,
+                    },
+                )),
+            }
+        );
+        assert_eq!(registry.calls().len(), 1);
+        assert_eq!(registry.reads().len(), 1);
+        let read = registry.reads()[0];
+        assert_eq!(read.fiber(), child_work_in_progress);
+        assert_eq!(read.context(), other_context);
+        assert_eq!(read.default_value(), other_default);
+        assert_eq!(read.value(), other_default);
+        assert_eq!(read.active_provider_count(), 0);
+        assert_eq!(context_store.context_reads(), &[read]);
+        assert_eq!(
+            context_store.current_value(provider_context).unwrap(),
+            provider_default
+        );
+        assert_eq!(
+            context_store.current_value(other_context).unwrap(),
+            other_default
+        );
+        assert_eq!(context_store.stack_depth(), 0);
+        assert_eq!(
+            context_store
+                .active_provider_count(provider_context)
+                .unwrap(),
+            0
+        );
+        assert_eq!(
+            arena.get(child_work_in_progress).unwrap().memoized_props(),
+            PropsHandle::NONE
         );
     }
 

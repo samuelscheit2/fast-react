@@ -3793,6 +3793,11 @@ pub(crate) enum FunctionComponentRenderError {
         fiber: FiberId,
         read_count: usize,
     },
+    UnexpectedUseContextContext {
+        fiber: FiberId,
+        expected: ContextHandle,
+        actual: ContextHandle,
+    },
     HookCursorPhaseMismatch {
         fiber: FiberId,
         expected: FunctionComponentHookRenderPhase,
@@ -4014,6 +4019,17 @@ impl Display for FunctionComponentRenderError {
                 "function component fiber {} performed {read_count} private use_context reads; this canary admits exactly one read",
                 fiber.slot().get()
             ),
+            Self::UnexpectedUseContextContext {
+                fiber,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "function component fiber {} read private context {}, expected provider context {}",
+                fiber.slot().get(),
+                actual.raw(),
+                expected.raw()
+            ),
             Self::HookCursorPhaseMismatch {
                 fiber,
                 expected,
@@ -4075,6 +4091,7 @@ impl Error for FunctionComponentRenderError {
             | Self::RefObjectHandleOverflow
             | Self::MissingUseContextRead { .. }
             | Self::UnsupportedUseContextReadCount { .. }
+            | Self::UnexpectedUseContextContext { .. }
             | Self::HookCursorPhaseMismatch { .. }
             | Self::Unsupported { .. }
             | Self::UnexpectedFiberTag { .. } => None,
@@ -4704,6 +4721,42 @@ pub(crate) fn render_function_component_with_use_context(
     render_lanes: Lanes,
     invoker: &mut impl FunctionComponentContextConsumerInvoker,
 ) -> Result<FunctionComponentUseContextRenderRecord, FunctionComponentRenderError> {
+    render_function_component_with_use_context_impl(
+        arena,
+        context_store,
+        work_in_progress,
+        render_lanes,
+        None,
+        invoker,
+    )
+}
+
+pub(crate) fn render_function_component_with_required_use_context(
+    arena: &mut FiberArena,
+    context_store: &mut FunctionComponentContextRenderStore,
+    work_in_progress: FiberId,
+    render_lanes: Lanes,
+    expected_context: ContextHandle,
+    invoker: &mut impl FunctionComponentContextConsumerInvoker,
+) -> Result<FunctionComponentUseContextRenderRecord, FunctionComponentRenderError> {
+    render_function_component_with_use_context_impl(
+        arena,
+        context_store,
+        work_in_progress,
+        render_lanes,
+        Some(expected_context),
+        invoker,
+    )
+}
+
+fn render_function_component_with_use_context_impl(
+    arena: &mut FiberArena,
+    context_store: &mut FunctionComponentContextRenderStore,
+    work_in_progress: FiberId,
+    render_lanes: Lanes,
+    expected_context: Option<ContextHandle>,
+    invoker: &mut impl FunctionComponentContextConsumerInvoker,
+) -> Result<FunctionComponentUseContextRenderRecord, FunctionComponentRenderError> {
     let mut request = validate_function_component_render(arena, work_in_progress, render_lanes)?;
     let context_state = context_store.prepare_render_state(work_in_progress);
     request = request.with_context_state(context_state);
@@ -4734,6 +4787,15 @@ pub(crate) fn render_function_component_with_use_context(
             );
         }
     };
+    if let Some(expected) = expected_context {
+        if context_read.context() != expected {
+            return Err(FunctionComponentRenderError::UnexpectedUseContextContext {
+                fiber: request.fiber(),
+                expected,
+                actual: context_read.context(),
+            });
+        }
+    }
 
     arena
         .get_mut(work_in_progress)?
@@ -5623,6 +5685,64 @@ mod tests {
         assert_eq!(
             arena.get(work_in_progress).unwrap().memoized_props(),
             PropsHandle::NONE
+        );
+    }
+
+    #[test]
+    fn function_component_required_use_context_rejects_unexpected_context_before_memoizing() {
+        let (mut arena, _current, work_in_progress, component) = function_component_pair();
+        let mut context_store = FunctionComponentContextRenderStore::new();
+        let expected_context = context_store.create_context(context_value(730));
+        let actual_context = context_store.create_context(context_value(731));
+        let before_provider = context_store
+            .push_provider(expected_context, context_value(732))
+            .unwrap();
+        let mut registry = TestUseContextComponentRegistry::new(
+            component,
+            UseContextBehavior::Single {
+                context: actual_context,
+            },
+        );
+
+        let error = render_function_component_with_required_use_context(
+            &mut arena,
+            &mut context_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            expected_context,
+            &mut registry,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            FunctionComponentRenderError::UnexpectedUseContextContext {
+                fiber: work_in_progress,
+                expected: expected_context,
+                actual: actual_context,
+            }
+        );
+        assert_eq!(registry.calls().len(), 1);
+        assert_eq!(registry.reads().len(), 1);
+        let read = registry.reads()[0];
+        assert_eq!(read.context(), actual_context);
+        assert_eq!(read.default_value(), context_value(731));
+        assert_eq!(read.value(), context_value(731));
+        assert_eq!(read.active_provider_count(), 0);
+        assert_eq!(context_store.context_reads(), &[read]);
+        assert_eq!(
+            context_store.current_value(expected_context).unwrap(),
+            context_value(732)
+        );
+        assert_eq!(
+            arena.get(work_in_progress).unwrap().memoized_props(),
+            PropsHandle::NONE
+        );
+
+        context_store.restore_snapshot(before_provider).unwrap();
+        assert_eq!(
+            context_store.current_value(expected_context).unwrap(),
+            context_value(730)
         );
     }
 
