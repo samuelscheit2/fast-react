@@ -1612,6 +1612,10 @@ const getInstancePrivateClassRootGate = Object.freeze({
 const privateTestInstanceWrapperRecordSymbol = Symbol.for(
   'fast.react_test_renderer.private_test_instance_wrapper_record'
 );
+const privateTestInstanceQueryBridgePreflightDiagnosticName =
+  'fast-react-test-renderer.testinstance.query-bridge-preflight';
+const privateTestInstanceQueryBridgePreflightStatus =
+  'private-test-instance-query-bridge-preflight-ready-public-test-instance-blocked';
 const privateErrorBoundaryDiagnosticsSymbol = Symbol.for(
   'fast.react_test_renderer.private_error_boundary_diagnostics'
 );
@@ -2281,6 +2285,42 @@ const privateTestInstanceFindByQueryDiagnostics = Object.freeze({
   nativeExecution: false,
   compatibilityClaimed: false
 });
+const privateTestInstanceQueryBridgePreflightGate = Object.freeze({
+  id: 'react-test-renderer-private-test-instance-query-bridge-preflight-gate',
+  diagnosticName: privateTestInstanceQueryBridgePreflightDiagnosticName,
+  status: privateTestInstanceQueryBridgePreflightStatus,
+  publicSurface: 'create().root/ReactTestInstance.find*',
+  acceptedWorker: 'worker-515-test-renderer-live-query-bridge-preflight',
+  acceptedRustCrate: 'fast-react-test-renderer',
+  acceptedRustDiagnosticName:
+    privateTestInstanceQueryBridgePreflightDiagnosticName,
+  acceptedRustApis: Object.freeze([
+    'TestRendererRoot::describe_private_test_instance_query_bridge_preflight_for_canary',
+    'TestRendererRoot::describe_private_test_instance_query_bridge_preflight_after_update_for_canary',
+    'TestRendererPrivateTestInstanceQueryBridgePreflightDiagnostics'
+  ]),
+  acceptedRustTests: Object.freeze([
+    'root_private_test_instance_query_bridge_preflight_ties_find_all_and_find_by_records',
+    'root_private_test_instance_query_bridge_preflight_follows_update_records'
+  ]),
+  bridgeSource:
+    'FastReactTestRendererPrivateRootRequestRecord.rustCanaryMetadata.testInstanceQuery',
+  wrapperRecordSymbol: privateTestInstanceWrapperRecordSymbol.description,
+  sourceFindAllDiagnosticName:
+    privateTestInstanceFindAllPredicateDiagnostics.diagnosticName,
+  sourceFindByDiagnosticName:
+    privateTestInstanceFindByQueryDiagnostics.diagnosticName,
+  consumesAcceptedRustFindAllDiagnostics: true,
+  consumesAcceptedRustFindByDiagnostics: true,
+  recordOnlyDiagnosticConsumption: true,
+  publicRootAvailable: false,
+  publicQueryMethodsAvailable: false,
+  publicTestInstanceObjectAvailable: false,
+  nativeBridgeAvailable: false,
+  nativeExecution: false,
+  rustExecutionFromJs: false,
+  compatibilityClaimed: false
+});
 const privateTestInstanceQueryMethodRecords = Object.freeze({
   find: privateTestInstanceFindQueryRecord,
   findAll: privateTestInstanceFindAllQueryRecord,
@@ -2319,6 +2359,7 @@ const privateTestInstanceWrapperSkeleton = Object.freeze({
   hostComponentQueryPath: privateTestInstanceHostComponentQueryPath,
   findAllPredicateDiagnostics: privateTestInstanceFindAllPredicateDiagnostics,
   findByQueryDiagnostics: privateTestInstanceFindByQueryDiagnostics,
+  queryBridgePreflightGate: privateTestInstanceQueryBridgePreflightGate,
   rootQueryRecord: privateTestInstanceRootQueryRecord,
   queryRecords: Object.freeze({
     root: privateTestInstanceRootQueryRecord,
@@ -2430,6 +2471,7 @@ const createRoutingGate = Object.freeze({
   toTreePrivateFacadeGate,
   getInstancePrivateClassRootGate,
   privateTestInstanceWrapperSkeleton,
+  privateTestInstanceQueryBridgePreflightGate,
   privateErrorBoundaryDiagnosticsGate
 });
 const rootRequestBridgeSymbol = Symbol.for(
@@ -2717,6 +2759,18 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
       'root_private_test_instance_find_by_query_diagnostics_build_on_find_all_metadata',
       'root_private_test_instance_find_by_query_diagnostics_follow_update_host_output'
     ]),
+    queryBridgePreflightDiagnosticName:
+      privateTestInstanceQueryBridgePreflightDiagnosticName,
+    queryBridgePreflightStatus: privateTestInstanceQueryBridgePreflightStatus,
+    queryBridgePreflightAvailable: true,
+    queryBridgePreflightAcceptedRustApis:
+      privateTestInstanceQueryBridgePreflightGate.acceptedRustApis,
+    queryBridgePreflightAcceptedRustTests:
+      privateTestInstanceQueryBridgePreflightGate.acceptedRustTests,
+    consumesAcceptedRustFindAllDiagnostics: true,
+    consumesAcceptedRustFindByDiagnostics: true,
+    recordOnlyDiagnosticConsumption: true,
+    queryBridgeRustExecutionFromJs: false,
     publicRootAvailable: false,
     publicQueryMethodsAvailable: false,
     publicTestInstanceObjectAvailable: false,
@@ -4510,6 +4564,9 @@ function createTestRendererRootRequestBridge(options) {
     getTestInstanceQueryDiagnostics(record) {
       return getTestInstanceQueryDiagnosticsForRootRequest(record);
     },
+    getTestInstanceQueryBridgePreflight(record) {
+      return getTestInstanceQueryBridgePreflightForRootRequest(record);
+    },
     getRootErrorBoundaryDiagnostics(record) {
       return getPrivateErrorBoundaryDiagnosticsForRootRequest(record);
     },
@@ -4518,6 +4575,12 @@ function createTestRendererRootRequestBridge(options) {
       return requests.length === 0
         ? null
         : getTestInstanceQueryDiagnosticsForRootRequest(requests[0]);
+    },
+    getRootTestInstanceQueryBridgePreflight(rootHandle) {
+      const requests = getRootRequestsForHandle(rootHandle);
+      return requests.length === 0
+        ? null
+        : getTestInstanceQueryBridgePreflightForRootRequest(requests[0]);
     },
     getRootErrorBoundaryDiagnosticsForHandle(rootHandle) {
       const requests = getRootRequestsForHandle(rootHandle);
@@ -4534,6 +4597,16 @@ function createTestRendererRootRequestBridge(options) {
       return requests.length === 0
         ? null
         : getTestInstanceQueryDiagnosticsForRootRequest(requests[0]);
+    },
+    getRendererTestInstanceQueryBridgePreflight(renderer) {
+      const rootHandle = rendererRootHandles.get(renderer);
+      if (rootHandle === undefined) {
+        return null;
+      }
+      const requests = getRootRequestsForHandle(rootHandle);
+      return requests.length === 0
+        ? null
+        : getTestInstanceQueryBridgePreflightForRootRequest(requests[0]);
     },
     getRendererErrorBoundaryDiagnostics(renderer) {
       const rootHandle = rendererRootHandles.get(renderer);
@@ -4557,6 +4630,23 @@ function createTestRendererRootRequestBridge(options) {
       return consumeAcceptedRustLifecycleDiagnosticForRequest(
         record,
         diagnostic
+      );
+    },
+    canConsumeAcceptedRustTestInstanceQueryDiagnostics(record, diagnostics) {
+      try {
+        consumeAcceptedRustTestInstanceQueryDiagnosticsForRequest(
+          record,
+          diagnostics
+        );
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    },
+    consumeAcceptedRustTestInstanceQueryDiagnostics(record, diagnostics) {
+      return consumeAcceptedRustTestInstanceQueryDiagnosticsForRequest(
+        record,
+        diagnostics
       );
     },
     createRootExecutionHandoff(record) {
@@ -5531,6 +5621,301 @@ function getTestInstanceQueryDiagnosticsForRootRequest(record) {
   return diagnostics;
 }
 
+function getTestInstanceQueryBridgePreflightForRootRequest(record) {
+  return getTestInstanceQueryDiagnosticsForRootRequest(record)
+    .queryBridgePreflight;
+}
+
+function consumeAcceptedRustTestInstanceQueryDiagnosticsForRequest(
+  record,
+  diagnostics
+) {
+  if (!isRootRequestRecord(record)) {
+    throwInvalidRootRequest(
+      'Expected a private react-test-renderer root request record.'
+    );
+  }
+
+  return createPrivateTestInstanceQueryBridgePreflightRecord(
+    record,
+    diagnostics
+  );
+}
+
+function createPrivateTestInstanceQueryBridgePreflightRecord(
+  rootRequest,
+  diagnostics
+) {
+  const findAllDiagnostic = selectAcceptedRustTestInstanceFindAllDiagnostic(
+    diagnostics
+  );
+  const findByDiagnostic = selectAcceptedRustTestInstanceFindByDiagnostic(
+    diagnostics
+  );
+  const normalizedFindAll =
+    normalizeAcceptedRustTestInstanceFindAllDiagnostic(findAllDiagnostic);
+  const normalizedFindBy =
+    normalizeAcceptedRustTestInstanceFindByDiagnostic(findByDiagnostic);
+
+  if (
+    normalizedFindBy.sourceFindAllDiagnosticName !==
+    normalizedFindAll.diagnosticName
+  ) {
+    throwInvalidRootRequest(
+      'Accepted Rust TestInstance findBy diagnostic is not based on the accepted findAll diagnostic.'
+    );
+  }
+
+  return freezeRecord({
+    id: 'react-test-renderer-private-test-instance-query-bridge-preflight',
+    kind: 'FastReactTestRendererPrivateTestInstanceQueryBridgePreflight',
+    diagnosticName: privateTestInstanceQueryBridgePreflightDiagnosticName,
+    status: privateTestInstanceQueryBridgePreflightStatus,
+    gate: privateTestInstanceQueryBridgePreflightGate,
+    entrypoint,
+    compatibilityTarget,
+    rootRequest,
+    rootHandle: rootRequest.rootHandle,
+    rootId: rootRequest.rootId,
+    rootSequence: rootRequest.rootSequence,
+    bridgeSource:
+      'FastReactTestRendererPrivateRootRequestRecord.rustCanaryMetadata.testInstanceQuery',
+    wrapperRecordSymbol: privateTestInstanceWrapperRecordSymbol.description,
+    sourceFindAllDiagnosticName: normalizedFindAll.diagnosticName,
+    sourceFindByDiagnosticName: normalizedFindBy.diagnosticName,
+    acceptedRustFindAllDiagnostics: findAllDiagnostic,
+    acceptedRustFindByDiagnostics: findByDiagnostic,
+    normalizedAcceptedRustFindAllDiagnostics: normalizedFindAll,
+    normalizedAcceptedRustFindByDiagnostics: normalizedFindBy,
+    findAllPredicateKinds: normalizedFindAll.predicateKinds,
+    findByQueries: normalizedFindBy.queries,
+    consumesAcceptedRustFindAllDiagnostics: true,
+    consumesAcceptedRustFindByDiagnostics: true,
+    recordOnlyDiagnosticConsumption: true,
+    publicRootAvailable: false,
+    publicQueryMethodsAvailable: false,
+    publicTestInstanceObjectAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    rustExecutionFromJs: false,
+    compatibilityClaimed: false
+  });
+}
+
+function selectAcceptedRustTestInstanceFindAllDiagnostic(diagnostics) {
+  if (diagnostics === undefined) {
+    return privateTestInstanceFindAllPredicateDiagnostics;
+  }
+  if (diagnostics === null || typeof diagnostics !== 'object') {
+    throwInvalidRootRequest(
+      'Expected accepted Rust TestInstance query diagnostics records.'
+    );
+  }
+
+  return (
+    readDiagnosticField(diagnostics, [
+      'findAll',
+      'findAllDiagnostic',
+      'findAllDiagnostics',
+      'findAllPredicateDiagnostics',
+      'acceptedRustFindAllDiagnostics'
+    ]) ?? diagnostics
+  );
+}
+
+function selectAcceptedRustTestInstanceFindByDiagnostic(diagnostics) {
+  if (diagnostics === undefined) {
+    return privateTestInstanceFindByQueryDiagnostics;
+  }
+  if (diagnostics === null || typeof diagnostics !== 'object') {
+    throwInvalidRootRequest(
+      'Expected accepted Rust TestInstance query diagnostics records.'
+    );
+  }
+
+  return (
+    readDiagnosticField(diagnostics, [
+      'findBy',
+      'findByDiagnostic',
+      'findByDiagnostics',
+      'findByQueryDiagnostics',
+      'acceptedRustFindByDiagnostics'
+    ]) ?? diagnostics
+  );
+}
+
+function normalizeAcceptedRustTestInstanceFindAllDiagnostic(diagnostic) {
+  if (diagnostic === null || typeof diagnostic !== 'object') {
+    throwInvalidRootRequest(
+      'Expected an accepted Rust TestInstance findAll diagnostic record.'
+    );
+  }
+
+  const diagnosticName = readDiagnosticField(diagnostic, [
+    'diagnosticName',
+    'diagnostic_name',
+    'acceptedRustDiagnosticName'
+  ]);
+  if (
+    diagnosticName !== privateTestInstanceFindAllPredicateDiagnostics.diagnosticName
+  ) {
+    throwInvalidRootRequest(
+      'Unsupported accepted Rust TestInstance findAll diagnostic name.'
+    );
+  }
+
+  assertFalseIfPresent(diagnostic, [
+    'publicQueryMethodAvailable',
+    'public_query_method_available',
+    'publicQueryMethodsAvailable',
+    'public_query_methods_available'
+  ], 'findAll public query availability');
+  assertFalseIfPresent(diagnostic, [
+    'publicTestInstanceObjectAvailable',
+    'public_test_instance_object_available'
+  ], 'findAll public TestInstance object availability');
+  assertFalseIfPresent(diagnostic, [
+    'nativeBridgeAvailable',
+    'native_bridge_available'
+  ], 'findAll native bridge availability');
+  assertFalseIfPresent(diagnostic, [
+    'nativeExecution',
+    'native_execution'
+  ], 'findAll native execution');
+  assertFalseIfPresent(diagnostic, [
+    'compatibilityClaimed',
+    'compatibility_claimed'
+  ], 'findAll compatibility claim');
+
+  return freezeRecord({
+    diagnosticName,
+    source:
+      readDiagnosticField(diagnostic, ['source']) ??
+      privateTestInstanceFindAllPredicateDiagnostics.source,
+    traversalOrder:
+      readDiagnosticField(diagnostic, [
+        'traversalOrder',
+        'traversal_order'
+      ]) ?? privateTestInstanceFindAllPredicateDiagnostics.traversalOrder,
+    defaultDeep:
+      readDiagnosticField(diagnostic, ['defaultDeep', 'default_deep']) ??
+      privateTestInstanceFindAllPredicateDiagnostics.defaultDeep,
+    predicateKinds: freezeArray(
+      normalizeStringArray(
+        readDiagnosticField(diagnostic, [
+          'predicateKinds',
+          'predicate_kinds'
+        ]),
+        privateTestInstanceFindAllPredicateDiagnostics.predicateKinds
+      )
+    ),
+    predicateExecution:
+      readDiagnosticField(diagnostic, [
+        'predicateExecution',
+        'predicate_execution'
+      ]) ?? false,
+    sourceRecord: diagnostic
+  });
+}
+
+function normalizeAcceptedRustTestInstanceFindByDiagnostic(diagnostic) {
+  if (diagnostic === null || typeof diagnostic !== 'object') {
+    throwInvalidRootRequest(
+      'Expected an accepted Rust TestInstance findBy diagnostic record.'
+    );
+  }
+
+  const diagnosticName = readDiagnosticField(diagnostic, [
+    'diagnosticName',
+    'diagnostic_name',
+    'acceptedRustDiagnosticName'
+  ]);
+  if (
+    diagnosticName !== privateTestInstanceFindByQueryDiagnostics.diagnosticName
+  ) {
+    throwInvalidRootRequest(
+      'Unsupported accepted Rust TestInstance findBy diagnostic name.'
+    );
+  }
+
+  assertFalseIfPresent(diagnostic, [
+    'publicQueryMethodAvailable',
+    'public_query_method_available',
+    'publicQueryMethodsAvailable',
+    'public_query_methods_available'
+  ], 'findBy public query availability');
+  assertFalseIfPresent(diagnostic, [
+    'publicTestInstanceObjectAvailable',
+    'public_test_instance_object_available'
+  ], 'findBy public TestInstance object availability');
+  assertFalseIfPresent(diagnostic, [
+    'nativeBridgeAvailable',
+    'native_bridge_available'
+  ], 'findBy native bridge availability');
+  assertFalseIfPresent(diagnostic, [
+    'nativeExecution',
+    'native_execution'
+  ], 'findBy native execution');
+  assertFalseIfPresent(diagnostic, [
+    'compatibilityClaimed',
+    'compatibility_claimed'
+  ], 'findBy compatibility claim');
+
+  return freezeRecord({
+    diagnosticName,
+    sourceFindAllDiagnosticName:
+      readDiagnosticField(diagnostic, [
+        'sourceFindAllDiagnosticName',
+        'source_find_all_diagnostic_name',
+        'findAllDiagnosticName'
+      ]) ?? privateTestInstanceFindByQueryDiagnostics.findAllDiagnosticName,
+    queries: freezeArray(
+      normalizeStringArray(
+        readDiagnosticField(diagnostic, ['queries', 'findByQueries']),
+        privateTestInstanceFindByQueryDiagnostics.queries
+      )
+    ),
+    effectiveDeep:
+      readDiagnosticField(diagnostic, ['effectiveDeep', 'effective_deep']) ??
+      privateTestInstanceFindByQueryDiagnostics.effectiveDeep,
+    expectOne:
+      readDiagnosticField(diagnostic, ['expectOne', 'expect_one']) ??
+      privateTestInstanceFindByQueryDiagnostics.expectOne,
+    predicateExecution:
+      readDiagnosticField(diagnostic, [
+        'predicateExecution',
+        'predicate_execution'
+      ]) ?? false,
+    sourceRecord: diagnostic
+  });
+}
+
+function normalizeStringArray(value, fallback) {
+  const source = value === undefined ? fallback : value;
+  if (!Array.isArray(source)) {
+    throwInvalidRootRequest(
+      'Expected an accepted Rust TestInstance query diagnostic array.'
+    );
+  }
+  for (const entry of source) {
+    if (typeof entry !== 'string') {
+      throwInvalidRootRequest(
+        'Expected accepted Rust TestInstance query diagnostic strings.'
+      );
+    }
+  }
+  return source.slice();
+}
+
+function assertFalseIfPresent(record, names, label) {
+  const value = readDiagnosticField(record, names);
+  if (value !== undefined && value !== false) {
+    throwInvalidRootRequest(
+      `Accepted Rust TestInstance query diagnostic ${label} must be false.`
+    );
+  }
+}
+
 function getPrivateErrorBoundaryDiagnosticsForRootRequest(record) {
   if (!isRootRequestRecord(record)) {
     throwInvalidRootRequest(
@@ -5649,6 +6034,8 @@ function createPrivateTestInstanceWrapperRecordForRootRequest(rootRequest) {
     hostOutputProduced: false,
     compatibilityClaimed: false
   });
+  const queryBridgePreflight =
+    createPrivateTestInstanceQueryBridgePreflightRecord(rootRequest);
 
   return freezeRecord({
     ...privateTestInstanceWrapperSkeleton,
@@ -5671,6 +6058,13 @@ function createPrivateTestInstanceWrapperRecordForRootRequest(rootRequest) {
     rootRequestRustCanaryMetadata: rootRequest.rustCanaryMetadata,
     rootRequestTestInstanceQueryMetadata:
       rootRequest.rustCanaryMetadata.testInstanceQuery,
+    queryBridgePreflight,
+    acceptedRustFindAllDiagnostics:
+      queryBridgePreflight.acceptedRustFindAllDiagnostics,
+    acceptedRustFindByDiagnostics:
+      queryBridgePreflight.acceptedRustFindByDiagnostics,
+    consumesAcceptedRustQueryDiagnostics: true,
+    recordOnlyDiagnosticConsumption: true,
     consumesRootBridgeMetadata: true,
     standaloneWrapperMetadata: false,
     nativeBridgeAvailable: false,

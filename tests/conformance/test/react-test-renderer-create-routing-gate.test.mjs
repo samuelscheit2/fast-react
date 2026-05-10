@@ -41,6 +41,10 @@ const privateTestInstanceWrapperRecordSymbolDescription =
 const privateTestInstanceWrapperRecordSymbol = Symbol.for(
   privateTestInstanceWrapperRecordSymbolDescription
 );
+const privateTestInstanceQueryBridgePreflightDiagnosticName =
+  "fast-react-test-renderer.testinstance.query-bridge-preflight";
+const privateTestInstanceQueryBridgePreflightStatus =
+  "private-test-instance-query-bridge-preflight-ready-public-test-instance-blocked";
 const privateErrorBoundaryDiagnosticsSymbolDescription =
   "fast.react_test_renderer.private_error_boundary_diagnostics";
 const privateErrorBoundaryDiagnosticsSymbol = Symbol.for(
@@ -1033,6 +1037,10 @@ test("react-test-renderer create routing gate feeds only private error diagnosti
     gate.localChecks.privateTestInstanceBridgeQueryDiagnosticsPresent,
     true
   );
+  assert.equal(
+    gate.localChecks.privateTestInstanceQueryBridgePreflightPresent,
+    true
+  );
   assert.equal(gate.localChecks.privateActQueueMetadataPresent, true);
   assert.equal(gate.localChecks.passiveEffectMetadataOnly, true);
   assert.equal(gate.localChecks.publicCreateUpdateUnmountErrorSurfaceBlocked, true);
@@ -1293,6 +1301,89 @@ test("react-test-renderer CJS development private TestInstance bridge records de
   assert.equal(
     bridge.getTestInstanceQueryDiagnostics(createRequest),
     record,
+    entry.entrypoint
+  );
+  assertNoPublicTestInstanceQueryMethods(renderer, entry.entrypoint);
+});
+
+test("react-test-renderer CJS development private TestInstance query bridge preflights accepted Rust diagnostics records", () => {
+  const entry = cjsEntrypoints.find((candidate) =>
+    candidate.entrypoint.endsWith("react-test-renderer.development")
+  );
+  assert.notEqual(entry, undefined);
+
+  const moduleExports = loadFresh(entry.modulePath);
+  const bridge = assertPrivateRootRequestBridge(
+    moduleExports,
+    entry.entrypoint
+  );
+  const renderer = moduleExports.create({ type: "private-query-preflight" });
+  const [createRequest] = bridge.getRendererRootRequests(renderer);
+  const record = Object.getOwnPropertyDescriptor(
+    renderer,
+    privateTestInstanceWrapperRecordSymbol
+  ).value;
+  const preflight = record.queryBridgePreflight;
+
+  assertPrivateTestInstanceQueryBridgePreflight(
+    preflight,
+    record,
+    createRequest,
+    entry.entrypoint
+  );
+  assert.equal(
+    bridge.getTestInstanceQueryBridgePreflight(createRequest),
+    preflight,
+    entry.entrypoint
+  );
+  assert.equal(
+    bridge.getRootTestInstanceQueryBridgePreflight(createRequest.rootHandle),
+    preflight,
+    entry.entrypoint
+  );
+  assert.equal(
+    bridge.getRendererTestInstanceQueryBridgePreflight(renderer),
+    preflight,
+    entry.entrypoint
+  );
+  assert.equal(
+    bridge.canConsumeAcceptedRustTestInstanceQueryDiagnostics(createRequest, {
+      findAll: record.findAllPredicateDiagnostics,
+      findBy: record.findByQueryDiagnostics
+    }),
+    true,
+    entry.entrypoint
+  );
+
+  const consumed = bridge.consumeAcceptedRustTestInstanceQueryDiagnostics(
+    createRequest,
+    {
+      findAll: record.findAllPredicateDiagnostics,
+      findBy: record.findByQueryDiagnostics
+    }
+  );
+  assertPrivateTestInstanceQueryBridgePreflight(
+    consumed,
+    record,
+    createRequest,
+    `${entry.entrypoint} consumed`
+  );
+  assert.equal(
+    consumed.acceptedRustFindAllDiagnostics,
+    record.findAllPredicateDiagnostics,
+    entry.entrypoint
+  );
+  assert.equal(
+    consumed.acceptedRustFindByDiagnostics,
+    record.findByQueryDiagnostics,
+    entry.entrypoint
+  );
+  assert.equal(
+    bridge.canConsumeAcceptedRustTestInstanceQueryDiagnostics(createRequest, {
+      findAll: { diagnosticName: "not-accepted" },
+      findBy: record.findByQueryDiagnostics
+    }),
+    false,
     entry.entrypoint
   );
   assertNoPublicTestInstanceQueryMethods(renderer, entry.entrypoint);
@@ -3681,6 +3772,187 @@ function assertPrivateFindByResultDiagnostics(
   assert.equal(resultDiagnostics.nativeBridgeAvailable, false, entrypoint);
   assert.equal(resultDiagnostics.nativeExecution, false, entrypoint);
   assert.equal(resultDiagnostics.compatibilityClaimed, false, entrypoint);
+}
+
+function assertPrivateTestInstanceQueryBridgePreflight(
+  preflight,
+  owner,
+  rootRequest,
+  entrypoint
+) {
+  assert.equal(Object.isFrozen(preflight), true, entrypoint);
+  assert.equal(
+    preflight.id,
+    "react-test-renderer-private-test-instance-query-bridge-preflight",
+    entrypoint
+  );
+  assert.equal(
+    preflight.kind,
+    "FastReactTestRendererPrivateTestInstanceQueryBridgePreflight",
+    entrypoint
+  );
+  assert.equal(
+    preflight.diagnosticName,
+    privateTestInstanceQueryBridgePreflightDiagnosticName,
+    entrypoint
+  );
+  assert.equal(
+    preflight.status,
+    privateTestInstanceQueryBridgePreflightStatus,
+    entrypoint
+  );
+  assert.equal(Object.isFrozen(preflight.gate), true, entrypoint);
+  assert.equal(
+    preflight.gate.id,
+    "react-test-renderer-private-test-instance-query-bridge-preflight-gate",
+    entrypoint
+  );
+  assert.equal(
+    preflight.gate.diagnosticName,
+    privateTestInstanceQueryBridgePreflightDiagnosticName,
+    entrypoint
+  );
+  assert.equal(
+    preflight.gate.status,
+    privateTestInstanceQueryBridgePreflightStatus,
+    entrypoint
+  );
+  assert.equal(
+    preflight.gate.acceptedWorker,
+    "worker-515-test-renderer-live-query-bridge-preflight",
+    entrypoint
+  );
+  assert.deepEqual(preflight.gate.acceptedRustApis, [
+    "TestRendererRoot::describe_private_test_instance_query_bridge_preflight_for_canary",
+    "TestRendererRoot::describe_private_test_instance_query_bridge_preflight_after_update_for_canary",
+    "TestRendererPrivateTestInstanceQueryBridgePreflightDiagnostics"
+  ]);
+  assert.deepEqual(preflight.gate.acceptedRustTests, [
+    "root_private_test_instance_query_bridge_preflight_ties_find_all_and_find_by_records",
+    "root_private_test_instance_query_bridge_preflight_follows_update_records"
+  ]);
+  assert.equal(preflight.rootRequest, rootRequest, entrypoint);
+  assert.equal(preflight.rootHandle, rootRequest.rootHandle, entrypoint);
+  assert.equal(preflight.rootId, rootRequest.rootId, entrypoint);
+  assert.equal(
+    preflight.bridgeSource,
+    "FastReactTestRendererPrivateRootRequestRecord.rustCanaryMetadata.testInstanceQuery",
+    entrypoint
+  );
+  assert.equal(
+    preflight.wrapperRecordSymbol,
+    privateTestInstanceWrapperRecordSymbolDescription,
+    entrypoint
+  );
+  assert.equal(
+    preflight.sourceFindAllDiagnosticName,
+    owner.findAllPredicateDiagnostics.diagnosticName,
+    entrypoint
+  );
+  assert.equal(
+    preflight.sourceFindByDiagnosticName,
+    owner.findByQueryDiagnostics.diagnosticName,
+    entrypoint
+  );
+  assert.equal(
+    preflight.acceptedRustFindAllDiagnostics,
+    owner.findAllPredicateDiagnostics,
+    entrypoint
+  );
+  assert.equal(
+    preflight.acceptedRustFindByDiagnostics,
+    owner.findByQueryDiagnostics,
+    entrypoint
+  );
+  assert.equal(
+    preflight.normalizedAcceptedRustFindAllDiagnostics.diagnosticName,
+    owner.findAllPredicateDiagnostics.diagnosticName,
+    entrypoint
+  );
+  assert.equal(
+    preflight.normalizedAcceptedRustFindByDiagnostics.diagnosticName,
+    owner.findByQueryDiagnostics.diagnosticName,
+    entrypoint
+  );
+  assert.deepEqual(preflight.findAllPredicateKinds, [
+    "type",
+    "props",
+    "predicate-like"
+  ]);
+  assert.deepEqual(preflight.findByQueries, ["findByType", "findByProps"]);
+  assert.equal(
+    preflight.consumesAcceptedRustFindAllDiagnostics,
+    true,
+    entrypoint
+  );
+  assert.equal(
+    preflight.consumesAcceptedRustFindByDiagnostics,
+    true,
+    entrypoint
+  );
+  assert.equal(preflight.recordOnlyDiagnosticConsumption, true, entrypoint);
+  assert.equal(preflight.publicRootAvailable, false, entrypoint);
+  assert.equal(preflight.publicQueryMethodsAvailable, false, entrypoint);
+  assert.equal(
+    preflight.publicTestInstanceObjectAvailable,
+    false,
+    entrypoint
+  );
+  assert.equal(preflight.nativeBridgeAvailable, false, entrypoint);
+  assert.equal(preflight.nativeExecution, false, entrypoint);
+  assert.equal(preflight.rustExecutionFromJs, false, entrypoint);
+  assert.equal(preflight.compatibilityClaimed, false, entrypoint);
+  assert.equal(
+    owner.acceptedRustFindAllDiagnostics,
+    owner.findAllPredicateDiagnostics,
+    entrypoint
+  );
+  assert.equal(
+    owner.acceptedRustFindByDiagnostics,
+    owner.findByQueryDiagnostics,
+    entrypoint
+  );
+  assert.equal(owner.consumesAcceptedRustQueryDiagnostics, true, entrypoint);
+  assert.equal(owner.recordOnlyDiagnosticConsumption, true, entrypoint);
+
+  const queryMetadata = owner.rootRequestTestInstanceQueryMetadata;
+  assert.equal(
+    queryMetadata.queryBridgePreflightDiagnosticName,
+    privateTestInstanceQueryBridgePreflightDiagnosticName,
+    entrypoint
+  );
+  assert.equal(
+    queryMetadata.queryBridgePreflightStatus,
+    privateTestInstanceQueryBridgePreflightStatus,
+    entrypoint
+  );
+  assert.equal(queryMetadata.queryBridgePreflightAvailable, true, entrypoint);
+  assert.deepEqual(
+    queryMetadata.queryBridgePreflightAcceptedRustApis,
+    preflight.gate.acceptedRustApis,
+    entrypoint
+  );
+  assert.deepEqual(
+    queryMetadata.queryBridgePreflightAcceptedRustTests,
+    preflight.gate.acceptedRustTests,
+    entrypoint
+  );
+  assert.equal(
+    queryMetadata.consumesAcceptedRustFindAllDiagnostics,
+    true,
+    entrypoint
+  );
+  assert.equal(
+    queryMetadata.consumesAcceptedRustFindByDiagnostics,
+    true,
+    entrypoint
+  );
+  assert.equal(
+    queryMetadata.recordOnlyDiagnosticConsumption,
+    true,
+    entrypoint
+  );
+  assert.equal(queryMetadata.queryBridgeRustExecutionFromJs, false, entrypoint);
 }
 
 function assertPrivateQueryMethodRecord(queryRecord, expected, owner, entrypoint) {
