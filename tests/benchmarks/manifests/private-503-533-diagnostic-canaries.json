@@ -1,0 +1,905 @@
+{
+  "schemaVersion": 1,
+  "kind": "fast-react-benchmark-manifest",
+  "manifestId": "private-503-533-diagnostic-canaries",
+  "description": "Metadata-only benchmark canaries for representative accepted private diagnostics from workers 503-533; public compatibility and comparable timing remain blocked.",
+  "timingDataPolicy": "diagnostic-until-compatible",
+  "requiredScenarioIds": [
+    "private-deleted-subtree-passive-fragment-portal-cleanup-canary",
+    "private-form-event-reset-queue-commit-canary",
+    "private-resource-map-load-error-state-canary",
+    "private-controlled-restore-radio-queue-write-canary",
+    "private-react-dom-facade-update-unmount-host-output-canary",
+    "private-dom-event-type-portal-error-routing-canary",
+    "private-test-renderer-query-committed-fiber-canary",
+    "private-test-renderer-act-warning-expired-scheduler-canary",
+    "private-suspenselist-activity-blocker-shape-canary",
+    "private-scheduler-posttask-environment-native-entry-canary",
+    "private-native-worker-thread-teardown-package-surface-canary",
+    "private-react-hook-dispatcher-public-blocker-canary",
+    "private-hydration-replay-error-metadata-canary",
+    "private-portal-root-render-public-blocker-canary",
+    "private-test-renderer-error-boundary-update-canary"
+  ],
+  "conformanceGates": [
+    {
+      "id": "reconciler-deleted-subtree-passive-fragment-portal-private-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-test-renderer-root-lifecycle-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "reconciler-deleted-subtree-passive-fragment-portal-private-diagnostic-gate",
+        "status": "accepted-private-partial",
+        "command": "cargo test -p fast-react-reconciler --all-features root_commit_deletion_subtree_traversal_gate deleted_subtree_passive",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Workers 503 and 504 admit private deleted-subtree passive destroy flush and Fragment/Portal deletion traversal metadata while public passive execution, broad deletion traversal, DOM mutation, and unmount compatibility remain blocked."
+      }
+    },
+    {
+      "id": "react-dom-form-event-reset-private-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-form-actions-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-dom-form-event-reset-private-diagnostic-gate",
+        "status": "accepted-private-partial",
+        "command": "node --test tests/conformance/test/react-dom-form-actions-oracle.test.mjs packages/react-dom/test/resource-form-unsupported-gates.test.js",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Workers 505 and 506 admit private form action event-extraction and reset queue/commit ordering metadata without SyntheticEvents, FormData, action invocation, reset execution, public roots, or form compatibility."
+      }
+    },
+    {
+      "id": "react-dom-resource-map-load-state-private-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-resource-hints-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-dom-resource-map-load-state-private-diagnostic-gate",
+        "status": "accepted-private-partial",
+        "command": "node --test tests/conformance/test/react-dom-resource-hints-oracle.test.mjs packages/react-dom/test/resource-form-unsupported-gates.test.js",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Workers 507 and 508 admit private resource-map commit and stylesheet load/error state rows for redacted stylesheet, preload, and script metadata while real resource maps, fetching, load events, head mutation, and public resource APIs remain blocked."
+      }
+    },
+    {
+      "id": "react-dom-controlled-restore-radio-queue-write-private-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-dom-controlled-input-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-dom-controlled-restore-radio-queue-write-private-diagnostic-gate",
+        "status": "accepted-private-partial",
+        "command": "node --test tests/conformance/test/dom-controlled-input-oracle.test.mjs packages/react-dom/test/resource-form-unsupported-gates.test.js",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Workers 509, 510, and 533 admit private controlled restore write/flush ordering, radio sibling-props lookup, and restore queue write preflight metadata without live value tracking, DOM queries, wrapper execution, or public controlled-input compatibility."
+      }
+    },
+    {
+      "id": "react-dom-facade-update-unmount-private-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-root-render-e2e-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-dom-facade-update-unmount-private-diagnostic-gate",
+        "status": "accepted-private-partial",
+        "command": "node --test packages/react-dom/test/react-dom-private-root-bridge-shell.test.js tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs && npm run root-render-e2e:conformance --workspace @fast-react/conformance",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Workers 511, 512, and 521 admit private public-shaped root.render update, unmount cleanup, and root-render metadata refresh rows through the fake-DOM host-output bridge while public createRoot, hydrateRoot, browser DOM mutation, scheduling, and compatibility remain blocked."
+      }
+    },
+    {
+      "id": "react-dom-event-type-portal-error-private-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-dom-event-delegation-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-dom-event-type-portal-error-private-diagnostic-gate",
+        "status": "accepted-private-partial",
+        "command": "node --test tests/conformance/test/react-dom-event-dispatch-plugin-skeleton.test.mjs packages/react-dom/test/react-dom-private-root-bridge-shell.test.js",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Workers 513 and 514 admit private broader event type dispatch metadata and portal listener error-routing records while browser dispatch, SyntheticEvents, hydration replay, global reporting, public callbacks, and portal event compatibility remain blocked."
+      }
+    },
+    {
+      "id": "react-test-renderer-query-committed-fiber-private-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-test-renderer-serialization-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-test-renderer-query-committed-fiber-private-diagnostic-gate",
+        "status": "accepted-private-partial",
+        "command": "cargo test -p fast-react-test-renderer --all-features private_test_instance root_private_tree_committed_fiber_inspection && npm run test:react-test-renderer:serialization --workspace @fast-react/conformance",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Workers 515 and 516 admit private TestInstance query bridge preflight and committed-fiber inspection metadata for multi-child and FunctionComponent shapes while public .root, TestInstance queries, toTree, native bridge execution, and serialization compatibility remain blocked."
+      }
+    },
+    {
+      "id": "react-test-renderer-act-warning-expired-scheduler-private-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-test-renderer-act-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-test-renderer-act-warning-expired-scheduler-private-diagnostic-gate",
+        "status": "accepted-private-partial",
+        "command": "node --test tests/conformance/test/react-test-renderer-act-oracle.test.mjs tests/conformance/test/scheduler-mock-oracle.test.mjs tests/conformance/test/act-passive-local-gate.test.mjs",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Workers 517 and 518 admit private react-test-renderer act warning/thenable blockers and expired mock Scheduler act-route metadata without warning emission, thenable awaiting, Scheduler flushes, public act queues, root execution, or compatibility."
+      }
+    },
+    {
+      "id": "reconciler-suspenselist-activity-blocker-private-gate",
+      "artifact": "tests/conformance/inventory/react-19.2.6-runtime-package-inventory.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "reconciler-suspenselist-activity-blocker-private-diagnostic-gate",
+        "status": "accepted-private-partial",
+        "command": "cargo test -p fast-react-reconciler --all-features begin_work_fails_closed_with_suspense_list_and_activity_child_shape_diagnostics root_work_loop_preflight_and_complete_handoff_report_suspense_list_activity_child_shapes",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Worker 522 admits private fail-closed SuspenseList and Activity child-shape diagnostics before generic unsupported-feature markers while reveal, hydration, hidden subtree work, host mutation, and public behavior remain blocked."
+      }
+    },
+    {
+      "id": "scheduler-posttask-environment-native-entry-private-gate",
+      "artifact": "tests/conformance/oracles/scheduler-0.27.0-post-task-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "scheduler-posttask-environment-native-entry-private-diagnostic-gate",
+        "status": "accepted-private-partial",
+        "command": "node --test tests/conformance/test/scheduler-post-task-oracle.test.mjs tests/conformance/test/scheduler-native-entry-oracle.test.mjs",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Workers 523 and 531 admit opt-in postTask environment/priority/abort/continuation diagnostics plus native-entry package guard rows while public Scheduler exports, default node keys, native/default entries, and browser postTask compatibility remain unchanged and blocked."
+      }
+    },
+    {
+      "id": "native-worker-thread-teardown-package-surface-private-gate",
+      "artifact": "tests/conformance/inventory/react-19.2.6-runtime-package-inventory.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "native-worker-thread-teardown-package-surface-private-diagnostic-gate",
+        "status": "accepted-private-partial",
+        "command": "cargo test -p fast-react-napi --all-features worker_thread_teardown && npm run check --workspace @fast-react/native",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Workers 524 and 532 admit private native worker-thread teardown metadata and package-surface mirror rows without addon loading, Node worker execution, N-API cleanup hooks, renderer execution, or public native compatibility."
+      }
+    },
+    {
+      "id": "react-hook-dispatcher-public-blocker-private-gate",
+      "artifact": "tests/conformance/inventory/react-19.2.6-runtime-package-inventory.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-hook-dispatcher-public-blocker-private-diagnostic-gate",
+        "status": "accepted-private-partial",
+        "command": "node --test tests/conformance/test/react-hook-dispatcher-guard.test.mjs",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Worker 525 admits private hook dispatcher metadata inventories for accepted state, memo, callback, context, and effect diagnostics while unmarked dispatchers and public React hook compatibility remain blocked."
+      }
+    },
+    {
+      "id": "react-dom-hydration-replay-error-private-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-hydration-marker-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-dom-hydration-replay-error-private-diagnostic-gate",
+        "status": "accepted-private-partial",
+        "command": "node --test tests/conformance/test/react-dom-hydration-boundary-gate.test.mjs packages/react-dom/test/react-dom-private-root-bridge-shell.test.js",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Worker 528 admits private hydration replay error metadata through retained dehydrated ownership rows and root option records while real hydration, browser event replay, callback invocation, root error scheduling, and hydration compatibility remain blocked."
+      }
+    },
+    {
+      "id": "react-dom-portal-root-render-public-blocker-private-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-portal-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-dom-portal-root-render-public-blocker-private-diagnostic-gate",
+        "status": "accepted-private-partial",
+        "command": "node --test tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs tests/conformance/test/react-dom-create-portal-local-gate.test.mjs",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Worker 529 admits private portal root-render blocker metadata for mount, event owner-root, and child reconciliation evidence while public root rendering, portal DOM mutation, listener setup, event bubbling, and compatibility remain blocked."
+      }
+    },
+    {
+      "id": "react-test-renderer-error-boundary-update-private-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-test-renderer-error-surface-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-test-renderer-error-boundary-update-private-diagnostic-gate",
+        "status": "accepted-private-partial",
+        "command": "cargo test -p fast-react-test-renderer --all-features private_error_boundary && node --test tests/conformance/test/react-test-renderer-error-surface-oracle.test.mjs tests/conformance/test/react-test-renderer-create-routing-gate.test.mjs",
+        "admitted": true,
+        "compatibilityClaimed": false,
+        "notes": "Worker 530 admits private react-test-renderer error-boundary update and commit rows that consume accepted serialization, TestInstance query, and act/passive metadata while public roots, lifecycle execution, callbacks, recovery, native/Rust bridge execution, and compatibility remain blocked."
+      }
+    },
+    {
+      "id": "react-dom-root-render-e2e-public-compatibility",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-root-render-e2e-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "root-render-dual-run-gate-1",
+        "status": "accepted-blocked",
+        "command": "npm run root-render-e2e:conformance --workspace @fast-react/conformance",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "The public root render E2E gate remains blocked, so private root facade, hydration, portal, event, resource, form, and controlled metadata cannot become comparable public timing evidence."
+      }
+    },
+    {
+      "id": "react-dom-root-public-facade-blocked-gate",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-root-render-e2e-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-dom-root-public-facade-blocked-gate-1",
+        "status": "accepted-blocked",
+        "command": "npm run root-public-facade:conformance --workspace @fast-react/conformance",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Public createRoot, hydrateRoot, render, unmount, browser DOM mutation, listener setup, events, error callbacks, and compatibility claims remain blocked despite private facade diagnostics."
+      }
+    },
+    {
+      "id": "react-dom-event-public-compatibility",
+      "artifact": "tests/conformance/oracles/react-19.2.6-dom-event-delegation-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-dom-event-public-compatibility-blocked-gate",
+        "status": "accepted-blocked",
+        "command": "node --test tests/conformance/test/react-dom-event-dispatch-plugin-skeleton.test.mjs",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Public DOM event dispatch, SyntheticEvent creation, browser listener invocation, hydration replay, portal bubbling, and compatibility claims remain blocked."
+      }
+    },
+    {
+      "id": "react-dom-hydration-public-compatibility",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-hydration-marker-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-dom-hydration-public-compatibility-blocked-gate",
+        "status": "accepted-blocked",
+        "command": "node --test tests/conformance/test/react-dom-hydration-boundary-gate.test.mjs",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Public hydrateRoot, marker parsing, browser replay, recoverable-error callbacks, and hydration compatibility claims remain blocked."
+      }
+    },
+    {
+      "id": "react-dom-portal-public-compatibility",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-portal-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-dom-portal-public-compatibility-blocked-gate",
+        "status": "accepted-blocked",
+        "command": "node --test tests/conformance/test/react-dom-create-portal-local-gate.test.mjs",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Public portal root rendering, portal DOM mutation, cross-container event bubbling, and compatibility claims remain blocked."
+      }
+    },
+    {
+      "id": "react-dom-resource-public-compatibility",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-resource-hints-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-dom-resource-public-compatibility-blocked-gate",
+        "status": "accepted-blocked",
+        "command": "node --test tests/conformance/test/react-dom-resource-hints-oracle.test.mjs",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Public resource hint dispatch, resource-map ownership, stylesheet insertion/load/error behavior, head singletons, and compatibility claims remain blocked."
+      }
+    },
+    {
+      "id": "react-dom-form-actions-public-compatibility",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-dom-form-actions-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-dom-form-actions-public-compatibility-blocked-gate",
+        "status": "accepted-blocked",
+        "command": "node --test tests/conformance/test/react-dom-form-actions-oracle.test.mjs",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Public form submit/requestSubmit behavior, SyntheticEvents, FormData, action invocation, reset queueing/commit, and compatibility claims remain blocked."
+      }
+    },
+    {
+      "id": "react-dom-controlled-input-public-compatibility",
+      "artifact": "tests/conformance/oracles/react-19.2.6-dom-controlled-input-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-dom-controlled-input-public-compatibility-blocked-gate",
+        "status": "accepted-blocked",
+        "command": "node --test tests/conformance/test/dom-controlled-input-oracle.test.mjs",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Public controlled input restore behavior, queue writes/flushes, wrapper execution, value tracking, radio sibling lookup, live DOM mutation, and compatibility claims remain blocked."
+      }
+    },
+    {
+      "id": "react-test-renderer-root-public-compatibility",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-test-renderer-root-lifecycle-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-test-renderer-root-public-compatibility-blocked-gate",
+        "status": "accepted-blocked",
+        "command": "node --test tests/conformance/test/react-test-renderer-root-lifecycle-oracle.test.mjs",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Public react-test-renderer create/update/unmount, root access, refs, options, and compatibility claims remain blocked."
+      }
+    },
+    {
+      "id": "react-test-renderer-act-public-compatibility",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-test-renderer-act-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-test-renderer-act-public-compatibility-blocked-gate",
+        "status": "accepted-blocked",
+        "command": "node --test tests/conformance/test/react-test-renderer-act-oracle.test.mjs",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Public react-test-renderer act queue draining, warnings, thenable awaiting, Scheduler flushing, passive effects, and compatibility claims remain blocked."
+      }
+    },
+    {
+      "id": "react-test-renderer-serialization-public-compatibility",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-test-renderer-serialization-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-test-renderer-serialization-public-compatibility-blocked-gate",
+        "status": "accepted-blocked",
+        "command": "npm run test:react-test-renderer:serialization --workspace @fast-react/conformance",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Public toJSON, toTree, TestInstance query methods, live JS-to-Rust bridge execution, serialization, and compatibility claims remain blocked."
+      }
+    },
+    {
+      "id": "react-test-renderer-error-surface-public-compatibility",
+      "artifact": "tests/conformance/oracles/react-19.2.6-react-test-renderer-error-surface-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-test-renderer-error-surface-public-compatibility-blocked-gate",
+        "status": "accepted-blocked",
+        "command": "node --test tests/conformance/test/react-test-renderer-error-surface-oracle.test.mjs",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Public react-test-renderer error-boundary recovery, lifecycle execution, root callbacks, root error options, and compatibility claims remain blocked."
+      }
+    },
+    {
+      "id": "scheduler-mock-public-compatibility",
+      "artifact": "tests/conformance/oracles/scheduler-0.27.0-mock-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "scheduler-mock-public-compatibility-blocked-gate",
+        "status": "accepted-blocked",
+        "command": "node --test tests/conformance/test/scheduler-mock-oracle.test.mjs",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Public mock Scheduler flush behavior, expired-work draining, helper timing compatibility, and React act integration claims remain blocked."
+      }
+    },
+    {
+      "id": "scheduler-post-task-public-compatibility",
+      "artifact": "tests/conformance/oracles/scheduler-0.27.0-post-task-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "scheduler-post-task-public-compatibility-blocked-gate",
+        "status": "accepted-blocked",
+        "command": "node --test tests/conformance/test/scheduler-post-task-oracle.test.mjs",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Public browser postTask ordering, host task timing, and Scheduler postTask compatibility claims remain blocked."
+      }
+    },
+    {
+      "id": "scheduler-native-entry-public-compatibility",
+      "artifact": "tests/conformance/oracles/scheduler-0.27.0-native-entry-oracle.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "scheduler-native-entry-public-compatibility-blocked-gate",
+        "status": "accepted-blocked",
+        "command": "node --test tests/conformance/test/scheduler-native-entry-oracle.test.mjs",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Public native/default Scheduler entry behavior and private diagnostic promotion across variants remain blocked from compatibility claims."
+      }
+    },
+    {
+      "id": "fast-react-native-public-compatibility",
+      "artifact": "tests/conformance/inventory/react-19.2.6-runtime-package-inventory.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "fast-react-native-public-compatibility-blocked-gate",
+        "status": "accepted-blocked",
+        "command": "npm run check --workspace @fast-react/native",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Public native addon loading, N-API cleanup hooks, worker-thread execution, renderer scheduling, commit, host output, and native compatibility claims remain blocked."
+      }
+    },
+    {
+      "id": "react-hooks-public-compatibility",
+      "artifact": "tests/conformance/inventory/react-19.2.6-runtime-package-inventory.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "react-hooks-public-compatibility-blocked-gate",
+        "status": "accepted-blocked",
+        "command": "node --test tests/conformance/test/react-hook-dispatcher-guard.test.mjs",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Public hook forwarding, renderer-owned dispatcher execution, state updates, context propagation, effect lifecycles, and compatibility claims remain blocked."
+      }
+    },
+    {
+      "id": "reconciler-unsupported-feature-public-compatibility",
+      "artifact": "tests/conformance/inventory/react-19.2.6-runtime-package-inventory.json",
+      "requiredClaims": [
+        "compatibilityClaimed",
+        "fastReactBehaviorCompatible",
+        "fullDualRunOracleExists"
+      ],
+      "acceptedGate": {
+        "id": "reconciler-unsupported-feature-public-compatibility-blocked-gate",
+        "status": "accepted-blocked",
+        "command": "cargo test -p fast-react-reconciler --all-features unsupported_feature",
+        "admitted": false,
+        "compatibilityClaimed": false,
+        "notes": "Public SuspenseList, Activity, unsupported feature reconciliation, reveal/hydration semantics, host mutation, and compatibility claims remain blocked."
+      }
+    }
+  ],
+  "milestones": [
+    {
+      "id": "private-503-533-diagnostic-canaries-admission",
+      "description": "Representative accepted private diagnostics from the 503-533 batch may be tracked as deterministic metadata-only benchmark canaries.",
+      "scenarioIds": [
+        "private-deleted-subtree-passive-fragment-portal-cleanup-canary",
+        "private-form-event-reset-queue-commit-canary",
+        "private-resource-map-load-error-state-canary",
+        "private-controlled-restore-radio-queue-write-canary",
+        "private-react-dom-facade-update-unmount-host-output-canary",
+        "private-dom-event-type-portal-error-routing-canary",
+        "private-test-renderer-query-committed-fiber-canary",
+        "private-test-renderer-act-warning-expired-scheduler-canary",
+        "private-suspenselist-activity-blocker-shape-canary",
+        "private-scheduler-posttask-environment-native-entry-canary",
+        "private-native-worker-thread-teardown-package-surface-canary",
+        "private-react-hook-dispatcher-public-blocker-canary",
+        "private-hydration-replay-error-metadata-canary",
+        "private-portal-root-render-public-blocker-canary",
+        "private-test-renderer-error-boundary-update-canary"
+      ],
+      "conformanceGateIds": [
+        "reconciler-deleted-subtree-passive-fragment-portal-private-gate",
+        "react-dom-form-event-reset-private-gate",
+        "react-dom-resource-map-load-state-private-gate",
+        "react-dom-controlled-restore-radio-queue-write-private-gate",
+        "react-dom-facade-update-unmount-private-gate",
+        "react-dom-event-type-portal-error-private-gate",
+        "react-test-renderer-query-committed-fiber-private-gate",
+        "react-test-renderer-act-warning-expired-scheduler-private-gate",
+        "reconciler-suspenselist-activity-blocker-private-gate",
+        "scheduler-posttask-environment-native-entry-private-gate",
+        "native-worker-thread-teardown-package-surface-private-gate",
+        "react-hook-dispatcher-public-blocker-private-gate",
+        "react-dom-hydration-replay-error-private-gate",
+        "react-dom-portal-root-render-public-blocker-private-gate",
+        "react-test-renderer-error-boundary-update-private-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "benchmarkReadinessStatus": "diagnostic-admitted",
+      "blockedReason": "These benchmark canaries are admitted only as deterministic private metadata rows; public React DOM, react-test-renderer, Scheduler, native, hook, SuspenseList/Activity, passive-effect, and comparable timing claims remain blocked."
+    },
+    {
+      "id": "private-503-533-public-promotion-blocked",
+      "description": "Public comparable timing promotion remains blocked until the related public compatibility gates become green.",
+      "scenarioIds": [
+        "private-deleted-subtree-passive-fragment-portal-cleanup-canary",
+        "private-form-event-reset-queue-commit-canary",
+        "private-resource-map-load-error-state-canary",
+        "private-controlled-restore-radio-queue-write-canary",
+        "private-react-dom-facade-update-unmount-host-output-canary",
+        "private-dom-event-type-portal-error-routing-canary",
+        "private-test-renderer-query-committed-fiber-canary",
+        "private-test-renderer-act-warning-expired-scheduler-canary",
+        "private-suspenselist-activity-blocker-shape-canary",
+        "private-scheduler-posttask-environment-native-entry-canary",
+        "private-native-worker-thread-teardown-package-surface-canary",
+        "private-react-hook-dispatcher-public-blocker-canary",
+        "private-hydration-replay-error-metadata-canary",
+        "private-portal-root-render-public-blocker-canary",
+        "private-test-renderer-error-boundary-update-canary"
+      ],
+      "conformanceGateIds": [
+        "react-dom-root-render-e2e-public-compatibility",
+        "react-dom-root-public-facade-blocked-gate",
+        "react-dom-event-public-compatibility",
+        "react-dom-hydration-public-compatibility",
+        "react-dom-portal-public-compatibility",
+        "react-dom-resource-public-compatibility",
+        "react-dom-form-actions-public-compatibility",
+        "react-dom-controlled-input-public-compatibility",
+        "react-test-renderer-root-public-compatibility",
+        "react-test-renderer-act-public-compatibility",
+        "react-test-renderer-serialization-public-compatibility",
+        "react-test-renderer-error-surface-public-compatibility",
+        "scheduler-mock-public-compatibility",
+        "scheduler-post-task-public-compatibility",
+        "scheduler-native-entry-public-compatibility",
+        "fast-react-native-public-compatibility",
+        "react-hooks-public-compatibility",
+        "reconciler-unsupported-feature-public-compatibility"
+      ],
+      "compatibilityStatus": "blocked-by-conformance",
+      "timingStatus": "blocked-by-conformance",
+      "benchmarkReadinessStatus": "blocked-by-conformance",
+      "blockedReason": "Comparable public timing remains blocked until public React DOM root/event/hydration/portal/resource/form/controlled, react-test-renderer root/act/serialization/error, Scheduler, native, hook, and unsupported-feature compatibility gates are green-admitted and claim compatibility."
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "private-deleted-subtree-passive-fragment-portal-cleanup-canary",
+      "area": "reconciler private deletion cleanup metadata canary",
+      "entrypoints": [
+        "crates/fast-react-reconciler/src/root_commit.rs"
+      ],
+      "conformanceGateIds": [
+        "reconciler-deleted-subtree-passive-fragment-portal-private-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The canary tracks only private deleted-subtree passive destroy flush and Fragment/Portal deletion traversal metadata; public passive execution, broad deletion traversal, DOM mutation, unmount compatibility, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-form-event-reset-queue-commit-canary",
+      "area": "react-dom private form action/reset metadata canary",
+      "entrypoints": [
+        "packages/react-dom/src/resource-form-internals-gate.js",
+        "packages/react-dom/src/resource-form-gates.js"
+      ],
+      "conformanceGateIds": [
+        "react-dom-form-event-reset-private-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The canary tracks only private submit/requestSubmit event-extraction and reset queue/commit ordering metadata; SyntheticEvents, FormData, action invocation, reset execution, public roots, form compatibility, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-resource-map-load-error-state-canary",
+      "area": "react-dom private resource map/load metadata canary",
+      "entrypoints": [
+        "packages/react-dom/src/resource-form-internals-gate.js",
+        "packages/react-dom/src/resource-form-gates.js"
+      ],
+      "conformanceGateIds": [
+        "react-dom-resource-map-load-state-private-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The canary tracks only private redacted resource-map commit and stylesheet load/error state metadata; real resource maps, fetch/load subscriptions, head mutation, public resource APIs, compatibility, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-controlled-restore-radio-queue-write-canary",
+      "area": "react-dom private controlled restore metadata canary",
+      "entrypoints": [
+        "packages/react-dom/src/resource-form-internals-gate.js",
+        "packages/react-dom/src/resource-form-gates.js"
+      ],
+      "conformanceGateIds": [
+        "react-dom-controlled-restore-radio-queue-write-private-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The canary tracks only private controlled restore ordering, radio sibling-props lookup, and restore queue write preflight metadata; live value tracking, DOM queries, wrapper execution, controlled-input compatibility, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-react-dom-facade-update-unmount-host-output-canary",
+      "area": "react-dom private facade host-output metadata canary",
+      "entrypoints": [
+        "packages/react-dom/src/client/root-bridge.js",
+        "packages/react-dom/client.js",
+        "packages/react-dom/src/dom-host/mutation.js"
+      ],
+      "conformanceGateIds": [
+        "react-dom-facade-update-unmount-private-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The canary tracks only private public-shaped root.render update, unmount cleanup, and root-render metadata rows through the fake-DOM host-output bridge; public roots, browser DOM mutation, scheduling, compatibility, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-dom-event-type-portal-error-routing-canary",
+      "area": "react-dom private event dispatch/error metadata canary",
+      "entrypoints": [
+        "packages/react-dom/src/events/plugin-event-system.js",
+        "packages/react-dom/src/events/root-listeners.js",
+        "packages/react-dom/src/client/root-bridge.js"
+      ],
+      "conformanceGateIds": [
+        "react-dom-event-type-portal-error-private-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The canary tracks only private keydown/mousemove/animationend dispatch metadata and portal listener error-routing records; browser dispatch, SyntheticEvents, hydration replay, callbacks, portal bubbling, compatibility, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-test-renderer-query-committed-fiber-canary",
+      "area": "react-test-renderer private query/fiber metadata canary",
+      "entrypoints": [
+        "crates/fast-react-test-renderer/src/lib.rs",
+        "crates/fast-react-reconciler/src/private_fiber_inspection.rs",
+        "packages/react-test-renderer/cjs/react-test-renderer.development.js"
+      ],
+      "conformanceGateIds": [
+        "react-test-renderer-query-committed-fiber-private-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The canary tracks only private TestInstance query bridge preflight and committed-fiber inspection metadata; public .root, TestInstance queries, toTree, native bridge execution, serialization compatibility, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-test-renderer-act-warning-expired-scheduler-canary",
+      "area": "react-test-renderer private act/Scheduler metadata canary",
+      "entrypoints": [
+        "packages/react-test-renderer/cjs/react-test-renderer.development.js",
+        "packages/scheduler/unstable_mock.js"
+      ],
+      "conformanceGateIds": [
+        "react-test-renderer-act-warning-expired-scheduler-private-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The canary tracks only private act warning/thenable blocker rows and expired mock Scheduler route metadata; warning emission, thenable awaiting, Scheduler flushes, public act queues, root execution, compatibility, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-suspenselist-activity-blocker-shape-canary",
+      "area": "reconciler private unsupported feature blocker canary",
+      "entrypoints": [
+        "crates/fast-react-reconciler/src/begin_work.rs",
+        "crates/fast-react-reconciler/src/root_work_loop.rs"
+      ],
+      "conformanceGateIds": [
+        "reconciler-suspenselist-activity-blocker-private-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The canary tracks only private fail-closed SuspenseList and Activity child-shape metadata; reveal behavior, Activity reconciliation, hydration reveal, hidden subtree rendering, host mutation, compatibility, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-scheduler-posttask-environment-native-entry-canary",
+      "area": "scheduler private postTask/native-entry metadata canary",
+      "entrypoints": [
+        "packages/scheduler/cjs/scheduler-unstable_post_task.development.js",
+        "packages/scheduler/cjs/scheduler-unstable_post_task.production.js",
+        "packages/scheduler"
+      ],
+      "conformanceGateIds": [
+        "scheduler-posttask-environment-native-entry-private-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The canary tracks only private opt-in postTask environment/abort/continuation metadata and native-entry package guard diagnostics; public Scheduler exports, default task node shape, browser postTask compatibility, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-native-worker-thread-teardown-package-surface-canary",
+      "area": "native private transport teardown metadata canary",
+      "entrypoints": [
+        "crates/fast-react-napi/src/lib.rs",
+        "packages/native"
+      ],
+      "conformanceGateIds": [
+        "native-worker-thread-teardown-package-surface-private-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The canary tracks only private native worker-thread teardown metadata and addon-free package-surface mirror rows; addon loading, Node worker execution, N-API cleanup hooks, renderer execution, native compatibility, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-react-hook-dispatcher-public-blocker-canary",
+      "area": "react private hook dispatcher blocker canary",
+      "entrypoints": [
+        "packages/react/hook-dispatcher.js"
+      ],
+      "conformanceGateIds": [
+        "react-hook-dispatcher-public-blocker-private-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The canary tracks only private hook dispatcher metadata inventories and fail-closed public blocker rows; public hook forwarding, renderer dispatcher execution, effects, context propagation, compatibility, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-hydration-replay-error-metadata-canary",
+      "area": "react-dom private hydration replay error metadata canary",
+      "entrypoints": [
+        "packages/react-dom/src/client/root-bridge.js",
+        "tests/conformance/test/react-dom-hydration-boundary-gate.test.mjs"
+      ],
+      "conformanceGateIds": [
+        "react-dom-hydration-replay-error-private-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The canary tracks only private hydration replay error metadata connected to retained dehydrated ownership and root option records; real hydration, browser event replay, callback invocation, root error scheduling, compatibility, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-portal-root-render-public-blocker-canary",
+      "area": "react-dom private portal public-blocker metadata canary",
+      "entrypoints": [
+        "packages/react-dom/src/client/root-bridge.js",
+        "tests/conformance/src/react-dom-root-render-e2e-conformance-gate.mjs"
+      ],
+      "conformanceGateIds": [
+        "react-dom-portal-root-render-public-blocker-private-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The canary tracks only private portal mount, event owner-root, and child reconciliation metadata with explicit public-root denial fields; portal DOM mutation, listener setup, event bubbling, root-render compatibility, and comparable timing remain blocked."
+    },
+    {
+      "id": "private-test-renderer-error-boundary-update-canary",
+      "area": "react-test-renderer private error-boundary update metadata canary",
+      "entrypoints": [
+        "crates/fast-react-test-renderer/src/lib.rs",
+        "packages/react-test-renderer/cjs/react-test-renderer.development.js"
+      ],
+      "conformanceGateIds": [
+        "react-test-renderer-error-boundary-update-private-gate"
+      ],
+      "compatibilityStatus": "matched-but-compatibility-not-claimed",
+      "timingStatus": "diagnostic-only",
+      "timingDataPolicy": "diagnostic-until-compatible",
+      "blockedReason": "The canary tracks only private error-boundary update/commit rows and accepted dependency metadata; public roots, lifecycle execution, root callbacks, error recovery, native/Rust bridge execution, compatibility, and comparable timing remain blocked."
+    }
+  ]
+}
