@@ -483,9 +483,57 @@ sequencing belong in `MASTER_PLAN.md`.
   adding package-private effect dispatcher markers for `useEffect`,
   `useLayoutEffect`, `useInsertionEffect`, and `useImperativeHandle` without
   executing effects, wiring reconciler hooks, or claiming compatibility.
+- Workers 233, 249, and 250 reconciler commit/function/effect canaries were
+  merged, adding test-only HostRoot mutation apply records, function-component
+  single-child HostComponent/HostText handoff, and data-only passive effect
+  commit handoff while preserving portal fail-closed diagnostics, context
+  reads, no public renderer output, and no compatibility claims.
+- Workers 234, 235, and 236 test-renderer private output and serialization
+  canaries were merged, extending the Rust-only host-output canary through
+  update/unmount, adding read-only committed-fiber inspection, and moving the
+  private JSON diagnostic gate to ready only for private diagnostics while the
+  JS facade, `act`, public serialization, and compatibility claims remain
+  blocked.
+- Workers 237, 255, and 258 react-test-renderer package-surface gates were
+  merged, keeping `create()` routed through a deterministic fail-closed shell,
+  preserving mock Scheduler exposure, and tightening package-surface checks
+  without behaviorful public renderer compatibility.
+- Workers 238, 242, 259, and 261 DOM private mutation slices were merged,
+  combining ordinary property payload application, style/innerHTML application,
+  component-tree latest-props commit records, and HostText commit conformance
+  gates without public root behavior or broad DOM compatibility claims.
+- Workers 239, 240, and 262 React DOM root bridge/facade gates were merged,
+  preserving private create/render/unmount request records, keeping public root
+  facade behavior blocked, and adding root-render E2E private bridge rows
+  alongside the accepted React oracle evidence.
+- Workers 244, 245, and 246 event/ref/hydration private gates were merged,
+  adding fail-closed event dispatch plugin records, ref callback commit gate
+  metadata, and hydration container marker parsing while leaving event replay,
+  real refs, hydration, and public renderer compatibility blocked.
+- Workers 247, 252, 253, and 254 function-context and act surface gates were
+  merged, preserving context read canaries, sync-flush act continuation
+  metadata, public React `act` blocked gates, and React DOM test-utils `act`
+  package shape without executing effects or claiming act compatibility.
+- Workers 256, 257, and 260 native/resource/benchmark gates were merged,
+  adding native root bridge request records, resource/form internals gates, and
+  blocked benchmark admission metadata tied to accepted root/test-renderer
+  conformance evidence without timing artifacts or speed claims.
 
 ## Latest Accepted Verification
 
+- Workers 233-262 were verified on their worktrees where applicable and again
+  on `main` after merge conflict resolution. The combined `main` result passed
+  `cargo fmt --all --check`, full `fast-react-core` tests with 130 unit tests,
+  full `fast-react-reconciler` tests with 217 unit tests plus 1 compile-fail
+  doctest, full `fast-react-test-renderer` tests with 44 unit tests, workspace
+  clippy with warnings denied, `npm run check:benchmarks` with 4 manifests,
+  65 scenarios, 9 milestones, and 0 result artifacts, `npm run check:js` with
+  539 conformance tests plus package-surface, benchmark, workspace, and native
+  checks, and `git diff --check`. Conflict resolutions preserved portal
+  diagnostics with function-component single-child handoff, context reads with
+  passive metadata, private JSON serialization with committed-fiber inspection,
+  package-surface routing with mock Scheduler, DOM payload/style/latest-props
+  helpers, and root public/private facade gates together.
 - Workers 241, 243, 248, and 251 were verified on their worktrees and again on
   `main`; worker 251 required a scoped conflict resolution with worker 248 in
   `packages/react/hook-dispatcher.js` and

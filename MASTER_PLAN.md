@@ -45,66 +45,17 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 233: root commit host mutation apply skeleton in
-  `/Users/user/Developer/Developer/fast-react-worker-233-root-commit-host-mutation-apply-skeleton`.
-- Worker 234: test-renderer host output update/unmount canary in
-  `/Users/user/Developer/Developer/fast-react-worker-234-test-renderer-host-output-update-unmount-canary`.
-- Worker 235: test-renderer private fiber inspection API in
-  `/Users/user/Developer/Developer/fast-react-worker-235-test-renderer-private-fiber-inspection`.
-- Worker 236: test-renderer private JSON serialization skeleton in
-  `/Users/user/Developer/Developer/fast-react-worker-236-test-renderer-private-json-serialization`.
-- Worker 237: react-test-renderer JS create routing gate in
-  `/Users/user/Developer/Developer/fast-react-worker-237-react-test-renderer-js-create-routing-gate`.
-- Worker 238: DOM mutation payload applier in
-  `/Users/user/Developer/Developer/fast-react-worker-238-dom-mutation-payload-applier`.
-- Worker 239: DOM root bridge request admission gate in
-  `/Users/user/Developer/Developer/fast-react-worker-239-dom-root-bridge-request-admission-gate`.
-- Worker 240: DOM root public facade dual-run blocked gate in
-  `/Users/user/Developer/Developer/fast-react-worker-240-dom-root-public-facade-dualrun-blocked-gate`.
-- Worker 242: DOM style/dangerous HTML applier gate in
-  `/Users/user/Developer/Developer/fast-react-worker-242-dom-style-dangerous-html-applier-gate`.
-- Worker 244: DOM event dispatch plugin skeleton in
-  `/Users/user/Developer/Developer/fast-react-worker-244-dom-event-dispatch-plugin-skeleton`.
-- Worker 245: DOM ref callback commit gate in
-  `/Users/user/Developer/Developer/fast-react-worker-245-dom-ref-callback-commit-gate`.
-- Worker 246: hydration container marker parser in
-  `/Users/user/Developer/Developer/fast-react-worker-246-hydration-container-marker-parser`.
-- Worker 247: function component context read canary in
-  `/Users/user/Developer/Developer/fast-react-worker-247-function-component-context-read-canary`.
-- Worker 249: function component single child reconciliation canary in
-  `/Users/user/Developer/Developer/fast-react-worker-249-function-component-single-child-reconciliation`.
-- Worker 250: hook effect passive commit handoff in
-  `/Users/user/Developer/Developer/fast-react-worker-250-hook-effect-passive-commit-handoff`.
-- Worker 252: sync flush act continuation skeleton in
-  `/Users/user/Developer/Developer/fast-react-worker-252-sync-flush-act-continuation-skeleton`.
-- Worker 253: public React `act` blocked gate in
-  `/Users/user/Developer/Developer/fast-react-worker-253-react-act-public-blocked-gate`.
-- Worker 254: React DOM test-utils act package surface in
-  `/Users/user/Developer/Developer/fast-react-worker-254-react-dom-test-utils-act-package-surface`.
-- Worker 255: test-renderer mock scheduler shell in
-  `/Users/user/Developer/Developer/fast-react-worker-255-test-renderer-mock-scheduler-shell`.
-- Worker 256: native root bridge request records in
-  `/Users/user/Developer/Developer/fast-react-worker-256-native-root-bridge-request-records`.
-- Worker 257: benchmark root lifecycle admission manifest in
-  `/Users/user/Developer/Developer/fast-react-worker-257-benchmark-root-lifecycle-admission-manifest`.
-- Worker 258: react-test-renderer package surface tightening in
-  `/Users/user/Developer/Developer/fast-react-worker-258-react-test-renderer-package-surface-tightening`.
-- Worker 259: DOM component-tree latest props commit adapter in
-  `/Users/user/Developer/Developer/fast-react-worker-259-dom-component-tree-latest-props-commit-adapter`.
-- Worker 260: resource/form action internals gate in
-  `/Users/user/Developer/Developer/fast-react-worker-260-resource-form-action-internals-gate`.
-- Worker 261: DOM HostText commit conformance gate in
-  `/Users/user/Developer/Developer/fast-react-worker-261-dom-host-text-commit-conformance-gate`.
-- Worker 262: root render E2E private bridge dual-run gate in
-  `/Users/user/Developer/Developer/fast-react-worker-262-root-render-e2e-private-bridge-dualrun-gate`.
+- No top-level workers are active after the 233-262 merge batch. Clean accepted
+  worker worktrees and refill the queue to at most 30 top-level workers.
 
 ## Near-Term Sequencing
 
 1. Keep the implementation queue at 30 top-level workers or fewer.
 2. Accept code workers opportunistically, resolving conflicts after the fact
    rather than serializing all implementation behind one commit path.
-3. Fold scheduler, host complete-work, sync flush, and canary branches onto the
-   accepted HostRoot render/commit lifecycle shape.
+3. Refill with non-overlapping slices that turn the accepted private root,
+   commit, host-output, function-component, DOM, and package gates into the
+   next narrow implementation or conformance checkpoints.
 
 ## Next Queue Candidates
 
