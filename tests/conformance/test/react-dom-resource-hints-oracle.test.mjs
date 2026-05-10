@@ -577,6 +577,46 @@ test("private preload/preinit dedupe and order diagnostics stay record-only", ()
       }
     ]),
     dispatcherGate.recordResourceHintDispatcherRequest("L", [
+      "/script.js",
+      "script",
+      {
+        crossOrigin: undefined,
+        integrity: "sha256-script-preload",
+        nonce: undefined,
+        type: undefined,
+        fetchPriority: undefined,
+        referrerPolicy: undefined,
+        imageSrcSet: undefined,
+        imageSizes: undefined,
+        media: undefined
+      }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest("X", [
+      "/script.js",
+      {
+        crossOrigin: undefined,
+        integrity: "sha256-script",
+        fetchPriority: "high",
+        nonce: "nonce-script"
+      }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest("m", [
+      "/module.mjs",
+      {
+        as: undefined,
+        crossOrigin: "",
+        integrity: "sha256-module-preload"
+      }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest("M", [
+      "/module.mjs",
+      {
+        crossOrigin: "",
+        integrity: "sha256-module",
+        nonce: "nonce-module"
+      }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest("L", [
       "/font.woff2",
       "font",
       {
@@ -604,6 +644,22 @@ test("private preload/preinit dedupe and order diagnostics stay record-only", ()
     "data-precedence": "theme",
     "data-fast-react-resource-key": "style-main",
     "data-fast-react-precedence-key": "precedence-theme"
+  });
+  appendResourceHintFakeHeadChild(fakeDom, "link", {
+    rel: "preload",
+    as: "script",
+    "data-fast-react-resource-key": "script-main"
+  });
+  appendResourceHintFakeHeadChild(fakeDom, "script", {
+    "data-fast-react-resource-key": "script-main"
+  });
+  appendResourceHintFakeHeadChild(fakeDom, "link", {
+    rel: "modulepreload",
+    "data-fast-react-resource-key": "module-main"
+  });
+  appendResourceHintFakeHeadChild(fakeDom, "script", {
+    type: "module",
+    "data-fast-react-resource-key": "module-main"
   });
   appendResourceHintFakeHeadChild(fakeDom, "link", {
     rel: "preload",
@@ -637,6 +693,26 @@ test("private preload/preinit dedupe and order diagnostics stay record-only", ()
         },
         {
           sourceAdapterAdmissionId: admissions[3].adapterAdmissionId,
+          resourceKind: "script",
+          resourceKey: "script-main"
+        },
+        {
+          sourceAdapterAdmissionId: admissions[4].adapterAdmissionId,
+          resourceKind: "script",
+          resourceKey: "script-main"
+        },
+        {
+          sourceAdapterAdmissionId: admissions[5].adapterAdmissionId,
+          resourceKind: "script",
+          resourceKey: "module-main"
+        },
+        {
+          sourceAdapterAdmissionId: admissions[6].adapterAdmissionId,
+          resourceKind: "script",
+          resourceKey: "module-main"
+        },
+        {
+          sourceAdapterAdmissionId: admissions[7].adapterAdmissionId,
           resourceKind: "font",
           resourceKey: "font-main"
         }
@@ -654,12 +730,24 @@ test("private preload/preinit dedupe and order diagnostics stay record-only", ()
       "insert-preload",
       "preinit-adopts-preload",
       "dedupe-preinit",
+      "insert-preload",
+      "preinit-adopts-preload",
+      "insert-preload",
+      "preinit-adopts-preload",
       "insert-preload"
     ]
   );
   assert.deepEqual(
     diagnostic.plannedHeadInsertionOrder.rows.map((row) => row.contractId),
-    ["preinit-style", "preload", "preload"]
+    [
+      "preinit-style",
+      "preload",
+      "preload",
+      "preinit-script",
+      "preload-module",
+      "preinit-module-script",
+      "preload"
+    ]
   );
   assert.deepEqual(
     diagnostic.observedHeadOrder.rows.map((row) => ({
@@ -678,16 +766,98 @@ test("private preload/preinit dedupe and order diagnostics stay record-only", ()
       {
         nodeName: "LINK",
         relationship: "preload",
+        resourceKey: "script-main",
+        orderMutated: false
+      },
+      {
+        nodeName: "SCRIPT",
+        relationship: null,
+        resourceKey: "script-main",
+        orderMutated: false
+      },
+      {
+        nodeName: "LINK",
+        relationship: "modulepreload",
+        resourceKey: "module-main",
+        orderMutated: false
+      },
+      {
+        nodeName: "SCRIPT",
+        relationship: null,
+        resourceKey: "module-main",
+        orderMutated: false
+      },
+      {
+        nodeName: "LINK",
+        relationship: "preload",
         resourceKey: "font-main",
         orderMutated: false
       }
     ]
   );
-  assert.equal(diagnostic.resourceMapPlan.uniqueResourceCount, 2);
+  assert.equal(diagnostic.resourceMapPlan.uniqueResourceCount, 4);
+  assert.equal(diagnostic.resourceMapPlan.scriptModuleRowCount, 4);
   assert.equal(diagnostic.resourceMapPlan.dedupedRowCount, 1);
+  assert.deepEqual(
+    diagnostic.scriptModulePreinitRows.map((row) => ({
+      contractId: row.contractId,
+      scriptKind: row.scriptKind,
+      dedupeKey: row.dedupeKey,
+      publicScriptModuleResourceDispatch:
+        row.publicScriptModuleResourceDispatch,
+      scriptExecutionStarted: row.scriptExecutionStarted
+    })),
+    [
+      {
+        contractId: "preload",
+        scriptKind: "classic",
+        dedupeKey: "script:script-main",
+        publicScriptModuleResourceDispatch: false,
+        scriptExecutionStarted: false
+      },
+      {
+        contractId: "preinit-script",
+        scriptKind: "classic",
+        dedupeKey: "script:script-main",
+        publicScriptModuleResourceDispatch: false,
+        scriptExecutionStarted: false
+      },
+      {
+        contractId: "preload-module",
+        scriptKind: "module",
+        dedupeKey: "script:module-main",
+        publicScriptModuleResourceDispatch: false,
+        scriptExecutionStarted: false
+      },
+      {
+        contractId: "preinit-module-script",
+        scriptKind: "module",
+        dedupeKey: "script:module-main",
+        publicScriptModuleResourceDispatch: false,
+        scriptExecutionStarted: false
+      }
+    ]
+  );
+  assert.equal(diagnostic.scriptModuleHeadOrder.plannedRowCount, 4);
+  assert.equal(diagnostic.scriptModuleHeadOrder.observedRowCount, 4);
+  assert.equal(
+    diagnostic.publicScriptModuleDispatchBoundary
+      .publicScriptModuleResourceDispatch,
+    false
+  );
+  assert.equal(
+    diagnostic.publicScriptModuleDispatchBoundary.scriptExecutionStarted,
+    false
+  );
   assert.equal(diagnostic.sideEffects.fakeHeadRead, true);
   assert.equal(diagnostic.sideEffects.fakeHeadMutated, false);
   assert.equal(diagnostic.sideEffects.resourceHintDedupeRowsRecorded, true);
+  assert.equal(diagnostic.sideEffects.scriptModulePreinitRowsRecorded, true);
+  assert.equal(
+    diagnostic.sideEffects.scriptModuleFakeHeadOrderRowsRecorded,
+    true
+  );
+  assert.equal(diagnostic.sideEffects.publicScriptModuleResourceDispatch, false);
   assert.equal(
     diagnostic.sideEffects.publicPreloadPreinitDedupeBehavior,
     false
@@ -706,7 +876,9 @@ test("private preload/preinit dedupe and order diagnostics stay record-only", ()
     resourceFormGate.resourceHintPreloadPreinitOrderBlockedCapabilities
   );
   assert.equal(JSON.stringify(diagnostic).includes("/style.css"), false);
+  assert.equal(JSON.stringify(diagnostic).includes("/module.mjs"), false);
   assert.equal(JSON.stringify(diagnostic).includes("sha256-style"), false);
+  assert.equal(JSON.stringify(diagnostic).includes("nonce-module"), false);
   assert.equal(/"theme"/u.test(JSON.stringify(diagnostic)), false);
   assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
 });
@@ -951,6 +1123,22 @@ test("private resource-map commit diagnostics stay record-only", () => {
         fetchPriority: "high",
         nonce: "nonce-script"
       }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest("m", [
+      "/module.mjs",
+      {
+        as: undefined,
+        crossOrigin: "",
+        integrity: "sha256-module-preload"
+      }
+    ]),
+    dispatcherGate.recordResourceHintDispatcherRequest("M", [
+      "/module.mjs",
+      {
+        crossOrigin: "",
+        integrity: "sha256-module",
+        nonce: "nonce-module"
+      }
     ])
   ];
   const headRecord = dispatcherGate.recordSingletonRequest("head", [
@@ -968,6 +1156,14 @@ test("private resource-map commit diagnostics stay record-only", () => {
     "data-precedence": "theme",
     "data-fast-react-resource-key": "style-main",
     "data-fast-react-precedence-key": "precedence-main"
+  });
+  appendResourceHintFakeHeadChild(fakeDom, "link", {
+    rel: "modulepreload",
+    "data-fast-react-resource-key": "module-main"
+  });
+  appendResourceHintFakeHeadChild(fakeDom, "script", {
+    type: "module",
+    "data-fast-react-resource-key": "module-main"
   });
 
   const order = orderGate.recordPreloadPreinitOrderDiagnostic(
@@ -997,6 +1193,16 @@ test("private resource-map commit diagnostics stay record-only", () => {
           sourceAdapterAdmissionId: admissions[3].adapterAdmissionId,
           resourceKind: "script",
           resourceKey: "script-main"
+        },
+        {
+          sourceAdapterAdmissionId: admissions[4].adapterAdmissionId,
+          resourceKind: "script",
+          resourceKey: "module-main"
+        },
+        {
+          sourceAdapterAdmissionId: admissions[5].adapterAdmissionId,
+          resourceKind: "script",
+          resourceKey: "module-main"
         }
       ]
     }
@@ -1024,7 +1230,7 @@ test("private resource-map commit diagnostics stay record-only", () => {
   );
   assert.deepEqual(
     diagnostic.privateResourceMapRecords.map((row) => row.recordKind),
-    ["preload", "stylesheet", "preload", "script"]
+    ["preload", "stylesheet", "preload", "script", "preload", "script"]
   );
   assert.deepEqual(
     diagnostic.privateResourceMapRecords.map((row) => row.mapKind),
@@ -1032,24 +1238,66 @@ test("private resource-map commit diagnostics stay record-only", () => {
       "preload-props",
       "hoistable-styles",
       "preload-props",
+      "hoistable-scripts",
+      "preload-props",
       "hoistable-scripts"
     ]
   );
   assert.equal(diagnostic.resourceMapCommitPlan.stylesheetRecordCount, 1);
-  assert.equal(diagnostic.resourceMapCommitPlan.preloadRecordCount, 2);
-  assert.equal(diagnostic.resourceMapCommitPlan.scriptRecordCount, 1);
+  assert.equal(diagnostic.resourceMapCommitPlan.preloadRecordCount, 3);
+  assert.equal(diagnostic.resourceMapCommitPlan.scriptRecordCount, 2);
+  assert.equal(diagnostic.resourceMapCommitPlan.modulePreloadRecordCount, 1);
+  assert.equal(diagnostic.resourceMapCommitPlan.moduleScriptRecordCount, 1);
+  assert.deepEqual(
+    diagnostic.privateResourceMapRecords
+      .filter((row) =>
+        ["preload-module", "preinit-module-script"].includes(row.contractId)
+      )
+      .map((row) => ({
+        contractId: row.contractId,
+        scriptKind: row.scriptKind,
+        resourceKey: row.resourceKey,
+        publicScriptModuleResourceDispatch:
+          row.publicScriptModuleResourceDispatch,
+        scriptExecutionStarted: row.scriptExecutionStarted
+      })),
+    [
+      {
+        contractId: "preload-module",
+        scriptKind: "module",
+        resourceKey: "script:module-main",
+        publicScriptModuleResourceDispatch: false,
+        scriptExecutionStarted: false
+      },
+      {
+        contractId: "preinit-module-script",
+        scriptKind: "module",
+        resourceKey: "script:module-main",
+        publicScriptModuleResourceDispatch: false,
+        scriptExecutionStarted: false
+      }
+    ]
+  );
   assert.equal(diagnostic.resourceMapCommitPlan.realResourceMapsMutated, false);
   assert.equal(diagnostic.resourceMapCommitPlan.fakeResourceMapsMutated, false);
+  assert.equal(
+    diagnostic.resourceMapCommitPlan.publicScriptModuleResourceDispatch,
+    false
+  );
   assert.equal(diagnostic.sideEffects.fakeHeadRead, false);
   assert.equal(diagnostic.sideEffects.realResourceMapsMutated, false);
   assert.equal(diagnostic.sideEffects.fakeResourceMapsMutated, false);
   assert.equal(diagnostic.sideEffects.resourceFetchStarted, false);
+  assert.equal(diagnostic.sideEffects.scriptExecutionStarted, false);
+  assert.equal(diagnostic.sideEffects.publicScriptModuleResourceDispatch, false);
   assert.equal(diagnostic.sideEffects.resourceLoadStateMutated, false);
   assert.equal(
     diagnostic.resourceLifecycleBoundary.singletonOwnershipClaimed,
     false
   );
   assert.equal(diagnostic.resourceLifecycleBoundary.preloadStarted, false);
+  assert.equal(diagnostic.resourceLifecycleBoundary.modulePreloadStarted, false);
+  assert.equal(diagnostic.resourceLifecycleBoundary.scriptExecutionStarted, false);
   assert.equal(diagnostic.resourceLifecycleBoundary.loadStateMutated, false);
   assert.equal(
     diagnostic.publicResourceBoundary.publicResourceHintCallsReachable,
@@ -1061,8 +1309,10 @@ test("private resource-map commit diagnostics stay record-only", () => {
   );
   assert.equal(JSON.stringify(diagnostic).includes("/style.css"), false);
   assert.equal(JSON.stringify(diagnostic).includes("/script.js"), false);
+  assert.equal(JSON.stringify(diagnostic).includes("/module.mjs"), false);
   assert.equal(JSON.stringify(diagnostic).includes("sha256-style"), false);
   assert.equal(JSON.stringify(diagnostic).includes("sha256-script"), false);
+  assert.equal(JSON.stringify(diagnostic).includes("nonce-module"), false);
   assert.equal(/"theme"/u.test(JSON.stringify(diagnostic)), false);
   assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
 });
