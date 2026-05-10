@@ -90,12 +90,20 @@ use crate::{
         FunctionComponentContextChangePropagationError,
         FunctionComponentContextChangePropagationRecord,
         FunctionComponentContextChangePropagationRequest, FunctionComponentHookRenderStore,
-        FunctionComponentSingleChildOutput, FunctionComponentSingleChildOutputResolver,
+        FunctionComponentReducerDispatchRequest, FunctionComponentReducerHandle,
+        FunctionComponentRenderError, FunctionComponentSingleChildOutput,
+        FunctionComponentSingleChildOutputResolver,
         FunctionComponentSingleChildReconciliationError,
-        FunctionComponentSingleChildReconciliationRecord, FunctionComponentStateActionHandle,
-        FunctionComponentStateUpdateRenderLanes, FunctionComponentUseStateRenderRequest,
+        FunctionComponentSingleChildReconciliationRecord,
+        FunctionComponentSingleChildUpdateReconciliationError,
+        FunctionComponentSingleChildUpdateReconciliationRecord, FunctionComponentStateActionHandle,
+        FunctionComponentStateReducerId, FunctionComponentStateUpdateRenderLanes,
+        FunctionComponentUseReducerRenderRecord, FunctionComponentUseReducerRenderRequest,
+        FunctionComponentUseStateRenderRequest,
         propagate_context_change_to_function_component_dependencies,
         reconcile_function_component_single_child_output,
+        reconcile_function_component_single_child_update_output,
+        render_function_component_with_use_reducer,
     },
     host_work::{
         HostWorkError, HostWorkResult, mount_test_function_component_single_host_child_work,
@@ -105,10 +113,13 @@ use crate::{
         HostRootFinishedWorkCommitExecutionBlockerForCanary,
         HostRootFinishedWorkCommitExecutionStatusForCanary,
         HostRootFinishedWorkCommitHandoffErrorForCanary,
-        HostRootFinishedWorkCommitHandoffRecordForCanary,
+        HostRootFinishedWorkCommitHandoffRecordForCanary, HostRootMutationApplyRecordKind,
         HostRootPlacementApplyDiagnosticForCanary,
+        HostRootSingleHostUpdateApplyRecordErrorForCanary,
+        HostRootSingleHostUpdateApplyRecordForCanary,
         commit_finished_host_root_with_finished_work_handoff_for_canary,
         record_host_root_finished_work_pending_commit_for_canary,
+        record_host_root_single_host_update_apply_for_canary,
     },
     root_scheduler::{
         RootPingedRetryExecutionStatus, RootSyncSchedulerContinuationExecutionStatus,
@@ -1846,6 +1857,157 @@ impl HostRootFunctionComponentUseStateHostChildCommitHandoffRecord {
 
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct HostRootFunctionComponentUseReducerSingleChildCommitHandoffRecord {
+    root: FiberRootId,
+    host_root_work_in_progress: FiberId,
+    original_root_element: RootElementHandle,
+    function_component: FiberId,
+    use_reducer_render: FunctionComponentUseReducerRenderRecord,
+    single_child: FunctionComponentSingleChildReconciliationRecord,
+    complete_commit: HostRootCompleteWorkCommitHandoffRecord,
+}
+
+#[cfg(test)]
+impl HostRootFunctionComponentUseReducerSingleChildCommitHandoffRecord {
+    #[must_use]
+    const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    const fn host_root_work_in_progress(&self) -> FiberId {
+        self.host_root_work_in_progress
+    }
+
+    #[must_use]
+    const fn original_root_element(&self) -> RootElementHandle {
+        self.original_root_element
+    }
+
+    #[must_use]
+    const fn function_component(&self) -> FiberId {
+        self.function_component
+    }
+
+    #[must_use]
+    const fn use_reducer_render(&self) -> FunctionComponentUseReducerRenderRecord {
+        self.use_reducer_render
+    }
+
+    #[must_use]
+    const fn single_child(&self) -> FunctionComponentSingleChildReconciliationRecord {
+        self.single_child
+    }
+
+    #[must_use]
+    const fn complete_work(&self) -> HostRootCompleteWorkHandoffRecord {
+        self.complete_commit.complete_work()
+    }
+
+    #[must_use]
+    const fn commit(&self) -> &HostRootCommitRecord {
+        self.complete_commit.commit()
+    }
+
+    #[must_use]
+    const fn finished_work_handoff(&self) -> &HostRootFinishedWorkCommitHandoffRecordForCanary {
+        self.complete_commit.finished_work_handoff()
+    }
+
+    #[must_use]
+    fn placement_apply_diagnostics(&self) -> &[HostRootPlacementApplyDiagnosticForCanary] {
+        self.complete_commit.placement_apply_diagnostics()
+    }
+
+    #[must_use]
+    const fn host_operations_unchanged_by_commit(&self) -> bool {
+        self.complete_commit.host_operations_unchanged_by_commit()
+    }
+
+    #[must_use]
+    const fn public_render_blocked(&self) -> bool {
+        self.complete_commit.public_render_blocked()
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffRecord {
+    root: FiberRootId,
+    host_root_work_in_progress: FiberId,
+    original_root_element: RootElementHandle,
+    function_component: FiberId,
+    use_reducer_render: FunctionComponentUseReducerRenderRecord,
+    single_child_update: FunctionComponentSingleChildUpdateReconciliationRecord,
+    pending_host_update: HostRootSingleHostUpdateApplyRecordForCanary,
+    finished_work_handoff: HostRootFinishedWorkCommitHandoffRecordForCanary,
+    committed_host_update: HostRootSingleHostUpdateApplyRecordForCanary,
+}
+
+#[cfg(test)]
+impl HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffRecord {
+    #[must_use]
+    const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    const fn host_root_work_in_progress(&self) -> FiberId {
+        self.host_root_work_in_progress
+    }
+
+    #[must_use]
+    const fn original_root_element(&self) -> RootElementHandle {
+        self.original_root_element
+    }
+
+    #[must_use]
+    const fn function_component(&self) -> FiberId {
+        self.function_component
+    }
+
+    #[must_use]
+    const fn use_reducer_render(&self) -> FunctionComponentUseReducerRenderRecord {
+        self.use_reducer_render
+    }
+
+    #[must_use]
+    const fn single_child_update(&self) -> FunctionComponentSingleChildUpdateReconciliationRecord {
+        self.single_child_update
+    }
+
+    #[must_use]
+    const fn pending_host_update(&self) -> HostRootSingleHostUpdateApplyRecordForCanary {
+        self.pending_host_update
+    }
+
+    #[must_use]
+    const fn finished_work_handoff(&self) -> &HostRootFinishedWorkCommitHandoffRecordForCanary {
+        &self.finished_work_handoff
+    }
+
+    #[must_use]
+    const fn commit(&self) -> &HostRootCommitRecord {
+        self.finished_work_handoff.commit()
+    }
+
+    #[must_use]
+    const fn committed_host_update(&self) -> HostRootSingleHostUpdateApplyRecordForCanary {
+        self.committed_host_update
+    }
+
+    #[must_use]
+    const fn public_render_blocked(&self) -> bool {
+        self.finished_work_handoff.public_root_rendering_blocked()
+            && self.pending_host_update.public_root_rendering_blocked()
+            && !self
+                .pending_host_update
+                .public_renderer_package_behavior_exposed()
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum HostRootFunctionComponentSingleChildCompleteWorkHandoffError {
     ChildPreflight(Box<HostRootChildBeginWorkPreflightError>),
     BeginWork(BeginWorkError),
@@ -2095,6 +2257,287 @@ impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
 }
 
 #[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum HostRootFunctionComponentUseReducerSingleChildCommitHandoffError {
+    CompleteWork(HostRootCompleteWorkHandoffError),
+    FunctionComponentRender(FunctionComponentRenderError),
+    FunctionComponentSingleChild(FunctionComponentSingleChildReconciliationError),
+    FinishedWorkCommitHandoff(HostRootFinishedWorkCommitHandoffErrorForCanary),
+    MissingFunctionComponentChild {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+    },
+    ExpectedFunctionComponentChild {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        child: FiberId,
+        tag: FiberTag,
+    },
+    UnexpectedFunctionComponentSibling {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        function_component: FiberId,
+        sibling: FiberId,
+    },
+    CompletedChildTagMismatch {
+        expected: FiberTag,
+        actual: Option<FiberTag>,
+    },
+}
+
+#[cfg(test)]
+impl Display for HostRootFunctionComponentUseReducerSingleChildCommitHandoffError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::CompleteWork(error) => Display::fmt(error, formatter),
+            Self::FunctionComponentRender(error) => Display::fmt(error, formatter),
+            Self::FunctionComponentSingleChild(error) => Display::fmt(error, formatter),
+            Self::FinishedWorkCommitHandoff(error) => Display::fmt(error, formatter),
+            Self::MissingFunctionComponentChild {
+                root,
+                host_root_work_in_progress,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} has no FunctionComponent child for private useReducer single-child commit handoff",
+                root.raw(),
+                host_root_work_in_progress.slot().get()
+            ),
+            Self::ExpectedFunctionComponentChild {
+                root,
+                host_root_work_in_progress,
+                child,
+                tag,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} child {} must be FunctionComponent for private useReducer single-child commit handoff, found {:?}",
+                root.raw(),
+                host_root_work_in_progress.slot().get(),
+                child.slot().get(),
+                tag
+            ),
+            Self::UnexpectedFunctionComponentSibling {
+                root,
+                host_root_work_in_progress,
+                function_component,
+                sibling,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} has FunctionComponent child {} with sibling {}; private useReducer single-child commit handoff admits only one function child",
+                root.raw(),
+                host_root_work_in_progress.slot().get(),
+                function_component.slot().get(),
+                sibling.slot().get()
+            ),
+            Self::CompletedChildTagMismatch { expected, actual } => write!(
+                formatter,
+                "private useReducer complete-work produced {:?}, expected {:?}",
+                actual, expected
+            ),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Error for HostRootFunctionComponentUseReducerSingleChildCommitHandoffError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::CompleteWork(error) => Some(error),
+            Self::FunctionComponentRender(error) => Some(error),
+            Self::FunctionComponentSingleChild(error) => Some(error),
+            Self::FinishedWorkCommitHandoff(error) => Some(error),
+            Self::MissingFunctionComponentChild { .. }
+            | Self::ExpectedFunctionComponentChild { .. }
+            | Self::UnexpectedFunctionComponentSibling { .. }
+            | Self::CompletedChildTagMismatch { .. } => None,
+        }
+    }
+}
+
+#[cfg(test)]
+impl From<HostRootCompleteWorkHandoffError>
+    for HostRootFunctionComponentUseReducerSingleChildCommitHandoffError
+{
+    fn from(error: HostRootCompleteWorkHandoffError) -> Self {
+        Self::CompleteWork(error)
+    }
+}
+
+#[cfg(test)]
+impl From<FunctionComponentRenderError>
+    for HostRootFunctionComponentUseReducerSingleChildCommitHandoffError
+{
+    fn from(error: FunctionComponentRenderError) -> Self {
+        Self::FunctionComponentRender(error)
+    }
+}
+
+#[cfg(test)]
+impl From<FunctionComponentSingleChildReconciliationError>
+    for HostRootFunctionComponentUseReducerSingleChildCommitHandoffError
+{
+    fn from(error: FunctionComponentSingleChildReconciliationError) -> Self {
+        Self::FunctionComponentSingleChild(error)
+    }
+}
+
+#[cfg(test)]
+impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
+    for HostRootFunctionComponentUseReducerSingleChildCommitHandoffError
+{
+    fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
+        Self::FinishedWorkCommitHandoff(error)
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffError {
+    CompleteWork(HostRootCompleteWorkHandoffError),
+    FunctionComponentRender(FunctionComponentRenderError),
+    FunctionComponentSingleChildUpdate(FunctionComponentSingleChildUpdateReconciliationError),
+    SingleHostUpdateApply(HostRootSingleHostUpdateApplyRecordErrorForCanary),
+    FinishedWorkCommitHandoff(HostRootFinishedWorkCommitHandoffErrorForCanary),
+    CommittedHostUpdateMismatch {
+        expected: HostRootSingleHostUpdateApplyRecordForCanary,
+        actual: HostRootSingleHostUpdateApplyRecordForCanary,
+    },
+    MissingFunctionComponentChild {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+    },
+    ExpectedFunctionComponentChild {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        child: FiberId,
+        tag: FiberTag,
+    },
+    UnexpectedFunctionComponentSibling {
+        root: FiberRootId,
+        host_root_work_in_progress: FiberId,
+        function_component: FiberId,
+        sibling: FiberId,
+    },
+}
+
+#[cfg(test)]
+impl Display for HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::CompleteWork(error) => Display::fmt(error, formatter),
+            Self::FunctionComponentRender(error) => Display::fmt(error, formatter),
+            Self::FunctionComponentSingleChildUpdate(error) => Display::fmt(error, formatter),
+            Self::SingleHostUpdateApply(error) => Display::fmt(error, formatter),
+            Self::FinishedWorkCommitHandoff(error) => Display::fmt(error, formatter),
+            Self::CommittedHostUpdateMismatch { expected, actual } => write!(
+                formatter,
+                "private useReducer single-host update handoff committed {:?} for fiber {}, expected {:?} for fiber {}",
+                actual.kind(),
+                actual.fiber().slot().get(),
+                expected.kind(),
+                expected.fiber().slot().get()
+            ),
+            Self::MissingFunctionComponentChild {
+                root,
+                host_root_work_in_progress,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} has no FunctionComponent child for private useReducer single-host update commit handoff",
+                root.raw(),
+                host_root_work_in_progress.slot().get()
+            ),
+            Self::ExpectedFunctionComponentChild {
+                root,
+                host_root_work_in_progress,
+                child,
+                tag,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} child {} must be FunctionComponent for private useReducer single-host update commit handoff, found {:?}",
+                root.raw(),
+                host_root_work_in_progress.slot().get(),
+                child.slot().get(),
+                tag
+            ),
+            Self::UnexpectedFunctionComponentSibling {
+                root,
+                host_root_work_in_progress,
+                function_component,
+                sibling,
+            } => write!(
+                formatter,
+                "root {} HostRoot work-in-progress {} has FunctionComponent child {} with sibling {}; private useReducer single-host update commit handoff admits only one function child",
+                root.raw(),
+                host_root_work_in_progress.slot().get(),
+                function_component.slot().get(),
+                sibling.slot().get()
+            ),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Error for HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::CompleteWork(error) => Some(error),
+            Self::FunctionComponentRender(error) => Some(error),
+            Self::FunctionComponentSingleChildUpdate(error) => Some(error),
+            Self::SingleHostUpdateApply(error) => Some(error),
+            Self::FinishedWorkCommitHandoff(error) => Some(error),
+            Self::CommittedHostUpdateMismatch { .. }
+            | Self::MissingFunctionComponentChild { .. }
+            | Self::ExpectedFunctionComponentChild { .. }
+            | Self::UnexpectedFunctionComponentSibling { .. } => None,
+        }
+    }
+}
+
+#[cfg(test)]
+impl From<HostRootCompleteWorkHandoffError>
+    for HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffError
+{
+    fn from(error: HostRootCompleteWorkHandoffError) -> Self {
+        Self::CompleteWork(error)
+    }
+}
+
+#[cfg(test)]
+impl From<FunctionComponentRenderError>
+    for HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffError
+{
+    fn from(error: FunctionComponentRenderError) -> Self {
+        Self::FunctionComponentRender(error)
+    }
+}
+
+#[cfg(test)]
+impl From<FunctionComponentSingleChildUpdateReconciliationError>
+    for HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffError
+{
+    fn from(error: FunctionComponentSingleChildUpdateReconciliationError) -> Self {
+        Self::FunctionComponentSingleChildUpdate(error)
+    }
+}
+
+#[cfg(test)]
+impl From<HostRootSingleHostUpdateApplyRecordErrorForCanary>
+    for HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffError
+{
+    fn from(error: HostRootSingleHostUpdateApplyRecordErrorForCanary) -> Self {
+        Self::SingleHostUpdateApply(error)
+    }
+}
+
+#[cfg(test)]
+impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
+    for HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffError
+{
+    fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
+        Self::FinishedWorkCommitHandoff(error)
+    }
+}
+
+#[cfg(test)]
 fn handoff_completed_function_component_single_child_to_test_complete_work(
     store: &mut FiberRootStore<RecordingHost>,
     host: &mut RecordingHost,
@@ -2325,6 +2768,277 @@ fn handoff_completed_function_component_use_state_host_child_to_test_complete_wo
             complete_commit,
         },
     )
+}
+
+#[cfg(test)]
+fn handoff_completed_function_component_use_reducer_single_child_to_test_complete_work_and_commit(
+    store: &mut FiberRootStore<RecordingHost>,
+    host: &mut RecordingHost,
+    render: HostRootRenderPhaseRecord,
+    source: &TestHostTree,
+    hook_store: &mut FunctionComponentHookRenderStore,
+    reducer_request: FunctionComponentUseReducerRenderRequest,
+    invoker: &mut impl FunctionComponentInvoker,
+    resolver: &impl FunctionComponentSingleChildOutputResolver,
+    reducer: impl FnMut(StateHandle, &FunctionComponentStateActionHandle) -> StateHandle,
+) -> Result<
+    HostRootFunctionComponentUseReducerSingleChildCommitHandoffRecord,
+    HostRootFunctionComponentUseReducerSingleChildCommitHandoffError,
+> {
+    validate_completed_host_root_render_for_complete_work_handoff(store, render)?;
+    let validated = validate_host_root_child_preflight(
+        store,
+        render.root(),
+        render.work_in_progress(),
+        render.render_lanes(),
+    )
+    .map_err(HostRootCompleteWorkHandoffError::from)?;
+    let function_component = validated.child.ok_or(
+        HostRootFunctionComponentUseReducerSingleChildCommitHandoffError::MissingFunctionComponentChild {
+            root: render.root(),
+            host_root_work_in_progress: render.work_in_progress(),
+        },
+    )?;
+    let child_tag = validated.child_tag.ok_or(
+        HostRootFunctionComponentUseReducerSingleChildCommitHandoffError::MissingFunctionComponentChild {
+            root: render.root(),
+            host_root_work_in_progress: render.work_in_progress(),
+        },
+    )?;
+    if child_tag != FiberTag::FunctionComponent {
+        return Err(
+            HostRootFunctionComponentUseReducerSingleChildCommitHandoffError::ExpectedFunctionComponentChild {
+                root: render.root(),
+                host_root_work_in_progress: render.work_in_progress(),
+                child: function_component,
+                tag: child_tag,
+            },
+        );
+    }
+    if let Some(sibling) = store
+        .fiber_arena()
+        .get(function_component)
+        .map_err(HostRootCompleteWorkHandoffError::from)?
+        .sibling()
+    {
+        return Err(
+            HostRootFunctionComponentUseReducerSingleChildCommitHandoffError::UnexpectedFunctionComponentSibling {
+                root: render.root(),
+                host_root_work_in_progress: render.work_in_progress(),
+                function_component,
+                sibling,
+            },
+        );
+    }
+
+    let use_reducer_render = render_function_component_with_use_reducer(
+        store.fiber_arena_mut(),
+        hook_store,
+        function_component,
+        render.render_lanes(),
+        reducer_request,
+        invoker,
+        reducer,
+    )?;
+    let single_child = reconcile_function_component_single_child_output(
+        store.fiber_arena_mut(),
+        use_reducer_render.render(),
+        resolver,
+    )?;
+    let expected_child_tag = single_child.child_tag();
+    let host_work = mount_test_function_component_single_host_child_work(
+        store,
+        host,
+        render,
+        function_component,
+        single_child.child_element(),
+        source,
+    )
+    .map_err(HostRootCompleteWorkHandoffError::from)?;
+    let complete_work = host_root_complete_work_handoff_record_from_host_work(
+        store,
+        render,
+        single_child.child_element(),
+        &host_work,
+    )?;
+    if complete_work.completed_child_tag() != Some(expected_child_tag) {
+        return Err(
+            HostRootFunctionComponentUseReducerSingleChildCommitHandoffError::CompletedChildTagMismatch {
+                expected: expected_child_tag,
+                actual: complete_work.completed_child_tag(),
+            },
+        );
+    }
+
+    let host_operation_count_after_complete_work = host.operations().len();
+    let pending_finished_work =
+        record_host_root_finished_work_pending_commit_for_canary(store, render, 1)?;
+    let finished_work_handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
+        store,
+        render,
+        Some(pending_finished_work),
+        2,
+    )?;
+    let host_operation_count_after_commit = host.operations().len();
+    let placement_apply_diagnostics = finished_work_handoff
+        .commit()
+        .host_root_placement_apply_diagnostics_for_canary();
+    let complete_commit = HostRootCompleteWorkCommitHandoffRecord {
+        complete_work,
+        finished_work_handoff,
+        placement_apply_diagnostics,
+        host_operation_count_after_complete_work,
+        host_operation_count_after_commit,
+    };
+
+    Ok(
+        HostRootFunctionComponentUseReducerSingleChildCommitHandoffRecord {
+            root: render.root(),
+            host_root_work_in_progress: render.work_in_progress(),
+            original_root_element: render.resulting_element(),
+            function_component,
+            use_reducer_render,
+            single_child,
+            complete_commit,
+        },
+    )
+}
+
+#[cfg(test)]
+fn handoff_completed_function_component_use_reducer_single_host_update_to_commit(
+    store: &mut FiberRootStore<RecordingHost>,
+    render: HostRootRenderPhaseRecord,
+    hook_store: &mut FunctionComponentHookRenderStore,
+    reducer_request: FunctionComponentUseReducerRenderRequest,
+    invoker: &mut impl FunctionComponentInvoker,
+    resolver: &impl FunctionComponentSingleChildOutputResolver,
+    reducer: impl FnMut(StateHandle, &FunctionComponentStateActionHandle) -> StateHandle,
+) -> Result<
+    HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffRecord,
+    HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffError,
+> {
+    validate_completed_host_root_render_for_complete_work_handoff(store, render)?;
+    let validated = validate_host_root_child_preflight(
+        store,
+        render.root(),
+        render.work_in_progress(),
+        render.render_lanes(),
+    )
+    .map_err(HostRootCompleteWorkHandoffError::from)?;
+    let function_component = validated.child.ok_or(
+        HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffError::MissingFunctionComponentChild {
+            root: render.root(),
+            host_root_work_in_progress: render.work_in_progress(),
+        },
+    )?;
+    let child_tag = validated.child_tag.ok_or(
+        HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffError::MissingFunctionComponentChild {
+            root: render.root(),
+            host_root_work_in_progress: render.work_in_progress(),
+        },
+    )?;
+    if child_tag != FiberTag::FunctionComponent {
+        return Err(
+            HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffError::ExpectedFunctionComponentChild {
+                root: render.root(),
+                host_root_work_in_progress: render.work_in_progress(),
+                child: function_component,
+                tag: child_tag,
+            },
+        );
+    }
+    if let Some(sibling) = store
+        .fiber_arena()
+        .get(function_component)
+        .map_err(HostRootCompleteWorkHandoffError::from)?
+        .sibling()
+    {
+        return Err(
+            HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffError::UnexpectedFunctionComponentSibling {
+                root: render.root(),
+                host_root_work_in_progress: render.work_in_progress(),
+                function_component,
+                sibling,
+            },
+        );
+    }
+
+    let use_reducer_render = render_function_component_with_use_reducer(
+        store.fiber_arena_mut(),
+        hook_store,
+        function_component,
+        render.render_lanes(),
+        reducer_request,
+        invoker,
+        reducer,
+    )?;
+    let single_child_update = reconcile_function_component_single_child_update_output(
+        store.fiber_arena_mut(),
+        use_reducer_render.render(),
+        resolver,
+    )?;
+    bubble_function_component_single_host_update_to_host_root(
+        store,
+        render.work_in_progress(),
+        function_component,
+    )?;
+
+    let pending_host_update = record_host_root_single_host_update_apply_for_canary(store, render)?;
+    let pending_finished_work =
+        record_host_root_finished_work_pending_commit_for_canary(store, render, 1)?;
+    let finished_work_handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
+        store,
+        render,
+        Some(pending_finished_work),
+        2,
+    )?;
+    let committed_host_update = finished_work_handoff
+        .commit()
+        .single_host_update_apply_record_for_canary()?;
+    if committed_host_update != pending_host_update {
+        return Err(
+            HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffError::CommittedHostUpdateMismatch {
+                expected: pending_host_update,
+                actual: committed_host_update,
+            },
+        );
+    }
+
+    Ok(
+        HostRootFunctionComponentUseReducerSingleHostUpdateCommitHandoffRecord {
+            root: render.root(),
+            host_root_work_in_progress: render.work_in_progress(),
+            original_root_element: render.resulting_element(),
+            function_component,
+            use_reducer_render,
+            single_child_update,
+            pending_host_update,
+            finished_work_handoff,
+            committed_host_update,
+        },
+    )
+}
+
+#[cfg(test)]
+fn bubble_function_component_single_host_update_to_host_root(
+    store: &mut FiberRootStore<RecordingHost>,
+    host_root_work_in_progress: FiberId,
+    function_component: FiberId,
+) -> Result<(), HostRootCompleteWorkHandoffError> {
+    let function_bubbled = bubble_properties(store.fiber_arena(), function_component)?;
+    {
+        let function_node = store.fiber_arena_mut().get_mut(function_component)?;
+        function_node.set_child_lanes(function_bubbled.child_lanes());
+        function_node.set_subtree_flags(function_bubbled.subtree_flags());
+    }
+
+    let root_bubbled = bubble_properties(store.fiber_arena(), host_root_work_in_progress)?;
+    let root_node = store
+        .fiber_arena_mut()
+        .get_mut(host_root_work_in_progress)?;
+    root_node.set_child_lanes(root_bubbled.child_lanes());
+    root_node.set_subtree_flags(root_bubbled.subtree_flags());
+    Ok(())
 }
 
 #[cfg(test)]
@@ -4883,8 +5597,36 @@ mod tests {
         (current, work_in_progress, component)
     }
 
+    fn attach_current_single_host_child(
+        store: &mut FiberRootStore<RecordingHost>,
+        function_current: FiberId,
+        tag: FiberTag,
+        props: PropsHandle,
+        element_type: ElementTypeHandle,
+        state_node: StateNodeHandle,
+    ) -> FiberId {
+        let child = store
+            .fiber_arena_mut()
+            .create_fiber(tag, None, props, FiberMode::NO);
+        {
+            let node = store.fiber_arena_mut().get_mut(child).unwrap();
+            node.set_element_type(element_type);
+            node.set_memoized_props(props);
+            node.set_state_node(state_node);
+        }
+        store
+            .fiber_arena_mut()
+            .set_children(function_current, &[child])
+            .unwrap();
+        child
+    }
+
     fn action(raw: u64) -> FunctionComponentStateActionHandle {
         FunctionComponentStateActionHandle::from_raw(raw)
+    }
+
+    fn reducer(raw: u64) -> FunctionComponentReducerHandle {
+        FunctionComponentReducerHandle::from_raw(raw)
     }
 
     fn action_as_state(
@@ -10917,6 +11659,496 @@ mod tests {
             public_error,
             ReconcilerError::unimplemented(MUTATION_RENDER_PLACEHOLDER_FEATURE)
         );
+    }
+
+    #[test]
+    fn root_work_loop_use_reducer_dispatch_renders_function_host_child_and_commits_metadata() {
+        let mut source = TestHostTree::new();
+        let host_text = source.insert_text("reducer text commit");
+        let host_component = source.insert_host_element_with_text("section", "reducer host commit");
+
+        for (
+            expected_tag,
+            child_element,
+            initial_state,
+            action_handle,
+            previous_reducer,
+            next_reducer,
+        ) in [
+            (
+                FiberTag::HostText,
+                host_text,
+                StateHandle::from_raw(800),
+                action(8),
+                reducer(801),
+                reducer(802),
+            ),
+            (
+                FiberTag::HostComponent,
+                host_component,
+                StateHandle::from_raw(900),
+                action(9),
+                reducer(901),
+                reducer(902),
+            ),
+        ] {
+            let (mut store, root_id, mut host) = root_store();
+            let root_current = store.root(root_id).unwrap().current();
+            let (function_current, function_work_in_progress, component) =
+                attach_function_component_current_child_with_work_pair(&mut store, root_id);
+            let mut hook_store = FunctionComponentHookRenderStore::new();
+            let current_reducer = hook_store
+                .create_current_reducer_hook(function_current, previous_reducer, initial_state)
+                .unwrap();
+            let output = FunctionComponentOutputHandle::from_raw(child_element.raw());
+            let mut registry = TestFunctionComponentRegistry::default();
+            registry.register(component, Ok(output));
+            let resolver = TestHostTreeFunctionOutputResolver::new(&source);
+            let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+
+            let rescheduled = hook_store
+                .dispatch_reducer_update_and_reschedule_root(
+                    &mut store,
+                    FunctionComponentReducerDispatchRequest::new(
+                        current_reducer.dispatch(),
+                        action_handle,
+                        lane,
+                    ),
+                )
+                .unwrap();
+
+            assert_eq!(rescheduled.root(), root_id);
+            assert_eq!(rescheduled.dispatch().fiber(), function_current);
+            assert_eq!(rescheduled.dispatch().queue(), current_reducer.queue());
+            assert_eq!(
+                rescheduled.dispatch().dispatch(),
+                current_reducer.dispatch()
+            );
+            assert_eq!(rescheduled.dispatch().reducer(), previous_reducer);
+            assert_eq!(rescheduled.reschedule().fiber(), function_current);
+            assert_eq!(rescheduled.scheduled().root(), root_id);
+            assert!(rescheduled.scheduled().inserted());
+            assert!(rescheduled.scheduled().microtask().is_some());
+            assert!(
+                store
+                    .fiber_arena()
+                    .get(function_current)
+                    .unwrap()
+                    .lanes()
+                    .contains_lane(Lane::DEFAULT)
+            );
+            assert!(
+                store
+                    .root(root_id)
+                    .unwrap()
+                    .lanes()
+                    .pending_lanes()
+                    .contains_lane(Lane::DEFAULT)
+            );
+
+            let processed = process_root_schedule_in_microtask(&mut store).unwrap();
+            assert_eq!(processed.records().len(), 1);
+            let callback = processed.records()[0].scheduled_callback().unwrap();
+            let callback_render = render_host_root_via_scheduler_callback(
+                &mut store,
+                root_id,
+                callback.node(),
+                Lanes::DEFAULT,
+            )
+            .unwrap();
+            assert_eq!(
+                callback_render.status(),
+                SchedulerCallbackRenderStatus::Rendered
+            );
+            let render = callback_render.render_phase().unwrap();
+            assert_eq!(render.root(), root_id);
+            assert_eq!(render.current(), root_current);
+            assert_eq!(render.render_lanes(), Lanes::DEFAULT);
+            store
+                .fiber_arena_mut()
+                .set_children(render.work_in_progress(), &[function_work_in_progress])
+                .unwrap();
+
+            let reducer_request = FunctionComponentUseReducerRenderRequest::new(
+                next_reducer,
+                StateHandle::from_raw(999),
+                FunctionComponentStateUpdateRenderLanes::new(Lanes::DEFAULT, Lanes::DEFAULT),
+            );
+            let mut reducer_calls = 0;
+            let record =
+                handoff_completed_function_component_use_reducer_single_child_to_test_complete_work_and_commit(
+                    &mut store,
+                    &mut host,
+                    render,
+                    &source,
+                    &mut hook_store,
+                    reducer_request,
+                    &mut registry,
+                    &resolver,
+                    |state, action| {
+                        reducer_calls += 1;
+                        StateHandle::from_raw(state.raw() + action.raw())
+                    },
+                )
+                .unwrap();
+
+            assert_eq!(record.root(), root_id);
+            assert_eq!(
+                record.host_root_work_in_progress(),
+                render.work_in_progress()
+            );
+            assert_eq!(record.original_root_element(), render.resulting_element());
+            assert_eq!(record.function_component(), function_work_in_progress);
+            assert_eq!(
+                record.use_reducer_render().current(),
+                Some(function_current)
+            );
+            assert_eq!(
+                record.use_reducer_render().work_in_progress(),
+                function_work_in_progress
+            );
+            assert_eq!(record.use_reducer_render().output(), output);
+            let reducer_update = record
+                .use_reducer_render()
+                .reducer_hook()
+                .update_record()
+                .unwrap();
+            assert_eq!(reducer_update.reducer(), next_reducer);
+            assert_eq!(reducer_update.previous_memoized_state(), initial_state);
+            assert_eq!(
+                reducer_update.memoized_state(),
+                StateHandle::from_raw(initial_state.raw() + action_handle.raw())
+            );
+            assert_eq!(reducer_update.remaining_lanes(), Lanes::NO);
+            assert_eq!(reducer_update.applied_update_count(), 1);
+            assert_eq!(reducer_update.skipped_update_count(), 0);
+            assert_eq!(reducer_calls, 1);
+            assert_eq!(record.single_child().child_tag(), expected_tag);
+            assert_eq!(record.single_child().child_element(), child_element);
+            assert_eq!(
+                record.complete_work().root_child_tag(),
+                Some(FiberTag::FunctionComponent)
+            );
+            assert_eq!(
+                record.complete_work().completed_child_tag(),
+                Some(expected_tag)
+            );
+            assert_eq!(record.complete_work().completed_child_count(), 1);
+            assert_eq!(record.finished_work_handoff().pending().root(), root_id);
+            assert_eq!(
+                record.finished_work_handoff().pending().finished_work(),
+                render.finished_work()
+            );
+            assert!(
+                record
+                    .finished_work_handoff()
+                    .consumed_finished_work_record()
+            );
+            assert!(record.finished_work_handoff().mutation_execution_blocked());
+            assert!(
+                record
+                    .finished_work_handoff()
+                    .public_root_rendering_blocked()
+            );
+            assert!(
+                record
+                    .finished_work_handoff()
+                    .effects_refs_and_hydration_blocked()
+            );
+            assert_eq!(record.commit().root(), root_id);
+            assert_eq!(record.commit().previous_current(), root_current);
+            assert_eq!(record.commit().current(), render.work_in_progress());
+            assert_eq!(record.commit().finished_lanes(), Lanes::DEFAULT);
+            assert_eq!(record.commit().pending_lanes(), Lanes::NO);
+            assert_eq!(record.commit().mutation_log().len(), 1);
+            assert_eq!(record.commit().mutation_apply_log().len(), 1);
+            assert!(record.host_operations_unchanged_by_commit());
+            assert!(record.public_render_blocked());
+            let diagnostics = record.placement_apply_diagnostics();
+            assert_eq!(diagnostics.len(), 1);
+            assert_eq!(diagnostics[0].root(), root_id);
+            assert_eq!(diagnostics[0].host_root(), render.finished_work());
+            assert_eq!(diagnostics[0].tag(), expected_tag);
+            assert_eq!(
+                diagnostics[0].tag_name(),
+                match expected_tag {
+                    FiberTag::HostText => "HostText",
+                    FiberTag::HostComponent => "HostComponent",
+                    _ => unreachable!("test only covers HostText and HostComponent"),
+                }
+            );
+            assert_eq!(diagnostics[0].apply_kind(), "append-placement-to-container");
+            assert_eq!(diagnostics[0].sibling_status(), "append");
+            assert_eq!(diagnostics[0].sibling(), None);
+            assert_eq!(diagnostics[0].sibling_tag(), None);
+            assert!(!diagnostics[0].can_insert_before());
+            assert_eq!(
+                store
+                    .fiber_arena()
+                    .get(record.complete_work().completed_child().unwrap())
+                    .unwrap()
+                    .tag(),
+                expected_tag
+            );
+            assert_eq!(
+                store.root(root_id).unwrap().current(),
+                render.work_in_progress()
+            );
+            assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+            assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+            assert_eq!(
+                store.root(root_id).unwrap().lanes().pending_lanes(),
+                Lanes::NO
+            );
+            assert_eq!(registry.calls().len(), 1);
+            assert_eq!(
+                hook_store
+                    .state_queues()
+                    .pending_updates(current_reducer.queue())
+                    .unwrap(),
+                Vec::<fast_react_core::HookUpdateId>::new()
+            );
+            let queue = hook_store
+                .state_queues()
+                .queue(current_reducer.queue())
+                .unwrap();
+            assert_eq!(
+                queue.last_rendered_reducer().copied(),
+                Some(FunctionComponentStateReducerId::Reducer(next_reducer))
+            );
+            assert_eq!(
+                *queue.last_rendered_state(),
+                StateHandle::from_raw(initial_state.raw() + action_handle.raw())
+            );
+        }
+    }
+
+    #[test]
+    fn root_work_loop_use_reducer_render_commits_single_host_update_handoff() {
+        let mut source = TestHostTree::new();
+        let updated_text = source.insert_text("reducer text update");
+        let updated_component =
+            source.insert_host_element_with_text("section", "reducer component update");
+
+        for (child_element, previous_props, state_node, initial_state, action_handle, reducer_id) in [
+            (
+                updated_text,
+                PropsHandle::from_raw(9_001),
+                StateNodeHandle::from_raw(9_101),
+                StateHandle::from_raw(1_000),
+                action(11),
+                reducer(1_101),
+            ),
+            (
+                updated_component,
+                PropsHandle::from_raw(9_002),
+                StateNodeHandle::from_raw(9_102),
+                StateHandle::from_raw(2_000),
+                action(12),
+                reducer(1_102),
+            ),
+        ] {
+            let (expected_tag, element_type, next_props, expected_update_kind) =
+                match source.root(child_element).unwrap() {
+                    TestHostNode::Text(text) => (
+                        FiberTag::HostText,
+                        ElementTypeHandle::NONE,
+                        text.props(),
+                        HostRootMutationApplyRecordKind::CommitHostTextUpdate,
+                    ),
+                    TestHostNode::Element(element) => (
+                        FiberTag::HostComponent,
+                        element.element_type(),
+                        element.props(),
+                        HostRootMutationApplyRecordKind::CommitHostComponentUpdate,
+                    ),
+                };
+            let (mut store, root_id, _host) = root_store();
+            let root_current = store.root(root_id).unwrap().current();
+            let (function_current, function_work_in_progress, component) =
+                attach_function_component_current_child_with_work_pair(&mut store, root_id);
+            let current_child = attach_current_single_host_child(
+                &mut store,
+                function_current,
+                expected_tag,
+                previous_props,
+                element_type,
+                state_node,
+            );
+            let mut hook_store = FunctionComponentHookRenderStore::new();
+            let current_reducer = hook_store
+                .create_current_reducer_hook(function_current, reducer_id, initial_state)
+                .unwrap();
+            let output = FunctionComponentOutputHandle::from_raw(child_element.raw());
+            let mut registry = TestFunctionComponentRegistry::default();
+            registry.register(component, Ok(output));
+            let resolver = TestHostTreeFunctionOutputResolver::new(&source);
+            let lane = HookUpdateLane::from_lane(Lane::DEFAULT).unwrap();
+            hook_store
+                .dispatch_reducer_update_and_reschedule_root(
+                    &mut store,
+                    FunctionComponentReducerDispatchRequest::new(
+                        current_reducer.dispatch(),
+                        action_handle,
+                        lane,
+                    ),
+                )
+                .unwrap();
+            let processed = process_root_schedule_in_microtask(&mut store).unwrap();
+            let callback = processed.records()[0].scheduled_callback().unwrap();
+            let render = render_host_root_via_scheduler_callback(
+                &mut store,
+                root_id,
+                callback.node(),
+                Lanes::DEFAULT,
+            )
+            .unwrap()
+            .render_phase()
+            .unwrap();
+            store
+                .fiber_arena_mut()
+                .set_children(render.work_in_progress(), &[function_work_in_progress])
+                .unwrap();
+
+            let mut reducer_calls = 0;
+            let record =
+                handoff_completed_function_component_use_reducer_single_host_update_to_commit(
+                    &mut store,
+                    render,
+                    &mut hook_store,
+                    FunctionComponentUseReducerRenderRequest::new(
+                        reducer_id,
+                        StateHandle::from_raw(999),
+                        FunctionComponentStateUpdateRenderLanes::new(
+                            Lanes::DEFAULT,
+                            Lanes::DEFAULT,
+                        ),
+                    ),
+                    &mut registry,
+                    &resolver,
+                    |state, action| {
+                        reducer_calls += 1;
+                        StateHandle::from_raw(state.raw() + action.raw())
+                    },
+                )
+                .unwrap();
+
+            assert_eq!(record.root(), root_id);
+            assert_eq!(
+                record.host_root_work_in_progress(),
+                render.work_in_progress()
+            );
+            assert_eq!(record.original_root_element(), render.resulting_element());
+            assert_eq!(record.function_component(), function_work_in_progress);
+            assert_eq!(
+                record.use_reducer_render().current(),
+                Some(function_current)
+            );
+            assert_eq!(record.use_reducer_render().output(), output);
+            let reducer_update = record
+                .use_reducer_render()
+                .reducer_hook()
+                .update_record()
+                .unwrap();
+            assert_eq!(
+                reducer_update.memoized_state(),
+                StateHandle::from_raw(initial_state.raw() + action_handle.raw())
+            );
+            assert_eq!(reducer_update.remaining_lanes(), Lanes::NO);
+            assert_eq!(reducer_update.applied_update_count(), 1);
+            assert_eq!(reducer_update.skipped_update_count(), 0);
+            assert_eq!(reducer_calls, 1);
+
+            let single_child = record.single_child_update();
+            assert_eq!(single_child.function_component(), function_work_in_progress);
+            assert_eq!(single_child.current(), function_current);
+            assert_eq!(single_child.current_child(), current_child);
+            assert_eq!(single_child.output(), output);
+            assert_eq!(single_child.child_element(), child_element);
+            assert_eq!(single_child.child_tag(), expected_tag);
+            assert_eq!(single_child.child_element_type(), element_type);
+            assert_eq!(single_child.previous_child_props(), previous_props);
+            assert_eq!(single_child.child_props(), next_props);
+            assert_eq!(single_child.render_lanes(), Lanes::DEFAULT);
+
+            let updated_child = single_child.work_in_progress_child();
+            let updated_child_node = store.fiber_arena().get(updated_child).unwrap();
+            assert_eq!(updated_child_node.alternate(), Some(current_child));
+            assert_eq!(
+                updated_child_node.return_fiber(),
+                Some(function_work_in_progress)
+            );
+            assert_eq!(updated_child_node.tag(), expected_tag);
+            assert_eq!(updated_child_node.state_node(), state_node);
+            assert_eq!(updated_child_node.pending_props(), next_props);
+            assert_eq!(updated_child_node.memoized_props(), next_props);
+            assert!(updated_child_node.flags().contains_all(FiberFlags::UPDATE));
+            assert!(
+                store
+                    .fiber_arena()
+                    .get(function_work_in_progress)
+                    .unwrap()
+                    .subtree_flags()
+                    .contains_all(FiberFlags::UPDATE)
+            );
+            assert!(
+                store
+                    .fiber_arena()
+                    .get(render.work_in_progress())
+                    .unwrap()
+                    .subtree_flags()
+                    .contains_all(FiberFlags::UPDATE)
+            );
+
+            let pending_update = record.pending_host_update();
+            assert_eq!(pending_update.root(), root_id);
+            assert_eq!(pending_update.finished_work(), render.finished_work());
+            assert_eq!(pending_update.mutation_record_count(), 1);
+            assert_eq!(pending_update.host_update_record_count(), 1);
+            assert_eq!(pending_update.fiber(), updated_child);
+            assert_eq!(pending_update.alternate_fiber(), Some(current_child));
+            assert_eq!(pending_update.state_node(), state_node);
+            assert_eq!(pending_update.kind(), expected_update_kind);
+            match expected_tag {
+                FiberTag::HostText => {
+                    assert!(pending_update.is_host_text_content_update());
+                    assert!(!pending_update.is_host_component_props_update());
+                }
+                FiberTag::HostComponent => {
+                    assert!(pending_update.is_host_component_props_update());
+                    assert!(!pending_update.is_host_text_content_update());
+                }
+                _ => unreachable!("test only covers HostText and HostComponent"),
+            }
+            assert_eq!(record.committed_host_update(), pending_update);
+            assert_eq!(record.commit().mutation_log().len(), 1);
+            assert_eq!(record.commit().mutation_apply_log().len(), 1);
+            assert_eq!(
+                record.finished_work_handoff().pending().finished_work(),
+                render.finished_work()
+            );
+            assert!(
+                record
+                    .finished_work_handoff()
+                    .consumed_finished_work_record()
+            );
+            assert!(record.public_render_blocked());
+            assert_eq!(record.commit().root(), root_id);
+            assert_eq!(record.commit().previous_current(), root_current);
+            assert_eq!(record.commit().current(), render.work_in_progress());
+            assert_eq!(record.commit().finished_lanes(), Lanes::DEFAULT);
+            assert_eq!(record.commit().pending_lanes(), Lanes::NO);
+            assert_eq!(
+                store.root(root_id).unwrap().current(),
+                render.work_in_progress()
+            );
+            assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+            assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+            assert_eq!(
+                store.root(root_id).unwrap().lanes().pending_lanes(),
+                Lanes::NO
+            );
+        }
     }
 
     #[test]
