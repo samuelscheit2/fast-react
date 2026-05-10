@@ -20,17 +20,23 @@ record_exit_code() {
 }
 trap record_exit_code EXIT
 
-prompt_text="$(<"$prompt_file")"
-prompt_text+=$'\n\nGoal policy from the orchestrator:\n'
-prompt_text+=$'- Your first action must be to use /goal, the Codex create_goal tool, for this worker task using the Objective in the assigned prompt.\n'
-prompt_text+=$'- Do that before research, file reads, implementation, or verification.\n'
-prompt_text+=$'- On continuation, use /goal / create_goal again if the active goal is not already set for this exact worker task.\n'
-prompt_text+=$'- After goal setup, call get_goal if available and record the active goal status/objective in your progress report, or explicitly state if the goal command/tool or get_goal was unavailable.\n'
-prompt_text+=$'\nSubagent policy from the orchestrator:\n'
-prompt_text+=$'- You are running as a real Codex process in a tmux worker session.\n'
-prompt_text+=$'- You may spawn managed Codex subagents, explorers, nested agents, or parallel agent tools inside this worker when they help test hypotheses or verify work.\n'
-prompt_text+=$'- Nested managed agents spawned inside this worker do not count against the orchestrator top-level tmux worker limit, and may make the aggregate agent/process count exceed 30.\n'
-prompt_text+=$'- If nested agents affect your conclusions, summarize what you delegated and how you used their results in your report.\n'
+orchestration_policy="$(cat <<'POLICY'
+Goal policy from the orchestrator:
+- Your first action must be to use /goal, the Codex create_goal tool, for this worker task using the Objective in the assigned prompt.
+- Do that before research, file reads, implementation, or verification.
+- On continuation, use /goal / create_goal again if the active goal is not already set for this exact worker task.
+- After goal setup, call get_goal if available and record the active goal status/objective in your progress report, or explicitly state if the goal command/tool or get_goal was unavailable.
+
+Subagent policy from the orchestrator:
+- You are running as a real Codex process in a tmux worker session.
+- You may spawn managed Codex subagents, explorers, nested agents, or parallel agent tools inside this worker when they help test hypotheses or verify work.
+- Nested managed agents spawned inside this worker do not count against the orchestrator top-level tmux worker limit, and may make the aggregate agent/process count exceed 30.
+- If nested agents affect your conclusions, summarize what you delegated and how you used their results in your report.
+POLICY
+)"
+prompt_text="$(<"$prompt_file")
+
+$orchestration_policy"
 
 # Use the interactive TUI, not `codex exec`, so the tmux pane remains readable
 # (including "Pursuing goal") while `script` also records the session log.
