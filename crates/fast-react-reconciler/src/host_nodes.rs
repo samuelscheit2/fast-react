@@ -371,6 +371,38 @@ impl<H: HostTypes> HostNodeStore<H> {
             .count()
     }
 
+    #[must_use]
+    pub(crate) fn active_len(&self) -> usize {
+        self.records
+            .iter()
+            .flatten()
+            .filter(|record| record.metadata.active)
+            .count()
+    }
+
+    #[must_use]
+    pub(crate) fn active_instance_count(&self) -> usize {
+        self.records
+            .iter()
+            .flatten()
+            .filter(|record| {
+                record.metadata.active && record.metadata.target == HostFiberTokenTarget::Instance
+            })
+            .count()
+    }
+
+    #[must_use]
+    pub(crate) fn active_text_count(&self) -> usize {
+        self.records
+            .iter()
+            .flatten()
+            .filter(|record| {
+                record.metadata.active
+                    && record.metadata.target == HostFiberTokenTarget::TextInstance
+            })
+            .count()
+    }
+
     fn insert(
         &mut self,
         scope: HostNodeScope,
@@ -823,6 +855,10 @@ mod tests {
                 label: "main",
             },
         );
+        assert_eq!(store.len(), 1);
+        assert_eq!(store.active_len(), 1);
+        assert_eq!(store.active_instance_count(), 1);
+        assert_eq!(store.active_text_count(), 0);
         let wrong_phase = HostNodeScope::new(
             scope.root_id(),
             scope.fiber_id(),
@@ -839,6 +875,11 @@ mod tests {
         store.invalidate_instance(handle, scope).unwrap();
         let metadata = store.instance_metadata(handle, scope).unwrap();
         assert!(!metadata.is_active());
+        assert_eq!(store.len(), 1);
+        assert_eq!(store.instance_count(), 1);
+        assert_eq!(store.active_len(), 0);
+        assert_eq!(store.active_instance_count(), 0);
+        assert_eq!(store.active_text_count(), 0);
         assert_violation(store.instance(handle, scope), HostNodeViolation::Stale);
     }
 
@@ -853,6 +894,10 @@ mod tests {
                 text: "pending".to_owned(),
             },
         );
+        assert_eq!(store.len(), 1);
+        assert_eq!(store.active_len(), 1);
+        assert_eq!(store.active_instance_count(), 0);
+        assert_eq!(store.active_text_count(), 1);
 
         assert_violation(
             store.invalidate_instance(handle, scope),
@@ -862,6 +907,11 @@ mod tests {
 
         store.invalidate_text(handle, scope).unwrap();
         assert!(!store.text_metadata(handle, scope).unwrap().is_active());
+        assert_eq!(store.len(), 1);
+        assert_eq!(store.text_count(), 1);
+        assert_eq!(store.active_len(), 0);
+        assert_eq!(store.active_instance_count(), 0);
+        assert_eq!(store.active_text_count(), 0);
         assert_violation(store.text(handle, scope), HostNodeViolation::Stale);
     }
 }
