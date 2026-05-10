@@ -25,6 +25,7 @@ const {
   EVENT_TARGET_RESOLUTION_BLOCKED_CODE,
   HYDRATION_REPLAY_TARGET_DISPATCH_LINK_DIAGNOSTIC_KIND,
   HYDRATION_REPLAY_BLOCKED_CODE,
+  PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
   PRIVATE_HYDRATION_REPLAY_TARGET_DISPATCH_LINK_STATUS,
   createHydrationDehydratedTargetResolutionDiagnostic,
   createHydrationReplayEventQueueDiagnostic,
@@ -50,6 +51,8 @@ const HYDRATION_REPLAY_OWNERSHIP_GATE_ENTRY_RECORD_KIND =
   'FastReactDomHydrationReplayOwnershipGateEntryRecord';
 const HYDRATION_TARGET_CLAIMING_DIAGNOSTIC_KIND =
   'FastReactDomHydrationTargetClaimingDiagnostic';
+const HYDRATION_CLAIMED_REPLAY_TARGET_DISPATCH_EXECUTION_RECORD_KIND =
+  'FastReactDomHydrationClaimedReplayTargetDispatchExecutionRecord';
 const HYDRATION_BOUNDARY_ACCEPTED_METADATA_DIAGNOSTIC_KIND =
   'FastReactDomHydrationBoundaryAcceptedMetadataDiagnostics';
 const HYDRATION_TEXT_MISMATCH_BLOCKED_REASON =
@@ -60,12 +63,18 @@ const INVALID_HYDRATION_BOUNDARY_RECORD_CODE =
   'FAST_REACT_DOM_INVALID_HYDRATION_BOUNDARY_RECORD';
 const INVALID_HYDRATION_TARGET_CLAIMING_DIAGNOSTIC_CODE =
   'FAST_REACT_DOM_INVALID_HYDRATION_TARGET_CLAIMING_DIAGNOSTIC';
+const INVALID_HYDRATION_CLAIMED_REPLAY_TARGET_DISPATCH_EXECUTION_CODE =
+  'FAST_REACT_DOM_INVALID_HYDRATION_CLAIMED_REPLAY_TARGET_DISPATCH_EXECUTION';
 const privateHydrationReplayOwnershipGateId =
   'hydration-replay-ownership-private-gate-1';
 const privateHydrationTargetClaimingGateId =
   'hydration-target-claiming-private-gate-1';
 const privateHydrationTargetClaimingMetadataStatus =
   'accepted-private-hydration-target-claiming-metadata';
+const privateHydrationClaimedReplayTargetDispatchExecutionGateId =
+  'hydration-claimed-replay-target-dispatch-execution-private-gate-1';
+const privateHydrationClaimedReplayTargetDispatchExecutionStatus =
+  'blocked-private-hydration-claimed-replay-target-dispatch-execution';
 const privateHydrationBoundaryAcceptedMetadataGateId =
   'hydration-boundary-accepted-resource-form-metadata-private-gate-1';
 const privateHydrationBoundaryAcceptedMetadataStatus =
@@ -451,6 +460,8 @@ const hydrationBoundaryAcceptedMetadataBlockers = freezeArray([
 
 const hydrationBoundaryRecordPayloads = new WeakMap();
 const hydrationTargetClaimingDiagnosticPayloads = new WeakMap();
+const hydrationClaimedReplayTargetDispatchExecutionPayloads =
+  new WeakMap();
 const defaultHydrationBoundaryGate = createHydrationBoundaryGate();
 
 function createHydrationBoundaryGate(options) {
@@ -477,6 +488,17 @@ function createHydrationBoundaryGate(options) {
       return createHydrationTargetClaimingDiagnostic(
         hydrationBoundaryRecord,
         ownershipDiagnostics,
+        targetDispatchLinkDiagnostic,
+        options
+      );
+    },
+    createHydrationClaimedReplayTargetDispatchExecutionRecord(
+      targetClaimingDiagnostic,
+      targetDispatchLinkDiagnostic,
+      options
+    ) {
+      return createHydrationClaimedReplayTargetDispatchExecutionRecord(
+        targetClaimingDiagnostic,
         targetDispatchLinkDiagnostic,
         options
       );
@@ -754,12 +776,347 @@ function createHydrationTargetClaimingDiagnostic(
   return claimRecord;
 }
 
+function createHydrationClaimedReplayTargetDispatchExecutionRecord(
+  targetClaimingDiagnostic,
+  targetDispatchLinkDiagnostic,
+  options
+) {
+  const normalizedOptions =
+    options && typeof options === 'object' ? options : {};
+  const claimValidation =
+    assertHydrationClaimedReplayTargetDispatchExecutionClaim(
+      targetClaimingDiagnostic
+    );
+  const targetDispatchLink =
+    assertHydrationTargetClaimingDispatchLink(targetDispatchLinkDiagnostic);
+  const targetDispatchLinkPayload =
+    getPluginHydrationReplayTargetDispatchLinkDiagnosticPayload(
+      targetDispatchLink
+    );
+
+  assertHydrationClaimedReplayTargetDispatchExecutionLink(
+    claimValidation,
+    targetDispatchLink,
+    targetDispatchLinkPayload
+  );
+
+  const dispatchRecord = targetDispatchLinkPayload.dispatchRecord;
+  assertHydrationClaimedReplayTargetDispatchExecutionDispatchBlocked(
+    dispatchRecord,
+    targetDispatchLink
+  );
+
+  const hydrationBoundaryRecord = claimValidation.hydrationBoundaryRecord;
+  const recoverableErrorMetadata =
+    hydrationBoundaryRecord.recoverableErrorMetadata;
+  const recoverableErrorRows =
+    recoverableErrorMetadata &&
+    Array.isArray(recoverableErrorMetadata.recoverableErrorRows)
+      ? recoverableErrorMetadata.recoverableErrorRows
+      : [];
+  const onRecoverableErrorOption =
+    recoverableErrorMetadata &&
+    recoverableErrorMetadata.onRecoverableErrorOption
+      ? recoverableErrorMetadata.onRecoverableErrorOption
+      : null;
+
+  const executionRecord = freezeRecord({
+    kind: HYDRATION_CLAIMED_REPLAY_TARGET_DISPATCH_EXECUTION_RECORD_KIND,
+    gateId: privateHydrationClaimedReplayTargetDispatchExecutionGateId,
+    metadataId: 'hydration-claimed-replay-target-dispatch-execution',
+    status: privateHydrationClaimedReplayTargetDispatchExecutionStatus,
+    source:
+      typeof normalizedOptions.source === 'string'
+        ? normalizedOptions.source
+        : 'private-hydration-claimed-replay-target-dispatch-execution',
+    diagnosticOnly: true,
+    readOnly: true,
+    compatibilityClaimed: false,
+    browserDomEventCompatibilityClaimed: false,
+    publicRootBehaviorChanged: false,
+    publicHydrationCompatibilityClaimed: false,
+    publicHydrationReplayCompatibilityClaimed: false,
+    publicHydrationTargetClaimed: false,
+    publicHydrateRootSupported: false,
+    publicDispatchEnabled: false,
+    eventReplayInstalled: false,
+    eventReplaySupported: false,
+    hydrationReplaySupported: false,
+    hostInstanceHydrationAttempted: false,
+    hasScheduledReplayAttempt: false,
+    queueMutationAllowed: false,
+    replayQueuesDrained: false,
+    willDrainReplayQueues: false,
+    eventsReplayed: false,
+    eventDispatch: false,
+    willDispatchEvents: false,
+    willHydrateHostInstances: false,
+    willDispatch: false,
+    willHydrate: false,
+    willReplay: false,
+    blockedReason: HYDRATION_REPLAY_BLOCKED_CODE,
+    eventDispatchBlockedReason: EVENT_DISPATCH_BLOCKED_CODE,
+    eventTargetResolutionBlockedReason: EVENT_TARGET_RESOLUTION_BLOCKED_CODE,
+    publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
+    rootRecordId: hydrationBoundaryRecord.recordId,
+    rootKind: hydrationBoundaryRecord.rootKind,
+    rootTag: hydrationBoundaryRecord.rootTag,
+    targetClaimingDiagnostic,
+    targetClaimingDiagnosticStatus: targetClaimingDiagnostic.status,
+    claimGateId: targetClaimingDiagnostic.gateId,
+    targetClaimAccepted: true,
+    claimRecorded: true,
+    claimedTargetMetadata: true,
+    targetClaimExecuted: false,
+    targetDispatchLinkDiagnostic: targetDispatchLink,
+    targetDispatchLinkStatus: targetDispatchLink.status,
+    targetDispatchLinkAccepted: true,
+    inputOrder: targetClaimingDiagnostic.inputOrder,
+    replayQueueOrder: targetClaimingDiagnostic.replayQueueOrder,
+    prioritySortKey: targetClaimingDiagnostic.prioritySortKey,
+    domEventName: targetClaimingDiagnostic.domEventName,
+    nativeEventType: targetClaimingDiagnostic.nativeEventType,
+    queueCategory: targetClaimingDiagnostic.queueCategory,
+    queueName: targetClaimingDiagnostic.queueName,
+    queuePolicy: targetClaimingDiagnostic.queuePolicy,
+    replayableEvent: targetClaimingDiagnostic.replayableEvent,
+    replayQueueEntry: targetDispatchLinkPayload.replayQueueEntry,
+    hydratableEventTargetLookup:
+      targetDispatchLinkPayload.hydratableEventTargetLookup,
+    ownershipDiagnostics: claimValidation.ownershipDiagnostics,
+    ownershipRow: claimValidation.ownershipRow,
+    ownershipRowStatus: claimValidation.ownershipRow.status,
+    ownershipRetainedThroughDrainOrder:
+      claimValidation.ownershipRow.ownershipRetainedThroughDrainOrder,
+    markerRow: claimValidation.markerRow,
+    markerId: targetClaimingDiagnostic.markerId,
+    markerPath: targetClaimingDiagnostic.markerPath,
+    markerContractId: targetClaimingDiagnostic.markerContractId,
+    dehydratedBoundaryOwner:
+      targetClaimingDiagnostic.dehydratedBoundaryOwner,
+    dehydratedBoundaryOwnerId:
+      targetClaimingDiagnostic.dehydratedBoundaryOwnerId,
+    dehydratedBoundaryOwnerPath:
+      targetClaimingDiagnostic.dehydratedBoundaryOwnerPath,
+    ownerBoundaryKind: targetClaimingDiagnostic.ownerBoundaryKind,
+    ownerBoundaryStatus: targetClaimingDiagnostic.ownerBoundaryStatus,
+    rootOwnershipStatus: targetClaimingDiagnostic.rootOwnershipStatus,
+    targetPath: targetClaimingDiagnostic.targetPath,
+    targetPathStatus: targetClaimingDiagnostic.targetPathStatus,
+    targetPathParentPath: targetClaimingDiagnostic.targetPathParentPath,
+    targetPathIndex: targetClaimingDiagnostic.targetPathIndex,
+    targetPathSegmentCount: targetClaimingDiagnostic.targetPathSegmentCount,
+    targetNodeInfo: targetClaimingDiagnostic.targetNodeInfo,
+    targetContainerInfo: targetClaimingDiagnostic.targetContainerInfo,
+    targetContainerMatchesRoot:
+      targetClaimingDiagnostic.targetContainerMatchesRoot,
+    targetWithinRootContainer:
+      targetClaimingDiagnostic.targetWithinRootContainer,
+    dispatchRecord,
+    dispatchRecordStatus: dispatchRecord.status,
+    dispatchRecordBlockedReason: dispatchRecord.blockedReason,
+    targetDispatchPathRecord:
+      targetDispatchLinkPayload.targetDispatchPathRecord,
+    targetDispatchPathStatus:
+      targetClaimingDiagnostic.targetDispatchPathStatus,
+    targetDispatchPathLength:
+      targetClaimingDiagnostic.targetDispatchPathLength,
+    eventPathStatus: targetClaimingDiagnostic.eventPathStatus,
+    eventPathEntryCount: targetClaimingDiagnostic.eventPathEntryCount,
+    dispatchBlockerMetadata: targetDispatchLink.dispatchBlockerMetadata,
+    dispatchQueueStatus: targetDispatchLink.dispatchQueueStatus,
+    dispatchQueueLength: targetDispatchLink.dispatchQueueLength,
+    dispatchQueueListenerCount: targetDispatchLink.dispatchQueueListenerCount,
+    executionRecordCount: 1,
+    blockedReplayTargetDispatchExecutionCount: 1,
+    replayTargetDispatchExecutionRecorded: true,
+    replayTargetDispatchExecutionBlocked: true,
+    dispatchExecutionRecorded: true,
+    dispatchExecutionBlocked: true,
+    targetDispatchExecuted: false,
+    eventReplayDispatchAttempted: false,
+    pluginDispatchEventForPluginEventSystemCalled: false,
+    nativeEventRedispatched: false,
+    syntheticEventCreated: false,
+    syntheticEventCount: 0,
+    listenerInvocationCount: 0,
+    willInvokeListeners: false,
+    hydrateInstanceCalled: false,
+    hydrateTextInstanceCalled: false,
+    replayQueueDrained: false,
+    queued: false,
+    recoverableErrorMetadata,
+    recoverableErrorMetadataAccepted:
+      recoverableErrorMetadata !== null &&
+      recoverableErrorMetadata !== undefined,
+    recoverableErrorMetadataStatus:
+      recoverableErrorMetadata == null
+        ? null
+        : recoverableErrorMetadata.status,
+    recoverableErrorRowCount: recoverableErrorRows.length,
+    queuedRecoverableErrorCount:
+      recoverableErrorMetadata == null
+        ? 0
+        : recoverableErrorMetadata.queuedRecoverableErrorCount,
+    wouldQueueRecoverableErrorCount:
+      recoverableErrorMetadata == null
+        ? 0
+        : recoverableErrorMetadata.wouldQueueRecoverableErrorCount,
+    recoverableErrorsQueued: false,
+    onRecoverableErrorConfigured:
+      onRecoverableErrorOption === null
+        ? false
+        : onRecoverableErrorOption.present === true,
+    onRecoverableErrorInvoked: false,
+    publicOnRecoverableErrorInvoked: false,
+    unsupportedHydrationPrerequisiteCount:
+      unsupportedHydrationPrerequisites.length,
+    unsupportedHydrationPrerequisites,
+    hydrationEventReplayBlockerCount:
+      hydrationEventReplayBlockerContracts.length,
+    hydrationEventReplayBlockers: hydrationEventReplayBlockerContracts
+  });
+
+  hydrationClaimedReplayTargetDispatchExecutionPayloads.set(
+    executionRecord,
+    freezeRecord({
+      dispatchRecord,
+      hydrationBoundaryRecord,
+      markerRow: claimValidation.markerRow,
+      ownershipDiagnostics: claimValidation.ownershipDiagnostics,
+      ownershipRow: claimValidation.ownershipRow,
+      recoverableErrorMetadata,
+      targetClaimingDiagnostic,
+      targetClaimingDiagnosticPayload: claimValidation.claimPayload,
+      targetDispatchLinkDiagnostic: targetDispatchLink,
+      targetDispatchLinkPayload
+    })
+  );
+
+  return executionRecord;
+}
+
 function getPrivateHydrationTargetClaimingDiagnosticPayload(record) {
   return hydrationTargetClaimingDiagnosticPayloads.get(record) || null;
 }
 
 function isPrivateHydrationTargetClaimingDiagnostic(value) {
   return hydrationTargetClaimingDiagnosticPayloads.has(value);
+}
+
+function getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload(
+  record
+) {
+  return (
+    hydrationClaimedReplayTargetDispatchExecutionPayloads.get(record) ||
+    null
+  );
+}
+
+function isPrivateHydrationClaimedReplayTargetDispatchExecutionRecord(
+  value
+) {
+  return hydrationClaimedReplayTargetDispatchExecutionPayloads.has(value);
+}
+
+function assertHydrationClaimedReplayTargetDispatchExecutionClaim(
+  targetClaimingDiagnostic
+) {
+  const claimPayload =
+    getPrivateHydrationTargetClaimingDiagnosticPayload(
+      targetClaimingDiagnostic
+    );
+  if (
+    !targetClaimingDiagnostic ||
+    typeof targetClaimingDiagnostic !== 'object' ||
+    targetClaimingDiagnostic.kind !==
+      HYDRATION_TARGET_CLAIMING_DIAGNOSTIC_KIND ||
+    targetClaimingDiagnostic.status !==
+      privateHydrationTargetClaimingMetadataStatus ||
+    claimPayload === null ||
+    !isPrivateHydrationBoundaryRecord(claimPayload.hydrationBoundaryRecord) ||
+    claimPayload.targetDispatchLinkPayload === null ||
+    claimPayload.targetDispatchLinkPayload === undefined ||
+    targetClaimingDiagnostic.targetClaimExecuted !== false ||
+    targetClaimingDiagnostic.publicHydrationTargetClaimed !== false ||
+    targetClaimingDiagnostic.willDispatch !== false ||
+    targetClaimingDiagnostic.willHydrate !== false ||
+    targetClaimingDiagnostic.willReplay !== false
+  ) {
+    throwInvalidHydrationClaimedReplayTargetDispatchExecutionRecord(
+      'Hydration claimed replay target-dispatch execution requires an accepted private hydration target-claiming diagnostic.'
+    );
+  }
+
+  return {
+    claimPayload,
+    hydrationBoundaryRecord: claimPayload.hydrationBoundaryRecord,
+    markerRow: claimPayload.markerRow,
+    ownershipDiagnostics: claimPayload.ownershipDiagnostics,
+    ownershipRow: claimPayload.ownershipRow
+  };
+}
+
+function assertHydrationClaimedReplayTargetDispatchExecutionLink(
+  claimValidation,
+  targetDispatchLink,
+  targetDispatchLinkPayload
+) {
+  const claimPayload = claimValidation.claimPayload;
+  const claimedTargetDispatchLink =
+    claimPayload.targetDispatchLinkDiagnostic;
+
+  if (
+    targetDispatchLink !== claimedTargetDispatchLink ||
+    targetDispatchLinkPayload !== claimPayload.targetDispatchLinkPayload ||
+    targetDispatchLink.replayQueueEntry !==
+      targetDispatchLinkPayload.replayQueueEntry ||
+    targetDispatchLink.hydratableEventTargetLookup !==
+      targetDispatchLinkPayload.hydratableEventTargetLookup ||
+    targetDispatchLink.inputOrder !== claimPayload.ownershipRow.inputOrder ||
+    targetDispatchLink.targetPath !==
+      claimPayload.ownershipRow.eventQueueTargetPath ||
+    targetDispatchLink.targetPath !==
+      claimPayload.ownershipRow.drainOrderTargetPath ||
+    targetDispatchLink.dehydratedBoundaryOwnerId !==
+      claimPayload.ownershipRow.eventQueueDehydratedBoundaryOwnerId ||
+    targetDispatchLink.dehydratedBoundaryOwnerId !==
+      claimPayload.ownershipRow.drainOrderDehydratedBoundaryOwnerId
+  ) {
+    throwInvalidHydrationClaimedReplayTargetDispatchExecutionRecord(
+      'Hydration claimed replay target-dispatch execution rejects stale or mismatched target-dispatch links.'
+    );
+  }
+}
+
+function assertHydrationClaimedReplayTargetDispatchExecutionDispatchBlocked(
+  dispatchRecord,
+  targetDispatchLink
+) {
+  if (
+    !dispatchRecord ||
+    typeof dispatchRecord !== 'object' ||
+    dispatchRecord.status !== 'blocked' ||
+    dispatchRecord.blockedReason !== EVENT_DISPATCH_BLOCKED_CODE ||
+    dispatchRecord.targetResolutionStatus !== 'blocked' ||
+    dispatchRecord.targetResolutionBlockedReason !==
+      EVENT_TARGET_RESOLUTION_BLOCKED_CODE ||
+    targetDispatchLink.eventDispatch !== false ||
+    targetDispatchLink.publicDispatchEnabled !== false ||
+    targetDispatchLink.willDispatch !== false ||
+    targetDispatchLink.willHydrate !== false ||
+    targetDispatchLink.willReplay !== false ||
+    targetDispatchLink.replayQueueDrained !== false ||
+    !targetDispatchLink.dispatchBlockerMetadata ||
+    targetDispatchLink.dispatchBlockerMetadata.eventDispatch !== false ||
+    targetDispatchLink.dispatchBlockerMetadata.publicDispatchEnabled !==
+      false ||
+    targetDispatchLink.dispatchBlockerMetadata.willInvokeListeners !== false
+  ) {
+    throwInvalidHydrationClaimedReplayTargetDispatchExecutionRecord(
+      'Hydration claimed replay target-dispatch execution requires a blocked private dispatch record.'
+    );
+  }
 }
 
 function assertHydrationTargetClaimingDispatchLink(targetDispatchLink) {
@@ -934,6 +1291,15 @@ function findHydrationTargetClaimingReplayTargetCandidate(
 function throwInvalidHydrationTargetClaimingDiagnostic(message) {
   const error = new Error(message);
   error.code = INVALID_HYDRATION_TARGET_CLAIMING_DIAGNOSTIC_CODE;
+  throw error;
+}
+
+function throwInvalidHydrationClaimedReplayTargetDispatchExecutionRecord(
+  message
+) {
+  const error = new Error(message);
+  error.code =
+    INVALID_HYDRATION_CLAIMED_REPLAY_TARGET_DISPATCH_EXECUTION_CODE;
   throw error;
 }
 
@@ -2376,6 +2742,7 @@ module.exports = {
   HYDRATION_MARKER_ORACLE_KIND,
   HYDRATION_MARKER_ORACLE_SCHEMA_VERSION,
   HYDRATION_BOUNDARY_ACCEPTED_METADATA_DIAGNOSTIC_KIND,
+  HYDRATION_CLAIMED_REPLAY_TARGET_DISPATCH_EXECUTION_RECORD_KIND,
   HYDRATION_REPLAY_OWNERSHIP_GATE_DIAGNOSTIC_KIND,
   HYDRATION_REPLAY_OWNERSHIP_GATE_ENTRY_RECORD_KIND,
   HYDRATION_TARGET_CLAIMING_DIAGNOSTIC_KIND,
@@ -2383,27 +2750,33 @@ module.exports = {
   HYDRATION_TEXT_MISMATCH_DIAGNOSTIC_KIND,
   HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND,
   INVALID_HYDRATION_BOUNDARY_RECORD_CODE,
+  INVALID_HYDRATION_CLAIMED_REPLAY_TARGET_DISPATCH_EXECUTION_CODE,
   INVALID_HYDRATION_TARGET_CLAIMING_DIAGNOSTIC_CODE,
   UNSUPPORTED_HYDRATION_ROOT_KIND,
   acceptedHydrationBoundaryMetadataContracts,
   acceptedHydrationMarkerContracts,
   assertAcceptedHydrationMarkerOracle,
+  createHydrationClaimedReplayTargetDispatchExecutionRecord,
   createHydrationReplayOwnershipGateDiagnostic,
   createHydrationReplayTargetDispatchLinkDiagnostic,
   createHydrationTargetClaimingDiagnostic,
   createHydrationBoundaryGate,
   createUnsupportedHydrateRootRecord,
   getPrivateHydrationBoundaryRecordPayload,
+  getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload,
   getPrivateHydrationTargetClaimingDiagnosticPayload,
   hydrationBoundaryAcceptedMetadataBlockers,
   hydrationEventReplayBlockerContracts,
   hydrationMarkerReplayQueueContracts,
   inspectHydrationContainerMarkers,
   isPrivateHydrationBoundaryRecord,
+  isPrivateHydrationClaimedReplayTargetDispatchExecutionRecord,
   isPrivateHydrationTargetClaimingDiagnostic,
   privateHydrationBoundaryAcceptedMetadataGateId,
   privateHydrationBoundaryAcceptedMetadataStatus,
   privateHydrationBoundaryRecordType,
+  privateHydrationClaimedReplayTargetDispatchExecutionGateId,
+  privateHydrationClaimedReplayTargetDispatchExecutionStatus,
   privateHydrationReplayOwnershipGateId,
   privateHydrationTargetClaimingGateId,
   privateHydrationTargetClaimingMetadataStatus,
