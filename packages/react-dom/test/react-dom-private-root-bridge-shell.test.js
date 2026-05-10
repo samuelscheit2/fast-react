@@ -3408,6 +3408,160 @@ test('private root bridge ref callback error routing records metadata without pu
   assertBridgeDidNotTouchContainer(container, document);
 });
 
+test('private root bridge event listener error routing records root option metadata without public root callbacks', () => {
+  const document = createDocument('private-event-error-routing');
+  const container = createElement('DIV', document);
+  const publicRootErrorCalls = [];
+  const listenerCalls = [];
+  const thrown = new Error('bridge event listener route error');
+  thrown.code = 'BRIDGE_EVENT_LISTENER_ROUTE';
+  function onUncaughtError(error) {
+    publicRootErrorCalls.push(['uncaught', error.message]);
+  }
+  function onCaughtError(error) {
+    publicRootErrorCalls.push(['caught', error.message]);
+  }
+  function onRecoverableError(error) {
+    publicRootErrorCalls.push(['recoverable', error.message]);
+  }
+  function onClickCapture() {
+    listenerCalls.push('capture');
+    throw thrown;
+  }
+  function onClick() {
+    listenerCalls.push('bubble');
+  }
+
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    createRenderAdmissionIdPrefix: 'event-error-routing-admission',
+    initialHostOutputIdPrefix: 'event-error-routing-output',
+    sideEffectIdPrefix: 'event-error-routing-side-effect'
+  });
+  const create = bridge.createClientRoot(container, {
+    onCaughtError,
+    onRecoverableError,
+    onUncaughtError
+  });
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const render = bridge.renderContainer(create.handle, {
+    props: {
+      children: 'private event listener route',
+      onClick,
+      onClickCapture
+    },
+    type: 'button'
+  });
+  const admission = bridge.admitCreateRenderPath(
+    create,
+    sideEffects,
+    render
+  );
+  const handoff = bridge.applyInitialRenderHostOutput(admission);
+  const hostOutputPayload =
+    rootBridge.getPrivateRootInitialHostOutputHandoffPayload(handoff);
+  const clickRecord =
+    rootListeners.invokePrivateRootHostOutputClickDispatchCanary(
+      sideEffects.listenerRegistration,
+      hostOutputPayload,
+      {
+        enableListenerErrorRoutingDiagnostics: true
+      }
+    );
+
+  const routing = bridge.createEventListenerRootErrorRouting(
+    [create, render],
+    clickRecord,
+    {
+      routeLabels: ['bridge-event-listener-error-route']
+    }
+  );
+
+  assert.equal(
+    rootBridge.isPrivateRootEventListenerErrorRoutingRecord(routing),
+    true
+  );
+  assert.equal(
+    routing.$$typeof,
+    rootBridge.privateRootEventListenerErrorRoutingRecordType
+  );
+  assert.equal(
+    routing.routingStatus,
+    rootBridge.ROOT_BRIDGE_EVENT_LISTENER_ERROR_ROUTING_RECORDED
+  );
+  assert.equal(
+    routing.rootErrorOptionCallbackRecordStatus,
+    rootBridge.ROOT_BRIDGE_ROOT_ERROR_OPTION_CALLBACK_ACCEPTED
+  );
+  assert.equal(routing.sourceEventRecordKind, clickRecord.kind);
+  assert.equal(
+    routing.eventErrorRouteSource,
+    'private-root-host-output-click-dispatch-canary'
+  );
+  assert.equal(routing.rootErrorChannel, 'event-listener-reportGlobalError');
+  assert.equal(routing.listenerErrorCount, 1);
+  assert.equal(routing.listenerErrorRouteCount, 1);
+  assert.equal(routing.rootErrorOptionCallbackRecordCount, 1);
+  assert.equal(routing.onUncaughtErrorConfigured, true);
+  assert.equal(routing.onCaughtErrorConfigured, true);
+  assert.equal(routing.onRecoverableErrorConfigured, true);
+  assert.equal(routing.rootErrorUpdatesScheduled, false);
+  assert.equal(routing.publicRootErrorCallbacksInvoked, false);
+  assert.equal(routing.rootErrorCallbackInvocationCount, 0);
+  assert.equal(routing.reportGlobalErrorInvoked, false);
+  assert.equal(routing.eventListenerErrorsReported, false);
+  assert.equal(routing.rootErrorsReported, false);
+  assert.equal(routing.publicRootExecution, false);
+  assert.equal(routing.eventDispatch, false);
+  assert.equal(routing.publicDispatchEnabled, false);
+  assert.equal(routing.compatibilityClaimed, false);
+  assert.equal(routing.exposesErrorValue, false);
+  assert.deepEqual(publicRootErrorCalls, []);
+  assert.deepEqual(listenerCalls, ['capture', 'bubble']);
+
+  const [callbackRecord] = routing.rootErrorOptionCallbackRecords;
+  assert.equal(
+    callbackRecord.kind,
+    'FastReactDomPrivateRootEventListenerErrorOptionCallbackRecord'
+  );
+  assert.equal(
+    callbackRecord.status,
+    rootBridge.ROOT_BRIDGE_ROOT_ERROR_OPTION_CALLBACK_ACCEPTED
+  );
+  assert.equal(callbackRecord.acceptedRootOptionCallbackRecord, true);
+  assert.equal(callbackRecord.phase, 'event-listener');
+  assert.equal(callbackRecord.sourceErrorRouteTarget, 'reportGlobalError');
+  assert.equal(callbackRecord.sourceLabel, 'bridge-event-listener-error-route');
+  assert.equal(callbackRecord.registrationName, 'onClickCapture');
+  assert.equal(callbackRecord.listenerPhase, 'capture');
+  assert.equal(callbackRecord.errorName, 'Error');
+  assert.equal(callbackRecord.errorMessage, 'bridge event listener route error');
+  assert.equal(callbackRecord.errorCode, 'BRIDGE_EVENT_LISTENER_ROUTE');
+  assert.equal(callbackRecord.errorReported, false);
+  assert.equal(callbackRecord.reportGlobalErrorInvoked, false);
+  assert.equal(callbackRecord.rootErrorCallbacksInvoked, false);
+  assert.equal(callbackRecord.publicRootErrorCallbacksInvoked, false);
+  assert.equal(callbackRecord.rootErrorCallbackInvocationCount, 0);
+  assert.equal(callbackRecord.exposesErrorValue, false);
+  assert.equal(Object.hasOwn(callbackRecord, 'error'), false);
+
+  const payload =
+    rootBridge.getPrivateRootEventListenerErrorRoutingPayload(routing);
+  assert.equal(payload.rootOptions.onUncaughtError, onUncaughtError);
+  assert.equal(payload.rootOptions.onCaughtError, onCaughtError);
+  assert.equal(payload.rootOptions.onRecoverableError, onRecoverableError);
+  assert.equal(
+    payload.listenerErrorRoutes[0],
+    clickRecord.listenerErrorRoutes[0]
+  );
+  assert.equal(payload.listenerErrorRoutePayloads[0].error, thrown);
+  assert.equal(payload.rootErrorOptionCallbackRecords[0], callbackRecord);
+  assert.equal(Object.hasOwn(routing, 'error'), false);
+  assert.equal(Object.hasOwn(routing, 'listener'), false);
+
+  bridge.cleanupInitialRenderHostOutput(handoff);
+  bridge.revertCreateRootSideEffects(sideEffects);
+});
+
 test('private react-dom/client facade adapter routes root calls to bridge records', () => {
   const document = createDocument('private-client-facade-adapter');
   const container = createElement('DIV', document);
