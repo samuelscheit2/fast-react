@@ -4787,14 +4787,14 @@ fn render_function_component_with_use_context_impl(
             );
         }
     };
-    if let Some(expected) = expected_context {
-        if context_read.context() != expected {
-            return Err(FunctionComponentRenderError::UnexpectedUseContextContext {
-                fiber: request.fiber(),
-                expected,
-                actual: context_read.context(),
-            });
-        }
+    if let Some(expected) = expected_context
+        && context_read.context() != expected
+    {
+        return Err(FunctionComponentRenderError::UnexpectedUseContextContext {
+            fiber: request.fiber(),
+            expected,
+            actual: context_read.context(),
+        });
     }
 
     arena

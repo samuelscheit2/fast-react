@@ -577,7 +577,10 @@ const reactTestRendererPrivateRuntimeFacadeSymbols = {
   create: ['fast.react_test_renderer.root_request_bridge'],
   renderer: ['fast.react_test_renderer.private_test_instance_wrapper_record'],
   toJSON: ['fast.react_test_renderer.private_tojson_serialization_facade'],
-  toTree: ['fast.react_test_renderer.private_totree_host_output_metadata']
+  toTree: [
+    'fast.react_test_renderer.private_totree_facade',
+    'fast.react_test_renderer.private_totree_host_output_metadata'
+  ]
 };
 
 const reactTestRendererEntrypoints = [

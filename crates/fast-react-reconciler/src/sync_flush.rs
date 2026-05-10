@@ -564,6 +564,10 @@ impl SyncFlushRootRecord {
     }
 
     #[doc(hidden)]
+    #[allow(
+        dead_code,
+        reason = "crate-private sync-flush/act canary drain helper is exercised by tests and reserved for private act workers"
+    )]
     pub(crate) fn drain_accepted_act_continuations_after_host_output_canary(
         &mut self,
         diagnostics: SyncFlushRootHostOutputCommitDiagnosticsForCanary,
@@ -574,18 +578,15 @@ impl SyncFlushRootRecord {
             host_output_canary_committed && self.act_post_passive_continuation_gate.is_some();
         let can_drain = host_output_canary_committed && !blocked_by_pending_post_passive_gate;
         let mut drained_act_continuations = Vec::new();
-        if can_drain {
-            if let Some(continuation) = self.act_continuation {
-                if let Some(record) =
-                    sync_flush_act_continuation_drain_record_after_host_output_canary(
-                        continuation,
-                        true,
-                    )
-                {
-                    self.act_continuation = None;
-                    drained_act_continuations.push(record);
-                }
-            }
+        if can_drain
+            && let Some(continuation) = self.act_continuation
+            && let Some(record) = sync_flush_act_continuation_drain_record_after_host_output_canary(
+                continuation,
+                true,
+            )
+        {
+            self.act_continuation = None;
+            drained_act_continuations.push(record);
         }
 
         SyncFlushActPrivateExecutionDiagnosticsForCanary {
@@ -597,6 +598,10 @@ impl SyncFlushRootRecord {
         }
     }
 
+    #[allow(
+        dead_code,
+        reason = "crate-private sync-flush/act canary acceptance helper is exercised by tests and reserved for private act workers"
+    )]
     fn accepts_host_output_canary_commit_diagnostics(
         &self,
         diagnostics: SyncFlushRootHostOutputCommitDiagnosticsForCanary,

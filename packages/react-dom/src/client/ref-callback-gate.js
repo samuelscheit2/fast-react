@@ -388,7 +388,7 @@ function createRefCallbackControlledInvocationGateSnapshot(snapshot) {
 
 function createRefCallbackExecutionHandoffRecord(snapshot) {
   const rootCommitRefMetadata = unwrapRootCommitRefMetadataSnapshot(snapshot);
-  const metadata = normalizeMetadataSnapshot(rootCommitRefMetadata);
+  const metadata = normalizeRootCommitRefMetadataSnapshot(snapshot);
   const controlledSnapshot =
     createRefCallbackControlledInvocationGateSnapshot({
       rootCommitRefMetadata
@@ -854,6 +854,15 @@ function normalizeMetadataSnapshot(snapshot) {
 }
 
 function normalizeRootCommitRefMetadataSnapshot(snapshot) {
+  const privatePayload =
+    getRootCommitRefMetadataSnapshotPayloadFromInput(snapshot);
+  if (privatePayload !== null) {
+    return {
+      attach: privatePayload.attach,
+      detach: privatePayload.detach
+    };
+  }
+
   return normalizeMetadataSnapshot(unwrapRootCommitRefMetadataSnapshot(snapshot));
 }
 
@@ -865,28 +874,10 @@ function unwrapRootCommitRefMetadataSnapshot(snapshot) {
     );
   }
 
-  const directPayload =
-    getPrivateRefCallbackRootCommitMetadataSnapshotPayload(snapshot);
-  if (directPayload !== null) {
-    return {
-      attach: directPayload.attach,
-      detach: directPayload.detach
-    };
-  }
-
   const metadataSnapshot =
     'rootCommitRefMetadata' in snapshot
       ? snapshot.rootCommitRefMetadata
       : snapshot;
-  const metadataPayload =
-    getPrivateRefCallbackRootCommitMetadataSnapshotPayload(metadataSnapshot);
-  if (metadataPayload !== null) {
-    return {
-      attach: metadataPayload.attach,
-      detach: metadataPayload.detach
-    };
-  }
-
   if (metadataSnapshot == null || typeof metadataSnapshot !== 'object') {
     throw createRefCallbackGateError(
       'FAST_REACT_DOM_REF_CALLBACK_GATE_INVALID_SNAPSHOT',
@@ -895,6 +886,26 @@ function unwrapRootCommitRefMetadataSnapshot(snapshot) {
   }
 
   return metadataSnapshot;
+}
+
+function getRootCommitRefMetadataSnapshotPayloadFromInput(snapshot) {
+  const directPayload =
+    getPrivateRefCallbackRootCommitMetadataSnapshotPayload(snapshot);
+  if (directPayload !== null) {
+    return directPayload;
+  }
+
+  if (
+    snapshot !== null &&
+    typeof snapshot === 'object' &&
+    'rootCommitRefMetadata' in snapshot
+  ) {
+    return getPrivateRefCallbackRootCommitMetadataSnapshotPayload(
+      snapshot.rootCommitRefMetadata
+    );
+  }
+
+  return null;
 }
 
 function normalizeMetadataRecordList(records, expectedAction) {

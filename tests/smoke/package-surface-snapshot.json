@@ -1168,6 +1168,7 @@
                 "fast.react_test_renderer.private_tojson_serialization_facade"
               ],
               "toTree": [
+                "fast.react_test_renderer.private_totree_facade",
                 "fast.react_test_renderer.private_totree_host_output_metadata"
               ]
             },
@@ -1257,6 +1258,7 @@
                 "fast.react_test_renderer.private_tojson_serialization_facade"
               ],
               "toTree": [
+                "fast.react_test_renderer.private_totree_facade",
                 "fast.react_test_renderer.private_totree_host_output_metadata"
               ]
             },
@@ -1344,6 +1346,7 @@
                 "fast.react_test_renderer.private_tojson_serialization_facade"
               ],
               "toTree": [
+                "fast.react_test_renderer.private_totree_facade",
                 "fast.react_test_renderer.private_totree_host_output_metadata"
               ]
             },

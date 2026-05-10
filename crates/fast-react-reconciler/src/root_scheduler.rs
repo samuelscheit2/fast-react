@@ -1470,6 +1470,10 @@ pub(crate) fn sync_flush_act_post_passive_continuation_gate(
     })
 }
 
+#[allow(
+    dead_code,
+    reason = "crate-private sync-flush/act canary drain helper is exercised by tests and reserved for private act workers"
+)]
 pub(crate) fn sync_flush_act_continuation_drain_record_after_host_output_canary(
     act_continuation: SchedulerActContinuationRecord,
     host_output_canary_committed: bool,
