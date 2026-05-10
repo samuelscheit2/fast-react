@@ -20,8 +20,17 @@ const reactTestRendererPackageRoot = path.join(
   'react-test-renderer'
 );
 const schedulerPackageRoot = path.join(repoRoot, 'packages', 'scheduler');
+const nativePackageRoot = path.join(repoRoot, 'bindings', 'node');
 
 process.env.NODE_ENV = 'development';
+
+function packageFileSubpaths(packageName, files) {
+  return files.flatMap((file) => {
+    const specifier = `${packageName}/${file}`;
+    const extensionless = specifier.replace(/\.(?:cjs|js|json|mjs|node)$/u, '');
+    return extensionless === specifier ? [specifier] : [extensionless, specifier];
+  });
+}
 
 const defaultReactKeys = [
   'Activity',
@@ -176,6 +185,11 @@ const expectedPackageExports = {
 
 const blockedExtensionSubpaths = [
   '@fast-react/react/index.js',
+  ...packageFileSubpaths('@fast-react/react', [
+    'cjs/react.development.js',
+    'cjs/react.production.js',
+    'private-act-dispatcher-gate.js'
+  ]),
   '@fast-react/react/act-dispatcher',
   '@fast-react/react/act-dispatcher.js',
   '@fast-react/react/act-queue',
@@ -488,8 +502,40 @@ const expectedReactDomPackageExports = {
   './package.json': './package.json'
 };
 
+const reactDomPrivateDirectFiles = [
+  'placeholder-utils.js',
+  'src/client/component-tree.js',
+  'src/client/dom-container.js',
+  'src/client/dom-host-context.js',
+  'src/client/dom-namespaces.js',
+  'src/client/hydration-boundary-gate.js',
+  'src/client/hydration-marker-parser.js',
+  'src/client/ref-callback-gate.js',
+  'src/client/root-bridge.js',
+  'src/client/root-markers.js',
+  'src/dom-host/index.js',
+  'src/dom-host/mutation.js',
+  'src/dom-host/property-payload.js',
+  'src/dom-host/text-content.js',
+  'src/events/dispatch.js',
+  'src/events/event-names.js',
+  'src/events/event-priorities.js',
+  'src/events/event-system-flags.js',
+  'src/events/get-event-target.js',
+  'src/events/listener-registry.js',
+  'src/events/plugin-event-system.js',
+  'src/events/react-dom-event-listener.js',
+  'src/events/root-listeners.js',
+  'src/resource-form-gates.js',
+  'src/resource-form-internals-gate.js',
+  'src/shared/create-portal.js',
+  'src/shared/flush-sync-guard.js'
+];
+
 const blockedReactDomExtensionSubpaths = [
   '@fast-react/react-dom/index.js',
+  ...packageFileSubpaths('@fast-react/react-dom', reactDomPrivateDirectFiles),
+  '@fast-react/react-dom/src/dom-host',
   '@fast-react/react-dom/react-dom.react-server.js',
   '@fast-react/react-dom/client.js',
   '@fast-react/react-dom/client.react-server.js',
@@ -618,19 +664,28 @@ const reactTestRendererPhysicalSubpaths = [
   }
 ];
 
+const missingReactTestRendererPrivateFiles = [
+  'cjs/react-test-renderer-private-routes.development.js',
+  'cjs/react-test-renderer-private-routes.production.js',
+  'create-routing-gate.js',
+  'diagnostics.js',
+  'placeholder-utils.js',
+  'private-routes.js',
+  'src/act-scheduler-private-gate.js',
+  'src/error-surface-local-gate.js',
+  'src/private-root-request-bridge.js',
+  'src/private-serialization-facade.js',
+  'src/test-instance-private-wrapper.js',
+  'src/update-unmount-private-bridge.js'
+];
+
 const missingReactTestRendererPhysicalSubpaths = [
   '@fast-react/react-test-renderer/cjs/react-test-renderer',
-  '@fast-react/react-test-renderer/cjs/react-test-renderer-private-routes.development',
-  '@fast-react/react-test-renderer/cjs/react-test-renderer-private-routes.development.js',
-  '@fast-react/react-test-renderer/cjs/react-test-renderer-private-routes.production',
-  '@fast-react/react-test-renderer/cjs/react-test-renderer-private-routes.production.js',
-  '@fast-react/react-test-renderer/create-routing-gate',
-  '@fast-react/react-test-renderer/create-routing-gate.js',
-  '@fast-react/react-test-renderer/diagnostics',
-  '@fast-react/react-test-renderer/diagnostics.js',
-  '@fast-react/react-test-renderer/private-routes',
-  '@fast-react/react-test-renderer/private-routes.js',
-  '@fast-react/react-test-renderer/placeholder-utils.js'
+  '@fast-react/react-test-renderer/src',
+  ...packageFileSubpaths(
+    '@fast-react/react-test-renderer',
+    missingReactTestRendererPrivateFiles
+  )
 ];
 
 const schedulerImplementedRootKeys = [
@@ -854,13 +909,50 @@ const missingSchedulerPrivatePhysicalSubpaths = [
   'scheduler/unstable_mock-flush-helpers.js'
 ];
 
+const nativeKeys = [
+  'FastReactNativeBindingUnavailableError',
+  'bindingStatus',
+  'getNativeBindingLoadPlan',
+  'loadNativeBinding',
+  'nativeAddonName',
+  'nativeBindingManifest',
+  'nativeTargetMatrix',
+  'nodeApiVersionFloor',
+  'optionalPackagePrefix',
+  'packageName',
+  'platformArtifactPolicy',
+  'platformPackages',
+  'supportedNativeTargets',
+  'supportedNodeEngineRange',
+  'unavailableErrorCode'
+];
+const expectedNativePackageExports = {
+  '.': {
+    import: './index.mjs',
+    require: './index.cjs',
+    default: './index.mjs'
+  },
+  './package.json': './package.json'
+};
+const blockedNativeExtensionSubpaths = [
+  ...packageFileSubpaths('@fast-react/native', [
+    'index.cjs',
+    'index.mjs',
+    'native-root-bridge.js',
+    'private-root-bridge.js',
+    'src/native-root-bridge.js',
+    'src/private-root-bridge.js'
+  ]),
+  '@fast-react/native/src'
+];
+
 const allowedRuntimeMetadataKeys = new Set([
   '__FAST_REACT_ENTRYPOINT__',
   '__FAST_REACT_PLACEHOLDER__',
   'compatibilityTarget'
 ]);
 const privateDiagnosticRuntimeExportPattern =
-  /(?:private|diagnostic|diagnostics|gate|bridge|dispatcher|metadata|route|routes|secret)/iu;
+  /(?:private|diagnostic|diagnostics|gate|bridge|dispatcher|metadata|route|routes|secret|source)/iu;
 
 function assertNoPrivateDiagnosticRuntimeExports(moduleExports, label) {
   if (
@@ -3121,6 +3213,37 @@ async function assertPackageMetadata() {
     node: '>=26.0.0'
   });
 
+  const nativePackageJson = require(path.join(nativePackageRoot, 'package.json'));
+  assert.deepEqual(Object.keys(nativePackageJson), [
+    'name',
+    'version',
+    'private',
+    'description',
+    'type',
+    'main',
+    'exports',
+    'scripts',
+    'engines'
+  ]);
+  assert.equal(nativePackageJson.name, '@fast-react/native');
+  assert.equal(nativePackageJson.version, '0.0.0');
+  assert.equal(
+    nativePackageJson.description,
+    'Node loader placeholder for the Fast React native binding.'
+  );
+  assert.equal(nativePackageJson.type, 'module');
+  assert.equal(nativePackageJson.main, './index.cjs');
+  assert.deepEqual(nativePackageJson.exports, expectedNativePackageExports);
+  assert.deepEqual(nativePackageJson.scripts, {
+    build: 'cargo build -p fast-react-napi',
+    check:
+      'node ./test/native-loader.test.cjs && node ./test/native-no-load-guard.test.cjs && node ./test/native-loader-esm.test.mjs',
+    test: 'npm run check'
+  });
+  assert.deepEqual(nativePackageJson.engines, {
+    node: '>=22.0.0'
+  });
+
   const schedulerPackageJson = require(
     path.join(schedulerPackageRoot, 'package.json')
   );
@@ -3143,6 +3266,7 @@ async function assertPackageSpecifierEntrypoints() {
     scopedPackageRoot,
     'react-test-renderer'
   );
+  const tempNativePackageRoot = path.join(scopedPackageRoot, 'native');
   const tempSchedulerPackageRoot = path.join(tempRoot, 'node_modules', 'scheduler');
 
   try {
@@ -3156,6 +3280,10 @@ async function assertPackageSpecifierEntrypoints() {
       verbatimSymlinks: false
     });
     await cp(reactTestRendererPackageRoot, tempReactTestRendererPackageRoot, {
+      recursive: true,
+      verbatimSymlinks: false
+    });
+    await cp(nativePackageRoot, tempNativePackageRoot, {
       recursive: true,
       verbatimSymlinks: false
     });
@@ -3197,6 +3325,7 @@ async function assertPackageSpecifierEntrypoints() {
       ['@fast-react/react-dom/static', 'static.node.js']
     ]);
     await runReactTestRendererPackageProbe(tempRoot);
+    await runNativePackageProbe(tempRoot);
     await runSchedulerPackageProbe(tempRoot);
   } finally {
     await rm(tempRoot, { force: true, recursive: true });
@@ -3485,7 +3614,7 @@ async function runReactTestRendererPackageProbe(tempRoot) {
       'compatibilityTarget'
     ]);
     const privateDiagnosticRuntimeExportPattern =
-      /(?:private|diagnostic|diagnostics|gate|bridge|dispatcher|metadata|route|routes|secret)/iu;
+      /(?:private|diagnostic|diagnostics|gate|bridge|dispatcher|metadata|route|routes|secret|source)/iu;
 
     function assertNoPrivateDiagnosticRuntimeExports(moduleExports, label) {
       for (const key of Reflect.ownKeys(moduleExports)) {
@@ -3831,6 +3960,131 @@ async function runReactTestRendererPackageProbe(tempRoot) {
   );
 }
 
+async function runNativePackageProbe(tempRoot) {
+  const probePath = path.join(tempRoot, 'native-probe.cjs');
+  const probeSource = `
+    'use strict';
+
+    const assert = require('node:assert/strict');
+    const path = require('node:path');
+
+    const nativeKeys = ${JSON.stringify(nativeKeys)};
+    const expectedPackageExports = ${JSON.stringify(expectedNativePackageExports)};
+    const blockedExtensionSubpaths = ${JSON.stringify(
+      blockedNativeExtensionSubpaths
+    )};
+
+    function assertNativeKeys(moduleExports, label) {
+      assert.deepEqual(Object.keys(moduleExports), nativeKeys, label);
+      assert.equal(moduleExports.packageName, '@fast-react/native', label);
+      assert.equal(moduleExports.bindingStatus, 'placeholder', label);
+      assert.equal(moduleExports.nativeAddonName, 'fast_react_napi', label);
+      assert.equal(
+        moduleExports.unavailableErrorCode,
+        'FAST_REACT_NATIVE_BINDING_UNIMPLEMENTED',
+        label
+      );
+      for (const key of Reflect.ownKeys(moduleExports)) {
+        if (typeof key !== 'string') {
+          continue;
+        }
+        assert.equal(
+          /(?:private|diagnostic|diagnostics|gate|bridge|dispatcher|metadata|route|routes|secret|source)/iu.test(
+            key
+          ),
+          false,
+          label + ' must not expose private diagnostic export ' + key
+        );
+      }
+    }
+
+    (async () => {
+      const packageJson = require('@fast-react/native/package.json');
+      assert.deepEqual(Object.keys(packageJson), [
+        'name',
+        'version',
+        'private',
+        'description',
+        'type',
+        'main',
+        'exports',
+        'scripts',
+        'engines'
+      ]);
+      assert.equal(packageJson.name, '@fast-react/native');
+      assert.equal(packageJson.version, '0.0.0');
+      assert.equal(packageJson.type, 'module');
+      assert.equal(packageJson.main, './index.cjs');
+      assert.deepEqual(packageJson.exports, expectedPackageExports);
+      assert.equal(
+        require.resolve('@fast-react/native/package.json'),
+        path.join(
+          process.cwd(),
+          'node_modules',
+          '@fast-react',
+          'native',
+          'package.json'
+        )
+      );
+      assert.equal(
+        require.resolve('@fast-react/native'),
+        path.join(
+          process.cwd(),
+          'node_modules',
+          '@fast-react',
+          'native',
+          'index.cjs'
+        )
+      );
+
+      const cjsModule = require('@fast-react/native');
+      assertNativeKeys(cjsModule, '@fast-react/native');
+      assert.throws(
+        () => cjsModule.loadNativeBinding(),
+        (error) => {
+          assert.equal(error.name, 'FastReactNativeBindingUnavailableError');
+          assert.equal(error.code, 'FAST_REACT_NATIVE_BINDING_UNIMPLEMENTED');
+          assert.equal(error.packageName, '@fast-react/native');
+          assert.equal(error.bindingStatus, 'placeholder');
+          return true;
+        },
+        '@fast-react/native loadNativeBinding'
+      );
+
+      const esmModule = await import('@fast-react/native');
+      assert.equal(esmModule.default, cjsModule, '@fast-react/native ESM');
+      for (const key of nativeKeys) {
+        assert.equal(esmModule[key], cjsModule[key], '@fast-react/native ' + key);
+      }
+
+      for (const specifier of blockedExtensionSubpaths) {
+        assert.throws(
+          () => require(specifier),
+          (error) => error?.code === 'ERR_PACKAGE_PATH_NOT_EXPORTED',
+          specifier
+        );
+      }
+    })().catch((error) => {
+      console.error(error);
+      process.exitCode = 1;
+    });
+  `;
+
+  await writeFile(probePath, probeSource);
+
+  const result = spawnSync(process.execPath, [probePath], {
+    cwd: tempRoot,
+    encoding: 'utf8',
+    stdio: 'pipe'
+  });
+
+  assert.equal(
+    result.status,
+    0,
+    `native package probe failed:\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+  );
+}
+
 async function runSchedulerPackageProbe(tempRoot) {
   const probePath = path.join(tempRoot, 'scheduler-probe.cjs');
   const probeSource = `
@@ -3849,7 +4103,7 @@ async function runSchedulerPackageProbe(tempRoot) {
       'compatibilityTarget'
     ]);
     const privateDiagnosticRuntimeExportPattern =
-      /(?:private|diagnostic|diagnostics|gate|bridge|dispatcher|metadata|route|routes|secret)/iu;
+      /(?:private|diagnostic|diagnostics|gate|bridge|dispatcher|metadata|route|routes|secret|source)/iu;
 
     function assertNoPrivateDiagnosticRuntimeExports(moduleExports, label) {
       for (const key of Reflect.ownKeys(moduleExports)) {
