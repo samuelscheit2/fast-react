@@ -199,9 +199,21 @@ sequencing belong in `MASTER_PLAN.md`.
   constructor that validates containers, preserves React portal shape and key
   coercion, keeps server/client render behavior fail-closed, and leaves portal
   mounting/listeners/commit work unimplemented.
+- Worker 182 React hook dispatcher guard was merged, adding a package-private
+  shared dispatcher holder plus selected public hook forwarding for the default
+  and react-server React entrypoints, with invalid-hook-call boundaries,
+  shape-matched hook arity/name, and tests proving dispatcher forwarding
+  without hook state, effect queues, function-component render, DOM, or Rust
+  integration.
 
 ## Latest Accepted Verification
 
+- Worker 182 was verified on its integrated worktree and again on `main` with
+  focused React hook dispatcher guard tests, smoke entrypoint checks,
+  `npm run check:js` covering the package-surface guard, benchmark gate,
+  workspace checks, native loader probes, and 445 conformance tests, plus
+  `git diff --check`; merging current `main` into the worker branch produced
+  no conflicts after the import-entrypoints overlap auto-merged.
 - Worker 181 was verified on its integrated worktree and again on `main` with
   focused React DOM `createPortal` conformance tests, smoke entrypoint and
   React DOM root export checks, `npm run check:js` covering the package-surface
