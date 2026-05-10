@@ -1338,6 +1338,232 @@ test("scheduler mock private diagnostics hand expired callbacks to accepted act/
   }
 });
 
+test("scheduler mock private expired lane/root continuation handoff is deterministic", () => {
+  const reactGate = loadFreshWorkspaceModule(privateActDispatcherGateModule);
+
+  for (const nodeEnv of ["development", "production"]) {
+    const Scheduler = loadFreshSchedulerMock(nodeEnv);
+    const diagnostics = readSchedulerMockPrivateActQueueFlushDiagnostics(
+      Scheduler,
+      "unstable_flushExpired"
+    );
+    assertPrivateActQueueFlushDiagnostics(diagnostics, nodeEnv);
+
+    Scheduler.reset();
+    const events = [];
+    const createCallback = (label, continuation = null) =>
+      reactGate.createInternalActQueueTestCallback(
+        (didTimeout) => {
+          events.push([
+            label,
+            didTimeout,
+            Scheduler.unstable_getCurrentPriorityLevel(),
+            Scheduler.unstable_now()
+          ]);
+          Scheduler.log(label);
+          return continuation;
+        },
+        { label }
+      );
+
+    const expiredContinuation = createCallback(
+      "expired-root-continuation"
+    );
+    const expiredCallback = createCallback(
+      "expired-root-callback",
+      expiredContinuation
+    );
+    const expiredHandle = Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_UserBlockingPriority,
+      expiredCallback
+    );
+    let publicSchedulerCallbackRan = false;
+    Scheduler.unstable_scheduleCallback(
+      Scheduler.unstable_NormalPriority,
+      () => {
+        publicSchedulerCallbackRan = true;
+        Scheduler.log("public-normal-work");
+      }
+    );
+
+    const actRootContinuation = createCallback("act-root-continuation");
+    const actQueue = reactGate.createInternalActQueueTestQueue([
+      reactGate.createInternalActQueueTestTask({
+        label: "act-root-schedule",
+        recordKind: "SchedulerActQueueRequest",
+        taskKind: "RootSchedule",
+        continuationStatus: "NoContinuation",
+        callback: createCallback("act-root-schedule")
+      }),
+      reactGate.createInternalActQueueTestTask({
+        label: "act-root-callback",
+        recordKind: "SyncFlushActContinuationRecord",
+        taskKind: "SchedulerCallback",
+        continuationStatus: "PendingContinuation",
+        callback: createCallback("act-root-callback", actRootContinuation)
+      })
+    ]);
+    const rootWorkRecordKinds = [
+      "RootLaneSchedulingSnapshot",
+      "SchedulerCallbackRequest",
+      "RootSchedulerCallbackExecutionRecord",
+      "HostRootFinishedWorkPendingCommitRecordForCanary",
+      "HostRootFinishedWorkCommitHandoffRecordForCanary"
+    ];
+    const metadata = createExpiredActRootWorkMetadata(
+      Scheduler,
+      expiredHandle,
+      actQueue,
+      {
+        rootWorkRecords: rootWorkRecordKinds.map((recordKind) =>
+          createAcceptedRootWorkRecord(recordKind)
+        )
+      }
+    );
+
+    Scheduler.unstable_advanceTime(251);
+    const described =
+      diagnostics.describeExpiredActRootWorkMetadataForDiagnostics(metadata);
+    assert.equal(described.accepted, true, nodeEnv);
+    assert.equal(described.rejectionReason, null, nodeEnv);
+    assert.equal(described.metadata.laneLabel, "SyncLane", nodeEnv);
+    assert.deepEqual(
+      described.metadata.rootWorkRecords.map((record) => record.recordKind),
+      rootWorkRecordKinds,
+      nodeEnv
+    );
+    assert.equal(
+      described.metadata.actQueue.records[1].continuationStatus,
+      "PendingContinuation",
+      nodeEnv
+    );
+
+    const report = Scheduler.unstable_flushExpired(metadata);
+    assert.equal(
+      report.status,
+      "drained-expired-mock-scheduler-work-with-act-root-metadata-for-diagnostics",
+      nodeEnv
+    );
+    assert.equal(
+      report.flushAllOrFlushExpiredRoute.selectedFlushHelper,
+      "unstable_flushExpired",
+      nodeEnv
+    );
+    assert.equal(
+      report.flushAllOrFlushExpiredRoute.publicSchedulerFlushBehaviorExecuted,
+      false,
+      nodeEnv
+    );
+    assert.equal(
+      report.flushAllOrFlushExpiredRoute.invokesPublicSchedulerFlushHelper,
+      false,
+      nodeEnv
+    );
+    assert.equal(report.sourceDrainFlushedExpiredWork, true, nodeEnv);
+    assert.equal(report.rootWorkRecordsConsumedCount, 5, nodeEnv);
+    assert.equal(report.rootWorkRecordsPendingAfter, 0, nodeEnv);
+    assert.deepEqual(
+      report.rootWorkRecordConsumptionReport.consumedRecords.map(
+        (record) => record.recordKind
+      ),
+      rootWorkRecordKinds,
+      nodeEnv
+    );
+    assert.equal(report.actQueueDrainReport.drainedCount, 2, nodeEnv);
+    assert.equal(report.actQueueDrainReport.executedCallbackCount, 2, nodeEnv);
+    assert.equal(
+      report.actQueueDrainReport.recordedContinuationCount,
+      1,
+      nodeEnv
+    );
+    assert.equal(
+      report.actQueueDrainReport.executedContinuationCount,
+      1,
+      nodeEnv
+    );
+    assert.equal(
+      report.actQueueDrainReport.drainedRecords[1].returnedContinuation
+        .status,
+      "executed-branded-internal-test-continuation",
+      nodeEnv
+    );
+    assert.equal(
+      report.actQueueDrainReport.drainedRecords[1].returnedContinuation
+        .continuation.label,
+      "act-root-continuation",
+      nodeEnv
+    );
+    assert.equal(
+      report.matchedTaskBefore.callback.label,
+      "expired-root-callback",
+      nodeEnv
+    );
+    assert.equal(
+      report.matchedTaskAfter.callbackStatus,
+      "cancelled-tombstone",
+      nodeEnv
+    );
+    assert.equal(report.drainsPublicSchedulerTaskQueue, false, nodeEnv);
+    assert.equal(report.drainsPublicReactActQueue, false, nodeEnv);
+    assert.equal(report.publicSchedulerTimingCompatibilityClaimed, false);
+    assert.equal(report.publicReactActCompatibilityClaimed, false, nodeEnv);
+    assert.equal(report.compatibilityClaimed, false, nodeEnv);
+    assert.equal(report.executesQueuedWork, false, nodeEnv);
+    assert.equal(report.executesEffects, false, nodeEnv);
+    assert.equal(report.executesRendererWork, false, nodeEnv);
+    assert.equal(report.executesRendererRoots, false, nodeEnv);
+    assert.deepEqual(
+      events,
+      [
+        [
+          "expired-root-callback",
+          true,
+          Scheduler.unstable_UserBlockingPriority,
+          251
+        ],
+        [
+          "expired-root-continuation",
+          true,
+          Scheduler.unstable_UserBlockingPriority,
+          251
+        ],
+        [
+          "act-root-schedule",
+          false,
+          Scheduler.unstable_NormalPriority,
+          251
+        ],
+        [
+          "act-root-callback",
+          false,
+          Scheduler.unstable_NormalPriority,
+          251
+        ],
+        [
+          "act-root-continuation",
+          false,
+          Scheduler.unstable_NormalPriority,
+          251
+        ]
+      ],
+      nodeEnv
+    );
+    assert.deepEqual(Scheduler.unstable_clearLog(), [
+      "expired-root-callback",
+      "expired-root-continuation",
+      "act-root-schedule",
+      "act-root-callback",
+      "act-root-continuation"
+    ]);
+    assert.equal(publicSchedulerCallbackRan, false, nodeEnv);
+    assert.equal(metadata.rootWorkRecords.length, 0, nodeEnv);
+    assert.equal(actQueue.records.length, 0, nodeEnv);
+    assert.equal(Scheduler.unstable_hasPendingWork(), true, nodeEnv);
+
+    Scheduler.reset();
+  }
+});
+
 test("scheduler mock private flushAll route consumes act/root records without public flushAll", () => {
   const reactGate = loadFreshWorkspaceModule(privateActDispatcherGateModule);
 
