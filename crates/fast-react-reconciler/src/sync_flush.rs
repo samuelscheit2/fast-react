@@ -18,6 +18,7 @@ use crate::root_callbacks::{
     RootUpdateCallbackInvocationExecutionGateSnapshot, RootUpdateCallbackInvocationTestControl,
 };
 use crate::root_commit::{
+    HostRootCallbackDrainRecordForCanary, HostRootCallbackDrainSnapshotForCanary,
     HostRootCommitRecoverySnapshotForCanary, PendingPassiveCommitHandoff,
     host_root_commit_recovery_snapshot_for_canary,
 };
@@ -628,6 +629,137 @@ impl SyncFlushCrossRootRenderDiagnosticsForCanary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SyncFlushRootCallbackDrainDiagnosticsForCanary {
+    skipped_reentrant_flush: bool,
+    skipped_no_sync_work: bool,
+    committed_root_order: Vec<FiberRootId>,
+    root_snapshots: Vec<HostRootCallbackDrainSnapshotForCanary>,
+    records: Vec<HostRootCallbackDrainRecordForCanary>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private root callback drain diagnostics are reserved for lane/order canaries"
+)]
+impl SyncFlushRootCallbackDrainDiagnosticsForCanary {
+    #[must_use]
+    pub(crate) const fn skipped_reentrant_flush(&self) -> bool {
+        self.skipped_reentrant_flush
+    }
+
+    #[must_use]
+    pub(crate) const fn skipped_no_sync_work(&self) -> bool {
+        self.skipped_no_sync_work
+    }
+
+    #[must_use]
+    pub(crate) fn committed_root_order(&self) -> &[FiberRootId] {
+        &self.committed_root_order
+    }
+
+    #[must_use]
+    pub(crate) fn root_snapshots(&self) -> &[HostRootCallbackDrainSnapshotForCanary] {
+        &self.root_snapshots
+    }
+
+    #[must_use]
+    pub(crate) fn records(&self) -> &[HostRootCallbackDrainRecordForCanary] {
+        &self.records
+    }
+
+    #[must_use]
+    pub(crate) fn visible_callback_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| record.is_visible_callback())
+            .count()
+    }
+
+    #[must_use]
+    pub(crate) fn hidden_callback_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| record.is_hidden_callback())
+            .count()
+    }
+
+    #[must_use]
+    pub(crate) fn has_visible_and_hidden_callbacks(&self) -> bool {
+        self.visible_callback_count() > 0 && self.hidden_callback_count() > 0
+    }
+
+    #[must_use]
+    pub(crate) fn records_in_deterministic_commit_order(&self) -> bool {
+        self.records.windows(2).all(|records| {
+            let previous = records[0];
+            let next = records[1];
+            previous.commit_order() < next.commit_order()
+                || (previous.commit_order() == next.commit_order()
+                    && previous.callback_order() < next.callback_order())
+        })
+    }
+
+    #[must_use]
+    pub(crate) fn root_snapshots_in_commit_order(&self) -> bool {
+        self.root_snapshots
+            .iter()
+            .enumerate()
+            .all(|(expected_order, snapshot)| {
+                snapshot.commit_order() == expected_order
+                    && self.committed_root_order.get(expected_order).copied()
+                        == Some(snapshot.root())
+            })
+    }
+
+    #[must_use]
+    pub(crate) fn callback_records_match_commit_lanes(&self) -> bool {
+        self.records
+            .iter()
+            .all(|record| record.callback_lanes_match_commit())
+    }
+
+    #[must_use]
+    pub(crate) fn hidden_callbacks_deferred_without_invocation(&self) -> bool {
+        self.root_snapshots
+            .iter()
+            .all(|snapshot| snapshot.hidden_callbacks_deferred_without_invocation())
+    }
+
+    #[must_use]
+    pub(crate) fn root_snapshots_prove_deterministic_lane_order(&self) -> bool {
+        self.root_snapshots
+            .iter()
+            .all(|snapshot| snapshot.proves_deterministic_lane_order())
+    }
+
+    #[must_use]
+    pub(crate) fn proves_cross_root_callback_lane_commit_order(&self) -> bool {
+        self.root_snapshots.len() >= 2
+            && self.committed_root_order.len() == self.root_snapshots.len()
+            && self.has_visible_and_hidden_callbacks()
+            && self.root_snapshots_in_commit_order()
+            && self.records_in_deterministic_commit_order()
+            && self.callback_records_match_commit_lanes()
+            && self.hidden_callbacks_deferred_without_invocation()
+            && self.root_snapshots_prove_deterministic_lane_order()
+            && !self.skipped_reentrant_flush
+            && !self.skipped_no_sync_work
+            && !self.public_callbacks_invoked()
+            && !self.public_root_callback_behavior_exposed()
+    }
+
+    #[must_use]
+    pub(crate) const fn public_callbacks_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_callback_behavior_exposed(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyncFlushRootRecord {
     order: usize,
     root: FiberRootId,
@@ -1020,6 +1152,41 @@ impl SyncFlushResult {
                 .might_have_pending_sync_work(),
             root_current_matches_commits,
             sync_lanes_consumed_from_roots,
+        })
+    }
+
+    #[allow(
+        dead_code,
+        reason = "crate-private root callback drain diagnostics are reserved for lane/order canaries"
+    )]
+    pub(crate) fn root_callback_drain_diagnostics_for_canary<H: HostTypes>(
+        &self,
+        store: &FiberRootStore<H>,
+    ) -> Result<SyncFlushRootCallbackDrainDiagnosticsForCanary, SyncFlushError> {
+        let mut committed_root_order = Vec::with_capacity(self.records.len());
+        let mut root_snapshots = Vec::with_capacity(self.records.len());
+        let mut callback_records = Vec::new();
+
+        for record in &self.records {
+            let snapshot = record
+                .commit()
+                .root_update_callback_drain_snapshot_for_canary(
+                    store,
+                    record.order(),
+                    record.render_lanes(),
+                )?;
+
+            committed_root_order.push(record.root());
+            callback_records.extend(snapshot.records().iter().copied());
+            root_snapshots.push(snapshot);
+        }
+
+        Ok(SyncFlushRootCallbackDrainDiagnosticsForCanary {
+            skipped_reentrant_flush: self.skipped_reentrant_flush,
+            skipped_no_sync_work: self.skipped_no_sync_work,
+            committed_root_order,
+            root_snapshots,
+            records: callback_records,
         })
     }
 }
@@ -2629,6 +2796,180 @@ mod tests {
         assert!(diagnostics.proves_cross_root_sync_flush_scheduling());
         assert_eq!(current_host_root_element(&store, first), first_element);
         assert_eq!(current_host_root_element(&store, second), second_element);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_callback_drain_diagnostics_prove_cross_root_lane_commit_order() {
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let host = RecordingHost::default();
+        let scheduled_second = store
+            .create_client_root(FakeContainer::new(1), RootOptions::new())
+            .unwrap();
+        let scheduled_first = store
+            .create_client_root(FakeContainer::new(2), RootOptions::new())
+            .unwrap();
+        let first_visible_callback = RootUpdateCallbackHandle::from_raw(50101);
+        let first_hidden_callback = RootUpdateCallbackHandle::from_raw(50102);
+        let second_hidden_callback = RootUpdateCallbackHandle::from_raw(50103);
+        let second_visible_callback = RootUpdateCallbackHandle::from_raw(50104);
+
+        let first_visible = update_container_sync(
+            &mut store,
+            scheduled_first,
+            RootElementHandle::from_raw(50101),
+            Some(first_visible_callback),
+        )
+        .unwrap();
+        ensure_root_is_scheduled(&mut store, first_visible.schedule()).unwrap();
+        let first_hidden = update_container_sync(
+            &mut store,
+            scheduled_first,
+            RootElementHandle::from_raw(50102),
+            Some(first_hidden_callback),
+        )
+        .unwrap();
+        store
+            .update_queues_mut()
+            .mark_update_hidden(first_hidden.update())
+            .unwrap();
+        ensure_root_is_scheduled(&mut store, first_hidden.schedule()).unwrap();
+
+        let second_hidden = update_container_sync(
+            &mut store,
+            scheduled_second,
+            RootElementHandle::from_raw(50103),
+            Some(second_hidden_callback),
+        )
+        .unwrap();
+        store
+            .update_queues_mut()
+            .mark_update_hidden(second_hidden.update())
+            .unwrap();
+        ensure_root_is_scheduled(&mut store, second_hidden.schedule()).unwrap();
+        let second_visible = update_container_sync(
+            &mut store,
+            scheduled_second,
+            RootElementHandle::from_raw(50104),
+            Some(second_visible_callback),
+        )
+        .unwrap();
+        ensure_root_is_scheduled(&mut store, second_visible.schedule()).unwrap();
+
+        let result = flush_sync_commit_work_on_all_roots(&mut store).unwrap();
+        let diagnostics = result
+            .root_callback_drain_diagnostics_for_canary(&store)
+            .unwrap();
+
+        assert_eq!(result.records().len(), 2);
+        assert_eq!(
+            diagnostics.committed_root_order(),
+            &[scheduled_first, scheduled_second]
+        );
+        assert_eq!(diagnostics.root_snapshots().len(), 2);
+        assert_eq!(diagnostics.records().len(), 4);
+        assert_eq!(diagnostics.visible_callback_count(), 2);
+        assert_eq!(diagnostics.hidden_callback_count(), 2);
+        assert!(diagnostics.has_visible_and_hidden_callbacks());
+        assert!(diagnostics.root_snapshots_in_commit_order());
+        assert!(diagnostics.records_in_deterministic_commit_order());
+        assert!(diagnostics.callback_records_match_commit_lanes());
+        assert!(diagnostics.hidden_callbacks_deferred_without_invocation());
+        assert!(diagnostics.root_snapshots_prove_deterministic_lane_order());
+        assert!(diagnostics.proves_cross_root_callback_lane_commit_order());
+        assert!(!diagnostics.skipped_reentrant_flush());
+        assert!(!diagnostics.skipped_no_sync_work());
+        assert!(!diagnostics.public_callbacks_invoked());
+        assert!(!diagnostics.public_root_callback_behavior_exposed());
+
+        let first_snapshot = &diagnostics.root_snapshots()[0];
+        assert_eq!(first_snapshot.root(), scheduled_first);
+        assert_eq!(first_snapshot.commit_order(), 0);
+        assert_eq!(first_snapshot.render_lanes(), Lanes::SYNC);
+        assert_eq!(first_snapshot.finished_lanes(), Lanes::SYNC);
+        assert_eq!(first_snapshot.visible_callback_count(), 1);
+        assert_eq!(first_snapshot.hidden_callback_count(), 1);
+        assert!(first_snapshot.has_visible_and_hidden_callbacks());
+        assert!(first_snapshot.proves_deterministic_lane_order());
+
+        let second_snapshot = &diagnostics.root_snapshots()[1];
+        assert_eq!(second_snapshot.root(), scheduled_second);
+        assert_eq!(second_snapshot.commit_order(), 1);
+        assert_eq!(second_snapshot.render_lanes(), Lanes::SYNC);
+        assert_eq!(second_snapshot.finished_lanes(), Lanes::SYNC);
+        assert_eq!(second_snapshot.visible_callback_count(), 1);
+        assert_eq!(second_snapshot.hidden_callback_count(), 1);
+        assert!(second_snapshot.has_visible_and_hidden_callbacks());
+        assert!(second_snapshot.proves_deterministic_lane_order());
+
+        let records = diagnostics.records();
+        assert_eq!(records[0].root(), scheduled_first);
+        assert_eq!(records[0].commit_order(), 0);
+        assert_eq!(records[0].callback_order(), 0);
+        assert_eq!(records[0].accepted_sequence(), 0);
+        assert_eq!(records[0].update(), first_visible.update());
+        assert_eq!(records[0].callback(), first_visible_callback);
+        assert_eq!(
+            records[0].visibility(),
+            RootUpdateCallbackVisibility::Visible
+        );
+        assert_eq!(records[0].update_lanes(), Lanes::SYNC);
+        assert_eq!(records[0].callback_lanes(), Lanes::SYNC);
+        assert_eq!(records[0].render_lanes(), Lanes::SYNC);
+        assert_eq!(records[0].finished_lanes(), Lanes::SYNC);
+        assert!(records[0].callback_lanes_match_commit());
+
+        assert_eq!(records[1].root(), scheduled_first);
+        assert_eq!(records[1].commit_order(), 0);
+        assert_eq!(records[1].callback_order(), 1);
+        assert_eq!(records[1].accepted_sequence(), 1);
+        assert_eq!(records[1].update(), first_hidden.update());
+        assert_eq!(records[1].callback(), first_hidden_callback);
+        assert_eq!(
+            records[1].visibility(),
+            RootUpdateCallbackVisibility::DeferredHidden
+        );
+        assert_eq!(
+            records[1].update_lanes(),
+            Lanes::SYNC.merge_lane(Lane::OFFSCREEN)
+        );
+        assert_eq!(records[1].callback_lanes(), Lanes::SYNC);
+        assert!(records[1].update_lanes_include_offscreen());
+        assert!(records[1].callback_lanes_match_commit());
+        assert!(!records[1].public_callback_invoked());
+
+        assert_eq!(records[2].root(), scheduled_second);
+        assert_eq!(records[2].commit_order(), 1);
+        assert_eq!(records[2].callback_order(), 0);
+        assert_eq!(records[2].accepted_sequence(), 0);
+        assert_eq!(records[2].update(), second_hidden.update());
+        assert_eq!(records[2].callback(), second_hidden_callback);
+        assert_eq!(
+            records[2].visibility(),
+            RootUpdateCallbackVisibility::DeferredHidden
+        );
+        assert_eq!(
+            records[2].update_lanes(),
+            Lanes::SYNC.merge_lane(Lane::OFFSCREEN)
+        );
+        assert_eq!(records[2].callback_lanes(), Lanes::SYNC);
+        assert!(records[2].update_lanes_include_offscreen());
+        assert!(records[2].callback_lanes_match_commit());
+        assert!(!records[2].public_callback_invoked());
+
+        assert_eq!(records[3].root(), scheduled_second);
+        assert_eq!(records[3].commit_order(), 1);
+        assert_eq!(records[3].callback_order(), 1);
+        assert_eq!(records[3].accepted_sequence(), 1);
+        assert_eq!(records[3].update(), second_visible.update());
+        assert_eq!(records[3].callback(), second_visible_callback);
+        assert_eq!(
+            records[3].visibility(),
+            RootUpdateCallbackVisibility::Visible
+        );
+        assert_eq!(records[3].update_lanes(), Lanes::SYNC);
+        assert_eq!(records[3].callback_lanes(), Lanes::SYNC);
+        assert!(records[3].callback_lanes_match_commit());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 

@@ -13,7 +13,7 @@ use std::fmt::{self, Display, Formatter};
 use fast_react_core::{
     DeletionListId, ElementTypeHandle, FiberArena, FiberFlags, FiberId, FiberTag,
     FiberTopologyError, HookEffectCallbackHandle, HookEffectDependencies, HookEffectFlags,
-    HookEffectId, HookEffectInstanceId, HookListId, Lanes, PropsHandle, RefHandle,
+    HookEffectId, HookEffectInstanceId, HookListId, Lane, Lanes, PropsHandle, RefHandle,
     RootFinishedLanes, StateHandle, StateNodeHandle, UpdateQueueHandle,
 };
 use fast_react_host_config::{HostFiberTokenPhase, HostFiberTokenTarget, HostTypes};
@@ -37,9 +37,10 @@ use crate::{
     HostFiberTokenValidationError, HostRootRenderPhaseRecord, HostRootStateStoreError,
     RootCallbackPriority, RootErrorCallbackHandle, RootRecoverableErrorCallbackHandle,
     RootRenderExitStatus, RootSchedulerCallbackHandle, RootSchedulingState,
-    RootUpdateCallbackSnapshot, TestRendererHostOutputCanaryError,
+    RootUpdateCallbackHandle, RootUpdateCallbackRecord, RootUpdateCallbackSnapshot,
+    RootUpdateCallbackVisibility, TestRendererHostOutputCanaryError,
     TestRendererHostOutputCanaryPreparedFibers, TestRendererHostOutputCanaryUpdatedFibers,
-    UpdateQueueError,
+    UpdateId, UpdateQueueError,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1221,6 +1222,250 @@ impl HostRootCommitRecoverySnapshotForCanary {
             && self.render_phase_lanes == before.render_phase_lanes
             && self.callback_queue == before.callback_queue
             && self.root_update_callbacks == before.root_update_callbacks
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct HostRootCallbackDrainRecordForCanary {
+    root: FiberRootId,
+    commit_order: usize,
+    callback_order: usize,
+    render_lanes: Lanes,
+    finished_lanes: Lanes,
+    queue: UpdateQueueHandle,
+    update: UpdateId,
+    callback: RootUpdateCallbackHandle,
+    accepted_sequence: usize,
+    visibility: RootUpdateCallbackVisibility,
+    update_lanes: Lanes,
+    callback_lanes: Lanes,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private root callback drain metadata is reserved for lane/order canaries"
+)]
+impl HostRootCallbackDrainRecordForCanary {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn commit_order(self) -> usize {
+        self.commit_order
+    }
+
+    #[must_use]
+    pub(crate) const fn callback_order(self) -> usize {
+        self.callback_order
+    }
+
+    #[must_use]
+    pub(crate) const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_lanes(self) -> Lanes {
+        self.finished_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn queue(self) -> UpdateQueueHandle {
+        self.queue
+    }
+
+    #[must_use]
+    pub(crate) const fn update(self) -> UpdateId {
+        self.update
+    }
+
+    #[must_use]
+    pub(crate) const fn callback(self) -> RootUpdateCallbackHandle {
+        self.callback
+    }
+
+    #[must_use]
+    pub(crate) const fn accepted_sequence(self) -> usize {
+        self.accepted_sequence
+    }
+
+    #[must_use]
+    pub(crate) const fn visibility(self) -> RootUpdateCallbackVisibility {
+        self.visibility
+    }
+
+    #[must_use]
+    pub(crate) const fn update_lanes(self) -> Lanes {
+        self.update_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn callback_lanes(self) -> Lanes {
+        self.callback_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn is_visible_callback(self) -> bool {
+        self.visibility.is_visible()
+    }
+
+    #[must_use]
+    pub(crate) const fn is_hidden_callback(self) -> bool {
+        self.visibility.is_hidden()
+    }
+
+    #[must_use]
+    pub(crate) const fn is_deferred_hidden_callback(self) -> bool {
+        self.visibility.is_deferred()
+    }
+
+    #[must_use]
+    pub(crate) const fn update_lanes_include_offscreen(self) -> bool {
+        self.update_lanes.contains_lane(Lane::OFFSCREEN)
+    }
+
+    #[must_use]
+    pub(crate) const fn callback_lanes_match_commit(self) -> bool {
+        self.callback_lanes.is_non_empty()
+            && self.render_lanes.contains_all(self.callback_lanes)
+            && self.finished_lanes.contains_all(self.callback_lanes)
+    }
+
+    #[must_use]
+    pub(crate) const fn public_callback_invoked(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_callback_behavior_exposed(self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct HostRootCallbackDrainSnapshotForCanary {
+    root: FiberRootId,
+    commit_order: usize,
+    render_lanes: Lanes,
+    finished_lanes: Lanes,
+    pending_lanes_after_commit: Lanes,
+    records: Vec<HostRootCallbackDrainRecordForCanary>,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private root callback drain metadata is reserved for lane/order canaries"
+)]
+impl HostRootCallbackDrainSnapshotForCanary {
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn commit_order(&self) -> usize {
+        self.commit_order
+    }
+
+    #[must_use]
+    pub(crate) const fn render_lanes(&self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_lanes(&self) -> Lanes {
+        self.finished_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_lanes_after_commit(&self) -> Lanes {
+        self.pending_lanes_after_commit
+    }
+
+    #[must_use]
+    pub(crate) fn records(&self) -> &[HostRootCallbackDrainRecordForCanary] {
+        &self.records
+    }
+
+    #[must_use]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    #[must_use]
+    pub(crate) fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    #[must_use]
+    pub(crate) fn visible_callback_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| record.is_visible_callback())
+            .count()
+    }
+
+    #[must_use]
+    pub(crate) fn hidden_callback_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| record.is_hidden_callback())
+            .count()
+    }
+
+    #[must_use]
+    pub(crate) fn has_visible_and_hidden_callbacks(&self) -> bool {
+        self.visible_callback_count() > 0 && self.hidden_callback_count() > 0
+    }
+
+    #[must_use]
+    pub(crate) fn records_in_callback_sequence_order(&self) -> bool {
+        self.records.iter().enumerate().all(|(expected, record)| {
+            record.callback_order() == expected && record.accepted_sequence() == expected
+        })
+    }
+
+    #[must_use]
+    pub(crate) fn records_match_commit_lanes(&self) -> bool {
+        self.records
+            .iter()
+            .all(|record| record.callback_lanes_match_commit())
+    }
+
+    #[must_use]
+    pub(crate) fn hidden_callbacks_deferred_without_invocation(&self) -> bool {
+        self.records
+            .iter()
+            .filter(|record| record.is_hidden_callback())
+            .all(|record| {
+                record.is_deferred_hidden_callback()
+                    && record.update_lanes_include_offscreen()
+                    && !record.public_callback_invoked()
+                    && !record.public_root_callback_behavior_exposed()
+            })
+    }
+
+    #[must_use]
+    pub(crate) fn proves_deterministic_lane_order(&self) -> bool {
+        !self.is_empty()
+            && self.records_in_callback_sequence_order()
+            && self.records_match_commit_lanes()
+            && self.records.iter().all(|record| {
+                record.root() == self.root && record.commit_order() == self.commit_order
+            })
+            && self.hidden_callbacks_deferred_without_invocation()
+    }
+
+    #[must_use]
+    pub(crate) const fn public_callbacks_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_callback_behavior_exposed(&self) -> bool {
+        false
     }
 }
 
@@ -2431,6 +2676,35 @@ impl HostRootCommitRecord {
         )
     }
 
+    #[allow(
+        dead_code,
+        reason = "crate-private root callback drain metadata is reserved for lane/order canaries"
+    )]
+    pub(crate) fn root_update_callback_drain_snapshot_for_canary<H: HostTypes>(
+        &self,
+        store: &FiberRootStore<H>,
+        commit_order: usize,
+        render_lanes: Lanes,
+    ) -> Result<HostRootCallbackDrainSnapshotForCanary, RootCommitError> {
+        let records = collect_host_root_callback_drain_records_for_canary(
+            store,
+            self.root,
+            commit_order,
+            render_lanes,
+            self.finished_lanes,
+            &self.root_update_callbacks,
+        )?;
+
+        Ok(HostRootCallbackDrainSnapshotForCanary {
+            root: self.root,
+            commit_order,
+            render_lanes,
+            finished_lanes: self.finished_lanes,
+            pending_lanes_after_commit: self.pending_lanes,
+            records,
+        })
+    }
+
     #[must_use]
     #[allow(
         dead_code,
@@ -2876,6 +3150,80 @@ impl HostRootCommitRecord {
         }
 
         diagnostics
+    }
+}
+
+fn collect_host_root_callback_drain_records_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root: FiberRootId,
+    commit_order: usize,
+    render_lanes: Lanes,
+    finished_lanes: Lanes,
+    callbacks: &RootUpdateCallbackSnapshot,
+) -> Result<Vec<HostRootCallbackDrainRecordForCanary>, RootCommitError> {
+    let mut callback_records = Vec::with_capacity(
+        callbacks.visible().len() + callbacks.hidden().len() + callbacks.deferred_hidden().len(),
+    );
+    callback_records.extend_from_slice(callbacks.visible());
+    callback_records.extend_from_slice(callbacks.hidden());
+    callback_records.extend_from_slice(callbacks.deferred_hidden());
+    callback_records.sort_by_key(|record| {
+        (
+            record.sequence(),
+            root_update_callback_visibility_order(record.visibility()),
+        )
+    });
+
+    callback_records
+        .into_iter()
+        .enumerate()
+        .map(|(callback_order, record)| {
+            host_root_callback_drain_record_for_canary(
+                store,
+                root,
+                commit_order,
+                callback_order,
+                render_lanes,
+                finished_lanes,
+                record,
+            )
+        })
+        .collect()
+}
+
+fn host_root_callback_drain_record_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root: FiberRootId,
+    commit_order: usize,
+    callback_order: usize,
+    render_lanes: Lanes,
+    finished_lanes: Lanes,
+    record: RootUpdateCallbackRecord,
+) -> Result<HostRootCallbackDrainRecordForCanary, RootCommitError> {
+    let update_lanes = store.update_queues().update(record.update())?.lane();
+    let callback_lanes = update_lanes.remove_lane(Lane::OFFSCREEN);
+
+    Ok(HostRootCallbackDrainRecordForCanary {
+        root,
+        commit_order,
+        callback_order,
+        render_lanes,
+        finished_lanes,
+        queue: record.queue(),
+        update: record.update(),
+        callback: record.callback(),
+        accepted_sequence: record.sequence(),
+        visibility: record.visibility(),
+        update_lanes,
+        callback_lanes,
+    })
+}
+
+const fn root_update_callback_visibility_order(visibility: RootUpdateCallbackVisibility) -> u8 {
+    match visibility {
+        RootUpdateCallbackVisibility::Visible => 0,
+        RootUpdateCallbackVisibility::Hidden => 1,
+        RootUpdateCallbackVisibility::DeferredHidden => 2,
     }
 }
 
@@ -10714,6 +11062,108 @@ mod tests {
             callback_handles(after_commit.deferred_hidden()),
             vec![hidden_callback]
         );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_callback_drain_diagnostics_record_visible_and_hidden_lane_order() {
+        let (mut store, root_id, host) = root_store();
+        let first_callback = RootUpdateCallbackHandle::from_raw(5011);
+        let hidden_callback = RootUpdateCallbackHandle::from_raw(5012);
+        let second_callback = RootUpdateCallbackHandle::from_raw(5013);
+        let first = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(5011),
+            Some(first_callback),
+        )
+        .unwrap();
+        let hidden = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(5012),
+            Some(hidden_callback),
+        )
+        .unwrap();
+        let second = update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(5013),
+            Some(second_callback),
+        )
+        .unwrap();
+        store
+            .update_queues_mut()
+            .mark_update_hidden(hidden.update())
+            .unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let diagnostics = commit
+            .root_update_callback_drain_snapshot_for_canary(&store, 7, render.render_lanes())
+            .unwrap();
+
+        assert_eq!(diagnostics.root(), root_id);
+        assert_eq!(diagnostics.commit_order(), 7);
+        assert_eq!(diagnostics.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(diagnostics.finished_lanes(), Lanes::DEFAULT);
+        assert_eq!(diagnostics.pending_lanes_after_commit(), Lanes::NO);
+        assert_eq!(diagnostics.len(), 3);
+        assert_eq!(diagnostics.visible_callback_count(), 2);
+        assert_eq!(diagnostics.hidden_callback_count(), 1);
+        assert!(diagnostics.has_visible_and_hidden_callbacks());
+        assert!(diagnostics.records_in_callback_sequence_order());
+        assert!(diagnostics.records_match_commit_lanes());
+        assert!(diagnostics.hidden_callbacks_deferred_without_invocation());
+        assert!(diagnostics.proves_deterministic_lane_order());
+        assert!(!diagnostics.public_callbacks_invoked());
+        assert!(!diagnostics.public_root_callback_behavior_exposed());
+
+        let records = diagnostics.records();
+        assert_eq!(records[0].callback_order(), 0);
+        assert_eq!(records[0].accepted_sequence(), 0);
+        assert_eq!(records[0].queue(), commit.root_update_callbacks().queue());
+        assert_eq!(records[0].update(), first.update());
+        assert_eq!(records[0].callback(), first_callback);
+        assert_eq!(
+            records[0].visibility(),
+            RootUpdateCallbackVisibility::Visible
+        );
+        assert_eq!(records[0].update_lanes(), Lanes::DEFAULT);
+        assert_eq!(records[0].callback_lanes(), Lanes::DEFAULT);
+        assert!(records[0].callback_lanes_match_commit());
+        assert!(!records[0].public_callback_invoked());
+
+        assert_eq!(records[1].callback_order(), 1);
+        assert_eq!(records[1].accepted_sequence(), 1);
+        assert_eq!(records[1].update(), hidden.update());
+        assert_eq!(records[1].callback(), hidden_callback);
+        assert_eq!(
+            records[1].visibility(),
+            RootUpdateCallbackVisibility::DeferredHidden
+        );
+        assert_eq!(
+            records[1].update_lanes(),
+            Lanes::DEFAULT.merge_lane(Lane::OFFSCREEN)
+        );
+        assert_eq!(records[1].callback_lanes(), Lanes::DEFAULT);
+        assert!(records[1].update_lanes_include_offscreen());
+        assert!(records[1].is_hidden_callback());
+        assert!(records[1].is_deferred_hidden_callback());
+        assert!(records[1].callback_lanes_match_commit());
+        assert!(!records[1].public_callback_invoked());
+
+        assert_eq!(records[2].callback_order(), 2);
+        assert_eq!(records[2].accepted_sequence(), 2);
+        assert_eq!(records[2].update(), second.update());
+        assert_eq!(records[2].callback(), second_callback);
+        assert_eq!(
+            records[2].visibility(),
+            RootUpdateCallbackVisibility::Visible
+        );
+        assert_eq!(records[2].update_lanes(), Lanes::DEFAULT);
+        assert_eq!(records[2].callback_lanes(), Lanes::DEFAULT);
+        assert!(records[2].callback_lanes_match_commit());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
