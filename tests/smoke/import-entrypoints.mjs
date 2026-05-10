@@ -180,6 +180,7 @@ const blockedExtensionSubpaths = [
   '@fast-react/react/children-helper.js',
   '@fast-react/react/component-class.js',
   '@fast-react/react/context-object.js',
+  '@fast-react/react/element-type.js',
   '@fast-react/react/element-factory.js',
   '@fast-react/react/hook-dispatcher.js',
   '@fast-react/react/ref-object.js',
@@ -1579,6 +1580,10 @@ function assertWrapperObjectBehavior(react, label, options = {}) {
       [
         'memo: The first argument must be a component. Instead received: %s',
         'undefined'
+      ],
+      [
+        'memo: The first argument must be a component. Instead received: %s',
+        'number'
       ]
     ]);
 
