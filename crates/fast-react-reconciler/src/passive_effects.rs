@@ -17,12 +17,14 @@ use std::fmt::{self, Display, Formatter};
 #[cfg(test)]
 use fast_react_core::FiberTag;
 use fast_react_core::{
-    FiberId, HookEffectCallbackHandle, HookEffectId, HookEffectInstanceId, Lanes, RefHandle,
-    StateNodeHandle,
+    FiberId, HookEffectArenaError, HookEffectCallbackHandle, HookEffectId, HookEffectInstanceId,
+    Lanes, RefHandle, StateNodeHandle,
 };
 use fast_react_host_config::{HostFiberTokenPhase, HostFiberTokenTarget, HostTypes};
 
-use crate::function_component::FunctionComponentHookRenderPhase;
+use crate::function_component::{
+    FunctionComponentHookRenderPhase, FunctionComponentHookRenderStore,
+};
 use crate::host_tokens::HostFiberTokenId;
 #[cfg(test)]
 use crate::root_commit::HostRootOffscreenRevealCommitHandoffRecordForCanary;
@@ -2189,6 +2191,216 @@ impl PassiveEffectCallbackInvocationGateSnapshot {
     pub const fn scheduler_driven_passive_execution_enabled(&self) -> bool {
         false
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct PassiveEffectReturnedDestroyHandlePersistenceRecord {
+    persistence_order: usize,
+    root: FiberRootId,
+    finished_work: FiberId,
+    lanes: Lanes,
+    fiber: FiberId,
+    effect: HookEffectId,
+    effect_instance: HookEffectInstanceId,
+    invocation_instance: HookEffectInstanceId,
+    create: HookEffectCallbackHandle,
+    previous_destroy: Option<HookEffectCallbackHandle>,
+    returned_destroy: HookEffectCallbackHandle,
+    stored_destroy: Option<HookEffectCallbackHandle>,
+}
+
+#[allow(
+    dead_code,
+    reason = "private passive create returned-destroy persistence canary"
+)]
+impl PassiveEffectReturnedDestroyHandlePersistenceRecord {
+    #[must_use]
+    pub const fn persistence_order(self) -> usize {
+        self.persistence_order
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn finished_work(self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub const fn lanes(self) -> Lanes {
+        self.lanes
+    }
+
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn effect(self) -> HookEffectId {
+        self.effect
+    }
+
+    #[must_use]
+    pub const fn effect_instance(self) -> HookEffectInstanceId {
+        self.effect_instance
+    }
+
+    #[must_use]
+    pub const fn invocation_instance(self) -> HookEffectInstanceId {
+        self.invocation_instance
+    }
+
+    #[must_use]
+    pub const fn create(self) -> HookEffectCallbackHandle {
+        self.create
+    }
+
+    #[must_use]
+    pub const fn previous_destroy(self) -> Option<HookEffectCallbackHandle> {
+        self.previous_destroy
+    }
+
+    #[must_use]
+    pub const fn returned_destroy(self) -> HookEffectCallbackHandle {
+        self.returned_destroy
+    }
+
+    #[must_use]
+    pub const fn stored_destroy(self) -> Option<HookEffectCallbackHandle> {
+        self.stored_destroy
+    }
+
+    #[must_use]
+    pub fn proves_returned_destroy_persisted(self) -> bool {
+        self.effect_instance == self.invocation_instance
+            && self.stored_destroy == Some(self.returned_destroy)
+    }
+
+    #[must_use]
+    pub const fn public_effect_execution_enabled(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn public_act_compatibility_claimed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn scheduler_driven_passive_execution_enabled(self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(crate) struct PassiveEffectReturnedDestroyHandlePersistenceSnapshot {
+    records: Vec<PassiveEffectReturnedDestroyHandlePersistenceRecord>,
+}
+
+#[allow(
+    dead_code,
+    reason = "private passive create returned-destroy persistence canary"
+)]
+impl PassiveEffectReturnedDestroyHandlePersistenceSnapshot {
+    #[must_use]
+    pub fn records(&self) -> &[PassiveEffectReturnedDestroyHandlePersistenceRecord] {
+        &self.records
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    #[must_use]
+    pub fn proves_returned_destroy_handles_persisted(&self) -> bool {
+        !self.records.is_empty()
+            && self
+                .records
+                .iter()
+                .all(|record| record.proves_returned_destroy_persisted())
+    }
+
+    #[must_use]
+    pub const fn public_effect_execution_enabled(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn public_act_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub const fn scheduler_driven_passive_execution_enabled(&self) -> bool {
+        false
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private passive create returned-destroy persistence helper for deterministic canaries"
+)]
+pub(crate) fn persist_passive_effect_returned_destroy_handles_for_canary(
+    hook_store: &mut FunctionComponentHookRenderStore,
+    gate: &PassiveEffectCallbackInvocationGateSnapshot,
+) -> Result<PassiveEffectReturnedDestroyHandlePersistenceSnapshot, HookEffectArenaError> {
+    let mut records = Vec::new();
+
+    for invocation in gate.records().iter().copied() {
+        if invocation.kind() != PassiveEffectCallbackInvocationKind::Create
+            || !invocation.completed()
+        {
+            continue;
+        }
+
+        let Some(returned_destroy) = invocation.returned_destroy() else {
+            continue;
+        };
+
+        let effect_instance = hook_store
+            .hook_effects()
+            .get_effect(invocation.effect())?
+            .instance();
+        let previous_destroy = hook_store
+            .hook_effects()
+            .get_instance(invocation.instance())?
+            .destroy();
+        hook_store
+            .hook_effects_mut()
+            .get_instance_mut(invocation.instance())?
+            .set_destroy(Some(returned_destroy));
+        let stored_destroy = hook_store
+            .hook_effects()
+            .get_instance(invocation.instance())?
+            .destroy();
+
+        records.push(PassiveEffectReturnedDestroyHandlePersistenceRecord {
+            persistence_order: records.len(),
+            root: invocation.root(),
+            finished_work: invocation.finished_work(),
+            lanes: invocation.committed_lanes(),
+            fiber: invocation.fiber(),
+            effect: invocation.effect(),
+            effect_instance,
+            invocation_instance: invocation.instance(),
+            create: invocation.callback(),
+            previous_destroy,
+            returned_destroy,
+            stored_destroy,
+        });
+    }
+
+    Ok(PassiveEffectReturnedDestroyHandlePersistenceSnapshot { records })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -6980,6 +7192,7 @@ mod tests {
             store.scheduler_bridge().act_queue_requests().len(),
             act_queue_request_count
         );
+
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
@@ -7714,6 +7927,7 @@ mod tests {
             store.scheduler_bridge().act_queue_requests().len(),
             act_queue_request_count
         );
+
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
@@ -7899,6 +8113,188 @@ mod tests {
             store.scheduler_bridge().act_queue_requests().len(),
             act_queue_request_count
         );
+
+        let returned_destroy_persistence =
+            persist_passive_effect_returned_destroy_handles_for_canary(&mut hook_store, &gate)
+                .unwrap();
+        assert_eq!(returned_destroy_persistence.len(), 1);
+        assert!(returned_destroy_persistence.proves_returned_destroy_handles_persisted());
+        assert!(!returned_destroy_persistence.public_effect_execution_enabled());
+        assert!(!returned_destroy_persistence.public_act_compatibility_claimed());
+        assert!(!returned_destroy_persistence.scheduler_driven_passive_execution_enabled());
+
+        let returned_destroy_record = returned_destroy_persistence.records()[0];
+        assert_eq!(returned_destroy_record.persistence_order(), 0);
+        assert_eq!(returned_destroy_record.root(), root_id);
+        assert_eq!(returned_destroy_record.finished_work(), finished_work);
+        assert_eq!(returned_destroy_record.lanes(), Lanes::DEFAULT);
+        assert_eq!(returned_destroy_record.fiber(), finished_function);
+        assert_eq!(returned_destroy_record.effect(), registration.effect());
+        assert_eq!(
+            returned_destroy_record.effect_instance(),
+            registration.instance()
+        );
+        assert_eq!(
+            returned_destroy_record.invocation_instance(),
+            registration.instance()
+        );
+        assert_eq!(returned_destroy_record.create(), callback(1_067));
+        assert_eq!(
+            returned_destroy_record.previous_destroy(),
+            Some(callback(1_064))
+        );
+        assert_eq!(returned_destroy_record.returned_destroy(), callback(1_069));
+        assert_eq!(
+            returned_destroy_record.stored_destroy(),
+            Some(callback(1_069))
+        );
+        assert!(
+            returned_destroy_record.proves_returned_destroy_persisted(),
+            "test-controlled passive create return must be stored on the reused hook effect instance"
+        );
+        assert_eq!(
+            hook_store
+                .hook_effects()
+                .get_instance(registration.instance())
+                .unwrap()
+                .destroy(),
+            Some(callback(1_069))
+        );
+
+        update_container(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(1_070),
+            None,
+        )
+        .unwrap();
+        let second_render =
+            render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let second_finished_work = second_render.finished_work();
+        let second_finished_function = append_function_component_child(
+            &mut store,
+            second_finished_work,
+            PropsHandle::from_raw(1_071),
+            component,
+        );
+        store
+            .fiber_arena_mut()
+            .link_alternates(finished_function, second_finished_function)
+            .unwrap();
+        let second_state = hook_store
+            .prepare_render_state(store.fiber_arena(), second_finished_function)
+            .unwrap();
+        assert_eq!(
+            second_state.phase(),
+            FunctionComponentHookRenderPhase::Update
+        );
+        let mut second_cursor = hook_store.begin_render_cursor(second_state).unwrap();
+        let second_registration = hook_store
+            .update_effect_metadata(
+                store.fiber_arena_mut(),
+                &mut second_cursor,
+                FunctionComponentEffectPhase::Passive,
+                callback(1_072),
+                deps(1_073),
+                FunctionComponentEffectDependencyStatus::Changed,
+            )
+            .unwrap();
+        hook_store.finish_render_cursor(second_cursor).unwrap();
+
+        let second_persistence = hook_store
+            .effect_destroy_handle_persistence_records(second_state)
+            .unwrap();
+        assert_eq!(second_persistence.len(), 1);
+        assert_eq!(
+            second_persistence[0].previous_effect(),
+            registration.effect()
+        );
+        assert_eq!(second_persistence[0].effect(), second_registration.effect());
+        assert_eq!(
+            second_persistence[0].previous_instance(),
+            registration.instance()
+        );
+        assert_eq!(
+            second_persistence[0].retained_instance(),
+            second_registration.instance()
+        );
+        assert_eq!(
+            second_persistence[0].recorded_destroy(),
+            Some(callback(1_069))
+        );
+        assert_eq!(
+            second_persistence[0].previous_destroy(),
+            Some(callback(1_069))
+        );
+        assert_eq!(
+            second_persistence[0].retained_destroy(),
+            Some(callback(1_069))
+        );
+        assert!(second_persistence[0].proves_destroy_handle_persisted());
+        assert!(second_persistence[0].proves_update_unmount_metadata_consumes_previous_destroy());
+
+        let second_queued = queue_function_component_pending_passive_effects(
+            &mut store,
+            root_id,
+            &hook_store,
+            second_state,
+            Lanes::DEFAULT,
+        )
+        .unwrap();
+        assert_eq!(second_queued.records().len(), 1);
+        assert_eq!(
+            second_queued.records()[0].previous_effect(),
+            Some(registration.effect())
+        );
+        assert_eq!(
+            second_queued.records()[0].effect(),
+            second_registration.effect()
+        );
+        assert_eq!(second_queued.records()[0].destroy(), Some(callback(1_069)));
+        assert_eq!(second_queued.records()[0].create(), callback(1_072));
+        bubble_test_fiber(&mut store, second_finished_function);
+        bubble_test_fiber(&mut store, second_finished_work);
+
+        let mut second_commit = commit_finished_host_root(&mut store, second_render).unwrap();
+        let second_committed_queues = commit_function_component_effect_queues_for_committed_root(
+            &store,
+            root_id,
+            &mut hook_store,
+            Lanes::DEFAULT,
+        )
+        .unwrap();
+        assert_eq!(second_committed_queues.len(), 1);
+        assert_eq!(second_committed_queues[0].fiber(), second_finished_function);
+        assert_eq!(second_committed_queues[0].accepted_passive_count(), 1);
+
+        let second_effect_list = second_commit
+            .record_function_component_effect_list_commit_phase_order_for_canary(
+                &store,
+                &mut hook_store,
+                std::slice::from_ref(&second_queued),
+            )
+            .unwrap()
+            .clone();
+        let second_passive_unmount = second_effect_list
+            .records()
+            .iter()
+            .find(|record| {
+                record.kind()
+                    == FunctionComponentEffectListCommitPhaseOrderKind::PassiveUnmountScheduled
+            })
+            .copied()
+            .unwrap();
+        assert_eq!(second_passive_unmount.fiber(), second_finished_function);
+        assert_eq!(
+            second_passive_unmount.effect(),
+            Some(second_registration.effect())
+        );
+        assert_eq!(
+            second_passive_unmount.previous_effect(),
+            Some(registration.effect())
+        );
+        assert_eq!(second_passive_unmount.destroy(), Some(callback(1_069)));
+
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
