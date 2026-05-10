@@ -371,6 +371,162 @@ const expectedNativeRootBridgeCrossEnvironmentTeardownGate = {
   reactBehaviorError: false
 };
 
+const expectedNativeRootBridgeTransportWorkerThreadTeardownRowFields = [
+  'id',
+  'operation',
+  'workerThreadId',
+  'transport',
+  'sourceBatchIndex',
+  'requestId',
+  'handleKind',
+  'tableEnvironmentId',
+  'handleEnvironmentId',
+  'slot',
+  'handleGeneration',
+  'currentGeneration',
+  'recordId',
+  'errorCode',
+  'boundaryErrorCode',
+  'nativeAddonLoaded',
+  'nativeExecution',
+  'rendererExecution',
+  'reconcilerExecution',
+  'reactBehaviorError'
+];
+const expectedNativeRootBridgeTransportWorkerThreadTeardownRows = [
+  {
+    id: 'worker-root-stale-after-thread-teardown',
+    operation: 'worker-thread-teardown',
+    workerThreadId: 524,
+    transport: 'json',
+    sourceBatchIndex: 0,
+    requestId: 1,
+    handleKind: 'root',
+    tableEnvironmentId: 524,
+    handleEnvironmentId: 524,
+    slot: 1,
+    handleGeneration: 1,
+    currentGeneration: 2,
+    recordId: null,
+    errorCode: 'FAST_REACT_NAPI_STALE_HANDLE',
+    boundaryErrorCode: 'FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE',
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    reactBehaviorError: false
+  },
+  {
+    id: 'worker-create-value-stale-after-thread-teardown',
+    operation: 'worker-thread-teardown',
+    workerThreadId: 524,
+    transport: 'json',
+    sourceBatchIndex: 0,
+    requestId: 1,
+    handleKind: 'value',
+    tableEnvironmentId: 524,
+    handleEnvironmentId: 524,
+    slot: 2,
+    handleGeneration: 1,
+    currentGeneration: 2,
+    recordId: null,
+    errorCode: 'FAST_REACT_NAPI_STALE_HANDLE',
+    boundaryErrorCode: 'FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE',
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    reactBehaviorError: false
+  },
+  {
+    id: 'worker-render-value-stale-after-thread-teardown',
+    operation: 'worker-thread-teardown',
+    workerThreadId: 524,
+    transport: 'json',
+    sourceBatchIndex: 1,
+    requestId: 2,
+    handleKind: 'value',
+    tableEnvironmentId: 524,
+    handleEnvironmentId: 524,
+    slot: 3,
+    handleGeneration: 1,
+    currentGeneration: 2,
+    recordId: null,
+    errorCode: 'FAST_REACT_NAPI_STALE_HANDLE',
+    boundaryErrorCode: 'FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE',
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    reactBehaviorError: false
+  },
+  {
+    id: 'peer-root-active-after-worker-thread-teardown',
+    operation: 'peer-environment-isolation',
+    workerThreadId: 524,
+    transport: 'json',
+    sourceBatchIndex: null,
+    requestId: null,
+    handleKind: 'root',
+    tableEnvironmentId: 1524,
+    handleEnvironmentId: 1524,
+    slot: 1,
+    handleGeneration: 1,
+    currentGeneration: 1,
+    recordId: 152401,
+    errorCode: null,
+    boundaryErrorCode: null,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    reactBehaviorError: false
+  }
+];
+const expectedNativeRootBridgeTransportWorkerThreadTeardownGate = {
+  workerThreadTeardownGateStatus:
+    'diagnosed-native-root-bridge-transport-worker-thread-teardown',
+  transport: 'json',
+  workerThreadId: 524,
+  workerEnvironmentId: 524,
+  peerEnvironmentId: 1524,
+  validationModel: 'fast-react-napi.NativeRootBridgeRequestSequenceValidator',
+  handleTableModel: 'fast-react-napi.BridgeHandleTable',
+  batchGateStatus:
+    'validated-native-root-bridge-batched-json-transport-records',
+  crossEnvironmentTeardownGateStatus:
+    'diagnosed-native-root-bridge-cross-environment-teardown-isolation',
+  environmentTeardownFields:
+    expectedNativeRootBridgeEnvironmentTeardownFields,
+  workerThreadTeardownDiagnosticRowFields:
+    expectedNativeRootBridgeTransportWorkerThreadTeardownRowFields,
+  mismatchedTeardown: {
+    requestedEnvironmentId: 524,
+    tableEnvironmentId: 1524,
+    environmentMatched: false,
+    rootHandlesInvalidated: 0,
+    valueHandlesInvalidated: 0,
+    totalHandlesInvalidated: 0,
+    toreDownHandles: false
+  },
+  matchedTeardown: {
+    requestedEnvironmentId: 524,
+    tableEnvironmentId: 524,
+    environmentMatched: true,
+    rootHandlesInvalidated: 1,
+    valueHandlesInvalidated: 2,
+    totalHandlesInvalidated: 3,
+    toreDownHandles: true
+  },
+  rows: expectedNativeRootBridgeTransportWorkerThreadTeardownRows,
+  nativeAddonLoaded: false,
+  nativeExecution: false,
+  rendererExecution: false,
+  reconcilerExecution: false,
+  publicNativeCompatibility: false,
+  reactBehaviorError: false
+};
+
 const expectedPackageExports = {
   '.': {
     import: './index.mjs',
@@ -694,6 +850,8 @@ const expectedNativeRootBridgeRequestShape = {
   },
   crossEnvironmentTeardownGate:
     expectedNativeRootBridgeCrossEnvironmentTeardownGate,
+  transportWorkerThreadTeardownGate:
+    expectedNativeRootBridgeTransportWorkerThreadTeardownGate,
   validationErrorCodes: {
     createAfterRootCreated:
       'FAST_REACT_NAPI_ROOT_REQUEST_CREATE_AFTER_ROOT_CREATED',
@@ -870,12 +1028,25 @@ for (const shapeValue of [
   native.nativeRootBridgeRequestShape.crossEnvironmentTeardownGate
     .matchedTeardown,
   native.nativeRootBridgeRequestShape.crossEnvironmentTeardownGate.rows,
+  native.nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate,
+  native.nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate
+    .environmentTeardownFields,
+  native.nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate
+    .workerThreadTeardownDiagnosticRowFields,
+  native.nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate
+    .mismatchedTeardown,
+  native.nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate
+    .matchedTeardown,
+  native.nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate.rows,
   native.nativeRootBridgeRequestShape.validationErrorCodes
 ]) {
   assert.ok(Object.isFrozen(shapeValue));
 }
 assertNativeRootBridgeCrossEnvironmentTeardownGate(
   native.nativeRootBridgeRequestShape.crossEnvironmentTeardownGate
+);
+assertNativeRootBridgeTransportWorkerThreadTeardownGate(
+  native.nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate
 );
 
 const document = createDocument('native-request-shape');
@@ -2270,6 +2441,134 @@ function assertNativeRootBridgeCrossEnvironmentTeardownGate(teardownGate) {
   assert.equal(teardownGate.rendererExecution, false);
   assert.equal(teardownGate.reconcilerExecution, false);
   assert.equal(teardownGate.reactBehaviorError, false);
+}
+
+function assertNativeRootBridgeTransportWorkerThreadTeardownGate(workerGate) {
+  assert.equal(Object.isFrozen(workerGate), true);
+  assert.equal(Object.isFrozen(workerGate.environmentTeardownFields), true);
+  assert.equal(
+    Object.isFrozen(workerGate.workerThreadTeardownDiagnosticRowFields),
+    true
+  );
+  assert.equal(Object.isFrozen(workerGate.mismatchedTeardown), true);
+  assert.equal(Object.isFrozen(workerGate.matchedTeardown), true);
+  assert.equal(Object.isFrozen(workerGate.rows), true);
+  assert.equal(
+    workerGate.workerThreadTeardownGateStatus,
+    'diagnosed-native-root-bridge-transport-worker-thread-teardown'
+  );
+  assert.equal(workerGate.transport, 'json');
+  assert.equal(workerGate.workerThreadId, 524);
+  assert.equal(workerGate.workerEnvironmentId, 524);
+  assert.equal(workerGate.peerEnvironmentId, 1524);
+  assert.equal(
+    workerGate.validationModel,
+    'fast-react-napi.NativeRootBridgeRequestSequenceValidator'
+  );
+  assert.equal(workerGate.handleTableModel, 'fast-react-napi.BridgeHandleTable');
+  assert.equal(
+    workerGate.batchGateStatus,
+    'validated-native-root-bridge-batched-json-transport-records'
+  );
+  assert.equal(
+    workerGate.crossEnvironmentTeardownGateStatus,
+    'diagnosed-native-root-bridge-cross-environment-teardown-isolation'
+  );
+  assert.deepEqual(
+    workerGate.environmentTeardownFields,
+    expectedNativeRootBridgeEnvironmentTeardownFields
+  );
+  assert.deepEqual(
+    workerGate.workerThreadTeardownDiagnosticRowFields,
+    expectedNativeRootBridgeTransportWorkerThreadTeardownRowFields
+  );
+  assert.deepEqual(workerGate.mismatchedTeardown, {
+    requestedEnvironmentId: 524,
+    tableEnvironmentId: 1524,
+    environmentMatched: false,
+    rootHandlesInvalidated: 0,
+    valueHandlesInvalidated: 0,
+    totalHandlesInvalidated: 0,
+    toreDownHandles: false
+  });
+  assert.deepEqual(workerGate.matchedTeardown, {
+    requestedEnvironmentId: 524,
+    tableEnvironmentId: 524,
+    environmentMatched: true,
+    rootHandlesInvalidated: 1,
+    valueHandlesInvalidated: 2,
+    totalHandlesInvalidated: 3,
+    toreDownHandles: true
+  });
+  assert.deepEqual(
+    workerGate.rows.map((row) => row.id),
+    [
+      'worker-root-stale-after-thread-teardown',
+      'worker-create-value-stale-after-thread-teardown',
+      'worker-render-value-stale-after-thread-teardown',
+      'peer-root-active-after-worker-thread-teardown'
+    ]
+  );
+  assert.deepEqual(
+    workerGate.rows.map((row) => row.sourceBatchIndex),
+    [0, 0, 1, null]
+  );
+  assert.deepEqual(
+    workerGate.rows.map((row) => row.requestId),
+    [1, 1, 2, null]
+  );
+  assert.deepEqual(
+    workerGate.rows.map((row) => row.handleKind),
+    ['root', 'value', 'value', 'root']
+  );
+  assert.deepEqual(
+    workerGate.rows.map((row) => row.currentGeneration),
+    [2, 2, 2, 1]
+  );
+  assert.deepEqual(
+    workerGate.rows.map((row) => row.recordId),
+    [null, null, null, 152401]
+  );
+  assert.deepEqual(
+    workerGate.rows.map((row) => row.errorCode),
+    [
+      'FAST_REACT_NAPI_STALE_HANDLE',
+      'FAST_REACT_NAPI_STALE_HANDLE',
+      'FAST_REACT_NAPI_STALE_HANDLE',
+      null
+    ]
+  );
+  assert.deepEqual(
+    workerGate.rows.map((row) => row.boundaryErrorCode),
+    [
+      'FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE',
+      'FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE',
+      'FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE',
+      null
+    ]
+  );
+  assert.deepEqual(
+    workerGate.rows[3],
+    expectedNativeRootBridgeTransportWorkerThreadTeardownRows[3]
+  );
+  for (const row of workerGate.rows) {
+    assert.equal(Object.isFrozen(row), true);
+    assert.deepEqual(
+      Object.keys(row),
+      workerGate.workerThreadTeardownDiagnosticRowFields
+    );
+    assert.equal(row.nativeAddonLoaded, false);
+    assert.equal(row.nativeExecution, false);
+    assert.equal(row.rendererExecution, false);
+    assert.equal(row.reconcilerExecution, false);
+    assert.equal(row.reactBehaviorError, false);
+  }
+  assert.equal(workerGate.nativeAddonLoaded, false);
+  assert.equal(workerGate.nativeExecution, false);
+  assert.equal(workerGate.rendererExecution, false);
+  assert.equal(workerGate.reconcilerExecution, false);
+  assert.equal(workerGate.publicNativeCompatibility, false);
+  assert.equal(workerGate.reactBehaviorError, false);
 }
 
 function assertBridgeDidNotTouchContainer(container, document) {

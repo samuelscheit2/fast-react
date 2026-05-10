@@ -150,6 +150,75 @@ assert.equal(
     .crossEnvironmentTeardownGate,
   nativeRootBridgeRequestShape.crossEnvironmentTeardownGate
 );
+assert.equal(
+  nativeBindingManifest.nativeRootBridgeRequestShape
+    .transportWorkerThreadTeardownGate,
+  nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate
+);
+assert.equal(
+  nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate
+    .workerThreadTeardownGateStatus,
+  'diagnosed-native-root-bridge-transport-worker-thread-teardown'
+);
+assert.equal(
+  nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate
+    .batchGateStatus,
+  'validated-native-root-bridge-batched-json-transport-records'
+);
+assert.equal(
+  nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate
+    .crossEnvironmentTeardownGateStatus,
+  'diagnosed-native-root-bridge-cross-environment-teardown-isolation'
+);
+assert.deepEqual(
+  nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate.rows.map(
+    (row) => row.id
+  ),
+  [
+    'worker-root-stale-after-thread-teardown',
+    'worker-create-value-stale-after-thread-teardown',
+    'worker-render-value-stale-after-thread-teardown',
+    'peer-root-active-after-worker-thread-teardown'
+  ]
+);
+assert.deepEqual(
+  nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate.rows.map(
+    (row) => row.errorCode
+  ),
+  [
+    'FAST_REACT_NAPI_STALE_HANDLE',
+    'FAST_REACT_NAPI_STALE_HANDLE',
+    'FAST_REACT_NAPI_STALE_HANDLE',
+    null
+  ]
+);
+assert.deepEqual(
+  nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate.rows.map(
+    (row) => row.boundaryErrorCode
+  ),
+  [
+    'FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE',
+    'FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE',
+    'FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE',
+    null
+  ]
+);
+assert.equal(
+  nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate.rows.every(
+    (row) =>
+      row.nativeAddonLoaded === false &&
+      row.nativeExecution === false &&
+      row.rendererExecution === false &&
+      row.reconcilerExecution === false &&
+      row.reactBehaviorError === false
+  ),
+  true
+);
+assert.equal(
+  nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate
+    .publicNativeCompatibility,
+  false
+);
 assert.deepEqual(
   shapeGate.jsonTransportSmoke.parserGate.batchedRecordGate.lifecycleRows.map(
     (row) => row.lifecycleTransition
