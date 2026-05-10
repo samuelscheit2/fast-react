@@ -666,6 +666,10 @@ const resourceHintResourceMapCommitBlockedSideEffects = freezeRecord({
   scriptResourceMapCommitRowsRecorded: false,
   moduleResourceMapOrderRowsRecorded: false,
   moduleResourceMapDedupeKeysRecorded: false,
+  fakeScriptModuleCommitExecutionDiagnosticInvoked: false,
+  scriptModuleFakeDomCommitRowsRecorded: false,
+  scriptResourceFakeDomCommitRowsRecorded: false,
+  modulePreloadFakeDomCommitRowsRecorded: false,
   stylesheetLoadErrorStateRecordConsumed: false,
   stylesheetLoadStateCommitOrderRowsRecorded: false,
   stylesheetLoadStateResourceMapRowsValidated: false,
@@ -703,6 +707,10 @@ const resourceHintResourceMapCommitSideEffects = freezeRecord({
   scriptResourceMapCommitRowsRecorded: true,
   moduleResourceMapOrderRowsRecorded: true,
   moduleResourceMapDedupeKeysRecorded: true,
+  fakeScriptModuleCommitExecutionDiagnosticInvoked: true,
+  scriptModuleFakeDomCommitRowsRecorded: true,
+  scriptResourceFakeDomCommitRowsRecorded: true,
+  modulePreloadFakeDomCommitRowsRecorded: true,
   stylesheetLoadErrorStateRecordConsumed: true,
   stylesheetLoadStateCommitOrderRowsRecorded: true,
   stylesheetLoadStateResourceMapRowsValidated: true,
@@ -1144,6 +1152,11 @@ const resourceHintResourceMapCommitMissingPrerequisites = freezeArray([
     'Resource fetch, load, error, and suspended commit state remain blocked.'
   ),
   prerequisite(
+    'no-script-module-resource-acquire',
+    'react-dom-resource',
+    'Script and modulepreload commit rows remain private fake-DOM evidence without resource acquisition or execution.'
+  ),
+  prerequisite(
     'no-public-resource-api-dispatch',
     'react-dom-resource',
     'Public resource hint APIs remain placeholders and do not reach commit.'
@@ -1302,6 +1315,10 @@ const resourceHintResourceMapCommitBlockedCapabilities = freezeArray([
   blockedCapability(
     'preload-style-dom-work',
     'No real preload or stylesheet DOM element is created, inserted, fetched, or subscribed.'
+  ),
+  blockedCapability(
+    'script-module-resource-execution',
+    'Script and modulepreload rows are recorded as private fake-DOM commit evidence without public dispatch or script execution.'
   ),
   blockedCapability(
     'public-resource-compatibility',
@@ -3001,6 +3018,9 @@ function describePrivateResourceHintResourceMapCommitGate() {
     recordsModuleScriptRows: true,
     recordsModuleResourceMapOrderRows: true,
     recordsModuleResourceMapDedupeKeys: true,
+    recordsScriptModuleFakeDomCommitExecutionRows: true,
+    recordsScriptFakeDomCommitExecutionRows: true,
+    recordsModulePreloadFakeDomCommitExecutionRows: true,
     consumesStylesheetLoadErrorState: true,
     recordsStylesheetLoadStateCommitOrderRows: true,
     validatesStylesheetLoadStateResourceMapRows: true,
@@ -4335,6 +4355,8 @@ function recordResourceHintResourceMapCommitWithGate(
     preloadResourceMapRecords: commitPlan.preloadResourceMapRecords,
     scriptResourceMapRecords: commitPlan.scriptResourceMapRecords,
     moduleResourceMapOrder: commitPlan.moduleResourceMapOrder,
+    scriptModuleFakeDomCommitExecution:
+      commitPlan.scriptModuleFakeDomCommitExecution,
     stylesheetLoadStateCommitOrder:
       commitPlan.stylesheetLoadStateCommitOrder,
     resourceMapConflictBoundary: commitPlan.resourceMapConflictBoundary,
@@ -9371,6 +9393,10 @@ function createResourceHintResourceMapCommitPlan(
     createResourceMapCommitConflictBoundary(privateResourceMapRecords);
   const moduleResourceMapOrder =
     createResourceMapCommitModuleResourceOrder(privateResourceMapRecords);
+  const scriptModuleFakeDomCommitExecution =
+    createResourceMapCommitScriptModuleFakeDomExecution(
+      moduleResourceMapOrder
+    );
   const stylesheetLoadStateCommitOrder =
     createResourceMapCommitStylesheetLoadStateOrder(
       privateResourceMapRecords,
@@ -9394,6 +9420,7 @@ function createResourceHintResourceMapCommitPlan(
       createResourceMapCommitPlanSummary(
         privateResourceMapRecords,
         moduleResourceMapOrder,
+        scriptModuleFakeDomCommitExecution,
         resourceMapConflictBoundary,
         stylesheetLoadStateCommitOrder
       ),
@@ -9402,6 +9429,7 @@ function createResourceHintResourceMapCommitPlan(
     preloadResourceMapRecords,
     scriptResourceMapRecords,
     moduleResourceMapOrder,
+    scriptModuleFakeDomCommitExecution,
     stylesheetLoadStateCommitOrder,
     resourceMapConflictBoundary,
     stylesheetPrecedenceBoundary:
@@ -9821,6 +9849,212 @@ function createResourceMapCommitModuleDedupeKeyRows(orderRows) {
   );
 }
 
+function createResourceMapCommitScriptModuleFakeDomExecution(
+  moduleResourceMapOrder
+) {
+  const rows = freezeArray(
+    moduleResourceMapOrder.rows.map((row, executionOrderIndex) => {
+      const dedupeKeyRow =
+        findResourceMapCommitModuleDedupeKeyRow(
+          moduleResourceMapOrder.dedupeKeys,
+          row.dedupeKey
+        );
+      return createResourceMapCommitScriptModuleFakeDomExecutionRow(
+        row,
+        dedupeKeyRow,
+        executionOrderIndex
+      );
+    })
+  );
+  const scriptResourceRows = rows.filter(
+    (row) => row.recordKind === 'script'
+  );
+  const modulePreloadRows = rows.filter(
+    (row) => row.modulePreload === true
+  );
+  const dedupeOrderBoundary =
+    createResourceMapCommitScriptModuleDedupeOrderBoundary(
+      moduleResourceMapOrder,
+      rows
+    );
+
+  return freezeRecord({
+    executionKind:
+      'react-19.2.6-script-modulepreload-fake-dom-commit-execution-diagnostic',
+    targetKind: 'document-head',
+    hostTag: 'head',
+    sourceModuleResourceMapOrderKind: moduleResourceMapOrder.orderKind,
+    sourceModuleResourceMapOrderRowCount:
+      moduleResourceMapOrder.rowCount,
+    sourceModuleResourceMapDedupeKeyCount:
+      moduleResourceMapOrder.dedupeKeyCount,
+    rowCount: rows.length,
+    scriptResourceMapRowCount: scriptResourceRows.length,
+    modulePreloadResourceMapRowCount: modulePreloadRows.length,
+    classicScriptPreloadRowCount: rows.filter(
+      (row) => row.classicScriptPreload === true
+    ).length,
+    classicScriptPreinitRowCount: rows.filter(
+      (row) => row.classicScriptPreinit === true
+    ).length,
+    moduleScriptPreinitRowCount: rows.filter(
+      (row) => row.moduleScript === true
+    ).length,
+    rows,
+    dedupeOrderBoundary,
+    fakeDomCommitEvidenceRecorded: true,
+    fakeDomCommitApplied: false,
+    fakeHeadRead: false,
+    fakeHeadMutated: false,
+    realHeadMutated: false,
+    realResourceMapsMutated: false,
+    fakeResourceMapsMutated: false,
+    dedupeRowsMutated: false,
+    orderRowsMutated: false,
+    resourceInstancesCreated: false,
+    preloadPropsMapMutated: false,
+    hoistableScriptsMapMutated: false,
+    fetchStarted: false,
+    preloadStarted: false,
+    modulePreloadStarted: false,
+    scriptPreinitStarted: false,
+    moduleScriptPreinitStarted: false,
+    scriptExecutionStarted: false,
+    publicResourceDispatchBlocked: true,
+    publicScriptModuleResourceDispatch: false,
+    rawValuesRetained: false,
+    compatibilityClaimed: false
+  });
+}
+
+function findResourceMapCommitModuleDedupeKeyRow(dedupeKeys, dedupeKey) {
+  return dedupeKeys.find((row) => row.dedupeKey === dedupeKey) || null;
+}
+
+function createResourceMapCommitScriptModuleFakeDomExecutionRow(
+  row,
+  dedupeKeyRow,
+  executionOrderIndex
+) {
+  const wouldCreatePreloadPropsRecord = row.recordKind === 'preload';
+  const wouldCreateHoistableScriptResource = row.recordKind === 'script';
+  const wouldAdoptPreloadProps =
+    wouldCreateHoistableScriptResource &&
+    dedupeKeyRow !== null &&
+    (dedupeKeyRow.hasClassicScriptPreload === true ||
+      dedupeKeyRow.hasModulePreload === true);
+
+  return freezeRecord({
+    rowId: `script-module-fake-dom-commit-${executionOrderIndex}`,
+    rowType: 'script-module-fake-dom-commit-execution',
+    executionOrderIndex,
+    sourceModuleResourceMapOrderRowId: row.rowId,
+    sourceResourceMapCommitRowId: row.sourceResourceMapCommitRowId,
+    sourceModuleDedupeKeyRowId:
+      dedupeKeyRow === null ? null : dedupeKeyRow.rowId,
+    resourceMapOrderIndex: row.resourceMapOrderIndex,
+    moduleOrderIndex: row.moduleOrderIndex,
+    inputIndex: row.inputIndex,
+    sourceAdapterAdmissionId: row.sourceAdapterAdmissionId,
+    sourceRequestId: row.sourceRequestId,
+    contractId: row.contractId,
+    privateDispatcherKey: row.privateDispatcherKey,
+    publicName: row.publicName,
+    recordKind: row.recordKind,
+    mapKind: row.mapKind,
+    resourceStage: row.resourceStage,
+    resourceKind: row.resourceKind,
+    scriptKind: row.scriptKind,
+    relationship: row.relationship,
+    dedupeKey: row.dedupeKey,
+    resourceMapDedupeKey: row.resourceMapDedupeKey,
+    modulePreload: row.modulePreload,
+    moduleScript: row.moduleScript,
+    classicScriptPreload:
+      row.contractId === 'preload' && row.scriptKind === 'classic',
+    classicScriptPreinit: row.classicScriptPreinit,
+    dedupeAction: row.dedupeAction,
+    dedupeMatched: row.dedupeMatched,
+    wouldInsertIntoHead: row.wouldInsertIntoHead,
+    fakeDomCommitOperation:
+      getScriptModuleFakeDomCommitOperation(row),
+    fakeDomCommitEvidenceRecorded: true,
+    privateFakeDomCommitOnly: true,
+    fakeDomCommitApplied: false,
+    dedupeOrderPreserved: true,
+    dedupeRowsMutated: false,
+    orderRowsMutated: false,
+    wouldCreatePreloadPropsRecord,
+    wouldCreateHoistableScriptResource,
+    wouldAdoptPreloadProps,
+    preloadPropsAdoptionBlocked: wouldAdoptPreloadProps,
+    preloadPropsMapMutated: false,
+    hoistableScriptsMapMutated: false,
+    resourceInstanceCreated: false,
+    hostNodeInserted: false,
+    fakeHeadMutated: false,
+    realHeadMutated: false,
+    fetchStarted: false,
+    preloadStarted: false,
+    modulePreloadStarted: false,
+    scriptPreinitStarted: false,
+    moduleScriptPreinitStarted: false,
+    scriptExecutionStarted: false,
+    publicResourceDispatchBlocked: true,
+    publicScriptModuleResourceDispatch: false,
+    rawValuesRetained: false,
+    compatibilityClaimed: false
+  });
+}
+
+function getScriptModuleFakeDomCommitOperation(row) {
+  if (row.modulePreload === true) {
+    return 'record-modulepreload-preload-props-fake-dom-commit';
+  }
+  if (row.moduleScript === true) {
+    return 'record-module-script-hoistable-script-fake-dom-commit';
+  }
+  if (row.classicScriptPreinit === true) {
+    return 'record-classic-script-hoistable-script-fake-dom-commit';
+  }
+  if (row.contractId === 'preload' && row.scriptKind === 'classic') {
+    return 'record-classic-script-preload-props-fake-dom-commit';
+  }
+  return 'record-script-resource-map-fake-dom-commit';
+}
+
+function createResourceMapCommitScriptModuleDedupeOrderBoundary(
+  moduleResourceMapOrder,
+  executionRows
+) {
+  return freezeRecord({
+    status:
+      'preserved-private-script-module-resource-map-dedupe-order-blocker',
+    sourceModuleResourceMapOrderRowCount:
+      moduleResourceMapOrder.rowCount,
+    sourceModuleResourceMapDedupeKeyCount:
+      moduleResourceMapOrder.dedupeKeyCount,
+    executionRowCount: executionRows.length,
+    consumedDedupeKeyCount:
+      uniqueStrings(executionRows.map((row) => row.dedupeKey)).length,
+    sourceDedupeKeyRowIds: freezeArray(
+      moduleResourceMapOrder.dedupeKeys.map((row) => row.rowId)
+    ),
+    sourceDedupeKeys: freezeArray(
+      moduleResourceMapOrder.dedupeKeys.map((row) => row.dedupeKey)
+    ),
+    dedupeRowsMutated: false,
+    orderRowsMutated: false,
+    conflictingDuplicateRecordCount:
+      moduleResourceMapOrder.conflictingDuplicateRecordCount,
+    malformedModuleRowCount:
+      moduleResourceMapOrder.malformedModuleRowCount,
+    publicScriptModuleResourceDispatch: false,
+    rawValuesRetained: false,
+    compatibilityClaimed: false
+  });
+}
+
 function createResourceMapCommitStylesheetLoadStateOrder(
   privateResourceMapRecords,
   stylesheetLoadErrorState
@@ -10090,6 +10324,7 @@ function createResourceMapCommitStylesheetLoadStateTransition(
 function createResourceMapCommitPlanSummary(
   privateResourceMapRecords,
   moduleResourceMapOrder,
+  scriptModuleFakeDomCommitExecution,
   resourceMapConflictBoundary,
   stylesheetLoadStateCommitOrder
 ) {
@@ -10128,6 +10363,12 @@ function createResourceMapCommitPlanSummary(
     moduleScriptRecordCount,
     moduleResourceMapOrderRowCount: moduleResourceMapOrder.rowCount,
     moduleResourceMapDedupeKeyCount: moduleResourceMapOrder.dedupeKeyCount,
+    scriptModuleFakeDomCommitExecutionRowCount:
+      scriptModuleFakeDomCommitExecution.rowCount,
+    scriptResourceFakeDomCommitExecutionRowCount:
+      scriptModuleFakeDomCommitExecution.scriptResourceMapRowCount,
+    modulePreloadFakeDomCommitExecutionRowCount:
+      scriptModuleFakeDomCommitExecution.modulePreloadResourceMapRowCount,
     stylesheetLoadStateCommitOrderRowCount:
       stylesheetLoadStateCommitOrder.rowCount,
     stylesheetLoadStateResourceCount:
@@ -10162,6 +10403,8 @@ function createResourceMapCommitPlanSummary(
     hoistableScriptsMapMutated: false,
     preloadPropsMapCreated: false,
     preloadPropsMapMutated: false,
+    scriptModuleFakeDomCommitEvidenceRecorded: true,
+    fakeDomCommitApplied: false,
     modulePreloadStarted: false,
     scriptPreinitStarted: false,
     moduleScriptPreinitStarted: false,
@@ -10210,6 +10453,15 @@ function createResourceMapCommitLifecycleBoundary(commitPlan) {
       commitPlan.resourceMapCommitPlan.modulePreloadRecordCount,
     moduleScriptRecordCount:
       commitPlan.resourceMapCommitPlan.moduleScriptRecordCount,
+    scriptModuleFakeDomCommitExecutionRowCount:
+      commitPlan.resourceMapCommitPlan
+        .scriptModuleFakeDomCommitExecutionRowCount,
+    scriptResourceFakeDomCommitExecutionRowCount:
+      commitPlan.resourceMapCommitPlan
+        .scriptResourceFakeDomCommitExecutionRowCount,
+    modulePreloadFakeDomCommitExecutionRowCount:
+      commitPlan.resourceMapCommitPlan
+        .modulePreloadFakeDomCommitExecutionRowCount,
     stylesheetLoadStateCommitOrderRowCount:
       commitPlan.resourceMapCommitPlan
         .stylesheetLoadStateCommitOrderRowCount,
@@ -10225,6 +10477,10 @@ function createResourceMapCommitLifecycleBoundary(commitPlan) {
     singletonOwnershipClaimed: false,
     resourceCountIncremented: false,
     resourceInstanceCreated: false,
+    scriptModuleFakeDomCommitEvidenceRecorded: true,
+    fakeDomCommitApplied: false,
+    preloadPropsMapMutated: false,
+    hoistableScriptsMapMutated: false,
     hostNodeInserted: false,
     fetchStarted: false,
     preloadStarted: false,
