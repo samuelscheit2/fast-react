@@ -134,6 +134,164 @@ impl RootUpdateCallbackSnapshot {
     }
 }
 
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(crate) struct RootUpdateCallbackInvocationGateSnapshot {
+    records: Vec<RootUpdateCallbackInvocationGateRecord>,
+    hidden_record_count: usize,
+    deferred_hidden_record_count: usize,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private root callback invocation metadata is reserved for future commit workers"
+)]
+impl RootUpdateCallbackInvocationGateSnapshot {
+    #[must_use]
+    pub(crate) fn records(&self) -> &[RootUpdateCallbackInvocationGateRecord] {
+        &self.records
+    }
+
+    #[must_use]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    #[must_use]
+    pub(crate) fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    #[must_use]
+    pub(crate) const fn hidden_record_count(&self) -> usize {
+        self.hidden_record_count
+    }
+
+    #[must_use]
+    pub(crate) const fn deferred_hidden_record_count(&self) -> usize {
+        self.deferred_hidden_record_count
+    }
+
+    #[must_use]
+    pub(crate) const fn user_callbacks_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn hidden_callbacks_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_callback_behavior_exposed(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RootUpdateCallbackInvocationGateRecord {
+    invocation_order: usize,
+    queue: UpdateQueueHandle,
+    update: UpdateId,
+    callback: RootUpdateCallbackHandle,
+    accepted_sequence: usize,
+    visibility: RootUpdateCallbackVisibility,
+    status: RootUpdateCallbackInvocationGateStatus,
+    blockers: [RootUpdateCallbackInvocationGateBlocker; 2],
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private root callback invocation metadata is reserved for future commit workers"
+)]
+impl RootUpdateCallbackInvocationGateRecord {
+    #[must_use]
+    pub(crate) const fn invocation_order(self) -> usize {
+        self.invocation_order
+    }
+
+    #[must_use]
+    pub(crate) const fn queue(self) -> UpdateQueueHandle {
+        self.queue
+    }
+
+    #[must_use]
+    pub(crate) const fn update(self) -> UpdateId {
+        self.update
+    }
+
+    #[must_use]
+    pub(crate) const fn callback(self) -> RootUpdateCallbackHandle {
+        self.callback
+    }
+
+    #[must_use]
+    pub(crate) const fn accepted_sequence(self) -> usize {
+        self.accepted_sequence
+    }
+
+    #[must_use]
+    pub(crate) const fn visibility(self) -> RootUpdateCallbackVisibility {
+        self.visibility
+    }
+
+    #[must_use]
+    pub(crate) const fn status(self) -> RootUpdateCallbackInvocationGateStatus {
+        self.status
+    }
+
+    #[must_use]
+    pub(crate) const fn blockers(&self) -> &[RootUpdateCallbackInvocationGateBlocker; 2] {
+        &self.blockers
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RootUpdateCallbackInvocationGateStatus {
+    Blocked,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RootUpdateCallbackInvocationGateBlocker {
+    UserCallbackInvocation,
+    PublicRootCallbackBehavior,
+}
+
+pub(crate) const ROOT_UPDATE_CALLBACK_INVOCATION_GATE_BLOCKERS:
+    [RootUpdateCallbackInvocationGateBlocker; 2] = [
+    RootUpdateCallbackInvocationGateBlocker::UserCallbackInvocation,
+    RootUpdateCallbackInvocationGateBlocker::PublicRootCallbackBehavior,
+];
+
+#[must_use]
+pub(crate) fn materialize_root_update_callback_invocation_gate(
+    snapshot: &RootUpdateCallbackSnapshot,
+) -> RootUpdateCallbackInvocationGateSnapshot {
+    let records = snapshot
+        .visible()
+        .iter()
+        .copied()
+        .enumerate()
+        .map(
+            |(invocation_order, record)| RootUpdateCallbackInvocationGateRecord {
+                invocation_order,
+                queue: record.queue(),
+                update: record.update(),
+                callback: record.callback(),
+                accepted_sequence: record.sequence(),
+                visibility: RootUpdateCallbackVisibility::Visible,
+                status: RootUpdateCallbackInvocationGateStatus::Blocked,
+                blockers: ROOT_UPDATE_CALLBACK_INVOCATION_GATE_BLOCKERS,
+            },
+        )
+        .collect();
+
+    RootUpdateCallbackInvocationGateSnapshot {
+        records,
+        hidden_record_count: snapshot.hidden().len(),
+        deferred_hidden_record_count: snapshot.deferred_hidden().len(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -331,6 +489,93 @@ mod tests {
                 .peek_root_update_callback_records(queue)
                 .unwrap()
                 .is_empty()
+        );
+    }
+
+    #[test]
+    fn root_callbacks_invocation_gate_records_visible_callbacks_in_drained_order() {
+        let mut store = UpdateQueueStore::new();
+        let queue = store.initialize_host_root_queue(state(0));
+        let first = update_with_callback(&mut store, Lane::DEFAULT, 1, 10);
+        let hidden = update_with_callback(&mut store, Lane::DEFAULT, 2, 11);
+        let second = update_with_callback(&mut store, Lane::DEFAULT, 3, 12);
+        store.mark_update_hidden(hidden).unwrap();
+        store.append_pending_update(queue, first).unwrap();
+        store.append_pending_update(queue, hidden).unwrap();
+        store.append_pending_update(queue, second).unwrap();
+
+        store
+            .process_host_root_update_queue(queue, None, Lanes::DEFAULT, Lanes::DEFAULT)
+            .unwrap();
+
+        let taken = store.take_root_update_callback_records(queue).unwrap();
+        let gate = materialize_root_update_callback_invocation_gate(&taken);
+
+        assert_eq!(
+            callback_handles(taken.visible()),
+            vec![
+                RootUpdateCallbackHandle::from_raw(10),
+                RootUpdateCallbackHandle::from_raw(12)
+            ]
+        );
+        assert_eq!(
+            callback_handles(taken.deferred_hidden()),
+            vec![RootUpdateCallbackHandle::from_raw(11)]
+        );
+        assert_eq!(gate.len(), 2);
+        assert_eq!(gate.hidden_record_count(), 0);
+        assert_eq!(gate.deferred_hidden_record_count(), 1);
+        assert!(!gate.user_callbacks_invoked());
+        assert!(!gate.hidden_callbacks_invoked());
+        assert!(!gate.public_root_callback_behavior_exposed());
+
+        let records = gate.records();
+        assert_eq!(records[0].invocation_order(), 0);
+        assert_eq!(records[0].accepted_sequence(), 0);
+        assert_eq!(records[0].queue(), queue);
+        assert_eq!(records[0].update(), first);
+        assert_eq!(
+            records[0].callback(),
+            RootUpdateCallbackHandle::from_raw(10)
+        );
+        assert_eq!(
+            records[0].visibility(),
+            RootUpdateCallbackVisibility::Visible
+        );
+        assert_eq!(
+            records[0].status(),
+            RootUpdateCallbackInvocationGateStatus::Blocked
+        );
+        assert_eq!(
+            records[0].blockers(),
+            &ROOT_UPDATE_CALLBACK_INVOCATION_GATE_BLOCKERS
+        );
+        assert_eq!(records[1].invocation_order(), 1);
+        assert_eq!(records[1].accepted_sequence(), 2);
+        assert_eq!(records[1].queue(), queue);
+        assert_eq!(records[1].update(), second);
+        assert_eq!(
+            records[1].callback(),
+            RootUpdateCallbackHandle::from_raw(12)
+        );
+        assert_eq!(
+            records[1].visibility(),
+            RootUpdateCallbackVisibility::Visible
+        );
+        assert_eq!(
+            records[1].status(),
+            RootUpdateCallbackInvocationGateStatus::Blocked
+        );
+        assert_eq!(
+            records[1].blockers(),
+            &ROOT_UPDATE_CALLBACK_INVOCATION_GATE_BLOCKERS
+        );
+
+        let after_take = store.peek_root_update_callback_records(queue).unwrap();
+        assert!(after_take.visible().is_empty());
+        assert_eq!(
+            callback_handles(after_take.deferred_hidden()),
+            vec![RootUpdateCallbackHandle::from_raw(11)]
         );
     }
 
