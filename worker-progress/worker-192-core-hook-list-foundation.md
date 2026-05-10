@@ -117,6 +117,21 @@ set below passed after those fixes.
   passed.
 - `git diff --check`: passed.
 
+## Post-Merge Orchestrator Verification
+
+- Merged current `main` into `worker/192-core-hook-list-foundation`; no manual
+  conflict resolution was required.
+- Confirmed the merged `fast-react-core` export list keeps accepted
+  `context_stack` and portal exports while adding `hook_list`.
+- `cargo fmt --all --check`: passed.
+- `cargo test -p fast-react-core --all-features hook_list`: passed, 7 tests.
+- `cargo test -p fast-react-core --all-features hook`: passed, 31 tests.
+- `cargo test -p fast-react-core --all-features`: passed, 129 unit tests and
+  0 doctests.
+- `cargo clippy -p fast-react-core --all-targets --all-features -- -D warnings`:
+  passed.
+- `git diff --check`: passed.
+
 ## Risks Or Blockers
 
 - This is intentionally data-model only. It is not wired into
