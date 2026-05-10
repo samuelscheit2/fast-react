@@ -47,23 +47,29 @@ Drive toward a minimal real root render/update/unmount path:
 
 Top-level cap: 30 workers. Queue 685-714 was launched from queue base commit
 `9ec6678` in isolated `worker/<slug>` branches and worktrees and has been
-accepted and cleaned up. Workers 715-745 have also been accepted and are no
-longer active. Workers 746, 748-761 have been accepted and cleaned up as
-private evidence batches; Worker 747 remains active after final audit found a
-forgeable Scheduler source-proof path that must be hardened before merge.
+accepted and cleaned up. Workers 715-766 have also been accepted and are no
+longer active; accepted private evidence still keeps public root, act,
+Scheduler timing, hydration, serialization, native execution, package
+compatibility, and broad renderer compatibility blocked.
 
-Workers 762-766 are running from queue base commit `14bbce7` in isolated
-worktrees:
+Workers 767-774 are running in isolated worktrees:
 
-- Worker 762: hydrateRoot private marker/listener gate.
-- Worker 763: sibling-text JS/CJS private serialization admission.
-- Worker 764: native worker-thread teardown executable/preflight evidence.
-- Worker 765: Scheduler mock delayed root/act producer gate.
-- Worker 766: test-renderer root finished-work/finished-lanes handoff gate.
+- Worker 767: package-private admission audit ledger for Workers 754-766.
+- Worker 768: package-root sibling-text private admission.
+- Worker 769: CJS sibling-text `toTree` private admission.
+- Worker 770: hydrateRoot target-claiming preflight.
+- Worker 771: native cleanup-hook/order preflight.
+- Worker 772: Scheduler delayed renderer-root producer gate.
+- Worker 773: React DOM test-utils act expired Scheduler handoff.
+- Worker 774: native teardown executable preflight JS mirror.
 
 ## Near-Term Sequencing
 
-1. Select the next runtime or research queue from accepted private evidence:
+1. Audit and merge Workers 767-774 as they complete. Expect overlap in
+   react-test-renderer serialization/create-routing tests and Scheduler/React
+   act diagnostics; resolve conflicts by preserving all accepted private
+   blockers and canonical evidence requirements.
+2. Select the next runtime or research queue from accepted private evidence:
    Worker 745's narrow sibling-text identity gate, Worker 744's 737-738 ledger,
    Worker 742's delayed act/root Scheduler mock diagnostic, Worker 741's
    hydrateRoot preflight, Worker 740's native teardown mirror, Worker 738's
@@ -73,10 +79,10 @@ worktrees:
    serialization, JS/CJS, native bridge, package compatibility, and broad
    sibling/multichild identity admission blocked until each private gate is
    proven.
-2. Audit and merge completed workers one at a time or in a small non-conflicting
+3. Audit and merge completed workers one at a time or in a small non-conflicting
    batch, with focused reruns before each merge and full workspace checks after
    the batch.
-3. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
+4. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
 
 ## Next Queue Candidates

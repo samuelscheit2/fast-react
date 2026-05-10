@@ -29,6 +29,41 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 747, 762-766
+
+- Worker 747 added a private React act consumer for Scheduler mock expired
+  act/root diagnostics. The accepted fix hardened Scheduler's source proof by
+  keeping wrapped flush helper export slots non-writable/non-configurable,
+  freezing wrapped functions after private descriptors are installed, and
+  requiring React to discover the validator from the immutable Scheduler-owned
+  `unstable_flushExpired` function slot. Cloned diagnostics, old global source
+  proofs, fake validator mutations, public scheduler drains, public React act
+  drains, renderer work, effects, and root execution remain blocked.
+- Worker 762 added hydrateRoot private marker/listener evidence. The accepted
+  gate binds private marker/listener records to the private hydrateRoot route
+  without opening public hydration, event replay, DOM mutation, recoverable
+  error routing, root execution, or package compatibility.
+- Worker 763 added sibling-text JS/CJS private serialization admission while
+  preserving the dedicated sibling-text identity requirement and rejecting
+  broad/generic multichild finished-work identity.
+- Worker 764 added native worker-thread teardown executable/preflight evidence
+  for `fast-react-napi`, keeping native addon loading, renderer/reconciler
+  execution, public native compatibility, and stale worker/root values blocked.
+- Worker 765 added the Scheduler mock delayed root/act producer gate and
+  preserved nested producer evidence validation before expired act/root
+  consumption. Public Scheduler timing, public flush helper compatibility,
+  public React act/root behavior, renderer/effects, and package compatibility
+  remain blocked.
+- Worker 766 added react-test-renderer root finished-work/finished-lanes
+  handoff evidence across package root, CJS development, CJS production, and
+  Rust create native bridge validation. The accepted audit fixed package-root
+  alias admission by requiring the canonical own `rootFinishedLanesHandoff`
+  property and proving alias-only handoffs reject.
+- The batch was accepted after focused React act/Scheduler tests, React DOM
+  hydration tests, react-test-renderer serialization/create-routing tests,
+  Rust fmt/clippy/focused tests, package-surface guards, import-smoke,
+  conflict-marker scans, and `git diff --check`.
+
 ### Workers 750, 754-761
 
 - Worker 750 added private nested hydration target-claiming evidence while
