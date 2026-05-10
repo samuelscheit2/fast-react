@@ -1,8 +1,11 @@
 'use strict';
 
-const REACT_MEMO_TYPE = Symbol.for('react.memo');
-const REACT_LAZY_TYPE = Symbol.for('react.lazy');
-const REACT_FORWARD_REF_TYPE = Symbol.for('react.forward_ref');
+const {
+  REACT_FORWARD_REF_TYPE,
+  REACT_LAZY_TYPE,
+  REACT_MEMO_TYPE,
+  isValidElementType
+} = require('./element-type.js');
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
 const createConsoleTask =
@@ -13,7 +16,7 @@ const createConsoleTask =
       };
 
 function memo(type, compare) {
-  if (isDevelopment && type == null) {
+  if (isDevelopment && !isValidElementType(type)) {
     console.error(
       'memo: The first argument must be a component. Instead received: %s',
       type === null ? 'null' : typeof type

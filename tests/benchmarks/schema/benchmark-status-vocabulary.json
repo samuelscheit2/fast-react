@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "kind": "fast-react-benchmark-status-vocabulary",
+  "compatibilityStatuses": [
+    {
+      "id": "blocked-by-conformance",
+      "green": false,
+      "description": "Required conformance evidence is absent, incomplete, failing, or explicitly not claimable."
+    },
+    {
+      "id": "oracle-only",
+      "green": false,
+      "description": "The React oracle exists, but no local Fast React dual-run comparison exists."
+    },
+    {
+      "id": "unsupported-placeholder",
+      "green": false,
+      "description": "The local Fast React path is still a placeholder or unsupported facade."
+    },
+    {
+      "id": "known-mismatch",
+      "green": false,
+      "description": "Fast React was compared against React and the observed behavior mismatched."
+    },
+    {
+      "id": "matched-but-compatibility-not-claimed",
+      "green": false,
+      "description": "Fast React matched the checked observation, but the broader compatibility claim remains false."
+    },
+    {
+      "id": "green",
+      "green": true,
+      "description": "All required conformance gates are green and compatibility is explicitly claimable."
+    }
+  ],
+  "timingStatuses": [
+    {
+      "id": "not-collected",
+      "claimCapable": false,
+      "description": "No benchmark samples have been collected for this scenario."
+    },
+    {
+      "id": "blocked-by-conformance",
+      "claimCapable": false,
+      "description": "Timing collection or reporting is blocked by non-green conformance evidence."
+    },
+    {
+      "id": "diagnostic-only",
+      "claimCapable": false,
+      "description": "Timing data may be recorded for diagnosis, but cannot support a speed claim."
+    },
+    {
+      "id": "compared-not-compatible",
+      "claimCapable": false,
+      "description": "Implementations were timed, but compatibility evidence is not green, so the timing is diagnostic."
+    },
+    {
+      "id": "comparable",
+      "claimCapable": true,
+      "description": "Compatibility and timing gates are both green, so timing may be compared without direction."
+    },
+    {
+      "id": "noise-bound",
+      "claimCapable": true,
+      "description": "A comparable timing result is inside the configured noise band."
+    },
+    {
+      "id": "regression",
+      "claimCapable": true,
+      "description": "A comparable timing result shows Fast React slower for this exact scenario and lane."
+    },
+    {
+      "id": "improvement",
+      "claimCapable": true,
+      "description": "A comparable timing result shows Fast React faster for this exact scenario and lane."
+    }
+  ]
+}
