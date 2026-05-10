@@ -16,6 +16,7 @@ mod fiber_flags;
 mod fiber_handles;
 mod fiber_id;
 mod hook_effect_flags;
+mod hook_effect_ring;
 mod lane;
 mod root_lanes;
 mod symbols;
@@ -50,6 +51,12 @@ pub use fiber_handles::{
 };
 pub use fiber_id::{FiberArenaId, FiberGeneration, FiberId, FiberIdError, FiberSlot};
 pub use hook_effect_flags::{HookEffectFlags, VALID_HOOK_EFFECT_FLAG_BITS};
+pub use hook_effect_ring::{
+    HookEffectArena, HookEffectArenaError, HookEffectArenaId, HookEffectCallbackHandle,
+    HookEffectDependencies, HookEffectFilteredIter, HookEffectGeneration, HookEffectId,
+    HookEffectInstance, HookEffectInstanceGeneration, HookEffectInstanceId, HookEffectInstanceSlot,
+    HookEffectIter, HookEffectNode, HookEffectRing, HookEffectSlot,
+};
 pub use lane::{Lane, LaneIndex, LaneMap, Lanes, TOTAL_LANES, VALID_LANE_BITS};
 pub use root_lanes::{
     LaneClaimers, LaneTimestamp, NO_TIMESTAMP, RETRY_LANE_EXPIRATION_MS, RootFinishedLanes,
