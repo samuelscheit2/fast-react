@@ -145,6 +145,36 @@ test("checked benchmark manifests pass the fail-closed gate", () => {
   assert.equal(admittedPrivateGateCount, 8);
 });
 
+test("public benchmark manifests stay blocked without new gate evidence", () => {
+  const result = assertBenchmarkGate({ benchmarkRoot, repoRoot });
+  const publicManifests = result.manifests.filter(
+    (manifest) => manifest.manifestId !== privateDiagnosticManifest.manifestId
+  );
+
+  assert.equal(publicManifests.length, 4);
+
+  for (const manifest of publicManifests) {
+    for (const gate of manifest.conformanceGates ?? []) {
+      if (gate.acceptedGate) {
+        assert.equal(gate.acceptedGate.admitted, false);
+        assert.equal(gate.acceptedGate.compatibilityClaimed, false);
+      }
+    }
+    for (const scenario of manifest.scenarios) {
+      assert.equal(scenario.compatibilityStatus, "blocked-by-conformance");
+      assert.equal(scenario.timingStatus, "blocked-by-conformance");
+    }
+    for (const milestone of manifest.milestones ?? []) {
+      assert.equal(milestone.compatibilityStatus, "blocked-by-conformance");
+      assert.equal(milestone.timingStatus, "blocked-by-conformance");
+      assert.equal(
+        milestone.benchmarkReadinessStatus,
+        "blocked-by-conformance"
+      );
+    }
+  }
+});
+
 test("benchmark manifest gate rejects missing required scenarios", () => {
   const manifest = clone(rootManifest);
   manifest.requiredScenarioIds.push("missing-root-scenario");
