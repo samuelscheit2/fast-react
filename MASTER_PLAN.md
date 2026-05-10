@@ -50,18 +50,23 @@ Top-level cap: 30 workers. Queue 685-714 was launched from queue base commit
 accepted and cleaned up. Workers 715-723 have also been accepted and cleaned
 up.
 
-No worker branches or worktrees are currently active.
+Worker 724 was launched from queue base commit `7a331e1` in an isolated
+`worker/<slug>` branch and worktree.
+
+- Worker 724: package/private-admission ledger for Workers 722-723.
 
 ## Near-Term Sequencing
 
-1. Select the next queue from accepted Worker 722-723 evidence and remaining
-   private blockers only; keep public root,
-   act, flushSync, hooks/effects, test-renderer, and React DOM compatibility
-   blocked until each private gate is proven.
-2. Audit and merge completed workers one at a time or in a small non-conflicting
+1. Monitor Worker 724 and accept only static private-admission evidence with
+   public package behavior and compatibility claims still blocked.
+2. Select the next runtime queue from accepted Worker 723 evidence and
+   remaining private blockers only; keep public root, act, flushSync,
+   hooks/effects, test-renderer, and React DOM compatibility blocked until each
+   private gate is proven.
+3. Audit and merge completed workers one at a time or in a small non-conflicting
    batch, with focused reruns before each merge and full workspace checks after
    the batch.
-3. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
+4. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
 
 ## Next Queue Candidates
