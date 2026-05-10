@@ -45,8 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 161: root error option handles in
-  `/Users/user/Developer/Developer/fast-react-worker-161-root-error-option-handles`.
 - Worker 162: benchmark manifest gate in
   `/Users/user/Developer/Developer/fast-react-worker-162-benchmark-manifest-gate`.
 - Worker 163: root E2E conformance gate in

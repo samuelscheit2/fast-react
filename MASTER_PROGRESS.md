@@ -123,9 +123,18 @@ sequencing belong in `MASTER_PLAN.md`.
   visible/hidden/deferred visibility, plus peek/take APIs for future layout
   commit tests without invoking JS callbacks or wiring error/public/native
   callback paths.
+- Worker 161 root error option handles were merged, adding internal typed root
+  option records for uncaught, caught, and recoverable error callback handles
+  while preserving inert root creation and avoiding render error capture,
+  callback invocation, DOM packages, native handle tables, or test-renderer
+  public error surfaces.
 
 ## Latest Accepted Verification
 
+- Worker 161 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused root-config, fiber-root, and fiber-store
+  tests, full `fast-react-reconciler` tests with 95 unit tests plus 1 doctest,
+  reconciler clippy with warnings denied, and `git diff --check`.
 - Worker 160 was verified on its integrated worktree and again on `main` with
   `cargo fmt --all --check`, focused update-queue and root-callback tests, full
   `fast-react-reconciler` tests with 94 unit tests plus 1 doctest, reconciler
