@@ -21,17 +21,20 @@ use std::fmt::{self, Display, Formatter};
 #[cfg(test)]
 use fast_react_core::ContextValueChange;
 #[cfg(test)]
+use fast_react_core::Lane;
+#[cfg(test)]
 use fast_react_core::bubble_properties;
 use fast_react_core::{
-    ContextHandle, ContextValueHandle, FiberId, FiberTag, FiberTopologyError, Lane, Lanes,
-    PropsHandle, StateHandle, UpdateQueueHandle,
+    ContextHandle, ContextValueHandle, FiberId, FiberTag, FiberTopologyError, Lanes, PropsHandle,
+    StateHandle, UpdateQueueHandle,
 };
 use fast_react_host_config::HostTypes;
 
+#[cfg(test)]
+use crate::UpdateId;
 use crate::{
     FiberRootId, FiberRootStore, FiberRootStoreError, HostRootStateStoreError, RootElementHandle,
-    RootRenderExitStatus, RootSchedulerCallbackHandle, UpdateId, UpdateQueueError,
-    WorkInProgressError,
+    RootRenderExitStatus, RootSchedulerCallbackHandle, UpdateQueueError, WorkInProgressError,
     begin_work::{
         BeginWorkError, BeginWorkRequest, BeginWorkResult, NestedContextProviderBeginWorkError,
         NestedContextProviderBeginWorkRecord, NestedContextProviderBeginWorkRequest,
