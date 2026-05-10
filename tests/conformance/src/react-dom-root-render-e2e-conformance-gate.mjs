@@ -964,6 +964,18 @@ export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ADMISSIONS =
         "Worker 528 accepted only private hydration replay error metadata that links retained dehydrated ownership rows to root option callback records without replaying events, invoking callbacks, reporting globally, or enabling hydration compatibility."
     }),
     Object.freeze({
+      metadataId: "worker-708-hydration-text-node-claim-patch",
+      workerId: "708",
+      category: "hydration",
+      scenarioId: "create-root-no-render",
+      admission: "private-react-dom-metadata-diagnostic",
+      gateStatus:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_REACT_DOM_METADATA_ACCEPTED_STATUS,
+      evidenceKind: "private-hydration-text-node-claim-patch",
+      reason:
+        "Worker 708 accepted only a private fake-DOM hydration text-node claim and mismatch patch execution record while public hydrateRoot, root scheduling, browser DOM hydration, replay, and compatibility claims remain blocked."
+    }),
+    Object.freeze({
       metadataId: "worker-533-controlled-restore-queue-write-preflight",
       workerId: "533",
       category: "controlled",
@@ -6698,6 +6710,13 @@ function runPrivateReactDomMetadataDiagnostic({ admission, mode, modules }) {
             modules
           });
         break;
+      case "worker-708-hydration-text-node-claim-patch":
+        metadataEvidence =
+          runPrivateReactDomMetadataHydrationTextNodeClaimPatchDiagnostic({
+            mode,
+            modules
+          });
+        break;
       case "worker-533-controlled-restore-queue-write-preflight":
         metadataEvidence =
           runPrivateReactDomMetadataControlledQueueWritePreflightDiagnostic({
@@ -8600,6 +8619,83 @@ function runPrivateReactDomMetadataHydrationReplayErrorDiagnostic({
     willReplayFlags: metadata.rootErrorOptionCallbackRecords.map(
       (record) => record.willReplay
     )
+  };
+}
+
+function runPrivateReactDomMetadataHydrationTextNodeClaimPatchDiagnostic({
+  mode,
+  modules
+}) {
+  const document = createPrivateHostOutputDocument({
+    domContainer: modules.domContainer,
+    label: `${mode.id}:metadata-hydration-text-patch`
+  });
+  const container = document.createElement("div");
+  const textNode = document.createTextNode("server text");
+  textNode.__fastReactFakeHydrationTextNode = true;
+  textNode.parentNode = container;
+  container.childNodes = [textNode];
+  const initialChildren = {
+    props: {
+      children: "client text"
+    },
+    type: "App"
+  };
+  const hydrationOptions = {
+    identifierPrefix: "metadata-hydration-text-patch-",
+    onRecoverableError() {
+      throw new Error("Public recoverable error callback should stay blocked.");
+    }
+  };
+  const gate = modules.hydrationGate.createHydrationBoundaryGate({
+    markerOracle: modules.hydrationMarkerOracle,
+    recordIdPrefix: `${mode.id}:metadata-hydration-text-patch`
+  });
+  const record = gate.recordUnsupportedHydrateRoot(
+    container,
+    initialChildren,
+    hydrationOptions
+  );
+  const mismatchRow = record.textMismatchDiagnostics.mismatchRows[0];
+  const execution =
+    modules.hydrationGate.createHydrationTextNodeClaimPatchExecutionRecord(
+      record,
+      record.acceptedPrivateMetadataDiagnostics,
+      {
+        claimLabel: "metadata-text",
+        enableTextNodeClaimPatchExecution: true,
+        hydrationOptions,
+        mismatchRow,
+        source: "root-render-private-react-dom-metadata-gate"
+      }
+    );
+
+  return {
+    actualTextAfter: execution.actualTextAfter,
+    actualTextBefore: execution.actualTextBefore,
+    browserDomMutated: execution.browserDomMutated,
+    canHydrate: execution.canHydrate,
+    claimedTextNodePath: execution.claimedTextNodePath,
+    claimedTextNodePathStatus: execution.claimedTextNodePathStatus,
+    compatibilityClaimed: execution.compatibilityClaimed,
+    eventDispatch: execution.eventDispatch,
+    eventsReplayed: execution.eventsReplayed,
+    expectedText: execution.expectedText,
+    fakeDomMutation: execution.fakeDomMutation,
+    fakeDomOnly: execution.fakeDomOnly,
+    fakeTextNodeClaimed: execution.fakeTextNodeClaimed,
+    fakeTextNodePatched: execution.fakeTextNodePatched,
+    hydration: execution.hydration,
+    onRecoverableErrorInvoked: execution.onRecoverableErrorInvoked,
+    patchWriteProperty: execution.patchWriteProperty,
+    publicHydrateRootSupported: execution.publicHydrateRootSupported,
+    publicHydrationCompatibilityClaimed:
+      execution.publicHydrationCompatibilityClaimed,
+    publicRootCreated: execution.publicRootCreated,
+    rootScheduled: execution.rootScheduled,
+    status: execution.status,
+    textNodeValue: textNode.nodeValue,
+    textPatched: execution.textPatched
   };
 }
 
@@ -13165,6 +13261,33 @@ function expectedPrivateReactDomMetadataEvidence(metadataId) {
         sourceLabels: ["first-boundary", "root-target", "second-boundary"],
         willReplayFlags: [false, false, false]
       };
+    case "worker-708-hydration-text-node-claim-patch":
+      return {
+        actualTextAfter: "client text",
+        actualTextBefore: "server text",
+        browserDomMutated: false,
+        canHydrate: false,
+        claimedTextNodePath: "container.childNodes[0]",
+        claimedTextNodePathStatus: "resolved",
+        compatibilityClaimed: false,
+        eventDispatch: false,
+        eventsReplayed: false,
+        expectedText: "client text",
+        fakeDomMutation: true,
+        fakeDomOnly: true,
+        fakeTextNodeClaimed: true,
+        fakeTextNodePatched: true,
+        hydration: false,
+        onRecoverableErrorInvoked: false,
+        patchWriteProperty: "nodeValue",
+        publicHydrateRootSupported: false,
+        publicHydrationCompatibilityClaimed: false,
+        publicRootCreated: false,
+        rootScheduled: false,
+        status: "executed-private-hydration-text-node-claim-patch",
+        textNodeValue: "client text",
+        textPatched: true
+      };
     case "worker-533-controlled-restore-queue-write-preflight":
       return {
         acceptedRestoreKinds: ["input-text-value", "input-radio-checked"],
@@ -13367,6 +13490,7 @@ function comparablePrivateReactDomMetadataEvidence(metadataId, evidence) {
     case "worker-513-event-type-dispatch-canary":
     case "worker-514-portal-event-error-routing":
     case "worker-528-hydration-replay-error-metadata":
+    case "worker-708-hydration-text-node-claim-patch":
     case "worker-533-controlled-restore-queue-write-preflight":
     case "worker-641-public-facade-root-render-execution":
       return evidence;

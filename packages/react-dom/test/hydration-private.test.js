@@ -1151,6 +1151,261 @@ test('private hydration text mismatch recoverable-error routing execution consum
   assert.deepEqual(fixture.document.__registrations, []);
 });
 
+test('private hydration text node claim patch execution mutates one admitted fake text mismatch only', () => {
+  let recoverableErrorCalls = 0;
+  const document = createDocument('text-node-claim-patch');
+  const container = createElement('DIV', document);
+  const textNode = createText('server text');
+  textNode.parentNode = container;
+  container.childNodes = [textNode];
+  const initialChildren = {
+    props: {
+      children: 'client text'
+    },
+    type: 'App'
+  };
+  const hydrationOptions = {
+    identifierPrefix: 'text-node-claim-patch-',
+    onRecoverableError() {
+      recoverableErrorCalls++;
+    }
+  };
+  const gate = hydrationGate.createHydrationBoundaryGate({
+    recordIdPrefix: 'hydration-text-patch'
+  });
+  const record = gate.recordUnsupportedHydrateRoot(
+    container,
+    initialChildren,
+    hydrationOptions
+  );
+  const mismatchRow = record.textMismatchDiagnostics.mismatchRows[0];
+  const execution =
+    hydrationGate.createHydrationTextNodeClaimPatchExecutionRecord(
+      record,
+      record.acceptedPrivateMetadataDiagnostics,
+      {
+        claimLabel: 'primary-text',
+        enableTextNodeClaimPatchExecution: true,
+        hydrationOptions,
+        mismatchRow,
+        source: 'hydration-private-text-node-claim-patch'
+      }
+    );
+
+  assert.equal(
+    hydrationGate.isPrivateHydrationTextNodeClaimPatchExecutionRecord(
+      execution
+    ),
+    true
+  );
+  assert.equal(
+    execution.kind,
+    hydrationGate.HYDRATION_TEXT_NODE_CLAIM_PATCH_EXECUTION_RECORD_KIND
+  );
+  assert.equal(
+    execution.gateId,
+    hydrationGate.privateHydrationTextNodeClaimPatchExecutionGateId
+  );
+  assert.equal(
+    execution.metadataId,
+    hydrationGate.privateHydrationTextNodeClaimPatchMetadataId
+  );
+  assert.equal(
+    execution.status,
+    hydrationGate.privateHydrationTextNodeClaimPatchExecutionStatus
+  );
+  assert.equal(Object.isFrozen(execution), true);
+  assert.equal(execution.privateExecution, true);
+  assert.equal(execution.compatibilityClaimed, false);
+  assert.equal(execution.publicHydrationCompatibilityClaimed, false);
+  assert.equal(execution.publicHydrationReplayCompatibilityClaimed, false);
+  assert.equal(execution.publicHydrateRootSupported, false);
+  assert.equal(execution.publicRootExecution, false);
+  assert.equal(execution.publicRootCreated, false);
+  assert.equal(execution.nativeExecution, false);
+  assert.equal(execution.reconcilerExecution, false);
+  assert.equal(execution.rootScheduled, false);
+  assert.equal(execution.hydrationRequested, true);
+  assert.equal(execution.hydration, false);
+  assert.equal(execution.canHydrate, false);
+  assert.equal(execution.hydrateTextInstanceCalled, false);
+  assert.equal(execution.diffHydratedTextForDevWarningsCalled, false);
+  assert.equal(execution.boundaryCleared, false);
+  assert.equal(execution.domMutation, false);
+  assert.equal(execution.browserDomMutated, false);
+  assert.equal(execution.fakeDomOnly, true);
+  assert.equal(execution.fakeDomMutation, true);
+  assert.equal(execution.fakeTextNodeClaimed, true);
+  assert.equal(execution.fakeTextNodePatched, true);
+  assert.equal(execution.textNodeClaimRecorded, true);
+  assert.equal(execution.textNodeClaimExecuted, true);
+  assert.equal(execution.textPatchAdmitted, true);
+  assert.equal(execution.textPatchApplied, true);
+  assert.equal(execution.textPatched, true);
+  assert.equal(execution.eventDispatch, false);
+  assert.equal(execution.eventReplayInstalled, false);
+  assert.equal(execution.eventsReplayed, false);
+  assert.equal(execution.replayQueuesDrained, false);
+  assert.equal(execution.recoverableErrorsQueued, false);
+  assert.equal(execution.onRecoverableErrorInvoked, false);
+  assert.equal(execution.publicOnRecoverableErrorInvoked, false);
+  assert.equal(
+    execution.blockedReason,
+    hydrationGate.HYDRATION_TEXT_MISMATCH_BLOCKED_REASON
+  );
+  assert.equal(execution.rootRecordId, 'hydration-text-patch:1');
+  assert.equal(execution.acceptedBoundaryMetadataConsumed, true);
+  assert.equal(
+    execution.acceptedBoundaryMetadataDiagnostics,
+    record.acceptedPrivateMetadataDiagnostics
+  );
+  assert.equal(
+    execution.acceptedBoundaryMetadataId,
+    hydrationGate
+      .privateHydrationTextMismatchRecoverableErrorRoutingMetadataId
+  );
+  assert.equal(
+    execution.sourceTextMismatchDiagnosticKind,
+    hydrationGate.HYDRATION_TEXT_MISMATCH_DIAGNOSTIC_KIND
+  );
+  assert.equal(
+    execution.sourceRecoverableErrorMetadataKind,
+    hydrationGate.HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND
+  );
+  assert.equal(execution.recoverableErrorMetadataAccepted, true);
+  assert.equal(execution.textMismatchRowCount, 1);
+  assert.equal(execution.patchedTextMismatchRowCount, 1);
+  assert.equal(execution.textMismatchRow, mismatchRow);
+  assert.equal(execution.textMismatchRowId, mismatchRow.rowId);
+  assert.equal(execution.textMismatchReason, 'text-content-different');
+  assert.equal(execution.expectedPath, 'initialChildren.props.children');
+  assert.equal(execution.actualPath, 'container.childNodes[0]');
+  assert.equal(execution.expectedText, 'client text');
+  assert.equal(execution.actualTextBefore, 'server text');
+  assert.equal(execution.actualTextAfter, 'client text');
+  assert.equal(execution.exactTextMatchesBefore, false);
+  assert.equal(execution.exactTextMatchesAfter, true);
+  assert.equal(execution.normalizedTextMatchesBefore, false);
+  assert.equal(execution.normalizedTextMatchesAfter, true);
+  assert.deepEqual(execution.claimedTextNodeInfo, {
+    nodeName: '#text',
+    nodeType: domContainer.TEXT_NODE
+  });
+  assert.equal(execution.claimedTextNodePath, 'container.childNodes[0]');
+  assert.equal(execution.claimedTextNodePathStatus, 'resolved');
+  assert.equal(execution.claimedTextNodeParentPath, 'container');
+  assert.equal(execution.claimedTextNodeIndex, 0);
+  assert.equal(execution.claimedTextNodeSegmentCount, 1);
+  assert.equal(execution.fakeTextNodeMarkerAccepted, true);
+  assert.equal(execution.fakeTextNodeConstructorName, 'Object');
+  assert.equal(execution.patchWriteProperty, 'nodeValue');
+  assert.equal(execution.patchWriteCount, 1);
+  assert.deepEqual(execution.patchWrites, [
+    {
+      property: 'nodeValue',
+      text: 'client text'
+    }
+  ]);
+  assert.equal(execution.claimLabel, 'primary-text');
+  assert.equal(textNode.nodeValue, 'client text');
+  assert.equal(recoverableErrorCalls, 0);
+
+  const payload =
+    hydrationGate.getPrivateHydrationTextNodeClaimPatchExecutionPayload(
+      execution
+    );
+  assert.equal(payload.hydrationBoundaryRecord, record);
+  assert.equal(payload.hydrationOptions, hydrationOptions);
+  assert.equal(payload.initialChildren, initialChildren);
+  assert.equal(payload.claimedTextNode, textNode);
+  assert.equal(payload.claimedTextNodeResolution.node, textNode);
+  assert.equal(payload.mismatchRow, mismatchRow);
+  assert.equal(payload.patchResult.actualTextBefore, 'server text');
+  assert.equal(payload.patchResult.actualTextAfter, 'client text');
+  assert.equal(payload.recoverableErrorMetadata, record.recoverableErrorMetadata);
+  assert.equal(
+    payload.textMismatchDiagnostics,
+    record.textMismatchDiagnostics
+  );
+
+  assert.throws(
+    () =>
+      hydrationGate.createHydrationTextNodeClaimPatchExecutionRecord(
+        record,
+        record.acceptedPrivateMetadataDiagnostics,
+        {
+          hydrationOptions,
+          mismatchRow
+        }
+      ),
+    {
+      code:
+        hydrationGate.INVALID_HYDRATION_TEXT_NODE_CLAIM_PATCH_EXECUTION_CODE
+    }
+  );
+
+  const staleDocument = createDocument('text-node-claim-patch-stale');
+  const staleContainer = createElement('DIV', staleDocument);
+  const staleTextNode = createText('server text');
+  staleTextNode.parentNode = staleContainer;
+  staleContainer.childNodes = [staleTextNode];
+  const staleRecord = gate.recordUnsupportedHydrateRoot(
+    staleContainer,
+    initialChildren,
+    hydrationOptions
+  );
+  assert.throws(
+    () =>
+      hydrationGate.createHydrationTextNodeClaimPatchExecutionRecord(
+        record,
+        record.acceptedPrivateMetadataDiagnostics,
+        {
+          enableTextNodeClaimPatchExecution: true,
+          hydrationOptions,
+          mismatchRow: staleRecord.textMismatchDiagnostics.mismatchRows[0]
+        }
+      ),
+    {
+      code:
+        hydrationGate.INVALID_HYDRATION_TEXT_NODE_CLAIM_PATCH_EXECUTION_CODE
+    }
+  );
+
+  class Text {}
+  const realLikeDocument = createDocument('text-node-claim-patch-real-like');
+  const realLikeContainer = createElement('DIV', realLikeDocument);
+  const realLikeTextNode = new Text();
+  realLikeTextNode.nodeName = '#text';
+  realLikeTextNode.nodeType = domContainer.TEXT_NODE;
+  realLikeTextNode.nodeValue = 'server text';
+  realLikeTextNode.parentNode = realLikeContainer;
+  realLikeContainer.childNodes = [realLikeTextNode];
+  const realLikeRecord = gate.recordUnsupportedHydrateRoot(
+    realLikeContainer,
+    initialChildren,
+    hydrationOptions
+  );
+  assert.throws(
+    () =>
+      hydrationGate.createHydrationTextNodeClaimPatchExecutionRecord(
+        realLikeRecord,
+        realLikeRecord.acceptedPrivateMetadataDiagnostics,
+        {
+          enableTextNodeClaimPatchExecution: true,
+          hydrationOptions,
+          mismatchRow: realLikeRecord.textMismatchDiagnostics.mismatchRows[0]
+        }
+      ),
+    {
+      code:
+        hydrationGate.INVALID_HYDRATION_TEXT_NODE_CLAIM_PATCH_EXECUTION_CODE
+    }
+  );
+
+  assert.deepEqual(container.__registrations, []);
+  assert.deepEqual(document.__registrations, []);
+});
+
 function createHydrationReplayTargetDispatchFixture(label, options) {
   const normalizedOptions = options || {};
   const document = createDocument(label);
@@ -1218,6 +1473,15 @@ function createComment(data) {
   return {
     data,
     nodeType: domContainer.COMMENT_NODE
+  };
+}
+
+function createText(nodeValue) {
+  return {
+    __fastReactFakeHydrationTextNode: true,
+    nodeName: '#text',
+    nodeType: domContainer.TEXT_NODE,
+    nodeValue
   };
 }
 
