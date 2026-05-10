@@ -67,6 +67,7 @@ const rootBoundarySideEffects = freezeRecord({
   ...internalsGate.resourceHintFakeDomInsertionBlockedSideEffects,
   ...internalsGate.resourceHintHeadBoundaryBlockedSideEffects,
   ...internalsGate.resourceHintHeadClearRetainBlockedSideEffects,
+  ...internalsGate.formActionResetDispatcherBlockedSideEffects,
   ...internalsGate.controlledInputValueTrackerSideEffects,
   privateRootBridgeExecuted: false,
   publicRootFacadeCreated: false,
@@ -102,6 +103,8 @@ function describeResourceFormRootBridgeBlockedGate() {
     privateRootBridgeBoundary: describePrivateRootBridgeBoundary(),
     privateResourceDispatcherBoundary:
       describePrivateResourceDispatcherBoundary(null),
+    privateFormActionResetDispatcherBoundary:
+      describePrivateFormActionResetDispatcherBoundary(null),
     sourceAdapterBoundary: describeSourceAdapterBoundary(null),
     sideEffects: rootBoundarySideEffects
   });
@@ -118,6 +121,8 @@ function recordResourceFormRootBridgeBlockedRequest(record, options) {
   );
   const privateResourceDispatcherBoundary =
     describePrivateResourceDispatcherBoundary(request.behaviorArea);
+  const privateFormActionResetDispatcherBoundary =
+    describePrivateFormActionResetDispatcherBoundary(request.behaviorArea);
 
   const payload = freezeRecord({
     $$typeof: resourceFormRootBoundaryRecordType,
@@ -136,6 +141,7 @@ function recordResourceFormRootBridgeBlockedRequest(record, options) {
     rootBridgeBoundary,
     publicRootBoundary,
     privateResourceDispatcherBoundary,
+    privateFormActionResetDispatcherBoundary,
     sourceAdapterBoundary,
     sideEffects: rootBoundarySideEffects
   });
@@ -422,6 +428,8 @@ function describeSourceAdapterBoundary(behaviorArea) {
     compatibilityClaimed: false,
     resourceHintFakeDomAdapterBoundary:
       describeResourceHintFakeDomAdapterBoundary(behaviorArea),
+    formActionResetDispatcherBoundary:
+      describeFormActionResetDispatcherBoundary(behaviorArea),
     controlledValueTrackerBoundary:
       describeControlledValueTrackerBoundary(behaviorArea)
   });
@@ -480,6 +488,36 @@ function describeResourceHintFakeDomAdapterBoundary(behaviorArea) {
   });
 }
 
+function describeFormActionResetDispatcherBoundary(behaviorArea) {
+  if (behaviorArea !== null && behaviorArea !== 'form-action') {
+    return null;
+  }
+
+  return freezeRecord({
+    gateStatus: privateSourceAdapterBlockedStatus,
+    behaviorArea,
+    supportedBehaviorArea: 'form-action',
+    appliesToRequest: behaviorArea === 'form-action',
+    metadataGateAvailable: true,
+    dispatcherRecordsAccepted:
+      behaviorArea === null || behaviorArea === 'form-action',
+    realFormAccepted: false,
+    rawTargetCaptured: false,
+    formInspected: false,
+    submitControlInspected: false,
+    formDataConstructed: false,
+    syntheticEventCreated: false,
+    actionInvoked: false,
+    transitionStarted: false,
+    resetFiberResolved: false,
+    resetStateQueued: false,
+    formResetCommitted: false,
+    realFormReset: false,
+    compatibilityClaimed: false,
+    dispatcherGate: internalsGate.describePrivateFormActionResetDispatcherGate()
+  });
+}
+
 function describeControlledValueTrackerBoundary(behaviorArea) {
   return freezeRecord({
     gateStatus: privateControlledValueTrackerBlockedStatus,
@@ -506,6 +544,14 @@ function describePrivateResourceDispatcherBoundary(behaviorArea) {
   }
 
   return internalsGate.describePrivateResourceHintDispatcherMetadataGate();
+}
+
+function describePrivateFormActionResetDispatcherBoundary(behaviorArea) {
+  if (behaviorArea !== null && behaviorArea !== 'form-action') {
+    return null;
+  }
+
+  return internalsGate.describePrivateFormActionResetDispatcherGate();
 }
 
 function assertResourceFormGateRecord(record) {
@@ -747,6 +793,7 @@ function freezeRecord(value) {
 }
 
 module.exports = Object.assign({}, internalsGate, {
+  describePrivateFormActionResetDispatcherBoundary,
   describeResourceFormRootBridgeBlockedGate,
   describePrivateResourceDispatcherBoundary,
   getResourceFormPortalCommitBlockedRecordPayload,

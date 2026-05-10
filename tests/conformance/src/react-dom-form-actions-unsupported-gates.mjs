@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { REACT_DOM_FORM_ACTIONS_API_NAMES } from "./react-dom-form-actions-targets.mjs";
 import {
   FAST_REACT_DOM_IMPLEMENTED_VERSION,
+  FAST_REACT_DOM_COMPATIBILITY_TARGET,
   FAST_REACT_DOM_INTERNALS_EXPORT,
   FAST_REACT_DOM_PLACEHOLDER_VERSION,
   assertFastReactDomPlaceholderMetadata,
@@ -102,6 +103,8 @@ export function assertFastReactFormActionsUnsupportedGate() {
     });
   }
 
+  assertPrivateFormActionResetDispatcherGate();
+
   const reactServerExports = requireReactDomPackageFile(
     FAST_REACT_FORM_ACTION_REACT_SERVER_ENTRYPOINT.fileName
   );
@@ -123,6 +126,115 @@ export function assertFastReactFormActionsUnsupportedGate() {
   }
 }
 
+export function assertPrivateFormActionResetDispatcherGate() {
+  const resourceFormGate = requireReactDomPackageFile(
+    "src/resource-form-gates.js"
+  );
+  const gate = resourceFormGate.createFormActionResetDispatcherGate({
+    requestIdPrefix: "conformance-form-dispatcher"
+  });
+  const submission = gate.recordSubmissionIntent({
+    explicitIntent: true,
+    eventName: "submit",
+    actionKind: "function",
+    actionSource: "form",
+    submitControlKind: "button",
+    defaultPrevented: false,
+    transitionScheduled: false
+  });
+  const reset = gate.recordResetIntent({
+    explicitIntent: true,
+    dispatcherKey: "r",
+    resetSource: "requestFormReset",
+    formOwnership: "not-inspected",
+    transitionContext: "action"
+  });
+  const summary = resourceFormGate.describePrivateFormActionResetDispatcherGate();
+
+  assert.equal(
+    summary.gateId,
+    resourceFormGate.privateFormActionResetDispatcherGateId
+  );
+  assert.equal(
+    summary.status,
+    resourceFormGate.privateFormActionResetDispatcherStatus
+  );
+  assert.equal(summary.recordsSubmissionIntentMetadata, true);
+  assert.equal(summary.recordsResetIntentMetadata, true);
+  assert.equal(summary.acceptsRealForms, false);
+  assert.equal(summary.acceptsRawEvents, false);
+  assert.equal(summary.acceptsActionFunctions, false);
+  assert.equal(summary.invokesActions, false);
+  assert.equal(summary.constructsFormData, false);
+  assert.equal(summary.startsHostTransition, false);
+  assert.equal(summary.resetsForms, false);
+  assert.deepEqual(
+    summary.sideEffects,
+    resourceFormGate.formActionResetDispatcherBlockedSideEffects
+  );
+
+  assert.equal(
+    resourceFormGate.isPrivateFormActionResetDispatcherRecord(submission),
+    true
+  );
+  assert.equal(
+    resourceFormGate.getPrivateFormActionResetDispatcherRecordPayload(
+      submission
+    ),
+    submission
+  );
+  assert.equal(
+    resourceFormGate.isPrivateFormActionResetDispatcherRecord(reset),
+    true
+  );
+  assert.equal(submission.status, resourceFormGate.privateFormActionSubmissionIntentRecordedStatus);
+  assert.equal(reset.status, resourceFormGate.privateFormActionResetIntentRecordedStatus);
+  assert.equal(submission.intent.realFormInspected, false);
+  assert.equal(submission.intent.submitControlInspected, false);
+  assert.equal(submission.intent.formDataConstructed, false);
+  assert.equal(submission.intent.actionInvoked, false);
+  assert.equal(submission.intent.hostTransitionStarted, false);
+  assert.equal(reset.intent.realFormInspected, false);
+  assert.equal(reset.intent.formFiberResolved, false);
+  assert.equal(reset.intent.resetCommitWouldRun, false);
+  assert.equal(reset.intent.realFormReset, false);
+  assert.equal(submission.sideEffects.actionInvoked, false);
+  assert.equal(submission.sideEffects.formDataConstructed, false);
+  assert.equal(reset.sideEffects.resetStateQueued, false);
+  assert.equal(reset.sideEffects.realFormReset, false);
+
+  let actionCalls = 0;
+  const action = () => {
+    actionCalls++;
+  };
+  assert.throws(
+    () =>
+      gate.recordSubmissionIntent({
+        explicitIntent: true,
+        eventName: "submit",
+        action
+      }),
+    {
+      code: resourceFormGate.privateFormActionResetDispatcherInvalidIntentCode,
+      compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
+      reason: "action must not be passed to the metadata gate"
+    }
+  );
+  assert.equal(actionCalls, 0);
+  assert.throws(
+    () =>
+      gate.recordResetIntent({
+        explicitIntent: true,
+        form: throwingProxy("form")
+      }),
+    {
+      code: resourceFormGate.privateFormActionResetDispatcherInvalidIntentCode,
+      compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
+      reason: "form must not be passed to the metadata gate"
+    }
+  );
+}
+
 export function assertFastReactFormActionPrerequisiteGate() {
   const matches = findDisallowedReactDomSourceMatches(
     FAST_REACT_FORM_ACTION_UNSUPPORTED_SOURCE_PATTERNS
@@ -132,6 +244,26 @@ export function assertFastReactFormActionPrerequisiteGate() {
     [],
     formatDisallowedSourceMessage(matches)
   );
+}
+
+function throwingProxy(label) {
+  return new Proxy(Object.create(null), {
+    get(_target, property) {
+      throw new Error(`Unexpected ${label}.${String(property)} read`);
+    },
+    getPrototypeOf() {
+      throw new Error(`Unexpected ${label} prototype read`);
+    },
+    has(_target, property) {
+      throw new Error(`Unexpected ${label}.${String(property)} presence check`);
+    },
+    ownKeys() {
+      throw new Error(`Unexpected ${label} key enumeration`);
+    },
+    set(_target, property) {
+      throw new Error(`Unexpected ${label}.${String(property)} write`);
+    }
+  });
 }
 
 function assertPrivateFormResetDispatcherPlaceholder(
