@@ -629,6 +629,25 @@ impl UnsupportedOffscreenVisibilityTransitionRecord {
     pub(crate) const fn work_in_progress_includes_offscreen_lane(&self) -> bool {
         self.work_in_progress_includes_offscreen_lane
     }
+
+    #[must_use]
+    pub(crate) fn has_same_transition_identity(&self, other: &Self) -> bool {
+        self.work_in_progress == other.work_in_progress
+            && self.previous == other.previous
+            && self.key == other.key
+            && self.mode == other.mode
+            && self.previous_visibility == other.previous_visibility
+            && self.current_visibility == other.current_visibility
+            && self.transition == other.transition
+            && self.render_lanes == other.render_lanes
+            && self.work_in_progress_lanes == other.work_in_progress_lanes
+            && self.work_in_progress_child_lanes == other.work_in_progress_child_lanes
+            && self.previous_lanes == other.previous_lanes
+            && self.previous_child_lanes == other.previous_child_lanes
+            && self.render_includes_offscreen_lane == other.render_includes_offscreen_lane
+            && self.work_in_progress_includes_offscreen_lane
+                == other.work_in_progress_includes_offscreen_lane
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
