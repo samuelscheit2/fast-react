@@ -3436,6 +3436,29 @@ impl FunctionComponentLayoutEffectCallbackInvocationRequest {
     }
 
     #[must_use]
+    pub(crate) const fn handoff(self) -> FunctionComponentLayoutEffectHandoff {
+        self.source.handoff()
+    }
+
+    #[must_use]
+    pub(crate) const fn commit_phase(self) -> FunctionComponentLayoutEffectCommitPhase {
+        self.source.commit_phase()
+    }
+
+    #[must_use]
+    pub(crate) const fn is_destroy_callback(self) -> bool {
+        matches!(
+            self.handoff(),
+            FunctionComponentLayoutEffectHandoff::Destroy
+        )
+    }
+
+    #[must_use]
+    pub(crate) const fn is_create_callback(self) -> bool {
+        matches!(self.handoff(), FunctionComponentLayoutEffectHandoff::Create)
+    }
+
+    #[must_use]
     pub(crate) const fn fiber(self) -> FiberId {
         self.source.fiber()
     }
@@ -3500,6 +3523,13 @@ impl FunctionComponentLayoutEffectCallbackInvocationRequest {
 }
 
 pub(crate) trait FunctionComponentLayoutEffectCallbackInvocationTestControl {
+    fn invoke_layout_effect_destroy(
+        &mut self,
+        _request: FunctionComponentLayoutEffectCallbackInvocationRequest,
+    ) -> Result<(), FunctionComponentLayoutEffectCallbackInvocationErrorHandle> {
+        Ok(())
+    }
+
     fn invoke_layout_effect_create(
         &mut self,
         request: FunctionComponentLayoutEffectCallbackInvocationRequest,
@@ -3546,6 +3576,26 @@ impl FunctionComponentLayoutEffectCallbackInvocationRecord {
     #[must_use]
     pub(crate) const fn request(self) -> FunctionComponentLayoutEffectCallbackInvocationRequest {
         self.request
+    }
+
+    #[must_use]
+    pub(crate) const fn handoff(self) -> FunctionComponentLayoutEffectHandoff {
+        self.request.handoff()
+    }
+
+    #[must_use]
+    pub(crate) const fn commit_phase(self) -> FunctionComponentLayoutEffectCommitPhase {
+        self.request.commit_phase()
+    }
+
+    #[must_use]
+    pub(crate) const fn is_destroy_callback(self) -> bool {
+        self.request.is_destroy_callback()
+    }
+
+    #[must_use]
+    pub(crate) const fn is_create_callback(self) -> bool {
+        self.request.is_create_callback()
     }
 
     #[must_use]
@@ -3607,12 +3657,137 @@ impl FunctionComponentLayoutEffectCallbackInvocationRecord {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentLayoutEffectCallbackErrorCaptureRecord {
+    capture_order: usize,
+    request: FunctionComponentLayoutEffectCallbackInvocationRequest,
+    error: FunctionComponentLayoutEffectCallbackInvocationErrorHandle,
+    error_option_callbacks: RootErrorOptionCallbackRecord,
+}
+
+#[allow(
+    dead_code,
+    reason = "crate-private layout effect callback error capture metadata is reserved for private commit canaries"
+)]
+impl FunctionComponentLayoutEffectCallbackErrorCaptureRecord {
+    #[must_use]
+    pub(crate) const fn capture_order(self) -> usize {
+        self.capture_order
+    }
+
+    #[must_use]
+    pub(crate) const fn request(self) -> FunctionComponentLayoutEffectCallbackInvocationRequest {
+        self.request
+    }
+
+    #[must_use]
+    pub(crate) const fn handoff(self) -> FunctionComponentLayoutEffectHandoff {
+        self.request.handoff()
+    }
+
+    #[must_use]
+    pub(crate) const fn commit_phase(self) -> FunctionComponentLayoutEffectCommitPhase {
+        self.request.commit_phase()
+    }
+
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.request.root()
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(self) -> FiberId {
+        self.request.finished_work()
+    }
+
+    #[must_use]
+    pub(crate) const fn lanes(self) -> Lanes {
+        self.request.lanes()
+    }
+
+    #[must_use]
+    pub(crate) const fn fiber(self) -> FiberId {
+        self.request.fiber()
+    }
+
+    #[must_use]
+    pub(crate) const fn hook_list(self) -> HookListId {
+        self.request.hook_list()
+    }
+
+    #[must_use]
+    pub(crate) const fn effect_index(self) -> usize {
+        self.request.effect_index()
+    }
+
+    #[must_use]
+    pub(crate) const fn effect(self) -> HookEffectId {
+        self.request.effect()
+    }
+
+    #[must_use]
+    pub(crate) const fn previous_effect(self) -> Option<HookEffectId> {
+        self.request.previous_effect()
+    }
+
+    #[must_use]
+    pub(crate) const fn instance(self) -> HookEffectInstanceId {
+        self.request.instance()
+    }
+
+    #[must_use]
+    pub(crate) const fn callback(self) -> HookEffectCallbackHandle {
+        self.request.callback()
+    }
+
+    #[must_use]
+    pub(crate) const fn error(self) -> FunctionComponentLayoutEffectCallbackInvocationErrorHandle {
+        self.error
+    }
+
+    #[must_use]
+    pub(crate) const fn error_option_callbacks(self) -> RootErrorOptionCallbackRecord {
+        self.error_option_callbacks
+    }
+
+    #[must_use]
+    pub(crate) const fn root_error_update_scheduled(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn scheduler_queue_touched(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn root_error_callbacks_invoked(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_act_error_aggregation_enabled(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_use_layout_effect_compatibility_claimed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn has_configured_error_callback(self) -> bool {
+        self.error_option_callbacks.has_configured_error_callback()
+    }
+}
+
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub(crate) struct FunctionComponentLayoutEffectCallbackInvocationGateSnapshot {
     root: Option<FiberRootId>,
     finished_work: Option<FiberId>,
     lanes: Lanes,
     records: Vec<FunctionComponentLayoutEffectCallbackInvocationRecord>,
+    error_captures: Vec<FunctionComponentLayoutEffectCallbackErrorCaptureRecord>,
 }
 
 #[allow(
@@ -3641,6 +3816,13 @@ impl FunctionComponentLayoutEffectCallbackInvocationGateSnapshot {
     }
 
     #[must_use]
+    pub(crate) fn error_captures(
+        &self,
+    ) -> &[FunctionComponentLayoutEffectCallbackErrorCaptureRecord] {
+        &self.error_captures
+    }
+
+    #[must_use]
     pub(crate) fn is_empty(&self) -> bool {
         self.records.is_empty()
     }
@@ -3659,6 +3841,22 @@ impl FunctionComponentLayoutEffectCallbackInvocationGateSnapshot {
     }
 
     #[must_use]
+    pub(crate) fn destroy_callback_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| record.is_destroy_callback())
+            .count()
+    }
+
+    #[must_use]
+    pub(crate) fn create_callback_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| record.is_create_callback())
+            .count()
+    }
+
+    #[must_use]
     pub(crate) fn error_count(&self) -> usize {
         self.records
             .iter()
@@ -3672,6 +3870,40 @@ impl FunctionComponentLayoutEffectCallbackInvocationGateSnapshot {
             .iter()
             .filter_map(|record| record.error())
             .collect()
+    }
+
+    #[must_use]
+    pub(crate) fn error_capture_count(&self) -> usize {
+        self.error_captures.len()
+    }
+
+    #[must_use]
+    pub(crate) fn did_record_error_capture_metadata(&self) -> bool {
+        !self.error_captures.is_empty()
+    }
+
+    #[must_use]
+    pub(crate) fn destroy_before_create_order_proven(&self) -> bool {
+        let destroy = self
+            .records
+            .iter()
+            .find(|record| record.is_destroy_callback());
+        let create = self
+            .records
+            .iter()
+            .find(|record| record.is_create_callback());
+        match (destroy, create) {
+            (Some(destroy), Some(create)) => {
+                destroy.invocation_order() < create.invocation_order()
+                    && destroy.request().source().source_commit_order()
+                        == create.request().source().source_commit_order()
+                    && destroy.commit_phase() == FunctionComponentLayoutEffectCommitPhase::Mutation
+                    && create.commit_phase() == FunctionComponentLayoutEffectCommitPhase::Layout
+                    && destroy.request().source().destroy() == Some(destroy.request().callback())
+                    && create.request().source().create() == Some(create.request().callback())
+            }
+            _ => false,
+        }
     }
 
     #[must_use]
@@ -3708,6 +3940,16 @@ impl FunctionComponentLayoutEffectCallbackInvocationGateSnapshot {
 
     #[must_use]
     pub(crate) const fn passive_phase_callbacks_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn root_error_callbacks_invoked(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn scheduler_queues_touched(&self) -> bool {
         false
     }
 }
@@ -7067,6 +7309,44 @@ impl HostRootCommitRecord {
 
     #[allow(
         dead_code,
+        reason = "crate-private layout effect destroy/create execution gate is reserved for deterministic canaries"
+    )]
+    pub(crate) fn execute_function_component_layout_effect_update_destroy_create_under_test_control_for_canary<
+        H: HostTypes,
+    >(
+        &mut self,
+        store: &FiberRootStore<H>,
+        hook_store: &FunctionComponentHookRenderStore,
+        record: FunctionComponentEffectListCommitPhaseOrderRecord,
+        control: &mut impl FunctionComponentLayoutEffectCallbackInvocationTestControl,
+    ) -> Result<&FunctionComponentLayoutEffectCallbackInvocationGateSnapshot, RootCommitError> {
+        let store_current = store.root(self.root)?.current();
+        if store_current != self.current {
+            return Err(RootCommitError::LayoutEffectHandoffCurrentMismatch {
+                root: self.root,
+                commit_current: self.current,
+                store_current,
+            });
+        }
+
+        self.function_component_layout_effect_callback_invocation_gate =
+            execute_function_component_layout_effect_update_destroy_create_record_under_test_control(
+                store,
+                self.root,
+                self.current,
+                self.finished_lanes,
+                hook_store,
+                &self.function_component_layout_effects,
+                &self.function_component_effect_list_commit_phase_order,
+                record,
+                control,
+            )?;
+
+        Ok(&self.function_component_layout_effect_callback_invocation_gate)
+    }
+
+    #[allow(
+        dead_code,
         reason = "crate-private function-component effect-list commit phase order diagnostics"
     )]
     #[must_use]
@@ -7185,6 +7465,25 @@ impl HostRootCommitRecord {
             });
         }
 
+        for record in self
+            .function_component_layout_effect_callback_invocation_gate
+            .records()
+            .iter()
+            .filter(|record| {
+                record.commit_phase() == FunctionComponentLayoutEffectCommitPhase::Mutation
+            })
+        {
+            diagnostics.push(HostRootCommitOrderRecordInputForCanary {
+                phase: HostRootCommitOrderPhaseForCanary::Mutation,
+                metadata_kind: HostRootCommitOrderMetadataKindForCanary::LayoutEffectCallback,
+                root: record.root(),
+                finished_work: record.finished_work(),
+                fiber: record.fiber(),
+                tag: FiberTag::FunctionComponent,
+                source_order: record.invocation_order() as u64,
+            });
+        }
+
         for record in self.ref_callback_execution_handoff.records() {
             diagnostics.push(HostRootCommitOrderRecordInputForCanary {
                 phase: HostRootCommitOrderPhaseForCanary::Layout,
@@ -7215,6 +7514,10 @@ impl HostRootCommitRecord {
         for record in self
             .function_component_layout_effect_callback_invocation_gate
             .records()
+            .iter()
+            .filter(|record| {
+                record.commit_phase() == FunctionComponentLayoutEffectCommitPhase::Layout
+            })
         {
             diagnostics.push(HostRootCommitOrderRecordInputForCanary {
                 phase: HostRootCommitOrderPhaseForCanary::Layout,
@@ -8344,6 +8647,15 @@ const fn function_component_layout_effect_commit_record(
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FunctionComponentLayoutEffectCallbackExecutionPlan {
+    destroy_record: FunctionComponentLayoutEffectPhaseCommitRecord,
+    create_record: FunctionComponentLayoutEffectPhaseCommitRecord,
+    destroy_effect_list_record: FunctionComponentEffectListCommitPhaseOrderRecord,
+    create_effect_list_record: FunctionComponentEffectListCommitPhaseOrderRecord,
+    first_passive_sequence: Option<usize>,
+}
+
 fn execute_function_component_layout_effect_callback_record_under_test_control<H: HostTypes>(
     store: &FiberRootStore<H>,
     root: FiberRootId,
@@ -8355,22 +8667,25 @@ fn execute_function_component_layout_effect_callback_record_under_test_control<H
     record: FunctionComponentEffectListCommitPhaseOrderRecord,
     control: &mut impl FunctionComponentLayoutEffectCallbackInvocationTestControl,
 ) -> Result<FunctionComponentLayoutEffectCallbackInvocationGateSnapshot, RootCommitError> {
-    let (layout_record, matched_mutation_sequence, first_passive_sequence) =
-        validate_layout_effect_callback_execution_record(
-            store,
-            root,
-            finished_work,
-            lanes,
-            hook_store,
-            layout_snapshot,
-            effect_list_snapshot,
-            record,
-        )?;
-    let callback = layout_record.create().ok_or_else(|| {
+    let plan = validate_layout_effect_callback_execution_record(
+        store,
+        root,
+        finished_work,
+        lanes,
+        hook_store,
+        layout_snapshot,
+        effect_list_snapshot,
+        record,
+    )?;
+    let error_option_callbacks = store
+        .root(root)?
+        .options()
+        .error_option_callback_record(root, RootErrorOptionCallbackPhase::Commit);
+    let create_callback = plan.create_record.create().ok_or_else(|| {
         RootCommitError::LayoutEffectCallbackExecutionRecordMismatch {
             root,
-            fiber: layout_record.fiber(),
-            effect: Some(layout_record.effect()),
+            fiber: plan.create_record.fiber(),
+            effect: Some(plan.create_record.effect()),
             message: "layout create phase record does not carry a create callback".to_owned(),
         }
     })?;
@@ -8379,11 +8694,11 @@ fn execute_function_component_layout_effect_callback_record_under_test_control<H
         root,
         finished_work,
         lanes,
-        source: layout_record,
-        effect_list_sequence: record.sequence(),
-        matched_mutation_sequence,
-        first_passive_sequence,
-        callback,
+        source: plan.create_record,
+        effect_list_sequence: plan.create_effect_list_record.sequence(),
+        matched_mutation_sequence: plan.destroy_effect_list_record.sequence(),
+        first_passive_sequence: plan.first_passive_sequence,
+        callback: create_callback,
     };
     let (status, error) = match control.invoke_layout_effect_create(request) {
         Ok(()) => (
@@ -8395,19 +8710,148 @@ fn execute_function_component_layout_effect_callback_record_under_test_control<H
             Some(error),
         ),
     };
+    let records = vec![FunctionComponentLayoutEffectCallbackInvocationRecord {
+        request,
+        status,
+        error,
+    }];
+    let error_captures = layout_effect_callback_error_captures(&records, error_option_callbacks);
 
     Ok(
         FunctionComponentLayoutEffectCallbackInvocationGateSnapshot {
             root: Some(root),
             finished_work: Some(finished_work),
             lanes,
-            records: vec![FunctionComponentLayoutEffectCallbackInvocationRecord {
-                request,
-                status,
-                error,
-            }],
+            records,
+            error_captures,
         },
     )
+}
+
+fn execute_function_component_layout_effect_update_destroy_create_record_under_test_control<
+    H: HostTypes,
+>(
+    store: &FiberRootStore<H>,
+    root: FiberRootId,
+    finished_work: FiberId,
+    lanes: Lanes,
+    hook_store: &FunctionComponentHookRenderStore,
+    layout_snapshot: &FunctionComponentLayoutEffectsSnapshot,
+    effect_list_snapshot: &FunctionComponentEffectListCommitPhaseOrderSnapshot,
+    record: FunctionComponentEffectListCommitPhaseOrderRecord,
+    control: &mut impl FunctionComponentLayoutEffectCallbackInvocationTestControl,
+) -> Result<FunctionComponentLayoutEffectCallbackInvocationGateSnapshot, RootCommitError> {
+    let plan = validate_layout_effect_callback_execution_record(
+        store,
+        root,
+        finished_work,
+        lanes,
+        hook_store,
+        layout_snapshot,
+        effect_list_snapshot,
+        record,
+    )?;
+    let error_option_callbacks = store
+        .root(root)?
+        .options()
+        .error_option_callback_record(root, RootErrorOptionCallbackPhase::Commit);
+    let destroy_callback = plan.destroy_record.destroy().ok_or_else(|| {
+        RootCommitError::LayoutEffectCallbackExecutionRecordMismatch {
+            root,
+            fiber: plan.destroy_record.fiber(),
+            effect: Some(plan.destroy_record.effect()),
+            message: "layout destroy phase record does not carry a destroy callback".to_owned(),
+        }
+    })?;
+    let create_callback = plan.create_record.create().ok_or_else(|| {
+        RootCommitError::LayoutEffectCallbackExecutionRecordMismatch {
+            root,
+            fiber: plan.create_record.fiber(),
+            effect: Some(plan.create_record.effect()),
+            message: "layout create phase record does not carry a create callback".to_owned(),
+        }
+    })?;
+    let destroy_request = FunctionComponentLayoutEffectCallbackInvocationRequest {
+        invocation_order: 0,
+        root,
+        finished_work,
+        lanes,
+        source: plan.destroy_record,
+        effect_list_sequence: plan.destroy_effect_list_record.sequence(),
+        matched_mutation_sequence: plan.destroy_effect_list_record.sequence(),
+        first_passive_sequence: plan.first_passive_sequence,
+        callback: destroy_callback,
+    };
+    let create_request = FunctionComponentLayoutEffectCallbackInvocationRequest {
+        invocation_order: 1,
+        root,
+        finished_work,
+        lanes,
+        source: plan.create_record,
+        effect_list_sequence: plan.create_effect_list_record.sequence(),
+        matched_mutation_sequence: plan.destroy_effect_list_record.sequence(),
+        first_passive_sequence: plan.first_passive_sequence,
+        callback: create_callback,
+    };
+
+    let destroy_invocation = match control.invoke_layout_effect_destroy(destroy_request) {
+        Ok(()) => FunctionComponentLayoutEffectCallbackInvocationRecord {
+            request: destroy_request,
+            status: FunctionComponentLayoutEffectCallbackInvocationStatus::Completed,
+            error: None,
+        },
+        Err(error) => FunctionComponentLayoutEffectCallbackInvocationRecord {
+            request: destroy_request,
+            status: FunctionComponentLayoutEffectCallbackInvocationStatus::Errored,
+            error: Some(error),
+        },
+    };
+    let create_invocation = match control.invoke_layout_effect_create(create_request) {
+        Ok(()) => (
+            FunctionComponentLayoutEffectCallbackInvocationStatus::Completed,
+            None,
+        ),
+        Err(error) => (
+            FunctionComponentLayoutEffectCallbackInvocationStatus::Errored,
+            Some(error),
+        ),
+    };
+    let create_invocation = FunctionComponentLayoutEffectCallbackInvocationRecord {
+        request: create_request,
+        status: create_invocation.0,
+        error: create_invocation.1,
+    };
+    let records = vec![destroy_invocation, create_invocation];
+    let error_captures = layout_effect_callback_error_captures(&records, error_option_callbacks);
+
+    Ok(
+        FunctionComponentLayoutEffectCallbackInvocationGateSnapshot {
+            root: Some(root),
+            finished_work: Some(finished_work),
+            lanes,
+            records,
+            error_captures,
+        },
+    )
+}
+
+fn layout_effect_callback_error_captures(
+    records: &[FunctionComponentLayoutEffectCallbackInvocationRecord],
+    error_option_callbacks: RootErrorOptionCallbackRecord,
+) -> Vec<FunctionComponentLayoutEffectCallbackErrorCaptureRecord> {
+    let mut captures = Vec::new();
+    for record in records {
+        let Some(error) = record.error() else {
+            continue;
+        };
+        captures.push(FunctionComponentLayoutEffectCallbackErrorCaptureRecord {
+            capture_order: captures.len(),
+            request: record.request(),
+            error,
+            error_option_callbacks,
+        });
+    }
+    captures
 }
 
 fn validate_layout_effect_callback_execution_record<H: HostTypes>(
@@ -8419,14 +8863,7 @@ fn validate_layout_effect_callback_execution_record<H: HostTypes>(
     layout_snapshot: &FunctionComponentLayoutEffectsSnapshot,
     effect_list_snapshot: &FunctionComponentEffectListCommitPhaseOrderSnapshot,
     record: FunctionComponentEffectListCommitPhaseOrderRecord,
-) -> Result<
-    (
-        FunctionComponentLayoutEffectPhaseCommitRecord,
-        usize,
-        Option<usize>,
-    ),
-    RootCommitError,
-> {
+) -> Result<FunctionComponentLayoutEffectCallbackExecutionPlan, RootCommitError> {
     validate_layout_effect_callback_record_phase(root, record)?;
     let tag = store.fiber_arena().get(record.fiber())?.tag();
     if tag != FiberTag::FunctionComponent {
@@ -8465,17 +8902,17 @@ fn validate_layout_effect_callback_execution_record<H: HostTypes>(
         );
     }
 
-    let matched_mutation_sequence =
-        matching_layout_effect_mutation_sequence(effect_list_snapshot, record).ok_or_else(
-            || RootCommitError::LayoutEffectCallbackExecutionRecordMismatch {
+    let destroy_effect_list_record =
+        matching_layout_effect_mutation_record(effect_list_snapshot, record).ok_or_else(|| {
+            RootCommitError::LayoutEffectCallbackExecutionRecordMismatch {
                 root,
                 fiber: record.fiber(),
                 effect: record.effect(),
                 message: "layout create callback record has no accepted mutation destroy metadata"
                     .to_owned(),
-            },
-        )?;
-    if matched_mutation_sequence >= record.sequence() {
+            }
+        })?;
+    if destroy_effect_list_record.sequence() >= record.sequence() {
         return Err(
             RootCommitError::LayoutEffectCallbackExecutionRecordMismatch {
                 root,
@@ -8487,7 +8924,7 @@ fn validate_layout_effect_callback_execution_record<H: HostTypes>(
         );
     }
 
-    let layout_record = matching_layout_effect_create_phase_record(layout_snapshot, record)
+    let create_record = matching_layout_effect_create_phase_record(layout_snapshot, record)
         .ok_or_else(
             || RootCommitError::LayoutEffectCallbackExecutionRecordMismatch {
                 root,
@@ -8497,13 +8934,34 @@ fn validate_layout_effect_callback_execution_record<H: HostTypes>(
                     .to_owned(),
             },
         )?;
-    validate_layout_effect_callback_committed_effect_ring(root, hook_store, record, layout_record)?;
+    let destroy_record =
+        matching_layout_effect_destroy_phase_record(layout_snapshot, destroy_effect_list_record)
+            .ok_or_else(
+                || RootCommitError::LayoutEffectCallbackExecutionRecordMismatch {
+                    root,
+                    fiber: destroy_effect_list_record.fiber(),
+                    effect: destroy_effect_list_record.effect(),
+                    message:
+                        "layout destroy callback record is missing from accepted layout metadata"
+                            .to_owned(),
+                },
+            )?;
+    validate_layout_effect_destroy_create_pair(root, destroy_record, create_record)?;
+    validate_layout_effect_callback_committed_effect_ring(
+        root,
+        hook_store,
+        record,
+        create_record,
+        destroy_record,
+    )?;
 
-    Ok((
-        layout_record,
-        matched_mutation_sequence,
+    Ok(FunctionComponentLayoutEffectCallbackExecutionPlan {
+        destroy_record,
+        create_record,
+        destroy_effect_list_record,
+        create_effect_list_record: record,
         first_passive_sequence,
-    ))
+    })
 }
 
 fn validate_layout_effect_callback_record_phase(
@@ -8603,24 +9061,21 @@ fn validate_layout_effect_callback_effect_list_snapshot(
     Ok(())
 }
 
-fn matching_layout_effect_mutation_sequence(
+fn matching_layout_effect_mutation_record(
     snapshot: &FunctionComponentEffectListCommitPhaseOrderSnapshot,
     record: FunctionComponentEffectListCommitPhaseOrderRecord,
-) -> Option<usize> {
-    snapshot
-        .records()
-        .iter()
-        .find(|accepted| {
-            accepted.phase() == FunctionComponentEffectListCommitPhase::Mutation
-                && accepted.kind() == FunctionComponentEffectListCommitPhaseOrderKind::LayoutDestroy
-                && accepted.fiber() == record.fiber()
-                && accepted.hook_list() == record.hook_list()
-                && accepted.lanes() == record.lanes()
-                && accepted.previous_effect() == record.previous_effect()
-                && accepted.destroy().is_some()
-                && accepted.sequence() < record.sequence()
-        })
-        .map(|accepted| accepted.sequence())
+) -> Option<FunctionComponentEffectListCommitPhaseOrderRecord> {
+    snapshot.records().iter().copied().find(|accepted| {
+        accepted.phase() == FunctionComponentEffectListCommitPhase::Mutation
+            && accepted.kind() == FunctionComponentEffectListCommitPhaseOrderKind::LayoutDestroy
+            && accepted.fiber() == record.fiber()
+            && accepted.hook_list() == record.hook_list()
+            && accepted.lanes() == record.lanes()
+            && accepted.effect() == record.previous_effect()
+            && accepted.previous_effect() == record.previous_effect()
+            && accepted.destroy().is_some()
+            && accepted.sequence() < record.sequence()
+    })
 }
 
 fn matching_layout_effect_create_phase_record(
@@ -8643,11 +9098,110 @@ fn matching_layout_effect_create_phase_record(
         })
 }
 
+fn matching_layout_effect_destroy_phase_record(
+    snapshot: &FunctionComponentLayoutEffectsSnapshot,
+    record: FunctionComponentEffectListCommitPhaseOrderRecord,
+) -> Option<FunctionComponentLayoutEffectPhaseCommitRecord> {
+    snapshot
+        .destroy_phase_records()
+        .into_iter()
+        .find(|accepted| {
+            accepted.fiber() == record.fiber()
+                && accepted.hook_list() == record.hook_list()
+                && accepted.render_phase() == record.render_phase()
+                && accepted.lanes() == record.lanes()
+                && Some(accepted.effect_index()) == record.effect_index()
+                && Some(accepted.effect()) == record.effect()
+                && accepted.previous_effect() == record.previous_effect()
+                && accepted.create() == record.create()
+                && accepted.destroy() == record.destroy()
+        })
+}
+
+fn validate_layout_effect_destroy_create_pair(
+    root: FiberRootId,
+    destroy_record: FunctionComponentLayoutEffectPhaseCommitRecord,
+    create_record: FunctionComponentLayoutEffectPhaseCommitRecord,
+) -> Result<(), RootCommitError> {
+    if destroy_record.handoff() != FunctionComponentLayoutEffectHandoff::Destroy
+        || destroy_record.commit_phase() != FunctionComponentLayoutEffectCommitPhase::Mutation
+        || destroy_record.destroy().is_none()
+        || destroy_record.create().is_some()
+    {
+        return Err(
+            RootCommitError::LayoutEffectCallbackExecutionRecordMismatch {
+                root,
+                fiber: destroy_record.fiber(),
+                effect: Some(destroy_record.effect()),
+                message: "layout destroy callback execution requires mutation destroy metadata"
+                    .to_owned(),
+            },
+        );
+    }
+
+    if create_record.handoff() != FunctionComponentLayoutEffectHandoff::Create
+        || create_record.commit_phase() != FunctionComponentLayoutEffectCommitPhase::Layout
+        || create_record.create().is_none()
+        || create_record.destroy().is_some()
+    {
+        return Err(
+            RootCommitError::LayoutEffectCallbackExecutionRecordMismatch {
+                root,
+                fiber: create_record.fiber(),
+                effect: Some(create_record.effect()),
+                message: "layout create callback execution requires layout create metadata"
+                    .to_owned(),
+            },
+        );
+    }
+
+    let Some(previous_effect) = create_record.previous_effect() else {
+        return Err(
+            RootCommitError::LayoutEffectCallbackExecutionRecordMismatch {
+                root,
+                fiber: create_record.fiber(),
+                effect: Some(create_record.effect()),
+                message: "layout destroy/create execution gate only accepts update effects"
+                    .to_owned(),
+            },
+        );
+    };
+
+    if destroy_record.source_commit_order() != create_record.source_commit_order()
+        || destroy_record.fiber() != create_record.fiber()
+        || destroy_record.hook_list() != create_record.hook_list()
+        || destroy_record.render_phase() != create_record.render_phase()
+        || destroy_record.effect_index() != create_record.effect_index()
+        || destroy_record.effect() != previous_effect
+        || destroy_record.previous_effect() != create_record.previous_effect()
+        || destroy_record.instance() != create_record.instance()
+        || destroy_record.tag() != create_record.tag()
+        || destroy_record.previous_dependencies() != create_record.previous_dependencies()
+        || destroy_record.dependencies() != create_record.dependencies()
+        || destroy_record.dependency_status() != create_record.dependency_status()
+        || destroy_record.lanes() != create_record.lanes()
+    {
+        return Err(
+            RootCommitError::LayoutEffectCallbackExecutionRecordMismatch {
+                root,
+                fiber: create_record.fiber(),
+                effect: Some(create_record.effect()),
+                message:
+                    "layout destroy/create phase records do not describe the same update effect"
+                        .to_owned(),
+            },
+        );
+    }
+
+    Ok(())
+}
+
 fn validate_layout_effect_callback_committed_effect_ring(
     root: FiberRootId,
     hook_store: &FunctionComponentHookRenderStore,
     record: FunctionComponentEffectListCommitPhaseOrderRecord,
-    layout_record: FunctionComponentLayoutEffectPhaseCommitRecord,
+    create_record: FunctionComponentLayoutEffectPhaseCommitRecord,
+    destroy_record: FunctionComponentLayoutEffectPhaseCommitRecord,
 ) -> Result<(), RootCommitError> {
     let current_list = hook_store.current_list(record.fiber());
     if current_list != Some(record.hook_list()) {
@@ -8711,12 +9265,14 @@ fn validate_layout_effect_callback_committed_effect_ring(
     };
 
     if !committed_record.accepted_for_layout_commit()
-        || committed_record.previous_effect() != layout_record.previous_effect()
-        || committed_record.instance() != layout_record.instance()
-        || committed_record.create() != layout_record.create().expect("layout create checked")
-        || committed_record.previous_dependencies() != layout_record.previous_dependencies()
-        || committed_record.dependencies() != layout_record.dependencies()
-        || committed_record.dependency_status() != layout_record.dependency_status()
+        || committed_record.previous_effect() != create_record.previous_effect()
+        || committed_record.previous_effect() != Some(destroy_record.effect())
+        || committed_record.instance() != create_record.instance()
+        || committed_record.create() != create_record.create().expect("layout create checked")
+        || committed_record.destroy() != destroy_record.destroy()
+        || committed_record.previous_dependencies() != create_record.previous_dependencies()
+        || committed_record.dependencies() != create_record.dependencies()
+        || committed_record.dependency_status() != create_record.dependency_status()
     {
         return Err(
             RootCommitError::LayoutEffectCallbackExecutionRecordMismatch {
@@ -14015,13 +14571,19 @@ mod tests {
     };
     use fast_react_host_config::HostFiberTokenViolation;
 
-    fn root_store() -> (FiberRootStore<RecordingHost>, FiberRootId, RecordingHost) {
+    fn root_store_with_options(
+        options: RootOptions,
+    ) -> (FiberRootStore<RecordingHost>, FiberRootId, RecordingHost) {
         let host = RecordingHost::default();
         let mut store = FiberRootStore::<RecordingHost>::new();
         let root_id = store
-            .create_client_root(FakeContainer::new(1), RootOptions::new())
+            .create_client_root(FakeContainer::new(1), options)
             .unwrap();
         (store, root_id, host)
+    }
+
+    fn root_store() -> (FiberRootStore<RecordingHost>, FiberRootId, RecordingHost) {
+        root_store_with_options(RootOptions::new())
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
@@ -14353,6 +14915,15 @@ mod tests {
     }
 
     impl TestLayoutEffectCallbackControl {
+        fn with_result(
+            mut self,
+            callback: HookEffectCallbackHandle,
+            result: Result<(), FunctionComponentLayoutEffectCallbackInvocationErrorHandle>,
+        ) -> Self {
+            self.results.push((callback, result));
+            self
+        }
+
         fn calls(&self) -> &[FunctionComponentLayoutEffectCallbackInvocationRequest] {
             &self.calls
         }
@@ -14371,6 +14942,14 @@ mod tests {
     impl FunctionComponentLayoutEffectCallbackInvocationTestControl
         for TestLayoutEffectCallbackControl
     {
+        fn invoke_layout_effect_destroy(
+            &mut self,
+            request: FunctionComponentLayoutEffectCallbackInvocationRequest,
+        ) -> Result<(), FunctionComponentLayoutEffectCallbackInvocationErrorHandle> {
+            self.calls.push(request);
+            self.result(request.callback())
+        }
+
         fn invoke_layout_effect_create(
             &mut self,
             request: FunctionComponentLayoutEffectCallbackInvocationRequest,
@@ -19207,7 +19786,7 @@ mod tests {
     }
 
     #[test]
-    fn root_commit_effect_list_layout_effect_execution_gate_invokes_one_callback_after_mutation_before_passive()
+    fn root_commit_effect_list_layout_effect_execution_gate_invokes_destroy_before_create_before_passive()
      {
         let (mut store, root_id, host) = root_store();
         let mut hook_store = FunctionComponentHookRenderStore::new();
@@ -19225,17 +19804,21 @@ mod tests {
             )
             .unwrap()
             .clone();
-        let layout_record = first_effect_list_record(
+        let layout_destroy_record = first_effect_list_record(
+            &effect_list,
+            FunctionComponentEffectListCommitPhaseOrderKind::LayoutDestroy,
+        );
+        let layout_create_record = first_effect_list_record(
             &effect_list,
             FunctionComponentEffectListCommitPhaseOrderKind::LayoutCreate,
         );
         let mut control = TestLayoutEffectCallbackControl::default();
 
         let execution = commit
-            .execute_function_component_layout_effect_record_under_test_control_for_canary(
+            .execute_function_component_layout_effect_update_destroy_create_under_test_control_for_canary(
                 &store,
                 &hook_store,
-                layout_record,
+                layout_create_record,
                 &mut control,
             )
             .unwrap()
@@ -19244,10 +19827,15 @@ mod tests {
         assert_eq!(execution.root(), Some(root_id));
         assert_eq!(execution.finished_work(), Some(fixture.finished_work));
         assert_eq!(execution.lanes(), Lanes::DEFAULT);
-        assert_eq!(execution.len(), 1);
-        assert_eq!(execution.completed_count(), 1);
+        assert_eq!(execution.len(), 2);
+        assert_eq!(execution.completed_count(), 2);
+        assert_eq!(execution.destroy_callback_count(), 1);
+        assert_eq!(execution.create_callback_count(), 1);
         assert_eq!(execution.error_count(), 0);
+        assert_eq!(execution.error_capture_count(), 0);
         assert!(!execution.has_errors());
+        assert!(!execution.did_record_error_capture_metadata());
+        assert!(execution.destroy_before_create_order_proven());
         assert_eq!(
             execution.status(),
             FunctionComponentLayoutEffectCallbackInvocationGateStatus::TestControlOnly
@@ -19260,6 +19848,8 @@ mod tests {
         assert!(!execution.public_use_layout_effect_compatibility_claimed());
         assert!(!execution.public_act_compatibility_claimed());
         assert!(!execution.passive_phase_callbacks_invoked());
+        assert!(!execution.root_error_callbacks_invoked());
+        assert!(!execution.scheduler_queues_touched());
 
         let records = execution.records();
         assert_eq!(records[0].invocation_order(), 0);
@@ -19267,17 +19857,69 @@ mod tests {
             records[0].status(),
             FunctionComponentLayoutEffectCallbackInvocationStatus::Completed
         );
+        assert!(records[0].is_destroy_callback());
+        assert_eq!(
+            records[0].handoff(),
+            FunctionComponentLayoutEffectHandoff::Destroy
+        );
+        assert_eq!(
+            records[0].commit_phase(),
+            FunctionComponentLayoutEffectCommitPhase::Mutation
+        );
         assert_eq!(records[0].root(), root_id);
         assert_eq!(records[0].finished_work(), fixture.finished_work);
         assert_eq!(records[0].fiber(), fixture.finished_function);
-        assert_eq!(records[0].effect(), fixture.layout.effect());
-        assert_eq!(records[0].callback(), callback(8_110));
-        let request = records[0].request();
-        assert_eq!(request.effect_list_sequence(), layout_record.sequence());
-        assert!(request.after_matching_mutation_metadata());
-        assert!(request.before_passive_metadata());
+        assert_eq!(records[0].effect(), fixture.previous_layout.effect());
+        assert_eq!(records[0].callback(), callback(8_104));
+        let destroy_request = records[0].request();
         assert_eq!(
-            request.first_passive_sequence(),
+            destroy_request.effect_list_sequence(),
+            layout_destroy_record.sequence()
+        );
+        assert_eq!(
+            destroy_request.matched_mutation_sequence(),
+            layout_destroy_record.sequence()
+        );
+        assert!(!destroy_request.after_matching_mutation_metadata());
+        assert!(destroy_request.before_passive_metadata());
+        assert_eq!(
+            destroy_request.previous_effect(),
+            Some(fixture.previous_layout.effect())
+        );
+        assert_eq!(destroy_request.instance(), fixture.layout.instance());
+        assert_eq!(
+            destroy_request.hook_list(),
+            fixture.state.work_in_progress_list()
+        );
+
+        assert_eq!(records[1].invocation_order(), 1);
+        assert_eq!(
+            records[1].status(),
+            FunctionComponentLayoutEffectCallbackInvocationStatus::Completed
+        );
+        assert!(records[1].is_create_callback());
+        assert_eq!(
+            records[1].handoff(),
+            FunctionComponentLayoutEffectHandoff::Create
+        );
+        assert_eq!(
+            records[1].commit_phase(),
+            FunctionComponentLayoutEffectCommitPhase::Layout
+        );
+        assert_eq!(records[1].root(), root_id);
+        assert_eq!(records[1].finished_work(), fixture.finished_work);
+        assert_eq!(records[1].fiber(), fixture.finished_function);
+        assert_eq!(records[1].effect(), fixture.layout.effect());
+        assert_eq!(records[1].callback(), callback(8_110));
+        let create_request = records[1].request();
+        assert_eq!(
+            create_request.effect_list_sequence(),
+            layout_create_record.sequence()
+        );
+        assert!(create_request.after_matching_mutation_metadata());
+        assert!(create_request.before_passive_metadata());
+        assert_eq!(
+            create_request.first_passive_sequence(),
             Some(
                 first_effect_list_record(
                     &effect_list,
@@ -19287,13 +19929,16 @@ mod tests {
             )
         );
         assert_eq!(
-            request.previous_effect(),
+            create_request.previous_effect(),
             Some(fixture.previous_layout.effect())
         );
-        assert_eq!(request.instance(), fixture.layout.instance());
-        assert_eq!(request.hook_list(), fixture.state.work_in_progress_list());
+        assert_eq!(create_request.instance(), fixture.layout.instance());
+        assert_eq!(
+            create_request.hook_list(),
+            fixture.state.work_in_progress_list()
+        );
 
-        assert_eq!(control.calls(), &[request]);
+        assert_eq!(control.calls(), &[destroy_request, create_request]);
         assert_eq!(
             commit.function_component_layout_effect_callback_invocation_gate(),
             &execution
@@ -19307,6 +19952,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![
                 "layout-effect-destroy",
+                "layout-effect-callback",
                 "layout-effect-create",
                 "layout-effect-callback",
                 "passive-unmount",
@@ -19319,7 +19965,9 @@ mod tests {
                 .iter()
                 .map(|record| record.phase_name())
                 .collect::<Vec<_>>(),
-            vec!["mutation", "layout", "layout", "passive", "passive"]
+            vec![
+                "mutation", "mutation", "layout", "layout", "passive", "passive"
+            ]
         );
         assert_eq!(
             commit
@@ -19335,6 +19983,153 @@ mod tests {
         assert_eq!(
             fixture.previous_passive.instance(),
             fixture.passive.instance()
+        );
+        assert_eq!(
+            store.scheduler_bridge().callback_requests().len(),
+            callback_request_count
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_effect_list_layout_effect_execution_gate_records_error_capture_metadata_without_public_callbacks()
+     {
+        let options = RootOptions::new()
+            .with_on_uncaught_error(RootErrorCallbackHandle::from_raw(91))
+            .with_on_caught_error(RootErrorCallbackHandle::from_raw(92))
+            .with_on_recoverable_error(RootRecoverableErrorCallbackHandle::from_raw(93));
+        let (mut store, root_id, host) = root_store_with_options(options);
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let (render, fixture) =
+            prepare_layout_effect_execution_fixture(&mut store, root_id, &mut hook_store, 8_500);
+
+        let callback_request_count = store.scheduler_bridge().callback_requests().len();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+        let mut commit = commit_finished_host_root(&mut store, render).unwrap();
+        let effect_list = commit
+            .record_function_component_effect_list_commit_phase_order_for_canary(
+                &store,
+                &mut hook_store,
+                std::slice::from_ref(&fixture.queued_passive),
+            )
+            .unwrap()
+            .clone();
+        let layout_create_record = first_effect_list_record(
+            &effect_list,
+            FunctionComponentEffectListCommitPhaseOrderKind::LayoutCreate,
+        );
+        let destroy_error =
+            FunctionComponentLayoutEffectCallbackInvocationErrorHandle::from_raw(51);
+        let create_error = FunctionComponentLayoutEffectCallbackInvocationErrorHandle::from_raw(52);
+        let mut control = TestLayoutEffectCallbackControl::default()
+            .with_result(callback(8_504), Err(destroy_error))
+            .with_result(callback(8_510), Err(create_error));
+
+        let execution = commit
+            .execute_function_component_layout_effect_update_destroy_create_under_test_control_for_canary(
+                &store,
+                &hook_store,
+                layout_create_record,
+                &mut control,
+            )
+            .unwrap()
+            .clone();
+
+        assert_eq!(execution.len(), 2);
+        assert_eq!(execution.completed_count(), 0);
+        assert_eq!(execution.error_count(), 2);
+        assert_eq!(execution.error_capture_count(), 2);
+        assert!(execution.has_errors());
+        assert!(execution.did_record_error_capture_metadata());
+        assert!(execution.destroy_before_create_order_proven());
+        assert!(!execution.public_use_layout_effect_compatibility_claimed());
+        assert!(!execution.public_act_compatibility_claimed());
+        assert!(!execution.root_error_callbacks_invoked());
+        assert!(!execution.scheduler_queues_touched());
+        assert_eq!(execution.errors(), vec![destroy_error, create_error]);
+        assert_eq!(
+            control.calls(),
+            &[
+                execution.records()[0].request(),
+                execution.records()[1].request()
+            ]
+        );
+
+        let captures = execution.error_captures();
+        assert_eq!(captures[0].capture_order(), 0);
+        assert_eq!(
+            captures[0].handoff(),
+            FunctionComponentLayoutEffectHandoff::Destroy
+        );
+        assert_eq!(
+            captures[0].commit_phase(),
+            FunctionComponentLayoutEffectCommitPhase::Mutation
+        );
+        assert_eq!(captures[0].root(), root_id);
+        assert_eq!(captures[0].finished_work(), fixture.finished_work);
+        assert_eq!(captures[0].lanes(), Lanes::DEFAULT);
+        assert_eq!(captures[0].fiber(), fixture.finished_function);
+        assert_eq!(captures[0].effect(), fixture.previous_layout.effect());
+        assert_eq!(
+            captures[0].previous_effect(),
+            Some(fixture.previous_layout.effect())
+        );
+        assert_eq!(captures[0].instance(), fixture.layout.instance());
+        assert_eq!(captures[0].callback(), callback(8_504));
+        assert_eq!(captures[0].error(), destroy_error);
+        assert!(!captures[0].root_error_update_scheduled());
+        assert!(!captures[0].scheduler_queue_touched());
+        assert!(!captures[0].root_error_callbacks_invoked());
+        assert!(!captures[0].public_act_error_aggregation_enabled());
+        assert!(!captures[0].public_use_layout_effect_compatibility_claimed());
+        assert!(captures[0].has_configured_error_callback());
+
+        assert_eq!(captures[1].capture_order(), 1);
+        assert_eq!(
+            captures[1].handoff(),
+            FunctionComponentLayoutEffectHandoff::Create
+        );
+        assert_eq!(
+            captures[1].commit_phase(),
+            FunctionComponentLayoutEffectCommitPhase::Layout
+        );
+        assert_eq!(captures[1].root(), root_id);
+        assert_eq!(captures[1].finished_work(), fixture.finished_work);
+        assert_eq!(captures[1].lanes(), Lanes::DEFAULT);
+        assert_eq!(captures[1].fiber(), fixture.finished_function);
+        assert_eq!(captures[1].effect(), fixture.layout.effect());
+        assert_eq!(
+            captures[1].previous_effect(),
+            Some(fixture.previous_layout.effect())
+        );
+        assert_eq!(captures[1].instance(), fixture.layout.instance());
+        assert_eq!(captures[1].callback(), callback(8_510));
+        assert_eq!(captures[1].error(), create_error);
+        assert!(!captures[1].root_error_update_scheduled());
+        assert!(!captures[1].scheduler_queue_touched());
+        assert!(!captures[1].root_error_callbacks_invoked());
+        assert!(!captures[1].public_act_error_aggregation_enabled());
+        assert!(!captures[1].public_use_layout_effect_compatibility_claimed());
+        assert!(captures[1].has_configured_error_callback());
+
+        let callbacks = captures[0].error_option_callbacks();
+        assert_eq!(callbacks.root(), root_id);
+        assert_eq!(callbacks.phase(), RootErrorOptionCallbackPhase::Commit);
+        assert_eq!(
+            callbacks.on_uncaught_error(),
+            RootErrorCallbackHandle::from_raw(91)
+        );
+        assert_eq!(
+            callbacks.on_caught_error(),
+            RootErrorCallbackHandle::from_raw(92)
+        );
+        assert_eq!(
+            captures[1].error_option_callbacks().on_recoverable_error(),
+            RootRecoverableErrorCallbackHandle::from_raw(93)
         );
         assert_eq!(
             store.scheduler_bridge().callback_requests().len(),
