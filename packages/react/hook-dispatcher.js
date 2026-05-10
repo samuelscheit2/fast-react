@@ -26,6 +26,8 @@ const privateMemoHookDispatchers = new WeakSet();
 const privateMemoHookDispatcherMetadataByDispatcher = new WeakMap();
 const privateContextHookDispatchers = new WeakSet();
 const privateContextHookDispatcherMetadataByDispatcher = new WeakMap();
+const privateTransitionHookDispatchers = new WeakSet();
+const privateTransitionHookDispatcherMetadataByDispatcher = new WeakMap();
 
 const effectRegistrationFieldNames = Object.freeze([
   'hook',
@@ -127,6 +129,62 @@ const contextPropagationRecordFieldNames = Object.freeze([
   'scanned_dependency_count',
   'marked_dependencies',
   'roots'
+]);
+const transitionHookNames = freezeArray(['useDeferredValue', 'useTransition']);
+const transitionHookPublicShapeBlockerFields = freezeArray([
+  'hookName',
+  'expectedName',
+  'expectedLength',
+  'currentPublicExport',
+  'blocker'
+]);
+const transitionHookPublicShapeBlockers = freezeRecordArray([
+  {
+    hookName: 'useDeferredValue',
+    expectedName: '',
+    expectedLength: 2,
+    currentPublicExport: 'react.useDeferredValue placeholder',
+    blocker:
+      'public export remains a createUnimplementedFunction placeholder until deferred value scheduling is admitted'
+  },
+  {
+    hookName: 'useTransition',
+    expectedName: '',
+    expectedLength: 0,
+    currentPublicExport: 'react.useTransition placeholder',
+    blocker:
+      'public export remains a createUnimplementedFunction placeholder until transition scheduling is admitted'
+  }
+]);
+const transitionHookMissingSchedulerPrerequisites = freezeArray([
+  'getCurrentUpdatePriority',
+  'setCurrentUpdatePriority',
+  'higherEventPriority',
+  'requestUpdateLane',
+  'requestDeferredLane',
+  'dispatchOptimisticSetState',
+  'dispatchSetStateInternal',
+  'markSkippedUpdateLanes',
+  'useThenable'
+]);
+const transitionHookMissingRootLanePrerequisites = freezeArray([
+  'LaneClaimers.claim_next_transition_update_lane',
+  'LaneClaimers.claim_next_transition_deferred_lane',
+  'RootLaneState.mark_updated',
+  'RootLaneState.mark_entangled',
+  'UpdateQueueStore.entangle_transition_update'
+]);
+const transitionHookCompatibilityFalseFlags = freezeArray([
+  'compatibilityClaimed',
+  'exposesPublicHookImplementation',
+  'rendererIntegration',
+  'schedulerIntegration',
+  'rootLaneIntegration',
+  'schedulesTransitionUpdates',
+  'schedulesDeferredValueUpdates',
+  'executesTransitionCallbacks',
+  'returnsPendingState',
+  'readsThenables'
 ]);
 
 const effectHookMetadataByHookName = Object.freeze({
@@ -238,6 +296,35 @@ const privateContextHookDispatcherMetadataArrayKeys = freezeArray([
   'contextPropagationDependencyRecordFields',
   'contextPropagationRecordFields',
   'acceptedReconcilerRecords'
+]);
+
+const privateTransitionHookDispatcherMetadata = freezeRecord({
+  capability: 'fast-react.private.transition_hook_dispatcher_blockers',
+  compatibilityTarget: 'react@19.2.6',
+  compatibilityClaimed: false,
+  exposesPublicHookImplementation: false,
+  rendererIntegration: false,
+  schedulerIntegration: false,
+  rootLaneIntegration: false,
+  schedulesTransitionUpdates: false,
+  schedulesDeferredValueUpdates: false,
+  executesTransitionCallbacks: false,
+  returnsPendingState: false,
+  readsThenables: false,
+  hookNames: transitionHookNames,
+  publicShapeBlockerFields: transitionHookPublicShapeBlockerFields,
+  publicShapeBlockers: transitionHookPublicShapeBlockers,
+  missingSchedulerPrerequisites: transitionHookMissingSchedulerPrerequisites,
+  missingRootLanePrerequisites: transitionHookMissingRootLanePrerequisites,
+  compatibilityFalseFlags: transitionHookCompatibilityFalseFlags
+});
+
+const privateTransitionHookDispatcherMetadataArrayKeys = freezeArray([
+  'hookNames',
+  'publicShapeBlockerFields',
+  'missingSchedulerPrerequisites',
+  'missingRootLanePrerequisites',
+  'compatibilityFalseFlags'
 ]);
 
 const privateStateHookDispatcherMetadata = freezeRecord({
@@ -636,6 +723,14 @@ function isPrivateEffectHookDispatcher(dispatcher) {
   );
 }
 
+function isPrivateTransitionHookDispatcher(dispatcher) {
+  return (
+    isObjectLike(dispatcher) &&
+    privateTransitionHookDispatchers.has(dispatcher) &&
+    privateTransitionHookDispatcherMetadataByDispatcher.has(dispatcher)
+  );
+}
+
 function validatePrivateStateHookDispatcher(dispatcher, metadata) {
   if (!isObjectLike(dispatcher)) {
     throw createMissingPrivateStateHookDispatcherError('useState');
@@ -688,6 +783,20 @@ function validatePrivateEffectHookDispatcher(dispatcher, metadata) {
   validatePrivateEffectHookDispatcherMetadata(metadata);
 }
 
+function validatePrivateTransitionHookDispatcher(dispatcher, metadata) {
+  if (!isObjectLike(dispatcher)) {
+    throw createInvalidHookCallError('useTransition');
+  }
+
+  for (const hookName of transitionHookNames) {
+    if (typeof dispatcher[hookName] !== 'function') {
+      throw createInvalidHookCallError(hookName);
+    }
+  }
+
+  validatePrivateTransitionHookDispatcherMetadata(metadata);
+}
+
 function markPrivateStateHookDispatcher(dispatcher, metadata) {
   validatePrivateStateHookDispatcher(dispatcher, metadata);
   privateStateHookDispatchers.add(dispatcher);
@@ -734,6 +843,16 @@ function markPrivateEffectHookDispatcher(dispatcher, metadata) {
   privateEffectHookDispatcherMetadataByDispatcher.set(
     dispatcher,
     privateEffectHookDispatcherMetadata
+  );
+  return dispatcher;
+}
+
+function markPrivateTransitionHookDispatcher(dispatcher, metadata) {
+  validatePrivateTransitionHookDispatcher(dispatcher, metadata);
+  privateTransitionHookDispatchers.add(dispatcher);
+  privateTransitionHookDispatcherMetadataByDispatcher.set(
+    dispatcher,
+    privateTransitionHookDispatcherMetadata
   );
   return dispatcher;
 }
@@ -952,6 +1071,14 @@ function getPrivateStateHookDispatcherMetadata(dispatcher) {
   return privateStateHookDispatcherMetadataByDispatcher.get(dispatcher);
 }
 
+function getPrivateTransitionHookDispatcherMetadata(dispatcher) {
+  if (!isPrivateTransitionHookDispatcher(dispatcher)) {
+    return null;
+  }
+
+  return privateTransitionHookDispatcherMetadataByDispatcher.get(dispatcher);
+}
+
 function isPrivateStateHookDispatcherMetadata(metadata) {
   if (
     !isObjectLike(metadata) ||
@@ -1093,6 +1220,40 @@ function isPrivateEffectHookDispatcherMetadata(metadata) {
   return true;
 }
 
+function isPrivateTransitionHookDispatcherMetadata(metadata) {
+  if (
+    !isObjectLike(metadata) ||
+    metadata.capability !==
+      privateTransitionHookDispatcherMetadata.capability ||
+    metadata.compatibilityTarget !==
+      privateTransitionHookDispatcherMetadata.compatibilityTarget
+  ) {
+    return false;
+  }
+
+  for (const flagName of transitionHookCompatibilityFalseFlags) {
+    if (metadata[flagName] !== false) {
+      return false;
+    }
+  }
+
+  for (const key of privateTransitionHookDispatcherMetadataArrayKeys) {
+    if (
+      !hasSameStringArray(
+        metadata[key],
+        privateTransitionHookDispatcherMetadata[key]
+      )
+    ) {
+      return false;
+    }
+  }
+
+  return hasSamePublicShapeBlockers(
+    metadata.publicShapeBlockers,
+    privateTransitionHookDispatcherMetadata.publicShapeBlockers
+  );
+}
+
 function validatePrivateStateHookDispatcherMetadata(metadata) {
   if (!isPrivateStateHookDispatcherMetadata(metadata)) {
     throw createMissingPrivateStateHookDispatcherError('useState');
@@ -1123,6 +1284,12 @@ function validatePrivateEffectHookDispatcherMetadata(metadata) {
   }
 }
 
+function validatePrivateTransitionHookDispatcherMetadata(metadata) {
+  if (!isPrivateTransitionHookDispatcherMetadata(metadata)) {
+    throw createInvalidHookCallError('useTransition');
+  }
+}
+
 function hasSameStringArray(actual, expected) {
   if (!Array.isArray(actual) || actual.length !== expected.length) {
     return false;
@@ -1137,12 +1304,39 @@ function hasSameStringArray(actual, expected) {
   return true;
 }
 
+function hasSamePublicShapeBlockers(actual, expected) {
+  if (!Array.isArray(actual) || actual.length !== expected.length) {
+    return false;
+  }
+
+  for (let index = 0; index < expected.length; index += 1) {
+    const actualRecord = actual[index];
+    const expectedRecord = expected[index];
+
+    if (!isObjectLike(actualRecord)) {
+      return false;
+    }
+
+    for (const fieldName of transitionHookPublicShapeBlockerFields) {
+      if (actualRecord[fieldName] !== expectedRecord[fieldName]) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 function freezeArray(values) {
   return Object.freeze(values.slice());
 }
 
 function freezeRecord(record) {
   return Object.freeze(record);
+}
+
+function freezeRecordArray(records) {
+  return Object.freeze(records.map((record) => freezeRecord({ ...record })));
 }
 
 function defineHookFunctionShape(fn, length) {
@@ -1223,6 +1417,7 @@ module.exports = {
   getPrivateEffectHookDispatcherMetadata,
   getPrivateMemoHookDispatcherMetadata,
   getPrivateStateHookDispatcherMetadata,
+  getPrivateTransitionHookDispatcherMetadata,
   invalidHookCallErrorCode,
   invalidHookCallMessage,
   isPrivateCallbackHookDispatcher,
@@ -1235,17 +1430,22 @@ module.exports = {
   isPrivateMemoHookDispatcherMetadata,
   isPrivateStateHookDispatcher,
   isPrivateStateHookDispatcherMetadata,
+  isPrivateTransitionHookDispatcher,
+  isPrivateTransitionHookDispatcherMetadata,
   markPrivateCallbackHookDispatcher,
   markPrivateContextHookDispatcher,
   markPrivateEffectHookDispatcher,
   markPrivateMemoHookDispatcher,
   markPrivateStateHookDispatcher,
+  markPrivateTransitionHookDispatcher,
   privateCallbackHookDispatcherMetadata,
   privateContextHookDispatcherMetadata,
   privateEffectHookDispatcherMetadata,
   privateMemoHookDispatcherMetadata,
   privateStateHookDispatcherMetadata,
+  privateTransitionHookDispatcherMetadata,
   resolveDispatcher,
+  transitionHookNames,
   use,
   useCallback,
   useContext,
