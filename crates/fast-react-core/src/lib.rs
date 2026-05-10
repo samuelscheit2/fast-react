@@ -5,6 +5,7 @@
 //! development freezing are binding/conformance concerns and fail loudly here.
 
 mod compatibility;
+mod context_stack;
 mod element;
 mod event_priority;
 mod fiber;
@@ -17,6 +18,7 @@ mod fiber_handles;
 mod fiber_id;
 mod hook_effect_flags;
 mod hook_effect_ring;
+mod hook_list;
 mod hook_state_queue;
 mod lane;
 mod root_lanes;
@@ -30,7 +32,13 @@ pub use compatibility::{
     REACT_DOM_COMPATIBILITY_TARGET, REACT_DOM_PACKAGE_TARGET, REACT_PACKAGE_TARGET,
     TYPES_REACT_COMPATIBILITY_TARGET, TYPES_REACT_PACKAGE_TARGET,
 };
-pub use element::{ReactElementRecord, ReactKey, ReactOwner, ReactOwnerSlot, ReactRefSlot};
+pub use context_stack::{
+    ContextFrameId, ContextHandle, ContextSlot, ContextStack, ContextStackError,
+    ContextStackSnapshot, ContextValueHandle,
+};
+pub use element::{
+    ReactElementRecord, ReactKey, ReactOwner, ReactOwnerSlot, ReactPortalRecord, ReactRefSlot,
+};
 pub use event_priority::{
     EventPriority, event_priority_to_lane, higher_event_priority, is_higher_event_priority,
     lanes_to_event_priority, lower_event_priority,
@@ -57,6 +65,12 @@ pub use hook_effect_ring::{
     HookEffectDependencies, HookEffectFilteredIter, HookEffectGeneration, HookEffectId,
     HookEffectInstance, HookEffectInstanceGeneration, HookEffectInstanceId, HookEffectInstanceSlot,
     HookEffectIter, HookEffectNode, HookEffectRing, HookEffectSlot,
+};
+pub use hook_list::{
+    HookEffectPayload, HookList, HookListArena, HookListArenaId, HookListError, HookListGeneration,
+    HookListId, HookListMountCursor, HookListSlot, HookListTraversalResult, HookListUpdateCursor,
+    HookOpaquePayload, HookSlot, HookSlotGeneration, HookSlotId, HookSlotIndex, HookSlotPayload,
+    HookStatePayload,
 };
 pub use hook_state_queue::{
     HookQueue, HookQueueError, HookQueueId, HookQueueStore, HookRevertLane, HookStateSlot,

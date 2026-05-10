@@ -539,8 +539,28 @@ mod tests {
             (5, FiberTag::HostComponent),
             (6, FiberTag::HostText),
             (7, FiberTag::Fragment),
+            (8, FiberTag::Mode),
+            (9, FiberTag::ContextConsumer),
+            (10, FiberTag::ContextProvider),
+            (11, FiberTag::ForwardRef),
+            (12, FiberTag::Profiler),
             (13, FiberTag::Suspense),
+            (14, FiberTag::MemoComponent),
+            (15, FiberTag::SimpleMemoComponent),
+            (16, FiberTag::LazyComponent),
+            (17, FiberTag::IncompleteClassComponent),
+            (18, FiberTag::DehydratedFragment),
+            (19, FiberTag::SuspenseList),
+            (21, FiberTag::Scope),
             (22, FiberTag::Offscreen),
+            (23, FiberTag::LegacyHidden),
+            (24, FiberTag::Cache),
+            (25, FiberTag::TracingMarker),
+            (26, FiberTag::HostHoistable),
+            (27, FiberTag::HostSingleton),
+            (28, FiberTag::IncompleteFunctionComponent),
+            (29, FiberTag::Throw),
+            (30, FiberTag::ViewTransition),
             (31, FiberTag::Activity),
         ];
 
@@ -549,6 +569,7 @@ mod tests {
             assert_eq!(tag.react_tag(), raw);
         }
         assert_eq!(FiberTag::from_react_tag(2), FiberTag::Reserved(2));
+        assert_eq!(FiberTag::from_react_tag(20), FiberTag::Reserved(20));
     }
 
     #[test]
