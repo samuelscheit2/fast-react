@@ -29,6 +29,24 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Workers 263-292 were accepted as a complete implementation batch. The batch
+  added root commit update/deletion apply canaries, private test-renderer JSON,
+  routing, TestInstance, serialization, and act gates, DOM root bridge/public
+  facade/portal gates, DOM property/text mutation adapters, ref/event,
+  hydration, resource/form, React act/state/effect hook gates, native root
+  bridge validation, context provider/root work-loop topology and unsupported
+  preflight canaries, scheduler mock flush helpers, package-surface hardening,
+  sync-flush post-passive gates, and benchmark accepted-gate refreshes.
+- Workers 263-292 were verified on `main` with `cargo fmt --all --check`,
+  `cargo test -p fast-react-reconciler --all-features`,
+  `cargo test -p fast-react-test-renderer --all-features`,
+  `cargo test -p fast-react-napi --all-features`,
+  `cargo clippy --workspace --all-targets --all-features -- -D warnings`,
+  `npm run check:js`, `npm run check:benchmarks`, and `git diff --check`.
+  Conflict resolutions preserved overlapping root commit/deletion behavior,
+  test-renderer gates, DOM root/portal metadata, hook state/effect metadata,
+  package-surface privacy for the act gate, and root-work-loop provider,
+  function-component, and unsupported-tag preflight canaries.
 - Report-only implementation planning workers 104-117 were merged; their tmux
   sessions and worktrees were closed.
 - Core source workers 047, 075, and 076 were merged, adding root lane
