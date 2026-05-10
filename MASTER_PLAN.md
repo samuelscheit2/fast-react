@@ -45,7 +45,7 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue 503-518 is assigned in isolated worktrees.
+Top-level cap: 30 workers. Queue 503-526 is assigned in isolated worktrees.
 
 | Worker | Focus |
 | --- | --- |
@@ -65,6 +65,14 @@ Top-level cap: 30 workers. Queue 503-518 is assigned in isolated worktrees.
 | 516 | Test renderer committed fiber tree inspection |
 | 517 | Test renderer act warning/thenable blockers |
 | 518 | Scheduler mock expired act-route diagnostics |
+| 519 | Package surface private audit for 480-492 |
+| 520 | Benchmark private diagnostics canaries |
+| 521 | Root-render E2E private gate refresh |
+| 522 | SuspenseList/Activity blocker diagnostics |
+| 523 | Scheduler postTask environment diagnostics |
+| 524 | Native transport worker-thread teardown |
+| 525 | React hook dispatcher public blocker refresh |
+| 526 | Conformance private admission refresh for 473-502 |
 
 ## Near-Term Sequencing
 
