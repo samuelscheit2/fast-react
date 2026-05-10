@@ -76,6 +76,24 @@ future root work-loop slice consumes it.
   passed.
 - `git diff --check`: passed after the final report edit.
 
+## Post-Merge Orchestrator Verification
+
+- Merged current `main` into
+  `worker/194-function-component-begin-work-handoff`; no manual conflict
+  resolution was required.
+- Confirmed the merged reconciler module list keeps accepted host/sync/callback
+  modules while adding private `begin_work`.
+- `cargo fmt --all --check`: passed.
+- `cargo test -p fast-react-reconciler --all-features begin_work`: passed, 4
+  tests.
+- `cargo test -p fast-react-reconciler --all-features function_component`:
+  passed, 8 matching tests.
+- `cargo test -p fast-react-reconciler --all-features`: passed, 138 unit tests
+  plus 1 compile-fail doctest.
+- `cargo clippy -p fast-react-reconciler --all-targets --all-features -- -D warnings`:
+  passed.
+- `git diff --check`: passed.
+
 ## Risks Or Blockers
 
 - The handoff is deliberately private and not consumed by the root scheduler or
