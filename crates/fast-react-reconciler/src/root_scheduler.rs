@@ -1465,6 +1465,84 @@ mod tests {
     }
 
     #[test]
+    fn root_scheduler_pinged_retry_lane_schedules_deterministic_callback_metadata() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        schedule_default_update(&mut store, root_id);
+        let retry_lanes = Lanes::from(Lane::RETRY_1).merge_lane(Lane::RETRY_2);
+        let retry_and_offscreen = retry_lanes.merge(Lanes::OFFSCREEN);
+        {
+            let lanes = store.root_mut(root_id).unwrap().lanes_mut();
+            lanes.mark_updated(Lane::RETRY_1);
+            lanes.mark_updated(Lane::RETRY_2);
+            lanes.mark_updated(Lane::OFFSCREEN);
+            lanes.mark_finished(RootFinishedLanes::new(Lanes::DEFAULT, retry_and_offscreen));
+            lanes.mark_suspended(retry_and_offscreen, Lane::NO, true);
+            lanes.mark_pinged(Lanes::from(Lane::RETRY_2));
+        }
+
+        let processed = process_root_schedule_in_microtask(&mut store).unwrap();
+        let record = processed.records()[0];
+        let scheduled_callback = record.scheduled_callback().unwrap();
+
+        assert_eq!(record.outcome(), RootTaskScheduleOutcome::Scheduled);
+        assert_eq!(record.next_lanes(), Lanes::from(Lane::RETRY_2));
+        assert_eq!(
+            record.callback_priority(),
+            RootCallbackPriority::new(Lane::RETRY_2)
+        );
+        assert_eq!(record.callback_node(), scheduled_callback.node());
+        assert_eq!(record.scheduler_priority(), Some(SchedulerPriority::Normal));
+        assert_eq!(record.scheduled_act_queue_task(), None);
+        assert_eq!(record.canceled_callback(), None);
+        assert_eq!(scheduled_callback.root(), root_id);
+        assert_eq!(
+            scheduled_callback.callback_priority(),
+            RootCallbackPriority::new(Lane::RETRY_2)
+        );
+        assert_eq!(
+            scheduled_callback.scheduler_priority(),
+            SchedulerPriority::Normal
+        );
+        assert_eq!(
+            store.scheduler_bridge().callback_requests(),
+            &[scheduled_callback]
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().callback_node(),
+            scheduled_callback.node()
+        );
+        assert_eq!(
+            store
+                .root(root_id)
+                .unwrap()
+                .scheduling()
+                .callback_priority(),
+            RootCallbackPriority::new(Lane::RETRY_2)
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            retry_and_offscreen
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().suspended_lanes(),
+            retry_and_offscreen
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pinged_lanes(),
+            Lanes::from(Lane::RETRY_2)
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().warm_lanes(),
+            Lanes::from(Lane::RETRY_1).merge(Lanes::OFFSCREEN)
+        );
+        assert_eq!(scheduled_roots(&store).unwrap(), vec![root_id]);
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
     fn root_scheduler_prewarm_lane_selection_fails_closed_with_pending_commit() {
         let mut root_lanes = RootLaneState::new();
         root_lanes.mark_updated(Lane::DEFAULT);
