@@ -29,6 +29,15 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+- Worker 473 was accepted from queue 473-502. It replaced the stale worker 466
+  with private react-test-renderer act passive-drain diagnostics that consume
+  accepted pending-passive flush metadata through the existing private
+  Scheduler act diagnostics surface while keeping public act, Scheduler
+  callbacks, root requests, passive callbacks, and host mutation blocked. It
+  was verified after merge with full `fast-react-test-renderer` tests, focused
+  react-test-renderer act and create-routing tests, the react-test-renderer
+  workspace smoke check, the act/passive local gate, Rust fmt, conflict-marker
+  scanning, and `git diff --check`.
 - Worker 500 was accepted from queue 473-502. It added a fail-closed
   act/passive local conformance gate for the accepted private diagnostics from
   workers 473, 474, 475, 482, 483, and 498 while rejecting public act,
