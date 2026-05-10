@@ -2440,6 +2440,197 @@ test('private root bridge ref ordering diagnostic wraps update and unmount canar
   assertBridgeDidNotTouchContainer(container, document);
 });
 
+test('private root bridge ref callback error routing records metadata without public root callbacks', () => {
+  const document = createDocument('private-ref-error-routing');
+  const container = createElement('DIV', document);
+  const attachNode = createElement('DIV', document);
+  const cleanupNode = createElement('SPAN', document);
+  const bridge = rootBridge.createPrivateRootBridgeShell();
+  const publicRootErrorCalls = [];
+  function onUncaughtError(error) {
+    publicRootErrorCalls.push(['uncaught', error.message]);
+  }
+  function onCaughtError(error) {
+    publicRootErrorCalls.push(['caught', error.message]);
+  }
+  function onRecoverableError(error) {
+    publicRootErrorCalls.push(['recoverable', error.message]);
+  }
+
+  const create = bridge.createClientRoot(container, {
+    onCaughtError,
+    onRecoverableError,
+    onUncaughtError
+  });
+  const render = bridge.renderContainer(create.handle, {
+    props: {children: 'private error route'},
+    type: 'div'
+  });
+  const unmount = bridge.unmountContainer(create.handle);
+  const rootOwner = rootBridge.getRootOwnerFromHandle(create.handle);
+  const attachHostOwner = {kind: 'PrivateRootBridgeRefErrorAttachHost'};
+  const cleanupHostOwner = {kind: 'PrivateRootBridgeRefErrorCleanupHost'};
+  const attachToken = componentTree.createHostInstanceToken(
+    attachHostOwner,
+    rootOwner
+  );
+  const cleanupToken = componentTree.createHostInstanceToken(
+    cleanupHostOwner,
+    rootOwner
+  );
+  const attachError = new Error('bridge attach route error');
+  attachError.code = 'BRIDGE_ATTACH_ROUTE';
+  const cleanupError = new TypeError('bridge cleanup route error');
+
+  function throwingAttachRef() {
+    throw attachError;
+  }
+
+  function cleanupRef() {}
+
+  function throwingCleanup() {
+    throw cleanupError;
+  }
+
+  componentTree.attachHostInstanceNode(attachNode, attachToken, {
+    ref: throwingAttachRef
+  });
+  componentTree.attachHostInstanceNode(cleanupNode, cleanupToken, {
+    ref: cleanupRef
+  });
+
+  const attachMetadata = refCallbackGate.createRefAttachMetadataRecord({
+    rootOwner,
+    hostOwner: attachHostOwner,
+    hostInstanceToken: attachToken,
+    fiber: {id: 'bridge-attach-error-fiber'},
+    stateNode: {id: 'bridge-attach-state-node'},
+    refHandle: {id: 'bridge-throwing-attach-ref'},
+    ref: throwingAttachRef,
+    sourceToken: 'commit:bridge-attach-error'
+  });
+  const cleanupMetadata = refCallbackGate.createRefDetachMetadataRecord({
+    rootOwner,
+    hostOwner: cleanupHostOwner,
+    hostInstanceToken: cleanupToken,
+    fiber: {id: 'bridge-cleanup-error-fiber'},
+    stateNode: {id: 'bridge-cleanup-state-node'},
+    refHandle: {id: 'bridge-cleanup-ref'},
+    ref: cleanupRef,
+    refCleanup: throwingCleanup,
+    sourceToken: 'deletion:bridge-cleanup-error',
+    detachReason: refCallbackGate.REF_DETACH_REASON_DELETED
+  });
+  const renderMetadata = bridge.admitRootCommitRefMetadata(
+    render,
+    {detach: [], attach: [attachMetadata]},
+    {label: 'bridge-attach-error'}
+  );
+  const unmountMetadata = bridge.admitRootCommitRefMetadata(
+    unmount,
+    {detach: [cleanupMetadata], attach: []},
+    {label: 'bridge-cleanup-error'}
+  );
+
+  const routing = bridge.createRefCallbackRootErrorRouting(
+    [create, render, unmount],
+    {
+      steps: [
+        {label: 'bridge-attach-error-route'},
+        {label: 'bridge-cleanup-error-route'}
+      ]
+    }
+  );
+
+  assert.equal(
+    rootBridge.isPrivateRootRefCallbackErrorRoutingRecord(routing),
+    true
+  );
+  assert.equal(
+    routing.$$typeof,
+    rootBridge.privateRootRefCallbackErrorRoutingRecordType
+  );
+  assert.equal(
+    routing.routingStatus,
+    rootBridge.ROOT_BRIDGE_REF_CALLBACK_ERROR_ROUTING_RECORDED
+  );
+  assert.equal(
+    routing.rootCommitRefMetadataSource,
+    'accepted-root-commit-ref-metadata'
+  );
+  assert.equal(routing.acceptedRootCommitRefMetadataCount, 2);
+  assert.equal(routing.rootErrorRoutingRecordCount, 2);
+  assert.equal(routing.callbackAttachErrorCount, 1);
+  assert.equal(routing.cleanupReturnErrorCount, 1);
+  assert.equal(routing.rootErrorChannel, 'onUncaughtError');
+  assert.equal(routing.onUncaughtErrorConfigured, true);
+  assert.equal(routing.onCaughtErrorConfigured, true);
+  assert.equal(routing.onRecoverableErrorConfigured, true);
+  assert.equal(routing.rootErrorUpdatesScheduled, false);
+  assert.equal(routing.publicRootErrorCallbacksInvoked, false);
+  assert.equal(routing.rootErrorCallbackInvocationCount, 0);
+  assert.equal(routing.rootErrorsReported, false);
+  assert.equal(routing.publicRootExecution, false);
+  assert.equal(routing.reconcilerExecution, false);
+  assert.equal(routing.compatibilityClaimed, false);
+  assert.deepEqual(publicRootErrorCalls, []);
+  assert.deepEqual(
+    routing.rootErrorRoutingSnapshot.records.map((record) => [
+      record.sourceStepLabel,
+      record.sourceHostOutputCanary,
+      record.errorName,
+      record.errorMessage,
+      record.errorCode,
+      record.publicRootErrorCallbackInvoked
+    ]),
+    [
+      [
+        'bridge-attach-error-route',
+        'initial-host-output',
+        'Error',
+        'bridge attach route error',
+        'BRIDGE_ATTACH_ROUTE',
+        false
+      ],
+      [
+        'bridge-cleanup-error-route',
+        'unmount-host-output',
+        'TypeError',
+        'bridge cleanup route error',
+        null,
+        false
+      ]
+    ]
+  );
+
+  const payload =
+    rootBridge.getPrivateRootRefCallbackErrorRoutingPayload(routing);
+  assert.deepEqual(payload.acceptedRootCommitRefMetadataRecords, [
+    renderMetadata,
+    unmountMetadata
+  ]);
+  assert.equal(payload.rootOptions.onUncaughtError, onUncaughtError);
+  assert.equal(payload.rootOptions.onCaughtError, onCaughtError);
+  assert.equal(payload.rootOptions.onRecoverableError, onRecoverableError);
+  assert.equal(
+    payload.rootErrorRoutingPayload.records[0].error,
+    attachError
+  );
+  assert.equal(
+    payload.rootErrorRoutingPayload.records[1].error,
+    cleanupError
+  );
+  assert.equal(Object.hasOwn(routing, 'error'), false);
+  assert.equal(Object.hasOwn(routing, 'ref'), false);
+
+  assert.equal(componentTree.detachHostInstanceToken(attachToken), attachToken);
+  assert.equal(
+    componentTree.detachHostInstanceToken(cleanupToken),
+    cleanupToken
+  );
+  assertBridgeDidNotTouchContainer(container, document);
+});
+
 test('private react-dom/client facade adapter routes root calls to bridge records', () => {
   const document = createDocument('private-client-facade-adapter');
   const container = createElement('DIV', document);
