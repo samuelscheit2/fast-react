@@ -2209,6 +2209,7 @@ impl TestRendererNestedCommittedHostOutput {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestRendererNestedHostParentPlacedHostOutput {
+    scheduled_update_sequence: usize,
     render: HostRootRenderPhaseRecord,
     commit: HostRootCommitRecord,
     commit_diagnostics: TestRendererHostOutputCanaryCommitDiagnostics,
@@ -2221,6 +2222,11 @@ pub struct TestRendererNestedHostParentPlacedHostOutput {
 }
 
 impl TestRendererNestedHostParentPlacedHostOutput {
+    #[must_use]
+    pub const fn scheduled_update_sequence(&self) -> usize {
+        self.scheduled_update_sequence
+    }
+
     #[must_use]
     pub const fn render(&self) -> HostRootRenderPhaseRecord {
         self.render
@@ -12626,9 +12632,34 @@ impl TestRendererRoot {
         &self,
         output: &TestRendererNestedHostParentPlacedHostOutput,
         execution: TestRendererPrivateUpdateRouteAdmissionRecord,
+        identity: Option<TestRendererPrivateSerializationFinishedWorkIdentityGate>,
     ) -> Result<TestRendererPrivateToJsonNativeExecutionEvidence, TestRendererRootError> {
         self.validate_private_to_json_update_native_execution_record_for_canary(execution)?;
         let row = self.describe_private_to_json_nested_host_output_update_row_for_canary(output)?;
+        let identity = self
+            .validate_private_serialization_finished_work_identity_for_native_execution(
+                "create().toJSON",
+                TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME,
+                row.host_output_update_kind(),
+                true,
+                false,
+                identity,
+            )
+            .map_err(|reason| {
+                TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                    operation: "update",
+                    reason,
+                }
+            })?;
+        self.validate_private_nested_update_native_execution_matches_handoff_for_canary(
+            output, execution, identity,
+        )
+        .map_err(|reason| {
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "update",
+                reason,
+            }
+        })?;
         if output.host_parent_placement_apply_count() == 0
             || !output
                 .commit()
@@ -13941,6 +13972,64 @@ impl TestRendererRoot {
         Ok(())
     }
 
+    fn validate_private_nested_update_native_execution_matches_handoff_for_canary(
+        &self,
+        output: &TestRendererNestedHostParentPlacedHostOutput,
+        execution: TestRendererPrivateUpdateRouteAdmissionRecord,
+        identity: TestRendererPrivateSerializationFinishedWorkIdentityGate,
+    ) -> Result<(), &'static str> {
+        macro_rules! fiber_handle {
+            ($fiber:expr) => {{
+                let fiber = $fiber;
+                TestRendererFiberHandleDiagnostics {
+                    arena_id: fiber.arena_id().get(),
+                    slot: fiber.slot().get(),
+                    generation: fiber.generation().get(),
+                }
+            }};
+        }
+
+        let render = output.render();
+        let commit = output.commit();
+        if execution.scheduled_update_sequence() != output.scheduled_update_sequence()
+            || identity.root_scheduled_update_sequence() != output.scheduled_update_sequence()
+            || output.scheduled_update_sequence() != self.scheduled_updates.len()
+        {
+            return Err("update-admission-handoff-mismatch");
+        }
+
+        if execution.render_current() != fiber_handle!(render.current())
+            || execution.render_finished_work() != fiber_handle!(render.finished_work())
+            || execution.commit_previous_current() != fiber_handle!(commit.previous_current())
+            || execution.commit_current() != fiber_handle!(commit.current())
+        {
+            return Err("update-admission-handoff-mismatch");
+        }
+
+        if execution.render_current() != identity.render_current()
+            || execution.render_finished_work() != identity.render_finished_work()
+            || execution.commit_previous_current() != identity.commit_previous_current()
+            || execution.commit_current() != identity.commit_current()
+        {
+            return Err("update-admission-finished-work-identity-mismatch");
+        }
+
+        if execution.render_lanes_bits() == 0
+            || execution.render_lanes_bits() != render.render_lanes().bits()
+            || execution.commit_finished_lanes_bits() != commit.finished_lanes().bits()
+        {
+            return Err("update-admission-lane-mismatch");
+        }
+
+        if execution.render_lanes_bits() != identity.render_lanes_bits()
+            || execution.commit_finished_lanes_bits() != identity.commit_finished_lanes_bits()
+        {
+            return Err("update-admission-finished-work-identity-lane-mismatch");
+        }
+
+        Ok(())
+    }
+
     fn validate_private_to_json_create_native_execution_record_for_canary(
         &self,
         execution: TestRendererPrivateCreateRouteAdmissionDiagnostics,
@@ -14584,6 +14673,7 @@ impl TestRendererRoot {
             None,
         )?;
         self.scheduled_updates.push(scheduled);
+        let scheduled_update_sequence = self.scheduled_updates.len();
         let render = self
             .render_latest_scheduled_host_root_for_commit_handoff()?
             .expect("nested host-parent placement canary schedules an update before rendering");
@@ -14666,6 +14756,7 @@ impl TestRendererRoot {
         self.current_host_output = None;
 
         Ok(TestRendererNestedHostParentPlacedHostOutput {
+            scheduled_update_sequence,
             render,
             commit,
             commit_diagnostics,
@@ -17180,28 +17271,41 @@ mod tests {
         RootElementHandle::from_raw(raw)
     }
 
-    fn accepted_update_route_admission_for_root(
+    fn accepted_nested_update_route_admission_for_root(
         root: &TestRendererRoot,
+        output: &TestRendererNestedHostParentPlacedHostOutput,
     ) -> TestRendererPrivateUpdateRouteAdmissionRecord {
-        let empty_fiber = TestRendererFiberHandleDiagnostics::from_raw_parts_for_canary(0, 0, 0);
+        macro_rules! fiber_handle {
+            ($fiber:expr) => {{
+                let fiber = $fiber;
+                TestRendererFiberHandleDiagnostics {
+                    arena_id: fiber.arena_id().get(),
+                    slot: fiber.slot().get(),
+                    generation: fiber.generation().get(),
+                }
+            }};
+        }
+
+        let render = output.render();
+        let commit = output.commit();
         TestRendererPrivateUpdateRouteAdmissionRecord {
             record_id: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID,
             status: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS,
             public_surface: "create().update",
             root: root.root_id(),
-            scheduled_update_sequence: root.scheduled_updates.len(),
+            scheduled_update_sequence: output.scheduled_update_sequence(),
             request_api: "TestRendererRoot::update",
             source_diagnostic_name: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_DIAGNOSTIC_NAME,
             source_diagnostic_status: TEST_RENDERER_PRIVATE_UPDATE_ROUTE_STATUS,
             lifecycle: TestRendererRootLifecycle::Active,
             scheduled_update_kind: TestRendererRootUpdateKind::Update,
             host_output_update_kind: TestRendererRootUpdateKind::Update,
-            render_current: empty_fiber,
-            render_finished_work: empty_fiber,
-            commit_previous_current: empty_fiber,
-            commit_current: empty_fiber,
-            render_lanes_bits: 0,
-            commit_finished_lanes_bits: 0,
+            render_current: fiber_handle!(render.current()),
+            render_finished_work: fiber_handle!(render.finished_work()),
+            commit_previous_current: fiber_handle!(commit.previous_current()),
+            commit_current: fiber_handle!(commit.current()),
+            render_lanes_bits: render.render_lanes().bits(),
+            commit_finished_lanes_bits: commit.finished_lanes().bits(),
             consumes_accepted_host_root_update_queue_metadata: true,
             consumes_accepted_root_work_loop_metadata: true,
             consumes_accepted_host_output_metadata: true,
@@ -17211,6 +17315,82 @@ mod tests {
             public_root_update_available: false,
             public_serialization_available: false,
             native_execution_available: false,
+            compatibility_claimed: false,
+        }
+    }
+
+    fn accepted_nested_to_json_identity_for_root(
+        root: &TestRendererRoot,
+        output: &TestRendererNestedHostParentPlacedHostOutput,
+    ) -> TestRendererPrivateSerializationFinishedWorkIdentityGate {
+        macro_rules! fiber_handle {
+            ($fiber:expr) => {{
+                let fiber = $fiber;
+                TestRendererFiberHandleDiagnostics {
+                    arena_id: fiber.arena_id().get(),
+                    slot: fiber.slot().get(),
+                    generation: fiber.generation().get(),
+                }
+            }};
+        }
+
+        root.validate_serialization_gate_commit(output.commit())
+            .unwrap();
+        let row = root
+            .describe_private_to_json_nested_host_output_update_row_for_canary(output)
+            .unwrap();
+        assert_eq!(
+            row.host_output_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert_eq!(
+            row.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::NestedHostText
+        );
+
+        let render = output.render();
+        let commit = output.commit();
+        assert_eq!(render.root(), root.root_id());
+        assert_eq!(commit.root(), root.root_id());
+        assert_eq!(commit.current(), render.finished_work());
+        assert_eq!(commit.previous_current(), render.current());
+        assert_eq!(commit.finished_lanes(), render.render_lanes());
+
+        TestRendererPrivateSerializationFinishedWorkIdentityGate {
+            diagnostic_name:
+                TEST_RENDERER_PRIVATE_SERIALIZATION_FINISHED_WORK_IDENTITY_DIAGNOSTIC_NAME,
+            status: TEST_RENDERER_PRIVATE_SERIALIZATION_FINISHED_WORK_IDENTITY_STATUS,
+            root: root.root_id(),
+            root_scheduled_update_sequence: root.scheduled_updates.len(),
+            public_surface: "create().toJSON",
+            source_serialization_diagnostic_name:
+                TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME,
+            host_output_update_kind: row.host_output_update_kind(),
+            render_current: fiber_handle!(render.current()),
+            render_finished_work: fiber_handle!(render.finished_work()),
+            commit_previous_current: fiber_handle!(commit.previous_current()),
+            commit_current: fiber_handle!(commit.current()),
+            report_finished_work: fiber_handle!(commit.current()),
+            render_lanes_bits: render.render_lanes().bits(),
+            commit_finished_lanes_bits: commit.finished_lanes().bits(),
+            report_finished_lanes_bits: commit.finished_lanes().bits(),
+            commit_remaining_lanes_bits: commit.remaining_lanes().bits(),
+            commit_pending_lanes_bits: commit.pending_lanes().bits(),
+            commit_current_matches_render_finished_work: true,
+            commit_previous_current_matches_render_current: true,
+            commit_lanes_match_render_lanes: true,
+            report_finished_work_matches_commit_current: true,
+            report_lanes_match_commit_lanes: true,
+            committed_fiber_inspection_current_matches_commit: true,
+            host_output_snapshot_current: true,
+            consumes_committed_host_root_finished_work_identity: true,
+            consumes_committed_host_root_finished_work_lanes: true,
+            consumes_private_to_json_evidence: true,
+            consumes_private_to_tree_evidence: false,
+            public_to_json_available: false,
+            public_to_tree_available: false,
+            public_test_instance_available: false,
+            public_serialization_available: false,
             compatibility_claimed: false,
         }
     }
@@ -19420,6 +19600,189 @@ mod tests {
     }
 
     #[test]
+    fn root_private_to_json_nested_update_native_execution_requires_finished_work_identity_gate() {
+        let mut root = TestRendererRoot::create_nested_host_components_with_text_for_canary(
+            "section",
+            "span",
+            "stable",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        root.render_and_commit_nested_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let placed = root
+            .render_and_commit_nested_host_parent_text_placement_for_canary("inserted")
+            .unwrap();
+        let execution = accepted_nested_update_route_admission_for_root(&root, &placed);
+        let identity = accepted_nested_to_json_identity_for_root(&root, &placed);
+
+        let error = root
+            .describe_private_to_json_after_nested_update_native_execution_for_canary(
+                &placed, execution, None,
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON nested update native execution identity rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "update",
+                reason: "finished-work-identity-missing"
+            }
+        ));
+
+        let mut wrong_request_admission = execution;
+        wrong_request_admission.request_api = "TestRendererRoot::create";
+        let error = root
+            .describe_private_to_json_after_nested_update_native_execution_for_canary(
+                &placed,
+                wrong_request_admission,
+                Some(identity),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON nested update native execution route rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "update",
+                reason: "route-metadata-stale"
+            }
+        ));
+
+        let mut stale_identity = identity;
+        stale_identity.commit_current.slot += 1;
+        let error = root
+            .describe_private_to_json_after_nested_update_native_execution_for_canary(
+                &placed,
+                execution,
+                Some(stale_identity),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON nested update native execution stale identity rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "update",
+                reason: "finished-work-identity-stale"
+            }
+        ));
+
+        let mut mismatched_identity_handoff = identity;
+        mismatched_identity_handoff.render_current.slot += 1;
+        mismatched_identity_handoff.commit_previous_current =
+            mismatched_identity_handoff.render_current;
+        let error = root
+            .describe_private_to_json_after_nested_update_native_execution_for_canary(
+                &placed,
+                execution,
+                Some(mismatched_identity_handoff),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!(
+                "expected private JSON nested update native execution identity handoff rejection"
+            );
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "update",
+                reason: "update-admission-finished-work-identity-mismatch"
+            }
+        ));
+
+        let mut stale_sequence_admission = execution;
+        stale_sequence_admission.scheduled_update_sequence += 1;
+        let error = root
+            .describe_private_to_json_after_nested_update_native_execution_for_canary(
+                &placed,
+                stale_sequence_admission,
+                Some(identity),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON nested update native execution sequence rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "update",
+                reason: "update-admission-handoff-mismatch"
+            }
+        ));
+
+        let mut mismatched_handoff_admission = execution;
+        mismatched_handoff_admission.commit_current.slot += 1;
+        let error = root
+            .describe_private_to_json_after_nested_update_native_execution_for_canary(
+                &placed,
+                mismatched_handoff_admission,
+                Some(identity),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON nested update native execution handoff rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "update",
+                reason: "update-admission-handoff-mismatch"
+            }
+        ));
+
+        let mut identity_lane_mismatch = identity;
+        identity_lane_mismatch.render_lanes_bits += 1;
+        identity_lane_mismatch.commit_finished_lanes_bits =
+            identity_lane_mismatch.render_lanes_bits;
+        identity_lane_mismatch.report_finished_lanes_bits =
+            identity_lane_mismatch.commit_finished_lanes_bits;
+        let error = root
+            .describe_private_to_json_after_nested_update_native_execution_for_canary(
+                &placed,
+                execution,
+                Some(identity_lane_mismatch),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON nested update native execution identity lane rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "update",
+                reason: "update-admission-finished-work-identity-lane-mismatch"
+            }
+        ));
+
+        let mut lane_admission = execution;
+        lane_admission.commit_finished_lanes_bits += 1;
+        let error = root
+            .describe_private_to_json_after_nested_update_native_execution_for_canary(
+                &placed,
+                lane_admission,
+                Some(identity),
+            )
+            .unwrap_err();
+        let TestRendererRootError::PrivateJsonSerialization(error) = error else {
+            panic!("expected private JSON nested update native execution lane rejection");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateJsonSerializationError::NativeExecutionRecordMismatch {
+                operation: "update",
+                reason: "update-admission-lane-mismatch"
+            }
+        ));
+    }
+
+    #[test]
     fn root_private_to_json_nested_update_native_execution_evidence_consumes_multichild_row() {
         let mut root = TestRendererRoot::create_nested_host_components_with_text_for_canary(
             "section",
@@ -19434,11 +19797,14 @@ mod tests {
         let placed = root
             .render_and_commit_nested_host_parent_text_placement_for_canary("inserted")
             .unwrap();
-        let execution = accepted_update_route_admission_for_root(&root);
+        let execution = accepted_nested_update_route_admission_for_root(&root, &placed);
+        let identity = accepted_nested_to_json_identity_for_root(&root, &placed);
 
         let evidence = root
             .describe_private_to_json_after_nested_update_native_execution_for_canary(
-                &placed, execution,
+                &placed,
+                execution,
+                Some(identity),
             )
             .unwrap();
 
