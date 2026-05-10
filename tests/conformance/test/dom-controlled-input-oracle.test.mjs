@@ -25,6 +25,15 @@ const require = createRequire(import.meta.url);
 const resourceFormGate = require(
   "../../../packages/react-dom/src/resource-form-internals-gate.js"
 );
+const controlledRestoreQueue = require(
+  "../../../packages/react-dom/src/client/controlled-restore-queue.js"
+);
+const componentTree = require(
+  "../../../packages/react-dom/src/client/component-tree.js"
+);
+const eventListener = require(
+  "../../../packages/react-dom/src/events/react-dom-event-listener.js"
+);
 
 const oracle = readCheckedDomControlledInputOracle();
 
@@ -169,6 +178,90 @@ test("private controlled restore queue diagnostic records fake-DOM intent withou
     undefined
   );
   assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
+});
+
+test("private controlled post-event restore queue consumes event latest-props evidence only", () => {
+  const gate =
+    controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({
+      requestIdPrefix: "controlled-oracle-event-restore"
+    });
+  const eventDispatch = createPrivateControlledEventDispatch({
+    domEventName: "click",
+    latestProps: {
+      type: "checkbox",
+      checked: true,
+      onChange() {},
+      onClick() {}
+    },
+    nodeName: "INPUT",
+    value: "browser-mutated"
+  });
+  const descriptorBefore = Object.getOwnPropertyDescriptor(
+    eventDispatch.targetNode,
+    "value"
+  );
+  const intent = gate.recordPostEventRestoreIntentFromEventLatestProps(
+    eventDispatch.dispatchRecord,
+    {
+      explicitAdmission: true,
+      queueKind:
+        "deterministic-event-latest-props-post-event-restore-queue",
+      queueId: "controlled-oracle-event-restore-queue",
+      eventName: "click",
+      targetKind: "controlled-input-post-event-restore-queue"
+    }
+  );
+
+  assert.equal(
+    intent.status,
+    controlledRestoreQueue.controlledInputPostEventRestoreQueueIntentRecordedStatus
+  );
+  assert.equal(intent.hostTag, "input");
+  assert.equal(intent.controlKind, "checked");
+  assert.equal(intent.trackedField, "checked");
+  assert.equal(intent.restoreIntent.intentRecorded, true);
+  assert.equal(intent.restoreIntent.restoreTargetWouldBeQueued, true);
+  assert.equal(intent.restoreIntent.latestPropsEvidenceAccepted, true);
+  assert.equal(intent.restoreIntent.latestPropsLookupPerformed, true);
+  assert.equal(intent.restoreIntent.eventDispatchRecordAccepted, true);
+  assert.equal(intent.restoreIntent.eventPluginDispatchPerformed, false);
+  assert.equal(intent.restoreIntent.restoreQueueWritten, false);
+  assert.equal(intent.restoreIntent.controlledStateRestoreInvoked, false);
+  assert.equal(intent.restoreIntent.restoreFlushed, false);
+  assert.equal(intent.restoreIntent.liveValueTrackerInstalled, false);
+  assert.equal(intent.restoreIntent.valueTrackerFieldWritten, false);
+  assert.equal(intent.restoreIntent.propertyDescriptorInstalled, false);
+  assert.equal(intent.restoreIntent.hostValueRead, false);
+  assert.equal(intent.restoreIntent.hostValueWritten, false);
+  assert.equal(intent.postEventRestoreBoundary.restoreQueued, false);
+  assert.equal(intent.postEventRestoreBoundary.restoreFlushed, false);
+  assert.equal(intent.sideEffects.restoreQueueWritten, false);
+  assert.equal(intent.sideEffects.restoreQueueFlushed, false);
+  assert.equal(intent.sideEffects.controlledStateRestoreScheduled, false);
+  assert.equal(intent.sideEffects.controlledStateRestoreInvoked, false);
+  assert.equal(intent.sideEffects.propertyDescriptorInstalled, false);
+  assert.equal(intent.sideEffects.hostValueRead, false);
+  assert.equal(intent.sideEffects.hostValueWritten, false);
+  assert.equal(intent.sideEffects.publicControlledBehaviorEnabled, false);
+  assert.equal(intent.sideEffects.compatibilityClaimed, false);
+  assert.equal(
+    intent.publicControlledBehaviorBoundary.compatibilityClaimed,
+    false
+  );
+  assert.equal(Object.hasOwn(eventDispatch.targetNode, "_valueTracker"), false);
+  assert.equal(descriptorBefore.get, undefined);
+  assert.equal(descriptorBefore.set, undefined);
+  assert.equal(
+    Object.getOwnPropertyDescriptor(eventDispatch.targetNode, "value").get,
+    undefined
+  );
+  assert.equal(
+    Object.getOwnPropertyDescriptor(eventDispatch.targetNode, "value").set,
+    undefined
+  );
+  assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
+
+  componentTree.detachHostInstanceToken(eventDispatch.token);
 });
 
 test("DOM controlled input oracle covers every scenario in every probe mode", () => {
@@ -680,5 +773,58 @@ function createPrivateControlledInputFakeDomTarget(fields) {
   return {
     [resourceFormGate.controlledInputValueTrackerFakeDomTargetMarker]: true,
     ...fields
+  };
+}
+
+function createPrivateControlledEventDispatch(options) {
+  const document = {
+    nodeName: "#document",
+    nodeType: 9
+  };
+  document.ownerDocument = document;
+  const container = createPrivateControlledHostNode("DIV", document);
+  const targetNode = createPrivateControlledHostNode(
+    options.nodeName,
+    document
+  );
+  targetNode.parentNode = container;
+  if (Object.hasOwn(options, "value")) {
+    targetNode.value = options.value;
+  }
+  const token = componentTree.createHostInstanceToken(
+    {kind: "ControlledOracleEventHost"},
+    {kind: "ControlledOracleEventRoot"}
+  );
+  componentTree.attachHostInstanceNode(
+    targetNode,
+    token,
+    options.latestProps
+  );
+  const wrapperRecord =
+    eventListener.createEventListenerWrapperRecordWithPriority(
+      container,
+      options.domEventName,
+      0
+    );
+
+  return {
+    container,
+    dispatchRecord: eventListener.dispatchEvent(wrapperRecord, {
+      target: targetNode,
+      type: options.domEventName
+    }),
+    document,
+    targetNode,
+    token
+  };
+}
+
+function createPrivateControlledHostNode(nodeName, ownerDocument) {
+  return {
+    localName: nodeName.toLowerCase(),
+    nodeName,
+    nodeType: 1,
+    ownerDocument,
+    parentNode: null
   };
 }

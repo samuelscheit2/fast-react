@@ -50,6 +50,7 @@ const reactDomPackageJson = require(
 
 const {
   CONTROLLED_FORM_PROPERTY_PAYLOAD_STATUS,
+  CONTROLLED_POST_EVENT_RESTORE_QUEUE_STATUS,
   CONTROLLED_PRIVATE_WRAPPER_PROPERTY_PAYLOAD_STATUS,
   CONTROLLED_VALUE_TRACKER_FAKE_DOM_DIAGNOSTIC_STATUS,
   CONTROLLED_VALUE_TRACKER_GATE_STATUS,
@@ -1326,10 +1327,16 @@ test("private DOM controlled payload rows carry wrapper metadata without live tr
         boundary.fakeDomTrackerDiagnosticStatus,
         CONTROLLED_VALUE_TRACKER_FAKE_DOM_DIAGNOSTIC_STATUS
       );
+      assert.equal(
+        boundary.postEventRestoreQueueGateStatus,
+        CONTROLLED_POST_EVENT_RESTORE_QUEUE_STATUS
+      );
       assert.equal(boundary.fakeDomTrackerDiagnosticAvailable, true);
+      assert.equal(boundary.postEventRestoreQueueGateAvailable, true);
       assert.equal(boundary.fakeDomTrackerDiagnosticInstalled, false);
       assert.equal(boundary.fakeDomTrackerDiagnosticObserved, false);
       assert.equal(boundary.fakeDomTrackerDiagnosticDetached, false);
+      assert.equal(boundary.postEventRestoreQueueIntentRecorded, false);
       assert.equal(record.wrapperMetadata.deterministicMetadataOnly, true);
       assert.equal(record.wrapperMetadata.propertyPayloadRowAccepted, false);
       assert.equal(record.wrapperMetadata.hostWrapperInvoked, false);
@@ -1736,13 +1743,17 @@ function controlledUnsupported(hostTag, propName, props = {}) {
         valueTrackerGateStatus: CONTROLLED_VALUE_TRACKER_GATE_STATUS,
         fakeDomTrackerDiagnosticStatus:
           CONTROLLED_VALUE_TRACKER_FAKE_DOM_DIAGNOSTIC_STATUS,
+        postEventRestoreQueueGateStatus:
+          CONTROLLED_POST_EVENT_RESTORE_QUEUE_STATUS,
         hostTag,
         ordinaryPayloadAccepted: false,
         sourceAdapterInvoked: false,
         fakeDomTrackerDiagnosticAvailable: true,
+        postEventRestoreQueueGateAvailable: true,
         fakeDomTrackerDiagnosticInstalled: false,
         fakeDomTrackerDiagnosticObserved: false,
         fakeDomTrackerDiagnosticDetached: false,
+        postEventRestoreQueueIntentRecorded: false,
         liveTrackingStarted: false,
         postEventRestoreQueued: false,
         publicControlledBehaviorEnabled: false,
