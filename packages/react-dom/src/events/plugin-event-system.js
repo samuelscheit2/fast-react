@@ -15,6 +15,7 @@ const {
   getNativeEventType
 } = require('./get-event-target.js');
 const {
+  IS_CAPTURE_PHASE,
   isCapturePhase,
   isEventHandleNonManagedNode,
   isNonDelegatedEventSystem,
@@ -57,6 +58,12 @@ const DISPATCH_LISTENER_ERROR_ROUTE_RECORD_KIND =
   'FastReactDomDispatchListenerErrorRouteRecord';
 const PORTAL_EVENT_OWNER_ROOT_GATE_RECORD_KIND =
   'FastReactDomPortalEventOwnerRootGateRecord';
+const FOCUS_BLUR_EVENT_BLOCKER_GATE_RECORD_KIND =
+  'FastReactDomFocusBlurEventBlockerGateRecord';
+const FOCUS_BLUR_EVENT_BLOCKER_PHASE_RECORD_KIND =
+  'FastReactDomFocusBlurEventBlockerPhaseRecord';
+const FOCUS_BLUR_EVENT_BLOCKER_LISTENER_RECORD_KIND =
+  'FastReactDomFocusBlurEventBlockerListenerRecord';
 const HYDRATION_REPLAY_EVENT_QUEUE_DIAGNOSTIC_KIND =
   'FastReactDomHydrationReplayEventQueueDiagnostic';
 const HYDRATION_REPLAY_EVENT_QUEUE_ENTRY_RECORD_KIND =
@@ -91,6 +98,10 @@ const LISTENER_ERROR_ROUTING_BLOCKED_CODE =
   'FAST_REACT_DOM_LISTENER_ERROR_ROUTING_BLOCKED';
 const PORTAL_EVENT_BUBBLING_BLOCKED_CODE =
   'FAST_REACT_DOM_PORTAL_EVENT_BUBBLING_BLOCKED';
+const FOCUS_BLUR_EVENT_BLOCKED_CODE =
+  'FAST_REACT_DOM_FOCUS_BLUR_EVENT_BLOCKED';
+const FOCUS_BLUR_EVENT_LISTENER_INSTALLATION_BLOCKED_CODE =
+  'FAST_REACT_DOM_FOCUS_BLUR_EVENT_LISTENER_INSTALLATION_BLOCKED';
 const HYDRATION_REPLAY_BLOCKED_CODE =
   'FAST_REACT_DOM_HYDRATION_REPLAY_BLOCKED';
 const CONTROLLED_STATE_RESTORE_BLOCKED_CODE =
@@ -103,6 +114,8 @@ const INVALID_DISPATCH_LISTENER_RECORD_CODE =
   'FAST_REACT_DOM_INVALID_DISPATCH_LISTENER_RECORD';
 const INVALID_PORTAL_EVENT_OWNER_ROOT_GATE_CODE =
   'FAST_REACT_DOM_INVALID_PORTAL_EVENT_OWNER_ROOT_GATE';
+const INVALID_FOCUS_BLUR_EVENT_BLOCKER_GATE_CODE =
+  'FAST_REACT_DOM_INVALID_FOCUS_BLUR_EVENT_BLOCKER_GATE';
 const PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS =
   'admitted-private-fake-dom-event-dispatch-metadata';
 const PRIVATE_SINGLE_LISTENER_INVOCATION_CANARY_STATUS =
@@ -127,6 +140,8 @@ const PRIVATE_PORTAL_EVENT_OWNER_ROOT_GATE_STATUS =
   'controlled-private-portal-event-owner-root-gate';
 const PRIVATE_EVENT_TYPE_DISPATCH_CANARY_STATUS =
   'controlled-private-event-type-dispatch-canary';
+const PRIVATE_FOCUS_BLUR_EVENT_BLOCKER_GATE_STATUS =
+  'controlled-private-focus-blur-event-blocker-gate';
 
 const SIMPLE_EVENT_PLUGIN_NAME = 'simple-event-plugin';
 const POLYFILL_EVENT_PLUGIN_NAMES = Object.freeze([
@@ -259,6 +274,12 @@ const hydrationContinuousReplayQueueNames = Object.freeze({
   lostpointercapture: 'queuedPointerCaptures'
 });
 const simpleEventReactNames = createSimpleEventReactNameMap();
+const focusBlurNativeEventNames = Object.freeze(['focusin', 'focusout']);
+const focusBlurNativeEventNameSet = new Set(focusBlurNativeEventNames);
+const focusBlurSyntheticEventTypes = Object.freeze({
+  focusin: 'focus',
+  focusout: 'blur'
+});
 const dispatchListenerRecordPayloads = new WeakMap();
 const dispatchQueueEntryRecordPayloads = new WeakMap();
 const dispatchListenerInvocationCanaryRecordPayloads = new WeakMap();
@@ -268,6 +289,7 @@ const syntheticEventShapeRecordPayloads = new WeakMap();
 const syntheticEventShapeGateRecordPayloads = new WeakMap();
 const dispatchListenerErrorRouteRecordPayloads = new WeakMap();
 const portalEventOwnerRootGateRecordPayloads = new WeakMap();
+const focusBlurEventBlockerGateRecordPayloads = new WeakMap();
 const hydrationDehydratedTargetResolutionDiagnosticPayloads =
   new WeakMap();
 
@@ -2016,6 +2038,379 @@ function createPortalEventOwnerRootGateRecord(
   return record;
 }
 
+function createFocusBlurEventBlockerGateFromDispatchRecords(
+  dispatchRecords,
+  options
+) {
+  const normalizedDispatchRecords =
+    normalizeFocusBlurEventBlockerDispatchRecords(dispatchRecords);
+  const normalizedOptions = normalizeFocusBlurEventBlockerGateOptions(
+    options
+  );
+  const phaseRecords = Object.freeze(
+    normalizedDispatchRecords.map((dispatchRecord, index) =>
+      createFocusBlurEventBlockerPhaseRecord(dispatchRecord, index)
+    )
+  );
+  const listenerMetadata = Object.freeze(
+    phaseRecords.flatMap((phaseRecord) => phaseRecord.listenerMetadata)
+  );
+  const processingListenerMetadata = Object.freeze(
+    phaseRecords.flatMap(
+      (phaseRecord) => phaseRecord.processingListenerMetadata
+    )
+  );
+  const targetCurrentTargetBlockers =
+    createFocusBlurTargetCurrentTargetBlockers(phaseRecords);
+  const observedNativeEventNames = Object.freeze(
+    focusBlurNativeEventNames.filter((domEventName) =>
+      phaseRecords.some((phaseRecord) => phaseRecord.domEventName === domEventName)
+    )
+  );
+  const portalOwnerRoot = createFocusBlurPortalOwnerRootSummary(
+    normalizedOptions.portalEventOwnerRootGateRecord
+  );
+  const record = Object.freeze({
+    admissionStatus: PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS,
+    blockedReason: FOCUS_BLUR_EVENT_BLOCKED_CODE,
+    browserDomEventCompatibilityClaimed: false,
+    bubblePhaseRecordCount: phaseRecords.filter(
+      (phaseRecord) => phaseRecord.phase === 'bubble'
+    ).length,
+    capturePhaseRecordCount: phaseRecords.filter(
+      (phaseRecord) => phaseRecord.phase === 'capture'
+    ).length,
+    compatibilityClaimed: false,
+    diagnosticOnly: true,
+    dispatchRecordCount: normalizedDispatchRecords.length,
+    eventDispatch: false,
+    eventObjectCreation: false,
+    eventObjectCreationBlockedReason: SYNTHETIC_EVENT_BLOCKED_CODE,
+    focusBlurEventBlocker: true,
+    focusDispatchRecordCount: phaseRecords.filter(
+      (phaseRecord) => phaseRecord.domEventName === 'focusin'
+    ).length,
+    kind: FOCUS_BLUR_EVENT_BLOCKER_GATE_RECORD_KIND,
+    listenerInstallation: false,
+    listenerInstallationBlockedReason:
+      FOCUS_BLUR_EVENT_LISTENER_INSTALLATION_BLOCKED_CODE,
+    listenerInvocationCount: 0,
+    listenerMetadata,
+    listenerMetadataCount: listenerMetadata.length,
+    nativeEventMappingCount: focusBlurNativeEventNames.length,
+    nativeEventMappings: createFocusBlurNativeEventMappingRecords(),
+    observedNativeEventNames,
+    phaseRecordCount: phaseRecords.length,
+    phaseRecords,
+    portalOwnerRoot,
+    portalOwnerRootAvailable: portalOwnerRoot.available,
+    portalOwnerRootStatus: portalOwnerRoot.status,
+    processingListenerMetadata,
+    processingListenerMetadataCount: processingListenerMetadata.length,
+    publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
+    publicDispatchEnabled: false,
+    publicRootBehaviorChanged: false,
+    readOnly: true,
+    status: PRIVATE_FOCUS_BLUR_EVENT_BLOCKER_GATE_STATUS,
+    syntheticEventCount: 0,
+    syntheticEventCreation: false,
+    syntheticEventStatus: 'blocked-not-created',
+    syntheticFocusEventBlockedReason: SYNTHETIC_EVENT_BLOCKED_CODE,
+    syntheticFocusEventCreation: false,
+    targetCurrentTargetBlockerCount: targetCurrentTargetBlockers.length,
+    targetCurrentTargetBlockers,
+    willCreateSyntheticFocusEvents: false,
+    willDispatchEvents: false,
+    willInstallListeners: false,
+    willInvokeListeners: false,
+    blurDispatchRecordCount: phaseRecords.filter(
+      (phaseRecord) => phaseRecord.domEventName === 'focusout'
+    ).length
+  });
+
+  focusBlurEventBlockerGateRecordPayloads.set(
+    record,
+    Object.freeze({
+      dispatchRecords: Object.freeze(normalizedDispatchRecords.slice()),
+      listenerMetadata,
+      options: normalizedOptions.rawOptions,
+      phaseRecords,
+      portalEventOwnerRootGateRecord:
+        normalizedOptions.portalEventOwnerRootGateRecord,
+      processingListenerMetadata,
+      targetCurrentTargetBlockers
+    })
+  );
+
+  return record;
+}
+
+function createFocusBlurEventBlockerPhaseRecord(dispatchRecord, index) {
+  const normalizedDispatchRecord = assertEventDispatchRecord(dispatchRecord);
+  const dispatchQueueEntries = Object.freeze(
+    normalizedDispatchRecord.dispatchQueue.entries.map((entry) =>
+      assertDispatchQueueEntryRecord(entry)
+    )
+  );
+  const listenerRecords = Object.freeze(
+    dispatchQueueEntries.flatMap((entry) => {
+      const payload = getDispatchQueueEntryRecordPayload(entry);
+      return payload === null ? [] : payload.listenerRecords;
+    })
+  );
+  const processingListenerRecords = Object.freeze(
+    dispatchQueueEntries.flatMap((entry) => {
+      const payload = getDispatchQueueEntryRecordPayload(entry);
+      return payload === null ? [] : payload.processingListenerRecords;
+    })
+  );
+  const listenerMetadata = Object.freeze(
+    listenerRecords.map((listenerRecord, listenerIndex) =>
+      createFocusBlurEventBlockerListenerMetadata(
+        listenerRecord,
+        listenerIndex,
+        index,
+        'accumulation'
+      )
+    )
+  );
+  const processingListenerMetadata = Object.freeze(
+    processingListenerRecords.map((listenerRecord, listenerIndex) =>
+      createFocusBlurEventBlockerListenerMetadata(
+        listenerRecord,
+        listenerIndex,
+        index,
+        'processing'
+      )
+    )
+  );
+  const domEventName = normalizedDispatchRecord.domEventName;
+  const registrationName = getSimpleEventRegistrationName(
+    domEventName,
+    normalizedDispatchRecord.eventSystemFlags
+  );
+
+  return Object.freeze({
+    blockedReason: FOCUS_BLUR_EVENT_BLOCKED_CODE,
+    browserDomEventCompatibilityClaimed: false,
+    currentTargetExposureBlockedReason: SYNTHETIC_EVENT_BLOCKED_CODE,
+    dispatchQueueEntryCount: dispatchQueueEntries.length,
+    dispatchQueueLength: normalizedDispatchRecord.dispatchQueue.length,
+    dispatchQueueListenerCount:
+      normalizedDispatchRecord.dispatchQueue.listenerCount,
+    domEventName,
+    eventDispatch: false,
+    eventObjectCreation: false,
+    eventPriorityLabel: normalizedDispatchRecord.eventPriorityLabel,
+    eventPriorityLane: normalizedDispatchRecord.eventPriorityLane,
+    eventPriorityName: normalizedDispatchRecord.eventPriorityName,
+    eventSystemFlags: normalizedDispatchRecord.eventSystemFlags,
+    inCapturePhase: normalizedDispatchRecord.inCapturePhase,
+    index,
+    kind: FOCUS_BLUR_EVENT_BLOCKER_PHASE_RECORD_KIND,
+    listenerInvocationCount: 0,
+    listenerMetadata,
+    listenerMetadataCount: listenerMetadata.length,
+    nativeEventName: domEventName,
+    nativeEventTarget: normalizedDispatchRecord.nativeEventTarget,
+    nativeEventType: normalizedDispatchRecord.nativeEventType,
+    phase: normalizedDispatchRecord.inCapturePhase ? 'capture' : 'bubble',
+    processingListenerMetadata,
+    processingListenerMetadataCount: processingListenerMetadata.length,
+    publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
+    publicDispatchEnabled: false,
+    publicRootBehaviorChanged: false,
+    reactName: getSimpleEventReactName(domEventName),
+    registrationName,
+    syntheticEventConstructor: 'SyntheticFocusEvent',
+    syntheticEventCount: 0,
+    syntheticEventCreation: false,
+    syntheticEventStatus: 'blocked-not-created',
+    syntheticEventType: getFocusBlurSyntheticEventType(domEventName),
+    targetCurrentTargetBlockerStatus:
+      listenerMetadata.length === 0
+        ? 'blocked-no-current-target-listeners-recorded'
+        : 'blocked-target-current-target-metadata-recorded',
+    targetDispatchPathLength:
+      normalizedDispatchRecord.targetDispatchPathLength,
+    targetDispatchPathStatus:
+      normalizedDispatchRecord.targetDispatchPathStatus,
+    targetExposureBlockedReason: SYNTHETIC_EVENT_BLOCKED_CODE,
+    targetInst: normalizedDispatchRecord.targetInst,
+    targetInstStatus: normalizedDispatchRecord.targetInstStatus,
+    targetListenerFound: normalizedDispatchRecord.targetListenerFound,
+    targetListenerLookupCount:
+      normalizedDispatchRecord.targetListenerLookupCount,
+    targetListenerLookupStatus:
+      normalizedDispatchRecord.targetListenerLookupStatus,
+    targetListenerRegistrationName:
+      normalizedDispatchRecord.targetListenerRegistrationName,
+    targetResolutionBlockedReason:
+      normalizedDispatchRecord.targetResolutionBlockedReason,
+    targetResolutionStatus: normalizedDispatchRecord.targetResolutionStatus,
+    willCreateSyntheticFocusEvent: false,
+    willDispatchEvent: false,
+    willInvokeListeners: false,
+    wrapperKind: normalizedDispatchRecord.wrapperKind
+  });
+}
+
+function createFocusBlurEventBlockerListenerMetadata(
+  dispatchListenerRecord,
+  listenerIndex,
+  phaseRecordIndex,
+  order
+) {
+  const normalizedDispatchListenerRecord =
+    assertDispatchListenerRecord(dispatchListenerRecord);
+
+  return Object.freeze({
+    blockedReason: FOCUS_BLUR_EVENT_BLOCKED_CODE,
+    browserDomEventCompatibilityClaimed: false,
+    currentTarget: normalizedDispatchListenerRecord.currentTarget,
+    currentTargetExposureBlockedReason: SYNTHETIC_EVENT_BLOCKED_CODE,
+    dispatchPathIndex:
+      normalizedDispatchListenerRecord.dispatchPathIndex,
+    domEventName: normalizedDispatchListenerRecord.domEventName,
+    exposesLatestProps: false,
+    exposesListener: false,
+    hostOwner: normalizedDispatchListenerRecord.hostOwner,
+    inCapturePhase: normalizedDispatchListenerRecord.inCapturePhase,
+    index: listenerIndex,
+    kind: FOCUS_BLUR_EVENT_BLOCKER_LISTENER_RECORD_KIND,
+    latestPropsStatus:
+      normalizedDispatchListenerRecord.latestPropsStatus,
+    listenerFound: normalizedDispatchListenerRecord.listenerFound,
+    listenerInvocationCount: 0,
+    listenerStatus: normalizedDispatchListenerRecord.listenerStatus,
+    listenerType: normalizedDispatchListenerRecord.listenerType,
+    nativeEventTarget: normalizedDispatchListenerRecord.nativeEventTarget,
+    nativeEventType: normalizedDispatchListenerRecord.nativeEventType,
+    order,
+    phase: normalizedDispatchListenerRecord.phase,
+    phaseRecordIndex,
+    publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
+    publicDispatchEnabled: false,
+    publicRootBehaviorChanged: false,
+    registrationName:
+      normalizedDispatchListenerRecord.registrationName,
+    rootOwner: normalizedDispatchListenerRecord.rootOwner,
+    status: 'blocked-focus-blur-listener-metadata-recorded',
+    syntheticEventCount: 0,
+    syntheticEventStatus: 'blocked-not-created',
+    targetExposureBlockedReason: SYNTHETIC_EVENT_BLOCKED_CODE,
+    targetHostInstanceNode:
+      normalizedDispatchListenerRecord.targetHostInstanceNode,
+    targetHostInstanceStatus:
+      normalizedDispatchListenerRecord.targetHostInstanceStatus,
+    targetHostInstanceToken:
+      normalizedDispatchListenerRecord.targetHostInstanceToken,
+    targetInst: normalizedDispatchListenerRecord.targetInst,
+    targetInstStatus: normalizedDispatchListenerRecord.targetInstStatus,
+    willInvokeListener: false
+  });
+}
+
+function createFocusBlurTargetCurrentTargetBlockers(phaseRecords) {
+  return Object.freeze(
+    phaseRecords.flatMap((phaseRecord) =>
+      phaseRecord.listenerMetadata.map((listenerRecord) =>
+        Object.freeze({
+          blockedReason: FOCUS_BLUR_EVENT_BLOCKED_CODE,
+          currentTarget: listenerRecord.currentTarget,
+          currentTargetExposureBlockedReason:
+            listenerRecord.currentTargetExposureBlockedReason,
+          dispatchPathIndex: listenerRecord.dispatchPathIndex,
+          domEventName: listenerRecord.domEventName,
+          eventObjectCreation: false,
+          listenerInvocationCount: 0,
+          nativeEventTarget: listenerRecord.nativeEventTarget,
+          phase: listenerRecord.phase,
+          phaseRecordIndex: listenerRecord.phaseRecordIndex,
+          registrationName: listenerRecord.registrationName,
+          syntheticEventCount: 0,
+          targetExposureBlockedReason:
+            listenerRecord.targetExposureBlockedReason,
+          targetInst: listenerRecord.targetInst
+        })
+      )
+    )
+  );
+}
+
+function createFocusBlurNativeEventMappingRecords() {
+  return Object.freeze(
+    focusBlurNativeEventNames.map((domEventName) =>
+      Object.freeze({
+        blockedReason: FOCUS_BLUR_EVENT_BLOCKED_CODE,
+        browserDomEventCompatibilityClaimed: false,
+        bubbleRegistrationName: getSimpleEventRegistrationName(
+          domEventName,
+          0
+        ),
+        captureRegistrationName: getSimpleEventRegistrationName(
+          domEventName,
+          IS_CAPTURE_PHASE
+        ),
+        domEventName,
+        nativeEventName: domEventName,
+        publicDispatchEnabled: false,
+        reactName: getSimpleEventReactName(domEventName),
+        syntheticEventConstructor: 'SyntheticFocusEvent',
+        syntheticEventCreation: false,
+        syntheticEventStatus: 'blocked-not-created',
+        syntheticEventType: getFocusBlurSyntheticEventType(domEventName)
+      })
+    )
+  );
+}
+
+function createFocusBlurPortalOwnerRootSummary(
+  portalEventOwnerRootGateRecord
+) {
+  if (portalEventOwnerRootGateRecord === null) {
+    return Object.freeze({
+      available: false,
+      blockedReason: null,
+      dispatchPathRootOwnerMatchCount: 0,
+      dispatchPathRootOwnerMismatchCount: 0,
+      ownerRootMatchesTargetRoot: false,
+      portalContainerContainsTarget: false,
+      publicPortalBubblingEnabled: false,
+      recordKind: null,
+      rootContainerContainsTarget: false,
+      status: 'unavailable-no-portal-owner-root-gate',
+      targetDispatchPathLength: 0,
+      targetDispatchPathStatus: 'unavailable-no-portal-owner-root-gate',
+      targetInstStatus: 'not-applicable'
+    });
+  }
+
+  return Object.freeze({
+    available: true,
+    blockedReason: portalEventOwnerRootGateRecord.blockedReason,
+    dispatchPathRootOwnerMatchCount:
+      portalEventOwnerRootGateRecord.dispatchPathRootOwnerMatchCount,
+    dispatchPathRootOwnerMismatchCount:
+      portalEventOwnerRootGateRecord.dispatchPathRootOwnerMismatchCount,
+    ownerRootMatchesTargetRoot:
+      portalEventOwnerRootGateRecord.ownerRootMatchesTargetRoot,
+    portalContainerContainsTarget:
+      portalEventOwnerRootGateRecord.portalContainerContainsTarget,
+    publicPortalBubblingEnabled:
+      portalEventOwnerRootGateRecord.publicPortalBubblingEnabled,
+    recordKind: portalEventOwnerRootGateRecord.kind,
+    rootContainerContainsTarget:
+      portalEventOwnerRootGateRecord.rootContainerContainsTarget,
+    status: portalEventOwnerRootGateRecord.status,
+    targetDispatchPathLength:
+      portalEventOwnerRootGateRecord.targetDispatchPathLength,
+    targetDispatchPathStatus:
+      portalEventOwnerRootGateRecord.targetDispatchPathStatus,
+    targetInstStatus: portalEventOwnerRootGateRecord.targetInstStatus
+  });
+}
+
 function invokeDispatchListenerRecordForCanary(dispatchListenerRecord, options) {
   const normalizedListenerRecord =
     assertDispatchListenerRecord(dispatchListenerRecord);
@@ -3240,6 +3635,18 @@ function isPortalEventOwnerRootGateRecord(record) {
   return getPortalEventOwnerRootGateRecordPayload(record) !== null;
 }
 
+function getFocusBlurEventBlockerGateRecordPayload(record) {
+  if (!isObjectLike(record)) {
+    return null;
+  }
+
+  return focusBlurEventBlockerGateRecordPayloads.get(record) || null;
+}
+
+function isFocusBlurEventBlockerGateRecord(record) {
+  return getFocusBlurEventBlockerGateRecordPayload(record) !== null;
+}
+
 function assertEventDispatchRecord(record) {
   if (
     !isObjectLike(record) ||
@@ -3257,6 +3664,18 @@ function assertEventDispatchRecord(record) {
   return record;
 }
 
+function assertFocusBlurEventBlockerDispatchRecord(record) {
+  const normalizedDispatchRecord = assertEventDispatchRecord(record);
+  if (!focusBlurNativeEventNameSet.has(normalizedDispatchRecord.domEventName)) {
+    throw createPluginEventSystemError(
+      'Focus/blur event blocker diagnostics require private focusin/focusout event dispatch records.',
+      INVALID_FOCUS_BLUR_EVENT_BLOCKER_GATE_CODE
+    );
+  }
+
+  return normalizedDispatchRecord;
+}
+
 function assertPortalEventOwnerRootDispatchPathRecord(record) {
   if (
     !isObjectLike(record) ||
@@ -3270,6 +3689,54 @@ function assertPortalEventOwnerRootDispatchPathRecord(record) {
   }
 
   return record;
+}
+
+function normalizeFocusBlurEventBlockerDispatchRecords(dispatchRecords) {
+  const normalizedDispatchRecords = Array.isArray(dispatchRecords)
+    ? dispatchRecords.map((dispatchRecord) =>
+        assertFocusBlurEventBlockerDispatchRecord(dispatchRecord)
+      )
+    : [assertFocusBlurEventBlockerDispatchRecord(dispatchRecords)];
+
+  if (normalizedDispatchRecords.length === 0) {
+    throw createPluginEventSystemError(
+      'Focus/blur event blocker diagnostics require at least one private focusin/focusout event dispatch record.',
+      INVALID_FOCUS_BLUR_EVENT_BLOCKER_GATE_CODE
+    );
+  }
+
+  return normalizedDispatchRecords;
+}
+
+function normalizeFocusBlurEventBlockerGateOptions(options) {
+  const normalizedOptions = isObjectLike(options) ? options : {};
+  const sourcePortalGate =
+    normalizedOptions.portalEventOwnerRootGateRecord ||
+    normalizedOptions.portalOwnerRootGateRecord ||
+    null;
+  if (
+    sourcePortalGate !== null &&
+    !isPortalEventOwnerRootGateRecord(sourcePortalGate)
+  ) {
+    throw createPluginEventSystemError(
+      'Focus/blur event blocker diagnostics require a private portal event owner-root gate record when portal metadata is provided.',
+      INVALID_FOCUS_BLUR_EVENT_BLOCKER_GATE_CODE
+    );
+  }
+
+  return {
+    portalEventOwnerRootGateRecord: sourcePortalGate,
+    rawOptions: options
+  };
+}
+
+function getFocusBlurSyntheticEventType(domEventName) {
+  return Object.prototype.hasOwnProperty.call(
+    focusBlurSyntheticEventTypes,
+    domEventName
+  )
+    ? focusBlurSyntheticEventTypes[domEventName]
+    : null;
 }
 
 function assertDispatchQueueEntryRecord(record) {
@@ -4904,6 +5371,11 @@ module.exports = {
   EVENT_LISTENER_TARGET_LOOKUP_RECORD_KIND,
   EVENT_PLUGIN_NAMES,
   EVENT_TARGET_RESOLUTION_BLOCKED_CODE,
+  FOCUS_BLUR_EVENT_BLOCKED_CODE,
+  FOCUS_BLUR_EVENT_BLOCKER_GATE_RECORD_KIND,
+  FOCUS_BLUR_EVENT_BLOCKER_LISTENER_RECORD_KIND,
+  FOCUS_BLUR_EVENT_BLOCKER_PHASE_RECORD_KIND,
+  FOCUS_BLUR_EVENT_LISTENER_INSTALLATION_BLOCKED_CODE,
   HYDRATION_REPLAY_EVENT_QUEUE_DIAGNOSTIC_KIND,
   HYDRATION_REPLAY_EVENT_QUEUE_ENTRY_RECORD_KIND,
   HYDRATION_DEHYDRATED_BOUNDARY_OWNER_RECORD_KIND,
@@ -4915,6 +5387,7 @@ module.exports = {
   INVALID_DISPATCH_LISTENER_RECORD_CODE,
   INVALID_EVENT_DISPATCH_RECORD_CODE,
   INVALID_EVENT_WRAPPER_RECORD_CODE,
+  INVALID_FOCUS_BLUR_EVENT_BLOCKER_GATE_CODE,
   INVALID_PORTAL_EVENT_OWNER_ROOT_GATE_CODE,
   LISTENER_ERROR_ROUTING_BLOCKED_CODE,
   NATIVE_STOP_IMMEDIATE_PROPAGATION_DIAGNOSTIC_BLOCKED_CODE,
@@ -4932,6 +5405,7 @@ module.exports = {
   PRIVATE_PORTAL_EVENT_OWNER_ROOT_GATE_STATUS,
   PRIVATE_PROPAGATION_STOP_DIAGNOSTIC_STATUS,
   PRIVATE_EVENT_TYPE_DISPATCH_CANARY_STATUS,
+  PRIVATE_FOCUS_BLUR_EVENT_BLOCKER_GATE_STATUS,
   PRIVATE_SINGLE_LISTENER_INVOCATION_CANARY_STATUS,
   PRIVATE_SYNTHETIC_EVENT_SHAPE_GATE_STATUS,
   PRIVATE_SYNTHETIC_EVENT_SHAPE_STATUS,
@@ -4945,6 +5419,7 @@ module.exports = {
   assertEventListenerWrapperRecord,
   createEventDispatchRecordFromWrapperRecord,
   createEventTypeDispatchCanaryRecord,
+  createFocusBlurEventBlockerGateFromDispatchRecords,
   createHydrationDehydratedTargetResolutionDiagnostic,
   createHydrationReplayEventQueueDiagnostic,
   createPortalEventOwnerRootGateRecord,
@@ -4959,6 +5434,7 @@ module.exports = {
   getDispatchQueueEntryRecordPayload,
   getDispatchQueueInvocationCanaryRecordPayload,
   getEventTypeDispatchCanaryRecordPayload,
+  getFocusBlurEventBlockerGateRecordPayload,
   getSimpleEventReactName,
   getSimpleEventRegistrationName,
   getSyntheticEventShapeGateRecordPayload,
@@ -4974,6 +5450,7 @@ module.exports = {
   isDispatchQueueEntryRecord,
   isDispatchQueueInvocationCanaryRecord,
   isEventTypeDispatchCanaryRecord,
+  isFocusBlurEventBlockerGateRecord,
   isPortalEventOwnerRootGateRecord,
   isSyntheticEventShapeGateRecord,
   isSyntheticEventShapeRecord

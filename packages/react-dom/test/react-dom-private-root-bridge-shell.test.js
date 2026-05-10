@@ -2714,6 +2714,251 @@ test('private portal event owner-root gate records portal child event path owner
   assert.equal(portalContainer.__registrations.length, 0);
 });
 
+test('private focus/blur blocker gate records phase metadata and portal ownership without dispatch', () => {
+  const document = createDocument('private-focus-blur-blocker');
+  const rootContainer = createElement('DIV', document);
+  const portalContainer = createElement('SECTION', document);
+  const portalParent = createElement('DIV', document);
+  const portalChild = createElement('INPUT', document);
+  const rootOwner = {kind: 'FocusBlurRootOwner'};
+  const parentHostOwner = {kind: 'FocusBlurParentHostOwner'};
+  const childHostOwner = {kind: 'FocusBlurChildHostOwner'};
+  const parentToken = componentTree.createHostInstanceToken(
+    parentHostOwner,
+    rootOwner
+  );
+  const childToken = componentTree.createHostInstanceToken(
+    childHostOwner,
+    rootOwner
+  );
+  let listenerCalls = 0;
+  const parentProps = {
+    onBlur() {
+      listenerCalls++;
+    },
+    onBlurCapture() {
+      listenerCalls++;
+    },
+    onFocus() {
+      listenerCalls++;
+    },
+    onFocusCapture() {
+      listenerCalls++;
+    }
+  };
+  const childProps = {
+    onBlur() {
+      listenerCalls++;
+    },
+    onBlurCapture() {
+      listenerCalls++;
+    },
+    onFocus() {
+      listenerCalls++;
+    },
+    onFocusCapture() {
+      listenerCalls++;
+    }
+  };
+
+  portalContainer.appendChild(portalParent);
+  portalParent.appendChild(portalChild);
+  componentTree.attachHostInstanceNode(
+    portalParent,
+    parentToken,
+    parentProps
+  );
+  componentTree.attachHostInstanceNode(portalChild, childToken, childProps);
+
+  function createFocusBlurDispatch(domEventName, eventSystemFlags) {
+    const listener = rootListeners.createEventListenerShell(
+      rootContainer,
+      domEventName,
+      eventSystemFlags
+    );
+    return pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      listener,
+      createFocusBlurNativeEvent(domEventName, portalChild)
+    );
+  }
+
+  const focusCapture = createFocusBlurDispatch(
+    'focusin',
+    rootListeners.IS_CAPTURE_PHASE
+  );
+  const focusBubble = createFocusBlurDispatch('focusin', 0);
+  const blurCapture = createFocusBlurDispatch(
+    'focusout',
+    rootListeners.IS_CAPTURE_PHASE
+  );
+  const blurBubble = createFocusBlurDispatch('focusout', 0);
+  const portalOwnerGate =
+    pluginEventSystem.createPortalEventOwnerRootGateRecord(
+      focusCapture.targetDispatchPathRecord,
+      {
+        domEventName: 'focusin',
+        hostFiberPath: [
+          'HostRoot',
+          'HostPortal',
+          'HostComponent',
+          'HostComponent'
+        ],
+        ownerRoot: rootOwner,
+        portalContainer,
+        portalKey: 'focus-blur-portal',
+        rootContainer
+      }
+    );
+  const blocker =
+    pluginEventSystem.createFocusBlurEventBlockerGateFromDispatchRecords(
+      [focusCapture, focusBubble, blurCapture, blurBubble],
+      {
+        portalEventOwnerRootGateRecord: portalOwnerGate
+      }
+    );
+  const blockerPayload =
+    pluginEventSystem.getFocusBlurEventBlockerGateRecordPayload(blocker);
+
+  assert.equal(Object.isFrozen(blocker), true);
+  assert.equal(
+    blocker.kind,
+    pluginEventSystem.FOCUS_BLUR_EVENT_BLOCKER_GATE_RECORD_KIND
+  );
+  assert.equal(
+    blocker.status,
+    pluginEventSystem.PRIVATE_FOCUS_BLUR_EVENT_BLOCKER_GATE_STATUS
+  );
+  assert.equal(blocker.blockedReason, pluginEventSystem.FOCUS_BLUR_EVENT_BLOCKED_CODE);
+  assert.equal(blocker.dispatchRecordCount, 4);
+  assert.equal(blocker.focusDispatchRecordCount, 2);
+  assert.equal(blocker.blurDispatchRecordCount, 2);
+  assert.equal(blocker.capturePhaseRecordCount, 2);
+  assert.equal(blocker.bubblePhaseRecordCount, 2);
+  assert.deepEqual(blocker.observedNativeEventNames, [
+    'focusin',
+    'focusout'
+  ]);
+  assert.deepEqual(
+    blocker.nativeEventMappings.map((mapping) => [
+      mapping.nativeEventName,
+      mapping.reactName,
+      mapping.bubbleRegistrationName,
+      mapping.captureRegistrationName,
+      mapping.syntheticEventType,
+      mapping.syntheticEventCreation
+    ]),
+    [
+      ['focusin', 'onFocus', 'onFocus', 'onFocusCapture', 'focus', false],
+      ['focusout', 'onBlur', 'onBlur', 'onBlurCapture', 'blur', false]
+    ]
+  );
+  assert.deepEqual(
+    blocker.phaseRecords.map((record) => [
+      record.domEventName,
+      record.phase,
+      record.registrationName,
+      record.reactName,
+      record.syntheticEventType,
+      record.listenerMetadataCount,
+      record.processingListenerMetadata.map((listener) => listener.currentTarget)
+    ]),
+    [
+      [
+        'focusin',
+        'capture',
+        'onFocusCapture',
+        'onFocus',
+        'focus',
+        2,
+        [portalParent, portalChild]
+      ],
+      ['focusin', 'bubble', 'onFocus', 'onFocus', 'focus', 2, [
+        portalChild,
+        portalParent
+      ]],
+      [
+        'focusout',
+        'capture',
+        'onBlurCapture',
+        'onBlur',
+        'blur',
+        2,
+        [portalParent, portalChild]
+      ],
+      ['focusout', 'bubble', 'onBlur', 'onBlur', 'blur', 2, [
+        portalChild,
+        portalParent
+      ]]
+    ]
+  );
+  assert.equal(blocker.listenerMetadataCount, 8);
+  assert.equal(blocker.processingListenerMetadataCount, 8);
+  assert.equal(blocker.targetCurrentTargetBlockerCount, 8);
+  for (const listenerMetadata of blocker.listenerMetadata) {
+    assert.equal(
+      listenerMetadata.kind,
+      pluginEventSystem.FOCUS_BLUR_EVENT_BLOCKER_LISTENER_RECORD_KIND
+    );
+    assert.equal(listenerMetadata.listenerInvocationCount, 0);
+    assert.equal(listenerMetadata.syntheticEventCount, 0);
+    assert.equal(listenerMetadata.willInvokeListener, false);
+    assert.equal(listenerMetadata.exposesListener, false);
+    assert.equal(listenerMetadata.exposesLatestProps, false);
+    assert.equal(
+      listenerMetadata.currentTargetExposureBlockedReason,
+      pluginEventSystem.SYNTHETIC_EVENT_BLOCKED_CODE
+    );
+  }
+  assert.equal(blocker.listenerInstallation, false);
+  assert.equal(
+    blocker.listenerInstallationBlockedReason,
+    pluginEventSystem.FOCUS_BLUR_EVENT_LISTENER_INSTALLATION_BLOCKED_CODE
+  );
+  assert.equal(blocker.eventObjectCreation, false);
+  assert.equal(blocker.syntheticFocusEventCreation, false);
+  assert.equal(blocker.syntheticEventCount, 0);
+  assert.equal(blocker.willInstallListeners, false);
+  assert.equal(blocker.willDispatchEvents, false);
+  assert.equal(blocker.willCreateSyntheticFocusEvents, false);
+  assert.equal(blocker.publicDispatchEnabled, false);
+  assert.equal(blocker.browserDomEventCompatibilityClaimed, false);
+  assert.equal(blocker.compatibilityClaimed, false);
+  assert.equal(blocker.portalOwnerRootAvailable, true);
+  assert.equal(
+    blocker.portalOwnerRootStatus,
+    pluginEventSystem.PRIVATE_PORTAL_EVENT_OWNER_ROOT_GATE_STATUS
+  );
+  assert.equal(blocker.portalOwnerRoot.ownerRootMatchesTargetRoot, true);
+  assert.equal(blocker.portalOwnerRoot.portalContainerContainsTarget, true);
+  assert.equal(blocker.portalOwnerRoot.rootContainerContainsTarget, false);
+  assert.equal(blockerPayload.dispatchRecords[0], focusCapture);
+  assert.equal(
+    blockerPayload.portalEventOwnerRootGateRecord,
+    portalOwnerGate
+  );
+  assert.equal(
+    pluginEventSystem.isFocusBlurEventBlockerGateRecord(blocker),
+    true
+  );
+  assert.equal(listenerCalls, 0);
+  assert.equal(rootContainer.__registrations.length, 0);
+  assert.equal(portalContainer.__registrations.length, 0);
+  assert.equal(portalChild.__registrations.length, 0);
+
+  assert.throws(
+    () =>
+      pluginEventSystem.createFocusBlurEventBlockerGateFromDispatchRecords(
+        createFocusBlurDispatch('click', 0)
+      ),
+    {
+      code: pluginEventSystem.INVALID_FOCUS_BLUR_EVENT_BLOCKER_GATE_CODE
+    }
+  );
+
+  assert.equal(componentTree.detachHostInstanceToken(childToken), childToken);
+  assert.equal(componentTree.detachHostInstanceToken(parentToken), parentToken);
+});
+
 test('private portal child reconciliation diagnostic updates one mounted fake-DOM HostComponent', () => {
   const document = createDocument('private-portal-child-reconciliation');
   const rootContainer = createElement('DIV', document);
@@ -5926,6 +6171,25 @@ function detachHostOutputChild(child) {
     siblings.splice(index, 1);
   }
   child.parentNode = null;
+}
+
+function createFocusBlurNativeEvent(type, target) {
+  return {
+    defaultPrevented: false,
+    preventDefaultCallCount: 0,
+    returnValue: true,
+    stopPropagationCallCount: 0,
+    target,
+    type,
+    preventDefault() {
+      this.defaultPrevented = true;
+      this.preventDefaultCallCount++;
+      this.returnValue = false;
+    },
+    stopPropagation() {
+      this.stopPropagationCallCount++;
+    }
+  };
 }
 
 function createDocument(label) {
