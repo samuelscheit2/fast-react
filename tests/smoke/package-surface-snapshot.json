@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updateInstructions": "When a public package entrypoint or type surface is intentionally accepted, update this snapshot in the same change and document the reason.",
+  "updateInstructions": "When a public package entrypoint, private implementation file inventory, or type surface is intentionally accepted, update this snapshot in the same change and document the reason.",
   "packageDirectories": [
     "react",
     "react-dom",
@@ -340,6 +340,21 @@
         "package.json",
         "react.react-server.js"
       ],
+      "privateImplementationFiles": [
+        "children-helper.js",
+        "cjs/react.development.js",
+        "cjs/react.production.js",
+        "component-class.js",
+        "context-object.js",
+        "element-factory.js",
+        "element-type.js",
+        "hook-dispatcher.js",
+        "placeholder-utils.js",
+        "private-act-dispatcher-gate.js",
+        "ref-object.js",
+        "transition.js",
+        "wrapper-object.js"
+      ],
       "declarationFiles": [],
       "runtimeEntrypoints": [
         {
@@ -512,6 +527,36 @@
         "static.node.js",
         "static.react-server.js",
         "test-utils.js"
+      ],
+      "privateImplementationFiles": [
+        "placeholder-utils.js",
+        "src/client/component-tree.js",
+        "src/client/dom-container.js",
+        "src/client/dom-host-context.js",
+        "src/client/dom-namespaces.js",
+        "src/client/hydration-boundary-gate.js",
+        "src/client/hydration-marker-parser.js",
+        "src/client/ref-callback-gate.js",
+        "src/client/root-bridge.js",
+        "src/client/root-markers.js",
+        "src/dom-host/index.js",
+        "src/dom-host/mutation.js",
+        "src/dom-host/property-payload.js",
+        "src/dom-host/text-content.js",
+        "src/events/dispatch.js",
+        "src/events/event-names.js",
+        "src/events/event-priorities.js",
+        "src/events/event-system-flags.js",
+        "src/events/get-event-target.js",
+        "src/events/listener-registry.js",
+        "src/events/plugin-event-system.js",
+        "src/events/react-dom-event-listener.js",
+        "src/events/root-listeners.js",
+        "src/resource-form-gates.js",
+        "src/resource-form-internals-gate.js",
+        "src/shared/create-portal.js",
+        "src/shared/flush-sync-guard.js",
+        "src/test-utils-act-gate.js"
       ],
       "declarationFiles": [],
       "runtimeEntrypoints": [
@@ -1020,6 +1065,7 @@
         "package.json",
         "shallow.js"
       ],
+      "privateImplementationFiles": [],
       "declarationFiles": [],
       "packageJsonKeys": [
         "name",
@@ -1357,6 +1403,7 @@
         "unstable_mock.js",
         "unstable_post_task.js"
       ],
+      "privateImplementationFiles": [],
       "declarationFiles": [],
       "runtimeEntrypoints": [
         {

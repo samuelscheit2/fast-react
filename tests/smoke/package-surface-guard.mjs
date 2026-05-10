@@ -23,8 +23,9 @@ process.env.NODE_ENV = 'development';
 
 const snapshot = JSON.parse(await readFile(snapshotPath, 'utf8'));
 
-const resolverFilePattern = /\.(?:js|json|node)$/;
+const resolverFilePattern = /\.(?:cjs|js|json|mjs|node)$/;
 const declarationFilePattern = /\.(?:d\.ts|d\.mts|d\.cts)$/;
+const privateImplementationFileIgnorePatterns = [/^test\//u];
 const allowedRuntimeMetadataKeys = new Set([
   '__FAST_REACT_ENTRYPOINT__',
   '__FAST_REACT_PLACEHOLDER__',
@@ -189,6 +190,7 @@ const expectedNativePackage = {
     }
   },
   publicResolverFiles: ['index.cjs', 'index.mjs', 'package.json'],
+  privateImplementationFiles: [],
   declarationFiles: []
 };
 
@@ -889,6 +891,67 @@ function assertPhysicalNoExportsSubpaths(
   }
 }
 
+function isIgnoredPrivateImplementationFile(relativePath) {
+  return privateImplementationFileIgnorePatterns.some((pattern) =>
+    pattern.test(relativePath)
+  );
+}
+
+async function collectPrivateImplementationFiles(
+  packageRoot,
+  publicResolverFiles
+) {
+  const publicResolverFileSet = new Set(publicResolverFiles);
+  return (await listFiles(packageRoot, resolverFilePattern)).filter(
+    (relativePath) =>
+      !publicResolverFileSet.has(relativePath) &&
+      !isIgnoredPrivateImplementationFile(relativePath)
+  );
+}
+
+async function assertPrivateImplementationFiles(
+  packageRoot,
+  publicResolverFiles,
+  expectedPackage,
+  packageName
+) {
+  const expectedPrivateFiles = expectedPackage.privateImplementationFiles ?? [];
+
+  assert.deepEqual(
+    [...expectedPrivateFiles].sort(),
+    expectedPrivateFiles,
+    `${packageName} private implementation files snapshot must stay sorted`
+  );
+  assert.equal(
+    new Set(expectedPrivateFiles).size,
+    expectedPrivateFiles.length,
+    `${packageName} private implementation files snapshot must stay unique`
+  );
+
+  const actualPrivateFiles = await collectPrivateImplementationFiles(
+    packageRoot,
+    publicResolverFiles
+  );
+  assert.deepEqual(
+    actualPrivateFiles,
+    expectedPrivateFiles,
+    `${packageName} private implementation file inventory`
+  );
+
+  for (const privateFile of expectedPrivateFiles) {
+    assert.equal(
+      publicResolverFiles.includes(privateFile),
+      false,
+      `${packageName}/${privateFile} must remain a non-public private implementation file`
+    );
+    await assertFileExists(
+      packageRoot,
+      privateFile,
+      `${packageName}/${privateFile}`
+    );
+  }
+}
+
 function assertNoPrivateDiagnosticPublicFiles(publicResolverFiles, packageName) {
   const guards = privateDiagnosticPublicFileGuards[packageName] ?? [];
   const exactPrivateFiles = exactPrivatePublicFileGuards[packageName] ?? [];
@@ -1016,6 +1079,12 @@ for (const packageName of snapshot.packageDirectories) {
     `${packageName} public resolver files`
   );
   assertNoPrivateDiagnosticPublicFiles(actualPublicFiles, packageName);
+  await assertPrivateImplementationFiles(
+    packageRoot,
+    actualPublicFiles,
+    expectedPackage,
+    packageName
+  );
   assertPhysicalNoExportsSubpaths(
     surfaceManifest,
     actualPublicFiles,
@@ -1064,6 +1133,12 @@ assert.deepEqual(
   'native public resolver files'
 );
 assertNoPrivateDiagnosticPublicFiles(nativePublicFiles, 'native');
+await assertPrivateImplementationFiles(
+  nativePackageRoot,
+  nativePublicFiles,
+  expectedNativePackage,
+  'native'
+);
 
 for (const publicFile of expectedNativePackage.publicResolverFiles) {
   await assertFileExists(nativePackageRoot, publicFile, `native/${publicFile}`);
