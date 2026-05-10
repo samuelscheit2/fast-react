@@ -32,6 +32,9 @@ const eventListener = require(
 const eventSystemFlags = require(
   path.join(repoRoot, "packages/react-dom/src/events/event-system-flags.js")
 );
+const listenerRegistry = require(
+  path.join(repoRoot, "packages/react-dom/src/events/listener-registry.js")
+);
 const rootBridge = require(
   path.join(repoRoot, "packages/react-dom/src/client/root-bridge.js")
 );
@@ -1655,6 +1658,411 @@ test("private root host-output click canary records listener error routing witho
   bridge.revertCreateRootSideEffects(sideEffects);
 });
 
+test("private dispatch queue propagation stop preserves same-target listener queues and skips ancestors", () => {
+  const root = createEventTarget("same-target-stop-root");
+  const parent = createNode("DIV", domContainer.ELEMENT_NODE, root);
+  const child = createNode("BUTTON", domContainer.ELEMENT_NODE, parent);
+  const rootOwner = {kind: "SameTargetStopRootOwner"};
+  const parentHostOwner = {kind: "SameTargetStopParentHostOwner"};
+  const childHostOwner = {kind: "SameTargetStopChildHostOwner"};
+  const calls = [];
+  const parentToken = componentTree.createHostInstanceToken(
+    parentHostOwner,
+    rootOwner
+  );
+  const childToken = componentTree.createHostInstanceToken(
+    childHostOwner,
+    rootOwner
+  );
+  componentTree.attachHostInstanceNode(parent, parentToken, {});
+  componentTree.attachHostInstanceNode(child, childToken, {});
+  const childFirstQueue =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      child,
+      "click",
+      false,
+      event => {
+        event.stopPropagation();
+        calls.push({
+          currentTarget: event.currentTarget,
+          event,
+          name: "child-first",
+          stoppedAfter: event.isPropagationStopped(),
+          targetInst: event.targetInst
+        });
+      }
+    );
+  const childSecondQueue =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      child,
+      "click",
+      false,
+      event => {
+        calls.push({
+          currentTarget: event.currentTarget,
+          event,
+          name: "child-second",
+          stoppedBefore: event.isPropagationStopped(),
+          targetInst: event.targetInst
+        });
+      }
+    );
+  const parentQueue =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      parent,
+      "click",
+      false,
+      event => {
+        calls.push({
+          currentTarget: event.currentTarget,
+          event,
+          name: "parent",
+          targetInst: event.targetInst
+        });
+      }
+    );
+  const wrapperRecord = eventListener.createEventListenerWrapperRecordWithPriority(
+    root,
+    "click",
+    0
+  );
+  const nativeEvent = createNativeEvent("click", child);
+  const dispatchRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      wrapperRecord,
+      nativeEvent
+    );
+
+  assert.equal(dispatchRecord.targetListenerFound, false);
+  assert.equal(dispatchRecord.dispatchQueue.listenerCount, 3);
+  assert.deepEqual(
+    dispatchRecord.dispatchQueue.entries[0].listeners.map((record) => [
+      record.listenerType,
+      record.listenerQueueIndex,
+      record.currentTarget
+    ]),
+    [
+      ["private-event-listener-queue", 0, child],
+      ["private-event-listener-queue", 1, child],
+      ["private-event-listener-queue", 0, parent]
+    ]
+  );
+
+  const queueRecord =
+    pluginEventSystem.invokeDispatchQueueCanaryFromDispatchRecords(
+      dispatchRecord,
+      {
+        enablePropagationStopDiagnostics: true
+      }
+    );
+
+  assert.equal(queueRecord.publicDispatchEnabled, false);
+  assert.equal(queueRecord.syntheticEventCount, 0);
+  assert.equal(queueRecord.listenerCandidateCount, 3);
+  assert.equal(queueRecord.listenerInvocationCount, 2);
+  assert.equal(queueRecord.propagationStopCallCount, 1);
+  assert.equal(queueRecord.propagationStopNativeCallCount, 1);
+  assert.equal(queueRecord.propagationSkippedListenerCount, 1);
+  assert.equal(
+    queueRecord.nativeStopImmediatePropagationSkippedListenerCount,
+    0
+  );
+  assert.equal(
+    queueRecord.nativeStopImmediatePropagationDiagnosticStatus,
+    "not-applicable"
+  );
+  assert.deepEqual(
+    queueRecord.invocationOrder.map((entry) => [
+      entry.currentTarget,
+      entry.invocationStatus,
+      entry.skippedByPropagationStop,
+      entry.skippedByNativeStopImmediatePropagation,
+      entry.targetInst
+    ]),
+    [
+      [child, "invoked-single-listener", false, false, childToken],
+      [child, "invoked-single-listener", false, false, childToken],
+      [parent, "skipped-propagation-stopped", true, false, parentToken]
+    ]
+  );
+  assert.deepEqual(
+    queueRecord.propagationStopDiagnostics.map((record) => [
+      record.action,
+      record.listenerQueueRelationToStopSource,
+      record.sameTargetAsStopSource,
+      record.propagationSkippedListener,
+      record.targetInst
+    ]),
+    [
+      ["stop-propagation", "same-target", true, false, childToken],
+      ["skip-listener", "ancestor", false, true, parentToken]
+    ]
+  );
+  assert.deepEqual(
+    calls.map((call) => [
+      call.name,
+      call.currentTarget,
+      call.targetInst,
+      call.stoppedAfter ?? call.stoppedBefore
+    ]),
+    [
+      ["child-first", child, childToken, true],
+      ["child-second", child, childToken, true]
+    ]
+  );
+  assert.equal(Object.hasOwn(calls[0].event, "nativeEvent"), false);
+  assert.equal(typeof calls[0].event.stopPropagation, "function");
+  assert.equal(typeof calls[0].event.isPropagationStopped, "function");
+  assert.equal(nativeEvent.stopPropagationCallCount, 1);
+  assert.equal(nativeEvent.stopImmediatePropagationCallCount, 0);
+
+  listenerRegistry.removePrivateEventListenerQueueEntry(parentQueue);
+  listenerRegistry.removePrivateEventListenerQueueEntry(childSecondQueue);
+  listenerRegistry.removePrivateEventListenerQueueEntry(childFirstQueue);
+  assert.equal(componentTree.detachHostInstanceToken(childToken), childToken);
+  assert.equal(componentTree.detachHostInstanceToken(parentToken), parentToken);
+});
+
+test("private dispatch queue native stopImmediatePropagation diagnostics skip same-target and ancestor queues", () => {
+  const root = createEventTarget("native-stop-immediate-root");
+  const parent = createNode("DIV", domContainer.ELEMENT_NODE, root);
+  const child = createNode("BUTTON", domContainer.ELEMENT_NODE, parent);
+  const rootOwner = {kind: "NativeStopImmediateRootOwner"};
+  const parentHostOwner = {kind: "NativeStopImmediateParentHostOwner"};
+  const childHostOwner = {kind: "NativeStopImmediateChildHostOwner"};
+  const calls = [];
+  const parentToken = componentTree.createHostInstanceToken(
+    parentHostOwner,
+    rootOwner
+  );
+  const childToken = componentTree.createHostInstanceToken(
+    childHostOwner,
+    rootOwner
+  );
+  componentTree.attachHostInstanceNode(parent, parentToken, {});
+  componentTree.attachHostInstanceNode(child, childToken, {});
+  const childFirstQueue =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      child,
+      "click",
+      false,
+      event => {
+        event.stopPropagation();
+        const stoppedBefore =
+          event.isNativeImmediatePropagationStopped();
+        event.nativeEvent.stopImmediatePropagation();
+        calls.push({
+          currentTarget: event.currentTarget,
+          event,
+          name: "child-first",
+          nativeEvent: event.nativeEvent,
+          stoppedAfter:
+            event.isNativeImmediatePropagationStopped(),
+          stoppedBefore,
+          targetInst: event.targetInst
+        });
+      }
+    );
+  const childSecondQueue =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      child,
+      "click",
+      false,
+      event => {
+        calls.push({
+          currentTarget: event.currentTarget,
+          event,
+          name: "child-second",
+          targetInst: event.targetInst
+        });
+      }
+    );
+  const parentQueue =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      parent,
+      "click",
+      false,
+      event => {
+        calls.push({
+          currentTarget: event.currentTarget,
+          event,
+          name: "parent",
+          targetInst: event.targetInst
+        });
+      }
+    );
+  const wrapperRecord = eventListener.createEventListenerWrapperRecordWithPriority(
+    root,
+    "click",
+    0
+  );
+  const nativeEvent = createNativeEvent("click", child);
+  const dispatchRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      wrapperRecord,
+      nativeEvent
+    );
+
+  const queueRecord =
+    pluginEventSystem.invokeDispatchQueueCanaryFromDispatchRecords(
+      dispatchRecord,
+      {
+        enableNativeStopImmediatePropagationDiagnostics: true,
+        enablePropagationStopDiagnostics: true
+      }
+    );
+
+  assert.equal(queueRecord.publicDispatchEnabled, false);
+  assert.equal(queueRecord.syntheticEventCount, 0);
+  assert.equal(queueRecord.listenerCandidateCount, 3);
+  assert.equal(queueRecord.listenerInvocationCount, 1);
+  assert.equal(queueRecord.propagationStopped, true);
+  assert.equal(queueRecord.propagationStopCallCount, 1);
+  assert.equal(queueRecord.propagationStopNativeCallCount, 1);
+  assert.equal(queueRecord.propagationSkippedListenerCount, 0);
+  assert.equal(queueRecord.nativeImmediatePropagationStopped, true);
+  assert.equal(queueRecord.nativeStopImmediatePropagationCallCount, 1);
+  assert.equal(
+    queueRecord.nativeStopImmediatePropagationNativeCallCount,
+    1
+  );
+  assert.equal(
+    queueRecord.nativeStopImmediatePropagationSkippedListenerCount,
+    2
+  );
+  assert.equal(
+    queueRecord.nativeStopImmediatePropagationDiagnosticStatus,
+    pluginEventSystem.PRIVATE_NATIVE_STOP_IMMEDIATE_PROPAGATION_DIAGNOSTIC_STATUS
+  );
+  assert.deepEqual(
+    queueRecord.invocationOrder.map((entry) => [
+      entry.currentTarget,
+      entry.invocationStatus,
+      entry.skippedByPropagationStop,
+      entry.skippedByNativeStopImmediatePropagation,
+      entry.targetInst
+    ]),
+    [
+      [child, "invoked-single-listener", false, false, childToken],
+      [
+        child,
+        "skipped-native-stop-immediate-propagation",
+        false,
+        true,
+        childToken
+      ],
+      [
+        parent,
+        "skipped-native-stop-immediate-propagation",
+        false,
+        true,
+        parentToken
+      ]
+    ]
+  );
+  assert.deepEqual(
+    queueRecord.nativeStopImmediatePropagationDiagnostics.map((record) => [
+      record.kind,
+      record.action,
+      record.listenerQueueRelationToStopSource,
+      record.sameTargetAsStopSource,
+      record.nativeStopImmediatePropagationSkippedListener,
+      record.targetInst
+    ]),
+    [
+      [
+        pluginEventSystem.DISPATCH_NATIVE_STOP_IMMEDIATE_PROPAGATION_DIAGNOSTIC_RECORD_KIND,
+        "native-stop-immediate-propagation",
+        "same-target",
+        true,
+        false,
+        childToken
+      ],
+      [
+        pluginEventSystem.DISPATCH_NATIVE_STOP_IMMEDIATE_PROPAGATION_DIAGNOSTIC_RECORD_KIND,
+        "skip-listener",
+        "same-target",
+        true,
+        true,
+        childToken
+      ],
+      [
+        pluginEventSystem.DISPATCH_NATIVE_STOP_IMMEDIATE_PROPAGATION_DIAGNOSTIC_RECORD_KIND,
+        "skip-listener",
+        "ancestor",
+        false,
+        true,
+        parentToken
+      ]
+    ]
+  );
+  assert.deepEqual(
+    queueRecord.propagationStopDiagnostics.map((record) => [
+      record.action,
+      record.listenerQueueRelationToStopSource,
+      record.propagationSkippedListener,
+      record.targetInst
+    ]),
+    [["stop-propagation", "same-target", false, childToken]]
+  );
+  assert.deepEqual(
+    calls.map((call) => [
+      call.name,
+      call.currentTarget,
+      call.targetInst,
+      call.nativeEvent,
+      call.stoppedBefore,
+      call.stoppedAfter
+    ]),
+    [["child-first", child, childToken, nativeEvent, false, true]]
+  );
+  assert.equal(Object.hasOwn(calls[0].event, "nativeEvent"), true);
+  assert.equal(
+    typeof calls[0].event.isNativeImmediatePropagationStopped,
+    "function"
+  );
+  assert.equal(nativeEvent.stopPropagationCallCount, 1);
+  assert.equal(nativeEvent.stopImmediatePropagationCallCount, 1);
+  assert.equal(nativeEvent.immediatePropagationStopped, true);
+
+  const queuePayload =
+    pluginEventSystem.getDispatchQueueInvocationCanaryRecordPayload(
+      queueRecord
+    );
+  assert.deepEqual(
+    queuePayload.invocationRecords.map((record) => [
+      record.invocationStatus,
+      record.nativeStopImmediatePropagationDiagnosticEnabled,
+      record.nativeStopImmediatePropagationSkipped,
+      record.nativeStopImmediatePropagationCallCount,
+      record.nativeStopImmediatePropagationCallCountDelta
+    ]),
+    [
+      ["invoked-single-listener", true, false, 1, 1],
+      [
+        "skipped-native-stop-immediate-propagation",
+        true,
+        true,
+        1,
+        0
+      ],
+      [
+        "skipped-native-stop-immediate-propagation",
+        true,
+        true,
+        1,
+        0
+      ]
+    ]
+  );
+
+  listenerRegistry.removePrivateEventListenerQueueEntry(parentQueue);
+  listenerRegistry.removePrivateEventListenerQueueEntry(childSecondQueue);
+  listenerRegistry.removePrivateEventListenerQueueEntry(childFirstQueue);
+  assert.equal(componentTree.detachHostInstanceToken(childToken), childToken);
+  assert.equal(componentTree.detachHostInstanceToken(parentToken), parentToken);
+});
+
 test("plugin extraction records remain deterministic and fail closed for flag variants", () => {
   const root = createEventTarget("plugin-root");
   assert.equal(
@@ -2002,12 +2410,17 @@ test("private dispatch skeleton does not change public React DOM exports", () =>
     ),
     false
   );
+  assert.equal(
+    Object.hasOwn(reactDomClient, "registerPrivateEventListenerQueueEntry"),
+    false
+  );
 
   const exportedSubpaths = Object.keys(reactDomPackageJson.exports);
   for (const subpath of [
     "./src/events/dispatch",
     "./src/events/event-system-flags",
     "./src/events/get-event-target",
+    "./src/events/listener-registry",
     "./src/events/plugin-event-system"
   ]) {
     assert.equal(exportedSubpaths.includes(subpath), false, subpath);
@@ -2039,7 +2452,9 @@ function createNode(nodeName, nodeType, parentNode) {
 
 function createNativeEvent(type, target) {
   return {
+    immediatePropagationStopped: false,
     preventDefaultCallCount: 0,
+    stopImmediatePropagationCallCount: 0,
     stopPropagationCallCount: 0,
     target,
     type,
@@ -2048,6 +2463,10 @@ function createNativeEvent(type, target) {
     },
     stopPropagation() {
       this.stopPropagationCallCount++;
+    },
+    stopImmediatePropagation() {
+      this.immediatePropagationStopped = true;
+      this.stopImmediatePropagationCallCount++;
     }
   };
 }
