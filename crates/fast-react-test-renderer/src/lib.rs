@@ -2,10 +2,15 @@
 //!
 //! This crate proves that the canonical `fast-react-host-config` capability
 //! traits can be implemented without DOM, native, hydration, persistence, or
-//! legacy `HostConfig` behavior. It is not a reconciler and does not render
-//! React components yet; callers drive host operations directly.
+//! legacy `HostConfig` behavior. Its root canary delegates create/update/
+//! unmount scheduling to `fast-react-reconciler`, but it still stops before
+//! commit, host output, serialization, act, or public `react-test-renderer`
+//! compatibility.
 
 use std::collections::BTreeMap;
+use std::error::Error;
+use std::fmt::{self, Display, Formatter};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use fast_react_host_config::{
@@ -14,6 +19,13 @@ use fast_react_host_config::{
     HostFiberTokenViolation, HostHandleKind, HostIdentityAndContext, HostMutationViolation,
     HostOperationError, HostParentKind, HostResult, HostTypes, InitialChildrenFinalization,
     MutationHost,
+};
+use fast_react_reconciler::{
+    FiberRootId, FiberRootStore, FiberRootStoreError, HostRootRenderPhaseRecord, RootElementHandle,
+    RootOptions, RootScheduleMicrotaskResult, RootSchedulerError, RootUpdateError,
+    RootWorkLoopError, ScheduledRootUpdateResult, UpdateContainerResult, ensure_root_is_scheduled,
+    process_root_schedule_in_microtask, render_host_root_for_lanes, scheduled_roots,
+    update_container, update_container_sync,
 };
 
 pub const TEST_RENDERER_NAME: &str = "fast-react-test-renderer";
@@ -630,6 +642,353 @@ impl TestChildHandle {
     }
 }
 
+type TestCreateNodeMockCallback = dyn Fn() + Send + Sync + 'static;
+
+#[derive(Clone)]
+pub struct TestCreateNodeMock {
+    callback: Arc<TestCreateNodeMockCallback>,
+}
+
+impl TestCreateNodeMock {
+    #[must_use]
+    pub fn new(callback: impl Fn() + Send + Sync + 'static) -> Self {
+        Self {
+            callback: Arc::new(callback),
+        }
+    }
+
+    fn is_stored(&self) -> bool {
+        Arc::strong_count(&self.callback) > 0
+    }
+}
+
+impl fmt::Debug for TestCreateNodeMock {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        formatter.write_str("TestCreateNodeMock { stored callback }")
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct TestRendererOptions {
+    strict_mode: bool,
+    create_node_mock: Option<TestCreateNodeMock>,
+}
+
+impl TestRendererOptions {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    #[must_use]
+    pub const fn with_strict_mode(mut self, strict_mode: bool) -> Self {
+        self.strict_mode = strict_mode;
+        self
+    }
+
+    #[must_use]
+    pub fn with_create_node_mock(mut self, create_node_mock: TestCreateNodeMock) -> Self {
+        self.create_node_mock = Some(create_node_mock);
+        self
+    }
+
+    #[must_use]
+    pub const fn strict_mode(&self) -> bool {
+        self.strict_mode
+    }
+
+    #[must_use]
+    pub fn create_node_mock(&self) -> Option<&TestCreateNodeMock> {
+        self.create_node_mock.as_ref()
+    }
+
+    #[must_use]
+    pub fn has_create_node_mock(&self) -> bool {
+        self.create_node_mock
+            .as_ref()
+            .is_some_and(TestCreateNodeMock::is_stored)
+    }
+
+    fn reconciler_options(&self) -> RootOptions {
+        RootOptions::new().with_strict_mode(self.strict_mode)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TestRendererRootLifecycle {
+    Active,
+    UnmountScheduled,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TestRendererRootUpdateKind {
+    Create,
+    Update,
+    Unmount,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestRendererRootScheduledUpdate {
+    kind: TestRendererRootUpdateKind,
+    element: RootElementHandle,
+    container_update: UpdateContainerResult,
+    root_schedule: ScheduledRootUpdateResult,
+}
+
+impl TestRendererRootScheduledUpdate {
+    #[must_use]
+    pub const fn kind(&self) -> TestRendererRootUpdateKind {
+        self.kind
+    }
+
+    #[must_use]
+    pub const fn element(&self) -> RootElementHandle {
+        self.element
+    }
+
+    #[must_use]
+    pub const fn container_update(&self) -> &UpdateContainerResult {
+        &self.container_update
+    }
+
+    #[must_use]
+    pub const fn root_schedule(&self) -> ScheduledRootUpdateResult {
+        self.root_schedule
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TestRendererRootUpdateOutcome {
+    Scheduled(TestRendererRootScheduledUpdate),
+    IgnoredAfterUnmount,
+    AlreadyUnmountScheduled,
+}
+
+impl TestRendererRootUpdateOutcome {
+    #[must_use]
+    pub const fn scheduled(&self) -> Option<&TestRendererRootScheduledUpdate> {
+        match self {
+            Self::Scheduled(record) => Some(record),
+            Self::IgnoredAfterUnmount | Self::AlreadyUnmountScheduled => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TestRendererRootError {
+    Host(HostError),
+    FiberRootStore(FiberRootStoreError),
+    RootUpdate(RootUpdateError),
+    RootScheduler(RootSchedulerError),
+    RootWorkLoop(RootWorkLoopError),
+}
+
+impl Display for TestRendererRootError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Host(error) => Display::fmt(error, formatter),
+            Self::FiberRootStore(error) => Display::fmt(error, formatter),
+            Self::RootUpdate(error) => Display::fmt(error, formatter),
+            Self::RootScheduler(error) => Display::fmt(error, formatter),
+            Self::RootWorkLoop(error) => Display::fmt(error, formatter),
+        }
+    }
+}
+
+impl Error for TestRendererRootError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::Host(error) => Some(error),
+            Self::FiberRootStore(error) => Some(error),
+            Self::RootUpdate(error) => Some(error),
+            Self::RootScheduler(error) => Some(error),
+            Self::RootWorkLoop(error) => Some(error),
+        }
+    }
+}
+
+impl From<HostError> for TestRendererRootError {
+    fn from(error: HostError) -> Self {
+        Self::Host(error)
+    }
+}
+
+impl From<FiberRootStoreError> for TestRendererRootError {
+    fn from(error: FiberRootStoreError) -> Self {
+        Self::FiberRootStore(error)
+    }
+}
+
+impl From<RootUpdateError> for TestRendererRootError {
+    fn from(error: RootUpdateError) -> Self {
+        Self::RootUpdate(error)
+    }
+}
+
+impl From<RootSchedulerError> for TestRendererRootError {
+    fn from(error: RootSchedulerError) -> Self {
+        Self::RootScheduler(error)
+    }
+}
+
+impl From<RootWorkLoopError> for TestRendererRootError {
+    fn from(error: RootWorkLoopError) -> Self {
+        Self::RootWorkLoop(error)
+    }
+}
+
+pub struct TestRendererRoot {
+    renderer: TestRenderer,
+    container: TestContainer,
+    store: FiberRootStore<TestRenderer>,
+    root_id: FiberRootId,
+    options: TestRendererOptions,
+    lifecycle: TestRendererRootLifecycle,
+    scheduled_updates: Vec<TestRendererRootScheduledUpdate>,
+}
+
+impl TestRendererRoot {
+    pub fn create(
+        element: RootElementHandle,
+        options: TestRendererOptions,
+    ) -> Result<Self, TestRendererRootError> {
+        let mut renderer = TestRenderer::new();
+        let container = renderer.create_container();
+        let mut store = FiberRootStore::<TestRenderer>::new();
+        let root_id = store.create_client_root(container, options.reconciler_options())?;
+        let mut root = Self {
+            renderer,
+            container,
+            store,
+            root_id,
+            options,
+            lifecycle: TestRendererRootLifecycle::Active,
+            scheduled_updates: Vec::new(),
+        };
+
+        let record = root.schedule_root_update(TestRendererRootUpdateKind::Create, element)?;
+        root.scheduled_updates.push(record);
+        Ok(root)
+    }
+
+    pub fn update(
+        &mut self,
+        element: RootElementHandle,
+    ) -> Result<TestRendererRootUpdateOutcome, TestRendererRootError> {
+        if !matches!(self.lifecycle, TestRendererRootLifecycle::Active) {
+            return Ok(TestRendererRootUpdateOutcome::IgnoredAfterUnmount);
+        }
+
+        let record = self.schedule_root_update(TestRendererRootUpdateKind::Update, element)?;
+        self.scheduled_updates.push(record.clone());
+        Ok(TestRendererRootUpdateOutcome::Scheduled(record))
+    }
+
+    pub fn unmount(&mut self) -> Result<TestRendererRootUpdateOutcome, TestRendererRootError> {
+        if !matches!(self.lifecycle, TestRendererRootLifecycle::Active) {
+            return Ok(TestRendererRootUpdateOutcome::AlreadyUnmountScheduled);
+        }
+
+        let record = self
+            .schedule_root_update(TestRendererRootUpdateKind::Unmount, RootElementHandle::NONE)?;
+        self.scheduled_updates.push(record.clone());
+        self.lifecycle = TestRendererRootLifecycle::UnmountScheduled;
+        Ok(TestRendererRootUpdateOutcome::Scheduled(record))
+    }
+
+    #[must_use]
+    pub const fn renderer(&self) -> &TestRenderer {
+        &self.renderer
+    }
+
+    #[must_use]
+    pub const fn container(&self) -> TestContainer {
+        self.container
+    }
+
+    #[must_use]
+    pub const fn store(&self) -> &FiberRootStore<TestRenderer> {
+        &self.store
+    }
+
+    #[must_use]
+    pub const fn root_id(&self) -> FiberRootId {
+        self.root_id
+    }
+
+    #[must_use]
+    pub const fn options(&self) -> &TestRendererOptions {
+        &self.options
+    }
+
+    #[must_use]
+    pub const fn lifecycle(&self) -> TestRendererRootLifecycle {
+        self.lifecycle
+    }
+
+    #[must_use]
+    pub fn scheduled_updates(&self) -> &[TestRendererRootScheduledUpdate] {
+        &self.scheduled_updates
+    }
+
+    #[must_use]
+    pub fn last_scheduled_update(&self) -> Option<&TestRendererRootScheduledUpdate> {
+        self.scheduled_updates.last()
+    }
+
+    pub fn scheduled_roots_for_canary(&self) -> Result<Vec<FiberRootId>, TestRendererRootError> {
+        Ok(scheduled_roots(&self.store)?)
+    }
+
+    pub fn process_root_schedule_microtask_for_canary(
+        &mut self,
+    ) -> Result<RootScheduleMicrotaskResult, TestRendererRootError> {
+        Ok(process_root_schedule_in_microtask(&mut self.store)?)
+    }
+
+    pub fn render_latest_scheduled_host_root_for_commit_handoff(
+        &mut self,
+    ) -> Result<Option<HostRootRenderPhaseRecord>, TestRendererRootError> {
+        let Some(update) = self.scheduled_updates.last() else {
+            return Ok(None);
+        };
+
+        Ok(Some(render_host_root_for_lanes(
+            &mut self.store,
+            self.root_id,
+            update.container_update.lane().to_lanes(),
+        )?))
+    }
+
+    pub fn diagnostic_container_snapshot(
+        &self,
+    ) -> Result<TestContainerSnapshot, TestRendererRootError> {
+        Ok(self.renderer.snapshot_container(&self.container)?)
+    }
+
+    fn schedule_root_update(
+        &mut self,
+        kind: TestRendererRootUpdateKind,
+        element: RootElementHandle,
+    ) -> Result<TestRendererRootScheduledUpdate, TestRendererRootError> {
+        let container_update = match kind {
+            TestRendererRootUpdateKind::Create | TestRendererRootUpdateKind::Update => {
+                update_container(&mut self.store, self.root_id, element, None)?
+            }
+            TestRendererRootUpdateKind::Unmount => {
+                update_container_sync(&mut self.store, self.root_id, element, None)?
+            }
+        };
+        let root_schedule = ensure_root_is_scheduled(&mut self.store, container_update.schedule())?;
+        Ok(TestRendererRootScheduledUpdate {
+            kind,
+            element,
+            container_update,
+            root_schedule,
+        })
+    }
+}
+
 impl HostTypes for TestRenderer {
     type HostFiberToken = TestHostFiberToken;
     type Type = TestElementType;
@@ -1031,7 +1390,10 @@ impl MutationHost for TestRenderer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::AtomicUsize;
+
     use fast_react_host_config::{HostOperationErrorKind, HostTreeUpdateMode, MutationRenderer};
+    use fast_react_reconciler::RootTaskScheduleOutcome;
 
     static TEST_HOST_FIBER_TOKEN: TestHostFiberToken = 1;
 
@@ -1133,6 +1495,287 @@ mod tests {
         assert!(error.as_unsupported_capability().is_none());
         assert_eq!(operation.renderer_name(), TEST_RENDERER_NAME);
         assert_eq!(operation.kind(), &expected);
+    }
+
+    fn root_element(raw: u64) -> RootElementHandle {
+        RootElementHandle::from_raw(raw)
+    }
+
+    fn current_host_root_element(root: &TestRendererRoot) -> RootElementHandle {
+        let current = root.store().root(root.root_id()).unwrap().current();
+        let state = root
+            .store()
+            .fiber_arena()
+            .get(current)
+            .unwrap()
+            .memoized_state();
+        root.store()
+            .host_root_states()
+            .get(state)
+            .unwrap()
+            .element()
+    }
+
+    #[test]
+    fn root_create_enqueues_host_root_update_without_host_mutation() {
+        let element = root_element(42);
+        let root = TestRendererRoot::create(element, TestRendererOptions::new()).unwrap();
+        let update = root.last_scheduled_update().unwrap();
+        let pending_updates = root
+            .store()
+            .update_queues()
+            .pending_updates(update.container_update().queue())
+            .unwrap();
+
+        assert_eq!(root.store().len(), 1);
+        assert_eq!(root.lifecycle(), TestRendererRootLifecycle::Active);
+        assert_eq!(update.kind(), TestRendererRootUpdateKind::Create);
+        assert_eq!(update.element(), element);
+        assert_eq!(update.container_update().schedule().root(), root.root_id());
+        assert_eq!(
+            update.container_update().schedule().fiber(),
+            root.store().root(root.root_id()).unwrap().current()
+        );
+        assert_eq!(update.root_schedule().root(), root.root_id());
+        assert!(update.root_schedule().inserted());
+        assert!(update.root_schedule().microtask().is_some());
+        assert_eq!(
+            root.scheduled_roots_for_canary().unwrap(),
+            vec![root.root_id()]
+        );
+        assert_eq!(pending_updates, vec![update.container_update().update()]);
+        assert_eq!(
+            root.store()
+                .update_queues()
+                .update(update.container_update().update())
+                .unwrap()
+                .payload()
+                .unwrap()
+                .element(),
+            element
+        );
+        assert_eq!(current_host_root_element(&root), RootElementHandle::NONE);
+        assert!(
+            root.diagnostic_container_snapshot()
+                .unwrap()
+                .children()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn root_update_reuses_same_fiber_root_and_shared_scheduler_record() {
+        let mut root =
+            TestRendererRoot::create(root_element(1), TestRendererOptions::new()).unwrap();
+        let root_id = root.root_id();
+        let current = root.store().root(root_id).unwrap().current();
+        let first_queue = root
+            .last_scheduled_update()
+            .unwrap()
+            .container_update()
+            .queue();
+
+        let outcome = root.update(root_element(2)).unwrap();
+        let update = outcome.scheduled().unwrap();
+        let pending_updates = root
+            .store()
+            .update_queues()
+            .pending_updates(update.container_update().queue())
+            .unwrap();
+
+        assert_eq!(root.root_id(), root_id);
+        assert_eq!(root.store().root(root_id).unwrap().current(), current);
+        assert_eq!(root.scheduled_updates().len(), 2);
+        assert_eq!(update.kind(), TestRendererRootUpdateKind::Update);
+        assert_eq!(update.element(), root_element(2));
+        assert_eq!(update.container_update().queue(), first_queue);
+        assert!(!update.root_schedule().inserted());
+        assert_eq!(update.root_schedule().microtask(), None);
+        assert_eq!(root.scheduled_roots_for_canary().unwrap(), vec![root_id]);
+        assert_eq!(pending_updates.len(), 2);
+        assert_eq!(
+            root.store()
+                .update_queues()
+                .update(update.container_update().update())
+                .unwrap()
+                .payload()
+                .unwrap()
+                .element(),
+            root_element(2)
+        );
+        assert!(
+            root.diagnostic_container_snapshot()
+                .unwrap()
+                .children()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn root_render_phase_canary_reaches_wip_state_without_commit_handoff() {
+        let mut root =
+            TestRendererRoot::create(root_element(1), TestRendererOptions::new()).unwrap();
+        root.update(root_element(2)).unwrap();
+        let current = root.store().root(root.root_id()).unwrap().current();
+
+        let schedule = root.process_root_schedule_microtask_for_canary().unwrap();
+        let render = root
+            .render_latest_scheduled_host_root_for_commit_handoff()
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(schedule.records().len(), 1);
+        assert_eq!(
+            schedule.records()[0].outcome(),
+            RootTaskScheduleOutcome::Scheduled
+        );
+        assert_eq!(render.root(), root.root_id());
+        assert_eq!(render.resulting_element(), root_element(2));
+        assert_eq!(render.applied_update_count(), 2);
+        assert_eq!(render.skipped_update_count(), 0);
+        assert_eq!(
+            render.render_lanes(),
+            root.last_scheduled_update()
+                .unwrap()
+                .container_update()
+                .lane()
+                .to_lanes()
+        );
+        assert_eq!(
+            root.store().root(root.root_id()).unwrap().current(),
+            current
+        );
+        assert_eq!(
+            root.store().root(root.root_id()).unwrap().finished_work(),
+            None
+        );
+        assert!(
+            root.diagnostic_container_snapshot()
+                .unwrap()
+                .children()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn root_unmount_enqueues_sync_null_update_before_wrapper_invalidation() {
+        let mut root =
+            TestRendererRoot::create(root_element(1), TestRendererOptions::new()).unwrap();
+        let current = root.store().root(root.root_id()).unwrap().current();
+
+        let outcome = root.unmount().unwrap();
+        let unmount = outcome.scheduled().unwrap();
+
+        assert_eq!(
+            root.lifecycle(),
+            TestRendererRootLifecycle::UnmountScheduled
+        );
+        assert_eq!(unmount.kind(), TestRendererRootUpdateKind::Unmount);
+        assert_eq!(unmount.element(), RootElementHandle::NONE);
+        assert!(
+            unmount
+                .container_update()
+                .lane()
+                .to_lanes()
+                .includes_sync_lane()
+        );
+        assert_eq!(
+            root.store()
+                .update_queues()
+                .update(unmount.container_update().update())
+                .unwrap()
+                .payload()
+                .unwrap()
+                .element(),
+            RootElementHandle::NONE
+        );
+        assert!(root.store().root_scheduler().might_have_pending_sync_work());
+        assert_eq!(
+            root.store().root(root.root_id()).unwrap().current(),
+            current
+        );
+        assert!(
+            root.diagnostic_container_snapshot()
+                .unwrap()
+                .children()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn root_unmount_is_idempotent() {
+        let mut root =
+            TestRendererRoot::create(root_element(1), TestRendererOptions::new()).unwrap();
+
+        assert!(matches!(
+            root.unmount().unwrap(),
+            TestRendererRootUpdateOutcome::Scheduled(_)
+        ));
+        let scheduled_count = root.scheduled_updates().len();
+        let second = root.unmount().unwrap();
+
+        assert_eq!(
+            second,
+            TestRendererRootUpdateOutcome::AlreadyUnmountScheduled
+        );
+        assert_eq!(root.scheduled_updates().len(), scheduled_count);
+    }
+
+    #[test]
+    fn root_update_after_unmount_does_not_mutate_or_reschedule() {
+        let mut root =
+            TestRendererRoot::create(root_element(1), TestRendererOptions::new()).unwrap();
+        root.unmount().unwrap();
+        let scheduled_count = root.scheduled_updates().len();
+        let scheduled_roots = root.scheduled_roots_for_canary().unwrap();
+        let queue = root
+            .last_scheduled_update()
+            .unwrap()
+            .container_update()
+            .queue();
+        let pending_before = root.store().update_queues().pending_updates(queue).unwrap();
+
+        let outcome = root.update(root_element(2)).unwrap();
+        let pending_after = root.store().update_queues().pending_updates(queue).unwrap();
+
+        assert_eq!(outcome, TestRendererRootUpdateOutcome::IgnoredAfterUnmount);
+        assert_eq!(root.scheduled_updates().len(), scheduled_count);
+        assert_eq!(root.scheduled_roots_for_canary().unwrap(), scheduled_roots);
+        assert_eq!(pending_after, pending_before);
+        assert!(
+            root.diagnostic_container_snapshot()
+                .unwrap()
+                .children()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn root_options_store_strict_mode_and_create_node_mock_without_invocation() {
+        let invocation_count = Arc::new(AtomicUsize::new(0));
+        let invocation_count_for_mock = Arc::clone(&invocation_count);
+        let create_node_mock = TestCreateNodeMock::new(move || {
+            invocation_count_for_mock.fetch_add(1, Ordering::SeqCst);
+        });
+        let options = TestRendererOptions::new()
+            .with_strict_mode(true)
+            .with_create_node_mock(create_node_mock);
+
+        let mut root = TestRendererRoot::create(root_element(1), options).unwrap();
+        root.update(root_element(2)).unwrap();
+        root.unmount().unwrap();
+
+        assert!(root.options().strict_mode());
+        assert!(root.options().has_create_node_mock());
+        assert!(root.options().create_node_mock().is_some());
+        assert!(
+            root.store()
+                .root(root.root_id())
+                .unwrap()
+                .options()
+                .is_strict_mode()
+        );
+        assert_eq!(invocation_count.load(Ordering::SeqCst), 0);
     }
 
     #[test]
