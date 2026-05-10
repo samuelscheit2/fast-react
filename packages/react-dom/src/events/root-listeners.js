@@ -31,8 +31,10 @@ const {
   createEventListenerWrapperRecordWithPriority
 } = require('./react-dom-event-listener.js');
 const {
+  createSyntheticEventShapeGateFromDispatchRecords,
   createEventDispatchRecordFromWrapperRecord,
   getDispatchQueueInvocationCanaryRecordPayload,
+  getSyntheticEventShapeGateRecordPayload,
   invokeDispatchQueueCanaryFromDispatchRecords,
   invokeSingleListenerCanaryFromDispatchRecord
 } = require('./plugin-event-system.js');
@@ -51,8 +53,12 @@ const ROOT_LISTENERS_REVERTED =
   'reverted-private-root-listeners';
 const PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CANARY_RECORD_KIND =
   'FastReactDomPrivateRootHostOutputClickDispatchCanaryRecord';
+const PRIVATE_ROOT_HOST_OUTPUT_SYNTHETIC_EVENT_SHAPE_GATE_RECORD_KIND =
+  'FastReactDomPrivateRootHostOutputSyntheticEventShapeGateRecord';
 const PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CANARY_STATUS =
   'controlled-private-root-host-output-click-dispatch-canary';
+const PRIVATE_ROOT_HOST_OUTPUT_SYNTHETIC_EVENT_SHAPE_GATE_STATUS =
+  'controlled-private-root-host-output-synthetic-event-shape-gate';
 const INVALID_PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CODE =
   'FAST_REACT_DOM_INVALID_PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH';
 
@@ -61,6 +67,14 @@ const rootListenerCleanupRecords = new WeakMap();
 const rootListenerDispatchRecords = new WeakMap();
 const rootListenerInvocationCanaryRecords = new WeakMap();
 const privateRootHostOutputClickDispatchCanaryPayloads = new WeakMap();
+const privateRootHostOutputSyntheticEventShapeGatePayloads = new WeakMap();
+
+function isObjectLike(value) {
+  return (
+    value !== null &&
+    (typeof value === 'object' || typeof value === 'function')
+  );
+}
 
 function createEventListenerShell(target, domEventName, eventSystemFlags) {
   const priorityWrapperRecord = createEventListenerWrapperRecordWithPriority(
@@ -273,6 +287,121 @@ function invokePrivateRootHostOutputClickDispatchCanary(
   return record;
 }
 
+function createPrivateRootHostOutputClickSyntheticEventShapeGate(
+  listenerRegistrationRecord,
+  hostOutputPayloadOrTargetRecord,
+  options
+) {
+  const registrationPayload =
+    assertActiveRootListenerRegistrationPayload(listenerRegistrationRecord);
+  const targetRecord = isPrivateRootHostOutputEventTargetRecord(
+    hostOutputPayloadOrTargetRecord
+  )
+    ? hostOutputPayloadOrTargetRecord
+    : createPrivateRootHostOutputEventTargetRecord(
+        hostOutputPayloadOrTargetRecord,
+        options
+      );
+  const targetPayload =
+    getPrivateRootHostOutputEventTargetRecordPayload(targetRecord);
+  if (targetPayload === null) {
+    throwRootHostOutputClickDispatchError(
+      'Expected private React DOM root host-output event target metadata.'
+    );
+  }
+
+  const normalizedOptions = isObjectLike(options) ? options : {};
+  const clickListeners = getInstalledRootListenerPair(
+    registrationPayload,
+    'click'
+  );
+  const nativeEvent = createPrivateFakeClickEvent(targetPayload.targetNode);
+  const captureDispatchRecord = dispatchInstalledRootListener(
+    clickListeners.capture,
+    nativeEvent
+  );
+  const bubbleDispatchRecord = dispatchInstalledRootListener(
+    clickListeners.bubble,
+    nativeEvent
+  );
+  const shapeGateRecord = createSyntheticEventShapeGateFromDispatchRecords(
+    [captureDispatchRecord, bubbleDispatchRecord],
+    {
+      preventDefaultAtPhase:
+        normalizedOptions.preventDefaultAtPhase === undefined
+          ? null
+          : normalizedOptions.preventDefaultAtPhase,
+      useProcessingOrder: true
+    }
+  );
+  const shapeGatePayload =
+    getSyntheticEventShapeGateRecordPayload(shapeGateRecord);
+  const shapeRecords =
+    shapeGatePayload === null ? [] : shapeGatePayload.shapeRecords;
+  const record = freezeRecord({
+    browserDomEventCompatibilityClaimed: false,
+    bubbleDispatchRecordKind: bubbleDispatchRecord.kind,
+    captureDispatchRecordKind: captureDispatchRecord.kind,
+    clickDispatchOrder: freezeArray(['capture', 'bubble']),
+    dispatchQueueProcessed: false,
+    dispatchRecordCount: 2,
+    domEventName: 'click',
+    eventDispatch: false,
+    fakeDomEventCompatibilityClaimed: false,
+    kind: PRIVATE_ROOT_HOST_OUTPUT_SYNTHETIC_EVENT_SHAPE_GATE_RECORD_KIND,
+    listenerInvocationCount: 0,
+    nativeEventDefaultPrevented: nativeEvent.defaultPrevented === true,
+    nativeEventPreventDefaultCallCount:
+      nativeEvent.preventDefaultCallCount,
+    preventDefaultAtPhase:
+      shapeGateRecord.preventDefaultAtPhase,
+    preventDefaultShapeCount:
+      shapeGateRecord.preventDefaultShapeCount,
+    privateSyntheticEventShapeGate: true,
+    publicDispatchBlockedReason:
+      shapeGateRecord.publicDispatchBlockedReason,
+    publicDispatchEnabled: false,
+    publicRootBehaviorChanged: false,
+    rootListenerDispatchOrder: freezeArray(['capture', 'bubble']),
+    selectedFromProcessingOrder:
+      shapeGateRecord.selectedFromProcessingOrder,
+    shapeGateRecordKind: shapeGateRecord.kind,
+    status: PRIVATE_ROOT_HOST_OUTPUT_SYNTHETIC_EVENT_SHAPE_GATE_STATUS,
+    syntheticEventCompatibilityClaimed: false,
+    syntheticEventCount: shapeGateRecord.syntheticEventCount,
+    syntheticEventDispatchCount:
+      shapeGateRecord.syntheticEventDispatchCount,
+    syntheticEventShapeCount:
+      shapeGateRecord.syntheticEventShapeCount,
+    syntheticEventShapeOrder: freezeArray(
+      shapeGateRecord.syntheticEventShapeOrder
+    ),
+    targetRecordKind: PRIVATE_ROOT_HOST_OUTPUT_EVENT_TARGET_RECORD_KIND,
+    targetInst: targetRecord.targetInst,
+    targetInstStatus: targetRecord.targetInstStatus,
+    willInvokeListeners: false,
+    willInvokePublicListeners: false
+  });
+
+  privateRootHostOutputSyntheticEventShapeGatePayloads.set(
+    record,
+    freezeRecord({
+      bubbleDispatchRecord,
+      bubbleListenerRecord: clickListeners.bubble,
+      captureDispatchRecord,
+      captureListenerRecord: clickListeners.capture,
+      listenerRegistrationRecord,
+      nativeEvent,
+      shapeGateRecord,
+      shapeRecords,
+      targetPayload,
+      targetRecord
+    })
+  );
+
+  return record;
+}
+
 function getPrivateRootHostOutputClickDispatchCanaryPayload(record) {
   if (
     record === null ||
@@ -284,8 +413,27 @@ function getPrivateRootHostOutputClickDispatchCanaryPayload(record) {
   return privateRootHostOutputClickDispatchCanaryPayloads.get(record) || null;
 }
 
+function getPrivateRootHostOutputSyntheticEventShapeGatePayload(record) {
+  if (
+    record === null ||
+    (typeof record !== 'object' && typeof record !== 'function')
+  ) {
+    return null;
+  }
+
+  return (
+    privateRootHostOutputSyntheticEventShapeGatePayloads.get(record) || null
+  );
+}
+
 function isPrivateRootHostOutputClickDispatchCanaryRecord(record) {
   return getPrivateRootHostOutputClickDispatchCanaryPayload(record) !== null;
+}
+
+function isPrivateRootHostOutputSyntheticEventShapeGateRecord(record) {
+  return (
+    getPrivateRootHostOutputSyntheticEventShapeGatePayload(record) !== null
+  );
 }
 
 function getAddEventListenerOptions(
@@ -871,12 +1019,16 @@ function dispatchInstalledRootListener(listenerRecord, nativeEvent) {
 
 function createPrivateFakeClickEvent(target) {
   return {
+    defaultPrevented: false,
     preventDefaultCallCount: 0,
+    returnValue: true,
     stopPropagationCallCount: 0,
     target,
     type: 'click',
     preventDefault() {
+      this.defaultPrevented = true;
       this.preventDefaultCallCount++;
+      this.returnValue = false;
     },
     stopPropagation() {
       this.stopPropagationCallCount++;
@@ -904,9 +1056,12 @@ module.exports = {
   INVALID_PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CODE,
   PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CANARY_RECORD_KIND,
   PRIVATE_ROOT_HOST_OUTPUT_CLICK_DISPATCH_CANARY_STATUS,
+  PRIVATE_ROOT_HOST_OUTPUT_SYNTHETIC_EVENT_SHAPE_GATE_RECORD_KIND,
+  PRIVATE_ROOT_HOST_OUTPUT_SYNTHETIC_EVENT_SHAPE_GATE_STATUS,
   ROOT_LISTENERS_REGISTERED,
   ROOT_LISTENERS_REVERTED,
   addTrappedEventListener,
+  createPrivateRootHostOutputClickSyntheticEventShapeGate,
   createEventListenerShell,
   describePortalContainerListenerGuard,
   describeRootListenerGuard,
@@ -915,9 +1070,11 @@ module.exports = {
   getLastRootListenerDispatchRecord,
   getRootEventTargetOwnerDocument,
   getPrivateRootHostOutputClickDispatchCanaryPayload,
+  getPrivateRootHostOutputSyntheticEventShapeGatePayload,
   invokeLastRootListenerSingleListenerCanary,
   invokePrivateRootHostOutputClickDispatchCanary,
   isPrivateRootHostOutputClickDispatchCanaryRecord,
+  isPrivateRootHostOutputSyntheticEventShapeGateRecord,
   listenToAllSupportedEvents,
   listenToNativeEvent,
   listenToNonDelegatedEvent,
