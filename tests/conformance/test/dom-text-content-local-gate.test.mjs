@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   DOM_TEXT_CONTENT_LOCAL_GATE_STATUS,
@@ -17,6 +20,16 @@ import {
 } from "../src/dom-text-content-scenarios.mjs";
 
 const oracle = readCheckedDomTextContentOracle();
+const require = createRequire(import.meta.url);
+const repoRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  ".."
+);
+const domHost = require(
+  path.join(repoRoot, "packages", "react-dom", "src", "dom-host", "mutation.js")
+);
 
 test("DOM text-content local gate compares the private shouldSetTextContent helper to the React DOM oracle", () => {
   const gate = evaluateDomTextContentLocalGate({ oracle });
@@ -160,6 +173,145 @@ test("DOM text-content local gate compares private fake-DOM text-to-element orde
   }
 });
 
+test("DOM text-content local gate covers private dangerousHTML reset execution and rollback", () => {
+  const section = createDangerousHtmlResetFakeElement(
+    "<strong>Before</strong>"
+  );
+  const rows = [
+    {
+      id: "dangerous-html-to-managed-child-reset-text-content-blocked",
+      kind: "resetTextContent",
+      mutation: "textContent",
+      propertyName: "textContent",
+      status: "blocked",
+      value: ""
+    }
+  ];
+
+  const mutationRecords =
+    domHost.applyDangerousHtmlTextResetFakeDomRows(section, rows);
+  const payload =
+    domHost.getDangerousHtmlTextResetFakeDomMutationPayload(
+      mutationRecords
+    );
+
+  assert.equal(
+    domHost.isDangerousHtmlTextResetFakeDomMutationRecords(
+      mutationRecords
+    ),
+    true
+  );
+  assert.equal(payload.resetTextContentCount, 1);
+  assert.equal(payload.setTextContentCount, 0);
+  assert.equal(payload.setInnerHTMLCount, 0);
+  assert.deepEqual(mutationRecords, [
+    {
+      kind: domHost.DANGEROUS_HTML_TEXT_RESET_FAKE_DOM_MUTATION_RECORD,
+      rowIndex: 0,
+      sourceRowId:
+        "dangerous-html-to-managed-child-reset-text-content-blocked",
+      sourceKind: "resetTextContent",
+      operation: "resetTextContent",
+      mutation: "textContent",
+      propName: null,
+      propertyName: "textContent",
+      valueLength: 0,
+      fakeDomMutation: true,
+      realDomMutation: false,
+      browserDomMutation: false,
+      compatibilityClaimed: false
+    }
+  ]);
+  assert.deepEqual(section.writeLog, [["textContent", ""]]);
+  assert.equal(section.innerHTML, "");
+  assert.equal(section.textContent, "");
+
+  assert.equal(
+    domHost.rollbackDangerousHtmlTextResetFakeDomMutation(mutationRecords),
+    1
+  );
+  assert.deepEqual(section.writeLog, [
+    ["textContent", ""],
+    ["innerHTML", "<strong>Before</strong>"]
+  ]);
+  assert.equal(section.innerHTML, "<strong>Before</strong>");
+
+  const failClosed = createDangerousHtmlResetFakeElement(
+    "<strong>Before</strong>"
+  );
+  assert.throws(
+    () =>
+      domHost.applyDangerousHtmlTextResetFakeDomRows(failClosed, [
+        rows[0],
+        {
+          id: "unsupported-property-payload-blocked",
+          kind: "unsupported",
+          mutation: "unsupportedPropertyPayload",
+          reason: "children conflict",
+          status: "blocked"
+        }
+      ]),
+    {
+      code: "FAST_REACT_DOM_UNSUPPORTED_DANGEROUS_HTML_TEXT_RESET_ROW"
+    }
+  );
+  assert.deepEqual(failClosed.writeLog, []);
+  assert.equal(failClosed.innerHTML, "<strong>Before</strong>");
+});
+
+test("DOM text-content local gate rejects unadmitted dangerousHTML fake-DOM targets before DOM access", () => {
+  const accessLog = [];
+  let innerHTML = "<span>Live</span>";
+  let textContent = "";
+  const liveLike = {
+    childNodes: [],
+    nodeName: "DIV",
+    nodeType: 1,
+    ownerDocument: {
+      defaultView: {}
+    },
+    get innerHTML() {
+      accessLog.push("read:innerHTML");
+      return innerHTML;
+    },
+    set innerHTML(value) {
+      accessLog.push(`write:innerHTML:${String(value)}`);
+      innerHTML = String(value);
+    },
+    get textContent() {
+      accessLog.push("read:textContent");
+      return textContent;
+    },
+    set textContent(value) {
+      accessLog.push(`write:textContent:${String(value)}`);
+      textContent = String(value);
+    }
+  };
+
+  assert.equal(domHost.isDangerousHtmlTextResetFakeDomTarget(liveLike), false);
+  assert.throws(
+    () =>
+      domHost.applyDangerousHtmlTextResetFakeDomRows(liveLike, [
+        {
+          id: "live-like-unadmitted-set-inner-html-blocked",
+          kind: "setInnerHTML",
+          mutation: "innerHTML",
+          propName: "dangerouslySetInnerHTML",
+          propertyName: "innerHTML",
+          status: "blocked",
+          value: "<em>After</em>"
+        }
+      ]),
+    {
+      code:
+        "FAST_REACT_DOM_UNADMITTED_DANGEROUS_HTML_TEXT_RESET_FAKE_DOM_TARGET"
+    }
+  );
+  assert.deepEqual(accessLog, []);
+  assert.equal(innerHTML, "<span>Live</span>");
+  assert.equal(textContent, "");
+});
+
 test("DOM text-content local gate rejects private helper drift from the checked oracle", () => {
   const driftedOracle = JSON.parse(JSON.stringify(oracle));
   const stringChildObservation =
@@ -227,3 +379,43 @@ test("DOM text-content local gate CLI reports the closed local status", () => {
   assert.match(output, /should-set-textarea-special-case/u);
   assert.match(output, /should-set-noscript-special-case/u);
 });
+
+function createDangerousHtmlResetFakeElement(initialInnerHTML) {
+  let innerHTML = initialInnerHTML;
+  let textContent = "";
+  const element = {
+    childNodes: [],
+    nodeName: "SECTION",
+    nodeType: 1,
+    writeLog: [],
+    get firstChild() {
+      return this.childNodes[0] || null;
+    },
+    get lastChild() {
+      return this.childNodes[this.childNodes.length - 1] || null;
+    },
+    get innerHTML() {
+      return innerHTML;
+    },
+    set innerHTML(value) {
+      innerHTML = String(value);
+      textContent = "";
+      this.childNodes = [];
+      this.writeLog.push(["innerHTML", innerHTML]);
+    },
+    get textContent() {
+      if (this.childNodes.length > 0) {
+        return this.childNodes.map((child) => child.textContent).join("");
+      }
+      return textContent;
+    },
+    set textContent(value) {
+      textContent = String(value);
+      innerHTML = "";
+      this.childNodes = [];
+      this.writeLog.push(["textContent", textContent]);
+    }
+  };
+  domHost.markDangerousHtmlTextResetFakeDomTarget(element);
+  return element;
+}

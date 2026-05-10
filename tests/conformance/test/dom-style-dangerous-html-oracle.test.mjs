@@ -857,6 +857,75 @@ test("private dangerous HTML fake-DOM commit metadata mirrors oracle transitions
   }
 });
 
+test("private dangerous HTML/text reset fake-DOM execution mirrors oracle transitions without public compatibility", () => {
+  const updatePreviousProps = {
+    dangerouslySetInnerHTML: { __html: "<span>Before</span>" }
+  };
+  const updateNextProps = {
+    dangerouslySetInnerHTML: { __html: "<em>After</em>" }
+  };
+  const removePreviousProps = {
+    dangerouslySetInnerHTML: { __html: "<em>After</em>" }
+  };
+  const removeNextProps = {
+    dangerouslySetInnerHTML: undefined,
+    children: "Managed child"
+  };
+
+  const updateResult = applyDangerousHtmlOracleCommit(
+    "oracle-inner-html-update-execution",
+    updatePreviousProps,
+    updateNextProps
+  );
+  const removeResult = applyDangerousHtmlOracleCommit(
+    "oracle-html-to-text-execution",
+    removePreviousProps,
+    removeNextProps
+  );
+
+  assert.deepEqual(
+    updateResult.handoff.fakeDomCommitRows.map((row) => row.commitRowKind),
+    ["setInnerHTML"]
+  );
+  assert.deepEqual(
+    removeResult.handoff.fakeDomCommitRows.map((row) => row.commitRowKind),
+    ["setTextContent"]
+  );
+  assert.deepEqual(updateResult.host.dangerousWriteLog, [
+    ["setInnerHTML", "<em>After</em>"]
+  ]);
+  assert.deepEqual(removeResult.host.dangerousWriteLog, [
+    ["setTextContent", "Managed child"]
+  ]);
+  assert.equal(updateResult.host.innerHTML, "<em>After</em>");
+  assert.equal(removeResult.host.innerHTML, "");
+  assert.equal(removeResult.host.textContent, "Managed child");
+
+  for (const { handoff, hidden, host, nextProps } of [
+    updateResult,
+    removeResult
+  ]) {
+    assert.equal(handoff.fakeDomMutation, true);
+    assert.equal(handoff.browserDomMutation, false);
+    assert.equal(handoff.realDomInnerHTMLWritten, false);
+    assert.equal(handoff.realDomTextContentWritten, false);
+    assert.equal(handoff.latestPropsPublished, true);
+    assert.equal(handoff.publicRootObjectExposed, false);
+    assert.equal(handoff.compatibilityClaimed, false);
+    assert.equal(
+      handoff.blockedCapabilities.some(
+        (capability) => capability.id === "browser-dom-compatibility"
+      ),
+      true
+    );
+    assert.equal(hidden.hostInstanceNode, host);
+    assert.equal(componentTree.getLatestPropsFromNode(host), nextProps);
+  }
+
+  updateResult.cleanup();
+  removeResult.cleanup();
+});
+
 test("shape validation records server throws and client root errors", () => {
   const styleServer = serverPhase(
     "default-node-development",
@@ -1000,6 +1069,80 @@ function recordDangerousHtmlOracleCommit(label, previousProps, nextProps) {
     componentTree.detachHostInstanceToken(token);
     bridge.revertCreateRootSideEffects(sideEffects);
   }
+}
+
+function applyDangerousHtmlOracleCommit(label, previousProps, nextProps) {
+  const document = new StyleCommitBridgeDocument(label);
+  const container = document.createElement("div");
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    dangerousHtmlTextResetCommitIdPrefix: `${label}-execution`,
+    sideEffectIdPrefix: `${label}-side-effect`
+  });
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const initialRender = bridge.renderContainer(create.handle, {
+    props: previousProps,
+    type: "div"
+  });
+  bridge.admitCreateRenderPath(create, sideEffects, initialRender);
+
+  const host = document.createElement("div");
+  host._innerHTML = readDangerousHtmlString(previousProps);
+  host._textContent = readPrimitiveChildrenString(previousProps);
+  host.dangerousWriteLog = [];
+  domHost.markDangerousHtmlTextResetFakeDomTarget(host);
+  const token = componentTree.createHostInstanceToken(
+    { kind: "DangerousHtmlOracleExecutionHost" },
+    create.owner
+  );
+  componentTree.attachHostInstanceNode(host, token, previousProps);
+  const update = bridge.renderContainer(create.handle, {
+    props: nextProps,
+    type: "div"
+  });
+  const diagnostic = createDangerousHtmlTextResetDiagnostic(
+    "div",
+    previousProps,
+    nextProps
+  );
+
+  const handoff = bridge.applyDangerousHtmlTextResetCommit(
+    update,
+    createDangerousHtmlOracleRootCommitMetadata(),
+    diagnostic,
+    {
+      hostInstanceToken: token,
+      nextProps,
+      stateNodeRaw: 901,
+      tag: "div"
+    }
+  );
+  return {
+    cleanup() {
+      componentTree.detachHostInstanceToken(token);
+      bridge.revertCreateRootSideEffects(sideEffects);
+    },
+    handoff,
+    hidden:
+      rootBridge.getPrivateRootDangerousHtmlTextResetCommitHandoffPayload(
+        handoff
+      ),
+    host,
+    nextProps
+  };
+}
+
+function readDangerousHtmlString(props) {
+  const html = props?.dangerouslySetInnerHTML;
+  return html && typeof html.__html === "string" ? html.__html : "";
+}
+
+function readPrimitiveChildrenString(props) {
+  const children = props?.children;
+  const childrenType = typeof children;
+  return childrenType === "string" || childrenType === "number"
+    ? String(children)
+    : "";
 }
 
 function createDangerousHtmlOracleRootCommitMetadata() {
@@ -1303,6 +1446,7 @@ class StyleCommitBridgeElement extends StyleCommitBridgeEventTarget {
     this.childNodes = [];
     this.dangerousWriteLog = [];
     this._innerHTML = "";
+    this._textContent = "";
     this.styleLog = [];
     this.style = new StyleCommitBridgeStyle(this);
   }
@@ -1315,7 +1459,23 @@ class StyleCommitBridgeElement extends StyleCommitBridgeEventTarget {
     const stringValue = String(value);
     this.childNodes = [];
     this._innerHTML = stringValue;
+    this._textContent = "";
     this.dangerousWriteLog.push(["setInnerHTML", stringValue]);
+  }
+
+  get textContent() {
+    if (this.childNodes.length > 0) {
+      return this.childNodes.map((child) => child.textContent).join("");
+    }
+    return this._textContent;
+  }
+
+  set textContent(value) {
+    const stringValue = String(value);
+    this.childNodes = [];
+    this._innerHTML = "";
+    this._textContent = stringValue;
+    this.dangerousWriteLog.push(["setTextContent", stringValue]);
   }
 }
 
