@@ -19,6 +19,8 @@ use fast_react_core::{
 use fast_react_host_config::{HostFiberTokenPhase, HostFiberTokenTarget, HostTypes};
 
 #[cfg(test)]
+use crate::RootElementHandle;
+#[cfg(test)]
 use crate::complete_work::{
     OffscreenRevealCommitMetadataRecord, OffscreenRevealCommitMetadataStatus,
     OffscreenVisibilitySubtreeFlagBubblingIntent,
@@ -1158,6 +1160,170 @@ const HOST_ROOT_FINISHED_WORK_COMMIT_EXECUTION_BLOCKERS:
     HostRootFinishedWorkCommitExecutionBlockerForCanary::Hydration,
     HostRootFinishedWorkCommitExecutionBlockerForCanary::PublicCompatibilityClaim,
 ];
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct HostRootSuspenseFallbackContentCommitHandoffRecordForCanary {
+    root: FiberRootId,
+    previous_current: FiberId,
+    committed_current: FiberId,
+    fallback_element: RootElementHandle,
+    content_element: RootElementHandle,
+    previous_current_element: RootElementHandle,
+    committed_current_element: RootElementHandle,
+    retry_lanes: Lanes,
+    finished_lanes: Lanes,
+    private_finished_work_commit_proof: bool,
+}
+
+#[cfg(test)]
+impl HostRootSuspenseFallbackContentCommitHandoffRecordForCanary {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn previous_current(self) -> FiberId {
+        self.previous_current
+    }
+
+    #[must_use]
+    pub(crate) const fn committed_current(self) -> FiberId {
+        self.committed_current
+    }
+
+    #[must_use]
+    pub(crate) const fn fallback_element(self) -> RootElementHandle {
+        self.fallback_element
+    }
+
+    #[must_use]
+    pub(crate) const fn content_element(self) -> RootElementHandle {
+        self.content_element
+    }
+
+    #[must_use]
+    pub(crate) const fn previous_current_element(self) -> RootElementHandle {
+        self.previous_current_element
+    }
+
+    #[must_use]
+    pub(crate) const fn committed_current_element(self) -> RootElementHandle {
+        self.committed_current_element
+    }
+
+    #[must_use]
+    pub(crate) const fn retry_lanes(self) -> Lanes {
+        self.retry_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_lanes(self) -> Lanes {
+        self.finished_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn private_finished_work_commit_proof(self) -> bool {
+        self.private_finished_work_commit_proof
+    }
+
+    #[must_use]
+    pub(crate) fn fallback_to_content_element_handoff(self) -> bool {
+        self.fallback_element.is_some()
+            && self.content_element.is_some()
+            && self.fallback_element != self.content_element
+            && self.previous_current_element == self.fallback_element
+            && self.committed_current_element == self.content_element
+            && self.previous_current != self.committed_current
+    }
+
+    #[must_use]
+    pub(crate) fn retry_lanes_committed(self) -> bool {
+        self.retry_lanes.is_non_empty()
+            && self.retry_lanes.includes_only_retries()
+            && self.finished_lanes == self.retry_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn suspense_boundary_rendering_executed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn fallback_traversal_executed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn wakeable_subscription_performed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_suspense_compatibility_claimed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn public_root_compatibility_claimed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) fn proves_private_suspense_retry_fallback_content_commit_handoff(self) -> bool {
+        self.private_finished_work_commit_proof()
+            && self.fallback_to_content_element_handoff()
+            && self.retry_lanes_committed()
+            && !self.suspense_boundary_rendering_executed()
+            && !self.fallback_traversal_executed()
+            && !self.wakeable_subscription_performed()
+            && !self.public_suspense_compatibility_claimed()
+            && !self.public_root_compatibility_claimed()
+    }
+}
+
+#[cfg(test)]
+fn host_root_element_for_finished_work_commit_handoff_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    fiber: FiberId,
+) -> Result<RootElementHandle, RootCommitError> {
+    let memoized_state = store.fiber_arena().get(fiber)?.memoized_state();
+    Ok(store.host_root_states().get(memoized_state)?.element())
+}
+
+#[cfg(test)]
+pub(crate) fn record_host_root_suspense_fallback_content_commit_handoff_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    finished_work_handoff: &HostRootFinishedWorkCommitHandoffRecordForCanary,
+    fallback_element: RootElementHandle,
+    content_element: RootElementHandle,
+    retry_lanes: Lanes,
+) -> Result<HostRootSuspenseFallbackContentCommitHandoffRecordForCanary, RootCommitError> {
+    let commit = finished_work_handoff.commit();
+    let previous_current = commit.previous_current();
+    let committed_current = commit.current();
+    let previous_current_element =
+        host_root_element_for_finished_work_commit_handoff_for_canary(store, previous_current)?;
+    let committed_current_element =
+        host_root_element_for_finished_work_commit_handoff_for_canary(store, committed_current)?;
+
+    Ok(
+        HostRootSuspenseFallbackContentCommitHandoffRecordForCanary {
+            root: commit.root(),
+            previous_current,
+            committed_current,
+            fallback_element,
+            content_element,
+            previous_current_element,
+            committed_current_element,
+            retry_lanes,
+            finished_lanes: commit.finished_lanes(),
+            private_finished_work_commit_proof: finished_work_handoff
+                .proves_private_finished_work_commit_execution(),
+        },
+    )
+}
 
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
