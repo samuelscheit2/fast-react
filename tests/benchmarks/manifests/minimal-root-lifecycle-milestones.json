@@ -73,7 +73,7 @@
         "command": "npm run root-render-e2e:conformance --workspace @fast-react/conformance",
         "admitted": false,
         "compatibilityClaimed": false,
-        "notes": "Worker 262 compares private root-bridge request records only; public root E2E rows remain blocked and compatibility remains false."
+        "notes": "Workers 262, 269, and 270 compare private root-bridge request/native-handoff records only; public root E2E rows remain blocked and compatibility remains false."
       }
     },
     {
@@ -90,7 +90,7 @@
         "command": "cargo test -p fast-react-reconciler --all-features",
         "admitted": false,
         "compatibilityClaimed": false,
-        "notes": "Workers 233, 249, and 250 accepted private commit apply, function single-child, and passive handoff canaries without public renderer output or compatibility claims."
+        "notes": "Workers 233, 249, 250, 263, 264, 282, 283, and 286 accepted private root commit, deletion, context, state-update, and topology canaries without public renderer output or compatibility claims."
       }
     },
     {
@@ -175,7 +175,7 @@
         "command": "npm run dom-text-content:conformance --workspace @fast-react/conformance",
         "admitted": false,
         "compatibilityClaimed": false,
-        "notes": "Workers 230 and 261 accepted private shouldSetTextContent and HostText fake-DOM commit rows only; public roots, full DOM mutation, hydration, and compatibility remain blocked."
+        "notes": "Workers 230, 261, 272, and 292 accepted private shouldSetTextContent and HostText fake-DOM commit rows only; public roots, full DOM mutation, hydration, and compatibility remain blocked."
       }
     }
   ],
