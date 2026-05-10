@@ -25,6 +25,7 @@ import {
   REACT_DOM_ROOT_PUBLIC_FACADE_BRIDGE_RECORD_ONLY_STATUS,
   REACT_DOM_ROOT_PUBLIC_FACADE_LIFECYCLE_BLOCKED_ROWS,
   REACT_DOM_ROOT_PUBLIC_FACADE_SCENARIO_ADMISSIONS,
+  REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_ACCEPTED_STATUS,
   evaluateReactDomRootRenderE2EConformanceGate,
   evaluateReactDomRootPublicFacadeBlockedGate,
   inspectReactDomPrivateRootBridgeBoundary,
@@ -82,6 +83,22 @@ test("React DOM public root facade gate blocks placeholders while oracle prerequ
     gate.rootRenderGate.summary.privateHostOutputCompatibilityClaimed,
     false
   );
+  assert.equal(
+    gate.rootRenderGate.summary.privateWarningBoundaryDiagnosticScenarioModeRowCount,
+    2
+  );
+  assert.equal(
+    gate.rootRenderGate.summary.privateWarningBoundaryBlockedScenarioModeRowCount,
+    18
+  );
+  assert.equal(
+    gate.rootRenderGate.summary.privateWarningBoundaryCompatibilityClaimed,
+    false
+  );
+  assert.equal(
+    gate.rootRenderGate.summary.privateWarningBoundaryConsoleOutputUsedAsEvidence,
+    false
+  );
   assert.equal(gate.rootRenderGate.summary.portalRootRenderBlockedRowCount, 5);
   assert.equal(
     gate.rootRenderGate.summary.portalRootRenderCompatibilityClaimed,
@@ -90,6 +107,10 @@ test("React DOM public root facade gate blocks placeholders while oracle prerequ
   for (const row of gate.blockedPublicFacadeRows) {
     assert.equal(row.gateStatus, REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS);
     assert.notEqual(row.gateStatus, "accepted-private-root-host-output-diagnostic");
+    assert.notEqual(
+      row.gateStatus,
+      REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_ACCEPTED_STATUS
+    );
     assert.notEqual(row.gateStatus, "blocked-portal-root-render");
     if ("compatibilityClaimed" in row) {
       assert.equal(row.compatibilityClaimed, false);
@@ -435,6 +456,49 @@ test("React DOM public root facade gate rejects private host-output promotion to
       (failure) =>
         failure.gateStatus ===
         "root-render-private-host-output-row-not-private-blocked"
+    )
+  );
+});
+
+test("React DOM public root facade gate rejects private warning-boundary promotion to public compatibility", () => {
+  const rootRenderGate = clone(
+    evaluateReactDomRootRenderE2EConformanceGate({
+      checkedOracle: rootRenderOracle,
+      currentOracle: rootRenderOracle
+    })
+  );
+  rootRenderGate.summary.privateWarningBoundaryCompatibilityClaimed = true;
+  rootRenderGate.summary.privateWarningBoundaryConsoleOutputUsedAsEvidence = true;
+  rootRenderGate.privateWarningBoundaryGate.compatibilityClaimed = true;
+  rootRenderGate.privateWarningBoundaryGate.consoleOutputUsedAsEvidence = true;
+  rootRenderGate.privateWarningBoundaryDiagnosticScenarioModeRows[0] = {
+    ...rootRenderGate.privateWarningBoundaryDiagnosticScenarioModeRows[0],
+    comparedToReactDomOracle: true,
+    compatibilityClaimed: true,
+    consoleOutputUsedAsEvidence: true,
+    publicRootCompatibilitySurface: true
+  };
+
+  const gate = evaluateReactDomRootPublicFacadeBlockedGate({
+    checkedOracle: rootRenderOracle,
+    currentOracle: rootRenderOracle,
+    clientRootOracle,
+    rootRenderGateResult: rootRenderGate
+  });
+
+  assert.equal(gate.ok, false);
+  assert.ok(
+    gate.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+        "root-render-private-warning-boundary-claims-compatibility-while-public-facade-blocked"
+    )
+  );
+  assert.ok(
+    gate.failures.some(
+      (failure) =>
+        failure.gateStatus ===
+        "root-render-private-warning-boundary-row-not-private"
     )
   );
 });

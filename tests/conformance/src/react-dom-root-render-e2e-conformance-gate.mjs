@@ -141,6 +141,14 @@ export const REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_BOUNDARY_ROWS =
       portalRootRenderEvidence: "separate"
     }),
     Object.freeze({
+      id: "public-development-warning-compatibility",
+      publicApi: "development warning output through public root APIs",
+      admission: "blocked",
+      expectedGateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+      compatibilityClaimed: false,
+      privateWarningBoundaryEvidence: "separate"
+    }),
+    Object.freeze({
       id: "public-dom-mutation",
       publicApi: "DOM mutation through public roots",
       admission: "blocked",
@@ -194,6 +202,15 @@ export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ACCEPTED_STATUS =
 
 export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_BLOCKED_STATUS =
   "blocked-private-root-host-output-diagnostic";
+
+export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_GATE_ID =
+  "root-render-private-warning-boundary-diagnostic-gate-1";
+
+export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_ACCEPTED_STATUS =
+  "accepted-private-root-warning-boundary-diagnostic";
+
+export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_BLOCKED_STATUS =
+  "blocked-private-root-warning-boundary-diagnostic";
 
 export const REACT_DOM_PORTAL_ROOT_RENDER_BLOCKED_GATE_ID =
   "react-dom-portal-root-render-blocked-gate-1";
@@ -431,6 +448,29 @@ export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_HOST_OUTPUT_ADMISSIONS =
     }))
   ]);
 
+export const REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_ADMISSIONS =
+  Object.freeze(
+    REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.map((scenarioId) =>
+      scenarioId === "development-warning-boundaries"
+        ? Object.freeze({
+            scenarioId,
+            admission: "private-warning-boundary-diagnostic",
+            gateStatus:
+              REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_ACCEPTED_STATUS,
+            reason:
+              "Private root records can prove the development warning argument boundaries without comparing console output or admitting public root warning compatibility."
+          })
+        : Object.freeze({
+            scenarioId,
+            admission: "unsupported",
+            gateStatus:
+              REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_BLOCKED_STATUS,
+            reason:
+              "This root E2E scenario is not a warning-boundary diagnostic row; its public behavior remains blocked by the root-render facade gate."
+          })
+    )
+  );
+
 export async function runReactDomRootRenderE2EConformanceGate({
   checkedOracle = readCheckedReactDomRootRenderE2EOracle(),
   currentOracle,
@@ -443,6 +483,10 @@ export async function runReactDomRootRenderE2EConformanceGate({
       inspectReactDomRootRenderE2EPrivateBridgeRequests({ workspaceRoot }),
     privateHostOutputDiagnostics:
       inspectReactDomRootRenderE2EPrivateHostOutputDiagnostics({
+        workspaceRoot
+      }),
+    privateWarningBoundaryDiagnostics:
+      inspectReactDomRootRenderE2EPrivateWarningBoundaryDiagnostics({
         workspaceRoot
       }),
     portalRootRenderObservations: inspectReactDomPortalRootRenderBlockedBoundary({
@@ -480,6 +524,8 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
     inspectReactDomRootRenderE2EPrivateBridgeRequests(),
   privateHostOutputDiagnostics =
     inspectReactDomRootRenderE2EPrivateHostOutputDiagnostics(),
+  privateWarningBoundaryDiagnostics =
+    inspectReactDomRootRenderE2EPrivateWarningBoundaryDiagnostics(),
   portalRootRenderObservations =
     inspectReactDomPortalRootRenderBlockedBoundary()
 }) {
@@ -490,6 +536,8 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
   const privateBridgeBlockedRows = [];
   const privateHostOutputDiagnosticRows = [];
   const privateHostOutputBlockedRows = [];
+  const privateWarningBoundaryDiagnosticRows = [];
+  const privateWarningBoundaryBlockedRows = [];
   const behaviorByScenario = new Map(
     REACT_DOM_ROOT_RENDER_E2E_LOCAL_FAST_REACT_BEHAVIOR.map((behavior) => [
       behavior.scenarioId,
@@ -518,6 +566,17 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
       row
     ])
   );
+  const privateWarningBoundaryAdmissionByScenario = new Map(
+    REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_ADMISSIONS.map(
+      (admission) => [admission.scenarioId, admission]
+    )
+  );
+  const privateWarningBoundaryObservationByRow = new Map(
+    (privateWarningBoundaryDiagnostics.rows ?? []).map((row) => [
+      formatScenarioModeKey(row),
+      row
+    ])
+  );
 
   validateOracleShape({
     checkedOracle,
@@ -536,6 +595,10 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
     privateHostOutputAdmissionByScenario,
     failures
   });
+  validatePrivateWarningBoundaryAdmissionMetadata({
+    privateWarningBoundaryAdmissionByScenario,
+    failures
+  });
 
   if (privateBridgeObservations.loadError) {
     failures.push({
@@ -547,6 +610,12 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
     failures.push({
       gateStatus: "private-root-host-output-diagnostic-load-failed",
       error: privateHostOutputDiagnostics.loadError
+    });
+  }
+  if (privateWarningBoundaryDiagnostics.loadError) {
+    failures.push({
+      gateStatus: "private-root-warning-boundary-diagnostic-load-failed",
+      error: privateWarningBoundaryDiagnostics.loadError
     });
   }
 
@@ -723,6 +792,80 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
         });
       }
 
+      const privateWarningBoundaryAdmission =
+        privateWarningBoundaryAdmissionByScenario.get(scenarioId);
+      if (!privateWarningBoundaryAdmission) {
+        failures.push({
+          ...context,
+          gateStatus: "missing-private-root-warning-boundary-admission"
+        });
+      } else if (
+        privateWarningBoundaryAdmission.admission ===
+        "private-warning-boundary-diagnostic"
+      ) {
+        const privateWarningBoundaryObservation =
+          privateWarningBoundaryObservationByRow.get(
+            formatScenarioModeKey(context)
+          );
+
+        if (!privateWarningBoundaryObservation) {
+          failures.push({
+            ...context,
+            gateStatus: "missing-private-root-warning-boundary-diagnostic"
+          });
+        } else {
+          const validationFailure =
+            validatePrivateWarningBoundaryDiagnosticObservation({
+              mode,
+              observation: privateWarningBoundaryObservation,
+              scenarioId
+            });
+
+          if (validationFailure === null) {
+            privateWarningBoundaryDiagnosticRows.push({
+              ...context,
+              gateStatus: privateWarningBoundaryAdmission.gateStatus,
+              oracleRowAccepted,
+              publicFacadeGateStatus: behavior.gateStatus,
+              publicRootCompatibilitySurface: false,
+              comparedToReactDomOracle: false,
+              compatibilityClaimed: false,
+              consoleOutputUsedAsEvidence: false,
+              diagnosticKind:
+                privateWarningBoundaryObservation.evidence.diagnosticKind,
+              modeWarningEnabled:
+                privateWarningBoundaryObservation.evidence.modeWarningEnabled,
+              warningBoundaryEvidence:
+                privateWarningBoundaryObservation.evidence
+                  .warningBoundaryEvidence
+            });
+          } else {
+            failures.push({
+              ...context,
+              ...validationFailure
+            });
+          }
+        }
+      } else if (privateWarningBoundaryAdmission.admission === "unsupported") {
+        privateWarningBoundaryBlockedRows.push({
+          ...context,
+          gateStatus: privateWarningBoundaryAdmission.gateStatus,
+          oracleRowAccepted,
+          publicFacadeGateStatus: behavior.gateStatus,
+          publicRootCompatibilitySurface: false,
+          reason: privateWarningBoundaryAdmission.reason,
+          comparedToReactDomOracle: false,
+          compatibilityClaimed: false,
+          consoleOutputUsedAsEvidence: false
+        });
+      } else {
+        failures.push({
+          ...context,
+          gateStatus: "unknown-private-root-warning-boundary-admission",
+          admission: privateWarningBoundaryAdmission.admission
+        });
+      }
+
       const privateHostOutputAdmission =
         privateHostOutputAdmissionByScenario.get(scenarioId);
       if (!privateHostOutputAdmission) {
@@ -855,9 +998,29 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
         ).map((admission) => admission.scenarioId),
       compatibilityClaimed: false
     },
+    privateWarningBoundaryGate: {
+      id: REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_GATE_ID,
+      localEntrypoint:
+        "packages/react-dom/src/client/root-bridge.js + packages/react-dom/src/client/root-markers.js private warning-boundary diagnostics",
+      admittedPrivateWarningBoundaryScenarioIds:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_ADMISSIONS.filter(
+          (admission) =>
+            admission.admission === "private-warning-boundary-diagnostic"
+        ).map((admission) => admission.scenarioId),
+      unsupportedPrivateWarningBoundaryScenarioIds:
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_ADMISSIONS.filter(
+          (admission) => admission.admission === "unsupported"
+        ).map((admission) => admission.scenarioId),
+      consoleOutputUsedAsEvidence: false,
+      compatibilityClaimed: false
+    },
     privateHostOutputDiagnosticScenarioModeRows:
       privateHostOutputDiagnosticRows,
     privateHostOutputBlockedScenarioModeRows: privateHostOutputBlockedRows,
+    privateWarningBoundaryDiagnosticScenarioModeRows:
+      privateWarningBoundaryDiagnosticRows,
+    privateWarningBoundaryBlockedScenarioModeRows:
+      privateWarningBoundaryBlockedRows,
     portalRootRenderGate,
     portalRootRenderPrerequisiteRows: portalRootRenderGate.prerequisiteRows,
     portalRootRenderBlockedRows: portalRootRenderGate.blockedRows,
@@ -873,6 +1036,10 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
         privateHostOutputDiagnosticRows.length,
       privateHostOutputBlockedScenarioModeRowCount:
         privateHostOutputBlockedRows.length,
+      privateWarningBoundaryDiagnosticScenarioModeRowCount:
+        privateWarningBoundaryDiagnosticRows.length,
+      privateWarningBoundaryBlockedScenarioModeRowCount:
+        privateWarningBoundaryBlockedRows.length,
       portalRootRenderPrerequisiteRowCount:
         portalRootRenderGate.summary.prerequisiteRowCount,
       portalRootRenderBlockedRowCount:
@@ -887,6 +1054,8 @@ export function evaluateReactDomRootRenderE2EConformanceGate({
         admitted.length > 0,
       privateBridgeCompatibilityClaimed: false,
       privateHostOutputCompatibilityClaimed: false,
+      privateWarningBoundaryCompatibilityClaimed: false,
+      privateWarningBoundaryConsoleOutputUsedAsEvidence: false,
       portalRootRenderCompatibilityClaimed: false,
       compatibilityClaimed: false
     }
@@ -1061,6 +1230,8 @@ export function formatReactDomRootRenderE2EConformanceGateResult(result) {
     `Private bridge request rows blocked: ${result.summary.privateBridgeBlockedScenarioModeRowCount}`,
     `Private host-output diagnostic rows admitted: ${result.summary.privateHostOutputDiagnosticScenarioModeRowCount}`,
     `Private host-output diagnostic rows blocked: ${result.summary.privateHostOutputBlockedScenarioModeRowCount}`,
+    `Private warning-boundary diagnostic rows admitted: ${result.summary.privateWarningBoundaryDiagnosticScenarioModeRowCount}`,
+    `Private warning-boundary diagnostic rows blocked: ${result.summary.privateWarningBoundaryBlockedScenarioModeRowCount}`,
     `Portal root-render prerequisite rows accepted: ${result.summary.portalRootRenderPrerequisiteRowCount}`,
     `Portal root-render rows blocked: ${result.summary.portalRootRenderBlockedRowCount}`,
     `Failures: ${result.summary.failureCount}`
@@ -1079,6 +1250,11 @@ export function formatReactDomRootRenderE2EConformanceGateResult(result) {
   if (result.privateHostOutputDiagnosticScenarioModeRows.length > 0) {
     lines.push(
       "Private host-output diagnostics use fake-DOM helper evidence only; public root render scenarios and compatibility claims remain blocked."
+    );
+  }
+  if (result.privateWarningBoundaryDiagnosticScenarioModeRows.length > 0) {
+    lines.push(
+      "Private warning-boundary diagnostics use root record metadata only; console output and public development warning compatibility remain blocked."
     );
   }
   if (result.portalRootRenderBlockedRows.length > 0) {
@@ -1120,6 +1296,14 @@ export function formatReactDomRootPublicFacadeBlockedGateResult(result) {
       result.rootRenderGate?.summary
         .privateHostOutputBlockedScenarioModeRowCount ?? 0
     }`,
+    `Root-render private warning-boundary diagnostic rows admitted: ${
+      result.rootRenderGate?.summary
+        .privateWarningBoundaryDiagnosticScenarioModeRowCount ?? 0
+    }`,
+    `Root-render private warning-boundary diagnostic rows blocked: ${
+      result.rootRenderGate?.summary
+        .privateWarningBoundaryBlockedScenarioModeRowCount ?? 0
+    }`,
     `Root-render portal rows blocked: ${
       result.rootRenderGate?.summary.portalRootRenderBlockedRowCount ?? 0
     }`,
@@ -1142,6 +1326,14 @@ export function formatReactDomRootPublicFacadeBlockedGateResult(result) {
   ) {
     lines.push(
       "Private host-output diagnostics remain fake-DOM evidence only and do not unblock public root facade rows."
+    );
+  }
+  if (
+    (result.rootRenderGate?.summary
+      .privateWarningBoundaryDiagnosticScenarioModeRowCount ?? 0) > 0
+  ) {
+    lines.push(
+      "Private warning-boundary diagnostics remain metadata evidence only and do not unblock public warning compatibility."
     );
   }
   if ((result.rootRenderGate?.summary.portalRootRenderBlockedRowCount ?? 0) > 0) {
@@ -1297,6 +1489,41 @@ export function inspectReactDomRootRenderE2EPrivateHostOutputDiagnostics({
 
         rows.push(
           runPrivateHostOutputDiagnosticScenario({
+            mode,
+            modules,
+            scenarioId: admission.scenarioId
+          })
+        );
+      }
+    }
+
+    return {
+      loadError: null,
+      rows
+    };
+  } catch (error) {
+    return {
+      loadError: describePrivateBridgeError(error),
+      rows: []
+    };
+  }
+}
+
+export function inspectReactDomRootRenderE2EPrivateWarningBoundaryDiagnostics({
+  workspaceRoot = DEFAULT_WORKSPACE_ROOT
+} = {}) {
+  try {
+    const modules = loadPrivateBridgeModules(workspaceRoot);
+    const rows = [];
+
+    for (const mode of REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES) {
+      for (const admission of REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_ADMISSIONS) {
+        if (admission.admission !== "private-warning-boundary-diagnostic") {
+          continue;
+        }
+
+        rows.push(
+          runPrivateWarningBoundaryDiagnosticScenario({
             mode,
             modules,
             scenarioId: admission.scenarioId
@@ -1672,6 +1899,10 @@ function validateRootRenderGatePrerequisites({
     rootRenderGateResult,
     failures
   });
+  validateRootRenderPrivateWarningBoundaryBlockers({
+    rootRenderGateResult,
+    failures
+  });
   validateRootRenderPortalBlockers({
     rootRenderGateResult,
     failures
@@ -1823,6 +2054,147 @@ function validateRootRenderPrivateHostOutputBlockers({
         scenarioId: row.scenarioId,
         gateStatus:
           "root-render-private-host-output-blocked-row-not-fail-closed",
+        row
+      });
+    }
+  }
+}
+
+function validateRootRenderPrivateWarningBoundaryBlockers({
+  rootRenderGateResult,
+  failures
+}) {
+  if (!rootRenderGateResult) {
+    return;
+  }
+
+  const admittedScenarioIds =
+    REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_ADMISSIONS.filter(
+      (admission) =>
+        admission.admission === "private-warning-boundary-diagnostic"
+    ).map((admission) => admission.scenarioId);
+  const unsupportedScenarioIds =
+    REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_ADMISSIONS.filter(
+      (admission) => admission.admission === "unsupported"
+    ).map((admission) => admission.scenarioId);
+  const expectedAdmittedRows =
+    admittedScenarioIds.length * REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES.length;
+  const expectedBlockedRows =
+    unsupportedScenarioIds.length *
+    REACT_DOM_ROOT_RENDER_E2E_PROBE_MODES.length;
+
+  if (
+    rootRenderGateResult.summary
+      .privateWarningBoundaryDiagnosticScenarioModeRowCount !==
+      expectedAdmittedRows ||
+    rootRenderGateResult.summary
+      .privateWarningBoundaryBlockedScenarioModeRowCount !== expectedBlockedRows
+  ) {
+    failures.push({
+      gateStatus: "root-render-private-warning-boundary-row-count-mismatch",
+      actualAdmitted:
+        rootRenderGateResult.summary
+          .privateWarningBoundaryDiagnosticScenarioModeRowCount ?? null,
+      actualBlocked:
+        rootRenderGateResult.summary
+          .privateWarningBoundaryBlockedScenarioModeRowCount ?? null,
+      expectedAdmitted: expectedAdmittedRows,
+      expectedBlocked: expectedBlockedRows
+    });
+  }
+
+  if (
+    rootRenderGateResult.summary.privateWarningBoundaryCompatibilityClaimed !==
+      false ||
+    rootRenderGateResult.summary
+      .privateWarningBoundaryConsoleOutputUsedAsEvidence !== false ||
+    rootRenderGateResult.privateWarningBoundaryGate?.compatibilityClaimed !==
+      false ||
+    rootRenderGateResult.privateWarningBoundaryGate
+      ?.consoleOutputUsedAsEvidence !== false
+  ) {
+    failures.push({
+      gateStatus:
+        "root-render-private-warning-boundary-claims-compatibility-while-public-facade-blocked",
+      summaryClaim:
+        rootRenderGateResult.summary.privateWarningBoundaryCompatibilityClaimed ??
+        null,
+      summaryConsoleEvidence:
+        rootRenderGateResult.summary
+          .privateWarningBoundaryConsoleOutputUsedAsEvidence ?? null,
+      gateClaim:
+        rootRenderGateResult.privateWarningBoundaryGate?.compatibilityClaimed ??
+        null,
+      gateConsoleEvidence:
+        rootRenderGateResult.privateWarningBoundaryGate
+          ?.consoleOutputUsedAsEvidence ?? null
+    });
+  }
+
+  if (
+    findFirstDifferencePath(
+      rootRenderGateResult.privateWarningBoundaryGate
+        ?.admittedPrivateWarningBoundaryScenarioIds ?? [],
+      admittedScenarioIds
+    ) !== null ||
+    findFirstDifferencePath(
+      rootRenderGateResult.privateWarningBoundaryGate
+        ?.unsupportedPrivateWarningBoundaryScenarioIds ?? [],
+      unsupportedScenarioIds
+    ) !== null
+  ) {
+    failures.push({
+      gateStatus:
+        "root-render-private-warning-boundary-admission-set-mismatch",
+      admitted:
+        rootRenderGateResult.privateWarningBoundaryGate
+          ?.admittedPrivateWarningBoundaryScenarioIds ?? null,
+      unsupported:
+        rootRenderGateResult.privateWarningBoundaryGate
+          ?.unsupportedPrivateWarningBoundaryScenarioIds ?? null
+    });
+  }
+
+  for (const row of rootRenderGateResult.privateWarningBoundaryDiagnosticScenarioModeRows ??
+    []) {
+    if (
+      row.gateStatus !==
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_ACCEPTED_STATUS ||
+      row.scenarioId !== "development-warning-boundaries" ||
+      row.publicFacadeGateStatus !==
+        REACT_DOM_ROOT_RENDER_E2E_FAST_REACT_BLOCKED_STATUS ||
+      row.publicRootCompatibilitySurface !== false ||
+      row.comparedToReactDomOracle !== false ||
+      row.compatibilityClaimed !== false ||
+      row.consoleOutputUsedAsEvidence !== false ||
+      row.diagnosticKind !== "private-root-warning-boundary"
+    ) {
+      failures.push({
+        modeId: row.modeId,
+        scenarioId: row.scenarioId,
+        gateStatus: "root-render-private-warning-boundary-row-not-private",
+        row
+      });
+    }
+  }
+
+  for (const row of rootRenderGateResult.privateWarningBoundaryBlockedScenarioModeRows ??
+    []) {
+    if (
+      row.gateStatus !==
+        REACT_DOM_ROOT_RENDER_E2E_PRIVATE_WARNING_BOUNDARY_BLOCKED_STATUS ||
+      row.publicFacadeGateStatus !==
+        REACT_DOM_ROOT_RENDER_E2E_FAST_REACT_BLOCKED_STATUS ||
+      row.publicRootCompatibilitySurface !== false ||
+      row.comparedToReactDomOracle !== false ||
+      row.compatibilityClaimed !== false ||
+      row.consoleOutputUsedAsEvidence !== false
+    ) {
+      failures.push({
+        modeId: row.modeId,
+        scenarioId: row.scenarioId,
+        gateStatus:
+          "root-render-private-warning-boundary-blocked-row-not-fail-closed",
         row
       });
     }
@@ -2088,6 +2460,15 @@ function validatePublicFacadeBoundary({
     compatibilityClaimed: false,
     privateHostOutputEvidence: "separate",
     portalRootRenderEvidence: "separate"
+  });
+
+  blockedPublicFacadeRows.push({
+    id: "public-development-warning-compatibility",
+    gateStatus: REACT_DOM_ROOT_PUBLIC_FACADE_BLOCKED_STATUS,
+    reason:
+      "Private warning-boundary metadata remains separate from public console warning compatibility while public roots are placeholders.",
+    compatibilityClaimed: false,
+    privateWarningBoundaryEvidence: "separate"
   });
 
   const createRootSideEffects = localPublicFacadeBoundary.createRoot.sideEffects;
@@ -3234,6 +3615,205 @@ function runPrivateHostOutputDiagnosticScenario({ mode, modules, scenarioId }) {
   }
 }
 
+function runPrivateWarningBoundaryDiagnosticScenario({
+  mode,
+  modules,
+  scenarioId
+}) {
+  try {
+    if (scenarioId !== "development-warning-boundaries") {
+      throw new Error(
+        `No private warning-boundary diagnostic plan for scenario: ${scenarioId}`
+      );
+    }
+
+    const modeWarningEnabled = mode.nodeEnv !== "production";
+    const bridge = modules.rootBridge.createPrivateRootBridgeShell({
+      markerOptions: {
+        development: modeWarningEnabled
+      },
+      requestIdPrefix: "warning-boundary-request",
+      rootIdPrefix: "warning-boundary-root",
+      updateIdPrefix: "warning-boundary-update"
+    });
+    const document = createPrivateBridgeDocument({
+      domContainer: modules.domContainer,
+      label: `${mode.id}:${scenarioId}:warning-boundary`
+    });
+    const container = createPrivateBridgeElement({
+      domContainer: modules.domContainer,
+      nodeName: "DIV",
+      ownerDocument: document
+    });
+    const create = bridge.createClientRoot(container);
+    const element = createPrivateBridgeElementValue("object");
+    const containerSecondArgument = createPrivateBridgeElement({
+      domContainer: modules.domContainer,
+      nodeName: "SECTION",
+      ownerDocument: document
+    });
+
+    const callbackSecondArg = bridge.renderContainer(
+      create.handle,
+      element,
+      function afterRender() {}
+    );
+    const containerSecondArg = bridge.renderContainer(
+      create.handle,
+      element,
+      containerSecondArgument
+    );
+    const genericSecondArg = bridge.renderContainer(create.handle, element, {
+      unexpected: true
+    });
+    const unmountCallback = bridge.unmountContainer(
+      create.handle,
+      function afterUnmount() {}
+    );
+    const duplicateBoundary = runPrivateDuplicateCreateRootWarningBoundary({
+      modeWarningEnabled,
+      modules
+    });
+
+    return {
+      modeId: mode.id,
+      scenarioId,
+      status: "ok",
+      evidence: {
+        compatibilityClaimed: false,
+        comparedToReactDomOracle: false,
+        consoleOutputCaptured: false,
+        consoleOutputUsedAsEvidence: false,
+        diagnosticKind: "private-root-warning-boundary",
+        modeWarningEnabled,
+        publicRootCompatibilitySurface: false,
+        warningBoundaryEvidence: {
+          boundaries: [
+            summarizePrivateWarningArgumentBoundary({
+              argumentClassification: {
+                isValidContainer: false,
+                type: "function"
+              },
+              boundaryId: "root-render-callback-second-argument",
+              modeWarningEnabled,
+              reactDomSourceBoundary:
+                "ReactDOMRoot.render __DEV__ args[1] function",
+              record: callbackSecondArg
+            }),
+            summarizePrivateWarningArgumentBoundary({
+              argumentClassification: {
+                isValidContainer: true,
+                nodeType: containerSecondArgument.nodeType,
+                type: "object"
+              },
+              boundaryId: "root-render-container-second-argument",
+              modeWarningEnabled,
+              reactDomSourceBoundary:
+                "ReactDOMRoot.render __DEV__ args[1] valid container",
+              record: containerSecondArg
+            }),
+            summarizePrivateWarningArgumentBoundary({
+              argumentClassification: {
+                isValidContainer: false,
+                type: "object"
+              },
+              boundaryId: "root-render-generic-second-argument",
+              modeWarningEnabled,
+              reactDomSourceBoundary:
+                "ReactDOMRoot.render __DEV__ args[1] defined non-container",
+              record: genericSecondArg
+            }),
+            summarizePrivateWarningArgumentBoundary({
+              argumentClassification: {
+                isValidContainer: false,
+                type: "function"
+              },
+              boundaryId: "root-unmount-callback-argument",
+              modeWarningEnabled,
+              reactDomSourceBoundary:
+                "ReactDOMRoot.unmount __DEV__ args[0] function",
+              record: unmountCallback
+            }),
+            duplicateBoundary
+          ],
+          consoleOutputUsedAsEvidence: false,
+          publicRootCompatibilitySurface: false
+        }
+      }
+    };
+  } catch (error) {
+    return {
+      modeId: mode.id,
+      scenarioId,
+      status: "throws",
+      error: describePrivateBridgeError(error)
+    };
+  }
+}
+
+function runPrivateDuplicateCreateRootWarningBoundary({
+  modeWarningEnabled,
+  modules
+}) {
+  const bridge = modules.rootBridge.createPrivateRootBridgeShell({
+    markerOptions: {
+      development: modeWarningEnabled
+    },
+    requestIdPrefix: "warning-duplicate-request",
+    rootIdPrefix: "warning-duplicate-root",
+    sideEffectIdPrefix: "warning-duplicate-side-effect"
+  });
+  const document = createPrivateBridgeDocument({
+    domContainer: modules.domContainer,
+    label: `warning-boundary-duplicate:${modeWarningEnabled}`
+  });
+  const container = createPrivateBridgeElement({
+    domContainer: modules.domContainer,
+    nodeName: "DIV",
+    ownerDocument: document
+  });
+  const firstCreate = bridge.createClientRoot(container);
+  const sideEffect = bridge.applyCreateRootSideEffects(firstCreate);
+  const isContainerMarkedBeforeSecondCreate =
+    modules.rootMarkers.isContainerMarkedAsRoot(container);
+  const secondCreate = bridge.createClientRoot(container);
+  const cleanup = bridge.revertCreateRootSideEffects(sideEffect);
+
+  return {
+    argumentClassification: {
+      isContainerMarkedAsRootBeforeSecondCreate:
+        isContainerMarkedBeforeSecondCreate,
+      isValidContainer: modules.domContainer.isValidContainer(container),
+      type: "object"
+    },
+    boundaryId: "duplicate-create-root",
+    consoleOutputUsedAsEvidence: false,
+    duplicateWarningType: secondCreate.markerGuard.warning?.type ?? null,
+    firstCreateMarkerWarning: firstCreate.markerGuard.warning,
+    modeWarningEnabled,
+    privateEvidenceKind: "private-root-create-markerGuard",
+    publicRootCompatibilitySurface: false,
+    reactDomSourceBoundary:
+      "warnIfReactDOMContainerInDEV isContainerMarkedAsRoot",
+    record: summarizePrivateWarningCreateBoundaryRecord(secondCreate),
+    rootSideEffects: {
+      afterCleanup: inspectRootFacadeSideEffects(
+        container,
+        document,
+        modules.rootMarkers,
+        modules.listenerRegistry
+      ),
+      cleanup: summarizePrivateRootCreateSideEffectCleanupRecord(cleanup),
+      sideEffect: summarizePrivateRootCreateSideEffectRecord(sideEffect)
+    },
+    secondCreateMarkerWarning: secondCreate.markerGuard.warning,
+    warningEmission:
+      modeWarningEnabled && secondCreate.markerGuard.warning !== null
+        ? "development-warning-boundary"
+        : "production-warning-disabled"
+  };
+}
+
 function createPrivateHostOutputHarness({ mode, modules, scenarioId }) {
   const document = createPrivateHostOutputDocument({
     domContainer: modules.domContainer,
@@ -4033,6 +4613,60 @@ function summarizeNativeRootBridgeHandoffRecord(record) {
     operation: record.operation,
     reconcilerExecution: record.reconcilerExecution,
     requestType: record.sourceRequestType
+  };
+}
+
+function summarizePrivateWarningArgumentBoundary({
+  argumentClassification,
+  boundaryId,
+  modeWarningEnabled,
+  reactDomSourceBoundary,
+  record
+}) {
+  return {
+    argumentClassification,
+    boundaryId,
+    callbackInfo: record.callbackInfo,
+    consoleOutputUsedAsEvidence: false,
+    modeWarningEnabled,
+    privateEvidenceKind: "private-root-update-callbackInfo",
+    publicRootCompatibilitySurface: false,
+    reactDomSourceBoundary,
+    record: summarizePrivateWarningUpdateBoundaryRecord(record),
+    warningEmission: modeWarningEnabled
+      ? "development-warning-boundary"
+      : "production-warning-disabled"
+  };
+}
+
+function summarizePrivateWarningUpdateBoundaryRecord(record) {
+  return {
+    compatibilityClaimed: record.compatibilityClaimed,
+    domMutation: record.domMutation,
+    eventDispatch: record.eventDispatch,
+    hydration: record.hydration,
+    listenerInstallation: record.listenerInstallation,
+    markerWrites: record.markerWrites,
+    nativeExecution: record.nativeExecution,
+    operation: record.operation,
+    reconcilerExecution: record.reconcilerExecution,
+    requestType: record.requestType
+  };
+}
+
+function summarizePrivateWarningCreateBoundaryRecord(record) {
+  return {
+    compatibilityClaimed: record.compatibilityClaimed,
+    domMutation: record.domMutation,
+    eventDispatch: record.eventDispatch,
+    hydration: record.hydration,
+    listenerInstallation: record.listenerInstallation,
+    markerGuard: record.markerGuard,
+    markerWrites: record.markerWrites,
+    nativeExecution: record.nativeExecution,
+    operation: record.operation,
+    reconcilerExecution: record.reconcilerExecution,
+    requestType: record.requestType
   };
 }
 
@@ -4882,6 +5516,17 @@ function createPrivateBridgeEventTarget(fields) {
     },
     removeChild(child) {
       this.__mutationLog.push({ child, type: "removeChild" });
+    },
+    removeEventListener(type, listener, options) {
+      const index = this.__registrations.findIndex(
+        (entry) =>
+          entry.type === type &&
+          entry.listener === listener &&
+          entry.options === options
+      );
+      if (index !== -1) {
+        this.__registrations.splice(index, 1);
+      }
     }
   };
   let textContent = "";
@@ -5490,6 +6135,256 @@ function isPortalRootRenderSideEffectFree(sideEffects) {
     sideEffects.ownerDocumentListeningMarkerPropertyCount === 0 &&
     sideEffects.ownerDocumentMutationCount === 0
   );
+}
+
+function validatePrivateWarningBoundaryDiagnosticObservation({
+  mode,
+  observation,
+  scenarioId
+}) {
+  if (observation.status !== "ok") {
+    return {
+      gateStatus: "private-root-warning-boundary-diagnostic-failed",
+      status: observation.status,
+      error: observation.error ?? null
+    };
+  }
+
+  if (scenarioId !== "development-warning-boundaries") {
+    return {
+      gateStatus: "private-root-warning-boundary-unexpected-scenario"
+    };
+  }
+
+  const modeWarningEnabled = mode.nodeEnv !== "production";
+  const evidence = observation.evidence;
+  const commonDifference = findFirstDifferencePath(
+    {
+      compatibilityClaimed: false,
+      comparedToReactDomOracle: false,
+      consoleOutputCaptured: false,
+      consoleOutputUsedAsEvidence: false,
+      diagnosticKind: "private-root-warning-boundary",
+      modeWarningEnabled,
+      publicRootCompatibilitySurface: false,
+      warningBoundaryConsoleEvidence: false,
+      warningBoundaryPublicSurface: false
+    },
+    {
+      compatibilityClaimed: evidence.compatibilityClaimed,
+      comparedToReactDomOracle: evidence.comparedToReactDomOracle,
+      consoleOutputCaptured: evidence.consoleOutputCaptured,
+      consoleOutputUsedAsEvidence: evidence.consoleOutputUsedAsEvidence,
+      diagnosticKind: evidence.diagnosticKind,
+      modeWarningEnabled: evidence.modeWarningEnabled,
+      publicRootCompatibilitySurface: evidence.publicRootCompatibilitySurface,
+      warningBoundaryConsoleEvidence:
+        evidence.warningBoundaryEvidence?.consoleOutputUsedAsEvidence,
+      warningBoundaryPublicSurface:
+        evidence.warningBoundaryEvidence?.publicRootCompatibilitySurface
+    }
+  );
+  if (commonDifference !== null) {
+    return {
+      gateStatus: "private-root-warning-boundary-common-evidence-mismatch",
+      firstDifferencePath: commonDifference
+    };
+  }
+
+  const boundaries = evidence.warningBoundaryEvidence?.boundaries ?? [];
+  const boundaryIds = boundaries.map((boundary) => boundary.boundaryId);
+  const boundaryIdDifference = findFirstDifferencePath(
+    [
+      "root-render-callback-second-argument",
+      "root-render-container-second-argument",
+      "root-render-generic-second-argument",
+      "root-unmount-callback-argument",
+      "duplicate-create-root"
+    ],
+    boundaryIds
+  );
+  if (boundaryIdDifference !== null) {
+    return {
+      gateStatus: "private-root-warning-boundary-id-mismatch",
+      firstDifferencePath: boundaryIdDifference
+    };
+  }
+
+  for (const boundary of boundaries) {
+    if (
+      boundary.consoleOutputUsedAsEvidence !== false ||
+      boundary.modeWarningEnabled !== modeWarningEnabled ||
+      boundary.publicRootCompatibilitySurface !== false ||
+      boundary.warningEmission !==
+        (modeWarningEnabled
+          ? "development-warning-boundary"
+          : "production-warning-disabled")
+    ) {
+      return {
+        gateStatus: "private-root-warning-boundary-row-mismatch",
+        boundary
+      };
+    }
+
+    if (boundary.boundaryId === "duplicate-create-root") {
+      const expectedWarningType = modeWarningEnabled
+        ? "duplicate-create-root"
+        : null;
+      if (
+        boundary.argumentClassification?.isValidContainer !== true ||
+        boundary.argumentClassification
+          ?.isContainerMarkedAsRootBeforeSecondCreate !== true ||
+        boundary.duplicateWarningType !== expectedWarningType ||
+        boundary.firstCreateMarkerWarning !== null ||
+        (boundary.secondCreateMarkerWarning?.type ?? null) !==
+          expectedWarningType ||
+        boundary.privateEvidenceKind !== "private-root-create-markerGuard" ||
+        boundary.record?.requestType !== "createRoot" ||
+        boundary.record?.nativeExecution !== false ||
+        boundary.record?.reconcilerExecution !== false ||
+        boundary.record?.domMutation !== false ||
+        boundary.record?.compatibilityClaimed !== false ||
+        boundary.rootSideEffects?.sideEffect?.sideEffectStatus !==
+          "applied-private-root-create-mark-listen-gate" ||
+        boundary.rootSideEffects?.cleanup?.sideEffectStatus !==
+          "reverted-private-root-create-mark-listen-gate" ||
+        !isRootFacadeSideEffectFree(boundary.rootSideEffects?.afterCleanup)
+      ) {
+        return {
+          gateStatus: "private-root-duplicate-warning-boundary-mismatch",
+          boundary
+        };
+      }
+      continue;
+    }
+
+    const expected = expectedPrivateWarningArgumentBoundary(
+      boundary.boundaryId
+    );
+    if (expected === null) {
+      return {
+        gateStatus: "private-root-warning-boundary-unknown-id",
+        boundaryId: boundary.boundaryId
+      };
+    }
+
+    const boundaryDifference = findFirstDifferencePath(expected, {
+      argumentClassification: boundary.argumentClassification,
+      callbackInfo: boundary.callbackInfo,
+      privateEvidenceKind: boundary.privateEvidenceKind,
+      record: boundary.record
+    });
+    if (boundaryDifference !== null) {
+      return {
+        gateStatus: "private-root-warning-boundary-argument-mismatch",
+        boundaryId: boundary.boundaryId,
+        firstDifferencePath: boundaryDifference
+      };
+    }
+  }
+
+  return null;
+}
+
+function expectedPrivateWarningArgumentBoundary(boundaryId) {
+  switch (boundaryId) {
+    case "root-render-callback-second-argument":
+      return {
+        argumentClassification: {
+          isValidContainer: false,
+          type: "function"
+        },
+        callbackInfo: {
+          length: 0,
+          name: "afterRender",
+          type: "function"
+        },
+        privateEvidenceKind: "private-root-update-callbackInfo",
+        record: expectedPrivateWarningUpdateBoundaryRecord(
+          "render",
+          "root.render"
+        )
+      };
+    case "root-render-container-second-argument":
+      return {
+        argumentClassification: {
+          isValidContainer: true,
+          nodeType: 1,
+          type: "object"
+        },
+        callbackInfo: {
+          keys: [
+            "__mutationLog",
+            "__registrations",
+            "addEventListener",
+            "appendChild",
+            "insertBefore",
+            "nodeName",
+            "nodeType",
+            "ownerDocument",
+            "removeChild",
+            "removeEventListener",
+            "textContent"
+          ],
+          type: "object"
+        },
+        privateEvidenceKind: "private-root-update-callbackInfo",
+        record: expectedPrivateWarningUpdateBoundaryRecord(
+          "render",
+          "root.render"
+        )
+      };
+    case "root-render-generic-second-argument":
+      return {
+        argumentClassification: {
+          isValidContainer: false,
+          type: "object"
+        },
+        callbackInfo: {
+          keys: ["unexpected"],
+          type: "object"
+        },
+        privateEvidenceKind: "private-root-update-callbackInfo",
+        record: expectedPrivateWarningUpdateBoundaryRecord(
+          "render",
+          "root.render"
+        )
+      };
+    case "root-unmount-callback-argument":
+      return {
+        argumentClassification: {
+          isValidContainer: false,
+          type: "function"
+        },
+        callbackInfo: {
+          length: 0,
+          name: "afterUnmount",
+          type: "function"
+        },
+        privateEvidenceKind: "private-root-update-callbackInfo",
+        record: expectedPrivateWarningUpdateBoundaryRecord(
+          "unmount",
+          "root.unmount"
+        )
+      };
+    default:
+      return null;
+  }
+}
+
+function expectedPrivateWarningUpdateBoundaryRecord(operation, requestType) {
+  return {
+    compatibilityClaimed: false,
+    domMutation: false,
+    eventDispatch: false,
+    hydration: false,
+    listenerInstallation: false,
+    markerWrites: false,
+    nativeExecution: false,
+    operation,
+    reconcilerExecution: false,
+    requestType
+  };
 }
 
 function validatePrivateHostOutputDiagnosticObservation({
@@ -6209,6 +7104,48 @@ function validatePrivateHostOutputAdmissionMetadata({
       failures.push({
         scenarioId,
         gateStatus: "missing-private-root-host-output-plan"
+      });
+    }
+  }
+}
+
+function validatePrivateWarningBoundaryAdmissionMetadata({
+  privateWarningBoundaryAdmissionByScenario,
+  failures
+}) {
+  for (const scenarioId of REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS) {
+    if (!privateWarningBoundaryAdmissionByScenario.has(scenarioId)) {
+      failures.push({
+        scenarioId,
+        gateStatus: "missing-private-root-warning-boundary-admission"
+      });
+    }
+  }
+
+  for (const [scenarioId, admission] of privateWarningBoundaryAdmissionByScenario) {
+    if (!REACT_DOM_ROOT_RENDER_E2E_SCENARIO_IDS.includes(scenarioId)) {
+      failures.push({
+        scenarioId,
+        gateStatus: "unknown-private-root-warning-boundary-admission-scenario"
+      });
+    }
+    if (
+      admission.admission !== "private-warning-boundary-diagnostic" &&
+      admission.admission !== "unsupported"
+    ) {
+      failures.push({
+        scenarioId,
+        gateStatus: "unknown-private-root-warning-boundary-admission",
+        admission: admission.admission
+      });
+    }
+    if (
+      admission.admission === "private-warning-boundary-diagnostic" &&
+      scenarioId !== "development-warning-boundaries"
+    ) {
+      failures.push({
+        scenarioId,
+        gateStatus: "unexpected-private-root-warning-boundary-admission"
       });
     }
   }
