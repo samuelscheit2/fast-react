@@ -12,10 +12,11 @@ use fast_react_core::{EventPriority, FiberId, Lane, Lanes, lanes_to_event_priori
 use fast_react_host_config::HostTypes;
 
 use crate::{
-    FiberRootId, FiberRootStore, FiberRootStoreError, RootCallbackPriority,
-    RootScheduleUpdateRecord, RootSchedulerCallbackHandle, SchedulerCallbackRequest,
+    ExecutionContextState, FiberRootId, FiberRootStore, FiberRootStoreError,
+    HostRootRenderPhaseRecord, RootCallbackPriority, RootScheduleUpdateRecord,
+    RootSchedulerCallbackHandle, RootWorkLoopError, SchedulerCallbackRequest,
     SchedulerCancellationRecord, SchedulerMicrotaskKind, SchedulerMicrotaskRequest,
-    SchedulerPriority,
+    SchedulerPriority, SyncFlushExecutionContextRecord, render_host_root_for_lanes,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -238,9 +239,83 @@ impl RootSyncFlushPlan {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RootSyncFlushExitStatus {
+    BlockedByExecutionContext,
+    SkippedReentrantFlush,
+    SkippedNoPendingSyncWork,
+    Completed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RootSyncFlushRecordStatus {
+    RenderedAwaitingCommit,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RootSyncFlushRecord {
+    order: usize,
+    root: FiberRootId,
+    lanes: Lanes,
+    status: RootSyncFlushRecordStatus,
+    render_phase: HostRootRenderPhaseRecord,
+}
+
+impl RootSyncFlushRecord {
+    #[must_use]
+    pub const fn order(self) -> usize {
+        self.order
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn lanes(self) -> Lanes {
+        self.lanes
+    }
+
+    #[must_use]
+    pub const fn status(self) -> RootSyncFlushRecordStatus {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn render_phase(self) -> HostRootRenderPhaseRecord {
+        self.render_phase
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RootSyncFlushResult {
+    execution_context: SyncFlushExecutionContextRecord,
+    exit_status: RootSyncFlushExitStatus,
+    records: Vec<RootSyncFlushRecord>,
+}
+
+impl RootSyncFlushResult {
+    #[must_use]
+    pub const fn execution_context(&self) -> SyncFlushExecutionContextRecord {
+        self.execution_context
+    }
+
+    #[must_use]
+    pub const fn exit_status(&self) -> RootSyncFlushExitStatus {
+        self.exit_status
+    }
+
+    #[must_use]
+    pub fn records(&self) -> &[RootSyncFlushRecord] {
+        &self.records
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RootSchedulerError {
     FiberRootStore(FiberRootStoreError),
+    RootWorkLoop(RootWorkLoopError),
     ScheduleRecordWrongFiber {
         root: FiberRootId,
         expected: FiberId,
@@ -252,6 +327,7 @@ impl Display for RootSchedulerError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::FiberRootStore(error) => Display::fmt(error, formatter),
+            Self::RootWorkLoop(error) => Display::fmt(error, formatter),
             Self::ScheduleRecordWrongFiber {
                 root,
                 expected,
@@ -271,6 +347,7 @@ impl Error for RootSchedulerError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::FiberRootStore(error) => Some(error),
+            Self::RootWorkLoop(error) => Some(error),
             Self::ScheduleRecordWrongFiber { .. } => None,
         }
     }
@@ -279,6 +356,12 @@ impl Error for RootSchedulerError {
 impl From<FiberRootStoreError> for RootSchedulerError {
     fn from(error: FiberRootStoreError) -> Self {
         Self::FiberRootStore(error)
+    }
+}
+
+impl From<RootWorkLoopError> for RootSchedulerError {
+    fn from(error: RootWorkLoopError) -> Self {
+        Self::RootWorkLoop(error)
     }
 }
 
@@ -503,6 +586,79 @@ pub fn collect_sync_flush_plan<H: HostTypes>(
     })
 }
 
+/// Prepare all currently scheduled sync roots for a later commit handoff.
+///
+/// This is the first data-producing foundation for React's
+/// `flushSyncWorkOnAllRoots`: it checks execution-context and scheduler
+/// reentry guards, traverses the scheduled-root list in insertion order, and
+/// renders each sync HostRoot lane into a deterministic record. It deliberately
+/// stops before the commit worker's responsibilities: no lane is marked
+/// finished, `root.current` is not switched, and host mutation APIs are not
+/// called.
+pub fn flush_sync_work_on_all_roots<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    execution_context: &ExecutionContextState,
+) -> Result<RootSyncFlushResult, RootSchedulerError> {
+    let execution_context_record = execution_context.sync_flush_record();
+    if !execution_context_record.can_enter_sync_flush() {
+        return Ok(RootSyncFlushResult {
+            execution_context: execution_context_record,
+            exit_status: RootSyncFlushExitStatus::BlockedByExecutionContext,
+            records: Vec::new(),
+        });
+    }
+
+    if store.root_scheduler().is_flushing_work() {
+        return Ok(RootSyncFlushResult {
+            execution_context: execution_context_record,
+            exit_status: RootSyncFlushExitStatus::SkippedReentrantFlush,
+            records: Vec::new(),
+        });
+    }
+
+    if !store.root_scheduler().might_have_pending_sync_work() {
+        return Ok(RootSyncFlushResult {
+            execution_context: execution_context_record,
+            exit_status: RootSyncFlushExitStatus::SkippedNoPendingSyncWork,
+            records: Vec::new(),
+        });
+    }
+
+    store.root_scheduler_mut().set_is_flushing_work(true);
+    let records = (|| {
+        let mut records = Vec::new();
+        let mut root = store.root_scheduler().first_scheduled_root();
+
+        while let Some(root_id) = root {
+            let next_root = store.root(root_id)?.scheduling().next_scheduled_root();
+            let next_lanes = next_lanes_for_root(store, root_id)?;
+
+            if next_lanes.includes_sync_lane() {
+                let render_phase = render_host_root_for_lanes(store, root_id, next_lanes)?;
+                records.push(RootSyncFlushRecord {
+                    order: records.len(),
+                    root: root_id,
+                    lanes: next_lanes,
+                    status: RootSyncFlushRecordStatus::RenderedAwaitingCommit,
+                    render_phase,
+                });
+            }
+
+            root = next_root;
+        }
+
+        Ok::<_, RootSchedulerError>(records)
+    })();
+    store.root_scheduler_mut().set_is_flushing_work(false);
+    let records = records?;
+
+    Ok(RootSyncFlushResult {
+        execution_context: execution_context_record,
+        exit_status: RootSyncFlushExitStatus::Completed,
+        records,
+    })
+}
+
 pub fn scheduled_roots<H: HostTypes>(
     store: &FiberRootStore<H>,
 ) -> Result<Vec<FiberRootId>, RootSchedulerError> {
@@ -594,7 +750,7 @@ mod tests {
     use crate::RootOptions;
     use crate::test_support::{FakeContainer, RecordingHost};
     use crate::{RootElementHandle, update_container, update_container_sync};
-    use fast_react_core::RootFinishedLanes;
+    use fast_react_core::{Lanes, RootFinishedLanes};
 
     fn root_store() -> (FiberRootStore<RecordingHost>, FiberRootId, RecordingHost) {
         let host = RecordingHost::default();
@@ -611,6 +767,15 @@ mod tests {
     ) -> ScheduledRootUpdateResult {
         let result =
             update_container(store, root_id, RootElementHandle::from_raw(1), None).unwrap();
+        ensure_root_is_scheduled(store, result.schedule()).unwrap()
+    }
+
+    fn schedule_sync_update(
+        store: &mut FiberRootStore<RecordingHost>,
+        root_id: FiberRootId,
+        element: RootElementHandle,
+    ) -> ScheduledRootUpdateResult {
+        let result = update_container_sync(store, root_id, element, None).unwrap();
         ensure_root_is_scheduled(store, result.schedule()).unwrap()
     }
 
@@ -847,5 +1012,140 @@ mod tests {
 
         assert!(reentrant_plan.skipped_reentrant_flush());
         assert!(reentrant_plan.sync_roots().is_empty());
+    }
+
+    #[test]
+    fn root_scheduler_sync_flush_records_fast_path_when_no_pending_sync_work() {
+        let (mut store, _root_id, _host) = root_store();
+        let execution_context = ExecutionContextState::new();
+
+        let result = flush_sync_work_on_all_roots(&mut store, &execution_context).unwrap();
+
+        assert_eq!(
+            result.exit_status(),
+            RootSyncFlushExitStatus::SkippedNoPendingSyncWork
+        );
+        assert!(result.execution_context().can_enter_sync_flush());
+        assert!(result.records().is_empty());
+        assert!(!store.root_scheduler().is_flushing_work());
+    }
+
+    #[test]
+    fn root_scheduler_sync_flush_records_reject_render_or_commit_context() {
+        let (mut store, root_id, _host) = root_store();
+        schedule_sync_update(&mut store, root_id, RootElementHandle::NONE);
+        let mut execution_context = ExecutionContextState::new();
+
+        let render_result = execution_context
+            .with_render_context(|execution_context| {
+                flush_sync_work_on_all_roots(&mut store, execution_context)
+            })
+            .unwrap();
+
+        assert_eq!(
+            render_result.exit_status(),
+            RootSyncFlushExitStatus::BlockedByExecutionContext
+        );
+        assert!(
+            render_result
+                .execution_context()
+                .blocked_by_render_or_commit()
+        );
+        assert!(render_result.records().is_empty());
+        assert!(!store.root_scheduler().is_flushing_work());
+        assert!(store.root_scheduler().might_have_pending_sync_work());
+
+        let commit_result = execution_context
+            .with_commit_context(|execution_context| {
+                flush_sync_work_on_all_roots(&mut store, execution_context)
+            })
+            .unwrap();
+
+        assert_eq!(
+            commit_result.exit_status(),
+            RootSyncFlushExitStatus::BlockedByExecutionContext
+        );
+        assert!(
+            commit_result
+                .execution_context()
+                .blocked_by_render_or_commit()
+        );
+        assert!(commit_result.records().is_empty());
+        assert!(!store.root_scheduler().is_flushing_work());
+    }
+
+    #[test]
+    fn root_scheduler_sync_flush_records_reentrant_guard_without_clearing_state() {
+        let (mut store, root_id, _host) = root_store();
+        schedule_sync_update(&mut store, root_id, RootElementHandle::NONE);
+        store.root_scheduler_mut().set_is_flushing_work(true);
+
+        let result =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+
+        assert_eq!(
+            result.exit_status(),
+            RootSyncFlushExitStatus::SkippedReentrantFlush
+        );
+        assert!(result.records().is_empty());
+        assert!(store.root_scheduler().is_flushing_work());
+        assert!(store.root_scheduler().might_have_pending_sync_work());
+
+        store.root_scheduler_mut().set_is_flushing_work(false);
+    }
+
+    #[test]
+    fn root_scheduler_sync_flush_records_roots_in_scheduled_order_and_renders_for_commit_handoff() {
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let second_scheduled = store
+            .create_client_root(FakeContainer::new(2), RootOptions::new())
+            .unwrap();
+        let first_scheduled = store
+            .create_client_root(FakeContainer::new(1), RootOptions::new())
+            .unwrap();
+        let second_current = store.root(second_scheduled).unwrap().current();
+        let first_current = store.root(first_scheduled).unwrap().current();
+
+        schedule_sync_update(
+            &mut store,
+            second_scheduled,
+            RootElementHandle::from_raw(20),
+        );
+        schedule_sync_update(&mut store, first_scheduled, RootElementHandle::from_raw(10));
+
+        let result =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+
+        assert_eq!(result.exit_status(), RootSyncFlushExitStatus::Completed);
+        assert_eq!(result.records().len(), 2);
+        assert_eq!(result.records()[0].order(), 0);
+        assert_eq!(result.records()[0].root(), second_scheduled);
+        assert_eq!(result.records()[0].lanes(), Lanes::SYNC);
+        assert_eq!(
+            result.records()[0].status(),
+            RootSyncFlushRecordStatus::RenderedAwaitingCommit
+        );
+        assert_eq!(
+            result.records()[0].render_phase().resulting_element(),
+            RootElementHandle::from_raw(20)
+        );
+        assert_eq!(result.records()[1].order(), 1);
+        assert_eq!(result.records()[1].root(), first_scheduled);
+        assert_eq!(result.records()[1].lanes(), Lanes::SYNC);
+        assert_eq!(
+            result.records()[1].render_phase().resulting_element(),
+            RootElementHandle::from_raw(10)
+        );
+        assert_eq!(
+            store.root(second_scheduled).unwrap().current(),
+            second_current
+        );
+        assert_eq!(
+            store.root(first_scheduled).unwrap().current(),
+            first_current
+        );
+        assert_eq!(store.root(second_scheduled).unwrap().finished_work(), None);
+        assert_eq!(store.root(first_scheduled).unwrap().finished_work(), None);
+        assert!(!store.root_scheduler().is_flushing_work());
     }
 }
