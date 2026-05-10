@@ -85,6 +85,12 @@ export const REACT_TEST_RENDERER_TOJSON_PRIVATE_FACADE_REQUIREMENTS = [
       "The private toJSON facade must expose explicit update and unmount host-output rows with dependency metadata while public serialization stays blocked."
   },
   {
+    id: "js-tojson-update-prop-and-text-diagnostics",
+    requiredBeforePrivateDiagnostics: true,
+    reason:
+      "The private toJSON facade must retain an accepted HostComponent prop plus text update payload while public serialization stays blocked."
+  },
+  {
     id: "js-tojson-public-serialization-blocked",
     requiredBeforePrivateDiagnostics: true,
     reason:
@@ -309,6 +315,7 @@ export function evaluateReactTestRendererSerializationLocalGate({
     localChecks.privateToJSONSerializationFacadeCoversBroaderHostShapes &&
     localChecks.privateToJSONSerializationFacadeExposesDiagnosticResult &&
     localChecks.privateToJSONUpdateUnmountRowsPresent &&
+    localChecks.privateToJSONUpdatePropAndTextDiagnosticsPresent &&
     localChecks.privateToJSONSerializationFacadePubliclyBlocked;
   const privateToTreeMetadataGateReady =
     privateDiagnosticsReady &&
@@ -418,6 +425,11 @@ export function evaluateReactTestRendererSerializationLocalGate({
           requirement.id === "js-tojson-update-unmount-host-output-rows"
         ) {
           return !localChecks.privateToJSONUpdateUnmountRowsPresent;
+        }
+        if (
+          requirement.id === "js-tojson-update-prop-and-text-diagnostics"
+        ) {
+          return !localChecks.privateToJSONUpdatePropAndTextDiagnosticsPresent;
         }
         if (requirement.id === "js-tojson-public-serialization-blocked") {
           return !localChecks.privateToJSONSerializationFacadePubliclyBlocked;
@@ -974,6 +986,29 @@ export function inspectReactTestRendererSerializationLocalTargets({
   const privateToJSONUpdateUnmountRowsPresent =
     privateToJSONBaseUpdateUnmountRowsPresent &&
     privateToJSONNestedUpdateSiblingTextRowsPresent;
+  const privateToJSONUpdatePropAndTextDiagnosticsPresent =
+    privateToJSONUpdateUnmountRowsPresent &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bprivateUpdateHostComponentPropSerializationEvidenceAvailable\s*:\s*true\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bHostComponentPropPlusTextUpdate\b/u
+    ) &&
+    hasSourcePattern(
+      publicJsReactTestRendererPackageSource,
+      /\bworker-671-test-renderer-root-update-serialization-props\b/u
+    ) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\bupdate_host_component_with_props_and_text_for_canary\b/u
+    ) &&
+    hasSourcePattern(testRendererSource, /\bdata-state\b/u) &&
+    hasSourcePattern(
+      testRendererSource,
+      /\broot_private_json_serialization_canary_describes_updated_host_component_text_after_commit\b/u
+    );
   const privateToJSONSerializationFacadePubliclyBlocked =
     privateToJSONSerializationFacadeGatePresent &&
     hasSourcePattern(
@@ -1538,6 +1573,7 @@ export function inspectReactTestRendererSerializationLocalTargets({
     privateToJSONSerializationFacadeCoversBroaderHostShapes,
     privateToJSONSerializationFacadeExposesDiagnosticResult,
     privateToJSONUpdateUnmountRowsPresent,
+    privateToJSONUpdatePropAndTextDiagnosticsPresent,
     privateToJSONSerializationFacadePubliclyBlocked,
     privateToTreeHostOutputMetadataGatePresent,
     privateToTreePrivateFacadeGatePresent,

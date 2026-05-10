@@ -1936,7 +1936,7 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
   );
   const renderer = moduleExports.create(
     {
-      props: { children: "hello" },
+      props: { "data-state": "old", children: "hello" },
       type: "span"
     },
     {}
@@ -1944,7 +1944,10 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
   const [createRequest] = bridge.getRendererRootRequests(renderer);
   const createAdmission = bridge.getRootCreateRouteAdmission(createRequest);
   const updateError = captureThrown(() =>
-    renderer.update({ props: { children: "goodbye" }, type: "span" })
+    renderer.update({
+      props: { "data-state": "new", children: "goodbye" },
+      type: "span"
+    })
   );
   const unmountError = captureThrown(() => renderer.unmount());
   const facade = renderer.toJSON[privateToJSONSerializationFacadeSymbol];
@@ -1994,6 +1997,18 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
   assert.equal(
     facade.privateNativeExecutionStatus,
     privateToJSONNativeExecutionStatus
+  );
+  assert.equal(
+    facade.privateUpdateHostComponentPropSerializationEvidenceAvailable,
+    true
+  );
+  assert.equal(
+    facade.acceptedUpdateHostComponentPropPayloadShape,
+    "HostComponentPropPlusTextUpdate"
+  );
+  assert.equal(
+    facade.updatePropSerializationWorker,
+    "worker-671-test-renderer-root-update-serialization-props"
   );
   assert.deepEqual(facade.acceptedNativeExecutionOperations, [
     "create",
@@ -2060,7 +2075,9 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
         rootChildCount: 1,
         rootNodeKind: "HostComponent",
         nodes: [
-          hostComponentNode(0, null, [1], "span"),
+          hostComponentNode(0, null, [1], "span", {
+            "data-state": "new"
+          }),
           textNode(1, 0, "goodbye")
         ]
       })
@@ -2074,9 +2091,17 @@ test("react-test-renderer CJS development private toJSON facade consumes accepte
   assert.equal(updateEvidence.consumesAcceptedHostOutputRow, true);
   assert.deepEqual(updateEvidence.result, {
     type: "span",
-    props: {},
+    props: { "data-state": "new" },
     children: ["goodbye"]
   });
+  assert.equal(
+    captureThrown(() => renderer.toJSON()).name,
+    "FastReactTestRendererUnimplementedError"
+  );
+  assert.equal(
+    captureThrown(() => renderer.toTree()).name,
+    "FastReactTestRendererUnimplementedError"
+  );
 
   const unmountEvidence =
     facade.createAcceptedNativeExecutionDiagnosticResult(
@@ -3168,14 +3193,20 @@ function privateToJSONReport({
   };
 }
 
-function hostComponentNode(ordinal, parentOrdinal, childOrdinals, elementType) {
+function hostComponentNode(
+  ordinal,
+  parentOrdinal,
+  childOrdinals,
+  elementType,
+  props = {}
+) {
   return {
     ordinal,
     nodeKind: "HostComponent",
     parentOrdinal,
     childOrdinals,
     elementType,
-    props: {},
+    props,
     hidden: false,
     detached: false
   };

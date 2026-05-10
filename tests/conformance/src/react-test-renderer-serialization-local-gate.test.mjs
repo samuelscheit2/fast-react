@@ -149,6 +149,7 @@ test("react-test-renderer serialization gate is ready for private diagnostics wh
     privateToJSONSerializationFacadeCoversBroaderHostShapes: true,
     privateToJSONSerializationFacadeExposesDiagnosticResult: true,
     privateToJSONUpdateUnmountRowsPresent: true,
+    privateToJSONUpdatePropAndTextDiagnosticsPresent: true,
     privateToJSONSerializationFacadePubliclyBlocked: true,
     privateToTreeHostOutputMetadataGatePresent: true,
     privateToTreePrivateFacadeGatePresent: true,
@@ -199,6 +200,7 @@ test("react-test-renderer serialization gate records accepted Rust-private prere
       "js-tojson-broader-host-shape-diagnostics",
       "js-tojson-exposes-private-diagnostic-result",
       "js-tojson-update-unmount-host-output-rows",
+      "js-tojson-update-prop-and-text-diagnostics",
       "js-tojson-public-serialization-blocked"
     ]
   );
@@ -296,6 +298,20 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
       facadeGate.privateDiagnosticResultStatus,
       privateToJSONFacadeResultStatus
     );
+    if (entry.entrypoint.endsWith(".development")) {
+      assert.equal(
+        facadeGate.privateUpdateHostComponentPropSerializationEvidenceAvailable,
+        true
+      );
+      assert.equal(
+        facadeGate.acceptedUpdateHostComponentPropPayloadShape,
+        "HostComponentPropPlusTextUpdate"
+      );
+      assert.equal(
+        facadeGate.updatePropSerializationWorker,
+        "worker-671-test-renderer-root-update-serialization-props"
+      );
+    }
     assert.equal(facadeGate.acceptedRustPrivateJsonDiagnostics, true);
     assert.equal(facadeGate.acceptedRustPrivateToJSONFacadeResult, true);
     assert.equal(facadeGate.publicSerializationAvailable, false);
@@ -431,6 +447,18 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
     assert.equal(privateFacade.privateHostOutputDiagnosticsSerializable, true);
     assert.equal(privateFacade.privateDiagnosticResultAvailable, true);
     if (entry.entrypoint.endsWith(".development")) {
+      assert.equal(
+        privateFacade.privateUpdateHostComponentPropSerializationEvidenceAvailable,
+        true
+      );
+      assert.equal(
+        privateFacade.acceptedUpdateHostComponentPropPayloadShape,
+        "HostComponentPropPlusTextUpdate"
+      );
+      assert.equal(
+        privateFacade.updatePropSerializationWorker,
+        "worker-671-test-renderer-root-update-serialization-props"
+      );
       assert.equal(privateFacade.mismatchedUpdateUnmountRecordRejection, true);
       assert.deepEqual(
         privateFacade.privateUpdateUnmountDependencyMetadata
@@ -478,12 +506,13 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
     const updatedPrivateJson = privateFacade.serializeAcceptedHostOutputDiagnostic(
       createAcceptedMinimalHostOutputDiagnostic({
         hostOutputUpdateKind: "Update",
+        propsAttributes: { "data-state": "new" },
         text: "goodbye"
       })
     );
     assert.deepEqual(updatedPrivateJson, {
       type: "span",
-      props: {},
+      props: { "data-state": "new" },
       children: ["goodbye"]
     });
     const broadPrivateJson = privateFacade.serializeAcceptedHostOutputDiagnostic(
@@ -527,6 +556,7 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
       privateFacade.canSerializeAcceptedHostOutputDiagnostic(
         createAcceptedMinimalHostOutputDiagnostic({
           hostOutputUpdateKind: "Update",
+          propsAttributes: { "data-state": "new" },
           text: "goodbye"
         })
       ),
@@ -592,6 +622,7 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
       privateFacade.createAcceptedHostOutputDiagnosticResult(
         createAcceptedMinimalHostOutputDiagnostic({
           hostOutputUpdateKind: "Update",
+          propsAttributes: { "data-state": "new" },
           text: "goodbye"
         })
       );
@@ -601,7 +632,7 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
     );
     assert.deepEqual(updatedPrivateDiagnosticResult.result, {
       type: "span",
-      props: {},
+      props: { "data-state": "new" },
       children: ["goodbye"]
     });
     const broadPrivateDiagnosticResult =
@@ -1533,6 +1564,7 @@ function captureThrown(callback) {
 function createAcceptedMinimalHostOutputDiagnostic({
   hostOutputSnapshotCurrent = true,
   hostOutputUpdateKind = "Create",
+  propsAttributes = {},
   text = "hello"
 } = {}) {
   const diagnostic = {
@@ -1563,7 +1595,7 @@ function createAcceptedMinimalHostOutputDiagnostic({
         childOrdinals: [1],
         elementType: { name: "span" },
         props: {
-          attributes: {},
+          attributes: propsAttributes,
           textContent: null
         },
         text: null,
@@ -1586,7 +1618,7 @@ function createAcceptedMinimalHostOutputDiagnostic({
       nodeKind: "HostComponent",
       elementType: { name: "span" },
       props: {
-        attributes: {},
+        attributes: propsAttributes,
         textContent: null
       },
       hidden: false,
