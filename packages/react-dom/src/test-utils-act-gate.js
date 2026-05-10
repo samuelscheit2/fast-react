@@ -2,10 +2,13 @@
 
 const {
   compatibilityTarget,
+  createUnsupportedError,
   createUnsupportedFunction
 } = require('../placeholder-utils.js');
 
 const entrypoint = 'react-dom/test-utils';
+const privateTestUtilsActGateExport =
+  '__FAST_REACT_DOM_TEST_UTILS_PRIVATE_ACT_GATE__';
 
 const privateRoutingGateId =
   'react-dom-test-utils-act-private-routing-gate-5';
@@ -30,6 +33,16 @@ const privateSyncFlushRootHandoffDiagnosticGateId =
   'react-dom-test-utils-act-private-sync-flush-root-handoff-gate-1';
 const privateSyncFlushRootHandoffDiagnosticStatus =
   'accepted-private-test-utils-act-sync-flush-root-handoff-diagnostics-without-public-act-routing';
+const privateSchedulerMockExpiredActRootWorkDiagnosticGateId =
+  'react-dom-test-utils-act-private-scheduler-mock-expired-act-root-work-gate-1';
+const privateSchedulerMockExpiredActRootWorkDiagnosticStatus =
+  'accepted-private-test-utils-act-scheduler-mock-expired-act-root-work-diagnostics-without-public-act-routing';
+const privateSchedulerMockExpiredActRootWorkPrerequisiteId =
+  'scheduler-mock-expired-act-root-work-diagnostics';
+const privateSchedulerMockExpiredActRootWorkConsumptionStatus =
+  'consumed-private-test-utils-act-scheduler-mock-expired-act-root-work-diagnostics';
+const reactActSchedulerMockExpiredActRootWorkConsumptionStatus =
+  'consumed-accepted-scheduler-mock-expired-act-root-work-diagnostics';
 const schedulerMockFlushHelperStatus =
   'accepted-scheduler-mock-flush-helper-and-continuation-evidence';
 const passiveEffectsFlushMetadataStatus =
@@ -351,13 +364,57 @@ const privateSyncFlushRootHandoffEvidenceRequirements = freezeRecords([
     ])
   }
 ]);
+const privateSchedulerMockExpiredActRootWorkRecords = freezeArray([
+  'RootLaneSchedulingSnapshot',
+  'UpdateContainerResult',
+  'RootScheduleUpdateRecord',
+  'RootTaskScheduleRecord',
+  'SchedulerCallbackRequest',
+  'RootSchedulerCallbackExecutionRecord',
+  'HostRootFinishedWorkPendingCommitRecordForCanary',
+  'HostRootFinishedWorkCommitHandoffRecordForCanary'
+]);
+const privateSchedulerMockExpiredActRootWorkEvidence = freezeArray([
+  'worker-747-react-private-act-expired-scheduler-consumer',
+  'scheduler-owned-expired-act-root-source-validator',
+  'frozen-branded-expired-act-root-diagnostics-version-1',
+  'private-act-queue-drain-evidence-consumed',
+  'expired-root-work-records-consumed-with-no-remainder',
+  'cloned-and-forged-diagnostics-rejected',
+  'public-act-root-renderer-and-effects-compatibility-remains-blocked'
+]);
+const privateSchedulerMockExpiredActRootWorkDiagnosticSummary = freezeRecord({
+  gateId: privateSchedulerMockExpiredActRootWorkDiagnosticGateId,
+  status: privateSchedulerMockExpiredActRootWorkDiagnosticStatus,
+  workerId: 'worker-747-react-private-act-expired-scheduler-consumer',
+  prerequisiteId: privateSchedulerMockExpiredActRootWorkPrerequisiteId,
+  consumesReactActPrivateSchedulerDiagnostics: true,
+  consumesAcceptedExpiredActRootWorkRecords: true,
+  requiresSchedulerOwnedSourceProof: true,
+  rejectsClonedDiagnostics: true,
+  rejectsForgedDiagnostics: true,
+  drainsAcceptedInternalTestQueues: true,
+  queueFlushingReady: false,
+  rendererRootsReady: false,
+  passiveEffectsReady: false,
+  continuationFlushingReady: false,
+  publicActExecution: false,
+  publicRootExecution: false,
+  publicEffectExecution: false,
+  executesRendererWork: false,
+  executesRendererRoots: false,
+  compatibilityClaimed: false
+});
 const acceptedPrivatePrerequisitePublicClaimFields = freezeArray([
   'compatibilityClaimed',
   'publicCompatibilityClaimed',
+  'publicSchedulerTimingCompatibilityClaimed',
   'publicActCompatibilityClaimed',
   'publicFlushSyncCompatibilityClaimed',
   'publicRootCompatibilityClaimed',
+  'publicRootSchedulerCompatibilityClaimed',
   'publicRenderCompatibilityClaimed',
+  'publicRendererCompatibilityClaimed',
   'publicEffectCompatibilityClaimed',
   'publicActExecution',
   'publicFlushSyncExecution',
@@ -365,7 +422,18 @@ const acceptedPrivatePrerequisitePublicClaimFields = freezeArray([
   'publicDomMutation',
   'publicEffectExecution',
   'publicRendererWork',
+  'drainsPublicSchedulerTaskQueue',
+  'drainsPublicReactActQueue',
+  'invokesPublicSchedulerFlushHelper',
+  'publicSchedulerFlushBehaviorExecuted',
+  'executesQueuedWork',
+  'executesEffects',
+  'executesPassiveEffects',
+  'executesRendererWork',
+  'executesRendererRoots',
   'executesPublicRendererRoots',
+  'publicActPassiveDrain',
+  'schedulerDrivenPassiveExecution',
   'executesPublicFlushSync'
 ]);
 const passiveEffectsFlushRecords = freezeArray([
@@ -601,6 +669,43 @@ const acceptedPrivatePrerequisites = freezeRecords([
       requiredTaskKinds: reactActPrivateTaskKinds,
       requiredContinuationStatuses: reactActPrivateContinuationStatuses
     }
+  },
+  {
+    id: privateSchedulerMockExpiredActRootWorkPrerequisiteId,
+    present: true,
+    status: privateSchedulerMockExpiredActRootWorkDiagnosticStatus,
+    source: 'packages/react/private-act-dispatcher-gate.js',
+    workerId: 'worker-747-react-private-act-expired-scheduler-consumer',
+    recordOnly: false,
+    privateDiagnostic: true,
+    diagnosticGateId: privateSchedulerMockExpiredActRootWorkDiagnosticGateId,
+    diagnosticStatus: privateSchedulerMockExpiredActRootWorkDiagnosticStatus,
+    consumesReactActPrivateSchedulerDiagnostics: true,
+    consumesAcceptedExpiredActRootWorkRecords: true,
+    requiresSchedulerOwnedSourceProof: true,
+    rejectsClonedDiagnostics: true,
+    rejectsForgedDiagnostics: true,
+    drainsAcceptedInternalTestQueues: true,
+    queueFlushingReady: false,
+    rendererRootsReady: false,
+    passiveEffectsReady: false,
+    continuationFlushingReady: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    publicRootSchedulerCompatibilityClaimed: false,
+    publicRendererCompatibilityClaimed: false,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    publicActExecution: false,
+    publicRootExecution: false,
+    publicEffectExecution: false,
+    executesQueuedWork: false,
+    executesEffects: false,
+    executesRendererWork: false,
+    executesRendererRoots: false,
+    compatibilityClaimed: false,
+    records: privateSchedulerMockExpiredActRootWorkRecords,
+    evidence: privateSchedulerMockExpiredActRootWorkEvidence
   },
   {
     id: 'scheduler-act-queue-routing-records',
@@ -851,6 +956,9 @@ const blockedPublicPrerequisites = freezeRecords([
     id: 'public-react-act-delegation',
     present: false,
     requiredBeforePublicAct: true,
+    blockedByAcceptedPrivateSchedulerMockExpiredActRootWorkDiagnostics: true,
+    acceptedPrivateSchedulerMockExpiredActRootWorkPrerequisiteId:
+      privateSchedulerMockExpiredActRootWorkPrerequisiteId,
     reason:
       'Public React.act remains a FAST_REACT_UNIMPLEMENTED placeholder in the default React entrypoint.'
   },
@@ -859,10 +967,13 @@ const blockedPublicPrerequisites = freezeRecords([
     present: false,
     requiredBeforePublicAct: true,
     reason:
-      'Accepted act queue records still do not drain queued work or act scheduler continuations, even though private scheduler, nested continuation, and sync-flush root handoff evidence exists.',
+      'Accepted act queue records still do not drain public queued work or act scheduler continuations, even though private scheduler mock expired act/root, nested continuation, and sync-flush root handoff evidence exists.',
     blockedByAcceptedPrivateSyncFlushRootHandoffDiagnostics: true,
     acceptedPrivateSyncFlushRootHandoffPrerequisiteIds:
-      privateSyncFlushRootHandoffPrerequisiteIds
+      privateSyncFlushRootHandoffPrerequisiteIds,
+    blockedByAcceptedPrivateSchedulerMockExpiredActRootWorkDiagnostics: true,
+    acceptedPrivateSchedulerMockExpiredActRootWorkPrerequisiteId:
+      privateSchedulerMockExpiredActRootWorkPrerequisiteId
   },
   {
     id: 'passive-effect-callback-execution',
@@ -906,10 +1017,13 @@ const blockedPublicPrerequisites = freezeRecords([
     acceptedPrivateWarningBoundaryScenarioModeRowCount: 2,
     unsupportedPrivateWarningBoundaryScenarioModeRowCount: 18,
     reason:
-      'Private fake-DOM host-output, warning-boundary, and sync-flush finished-work handoff diagnostics exist, but public React DOM roots still throw placeholders instead of routing create, render, update, unmount, or warning behavior.',
+      'Private fake-DOM host-output, warning-boundary, Scheduler mock expired act/root, and sync-flush finished-work handoff diagnostics exist, but public React DOM roots still throw placeholders instead of routing create, render, update, unmount, or warning behavior.',
     blockedByAcceptedPrivateSyncFlushRootHandoffDiagnostics: true,
     acceptedPrivateSyncFlushRootHandoffPrerequisiteIds:
-      privateSyncFlushRootHandoffPrerequisiteIds
+      privateSyncFlushRootHandoffPrerequisiteIds,
+    blockedByAcceptedPrivateSchedulerMockExpiredActRootWorkDiagnostics: true,
+    acceptedPrivateSchedulerMockExpiredActRootWorkPrerequisiteId:
+      privateSchedulerMockExpiredActRootWorkPrerequisiteId
   },
   {
     id: 'public-react-dom-flush-sync-execution',
@@ -994,6 +1108,11 @@ function getReactDomTestUtilsActPrivateRoutingGate(overrides = {}) {
       rendererRootsReady: false,
       passiveEffectsReady: false,
       continuationFlushingReady: false,
+      schedulerMockExpiredActRootWorkDiagnosticsReady: true,
+      consumesSchedulerMockExpiredActRootWorkDiagnostics: true,
+      drainsAcceptedSchedulerMockExpiredActRootWorkDiagnostics: true,
+      acceptedSchedulerMockExpiredActRootWorkRecords:
+        privateSchedulerMockExpiredActRootWorkRecords,
       executesQueuedWork: false,
       executesEffects: false
     }),
@@ -1084,6 +1203,42 @@ function getReactDomTestUtilsActPrivateRoutingGate(overrides = {}) {
       publicRootExecution: false,
       publicEffectExecution: false,
       executesRendererWork: false,
+      compatibilityClaimed: false
+    }),
+    privateSchedulerMockExpiredActRootWorkDiagnostics: freezeRecord({
+      gateId: privateSchedulerMockExpiredActRootWorkDiagnosticGateId,
+      status: privateSchedulerMockExpiredActRootWorkDiagnosticStatus,
+      workerId: 'worker-747-react-private-act-expired-scheduler-consumer',
+      prerequisiteId: privateSchedulerMockExpiredActRootWorkPrerequisiteId,
+      acceptedPrerequisiteId:
+        privateSchedulerMockExpiredActRootWorkPrerequisiteId,
+      records: privateSchedulerMockExpiredActRootWorkRecords,
+      evidence: privateSchedulerMockExpiredActRootWorkEvidence,
+      summary: privateSchedulerMockExpiredActRootWorkDiagnosticSummary,
+      consumesReactActPrivateSchedulerDiagnostics: true,
+      consumesAcceptedExpiredActRootWorkRecords: true,
+      requiresSchedulerOwnedSourceProof: true,
+      rejectsClonedDiagnostics: true,
+      rejectsForgedDiagnostics: true,
+      drainsAcceptedInternalTestQueues: true,
+      queueFlushingReady: false,
+      rendererRootsReady: false,
+      passiveEffectsReady: false,
+      continuationFlushingReady: false,
+      publicActExecution: false,
+      publicRootExecution: false,
+      publicEffectExecution: false,
+      executesQueuedWork: false,
+      executesEffects: false,
+      executesRendererWork: false,
+      executesRendererRoots: false,
+      publicCompatibilityClaimed: false,
+      publicSchedulerTimingCompatibilityClaimed: false,
+      publicReactActCompatibilityClaimed: false,
+      publicRootSchedulerCompatibilityClaimed: false,
+      publicRendererCompatibilityClaimed: false,
+      drainsPublicSchedulerTaskQueue: false,
+      drainsPublicReactActQueue: false,
       compatibilityClaimed: false
     }),
     passiveEffects: freezeRecord({
@@ -1368,6 +1523,172 @@ function evaluateReactDomTestUtilsActPrivateRoutingGate(options = {}) {
   });
 }
 
+function loadReactPrivateActDispatcherGate() {
+  return require('../../react/private-act-dispatcher-gate.js');
+}
+
+function isAcceptedReactSchedulerMockExpiredActRootWorkConsumption(
+  consumption
+) {
+  return (
+    isObjectLike(consumption) &&
+    Object.isFrozen(consumption) &&
+    consumption.status ===
+      reactActSchedulerMockExpiredActRootWorkConsumptionStatus &&
+    consumption.accepted === true &&
+    consumption.schedulerMockExpiredActRootWorkDiagnosticsReady === true &&
+    consumption.consumesSchedulerMockExpiredActRootWorkDiagnostics === true &&
+    consumption.drainsAcceptedSchedulerMockExpiredActRootWorkDiagnostics ===
+      true &&
+    consumption.consumesAcceptedExpiredActRootWorkRecords === true &&
+    consumption.drainsAcceptedInternalTestQueues === true &&
+    consumption.queueFlushingReady === false &&
+    consumption.rendererRootsReady === false &&
+    consumption.passiveEffectsReady === false &&
+    consumption.continuationFlushingReady === false &&
+    consumption.publicCompatibilityClaimed === false &&
+    consumption.publicSchedulerTimingCompatibilityClaimed === false &&
+    consumption.publicReactActCompatibilityClaimed === false &&
+    consumption.publicRootSchedulerCompatibilityClaimed === false &&
+    consumption.publicRendererCompatibilityClaimed === false &&
+    consumption.drainsPublicSchedulerTaskQueue === false &&
+    consumption.drainsPublicReactActQueue === false &&
+    consumption.invokesPublicSchedulerFlushHelper === false &&
+    consumption.publicSchedulerFlushBehaviorExecuted === false &&
+    consumption.executesQueuedWork === false &&
+    consumption.executesEffects === false &&
+    consumption.executesRendererWork === false &&
+    consumption.executesRendererRoots === false
+  );
+}
+
+function isAcceptedSchedulerMockExpiredActRootWorkDiagnostics(report) {
+  try {
+    const reactGate = loadReactPrivateActDispatcherGate();
+    return (
+      typeof reactGate.isAcceptedSchedulerMockExpiredActRootWorkDiagnostics ===
+        'function' &&
+      reactGate.isAcceptedSchedulerMockExpiredActRootWorkDiagnostics(report) ===
+        true
+    );
+  } catch (_error) {
+    return false;
+  }
+}
+
+function consumeSchedulerMockExpiredActRootWorkDiagnostics(report) {
+  const reactGate = loadReactPrivateActDispatcherGate();
+  let reactActConsumptionReport;
+
+  try {
+    reactActConsumptionReport =
+      reactGate.consumeSchedulerMockExpiredActRootWorkDiagnostics(report);
+  } catch (error) {
+    throw createSchedulerMockExpiredActRootWorkDiagnosticsGateError(
+      getReactActSchedulerMockExpiredActRootWorkRejectionReason(error)
+    );
+  }
+
+  if (
+    !isAcceptedReactSchedulerMockExpiredActRootWorkConsumption(
+      reactActConsumptionReport
+    )
+  ) {
+    throw createSchedulerMockExpiredActRootWorkDiagnosticsGateError(
+      'react-act-private-consumption-report'
+    );
+  }
+
+  return freezeRecord({
+    status: privateSchedulerMockExpiredActRootWorkConsumptionStatus,
+    accepted: true,
+    gateId: privateSchedulerMockExpiredActRootWorkDiagnosticGateId,
+    diagnosticStatus: privateSchedulerMockExpiredActRootWorkDiagnosticStatus,
+    prerequisiteId: privateSchedulerMockExpiredActRootWorkPrerequisiteId,
+    workerId: 'worker-747-react-private-act-expired-scheduler-consumer',
+    reactActConsumptionStatus: reactActConsumptionReport.status,
+    schedulerMockExpiredActRootWorkDiagnosticsStatus:
+      reactActConsumptionReport.schedulerMockExpiredActRootWorkDiagnosticsStatus,
+    schedulerMockExpiredActRootWorkDiagnosticKind:
+      reactActConsumptionReport.schedulerMockExpiredActRootWorkDiagnosticKind,
+    schedulerMockExpiredActRootWorkDiagnosticVersion:
+      reactActConsumptionReport.schedulerMockExpiredActRootWorkDiagnosticVersion,
+    schedulerDiagnosticStatus:
+      reactActConsumptionReport.schedulerDiagnosticStatus,
+    selectedFlushHelper: reactActConsumptionReport.selectedFlushHelper,
+    rootWorkRecordSummary: reactActConsumptionReport.rootWorkRecordSummary,
+    actQueueDrainSummary: reactActConsumptionReport.actQueueDrainSummary,
+    consumesReactActPrivateSchedulerDiagnostics: true,
+    consumesSchedulerMockExpiredActRootWorkDiagnostics: true,
+    drainsAcceptedSchedulerMockExpiredActRootWorkDiagnostics: true,
+    consumesAcceptedExpiredActRootWorkRecords: true,
+    drainsAcceptedInternalTestQueues: true,
+    requiresSchedulerOwnedSourceProof: true,
+    rejectsClonedDiagnostics: true,
+    rejectsForgedDiagnostics: true,
+    privateRoutingReady: false,
+    publicReactActReady: false,
+    publicTestUtilsActReady: false,
+    queueFlushingReady: false,
+    rendererRootsReady: false,
+    passiveEffectsReady: false,
+    continuationFlushingReady: false,
+    publicActExecution: false,
+    publicRootExecution: false,
+    publicEffectExecution: false,
+    publicActPassiveDrain: false,
+    schedulerDrivenPassiveExecution: false,
+    publicCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    publicRootSchedulerCompatibilityClaimed: false,
+    publicRendererCompatibilityClaimed: false,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    invokesPublicSchedulerFlushHelper: false,
+    publicSchedulerFlushBehaviorExecuted: false,
+    executesQueuedWork: false,
+    executesEffects: false,
+    executesPassiveEffects: false,
+    executesRendererWork: false,
+    executesRendererRoots: false,
+    compatibilityClaimed: false,
+    reactActConsumptionReport
+  });
+}
+
+function getReactActSchedulerMockExpiredActRootWorkRejectionReason(error) {
+  if (isObjectLike(error) && typeof error.reason === 'string') {
+    return error.reason;
+  }
+
+  return 'react-act-private-scheduler-expired-diagnostics';
+}
+
+function createSchedulerMockExpiredActRootWorkDiagnosticsGateError(reason) {
+  const error = createUnsupportedError(
+    entrypoint,
+    `${privateTestUtilsActGateExport}.consumeSchedulerMockExpiredActRootWorkDiagnostics`,
+    'rejected Scheduler mock expired act/root work diagnostics',
+    'Only React-owned private Scheduler mock expired act/root diagnostics can ' +
+      'pass this package-private React DOM test-utils act route.'
+  );
+  error.reason = reason;
+  error.publicCompatibilityClaimed = false;
+  error.publicSchedulerTimingCompatibilityClaimed = false;
+  error.publicReactActCompatibilityClaimed = false;
+  error.publicRootSchedulerCompatibilityClaimed = false;
+  error.publicRendererCompatibilityClaimed = false;
+  error.drainsPublicSchedulerTaskQueue = false;
+  error.drainsPublicReactActQueue = false;
+  error.executesQueuedWork = false;
+  error.executesEffects = false;
+  error.executesPassiveEffects = false;
+  error.executesRendererWork = false;
+  error.executesRendererRoots = false;
+  return error;
+}
+
 function collectStaleAcceptedPrivatePrerequisites(prerequisites) {
   const prerequisitesById = new Map(
     prerequisites.map((prerequisite) => [prerequisite.id, prerequisite])
@@ -1450,6 +1771,13 @@ function captureThrown(fn) {
   return null;
 }
 
+function isObjectLike(value) {
+  return (
+    (typeof value === 'object' && value !== null) ||
+    typeof value === 'function'
+  );
+}
+
 function freezeRecord(record) {
   return Object.freeze(record);
 }
@@ -1472,12 +1800,19 @@ module.exports = {
   blockedPublicPrerequisites,
   createReactDomTestUtilsActBlockedError,
   createReactDomTestUtilsActPlaceholder,
+  consumeSchedulerMockExpiredActRootWorkDiagnostics,
   entrypoint,
   evaluateReactDomTestUtilsActPrivateRoutingGate,
   getReactDomTestUtilsActPrivateRoutingGate,
+  isAcceptedSchedulerMockExpiredActRootWorkDiagnostics,
   passiveEffectDeletedSubtreeRefPassiveOrderingStatus,
+  privateSchedulerMockExpiredActRootWorkConsumptionStatus,
+  privateSchedulerMockExpiredActRootWorkDiagnosticGateId,
+  privateSchedulerMockExpiredActRootWorkDiagnosticStatus,
+  privateSchedulerMockExpiredActRootWorkPrerequisiteId,
   privateRoutingGateId,
   privateRoutingGateStatus,
+  privateTestUtilsActGateExport,
   publicActStatus,
   sideEffectPolicy
 };

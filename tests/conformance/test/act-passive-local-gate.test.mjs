@@ -200,6 +200,7 @@ test("act/passive local gate recognizes accepted queue diagnostics without publi
 
   assert.deepEqual(gate.reactDomTestUtilsActGate.acceptedPrivatePrerequisiteIds, [
     "react-act-private-dispatcher-gate",
+    "scheduler-mock-expired-act-root-work-diagnostics",
     "scheduler-act-queue-routing-records",
     "scheduler-mock-flush-helper-metadata",
     "sync-flush-act-continuation-records",
