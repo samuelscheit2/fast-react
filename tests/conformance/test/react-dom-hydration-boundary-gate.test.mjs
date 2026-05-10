@@ -1084,6 +1084,114 @@ test("private hydration target claim links to one blocked replay target-dispatch
   assert.deepEqual(document.__registrations, []);
 });
 
+test("private hydration target claim accepts nested child path evidence read-only", () => {
+  const document = createDocument("nested-claim");
+  const container = createElement("DIV", document);
+  const wrapper = createElement("SPAN", document);
+  const target = createElement("BUTTON", document);
+  target.parentNode = wrapper;
+  wrapper.parentNode = container;
+  wrapper.childNodes = [target];
+  container.childNodes = [
+    createComment("$"),
+    wrapper,
+    createComment("/$")
+  ];
+  const gate = hydrationGate.createHydrationBoundaryGate({
+    markerOracle: oracle,
+    recordIdPrefix: "hydration-nested-claim"
+  });
+  const record = gate.recordUnsupportedHydrateRoot(
+    container,
+    { props: { children: "nested claim" }, type: "App" },
+    {
+      identifierPrefix: "nested-claim-"
+    }
+  );
+  const dispatchRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      eventListener.createEventListenerWrapperRecordWithPriority(
+        container,
+        "click",
+        eventSystemFlags.IS_CAPTURE_PHASE
+      ),
+      createNativeEvent("click", target)
+    );
+  const targetDispatchLink =
+    hydrationGate.createHydrationReplayTargetDispatchLinkDiagnostic(
+      record,
+      dispatchRecord,
+      {
+        source: "conformance-hydration-nested-claim-link"
+      }
+    );
+  const ownershipDiagnostics =
+    hydrationGate.createHydrationReplayOwnershipGateDiagnostic(
+      record,
+      dispatchRecord,
+      {
+        source: "conformance-hydration-nested-claim-ownership"
+      }
+    );
+  const claim = hydrationGate.createHydrationTargetClaimingDiagnostic(
+    record,
+    ownershipDiagnostics,
+    targetDispatchLink,
+    {
+      source: "conformance-hydration-nested-claim"
+    }
+  );
+
+  assert.deepEqual(
+    [
+      claim.rootRecordId,
+      claim.markerPath,
+      claim.targetPath,
+      claim.targetPathParentPath,
+      claim.targetPathIndex,
+      claim.targetPathRootIndex,
+      claim.targetPathSegmentCount,
+      claim.dehydratedBoundaryOwnerId,
+      claim.ownerBoundaryKind
+    ],
+    [
+      "hydration-nested-claim:1",
+      "container.childNodes[0]",
+      "container.childNodes[1].childNodes[0]",
+      "container.childNodes[1]",
+      0,
+      1,
+      2,
+      "hydration-nested-claim:1:boundary:0",
+      "suspense-boundary"
+    ]
+  );
+  assert.deepEqual(claim.targetPathSegments, [1, 0]);
+  assert.deepEqual(claim.targetPathMatchedPaths, [claim.targetPath]);
+  assert.equal(claim.targetPathDeterministicallySelected, true);
+  assert.equal(claim.targetPathResolvedToDispatchTarget, true);
+  assert.equal(claim.targetPathUniqueInContainer, true);
+  assert.equal(claim.targetPathParentChainRetained, true);
+  assert.equal(claim.targetContainerMatchesBoundaryRecord, true);
+  assert.equal(claim.hydratableLookupTargetPathRetained, true);
+  assert.equal(claim.queueMutationAllowed, false);
+  assert.equal(claim.replayQueuesDrained, false);
+  assert.equal(claim.eventDispatch, false);
+  assert.equal(claim.eventsReplayed, false);
+  assert.equal(claim.publicHydrationTargetClaimed, false);
+  assert.equal(claim.publicHydrationCompatibilityClaimed, false);
+  assert.equal(claim.compatibilityClaimed, false);
+
+  const payload =
+    hydrationGate.getPrivateHydrationTargetClaimingDiagnosticPayload(claim);
+  assert.equal(payload.hydrationBoundaryRecord, record);
+  assert.equal(payload.targetPathResolution.node, target);
+  assert.equal(payload.targetPathResolution.parentNode, wrapper);
+  assert.equal(dispatchRecord.hydrationReplay.queued, false);
+  assert.deepEqual(container.__registrations, []);
+  assert.deepEqual(document.__registrations, []);
+});
+
 test("private root bridge hydrateRoot requests preserve accepted marker evidence record-only", () => {
   const first = createRootBridgeHydrateRootScenario("root-bridge");
   const second = createRootBridgeHydrateRootScenario("root-bridge");
