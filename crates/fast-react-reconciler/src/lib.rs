@@ -6,6 +6,7 @@
 mod concurrent_updates;
 mod fiber_root;
 mod fiber_store;
+mod function_component;
 mod host_tokens;
 mod root_config;
 mod root_scheduler;
