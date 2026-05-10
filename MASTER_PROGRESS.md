@@ -42,6 +42,20 @@ sequencing belong in `MASTER_PLAN.md`.
   context provider update lanes; focused React DOM hydration/form conformance
   checks; `npm run check --workspace @fast-react/react-dom`; conflict-marker
   scanning; and `git diff --check`.
+- Workers 596, 600, 605-608, 613, 619, 623, and 624 were accepted from the
+  active queue. The batch added root scheduler sync-commit execution,
+  `useReducer` dispatch commit linkage, Suspense retry render handoff,
+  Offscreen hidden-lane reveal metadata, private HostText and HostComponent
+  property update execution, React DOM root-render native handoff, hydration
+  recoverable-error routing, scheduler postTask abort-continuation diagnostics,
+  and package/benchmark/conformance guards for queue 565-594 while keeping
+  public compatibility blocked.
+- The batch was verified after merge with `cargo fmt --all --check`, focused
+  reconciler filters for root scheduler/work loop, Offscreen, complete work,
+  HostText, HostComponent, host nodes, host work, and root commit; focused and
+  full React DOM package checks; scheduler postTask and package-surface checks;
+  private-admission, benchmark, and conformance workspace checks;
+  conflict-marker scanning; and `git diff --check`.
 
 ### Queue 565-594
 

@@ -48,17 +48,15 @@ Drive toward a minimal real root render/update/unmount path:
 Top-level cap: 30 workers. Replacement queue 595-624 is active in `fr-*` tmux
 sessions from isolated `worker/<slug>` branches and worktrees.
 
-- Accepted so far: 595, 597, 598, 601, 604, 618, and 621.
-- 596, 599-600, 602-603, 605-609: Rust scheduler, hook dispatch, layout effect,
-  context traversal, Suspense, Offscreen, host update, and deletion execution
-  gates.
+- Accepted so far: 595-598, 600-601, 604-608, 613, 618-619, 621, and
+  623-624.
+- 599, 602-603, 609: remaining Rust hook dispatch, layout effect, context
+  traversal, and deletion execution gates.
 - 610-612: React test-renderer create/update/unmount private native-bridge
   admission gates.
-- 613-617, 619-620: React DOM root render/update/unmount, event, controlled
-  restore, hydration recoverable error, and resource private gates.
-- 622-623: Scheduler mock and postTask private execution/continuation gates.
-- 624: Package-surface, benchmark, and conformance guards for accepted
-  queue 565-594.
+- 614-617 and 620: React DOM root update/unmount, event, controlled restore,
+  and resource private gates.
+- 622: Scheduler mock private execution gate.
 
 ## Near-Term Sequencing
 
