@@ -19,6 +19,21 @@ const propertyPayload = require(path.join(
   'property-payload.js'
 ));
 const rootBridge = require(path.join(sourceRoot, 'client', 'root-bridge.js'));
+const componentTree = require(path.join(
+  sourceRoot,
+  'client',
+  'component-tree.js'
+));
+const controlledRestoreQueue = require(path.join(
+  sourceRoot,
+  'client',
+  'controlled-restore-queue.js'
+));
+const eventListener = require(path.join(
+  sourceRoot,
+  'events',
+  'react-dom-event-listener.js'
+));
 
 const resourceOracle = require(path.join(
   repoRoot,
@@ -958,6 +973,295 @@ test('private controlled input restore queue diagnostic records fake-DOM observa
   assert.equal(error.sourceTrackerRequestId, 'fake-restore:2');
   assert.equal(error.restoreIntent.intentRecorded, true);
   assert.deepEqual(error.sideEffects, changedIntent.sideEffects);
+});
+
+test('private controlled input post-event restore queue gate records event/latest-props intent only', () => {
+  const gate =
+    controlledRestoreQueue.createControlledInputPostEventRestoreQueueGate({
+      requestIdPrefix: 'event-restore'
+    });
+  const controlled = createControlledInputEventDispatch({
+    domEventName: 'input',
+    latestProps: {
+      type: 'text',
+      value: 'alpha',
+      onChange() {},
+      onInput() {}
+    },
+    nodeName: 'INPUT',
+    value: 'browser-mutated'
+  });
+  const descriptorBefore = Object.getOwnPropertyDescriptor(
+    controlled.targetNode,
+    'value'
+  );
+  const intent =
+    gate.recordPostEventRestoreIntentFromEventLatestProps(
+      controlled.dispatchRecord,
+      {
+        explicitAdmission: true,
+        queueKind:
+          'deterministic-event-latest-props-post-event-restore-queue',
+        queueId: 'event-latest-props-restore-queue',
+        eventName: 'input',
+        targetKind: 'controlled-input-post-event-restore-queue'
+      }
+    );
+  const skippedControlled = createControlledInputEventDispatch({
+    domEventName: 'click',
+    latestProps: {
+      type: 'text',
+      value: 'alpha',
+      onClick() {}
+    },
+    nodeName: 'INPUT',
+    value: 'browser-mutated'
+  });
+  const skipped = gate.recordPostEventRestoreIntentFromEventLatestProps(
+    skippedControlled.dispatchRecord,
+    {
+      explicitAdmission: true,
+      queueKind:
+        'deterministic-event-latest-props-post-event-restore-queue',
+      targetKind: 'controlled-input-post-event-restore-queue'
+    }
+  );
+  const summary =
+    controlledRestoreQueue.describeControlledInputPostEventRestoreQueueGate();
+
+  assert.equal(
+    propertyPayload.CONTROLLED_POST_EVENT_RESTORE_QUEUE_STATUS,
+    controlledRestoreQueue.controlledInputPostEventRestoreQueueStatus
+  );
+  assert.equal(Object.isFrozen(intent), true);
+  assert.equal(
+    controlledRestoreQueue.isPrivateControlledInputPostEventRestoreQueueRecord(
+      intent
+    ),
+    true
+  );
+  assert.equal(
+    controlledRestoreQueue.getPrivateControlledInputPostEventRestoreQueueRecordPayload(
+      intent
+    ),
+    intent
+  );
+  assert.deepEqual(
+    [intent, skipped].map((record) => ({
+      requestId: record.requestId,
+      requestSequence: record.requestSequence,
+      status: record.status,
+      domEventName: record.domEventName,
+      hostTag: record.hostTag,
+      controlKind: record.controlKind,
+      controlledPropName: record.controlledPropName,
+      latestPropsEvidenceAccepted:
+        record.restoreIntent.latestPropsEvidenceAccepted,
+      supportedEventName: record.restoreIntent.supportedEventName,
+      intentRecorded: record.restoreIntent.intentRecorded,
+      restoreTargetWouldBeQueued:
+        record.restoreIntent.restoreTargetWouldBeQueued,
+      queuePosition: record.restoreIntent.queuePosition,
+      latestPropsLookupPerformed:
+        record.restoreIntent.latestPropsLookupPerformed,
+      eventDispatchRecordAccepted:
+        record.restoreIntent.eventDispatchRecordAccepted,
+      eventPluginDispatchPerformed:
+        record.restoreIntent.eventPluginDispatchPerformed,
+      restoreQueueWritten: record.restoreIntent.restoreQueueWritten,
+      controlledStateRestoreInvoked:
+        record.restoreIntent.controlledStateRestoreInvoked,
+      postEventRestoreIntentRecorded:
+        record.sideEffects.postEventRestoreIntentRecorded,
+      postEventRestoreIntentSkipped:
+        record.sideEffects.postEventRestoreIntentSkipped,
+      latestPropsMetadataRead: record.sideEffects.latestPropsMetadataRead
+    })),
+    [
+      {
+        requestId: 'event-restore:1',
+        requestSequence: 1,
+        status:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueIntentRecordedStatus,
+        domEventName: 'input',
+        hostTag: 'input',
+        controlKind: 'value',
+        controlledPropName: 'value',
+        latestPropsEvidenceAccepted: true,
+        supportedEventName: true,
+        intentRecorded: true,
+        restoreTargetWouldBeQueued: true,
+        queuePosition: 'primary',
+        latestPropsLookupPerformed: true,
+        eventDispatchRecordAccepted: true,
+        eventPluginDispatchPerformed: false,
+        restoreQueueWritten: false,
+        controlledStateRestoreInvoked: false,
+        postEventRestoreIntentRecorded: true,
+        postEventRestoreIntentSkipped: false,
+        latestPropsMetadataRead: true
+      },
+      {
+        requestId: 'event-restore:2',
+        requestSequence: 2,
+        status:
+          controlledRestoreQueue.controlledInputPostEventRestoreQueueIntentSkippedStatus,
+        domEventName: 'click',
+        hostTag: 'input',
+        controlKind: 'value',
+        controlledPropName: 'value',
+        latestPropsEvidenceAccepted: true,
+        supportedEventName: false,
+        intentRecorded: false,
+        restoreTargetWouldBeQueued: false,
+        queuePosition: null,
+        latestPropsLookupPerformed: true,
+        eventDispatchRecordAccepted: true,
+        eventPluginDispatchPerformed: false,
+        restoreQueueWritten: false,
+        controlledStateRestoreInvoked: false,
+        postEventRestoreIntentRecorded: false,
+        postEventRestoreIntentSkipped: true,
+        latestPropsMetadataRead: true
+      }
+    ]
+  );
+
+  assert.equal(
+    intent.gateId,
+    controlledRestoreQueue.controlledInputPostEventRestoreQueueGateId
+  );
+  assert.equal(intent.compatibilityTarget, compatibilityTarget);
+  assert.equal(intent.unsupportedCode, unsupportedCode);
+  assert.equal(
+    intent.eventEvidence.sourceRecordKind,
+    'FastReactDomEventDispatchRecord'
+  );
+  assert.equal(intent.eventEvidence.targetResolutionStatus, 'resolved');
+  assert.equal(
+    intent.eventEvidence.controlledStateRestoreBlockedReason,
+    'FAST_REACT_DOM_CONTROLLED_STATE_RESTORE_BLOCKED'
+  );
+  assert.equal(intent.latestPropsEvidence.latestPropsStatus, 'present');
+  assert.equal(intent.latestPropsEvidence.exposesLatestProps, false);
+  assert.equal(intent.latestPropsEvidence.rawLatestPropsRetained, false);
+  assert.deepEqual(intent.latestPropsEvidence.propKeys, [
+    'type',
+    'value',
+    'onChange',
+    'onInput'
+  ]);
+  assert.deepEqual(intent.latestPropsEvidence.controlledPropSummary.value, {
+    present: true,
+    value: {type: 'string', empty: false}
+  });
+  assert.equal(intent.controlledTarget.liveValueTrackerInstalled, false);
+  assert.equal(intent.controlledTarget.valueTrackerFieldWritten, false);
+  assert.equal(intent.controlledTarget.propertyDescriptorInstalled, false);
+  assert.equal(intent.controlledTarget.hostValueRead, false);
+  assert.equal(intent.controlledTarget.hostValueWritten, false);
+  assert.equal(intent.restoreIntent.rawTargetCaptured, false);
+  assert.equal(intent.restoreIntent.rawEventCaptured, false);
+  assert.equal(intent.restoreIntent.rawLatestPropsRetained, false);
+  assert.equal(intent.postEventRestoreBoundary.latestPropsLookup, true);
+  assert.equal(intent.postEventRestoreBoundary.eventPluginDispatch, false);
+  assert.equal(intent.postEventRestoreBoundary.restoreQueued, false);
+  assert.equal(intent.postEventRestoreBoundary.restoreFlushed, false);
+  assert.equal(intent.sideEffects.eventDispatchRecordAccepted, true);
+  assert.equal(intent.sideEffects.latestPropsEvidenceAccepted, true);
+  assert.equal(intent.sideEffects.restoreQueueRecordCreated, true);
+  assert.equal(intent.sideEffects.restoreQueueWritten, false);
+  assert.equal(intent.sideEffects.restoreQueueFlushed, false);
+  assert.equal(intent.sideEffects.controlledStateRestoreScheduled, false);
+  assert.equal(intent.sideEffects.controlledStateRestoreInvoked, false);
+  assert.equal(intent.sideEffects.liveValueTrackerInstalled, false);
+  assert.equal(intent.sideEffects.valueTrackerFieldWritten, false);
+  assert.equal(intent.sideEffects.propertyDescriptorInstalled, false);
+  assert.equal(intent.sideEffects.hostValueRead, false);
+  assert.equal(intent.sideEffects.hostValueWritten, false);
+  assert.equal(intent.sideEffects.browserInputMutated, false);
+  assert.equal(intent.sideEffects.rawLatestPropsRetained, false);
+  assert.equal(
+    intent.publicControlledBehaviorBoundary.compatibilityClaimed,
+    false
+  );
+  assert.equal(Object.hasOwn(controlled.targetNode, '_valueTracker'), false);
+  assert.equal(descriptorBefore.get, undefined);
+  assert.equal(descriptorBefore.set, undefined);
+  assert.equal(
+    Object.getOwnPropertyDescriptor(controlled.targetNode, 'value').get,
+    undefined
+  );
+  assert.equal(
+    Object.getOwnPropertyDescriptor(controlled.targetNode, 'value').set,
+    undefined
+  );
+
+  assert.equal(
+    summary.gateId,
+    controlledRestoreQueue.controlledInputPostEventRestoreQueueGateId
+  );
+  assert.equal(
+    summary.acceptedSourceRecordType,
+    'FastReactDomEventDispatchRecord'
+  );
+  assert.equal(summary.consumesEventDispatchEvidence, true);
+  assert.equal(summary.consumesLatestPropsEvidence, true);
+  assert.equal(summary.installsLiveDescriptors, false);
+  assert.equal(summary.writesValueTrackerField, false);
+  assert.equal(summary.writesRestoreQueue, false);
+  assert.equal(summary.flushesRestoreQueue, false);
+  assert.equal(summary.publicControlledBehaviorEnabled, false);
+  assert.deepEqual(
+    summary.sideEffects,
+    controlledRestoreQueue.controlledInputPostEventRestoreQueueNoSideEffects
+  );
+
+  const error =
+    controlledRestoreQueue.createUnsupportedControlledInputPostEventRestoreQueueError(
+      intent
+    );
+  assert.equal(error.name, 'FastReactDomUnimplementedError');
+  assert.equal(
+    error.code,
+    controlledRestoreQueue.controlledInputPostEventRestoreQueueGateErrorCode
+  );
+  assert.equal(error.exportName, 'controlled-post-event-restore.input');
+  assert.equal(error.requestId, 'event-restore:1');
+  assert.equal(error.restoreIntent.intentRecorded, true);
+  assert.deepEqual(error.sideEffects, intent.sideEffects);
+
+  assert.throws(
+    () =>
+      gate.recordPostEventRestoreIntentFromEventLatestProps(
+        {},
+        {explicitAdmission: true}
+      ),
+    {
+      code:
+        controlledRestoreQueue.controlledInputPostEventRestoreQueueInvalidEventCode,
+      compatibilityTarget
+    }
+  );
+  assert.throws(
+    () =>
+      gate.recordPostEventRestoreIntentFromEventLatestProps(
+        controlled.dispatchRecord,
+        {
+          queueKind:
+            'deterministic-event-latest-props-post-event-restore-queue'
+        }
+      ),
+    {
+      code:
+        controlledRestoreQueue.controlledInputPostEventRestoreQueueInvalidAdmissionCode,
+      compatibilityTarget,
+      reason: 'explicitAdmission must be true'
+    }
+  );
+
+  componentTree.detachHostInstanceToken(controlled.token);
+  componentTree.detachHostInstanceToken(skippedControlled.token);
 });
 
 test('private controlled input fake-DOM value-tracker diagnostic rejects live DOM-like or inactive records', () => {
@@ -3540,13 +3844,51 @@ function createRootBridgeDocument() {
 function createRootBridgeElement(nodeName, ownerDocument) {
   return {
     nodeName,
+    localName: nodeName.toLowerCase(),
     nodeType: 1,
     ownerDocument,
+    parentNode: null,
     __mutationLog: [],
     __registrations: [],
     addEventListener(type, listener) {
       this.__registrations.push({ listener, type });
     }
+  };
+}
+
+function createControlledInputEventDispatch(options) {
+  const document = createRootBridgeDocument();
+  const container = createRootBridgeElement('DIV', document);
+  const targetNode = createRootBridgeElement(options.nodeName, document);
+  targetNode.parentNode = container;
+  if (Object.hasOwn(options, 'value')) {
+    targetNode.value = options.value;
+  }
+  const token = componentTree.createHostInstanceToken(
+    {kind: 'ControlledEventHost'},
+    {kind: 'ControlledEventRoot'}
+  );
+  componentTree.attachHostInstanceNode(
+    targetNode,
+    token,
+    options.latestProps
+  );
+  const wrapperRecord =
+    eventListener.createEventListenerWrapperRecordWithPriority(
+      container,
+      options.domEventName,
+      0
+    );
+
+  return {
+    container,
+    dispatchRecord: eventListener.dispatchEvent(wrapperRecord, {
+      target: targetNode,
+      type: options.domEventName
+    }),
+    document,
+    targetNode,
+    token
   };
 }
 

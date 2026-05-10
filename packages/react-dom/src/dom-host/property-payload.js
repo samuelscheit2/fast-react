@@ -19,6 +19,8 @@ const CONTROLLED_VALUE_TRACKER_FAKE_DOM_DIAGNOSTIC_STATUS =
   resourceFormInternalsGate.controlledInputValueTrackerFakeDomDiagnosticStatus;
 const CONTROLLED_RESTORE_QUEUE_FAKE_DOM_DIAGNOSTIC_STATUS =
   resourceFormInternalsGate.controlledInputPrivateRestoreQueueDiagnosticStatus;
+const CONTROLLED_POST_EVENT_RESTORE_QUEUE_STATUS =
+  'private-controlled-input-post-event-restore-queue-intent';
 const CONTROLLED_PRIVATE_WRAPPER_PROPERTY_PAYLOAD_STATUS =
   resourceFormInternalsGate.controlledInputPrivateWrapperGateStatus;
 
@@ -671,13 +673,17 @@ function createControlledFormUnsupportedEntry(tag, propName, props) {
         valueTrackerGateStatus: CONTROLLED_VALUE_TRACKER_GATE_STATUS,
         fakeDomTrackerDiagnosticStatus:
           CONTROLLED_VALUE_TRACKER_FAKE_DOM_DIAGNOSTIC_STATUS,
+        postEventRestoreQueueGateStatus:
+          CONTROLLED_POST_EVENT_RESTORE_QUEUE_STATUS,
         hostTag: tag,
         ordinaryPayloadAccepted: false,
         sourceAdapterInvoked: false,
         fakeDomTrackerDiagnosticAvailable: true,
+        postEventRestoreQueueGateAvailable: true,
         fakeDomTrackerDiagnosticInstalled: false,
         fakeDomTrackerDiagnosticObserved: false,
         fakeDomTrackerDiagnosticDetached: false,
+        postEventRestoreQueueIntentRecorded: false,
         liveTrackingStarted: false,
         postEventRestoreQueued: false,
         publicControlledBehaviorEnabled: false,
@@ -795,6 +801,7 @@ function getStyleMutationTarget(styleName) {
 
 module.exports = {
   CONTROLLED_FORM_PROPERTY_PAYLOAD_STATUS,
+  CONTROLLED_POST_EVENT_RESTORE_QUEUE_STATUS,
   CONTROLLED_PRIVATE_WRAPPER_PROPERTY_PAYLOAD_STATUS,
   CONTROLLED_RESTORE_QUEUE_FAKE_DOM_DIAGNOSTIC_STATUS,
   CONTROLLED_VALUE_TRACKER_FAKE_DOM_DIAGNOSTIC_STATUS,
