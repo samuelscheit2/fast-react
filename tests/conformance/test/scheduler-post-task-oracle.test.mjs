@@ -732,6 +732,20 @@ test("scheduler post-task private priority diagnostics capture shimmed TaskContr
     assert.deepEqual(
       report.scheduling.map((entry) => [
         entry.label,
+        entry.diagnosticsBeforeFlush.schedule.delay.delayClassification
+      ]),
+      [
+        ["immediate", "zero-delay-task"],
+        ["user-blocking", "zero-delay-task"],
+        ["normal", "no-delay-value"],
+        ["low-delay", "delayed-task"],
+        ["idle-zero-delay", "zero-delay-task"],
+        ["invalid-delay", "delayed-task"]
+      ]
+    );
+    assert.deepEqual(
+      report.scheduling.map((entry) => [
+        entry.label,
         entry.diagnosticsBeforeFlush.priorityMapping.schedulerPriorityName,
         entry.diagnosticsBeforeFlush.priorityMapping.recognizedPriority,
         entry.diagnosticsBeforeFlush.priorityMapping.taskControllerPriority,
@@ -824,6 +838,14 @@ test("scheduler post-task private priority diagnostics capture shimmed TaskContr
         entry.diagnosticsAfterFlush.callbackRuns[0].shouldYieldAtStart,
         false
       );
+      assert.deepEqual(
+        entry.diagnosticsAfterFlush.callbackRuns[0].scheduledDelay,
+        entry.diagnosticsBeforeFlush.schedule.delay
+      );
+      assert.equal(
+        entry.diagnosticsAfterFlush.callbackRuns[0].continuationStatus,
+        "completed-without-continuation"
+      );
     }
 
     assert.deepEqual(
@@ -847,6 +869,14 @@ test("scheduler post-task private priority diagnostics capture shimmed TaskContr
       report.cancellation.diagnosticsBeforeCancel.schedule.postTaskPriority,
       "user-visible"
     );
+    assert.equal(
+      report.cancellation.diagnosticsBeforeCancel.schedule.priorityLevel,
+      4
+    );
+    assert.deepEqual(
+      report.cancellation.diagnosticsBeforeCancel.schedule.delay,
+      expectedPostTaskDelayDiagnostic("number", 13, "delayed-task")
+    );
     assert.equal(report.cancellation.diagnosticsBeforeCancel.cancellation, null);
     assert.equal(report.cancellation.cancelReturnType, "undefined");
     assert.equal(
@@ -859,8 +889,42 @@ test("scheduler post-task private priority diagnostics capture shimmed TaskContr
     );
     assert.equal(report.cancellation.diagnosticsAfterCancel.diagnosticEventCount, 3);
     assert.equal(
+      report.cancellation.diagnosticsAfterCancel.delayAbortOrderingDiagnostics,
+      true
+    );
+    assert.equal(
+      report.cancellation.diagnosticsAfterCancel
+        .fallbackEnvironmentClassificationDiagnostics,
+      true
+    );
+    assert.equal(
       report.cancellation.diagnosticsAfterCancel.cancellation.status,
       "cancelled-shimmed-task-controller"
+    );
+    assert.deepEqual(
+      report.cancellation.diagnosticsAfterCancel.cancellation.delayAbortOrdering,
+      expectedDelayAbortOrdering({
+        requestEventIndex: 1,
+        completionEventIndex: 2,
+        delay: expectedPostTaskDelayDiagnostic(
+          "number",
+          13,
+          "delayed-task"
+        ),
+        priorityLevel: 4,
+        postTaskPriority: "user-visible",
+        signalId: 7,
+        signalPriority: "user-visible",
+        withYield: true,
+        continuationStatus: expectedContinuationStatus({
+          status: "no-callback-runs-before-abort",
+          callbackRunCount: 0,
+          continuationFallbackCount: 0,
+          lastCallbackRunIndex: null,
+          lastCallbackContinuationStatus: null,
+          lastContinuationFallbackIndex: null
+        })
+      })
     );
     assert.deepEqual(
       report.cancellation.diagnosticsAfterCancel.cancellation.abortMetadata,
@@ -995,6 +1059,10 @@ test("scheduler post-task private priority diagnostics capture continuation fall
       );
       assert.equal(diagnostics.continuationFallbackDiagnostics, true);
       assert.equal(diagnostics.continuationFallbackMetadataDiagnostics, true);
+      assert.equal(
+        diagnostics.fallbackEnvironmentClassificationDiagnostics,
+        true
+      );
       assert.equal(diagnostics.taskControllerAbortOrderingDiagnostics, false);
       assert.equal(diagnostics.diagnosticEventCount, 4);
       assert.equal(diagnostics.callbackRuns.length, 2);
@@ -1005,12 +1073,46 @@ test("scheduler post-task private priority diagnostics capture continuation fall
           entry.priorityLevel,
           entry.postTaskPriority,
           entry.currentPriorityLevel,
-          entry.signal.priority
+          entry.signal.priority,
+          entry.scheduledDelay.delayClassification,
+          entry.continuationStatus,
+          entry.returnedContinuationType,
+          entry.continuationFallbackIndex
         ]),
         [
-          [0, 1, 3, "user-visible", 3, "user-visible"],
-          [1, 3, 3, "user-visible", 3, "user-visible"]
+          [
+            0,
+            1,
+            3,
+            "user-visible",
+            3,
+            "user-visible",
+            "zero-delay-task",
+            "scheduled-continuation-fallback",
+            "function",
+            0
+          ],
+          [
+            1,
+            3,
+            3,
+            "user-visible",
+            3,
+            "user-visible",
+            "zero-delay-task",
+            "completed-without-continuation",
+            "undefined",
+            null
+          ]
         ]
+      );
+      assert.deepEqual(
+        diagnostics.callbackRuns[0].fallbackEnvironmentClassification,
+        expectedFallbackEnvironmentClassification(withYield)
+      );
+      assert.equal(
+        diagnostics.callbackRuns[1].fallbackEnvironmentClassification,
+        null
       );
       assert.deepEqual(diagnostics.continuationFallbacks, [
         {
@@ -1029,8 +1131,10 @@ test("scheduler post-task private priority diagnostics capture continuation fall
             signalMatchesTaskController: true,
             signalAbortedAtSchedule: false
           },
+          continuationStatus: "scheduled-continuation-fallback",
           continuationMetadata: {
             status: "shimmed-post-task-continuation-metadata",
+            continuationStatus: "scheduled-continuation-fallback",
             selectedFallback: expectedFallback,
             schedulerYieldAvailableAtSchedule: withYield,
             schedulerPostTaskAvailableAtSchedule: true,
@@ -1038,10 +1142,16 @@ test("scheduler post-task private priority diagnostics capture continuation fall
             callbackRunCountAtSchedule: 1,
             reusesOriginalSignal: true,
             signalAbortedAtSchedule: false,
+            fallbackEnvironmentClassification:
+              expectedFallbackEnvironmentClassification(withYield)
+                .classification,
+            fallbackEnvironmentKind: "controlled-task-scheduling-api-shim",
             browserPostTaskCompatibilityClaimed: false,
             publicSchedulerTimingCompatibilityClaimed: false,
             compatibilityClaimed: false
           },
+          fallbackEnvironmentClassification:
+            expectedFallbackEnvironmentClassification(withYield),
           reusesOriginalSignal: true,
           signalAtSchedule: {
             id: 8,
@@ -1118,10 +1228,24 @@ test("scheduler post-task private priority diagnostics capture abort ordering ar
         entry.sourceCallbackRunIndex,
         entry.callbackRunCountAtSchedule,
         entry.fallback,
+        entry.continuationStatus,
+        entry.fallbackEnvironmentClassification.classification,
         entry.continuationOptions.signalMatchesTaskController,
         entry.continuationOptions.signalAbortedAtSchedule
       ]),
-      [[0, 2, 0, 1, "scheduler.postTask", true, false]]
+      [
+        [
+          0,
+          2,
+          0,
+          1,
+          "scheduler.postTask",
+          "scheduled-continuation-fallback",
+          "controlled-shim-scheduler-post-task-continuation",
+          true,
+          false
+        ]
+      ]
     );
 
     const afterCancel = flow.diagnosticsAfterCancel;
@@ -1134,7 +1258,33 @@ test("scheduler post-task private priority diagnostics capture abort ordering ar
     );
     assert.equal(afterCancel.taskControllerAbortOrderingDiagnostics, true);
     assert.equal(afterCancel.continuationFallbackMetadataDiagnostics, true);
+    assert.equal(afterCancel.delayAbortOrderingDiagnostics, true);
+    assert.equal(
+      afterCancel.fallbackEnvironmentClassificationDiagnostics,
+      true
+    );
     assert.equal(afterCancel.diagnosticEventCount, 5);
+    assert.deepEqual(
+      afterCancel.cancellation.delayAbortOrdering,
+      expectedDelayAbortOrdering({
+        requestEventIndex: 3,
+        completionEventIndex: 4,
+        delay: expectedPostTaskDelayDiagnostic("number", 0, "zero-delay-task"),
+        priorityLevel: 3,
+        postTaskPriority: "user-visible",
+        signalId: 9,
+        signalPriority: "user-visible",
+        withYield: false,
+        continuationStatus: expectedContinuationStatus({
+          status: "continuation-fallback-scheduled",
+          callbackRunCount: 1,
+          continuationFallbackCount: 1,
+          lastCallbackRunIndex: 0,
+          lastCallbackContinuationStatus: "scheduled-continuation-fallback",
+          lastContinuationFallbackIndex: 0
+        })
+      })
+    );
     assert.deepEqual(afterCancel.cancellation.abortMetadata, {
       status: "shimmed-task-controller-abort-metadata",
       controller: {
@@ -1216,6 +1366,114 @@ test("print-scheduler-post-task-oracle CLI emits the checked-in oracle", () => {
 
   assert.equal(output, readCheckedSchedulerPostTaskOracleText());
 });
+
+function expectedPostTaskDelayDiagnostic(type, value, delayClassification) {
+  return {
+    hasDelayProperty: true,
+    type,
+    value,
+    normalizedDelayType: type,
+    normalizedDelayValue: value,
+    delayClassification,
+    browserPostTaskCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  };
+}
+
+function expectedFallbackEnvironmentClassification(withYield) {
+  return {
+    status: "controlled-shim-fallback-environment-classification",
+    environmentKind: "controlled-task-scheduling-api-shim",
+    classification: withYield
+      ? "controlled-shim-scheduler-yield-continuation"
+      : "controlled-shim-scheduler-post-task-continuation",
+    selectedFallback: withYield ? "scheduler.yield" : "scheduler.postTask",
+    hasSchedulerPostTask: true,
+    hasSchedulerYield: withYield,
+    usesSchedulerYield: withYield,
+    usesSchedulerPostTaskFallback: !withYield,
+    browserPostTaskCompatibilityClaimed: false,
+    browserTaskOrderingCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  };
+}
+
+function expectedContinuationStatus({
+  status,
+  callbackRunCount,
+  continuationFallbackCount,
+  lastCallbackRunIndex,
+  lastCallbackContinuationStatus,
+  lastContinuationFallbackIndex
+}) {
+  return {
+    status,
+    callbackRunCount,
+    continuationFallbackCount,
+    lastCallbackRunIndex,
+    lastCallbackContinuationStatus,
+    lastContinuationFallbackIndex,
+    browserPostTaskCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  };
+}
+
+function expectedDelayAbortOrdering({
+  requestEventIndex,
+  completionEventIndex,
+  delay,
+  priorityLevel,
+  postTaskPriority,
+  signalId,
+  signalPriority,
+  withYield,
+  continuationStatus
+}) {
+  const signalBeforeAbort = expectedPostTaskSignal(
+    signalId,
+    signalPriority,
+    false
+  );
+  const signalAfterAbort = expectedPostTaskSignal(
+    signalId,
+    signalPriority,
+    true
+  );
+
+  return {
+    status: "delay-abort-ordering-observed-after-abort-call",
+    requestEventIndex,
+    completionEventIndex,
+    scheduledDelay: delay,
+    scheduledPriority: {
+      priorityLevel,
+      postTaskPriority
+    },
+    signalBeforeAbort,
+    signalAfterAbort,
+    abortSignalStateAfterAbort: "aborted",
+    continuationStatusAtRequest: continuationStatus,
+    continuationStatusAtCompletion: continuationStatus,
+    fallbackEnvironmentClassification:
+      expectedFallbackEnvironmentClassification(withYield),
+    browserPostTaskCompatibilityClaimed: false,
+    browserTaskOrderingCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  };
+}
+
+function expectedPostTaskSignal(id, priority, aborted) {
+  return {
+    id,
+    priority,
+    aborted,
+    ownKeys: ["id", "aborted", "priority"]
+  };
+}
 
 function operationValue(modeId, scenarioId) {
   const result = observation(modeId, scenarioId).result;
