@@ -67,7 +67,10 @@ const propertyPayload = require(
 );
 const {
   ENTRY_REMOVE_STYLE,
+  ENTRY_SET_INNER_HTML,
   ENTRY_SET_STYLE,
+  PRIVATE_DANGEROUS_HTML_UPDATE_FAKE_DOM_COMMIT_METADATA_KIND,
+  PRIVATE_DANGEROUS_HTML_UPDATE_FAKE_DOM_COMMIT_STATUS,
   PRIVATE_STYLE_OBJECT_DIFF_DIAGNOSTIC_STATUS,
   PRIVATE_STYLE_OBJECT_DIFF_FAKE_DOM_COMMIT_METADATA_KIND,
   PRIVATE_STYLE_OBJECT_DIFF_FAKE_DOM_COMMIT_STATUS,
@@ -561,6 +564,137 @@ test("private root fake-DOM commit metadata accepts oracle style rows without pu
   assert.equal(handoff.compatibilityClaimed, false);
 
   cleanupStyleCommitBridgeFixture(fixture);
+});
+
+test("private root update applies oracle style and dangerous HTML rows without public compatibility", () => {
+  const previousStyle = orderedProps([
+    ["color", "red"],
+    ["marginTop", 4],
+    ["opacity", 0.5],
+    ["flex", 1],
+    ["--gap", "4px"],
+    ["--count", 3],
+    ["backgroundColor", "yellow"],
+    ["borderWidth", 2],
+    ["paddingLeft", "1em"]
+  ]);
+  const nextStyle = orderedProps([
+    ["color", null],
+    ["marginTop", 0],
+    ["opacity", null],
+    ["--gap", null],
+    ["backgroundColor", "blue"]
+  ]);
+  const previousProps = {
+    style: previousStyle,
+    dangerouslySetInnerHTML: { __html: "<span>Before</span>" }
+  };
+  const nextProps = {
+    style: nextStyle,
+    dangerouslySetInnerHTML: { __html: "<em>After</em>" }
+  };
+  const fixture = createStyleDangerousHtmlUpdateBridgeFixture(previousProps);
+  const update = fixture.bridge.renderContainer(fixture.create.handle, {
+    props: nextProps,
+    type: "div"
+  });
+  const styleUpdatePhase = clientPhase(
+    "default-node-development",
+    "style-update-and-removal",
+    "update"
+  );
+  const htmlUpdatePhase = clientPhase(
+    "default-node-development",
+    "dangerously-set-inner-html-update-and-removal",
+    "update"
+  );
+
+  fixture.host.styleLog = [];
+  fixture.host.dangerousWriteLog = [];
+
+  const handoff = fixture.bridge.applyHostOutputUpdate(update, {
+    hostInstanceToken: fixture.token,
+    nextProps,
+    tag: "div"
+  });
+  const hiddenHandoff =
+    rootBridge.getPrivateRootHostOutputUpdateHandoffPayload(handoff);
+  const dangerousHtmlCommit = hiddenHandoff.dangerousHtmlUpdateCommit;
+
+  assert.equal(handoff.latestPropsPublished, true);
+  assert.equal(handoff.browserDomMutation, false);
+  assert.equal(handoff.publicRootObjectExposed, false);
+  assert.equal(handoff.compatibilityClaimed, false);
+  assert.equal(
+    hiddenHandoff.styleObjectDiffCommit.publicMetadata.fakeDomMutation,
+    true
+  );
+  assert.equal(
+    dangerousHtmlCommit.publicMetadata.kind,
+    PRIVATE_DANGEROUS_HTML_UPDATE_FAKE_DOM_COMMIT_METADATA_KIND
+  );
+  assert.equal(
+    dangerousHtmlCommit.publicMetadata.status,
+    PRIVATE_DANGEROUS_HTML_UPDATE_FAKE_DOM_COMMIT_STATUS
+  );
+  assert.equal(dangerousHtmlCommit.publicMetadata.payloadRowsAccepted, true);
+  assert.equal(dangerousHtmlCommit.publicMetadata.fakeDomMutation, true);
+  assert.equal(
+    dangerousHtmlCommit.publicMetadata.fakeDomInnerHTMLWritten,
+    true
+  );
+  assert.equal(
+    dangerousHtmlCommit.publicMetadata.realDomInnerHTMLWritten,
+    false
+  );
+  assert.equal(dangerousHtmlCommit.publicMetadata.browserDomMutation, false);
+  assert.equal(
+    dangerousHtmlCommit.publicMetadata.publicRootCompatibility,
+    false
+  );
+  assert.equal(dangerousHtmlCommit.publicMetadata.compatibilityClaimed, false);
+  assert.deepEqual(
+    hiddenHandoff.styleObjectDiffCommit.payloadRows.map((row) => [
+      styleMutationType(row),
+      row.styleName,
+      row.value
+    ]),
+    styleUpdatePhase.mutations
+      .filter((mutation) => mutation.type.startsWith("style"))
+      .map((mutation) => [
+        mutation.type,
+        mutation.property ?? mutation.name,
+        mutation.value
+      ])
+  );
+  assert.deepEqual(dangerousHtmlCommit.payloadRows, [
+    {
+      kind: ENTRY_SET_INNER_HTML,
+      propName: "dangerouslySetInnerHTML",
+      propertyName: "innerHTML",
+      value: "<em>After</em>"
+    }
+  ]);
+  assert.deepEqual(
+    fixture.host.dangerousWriteLog,
+    htmlUpdatePhase.mutations
+      .filter((mutation) => mutation.type === "setInnerHTML")
+      .map((mutation) => ["setInnerHTML", mutation.value])
+  );
+  assert.equal(fixture.host.innerHTML, "<em>After</em>");
+  assert.deepEqual(
+    activeStyleProperties(fixture.host),
+    firstRenderedElement(styleUpdatePhase).activeStyleProperties
+  );
+  assert.equal(
+    componentTree.getLatestPropsFromHostInstanceToken(fixture.token),
+    nextProps
+  );
+
+  const serialized = JSON.stringify(handoff);
+  assert.equal(serialized.includes("<span>Before</span>"), false);
+  assert.equal(serialized.includes("<em>After</em>"), false);
+  cleanupStyleDangerousHtmlUpdateBridgeFixture(fixture);
 });
 
 test("client mutation observations record dangerouslySetInnerHTML update and removal", () => {
@@ -1070,6 +1204,54 @@ function cleanupStyleCommitBridgeFixture(fixture) {
   fixture.bridge.revertCreateRootSideEffects(fixture.sideEffects);
 }
 
+function createStyleDangerousHtmlUpdateBridgeFixture(initialProps) {
+  const document = new StyleCommitBridgeDocument(
+    "style-dangerous-html-update-conformance"
+  );
+  const container = document.createElement("div");
+  const bridge = rootBridge.createPrivateRootBridgeShell();
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const initialRender = bridge.renderContainer(create.handle, {
+    props: initialProps,
+    type: "div"
+  });
+  bridge.admitCreateRenderPath(create, sideEffects, initialRender);
+
+  const host = document.createElement("div");
+  const token = componentTree.createHostInstanceToken(
+    { kind: "StyleDangerousHtmlUpdateBridgeHost" },
+    create.owner
+  );
+  componentTree.attachHostInstanceNode(host, token, {});
+  const propsHandoff = domHost.commitDomPropertyUpdateForLatestProps(
+    host,
+    "div",
+    {},
+    initialProps
+  );
+  componentTree.commitLatestPropsFromMutationHandoff(propsHandoff);
+
+  return {
+    bridge,
+    create,
+    host,
+    sideEffects,
+    token
+  };
+}
+
+function cleanupStyleDangerousHtmlUpdateBridgeFixture(fixture) {
+  componentTree.detachHostInstanceToken(fixture.token);
+  fixture.bridge.revertCreateRootSideEffects(fixture.sideEffects);
+}
+
+function activeStyleProperties(element) {
+  return Array.from(element.style.properties.entries())
+    .filter(([, value]) => value !== "")
+    .sort(([left], [right]) => left.localeCompare(right));
+}
+
 class StyleCommitBridgeEventTarget {
   constructor(fields) {
     Object.assign(this, fields);
@@ -1118,8 +1300,22 @@ class StyleCommitBridgeElement extends StyleCommitBridgeEventTarget {
       nodeType: 1,
       ownerDocument
     });
+    this.childNodes = [];
+    this.dangerousWriteLog = [];
+    this._innerHTML = "";
     this.styleLog = [];
     this.style = new StyleCommitBridgeStyle(this);
+  }
+
+  get innerHTML() {
+    return this._innerHTML;
+  }
+
+  set innerHTML(value) {
+    const stringValue = String(value);
+    this.childNodes = [];
+    this._innerHTML = stringValue;
+    this.dangerousWriteLog.push(["setInnerHTML", stringValue]);
   }
 }
 
