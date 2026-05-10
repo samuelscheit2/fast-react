@@ -5,8 +5,179 @@ const entrypoint =
   'react-test-renderer/cjs/react-test-renderer.production';
 const placeholderVersion = '0.0.0-fast-react-test-renderer-placeholder';
 const unimplementedCode = 'FAST_REACT_UNIMPLEMENTED';
+const actSchedulerGateStatus =
+  'blocked-private-react-test-renderer-act-scheduler-metadata-only';
 const createRoutingGateStatus =
   'blocked-missing-react-test-renderer-create-routing-prerequisites';
+const actSchedulerMissingBeforeExecution = Object.freeze([
+  'public-react-test-renderer-act-queue-drain',
+  'public-react-test-renderer-scheduler-flush-execution',
+  'public-react-test-renderer-root-sync-flush-route',
+  'react-test-renderer-renderer-roots-compatibility-admission'
+]);
+const schedulerMockFlushHelperMetadata = Object.freeze([
+  Object.freeze({
+    key: 'unstable_flushAll',
+    acceptedOracle: 'scheduler-0.27.0-mock-oracle',
+    acceptedScenario: 'scheduler-mock-export-shape',
+    descriptor: Object.freeze({
+      kind: 'data',
+      configurable: true,
+      enumerable: true,
+      writable: true,
+      value: Object.freeze({ type: 'function', name: '', length: 0 })
+    })
+  }),
+  Object.freeze({
+    key: 'unstable_flushAllWithoutAsserting',
+    acceptedOracle: 'scheduler-0.27.0-mock-oracle',
+    acceptedScenario: 'scheduler-mock-export-shape',
+    descriptor: Object.freeze({
+      kind: 'data',
+      configurable: true,
+      enumerable: true,
+      writable: true,
+      value: Object.freeze({
+        type: 'function',
+        name: 'unstable_flushAllWithoutAsserting',
+        length: 0
+      })
+    })
+  }),
+  Object.freeze({
+    key: 'unstable_flushExpired',
+    acceptedOracle: 'scheduler-0.27.0-mock-oracle',
+    acceptedScenario: 'scheduler-mock-export-shape',
+    descriptor: Object.freeze({
+      kind: 'data',
+      configurable: true,
+      enumerable: true,
+      writable: true,
+      value: Object.freeze({ type: 'function', name: '', length: 0 })
+    })
+  }),
+  Object.freeze({
+    key: 'unstable_flushNumberOfYields',
+    acceptedOracle: 'scheduler-0.27.0-mock-oracle',
+    acceptedScenario: 'scheduler-mock-export-shape',
+    descriptor: Object.freeze({
+      kind: 'data',
+      configurable: true,
+      enumerable: true,
+      writable: true,
+      value: Object.freeze({ type: 'function', name: '', length: 1 })
+    })
+  }),
+  Object.freeze({
+    key: 'unstable_flushUntilNextPaint',
+    acceptedOracle: 'scheduler-0.27.0-mock-oracle',
+    acceptedScenario: 'scheduler-mock-export-shape',
+    descriptor: Object.freeze({
+      kind: 'data',
+      configurable: true,
+      enumerable: true,
+      writable: true,
+      value: Object.freeze({ type: 'function', name: '', length: 0 })
+    })
+  })
+]);
+const rootActSchedulerRecords = Object.freeze([
+  Object.freeze({
+    id: 'act-root-schedule-request',
+    rustRecord: 'SchedulerActQueueRequest',
+    taskKind: 'SchedulerActQueueTaskKind::RootSchedule',
+    acceptedWorker: 'worker-176-act-queue-routing-skeleton',
+    acceptedFields: Object.freeze([
+      'kind',
+      'node',
+      'root',
+      'scheduler_priority',
+      'callback_priority'
+    ]),
+    queuedWorkExecution: false
+  }),
+  Object.freeze({
+    id: 'act-render-callback-request',
+    rustRecord: 'SchedulerActQueueRequest',
+    taskKind: 'SchedulerActQueueTaskKind::RenderCallback',
+    fakeCallbackNode: 'FAKE_ACT_CALLBACK_NODE',
+    acceptedWorker: 'worker-176-act-queue-routing-skeleton',
+    acceptedFields: Object.freeze([
+      'kind',
+      'node',
+      'root',
+      'scheduler_priority',
+      'callback_priority'
+    ]),
+    queuedWorkExecution: false
+  })
+]);
+const syncFlushActSchedulerRecords = Object.freeze([
+  Object.freeze({
+    id: 'sync-flush-act-continuation-record',
+    rustRecord: 'SchedulerActContinuationRecord',
+    producer: 'record_sync_flush_act_continuation',
+    acceptedWorker: 'worker-252-sync-flush-act-continuation-skeleton',
+    acceptedFields: Object.freeze([
+      'root',
+      'sync_flush_order',
+      'flushed_lanes',
+      'remaining_lanes',
+      'continuation_lanes',
+      'act_scope_depth',
+      'nested_act_scope',
+      'status'
+    ]),
+    queuedWorkExecution: false
+  }),
+  Object.freeze({
+    id: 'sync-flush-act-post-passive-continuation-gate',
+    rustRecord: 'SyncFlushActPostPassiveContinuationGateRecord',
+    producer: 'sync_flush_act_post_passive_continuation_gate',
+    acceptedWorker:
+      'worker-285-sync-flush-act-continuation-post-passive-gate',
+    acceptedFields: Object.freeze([
+      'root',
+      'sync_flush_order',
+      'flushed_lanes',
+      'remaining_lanes',
+      'continuation_lanes',
+      'pending_passive_finished_work',
+      'pending_passive_lanes',
+      'pending_passive_unmount_count',
+      'pending_passive_mount_count',
+      'act_scope_depth',
+      'nested_act_scope'
+    ]),
+    queuedWorkExecution: false,
+    passiveEffectExecution: false
+  })
+]);
+const actSchedulerGate = Object.freeze({
+  id: 'react-test-renderer-act-scheduler-private-gate',
+  status: actSchedulerGateStatus,
+  entrypoint,
+  deterministic: true,
+  acceptedWorkers: Object.freeze([
+    'worker-176-act-queue-routing-skeleton',
+    'worker-252-sync-flush-act-continuation-skeleton',
+    'worker-280-scheduler-mock-flush-helper-gate',
+    'worker-285-sync-flush-act-continuation-post-passive-gate'
+  ]),
+  publicActBehaviorAvailable: false,
+  publicSchedulerFlushExecutionAvailable: false,
+  publicRootSyncFlushRouteAvailable: false,
+  queuedWorkExecution: false,
+  rendererRootsCompatibilityClaimed: false,
+  compatibilityClaimed: false,
+  schedulerMockFlushHelperMetadataAccepted: true,
+  rootActRecordsAccepted: true,
+  syncFlushActRecordsAccepted: true,
+  recognizedSchedulerMockFlushHelpers: schedulerMockFlushHelperMetadata,
+  recognizedRootActRecords: rootActSchedulerRecords,
+  recognizedSyncFlushActRecords: syncFlushActSchedulerRecords,
+  missingBeforeExecution: actSchedulerMissingBeforeExecution
+});
 const createRoutingMissingPrerequisites = Object.freeze([
   'rust-native-test-renderer-create-bridge',
   'react-test-renderer-host-output-serialization'
@@ -184,6 +355,8 @@ const createRoutingGate = Object.freeze({
   serializationAvailable: false,
   actIntegrationAvailable: false,
   schedulerIntegrationAvailable: false,
+  actSchedulerGate,
+  actSchedulerGateStatus: actSchedulerGate.status,
   compatibilityClaimed: false,
   missingPrerequisites: createRoutingMissingPrerequisites,
   prerequisites: createRoutingPrerequisites,
@@ -263,7 +436,8 @@ function createUnsupportedError(
   action,
   detail,
   routingGate,
-  privateRootDiagnostics
+  privateRootDiagnostics,
+  schedulerGate
 ) {
   const suffix = detail === undefined ? '' : ` ${detail}`;
   const error = new Error(
@@ -279,6 +453,24 @@ function createUnsupportedError(
   error.entrypoint = entrypoint;
   error.exportName = exportName;
   error.compatibilityTarget = compatibilityTarget;
+
+  const recognizedActSchedulerGate =
+    schedulerGate ??
+    (routingGate === undefined ? undefined : routingGate.actSchedulerGate);
+
+  if (recognizedActSchedulerGate !== undefined) {
+    error.actSchedulerGate = recognizedActSchedulerGate;
+    error.actSchedulerGateStatus = recognizedActSchedulerGate.status;
+    error.schedulerMockFlushHelperMetadataAccepted =
+      recognizedActSchedulerGate.schedulerMockFlushHelperMetadataAccepted;
+    error.rootActRecordsAccepted =
+      recognizedActSchedulerGate.rootActRecordsAccepted;
+    error.syncFlushActRecordsAccepted =
+      recognizedActSchedulerGate.syncFlushActRecordsAccepted;
+    error.queuedWorkExecution = recognizedActSchedulerGate.queuedWorkExecution;
+    error.rendererRootsCompatibilityClaimed =
+      recognizedActSchedulerGate.rendererRootsCompatibilityClaimed;
+  }
 
   if (routingGate !== undefined) {
     error.routingGate = routingGate;
@@ -322,9 +514,16 @@ function defineFunctionShape(fn, name, length) {
   return fn;
 }
 
-function createUnsupportedFunction(exportName, length) {
+function createUnsupportedFunction(exportName, length, detail, schedulerGate) {
   const fn = function fastReactTestRendererUnimplementedPlaceholder() {
-    throw createUnsupportedError(exportName, 'was called');
+    throw createUnsupportedError(
+      exportName,
+      'was called',
+      detail,
+      undefined,
+      undefined,
+      schedulerGate
+    );
   };
 
   return defineFunctionShape(fn, exportName, length);
@@ -335,7 +534,10 @@ function createSchedulerUnsupportedFunction(exportName, name, length) {
     throw createUnsupportedError(
       `_Scheduler.${exportName}`,
       'was called',
-      'The public Scheduler exposure is intentionally a throwing shape shell until react-test-renderer act and scheduling behavior are wired.'
+      'The public Scheduler exposure is intentionally a throwing shape shell until react-test-renderer act and scheduling behavior are wired.',
+      undefined,
+      undefined,
+      actSchedulerGate
     );
   };
 
