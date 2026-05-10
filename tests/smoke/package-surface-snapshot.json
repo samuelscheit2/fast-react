@@ -558,6 +558,7 @@
         "src/resource-form-internals-gate.js",
         "src/shared/create-portal.js",
         "src/shared/flush-sync-guard.js",
+        "src/shared/form-actions.js",
         "src/test-utils-act-gate.js"
       ],
       "declarationFiles": [],

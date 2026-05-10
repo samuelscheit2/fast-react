@@ -105,6 +105,7 @@ const exactPrivatePublicFileGuards = {
     'src/resource-form-internals-gate.js',
     'src/shared/create-portal.js',
     'src/shared/flush-sync-guard.js',
+    'src/shared/form-actions.js',
     'src/test-utils-act-gate.js'
   ],
   'react-test-renderer': [
@@ -1509,6 +1510,49 @@ function assertNoPrivateDiagnosticExportKeys(exportsMap, packageName) {
   }
 }
 
+function packageExportSubpathVariants(relativePath) {
+  const withExtension = `./${relativePath}`;
+  const extensionless = withExtension.replace(
+    /\.(?:cjs|js|json|mjs|node)$/u,
+    ''
+  );
+
+  return [...new Set([extensionless, withExtension])].sort();
+}
+
+function assertPrivateImplementationExportMapBlocked(
+  exportsMap,
+  expectedPrivateFiles,
+  packageName
+) {
+  if (exportsMap === null) {
+    assert.deepEqual(
+      expectedPrivateFiles,
+      [],
+      `${packageName} private implementation files require an exports map`
+    );
+    return;
+  }
+
+  const exportKeys = new Set(Object.keys(exportsMap));
+  const exportTargets = collectPackageExportTargets(exportsMap);
+
+  for (const privateFile of expectedPrivateFiles) {
+    for (const subpath of packageExportSubpathVariants(privateFile)) {
+      assert.equal(
+        exportKeys.has(subpath),
+        false,
+        `${packageName} package exports must not expose private implementation subpath ${subpath}`
+      );
+      assert.equal(
+        exportTargets.has(subpath.slice(2)),
+        false,
+        `${packageName} package exports must not target private implementation file ${subpath}`
+      );
+    }
+  }
+}
+
 function loadFresh(modulePath) {
   const resolved = require.resolve(modulePath);
   delete require.cache[resolved];
@@ -1591,6 +1635,11 @@ for (const packageName of snapshot.packageDirectories) {
     `${packageName} package.json public surface`
   );
   assertNoPrivateDiagnosticExportKeys(surfaceManifest.exports, packageName);
+  assertPrivateImplementationExportMapBlocked(
+    surfaceManifest.exports,
+    expectedPackage.privateImplementationFiles ?? [],
+    packageName
+  );
 
   const actualPublicFiles = await publicResolverFiles(
     packageRoot,
@@ -1645,6 +1694,11 @@ assert.deepEqual(
   'native package.json public surface'
 );
 assertNoPrivateDiagnosticExportKeys(nativeSurfaceManifest.exports, 'native');
+assertPrivateImplementationExportMapBlocked(
+  nativeSurfaceManifest.exports,
+  expectedNativePackage.privateImplementationFiles,
+  'native'
+);
 
 const nativePublicFiles = await publicResolverFiles(
   nativePackageRoot,
