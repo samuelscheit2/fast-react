@@ -226,6 +226,8 @@ function invokePrivateRootHostOutputClickDispatchCanary(
     {
       enableListenerErrorRoutingDiagnostics:
         diagnosticOptions.enableListenerErrorRoutingDiagnostics,
+      enableNativeStopImmediatePropagationDiagnostics:
+        diagnosticOptions.enableNativeStopImmediatePropagationDiagnostics,
       enablePropagationStopDiagnostics:
         diagnosticOptions.enablePropagationStopDiagnostics,
       useProcessingOrder: true
@@ -259,8 +261,25 @@ function invokePrivateRootHostOutputClickDispatchCanary(
     listenerInvocationCount: queueInvocationRecord.listenerInvocationCount,
     nativeEventPreventDefaultCallCount:
       nativeEvent.preventDefaultCallCount,
+    nativeEventStopImmediatePropagationCallCount:
+      nativeEvent.stopImmediatePropagationCallCount,
     nativeEventStopPropagationCallCount:
       nativeEvent.stopPropagationCallCount,
+    nativeImmediatePropagationStopped:
+      queueInvocationRecord.nativeImmediatePropagationStopped,
+    nativeStopImmediatePropagationCallCount:
+      queueInvocationRecord.nativeStopImmediatePropagationCallCount,
+    nativeStopImmediatePropagationDiagnosticEnabled:
+      queueInvocationRecord.nativeStopImmediatePropagationDiagnosticEnabled,
+    nativeStopImmediatePropagationDiagnosticStatus:
+      queueInvocationRecord.nativeStopImmediatePropagationDiagnosticStatus,
+    nativeStopImmediatePropagationDiagnostics: freezeArray(
+      queueInvocationRecord.nativeStopImmediatePropagationDiagnostics
+    ),
+    nativeStopImmediatePropagationNativeCallCount:
+      queueInvocationRecord.nativeStopImmediatePropagationNativeCallCount,
+    nativeStopImmediatePropagationSkippedListenerCount:
+      queueInvocationRecord.nativeStopImmediatePropagationSkippedListenerCount,
     privateCanaryInvocation: true,
     propagationSkippedListenerCount:
       queueInvocationRecord.propagationSkippedListenerCount,
@@ -1235,6 +1254,8 @@ function normalizePrivateRootHostOutputClickDispatchCanaryOptions(options) {
   return freezeRecord({
     enableListenerErrorRoutingDiagnostics:
       normalizedOptions.enableListenerErrorRoutingDiagnostics === true,
+    enableNativeStopImmediatePropagationDiagnostics:
+      normalizedOptions.enableNativeStopImmediatePropagationDiagnostics === true,
     enablePropagationStopDiagnostics:
       normalizedOptions.enablePropagationStopDiagnostics === true
   });
@@ -1280,8 +1301,10 @@ function dispatchInstalledRootListener(listenerRecord, nativeEvent) {
 function createPrivateFakeClickEvent(target) {
   return {
     defaultPrevented: false,
+    immediatePropagationStopped: false,
     preventDefaultCallCount: 0,
     returnValue: true,
+    stopImmediatePropagationCallCount: 0,
     stopPropagationCallCount: 0,
     target,
     type: 'click',
@@ -1292,6 +1315,10 @@ function createPrivateFakeClickEvent(target) {
     },
     stopPropagation() {
       this.stopPropagationCallCount++;
+    },
+    stopImmediatePropagation() {
+      this.immediatePropagationStopped = true;
+      this.stopImmediatePropagationCallCount++;
     }
   };
 }
