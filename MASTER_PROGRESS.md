@@ -75,9 +75,15 @@ sequencing belong in `MASTER_PLAN.md`.
 - Workers 170 and 171 React DOM event/root listener internals were merged,
   adding the private event-priority shell and root marker/listener guard.
 - Worker 177 React DOM `flushSync` private guard was merged.
+- Worker 174 ref token lifecycle hardening was merged, making host token
+  metadata reads and invalidation phase/target scoped for future ref
+  attach/detach commit phases.
 
 ## Latest Accepted Verification
 
+- Worker 174 was verified on its worktree and again on `main` with `cargo fmt
+  --all --check`, focused host token tests, full `fast-react-reconciler` tests,
+  reconciler clippy with warnings denied, and `git diff --check`.
 - Workers 130-148 were accepted as report-only branches after pane inspection
   and scoped changed-path checks showing one `worker-progress/*.md` report per
   worker; they were merged as a single octopus report batch.
