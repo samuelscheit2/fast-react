@@ -20,6 +20,7 @@ import {
   readCheckedReactDomFormActionsOracleText
 } from "../src/react-dom-form-actions-oracle.mjs";
 import {
+  assertPrivateFormActionAsyncCallbackExecutionGate,
   assertPrivateFormActionResetDispatcherGate,
   assertFastReactFormActionPrerequisiteGate,
   assertFastReactFormActionsUnsupportedGate
@@ -96,6 +97,10 @@ test("Fast React form-action APIs stay unsupported placeholders until form adapt
 
 test("Fast React form-action private submit/reset/callback gates stay metadata-only", () => {
   assertPrivateFormActionResetDispatcherGate();
+});
+
+test("Fast React form-action private async callback execution stays fail-closed", async () => {
+  await assertPrivateFormActionAsyncCallbackExecutionGate();
 });
 
 test("Fast React form-action FormData blocker stays private metadata-only", () => {
