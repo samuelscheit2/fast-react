@@ -46,6 +46,24 @@ const privateErrorBoundaryDiagnosticsSymbolDescription =
 const privateErrorBoundaryDiagnosticsSymbol = Symbol.for(
   privateErrorBoundaryDiagnosticsSymbolDescription
 );
+const privateErrorBoundaryUpdateRefreshRows = [
+  "react-test-renderer-update-error-root-option-private-diagnostic",
+  "react-test-renderer-commit-error-root-option-private-diagnostic"
+];
+const privateErrorBoundaryUpdateRefreshDependencyIds = [
+  "react-test-renderer-update-private-route",
+  "react-test-renderer-serialization-private-json-diagnostic",
+  "react-test-renderer-test-instance-private-fiber-diagnostic",
+  "react-test-renderer-act-scheduler-private-diagnostic"
+];
+const privateErrorBoundaryRootOptionsRustApi =
+  "TestRendererRoot::describe_private_error_boundary_diagnostics_for_canary";
+const privateErrorBoundaryUpdateRustApi =
+  "TestRendererRoot::describe_private_error_boundary_update_diagnostics_for_canary";
+const privateErrorBoundaryAcceptedRustApis = [
+  privateErrorBoundaryRootOptionsRustApi,
+  privateErrorBoundaryUpdateRustApi
+];
 const privateToTreeHostOutputMetadataSymbolDescription =
   "fast.react_test_renderer.private_totree_host_output_metadata";
 const privateToTreeHostOutputMetadataSymbol = Symbol.for(
@@ -876,6 +894,119 @@ test("react-test-renderer private root request bridge can call a private Rust ex
     assertCreateRoutingGate(publicUpdateError, entry.entrypoint);
     assert.equal(publicUpdateError.rootRequest.rustExecution, false);
   }
+});
+
+test("react-test-renderer development private error-boundary diagnostics follow update requests", () => {
+  const entry = entrypoints.find(
+    (candidate) => candidate.entrypoint === cjsDevelopmentEntrypoint
+  );
+  const moduleExports = loadFresh(entry.modulePath);
+  const bridge = assertPrivateRootRequestBridge(
+    moduleExports,
+    entry.entrypoint
+  );
+  const calls = [];
+  const renderer = moduleExports.create(
+    { type: "initial" },
+    {
+      onUncaughtError(error) {
+        calls.push(["uncaught", error.message]);
+      },
+      onCaughtError(error) {
+        calls.push(["caught", error.message]);
+      },
+      onRecoverableError(error) {
+        calls.push(["recoverable", error.message]);
+      }
+    }
+  );
+  const [createRequest] = bridge.getRendererRootRequests(renderer);
+  const rendererDescriptor = Object.getOwnPropertyDescriptor(
+    renderer,
+    privateErrorBoundaryDiagnosticsSymbol
+  );
+
+  assert.notEqual(rendererDescriptor, undefined);
+  assert.equal(rendererDescriptor.enumerable, false);
+  assert.deepEqual(
+    rendererDescriptor.value.rows.map((row) => row.id),
+    privateErrorBoundaryUpdateRefreshRows
+  );
+  assert.deepEqual(
+    rendererDescriptor.value.rows.map((row) => row.phase),
+    ["Update", "Commit"]
+  );
+  assert.deepEqual(
+    rendererDescriptor.value.acceptedPrivateDiagnosticDependencyIds,
+    privateErrorBoundaryUpdateRefreshDependencyIds
+  );
+  assert.deepEqual(
+    rendererDescriptor.value.gate.acceptedRustRecords,
+    [
+      "TestRendererPrivateErrorBoundaryDiagnostics",
+      "TestRendererPrivateErrorDiagnosticRow",
+      "TestRendererPrivateErrorBoundaryDependencyDiagnostics",
+      "TestRendererRootErrorOptionDiagnostics"
+    ]
+  );
+  assert.deepEqual(
+    rendererDescriptor.value.gate.acceptedRustApis,
+    privateErrorBoundaryAcceptedRustApis
+  );
+  assert.equal(
+    rendererDescriptor.value.acceptedRustApi,
+    privateErrorBoundaryRootOptionsRustApi
+  );
+  assert.deepEqual(
+    rendererDescriptor.value.rows.map((row) => row.acceptedRustApi),
+    [
+      privateErrorBoundaryRootOptionsRustApi,
+      privateErrorBoundaryRootOptionsRustApi
+    ]
+  );
+
+  const updateError = captureThrown(() =>
+    renderer.update({ type: "updated" })
+  );
+  const updateRequest = updateError.rootRequest;
+  const updateDiagnostics = updateError.privateErrorBoundaryDiagnostics;
+
+  assert.equal(updateRequest.operation, "update");
+  assert.equal(updateRequest.privateErrorBoundaryDiagnosticsAvailable, true);
+  assert.equal(updateDiagnostics.rootRequest, updateRequest);
+  assert.equal(updateDiagnostics.rootOperation, "update");
+  assert.equal(updateDiagnostics.acceptedRustApi, privateErrorBoundaryUpdateRustApi);
+  assert.equal(updateDiagnostics.rootErrorOptions, createRequest.optionsInfo.rootErrorOptions);
+  assert.equal(updateDiagnostics.rootErrorOptionsSourceRequestId, createRequest.requestId);
+  assert.equal(updateDiagnostics.rootErrorOptionsInheritedFromCreateRequest, true);
+  assert.deepEqual(
+    updateDiagnostics.rows.map((row) => row.id),
+    privateErrorBoundaryUpdateRefreshRows
+  );
+  assert.deepEqual(
+    updateDiagnostics.rows.map((row) => row.hostOutputUpdateKind),
+    ["Update", "Update"]
+  );
+  assert.deepEqual(
+    updateDiagnostics.rows.map((row) => row.acceptedRustApi),
+    [privateErrorBoundaryUpdateRustApi, privateErrorBoundaryUpdateRustApi]
+  );
+  assert.equal(updateDiagnostics.updateErrorRowAvailable, true);
+  assert.equal(updateDiagnostics.renderErrorRowAvailable, false);
+  assert.equal(updateDiagnostics.commitErrorRowAvailable, true);
+  assert.equal(updateDiagnostics.dependencyDiagnostics.updateRouteDiagnosticsAvailable, true);
+  assert.equal(updateDiagnostics.dependencyDiagnostics.serializationDiagnosticsAvailable, true);
+  assert.equal(updateDiagnostics.dependencyDiagnostics.testInstanceQueryDiagnosticsAvailable, true);
+  assert.equal(updateDiagnostics.dependencyDiagnostics.actSchedulerMetadataAvailable, true);
+  assert.equal(updateDiagnostics.publicRendererRootsExecuted, false);
+  assert.equal(updateDiagnostics.publicLifecycleMethodsExecuted, false);
+  assert.equal(updateDiagnostics.errorBoundaryRecoveryExecuted, false);
+  assert.equal(updateDiagnostics.compatibilityClaimed, false);
+  assert.equal(
+    bridge.getRootErrorBoundaryDiagnostics(updateRequest),
+    updateDiagnostics
+  );
+  assert.deepEqual(calls, []);
 });
 
 test("react-test-renderer private root request bridge consumes accepted Rust lifecycle diagnostics", () => {
@@ -1799,7 +1930,8 @@ function assertRustCanaryMetadata(metadata, label) {
   ];
   if (metadata.errorBoundaryDiagnostics !== undefined) {
     expectedAcceptedRustWorkers.push(
-      "worker-465-test-renderer-error-boundary-diagnostics"
+      "worker-465-test-renderer-error-boundary-diagnostics",
+      "worker-530-test-renderer-error-boundary-update-refresh"
     );
   }
   assert.deepEqual(metadata.acceptedRustWorkers, expectedAcceptedRustWorkers);

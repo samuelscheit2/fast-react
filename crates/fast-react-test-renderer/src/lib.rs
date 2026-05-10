@@ -1817,7 +1817,7 @@ pub const TEST_RENDERER_SERIALIZATION_ORACLE_SCENARIO_COUNT: usize = 7;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TestRendererPrivateErrorDiagnosticPhase {
-    Render,
+    Update,
     Commit,
 }
 
@@ -1825,7 +1825,7 @@ impl TestRendererPrivateErrorDiagnosticPhase {
     #[must_use]
     pub const fn code(self) -> &'static str {
         match self {
-            Self::Render => "Render",
+            Self::Update => "Update",
             Self::Commit => "Commit",
         }
     }
@@ -1833,7 +1833,7 @@ impl TestRendererPrivateErrorDiagnosticPhase {
     #[must_use]
     pub const fn row_id(self) -> &'static str {
         match self {
-            Self::Render => "react-test-renderer-render-error-root-option-private-diagnostic",
+            Self::Update => "react-test-renderer-update-error-root-option-private-diagnostic",
             Self::Commit => "react-test-renderer-commit-error-root-option-private-diagnostic",
         }
     }
@@ -1841,7 +1841,7 @@ impl TestRendererPrivateErrorDiagnosticPhase {
     #[must_use]
     pub const fn react_reference(self) -> &'static str {
         match self {
-            Self::Render => "ReactFiberThrow.createRootErrorUpdate",
+            Self::Update => "ReactTestRenderer.js update -> updateContainer",
             Self::Commit => "ReactFiberWorkLoop.captureCommitPhaseError",
         }
     }
@@ -1903,14 +1903,95 @@ impl TestRendererRootErrorOptionDiagnostics {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererPrivateErrorBoundaryDependencyDiagnostics {
+    update_route_diagnostics_available: bool,
+    serialization_diagnostics_available: bool,
+    test_instance_query_diagnostics_available: bool,
+    act_scheduler_metadata_available: bool,
+    public_renderer_roots_executed: bool,
+    public_lifecycle_methods_executed: bool,
+    error_boundary_recovery_executed: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererPrivateErrorBoundaryDependencyDiagnostics {
+    const fn root_options_only() -> Self {
+        Self {
+            update_route_diagnostics_available: false,
+            serialization_diagnostics_available: false,
+            test_instance_query_diagnostics_available: false,
+            act_scheduler_metadata_available: false,
+            public_renderer_roots_executed: false,
+            public_lifecycle_methods_executed: false,
+            error_boundary_recovery_executed: false,
+            compatibility_claimed: false,
+        }
+    }
+
+    #[must_use]
+    pub const fn update_route_diagnostics_available(self) -> bool {
+        self.update_route_diagnostics_available
+    }
+
+    #[must_use]
+    pub const fn serialization_diagnostics_available(self) -> bool {
+        self.serialization_diagnostics_available
+    }
+
+    #[must_use]
+    pub const fn test_instance_query_diagnostics_available(self) -> bool {
+        self.test_instance_query_diagnostics_available
+    }
+
+    #[must_use]
+    pub const fn act_scheduler_metadata_available(self) -> bool {
+        self.act_scheduler_metadata_available
+    }
+
+    #[must_use]
+    pub const fn public_renderer_roots_executed(self) -> bool {
+        self.public_renderer_roots_executed
+    }
+
+    #[must_use]
+    pub const fn public_lifecycle_methods_executed(self) -> bool {
+        self.public_lifecycle_methods_executed
+    }
+
+    #[must_use]
+    pub const fn error_boundary_recovery_executed(self) -> bool {
+        self.error_boundary_recovery_executed
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(self) -> bool {
+        self.compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn update_commit_rows_ready(self) -> bool {
+        self.update_route_diagnostics_available
+            && self.serialization_diagnostics_available
+            && self.test_instance_query_diagnostics_available
+            && self.act_scheduler_metadata_available
+            && !self.public_renderer_roots_executed
+            && !self.public_lifecycle_methods_executed
+            && !self.error_boundary_recovery_executed
+            && !self.compatibility_claimed
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TestRendererPrivateErrorDiagnosticRow {
     id: &'static str,
     diagnostic_name: &'static str,
     status: &'static str,
     phase: TestRendererPrivateErrorDiagnosticPhase,
+    host_output_update_kind: TestRendererRootUpdateKind,
     root: FiberRootId,
     root_error_channel: &'static str,
     root_error_options: TestRendererRootErrorOptionDiagnostics,
+    dependency_diagnostics: TestRendererPrivateErrorBoundaryDependencyDiagnostics,
     react_reference: &'static str,
     root_error_update_scheduled: bool,
     public_root_error_callbacks_invoked: bool,
@@ -1940,6 +2021,11 @@ impl TestRendererPrivateErrorDiagnosticRow {
     }
 
     #[must_use]
+    pub const fn host_output_update_kind(self) -> TestRendererRootUpdateKind {
+        self.host_output_update_kind
+    }
+
+    #[must_use]
     pub const fn root(self) -> FiberRootId {
         self.root
     }
@@ -1952,6 +2038,13 @@ impl TestRendererPrivateErrorDiagnosticRow {
     #[must_use]
     pub const fn root_error_options(self) -> TestRendererRootErrorOptionDiagnostics {
         self.root_error_options
+    }
+
+    #[must_use]
+    pub const fn dependency_diagnostics(
+        self,
+    ) -> TestRendererPrivateErrorBoundaryDependencyDiagnostics {
+        self.dependency_diagnostics
     }
 
     #[must_use]
@@ -1985,7 +2078,9 @@ pub struct TestRendererPrivateErrorBoundaryDiagnostics {
     diagnostic_name: &'static str,
     status: &'static str,
     root: FiberRootId,
+    host_output_update_kind: TestRendererRootUpdateKind,
     root_error_options: TestRendererRootErrorOptionDiagnostics,
+    dependency_diagnostics: TestRendererPrivateErrorBoundaryDependencyDiagnostics,
     rows: [TestRendererPrivateErrorDiagnosticRow; 2],
     public_error_boundary_behavior_available: bool,
     public_root_error_callbacks_invoked: bool,
@@ -2009,8 +2104,20 @@ impl TestRendererPrivateErrorBoundaryDiagnostics {
     }
 
     #[must_use]
+    pub const fn host_output_update_kind(self) -> TestRendererRootUpdateKind {
+        self.host_output_update_kind
+    }
+
+    #[must_use]
     pub const fn root_error_options(self) -> TestRendererRootErrorOptionDiagnostics {
         self.root_error_options
+    }
+
+    #[must_use]
+    pub const fn dependency_diagnostics(
+        self,
+    ) -> TestRendererPrivateErrorBoundaryDependencyDiagnostics {
+        self.dependency_diagnostics
     }
 
     #[must_use]
@@ -4754,6 +4861,57 @@ impl TestRendererRoot {
     pub fn describe_private_error_boundary_diagnostics_for_canary(
         &self,
     ) -> Result<TestRendererPrivateErrorBoundaryDiagnostics, TestRendererRootError> {
+        self.describe_private_error_boundary_diagnostics_with_dependencies(
+            TestRendererPrivateErrorBoundaryDependencyDiagnostics::root_options_only(),
+        )
+    }
+
+    pub fn describe_private_error_boundary_update_diagnostics_for_canary(
+        &self,
+        output: &TestRendererUpdatedHostOutput,
+    ) -> Result<TestRendererPrivateErrorBoundaryDiagnostics, TestRendererRootError> {
+        let serialization =
+            self.describe_private_json_serialization_after_update_for_canary(output)?;
+        let query =
+            self.describe_private_test_instance_find_by_query_after_update_for_canary(output)?;
+        let finished_work = output.commit().current();
+        let passive_metadata = TestRendererPrivateActPendingPassiveFlushMetadata::new_for_canary(
+            self.root_id,
+            TestRendererFiberHandleDiagnostics {
+                arena_id: finished_work.arena_id().get(),
+                slot: finished_work.slot().get(),
+                generation: finished_work.generation().get(),
+            },
+            0,
+            0,
+        );
+        let act_diagnostics =
+            self.consume_private_act_pending_passive_flush_metadata_for_canary(passive_metadata);
+        let dependency_diagnostics = TestRendererPrivateErrorBoundaryDependencyDiagnostics {
+            update_route_diagnostics_available: true,
+            serialization_diagnostics_available: serialization.host_output_update_kind()
+                == TestRendererRootUpdateKind::Update
+                && serialization.host_output_snapshot_current(),
+            test_instance_query_diagnostics_available: query.host_output_update_kind()
+                == TestRendererRootUpdateKind::Update
+                && query.host_output_snapshot_current(),
+            act_scheduler_metadata_available: act_diagnostics.metadata_root_matches_renderer_root()
+                && act_diagnostics.consumes_pending_passive_flush_metadata()
+                && act_diagnostics.consumes_accepted_scheduler_flush_metadata()
+                && act_diagnostics.private_scheduler_flush_request_metadata_consumed(),
+            public_renderer_roots_executed: false,
+            public_lifecycle_methods_executed: false,
+            error_boundary_recovery_executed: false,
+            compatibility_claimed: false,
+        };
+
+        self.describe_private_error_boundary_diagnostics_with_dependencies(dependency_diagnostics)
+    }
+
+    fn describe_private_error_boundary_diagnostics_with_dependencies(
+        &self,
+        dependency_diagnostics: TestRendererPrivateErrorBoundaryDependencyDiagnostics,
+    ) -> Result<TestRendererPrivateErrorBoundaryDiagnostics, TestRendererRootError> {
         let root_options = self.store.root(self.root_id)?.options();
         let root_error_options = TestRendererRootErrorOptionDiagnostics {
             on_uncaught_error: root_options.on_uncaught_error(),
@@ -4766,12 +4924,14 @@ impl TestRendererRoot {
         };
         let rows = [
             self.create_private_error_diagnostic_row(
-                TestRendererPrivateErrorDiagnosticPhase::Render,
+                TestRendererPrivateErrorDiagnosticPhase::Update,
                 root_error_options,
+                dependency_diagnostics,
             ),
             self.create_private_error_diagnostic_row(
                 TestRendererPrivateErrorDiagnosticPhase::Commit,
                 root_error_options,
+                dependency_diagnostics,
             ),
         ];
 
@@ -4779,7 +4939,9 @@ impl TestRendererRoot {
             diagnostic_name: TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_NAME,
             status: TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_STATUS,
             root: self.root_id,
+            host_output_update_kind: TestRendererRootUpdateKind::Update,
             root_error_options,
+            dependency_diagnostics,
             rows,
             public_error_boundary_behavior_available: false,
             public_root_error_callbacks_invoked: false,
@@ -5826,15 +5988,18 @@ impl TestRendererRoot {
         &self,
         phase: TestRendererPrivateErrorDiagnosticPhase,
         root_error_options: TestRendererRootErrorOptionDiagnostics,
+        dependency_diagnostics: TestRendererPrivateErrorBoundaryDependencyDiagnostics,
     ) -> TestRendererPrivateErrorDiagnosticRow {
         TestRendererPrivateErrorDiagnosticRow {
             id: phase.row_id(),
             diagnostic_name: TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_NAME,
             status: TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_STATUS,
             phase,
+            host_output_update_kind: TestRendererRootUpdateKind::Update,
             root: self.root_id,
             root_error_channel: "onUncaughtError",
             root_error_options,
+            dependency_diagnostics,
             react_reference: phase.react_reference(),
             root_error_update_scheduled: false,
             public_root_error_callbacks_invoked: false,
@@ -10296,18 +10461,29 @@ mod tests {
     }
 
     #[test]
-    fn root_private_error_boundary_diagnostics_record_render_and_commit_rows_from_options() {
+    fn root_private_error_boundary_diagnostics_record_update_and_commit_rows_from_options() {
         let options = TestRendererOptions::new()
             .with_on_uncaught_error(RootErrorCallbackHandle::from_raw(601))
             .with_on_caught_error(RootErrorCallbackHandle::from_raw(602))
             .with_on_recoverable_error(RootRecoverableErrorCallbackHandle::from_raw(603));
-        let mut root = TestRendererRoot::create(root_element(1), options).unwrap();
-        render_and_commit_latest_host_root(&mut root);
+        let mut root =
+            TestRendererRoot::create_host_component_with_text_for_canary("span", "hello", options)
+                .unwrap();
+        root.render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let updated = root
+            .render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
 
         let diagnostics = root
-            .describe_private_error_boundary_diagnostics_for_canary()
+            .describe_private_error_boundary_update_diagnostics_for_canary(&updated)
             .unwrap();
         let root_error_options = diagnostics.root_error_options();
+        let dependencies = diagnostics.dependency_diagnostics();
 
         assert_eq!(
             diagnostics.diagnostic_name(),
@@ -10318,6 +10494,10 @@ mod tests {
             TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_STATUS
         );
         assert_eq!(diagnostics.root(), root.root_id());
+        assert_eq!(
+            diagnostics.host_output_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
         assert!(root_error_options.root_error_option_metadata_available());
         assert!(root_error_options.has_configured_error_callback());
         assert_eq!(
@@ -10335,16 +10515,25 @@ mod tests {
         assert!(!diagnostics.public_error_boundary_behavior_available());
         assert!(!diagnostics.public_root_error_callbacks_invoked());
         assert!(!diagnostics.compatibility_claimed());
+        assert!(dependencies.update_commit_rows_ready());
+        assert!(dependencies.update_route_diagnostics_available());
+        assert!(dependencies.serialization_diagnostics_available());
+        assert!(dependencies.test_instance_query_diagnostics_available());
+        assert!(dependencies.act_scheduler_metadata_available());
+        assert!(!dependencies.public_renderer_roots_executed());
+        assert!(!dependencies.public_lifecycle_methods_executed());
+        assert!(!dependencies.error_boundary_recovery_executed());
+        assert!(!dependencies.compatibility_claimed());
 
         let rows = diagnostics.rows();
         assert_eq!(rows.len(), 2);
         assert_eq!(
             rows[0].id(),
-            "react-test-renderer-render-error-root-option-private-diagnostic"
+            "react-test-renderer-update-error-root-option-private-diagnostic"
         );
         assert_eq!(
             rows[0].phase(),
-            TestRendererPrivateErrorDiagnosticPhase::Render
+            TestRendererPrivateErrorDiagnosticPhase::Update
         );
         assert_eq!(
             rows[1].id(),
@@ -10363,9 +10552,15 @@ mod tests {
                 row.status(),
                 TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_STATUS
             );
+            assert_eq!(
+                row.host_output_update_kind(),
+                TestRendererRootUpdateKind::Update
+            );
             assert_eq!(row.root(), root.root_id());
             assert_eq!(row.root_error_channel(), "onUncaughtError");
             assert_eq!(row.root_error_options(), root_error_options);
+            assert_eq!(row.dependency_diagnostics(), dependencies);
+            assert!(row.dependency_diagnostics().update_commit_rows_ready());
             assert!(row.root_error_options().has_configured_error_callback());
             assert!(!row.root_error_update_scheduled());
             assert!(!row.public_root_error_callbacks_invoked());

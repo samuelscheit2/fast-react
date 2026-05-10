@@ -15,7 +15,6 @@ import {
 } from "../src/react-test-renderer-error-surface-scenarios.mjs";
 import {
   REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_NAME,
-  REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_ROWS,
   REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_STATUS,
   findReactTestRendererErrorSurfaceObservation,
   readCheckedReactTestRendererErrorSurfaceOracle,
@@ -61,6 +60,26 @@ const privateErrorBoundaryDiagnosticsSymbol = Symbol.for(
 const rootRequestBridgeSymbol = Symbol.for(
   "fast.react_test_renderer.root_request_bridge"
 );
+const ERROR_BOUNDARY_UPDATE_REFRESH_DIAGNOSTIC_ROWS = [
+  {
+    id: "react-test-renderer-update-error-root-option-private-diagnostic",
+    phase: "Update"
+  },
+  {
+    id: "react-test-renderer-commit-error-root-option-private-diagnostic",
+    phase: "Commit"
+  }
+];
+const ERROR_BOUNDARY_UPDATE_REFRESH_DEPENDENCY_IDS = [
+  "react-test-renderer-update-private-route",
+  "react-test-renderer-serialization-private-json-diagnostic",
+  "react-test-renderer-test-instance-private-fiber-diagnostic",
+  "react-test-renderer-act-scheduler-private-diagnostic"
+];
+const ERROR_BOUNDARY_ROOT_OPTIONS_RUST_API =
+  "TestRendererRoot::describe_private_error_boundary_diagnostics_for_canary";
+const ERROR_BOUNDARY_UPDATE_RUST_API =
+  "TestRendererRoot::describe_private_error_boundary_update_diagnostics_for_canary";
 const jsEntrypoints = [
   {
     entrypoint: "react-test-renderer",
@@ -273,7 +292,7 @@ test("React test renderer error surface local gate admits only private diagnosti
   assert.equal(gate.localChecks.publicTestInstanceWrappersPresent, false);
 });
 
-test("React test renderer private render and commit error rows stay root-option metadata only", () => {
+test("React test renderer private update and commit error rows stay metadata only", () => {
   assert.equal(
     REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_NAME,
     "fast-react-test-renderer.error-boundary.private-root-options-canary"
@@ -283,11 +302,9 @@ test("React test renderer private render and commit error rows stay root-option 
     "private-error-boundary-diagnostics-root-options-metadata-public-boundary-blocked"
   );
   assert.deepEqual(
-    REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_ROWS.map(
-      (row) => row.id
-    ),
+    ERROR_BOUNDARY_UPDATE_REFRESH_DIAGNOSTIC_ROWS.map((row) => row.id),
     [
-      "react-test-renderer-render-error-root-option-private-diagnostic",
+      "react-test-renderer-update-error-root-option-private-diagnostic",
       "react-test-renderer-commit-error-root-option-private-diagnostic"
     ]
   );
@@ -337,14 +354,31 @@ test("React test renderer private render and commit error rows stay root-option 
   assert.equal(diagnostics.rowCount, 2);
   assert.deepEqual(
     diagnostics.rows.map((row) => row.id),
-    REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_ROWS.map(
-      (row) => row.id
-    )
+    ERROR_BOUNDARY_UPDATE_REFRESH_DIAGNOSTIC_ROWS.map((row) => row.id)
   );
   assert.deepEqual(
     diagnostics.rows.map((row) => row.phase),
-    ["Render", "Commit"]
+    ERROR_BOUNDARY_UPDATE_REFRESH_DIAGNOSTIC_ROWS.map((row) => row.phase)
   );
+  assert.equal(diagnostics.hostOutputUpdateKind, "Update");
+  assert.equal(diagnostics.updateErrorRowAvailable, true);
+  assert.equal(diagnostics.renderErrorRowAvailable, false);
+  assert.equal(diagnostics.commitErrorRowAvailable, true);
+  assert.deepEqual(
+    diagnostics.acceptedPrivateDiagnosticDependencyIds,
+    ERROR_BOUNDARY_UPDATE_REFRESH_DEPENDENCY_IDS
+  );
+  assert.equal(
+    diagnostics.acceptedRustApi,
+    ERROR_BOUNDARY_ROOT_OPTIONS_RUST_API
+  );
+  assert.equal(diagnostics.dependencyDiagnostics.updateRouteDiagnosticsAvailable, true);
+  assert.equal(diagnostics.dependencyDiagnostics.serializationDiagnosticsAvailable, true);
+  assert.equal(diagnostics.dependencyDiagnostics.testInstanceQueryDiagnosticsAvailable, true);
+  assert.equal(diagnostics.dependencyDiagnostics.actSchedulerMetadataAvailable, true);
+  assert.equal(diagnostics.dependencyDiagnostics.publicRendererRootsExecuted, false);
+  assert.equal(diagnostics.dependencyDiagnostics.publicLifecycleMethodsExecuted, false);
+  assert.equal(diagnostics.dependencyDiagnostics.errorBoundaryRecoveryExecuted, false);
   assert.equal(
     diagnostics.rootErrorOptions.onUncaughtErrorConfigured,
     true
@@ -365,11 +399,21 @@ test("React test renderer private render and commit error rows stay root-option 
   for (const row of diagnostics.rows) {
     assert.equal(row.diagnosticName, diagnostics.diagnosticName);
     assert.equal(row.status, diagnostics.status);
+    assert.equal(row.hostOutputUpdateKind, "Update");
     assert.equal(row.rootErrorOptions, diagnostics.rootErrorOptions);
+    assert.equal(row.dependencyDiagnostics, diagnostics.dependencyDiagnostics);
+    assert.equal(row.acceptedRustApi, ERROR_BOUNDARY_ROOT_OPTIONS_RUST_API);
+    assert.deepEqual(
+      row.acceptedPrivateDiagnosticDependencyIds,
+      ERROR_BOUNDARY_UPDATE_REFRESH_DEPENDENCY_IDS
+    );
     assert.equal(row.capturesRootErrorOptions, true);
     assert.equal(row.rootErrorUpdateScheduled, false);
     assert.equal(row.publicRootErrorCallbacksInvoked, false);
     assert.equal(row.publicErrorBoundaryBehaviorAvailable, false);
+    assert.equal(row.publicRendererRootsExecuted, false);
+    assert.equal(row.publicLifecycleMethodsExecuted, false);
+    assert.equal(row.errorBoundaryRecoveryExecuted, false);
     assert.equal(row.compatibilityClaimed, false);
   }
 
@@ -377,9 +421,44 @@ test("React test renderer private render and commit error rows stay root-option 
     renderer.update({ type: "still-blocked" })
   );
   assert.equal(updateError.name, "FastReactTestRendererUnimplementedError");
+  assert.equal(updateError.rootRequest.operation, "update");
   assert.equal(
     updateError.privateErrorBoundaryDiagnostics.status,
     REACT_TEST_RENDERER_PRIVATE_ERROR_BOUNDARY_DIAGNOSTIC_STATUS
+  );
+  assert.equal(
+    updateError.privateErrorBoundaryDiagnostics.rootRequest,
+    updateError.rootRequest
+  );
+  assert.equal(
+    updateError.privateErrorBoundaryDiagnostics.rootErrorOptions,
+    createRequest.optionsInfo.rootErrorOptions
+  );
+  assert.equal(
+    updateError.privateErrorBoundaryDiagnostics.rootErrorOptionsInheritedFromCreateRequest,
+    true
+  );
+  assert.equal(
+    updateError.privateErrorBoundaryDiagnostics.acceptedRustApi,
+    ERROR_BOUNDARY_UPDATE_RUST_API
+  );
+  assert.deepEqual(
+    updateError.privateErrorBoundaryDiagnostics.rows.map((row) => row.id),
+    ERROR_BOUNDARY_UPDATE_REFRESH_DIAGNOSTIC_ROWS.map((row) => row.id)
+  );
+  assert.deepEqual(
+    updateError.privateErrorBoundaryDiagnostics.rows.map(
+      (row) => row.acceptedRustApi
+    ),
+    [ERROR_BOUNDARY_UPDATE_RUST_API, ERROR_BOUNDARY_UPDATE_RUST_API]
+  );
+  assert.equal(
+    updateError.privateErrorBoundaryDiagnostics.publicRendererRootsExecuted,
+    false
+  );
+  assert.equal(
+    updateError.privateErrorBoundaryDiagnostics.errorBoundaryRecoveryExecuted,
+    false
   );
   assert.deepEqual(calls, []);
 });
