@@ -3,9 +3,9 @@
 //! This crate proves that the canonical `fast-react-host-config` capability
 //! traits can be implemented without DOM, native, hydration, persistence, or
 //! legacy `HostConfig` behavior. Its root canary delegates create/update/
-//! unmount scheduling to `fast-react-reconciler`, but it still stops before
-//! commit, host output, serialization, act, or public `react-test-renderer`
-//! compatibility.
+//! unmount scheduling to `fast-react-reconciler` and exposes a diagnostic
+//! HostRoot render/commit handoff, but it still stops before host output,
+//! serialization, act, or public `react-test-renderer` compatibility.
 
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -21,11 +21,12 @@ use fast_react_host_config::{
     MutationHost,
 };
 use fast_react_reconciler::{
-    FiberRootId, FiberRootStore, FiberRootStoreError, HostRootRenderPhaseRecord, RootElementHandle,
-    RootOptions, RootScheduleMicrotaskResult, RootSchedulerError, RootUpdateError,
-    RootWorkLoopError, ScheduledRootUpdateResult, UpdateContainerResult, ensure_root_is_scheduled,
-    process_root_schedule_in_microtask, render_host_root_for_lanes, scheduled_roots,
-    update_container, update_container_sync,
+    FiberRootId, FiberRootStore, FiberRootStoreError, HostRootCommitRecord,
+    HostRootRenderPhaseRecord, RootCommitError, RootElementHandle, RootOptions,
+    RootScheduleMicrotaskResult, RootSchedulerError, RootUpdateError, RootWorkLoopError,
+    ScheduledRootUpdateResult, UpdateContainerResult, commit_finished_host_root,
+    ensure_root_is_scheduled, process_root_schedule_in_microtask, render_host_root_for_lanes,
+    scheduled_roots, update_container, update_container_sync,
 };
 
 pub const TEST_RENDERER_NAME: &str = "fast-react-test-renderer";
@@ -781,6 +782,7 @@ pub enum TestRendererRootError {
     RootUpdate(RootUpdateError),
     RootScheduler(RootSchedulerError),
     RootWorkLoop(RootWorkLoopError),
+    RootCommit(RootCommitError),
 }
 
 impl Display for TestRendererRootError {
@@ -791,6 +793,7 @@ impl Display for TestRendererRootError {
             Self::RootUpdate(error) => Display::fmt(error, formatter),
             Self::RootScheduler(error) => Display::fmt(error, formatter),
             Self::RootWorkLoop(error) => Display::fmt(error, formatter),
+            Self::RootCommit(error) => Display::fmt(error, formatter),
         }
     }
 }
@@ -803,6 +806,7 @@ impl Error for TestRendererRootError {
             Self::RootUpdate(error) => Some(error),
             Self::RootScheduler(error) => Some(error),
             Self::RootWorkLoop(error) => Some(error),
+            Self::RootCommit(error) => Some(error),
         }
     }
 }
@@ -834,6 +838,12 @@ impl From<RootSchedulerError> for TestRendererRootError {
 impl From<RootWorkLoopError> for TestRendererRootError {
     fn from(error: RootWorkLoopError) -> Self {
         Self::RootWorkLoop(error)
+    }
+}
+
+impl From<RootCommitError> for TestRendererRootError {
+    fn from(error: RootCommitError) -> Self {
+        Self::RootCommit(error)
     }
 }
 
@@ -958,6 +968,13 @@ impl TestRendererRoot {
             self.root_id,
             update.container_update.lane().to_lanes(),
         )?))
+    }
+
+    pub fn commit_host_root_render_for_canary(
+        &mut self,
+        render: HostRootRenderPhaseRecord,
+    ) -> Result<HostRootCommitRecord, TestRendererRootError> {
+        Ok(commit_finished_host_root(&mut self.store, render)?)
     }
 
     pub fn diagnostic_container_snapshot(
@@ -1516,6 +1533,25 @@ mod tests {
             .element()
     }
 
+    fn host_storage_counts(root: &TestRendererRoot) -> (usize, usize, usize) {
+        (
+            root.renderer.containers.len(),
+            root.renderer.instances.len(),
+            root.renderer.texts.len(),
+        )
+    }
+
+    fn render_and_commit_latest_host_root(
+        root: &mut TestRendererRoot,
+    ) -> (HostRootRenderPhaseRecord, HostRootCommitRecord) {
+        let render = root
+            .render_latest_scheduled_host_root_for_commit_handoff()
+            .unwrap()
+            .unwrap();
+        let commit = root.commit_host_root_render_for_canary(render).unwrap();
+        (render, commit)
+    }
+
     #[test]
     fn root_create_enqueues_host_root_update_without_host_mutation() {
         let element = root_element(42);
@@ -1612,7 +1648,7 @@ mod tests {
     }
 
     #[test]
-    fn root_render_phase_canary_reaches_wip_state_without_commit_handoff() {
+    fn root_render_phase_canary_reaches_wip_state_without_committing() {
         let mut root =
             TestRendererRoot::create(root_element(1), TestRendererOptions::new()).unwrap();
         root.update(root_element(2)).unwrap();
@@ -1649,6 +1685,159 @@ mod tests {
             root.store().root(root.root_id()).unwrap().finished_work(),
             None
         );
+        assert!(
+            root.diagnostic_container_snapshot()
+                .unwrap()
+                .children()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn root_create_commit_handoff_switches_current_and_state_without_host_mutation() {
+        let element = root_element(42);
+        let mut root = TestRendererRoot::create(element, TestRendererOptions::new()).unwrap();
+        let previous_current = root.store().root(root.root_id()).unwrap().current();
+        let snapshot_before = root.diagnostic_container_snapshot().unwrap();
+        let storage_before = host_storage_counts(&root);
+
+        let (render, commit) = render_and_commit_latest_host_root(&mut root);
+        let new_current = root.store().root(root.root_id()).unwrap().current();
+
+        assert_eq!(render.root(), root.root_id());
+        assert_eq!(render.current(), previous_current);
+        assert_eq!(render.resulting_element(), element);
+        assert_eq!(render.applied_update_count(), 1);
+        assert_eq!(render.skipped_update_count(), 0);
+        assert!(render.remaining_lanes().is_empty());
+        assert_eq!(commit.root(), root.root_id());
+        assert_eq!(commit.previous_current(), previous_current);
+        assert_eq!(commit.current(), render.finished_work());
+        assert_eq!(commit.finished_lanes(), render.render_lanes());
+        assert!(commit.remaining_lanes().is_empty());
+        assert!(commit.pending_lanes().is_empty());
+        assert_eq!(new_current, render.finished_work());
+        assert_ne!(new_current, previous_current);
+        assert_eq!(current_host_root_element(&root), element);
+        assert!(
+            root.store()
+                .root(root.root_id())
+                .unwrap()
+                .lanes()
+                .pending_lanes()
+                .is_empty()
+        );
+        assert_eq!(
+            root.store()
+                .root(root.root_id())
+                .unwrap()
+                .scheduling()
+                .work_in_progress(),
+            None
+        );
+        assert_eq!(
+            root.diagnostic_container_snapshot().unwrap(),
+            snapshot_before
+        );
+        assert_eq!(host_storage_counts(&root), storage_before);
+    }
+
+    #[test]
+    fn root_update_commit_handoff_switches_current_again_and_updates_state_only() {
+        let mut root =
+            TestRendererRoot::create(root_element(1), TestRendererOptions::new()).unwrap();
+        let (_create_render, create_commit) = render_and_commit_latest_host_root(&mut root);
+        let previous_current = root.store().root(root.root_id()).unwrap().current();
+        let snapshot_after_create = root.diagnostic_container_snapshot().unwrap();
+        let storage_after_create = host_storage_counts(&root);
+
+        assert_eq!(create_commit.current(), previous_current);
+        assert_eq!(current_host_root_element(&root), root_element(1));
+
+        let outcome = root.update(root_element(2)).unwrap();
+        let update = outcome.scheduled().unwrap();
+        let (render, commit) = render_and_commit_latest_host_root(&mut root);
+        let new_current = root.store().root(root.root_id()).unwrap().current();
+
+        assert_eq!(update.kind(), TestRendererRootUpdateKind::Update);
+        assert_eq!(render.current(), previous_current);
+        assert_eq!(render.resulting_element(), root_element(2));
+        assert_eq!(render.applied_update_count(), 1);
+        assert_eq!(render.skipped_update_count(), 0);
+        assert_eq!(commit.previous_current(), previous_current);
+        assert_eq!(commit.current(), render.finished_work());
+        assert!(commit.pending_lanes().is_empty());
+        assert_eq!(new_current, render.finished_work());
+        assert_ne!(new_current, previous_current);
+        assert_eq!(current_host_root_element(&root), root_element(2));
+        assert_eq!(
+            root.diagnostic_container_snapshot().unwrap(),
+            snapshot_after_create
+        );
+        assert_eq!(host_storage_counts(&root), storage_after_create);
+    }
+
+    #[test]
+    fn root_unmount_commit_handoff_commits_none_without_host_teardown_output() {
+        let mut root =
+            TestRendererRoot::create(root_element(1), TestRendererOptions::new()).unwrap();
+        render_and_commit_latest_host_root(&mut root);
+        let previous_current = root.store().root(root.root_id()).unwrap().current();
+        let snapshot_after_create = root.diagnostic_container_snapshot().unwrap();
+        let storage_after_create = host_storage_counts(&root);
+
+        let outcome = root.unmount().unwrap();
+        let unmount = outcome.scheduled().unwrap();
+        let (render, commit) = render_and_commit_latest_host_root(&mut root);
+        let new_current = root.store().root(root.root_id()).unwrap().current();
+
+        assert_eq!(unmount.kind(), TestRendererRootUpdateKind::Unmount);
+        assert_eq!(unmount.element(), RootElementHandle::NONE);
+        assert_eq!(
+            root.lifecycle(),
+            TestRendererRootLifecycle::UnmountScheduled
+        );
+        assert_eq!(render.current(), previous_current);
+        assert_eq!(render.resulting_element(), RootElementHandle::NONE);
+        assert_eq!(render.applied_update_count(), 1);
+        assert_eq!(render.skipped_update_count(), 0);
+        assert!(render.render_lanes().includes_sync_lane());
+        assert_eq!(commit.previous_current(), previous_current);
+        assert_eq!(commit.current(), render.finished_work());
+        assert!(commit.pending_lanes().is_empty());
+        assert_eq!(new_current, render.finished_work());
+        assert_ne!(new_current, previous_current);
+        assert_eq!(current_host_root_element(&root), RootElementHandle::NONE);
+        assert_eq!(
+            root.diagnostic_container_snapshot().unwrap(),
+            snapshot_after_create
+        );
+        assert_eq!(host_storage_counts(&root), storage_after_create);
+    }
+
+    #[test]
+    fn root_commit_handoff_rejects_reused_render_record_after_current_switch() {
+        let mut root =
+            TestRendererRoot::create(root_element(1), TestRendererOptions::new()).unwrap();
+        let render = root
+            .render_latest_scheduled_host_root_for_commit_handoff()
+            .unwrap()
+            .unwrap();
+
+        let commit = root.commit_host_root_render_for_canary(render).unwrap();
+        let error = root.commit_host_root_render_for_canary(render).unwrap_err();
+
+        assert_eq!(
+            root.store().root(root.root_id()).unwrap().current(),
+            commit.current()
+        );
+        assert!(matches!(
+            error,
+            TestRendererRootError::RootCommit(RootCommitError::CurrentMismatch {
+                root: commit_root,
+                ..
+            }) if commit_root == root.root_id()
+        ));
         assert!(
             root.diagnostic_container_snapshot()
                 .unwrap()
