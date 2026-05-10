@@ -270,6 +270,53 @@ const reactDomPackage = require(
 }
 
 {
+  const rootOwner = {kind: 'SubtreeDetachRoot'};
+  const hostOwner = {kind: 'SubtreeDetachHost'};
+  const textOwner = {kind: 'SubtreeDetachText'};
+  const hostNode = createElement('DIV');
+  const textNode = createTextNode('subtree');
+  const hostToken = componentTree.createHostInstanceToken(
+    hostOwner,
+    rootOwner
+  );
+  const textToken = componentTree.createHostInstanceToken(
+    textOwner,
+    rootOwner
+  );
+
+  appendChild(hostNode, textNode);
+  componentTree.attachHostInstanceNode(hostNode, hostToken, {id: 'subtree'});
+  componentTree.attachHostInstanceNode(textNode, textToken, null);
+
+  assert.equal(componentTree.getRootOwnerFromNode(hostNode), rootOwner);
+  assert.equal(componentTree.getRootOwnerFromNode(textNode), rootOwner);
+  const detachRecord = componentTree.detachHostInstanceSubtree(hostNode, {
+    includeRoot: true
+  });
+  assert.equal(
+    componentTree.isPrivateHostInstanceSubtreeDetachRecord(detachRecord),
+    true
+  );
+  assert.equal(detachRecord.detachedHostInstanceCount, 2);
+  assert.equal(detachRecord.visitedNodeCount, 2);
+  assert.equal(detachRecord.includeRoot, true);
+  const hiddenDetach =
+    componentTree.getPrivateHostInstanceSubtreeDetachRecordPayload(
+      detachRecord
+    );
+  assert.equal(hiddenDetach.detachedTokens.length, 2);
+  assert.equal(componentTree.getRootOwnerFromNode(hostNode), null);
+  assert.equal(componentTree.getRootOwnerFromNode(textNode), null);
+  assert.equal(componentTree.getLatestPropsFromNode(hostNode), null);
+  assert.equal(componentTree.getLatestPropsFromNode(textNode), null);
+  assert.equal(
+    componentTree.detachHostInstanceSubtree(hostNode, {includeRoot: true})
+      .detachedHostInstanceCount,
+    0
+  );
+}
+
+{
   const rootOwner = {kind: 'WrongNodeRoot'};
   const hostOwner = {kind: 'WrongNodeHost'};
   const ownedNode = createElement('DIV');

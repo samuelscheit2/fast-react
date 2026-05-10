@@ -700,9 +700,15 @@ function runSmokeChecks() {
   {
     const document = new FakeDocument();
     const parent = createElement('div', document);
+    const host = domHost.createDomHostElementInstance('section', parent);
     const text = domHost.createDomHostTextInstance('created', parent);
+    const documentHost = domHost.createDomHostElementInstance('aside', document);
     const documentText = domHost.createDomHostTextInstance(9, document);
 
+    assert.equal(host.nodeName, 'section');
+    assert.equal(host.ownerDocument, document);
+    assert.equal(documentHost.nodeName, 'aside');
+    assert.equal(documentHost.ownerDocument, document);
     assert.equal(text.nodeName, '#text');
     assert.equal(text.ownerDocument, document);
     assert.equal(text.textContent, 'created');
@@ -714,6 +720,12 @@ function runSmokeChecks() {
     assert.equal(parent.textContent, 'created');
 
     assert.throws(() => domHost.createDomHostTextInstance('missing', {}), {
+      code: 'FAST_REACT_DOM_INVALID_TEXT_CREATION_TARGET'
+    });
+    assert.throws(() => domHost.createDomHostElementInstance('', parent), {
+      code: 'FAST_REACT_DOM_INVALID_ELEMENT_TYPE'
+    });
+    assert.throws(() => domHost.createDomHostElementInstance('main', {}), {
       code: 'FAST_REACT_DOM_INVALID_TEXT_CREATION_TARGET'
     });
   }

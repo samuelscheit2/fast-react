@@ -188,6 +188,31 @@ function createDomHostTextInstance(text, rootContainerInstance) {
   return textInstance;
 }
 
+function createDomHostElementInstance(type, rootContainerInstance) {
+  if (typeof type !== 'string' || type === '') {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_ELEMENT_TYPE',
+      'Cannot create a HostComponent without a non-empty string element type.'
+    );
+  }
+
+  const ownerDocument = getOwnerDocumentForHostText(
+    rootContainerInstance,
+    'createDomHostElementInstance'
+  );
+  const createElement = ownerDocument.createElement;
+  if (typeof createElement !== 'function') {
+    throw createDomHostMutationError(
+      'FAST_REACT_DOM_INVALID_ELEMENT_CREATION_TARGET',
+      'Cannot create HostComponent without an owner document element factory.'
+    );
+  }
+
+  const instance = createElement.call(ownerDocument, type);
+  assertDomLikeObject(instance, 'createDomHostElementInstance', 'child');
+  return instance;
+}
+
 function resetTextContent(instance) {
   setNodeTextContent(instance, '', 'resetTextContent');
 }
@@ -1392,6 +1417,7 @@ module.exports = {
   commitDomPropertyUpdateForLatestProps,
   commitTextUpdate,
   commitDomPropertyUpdate,
+  createDomHostElementInstance,
   createDomHostTextInstance,
   createDomHostMutationError,
   createLatestPropsCommitRecord,
