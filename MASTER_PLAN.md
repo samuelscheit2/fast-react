@@ -67,6 +67,24 @@ Drive toward a minimal real root render/update/unmount path:
   `/Users/user/Developer/Developer/fast-react-worker-138-root-error-callback-refresh`.
 - Worker 139: passive effects and ref lifecycle sequencing refresh in
   `/Users/user/Developer/Developer/fast-react-worker-139-passive-ref-refresh`.
+- Worker 140: hydration boundary sequencing refresh in
+  `/Users/user/Developer/Developer/fast-react-worker-140-hydration-boundary-refresh`.
+- Worker 141: event plugin and node map sequencing refresh in
+  `/Users/user/Developer/Developer/fast-react-worker-141-event-node-map-refresh`.
+- Worker 142: native/JS binding bridge sequencing refresh in
+  `/Users/user/Developer/Developer/fast-react-worker-142-native-js-bridge-refresh`.
+- Worker 143: forms/resources/singletons boundary refresh in
+  `/Users/user/Developer/Developer/fast-react-worker-143-resource-form-refresh`.
+- Worker 144: scheduler package regression audit refresh in
+  `/Users/user/Developer/Developer/fast-react-worker-144-scheduler-regression-refresh`.
+- Worker 145: package export/type surface refresh in
+  `/Users/user/Developer/Developer/fast-react-worker-145-package-surface-refresh`.
+- Worker 146: performance and profiling gate refresh in
+  `/Users/user/Developer/Developer/fast-react-worker-146-performance-gate-refresh`.
+- Worker 147: Suspense/Offscreen/root-lane blocker refresh in
+  `/Users/user/Developer/Developer/fast-react-worker-147-suspense-offscreen-refresh`.
+- Worker 148: coordination-doc drift audit in
+  `/Users/user/Developer/Developer/fast-react-worker-148-doc-drift-audit`.
 
 ## Near-Term Sequencing
 
@@ -74,7 +92,7 @@ Drive toward a minimal real root render/update/unmount path:
    scheduler callback identity validation.
 2. Keep worker 129 out of commit, host mutation, JS packages, React DOM,
    test-renderer facades, scheduler-native files, and smoke/conformance tests.
-3. Keep workers 130-139 report-only with one progress file each; use them to
+3. Keep workers 130-148 report-only with one progress file each; use them to
    refine the next source slices without touching active implementation files.
 4. After worker 129 is accepted, queue the minimal commit/root-current switch
    slice or a sync-flush integration slice depending on the worker's risks.
