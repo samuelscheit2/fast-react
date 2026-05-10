@@ -35,7 +35,9 @@ pub use context_stack::{
     ContextFrameId, ContextHandle, ContextSlot, ContextStack, ContextStackError,
     ContextStackSnapshot, ContextValueHandle,
 };
-pub use element::{ReactElementRecord, ReactKey, ReactOwner, ReactOwnerSlot, ReactRefSlot};
+pub use element::{
+    ReactElementRecord, ReactKey, ReactOwner, ReactOwnerSlot, ReactPortalRecord, ReactRefSlot,
+};
 pub use event_priority::{
     EventPriority, event_priority_to_lane, higher_event_priority, is_higher_event_priority,
     lanes_to_event_priority, lower_event_priority,

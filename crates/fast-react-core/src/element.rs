@@ -258,6 +258,70 @@ impl<Type, Props, Ref, Owner> ReactElementRecord<Type, Props, Ref, Owner> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReactPortalRecord<Children = (), ContainerInfo = (), Implementation = ()> {
+    symbol_tag: ReactSymbolTag,
+    key: Option<ReactKey>,
+    children: Children,
+    container_info: ContainerInfo,
+    implementation: Implementation,
+}
+
+impl<Children, ContainerInfo, Implementation>
+    ReactPortalRecord<Children, ContainerInfo, Implementation>
+{
+    #[must_use]
+    pub fn from_normalized_parts(
+        key: Option<ReactKey>,
+        children: Children,
+        container_info: ContainerInfo,
+        implementation: Implementation,
+    ) -> Self {
+        Self {
+            symbol_tag: ReactSymbolTag::Portal,
+            key,
+            children,
+            container_info,
+            implementation,
+        }
+    }
+
+    #[must_use]
+    pub const fn symbol_tag(&self) -> ReactSymbolTag {
+        self.symbol_tag
+    }
+
+    #[must_use]
+    pub fn key(&self) -> Option<&ReactKey> {
+        self.key.as_ref()
+    }
+
+    #[must_use]
+    pub const fn children(&self) -> &Children {
+        &self.children
+    }
+
+    #[must_use]
+    pub const fn container_info(&self) -> &ContainerInfo {
+        &self.container_info
+    }
+
+    #[must_use]
+    pub const fn implementation(&self) -> &Implementation {
+        &self.implementation
+    }
+
+    #[must_use]
+    pub fn into_parts(self) -> (Option<ReactKey>, Children, ContainerInfo, Implementation) {
+        (
+            self.key,
+            self.children,
+            self.container_info,
+            self.implementation,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -348,5 +412,76 @@ mod tests {
         assert_eq!(ref_slot, ReactRefSlot::Null);
         assert_eq!(props, ());
         assert_eq!(owner, ReactOwnerSlot::NoOwner);
+    }
+
+    #[test]
+    fn portal_records_use_portal_symbol_tag() {
+        let portal =
+            ReactPortalRecord::from_normalized_parts(None, "child-handle", "container-handle", ());
+
+        assert_eq!(portal.symbol_tag(), ReactSymbolTag::Portal);
+        assert_eq!(portal.symbol_tag().symbol_for_name(), "react.portal");
+    }
+
+    #[test]
+    fn portal_records_preserve_normalized_keys_and_absence() {
+        let keyed = ReactPortalRecord::from_normalized_parts(
+            Some(ReactKey::from_normalized("portal-key")),
+            (),
+            (),
+            (),
+        );
+        let unkeyed = ReactPortalRecord::from_normalized_parts(None, (), (), ());
+
+        assert_eq!(keyed.key().map(ReactKey::as_str), Some("portal-key"));
+        assert_eq!(unkeyed.key(), None);
+    }
+
+    #[test]
+    fn portal_records_store_generic_child_container_and_implementation_handles() {
+        #[derive(Debug, PartialEq, Eq)]
+        struct ChildHandle(u64);
+
+        #[derive(Debug, PartialEq, Eq)]
+        struct ContainerInfoHandle(&'static str);
+
+        #[derive(Debug, PartialEq, Eq)]
+        struct RendererImplementationHandle {
+            slot: u64,
+        }
+
+        let portal = ReactPortalRecord::from_normalized_parts(
+            Some(ReactKey::from_normalized("typed")),
+            ChildHandle(3),
+            ContainerInfoHandle("external-root"),
+            RendererImplementationHandle { slot: 7 },
+        );
+
+        assert_eq!(portal.children(), &ChildHandle(3));
+        assert_eq!(
+            portal.container_info(),
+            &ContainerInfoHandle("external-root")
+        );
+        assert_eq!(
+            portal.implementation(),
+            &RendererImplementationHandle { slot: 7 }
+        );
+
+        let (key, children, container_info, implementation) = portal.into_parts();
+        assert_eq!(
+            key.map(|key| key.into_string()),
+            Some(String::from("typed"))
+        );
+        assert_eq!(children, ChildHandle(3));
+        assert_eq!(container_info, ContainerInfoHandle("external-root"));
+        assert_eq!(implementation, RendererImplementationHandle { slot: 7 });
+    }
+
+    #[test]
+    fn portal_records_are_not_element_brand_records() {
+        let portal = ReactPortalRecord::from_normalized_parts(None, (), (), ());
+
+        assert!(!portal.symbol_tag().is_react_element_brand());
+        assert!(!ReactSymbolTag::Portal.is_react_element_brand());
     }
 }
