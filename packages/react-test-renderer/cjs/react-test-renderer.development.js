@@ -2679,6 +2679,10 @@ const privateToJSONNativeExecutionDiagnosticName =
   'fast-react-test-renderer.tojson.private-native-execution-evidence';
 const privateToJSONNativeExecutionStatus =
   'private-tojson-native-execution-records-consumed-public-tojson-blocked';
+const privateSerializationFinishedWorkIdentityDiagnosticName =
+  'fast-react-test-renderer.serialization.private-finished-work-identity';
+const privateSerializationFinishedWorkIdentityStatus =
+  'private-serialization-finished-work-identity-validated-public-serialization-blocked';
 const privateToJSONNativeExecutionRecordKind =
   'FastReactTestRendererPrivateRootExecutionResult';
 const privateToJSONNativeExecutionAcceptedOperations = Object.freeze([
@@ -2812,6 +2816,13 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
   privateNativeExecutionDiagnosticName:
     privateToJSONNativeExecutionDiagnosticName,
   privateNativeExecutionStatus: privateToJSONNativeExecutionStatus,
+  privateFinishedWorkIdentityGateAvailable: true,
+  privateFinishedWorkIdentityDiagnosticName:
+    privateSerializationFinishedWorkIdentityDiagnosticName,
+  privateFinishedWorkIdentityStatus:
+    privateSerializationFinishedWorkIdentityStatus,
+  consumesCommittedHostRootFinishedWorkIdentity: true,
+  consumesCommittedHostRootFinishedWorkLanes: true,
   acceptedNativeExecutionRecordKind: privateToJSONNativeExecutionRecordKind,
   acceptedNativeExecutionOperations:
     privateToJSONNativeExecutionAcceptedOperations,
@@ -2827,6 +2838,7 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
     'TestRendererRoot::describe_private_to_json_after_nested_update_native_execution_for_canary',
     'TestRendererRoot::describe_private_to_json_sibling_text_update_native_execution_from_snapshot_for_diagnostics',
     'TestRendererRoot::describe_private_to_json_after_unmount_native_execution_for_canary',
+    'TestRendererRoot::describe_private_to_json_finished_work_identity_gate_for_canary',
     'TestRendererPrivateToJsonNativeExecutionEvidence'
   ]),
   nativeExecutionAcceptedRustTests: Object.freeze([
@@ -2834,7 +2846,13 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
     'root_private_to_json_nested_update_native_execution_evidence_consumes_multichild_row',
     'root_private_to_json_sibling_text_native_execution_evidence_consumes_sibling_row',
     'root_private_to_json_native_execution_evidence_rejects_row_id_shape_mismatch',
-    'root_private_to_json_native_execution_evidence_rejects_stale_update_record'
+    'root_private_to_json_native_execution_evidence_rejects_stale_update_record',
+    'root_private_to_json_serialization_finished_work_identity_gate_accepts_committed_handoff',
+    'root_private_serialization_finished_work_identity_gate_rejects_missing_evidence',
+    'root_private_serialization_finished_work_identity_gate_rejects_foreign_evidence',
+    'root_private_serialization_finished_work_identity_gate_rejects_stale_evidence',
+    'root_private_serialization_finished_work_identity_gate_rejects_non_committed_identity',
+    'root_private_serialization_finished_work_identity_gate_rejects_lane_mismatch'
   ]),
   acceptedRustPrivateJsonDiagnostics: true,
   acceptedRustPrivateToJSONFacadeResult: true,
@@ -2874,11 +2892,13 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
     'TestRendererRoot::describe_private_to_json_facade_result_after_update_for_canary',
     'TestRendererRoot::describe_private_to_json_host_output_update_row_for_canary',
     'TestRendererRoot::describe_private_to_json_host_output_unmount_row_for_canary',
+    'TestRendererRoot::describe_private_to_json_finished_work_identity_gate_for_canary',
     'TestRendererRoot::describe_private_to_json_host_shape_from_snapshot_for_diagnostics',
     'TestRendererPrivateJsonSerializationReport',
     'TestRendererPrivateJsonRenderedRoot',
     'TestRendererPrivateToJsonFacadeResult',
     'TestRendererPrivateToJsonHostOutputRow',
+    'TestRendererPrivateSerializationFinishedWorkIdentityGate',
     'TestRendererPrivateToJsonHostOutputDependencyDiagnostics',
     'TestRendererPrivateJsonPublicSurfaceBlockers'
   ]),
@@ -2924,7 +2944,13 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
     'root_private_to_json_facade_result_canary_wraps_update_serialization_evidence',
     'root_private_to_json_unmount_host_output_row_records_empty_snapshot_blockers',
     'root_private_to_json_unmount_host_output_row_rejects_stale_snapshot',
-    'root_private_to_json_update_host_output_row_rejects_mismatched_row_kind'
+    'root_private_to_json_update_host_output_row_rejects_mismatched_row_kind',
+    'root_private_to_json_serialization_finished_work_identity_gate_accepts_committed_handoff',
+    'root_private_serialization_finished_work_identity_gate_rejects_missing_evidence',
+    'root_private_serialization_finished_work_identity_gate_rejects_foreign_evidence',
+    'root_private_serialization_finished_work_identity_gate_rejects_stale_evidence',
+    'root_private_serialization_finished_work_identity_gate_rejects_non_committed_identity',
+    'root_private_serialization_finished_work_identity_gate_rejects_lane_mismatch'
   ]),
   nestedUpdateSiblingAcceptedRustTests: Object.freeze([
     'root_private_to_json_nested_host_output_update_row_records_nested_text_rows',
@@ -3142,6 +3168,13 @@ const toTreePrivateFacadeGate = Object.freeze({
   privateNativeExecutionDiagnosticName:
     privateToTreeNativeExecutionDiagnosticName,
   privateNativeExecutionStatus: privateToTreeNativeExecutionStatus,
+  privateFinishedWorkIdentityGateAvailable: true,
+  privateFinishedWorkIdentityDiagnosticName:
+    privateSerializationFinishedWorkIdentityDiagnosticName,
+  privateFinishedWorkIdentityStatus:
+    privateSerializationFinishedWorkIdentityStatus,
+  consumesCommittedHostRootFinishedWorkIdentity: true,
+  consumesCommittedHostRootFinishedWorkLanes: true,
   privateNativeExecutionFunctionComponentShapeAvailable: true,
   nativeExecutionCompositeAcceptedFiberShape:
     privateToTreeCompositeAcceptedFiberShape,
@@ -3176,8 +3209,10 @@ const toTreePrivateFacadeGate = Object.freeze({
     'TestRendererRoot::describe_private_to_tree_after_create_native_execution_for_canary',
     'TestRendererRoot::describe_private_to_tree_after_update_native_execution_for_canary',
     'TestRendererRoot::describe_private_to_tree_after_unmount_native_execution_for_canary',
+    'TestRendererRoot::describe_private_to_tree_finished_work_identity_gate_for_canary',
     'TestRendererPrivateTreeMetadataReport',
     'TestRendererPrivateToTreeNativeExecutionEvidence',
+    'TestRendererPrivateSerializationFinishedWorkIdentityGate',
     'TestRendererPrivateTreeFunctionComponentDiagnostic',
     'TestRendererPrivateTreeHostComponentDiagnostic',
     'TestRendererPrivateTreeHostTextDiagnostic'
@@ -3188,6 +3223,7 @@ const toTreePrivateFacadeGate = Object.freeze({
     'root_private_tree_metadata_canary_describes_function_component_above_host_output',
     'root_private_to_tree_native_execution_evidence_consumes_create_update_unmount_records',
     'root_private_to_tree_native_execution_evidence_records_composite_host_shape',
+    'root_private_to_tree_serialization_finished_work_identity_gate_accepts_committed_handoff',
     'root_private_tree_metadata_canary_rejects_stale_host_output_snapshot'
   ]),
   nativeExecutionEvidenceWorker:
@@ -14344,6 +14380,13 @@ function createPrivateToJSONSerializationFacade(rootRequest) {
     privateNativeExecutionDiagnosticName:
       privateToJSONNativeExecutionDiagnosticName,
     privateNativeExecutionStatus: privateToJSONNativeExecutionStatus,
+    privateFinishedWorkIdentityGateAvailable: true,
+    privateFinishedWorkIdentityDiagnosticName:
+      privateSerializationFinishedWorkIdentityDiagnosticName,
+    privateFinishedWorkIdentityStatus:
+      privateSerializationFinishedWorkIdentityStatus,
+    consumesCommittedHostRootFinishedWorkIdentity: true,
+    consumesCommittedHostRootFinishedWorkLanes: true,
     acceptedNativeExecutionRecordKind: privateToJSONNativeExecutionRecordKind,
     acceptedNativeExecutionOperations:
       privateToJSONNativeExecutionAcceptedOperations,
@@ -14407,6 +14450,29 @@ function createPrivateToJSONSerializationFacade(rootRequest) {
         executionRecord,
         report
       );
+    },
+    canValidateAcceptedFinishedWorkIdentity(evidence, report) {
+      try {
+        createPrivateSerializationFinishedWorkIdentityGateResult(
+          rootRequest,
+          'create().toJSON',
+          privateToJSONAcceptedDiagnosticName,
+          evidence,
+          report
+        );
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    },
+    validateAcceptedFinishedWorkIdentity(evidence, report) {
+      return createPrivateSerializationFinishedWorkIdentityGateResult(
+        rootRequest,
+        'create().toJSON',
+        privateToJSONAcceptedDiagnosticName,
+        evidence,
+        report
+      );
     }
   });
 }
@@ -14459,6 +14525,13 @@ function createPrivateToTreeFacade(rootRequest) {
     privateNativeExecutionDiagnosticName:
       privateToTreeNativeExecutionDiagnosticName,
     privateNativeExecutionStatus: privateToTreeNativeExecutionStatus,
+    privateFinishedWorkIdentityGateAvailable: true,
+    privateFinishedWorkIdentityDiagnosticName:
+      privateSerializationFinishedWorkIdentityDiagnosticName,
+    privateFinishedWorkIdentityStatus:
+      privateSerializationFinishedWorkIdentityStatus,
+    consumesCommittedHostRootFinishedWorkIdentity: true,
+    consumesCommittedHostRootFinishedWorkLanes: true,
     privateNativeExecutionFunctionComponentShapeAvailable: true,
     nativeExecutionCompositeAcceptedFiberShape:
       privateToTreeCompositeAcceptedFiberShape,
@@ -14499,6 +14572,29 @@ function createPrivateToTreeFacade(rootRequest) {
       return createPrivateToTreeNativeExecutionDiagnosticResult(
         rootRequest,
         executionRecord,
+        report
+      );
+    },
+    canValidateAcceptedFinishedWorkIdentity(evidence, report) {
+      try {
+        createPrivateSerializationFinishedWorkIdentityGateResult(
+          rootRequest,
+          'create().toTree',
+          privateToTreeAcceptedDiagnosticName,
+          evidence,
+          report
+        );
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    },
+    validateAcceptedFinishedWorkIdentity(evidence, report) {
+      return createPrivateSerializationFinishedWorkIdentityGateResult(
+        rootRequest,
+        'create().toTree',
+        privateToTreeAcceptedDiagnosticName,
+        evidence,
         report
       );
     }
@@ -16402,6 +16498,484 @@ function createPrivateToJSONNativeExecutionDiagnosticResult(
     nativeExecution: false,
     compatibilityClaimed: false
   });
+}
+
+function createPrivateSerializationFinishedWorkIdentityGateResult(
+  rootRequest,
+  publicSurface,
+  sourceSerializationDiagnosticName,
+  evidence,
+  report
+) {
+  if (!isRootRequestRecord(rootRequest)) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Expected a private root request for serialization finished-work identity evidence.'
+    );
+  }
+  if (evidence === null || typeof evidence !== 'object') {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Expected accepted serialization finished-work identity evidence.'
+    );
+  }
+
+  const normalized =
+    normalizePrivateSerializationFinishedWorkIdentityEvidence(
+      publicSurface,
+      evidence
+    );
+  if (
+    normalized.diagnosticName !==
+      privateSerializationFinishedWorkIdentityDiagnosticName ||
+    normalized.status !== privateSerializationFinishedWorkIdentityStatus ||
+    normalized.publicSurface !== publicSurface ||
+    normalized.sourceSerializationDiagnosticName !==
+      sourceSerializationDiagnosticName
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private serialization finished-work identity diagnostic identity is not accepted.'
+    );
+  }
+  if (
+    normalized.rootRequestId !== undefined &&
+    normalized.rootRequestId !== rootRequest.requestId
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private serialization finished-work identity request id is stale.'
+    );
+  }
+  if (
+    normalized.rootRequestSequence !== undefined &&
+    normalized.rootRequestSequence !== rootRequest.requestSequence
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private serialization finished-work identity request sequence is stale.'
+    );
+  }
+  if (
+    normalized.rootId !== undefined &&
+    normalized.rootId !== rootRequest.rootId
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private serialization finished-work identity belongs to a foreign root.'
+    );
+  }
+  if (
+    !privateSerializationFinishedWorkHandlesEqual(
+      normalized.renderFinishedWork,
+      normalized.commitCurrent
+    ) ||
+    !privateSerializationFinishedWorkHandlesEqual(
+      normalized.reportFinishedWork,
+      normalized.commitCurrent
+    ) ||
+    normalized.commitCurrentMatchesRenderFinishedWork !== true ||
+    normalized.commitPreviousCurrentMatchesRenderCurrent !== true ||
+    normalized.reportFinishedWorkMatchesCommitCurrent !== true ||
+    normalized.committedFiberInspectionCurrentMatchesCommit !== true
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private serialization evidence is not tied to the committed HostRoot finished_work identity.'
+    );
+  }
+  if (
+    normalized.renderLanesBits <= 0 ||
+    normalized.renderLanesBits !== normalized.commitFinishedLanesBits ||
+    normalized.reportFinishedLanesBits !==
+      normalized.commitFinishedLanesBits ||
+    normalized.commitRemainingLanesBits !== 0 ||
+    normalized.commitPendingLanesBits !== 0 ||
+    normalized.commitLanesMatchRenderLanes !== true ||
+    normalized.reportLanesMatchCommitLanes !== true
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private serialization evidence lane handoff does not match the committed HostRoot finished lanes.'
+    );
+  }
+  if (
+    normalized.hostOutputSnapshotCurrent !== true ||
+    normalized.consumesCommittedHostRootFinishedWorkIdentity !== true ||
+    normalized.consumesCommittedHostRootFinishedWorkLanes !== true
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private serialization finished-work identity evidence is not current.'
+    );
+  }
+  if (
+    publicSurface === 'create().toJSON'
+      ? normalized.consumesPrivateToJSONEvidence !== true ||
+        normalized.consumesPrivateToTreeEvidence !== false
+      : normalized.consumesPrivateToJSONEvidence !== false ||
+        normalized.consumesPrivateToTreeEvidence !== true
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private serialization finished-work identity consumed the wrong serialization evidence kind.'
+    );
+  }
+  if (
+    normalized.publicToJSONAvailable !== false ||
+    normalized.publicToTreeAvailable !== false ||
+    normalized.publicTestInstanceAvailable !== false ||
+    normalized.publicSerializationAvailable !== false ||
+    normalized.compatibilityClaimed !== false
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private serialization finished-work identity cannot open public serialization compatibility.'
+    );
+  }
+  validatePrivateSerializationFinishedWorkIdentitySourceReport(
+    publicSurface,
+    sourceSerializationDiagnosticName,
+    normalized,
+    report
+  );
+
+  return freezeRecord({
+    id: 'react-test-renderer-private-serialization-finished-work-identity-result',
+    diagnosticName: privateSerializationFinishedWorkIdentityDiagnosticName,
+    status: privateSerializationFinishedWorkIdentityStatus,
+    entrypoint,
+    publicSurface,
+    sourceSerializationDiagnosticName,
+    rootRequest,
+    rootRequestId: rootRequest.requestId,
+    rootRequestSequence: rootRequest.requestSequence,
+    rootId: rootRequest.rootId,
+    hostOutputUpdateKind: normalized.hostOutputUpdateKind,
+    renderFinishedWork: normalized.renderFinishedWork,
+    commitCurrent: normalized.commitCurrent,
+    reportFinishedWork: normalized.reportFinishedWork,
+    renderLanesBits: normalized.renderLanesBits,
+    commitFinishedLanesBits: normalized.commitFinishedLanesBits,
+    reportFinishedLanesBits: normalized.reportFinishedLanesBits,
+    commitRemainingLanesBits: normalized.commitRemainingLanesBits,
+    commitPendingLanesBits: normalized.commitPendingLanesBits,
+    commitCurrentMatchesRenderFinishedWork: true,
+    commitPreviousCurrentMatchesRenderCurrent: true,
+    commitLanesMatchRenderLanes: true,
+    reportFinishedWorkMatchesCommitCurrent: true,
+    reportLanesMatchCommitLanes: true,
+    committedFiberInspectionCurrentMatchesCommit: true,
+    hostOutputSnapshotCurrent: true,
+    consumesCommittedHostRootFinishedWorkIdentity: true,
+    consumesCommittedHostRootFinishedWorkLanes: true,
+    consumesPrivateToJSONEvidence:
+      publicSurface === 'create().toJSON',
+    consumesPrivateToTreeEvidence:
+      publicSurface === 'create().toTree',
+    publicToJSONAvailable: false,
+    publicToTreeAvailable: false,
+    publicTestInstanceAvailable: false,
+    publicSerializationAvailable: false,
+    compatibilityClaimed: false
+  });
+}
+
+function normalizePrivateSerializationFinishedWorkIdentityEvidence(
+  publicSurface,
+  evidence
+) {
+  return freezeRecord({
+    diagnosticName: readPrivateToJSONField(
+      evidence,
+      'diagnosticName',
+      'diagnostic_name'
+    ),
+    status: readPrivateToJSONField(evidence, 'status'),
+    publicSurface: readPrivateToJSONField(
+      evidence,
+      'publicSurface',
+      'public_surface'
+    ),
+    sourceSerializationDiagnosticName: readPrivateToJSONField(
+      evidence,
+      'sourceSerializationDiagnosticName',
+      'source_serialization_diagnostic_name'
+    ),
+    rootRequestId: readPrivateToJSONField(
+      evidence,
+      'rootRequestId',
+      'root_request_id'
+    ),
+    rootRequestSequence: readPrivateToJSONField(
+      evidence,
+      'rootRequestSequence',
+      'root_request_sequence'
+    ),
+    rootId: readPrivateToJSONField(evidence, 'rootId', 'root_id'),
+    hostOutputUpdateKind: readPrivateToJSONField(
+      evidence,
+      'hostOutputUpdateKind',
+      'host_output_update_kind'
+    ),
+    renderFinishedWork: normalizePrivateSerializationFinishedWorkHandle(
+      publicSurface,
+      readPrivateToJSONField(
+        evidence,
+        'renderFinishedWork',
+        'render_finished_work'
+      ),
+      'renderFinishedWork'
+    ),
+    commitCurrent: normalizePrivateSerializationFinishedWorkHandle(
+      publicSurface,
+      readPrivateToJSONField(evidence, 'commitCurrent', 'commit_current'),
+      'commitCurrent'
+    ),
+    reportFinishedWork: normalizePrivateSerializationFinishedWorkHandle(
+      publicSurface,
+      readPrivateToJSONField(
+        evidence,
+        'reportFinishedWork',
+        'report_finished_work'
+      ),
+      'reportFinishedWork'
+    ),
+    renderLanesBits: readPrivateSerializationLaneBits(
+      publicSurface,
+      evidence,
+      'renderLanesBits',
+      'render_lanes_bits'
+    ),
+    commitFinishedLanesBits: readPrivateSerializationLaneBits(
+      publicSurface,
+      evidence,
+      'commitFinishedLanesBits',
+      'commit_finished_lanes_bits'
+    ),
+    reportFinishedLanesBits: readPrivateSerializationLaneBits(
+      publicSurface,
+      evidence,
+      'reportFinishedLanesBits',
+      'report_finished_lanes_bits'
+    ),
+    commitRemainingLanesBits: readPrivateSerializationLaneBits(
+      publicSurface,
+      evidence,
+      'commitRemainingLanesBits',
+      'commit_remaining_lanes_bits'
+    ),
+    commitPendingLanesBits: readPrivateSerializationLaneBits(
+      publicSurface,
+      evidence,
+      'commitPendingLanesBits',
+      'commit_pending_lanes_bits'
+    ),
+    commitCurrentMatchesRenderFinishedWork: readPrivateToJSONField(
+      evidence,
+      'commitCurrentMatchesRenderFinishedWork',
+      'commit_current_matches_render_finished_work'
+    ),
+    commitPreviousCurrentMatchesRenderCurrent: readPrivateToJSONField(
+      evidence,
+      'commitPreviousCurrentMatchesRenderCurrent',
+      'commit_previous_current_matches_render_current'
+    ),
+    commitLanesMatchRenderLanes: readPrivateToJSONField(
+      evidence,
+      'commitLanesMatchRenderLanes',
+      'commit_lanes_match_render_lanes'
+    ),
+    reportFinishedWorkMatchesCommitCurrent: readPrivateToJSONField(
+      evidence,
+      'reportFinishedWorkMatchesCommitCurrent',
+      'report_finished_work_matches_commit_current'
+    ),
+    reportLanesMatchCommitLanes: readPrivateToJSONField(
+      evidence,
+      'reportLanesMatchCommitLanes',
+      'report_lanes_match_commit_lanes'
+    ),
+    committedFiberInspectionCurrentMatchesCommit: readPrivateToJSONField(
+      evidence,
+      'committedFiberInspectionCurrentMatchesCommit',
+      'committed_fiber_inspection_current_matches_commit'
+    ),
+    hostOutputSnapshotCurrent: readPrivateToJSONField(
+      evidence,
+      'hostOutputSnapshotCurrent',
+      'host_output_snapshot_current'
+    ),
+    consumesCommittedHostRootFinishedWorkIdentity: readPrivateToJSONField(
+      evidence,
+      'consumesCommittedHostRootFinishedWorkIdentity',
+      'consumes_committed_host_root_finished_work_identity'
+    ),
+    consumesCommittedHostRootFinishedWorkLanes: readPrivateToJSONField(
+      evidence,
+      'consumesCommittedHostRootFinishedWorkLanes',
+      'consumes_committed_host_root_finished_work_lanes'
+    ),
+    consumesPrivateToJSONEvidence: readPrivateToJSONField(
+      evidence,
+      'consumesPrivateToJSONEvidence',
+      'consumes_private_to_json_evidence'
+    ),
+    consumesPrivateToTreeEvidence: readPrivateToJSONField(
+      evidence,
+      'consumesPrivateToTreeEvidence',
+      'consumes_private_to_tree_evidence'
+    ),
+    publicToJSONAvailable: readPrivateToJSONField(
+      evidence,
+      'publicToJSONAvailable',
+      'public_to_json_available'
+    ),
+    publicToTreeAvailable: readPrivateToJSONField(
+      evidence,
+      'publicToTreeAvailable',
+      'public_to_tree_available'
+    ),
+    publicTestInstanceAvailable: readPrivateToJSONField(
+      evidence,
+      'publicTestInstanceAvailable',
+      'public_test_instance_available'
+    ),
+    publicSerializationAvailable: readPrivateToJSONField(
+      evidence,
+      'publicSerializationAvailable',
+      'public_serialization_available'
+    ),
+    compatibilityClaimed: readPrivateToJSONField(
+      evidence,
+      'compatibilityClaimed',
+      'compatibility_claimed'
+    )
+  });
+}
+
+function normalizePrivateSerializationFinishedWorkHandle(
+  publicSurface,
+  handle,
+  label
+) {
+  if (handle === null || typeof handle !== 'object' || Array.isArray(handle)) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      `Expected private serialization finished-work handle ${label}.`
+    );
+  }
+  const arenaId = readPrivateToJSONField(handle, 'arenaId', 'arena_id');
+  const slot = readPrivateToJSONField(handle, 'slot');
+  const generation = readPrivateToJSONField(
+    handle,
+    'generation',
+    'generation_id'
+  );
+  if (
+    !isNonNegativeInteger(arenaId) ||
+    !isNonNegativeInteger(slot) ||
+    !isNonNegativeInteger(generation)
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      `Expected numeric private serialization finished-work handle ${label}.`
+    );
+  }
+  return freezeRecord({ arenaId, slot, generation });
+}
+
+function privateSerializationFinishedWorkHandlesEqual(left, right) {
+  return (
+    left.arenaId === right.arenaId &&
+    left.slot === right.slot &&
+    left.generation === right.generation
+  );
+}
+
+function readPrivateSerializationLaneBits(
+  publicSurface,
+  record,
+  camelName,
+  snakeName
+) {
+  const value = readPrivateToJSONField(record, camelName, snakeName);
+  if (!isNonNegativeInteger(value)) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      `Expected private serialization finished-work identity ${camelName} lane bits.`
+    );
+  }
+  return value;
+}
+
+function validatePrivateSerializationFinishedWorkIdentitySourceReport(
+  publicSurface,
+  expectedDiagnosticName,
+  identity,
+  report
+) {
+  if (report === undefined) {
+    return;
+  }
+  if (report === null || typeof report !== 'object') {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Expected private serialization source report.'
+    );
+  }
+  if (
+    readPrivateToJSONField(report, 'diagnosticName', 'diagnostic_name') !==
+    expectedDiagnosticName
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private serialization source report diagnostic name is stale.'
+    );
+  }
+  const hostOutputUpdateKind = readPrivateToJSONField(
+    report,
+    'hostOutputUpdateKind',
+    'host_output_update_kind'
+  );
+  if (
+    hostOutputUpdateKind !== undefined &&
+    hostOutputUpdateKind !== identity.hostOutputUpdateKind
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private serialization source report update kind does not match identity evidence.'
+    );
+  }
+  const snapshotCurrent = readPrivateToJSONField(
+    report,
+    'hostOutputSnapshotCurrent',
+    'host_output_snapshot_current'
+  );
+  if (snapshotCurrent !== undefined && snapshotCurrent !== true) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private serialization source report host output snapshot is stale.'
+    );
+  }
+  const publicBlockers = readPrivateToJSONField(
+    report,
+    'publicBlockers',
+    'public_blockers'
+  );
+  if (publicBlockers !== undefined) {
+    assertPrivateToJSONPublicBlockers(publicBlockers);
+  }
+}
+
+function throwPrivateSerializationFinishedWorkIdentityError(
+  publicSurface,
+  message
+) {
+  if (publicSurface === 'create().toTree') {
+    throwPrivateToTreeMetadataError(message);
+  }
+  throwPrivateToJSONSerializationError(message);
 }
 
 function consumeAcceptedToJSONNativeExecutionRecord(

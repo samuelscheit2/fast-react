@@ -3214,6 +3214,10 @@ pub const TEST_RENDERER_PRIVATE_TO_TREE_NATIVE_EXECUTION_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.totree.private-native-execution-evidence";
 pub const TEST_RENDERER_PRIVATE_TO_TREE_NATIVE_EXECUTION_STATUS: &str =
     "private-totree-native-execution-records-consumed-public-totree-blocked";
+pub const TEST_RENDERER_PRIVATE_SERIALIZATION_FINISHED_WORK_IDENTITY_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.serialization.private-finished-work-identity";
+pub const TEST_RENDERER_PRIVATE_SERIALIZATION_FINISHED_WORK_IDENTITY_STATUS: &str =
+    "private-serialization-finished-work-identity-validated-public-serialization-blocked";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_UPDATE_HOST_OUTPUT_ROW_ID: &str =
     "react-test-renderer-tojson-update-host-output-private-diagnostic";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_NESTED_UPDATE_HOST_OUTPUT_ROW_ID: &str =
@@ -5707,6 +5711,9 @@ pub struct TestRendererCommitDiagnostics {
     previous_current: TestRendererFiberHandleDiagnostics,
     current: TestRendererFiberHandleDiagnostics,
     finished_work: TestRendererFiberHandleDiagnostics,
+    finished_lanes_bits: u32,
+    remaining_lanes_bits: u32,
+    pending_lanes_bits: u32,
     finished_lanes_empty: bool,
     finished_lanes_include_sync: bool,
     remaining_lanes_empty: bool,
@@ -5749,6 +5756,21 @@ impl TestRendererCommitDiagnostics {
     #[must_use]
     pub const fn finished_work(self) -> TestRendererFiberHandleDiagnostics {
         self.finished_work
+    }
+
+    #[must_use]
+    pub const fn finished_lanes_bits(self) -> u32 {
+        self.finished_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn remaining_lanes_bits(self) -> u32 {
+        self.remaining_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn pending_lanes_bits(self) -> u32 {
+        self.pending_lanes_bits
     }
 
     #[must_use]
@@ -6870,6 +6892,204 @@ impl TestRendererPrivateToTreeNativeExecutionEvidence {
 
     #[must_use]
     pub const fn compatibility_claimed(&self) -> bool {
+        self.compatibility_claimed
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererPrivateSerializationFinishedWorkIdentityGate {
+    diagnostic_name: &'static str,
+    status: &'static str,
+    root: FiberRootId,
+    public_surface: &'static str,
+    source_serialization_diagnostic_name: &'static str,
+    host_output_update_kind: TestRendererRootUpdateKind,
+    render_current: TestRendererFiberHandleDiagnostics,
+    render_finished_work: TestRendererFiberHandleDiagnostics,
+    commit_previous_current: TestRendererFiberHandleDiagnostics,
+    commit_current: TestRendererFiberHandleDiagnostics,
+    report_finished_work: TestRendererFiberHandleDiagnostics,
+    render_lanes_bits: u32,
+    commit_finished_lanes_bits: u32,
+    report_finished_lanes_bits: u32,
+    commit_remaining_lanes_bits: u32,
+    commit_pending_lanes_bits: u32,
+    commit_current_matches_render_finished_work: bool,
+    commit_previous_current_matches_render_current: bool,
+    commit_lanes_match_render_lanes: bool,
+    report_finished_work_matches_commit_current: bool,
+    report_lanes_match_commit_lanes: bool,
+    committed_fiber_inspection_current_matches_commit: bool,
+    host_output_snapshot_current: bool,
+    consumes_committed_host_root_finished_work_identity: bool,
+    consumes_committed_host_root_finished_work_lanes: bool,
+    consumes_private_to_json_evidence: bool,
+    consumes_private_to_tree_evidence: bool,
+    public_to_json_available: bool,
+    public_to_tree_available: bool,
+    public_test_instance_available: bool,
+    public_serialization_available: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererPrivateSerializationFinishedWorkIdentityGate {
+    #[must_use]
+    pub const fn diagnostic_name(self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn status(self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn public_surface(self) -> &'static str {
+        self.public_surface
+    }
+
+    #[must_use]
+    pub const fn source_serialization_diagnostic_name(self) -> &'static str {
+        self.source_serialization_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn host_output_update_kind(self) -> TestRendererRootUpdateKind {
+        self.host_output_update_kind
+    }
+
+    #[must_use]
+    pub const fn render_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.render_current
+    }
+
+    #[must_use]
+    pub const fn render_finished_work(self) -> TestRendererFiberHandleDiagnostics {
+        self.render_finished_work
+    }
+
+    #[must_use]
+    pub const fn commit_previous_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.commit_previous_current
+    }
+
+    #[must_use]
+    pub const fn commit_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.commit_current
+    }
+
+    #[must_use]
+    pub const fn report_finished_work(self) -> TestRendererFiberHandleDiagnostics {
+        self.report_finished_work
+    }
+
+    #[must_use]
+    pub const fn render_lanes_bits(self) -> u32 {
+        self.render_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn commit_finished_lanes_bits(self) -> u32 {
+        self.commit_finished_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn report_finished_lanes_bits(self) -> u32 {
+        self.report_finished_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn commit_remaining_lanes_bits(self) -> u32 {
+        self.commit_remaining_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn commit_pending_lanes_bits(self) -> u32 {
+        self.commit_pending_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn commit_current_matches_render_finished_work(self) -> bool {
+        self.commit_current_matches_render_finished_work
+    }
+
+    #[must_use]
+    pub const fn commit_previous_current_matches_render_current(self) -> bool {
+        self.commit_previous_current_matches_render_current
+    }
+
+    #[must_use]
+    pub const fn commit_lanes_match_render_lanes(self) -> bool {
+        self.commit_lanes_match_render_lanes
+    }
+
+    #[must_use]
+    pub const fn report_finished_work_matches_commit_current(self) -> bool {
+        self.report_finished_work_matches_commit_current
+    }
+
+    #[must_use]
+    pub const fn report_lanes_match_commit_lanes(self) -> bool {
+        self.report_lanes_match_commit_lanes
+    }
+
+    #[must_use]
+    pub const fn committed_fiber_inspection_current_matches_commit(self) -> bool {
+        self.committed_fiber_inspection_current_matches_commit
+    }
+
+    #[must_use]
+    pub const fn host_output_snapshot_current(self) -> bool {
+        self.host_output_snapshot_current
+    }
+
+    #[must_use]
+    pub const fn consumes_committed_host_root_finished_work_identity(self) -> bool {
+        self.consumes_committed_host_root_finished_work_identity
+    }
+
+    #[must_use]
+    pub const fn consumes_committed_host_root_finished_work_lanes(self) -> bool {
+        self.consumes_committed_host_root_finished_work_lanes
+    }
+
+    #[must_use]
+    pub const fn consumes_private_to_json_evidence(self) -> bool {
+        self.consumes_private_to_json_evidence
+    }
+
+    #[must_use]
+    pub const fn consumes_private_to_tree_evidence(self) -> bool {
+        self.consumes_private_to_tree_evidence
+    }
+
+    #[must_use]
+    pub const fn public_to_json_available(self) -> bool {
+        self.public_to_json_available
+    }
+
+    #[must_use]
+    pub const fn public_to_tree_available(self) -> bool {
+        self.public_to_tree_available
+    }
+
+    #[must_use]
+    pub const fn public_test_instance_available(self) -> bool {
+        self.public_test_instance_available
+    }
+
+    #[must_use]
+    pub const fn public_serialization_available(self) -> bool {
+        self.public_serialization_available
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(self) -> bool {
         self.compatibility_claimed
     }
 }
@@ -9231,6 +9451,86 @@ impl Display for TestRendererPrivateJsonSerializationError {
 impl Error for TestRendererPrivateJsonSerializationError {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TestRendererPrivateSerializationFinishedWorkIdentityError {
+    MissingSerializationEvidence {
+        public_surface: &'static str,
+    },
+    MissingFinishedWorkHandoff {
+        public_surface: &'static str,
+    },
+    MissingCommittedHostRoot {
+        public_surface: &'static str,
+    },
+    ForeignFinishedWorkIdentity {
+        reason: &'static str,
+    },
+    StaleFinishedWorkIdentity {
+        reason: &'static str,
+    },
+    NonCommittedFinishedWorkIdentity {
+        reason: &'static str,
+    },
+    LaneMismatch {
+        render_lanes_bits: u32,
+        commit_finished_lanes_bits: u32,
+    },
+    SerializationEvidenceMismatch {
+        reason: &'static str,
+    },
+    PublicCompatibilityOpened {
+        reason: &'static str,
+    },
+}
+
+impl Display for TestRendererPrivateSerializationFinishedWorkIdentityError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MissingSerializationEvidence { public_surface } => write!(
+                formatter,
+                "private {public_surface} finished-work identity gate requires serialization evidence",
+            ),
+            Self::MissingFinishedWorkHandoff { public_surface } => write!(
+                formatter,
+                "private {public_surface} finished-work identity gate requires HostRoot render finished-work evidence",
+            ),
+            Self::MissingCommittedHostRoot { public_surface } => write!(
+                formatter,
+                "private {public_surface} finished-work identity gate requires committed HostRoot evidence",
+            ),
+            Self::ForeignFinishedWorkIdentity { reason } => write!(
+                formatter,
+                "private serialization finished-work identity gate rejected foreign evidence: {reason}",
+            ),
+            Self::StaleFinishedWorkIdentity { reason } => write!(
+                formatter,
+                "private serialization finished-work identity gate rejected stale evidence: {reason}",
+            ),
+            Self::NonCommittedFinishedWorkIdentity { reason } => write!(
+                formatter,
+                "private serialization finished-work identity gate rejected non-committed finished-work evidence: {reason}",
+            ),
+            Self::LaneMismatch {
+                render_lanes_bits,
+                commit_finished_lanes_bits,
+            } => write!(
+                formatter,
+                "private serialization finished-work identity gate expected render lanes {render_lanes_bits}, found committed finished lanes {commit_finished_lanes_bits}",
+            ),
+            Self::SerializationEvidenceMismatch { reason } => write!(
+                formatter,
+                "private serialization finished-work identity gate rejected serialization evidence: {reason}",
+            ),
+            Self::PublicCompatibilityOpened { reason } => write!(
+                formatter,
+                "private serialization finished-work identity gate cannot open public compatibility: {reason}",
+            ),
+        }
+    }
+}
+
+impl Error for TestRendererPrivateSerializationFinishedWorkIdentityError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TestRendererStableSiblingInsertionCanaryError {
     MissingPlacementRecord,
     MultiplePlacementRecords { actual: usize },
@@ -9420,6 +9720,9 @@ pub enum TestRendererRootError {
         Box<TestRendererPrivateTestInstanceNativeQueryExecutionError>,
     ),
     PrivateJsonSerialization(Box<TestRendererPrivateJsonSerializationError>),
+    PrivateSerializationFinishedWorkIdentity(
+        Box<TestRendererPrivateSerializationFinishedWorkIdentityError>,
+    ),
     StableSiblingInsertionCanary(Box<TestRendererStableSiblingInsertionCanaryError>),
     RootCreatePreflight(Box<TestRendererRootCreatePreflightError>),
     PrivateCreateRouteAdmission(Box<TestRendererPrivateCreateRouteAdmissionError>),
@@ -9463,6 +9766,7 @@ impl Display for TestRendererRootError {
             Self::PrivateUnmountNativeBridgeAdmission(error) => Display::fmt(error, formatter),
             Self::PrivateTestInstanceNativeQueryExecution(error) => Display::fmt(error, formatter),
             Self::PrivateJsonSerialization(error) => Display::fmt(error, formatter),
+            Self::PrivateSerializationFinishedWorkIdentity(error) => Display::fmt(error, formatter),
             Self::StableSiblingInsertionCanary(error) => Display::fmt(error, formatter),
             Self::RootCreatePreflight(error) => Display::fmt(error, formatter),
             Self::PrivateCreateRouteAdmission(error) => Display::fmt(error, formatter),
@@ -9519,6 +9823,7 @@ impl Error for TestRendererRootError {
             Self::PrivateUnmountNativeBridgeAdmission(error) => Some(error),
             Self::PrivateTestInstanceNativeQueryExecution(error) => Some(error),
             Self::PrivateJsonSerialization(error) => Some(error),
+            Self::PrivateSerializationFinishedWorkIdentity(error) => Some(error),
             Self::StableSiblingInsertionCanary(error) => Some(error),
             Self::RootCreatePreflight(error) => Some(error),
             Self::PrivateCreateRouteAdmission(error) => Some(error),
@@ -9614,6 +9919,12 @@ impl From<TestRendererPrivateTestInstanceNativeQueryExecutionError> for TestRend
 impl From<TestRendererPrivateJsonSerializationError> for TestRendererRootError {
     fn from(error: TestRendererPrivateJsonSerializationError) -> Self {
         Self::PrivateJsonSerialization(Box::new(error))
+    }
+}
+
+impl From<TestRendererPrivateSerializationFinishedWorkIdentityError> for TestRendererRootError {
+    fn from(error: TestRendererPrivateSerializationFinishedWorkIdentityError) -> Self {
+        Self::PrivateSerializationFinishedWorkIdentity(Box::new(error))
     }
 }
 
@@ -10957,6 +11268,9 @@ impl TestRendererRoot {
                     slot: finished_work.slot().get(),
                     generation: finished_work.generation().get(),
                 },
+                finished_lanes_bits: commit.finished_lanes().bits(),
+                remaining_lanes_bits: commit.remaining_lanes().bits(),
+                pending_lanes_bits: commit.pending_lanes().bits(),
                 finished_lanes_empty: commit.finished_lanes().is_empty(),
                 finished_lanes_include_sync: commit.finished_lanes().includes_sync_lane(),
                 remaining_lanes_empty: commit.remaining_lanes().is_empty(),
@@ -12373,6 +12687,66 @@ impl TestRendererRoot {
             native_execution_available: false,
             compatibility_claimed: false,
         })
+    }
+
+    pub fn describe_private_to_json_finished_work_identity_gate_for_canary(
+        &self,
+        render: Option<HostRootRenderPhaseRecord>,
+        commit: Option<&HostRootCommitRecord>,
+        report: Option<&TestRendererPrivateJsonSerializationReport>,
+    ) -> Result<TestRendererPrivateSerializationFinishedWorkIdentityGate, TestRendererRootError>
+    {
+        let Some(report) = report else {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::MissingSerializationEvidence {
+                    public_surface: "create().toJSON",
+                }
+                .into(),
+            );
+        };
+
+        self.describe_private_serialization_finished_work_identity_gate_for_canary(
+            "create().toJSON",
+            TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME,
+            report.host_output_update_kind(),
+            report.host_output_snapshot_current(),
+            report.public_blockers(),
+            render,
+            commit,
+            true,
+            false,
+            report.gate(),
+        )
+    }
+
+    pub fn describe_private_to_tree_finished_work_identity_gate_for_canary(
+        &self,
+        render: Option<HostRootRenderPhaseRecord>,
+        commit: Option<&HostRootCommitRecord>,
+        report: Option<&TestRendererPrivateTreeMetadataReport>,
+    ) -> Result<TestRendererPrivateSerializationFinishedWorkIdentityGate, TestRendererRootError>
+    {
+        let Some(report) = report else {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::MissingSerializationEvidence {
+                    public_surface: "create().toTree",
+                }
+                .into(),
+            );
+        };
+
+        self.describe_private_serialization_finished_work_identity_gate_for_canary(
+            "create().toTree",
+            TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME,
+            report.host_output_update_kind(),
+            report.host_output_snapshot_current(),
+            report.public_blockers(),
+            render,
+            commit,
+            false,
+            true,
+            report.gate(),
+        )
     }
 
     pub fn describe_private_tree_committed_fiber_inspection_for_canary(
@@ -15253,6 +15627,225 @@ impl TestRendererRoot {
             public_query_methods_available: false,
             compatibility_claimed: false,
         }
+    }
+
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "private serialization identity gate mirrors the finished-work handoff evidence shape"
+    )]
+    fn describe_private_serialization_finished_work_identity_gate_for_canary(
+        &self,
+        public_surface: &'static str,
+        source_serialization_diagnostic_name: &'static str,
+        host_output_update_kind: TestRendererRootUpdateKind,
+        host_output_snapshot_current: bool,
+        public_blockers: TestRendererPrivateJsonPublicSurfaceBlockers,
+        render: Option<HostRootRenderPhaseRecord>,
+        commit: Option<&HostRootCommitRecord>,
+        consumes_private_to_json_evidence: bool,
+        consumes_private_to_tree_evidence: bool,
+        report_gate: &TestRendererSerializationGateReport,
+    ) -> Result<TestRendererPrivateSerializationFinishedWorkIdentityGate, TestRendererRootError>
+    {
+        let Some(render) = render else {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::MissingFinishedWorkHandoff {
+                    public_surface,
+                }
+                .into(),
+            );
+        };
+        let Some(commit) = commit else {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::MissingCommittedHostRoot {
+                    public_surface,
+                }
+                .into(),
+            );
+        };
+
+        macro_rules! fiber_handle {
+            ($fiber:expr) => {{
+                let fiber = $fiber;
+                TestRendererFiberHandleDiagnostics {
+                    arena_id: fiber.arena_id().get(),
+                    slot: fiber.slot().get(),
+                    generation: fiber.generation().get(),
+                }
+            }};
+        }
+
+        if render.root() != self.root_id {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::ForeignFinishedWorkIdentity {
+                    reason: "render-root-mismatch",
+                }
+                .into(),
+            );
+        }
+        if commit.root() != self.root_id {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::ForeignFinishedWorkIdentity {
+                    reason: "commit-root-mismatch",
+                }
+                .into(),
+            );
+        }
+        if report_gate.commit().root() != self.root_id {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::ForeignFinishedWorkIdentity {
+                    reason: "serialization-report-root-mismatch",
+                }
+                .into(),
+            );
+        }
+
+        let actual_current = self.store.root(self.root_id)?.current();
+        if actual_current != commit.current() {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::StaleFinishedWorkIdentity {
+                    reason: "commit-current-not-root-current",
+                }
+                .into(),
+            );
+        }
+        if commit.current() != render.finished_work() {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::NonCommittedFinishedWorkIdentity {
+                    reason: "commit-current-finished-work-mismatch",
+                }
+                .into(),
+            );
+        }
+        if commit.previous_current() != render.current() {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::StaleFinishedWorkIdentity {
+                    reason: "commit-previous-current-render-current-mismatch",
+                }
+                .into(),
+            );
+        }
+        if commit.finished_lanes() != render.render_lanes() {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::LaneMismatch {
+                    render_lanes_bits: render.render_lanes().bits(),
+                    commit_finished_lanes_bits: commit.finished_lanes().bits(),
+                }
+                .into(),
+            );
+        }
+        if report_gate.gate_name() != TEST_RENDERER_SERIALIZATION_CANARY_GATE_NAME
+            || report_gate.status()
+                != TestRendererSerializationGateStatus::ReadyForPrivateSerializationDiagnostics
+            || !report_gate.requirements().private_serialization_ready()
+        {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "serialization-gate-not-ready",
+                }
+                .into(),
+            );
+        }
+        if !host_output_snapshot_current {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "host-output-snapshot-stale",
+                }
+                .into(),
+            );
+        }
+        if !public_blockers.all_blocked() {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::PublicCompatibilityOpened {
+                    reason: "public-blockers-not-all-closed",
+                }
+                .into(),
+            );
+        }
+
+        let report_commit = report_gate.commit();
+        if report_commit.current() != report_commit.finished_work() {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::NonCommittedFinishedWorkIdentity {
+                    reason: "serialization-report-current-finished-work-mismatch",
+                }
+                .into(),
+            );
+        }
+        if report_commit.current() != fiber_handle!(commit.current())
+            || report_commit.finished_work() != fiber_handle!(commit.finished_work())
+        {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::StaleFinishedWorkIdentity {
+                    reason: "serialization-report-finished-work-mismatch",
+                }
+                .into(),
+            );
+        }
+        if report_commit.finished_lanes_bits() != commit.finished_lanes().bits()
+            || report_commit.remaining_lanes_bits() != commit.remaining_lanes().bits()
+            || report_commit.pending_lanes_bits() != commit.pending_lanes().bits()
+        {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::LaneMismatch {
+                    render_lanes_bits: report_commit.finished_lanes_bits(),
+                    commit_finished_lanes_bits: commit.finished_lanes().bits(),
+                }
+                .into(),
+            );
+        }
+        let Some(fiber_inspection) = report_gate.fiber_inspection() else {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                    reason: "missing-committed-fiber-inspection",
+                }
+                .into(),
+            );
+        };
+        if fiber_inspection.current() != commit.current() {
+            return Err(
+                TestRendererPrivateSerializationFinishedWorkIdentityError::StaleFinishedWorkIdentity {
+                    reason: "committed-fiber-inspection-current-mismatch",
+                }
+                .into(),
+            );
+        }
+
+        Ok(TestRendererPrivateSerializationFinishedWorkIdentityGate {
+            diagnostic_name:
+                TEST_RENDERER_PRIVATE_SERIALIZATION_FINISHED_WORK_IDENTITY_DIAGNOSTIC_NAME,
+            status: TEST_RENDERER_PRIVATE_SERIALIZATION_FINISHED_WORK_IDENTITY_STATUS,
+            root: self.root_id,
+            public_surface,
+            source_serialization_diagnostic_name,
+            host_output_update_kind,
+            render_current: fiber_handle!(render.current()),
+            render_finished_work: fiber_handle!(render.finished_work()),
+            commit_previous_current: fiber_handle!(commit.previous_current()),
+            commit_current: fiber_handle!(commit.current()),
+            report_finished_work: report_commit.finished_work(),
+            render_lanes_bits: render.render_lanes().bits(),
+            commit_finished_lanes_bits: commit.finished_lanes().bits(),
+            report_finished_lanes_bits: report_commit.finished_lanes_bits(),
+            commit_remaining_lanes_bits: commit.remaining_lanes().bits(),
+            commit_pending_lanes_bits: commit.pending_lanes().bits(),
+            commit_current_matches_render_finished_work: true,
+            commit_previous_current_matches_render_current: true,
+            commit_lanes_match_render_lanes: true,
+            report_finished_work_matches_commit_current: true,
+            report_lanes_match_commit_lanes: true,
+            committed_fiber_inspection_current_matches_commit: true,
+            host_output_snapshot_current,
+            consumes_committed_host_root_finished_work_identity: true,
+            consumes_committed_host_root_finished_work_lanes: true,
+            consumes_private_to_json_evidence,
+            consumes_private_to_tree_evidence,
+            public_to_json_available: false,
+            public_to_tree_available: false,
+            public_test_instance_available: false,
+            public_serialization_available: false,
+            compatibility_claimed: false,
+        })
     }
 
     #[allow(
@@ -18469,6 +19062,304 @@ mod tests {
         assert!(!evidence.public_to_tree_available());
         assert!(!evidence.native_execution_available());
         assert!(!evidence.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_to_json_serialization_finished_work_identity_gate_accepts_committed_handoff() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let report = root
+            .describe_private_json_serialization_for_canary(&output)
+            .unwrap();
+
+        let identity = root
+            .describe_private_to_json_finished_work_identity_gate_for_canary(
+                Some(output.render()),
+                Some(output.commit()),
+                Some(&report),
+            )
+            .unwrap();
+
+        assert_eq!(
+            identity.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_SERIALIZATION_FINISHED_WORK_IDENTITY_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            identity.status(),
+            TEST_RENDERER_PRIVATE_SERIALIZATION_FINISHED_WORK_IDENTITY_STATUS
+        );
+        assert_eq!(identity.root(), root.root_id());
+        assert_eq!(identity.public_surface(), "create().toJSON");
+        assert_eq!(
+            identity.source_serialization_diagnostic_name(),
+            TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            identity.host_output_update_kind(),
+            TestRendererRootUpdateKind::Create
+        );
+        assert_eq!(identity.render_finished_work(), identity.commit_current());
+        assert_eq!(identity.report_finished_work(), identity.commit_current());
+        assert_eq!(
+            identity.render_lanes_bits(),
+            identity.commit_finished_lanes_bits()
+        );
+        assert_eq!(
+            identity.report_finished_lanes_bits(),
+            identity.commit_finished_lanes_bits()
+        );
+        assert_eq!(identity.commit_remaining_lanes_bits(), 0);
+        assert_eq!(identity.commit_pending_lanes_bits(), 0);
+        assert!(identity.commit_current_matches_render_finished_work());
+        assert!(identity.commit_previous_current_matches_render_current());
+        assert!(identity.commit_lanes_match_render_lanes());
+        assert!(identity.report_finished_work_matches_commit_current());
+        assert!(identity.report_lanes_match_commit_lanes());
+        assert!(identity.committed_fiber_inspection_current_matches_commit());
+        assert!(identity.host_output_snapshot_current());
+        assert!(identity.consumes_committed_host_root_finished_work_identity());
+        assert!(identity.consumes_committed_host_root_finished_work_lanes());
+        assert!(identity.consumes_private_to_json_evidence());
+        assert!(!identity.consumes_private_to_tree_evidence());
+        assert!(!identity.public_to_json_available());
+        assert!(!identity.public_to_tree_available());
+        assert!(!identity.public_test_instance_available());
+        assert!(!identity.public_serialization_available());
+        assert!(!identity.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_to_tree_serialization_finished_work_identity_gate_accepts_committed_handoff() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let report = root
+            .describe_private_tree_metadata_for_canary(&output)
+            .unwrap();
+
+        let identity = root
+            .describe_private_to_tree_finished_work_identity_gate_for_canary(
+                Some(output.render()),
+                Some(output.commit()),
+                Some(&report),
+            )
+            .unwrap();
+
+        assert_eq!(identity.public_surface(), "create().toTree");
+        assert_eq!(
+            identity.source_serialization_diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME
+        );
+        assert_eq!(identity.render_finished_work(), identity.commit_current());
+        assert_eq!(
+            identity.render_lanes_bits(),
+            identity.commit_finished_lanes_bits()
+        );
+        assert!(!identity.consumes_private_to_json_evidence());
+        assert!(identity.consumes_private_to_tree_evidence());
+        assert!(!identity.public_serialization_available());
+        assert!(!identity.compatibility_claimed());
+    }
+
+    #[test]
+    fn root_private_serialization_finished_work_identity_gate_rejects_missing_evidence() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let error = root
+            .describe_private_to_json_finished_work_identity_gate_for_canary(
+                Some(output.render()),
+                Some(output.commit()),
+                None,
+            )
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateSerializationFinishedWorkIdentity(error) = error else {
+            panic!("expected private serialization finished-work identity error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateSerializationFinishedWorkIdentityError::MissingSerializationEvidence {
+                public_surface: "create().toJSON"
+            }
+        ));
+    }
+
+    #[test]
+    fn root_private_serialization_finished_work_identity_gate_rejects_foreign_evidence() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let mut report = root
+            .describe_private_json_serialization_for_canary(&output)
+            .unwrap();
+        report.gate.commit.root = FiberRootId::new(root.root_id().raw() + 1).unwrap();
+
+        let error = root
+            .describe_private_to_json_finished_work_identity_gate_for_canary(
+                Some(output.render()),
+                Some(output.commit()),
+                Some(&report),
+            )
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateSerializationFinishedWorkIdentity(error) = error else {
+            panic!("expected private serialization finished-work identity error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateSerializationFinishedWorkIdentityError::ForeignFinishedWorkIdentity {
+                reason: "serialization-report-root-mismatch"
+            }
+        ));
+    }
+
+    #[test]
+    fn root_private_serialization_finished_work_identity_gate_rejects_stale_evidence() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let stale_output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let stale_report = root
+            .describe_private_json_serialization_for_canary(&stale_output)
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        root.render_and_commit_host_output_update_for_canary()
+            .unwrap()
+            .unwrap();
+
+        let error = root
+            .describe_private_to_json_finished_work_identity_gate_for_canary(
+                Some(stale_output.render()),
+                Some(stale_output.commit()),
+                Some(&stale_report),
+            )
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateSerializationFinishedWorkIdentity(error) = error else {
+            panic!("expected private serialization finished-work identity error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateSerializationFinishedWorkIdentityError::StaleFinishedWorkIdentity {
+                reason: "commit-current-not-root-current"
+            }
+        ));
+    }
+
+    #[test]
+    fn root_private_serialization_finished_work_identity_gate_rejects_non_committed_identity() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let report = root
+            .describe_private_json_serialization_for_canary(&output)
+            .unwrap();
+        root.update_host_component_with_text_for_canary("span", "goodbye")
+            .unwrap();
+        let render = root
+            .render_latest_scheduled_host_root_for_commit_handoff()
+            .unwrap()
+            .unwrap();
+
+        let error = root
+            .describe_private_to_json_finished_work_identity_gate_for_canary(
+                Some(render),
+                Some(output.commit()),
+                Some(&report),
+            )
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateSerializationFinishedWorkIdentity(error) = error else {
+            panic!("expected private serialization finished-work identity error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateSerializationFinishedWorkIdentityError::NonCommittedFinishedWorkIdentity {
+                reason: "commit-current-finished-work-mismatch"
+            }
+        ));
+    }
+
+    #[test]
+    fn root_private_serialization_finished_work_identity_gate_rejects_lane_mismatch() {
+        let mut root = TestRendererRoot::create_host_component_with_text_for_canary(
+            "span",
+            "hello",
+            TestRendererOptions::new(),
+        )
+        .unwrap();
+        let output = root
+            .render_and_commit_host_output_for_canary()
+            .unwrap()
+            .unwrap();
+        let mut report = root
+            .describe_private_json_serialization_for_canary(&output)
+            .unwrap();
+        report.gate.commit.finished_lanes_bits = 0;
+
+        let error = root
+            .describe_private_to_json_finished_work_identity_gate_for_canary(
+                Some(output.render()),
+                Some(output.commit()),
+                Some(&report),
+            )
+            .unwrap_err();
+
+        let TestRendererRootError::PrivateSerializationFinishedWorkIdentity(error) = error else {
+            panic!("expected private serialization finished-work identity error");
+        };
+        assert!(matches!(
+            error.as_ref(),
+            TestRendererPrivateSerializationFinishedWorkIdentityError::LaneMismatch {
+                render_lanes_bits: 0,
+                commit_finished_lanes_bits
+            } if *commit_finished_lanes_bits != 0
+        ));
     }
 
     #[test]
