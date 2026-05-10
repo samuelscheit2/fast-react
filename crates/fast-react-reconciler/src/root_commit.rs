@@ -6441,9 +6441,7 @@ impl HostRootCommitRecord {
         self.mutation_apply_log
             .records()
             .iter()
-            .filter(|record| {
-                record.kind() == HostRootMutationApplyRecordKind::AppendPlacementToHostParent
-            })
+            .filter(|record| is_host_parent_placement_apply_kind_for_canary(record.kind()))
             .count()
     }
 
@@ -6455,7 +6453,7 @@ impl HostRootCommitRecord {
         child_state_node_raw: u64,
     ) -> bool {
         self.mutation_apply_log.records().iter().any(|record| {
-            record.kind() == HostRootMutationApplyRecordKind::AppendPlacementToHostParent
+            is_host_parent_placement_apply_kind_for_canary(record.kind())
                 && record.parent_tag() == FiberTag::HostComponent
                 && record.parent_state_node().raw() == parent_state_node_raw
                 && record.state_node().raw() == child_state_node_raw
@@ -6623,18 +6621,34 @@ impl HostRootCommitRecord {
                         )
                     )
             })
-            .map(|record| HostParentPlacementApplyDiagnosticForCanary {
-                root: record.root(),
-                host_root: record.host_root(),
-                parent: record.parent(),
-                parent_tag: record.parent_tag(),
-                parent_state_node: record.parent_state_node(),
-                fiber: record.fiber(),
-                tag: record.tag(),
-                state_node: record.state_node(),
-                apply_kind: host_root_mutation_apply_record_kind_name(record.kind()),
-                applies_to_host_parent: record.kind()
-                    == HostRootMutationApplyRecordKind::AppendPlacementToHostParent,
+            .map(|record| {
+                let placement_sibling = record.placement_sibling();
+                HostParentPlacementApplyDiagnosticForCanary {
+                    root: record.root(),
+                    host_root: record.host_root(),
+                    parent: record.parent(),
+                    parent_tag: record.parent_tag(),
+                    parent_state_node: record.parent_state_node(),
+                    fiber: record.fiber(),
+                    tag: record.tag(),
+                    state_node: record.state_node(),
+                    apply_kind: host_root_mutation_apply_record_kind_name(record.kind()),
+                    sibling_status: placement_sibling
+                        .map(HostRootPlacementSiblingRecord::status)
+                        .map(host_root_placement_sibling_status_name)
+                        .unwrap_or("missing-placement-sibling-record"),
+                    sibling: placement_sibling.and_then(HostRootPlacementSiblingRecord::sibling),
+                    sibling_tag: placement_sibling
+                        .and_then(HostRootPlacementSiblingRecord::sibling_tag),
+                    sibling_state_node: placement_sibling
+                        .map(HostRootPlacementSiblingRecord::sibling_state_node)
+                        .unwrap_or(StateNodeHandle::NONE),
+                    can_insert_before: placement_sibling
+                        .is_some_and(HostRootPlacementSiblingRecord::can_insert_before),
+                    applies_to_host_parent: is_host_parent_placement_apply_kind_for_canary(
+                        record.kind(),
+                    ),
+                }
             })
             .collect()
     }
@@ -10234,6 +10248,7 @@ pub(crate) enum HostRootMutationApplyRecordKind {
     AppendPlacementToContainer,
     AppendPlacementToHostParent,
     InsertPlacementInContainerBefore,
+    InsertPlacementInHostParentBefore,
     RecordPlacementInsertionBlocked,
     CommitHostComponentUpdate,
     CommitHostTextUpdate,
@@ -10349,6 +10364,11 @@ pub struct HostParentPlacementApplyDiagnosticForCanary {
     tag: FiberTag,
     state_node: StateNodeHandle,
     apply_kind: &'static str,
+    sibling_status: &'static str,
+    sibling: Option<FiberId>,
+    sibling_tag: Option<FiberTag>,
+    sibling_state_node: StateNodeHandle,
+    can_insert_before: bool,
     applies_to_host_parent: bool,
 }
 
@@ -10416,6 +10436,44 @@ impl HostParentPlacementApplyDiagnosticForCanary {
     #[must_use]
     pub const fn apply_kind(self) -> &'static str {
         self.apply_kind
+    }
+
+    #[must_use]
+    pub const fn sibling_status(self) -> &'static str {
+        self.sibling_status
+    }
+
+    #[must_use]
+    pub const fn sibling(self) -> Option<FiberId> {
+        self.sibling
+    }
+
+    #[must_use]
+    pub const fn sibling_tag(self) -> Option<FiberTag> {
+        self.sibling_tag
+    }
+
+    #[must_use]
+    pub const fn sibling_tag_name(self) -> Option<&'static str> {
+        match self.sibling_tag {
+            Some(tag) => Some(host_root_fiber_tag_name(tag)),
+            None => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn sibling_state_node(self) -> StateNodeHandle {
+        self.sibling_state_node
+    }
+
+    #[must_use]
+    pub const fn sibling_state_node_raw(self) -> u64 {
+        self.sibling_state_node.raw()
+    }
+
+    #[must_use]
+    pub const fn can_insert_before(self) -> bool {
+        self.can_insert_before
     }
 
     #[must_use]
@@ -10738,6 +10796,16 @@ const fn is_host_update_apply_record_kind_for_canary(
     )
 }
 
+const fn is_host_parent_placement_apply_kind_for_canary(
+    kind: HostRootMutationApplyRecordKind,
+) -> bool {
+    matches!(
+        kind,
+        HostRootMutationApplyRecordKind::AppendPlacementToHostParent
+            | HostRootMutationApplyRecordKind::InsertPlacementInHostParentBefore
+    )
+}
+
 const fn host_root_mutation_apply_record_kind_name(
     kind: HostRootMutationApplyRecordKind,
 ) -> &'static str {
@@ -10750,6 +10818,9 @@ const fn host_root_mutation_apply_record_kind_name(
         }
         HostRootMutationApplyRecordKind::InsertPlacementInContainerBefore => {
             "insert-placement-in-container-before"
+        }
+        HostRootMutationApplyRecordKind::InsertPlacementInHostParentBefore => {
+            "insert-placement-in-host-parent-before"
         }
         HostRootMutationApplyRecordKind::RecordPlacementInsertionBlocked => {
             "record-placement-insertion-blocked"
@@ -11163,10 +11234,15 @@ fn host_root_mutation_phase_record(
         parent_node.state_node()
     };
     let placement_sibling = match kind {
-        HostRootMutationPhaseRecordKind::Placement if parent_node.tag() == FiberTag::HostRoot => {
-            Some(host_root_placement_sibling_record(
+        HostRootMutationPhaseRecordKind::Placement
+            if matches!(
+                parent_node.tag(),
+                FiberTag::HostRoot | FiberTag::HostComponent
+            ) =>
+        {
+            Some(host_parent_placement_sibling_record(
                 arena,
-                host_root,
+                parent,
                 node.sibling(),
             )?)
         }
@@ -11197,9 +11273,9 @@ fn host_root_mutation_phase_record(
     })
 }
 
-fn host_root_placement_sibling_record(
+fn host_parent_placement_sibling_record(
     arena: &fast_react_core::FiberArena,
-    host_root: FiberId,
+    host_parent: FiberId,
     sibling: Option<FiberId>,
 ) -> Result<HostRootPlacementSiblingRecord, RootCommitError> {
     let Some(sibling) = sibling else {
@@ -11207,9 +11283,9 @@ fn host_root_placement_sibling_record(
     };
 
     let sibling_node = arena.get(sibling)?;
-    if sibling_node.return_fiber() != Some(host_root) {
+    if sibling_node.return_fiber() != Some(host_parent) {
         return Err(FiberTopologyError::MixedParentSiblingChain {
-            parent: host_root,
+            parent: host_parent,
             child: sibling,
             actual_parent: sibling_node.return_fiber(),
         }
@@ -11351,7 +11427,23 @@ fn host_root_mutation_phase_apply_record(
             if record.parent_tag() == FiberTag::HostComponent
                 && !record.parent_flags().contains_all(FiberFlags::PLACEMENT) =>
         {
-            HostRootMutationApplyRecordKind::AppendPlacementToHostParent
+            match record
+                .placement_sibling()
+                .unwrap_or(HostRootPlacementSiblingRecord::append())
+                .status()
+            {
+                HostRootPlacementSiblingStatus::Append => {
+                    HostRootMutationApplyRecordKind::AppendPlacementToHostParent
+                }
+                HostRootPlacementSiblingStatus::InsertBefore => {
+                    HostRootMutationApplyRecordKind::InsertPlacementInHostParentBefore
+                }
+                HostRootPlacementSiblingStatus::BlockedPendingPlacement
+                | HostRootPlacementSiblingStatus::BlockedUnsupportedTag
+                | HostRootPlacementSiblingStatus::BlockedMissingStateNode => {
+                    HostRootMutationApplyRecordKind::RecordPlacementInsertionBlocked
+                }
+            }
         }
         (HostRootMutationPhaseRecordKind::Placement, _) => {
             HostRootMutationApplyRecordKind::SkipUnsupportedNestedPlacement
@@ -14837,6 +14929,161 @@ mod tests {
                 StateNodeHandle::from_raw(9999).raw()
             )
         );
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            render.finished_work()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_records_host_parent_child_reorder_before_stable_sibling_without_host_mutation() {
+        let (mut store, root_id, host) = root_store();
+        let current_root = store.root(root_id).unwrap().current();
+        let parent_state_node = StateNodeHandle::from_raw(9_220);
+        let stable_state_node = StateNodeHandle::from_raw(9_221);
+        let moving_state_node = StateNodeHandle::from_raw(9_222);
+        let parent_props = PropsHandle::from_raw(9_223);
+        let stable_props = PropsHandle::from_raw(9_224);
+        let moving_props = PropsHandle::from_raw(9_225);
+        let current_parent = attach_host_root_child(
+            &mut store,
+            current_root,
+            FiberTag::HostComponent,
+            FiberFlags::NO,
+            parent_state_node,
+            parent_props,
+            parent_props,
+        );
+        let mode = store.fiber_arena().get(current_parent).unwrap().mode();
+        let stable_current =
+            store
+                .fiber_arena_mut()
+                .create_fiber(FiberTag::HostText, None, stable_props, mode);
+        let moving_current =
+            store
+                .fiber_arena_mut()
+                .create_fiber(FiberTag::HostText, None, moving_props, mode);
+        {
+            let node = store.fiber_arena_mut().get_mut(stable_current).unwrap();
+            node.set_state_node(stable_state_node);
+            node.set_memoized_props(stable_props);
+        }
+        {
+            let node = store.fiber_arena_mut().get_mut(moving_current).unwrap();
+            node.set_state_node(moving_state_node);
+            node.set_memoized_props(moving_props);
+        }
+        store
+            .fiber_arena_mut()
+            .set_children(current_parent, &[stable_current, moving_current])
+            .unwrap();
+
+        update_container(&mut store, root_id, RootElementHandle::from_raw(46), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let work_parent = store
+            .fiber_arena_mut()
+            .create_work_in_progress(current_parent, parent_props)
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(work_parent).unwrap();
+            node.set_state_node(parent_state_node);
+            node.set_memoized_props(parent_props);
+            node.set_lanes(Lanes::NO);
+        }
+        let moving_work = store
+            .fiber_arena_mut()
+            .create_work_in_progress(moving_current, moving_props)
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(moving_work).unwrap();
+            node.set_flags(FiberFlags::PLACEMENT);
+            node.set_state_node(moving_state_node);
+            node.set_memoized_props(moving_props);
+            node.set_lanes(Lanes::NO);
+        }
+        let stable_work = store
+            .fiber_arena_mut()
+            .create_work_in_progress(stable_current, stable_props)
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(stable_work).unwrap();
+            node.set_state_node(stable_state_node);
+            node.set_memoized_props(stable_props);
+            node.set_lanes(Lanes::NO);
+        }
+        store
+            .fiber_arena_mut()
+            .set_children(work_parent, &[moving_work, stable_work])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(render.finished_work(), &[work_parent])
+            .unwrap();
+        bubble_test_fiber(&mut store, moving_work);
+        bubble_test_fiber(&mut store, stable_work);
+        bubble_test_fiber(&mut store, work_parent);
+        bubble_test_fiber(&mut store, render.finished_work());
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let records = commit.mutation_log().records();
+        let apply_records = commit.mutation_apply_log().records();
+        let diagnostics = commit.host_parent_placement_apply_diagnostics_for_canary();
+        let placement_sibling = records[0].placement_sibling().unwrap();
+
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].parent(), work_parent);
+        assert_eq!(records[0].parent_tag(), FiberTag::HostComponent);
+        assert_eq!(records[0].parent_state_node(), parent_state_node);
+        assert_eq!(records[0].fiber(), moving_work);
+        assert_eq!(records[0].alternate_fiber(), Some(moving_current));
+        assert_eq!(
+            placement_sibling.status(),
+            HostRootPlacementSiblingStatus::InsertBefore
+        );
+        assert_eq!(placement_sibling.sibling(), Some(stable_work));
+        assert_eq!(placement_sibling.sibling_tag(), Some(FiberTag::HostText));
+        assert_eq!(placement_sibling.sibling_state_node(), stable_state_node);
+        assert!(placement_sibling.can_insert_before());
+
+        assert_eq!(apply_records.len(), 1);
+        assert_eq!(
+            apply_records[0].kind(),
+            HostRootMutationApplyRecordKind::InsertPlacementInHostParentBefore
+        );
+        assert_eq!(apply_records[0].parent(), work_parent);
+        assert_eq!(apply_records[0].parent_state_node(), parent_state_node);
+        assert_eq!(apply_records[0].fiber(), moving_work);
+        assert_eq!(apply_records[0].state_node(), moving_state_node);
+        assert_eq!(
+            apply_records[0].placement_sibling(),
+            Some(placement_sibling)
+        );
+
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].parent(), work_parent);
+        assert_eq!(diagnostics[0].fiber(), moving_work);
+        assert_eq!(
+            diagnostics[0].apply_kind(),
+            "insert-placement-in-host-parent-before"
+        );
+        assert_eq!(diagnostics[0].sibling_status(), "insert-before");
+        assert_eq!(diagnostics[0].sibling(), Some(stable_work));
+        assert_eq!(diagnostics[0].sibling_tag_name(), Some("HostText"));
+        assert_eq!(
+            diagnostics[0].sibling_state_node_raw(),
+            stable_state_node.raw()
+        );
+        assert!(diagnostics[0].can_insert_before());
+        assert!(diagnostics[0].applies_to_host_parent());
+        assert_eq!(
+            commit.test_only_host_parent_placement_apply_count_for_canary(),
+            1
+        );
+        assert!(commit.has_test_only_host_parent_placement_apply_for_canary(
+            parent_state_node.raw(),
+            moving_state_node.raw()
+        ));
         assert_eq!(
             store.root(root_id).unwrap().current(),
             render.finished_work()
