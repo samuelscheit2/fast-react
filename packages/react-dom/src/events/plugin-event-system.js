@@ -34,6 +34,10 @@ const DISPATCH_LISTENER_CANARY_EVENT_KIND =
   'FastReactDomDispatchListenerCanaryEvent';
 const DISPATCH_QUEUE_INVOCATION_CANARY_RECORD_KIND =
   'FastReactDomDispatchQueueInvocationCanaryRecord';
+const SYNTHETIC_EVENT_SHAPE_RECORD_KIND =
+  'FastReactDomSyntheticEventShapeRecord';
+const SYNTHETIC_EVENT_SHAPE_GATE_RECORD_KIND =
+  'FastReactDomSyntheticEventShapeGateRecord';
 const HYDRATION_REPLAY_EVENT_QUEUE_DIAGNOSTIC_KIND =
   'FastReactDomHydrationReplayEventQueueDiagnostic';
 const HYDRATION_REPLAY_EVENT_QUEUE_ENTRY_RECORD_KIND =
@@ -64,6 +68,10 @@ const PRIVATE_SINGLE_LISTENER_INVOCATION_CANARY_STATUS =
   'controlled-private-single-listener-invocation-canary';
 const PRIVATE_DISPATCH_QUEUE_INVOCATION_CANARY_STATUS =
   'controlled-private-dispatch-queue-invocation-canary';
+const PRIVATE_SYNTHETIC_EVENT_SHAPE_GATE_STATUS =
+  'controlled-private-synthetic-event-shape-gate';
+const PRIVATE_SYNTHETIC_EVENT_SHAPE_STATUS =
+  'validated-private-synthetic-event-shape';
 
 const SIMPLE_EVENT_PLUGIN_NAME = 'simple-event-plugin';
 const POLYFILL_EVENT_PLUGIN_NAMES = Object.freeze([
@@ -200,6 +208,8 @@ const dispatchListenerRecordPayloads = new WeakMap();
 const dispatchQueueEntryRecordPayloads = new WeakMap();
 const dispatchListenerInvocationCanaryRecordPayloads = new WeakMap();
 const dispatchQueueInvocationCanaryRecordPayloads = new WeakMap();
+const syntheticEventShapeRecordPayloads = new WeakMap();
+const syntheticEventShapeGateRecordPayloads = new WeakMap();
 
 function isObjectLike(value) {
   return (
@@ -220,6 +230,14 @@ function createPluginEventSystemError(message, code) {
   const error = new Error(message);
   error.code = code;
   return error;
+}
+
+function functionThatReturnsTrue() {
+  return true;
+}
+
+function functionThatReturnsFalse() {
+  return false;
 }
 
 function getWrapperRecord(listenerOrWrapperRecord) {
@@ -745,10 +763,11 @@ function invokeDispatchListenerRecordForCanary(dispatchListenerRecord, options) 
       : assertDispatchQueueEntryRecord(normalizedOptions.dispatchQueueEntry);
   const selectedFromProcessingOrder =
     normalizedOptions.selectedFromProcessingOrder !== false;
-  const listenerIndex =
-    typeof normalizedOptions.listenerIndex === 'number'
-      ? normalizedOptions.listenerIndex
-      : 0;
+  const listenerIndex = normalizeNonNegativeInteger(
+    normalizedOptions.listenerIndex,
+    0,
+    'listenerIndex'
+  );
 
   if (typeof payload.listener !== 'function') {
     return createSkippedSingleListenerInvocationCanaryRecord(
@@ -989,6 +1008,400 @@ function createDispatchListenerCanaryEvent(dispatchListenerRecord, payload) {
     targetInst: dispatchListenerRecord.targetInst,
     type: dispatchListenerRecord.nativeEventType
   });
+}
+
+function SyntheticBaseEvent(
+  reactName,
+  reactEventType,
+  targetInst,
+  nativeEvent,
+  nativeEventTarget
+) {
+  const defaultPrevented = getNativeEventDefaultPrevented(nativeEvent);
+
+  this._reactName = reactName;
+  this._targetInst = targetInst;
+  this.type = reactEventType;
+  this.nativeEvent = nativeEvent;
+  this.target = nativeEventTarget;
+  this.currentTarget = null;
+  this.defaultPrevented = defaultPrevented;
+  this.isDefaultPrevented = defaultPrevented
+    ? functionThatReturnsTrue
+    : functionThatReturnsFalse;
+  this.isPropagationStopped = functionThatReturnsFalse;
+}
+
+SyntheticBaseEvent.prototype.preventDefault = function preventDefault() {
+  this.defaultPrevented = true;
+  const nativeEvent = this.nativeEvent;
+  if (isObjectLike(nativeEvent)) {
+    if (typeof nativeEvent.preventDefault === 'function') {
+      nativeEvent.preventDefault();
+    } else if (typeof nativeEvent.returnValue !== 'unknown') {
+      nativeEvent.returnValue = false;
+    }
+  }
+  this.isDefaultPrevented = functionThatReturnsTrue;
+};
+
+SyntheticBaseEvent.prototype.stopPropagation = function stopPropagation() {
+  const nativeEvent = this.nativeEvent;
+  if (isObjectLike(nativeEvent)) {
+    if (typeof nativeEvent.stopPropagation === 'function') {
+      nativeEvent.stopPropagation();
+    } else if (typeof nativeEvent.cancelBubble !== 'unknown') {
+      nativeEvent.cancelBubble = true;
+    }
+  }
+  this.isPropagationStopped = functionThatReturnsTrue;
+};
+
+SyntheticBaseEvent.prototype.persist = function persist() {};
+SyntheticBaseEvent.prototype.isPersistent = functionThatReturnsTrue;
+
+function createSyntheticEventShapeGateFromDispatchRecords(
+  dispatchRecords,
+  options
+) {
+  const normalizedDispatchRecords = normalizeDispatchRecordList(
+    dispatchRecords
+  );
+  const normalizedOptions = isObjectLike(options) ? options : {};
+  const useProcessingOrder = normalizedOptions.useProcessingOrder !== false;
+  const preventDefaultAtPhase = normalizePreventDefaultAtPhase(
+    normalizedOptions.preventDefaultAtPhase
+  );
+  const shapeRecords = [];
+  let dispatchQueueEntryCount = 0;
+  let listenerCandidateCount = 0;
+  let preventDefaultConsumed = false;
+
+  for (
+    let dispatchRecordIndex = 0;
+    dispatchRecordIndex < normalizedDispatchRecords.length;
+    dispatchRecordIndex++
+  ) {
+    const dispatchRecord = normalizedDispatchRecords[dispatchRecordIndex];
+    const dispatchQueue = dispatchRecord.dispatchQueue;
+
+    for (
+      let dispatchQueueEntryIndex = 0;
+      dispatchQueueEntryIndex < dispatchQueue.entries.length;
+      dispatchQueueEntryIndex++
+    ) {
+      const dispatchQueueEntry = assertDispatchQueueEntryRecord(
+        dispatchQueue.entries[dispatchQueueEntryIndex]
+      );
+      const entryPayload =
+        getDispatchQueueEntryRecordPayload(dispatchQueueEntry);
+      const listenerRecords = useProcessingOrder
+        ? entryPayload.processingListenerRecords
+        : entryPayload.listenerRecords;
+      dispatchQueueEntryCount++;
+      listenerCandidateCount += listenerRecords.length;
+
+      for (
+        let listenerIndex = 0;
+        listenerIndex < listenerRecords.length;
+        listenerIndex++
+      ) {
+        const listenerRecord = listenerRecords[listenerIndex];
+        const shouldPreventDefault =
+          preventDefaultAtPhase !== null &&
+          preventDefaultConsumed === false &&
+          listenerRecord.phase === preventDefaultAtPhase;
+        const shapeRecord =
+          createSyntheticEventShapeRecordForDispatchListenerRecord(
+            listenerRecord,
+            {
+              dispatchQueueEntry,
+              dispatchRecord,
+              listenerIndex,
+              preventDefault: shouldPreventDefault,
+              selectedFromProcessingOrder: useProcessingOrder
+            }
+          );
+        shapeRecords.push(shapeRecord);
+        if (shouldPreventDefault) {
+          preventDefaultConsumed = true;
+        }
+      }
+    }
+  }
+
+  const frozenShapeRecords = Object.freeze(shapeRecords.slice());
+  const syntheticEventShapeOrder = Object.freeze(
+    frozenShapeRecords.map((shapeRecord, index) =>
+      Object.freeze({
+        currentTarget: shapeRecord.currentTargetDuringDispatch,
+        defaultPreventedAfterAction:
+          shapeRecord.defaultPreventedAfterAction,
+        dispatchPathIndex: shapeRecord.dispatchPathIndex,
+        index,
+        phase: shapeRecord.phase,
+        preventDefaultInvoked: shapeRecord.preventDefaultInvoked,
+        registrationName: shapeRecord.registrationName,
+        target: shapeRecord.target,
+        targetInst: shapeRecord.targetInst
+      })
+    )
+  );
+  const preventDefaultShapeCount = frozenShapeRecords.filter(
+    (shapeRecord) => shapeRecord.preventDefaultInvoked
+  ).length;
+  const record = Object.freeze({
+    admissionStatus: PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS,
+    broadDispatchQueueProcessing: false,
+    browserDomEventCompatibilityClaimed: false,
+    dispatchQueueEntryCount,
+    dispatchQueueProcessed: false,
+    dispatchRecordCount: normalizedDispatchRecords.length,
+    exposesSyntheticEvent: false,
+    kind: SYNTHETIC_EVENT_SHAPE_GATE_RECORD_KIND,
+    listenerCandidateCount,
+    listenerInvocationCount: 0,
+    preventDefaultAtPhase,
+    preventDefaultShapeCount,
+    publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
+    publicDispatchEnabled: false,
+    publicRootBehaviorChanged: false,
+    selectedFromProcessingOrder: useProcessingOrder,
+    status: PRIVATE_SYNTHETIC_EVENT_SHAPE_GATE_STATUS,
+    syntheticEventCompatibilityClaimed: false,
+    syntheticEventCount: frozenShapeRecords.length,
+    syntheticEventDispatchCount: 0,
+    syntheticEventShapeCount: frozenShapeRecords.length,
+    syntheticEventShapeOrder,
+    syntheticEventShapeRecords: frozenShapeRecords,
+    willInvokeListeners: false
+  });
+
+  syntheticEventShapeGateRecordPayloads.set(
+    record,
+    Object.freeze({
+      dispatchRecords: Object.freeze(normalizedDispatchRecords.slice()),
+      options: Object.freeze({
+        preventDefaultAtPhase,
+        useProcessingOrder
+      }),
+      shapeRecords: frozenShapeRecords
+    })
+  );
+
+  return record;
+}
+
+function createSyntheticEventShapeRecordForDispatchListenerRecord(
+  dispatchListenerRecord,
+  options
+) {
+  const normalizedListenerRecord =
+    assertDispatchListenerRecord(dispatchListenerRecord);
+  const payload =
+    getDispatchListenerRecordPayload(normalizedListenerRecord);
+  const normalizedOptions = isObjectLike(options) ? options : {};
+  const dispatchRecord =
+    normalizedOptions.dispatchRecord === undefined
+      ? null
+      : assertEventDispatchRecord(normalizedOptions.dispatchRecord);
+  const dispatchQueueEntry =
+    normalizedOptions.dispatchQueueEntry === undefined
+      ? null
+      : assertDispatchQueueEntryRecord(normalizedOptions.dispatchQueueEntry);
+  const shouldPreventDefault = normalizedOptions.preventDefault === true;
+  const selectedFromProcessingOrder =
+    normalizedOptions.selectedFromProcessingOrder !== false;
+  const listenerIndex =
+    typeof normalizedOptions.listenerIndex === 'number'
+      ? normalizedOptions.listenerIndex
+      : 0;
+  const syntheticEvent = new SyntheticBaseEvent(
+    normalizedListenerRecord.registrationName,
+    normalizedListenerRecord.nativeEventType,
+    normalizedListenerRecord.targetInst,
+    payload.nativeEvent,
+    payload.nativeEventTarget
+  );
+  const beforeDispatch = createSyntheticEventShapeSnapshot(
+    syntheticEvent,
+    payload.nativeEvent
+  );
+
+  syntheticEvent.currentTarget = normalizedListenerRecord.currentTarget;
+  const duringBeforeAction = createSyntheticEventShapeSnapshot(
+    syntheticEvent,
+    payload.nativeEvent
+  );
+
+  if (shouldPreventDefault) {
+    syntheticEvent.preventDefault();
+  }
+
+  const duringAfterAction = createSyntheticEventShapeSnapshot(
+    syntheticEvent,
+    payload.nativeEvent
+  );
+  syntheticEvent.currentTarget = null;
+  const afterDispatch = createSyntheticEventShapeSnapshot(
+    syntheticEvent,
+    payload.nativeEvent
+  );
+  const record = Object.freeze({
+    admissionStatus: PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS,
+    browserDomEventCompatibilityClaimed: false,
+    constructorName: afterDispatch.constructorName,
+    currentTargetAfterAction: duringAfterAction.currentTarget,
+    currentTargetAfterDispatch: afterDispatch.currentTarget,
+    currentTargetBeforeDispatch: beforeDispatch.currentTarget,
+    currentTargetDuringDispatch: duringBeforeAction.currentTarget,
+    defaultPreventedAfterAction: duringAfterAction.defaultPrevented,
+    defaultPreventedAfterDispatch: afterDispatch.defaultPrevented,
+    defaultPreventedBeforeAction: duringBeforeAction.defaultPrevented,
+    dispatchPathIndex: normalizedListenerRecord.dispatchPathIndex,
+    dispatchQueueEntryKind:
+      dispatchQueueEntry === null ? null : dispatchQueueEntry.kind,
+    dispatchQueueProcessed: false,
+    dispatchRecordKind:
+      dispatchRecord === null ? null : dispatchRecord.kind,
+    domEventName: normalizedListenerRecord.domEventName,
+    exposesSyntheticEvent: false,
+    hasPersist: afterDispatch.hasPersist,
+    hasPreventDefault: afterDispatch.hasPreventDefault,
+    initialDefaultPrevented: beforeDispatch.defaultPrevented,
+    isDefaultPreventedAfterAction:
+      duringAfterAction.isDefaultPrevented,
+    isDefaultPreventedAfterDispatch: afterDispatch.isDefaultPrevented,
+    isDefaultPreventedBeforeAction:
+      duringBeforeAction.isDefaultPrevented,
+    kind: SYNTHETIC_EVENT_SHAPE_RECORD_KIND,
+    listenerIndex,
+    listenerInvocationCount: 0,
+    nativeDefaultPreventedAfterAction:
+      duringAfterAction.nativeDefaultPrevented,
+    nativeDefaultPreventedAfterDispatch:
+      afterDispatch.nativeDefaultPrevented,
+    nativeDefaultPreventedBeforeAction:
+      duringBeforeAction.nativeDefaultPrevented,
+    nativeEventPreventDefaultCallCountAfterAction:
+      duringAfterAction.nativePreventDefaultCallCount,
+    nativeEventPreventDefaultCallCountBeforeAction:
+      duringBeforeAction.nativePreventDefaultCallCount,
+    nativeEventType: normalizedListenerRecord.nativeEventType,
+    phase: normalizedListenerRecord.phase,
+    preventDefaultApplied:
+      shouldPreventDefault && duringAfterAction.defaultPrevented === true,
+    preventDefaultInvoked: shouldPreventDefault,
+    publicDispatchBlockedReason: PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
+    publicDispatchEnabled: false,
+    publicRootBehaviorChanged: false,
+    registrationName: normalizedListenerRecord.registrationName,
+    selectedFromProcessingOrder,
+    status: PRIVATE_SYNTHETIC_EVENT_SHAPE_STATUS,
+    syntheticEventCompatibilityClaimed: false,
+    syntheticEventDispatchCount: 0,
+    syntheticEventShapeOnly: true,
+    target: syntheticEvent.target,
+    targetInst: normalizedListenerRecord.targetInst,
+    targetInstStatus: normalizedListenerRecord.targetInstStatus,
+    targetMatchesNativeEventTarget:
+      syntheticEvent.target === payload.nativeEventTarget,
+    type: syntheticEvent.type,
+    willInvokeListener: false
+  });
+
+  syntheticEventShapeRecordPayloads.set(
+    record,
+    Object.freeze({
+      afterDispatch,
+      beforeDispatch,
+      dispatchListenerRecord: normalizedListenerRecord,
+      dispatchQueueEntry,
+      dispatchRecord,
+      duringAfterAction,
+      duringBeforeAction,
+      nativeEvent: payload.nativeEvent,
+      nativeEventTarget: payload.nativeEventTarget,
+      syntheticEvent
+    })
+  );
+
+  return record;
+}
+
+function createSyntheticEventShapeSnapshot(syntheticEvent, nativeEvent) {
+  return Object.freeze({
+    constructorName:
+      syntheticEvent.constructor &&
+      typeof syntheticEvent.constructor.name === 'string'
+        ? syntheticEvent.constructor.name
+        : null,
+    currentTarget: syntheticEvent.currentTarget,
+    defaultPrevented: syntheticEvent.defaultPrevented === true,
+    hasPersist: typeof syntheticEvent.persist === 'function',
+    hasPreventDefault:
+      typeof syntheticEvent.preventDefault === 'function',
+    isDefaultPrevented: syntheticEvent.isDefaultPrevented(),
+    nativeDefaultPrevented: getNativeEventDefaultPrevented(nativeEvent),
+    nativePreventDefaultCallCount:
+      getNativeEventPreventDefaultCallCount(nativeEvent),
+    target: syntheticEvent.target,
+    type: syntheticEvent.type
+  });
+}
+
+function getNativeEventDefaultPrevented(nativeEvent) {
+  if (!isObjectLike(nativeEvent)) {
+    return false;
+  }
+  if (nativeEvent.defaultPrevented != null) {
+    return nativeEvent.defaultPrevented === true;
+  }
+  return nativeEvent.returnValue === false;
+}
+
+function getNativeEventPreventDefaultCallCount(nativeEvent) {
+  return isObjectLike(nativeEvent) &&
+    typeof nativeEvent.preventDefaultCallCount === 'number'
+    ? nativeEvent.preventDefaultCallCount
+    : null;
+}
+
+function normalizePreventDefaultAtPhase(value) {
+  if (value === undefined || value === null || value === false) {
+    return null;
+  }
+  if (value === 'capture' || value === 'bubble') {
+    return value;
+  }
+  throw createPluginEventSystemError(
+    'Expected preventDefaultAtPhase to be "capture", "bubble", or null.',
+    INVALID_EVENT_DISPATCH_RECORD_CODE
+  );
+}
+
+function getSyntheticEventShapeRecordPayload(record) {
+  if (!isObjectLike(record)) {
+    return null;
+  }
+
+  return syntheticEventShapeRecordPayloads.get(record) || null;
+}
+
+function isSyntheticEventShapeRecord(record) {
+  return getSyntheticEventShapeRecordPayload(record) !== null;
+}
+
+function getSyntheticEventShapeGateRecordPayload(record) {
+  if (!isObjectLike(record)) {
+    return null;
+  }
+
+  return syntheticEventShapeGateRecordPayloads.get(record) || null;
+}
+
+function isSyntheticEventShapeGateRecord(record) {
+  return getSyntheticEventShapeGateRecordPayload(record) !== null;
 }
 
 function getDispatchListenerInvocationCanaryRecordPayload(record) {
@@ -1596,20 +2009,28 @@ module.exports = {
   PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS,
   PRIVATE_DISPATCH_QUEUE_INVOCATION_CANARY_STATUS,
   PRIVATE_SINGLE_LISTENER_INVOCATION_CANARY_STATUS,
+  PRIVATE_SYNTHETIC_EVENT_SHAPE_GATE_STATUS,
+  PRIVATE_SYNTHETIC_EVENT_SHAPE_STATUS,
   PUBLIC_EVENT_DISPATCH_BLOCKED_CODE,
   SCROLL_END_EVENT_PLUGIN_NAME,
   SIMPLE_EVENT_PLUGIN_NAME,
   SYNTHETIC_EVENT_BLOCKED_CODE,
+  SYNTHETIC_EVENT_SHAPE_GATE_RECORD_KIND,
+  SYNTHETIC_EVENT_SHAPE_RECORD_KIND,
   assertEventListenerWrapperRecord,
   createEventDispatchRecordFromWrapperRecord,
   createHydrationReplayEventQueueDiagnostic,
   createPluginExtractionRecord,
+  createSyntheticEventShapeGateFromDispatchRecords,
+  createSyntheticEventShapeRecordForDispatchListenerRecord,
   getDispatchListenerInvocationCanaryRecordPayload,
   getDispatchListenerRecordPayload,
   getDispatchQueueEntryRecordPayload,
   getDispatchQueueInvocationCanaryRecordPayload,
   getSimpleEventReactName,
   getSimpleEventRegistrationName,
+  getSyntheticEventShapeGateRecordPayload,
+  getSyntheticEventShapeRecordPayload,
   getWrapperRecord,
   invokeDispatchListenerRecordForCanary,
   invokeDispatchQueueCanaryFromDispatchRecords,
@@ -1617,5 +2038,7 @@ module.exports = {
   isDispatchListenerInvocationCanaryRecord,
   isDispatchListenerRecord,
   isDispatchQueueEntryRecord,
-  isDispatchQueueInvocationCanaryRecord
+  isDispatchQueueInvocationCanaryRecord,
+  isSyntheticEventShapeGateRecord,
+  isSyntheticEventShapeRecord
 };

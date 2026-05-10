@@ -1131,6 +1131,254 @@ test("private root host-output fake click dispatch proves capture before bubble 
   bridge.revertCreateRootSideEffects(sideEffects);
 });
 
+test("private root host-output SyntheticEvent shape gate records target/currentTarget/defaultPrevented without queue processing", () => {
+  const document = createHostOutputDocument("root-output-synthetic-shape");
+  const container = document.createElement("div");
+  const calls = [];
+  const element = {
+    props: {
+      children: "shape target",
+      id: "root-output-synthetic-shape-target",
+      onClick(event) {
+        calls.push(["bubble", event]);
+      },
+      onClickCapture(event) {
+        calls.push(["capture", event]);
+      }
+    },
+    type: "button"
+  };
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    createRenderAdmissionIdPrefix: "event-shape-admission",
+    initialHostOutputIdPrefix: "event-shape-output",
+    sideEffectIdPrefix: "event-shape-side-effect"
+  });
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const render = bridge.renderContainer(create.handle, element);
+  const admission = bridge.admitCreateRenderPath(
+    create,
+    sideEffects,
+    render
+  );
+  const handoff = bridge.applyInitialRenderHostOutput(admission);
+  const hostOutputPayload =
+    rootBridge.getPrivateRootInitialHostOutputHandoffPayload(handoff);
+  const targetRecord =
+    componentTree.createPrivateRootHostOutputEventTargetRecord(
+      hostOutputPayload
+    );
+
+  const shapeGate =
+    rootListeners.createPrivateRootHostOutputClickSyntheticEventShapeGate(
+      sideEffects.listenerRegistration,
+      targetRecord,
+      {
+        preventDefaultAtPhase: "bubble"
+      }
+    );
+
+  assert.equal(Object.isFrozen(shapeGate), true);
+  assert.equal(
+    shapeGate.kind,
+    rootListeners.PRIVATE_ROOT_HOST_OUTPUT_SYNTHETIC_EVENT_SHAPE_GATE_RECORD_KIND
+  );
+  assert.equal(
+    rootListeners.isPrivateRootHostOutputSyntheticEventShapeGateRecord(
+      shapeGate
+    ),
+    true
+  );
+  assert.equal(
+    shapeGate.status,
+    rootListeners.PRIVATE_ROOT_HOST_OUTPUT_SYNTHETIC_EVENT_SHAPE_GATE_STATUS
+  );
+  assert.equal(shapeGate.privateSyntheticEventShapeGate, true);
+  assert.equal(shapeGate.publicDispatchEnabled, false);
+  assert.equal(shapeGate.publicRootBehaviorChanged, false);
+  assert.equal(shapeGate.browserDomEventCompatibilityClaimed, false);
+  assert.equal(shapeGate.fakeDomEventCompatibilityClaimed, false);
+  assert.equal(shapeGate.syntheticEventCompatibilityClaimed, false);
+  assert.equal(shapeGate.dispatchQueueProcessed, false);
+  assert.equal(shapeGate.listenerInvocationCount, 0);
+  assert.equal(shapeGate.willInvokeListeners, false);
+  assert.equal(shapeGate.syntheticEventCount, 2);
+  assert.equal(shapeGate.syntheticEventShapeCount, 2);
+  assert.equal(shapeGate.syntheticEventDispatchCount, 0);
+  assert.equal(shapeGate.preventDefaultAtPhase, "bubble");
+  assert.equal(shapeGate.preventDefaultShapeCount, 1);
+  assert.equal(shapeGate.nativeEventPreventDefaultCallCount, 1);
+  assert.equal(shapeGate.nativeEventDefaultPrevented, true);
+  assert.deepEqual(shapeGate.rootListenerDispatchOrder, [
+    "capture",
+    "bubble"
+  ]);
+  assert.deepEqual(
+    shapeGate.syntheticEventShapeOrder.map((entry) => [
+      entry.phase,
+      entry.registrationName,
+      entry.target,
+      entry.currentTarget,
+      entry.defaultPreventedAfterAction,
+      entry.preventDefaultInvoked
+    ]),
+    [
+      [
+        "capture",
+        "onClickCapture",
+        hostOutputPayload.hostNode,
+        hostOutputPayload.hostNode,
+        false,
+        false
+      ],
+      [
+        "bubble",
+        "onClick",
+        hostOutputPayload.hostNode,
+        hostOutputPayload.hostNode,
+        true,
+        true
+      ]
+    ]
+  );
+  assert.deepEqual(calls, []);
+
+  const shapePayload =
+    rootListeners.getPrivateRootHostOutputSyntheticEventShapeGatePayload(
+      shapeGate
+    );
+  assert.equal(shapePayload.targetRecord, targetRecord);
+  assert.equal(shapePayload.targetPayload.hostOutputPayload, hostOutputPayload);
+  assert.equal(shapePayload.nativeEvent.target, hostOutputPayload.hostNode);
+  assert.equal(shapePayload.nativeEvent.preventDefaultCallCount, 1);
+  assert.equal(shapePayload.nativeEvent.defaultPrevented, true);
+  assert.equal(
+    pluginEventSystem.isSyntheticEventShapeGateRecord(
+      shapePayload.shapeGateRecord
+    ),
+    true
+  );
+  assert.equal(
+    shapePayload.shapeGateRecord.kind,
+    pluginEventSystem.SYNTHETIC_EVENT_SHAPE_GATE_RECORD_KIND
+  );
+  assert.equal(
+    shapePayload.shapeGateRecord.status,
+    pluginEventSystem.PRIVATE_SYNTHETIC_EVENT_SHAPE_GATE_STATUS
+  );
+  assert.equal(shapePayload.shapeGateRecord.dispatchQueueProcessed, false);
+  assert.equal(shapePayload.shapeGateRecord.listenerInvocationCount, 0);
+  assert.equal(shapePayload.shapeRecords.length, 2);
+
+  const [captureShape, bubbleShape] = shapePayload.shapeRecords;
+  assert.equal(
+    pluginEventSystem.isSyntheticEventShapeRecord(captureShape),
+    true
+  );
+  assert.equal(
+    pluginEventSystem.isSyntheticEventShapeRecord(bubbleShape),
+    true
+  );
+  assert.deepEqual(
+    shapePayload.shapeRecords.map((record) => [
+      record.kind,
+      record.constructorName,
+      record.type,
+      record.phase,
+      record.registrationName,
+      record.target,
+      record.currentTargetBeforeDispatch,
+      record.currentTargetDuringDispatch,
+      record.currentTargetAfterDispatch,
+      record.defaultPreventedBeforeAction,
+      record.defaultPreventedAfterAction,
+      record.isDefaultPreventedAfterAction,
+      record.preventDefaultInvoked,
+      record.nativeEventPreventDefaultCallCountAfterAction
+    ]),
+    [
+      [
+        pluginEventSystem.SYNTHETIC_EVENT_SHAPE_RECORD_KIND,
+        "SyntheticBaseEvent",
+        "click",
+        "capture",
+        "onClickCapture",
+        hostOutputPayload.hostNode,
+        null,
+        hostOutputPayload.hostNode,
+        null,
+        false,
+        false,
+        false,
+        false,
+        0
+      ],
+      [
+        pluginEventSystem.SYNTHETIC_EVENT_SHAPE_RECORD_KIND,
+        "SyntheticBaseEvent",
+        "click",
+        "bubble",
+        "onClick",
+        hostOutputPayload.hostNode,
+        null,
+        hostOutputPayload.hostNode,
+        null,
+        false,
+        true,
+        true,
+        true,
+        1
+      ]
+    ]
+  );
+  for (const shapeRecord of shapePayload.shapeRecords) {
+    assert.equal(Object.hasOwn(shapeRecord, "syntheticEvent"), false);
+    assert.equal(shapeRecord.dispatchQueueProcessed, false);
+    assert.equal(shapeRecord.listenerInvocationCount, 0);
+    assert.equal(shapeRecord.publicDispatchEnabled, false);
+    assert.equal(shapeRecord.exposesSyntheticEvent, false);
+    assert.equal(shapeRecord.hasPersist, true);
+    assert.equal(shapeRecord.hasPreventDefault, true);
+    assert.equal(shapeRecord.targetMatchesNativeEventTarget, true);
+    assert.equal(shapeRecord.targetInst, hostOutputPayload.hostToken);
+  }
+
+  const captureShapePayload =
+    pluginEventSystem.getSyntheticEventShapeRecordPayload(captureShape);
+  const bubbleShapePayload =
+    pluginEventSystem.getSyntheticEventShapeRecordPayload(bubbleShape);
+  assert.equal(
+    captureShapePayload.syntheticEvent.constructor.name,
+    "SyntheticBaseEvent"
+  );
+  assert.equal(
+    captureShapePayload.syntheticEvent.target,
+    hostOutputPayload.hostNode
+  );
+  assert.equal(captureShapePayload.syntheticEvent.currentTarget, null);
+  assert.equal(captureShapePayload.syntheticEvent.defaultPrevented, false);
+  assert.equal(
+    captureShapePayload.syntheticEvent.isDefaultPrevented(),
+    false
+  );
+  assert.equal(
+    bubbleShapePayload.syntheticEvent.target,
+    hostOutputPayload.hostNode
+  );
+  assert.equal(bubbleShapePayload.syntheticEvent.currentTarget, null);
+  assert.equal(bubbleShapePayload.syntheticEvent.defaultPrevented, true);
+  assert.equal(
+    bubbleShapePayload.syntheticEvent.isDefaultPrevented(),
+    true
+  );
+  assert.equal(container.__registrations.length, 138);
+  assert.equal(document.__registrations.length, 1);
+  assert.equal(container.childNodes.length, 1);
+
+  bridge.cleanupInitialRenderHostOutput(handoff);
+  bridge.revertCreateRootSideEffects(sideEffects);
+});
+
 test("plugin extraction records remain deterministic and fail closed for flag variants", () => {
   const root = createEventTarget("plugin-root");
   assert.equal(
@@ -1348,6 +1596,21 @@ test("invalid dispatch wrapper metadata fails before any native event side effec
       code: pluginEventSystem.INVALID_DISPATCH_LISTENER_RECORD_CODE
     }
   );
+  assert.throws(
+    () =>
+      pluginEventSystem.createSyntheticEventShapeRecordForDispatchListenerRecord(
+        {}
+      ),
+    {
+      code: pluginEventSystem.INVALID_DISPATCH_LISTENER_RECORD_CODE
+    }
+  );
+  assert.throws(
+    () => pluginEventSystem.createSyntheticEventShapeGateFromDispatchRecords({}),
+    {
+      code: pluginEventSystem.INVALID_EVENT_DISPATCH_RECORD_CODE
+    }
+  );
   assert.equal(nativeEvent.stopPropagationCallCount, 0);
   assert.equal(nativeEvent.preventDefaultCallCount, 0);
 });
@@ -1454,6 +1717,13 @@ test("private dispatch skeleton does not change public React DOM exports", () =>
   );
   assert.equal(
     Object.hasOwn(reactDomClient, "invokeLastRootListenerSingleListenerCanary"),
+    false
+  );
+  assert.equal(
+    Object.hasOwn(
+      reactDomClient,
+      "createPrivateRootHostOutputClickSyntheticEventShapeGate"
+    ),
     false
   );
 
