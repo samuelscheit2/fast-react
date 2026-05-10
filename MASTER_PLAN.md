@@ -45,8 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 159: function component render skeleton in
-  `/Users/user/Developer/Developer/fast-react-worker-159-function-component-render-skeleton`.
 - Worker 160: root update callback commit prep in
   `/Users/user/Developer/Developer/fast-react-worker-160-root-update-callback-commit-prep`.
 - Worker 161: root error option handles in

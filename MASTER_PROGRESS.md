@@ -114,9 +114,17 @@ sequencing belong in `MASTER_PLAN.md`.
   queue helpers, staged update finishing, and generational stale-handle guards,
   without reconciler dispatcher, function-component render, public hook facade,
   DOM, package, or native bridge integration.
+- Worker 159 private function-component render skeleton was merged, adding an
+  internal invocation request/record boundary, opaque output handle, explicit
+  unsupported hook/context/class/thrown-value errors, and focused tests proving
+  no host mutation, commit, child reconciliation, or public hook facade wiring.
 
 ## Latest Accepted Verification
 
+- Worker 159 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused `function_component` tests, full
+  `fast-react-reconciler` tests with 90 unit tests plus 1 doctest, reconciler
+  clippy with warnings denied, and `git diff --check`.
 - Worker 158 was verified on its integrated worktree and again on `main` with
   `cargo fmt --all --check`, focused `hook` tests with 24 unit tests, full
   `fast-react-core` tests with 112 unit tests, core clippy with warnings
