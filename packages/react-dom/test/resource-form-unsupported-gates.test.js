@@ -497,6 +497,307 @@ test('private controlled input value-tracker gate records deterministic metadata
   );
 });
 
+test('private controlled input fake-DOM value-tracker diagnostic installs observes and detaches record state only', () => {
+  const gate = resourceFormGate.createControlledInputValueTrackerGate({
+    requestIdPrefix: 'fake-tracker'
+  });
+  const fakeInput = createControlledInputFakeDomTarget({
+    value: 'alpha'
+  });
+  const descriptorBefore = Object.getOwnPropertyDescriptor(fakeInput, 'value');
+  const install = gate.installFakeDomTracker(
+    {
+      scenarioId: 'input-text-controlled-value-fake-dom-diagnostic',
+      phaseId: 'diagnostic',
+      hostTag: 'input',
+      inputType: 'text',
+      props: {
+        type: 'text',
+        value: 'alpha',
+        onChange() {}
+      }
+    },
+    {
+      explicitAdmission: true,
+      adapterKind: 'deterministic-fake-dom',
+      adapterId: 'fake-input-diagnostic',
+      targetKind: 'controlled-input-value-tracker',
+      fakeTarget: fakeInput
+    }
+  );
+
+  fakeInput.value = 'beta';
+  const observe = gate.observeFakeDomTracker(install);
+  const detach = gate.detachFakeDomTracker(observe);
+  const records = [install, observe, detach];
+  const summary =
+    resourceFormGate.describeControlledInputValueTrackerFakeDomDiagnosticGate();
+
+  for (const record of records) {
+    assert.equal(Object.isFrozen(record), true, record.operation);
+    assert.equal(
+      resourceFormGate.isPrivateControlledInputValueTrackerFakeDomDiagnosticRecord(
+        record
+      ),
+      true,
+      record.operation
+    );
+    assert.equal(
+      resourceFormGate.getPrivateControlledInputValueTrackerFakeDomDiagnosticRecordPayload(
+        record
+      ),
+      record,
+      record.operation
+    );
+    assert.equal(record.compatibilityTarget, compatibilityTarget);
+    assert.equal(record.unsupportedCode, unsupportedCode);
+    assert.equal(record.trackerRecord.fakeDomOnly, true);
+    assert.equal(record.trackerRecord.fakeTargetCaptured, false);
+    assert.equal(record.trackerRecord.realDomNodeTouched, false);
+    assert.equal(record.trackerRecord.propertyDescriptorInstalled, false);
+    assert.equal(record.sideEffects.hostValueRead, false);
+    assert.equal(record.sideEffects.hostValueWritten, false);
+    assert.equal(record.sideEffects.propertyDescriptorInstalled, false);
+    assert.equal(record.sideEffects.changeEventsObserved, false);
+    assert.equal(record.sideEffects.postEventRestoreQueued, false);
+    assert.equal(record.sideEffects.publicControlledBehaviorEnabled, false);
+    assert.equal(record.sideEffects.publicRootTouched, false);
+    assert.equal(record.sideEffects.compatibilityClaimed, false);
+    assert.equal(record.sideEffects.fakeDomValueWritten, false);
+    assert.equal(record.sideEffects.fakeDomDescriptorInstalled, false);
+    assert.equal(record.sideEffects.fakeDomTargetCaptured, false);
+    assert.equal(record.sideEffects.realDomNodeTouched, false);
+    assert.equal(record.trackerMetadata.deterministicFakeDomOnly, true);
+    assert.equal(record.trackerMetadata.liveHostNodeRequired, false);
+    assert.equal(record.trackerMetadata.rawTargetCaptured, false);
+    assert.equal(record.trackerMetadata.realDomNodeTouched, false);
+    assert.equal(record.trackerMetadata.propertyDescriptorInstalled, false);
+    assert.equal(record.postEventRestoreBoundary.restoreQueued, false);
+    assert.equal(
+      record.publicControlledBehaviorBoundary.compatibilityClaimed,
+      false
+    );
+  }
+
+  assert.deepEqual(
+    records.map((record) => ({
+      requestId: record.requestId,
+      requestSequence: record.requestSequence,
+      lifecycleId: record.lifecycleId,
+      operation: record.operation,
+      status: record.status,
+      attachedBefore: record.trackerRecord.attachedBefore,
+      attachedAfter: record.trackerRecord.attachedAfter,
+      changed: record.trackerRecord.changed,
+      observedCount: record.trackerRecord.observedCount,
+      previousValueSnapshot: record.trackerRecord.previousValueSnapshot,
+      currentValueSnapshot: record.trackerRecord.currentValueSnapshot,
+      fakeDomTrackerRecordInstalled:
+        record.sideEffects.fakeDomTrackerRecordInstalled,
+      fakeDomTrackerRecordObserved:
+        record.sideEffects.fakeDomTrackerRecordObserved,
+      fakeDomTrackerRecordDetached:
+        record.sideEffects.fakeDomTrackerRecordDetached,
+      fakeDomValueRead: record.sideEffects.fakeDomValueRead,
+      trackerAttached: record.trackerMetadata.trackerAttached
+    })),
+    [
+      {
+        requestId: 'fake-tracker:1',
+        requestSequence: 1,
+        lifecycleId: 'fake-tracker:1',
+        operation: 'install',
+        status:
+          resourceFormGate.controlledInputValueTrackerFakeDomInstalledStatus,
+        attachedBefore: false,
+        attachedAfter: true,
+        changed: false,
+        observedCount: 0,
+        previousValueSnapshot: null,
+        currentValueSnapshot: 'alpha',
+        fakeDomTrackerRecordInstalled: true,
+        fakeDomTrackerRecordObserved: false,
+        fakeDomTrackerRecordDetached: false,
+        fakeDomValueRead: true,
+        trackerAttached: true
+      },
+      {
+        requestId: 'fake-tracker:2',
+        requestSequence: 2,
+        lifecycleId: 'fake-tracker:1',
+        operation: 'observe',
+        status:
+          resourceFormGate.controlledInputValueTrackerFakeDomObservedStatus,
+        attachedBefore: true,
+        attachedAfter: true,
+        changed: true,
+        observedCount: 1,
+        previousValueSnapshot: 'alpha',
+        currentValueSnapshot: 'beta',
+        fakeDomTrackerRecordInstalled: false,
+        fakeDomTrackerRecordObserved: true,
+        fakeDomTrackerRecordDetached: false,
+        fakeDomValueRead: true,
+        trackerAttached: true
+      },
+      {
+        requestId: 'fake-tracker:3',
+        requestSequence: 3,
+        lifecycleId: 'fake-tracker:1',
+        operation: 'detach',
+        status:
+          resourceFormGate.controlledInputValueTrackerFakeDomDetachedStatus,
+        attachedBefore: true,
+        attachedAfter: false,
+        changed: false,
+        observedCount: 1,
+        previousValueSnapshot: 'beta',
+        currentValueSnapshot: 'beta',
+        fakeDomTrackerRecordInstalled: false,
+        fakeDomTrackerRecordObserved: false,
+        fakeDomTrackerRecordDetached: true,
+        fakeDomValueRead: false,
+        trackerAttached: false
+      }
+    ]
+  );
+
+  assert.equal(install.admission.adapterId, 'fake-input-diagnostic');
+  assert.equal(install.admission.rawTargetCaptured, false);
+  assert.equal(install.admission.propertyDescriptorInstallationAllowed, false);
+  assert.equal(observe.admission, null);
+  assert.equal(detach.admission, null);
+  assert.equal(Object.hasOwn(fakeInput, '_valueTracker'), false);
+  assert.equal(descriptorBefore.get, undefined);
+  assert.equal(descriptorBefore.set, undefined);
+  assert.equal(
+    Object.getOwnPropertyDescriptor(fakeInput, 'value').get,
+    undefined
+  );
+  assert.equal(
+    Object.getOwnPropertyDescriptor(fakeInput, 'value').set,
+    undefined
+  );
+  assert.equal(
+    summary.gateId,
+    resourceFormGate.controlledInputValueTrackerFakeDomDiagnosticGateId
+  );
+  assert.equal(
+    summary.status,
+    resourceFormGate.controlledInputValueTrackerFakeDomDiagnosticStatus
+  );
+  assert.deepEqual(summary.acceptedOperations, ['install', 'observe', 'detach']);
+  assert.equal(summary.deterministicFakeDomOnly, true);
+  assert.equal(summary.liveDomDescriptorInstallation, false);
+  assert.equal(summary.realDomNodeAccepted, false);
+  assert.deepEqual(
+    summary.sideEffects,
+    resourceFormGate.controlledInputValueTrackerFakeDomDiagnosticNoSideEffects
+  );
+  assert.throws(() => gate.observeFakeDomTracker(install), {
+    code:
+      resourceFormGate.privateControlledInputValueTrackerFakeDomDiagnosticInactiveRecordCode,
+    compatibilityTarget
+  });
+});
+
+test('private controlled input fake-DOM value-tracker diagnostic rejects live DOM-like or inactive records', () => {
+  const gate = resourceFormGate.createControlledInputValueTrackerGate({
+    requestIdPrefix: 'fake-tracker-error'
+  });
+  const fakeInput = createControlledInputFakeDomTarget({
+    value: 'alpha'
+  });
+
+  assert.throws(
+    () =>
+      gate.installFakeDomTracker(
+        {
+          hostTag: 'input',
+          inputType: 'text'
+        },
+        {
+          explicitAdmission: true,
+          adapterKind: 'deterministic-fake-dom',
+          targetKind: 'controlled-input-value-tracker',
+          fakeTarget: {
+            [resourceFormGate.controlledInputValueTrackerFakeDomTargetMarker]:
+              true,
+            nodeType: 1,
+            value: 'live-like'
+          }
+        }
+      ),
+    {
+      code:
+        resourceFormGate.privateControlledInputValueTrackerFakeDomDiagnosticInvalidAdmissionCode,
+      compatibilityTarget,
+      reason: 'fakeTarget must not be a DOM-like node'
+    }
+  );
+
+  assert.throws(
+    () =>
+      gate.installFakeDomTracker(
+        {hostTag: 'input', inputType: 'text'},
+        {
+          explicitAdmission: true,
+          adapterKind: 'deterministic-fake-dom',
+          targetKind: 'controlled-input-value-tracker',
+          fakeTarget: {value: 'missing marker'}
+        }
+      ),
+    {
+      code:
+        resourceFormGate.privateControlledInputValueTrackerFakeDomDiagnosticInvalidAdmissionCode,
+      compatibilityTarget,
+      reason: 'fakeTarget must carry the private fake DOM marker'
+    }
+  );
+
+  assert.throws(() => gate.observeFakeDomTracker({}), {
+    code:
+      resourceFormGate.privateControlledInputValueTrackerFakeDomDiagnosticInvalidRecordCode,
+    compatibilityTarget
+  });
+
+  const install = gate.installFakeDomTracker(
+    {hostTag: 'input', inputType: 'text'},
+    {
+      explicitAdmission: true,
+      adapterKind: 'deterministic-fake-dom',
+      targetKind: 'controlled-input-value-tracker',
+      fakeTarget: fakeInput
+    }
+  );
+
+  assert.throws(
+    () =>
+      gate.installFakeDomTracker(
+        {hostTag: 'input', inputType: 'text'},
+        {
+          explicitAdmission: true,
+          adapterKind: 'deterministic-fake-dom',
+          targetKind: 'controlled-input-value-tracker',
+          fakeTarget: fakeInput
+        }
+      ),
+    {
+      code:
+        resourceFormGate.privateControlledInputValueTrackerFakeDomDiagnosticInvalidAdmissionCode,
+      compatibilityTarget,
+      reason: 'fakeTarget already has an active private fake DOM tracker record'
+    }
+  );
+
+  const detach = gate.detachFakeDomTracker(install);
+  assert.throws(() => gate.detachFakeDomTracker(detach), {
+    code:
+      resourceFormGate.privateControlledInputValueTrackerFakeDomDiagnosticInactiveRecordCode,
+    compatibilityTarget
+  });
+});
+
 test('private controlled input wrapper property-payload gate records blocked rows only', () => {
   const first = createPrivateControlledWrapperPropertyPayloadScenario();
   const second = createPrivateControlledWrapperPropertyPayloadScenario();
@@ -2699,6 +3000,13 @@ function createDeterministicFakeResourceElement(tagName, ownerDocument, log) {
       this.attributes[name] = String(value);
       log.push({name, type: 'element.setAttribute', value: String(value)});
     }
+  };
+}
+
+function createControlledInputFakeDomTarget(fields) {
+  return {
+    [resourceFormGate.controlledInputValueTrackerFakeDomTargetMarker]: true,
+    ...fields
   };
 }
 

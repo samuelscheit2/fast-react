@@ -51,6 +51,7 @@ const reactDomPackageJson = require(
 const {
   CONTROLLED_FORM_PROPERTY_PAYLOAD_STATUS,
   CONTROLLED_PRIVATE_WRAPPER_PROPERTY_PAYLOAD_STATUS,
+  CONTROLLED_VALUE_TRACKER_FAKE_DOM_DIAGNOSTIC_STATUS,
   CONTROLLED_VALUE_TRACKER_GATE_STATUS,
   ENTRY_NON_PAYLOAD,
   ENTRY_REMOVE_ATTRIBUTE,
@@ -1220,6 +1221,14 @@ test("private DOM controlled payload rows carry wrapper metadata without live tr
       assert.equal(record.sideEffects.wrapperPropertyWritten, false);
       assert.equal(record.sideEffects.postEventRestoreQueued, false);
       assert.equal(record.sideEffects.latestPropsLookup, false);
+      assert.equal(
+        boundary.fakeDomTrackerDiagnosticStatus,
+        CONTROLLED_VALUE_TRACKER_FAKE_DOM_DIAGNOSTIC_STATUS
+      );
+      assert.equal(boundary.fakeDomTrackerDiagnosticAvailable, true);
+      assert.equal(boundary.fakeDomTrackerDiagnosticInstalled, false);
+      assert.equal(boundary.fakeDomTrackerDiagnosticObserved, false);
+      assert.equal(boundary.fakeDomTrackerDiagnosticDetached, false);
       assert.equal(record.wrapperMetadata.deterministicMetadataOnly, true);
       assert.equal(record.wrapperMetadata.propertyPayloadRowAccepted, false);
       assert.equal(record.wrapperMetadata.hostWrapperInvoked, false);
@@ -1624,9 +1633,15 @@ function controlledUnsupported(hostTag, propName, props = {}) {
             : CONTROLLED_PRIVATE_WRAPPER_PROPERTY_PAYLOAD_STATUS,
         privateWrapperGateRecord,
         valueTrackerGateStatus: CONTROLLED_VALUE_TRACKER_GATE_STATUS,
+        fakeDomTrackerDiagnosticStatus:
+          CONTROLLED_VALUE_TRACKER_FAKE_DOM_DIAGNOSTIC_STATUS,
         hostTag,
         ordinaryPayloadAccepted: false,
         sourceAdapterInvoked: false,
+        fakeDomTrackerDiagnosticAvailable: true,
+        fakeDomTrackerDiagnosticInstalled: false,
+        fakeDomTrackerDiagnosticObserved: false,
+        fakeDomTrackerDiagnosticDetached: false,
         liveTrackingStarted: false,
         postEventRestoreQueued: false,
         publicControlledBehaviorEnabled: false,
