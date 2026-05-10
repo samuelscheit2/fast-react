@@ -124,7 +124,8 @@ use crate::{
         HostRootFinishedWorkCommitExecutionBlockerForCanary,
         HostRootFinishedWorkCommitExecutionStatusForCanary,
         HostRootFinishedWorkCommitHandoffErrorForCanary,
-        HostRootFinishedWorkCommitHandoffRecordForCanary, HostRootMutationApplyRecordKind,
+        HostRootFinishedWorkCommitHandoffRecordForCanary,
+        HostRootFinishedWorkPendingCommitRecordForCanary, HostRootMutationApplyRecordKind,
         HostRootPlacementApplyDiagnosticForCanary,
         HostRootSingleHostUpdateApplyRecordErrorForCanary,
         HostRootSingleHostUpdateApplyRecordForCanary,
@@ -1001,6 +1002,175 @@ impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
 }
 
 #[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct HostRootRenderFinishedWorkCommitMetadataHandoffRecord {
+    root: FiberRootId,
+    previous_current: FiberId,
+    finished_work: FiberId,
+    render_lanes: Lanes,
+    root_finished_work_before_handoff: Option<FiberId>,
+    root_finished_lanes_before_handoff: Lanes,
+    root_finished_work_after_handoff: Option<FiberId>,
+    root_finished_lanes_after_handoff: Lanes,
+    pending_commit: HostRootFinishedWorkPendingCommitRecordForCanary,
+}
+
+#[cfg(test)]
+impl HostRootRenderFinishedWorkCommitMetadataHandoffRecord {
+    #[must_use]
+    const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    const fn previous_current(self) -> FiberId {
+        self.previous_current
+    }
+
+    #[must_use]
+    const fn finished_work(self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    const fn root_finished_work_before_handoff(self) -> Option<FiberId> {
+        self.root_finished_work_before_handoff
+    }
+
+    #[must_use]
+    const fn root_finished_lanes_before_handoff(self) -> Lanes {
+        self.root_finished_lanes_before_handoff
+    }
+
+    #[must_use]
+    const fn root_finished_work_after_handoff(self) -> Option<FiberId> {
+        self.root_finished_work_after_handoff
+    }
+
+    #[must_use]
+    const fn root_finished_lanes_after_handoff(self) -> Lanes {
+        self.root_finished_lanes_after_handoff
+    }
+
+    #[must_use]
+    const fn pending_commit(self) -> HostRootFinishedWorkPendingCommitRecordForCanary {
+        self.pending_commit
+    }
+
+    #[must_use]
+    fn records_completed_render_as_root_finished_work(self) -> bool {
+        self.root_finished_work_after_handoff == Some(self.finished_work)
+            && self.root_finished_lanes_after_handoff == self.render_lanes
+            && self.pending_commit.root_finished_work() == Some(self.finished_work)
+            && self.pending_commit.root_finished_lanes() == self.render_lanes
+            && self.pending_commit.records_root_finished_work()
+    }
+
+    #[must_use]
+    const fn host_mutation_blocked(self) -> bool {
+        true
+    }
+
+    #[must_use]
+    const fn public_root_rendering_blocked(self) -> bool {
+        true
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum HostRootRenderFinishedWorkCommitMetadataHandoffError {
+    FiberRootStore(FiberRootStoreError),
+    RenderPhaseWorkMismatch {
+        root: FiberRootId,
+        expected: Option<FiberId>,
+        actual: FiberId,
+    },
+    RenderPhaseLanesMismatch {
+        root: FiberRootId,
+        expected: Lanes,
+        actual: Lanes,
+    },
+    RenderPhaseNotCompleted {
+        root: FiberRootId,
+        status: RootRenderExitStatus,
+    },
+    FinishedWorkCommitHandoff(HostRootFinishedWorkCommitHandoffErrorForCanary),
+}
+
+#[cfg(test)]
+impl Display for HostRootRenderFinishedWorkCommitMetadataHandoffError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::FiberRootStore(error) => Display::fmt(error, formatter),
+            Self::RenderPhaseWorkMismatch {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} completed render expected work {:?} before finished-work metadata handoff, found fiber slot {}",
+                root.raw(),
+                expected.map(|fiber| fiber.slot().get()),
+                actual.slot().get()
+            ),
+            Self::RenderPhaseLanesMismatch {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} completed render lanes {:?} do not match finished-work metadata handoff lanes {:?}",
+                root.raw(),
+                expected,
+                actual
+            ),
+            Self::RenderPhaseNotCompleted { root, status } => write!(
+                formatter,
+                "root {} render phase must be completed before finished-work metadata handoff, found {:?}",
+                root.raw(),
+                status
+            ),
+            Self::FinishedWorkCommitHandoff(error) => Display::fmt(error, formatter),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Error for HostRootRenderFinishedWorkCommitMetadataHandoffError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::FiberRootStore(error) => Some(error),
+            Self::FinishedWorkCommitHandoff(error) => Some(error),
+            Self::RenderPhaseWorkMismatch { .. }
+            | Self::RenderPhaseLanesMismatch { .. }
+            | Self::RenderPhaseNotCompleted { .. } => None,
+        }
+    }
+}
+
+#[cfg(test)]
+impl From<FiberRootStoreError> for HostRootRenderFinishedWorkCommitMetadataHandoffError {
+    fn from(error: FiberRootStoreError) -> Self {
+        Self::FiberRootStore(error)
+    }
+}
+
+#[cfg(test)]
+impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
+    for HostRootRenderFinishedWorkCommitMetadataHandoffError
+{
+    fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
+        Self::FinishedWorkCommitHandoff(error)
+    }
+}
+
+#[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct OffscreenHiddenLaneRevealCommitGateRecord {
     root: FiberRootId,
@@ -1374,6 +1544,83 @@ fn offscreen_hidden_lane_reveal_commit_gate_for_test(
         public_passive_compatibility_blocked: true,
         public_activity_compatibility_blocked: true,
     })
+}
+
+#[cfg(test)]
+fn handoff_completed_host_root_render_to_finished_work_commit_metadata_for_canary<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    render: HostRootRenderPhaseRecord,
+    handoff_order: usize,
+) -> Result<
+    HostRootRenderFinishedWorkCommitMetadataHandoffRecord,
+    HostRootRenderFinishedWorkCommitMetadataHandoffError,
+> {
+    validate_completed_host_root_render_for_finished_work_commit_metadata_handoff(store, render)?;
+
+    let root_id = render.root();
+    let (root_finished_work_before_handoff, root_finished_lanes_before_handoff) = {
+        let root = store.root(root_id)?;
+        (root.finished_work(), root.finished_lanes())
+    };
+    {
+        let root = store.root_mut(root_id)?;
+        root.record_finished_work_for_canary(render.finished_work(), render.render_lanes());
+    }
+    let pending_commit =
+        record_host_root_finished_work_pending_commit_for_canary(store, render, handoff_order)?;
+    let root = store.root(root_id)?;
+
+    Ok(HostRootRenderFinishedWorkCommitMetadataHandoffRecord {
+        root: root_id,
+        previous_current: render.current(),
+        finished_work: render.finished_work(),
+        render_lanes: render.render_lanes(),
+        root_finished_work_before_handoff,
+        root_finished_lanes_before_handoff,
+        root_finished_work_after_handoff: root.finished_work(),
+        root_finished_lanes_after_handoff: root.finished_lanes(),
+        pending_commit,
+    })
+}
+
+#[cfg(test)]
+fn validate_completed_host_root_render_for_finished_work_commit_metadata_handoff<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    render: HostRootRenderPhaseRecord,
+) -> Result<(), HostRootRenderFinishedWorkCommitMetadataHandoffError> {
+    let root_id = render.root();
+    let scheduling = store.root(root_id)?.scheduling();
+
+    if scheduling.work_in_progress() != Some(render.work_in_progress()) {
+        return Err(
+            HostRootRenderFinishedWorkCommitMetadataHandoffError::RenderPhaseWorkMismatch {
+                root: root_id,
+                expected: scheduling.work_in_progress(),
+                actual: render.work_in_progress(),
+            },
+        );
+    }
+
+    if scheduling.work_in_progress_root_render_lanes() != render.render_lanes() {
+        return Err(
+            HostRootRenderFinishedWorkCommitMetadataHandoffError::RenderPhaseLanesMismatch {
+                root: root_id,
+                expected: scheduling.work_in_progress_root_render_lanes(),
+                actual: render.render_lanes(),
+            },
+        );
+    }
+
+    if scheduling.render_exit_status() != RootRenderExitStatus::Completed {
+        return Err(
+            HostRootRenderFinishedWorkCommitMetadataHandoffError::RenderPhaseNotCompleted {
+                root: root_id,
+                status: scheduling.render_exit_status(),
+            },
+        );
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -7316,6 +7563,83 @@ mod tests {
                 .unwrap()
                 .update_queue()
         );
+    }
+
+    #[test]
+    fn root_work_loop_hands_completed_host_root_render_to_finished_work_commit_metadata() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        update_container(&mut store, root_id, RootElementHandle::from_raw(43), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+
+        let metadata =
+            handoff_completed_host_root_render_to_finished_work_commit_metadata_for_canary(
+                &mut store, render, 1,
+            )
+            .unwrap();
+
+        assert_eq!(metadata.root(), root_id);
+        assert_eq!(metadata.previous_current(), current);
+        assert_eq!(metadata.finished_work(), render.finished_work());
+        assert_eq!(metadata.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(metadata.root_finished_work_before_handoff(), None);
+        assert_eq!(metadata.root_finished_lanes_before_handoff(), Lanes::NO);
+        assert_eq!(
+            metadata.root_finished_work_after_handoff(),
+            Some(render.finished_work())
+        );
+        assert_eq!(metadata.root_finished_lanes_after_handoff(), Lanes::DEFAULT);
+        assert!(metadata.records_completed_render_as_root_finished_work());
+        assert!(metadata.host_mutation_blocked());
+        assert!(metadata.public_root_rendering_blocked());
+
+        let pending = metadata.pending_commit();
+        assert_eq!(pending.pending_work(), Some(render.finished_work()));
+        assert_eq!(pending.root_finished_work(), Some(render.finished_work()));
+        assert_eq!(pending.finished_work(), render.finished_work());
+        assert_eq!(pending.root_finished_lanes(), Lanes::DEFAULT);
+        assert_eq!(pending.finished_lanes(), Lanes::DEFAULT);
+        assert_eq!(
+            pending.render_exit_status(),
+            RootRenderExitStatus::Completed
+        );
+        assert_eq!(pending.handoff_order(), 1);
+        assert!(pending.records_finished_work());
+        assert!(pending.records_root_finished_work());
+
+        let root_after_handoff = store.root(root_id).unwrap();
+        assert_eq!(root_after_handoff.current(), current);
+        assert_eq!(
+            root_after_handoff.finished_work(),
+            Some(render.finished_work())
+        );
+        assert_eq!(root_after_handoff.finished_lanes(), Lanes::DEFAULT);
+        assert_eq!(
+            root_after_handoff.scheduling().work_in_progress(),
+            Some(render.work_in_progress())
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+
+        let handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
+            &mut store,
+            render,
+            Some(pending),
+            2,
+        )
+        .unwrap();
+
+        assert!(handoff.proves_private_finished_work_commit_execution());
+        assert!(handoff.proves_private_root_finished_work_commit_metadata_handoff());
+        assert_eq!(handoff.current_after_commit(), render.finished_work());
+        assert_eq!(handoff.finished_work_after_commit(), None);
+        assert_eq!(handoff.finished_lanes_after_commit(), Lanes::NO);
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            render.finished_work()
+        );
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 
     #[test]

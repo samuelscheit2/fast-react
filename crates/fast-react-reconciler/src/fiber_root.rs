@@ -623,6 +623,16 @@ impl<H: HostTypes> FiberRoot<H> {
         self.finished_lanes
     }
 
+    #[cfg(test)]
+    pub(crate) fn record_finished_work_for_canary(
+        &mut self,
+        finished_work: FiberId,
+        finished_lanes: Lanes,
+    ) {
+        self.finished_work = Some(finished_work);
+        self.finished_lanes = finished_lanes;
+    }
+
     pub(crate) fn clear_finished_work(&mut self) {
         self.finished_work = None;
         self.finished_lanes = Lanes::NO;
@@ -893,5 +903,22 @@ mod tests {
 
         assert!(scheduling.pending_passive().is_empty());
         assert!(!scheduling.pending_passive().has_effects());
+    }
+
+    #[test]
+    fn fiber_root_records_finished_work_metadata_for_private_commit_handoff() {
+        let mut root =
+            FiberRoot::<Host>::new_client(root_id(), (), fiber_id(1), RootOptions::default());
+        let finished_work = fiber_id(2);
+
+        root.record_finished_work_for_canary(finished_work, Lanes::DEFAULT);
+
+        assert_eq!(root.finished_work(), Some(finished_work));
+        assert_eq!(root.finished_lanes(), Lanes::DEFAULT);
+
+        root.clear_finished_work();
+
+        assert_eq!(root.finished_work(), None);
+        assert_eq!(root.finished_lanes(), Lanes::NO);
     }
 }
