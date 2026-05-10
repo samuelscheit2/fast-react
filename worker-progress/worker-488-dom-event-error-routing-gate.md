@@ -6,7 +6,7 @@
 - `create_goal` was called before research, file reads, implementation, or
   verification.
 - `get_goal` was available after setup and again before this report.
-- Active goal status from `get_goal`: `active`.
+- Goal status after final pane closeout: `complete`.
 - Active goal objective from `get_goal`: add private diagnostics for event
   listener errors flowing to accepted root option callback records without
   invoking public root callbacks.
