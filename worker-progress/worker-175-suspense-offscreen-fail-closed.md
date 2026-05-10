@@ -22,13 +22,25 @@
 
 ## Verification
 
-- `cargo test -p fast-react-core fiber_tag_values_match_react_19_2_6_work_tags --all-features` passed.
-- `cargo test -p fast-react-reconciler unsupported_feature_tags_have_explicit_fail_closed_markers --all-features` passed.
-- `cargo test -p fast-react-reconciler generic_supported_tags_are_not_marked_unsupported --all-features` passed.
-- `cargo fmt --all --check` passed.
-- `cargo test -p fast-react-core --all-features` passed: 79 unit tests, 0 doctests.
-- `cargo test -p fast-react-reconciler --all-features` passed after warning cleanup: 65 unit tests and 1 compile-fail doctest.
-- `git diff --check` passed.
+- Worker-local verification passed before orchestration merge:
+  - `cargo test -p fast-react-core fiber_tag_values_match_react_19_2_6_work_tags --all-features`
+  - `cargo test -p fast-react-reconciler unsupported_feature_tags_have_explicit_fail_closed_markers --all-features`
+  - `cargo test -p fast-react-reconciler generic_supported_tags_are_not_marked_unsupported --all-features`
+  - `cargo fmt --all --check`
+  - `cargo test -p fast-react-core --all-features`: 79 unit tests
+  - `cargo test -p fast-react-reconciler --all-features`: 65 unit tests + 1 doctest
+  - `git diff --check`
+- Orchestrator merged current `main` into this branch without conflicts.
+- Post-merge orchestrator verification passed:
+  - `cargo fmt --all --check`
+  - `cargo test -p fast-react-core --all-features fiber_tag_values_match_react_19_2_6_work_tags`: 1 test
+  - `cargo test -p fast-react-reconciler --all-features unsupported_feature_tags_have_explicit_fail_closed_markers`: 1 test
+  - `cargo test -p fast-react-reconciler --all-features generic_supported_tags_are_not_marked_unsupported`: 1 test
+  - `cargo test -p fast-react-core --all-features`: 112 tests
+  - `cargo test -p fast-react-reconciler --all-features`: 104 tests + 1 doctest
+  - `cargo clippy -p fast-react-core --all-targets --all-features -- -D warnings`
+  - `cargo clippy -p fast-react-reconciler --all-targets --all-features -- -D warnings`
+  - `git diff --check`
 
 ## Evidence Gathered
 
