@@ -637,6 +637,16 @@ impl SyncFlushPostPassiveContinuationExecutionGateRecord {
     pub(crate) fn did_find_continuation_roots(&self) -> bool {
         !self.continuation_roots.is_empty()
     }
+
+    #[must_use]
+    pub(crate) const fn should_execute_follow_up_sync_flush(&self) -> bool {
+        match self.exit_status {
+            RootSyncFlushExitStatus::Completed => true,
+            RootSyncFlushExitStatus::BlockedByExecutionContext
+            | RootSyncFlushExitStatus::SkippedReentrantFlush
+            | RootSyncFlushExitStatus::SkippedNoPendingSyncWork => false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2622,6 +2632,7 @@ mod tests {
         assert_eq!(gate.pending_passive_unmount_count(), 0);
         assert_eq!(gate.pending_passive_mount_count(), 1);
         assert_eq!(gate.pending_passive_record_count(), 1);
+        assert!(gate.should_execute_follow_up_sync_flush());
         assert!(gate.did_find_continuation_roots());
         assert_eq!(gate.continuation_roots().len(), 1);
         let continuation = gate.continuation_roots()[0];
@@ -2686,6 +2697,7 @@ mod tests {
             blocked.exit_status(),
             RootSyncFlushExitStatus::BlockedByExecutionContext
         );
+        assert!(!blocked.should_execute_follow_up_sync_flush());
         assert!(blocked.execution_context().blocked_by_render_or_commit());
         assert!(blocked.continuation_roots().is_empty());
         assert!(!store.root_scheduler().is_flushing_work());
@@ -2702,6 +2714,7 @@ mod tests {
             reentrant.exit_status(),
             RootSyncFlushExitStatus::SkippedReentrantFlush
         );
+        assert!(!reentrant.should_execute_follow_up_sync_flush());
         assert!(reentrant.continuation_roots().is_empty());
         assert!(store.root_scheduler().is_flushing_work());
         store.root_scheduler_mut().set_is_flushing_work(false);
@@ -2718,6 +2731,7 @@ mod tests {
             no_work.exit_status(),
             RootSyncFlushExitStatus::SkippedNoPendingSyncWork
         );
+        assert!(!no_work.should_execute_follow_up_sync_flush());
         assert!(no_work.continuation_roots().is_empty());
         assert!(
             store
