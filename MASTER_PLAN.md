@@ -45,8 +45,6 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-- Worker 157: core hook effect ring in
-  `/Users/user/Developer/Developer/fast-react-worker-157-core-hook-effect-ring`.
 - Worker 158: core hook state queue in
   `/Users/user/Developer/Developer/fast-react-worker-158-core-hook-state-queue`.
 - Worker 159: function component render skeleton in

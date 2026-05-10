@@ -103,9 +103,18 @@ sequencing belong in `MASTER_PLAN.md`.
   React-source-grounded `get_next_lanes`,
   `get_next_lanes_to_flush_sync`, and prerender checks on `RootLaneState` plus
   exported pure-core wrappers, without changing reconciler scheduling behavior.
+- Worker 157 core hook effect ring was merged, adding an arena-backed
+  generational hook-effect ring, opaque create/destroy/dependency handles,
+  ordered circular iteration from `lastEffect.next`, and all-flags-present
+  filtering with `HookEffectFlags`, without function-component render, commit,
+  passive scheduler, DOM, or JS package integration.
 
 ## Latest Accepted Verification
 
+- Worker 157 was verified on its integrated worktree and again on `main` with
+  `cargo fmt --all --check`, focused `hook_effect` tests, full
+  `fast-react-core` tests with 98 unit tests, core clippy with warnings denied,
+  and `git diff --check`.
 - Worker 156 was verified on its integrated worktree and again on `main` with
   `cargo fmt --all --check`, focused `root_lanes` tests, full
   `fast-react-core` tests with 92 unit tests, core clippy with warnings
