@@ -11,6 +11,7 @@ mod function_component;
 mod host_tokens;
 #[cfg(test)]
 mod host_work;
+mod root_callbacks;
 mod root_commit;
 mod root_config;
 mod root_scheduler;
@@ -48,6 +49,9 @@ pub use fiber_store::{FiberRootId, FiberRootStore, FiberRootStoreError};
 pub use host_tokens::{
     HostFiberTokenGeneration, HostFiberTokenId, HostFiberTokenMetadata, HostFiberTokenStore,
     HostFiberTokenValidationError,
+};
+pub use root_callbacks::{
+    RootUpdateCallbackRecord, RootUpdateCallbackSnapshot, RootUpdateCallbackVisibility,
 };
 pub use root_commit::{HostRootCommitRecord, RootCommitError, commit_finished_host_root};
 pub use root_config::{
