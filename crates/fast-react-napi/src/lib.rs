@@ -21,8 +21,8 @@ mod root_bridge_requests {
     use std::fmt::{self, Display, Formatter};
 
     use crate::handle_table::{
-        BridgeEnvironmentId, BridgeHandle, BridgeHandleTable, BridgeHandleTableError,
-        PlaceholderRootRecord,
+        BridgeEnvironmentId, BridgeHandle, BridgeHandleAdmissionOutcome, BridgeHandleTable,
+        BridgeHandleTableError, PlaceholderRootRecord, PlaceholderValueRecord,
     };
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -191,6 +191,27 @@ mod root_bridge_requests {
         }
 
         #[must_use]
+        pub(crate) const fn from_js_native_handoff_record(
+            request_id: u64,
+            kind: NativeRootBridgeRequestKind,
+            environment_id: BridgeEnvironmentId,
+            root_handle: BridgeHandle,
+            root_id: u64,
+            value_handle: Option<BridgeHandle>,
+            root_handle_state: NativeRootBridgeRootHandleState,
+        ) -> Self {
+            Self::new(
+                request_id,
+                kind,
+                environment_id,
+                root_handle,
+                root_id,
+                value_handle,
+                root_handle_state,
+            )
+        }
+
+        #[must_use]
         pub(crate) const fn request_id(self) -> u64 {
             self.request_id
         }
@@ -308,6 +329,170 @@ mod root_bridge_requests {
         #[must_use]
         pub(crate) const fn value_handle_validated(self) -> bool {
             self.value_handle_validated
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum NativeRootBridgeHandleAdmissionAction {
+        AdmitRootHandle,
+        AdmitValueHandle,
+        ValidateActiveRootHandle,
+        ValidateValueHandle,
+        RetireRootHandle,
+        ValidateRetiredRootHandle,
+    }
+
+    impl NativeRootBridgeHandleAdmissionAction {
+        #[must_use]
+        pub(crate) const fn code(self) -> &'static str {
+            match self {
+                Self::AdmitRootHandle => "admit-root-handle",
+                Self::AdmitValueHandle => "admit-value-handle",
+                Self::ValidateActiveRootHandle => "validate-active-root-handle",
+                Self::ValidateValueHandle => "validate-value-handle",
+                Self::RetireRootHandle => "retire-root-handle",
+                Self::ValidateRetiredRootHandle => "validate-retired-root-handle",
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct NativeRootBridgeHandleTableAdmissionSmokeRecord {
+        request_id: u64,
+        kind: NativeRootBridgeRequestKind,
+        lifecycle_transition: NativeRootBridgeLifecycleTransition,
+        root_handle_state_before: Option<NativeRootBridgeRootHandleState>,
+        root_handle_state_after: NativeRootBridgeRootHandleState,
+        root_handle_action: NativeRootBridgeHandleAdmissionAction,
+        root_handle_current_generation: u64,
+        value_handle_action: Option<NativeRootBridgeHandleAdmissionAction>,
+        value_handle_current_generation: Option<u64>,
+        retired_root_source_error_code: Option<&'static str>,
+    }
+
+    impl NativeRootBridgeHandleTableAdmissionSmokeRecord {
+        #[allow(clippy::too_many_arguments)]
+        const fn new(
+            request: NativeRootBridgeRequestRecord,
+            lifecycle_transition: NativeRootBridgeLifecycleTransition,
+            root_handle_state_before: Option<NativeRootBridgeRootHandleState>,
+            root_handle_state_after: NativeRootBridgeRootHandleState,
+            root_handle_action: NativeRootBridgeHandleAdmissionAction,
+            root_handle_current_generation: u64,
+            value_handle_action: Option<NativeRootBridgeHandleAdmissionAction>,
+            value_handle_current_generation: Option<u64>,
+            retired_root_source_error_code: Option<&'static str>,
+        ) -> Self {
+            Self {
+                request_id: request.request_id(),
+                kind: request.kind(),
+                lifecycle_transition,
+                root_handle_state_before,
+                root_handle_state_after,
+                root_handle_action,
+                root_handle_current_generation,
+                value_handle_action,
+                value_handle_current_generation,
+                retired_root_source_error_code,
+            }
+        }
+
+        #[must_use]
+        pub(crate) const fn request_id(self) -> u64 {
+            self.request_id
+        }
+
+        #[must_use]
+        pub(crate) const fn kind(self) -> NativeRootBridgeRequestKind {
+            self.kind
+        }
+
+        #[must_use]
+        pub(crate) const fn lifecycle_transition(self) -> NativeRootBridgeLifecycleTransition {
+            self.lifecycle_transition
+        }
+
+        #[must_use]
+        pub(crate) const fn root_handle_state_before(
+            self,
+        ) -> Option<NativeRootBridgeRootHandleState> {
+            self.root_handle_state_before
+        }
+
+        #[must_use]
+        pub(crate) const fn root_handle_state_after(self) -> NativeRootBridgeRootHandleState {
+            self.root_handle_state_after
+        }
+
+        #[must_use]
+        pub(crate) const fn root_handle_action(self) -> NativeRootBridgeHandleAdmissionAction {
+            self.root_handle_action
+        }
+
+        #[must_use]
+        pub(crate) const fn root_handle_current_generation(self) -> u64 {
+            self.root_handle_current_generation
+        }
+
+        #[must_use]
+        pub(crate) const fn value_handle_action(
+            self,
+        ) -> Option<NativeRootBridgeHandleAdmissionAction> {
+            self.value_handle_action
+        }
+
+        #[must_use]
+        pub(crate) const fn value_handle_current_generation(self) -> Option<u64> {
+            self.value_handle_current_generation
+        }
+
+        #[must_use]
+        pub(crate) const fn retired_root_source_error_code(self) -> Option<&'static str> {
+            self.retired_root_source_error_code
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(crate) struct NativeRootBridgeHandleTableAdmissionSmoke {
+        environment_id: BridgeEnvironmentId,
+        root_handle: Option<BridgeHandle>,
+        root_id: Option<u64>,
+        root_retired: bool,
+        admission_records: Vec<NativeRootBridgeHandleTableAdmissionSmokeRecord>,
+        validation_records: Vec<NativeRootBridgeRequestValidationRecord>,
+    }
+
+    impl NativeRootBridgeHandleTableAdmissionSmoke {
+        #[must_use]
+        pub(crate) fn environment_id(&self) -> BridgeEnvironmentId {
+            self.environment_id
+        }
+
+        #[must_use]
+        pub(crate) fn root_handle(&self) -> Option<BridgeHandle> {
+            self.root_handle
+        }
+
+        #[must_use]
+        pub(crate) fn root_id(&self) -> Option<u64> {
+            self.root_id
+        }
+
+        #[must_use]
+        pub(crate) fn root_retired(&self) -> bool {
+            self.root_retired
+        }
+
+        #[must_use]
+        pub(crate) fn admission_records(
+            &self,
+        ) -> &[NativeRootBridgeHandleTableAdmissionSmokeRecord] {
+            &self.admission_records
+        }
+
+        #[must_use]
+        pub(crate) fn validation_records(&self) -> &[NativeRootBridgeRequestValidationRecord] {
+            &self.validation_records
         }
     }
 
@@ -687,6 +872,159 @@ mod root_bridge_requests {
         }
     }
 
+    pub(crate) fn smoke_admit_js_native_root_bridge_handoff_records(
+        requests: &[NativeRootBridgeRequestRecord],
+    ) -> Result<NativeRootBridgeHandleTableAdmissionSmoke, NativeRootBridgeRequestError> {
+        let environment_id = requests
+            .first()
+            .map_or(BridgeEnvironmentId::NONE, |request| {
+                request.environment_id()
+            });
+        let mut table = BridgeHandleTable::new(environment_id);
+        let mut validator = NativeRootBridgeRequestSequenceValidator::new();
+        let mut admission_records = Vec::with_capacity(requests.len());
+        let mut validation_records = Vec::with_capacity(requests.len());
+        let mut root_handle_state = None;
+
+        for request in requests.iter().copied() {
+            let admission_record =
+                admit_js_native_root_bridge_handoff_record(&mut table, request, root_handle_state)?;
+            let validation_record = validator.validate_next(&table, request)?;
+
+            root_handle_state = Some(validation_record.root_handle_state());
+            admission_records.push(admission_record);
+            validation_records.push(validation_record);
+        }
+
+        Ok(NativeRootBridgeHandleTableAdmissionSmoke {
+            environment_id,
+            root_handle: validator.root_handle(),
+            root_id: validator.root_id(),
+            root_retired: validator.root_retired(),
+            admission_records,
+            validation_records,
+        })
+    }
+
+    fn admit_js_native_root_bridge_handoff_record(
+        table: &mut BridgeHandleTable,
+        request: NativeRootBridgeRequestRecord,
+        root_handle_state_before: Option<NativeRootBridgeRootHandleState>,
+    ) -> Result<NativeRootBridgeHandleTableAdmissionSmokeRecord, NativeRootBridgeRequestError> {
+        validate_record_environment(table, request)?;
+
+        match request.kind() {
+            NativeRootBridgeRequestKind::Create => {
+                validate_root_handle_state(request, NativeRootBridgeRootHandleState::Active)?;
+
+                let root_admission = table.admit_root_handoff_handle(
+                    request.root_handle(),
+                    PlaceholderRootRecord::new(request.root_id()),
+                )?;
+                let value_admission = if let Some(value_handle) = request.value_handle() {
+                    Some(table.admit_value_handoff_handle(
+                        value_handle,
+                        PlaceholderValueRecord::new(request.request_id()),
+                    )?)
+                } else {
+                    None
+                };
+
+                Ok(NativeRootBridgeHandleTableAdmissionSmokeRecord::new(
+                    request,
+                    NativeRootBridgeLifecycleTransition::NoneToActive,
+                    root_handle_state_before,
+                    NativeRootBridgeRootHandleState::Active,
+                    NativeRootBridgeHandleAdmissionAction::AdmitRootHandle,
+                    root_admission.current_generation(),
+                    value_admission.map(value_handoff_admission_action),
+                    value_admission.map(|admission| admission.current_generation()),
+                    None,
+                ))
+            }
+            NativeRootBridgeRequestKind::Render => {
+                validate_root_handle_state(request, NativeRootBridgeRootHandleState::Active)?;
+                let root = table.get_root(request.root_handle())?;
+                validate_root_id(request, root.root_id())?;
+
+                let value_admission = if let Some(value_handle) = request.value_handle() {
+                    Some(table.admit_value_handoff_handle(
+                        value_handle,
+                        PlaceholderValueRecord::new(request.request_id()),
+                    )?)
+                } else {
+                    None
+                };
+
+                Ok(NativeRootBridgeHandleTableAdmissionSmokeRecord::new(
+                    request,
+                    NativeRootBridgeLifecycleTransition::ActiveToActive,
+                    root_handle_state_before,
+                    NativeRootBridgeRootHandleState::Active,
+                    NativeRootBridgeHandleAdmissionAction::ValidateActiveRootHandle,
+                    request.root_handle().generation(),
+                    value_admission.map(value_handoff_admission_action),
+                    value_admission.map(|admission| admission.current_generation()),
+                    None,
+                ))
+            }
+            NativeRootBridgeRequestKind::Unmount => {
+                validate_root_handle_state(request, NativeRootBridgeRootHandleState::Retired)?;
+
+                if let Some(value_handle) = request.value_handle() {
+                    return Err(NativeRootBridgeRequestError::UnexpectedValueHandle {
+                        kind: request.kind(),
+                        value_handle,
+                    });
+                }
+
+                let root = table.get_root(request.root_handle())?;
+                validate_root_id(request, root.root_id())?;
+                table.remove_root(request.root_handle())?;
+
+                let (retired_root_current_generation, retired_root_source_error_code) =
+                    match table.get_root(request.root_handle()) {
+                        Ok(_) => {
+                            return Err(NativeRootBridgeRequestError::RootHandleStillActive {
+                                handle: request.root_handle(),
+                            });
+                        }
+                        Err(
+                            error @ BridgeHandleTableError::StaleHandle {
+                                current_generation, ..
+                            },
+                        ) => (current_generation, Some(error.code())),
+                        Err(error) => return Err(NativeRootBridgeRequestError::HandleTable(error)),
+                    };
+
+                Ok(NativeRootBridgeHandleTableAdmissionSmokeRecord::new(
+                    request,
+                    NativeRootBridgeLifecycleTransition::ActiveToRetired,
+                    root_handle_state_before,
+                    NativeRootBridgeRootHandleState::Retired,
+                    NativeRootBridgeHandleAdmissionAction::RetireRootHandle,
+                    retired_root_current_generation,
+                    None,
+                    None,
+                    retired_root_source_error_code,
+                ))
+            }
+        }
+    }
+
+    fn value_handoff_admission_action(
+        admission: crate::handle_table::BridgeHandleAdmission,
+    ) -> NativeRootBridgeHandleAdmissionAction {
+        match admission.outcome() {
+            BridgeHandleAdmissionOutcome::Admitted => {
+                NativeRootBridgeHandleAdmissionAction::AdmitValueHandle
+            }
+            BridgeHandleAdmissionOutcome::Validated => {
+                NativeRootBridgeHandleAdmissionAction::ValidateValueHandle
+            }
+        }
+    }
+
     fn validate_create_record(
         table: &BridgeHandleTable,
         request: NativeRootBridgeRequestRecord,
@@ -839,6 +1177,8 @@ pub const NATIVE_ROOT_BRIDGE_JS_REQUEST_SHAPE_GATE_STATUS: &str =
     "admitted-native-root-bridge-js-request-shape";
 pub const NATIVE_ROOT_BRIDGE_HANDLE_ADMISSION_PREFLIGHT_STATUS: &str =
     "preflighted-native-root-bridge-real-handle-admission";
+pub const NATIVE_ROOT_BRIDGE_RUST_HANDLE_TABLE_ADMISSION_SMOKE_STATUS: &str =
+    "mirrored-native-root-bridge-rust-handle-table-admission-smoke";
 pub const NATIVE_ROOT_BRIDGE_REQUEST_VALIDATION_MODEL: &str =
     "fast-react-napi.NativeRootBridgeRequestSequenceValidator";
 pub const NATIVE_ROOT_BRIDGE_HANDLE_TABLE_MODEL: &str = "fast-react-napi.BridgeHandleTable";
@@ -888,6 +1228,18 @@ pub const NATIVE_ROOT_BRIDGE_HANDLE_ADMISSION_ACTION_CODES: &[&str] = &[
     "validate-value-handle",
     "retire-root-handle",
     "validate-retired-root-handle",
+];
+pub const NATIVE_ROOT_BRIDGE_RUST_HANDLE_TABLE_ADMISSION_SMOKE_RECORD_FIELDS: &[&str] = &[
+    "request_id",
+    "kind",
+    "lifecycle_transition",
+    "root_handle_state_before",
+    "root_handle_state_after",
+    "root_handle_action",
+    "root_handle_current_generation",
+    "value_handle_action",
+    "value_handle_current_generation",
+    "retired_root_source_error_code",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1276,14 +1628,16 @@ fn native_boundary_kind_for_root_bridge_request_error(
 mod tests {
     use super::*;
     use crate::handle_table::{
-        BridgeEnvironmentId, BridgeHandleKind, BridgeHandleTable, BridgeHandleTableError,
-        PlaceholderRootRecord, PlaceholderValueRecord,
+        BridgeEnvironmentId, BridgeHandle, BridgeHandleKind, BridgeHandleTable,
+        BridgeHandleTableError, PlaceholderRootRecord, PlaceholderValueRecord,
     };
     use crate::root_bridge_requests::{
-        NativeRootBridgeCreateRequest, NativeRootBridgeLifecycleTransition,
-        NativeRootBridgeRenderRequest, NativeRootBridgeRequestError, NativeRootBridgeRequestKind,
+        NativeRootBridgeCreateRequest, NativeRootBridgeHandleAdmissionAction,
+        NativeRootBridgeLifecycleTransition, NativeRootBridgeRenderRequest,
+        NativeRootBridgeRequestError, NativeRootBridgeRequestKind, NativeRootBridgeRequestRecord,
         NativeRootBridgeRequestRecorder, NativeRootBridgeRequestSequenceValidator,
         NativeRootBridgeRootHandleState, NativeRootBridgeUnmountRequest,
+        smoke_admit_js_native_root_bridge_handoff_records,
     };
     use std::path::Path;
 
@@ -1846,6 +2200,149 @@ mod tests {
     }
 
     #[test]
+    fn native_root_bridge_js_handoff_records_smoke_admit_through_rust_handle_table() {
+        let environment_id = BridgeEnvironmentId::from_raw(376);
+        let root_handle = BridgeHandle::new(environment_id, 1, 1, BridgeHandleKind::Root);
+        let container_handle = BridgeHandle::new(environment_id, 2, 1, BridgeHandleKind::Value);
+        let element_handle = BridgeHandle::new(environment_id, 3, 1, BridgeHandleKind::Value);
+        let requests = [
+            NativeRootBridgeRequestRecord::from_js_native_handoff_record(
+                1,
+                NativeRootBridgeRequestKind::Create,
+                environment_id,
+                root_handle,
+                1,
+                Some(container_handle),
+                NativeRootBridgeRootHandleState::Active,
+            ),
+            NativeRootBridgeRequestRecord::from_js_native_handoff_record(
+                2,
+                NativeRootBridgeRequestKind::Render,
+                environment_id,
+                root_handle,
+                1,
+                Some(element_handle),
+                NativeRootBridgeRootHandleState::Active,
+            ),
+            NativeRootBridgeRequestRecord::from_js_native_handoff_record(
+                3,
+                NativeRootBridgeRequestKind::Unmount,
+                environment_id,
+                root_handle,
+                1,
+                None,
+                NativeRootBridgeRootHandleState::Retired,
+            ),
+        ];
+
+        let smoke = smoke_admit_js_native_root_bridge_handoff_records(&requests).unwrap();
+        let admission_records = smoke.admission_records();
+        let validation_records = smoke.validation_records();
+
+        assert_eq!(smoke.environment_id(), environment_id);
+        assert_eq!(smoke.root_handle(), Some(root_handle));
+        assert_eq!(smoke.root_id(), Some(1));
+        assert!(smoke.root_retired());
+        assert_eq!(admission_records.len(), 3);
+        assert_eq!(validation_records.len(), 3);
+        assert_eq!(
+            admission_records
+                .iter()
+                .map(|record| record.request_id())
+                .collect::<Vec<_>>(),
+            [1, 2, 3]
+        );
+        assert_eq!(
+            admission_records
+                .iter()
+                .map(|record| record.kind().code())
+                .collect::<Vec<_>>(),
+            ["create", "render", "unmount"]
+        );
+        assert_eq!(
+            admission_records
+                .iter()
+                .map(|record| record.lifecycle_transition().code())
+                .collect::<Vec<_>>(),
+            ["none->active", "active->active", "active->retired"]
+        );
+        assert_eq!(
+            admission_records
+                .iter()
+                .map(|record| record.root_handle_state_before().map(|state| state.code()))
+                .collect::<Vec<_>>(),
+            [None, Some("active"), Some("active")]
+        );
+        assert_eq!(
+            admission_records
+                .iter()
+                .map(|record| record.root_handle_state_after().code())
+                .collect::<Vec<_>>(),
+            ["active", "active", "retired"]
+        );
+        assert_eq!(
+            admission_records
+                .iter()
+                .map(|record| record.root_handle_action().code())
+                .collect::<Vec<_>>(),
+            [
+                NativeRootBridgeHandleAdmissionAction::AdmitRootHandle.code(),
+                NativeRootBridgeHandleAdmissionAction::ValidateActiveRootHandle.code(),
+                NativeRootBridgeHandleAdmissionAction::RetireRootHandle.code()
+            ]
+        );
+        assert_eq!(
+            admission_records
+                .iter()
+                .map(|record| record.root_handle_current_generation())
+                .collect::<Vec<_>>(),
+            [1, 1, 2]
+        );
+        assert_eq!(
+            admission_records
+                .iter()
+                .map(|record| record.value_handle_action().map(|action| action.code()))
+                .collect::<Vec<_>>(),
+            [
+                Some(NativeRootBridgeHandleAdmissionAction::AdmitValueHandle.code()),
+                Some(NativeRootBridgeHandleAdmissionAction::AdmitValueHandle.code()),
+                None
+            ]
+        );
+        assert_eq!(
+            admission_records
+                .iter()
+                .map(|record| record.value_handle_current_generation())
+                .collect::<Vec<_>>(),
+            [Some(1), Some(1), None]
+        );
+        assert_eq!(
+            admission_records[2].retired_root_source_error_code(),
+            Some("FAST_REACT_NAPI_STALE_HANDLE")
+        );
+        assert_eq!(
+            validation_records
+                .iter()
+                .map(|record| record.lifecycle_transition().code())
+                .collect::<Vec<_>>(),
+            ["none->active", "active->active", "active->retired"]
+        );
+        assert_eq!(
+            validation_records
+                .iter()
+                .map(|record| record.root_handle_state().code())
+                .collect::<Vec<_>>(),
+            ["active", "active", "retired"]
+        );
+        assert_eq!(validation_records[0].value_handle(), Some(container_handle));
+        assert_eq!(validation_records[1].value_handle(), Some(element_handle));
+        assert_eq!(validation_records[2].value_handle(), None);
+        assert!(validation_records[0].value_handle_validated());
+        assert!(validation_records[1].value_handle_validated());
+        assert!(!validation_records[2].value_handle_validated());
+    }
+
+    #[test]
     fn native_root_bridge_js_request_shape_metadata_matches_handle_validation_model() {
         assert_eq!(
             NATIVE_ROOT_BRIDGE_JS_REQUEST_SHAPE_GATE_STATUS,
@@ -1854,6 +2351,10 @@ mod tests {
         assert_eq!(
             NATIVE_ROOT_BRIDGE_HANDLE_ADMISSION_PREFLIGHT_STATUS,
             "preflighted-native-root-bridge-real-handle-admission"
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_RUST_HANDLE_TABLE_ADMISSION_SMOKE_STATUS,
+            "mirrored-native-root-bridge-rust-handle-table-admission-smoke"
         );
         assert_eq!(
             NATIVE_ROOT_BRIDGE_REQUEST_VALIDATION_MODEL,
@@ -1939,12 +2440,27 @@ mod tests {
         assert_eq!(
             NATIVE_ROOT_BRIDGE_HANDLE_ADMISSION_ACTION_CODES,
             &[
-                "admit-root-handle",
-                "admit-value-handle",
-                "validate-active-root-handle",
-                "validate-value-handle",
-                "retire-root-handle",
-                "validate-retired-root-handle"
+                NativeRootBridgeHandleAdmissionAction::AdmitRootHandle.code(),
+                NativeRootBridgeHandleAdmissionAction::AdmitValueHandle.code(),
+                NativeRootBridgeHandleAdmissionAction::ValidateActiveRootHandle.code(),
+                NativeRootBridgeHandleAdmissionAction::ValidateValueHandle.code(),
+                NativeRootBridgeHandleAdmissionAction::RetireRootHandle.code(),
+                NativeRootBridgeHandleAdmissionAction::ValidateRetiredRootHandle.code()
+            ]
+        );
+        assert_eq!(
+            NATIVE_ROOT_BRIDGE_RUST_HANDLE_TABLE_ADMISSION_SMOKE_RECORD_FIELDS,
+            &[
+                "request_id",
+                "kind",
+                "lifecycle_transition",
+                "root_handle_state_before",
+                "root_handle_state_after",
+                "root_handle_action",
+                "root_handle_current_generation",
+                "value_handle_action",
+                "value_handle_current_generation",
+                "retired_root_source_error_code"
             ]
         );
     }

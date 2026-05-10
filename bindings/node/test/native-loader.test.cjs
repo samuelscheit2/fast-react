@@ -155,6 +155,36 @@ const expectedNativeRootBridgeRequestShape = {
       'validate-retired-root-handle'
     ]
   },
+  rustHandleTableAdmissionSmoke: {
+    smokeStatus: 'mirrored-native-root-bridge-rust-handle-table-admission-smoke',
+    handleTableModel: 'fast-react-napi.BridgeHandleTable',
+    validationModel: 'fast-react-napi.NativeRootBridgeRequestSequenceValidator',
+    rustAdmissionSmokeRecordFields: [
+      'request_id',
+      'kind',
+      'lifecycle_transition',
+      'root_handle_state_before',
+      'root_handle_state_after',
+      'root_handle_action',
+      'root_handle_current_generation',
+      'value_handle_action',
+      'value_handle_current_generation',
+      'retired_root_source_error_code'
+    ],
+    stateTransitions: ['none->active', 'active->active', 'active->retired'],
+    admissionActions: [
+      'admit-root-handle',
+      'admit-value-handle',
+      'validate-active-root-handle',
+      'validate-value-handle',
+      'retire-root-handle',
+      'validate-retired-root-handle'
+    ],
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false
+  },
   validationErrorCodes: {
     createAfterRootCreated:
       'FAST_REACT_NAPI_ROOT_REQUEST_CREATE_AFTER_ROOT_CREATED',
@@ -263,6 +293,13 @@ for (const shapeValue of [
   native.nativeRootBridgeRequestShape.lifecycleTransitions,
   native.nativeRootBridgeRequestShape.handleAdmissionPreflight,
   native.nativeRootBridgeRequestShape.handleAdmissionPreflight.admissionActions,
+  native.nativeRootBridgeRequestShape.rustHandleTableAdmissionSmoke,
+  native.nativeRootBridgeRequestShape.rustHandleTableAdmissionSmoke
+    .rustAdmissionSmokeRecordFields,
+  native.nativeRootBridgeRequestShape.rustHandleTableAdmissionSmoke
+    .stateTransitions,
+  native.nativeRootBridgeRequestShape.rustHandleTableAdmissionSmoke
+    .admissionActions,
   native.nativeRootBridgeRequestShape.validationErrorCodes
 ]) {
   assert.ok(Object.isFrozen(shapeValue));
@@ -314,6 +351,14 @@ assert.equal(nativeShapeGate.rendererExecution, false);
 assert.equal(nativeShapeGate.reconcilerExecution, false);
 assertNativeRootBridgeHandleAdmissionPreflight(
   nativeShapeGate.handleAdmissionPreflight,
+  {
+    environmentId: 318,
+    rootId: 1,
+    rootSlot: 1
+  }
+);
+assertNativeRootBridgeRustHandleTableAdmissionSmoke(
+  nativeShapeGate.rustHandleTableAdmissionSmoke,
   {
     environmentId: 318,
     rootId: 1,
@@ -693,6 +738,92 @@ function assertNativeRootBridgeHandleAdmissionPreflight(preflight, expected) {
     rootId: expected.rootId,
     sourceErrorCode: 'FAST_REACT_NAPI_STALE_HANDLE'
   });
+}
+
+function assertNativeRootBridgeRustHandleTableAdmissionSmoke(smoke, expected) {
+  assert.equal(Object.isFrozen(smoke), true);
+  assert.equal(Object.isFrozen(smoke.smokeRecords), true);
+  assert.equal(
+    smoke.smokeStatus,
+    'mirrored-native-root-bridge-rust-handle-table-admission-smoke'
+  );
+  assert.equal(smoke.handleTableModel, 'fast-react-napi.BridgeHandleTable');
+  assert.equal(
+    smoke.validationModel,
+    'fast-react-napi.NativeRootBridgeRequestSequenceValidator'
+  );
+  assert.equal(smoke.requestCount, 3);
+  assert.equal(smoke.tableEnvironmentId, expected.environmentId);
+  assert.equal(smoke.rootId, expected.rootId);
+  assert.equal(smoke.rootRetired, true);
+  assert.deepEqual(smoke.rootHandle, {
+    environmentId: expected.environmentId,
+    generation: 1,
+    kind: 'root',
+    slot: expected.rootSlot
+  });
+  assert.equal(
+    smoke.rustAdmissionSmokeRecordFields,
+    native.nativeRootBridgeRequestShape.rustHandleTableAdmissionSmoke
+      .rustAdmissionSmokeRecordFields
+  );
+  assert.deepEqual(
+    smoke.smokeRecords.map((record) => record.lifecycleTransition),
+    ['none->active', 'active->active', 'active->retired']
+  );
+  assert.deepEqual(
+    smoke.smokeRecords.map((record) => record.rootHandleStateBefore),
+    [null, 'active', 'active']
+  );
+  assert.deepEqual(
+    smoke.smokeRecords.map((record) => record.rootHandleStateAfter),
+    ['active', 'active', 'retired']
+  );
+  assert.deepEqual(
+    smoke.smokeRecords.map((record) => record.rootHandleAction),
+    [
+      'admit-root-handle',
+      'validate-active-root-handle',
+      'retire-root-handle'
+    ]
+  );
+  assert.deepEqual(
+    smoke.smokeRecords.map((record) => record.rootHandleCurrentGeneration),
+    [1, 1, 2]
+  );
+  assert.deepEqual(
+    smoke.smokeRecords.map((record) => record.valueHandleAction),
+    ['admit-value-handle', 'admit-value-handle', null]
+  );
+  assert.deepEqual(
+    smoke.smokeRecords.map((record) => record.valueHandleCurrentGeneration),
+    [1, 1, null]
+  );
+  assert.equal(
+    smoke.smokeRecords[2].retiredRootSourceErrorCode,
+    'FAST_REACT_NAPI_STALE_HANDLE'
+  );
+  assert.deepEqual(smoke.smokeRecords[2].rustAdmissionSmokeRecord, {
+    kind: 'unmount',
+    lifecycle_transition: 'active->retired',
+    request_id: 3,
+    retired_root_source_error_code: 'FAST_REACT_NAPI_STALE_HANDLE',
+    root_handle_action: 'retire-root-handle',
+    root_handle_current_generation: 2,
+    root_handle_state_after: 'retired',
+    root_handle_state_before: 'active',
+    value_handle_action: null,
+    value_handle_current_generation: null
+  });
+  for (const record of smoke.smokeRecords) {
+    assert.equal(Object.isFrozen(record), true);
+    assert.equal(Object.isFrozen(record.rustAdmissionSmokeRecord), true);
+    assert.deepEqual(
+      Object.keys(record.rustAdmissionSmokeRecord),
+      native.nativeRootBridgeRequestShape.rustHandleTableAdmissionSmoke
+        .rustAdmissionSmokeRecordFields
+    );
+  }
 }
 
 function assertBridgeDidNotTouchContainer(container, document) {
