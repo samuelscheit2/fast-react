@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   findReactTestRendererActObservation,
@@ -19,6 +23,64 @@ import {
 } from "../src/react-test-renderer-act-scenarios.mjs";
 
 const oracle = readCheckedReactTestRendererActOracle();
+const require = createRequire(import.meta.url);
+const repoRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  ".."
+);
+const compatibilityTarget = "react-test-renderer@19.2.6";
+const actBlockedGateStatus =
+  "blocked-until-react-test-renderer-act-queue-effects-and-renderer-roots";
+const actUnblockingRequirements = [
+  {
+    id: "react-test-renderer-act-queue-flushing",
+    requiredBeforeCompatibilityClaim: true,
+    reason:
+      "Test renderer act must wait for internal act queue task execution and continuation draining."
+  },
+  {
+    id: "react-test-renderer-effect-flushing",
+    requiredBeforeCompatibilityClaim: true,
+    reason:
+      "Test renderer act compatibility requires layout/passive effect callbacks to execute during renderer flushes."
+  },
+  {
+    id: "react-test-renderer-public-root-routing",
+    requiredBeforeCompatibilityClaim: true,
+    reason:
+      "Test renderer act needs public create, update, unmount, and serialization routes backed by renderer roots."
+  }
+];
+const localEntrypoints = [
+  {
+    entrypoint: "react-test-renderer",
+    modulePath: "packages/react-test-renderer/index.js",
+    nodeEnv: "development",
+    actExport: "function"
+  },
+  {
+    entrypoint: "react-test-renderer",
+    modulePath: "packages/react-test-renderer/index.js",
+    nodeEnv: "production",
+    actExport: "undefined"
+  },
+  {
+    entrypoint: "react-test-renderer/cjs/react-test-renderer.development",
+    modulePath:
+      "packages/react-test-renderer/cjs/react-test-renderer.development.js",
+    nodeEnv: "development",
+    actExport: "function"
+  },
+  {
+    entrypoint: "react-test-renderer/cjs/react-test-renderer.production",
+    modulePath:
+      "packages/react-test-renderer/cjs/react-test-renderer.production.js",
+    nodeEnv: "production",
+    actExport: "undefined"
+  }
+];
 
 const TEST_RENDERER_EXPORT_KEYS = [
   "_Scheduler",
@@ -351,6 +413,71 @@ test("root unstable_flushSync flushes updates after the callback and restores af
   assert.deepEqual(production.finalJSON, textJSON("C"));
 });
 
+test("Fast React react-test-renderer act stays blocked behind accepted package and reconciler metadata", () => {
+  assert.equal(
+    oracle.conformanceClaims.fastReactComparedToReactTestRenderer,
+    false
+  );
+  assert.equal(oracle.conformanceClaims.fastReactBehaviorCompatible, false);
+  assert.equal(oracle.conformanceClaims.compatibilityClaimed, false);
+
+  const localGate = inspectLocalReactTestRendererActBlockedGate();
+  assert.equal(localGate.status, actBlockedGateStatus);
+  assert.deepEqual(localGate.unblockRequires, [
+    "react-test-renderer-act-queue-flushing",
+    "react-test-renderer-effect-flushing",
+    "react-test-renderer-public-root-routing"
+  ]);
+  assert.equal(
+    localGate.actQueueStatus,
+    "private-records-and-continuation-metadata-without-flushing"
+  );
+  assert.equal(
+    localGate.effectExecutionStatus,
+    "metadata-only-no-callback-execution"
+  );
+  assert.equal(
+    localGate.rendererRootStatus,
+    "public-renderer-roots-placeholder-blocked"
+  );
+  assert.equal(localGate.actQueueFlushingReady, false);
+  assert.equal(localGate.effectExecutionReady, false);
+  assert.equal(localGate.rendererRootsReady, false);
+  assert.equal(localGate.compatibilityClaimed, false);
+
+  for (const requirement of actUnblockingRequirements) {
+    assert.equal(requirement.requiredBeforeCompatibilityClaim, true);
+    assert.equal(
+      localGate.unblockRequires.includes(requirement.id),
+      true,
+      requirement.id
+    );
+    assert.match(requirement.reason, /Test renderer act/u);
+  }
+
+  for (const entry of localEntrypoints) {
+    const moduleExports = loadFreshLocalEntrypoint(entry);
+    assert.deepEqual(Object.keys(moduleExports), TEST_RENDERER_EXPORT_KEYS);
+    assert.equal(moduleExports.__FAST_REACT_PLACEHOLDER__, true);
+    assert.equal(moduleExports.__FAST_REACT_ENTRYPOINT__, entry.entrypoint);
+    assert.equal(moduleExports.compatibilityTarget, compatibilityTarget);
+    assert.deepEqual(
+      Object.keys(moduleExports._Scheduler),
+      MOCK_SCHEDULER_KEYS
+    );
+    assert.deepEqual(
+      Reflect.ownKeys(moduleExports._Scheduler),
+      MOCK_SCHEDULER_KEYS
+    );
+
+    const renderer = moduleExports.create(null);
+    assert.equal(renderer._Scheduler, moduleExports._Scheduler);
+    assert.equal(renderer.unstable_flushSync.length, 1);
+    assertActSurface(entry, moduleExports);
+    assertSchedulerSurfaceBlocked(entry, moduleExports._Scheduler);
+  }
+});
+
 test("development act propagates callback errors and aggregates multiple render errors", () => {
   const result = observation(
     "node-development",
@@ -510,4 +637,212 @@ function assertThrowsErrorWithCode(operation, name, message, code) {
   assert.equal(operation.error.name, name);
   assert.equal(operation.error.message, message);
   assert.equal(operation.error.code, code);
+}
+
+function loadFreshLocalEntrypoint(entry) {
+  const absolutePath = path.join(repoRoot, entry.modulePath);
+  const resolved = require.resolve(absolutePath);
+  const previousNodeEnv = process.env.NODE_ENV;
+
+  if (entry.nodeEnv === undefined) {
+    delete process.env.NODE_ENV;
+  } else {
+    process.env.NODE_ENV = entry.nodeEnv;
+  }
+
+  delete require.cache[resolved];
+
+  try {
+    return require(resolved);
+  } finally {
+    delete require.cache[resolved];
+    if (previousNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
+  }
+}
+
+function inspectLocalReactTestRendererActBlockedGate() {
+  const schedulerBridgeSource = readWorkspaceFile(
+    "crates/fast-react-reconciler/src/scheduler_bridge.rs"
+  );
+  const rootSchedulerSource = readWorkspaceFile(
+    "crates/fast-react-reconciler/src/root_scheduler.rs"
+  );
+  const syncFlushSource = readWorkspaceFile(
+    "crates/fast-react-reconciler/src/sync_flush.rs"
+  );
+  const passiveEffectsSource = readWorkspaceFile(
+    "crates/fast-react-reconciler/src/passive_effects.rs"
+  );
+  const reactDomClientSource = readWorkspaceFile("packages/react-dom/client.js");
+  const testRendererSource = readWorkspaceFile(
+    "packages/react-test-renderer/index.js"
+  );
+  const actQueueSource = [
+    schedulerBridgeSource,
+    rootSchedulerSource,
+    syncFlushSource
+  ].join("\n");
+  const actQueueRecordsPresent =
+    /\bSchedulerActQueueRequest\b/u.test(actQueueSource) &&
+    /\bSchedulerActQueueTaskKind\b/u.test(actQueueSource) &&
+    /\bFAKE_ACT_CALLBACK_NODE\b/u.test(actQueueSource);
+  const actContinuationMetadataPresent =
+    /\bSchedulerActContinuationRecord\b/u.test(actQueueSource) &&
+    /\brecord_sync_flush_act_continuation\b/u.test(actQueueSource);
+  const actFlushExecutionPresent =
+    /\b(?:flush|drain)_act_queue\b|\b(?:flush|drain)ActQueue\b|\brecursivelyFlushAsyncActWork\b/u.test(
+      actQueueSource
+    );
+  const passiveEffectMetadataOnly =
+    /does not traverse hook rings, invoke create\/destroy callbacks/u.test(
+      passiveEffectsSource
+    );
+  const effectCallbackExecutionPresent =
+    /\b(?:invoke|execute)_(?:layout|passive|hook)_effects?\b|\b(?:invoke|execute)Effect(?:Create|Destroy)\b/u.test(
+      passiveEffectsSource
+    );
+  const reactDomClientRootPlaceholder =
+    /createUnsupportedFunction\(entrypoint, 'createRoot'/u.test(
+      reactDomClientSource
+    );
+  const testRendererRootPlaceholder =
+    /\bFastReactTestRendererUnimplementedError\b/u.test(testRendererSource) &&
+    /Root updates are intentionally blocked/u.test(testRendererSource) &&
+    /Synchronous flushing is intentionally blocked/u.test(testRendererSource);
+  const actQueueFlushingReady = actFlushExecutionPresent;
+  const effectExecutionReady = effectCallbackExecutionPresent;
+  const rendererRootsReady =
+    !reactDomClientRootPlaceholder && !testRendererRootPlaceholder;
+
+  return {
+    status: actBlockedGateStatus,
+    unblockRequires: actUnblockingRequirements.map(
+      (requirement) => requirement.id
+    ),
+    actQueueStatus: actQueueFlushingReady
+      ? "flush-execution-token-present-needs-explicit-admission"
+      : actQueueRecordsPresent && actContinuationMetadataPresent
+        ? "private-records-and-continuation-metadata-without-flushing"
+        : "missing-private-act-queue-metadata",
+    effectExecutionStatus: effectExecutionReady
+      ? "callback-execution-token-present-needs-explicit-admission"
+      : passiveEffectMetadataOnly
+        ? "metadata-only-no-callback-execution"
+        : "effect-callback-execution-not-detected",
+    rendererRootStatus: rendererRootsReady
+      ? "public-renderer-roots-need-explicit-admission"
+      : "public-renderer-roots-placeholder-blocked",
+    actQueueRecordsPresent,
+    actContinuationMetadataPresent,
+    actQueueFlushingReady,
+    effectExecutionReady,
+    rendererRootsReady,
+    compatibilityClaimed: false
+  };
+}
+
+function assertActSurface(entry, moduleExports) {
+  if (entry.actExport === "undefined") {
+    assert.equal(moduleExports.act, undefined, entry.entrypoint);
+    return;
+  }
+
+  let callbackInvoked = false;
+  const error = captureThrown(() =>
+    moduleExports.act(() => {
+      callbackInvoked = true;
+      throw new Error("act callback must not run");
+    })
+  );
+
+  assert.equal(callbackInvoked, false, entry.entrypoint);
+  assertReactTestRendererUnimplementedError(error, entry.entrypoint, "act");
+  assert.equal(Object.hasOwn(error, "routingGate"), false);
+  assert.equal(Object.hasOwn(error, "missingPrerequisites"), false);
+}
+
+function assertSchedulerSurfaceBlocked(entry, scheduler) {
+  assert.deepEqual(
+    {
+      Immediate: scheduler.unstable_ImmediatePriority,
+      UserBlocking: scheduler.unstable_UserBlockingPriority,
+      Normal: scheduler.unstable_NormalPriority,
+      Low: scheduler.unstable_LowPriority,
+      Idle: scheduler.unstable_IdlePriority,
+      Profiling: scheduler.unstable_Profiling
+    },
+    {
+      Immediate: 1,
+      UserBlocking: 2,
+      Normal: 3,
+      Low: 4,
+      Idle: 5,
+      Profiling: null
+    }
+  );
+
+  let scheduledCallbackInvoked = false;
+  const scheduleError = captureThrown(() =>
+    scheduler.unstable_scheduleCallback(
+      scheduler.unstable_NormalPriority,
+      () => {
+        scheduledCallbackInvoked = true;
+      }
+    )
+  );
+  assert.equal(scheduledCallbackInvoked, false, entry.entrypoint);
+  assertReactTestRendererUnimplementedError(
+    scheduleError,
+    entry.entrypoint,
+    "_Scheduler.unstable_scheduleCallback"
+  );
+  assert.equal(Object.hasOwn(scheduleError, "routingGate"), false);
+
+  for (const method of [
+    "unstable_flushAll",
+    "unstable_flushNumberOfYields",
+    "unstable_clearLog"
+  ]) {
+    const error = captureThrown(() => scheduler[method]());
+    assertReactTestRendererUnimplementedError(
+      error,
+      entry.entrypoint,
+      `_Scheduler.${method}`
+    );
+    assert.equal(Object.hasOwn(error, "routingGate"), false);
+  }
+}
+
+function assertReactTestRendererUnimplementedError(
+  error,
+  entrypoint,
+  exportName
+) {
+  assert.equal(error.name, "FastReactTestRendererUnimplementedError");
+  assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED");
+  assert.equal(error.entrypoint, entrypoint);
+  assert.equal(error.exportName, exportName);
+  assert.equal(error.compatibilityTarget, compatibilityTarget);
+  assert.match(
+    error.message,
+    /no React Test Renderer behavior implementation yet/
+  );
+}
+
+function captureThrown(callback) {
+  try {
+    callback();
+  } catch (error) {
+    return error;
+  }
+
+  assert.fail("Expected callback to throw");
+}
+
+function readWorkspaceFile(relativePath) {
+  return readFileSync(path.join(repoRoot, relativePath), "utf8");
 }

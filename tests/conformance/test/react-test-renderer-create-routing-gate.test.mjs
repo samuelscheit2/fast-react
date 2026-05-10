@@ -129,8 +129,16 @@ test("react-test-renderer create shell exposes routing gate metadata without cha
 
     const firstRenderer = moduleExports.create({ type: "placeholder" });
     const secondRenderer = moduleExports.create(null);
-    assertRendererShape(firstRenderer, entry.entrypoint);
-    assertRendererShape(secondRenderer, `${entry.entrypoint} second create`);
+    assertRendererShape(
+      firstRenderer,
+      entry.entrypoint,
+      moduleExports._Scheduler
+    );
+    assertRendererShape(
+      secondRenderer,
+      `${entry.entrypoint} second create`,
+      moduleExports._Scheduler
+    );
 
     const firstError = captureThrown(() => firstRenderer.toJSON());
     const secondError = captureThrown(() => secondRenderer.toJSON());
@@ -200,18 +208,28 @@ test("react-test-renderer create shell keeps every behaviorful renderer surface 
     if (entry.production) {
       assert.equal(moduleExports.act, undefined, entry.entrypoint);
     } else {
+      let actCallbackInvoked = false;
       const actError = captureThrown(() =>
         moduleExports.act(() => {
+          actCallbackInvoked = true;
           throw new Error("must not run act callback");
         })
       );
+      assert.equal(actCallbackInvoked, false, entry.entrypoint);
       assertReactTestRendererUnimplemented(actError, entry.entrypoint, "act");
       assert.equal(Object.hasOwn(actError, "routingGate"), false);
     }
 
+    let scheduledCallbackInvoked = false;
     const schedulerError = captureThrown(() =>
-      moduleExports._Scheduler.unstable_scheduleCallback()
+      moduleExports._Scheduler.unstable_scheduleCallback(
+        moduleExports._Scheduler.unstable_NormalPriority,
+        () => {
+          scheduledCallbackInvoked = true;
+        }
+      )
     );
+    assert.equal(scheduledCallbackInvoked, false, entry.entrypoint);
     assertReactTestRendererUnimplemented(
       schedulerError,
       entry.entrypoint,
@@ -314,12 +332,13 @@ function loadFresh(relativePath) {
   return require(resolved);
 }
 
-function assertRendererShape(renderer, label) {
+function assertRendererShape(renderer, label, moduleScheduler) {
   assert.deepEqual(Object.keys(renderer), rendererKeys, label);
   assert.deepEqual(Object.getOwnPropertyNames(renderer), rendererKeys, label);
   assert.deepEqual(Reflect.ownKeys(renderer), rendererKeys, label);
   assert.equal(Object.hasOwn(renderer, "routingGate"), false, label);
   assert.equal(Object.hasOwn(renderer, "missingPrerequisites"), false, label);
+  assert.equal(renderer._Scheduler, moduleScheduler, label);
 
   const rootDescriptor = Object.getOwnPropertyDescriptor(renderer, "root");
   assert.equal(rootDescriptor.configurable, true, label);
