@@ -7,6 +7,7 @@ mod concurrent_updates;
 mod execution_context;
 mod fiber_root;
 mod fiber_store;
+mod host_nodes;
 mod host_tokens;
 #[cfg(test)]
 mod host_work;
