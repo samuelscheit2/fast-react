@@ -278,9 +278,30 @@ sequencing belong in `MASTER_PLAN.md`.
   render/output record, without public work-loop wiring, hooks, context
   propagation, child reconciliation, commit effects, DOM/test-renderer
   integration, or public React hook facades.
+- Worker 195 test-renderer root callback snapshot was merged, extending the
+  Rust-only `TestRendererRoot` canary with explicit callback-handle create,
+  update, and unmount helpers so returned `HostRootCommitRecord` values can
+  expose empty and visible root update callback snapshots without JS callback
+  invocation, public serialization, public `act`, host output mutation,
+  DOM/native behavior, or reconciler commit semantic changes.
+- Worker 196 sync-flush root callback snapshot was merged, adding a borrowing
+  `SyncFlushRootRecord::root_update_callbacks()` accessor that surfaces the
+  callback snapshot already owned by the accepted HostRoot commit record, with
+  visible and deferred-hidden sync-flush coverage while preserving scheduling
+  selection, callback invocation, public `flushSync`, DOM/test-renderer
+  facades, and host mutation boundaries.
 
 ## Latest Accepted Verification
 
+- Workers 195 and 196 were verified on their integrated worktrees and again on
+  `main` with `cargo fmt --all --check`, full
+  `fast-react-test-renderer` tests with 32 unit tests and 0 doctests, full
+  `fast-react-reconciler` tests with 140 unit tests plus 1 compile-fail
+  doctest, focused 195 root tests with 16 matching tests, focused 196
+  `sync_flush` tests with 14 matching tests, focused `root_commit` tests with
+  7 matching tests, clippy for both touched packages with warnings denied, and
+  `git diff --check`; merging current `main` into both worker branches
+  produced no conflicts, and both merge commits applied cleanly to `main`.
 - Worker 194 was verified on its integrated worktree and again on `main` with
   `cargo fmt --all --check`, focused `begin_work` tests with 4 tests, broader
   `function_component` tests with 8 matching tests, full
