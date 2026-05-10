@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   DOM_STYLE_DANGEROUS_HTML_ORACLE_ARTIFACT_PATH,
@@ -16,6 +19,32 @@ import {
   readCheckedDomStyleDangerousHtmlOracle,
   readCheckedDomStyleDangerousHtmlOracleText
 } from "../src/dom-style-dangerous-html-oracle.mjs";
+
+const require = createRequire(import.meta.url);
+const repoRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  ".."
+);
+const propertyPayload = require(
+  path.join(
+    repoRoot,
+    "packages",
+    "react-dom",
+    "src",
+    "dom-host",
+    "property-payload.js"
+  )
+);
+const {
+  ENTRY_REMOVE_STYLE,
+  ENTRY_SET_STYLE,
+  PRIVATE_STYLE_OBJECT_DIFF_DIAGNOSTIC_STATUS,
+  PRIVATE_STYLE_OBJECT_DIFF_PUBLIC_COMPATIBILITY_STATUS,
+  PRIVATE_STYLE_OBJECT_DIFF_PUBLIC_MUTATION_STATUS,
+  recordPrivateDomStyleObjectDiffDiagnostics
+} = propertyPayload;
 
 const oracle = readCheckedDomStyleDangerousHtmlOracle();
 
@@ -242,6 +271,178 @@ test("client mutation observations record style assignment, update, and removal 
   );
 });
 
+test("private style object diff diagnostics mirror oracle style rows without DOM mutation", () => {
+  const diagnostic = recordPrivateDomStyleObjectDiffDiagnostics(
+    orderedProps([
+      ["color", "red"],
+      ["marginTop", 4],
+      ["opacity", 0.5],
+      ["flex", 1],
+      ["--gap", "4px"],
+      ["--count", 3],
+      ["backgroundColor", "yellow"],
+      ["borderWidth", 2],
+      ["paddingLeft", "1em"]
+    ]),
+    orderedProps([
+      ["color", null],
+      ["marginTop", 0],
+      ["opacity", null],
+      ["--gap", null],
+      ["backgroundColor", "blue"]
+    ])
+  );
+  const updatePhase = clientPhase(
+    "default-node-development",
+    "style-update-and-removal",
+    "update"
+  );
+
+  assert.equal(diagnostic.status, PRIVATE_STYLE_OBJECT_DIFF_DIAGNOSTIC_STATUS);
+  assert.deepEqual(diagnostic.summary, {
+    rowCount: 9,
+    payloadRowCount: 9,
+    setStyleCount: 2,
+    removeStyleCount: 7,
+    additionRowCount: 0,
+    changeRowCount: 2,
+    removalRowCount: 7,
+    unsupportedRowCount: 0,
+    unitlessRowCount: 2,
+    unitlessSetRowCount: 0,
+    customPropertyRowCount: 2,
+    numericWithoutPxRowCount: 1,
+    pxAppendedRowCount: 0,
+    zeroNumericRowCount: 1,
+    propertyAssignmentCount: 7,
+    setPropertyCount: 2,
+    mutatingRowCount: 0,
+    realDomNodeMutated: false,
+    browserDomMutation: false,
+    fakeDomMutation: false,
+    compatibilityClaimed: false,
+    publicMutationBlocked: true,
+    rowKinds: [ENTRY_REMOVE_STYLE, ENTRY_SET_STYLE]
+  });
+  assert.deepEqual(
+    diagnostic.payloadRows.map((row) => [
+      styleMutationType(row),
+      row.styleName,
+      row.value
+    ]),
+    updatePhase.mutations
+      .filter((mutation) => mutation.type.startsWith("style"))
+      .map((mutation) => [
+        mutation.type,
+        mutation.property ?? mutation.name,
+        mutation.value
+      ])
+  );
+  assert.deepEqual(
+    diagnostic.styleObjectDiffRows.map((row) => [
+      row.styleName,
+      row.action,
+      row.removalReason,
+      row.unitless,
+      row.customProperty,
+      row.pxAppended,
+      row.realDomNodeMutated,
+      row.compatibilityClaimed
+    ]),
+    [
+      [
+        "flex",
+        "remove",
+        "omitted-next-style-property",
+        true,
+        false,
+        false,
+        false,
+        false
+      ],
+      [
+        "--count",
+        "remove",
+        "omitted-next-style-property",
+        false,
+        true,
+        false,
+        false,
+        false
+      ],
+      [
+        "borderWidth",
+        "remove",
+        "omitted-next-style-property",
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      [
+        "paddingLeft",
+        "remove",
+        "omitted-next-style-property",
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      [
+        "color",
+        "remove",
+        "nullish-empty-or-boolean-next-value",
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      ["marginTop", "change", null, false, false, false, false, false],
+      [
+        "opacity",
+        "remove",
+        "nullish-empty-or-boolean-next-value",
+        true,
+        false,
+        false,
+        false,
+        false
+      ],
+      [
+        "--gap",
+        "remove",
+        "nullish-empty-or-boolean-next-value",
+        false,
+        true,
+        false,
+        false,
+        false
+      ],
+      ["backgroundColor", "change", null, false, false, false, false, false]
+    ]
+  );
+  assert.deepEqual(diagnostic.blockedPublicMutation, {
+    status: PRIVATE_STYLE_OBJECT_DIFF_PUBLIC_MUTATION_STATUS,
+    realDomNodeRequired: false,
+    browserDomMutation: false,
+    fakeDomMutation: false,
+    styleObjectMutated: false,
+    propertyAssignmentInvoked: false,
+    setPropertyInvoked: false
+  });
+  assert.equal(
+    diagnostic.blockedPublicCompatibility.status,
+    PRIVATE_STYLE_OBJECT_DIFF_PUBLIC_COMPATIBILITY_STATUS
+  );
+  assert.equal(diagnostic.sideEffects.browserDomMutation, false);
+  assert.equal(diagnostic.sideEffects.propertyAssignmentInvoked, false);
+  assert.equal(diagnostic.sideEffects.setPropertyInvoked, false);
+  assert.equal(diagnostic.sideEffects.compatibilityClaimed, false);
+});
+
 test("client mutation observations record dangerouslySetInnerHTML update and removal", () => {
   const initialElement = firstRenderedElement(
     clientPhase(
@@ -410,4 +611,19 @@ function consoleMessageStrings(phase) {
     assert.equal(call.method, "error");
     return call.args[0].value;
   });
+}
+
+function orderedProps(entries) {
+  const props = {};
+  for (const [key, value] of entries) {
+    props[key] = value;
+  }
+  return props;
+}
+
+function styleMutationType(row) {
+  if (row.mutation === "setProperty") {
+    return "styleSetProperty";
+  }
+  return "stylePropertyAssignment";
 }
