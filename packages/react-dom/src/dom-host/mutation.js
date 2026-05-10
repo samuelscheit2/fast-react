@@ -49,6 +49,23 @@ function createDomHostMutationError(code, message) {
   return error;
 }
 
+const DOM_HOST_TEXT_COMMIT_GATE_METADATA = Object.freeze({
+  gateVersion: 1,
+  target: 'packages/react-dom/src/dom-host/mutation.js',
+  publicRootsCompared: false,
+  serverRenderingCompared: false,
+  hydrationCompared: false,
+  browserDomCompared: false,
+  compatibilityClaimed: false,
+  supportedFakeDomRowIds: Object.freeze([
+    'host-text-create-append',
+    'host-text-update-node-value',
+    'host-text-delete-remove-child',
+    'host-text-insert-before',
+    'reset-text-content-before-managed-child'
+  ])
+});
+
 function appendInitialChild(parentInstance, child) {
   return appendChild(parentInstance, child);
 }
@@ -765,6 +782,7 @@ function applyStylePayloadEntry(instance, entry) {
 }
 
 module.exports = {
+  DOM_HOST_TEXT_COMMIT_GATE_METADATA,
   appendChild,
   appendChildToContainer,
   appendInitialChild,
