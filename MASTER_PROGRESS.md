@@ -29,6 +29,18 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Queue 625-654
+
+- Workers 644 and 647 were accepted from the active queue. The batch added
+  private checkbox input/change controlled-restore execution for an admitted
+  fake-DOM checked path, and broadened private portal click delegation execution
+  with owner-root validation while keeping public controlled-input, browser
+  event, and portal event compatibility blocked.
+- The batch was verified after merge with focused React DOM event,
+  resource/form, controlled-input, and event-delegation conformance checks;
+  `npm run check --workspace @fast-react/react-dom`; conflict-marker scanning;
+  and `git diff --check`.
+
 ### Queue 595-624
 
 - Workers 595, 597, 598, 601, 604, 618, and 621 were accepted from the active

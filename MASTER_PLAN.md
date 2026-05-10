@@ -45,8 +45,8 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Queue 625-654 is active in 30 `fr-*` tmux sessions
-from isolated `worker/<slug>` branches and worktrees.
+Top-level cap: 30 workers. Queue 625-654 is active in isolated
+`worker/<slug>` branches and worktrees.
 
 - 625-635: Rust reconciler execution paths for root scheduling, sync flush,
   function components, effects, context, Suspense, Offscreen, host placement,
@@ -56,6 +56,8 @@ from isolated `worker/<slug>` branches and worktrees.
 - 641-652: React DOM private facade, controlled input, event, hydration,
   resource, and form execution gates.
 - 653-654: Scheduler mock and postTask private execution routes.
+- Accepted so far: 644 and 647.
+- Remaining active: 625-643, 645-646, and 648-654.
 
 ## Near-Term Sequencing
 
