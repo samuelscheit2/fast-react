@@ -7,35 +7,26 @@ const test = require('node:test');
 const packageRoot = path.resolve(__dirname, '..');
 const reactDom = require(path.join(packageRoot, 'index.js'));
 const reactDomClient = require(path.join(packageRoot, 'client.js'));
-const resourceFormGate = require(path.join(
-  packageRoot,
-  'src/resource-form-gates.js'
-));
-const rootBridge = require(path.join(
-  packageRoot,
-  'src/client/root-bridge.js'
-));
-const componentTree = require(path.join(
-  packageRoot,
-  'src/client/component-tree.js'
-));
-const rootMarkers = require(path.join(
-  packageRoot,
-  'src/client/root-markers.js'
-));
-const listenerRegistry = require(path.join(
-  packageRoot,
-  'src/events/listener-registry.js'
-));
-const rootListeners = require(path.join(
-  packageRoot,
-  'src/events/root-listeners.js'
-));
-const {
-  DOCUMENT_NODE,
-  ELEMENT_NODE,
-  TEXT_NODE
-} = require(path.join(packageRoot, 'src/client/dom-container.js'));
+const resourceFormGate = require(
+  path.join(packageRoot, 'src/resource-form-gates.js')
+);
+const rootBridge = require(path.join(packageRoot, 'src/client/root-bridge.js'));
+const componentTree = require(
+  path.join(packageRoot, 'src/client/component-tree.js')
+);
+const domHost = require(path.join(packageRoot, 'src/dom-host/mutation.js'));
+const rootMarkers = require(
+  path.join(packageRoot, 'src/client/root-markers.js')
+);
+const listenerRegistry = require(
+  path.join(packageRoot, 'src/events/listener-registry.js')
+);
+const rootListeners = require(
+  path.join(packageRoot, 'src/events/root-listeners.js')
+);
+const {DOCUMENT_NODE, ELEMENT_NODE, TEXT_NODE} = require(
+  path.join(packageRoot, 'src/client/dom-container.js')
+);
 
 test('private root bridge native handoff mirrors create/render/unmount records only', () => {
   const document = createDocument('native-handoff');
@@ -339,11 +330,7 @@ test('private create/render admission combines mark/listen and render records wi
   const create = bridge.createClientRoot(container);
   const sideEffects = bridge.applyCreateRootSideEffects(create);
   const render = bridge.renderContainer(create.handle, element);
-  const admission = bridge.admitCreateRenderPath(
-    create,
-    sideEffects,
-    render
-  );
+  const admission = bridge.admitCreateRenderPath(create, sideEffects, render);
 
   assert.equal(
     rootBridge.admitPrivateCreateRenderPath(create, sideEffects, render),
@@ -442,10 +429,7 @@ test('private create/render admission combines mark/listen and render records wi
   assert.equal(payload.renderRecord, render);
   assert.equal(payload.container, container);
   assert.equal(payload.element, element);
-  assert.equal(
-    rootBridge.getPrivateRootCreateRenderAdmissionPayload({}),
-    null
-  );
+  assert.equal(rootBridge.getPrivateRootCreateRenderAdmissionPayload({}), null);
   assert.equal(rootBridge.isPrivateRootCreateRenderAdmissionRecord({}), false);
 
   assert.equal(rootMarkers.getContainerRoot(container), create.owner);
@@ -780,15 +764,350 @@ test('private create/render admission validates bridge ownership and active mark
   );
 
   bridge.revertCreateRootSideEffects(sideEffects);
-  assert.throws(() => bridge.admitCreateRenderPath(create, sideEffects, render), {
-    code: 'FAST_REACT_DOM_INVALID_CREATE_RENDER_ADMISSION'
-  });
+  assert.throws(
+    () => bridge.admitCreateRenderPath(create, sideEffects, render),
+    {
+      code: 'FAST_REACT_DOM_INVALID_CREATE_RENDER_ADMISSION'
+    }
+  );
 
   bridge.revertCreateRootSideEffects(
     bridge.applyCreateRootSideEffects(secondCreate)
   );
   assertBridgeDidNotTouchContainer(container, document);
   assertBridgeDidNotTouchContainer(secondContainer, secondDocument);
+});
+
+test('private root host-output update mutates props/text before publishing latest props', () => {
+  const document = createHostOutputDocument('private-host-output-update');
+  const container = document.createElement('div');
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    hostOutputUpdateIdPrefix: 'host-update',
+    sideEffectIdPrefix: 'host-side-effect'
+  });
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const initialProps = createHostOutputProps('initial');
+  const nextProps = createHostOutputProps('updated');
+  const initialRender = bridge.renderContainer(create.handle, {
+    props: initialProps,
+    type: 'div'
+  });
+  bridge.admitCreateRenderPath(create, sideEffects, initialRender);
+  const mounted = mountPrivateHostOutput(container, create.owner, initialProps);
+  const update = bridge.renderContainer(create.handle, {
+    props: nextProps,
+    type: 'div'
+  });
+
+  mounted.host.attributeLog = [];
+  mounted.text.writeLog = [];
+
+  const handoff = bridge.applyHostOutputUpdate(update, {
+    hostInstanceToken: mounted.token,
+    nextProps,
+    tag: 'div',
+    textUpdate: {
+      newText: 'goodbye',
+      oldText: 'hello',
+      textInstance: mounted.text
+    }
+  });
+  const hiddenHandoff =
+    rootBridge.getPrivateRootHostOutputUpdateHandoffPayload(handoff);
+
+  assert.equal(
+    handoff.$$typeof,
+    rootBridge.privateRootHostOutputUpdateHandoffRecordType
+  );
+  assert.equal(
+    handoff.kind,
+    'FastReactDomPrivateRootHostOutputUpdateHandoffRecord'
+  );
+  assert.equal(handoff.handoffId, 'host-update:1');
+  assert.equal(
+    handoff.updateStatus,
+    rootBridge.ROOT_BRIDGE_HOST_OUTPUT_UPDATE_APPLIED
+  );
+  assert.equal(handoff.sourceUpdateId, update.updateId);
+  assert.equal(
+    handoff.sourceLifecycleStatusBefore,
+    rootBridge.ROOT_LIFECYCLE_RENDERED
+  );
+  assert.equal(
+    handoff.sourceLifecycleStatusAfter,
+    rootBridge.ROOT_LIFECYCLE_RENDERED
+  );
+  assert.equal(handoff.hostTag, 'div');
+  assert.deepEqual(handoff.propertyMutation, {
+    handoffKind: domHost.DOM_PROPERTY_UPDATE_LATEST_PROPS_HANDOFF,
+    latestPropsCommitRecordKind: domHost.LATEST_PROPS_COMMIT_RECORD,
+    latestPropsCommitRecordStatus: 'safe-for-latest-props',
+    mutationRecordCount: 4,
+    payloadCount: 4,
+    status: 'mutated'
+  });
+  assert.deepEqual(handoff.textMutation, {
+    newTextLength: 7,
+    oldTextLength: 5,
+    status: 'mutated'
+  });
+  assert.equal(handoff.latestPropsPublished, true);
+  assert.equal(
+    handoff.latestPropsPublishOrder,
+    'after-property-and-text-mutation'
+  );
+  assert.equal(handoff.fakeDomMutation, true);
+  assert.equal(handoff.domMutation, true);
+  assert.equal(handoff.browserDomMutation, false);
+  assert.equal(handoff.nativeExecution, false);
+  assert.equal(handoff.reconcilerExecution, false);
+  assert.equal(handoff.compatibilityClaimed, false);
+  assert.deepEqual(
+    handoff.acceptedCapabilities.map((capability) => capability.id),
+    [
+      'fake-dom-property-update',
+      'fake-dom-text-update',
+      'latest-props-after-mutation'
+    ]
+  );
+  assert.deepEqual(
+    handoff.blockedCapabilities.map((capability) => capability.id),
+    [
+      'native-execution',
+      'reconciler-execution',
+      'browser-dom-compatibility',
+      'hydration',
+      'events',
+      'refs',
+      'compatibility-claims'
+    ]
+  );
+  assert.equal(
+    rootBridge.isPrivateRootHostOutputUpdateHandoffRecord(handoff),
+    true
+  );
+  assert.equal(
+    rootBridge.isPrivateRootHostOutputUpdateHandoffRecord({}),
+    false
+  );
+  assert.equal(
+    rootBridge.getPrivateRootHostOutputUpdateHandoffPayload({}),
+    null
+  );
+  assert.equal(hiddenHandoff.sourceRecord, update);
+  assert.equal(hiddenHandoff.rootHandle, create.handle);
+  assert.equal(hiddenHandoff.hostInstanceNode, mounted.host);
+  assert.equal(hiddenHandoff.hostInstanceToken, mounted.token);
+  assert.equal(hiddenHandoff.textInstance, mounted.text);
+  assert.equal(hiddenHandoff.previousProps, initialProps);
+  assert.equal(hiddenHandoff.nextProps, nextProps);
+  assert.equal(hiddenHandoff.latestPropsPublished, true);
+  assert.equal(hiddenHandoff.textUpdate.oldText, 'hello');
+  assert.equal(hiddenHandoff.textUpdate.newText, 'goodbye');
+
+  assert.deepEqual(activeHostOutputAttributes(mounted.host), [
+    ['class', 'root-card updated'],
+    ['data-phase', 'updated'],
+    ['id', 'message'],
+    ['title', 'updated title']
+  ]);
+  assert.deepEqual(mounted.host.attributeLog, [
+    ['setAttribute', 'class', 'root-card updated'],
+    ['setAttribute', 'title', 'updated title'],
+    ['setAttribute', 'data-phase', 'updated']
+  ]);
+  assert.deepEqual(mounted.text.writeLog, [['nodeValue', 'goodbye']]);
+  assert.equal(container.textContent, 'goodbye');
+  assert.equal(componentTree.getLatestPropsFromNode(mounted.host), nextProps);
+  assert.equal(bridge.applyHostOutputUpdate(update, {}), handoff);
+
+  const serialized = JSON.stringify(handoff);
+  assert.equal(serialized.includes('goodbye'), false);
+  assert.equal(serialized.includes('updated title'), false);
+  assert.equal(serialized.includes('__registrations'), false);
+
+  assert.equal(
+    componentTree.detachHostInstanceToken(mounted.token),
+    mounted.token
+  );
+  bridge.revertCreateRootSideEffects(sideEffects);
+});
+
+test('private root host-output update rolls back props when text mutation fails', () => {
+  const document = createHostOutputDocument(
+    'private-host-output-update-rollback'
+  );
+  const container = document.createElement('div');
+  const bridge = rootBridge.createPrivateRootBridgeShell();
+  const create = bridge.createClientRoot(container);
+  const sideEffects = bridge.applyCreateRootSideEffects(create);
+  const initialProps = createHostOutputProps('initial');
+  const nextProps = createHostOutputProps('updated');
+  const initialRender = bridge.renderContainer(create.handle, {
+    props: initialProps,
+    type: 'div'
+  });
+  bridge.admitCreateRenderPath(create, sideEffects, initialRender);
+  const mounted = mountPrivateHostOutput(container, create.owner, initialProps);
+  const update = bridge.renderContainer(create.handle, {
+    props: nextProps,
+    type: 'div'
+  });
+  const thrownError = new Error('fake HostText update failed');
+
+  mounted.host.attributeLog = [];
+  mounted.text.writeLog = [];
+  Object.defineProperty(mounted.text, 'nodeValue', {
+    configurable: true,
+    get() {
+      return this.data;
+    },
+    set(value) {
+      this.writeLog.push(['nodeValue', String(value), 'throw']);
+      throw thrownError;
+    }
+  });
+
+  assert.throws(
+    () =>
+      bridge.applyHostOutputUpdate(update, {
+        hostInstanceToken: mounted.token,
+        nextProps,
+        tag: 'div',
+        textUpdate: {
+          newText: 'goodbye',
+          oldText: 'hello',
+          textInstance: mounted.text
+        }
+      }),
+    (error) => error === thrownError
+  );
+  assert.deepEqual(activeHostOutputAttributes(mounted.host), [
+    ['class', 'root-card'],
+    ['data-phase', 'initial'],
+    ['id', 'message'],
+    ['title', 'initial title']
+  ]);
+  assert.deepEqual(mounted.host.attributeLog, [
+    ['setAttribute', 'class', 'root-card updated'],
+    ['setAttribute', 'title', 'updated title'],
+    ['setAttribute', 'data-phase', 'updated'],
+    ['setAttribute', 'data-phase', 'initial'],
+    ['setAttribute', 'title', 'initial title'],
+    ['setAttribute', 'class', 'root-card']
+  ]);
+  assert.deepEqual(mounted.text.writeLog, [['nodeValue', 'goodbye', 'throw']]);
+  assert.equal(mounted.text.textContent, 'hello');
+  assert.equal(
+    componentTree.getLatestPropsFromNode(mounted.host),
+    initialProps
+  );
+  assert.equal(
+    rootBridge.getPrivateRootHostOutputUpdateHandoffPayload(update),
+    null
+  );
+
+  assert.equal(
+    componentTree.detachHostInstanceToken(mounted.token),
+    mounted.token
+  );
+  bridge.revertCreateRootSideEffects(sideEffects);
+});
+
+test('private root host-output update validates initial admission and root ownership', () => {
+  const document = createHostOutputDocument('private-host-output-validation');
+  const firstContainer = document.createElement('div');
+  const secondContainer = document.createElement('section');
+  const bridge = rootBridge.createPrivateRootBridgeShell();
+  const firstCreate = bridge.createClientRoot(firstContainer);
+  const secondCreate = bridge.createClientRoot(secondContainer);
+  const firstProps = createHostOutputProps('initial');
+  const nextProps = createHostOutputProps('updated');
+  const firstInitialRender = bridge.renderContainer(firstCreate.handle, {
+    props: firstProps,
+    type: 'div'
+  });
+  const firstUpdate = bridge.renderContainer(firstCreate.handle, {
+    props: nextProps,
+    type: 'div'
+  });
+  const firstMounted = mountPrivateHostOutput(
+    firstContainer,
+    firstCreate.owner,
+    firstProps
+  );
+  const secondMounted = mountPrivateHostOutput(
+    secondContainer,
+    secondCreate.owner,
+    firstProps
+  );
+
+  assert.throws(
+    () =>
+      bridge.applyHostOutputUpdate(firstInitialRender, {
+        hostInstanceToken: firstMounted.token,
+        nextProps,
+        tag: 'div',
+        textUpdate: {
+          newText: 'goodbye',
+          oldText: 'hello',
+          textInstance: firstMounted.text
+        }
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_HOST_OUTPUT_UPDATE_HANDOFF'
+    }
+  );
+  assert.throws(
+    () =>
+      bridge.applyHostOutputUpdate(firstUpdate, {
+        hostInstanceToken: firstMounted.token,
+        nextProps,
+        tag: 'div',
+        textUpdate: {
+          newText: 'goodbye',
+          oldText: 'hello',
+          textInstance: firstMounted.text
+        }
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_HOST_OUTPUT_UPDATE_HANDOFF'
+    }
+  );
+
+  const firstSideEffects = bridge.applyCreateRootSideEffects(firstCreate);
+  bridge.admitCreateRenderPath(
+    firstCreate,
+    firstSideEffects,
+    firstInitialRender
+  );
+  assert.throws(
+    () =>
+      bridge.applyHostOutputUpdate(firstUpdate, {
+        hostInstanceToken: secondMounted.token,
+        nextProps,
+        tag: 'div',
+        textUpdate: {
+          newText: 'goodbye',
+          oldText: 'hello',
+          textInstance: secondMounted.text
+        }
+      }),
+    {
+      code: 'FAST_REACT_DOM_INVALID_HOST_OUTPUT_UPDATE_HANDOFF'
+    }
+  );
+
+  assert.equal(
+    componentTree.detachHostInstanceToken(firstMounted.token),
+    firstMounted.token
+  );
+  assert.equal(
+    componentTree.detachHostInstanceToken(secondMounted.token),
+    secondMounted.token
+  );
+  bridge.revertCreateRootSideEffects(firstSideEffects);
 });
 
 test('private portal fake-DOM commit handoff validates ownership and blocked side effects', () => {
@@ -898,7 +1217,10 @@ test('private portal fake-DOM commit handoff validates ownership and blocked sid
     handoff.portalContainerOwnership.ownershipStatus,
     rootBridge.ROOT_BRIDGE_PORTAL_CONTAINER_OWNERSHIP_VALIDATED
   );
-  assert.equal(handoff.portalContainerOwnership.rootContainerMarkedAsRoot, true);
+  assert.equal(
+    handoff.portalContainerOwnership.rootContainerMarkedAsRoot,
+    true
+  );
   assert.equal(
     handoff.portalContainerOwnership.rootContainerOwnerMatchesHandle,
     true
@@ -921,14 +1243,8 @@ test('private portal fake-DOM commit handoff validates ownership and blocked sid
   );
   assert.equal(handoff.portalContainerOwnership.sameContainerAsRoot, false);
   assert.equal(handoff.portalContainerOwnership.sameOwnerDocument, true);
-  assert.equal(
-    handoff.listenerSideEffects.preparePortalMount,
-    false
-  );
-  assert.equal(
-    handoff.listenerSideEffects.listenToAllSupportedEvents,
-    false
-  );
+  assert.equal(handoff.listenerSideEffects.preparePortalMount, false);
+  assert.equal(handoff.listenerSideEffects.listenToAllSupportedEvents, false);
   assert.equal(handoff.listenerSideEffects.listenerInstallation, false);
   assert.equal(handoff.listenerSideEffects.hasPortalListeningMarker, false);
   assert.equal(
@@ -964,10 +1280,7 @@ test('private portal fake-DOM commit handoff validates ownership and blocked sid
     resourceBoundary.rootBridgeBoundary.commitStatus,
     rootBridge.ROOT_BRIDGE_PORTAL_COMMIT_MUTATION_BLOCKED
   );
-  assert.equal(
-    resourceBoundary.rootBridgeBoundary.resourceSideEffects,
-    false
-  );
+  assert.equal(resourceBoundary.rootBridgeBoundary.resourceSideEffects, false);
   assert.deepEqual(
     resourceBoundary.sideEffects,
     resourceFormGate.portalCommitResourceSideEffects
@@ -984,10 +1297,7 @@ test('private portal fake-DOM commit handoff validates ownership and blocked sid
 
   assert.equal(portalContainer.__registrations.length, 0);
   assert.equal(portalContainer.__mutationLog.length, 0);
-  assert.equal(
-    listenerRegistry.hasListeningMarker(portalContainer),
-    false
-  );
+  assert.equal(listenerRegistry.hasListeningMarker(portalContainer), false);
   assert.throws(() => bridge.createPortalCommitHandoff({}), {
     code: 'FAST_REACT_DOM_INVALID_PORTAL_COMMIT_HANDOFF_RECORD'
   });
@@ -1445,6 +1755,58 @@ test('public react-dom/client root placeholders remain inert', () => {
   assertBridgeDidNotTouchContainer(container, document);
 });
 
+function createHostOutputProps(phase) {
+  if (phase === 'updated') {
+    return {
+      id: 'message',
+      className: 'root-card updated',
+      title: 'updated title',
+      'data-phase': 'updated',
+      children: 'goodbye'
+    };
+  }
+
+  return {
+    id: 'message',
+    className: 'root-card',
+    title: 'initial title',
+    'data-phase': 'initial',
+    children: 'hello'
+  };
+}
+
+function mountPrivateHostOutput(container, rootOwner, initialProps) {
+  const host = container.ownerDocument.createElement('div');
+  const text = container.ownerDocument.createTextNode(initialProps.children);
+  const token = componentTree.createHostInstanceToken(
+    {kind: 'PrivateRootHostOutputHost'},
+    rootOwner
+  );
+
+  componentTree.attachHostInstanceNode(host, token, {});
+  const propsHandoff = domHost.commitDomPropertyUpdateForLatestProps(
+    host,
+    'div',
+    {},
+    initialProps
+  );
+  componentTree.commitLatestPropsFromMutationHandoff(propsHandoff);
+  domHost.appendInitialChild(host, text);
+  domHost.appendChildToContainer(container, host);
+
+  return {
+    host,
+    text,
+    token
+  };
+}
+
+function activeHostOutputAttributes(element) {
+  return Array.from(element.attributes.entries()).sort(([left], [right]) =>
+    left.localeCompare(right)
+  );
+}
+
 function assertNativeHandoff(handoff, expected) {
   assert.equal(Object.isFrozen(handoff), true);
   assert.equal(Object.isFrozen(handoff.nativeRequestRecord), true);
@@ -1453,7 +1815,10 @@ function assertNativeHandoff(handoff, expected) {
     handoff.kind,
     'FastReactDomPrivateRootNativeRequestHandoffRecord'
   );
-  assert.equal(handoff.handoffStatus, rootBridge.ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED);
+  assert.equal(
+    handoff.handoffStatus,
+    rootBridge.ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED
+  );
   assert.equal(handoff.operation, expected.operation);
   assert.equal(handoff.handoffId, expected.handoffId);
   assert.equal(handoff.handoffSequence, expected.handoffSequence);
@@ -1521,7 +1886,10 @@ function assertHiddenNativePayload(handoff) {
 }
 
 function assertBridgeDidNotTouchContainer(container, document) {
-  assert.equal(rootMarkers.inspectContainerRootMarker(container).propertyCount, 0);
+  assert.equal(
+    rootMarkers.inspectContainerRootMarker(container).propertyCount,
+    0
+  );
   assert.equal(rootMarkers.isContainerMarkedAsRoot(container), false);
   assert.equal(listenerRegistry.hasListeningMarker(container), false);
   assert.equal(listenerRegistry.hasListeningMarker(document), false);
@@ -1529,6 +1897,240 @@ function assertBridgeDidNotTouchContainer(container, document) {
   assert.equal(document.__registrations.length, 0);
   assert.equal(container.__mutationLog.length, 0);
   assert.equal(document.__mutationLog.length, 0);
+}
+
+function createHostOutputDocument(label) {
+  return new HostOutputDocument(label);
+}
+
+class HostOutputEventTarget {
+  constructor(fields) {
+    Object.assign(this, fields);
+    this.__mutationLog = [];
+    this.__removals = [];
+    this.__registrations = [];
+  }
+
+  addEventListener(type, listener, options) {
+    this.__registrations.push({
+      listener,
+      options,
+      type
+    });
+  }
+
+  removeEventListener(type, listener, options) {
+    const index = this.__registrations.findIndex(
+      (entry) =>
+        entry.type === type &&
+        entry.listener === listener &&
+        entry.options === options
+    );
+    if (index !== -1) {
+      this.__registrations.splice(index, 1);
+    }
+    this.__removals.push({
+      listener,
+      options,
+      type
+    });
+  }
+}
+
+class HostOutputDocument extends HostOutputEventTarget {
+  constructor(label) {
+    super({
+      label,
+      nodeName: '#document',
+      nodeType: DOCUMENT_NODE
+    });
+    this.ownerDocument = this;
+    this.defaultView = new HostOutputEventTarget({
+      label: `${label}-window`
+    });
+  }
+
+  createElement(nodeName) {
+    return new HostOutputElement(String(nodeName), this);
+  }
+
+  createTextNode(text) {
+    return new HostOutputText(text, this);
+  }
+}
+
+class HostOutputNode extends HostOutputEventTarget {
+  constructor(nodeName, nodeType, ownerDocument) {
+    super({
+      nodeName,
+      nodeType,
+      ownerDocument
+    });
+    this.childNodes = [];
+    this.parentNode = null;
+    this._textContent = '';
+  }
+
+  get firstChild() {
+    return this.childNodes[0] || null;
+  }
+
+  get lastChild() {
+    return this.childNodes[this.childNodes.length - 1] || null;
+  }
+
+  get textContent() {
+    if (this.childNodes.length === 0) {
+      return this._textContent;
+    }
+    return this.childNodes.map((child) => child.textContent).join('');
+  }
+
+  set textContent(value) {
+    for (const child of [...this.childNodes]) {
+      detachHostOutputChild(child);
+    }
+    this._textContent = String(value);
+    this.__mutationLog.push({type: 'textContent', value: String(value)});
+  }
+
+  appendChild(child) {
+    assertHostOutputChild(child);
+    assertHostOutputCanAcceptChild(this, child);
+    detachHostOutputChild(child);
+    this.childNodes.push(child);
+    child.parentNode = this;
+    this.__mutationLog.push({child, type: 'appendChild'});
+    return child;
+  }
+
+  insertBefore(child, beforeChild) {
+    assertHostOutputChild(child);
+    assertHostOutputCanAcceptChild(this, child);
+    if (beforeChild.parentNode !== this) {
+      throw new Error('Host-output insert target is not a child.');
+    }
+    if (child === beforeChild) {
+      return child;
+    }
+    detachHostOutputChild(child);
+    const insertionIndex = this.childNodes.indexOf(beforeChild);
+    this.childNodes.splice(insertionIndex, 0, child);
+    child.parentNode = this;
+    this.__mutationLog.push({beforeChild, child, type: 'insertBefore'});
+    return child;
+  }
+
+  removeChild(child) {
+    if (child.parentNode !== this) {
+      throw new Error('Host-output remove target is not a child.');
+    }
+    detachHostOutputChild(child);
+    this.__mutationLog.push({child, type: 'removeChild'});
+    return child;
+  }
+}
+
+class HostOutputElement extends HostOutputNode {
+  constructor(nodeName, ownerDocument) {
+    super(nodeName, ELEMENT_NODE, ownerDocument);
+    this.attributes = new Map();
+    this.attributeLog = [];
+  }
+
+  setAttribute(name, value) {
+    const attributeName = String(name);
+    const stringValue = String(value);
+    this.attributeLog.push(['setAttribute', attributeName, stringValue]);
+    this.attributes.set(attributeName, stringValue);
+  }
+
+  removeAttribute(name) {
+    const attributeName = String(name);
+    this.attributeLog.push([
+      'removeAttribute',
+      attributeName,
+      this.attributes.has(attributeName)
+    ]);
+    this.attributes.delete(attributeName);
+  }
+
+  getAttribute(name) {
+    const attributeName = String(name);
+    return this.attributes.has(attributeName)
+      ? this.attributes.get(attributeName)
+      : null;
+  }
+
+  hasAttribute(name) {
+    return this.attributes.has(String(name));
+  }
+}
+
+class HostOutputText extends HostOutputNode {
+  constructor(text, ownerDocument) {
+    super('#text', TEXT_NODE, ownerDocument);
+    this._data = String(text);
+    this.writeLog = [];
+  }
+
+  get data() {
+    return this._data;
+  }
+
+  set data(value) {
+    const text = String(value);
+    this.writeLog.push(['data', text]);
+    this._data = text;
+  }
+
+  get nodeValue() {
+    return this._data;
+  }
+
+  set nodeValue(value) {
+    const text = String(value);
+    this.writeLog.push(['nodeValue', text]);
+    this._data = text;
+  }
+
+  get textContent() {
+    return this._data;
+  }
+
+  set textContent(value) {
+    const text = String(value);
+    this.writeLog.push(['textContent', text]);
+    this._data = text;
+  }
+}
+
+function assertHostOutputChild(child) {
+  if (child === null || typeof child !== 'object') {
+    throw new Error('Host-output child must be a node.');
+  }
+}
+
+function assertHostOutputCanAcceptChild(parent, child) {
+  let current = parent;
+  while (current !== null) {
+    if (current === child) {
+      throw new Error('Host-output cannot insert an ancestor.');
+    }
+    current = current.parentNode;
+  }
+}
+
+function detachHostOutputChild(child) {
+  if (child.parentNode === null) {
+    return;
+  }
+  const siblings = child.parentNode.childNodes;
+  const index = siblings.indexOf(child);
+  if (index !== -1) {
+    siblings.splice(index, 1);
+  }
+  child.parentNode = null;
 }
 
 function createDocument(label) {
