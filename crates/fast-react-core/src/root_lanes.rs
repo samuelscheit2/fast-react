@@ -126,6 +126,42 @@ impl RootFinishedLanes {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RootLaneSchedulingSnapshot {
+    pending_lanes: Lanes,
+    wip_lanes: Lanes,
+    root_has_pending_commit: bool,
+    priority_lanes: Lanes,
+    selected_next_lanes: Lanes,
+}
+
+impl RootLaneSchedulingSnapshot {
+    #[must_use]
+    pub const fn pending_lanes(self) -> Lanes {
+        self.pending_lanes
+    }
+
+    #[must_use]
+    pub const fn wip_lanes(self) -> Lanes {
+        self.wip_lanes
+    }
+
+    #[must_use]
+    pub const fn root_has_pending_commit(self) -> bool {
+        self.root_has_pending_commit
+    }
+
+    #[must_use]
+    pub const fn priority_lanes(self) -> Lanes {
+        self.priority_lanes
+    }
+
+    #[must_use]
+    pub const fn selected_next_lanes(self) -> Lanes {
+        self.selected_next_lanes
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RootLaneState {
     features: RootLaneFeatureFlags,
@@ -457,6 +493,28 @@ impl RootLaneState {
         }
 
         next_lanes
+    }
+
+    #[must_use]
+    pub fn scheduling_snapshot(
+        &self,
+        wip_lanes: Lanes,
+        root_has_pending_commit: bool,
+    ) -> RootLaneSchedulingSnapshot {
+        let priority_lanes = self.get_next_lanes(wip_lanes, root_has_pending_commit);
+        let selected_next_lanes = if priority_lanes.is_empty() {
+            Lanes::NO
+        } else {
+            self.entangled_lanes_for(priority_lanes)
+        };
+
+        RootLaneSchedulingSnapshot {
+            pending_lanes: self.pending_lanes,
+            wip_lanes,
+            root_has_pending_commit,
+            priority_lanes,
+            selected_next_lanes,
+        }
     }
 
     #[must_use]
@@ -1032,6 +1090,40 @@ mod tests {
 
         assert_eq!(state.highest_priority_pending_lanes(), Lanes::DEFAULT);
         assert_eq!(state.get_next_lanes(Lanes::NO, false), Lanes::DEFAULT);
+    }
+
+    #[test]
+    fn root_lane_scheduling_snapshot_records_default_and_sync_next_lanes() {
+        let mut state = RootLaneState::new();
+        state.mark_updated(Lane::DEFAULT);
+
+        let default_snapshot = state.scheduling_snapshot(Lanes::NO, false);
+
+        assert_eq!(default_snapshot.pending_lanes(), Lanes::DEFAULT);
+        assert_eq!(default_snapshot.wip_lanes(), Lanes::NO);
+        assert!(!default_snapshot.root_has_pending_commit());
+        assert_eq!(default_snapshot.priority_lanes(), Lanes::DEFAULT);
+        assert_eq!(default_snapshot.selected_next_lanes(), Lanes::DEFAULT);
+
+        state.mark_updated(Lane::SYNC);
+        let sync_snapshot = state.scheduling_snapshot(Lanes::NO, false);
+
+        assert_eq!(
+            sync_snapshot.pending_lanes(),
+            lanes(&[Lane::SYNC, Lane::DEFAULT])
+        );
+        assert_eq!(
+            sync_snapshot.priority_lanes(),
+            lanes(&[Lane::SYNC, Lane::DEFAULT])
+        );
+        assert_eq!(
+            sync_snapshot.selected_next_lanes(),
+            lanes(&[Lane::SYNC, Lane::DEFAULT])
+        );
+        assert_ne!(
+            default_snapshot.selected_next_lanes(),
+            sync_snapshot.selected_next_lanes()
+        );
     }
 
     #[test]

@@ -90,7 +90,8 @@ pub use root_scheduler::{
 };
 pub use root_updates::{
     RootScheduleUpdateRecord, RootTransitionEntanglementRecord, RootUpdateError,
-    UpdateContainerResult, update_container, update_container_sync,
+    RootUpdateLaneChoiceRecord, RootUpdateLaneSourcePriority, UpdateContainerResult,
+    update_container, update_container_sync,
 };
 pub use root_work_loop::{
     HostRootRenderPhaseRecord, RootWorkLoopError, SchedulerCallbackHostRootRenderResult,

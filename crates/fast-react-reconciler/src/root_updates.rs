@@ -8,7 +8,10 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-use fast_react_core::{FiberId, FiberTopologyError, Lane, Lanes, UpdateQueueHandle};
+use fast_react_core::{
+    EventPriority, FiberId, FiberTopologyError, Lane, Lanes, RootLaneSchedulingSnapshot,
+    UpdateQueueHandle, lanes_to_event_priority,
+};
 use fast_react_host_config::HostTypes;
 
 use crate::{
@@ -16,6 +19,46 @@ use crate::{
     RootUpdateCallbackHandle, RootUpdatePayload, UpdateId, UpdatePriorityState, UpdateQueueError,
     enqueue_concurrent_host_root_update, finish_queueing_concurrent_updates, request_update_lane,
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RootUpdateLaneSourcePriority {
+    DefaultEventPriority,
+    LegacyRootSync,
+    ExplicitSync,
+    TransitionLane,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RootUpdateLaneChoiceRecord {
+    lane: Lane,
+    event_priority: EventPriority,
+    source_priority: RootUpdateLaneSourcePriority,
+}
+
+impl RootUpdateLaneChoiceRecord {
+    #[must_use]
+    pub const fn lane(self) -> Lane {
+        self.lane
+    }
+
+    #[must_use]
+    pub const fn event_priority(self) -> EventPriority {
+        self.event_priority
+    }
+
+    #[must_use]
+    pub const fn source_priority(self) -> RootUpdateLaneSourcePriority {
+        self.source_priority
+    }
+
+    fn transition_for_lane_for_canary(lane: Lane) -> Self {
+        Self {
+            lane,
+            event_priority: lanes_to_event_priority(lane.to_lanes()),
+            source_priority: RootUpdateLaneSourcePriority::TransitionLane,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RootScheduleUpdateRecord {
@@ -74,16 +117,35 @@ impl RootTransitionEntanglementRecord {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UpdateContainerResult {
     lane: Lane,
+    lane_choice: RootUpdateLaneChoiceRecord,
     update: UpdateId,
     queue: UpdateQueueHandle,
     schedule: RootScheduleUpdateRecord,
     entanglement: Option<RootTransitionEntanglementRecord>,
+    pending_lanes_before_enqueue: Lanes,
+    pending_lanes_after_enqueue: Lanes,
+    selected_next_lanes: Lanes,
 }
 
 impl UpdateContainerResult {
     #[must_use]
     pub const fn lane(&self) -> Lane {
         self.lane
+    }
+
+    #[must_use]
+    pub const fn lane_choice(&self) -> RootUpdateLaneChoiceRecord {
+        self.lane_choice
+    }
+
+    #[must_use]
+    pub const fn event_priority(&self) -> EventPriority {
+        self.lane_choice.event_priority()
+    }
+
+    #[must_use]
+    pub const fn source_priority(&self) -> RootUpdateLaneSourcePriority {
+        self.lane_choice.source_priority()
     }
 
     #[must_use]
@@ -105,6 +167,36 @@ impl UpdateContainerResult {
     pub const fn entanglement(&self) -> Option<RootTransitionEntanglementRecord> {
         self.entanglement
     }
+
+    #[must_use]
+    pub const fn pending_lanes_before_enqueue(&self) -> Lanes {
+        self.pending_lanes_before_enqueue
+    }
+
+    #[must_use]
+    pub const fn pending_lanes_after_enqueue(&self) -> Lanes {
+        self.pending_lanes_after_enqueue
+    }
+
+    #[must_use]
+    pub const fn selected_next_lanes(&self) -> Lanes {
+        self.selected_next_lanes
+    }
+
+    #[must_use]
+    pub const fn callback_scheduling_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub const fn callback_execution_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub const fn public_batching_compatibility_claimed(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -113,6 +205,20 @@ pub enum RootUpdateError {
     FiberTopology(FiberTopologyError),
     UpdateQueue(UpdateQueueError),
     ConcurrentUpdate(ConcurrentUpdateError),
+    UnknownPriorityLane {
+        lane: Lane,
+        source_priority: RootUpdateLaneSourcePriority,
+    },
+    EmptyRoot {
+        root: FiberRootId,
+    },
+    StaleQueueEvidence {
+        root: FiberRootId,
+        queue: UpdateQueueHandle,
+        update: UpdateId,
+        expected_pending_lanes: Lanes,
+        actual_pending_lanes: Lanes,
+    },
     EnqueuedWrongRoot {
         expected: FiberRootId,
         actual: FiberRootId,
@@ -126,6 +232,34 @@ impl Display for RootUpdateError {
             Self::FiberTopology(error) => Display::fmt(error, formatter),
             Self::UpdateQueue(error) => Display::fmt(error, formatter),
             Self::ConcurrentUpdate(error) => Display::fmt(error, formatter),
+            Self::UnknownPriorityLane {
+                lane,
+                source_priority,
+            } => write!(
+                formatter,
+                "{source_priority:?} cannot claim event-priority lane metadata for lane {}",
+                lane.bits()
+            ),
+            Self::EmptyRoot { root } => write!(
+                formatter,
+                "root {} has no pending lanes for lane priority scheduling diagnostics",
+                root.raw()
+            ),
+            Self::StaleQueueEvidence {
+                root,
+                queue,
+                update,
+                expected_pending_lanes,
+                actual_pending_lanes,
+            } => write!(
+                formatter,
+                "root {} queue {} update {} has stale lane priority evidence; expected pending lanes {}, actual pending lanes {}",
+                root.raw(),
+                queue.raw(),
+                update.raw(),
+                expected_pending_lanes.bits(),
+                actual_pending_lanes.bits()
+            ),
             Self::EnqueuedWrongRoot { expected, actual } => write!(
                 formatter,
                 "enqueued HostRoot update for root {}, expected root {}",
@@ -143,7 +277,10 @@ impl Error for RootUpdateError {
             Self::FiberTopology(error) => Some(error),
             Self::UpdateQueue(error) => Some(error),
             Self::ConcurrentUpdate(error) => Some(error),
-            Self::EnqueuedWrongRoot { .. } => None,
+            Self::UnknownPriorityLane { .. }
+            | Self::EmptyRoot { .. }
+            | Self::StaleQueueEvidence { .. }
+            | Self::EnqueuedWrongRoot { .. } => None,
         }
     }
 }
@@ -183,7 +320,13 @@ pub fn update_container<H: HostTypes>(
         let current_fiber = store.fiber_arena().get(current)?;
         request_update_lane(current_fiber, UpdatePriorityState::new())
     };
-    update_container_impl(store, root_id, current, lane, element, callback)
+    let source_priority = if lane == Lane::SYNC {
+        RootUpdateLaneSourcePriority::LegacyRootSync
+    } else {
+        RootUpdateLaneSourcePriority::DefaultEventPriority
+    };
+    let lane_choice = root_update_lane_choice_from_source_lane_for_canary(lane, source_priority)?;
+    update_container_impl(store, root_id, current, lane_choice, element, callback)
 }
 
 pub fn update_container_sync<H: HostTypes>(
@@ -193,17 +336,23 @@ pub fn update_container_sync<H: HostTypes>(
     callback: Option<RootUpdateCallbackHandle>,
 ) -> Result<UpdateContainerResult, RootUpdateError> {
     let current = store.root(root_id)?.current();
-    update_container_impl(store, root_id, current, Lane::SYNC, element, callback)
+    let lane_choice = root_update_lane_choice_from_source_lane_for_canary(
+        Lane::SYNC,
+        RootUpdateLaneSourcePriority::ExplicitSync,
+    )?;
+    update_container_impl(store, root_id, current, lane_choice, element, callback)
 }
 
 fn update_container_impl<H: HostTypes>(
     store: &mut FiberRootStore<H>,
     root_id: FiberRootId,
     root_fiber: FiberId,
-    lane: Lane,
+    lane_choice: RootUpdateLaneChoiceRecord,
     element: RootElementHandle,
     callback: Option<RootUpdateCallbackHandle>,
 ) -> Result<UpdateContainerResult, RootUpdateError> {
+    let lane = lane_choice.lane();
+    let pending_lanes_before_enqueue = store.root(root_id)?.lanes().pending_lanes();
     let queue = store.ensure_host_root_update_queue(root_id)?;
     let update = store.update_queues_mut().create_update(lane);
     {
@@ -229,6 +378,8 @@ fn update_container_impl<H: HostTypes>(
     // concurrent staging hook immediately into the HostRoot pending ring. The
     // staging API remains available for future render-boundary control.
     finish_queueing_concurrent_updates(store)?;
+    let pending_lanes_after_enqueue = store.root(root_id)?.lanes().pending_lanes();
+    let lane_snapshot = root_lane_priority_scheduling_snapshot_for_canary(store, root_id)?;
 
     let schedule = RootScheduleUpdateRecord {
         root: root_id,
@@ -256,11 +407,98 @@ fn update_container_impl<H: HostTypes>(
 
     Ok(UpdateContainerResult {
         lane,
+        lane_choice,
         update,
         queue,
         schedule,
         entanglement,
+        pending_lanes_before_enqueue,
+        pending_lanes_after_enqueue,
+        selected_next_lanes: lane_snapshot.selected_next_lanes(),
     })
+}
+
+pub(crate) fn root_update_lane_choice_from_source_lane_for_canary(
+    lane: Lane,
+    source_priority: RootUpdateLaneSourcePriority,
+) -> Result<RootUpdateLaneChoiceRecord, RootUpdateError> {
+    let Some(event_priority) = EventPriority::from_lane(lane) else {
+        return Err(RootUpdateError::UnknownPriorityLane {
+            lane,
+            source_priority,
+        });
+    };
+
+    if event_priority.is_no() {
+        return Err(RootUpdateError::UnknownPriorityLane {
+            lane,
+            source_priority,
+        });
+    }
+
+    Ok(RootUpdateLaneChoiceRecord {
+        lane,
+        event_priority,
+        source_priority,
+    })
+}
+
+pub(crate) fn root_lane_priority_scheduling_snapshot_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root_id: FiberRootId,
+) -> Result<RootLaneSchedulingSnapshot, RootUpdateError> {
+    let root = store.root(root_id)?;
+    if root.lanes().pending_lanes().is_empty() {
+        return Err(RootUpdateError::EmptyRoot { root: root_id });
+    }
+
+    let scheduling = root.scheduling();
+    let wip_lanes = if scheduling.work_in_progress().is_some() {
+        scheduling.work_in_progress_root_render_lanes()
+    } else {
+        Lanes::NO
+    };
+    let root_has_pending_commit = root.pending_commit().is_some()
+        || scheduling.cancel_pending_commit().is_some()
+        || scheduling.timeout_handle().is_some();
+
+    Ok(root
+        .lanes()
+        .scheduling_snapshot(wip_lanes, root_has_pending_commit))
+}
+
+pub(crate) fn validate_update_container_lane_diagnostics_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    result: &UpdateContainerResult,
+) -> Result<RootLaneSchedulingSnapshot, RootUpdateError> {
+    let root_id = result.schedule().root();
+    let root = store.root(root_id)?;
+    let actual_pending_lanes = root.lanes().pending_lanes();
+    if actual_pending_lanes.is_empty() {
+        return Err(RootUpdateError::EmptyRoot { root: root_id });
+    }
+
+    let current_queue = store.fiber_arena().get(root.current())?.update_queue();
+    let pending_updates = store.update_queues().pending_updates(result.queue())?;
+    let update_lane = store.update_queues().update(result.update())?.lane();
+    let lane_snapshot = root_lane_priority_scheduling_snapshot_for_canary(store, root_id)?;
+    let stale = current_queue != result.queue()
+        || !pending_updates.contains(&result.update())
+        || !update_lane.contains_lane(result.lane())
+        || actual_pending_lanes != result.pending_lanes_after_enqueue()
+        || lane_snapshot.selected_next_lanes() != result.selected_next_lanes();
+
+    if stale {
+        return Err(RootUpdateError::StaleQueueEvidence {
+            root: root_id,
+            queue: result.queue(),
+            update: result.update(),
+            expected_pending_lanes: result.pending_lanes_after_enqueue(),
+            actual_pending_lanes,
+        });
+    }
+
+    Ok(lane_snapshot)
 }
 
 #[cfg(test)]
@@ -286,7 +524,20 @@ mod tests {
         let result = update_container(&mut store, root_id, element, None).unwrap();
 
         assert_eq!(result.lane(), Lane::DEFAULT);
+        assert_eq!(result.lane_choice().lane(), Lane::DEFAULT);
+        assert_eq!(result.event_priority(), EventPriority::DEFAULT);
+        assert_eq!(
+            result.source_priority(),
+            RootUpdateLaneSourcePriority::DefaultEventPriority
+        );
         assert_eq!(result.schedule().root(), root_id);
+        assert_eq!(result.pending_lanes_before_enqueue(), Lanes::NO);
+        assert_eq!(result.pending_lanes_after_enqueue(), Lanes::DEFAULT);
+        assert_eq!(result.selected_next_lanes(), Lanes::DEFAULT);
+        assert!(result.callback_scheduling_blocked());
+        assert!(result.callback_execution_blocked());
+        assert!(!result.public_batching_compatibility_claimed());
+        validate_update_container_lane_diagnostics_for_canary(&store, &result).unwrap();
         assert_eq!(
             store
                 .update_queues()
@@ -322,6 +573,18 @@ mod tests {
             update_container_sync(&mut store, root_id, RootElementHandle::NONE, None).unwrap();
 
         assert_eq!(result.lane(), Lane::SYNC);
+        assert_eq!(result.event_priority(), EventPriority::DISCRETE);
+        assert_eq!(
+            result.source_priority(),
+            RootUpdateLaneSourcePriority::ExplicitSync
+        );
+        assert_eq!(result.pending_lanes_before_enqueue(), Lanes::NO);
+        assert_eq!(result.pending_lanes_after_enqueue(), Lanes::SYNC);
+        assert_eq!(result.selected_next_lanes(), Lanes::SYNC);
+        assert!(result.callback_scheduling_blocked());
+        assert!(result.callback_execution_blocked());
+        assert!(!result.public_batching_compatibility_claimed());
+        validate_update_container_lane_diagnostics_for_canary(&store, &result).unwrap();
         assert_eq!(
             store
                 .update_queues()
@@ -383,7 +646,7 @@ mod tests {
             &mut store,
             root_id,
             current,
-            Lane::TRANSITION_1,
+            RootUpdateLaneChoiceRecord::transition_for_lane_for_canary(Lane::TRANSITION_1),
             RootElementHandle::from_raw(1),
             None,
         )
@@ -409,5 +672,44 @@ mod tests {
                 .callback_node()
                 .is_none()
         );
+    }
+
+    #[test]
+    fn root_updates_lane_priority_diagnostics_fail_closed_for_unknown_priority() {
+        let error = root_update_lane_choice_from_source_lane_for_canary(
+            Lane::TRANSITION_1,
+            RootUpdateLaneSourcePriority::DefaultEventPriority,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            RootUpdateError::UnknownPriorityLane {
+                lane: Lane::TRANSITION_1,
+                source_priority: RootUpdateLaneSourcePriority::DefaultEventPriority
+            }
+        );
+
+        let no_lane_error = root_update_lane_choice_from_source_lane_for_canary(
+            Lane::NO,
+            RootUpdateLaneSourcePriority::DefaultEventPriority,
+        )
+        .unwrap_err();
+        assert_eq!(
+            no_lane_error,
+            RootUpdateError::UnknownPriorityLane {
+                lane: Lane::NO,
+                source_priority: RootUpdateLaneSourcePriority::DefaultEventPriority
+            }
+        );
+    }
+
+    #[test]
+    fn root_updates_lane_priority_snapshot_fails_closed_for_empty_root() {
+        let (store, root_id, _host) = root_store();
+
+        let error = root_lane_priority_scheduling_snapshot_for_canary(&store, root_id).unwrap_err();
+
+        assert_eq!(error, RootUpdateError::EmptyRoot { root: root_id });
     }
 }

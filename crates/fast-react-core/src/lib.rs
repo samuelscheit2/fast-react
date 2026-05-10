@@ -80,9 +80,9 @@ pub use hook_state_queue::{
 pub use lane::{Lane, LaneIndex, LaneMap, Lanes, TOTAL_LANES, VALID_LANE_BITS};
 pub use root_lanes::{
     LaneClaimers, LaneTimestamp, NO_TIMESTAMP, RETRY_LANE_EXPIRATION_MS, RootFinishedLanes,
-    RootLaneFeatureFlags, RootLaneState, SYNC_LANE_EXPIRATION_MS, TRANSITION_LANE_EXPIRATION_MS,
-    check_if_root_is_prerendering, get_next_lanes, get_next_lanes_to_flush_sync,
-    highest_priority_lanes,
+    RootLaneFeatureFlags, RootLaneSchedulingSnapshot, RootLaneState, SYNC_LANE_EXPIRATION_MS,
+    TRANSITION_LANE_EXPIRATION_MS, check_if_root_is_prerendering, get_next_lanes,
+    get_next_lanes_to_flush_sync, highest_priority_lanes,
 };
 pub use symbols::ReactSymbolTag;
 
