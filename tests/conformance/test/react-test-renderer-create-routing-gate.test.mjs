@@ -1191,6 +1191,22 @@ function assertRustCanaryMetadata(metadata, label) {
     "TestRendererRoot::describe_private_json_serialization_for_canary",
     label
   );
+  assert.equal(
+    metadata.privateJson.createApi,
+    "TestRendererRoot::describe_private_json_serialization_for_canary",
+    label
+  );
+  assert.equal(
+    metadata.privateJson.updateApi,
+    "TestRendererRoot::describe_private_json_serialization_after_update_for_canary",
+    label
+  );
+  assert.deepEqual(metadata.privateJson.acceptedHostOutputUpdateKinds, [
+    "Create",
+    "Update"
+  ]);
+  assert.equal(metadata.privateJson.hostOutputSnapshotFreshnessRequired, true);
+  assert.equal(metadata.privateJson.staleSnapshotRejection, true);
   assert.equal(metadata.privateJson.publicSerializationAvailable, false);
 
   assert.deepEqual(Object.keys(metadata.operations), [

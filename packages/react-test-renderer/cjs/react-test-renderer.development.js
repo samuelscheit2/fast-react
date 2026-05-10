@@ -561,6 +561,7 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
   acceptedRustDiagnosticName: privateToJSONAcceptedDiagnosticName,
   acceptedRustApis: Object.freeze([
     'TestRendererRoot::describe_private_json_serialization_for_canary',
+    'TestRendererRoot::describe_private_json_serialization_after_update_for_canary',
     'TestRendererPrivateJsonSerializationReport',
     'TestRendererPrivateJsonPublicSurfaceBlockers'
   ]),
@@ -568,9 +569,17 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
     'HostComponent',
     'Text'
   ]),
+  acceptedHostOutputUpdateKinds: Object.freeze([
+    'Create',
+    'Update'
+  ]),
+  hostOutputSnapshotFreshnessRequired: true,
+  staleSnapshotRejection: true,
   acceptedRustTests: Object.freeze([
     'root_private_json_serialization_canary_describes_minimal_host_component_with_text',
+    'root_private_json_serialization_canary_describes_updated_host_component_text_after_commit',
     'root_private_json_serialization_canary_rejects_stale_host_output_snapshot',
+    'root_private_json_serialization_canary_rejects_stale_updated_host_output_snapshot',
     'root_private_json_serialization_canary_rejects_stale_commit_after_same_shape_update',
     'root_private_json_serialization_canary_rejects_non_minimal_snapshot_shapes'
   ]),
@@ -1192,6 +1201,12 @@ const currentRustTestRendererRootCanaryMetadata = freezeRecord({
       'fast-react-test-renderer.serialization.private-json-canary',
     report: 'TestRendererPrivateJsonSerializationReport',
     api: 'TestRendererRoot::describe_private_json_serialization_for_canary',
+    createApi: 'TestRendererRoot::describe_private_json_serialization_for_canary',
+    updateApi:
+      'TestRendererRoot::describe_private_json_serialization_after_update_for_canary',
+    acceptedHostOutputUpdateKinds: freezeArray(['Create', 'Update']),
+    hostOutputSnapshotFreshnessRequired: true,
+    staleSnapshotRejection: true,
     publicSerializationAvailable: false
   }),
   operations: currentRustTestRendererRootCanaryOperations,
@@ -2212,6 +2227,13 @@ function validatePrivateToJSONHostOutputDiagnostic(report) {
     'root_node_kind',
     'HostComponent'
   );
+  assertPrivateToJSONHostOutputUpdateKind(report);
+  assertPrivateToJSONBooleanField(
+    report,
+    'hostOutputSnapshotCurrent',
+    'host_output_snapshot_current',
+    true
+  );
   assertPrivateToJSONPublicBlockers(
     readPrivateToJSONRecordField(report, 'publicBlockers', 'public_blockers')
   );
@@ -2360,6 +2382,33 @@ function assertPrivateToJSONKindField(record, camelName, snakeName, expected) {
   if (actual !== expected) {
     throwPrivateToJSONSerializationError(
       `Expected private JSON diagnostic kind ${camelName} to be ${expected}.`
+    );
+  }
+}
+
+function assertPrivateToJSONHostOutputUpdateKind(report) {
+  const actual = readPrivateToJSONStringField(
+    report,
+    'hostOutputUpdateKind',
+    'host_output_update_kind'
+  );
+  if (actual !== 'Create' && actual !== 'Update') {
+    throwPrivateToJSONSerializationError(
+      'Expected private JSON diagnostic host output update kind to be Create or Update.'
+    );
+  }
+}
+
+function assertPrivateToJSONBooleanField(
+  record,
+  camelName,
+  snakeName,
+  expected
+) {
+  const actual = readPrivateToJSONField(record, camelName, snakeName);
+  if (actual !== expected) {
+    throwPrivateToJSONSerializationError(
+      `Expected private JSON diagnostic field ${camelName} to be ${expected}.`
     );
   }
 }

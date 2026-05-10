@@ -38,12 +38,15 @@ const jsEntrypoints = [
 ];
 const expectedToJSONFacadeRustApis = [
   "TestRendererRoot::describe_private_json_serialization_for_canary",
+  "TestRendererRoot::describe_private_json_serialization_after_update_for_canary",
   "TestRendererPrivateJsonSerializationReport",
   "TestRendererPrivateJsonPublicSurfaceBlockers"
 ];
 const expectedToJSONFacadeRustTests = [
   "root_private_json_serialization_canary_describes_minimal_host_component_with_text",
+  "root_private_json_serialization_canary_describes_updated_host_component_text_after_commit",
   "root_private_json_serialization_canary_rejects_stale_host_output_snapshot",
+  "root_private_json_serialization_canary_rejects_stale_updated_host_output_snapshot",
   "root_private_json_serialization_canary_rejects_stale_commit_after_same_shape_update",
   "root_private_json_serialization_canary_rejects_non_minimal_snapshot_shapes"
 ];
@@ -199,6 +202,12 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
       facadeGate.acceptedRustNodeKinds,
       ["HostComponent", "Text"]
     );
+    assert.deepEqual(facadeGate.acceptedHostOutputUpdateKinds, [
+      "Create",
+      "Update"
+    ]);
+    assert.equal(facadeGate.hostOutputSnapshotFreshnessRequired, true);
+    assert.equal(facadeGate.staleSnapshotRejection, true);
     assert.deepEqual(
       facadeGate.acceptedRustTests,
       expectedToJSONFacadeRustTests
@@ -266,9 +275,29 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
       props: {},
       children: ["hello"]
     });
+    const updatedPrivateJson = privateFacade.serializeAcceptedHostOutputDiagnostic(
+      createAcceptedMinimalHostOutputDiagnostic({
+        hostOutputUpdateKind: "Update",
+        text: "goodbye"
+      })
+    );
+    assert.deepEqual(updatedPrivateJson, {
+      type: "span",
+      props: {},
+      children: ["goodbye"]
+    });
     assert.equal(
       privateFacade.canSerializeAcceptedHostOutputDiagnostic(
         createAcceptedMinimalHostOutputDiagnostic()
+      ),
+      true
+    );
+    assert.equal(
+      privateFacade.canSerializeAcceptedHostOutputDiagnostic(
+        createAcceptedMinimalHostOutputDiagnostic({
+          hostOutputUpdateKind: "Update",
+          text: "goodbye"
+        })
       ),
       true
     );
@@ -296,6 +325,31 @@ test("react-test-renderer JS toJSON private facade recognizes Rust diagnostics w
     assert.equal(privateError.nativeBridgeAvailable, false);
     assert.equal(privateError.nativeExecution, false);
     assert.equal(privateError.compatibilityClaimed, false);
+
+    const staleSnapshotDiagnostic = createAcceptedMinimalHostOutputDiagnostic({
+      hostOutputSnapshotCurrent: false,
+      hostOutputUpdateKind: "Update",
+      text: "goodbye"
+    });
+    assert.equal(
+      privateFacade.canSerializeAcceptedHostOutputDiagnostic(
+        staleSnapshotDiagnostic
+      ),
+      false
+    );
+    const staleSnapshotError = captureThrown(() =>
+      privateFacade.serializeAcceptedHostOutputDiagnostic(
+        staleSnapshotDiagnostic
+      )
+    );
+    assert.equal(
+      staleSnapshotError.name,
+      "FastReactTestRendererPrivateToJSONSerializationError"
+    );
+    assert.match(
+      staleSnapshotError.message,
+      /hostOutputSnapshotCurrent to be true/u
+    );
   }
 });
 
@@ -370,9 +424,15 @@ function captureThrown(callback) {
   assert.fail("Expected callback to throw");
 }
 
-function createAcceptedMinimalHostOutputDiagnostic() {
+function createAcceptedMinimalHostOutputDiagnostic({
+  hostOutputSnapshotCurrent = true,
+  hostOutputUpdateKind = "Create",
+  text = "hello"
+} = {}) {
   return {
     diagnosticName: "fast-react-test-renderer.serialization.private-json-canary",
+    hostOutputUpdateKind,
+    hostOutputSnapshotCurrent,
     gate: {
       status: "ReadyForPrivateSerializationDiagnostics",
       requirements: {
@@ -411,7 +471,7 @@ function createAcceptedMinimalHostOutputDiagnostic() {
         childOrdinals: [],
         elementType: null,
         props: null,
-        text: "hello",
+        text,
         hidden: false,
         detached: false
       }
@@ -428,7 +488,7 @@ function createAcceptedMinimalHostOutputDiagnostic() {
       childCount: 1,
       textChild: {
         nodeKind: "Text",
-        text: "hello",
+        text,
         hidden: false
       }
     },
