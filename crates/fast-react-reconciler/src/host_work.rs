@@ -2291,6 +2291,305 @@ mod tests {
         (work_parent, text_fiber)
     }
 
+    fn attach_detached_nested_root_element_with_text_for_commit(
+        store: &mut FiberRootStore<RecordingHost>,
+        host: &mut RecordingHost,
+        detached_hosts: &mut DetachedHostRecords,
+        root_id: FiberRootId,
+        host_root: FiberId,
+        text: &str,
+    ) -> (FiberId, FiberId, FiberId) {
+        let mode = store.fiber_arena().get(host_root).unwrap().mode();
+        let outer = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::from_raw(9050),
+            mode,
+        );
+        let inner = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::from_raw(9051),
+            mode,
+        );
+        let text_fiber = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(9052),
+            mode,
+        );
+
+        let container = *store.root(root_id).unwrap().container_info();
+        let text_scope = issue_creation_host_node_scope(
+            store,
+            root_id,
+            text_fiber,
+            HostFiberTokenTarget::TextInstance,
+        )
+        .unwrap();
+        let text_token = FakeHostFiberToken(text_scope.token_id().raw());
+        let text_instance = host
+            .create_text_instance(
+                HostFiberTokenRef::new(
+                    &text_token,
+                    HostFiberTokenPhase::Creation,
+                    HostFiberTokenTarget::TextInstance,
+                ),
+                text,
+                &container,
+                &(),
+            )
+            .unwrap();
+        let text_state_node = detached_hosts.insert_text(text_scope, text_instance);
+        complete_fiber_common(
+            store,
+            text_fiber,
+            PropsHandle::from_raw(9052),
+            text_state_node,
+            InitialChildrenFinalization::NoCommitMount,
+        )
+        .unwrap();
+
+        let inner_scope =
+            issue_creation_host_node_scope(store, root_id, inner, HostFiberTokenTarget::Instance)
+                .unwrap();
+        let inner_token = FakeHostFiberToken(inner_scope.token_id().raw());
+        let mut inner_instance = host
+            .create_instance(
+                HostFiberTokenRef::new(
+                    &inner_token,
+                    HostFiberTokenPhase::Creation,
+                    HostFiberTokenTarget::Instance,
+                ),
+                &"label",
+                &(),
+                &container,
+                &(),
+            )
+            .unwrap();
+        detached_hosts
+            .append_initial_child(
+                store.host_tokens(),
+                host,
+                &mut inner_instance,
+                root_id,
+                store.fiber_arena().get(text_fiber).unwrap(),
+            )
+            .unwrap();
+        let inner_state_node = detached_hosts.insert_instance(inner_scope, inner_instance);
+        store
+            .fiber_arena_mut()
+            .set_children(inner, &[text_fiber])
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(inner).unwrap();
+            node.set_flags(FiberFlags::PLACEMENT);
+        }
+        complete_fiber_common(
+            store,
+            inner,
+            PropsHandle::from_raw(9051),
+            inner_state_node,
+            InitialChildrenFinalization::NoCommitMount,
+        )
+        .unwrap();
+
+        let outer_scope =
+            issue_creation_host_node_scope(store, root_id, outer, HostFiberTokenTarget::Instance)
+                .unwrap();
+        let outer_token = FakeHostFiberToken(outer_scope.token_id().raw());
+        let mut outer_instance = host
+            .create_instance(
+                HostFiberTokenRef::new(
+                    &outer_token,
+                    HostFiberTokenPhase::Creation,
+                    HostFiberTokenTarget::Instance,
+                ),
+                &"section",
+                &(),
+                &container,
+                &(),
+            )
+            .unwrap();
+        detached_hosts
+            .append_initial_child(
+                store.host_tokens(),
+                host,
+                &mut outer_instance,
+                root_id,
+                store.fiber_arena().get(inner).unwrap(),
+            )
+            .unwrap();
+        let outer_state_node = detached_hosts.insert_instance(outer_scope, outer_instance);
+        store
+            .fiber_arena_mut()
+            .set_children(outer, &[inner])
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(outer).unwrap();
+            node.set_flags(FiberFlags::PLACEMENT);
+        }
+        complete_fiber_common(
+            store,
+            outer,
+            PropsHandle::from_raw(9050),
+            outer_state_node,
+            InitialChildrenFinalization::NoCommitMount,
+        )
+        .unwrap();
+
+        store
+            .fiber_arena_mut()
+            .set_children(host_root, &[outer])
+            .unwrap();
+        complete_host_root(store, host_root).unwrap();
+        (outer, inner, text_fiber)
+    }
+
+    fn place_detached_text_under_existing_nested_host_parent_for_commit(
+        store: &mut FiberRootStore<RecordingHost>,
+        host: &mut RecordingHost,
+        detached_hosts: &mut DetachedHostRecords,
+        root_id: FiberRootId,
+        host_root: FiberId,
+        current_outer: FiberId,
+        current_inner: FiberId,
+        current_text: FiberId,
+        text: &str,
+    ) -> (FiberId, FiberId, FiberId, FiberId) {
+        let outer_props = store
+            .fiber_arena()
+            .get(current_outer)
+            .unwrap()
+            .memoized_props();
+        let inner_props = store
+            .fiber_arena()
+            .get(current_inner)
+            .unwrap()
+            .memoized_props();
+        let text_props = store
+            .fiber_arena()
+            .get(current_text)
+            .unwrap()
+            .memoized_props();
+        let outer_state_node = store.fiber_arena().get(current_outer).unwrap().state_node();
+        let inner_state_node = store.fiber_arena().get(current_inner).unwrap().state_node();
+        let text_state_node = store.fiber_arena().get(current_text).unwrap().state_node();
+
+        let work_outer = store
+            .fiber_arena_mut()
+            .create_work_in_progress(current_outer, outer_props)
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(work_outer).unwrap();
+            node.set_state_node(outer_state_node);
+            node.set_memoized_props(outer_props);
+            node.set_lanes(Lanes::NO);
+        }
+        let work_inner = store
+            .fiber_arena_mut()
+            .create_work_in_progress(current_inner, inner_props)
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(work_inner).unwrap();
+            node.set_state_node(inner_state_node);
+            node.set_memoized_props(inner_props);
+            node.set_lanes(Lanes::NO);
+        }
+        let stable_text = store
+            .fiber_arena_mut()
+            .create_work_in_progress(current_text, text_props)
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(stable_text).unwrap();
+            node.set_state_node(text_state_node);
+            node.set_memoized_props(text_props);
+            node.set_lanes(Lanes::NO);
+        }
+
+        let mode = store.fiber_arena().get(work_inner).unwrap().mode();
+        let placed_text = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(9053),
+            mode,
+        );
+        {
+            let node = store.fiber_arena_mut().get_mut(placed_text).unwrap();
+            node.set_flags(FiberFlags::PLACEMENT);
+        }
+        let text_scope = issue_creation_host_node_scope(
+            store,
+            root_id,
+            placed_text,
+            HostFiberTokenTarget::TextInstance,
+        )
+        .unwrap();
+        let text_token = FakeHostFiberToken(text_scope.token_id().raw());
+        let container = *store.root(root_id).unwrap().container_info();
+        let text_instance = host
+            .create_text_instance(
+                HostFiberTokenRef::new(
+                    &text_token,
+                    HostFiberTokenPhase::Creation,
+                    HostFiberTokenTarget::TextInstance,
+                ),
+                text,
+                &container,
+                &(),
+            )
+            .unwrap();
+        let placed_text_state_node = detached_hosts.insert_text(text_scope, text_instance);
+        complete_fiber_common(
+            store,
+            placed_text,
+            PropsHandle::from_raw(9053),
+            placed_text_state_node,
+            InitialChildrenFinalization::NoCommitMount,
+        )
+        .unwrap();
+
+        store
+            .fiber_arena_mut()
+            .set_children(work_inner, &[stable_text, placed_text])
+            .unwrap();
+        complete_fiber_common(
+            store,
+            stable_text,
+            text_props,
+            text_state_node,
+            InitialChildrenFinalization::NoCommitMount,
+        )
+        .unwrap();
+        complete_fiber_common(
+            store,
+            work_inner,
+            inner_props,
+            inner_state_node,
+            InitialChildrenFinalization::NoCommitMount,
+        )
+        .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(work_outer, &[work_inner])
+            .unwrap();
+        complete_fiber_common(
+            store,
+            work_outer,
+            outer_props,
+            outer_state_node,
+            InitialChildrenFinalization::NoCommitMount,
+        )
+        .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root, &[work_outer])
+            .unwrap();
+        complete_host_root(store, host_root).unwrap();
+
+        (work_outer, work_inner, stable_text, placed_text)
+    }
+
     fn attach_detached_root_element_with_placed_text_for_commit(
         store: &mut FiberRootStore<RecordingHost>,
         host: &mut RecordingHost,
@@ -3176,6 +3475,115 @@ mod tests {
         assert_eq!(
             detached_hosts.text(text_state_node).unwrap().text(),
             "placed child"
+        );
+        let mut expected_operations = operations_before_apply;
+        expected_operations.push("append_child");
+        assert_eq!(host.operations(), expected_operations);
+    }
+
+    #[test]
+    fn host_work_applies_nested_host_parent_text_placement_record_to_fake_host_config() {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let create_render = render_test_root(&mut store, root_id, RootElementHandle::from_raw(82));
+        let (current_outer, current_inner, current_text) =
+            attach_detached_nested_root_element_with_text_for_commit(
+                &mut store,
+                &mut host,
+                &mut detached_hosts,
+                root_id,
+                create_render.finished_work(),
+                "stable",
+            );
+        let inner_state_node = store.fiber_arena().get(current_inner).unwrap().state_node();
+        let outer_state_node = store.fiber_arena().get(current_outer).unwrap().state_node();
+        let create_commit = commit_finished_host_root(&mut store, create_render).unwrap();
+        apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &create_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        update_container(&mut store, root_id, RootElementHandle::from_raw(83), None).unwrap();
+        let placement_render =
+            render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let (_work_outer, work_inner, stable_text, placed_text) =
+            place_detached_text_under_existing_nested_host_parent_for_commit(
+                &mut store,
+                &mut host,
+                &mut detached_hosts,
+                root_id,
+                placement_render.finished_work(),
+                current_outer,
+                current_inner,
+                current_text,
+                "nested placed",
+            );
+        let text_state_node = store.fiber_arena().get(placed_text).unwrap().state_node();
+        let placement_commit = commit_finished_host_root(&mut store, placement_render).unwrap();
+        let diagnostics = placement_commit.host_parent_placement_apply_diagnostics_for_canary();
+
+        assert_eq!(
+            placement_commit.test_only_host_parent_placement_apply_count_for_canary(),
+            1
+        );
+        assert!(
+            placement_commit.has_test_only_host_parent_placement_apply_for_canary(
+                inner_state_node.raw(),
+                text_state_node.raw()
+            )
+        );
+        assert!(
+            !placement_commit.has_test_only_host_parent_placement_apply_for_canary(
+                outer_state_node.raw(),
+                text_state_node.raw()
+            )
+        );
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].parent(), work_inner);
+        assert_eq!(diagnostics[0].parent_state_node(), inner_state_node);
+        assert_eq!(diagnostics[0].fiber(), placed_text);
+        assert_eq!(diagnostics[0].state_node(), text_state_node);
+        assert!(diagnostics[0].applies_to_host_parent());
+        let operations_before_apply = host.operations();
+        let apply = apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &placement_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        assert_eq!(apply.records().len(), 1);
+        assert_eq!(apply.records()[0].mutation().parent(), work_inner);
+        assert_eq!(
+            apply.records()[0].mutation().parent_state_node(),
+            inner_state_node
+        );
+        assert_eq!(apply.records()[0].mutation().fiber(), placed_text);
+        assert_eq!(
+            apply.records()[0].mutation().kind(),
+            HostRootMutationApplyRecordKind::AppendPlacementToHostParent
+        );
+        assert_eq!(
+            apply.records()[0].status(),
+            TestHostRootMutationApplyStatus::Applied(TestHostRootMutationHostCall::AppendChild)
+        );
+        assert_eq!(apply.applied_host_call_count(), 1);
+        assert_eq!(
+            detached_hosts.text(text_state_node).unwrap().text(),
+            "nested placed"
+        );
+        assert_eq!(
+            store.fiber_arena().get(work_inner).unwrap().child(),
+            Some(stable_text)
+        );
+        assert_eq!(
+            store.fiber_arena().get(stable_text).unwrap().sibling(),
+            Some(placed_text)
         );
         let mut expected_operations = operations_before_apply;
         expected_operations.push("append_child");

@@ -11,9 +11,9 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 use fast_react_core::{
-    DeletionListId, FiberArena, FiberFlags, FiberId, FiberTag, FiberTopologyError,
-    HookEffectCallbackHandle, HookEffectId, HookEffectInstanceId, Lanes, PropsHandle, RefHandle,
-    RootFinishedLanes, StateHandle, StateNodeHandle, UpdateQueueHandle,
+    DeletionListId, ElementTypeHandle, FiberArena, FiberFlags, FiberId, FiberTag,
+    FiberTopologyError, HookEffectCallbackHandle, HookEffectId, HookEffectInstanceId, Lanes,
+    PropsHandle, RefHandle, RootFinishedLanes, StateHandle, StateNodeHandle, UpdateQueueHandle,
 };
 use fast_react_host_config::{HostFiberTokenPhase, HostFiberTokenTarget, HostTypes};
 
@@ -1433,6 +1433,38 @@ impl HostRootCommitRecord {
             .collect()
     }
 
+    #[must_use]
+    pub fn host_parent_placement_apply_diagnostics_for_canary(
+        &self,
+    ) -> Vec<HostParentPlacementApplyDiagnosticForCanary> {
+        self.mutation_apply_log
+            .records()
+            .iter()
+            .filter(|record| {
+                record.parent_tag() == FiberTag::HostComponent
+                    && matches!(
+                        record.source(),
+                        HostRootMutationApplyRecordSource::MutationPhase(
+                            HostRootMutationPhaseRecordKind::Placement
+                        )
+                    )
+            })
+            .map(|record| HostParentPlacementApplyDiagnosticForCanary {
+                root: record.root(),
+                host_root: record.host_root(),
+                parent: record.parent(),
+                parent_tag: record.parent_tag(),
+                parent_state_node: record.parent_state_node(),
+                fiber: record.fiber(),
+                tag: record.tag(),
+                state_node: record.state_node(),
+                apply_kind: host_root_mutation_apply_record_kind_name(record.kind()),
+                applies_to_host_parent: record.kind()
+                    == HostRootMutationApplyRecordKind::AppendPlacementToHostParent,
+            })
+            .collect()
+    }
+
     #[allow(
         dead_code,
         reason = "crate-private passive commit metadata for future passive-effect workers"
@@ -2525,6 +2557,92 @@ impl HostRootPlacementApplyDiagnosticForCanary {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HostParentPlacementApplyDiagnosticForCanary {
+    root: FiberRootId,
+    host_root: FiberId,
+    parent: FiberId,
+    parent_tag: FiberTag,
+    parent_state_node: StateNodeHandle,
+    fiber: FiberId,
+    tag: FiberTag,
+    state_node: StateNodeHandle,
+    apply_kind: &'static str,
+    applies_to_host_parent: bool,
+}
+
+impl HostParentPlacementApplyDiagnosticForCanary {
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub const fn host_root(self) -> FiberId {
+        self.host_root
+    }
+
+    #[must_use]
+    pub const fn parent(self) -> FiberId {
+        self.parent
+    }
+
+    #[must_use]
+    pub const fn parent_tag(self) -> FiberTag {
+        self.parent_tag
+    }
+
+    #[must_use]
+    pub const fn parent_tag_name(self) -> &'static str {
+        host_root_fiber_tag_name(self.parent_tag)
+    }
+
+    #[must_use]
+    pub const fn parent_state_node(self) -> StateNodeHandle {
+        self.parent_state_node
+    }
+
+    #[must_use]
+    pub const fn parent_state_node_raw(self) -> u64 {
+        self.parent_state_node.raw()
+    }
+
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn tag(self) -> FiberTag {
+        self.tag
+    }
+
+    #[must_use]
+    pub const fn tag_name(self) -> &'static str {
+        host_root_fiber_tag_name(self.tag)
+    }
+
+    #[must_use]
+    pub const fn state_node(self) -> StateNodeHandle {
+        self.state_node
+    }
+
+    #[must_use]
+    pub const fn state_node_raw(self) -> u64 {
+        self.state_node.raw()
+    }
+
+    #[must_use]
+    pub const fn apply_kind(self) -> &'static str {
+        self.apply_kind
+    }
+
+    #[must_use]
+    pub const fn applies_to_host_parent(self) -> bool {
+        self.applies_to_host_parent
+    }
+}
+
 const fn host_root_mutation_apply_record_kind_name(
     kind: HostRootMutationApplyRecordKind,
 ) -> &'static str {
@@ -2641,6 +2759,7 @@ fn collect_host_root_mutation_phase_log<H: HostTypes>(
             root,
             finished_work,
             child,
+            1,
             lanes,
         )?;
     }
@@ -2654,6 +2773,7 @@ fn collect_host_component_child_placement_phase_records(
     root: FiberRootId,
     host_root: FiberId,
     parent: FiberId,
+    host_component_depth: usize,
     lanes: Lanes,
 ) -> Result<(), RootCommitError> {
     let parent_node = arena.get(parent)?;
@@ -2661,30 +2781,47 @@ fn collect_host_component_child_placement_phase_records(
         return Ok(());
     }
 
+    let parent_is_stable = !parent_node.flags().contains_all(FiberFlags::PLACEMENT);
     let mut next_child = parent_node.child();
     while let Some(child) = next_child {
         let node = arena.get(child)?;
         next_child = node.sibling();
 
-        if !node.flags().contains_all(FiberFlags::PLACEMENT)
-            || !is_supported_host_root_mutation_child(node.tag())
+        if node.flags().contains_all(FiberFlags::PLACEMENT)
+            && is_supported_host_root_mutation_child(node.tag())
         {
-            continue;
+            log.push(host_root_mutation_phase_record(
+                arena,
+                root,
+                host_root,
+                parent,
+                child,
+                HostRootMutationPhaseRecordKind::Placement,
+                lanes,
+            )?);
         }
 
-        log.push(host_root_mutation_phase_record(
-            arena,
-            root,
-            host_root,
-            parent,
-            child,
-            HostRootMutationPhaseRecordKind::Placement,
-            lanes,
-        )?);
+        if parent_is_stable
+            && host_component_depth < HOST_PARENT_PLACEMENT_CANARY_MAX_HOST_COMPONENT_DEPTH
+            && node.tag() == FiberTag::HostComponent
+            && !node.flags().contains_all(FiberFlags::PLACEMENT)
+        {
+            collect_host_component_child_placement_phase_records(
+                arena,
+                log,
+                root,
+                host_root,
+                child,
+                host_component_depth + 1,
+                lanes,
+            )?;
+        }
     }
 
     Ok(())
 }
+
+const HOST_PARENT_PLACEMENT_CANARY_MAX_HOST_COMPONENT_DEPTH: usize = 2;
 
 fn host_root_mutation_phase_record(
     arena: &fast_react_core::FiberArena,
@@ -2949,6 +3086,374 @@ fn host_root_deletion_apply_record(
 
 #[doc(hidden)]
 impl<H: HostTypes> FiberRootStore<H> {
+    pub fn prepare_test_renderer_nested_host_output_canary_fibers(
+        &mut self,
+        render: HostRootRenderPhaseRecord,
+        outer_fixture: crate::TestRendererHostOutputCanaryFixture,
+        inner_fixture: crate::TestRendererHostOutputCanaryFixture,
+    ) -> Result<
+        (
+            crate::TestRendererHostOutputCanaryPreparedFibers,
+            crate::TestRendererHostOutputCanaryPreparedFibers,
+        ),
+        crate::TestRendererHostOutputCanaryError,
+    > {
+        expect_test_renderer_host_parent_placement_canary_tag(
+            self,
+            render.work_in_progress(),
+            FiberTag::HostRoot,
+        )?;
+
+        let mode = self.fiber_arena().get(render.work_in_progress())?.mode();
+        let outer = self.fiber_arena_mut().create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::from_raw(outer_fixture.component_props_raw()),
+            mode,
+        );
+        {
+            let node = self.fiber_arena_mut().get_mut(outer)?;
+            node.set_element_type(ElementTypeHandle::from_raw(
+                outer_fixture.element_type_raw(),
+            ));
+            node.merge_flags(FiberFlags::PLACEMENT);
+        }
+
+        let inner = self.fiber_arena_mut().create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::from_raw(inner_fixture.component_props_raw()),
+            mode,
+        );
+        {
+            let node = self.fiber_arena_mut().get_mut(inner)?;
+            node.set_element_type(ElementTypeHandle::from_raw(
+                inner_fixture.element_type_raw(),
+            ));
+            node.merge_flags(FiberFlags::PLACEMENT);
+        }
+
+        let text = self.fiber_arena_mut().create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(inner_fixture.text_props_raw()),
+            mode,
+        );
+        self.fiber_arena_mut().set_children(inner, &[text])?;
+        self.fiber_arena_mut().set_children(outer, &[inner])?;
+        self.fiber_arena_mut()
+            .set_children(render.work_in_progress(), &[outer])?;
+
+        let text_token = self.host_tokens_mut().issue(
+            render.root(),
+            text,
+            HostFiberTokenPhase::Creation,
+            HostFiberTokenTarget::TextInstance,
+        );
+        self.host_tokens().validate(
+            text_token,
+            render.root(),
+            text,
+            HostFiberTokenPhase::Creation,
+            HostFiberTokenTarget::TextInstance,
+        )?;
+        let inner_token = self.host_tokens_mut().issue(
+            render.root(),
+            inner,
+            HostFiberTokenPhase::Creation,
+            HostFiberTokenTarget::Instance,
+        );
+        self.host_tokens().validate(
+            inner_token,
+            render.root(),
+            inner,
+            HostFiberTokenPhase::Creation,
+            HostFiberTokenTarget::Instance,
+        )?;
+        let outer_token = self.host_tokens_mut().issue(
+            render.root(),
+            outer,
+            HostFiberTokenPhase::Creation,
+            HostFiberTokenTarget::Instance,
+        );
+        self.host_tokens().validate(
+            outer_token,
+            render.root(),
+            outer,
+            HostFiberTokenPhase::Creation,
+            HostFiberTokenTarget::Instance,
+        )?;
+
+        let outer_prepared = crate::TestRendererHostOutputCanaryPreparedFibers {
+            root: render.root(),
+            host_root: render.work_in_progress(),
+            component: outer,
+            text,
+            render_lanes: render.render_lanes(),
+            component_token: outer_token,
+            text_token,
+            fixture: outer_fixture,
+        };
+        let inner_prepared = crate::TestRendererHostOutputCanaryPreparedFibers {
+            root: render.root(),
+            host_root: render.work_in_progress(),
+            component: inner,
+            text,
+            render_lanes: render.render_lanes(),
+            component_token: inner_token,
+            text_token,
+            fixture: inner_fixture,
+        };
+
+        Ok((outer_prepared, inner_prepared))
+    }
+
+    pub fn finish_test_renderer_nested_host_output_canary_fibers(
+        &mut self,
+        outer_prepared: crate::TestRendererHostOutputCanaryPreparedFibers,
+        inner_prepared: crate::TestRendererHostOutputCanaryPreparedFibers,
+        outer_state_node_raw: u64,
+        inner_state_node_raw: u64,
+        text_state_node_raw: u64,
+    ) -> Result<
+        (
+            crate::TestRendererHostOutputCanaryCurrentFibers,
+            crate::TestRendererHostOutputCanaryCurrentFibers,
+        ),
+        crate::TestRendererHostOutputCanaryError,
+    > {
+        expect_test_renderer_nested_host_output_canary_topology(
+            self,
+            outer_prepared,
+            inner_prepared,
+        )?;
+
+        complete_test_renderer_nested_host_output_canary_fiber(
+            self,
+            inner_prepared.text(),
+            FiberTag::HostText,
+            inner_prepared.fixture().text_props_raw(),
+            text_state_node_raw,
+        )?;
+        complete_test_renderer_nested_host_output_canary_fiber(
+            self,
+            inner_prepared.component(),
+            FiberTag::HostComponent,
+            inner_prepared.fixture().component_props_raw(),
+            inner_state_node_raw,
+        )?;
+        complete_test_renderer_nested_host_output_canary_fiber(
+            self,
+            outer_prepared.component(),
+            FiberTag::HostComponent,
+            outer_prepared.fixture().component_props_raw(),
+            outer_state_node_raw,
+        )?;
+        refresh_test_renderer_host_parent_placement_canary_bubbled_flags(
+            self,
+            outer_prepared.host_root(),
+        )?;
+
+        Ok((
+            crate::TestRendererHostOutputCanaryCurrentFibers {
+                root: outer_prepared.root(),
+                host_root: outer_prepared.host_root(),
+                component: outer_prepared.component(),
+                text: inner_prepared.text(),
+                fixture: outer_prepared.fixture(),
+            },
+            crate::TestRendererHostOutputCanaryCurrentFibers {
+                root: inner_prepared.root(),
+                host_root: inner_prepared.host_root(),
+                component: inner_prepared.component(),
+                text: inner_prepared.text(),
+                fixture: inner_prepared.fixture(),
+            },
+        ))
+    }
+
+    pub fn prepare_test_renderer_nested_host_parent_text_placement_canary_fibers(
+        &mut self,
+        render: HostRootRenderPhaseRecord,
+        outer_current: crate::TestRendererHostOutputCanaryCurrentFibers,
+        inner_current: crate::TestRendererHostOutputCanaryCurrentFibers,
+        placed_text_props_raw: u64,
+    ) -> Result<
+        (
+            crate::TestRendererHostOutputCanaryCurrentFibers,
+            crate::TestRendererHostOutputCanaryCurrentFibers,
+            FiberId,
+            HostFiberTokenId,
+        ),
+        crate::TestRendererHostOutputCanaryError,
+    > {
+        validate_test_renderer_nested_host_output_canary_current(
+            self,
+            render,
+            outer_current,
+            inner_current,
+        )?;
+
+        let outer_node = self.fiber_arena().get(outer_current.component())?;
+        let outer_state_node = outer_node.state_node();
+        if outer_state_node.is_none() {
+            return Err(crate::TestRendererHostOutputCanaryError::EmptyStateNode {
+                fiber: outer_current.component(),
+                tag: FiberTag::HostComponent,
+            });
+        }
+        let outer_props = outer_node.memoized_props();
+
+        let inner_node = self.fiber_arena().get(inner_current.component())?;
+        let inner_state_node = inner_node.state_node();
+        if inner_state_node.is_none() {
+            return Err(crate::TestRendererHostOutputCanaryError::EmptyStateNode {
+                fiber: inner_current.component(),
+                tag: FiberTag::HostComponent,
+            });
+        }
+        let inner_props = inner_node.memoized_props();
+
+        let text_node = self.fiber_arena().get(inner_current.text())?;
+        let text_state_node = text_node.state_node();
+        if text_state_node.is_none() {
+            return Err(crate::TestRendererHostOutputCanaryError::EmptyStateNode {
+                fiber: inner_current.text(),
+                tag: FiberTag::HostText,
+            });
+        }
+        let text_props = text_node.memoized_props();
+
+        let work_outer = self
+            .fiber_arena_mut()
+            .create_work_in_progress(outer_current.component(), outer_props)?;
+        {
+            let node = self.fiber_arena_mut().get_mut(work_outer)?;
+            node.set_state_node(outer_state_node);
+            node.set_memoized_props(outer_props);
+            node.set_lanes(Lanes::NO);
+        }
+
+        let work_inner = self
+            .fiber_arena_mut()
+            .create_work_in_progress(inner_current.component(), inner_props)?;
+        {
+            let node = self.fiber_arena_mut().get_mut(work_inner)?;
+            node.set_state_node(inner_state_node);
+            node.set_memoized_props(inner_props);
+            node.set_lanes(Lanes::NO);
+        }
+
+        let stable_text = self
+            .fiber_arena_mut()
+            .create_work_in_progress(inner_current.text(), text_props)?;
+        {
+            let node = self.fiber_arena_mut().get_mut(stable_text)?;
+            node.set_state_node(text_state_node);
+            node.set_memoized_props(text_props);
+            node.set_lanes(Lanes::NO);
+        }
+
+        let mode = self.fiber_arena().get(work_inner)?.mode();
+        let placed_text = self.fiber_arena_mut().create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(placed_text_props_raw),
+            mode,
+        );
+        {
+            let node = self.fiber_arena_mut().get_mut(placed_text)?;
+            node.set_lanes(Lanes::NO);
+            node.merge_flags(FiberFlags::PLACEMENT);
+        }
+
+        self.fiber_arena_mut()
+            .set_children(work_inner, &[stable_text, placed_text])?;
+        self.fiber_arena_mut()
+            .set_children(work_outer, &[work_inner])?;
+        self.fiber_arena_mut()
+            .set_children(render.work_in_progress(), &[work_outer])?;
+
+        let text_token = self.host_tokens_mut().issue(
+            render.root(),
+            placed_text,
+            HostFiberTokenPhase::Creation,
+            HostFiberTokenTarget::TextInstance,
+        );
+        self.host_tokens().validate(
+            text_token,
+            render.root(),
+            placed_text,
+            HostFiberTokenPhase::Creation,
+            HostFiberTokenTarget::TextInstance,
+        )?;
+
+        Ok((
+            crate::TestRendererHostOutputCanaryCurrentFibers {
+                root: render.root(),
+                host_root: render.work_in_progress(),
+                component: work_outer,
+                text: stable_text,
+                fixture: outer_current.fixture(),
+            },
+            crate::TestRendererHostOutputCanaryCurrentFibers {
+                root: render.root(),
+                host_root: render.work_in_progress(),
+                component: work_inner,
+                text: stable_text,
+                fixture: inner_current.fixture(),
+            },
+            placed_text,
+            text_token,
+        ))
+    }
+
+    pub fn finish_test_renderer_nested_host_parent_text_placement_canary_fibers(
+        &mut self,
+        outer_current: crate::TestRendererHostOutputCanaryCurrentFibers,
+        inner_current: crate::TestRendererHostOutputCanaryCurrentFibers,
+        placed_text: FiberId,
+        placed_text_state_node_raw: u64,
+        placed_text_props_raw: u64,
+    ) -> Result<(), crate::TestRendererHostOutputCanaryError> {
+        expect_test_renderer_nested_host_output_canary_current_topology(
+            self,
+            outer_current,
+            inner_current,
+        )?;
+        expect_test_renderer_host_parent_placement_canary_tag(
+            self,
+            placed_text,
+            FiberTag::HostText,
+        )?;
+
+        complete_test_renderer_nested_host_output_canary_fiber(
+            self,
+            placed_text,
+            FiberTag::HostText,
+            placed_text_props_raw,
+            placed_text_state_node_raw,
+        )?;
+        refresh_test_renderer_host_parent_placement_canary_bubbled_flags(
+            self,
+            inner_current.text(),
+        )?;
+        refresh_test_renderer_host_parent_placement_canary_bubbled_flags(self, placed_text)?;
+        refresh_test_renderer_host_parent_placement_canary_bubbled_flags(
+            self,
+            inner_current.component(),
+        )?;
+        refresh_test_renderer_host_parent_placement_canary_bubbled_flags(
+            self,
+            outer_current.component(),
+        )?;
+        refresh_test_renderer_host_parent_placement_canary_bubbled_flags(
+            self,
+            outer_current.host_root(),
+        )?;
+        Ok(())
+    }
+
     pub fn prepare_test_renderer_host_parent_text_placement_canary_fibers(
         &mut self,
         render: HostRootRenderPhaseRecord,
@@ -3150,6 +3655,241 @@ impl<H: HostTypes> FiberRootStore<H> {
         )?;
         Ok(())
     }
+}
+
+fn expect_test_renderer_nested_host_output_canary_topology<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    outer_prepared: crate::TestRendererHostOutputCanaryPreparedFibers,
+    inner_prepared: crate::TestRendererHostOutputCanaryPreparedFibers,
+) -> Result<(), crate::TestRendererHostOutputCanaryError> {
+    expect_test_renderer_host_parent_placement_canary_tag(
+        store,
+        outer_prepared.host_root(),
+        FiberTag::HostRoot,
+    )?;
+    expect_test_renderer_host_parent_placement_canary_tag(
+        store,
+        outer_prepared.component(),
+        FiberTag::HostComponent,
+    )?;
+    expect_test_renderer_host_parent_placement_canary_tag(
+        store,
+        inner_prepared.component(),
+        FiberTag::HostComponent,
+    )?;
+    expect_test_renderer_host_parent_placement_canary_tag(
+        store,
+        inner_prepared.text(),
+        FiberTag::HostText,
+    )?;
+
+    if outer_prepared.root() != inner_prepared.root() {
+        return Err(crate::TestRendererHostOutputCanaryError::RootMismatch {
+            expected: outer_prepared.root(),
+            actual: inner_prepared.root(),
+        });
+    }
+    if outer_prepared.host_root() != inner_prepared.host_root() {
+        return Err(
+            crate::TestRendererHostOutputCanaryError::ExpectedCurrentHostRoot {
+                expected: outer_prepared.host_root(),
+                actual: inner_prepared.host_root(),
+            },
+        );
+    }
+    if outer_prepared.text() != inner_prepared.text() {
+        return Err(FiberTopologyError::MixedParentSiblingChain {
+            parent: inner_prepared.component(),
+            child: inner_prepared.text(),
+            actual_parent: store
+                .fiber_arena()
+                .get(outer_prepared.text())?
+                .return_fiber(),
+        }
+        .into());
+    }
+
+    expect_test_renderer_nested_host_output_canary_prepared_topology(
+        store,
+        outer_prepared.host_root(),
+        outer_prepared.component(),
+        inner_prepared.component(),
+        inner_prepared.text(),
+    )
+}
+
+fn expect_test_renderer_nested_host_output_canary_prepared_topology<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    host_root: FiberId,
+    outer_component: FiberId,
+    inner_component: FiberId,
+    text: FiberId,
+) -> Result<(), crate::TestRendererHostOutputCanaryError> {
+    if store.fiber_arena().get(host_root)?.child() != Some(outer_component) {
+        return Err(FiberTopologyError::MixedParentSiblingChain {
+            parent: host_root,
+            child: outer_component,
+            actual_parent: store.fiber_arena().get(outer_component)?.return_fiber(),
+        }
+        .into());
+    }
+    if store.fiber_arena().get(outer_component)?.return_fiber() != Some(host_root) {
+        return Err(FiberTopologyError::MixedParentSiblingChain {
+            parent: host_root,
+            child: outer_component,
+            actual_parent: store.fiber_arena().get(outer_component)?.return_fiber(),
+        }
+        .into());
+    }
+    if store.fiber_arena().get(outer_component)?.child() != Some(inner_component) {
+        return Err(FiberTopologyError::MixedParentSiblingChain {
+            parent: outer_component,
+            child: inner_component,
+            actual_parent: store.fiber_arena().get(inner_component)?.return_fiber(),
+        }
+        .into());
+    }
+    if store.fiber_arena().get(inner_component)?.return_fiber() != Some(outer_component) {
+        return Err(FiberTopologyError::MixedParentSiblingChain {
+            parent: outer_component,
+            child: inner_component,
+            actual_parent: store.fiber_arena().get(inner_component)?.return_fiber(),
+        }
+        .into());
+    }
+    if store.fiber_arena().get(inner_component)?.child() != Some(text) {
+        return Err(FiberTopologyError::MixedParentSiblingChain {
+            parent: inner_component,
+            child: text,
+            actual_parent: store.fiber_arena().get(text)?.return_fiber(),
+        }
+        .into());
+    }
+    if store.fiber_arena().get(text)?.return_fiber() != Some(inner_component) {
+        return Err(FiberTopologyError::MixedParentSiblingChain {
+            parent: inner_component,
+            child: text,
+            actual_parent: store.fiber_arena().get(text)?.return_fiber(),
+        }
+        .into());
+    }
+
+    Ok(())
+}
+
+fn validate_test_renderer_nested_host_output_canary_current<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    render: HostRootRenderPhaseRecord,
+    outer_current: crate::TestRendererHostOutputCanaryCurrentFibers,
+    inner_current: crate::TestRendererHostOutputCanaryCurrentFibers,
+) -> Result<(), crate::TestRendererHostOutputCanaryError> {
+    expect_test_renderer_host_parent_placement_canary_tag(
+        store,
+        render.work_in_progress(),
+        FiberTag::HostRoot,
+    )?;
+    if outer_current.root() != render.root() {
+        return Err(crate::TestRendererHostOutputCanaryError::RootMismatch {
+            expected: outer_current.root(),
+            actual: render.root(),
+        });
+    }
+    if inner_current.root() != render.root() {
+        return Err(crate::TestRendererHostOutputCanaryError::RootMismatch {
+            expected: inner_current.root(),
+            actual: render.root(),
+        });
+    }
+    if outer_current.host_root() != render.current() {
+        return Err(
+            crate::TestRendererHostOutputCanaryError::ExpectedCurrentHostRoot {
+                expected: render.current(),
+                actual: outer_current.host_root(),
+            },
+        );
+    }
+    if inner_current.host_root() != render.current() {
+        return Err(
+            crate::TestRendererHostOutputCanaryError::ExpectedCurrentHostRoot {
+                expected: render.current(),
+                actual: inner_current.host_root(),
+            },
+        );
+    }
+
+    expect_test_renderer_nested_host_output_canary_current_topology(
+        store,
+        outer_current,
+        inner_current,
+    )
+}
+
+fn expect_test_renderer_nested_host_output_canary_current_topology<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    outer_current: crate::TestRendererHostOutputCanaryCurrentFibers,
+    inner_current: crate::TestRendererHostOutputCanaryCurrentFibers,
+) -> Result<(), crate::TestRendererHostOutputCanaryError> {
+    expect_test_renderer_host_parent_placement_canary_tag(
+        store,
+        outer_current.host_root(),
+        FiberTag::HostRoot,
+    )?;
+    expect_test_renderer_host_parent_placement_canary_tag(
+        store,
+        outer_current.component(),
+        FiberTag::HostComponent,
+    )?;
+    expect_test_renderer_host_parent_placement_canary_tag(
+        store,
+        inner_current.component(),
+        FiberTag::HostComponent,
+    )?;
+    expect_test_renderer_host_parent_placement_canary_tag(
+        store,
+        inner_current.text(),
+        FiberTag::HostText,
+    )?;
+
+    if outer_current.text() != inner_current.text() {
+        return Err(FiberTopologyError::MixedParentSiblingChain {
+            parent: inner_current.component(),
+            child: inner_current.text(),
+            actual_parent: store
+                .fiber_arena()
+                .get(outer_current.text())?
+                .return_fiber(),
+        }
+        .into());
+    }
+
+    expect_test_renderer_nested_host_output_canary_prepared_topology(
+        store,
+        outer_current.host_root(),
+        outer_current.component(),
+        inner_current.component(),
+        inner_current.text(),
+    )
+}
+
+fn complete_test_renderer_nested_host_output_canary_fiber<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    fiber: FiberId,
+    tag: FiberTag,
+    props_raw: u64,
+    state_node_raw: u64,
+) -> Result<(), crate::TestRendererHostOutputCanaryError> {
+    if state_node_raw == StateNodeHandle::NONE.raw() {
+        return Err(crate::TestRendererHostOutputCanaryError::EmptyStateNode { fiber, tag });
+    }
+    expect_test_renderer_host_parent_placement_canary_tag(store, fiber, tag)?;
+
+    let bubbled = fast_react_core::bubble_properties(store.fiber_arena(), fiber)?;
+    let node = store.fiber_arena_mut().get_mut(fiber)?;
+    node.set_state_node(StateNodeHandle::from_raw(state_node_raw));
+    node.set_memoized_props(PropsHandle::from_raw(props_raw));
+    node.set_child_lanes(bubbled.child_lanes());
+    node.set_subtree_flags(bubbled.subtree_flags());
+    Ok(())
 }
 
 fn refresh_test_renderer_host_parent_placement_canary_bubbled_flags<H: HostTypes>(
@@ -3725,6 +4465,152 @@ mod tests {
             .create_fiber(tag, None, PropsHandle::from_raw(props), FiberMode::NO)
     }
 
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct NestedHostParentFixture {
+        outer_current: FiberId,
+        inner_current: FiberId,
+        text_current: FiberId,
+        outer_state_node: StateNodeHandle,
+        inner_state_node: StateNodeHandle,
+        text_state_node: StateNodeHandle,
+        outer_props: PropsHandle,
+        inner_props: PropsHandle,
+        text_props: PropsHandle,
+    }
+
+    fn attach_current_nested_host_parent_fixture(
+        store: &mut FiberRootStore<RecordingHost>,
+        host_root: FiberId,
+    ) -> NestedHostParentFixture {
+        let mode = store.fiber_arena().get(host_root).unwrap().mode();
+        let outer_current = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::from_raw(9_100),
+            mode,
+        );
+        let inner_current = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::from_raw(9_101),
+            mode,
+        );
+        let text_current = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(9_102),
+            mode,
+        );
+        let fixture = NestedHostParentFixture {
+            outer_current,
+            inner_current,
+            text_current,
+            outer_state_node: StateNodeHandle::from_raw(9_200),
+            inner_state_node: StateNodeHandle::from_raw(9_201),
+            text_state_node: StateNodeHandle::from_raw(9_202),
+            outer_props: PropsHandle::from_raw(9_100),
+            inner_props: PropsHandle::from_raw(9_101),
+            text_props: PropsHandle::from_raw(9_102),
+        };
+        {
+            let node = store.fiber_arena_mut().get_mut(outer_current).unwrap();
+            node.set_state_node(fixture.outer_state_node);
+            node.set_memoized_props(fixture.outer_props);
+        }
+        {
+            let node = store.fiber_arena_mut().get_mut(inner_current).unwrap();
+            node.set_state_node(fixture.inner_state_node);
+            node.set_memoized_props(fixture.inner_props);
+        }
+        {
+            let node = store.fiber_arena_mut().get_mut(text_current).unwrap();
+            node.set_state_node(fixture.text_state_node);
+            node.set_memoized_props(fixture.text_props);
+        }
+        store
+            .fiber_arena_mut()
+            .set_children(inner_current, &[text_current])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(outer_current, &[inner_current])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root, &[outer_current])
+            .unwrap();
+        fixture
+    }
+
+    fn prepare_nested_host_parent_placement_wip(
+        store: &mut FiberRootStore<RecordingHost>,
+        host_root: FiberId,
+        fixture: NestedHostParentFixture,
+        placed_text_state_node: StateNodeHandle,
+    ) -> (FiberId, FiberId, FiberId, FiberId) {
+        let work_outer = store
+            .fiber_arena_mut()
+            .create_work_in_progress(fixture.outer_current, fixture.outer_props)
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(work_outer).unwrap();
+            node.set_state_node(fixture.outer_state_node);
+            node.set_memoized_props(fixture.outer_props);
+            node.set_lanes(Lanes::NO);
+        }
+        let work_inner = store
+            .fiber_arena_mut()
+            .create_work_in_progress(fixture.inner_current, fixture.inner_props)
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(work_inner).unwrap();
+            node.set_state_node(fixture.inner_state_node);
+            node.set_memoized_props(fixture.inner_props);
+            node.set_lanes(Lanes::NO);
+        }
+        let stable_text = store
+            .fiber_arena_mut()
+            .create_work_in_progress(fixture.text_current, fixture.text_props)
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(stable_text).unwrap();
+            node.set_state_node(fixture.text_state_node);
+            node.set_memoized_props(fixture.text_props);
+            node.set_lanes(Lanes::NO);
+        }
+        let mode = store.fiber_arena().get(work_inner).unwrap().mode();
+        let placed_text = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(9_103),
+            mode,
+        );
+        {
+            let node = store.fiber_arena_mut().get_mut(placed_text).unwrap();
+            node.set_flags(FiberFlags::PLACEMENT);
+            node.set_state_node(placed_text_state_node);
+            node.set_memoized_props(PropsHandle::from_raw(9_103));
+        }
+        store
+            .fiber_arena_mut()
+            .set_children(work_inner, &[stable_text, placed_text])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(work_outer, &[work_inner])
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(host_root, &[work_outer])
+            .unwrap();
+        bubble_test_fiber(store, stable_text);
+        bubble_test_fiber(store, placed_text);
+        bubble_test_fiber(store, work_inner);
+        bubble_test_fiber(store, work_outer);
+        bubble_test_fiber(store, host_root);
+        (work_outer, work_inner, stable_text, placed_text)
+    }
+
     fn attach_deletion_metadata_fixture(
         store: &mut FiberRootStore<RecordingHost>,
         host_root_work_in_progress: FiberId,
@@ -4195,6 +5081,162 @@ mod tests {
             render.finished_work()
         );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_records_nested_host_parent_child_placement_apply_record_without_host_mutation() {
+        let (mut store, root_id, host) = root_store();
+        let current_root = store.root(root_id).unwrap().current();
+        let fixture = attach_current_nested_host_parent_fixture(&mut store, current_root);
+        update_container(&mut store, root_id, RootElementHandle::from_raw(46), None).unwrap();
+        let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+        let placed_text_state_node = StateNodeHandle::from_raw(9_203);
+        let (work_outer, work_inner, stable_text, placed_text) =
+            prepare_nested_host_parent_placement_wip(
+                &mut store,
+                render.finished_work(),
+                fixture,
+                placed_text_state_node,
+            );
+
+        let commit = commit_finished_host_root(&mut store, render).unwrap();
+        let records = commit.mutation_log().records();
+        let apply_records = commit.mutation_apply_log().records();
+        let diagnostics = commit.host_parent_placement_apply_diagnostics_for_canary();
+
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].host_root(), render.finished_work());
+        assert_eq!(records[0].parent(), work_inner);
+        assert_eq!(records[0].parent_tag(), FiberTag::HostComponent);
+        assert_eq!(records[0].parent_state_node(), fixture.inner_state_node);
+        assert_eq!(records[0].fiber(), placed_text);
+        assert_eq!(records[0].tag(), FiberTag::HostText);
+        assert_eq!(
+            records[0].kind(),
+            HostRootMutationPhaseRecordKind::Placement
+        );
+        assert_eq!(records[0].state_node(), placed_text_state_node);
+        assert_eq!(records[0].placement_sibling().unwrap().sibling(), None);
+        assert_eq!(apply_records.len(), 1);
+        assert_eq!(apply_records[0].parent(), work_inner);
+        assert_eq!(
+            apply_records[0].kind(),
+            HostRootMutationApplyRecordKind::AppendPlacementToHostParent
+        );
+        assert_eq!(apply_records[0].fiber(), placed_text);
+        assert_eq!(apply_records[0].state_node(), placed_text_state_node);
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].root(), root_id);
+        assert_eq!(diagnostics[0].host_root(), render.finished_work());
+        assert_eq!(diagnostics[0].parent(), work_inner);
+        assert_eq!(diagnostics[0].parent_tag_name(), "HostComponent");
+        assert_eq!(
+            diagnostics[0].parent_state_node_raw(),
+            fixture.inner_state_node.raw()
+        );
+        assert_eq!(diagnostics[0].fiber(), placed_text);
+        assert_eq!(diagnostics[0].tag_name(), "HostText");
+        assert_eq!(
+            diagnostics[0].state_node_raw(),
+            placed_text_state_node.raw()
+        );
+        assert_eq!(
+            diagnostics[0].apply_kind(),
+            "append-placement-to-host-parent"
+        );
+        assert!(diagnostics[0].applies_to_host_parent());
+        assert_eq!(
+            store.fiber_arena().get(work_outer).unwrap().child(),
+            Some(work_inner)
+        );
+        assert_eq!(
+            store.fiber_arena().get(work_inner).unwrap().child(),
+            Some(stable_text)
+        );
+        assert_eq!(
+            store.fiber_arena().get(stable_text).unwrap().sibling(),
+            Some(placed_text)
+        );
+        assert_eq!(
+            commit.test_only_host_parent_placement_apply_count_for_canary(),
+            1
+        );
+        assert!(commit.has_test_only_host_parent_placement_apply_for_canary(
+            fixture.inner_state_node.raw(),
+            placed_text_state_node.raw()
+        ));
+        assert!(
+            !commit.has_test_only_host_parent_placement_apply_for_canary(
+                fixture.outer_state_node.raw(),
+                placed_text_state_node.raw()
+            )
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            render.finished_work()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_commit_does_not_descend_through_unsupported_nested_parent_blockers() {
+        for blocker_tag in [FiberTag::Fragment, FiberTag::Portal, FiberTag::Suspense] {
+            let (mut store, root_id, host) = root_store();
+            update_container(&mut store, root_id, RootElementHandle::from_raw(48), None).unwrap();
+            let render = render_host_root_for_lanes(&mut store, root_id, Lanes::DEFAULT).unwrap();
+            let outer = create_test_fiber(&mut store, FiberTag::HostComponent, 9_300);
+            let blocker = create_test_fiber(&mut store, blocker_tag, 9_301);
+            let nested_parent = create_test_fiber(&mut store, FiberTag::HostComponent, 9_302);
+            let placed_text = create_test_fiber(&mut store, FiberTag::HostText, 9_303);
+            {
+                let node = store.fiber_arena_mut().get_mut(outer).unwrap();
+                node.set_state_node(StateNodeHandle::from_raw(9_400));
+                node.set_memoized_props(PropsHandle::from_raw(9_300));
+            }
+            {
+                let node = store.fiber_arena_mut().get_mut(nested_parent).unwrap();
+                node.set_state_node(StateNodeHandle::from_raw(9_401));
+                node.set_memoized_props(PropsHandle::from_raw(9_302));
+            }
+            {
+                let node = store.fiber_arena_mut().get_mut(placed_text).unwrap();
+                node.set_flags(FiberFlags::PLACEMENT);
+                node.set_state_node(StateNodeHandle::from_raw(9_402));
+                node.set_memoized_props(PropsHandle::from_raw(9_303));
+            }
+            store
+                .fiber_arena_mut()
+                .set_children(nested_parent, &[placed_text])
+                .unwrap();
+            store
+                .fiber_arena_mut()
+                .set_children(blocker, &[nested_parent])
+                .unwrap();
+            store
+                .fiber_arena_mut()
+                .set_children(outer, &[blocker])
+                .unwrap();
+            store
+                .fiber_arena_mut()
+                .set_children(render.finished_work(), &[outer])
+                .unwrap();
+            bubble_test_fiber(&mut store, placed_text);
+            bubble_test_fiber(&mut store, nested_parent);
+            bubble_test_fiber(&mut store, blocker);
+            bubble_test_fiber(&mut store, outer);
+            bubble_test_fiber(&mut store, render.finished_work());
+
+            let commit = commit_finished_host_root(&mut store, render).unwrap();
+
+            assert!(commit.mutation_log().is_empty());
+            assert!(commit.mutation_apply_log().is_empty());
+            assert!(
+                commit
+                    .host_parent_placement_apply_diagnostics_for_canary()
+                    .is_empty()
+            );
+            assert_eq!(host.operations(), Vec::<&'static str>::new());
+        }
     }
 
     #[test]
