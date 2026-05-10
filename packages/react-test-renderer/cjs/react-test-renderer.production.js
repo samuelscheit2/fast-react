@@ -11491,7 +11491,6 @@ function createPrivateSerializationFinishedWorkIdentityGateResult(
     );
   }
   if (
-    normalized.rootRequestId !== undefined &&
     normalized.rootRequestId !== rootRequest.requestId
   ) {
     throwPrivateSerializationFinishedWorkIdentityError(
@@ -11500,7 +11499,6 @@ function createPrivateSerializationFinishedWorkIdentityGateResult(
     );
   }
   if (
-    normalized.rootRequestSequence !== undefined &&
     normalized.rootRequestSequence !== rootRequest.requestSequence
   ) {
     throwPrivateSerializationFinishedWorkIdentityError(
@@ -11508,10 +11506,7 @@ function createPrivateSerializationFinishedWorkIdentityGateResult(
       'Private serialization finished-work identity request sequence is stale.'
     );
   }
-  if (
-    normalized.rootId !== undefined &&
-    normalized.rootId !== rootRequest.rootId
-  ) {
+  if (normalized.rootId !== rootRequest.rootId) {
     throwPrivateSerializationFinishedWorkIdentityError(
       publicSurface,
       'Private serialization finished-work identity belongs to a foreign root.'
@@ -11525,6 +11520,10 @@ function createPrivateSerializationFinishedWorkIdentityGateResult(
     !privateSerializationFinishedWorkHandlesEqual(
       normalized.reportFinishedWork,
       normalized.commitCurrent
+    ) ||
+    !privateSerializationFinishedWorkHandlesEqual(
+      normalized.renderCurrent,
+      normalized.commitPreviousCurrent
     ) ||
     normalized.commitCurrentMatchesRenderFinishedWork !== true ||
     normalized.commitPreviousCurrentMatchesRenderCurrent !== true ||
@@ -11604,7 +11603,9 @@ function createPrivateSerializationFinishedWorkIdentityGateResult(
     rootRequestSequence: rootRequest.requestSequence,
     rootId: rootRequest.rootId,
     hostOutputUpdateKind: normalized.hostOutputUpdateKind,
+    renderCurrent: normalized.renderCurrent,
     renderFinishedWork: normalized.renderFinishedWork,
+    commitPreviousCurrent: normalized.commitPreviousCurrent,
     commitCurrent: normalized.commitCurrent,
     reportFinishedWork: normalized.reportFinishedWork,
     renderLanesBits: normalized.renderLanesBits,
@@ -11670,6 +11671,11 @@ function normalizePrivateSerializationFinishedWorkIdentityEvidence(
       'hostOutputUpdateKind',
       'host_output_update_kind'
     ),
+    renderCurrent: normalizePrivateSerializationFinishedWorkHandle(
+      publicSurface,
+      readPrivateToJSONField(evidence, 'renderCurrent', 'render_current'),
+      'renderCurrent'
+    ),
     renderFinishedWork: normalizePrivateSerializationFinishedWorkHandle(
       publicSurface,
       readPrivateToJSONField(
@@ -11683,6 +11689,15 @@ function normalizePrivateSerializationFinishedWorkIdentityEvidence(
       publicSurface,
       readPrivateToJSONField(evidence, 'commitCurrent', 'commit_current'),
       'commitCurrent'
+    ),
+    commitPreviousCurrent: normalizePrivateSerializationFinishedWorkHandle(
+      publicSurface,
+      readPrivateToJSONField(
+        evidence,
+        'commitPreviousCurrent',
+        'commit_previous_current'
+      ),
+      'commitPreviousCurrent'
     ),
     reportFinishedWork: normalizePrivateSerializationFinishedWorkHandle(
       publicSurface,
@@ -11867,9 +11882,6 @@ function validatePrivateSerializationFinishedWorkIdentitySourceReport(
   identity,
   report
 ) {
-  if (report === undefined) {
-    return;
-  }
   if (report === null || typeof report !== 'object') {
     throwPrivateSerializationFinishedWorkIdentityError(
       publicSurface,

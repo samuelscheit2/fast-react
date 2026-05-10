@@ -1758,6 +1758,11 @@ test("react-test-renderer JS private serialization finished-work identity valida
     );
     assert.equal(jsonIdentity.publicSurface, "create().toJSON");
     assert.equal(jsonIdentity.rootRequest, jsonError.rootRequest);
+    assert.deepEqual(jsonIdentity.renderCurrent, jsonEvidence.renderCurrent);
+    assert.deepEqual(
+      jsonIdentity.commitPreviousCurrent,
+      jsonEvidence.commitPreviousCurrent
+    );
     assert.equal(jsonIdentity.consumesPrivateToJSONEvidence, true);
     assert.equal(jsonIdentity.consumesPrivateToTreeEvidence, false);
     assert.equal(jsonIdentity.publicSerializationAvailable, false);
@@ -1766,6 +1771,16 @@ test("react-test-renderer JS private serialization finished-work identity valida
     assertFinishedWorkIdentityRejection(
       jsonFacade,
       null,
+      jsonReport,
+      "FastReactTestRendererPrivateToJSONSerializationError"
+    );
+    assertFinishedWorkIdentityRejection(
+      jsonFacade,
+      withFinishedWorkIdentityChange(jsonEvidence, (evidence) => {
+        delete evidence.rootRequestId;
+        delete evidence.rootRequestSequence;
+        delete evidence.rootId;
+      }),
       jsonReport,
       "FastReactTestRendererPrivateToJSONSerializationError"
     );
@@ -1781,6 +1796,29 @@ test("react-test-renderer JS private serialization finished-work identity valida
       jsonFacade,
       withFinishedWorkIdentityChange(jsonEvidence, (evidence) => {
         evidence.rootId = `${evidence.rootId}:foreign`;
+      }),
+      jsonReport,
+      "FastReactTestRendererPrivateToJSONSerializationError"
+    );
+    assertFinishedWorkIdentityRejection(
+      jsonFacade,
+      jsonEvidence,
+      undefined,
+      "FastReactTestRendererPrivateToJSONSerializationError"
+    );
+    assertFinishedWorkIdentityRejection(
+      jsonFacade,
+      withFinishedWorkIdentityChange(jsonEvidence, (evidence) => {
+        delete evidence.renderCurrent;
+        delete evidence.commitPreviousCurrent;
+      }),
+      jsonReport,
+      "FastReactTestRendererPrivateToJSONSerializationError"
+    );
+    assertFinishedWorkIdentityRejection(
+      jsonFacade,
+      withFinishedWorkIdentityChange(jsonEvidence, (evidence) => {
+        evidence.commitPreviousCurrent.slot += 1;
       }),
       jsonReport,
       "FastReactTestRendererPrivateToJSONSerializationError"
@@ -1828,6 +1866,11 @@ test("react-test-renderer JS private serialization finished-work identity valida
       treeReport
     );
     assert.equal(treeIdentity.publicSurface, "create().toTree");
+    assert.deepEqual(treeIdentity.renderCurrent, treeEvidence.renderCurrent);
+    assert.deepEqual(
+      treeIdentity.commitPreviousCurrent,
+      treeEvidence.commitPreviousCurrent
+    );
     assert.equal(treeIdentity.consumesPrivateToJSONEvidence, false);
     assert.equal(treeIdentity.consumesPrivateToTreeEvidence, true);
     assert.equal(treeIdentity.publicToTreeAvailable, false);

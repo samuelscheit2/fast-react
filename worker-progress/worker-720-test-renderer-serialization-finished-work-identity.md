@@ -5,6 +5,7 @@
 - Added the private serialization finished-work identity gate in Rust and JS.
 - Wired the root package entrypoint and both CJS bundles so hidden toJSON/toTree facades can validate accepted committed HostRoot `finished_work` identity/lane evidence.
 - Updated serialization and create-routing conformance gates/tests.
+- Acceptance audit follow-up fixed the JS hidden facade fail-open cases: root identity fields and source report are now required, and `renderCurrent` is directly compared to `commitPreviousCurrent` instead of trusting only boolean claims.
 
 ## Notes
 - Scope remains private serialization evidence only.
@@ -18,11 +19,13 @@
 - `tests/conformance/src/react-test-renderer-serialization-local-gate.mjs`
 - `tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`
 - `tests/conformance/test/react-test-renderer-create-routing-gate.test.mjs`
+- `worker-progress/worker-720-test-renderer-serialization-finished-work-identity.md`
 
 ## Evidence
 - Rust gate exposes `TestRendererPrivateSerializationFinishedWorkIdentityGate` with diagnostic/status constants, committed render/commit/report fiber handles, lane bit handoff data, source serialization diagnostic name, and public-blocked flags.
 - Rust toJSON/toTree canaries accept matching committed HostRoot handoff evidence and fail closed for missing, foreign, stale, non-committed, and lane-mismatched evidence.
 - JS hidden facades expose `validateAcceptedFinishedWorkIdentity` and `canValidateAcceptedFinishedWorkIdentity` for private toJSON/toTree only, with public serializer/root/TestInstance compatibility still false.
+- JS hidden facades now fail closed for missing root request id/sequence/root id, missing source report, missing previous-current handles, mismatched previous-current handles, stale finished-work handles, and lane mismatches.
 - Conformance local gates now require the private finished-work identity gate for toJSON and toTree readiness while public compatibility remains blocked.
 
 ## Verification
