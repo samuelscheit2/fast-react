@@ -1,6 +1,6 @@
 Worker 161: Root Error Option Handles
 
-Goal status: active
+Goal status: complete
 Goal objective: strengthen root option storage for uncaught/caught/recoverable error callback handles and option parsing records, without implementing actual render error capture or public React DOM warnings
 
 Progress:
@@ -20,9 +20,13 @@ Verification:
 - `cargo test -p fast-react-reconciler --all-features root_config` passed.
 - `cargo test -p fast-react-reconciler --all-features fiber_root` passed.
 - `cargo test -p fast-react-reconciler --all-features fiber_store` passed.
-- `cargo test -p fast-react-reconciler --all-features` passed: 64 unit tests and 1 doc-test.
+- `cargo test -p fast-react-reconciler --all-features` passed: 95 unit tests and 1 doc-test after integrating current `main`.
 - `cargo clippy -p fast-react-reconciler --all-targets --all-features -- -D warnings` passed.
 - `git diff --check` passed.
+
+Integration with current main:
+- Merged current `main` after implementation and reran the full verification
+  set above on the integrated worker branch.
 
 Risks / notes:
 - The new typed records are crate-internal because this worker's write scope excluded public crate export wiring. A future native/JS bridge worker can expose or convert into this record shape when that bridge is implemented.
