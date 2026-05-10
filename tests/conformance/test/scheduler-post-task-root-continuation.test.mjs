@@ -342,6 +342,135 @@ test('private postTask delayed continuation metadata accepts act/root handoff wi
   assert.equal(row.compatibilityClaimed, false);
 });
 
+test('private postTask delayed scheduler.yield handoff stays diagnostic-only after continuation execution', async () => {
+  const {inspectSchedulerPostTaskPriorityDiagnostics} =
+    await loadPostTaskOracleModule();
+  const report = inspectSchedulerPostTaskPriorityDiagnostics({
+    nodeEnv: 'development',
+    withYield: true
+  });
+  const flow = report.delayedContinuationActRootHandoff;
+  const diagnostics = flow.diagnosticsAfterFallback;
+  const continuation = diagnostics.continuationFallbacks[0];
+  const route = diagnostics.rootContinuationExecutionRoute;
+  const handoff = route.actRootWorkHandoff;
+  const row = createPrivatePostTaskRootContinuationMetadataRow(diagnostics);
+
+  assert.deepEqual(
+    flow.fallbackEvents.map((entry) => entry.type),
+    ['yield', 'yield.then']
+  );
+  assert.deepEqual(flow.events, [
+    {
+      label: 'delayed-start',
+      currentPriorityLevel: 4
+    },
+    {
+      label: 'delayed-continuation',
+      currentPriorityLevel: 4
+    }
+  ]);
+  assert.equal(diagnostics.environmentCapabilities.hasSchedulerYield, true);
+  assert.equal(diagnostics.actRootWorkHandoffDiagnostics, true);
+  assert.equal(diagnostics.callbackRuns.length, 2);
+  assert.equal(diagnostics.continuationFallbacks.length, 1);
+  assert.equal(continuation.fallback, 'scheduler.yield');
+  assert.equal(
+    continuation.continuationMetadata.selectedFallback,
+    'scheduler.yield'
+  );
+  assert.equal(
+    continuation.continuationMetadata.schedulerYieldAvailableAtSchedule,
+    true
+  );
+  assert.deepEqual(
+    continuation.fallbackEnvironmentClassification,
+    expectedFallbackEnvironmentClassification(true)
+  );
+  assert.equal(route.hasActRootWorkHandoff, true);
+  assert.equal(route.fallback, 'scheduler.yield');
+  assert.deepEqual(
+    route.fallbackEnvironmentClassification,
+    expectedFallbackEnvironmentClassification(true)
+  );
+  assert.equal(handoff.status, ROOT_CONTINUATION_ACT_ROOT_WORK_HANDOFF_STATUS);
+  assert.equal(handoff.accepted, true);
+  assert.equal(handoff.delayedCallbackPathAccepted, true);
+  assert.equal(handoff.actQueueHandoffOnly, true);
+  assert.equal(handoff.rootWorkMetadataOnly, true);
+  assert.equal(handoff.rendererWorkExecutionBlocked, true);
+  assert.equal(handoff.drainsPublicSchedulerTaskQueue, false);
+  assert.equal(handoff.drainsPublicReactActQueue, false);
+  assert.equal(handoff.executesQueuedWork, false);
+  assert.equal(handoff.executesEffects, false);
+  assert.equal(handoff.executesRendererWork, false);
+  assert.equal(handoff.executesRendererRoots, false);
+  assert.equal(handoff.publicSchedulerTimingCompatibilityClaimed, false);
+  assert.equal(handoff.publicReactActCompatibilityClaimed, false);
+  assert.equal(handoff.publicRootSchedulerCompatibilityClaimed, false);
+  assert.equal(handoff.publicRendererCompatibilityClaimed, false);
+  assert.equal(handoff.compatibilityClaimed, false);
+  assert.equal(route.privateRootContinuationExecution.rendererWorkExecuted, false);
+  assert.equal(route.privateRootContinuationExecution.reconcilerWorkExecuted, false);
+  assert.equal(
+    route.privateRootContinuationExecution.nativeRendererWorkExecuted,
+    false
+  );
+  assert.equal(route.privateRootContinuationExecution.publicRootExecution, false);
+  assert.equal(route.privateRootContinuationExecution.publicSchedulerFlush, false);
+  assert.equal(
+    route.privateRootContinuationExecution.continuationCallbackExecuted,
+    false
+  );
+
+  assert.equal(row.status, ROOT_CONTINUATION_REJECTED_STATUS);
+  assert.equal(row.accepted, false);
+  assert.equal(row.rejected, true);
+  assert.equal(row.rejectionReason, 'stale-continuation');
+  assert.equal(row.rejectionDetails.continuationIndex, 0);
+  assert.equal(
+    row.rejectionDetails.continuationId,
+    derivePrivatePostTaskRootContinuationId(diagnostics, continuation)
+  );
+  assert.equal(row.rejectionDetails.callbackRunCountAtSchedule, 1);
+  assert.equal(row.rejectionDetails.currentCallbackRunCount, 2);
+  assert.equal(row.blockedRootExecution.rendererWorkExecuted, false);
+  assert.equal(row.blockedRootExecution.reconcilerWorkExecuted, false);
+  assert.equal(row.blockedRootExecution.nativeRendererWorkExecuted, false);
+  assert.equal(row.blockedRootExecution.publicRootExecution, false);
+  assert.equal(row.blockedRootExecution.publicSchedulerFlush, false);
+  assert.equal(row.publicSchedulerTimingCompatibilityClaimed, false);
+  assert.equal(row.compatibilityClaimed, false);
+
+  const publicYieldHandoffClaimRecord = {
+    ...diagnostics,
+    rootContinuationExecutionRoute: {
+      ...route,
+      actRootWorkHandoff: {
+        ...handoff,
+        publicRootSchedulerCompatibilityClaimed: true
+      }
+    }
+  };
+  const publicYieldHandoffClaimRow =
+    createPrivatePostTaskRootContinuationMetadataRow(
+      publicYieldHandoffClaimRecord
+    );
+  assert.equal(
+    publicYieldHandoffClaimRow.status,
+    ROOT_CONTINUATION_REJECTED_STATUS
+  );
+  assert.equal(
+    publicYieldHandoffClaimRow.rejectionReason,
+    'public-compatibility-claimed'
+  );
+  assert.equal(
+    publicYieldHandoffClaimRow.rejectionDetails.claimPath,
+    'record.rootContinuationExecutionRoute.actRootWorkHandoff.publicRootSchedulerCompatibilityClaimed'
+  );
+  assert.equal(publicYieldHandoffClaimRow.compatibilityClaimed, false);
+});
+
 test('private postTask root continuation metadata rejects missing signal, stale continuation, and unsupported priority records', async () => {
   const {inspectSchedulerPostTaskPriorityDiagnostics} =
     await loadPostTaskOracleModule();
@@ -553,6 +682,25 @@ function expectedPriorityTimeout({
       'scheduler-post-task-deprecated-didTimeout-is-always-false',
     expiresAt: null,
     rawTimingCaptured: false,
+    browserPostTaskCompatibilityClaimed: false,
+    browserTaskOrderingCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  };
+}
+
+function expectedFallbackEnvironmentClassification(withYield) {
+  return {
+    status: 'controlled-shim-fallback-environment-classification',
+    environmentKind: 'controlled-task-scheduling-api-shim',
+    classification: withYield
+      ? 'controlled-shim-scheduler-yield-continuation'
+      : 'controlled-shim-scheduler-post-task-continuation',
+    selectedFallback: withYield ? 'scheduler.yield' : 'scheduler.postTask',
+    hasSchedulerPostTask: true,
+    hasSchedulerYield: withYield,
+    usesSchedulerYield: withYield,
+    usesSchedulerPostTaskFallback: !withYield,
     browserPostTaskCompatibilityClaimed: false,
     browserTaskOrderingCompatibilityClaimed: false,
     publicSchedulerTimingCompatibilityClaimed: false,
