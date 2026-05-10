@@ -98,6 +98,26 @@ async function main() {
       actualRootBridgeEvidence,
       expectedRootBridgeEvidence
     );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.crossEnvironmentTeardownGate
+        .teardownGateStatus,
+      'diagnosed-native-root-bridge-cross-environment-teardown-isolation'
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.crossEnvironmentTeardownGate
+        .nativeAddonLoaded,
+      false
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.crossEnvironmentTeardownGate
+        .nativeExecution,
+      false
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.crossEnvironmentTeardownGate.rows
+        .length,
+      12
+    );
     assert.ok(Object.isFrozen(actualRootBridgeEvidence));
     for (const evidence of actualRootBridgeEvidence) {
       assert.ok(Object.isFrozen(evidence));

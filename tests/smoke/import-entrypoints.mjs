@@ -4486,6 +4486,170 @@ async function runNativePackageProbe(tempRoot) {
       }
     }
 
+    function createNativeDiagnosticRecords() {
+      const rootHandle = Object.freeze({
+        environmentId: 532,
+        generation: 1,
+        kind: 'root',
+        slot: 1
+      });
+
+      return [
+        {
+          environmentId: 532,
+          kind: 'create',
+          requestId: 1,
+          rootHandle,
+          rootHandleState: 'active',
+          rootId: 1,
+          valueHandle: Object.freeze({
+            environmentId: 532,
+            generation: 1,
+            kind: 'value',
+            slot: 2
+          })
+        },
+        {
+          environmentId: 532,
+          kind: 'render',
+          requestId: 2,
+          rootHandle,
+          rootHandleState: 'active',
+          rootId: 1,
+          valueHandle: Object.freeze({
+            environmentId: 532,
+            generation: 1,
+            kind: 'value',
+            slot: 3
+          })
+        },
+        {
+          environmentId: 532,
+          kind: 'unmount',
+          requestId: 3,
+          rootHandle,
+          rootHandleState: 'retired',
+          rootId: 1,
+          valueHandle: null
+        }
+      ];
+    }
+
+    function assertNoExecution(record, label) {
+      assert.equal(record.nativeAddonLoaded, false, label + ' native addon');
+      assert.equal(record.nativeExecution, false, label + ' native execution');
+      assert.equal(
+        record.rendererExecution,
+        false,
+        label + ' renderer execution'
+      );
+      assert.equal(
+        record.reconcilerExecution,
+        false,
+        label + ' reconciler execution'
+      );
+      if (Object.hasOwn(record, 'reactBehaviorError')) {
+        assert.equal(
+          record.reactBehaviorError,
+          false,
+          label + ' React behavior error'
+        );
+      }
+    }
+
+    function assertNativeDiagnostics(moduleExports, label) {
+      const requestShape = moduleExports.nativeRootBridgeRequestShape;
+      const batchMetadata =
+        requestShape.jsonTransportSmoke.parserGate.batchedRecordGate;
+      const runtimeGate = moduleExports.createNativeRootBridgeRequestShapeGate(
+        createNativeDiagnosticRecords()
+      );
+      const batchGate =
+        runtimeGate.jsonTransportSmoke.parserGate.batchedRecordGate;
+      const teardownGate = requestShape.crossEnvironmentTeardownGate;
+
+      assert.equal(
+        batchMetadata.batchGateStatus,
+        'validated-native-root-bridge-batched-json-transport-records',
+        label + ' batched JSON metadata'
+      );
+      assert.deepEqual(
+        batchGate.lifecycleRows.map((row) => row.status),
+        ['accepted', 'accepted', 'accepted'],
+        label + ' batched JSON accepted rows'
+      );
+      assert.deepEqual(
+        batchGate.errorRows.map((row) => row.code),
+        [
+          'FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_MUST_START_WITH_CREATE',
+          'FAST_REACT_NAPI_ROOT_REQUEST_RECORD_HANDLE_STATE_MISMATCH',
+          'FAST_REACT_NAPI_ROOT_REQUEST_CREATE_AFTER_ROOT_CREATED',
+          'FAST_REACT_NAPI_ROOT_REQUEST_AFTER_UNMOUNT',
+          'FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_OUT_OF_ORDER'
+        ],
+        label + ' batched JSON error rows'
+      );
+      for (const row of [...batchGate.lifecycleRows, ...batchGate.errorRows]) {
+        assert.deepEqual(
+          Object.keys(row),
+          batchGate.jsonTransportBatchLifecycleRowFields,
+          label + ' batched JSON row fields ' + row.id
+        );
+        assertNoExecution(row, label + ' batched JSON ' + row.id);
+      }
+
+      assert.equal(
+        teardownGate.teardownGateStatus,
+        'diagnosed-native-root-bridge-cross-environment-teardown-isolation',
+        label + ' teardown status'
+      );
+      assert.deepEqual(
+        teardownGate.rows.map((row) => row.id),
+        [
+          'first-root-active-after-mismatched-teardown',
+          'first-value-active-after-mismatched-teardown',
+          'first-root-stale-after-own-teardown',
+          'first-value-stale-after-own-teardown',
+          'first-root-wrong-environment-in-peer-table',
+          'first-value-wrong-environment-in-peer-table',
+          'peer-root-active-after-first-teardown',
+          'peer-value-active-after-first-teardown',
+          'first-root-stale-after-slot-reuse',
+          'first-value-stale-after-slot-reuse',
+          'replacement-root-active-after-slot-reuse',
+          'replacement-value-active-after-slot-reuse'
+        ],
+        label + ' teardown row ids'
+      );
+      assert.deepEqual(
+        teardownGate.rows.map((row) => row.errorCode),
+        [
+          null,
+          null,
+          'FAST_REACT_NAPI_STALE_HANDLE',
+          'FAST_REACT_NAPI_STALE_HANDLE',
+          'FAST_REACT_NAPI_WRONG_ENVIRONMENT',
+          'FAST_REACT_NAPI_WRONG_ENVIRONMENT',
+          null,
+          null,
+          'FAST_REACT_NAPI_STALE_HANDLE',
+          'FAST_REACT_NAPI_STALE_HANDLE',
+          null,
+          null
+        ],
+        label + ' teardown error codes'
+      );
+      for (const row of teardownGate.rows) {
+        assert.deepEqual(
+          Object.keys(row),
+          teardownGate.teardownDiagnosticRowFields,
+          label + ' teardown row fields ' + row.id
+        );
+        assertNoExecution(row, label + ' teardown ' + row.id);
+      }
+      assertNoExecution(teardownGate, label + ' teardown gate');
+    }
+
     (async () => {
       const packageJson = require('@fast-react/native/package.json');
       assert.deepEqual(Object.keys(packageJson), [
@@ -4527,6 +4691,7 @@ async function runNativePackageProbe(tempRoot) {
 
       const cjsModule = require('@fast-react/native');
       assertNativeKeys(cjsModule, '@fast-react/native');
+      assertNativeDiagnostics(cjsModule, '@fast-react/native');
       assert.throws(
         () => cjsModule.loadNativeBinding(),
         (error) => {

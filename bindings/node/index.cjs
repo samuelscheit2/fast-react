@@ -20,6 +20,8 @@ const nativeRootBridgeJsonTransportSmokeStatus =
   'smoked-native-root-bridge-js-to-rust-json-transport';
 const nativeRootBridgeJsonTransportParserGateStatus =
   'parsed-native-root-bridge-json-transport-schema';
+const nativeRootBridgeCrossEnvironmentTeardownGateStatus =
+  'diagnosed-native-root-bridge-cross-environment-teardown-isolation';
 const nativeRootBridgeBatchedJsonTransportGateStatus =
   'validated-native-root-bridge-batched-json-transport-records';
 const nativeRootBridgeJsonTransportFormat = 'json';
@@ -150,6 +152,33 @@ const nativeRootBridgeJsonTransportBatchLifecycleRowFields = Object.freeze([
   'code',
   'sourceErrorCode',
   'boundaryErrorCode',
+  'nativeAddonLoaded',
+  'nativeExecution',
+  'rendererExecution',
+  'reconcilerExecution',
+  'reactBehaviorError'
+]);
+const nativeRootBridgeEnvironmentTeardownFields = Object.freeze([
+  'requestedEnvironmentId',
+  'tableEnvironmentId',
+  'environmentMatched',
+  'rootHandlesInvalidated',
+  'valueHandlesInvalidated',
+  'totalHandlesInvalidated',
+  'toreDownHandles'
+]);
+const nativeRootBridgeCrossEnvironmentTeardownRowFields = Object.freeze([
+  'id',
+  'operation',
+  'handleKind',
+  'tableEnvironmentId',
+  'handleEnvironmentId',
+  'slot',
+  'handleGeneration',
+  'currentGeneration',
+  'recordId',
+  'errorCode',
+  'rejectedByHandleTable',
   'nativeAddonLoaded',
   'nativeExecution',
   'rendererExecution',
@@ -287,6 +316,176 @@ const nativeRootBridgeJsonTransportSmoke = Object.freeze({
   rendererExecution: false,
   reconcilerExecution: false
 });
+const nativeRootBridgeCrossEnvironmentTeardownGate = Object.freeze({
+  teardownGateStatus: nativeRootBridgeCrossEnvironmentTeardownGateStatus,
+  handleTableModel: nativeRootBridgeHandleTableModel,
+  environmentTeardownFields: nativeRootBridgeEnvironmentTeardownFields,
+  teardownDiagnosticRowFields:
+    nativeRootBridgeCrossEnvironmentTeardownRowFields,
+  mismatchedTeardown: freezeNativeRootBridgeEnvironmentTeardown({
+    requestedEnvironmentId: 1496,
+    tableEnvironmentId: 496,
+    rootHandlesInvalidated: 0,
+    valueHandlesInvalidated: 0
+  }),
+  matchedTeardown: freezeNativeRootBridgeEnvironmentTeardown({
+    requestedEnvironmentId: 496,
+    tableEnvironmentId: 496,
+    rootHandlesInvalidated: 1,
+    valueHandlesInvalidated: 1
+  }),
+  rows: Object.freeze([
+    freezeNativeRootBridgeTeardownDiagnosticRow({
+      id: 'first-root-active-after-mismatched-teardown',
+      operation: 'mismatched-teardown',
+      handleKind: nativeRootBridgeHandleKindRoot,
+      tableEnvironmentId: 496,
+      handleEnvironmentId: 496,
+      slot: 1,
+      handleGeneration: 1,
+      currentGeneration: 1,
+      recordId: 49601,
+      errorCode: null
+    }),
+    freezeNativeRootBridgeTeardownDiagnosticRow({
+      id: 'first-value-active-after-mismatched-teardown',
+      operation: 'mismatched-teardown',
+      handleKind: nativeRootBridgeHandleKindValue,
+      tableEnvironmentId: 496,
+      handleEnvironmentId: 496,
+      slot: 2,
+      handleGeneration: 1,
+      currentGeneration: 1,
+      recordId: 49602,
+      errorCode: null
+    }),
+    freezeNativeRootBridgeTeardownDiagnosticRow({
+      id: 'first-root-stale-after-own-teardown',
+      operation: 'matched-teardown',
+      handleKind: nativeRootBridgeHandleKindRoot,
+      tableEnvironmentId: 496,
+      handleEnvironmentId: 496,
+      slot: 1,
+      handleGeneration: 1,
+      currentGeneration: 2,
+      recordId: null,
+      errorCode: nativeRootBridgeValidationErrorCodes.staleHandle
+    }),
+    freezeNativeRootBridgeTeardownDiagnosticRow({
+      id: 'first-value-stale-after-own-teardown',
+      operation: 'matched-teardown',
+      handleKind: nativeRootBridgeHandleKindValue,
+      tableEnvironmentId: 496,
+      handleEnvironmentId: 496,
+      slot: 2,
+      handleGeneration: 1,
+      currentGeneration: 2,
+      recordId: null,
+      errorCode: nativeRootBridgeValidationErrorCodes.staleHandle
+    }),
+    freezeNativeRootBridgeTeardownDiagnosticRow({
+      id: 'first-root-wrong-environment-in-peer-table',
+      operation: 'wrong-environment-validation',
+      handleKind: nativeRootBridgeHandleKindRoot,
+      tableEnvironmentId: 1496,
+      handleEnvironmentId: 496,
+      slot: 1,
+      handleGeneration: 1,
+      currentGeneration: null,
+      recordId: null,
+      errorCode: nativeRootBridgeValidationErrorCodes.wrongEnvironment
+    }),
+    freezeNativeRootBridgeTeardownDiagnosticRow({
+      id: 'first-value-wrong-environment-in-peer-table',
+      operation: 'wrong-environment-validation',
+      handleKind: nativeRootBridgeHandleKindValue,
+      tableEnvironmentId: 1496,
+      handleEnvironmentId: 496,
+      slot: 2,
+      handleGeneration: 1,
+      currentGeneration: null,
+      recordId: null,
+      errorCode: nativeRootBridgeValidationErrorCodes.wrongEnvironment
+    }),
+    freezeNativeRootBridgeTeardownDiagnosticRow({
+      id: 'peer-root-active-after-first-teardown',
+      operation: 'post-teardown-peer-validation',
+      handleKind: nativeRootBridgeHandleKindRoot,
+      tableEnvironmentId: 1496,
+      handleEnvironmentId: 1496,
+      slot: 1,
+      handleGeneration: 1,
+      currentGeneration: 1,
+      recordId: 149601,
+      errorCode: null
+    }),
+    freezeNativeRootBridgeTeardownDiagnosticRow({
+      id: 'peer-value-active-after-first-teardown',
+      operation: 'post-teardown-peer-validation',
+      handleKind: nativeRootBridgeHandleKindValue,
+      tableEnvironmentId: 1496,
+      handleEnvironmentId: 1496,
+      slot: 2,
+      handleGeneration: 1,
+      currentGeneration: 1,
+      recordId: 149602,
+      errorCode: null
+    }),
+    freezeNativeRootBridgeTeardownDiagnosticRow({
+      id: 'first-root-stale-after-slot-reuse',
+      operation: 'post-reuse-stale-validation',
+      handleKind: nativeRootBridgeHandleKindRoot,
+      tableEnvironmentId: 496,
+      handleEnvironmentId: 496,
+      slot: 1,
+      handleGeneration: 1,
+      currentGeneration: 2,
+      recordId: null,
+      errorCode: nativeRootBridgeValidationErrorCodes.staleHandle
+    }),
+    freezeNativeRootBridgeTeardownDiagnosticRow({
+      id: 'first-value-stale-after-slot-reuse',
+      operation: 'post-reuse-stale-validation',
+      handleKind: nativeRootBridgeHandleKindValue,
+      tableEnvironmentId: 496,
+      handleEnvironmentId: 496,
+      slot: 2,
+      handleGeneration: 1,
+      currentGeneration: 2,
+      recordId: null,
+      errorCode: nativeRootBridgeValidationErrorCodes.staleHandle
+    }),
+    freezeNativeRootBridgeTeardownDiagnosticRow({
+      id: 'replacement-root-active-after-slot-reuse',
+      operation: 'post-reuse-active-validation',
+      handleKind: nativeRootBridgeHandleKindRoot,
+      tableEnvironmentId: 496,
+      handleEnvironmentId: 496,
+      slot: 1,
+      handleGeneration: 2,
+      currentGeneration: 2,
+      recordId: 49603,
+      errorCode: null
+    }),
+    freezeNativeRootBridgeTeardownDiagnosticRow({
+      id: 'replacement-value-active-after-slot-reuse',
+      operation: 'post-reuse-active-validation',
+      handleKind: nativeRootBridgeHandleKindValue,
+      tableEnvironmentId: 496,
+      handleEnvironmentId: 496,
+      slot: 2,
+      handleGeneration: 2,
+      currentGeneration: 2,
+      recordId: 49604,
+      errorCode: null
+    })
+  ]),
+  nativeAddonLoaded: false,
+  nativeExecution: false,
+  rendererExecution: false,
+  reconcilerExecution: false,
+  reactBehaviorError: false
+});
 
 function freezeNativeTarget({ target, platform, arch, libc, toolchain }) {
   return Object.freeze({
@@ -358,6 +557,58 @@ const supportedNativeTargets = Object.freeze(
   nativeTargetMatrix.map((target) => target.target)
 );
 
+function freezeNativeRootBridgeEnvironmentTeardown({
+  requestedEnvironmentId,
+  tableEnvironmentId,
+  rootHandlesInvalidated,
+  valueHandlesInvalidated
+}) {
+  const totalHandlesInvalidated =
+    rootHandlesInvalidated + valueHandlesInvalidated;
+
+  return Object.freeze({
+    requestedEnvironmentId,
+    tableEnvironmentId,
+    environmentMatched: requestedEnvironmentId === tableEnvironmentId,
+    rootHandlesInvalidated,
+    valueHandlesInvalidated,
+    totalHandlesInvalidated,
+    toreDownHandles: totalHandlesInvalidated > 0
+  });
+}
+
+function freezeNativeRootBridgeTeardownDiagnosticRow({
+  id,
+  operation,
+  handleKind,
+  tableEnvironmentId,
+  handleEnvironmentId,
+  slot,
+  handleGeneration,
+  currentGeneration,
+  recordId,
+  errorCode
+}) {
+  return Object.freeze({
+    id,
+    operation,
+    handleKind,
+    tableEnvironmentId,
+    handleEnvironmentId,
+    slot,
+    handleGeneration,
+    currentGeneration,
+    recordId,
+    errorCode,
+    rejectedByHandleTable: errorCode !== null,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    reactBehaviorError: false
+  });
+}
+
 const nativeBoundaryErrorCodeMap = Object.freeze({
   unsupportedNativeExecution: unavailableErrorCode,
   rustNativeExportsNotBuilt: rustNativeExportsNotBuiltErrorCode,
@@ -418,6 +669,7 @@ const nativeRootBridgeRequestShape = Object.freeze({
   rustHandleTableAdmissionSmoke:
     nativeRootBridgeRustHandleTableAdmissionSmoke,
   jsonTransportSmoke: nativeRootBridgeJsonTransportSmoke,
+  crossEnvironmentTeardownGate: nativeRootBridgeCrossEnvironmentTeardownGate,
   validationErrorCodes: nativeRootBridgeValidationErrorCodes
 });
 
