@@ -45,7 +45,9 @@ sequencing belong in `MASTER_PLAN.md`.
   import-smoke, and conformance checks, plus conflict-marker scanning and
   `git diff --check`. Post-merge cleanup refreshed the CJS development
   react-test-renderer package-surface snapshot for the accepted private
-  error-boundary diagnostic symbol.
+  error-boundary diagnostic symbol, made the react-test-renderer act gate
+  expectation CJS-aware for the accepted private `getInstance` diagnostic, and
+  fixed a strict clippy lifecycle-validator warning.
 - Workers 413-442 were accepted as a complete implementation batch. The batch
   added root commit HostComponent update traversal and deletion-parent
   traversal canaries, ref cleanup/error routing metadata, context dependency
