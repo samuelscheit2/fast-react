@@ -2686,6 +2686,373 @@ test('private resource hint head-singleton boundary observes fake-DOM insertion 
   );
 });
 
+test('private resource hint head clear/retain diagnostic records singleton and resource rows only', () => {
+  const gate = resourceFormGate.createResourceFormActionInternalsGate({
+    requestIdPrefix: 'head-clear-source'
+  });
+  const adapterGate = resourceFormGate.createResourceHintFakeDomAdapterGate({
+    requestIdPrefix: 'head-clear-adapter'
+  });
+  const insertionGate = resourceFormGate.createResourceHintFakeDomInsertionGate({
+    requestIdPrefix: 'head-clear-insertion'
+  });
+  const headBoundaryGate =
+    resourceFormGate.createResourceHintHeadBoundaryGate({
+      requestIdPrefix: 'head-clear-boundary'
+    });
+  const clearRetainGate =
+    resourceFormGate.createResourceHintHeadClearRetainGate({
+      requestIdPrefix: 'head-clear-retain'
+    });
+  const fakeDom = createDeterministicFakeResourceDom();
+  const dispatcherRecord = gate.recordResourceHintDispatcherRequest('C', [
+    'https://connect.example.test',
+    ''
+  ]);
+  const headRecord = gate.recordSingletonRequest('head', [
+    throwingProxy('head clear props')
+  ]);
+  const adapterAdmission = adapterGate.admitDispatcherRecord(
+    dispatcherRecord,
+    {
+      explicitAdmission: true,
+      adapterKind: 'deterministic-fake-dom',
+      targetKind: 'document-head'
+    }
+  );
+  const insertion = insertionGate.insertAdapterAdmissionRecord(
+    adapterAdmission,
+    {
+      explicitInsertion: true,
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head
+    }
+  );
+  const boundary = headBoundaryGate.recordInsertionUpdateBoundary(
+    insertion,
+    headRecord,
+    {
+      explicitBoundary: true,
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head
+    }
+  );
+  appendFakeHeadChild(fakeDom, 'script');
+  appendFakeHeadChild(fakeDom, 'style');
+  appendFakeHeadChild(fakeDom, 'link', {
+    rel: 'stylesheet',
+    'data-precedence': 'theme'
+  });
+  appendFakeHeadChild(fakeDom, 'meta', {
+    name: 'description'
+  });
+
+  const diagnostic = clearRetainGate.recordHeadClearRetainDiagnostic(
+    boundary,
+    {
+      explicitClearRetain: true,
+      clearRetainKind: 'deterministic-fake-dom-head-clear-retain',
+      clearRetainId: 'preconnect-head-clear-retain',
+      targetKind: 'document-head',
+      hostTag: 'head',
+      fakeDocument: fakeDom.document,
+      fakeHead: fakeDom.head
+    }
+  );
+  const summary =
+    resourceFormGate.describePrivateResourceHintHeadClearRetainGate();
+
+  assert.equal(Object.isFrozen(diagnostic), true);
+  assert.equal(
+    resourceFormGate.isPrivateResourceHintHeadClearRetainRecord(diagnostic),
+    true
+  );
+  assert.equal(
+    resourceFormGate.getPrivateResourceHintHeadClearRetainRecordPayload(
+      diagnostic
+    ),
+    diagnostic
+  );
+  assert.deepEqual(summarizeHeadClearRetain(diagnostic), {
+    clearRetainId: 'head-clear-retain:1',
+    sourceBoundaryId: 'head-clear-boundary:1',
+    sourceInsertionId: 'head-clear-insertion:1',
+    sourceHeadRequestId: 'head-clear-source:2',
+    requestType: 'resource-hint-head-clear-retain.preconnect',
+    contractId: 'preconnect',
+    hostTag: 'head',
+    clearRetainStatus:
+      resourceFormGate.privateResourceHintHeadClearRetainStatus,
+    executionStatus:
+      resourceFormGate.privateResourceHintHeadClearRetainExecutionStatus,
+    singletonRow: {
+      rowType: 'host-singleton',
+      retainedChildCount: 3,
+      clearableChildCount: 2,
+      actualHeadChildrenCleared: false
+    },
+    resourceHintRow: {
+      rowType: 'resource-hint',
+      childIndex: 0,
+      nodeName: 'LINK',
+      relationship: 'preconnect',
+      clearRetainDecision: 'clear',
+      clearReason: 'resource-hint-hoistable-marker-blocked',
+      resourceHoistableRetentionBlocked: true
+    },
+    fakeHeadPlan: {
+      childCount: 5,
+      retainedChildCount: 3,
+      clearableChildCount: 2,
+      clearApplied: false
+    }
+  });
+  assert.equal(diagnostic.status, resourceFormGate.unsupportedStatus);
+  assert.equal(diagnostic.unsupportedCode, unsupportedCode);
+  assert.equal(diagnostic.compatibilityTarget, compatibilityTarget);
+  assert.equal(
+    diagnostic.compatibilityStatus,
+    resourceFormGate.privateResourceHintHeadClearRetainCompatibilityBlockedStatus
+  );
+  assert.deepEqual(
+    diagnostic.sideEffects,
+    resourceFormGate.resourceHintHeadClearRetainSideEffects
+  );
+  assert.equal(diagnostic.sideEffects.fakeHeadRead, true);
+  assert.equal(
+    diagnostic.sideEffects.fakeHeadClearRetainDiagnosticInvoked,
+    true
+  );
+  assert.equal(diagnostic.sideEffects.fakeHeadChildrenScanned, true);
+  assert.equal(diagnostic.sideEffects.fakeHeadMutated, false);
+  assert.equal(diagnostic.sideEffects.fakeHeadChildRemoved, false);
+  assert.equal(diagnostic.sideEffects.headChildrenCleared, false);
+  assert.equal(
+    diagnostic.sideEffects.stylesheetPrecedenceApplied,
+    false
+  );
+  assert.equal(
+    diagnostic.sideEffects.stylesheetPrecedenceBlockedCapabilitiesRecorded,
+    true
+  );
+  assert.equal(diagnostic.sideEffects.realDocumentMutated, false);
+  assert.equal(diagnostic.sideEffects.publicResourceHintDomInsertion, false);
+  assert.equal(diagnostic.sideEffects.publicHeadSingletonBehavior, false);
+  assert.equal(diagnostic.sideEffects.compatibilityClaimed, false);
+  assert.equal(diagnostic.clearRetainAdmission.rawDocumentCaptured, false);
+  assert.equal(diagnostic.clearRetainAdmission.rawHeadCaptured, false);
+  assert.equal(diagnostic.clearRetainAdmission.fakeHeadRemovalAllowed, false);
+  assert.equal(
+    diagnostic.clearRetainAdmission.stylesheetPrecedenceAllowed,
+    false
+  );
+  assert.deepEqual(
+    diagnostic.headChildRows.map((row) => ({
+      childIndex: row.childIndex,
+      nodeName: row.nodeName,
+      relationship: row.relationship,
+      sourceResourceHint: row.sourceResourceHint,
+      clearRetainDecision: row.clearRetainDecision,
+      retainReason: row.retainReason,
+      clearReason: row.clearReason,
+      stylesheetPrecedenceCandidate:
+        row.stylesheetPrecedenceCandidate,
+      actualNodeRemoved: row.actualNodeRemoved
+    })),
+    [
+      {
+        childIndex: 0,
+        nodeName: 'LINK',
+        relationship: 'preconnect',
+        sourceResourceHint: true,
+        clearRetainDecision: 'clear',
+        retainReason: null,
+        clearReason: 'resource-hint-hoistable-marker-blocked',
+        stylesheetPrecedenceCandidate: false,
+        actualNodeRemoved: false
+      },
+      {
+        childIndex: 1,
+        nodeName: 'SCRIPT',
+        relationship: null,
+        sourceResourceHint: false,
+        clearRetainDecision: 'retain',
+        retainReason: 'script',
+        clearReason: null,
+        stylesheetPrecedenceCandidate: false,
+        actualNodeRemoved: false
+      },
+      {
+        childIndex: 2,
+        nodeName: 'STYLE',
+        relationship: null,
+        sourceResourceHint: false,
+        clearRetainDecision: 'retain',
+        retainReason: 'style',
+        clearReason: null,
+        stylesheetPrecedenceCandidate: false,
+        actualNodeRemoved: false
+      },
+      {
+        childIndex: 3,
+        nodeName: 'LINK',
+        relationship: 'stylesheet',
+        sourceResourceHint: false,
+        clearRetainDecision: 'retain',
+        retainReason: 'stylesheet-link',
+        clearReason: null,
+        stylesheetPrecedenceCandidate: true,
+        actualNodeRemoved: false
+      },
+      {
+        childIndex: 4,
+        nodeName: 'META',
+        relationship: null,
+        sourceResourceHint: false,
+        clearRetainDecision: 'clear',
+        retainReason: null,
+        clearReason: 'unretained-head-child',
+        stylesheetPrecedenceCandidate: false,
+        actualNodeRemoved: false
+      }
+    ]
+  );
+  assert.equal(
+    diagnostic.stylesheetPrecedenceBoundary.status,
+    resourceFormGate.privateResourceHintHeadStylesheetPrecedenceBlockedStatus
+  );
+  assert.equal(
+    diagnostic.stylesheetPrecedenceBoundary.stylesheetPrecedenceRowsObserved,
+    true
+  );
+  assert.equal(diagnostic.stylesheetPrecedenceBoundary.stylesheetRowCount, 1);
+  assert.deepEqual(
+    diagnostic.stylesheetPrecedenceBoundary.blockedCapabilities,
+    resourceFormGate.resourceHintHeadStylesheetPrecedenceBlockedCapabilities
+  );
+  assert.deepEqual(
+    diagnostic.blockedCapabilities,
+    resourceFormGate.resourceHintHeadClearRetainBlockedCapabilities
+  );
+  assert.equal(
+    diagnostic.publicHeadBoundary.publicSingletonBehavior,
+    false
+  );
+  assert.equal(
+    diagnostic.publicHeadBoundary.headChildrenCleared,
+    false
+  );
+  assert.equal(
+    diagnostic.publicResourceBoundary.publicResourceHintCallsReachable,
+    false
+  );
+  assert.equal(fakeDom.head.childNodes.length, 5);
+  assert.equal(fakeDom.head.childNodes[4].nodeName, 'META');
+  assert.equal(JSON.stringify(diagnostic).includes('connect.example'), false);
+  assert.equal(JSON.stringify(diagnostic).includes('theme'), false);
+
+  assert.equal(
+    summary.gateId,
+    resourceFormGate.privateResourceHintHeadClearRetainGateId
+  );
+  assert.equal(summary.status, resourceFormGate.unsupportedStatus);
+  assert.equal(
+    summary.admissionStatus,
+    resourceFormGate.privateResourceHintHeadClearRetainAdmissionRequiredStatus
+  );
+  assert.deepEqual(summary.acceptsContractIds, ['preconnect', 'preload']);
+  assert.equal(summary.maxDiagnosticsPerGate, 1);
+  assert.equal(summary.mutatesFakeHead, false);
+  assert.equal(summary.mutatesRealHead, false);
+  assert.equal(summary.clearsHeadChildren, false);
+  assert.equal(summary.recordsSingletonRows, true);
+  assert.equal(summary.recordsResourceHintRows, true);
+  assert.deepEqual(
+    summary.blockedCapabilities,
+    resourceFormGate.resourceHintHeadClearRetainBlockedCapabilities
+  );
+  assert.deepEqual(
+    summary.sideEffects,
+    resourceFormGate.resourceHintHeadClearRetainBlockedSideEffects
+  );
+
+  const error =
+    resourceFormGate.createUnsupportedResourceHintHeadClearRetainError(
+      diagnostic
+    );
+  assert.equal(error.name, 'FastReactDomUnimplementedError');
+  assert.equal(
+    error.code,
+    resourceFormGate.privateResourceHintHeadClearRetainGateErrorCode
+  );
+  assert.equal(
+    error.exportName,
+    'resource-hint-head-clear-retain.preconnect'
+  );
+  assert.equal(error.clearRetainId, 'head-clear-retain:1');
+  assert.equal(error.sourceBoundaryId, 'head-clear-boundary:1');
+  assert.equal(error.sourceInsertionId, 'head-clear-insertion:1');
+  assert.equal(error.sourceHeadRequestId, 'head-clear-source:2');
+  assert.deepEqual(
+    error.blockedCapabilities,
+    resourceFormGate.resourceHintHeadClearRetainBlockedCapabilities
+  );
+
+  assert.throws(
+    () =>
+      clearRetainGate.recordHeadClearRetainDiagnostic(boundary, {
+        explicitClearRetain: true,
+        fakeDocument: fakeDom.document,
+        fakeHead: fakeDom.head
+      }),
+    {
+      code:
+        resourceFormGate.privateResourceHintHeadClearRetainInvalidAdmissionCode,
+      compatibilityTarget,
+      reason: 'head clear/retain gate admits exactly one diagnostic record'
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate
+        .createResourceHintHeadClearRetainGate()
+        .recordHeadClearRetainDiagnostic(insertion, {
+          explicitClearRetain: true,
+          fakeDocument: fakeDom.document,
+          fakeHead: fakeDom.head
+        }),
+    {
+      code: resourceFormGate.privateResourceHintHeadClearRetainInvalidRecordCode,
+      compatibilityTarget
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate
+        .createResourceHintHeadClearRetainGate()
+        .recordHeadClearRetainDiagnostic(boundary, {
+          explicitClearRetain: true,
+          fakeDocument: createDeterministicFakeResourceDom().document,
+          fakeHead: createDeterministicFakeResourceDom().head
+        }),
+    {
+      code:
+        resourceFormGate.privateResourceHintHeadClearRetainInvalidAdmissionCode,
+      compatibilityTarget,
+      reason:
+        'fakeHead must belong to the deterministic fake resource document'
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate.createUnsupportedResourceHintHeadClearRetainError({}),
+    {
+      code: resourceFormGate.privateResourceHintHeadClearRetainInvalidRecordCode,
+      compatibilityTarget
+    }
+  );
+});
+
 test('private resource hint dispatcher metadata rejects malformed or dispatching shapes', () => {
   const gate = resourceFormGate.createResourceFormActionInternalsGate({
     requestIdPrefix: 'resource-dispatcher-error-gate'
@@ -3042,6 +3409,16 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
   assert.equal(summary.sideEffects.fakeHeadBoundaryInvoked, false);
   assert.equal(summary.sideEffects.fakeHeadInsertionObserved, false);
   assert.equal(summary.sideEffects.fakeHeadUpdateApplied, false);
+  assert.equal(
+    summary.sideEffects.fakeHeadClearRetainDiagnosticInvoked,
+    false
+  );
+  assert.equal(summary.sideEffects.fakeHeadChildrenScanned, false);
+  assert.equal(summary.sideEffects.fakeHeadChildRemoved, false);
+  assert.equal(
+    summary.sideEffects.stylesheetPrecedenceBlockedCapabilitiesRecorded,
+    false
+  );
   assert.equal(summary.sideEffects.headSingletonResolved, false);
   assert.equal(summary.sideEffects.publicHeadSingletonBehavior, false);
   assert.equal(summary.sideEffects.realDocumentMutated, false);
@@ -3120,6 +3497,19 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
       fakeHeadBoundaryInvoked: false,
       fakeHeadInsertionObserved: false,
       fakeHeadUpdateApplied: false,
+      fakeHeadClearRetainDiagnosticInvoked: false,
+      fakeHeadRetainPolicyEvaluated: false,
+      fakeHeadChildrenScanned: false,
+      fakeHeadClearableChildrenObserved: false,
+      fakeHeadRetainedChildrenObserved: false,
+      fakeHeadChildRemoved: false,
+      fakeHeadChildRetained: false,
+      resourceHintClearRetainRowsRecorded: false,
+      singletonClearRetainRowsRecorded: false,
+      stylesheetPrecedenceBlockedCapabilitiesRecorded: false,
+      stylesheetPrecedenceOrderQueried: false,
+      stylesheetPrecedenceOrderMutated: false,
+      publicStylesheetPrecedenceBehavior: false,
       resourceFetchStarted: false,
       realDocumentMutated: false,
       publicResourceHintDomInsertion: false,
@@ -3128,7 +3518,9 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
       insertionGate:
         resourceFormGate.describePrivateResourceHintFakeDomInsertionGate(),
       headBoundaryGate:
-        resourceFormGate.describePrivateResourceHintHeadBoundaryGate()
+        resourceFormGate.describePrivateResourceHintHeadBoundaryGate(),
+      headClearRetainGate:
+        resourceFormGate.describePrivateResourceHintHeadClearRetainGate()
     },
     controlledValueTrackerBoundary: {
       gateStatus: resourceFormGate.privateControlledValueTrackerBlockedStatus,
@@ -3292,6 +3684,25 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
     assert.equal(blockedRecord.sideEffects.fakeHeadBoundaryInvoked, false);
     assert.equal(blockedRecord.sideEffects.fakeHeadInsertionObserved, false);
     assert.equal(blockedRecord.sideEffects.fakeHeadUpdateApplied, false);
+    assert.equal(
+      blockedRecord.sideEffects.fakeHeadClearRetainDiagnosticInvoked,
+      false
+    );
+    assert.equal(blockedRecord.sideEffects.fakeHeadChildrenScanned, false);
+    assert.equal(blockedRecord.sideEffects.fakeHeadChildRemoved, false);
+    assert.equal(
+      blockedRecord.sideEffects.resourceHintClearRetainRowsRecorded,
+      false
+    );
+    assert.equal(
+      blockedRecord.sideEffects.singletonClearRetainRowsRecorded,
+      false
+    );
+    assert.equal(
+      blockedRecord.sideEffects
+        .stylesheetPrecedenceBlockedCapabilitiesRecorded,
+      false
+    );
     assert.equal(blockedRecord.sideEffects.headSingletonResolved, false);
     assert.equal(
       blockedRecord.sideEffects.publicHeadSingletonBehavior,
@@ -3330,6 +3741,24 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
       assert.equal(adapterBoundary.fakeHeadBoundaryInvoked, false);
       assert.equal(adapterBoundary.fakeHeadInsertionObserved, false);
       assert.equal(adapterBoundary.fakeHeadUpdateApplied, false);
+      assert.equal(
+        adapterBoundary.fakeHeadClearRetainDiagnosticInvoked,
+        false
+      );
+      assert.equal(adapterBoundary.fakeHeadChildrenScanned, false);
+      assert.equal(adapterBoundary.fakeHeadChildRemoved, false);
+      assert.equal(
+        adapterBoundary.resourceHintClearRetainRowsRecorded,
+        false
+      );
+      assert.equal(
+        adapterBoundary.singletonClearRetainRowsRecorded,
+        false
+      );
+      assert.equal(
+        adapterBoundary.stylesheetPrecedenceBlockedCapabilitiesRecorded,
+        false
+      );
       assert.equal(adapterBoundary.resourceFetchStarted, false);
       assert.equal(adapterBoundary.realDocumentMutated, false);
       assert.equal(adapterBoundary.publicResourceHintDomInsertion, false);
@@ -3344,6 +3773,10 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
       assert.deepEqual(
         adapterBoundary.headBoundaryGate,
         resourceFormGate.describePrivateResourceHintHeadBoundaryGate()
+      );
+      assert.deepEqual(
+        adapterBoundary.headClearRetainGate,
+        resourceFormGate.describePrivateResourceHintHeadClearRetainGate()
       );
     } else {
       assert.equal(
@@ -3975,6 +4408,15 @@ function createDeterministicFakeResourceElement(tagName, ownerDocument, log) {
   };
 }
 
+function appendFakeHeadChild(fakeDom, tagName, attributes = {}) {
+  const element = fakeDom.document.createElement(tagName);
+  for (const [name, value] of Object.entries(attributes)) {
+    element.setAttribute(name, value);
+  }
+  fakeDom.head.appendChild(element);
+  return element;
+}
+
 function createControlledInputFakeDomTarget(fields) {
   return {
     [resourceFormGate.controlledInputValueTrackerFakeDomTargetMarker]: true,
@@ -4100,6 +4542,44 @@ function summarizeHeadBoundary(boundary) {
       updateApplied: boundary.resourceElementPlan.updateApplied,
       updateAttributeNames:
         boundary.resourceElementPlan.updateAttributeNames
+    }
+  };
+}
+
+function summarizeHeadClearRetain(diagnostic) {
+  const singletonRow = diagnostic.singletonRows[0];
+  const resourceHintRow = diagnostic.resourceHintRows[0];
+  return {
+    clearRetainId: diagnostic.clearRetainId,
+    sourceBoundaryId: diagnostic.sourceBoundaryId,
+    sourceInsertionId: diagnostic.sourceInsertionId,
+    sourceHeadRequestId: diagnostic.sourceHeadRequestId,
+    requestType: diagnostic.requestType,
+    contractId: diagnostic.contractId,
+    hostTag: diagnostic.hostTag,
+    clearRetainStatus: diagnostic.clearRetainStatus,
+    executionStatus: diagnostic.executionStatus,
+    singletonRow: {
+      rowType: singletonRow.rowType,
+      retainedChildCount: singletonRow.retainedChildCount,
+      clearableChildCount: singletonRow.clearableChildCount,
+      actualHeadChildrenCleared: singletonRow.actualHeadChildrenCleared
+    },
+    resourceHintRow: {
+      rowType: resourceHintRow.rowType,
+      childIndex: resourceHintRow.childIndex,
+      nodeName: resourceHintRow.nodeName,
+      relationship: resourceHintRow.relationship,
+      clearRetainDecision: resourceHintRow.clearRetainDecision,
+      clearReason: resourceHintRow.clearReason,
+      resourceHoistableRetentionBlocked:
+        resourceHintRow.resourceHoistableRetentionBlocked
+    },
+    fakeHeadPlan: {
+      childCount: diagnostic.fakeHeadPlan.childCount,
+      retainedChildCount: diagnostic.fakeHeadPlan.retainedChildCount,
+      clearableChildCount: diagnostic.fakeHeadPlan.clearableChildCount,
+      clearApplied: diagnostic.fakeHeadPlan.clearApplied
     }
   };
 }

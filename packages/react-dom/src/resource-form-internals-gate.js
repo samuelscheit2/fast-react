@@ -13,6 +13,7 @@ const resourceHintDispatcherMetadataGateSchemaVersion = 1;
 const resourceHintFakeDomAdapterGateSchemaVersion = 1;
 const resourceHintFakeDomInsertionGateSchemaVersion = 1;
 const resourceHintHeadBoundaryGateSchemaVersion = 1;
+const resourceHintHeadClearRetainGateSchemaVersion = 1;
 const controlledInputValueTrackerGateSchemaVersion = 1;
 const controlledInputValueTrackerFakeDomDiagnosticGateSchemaVersion = 1;
 const controlledInputPrivateRestoreQueueDiagnosticGateSchemaVersion = 1;
@@ -27,6 +28,8 @@ const privateResourceHintFakeDomInsertionRecordType =
   'fast.react_dom.private_resource_hint_fake_dom_insertion_record';
 const privateResourceHintHeadBoundaryRecordType =
   'fast.react_dom.private_resource_hint_head_singleton_boundary_record';
+const privateResourceHintHeadClearRetainRecordType =
+  'fast.react_dom.private_resource_hint_head_clear_retain_record';
 const privateControlledInputValueTrackerGateRecordType =
   'fast.react_dom.private_controlled_input_value_tracker_gate_record';
 const privateControlledInputValueTrackerFakeDomDiagnosticRecordType =
@@ -43,6 +46,8 @@ const privateResourceHintFakeDomInsertionGateId =
   'resource-hint-private-fake-dom-insertion-gate-1';
 const privateResourceHintHeadBoundaryGateId =
   'resource-hint-head-singleton-private-gate-1';
+const privateResourceHintHeadClearRetainGateId =
+  'resource-hint-head-clear-retain-private-gate-1';
 const privateResourceHintFakeDomAdapterAdmissionRequiredStatus =
   'blocked-private-resource-hint-fake-dom-adapter-admission-required';
 const privateResourceHintFakeDomAdapterAdmissionStatus =
@@ -67,6 +72,16 @@ const privateResourceHintHeadBoundaryExecutionStatus =
   'executed-private-resource-hint-fake-dom-head-singleton-insertion-update-boundary';
 const privateResourceHintHeadBoundaryCompatibilityBlockedStatus =
   'blocked-private-resource-hint-head-singleton-boundary-compatibility';
+const privateResourceHintHeadClearRetainAdmissionRequiredStatus =
+  'blocked-private-resource-hint-head-clear-retain-admission-required';
+const privateResourceHintHeadClearRetainStatus =
+  'admitted-private-resource-hint-head-clear-retain-diagnostic-record';
+const privateResourceHintHeadClearRetainExecutionStatus =
+  'diagnosed-private-resource-hint-fake-dom-head-clear-retain';
+const privateResourceHintHeadClearRetainCompatibilityBlockedStatus =
+  'blocked-private-resource-hint-head-clear-retain-compatibility';
+const privateResourceHintHeadStylesheetPrecedenceBlockedStatus =
+  'blocked-private-resource-hint-head-stylesheet-precedence';
 const privateResourceFormActionGateErrorCode =
   'FAST_REACT_DOM_RESOURCE_FORM_ACTION_GATE';
 const privateResourceFormActionGateUnknownRequestCode =
@@ -95,6 +110,12 @@ const privateResourceHintHeadBoundaryInvalidRecordCode =
   'FAST_REACT_DOM_RESOURCE_HINT_HEAD_SINGLETON_BOUNDARY_INVALID_RECORD';
 const privateResourceHintHeadBoundaryInvalidAdmissionCode =
   'FAST_REACT_DOM_RESOURCE_HINT_HEAD_SINGLETON_BOUNDARY_INVALID_ADMISSION';
+const privateResourceHintHeadClearRetainGateErrorCode =
+  'FAST_REACT_DOM_RESOURCE_HINT_HEAD_CLEAR_RETAIN_GATE';
+const privateResourceHintHeadClearRetainInvalidRecordCode =
+  'FAST_REACT_DOM_RESOURCE_HINT_HEAD_CLEAR_RETAIN_INVALID_RECORD';
+const privateResourceHintHeadClearRetainInvalidAdmissionCode =
+  'FAST_REACT_DOM_RESOURCE_HINT_HEAD_CLEAR_RETAIN_INVALID_ADMISSION';
 const privateControlledInputValueTrackerGateErrorCode =
   'FAST_REACT_DOM_CONTROLLED_INPUT_VALUE_TRACKER_GATE';
 const privateControlledInputValueTrackerGateUnknownScenarioCode =
@@ -250,6 +271,41 @@ const resourceHintHeadBoundarySideEffects = freezeRecord({
   headSingletonReleased: false,
   headChildrenCleared: false,
   publicHeadSingletonBehavior: false
+});
+
+const resourceHintHeadClearRetainBlockedSideEffects = freezeRecord({
+  ...resourceHintHeadBoundaryBlockedSideEffects,
+  fakeHeadClearRetainDiagnosticInvoked: false,
+  fakeHeadRetainPolicyEvaluated: false,
+  fakeHeadChildrenScanned: false,
+  fakeHeadClearableChildrenObserved: false,
+  fakeHeadRetainedChildrenObserved: false,
+  fakeHeadChildRemoved: false,
+  fakeHeadChildRetained: false,
+  resourceHintClearRetainRowsRecorded: false,
+  singletonClearRetainRowsRecorded: false,
+  stylesheetPrecedenceBlockedCapabilitiesRecorded: false,
+  stylesheetPrecedenceOrderQueried: false,
+  stylesheetPrecedenceOrderMutated: false,
+  publicStylesheetPrecedenceBehavior: false
+});
+
+const resourceHintHeadClearRetainSideEffects = freezeRecord({
+  ...resourceHintHeadBoundaryBlockedSideEffects,
+  fakeHeadRead: true,
+  fakeHeadClearRetainDiagnosticInvoked: true,
+  fakeHeadRetainPolicyEvaluated: true,
+  fakeHeadChildrenScanned: true,
+  fakeHeadClearableChildrenObserved: true,
+  fakeHeadRetainedChildrenObserved: true,
+  fakeHeadChildRemoved: false,
+  fakeHeadChildRetained: false,
+  resourceHintClearRetainRowsRecorded: true,
+  singletonClearRetainRowsRecorded: true,
+  stylesheetPrecedenceBlockedCapabilitiesRecorded: true,
+  stylesheetPrecedenceOrderQueried: false,
+  stylesheetPrecedenceOrderMutated: false,
+  publicStylesheetPrecedenceBehavior: false
 });
 
 const controlledInputValueTrackerSideEffects = freezeRecord({
@@ -422,6 +478,80 @@ const resourceHintHeadBoundaryMissingPrerequisites = freezeArray([
     'no-public-resource-or-singleton-root-behavior',
     'react-dom-client',
     'Public resource hints and singleton roots remain placeholder-gated.'
+  )
+]);
+
+const resourceHintHeadClearRetainMissingPrerequisites = freezeArray([
+  prerequisite(
+    'no-head-singleton-clear-commit',
+    'react-dom-resource',
+    'Head singleton clear/release semantics are not wired to commit.'
+  ),
+  prerequisite(
+    'no-resource-hoistable-retain-policy',
+    'react-dom-resource',
+    'Resource hint retain markers are not wired to head clearing.'
+  ),
+  prerequisite(
+    'no-stylesheet-precedence-ordering',
+    'react-dom-resource',
+    'Stylesheet precedence ordering is recorded as blocked metadata only.'
+  ),
+  prerequisite(
+    'no-real-head-clear-or-retain',
+    'react-dom-resource',
+    'Only deterministic fake DOM clear/retain diagnostics are admitted.'
+  ),
+  prerequisite(
+    'no-public-resource-or-singleton-root-behavior',
+    'react-dom-client',
+    'Public resource hints and singleton roots remain placeholder-gated.'
+  )
+]);
+
+const resourceHintHeadClearRetainBlockedCapabilities = freezeArray([
+  blockedCapability(
+    'head-singleton-release',
+    'Head singleton release and ownership are not wired to public roots.'
+  ),
+  blockedCapability(
+    'head-child-removal',
+    'Head child removal is diagnostic-only and does not clear fake or real head children.'
+  ),
+  blockedCapability(
+    'resource-hoistable-retain-marker',
+    'Resource hint hoistable retain markers are not applied by this fake-DOM gate.'
+  ),
+  blockedCapability(
+    'stylesheet-precedence-ordering',
+    'Stylesheet precedence maps, ordering, and insertion positions remain blocked.'
+  ),
+  blockedCapability(
+    'real-document-head-mutation',
+    'Real document head reads and mutations remain blocked.'
+  ),
+  blockedCapability(
+    'public-resource-singleton-compatibility',
+    'Public resource hint and head singleton compatibility remains unclaimed.'
+  )
+]);
+
+const resourceHintHeadStylesheetPrecedenceBlockedCapabilities = freezeArray([
+  blockedCapability(
+    'stylesheet-precedence-map',
+    'No per-root stylesheet precedence map is created.'
+  ),
+  blockedCapability(
+    'stylesheet-precedence-query',
+    'No real querySelectorAll scan for precedence-managed stylesheets is run.'
+  ),
+  blockedCapability(
+    'stylesheet-precedence-insertion',
+    'No stylesheet is inserted before or after precedence peers.'
+  ),
+  blockedCapability(
+    'stylesheet-precedence-commit-suspension',
+    'Stylesheet load, error, and suspended commit behavior remains blocked.'
   )
 ]);
 
@@ -613,6 +743,33 @@ const resourceHintHeadBoundaryContracts = freezeArray([
     'L',
     'link',
     'preload'
+  )
+]);
+
+const resourceHintHeadClearRetainContracts = freezeArray([
+  resourceHintHeadClearRetainContract(
+    'head-singleton-clear-retain',
+    'host-singleton',
+    'head-singleton',
+    'head',
+    null,
+    null
+  ),
+  resourceHintHeadClearRetainContract(
+    'preconnect-resource-head-clear-retain',
+    'resource-hint',
+    'preconnect',
+    'link',
+    'preconnect',
+    'C'
+  ),
+  resourceHintHeadClearRetainContract(
+    'preload-resource-head-clear-retain',
+    'resource-hint',
+    'preload',
+    'link',
+    'preload',
+    'L'
   )
 ]);
 
@@ -822,6 +979,7 @@ const resourceHintDispatcherMetadataPayloads = new WeakMap();
 const resourceHintFakeDomAdapterAdmissionPayloads = new WeakMap();
 const resourceHintFakeDomInsertionPayloads = new WeakMap();
 const resourceHintHeadBoundaryPayloads = new WeakMap();
+const resourceHintHeadClearRetainPayloads = new WeakMap();
 const controlledInputValueTrackerRecordPayloads = new WeakMap();
 const controlledInputValueTrackerFakeDomDiagnosticPayloads = new WeakMap();
 const controlledInputValueTrackerFakeDomDiagnosticStates = new WeakMap();
@@ -993,6 +1151,24 @@ function createResourceHintHeadBoundaryGate(options) {
   });
 }
 
+function createResourceHintHeadClearRetainGate(options) {
+  const gateState = createGateStateWithDefaultPrefix(
+    options,
+    'resource-hint-head-clear-retain'
+  );
+  gateState.headClearRetainConsumed = false;
+
+  return Object.freeze({
+    recordHeadClearRetainDiagnostic(headBoundaryRecord, diagnostic) {
+      return recordResourceHintHeadClearRetainWithGate(
+        gateState,
+        headBoundaryRecord,
+        diagnostic
+      );
+    }
+  });
+}
+
 function recordUnsupportedResourceHintRequest(requestName, args) {
   return defaultGate.recordResourceHintRequest(requestName, args);
 }
@@ -1144,6 +1320,14 @@ function isPrivateResourceHintHeadBoundaryRecord(value) {
   return resourceHintHeadBoundaryPayloads.has(value);
 }
 
+function getPrivateResourceHintHeadClearRetainRecordPayload(record) {
+  return resourceHintHeadClearRetainPayloads.get(record) || null;
+}
+
+function isPrivateResourceHintHeadClearRetainRecord(value) {
+  return resourceHintHeadClearRetainPayloads.has(value);
+}
+
 function getPrivateControlledInputValueTrackerRecordPayload(record) {
   return controlledInputValueTrackerRecordPayloads.get(record) || null;
 }
@@ -1198,6 +1382,7 @@ function describeResourceFormActionInternalsGate() {
       resourceHintFakeDomAdapters: resourceHintFakeDomAdapterContracts,
       resourceHintFakeDomInsertions: resourceHintFakeDomInsertionContracts,
       resourceHintHeadBoundaries: resourceHintHeadBoundaryContracts,
+      resourceHintHeadClearRetain: resourceHintHeadClearRetainContracts,
       singletons: singletonContracts,
       formActions: formActionContracts,
       controlledForms: controlledFormContracts,
@@ -1300,7 +1485,43 @@ function describePrivateResourceHintHeadBoundaryGate() {
     publicHeadSingletonBehavior: false,
     contracts: resourceHintHeadBoundaryContracts,
     sideEffects: resourceHintHeadBoundaryBlockedSideEffects,
-    missingPrerequisites: resourceHintHeadBoundaryMissingPrerequisites
+    missingPrerequisites: resourceHintHeadBoundaryMissingPrerequisites,
+    headClearRetain: describePrivateResourceHintHeadClearRetainGate()
+  });
+}
+
+function describePrivateResourceHintHeadClearRetainGate() {
+  return freezeRecord({
+    schemaVersion: resourceHintHeadClearRetainGateSchemaVersion,
+    gateId: privateResourceHintHeadClearRetainGateId,
+    compatibilityTarget,
+    status: unsupportedStatus,
+    unsupportedCode: unimplementedCode,
+    admissionStatus:
+      privateResourceHintHeadClearRetainAdmissionRequiredStatus,
+    executionStatus: null,
+    compatibilityStatus:
+      privateResourceHintHeadClearRetainCompatibilityBlockedStatus,
+    acceptedHeadBoundaryRecordType:
+      privateResourceHintHeadBoundaryRecordType,
+    acceptedHostTag: 'head',
+    acceptsContractIds: freezeArray(['preconnect', 'preload']),
+    maxDiagnosticsPerGate: 1,
+    deterministicFakeDomOnly: true,
+    mutatesFakeHead: false,
+    mutatesRealHead: false,
+    clearsHeadChildren: false,
+    recordsSingletonRows: true,
+    recordsResourceHintRows: true,
+    rawValuesRetained: false,
+    publicResourceHintDomInsertion: false,
+    publicHeadSingletonBehavior: false,
+    stylesheetPrecedenceBoundary:
+      createStylesheetPrecedenceBlockedBoundary(false, freezeArray([])),
+    blockedCapabilities: resourceHintHeadClearRetainBlockedCapabilities,
+    contracts: resourceHintHeadClearRetainContracts,
+    sideEffects: resourceHintHeadClearRetainBlockedSideEffects,
+    missingPrerequisites: resourceHintHeadClearRetainMissingPrerequisites
   });
 }
 
@@ -1580,6 +1801,33 @@ function createUnsupportedResourceHintHeadBoundaryError(record) {
   error.boundaryStatus = payload.boundaryStatus;
   error.executionStatus = payload.executionStatus;
   error.compatibilityStatus = payload.compatibilityStatus;
+  error.sideEffects = payload.sideEffects;
+
+  return error;
+}
+
+function createUnsupportedResourceHintHeadClearRetainError(record) {
+  const payload = assertPrivateResourceHintHeadClearRetainRecord(record);
+  const error = createUnsupportedError(
+    'react-dom/private-internals',
+    payload.requestType,
+    'was recorded',
+    'The private resource hint head clear/retain gate is a deterministic fake-DOM diagnostic only.'
+  );
+
+  error.code = privateResourceHintHeadClearRetainGateErrorCode;
+  error.clearRetainId = payload.clearRetainId;
+  error.clearRetainSequence = payload.clearRetainSequence;
+  error.sourceBoundaryId = payload.sourceBoundaryId;
+  error.sourceInsertionId = payload.sourceInsertionId;
+  error.sourceHeadRequestId = payload.sourceHeadRequestId;
+  error.requestType = payload.requestType;
+  error.contractId = payload.contractId;
+  error.hostTag = payload.hostTag;
+  error.clearRetainStatus = payload.clearRetainStatus;
+  error.executionStatus = payload.executionStatus;
+  error.compatibilityStatus = payload.compatibilityStatus;
+  error.blockedCapabilities = payload.blockedCapabilities;
   error.sideEffects = payload.sideEffects;
 
   return error;
@@ -1865,6 +2113,86 @@ function recordResourceHintHeadBoundaryWithGate(
   });
 
   resourceHintHeadBoundaryPayloads.set(payload, payload);
+  return payload;
+}
+
+function recordResourceHintHeadClearRetainWithGate(
+  gateState,
+  headBoundaryRecord,
+  diagnostic
+) {
+  if (gateState.headClearRetainConsumed === true) {
+    throwInvalidResourceHintHeadClearRetainAdmission(
+      'head clear/retain gate admits exactly one diagnostic record'
+    );
+  }
+
+  const headBoundary =
+    assertHeadBoundaryRecordForClearRetain(headBoundaryRecord);
+  const diagnosticAdmission =
+    normalizeResourceHintHeadClearRetainAdmission(diagnostic);
+  const clearRetainPlan = createFakeHeadClearRetainPlan(
+    headBoundary,
+    diagnostic.fakeDocument,
+    diagnostic.fakeHead
+  );
+  gateState.headClearRetainConsumed = true;
+
+  const clearRetainSequence = gateState.nextRequestSequence++;
+  const clearRetainId = `${gateState.requestIdPrefix}:${clearRetainSequence}`;
+
+  const payload = freezeRecord({
+    schemaVersion: resourceHintHeadClearRetainGateSchemaVersion,
+    $$typeof: privateResourceHintHeadClearRetainRecordType,
+    kind: 'FastReactDomPrivateResourceHintHeadClearRetainRecord',
+    gateId: privateResourceHintHeadClearRetainGateId,
+    compatibilityTarget,
+    status: unsupportedStatus,
+    unsupportedCode: unimplementedCode,
+    clearRetainId,
+    clearRetainSequence,
+    sourceBoundaryId: headBoundary.boundaryId,
+    sourceBoundarySequence: headBoundary.boundarySequence,
+    sourceInsertionId: headBoundary.sourceInsertionId,
+    sourceInsertionSequence: headBoundary.sourceInsertionSequence,
+    sourceAdapterAdmissionId: headBoundary.sourceAdapterAdmissionId,
+    sourceRequestId: headBoundary.sourceRequestId,
+    sourceRequestSequence: headBoundary.sourceRequestSequence,
+    sourceRequestType: headBoundary.sourceRequestType,
+    sourceHeadRequestId: headBoundary.sourceHeadRequestId,
+    sourceHeadRequestSequence: headBoundary.sourceHeadRequestSequence,
+    sourceHeadRequestType: headBoundary.sourceHeadRequestType,
+    requestType: `resource-hint-head-clear-retain.${headBoundary.contractId}`,
+    requestName: headBoundary.requestName,
+    contractId: headBoundary.contractId,
+    boundaryContractId: headBoundary.boundaryContractId,
+    headContractId: headBoundary.headContractId,
+    hostTag: 'head',
+    oracleKind: headBoundary.oracleKind,
+    oracleSchemaVersion: headBoundary.oracleSchemaVersion,
+    publicName: headBoundary.publicName,
+    privateDispatcherKey: headBoundary.privateDispatcherKey,
+    clearRetainStatus: privateResourceHintHeadClearRetainStatus,
+    executionStatus: privateResourceHintHeadClearRetainExecutionStatus,
+    compatibilityStatus:
+      privateResourceHintHeadClearRetainCompatibilityBlockedStatus,
+    clearRetainAdmission: diagnosticAdmission,
+    sourceHeadBoundary:
+      createResourceHintHeadClearRetainSourceBoundary(headBoundary),
+    singletonRows: clearRetainPlan.singletonRows,
+    resourceHintRows: clearRetainPlan.resourceHintRows,
+    headChildRows: clearRetainPlan.headChildRows,
+    fakeHeadPlan: clearRetainPlan.fakeHeadPlan,
+    stylesheetPrecedenceBoundary:
+      clearRetainPlan.stylesheetPrecedenceBoundary,
+    publicResourceBoundary: createPublicResourceHintDomInsertionBoundary(),
+    publicHeadBoundary: createPublicHeadSingletonBoundary(),
+    blockedCapabilities: resourceHintHeadClearRetainBlockedCapabilities,
+    sideEffects: resourceHintHeadClearRetainSideEffects,
+    missingPrerequisites: resourceHintHeadClearRetainMissingPrerequisites
+  });
+
+  resourceHintHeadClearRetainPayloads.set(payload, payload);
   return payload;
 }
 
@@ -2426,6 +2754,28 @@ function getResourceHintHeadBoundaryContract(contractId) {
   throw error;
 }
 
+function getResourceHintHeadClearRetainResourceContract(contractId) {
+  for (const contract of resourceHintHeadClearRetainContracts) {
+    if (
+      contract.rowType === 'resource-hint' &&
+      contract.sourceContractId === contractId
+    ) {
+      return contract;
+    }
+  }
+
+  const error = new Error(
+    `Unsupported private React DOM resource hint head clear/retain contract: ${String(
+      contractId
+    )}.`
+  );
+  error.name = 'FastReactDomResourceHintHeadClearRetainGateError';
+  error.code = privateResourceHintHeadClearRetainInvalidRecordCode;
+  error.contractId = contractId;
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
 function assertPrivateResourceHintDispatcherMetadataRecord(record) {
   const payload =
     getPrivateResourceHintDispatcherMetadataRecordPayload(record);
@@ -2485,6 +2835,21 @@ function assertPrivateResourceHintHeadBoundaryRecord(record) {
   );
   error.name = 'FastReactDomResourceHintHeadBoundaryGateError';
   error.code = privateResourceHintHeadBoundaryInvalidRecordCode;
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
+function assertPrivateResourceHintHeadClearRetainRecord(record) {
+  const payload = getPrivateResourceHintHeadClearRetainRecordPayload(record);
+  if (payload !== null) {
+    return payload;
+  }
+
+  const error = new Error(
+    'Expected a private React DOM resource hint head clear/retain record.'
+  );
+  error.name = 'FastReactDomResourceHintHeadClearRetainGateError';
+  error.code = privateResourceHintHeadClearRetainInvalidRecordCode;
   error.compatibilityTarget = compatibilityTarget;
   throw error;
 }
@@ -2572,6 +2937,32 @@ function assertHeadSingletonRequestRecordForBoundary(record) {
   );
   error.name = 'FastReactDomResourceHintHeadBoundaryGateError';
   error.code = privateResourceHintHeadBoundaryInvalidRecordCode;
+  error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
+function assertHeadBoundaryRecordForClearRetain(record) {
+  const payload = getPrivateResourceHintHeadBoundaryRecordPayload(record);
+  if (
+    payload !== null &&
+    payload.boundaryStatus === privateResourceHintHeadBoundaryStatus &&
+    payload.executionStatus ===
+      privateResourceHintHeadBoundaryExecutionStatus &&
+    payload.compatibilityStatus ===
+      privateResourceHintHeadBoundaryCompatibilityBlockedStatus &&
+    payload.hostTag === 'head' &&
+    payload.publicHeadBoundary?.publicSingletonBehavior === false &&
+    payload.publicResourceBoundary?.publicResourceHintCallsReachable === false
+  ) {
+    getResourceHintHeadClearRetainResourceContract(payload.contractId);
+    return payload;
+  }
+
+  const error = new Error(
+    'Expected a private React DOM resource hint head boundary record for the head clear/retain diagnostic.'
+  );
+  error.name = 'FastReactDomResourceHintHeadClearRetainGateError';
+  error.code = privateResourceHintHeadClearRetainInvalidRecordCode;
   error.compatibilityTarget = compatibilityTarget;
   throw error;
 }
@@ -3452,6 +3843,31 @@ function createResourceHintHeadBoundaryResourceElementPlan(
   });
 }
 
+function createResourceHintHeadClearRetainSourceBoundary(headBoundary) {
+  return freezeRecord({
+    boundaryId: headBoundary.boundaryId,
+    boundarySequence: headBoundary.boundarySequence,
+    boundaryStatus: headBoundary.boundaryStatus,
+    executionStatus: headBoundary.executionStatus,
+    compatibilityStatus: headBoundary.compatibilityStatus,
+    sourceInsertionId: headBoundary.sourceInsertionId,
+    sourceHeadRequestId: headBoundary.sourceHeadRequestId,
+    contractId: headBoundary.contractId,
+    boundaryContractId: headBoundary.boundaryContractId,
+    headContractId: headBoundary.headContractId,
+    hostTag: headBoundary.hostTag,
+    insertedElementObserved:
+      headBoundary.resourceElementPlan.insertedElementObserved,
+    updateApplied: headBoundary.resourceElementPlan.updateApplied,
+    publicResourceHintDomInsertion:
+      headBoundary.resourceElementPlan.publicResourceHintDomInsertion,
+    publicHeadSingletonBehavior:
+      headBoundary.resourceElementPlan.publicHeadSingletonBehavior,
+    compatibilityClaimed: headBoundary.resourceElementPlan.compatibilityClaimed,
+    sideEffects: headBoundary.sideEffects
+  });
+}
+
 function createPublicHeadSingletonBoundary() {
   return freezeRecord({
     status: 'blocked-public-head-singleton-boundary',
@@ -3465,6 +3881,397 @@ function createPublicHeadSingletonBoundary() {
     realDocumentMutated: false,
     publicRootTouched: false,
     compatibilityClaimed: false
+  });
+}
+
+function normalizeResourceHintHeadClearRetainAdmission(diagnostic) {
+  if (diagnostic == null || typeof diagnostic !== 'object') {
+    throwInvalidResourceHintHeadClearRetainAdmission(
+      'head clear/retain admission metadata must be an object'
+    );
+  }
+
+  if (diagnostic.explicitClearRetain !== true) {
+    throwInvalidResourceHintHeadClearRetainAdmission(
+      'explicitClearRetain must be true'
+    );
+  }
+
+  const clearRetainKind = getAdmissionStringProperty(
+    diagnostic,
+    'clearRetainKind',
+    'deterministic-fake-dom-head-clear-retain'
+  );
+  if (clearRetainKind !== 'deterministic-fake-dom-head-clear-retain') {
+    throwInvalidResourceHintHeadClearRetainAdmission(
+      'clearRetainKind must be deterministic-fake-dom-head-clear-retain'
+    );
+  }
+
+  const targetKind = getAdmissionStringProperty(
+    diagnostic,
+    'targetKind',
+    'document-head'
+  );
+  if (targetKind !== 'document-head') {
+    throwInvalidResourceHintHeadClearRetainAdmission(
+      'targetKind must be document-head'
+    );
+  }
+
+  const hostTag = getAdmissionStringProperty(diagnostic, 'hostTag', 'head');
+  if (hostTag !== 'head') {
+    throwInvalidResourceHintHeadClearRetainAdmission('hostTag must be head');
+  }
+
+  assertDeterministicFakeHeadClearRetainTarget(
+    diagnostic.fakeDocument,
+    diagnostic.fakeHead
+  );
+
+  return freezeRecord({
+    clearRetainKind,
+    clearRetainId: getAdmissionStringProperty(
+      diagnostic,
+      'clearRetainId',
+      'anonymous-fake-dom-head-clear-retain'
+    ),
+    targetKind,
+    hostTag,
+    explicitClearRetain: true,
+    deterministicFakeDomOnly: true,
+    rawDocumentCaptured: false,
+    rawHeadCaptured: false,
+    rawElementCaptured: false,
+    realHeadMutationAllowed: false,
+    fakeHeadRemovalAllowed: false,
+    singletonReleaseAllowed: false,
+    resourceRetainMarkerAllowed: false,
+    stylesheetPrecedenceAllowed: false,
+    publicHeadSingletonBehavior: false,
+    publicRootTouched: false,
+    compatibilityClaimed: false
+  });
+}
+
+function assertDeterministicFakeHeadClearRetainTarget(fakeDocument, fakeHead) {
+  if (
+    fakeDocument == null ||
+    typeof fakeDocument !== 'object' ||
+    fakeDocument.__fastReactFakeResourceDocument !== true
+  ) {
+    throwInvalidResourceHintHeadClearRetainAdmission(
+      'fakeDocument must be an explicit deterministic fake resource document'
+    );
+  }
+
+  if (
+    fakeHead == null ||
+    typeof fakeHead !== 'object' ||
+    fakeHead.__fastReactFakeResourceHead !== true ||
+    fakeHead.ownerDocument !== fakeDocument
+  ) {
+    throwInvalidResourceHintHeadClearRetainAdmission(
+      'fakeHead must belong to the deterministic fake resource document'
+    );
+  }
+
+  if (!Array.isArray(fakeHead.childNodes)) {
+    throwInvalidResourceHintHeadClearRetainAdmission(
+      'fakeHead must expose deterministic childNodes for clear/retain diagnostics'
+    );
+  }
+}
+
+function createFakeHeadClearRetainPlan(
+  headBoundary,
+  fakeDocument,
+  fakeHead
+) {
+  const sourceResource = findHeadBoundaryFakeResourceElement(
+    headBoundary,
+    fakeDocument,
+    fakeHead
+  );
+  const headChildRows = freezeArray(
+    fakeHead.childNodes.map((node, index) =>
+      createFakeHeadClearRetainChildRow(
+        node,
+        index,
+        sourceResource.index,
+        headBoundary
+      )
+    )
+  );
+  const retainedChildRows = headChildRows.filter(
+    (row) => row.clearRetainDecision === 'retain'
+  );
+  const clearableChildRows = headChildRows.filter(
+    (row) => row.clearRetainDecision === 'clear'
+  );
+  const sourceResourceRow = headChildRows[sourceResource.index];
+  const stylesheetRows = freezeArray(
+    headChildRows.filter((row) => row.stylesheetPrecedenceCandidate === true)
+  );
+
+  return freezeRecord({
+    singletonRows: freezeArray([
+      createHeadSingletonClearRetainRow(
+        headBoundary,
+        retainedChildRows.length,
+        clearableChildRows.length
+      )
+    ]),
+    resourceHintRows: freezeArray([
+      createResourceHintClearRetainRow(headBoundary, sourceResourceRow)
+    ]),
+    headChildRows,
+    fakeHeadPlan: createFakeHeadClearRetainSummary(
+      headChildRows.length,
+      retainedChildRows.length,
+      clearableChildRows.length
+    ),
+    stylesheetPrecedenceBoundary:
+      createStylesheetPrecedenceBlockedBoundary(
+        stylesheetRows.length > 0,
+        stylesheetRows
+      )
+  });
+}
+
+function findHeadBoundaryFakeResourceElement(
+  headBoundary,
+  fakeDocument,
+  fakeHead
+) {
+  const expectedNodeName =
+    headBoundary.resourceElementPlan.elementTag.toUpperCase();
+  const expectedRelationship = headBoundary.resourceElementPlan.relationship;
+
+  for (let index = fakeHead.childNodes.length - 1; index >= 0; index--) {
+    const node = fakeHead.childNodes[index];
+    if (
+      isDeterministicFakeHeadBoundaryResourceElement(
+        node,
+        fakeDocument,
+        fakeHead,
+        expectedNodeName,
+        expectedRelationship
+      )
+    ) {
+      return freezeRecord({index, node});
+    }
+  }
+
+  throwInvalidResourceHintHeadClearRetainAdmission(
+    'fakeHead must contain the deterministic resource element from the head boundary record'
+  );
+}
+
+function createFakeHeadClearRetainChildRow(
+  node,
+  childIndex,
+  sourceResourceIndex,
+  headBoundary
+) {
+  const nodeName =
+    node != null && typeof node.nodeName === 'string'
+      ? node.nodeName.toUpperCase()
+      : 'UNKNOWN';
+  const relationship = getFakeHeadNodeRelationship(node);
+  const markedHoistable =
+    node != null &&
+    typeof node === 'object' &&
+    node.__fastReactFakeHoistable === true;
+  const stylesheetPrecedenceCandidate =
+    nodeName === 'LINK' &&
+    relationship === 'stylesheet' &&
+    hasFakeHeadNodeAttribute(node, 'data-precedence');
+  const sourceResourceHint = childIndex === sourceResourceIndex;
+  const retainReason = getFakeHeadRetainReason(
+    nodeName,
+    relationship,
+    markedHoistable
+  );
+  const clearRetainDecision = retainReason === null ? 'clear' : 'retain';
+  const clearReason =
+    clearRetainDecision === 'clear'
+      ? sourceResourceHint
+        ? 'resource-hint-hoistable-marker-blocked'
+        : 'unretained-head-child'
+      : null;
+
+  return freezeRecord({
+    rowId: sourceResourceHint
+      ? `resource-hint-${headBoundary.contractId}-head-child`
+      : `head-child-${childIndex}`,
+    rowType: sourceResourceHint ? 'resource-hint' : 'head-child',
+    childIndex,
+    nodeName,
+    relationship,
+    sourceResourceHint,
+    sourceBoundaryId: sourceResourceHint ? headBoundary.boundaryId : null,
+    contractId: sourceResourceHint ? headBoundary.contractId : null,
+    privateDispatcherKey: sourceResourceHint
+      ? headBoundary.privateDispatcherKey
+      : null,
+    clearRetainDecision,
+    retainReason,
+    clearReason,
+    markedHoistable,
+    stylesheetPrecedenceCandidate,
+    stylesheetPrecedenceApplied: false,
+    stylesheetPrecedenceValueRetained: false,
+    rawValuesRetained: false,
+    actualNodeRemoved: false,
+    compatibilityClaimed: false
+  });
+}
+
+function getFakeHeadRetainReason(nodeName, relationship, markedHoistable) {
+  if (markedHoistable) {
+    return 'marked-hoistable';
+  }
+  if (nodeName === 'SCRIPT') {
+    return 'script';
+  }
+  if (nodeName === 'STYLE') {
+    return 'style';
+  }
+  if (nodeName === 'LINK' && relationship === 'stylesheet') {
+    return 'stylesheet-link';
+  }
+  return null;
+}
+
+function getFakeHeadNodeRelationship(node) {
+  const rel = getFakeHeadNodeAttribute(node, 'rel');
+  return typeof rel === 'string' && rel.length > 0 ? rel.toLowerCase() : null;
+}
+
+function hasFakeHeadNodeAttribute(node, name) {
+  return getFakeHeadNodeAttribute(node, name) !== undefined;
+}
+
+function getFakeHeadNodeAttribute(node, name) {
+  if (node == null || typeof node !== 'object') {
+    return undefined;
+  }
+  const attributes = node.attributes;
+  if (attributes == null || typeof attributes !== 'object') {
+    return undefined;
+  }
+  if (hasOwnProp(attributes, name)) {
+    return attributes[name];
+  }
+  return undefined;
+}
+
+function createHeadSingletonClearRetainRow(
+  headBoundary,
+  retainedChildCount,
+  clearableChildCount
+) {
+  return freezeRecord({
+    rowId: 'head-singleton-clear-retain',
+    rowType: 'host-singleton',
+    hostTag: 'head',
+    sourceHeadRequestId: headBoundary.sourceHeadRequestId,
+    sourceBoundaryId: headBoundary.boundaryId,
+    headContractId: headBoundary.headContractId,
+    clearHeadWouldRun: true,
+    releaseSingletonWouldRun: true,
+    singletonReleaseAllowed: false,
+    singletonOwnershipClaimed: false,
+    retainedChildCount,
+    clearableChildCount,
+    actualHeadChildrenCleared: false,
+    rawValuesRetained: false,
+    compatibilityClaimed: false,
+    blockedCapabilities: resourceHintHeadClearRetainBlockedCapabilities
+  });
+}
+
+function createResourceHintClearRetainRow(headBoundary, sourceResourceRow) {
+  return freezeRecord({
+    rowId: `${headBoundary.contractId}-resource-head-clear-retain`,
+    rowType: 'resource-hint',
+    contractId: headBoundary.contractId,
+    privateDispatcherKey: headBoundary.privateDispatcherKey,
+    sourceInsertionId: headBoundary.sourceInsertionId,
+    sourceBoundaryId: headBoundary.boundaryId,
+    childIndex: sourceResourceRow.childIndex,
+    nodeName: sourceResourceRow.nodeName,
+    relationship: sourceResourceRow.relationship,
+    clearRetainDecision: sourceResourceRow.clearRetainDecision,
+    retainReason: sourceResourceRow.retainReason,
+    clearReason: sourceResourceRow.clearReason,
+    markedHoistable: sourceResourceRow.markedHoistable,
+    resourceHoistableRetentionBlocked: true,
+    stylesheetPrecedenceApplied: false,
+    stylesheetPrecedenceBlocked: true,
+    rawValuesRetained: false,
+    actualNodeRemoved: false,
+    compatibilityClaimed: false,
+    blockedCapabilities: resourceHintHeadClearRetainBlockedCapabilities
+  });
+}
+
+function createFakeHeadClearRetainSummary(
+  childCount,
+  retainedChildCount,
+  clearableChildCount
+) {
+  return freezeRecord({
+    targetKind: 'document-head',
+    hostTag: 'head',
+    childCount,
+    retainedChildCount,
+    clearableChildCount,
+    retainPolicy: 'react-19.2.6-clearHead-retain-policy-diagnostic',
+    retainedNodeReasons: freezeArray([
+      'marked-hoistable',
+      'script',
+      'style',
+      'stylesheet-link'
+    ]),
+    clearApplied: false,
+    fakeHeadMutated: false,
+    realHeadMutated: false,
+    rawValuesRetained: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createStylesheetPrecedenceBlockedBoundary(
+  stylesheetPrecedenceRowsObserved,
+  stylesheetRows
+) {
+  return freezeRecord({
+    status: privateResourceHintHeadStylesheetPrecedenceBlockedStatus,
+    stylesheetPrecedenceRowsObserved,
+    stylesheetRowCount: stylesheetRows.length,
+    stylesheetRows: freezeArray(
+      stylesheetRows.map((row) =>
+        freezeRecord({
+          rowId: row.rowId,
+          childIndex: row.childIndex,
+          nodeName: row.nodeName,
+          relationship: row.relationship,
+          dataPrecedenceAttributePresent:
+            row.stylesheetPrecedenceCandidate,
+          precedenceValueRetained: false,
+          orderingApplied: false
+        })
+      )
+    ),
+    precedenceMapCreated: false,
+    precedenceQueryRun: false,
+    precedenceInsertionApplied: false,
+    publicStylesheetPrecedenceBehavior: false,
+    compatibilityClaimed: false,
+    blockedCapabilities:
+      resourceHintHeadStylesheetPrecedenceBlockedCapabilities
   });
 }
 
@@ -3501,6 +4308,17 @@ function throwInvalidResourceHintHeadBoundaryAdmission(reason) {
   );
   error.name = 'FastReactDomResourceHintHeadBoundaryGateError';
   error.code = privateResourceHintHeadBoundaryInvalidAdmissionCode;
+  error.compatibilityTarget = compatibilityTarget;
+  error.reason = reason;
+  throw error;
+}
+
+function throwInvalidResourceHintHeadClearRetainAdmission(reason) {
+  const error = new Error(
+    `Invalid private React DOM resource hint head clear/retain admission: ${reason}.`
+  );
+  error.name = 'FastReactDomResourceHintHeadClearRetainGateError';
+  error.code = privateResourceHintHeadClearRetainInvalidAdmissionCode;
   error.compatibilityTarget = compatibilityTarget;
   error.reason = reason;
   throw error;
@@ -4464,6 +5282,29 @@ function resourceHintHeadBoundaryContract(
   });
 }
 
+function resourceHintHeadClearRetainContract(
+  id,
+  rowType,
+  sourceContractId,
+  elementTag,
+  relationship,
+  privateDispatcherKey
+) {
+  return freezeRecord({
+    id,
+    rowType,
+    sourceContractId,
+    privateDispatcherKey,
+    hostTag: 'head',
+    elementTag,
+    relationship,
+    capability: 'react-dom-resource-head-clear-retain-diagnostic',
+    oracleKind: resourceHintOracleKind,
+    deterministicFakeDomOnly: true,
+    compatibilityClaimed: false
+  });
+}
+
 function singletonContract(id, hostTag) {
   return freezeRecord({
     id,
@@ -4562,6 +5403,14 @@ function prerequisite(id, area, reason) {
   });
 }
 
+function blockedCapability(id, reason) {
+  return freezeRecord({
+    id,
+    blocked: true,
+    reason
+  });
+}
+
 function oracleEvidence(oracleKind, contractCount) {
   return freezeRecord({
     oracleKind,
@@ -4614,12 +5463,14 @@ module.exports = {
   createResourceHintFakeDomAdapterGate,
   createResourceHintFakeDomInsertionGate,
   createResourceHintHeadBoundaryGate,
+  createResourceHintHeadClearRetainGate,
   createResourceFormActionInternalsGate,
   createUnsupportedControlledInputValueTrackerError,
   createUnsupportedControlledInputRestoreQueueDiagnosticError,
   createUnsupportedResourceHintFakeDomAdapterError,
   createUnsupportedResourceHintFakeDomInsertionError,
   createUnsupportedResourceHintHeadBoundaryError,
+  createUnsupportedResourceHintHeadClearRetainError,
   createUnsupportedResourceFormActionInternalsError,
   createUnsupportedResourceHintDispatcherMetadataError,
   describeControlledInputValueTrackerGate,
@@ -4629,6 +5480,7 @@ module.exports = {
   describePrivateResourceHintFakeDomAdapterGate,
   describePrivateResourceHintFakeDomInsertionGate,
   describePrivateResourceHintHeadBoundaryGate,
+  describePrivateResourceHintHeadClearRetainGate,
   describePrivateResourceHintDispatcherMetadataGate,
   describeResourceFormActionInternalsGate,
   formActionContracts,
@@ -4640,11 +5492,13 @@ module.exports = {
   getPrivateResourceHintFakeDomAdapterAdmissionRecordPayload,
   getPrivateResourceHintFakeDomInsertionRecordPayload,
   getPrivateResourceHintHeadBoundaryRecordPayload,
+  getPrivateResourceHintHeadClearRetainRecordPayload,
   getPrivateResourceFormActionGateRecordPayload,
   getPrivateResourceHintDispatcherMetadataRecordPayload,
   isPrivateResourceHintFakeDomAdapterAdmissionRecord,
   isPrivateResourceHintFakeDomInsertionRecord,
   isPrivateResourceHintHeadBoundaryRecord,
+  isPrivateResourceHintHeadClearRetainRecord,
   isPrivateControlledInputValueTrackerRecord,
   isPrivateControlledInputValueTrackerFakeDomDiagnosticRecord,
   isPrivateControlledInputRestoreQueueDiagnosticRecord,
@@ -4697,6 +5551,16 @@ module.exports = {
   privateResourceHintHeadBoundaryInvalidRecordCode,
   privateResourceHintHeadBoundaryRecordType,
   privateResourceHintHeadBoundaryStatus,
+  privateResourceHintHeadClearRetainAdmissionRequiredStatus,
+  privateResourceHintHeadClearRetainCompatibilityBlockedStatus,
+  privateResourceHintHeadClearRetainExecutionStatus,
+  privateResourceHintHeadClearRetainGateErrorCode,
+  privateResourceHintHeadClearRetainGateId,
+  privateResourceHintHeadClearRetainInvalidAdmissionCode,
+  privateResourceHintHeadClearRetainInvalidRecordCode,
+  privateResourceHintHeadClearRetainRecordType,
+  privateResourceHintHeadClearRetainStatus,
+  privateResourceHintHeadStylesheetPrecedenceBlockedStatus,
   privateResourceHintDispatcherMetadataGateErrorCode,
   privateResourceHintDispatcherMetadataGateId,
   privateResourceHintDispatcherMetadataInvalidShapeCode,
@@ -4726,6 +5590,13 @@ module.exports = {
   resourceHintHeadBoundaryGateSchemaVersion,
   resourceHintHeadBoundaryMissingPrerequisites,
   resourceHintHeadBoundarySideEffects,
+  resourceHintHeadClearRetainBlockedCapabilities,
+  resourceHintHeadClearRetainBlockedSideEffects,
+  resourceHintHeadClearRetainContracts,
+  resourceHintHeadClearRetainGateSchemaVersion,
+  resourceHintHeadClearRetainMissingPrerequisites,
+  resourceHintHeadClearRetainSideEffects,
+  resourceHintHeadStylesheetPrecedenceBlockedCapabilities,
   resourceHintDispatcherMetadataContracts,
   resourceHintDispatcherMetadataGateSchemaVersion,
   resourceHintDispatcherMissingPrerequisites,
