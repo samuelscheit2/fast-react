@@ -722,6 +722,7 @@ impl FunctionComponentMemoHookRecord {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentMemoUpdateRecord {
     hook: HookSlotId,
+    previous_hook: HookSlotId,
     previous_value: StateHandle,
     previous_dependencies: HookEffectDependencies,
     requested_value: StateHandle,
@@ -734,6 +735,11 @@ impl FunctionComponentMemoUpdateRecord {
     #[must_use]
     pub const fn hook(self) -> HookSlotId {
         self.hook
+    }
+
+    #[must_use]
+    pub const fn previous_hook(self) -> HookSlotId {
+        self.previous_hook
     }
 
     #[must_use]
@@ -769,6 +775,109 @@ impl FunctionComponentMemoUpdateRecord {
     #[must_use]
     pub const fn reused_previous_value(self) -> bool {
         self.dependency_status.reused_previous_value()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentMemoUpdateDiagnosticRecord {
+    diagnostic_index: usize,
+    fiber: FiberId,
+    current: FiberId,
+    current_hook_list: HookListId,
+    hook_list: HookListId,
+    previous_hook: HookSlotId,
+    hook: HookSlotId,
+    render_lanes: Lanes,
+    previous_value: StateHandle,
+    previous_dependencies: HookEffectDependencies,
+    requested_value: StateHandle,
+    value: StateHandle,
+    dependencies: HookEffectDependencies,
+    dependency_status: FunctionComponentMemoDependencyStatus,
+}
+
+impl FunctionComponentMemoUpdateDiagnosticRecord {
+    #[must_use]
+    pub const fn diagnostic_index(self) -> usize {
+        self.diagnostic_index
+    }
+
+    #[must_use]
+    pub const fn fiber(self) -> FiberId {
+        self.fiber
+    }
+
+    #[must_use]
+    pub const fn current(self) -> FiberId {
+        self.current
+    }
+
+    #[must_use]
+    pub const fn current_hook_list(self) -> HookListId {
+        self.current_hook_list
+    }
+
+    #[must_use]
+    pub const fn hook_list(self) -> HookListId {
+        self.hook_list
+    }
+
+    #[must_use]
+    pub const fn previous_hook(self) -> HookSlotId {
+        self.previous_hook
+    }
+
+    #[must_use]
+    pub const fn hook(self) -> HookSlotId {
+        self.hook
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub const fn previous_value(self) -> StateHandle {
+        self.previous_value
+    }
+
+    #[must_use]
+    pub const fn previous_dependencies(self) -> HookEffectDependencies {
+        self.previous_dependencies
+    }
+
+    #[must_use]
+    pub const fn requested_value(self) -> StateHandle {
+        self.requested_value
+    }
+
+    #[must_use]
+    pub const fn value(self) -> StateHandle {
+        self.value
+    }
+
+    #[must_use]
+    pub const fn dependencies(self) -> HookEffectDependencies {
+        self.dependencies
+    }
+
+    #[must_use]
+    pub const fn dependency_status(self) -> FunctionComponentMemoDependencyStatus {
+        self.dependency_status
+    }
+
+    #[must_use]
+    pub const fn reused_previous_value(self) -> bool {
+        self.dependency_status.reused_previous_value()
+    }
+
+    #[must_use]
+    pub const fn recomputed_value(self) -> bool {
+        matches!(
+            self.dependency_status,
+            FunctionComponentMemoDependencyStatus::Changed
+        )
     }
 }
 
@@ -2196,6 +2305,50 @@ struct FunctionComponentMemoHookBinding {
     dependencies: HookEffectDependencies,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FunctionComponentMemoUpdateDiagnostics {
+    hook_list: HookListId,
+    records: Vec<FunctionComponentMemoUpdateDiagnosticRecord>,
+}
+
+impl FunctionComponentMemoUpdateDiagnostics {
+    #[must_use]
+    pub const fn hook_list(&self) -> HookListId {
+        self.hook_list
+    }
+
+    #[must_use]
+    pub fn records(&self) -> &[FunctionComponentMemoUpdateDiagnosticRecord] {
+        &self.records
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    #[must_use]
+    pub fn reuse_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| record.reused_previous_value())
+            .count()
+    }
+
+    #[must_use]
+    pub fn recompute_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| record.recomputed_value())
+            .count()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct FunctionComponentRefHookBinding {
     hook: HookSlotId,
@@ -2636,6 +2789,7 @@ pub(crate) struct FunctionComponentHookRenderStore {
     pending_effect_queues: Vec<FunctionComponentPendingEffectQueueBinding>,
     committed_effect_queues: Vec<FunctionComponentCommittedEffectQueue>,
     memo_hooks: Vec<FunctionComponentMemoHookBinding>,
+    memo_update_diagnostics: Vec<FunctionComponentMemoUpdateDiagnostics>,
     ref_hooks: Vec<FunctionComponentRefHookBinding>,
     state_dispatches: Vec<FunctionComponentStateDispatchBinding>,
     next_state_dispatch_raw: u64,
@@ -2654,6 +2808,7 @@ impl Default for FunctionComponentHookRenderStore {
             pending_effect_queues: Vec::new(),
             committed_effect_queues: Vec::new(),
             memo_hooks: Vec::new(),
+            memo_update_diagnostics: Vec::new(),
             ref_hooks: Vec::new(),
             state_dispatches: Vec::new(),
             next_state_dispatch_raw: 1,
@@ -2738,6 +2893,32 @@ impl FunctionComponentHookRenderStore {
         state: FunctionComponentHookRenderState,
     ) -> Result<&[FunctionComponentEffectUpdateQueueRecord], FunctionComponentRenderError> {
         match self.effect_update_queue(state)? {
+            Some(queue) => Ok(queue.records()),
+            None => Ok(&[]),
+        }
+    }
+
+    pub fn memo_update_diagnostics(
+        &self,
+        state: FunctionComponentHookRenderState,
+    ) -> Result<Option<&FunctionComponentMemoUpdateDiagnostics>, FunctionComponentRenderError> {
+        self.hook_lists
+            .list(state.work_in_progress_list())
+            .map_err(|error| {
+                FunctionComponentRenderError::hook_list(state.render_fiber(), error)
+            })?;
+
+        Ok(self
+            .memo_update_diagnostics
+            .iter()
+            .find(|queue| queue.hook_list() == state.work_in_progress_list()))
+    }
+
+    pub fn memo_update_diagnostic_records(
+        &self,
+        state: FunctionComponentHookRenderState,
+    ) -> Result<&[FunctionComponentMemoUpdateDiagnosticRecord], FunctionComponentRenderError> {
+        match self.memo_update_diagnostics(state)? {
             Some(queue) => Ok(queue.records()),
             None => Ok(&[]),
         }
@@ -3105,6 +3286,7 @@ impl FunctionComponentHookRenderStore {
 
         Ok(FunctionComponentMemoUpdateRecord {
             hook,
+            previous_hook,
             previous_value: previous.value(),
             previous_dependencies: previous.dependencies(),
             requested_value,
@@ -4260,6 +4442,89 @@ impl FunctionComponentHookRenderStore {
         let queue_index = self.ensure_effect_update_queue_index(record.hook_list());
         record.update_index = self.effect_update_queues[queue_index].records.len();
         self.effect_update_queues[queue_index].records.push(record);
+    }
+
+    pub fn record_memo_update_diagnostic(
+        &mut self,
+        state: FunctionComponentHookRenderState,
+        render_lanes: Lanes,
+        update: FunctionComponentMemoUpdateRecord,
+    ) -> Result<FunctionComponentMemoUpdateDiagnosticRecord, FunctionComponentRenderError> {
+        if state.phase() != FunctionComponentHookRenderPhase::Update {
+            return Err(FunctionComponentRenderError::HookCursorPhaseMismatch {
+                fiber: state.render_fiber(),
+                expected: FunctionComponentHookRenderPhase::Update,
+                actual: state.phase(),
+            });
+        }
+
+        let current =
+            state
+                .current()
+                .ok_or(FunctionComponentRenderError::MissingCurrentHookList {
+                    fiber: state.render_fiber(),
+                })?;
+        let current_hook_list =
+            state
+                .current_list()
+                .ok_or(FunctionComponentRenderError::MissingCurrentHookList {
+                    fiber: state.render_fiber(),
+                })?;
+        self.hook_lists.list(current_hook_list).map_err(|error| {
+            FunctionComponentRenderError::hook_list(state.render_fiber(), error)
+        })?;
+        self.hook_lists
+            .list(state.work_in_progress_list())
+            .map_err(|error| {
+                FunctionComponentRenderError::hook_list(state.render_fiber(), error)
+            })?;
+
+        let record = FunctionComponentMemoUpdateDiagnosticRecord {
+            diagnostic_index: 0,
+            fiber: state.render_fiber(),
+            current,
+            current_hook_list,
+            hook_list: state.work_in_progress_list(),
+            previous_hook: update.previous_hook(),
+            hook: update.hook(),
+            render_lanes,
+            previous_value: update.previous_value(),
+            previous_dependencies: update.previous_dependencies(),
+            requested_value: update.requested_value(),
+            value: update.value(),
+            dependencies: update.dependencies(),
+            dependency_status: update.dependency_status(),
+        };
+        Ok(self.push_memo_update_diagnostic_record(record))
+    }
+
+    fn push_memo_update_diagnostic_record(
+        &mut self,
+        mut record: FunctionComponentMemoUpdateDiagnosticRecord,
+    ) -> FunctionComponentMemoUpdateDiagnosticRecord {
+        let queue_index = self.ensure_memo_update_diagnostics_index(record.hook_list());
+        record.diagnostic_index = self.memo_update_diagnostics[queue_index].records.len();
+        self.memo_update_diagnostics[queue_index]
+            .records
+            .push(record);
+        record
+    }
+
+    fn ensure_memo_update_diagnostics_index(&mut self, list: HookListId) -> usize {
+        if let Some(index) = self
+            .memo_update_diagnostics
+            .iter()
+            .position(|queue| queue.hook_list() == list)
+        {
+            index
+        } else {
+            self.memo_update_diagnostics
+                .push(FunctionComponentMemoUpdateDiagnostics {
+                    hook_list: list,
+                    records: Vec::new(),
+                });
+            self.memo_update_diagnostics.len() - 1
+        }
     }
 
     fn ensure_effect_update_queue_index(&mut self, list: HookListId) -> usize {
@@ -5741,10 +6006,73 @@ impl FunctionComponentUseStateRenderRecord {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentUseMemoRenderRecord {
+    render: FunctionComponentRenderRecord,
+    hook_result: FunctionComponentHookRenderResult,
+    memo_hook: FunctionComponentUseMemoHookRenderRecord,
+    memo_update_diagnostic: Option<FunctionComponentMemoUpdateDiagnosticRecord>,
+}
+
+impl FunctionComponentUseMemoRenderRecord {
+    #[must_use]
+    pub const fn render(self) -> FunctionComponentRenderRecord {
+        self.render
+    }
+
+    #[must_use]
+    pub const fn hook_result(self) -> FunctionComponentHookRenderResult {
+        self.hook_result
+    }
+
+    #[must_use]
+    pub const fn memo_hook(self) -> FunctionComponentUseMemoHookRenderRecord {
+        self.memo_hook
+    }
+
+    #[must_use]
+    pub const fn memo_update_diagnostic(
+        self,
+    ) -> Option<FunctionComponentMemoUpdateDiagnosticRecord> {
+        self.memo_update_diagnostic
+    }
+
+    #[must_use]
+    pub const fn current(self) -> Option<FiberId> {
+        self.render.current()
+    }
+
+    #[must_use]
+    pub const fn work_in_progress(self) -> FiberId {
+        self.render.work_in_progress()
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.render.render_lanes()
+    }
+
+    #[must_use]
+    pub const fn output(self) -> FunctionComponentOutputHandle {
+        self.render.output()
+    }
+
+    #[must_use]
+    pub const fn hook_state(self) -> FunctionComponentHookRenderState {
+        self.hook_result.state()
+    }
+
+    #[must_use]
+    pub const fn hook_traversal(self) -> HookListTraversalResult {
+        self.hook_result.traversal()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentUseMemoUseRefRenderRecord {
     render: FunctionComponentRenderRecord,
     hook_result: FunctionComponentHookRenderResult,
     memo_hook: FunctionComponentUseMemoHookRenderRecord,
+    memo_update_diagnostic: Option<FunctionComponentMemoUpdateDiagnosticRecord>,
     ref_hook: FunctionComponentUseRefHookRenderRecord,
 }
 
@@ -5762,6 +6090,13 @@ impl FunctionComponentUseMemoUseRefRenderRecord {
     #[must_use]
     pub const fn memo_hook(self) -> FunctionComponentUseMemoHookRenderRecord {
         self.memo_hook
+    }
+
+    #[must_use]
+    pub const fn memo_update_diagnostic(
+        self,
+    ) -> Option<FunctionComponentMemoUpdateDiagnosticRecord> {
+        self.memo_update_diagnostic
     }
 
     #[must_use]
@@ -5990,42 +6325,38 @@ pub(crate) fn render_function_component_with_use_state(
     })
 }
 
-pub(crate) fn render_function_component_with_use_memo_and_ref(
+pub(crate) fn render_function_component_with_use_memo(
     arena: &mut FiberArena,
     hook_store: &mut FunctionComponentHookRenderStore,
     work_in_progress: FiberId,
     render_lanes: Lanes,
     memo_request: FunctionComponentUseMemoRenderRequest,
-    ref_request: FunctionComponentUseRefRenderRequest,
     invoker: &mut impl FunctionComponentInvoker,
-) -> Result<FunctionComponentUseMemoUseRefRenderRecord, FunctionComponentRenderError> {
+) -> Result<FunctionComponentUseMemoRenderRecord, FunctionComponentRenderError> {
     let mut request = validate_function_component_render(arena, work_in_progress, render_lanes)?;
     let hook_state = hook_store.prepare_render_state(arena, work_in_progress)?;
     request = request.with_hook_state(hook_state);
     reset_function_component_render_state(arena, work_in_progress)?;
 
+    let mut pending_memo_update = None;
     let mut cursor = hook_store.begin_render_cursor(hook_state)?;
-    let (memo_hook, ref_hook) = match hook_state.phase() {
-        FunctionComponentHookRenderPhase::Mount => (
+    let memo_hook = match hook_state.phase() {
+        FunctionComponentHookRenderPhase::Mount => {
             FunctionComponentUseMemoHookRenderRecord::Mount(hook_store.mount_memo_hook(
                 &mut cursor,
                 memo_request.value(),
                 memo_request.dependencies(),
-            )?),
-            FunctionComponentUseRefHookRenderRecord::Mount(
-                hook_store.mount_ref_hook(&mut cursor, ref_request.initial_value())?,
-            ),
-        ),
-        FunctionComponentHookRenderPhase::Update => (
-            FunctionComponentUseMemoHookRenderRecord::Update(hook_store.update_memo_hook(
+            )?)
+        }
+        FunctionComponentHookRenderPhase::Update => {
+            let update = hook_store.update_memo_hook(
                 &mut cursor,
                 memo_request.value(),
                 memo_request.dependencies(),
-            )?),
-            FunctionComponentUseRefHookRenderRecord::Update(
-                hook_store.update_ref_hook(&mut cursor, ref_request.initial_value())?,
-            ),
-        ),
+            )?;
+            pending_memo_update = Some(update);
+            FunctionComponentUseMemoHookRenderRecord::Update(update)
+        }
     };
     let hook_result = hook_store.finish_render_cursor(cursor)?;
 
@@ -6041,6 +6372,98 @@ pub(crate) fn render_function_component_with_use_memo_and_ref(
         .get_mut(work_in_progress)?
         .set_memoized_props(request.props());
 
+    let memo_update_diagnostic = match pending_memo_update {
+        Some(update) => Some(hook_store.record_memo_update_diagnostic(
+            hook_state,
+            request.render_lanes(),
+            update,
+        )?),
+        None => None,
+    };
+
+    Ok(FunctionComponentUseMemoRenderRecord {
+        render: FunctionComponentRenderRecord {
+            current: arena.get(work_in_progress)?.alternate(),
+            work_in_progress,
+            component: request.component(),
+            props: request.props(),
+            render_lanes: request.render_lanes(),
+            hook_state: request.hook_state(),
+            context_state: request.context_state(),
+            context_read_count: 0,
+            output,
+        },
+        hook_result,
+        memo_hook,
+        memo_update_diagnostic,
+    })
+}
+
+pub(crate) fn render_function_component_with_use_memo_and_ref(
+    arena: &mut FiberArena,
+    hook_store: &mut FunctionComponentHookRenderStore,
+    work_in_progress: FiberId,
+    render_lanes: Lanes,
+    memo_request: FunctionComponentUseMemoRenderRequest,
+    ref_request: FunctionComponentUseRefRenderRequest,
+    invoker: &mut impl FunctionComponentInvoker,
+) -> Result<FunctionComponentUseMemoUseRefRenderRecord, FunctionComponentRenderError> {
+    let mut request = validate_function_component_render(arena, work_in_progress, render_lanes)?;
+    let hook_state = hook_store.prepare_render_state(arena, work_in_progress)?;
+    request = request.with_hook_state(hook_state);
+    reset_function_component_render_state(arena, work_in_progress)?;
+
+    let mut pending_memo_update = None;
+    let mut cursor = hook_store.begin_render_cursor(hook_state)?;
+    let (memo_hook, ref_hook) = match hook_state.phase() {
+        FunctionComponentHookRenderPhase::Mount => (
+            FunctionComponentUseMemoHookRenderRecord::Mount(hook_store.mount_memo_hook(
+                &mut cursor,
+                memo_request.value(),
+                memo_request.dependencies(),
+            )?),
+            FunctionComponentUseRefHookRenderRecord::Mount(
+                hook_store.mount_ref_hook(&mut cursor, ref_request.initial_value())?,
+            ),
+        ),
+        FunctionComponentHookRenderPhase::Update => {
+            let memo_update = hook_store.update_memo_hook(
+                &mut cursor,
+                memo_request.value(),
+                memo_request.dependencies(),
+            )?;
+            pending_memo_update = Some(memo_update);
+            (
+                FunctionComponentUseMemoHookRenderRecord::Update(memo_update),
+                FunctionComponentUseRefHookRenderRecord::Update(
+                    hook_store.update_ref_hook(&mut cursor, ref_request.initial_value())?,
+                ),
+            )
+        }
+    };
+    let hook_result = hook_store.finish_render_cursor(cursor)?;
+
+    let output = invoker
+        .invoke_function_component(request)
+        .map_err(|error| FunctionComponentRenderError::Invocation {
+            fiber: request.fiber(),
+            component: request.component(),
+            error,
+        })?;
+
+    arena
+        .get_mut(work_in_progress)?
+        .set_memoized_props(request.props());
+
+    let memo_update_diagnostic = match pending_memo_update {
+        Some(update) => Some(hook_store.record_memo_update_diagnostic(
+            hook_state,
+            request.render_lanes(),
+            update,
+        )?),
+        None => None,
+    };
+
     Ok(FunctionComponentUseMemoUseRefRenderRecord {
         render: FunctionComponentRenderRecord {
             current: arena.get(work_in_progress)?.alternate(),
@@ -6055,6 +6478,7 @@ pub(crate) fn render_function_component_with_use_memo_and_ref(
         },
         hook_result,
         memo_hook,
+        memo_update_diagnostic,
         ref_hook,
     })
 }
@@ -8983,6 +9407,7 @@ mod tests {
         assert_eq!(record.work_in_progress(), work_in_progress);
         assert_eq!(record.output(), output);
         assert_eq!(record.render().hook_state(), Some(hook_state));
+        assert_eq!(record.memo_update_diagnostic(), None);
         assert_eq!(hook_state.phase(), FunctionComponentHookRenderPhase::Mount);
         assert_eq!(record.hook_traversal().traversed_count(), 2);
         assert_eq!(memo_hook.phase(), FunctionComponentHookRenderPhase::Mount);
@@ -9023,6 +9448,126 @@ mod tests {
             ),
             StateHandle::from_raw(ref_mount.ref_object().raw())
         );
+        assert!(
+            hook_store
+                .memo_update_diagnostic_records(hook_state)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn private_use_memo_render_path_records_reuse_diagnostic_when_deps_match() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let current_memo = hook_store
+            .create_current_memo_hook(current, StateHandle::from_raw(700), deps(7000))
+            .unwrap();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(74)));
+        let memo_request =
+            FunctionComponentUseMemoRenderRequest::new(StateHandle::from_raw(701), deps(7000));
+
+        let record = render_function_component_with_use_memo(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            memo_request,
+            &mut registry,
+        )
+        .unwrap();
+
+        let memo_update = record.memo_hook().update_record().unwrap();
+        let diagnostic = record.memo_update_diagnostic().unwrap();
+        assert_eq!(record.hook_traversal().traversed_count(), 1);
+        assert_eq!(memo_update.previous_hook(), current_memo.hook());
+        assert_eq!(diagnostic.diagnostic_index(), 0);
+        assert_eq!(diagnostic.fiber(), work_in_progress);
+        assert_eq!(diagnostic.current(), current);
+        assert_eq!(
+            diagnostic.current_hook_list(),
+            record.hook_state().current_list().unwrap()
+        );
+        assert_eq!(
+            diagnostic.hook_list(),
+            record.hook_state().work_in_progress_list()
+        );
+        assert_eq!(diagnostic.previous_hook(), current_memo.hook());
+        assert_eq!(diagnostic.hook(), memo_update.hook());
+        assert_eq!(diagnostic.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(diagnostic.previous_value(), StateHandle::from_raw(700));
+        assert_eq!(diagnostic.previous_dependencies(), deps(7000));
+        assert_eq!(diagnostic.requested_value(), StateHandle::from_raw(701));
+        assert_eq!(diagnostic.value(), StateHandle::from_raw(700));
+        assert_eq!(diagnostic.dependencies(), deps(7000));
+        assert_eq!(
+            diagnostic.dependency_status(),
+            FunctionComponentMemoDependencyStatus::Unchanged
+        );
+        assert!(diagnostic.reused_previous_value());
+        assert!(!diagnostic.recomputed_value());
+
+        let queue = hook_store
+            .memo_update_diagnostics(record.hook_state())
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            queue.hook_list(),
+            record.hook_state().work_in_progress_list()
+        );
+        assert_eq!(queue.len(), 1);
+        assert!(!queue.is_empty());
+        assert_eq!(queue.reuse_count(), 1);
+        assert_eq!(queue.recompute_count(), 0);
+        assert_eq!(queue.records(), &[diagnostic]);
+    }
+
+    #[test]
+    fn private_use_memo_update_diagnostics_count_reuse_and_recompute() {
+        let (arena, current, work_in_progress, _component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let first_current = hook_store
+            .create_current_memo_hook(current, StateHandle::from_raw(702), deps(7020))
+            .unwrap();
+        let second_current = hook_store
+            .create_current_memo_hook(current, StateHandle::from_raw(703), deps(7030))
+            .unwrap();
+        let state = hook_store
+            .prepare_render_state(&arena, work_in_progress)
+            .unwrap();
+        let mut cursor = hook_store.begin_render_cursor(state).unwrap();
+
+        let first_update = hook_store
+            .update_memo_hook(&mut cursor, StateHandle::from_raw(712), deps(7020))
+            .unwrap();
+        let second_update = hook_store
+            .update_memo_hook(&mut cursor, StateHandle::from_raw(713), deps(7130))
+            .unwrap();
+        let finished = hook_store.finish_render_cursor(cursor).unwrap();
+
+        assert_eq!(finished.traversal().traversed_count(), 2);
+        assert_eq!(first_update.previous_hook(), first_current.hook());
+        assert_eq!(second_update.previous_hook(), second_current.hook());
+        let first_diagnostic = hook_store
+            .record_memo_update_diagnostic(state, Lanes::DEFAULT, first_update)
+            .unwrap();
+        let second_diagnostic = hook_store
+            .record_memo_update_diagnostic(state, Lanes::SYNC, second_update)
+            .unwrap();
+        let queue = hook_store.memo_update_diagnostics(state).unwrap().unwrap();
+
+        assert_eq!(first_diagnostic.diagnostic_index(), 0);
+        assert_eq!(second_diagnostic.diagnostic_index(), 1);
+        assert_eq!(queue.len(), 2);
+        assert_eq!(queue.reuse_count(), 1);
+        assert_eq!(queue.recompute_count(), 1);
+        assert!(first_diagnostic.reused_previous_value());
+        assert!(!first_diagnostic.recomputed_value());
+        assert!(!second_diagnostic.reused_previous_value());
+        assert!(second_diagnostic.recomputed_value());
+        assert_eq!(second_diagnostic.render_lanes(), Lanes::SYNC);
+        assert_eq!(queue.records(), &[first_diagnostic, second_diagnostic]);
     }
 
     #[test]
@@ -9053,6 +9598,7 @@ mod tests {
         .unwrap();
 
         let memo_update = record.memo_hook().update_record().unwrap();
+        let memo_diagnostic = record.memo_update_diagnostic().unwrap();
         let ref_update = record.ref_hook().update_record().unwrap();
         assert_eq!(
             record.hook_state().phase(),
@@ -9071,6 +9617,19 @@ mod tests {
         );
         assert!(memo_update.reused_previous_value());
         assert_eq!(record.memo_hook().value(), StateHandle::from_raw(730));
+        assert_eq!(memo_diagnostic.previous_hook(), current_memo.hook());
+        assert_eq!(memo_diagnostic.hook(), memo_update.hook());
+        assert_eq!(
+            memo_diagnostic.hook_list(),
+            record.hook_state().work_in_progress_list()
+        );
+        assert_eq!(memo_diagnostic.render_lanes(), Lanes::DEFAULT);
+        assert_eq!(
+            memo_diagnostic.dependency_status(),
+            FunctionComponentMemoDependencyStatus::Unchanged
+        );
+        assert!(memo_diagnostic.reused_previous_value());
+        assert!(!memo_diagnostic.recomputed_value());
 
         assert_ne!(ref_update.hook(), current_ref.hook());
         assert_eq!(ref_update.ref_object(), current_ref.ref_object());
@@ -9146,6 +9705,7 @@ mod tests {
         .unwrap();
 
         let memo_update = record.memo_hook().update_record().unwrap();
+        let memo_diagnostic = record.memo_update_diagnostic().unwrap();
         let ref_update = record.ref_hook().update_record().unwrap();
         assert_eq!(memo_update.previous_value(), StateHandle::from_raw(750));
         assert_eq!(memo_update.previous_dependencies(), deps(7500));
@@ -9158,6 +9718,14 @@ mod tests {
         );
         assert!(!memo_update.reused_previous_value());
         assert_eq!(record.memo_hook().value(), StateHandle::from_raw(751));
+        assert_eq!(memo_diagnostic.previous_hook(), memo_update.previous_hook());
+        assert_eq!(memo_diagnostic.hook(), memo_update.hook());
+        assert_eq!(
+            memo_diagnostic.dependency_status(),
+            FunctionComponentMemoDependencyStatus::Changed
+        );
+        assert!(!memo_diagnostic.reused_previous_value());
+        assert!(memo_diagnostic.recomputed_value());
         assert_eq!(ref_update.ref_object(), current_ref.ref_object());
         assert_eq!(
             ref_update.ignored_initial_value(),

@@ -45,6 +45,10 @@ const callbackDefaultHooks = [
   ["useCallback", 2, ["callback", ["dep"]]]
 ];
 
+const memoDefaultHooks = [
+  ["useMemo", 2, [() => "memo", []]]
+];
+
 const contextDefaultHooks = [
   ["useContext", 1, [{ $$typeof: Symbol.for("react.context") }]]
 ];
@@ -154,6 +158,7 @@ const invalidHookCallDefaultHooks = selectedDefaultHooks;
 const dispatcherForwardedDefaultHooks = selectedDefaultHooks.filter(
   ([hookName]) =>
     !hasHookName(callbackDefaultHooks, hookName) &&
+    !hasHookName(memoDefaultHooks, hookName) &&
     !hasHookName(statefulDefaultHooks, hookName) &&
     !hasHookName(contextDefaultHooks, hookName) &&
     !hasHookName(effectDefaultHooks, hookName)
@@ -316,6 +321,32 @@ test("useCallback fails closed without a marked private callback-hook dispatcher
   assert.deepEqual(calls, []);
   assert.equal(
     hookDispatcher.isPrivateCallbackHookDispatcher(genericDispatcher),
+    false
+  );
+});
+
+test("useMemo fails closed without a marked private memo-hook dispatcher", () => {
+  const calls = [];
+  const genericDispatcher = {
+    useMemo(create, deps) {
+      calls.push([create, deps]);
+      return create();
+    }
+  };
+  const create = () => "memo";
+
+  hookDispatcher.ReactCurrentDispatcher.current = genericDispatcher;
+
+  assertInvalidHookCall(() => React.useMemo(create, ["dep"]), "useMemo");
+  assertInvalidHookCall(() => ReactServer.useMemo(create, ["dep"]), "useMemo");
+  assertInvalidHookCall(
+    () => hookDispatcher.markPrivateMemoHookDispatcher(genericDispatcher),
+    "useMemo"
+  );
+
+  assert.deepEqual(calls, []);
+  assert.equal(
+    hookDispatcher.isPrivateMemoHookDispatcher(genericDispatcher),
     false
   );
 });
@@ -498,6 +529,7 @@ test("private callback-hook dispatcher metadata names match accepted memo record
   ]);
   assert.deepEqual(metadata.memoUpdateRecordFields, [
     "hook",
+    "previousHook",
     "previousValue",
     "previousDependencies",
     "requestedValue",
@@ -533,6 +565,76 @@ test("private callback-hook dispatcher metadata names match accepted memo record
   assert.equal(React.markPrivateCallbackHookDispatcher, undefined);
 });
 
+test("private memo-hook dispatcher metadata names match accepted useMemo diagnostics", () => {
+  const metadata = hookDispatcher.privateMemoHookDispatcherMetadata;
+
+  assert.equal(metadata.capability, "fast-react.private.memo_hook_dispatcher");
+  assert.equal(metadata.compatibilityTarget, "react@19.2.6");
+  assert.equal(metadata.compatibilityClaimed, false);
+  assert.equal(metadata.exposesPublicHookImplementation, false);
+  assert.equal(metadata.rendererIntegration, false);
+  assert.equal(metadata.schedulesPublicJsUpdates, false);
+  assert.equal(metadata.executesCreate, false);
+  assert.deepEqual(metadata.hookNames, ["useMemo"]);
+  assert.deepEqual(metadata.hookCallFields, ["create", "dependencies"]);
+  assert.deepEqual(metadata.renderRequestFields, ["value", "dependencies"]);
+  assert.deepEqual(metadata.hookRecordFields, [
+    "hook",
+    "value",
+    "dependencies"
+  ]);
+  assert.deepEqual(metadata.updateRecordFields, [
+    "hook",
+    "previousHook",
+    "previousValue",
+    "previousDependencies",
+    "requestedValue",
+    "value",
+    "dependencies",
+    "dependencyStatus"
+  ]);
+  assert.deepEqual(metadata.updateDiagnosticRecordFields, [
+    "diagnosticIndex",
+    "fiber",
+    "current",
+    "currentHookList",
+    "hookList",
+    "previousHook",
+    "hook",
+    "renderLanes",
+    "previousValue",
+    "previousDependencies",
+    "requestedValue",
+    "value",
+    "dependencies",
+    "dependencyStatus"
+  ]);
+  assert.deepEqual(metadata.updateDiagnosticsFields, ["hookList", "records"]);
+  assert.deepEqual(metadata.dependencyStatusNames, ["Changed", "Unchanged"]);
+  assert.deepEqual(metadata.acceptedReconcilerRecords, [
+    "FunctionComponentUseMemoRenderRequest",
+    "FunctionComponentMemoDependencyStatus",
+    "FunctionComponentMemoHookRecord",
+    "FunctionComponentMemoUpdateRecord",
+    "FunctionComponentMemoUpdateDiagnosticRecord",
+    "FunctionComponentMemoUpdateDiagnostics",
+    "FunctionComponentUseMemoHookRenderRecord",
+    "FunctionComponentUseMemoRenderRecord",
+    "FunctionComponentUseMemoUseRefRenderRecord"
+  ]);
+  assert.equal(hookDispatcher.isPrivateMemoHookDispatcherMetadata(metadata), true);
+  assert.equal(Object.isFrozen(metadata), true);
+
+  for (const value of Object.values(metadata)) {
+    if (Array.isArray(value)) {
+      assert.equal(Object.isFrozen(value), true);
+    }
+  }
+
+  assert.equal(React.privateMemoHookDispatcherMetadata, undefined);
+  assert.equal(React.markPrivateMemoHookDispatcher, undefined);
+});
+
 test("private callback-hook dispatcher marker rejects dependency metadata drift", () => {
   const dispatcher = {
     useCallback() {
@@ -557,6 +659,29 @@ test("private callback-hook dispatcher marker rejects dependency metadata drift"
     "useCallback"
   );
   assert.equal(hookDispatcher.isPrivateCallbackHookDispatcher(dispatcher), false);
+});
+
+test("private memo-hook dispatcher marker rejects diagnostic metadata drift", () => {
+  const dispatcher = {
+    useMemo() {
+      throw new Error("unreachable memo dispatch");
+    }
+  };
+  const driftedMetadata = {
+    ...hookDispatcher.privateMemoHookDispatcherMetadata,
+    updateDiagnosticRecordFields: ["hook", "dependencyStatus"]
+  };
+
+  assert.equal(
+    hookDispatcher.isPrivateMemoHookDispatcherMetadata(driftedMetadata),
+    false
+  );
+  assertInvalidHookCall(
+    () =>
+      hookDispatcher.markPrivateMemoHookDispatcher(dispatcher, driftedMetadata),
+    "useMemo"
+  );
+  assert.equal(hookDispatcher.isPrivateMemoHookDispatcher(dispatcher), false);
 });
 
 test("private state-hook dispatcher marker rejects lane and update metadata drift", () => {
@@ -741,6 +866,55 @@ test("useCallback forwards only to a marked private callback-hook dispatcher", (
   assert.equal(hookDispatcher.isPrivateCallbackHookDispatcher(dispatcher), true);
   assert.equal(
     hookDispatcher.getPrivateCallbackHookDispatcherMetadata(dispatcher),
+    metadata
+  );
+});
+
+test("useMemo forwards only to a marked private memo-hook dispatcher", () => {
+  const calls = [];
+  const invokedCreates = [];
+  const metadata = hookDispatcher.privateMemoHookDispatcherMetadata;
+  const dispatcher = hookDispatcher.markPrivateMemoHookDispatcher(
+    {
+      useMemo(create, deps, receivedMetadata) {
+        calls.push({
+          args: [create, deps],
+          hookName: "useMemo",
+          metadata: receivedMetadata,
+          thisMatchesDispatcher: this === dispatcher
+        });
+        return "memoized-value";
+      }
+    },
+    metadata
+  );
+  const create = () => {
+    invokedCreates.push("called");
+    return "memo";
+  };
+
+  hookDispatcher.ReactCurrentDispatcher.current = dispatcher;
+
+  assert.equal(React.useMemo(create, ["dep"]), "memoized-value");
+  assert.equal(ReactServer.useMemo(create, ["server-dep"]), "memoized-value");
+  assert.deepEqual(invokedCreates, []);
+  assert.deepEqual(calls, [
+    {
+      args: [create, ["dep"]],
+      hookName: "useMemo",
+      metadata,
+      thisMatchesDispatcher: true
+    },
+    {
+      args: [create, ["server-dep"]],
+      hookName: "useMemo",
+      metadata,
+      thisMatchesDispatcher: true
+    }
+  ]);
+  assert.equal(hookDispatcher.isPrivateMemoHookDispatcher(dispatcher), true);
+  assert.equal(
+    hookDispatcher.getPrivateMemoHookDispatcherMetadata(dispatcher),
     metadata
   );
 });
@@ -935,7 +1109,7 @@ test("effect hooks forward only to a marked private effect-hook dispatcher", () 
   assert.equal(hookDispatcher.isPrivateEffectHookDispatcher(dispatcher), true);
 });
 
-test("react-server hooks share the generic guard while useCallback stays private", () => {
+test("react-server hooks share the generic guard while memo and callback stay private", () => {
   const calls = [];
   const dispatcher = {
     use(usable) {
@@ -962,11 +1136,8 @@ test("react-server hooks share the generic guard while useCallback stays private
     () => ReactServer.useCallback(callback, ["dep"]),
     "useCallback"
   );
-  assert.equal(ReactServer.useMemo(create, ["dep"]), "memo");
-  assert.deepEqual(calls, [
-    ["use", "usable"],
-    ["useMemo", create, ["dep"]]
-  ]);
+  assertInvalidHookCall(() => ReactServer.useMemo(create, ["dep"]), "useMemo");
+  assert.deepEqual(calls, [["use", "usable"]]);
 });
 
 function hasHookName(hooks, hookName) {
