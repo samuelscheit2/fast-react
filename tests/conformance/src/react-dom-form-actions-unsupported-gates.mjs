@@ -256,6 +256,82 @@ export function assertPrivateFormActionResetDispatcherGate() {
   );
   assert.equal(requestSubmit.intent.realFormInspected, false);
 
+  const extractionGate = resourceFormGate.createFormActionEventExtractionGate({
+    requestIdPrefix: "conformance-form-event-extraction"
+  });
+  const extraction =
+    extractionGate.recordEventExtractionFromSubmissionIntent(requestSubmit);
+  const extractionSummary =
+    resourceFormGate.describePrivateFormActionEventExtractionGate();
+  assert.equal(
+    extractionSummary.gateId,
+    resourceFormGate.privateFormActionEventExtractionGateId
+  );
+  assert.equal(
+    extractionSummary.status,
+    resourceFormGate.privateFormActionEventExtractionStatus
+  );
+  assert.equal(
+    extractionSummary.acceptedSourceRecordType,
+    resourceFormGate.privateFormActionResetDispatcherRecordType
+  );
+  assert.deepEqual(extractionSummary.acceptedSubmissionTriggers, [
+    "submit",
+    "requestSubmit"
+  ]);
+  assert.equal(
+    extractionSummary.consumesSubmitRequestSubmitActionMetadata,
+    true
+  );
+  assert.equal(extractionSummary.recordsEventExtractionMetadata, true);
+  assert.equal(extractionSummary.acceptsRealForms, false);
+  assert.equal(extractionSummary.acceptsRawEvents, false);
+  assert.equal(extractionSummary.createsSyntheticEvents, false);
+  assert.equal(extractionSummary.constructsFormData, false);
+  assert.equal(extractionSummary.invokesActions, false);
+  assert.equal(extractionSummary.startsHostTransition, false);
+  assert.deepEqual(
+    extractionSummary.sideEffects,
+    resourceFormGate.formActionEventExtractionBlockedSideEffects
+  );
+  assert.equal(
+    resourceFormGate.isPrivateFormActionEventExtractionRecord(extraction),
+    true
+  );
+  assert.equal(
+    resourceFormGate.getPrivateFormActionEventExtractionRecordPayload(
+      extraction
+    ),
+    extraction
+  );
+  assert.equal(
+    extraction.status,
+    resourceFormGate.privateFormActionEventExtractionRecordedStatus
+  );
+  assert.equal(extraction.sourceRequestId, requestSubmit.requestId);
+  assert.equal(extraction.submissionTrigger, "requestSubmit");
+  assert.equal(extraction.sourceActionMetadata.metadataOnly, true);
+  assert.equal(
+    extraction.eventExtraction.consumedSubmitRequestSubmitActionMetadata,
+    true
+  );
+  assert.equal(
+    extraction.eventExtraction.requestSubmitWouldDispatchSubmitEvent,
+    true
+  );
+  assert.equal(extraction.eventExtraction.formDataConstructed, false);
+  assert.equal(extraction.eventExtraction.syntheticEventCreated, false);
+  assert.equal(extraction.eventExtraction.actionInvoked, false);
+  assert.equal(extraction.eventExtraction.hostTransitionStarted, false);
+  assert.deepEqual(
+    extraction.sideEffects,
+    resourceFormGate.formActionEventExtractionMetadataSideEffects
+  );
+  assert.equal(extraction.sideEffects.formActionEventPluginInvoked, false);
+  assert.equal(extraction.sideEffects.nativeEventInspected, false);
+  assert.equal(extraction.sideEffects.realFormInspected, false);
+  assert.equal(extraction.sideEffects.formDataConstructed, false);
+
   const actionCompletionReset = gate.recordResetIntent({
     explicitIntent: true,
     dispatcherKey: "r",
@@ -305,6 +381,14 @@ export function assertPrivateFormActionResetDispatcherGate() {
       code: resourceFormGate.privateFormActionResetDispatcherInvalidIntentCode,
       compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
       reason: "form must not be passed to the metadata gate"
+    }
+  );
+  assert.throws(
+    () => extractionGate.recordEventExtractionFromSubmissionIntent(reset),
+    {
+      code: resourceFormGate.privateFormActionEventExtractionInvalidRecordCode,
+      compatibilityTarget: FAST_REACT_DOM_COMPATIBILITY_TARGET,
+      reason: "source record must be a recorded submit action intent"
     }
   );
 }

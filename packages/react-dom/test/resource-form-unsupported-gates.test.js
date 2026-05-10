@@ -656,6 +656,288 @@ test('private form action/reset dispatcher gate records intent metadata only', (
   assert.equal(actionCompletionReset.intent.realFormReset, false);
 });
 
+test('private form action event-extraction gate consumes submit metadata only', () => {
+  const dispatcherGate = resourceFormGate.createFormActionResetDispatcherGate({
+    requestIdPrefix: 'form-event-source'
+  });
+  const extractionGate = resourceFormGate.createFormActionEventExtractionGate({
+    requestIdPrefix: 'form-event-extraction'
+  });
+  const submitIntent = dispatcherGate.recordSubmissionIntent({
+    explicitIntent: true,
+    eventName: 'submit',
+    actionKind: 'function',
+    actionSource: 'form',
+    submitControlKind: 'button',
+    defaultPrevented: false,
+    transitionScheduled: false
+  });
+  const requestSubmitIntent = dispatcherGate.recordSubmissionIntent({
+    explicitIntent: true,
+    eventName: 'submit',
+    submissionTrigger: 'requestSubmit',
+    actionKind: 'function',
+    actionSource: 'submit-control',
+    submitControlKind: 'input',
+    formActionKind: 'string',
+    submitterActionKind: 'function',
+    defaultPrevented: false,
+    transitionScheduled: false
+  });
+  const records = [
+    extractionGate.recordEventExtractionFromSubmissionIntent(submitIntent),
+    extractionGate.recordEventExtractionFromSubmissionIntent(
+      requestSubmitIntent
+    )
+  ];
+  const summary =
+    resourceFormGate.describePrivateFormActionEventExtractionGate();
+
+  assert.equal(
+    summary.gateId,
+    resourceFormGate.privateFormActionEventExtractionGateId
+  );
+  assert.equal(
+    summary.status,
+    resourceFormGate.privateFormActionEventExtractionStatus
+  );
+  assert.equal(
+    summary.acceptedSourceRecordType,
+    resourceFormGate.privateFormActionResetDispatcherRecordType
+  );
+  assert.equal(
+    summary.acceptedSourceGateId,
+    resourceFormGate.privateFormActionResetDispatcherGateId
+  );
+  assert.equal(
+    summary.acceptedSourceStatus,
+    resourceFormGate.privateFormActionSubmissionIntentRecordedStatus
+  );
+  assert.deepEqual(summary.acceptedSubmissionTriggers, [
+    'submit',
+    'requestSubmit'
+  ]);
+  assert.equal(summary.consumesSubmitRequestSubmitActionMetadata, true);
+  assert.equal(summary.recordsEventExtractionMetadata, true);
+  assert.equal(summary.acceptsRealForms, false);
+  assert.equal(summary.acceptsRawEvents, false);
+  assert.equal(summary.createsSyntheticEvents, false);
+  assert.equal(summary.constructsFormData, false);
+  assert.equal(summary.invokesActions, false);
+  assert.equal(summary.startsHostTransition, false);
+  assert.deepEqual(
+    summary.sideEffects,
+    resourceFormGate.formActionEventExtractionBlockedSideEffects
+  );
+
+  assert.deepEqual(
+    records.map((record) => ({
+      extractionId: record.extractionId,
+      extractionSequence: record.extractionSequence,
+      sourceRequestId: record.sourceRequestId,
+      sourceRequestSequence: record.sourceRequestSequence,
+      requestType: record.requestType,
+      status: record.status,
+      eventName: record.eventName,
+      submissionTrigger: record.submissionTrigger,
+      actionKind: record.actionKind,
+      actionSource: record.actionSource,
+      submitControlKind: record.submitControlKind,
+      formActionKind: record.formActionKind,
+      submitterActionKind: record.submitterActionKind,
+      submitterActionOverridesFormAction:
+        record.submitterActionOverridesFormAction,
+      eventExtraction: {
+        metadataOnly: record.eventExtraction.metadataOnly,
+        sourceMetadataOnly: record.eventExtraction.sourceMetadataOnly,
+        consumedSubmitRequestSubmitActionMetadata:
+          record.eventExtraction.consumedSubmitRequestSubmitActionMetadata,
+        requestSubmitWouldDispatchSubmitEvent:
+          record.eventExtraction.requestSubmitWouldDispatchSubmitEvent,
+        nativeNavigationWouldBePrevented:
+          record.eventExtraction.nativeNavigationWouldBePrevented,
+        pendingStatusWouldBeSet:
+          record.eventExtraction.pendingStatusWouldBeSet,
+        actionInvocationWouldBeScheduled:
+          record.eventExtraction.actionInvocationWouldBeScheduled,
+        submitterValueWouldBeIncludedInFormData:
+          record.eventExtraction.submitterValueWouldBeIncludedInFormData,
+        formDataConstructed: record.eventExtraction.formDataConstructed,
+        syntheticEventCreated: record.eventExtraction.syntheticEventCreated,
+        listenerDispatchStarted:
+          record.eventExtraction.listenerDispatchStarted,
+        actionInvoked: record.eventExtraction.actionInvoked,
+        hostTransitionStarted: record.eventExtraction.hostTransitionStarted,
+        compatibilityClaimed: record.eventExtraction.compatibilityClaimed
+      }
+    })),
+    [
+      {
+        extractionId: 'form-event-extraction:1',
+        extractionSequence: 1,
+        sourceRequestId: 'form-event-source:1',
+        sourceRequestSequence: 1,
+        requestType: 'form-action-event-extraction.submit',
+        status: resourceFormGate.privateFormActionEventExtractionRecordedStatus,
+        eventName: 'submit',
+        submissionTrigger: 'submit',
+        actionKind: 'function',
+        actionSource: 'form',
+        submitControlKind: 'button',
+        formActionKind: 'function',
+        submitterActionKind: 'none',
+        submitterActionOverridesFormAction: false,
+        eventExtraction: {
+          metadataOnly: true,
+          sourceMetadataOnly: true,
+          consumedSubmitRequestSubmitActionMetadata: true,
+          requestSubmitWouldDispatchSubmitEvent: false,
+          nativeNavigationWouldBePrevented: true,
+          pendingStatusWouldBeSet: true,
+          actionInvocationWouldBeScheduled: true,
+          submitterValueWouldBeIncludedInFormData: true,
+          formDataConstructed: false,
+          syntheticEventCreated: false,
+          listenerDispatchStarted: false,
+          actionInvoked: false,
+          hostTransitionStarted: false,
+          compatibilityClaimed: false
+        }
+      },
+      {
+        extractionId: 'form-event-extraction:2',
+        extractionSequence: 2,
+        sourceRequestId: 'form-event-source:2',
+        sourceRequestSequence: 2,
+        requestType: 'form-action-event-extraction.submit',
+        status: resourceFormGate.privateFormActionEventExtractionRecordedStatus,
+        eventName: 'submit',
+        submissionTrigger: 'requestSubmit',
+        actionKind: 'function',
+        actionSource: 'submit-control',
+        submitControlKind: 'input',
+        formActionKind: 'string',
+        submitterActionKind: 'function',
+        submitterActionOverridesFormAction: true,
+        eventExtraction: {
+          metadataOnly: true,
+          sourceMetadataOnly: true,
+          consumedSubmitRequestSubmitActionMetadata: true,
+          requestSubmitWouldDispatchSubmitEvent: true,
+          nativeNavigationWouldBePrevented: true,
+          pendingStatusWouldBeSet: true,
+          actionInvocationWouldBeScheduled: true,
+          submitterValueWouldBeIncludedInFormData: false,
+          formDataConstructed: false,
+          syntheticEventCreated: false,
+          listenerDispatchStarted: false,
+          actionInvoked: false,
+          hostTransitionStarted: false,
+          compatibilityClaimed: false
+        }
+      }
+    ]
+  );
+
+  for (const record of records) {
+    assert.equal(Object.isFrozen(record), true, record.extractionId);
+    assert.equal(
+      resourceFormGate.isPrivateFormActionEventExtractionRecord(record),
+      true,
+      record.extractionId
+    );
+    assert.equal(
+      resourceFormGate.getPrivateFormActionEventExtractionRecordPayload(
+        record
+      ),
+      record,
+      record.extractionId
+    );
+    assert.deepEqual(
+      record.sideEffects,
+      resourceFormGate.formActionEventExtractionMetadataSideEffects
+    );
+    assert.equal(record.sideEffects.sourceSubmissionIntentConsumed, true);
+    assert.equal(record.sideEffects.eventExtractionMetadataRecorded, true);
+    assert.equal(record.sideEffects.formActionEventPluginInvoked, false);
+    assert.equal(record.sideEffects.nativeEventInspected, false);
+    assert.equal(record.sideEffects.realFormInspected, false);
+    assert.equal(record.sideEffects.submitControlInspected, false);
+    assert.equal(record.sideEffects.formDataConstructed, false);
+    assert.equal(record.sideEffects.syntheticEventCreated, false);
+    assert.equal(record.sideEffects.actionInvoked, false);
+    assert.equal(record.sideEffects.hostTransitionStarted, false);
+    assert.equal(record.eventExtractionBoundary.acceptsRealForms, false);
+    assert.equal(record.eventExtractionBoundary.acceptsRawEvents, false);
+    assert.equal(
+      record.eventExtractionBoundary.consumesSubmitRequestSubmitActionMetadata,
+      true
+    );
+    assert.equal(record.eventExtractionBoundary.syntheticEventCreated, false);
+    assert.equal(record.eventExtractionBoundary.formDataConstructed, false);
+    assert.equal(record.eventExtractionBoundary.actionInvoked, false);
+    assert.equal(record.eventExtractionBoundary.hostTransitionStarted, false);
+  }
+
+  const error =
+    resourceFormGate.createUnsupportedFormActionEventExtractionError(
+      records[0]
+    );
+  assert.equal(error.name, 'FastReactDomUnimplementedError');
+  assert.equal(
+    error.code,
+    resourceFormGate.privateFormActionEventExtractionGateErrorCode
+  );
+  assert.equal(error.extractionId, 'form-event-extraction:1');
+  assert.equal(error.sourceRequestId, 'form-event-source:1');
+  assert.equal(error.status, records[0].status);
+  assert.deepEqual(error.sideEffects, records[0].sideEffects);
+  assert.match(
+    error.message,
+    /private form action event-extraction gate records submit metadata only/u
+  );
+
+  const resetIntent = dispatcherGate.recordResetIntent({
+    explicitIntent: true,
+    dispatcherKey: 'r',
+    resetSource: 'requestFormReset',
+    formOwnership: 'not-inspected',
+    transitionContext: 'action'
+  });
+  assert.throws(
+    () => extractionGate.recordEventExtractionFromSubmissionIntent(resetIntent),
+    {
+      code: resourceFormGate.privateFormActionEventExtractionInvalidRecordCode,
+      compatibilityTarget,
+      reason: 'source record must be a recorded submit action intent'
+    }
+  );
+
+  const replayIntent = dispatcherGate.recordSubmissionIntent({
+    explicitIntent: true,
+    eventName: 'submit',
+    replayed: true,
+    actionKind: 'function',
+    actionSource: 'replay',
+    submitControlKind: 'none'
+  });
+  assert.throws(
+    () => extractionGate.recordEventExtractionFromSubmissionIntent(replayIntent),
+    {
+      code: resourceFormGate.privateFormActionEventExtractionInvalidRecordCode,
+      compatibilityTarget,
+      reason: 'source action metadata must be for submit or requestSubmit'
+    }
+  );
+  assert.throws(
+    () => resourceFormGate.createUnsupportedFormActionEventExtractionError({}),
+    {
+      code: resourceFormGate.privateFormActionEventExtractionInvalidRecordCode,
+      compatibilityTarget
+    }
+  );
+});
+
 test('private controlled input value-tracker gate records deterministic metadata only', () => {
   const first = createPrivateControlledValueTrackerScenario();
   const second = createPrivateControlledValueTrackerScenario();
@@ -6297,6 +6579,16 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
   assert.equal(summary.sideEffects.realFormInspected, false);
   assert.equal(summary.sideEffects.submitControlInspected, false);
   assert.equal(summary.sideEffects.formDataConstructed, false);
+  assert.equal(
+    summary.sideEffects.sourceSubmissionIntentConsumed,
+    false
+  );
+  assert.equal(
+    summary.sideEffects.eventExtractionMetadataRecorded,
+    false
+  );
+  assert.equal(summary.sideEffects.nativeEventInspected, false);
+  assert.equal(summary.sideEffects.syntheticEventCreated, false);
   assert.equal(summary.sideEffects.actionInvoked, false);
   assert.equal(summary.sideEffects.hostTransitionStarted, false);
   assert.equal(summary.sideEffects.realFormReset, false);
@@ -6315,6 +6607,14 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
   assert.deepEqual(
     summary.privateFormActionResetDispatcherBoundary,
     resourceFormGate.describePrivateFormActionResetDispatcherGate()
+  );
+  assert.deepEqual(
+    summary.privateFormActionEventExtractionBoundary,
+    resourceFormGate.describePrivateFormActionEventExtractionBoundary(null)
+  );
+  assert.deepEqual(
+    summary.privateFormActionEventExtractionBoundary,
+    resourceFormGate.describePrivateFormActionEventExtractionGate()
   );
 
   assert.deepEqual(summary.publicRootBoundary, {
@@ -6449,7 +6749,40 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
       realFormReset: false,
       compatibilityClaimed: false,
       dispatcherGate:
-        resourceFormGate.describePrivateFormActionResetDispatcherGate()
+        resourceFormGate.describePrivateFormActionResetDispatcherGate(),
+      eventExtractionGate:
+        resourceFormGate.describePrivateFormActionEventExtractionGate()
+    },
+    formActionEventExtractionBoundary: {
+      gateStatus: resourceFormGate.privateSourceAdapterBlockedStatus,
+      behaviorArea: null,
+      supportedBehaviorArea: 'form-action',
+      appliesToRequest: false,
+      metadataGateAvailable: true,
+      sourceRecordsAccepted: true,
+      acceptedSourceRecordType:
+        resourceFormGate.privateFormActionResetDispatcherRecordType,
+      acceptedSourceStatus:
+        resourceFormGate.privateFormActionSubmissionIntentRecordedStatus,
+      acceptedSubmissionTriggers: ['submit', 'requestSubmit'],
+      consumesSubmitRequestSubmitActionMetadata: true,
+      eventExtractionMetadataRecorded: true,
+      realFormAccepted: false,
+      rawTargetCaptured: false,
+      rawEventCaptured: false,
+      nativeEventInspected: false,
+      formInspected: false,
+      submitControlInspected: false,
+      formDataConstructed: false,
+      syntheticEventCreated: false,
+      listenerDispatchStarted: false,
+      actionInvoked: false,
+      transitionStarted: false,
+      resetStateQueued: false,
+      publicRootTouched: false,
+      compatibilityClaimed: false,
+      extractionGate:
+        resourceFormGate.describePrivateFormActionEventExtractionGate()
     },
     controlledValueTrackerBoundary: {
       gateStatus: resourceFormGate.privateControlledValueTrackerBlockedStatus,
@@ -6508,6 +6841,9 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
       formActionDispatcherApplies:
         record.sourceAdapterBoundary.formActionResetDispatcherBoundary !==
         null,
+      formActionEventExtractionApplies:
+        record.sourceAdapterBoundary.formActionEventExtractionBoundary !==
+        null,
       trackerBoundaryApplies:
         record.sourceAdapterBoundary.controlledValueTrackerBoundary
           .appliesToRequest
@@ -6522,6 +6858,7 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
         sourceAdapterStatus: resourceFormGate.privateSourceAdapterBlockedStatus,
         resourceHintAdapterApplies: true,
         formActionDispatcherApplies: false,
+        formActionEventExtractionApplies: false,
         trackerBoundaryApplies: false
       },
       {
@@ -6533,6 +6870,7 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
         sourceAdapterStatus: resourceFormGate.privateSourceAdapterBlockedStatus,
         resourceHintAdapterApplies: false,
         formActionDispatcherApplies: true,
+        formActionEventExtractionApplies: true,
         trackerBoundaryApplies: false
       },
       {
@@ -6544,6 +6882,7 @@ test('resource/form requests stay fail-closed with accepted private root bridge 
         sourceAdapterStatus: resourceFormGate.privateSourceAdapterBlockedStatus,
         resourceHintAdapterApplies: false,
         formActionDispatcherApplies: false,
+        formActionEventExtractionApplies: false,
         trackerBoundaryApplies: true
       }
     ]

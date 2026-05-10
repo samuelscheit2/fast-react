@@ -70,6 +70,7 @@ const rootBoundarySideEffects = freezeRecord({
   ...internalsGate.resourceHintPreloadPreinitOrderBlockedSideEffects,
   ...internalsGate.resourceHintStylesheetPrecedenceBlockedSideEffects,
   ...internalsGate.formActionResetDispatcherBlockedSideEffects,
+  ...internalsGate.formActionEventExtractionBlockedSideEffects,
   ...internalsGate.controlledInputValueTrackerSideEffects,
   privateRootBridgeExecuted: false,
   publicRootFacadeCreated: false,
@@ -107,6 +108,8 @@ function describeResourceFormRootBridgeBlockedGate() {
       describePrivateResourceDispatcherBoundary(null),
     privateFormActionResetDispatcherBoundary:
       describePrivateFormActionResetDispatcherBoundary(null),
+    privateFormActionEventExtractionBoundary:
+      describePrivateFormActionEventExtractionBoundary(null),
     sourceAdapterBoundary: describeSourceAdapterBoundary(null),
     sideEffects: rootBoundarySideEffects
   });
@@ -125,6 +128,8 @@ function recordResourceFormRootBridgeBlockedRequest(record, options) {
     describePrivateResourceDispatcherBoundary(request.behaviorArea);
   const privateFormActionResetDispatcherBoundary =
     describePrivateFormActionResetDispatcherBoundary(request.behaviorArea);
+  const privateFormActionEventExtractionBoundary =
+    describePrivateFormActionEventExtractionBoundary(request.behaviorArea);
 
   const payload = freezeRecord({
     $$typeof: resourceFormRootBoundaryRecordType,
@@ -144,6 +149,7 @@ function recordResourceFormRootBridgeBlockedRequest(record, options) {
     publicRootBoundary,
     privateResourceDispatcherBoundary,
     privateFormActionResetDispatcherBoundary,
+    privateFormActionEventExtractionBoundary,
     sourceAdapterBoundary,
     sideEffects: rootBoundarySideEffects
   });
@@ -432,6 +438,8 @@ function describeSourceAdapterBoundary(behaviorArea) {
       describeResourceHintFakeDomAdapterBoundary(behaviorArea),
     formActionResetDispatcherBoundary:
       describeFormActionResetDispatcherBoundary(behaviorArea),
+    formActionEventExtractionBoundary:
+      describeFormActionEventExtractionBoundary(behaviorArea),
     controlledValueTrackerBoundary:
       describeControlledValueTrackerBoundary(behaviorArea)
   });
@@ -537,7 +545,48 @@ function describeFormActionResetDispatcherBoundary(behaviorArea) {
     formResetCommitted: false,
     realFormReset: false,
     compatibilityClaimed: false,
-    dispatcherGate: internalsGate.describePrivateFormActionResetDispatcherGate()
+    dispatcherGate: internalsGate.describePrivateFormActionResetDispatcherGate(),
+    eventExtractionGate:
+      internalsGate.describePrivateFormActionEventExtractionGate()
+  });
+}
+
+function describeFormActionEventExtractionBoundary(behaviorArea) {
+  if (behaviorArea !== null && behaviorArea !== 'form-action') {
+    return null;
+  }
+
+  return freezeRecord({
+    gateStatus: privateSourceAdapterBlockedStatus,
+    behaviorArea,
+    supportedBehaviorArea: 'form-action',
+    appliesToRequest: behaviorArea === 'form-action',
+    metadataGateAvailable: true,
+    sourceRecordsAccepted:
+      behaviorArea === null || behaviorArea === 'form-action',
+    acceptedSourceRecordType:
+      internalsGate.privateFormActionResetDispatcherRecordType,
+    acceptedSourceStatus:
+      internalsGate.privateFormActionSubmissionIntentRecordedStatus,
+    acceptedSubmissionTriggers: freezeArray(['submit', 'requestSubmit']),
+    consumesSubmitRequestSubmitActionMetadata: true,
+    eventExtractionMetadataRecorded: true,
+    realFormAccepted: false,
+    rawTargetCaptured: false,
+    rawEventCaptured: false,
+    nativeEventInspected: false,
+    formInspected: false,
+    submitControlInspected: false,
+    formDataConstructed: false,
+    syntheticEventCreated: false,
+    listenerDispatchStarted: false,
+    actionInvoked: false,
+    transitionStarted: false,
+    resetStateQueued: false,
+    publicRootTouched: false,
+    compatibilityClaimed: false,
+    extractionGate:
+      internalsGate.describePrivateFormActionEventExtractionGate()
   });
 }
 
@@ -575,6 +624,14 @@ function describePrivateFormActionResetDispatcherBoundary(behaviorArea) {
   }
 
   return internalsGate.describePrivateFormActionResetDispatcherGate();
+}
+
+function describePrivateFormActionEventExtractionBoundary(behaviorArea) {
+  if (behaviorArea !== null && behaviorArea !== 'form-action') {
+    return null;
+  }
+
+  return internalsGate.describePrivateFormActionEventExtractionGate();
 }
 
 function assertResourceFormGateRecord(record) {
@@ -816,6 +873,7 @@ function freezeRecord(value) {
 }
 
 module.exports = Object.assign({}, internalsGate, {
+  describePrivateFormActionEventExtractionBoundary,
   describePrivateFormActionResetDispatcherBoundary,
   describeResourceFormRootBridgeBlockedGate,
   describePrivateResourceDispatcherBoundary,
