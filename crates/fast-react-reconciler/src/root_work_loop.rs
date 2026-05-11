@@ -127,7 +127,8 @@ use crate::{
         HostRootFinishedWorkCommitExecutionStatusForCanary,
         HostRootFinishedWorkCommitHandoffErrorForCanary,
         HostRootFinishedWorkCommitHandoffRecordForCanary,
-        HostRootFinishedWorkPendingCommitRecordForCanary, HostRootMutationApplyRecordKind,
+        HostRootFinishedWorkPendingCommitRecordForCanary,
+        HostRootMutationApplyRecordKind,
         HostRootPlacementApplyDiagnosticForCanary,
         HostRootSingleHostUpdateApplyRecordErrorForCanary,
         HostRootSingleHostUpdateApplyRecordForCanary,
@@ -6977,23 +6978,28 @@ mod tests {
     };
     use crate::host_nodes::HostNodeViolation;
     use crate::host_work::{
-        DetachedHostRecords, TestHostRootManagedChildExecutionDiagnosticForCanary,
+        DetachedHostRecords, TestHostRootDeletionCleanupAction,
+        TestHostRootDeletionCleanupApplyResult, TestHostRootDeletionCleanupStatus,
+        TestHostRootManagedChildExecutionDiagnosticForCanary,
         TestHostRootManagedChildSiblingOrderExecutionDiagnosticForCanary,
-        TestHostRootMutationApplyStatus, TestHostRootMutationHostCall,
-        apply_managed_child_complete_work_handoff_for_canary,
+        TestHostRootMutationApplyResult, TestHostRootMutationApplyStatus,
+        TestHostRootMutationHostCall, apply_managed_child_complete_work_handoff_for_canary,
         apply_managed_child_sibling_order_complete_work_handoff_for_canary,
         apply_test_host_root_commit_mutations_for_canary,
+        apply_test_host_root_deletion_cleanup_for_canary,
         create_detached_test_host_component_for_existing_fiber_for_canary,
         create_detached_test_host_text_for_existing_fiber_for_canary,
         mount_test_host_sibling_work_with_detached_hosts_for_canary,
+        preflight_test_host_root_deletion_apply_and_cleanup_for_canary,
     };
     use crate::root_commit::{
         HostRootManagedChildCommitExecutionBlockerForCanary,
         HostRootManagedChildCommitExecutionStatusForCanary,
         HostRootManagedChildCommitHandoffRecordForCanary,
         HostRootManagedChildSiblingOrderCommitHandoffRecordForCanary,
-        HostRootMutationApplyRecordSource, HostRootMutationPhaseRecordKind,
-        HostRootPlacementSiblingStatus, commit_managed_child_complete_work_handoff_for_canary,
+        HostRootMutationApplyRecordKind, HostRootMutationApplyRecordSource,
+        HostRootMutationPhaseRecordKind, HostRootPlacementSiblingStatus,
+        commit_managed_child_complete_work_handoff_for_canary,
         commit_managed_child_sibling_order_complete_work_handoff_for_canary,
     };
     use crate::root_updates::validate_update_container_lane_diagnostics_for_canary;
@@ -7030,6 +7036,8 @@ mod tests {
     const ROOT_WORK_LOOP_MANAGED_CHILD_APPEND_SOURCE_ORDER: usize = 826_021;
     const ROOT_WORK_LOOP_MANAGED_CHILD_APPEND_COMMIT_ORDER: usize = 826_022;
     const ROOT_WORK_LOOP_MANAGED_CHILD_APPEND_REQUEST_ORDER: usize = 826_023;
+    const ROOT_WORK_LOOP_ROOT_UNMOUNT_SOURCE_ORDER: usize = 862_001;
+    const ROOT_WORK_LOOP_ROOT_UNMOUNT_COMMIT_ORDER: usize = 862_002;
 
     #[derive(Debug, Clone)]
     struct RegisteredComponent {
@@ -9862,6 +9870,321 @@ mod tests {
         )
         .unwrap();
         stable_work
+    }
+
+    #[derive(Debug)]
+    struct RootWorkLoopRootUnmountMountedOutput {
+        complete_work: HostRootOneLevelChildSetCompleteWorkHandoffRecord,
+        host_work: HostWorkResult,
+        first_child: FiberId,
+        second_child: FiberId,
+        first_state_node: StateNodeHandle,
+        second_state_node: StateNodeHandle,
+        operations_after_mount: Vec<&'static str>,
+        token_count_after_mount: usize,
+    }
+
+    #[derive(Debug)]
+    struct RootWorkLoopRootUnmountExecution {
+        render: HostRootRenderPhaseRecord,
+        finished_work_handoff: HostRootFinishedWorkCommitHandoffRecordForCanary,
+        mutation_apply: TestHostRootMutationApplyResult,
+        deletion_cleanup: TestHostRootDeletionCleanupApplyResult,
+        deleted_children: Vec<FiberId>,
+        operations_before_apply: Vec<&'static str>,
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    enum RootWorkLoopRootUnmountExecutionError {
+        FiberRootStore(FiberRootStoreError),
+        FiberTopology(FiberTopologyError),
+        HostRootStateStore(HostRootStateStoreError),
+        HostWork(HostWorkError),
+        FinishedWorkCommitHandoff(Box<HostRootFinishedWorkCommitHandoffErrorForCanary>),
+        MountRootMismatch {
+            expected: FiberRootId,
+            actual: FiberRootId,
+        },
+        MountHostWorkMismatch {
+            root: FiberRootId,
+            expected: FiberId,
+            actual: FiberId,
+        },
+        EmptyMountedChildren {
+            root: FiberRootId,
+        },
+        UnmountElementNotNone {
+            root: FiberRootId,
+            element: RootElementHandle,
+        },
+        AlreadyUnmounted {
+            root: FiberRootId,
+            current: FiberId,
+        },
+        CurrentElementMismatch {
+            root: FiberRootId,
+            expected: RootElementHandle,
+            actual: RootElementHandle,
+        },
+        CurrentChildListMismatch {
+            root: FiberRootId,
+            expected: Vec<FiberId>,
+            actual: Vec<FiberId>,
+        },
+        UnexpectedUnmountMutationCount {
+            root: FiberRootId,
+            expected: usize,
+            actual: usize,
+        },
+        UnexpectedUnmountMutationKind {
+            root: FiberRootId,
+            finished_work: FiberId,
+            kind: HostRootMutationApplyRecordKind,
+        },
+    }
+
+    impl From<FiberRootStoreError> for RootWorkLoopRootUnmountExecutionError {
+        fn from(error: FiberRootStoreError) -> Self {
+            Self::FiberRootStore(error)
+        }
+    }
+
+    impl From<FiberTopologyError> for RootWorkLoopRootUnmountExecutionError {
+        fn from(error: FiberTopologyError) -> Self {
+            Self::FiberTopology(error)
+        }
+    }
+
+    impl From<HostRootStateStoreError> for RootWorkLoopRootUnmountExecutionError {
+        fn from(error: HostRootStateStoreError) -> Self {
+            Self::HostRootStateStore(error)
+        }
+    }
+
+    impl From<HostWorkError> for RootWorkLoopRootUnmountExecutionError {
+        fn from(error: HostWorkError) -> Self {
+            Self::HostWork(error)
+        }
+    }
+
+    impl From<HostRootFinishedWorkCommitHandoffErrorForCanary>
+        for RootWorkLoopRootUnmountExecutionError
+    {
+        fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
+            Self::FinishedWorkCommitHandoff(Box::new(error))
+        }
+    }
+
+    fn mount_one_level_root_host_output_for_unmount(
+        store: &mut FiberRootStore<RecordingHost>,
+        host: &mut RecordingHost,
+        root_id: FiberRootId,
+        raw: u64,
+    ) -> RootWorkLoopRootUnmountMountedOutput {
+        let mut source = TestHostTree::new();
+        let first_element = source.insert_host_element_with_text("article", format!("root {raw}"));
+        let second_element = source.insert_text(format!("tail {raw}"));
+        let root_element = RootElementHandle::from_raw(raw);
+        update_container(store, root_id, root_element, None).unwrap();
+        let render = render_host_root_for_lanes(store, root_id, Lanes::DEFAULT).unwrap();
+        let child_set = HostRootOneLevelChildSet::array(
+            root_element,
+            vec![
+                HostRootOneLevelChildSetEntry::host(first_element),
+                HostRootOneLevelChildSetEntry::host(second_element),
+            ],
+        );
+        let (complete_work, mut host_work) =
+            handoff_completed_host_root_render_to_test_complete_work_for_one_level_child_set_retaining_host_work(
+                store,
+                host,
+                render,
+                &source,
+                &child_set,
+                DetachedHostRecords::default(),
+            )
+            .unwrap();
+        let finished_work_handoff =
+            commit_completed_host_root_render_with_finished_work_handoff_for_canary(
+                store,
+                render,
+                ROOT_WORK_LOOP_ROOT_UNMOUNT_SOURCE_ORDER,
+                ROOT_WORK_LOOP_ROOT_UNMOUNT_COMMIT_ORDER,
+            )
+            .unwrap();
+        let mount_apply = apply_test_host_root_commit_mutations_for_canary(
+            store,
+            host,
+            finished_work_handoff.commit(),
+            &mut host_work,
+        )
+        .unwrap();
+
+        assert_eq!(mount_apply.applied_host_call_count(), 2);
+        assert_eq!(
+            mount_apply.records()[0].status(),
+            TestHostRootMutationApplyStatus::Applied(
+                TestHostRootMutationHostCall::AppendChildToContainer
+            )
+        );
+        assert_eq!(
+            mount_apply.records()[1].status(),
+            TestHostRootMutationApplyStatus::Applied(
+                TestHostRootMutationHostCall::AppendChildToContainer
+            )
+        );
+
+        let first_child = complete_work.complete_work().root_child().unwrap();
+        let second_child = complete_work.complete_work().last_root_child().unwrap();
+        let first_state_node = store.fiber_arena().get(first_child).unwrap().state_node();
+        let second_state_node = store.fiber_arena().get(second_child).unwrap().state_node();
+
+        RootWorkLoopRootUnmountMountedOutput {
+            complete_work,
+            host_work,
+            first_child,
+            second_child,
+            first_state_node,
+            second_state_node,
+            operations_after_mount: host.operations(),
+            token_count_after_mount: store.host_tokens().len(),
+        }
+    }
+
+    fn execute_root_unmount_from_mounted_one_level_output(
+        store: &mut FiberRootStore<RecordingHost>,
+        host: &mut RecordingHost,
+        unmount_render: HostRootRenderPhaseRecord,
+        mounted: &HostRootOneLevelChildSetCompleteWorkHandoffRecord,
+        host_work: &mut HostWorkResult,
+        source_order: usize,
+        commit_order: usize,
+    ) -> Result<RootWorkLoopRootUnmountExecution, RootWorkLoopRootUnmountExecutionError> {
+        let mounted_complete = mounted.complete_work();
+        if mounted_complete.root() != unmount_render.root() {
+            return Err(RootWorkLoopRootUnmountExecutionError::MountRootMismatch {
+                expected: mounted_complete.root(),
+                actual: unmount_render.root(),
+            });
+        }
+        if host_work.root() != mounted_complete.root()
+            || host_work.work_in_progress() != mounted_complete.host_root_work_in_progress()
+        {
+            return Err(
+                RootWorkLoopRootUnmountExecutionError::MountHostWorkMismatch {
+                    root: mounted_complete.root(),
+                    expected: mounted_complete.host_root_work_in_progress(),
+                    actual: host_work.work_in_progress(),
+                },
+            );
+        }
+        if unmount_render.resulting_element() != RootElementHandle::NONE {
+            return Err(
+                RootWorkLoopRootUnmountExecutionError::UnmountElementNotNone {
+                    root: unmount_render.root(),
+                    element: unmount_render.resulting_element(),
+                },
+            );
+        }
+
+        let deleted_children = host_work.root_children().to_vec();
+        if deleted_children.is_empty() {
+            return Err(
+                RootWorkLoopRootUnmountExecutionError::EmptyMountedChildren {
+                    root: unmount_render.root(),
+                },
+            );
+        }
+
+        let current_state = store
+            .fiber_arena()
+            .get(unmount_render.current())?
+            .memoized_state();
+        let current_element = store.host_root_states().get(current_state)?.element();
+        if current_element == RootElementHandle::NONE {
+            return Err(RootWorkLoopRootUnmountExecutionError::AlreadyUnmounted {
+                root: unmount_render.root(),
+                current: unmount_render.current(),
+            });
+        }
+        if current_element != mounted.root_element() {
+            return Err(
+                RootWorkLoopRootUnmountExecutionError::CurrentElementMismatch {
+                    root: unmount_render.root(),
+                    expected: mounted.root_element(),
+                    actual: current_element,
+                },
+            );
+        }
+
+        let current_children = store.fiber_arena().child_ids(unmount_render.current())?;
+        if current_children.is_empty() {
+            return Err(RootWorkLoopRootUnmountExecutionError::AlreadyUnmounted {
+                root: unmount_render.root(),
+                current: unmount_render.current(),
+            });
+        }
+        if current_children != deleted_children {
+            return Err(
+                RootWorkLoopRootUnmountExecutionError::CurrentChildListMismatch {
+                    root: unmount_render.root(),
+                    expected: deleted_children,
+                    actual: current_children,
+                },
+            );
+        }
+
+        for &child in &deleted_children {
+            store
+                .fiber_arena_mut()
+                .mark_child_for_deletion(unmount_render.finished_work(), child)?;
+        }
+
+        let finished_work_handoff =
+            commit_completed_host_root_render_with_finished_work_handoff_for_canary(
+                store,
+                unmount_render,
+                source_order,
+                commit_order,
+            )?;
+        let commit = finished_work_handoff.commit();
+        let mutation_records = commit.mutation_apply_log().records();
+        if mutation_records.len() != deleted_children.len() {
+            return Err(
+                RootWorkLoopRootUnmountExecutionError::UnexpectedUnmountMutationCount {
+                    root: commit.root(),
+                    expected: deleted_children.len(),
+                    actual: mutation_records.len(),
+                },
+            );
+        }
+        for mutation in mutation_records {
+            if mutation.kind() != HostRootMutationApplyRecordKind::RemoveDeletedFromContainer {
+                return Err(
+                    RootWorkLoopRootUnmountExecutionError::UnexpectedUnmountMutationKind {
+                        root: commit.root(),
+                        finished_work: commit.finished_work(),
+                        kind: mutation.kind(),
+                    },
+                );
+            }
+        }
+
+        preflight_test_host_root_deletion_apply_and_cleanup_for_canary(store, commit, host_work)?;
+        let operations_before_apply = host.operations();
+        let mutation_apply =
+            apply_test_host_root_commit_mutations_for_canary(store, host, commit, host_work)?;
+        let deletion_cleanup =
+            apply_test_host_root_deletion_cleanup_for_canary(store, host, commit, host_work)?;
+
+        Ok(RootWorkLoopRootUnmountExecution {
+            render: unmount_render,
+            finished_work_handoff,
+            mutation_apply,
+            deletion_cleanup,
+            deleted_children,
+            operations_before_apply,
+        })
     }
 
     fn assert_root_child_preflight_blocks_unsupported_tag(
@@ -16669,6 +16992,287 @@ mod tests {
             HostWorkError::HostNode(error) if error.violation() == HostNodeViolation::Stale
         ));
         assert_eq!(host.operations(), operations_before_apply);
+    }
+
+    #[test]
+    fn root_work_loop_root_unmount_one_level_child_set_sync_executes_container_removal_and_cleanup()
+    {
+        let (mut store, root_id, mut host) = root_store();
+        let mut mounted =
+            mount_one_level_root_host_output_for_unmount(&mut store, &mut host, root_id, 86_200);
+        let update =
+            update_container_sync(&mut store, root_id, RootElementHandle::NONE, None).unwrap();
+        let unmount_render = render_host_root_for_lanes(&mut store, root_id, Lanes::SYNC).unwrap();
+
+        let execution = execute_root_unmount_from_mounted_one_level_output(
+            &mut store,
+            &mut host,
+            unmount_render,
+            &mounted.complete_work,
+            &mut mounted.host_work,
+            ROOT_WORK_LOOP_ROOT_UNMOUNT_SOURCE_ORDER + 10,
+            ROOT_WORK_LOOP_ROOT_UNMOUNT_COMMIT_ORDER + 10,
+        )
+        .unwrap();
+
+        assert_eq!(update.lane(), Lane::SYNC);
+        assert_eq!(
+            execution.render.resulting_element(),
+            RootElementHandle::NONE
+        );
+        assert_eq!(execution.render.render_lanes(), Lanes::SYNC);
+        assert_eq!(
+            execution.deleted_children,
+            vec![mounted.first_child, mounted.second_child]
+        );
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            execution.render.finished_work()
+        );
+        assert_eq!(
+            current_host_root_element(&store, root_id),
+            RootElementHandle::NONE
+        );
+        assert_eq!(
+            execution.finished_work_handoff.commit_order(),
+            ROOT_WORK_LOOP_ROOT_UNMOUNT_COMMIT_ORDER + 10
+        );
+        assert!(execution.finished_work_handoff.mutation_execution_blocked());
+        assert!(
+            execution
+                .finished_work_handoff
+                .public_root_rendering_blocked()
+        );
+
+        let commit = execution.finished_work_handoff.commit();
+        assert_eq!(commit.finished_lanes(), Lanes::SYNC);
+        assert_eq!(commit.deletion_lists().len(), 1);
+        assert_eq!(
+            commit.deletion_lists()[0].parent(),
+            execution.render.finished_work()
+        );
+        assert_eq!(
+            commit.deletion_lists()[0].deleted(),
+            &[mounted.first_child, mounted.second_child]
+        );
+        assert_eq!(commit.host_node_deletion_cleanup_log().len(), 3);
+
+        assert_eq!(execution.mutation_apply.records().len(), 2);
+        assert_eq!(
+            execution.mutation_apply.records()[0].mutation().kind(),
+            HostRootMutationApplyRecordKind::RemoveDeletedFromContainer
+        );
+        assert_eq!(
+            execution.mutation_apply.records()[0].status(),
+            TestHostRootMutationApplyStatus::Applied(
+                TestHostRootMutationHostCall::RemoveChildFromContainer
+            )
+        );
+        assert_eq!(
+            execution.mutation_apply.records()[1].mutation().kind(),
+            HostRootMutationApplyRecordKind::RemoveDeletedFromContainer
+        );
+        assert_eq!(
+            execution.mutation_apply.records()[1].status(),
+            TestHostRootMutationApplyStatus::Applied(
+                TestHostRootMutationHostCall::RemoveChildFromContainer
+            )
+        );
+        assert_eq!(execution.mutation_apply.applied_host_call_count(), 2);
+
+        assert_eq!(execution.deletion_cleanup.root(), root_id);
+        assert_eq!(
+            execution.deletion_cleanup.finished_work(),
+            execution.render.finished_work()
+        );
+        assert_eq!(execution.deletion_cleanup.records().len(), 3);
+        assert_eq!(execution.deletion_cleanup.applied_record_count(), 3);
+        assert_eq!(execution.deletion_cleanup.detached_instance_count(), 1);
+        assert_eq!(execution.deletion_cleanup.invalidated_text_count(), 2);
+        assert_eq!(
+            execution
+                .deletion_cleanup
+                .records()
+                .iter()
+                .filter(|record| record.previous_metadata().is_some())
+                .count(),
+            3
+        );
+        assert!(execution.deletion_cleanup.records().iter().any(|record| {
+            record.cleanup().fiber() == mounted.first_child
+                && record.status()
+                    == TestHostRootDeletionCleanupStatus::Applied(
+                        TestHostRootDeletionCleanupAction::DetachDeletedInstance,
+                    )
+        }));
+        assert!(execution.deletion_cleanup.records().iter().any(|record| {
+            record.cleanup().fiber() == mounted.second_child
+                && record.status()
+                    == TestHostRootDeletionCleanupStatus::Applied(
+                        TestHostRootDeletionCleanupAction::InvalidateDeletedText,
+                    )
+        }));
+
+        assert!(
+            !mounted
+                .host_work
+                .detached_hosts_mut_for_canary()
+                .instance_metadata(mounted.first_state_node)
+                .unwrap()
+                .is_active()
+        );
+        assert!(
+            !mounted
+                .host_work
+                .detached_hosts_mut_for_canary()
+                .text_metadata(mounted.second_state_node)
+                .unwrap()
+                .is_active()
+        );
+        assert_eq!(
+            store.host_tokens().len(),
+            mounted.token_count_after_mount + execution.deletion_cleanup.records().len()
+        );
+
+        let mut expected_operations = mounted.operations_after_mount.clone();
+        expected_operations.push("remove_child_from_container");
+        expected_operations.push("remove_child_from_container");
+        expected_operations.push("detach_deleted_instance");
+        assert_eq!(
+            execution.operations_before_apply,
+            mounted.operations_after_mount
+        );
+        assert_eq!(host.operations(), expected_operations);
+    }
+
+    #[test]
+    fn root_work_loop_root_unmount_rejects_stale_detached_host_before_container_remove() {
+        let (mut store, root_id, mut host) = root_store();
+        let mut mounted =
+            mount_one_level_root_host_output_for_unmount(&mut store, &mut host, root_id, 86_210);
+        update_container_sync(&mut store, root_id, RootElementHandle::NONE, None).unwrap();
+        let unmount_render = render_host_root_for_lanes(&mut store, root_id, Lanes::SYNC).unwrap();
+        mounted
+            .host_work
+            .detached_hosts_mut_for_canary()
+            .invalidate_text_for_canary(mounted.second_state_node)
+            .unwrap();
+        let operations_before_unmount = host.operations();
+
+        let error = execute_root_unmount_from_mounted_one_level_output(
+            &mut store,
+            &mut host,
+            unmount_render,
+            &mounted.complete_work,
+            &mut mounted.host_work,
+            ROOT_WORK_LOOP_ROOT_UNMOUNT_SOURCE_ORDER + 20,
+            ROOT_WORK_LOOP_ROOT_UNMOUNT_COMMIT_ORDER + 20,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            RootWorkLoopRootUnmountExecutionError::HostWork(HostWorkError::HostNode(error))
+                if error.violation() == HostNodeViolation::Stale
+        ));
+        assert_eq!(host.operations(), operations_before_unmount);
+    }
+
+    #[test]
+    fn root_work_loop_root_unmount_rejects_cross_root_mount_evidence_before_host_call() {
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let first_root = store
+            .create_client_root(FakeContainer::new(1), RootOptions::new())
+            .unwrap();
+        let second_root = store
+            .create_client_root(FakeContainer::new(2), RootOptions::new())
+            .unwrap();
+        let mut host = RecordingHost::default();
+        let mut mounted =
+            mount_one_level_root_host_output_for_unmount(&mut store, &mut host, first_root, 86_220);
+        let first_current_after_mount = store.root(first_root).unwrap().current();
+        update_container_sync(&mut store, second_root, RootElementHandle::NONE, None).unwrap();
+        let second_render =
+            render_host_root_for_lanes(&mut store, second_root, Lanes::SYNC).unwrap();
+        let operations_before_unmount = host.operations();
+
+        let error = execute_root_unmount_from_mounted_one_level_output(
+            &mut store,
+            &mut host,
+            second_render,
+            &mounted.complete_work,
+            &mut mounted.host_work,
+            ROOT_WORK_LOOP_ROOT_UNMOUNT_SOURCE_ORDER + 30,
+            ROOT_WORK_LOOP_ROOT_UNMOUNT_COMMIT_ORDER + 30,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            RootWorkLoopRootUnmountExecutionError::MountRootMismatch {
+                expected: first_root,
+                actual: second_root,
+            }
+        );
+        assert_eq!(host.operations(), operations_before_unmount);
+        assert_eq!(
+            store.root(first_root).unwrap().current(),
+            first_current_after_mount
+        );
+    }
+
+    #[test]
+    fn root_work_loop_root_unmount_rejects_double_unmount_and_render_after_unmount_before_host_call()
+     {
+        let (mut store, root_id, mut host) = root_store();
+        let mut mounted =
+            mount_one_level_root_host_output_for_unmount(&mut store, &mut host, root_id, 86_230);
+        update_container_sync(&mut store, root_id, RootElementHandle::NONE, None).unwrap();
+        let unmount_render = render_host_root_for_lanes(&mut store, root_id, Lanes::SYNC).unwrap();
+        let execution = execute_root_unmount_from_mounted_one_level_output(
+            &mut store,
+            &mut host,
+            unmount_render,
+            &mounted.complete_work,
+            &mut mounted.host_work,
+            ROOT_WORK_LOOP_ROOT_UNMOUNT_SOURCE_ORDER + 40,
+            ROOT_WORK_LOOP_ROOT_UNMOUNT_COMMIT_ORDER + 40,
+        )
+        .unwrap();
+        let operations_after_unmount = host.operations();
+
+        let replay_error = preflight_test_host_root_deletion_apply_and_cleanup_for_canary(
+            &store,
+            execution.finished_work_handoff.commit(),
+            &mounted.host_work,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            replay_error,
+            HostWorkError::HostNode(error) if error.violation() == HostNodeViolation::Stale
+        ));
+        assert_eq!(host.operations(), operations_after_unmount);
+
+        update_container_sync(&mut store, root_id, RootElementHandle::NONE, None).unwrap();
+        let render_after_unmount =
+            render_host_root_for_lanes(&mut store, root_id, Lanes::SYNC).unwrap();
+        let render_after_error = execute_root_unmount_from_mounted_one_level_output(
+            &mut store,
+            &mut host,
+            render_after_unmount,
+            &mounted.complete_work,
+            &mut mounted.host_work,
+            ROOT_WORK_LOOP_ROOT_UNMOUNT_SOURCE_ORDER + 41,
+            ROOT_WORK_LOOP_ROOT_UNMOUNT_COMMIT_ORDER + 41,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            render_after_error,
+            RootWorkLoopRootUnmountExecutionError::AlreadyUnmounted { root, .. }
+                if root == root_id
+        ));
+        assert_eq!(host.operations(), operations_after_unmount);
     }
 
     #[test]
