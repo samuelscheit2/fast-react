@@ -212,10 +212,14 @@ function finishFlushSyncGuard(dispatcher, options) {
 function createPublicReactDomFlushSyncBlockedCurrentnessReport(
   overrides = {}
 ) {
-  const normalizedOptions = overrides ?? {};
+  const normalizedOptions = captureOwnDataOptions(
+    overrides,
+    arguments.length > 0
+  );
+  const optionValues = normalizedOptions.values;
   const publicFlushSyncExports = freezeArray(
     (
-      normalizedOptions.publicFlushSyncExports ??
+      optionValues.publicFlushSyncExports ??
       publicFlushSyncBlockedCurrentnessEntrypoints.map((entrypoint) =>
         describePublicFlushSyncCurrentnessExport(
           entrypoint,
@@ -226,136 +230,136 @@ function createPublicReactDomFlushSyncBlockedCurrentnessReport(
   );
   const scenarios = freezeArray(
     (
-      normalizedOptions.scenarios ??
+      optionValues.scenarios ??
       createPublicFlushSyncBlockedCurrentnessScenarios()
     ).map(freezePublicFlushSyncBlockedCurrentnessScenario)
   );
   const report = freezeRecord({
     kind:
-      normalizedOptions.kind ?? publicFlushSyncBlockedCurrentnessKind,
+      optionValues.kind ?? publicFlushSyncBlockedCurrentnessKind,
     version:
-      normalizedOptions.version ?? publicFlushSyncBlockedCurrentnessVersion,
+      optionValues.version ?? publicFlushSyncBlockedCurrentnessVersion,
     status:
-      normalizedOptions.status ?? publicFlushSyncBlockedCurrentnessStatus,
+      optionValues.status ?? publicFlushSyncBlockedCurrentnessStatus,
     source:
-      normalizedOptions.source ??
+      optionValues.source ??
       'packages/react-dom/src/shared/flush-sync-guard.js',
     compatibilityTarget:
-      normalizedOptions.compatibilityTarget ?? compatibilityTarget,
+      optionValues.compatibilityTarget ?? compatibilityTarget,
     entrypoints: freezeStringArray(
-      normalizedOptions.entrypoints,
+      optionValues.entrypoints,
       publicFlushSyncBlockedCurrentnessEntrypoints
     ),
     scenarioIds: freezeStringArray(
-      normalizedOptions.scenarioIds,
+      optionValues.scenarioIds,
       publicFlushSyncBlockedCurrentnessScenarios
     ),
     scenarios,
     publicFlushSyncExports,
     acceptedWorkerIds: freezeStringArray(
-      normalizedOptions.acceptedWorkerIds,
+      optionValues.acceptedWorkerIds,
       publicFlushSyncBlockedCurrentnessAcceptedWorkerIds
     ),
     excludedWorkerIds: freezeStringArray(
-      normalizedOptions.excludedWorkerIds,
+      optionValues.excludedWorkerIds,
       publicFlushSyncBlockedCurrentnessExcludedWorkerIds
     ),
     privatePrerequisites:
       createPublicFlushSyncBlockedCurrentnessPrivatePrerequisites(
-        normalizedOptions.privatePrerequisites
+        optionValues.privatePrerequisites
       ),
     callbackInvocationBlocked:
-      normalizedOptions.callbackInvocationBlocked ?? true,
+      optionValues.callbackInvocationBlocked ?? true,
     thenableReturnBlocked:
-      normalizedOptions.thenableReturnBlocked ?? true,
+      optionValues.thenableReturnBlocked ?? true,
     returnValueCompatibilityBlocked:
-      normalizedOptions.returnValueCompatibilityBlocked ?? true,
-    invokesCallback: normalizedOptions.invokesCallback ?? false,
-    returnsThenable: normalizedOptions.returnsThenable ?? false,
+      optionValues.returnValueCompatibilityBlocked ?? true,
+    invokesCallback: optionValues.invokesCallback ?? false,
+    returnsThenable: optionValues.returnsThenable ?? false,
     returnValueCompatibilityClaimed:
-      normalizedOptions.returnValueCompatibilityClaimed ?? false,
+      optionValues.returnValueCompatibilityClaimed ?? false,
     publicFlushSyncReady:
-      normalizedOptions.publicFlushSyncReady ?? false,
-    privateRoutingReady: normalizedOptions.privateRoutingReady ?? false,
+      optionValues.publicFlushSyncReady ?? false,
+    privateRoutingReady: optionValues.privateRoutingReady ?? false,
     privateSyncFlushRowsOpenPublicCallbackExecution:
-      normalizedOptions.privateSyncFlushRowsOpenPublicCallbackExecution ??
+      optionValues.privateSyncFlushRowsOpenPublicCallbackExecution ??
       false,
-    queueFlushingReady: normalizedOptions.queueFlushingReady ?? false,
-    rendererRootsReady: normalizedOptions.rendererRootsReady ?? false,
-    passiveEffectsReady: normalizedOptions.passiveEffectsReady ?? false,
+    queueFlushingReady: optionValues.queueFlushingReady ?? false,
+    rendererRootsReady: optionValues.rendererRootsReady ?? false,
+    passiveEffectsReady: optionValues.passiveEffectsReady ?? false,
     continuationFlushingReady:
-      normalizedOptions.continuationFlushingReady ?? false,
+      optionValues.continuationFlushingReady ?? false,
     publicCompatibilityClaimed:
-      normalizedOptions.publicCompatibilityClaimed ?? false,
+      optionValues.publicCompatibilityClaimed ?? false,
     publicFlushSyncCompatibilityClaimed:
-      normalizedOptions.publicFlushSyncCompatibilityClaimed ?? false,
+      optionValues.publicFlushSyncCompatibilityClaimed ?? false,
     publicProfilingFlushSyncCompatibilityClaimed:
-      normalizedOptions.publicProfilingFlushSyncCompatibilityClaimed ??
+      optionValues.publicProfilingFlushSyncCompatibilityClaimed ??
       false,
     publicSchedulerTimingCompatibilityClaimed:
-      normalizedOptions.publicSchedulerTimingCompatibilityClaimed ?? false,
+      optionValues.publicSchedulerTimingCompatibilityClaimed ?? false,
     publicActTimingCompatibilityClaimed:
-      normalizedOptions.publicActTimingCompatibilityClaimed ?? false,
+      optionValues.publicActTimingCompatibilityClaimed ?? false,
     publicActCompatibilityClaimed:
-      normalizedOptions.publicActCompatibilityClaimed ?? false,
+      optionValues.publicActCompatibilityClaimed ?? false,
     publicReactActCompatibilityClaimed:
-      normalizedOptions.publicReactActCompatibilityClaimed ?? false,
+      optionValues.publicReactActCompatibilityClaimed ?? false,
     publicTestUtilsActCompatibilityClaimed:
-      normalizedOptions.publicTestUtilsActCompatibilityClaimed ?? false,
+      optionValues.publicTestUtilsActCompatibilityClaimed ?? false,
     publicRootSchedulerCompatibilityClaimed:
-      normalizedOptions.publicRootSchedulerCompatibilityClaimed ?? false,
+      optionValues.publicRootSchedulerCompatibilityClaimed ?? false,
     publicRootCompatibilityClaimed:
-      normalizedOptions.publicRootCompatibilityClaimed ?? false,
+      optionValues.publicRootCompatibilityClaimed ?? false,
     publicRendererCompatibilityClaimed:
-      normalizedOptions.publicRendererCompatibilityClaimed ?? false,
+      optionValues.publicRendererCompatibilityClaimed ?? false,
     publicWarningCompatibilityClaimed:
-      normalizedOptions.publicWarningCompatibilityClaimed ?? false,
+      optionValues.publicWarningCompatibilityClaimed ?? false,
     publicPackageCompatibilityClaimed:
-      normalizedOptions.publicPackageCompatibilityClaimed ?? false,
+      optionValues.publicPackageCompatibilityClaimed ?? false,
     packageCompatibilityClaimed:
-      normalizedOptions.packageCompatibilityClaimed ?? false,
-    packageSurfaceChanged: normalizedOptions.packageSurfaceChanged ?? false,
+      optionValues.packageCompatibilityClaimed ?? false,
+    packageSurfaceChanged: optionValues.packageSurfaceChanged ?? false,
     profilingCompatibilityClaimed:
-      normalizedOptions.profilingCompatibilityClaimed ?? false,
+      optionValues.profilingCompatibilityClaimed ?? false,
     profilingPackageCompatibilityClaimed:
-      normalizedOptions.profilingPackageCompatibilityClaimed ?? false,
-    publicRootExecution: normalizedOptions.publicRootExecution ?? false,
+      optionValues.profilingPackageCompatibilityClaimed ?? false,
+    publicRootExecution: optionValues.publicRootExecution ?? false,
     publicRootLifecycleReady:
-      normalizedOptions.publicRootLifecycleReady ?? false,
+      optionValues.publicRootLifecycleReady ?? false,
     drainsPublicSchedulerTaskQueue:
-      normalizedOptions.drainsPublicSchedulerTaskQueue ?? false,
+      optionValues.drainsPublicSchedulerTaskQueue ?? false,
     drainsPublicReactActQueue:
-      normalizedOptions.drainsPublicReactActQueue ?? false,
+      optionValues.drainsPublicReactActQueue ?? false,
     invokesPublicSchedulerFlushHelper:
-      normalizedOptions.invokesPublicSchedulerFlushHelper ?? false,
+      optionValues.invokesPublicSchedulerFlushHelper ?? false,
     publicSchedulerFlushBehaviorExecuted:
-      normalizedOptions.publicSchedulerFlushBehaviorExecuted ?? false,
+      optionValues.publicSchedulerFlushBehaviorExecuted ?? false,
     publicActPassiveDrain:
-      normalizedOptions.publicActPassiveDrain ?? false,
+      optionValues.publicActPassiveDrain ?? false,
     publicEffectExecution:
-      normalizedOptions.publicEffectExecution ?? false,
-    executesQueuedWork: normalizedOptions.executesQueuedWork ?? false,
-    executesEffects: normalizedOptions.executesEffects ?? false,
+      optionValues.publicEffectExecution ?? false,
+    executesQueuedWork: optionValues.executesQueuedWork ?? false,
+    executesEffects: optionValues.executesEffects ?? false,
     executesPassiveEffects:
-      normalizedOptions.executesPassiveEffects ?? false,
+      optionValues.executesPassiveEffects ?? false,
     executesRendererWork:
-      normalizedOptions.executesRendererWork ?? false,
+      optionValues.executesRendererWork ?? false,
     executesRendererRoots:
-      normalizedOptions.executesRendererRoots ?? false,
+      optionValues.executesRendererRoots ?? false,
     executesPublicRendererRoots:
-      normalizedOptions.executesPublicRendererRoots ?? false,
-    executesSyncFlush: normalizedOptions.executesSyncFlush ?? false,
+      optionValues.executesPublicRendererRoots ?? false,
+    executesSyncFlush: optionValues.executesSyncFlush ?? false,
     executesPublicFlushSync:
-      normalizedOptions.executesPublicFlushSync ?? false,
+      optionValues.executesPublicFlushSync ?? false,
     executesPublicDomMutation:
-      normalizedOptions.executesPublicDomMutation ?? false,
-    compatibilityClaimed: normalizedOptions.compatibilityClaimed ?? false
+      optionValues.executesPublicDomMutation ?? false,
+    compatibilityClaimed: optionValues.compatibilityClaimed ?? false
   });
 
   publicFlushSyncBlockedCurrentnessReports.add(report);
   publicFlushSyncBlockedCurrentnessReportOverrideKeys.set(
     report,
-    getOwnOptionKeys(normalizedOptions)
+    normalizedOptions.overrideKeys
   );
   return report;
 }
@@ -1117,8 +1121,33 @@ function freezeArray(array) {
   return Object.freeze(array.slice());
 }
 
-function getOwnOptionKeys(options) {
-  return freezeArray(Reflect.ownKeys(Object(options)));
+function captureOwnDataOptions(options, callerProvided) {
+  const values = Object.create(null);
+  const callerProvidedObject =
+    callerProvided && options !== null && options !== undefined;
+  const ownKeys = [];
+
+  if (callerProvidedObject) {
+    try {
+      const descriptors = Object.getOwnPropertyDescriptors(Object(options));
+      for (const key of Reflect.ownKeys(descriptors)) {
+        ownKeys.push(key);
+        const descriptor = descriptors[key];
+        if (Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+          values[key] = descriptor.value;
+        }
+      }
+    } catch {
+      ownKeys.push('unreadable-caller-options');
+    }
+  }
+
+  return freezeRecord({
+    values,
+    overrideKeys: callerProvidedObject
+      ? freezeArray(['caller-options-object', ...ownKeys])
+      : freezeArray([])
+  });
 }
 
 function freezeStringArray(value, fallback) {

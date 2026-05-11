@@ -7,6 +7,8 @@
 - Hardened native cleanup and resource/form admission ledgers so evidence identities remain bound to their expected path/slice or path/token context, including Worker 940 and Worker 942 currentness evidence.
 - Hardened public-blocked currentness factories for React DOM `flushSync` and unsupported React placeholder hooks so otherwise-valid caller override reports are rejected.
 - Audit repair: caller override proof now uses all own option keys, including non-enumerable properties and symbols, so non-enumerable `scenarios` and `publicExportsPlaceholderBlocked` overrides cannot be accepted.
+- Second audit repair: report builders now snapshot only own data descriptors before reading option values, reject caller option objects even when inherited/proxy/accessor tricks hide keys, and avoid getter/prototype authority for the top-level options that shape currentness reports.
+- Scheduler variant currentness now also pins Worker 886 boundary gates to module-owned provenance and scans public compatibility claims through descriptor/own-key enumeration, including non-enumerable claims.
 - Public roots, public Scheduler timing, public DOM mutation, public form/resource execution, public hook execution, public `flushSync`, native execution, and package compatibility claims remain blocked.
 
 ## Changed Files
@@ -41,12 +43,13 @@
 - Private admission 821 now pins evidence role to exact `{ path, sliceStart, sliceEnd }` context and rejects Worker 940 role spoofing, test-slice aliasing, and cross-worker context reuse with `native-cleanup-stale-evidence-context-mismatch`.
 - Private admission 850 now tracks Worker 942 as currentness evidence, exposes a currentness manifest, pins implementation paths, and binds evidence ids to `{ path, tokenPolicy }`; missing Worker 942 evidence and evidence-path replacement fail closed.
 - React DOM `flushSync` blocked-currentness and unsupported React placeholder hook currentness reports now record caller override keys and reject no-op override reports after canonical shape validation.
-- The caller override regressions include non-enumerable own-property overrides for React DOM `flushSync` scenarios and unsupported React placeholder hook export blocking.
-- Final focused conformance pass reported 123 passing tests; `@fast-react/react-dom` workspace check reported 222 passing package tests plus import smoke.
+- The caller override regressions include non-enumerable own data-property overrides, hidden self-deleting accessors, inherited option fields, and proxy `get` values hidden from `ownKeys` for React DOM `flushSync` scenarios and unsupported React placeholder hook export blocking.
+- Scheduler regressions now reject caller-provided fake Worker 886 gates and non-enumerable `oracle.conformanceClaims.compatibilityClaimed`.
+- Final focused conformance pass reported 125 passing tests; `@fast-react/react-dom` workspace check reported 222 passing package tests plus import smoke.
 
 ## Risks / Blockers
 
-- No blocker remains. The audit-discovered non-enumerable override bypass was reproduced conceptually and repaired with own-key tracking plus focused negatives.
+- No blocker remains. The audit-discovered non-enumerable data-property, accessor, inherited option, proxy option, fake Scheduler gate, and non-enumerable compatibility-claim bypasses are covered by focused negatives.
 - The changes are intentionally private and source-proof focused; they do not open any public compatibility, DOM, root, Scheduler, form/resource, hook, or native execution path.
 - Merge overlap risk is moderate because nearby active workers may touch the same private-admission ledgers or currentness tests. Preserve the new context/source-proof checks when resolving conflicts.
 - npm emitted the existing unsupported `minimum-release-age` config warning during workspace checks; it did not affect the checks.

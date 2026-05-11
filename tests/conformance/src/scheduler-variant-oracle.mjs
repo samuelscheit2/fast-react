@@ -22,6 +22,7 @@ export const SCHEDULER_VARIANT_CURRENTNESS_REPORT_KIND =
 export const SCHEDULER_VARIANT_CURRENTNESS_REPORT_ID =
   "scheduler-variant-source-currentness-report-937-1";
 const schedulerVariantSourceCurrentnessReports = new WeakSet();
+const schedulerVariantPrivateBoundaryGates = new WeakSet();
 
 export const SCHEDULER_VARIANT_CURRENTNESS_BLOCKED_PUBLIC_CLAIMS =
   freezeArray([
@@ -158,15 +159,23 @@ export function findSchedulerVariantDeepCjsProbe(oracle, modeId, specifier) {
 }
 
 export function createSchedulerVariantSourceCurrentnessReport(options = {}) {
-  const normalizedOptions = options ?? {};
+  const privateVariantBoundaryGateDescriptor =
+    options === null || options === undefined
+      ? undefined
+      : Object.getOwnPropertyDescriptor(
+          Object(options),
+          "privateVariantBoundaryGate"
+        );
   const callerProvidedPrivateVariantBoundaryGate =
+    privateVariantBoundaryGateDescriptor !== undefined;
+  const privateVariantBoundaryGate =
+    callerProvidedPrivateVariantBoundaryGate &&
     Object.prototype.hasOwnProperty.call(
-      normalizedOptions,
-      "privateVariantBoundaryGate"
-    );
-  const privateVariantBoundaryGate = callerProvidedPrivateVariantBoundaryGate
-    ? normalizedOptions.privateVariantBoundaryGate
-    : evaluatePrivateAdmission886Gate();
+      privateVariantBoundaryGateDescriptor,
+      "value"
+    )
+      ? privateVariantBoundaryGateDescriptor.value
+      : createSchedulerVariantPrivateBoundaryGate();
   const rows = freezeArray(
     Object.values(privateVariantBoundaryGate?.rowsByVariant ?? {}).map((row) =>
       createSchedulerVariantCurrentnessRow(
@@ -206,7 +215,7 @@ export function evaluateSchedulerVariantCurrentnessGate({
   privateVariantBoundaryGate = null
 } = {}) {
   const effectivePrivateVariantBoundaryGate =
-    privateVariantBoundaryGate ?? evaluatePrivateAdmission886Gate();
+    privateVariantBoundaryGate ?? createSchedulerVariantPrivateBoundaryGate();
   const effectiveReport =
     sourceCurrentnessReport ??
     createSchedulerVariantSourceCurrentnessReport();
@@ -706,13 +715,28 @@ function schedulerVariantSourceReportSchemaIsCurrent(report) {
   );
 }
 
+function createSchedulerVariantPrivateBoundaryGate() {
+  const gate = evaluatePrivateAdmission886Gate();
+  if (gate !== null && typeof gate === "object") {
+    schedulerVariantPrivateBoundaryGates.add(gate);
+  }
+  return gate;
+}
+
 function summarizePrivateVariantBoundaryGate(gate, report) {
+  const sourceGateProofRecognized =
+    gate !== null &&
+    typeof gate === "object" &&
+    schedulerVariantPrivateBoundaryGates.has(gate) &&
+    gate?.gateId === report?.sourceGateId;
   return freezeRecord({
     gateId: gate?.gateId ?? null,
     status: gate?.status ?? null,
     reportStatus: report?.sourceGateStatus ?? null,
+    sourceGateProofRecognized,
     role: "private-scheduler-variant-boundary-currentness-context-only",
     acceptedAsPrivateContextOnly:
+      sourceGateProofRecognized &&
       gate?.status === PRIVATE_ADMISSION_886_GATE_STATUS &&
       gate?.compatibilityClaimed === false &&
       report?.sourceGateAcceptedAsPrivateContextOnly === true &&
@@ -818,15 +842,20 @@ function findSchedulerVariantPublicClaimIds({ oracle, report, rows }) {
     claimIds.push("sourceCurrentnessReport.compatibilityClaimed");
   }
 
-  for (const [claim, value] of Object.entries(
+  for (const [claim, value] of ownDescriptorEntries(
     report?.blockedPublicClaims ?? {}
   )) {
     if (value !== false) {
-      claimIds.push(`sourceCurrentnessReport.blockedPublicClaims.${claim}`);
+      claimIds.push(
+        `sourceCurrentnessReport.blockedPublicClaims.${String(claim)}`
+      );
     }
   }
 
-  for (const [claim, value] of Object.entries(oracle?.conformanceClaims ?? {})) {
+  for (const [claim, value] of ownDescriptorEntries(
+    oracle?.conformanceClaims ?? {}
+  )) {
+    const claimName = String(claim);
     if (
       value === true &&
       [
@@ -834,9 +863,9 @@ function findSchedulerVariantPublicClaimIds({ oracle, report, rows }) {
         "fastReactBehaviorCompatible",
         "fullDualRunOracleExists",
         "compatibilityClaimed"
-      ].includes(claim)
+      ].includes(claimName)
     ) {
-      claimIds.push(`oracle.conformanceClaims.${claim}`);
+      claimIds.push(`oracle.conformanceClaims.${claimName}`);
     }
   }
 
@@ -854,21 +883,44 @@ function findSchedulerVariantPublicClaimIds({ oracle, report, rows }) {
     if (row.compatibilityClaimed !== false) {
       claimIds.push(`${row.variantId}.compatibilityClaimed`);
     }
-    for (const [claim, value] of Object.entries(row.publicBlockerClaims ?? {})) {
+    for (const [claim, value] of ownDescriptorEntries(
+      row.publicBlockerClaims ?? {}
+    )) {
       if (value !== false) {
-        claimIds.push(`${row.variantId}.publicBlockerClaims.${claim}`);
+        claimIds.push(
+          `${row.variantId}.publicBlockerClaims.${String(claim)}`
+        );
       }
     }
-    for (const [claim, value] of Object.entries(row.evidenceScope ?? {})) {
-      if (/CompatibilityClaimed|BehaviorClaimed|EvidenceClaimed/u.test(claim)) {
+    for (const [claim, value] of ownDescriptorEntries(row.evidenceScope ?? {})) {
+      const claimName = String(claim);
+      if (
+        /CompatibilityClaimed|BehaviorClaimed|EvidenceClaimed/u.test(claimName)
+      ) {
         if (value !== false) {
-          claimIds.push(`${row.variantId}.evidenceScope.${claim}`);
+          claimIds.push(`${row.variantId}.evidenceScope.${claimName}`);
         }
       }
     }
   }
 
   return freezeArray(claimIds);
+}
+
+function ownDescriptorEntries(record) {
+  if (record === null || typeof record !== "object") {
+    return [];
+  }
+
+  return Reflect.ownKeys(record).map((key) => {
+    const descriptor = Object.getOwnPropertyDescriptor(record, key);
+    return [
+      key,
+      descriptor && Object.prototype.hasOwnProperty.call(descriptor, "value")
+        ? descriptor.value
+        : true
+    ];
+  });
 }
 
 function compareStringSets(expected, actual) {

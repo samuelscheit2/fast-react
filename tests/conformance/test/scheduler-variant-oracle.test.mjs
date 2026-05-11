@@ -202,6 +202,10 @@ test("scheduler variant currentness gate binds source-owned variant boundaries w
   assert.equal(gate.mockPostTaskAliasesRejected, true);
   assert.equal(gate.cjsDiagnosticCoverageRecognized, true);
   assert.equal(gate.sourceReportSourceProofRecognized, true);
+  assert.equal(
+    gate.privateVariantBoundaryContext.sourceGateProofRecognized,
+    true
+  );
   assert.equal(gate.compatibilityClaimed, false);
   assert.deepEqual(gate.violations, []);
   assert.deepEqual(
@@ -393,6 +397,28 @@ test("scheduler variant currentness gate rejects reports minted from caller-prov
   );
 });
 
+test("scheduler variant currentness gate rejects caller-provided private gate self-attestation", () => {
+  const acceptedGate = evaluatePrivateAdmission886Gate();
+  const fakeGate = Object.freeze({
+    ...acceptedGate,
+    violations: []
+  });
+  const gate = evaluateSchedulerVariantCurrentnessGate({
+    oracle,
+    privateVariantBoundaryGate: fakeGate
+  });
+
+  assert.equal(gate.status, SCHEDULER_VARIANT_CURRENTNESS_VIOLATION_STATUS);
+  assert.equal(
+    gate.privateVariantBoundaryContext.sourceGateProofRecognized,
+    false
+  );
+  assertViolation(
+    gate,
+    "scheduler-variant-currentness-private-886-context-not-accepted"
+  );
+});
+
 test("scheduler variant currentness gate rejects root evidence used as variant evidence", () => {
   const report = cloneJson(baselineVariantCurrentnessGate().sourceCurrentnessReport);
   const row = report.rows.find(
@@ -542,6 +568,31 @@ test("scheduler variant currentness gate keeps public timing, root, act, and pac
       "sourceCurrentnessReport.blockedPublicClaims.publicPackageCompatibilityClaimed"
     ],
     gate.publicCompatibilityClaimIds
+  );
+  assertViolation(
+    gate,
+    "scheduler-variant-currentness-public-compatibility-claim-detected"
+  );
+});
+
+test("scheduler variant currentness gate rejects non-enumerable oracle compatibility claims", () => {
+  const claimedOracle = cloneJson(oracle);
+  Object.defineProperty(claimedOracle.conformanceClaims, "compatibilityClaimed", {
+    configurable: true,
+    enumerable: false,
+    value: true
+  });
+  const gate = evaluateSchedulerVariantCurrentnessGate({
+    oracle: claimedOracle
+  });
+
+  assert.equal(gate.status, SCHEDULER_VARIANT_CURRENTNESS_VIOLATION_STATUS);
+  assert.equal(gate.blockedPublicClaimsRecognized, false);
+  assert.equal(
+    gate.publicCompatibilityClaimIds.includes(
+      "oracle.conformanceClaims.compatibilityClaimed"
+    ),
+    true
   );
   assertViolation(
     gate,

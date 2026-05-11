@@ -200,6 +200,47 @@ test('public React DOM flushSync blocked currentness stays source-owned and fail
     ),
     'public-react-dom-flush-sync-currentness-caller-overrides'
   );
+  const deletingScenarioOverride = {};
+  Object.defineProperty(deletingScenarioOverride, 'scenarios', {
+    configurable: true,
+    enumerable: false,
+    get() {
+      delete deletingScenarioOverride.scenarios;
+      return report.scenarios;
+    }
+  });
+  assertFlushSyncCurrentnessRejected(
+    guard.createPublicReactDomFlushSyncBlockedCurrentnessReport(
+      deletingScenarioOverride
+    ),
+    'public-react-dom-flush-sync-currentness-caller-overrides'
+  );
+  assertFlushSyncCurrentnessRejected(
+    guard.createPublicReactDomFlushSyncBlockedCurrentnessReport(
+      Object.create({ scenarios: report.scenarios })
+    ),
+    'public-react-dom-flush-sync-currentness-caller-overrides'
+  );
+  const proxyScenarioOverride = new Proxy(
+    {},
+    {
+      ownKeys() {
+        return [];
+      },
+      getOwnPropertyDescriptor() {
+        return undefined;
+      },
+      get(_target, key) {
+        return key === 'scenarios' ? report.scenarios : undefined;
+      }
+    }
+  );
+  assertFlushSyncCurrentnessRejected(
+    guard.createPublicReactDomFlushSyncBlockedCurrentnessReport(
+      proxyScenarioOverride
+    ),
+    'public-react-dom-flush-sync-currentness-caller-overrides'
+  );
   assertFlushSyncCurrentnessRejected(
     guard.createPublicReactDomFlushSyncBlockedCurrentnessReport({
       publicFlushSyncCompatibilityClaimed: true

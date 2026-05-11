@@ -1058,6 +1058,51 @@ test("unsupported placeholder hook currentness rejects stale source and forged c
     ),
     "unsupported-placeholder-hook-currentness-caller-overrides"
   );
+  const deletingPlaceholderOverride = {};
+  Object.defineProperty(
+    deletingPlaceholderOverride,
+    "publicExportsPlaceholderBlocked",
+    {
+      configurable: true,
+      enumerable: false,
+      get() {
+        delete deletingPlaceholderOverride.publicExportsPlaceholderBlocked;
+        return true;
+      }
+    }
+  );
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport(
+      deletingPlaceholderOverride
+    ),
+    "unsupported-placeholder-hook-currentness-caller-overrides"
+  );
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport(
+      Object.create({ publicExportsPlaceholderBlocked: true })
+    ),
+    "unsupported-placeholder-hook-currentness-caller-overrides"
+  );
+  const proxyPlaceholderOverride = new Proxy(
+    {},
+    {
+      ownKeys() {
+        return [];
+      },
+      getOwnPropertyDescriptor() {
+        return undefined;
+      },
+      get(_target, key) {
+        return key === "publicExportsPlaceholderBlocked" ? true : undefined;
+      }
+    }
+  );
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport(
+      proxyPlaceholderOverride
+    ),
+    "unsupported-placeholder-hook-currentness-caller-overrides"
+  );
   assertUnsupportedCurrentnessRejected(
     hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
       publicShapeBlockers: [
