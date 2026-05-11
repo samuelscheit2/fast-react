@@ -17,6 +17,11 @@ use fast_react_host_config::{
     HostFiberTokenTarget, HostIdentityAndContext, InitialChildrenFinalization, MutationHost,
 };
 
+use crate::complete_work::{
+    HostComponentDangerousHtmlTextResetCompleteWorkRecordForCanary,
+    HostComponentDangerousHtmlTextResetPayloadKindForCanary,
+    host_component_dangerous_html_text_reset_complete_work_record_for_canary,
+};
 use crate::host_nodes::{
     HostNodeAppliedTextUpdate, HostNodeMetadata, HostNodePropertyUpdate,
     HostNodePropertyUpdateExecution, HostNodeScope, HostNodeStore, HostNodeTextUpdate,
@@ -26,12 +31,13 @@ use crate::passive_effects::PassiveEffectsFlushResult;
 #[cfg(test)]
 use crate::root_commit::HostRootTextUpdateCommitExecutionRequestForCanary;
 use crate::root_commit::{
-    HostRootDeletionCleanupOrderPhase, HostRootDeletionCleanupRecord,
-    HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary,
+    HostRootDangerousHtmlTextResetCommitHandoffRecordForCanary, HostRootDeletionCleanupOrderPhase,
+    HostRootDeletionCleanupRecord, HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary,
     HostRootDeletionSubtreeHostDetachmentPlanForCanary,
     HostRootFinishedWorkCommitHandoffErrorForCanary,
     HostRootFinishedWorkPendingCommitRecordForCanary, HostRootMutationApplyRecord,
     HostRootMutationApplyRecordKind, HostRootSingleHostUpdateApplyRecordErrorForCanary,
+    commit_dangerous_html_text_reset_complete_work_handoff_for_canary,
     commit_finished_host_root_with_finished_work_handoff_for_canary,
     record_host_root_single_host_update_apply_for_canary,
 };
@@ -956,6 +962,20 @@ impl TestHostComponentPropertyPayloadRow {
             property_name: TEST_HOST_TEXT_CONTENT_PROPERTY_NAME,
             old_props,
             new_props,
+        }
+    }
+
+    #[must_use]
+    fn from_dangerous_html_text_reset_complete_work(
+        complete_work: HostComponentDangerousHtmlTextResetCompleteWorkRecordForCanary,
+    ) -> Self {
+        match complete_work.payload_kind() {
+            HostComponentDangerousHtmlTextResetPayloadKindForCanary::DangerousHtml => {
+                Self::dangerous_html(complete_work.old_props(), complete_work.new_props())
+            }
+            HostComponentDangerousHtmlTextResetPayloadKindForCanary::TextContentReset => {
+                Self::text_content_reset(complete_work.old_props(), complete_work.new_props())
+            }
         }
     }
 
@@ -1977,6 +1997,109 @@ fn apply_one_test_host_update_with_finished_work_handoff_for_canary(
         private_host_store_update_count: apply.private_host_store_update_count(),
         blockers: TEST_HOST_ROOT_HOST_UPDATE_EXECUTION_BLOCKERS,
     })
+}
+
+fn apply_dangerous_html_text_reset_handoff_for_canary(
+    store: &mut FiberRootStore<RecordingHost>,
+    host: &mut RecordingHost,
+    handoff: &HostRootDangerousHtmlTextResetCommitHandoffRecordForCanary,
+    detached_hosts: &mut DetachedHostRecords,
+) -> Result<
+    TestHostRootHostUpdateExecutionDiagnosticForCanary,
+    TestHostRootHostUpdateExecutionErrorForCanary,
+> {
+    let mutation = handoff.mutation();
+    let Some(payload) =
+        accept_dangerous_html_text_reset_payload_from_complete_work_handoff_for_canary(
+            detached_hosts,
+            handoff.complete_work(),
+            mutation,
+        )
+    else {
+        return Err(
+            TestHostRootHostUpdateExecutionErrorForCanary::UnsupportedPayload {
+                root: handoff.root(),
+                finished_work: handoff.finished_work(),
+                fiber: mutation.fiber(),
+                kind: mutation.kind(),
+            },
+        );
+    };
+
+    let apply = apply_test_host_root_commit_mutations(
+        store,
+        host,
+        handoff.finished_work_handoff().commit(),
+        detached_hosts,
+    )?;
+    let applied_status = apply
+        .records()
+        .iter()
+        .find(|record| record.mutation() == mutation)
+        .map(|record| record.status());
+    let Some(status) = applied_status else {
+        return Err(
+            TestHostRootHostUpdateExecutionErrorForCanary::HostUpdateNotApplied {
+                root: handoff.root(),
+                finished_work: handoff.finished_work(),
+                fiber: mutation.fiber(),
+                status: None,
+            },
+        );
+    };
+    if !host_update_apply_status_matches_mutation_kind(status, mutation.kind()) {
+        return Err(
+            TestHostRootHostUpdateExecutionErrorForCanary::HostUpdateNotApplied {
+                root: handoff.root(),
+                finished_work: handoff.finished_work(),
+                fiber: mutation.fiber(),
+                status: Some(status),
+            },
+        );
+    }
+
+    Ok(TestHostRootHostUpdateExecutionDiagnosticForCanary {
+        root: handoff.root(),
+        finished_work: handoff.finished_work(),
+        source_handoff_order: handoff.source_handoff_order(),
+        commit_order: handoff.commit_order(),
+        mutation,
+        payload: TestHostRootHostUpdatePayloadForCanary::component(payload),
+        status,
+        applied_host_call_count: apply.applied_host_call_count(),
+        private_host_store_update_count: apply.private_host_store_update_count(),
+        blockers: TEST_HOST_ROOT_HOST_UPDATE_EXECUTION_BLOCKERS,
+    })
+}
+
+fn accept_dangerous_html_text_reset_payload_from_complete_work_handoff_for_canary(
+    detached_hosts: &mut DetachedHostRecords,
+    complete_work: HostComponentDangerousHtmlTextResetCompleteWorkRecordForCanary,
+    mutation: HostRootMutationApplyRecord,
+) -> Option<HostComponentUpdatePayload> {
+    let property_row =
+        TestHostComponentPropertyPayloadRow::from_dangerous_html_text_reset_complete_work(
+            complete_work,
+        );
+
+    detached_hosts
+        .component_updates
+        .iter_mut()
+        .find(|payload| {
+            payload.root() == complete_work.root()
+                && payload.current() == complete_work.current()
+                && payload.work_in_progress() == complete_work.work_in_progress()
+                && payload.state_node() == complete_work.state_node()
+                && payload.old_props() == complete_work.old_props()
+                && payload.new_props() == complete_work.new_props()
+                && payload.work_in_progress() == mutation.fiber()
+                && payload.state_node() == mutation.state_node()
+                && Some(payload.current()) == mutation.alternate_fiber()
+        })
+        .map(|payload| {
+            payload.property_row = property_row;
+            payload.clone()
+        })
 }
 
 fn accepted_test_host_update_payload_for_canary(
@@ -4250,6 +4373,97 @@ mod tests {
             commit,
             payload,
             state_node,
+            operations_before_apply,
+            token_count_before_apply,
+        }
+    }
+
+    struct DangerousHtmlTextResetHandoffFixture {
+        store: FiberRootStore<RecordingHost>,
+        root_id: FiberRootId,
+        host: RecordingHost,
+        detached_hosts: DetachedHostRecords,
+        render: HostRootRenderPhaseRecord,
+        pending: HostRootFinishedWorkPendingCommitRecordForCanary,
+        complete_work: HostComponentDangerousHtmlTextResetCompleteWorkRecordForCanary,
+        payload: HostComponentUpdatePayload,
+        state_node: StateNodeHandle,
+        previous_current: FiberId,
+        operations_before_apply: Vec<&'static str>,
+        token_count_before_apply: usize,
+    }
+
+    fn dangerous_html_text_reset_handoff_fixture(
+        payload_kind: HostComponentDangerousHtmlTextResetPayloadKindForCanary,
+        handoff_order: usize,
+    ) -> DangerousHtmlTextResetHandoffFixture {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let mut source = TestHostTree::new();
+        let initial_element = source.insert_host_element_with_text("section", "ignored");
+        let initial = element_from_root(&source, initial_element);
+        let create_render = render_test_root(&mut store, root_id, initial_element);
+        let current_component = attach_detached_root_instance_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            create_render.finished_work(),
+            initial,
+            FiberFlags::PLACEMENT,
+        );
+        let state_node = store
+            .fiber_arena()
+            .get(current_component)
+            .unwrap()
+            .state_node();
+        let create_commit = commit_finished_host_root(&mut store, create_render).unwrap();
+        apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &create_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        let next_element = source.insert_host_element_with_text("section", "updated");
+        let next = element_from_root(&source, next_element);
+        let render = render_test_root(&mut store, root_id, next_element);
+        let payload = update_root_component_for_commit(
+            &mut store,
+            root_id,
+            render.finished_work(),
+            current_component,
+            next,
+            &mut detached_hosts,
+        );
+        let complete_work =
+            host_component_dangerous_html_text_reset_complete_work_record_for_canary(
+                store.fiber_arena(),
+                root_id,
+                payload.work_in_progress(),
+                payload_kind,
+            )
+            .unwrap();
+        let pending =
+            record_host_root_finished_work_pending_commit_for_canary(&store, render, handoff_order)
+                .unwrap();
+        let previous_current = store.root(root_id).unwrap().current();
+        let operations_before_apply = host.operations();
+        let token_count_before_apply = store.host_tokens().len();
+
+        DangerousHtmlTextResetHandoffFixture {
+            store,
+            root_id,
+            host,
+            detached_hosts,
+            render,
+            pending,
+            complete_work,
+            payload,
+            state_node,
+            previous_current,
             operations_before_apply,
             token_count_before_apply,
         }
@@ -8003,6 +8217,247 @@ mod tests {
         let mut expected_operations = fixture.operations_before_apply;
         expected_operations.push("reset_text_content");
         assert_eq!(fixture.host.operations(), expected_operations);
+    }
+
+    #[test]
+    fn host_work_dangerous_html_complete_work_handoff_executes_canonical_private_row() {
+        let mut fixture = dangerous_html_text_reset_handoff_fixture(
+            HostComponentDangerousHtmlTextResetPayloadKindForCanary::DangerousHtml,
+            61,
+        );
+        let finished_work = fixture.render.finished_work();
+
+        let handoff = commit_dangerous_html_text_reset_complete_work_handoff_for_canary(
+            &mut fixture.store,
+            fixture.render,
+            Some(fixture.pending),
+            fixture.complete_work,
+            0,
+            62,
+            63,
+        )
+        .unwrap();
+
+        assert_eq!(handoff.root(), fixture.root_id);
+        assert_eq!(handoff.finished_work(), finished_work);
+        assert_eq!(handoff.source_handoff_order(), 61);
+        assert_eq!(handoff.commit_order(), 62);
+        assert_eq!(handoff.request_order(), 63);
+        assert_eq!(handoff.payload_kind_name(), "dangerous-html");
+        assert!(handoff.complete_metadata_matches_mutation());
+        assert!(handoff.private_test_host_mutation_allowed());
+        assert!(handoff.public_root_rendering_blocked());
+        assert!(handoff.public_renderer_mutation_blocked());
+        assert!(!handoff.public_dom_compatibility_claimed());
+        assert!(!handoff.test_renderer_compatibility_claimed());
+        assert_eq!(
+            fixture.store.root(fixture.root_id).unwrap().current(),
+            finished_work
+        );
+
+        let diagnostic = apply_dangerous_html_text_reset_handoff_for_canary(
+            &mut fixture.store,
+            &mut fixture.host,
+            &handoff,
+            &mut fixture.detached_hosts,
+        )
+        .unwrap();
+
+        assert_eq!(diagnostic.root(), fixture.root_id);
+        assert_eq!(diagnostic.finished_work(), finished_work);
+        assert_eq!(diagnostic.source_handoff_order(), 61);
+        assert_eq!(diagnostic.commit_order(), 62);
+        assert_eq!(diagnostic.mutation(), handoff.mutation());
+        assert_eq!(
+            diagnostic.status(),
+            TestHostRootMutationApplyStatus::Applied(TestHostRootMutationHostCall::CommitUpdate)
+        );
+        assert!(diagnostic.test_host_commit_executed());
+        assert_eq!(diagnostic.applied_host_call_count(), 1);
+        assert_eq!(diagnostic.private_host_store_update_count(), 0);
+        assert_eq!(
+            diagnostic.payload().host_component_property_payload_kind(),
+            Some(TestHostComponentPropertyPayloadKind::DangerousHtml)
+        );
+        assert_eq!(
+            diagnostic.payload().host_component_prop_name(),
+            Some(TEST_HOST_DANGEROUS_HTML_PROP_NAME)
+        );
+        assert_eq!(
+            diagnostic.payload().host_component_property_name(),
+            Some(TEST_HOST_DANGEROUS_HTML_PROPERTY_NAME)
+        );
+        assert!(diagnostic.public_root_rendering_blocked());
+        assert!(!diagnostic.public_renderer_package_behavior_exposed());
+        assert!(!diagnostic.react_dom_compatibility_claimed());
+        assert!(!diagnostic.test_renderer_compatibility_claimed());
+        assert_eq!(
+            fixture.store.host_tokens().len(),
+            fixture.token_count_before_apply + 1
+        );
+        assert_single_component_property_update(
+            &fixture.detached_hosts,
+            fixture.state_node,
+            fixture.root_id,
+            fixture.payload.current(),
+            fixture.payload.old_props(),
+            fixture.payload.new_props(),
+            TestHostComponentPropertyPayloadKind::DangerousHtml,
+            TEST_HOST_DANGEROUS_HTML_PROP_NAME,
+            TEST_HOST_DANGEROUS_HTML_PROPERTY_NAME,
+            HostNodePropertyUpdateExecution::CommitUpdate,
+        );
+        let mut expected_operations = fixture.operations_before_apply;
+        expected_operations.push("commit_update");
+        assert_eq!(fixture.host.operations(), expected_operations);
+    }
+
+    #[test]
+    fn host_work_text_reset_complete_work_handoff_executes_without_public_dom_claim() {
+        let mut fixture = dangerous_html_text_reset_handoff_fixture(
+            HostComponentDangerousHtmlTextResetPayloadKindForCanary::TextContentReset,
+            71,
+        );
+        let finished_work = fixture.render.finished_work();
+
+        let handoff = commit_dangerous_html_text_reset_complete_work_handoff_for_canary(
+            &mut fixture.store,
+            fixture.render,
+            Some(fixture.pending),
+            fixture.complete_work,
+            0,
+            72,
+            73,
+        )
+        .unwrap();
+        let diagnostic = apply_dangerous_html_text_reset_handoff_for_canary(
+            &mut fixture.store,
+            &mut fixture.host,
+            &handoff,
+            &mut fixture.detached_hosts,
+        )
+        .unwrap();
+
+        assert_eq!(handoff.root(), fixture.root_id);
+        assert_eq!(handoff.finished_work(), finished_work);
+        assert_eq!(handoff.payload_kind_name(), "text-content");
+        assert_eq!(
+            handoff.complete_work().expected_private_host_execution(),
+            "reset-text-content"
+        );
+        assert!(handoff.complete_work().host_component_update_required());
+        assert!(handoff.complete_work().private_reconciler_handoff_only());
+        assert!(!handoff.complete_work().public_dom_compatibility_claimed());
+        assert!(!handoff.complete_work().public_root_compatibility_claimed());
+        assert!(handoff.complete_metadata_matches_mutation());
+        assert_eq!(
+            diagnostic.status(),
+            TestHostRootMutationApplyStatus::Applied(
+                TestHostRootMutationHostCall::ResetTextContent
+            )
+        );
+        assert!(diagnostic.test_host_commit_executed());
+        assert_eq!(diagnostic.applied_host_call_count(), 1);
+        assert_eq!(diagnostic.private_host_store_update_count(), 0);
+        assert_eq!(
+            diagnostic.payload().host_component_property_payload_kind(),
+            Some(TestHostComponentPropertyPayloadKind::TextContent)
+        );
+        assert_eq!(
+            diagnostic.payload().host_component_prop_name(),
+            Some(TEST_HOST_TEXT_CONTENT_PROP_NAME)
+        );
+        assert_eq!(
+            diagnostic.payload().host_component_property_name(),
+            Some(TEST_HOST_TEXT_CONTENT_PROPERTY_NAME)
+        );
+        assert!(!diagnostic.react_dom_compatibility_claimed());
+        assert!(!diagnostic.test_renderer_compatibility_claimed());
+        assert_eq!(
+            fixture.store.host_tokens().len(),
+            fixture.token_count_before_apply
+        );
+        assert_single_component_property_update(
+            &fixture.detached_hosts,
+            fixture.state_node,
+            fixture.root_id,
+            fixture.payload.current(),
+            fixture.payload.old_props(),
+            fixture.payload.new_props(),
+            TestHostComponentPropertyPayloadKind::TextContent,
+            TEST_HOST_TEXT_CONTENT_PROP_NAME,
+            TEST_HOST_TEXT_CONTENT_PROPERTY_NAME,
+            HostNodePropertyUpdateExecution::ResetTextContent,
+        );
+        let mut expected_operations = fixture.operations_before_apply;
+        expected_operations.push("reset_text_content");
+        assert_eq!(fixture.host.operations(), expected_operations);
+    }
+
+    #[test]
+    fn host_work_dangerous_html_text_reset_handoff_rejects_stale_metadata_before_mutation() {
+        let mut fixture = dangerous_html_text_reset_handoff_fixture(
+            HostComponentDangerousHtmlTextResetPayloadKindForCanary::DangerousHtml,
+            81,
+        );
+        let finished_work = fixture.render.finished_work();
+        let stale_complete_work = fixture
+            .complete_work
+            .with_new_props_for_canary(PropsHandle::from_raw(98_881));
+
+        let error = commit_dangerous_html_text_reset_complete_work_handoff_for_canary(
+            &mut fixture.store,
+            fixture.render,
+            Some(fixture.pending),
+            stale_complete_work,
+            0,
+            82,
+            83,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            crate::root_commit::HostRootDangerousHtmlTextResetCommitHandoffErrorForCanary::MetadataPropsMismatch {
+                root,
+                fiber,
+                expected_old_props,
+                expected_new_props,
+                actual_pending_props,
+                actual_memoized_props,
+                ..
+            } if root == fixture.root_id
+                && fiber == fixture.payload.work_in_progress()
+                && expected_old_props == fixture.payload.old_props()
+                && expected_new_props == PropsHandle::from_raw(98_881)
+                && actual_pending_props == fixture.payload.new_props()
+                && actual_memoized_props == fixture.payload.new_props()
+        ));
+        assert_eq!(
+            fixture.store.root(fixture.root_id).unwrap().current(),
+            fixture.previous_current
+        );
+        assert_eq!(
+            fixture
+                .store
+                .root(fixture.root_id)
+                .unwrap()
+                .scheduling()
+                .work_in_progress(),
+            Some(finished_work)
+        );
+        assert_eq!(fixture.host.operations(), fixture.operations_before_apply);
+        assert_eq!(
+            fixture.store.host_tokens().len(),
+            fixture.token_count_before_apply
+        );
+        assert!(
+            fixture
+                .detached_hosts
+                .instance_property_updates(fixture.state_node)
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]
