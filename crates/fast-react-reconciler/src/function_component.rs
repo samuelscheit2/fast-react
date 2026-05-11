@@ -926,6 +926,602 @@ pub(crate) fn function_component_use_reducer_accepted_update_evidence_for_canary
     })
 }
 
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentUseRefExecutionSourceEvidenceForCanary {
+    react_version: &'static str,
+    react_hooks_use_ref: &'static str,
+    react_fiber_hooks_mount_ref: &'static str,
+    react_fiber_hooks_update_ref: &'static str,
+    fast_react_mount_ref_hook: &'static str,
+    fast_react_update_ref_hook: &'static str,
+    public_hook_compatibility_claimed: bool,
+    public_root_compatibility_claimed: bool,
+    root_scheduler_integration_claimed: bool,
+    scheduler_compatibility_claimed: bool,
+    act_compatibility_claimed: bool,
+    renderer_compatibility_claimed: bool,
+}
+
+#[cfg(test)]
+impl FunctionComponentUseRefExecutionSourceEvidenceForCanary {
+    #[must_use]
+    pub const fn react_19_2_6() -> Self {
+        Self {
+            react_version: "19.2.6",
+            react_hooks_use_ref: "ReactHooks.useRef",
+            react_fiber_hooks_mount_ref: "ReactFiberHooks.mountRef",
+            react_fiber_hooks_update_ref: "ReactFiberHooks.updateRef",
+            fast_react_mount_ref_hook: "FunctionComponentHookRenderStore::mount_ref_hook",
+            fast_react_update_ref_hook: "FunctionComponentHookRenderStore::update_ref_hook",
+            public_hook_compatibility_claimed: false,
+            public_root_compatibility_claimed: false,
+            root_scheduler_integration_claimed: false,
+            scheduler_compatibility_claimed: false,
+            act_compatibility_claimed: false,
+            renderer_compatibility_claimed: false,
+        }
+    }
+
+    #[must_use]
+    pub const fn react_version(self) -> &'static str {
+        self.react_version
+    }
+
+    #[must_use]
+    pub const fn react_hooks_use_ref(self) -> &'static str {
+        self.react_hooks_use_ref
+    }
+
+    #[must_use]
+    pub const fn react_fiber_hooks_mount_ref(self) -> &'static str {
+        self.react_fiber_hooks_mount_ref
+    }
+
+    #[must_use]
+    pub const fn react_fiber_hooks_update_ref(self) -> &'static str {
+        self.react_fiber_hooks_update_ref
+    }
+
+    #[must_use]
+    pub const fn fast_react_mount_ref_hook(self) -> &'static str {
+        self.fast_react_mount_ref_hook
+    }
+
+    #[must_use]
+    pub const fn fast_react_update_ref_hook(self) -> &'static str {
+        self.fast_react_update_ref_hook
+    }
+
+    #[must_use]
+    pub const fn public_hook_compatibility_claimed(self) -> bool {
+        self.public_hook_compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn public_root_compatibility_claimed(self) -> bool {
+        self.public_root_compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn root_scheduler_integration_claimed(self) -> bool {
+        self.root_scheduler_integration_claimed
+    }
+
+    #[must_use]
+    pub const fn scheduler_compatibility_claimed(self) -> bool {
+        self.scheduler_compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn act_compatibility_claimed(self) -> bool {
+        self.act_compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn renderer_compatibility_claimed(self) -> bool {
+        self.renderer_compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn is_private_execution_only(self) -> bool {
+        !self.public_hook_compatibility_claimed
+            && !self.public_root_compatibility_claimed
+            && !self.root_scheduler_integration_claimed
+            && !self.scheduler_compatibility_claimed
+            && !self.act_compatibility_claimed
+            && !self.renderer_compatibility_claimed
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct FunctionComponentUseRefExecutionEvidenceForCanary {
+    source: FunctionComponentUseRefExecutionSourceEvidenceForCanary,
+    current: FiberId,
+    work_in_progress: FiberId,
+    mount_hook_state: FunctionComponentHookRenderState,
+    update_hook_state: FunctionComponentHookRenderState,
+    mount_hook: HookSlotId,
+    update_hook: HookSlotId,
+    ref_object: FunctionComponentRefObjectHandle,
+    current_after_mount: StateHandle,
+    current_after_update: StateHandle,
+    ignored_update_initial_value: StateHandle,
+    mount_render_lanes: Lanes,
+    update_render_lanes: Lanes,
+    mount_traversed_count: usize,
+    update_traversed_count: usize,
+    caller_built_rows_accepted: bool,
+}
+
+#[cfg(test)]
+impl FunctionComponentUseRefExecutionEvidenceForCanary {
+    #[must_use]
+    pub const fn source(&self) -> FunctionComponentUseRefExecutionSourceEvidenceForCanary {
+        self.source
+    }
+
+    #[must_use]
+    pub const fn current(&self) -> FiberId {
+        self.current
+    }
+
+    #[must_use]
+    pub const fn work_in_progress(&self) -> FiberId {
+        self.work_in_progress
+    }
+
+    #[must_use]
+    pub const fn mount_hook_state(&self) -> FunctionComponentHookRenderState {
+        self.mount_hook_state
+    }
+
+    #[must_use]
+    pub const fn update_hook_state(&self) -> FunctionComponentHookRenderState {
+        self.update_hook_state
+    }
+
+    #[must_use]
+    pub const fn mount_hook(&self) -> HookSlotId {
+        self.mount_hook
+    }
+
+    #[must_use]
+    pub const fn update_hook(&self) -> HookSlotId {
+        self.update_hook
+    }
+
+    #[must_use]
+    pub const fn ref_object(&self) -> FunctionComponentRefObjectHandle {
+        self.ref_object
+    }
+
+    #[must_use]
+    pub const fn current_after_mount(&self) -> StateHandle {
+        self.current_after_mount
+    }
+
+    #[must_use]
+    pub const fn current_after_update(&self) -> StateHandle {
+        self.current_after_update
+    }
+
+    #[must_use]
+    pub const fn ignored_update_initial_value(&self) -> StateHandle {
+        self.ignored_update_initial_value
+    }
+
+    #[must_use]
+    pub const fn mount_render_lanes(&self) -> Lanes {
+        self.mount_render_lanes
+    }
+
+    #[must_use]
+    pub const fn update_render_lanes(&self) -> Lanes {
+        self.update_render_lanes
+    }
+
+    #[must_use]
+    pub const fn mount_traversed_count(&self) -> usize {
+        self.mount_traversed_count
+    }
+
+    #[must_use]
+    pub const fn update_traversed_count(&self) -> usize {
+        self.update_traversed_count
+    }
+
+    #[must_use]
+    pub const fn caller_built_rows_accepted(&self) -> bool {
+        self.caller_built_rows_accepted
+    }
+
+    #[must_use]
+    pub const fn public_hook_compatibility_claimed(&self) -> bool {
+        self.source.public_hook_compatibility_claimed()
+    }
+
+    #[must_use]
+    pub const fn public_root_compatibility_claimed(&self) -> bool {
+        self.source.public_root_compatibility_claimed()
+    }
+
+    #[must_use]
+    pub const fn root_scheduler_integration_claimed(&self) -> bool {
+        self.source.root_scheduler_integration_claimed()
+    }
+
+    #[must_use]
+    pub const fn scheduler_compatibility_claimed(&self) -> bool {
+        self.source.scheduler_compatibility_claimed()
+    }
+
+    #[must_use]
+    pub const fn act_compatibility_claimed(&self) -> bool {
+        self.source.act_compatibility_claimed()
+    }
+
+    #[must_use]
+    pub const fn renderer_compatibility_claimed(&self) -> bool {
+        self.source.renderer_compatibility_claimed()
+    }
+
+    #[must_use]
+    pub fn same_ref_identity_across_update(&self) -> bool {
+        self.ref_object.is_some()
+            && self.mount_hook != self.update_hook
+            && self.current_after_mount == self.current_after_update
+            && self.current_after_mount != self.ignored_update_initial_value
+    }
+
+    #[must_use]
+    pub fn proves_private_mount_update_ref_identity(&self) -> bool {
+        self.source.is_private_execution_only()
+            && self.same_ref_identity_across_update()
+            && !self.caller_built_rows_accepted
+            && self.mount_hook_state.phase() == FunctionComponentHookRenderPhase::Mount
+            && self.update_hook_state.phase() == FunctionComponentHookRenderPhase::Update
+            && self.mount_traversed_count == 1
+            && self.update_traversed_count == 1
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FunctionComponentUseRefExecutionEvidenceErrorForCanary {
+    MissingMountUseRef {
+        function_component: FiberId,
+    },
+    MissingUpdateUseRef {
+        function_component: FiberId,
+    },
+    StaleOrCrossComponentUseRefEvidence {
+        mount_current: Option<FiberId>,
+        update_current: Option<FiberId>,
+        mount_work_in_progress: FiberId,
+        update_work_in_progress: FiberId,
+        expected_current_list: HookListId,
+        actual_current_list: Option<HookListId>,
+    },
+    CallerShapedUseRefEvidence {
+        fiber: FiberId,
+        hook: HookSlotId,
+        ref_object: FunctionComponentRefObjectHandle,
+    },
+    RefHookListMismatch {
+        fiber: FiberId,
+        hook: HookSlotId,
+        expected_hook_list: HookListId,
+        actual_hook_list: HookListId,
+        ref_object: FunctionComponentRefObjectHandle,
+    },
+    RefHookListOwnerMismatch {
+        fiber: FiberId,
+        hook_list: HookListId,
+        owner: FiberId,
+        ref_object: FunctionComponentRefObjectHandle,
+    },
+    RefIdentityMismatch {
+        mount_ref_object: FunctionComponentRefObjectHandle,
+        update_ref_object: FunctionComponentRefObjectHandle,
+    },
+    RefCurrentValueOverride {
+        ref_object: FunctionComponentRefObjectHandle,
+        mount_current: StateHandle,
+        update_current: StateHandle,
+        ignored_update_initial_value: StateHandle,
+    },
+}
+
+#[cfg(test)]
+impl Display for FunctionComponentUseRefExecutionEvidenceErrorForCanary {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MissingMountUseRef { function_component } => write!(
+                formatter,
+                "FunctionComponent fiber {} has no private useRef mount evidence",
+                function_component.slot().get()
+            ),
+            Self::MissingUpdateUseRef { function_component } => write!(
+                formatter,
+                "FunctionComponent fiber {} has no private useRef update evidence",
+                function_component.slot().get()
+            ),
+            Self::StaleOrCrossComponentUseRefEvidence {
+                mount_current,
+                update_current,
+                mount_work_in_progress,
+                update_work_in_progress,
+                expected_current_list,
+                actual_current_list,
+            } => write!(
+                formatter,
+                "rejected stale or cross-component private useRef evidence: mount current {:?}, update current {:?}, mount fiber {}, update fiber {}, expected current list {:?}, actual {:?}",
+                mount_current.map(|fiber| fiber.slot().get()),
+                update_current.map(|fiber| fiber.slot().get()),
+                mount_work_in_progress.slot().get(),
+                update_work_in_progress.slot().get(),
+                expected_current_list,
+                actual_current_list
+            ),
+            Self::CallerShapedUseRefEvidence {
+                fiber,
+                hook,
+                ref_object,
+            } => write!(
+                formatter,
+                "rejected caller-shaped private useRef evidence for fiber {} hook {} ref object {}",
+                fiber.slot().get(),
+                hook.slot().get(),
+                ref_object.raw()
+            ),
+            Self::RefHookListMismatch {
+                fiber,
+                hook,
+                expected_hook_list,
+                actual_hook_list,
+                ref_object,
+            } => write!(
+                formatter,
+                "rejected private useRef evidence for fiber {} hook {} ref object {} because it belongs to hook list {:?}, expected {:?}",
+                fiber.slot().get(),
+                hook.slot().get(),
+                ref_object.raw(),
+                actual_hook_list,
+                expected_hook_list
+            ),
+            Self::RefHookListOwnerMismatch {
+                fiber,
+                hook_list,
+                owner,
+                ref_object,
+            } => write!(
+                formatter,
+                "rejected private useRef evidence for fiber {} hook list {:?} ref object {} because it is owned by fiber {}",
+                fiber.slot().get(),
+                hook_list,
+                ref_object.raw(),
+                owner.slot().get()
+            ),
+            Self::RefIdentityMismatch {
+                mount_ref_object,
+                update_ref_object,
+            } => write!(
+                formatter,
+                "private useRef update returned ref object {}, expected mount ref object {}",
+                update_ref_object.raw(),
+                mount_ref_object.raw()
+            ),
+            Self::RefCurrentValueOverride {
+                ref_object,
+                mount_current,
+                update_current,
+                ignored_update_initial_value,
+            } => write!(
+                formatter,
+                "private useRef ref object {} current value changed from {} to {} while update initializer {} should be ignored",
+                ref_object.raw(),
+                mount_current.raw(),
+                update_current.raw(),
+                ignored_update_initial_value.raw()
+            ),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Error for FunctionComponentUseRefExecutionEvidenceErrorForCanary {}
+
+#[cfg(test)]
+fn validate_use_ref_store_record_for_canary(
+    hook_store: &FunctionComponentHookRenderStore,
+    state: FunctionComponentHookRenderState,
+    record: FunctionComponentRefHookRecord,
+) -> Result<(), FunctionComponentUseRefExecutionEvidenceErrorForCanary> {
+    let fiber = state.render_fiber();
+    let work_in_progress_list = hook_store
+        .hook_lists()
+        .list(state.work_in_progress_list())
+        .map_err(|_| {
+            FunctionComponentUseRefExecutionEvidenceErrorForCanary::CallerShapedUseRefEvidence {
+                fiber,
+                hook: record.hook(),
+                ref_object: record.ref_object(),
+            }
+        })?;
+    if work_in_progress_list.owner() != fiber {
+        return Err(
+            FunctionComponentUseRefExecutionEvidenceErrorForCanary::RefHookListOwnerMismatch {
+                fiber,
+                hook_list: state.work_in_progress_list(),
+                owner: work_in_progress_list.owner(),
+                ref_object: record.ref_object(),
+            },
+        );
+    }
+
+    let stored = hook_store
+        .ref_hook_record(fiber, record.hook())
+        .map_err(|_| {
+            FunctionComponentUseRefExecutionEvidenceErrorForCanary::CallerShapedUseRefEvidence {
+                fiber,
+                hook: record.hook(),
+                ref_object: record.ref_object(),
+            }
+        })?;
+    if stored.ref_object() != record.ref_object()
+        || stored.initial_value() != record.initial_value()
+    {
+        return Err(
+            FunctionComponentUseRefExecutionEvidenceErrorForCanary::CallerShapedUseRefEvidence {
+                fiber,
+                hook: record.hook(),
+                ref_object: record.ref_object(),
+            },
+        );
+    }
+
+    let hook = hook_store.hook_lists().hook(record.hook()).map_err(|_| {
+        FunctionComponentUseRefExecutionEvidenceErrorForCanary::CallerShapedUseRefEvidence {
+            fiber,
+            hook: record.hook(),
+            ref_object: record.ref_object(),
+        }
+    })?;
+    let actual_hook_list = hook.list();
+    if actual_hook_list != state.work_in_progress_list() {
+        return Err(
+            FunctionComponentUseRefExecutionEvidenceErrorForCanary::RefHookListMismatch {
+                fiber,
+                hook: record.hook(),
+                expected_hook_list: state.work_in_progress_list(),
+                actual_hook_list,
+                ref_object: record.ref_object(),
+            },
+        );
+    }
+
+    let payload = hook.payload();
+    if payload != ref_payload(record.ref_object()) {
+        return Err(
+            FunctionComponentUseRefExecutionEvidenceErrorForCanary::CallerShapedUseRefEvidence {
+                fiber,
+                hook: record.hook(),
+                ref_object: record.ref_object(),
+            },
+        );
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+pub(crate) fn function_component_use_ref_execution_evidence_for_canary(
+    hook_store: &FunctionComponentHookRenderStore,
+    mount: FunctionComponentUseRefRenderRecord,
+    update: FunctionComponentUseRefRenderRecord,
+) -> Result<
+    FunctionComponentUseRefExecutionEvidenceForCanary,
+    FunctionComponentUseRefExecutionEvidenceErrorForCanary,
+> {
+    let mount_ref = mount.ref_hook().mount_record().ok_or(
+        FunctionComponentUseRefExecutionEvidenceErrorForCanary::MissingMountUseRef {
+            function_component: mount.work_in_progress(),
+        },
+    )?;
+    let update_ref = update.ref_hook().update_record().ok_or(
+        FunctionComponentUseRefExecutionEvidenceErrorForCanary::MissingUpdateUseRef {
+            function_component: update.work_in_progress(),
+        },
+    )?;
+    let mount_hook_state = mount.hook_state();
+    let update_hook_state = update.hook_state();
+    let mount_current = mount.current();
+    let update_current = update.current();
+    let expected_current_list = mount_hook_state.work_in_progress_list();
+    let actual_current_list = update_hook_state.current_list();
+
+    if mount.render().hook_state() != Some(mount_hook_state)
+        || update.render().hook_state() != Some(update_hook_state)
+        || mount_current.is_none()
+        || mount_current != update_current
+        || mount.work_in_progress() != update.work_in_progress()
+        || mount.work_in_progress() != mount_hook_state.render_fiber()
+        || update.work_in_progress() != update_hook_state.render_fiber()
+        || mount_hook_state.phase() != FunctionComponentHookRenderPhase::Mount
+        || mount_hook_state.current() != mount_current
+        || update_hook_state.phase() != FunctionComponentHookRenderPhase::Update
+        || update_hook_state.current() != update_current
+        || actual_current_list != Some(expected_current_list)
+        || update_current.and_then(|current| hook_store.current_list(current))
+            != Some(expected_current_list)
+    {
+        return Err(
+            FunctionComponentUseRefExecutionEvidenceErrorForCanary::StaleOrCrossComponentUseRefEvidence {
+                mount_current,
+                update_current,
+                mount_work_in_progress: mount.work_in_progress(),
+                update_work_in_progress: update.work_in_progress(),
+                expected_current_list,
+                actual_current_list,
+            },
+        );
+    }
+
+    validate_use_ref_store_record_for_canary(hook_store, mount_hook_state, mount_ref)?;
+    validate_use_ref_store_record_for_canary(
+        hook_store,
+        update_hook_state,
+        FunctionComponentRefHookRecord {
+            hook: update_ref.hook(),
+            ref_object: update_ref.ref_object(),
+            initial_value: update_ref.initial_value(),
+        },
+    )?;
+
+    if mount_ref.ref_object() != update_ref.ref_object() {
+        return Err(
+            FunctionComponentUseRefExecutionEvidenceErrorForCanary::RefIdentityMismatch {
+                mount_ref_object: mount_ref.ref_object(),
+                update_ref_object: update_ref.ref_object(),
+            },
+        );
+    }
+
+    if mount_ref.initial_value() != update_ref.initial_value()
+        || update_ref.initial_value() == update_ref.ignored_initial_value()
+    {
+        return Err(
+            FunctionComponentUseRefExecutionEvidenceErrorForCanary::RefCurrentValueOverride {
+                ref_object: mount_ref.ref_object(),
+                mount_current: mount_ref.initial_value(),
+                update_current: update_ref.initial_value(),
+                ignored_update_initial_value: update_ref.ignored_initial_value(),
+            },
+        );
+    }
+
+    Ok(FunctionComponentUseRefExecutionEvidenceForCanary {
+        source: FunctionComponentUseRefExecutionSourceEvidenceForCanary::react_19_2_6(),
+        current: mount_current.expect("validated current useRef mount evidence"),
+        work_in_progress: mount.work_in_progress(),
+        mount_hook_state,
+        update_hook_state,
+        mount_hook: mount_ref.hook(),
+        update_hook: update_ref.hook(),
+        ref_object: mount_ref.ref_object(),
+        current_after_mount: mount_ref.initial_value(),
+        current_after_update: update_ref.initial_value(),
+        ignored_update_initial_value: update_ref.ignored_initial_value(),
+        mount_render_lanes: mount.render_lanes(),
+        update_render_lanes: update.render_lanes(),
+        mount_traversed_count: mount.hook_traversal().traversed_count(),
+        update_traversed_count: update.hook_traversal().traversed_count(),
+        caller_built_rows_accepted: false,
+    })
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum FunctionComponentReducerDispatchEagerStateBlocker {
     NoEagerStateRequested,
@@ -9780,6 +10376,60 @@ impl FunctionComponentUseMemoRenderRecord {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FunctionComponentUseRefRenderRecord {
+    render: FunctionComponentRenderRecord,
+    hook_result: FunctionComponentHookRenderResult,
+    ref_hook: FunctionComponentUseRefHookRenderRecord,
+}
+
+impl FunctionComponentUseRefRenderRecord {
+    #[must_use]
+    pub const fn render(self) -> FunctionComponentRenderRecord {
+        self.render
+    }
+
+    #[must_use]
+    pub const fn hook_result(self) -> FunctionComponentHookRenderResult {
+        self.hook_result
+    }
+
+    #[must_use]
+    pub const fn ref_hook(self) -> FunctionComponentUseRefHookRenderRecord {
+        self.ref_hook
+    }
+
+    #[must_use]
+    pub const fn current(self) -> Option<FiberId> {
+        self.render.current()
+    }
+
+    #[must_use]
+    pub const fn work_in_progress(self) -> FiberId {
+        self.render.work_in_progress()
+    }
+
+    #[must_use]
+    pub const fn render_lanes(self) -> Lanes {
+        self.render.render_lanes()
+    }
+
+    #[must_use]
+    pub const fn output(self) -> FunctionComponentOutputHandle {
+        self.render.output()
+    }
+
+    #[must_use]
+    pub const fn hook_state(self) -> FunctionComponentHookRenderState {
+        self.hook_result.state()
+    }
+
+    #[must_use]
+    pub const fn hook_traversal(self) -> HookListTraversalResult {
+        self.hook_result.traversal()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct FunctionComponentUseMemoUseRefRenderRecord {
     render: FunctionComponentRenderRecord,
     hook_result: FunctionComponentHookRenderResult,
@@ -10241,6 +10891,61 @@ pub(crate) fn render_function_component_with_use_memo(
         hook_result,
         memo_hook,
         memo_update_diagnostic,
+    })
+}
+
+pub(crate) fn render_function_component_with_use_ref(
+    arena: &mut FiberArena,
+    hook_store: &mut FunctionComponentHookRenderStore,
+    work_in_progress: FiberId,
+    render_lanes: Lanes,
+    ref_request: FunctionComponentUseRefRenderRequest,
+    invoker: &mut impl FunctionComponentInvoker,
+) -> Result<FunctionComponentUseRefRenderRecord, FunctionComponentRenderError> {
+    let mut request = validate_function_component_render(arena, work_in_progress, render_lanes)?;
+    let hook_state = hook_store.prepare_render_state(arena, work_in_progress)?;
+    request = request.with_hook_state(hook_state);
+    reset_function_component_render_state(arena, work_in_progress)?;
+
+    let mut cursor = hook_store.begin_render_cursor(hook_state)?;
+    let ref_hook = match hook_state.phase() {
+        FunctionComponentHookRenderPhase::Mount => FunctionComponentUseRefHookRenderRecord::Mount(
+            hook_store.mount_ref_hook(&mut cursor, ref_request.initial_value())?,
+        ),
+        FunctionComponentHookRenderPhase::Update => {
+            FunctionComponentUseRefHookRenderRecord::Update(
+                hook_store.update_ref_hook(&mut cursor, ref_request.initial_value())?,
+            )
+        }
+    };
+    let hook_result = hook_store.finish_render_cursor(cursor)?;
+
+    let output = invoker
+        .invoke_function_component(request)
+        .map_err(|error| FunctionComponentRenderError::Invocation {
+            fiber: request.fiber(),
+            component: request.component(),
+            error,
+        })?;
+
+    arena
+        .get_mut(work_in_progress)?
+        .set_memoized_props(request.props());
+
+    Ok(FunctionComponentUseRefRenderRecord {
+        render: FunctionComponentRenderRecord {
+            current: arena.get(work_in_progress)?.alternate(),
+            work_in_progress,
+            component: request.component(),
+            props: request.props(),
+            render_lanes: request.render_lanes(),
+            hook_state: request.hook_state(),
+            context_state: request.context_state(),
+            context_read_count: 0,
+            output,
+        },
+        hook_result,
+        ref_hook,
     })
 }
 
@@ -14810,6 +15515,522 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn private_use_ref_execution_evidence_records_mount_update_ref_identity() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let output = FunctionComponentOutputHandle::from_raw(96);
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(output));
+
+        let mount = render_function_component_with_use_ref(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            FunctionComponentUseRefRenderRequest::new(StateHandle::from_raw(920)),
+            &mut registry,
+        )
+        .unwrap();
+        hook_store.bind_current_list_unchecked(current, mount.hook_state().work_in_progress_list());
+        let update = render_function_component_with_use_ref(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::SYNC,
+            FunctionComponentUseRefRenderRequest::new(StateHandle::from_raw(921)),
+            &mut registry,
+        )
+        .unwrap();
+
+        let mount_ref = mount.ref_hook().mount_record().unwrap();
+        let update_ref = update.ref_hook().update_record().unwrap();
+        let evidence =
+            function_component_use_ref_execution_evidence_for_canary(&hook_store, mount, update)
+                .unwrap();
+        let source = evidence.source();
+
+        assert_eq!(source.react_version(), "19.2.6");
+        assert_eq!(source.react_hooks_use_ref(), "ReactHooks.useRef");
+        assert_eq!(
+            source.react_fiber_hooks_mount_ref(),
+            "ReactFiberHooks.mountRef"
+        );
+        assert_eq!(
+            source.react_fiber_hooks_update_ref(),
+            "ReactFiberHooks.updateRef"
+        );
+        assert_eq!(
+            source.fast_react_mount_ref_hook(),
+            "FunctionComponentHookRenderStore::mount_ref_hook"
+        );
+        assert_eq!(
+            source.fast_react_update_ref_hook(),
+            "FunctionComponentHookRenderStore::update_ref_hook"
+        );
+        assert!(source.is_private_execution_only());
+        assert_eq!(evidence.current(), current);
+        assert_eq!(evidence.work_in_progress(), work_in_progress);
+        assert_eq!(
+            evidence.mount_hook_state().phase(),
+            FunctionComponentHookRenderPhase::Mount
+        );
+        assert_eq!(
+            evidence.update_hook_state().phase(),
+            FunctionComponentHookRenderPhase::Update
+        );
+        assert_eq!(evidence.mount_hook(), mount_ref.hook());
+        assert_eq!(evidence.update_hook(), update_ref.hook());
+        assert_ne!(evidence.mount_hook(), evidence.update_hook());
+        assert_eq!(evidence.ref_object(), mount_ref.ref_object());
+        assert_eq!(evidence.ref_object(), update_ref.ref_object());
+        assert_eq!(evidence.current_after_mount(), StateHandle::from_raw(920));
+        assert_eq!(evidence.current_after_update(), StateHandle::from_raw(920));
+        assert_eq!(
+            evidence.ignored_update_initial_value(),
+            StateHandle::from_raw(921)
+        );
+        assert_eq!(evidence.mount_render_lanes(), Lanes::DEFAULT);
+        assert_eq!(evidence.update_render_lanes(), Lanes::SYNC);
+        assert_eq!(evidence.mount_traversed_count(), 1);
+        assert_eq!(evidence.update_traversed_count(), 1);
+        assert!(!evidence.caller_built_rows_accepted());
+        assert!(!evidence.public_hook_compatibility_claimed());
+        assert!(!evidence.public_root_compatibility_claimed());
+        assert!(!evidence.root_scheduler_integration_claimed());
+        assert!(!evidence.scheduler_compatibility_claimed());
+        assert!(!evidence.act_compatibility_claimed());
+        assert!(!evidence.renderer_compatibility_claimed());
+        assert!(evidence.same_ref_identity_across_update());
+        assert!(evidence.proves_private_mount_update_ref_identity());
+        assert_eq!(
+            hook_store
+                .hook_lists()
+                .hook(evidence.mount_hook())
+                .unwrap()
+                .payload(),
+            ref_payload(evidence.ref_object())
+        );
+        assert_eq!(
+            hook_store
+                .hook_lists()
+                .hook(evidence.update_hook())
+                .unwrap()
+                .payload(),
+            ref_payload(evidence.ref_object())
+        );
+        assert_eq!(registry.calls().len(), 2);
+        assert_eq!(registry.calls()[0].hook_state(), Some(mount.hook_state()));
+        assert_eq!(registry.calls()[1].hook_state(), Some(update.hook_state()));
+    }
+
+    #[test]
+    fn private_use_ref_execution_evidence_rejects_stale_and_caller_shaped_records() {
+        let (mut arena, current, work_in_progress, component) = function_component_pair();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component, Ok(FunctionComponentOutputHandle::from_raw(97)));
+
+        let mount = render_function_component_with_use_ref(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            FunctionComponentUseRefRenderRequest::new(StateHandle::from_raw(930)),
+            &mut registry,
+        )
+        .unwrap();
+        hook_store.bind_current_list_unchecked(current, mount.hook_state().work_in_progress_list());
+        let update = render_function_component_with_use_ref(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            FunctionComponentUseRefRenderRequest::new(StateHandle::from_raw(931)),
+            &mut registry,
+        )
+        .unwrap();
+        assert!(
+            function_component_use_ref_execution_evidence_for_canary(&hook_store, mount, update)
+                .unwrap()
+                .proves_private_mount_update_ref_identity()
+        );
+
+        let stale_update_state = FunctionComponentHookRenderState {
+            current_list: Some(update.hook_state().work_in_progress_list()),
+            ..update.hook_state()
+        };
+        let stale_update = FunctionComponentUseRefRenderRecord {
+            render: FunctionComponentRenderRecord {
+                hook_state: Some(stale_update_state),
+                ..update.render()
+            },
+            hook_result: FunctionComponentHookRenderResult {
+                state: stale_update_state,
+                ..update.hook_result()
+            },
+            ..update
+        };
+        assert!(matches!(
+            function_component_use_ref_execution_evidence_for_canary(
+                &hook_store,
+                mount,
+                stale_update,
+            ),
+            Err(
+                FunctionComponentUseRefExecutionEvidenceErrorForCanary::StaleOrCrossComponentUseRefEvidence {
+                    ..
+                }
+            )
+        ));
+
+        let cross_component_update = FunctionComponentUseRefRenderRecord {
+            render: FunctionComponentRenderRecord {
+                work_in_progress: current,
+                ..update.render()
+            },
+            ..update
+        };
+        assert!(matches!(
+            function_component_use_ref_execution_evidence_for_canary(
+                &hook_store,
+                mount,
+                cross_component_update,
+            ),
+            Err(
+                FunctionComponentUseRefExecutionEvidenceErrorForCanary::StaleOrCrossComponentUseRefEvidence {
+                    ..
+                }
+            )
+        ));
+
+        let update_ref = update.ref_hook().update_record().unwrap();
+        let ref_override_update = FunctionComponentUseRefRenderRecord {
+            ref_hook: FunctionComponentUseRefHookRenderRecord::Update(
+                FunctionComponentRefUpdateRecord {
+                    ref_object: FunctionComponentRefObjectHandle::from_raw(
+                        update_ref.ref_object().raw() + 100,
+                    ),
+                    ..update_ref
+                },
+            ),
+            ..update
+        };
+        assert!(matches!(
+            function_component_use_ref_execution_evidence_for_canary(
+                &hook_store,
+                mount,
+                ref_override_update,
+            ),
+            Err(
+                FunctionComponentUseRefExecutionEvidenceErrorForCanary::CallerShapedUseRefEvidence {
+                    ..
+                }
+            )
+        ));
+
+        let same_initializer_update = render_function_component_with_use_ref(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress,
+            Lanes::DEFAULT,
+            FunctionComponentUseRefRenderRequest::new(StateHandle::from_raw(930)),
+            &mut registry,
+        )
+        .unwrap();
+        assert!(matches!(
+            function_component_use_ref_execution_evidence_for_canary(
+                &hook_store,
+                mount,
+                same_initializer_update,
+            ),
+            Err(
+                FunctionComponentUseRefExecutionEvidenceErrorForCanary::RefCurrentValueOverride { .. }
+            )
+        ));
+    }
+
+    #[test]
+    fn private_use_ref_execution_evidence_rejects_cross_component_real_ref_records() {
+        let (mut arena, current_a, work_in_progress_a, component_a) = function_component_pair();
+        let current_b = arena.create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(3),
+            FiberMode::NO,
+        );
+        let component_b = FiberTypeHandle::from_raw(101);
+        arena
+            .get_mut(current_b)
+            .unwrap()
+            .set_fiber_type(component_b);
+        let work_in_progress_b = arena
+            .create_work_in_progress(current_b, PropsHandle::from_raw(4))
+            .unwrap();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(component_a, Ok(FunctionComponentOutputHandle::from_raw(98)));
+        registry.register(component_b, Ok(FunctionComponentOutputHandle::from_raw(99)));
+
+        let mount_a = render_function_component_with_use_ref(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress_a,
+            Lanes::DEFAULT,
+            FunctionComponentUseRefRenderRequest::new(StateHandle::from_raw(940)),
+            &mut registry,
+        )
+        .unwrap();
+        hook_store
+            .bind_current_list_unchecked(current_a, mount_a.hook_state().work_in_progress_list());
+        let update_a = render_function_component_with_use_ref(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress_a,
+            Lanes::DEFAULT,
+            FunctionComponentUseRefRenderRequest::new(StateHandle::from_raw(941)),
+            &mut registry,
+        )
+        .unwrap();
+        assert!(
+            function_component_use_ref_execution_evidence_for_canary(
+                &hook_store,
+                mount_a,
+                update_a,
+            )
+            .unwrap()
+            .proves_private_mount_update_ref_identity()
+        );
+
+        let mount_b = render_function_component_with_use_ref(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress_b,
+            Lanes::SYNC,
+            FunctionComponentUseRefRenderRequest::new(StateHandle::from_raw(950)),
+            &mut registry,
+        )
+        .unwrap();
+        hook_store
+            .bind_current_list_unchecked(current_b, mount_b.hook_state().work_in_progress_list());
+        let update_b = render_function_component_with_use_ref(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress_b,
+            Lanes::SYNC,
+            FunctionComponentUseRefRenderRequest::new(StateHandle::from_raw(951)),
+            &mut registry,
+        )
+        .unwrap();
+        assert!(
+            function_component_use_ref_execution_evidence_for_canary(
+                &hook_store,
+                mount_b,
+                update_b,
+            )
+            .unwrap()
+            .proves_private_mount_update_ref_identity()
+        );
+
+        let forged_mount = FunctionComponentUseRefRenderRecord {
+            ref_hook: mount_b.ref_hook(),
+            ..mount_a
+        };
+        let forged_update = FunctionComponentUseRefRenderRecord {
+            ref_hook: update_b.ref_hook(),
+            ..update_a
+        };
+
+        assert!(matches!(
+            function_component_use_ref_execution_evidence_for_canary(
+                &hook_store,
+                forged_mount,
+                forged_update,
+            ),
+            Err(FunctionComponentUseRefExecutionEvidenceErrorForCanary::RefHookListMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn private_use_ref_execution_evidence_rejects_forged_work_in_progress_identity() {
+        let (mut arena, current_a, work_in_progress_a, component_a) = function_component_pair();
+        let current_b = arena.create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(5),
+            FiberMode::NO,
+        );
+        arena
+            .get_mut(current_b)
+            .unwrap()
+            .set_fiber_type(FiberTypeHandle::from_raw(102));
+        let work_in_progress_b = arena
+            .create_work_in_progress(current_b, PropsHandle::from_raw(6))
+            .unwrap();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(
+            component_a,
+            Ok(FunctionComponentOutputHandle::from_raw(100)),
+        );
+
+        let mount_a = render_function_component_with_use_ref(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress_a,
+            Lanes::DEFAULT,
+            FunctionComponentUseRefRenderRequest::new(StateHandle::from_raw(960)),
+            &mut registry,
+        )
+        .unwrap();
+        hook_store
+            .bind_current_list_unchecked(current_a, mount_a.hook_state().work_in_progress_list());
+        let update_a = render_function_component_with_use_ref(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress_a,
+            Lanes::DEFAULT,
+            FunctionComponentUseRefRenderRequest::new(StateHandle::from_raw(961)),
+            &mut registry,
+        )
+        .unwrap();
+        assert!(
+            function_component_use_ref_execution_evidence_for_canary(
+                &hook_store,
+                mount_a,
+                update_a,
+            )
+            .unwrap()
+            .proves_private_mount_update_ref_identity()
+        );
+
+        let forged_mount = FunctionComponentUseRefRenderRecord {
+            render: FunctionComponentRenderRecord {
+                work_in_progress: work_in_progress_b,
+                ..mount_a.render()
+            },
+            ..mount_a
+        };
+        let forged_update = FunctionComponentUseRefRenderRecord {
+            render: FunctionComponentRenderRecord {
+                work_in_progress: work_in_progress_b,
+                ..update_a.render()
+            },
+            ..update_a
+        };
+
+        assert!(matches!(
+            function_component_use_ref_execution_evidence_for_canary(
+                &hook_store,
+                forged_mount,
+                forged_update,
+            ),
+            Err(
+                FunctionComponentUseRefExecutionEvidenceErrorForCanary::StaleOrCrossComponentUseRefEvidence {
+                    ..
+                }
+            )
+        ));
+    }
+
+    #[test]
+    fn private_use_ref_execution_evidence_rejects_forged_hook_state_fiber_identity() {
+        let (mut arena, current_a, work_in_progress_a, component_a) = function_component_pair();
+        let current_b = arena.create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(7),
+            FiberMode::NO,
+        );
+        arena
+            .get_mut(current_b)
+            .unwrap()
+            .set_fiber_type(FiberTypeHandle::from_raw(103));
+        let work_in_progress_b = arena
+            .create_work_in_progress(current_b, PropsHandle::from_raw(8))
+            .unwrap();
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let mut registry = TestFunctionComponentRegistry::default();
+        registry.register(
+            component_a,
+            Ok(FunctionComponentOutputHandle::from_raw(101)),
+        );
+
+        let mount_a = render_function_component_with_use_ref(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress_a,
+            Lanes::DEFAULT,
+            FunctionComponentUseRefRenderRequest::new(StateHandle::from_raw(970)),
+            &mut registry,
+        )
+        .unwrap();
+        hook_store
+            .bind_current_list_unchecked(current_a, mount_a.hook_state().work_in_progress_list());
+        let update_a = render_function_component_with_use_ref(
+            &mut arena,
+            &mut hook_store,
+            work_in_progress_a,
+            Lanes::DEFAULT,
+            FunctionComponentUseRefRenderRequest::new(StateHandle::from_raw(971)),
+            &mut registry,
+        )
+        .unwrap();
+        assert!(
+            function_component_use_ref_execution_evidence_for_canary(
+                &hook_store,
+                mount_a,
+                update_a,
+            )
+            .unwrap()
+            .proves_private_mount_update_ref_identity()
+        );
+
+        let forged_mount_state = FunctionComponentHookRenderState {
+            render_fiber: work_in_progress_b,
+            ..mount_a.hook_state()
+        };
+        let forged_update_state = FunctionComponentHookRenderState {
+            render_fiber: work_in_progress_b,
+            ..update_a.hook_state()
+        };
+        let forged_mount = FunctionComponentUseRefRenderRecord {
+            render: FunctionComponentRenderRecord {
+                work_in_progress: work_in_progress_b,
+                hook_state: Some(forged_mount_state),
+                ..mount_a.render()
+            },
+            hook_result: FunctionComponentHookRenderResult {
+                state: forged_mount_state,
+                ..mount_a.hook_result()
+            },
+            ..mount_a
+        };
+        let forged_update = FunctionComponentUseRefRenderRecord {
+            render: FunctionComponentRenderRecord {
+                work_in_progress: work_in_progress_b,
+                hook_state: Some(forged_update_state),
+                ..update_a.render()
+            },
+            hook_result: FunctionComponentHookRenderResult {
+                state: forged_update_state,
+                ..update_a.hook_result()
+            },
+            ..update_a
+        };
+
+        assert!(matches!(
+            function_component_use_ref_execution_evidence_for_canary(
+                &hook_store,
+                forged_mount,
+                forged_update,
+            ),
+            Err(
+                FunctionComponentUseRefExecutionEvidenceErrorForCanary::RefHookListOwnerMismatch { .. }
+            )
+        ));
     }
 
     #[test]
