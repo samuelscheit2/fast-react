@@ -74,9 +74,6 @@ const privateHydrationTextNodeClaimPatchExecutionStatus =
 const privateHydrationTextNodeClaimPatchMetadataId =
   'hydration-text-node-claim-patch';
 let hydrationBoundaryGateModule = null;
-const rootBridgeHydrateRootSourceLedgerAuthorityToken = Object.freeze({
-  source: 'root-bridge-hydrate-root-source-ledger-authority'
-});
 const {
   hasListeningMarker,
   inspectListeningMarker,
@@ -169,20 +166,6 @@ function getHydrationBoundaryGateModule() {
     hydrationBoundaryGateModule = require('./hydration-boundary-gate.js');
   }
   return hydrationBoundaryGateModule;
-}
-
-function registerHydrateRootSourceLedgerRecord(record, payload) {
-  const hydrationBoundaryGate = getHydrationBoundaryGateModule();
-  const registerSourceLedgerRecord =
-    hydrationBoundaryGate
-      .registerPrivateHydrateRootSourceLedgerRecordForRootBridge;
-  if (typeof registerSourceLedgerRecord === 'function') {
-    registerSourceLedgerRecord(
-      record,
-      payload,
-      rootBridgeHydrateRootSourceLedgerAuthorityToken
-    );
-  }
 }
 
 function getAcceptedHydrationBoundaryMetadataContracts() {
@@ -3959,18 +3942,6 @@ function createPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord(
     record,
     lifecycleRequestBoundaryPayload
   );
-  registerHydrateRootSourceLedgerRecord(record, {
-    bridge: preflightState.bridge,
-    container,
-    hydrationBoundaryRecord: requestRecord.hydrationBoundaryRecord,
-    ledgerKind: 'hydrate-root-public-facade-lifecycle-request-boundary',
-    lifecycleContainerSnapshot,
-    preflight: preflightState.preflight,
-    requestAdmission,
-    requestPayload,
-    requestRecord,
-    record
-  });
   return record;
 }
 
@@ -4168,19 +4139,6 @@ function createPrivateHydrateRootPublicFacadePreflightRecord(
     record,
     preflightRecordPayload
   );
-  registerHydrateRootSourceLedgerRecord(record, {
-    bridge: preflightState.bridge,
-    hydrationBoundaryRecord: requestRecord.hydrationBoundaryRecord,
-    ledgerKind: 'hydrate-root-public-facade-preflight-record',
-    lifecycleRequestBoundary,
-    markerListenerPreflight,
-    nativeHandoffRecord: null,
-    preflight: preflightState.preflight,
-    recoverableErrorPreflight,
-    requestAdmission,
-    requestRecord,
-    record
-  });
   return record;
 }
 
@@ -5190,20 +5148,6 @@ function createPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(
     record,
     eventReplayPreflightPayload
   );
-  registerHydrateRootSourceLedgerRecord(record, {
-    bridge: preflightState.bridge,
-    hydrationBoundaryRecord: requestRecord.hydrationBoundaryRecord,
-    ledgerKind: 'hydrate-root-public-facade-event-replay-preflight-record',
-    lifecycleRequestBoundary:
-      eventReplayPreflightPayload.lifecycleRequestBoundary,
-    preflight: preflightState.preflight,
-    replayExecutionPayload,
-    replayExecutionRecord,
-    requestRecord,
-    targetClaimingPayload,
-    targetClaimingPreflight: targetClaimingPreflightRecord,
-    record
-  });
   return record;
 }
 
@@ -5647,19 +5591,6 @@ function createPrivateHydrateRootPublicFacadeExecutionPreflightRecord(
     record,
     executionPreflightPayload
   );
-  registerHydrateRootSourceLedgerRecord(record, {
-    bridge: preflightState.bridge,
-    eventReplayPreflight: eventReplayPreflightRecord,
-    hydrationBoundaryRecord: requestRecord.hydrationBoundaryRecord,
-    ledgerKind: 'hydrate-root-public-facade-execution-preflight-record',
-    lifecycleRequestBoundary:
-      executionPreflightPayload.lifecycleRequestBoundary,
-    preflight: preflightState.preflight,
-    replayExecutionPayload,
-    replayExecutionRecord,
-    requestRecord,
-    record
-  });
   return record;
 }
 

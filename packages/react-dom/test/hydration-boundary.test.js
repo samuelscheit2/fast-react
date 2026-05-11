@@ -2199,18 +2199,50 @@ test('private hydration recoverable error boundary admission rejects stale clone
   }, TypeError);
   assert.equal(require(rootBridgePath), rootBridge);
   assert.equal(
-    hydrationGate.registerPrivateHydrateRootSourceLedgerRecordForRootBridge(
-      clonedHydrateRootPreflightRecord,
-      {
-        ...rootBridge.getPrivateHydrateRootPublicFacadePreflightRecordPayload(
-          scenario.hydrateRecord
-        ),
-        ledgerKind: 'hydrate-root-public-facade-preflight-record',
-        record: clonedHydrateRootPreflightRecord
-      },
-      Object.freeze({source: 'caller-token'})
+    hydrationGate.registerPrivateHydrateRootSourceLedgerRecordForRootBridge,
+    undefined
+  );
+  const spoofedHydrateRootPayload = Object.freeze({
+    ...rootBridge.getPrivateHydrateRootPublicFacadePreflightRecordPayload(
+      scenario.hydrateRecord
     ),
-    null
+    ledgerKind: 'hydrate-root-public-facade-preflight-record',
+    record: clonedHydrateRootPreflightRecord
+  });
+  assert.equal(
+    vm.runInNewContext(
+      `
+(() => {
+  const originalPrepareStackTrace = Error.prepareStackTrace;
+  Error.prepareStackTrace = () => rootBridgePath;
+  try {
+    const register =
+      hydrationGate.registerPrivateHydrateRootSourceLedgerRecordForRootBridge;
+    if (typeof register !== 'function') {
+      return 'missing-registrar';
+    }
+    return register(
+      clonedHydrateRootPreflightRecord,
+      spoofedHydrateRootPayload,
+      callerAuthorityToken
+    ) === clonedHydrateRootPreflightRecord
+      ? 'registered'
+      : 'rejected';
+  } finally {
+    Error.prepareStackTrace = originalPrepareStackTrace;
+  }
+})()
+      `,
+      {
+        callerAuthorityToken: Object.freeze({source: 'caller-first-token'}),
+        clonedHydrateRootPreflightRecord,
+        hydrationGate,
+        rootBridgePath,
+        spoofedHydrateRootPayload
+      },
+      {filename: rootBridgePath}
+    ),
+    'missing-registrar'
   );
   assert.equal(
     hydrateRootSourceLedger.getPrivateHydrateRootSourceLedgerRecordPayload(
@@ -2319,6 +2351,7 @@ test('hydrateRoot source ledger rejects forged context and cache poisoning', () 
 
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const vm = require('node:vm');
 
 const packageRoot = ${JSON.stringify(packageRoot)};
 const rootBridgePath = path.join(packageRoot, 'src/client/root-bridge.js');
@@ -2424,7 +2457,78 @@ const clonedExecutionPreflightRecord = Object.freeze({
   eventReplayPreflight: clonedEventReplayPreflightRecord,
   lifecycleRequestBoundary: clonedLifecycleRequestBoundary
 });
+const spoofedHydrateRootPayload = Object.freeze({
+  ...rootBridge.getPrivateHydrateRootPublicFacadePreflightRecordPayload(
+    scenario.hydrateRecord
+  ),
+  ledgerKind: 'hydrate-root-public-facade-preflight-record',
+  record: clonedHydrateRootPreflightRecord
+});
 
+assert.equal(
+  hydrationGate.registerPrivateHydrateRootSourceLedgerRecordForRootBridge,
+  undefined
+);
+assert.equal(
+  vm.runInNewContext(
+    \`
+(() => {
+  const originalPrepareStackTrace = Error.prepareStackTrace;
+  Error.prepareStackTrace = () => rootBridgePath;
+  try {
+    const register =
+      hydrationGate.registerPrivateHydrateRootSourceLedgerRecordForRootBridge;
+    if (typeof register !== 'function') {
+      return 'missing-registrar';
+    }
+    return register(
+      clonedHydrateRootPreflightRecord,
+      spoofedHydrateRootPayload,
+      callerAuthorityToken
+    ) === clonedHydrateRootPreflightRecord
+      ? 'registered'
+      : 'rejected';
+  } finally {
+    Error.prepareStackTrace = originalPrepareStackTrace;
+  }
+})()
+    \`,
+    {
+      callerAuthorityToken: Object.freeze({source: 'caller-first-token'}),
+      clonedHydrateRootPreflightRecord,
+      hydrationGate,
+      rootBridgePath,
+      spoofedHydrateRootPayload
+    },
+    {filename: rootBridgePath}
+  ),
+  'missing-registrar'
+);
+
+sourceLedgerFakePayloads.set(
+  scenario.hydrateRecord,
+  rootBridge.getPrivateHydrateRootPublicFacadePreflightRecordPayload(
+    scenario.hydrateRecord
+  )
+);
+sourceLedgerFakePayloads.set(
+  scenario.eventReplayPreflightRecord,
+  rootBridge.getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload(
+    scenario.eventReplayPreflightRecord
+  )
+);
+sourceLedgerFakePayloads.set(
+  scenario.executionPreflightRecord,
+  rootBridge.getPrivateHydrateRootPublicFacadeExecutionPreflightPayload(
+    scenario.executionPreflightRecord
+  )
+);
+sourceLedgerFakePayloads.set(
+  scenario.lifecycleRequestBoundary,
+  rootBridge.getPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryPayload(
+    scenario.lifecycleRequestBoundary
+  )
+);
 sourceLedgerFakePayloads.set(
   clonedHydrateRootPreflightRecord,
   Object.freeze({
@@ -2464,6 +2568,40 @@ sourceLedgerFakePayloads.set(
       )
   })
 );
+const postLoadFakeRootBridgeCacheExports = Object.freeze({
+  getPrivateHydrateRootPublicFacadePreflightRecordPayload(record) {
+    return sourceLedgerFakePayloads.get(record) || null;
+  },
+  getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload(record) {
+    return sourceLedgerFakePayloads.get(record) || null;
+  },
+  getPrivateHydrateRootPublicFacadeExecutionPreflightPayload(record) {
+    return sourceLedgerFakePayloads.get(record) || null;
+  },
+  getPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryPayload(record) {
+    return sourceLedgerFakePayloads.get(record) || null;
+  },
+  isPrivateHydrateRootPublicFacadePreflightRecord(record) {
+    return sourceLedgerFakePayloads.has(record);
+  },
+  isPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(record) {
+    return sourceLedgerFakePayloads.has(record);
+  },
+  isPrivateHydrateRootPublicFacadeExecutionPreflightRecord(record) {
+    return sourceLedgerFakePayloads.has(record);
+  },
+  isPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord(record) {
+    return sourceLedgerFakePayloads.has(record);
+  }
+});
+delete require.cache[rootBridgeCacheKey];
+require.cache[rootBridgeCacheKey] = {
+  id: rootBridgeCacheKey,
+  filename: rootBridgeCacheKey,
+  loaded: true,
+  exports: postLoadFakeRootBridgeCacheExports
+};
+assert.equal(require(rootBridgePath), postLoadFakeRootBridgeCacheExports);
 
 const forgedPreflightState = {
   bridge: Object.freeze({kind: 'forged-bridge'}),

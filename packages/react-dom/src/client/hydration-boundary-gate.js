@@ -123,10 +123,6 @@ const privateHydrationTextNodeClaimPatchExecutionStatus =
   'executed-private-hydration-text-node-claim-patch';
 const privateHydrationTextNodeClaimPatchMetadataId =
   'hydration-text-node-claim-patch';
-const rootBridgeSourceLedgerCallerPath = require.resolve(
-  './root-bridge.js'
-);
-
 const privateHydrationBoundaryRecordType =
   'fast.react_dom.unsupported_hydration_boundary_record';
 
@@ -539,8 +535,7 @@ const hydrationTextMismatchRecoverableErrorRoutingExecutionPayloads =
   new WeakMap();
 const hydrationRecoverableErrorBoundaryAdmissionPayloads = new WeakMap();
 const hydrationTextNodeClaimPatchExecutionPayloads = new WeakMap();
-const hydrateRootSourceLedgerPayloads = new WeakMap();
-let hydrateRootSourceLedgerAuthorityToken = null;
+let hydrateRootSourceLedgerRootBridgeModule = null;
 const defaultHydrationBoundaryGate = createHydrationBoundaryGate();
 
 function createHydrationBoundaryGate(options) {
@@ -1498,6 +1493,12 @@ function createHydrationTextMismatchRecoverableErrorPreflightRecord(
       recoverableErrorMetadata,
       preflightOptions
     );
+  if (
+    preflightOptions.source ===
+    'private-hydrate-root-public-facade-recoverable-error-preflight'
+  ) {
+    rememberPrivateHydrateRootSourceLedgerRootBridgeModule();
+  }
   const preflightId =
     preflightOptions.preflightId ||
     `${validation.hydrationBoundaryRecord.recordId}:recoverable-error-preflight`;
@@ -4831,124 +4832,6 @@ function isHydrationRecoverableErrorBoundaryAdmissionSourceLedgerPayload(
   );
 }
 
-function registerPrivateHydrateRootSourceLedgerRecordForRootBridge(
-  record,
-  payload,
-  authorityToken
-) {
-  if (
-    !isRootBridgeSourceLedgerRegistrationCaller() ||
-    !isRootBridgeHydrateRootSourceLedgerPayload(record, payload) ||
-    !isRootBridgeSourceLedgerAuthorityToken(authorityToken)
-  ) {
-    return null;
-  }
-
-  hydrateRootSourceLedgerPayloads.set(
-    record,
-    freezeRecord({
-      ...payload,
-      authorityToken
-    })
-  );
-  return record;
-}
-
-function isRootBridgeSourceLedgerAuthorityToken(authorityToken) {
-  if (
-    !authorityToken ||
-    (typeof authorityToken !== 'object' &&
-      typeof authorityToken !== 'function')
-  ) {
-    return false;
-  }
-  if (hydrateRootSourceLedgerAuthorityToken === null) {
-    hydrateRootSourceLedgerAuthorityToken = authorityToken;
-    return true;
-  }
-
-  return hydrateRootSourceLedgerAuthorityToken === authorityToken;
-}
-
-function isRootBridgeSourceLedgerRegistrationCaller() {
-  const stack = new Error().stack;
-  return (
-    typeof stack === 'string' &&
-    stack.indexOf(rootBridgeSourceLedgerCallerPath) !== -1
-  );
-}
-
-function isRootBridgeHydrateRootSourceLedgerPayload(record, payload) {
-  if (
-    !record ||
-    typeof record !== 'object' ||
-    !Object.isFrozen(record) ||
-    !payload ||
-    typeof payload !== 'object' ||
-    payload.record !== record ||
-    typeof payload.ledgerKind !== 'string' ||
-    !payload.hydrationBoundaryRecord ||
-    typeof payload.hydrationBoundaryRecord !== 'object' ||
-    !payload.requestRecord ||
-    typeof payload.requestRecord !== 'object' ||
-    payload.requestRecord.hydrationBoundaryRecord !==
-      payload.hydrationBoundaryRecord
-  ) {
-    return false;
-  }
-
-  if (payload.ledgerKind === 'hydrate-root-public-facade-preflight-record') {
-    return (
-      record.kind ===
-        'FastReactDomPrivateHydrateRootPublicFacadePreflightRecord' &&
-      payload.lifecycleRequestBoundary === record.lifecycleRequestBoundary &&
-      payload.recoverableErrorPreflight === record.recoverableErrorPreflight &&
-      payload.requestAdmission === record.requestAdmission
-    );
-  }
-
-  if (
-    payload.ledgerKind ===
-    'hydrate-root-public-facade-event-replay-preflight-record'
-  ) {
-    return (
-      record.kind ===
-        'FastReactDomPrivateHydrateRootPublicFacadeEventReplayPreflightRecord' &&
-      payload.lifecycleRequestBoundary === record.lifecycleRequestBoundary &&
-      payload.replayExecutionRecord === record.replayExecutionRecord &&
-      payload.targetClaimingPreflight === record.targetClaimingPreflight
-    );
-  }
-
-  if (
-    payload.ledgerKind ===
-    'hydrate-root-public-facade-execution-preflight-record'
-  ) {
-    return (
-      record.kind ===
-        'FastReactDomPrivateHydrateRootPublicFacadeExecutionPreflightRecord' &&
-      payload.eventReplayPreflight === record.eventReplayPreflight &&
-      payload.lifecycleRequestBoundary === record.lifecycleRequestBoundary &&
-      payload.replayExecutionRecord === record.replayExecutionRecord
-    );
-  }
-
-  if (
-    payload.ledgerKind ===
-    'hydrate-root-public-facade-lifecycle-request-boundary'
-  ) {
-    return (
-      record.kind ===
-        'FastReactDomPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord' &&
-      record.sourceOwned === true &&
-      payload.lifecycleContainerSnapshot === record.lifecycleContainerSnapshot &&
-      payload.requestAdmission === record.requestAdmission
-    );
-  }
-
-  return false;
-}
-
 function getPrivateHydrateRootSourceLedgerRecordPayloadForAdmission(
   record,
   ledgerKind,
@@ -5127,18 +5010,224 @@ function createHydrateRootLifecycleSourceLedgerPayload(
 }
 
 function readPrivateHydrateRootSourceLedgerPayload(record, ledgerKind) {
-  const payload = hydrateRootSourceLedgerPayloads.get(record) || null;
+  const rootBridge = getPrivateHydrateRootSourceLedgerRootBridgeModule();
+  const payload = getPrivateHydrateRootSourceLedgerRootBridgePayload(
+    rootBridge,
+    record,
+    ledgerKind
+  );
+  const hydrationBoundaryRecord =
+    payload &&
+    typeof payload === 'object' &&
+    payload.hydrationBoundaryRecord
+      ? payload.hydrationBoundaryRecord
+      : payload &&
+          typeof payload === 'object' &&
+          payload.requestRecord &&
+          typeof payload.requestRecord === 'object'
+        ? payload.requestRecord.hydrationBoundaryRecord
+        : null;
   if (
     !payload ||
     typeof payload !== 'object' ||
-    payload.record !== record ||
-    payload.ledgerKind !== ledgerKind ||
-    payload.authorityToken !== hydrateRootSourceLedgerAuthorityToken
+    !hydrationBoundaryRecord ||
+    typeof hydrationBoundaryRecord !== 'object' ||
+    !payload.requestRecord ||
+    typeof payload.requestRecord !== 'object' ||
+    payload.requestRecord.hydrationBoundaryRecord !== hydrationBoundaryRecord
   ) {
     return null;
   }
 
-  return payload;
+  return freezeRecord({
+    ...payload,
+    hydrationBoundaryRecord,
+    ledgerKind,
+    record
+  });
+}
+
+function getPrivateHydrateRootSourceLedgerRootBridgeModule() {
+  if (hydrateRootSourceLedgerRootBridgeModule !== null) {
+    return hydrateRootSourceLedgerRootBridgeModule;
+  }
+  try {
+    return rememberPrivateHydrateRootSourceLedgerRootBridgeModule();
+  } catch (error) {
+    return null;
+  }
+}
+
+function rememberPrivateHydrateRootSourceLedgerRootBridgeModule() {
+  if (hydrateRootSourceLedgerRootBridgeModule !== null) {
+    return hydrateRootSourceLedgerRootBridgeModule;
+  }
+  const rootBridgePath = require.resolve('./root-bridge.js');
+  const rootBridge = require(rootBridgePath);
+  if (
+    !isPrivateHydrateRootSourceLedgerRootBridgeModule(rootBridge) ||
+    !isPrivateHydrateRootSourceLedgerRootBridgeCacheEntry(
+      rootBridgePath,
+      rootBridge
+    )
+  ) {
+    return null;
+  }
+  hydrateRootSourceLedgerRootBridgeModule = rootBridge;
+  return hydrateRootSourceLedgerRootBridgeModule;
+}
+
+function isPrivateHydrateRootSourceLedgerRootBridgeCacheEntry(
+  rootBridgePath,
+  rootBridge
+) {
+  const cacheEntry = require.cache[rootBridgePath];
+  if (
+    !cacheEntry ||
+    cacheEntry.filename !== rootBridgePath ||
+    cacheEntry.loaded !== true
+  ) {
+    return false;
+  }
+  const exportsDescriptor = Object.getOwnPropertyDescriptor(
+    cacheEntry,
+    'exports'
+  );
+  return (
+    exportsDescriptor !== undefined &&
+    exportsDescriptor.value === rootBridge &&
+    exportsDescriptor.writable === false &&
+    exportsDescriptor.configurable === false
+  );
+}
+
+function isPrivateHydrateRootSourceLedgerRootBridgeModule(rootBridge) {
+  return (
+    rootBridge &&
+    typeof rootBridge === 'object' &&
+    Object.isFrozen(rootBridge) &&
+    typeof rootBridge.isPrivateHydrateRootPublicFacadePreflightRecord ===
+      'function' &&
+    typeof rootBridge.getPrivateHydrateRootPublicFacadePreflightRecordPayload ===
+      'function' &&
+    typeof rootBridge
+      .isPrivateHydrateRootPublicFacadeEventReplayPreflightRecord ===
+      'function' &&
+    typeof rootBridge
+      .getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload ===
+      'function' &&
+    typeof rootBridge
+      .isPrivateHydrateRootPublicFacadeExecutionPreflightRecord ===
+      'function' &&
+    typeof rootBridge
+      .getPrivateHydrateRootPublicFacadeExecutionPreflightPayload ===
+      'function' &&
+    typeof rootBridge
+      .isPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord ===
+      'function' &&
+    typeof rootBridge
+      .getPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryPayload ===
+      'function'
+  );
+}
+
+function getPrivateHydrateRootSourceLedgerRootBridgePayload(
+  rootBridge,
+  record,
+  ledgerKind
+) {
+  if (
+    !rootBridge ||
+    typeof rootBridge !== 'object' ||
+    !isPrivateHydrateRootSourceLedgerRootBridgeModule(rootBridge) ||
+    !record ||
+    typeof record !== 'object' ||
+    !Object.isFrozen(record)
+  ) {
+    return null;
+  }
+
+  if (ledgerKind === 'hydrate-root-public-facade-preflight-record') {
+    if (
+      typeof rootBridge.isPrivateHydrateRootPublicFacadePreflightRecord !==
+        'function' ||
+      typeof rootBridge.getPrivateHydrateRootPublicFacadePreflightRecordPayload !==
+        'function' ||
+      !rootBridge.isPrivateHydrateRootPublicFacadePreflightRecord(record)
+    ) {
+      return null;
+    }
+    return rootBridge.getPrivateHydrateRootPublicFacadePreflightRecordPayload(
+      record
+    );
+  }
+
+  if (
+    ledgerKind ===
+    'hydrate-root-public-facade-event-replay-preflight-record'
+  ) {
+    if (
+      typeof rootBridge
+        .isPrivateHydrateRootPublicFacadeEventReplayPreflightRecord !==
+        'function' ||
+      typeof rootBridge
+        .getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload !==
+        'function' ||
+      !rootBridge.isPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(
+        record
+      )
+    ) {
+      return null;
+    }
+    return rootBridge.getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload(
+      record
+    );
+  }
+
+  if (
+    ledgerKind === 'hydrate-root-public-facade-execution-preflight-record'
+  ) {
+    if (
+      typeof rootBridge
+        .isPrivateHydrateRootPublicFacadeExecutionPreflightRecord !==
+        'function' ||
+      typeof rootBridge
+        .getPrivateHydrateRootPublicFacadeExecutionPreflightPayload !==
+        'function' ||
+      !rootBridge.isPrivateHydrateRootPublicFacadeExecutionPreflightRecord(
+        record
+      )
+    ) {
+      return null;
+    }
+    return rootBridge.getPrivateHydrateRootPublicFacadeExecutionPreflightPayload(
+      record
+    );
+  }
+
+  if (
+    ledgerKind ===
+    'hydrate-root-public-facade-lifecycle-request-boundary'
+  ) {
+    if (
+      typeof rootBridge
+        .isPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord !==
+        'function' ||
+      typeof rootBridge
+        .getPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryPayload !==
+        'function' ||
+      !rootBridge.isPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord(
+        record
+      )
+    ) {
+      return null;
+    }
+    return rootBridge.getPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryPayload(
+      record
+    );
+  }
+
+  return null;
 }
 
 function isHydrationRecoverableErrorBoundaryAdmissionHydrateRootPreflight(
@@ -6854,6 +6943,5 @@ module.exports = {
   privateHydrationTextNodeClaimPatchExecutionGateId,
   privateHydrationTextNodeClaimPatchExecutionStatus,
   privateHydrationTextNodeClaimPatchMetadataId,
-  registerPrivateHydrateRootSourceLedgerRecordForRootBridge,
   unsupportedHydrationPrerequisites
 };

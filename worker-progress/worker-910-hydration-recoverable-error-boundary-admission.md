@@ -8,15 +8,16 @@
   `hydrate-root-source-ledger.js` module. It now exposes only fail-closed
   public readers, with no symbol properties, `Symbol.for(...)` hooks, register
   capability, or private payload reader.
-- The authoritative admission source ledger is now gate-local exact-record
-  provenance: `hydration-boundary-gate.js` owns the WeakMap, binds the first
-  root-bridge authority token, and admits only exact root-bridge-created
-  hydrateRoot preflight, event-replay preflight, execution preflight, and
-  lifecycle boundary records.
-- `root-bridge.js` owns a module-local source-ledger authority token and
-  registers records through the hydration gate after creating them. The gate
-  validates the caller stack, token identity, record freezing, and payload shape
-  before storing any record.
+- Removed the exported hydration-gate source-ledger registrar rejected by the
+  follow-up audit. There is no caller-usable writer, no stack-string caller
+  check, and no first-token binding path.
+- The authoritative admission source ledger now comes from root-bridge
+  module-local WeakMap provenance: `hydration-boundary-gate.js` lazily reads
+  the existing exact-record root-bridge payload getters during admission and
+  caches the immutable real root-bridge export when the root-bridge-owned
+  recoverable-error preflight is created. Cloned hydrateRoot preflight,
+  event-replay preflight, execution preflight, and lifecycle boundary records
+  remain absent from source-owned provenance.
 - `hydration-boundary-gate.js` no longer accepts
   `options.hydrateRootSourceLedgerContext` as authority; forged caller
   preflight-state arrays are ignored and cloned records are absent from the
@@ -31,6 +32,14 @@
 - Added a fresh-process regression for the audit reproduction: a caller-created
   recoverable-error preflight with forged `preflightState` arrays containing
   cloned hydrate/event/execution/lifecycle records rejects.
+- Added stack-spoof and first-token-binding regressions: even with
+  `Error.prepareStackTrace` returning the root-bridge path and a VM filename set
+  to `root-bridge.js`, the hydration gate exposes no source-ledger registrar to
+  call.
+- Added a post-load `require.cache[rootBridgePath]` replacement regression with
+  fake `isPrivate...` and payload readers that would admit cloned records if
+  boundary admission consulted the cache replacement instead of the cached real
+  root-bridge module-local WeakMaps.
 - Merged current `main`, including Worker 947's root-bridge smoke fix, and
   preserved the Worker 910 source-ledger hardening.
 
@@ -46,17 +55,19 @@
 
 1. `hydrate-root-source-ledger.js` has no dependency on `root-bridge.js`; its
    public reader APIs remain fail-closed and expose no private symbol hooks.
-2. Root bridge registers exact source records through
-   `hydration-boundary-gate.js` using a module-local authority token after the
-   records are created.
-3. Hydration boundary admission reads only the gate-local WeakMap payloads for
-   the exact records supplied to admission, and the stored token must match the
-   token originally bound to root bridge.
+2. Root bridge does not register hydrateRoot source records through any
+   exported hydration-gate writer.
+3. Hydration boundary admission reads root-bridge module-local WeakMap payloads
+   through the existing private payload getters for the exact records supplied
+   to admission. The root-bridge module reference is cached only from the real
+   immutable cache entry.
 4. Caller-provided `hydrateRootSourceLedgerContext` objects are ignored by
    recoverable-error preflight creation and cannot seed admission provenance.
 5. Forged root-bridge and hydrate-root-source-ledger cache modules can still
-   exist before imports, but their fake readers/writers are never consulted by
-   boundary admission.
+   exist before imports; after the real root bridge is loaded, cloned records
+   still miss the root-bridge WeakMaps and forged ledger readers/writers are not
+   consulted by boundary admission, even if `require.cache[rootBridgePath]` is
+   replaced afterward.
 
 ## Commands Run
 
@@ -83,9 +94,11 @@
 
 ## Evidence Gathered
 
-- Focused hydration-boundary tests pass, including the new fresh-process
-  forged preflight-state regression and the pre-load fake root-bridge plus fake
-  hydrate-root-source-ledger cache-poisoning regression.
+- Focused hydration-boundary tests pass, including the fresh-process forged
+  preflight-state regression, the pre-load fake root-bridge plus fake
+  hydrate-root-source-ledger cache-poisoning regression, the post-load fake
+  root-bridge cache replacement regression, and the new
+  stack-spoof/first-token-binding negative.
 - Adjacent private hydration, hydrateRoot text claim patch, and root-bridge
   suites pass.
 - HydrateRoot preflight/text-patch conformance ledgers, hydration boundary
