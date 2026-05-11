@@ -29,6 +29,51 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 878-880, 882-883, 886, and 889
+
+- Worker 878 extended private Rust HostRoot test-host execution from
+  single-root update/delete canaries to narrow multi-child HostText
+  update/delete proofs with stable siblings, root/lane/finished-work identity,
+  mutation/detach records, public blockers, and replay rejection. Public React
+  DOM, test-renderer, native, root rendering, `flushSync`, and broad
+  multi-child compatibility remain blocked.
+- Worker 879 added a private FunctionComponent deletion teardown proof that
+  mounts one HostComponent child through the accepted FunctionComponent host
+  path, deletes it from HostRoot, and executes ordered ref cleanup, passive
+  destroy, root-container detach, and host-node cleanup after source-owned
+  topology and deletion evidence validation. Public hooks/effects/refs,
+  renderer packages, hydration, portals, Suspense/Offscreen, and broad deletion
+  traversal remain blocked.
+- Worker 880 added a private React DOM facade `root.render()` update execution
+  consumer for source-owned HostComponent/HostText update rows, rejecting
+  caller-built, cloned, cross-root, stale, and replayed execution records before
+  fake-DOM mutation or native handoff metadata is recorded. Public
+  `createRoot`, `hydrateRoot`, browser DOM, resources/forms, refs/events,
+  native/Rust execution, and compatibility remain blocked.
+- Worker 882 added a hidden, frozen native JS generation admission ledger for
+  Worker 873's Rust native JSON lifecycle generation/replay no-stale evidence,
+  keeping native addon loading, native execution, cleanup hooks, worker
+  threads, renderer/reconciler output, package exports, and public native
+  compatibility fail-closed.
+- Worker 883 required source-owned private React DOM root lifecycle boundary
+  records before resource/form root execution records can be consumed,
+  rejecting stale, cloned, caller-built, cross-root, and public alias evidence.
+  Public resource, form, and root compatibility remain blocked.
+- Worker 886 added a static read-only Scheduler variant private-admission
+  ledger for root, native, mock, postTask, and CJS entrypoints, preserving
+  fail-closed public Scheduler timing, root, `act`, package, native, postTask,
+  mock, and package-surface claims.
+- Worker 889 added a narrow private sync-flush deleted-subtree teardown canary
+  that revalidates accepted sync-flush host mutation and deleted-subtree
+  teardown requests before ordered ref cleanup, passive destroy, host detach,
+  and cleanup execution. Public `flushSync`, public roots/renderers,
+  hooks/effects, React DOM, test-renderer, native, package behavior, and broad
+  renderer behavior remain blocked.
+- The batch was accepted after focused Rust reconciler, sync-flush, deletion,
+  FunctionComponent, React DOM facade, resource/form, native no-load/package,
+  Scheduler variant, package-surface, import-smoke, formatting, and
+  `git diff --check` verification recorded in git history and worker reports.
+
 ### Workers 872-874
 
 - Worker 872 added a private `react-test-renderer` package-root/CJS lifecycle
