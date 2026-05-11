@@ -1371,6 +1371,10 @@ impl Display for HostComponentManagedChildMutationKindForCanary {
     }
 }
 
+const fn is_supported_managed_child_host_tag_for_canary(tag: FiberTag) -> bool {
+    matches!(tag, FiberTag::HostComponent | FiberTag::HostText)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct HostComponentManagedChildCompleteWorkRecordForCanary {
     root: FiberRootId,
@@ -1789,7 +1793,7 @@ pub(crate) enum HostComponentManagedChildCompleteWorkErrorForCanary {
         parent_work_in_progress: FiberId,
         flags: FiberFlags,
     },
-    ExpectedHostComponentChild {
+    ExpectedManagedHostChild {
         child: FiberId,
         tag: FiberTag,
     },
@@ -1845,7 +1849,7 @@ pub(crate) enum HostComponentManagedChildCompleteWorkErrorForCanary {
         parent_work_in_progress: FiberId,
         child: FiberId,
     },
-    ExpectedHostComponentOrderSibling {
+    ExpectedManagedHostOrderSibling {
         order_sibling: FiberId,
         tag: FiberTag,
     },
@@ -1941,9 +1945,9 @@ impl Display for HostComponentManagedChildCompleteWorkErrorForCanary {
                 parent_work_in_progress.slot().get(),
                 flags
             ),
-            Self::ExpectedHostComponentChild { child, tag } => write!(
+            Self::ExpectedManagedHostChild { child, tag } => write!(
                 formatter,
-                "fiber {} must be HostComponent child for private managed child metadata, found {:?}",
+                "fiber {} must be HostComponent or HostText child for private managed child metadata, found {:?}",
                 child.slot().get(),
                 tag
             ),
@@ -1991,7 +1995,7 @@ impl Display for HostComponentManagedChildCompleteWorkErrorForCanary {
             ),
             Self::MissingChildStateNode { child } => write!(
                 formatter,
-                "managed HostComponent child {} has no state node",
+                "managed host child {} has no state node",
                 child.slot().get()
             ),
             Self::MissingPlacementFlag { child, flags } => write!(
@@ -2054,9 +2058,9 @@ impl Display for HostComponentManagedChildCompleteWorkErrorForCanary {
                 child.slot().get(),
                 parent_work_in_progress.slot().get()
             ),
-            Self::ExpectedHostComponentOrderSibling { order_sibling, tag } => write!(
+            Self::ExpectedManagedHostOrderSibling { order_sibling, tag } => write!(
                 formatter,
-                "fiber {} must be HostComponent order sibling for private managed child sibling-order metadata, found {:?}",
+                "fiber {} must be HostComponent or HostText order sibling for private managed child sibling-order metadata, found {:?}",
                 order_sibling.slot().get(),
                 tag
             ),
@@ -2073,12 +2077,12 @@ impl Display for HostComponentManagedChildCompleteWorkErrorForCanary {
             ),
             Self::MissingOrderSiblingStateNode { order_sibling } => write!(
                 formatter,
-                "managed HostComponent order sibling {} has no state node",
+                "managed host order sibling {} has no state node",
                 order_sibling.slot().get()
             ),
             Self::MissingOrderSiblingCurrent { order_sibling } => write!(
                 formatter,
-                "managed HostComponent order sibling {} has no current alternate",
+                "managed host order sibling {} has no current alternate",
                 order_sibling.slot().get()
             ),
             Self::OrderSiblingCurrentTagMismatch {
@@ -2087,7 +2091,7 @@ impl Display for HostComponentManagedChildCompleteWorkErrorForCanary {
                 current_tag,
             } => write!(
                 formatter,
-                "managed HostComponent order sibling {} expected HostComponent current {}, found {:?}",
+                "managed host order sibling {} expected matching host current {}, found {:?}",
                 order_sibling.slot().get(),
                 order_sibling_current.slot().get(),
                 current_tag
@@ -2141,7 +2145,7 @@ impl Error for HostComponentManagedChildCompleteWorkErrorForCanary {
             | Self::MissingParentStateNode { .. }
             | Self::ParentStateNodeMismatch { .. }
             | Self::ParentStillBeingPlaced { .. }
-            | Self::ExpectedHostComponentChild { .. }
+            | Self::ExpectedManagedHostChild { .. }
             | Self::ChildParentMismatch { .. }
             | Self::MissingParentFinishedChild { .. }
             | Self::UnexpectedParentFirstChild { .. }
@@ -2154,7 +2158,7 @@ impl Error for HostComponentManagedChildCompleteWorkErrorForCanary {
             | Self::DeletionListChildCountMismatch { .. }
             | Self::DeletionListChildMismatch { .. }
             | Self::DeletedChildStillInFinishedChildren { .. }
-            | Self::ExpectedHostComponentOrderSibling { .. }
+            | Self::ExpectedManagedHostOrderSibling { .. }
             | Self::OrderSiblingParentMismatch { .. }
             | Self::MissingOrderSiblingStateNode { .. }
             | Self::MissingOrderSiblingCurrent { .. }
@@ -2246,9 +2250,9 @@ pub(crate) fn host_component_managed_child_complete_work_record_for_canary(
     }
 
     let child_node = arena.get(child)?;
-    if child_node.tag() != FiberTag::HostComponent {
+    if !is_supported_managed_child_host_tag_for_canary(child_node.tag()) {
         return Err(
-            HostComponentManagedChildCompleteWorkErrorForCanary::ExpectedHostComponentChild {
+            HostComponentManagedChildCompleteWorkErrorForCanary::ExpectedManagedHostChild {
                 child,
                 tag: child_node.tag(),
             },
@@ -2475,9 +2479,9 @@ pub(crate) fn host_component_managed_child_sibling_order_complete_work_record_fo
     }
 
     let child_node = arena.get(child)?;
-    if child_node.tag() != FiberTag::HostComponent {
+    if !is_supported_managed_child_host_tag_for_canary(child_node.tag()) {
         return Err(
-            HostComponentManagedChildCompleteWorkErrorForCanary::ExpectedHostComponentChild {
+            HostComponentManagedChildCompleteWorkErrorForCanary::ExpectedManagedHostChild {
                 child,
                 tag: child_node.tag(),
             },
@@ -2500,9 +2504,9 @@ pub(crate) fn host_component_managed_child_sibling_order_complete_work_record_fo
     }
 
     let order_sibling_node = arena.get(order_sibling)?;
-    if order_sibling_node.tag() != FiberTag::HostComponent {
+    if !is_supported_managed_child_host_tag_for_canary(order_sibling_node.tag()) {
         return Err(
-            HostComponentManagedChildCompleteWorkErrorForCanary::ExpectedHostComponentOrderSibling {
+            HostComponentManagedChildCompleteWorkErrorForCanary::ExpectedManagedHostOrderSibling {
                 order_sibling,
                 tag: order_sibling_node.tag(),
             },
@@ -2542,7 +2546,7 @@ pub(crate) fn host_component_managed_child_sibling_order_complete_work_record_fo
         },
     )?;
     let order_sibling_current_node = arena.get(order_sibling_current)?;
-    if order_sibling_current_node.tag() != FiberTag::HostComponent {
+    if order_sibling_current_node.tag() != order_sibling_node.tag() {
         return Err(
             HostComponentManagedChildCompleteWorkErrorForCanary::OrderSiblingCurrentTagMismatch {
                 order_sibling,
@@ -3432,6 +3436,189 @@ mod tests {
         )
     }
 
+    fn managed_child_placement_text_complete_fixture() -> (FiberArena, ManagedChildCompleteFixture)
+    {
+        let mut arena = FiberArena::new();
+        let root = FiberRootId::new(5).unwrap();
+        let parent_state_node = StateNodeHandle::from_raw(20_701);
+        let child_state_node = StateNodeHandle::from_raw(20_702);
+        let parent_props = PropsHandle::from_raw(20_703);
+        let child_props = PropsHandle::from_raw(20_704);
+        let parent_current =
+            arena.create_fiber(FiberTag::HostComponent, None, parent_props, FiberMode::NO);
+        {
+            let node = arena.get_mut(parent_current).unwrap();
+            node.set_state_node(parent_state_node);
+            node.set_memoized_props(parent_props);
+        }
+        let parent_work_in_progress = arena
+            .create_work_in_progress(parent_current, parent_props)
+            .unwrap();
+        {
+            let node = arena.get_mut(parent_work_in_progress).unwrap();
+            node.set_state_node(parent_state_node);
+            node.set_memoized_props(parent_props);
+        }
+        let child = arena.create_fiber(FiberTag::HostText, None, child_props, FiberMode::NO);
+        {
+            let node = arena.get_mut(child).unwrap();
+            node.set_flags(FiberFlags::PLACEMENT);
+            node.set_state_node(child_state_node);
+            node.set_memoized_props(child_props);
+        }
+        arena
+            .set_children(parent_work_in_progress, &[child])
+            .unwrap();
+
+        (
+            arena,
+            ManagedChildCompleteFixture {
+                root,
+                parent_current,
+                parent_work_in_progress,
+                child,
+                order_sibling: None,
+                order_sibling_current: None,
+                parent_state_node,
+                child_state_node,
+                order_sibling_state_node: StateNodeHandle::NONE,
+                parent_props,
+                child_props,
+                order_sibling_props: PropsHandle::NONE,
+                deletion_list: None,
+            },
+        )
+    }
+
+    fn managed_child_delete_text_complete_fixture() -> (FiberArena, ManagedChildCompleteFixture) {
+        let mut arena = FiberArena::new();
+        let root = FiberRootId::new(6).unwrap();
+        let parent_state_node = StateNodeHandle::from_raw(20_801);
+        let child_state_node = StateNodeHandle::from_raw(20_802);
+        let parent_props = PropsHandle::from_raw(20_803);
+        let child_props = PropsHandle::from_raw(20_804);
+        let parent_current =
+            arena.create_fiber(FiberTag::HostComponent, None, parent_props, FiberMode::NO);
+        {
+            let node = arena.get_mut(parent_current).unwrap();
+            node.set_state_node(parent_state_node);
+            node.set_memoized_props(parent_props);
+        }
+        let child = arena.create_fiber(FiberTag::HostText, None, child_props, FiberMode::NO);
+        {
+            let node = arena.get_mut(child).unwrap();
+            node.set_state_node(child_state_node);
+            node.set_memoized_props(child_props);
+        }
+        arena.set_children(parent_current, &[child]).unwrap();
+
+        let parent_work_in_progress = arena
+            .create_work_in_progress(parent_current, parent_props)
+            .unwrap();
+        {
+            let node = arena.get_mut(parent_work_in_progress).unwrap();
+            node.set_state_node(parent_state_node);
+            node.set_memoized_props(parent_props);
+        }
+        let deletion_list = arena
+            .mark_child_for_deletion(parent_work_in_progress, child)
+            .unwrap();
+
+        (
+            arena,
+            ManagedChildCompleteFixture {
+                root,
+                parent_current,
+                parent_work_in_progress,
+                child,
+                order_sibling: None,
+                order_sibling_current: None,
+                parent_state_node,
+                child_state_node,
+                order_sibling_state_node: StateNodeHandle::NONE,
+                parent_props,
+                child_props,
+                order_sibling_props: PropsHandle::NONE,
+                deletion_list: Some(deletion_list),
+            },
+        )
+    }
+
+    fn managed_child_text_placement_sibling_order_complete_fixture()
+    -> (FiberArena, ManagedChildCompleteFixture) {
+        let mut arena = FiberArena::new();
+        let root = FiberRootId::new(7).unwrap();
+        let parent_state_node = StateNodeHandle::from_raw(20_901);
+        let child_state_node = StateNodeHandle::from_raw(20_902);
+        let order_sibling_state_node = StateNodeHandle::from_raw(20_903);
+        let parent_props = PropsHandle::from_raw(20_904);
+        let child_props = PropsHandle::from_raw(20_905);
+        let order_sibling_props = PropsHandle::from_raw(20_906);
+        let parent_current =
+            arena.create_fiber(FiberTag::HostComponent, None, parent_props, FiberMode::NO);
+        {
+            let node = arena.get_mut(parent_current).unwrap();
+            node.set_state_node(parent_state_node);
+            node.set_memoized_props(parent_props);
+        }
+        let order_sibling_current =
+            arena.create_fiber(FiberTag::HostText, None, order_sibling_props, FiberMode::NO);
+        {
+            let node = arena.get_mut(order_sibling_current).unwrap();
+            node.set_state_node(order_sibling_state_node);
+            node.set_memoized_props(order_sibling_props);
+        }
+        arena
+            .set_children(parent_current, &[order_sibling_current])
+            .unwrap();
+
+        let parent_work_in_progress = arena
+            .create_work_in_progress(parent_current, parent_props)
+            .unwrap();
+        {
+            let node = arena.get_mut(parent_work_in_progress).unwrap();
+            node.set_state_node(parent_state_node);
+            node.set_memoized_props(parent_props);
+        }
+        let child = arena.create_fiber(FiberTag::HostText, None, child_props, FiberMode::NO);
+        {
+            let node = arena.get_mut(child).unwrap();
+            node.set_flags(FiberFlags::PLACEMENT);
+            node.set_state_node(child_state_node);
+            node.set_memoized_props(child_props);
+        }
+        let order_sibling = arena
+            .create_work_in_progress(order_sibling_current, order_sibling_props)
+            .unwrap();
+        {
+            let node = arena.get_mut(order_sibling).unwrap();
+            node.set_state_node(order_sibling_state_node);
+            node.set_memoized_props(order_sibling_props);
+        }
+        arena
+            .set_children(parent_work_in_progress, &[child, order_sibling])
+            .unwrap();
+
+        (
+            arena,
+            ManagedChildCompleteFixture {
+                root,
+                parent_current,
+                parent_work_in_progress,
+                child,
+                order_sibling: Some(order_sibling),
+                order_sibling_current: Some(order_sibling_current),
+                parent_state_node,
+                child_state_node,
+                order_sibling_state_node,
+                parent_props,
+                child_props,
+                order_sibling_props,
+                deletion_list: None,
+            },
+        )
+    }
+
     #[test]
     fn complete_context_provider_restores_stack_and_bubbles_children() {
         let (mut arena, mut context_store, begin_work, default_value) = provider_scope();
@@ -4052,6 +4239,86 @@ mod tests {
     }
 
     #[test]
+    fn complete_managed_child_records_one_new_host_text_placement() {
+        let (arena, fixture) = managed_child_placement_text_complete_fixture();
+
+        let record = host_component_managed_child_complete_work_record_for_canary(
+            &arena,
+            fixture.root,
+            fixture.parent_work_in_progress,
+            fixture.child,
+            HostComponentManagedChildMutationKindForCanary::Placement,
+        )
+        .unwrap();
+
+        assert_eq!(record.root(), fixture.root);
+        assert_eq!(
+            record.kind(),
+            HostComponentManagedChildMutationKindForCanary::Placement
+        );
+        assert_eq!(record.parent_current(), fixture.parent_current);
+        assert_eq!(
+            record.parent_work_in_progress(),
+            fixture.parent_work_in_progress
+        );
+        assert_eq!(record.parent_state_node(), fixture.parent_state_node);
+        assert_eq!(record.parent_flags(), FiberFlags::NO);
+        assert_eq!(record.child(), fixture.child);
+        assert_eq!(record.child_tag(), FiberTag::HostText);
+        assert_eq!(record.child_state_node(), fixture.child_state_node);
+        assert_eq!(record.child_pending_props(), fixture.child_props);
+        assert_eq!(record.child_memoized_props(), fixture.child_props);
+        assert_eq!(record.child_alternate(), None);
+        assert_eq!(record.child_flags(), FiberFlags::PLACEMENT);
+        assert_eq!(record.deletion_list(), None);
+        assert_eq!(record.expected_effect_flag(), FiberFlags::PLACEMENT);
+        assert!(record.private_reconciler_handoff_only());
+        assert!(!record.public_dom_compatibility_claimed());
+        assert!(!record.test_renderer_compatibility_claimed());
+        assert!(!record.broad_reconciliation_traversal_claimed());
+    }
+
+    #[test]
+    fn complete_managed_child_records_one_deleted_host_text_detach() {
+        let (arena, fixture) = managed_child_delete_text_complete_fixture();
+
+        let record = host_component_managed_child_complete_work_record_for_canary(
+            &arena,
+            fixture.root,
+            fixture.parent_work_in_progress,
+            fixture.child,
+            HostComponentManagedChildMutationKindForCanary::DeleteDetach,
+        )
+        .unwrap();
+
+        assert_eq!(record.root(), fixture.root);
+        assert_eq!(
+            record.kind(),
+            HostComponentManagedChildMutationKindForCanary::DeleteDetach
+        );
+        assert_eq!(record.parent_current(), fixture.parent_current);
+        assert_eq!(
+            record.parent_work_in_progress(),
+            fixture.parent_work_in_progress
+        );
+        assert_eq!(record.parent_state_node(), fixture.parent_state_node);
+        assert_eq!(record.parent_flags(), FiberFlags::CHILD_DELETION);
+        assert_eq!(record.child(), fixture.child);
+        assert_eq!(record.child_tag(), FiberTag::HostText);
+        assert_eq!(record.child_state_node(), fixture.child_state_node);
+        assert_eq!(record.child_pending_props(), fixture.child_props);
+        assert_eq!(record.child_memoized_props(), fixture.child_props);
+        assert_eq!(record.child_alternate(), None);
+        assert_eq!(record.child_flags(), FiberFlags::NO);
+        assert_eq!(record.deletion_list(), fixture.deletion_list);
+        assert_eq!(record.expected_effect_flag(), FiberFlags::CHILD_DELETION);
+        assert!(record.private_reconciler_handoff_only());
+        assert!(!record.public_dom_compatibility_claimed());
+        assert!(!record.test_renderer_compatibility_claimed());
+        assert!(!record.broad_reconciliation_traversal_claimed());
+    }
+
+    #[test]
     fn complete_managed_child_sibling_order_records_host_component_placement_before_sibling() {
         let (arena, fixture) = managed_child_placement_sibling_order_complete_fixture();
         let order_sibling = fixture.order_sibling.unwrap();
@@ -4090,6 +4357,69 @@ mod tests {
         assert_eq!(record.child_flags(), FiberFlags::PLACEMENT);
         assert_eq!(record.order_sibling(), order_sibling);
         assert_eq!(record.order_sibling_tag(), FiberTag::HostComponent);
+        assert_eq!(
+            record.order_sibling_state_node(),
+            fixture.order_sibling_state_node
+        );
+        assert_eq!(
+            record.order_sibling_pending_props(),
+            fixture.order_sibling_props
+        );
+        assert_eq!(
+            record.order_sibling_memoized_props(),
+            fixture.order_sibling_props
+        );
+        assert_eq!(
+            record.order_sibling_alternate(),
+            Some(order_sibling_current)
+        );
+        assert_eq!(record.order_sibling_flags(), FiberFlags::NO);
+        assert_eq!(record.deletion_list(), None);
+        assert_eq!(record.expected_effect_flag(), FiberFlags::PLACEMENT);
+        assert!(record.private_reconciler_handoff_only());
+        assert!(!record.public_dom_compatibility_claimed());
+        assert!(!record.test_renderer_compatibility_claimed());
+        assert!(!record.broad_reconciliation_traversal_claimed());
+    }
+
+    #[test]
+    fn complete_managed_child_sibling_order_records_host_text_placement_before_text_sibling() {
+        let (arena, fixture) = managed_child_text_placement_sibling_order_complete_fixture();
+        let order_sibling = fixture.order_sibling.unwrap();
+        let order_sibling_current = fixture.order_sibling_current.unwrap();
+
+        let record = host_component_managed_child_sibling_order_complete_work_record_for_canary(
+            &arena,
+            fixture.root,
+            fixture.parent_work_in_progress,
+            fixture.child,
+            order_sibling,
+            HostComponentManagedChildMutationKindForCanary::Placement,
+        )
+        .unwrap();
+
+        assert_eq!(record.root(), fixture.root);
+        assert_eq!(
+            record.kind(),
+            HostComponentManagedChildMutationKindForCanary::Placement
+        );
+        assert_eq!(record.order_evidence_name(), "next-sibling");
+        assert_eq!(record.parent_current(), fixture.parent_current);
+        assert_eq!(
+            record.parent_work_in_progress(),
+            fixture.parent_work_in_progress
+        );
+        assert_eq!(record.parent_state_node(), fixture.parent_state_node);
+        assert_eq!(record.parent_flags(), FiberFlags::NO);
+        assert_eq!(record.child(), fixture.child);
+        assert_eq!(record.child_tag(), FiberTag::HostText);
+        assert_eq!(record.child_state_node(), fixture.child_state_node);
+        assert_eq!(record.child_pending_props(), fixture.child_props);
+        assert_eq!(record.child_memoized_props(), fixture.child_props);
+        assert_eq!(record.child_alternate(), None);
+        assert_eq!(record.child_flags(), FiberFlags::PLACEMENT);
+        assert_eq!(record.order_sibling(), order_sibling);
+        assert_eq!(record.order_sibling_tag(), FiberTag::HostText);
         assert_eq!(
             record.order_sibling_state_node(),
             fixture.order_sibling_state_node
@@ -4317,7 +4647,7 @@ mod tests {
                 HostComponentManagedChildMutationKindForCanary::Placement,
             ),
             Err(
-                HostComponentManagedChildCompleteWorkErrorForCanary::ExpectedHostComponentChild {
+                HostComponentManagedChildCompleteWorkErrorForCanary::ExpectedManagedHostChild {
                     child: function_child,
                     tag: FiberTag::FunctionComponent,
                 },

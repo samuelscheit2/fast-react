@@ -400,9 +400,20 @@ impl DetachedHostRecords {
         Ok(self.nodes.instance_latest_props_updates(handle, scope)?)
     }
 
-    fn text_metadata(&self, handle: StateNodeHandle) -> Result<HostNodeMetadata, HostWorkError> {
+    pub(crate) fn text_metadata(
+        &self,
+        handle: StateNodeHandle,
+    ) -> Result<HostNodeMetadata, HostWorkError> {
         let scope = self.scope(handle, HostFiberTokenTarget::TextInstance)?;
         Ok(self.nodes.text_metadata(handle, scope)?)
+    }
+
+    pub(crate) fn invalidate_text_for_canary(
+        &mut self,
+        handle: StateNodeHandle,
+    ) -> Result<(), HostWorkError> {
+        let scope = self.scope(handle, HostFiberTokenTarget::TextInstance)?;
+        Ok(self.nodes.invalidate_text(handle, scope)?)
     }
 
     fn instance_count(&self) -> usize {
@@ -817,6 +828,42 @@ pub(crate) fn create_detached_test_host_component_for_existing_fiber_for_canary(
     }
     host.finalize_initial_children(&mut instance, &ty, &(), &container, &())?;
     let state_node = detached_hosts.insert_instance(scope, instance);
+    complete_fiber_common(
+        store,
+        fiber,
+        props,
+        state_node,
+        InitialChildrenFinalization::NoCommitMount,
+    )?;
+    Ok(state_node)
+}
+
+pub(crate) fn create_detached_test_host_text_for_existing_fiber_for_canary(
+    store: &mut FiberRootStore<RecordingHost>,
+    host: &mut RecordingHost,
+    detached_hosts: &mut DetachedHostRecords,
+    root_id: FiberRootId,
+    fiber: FiberId,
+    text: &str,
+    props: PropsHandle,
+) -> Result<StateNodeHandle, HostWorkError> {
+    expect_tag(store, fiber, FiberTag::HostText)?;
+
+    let scope =
+        issue_creation_host_node_scope(store, root_id, fiber, HostFiberTokenTarget::TextInstance)?;
+    let token = FakeHostFiberToken(scope.token_id().raw());
+    let container = *store.root(root_id)?.container_info();
+    let text_instance = host.create_text_instance(
+        HostFiberTokenRef::new(
+            &token,
+            HostFiberTokenPhase::Creation,
+            HostFiberTokenTarget::TextInstance,
+        ),
+        text,
+        &container,
+        &(),
+    )?;
+    let state_node = detached_hosts.insert_text(scope, text_instance);
     complete_fiber_common(
         store,
         fiber,
@@ -1881,11 +1928,9 @@ impl TestHostRootManagedChildExecutionDiagnosticForCanary {
                     TestHostRootMutationApplyStatus::Applied(
                         TestHostRootMutationHostCall::RemoveChild
                     )
-                ) && matches!(
+                ) && managed_child_deletion_cleanup_status_matches_tag(
                     self.cleanup_status,
-                    Some(TestHostRootDeletionCleanupStatus::Applied(
-                        TestHostRootDeletionCleanupAction::DetachDeletedInstance
-                    ))
+                    self.mutation.tag(),
                 )
             }
         }
@@ -2027,11 +2072,9 @@ impl TestHostRootManagedChildSiblingOrderExecutionDiagnosticForCanary {
                     TestHostRootMutationApplyStatus::Applied(
                         TestHostRootMutationHostCall::RemoveChild
                     )
-                ) && matches!(
+                ) && managed_child_deletion_cleanup_status_matches_tag(
                     self.cleanup_status,
-                    Some(TestHostRootDeletionCleanupStatus::Applied(
-                        TestHostRootDeletionCleanupAction::DetachDeletedInstance
-                    ))
+                    self.mutation.tag(),
                 )
             }
         }
@@ -2587,11 +2630,10 @@ pub(crate) fn apply_managed_child_complete_work_handoff_for_canary(
                     },
                 );
             };
-            if cleanup_status
-                != TestHostRootDeletionCleanupStatus::Applied(
-                    TestHostRootDeletionCleanupAction::DetachDeletedInstance,
-                )
-            {
+            if !managed_child_deletion_cleanup_status_matches_tag(
+                Some(cleanup_status),
+                mutation.tag(),
+            ) {
                 return Err(
                     TestHostRootManagedChildExecutionErrorForCanary::CleanupNotApplied {
                         root: handoff.root(),
@@ -2703,11 +2745,10 @@ pub(crate) fn apply_managed_child_sibling_order_complete_work_handoff_for_canary
                     },
                 );
             };
-            if cleanup_status
-                != TestHostRootDeletionCleanupStatus::Applied(
-                    TestHostRootDeletionCleanupAction::DetachDeletedInstance,
-                )
-            {
+            if !managed_child_deletion_cleanup_status_matches_tag(
+                Some(cleanup_status),
+                mutation.tag(),
+            ) {
                 return Err(
                     TestHostRootManagedChildExecutionErrorForCanary::CleanupNotApplied {
                         root: handoff.root(),
@@ -2789,6 +2830,27 @@ const fn managed_child_sibling_order_apply_status_matches_kind(
             HostComponentManagedChildMutationKindForCanary::DeleteDetach,
         )
     )
+}
+
+const fn managed_child_deletion_cleanup_status_matches_tag(
+    status: Option<TestHostRootDeletionCleanupStatus>,
+    tag: FiberTag,
+) -> bool {
+    match tag {
+        FiberTag::HostComponent => matches!(
+            status,
+            Some(TestHostRootDeletionCleanupStatus::Applied(
+                TestHostRootDeletionCleanupAction::DetachDeletedInstance,
+            ))
+        ),
+        FiberTag::HostText => matches!(
+            status,
+            Some(TestHostRootDeletionCleanupStatus::Applied(
+                TestHostRootDeletionCleanupAction::InvalidateDeletedText,
+            ))
+        ),
+        _ => false,
+    }
 }
 
 fn accept_dangerous_html_text_reset_payload_from_complete_work_handoff_for_canary(
