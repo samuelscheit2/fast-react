@@ -206,6 +206,27 @@ test('scheduler mock promotes delayed act/root metadata through the expired rout
       true,
       nodeEnv
     );
+    const sourceValidator =
+      readSchedulerMockExpiredActRootWorkSourceValidator(Scheduler);
+    assert.equal(
+      sourceValidator.isSchedulerMockExpiredActRootWorkSource(report),
+      true,
+      nodeEnv
+    );
+    assert.equal(
+      sourceValidator.isSchedulerMockExpiredActRootWorkSource(
+        Object.freeze({ ...report })
+      ),
+      false,
+      nodeEnv
+    );
+    assert.equal(
+      sourceValidator.isSchedulerMockExpiredActRootWorkSource(
+        report.expiredActRootWorkDrainReport
+      ),
+      true,
+      nodeEnv
+    );
     assert.equal(
       report.expiredActRootWorkDrainStatus,
       'drained-expired-mock-scheduler-work-with-act-root-metadata-for-diagnostics',
@@ -1634,6 +1655,34 @@ function readPrivateFlushDiagnostics(Scheduler) {
   assert.equal(typeof diagnostics, 'object');
   assert.notEqual(diagnostics, null);
   return diagnostics;
+}
+
+function readSchedulerMockExpiredActRootWorkSourceValidator(Scheduler) {
+  const flushExpired = Scheduler.unstable_flushExpired;
+  for (const key of Reflect.ownKeys(flushExpired)) {
+    if (typeof key !== 'symbol') {
+      continue;
+    }
+
+    const descriptor = Object.getOwnPropertyDescriptor(flushExpired, key);
+    const value = descriptor === undefined ? null : descriptor.value;
+    if (
+      descriptor !== undefined &&
+      descriptor.configurable === false &&
+      descriptor.enumerable === false &&
+      descriptor.writable === false &&
+      value !== null &&
+      typeof value === 'object' &&
+      Object.isFrozen(value) &&
+      value.status ===
+        'fast-react.scheduler.mock-expired-act-root-work-source-validator' &&
+      typeof value.isSchedulerMockExpiredActRootWorkSource === 'function'
+    ) {
+      return value;
+    }
+  }
+
+  assert.fail('Expected Scheduler mock source validator on unstable_flushExpired');
 }
 
 function getSchedulerPriorityName(Scheduler, priorityLevel) {

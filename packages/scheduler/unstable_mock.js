@@ -1594,7 +1594,7 @@ function drainDelayedMockSchedulerWorkWithActRootMetadataForDiagnostics(
     }
   );
 
-  return Object.freeze(metadata);
+  return freezeSchedulerOwnedExpiredActRootWorkSource(metadata);
 }
 
 function createDelayedActRootWorkMetadataFromAcceptedRootMetadataForDiagnostics(
