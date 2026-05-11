@@ -29,6 +29,39 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 968 Docs Refresh and Worker 966
+
+- Worker 968 refreshed coordination docs for the `b625e49c` baseline after
+  Workers 958 and 965 were accepted. It was accepted at `7aaaec6d`
+  (`Merge worker 968 docs refresh after 958 and 965`) with no runtime
+  compatibility claim change.
+- Worker 966 refreshed the private admission 804 managed-child placement/delete
+  ledger for the current accepted HostWork shape after Worker 954 made the
+  managed-child execution error enum `pub(crate)`.
+- Worker 966 kept the ledger static/read-only and did not change Rust source.
+  It updated cleanup-order evidence so the managed-child delete path proves
+  deletion cleanup is applied and validated before diagnostic blockers are
+  materialized.
+- Worker 966 pinned every evidence row to canonical role, path, source-slice
+  boundaries, source-owned evidence type, and gate-owned canonical token lists.
+  Caller-shaped, test-title-only, progress-prose-only,
+  public-compatibility-prose-only, source-syntax-only, and canonical-shell
+  replacement rows now fail closed.
+- Focused Worker 966 verification passed the private admission 804 file-scoped
+  Node test, the private admission 804 test-name pattern, JS syntax checks for
+  source and test files, `npm run check:package-surface`, import-smoke, and
+  `git diff --check`. The broader conformance workspace command still hit
+  unrelated pre-existing serialization and private-admission 727/739 failures;
+  the scoped 804 checks did not show an 804 failure.
+- Public React DOM roots, react-test-renderer/native behavior, hydration,
+  events, refs, resources/forms, package/native compatibility, and public
+  compatibility remain blocked.
+- The accepted state for this batch is current main `c2cb703f`
+  (`Merge worker 966 private admission 804 ledger refresh`) after merge commits
+  `7aaaec6d` and `c2cb703f`, with focused docs, private-admission 804,
+  package-surface, import-smoke, JS syntax, and `git diff --check` evidence
+  recorded in worker reports and git history.
+
 ### Worker 963 Docs Refresh, Worker 958, and Worker 965
 
 - Worker 963 refreshed coordination docs for the `2cf80d7d` baseline after

@@ -48,34 +48,39 @@ Drive toward a minimal real root render/update/unmount path:
 Top-level cap: 30 workers. Accepted implementation baseline for this branch
 includes Workers 803-837, 842-846, 848-852, 855-860, 862-874, 878-883,
 885-893, 895-896, 898-902, 904, 906-909, 912-930, 932-934, 936-948,
-950-958, and 965; coordination history includes docs refresh Workers 922, 931,
-935, 945, 959, 960, 961, 962, and 963. Current baseline is `b625e49c`
-(`Merge worker 965 private admission 739-745 evidence refresh`). Worker 853's
-competing test-renderer branch was rejected as redundant after Worker 844 was
-accepted; do not use it as accepted input.
+950-958, and 965-966; coordination history includes docs refresh Workers 922,
+931, 935, 945, 959, 960, 961, 962, 963, and 968. Current baseline is
+`c2cb703f` (`Merge worker 966 private admission 804 ledger refresh`). Worker
+853's competing test-renderer branch was rejected as redundant after Worker
+844 was accepted; do not use it as accepted input.
 
 Current orchestration queue:
 
 - Worker 910: DO NOT MERGE again for hydration recoverable-error boundary
-  admission after repeated audits found cloned/fake root-bridge admission
-  paths. The repair remains unaccepted and active as fix3 input only; do not
-  treat any Worker 910 evidence as accepted until a fresh audited merge lands.
+  admission after the latest audit found a forged real `Module` cache entry
+  preseeded in `require.cache[rootBridgePath]` with immutable exports and
+  Node-like private symbols. The repair remains unaccepted and active as fix3
+  input only; do not treat any Worker 910 evidence as accepted until a fresh
+  audited merge lands.
 - Worker 949: Scheduler postTask/mock variant currentness lane. Latest audit
-  found nested public-claim containers are not recursively fail-closed; the
-  repair remains active and unaccepted.
-- Worker 964: private admission 727-728 conformance repair lane for stale
-  unmount finished-work identity ledger failures.
-- Worker 966: private admission 804 managed-child ledger refresh lane;
-  source-authority audit returned DO NOT MERGE for caller-shaped/non-source
-  evidence contexts. Repair remains active and unaccepted.
+  returned DO NOT MERGE because exported
+  `createSchedulerVariantBoundaryDiagnosticsReport` factory input with
+  malformed `variantCurrentnessGate` and empty `rowsByVariant` can throw a raw
+  TypeError instead of failing closed. The repair remains active and
+  unaccepted.
+- Worker 964: private admission 727-728 conformance repair lane. Current
+  blocker is comment-spoofed source anchors: raw `indexOf` / raw token search
+  can recognize forged canonical gate objects inside block comments, so the
+  lane needs source-structural/comment-resistant evidence and remains active
+  and unaccepted.
 - Worker 967: react-test-renderer serialization/local oracle refresh lane.
 
-Worker 910, Worker 949, and Workers 964, 966, and 967 remain unaccepted until
-merged to main. If a fresh Worker 910 repair, Worker 949, or one of Workers
-964, 966, or 967 merges after this branch point, update this section and move
-accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
+Worker 910, Worker 949, and Workers 964 and 967 remain unaccepted until merged
+to main. If a fresh Worker 910 repair, Worker 949, Worker 964, or Worker 967
+merges after this branch point, update this section and move accepted facts
+into `MASTER_PROGRESS.md` in the next docs pass.
 
-Accepted private evidence through `b625e49c` still keeps public
+Accepted private evidence through `c2cb703f` still keeps public
 root/render/unmount, `act`, `react-dom/test-utils.act`, `flushSync`, Scheduler
 timing, hydration, resources/forms, public input/change or controlled-input
 behavior, serialization, native/reconciler execution, React Children traversal
@@ -88,13 +93,13 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat the accepted branch baseline through `b625e49c` as private evidence
+1. Treat the accepted branch baseline through `c2cb703f` as private evidence
    only. Public package, root, native, React DOM, test-renderer, Scheduler,
    `act`, `react-dom/test-utils.act`, hydration, resource/form,
    public controlled-input, serialization, React Children lazy/full traversal,
    unsupported hook, event dispatch, and `flushSync` compatibility still
    require fail-closed gates and dual-run oracle evidence.
-2. Review Worker 910 fix3, Worker 949, and Workers 964, 966, and 967 against
+2. Review Worker 910 fix3, Worker 949, and Workers 964 and 967 against
    the accepted source-owned lifecycle, hydration, `act`, deletion, sync-flush,
    HostRoot lane handoff, scheduler continuation/currentness,
    reconciler/test-renderer direct multi-child fiber inspection,
@@ -115,19 +120,20 @@ canonical evidence requirements.
 
 - Rust root/sync-flush/function/deletion execution can extend accepted Workers
   855, 860, 862-867, 878-879, 889-890, 896, 898, 904, 906-907, 917-921, 936,
-  943, 948, and 954 toward managed-child, HostText, multi-child, sync-flush
-  delete/post-passive, root child replacement/delete-plus-place
-  continuation, FunctionComponent deletion/render-phase update/bailout blocker
-  coverage, HostRoot update-queue lane handoff, finished-work commit queue-lane
-  consumer, direct committed-fiber inspection, terminal host descendant
-  collection, scheduler-owned continuation/currentness, HostNodeStore update
-  payload currentness, Worker 925 concurrent update drain currentness, Worker
-  926 hook staging failure preservation, and Worker 928 HostRoot container
-  descendant currentness shapes only as private test-host canaries with
-  source-owned commit, host-node, root/lane, scheduler, queue/handoff,
-  store-backed row lane metadata, topology, replay, ref/passive, and cleanup
-  validation. Public React DOM/test-renderer roots and public `flushSync`
-  remain blocked.
+  943, 948, and 954, plus Worker 966's refreshed private admission 804
+  managed-child source-token ledger, toward managed-child, HostText,
+  multi-child, sync-flush delete/post-passive, root child
+  replacement/delete-plus-place continuation, FunctionComponent
+  deletion/render-phase update/bailout blocker coverage, HostRoot update-queue
+  lane handoff, finished-work commit queue-lane consumer, direct
+  committed-fiber inspection, terminal host descendant collection,
+  scheduler-owned continuation/currentness, HostNodeStore update payload
+  currentness, Worker 925 concurrent update drain currentness, Worker 926 hook
+  staging failure preservation, and Worker 928 HostRoot container descendant
+  currentness shapes only as private test-host canaries with source-owned
+  commit, host-node, root/lane, scheduler, queue/handoff, store-backed row lane
+  metadata, topology, replay, ref/passive, and cleanup validation. Public React
+  DOM/test-renderer roots and public `flushSync` remain blocked.
 - Test-renderer package-root/native work should use accepted Worker 844
   package-root native execution parity, Workers 859 and 868 Rust private
   lifecycle/native consumer hardening, and Worker 872 package-root/CJS private
@@ -245,10 +251,10 @@ canonical evidence requirements.
   serialization and private-admission failures, so discovery coverage and
   benchmark manifest/result validation are not broad conformance or performance
   compatibility claims.
-- Active conformance repair lanes 964, 966, and 967 are current work only:
-  private admission 727-728, private admission 804, and react-test-renderer
-  serialization/local oracle repairs remain unaccepted until merged. Do not use
-  their branch output as accepted evidence.
+- Active conformance repair lanes 964 and 967 are current work only: private
+  admission 727-728 and react-test-renderer serialization/local oracle repairs
+  remain unaccepted until merged. Do not use their branch output as accepted
+  evidence.
 - Public `hydrateRoot` remains blocked after accepted marker/listener,
   target-claiming, recoverable-error, replay-target preflights, private
   text-claim patch execution, the text-patch admission ledger, Worker 887's
