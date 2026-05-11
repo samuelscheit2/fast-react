@@ -11499,7 +11499,13 @@ function consumePrivateRootLifecycleExecutionEvidence(records) {
 
 function readLifecycleExecutionResult(records, operation) {
   if (Array.isArray(records)) {
-    return records.find((record) => record && record.operation === operation);
+    for (let index = records.length - 1; index >= 0; index--) {
+      const record = records[index];
+      if (record && record.operation === operation) {
+        return record;
+      }
+    }
+    return undefined;
   }
   if (records !== null && typeof records === 'object') {
     return records[operation];
@@ -11619,13 +11625,20 @@ function assertRootLifecycleExecutionRowsAreCurrent(
   const createIndex = requests.indexOf(createResult.request);
   const updateIndex = requests.indexOf(updateResult.request);
   const unmountIndex = requests.indexOf(unmountResult.request);
+  let latestUpdateIndex = -1;
+  for (let index = 0; index < unmountIndex; index++) {
+    if (requests[index].operation === 'update') {
+      latestUpdateIndex = index;
+    }
+  }
   if (
     createIndex === -1 ||
     updateIndex === -1 ||
     unmountIndex === -1 ||
     requests[0] !== createResult.request ||
     requests[requests.length - 1] !== unmountResult.request ||
-    !(createIndex < updateIndex && updateIndex < unmountIndex)
+    !(createIndex < updateIndex && updateIndex < unmountIndex) ||
+    updateIndex !== latestUpdateIndex
   ) {
     throwInvalidRootRequest(
       'Private root lifecycle execution rows are stale for the current renderer root.'

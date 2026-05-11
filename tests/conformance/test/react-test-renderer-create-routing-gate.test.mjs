@@ -4851,6 +4851,60 @@ test("react-test-renderer package root and CJS consume source-owned root lifecyc
       bridge.consumePrivateRootLifecycleExecutionEvidence(rows)
     );
     assert.match(staleError.message, /stale for the current renderer root/u);
+
+    const multiUpdate =
+      createPrivateRootLifecycleExecutionRows(moduleExports, bridge, {
+        updateElements: [
+          {
+            props: { children: "update-1" },
+            type: "span"
+          },
+          {
+            props: { children: "update-2" },
+            type: "span"
+          }
+        ]
+      });
+    assert.equal(multiUpdate.updateResults.length, 2);
+    const staleUpdateRows = {
+      create: multiUpdate.createResult,
+      update: multiUpdate.updateResults[0],
+      unmount: multiUpdate.unmountResult
+    };
+    assert.equal(
+      bridge.canConsumePrivateRootLifecycleExecutionEvidence(staleUpdateRows),
+      false,
+      entry.entrypoint
+    );
+    const staleUpdateError = captureThrown(() =>
+      bridge.consumePrivateRootLifecycleExecutionEvidence(staleUpdateRows)
+    );
+    assert.match(
+      staleUpdateError.message,
+      /stale for the current renderer root/u
+    );
+
+    const latestUpdateRows = {
+      create: multiUpdate.createResult,
+      update: multiUpdate.updateResults[1],
+      unmount: multiUpdate.unmountResult
+    };
+    assert.equal(
+      bridge.canConsumePrivateRootLifecycleExecutionEvidence(latestUpdateRows),
+      true,
+      entry.entrypoint
+    );
+    const latestArrayEvidence =
+      bridge.consumePrivateRootLifecycleExecutionEvidence([
+        multiUpdate.createResult,
+        multiUpdate.updateResults[0],
+        multiUpdate.updateResults[1],
+        multiUpdate.unmountResult
+      ]);
+    assert.equal(
+      latestArrayEvidence.update.requestSequence,
+      multiUpdate.updateResults[1].requestSequence
+    );
   }
 });
 
@@ -6000,7 +6054,17 @@ function privateNativeExecutionRecord(bridge, rootRequest) {
   });
 }
 
-function createPrivateRootLifecycleExecutionRows(moduleExports, bridge) {
+function createPrivateRootLifecycleExecutionRows(
+  moduleExports,
+  bridge,
+  options = {}
+) {
+  const updateElements = options.updateElements ?? [
+    {
+      props: { children: "goodbye" },
+      type: "span"
+    }
+  ];
   const renderer = moduleExports.create(
     {
       props: { children: "hello" },
@@ -6014,17 +6078,16 @@ function createPrivateRootLifecycleExecutionRows(moduleExports, bridge) {
       ? bridge.getRootCreateRouteAdmission(createRequest)
       : null;
 
-  const updateError = captureThrown(() =>
-    renderer.update({
-      props: { children: "goodbye" },
-      type: "span"
-    })
+  const updateErrors = updateElements.map((element) =>
+    captureThrown(() => renderer.update(element))
   );
-  assertReactTestRendererUnimplemented(
-    updateError,
-    moduleExports.__FAST_REACT_ENTRYPOINT__,
-    "create().update"
-  );
+  for (const updateError of updateErrors) {
+    assertReactTestRendererUnimplemented(
+      updateError,
+      moduleExports.__FAST_REACT_ENTRYPOINT__,
+      "create().update"
+    );
+  }
 
   const unmountError = captureThrown(() => renderer.unmount());
   assertReactTestRendererUnimplemented(
@@ -6034,9 +6097,11 @@ function createPrivateRootLifecycleExecutionRows(moduleExports, bridge) {
   );
 
   const requestsBySequence = new Map(
-    [createRequest, updateError.rootRequest, unmountError.rootRequest].map(
-      (request) => [request.requestSequence, request]
-    )
+    [
+      createRequest,
+      ...updateErrors.map((updateError) => updateError.rootRequest),
+      unmountError.rootRequest
+    ].map((request) => [request.requestSequence, request])
   );
   const executor = (handoff) => {
     const request = requestsBySequence.get(handoff.requestSequence);
@@ -6093,23 +6158,29 @@ function createPrivateRootLifecycleExecutionRows(moduleExports, bridge) {
   };
 
   const createResult = bridge.executeRootRequest(createRequest, executor);
-  const updateResult = bridge.executeRootRequest(
-    updateError.rootRequest,
-    executor
+  const updateResults = updateErrors.map((updateError) =>
+    bridge.executeRootRequest(updateError.rootRequest, executor)
   );
   const unmountResult = bridge.executeRootRequest(
     unmountError.rootRequest,
     executor
   );
+  const updateResult = updateResults[updateResults.length - 1];
 
   assertRootExecutionResult(createResult, createRequest);
-  assertRootExecutionResult(updateResult, updateError.rootRequest);
+  for (let index = 0; index < updateResults.length; index++) {
+    assertRootExecutionResult(
+      updateResults[index],
+      updateErrors[index].rootRequest
+    );
+  }
   assertRootExecutionResult(unmountResult, unmountError.rootRequest);
 
   return {
     createResult,
     renderer,
     updateResult,
+    updateResults,
     unmountResult
   };
 }

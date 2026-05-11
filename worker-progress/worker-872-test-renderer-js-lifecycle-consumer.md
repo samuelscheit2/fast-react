@@ -17,6 +17,10 @@
 - Added focused package-root and CJS coverage that consumes bridge-owned
   create/update/unmount rows, then rejects cloned, caller-built, cross-surface,
   and stale rows before any public/native/package compatibility can be implied.
+- Audit follow-up: tightened current-root validation so the selected update row
+  must be the latest update lifecycle row before the selected unmount, and array
+  input selects the latest matching operation row instead of the first stale
+  match.
 
 ## Verification
 
@@ -41,6 +45,9 @@
 - Negative coverage proves source-owner rejection for cloned/caller-built rows,
   operation-slot rejection for cross-surface rows, and current-root history
   rejection for stale rows.
+- The audit regression now builds `create -> update#1 -> update#2 -> unmount`
+  source-owned rows, rejects stale `update#1`, and accepts `update#2` including
+  array input containing both update rows.
 
 ## Risks
 
