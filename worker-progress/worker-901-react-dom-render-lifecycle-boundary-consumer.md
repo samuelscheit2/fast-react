@@ -5,6 +5,8 @@
 - Added source-owned root lifecycle request-boundary admission for private public-facade render, update, nested update, and delayed render native-handoff consumers.
 - Bound render/update diagnostics to the active root/container/source request, lifecycle request version, same-container currentness, and current fake-DOM lifecycle snapshots.
 - Rejected caller-supplied lifecycle boundary and lifecycle snapshot evidence before render/update diagnostics can be accepted.
+- Audit fix: nested host-output update now uses the same source override and lifecycle evidence guard path before callbacks are read or any fake-DOM/render/update record is created.
+- Audit fix: nested source record aliases (`sourceCreateRecord`, `sourceRenderRecord`, `sourceUpdateRecord`, `sourceUnmountRecord`) and callback value smuggling (`renderCallback`, `updateCallback`, `callback`) reject with the update gate and leave the target container untouched.
 - Left public createRoot/root.render/hydrateRoot/browser/native/Rust compatibility surfaces blocked; accepted capability snapshots were not changed to avoid widening conformance gate admissions.
 
 ## Changed Files
@@ -29,8 +31,9 @@
 ## Evidence
 
 - Render and update diagnostics now expose `lifecycleRequestAdmission`, `lifecycleRequestBoundary`, boundary status/source-owned/current flags, and retain the WeakMap-backed boundary payload.
+- Nested host-output update diagnostics now expose initial-render and update lifecycle admissions/boundaries and retain both boundary records on the private root payload.
 - Native render handoff validates the render diagnostic's lifecycle boundary and fake-DOM snapshot are still current before mirroring native handoff metadata.
-- Focused tests cover cloned/caller-supplied lifecycle boundaries, caller-supplied container snapshots, cross-root lifecycle boundary evidence, and stale same-container render-native handoff evidence.
+- Focused tests cover cloned/caller-supplied lifecycle boundaries, caller-supplied container snapshots, cross-root lifecycle boundary evidence, stale same-container render-native handoff evidence, delayed `adapter.createRenderNativeHandoff(root, diagnostic)`, and nested alias-smuggling attempts.
 
 ## Risks Or Blockers
 

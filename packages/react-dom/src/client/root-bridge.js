@@ -9535,10 +9535,7 @@ function updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
     initialElement,
     nextElement
   );
-  assertNoCallerProvidedPrivateRootPublicFacadeLifecycleEvidence(
-    options,
-    'update'
-  );
+  assertPublicFacadeNestedLifecycleSourceRecordOverrides(payload, options);
   const rootBridgeState = handleState.bridgeState;
   const sequence =
     rootBridgeState.nextPublicFacadeNestedHostOutputUpdateSequence++;
@@ -9741,6 +9738,9 @@ function updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
     initialLifecycleRequestBoundaryAccepted: true,
     initialLifecycleRequestBoundarySourceOwned:
       renderLifecycleRequestBoundary.sourceOwned,
+    initialLifecycleRequestBoundaryCurrent: true,
+    initialLifecycleRequestVersion:
+      renderLifecycleRequestBoundary.lifecycleRequestVersion,
     updateRequestId: updateRecord.requestId,
     updateRequestSequence: updateRecord.requestSequence,
     updateRequestType: updateRecord.requestType,
@@ -9758,6 +9758,9 @@ function updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
     updateLifecycleRequestBoundaryAccepted: true,
     updateLifecycleRequestBoundarySourceOwned:
       updateLifecycleRequestBoundary.sourceOwned,
+    updateLifecycleRequestBoundaryCurrent: true,
+    updateLifecycleRequestVersion:
+      updateLifecycleRequestBoundary.lifecycleRequestVersion,
     sideEffectId: sideEffectRecord.sideEffectId,
     sideEffectSequence: sideEffectRecord.sideEffectSequence,
     setupSideEffectStatus: sideEffectRecord.sideEffectStatus,
@@ -23501,30 +23504,103 @@ function assertPublicFacadeLifecycleSourceRecordOverrides(
     );
   }
 
-  const sourceRecordField =
-    phase === 'render'
-      ? 'sourceRenderRecord'
-      : phase === 'update'
-        ? 'sourceUpdateRecord'
-        : 'sourceUnmountRecord';
-  if (Object.prototype.hasOwnProperty.call(options, sourceRecordField)) {
-    assertPrivateRootPublicFacadeLifecycleSourceRecord(
-      payload,
-      payload.createRecord,
-      phase,
-      options[sourceRecordField]
-    );
-    throwInvalidRootPublicFacadeLifecycleSourceRecord(
-      phase,
-      'Private public-facade lifecycle execution rejected a stale source record snapshot; render, update, and unmount records must be created inside the active lifecycle boundary.'
-    );
-  }
+  assertPublicFacadeLifecycleSourceRecordAliasOptions(
+    payload,
+    options,
+    phase
+  );
 
   assertNoCallerProvidedPrivateRootPublicFacadeLifecycleEvidence(
     options,
     phase,
     true
   );
+}
+
+function assertPublicFacadeNestedLifecycleSourceRecordOverrides(
+  payload,
+  options
+) {
+  if (!isObjectOrFunction(options)) {
+    return;
+  }
+
+  assertNoCallerProvidedPrivateRootPublicFacadeLifecycleEvidence(
+    options,
+    'update',
+    false
+  );
+
+  if (Object.prototype.hasOwnProperty.call(options, 'sourceCreateRecord')) {
+    assertPrivateRootPublicFacadeLifecycleCreateRecord(
+      payload,
+      'update',
+      options.sourceCreateRecord
+    );
+    throwInvalidRootPublicFacadeLifecycleSourceRecord(
+      'update',
+      'Private public-facade lifecycle execution rejected a stale source record snapshot; render, update, and unmount records must be created inside the active lifecycle boundary.'
+    );
+  }
+
+  assertPublicFacadeLifecycleSourceRecordAliasOptions(
+    payload,
+    options,
+    'update'
+  );
+
+  assertNoCallerProvidedPrivateRootPublicFacadeLifecycleEvidence(
+    options,
+    'update',
+    true
+  );
+}
+
+const privateRootPublicFacadeLifecycleSourceRecordOptionFields =
+  freezeArray([
+    freezeRecord({
+      field: 'sourceRenderRecord',
+      phase: 'render'
+    }),
+    freezeRecord({
+      field: 'sourceUpdateRecord',
+      phase: 'update'
+    }),
+    freezeRecord({
+      field: 'sourceUnmountRecord',
+      phase: 'unmount'
+    })
+  ]);
+
+function assertPublicFacadeLifecycleSourceRecordAliasOptions(
+  payload,
+  options,
+  errorPhase
+) {
+  for (const {
+    field,
+    phase
+  } of privateRootPublicFacadeLifecycleSourceRecordOptionFields) {
+    if (Object.prototype.hasOwnProperty.call(options, field)) {
+      try {
+        assertPrivateRootPublicFacadeLifecycleSourceRecord(
+          payload,
+          payload.createRecord,
+          phase,
+          options[field]
+        );
+      } catch (error) {
+        throwInvalidRootPublicFacadeLifecycleSourceRecord(
+          errorPhase,
+          error.message
+        );
+      }
+      throwInvalidRootPublicFacadeLifecycleSourceRecord(
+        errorPhase,
+        'Private public-facade lifecycle execution rejected a stale source record snapshot; render, update, and unmount records must be created inside the active lifecycle boundary.'
+      );
+    }
+  }
 }
 
 const privateRootPublicFacadeLifecycleEvidenceOptionFields =
