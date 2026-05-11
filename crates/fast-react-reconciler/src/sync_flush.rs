@@ -14,6 +14,8 @@ use std::fmt::{self, Display, Formatter};
 use fast_react_core::{FiberId, Lanes, StateNodeHandle, UpdateQueueHandle};
 use fast_react_host_config::HostTypes;
 
+#[cfg(not(test))]
+use crate::commit_finished_host_root;
 use crate::root_callbacks::{
     RootUpdateCallbackInvocationExecutionGateSnapshot, RootUpdateCallbackInvocationExecutionRecord,
     RootUpdateCallbackInvocationStatus, RootUpdateCallbackInvocationTestControl,
@@ -60,8 +62,12 @@ use crate::{
     HostRootRenderPhaseRecord, RootCallbackPriority, RootCommitError, RootSchedulerCallbackHandle,
     RootSchedulerError, RootSyncFlushRecord, RootSyncFlushRecordStatus, RootUpdateCallbackHandle,
     RootUpdateCallbackSnapshot, RootWorkLoopError, SyncFlushExecutionContextRecord, UpdateId,
-    commit_finished_host_root, render_host_root_for_lanes,
+    render_host_root_for_lanes,
 };
+
+#[cfg(test)]
+pub(crate) const SYNC_FLUSH_FINISHED_WORK_HANDOFF_IDENTITY_MISMATCH_FOR_CANARY: &str =
+    "SyncFlushFinishedWorkHandoffIdentityForCanary::accepted_current_finished_work_record_shape";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[doc(hidden)]
@@ -90,6 +96,9 @@ pub struct SyncFlushRootHostOutputCommitDiagnosticsForCanary {
     mutation_record_count: usize,
     mutation_apply_record_count: usize,
     host_root_placement_apply_count: usize,
+    finished_work_handoff_identity: Option<SyncFlushFinishedWorkHandoffIdentityForCanary>,
+    commit_result_identity: Option<SyncFlushCommitResultIdentityForCanary>,
+    finished_work_root_commit_handoff_verified: bool,
 }
 
 impl SyncFlushRootHostOutputCommitDiagnosticsForCanary {
@@ -221,6 +230,57 @@ impl SyncFlushRootHostOutputCommitDiagnosticsForCanary {
     }
 
     #[must_use]
+    pub fn finished_work_handoff_identity_recorded(self) -> bool {
+        self.finished_work_handoff_identity.is_some()
+    }
+
+    #[must_use]
+    pub fn commit_result_identity_recorded(self) -> bool {
+        self.commit_result_identity.is_some()
+    }
+
+    #[must_use]
+    pub fn root_finished_work_before_commit(self) -> Option<FiberId> {
+        self.finished_work_handoff_identity
+            .and_then(|identity| identity.root_finished_work_before_commit())
+    }
+
+    #[must_use]
+    pub fn root_finished_lanes_before_commit(self) -> Option<Lanes> {
+        self.finished_work_handoff_identity
+            .map(SyncFlushFinishedWorkHandoffIdentityForCanary::root_finished_lanes_before_commit)
+    }
+
+    #[must_use]
+    pub fn pending_work_before_commit(self) -> Option<FiberId> {
+        self.finished_work_handoff_identity
+            .and_then(|identity| identity.pending_work_before_commit())
+    }
+
+    #[must_use]
+    pub fn current_before_commit(self) -> Option<FiberId> {
+        self.finished_work_handoff_identity
+            .map(SyncFlushFinishedWorkHandoffIdentityForCanary::current_before_commit)
+    }
+
+    #[must_use]
+    pub fn finished_work_before_commit(self) -> Option<FiberId> {
+        self.finished_work_handoff_identity
+            .map(SyncFlushFinishedWorkHandoffIdentityForCanary::finished_work)
+    }
+
+    #[must_use]
+    pub fn finished_lanes_before_commit(self) -> Option<Lanes> {
+        self.finished_work_handoff_identity
+            .map(SyncFlushFinishedWorkHandoffIdentityForCanary::finished_lanes)
+    }
+
+    #[must_use]
+    pub const fn finished_work_root_commit_handoff_verified(self) -> bool {
+        self.finished_work_root_commit_handoff_verified
+    }
+
+    #[must_use]
     pub fn committed_current_matches_root(self) -> bool {
         self.root_current_after_commit == self.committed_current
     }
@@ -261,6 +321,31 @@ impl SyncFlushRootHostOutputCommitDiagnosticsForCanary {
     }
 
     #[must_use]
+    pub fn accepted_finished_work_handoff_identity(self) -> bool {
+        self.finished_work_handoff_identity.is_some_and(
+            SyncFlushFinishedWorkHandoffIdentityForCanary::accepted_current_finished_work_record_shape,
+        )
+    }
+
+    #[must_use]
+    pub fn commit_result_matches_finished_work_handoff(self) -> bool {
+        match (
+            self.finished_work_handoff_identity,
+            self.commit_result_identity,
+        ) {
+            (Some(handoff), Some(commit)) => commit.matches_finished_work_handoff(handoff),
+            _ => false,
+        }
+    }
+
+    #[must_use]
+    pub fn accepted_finished_work_handoff(self) -> bool {
+        self.accepted_finished_work_handoff_identity()
+            && self.commit_result_matches_finished_work_handoff()
+            && self.finished_work_root_commit_handoff_verified
+    }
+
+    #[must_use]
     pub fn commit_handoff_state_consumed(self) -> bool {
         self.committed_current_matches_root()
             && self.pending_lanes_match_root()
@@ -268,6 +353,7 @@ impl SyncFlushRootHostOutputCommitDiagnosticsForCanary {
             && self.callback_state_cleared()
             && self.rendered_lanes_consumed_from_root()
             && self.visible_callback_state_drained()
+            && self.accepted_finished_work_handoff()
     }
 }
 
@@ -1516,6 +1602,9 @@ pub struct SyncFlushRootRecord {
     commit: HostRootCommitRecord,
     act_continuation: Option<SchedulerActContinuationRecord>,
     act_post_passive_continuation_gate: Option<SyncFlushActPostPassiveContinuationGateRecord>,
+    finished_work_handoff_identity: Option<SyncFlushFinishedWorkHandoffIdentityForCanary>,
+    finished_work_commit_result_identity: Option<SyncFlushCommitResultIdentityForCanary>,
+    finished_work_root_commit_handoff_verified: bool,
 }
 
 impl SyncFlushRootRecord {
@@ -1542,6 +1631,24 @@ impl SyncFlushRootRecord {
     #[must_use]
     pub const fn commit(&self) -> &HostRootCommitRecord {
         &self.commit
+    }
+
+    #[allow(
+        dead_code,
+        reason = "crate-private sync-flush finished-work identity is reserved for private canary diagnostics"
+    )]
+    pub(crate) fn accepted_finished_work_handoff_for_canary(&self) -> bool {
+        match (
+            self.finished_work_handoff_identity,
+            self.finished_work_commit_result_identity,
+        ) {
+            (Some(handoff), Some(commit)) => {
+                handoff.accepted_current_finished_work_record_shape()
+                    && commit.matches_finished_work_handoff(handoff)
+                    && self.finished_work_root_commit_handoff_verified
+            }
+            _ => false,
+        }
     }
 
     #[must_use]
@@ -1778,6 +1885,10 @@ impl SyncFlushRootRecord {
                 .commit
                 .host_root_placement_apply_diagnostics_for_canary()
                 .len(),
+            finished_work_handoff_identity: self.finished_work_handoff_identity,
+            commit_result_identity: self.finished_work_commit_result_identity,
+            finished_work_root_commit_handoff_verified: self
+                .finished_work_root_commit_handoff_verified,
         })
     }
 
@@ -2128,7 +2239,12 @@ impl From<RootCommitError> for SyncFlushError {
 #[cfg(test)]
 impl From<HostRootFinishedWorkCommitHandoffErrorForCanary> for SyncFlushError {
     fn from(error: HostRootFinishedWorkCommitHandoffErrorForCanary) -> Self {
-        Self::FinishedWorkCommitHandoff(error.to_string())
+        match error {
+            HostRootFinishedWorkCommitHandoffErrorForCanary::Commit(error) => {
+                Self::RootCommit(error)
+            }
+            error => Self::FinishedWorkCommitHandoff(error.to_string()),
+        }
     }
 }
 
@@ -2269,20 +2385,70 @@ fn sync_flush_root_commit_continuation_record(
     }
 }
 
+#[cfg(test)]
+fn ensure_sync_flush_finished_work_handoff_identity_for_canary<H: HostTypes>(
+    store: &mut FiberRootStore<H>,
+    order: usize,
+    render_phase: HostRootRenderPhaseRecord,
+) -> Result<SyncFlushFinishedWorkHandoffIdentityForCanary, SyncFlushError> {
+    let pending =
+        record_host_root_finished_work_pending_commit_for_canary(store, render_phase, order)?;
+
+    if !pending.records_root_finished_work() {
+        store
+            .root_mut(render_phase.root())?
+            .record_finished_work_for_canary(
+                render_phase.finished_work(),
+                render_phase.render_lanes(),
+            );
+    }
+
+    let identity = sync_flush_finished_work_handoff_identity_from_render_phase_for_canary(
+        store,
+        render_phase.root(),
+        order,
+        render_phase.render_lanes(),
+        render_phase,
+    )?;
+
+    if !identity.accepted_current_finished_work_record_shape() {
+        return Err(SyncFlushError::FinishedWorkCommitHandoff(
+            SYNC_FLUSH_FINISHED_WORK_HANDOFF_IDENTITY_MISMATCH_FOR_CANARY.to_owned(),
+        ));
+    }
+
+    Ok(identity)
+}
+
 fn sync_flush_finished_work_handoff_identity_for_canary<H: HostTypes>(
     store: &FiberRootStore<H>,
     record: RootSyncFlushRecord,
 ) -> Result<SyncFlushFinishedWorkHandoffIdentityForCanary, SyncFlushError> {
-    let root = store.root(record.root())?;
+    sync_flush_finished_work_handoff_identity_from_render_phase_for_canary(
+        store,
+        record.root(),
+        record.order(),
+        record.lanes(),
+        record.render_phase(),
+    )
+}
+
+fn sync_flush_finished_work_handoff_identity_from_render_phase_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root_id: FiberRootId,
+    order: usize,
+    selected_lanes: Lanes,
+    render_phase: HostRootRenderPhaseRecord,
+) -> Result<SyncFlushFinishedWorkHandoffIdentityForCanary, SyncFlushError> {
+    let root = store.root(root_id)?;
     let scheduling = root.scheduling();
-    let render_phase = record.render_phase();
 
     Ok(SyncFlushFinishedWorkHandoffIdentityForCanary {
-        root: record.root(),
+        root: root_id,
         render_phase_root: render_phase.root(),
-        order: record.order(),
-        selected_lanes: record.lanes(),
-        root_token: record.root().state_node_handle(),
+        order,
+        selected_lanes,
+        root_token: root_id.state_node_handle(),
         previous_current: render_phase.current(),
         current_before_commit: root.current(),
         pending_work_before_commit: scheduling.work_in_progress(),
@@ -2585,9 +2751,43 @@ fn commit_render_phase<H: HostTypes>(
     order: usize,
     render_phase: HostRootRenderPhaseRecord,
 ) -> Result<SyncFlushRootRecord, SyncFlushError> {
+    #[cfg(test)]
+    let finished_work_handoff_identity =
+        ensure_sync_flush_finished_work_handoff_identity_for_canary(store, order, render_phase)?;
+
+    #[cfg(test)]
+    let root_commit_handoff = {
+        let pending =
+            record_host_root_finished_work_pending_commit_for_canary(store, render_phase, order)?;
+        commit_finished_host_root_with_finished_work_handoff_for_canary(
+            store,
+            render_phase,
+            Some(pending),
+            order.saturating_add(1),
+        )?
+    };
+    #[cfg(test)]
+    let commit = root_commit_handoff.commit().clone();
+    #[cfg(not(test))]
     let commit = commit_finished_host_root(store, render_phase)?;
-    sync_flush_root_record_after_commit(store, order, render_phase, commit)
-        .map_err(SyncFlushError::from)
+    let record = sync_flush_root_record_after_commit(store, order, render_phase, commit)
+        .map_err(SyncFlushError::from)?;
+
+    #[cfg(test)]
+    {
+        let mut record = record;
+        let commit_result_identity = sync_flush_commit_result_identity_for_canary(store, &record)?;
+        record.finished_work_handoff_identity = Some(finished_work_handoff_identity);
+        record.finished_work_commit_result_identity = Some(commit_result_identity);
+        record.finished_work_root_commit_handoff_verified =
+            root_commit_handoff.proves_private_root_finished_work_commit_metadata_handoff();
+        Ok(record)
+    }
+
+    #[cfg(not(test))]
+    {
+        Ok(record)
+    }
 }
 
 fn sync_flush_root_record_after_commit<H: HostTypes>(
@@ -2619,6 +2819,9 @@ fn sync_flush_root_record_after_commit<H: HostTypes>(
         commit,
         act_continuation,
         act_post_passive_continuation_gate,
+        finished_work_handoff_identity: None,
+        finished_work_commit_result_identity: None,
+        finished_work_root_commit_handoff_verified: false,
     })
 }
 
@@ -2689,6 +2892,46 @@ mod tests {
 
     fn callback_handles(records: &[RootUpdateCallbackRecord]) -> Vec<RootUpdateCallbackHandle> {
         records.iter().map(|record| record.callback()).collect()
+    }
+
+    fn assert_sync_flush_finished_work_handoff_diagnostics(
+        store: &FiberRootStore<RecordingHost>,
+        record: &SyncFlushRootRecord,
+        previous_current: fast_react_core::FiberId,
+    ) {
+        let diagnostics = record
+            .host_output_commit_diagnostics_for_canary(store)
+            .unwrap();
+
+        assert!(record.accepted_finished_work_handoff_for_canary());
+        assert!(diagnostics.finished_work_handoff_identity_recorded());
+        assert!(diagnostics.commit_result_identity_recorded());
+        assert!(diagnostics.accepted_finished_work_handoff_identity());
+        assert!(diagnostics.commit_result_matches_finished_work_handoff());
+        assert!(diagnostics.finished_work_root_commit_handoff_verified());
+        assert!(diagnostics.accepted_finished_work_handoff());
+        assert!(diagnostics.commit_handoff_state_consumed());
+        assert_eq!(
+            diagnostics.root_finished_work_before_commit(),
+            Some(record.render_phase().finished_work())
+        );
+        assert_eq!(
+            diagnostics.pending_work_before_commit(),
+            Some(record.render_phase().finished_work())
+        );
+        assert_eq!(
+            diagnostics.finished_work_before_commit(),
+            Some(record.render_phase().finished_work())
+        );
+        assert_eq!(
+            diagnostics.finished_lanes_before_commit(),
+            Some(record.render_lanes())
+        );
+        assert_eq!(
+            diagnostics.root_finished_lanes_before_commit(),
+            Some(record.render_lanes())
+        );
+        assert_eq!(diagnostics.current_before_commit(), Some(previous_current));
     }
 
     fn root_callback_error(raw: u64) -> RootUpdateCallbackInvocationErrorHandle {
@@ -2778,6 +3021,51 @@ mod tests {
             record.commit().current()
         );
         assert_eq!(current_host_root_element(&store, root_id), element);
+        assert!(!store.root_scheduler().might_have_pending_sync_work());
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn sync_flush_all_roots_commit_diagnostics_verify_finished_work_handoff_identity() {
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let host = RecordingHost::default();
+        let first = store
+            .create_client_root(FakeContainer::new(1), RootOptions::new())
+            .unwrap();
+        let second = store
+            .create_client_root(FakeContainer::new(2), RootOptions::new())
+            .unwrap();
+        let first_previous_current = store.root(first).unwrap().current();
+        let second_previous_current = store.root(second).unwrap().current();
+
+        schedule_sync_update(&mut store, first, RootElementHandle::from_raw(42_100));
+        schedule_sync_update(&mut store, second, RootElementHandle::from_raw(42_200));
+
+        let result = flush_sync_commit_work_on_all_roots(&mut store).unwrap();
+
+        assert!(result.did_flush_work());
+        assert_eq!(result.records().len(), 2);
+        assert_eq!(result.records()[0].root(), first);
+        assert_eq!(result.records()[1].root(), second);
+
+        let first_record = &result.records()[0];
+        assert_sync_flush_finished_work_handoff_diagnostics(
+            &store,
+            first_record,
+            first_previous_current,
+        );
+
+        let second_record = &result.records()[1];
+        assert_sync_flush_finished_work_handoff_diagnostics(
+            &store,
+            second_record,
+            second_previous_current,
+        );
+
+        assert_eq!(store.root(first).unwrap().finished_work(), None);
+        assert_eq!(store.root(first).unwrap().finished_lanes(), Lanes::NO);
+        assert_eq!(store.root(second).unwrap().finished_work(), None);
+        assert_eq!(store.root(second).unwrap().finished_lanes(), Lanes::NO);
         assert!(!store.root_scheduler().might_have_pending_sync_work());
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
@@ -3747,6 +4035,20 @@ mod tests {
         );
         assert_eq!(diagnostics.render_lanes(), Lanes::SYNC);
         assert_eq!(diagnostics.finished_lanes(), Lanes::SYNC);
+        assert!(diagnostics.finished_work_handoff_identity_recorded());
+        assert!(diagnostics.commit_result_identity_recorded());
+        assert!(diagnostics.accepted_finished_work_handoff_identity());
+        assert!(diagnostics.commit_result_matches_finished_work_handoff());
+        assert!(diagnostics.finished_work_root_commit_handoff_verified());
+        assert!(diagnostics.accepted_finished_work_handoff());
+        assert_eq!(
+            diagnostics.root_finished_work_before_commit(),
+            Some(completed.host_root())
+        );
+        assert_eq!(
+            diagnostics.root_finished_lanes_before_commit(),
+            Some(Lanes::SYNC)
+        );
         assert_eq!(diagnostics.remaining_lanes(), Lanes::DEFAULT);
         assert_eq!(diagnostics.commit_pending_lanes(), Lanes::DEFAULT);
         assert_eq!(
