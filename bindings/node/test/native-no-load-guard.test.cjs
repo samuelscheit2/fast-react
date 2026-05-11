@@ -258,6 +258,148 @@ function assertBlockedNativeRootBridgeClaim(native, blockedClaim) {
   }
 }
 
+function assertNoNativeCleanupHookExecution(record, label) {
+  assert.equal(record.nodeWorkerThreadsExecution, false, `${label} worker`);
+  assert.equal(record.napiCleanupHookExecution, false, `${label} cleanup`);
+  assert.equal(record.nativeAddonLoaded, false, `${label} addon`);
+  assert.equal(record.nativeExecution, false, `${label} native`);
+  assert.equal(record.rendererExecution, false, `${label} renderer`);
+  assert.equal(record.reconcilerExecution, false, `${label} reconciler`);
+  assert.equal(record.publicNativeCompatibility, false, `${label} public`);
+  assert.equal(record.reactBehaviorError, false, `${label} React behavior`);
+}
+
+function getCleanupHookPreflightValidator(native) {
+  const cleanupHookPreflight =
+    native.nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight;
+  const descriptor = Object.getOwnPropertyDescriptor(
+    cleanupHookPreflight,
+    'validateCleanupHookEvidenceRows'
+  );
+
+  assert.equal(typeof descriptor.value, 'function');
+  assert.equal(descriptor.value.name, 'validateNativeRootBridgeWorkerThreadCleanupHookPreflightRows');
+  assert.equal(descriptor.enumerable, false);
+  assert.equal(descriptor.configurable, false);
+  assert.equal(descriptor.writable, false);
+  assert.equal(
+    Object.keys(cleanupHookPreflight).includes('validateCleanupHookEvidenceRows'),
+    false
+  );
+
+  return descriptor.value;
+}
+
+function cleanupHookRow(row, overrides = {}) {
+  return Object.freeze({ ...row, ...overrides });
+}
+
+function assertPrivateCleanupHookPreflightCallable(native) {
+  const cleanupHookPreflight =
+    native.nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight;
+  const validateCleanupHookEvidenceRows =
+    getCleanupHookPreflightValidator(native);
+  const mirroredPreflight = validateCleanupHookEvidenceRows(
+    cleanupHookPreflight.rows
+  );
+
+  assert.notEqual(mirroredPreflight, cleanupHookPreflight);
+  assert.deepEqual(mirroredPreflight, cleanupHookPreflight);
+  assert.ok(Object.isFrozen(mirroredPreflight));
+  assert.ok(Object.isFrozen(mirroredPreflight.rows));
+  assertNoNativeCleanupHookExecution(
+    mirroredPreflight,
+    'callable cleanup-hook mirrored preflight'
+  );
+  for (const row of mirroredPreflight.rows) {
+    assert.ok(Object.isFrozen(row));
+    assertNoNativeCleanupHookExecution(row, row.id);
+  }
+
+  const canonicalRoot = cleanupHookPreflight.rows[0];
+  const cases = [
+    {
+      row: cleanupHookRow(canonicalRoot, {
+        id: 'cleanup-hook-callable-stale-source-rejected',
+        sourcePreflightStatus:
+          native.nativeRootBridgeRequestShape.transportWorkerThreadTeardownGate
+            .workerThreadTeardownGateStatus,
+        sourceWorkerThreadId: 524,
+        sourceEnvironmentId: 524,
+        sourceRowId: 'worker-root-stale-after-thread-teardown'
+      }),
+      code: cleanupHookPreflight.rows[2].code,
+      staleOrForged: true
+    },
+    {
+      row: cleanupHookRow(canonicalRoot, {
+        id: 'cleanup-hook-callable-forged-source-rejected',
+        sourceRowId: 'peer-root-active-executable-preflight',
+        sourceErrorCode: null,
+        sourceBoundaryErrorCode: null
+      }),
+      code: cleanupHookPreflight.rows[3].code,
+      staleOrForged: true
+    },
+    {
+      row: cleanupHookRow(canonicalRoot, {
+        id: 'cleanup-hook-callable-wrong-order-rejected',
+        expectedExecutionOrder: 2
+      }),
+      code: 'FAST_REACT_NAPI_CLEANUP_HOOK_ORDER_MISMATCH',
+      staleOrForged: false
+    },
+    {
+      row: cleanupHookRow(canonicalRoot, {
+        id: 'cleanup-hook-callable-identity-tamper-rejected',
+        cleanupHookFunctionIdentityToken:
+          'private-cleanup-hook-fn:worker-root-handle-tampered'
+      }),
+      code: 'FAST_REACT_NAPI_CLEANUP_HOOK_IDENTITY_MISMATCH',
+      staleOrForged: false
+    },
+    {
+      row: cleanupHookRow(canonicalRoot, {
+        id: 'cleanup-hook-callable-public-native-package-claim-rejected',
+        nativeAddonLoaded: true,
+        nativeExecution: true,
+        publicNativeCompatibility: true,
+        packageCompatibilityClaimed: true
+      }),
+      code: 'FAST_REACT_NAPI_CLEANUP_HOOK_PUBLIC_NATIVE_PACKAGE_CLAIM',
+      staleOrForged: false
+    }
+  ];
+
+  for (const diagnosticCase of cases) {
+    const result = validateCleanupHookEvidenceRows([diagnosticCase.row]);
+    assert.ok(Object.isFrozen(result));
+    assert.equal(result.rows.length, 1, diagnosticCase.row.id);
+    assert.equal(result.acceptedCleanupEvidenceCount, 0, diagnosticCase.row.id);
+    assert.equal(result.rejectedCleanupEvidenceCount, 1, diagnosticCase.row.id);
+    assert.equal(
+      result.canonicalExecutableEvidenceAccepted,
+      false,
+      diagnosticCase.row.id
+    );
+    assertNoNativeCleanupHookExecution(result, diagnosticCase.row.id);
+
+    const [row] = result.rows;
+    assert.equal(row.id, diagnosticCase.row.id);
+    assert.equal(row.status, 'rejected', diagnosticCase.row.id);
+    assert.equal(row.code, diagnosticCase.code, diagnosticCase.row.id);
+    assert.equal(row.observedExecutionOrder, null, diagnosticCase.row.id);
+    assert.equal(row.canonicalExecutableEvidence, false, diagnosticCase.row.id);
+    assert.equal(
+      row.staleOrForgedCleanupEvidenceRejected,
+      diagnosticCase.staleOrForged,
+      diagnosticCase.row.id
+    );
+    assert.equal(Object.hasOwn(row, 'packageCompatibilityClaimed'), false);
+    assertNoNativeCleanupHookExecution(row, diagnosticCase.row.id);
+  }
+}
+
 async function runForbiddenLoadFixtureMatrix() {
   const fixtures = createForbiddenLoadFixtureMatrix();
 
@@ -594,9 +736,10 @@ async function main() {
             row.reconcilerExecution === false &&
             row.publicNativeCompatibility === false &&
             row.reactBehaviorError === false
-        ),
+      ),
       true
     );
+    assertPrivateCleanupHookPreflightCallable(native);
     assert.equal(
       native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
         .batchedRecordGate.responseSequenceGate.responseSequenceGateStatus,
@@ -678,6 +821,10 @@ async function main() {
     const esmNative = await import('../index.mjs');
     assert.equal(esmNative.default, native);
     assert.equal(esmNative.nativeBindingManifest, native.nativeBindingManifest);
+    assert.equal(
+      getCleanupHookPreflightValidator(esmNative),
+      getCleanupHookPreflightValidator(native)
+    );
   } finally {
     restoreModuleGuards();
   }

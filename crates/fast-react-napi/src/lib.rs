@@ -41,14 +41,16 @@ mod root_bridge_requests {
     const NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_PREFLIGHT_MODEL: &str =
         "fast-react-napi.WorkerThreadCleanupHookOrderPreflight";
     const NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_PREFLIGHT_EXECUTION_SCOPE: &str = "rust-only-cleanup-hook-order-preflight-no-node-worker-thread-no-napi-cleanup-hook-execution";
-    const NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_STALE_EVIDENCE_CODE: &str =
+    pub(crate) const NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_STALE_EVIDENCE_CODE: &str =
         "FAST_REACT_NAPI_CLEANUP_HOOK_STALE_EXECUTABLE_PREFLIGHT";
-    const NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_FORGED_EVIDENCE_CODE: &str =
+    pub(crate) const NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_FORGED_EVIDENCE_CODE: &str =
         "FAST_REACT_NAPI_CLEANUP_HOOK_FORGED_EVIDENCE";
-    const NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ORDER_MISMATCH_CODE: &str =
+    pub(crate) const NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ORDER_MISMATCH_CODE: &str =
         "FAST_REACT_NAPI_CLEANUP_HOOK_ORDER_MISMATCH";
-    const NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_IDENTITY_MISMATCH_CODE: &str =
+    pub(crate) const NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_IDENTITY_MISMATCH_CODE: &str =
         "FAST_REACT_NAPI_CLEANUP_HOOK_IDENTITY_MISMATCH";
+    pub(crate) const NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_PUBLIC_NATIVE_PACKAGE_CLAIM_CODE: &str =
+        "FAST_REACT_NAPI_CLEANUP_HOOK_PUBLIC_NATIVE_PACKAGE_CLAIM";
     const NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ROOT_SOURCE_ROW_ID: &str =
         "worker-render-root-stale-executable-preflight";
     const NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_SOURCE_ROW_ID: &str =
@@ -2639,6 +2641,7 @@ mod root_bridge_requests {
         source_handle_kind: BridgeHandleKind,
         source_error_code: Option<&'static str>,
         source_boundary_error_code: Option<&'static str>,
+        public_native_package_claimed: bool,
     }
 
     impl NativeRootBridgeWorkerThreadCleanupHookEvidence {
@@ -2675,6 +2678,7 @@ mod root_bridge_requests {
                 source_handle_kind,
                 source_error_code,
                 source_boundary_error_code,
+                public_native_package_claimed: false,
             }
         }
 
@@ -2707,6 +2711,35 @@ mod root_bridge_requests {
                 source_row.source_error_code(),
                 source_row.boundary_error_code(),
             )
+        }
+
+        #[must_use]
+        pub(crate) const fn from_preflight_row(
+            row: NativeRootBridgeWorkerThreadCleanupHookPreflightRow,
+        ) -> Self {
+            Self {
+                id: row.id(),
+                operation: row.operation(),
+                cleanup_hook_id: row.cleanup_hook_id(),
+                cleanup_hook_function_identity_token: row.cleanup_hook_function_identity_token(),
+                cleanup_hook_argument_identity_token: row.cleanup_hook_argument_identity_token(),
+                registration_order: row.registration_order(),
+                expected_execution_order: row.expected_execution_order(),
+                source_preflight_status: row.source_preflight_status(),
+                source_worker_thread_id: row.source_worker_thread_id(),
+                source_environment_id: row.source_environment_id(),
+                source_row_id: row.source_row_id(),
+                source_handle_kind: row.source_handle_kind(),
+                source_error_code: row.source_error_code(),
+                source_boundary_error_code: row.source_boundary_error_code(),
+                public_native_package_claimed: false,
+            }
+        }
+
+        #[must_use]
+        pub(crate) const fn with_public_native_package_claim(mut self) -> Self {
+            self.public_native_package_claimed = true;
+            self
         }
 
         #[must_use]
@@ -2777,6 +2810,11 @@ mod root_bridge_requests {
         #[must_use]
         pub(crate) const fn source_boundary_error_code(self) -> Option<&'static str> {
             self.source_boundary_error_code
+        }
+
+        #[must_use]
+        pub(crate) const fn public_native_package_claimed(self) -> bool {
+            self.public_native_package_claimed
         }
     }
 
@@ -4547,7 +4585,48 @@ mod root_bridge_requests {
     pub(crate) fn native_root_bridge_worker_thread_cleanup_hook_preflight()
     -> NativeRootBridgeWorkerThreadCleanupHookPreflight {
         let executable_preflight = native_root_bridge_worker_thread_teardown_executable_preflight();
-        let rows = worker_thread_cleanup_hook_preflight_rows(&executable_preflight);
+        let evidence_rows =
+            worker_thread_cleanup_hook_preflight_evidence_rows(&executable_preflight);
+
+        validate_native_root_bridge_worker_thread_cleanup_hook_evidence_rows_for_preflight(
+            &executable_preflight,
+            evidence_rows,
+        )
+    }
+
+    pub(crate) fn validate_native_root_bridge_worker_thread_cleanup_hook_preflight_rows(
+        rows: impl IntoIterator<Item = NativeRootBridgeWorkerThreadCleanupHookPreflightRow>,
+    ) -> NativeRootBridgeWorkerThreadCleanupHookPreflight {
+        validate_native_root_bridge_worker_thread_cleanup_hook_evidence_rows(
+            rows.into_iter()
+                .map(NativeRootBridgeWorkerThreadCleanupHookEvidence::from_preflight_row),
+        )
+    }
+
+    pub(crate) fn validate_native_root_bridge_worker_thread_cleanup_hook_evidence_rows(
+        evidence_rows: impl IntoIterator<Item = NativeRootBridgeWorkerThreadCleanupHookEvidence>,
+    ) -> NativeRootBridgeWorkerThreadCleanupHookPreflight {
+        let executable_preflight = native_root_bridge_worker_thread_teardown_executable_preflight();
+
+        validate_native_root_bridge_worker_thread_cleanup_hook_evidence_rows_for_preflight(
+            &executable_preflight,
+            evidence_rows,
+        )
+    }
+
+    fn validate_native_root_bridge_worker_thread_cleanup_hook_evidence_rows_for_preflight(
+        executable_preflight: &NativeRootBridgeWorkerThreadTeardownExecutablePreflight,
+        evidence_rows: impl IntoIterator<Item = NativeRootBridgeWorkerThreadCleanupHookEvidence>,
+    ) -> NativeRootBridgeWorkerThreadCleanupHookPreflight {
+        let rows = evidence_rows
+            .into_iter()
+            .map(|evidence| {
+                validate_native_root_bridge_worker_thread_cleanup_hook_evidence_for_preflight(
+                    executable_preflight,
+                    evidence,
+                )
+            })
+            .collect::<Vec<_>>();
         let accepted_cleanup_evidence_count = rows
             .iter()
             .filter(|row| {
@@ -4889,9 +4968,9 @@ mod root_bridge_requests {
         )
     }
 
-    fn worker_thread_cleanup_hook_preflight_rows(
+    fn worker_thread_cleanup_hook_preflight_evidence_rows(
         executable_preflight: &NativeRootBridgeWorkerThreadTeardownExecutablePreflight,
-    ) -> Vec<NativeRootBridgeWorkerThreadCleanupHookPreflightRow> {
+    ) -> Vec<NativeRootBridgeWorkerThreadCleanupHookEvidence> {
         let root_stale_row = executable_preflight_row(
             executable_preflight,
             NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ROOT_SOURCE_ROW_ID,
@@ -4902,71 +4981,59 @@ mod root_bridge_requests {
         );
 
         vec![
-            validate_native_root_bridge_worker_thread_cleanup_hook_evidence_for_preflight(
+            NativeRootBridgeWorkerThreadCleanupHookEvidence::from_executable_preflight_row(
+                "cleanup-hook-worker-root-before-value-release",
+                "cleanup-hook-order-preflight",
+                NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ROOT_ID,
+                NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ROOT_FUNCTION_IDENTITY_TOKEN,
+                NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ROOT_ARGUMENT_IDENTITY_TOKEN,
+                2,
+                1,
                 executable_preflight,
-                NativeRootBridgeWorkerThreadCleanupHookEvidence::from_executable_preflight_row(
-                    "cleanup-hook-worker-root-before-value-release",
-                    "cleanup-hook-order-preflight",
-                    NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ROOT_ID,
-                    NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ROOT_FUNCTION_IDENTITY_TOKEN,
-                    NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ROOT_ARGUMENT_IDENTITY_TOKEN,
-                    2,
-                    1,
-                    executable_preflight,
-                    root_stale_row,
-                ),
+                root_stale_row,
             ),
-            validate_native_root_bridge_worker_thread_cleanup_hook_evidence_for_preflight(
+            NativeRootBridgeWorkerThreadCleanupHookEvidence::from_executable_preflight_row(
+                "cleanup-hook-worker-value-after-root-release",
+                "cleanup-hook-order-preflight",
+                NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_ID,
+                NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_FUNCTION_IDENTITY_TOKEN,
+                NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_ARGUMENT_IDENTITY_TOKEN,
+                1,
+                2,
                 executable_preflight,
-                NativeRootBridgeWorkerThreadCleanupHookEvidence::from_executable_preflight_row(
-                    "cleanup-hook-worker-value-after-root-release",
-                    "cleanup-hook-order-preflight",
-                    NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_ID,
-                    NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_FUNCTION_IDENTITY_TOKEN,
-                    NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_ARGUMENT_IDENTITY_TOKEN,
-                    1,
-                    2,
-                    executable_preflight,
-                    value_stale_row,
-                ),
+                value_stale_row,
             ),
-            validate_native_root_bridge_worker_thread_cleanup_hook_evidence_for_preflight(
-                executable_preflight,
-                NativeRootBridgeWorkerThreadCleanupHookEvidence::new(
-                    "cleanup-hook-stale-worker-transport-evidence-rejected",
-                    "cleanup-hook-evidence-preflight-rejection",
-                    "stale-worker-transport-cleanup-hook",
-                    "private-cleanup-hook-fn:stale-worker-teardown",
-                    "private-cleanup-hook-arg:worker-524-root-slot-1",
-                    2,
-                    1,
-                    super::NATIVE_ROOT_BRIDGE_TRANSPORT_WORKER_THREAD_TEARDOWN_GATE_STATUS,
-                    524,
-                    BridgeEnvironmentId::from_raw(524),
-                    "worker-root-stale-after-thread-teardown",
-                    BridgeHandleKind::Root,
-                    Some("FAST_REACT_NAPI_STALE_HANDLE"),
-                    Some(super::NativeBoundaryErrorKind::RootBridgeStaleHandle.code()),
-                ),
+            NativeRootBridgeWorkerThreadCleanupHookEvidence::new(
+                "cleanup-hook-stale-worker-transport-evidence-rejected",
+                "cleanup-hook-evidence-preflight-rejection",
+                "stale-worker-transport-cleanup-hook",
+                "private-cleanup-hook-fn:stale-worker-teardown",
+                "private-cleanup-hook-arg:worker-524-root-slot-1",
+                2,
+                1,
+                super::NATIVE_ROOT_BRIDGE_TRANSPORT_WORKER_THREAD_TEARDOWN_GATE_STATUS,
+                524,
+                BridgeEnvironmentId::from_raw(524),
+                "worker-root-stale-after-thread-teardown",
+                BridgeHandleKind::Root,
+                Some("FAST_REACT_NAPI_STALE_HANDLE"),
+                Some(super::NativeBoundaryErrorKind::RootBridgeStaleHandle.code()),
             ),
-            validate_native_root_bridge_worker_thread_cleanup_hook_evidence_for_preflight(
-                executable_preflight,
-                NativeRootBridgeWorkerThreadCleanupHookEvidence::new(
-                    "cleanup-hook-forged-peer-active-evidence-rejected",
-                    "cleanup-hook-evidence-preflight-rejection",
-                    "forged-peer-active-cleanup-hook",
-                    "private-cleanup-hook-fn:forged-peer-active",
-                    "private-cleanup-hook-arg:worker-1764-peer-root",
-                    1,
-                    2,
-                    executable_preflight.status(),
-                    executable_preflight.worker_thread_id(),
-                    executable_preflight.worker_environment_id(),
-                    "peer-root-active-executable-preflight",
-                    BridgeHandleKind::Root,
-                    None,
-                    None,
-                ),
+            NativeRootBridgeWorkerThreadCleanupHookEvidence::new(
+                "cleanup-hook-forged-peer-active-evidence-rejected",
+                "cleanup-hook-evidence-preflight-rejection",
+                "forged-peer-active-cleanup-hook",
+                "private-cleanup-hook-fn:forged-peer-active",
+                "private-cleanup-hook-arg:worker-1764-peer-root",
+                1,
+                2,
+                executable_preflight.status(),
+                executable_preflight.worker_thread_id(),
+                executable_preflight.worker_environment_id(),
+                "peer-root-active-executable-preflight",
+                BridgeHandleKind::Root,
+                None,
+                None,
             ),
         ]
     }
@@ -5003,6 +5070,13 @@ mod root_bridge_requests {
         executable_preflight: &NativeRootBridgeWorkerThreadTeardownExecutablePreflight,
         evidence: NativeRootBridgeWorkerThreadCleanupHookEvidence,
     ) -> NativeRootBridgeWorkerThreadCleanupHookPreflightRow {
+        if evidence.public_native_package_claimed() {
+            return NativeRootBridgeWorkerThreadCleanupHookPreflightRow::rejected(
+                evidence,
+                NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_PUBLIC_NATIVE_PACKAGE_CLAIM_CODE,
+            );
+        }
+
         if executable_preflight.status()
             != NATIVE_ROOT_BRIDGE_WORKER_THREAD_TEARDOWN_EXECUTABLE_PREFLIGHT_STATUS
             || evidence.source_preflight_status()
@@ -7228,7 +7302,12 @@ mod tests {
         BridgeHandleTableError, PlaceholderRootRecord, PlaceholderValueRecord,
     };
     use crate::root_bridge_requests::{
+        NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_FORGED_EVIDENCE_CODE,
+        NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_IDENTITY_MISMATCH_CODE,
+        NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ORDER_MISMATCH_CODE,
         NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_PREFLIGHT_STATUS,
+        NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_PUBLIC_NATIVE_PACKAGE_CLAIM_CODE,
+        NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_STALE_EVIDENCE_CODE,
         NATIVE_ROOT_BRIDGE_WORKER_THREAD_TEARDOWN_EXECUTABLE_PREFLIGHT_STATUS,
         NativeRootBridgeBatchResponseErrorRowStatus, NativeRootBridgeBatchResponseTeardownState,
         NativeRootBridgeBatchedJsonTransportLifecycleState,
@@ -7256,6 +7335,8 @@ mod tests {
         smoke_admit_js_native_root_bridge_handoff_records,
         smoke_admit_js_native_root_bridge_json_transport_records,
         validate_native_root_bridge_worker_thread_cleanup_hook_evidence_for_preflight,
+        validate_native_root_bridge_worker_thread_cleanup_hook_evidence_rows,
+        validate_native_root_bridge_worker_thread_cleanup_hook_preflight_rows,
     };
     use crate::test_renderer_root_execution_bridge::{
         TestRendererNativeRootExecutionBridge, TestRendererNativeRootExecutionBridgeError,
@@ -9580,6 +9661,194 @@ mod tests {
             assert!(!row.reconciler_execution());
             assert!(!row.public_native_compatibility());
             assert!(!row.react_behavior_error());
+        }
+    }
+
+    #[test]
+    fn cleanup_hook_preflight_callable_rows_recompute_supplied_rows() {
+        let preflight = native_root_bridge_worker_thread_cleanup_hook_preflight();
+        let mirrored = validate_native_root_bridge_worker_thread_cleanup_hook_preflight_rows(
+            preflight.rows().iter().copied(),
+        );
+
+        assert_eq!(mirrored.rows(), preflight.rows());
+        assert_eq!(
+            mirrored.accepted_cleanup_evidence_count(),
+            preflight.accepted_cleanup_evidence_count()
+        );
+        assert_eq!(
+            mirrored.rejected_cleanup_evidence_count(),
+            preflight.rejected_cleanup_evidence_count()
+        );
+        assert_eq!(
+            mirrored.stale_or_forged_cleanup_evidence_rejection_count(),
+            preflight.stale_or_forged_cleanup_evidence_rejection_count()
+        );
+        assert_eq!(
+            mirrored.canonical_executable_evidence_accepted(),
+            preflight.canonical_executable_evidence_accepted()
+        );
+        assert!(!mirrored.node_worker_threads_execution());
+        assert!(!mirrored.napi_cleanup_hook_execution());
+        assert!(!mirrored.native_addon_loaded());
+        assert!(!mirrored.native_execution());
+        assert!(!mirrored.renderer_execution());
+        assert!(!mirrored.reconciler_execution());
+        assert!(!mirrored.public_native_compatibility());
+        assert!(!mirrored.react_behavior_error());
+    }
+
+    #[test]
+    fn cleanup_hook_preflight_callable_evidence_rejects_invalid_claim_rows() {
+        #[derive(Clone, Copy)]
+        struct CallableCleanupHookRejectCase {
+            id: &'static str,
+            evidence: NativeRootBridgeWorkerThreadCleanupHookEvidence,
+            expected_code: &'static str,
+            stale_or_forged_rejected: bool,
+        }
+
+        let preflight = native_root_bridge_worker_thread_cleanup_hook_preflight();
+        let canonical_root = NativeRootBridgeWorkerThreadCleanupHookEvidence::from_preflight_row(
+            preflight.rows()[0],
+        );
+        let cases = [
+            CallableCleanupHookRejectCase {
+                id: "cleanup-hook-callable-stale-source-rejected",
+                evidence: NativeRootBridgeWorkerThreadCleanupHookEvidence::new(
+                    "cleanup-hook-callable-stale-source-rejected",
+                    canonical_root.operation(),
+                    canonical_root.cleanup_hook_id(),
+                    canonical_root.cleanup_hook_function_identity_token(),
+                    canonical_root.cleanup_hook_argument_identity_token(),
+                    canonical_root.registration_order(),
+                    canonical_root.expected_execution_order(),
+                    NATIVE_ROOT_BRIDGE_TRANSPORT_WORKER_THREAD_TEARDOWN_GATE_STATUS,
+                    524,
+                    BridgeEnvironmentId::from_raw(524),
+                    "worker-root-stale-after-thread-teardown",
+                    BridgeHandleKind::Root,
+                    Some("FAST_REACT_NAPI_STALE_HANDLE"),
+                    Some("FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE"),
+                ),
+                expected_code: NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_STALE_EVIDENCE_CODE,
+                stale_or_forged_rejected: true,
+            },
+            CallableCleanupHookRejectCase {
+                id: "cleanup-hook-callable-forged-source-rejected",
+                evidence: NativeRootBridgeWorkerThreadCleanupHookEvidence::new(
+                    "cleanup-hook-callable-forged-source-rejected",
+                    canonical_root.operation(),
+                    canonical_root.cleanup_hook_id(),
+                    canonical_root.cleanup_hook_function_identity_token(),
+                    canonical_root.cleanup_hook_argument_identity_token(),
+                    canonical_root.registration_order(),
+                    canonical_root.expected_execution_order(),
+                    canonical_root.source_preflight_status(),
+                    canonical_root.source_worker_thread_id(),
+                    canonical_root.source_environment_id(),
+                    "peer-root-active-executable-preflight",
+                    BridgeHandleKind::Root,
+                    None,
+                    None,
+                ),
+                expected_code: NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_FORGED_EVIDENCE_CODE,
+                stale_or_forged_rejected: true,
+            },
+            CallableCleanupHookRejectCase {
+                id: "cleanup-hook-callable-wrong-order-rejected",
+                evidence: NativeRootBridgeWorkerThreadCleanupHookEvidence::new(
+                    "cleanup-hook-callable-wrong-order-rejected",
+                    canonical_root.operation(),
+                    canonical_root.cleanup_hook_id(),
+                    canonical_root.cleanup_hook_function_identity_token(),
+                    canonical_root.cleanup_hook_argument_identity_token(),
+                    canonical_root.registration_order(),
+                    2,
+                    canonical_root.source_preflight_status(),
+                    canonical_root.source_worker_thread_id(),
+                    canonical_root.source_environment_id(),
+                    canonical_root.source_row_id(),
+                    canonical_root.source_handle_kind(),
+                    canonical_root.source_error_code(),
+                    canonical_root.source_boundary_error_code(),
+                ),
+                expected_code: NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ORDER_MISMATCH_CODE,
+                stale_or_forged_rejected: false,
+            },
+            CallableCleanupHookRejectCase {
+                id: "cleanup-hook-callable-identity-tamper-rejected",
+                evidence: NativeRootBridgeWorkerThreadCleanupHookEvidence::new(
+                    "cleanup-hook-callable-identity-tamper-rejected",
+                    canonical_root.operation(),
+                    canonical_root.cleanup_hook_id(),
+                    "private-cleanup-hook-fn:worker-root-handle-tampered",
+                    canonical_root.cleanup_hook_argument_identity_token(),
+                    canonical_root.registration_order(),
+                    canonical_root.expected_execution_order(),
+                    canonical_root.source_preflight_status(),
+                    canonical_root.source_worker_thread_id(),
+                    canonical_root.source_environment_id(),
+                    canonical_root.source_row_id(),
+                    canonical_root.source_handle_kind(),
+                    canonical_root.source_error_code(),
+                    canonical_root.source_boundary_error_code(),
+                ),
+                expected_code: NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_IDENTITY_MISMATCH_CODE,
+                stale_or_forged_rejected: false,
+            },
+            CallableCleanupHookRejectCase {
+                id: "cleanup-hook-callable-public-native-package-claim-rejected",
+                evidence: NativeRootBridgeWorkerThreadCleanupHookEvidence::new(
+                    "cleanup-hook-callable-public-native-package-claim-rejected",
+                    canonical_root.operation(),
+                    canonical_root.cleanup_hook_id(),
+                    canonical_root.cleanup_hook_function_identity_token(),
+                    canonical_root.cleanup_hook_argument_identity_token(),
+                    canonical_root.registration_order(),
+                    canonical_root.expected_execution_order(),
+                    canonical_root.source_preflight_status(),
+                    canonical_root.source_worker_thread_id(),
+                    canonical_root.source_environment_id(),
+                    canonical_root.source_row_id(),
+                    canonical_root.source_handle_kind(),
+                    canonical_root.source_error_code(),
+                    canonical_root.source_boundary_error_code(),
+                )
+                .with_public_native_package_claim(),
+                expected_code:
+                    NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_PUBLIC_NATIVE_PACKAGE_CLAIM_CODE,
+                stale_or_forged_rejected: false,
+            },
+        ];
+
+        let callable = validate_native_root_bridge_worker_thread_cleanup_hook_evidence_rows(
+            cases.iter().map(|case| case.evidence),
+        );
+
+        assert_eq!(callable.accepted_cleanup_evidence_count(), 0);
+        assert_eq!(callable.rejected_cleanup_evidence_count(), cases.len());
+        assert_eq!(
+            callable.stale_or_forged_cleanup_evidence_rejection_count(),
+            2
+        );
+        assert!(!callable.canonical_executable_evidence_accepted());
+        assert!(!callable.node_worker_threads_execution());
+        assert!(!callable.napi_cleanup_hook_execution());
+        assert!(!callable.native_addon_loaded());
+        assert!(!callable.native_execution());
+        assert!(!callable.renderer_execution());
+        assert!(!callable.reconciler_execution());
+        assert!(!callable.public_native_compatibility());
+
+        for (row, case) in callable.rows().iter().zip(cases) {
+            assert_rejected_cleanup_hook_evidence(*row, case.expected_code, case.id);
+            assert_eq!(
+                row.stale_or_forged_cleanup_evidence_rejected(),
+                case.stale_or_forged_rejected,
+                "{}",
+                case.id
+            );
         }
     }
 
