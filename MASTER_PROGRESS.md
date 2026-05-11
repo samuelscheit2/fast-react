@@ -29,6 +29,35 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 891, 898, and 900
+
+- Worker 891 added a private React DOM `root.unmount()` lifecycle execution
+  consumer that now requires source-owned
+  `PrivateRootLifecycleRequestBoundaryRecord` evidence before cleanup
+  diagnostics are accepted. It rejects public/browser
+  DOM/hydration/event/ref/package/native/Rust/prose/source-syntax aliases
+  before root retirement. Public root unmount/render/hydration/browser
+  DOM/native/package compatibility remain blocked.
+- Worker 898 added a private Rust HostRoot finished-work/commit queue-lane
+  consumer that requires source-owned queue/lane handoff rows and store-backed
+  row lane metadata before switching `root.current`. Forged-row bypass,
+  stale, replayed, cross-root, wrong-lane, and skipped-lane evidence is
+  rejected before commit. Public React DOM/test-renderer roots, scheduling
+  timing, broad hooks, and package compatibility remain blocked.
+- Worker 900 fixed the private admission 820 source ledger by correcting
+  Worker 803's stale token and adding real source-owned Worker 887 hydrateRoot
+  lifecycle boundary/admission rows in
+  `tests/conformance/src/private-admission-820-reconciler-ledger.mjs`. The
+  gate rejects test/progress/prose evidence paths and preserves public
+  hydrateRoot, root, browser DOM, event, native, reconciler, and package
+  blockers.
+- The latest accepted state was recorded in current main
+  `d566f7927eeeca172d32c9836711c3c612f2eca1` after focused React DOM private
+  root lifecycle, public-facade blocker, Rust queue-lane commit consumer,
+  hydrateRoot private admission 820 ledger, package-surface, import-smoke,
+  formatting, and `git diff --check` verification recorded in worker reports
+  and git history.
+
 ### Workers 885, 887, and 895
 
 - Worker 885 replaced React-minted `act` lifecycle evidence with React DOM
