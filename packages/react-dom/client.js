@@ -18,27 +18,29 @@ const entrypoint = 'react-dom/client';
 const createRoot = createUnsupportedFunction(entrypoint, 'createRoot');
 const hydrateRoot = createUnsupportedFunction(entrypoint, 'hydrateRoot');
 
-Object.defineProperty(createRoot, privateRootPublicFacadeAdapterSymbol, {
-  configurable: false,
-  enumerable: false,
-  value: createPrivateRootPublicFacadeAdapter,
-  writable: false
-});
-Object.defineProperty(createRoot, privateRootPublicFacadePreflightSymbol, {
-  configurable: false,
-  enumerable: false,
-  value: createPrivateRootPublicFacadePreflight,
-  writable: false
-});
-Object.defineProperty(
-  hydrateRoot,
-  privateHydrateRootPublicFacadePreflightSymbol,
-  {
+function definePrivateSymbolOnlyFacadeGate(target, symbol, value) {
+  Object.defineProperty(target, symbol, {
     configurable: false,
     enumerable: false,
-    value: createPrivateHydrateRootPublicFacadePreflight,
+    value,
     writable: false
-  }
+  });
+}
+
+definePrivateSymbolOnlyFacadeGate(
+  createRoot,
+  privateRootPublicFacadeAdapterSymbol,
+  createPrivateRootPublicFacadeAdapter
+);
+definePrivateSymbolOnlyFacadeGate(
+  createRoot,
+  privateRootPublicFacadePreflightSymbol,
+  createPrivateRootPublicFacadePreflight
+);
+definePrivateSymbolOnlyFacadeGate(
+  hydrateRoot,
+  privateHydrateRootPublicFacadePreflightSymbol,
+  createPrivateHydrateRootPublicFacadePreflight
 );
 
 exports.createRoot = createRoot;
