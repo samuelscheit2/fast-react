@@ -1102,6 +1102,101 @@ function getPrivateRootListenerCurrentnessGatePayload(record) {
   return privateRootListenerCurrentnessGatePayloads.get(record) || null;
 }
 
+function validatePrivateRootListenerCurrentnessGateForEvent(
+  record,
+  options
+) {
+  const payload = getPrivateRootListenerCurrentnessGatePayload(record);
+  if (payload === null) {
+    return freezeRecord({
+      accepted: false,
+      reason: 'root-listener-currentness-not-source-owned'
+    });
+  }
+
+  const validationOptions = isObjectLike(options) ? options : {};
+  const registrationPayload = rootListenerRegistrationPayloads.get(
+    payload.listenerRegistrationRecord
+  );
+  if (registrationPayload === undefined) {
+    return freezeRecord({
+      accepted: false,
+      reason: 'root-listener-currentness-registration-missing'
+    });
+  }
+  if (registrationPayload.rootContainerElement !== validationOptions.targetContainer) {
+    return freezeRecord({
+      accepted: false,
+      reason: 'root-listener-currentness-container-mismatch'
+    });
+  }
+  if (!registrationPayload.active) {
+    return freezeRecord({
+      accepted: false,
+      reason: 'root-listener-currentness-not-current'
+    });
+  }
+
+  const currentState =
+    createRootListenerCurrentnessGateState(registrationPayload);
+  const allTargetsCurrent = currentState.targetRows.every(
+    (row) => row.current
+  );
+  const allListenersCurrent = currentState.listenerRows.every(
+    (row) => row.current
+  );
+  if (!allTargetsCurrent || !allListenersCurrent) {
+    return freezeRecord({
+      accepted: false,
+      reason: 'root-listener-currentness-not-current'
+    });
+  }
+  if (
+    !rootListenerCurrentnessGateStateMatches(
+      payload.afterState,
+      currentState
+    )
+  ) {
+    return freezeRecord({
+      accepted: false,
+      reason: 'root-listener-currentness-state-mutated'
+    });
+  }
+
+  const phase =
+    validationOptions.phase === 'capture' ? 'capture' : 'bubble';
+  const eventRows = currentState.listenerRows.filter(
+    (row) =>
+      row.targetRole === 'root-container' &&
+      row.domEventName === validationOptions.domEventName &&
+      row.phase === phase &&
+      row.current === true &&
+      row.listenerShellOwned === true &&
+      row.sourceOwned === true &&
+      row.eventDispatch === false &&
+      row.publicRootBehaviorChanged === false &&
+      row.browserDomEventCompatibilityClaimed === false &&
+      row.compatibilityClaimed === false &&
+      row.willDispatchPublicEvent === false
+  );
+  if (eventRows.length === 0) {
+    return freezeRecord({
+      accepted: false,
+      reason: 'root-listener-currentness-event-type-mismatch'
+    });
+  }
+
+  return freezeRecord({
+    accepted: true,
+    reason: null,
+    exactRootContainerMatch: true,
+    listenerStateStable: true,
+    matchedEventListenerRowCount: eventRows.length,
+    phase,
+    registrationActive: true
+  });
+}
+
 function isPrivateRootListenerCurrentnessGateRecord(record) {
   return getPrivateRootListenerCurrentnessGatePayload(record) !== null;
 }
@@ -2940,5 +3035,6 @@ module.exports = {
   privateRootListenerCurrentnessGateRecordType,
   privateRootListenerRegistrationRecordType,
   registerRootListenersForPrivateRoot,
-  revertRootListenersForPrivateRoot
+  revertRootListenersForPrivateRoot,
+  validatePrivateRootListenerCurrentnessGateForEvent
 };

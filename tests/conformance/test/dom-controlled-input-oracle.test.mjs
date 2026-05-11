@@ -37,6 +37,9 @@ const eventListener = require(
 const pluginEventSystem = require(
   "../../../packages/react-dom/src/events/plugin-event-system.js"
 );
+const rootListeners = require(
+  "../../../packages/react-dom/src/events/root-listeners.js"
+);
 
 const oracle = readCheckedDomControlledInputOracle();
 
@@ -806,10 +809,9 @@ test("private input/change controlled restore bridge links latest props without 
     nodeName: "INPUT",
     value: "browser-mutated"
   });
-  const inputPreflight =
-    pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
-      eventDispatch.dispatchRecord
-    );
+  const inputPreflight = createPrivateControlledInputChangePreflight(
+    eventDispatch
+  );
   const intent = gate.recordPostEventRestoreIntentFromEventLatestProps(
     eventDispatch.dispatchRecord,
     {
@@ -852,6 +854,14 @@ test("private input/change controlled restore bridge links latest props without 
     true
   );
   assert.equal(bridge.requestId, "controlled-oracle-input-change-bridge:3");
+  assert.equal(
+    bridge.sourceInputChangePreflight.rootListenerCurrentnessSourceOwned,
+    true
+  );
+  assert.equal(
+    bridge.controlledRestoreQueueIdentity.sourceRecordsFromSameGate,
+    true
+  );
   assert.equal(
     bridge.latestPropsEvidenceBridge.latestPropsEvidenceLinked,
     true
@@ -926,10 +936,9 @@ test("private input/change controlled restore execution mutates only an admitted
     nodeName: "INPUT",
     value: "live-browser-mutated"
   });
-  const inputPreflight =
-    pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
-      eventDispatch.dispatchRecord
-    );
+  const inputPreflight = createPrivateControlledInputChangePreflight(
+    eventDispatch
+  );
   const intent = gate.recordPostEventRestoreIntentFromEventLatestProps(
     eventDispatch.dispatchRecord,
     {
@@ -1013,6 +1022,14 @@ test("private input/change controlled restore execution mutates only an admitted
   assert.equal(
     execution.status,
     controlledRestoreQueue.controlledInputPostEventRestoreQueueInputChangeExecutionStatus
+  );
+  assert.equal(
+    execution.eventExtractionEvidence.rootListenerCurrentnessSourceOwned,
+    true
+  );
+  assert.equal(
+    execution.controlledRestoreQueueIdentity.sourceRecordsFromSameGate,
+    true
   );
   assert.equal(execution.latestPropsValidation.currentLatestPropsFresh, true);
   assert.equal(execution.restoreQueueWriteEvidence.restoreQueueWritten, true);
@@ -1254,10 +1271,9 @@ test("private input/change controlled restore execution supports checkbox fake-D
     },
     nodeName: "INPUT"
   });
-  const inputPreflight =
-    pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
-      eventDispatch.dispatchRecord
-    );
+  const inputPreflight = createPrivateControlledInputChangePreflight(
+    eventDispatch
+  );
   const intent = gate.recordPostEventRestoreIntentFromEventLatestProps(
     eventDispatch.dispatchRecord,
     {
@@ -1338,6 +1354,10 @@ test("private input/change controlled restore execution supports checkbox fake-D
 
   assert.equal(fakeTarget.checked, false);
   assert.equal(execution.acceptedRestoreKinds[0], "input-checkbox-checked");
+  assert.equal(
+    execution.eventExtractionEvidence.rootListenerEventTypeCurrent,
+    true
+  );
   assert.deepEqual(
     execution.inputChangeRestoreExecutionRows.map((row) => ({
       acceptedRestoreKind: row.acceptedRestoreKind,
@@ -2820,12 +2840,14 @@ function createPrivateControlledInputFakeDomTarget(fields) {
 }
 
 function createPrivateControlledEventDispatch(options) {
-  const document = {
+  const document = installPrivateControlledEventTargetMethods({
     nodeName: "#document",
     nodeType: 9
-  };
+  });
   document.ownerDocument = document;
-  const container = createPrivateControlledHostNode("DIV", document);
+  const container = installPrivateControlledEventTargetMethods(
+    createPrivateControlledHostNode("DIV", document)
+  );
   const targetNode = createPrivateControlledHostNode(
     options.nodeName,
     document
@@ -2849,6 +2871,20 @@ function createPrivateControlledEventDispatch(options) {
       options.domEventName,
       0
     );
+  const rootRegistration =
+    rootListeners.registerRootListenersForPrivateRoot(container);
+  const rootListenerCurrentnessGateRecord =
+    rootListeners.createPrivateRootListenerCurrentnessGateRecord(
+      rootRegistration,
+      {
+        sourceKind: "createRoot",
+        sourceRecord: {
+          operation: "createRoot",
+          requestId: `controlled-oracle-${options.domEventName}-root-listener-currentness`,
+          requestType: "createRoot"
+        }
+      }
+    );
 
   return {
     container,
@@ -2857,9 +2893,51 @@ function createPrivateControlledEventDispatch(options) {
       type: options.domEventName
     }),
     document,
+    rootListenerCurrentnessGateRecord,
+    rootRegistration,
     targetNode,
     token
   };
+}
+
+function createPrivateControlledInputChangePreflight(eventDispatch) {
+  return pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
+    eventDispatch.dispatchRecord,
+    {
+      rootListenerCurrentnessGateRecord:
+        eventDispatch.rootListenerCurrentnessGateRecord,
+      sourceRecord: {
+        operation: "createRoot",
+        requestId: "controlled-oracle-input-change-preflight",
+        requestType: "createRoot"
+      }
+    }
+  );
+}
+
+function installPrivateControlledEventTargetMethods(target) {
+  if (!Array.isArray(target.__registrations)) {
+    target.__registrations = [];
+  }
+  target.addEventListener = function addEventListener(type, listener, options) {
+    this.__registrations.push({listener, options, type});
+  };
+  target.removeEventListener = function removeEventListener(
+    type,
+    listener,
+    options
+  ) {
+    const index = this.__registrations.findIndex(
+      (registration) =>
+        registration.type === type &&
+        registration.listener === listener &&
+        registration.options === options
+    );
+    if (index !== -1) {
+      this.__registrations.splice(index, 1);
+    }
+  };
+  return target;
 }
 
 function createPrivateControlledLatestPropsLookup(options) {

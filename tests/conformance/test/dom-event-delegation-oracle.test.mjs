@@ -677,11 +677,20 @@ test("private input/change extraction preflight records target and controlled me
   ];
 
   for (const testCase of cases) {
-    const { container, dispatchRecord, targetNode } =
+    const {
+      container,
+      dispatchRecord,
+      document,
+      rootListenerCurrentnessGateRecord,
+      rootRegistration,
+      targetNode,
+      token
+    } =
       createPrivateInputChangeDelegationDispatch(testCase);
     const preflight =
       pluginEventSystem.createInputChangeEventExtractionPreflightRecord(
-        dispatchRecord
+        dispatchRecord,
+        { rootListenerCurrentnessGateRecord }
       );
 
     assert.equal(
@@ -699,6 +708,12 @@ test("private input/change extraction preflight records target and controlled me
     assert.equal(preflight.reactEventType, "change");
     assert.equal(preflight.reactName, "onChange");
     assert.equal(preflight.eventType, testCase.domEventName);
+    assert.equal(preflight.rootListenerCurrentness.sourceOwned, true);
+    assert.equal(preflight.rootListenerCurrentness.eventTypeCurrent, true);
+    assert.equal(
+      preflight.rootListenerCurrentness.rootContainerMatchesDispatchTarget,
+      true
+    );
     assert.equal(preflight.targetTag, "input");
     assert.equal(preflight.targetType, testCase.inputType);
     assert.equal(preflight.targetMetadata.targetKind, testCase.targetKind);
@@ -755,8 +770,12 @@ test("private input/change extraction preflight records target and controlled me
     assert.equal(Object.hasOwn(preflight, "nativeEvent"), false);
     assert.equal(Object.hasOwn(preflight, "syntheticEvent"), false);
     assert.equal(Object.hasOwn(preflight, "latestProps"), false);
+    assert.equal(container.__registrations.length > 0, true);
+    rootListeners.revertRootListenersForPrivateRoot(rootRegistration);
     assert.equal(container.__registrations.length, 0);
+    assert.equal(document.__registrations.length, 0);
     assert.equal(Object.hasOwn(targetNode, "_valueTracker"), false);
+    componentTree.detachHostInstanceToken(token);
   }
 });
 
@@ -1444,6 +1463,20 @@ function createPrivateInputChangeDelegationDispatch(options) {
       options.domEventName,
       0
     );
+  const rootRegistration =
+    rootListeners.registerRootListenersForPrivateRoot(container);
+  const rootListenerCurrentnessGateRecord =
+    rootListeners.createPrivateRootListenerCurrentnessGateRecord(
+      rootRegistration,
+      {
+        sourceKind: "createRoot",
+        sourceRecord: {
+          operation: "createRoot",
+          requestId: `delegation-${options.domEventName}-root-listener-currentness`,
+          requestType: "createRoot"
+        }
+      }
+    );
 
   return {
     container,
@@ -1455,6 +1488,8 @@ function createPrivateInputChangeDelegationDispatch(options) {
       type: options.domEventName
     }),
     document,
+    rootListenerCurrentnessGateRecord,
+    rootRegistration,
     targetNode,
     token
   };
