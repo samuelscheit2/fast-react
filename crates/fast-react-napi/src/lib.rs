@@ -119,6 +119,33 @@ mod root_bridge_requests {
         "FAST_REACT_NAPI_CLEANUP_GENERATION_REPLAYED_EVIDENCE";
     pub(crate) const NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE: &str =
         "FAST_REACT_NAPI_CLEANUP_GENERATION_PUBLIC_NATIVE_EXECUTION_CLAIM";
+    #[cfg(test)]
+    pub(crate) const NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_CANARY_STATUS: &str =
+        "accepted-native-root-bridge-cleanup-generation-currentness-canary";
+    #[cfg(test)]
+    const NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_CANARY_MODEL: &str =
+        "fast-react-napi.NativeRootBridgeCleanupGenerationCurrentnessCanary";
+    #[cfg(test)]
+    pub(crate) const NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_GENERATION_CODE: &str =
+        "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_STALE_GENERATION";
+    #[cfg(test)]
+    pub(crate) const NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_FORGED_CLEANUP_ROW_CODE:
+        &str = "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_FORGED_CLEANUP_ROW";
+    #[cfg(test)]
+    pub(crate) const NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN_CODE: &str =
+        "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN";
+    #[cfg(test)]
+    pub(crate) const NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_REPLAYED_OR_RETIRED_CODE:
+        &str = "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_REPLAYED_OR_RETIRED";
+    #[cfg(test)]
+    pub(crate) const NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_MISSING_CLEANUP_HOOK_IDENTITY_CODE:
+        &str = "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_MISSING_CLEANUP_HOOK_IDENTITY";
+    #[cfg(test)]
+    pub(crate) const NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_CALLER_BUILT_METADATA_CODE:
+        &str = "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_CALLER_BUILT_METADATA";
+    #[cfg(test)]
+    pub(crate) const NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE:
+        &str = "FAST_REACT_NAPI_CLEANUP_GENERATION_CURRENTNESS_PUBLIC_NATIVE_EXECUTION_CLAIM";
     const NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_JSON_BATCH_ROUNDTRIP_LINKED_STATUS: &str =
         "linked";
     const NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_JSON_BATCH_ROUNDTRIP_REJECTED_STATUS: &str =
@@ -4519,6 +4546,462 @@ mod root_bridge_requests {
         pub(crate) const fn react_behavior_error(&self) -> bool {
             self.react_behavior_error
         }
+
+        #[cfg(test)]
+        pub(crate) fn with_source_environment_id_for_test(
+            mut self,
+            source_environment_id: BridgeEnvironmentId,
+        ) -> Self {
+            self.source_environment_id = source_environment_id;
+            self
+        }
+
+        #[cfg(test)]
+        pub(crate) fn with_source_handle_for_test(mut self, source_handle: BridgeHandle) -> Self {
+            self.source_handle = source_handle;
+            self
+        }
+
+        #[cfg(test)]
+        pub(crate) fn with_source_owned_executor_row_for_test(
+            mut self,
+            source_owned_executor_row: bool,
+        ) -> Self {
+            self.source_owned_executor_row = source_owned_executor_row;
+            self
+        }
+
+        #[cfg(test)]
+        pub(crate) fn with_cleanup_hook_identity_private_for_test(
+            mut self,
+            cleanup_hook_identity_private: bool,
+        ) -> Self {
+            self.cleanup_hook_identity_private = cleanup_hook_identity_private;
+            self
+        }
+
+        #[cfg(test)]
+        pub(crate) fn with_canonical_executable_evidence_for_test(
+            mut self,
+            canonical_executable_evidence: bool,
+        ) -> Self {
+            self.canonical_executable_evidence = canonical_executable_evidence;
+            self
+        }
+
+        #[cfg(test)]
+        pub(crate) fn with_native_execution_claim_for_test(mut self) -> Self {
+            self.native_execution = true;
+            self.public_native_compatibility = true;
+            self
+        }
+    }
+
+    #[cfg(test)]
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(crate) struct NativeRootBridgeCleanupGenerationCurrentnessCanary {
+        status: &'static str,
+        model: &'static str,
+        lifecycle_consumer_status: &'static str,
+        cleanup_generation_consumer_status: &'static str,
+        cleanup_hook_preflight_status: &'static str,
+        current_executor_generation: u64,
+        cleanup_executor_generation: u64,
+        cleanup_handoff_current: bool,
+        cleanup_handoff_error_code: Option<&'static str>,
+        accepted_cleanup_handoff_count: usize,
+        rows: Vec<NativeRootBridgeCleanupGenerationCurrentnessCanaryRow>,
+        node_worker_threads_execution: bool,
+        napi_cleanup_hook_execution: bool,
+        native_addon_loaded: bool,
+        native_execution: bool,
+        renderer_execution: bool,
+        reconciler_execution: bool,
+        public_native_compatibility: bool,
+        react_behavior_error: bool,
+    }
+
+    #[cfg(test)]
+    impl NativeRootBridgeCleanupGenerationCurrentnessCanary {
+        fn new(
+            lifecycle_consumer: &NativeRootBridgeBatchLifecycleConsumer,
+            cleanup_generation_consumer: &NativeRootBridgeCleanupGenerationConsumer,
+            cleanup_hook_preflight: &NativeRootBridgeWorkerThreadCleanupHookPreflight,
+            result: Result<
+                Vec<NativeRootBridgeCleanupGenerationCurrentnessCanaryRow>,
+                &'static str,
+            >,
+        ) -> Self {
+            let cleanup_handoff_error_code = result.as_ref().err().copied();
+            let rows = result.unwrap_or_default();
+            let cleanup_handoff_current = cleanup_handoff_error_code.is_none();
+
+            Self {
+                status: NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_CANARY_STATUS,
+                model: NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_CANARY_MODEL,
+                lifecycle_consumer_status: lifecycle_consumer.status(),
+                cleanup_generation_consumer_status: cleanup_generation_consumer.status(),
+                cleanup_hook_preflight_status: cleanup_hook_preflight.status(),
+                current_executor_generation: lifecycle_consumer
+                    .json_batch_lifecycle_executor_generation(),
+                cleanup_executor_generation: cleanup_generation_consumer.executor_generation(),
+                cleanup_handoff_current,
+                cleanup_handoff_error_code,
+                accepted_cleanup_handoff_count: rows.len(),
+                rows,
+                node_worker_threads_execution: false,
+                napi_cleanup_hook_execution: false,
+                native_addon_loaded: false,
+                native_execution: false,
+                renderer_execution: false,
+                reconciler_execution: false,
+                public_native_compatibility: false,
+                react_behavior_error: false,
+            }
+        }
+
+        #[must_use]
+        pub(crate) const fn status(&self) -> &'static str {
+            self.status
+        }
+
+        #[must_use]
+        pub(crate) const fn model(&self) -> &'static str {
+            self.model
+        }
+
+        #[must_use]
+        pub(crate) const fn lifecycle_consumer_status(&self) -> &'static str {
+            self.lifecycle_consumer_status
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_generation_consumer_status(&self) -> &'static str {
+            self.cleanup_generation_consumer_status
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_preflight_status(&self) -> &'static str {
+            self.cleanup_hook_preflight_status
+        }
+
+        #[must_use]
+        pub(crate) const fn current_executor_generation(&self) -> u64 {
+            self.current_executor_generation
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_executor_generation(&self) -> u64 {
+            self.cleanup_executor_generation
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_handoff_current(&self) -> bool {
+            self.cleanup_handoff_current
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_handoff_error_code(&self) -> Option<&'static str> {
+            self.cleanup_handoff_error_code
+        }
+
+        #[must_use]
+        pub(crate) const fn accepted_cleanup_handoff_count(&self) -> usize {
+            self.accepted_cleanup_handoff_count
+        }
+
+        #[must_use]
+        pub(crate) fn rows(&self) -> &[NativeRootBridgeCleanupGenerationCurrentnessCanaryRow] {
+            &self.rows
+        }
+
+        #[must_use]
+        pub(crate) const fn node_worker_threads_execution(&self) -> bool {
+            self.node_worker_threads_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn napi_cleanup_hook_execution(&self) -> bool {
+            self.napi_cleanup_hook_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn native_addon_loaded(&self) -> bool {
+            self.native_addon_loaded
+        }
+
+        #[must_use]
+        pub(crate) const fn native_execution(&self) -> bool {
+            self.native_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn renderer_execution(&self) -> bool {
+            self.renderer_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn reconciler_execution(&self) -> bool {
+            self.reconciler_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn public_native_compatibility(&self) -> bool {
+            self.public_native_compatibility
+        }
+
+        #[must_use]
+        pub(crate) const fn react_behavior_error(&self) -> bool {
+            self.react_behavior_error
+        }
+    }
+
+    #[cfg(test)]
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(crate) struct NativeRootBridgeCleanupGenerationCurrentnessCanaryRow {
+        id: String,
+        lifecycle_consumer_row_id: String,
+        cleanup_handoff_row_id: String,
+        current_executor_generation: u64,
+        cleanup_executor_generation: u64,
+        batch_index: usize,
+        request_id: u64,
+        kind: &'static str,
+        source_environment_id: BridgeEnvironmentId,
+        source_root_handle: BridgeHandle,
+        source_root_id: u64,
+        source_handle_kind: BridgeHandleKind,
+        source_handle: BridgeHandle,
+        handle_table_current_generation: u64,
+        cleanup_current_generation: u64,
+        cleanup_hook_evidence_row_id: &'static str,
+        cleanup_hook_source_row_id: &'static str,
+        cleanup_hook_id: &'static str,
+        cleanup_hook_function_identity_token: &'static str,
+        cleanup_hook_argument_identity_token: &'static str,
+        source_owned_cleanup_handoff: bool,
+        cleanup_hook_order_private: bool,
+        cleanup_hook_identity_private: bool,
+        canonical_executable_evidence: bool,
+        node_worker_threads_execution: bool,
+        napi_cleanup_hook_execution: bool,
+        native_addon_loaded: bool,
+        native_execution: bool,
+        renderer_execution: bool,
+        reconciler_execution: bool,
+        public_native_compatibility: bool,
+        react_behavior_error: bool,
+    }
+
+    #[cfg(test)]
+    impl NativeRootBridgeCleanupGenerationCurrentnessCanaryRow {
+        fn new(
+            lifecycle_row: &NativeRootBridgeBatchLifecycleConsumerRow,
+            cleanup_row: &NativeRootBridgeCleanupGenerationConsumerRow,
+            cleanup_hook_row: NativeRootBridgeWorkerThreadCleanupHookPreflightRow,
+            current_executor_generation: u64,
+        ) -> Self {
+            Self {
+                id: format!(
+                    "cleanup-generation-currentness-canary-{}-{}",
+                    cleanup_row.batch_index(),
+                    bridge_handle_kind_code(cleanup_row.source_handle_kind())
+                ),
+                lifecycle_consumer_row_id: lifecycle_row.id().to_owned(),
+                cleanup_handoff_row_id: cleanup_row.id().to_owned(),
+                current_executor_generation,
+                cleanup_executor_generation: cleanup_row.executor_generation(),
+                batch_index: cleanup_row.batch_index(),
+                request_id: cleanup_row.request_id(),
+                kind: cleanup_row.kind(),
+                source_environment_id: cleanup_row.source_environment_id(),
+                source_root_handle: cleanup_row.source_root_handle(),
+                source_root_id: cleanup_row.source_root_id(),
+                source_handle_kind: cleanup_row.source_handle_kind(),
+                source_handle: cleanup_row.source_handle(),
+                handle_table_current_generation: cleanup_row.executor_handle_current_generation(),
+                cleanup_current_generation: cleanup_row.cleanup_hook_source_current_generation(),
+                cleanup_hook_evidence_row_id: cleanup_row.cleanup_hook_evidence_row_id(),
+                cleanup_hook_source_row_id: cleanup_row.cleanup_hook_source_row_id(),
+                cleanup_hook_id: cleanup_hook_row.cleanup_hook_id(),
+                cleanup_hook_function_identity_token: cleanup_hook_row
+                    .cleanup_hook_function_identity_token(),
+                cleanup_hook_argument_identity_token: cleanup_hook_row
+                    .cleanup_hook_argument_identity_token(),
+                source_owned_cleanup_handoff: cleanup_row.source_owned_executor_row(),
+                cleanup_hook_order_private: cleanup_row.cleanup_hook_order_private(),
+                cleanup_hook_identity_private: cleanup_row.cleanup_hook_identity_private(),
+                canonical_executable_evidence: cleanup_row.canonical_executable_evidence(),
+                node_worker_threads_execution: false,
+                napi_cleanup_hook_execution: false,
+                native_addon_loaded: false,
+                native_execution: false,
+                renderer_execution: false,
+                reconciler_execution: false,
+                public_native_compatibility: false,
+                react_behavior_error: false,
+            }
+        }
+
+        #[must_use]
+        pub(crate) fn id(&self) -> &str {
+            &self.id
+        }
+
+        #[must_use]
+        pub(crate) fn lifecycle_consumer_row_id(&self) -> &str {
+            &self.lifecycle_consumer_row_id
+        }
+
+        #[must_use]
+        pub(crate) fn cleanup_handoff_row_id(&self) -> &str {
+            &self.cleanup_handoff_row_id
+        }
+
+        #[must_use]
+        pub(crate) const fn current_executor_generation(&self) -> u64 {
+            self.current_executor_generation
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_executor_generation(&self) -> u64 {
+            self.cleanup_executor_generation
+        }
+
+        #[must_use]
+        pub(crate) const fn batch_index(&self) -> usize {
+            self.batch_index
+        }
+
+        #[must_use]
+        pub(crate) const fn request_id(&self) -> u64 {
+            self.request_id
+        }
+
+        #[must_use]
+        pub(crate) const fn kind(&self) -> &'static str {
+            self.kind
+        }
+
+        #[must_use]
+        pub(crate) const fn source_environment_id(&self) -> BridgeEnvironmentId {
+            self.source_environment_id
+        }
+
+        #[must_use]
+        pub(crate) const fn source_root_handle(&self) -> BridgeHandle {
+            self.source_root_handle
+        }
+
+        #[must_use]
+        pub(crate) const fn source_root_id(&self) -> u64 {
+            self.source_root_id
+        }
+
+        #[must_use]
+        pub(crate) const fn source_handle_kind(&self) -> BridgeHandleKind {
+            self.source_handle_kind
+        }
+
+        #[must_use]
+        pub(crate) const fn source_handle(&self) -> BridgeHandle {
+            self.source_handle
+        }
+
+        #[must_use]
+        pub(crate) const fn handle_table_current_generation(&self) -> u64 {
+            self.handle_table_current_generation
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_current_generation(&self) -> u64 {
+            self.cleanup_current_generation
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_evidence_row_id(&self) -> &'static str {
+            self.cleanup_hook_evidence_row_id
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_source_row_id(&self) -> &'static str {
+            self.cleanup_hook_source_row_id
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_id(&self) -> &'static str {
+            self.cleanup_hook_id
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_function_identity_token(&self) -> &'static str {
+            self.cleanup_hook_function_identity_token
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_argument_identity_token(&self) -> &'static str {
+            self.cleanup_hook_argument_identity_token
+        }
+
+        #[must_use]
+        pub(crate) const fn source_owned_cleanup_handoff(&self) -> bool {
+            self.source_owned_cleanup_handoff
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_order_private(&self) -> bool {
+            self.cleanup_hook_order_private
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_identity_private(&self) -> bool {
+            self.cleanup_hook_identity_private
+        }
+
+        #[must_use]
+        pub(crate) const fn canonical_executable_evidence(&self) -> bool {
+            self.canonical_executable_evidence
+        }
+
+        #[must_use]
+        pub(crate) const fn node_worker_threads_execution(&self) -> bool {
+            self.node_worker_threads_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn napi_cleanup_hook_execution(&self) -> bool {
+            self.napi_cleanup_hook_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn native_addon_loaded(&self) -> bool {
+            self.native_addon_loaded
+        }
+
+        #[must_use]
+        pub(crate) const fn native_execution(&self) -> bool {
+            self.native_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn renderer_execution(&self) -> bool {
+            self.renderer_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn reconciler_execution(&self) -> bool {
+            self.reconciler_execution
+        }
+
+        #[must_use]
+        pub(crate) const fn public_native_compatibility(&self) -> bool {
+            self.public_native_compatibility
+        }
+
+        #[must_use]
+        pub(crate) const fn react_behavior_error(&self) -> bool {
+            self.react_behavior_error
+        }
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
@@ -7274,6 +7757,28 @@ mod root_bridge_requests {
         NativeRootBridgeCleanupGenerationConsumer::new(executor, cleanup_hook_preflight, result)
     }
 
+    #[cfg(test)]
+    pub(crate) fn native_root_bridge_cleanup_generation_currentness_canary_for_private_sources(
+        current_lifecycle_consumer: &NativeRootBridgeBatchLifecycleConsumer,
+        cleanup_generation_consumer: &NativeRootBridgeCleanupGenerationConsumer,
+        cleanup_hook_preflight: &NativeRootBridgeWorkerThreadCleanupHookPreflight,
+        cleanup_handoff_rows: &[NativeRootBridgeCleanupGenerationConsumerRow],
+    ) -> NativeRootBridgeCleanupGenerationCurrentnessCanary {
+        let result = validate_native_root_bridge_cleanup_generation_currentness_rows(
+            current_lifecycle_consumer,
+            cleanup_generation_consumer,
+            cleanup_hook_preflight,
+            cleanup_handoff_rows,
+        );
+
+        NativeRootBridgeCleanupGenerationCurrentnessCanary::new(
+            current_lifecycle_consumer,
+            cleanup_generation_consumer,
+            cleanup_hook_preflight,
+            result,
+        )
+    }
+
     pub(crate) fn native_root_bridge_batch_lifecycle_consumer_for_gate(
         gate: &NativeRootBridgeJsonTransportParserGate,
     ) -> NativeRootBridgeBatchLifecycleConsumer {
@@ -8236,6 +8741,409 @@ mod root_bridge_requests {
             value_handle_current_generation: value_row.executor_handle_current_generation(),
             value_cleanup_current_generation: value_row.cleanup_hook_source_current_generation(),
         })
+    }
+
+    #[cfg(test)]
+    fn validate_native_root_bridge_cleanup_generation_currentness_rows(
+        current_lifecycle_consumer: &NativeRootBridgeBatchLifecycleConsumer,
+        cleanup_generation_consumer: &NativeRootBridgeCleanupGenerationConsumer,
+        cleanup_hook_preflight: &NativeRootBridgeWorkerThreadCleanupHookPreflight,
+        cleanup_handoff_rows: &[NativeRootBridgeCleanupGenerationConsumerRow],
+    ) -> Result<Vec<NativeRootBridgeCleanupGenerationCurrentnessCanaryRow>, &'static str> {
+        if has_native_root_bridge_cleanup_generation_currentness_public_native_claim(
+            current_lifecycle_consumer,
+            cleanup_generation_consumer,
+            cleanup_hook_preflight,
+            cleanup_handoff_rows,
+        ) {
+            return Err(
+                NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE,
+            );
+        }
+
+        if !native_root_bridge_cleanup_generation_currentness_cleanup_hook_identity_current(
+            cleanup_hook_preflight,
+        ) {
+            return Err(
+                NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_MISSING_CLEANUP_HOOK_IDENTITY_CODE,
+            );
+        }
+
+        if !cleanup_generation_consumer.cleanup_generation_consumed()
+            || cleanup_generation_consumer
+                .cleanup_generation_error_code()
+                .is_some()
+            || !cleanup_generation_consumer.source_rows_validated()
+            || !cleanup_generation_consumer.cleanup_hook_preflight_accepted()
+        {
+            return Err(NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_REPLAYED_OR_RETIRED_CODE);
+        }
+
+        if !current_lifecycle_consumer.json_batch_lifecycle_executor_source_rows_validated()
+            || !current_lifecycle_consumer.json_batch_lifecycle_executor_replay_guard_consumed()
+            || current_lifecycle_consumer
+                .json_batch_lifecycle_executor_source_error_code()
+                .is_some()
+            || current_lifecycle_consumer.consumed_batch_record_count() == 0
+            || current_lifecycle_consumer.accepted_batch_record_count()
+                != current_lifecycle_consumer.consumed_batch_record_count()
+            || !current_lifecycle_consumer.cleanup_hook_callable_preflight_accepted()
+        {
+            return Err(NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN_CODE);
+        }
+
+        if current_lifecycle_consumer.json_batch_lifecycle_executor_generation()
+            != cleanup_generation_consumer.executor_generation()
+        {
+            return Err(NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_GENERATION_CODE);
+        }
+
+        if current_lifecycle_consumer.rows().iter().any(|row| {
+            row.root_handle_state_after() == NativeRootBridgeRootHandleState::Retired
+                || row.retired_root_source_error_code().is_some()
+        }) {
+            return Err(NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_REPLAYED_OR_RETIRED_CODE);
+        }
+
+        if cleanup_handoff_rows.len()
+            != cleanup_generation_consumer.consumed_cleanup_generation_count()
+            || cleanup_handoff_rows.len() != cleanup_generation_consumer.rows().len()
+        {
+            return Err(NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_FORGED_CLEANUP_ROW_CODE);
+        }
+
+        let Some(current_render_row) = native_root_bridge_cleanup_generation_currentness_render_row(
+            current_lifecycle_consumer,
+        ) else {
+            return Err(NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN_CODE);
+        };
+
+        let mut row_ids = HashSet::new();
+        let mut saw_root = false;
+        let mut saw_value = false;
+        let mut rows = Vec::with_capacity(cleanup_handoff_rows.len());
+
+        for cleanup_row in cleanup_handoff_rows {
+            if !row_ids.insert(cleanup_row.id()) {
+                return Err(
+                    NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_FORGED_CLEANUP_ROW_CODE,
+                );
+            }
+
+            match cleanup_row.source_handle_kind() {
+                BridgeHandleKind::Root => {
+                    if saw_root {
+                        return Err(
+                            NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_FORGED_CLEANUP_ROW_CODE,
+                        );
+                    }
+                    saw_root = true;
+                }
+                BridgeHandleKind::Value => {
+                    if saw_value {
+                        return Err(
+                            NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_FORGED_CLEANUP_ROW_CODE,
+                        );
+                    }
+                    saw_value = true;
+                }
+            }
+
+            rows.push(
+                native_root_bridge_cleanup_generation_currentness_row_for_handoff(
+                    current_lifecycle_consumer,
+                    current_render_row,
+                    cleanup_hook_preflight,
+                    cleanup_row,
+                )?,
+            );
+        }
+
+        if !saw_root || !saw_value {
+            return Err(NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_FORGED_CLEANUP_ROW_CODE);
+        }
+
+        Ok(rows)
+    }
+
+    #[cfg(test)]
+    fn native_root_bridge_cleanup_generation_currentness_row_for_handoff(
+        current_lifecycle_consumer: &NativeRootBridgeBatchLifecycleConsumer,
+        current_render_row: &NativeRootBridgeBatchLifecycleConsumerRow,
+        cleanup_hook_preflight: &NativeRootBridgeWorkerThreadCleanupHookPreflight,
+        cleanup_row: &NativeRootBridgeCleanupGenerationConsumerRow,
+    ) -> Result<NativeRootBridgeCleanupGenerationCurrentnessCanaryRow, &'static str> {
+        if !cleanup_row.source_owned_executor_row() {
+            return Err(
+                NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_CALLER_BUILT_METADATA_CODE,
+            );
+        }
+
+        if !cleanup_row.cleanup_hook_identity_private() {
+            return Err(
+                NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_MISSING_CLEANUP_HOOK_IDENTITY_CODE,
+            );
+        }
+
+        if !cleanup_row.cleanup_hook_order_private() || !cleanup_row.canonical_executable_evidence()
+        {
+            return Err(NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_FORGED_CLEANUP_ROW_CODE);
+        }
+
+        if cleanup_row.executor_generation()
+            != current_lifecycle_consumer.json_batch_lifecycle_executor_generation()
+        {
+            return Err(NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_GENERATION_CODE);
+        }
+
+        let (Some(source_environment_id), Some(source_root_handle), Some(source_root_id)) = (
+            current_render_row.source_environment_id(),
+            current_render_row.source_root_handle(),
+            current_render_row.source_root_id(),
+        ) else {
+            return Err(NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN_CODE);
+        };
+
+        if cleanup_row.batch_index() != current_render_row.batch_index()
+            || cleanup_row.request_id() != current_render_row.request_id()
+            || cleanup_row.kind() != current_render_row.kind()
+            || cleanup_row.source_environment_id() != source_environment_id
+            || cleanup_row.source_root_handle() != source_root_handle
+            || cleanup_row.source_root_id() != source_root_id
+        {
+            return Err(NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN_CODE);
+        }
+
+        let role = match cleanup_row.source_handle_kind() {
+            BridgeHandleKind::Root => NativeRootBridgeWorkerThreadCleanupHookCanonicalRole::Root,
+            BridgeHandleKind::Value => NativeRootBridgeWorkerThreadCleanupHookCanonicalRole::Value,
+        };
+        let Some(cleanup_hook_row) =
+            native_root_bridge_cleanup_generation_currentness_preflight_row_for_role(
+                cleanup_hook_preflight,
+                role,
+            )
+        else {
+            return Err(
+                NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_MISSING_CLEANUP_HOOK_IDENTITY_CODE,
+            );
+        };
+
+        if cleanup_row.cleanup_hook_evidence_row_id() != cleanup_hook_row.id()
+            || cleanup_row.cleanup_hook_source_row_id() != cleanup_hook_row.source_row_id()
+        {
+            return Err(NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_FORGED_CLEANUP_ROW_CODE);
+        }
+
+        native_root_bridge_cleanup_generation_currentness_validate_handle_fields(
+            current_render_row,
+            cleanup_row,
+            cleanup_hook_row,
+        )?;
+
+        Ok(NativeRootBridgeCleanupGenerationCurrentnessCanaryRow::new(
+            current_render_row,
+            cleanup_row,
+            cleanup_hook_row,
+            current_lifecycle_consumer.json_batch_lifecycle_executor_generation(),
+        ))
+    }
+
+    #[cfg(test)]
+    fn native_root_bridge_cleanup_generation_currentness_validate_handle_fields(
+        current_render_row: &NativeRootBridgeBatchLifecycleConsumerRow,
+        cleanup_row: &NativeRootBridgeCleanupGenerationConsumerRow,
+        cleanup_hook_row: NativeRootBridgeWorkerThreadCleanupHookPreflightRow,
+    ) -> Result<(), &'static str> {
+        let expected_current_generation = match cleanup_row.source_handle_kind() {
+            BridgeHandleKind::Root => current_render_row.root_handle_current_generation(),
+            BridgeHandleKind::Value => current_render_row
+                .value_handle_current_generation()
+                .ok_or(NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN_CODE)?,
+        };
+        let expected_cleanup_generation = expected_current_generation
+            .checked_add(1)
+            .ok_or(NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN_CODE)?;
+
+        if cleanup_row.executor_handle_current_generation() != expected_current_generation
+            || cleanup_row.cleanup_hook_source_current_generation() != expected_cleanup_generation
+            || cleanup_hook_row.source_current_generation() != Some(expected_cleanup_generation)
+        {
+            return Err(NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN_CODE);
+        }
+
+        let expected_source_handle =
+            match cleanup_row.source_handle_kind() {
+                BridgeHandleKind::Root => current_render_row.source_root_handle().ok_or(
+                    NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN_CODE,
+                )?,
+                BridgeHandleKind::Value => {
+                    if current_render_row.cleanup_hook_evidence_status()
+                        != NativeRootBridgeWorkerThreadCleanupHookPreflightRowStatus::Accepted
+                            .code()
+                        || current_render_row.cleanup_hook_evidence_row_id()
+                            != Some(cleanup_hook_row.id())
+                        || current_render_row.cleanup_hook_source_row_id()
+                            != Some(cleanup_hook_row.source_row_id())
+                        || current_render_row.cleanup_hook_source_handle_kind()
+                            != Some(BridgeHandleKind::Value)
+                        || current_render_row.cleanup_hook_canonical_executable_evidence()
+                            != Some(true)
+                    {
+                        return Err(
+                            NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN_CODE,
+                        );
+                    }
+
+                    BridgeHandle::new(
+                    current_render_row.cleanup_hook_source_handle_environment_id().ok_or(
+                        NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN_CODE,
+                    )?,
+                    current_render_row.cleanup_hook_source_handle_slot().ok_or(
+                        NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN_CODE,
+                    )?,
+                    current_render_row.cleanup_hook_source_handle_generation().ok_or(
+                        NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN_CODE,
+                    )?,
+                    BridgeHandleKind::Value,
+                )
+                }
+            };
+
+        if cleanup_row.source_handle() != expected_source_handle
+            || cleanup_hook_row.source_handle_environment_id()
+                != Some(cleanup_row.source_handle().environment_id())
+            || cleanup_hook_row.source_handle_slot() != Some(cleanup_row.source_handle().slot())
+            || cleanup_hook_row.source_handle_generation()
+                != Some(cleanup_row.source_handle().generation())
+        {
+            return Err(NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN_CODE);
+        }
+
+        Ok(())
+    }
+
+    #[cfg(test)]
+    fn native_root_bridge_cleanup_generation_currentness_render_row(
+        current_lifecycle_consumer: &NativeRootBridgeBatchLifecycleConsumer,
+    ) -> Option<&NativeRootBridgeBatchLifecycleConsumerRow> {
+        current_lifecycle_consumer.rows().iter().find(|row| {
+            row.kind() == NativeRootBridgeRequestKind::Render.code()
+                && row.status() == NativeRootBridgeBatchedJsonTransportLifecycleStatus::Accepted
+                && row.lifecycle_transition()
+                    == Some(NativeRootBridgeLifecycleTransition::ActiveToActive)
+        })
+    }
+
+    #[cfg(test)]
+    fn native_root_bridge_cleanup_generation_currentness_preflight_row_for_role(
+        cleanup_hook_preflight: &NativeRootBridgeWorkerThreadCleanupHookPreflight,
+        role: NativeRootBridgeWorkerThreadCleanupHookCanonicalRole,
+    ) -> Option<NativeRootBridgeWorkerThreadCleanupHookPreflightRow> {
+        cleanup_hook_preflight.rows().iter().copied().find(|row| {
+            cleanup_hook_accepted_canonical_role(*row) == Some(role)
+                && native_root_bridge_cleanup_generation_currentness_cleanup_hook_row_identity_current(
+                    *row,
+                )
+        })
+    }
+
+    #[cfg(test)]
+    fn native_root_bridge_cleanup_generation_currentness_cleanup_hook_identity_current(
+        cleanup_hook_preflight: &NativeRootBridgeWorkerThreadCleanupHookPreflight,
+    ) -> bool {
+        cleanup_hook_preflight.canonical_executable_evidence_accepted()
+            && cleanup_hook_preflight.accepted_cleanup_evidence_count()
+                == usize::from(NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_COUNT)
+            && cleanup_hook_preflight.cleanup_hook_order_private()
+            && cleanup_hook_preflight.cleanup_hook_identity_private()
+            && native_root_bridge_cleanup_generation_currentness_preflight_row_for_role(
+                cleanup_hook_preflight,
+                NativeRootBridgeWorkerThreadCleanupHookCanonicalRole::Root,
+            )
+            .is_some()
+            && native_root_bridge_cleanup_generation_currentness_preflight_row_for_role(
+                cleanup_hook_preflight,
+                NativeRootBridgeWorkerThreadCleanupHookCanonicalRole::Value,
+            )
+            .is_some()
+    }
+
+    #[cfg(test)]
+    fn native_root_bridge_cleanup_generation_currentness_cleanup_hook_row_identity_current(
+        row: NativeRootBridgeWorkerThreadCleanupHookPreflightRow,
+    ) -> bool {
+        if !row.cleanup_hook_order_private() || !row.cleanup_hook_identity_private() {
+            return false;
+        }
+
+        let Some(role) = cleanup_hook_accepted_canonical_role(row) else {
+            return false;
+        };
+        let expected_identity = match role {
+            NativeRootBridgeWorkerThreadCleanupHookCanonicalRole::Root => {
+                NativeRootBridgeWorkerThreadCleanupHookExpectedIdentity::root()
+            }
+            NativeRootBridgeWorkerThreadCleanupHookCanonicalRole::Value => {
+                NativeRootBridgeWorkerThreadCleanupHookExpectedIdentity::value()
+            }
+        };
+        let evidence = NativeRootBridgeWorkerThreadCleanupHookEvidence::from_preflight_row(row);
+
+        expected_identity.matches_evidence(evidence) && expected_identity.matches_order(evidence)
+    }
+
+    #[cfg(test)]
+    fn has_native_root_bridge_cleanup_generation_currentness_public_native_claim(
+        current_lifecycle_consumer: &NativeRootBridgeBatchLifecycleConsumer,
+        cleanup_generation_consumer: &NativeRootBridgeCleanupGenerationConsumer,
+        cleanup_hook_preflight: &NativeRootBridgeWorkerThreadCleanupHookPreflight,
+        cleanup_handoff_rows: &[NativeRootBridgeCleanupGenerationConsumerRow],
+    ) -> bool {
+        current_lifecycle_consumer.node_worker_threads_execution()
+            || current_lifecycle_consumer.napi_cleanup_hook_execution()
+            || current_lifecycle_consumer.native_addon_loaded()
+            || current_lifecycle_consumer.native_execution()
+            || current_lifecycle_consumer.renderer_execution()
+            || current_lifecycle_consumer.reconciler_execution()
+            || current_lifecycle_consumer.public_native_compatibility()
+            || current_lifecycle_consumer.react_behavior_error()
+            || current_lifecycle_consumer
+                .rows()
+                .iter()
+                .any(has_native_root_bridge_batch_lifecycle_consumer_public_native_claim)
+            || cleanup_generation_consumer.node_worker_threads_execution()
+            || cleanup_generation_consumer.napi_cleanup_hook_execution()
+            || cleanup_generation_consumer.native_addon_loaded()
+            || cleanup_generation_consumer.native_execution()
+            || cleanup_generation_consumer.renderer_execution()
+            || cleanup_generation_consumer.reconciler_execution()
+            || cleanup_generation_consumer.public_native_compatibility()
+            || cleanup_generation_consumer.react_behavior_error()
+            || cleanup_generation_consumer
+                .rows()
+                .iter()
+                .any(has_native_root_bridge_cleanup_generation_consumer_row_public_native_claim)
+            || has_native_root_bridge_cleanup_hook_preflight_public_native_claim(
+                cleanup_hook_preflight,
+            )
+            || cleanup_handoff_rows
+                .iter()
+                .any(has_native_root_bridge_cleanup_generation_consumer_row_public_native_claim)
+    }
+
+    #[cfg(test)]
+    fn has_native_root_bridge_cleanup_generation_consumer_row_public_native_claim(
+        row: &NativeRootBridgeCleanupGenerationConsumerRow,
+    ) -> bool {
+        row.node_worker_threads_execution()
+            || row.napi_cleanup_hook_execution()
+            || row.native_addon_loaded()
+            || row.native_execution()
+            || row.renderer_execution()
+            || row.reconciler_execution()
+            || row.public_native_compatibility()
+            || row.react_behavior_error()
     }
 
     const fn bridge_handle_kind_code(kind: BridgeHandleKind) -> &'static str {
@@ -11221,6 +12129,14 @@ mod tests {
         NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_REPLAYED_EVIDENCE_CODE,
         NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STALE_OR_FOREIGN_EVIDENCE_CODE,
         NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STATUS,
+        NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_CALLER_BUILT_METADATA_CODE,
+        NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_CANARY_STATUS,
+        NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_FORGED_CLEANUP_ROW_CODE,
+        NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_MISSING_CLEANUP_HOOK_IDENTITY_CODE,
+        NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE,
+        NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_REPLAYED_OR_RETIRED_CODE,
+        NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_GENERATION_CODE,
+        NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN_CODE,
         NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_CALLER_BUILT_ROW_CODE,
         NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE,
         NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_STALE_OR_FOREIGN_ROW_CODE,
@@ -11242,10 +12158,12 @@ mod tests {
         NativeRootBridgeBatchedJsonTransportLifecycleState,
         NativeRootBridgeBatchedJsonTransportLifecycleStatus,
         NativeRootBridgeCleanupGenerationConsumer, NativeRootBridgeCleanupGenerationConsumerRow,
-        NativeRootBridgeCreateRequest, NativeRootBridgeHandleAdmissionAction,
-        NativeRootBridgeJsonBatchLifecycleExecutor, NativeRootBridgeJsonBatchLifecycleExecutorRow,
-        NativeRootBridgeJsonTransportHandle, NativeRootBridgeJsonTransportParseError,
-        NativeRootBridgeJsonTransportRecord, NativeRootBridgeJsonTransportStreamAssemblyState,
+        NativeRootBridgeCleanupGenerationCurrentnessCanary,
+        NativeRootBridgeCleanupGenerationCurrentnessCanaryRow, NativeRootBridgeCreateRequest,
+        NativeRootBridgeHandleAdmissionAction, NativeRootBridgeJsonBatchLifecycleExecutor,
+        NativeRootBridgeJsonBatchLifecycleExecutorRow, NativeRootBridgeJsonTransportHandle,
+        NativeRootBridgeJsonTransportParseError, NativeRootBridgeJsonTransportRecord,
+        NativeRootBridgeJsonTransportStreamAssemblyState,
         NativeRootBridgeJsonTransportStreamChunkKind,
         NativeRootBridgeJsonTransportStreamChunkStatus,
         NativeRootBridgeJsonTransportStreamTeardownBlocker, NativeRootBridgeJsonTransportValueKind,
@@ -11254,6 +12172,7 @@ mod tests {
         NativeRootBridgeRequestRecorder, NativeRootBridgeRequestSequenceValidator,
         NativeRootBridgeRootHandleState, NativeRootBridgeUnmountRequest,
         NativeRootBridgeWorkerThreadCleanupHookEvidence,
+        NativeRootBridgeWorkerThreadCleanupHookPreflight,
         NativeRootBridgeWorkerThreadCleanupHookPreflightRow,
         NativeRootBridgeWorkerThreadCleanupHookPreflightRowStatus,
         native_root_bridge_batch_lifecycle_consumer_for_gate,
@@ -11262,6 +12181,7 @@ mod tests {
         native_root_bridge_cleanup_generation_consumer_for_gate,
         native_root_bridge_cleanup_generation_consumer_for_json,
         native_root_bridge_cleanup_generation_consumer_for_sources,
+        native_root_bridge_cleanup_generation_currentness_canary_for_private_sources,
         native_root_bridge_cross_environment_teardown_gate,
         native_root_bridge_json_batch_lifecycle_executor_for_json,
         native_root_bridge_json_batch_lifecycle_executor_for_records,
@@ -11291,6 +12211,76 @@ mod tests {
         format!(
             r#"{{"transport":"json","schemaVersion":1,"requestRecords":[{{"request_id":1,"kind":"create","environment_id":{environment_id},"root_handle":{{"environment_id":{environment_id},"slot":1,"generation":1,"kind":"root"}},"root_id":1,"value_handle":{{"environment_id":{environment_id},"slot":2,"generation":1,"kind":"value"}},"root_handle_state":"active"}},{{"request_id":2,"kind":"render","environment_id":{environment_id},"root_handle":{{"environment_id":{environment_id},"slot":1,"generation":1,"kind":"root"}},"root_id":1,"value_handle":{{"environment_id":{environment_id},"slot":3,"generation":1,"kind":"value"}},"root_handle_state":"active"}}]}}"#
         )
+    }
+
+    fn accepted_cleanup_generation_currentness_sources() -> (
+        NativeRootBridgeBatchLifecycleConsumer,
+        NativeRootBridgeCleanupGenerationConsumer,
+        NativeRootBridgeWorkerThreadCleanupHookPreflight,
+    ) {
+        let json = native_root_bridge_cleanup_generation_consumer_json(764);
+        let gate = parse_native_root_bridge_json_transport_for_gate(&json).unwrap();
+        let cleanup_hook_preflight = native_root_bridge_worker_thread_cleanup_hook_preflight();
+        let lifecycle_consumer = native_root_bridge_batch_lifecycle_consumer_for_gate(&gate);
+        let cleanup_generation_consumer =
+            native_root_bridge_cleanup_generation_consumer_for_gate(&gate, &cleanup_hook_preflight);
+
+        assert!(lifecycle_consumer.json_batch_lifecycle_executor_source_rows_validated());
+        assert!(lifecycle_consumer.json_batch_lifecycle_executor_replay_guard_consumed());
+        assert!(cleanup_generation_consumer.cleanup_generation_consumed());
+
+        (
+            lifecycle_consumer,
+            cleanup_generation_consumer,
+            cleanup_hook_preflight,
+        )
+    }
+
+    fn assert_cleanup_generation_currentness_canary_inert(
+        canary: &NativeRootBridgeCleanupGenerationCurrentnessCanary,
+    ) {
+        assert!(!canary.node_worker_threads_execution());
+        assert!(!canary.napi_cleanup_hook_execution());
+        assert!(!canary.native_addon_loaded());
+        assert!(!canary.native_execution());
+        assert!(!canary.renderer_execution());
+        assert!(!canary.reconciler_execution());
+        assert!(!canary.public_native_compatibility());
+        assert!(!canary.react_behavior_error());
+    }
+
+    fn assert_cleanup_generation_currentness_row_inert(
+        row: &NativeRootBridgeCleanupGenerationCurrentnessCanaryRow,
+    ) {
+        assert!(!row.node_worker_threads_execution());
+        assert!(!row.napi_cleanup_hook_execution());
+        assert!(!row.native_addon_loaded());
+        assert!(!row.native_execution());
+        assert!(!row.renderer_execution());
+        assert!(!row.reconciler_execution());
+        assert!(!row.public_native_compatibility());
+        assert!(!row.react_behavior_error());
+    }
+
+    fn assert_cleanup_generation_currentness_rejection(
+        lifecycle_consumer: &NativeRootBridgeBatchLifecycleConsumer,
+        cleanup_generation_consumer: &NativeRootBridgeCleanupGenerationConsumer,
+        cleanup_hook_preflight: &NativeRootBridgeWorkerThreadCleanupHookPreflight,
+        cleanup_handoff_rows: &[NativeRootBridgeCleanupGenerationConsumerRow],
+        expected_code: &'static str,
+    ) {
+        let canary = native_root_bridge_cleanup_generation_currentness_canary_for_private_sources(
+            lifecycle_consumer,
+            cleanup_generation_consumer,
+            cleanup_hook_preflight,
+            cleanup_handoff_rows,
+        );
+
+        assert!(!canary.cleanup_handoff_current());
+        assert_eq!(canary.cleanup_handoff_error_code(), Some(expected_code));
+        assert_eq!(canary.accepted_cleanup_handoff_count(), 0);
+        assert!(canary.rows().is_empty());
+        assert_cleanup_generation_currentness_canary_inert(&canary);
     }
 
     #[test]
@@ -13553,6 +14543,393 @@ mod tests {
         assert_eq!(
             reused_value_error.code(),
             "FAST_REACT_NAPI_ROOT_REQUEST_VALUE_HANDLE_REUSE"
+        );
+    }
+
+    #[test]
+    fn native_root_bridge_cleanup_generation_currentness_canary_accepts_current_private_handoff() {
+        let (lifecycle_consumer, cleanup_generation_consumer, cleanup_hook_preflight) =
+            accepted_cleanup_generation_currentness_sources();
+        let canary = native_root_bridge_cleanup_generation_currentness_canary_for_private_sources(
+            &lifecycle_consumer,
+            &cleanup_generation_consumer,
+            &cleanup_hook_preflight,
+            cleanup_generation_consumer.rows(),
+        );
+
+        assert_eq!(
+            canary.status(),
+            NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_CANARY_STATUS
+        );
+        assert_eq!(
+            canary.model(),
+            "fast-react-napi.NativeRootBridgeCleanupGenerationCurrentnessCanary"
+        );
+        assert_eq!(
+            canary.lifecycle_consumer_status(),
+            NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_STATUS
+        );
+        assert_eq!(
+            canary.cleanup_generation_consumer_status(),
+            NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CONSUMER_STATUS
+        );
+        assert_eq!(
+            canary.cleanup_hook_preflight_status(),
+            NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_PREFLIGHT_STATUS
+        );
+        assert_eq!(
+            canary.current_executor_generation(),
+            lifecycle_consumer.json_batch_lifecycle_executor_generation()
+        );
+        assert_eq!(
+            canary.cleanup_executor_generation(),
+            cleanup_generation_consumer.executor_generation()
+        );
+        assert_eq!(
+            canary.current_executor_generation(),
+            canary.cleanup_executor_generation()
+        );
+        assert!(canary.cleanup_handoff_current());
+        assert_eq!(canary.cleanup_handoff_error_code(), None);
+        assert_eq!(canary.accepted_cleanup_handoff_count(), 2);
+        assert_cleanup_generation_currentness_canary_inert(&canary);
+
+        let rows = canary.rows();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(
+            rows.iter().map(|row| row.id()).collect::<Vec<_>>(),
+            [
+                "cleanup-generation-currentness-canary-1-root",
+                "cleanup-generation-currentness-canary-1-value"
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.lifecycle_consumer_row_id())
+                .collect::<Vec<_>>(),
+            [
+                "batch-lifecycle-consumer-1-render",
+                "batch-lifecycle-consumer-1-render"
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.cleanup_handoff_row_id())
+                .collect::<Vec<_>>(),
+            [
+                "cleanup-generation-consumer-1-root",
+                "cleanup-generation-consumer-1-value"
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.current_executor_generation())
+                .collect::<Vec<_>>(),
+            [
+                canary.current_executor_generation(),
+                canary.current_executor_generation()
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.cleanup_executor_generation())
+                .collect::<Vec<_>>(),
+            [
+                canary.cleanup_executor_generation(),
+                canary.cleanup_executor_generation()
+            ]
+        );
+        assert_eq!(
+            rows.iter().map(|row| row.batch_index()).collect::<Vec<_>>(),
+            [1, 1]
+        );
+        assert_eq!(
+            rows.iter().map(|row| row.request_id()).collect::<Vec<_>>(),
+            [2, 2]
+        );
+        assert_eq!(
+            rows.iter().map(|row| row.kind()).collect::<Vec<_>>(),
+            ["render", "render"]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.source_environment_id())
+                .collect::<Vec<_>>(),
+            [
+                BridgeEnvironmentId::from_raw(764),
+                BridgeEnvironmentId::from_raw(764)
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.source_root_handle().slot())
+                .collect::<Vec<_>>(),
+            [1, 1]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.source_root_id())
+                .collect::<Vec<_>>(),
+            [1, 1]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.source_handle_kind())
+                .collect::<Vec<_>>(),
+            [BridgeHandleKind::Root, BridgeHandleKind::Value]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.source_handle().slot())
+                .collect::<Vec<_>>(),
+            [1, 3]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.source_handle().generation())
+                .collect::<Vec<_>>(),
+            [1, 1]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.handle_table_current_generation())
+                .collect::<Vec<_>>(),
+            [1, 1]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.cleanup_current_generation())
+                .collect::<Vec<_>>(),
+            [2, 2]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.cleanup_hook_evidence_row_id())
+                .collect::<Vec<_>>(),
+            [
+                "cleanup-hook-worker-root-before-value-release",
+                "cleanup-hook-worker-value-after-root-release"
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.cleanup_hook_source_row_id())
+                .collect::<Vec<_>>(),
+            [
+                "worker-render-root-stale-executable-preflight",
+                "worker-render-value-stale-executable-preflight"
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.cleanup_hook_id())
+                .collect::<Vec<_>>(),
+            [
+                "worker-root-handle-cleanup-hook",
+                "worker-value-handle-cleanup-hook"
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.cleanup_hook_function_identity_token())
+                .collect::<Vec<_>>(),
+            [
+                "private-cleanup-hook-fn:worker-root-handle-teardown",
+                "private-cleanup-hook-fn:worker-value-handle-teardown"
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.cleanup_hook_argument_identity_token())
+                .collect::<Vec<_>>(),
+            [
+                "private-cleanup-hook-arg:worker-764-root-slot-1",
+                "private-cleanup-hook-arg:worker-764-value-slot-3"
+            ]
+        );
+        assert!(rows.iter().all(|row| {
+            row.source_owned_cleanup_handoff()
+                && row.cleanup_hook_order_private()
+                && row.cleanup_hook_identity_private()
+                && row.canonical_executable_evidence()
+        }));
+        for row in rows {
+            assert_cleanup_generation_currentness_row_inert(row);
+        }
+    }
+
+    #[test]
+    fn native_root_bridge_cleanup_generation_currentness_canary_rejects_stale_generation_after_new_native_step()
+     {
+        let (_old_lifecycle, old_cleanup_generation, old_cleanup_hook_preflight) =
+            accepted_cleanup_generation_currentness_sources();
+        let (current_lifecycle, _current_cleanup_generation, _current_cleanup_hook_preflight) =
+            accepted_cleanup_generation_currentness_sources();
+
+        assert_ne!(
+            current_lifecycle.json_batch_lifecycle_executor_generation(),
+            old_cleanup_generation.executor_generation()
+        );
+        assert_cleanup_generation_currentness_rejection(
+            &current_lifecycle,
+            &old_cleanup_generation,
+            &old_cleanup_hook_preflight,
+            old_cleanup_generation.rows(),
+            NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_GENERATION_CODE,
+        );
+    }
+
+    #[test]
+    fn native_root_bridge_cleanup_generation_currentness_canary_rejects_forged_or_cloned_cleanup_rows()
+     {
+        let (lifecycle_consumer, cleanup_generation_consumer, cleanup_hook_preflight) =
+            accepted_cleanup_generation_currentness_sources();
+        let cloned_root_rows = vec![
+            cleanup_generation_consumer.rows()[0].clone(),
+            cleanup_generation_consumer.rows()[0].clone(),
+        ];
+        assert_cleanup_generation_currentness_rejection(
+            &lifecycle_consumer,
+            &cleanup_generation_consumer,
+            &cleanup_hook_preflight,
+            &cloned_root_rows,
+            NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_FORGED_CLEANUP_ROW_CODE,
+        );
+
+        let mut forged_rows = cleanup_generation_consumer.rows().to_vec();
+        forged_rows[1] = forged_rows[1]
+            .clone()
+            .with_canonical_executable_evidence_for_test(false);
+        assert_cleanup_generation_currentness_rejection(
+            &lifecycle_consumer,
+            &cleanup_generation_consumer,
+            &cleanup_hook_preflight,
+            &forged_rows,
+            NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_FORGED_CLEANUP_ROW_CODE,
+        );
+    }
+
+    #[test]
+    fn native_root_bridge_cleanup_generation_currentness_canary_rejects_cross_environment_and_cross_table_rows()
+     {
+        let (lifecycle_consumer, cleanup_generation_consumer, cleanup_hook_preflight) =
+            accepted_cleanup_generation_currentness_sources();
+
+        let mut foreign_environment_rows = cleanup_generation_consumer.rows().to_vec();
+        foreign_environment_rows[0] = foreign_environment_rows[0]
+            .clone()
+            .with_source_environment_id_for_test(BridgeEnvironmentId::from_raw(1764));
+        assert_cleanup_generation_currentness_rejection(
+            &lifecycle_consumer,
+            &cleanup_generation_consumer,
+            &cleanup_hook_preflight,
+            &foreign_environment_rows,
+            NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN_CODE,
+        );
+
+        let mut foreign_table_rows = cleanup_generation_consumer.rows().to_vec();
+        foreign_table_rows[1] =
+            foreign_table_rows[1]
+                .clone()
+                .with_source_handle_for_test(BridgeHandle::new(
+                    BridgeEnvironmentId::from_raw(764),
+                    99,
+                    1,
+                    BridgeHandleKind::Value,
+                ));
+        assert_cleanup_generation_currentness_rejection(
+            &lifecycle_consumer,
+            &cleanup_generation_consumer,
+            &cleanup_hook_preflight,
+            &foreign_table_rows,
+            NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_STALE_OR_FOREIGN_CODE,
+        );
+    }
+
+    #[test]
+    fn native_root_bridge_cleanup_generation_currentness_canary_rejects_replay_and_retired_lifecycle()
+     {
+        let json = native_root_bridge_cleanup_generation_consumer_json(764);
+        let gate = parse_native_root_bridge_json_transport_for_gate(&json).unwrap();
+        let cleanup_hook_preflight = native_root_bridge_worker_thread_cleanup_hook_preflight();
+        let lifecycle_consumer = native_root_bridge_batch_lifecycle_consumer_for_gate(&gate);
+        let first_cleanup_generation =
+            native_root_bridge_cleanup_generation_consumer_for_gate(&gate, &cleanup_hook_preflight);
+        assert!(first_cleanup_generation.cleanup_generation_consumed());
+        let replayed_cleanup_generation =
+            native_root_bridge_cleanup_generation_consumer_for_gate(&gate, &cleanup_hook_preflight);
+        assert!(!replayed_cleanup_generation.cleanup_generation_consumed());
+        assert_cleanup_generation_currentness_rejection(
+            &lifecycle_consumer,
+            &replayed_cleanup_generation,
+            &cleanup_hook_preflight,
+            replayed_cleanup_generation.rows(),
+            NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_REPLAYED_OR_RETIRED_CODE,
+        );
+
+        let retired_json = r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":764,"root_handle":{"environment_id":764,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":764,"slot":2,"generation":1,"kind":"value"},"root_handle_state":"active"},{"request_id":2,"kind":"render","environment_id":764,"root_handle":{"environment_id":764,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":764,"slot":3,"generation":1,"kind":"value"},"root_handle_state":"active"},{"request_id":3,"kind":"unmount","environment_id":764,"root_handle":{"environment_id":764,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"retired"}]}"#;
+        let retired_gate = parse_native_root_bridge_json_transport_for_gate(retired_json).unwrap();
+        let retired_lifecycle_consumer =
+            native_root_bridge_batch_lifecycle_consumer_for_gate(&retired_gate);
+        let retired_cleanup_generation = native_root_bridge_cleanup_generation_consumer_for_gate(
+            &retired_gate,
+            &cleanup_hook_preflight,
+        );
+        assert!(
+            retired_lifecycle_consumer.rows().iter().any(
+                |row| row.root_handle_state_after() == NativeRootBridgeRootHandleState::Retired
+            )
+        );
+        assert!(retired_cleanup_generation.cleanup_generation_consumed());
+        assert_cleanup_generation_currentness_rejection(
+            &retired_lifecycle_consumer,
+            &retired_cleanup_generation,
+            &cleanup_hook_preflight,
+            retired_cleanup_generation.rows(),
+            NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_REPLAYED_OR_RETIRED_CODE,
+        );
+    }
+
+    #[test]
+    fn native_root_bridge_cleanup_generation_currentness_canary_rejects_missing_identity_caller_metadata_and_public_claims()
+     {
+        let (lifecycle_consumer, cleanup_generation_consumer, cleanup_hook_preflight) =
+            accepted_cleanup_generation_currentness_sources();
+
+        let mut missing_identity_rows = cleanup_generation_consumer.rows().to_vec();
+        missing_identity_rows[0] = missing_identity_rows[0]
+            .clone()
+            .with_cleanup_hook_identity_private_for_test(false);
+        assert_cleanup_generation_currentness_rejection(
+            &lifecycle_consumer,
+            &cleanup_generation_consumer,
+            &cleanup_hook_preflight,
+            &missing_identity_rows,
+            NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_MISSING_CLEANUP_HOOK_IDENTITY_CODE,
+        );
+
+        let mut caller_built_rows = cleanup_generation_consumer.rows().to_vec();
+        caller_built_rows[1] = caller_built_rows[1]
+            .clone()
+            .with_source_owned_executor_row_for_test(false);
+        assert_cleanup_generation_currentness_rejection(
+            &lifecycle_consumer,
+            &cleanup_generation_consumer,
+            &cleanup_hook_preflight,
+            &caller_built_rows,
+            NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_CALLER_BUILT_METADATA_CODE,
+        );
+
+        let mut public_claim_rows = cleanup_generation_consumer.rows().to_vec();
+        public_claim_rows[0] = public_claim_rows[0]
+            .clone()
+            .with_native_execution_claim_for_test();
+        assert_cleanup_generation_currentness_rejection(
+            &lifecycle_consumer,
+            &cleanup_generation_consumer,
+            &cleanup_hook_preflight,
+            &public_claim_rows,
+            NATIVE_ROOT_BRIDGE_CLEANUP_GENERATION_CURRENTNESS_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE,
         );
     }
 
