@@ -3085,7 +3085,10 @@ impl TestHostRootDeletionTeardownExecutionDiagnosticForCanary {
     pub(crate) const fn private_host_subtree_detachment_applied(&self) -> bool {
         matches!(
             self.host_detachment_status,
-            TestHostRootMutationApplyStatus::Applied(TestHostRootMutationHostCall::RemoveChild)
+            TestHostRootMutationApplyStatus::Applied(
+                TestHostRootMutationHostCall::RemoveChild
+                    | TestHostRootMutationHostCall::RemoveChildFromContainer
+            )
         )
     }
 
@@ -4593,23 +4596,42 @@ fn apply_test_host_root_deletion_subtree_host_detachment_for_canary(
         plan.host_child_tag(),
         plan.host_child_state_node(),
     )?;
-    let parent_scope = detached_hosts.validated_scope_for_apply_fiber(
-        store,
-        plan.host_parent_state_node(),
-        plan.root(),
-        plan.host_parent(),
-        HostFiberTokenTarget::Instance,
-    )?;
-    let parent = detached_hosts
-        .nodes
-        .instance_mut(plan.host_parent_state_node(), parent_scope)?;
-    host.remove_child(parent, child.as_host_child())?;
+    let status = match store.fiber_arena().get(plan.host_parent())?.tag() {
+        FiberTag::HostComponent => {
+            let parent_scope = detached_hosts.validated_scope_for_apply_fiber(
+                store,
+                plan.host_parent_state_node(),
+                plan.root(),
+                plan.host_parent(),
+                HostFiberTokenTarget::Instance,
+            )?;
+            let parent = detached_hosts
+                .nodes
+                .instance_mut(plan.host_parent_state_node(), parent_scope)?;
+            host.remove_child(parent, child.as_host_child())?;
+            TestHostRootMutationApplyStatus::Applied(TestHostRootMutationHostCall::RemoveChild)
+        }
+        FiberTag::HostRoot => {
+            let mut container = *root.container_info();
+            host.remove_child_from_container(&mut container, child.as_host_child())?;
+            TestHostRootMutationApplyStatus::Applied(
+                TestHostRootMutationHostCall::RemoveChildFromContainer,
+            )
+        }
+        tag => {
+            return Err(HostWorkError::ExpectedFiberTag {
+                fiber: plan.host_parent(),
+                expected: FiberTag::HostComponent,
+                actual: tag,
+            });
+        }
+    };
 
     Ok(TestHostRootDeletionSubtreeHostDetachmentApplyResult {
         root: commit.root(),
         finished_work: commit.finished_work(),
         plan,
-        status: TestHostRootMutationApplyStatus::Applied(TestHostRootMutationHostCall::RemoveChild),
+        status,
     })
 }
 
@@ -4813,7 +4835,10 @@ fn materialize_test_host_root_deletion_ref_passive_cleanup_execution_from_privat
     let plan = detach_apply.plan();
     let host_subtree_detachment_count = usize::from(matches!(
         detach_apply.status(),
-        TestHostRootMutationApplyStatus::Applied(TestHostRootMutationHostCall::RemoveChild)
+        TestHostRootMutationApplyStatus::Applied(
+            TestHostRootMutationHostCall::RemoveChild
+                | TestHostRootMutationHostCall::RemoveChildFromContainer
+        )
     ));
     if host_subtree_detachment_count == 1 {
         records.push(TestHostRootDeletionRefPassiveCleanupExecutionRecord {
@@ -4926,7 +4951,10 @@ fn materialize_test_host_root_deletion_ref_passive_cleanup_execution_for_canary(
     let plan = detach_apply.plan();
     let host_subtree_detachment_count = usize::from(matches!(
         detach_apply.status(),
-        TestHostRootMutationApplyStatus::Applied(TestHostRootMutationHostCall::RemoveChild)
+        TestHostRootMutationApplyStatus::Applied(
+            TestHostRootMutationHostCall::RemoveChild
+                | TestHostRootMutationHostCall::RemoveChildFromContainer
+        )
     ));
     if host_subtree_detachment_count == 1 {
         records.push(TestHostRootDeletionRefPassiveCleanupExecutionRecord {
