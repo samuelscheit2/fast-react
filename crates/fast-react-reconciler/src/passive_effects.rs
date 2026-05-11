@@ -1293,6 +1293,7 @@ pub(crate) struct PassiveEffectsFlushResult {
     finished_work: Option<FiberId>,
     lanes: Lanes,
     status: PassiveEffectsFlushStatus,
+    scheduler_driven_passive_execution_enabled: bool,
     root_error_propagation: Option<PassiveEffectRootErrorPropagationRecord>,
     records: Vec<PassiveEffectFlushRecord>,
     destroy_callback_executions: Vec<PassiveEffectDestroyCallbackExecutionRecord>,
@@ -1448,7 +1449,11 @@ impl PassiveEffectsFlushResult {
 
     #[must_use]
     pub const fn scheduler_driven_passive_execution_enabled(&self) -> bool {
-        false
+        self.scheduler_driven_passive_execution_enabled
+    }
+
+    fn mark_scheduler_driven_passive_execution_enabled(&mut self) {
+        self.scheduler_driven_passive_execution_enabled = true;
     }
 }
 
@@ -4268,6 +4273,51 @@ pub(crate) enum PassiveEffectsFlushError {
         phase: PendingPassiveEffectPhase,
         order: PendingPassiveEffectOrder,
     },
+    SchedulerPassiveFlushMissingPendingHandoff {
+        root: FiberRootId,
+    },
+    SchedulerPassiveFlushGateRootMismatch {
+        expected: FiberRootId,
+        actual: FiberRootId,
+    },
+    SchedulerPassiveFlushGateFinishedWorkMismatch {
+        root: FiberRootId,
+        expected: FiberId,
+        actual: Option<FiberId>,
+    },
+    SchedulerPassiveFlushGateLanesMismatch {
+        root: FiberRootId,
+        expected: Lanes,
+        actual: Lanes,
+    },
+    SchedulerPassiveFlushGateRecordCountMismatch {
+        root: FiberRootId,
+        expected_unmounts: usize,
+        actual_unmounts: usize,
+        expected_mounts: usize,
+        actual_mounts: usize,
+    },
+    SchedulerPassiveFlushRequestRootMismatch {
+        expected: FiberRootId,
+        actual: FiberRootId,
+    },
+    SchedulerPassiveFlushRequestFinishedWorkMismatch {
+        root: FiberRootId,
+        expected: FiberId,
+        actual: FiberId,
+    },
+    SchedulerPassiveFlushRequestLanesMismatch {
+        root: FiberRootId,
+        expected: Lanes,
+        actual: Lanes,
+    },
+    SchedulerPassiveFlushRequestRecordCountMismatch {
+        root: FiberRootId,
+        expected_unmounts: usize,
+        actual_unmounts: usize,
+        expected_mounts: usize,
+        actual_mounts: usize,
+    },
     CommittedPassiveCallbackInvocationMissingHandoff {
         root: FiberRootId,
     },
@@ -4451,6 +4501,97 @@ impl Display for PassiveEffectsFlushError {
                 fiber.slot().get(),
                 order.sequence()
             ),
+            Self::SchedulerPassiveFlushMissingPendingHandoff { root } => write!(
+                formatter,
+                "root {} scheduler passive flush requires a pending passive commit handoff",
+                root.raw()
+            ),
+            Self::SchedulerPassiveFlushGateRootMismatch { expected, actual } => write!(
+                formatter,
+                "scheduler passive flush expected root {}, found gate root {}",
+                expected.raw(),
+                actual.raw()
+            ),
+            Self::SchedulerPassiveFlushGateFinishedWorkMismatch {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} scheduler passive flush expected finished work fiber slot {}, found gate finished work {:?}",
+                root.raw(),
+                expected.slot().get(),
+                actual.map(|fiber| fiber.slot().get())
+            ),
+            Self::SchedulerPassiveFlushGateLanesMismatch {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} scheduler passive flush expected lanes {:?}, found gate lanes {:?}",
+                root.raw(),
+                expected,
+                actual
+            ),
+            Self::SchedulerPassiveFlushGateRecordCountMismatch {
+                root,
+                expected_unmounts,
+                actual_unmounts,
+                expected_mounts,
+                actual_mounts,
+            } => write!(
+                formatter,
+                "root {} scheduler passive flush expected gate {} unmounts and {} mounts, found {} unmounts and {} mounts",
+                root.raw(),
+                expected_unmounts,
+                expected_mounts,
+                actual_unmounts,
+                actual_mounts
+            ),
+            Self::SchedulerPassiveFlushRequestRootMismatch { expected, actual } => write!(
+                formatter,
+                "scheduler passive flush expected scheduler request root {}, found {}",
+                expected.raw(),
+                actual.raw()
+            ),
+            Self::SchedulerPassiveFlushRequestFinishedWorkMismatch {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} scheduler passive flush expected request finished work fiber slot {}, found {}",
+                root.raw(),
+                expected.slot().get(),
+                actual.slot().get()
+            ),
+            Self::SchedulerPassiveFlushRequestLanesMismatch {
+                root,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "root {} scheduler passive flush expected request lanes {:?}, found {:?}",
+                root.raw(),
+                expected,
+                actual
+            ),
+            Self::SchedulerPassiveFlushRequestRecordCountMismatch {
+                root,
+                expected_unmounts,
+                actual_unmounts,
+                expected_mounts,
+                actual_mounts,
+            } => write!(
+                formatter,
+                "root {} scheduler passive flush expected request {} unmounts and {} mounts, found {} unmounts and {} mounts",
+                root.raw(),
+                expected_unmounts,
+                expected_mounts,
+                actual_unmounts,
+                actual_mounts
+            ),
             Self::CommittedPassiveCallbackInvocationMissingHandoff { root } => write!(
                 formatter,
                 "root {} committed passive callback invocation requires a pending passive commit handoff",
@@ -4526,6 +4667,15 @@ impl Error for PassiveEffectsFlushError {
             | Self::CommittedPassiveEffectRecordCountMismatch { .. }
             | Self::CommittedPassiveEffectDuplicateOrder { .. }
             | Self::CommittedPassiveEffectRecordMismatch { .. }
+            | Self::SchedulerPassiveFlushMissingPendingHandoff { .. }
+            | Self::SchedulerPassiveFlushGateRootMismatch { .. }
+            | Self::SchedulerPassiveFlushGateFinishedWorkMismatch { .. }
+            | Self::SchedulerPassiveFlushGateLanesMismatch { .. }
+            | Self::SchedulerPassiveFlushGateRecordCountMismatch { .. }
+            | Self::SchedulerPassiveFlushRequestRootMismatch { .. }
+            | Self::SchedulerPassiveFlushRequestFinishedWorkMismatch { .. }
+            | Self::SchedulerPassiveFlushRequestLanesMismatch { .. }
+            | Self::SchedulerPassiveFlushRequestRecordCountMismatch { .. }
             | Self::CommittedPassiveCallbackInvocationMissingHandoff { .. }
             | Self::CommittedPassiveCallbackInvocationFiberCountMismatch { .. }
             | Self::CommittedPassiveCallbackInvocationStaleFiber { .. }
@@ -4962,18 +5112,36 @@ pub(crate) fn flush_passive_effects_after_scheduler_flush_gate_from_committed_fi
     store: &mut FiberRootStore<H>,
     commit: &HostRootCommitRecord,
     scheduler_gate: PassiveEffectSchedulerFlushGateRecord,
+    destroy_executor: Option<&mut dyn PassiveEffectDestroyCallbackExecutor>,
+    mount_create_executor: Option<&mut dyn PassiveEffectMountCreateCallbackExecutor>,
 ) -> Result<Option<PassiveEffectSchedulerFlushExecutionRecord>, PassiveEffectsFlushError> {
     let Some(scheduler_request) = scheduler_gate.scheduler_request() else {
         return Ok(None);
     };
+    let handoff = commit.pending_passive_handoff().ok_or(
+        PassiveEffectsFlushError::SchedulerPassiveFlushMissingPendingHandoff {
+            root: commit.root(),
+        },
+    )?;
+    validate_passive_effect_scheduler_flush_gate(handoff, scheduler_gate, scheduler_request)?;
+    validate_update_passive_callback_invocation_committed_fiber_gate(
+        store,
+        handoff,
+        commit.function_component_committed_passive_effects(),
+    )?;
 
-    let passive_effects = flush_passive_effects_after_commit_inner(
+    let mut passive_effects = flush_passive_effects_after_commit_inner(
         store,
         commit,
         PassiveEffectRecordSource::CommittedFiberEffects,
-        None,
-        None,
+        destroy_executor,
+        mount_create_executor,
     )?;
+    if passive_effects.did_execute_destroy_callbacks()
+        || passive_effects.did_execute_mount_create_callbacks()
+    {
+        passive_effects.mark_scheduler_driven_passive_execution_enabled();
+    }
 
     Ok(Some(PassiveEffectSchedulerFlushExecutionRecord {
         execution_order: scheduler_request.order(),
@@ -5015,6 +5183,8 @@ pub(crate) fn preflight_passive_destroy_create_after_scheduler_flush_gate_from_c
             store,
             commit,
             scheduler_gate,
+            None,
+            None,
         )?
         .ok_or(
             PassiveEffectDestroyCreateSchedulerPreflightError::MissingSchedulerRequest {
@@ -5104,6 +5274,7 @@ fn flush_passive_effects_after_commit_inner<H: HostTypes>(
             finished_work: None,
             lanes: Lanes::NO,
             status: PassiveEffectsFlushStatus::NoPendingPassive,
+            scheduler_driven_passive_execution_enabled: false,
             root_error_propagation: None,
             records: Vec::new(),
             destroy_callback_executions: Vec::new(),
@@ -5191,6 +5362,7 @@ fn flush_passive_effects_after_commit_inner<H: HostTypes>(
         finished_work: Some(handoff.finished_work()),
         lanes: handoff.lanes(),
         status: PassiveEffectsFlushStatus::Flushed,
+        scheduler_driven_passive_execution_enabled: false,
         root_error_propagation: Some(root_error_propagation),
         records,
         destroy_callback_executions,
@@ -5479,6 +5651,109 @@ fn validate_passive_destroy_create_scheduler_preflight_request(
     {
         return Err(
             PassiveEffectDestroyCreateSchedulerPreflightError::SchedulerRequestRecordCountMismatch {
+                root: handoff.root(),
+                expected_unmounts: handoff.pending_unmount_count(),
+                actual_unmounts: scheduler_request.pending_unmount_count(),
+                expected_mounts: handoff.pending_mount_count(),
+                actual_mounts: scheduler_request.pending_mount_count(),
+            },
+        );
+    }
+
+    Ok(())
+}
+
+fn validate_passive_effect_scheduler_flush_gate(
+    handoff: PendingPassiveCommitHandoff,
+    scheduler_gate: PassiveEffectSchedulerFlushGateRecord,
+    scheduler_request: SchedulerPassiveEffectsFlushRequest,
+) -> Result<SchedulerPassiveEffectsFlushRequest, PassiveEffectsFlushError> {
+    if scheduler_gate.root() != handoff.root() {
+        return Err(
+            PassiveEffectsFlushError::SchedulerPassiveFlushGateRootMismatch {
+                expected: handoff.root(),
+                actual: scheduler_gate.root(),
+            },
+        );
+    }
+
+    if scheduler_gate.finished_work() != Some(handoff.finished_work()) {
+        return Err(
+            PassiveEffectsFlushError::SchedulerPassiveFlushGateFinishedWorkMismatch {
+                root: handoff.root(),
+                expected: handoff.finished_work(),
+                actual: scheduler_gate.finished_work(),
+            },
+        );
+    }
+
+    if scheduler_gate.lanes() != handoff.lanes() {
+        return Err(
+            PassiveEffectsFlushError::SchedulerPassiveFlushGateLanesMismatch {
+                root: handoff.root(),
+                expected: handoff.lanes(),
+                actual: scheduler_gate.lanes(),
+            },
+        );
+    }
+
+    if scheduler_gate.pending_unmount_count() != handoff.pending_unmount_count()
+        || scheduler_gate.pending_mount_count() != handoff.pending_mount_count()
+    {
+        return Err(
+            PassiveEffectsFlushError::SchedulerPassiveFlushGateRecordCountMismatch {
+                root: handoff.root(),
+                expected_unmounts: handoff.pending_unmount_count(),
+                actual_unmounts: scheduler_gate.pending_unmount_count(),
+                expected_mounts: handoff.pending_mount_count(),
+                actual_mounts: scheduler_gate.pending_mount_count(),
+            },
+        );
+    }
+
+    validate_passive_effect_scheduler_flush_request(handoff, scheduler_request)?;
+
+    Ok(scheduler_request)
+}
+
+fn validate_passive_effect_scheduler_flush_request(
+    handoff: PendingPassiveCommitHandoff,
+    scheduler_request: SchedulerPassiveEffectsFlushRequest,
+) -> Result<(), PassiveEffectsFlushError> {
+    if scheduler_request.root() != handoff.root() {
+        return Err(
+            PassiveEffectsFlushError::SchedulerPassiveFlushRequestRootMismatch {
+                expected: handoff.root(),
+                actual: scheduler_request.root(),
+            },
+        );
+    }
+
+    if scheduler_request.finished_work() != handoff.finished_work() {
+        return Err(
+            PassiveEffectsFlushError::SchedulerPassiveFlushRequestFinishedWorkMismatch {
+                root: handoff.root(),
+                expected: handoff.finished_work(),
+                actual: scheduler_request.finished_work(),
+            },
+        );
+    }
+
+    if scheduler_request.lanes() != handoff.lanes() {
+        return Err(
+            PassiveEffectsFlushError::SchedulerPassiveFlushRequestLanesMismatch {
+                root: handoff.root(),
+                expected: handoff.lanes(),
+                actual: scheduler_request.lanes(),
+            },
+        );
+    }
+
+    if scheduler_request.pending_unmount_count() != handoff.pending_unmount_count()
+        || scheduler_request.pending_mount_count() != handoff.pending_mount_count()
+    {
+        return Err(
+            PassiveEffectsFlushError::SchedulerPassiveFlushRequestRecordCountMismatch {
                 root: handoff.root(),
                 expected_unmounts: handoff.pending_unmount_count(),
                 actual_unmounts: scheduler_request.pending_unmount_count(),
@@ -8011,7 +8286,7 @@ mod tests {
     }
 
     #[test]
-    fn passive_effects_scheduler_flush_gate_flushes_metadata_without_callbacks() {
+    fn passive_effects_scheduler_flush_gate_executes_private_destroy_create_callbacks() {
         let (mut store, root_id, host) = root_store();
         let previous_current = store.root(root_id).unwrap().current();
         let component = FiberTypeHandle::from_raw(1040);
@@ -8084,6 +8359,9 @@ mod tests {
 
         let scheduler_gate =
             schedule_passive_effects_flush_after_commit_for_canary(&mut store, &commit).unwrap();
+        let mut destroy_executor = RecordingDestroyExecutor::default();
+        let mut mount_create_executor = RecordingMountCreateExecutor::default()
+            .with_returned_destroy(callback(1047), Some(callback(1049)));
 
         assert!(scheduler_gate.did_schedule_scheduler_flush_request());
         assert_eq!(scheduler_gate.root(), root_id);
@@ -8126,6 +8404,8 @@ mod tests {
                 &mut store,
                 &commit,
                 scheduler_gate,
+                Some(&mut destroy_executor),
+                Some(&mut mount_create_executor),
             )
             .unwrap()
             .unwrap();
@@ -8140,7 +8420,7 @@ mod tests {
         assert_eq!(execution.pending_mount_count(), 1);
         assert_eq!(execution.pending_record_count(), 2);
         assert!(execution.did_flush_pending_passive());
-        assert!(!execution.did_execute_private_callback_executors());
+        assert!(execution.did_execute_private_callback_executors());
         assert!(!execution.executes_public_effects());
         assert!(!execution.public_act_compatibility_claimed());
         assert!(!execution.public_scheduler_package_behavior_changed());
@@ -8149,11 +8429,13 @@ mod tests {
         assert_eq!(passive.status(), PassiveEffectsFlushStatus::Flushed);
         assert!(passive.consumed_pending_passive());
         assert_eq!(passive.records().len(), 2);
-        assert!(!passive.did_execute_destroy_callbacks());
-        assert!(!passive.did_execute_mount_create_callbacks());
+        assert!(passive.did_execute_destroy_callbacks());
+        assert!(passive.did_execute_mount_create_callbacks());
+        assert_eq!(passive.destroy_callback_executions().len(), 1);
+        assert_eq!(passive.mount_create_callback_executions().len(), 1);
         assert!(!passive.public_effect_execution_enabled());
         assert!(!passive.public_act_compatibility_claimed());
-        assert!(!passive.scheduler_driven_passive_execution_enabled());
+        assert!(passive.scheduler_driven_passive_execution_enabled());
 
         let unmount = passive.records()[0];
         let mount = passive.records()[1];
@@ -8179,10 +8461,39 @@ mod tests {
         assert_eq!(mount.effect_instance(), Some(registration.instance()));
         assert_eq!(unmount.destroy_callback(), Some(callback(1044)));
         assert_eq!(mount.create_callback(), Some(callback(1047)));
-        assert!(!unmount.destroy_callback_invoked());
-        assert!(!mount.create_callback_invoked());
+        assert!(unmount.destroy_callback_invoked());
+        assert!(mount.create_callback_invoked());
         assert!(!unmount.create_callback_invoked());
         assert!(!mount.destroy_callback_invoked());
+
+        let destroy_execution = passive.destroy_callback_executions()[0];
+        assert_eq!(destroy_execution.execution_order(), 0);
+        assert_eq!(
+            destroy_execution.pending_order(),
+            queued_effect.unmount_order().unwrap()
+        );
+        assert_eq!(destroy_execution.destroy_callback(), callback(1044));
+        let mount_create_execution = passive.mount_create_callback_executions()[0];
+        assert_eq!(mount_create_execution.execution_order(), 0);
+        assert_eq!(
+            mount_create_execution.pending_order(),
+            queued_effect.mount_order()
+        );
+        assert_eq!(mount_create_execution.create_callback(), callback(1047));
+        assert_eq!(
+            mount_create_execution.returned_destroy(),
+            Some(callback(1049))
+        );
+        assert_eq!(destroy_executor.calls().len(), 1);
+        assert_eq!(
+            destroy_executor.calls()[0].destroy_callback(),
+            callback(1044)
+        );
+        assert_eq!(mount_create_executor.calls().len(), 1);
+        assert_eq!(
+            mount_create_executor.calls()[0].create_callback(),
+            callback(1047)
+        );
 
         assert!(
             store
@@ -8203,6 +8514,272 @@ mod tests {
         assert_eq!(
             store.scheduler_bridge().microtask_requests().len(),
             microtask_request_count
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn passive_effects_scheduler_execution_rejects_foreign_gate_before_callbacks() {
+        let host = RecordingHost::default();
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let first_root = store
+            .create_client_root(FakeContainer::new(1), RootOptions::new())
+            .unwrap();
+        let second_root = store
+            .create_client_root(FakeContainer::new(2), RootOptions::new())
+            .unwrap();
+        let first = prepare_committed_passive_update_fixture(&mut store, first_root, 13_400);
+        let second = prepare_committed_passive_update_fixture(&mut store, second_root, 13_500);
+        let foreign_scheduler_gate =
+            schedule_passive_effects_flush_after_commit_for_canary(&mut store, &first.commit)
+                .unwrap();
+        let callback_request_count = store.scheduler_bridge().callback_requests().len();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+        let mut destroy_executor = RecordingDestroyExecutor::default();
+        let mut mount_create_executor = RecordingMountCreateExecutor::default()
+            .with_returned_destroy(
+                second.create_callback,
+                Some(second.returned_destroy_callback),
+            );
+
+        let error =
+            flush_passive_effects_after_scheduler_flush_gate_from_committed_fiber_effects_for_canary(
+                &mut store,
+                &second.commit,
+                foreign_scheduler_gate,
+                Some(&mut destroy_executor),
+                Some(&mut mount_create_executor),
+            )
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            PassiveEffectsFlushError::SchedulerPassiveFlushGateRootMismatch {
+                expected,
+                actual,
+            } if expected == second_root && actual == first_root
+        ));
+        assert!(destroy_executor.calls().is_empty());
+        assert!(mount_create_executor.calls().is_empty());
+        let second_pending = store
+            .root(second_root)
+            .unwrap()
+            .scheduling()
+            .pending_passive();
+        assert_eq!(second_pending.root(), Some(second_root));
+        assert_eq!(second_pending.finished_work(), Some(second.finished_work));
+        assert!(second_pending.has_commit_handoff());
+        assert_eq!(second_pending.passive_unmount_count(), 1);
+        assert_eq!(second_pending.passive_mount_count(), 1);
+        assert_eq!(second_pending.pending_record_count(), 2);
+        assert_eq!(
+            store.scheduler_bridge().callback_requests().len(),
+            callback_request_count
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn passive_effects_scheduler_execution_rejects_stale_fiber_before_callbacks() {
+        let (mut store, root_id, host) = root_store();
+        let fixture = prepare_committed_passive_update_fixture(&mut store, root_id, 13_600);
+        let scheduler_gate =
+            schedule_passive_effects_flush_after_commit_for_canary(&mut store, &fixture.commit)
+                .unwrap();
+        let callback_request_count = store.scheduler_bridge().callback_requests().len();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+        store
+            .fiber_arena_mut()
+            .set_children(fixture.finished_work, &[])
+            .unwrap();
+        let mut destroy_executor = RecordingDestroyExecutor::default();
+        let mut mount_create_executor = RecordingMountCreateExecutor::default()
+            .with_returned_destroy(
+                fixture.create_callback,
+                Some(fixture.returned_destroy_callback),
+            );
+
+        let error =
+            flush_passive_effects_after_scheduler_flush_gate_from_committed_fiber_effects_for_canary(
+                &mut store,
+                &fixture.commit,
+                scheduler_gate,
+                Some(&mut destroy_executor),
+                Some(&mut mount_create_executor),
+            )
+            .unwrap_err();
+        let pending_passive = store.root(root_id).unwrap().scheduling().pending_passive();
+
+        assert!(matches!(
+            error,
+            PassiveEffectsFlushError::CommittedPassiveCallbackInvocationStaleFiber {
+                root,
+                finished_work,
+                fiber,
+            } if root == root_id
+                && finished_work == fixture.finished_work
+                && fiber == fixture.finished_function
+        ));
+        assert!(destroy_executor.calls().is_empty());
+        assert!(mount_create_executor.calls().is_empty());
+        assert_eq!(pending_passive.root(), Some(root_id));
+        assert_eq!(pending_passive.finished_work(), Some(fixture.finished_work));
+        assert!(pending_passive.has_commit_handoff());
+        assert_eq!(pending_passive.passive_unmount_count(), 1);
+        assert_eq!(pending_passive.passive_mount_count(), 1);
+        assert_eq!(pending_passive.pending_record_count(), 2);
+        assert_eq!(
+            store.scheduler_bridge().callback_requests().len(),
+            callback_request_count
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn passive_effects_scheduler_execution_rejects_wrong_pending_order_before_callbacks() {
+        let (mut store, root_id, host) = root_store();
+        let fixture = prepare_committed_passive_update_fixture(&mut store, root_id, 13_700);
+        let scheduler_gate =
+            schedule_passive_effects_flush_after_commit_for_canary(&mut store, &fixture.commit)
+                .unwrap();
+        let callback_request_count = store.scheduler_bridge().callback_requests().len();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+        let (mount_order, unmount_order) = {
+            let scheduling = store.root_mut(root_id).unwrap().scheduling_mut();
+            scheduling.prepare_pending_passive(root_id, Lanes::NO);
+            let mount_order = scheduling
+                .pending_passive_mut()
+                .queue_mount(fixture.finished_function, Lanes::DEFAULT)
+                .unwrap();
+            let unmount_order = scheduling
+                .pending_passive_mut()
+                .queue_unmount(
+                    fixture.finished_function,
+                    PendingPassiveUnmountOrigin::UpdatedFiber,
+                    Lanes::DEFAULT,
+                )
+                .unwrap();
+            assert!(scheduling.pending_passive_mut().record_commit_handoff(
+                root_id,
+                fixture.finished_work,
+                Lanes::DEFAULT,
+            ));
+            (mount_order, unmount_order)
+        };
+        assert_eq!(mount_order.phase(), PendingPassiveEffectPhase::Mount);
+        assert_eq!(unmount_order.phase(), PendingPassiveEffectPhase::Unmount);
+        assert!(mount_order.sequence() < unmount_order.sequence());
+        let mut destroy_executor = RecordingDestroyExecutor::default();
+        let mut mount_create_executor = RecordingMountCreateExecutor::default()
+            .with_returned_destroy(
+                fixture.create_callback,
+                Some(fixture.returned_destroy_callback),
+            );
+
+        let error =
+            flush_passive_effects_after_scheduler_flush_gate_from_committed_fiber_effects_for_canary(
+                &mut store,
+                &fixture.commit,
+                scheduler_gate,
+                Some(&mut destroy_executor),
+                Some(&mut mount_create_executor),
+            )
+            .unwrap_err();
+        let pending_passive = store.root(root_id).unwrap().scheduling().pending_passive();
+
+        assert!(matches!(
+            error,
+            PassiveEffectsFlushError::CommittedPassiveEffectRecordMismatch {
+                root,
+                fiber,
+                phase: PendingPassiveEffectPhase::Unmount,
+                order,
+            } if root == root_id && fiber == fixture.finished_function && order == unmount_order
+        ));
+        assert!(destroy_executor.calls().is_empty());
+        assert!(mount_create_executor.calls().is_empty());
+        assert_eq!(pending_passive.root(), Some(root_id));
+        assert_eq!(pending_passive.finished_work(), Some(fixture.finished_work));
+        assert!(pending_passive.has_commit_handoff());
+        assert_eq!(pending_passive.passive_unmount_count(), 1);
+        assert_eq!(pending_passive.passive_mount_count(), 1);
+        assert_eq!(pending_passive.pending_record_count(), 2);
+        assert_eq!(
+            store.scheduler_bridge().callback_requests().len(),
+            callback_request_count
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn passive_effects_scheduler_execution_requires_scheduled_handoff_before_consuming() {
+        let (mut store, root_id, host) = root_store();
+        let fixture = prepare_committed_passive_update_fixture(&mut store, root_id, 13_800);
+        let no_handoff_root = store
+            .create_client_root(FakeContainer::new(3), RootOptions::new())
+            .unwrap();
+        update_container(
+            &mut store,
+            no_handoff_root,
+            RootElementHandle::from_raw(13_810),
+            None,
+        )
+        .unwrap();
+        let render =
+            render_host_root_for_lanes(&mut store, no_handoff_root, Lanes::DEFAULT).unwrap();
+        let no_handoff_commit = commit_finished_host_root(&mut store, render).unwrap();
+        let scheduler_gate =
+            schedule_passive_effects_flush_after_commit_for_canary(&mut store, &no_handoff_commit)
+                .unwrap();
+        let callback_request_count = store.scheduler_bridge().callback_requests().len();
+        let act_queue_request_count = store.scheduler_bridge().act_queue_requests().len();
+        let mut destroy_executor = RecordingDestroyExecutor::default();
+        let mut mount_create_executor = RecordingMountCreateExecutor::default()
+            .with_returned_destroy(
+                fixture.create_callback,
+                Some(fixture.returned_destroy_callback),
+            );
+
+        let execution =
+            flush_passive_effects_after_scheduler_flush_gate_from_committed_fiber_effects_for_canary(
+                &mut store,
+                &fixture.commit,
+                scheduler_gate,
+                Some(&mut destroy_executor),
+                Some(&mut mount_create_executor),
+            )
+            .unwrap();
+        let pending_passive = store.root(root_id).unwrap().scheduling().pending_passive();
+
+        assert_eq!(scheduler_gate.scheduler_request(), None);
+        assert_eq!(execution, None);
+        assert!(destroy_executor.calls().is_empty());
+        assert!(mount_create_executor.calls().is_empty());
+        assert_eq!(pending_passive.root(), Some(root_id));
+        assert_eq!(pending_passive.finished_work(), Some(fixture.finished_work));
+        assert!(pending_passive.has_commit_handoff());
+        assert_eq!(pending_passive.passive_unmount_count(), 1);
+        assert_eq!(pending_passive.passive_mount_count(), 1);
+        assert_eq!(pending_passive.pending_record_count(), 2);
+        assert_eq!(
+            store.scheduler_bridge().callback_requests().len(),
+            callback_request_count
+        );
+        assert_eq!(
+            store.scheduler_bridge().act_queue_requests().len(),
+            act_queue_request_count
         );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
