@@ -41,6 +41,8 @@ use crate::context::{
     record_context_provider_update_single_consumer_lane_gate,
     record_context_provider_update_two_consumer_lane_gate,
 };
+#[cfg(test)]
+use crate::root_commit::HostRootMutationApplyRecordKind;
 use crate::{
     FiberRootId, FiberRootStore, FiberRootStoreError, HostRootStateStoreError, RootElementHandle,
     RootRenderExitStatus, RootSchedulerCallbackHandle, UpdateQueueError, WorkInProgressError,
@@ -128,7 +130,6 @@ use crate::{
         HostRootFinishedWorkCommitHandoffErrorForCanary,
         HostRootFinishedWorkCommitHandoffRecordForCanary,
         HostRootFinishedWorkPendingCommitRecordForCanary,
-        HostRootMutationApplyRecordKind,
         HostRootPlacementApplyDiagnosticForCanary,
         HostRootSingleHostUpdateApplyRecordErrorForCanary,
         HostRootSingleHostUpdateApplyRecordForCanary,
