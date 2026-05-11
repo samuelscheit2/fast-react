@@ -5933,8 +5933,12 @@ test("react-test-renderer lifecycle-gated TestInstance diagnostics reject cross-
   const cjsEntry = entrypoints.find(
     (entry) => entry.entrypoint === cjsDevelopmentEntrypoint
   );
+  const cjsProductionEntry = entrypoints.find(
+    (entry) => entry.entrypoint === cjsProductionEntrypoint
+  );
   assert.notEqual(packageEntry, undefined);
   assert.notEqual(cjsEntry, undefined);
+  assert.notEqual(cjsProductionEntry, undefined);
 
   const packageExports = loadFresh(packageEntry.modulePath);
   const packageBridge = assertPrivateRootRequestBridge(
@@ -5966,6 +5970,37 @@ test("react-test-renderer lifecycle-gated TestInstance diagnostics reject cross-
     cjsBridge.consumePrivateRootLifecycleExecutionEvidence(crossEntrypointRows)
   );
   assert.match(error.message, /source-owned private root lifecycle/u);
+
+  const cjsProductionExports = loadFresh(cjsProductionEntry.modulePath);
+  const cjsProductionBridge = assertPrivateRootRequestBridge(
+    cjsProductionExports,
+    cjsProductionEntry.entrypoint
+  );
+  const packageToProductionError = captureThrown(() =>
+    cjsProductionBridge.consumePrivateRootLifecycleExecutionEvidence(
+      crossEntrypointRows
+    )
+  );
+  assert.match(
+    packageToProductionError.message,
+    /source-owned private root lifecycle/u
+  );
+
+  const cjsRows = createPrivateRootLifecycleExecutionRows(
+    cjsExports,
+    cjsBridge
+  );
+  const developmentToProductionError = captureThrown(() =>
+    cjsProductionBridge.consumePrivateRootLifecycleExecutionEvidence({
+      create: cjsRows.createResult,
+      update: cjsRows.updateResult,
+      unmount: cjsRows.unmountResult
+    })
+  );
+  assert.match(
+    developmentToProductionError.message,
+    /source-owned private root lifecycle/u
+  );
 });
 
 test("react-test-renderer create routing gate feeds only private error diagnostic rows", () => {
@@ -6334,155 +6369,275 @@ test("react-test-renderer CJS private TestInstance bridge records deterministic 
 });
 
 test("react-test-renderer CJS private TestInstance bridge records deterministic findBy diagnostics", () => {
-  const entry = cjsEntrypoints.find((candidate) =>
-    candidate.entrypoint.endsWith("react-test-renderer.development")
-  );
-  assert.notEqual(entry, undefined);
+  for (const entry of cjsEntrypoints.filter((candidate) =>
+    hasCompletePrivateRootLifecycleExecutionSourceRecords(candidate.entrypoint)
+  )) {
+    const moduleExports = loadFresh(entry.modulePath);
+    const bridge = assertPrivateRootRequestBridge(
+      moduleExports,
+      entry.entrypoint
+    );
+    const { record, renderer, unmountResult } =
+      createAcceptedTestInstanceLifecycle(moduleExports, bridge, {
+        element: { props: { children: "private-find-by" }, type: "span" }
+      });
+    const currentRequest = unmountResult.request;
+    const diagnostics = record.findByQueryDiagnostics;
 
-  const moduleExports = loadFresh(entry.modulePath);
-  const bridge = assertPrivateRootRequestBridge(
-    moduleExports,
-    entry.entrypoint
-  );
-  const { record, renderer, unmountResult } =
-    createAcceptedTestInstanceLifecycle(moduleExports, bridge, {
-      element: { props: { children: "private-find-by" }, type: "span" }
-    });
-  const currentRequest = unmountResult.request;
-  const diagnostics = record.findByQueryDiagnostics;
-
-  assertPrivateFindByQueryDiagnostics(diagnostics, record, entry.entrypoint);
-  assert.equal(
-    diagnostics.basedOnFindAllPredicateDiagnostics,
-    record.findAllPredicateDiagnostics,
-    entry.entrypoint
-  );
-  assert.equal(
-    record.rootRequestTestInstanceQueryMetadata.findByDiagnosticsAvailable,
-    true,
-    entry.entrypoint
-  );
-  assert.deepEqual(
-    record.rootRequestTestInstanceQueryMetadata.findByQueries,
-    ["findByType", "findByProps"],
-    entry.entrypoint
-  );
-  assert.equal(
-    record.rootRequestTestInstanceQueryMetadata.findByEffectiveDeep,
-    false,
-    entry.entrypoint
-  );
-  assert.equal(
-    record.rootRequestTestInstanceQueryMetadata.findByExpectOne,
-    true,
-    entry.entrypoint
-  );
-  assert.equal(
-    record.rootRequestTestInstanceQueryMetadata.findByPredicateExecution,
-    false,
-    entry.entrypoint
-  );
-  assert.deepEqual(
-    record.rootRequestTestInstanceQueryMetadata.findByAcceptedRustApis,
-    diagnostics.acceptedRustApis,
-    entry.entrypoint
-  );
-  assert.equal(
-    bridge.getTestInstanceQueryDiagnostics(currentRequest),
-    record,
-    entry.entrypoint
-  );
-  assertNoPublicTestInstanceQueryMethods(renderer, entry.entrypoint);
+    assertPrivateFindByQueryDiagnostics(diagnostics, record, entry.entrypoint);
+    assert.equal(
+      diagnostics.basedOnFindAllPredicateDiagnostics,
+      record.findAllPredicateDiagnostics,
+      entry.entrypoint
+    );
+    assert.equal(
+      record.rootRequestTestInstanceQueryMetadata.findByDiagnosticsAvailable,
+      true,
+      entry.entrypoint
+    );
+    assert.deepEqual(
+      record.rootRequestTestInstanceQueryMetadata.findByQueries,
+      ["findByType", "findByProps"],
+      entry.entrypoint
+    );
+    assert.equal(
+      record.rootRequestTestInstanceQueryMetadata.findByEffectiveDeep,
+      false,
+      entry.entrypoint
+    );
+    assert.equal(
+      record.rootRequestTestInstanceQueryMetadata.findByExpectOne,
+      true,
+      entry.entrypoint
+    );
+    assert.equal(
+      record.rootRequestTestInstanceQueryMetadata.findByPredicateExecution,
+      false,
+      entry.entrypoint
+    );
+    assert.deepEqual(
+      record.rootRequestTestInstanceQueryMetadata.findByAcceptedRustApis,
+      diagnostics.acceptedRustApis,
+      entry.entrypoint
+    );
+    assert.equal(
+      bridge.getTestInstanceQueryDiagnostics(currentRequest),
+      record,
+      entry.entrypoint
+    );
+    assertNoPublicTestInstanceQueryMethods(renderer, entry.entrypoint);
+  }
 });
 
 test("react-test-renderer CJS private TestInstance query bridge preflights accepted Rust diagnostics records", () => {
-  const entry = cjsEntrypoints.find((candidate) =>
-    candidate.entrypoint.endsWith("react-test-renderer.development")
-  );
-  assert.notEqual(entry, undefined);
+  for (const entry of cjsEntrypoints.filter((candidate) =>
+    hasCompletePrivateRootLifecycleExecutionSourceRecords(candidate.entrypoint)
+  )) {
+    const moduleExports = loadFresh(entry.modulePath);
+    const bridge = assertPrivateRootRequestBridge(
+      moduleExports,
+      entry.entrypoint
+    );
+    const { record, renderer, unmountResult } =
+      createAcceptedTestInstanceLifecycle(moduleExports, bridge, {
+        element: { props: { children: "private-query-preflight" }, type: "span" }
+      });
+    const currentRequest = unmountResult.request;
+    const preflight = record.queryBridgePreflight;
 
-  const moduleExports = loadFresh(entry.modulePath);
-  const bridge = assertPrivateRootRequestBridge(
-    moduleExports,
-    entry.entrypoint
-  );
-  const { record, renderer, unmountResult } =
-    createAcceptedTestInstanceLifecycle(moduleExports, bridge, {
-      element: { props: { children: "private-query-preflight" }, type: "span" }
-    });
-  const currentRequest = unmountResult.request;
-  const preflight = record.queryBridgePreflight;
+    assertPrivateTestInstanceQueryBridgePreflight(
+      preflight,
+      record,
+      currentRequest,
+      entry.entrypoint
+    );
+    assert.equal(
+      bridge.getTestInstanceQueryBridgePreflight(currentRequest),
+      preflight,
+      entry.entrypoint
+    );
+    assert.equal(
+      bridge.getRootTestInstanceQueryBridgePreflight(currentRequest.rootHandle),
+      preflight,
+      entry.entrypoint
+    );
+    assert.equal(
+      bridge.getRendererTestInstanceQueryBridgePreflight(renderer),
+      preflight,
+      entry.entrypoint
+    );
+    assert.equal(
+      bridge.canConsumeAcceptedRustTestInstanceQueryDiagnostics(currentRequest, {
+        findAll: record.findAllPredicateDiagnostics,
+        findBy: record.findByQueryDiagnostics
+      }),
+      true,
+      entry.entrypoint
+    );
 
-  assertPrivateTestInstanceQueryBridgePreflight(
-    preflight,
-    record,
-    currentRequest,
-    entry.entrypoint
-  );
-  assert.equal(
-    bridge.getTestInstanceQueryBridgePreflight(currentRequest),
-    preflight,
-    entry.entrypoint
-  );
-  assert.equal(
-    bridge.getRootTestInstanceQueryBridgePreflight(currentRequest.rootHandle),
-    preflight,
-    entry.entrypoint
-  );
-  assert.equal(
-    bridge.getRendererTestInstanceQueryBridgePreflight(renderer),
-    preflight,
-    entry.entrypoint
-  );
-  assert.equal(
-    bridge.canConsumeAcceptedRustTestInstanceQueryDiagnostics(currentRequest, {
-      findAll: record.findAllPredicateDiagnostics,
-      findBy: record.findByQueryDiagnostics
-    }),
-    true,
-    entry.entrypoint
-  );
+    const consumed = bridge.consumeAcceptedRustTestInstanceQueryDiagnostics(
+      currentRequest,
+      {
+        findAll: record.findAllPredicateDiagnostics,
+        findBy: record.findByQueryDiagnostics
+      }
+    );
+    assertPrivateTestInstanceQueryBridgePreflight(
+      consumed,
+      record,
+      currentRequest,
+      `${entry.entrypoint} consumed`
+    );
+    assert.equal(
+      consumed.acceptedRustFindAllDiagnostics,
+      record.findAllPredicateDiagnostics,
+      entry.entrypoint
+    );
+    assert.equal(
+      consumed.acceptedRustFindByDiagnostics,
+      record.findByQueryDiagnostics,
+      entry.entrypoint
+    );
+    assert.equal(
+      bridge.canConsumeAcceptedRustTestInstanceQueryDiagnostics(currentRequest, {
+        findAll: { diagnosticName: "not-accepted" },
+        findBy: record.findByQueryDiagnostics
+      }),
+      false,
+      entry.entrypoint
+    );
+    assert.equal(
+      bridge.canConsumeAcceptedRustTestInstanceQueryDiagnostics(currentRequest, {
+        findAll: { ...record.findAllPredicateDiagnostics },
+        findBy: record.findByQueryDiagnostics
+      }),
+      false,
+      `${entry.entrypoint} caller-shaped findAll row rejected`
+    );
+    assertNoPublicTestInstanceQueryMethods(renderer, entry.entrypoint);
+  }
+});
 
-  const consumed = bridge.consumeAcceptedRustTestInstanceQueryDiagnostics(
-    currentRequest,
-    {
-      findAll: record.findAllPredicateDiagnostics,
-      findBy: record.findByQueryDiagnostics
+test("react-test-renderer CJS private TestInstance query currentness rejects shape-only public and native claims", () => {
+  for (const entry of cjsEntrypoints.filter((candidate) =>
+    hasCompletePrivateRootLifecycleExecutionSourceRecords(candidate.entrypoint)
+  )) {
+    const moduleExports = loadFresh(entry.modulePath);
+    const bridge = assertPrivateRootRequestBridge(
+      moduleExports,
+      entry.entrypoint
+    );
+    const { record, renderer, unmountResult } =
+      createAcceptedTestInstanceLifecycle(moduleExports, bridge, {
+        element: { props: { children: "private-query-negative" }, type: "span" }
+      });
+    const [createRequest] = bridge.getRendererRootRequests(renderer);
+    const currentRequest = unmountResult.request;
+
+    assertPrivateTestInstanceLifecycleGate(
+      bridge.getTestInstanceQueryBridgePreflight(createRequest),
+      entry.entrypoint,
+      {
+        acceptedLifecycleEvidenceAvailable: true,
+        currentRootRequest: currentRequest,
+        exposesPrivateQueryDiagnostics: false,
+        rootRequest: createRequest
+      }
+    );
+    assert.equal(
+      bridge.getTestInstanceQueryBridgePreflight(currentRequest),
+      record.queryBridgePreflight,
+      entry.entrypoint
+    );
+
+    for (const [label, diagnostics] of [
+      [
+        "public-testinstance",
+        {
+          findAll: {
+            ...record.findAllPredicateDiagnostics,
+            publicTestInstanceObjectAvailable: true
+          },
+          findBy: record.findByQueryDiagnostics
+        }
+      ],
+      [
+        "public-serialization",
+        {
+          findAll: record.findAllPredicateDiagnostics,
+          findBy: {
+            ...record.findByQueryDiagnostics,
+            publicSerializationAvailable: true,
+            publicToJSONAvailable: true,
+            publicToTreeAvailable: true
+          }
+        }
+      ],
+      [
+        "native-bridge-execution",
+        {
+          findAll: {
+            ...record.findAllPredicateDiagnostics,
+            nativeBridgeAvailable: true,
+            nativeExecution: true
+          },
+          findBy: record.findByQueryDiagnostics
+        }
+      ],
+      [
+        "act-scheduler-smuggling",
+        {
+          findAll: record.findAllPredicateDiagnostics,
+          findBy: {
+            ...record.findByQueryDiagnostics,
+            publicActAvailable: true,
+            publicSchedulerAvailable: true
+          }
+        }
+      ],
+      [
+        "package-compatibility",
+        {
+          findAll: {
+            ...record.findAllPredicateDiagnostics,
+            compatibilityClaimed: true
+          },
+          findBy: record.findByQueryDiagnostics
+        }
+      ]
+    ]) {
+      assert.equal(
+        bridge.canConsumeAcceptedRustTestInstanceQueryDiagnostics(
+          currentRequest,
+          diagnostics
+        ),
+        false,
+        `${entry.entrypoint} ${label}`
+      );
+      const error = captureThrown(() =>
+        bridge.consumeAcceptedRustTestInstanceQueryDiagnostics(
+          currentRequest,
+          diagnostics
+        )
+      );
+      assert.equal(
+        error.name,
+        "FastReactTestRendererPrivateRootRequestError",
+        `${entry.entrypoint} ${label}`
+      );
+      assert.match(
+        error.message,
+        /source-owned records/u,
+        `${entry.entrypoint} ${label}`
+      );
     }
-  );
-  assertPrivateTestInstanceQueryBridgePreflight(
-    consumed,
-    record,
-    currentRequest,
-    `${entry.entrypoint} consumed`
-  );
-  assert.equal(
-    consumed.acceptedRustFindAllDiagnostics,
-    record.findAllPredicateDiagnostics,
-    entry.entrypoint
-  );
-  assert.equal(
-    consumed.acceptedRustFindByDiagnostics,
-    record.findByQueryDiagnostics,
-    entry.entrypoint
-  );
-  assert.equal(
-    bridge.canConsumeAcceptedRustTestInstanceQueryDiagnostics(currentRequest, {
-      findAll: { diagnosticName: "not-accepted" },
-      findBy: record.findByQueryDiagnostics
-    }),
-    false,
-    entry.entrypoint
-  );
-  assert.equal(
-    bridge.canConsumeAcceptedRustTestInstanceQueryDiagnostics(currentRequest, {
-      findAll: { ...record.findAllPredicateDiagnostics },
-      findBy: record.findByQueryDiagnostics
-    }),
-    false,
-    `${entry.entrypoint} caller-shaped findAll row rejected`
-  );
-  assertNoPublicTestInstanceQueryMethods(renderer, entry.entrypoint);
+
+    assertNoPublicTestInstanceQueryMethods(renderer, entry.entrypoint);
+    assert.throws(() => renderer.root, {
+      code: "FAST_REACT_UNIMPLEMENTED",
+      name: "FastReactTestRendererUnimplementedError"
+    });
+  }
 });
 
 test("react-test-renderer CJS private TestInstance query consumes accepted native create/update execution records", () => {
