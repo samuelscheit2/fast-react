@@ -7502,13 +7502,23 @@ pub struct TestRendererPrivateUnmountNestedSourceReportAdmissionGate {
     status: &'static str,
     nested_root: FiberRootId,
     unmount_root: FiberRootId,
+    nested_renderer_id: TestRendererId,
+    unmount_renderer_id: TestRendererId,
     nested_route_record_id: &'static str,
     nested_route_status: &'static str,
     unmount_admission_record_id: &'static str,
     unmount_admission_status: &'static str,
     nested_identity_diagnostic_name: &'static str,
+    nested_identity_public_surface: &'static str,
+    nested_identity_source_serialization_diagnostic_name: &'static str,
     unmount_identity_diagnostic_name: &'static str,
+    unmount_identity_public_surface: &'static str,
+    unmount_identity_source_serialization_diagnostic_name: &'static str,
     nested_source_report_diagnostic_name: &'static str,
+    nested_host_output_row_id: &'static str,
+    unmount_host_output_row_id: &'static str,
+    nested_scheduled_update_sequence: usize,
+    unmount_scheduled_update_sequence: usize,
     nested_host_output_shape: TestRendererPrivateToJsonHostOutputShape,
     unmount_host_output_shape: TestRendererPrivateToJsonHostOutputShape,
     nested_source_node_count: usize,
@@ -7586,13 +7596,53 @@ impl TestRendererPrivateUnmountNestedSourceReportAdmissionGate {
     }
 
     #[must_use]
+    pub const fn nested_identity_public_surface(self) -> &'static str {
+        self.nested_identity_public_surface
+    }
+
+    #[must_use]
+    pub const fn nested_identity_source_serialization_diagnostic_name(self) -> &'static str {
+        self.nested_identity_source_serialization_diagnostic_name
+    }
+
+    #[must_use]
     pub const fn unmount_identity_diagnostic_name(self) -> &'static str {
         self.unmount_identity_diagnostic_name
     }
 
     #[must_use]
+    pub const fn unmount_identity_public_surface(self) -> &'static str {
+        self.unmount_identity_public_surface
+    }
+
+    #[must_use]
+    pub const fn unmount_identity_source_serialization_diagnostic_name(self) -> &'static str {
+        self.unmount_identity_source_serialization_diagnostic_name
+    }
+
+    #[must_use]
     pub const fn nested_source_report_diagnostic_name(self) -> &'static str {
         self.nested_source_report_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn nested_host_output_row_id(self) -> &'static str {
+        self.nested_host_output_row_id
+    }
+
+    #[must_use]
+    pub const fn unmount_host_output_row_id(self) -> &'static str {
+        self.unmount_host_output_row_id
+    }
+
+    #[must_use]
+    pub const fn nested_scheduled_update_sequence(self) -> usize {
+        self.nested_scheduled_update_sequence
+    }
+
+    #[must_use]
+    pub const fn unmount_scheduled_update_sequence(self) -> usize {
+        self.unmount_scheduled_update_sequence
     }
 
     #[must_use]
@@ -15184,6 +15234,11 @@ impl TestRendererRoot {
             )
             .map_err(Self::private_unmount_nested_source_report_gate_error)?;
 
+        let nested_row = nested_report.host_output_row().ok_or_else(|| {
+            Self::private_unmount_nested_source_report_gate_error(
+                "nested-source-report-row-missing",
+            )
+        })?;
         let nested_inspection = nested_report.gate().fiber_inspection().ok_or_else(|| {
             Self::private_unmount_nested_source_report_gate_error(
                 "nested-source-report-ownership-mismatch",
@@ -15195,13 +15250,25 @@ impl TestRendererRoot {
             status: TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_GATE_STATUS,
             nested_root: nested_root.root_id,
             unmount_root: unmount_root.root_id,
+            nested_renderer_id: nested_root.renderer.renderer_id,
+            unmount_renderer_id: unmount_root.renderer.renderer_id,
             nested_route_record_id: nested_route.record_id(),
             nested_route_status: nested_route.status(),
             unmount_admission_record_id: unmount_admission.diagnostic_id(),
             unmount_admission_status: unmount_admission.status(),
             nested_identity_diagnostic_name: nested_identity.diagnostic_name(),
+            nested_identity_public_surface: nested_identity.public_surface(),
+            nested_identity_source_serialization_diagnostic_name: nested_identity
+                .source_serialization_diagnostic_name(),
             unmount_identity_diagnostic_name: unmount_identity.diagnostic_name(),
+            unmount_identity_public_surface: unmount_identity.public_surface(),
+            unmount_identity_source_serialization_diagnostic_name: unmount_identity
+                .source_serialization_diagnostic_name(),
             nested_source_report_diagnostic_name: nested_report.diagnostic_name(),
+            nested_host_output_row_id: nested_row.id(),
+            unmount_host_output_row_id: unmount_row.id(),
+            nested_scheduled_update_sequence: nested_identity.root_scheduled_update_sequence(),
+            unmount_scheduled_update_sequence: unmount_identity.root_scheduled_update_sequence(),
             nested_host_output_shape: nested_report.host_output_shape(),
             unmount_host_output_shape: unmount_row.host_output_shape(),
             nested_source_node_count: nested_report.node_count(),
@@ -17190,6 +17257,12 @@ impl TestRendererRoot {
         {
             return Err("unmount-nested-source-report-gate-diagnostic-mismatch");
         }
+        if gate.nested_renderer_id == gate.unmount_renderer_id
+            || gate.nested_scheduled_update_sequence() == 0
+            || gate.unmount_scheduled_update_sequence() == 0
+        {
+            return Err("unmount-nested-source-report-gate-root-pair-mismatch");
+        }
         if gate.nested_route_record_id() != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID
             || gate.nested_route_status() != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS
             || gate.unmount_admission_record_id()
@@ -17198,10 +17271,20 @@ impl TestRendererRoot {
                 != TEST_RENDERER_PRIVATE_UNMOUNT_NATIVE_BRIDGE_ADMISSION_STATUS
             || gate.nested_identity_diagnostic_name()
                 != TEST_RENDERER_PRIVATE_SERIALIZATION_FINISHED_WORK_IDENTITY_DIAGNOSTIC_NAME
+            || gate.nested_identity_public_surface() != "create().toJSON"
+            || gate.nested_identity_source_serialization_diagnostic_name()
+                != TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME
             || gate.unmount_identity_diagnostic_name()
                 != TEST_RENDERER_PRIVATE_SERIALIZATION_FINISHED_WORK_IDENTITY_DIAGNOSTIC_NAME
+            || gate.unmount_identity_public_surface() != "create().unmount -> create().toJSON"
+            || gate.unmount_identity_source_serialization_diagnostic_name()
+                != TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME
             || gate.nested_source_report_diagnostic_name()
                 != TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME
+            || gate.nested_host_output_row_id()
+                != TEST_RENDERER_PRIVATE_TO_JSON_NESTED_UPDATE_HOST_OUTPUT_ROW_ID
+            || gate.unmount_host_output_row_id()
+                != TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_HOST_OUTPUT_ROW_ID
         {
             return Err("unmount-nested-source-report-gate-source-mismatch");
         }
@@ -17249,13 +17332,20 @@ impl TestRendererRoot {
             || gate.unmount_root() != self.root_id
             || gate.unmount_admission_record_id() != execution.diagnostic_id()
             || gate.unmount_admission_status() != execution.status()
+            || gate.unmount_renderer_id != self.renderer.renderer_id
+            || gate.unmount_scheduled_update_sequence() != self.scheduled_updates.len()
+            || gate.unmount_scheduled_update_sequence() != execution.scheduled_update_sequence()
+            || gate.unmount_host_output_row_id() != row.id()
             || gate.unmount_host_output_shape() != row.host_output_shape()
             || gate.unmount_host_output_shape()
                 != TestRendererPrivateToJsonHostOutputShape::EmptyRoot
             || gate.unmount_host_node_cleanup_count() != execution.host_node_cleanup_count()
             || gate.unmount_cleanup_order_record_count() != execution.cleanup_order_record_count()
+            || gate.nested_renderer_id == gate.unmount_renderer_id
             || gate.nested_source_report_diagnostic_name()
                 != TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME
+            || gate.nested_host_output_row_id()
+                != TEST_RENDERER_PRIVATE_TO_JSON_NESTED_UPDATE_HOST_OUTPUT_ROW_ID
             || gate.nested_host_output_shape()
                 != TestRendererPrivateToJsonHostOutputShape::NestedHostText
             || gate.nested_source_node_count() != 4
@@ -24490,6 +24580,38 @@ mod tests {
         );
         assert_eq!(gate.nested_root(), nested_root.root_id());
         assert_eq!(gate.unmount_root(), unmount_root.root_id());
+        assert_ne!(gate.nested_renderer_id, gate.unmount_renderer_id);
+        assert_eq!(gate.nested_renderer_id, nested_root.renderer.renderer_id);
+        assert_eq!(gate.unmount_renderer_id, unmount_root.renderer.renderer_id);
+        assert_eq!(gate.nested_identity_public_surface(), "create().toJSON");
+        assert_eq!(
+            gate.nested_identity_source_serialization_diagnostic_name(),
+            TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            gate.unmount_identity_public_surface(),
+            "create().unmount -> create().toJSON"
+        );
+        assert_eq!(
+            gate.unmount_identity_source_serialization_diagnostic_name(),
+            TEST_RENDERER_PRIVATE_JSON_SERIALIZATION_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            gate.nested_host_output_row_id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_NESTED_UPDATE_HOST_OUTPUT_ROW_ID
+        );
+        assert_eq!(
+            gate.unmount_host_output_row_id(),
+            TEST_RENDERER_PRIVATE_TO_JSON_UNMOUNT_HOST_OUTPUT_ROW_ID
+        );
+        assert_eq!(
+            gate.nested_scheduled_update_sequence(),
+            nested_route.scheduled_update_sequence()
+        );
+        assert_eq!(
+            gate.unmount_scheduled_update_sequence(),
+            admission.scheduled_update_sequence()
+        );
         assert_eq!(
             gate.nested_host_output_shape(),
             TestRendererPrivateToJsonHostOutputShape::NestedHostText
@@ -24981,6 +25103,229 @@ mod tests {
             error,
             "unmount",
             TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_NATIVE_EXECUTION_GATE_MISMATCH_REASON,
+        );
+    }
+
+    #[test]
+    fn root_private_unmount_nested_source_report_native_execution_rejects_cross_surface_identities()
+    {
+        let (unmount_root, unmounted, handoff, admission, json_identity) =
+            accepted_unmount_identity_for_root(false, true);
+        let tree_identity = unmount_root
+            .describe_private_to_tree_unmount_finished_work_identity_gate_for_canary(
+                &unmounted,
+                Some(&handoff),
+            )
+            .unwrap();
+        let gate = accepted_unmount_nested_source_report_gate_for_unmount_root(
+            &unmount_root,
+            &unmounted,
+            handoff,
+            admission,
+            json_identity,
+        );
+
+        let error = unmount_root
+            .describe_private_to_json_after_unmount_nested_source_report_native_execution_for_canary(
+                &unmounted,
+                admission,
+                Some(tree_identity),
+                Some(gate),
+            )
+            .unwrap_err();
+        assert_to_json_native_execution_error_reason(
+            error,
+            "unmount",
+            "finished-work-identity-public-surface-mismatch",
+        );
+
+        let error = unmount_root
+            .describe_private_to_tree_after_unmount_nested_source_report_native_execution_for_canary(
+                &unmounted,
+                admission,
+                Some(json_identity),
+                Some(gate),
+            )
+            .unwrap_err();
+        assert_to_tree_native_execution_error_reason(
+            error,
+            "unmount",
+            "finished-work-identity-public-surface-mismatch",
+        );
+    }
+
+    #[test]
+    fn root_private_unmount_nested_source_report_native_execution_rejects_wrong_unmount_pairing() {
+        let (source_root, source_unmounted, source_handoff, source_admission, source_identity) =
+            accepted_unmount_identity_for_root(false, true);
+        let source_gate = accepted_unmount_nested_source_report_gate_for_unmount_root(
+            &source_root,
+            &source_unmounted,
+            source_handoff,
+            source_admission,
+            source_identity,
+        );
+        let (other_root, other_unmounted, _other_handoff, other_admission, other_identity) =
+            accepted_unmount_identity_for_root(false, true);
+
+        let error = other_root
+            .describe_private_to_json_after_unmount_nested_source_report_native_execution_for_canary(
+                &other_unmounted,
+                other_admission,
+                Some(other_identity),
+                Some(source_gate),
+            )
+            .unwrap_err();
+        assert_to_json_native_execution_error_reason(
+            error,
+            "unmount",
+            TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_NATIVE_EXECUTION_GATE_MISMATCH_REASON,
+        );
+
+        let mut stale_gate = source_gate;
+        stale_gate.unmount_scheduled_update_sequence += 1;
+        let error = source_root
+            .describe_private_to_json_after_unmount_nested_source_report_native_execution_for_canary(
+                &source_unmounted,
+                source_admission,
+                Some(source_identity),
+                Some(stale_gate),
+            )
+            .unwrap_err();
+        assert_to_json_native_execution_error_reason(
+            error,
+            "unmount",
+            TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_NATIVE_EXECUTION_GATE_MISMATCH_REASON,
+        );
+
+        let mut stale_execution = source_admission;
+        stale_execution.scheduled_update_sequence += 1;
+        let error = source_root
+            .describe_private_to_json_after_unmount_nested_source_report_native_execution_for_canary(
+                &source_unmounted,
+                stale_execution,
+                Some(source_identity),
+                Some(source_gate),
+            )
+            .unwrap_err();
+        assert_to_json_native_execution_error_reason(
+            error,
+            "unmount",
+            TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_NATIVE_EXECUTION_GATE_MISMATCH_REASON,
+        );
+
+        let mut self_paired_gate = source_gate;
+        self_paired_gate.nested_renderer_id = self_paired_gate.unmount_renderer_id;
+        let error = source_root
+            .describe_private_to_json_after_unmount_nested_source_report_native_execution_for_canary(
+                &source_unmounted,
+                source_admission,
+                Some(source_identity),
+                Some(self_paired_gate),
+            )
+            .unwrap_err();
+        assert_to_json_native_execution_error_reason(
+            error,
+            "unmount",
+            "unmount-nested-source-report-gate-root-pair-mismatch",
+        );
+    }
+
+    #[test]
+    fn root_private_unmount_nested_source_report_native_execution_rejects_caller_built_gate_fields()
+    {
+        let (unmount_root, unmounted, handoff, admission, identity) =
+            accepted_unmount_identity_for_root(false, true);
+        let gate = accepted_unmount_nested_source_report_gate_for_unmount_root(
+            &unmount_root,
+            &unmounted,
+            handoff,
+            admission,
+            identity,
+        );
+
+        let caller_built_missing_nested_row =
+            TestRendererPrivateUnmountNestedSourceReportAdmissionGate {
+                nested_host_output_row_id: "caller-built-nested-row",
+                ..gate
+            };
+        let error = unmount_root
+            .describe_private_to_json_after_unmount_nested_source_report_native_execution_for_canary(
+                &unmounted,
+                admission,
+                Some(identity),
+                Some(caller_built_missing_nested_row),
+            )
+            .unwrap_err();
+        assert_to_json_native_execution_error_reason(
+            error,
+            "unmount",
+            "unmount-nested-source-report-gate-source-mismatch",
+        );
+
+        let caller_built_missing_unmount_row =
+            TestRendererPrivateUnmountNestedSourceReportAdmissionGate {
+                unmount_host_output_row_id: "caller-built-unmount-row",
+                ..gate
+            };
+        let error = unmount_root
+            .describe_private_to_json_after_unmount_nested_source_report_native_execution_for_canary(
+                &unmounted,
+                admission,
+                Some(identity),
+                Some(caller_built_missing_unmount_row),
+            )
+            .unwrap_err();
+        assert_to_json_native_execution_error_reason(
+            error,
+            "unmount",
+            "unmount-nested-source-report-gate-source-mismatch",
+        );
+
+        let caller_built_cross_surface_gate =
+            TestRendererPrivateUnmountNestedSourceReportAdmissionGate {
+                unmount_identity_source_serialization_diagnostic_name:
+                    TEST_RENDERER_PRIVATE_TREE_METADATA_DIAGNOSTIC_NAME,
+                ..gate
+            };
+        let error = unmount_root
+            .describe_private_to_tree_after_unmount_nested_source_report_native_execution_for_canary(
+                &unmounted,
+                admission,
+                Some(
+                    unmount_root
+                        .describe_private_to_tree_unmount_finished_work_identity_gate_for_canary(
+                            &unmounted,
+                            Some(&handoff),
+                        )
+                        .unwrap(),
+                ),
+                Some(caller_built_cross_surface_gate),
+            )
+            .unwrap_err();
+        assert_to_tree_native_execution_error_reason(
+            error,
+            "unmount",
+            "unmount-nested-source-report-gate-source-mismatch",
+        );
+
+        let caller_built_missing_shape =
+            TestRendererPrivateUnmountNestedSourceReportAdmissionGate {
+                nested_host_component_count: 1,
+                ..gate
+            };
+        let error = unmount_root
+            .describe_private_to_json_after_unmount_nested_source_report_native_execution_for_canary(
+                &unmounted,
+                admission,
+                Some(identity),
+                Some(caller_built_missing_shape),
+            )
+            .unwrap_err();
+        assert_to_json_native_execution_error_reason(
+            error,
+            "unmount",
+            "unmount-nested-source-report-gate-shape-mismatch",
         );
     }
 
