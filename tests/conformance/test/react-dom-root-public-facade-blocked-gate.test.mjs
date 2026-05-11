@@ -3056,6 +3056,10 @@ test("React DOM client private facade host-output update routes through private 
   const update = root.render(nextElement);
   const hidden =
     rootBridge.getPrivateRootPublicFacadeHostOutputUpdatePayload(update);
+  const lifecycleBoundaryPayload =
+    rootBridge.getPrivateRootLifecycleRequestBoundaryPayload(
+      hidden.lifecycleRequestBoundary
+    );
   const rootWorkLoopRecord = initial.rootWorkLoopFinishedWorkRecord;
   const rootWorkLoopPayload =
     rootBridge.getPrivateRootPublicFacadeRootWorkLoopFinishedWorkPayload(
@@ -3121,6 +3125,22 @@ test("React DOM client private facade host-output update routes through private 
   assert.equal(update.diagnosticId, "facade-conformance-update:1");
   assert.equal(update.updateRequestType, "root.render");
   assert.equal(update.updateUpdateId, "facade-conformance-update-id:2");
+  assert.equal(
+    update.lifecycleRequestAdmission,
+    hidden.lifecycleRequestAdmission
+  );
+  assert.equal(
+    update.lifecycleRequestAdmissionStatus,
+    rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED
+  );
+  assert.equal(update.lifecycleRequestBoundary, hidden.lifecycleRequestBoundary);
+  assert.equal(
+    update.lifecycleRequestBoundaryStatus,
+    rootBridge.ROOT_BRIDGE_LIFECYCLE_REQUEST_BOUNDARY_ACCEPTED
+  );
+  assert.equal(update.lifecycleRequestBoundaryAccepted, true);
+  assert.equal(update.lifecycleRequestBoundarySourceOwned, true);
+  assert.equal(update.lifecycleRequestBoundaryCurrent, true);
   assert.equal(
     update.updateLifecycleStatusBefore,
     rootBridge.ROOT_LIFECYCLE_RENDERED
@@ -3209,6 +3229,24 @@ test("React DOM client private facade host-output update routes through private 
   assert.equal(snapshotPayload.container, container);
   assert.equal(snapshotPayload.before.childCount, 1);
   assert.equal(snapshotPayload.after.childCount, 1);
+  assert.equal(
+    rootBridge.isPrivateRootLifecycleRequestBoundaryRecord(
+      hidden.lifecycleRequestBoundary
+    ),
+    true
+  );
+  assert.equal(lifecycleBoundaryPayload.sourceRecord, hidden.updateRecord);
+  assert.equal(
+    lifecycleBoundaryPayload.admissionRecord,
+    hidden.lifecycleRequestAdmission
+  );
+  assert.equal(
+    rootBridge.isActiveSourceOwnedPrivateRootLifecycleRequestBoundaryForAdmission(
+      hidden.lifecycleRequestAdmission,
+      hidden.lifecycleRequestBoundary
+    ),
+    true
+  );
   assert.equal(
     hidden.hostOutputUpdateHandoff.updateStatus,
     rootBridge.ROOT_BRIDGE_HOST_OUTPUT_UPDATE_APPLIED
@@ -3517,7 +3555,62 @@ test("React DOM client private facade lifecycle boundary rejects stale source re
   const clonedSnapshot = Object.freeze({
     ...initial.sourceContainerSnapshot
   });
+  const clonedLifecycleRequestBoundary = Object.freeze({
+    ...hidden.lifecycleRequestBoundary
+  });
 
+  assert.equal(
+    rootBridge.isPrivateRootLifecycleRequestBoundaryRecord(
+      hidden.lifecycleRequestBoundary
+    ),
+    true
+  );
+  assert.equal(
+    rootBridge.getPrivateRootLifecycleRequestBoundaryPayload(
+      hidden.lifecycleRequestBoundary
+    ).sourceRecord,
+    hidden.renderRecord
+  );
+  assert.throws(
+    () =>
+      adapter.updateHostOutput(root, nextElement, {
+        lifecycleRequestBoundary: hidden.lifecycleRequestBoundary
+      }),
+    {
+      code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UPDATE",
+      message: /caller-supplied, stale, replayed, cloned, cross-root/
+    }
+  );
+  assert.throws(
+    () =>
+      adapter.updateHostOutput(root, nextElement, {
+        lifecycleRequestBoundary: clonedLifecycleRequestBoundary
+      }),
+    {
+      code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UPDATE",
+      message: /caller-supplied, stale, replayed, cloned, cross-root/
+    }
+  );
+  assert.throws(
+    () =>
+      adapter.updateHostOutput(root, nextElement, {
+        lifecycleRequestBoundary: crossHidden.lifecycleRequestBoundary
+      }),
+    {
+      code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UPDATE",
+      message: /caller-supplied, stale, replayed, cloned, cross-root/
+    }
+  );
+  assert.throws(
+    () =>
+      adapter.updateHostOutput(root, nextElement, {
+        sourceContainerSnapshot: initial.sourceContainerSnapshot
+      }),
+    {
+      code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UPDATE",
+      message: /lifecycle request-boundary evidence/
+    }
+  );
   assert.throws(
     () =>
       adapter.updateHostOutput(root, nextElement, {
@@ -3652,6 +3745,14 @@ test("React DOM client private facade nested host-output update stays diagnostic
     rootBridge.getPrivateRootPublicFacadeNestedHostOutputUpdatePayload(
       diagnostic
     );
+  const initialLifecycleBoundaryPayload =
+    rootBridge.getPrivateRootLifecycleRequestBoundaryPayload(
+      hidden.initialLifecycleRequestBoundary
+    );
+  const updateLifecycleBoundaryPayload =
+    rootBridge.getPrivateRootLifecycleRequestBoundaryPayload(
+      hidden.updateLifecycleRequestBoundary
+    );
   const parentNode = hidden.parentHostInstanceNode;
   const childNode = hidden.childHostInstanceNode;
   const textNode = hidden.textInstance;
@@ -3666,6 +3767,28 @@ test("React DOM client private facade nested host-output update stays diagnostic
   );
   assert.equal(diagnostic.diagnosticId, "facade-conformance-nested-update:1");
   assert.equal(diagnostic.updateRequestType, "root.render");
+  assert.equal(
+    diagnostic.initialLifecycleRequestAdmission,
+    hidden.initialLifecycleRequestAdmission
+  );
+  assert.equal(
+    diagnostic.initialLifecycleRequestBoundary,
+    hidden.initialLifecycleRequestBoundary
+  );
+  assert.equal(diagnostic.initialLifecycleRequestBoundaryAccepted, true);
+  assert.equal(diagnostic.initialLifecycleRequestBoundarySourceOwned, true);
+  assert.equal(diagnostic.initialLifecycleRequestBoundaryCurrent, true);
+  assert.equal(
+    diagnostic.updateLifecycleRequestAdmission,
+    hidden.updateLifecycleRequestAdmission
+  );
+  assert.equal(
+    diagnostic.updateLifecycleRequestBoundary,
+    hidden.updateLifecycleRequestBoundary
+  );
+  assert.equal(diagnostic.updateLifecycleRequestBoundaryAccepted, true);
+  assert.equal(diagnostic.updateLifecycleRequestBoundarySourceOwned, true);
+  assert.equal(diagnostic.updateLifecycleRequestBoundaryCurrent, true);
   assert.equal(
     diagnostic.hostOutputUpdateHandoffId,
     "facade-conformance-nested-handoff:1"
@@ -3754,7 +3877,48 @@ test("React DOM client private facade nested host-output update stays diagnostic
   assert.deepEqual(adapter.getRootNestedHostOutputUpdateDiagnostics(root), [
     diagnostic
   ]);
+  assert.deepEqual(
+    rootBridge.getPrivateRootPublicFacadeRootPayload(root)
+      .lifecycleRequestBoundaryRecords,
+    [
+      hidden.initialLifecycleRequestBoundary,
+      hidden.updateLifecycleRequestBoundary
+    ]
+  );
   assert.equal(hidden.createRecord, create);
+  assert.equal(
+    initialLifecycleBoundaryPayload.sourceRecord,
+    hidden.initialRenderRecord
+  );
+  assert.equal(updateLifecycleBoundaryPayload.sourceRecord, hidden.updateRecord);
+  assert.equal(
+    initialLifecycleBoundaryPayload.admissionRecord,
+    hidden.initialLifecycleRequestAdmission
+  );
+  assert.equal(
+    updateLifecycleBoundaryPayload.admissionRecord,
+    hidden.updateLifecycleRequestAdmission
+  );
+  assert.equal(
+    rootBridge.isPrivateRootLifecycleRequestBoundaryRecord(
+      hidden.initialLifecycleRequestBoundary
+    ),
+    true
+  );
+  assert.equal(
+    rootBridge.isActiveSourceOwnedPrivateRootLifecycleRequestBoundaryForAdmission(
+      hidden.initialLifecycleRequestAdmission,
+      hidden.initialLifecycleRequestBoundary
+    ),
+    false
+  );
+  assert.equal(
+    rootBridge.isActiveSourceOwnedPrivateRootLifecycleRequestBoundaryForAdmission(
+      hidden.updateLifecycleRequestAdmission,
+      hidden.updateLifecycleRequestBoundary
+    ),
+    true
+  );
   assert.equal(hidden.hostOutputUpdateHandoff.latestPropsPublished, true);
   assert.equal(
     rootBridge.getNativeRootBridgeHandoffPayload(hidden.nativeHandoffRecord),
@@ -3809,6 +3973,171 @@ test("React DOM client private facade nested host-output update stays diagnostic
   const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
   assert.equal(publicBoundary.createRoot.status, "throws");
   assert.equal(publicBoundary.createRoot.rootObjectCreated, false);
+});
+
+test("React DOM client private facade nested host-output update rejects lifecycle boundary aliases", () => {
+  const reactDomClient = require(
+    path.join(repoRoot, "packages/react-dom/client.js")
+  );
+  const rootBridge = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-bridge.js")
+  );
+  const rootMarkers = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-markers.js")
+  );
+  const listenerRegistry = require(
+    path.join(repoRoot, "packages/react-dom/src/events/listener-registry.js")
+  );
+  const domContainer = require(
+    path.join(repoRoot, "packages/react-dom/src/client/dom-container.js")
+  );
+  const symbol = rootBridge.privateRootPublicFacadeAdapterSymbol;
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.createRoot,
+    symbol
+  );
+  const adapter = descriptor.value({
+    initialHostOutputIdPrefix: "facade-conformance-nested-alias-initial",
+    publicFacadeHostOutputRenderIdPrefix:
+      "facade-conformance-nested-alias-render",
+    publicFacadeNestedHostOutputUpdateIdPrefix:
+      "facade-conformance-nested-alias-update",
+    requestIdPrefix: "facade-conformance-nested-alias-request",
+    rootIdPrefix: "facade-conformance-nested-alias-root",
+    updateIdPrefix: "facade-conformance-nested-alias-update-id"
+  });
+  const initialElement = {
+    props: {
+      children: {
+        props: {
+          children: "nested alias initial",
+          id: "nested-alias-child"
+        },
+        type: "span"
+      },
+      id: "nested-alias-parent"
+    },
+    type: "section"
+  };
+  const nextElement = {
+    props: {
+      children: {
+        props: {
+          children: "nested alias updated",
+          id: "nested-alias-child",
+          "data-phase": "updated"
+        },
+        type: "span"
+      },
+      id: "nested-alias-parent"
+    },
+    type: "section"
+  };
+  const crossDocument = createPrivateGateDocument(
+    "public-facade-nested-alias-cross",
+    domContainer
+  );
+  const crossContainer = createPrivateGateElement(
+    "DIV",
+    crossDocument,
+    domContainer
+  );
+  const crossRoot = adapter.createRoot(crossContainer);
+  const crossDiagnostic = adapter.renderHostOutput(crossRoot, {
+    props: {
+      children: "cross alias boundary",
+      id: "cross-alias-host"
+    },
+    type: "article"
+  });
+  const crossHidden =
+    rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(
+      crossDiagnostic
+    );
+  const callerBuiltHydrateBoundary = Object.freeze({
+    kind: "FastReactDomPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord",
+    operation: "hydrate-root-lifecycle-request-boundary"
+  });
+
+  function assertNestedAliasRejected(label, createOptions) {
+    const document = createPrivateGateDocument(
+      `public-facade-nested-alias-${label}`,
+      domContainer
+    );
+    const container = createPrivateGateElement(
+      "DIV",
+      document,
+      domContainer
+    );
+    const root = adapter.createRoot(container);
+    const create = adapter.getRootCreateRecord(root);
+
+    assert.throws(
+      () =>
+        adapter.updateNestedHostOutput(
+          root,
+          initialElement,
+          nextElement,
+          createOptions({create})
+        ),
+      {
+        code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UPDATE"
+      }
+    );
+    assert.deepEqual(adapter.getRootRequestRecords(root), [create]);
+    assert.deepEqual(adapter.getRootNestedHostOutputUpdateDiagnostics(root), []);
+    assert.deepEqual(
+      rootBridge.getPrivateRootPublicFacadeRootPayload(root)
+        .lifecycleRequestBoundaryRecords,
+      []
+    );
+    assert.equal(container.childNodes.length, 0);
+    assert.equal(rootMarkers.getContainerRoot(container), null);
+    assert.equal(listenerRegistry.hasListeningMarker(container), false);
+    assert.equal(listenerRegistry.hasListeningMarker(document), false);
+    assert.equal(container.__registrations.length, 0);
+    assert.equal(document.__registrations.length, 0);
+    assert.equal(container.__mutationLog.length, 0);
+    assert.equal(document.__mutationLog.length, 0);
+  }
+
+  const rejectionCases = [
+    [
+      "render-callback-boundary",
+      () => ({renderCallback: crossHidden.lifecycleRequestBoundary})
+    ],
+    [
+      "source-create-record",
+      ({create}) => ({sourceCreateRecord: create})
+    ],
+    [
+      "source-render-record",
+      () => ({sourceRenderRecord: crossHidden.renderRecord})
+    ],
+    [
+      "source-boundary-alias",
+      () => ({sourceBoundary: crossHidden.lifecycleRequestBoundary})
+    ],
+    [
+      "source-container-snapshot-alias",
+      () => ({
+        sourceContainerSnapshot: crossDiagnostic.sourceContainerSnapshot
+      })
+    ],
+    [
+      "hydrate-boundary-shape",
+      () => ({updateCallback: callerBuiltHydrateBoundary})
+    ]
+  ];
+
+  for (const [label, createOptions] of rejectionCases) {
+    assertNestedAliasRejected(label, createOptions);
+  }
+
+  crossHidden.bridge.cleanupInitialRenderHostOutput(
+    crossHidden.hostOutputHandoff
+  );
+  assert.equal(crossContainer.childNodes.length, 0);
 });
 
 test("React DOM client private facade unmount cleanup stays private and non-compatible", () => {
