@@ -50,6 +50,7 @@ use crate::root_commit::{
     commit_managed_child_sibling_order_complete_work_handoff_for_canary,
     record_host_root_single_host_update_apply_for_canary,
 };
+use crate::sync_flush::{SyncFlushRootHostOutputCommitDiagnosticsForCanary, SyncFlushRootRecord};
 use crate::test_support::{
     FakeHostFiberToken, FakeInstance, FakeTextInstance, RecordingHost, TestHostElement,
     TestHostNode, TestHostText, TestHostTree,
@@ -1394,6 +1395,312 @@ impl TestHostRootMutationApplyResult {
             })
             .count()
     }
+
+    #[must_use]
+    fn recorded_only_count(&self) -> usize {
+        self.records
+            .iter()
+            .filter(|record| {
+                matches!(
+                    record.status(),
+                    TestHostRootMutationApplyStatus::RecordedOnly
+                )
+            })
+            .count()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SyncFlushHostMutationExecutionRequestForCanary {
+    root: FiberRootId,
+    order: usize,
+    render_lanes: Lanes,
+    finished_lanes: Lanes,
+    remaining_lanes: Lanes,
+    pending_lanes: Lanes,
+    finished_work: FiberId,
+    committed_current: FiberId,
+    mutation_record_count: usize,
+    mutation_apply_record_count: usize,
+    host_root_placement_apply_count: usize,
+}
+
+impl SyncFlushHostMutationExecutionRequestForCanary {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn order(self) -> usize {
+        self.order
+    }
+
+    #[must_use]
+    pub(crate) const fn render_lanes(self) -> Lanes {
+        self.render_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_lanes(self) -> Lanes {
+        self.finished_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn remaining_lanes(self) -> Lanes {
+        self.remaining_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn pending_lanes(self) -> Lanes {
+        self.pending_lanes
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(self) -> FiberId {
+        self.finished_work
+    }
+
+    #[must_use]
+    pub(crate) const fn committed_current(self) -> FiberId {
+        self.committed_current
+    }
+
+    #[must_use]
+    pub(crate) const fn mutation_record_count(self) -> usize {
+        self.mutation_record_count
+    }
+
+    #[must_use]
+    pub(crate) const fn mutation_apply_record_count(self) -> usize {
+        self.mutation_apply_record_count
+    }
+
+    #[must_use]
+    pub(crate) const fn host_root_placement_apply_count(self) -> usize {
+        self.host_root_placement_apply_count
+    }
+
+    #[must_use]
+    fn matches_sync_flush_record(self, record: &SyncFlushRootRecord) -> bool {
+        self.root == record.root()
+            && self.order == record.order()
+            && self.render_lanes == record.render_lanes()
+            && self.finished_lanes == record.commit().finished_lanes()
+            && self.remaining_lanes == record.commit().remaining_lanes()
+            && self.pending_lanes == record.commit().pending_lanes()
+            && self.finished_work == record.commit().finished_work()
+            && self.committed_current == record.commit().current()
+            && self.mutation_record_count == record.commit().mutation_log().len()
+            && self.mutation_apply_record_count == record.commit().mutation_apply_log().len()
+            && self.host_root_placement_apply_count
+                == record
+                    .commit()
+                    .host_root_placement_apply_diagnostics_for_canary()
+                    .len()
+    }
+
+    #[must_use]
+    pub(crate) const fn private_opt_in_host_mutation_execution_requested(self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_renderer_mutation_blocked(self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_flush_sync_compatibility_claimed(self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SyncFlushHostMutationExecutionDiagnosticForCanary {
+    request: SyncFlushHostMutationExecutionRequestForCanary,
+    applied_host_call_count: usize,
+    private_host_store_update_count: usize,
+    recorded_only_count: usize,
+}
+
+impl SyncFlushHostMutationExecutionDiagnosticForCanary {
+    #[must_use]
+    pub(crate) const fn request(&self) -> SyncFlushHostMutationExecutionRequestForCanary {
+        self.request
+    }
+
+    #[must_use]
+    pub(crate) const fn root(&self) -> FiberRootId {
+        self.request.root()
+    }
+
+    #[must_use]
+    pub(crate) const fn order(&self) -> usize {
+        self.request.order()
+    }
+
+    #[must_use]
+    pub(crate) const fn finished_work(&self) -> FiberId {
+        self.request.finished_work()
+    }
+
+    #[must_use]
+    pub(crate) const fn mutation_apply_record_count(&self) -> usize {
+        self.request.mutation_apply_record_count()
+    }
+
+    #[must_use]
+    pub(crate) const fn applied_host_call_count(&self) -> usize {
+        self.applied_host_call_count
+    }
+
+    #[must_use]
+    pub(crate) const fn private_host_store_update_count(&self) -> usize {
+        self.private_host_store_update_count
+    }
+
+    #[must_use]
+    pub(crate) const fn recorded_only_count(&self) -> usize {
+        self.recorded_only_count
+    }
+
+    #[must_use]
+    pub(crate) const fn private_opt_in_host_mutation_execution_requested(&self) -> bool {
+        self.request
+            .private_opt_in_host_mutation_execution_requested()
+    }
+
+    #[must_use]
+    pub(crate) const fn private_test_host_mutation_executed(&self) -> bool {
+        self.applied_host_call_count + self.private_host_store_update_count > 0
+    }
+
+    #[must_use]
+    pub(crate) const fn public_renderer_mutation_blocked(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_flush_sync_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn react_dom_compatibility_claimed(&self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn test_renderer_compatibility_claimed(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum SyncFlushHostMutationExecutionErrorForCanary {
+    StaleFinishedWorkEvidence {
+        root: FiberRootId,
+        order: usize,
+    },
+    MismatchedRootOwnership {
+        expected_root: FiberRootId,
+        actual_root: FiberRootId,
+    },
+    MismatchedSyncFlushLanes {
+        root: FiberRootId,
+        expected_render_lanes: Lanes,
+        actual_render_lanes: Lanes,
+        expected_finished_lanes: Lanes,
+        actual_finished_lanes: Lanes,
+    },
+    MismatchedFinishedWork {
+        root: FiberRootId,
+        expected_finished_work: FiberId,
+        actual_finished_work: FiberId,
+    },
+    MissingHostMutationMetadata {
+        root: FiberRootId,
+        finished_work: FiberId,
+    },
+    HostWork(HostWorkError),
+}
+
+impl Display for SyncFlushHostMutationExecutionErrorForCanary {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::StaleFinishedWorkEvidence { root, order } => write!(
+                formatter,
+                "sync-flush host mutation execution rejected stale finished-work evidence for root {} order {}",
+                root.raw(),
+                order
+            ),
+            Self::MismatchedRootOwnership {
+                expected_root,
+                actual_root,
+            } => write!(
+                formatter,
+                "sync-flush host mutation execution root ownership mismatch: expected root {}, found root {}",
+                expected_root.raw(),
+                actual_root.raw()
+            ),
+            Self::MismatchedSyncFlushLanes {
+                root,
+                expected_render_lanes,
+                actual_render_lanes,
+                expected_finished_lanes,
+                actual_finished_lanes,
+            } => write!(
+                formatter,
+                "sync-flush host mutation execution lanes mismatch for root {}: render {:?}/{:?}, finished {:?}/{:?}",
+                root.raw(),
+                actual_render_lanes,
+                expected_render_lanes,
+                actual_finished_lanes,
+                expected_finished_lanes
+            ),
+            Self::MismatchedFinishedWork {
+                root,
+                expected_finished_work,
+                actual_finished_work,
+            } => write!(
+                formatter,
+                "sync-flush host mutation execution finished work mismatch for root {}: expected fiber slot {}, found fiber slot {}",
+                root.raw(),
+                expected_finished_work.slot().get(),
+                actual_finished_work.slot().get()
+            ),
+            Self::MissingHostMutationMetadata {
+                root,
+                finished_work,
+            } => write!(
+                formatter,
+                "sync-flush host mutation execution for root {} finished work fiber slot {} has no host mutation apply metadata",
+                root.raw(),
+                finished_work.slot().get()
+            ),
+            Self::HostWork(error) => Display::fmt(error, formatter),
+        }
+    }
+}
+
+impl Error for SyncFlushHostMutationExecutionErrorForCanary {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::HostWork(error) => Some(error),
+            Self::StaleFinishedWorkEvidence { .. }
+            | Self::MismatchedRootOwnership { .. }
+            | Self::MismatchedSyncFlushLanes { .. }
+            | Self::MismatchedFinishedWork { .. }
+            | Self::MissingHostMutationMetadata { .. } => None,
+        }
+    }
+}
+
+impl From<HostWorkError> for SyncFlushHostMutationExecutionErrorForCanary {
+    fn from(error: HostWorkError) -> Self {
+        Self::HostWork(error)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2407,6 +2714,228 @@ pub(crate) fn apply_test_host_root_commit_mutations_for_canary(
     host_work: &mut HostWorkResult,
 ) -> Result<TestHostRootMutationApplyResult, HostWorkError> {
     apply_test_host_root_commit_mutations(store, host, commit, host_work.detached_hosts_mut())
+}
+
+pub(crate) fn sync_flush_host_mutation_execution_request_for_canary(
+    record: &SyncFlushRootRecord,
+    diagnostics: SyncFlushRootHostOutputCommitDiagnosticsForCanary,
+) -> Result<
+    SyncFlushHostMutationExecutionRequestForCanary,
+    SyncFlushHostMutationExecutionErrorForCanary,
+> {
+    if !record.accepted_finished_work_handoff_for_canary()
+        || !diagnostics.accepted_finished_work_handoff()
+        || !diagnostics.commit_handoff_state_consumed()
+    {
+        return Err(
+            SyncFlushHostMutationExecutionErrorForCanary::StaleFinishedWorkEvidence {
+                root: record.root(),
+                order: record.order(),
+            },
+        );
+    }
+
+    if diagnostics.root() != record.root() {
+        return Err(
+            SyncFlushHostMutationExecutionErrorForCanary::MismatchedRootOwnership {
+                expected_root: record.root(),
+                actual_root: diagnostics.root(),
+            },
+        );
+    }
+
+    if diagnostics.render_lanes() != record.render_lanes()
+        || diagnostics.finished_lanes() != record.commit().finished_lanes()
+        || diagnostics.remaining_lanes() != record.commit().remaining_lanes()
+        || diagnostics.commit_pending_lanes() != record.commit().pending_lanes()
+        || diagnostics.root_pending_lanes_after_commit() != record.commit().pending_lanes()
+        || diagnostics.finished_lanes_before_commit() != Some(record.render_lanes())
+        || diagnostics.root_finished_lanes_before_commit() != Some(record.render_lanes())
+    {
+        return Err(
+            SyncFlushHostMutationExecutionErrorForCanary::MismatchedSyncFlushLanes {
+                root: record.root(),
+                expected_render_lanes: record.render_lanes(),
+                actual_render_lanes: diagnostics.render_lanes(),
+                expected_finished_lanes: record.commit().finished_lanes(),
+                actual_finished_lanes: diagnostics.finished_lanes(),
+            },
+        );
+    }
+
+    if diagnostics.order() != record.order()
+        || diagnostics.committed_current() != record.commit().current()
+        || diagnostics.root_current_after_commit() != record.commit().current()
+        || diagnostics.root_finished_work_before_commit() != Some(record.commit().finished_work())
+        || diagnostics.finished_work_before_commit() != Some(record.commit().finished_work())
+    {
+        return Err(
+            SyncFlushHostMutationExecutionErrorForCanary::StaleFinishedWorkEvidence {
+                root: record.root(),
+                order: record.order(),
+            },
+        );
+    }
+
+    if diagnostics.mutation_record_count() != record.commit().mutation_log().len()
+        || diagnostics.mutation_apply_record_count() != record.commit().mutation_apply_log().len()
+        || diagnostics.mutation_apply_record_count() == 0
+    {
+        return Err(
+            SyncFlushHostMutationExecutionErrorForCanary::MissingHostMutationMetadata {
+                root: record.root(),
+                finished_work: record.commit().finished_work(),
+            },
+        );
+    }
+
+    let request = SyncFlushHostMutationExecutionRequestForCanary {
+        root: record.root(),
+        order: record.order(),
+        render_lanes: record.render_lanes(),
+        finished_lanes: record.commit().finished_lanes(),
+        remaining_lanes: record.commit().remaining_lanes(),
+        pending_lanes: record.commit().pending_lanes(),
+        finished_work: record.commit().finished_work(),
+        committed_current: record.commit().current(),
+        mutation_record_count: record.commit().mutation_log().len(),
+        mutation_apply_record_count: record.commit().mutation_apply_log().len(),
+        host_root_placement_apply_count: record
+            .commit()
+            .host_root_placement_apply_diagnostics_for_canary()
+            .len(),
+    };
+    debug_assert!(request.matches_sync_flush_record(record));
+    Ok(request)
+}
+
+pub(crate) fn execute_sync_flush_host_mutations_for_canary(
+    store: &mut FiberRootStore<RecordingHost>,
+    host: &mut RecordingHost,
+    record: &SyncFlushRootRecord,
+    diagnostics: SyncFlushRootHostOutputCommitDiagnosticsForCanary,
+    request: SyncFlushHostMutationExecutionRequestForCanary,
+    host_work: &mut HostWorkResult,
+) -> Result<
+    SyncFlushHostMutationExecutionDiagnosticForCanary,
+    SyncFlushHostMutationExecutionErrorForCanary,
+> {
+    let source_request =
+        sync_flush_host_mutation_execution_request_for_canary(record, diagnostics)?;
+    validate_sync_flush_host_mutation_request_matches_record(request, record)?;
+    if request != source_request {
+        return Err(
+            SyncFlushHostMutationExecutionErrorForCanary::StaleFinishedWorkEvidence {
+                root: request.root(),
+                order: request.order(),
+            },
+        );
+    }
+
+    if host_work.root() != request.root() {
+        return Err(
+            SyncFlushHostMutationExecutionErrorForCanary::MismatchedRootOwnership {
+                expected_root: request.root(),
+                actual_root: host_work.root(),
+            },
+        );
+    }
+
+    if host_work.work_in_progress() != request.finished_work() {
+        return Err(
+            SyncFlushHostMutationExecutionErrorForCanary::MismatchedFinishedWork {
+                root: request.root(),
+                expected_finished_work: request.finished_work(),
+                actual_finished_work: host_work.work_in_progress(),
+            },
+        );
+    }
+
+    let apply =
+        apply_test_host_root_commit_mutations_for_canary(store, host, record.commit(), host_work)?;
+
+    if apply.root() != request.root() {
+        return Err(
+            SyncFlushHostMutationExecutionErrorForCanary::MismatchedRootOwnership {
+                expected_root: request.root(),
+                actual_root: apply.root(),
+            },
+        );
+    }
+
+    if apply.finished_work() != request.finished_work() {
+        return Err(
+            SyncFlushHostMutationExecutionErrorForCanary::MismatchedFinishedWork {
+                root: request.root(),
+                expected_finished_work: request.finished_work(),
+                actual_finished_work: apply.finished_work(),
+            },
+        );
+    }
+
+    Ok(SyncFlushHostMutationExecutionDiagnosticForCanary {
+        request,
+        applied_host_call_count: apply.applied_host_call_count(),
+        private_host_store_update_count: apply.private_host_store_update_count(),
+        recorded_only_count: apply.recorded_only_count(),
+    })
+}
+
+fn validate_sync_flush_host_mutation_request_matches_record(
+    request: SyncFlushHostMutationExecutionRequestForCanary,
+    record: &SyncFlushRootRecord,
+) -> Result<(), SyncFlushHostMutationExecutionErrorForCanary> {
+    if request.root() != record.root() {
+        return Err(
+            SyncFlushHostMutationExecutionErrorForCanary::MismatchedRootOwnership {
+                expected_root: request.root(),
+                actual_root: record.root(),
+            },
+        );
+    }
+
+    if request.render_lanes() != record.render_lanes()
+        || request.finished_lanes() != record.commit().finished_lanes()
+    {
+        return Err(
+            SyncFlushHostMutationExecutionErrorForCanary::MismatchedSyncFlushLanes {
+                root: request.root(),
+                expected_render_lanes: request.render_lanes(),
+                actual_render_lanes: record.render_lanes(),
+                expected_finished_lanes: request.finished_lanes(),
+                actual_finished_lanes: record.commit().finished_lanes(),
+            },
+        );
+    }
+
+    if request.finished_work() != record.commit().finished_work()
+        || request.committed_current() != record.commit().current()
+    {
+        return Err(
+            SyncFlushHostMutationExecutionErrorForCanary::MismatchedFinishedWork {
+                root: request.root(),
+                expected_finished_work: request.finished_work(),
+                actual_finished_work: record.commit().finished_work(),
+            },
+        );
+    }
+
+    if request.order() != record.order()
+        || request.remaining_lanes() != record.commit().remaining_lanes()
+        || request.pending_lanes() != record.commit().pending_lanes()
+        || request.mutation_record_count() != record.commit().mutation_log().len()
+        || request.mutation_apply_record_count() != record.commit().mutation_apply_log().len()
+        || !request.matches_sync_flush_record(record)
+    {
+        return Err(
+            SyncFlushHostMutationExecutionErrorForCanary::StaleFinishedWorkEvidence {
+                root: request.root(),
+                order: request.order(),
+            },
+        );
+    }
+
+    Ok(())
 }
 
 fn apply_one_test_host_update_with_finished_work_handoff_for_canary(
