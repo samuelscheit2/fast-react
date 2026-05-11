@@ -1533,6 +1533,233 @@ impl HostComponentManagedChildCompleteWorkRecordForCanary {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct HostComponentManagedChildSiblingOrderCompleteWorkRecordForCanary {
+    root: FiberRootId,
+    kind: HostComponentManagedChildMutationKindForCanary,
+    parent_current: FiberId,
+    parent_work_in_progress: FiberId,
+    parent_state_node: StateNodeHandle,
+    parent_flags: FiberFlags,
+    child: FiberId,
+    child_tag: FiberTag,
+    child_state_node: StateNodeHandle,
+    child_pending_props: PropsHandle,
+    child_memoized_props: PropsHandle,
+    child_alternate: Option<FiberId>,
+    child_flags: FiberFlags,
+    order_sibling: FiberId,
+    order_sibling_tag: FiberTag,
+    order_sibling_state_node: StateNodeHandle,
+    order_sibling_pending_props: PropsHandle,
+    order_sibling_memoized_props: PropsHandle,
+    order_sibling_alternate: Option<FiberId>,
+    order_sibling_flags: FiberFlags,
+    deletion_list: Option<DeletionListId>,
+}
+
+impl HostComponentManagedChildSiblingOrderCompleteWorkRecordForCanary {
+    #[must_use]
+    pub(crate) const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[must_use]
+    pub(crate) const fn kind(self) -> HostComponentManagedChildMutationKindForCanary {
+        self.kind
+    }
+
+    #[must_use]
+    pub(crate) const fn kind_name(self) -> &'static str {
+        self.kind.as_str()
+    }
+
+    #[must_use]
+    pub(crate) const fn parent_current(self) -> FiberId {
+        self.parent_current
+    }
+
+    #[must_use]
+    pub(crate) const fn parent_work_in_progress(self) -> FiberId {
+        self.parent_work_in_progress
+    }
+
+    #[must_use]
+    pub(crate) const fn parent_state_node(self) -> StateNodeHandle {
+        self.parent_state_node
+    }
+
+    #[must_use]
+    pub(crate) const fn parent_flags(self) -> FiberFlags {
+        self.parent_flags
+    }
+
+    #[must_use]
+    pub(crate) const fn child(self) -> FiberId {
+        self.child
+    }
+
+    #[must_use]
+    pub(crate) const fn child_tag(self) -> FiberTag {
+        self.child_tag
+    }
+
+    #[must_use]
+    pub(crate) const fn child_state_node(self) -> StateNodeHandle {
+        self.child_state_node
+    }
+
+    #[must_use]
+    pub(crate) const fn child_pending_props(self) -> PropsHandle {
+        self.child_pending_props
+    }
+
+    #[must_use]
+    pub(crate) const fn child_memoized_props(self) -> PropsHandle {
+        self.child_memoized_props
+    }
+
+    #[must_use]
+    pub(crate) const fn child_alternate(self) -> Option<FiberId> {
+        self.child_alternate
+    }
+
+    #[must_use]
+    pub(crate) const fn child_flags(self) -> FiberFlags {
+        self.child_flags
+    }
+
+    #[must_use]
+    pub(crate) const fn order_sibling(self) -> FiberId {
+        self.order_sibling
+    }
+
+    #[must_use]
+    pub(crate) const fn order_sibling_tag(self) -> FiberTag {
+        self.order_sibling_tag
+    }
+
+    #[must_use]
+    pub(crate) const fn order_sibling_state_node(self) -> StateNodeHandle {
+        self.order_sibling_state_node
+    }
+
+    #[must_use]
+    pub(crate) const fn order_sibling_pending_props(self) -> PropsHandle {
+        self.order_sibling_pending_props
+    }
+
+    #[must_use]
+    pub(crate) const fn order_sibling_memoized_props(self) -> PropsHandle {
+        self.order_sibling_memoized_props
+    }
+
+    #[must_use]
+    pub(crate) const fn order_sibling_alternate(self) -> Option<FiberId> {
+        self.order_sibling_alternate
+    }
+
+    #[must_use]
+    pub(crate) const fn order_sibling_flags(self) -> FiberFlags {
+        self.order_sibling_flags
+    }
+
+    #[must_use]
+    pub(crate) const fn deletion_list(self) -> Option<DeletionListId> {
+        self.deletion_list
+    }
+
+    #[must_use]
+    pub(crate) const fn expected_effect_flag(self) -> FiberFlags {
+        self.kind.effect_flag()
+    }
+
+    #[must_use]
+    pub(crate) const fn order_evidence_name(self) -> &'static str {
+        match self.kind {
+            HostComponentManagedChildMutationKindForCanary::Placement => "next-sibling",
+            HostComponentManagedChildMutationKindForCanary::DeleteDetach => "previous-sibling",
+        }
+    }
+
+    #[must_use]
+    pub(crate) const fn private_reconciler_handoff_only(self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub(crate) const fn public_dom_compatibility_claimed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn test_renderer_compatibility_claimed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn broad_reconciliation_traversal_claimed(self) -> bool {
+        false
+    }
+
+    #[must_use]
+    pub(crate) const fn with_root_for_canary(mut self, root: FiberRootId) -> Self {
+        self.root = root;
+        self
+    }
+
+    #[must_use]
+    pub(crate) const fn with_parent_state_node_for_canary(
+        mut self,
+        parent_state_node: StateNodeHandle,
+    ) -> Self {
+        self.parent_state_node = parent_state_node;
+        self
+    }
+
+    #[must_use]
+    pub(crate) const fn with_child_state_node_for_canary(
+        mut self,
+        child_state_node: StateNodeHandle,
+    ) -> Self {
+        self.child_state_node = child_state_node;
+        self
+    }
+
+    #[must_use]
+    pub(crate) const fn with_child_memoized_props_for_canary(
+        mut self,
+        child_memoized_props: PropsHandle,
+    ) -> Self {
+        self.child_memoized_props = child_memoized_props;
+        self
+    }
+
+    #[must_use]
+    pub(crate) const fn with_order_sibling_for_canary(mut self, order_sibling: FiberId) -> Self {
+        self.order_sibling = order_sibling;
+        self
+    }
+
+    #[must_use]
+    pub(crate) const fn with_order_sibling_state_node_for_canary(
+        mut self,
+        order_sibling_state_node: StateNodeHandle,
+    ) -> Self {
+        self.order_sibling_state_node = order_sibling_state_node;
+        self
+    }
+
+    #[must_use]
+    pub(crate) const fn with_deletion_list_for_canary(
+        mut self,
+        deletion_list: Option<DeletionListId>,
+    ) -> Self {
+        self.deletion_list = deletion_list;
+        self
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum HostComponentManagedChildCompleteWorkErrorForCanary {
     FiberTopology(FiberTopologyError),
@@ -1617,6 +1844,43 @@ pub(crate) enum HostComponentManagedChildCompleteWorkErrorForCanary {
     DeletedChildStillInFinishedChildren {
         parent_work_in_progress: FiberId,
         child: FiberId,
+    },
+    ExpectedHostComponentOrderSibling {
+        order_sibling: FiberId,
+        tag: FiberTag,
+    },
+    OrderSiblingParentMismatch {
+        parent_work_in_progress: FiberId,
+        order_sibling: FiberId,
+        actual_parent: Option<FiberId>,
+    },
+    MissingOrderSiblingStateNode {
+        order_sibling: FiberId,
+    },
+    MissingOrderSiblingCurrent {
+        order_sibling: FiberId,
+    },
+    OrderSiblingCurrentTagMismatch {
+        order_sibling: FiberId,
+        order_sibling_current: FiberId,
+        current_tag: FiberTag,
+    },
+    OrderSiblingStateNodeMismatch {
+        order_sibling: FiberId,
+        order_sibling_current: FiberId,
+        current_state_node: StateNodeHandle,
+        work_in_progress_state_node: StateNodeHandle,
+    },
+    OrderSiblingStillBeingPlaced {
+        order_sibling: FiberId,
+        flags: FiberFlags,
+    },
+    SiblingOrderShapeMismatch {
+        parent_work_in_progress: FiberId,
+        child: FiberId,
+        order_sibling: FiberId,
+        kind: HostComponentManagedChildMutationKindForCanary,
+        reason: &'static str,
     },
 }
 
@@ -1790,6 +2054,79 @@ impl Display for HostComponentManagedChildCompleteWorkErrorForCanary {
                 child.slot().get(),
                 parent_work_in_progress.slot().get()
             ),
+            Self::ExpectedHostComponentOrderSibling { order_sibling, tag } => write!(
+                formatter,
+                "fiber {} must be HostComponent order sibling for private managed child sibling-order metadata, found {:?}",
+                order_sibling.slot().get(),
+                tag
+            ),
+            Self::OrderSiblingParentMismatch {
+                parent_work_in_progress,
+                order_sibling,
+                actual_parent,
+            } => write!(
+                formatter,
+                "private managed child sibling-order metadata expected sibling {} to belong to parent {}, found {:?}",
+                order_sibling.slot().get(),
+                parent_work_in_progress.slot().get(),
+                actual_parent.map(|fiber| fiber.slot().get())
+            ),
+            Self::MissingOrderSiblingStateNode { order_sibling } => write!(
+                formatter,
+                "managed HostComponent order sibling {} has no state node",
+                order_sibling.slot().get()
+            ),
+            Self::MissingOrderSiblingCurrent { order_sibling } => write!(
+                formatter,
+                "managed HostComponent order sibling {} has no current alternate",
+                order_sibling.slot().get()
+            ),
+            Self::OrderSiblingCurrentTagMismatch {
+                order_sibling,
+                order_sibling_current,
+                current_tag,
+            } => write!(
+                formatter,
+                "managed HostComponent order sibling {} expected HostComponent current {}, found {:?}",
+                order_sibling.slot().get(),
+                order_sibling_current.slot().get(),
+                current_tag
+            ),
+            Self::OrderSiblingStateNodeMismatch {
+                order_sibling,
+                order_sibling_current,
+                current_state_node,
+                work_in_progress_state_node,
+            } => write!(
+                formatter,
+                "managed order sibling {} current {} expected shared state node {}, found {}",
+                order_sibling.slot().get(),
+                order_sibling_current.slot().get(),
+                current_state_node.raw(),
+                work_in_progress_state_node.raw()
+            ),
+            Self::OrderSiblingStillBeingPlaced {
+                order_sibling,
+                flags,
+            } => write!(
+                formatter,
+                "managed order sibling {} must be stable for private sibling-order metadata, found {:?}",
+                order_sibling.slot().get(),
+                flags
+            ),
+            Self::SiblingOrderShapeMismatch {
+                parent_work_in_progress,
+                child,
+                order_sibling,
+                kind,
+                reason,
+            } => write!(
+                formatter,
+                "managed child {kind} sibling-order metadata for parent {} child {} sibling {} rejected shape: {reason}",
+                parent_work_in_progress.slot().get(),
+                child.slot().get(),
+                order_sibling.slot().get()
+            ),
         }
     }
 }
@@ -1816,7 +2153,15 @@ impl Error for HostComponentManagedChildCompleteWorkErrorForCanary {
             | Self::MissingDeletionList { .. }
             | Self::DeletionListChildCountMismatch { .. }
             | Self::DeletionListChildMismatch { .. }
-            | Self::DeletedChildStillInFinishedChildren { .. } => None,
+            | Self::DeletedChildStillInFinishedChildren { .. }
+            | Self::ExpectedHostComponentOrderSibling { .. }
+            | Self::OrderSiblingParentMismatch { .. }
+            | Self::MissingOrderSiblingStateNode { .. }
+            | Self::MissingOrderSiblingCurrent { .. }
+            | Self::OrderSiblingCurrentTagMismatch { .. }
+            | Self::OrderSiblingStateNodeMismatch { .. }
+            | Self::OrderSiblingStillBeingPlaced { .. }
+            | Self::SiblingOrderShapeMismatch { .. } => None,
         }
     }
 }
@@ -2053,6 +2398,353 @@ fn validate_managed_child_deletion_shape_for_canary(
         );
     }
     Ok(Some(deletion_list))
+}
+
+pub(crate) fn host_component_managed_child_sibling_order_complete_work_record_for_canary(
+    arena: &FiberArena,
+    root: FiberRootId,
+    parent_work_in_progress: FiberId,
+    child: FiberId,
+    order_sibling: FiberId,
+    kind: HostComponentManagedChildMutationKindForCanary,
+) -> Result<
+    HostComponentManagedChildSiblingOrderCompleteWorkRecordForCanary,
+    HostComponentManagedChildCompleteWorkErrorForCanary,
+> {
+    let parent_node = arena.get(parent_work_in_progress)?;
+    if parent_node.tag() != FiberTag::HostComponent {
+        return Err(
+            HostComponentManagedChildCompleteWorkErrorForCanary::ExpectedParentHostComponent {
+                parent: parent_work_in_progress,
+                tag: parent_node.tag(),
+            },
+        );
+    }
+
+    let parent_current = parent_node.alternate().ok_or(
+        HostComponentManagedChildCompleteWorkErrorForCanary::MissingParentCurrent {
+            parent_work_in_progress,
+        },
+    )?;
+    let parent_current_node = arena.get(parent_current)?;
+    if parent_current_node.tag() != FiberTag::HostComponent {
+        return Err(
+            HostComponentManagedChildCompleteWorkErrorForCanary::ParentCurrentTagMismatch {
+                parent_current,
+                current_tag: parent_current_node.tag(),
+                parent_work_in_progress,
+                work_in_progress_tag: parent_node.tag(),
+            },
+        );
+    }
+
+    let parent_state_node = parent_node.state_node();
+    let parent_current_state_node = parent_current_node.state_node();
+    if parent_state_node.is_none() {
+        return Err(
+            HostComponentManagedChildCompleteWorkErrorForCanary::MissingParentStateNode {
+                parent: parent_work_in_progress,
+            },
+        );
+    }
+    if parent_current_state_node.is_none() {
+        return Err(
+            HostComponentManagedChildCompleteWorkErrorForCanary::MissingParentStateNode {
+                parent: parent_current,
+            },
+        );
+    }
+    if parent_state_node != parent_current_state_node {
+        return Err(
+            HostComponentManagedChildCompleteWorkErrorForCanary::ParentStateNodeMismatch {
+                parent_current,
+                parent_work_in_progress,
+                current_state_node: parent_current_state_node,
+                work_in_progress_state_node: parent_state_node,
+            },
+        );
+    }
+    let parent_flags = parent_node.flags();
+    if parent_flags.contains_all(FiberFlags::PLACEMENT) {
+        return Err(
+            HostComponentManagedChildCompleteWorkErrorForCanary::ParentStillBeingPlaced {
+                parent_work_in_progress,
+                flags: parent_flags,
+            },
+        );
+    }
+
+    let child_node = arena.get(child)?;
+    if child_node.tag() != FiberTag::HostComponent {
+        return Err(
+            HostComponentManagedChildCompleteWorkErrorForCanary::ExpectedHostComponentChild {
+                child,
+                tag: child_node.tag(),
+            },
+        );
+    }
+    if child_node.return_fiber() != Some(parent_work_in_progress) {
+        return Err(
+            HostComponentManagedChildCompleteWorkErrorForCanary::ChildParentMismatch {
+                parent_work_in_progress,
+                child,
+                actual_parent: child_node.return_fiber(),
+            },
+        );
+    }
+    let child_state_node = child_node.state_node();
+    if child_state_node.is_none() {
+        return Err(
+            HostComponentManagedChildCompleteWorkErrorForCanary::MissingChildStateNode { child },
+        );
+    }
+
+    let order_sibling_node = arena.get(order_sibling)?;
+    if order_sibling_node.tag() != FiberTag::HostComponent {
+        return Err(
+            HostComponentManagedChildCompleteWorkErrorForCanary::ExpectedHostComponentOrderSibling {
+                order_sibling,
+                tag: order_sibling_node.tag(),
+            },
+        );
+    }
+    if order_sibling_node.return_fiber() != Some(parent_work_in_progress) {
+        return Err(
+            HostComponentManagedChildCompleteWorkErrorForCanary::OrderSiblingParentMismatch {
+                parent_work_in_progress,
+                order_sibling,
+                actual_parent: order_sibling_node.return_fiber(),
+            },
+        );
+    }
+    let order_sibling_state_node = order_sibling_node.state_node();
+    if order_sibling_state_node.is_none() {
+        return Err(
+            HostComponentManagedChildCompleteWorkErrorForCanary::MissingOrderSiblingStateNode {
+                order_sibling,
+            },
+        );
+    }
+    if order_sibling_node
+        .flags()
+        .contains_all(FiberFlags::PLACEMENT)
+    {
+        return Err(
+            HostComponentManagedChildCompleteWorkErrorForCanary::OrderSiblingStillBeingPlaced {
+                order_sibling,
+                flags: order_sibling_node.flags(),
+            },
+        );
+    }
+    let order_sibling_current = order_sibling_node.alternate().ok_or(
+        HostComponentManagedChildCompleteWorkErrorForCanary::MissingOrderSiblingCurrent {
+            order_sibling,
+        },
+    )?;
+    let order_sibling_current_node = arena.get(order_sibling_current)?;
+    if order_sibling_current_node.tag() != FiberTag::HostComponent {
+        return Err(
+            HostComponentManagedChildCompleteWorkErrorForCanary::OrderSiblingCurrentTagMismatch {
+                order_sibling,
+                order_sibling_current,
+                current_tag: order_sibling_current_node.tag(),
+            },
+        );
+    }
+    if order_sibling_current_node.state_node() != order_sibling_state_node {
+        return Err(
+            HostComponentManagedChildCompleteWorkErrorForCanary::OrderSiblingStateNodeMismatch {
+                order_sibling,
+                order_sibling_current,
+                current_state_node: order_sibling_current_node.state_node(),
+                work_in_progress_state_node: order_sibling_state_node,
+            },
+        );
+    }
+
+    let deletion_list = match kind {
+        HostComponentManagedChildMutationKindForCanary::Placement => {
+            validate_managed_child_placement_sibling_order_shape_for_canary(
+                arena,
+                parent_current,
+                parent_work_in_progress,
+                child,
+                child_node,
+                order_sibling,
+                order_sibling_current,
+            )?;
+            None
+        }
+        HostComponentManagedChildMutationKindForCanary::DeleteDetach => {
+            validate_managed_child_deletion_sibling_order_shape_for_canary(
+                arena,
+                parent_current,
+                parent_work_in_progress,
+                child,
+                child_node,
+                order_sibling,
+                order_sibling_current,
+                parent_flags,
+            )?
+        }
+    };
+
+    Ok(
+        HostComponentManagedChildSiblingOrderCompleteWorkRecordForCanary {
+            root,
+            kind,
+            parent_current,
+            parent_work_in_progress,
+            parent_state_node,
+            parent_flags,
+            child,
+            child_tag: child_node.tag(),
+            child_state_node,
+            child_pending_props: child_node.pending_props(),
+            child_memoized_props: child_node.memoized_props(),
+            child_alternate: child_node.alternate(),
+            child_flags: child_node.flags(),
+            order_sibling,
+            order_sibling_tag: order_sibling_node.tag(),
+            order_sibling_state_node,
+            order_sibling_pending_props: order_sibling_node.pending_props(),
+            order_sibling_memoized_props: order_sibling_node.memoized_props(),
+            order_sibling_alternate: Some(order_sibling_current),
+            order_sibling_flags: order_sibling_node.flags(),
+            deletion_list,
+        },
+    )
+}
+
+fn validate_managed_child_placement_sibling_order_shape_for_canary(
+    arena: &FiberArena,
+    parent_current: FiberId,
+    parent_work_in_progress: FiberId,
+    child: FiberId,
+    child_node: &fast_react_core::FiberNode,
+    order_sibling: FiberId,
+    order_sibling_current: FiberId,
+) -> Result<(), HostComponentManagedChildCompleteWorkErrorForCanary> {
+    if arena.get(parent_work_in_progress)?.child() != Some(child) {
+        return Err(
+            HostComponentManagedChildCompleteWorkErrorForCanary::SiblingOrderShapeMismatch {
+                parent_work_in_progress,
+                child,
+                order_sibling,
+                kind: HostComponentManagedChildMutationKindForCanary::Placement,
+                reason: "placed child must be first finished child",
+            },
+        );
+    }
+    if child_node.sibling() != Some(order_sibling) {
+        return Err(
+            HostComponentManagedChildCompleteWorkErrorForCanary::SiblingOrderShapeMismatch {
+                parent_work_in_progress,
+                child,
+                order_sibling,
+                kind: HostComponentManagedChildMutationKindForCanary::Placement,
+                reason: "placed child must point at explicit next sibling",
+            },
+        );
+    }
+    if arena.get(order_sibling)?.sibling().is_some() {
+        return Err(
+            HostComponentManagedChildCompleteWorkErrorForCanary::SiblingOrderShapeMismatch {
+                parent_work_in_progress,
+                child,
+                order_sibling,
+                kind: HostComponentManagedChildMutationKindForCanary::Placement,
+                reason: "sibling-order placement admits exactly two finished children",
+            },
+        );
+    }
+    if !child_node.flags().contains_all(FiberFlags::PLACEMENT) {
+        return Err(
+            HostComponentManagedChildCompleteWorkErrorForCanary::MissingPlacementFlag {
+                child,
+                flags: child_node.flags(),
+            },
+        );
+    }
+    if let Some(alternate) = child_node.alternate() {
+        return Err(
+            HostComponentManagedChildCompleteWorkErrorForCanary::UnexpectedPlacementAlternate {
+                child,
+                alternate,
+            },
+        );
+    }
+    if arena.get(parent_current)?.child() != Some(order_sibling_current)
+        || arena.get(order_sibling_current)?.sibling().is_some()
+    {
+        return Err(
+            HostComponentManagedChildCompleteWorkErrorForCanary::SiblingOrderShapeMismatch {
+                parent_work_in_progress,
+                child,
+                order_sibling,
+                kind: HostComponentManagedChildMutationKindForCanary::Placement,
+                reason: "stable next sibling must be the only current child",
+            },
+        );
+    }
+
+    Ok(())
+}
+
+fn validate_managed_child_deletion_sibling_order_shape_for_canary(
+    arena: &FiberArena,
+    parent_current: FiberId,
+    parent_work_in_progress: FiberId,
+    child: FiberId,
+    child_node: &fast_react_core::FiberNode,
+    order_sibling: FiberId,
+    order_sibling_current: FiberId,
+    parent_flags: FiberFlags,
+) -> Result<Option<DeletionListId>, HostComponentManagedChildCompleteWorkErrorForCanary> {
+    if arena.get(parent_work_in_progress)?.child() != Some(order_sibling)
+        || arena.get(order_sibling)?.sibling().is_some()
+    {
+        return Err(
+            HostComponentManagedChildCompleteWorkErrorForCanary::SiblingOrderShapeMismatch {
+                parent_work_in_progress,
+                child,
+                order_sibling,
+                kind: HostComponentManagedChildMutationKindForCanary::DeleteDetach,
+                reason: "deletion sibling-order admits exactly one remaining finished child",
+            },
+        );
+    }
+    if arena.get(parent_current)?.child() != Some(order_sibling_current)
+        || arena.get(order_sibling_current)?.sibling() != Some(child)
+    {
+        return Err(
+            HostComponentManagedChildCompleteWorkErrorForCanary::SiblingOrderShapeMismatch {
+                parent_work_in_progress,
+                child,
+                order_sibling,
+                kind: HostComponentManagedChildMutationKindForCanary::DeleteDetach,
+                reason: "deleted child must follow the explicit previous sibling in current children",
+            },
+        );
+    }
+    if child_node.sibling().is_some() || arena.get(child)?.alternate().is_some() {
+        return Err(
+            HostComponentManagedChildCompleteWorkErrorForCanary::SiblingOrderShapeMismatch {
+                parent_work_in_progress,
+                child,
+                order_sibling,
+                kind: HostComponentManagedChildMutationKindForCanary::DeleteDetach,
+                reason: "deleted child must be the final managed child",
+            },
+        );
+    }
+
+    validate_managed_child_deletion_shape_for_canary(
+        arena,
+        parent_work_in_progress,
+        child,
+        parent_flags,
+    )
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2462,10 +3154,14 @@ mod tests {
         parent_current: FiberId,
         parent_work_in_progress: FiberId,
         child: FiberId,
+        order_sibling: Option<FiberId>,
+        order_sibling_current: Option<FiberId>,
         parent_state_node: StateNodeHandle,
         child_state_node: StateNodeHandle,
+        order_sibling_state_node: StateNodeHandle,
         parent_props: PropsHandle,
         child_props: PropsHandle,
+        order_sibling_props: PropsHandle,
         deletion_list: Option<DeletionListId>,
     }
 
@@ -2509,10 +3205,14 @@ mod tests {
                 parent_current,
                 parent_work_in_progress,
                 child,
+                order_sibling: None,
+                order_sibling_current: None,
                 parent_state_node,
                 child_state_node,
+                order_sibling_state_node: StateNodeHandle::NONE,
                 parent_props,
                 child_props,
+                order_sibling_props: PropsHandle::NONE,
                 deletion_list: None,
             },
         )
@@ -2559,10 +3259,174 @@ mod tests {
                 parent_current,
                 parent_work_in_progress,
                 child,
+                order_sibling: None,
+                order_sibling_current: None,
                 parent_state_node,
                 child_state_node,
+                order_sibling_state_node: StateNodeHandle::NONE,
                 parent_props,
                 child_props,
+                order_sibling_props: PropsHandle::NONE,
+                deletion_list: Some(deletion_list),
+            },
+        )
+    }
+
+    fn managed_child_placement_sibling_order_complete_fixture()
+    -> (FiberArena, ManagedChildCompleteFixture) {
+        let mut arena = FiberArena::new();
+        let root = FiberRootId::new(3).unwrap();
+        let parent_state_node = StateNodeHandle::from_raw(20_401);
+        let child_state_node = StateNodeHandle::from_raw(20_402);
+        let order_sibling_state_node = StateNodeHandle::from_raw(20_403);
+        let parent_props = PropsHandle::from_raw(20_404);
+        let child_props = PropsHandle::from_raw(20_405);
+        let order_sibling_props = PropsHandle::from_raw(20_406);
+        let parent_current =
+            arena.create_fiber(FiberTag::HostComponent, None, parent_props, FiberMode::NO);
+        {
+            let node = arena.get_mut(parent_current).unwrap();
+            node.set_state_node(parent_state_node);
+            node.set_memoized_props(parent_props);
+        }
+        let order_sibling_current = arena.create_fiber(
+            FiberTag::HostComponent,
+            None,
+            order_sibling_props,
+            FiberMode::NO,
+        );
+        {
+            let node = arena.get_mut(order_sibling_current).unwrap();
+            node.set_state_node(order_sibling_state_node);
+            node.set_memoized_props(order_sibling_props);
+        }
+        arena
+            .set_children(parent_current, &[order_sibling_current])
+            .unwrap();
+
+        let parent_work_in_progress = arena
+            .create_work_in_progress(parent_current, parent_props)
+            .unwrap();
+        {
+            let node = arena.get_mut(parent_work_in_progress).unwrap();
+            node.set_state_node(parent_state_node);
+            node.set_memoized_props(parent_props);
+        }
+        let child = arena.create_fiber(FiberTag::HostComponent, None, child_props, FiberMode::NO);
+        {
+            let node = arena.get_mut(child).unwrap();
+            node.set_flags(FiberFlags::PLACEMENT);
+            node.set_state_node(child_state_node);
+            node.set_memoized_props(child_props);
+        }
+        let order_sibling = arena
+            .create_work_in_progress(order_sibling_current, order_sibling_props)
+            .unwrap();
+        {
+            let node = arena.get_mut(order_sibling).unwrap();
+            node.set_state_node(order_sibling_state_node);
+            node.set_memoized_props(order_sibling_props);
+        }
+        arena
+            .set_children(parent_work_in_progress, &[child, order_sibling])
+            .unwrap();
+
+        (
+            arena,
+            ManagedChildCompleteFixture {
+                root,
+                parent_current,
+                parent_work_in_progress,
+                child,
+                order_sibling: Some(order_sibling),
+                order_sibling_current: Some(order_sibling_current),
+                parent_state_node,
+                child_state_node,
+                order_sibling_state_node,
+                parent_props,
+                child_props,
+                order_sibling_props,
+                deletion_list: None,
+            },
+        )
+    }
+
+    fn managed_child_delete_sibling_order_complete_fixture()
+    -> (FiberArena, ManagedChildCompleteFixture) {
+        let mut arena = FiberArena::new();
+        let root = FiberRootId::new(4).unwrap();
+        let parent_state_node = StateNodeHandle::from_raw(20_501);
+        let child_state_node = StateNodeHandle::from_raw(20_502);
+        let order_sibling_state_node = StateNodeHandle::from_raw(20_503);
+        let parent_props = PropsHandle::from_raw(20_504);
+        let child_props = PropsHandle::from_raw(20_505);
+        let order_sibling_props = PropsHandle::from_raw(20_506);
+        let parent_current =
+            arena.create_fiber(FiberTag::HostComponent, None, parent_props, FiberMode::NO);
+        {
+            let node = arena.get_mut(parent_current).unwrap();
+            node.set_state_node(parent_state_node);
+            node.set_memoized_props(parent_props);
+        }
+        let order_sibling_current = arena.create_fiber(
+            FiberTag::HostComponent,
+            None,
+            order_sibling_props,
+            FiberMode::NO,
+        );
+        {
+            let node = arena.get_mut(order_sibling_current).unwrap();
+            node.set_state_node(order_sibling_state_node);
+            node.set_memoized_props(order_sibling_props);
+        }
+        let child = arena.create_fiber(FiberTag::HostComponent, None, child_props, FiberMode::NO);
+        {
+            let node = arena.get_mut(child).unwrap();
+            node.set_state_node(child_state_node);
+            node.set_memoized_props(child_props);
+        }
+        arena
+            .set_children(parent_current, &[order_sibling_current, child])
+            .unwrap();
+
+        let parent_work_in_progress = arena
+            .create_work_in_progress(parent_current, parent_props)
+            .unwrap();
+        {
+            let node = arena.get_mut(parent_work_in_progress).unwrap();
+            node.set_state_node(parent_state_node);
+            node.set_memoized_props(parent_props);
+        }
+        let order_sibling = arena
+            .create_work_in_progress(order_sibling_current, order_sibling_props)
+            .unwrap();
+        {
+            let node = arena.get_mut(order_sibling).unwrap();
+            node.set_state_node(order_sibling_state_node);
+            node.set_memoized_props(order_sibling_props);
+        }
+        arena
+            .set_children(parent_work_in_progress, &[order_sibling])
+            .unwrap();
+        let deletion_list = arena
+            .mark_child_for_deletion(parent_work_in_progress, child)
+            .unwrap();
+
+        (
+            arena,
+            ManagedChildCompleteFixture {
+                root,
+                parent_current,
+                parent_work_in_progress,
+                child,
+                order_sibling: Some(order_sibling),
+                order_sibling_current: Some(order_sibling_current),
+                parent_state_node,
+                child_state_node,
+                order_sibling_state_node,
+                parent_props,
+                child_props,
+                order_sibling_props,
                 deletion_list: Some(deletion_list),
             },
         )
@@ -3185,6 +4049,250 @@ mod tests {
         assert!(!record.public_dom_compatibility_claimed());
         assert!(!record.test_renderer_compatibility_claimed());
         assert!(!record.broad_reconciliation_traversal_claimed());
+    }
+
+    #[test]
+    fn complete_managed_child_sibling_order_records_host_component_placement_before_sibling() {
+        let (arena, fixture) = managed_child_placement_sibling_order_complete_fixture();
+        let order_sibling = fixture.order_sibling.unwrap();
+        let order_sibling_current = fixture.order_sibling_current.unwrap();
+
+        let record = host_component_managed_child_sibling_order_complete_work_record_for_canary(
+            &arena,
+            fixture.root,
+            fixture.parent_work_in_progress,
+            fixture.child,
+            order_sibling,
+            HostComponentManagedChildMutationKindForCanary::Placement,
+        )
+        .unwrap();
+
+        assert_eq!(record.root(), fixture.root);
+        assert_eq!(
+            record.kind(),
+            HostComponentManagedChildMutationKindForCanary::Placement
+        );
+        assert_eq!(record.kind_name(), "managed-child-placement");
+        assert_eq!(record.order_evidence_name(), "next-sibling");
+        assert_eq!(record.parent_current(), fixture.parent_current);
+        assert_eq!(
+            record.parent_work_in_progress(),
+            fixture.parent_work_in_progress
+        );
+        assert_eq!(record.parent_state_node(), fixture.parent_state_node);
+        assert_eq!(record.parent_flags(), FiberFlags::NO);
+        assert_eq!(record.child(), fixture.child);
+        assert_eq!(record.child_tag(), FiberTag::HostComponent);
+        assert_eq!(record.child_state_node(), fixture.child_state_node);
+        assert_eq!(record.child_pending_props(), fixture.child_props);
+        assert_eq!(record.child_memoized_props(), fixture.child_props);
+        assert_eq!(record.child_alternate(), None);
+        assert_eq!(record.child_flags(), FiberFlags::PLACEMENT);
+        assert_eq!(record.order_sibling(), order_sibling);
+        assert_eq!(record.order_sibling_tag(), FiberTag::HostComponent);
+        assert_eq!(
+            record.order_sibling_state_node(),
+            fixture.order_sibling_state_node
+        );
+        assert_eq!(
+            record.order_sibling_pending_props(),
+            fixture.order_sibling_props
+        );
+        assert_eq!(
+            record.order_sibling_memoized_props(),
+            fixture.order_sibling_props
+        );
+        assert_eq!(
+            record.order_sibling_alternate(),
+            Some(order_sibling_current)
+        );
+        assert_eq!(record.order_sibling_flags(), FiberFlags::NO);
+        assert_eq!(record.deletion_list(), None);
+        assert_eq!(record.expected_effect_flag(), FiberFlags::PLACEMENT);
+        assert!(record.private_reconciler_handoff_only());
+        assert!(!record.public_dom_compatibility_claimed());
+        assert!(!record.test_renderer_compatibility_claimed());
+        assert!(!record.broad_reconciliation_traversal_claimed());
+    }
+
+    #[test]
+    fn complete_managed_child_sibling_order_records_host_component_delete_after_previous_sibling() {
+        let (arena, fixture) = managed_child_delete_sibling_order_complete_fixture();
+        let order_sibling = fixture.order_sibling.unwrap();
+        let order_sibling_current = fixture.order_sibling_current.unwrap();
+
+        let record = host_component_managed_child_sibling_order_complete_work_record_for_canary(
+            &arena,
+            fixture.root,
+            fixture.parent_work_in_progress,
+            fixture.child,
+            order_sibling,
+            HostComponentManagedChildMutationKindForCanary::DeleteDetach,
+        )
+        .unwrap();
+
+        assert_eq!(record.root(), fixture.root);
+        assert_eq!(
+            record.kind(),
+            HostComponentManagedChildMutationKindForCanary::DeleteDetach
+        );
+        assert_eq!(record.kind_name(), "managed-child-delete-detach");
+        assert_eq!(record.order_evidence_name(), "previous-sibling");
+        assert_eq!(record.parent_current(), fixture.parent_current);
+        assert_eq!(
+            record.parent_work_in_progress(),
+            fixture.parent_work_in_progress
+        );
+        assert_eq!(record.parent_state_node(), fixture.parent_state_node);
+        assert_eq!(record.parent_flags(), FiberFlags::CHILD_DELETION);
+        assert_eq!(record.child(), fixture.child);
+        assert_eq!(record.child_tag(), FiberTag::HostComponent);
+        assert_eq!(record.child_state_node(), fixture.child_state_node);
+        assert_eq!(record.child_pending_props(), fixture.child_props);
+        assert_eq!(record.child_memoized_props(), fixture.child_props);
+        assert_eq!(record.child_alternate(), None);
+        assert_eq!(record.child_flags(), FiberFlags::NO);
+        assert_eq!(record.order_sibling(), order_sibling);
+        assert_eq!(record.order_sibling_tag(), FiberTag::HostComponent);
+        assert_eq!(
+            record.order_sibling_state_node(),
+            fixture.order_sibling_state_node
+        );
+        assert_eq!(
+            record.order_sibling_pending_props(),
+            fixture.order_sibling_props
+        );
+        assert_eq!(
+            record.order_sibling_memoized_props(),
+            fixture.order_sibling_props
+        );
+        assert_eq!(
+            record.order_sibling_alternate(),
+            Some(order_sibling_current)
+        );
+        assert_eq!(record.order_sibling_flags(), FiberFlags::NO);
+        assert_eq!(record.deletion_list(), fixture.deletion_list);
+        assert_eq!(record.expected_effect_flag(), FiberFlags::CHILD_DELETION);
+        assert!(record.private_reconciler_handoff_only());
+        assert!(!record.public_dom_compatibility_claimed());
+        assert!(!record.test_renderer_compatibility_claimed());
+        assert!(!record.broad_reconciliation_traversal_claimed());
+    }
+
+    #[test]
+    fn complete_managed_child_sibling_order_rejects_foreign_or_pending_sibling() {
+        let (mut arena, fixture) = managed_child_placement_sibling_order_complete_fixture();
+        let order_sibling = fixture.order_sibling.unwrap();
+        arena
+            .get_mut(order_sibling)
+            .unwrap()
+            .merge_flags(FiberFlags::PLACEMENT);
+
+        assert_eq!(
+            host_component_managed_child_sibling_order_complete_work_record_for_canary(
+                &arena,
+                fixture.root,
+                fixture.parent_work_in_progress,
+                fixture.child,
+                order_sibling,
+                HostComponentManagedChildMutationKindForCanary::Placement,
+            ),
+            Err(
+                HostComponentManagedChildCompleteWorkErrorForCanary::OrderSiblingStillBeingPlaced {
+                    order_sibling,
+                    flags: FiberFlags::PLACEMENT,
+                },
+            )
+        );
+
+        let (mut arena, fixture) = managed_child_placement_sibling_order_complete_fixture();
+        let foreign_order_sibling = arena.create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::from_raw(20_601),
+            FiberMode::NO,
+        );
+        arena
+            .get_mut(foreign_order_sibling)
+            .unwrap()
+            .set_state_node(StateNodeHandle::from_raw(20_602));
+
+        assert_eq!(
+            host_component_managed_child_sibling_order_complete_work_record_for_canary(
+                &arena,
+                fixture.root,
+                fixture.parent_work_in_progress,
+                fixture.child,
+                foreign_order_sibling,
+                HostComponentManagedChildMutationKindForCanary::Placement,
+            ),
+            Err(
+                HostComponentManagedChildCompleteWorkErrorForCanary::OrderSiblingParentMismatch {
+                    parent_work_in_progress: fixture.parent_work_in_progress,
+                    order_sibling: foreign_order_sibling,
+                    actual_parent: None,
+                },
+            )
+        );
+    }
+
+    #[test]
+    fn complete_managed_child_sibling_order_rejects_tampered_child_order() {
+        let (mut arena, fixture) = managed_child_placement_sibling_order_complete_fixture();
+        let order_sibling = fixture.order_sibling.unwrap();
+        arena
+            .set_children(
+                fixture.parent_work_in_progress,
+                &[order_sibling, fixture.child],
+            )
+            .unwrap();
+
+        assert_eq!(
+            host_component_managed_child_sibling_order_complete_work_record_for_canary(
+                &arena,
+                fixture.root,
+                fixture.parent_work_in_progress,
+                fixture.child,
+                order_sibling,
+                HostComponentManagedChildMutationKindForCanary::Placement,
+            ),
+            Err(
+                HostComponentManagedChildCompleteWorkErrorForCanary::SiblingOrderShapeMismatch {
+                    parent_work_in_progress: fixture.parent_work_in_progress,
+                    child: fixture.child,
+                    order_sibling,
+                    kind: HostComponentManagedChildMutationKindForCanary::Placement,
+                    reason: "placed child must be first finished child",
+                },
+            )
+        );
+    }
+
+    #[test]
+    fn complete_managed_child_sibling_order_rejects_missing_placement_effect() {
+        let (mut arena, fixture) = managed_child_placement_sibling_order_complete_fixture();
+        let order_sibling = fixture.order_sibling.unwrap();
+        arena
+            .get_mut(fixture.child)
+            .unwrap()
+            .set_flags(FiberFlags::NO);
+
+        assert_eq!(
+            host_component_managed_child_sibling_order_complete_work_record_for_canary(
+                &arena,
+                fixture.root,
+                fixture.parent_work_in_progress,
+                fixture.child,
+                order_sibling,
+                HostComponentManagedChildMutationKindForCanary::Placement,
+            ),
+            Err(
+                HostComponentManagedChildCompleteWorkErrorForCanary::MissingPlacementFlag {
+                    child: fixture.child,
+                    flags: FiberFlags::NO,
+                },
+            )
+        );
     }
 
     #[test]
