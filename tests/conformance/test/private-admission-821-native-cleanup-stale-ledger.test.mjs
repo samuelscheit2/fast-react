@@ -127,6 +127,17 @@ test("private-admission-821-accepted", () => {
   assert.equal(row.recognized, true);
   assertAllFalse(row.publicBlockers, worker815);
 
+  const progressEvidence = row.evidence.find(
+    (evidenceRow) =>
+      evidenceRow.role === "worker-815-progress-ownership-evidence"
+  );
+  assert.notEqual(progressEvidence, undefined);
+  assert.equal(
+    progressEvidence.path,
+    "worker-progress/worker-815-native-worker-thread-cleanup-stale-matrix.md"
+  );
+  assert.equal(progressEvidence.recognized, true);
+
   for (const evidenceRow of row.evidence) {
     assert.equal(evidenceRow.recognized, true, evidenceRow.role);
     assert.deepEqual(evidenceRow.missingTokens, [], evidenceRow.role);
@@ -165,6 +176,64 @@ test("private-admission-821-rejects-missing-stale-evidence", () => {
     "native-cleanup-stale-evidence-token-missing",
     "native-cleanup-stale-evidence-id-mismatch"
   ]);
+});
+
+test("private-admission-821-rejects-missing-worker-815-ownership-evidence", () => {
+  const sourceRow = rowByWorker(worker815);
+  const staleGate = evaluatePrivateAdmission821Gate({
+    rowOverrides: {
+      [worker815]: {
+        evidence: withEvidenceRowOverride(
+          sourceRow,
+          "worker-815-progress-ownership-evidence",
+          {
+            tokens: [
+              ...progressEvidenceRow(sourceRow).tokens,
+              "worker-815-stale-progress-ownership-token"
+            ]
+          }
+        )
+      }
+    }
+  });
+
+  assert.equal(staleGate.status, PRIVATE_ADMISSION_821_VIOLATION_STATUS);
+  assert.equal(staleGate.privateDiagnosticsRecognized, false);
+  assert.equal(staleGate.evidenceRecognized, false);
+  assertViolationIds(staleGate, [
+    "native-cleanup-stale-evidence-token-missing"
+  ]);
+  assertEvidenceRoleRecognized(
+    staleGate,
+    "worker-815-progress-ownership-evidence",
+    false
+  );
+
+  const missingGate = evaluatePrivateAdmission821Gate({
+    rowOverrides: {
+      [worker815]: {
+        evidence: withEvidenceRowOverride(
+          sourceRow,
+          "worker-815-progress-ownership-evidence",
+          {
+            path: "worker-progress/missing-worker-815-native-worker-thread-cleanup-stale-matrix.md"
+          }
+        )
+      }
+    }
+  });
+
+  assert.equal(missingGate.status, PRIVATE_ADMISSION_821_VIOLATION_STATUS);
+  assert.equal(missingGate.privateDiagnosticsRecognized, false);
+  assert.equal(missingGate.evidenceRecognized, false);
+  assertViolationIds(missingGate, [
+    "native-cleanup-stale-evidence-token-missing"
+  ]);
+  assertEvidenceRoleRecognized(
+    missingGate,
+    "worker-815-progress-ownership-evidence",
+    false
+  );
 });
 
 test("private-admission-821-rejects-missing-cleanup-blockers", () => {
@@ -331,6 +400,14 @@ function assertSubset(expectedSubset, actualSuperset) {
   }
 }
 
+function assertEvidenceRoleRecognized(gate, role, expectedRecognized) {
+  const evidenceRow = gate.rowsByWorker[worker815].evidence.find(
+    (row) => row.role === role
+  );
+  assert.notEqual(evidenceRow, undefined, role);
+  assert.equal(evidenceRow.recognized, expectedRecognized, role);
+}
+
 function rowByWorker(workerId) {
   const row = PRIVATE_ADMISSION_821_ROWS.find(
     (candidate) => candidate.workerId === workerId
@@ -353,4 +430,25 @@ function withMissingEvidenceToken(row, role, token) {
       tokens: [...evidenceRow.tokens, token]
     };
   });
+}
+
+function withEvidenceRowOverride(row, role, override) {
+  return row.evidence.map((evidenceRow) => {
+    if (evidenceRow.role !== role) {
+      return evidenceRow;
+    }
+    return {
+      ...evidenceRow,
+      ...override
+    };
+  });
+}
+
+function progressEvidenceRow(row) {
+  const evidenceRow = row.evidence.find(
+    (candidate) =>
+      candidate.role === "worker-815-progress-ownership-evidence"
+  );
+  assert.notEqual(evidenceRow, undefined);
+  return evidenceRow;
 }

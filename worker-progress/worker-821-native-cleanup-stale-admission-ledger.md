@@ -15,6 +15,12 @@ execution, N-API cleanup-hook execution, renderer/reconciler execution, package
 export change, public compatibility admission, JS/CJS bridge admission, broad
 root admission, act admission, or Scheduler admission was added.
 
+Audit follow-up: fixed the Worker 815 ownership gap by making
+`worker-progress/worker-815-native-worker-thread-cleanup-stale-matrix.md` a
+real evidence row instead of only an implementation path. Added a regression
+that fails the ledger for missing or stale Worker 815 progress ownership
+evidence.
+
 ## Changed Files
 
 - `tests/conformance/src/private-admission-821-native-cleanup-stale-ledger.mjs`
@@ -22,6 +28,8 @@ root admission, act admission, or Scheduler admission was added.
   - Pins the prior 807 native no-load ledger context.
   - Checks cleanup stale evidence IDs, cleanup blocker IDs, statuses, function
     names, field names, and source constants.
+  - Reads Worker 815 progress ownership evidence with durable worker/path,
+    command, and field identifiers.
   - Fails closed for native/public execution, stale cleanup acceptance, package
     compatibility/export, JS/CJS bridge, root/act/Scheduler, and static ledger
     drift claims.
@@ -29,6 +37,8 @@ root admission, act admission, or Scheduler admission was added.
   - Added accepted-path assertions and focused negative cases for missing stale
     evidence, missing cleanup blockers, public compatibility claims, and static
     ledger drift.
+  - Audit follow-up: added a regression for missing/stale Worker 815 progress
+    ownership evidence.
 - `worker-progress/worker-821-native-cleanup-stale-admission-ledger.md`
   - Recorded implementation, verification, evidence, risks, and handoff.
 
@@ -58,6 +68,14 @@ root admission, act admission, or Scheduler admission was added.
 - `git diff --cached --check`
 - `git diff --cached --stat`
 - `git status --short`
+- Audit follow-up:
+  - `rg -n "worker-815|Worker 815|FAST_REACT_NAPI|cleanup_hook|nativeAddonLoaded|rendererExecution|publicNativeCompatibility|cargo test|node bindings/node/test/native-no-load-guard|bindings/node/index.cjs|crates/fast-react-napi/src/lib.rs|worker-progress/worker-815" worker-progress/worker-815-native-worker-thread-cleanup-stale-matrix.md`
+  - `node --check tests/conformance/src/private-admission-821-native-cleanup-stale-ledger.mjs`
+  - `node --check tests/conformance/test/private-admission-821-native-cleanup-stale-ledger.test.mjs`
+  - `node --test tests/conformance/test/private-admission-821-native-cleanup-stale-ledger.test.mjs`
+  - `node bindings/node/test/native-no-load-guard.test.cjs`
+  - `cargo test -p fast-react-napi --all-features cleanup_hook_preflight`
+  - `git diff --check`
 
 ## Evidence Gathered
 
@@ -77,6 +95,9 @@ root admission, act admission, or Scheduler admission was added.
   compatibility claims without native execution.
 - Prior 807 native no-load private admission context remains recognized by the
   new 821 ledger.
+- Audit follow-up proved the Worker 815 progress file is evaluated as an
+  evidence row. Missing path evidence and stale ownership-token evidence now
+  produce `native-cleanup-stale-evidence-token-missing` and block acceptance.
 
 ## Verification
 
@@ -85,6 +106,8 @@ Passed:
 - `node --check tests/conformance/src/private-admission-821-native-cleanup-stale-ledger.mjs`
 - `node --check tests/conformance/test/private-admission-821-native-cleanup-stale-ledger.test.mjs`
 - `node --test tests/conformance/test/private-admission-821-native-cleanup-stale-ledger.test.mjs`
+  - Audit follow-up run: 7 tests passed, including missing/stale Worker 815
+    progress ownership evidence.
 - `node bindings/node/test/native-no-load-guard.test.cjs`
 - `cargo test -p fast-react-napi --all-features cleanup_hook_preflight`
 - `git diff --check`

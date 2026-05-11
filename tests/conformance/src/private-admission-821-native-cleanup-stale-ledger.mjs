@@ -416,6 +416,23 @@ const privateAdmission821Rows = freezeArray([
           "publicNativeCompatibility",
           "reactBehaviorError"
         ]
+      }),
+      evidenceData({
+        role: "worker-815-progress-ownership-evidence",
+        path: worker815ProgressPath,
+        tokens: [
+          "worker-progress/worker-815-native-worker-thread-cleanup-stale-matrix.md",
+          "worker-815-native-worker-thread-cleanup-stale-matrix.md",
+          "bindings/node/index.cjs",
+          "crates/fast-react-napi/src/lib.rs",
+          "bindings/node/test/native-no-load-guard.test.cjs",
+          "cargo test -p fast-react-napi --all-features cleanup_hook_preflight",
+          "node bindings/node/test/native-no-load-guard.test.cjs",
+          "node --check bindings/node/index.cjs",
+          "nativeAddonLoaded",
+          "rendererExecution",
+          "publicNativeCompatibility"
+        ]
       })
     ]
   })
