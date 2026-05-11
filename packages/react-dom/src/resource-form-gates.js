@@ -71,6 +71,7 @@ const rootBoundarySideEffects = freezeRecord({
   ...internalsGate.resourceHintPreloadPreinitOrderBlockedSideEffects,
   ...internalsGate.resourceHintStylesheetPrecedenceBlockedSideEffects,
   ...internalsGate.resourceHintResourceMapCommitBlockedSideEffects,
+  ...internalsGate.resourceHintRootMapStoragePreflightBlockedSideEffects,
   ...internalsGate.resourceHintStylesheetLoadErrorStateBlockedSideEffects,
   ...internalsGate.formActionResetDispatcherBlockedSideEffects,
   ...internalsGate.formActionEventExtractionBlockedSideEffects,
@@ -548,6 +549,25 @@ function describeResourceHintFakeDomAdapterBoundary(behaviorArea) {
     stylesheetLoadStateCommitExecutionRowsRecorded: false,
     stylesheetLoadStateChangeRowsRecorded: false,
     deterministicStylesheetLoadStateChangesRecorded: false,
+    rootMapStoragePreflightRecorded: false,
+    rootMapStorageRowsRecorded: false,
+    canonicalRootMapStorageRowsRecorded: false,
+    rootResourceStorageShapeRecorded: false,
+    hoistableStylesRootMapRowsRecorded: false,
+    hoistableScriptsRootMapRowsRecorded: false,
+    preloadPropsRootMapRowsSkipped: false,
+    rootMapStorageValidationRecorded: false,
+    duplicateRootMapStorageRowsRejected: false,
+    staleRootMapStorageRowsRejected: false,
+    foreignRootMapStorageRowsRejected: false,
+    rootResourceStorageCreated: false,
+    rootResourceStorageMutated: false,
+    hoistableStylesMapCreated: false,
+    hoistableStylesMapMutated: false,
+    hoistableScriptsMapCreated: false,
+    hoistableScriptsMapMutated: false,
+    preloadPropsMapCreated: false,
+    preloadPropsMapMutated: false,
     duplicateStylesheetPrecedenceRowsRejected: false,
     staleStylesheetResourceMapEntriesRejected: false,
     realResourceMapsCreated: false,
@@ -590,6 +610,8 @@ function describeResourceHintFakeDomAdapterBoundary(behaviorArea) {
       internalsGate.describePrivateResourceHintStylesheetPrecedenceGate(),
     resourceMapCommitGate:
       internalsGate.describePrivateResourceHintResourceMapCommitGate(),
+    rootMapStoragePreflightGate:
+      internalsGate.describePrivateResourceHintRootMapStoragePreflightGate(),
     stylesheetLoadErrorStateGate:
       internalsGate.describePrivateResourceHintStylesheetLoadErrorStateGate()
   });
