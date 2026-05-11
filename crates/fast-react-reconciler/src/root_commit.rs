@@ -17756,6 +17756,13 @@ fn materialize_deletion_subtree_host_detachment_plan_for_canary(
         .records()
         .iter()
         .find(|record| record.deleted_root() == deleted_root && record.traversal_depth() == 0)
+        .or_else(|| {
+            commit
+                .deletion_subtree_traversal_gate
+                .records()
+                .iter()
+                .find(|record| record.deleted_root() == deleted_root)
+        })
         .ok_or(HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary::MissingDeletedRootTraversalRecord {
             root: commit.root,
             deletion_list: deletion_list.list(),
