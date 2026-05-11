@@ -9,6 +9,7 @@ const {
   createEventTargetNormalizationRecord,
   getEventListenerTargetLookupRecordPayload,
   getPrivateRootHostOutputEventTargetRecordPayload,
+  getRootOwnerFromNode,
   isPrivateRootHostOutputEventTargetRecord
 } = require('../client/component-tree.js');
 const {describeContainer} = require('../client/dom-container.js');
@@ -3541,6 +3542,11 @@ function invokePrivateClickEventDelegationAcceptedListenerOrder(
       normalizedDispatchRecords,
       normalizedOptions
     );
+  const ownerRootMetadata =
+    validatePrivateClickEventDelegationAcceptedListenerOrderOwnerRoots(
+      normalizedDispatchRecords,
+      acceptedListenerQueueEntryRecords
+    );
   const selections =
     collectPrivateClickEventDelegationAcceptedListenerOrderSelections(
       normalizedDispatchRecords,
@@ -3586,17 +3592,29 @@ function invokePrivateClickEventDelegationAcceptedListenerOrder(
   const record = Object.freeze({
     acceptedListenerCount: acceptedListenerQueueEntryRecords.length,
     acceptedListenerOrder,
+    acceptedListenerOwnerRootMatchCount:
+      ownerRootMetadata.acceptedListenerOwnerRootMatchCount,
+    acceptedListenerOwnerRootMismatchCount:
+      ownerRootMetadata.acceptedListenerOwnerRootMismatchCount,
     admissionStatus: PRIVATE_FAKE_DOM_EVENT_DISPATCH_ADMISSION_STATUS,
     browserDomEventCompatibilityClaimed: false,
     clickEventDelegationAcceptedListenerOrder: true,
     compatibilityClaimed: false,
     dispatchRecordCount: normalizedDispatchRecords.length,
+    dispatchRecordOwnerRootMatchCount:
+      ownerRootMetadata.dispatchRecordOwnerRootMatchCount,
+    dispatchRecordOwnerRootMismatchCount:
+      ownerRootMetadata.dispatchRecordOwnerRootMismatchCount,
     domEventName: 'click',
     eventDispatch: false,
     invocationRecordCount: invocationRecords.length,
     kind:
       PRIVATE_CLICK_EVENT_DELEGATION_ACCEPTED_LISTENER_ORDER_RECORD_KIND,
     listenerInvocationCount,
+    nestedDispatchPath: targetDispatchPathLength > 1,
+    ownerRootPreserved: ownerRootMetadata.ownerRootPreserved,
+    ownerRootRequired: ownerRootMetadata.ownerRootRequired,
+    ownerRootStatus: ownerRootMetadata.status,
     phases: Object.freeze(
       acceptedListenerOrder.map((entry) => entry.phase)
     ),
@@ -3623,12 +3641,18 @@ function invokePrivateClickEventDelegationAcceptedListenerOrder(
     syntheticEventCount: 0,
     syntheticEventStatus: 'blocked-not-created',
     targetDispatchPathLength,
+    targetDispatchPathOwnerRootPreserved:
+      ownerRootMetadata.targetDispatchPathOwnerRootPreserved,
     targetDispatchPathStatus,
     targetInst,
     targetInstStatus,
     targetRecordAvailable: targetRecordMetadata.available,
     targetRecordKind: targetRecordMetadata.recordKind,
     targetRecordStatus: targetRecordMetadata.status,
+    targetRootOwnerMatchCount:
+      ownerRootMetadata.targetRootOwnerMatchCount,
+    targetRootOwnerMismatchCount:
+      ownerRootMetadata.targetRootOwnerMismatchCount,
     willDispatchPublicEvent: false,
     willInvokeListeners: false,
     willInvokePublicListeners: false
@@ -3645,6 +3669,7 @@ function invokePrivateClickEventDelegationAcceptedListenerOrder(
       ),
       dispatchRecords: Object.freeze(normalizedDispatchRecords.slice()),
       invocationRecords: Object.freeze(invocationRecords.slice()),
+      ownerRootMetadata,
       options: normalizedOptions.rawOptions,
       selections: Object.freeze(selections.slice()),
       targetRecord: normalizedOptions.targetRecord,
@@ -5603,6 +5628,112 @@ function validatePrivateClickEventDelegationAcceptedListenerOrderTargetRecord(
     rootRenderMetadataStatus:
       targetRecord.rootRenderMetadataStatus || 'unknown',
     status: targetRecord.status
+  });
+}
+
+function validatePrivateClickEventDelegationAcceptedListenerOrderOwnerRoots(
+  dispatchRecords,
+  listenerQueueEntryRecords
+) {
+  const primaryDispatchRecord = dispatchRecords[0];
+  const primaryDispatchPathRecord =
+    primaryDispatchRecord.targetDispatchPathRecord;
+  const ownerRoot = primaryDispatchPathRecord.rootOwner;
+  const ownerRootRequired = ownerRoot !== null;
+
+  if (!ownerRootRequired) {
+    return Object.freeze({
+      acceptedListenerOwnerRootMatchCount: 0,
+      acceptedListenerOwnerRootMismatchCount: 0,
+      dispatchRecordOwnerRootMatchCount: 0,
+      dispatchRecordOwnerRootMismatchCount: 0,
+      ownerRootPreserved: false,
+      ownerRootRequired: false,
+      status: 'unavailable-no-click-owner-root',
+      targetDispatchPathOwnerRootPreserved: false,
+      targetRootOwnerMatchCount: 0,
+      targetRootOwnerMismatchCount: 0
+    });
+  }
+
+  let dispatchRecordOwnerRootMatchCount = 0;
+  let dispatchRecordOwnerRootMismatchCount = 0;
+  for (const dispatchRecord of dispatchRecords) {
+    const dispatchPathRecord = dispatchRecord.targetDispatchPathRecord;
+    if (
+      dispatchPathRecord.rootOwner === ownerRoot &&
+      dispatchPathRecord.targetInst === primaryDispatchPathRecord.targetInst &&
+      dispatchRecord.targetInst === primaryDispatchRecord.targetInst &&
+      dispatchRecord.nativeEventTarget ===
+        primaryDispatchRecord.nativeEventTarget
+    ) {
+      dispatchRecordOwnerRootMatchCount++;
+    } else {
+      dispatchRecordOwnerRootMismatchCount++;
+    }
+  }
+
+  if (dispatchRecordOwnerRootMismatchCount !== 0) {
+    throw createPrivateClickEventDelegationAcceptedListenerOrderError(
+      'Private click event delegation accepted listener order requires dispatch records from one owner root and event target.',
+      'foreign-owner-root'
+    );
+  }
+
+  let acceptedListenerOwnerRootMatchCount = 0;
+  let acceptedListenerOwnerRootMismatchCount = 0;
+  for (const listenerQueueEntryRecord of listenerQueueEntryRecords) {
+    const queueEntryPayload = getPrivateEventListenerQueueEntryPayload(
+      listenerQueueEntryRecord
+    );
+    const listenerOwnerRoot =
+      queueEntryPayload === null
+        ? null
+        : getRootOwnerFromNode(queueEntryPayload.target);
+
+    if (listenerOwnerRoot === ownerRoot) {
+      acceptedListenerOwnerRootMatchCount++;
+    } else if (listenerOwnerRoot === null) {
+      throw createPrivateClickEventDelegationAcceptedListenerOrderError(
+        'Private click event delegation accepted listener order rejected listener target metadata that is no longer mounted.',
+        'stale-listener-record'
+      );
+    } else {
+      acceptedListenerOwnerRootMismatchCount++;
+    }
+  }
+
+  if (acceptedListenerOwnerRootMismatchCount !== 0) {
+    throw createPrivateClickEventDelegationAcceptedListenerOrderError(
+      'Private click event delegation accepted listener order rejected listener queue entries from a foreign owner root.',
+      'foreign-owner-root'
+    );
+  }
+
+  const targetRootOwnerMatchCount =
+    typeof primaryDispatchPathRecord.targetRootOwnerMatchCount === 'number'
+      ? primaryDispatchPathRecord.targetRootOwnerMatchCount
+      : 0;
+  const targetRootOwnerMismatchCount =
+    typeof primaryDispatchPathRecord.targetRootOwnerMismatchCount === 'number'
+      ? primaryDispatchPathRecord.targetRootOwnerMismatchCount
+      : 0;
+  const targetDispatchPathOwnerRootPreserved =
+    primaryDispatchPathRecord.length > 0 &&
+    targetRootOwnerMatchCount === primaryDispatchPathRecord.length &&
+    targetRootOwnerMismatchCount === 0;
+
+  return Object.freeze({
+    acceptedListenerOwnerRootMatchCount,
+    acceptedListenerOwnerRootMismatchCount,
+    dispatchRecordOwnerRootMatchCount,
+    dispatchRecordOwnerRootMismatchCount,
+    ownerRootPreserved: targetDispatchPathOwnerRootPreserved,
+    ownerRootRequired,
+    status: 'validated-private-click-owner-root',
+    targetDispatchPathOwnerRootPreserved,
+    targetRootOwnerMatchCount,
+    targetRootOwnerMismatchCount
   });
 }
 
