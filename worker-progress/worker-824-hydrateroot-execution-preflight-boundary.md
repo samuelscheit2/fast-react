@@ -76,3 +76,32 @@
   last private preflight gate before root construction and add public DOM,
   listener, replay drain, recoverable-callback timing, and package-surface
   compatibility tests together.
+
+## Audit Follow-up
+
+- Fixed the audit blocker where exposed WeakMap payloads for hydrateRoot
+  event replay preflight records could be mutated to rewrite `preflight` and
+  `bridge` ownership fields before calling `preflightExecution`.
+- The stored hydrateRoot public-facade per-record payloads are now frozen for
+  preflight record, marker/listener, target-claiming, event-replay, and
+  execution-preflight records. The public getters now expose immutable payload
+  objects for the boundary ownership fields instead of mutable WeakMap payloads.
+- Added a regression that obtains a foreign event replay payload through
+  `getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload`, proves the
+  payload and nested target-claiming payload are frozen, verifies `Reflect.set`
+  cannot rewrite `preflight` or `bridge`, and then verifies the foreign event
+  replay record remains rejected by the base preflight execution boundary.
+
+### Audit Verification
+
+- `node --check packages/react-dom/src/client/root-bridge.js`: passed.
+- `node --check tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs`: passed.
+- `node --check packages/react-dom/test/hydration-private.test.js`: passed.
+- `node --check tests/conformance/test/react-dom-hydration-boundary-gate.test.mjs`: passed.
+- `node --test tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs --test-name-pattern "hydrateRoot execution preflight|hydrateRoot event replay preflight|hydrateRoot preflight matrix"`: passed, 33 tests.
+- `node --test packages/react-dom/test/react-dom-private-root-bridge-shell.test.js --test-name-pattern "hydrateRoot event replay preflight|hydrateRoot preflight matrix|hydrateRoot target-claiming preflight"`: passed, 65 tests.
+- `node --test packages/react-dom/test/hydration-private.test.js --test-name-pattern "target|replay|recoverable|hydrateRoot"`: passed, 11 tests.
+- `node --test tests/conformance/test/react-dom-hydration-boundary-gate.test.mjs --test-name-pattern "target|replay|recoverable|hydrateRoot"`: passed, 17 tests.
+- `npm run check --workspace @fast-react/react-dom`: passed, 180 package tests plus import-entrypoint smoke. npm emitted the existing unknown `minimum-release-age` warning.
+- `npm run check:package-surface`: passed with the existing unknown `minimum-release-age` npm warning.
+- `node tests/smoke/import-entrypoints.mjs`: passed.

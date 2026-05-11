@@ -1767,6 +1767,35 @@ test("React DOM client private hydrateRoot execution preflight rejects stale for
     createHydrateRootExecutionPreflightScenario(
       "public-facade-hydrate-execution-foreign"
     );
+  const baseEventReplayPayload =
+    rootBridge.getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload(
+      eventReplayRecord
+    );
+  const foreignEventReplayPayload =
+    rootBridge.getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload(
+      foreign.eventReplayRecord
+    );
+  assert.equal(Object.isFrozen(baseEventReplayPayload), true);
+  assert.equal(Object.isFrozen(foreignEventReplayPayload), true);
+  assert.equal(
+    Object.isFrozen(foreignEventReplayPayload.targetClaimingPayload),
+    true
+  );
+  assert.equal(
+    Reflect.set(foreignEventReplayPayload, "preflight", preflight),
+    false
+  );
+  assert.equal(
+    Reflect.set(
+      foreignEventReplayPayload,
+      "bridge",
+      baseEventReplayPayload.bridge
+    ),
+    false
+  );
+  assert.equal(foreignEventReplayPayload.preflight, foreign.preflight);
+  assert.notEqual(foreignEventReplayPayload.preflight, preflight);
+  assert.notEqual(foreignEventReplayPayload.bridge, baseEventReplayPayload.bridge);
   assert.throws(
     () => preflight.preflightExecution(foreign.eventReplayRecord),
     {

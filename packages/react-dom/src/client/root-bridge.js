@@ -3591,7 +3591,7 @@ function createPrivateHydrateRootPublicFacadePreflightRecord(
     compatibilityClaimed: false
   });
 
-  rootHydratePublicFacadePreflightRecordPayloads.set(record, {
+  rootHydratePublicFacadePreflightRecordPayloads.set(record, freezeRecord({
     bridge: preflightState.bridge,
     markerListenerPreflight,
     nativeHandoffRecord: null,
@@ -3599,7 +3599,7 @@ function createPrivateHydrateRootPublicFacadePreflightRecord(
     recoverableErrorPreflight,
     requestAdmission,
     requestRecord
-  });
+  }));
   return record;
 }
 
@@ -3771,7 +3771,7 @@ function createPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord(
     compatibilityClaimed: false
   });
 
-  rootHydratePublicFacadeMarkerListenerPreflightPayloads.set(record, {
+  rootHydratePublicFacadeMarkerListenerPreflightPayloads.set(record, freezeRecord({
     afterState,
     beforeState,
     blockerEvidence,
@@ -3783,7 +3783,7 @@ function createPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord(
     preconditions,
     preflight: preflightState.preflight,
     requestRecord
-  });
+  }));
   return record;
 }
 
@@ -4082,7 +4082,7 @@ function createPrivateHydrateRootPublicFacadeTargetClaimingPreflightRecord(
     browserDomEventCompatibilityClaimed: false
   });
 
-  rootHydratePublicFacadeTargetClaimingPreflightPayloads.set(record, {
+  rootHydratePublicFacadeTargetClaimingPreflightPayloads.set(record, freezeRecord({
     afterState,
     beforeState,
     blockerEvidence,
@@ -4101,7 +4101,7 @@ function createPrivateHydrateRootPublicFacadeTargetClaimingPreflightRecord(
     targetClaimingDiagnostic,
     targetClaimingPayload,
     targetDispatchLinkDiagnostic
-  });
+  }));
   return record;
 }
 
@@ -4485,7 +4485,7 @@ function createPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(
     browserDomEventCompatibilityClaimed: false
   });
 
-  rootHydratePublicFacadeEventReplayPreflightPayloads.set(record, {
+  rootHydratePublicFacadeEventReplayPreflightPayloads.set(record, freezeRecord({
     afterState,
     beforeState,
     blockerEvidence,
@@ -4503,7 +4503,7 @@ function createPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(
     requestRecord,
     targetClaimingPayload,
     targetClaimingPreflight: targetClaimingPreflightRecord
-  });
+  }));
   return record;
 }
 
@@ -4890,7 +4890,7 @@ function createPrivateHydrateRootPublicFacadeExecutionPreflightRecord(
     browserDomEventCompatibilityClaimed: false
   });
 
-  rootHydratePublicFacadeExecutionPreflightPayloads.set(record, {
+  rootHydratePublicFacadeExecutionPreflightPayloads.set(record, freezeRecord({
     afterState,
     beforeState,
     blockerEvidence,
@@ -4910,7 +4910,7 @@ function createPrivateHydrateRootPublicFacadeExecutionPreflightRecord(
     targetClaimingPayload: eventReplayPayload.targetClaimingPayload,
     targetClaimingPreflight:
       eventReplayPayload.targetClaimingPreflight
-  });
+  }));
   return record;
 }
 
