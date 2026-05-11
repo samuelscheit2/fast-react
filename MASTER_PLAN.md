@@ -48,9 +48,9 @@ Drive toward a minimal real root render/update/unmount path:
 Top-level cap: 30 workers. Accepted implementation baseline for this branch
 includes Workers 803-837, 842-846, 848-852, 855-860, 862-874, 878-883,
 885-893, 895-896, 898-902, 904, 906-909, 912-930, 932-934, 936-948,
-950-952, and 955; coordination history includes docs refresh Workers 922,
-931, 935, 945, 959, and 960. Current baseline is `a34f8c76`
-(`Merge worker 952 resource hints currentness`). Worker 853's
+950-952, and 955-956; coordination history includes docs refresh Workers 922,
+931, 935, 945, 959, 960, and 961. Current baseline is `323fcfee`
+(`Merge worker 956 useRef dispatcher currentness`). Worker 853's
 competing test-renderer branch was rejected as redundant after Worker 844 was
 accepted; do not use it as accepted input.
 
@@ -63,16 +63,15 @@ Current orchestration queue:
 - Worker 949: Scheduler postTask/mock variant currentness lane.
 - Worker 953: private-admission 932-944 ledger hardening lane.
 - Worker 954: HostWork root child replacement execution lane.
-- Worker 956: React `useRef` private dispatcher currentness lane.
 - Worker 957: benchmark result false-green hardening lane.
 - Worker 958: React DOM input change extraction currentness lane.
 
-Worker 949 and Workers 953-954 and 956-958 remain unaccepted until merged to
-main. If Worker 910, Worker 949, or Workers 953-954 and 956-958 merge after
+Worker 949 and Workers 953-954 and 957-958 remain unaccepted until merged to
+main. If Worker 910, Worker 949, or Workers 953-954 and 957-958 merge after
 this branch point, update this section and move accepted facts into
 `MASTER_PROGRESS.md` in the next docs pass.
 
-Accepted private evidence through `a34f8c76` still keeps public
+Accepted private evidence through `323fcfee` still keeps public
 root/render/unmount, `act`, `react-dom/test-utils.act`, `flushSync`, Scheduler
 timing, hydration, resources/forms, serialization, native/reconciler execution,
 React Children traversal parity, unsupported hook behavior, event dispatch,
@@ -84,13 +83,13 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat the accepted branch baseline through `a34f8c76` as private evidence
+1. Treat the accepted branch baseline through `323fcfee` as private evidence
    only. Public package, root, native, React DOM, test-renderer, Scheduler,
    `act`, `react-dom/test-utils.act`, hydration, resource/form,
    serialization, React Children lazy/full traversal, unsupported hook, event
    dispatch, and `flushSync` compatibility still require fail-closed gates and
    dual-run oracle evidence.
-2. Review Worker 910 fix3, Worker 949, and Workers 953-954 and 956-958 against
+2. Review Worker 910 fix3, Worker 949, and Workers 953-954 and 957-958 against
    the accepted source-owned lifecycle, hydration, `act`, deletion, sync-flush,
    HostRoot
    lane handoff, scheduler continuation/currentness,
@@ -200,10 +199,12 @@ canonical evidence requirements.
   currentness, Worker 918 render-phase update ownership evidence, Worker 926
   hook staging failure-preservation currentness, Worker 929 unsupported
   placeholder hook blocker currentness, Worker 938 CJS/server unsupported hook
-  surface currentness, and Worker 943 private render-phase staging currentness.
-  Public dispatcher routing, unsupported hook execution, external-store
-  subscription, callback invocation, ID generation, root scheduling, renderer
-  behavior, `act`, Scheduler timing, and package compatibility remain blocked.
+  surface currentness, Worker 943 private render-phase staging currentness, and
+  Worker 956 private `useRef` dispatcher currentness. Public dispatcher
+  routing, `useRef` execution/ref identity, unsupported hook execution,
+  external-store subscription, callback invocation, ID generation, root
+  scheduling, renderer behavior, `act`, Scheduler timing, and package
+  compatibility remain blocked.
 - Scheduler variant and root-scheduler continuation work can consume accepted
   Worker 886 as the variant boundary, Worker 909's live source-currentness seal,
   Worker 914's public root-entry currentness gate, and Worker 937's variant

@@ -29,6 +29,34 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 961 Docs Refresh and Worker 956
+
+- Worker 961 refreshed coordination docs for the `a34f8c76` baseline after
+  Workers 948, 955, and 952 were accepted. It was accepted at `cc19d5dd`
+  (`Merge worker 961 docs refresh after workers 948 955 952`) with no runtime
+  compatibility claim change.
+- Worker 956 moved `React.useRef` off the generic dispatcher pass-through path
+  and behind a source-owned private ref-hook dispatcher marker. It added
+  package-private `useRef` source/currentness reports for root, CJS
+  development, CJS production, and react-server surfaces.
+- Worker 956's accepted path requires canonical module-owned dispatcher
+  metadata object identity, source-function identity, generated no-override
+  surface row identity, and rootless/generic-dispatcher probes before a private
+  `useRef` currentness report can be consumed. Cloned metadata, reports, rows,
+  row overrides, same-shaped fake `useRef`, inherited/accessor/proxy-ambiguous
+  options, public compatibility flags, Scheduler/root prerequisite smuggling,
+  callback/external-store/id claims, and ref identity compatibility claims
+  remain rejected.
+- Public `useRef` execution, ref object identity compatibility, hook dispatcher
+  lifecycle, root rendering, renderer behavior, Scheduler timing, `act`, and
+  package compatibility remain blocked.
+- The accepted state for this batch is current main `323fcfee`
+  (`Merge worker 956 useRef dispatcher currentness`) after merge commits
+  `cc19d5dd` and `323fcfee`, with focused hook-dispatcher guard/oracle checks,
+  React package workspace checks, package-surface/import-smoke checks, JS
+  syntax checks, docs checks, and `git diff --check` evidence recorded in
+  worker reports and git history.
+
 ### Worker 960 Docs Refresh and Workers 948, 955, and 952
 
 - Worker 960 refreshed coordination docs for the `c155d301` baseline after
