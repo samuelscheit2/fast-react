@@ -339,6 +339,145 @@ assert.throws(
   },
   { name: 'TypeError' }
 );
+assert.equal(
+  nativeBindingManifest.nativeRootBridgeRequestShape
+    .workerThreadCleanupHookPreflight,
+  nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight
+);
+assert.equal(
+  nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight
+    .preflightStatus,
+  'preflighted-native-root-bridge-worker-thread-cleanup-hook-order'
+);
+assert.equal(
+  nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight.model,
+  'fast-react-napi.WorkerThreadCleanupHookOrderPreflight'
+);
+assert.equal(
+  nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight.executionScope,
+  'rust-only-cleanup-hook-order-preflight-no-node-worker-thread-no-napi-cleanup-hook-execution'
+);
+assert.equal(
+  nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight
+    .sourceExecutablePreflightStatus,
+  nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+    .preflightStatus
+);
+assert.equal(
+  nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight.workerThreadId,
+  764
+);
+assert.equal(
+  nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight
+    .peerEnvironmentId,
+  1764
+);
+assert.equal(
+  nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight
+    .canonicalExecutableEvidenceRequired,
+  true
+);
+assert.equal(
+  nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight
+    .canonicalExecutableEvidenceAccepted,
+  true
+);
+assert.equal(
+  nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight
+    .cleanupHookExecutionOrder,
+  'reverse-registration-order'
+);
+assert.equal(
+  nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight
+    .cleanupHookRegistrationCount,
+  2
+);
+assert.deepEqual(
+  nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight.rows.map(
+    (row) => row.id
+  ),
+  [
+    'cleanup-hook-worker-root-before-value-release',
+    'cleanup-hook-worker-value-after-root-release',
+    'cleanup-hook-stale-worker-transport-evidence-rejected',
+    'cleanup-hook-forged-peer-active-evidence-rejected'
+  ]
+);
+assert.deepEqual(
+  nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight.rows.map(
+    (row) => row.registrationOrder
+  ),
+  [2, 1, 2, 1]
+);
+assert.deepEqual(
+  nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight.rows.map(
+    (row) => row.expectedExecutionOrder
+  ),
+  [1, 2, 1, 2]
+);
+assert.deepEqual(
+  nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight.rows.map(
+    (row) => row.observedExecutionOrder
+  ),
+  [1, 2, null, null]
+);
+assert.deepEqual(
+  nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight.rows.map(
+    (row) => row.status
+  ),
+  ['accepted', 'accepted', 'rejected', 'rejected']
+);
+assert.deepEqual(
+  nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight.rows.map(
+    (row) => row.code
+  ),
+  [
+    null,
+    null,
+    'FAST_REACT_NAPI_CLEANUP_HOOK_STALE_EXECUTABLE_PREFLIGHT',
+    'FAST_REACT_NAPI_CLEANUP_HOOK_FORGED_EVIDENCE'
+  ]
+);
+assert.deepEqual(
+  nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight.rows.map(
+    (row) => row.canonicalExecutableEvidence
+  ),
+  [true, true, false, false]
+);
+assert.deepEqual(
+  nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight.rows.map(
+    (row) => row.staleOrForgedCleanupEvidenceRejected
+  ),
+  [false, false, true, true]
+);
+assert.equal(
+  nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight.rows.every(
+    (row) =>
+      row.cleanupHookOrderPrivate === true &&
+      row.cleanupHookIdentityPrivate === true &&
+      row.nodeWorkerThreadsExecution === false &&
+      row.napiCleanupHookExecution === false &&
+      row.nativeAddonLoaded === false &&
+      row.nativeExecution === false &&
+      row.rendererExecution === false &&
+      row.reconcilerExecution === false &&
+      row.publicNativeCompatibility === false &&
+      row.reactBehaviorError === false
+  ),
+  true
+);
+assert.equal(
+  nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight
+    .publicNativeCompatibility,
+  false
+);
+assert.throws(
+  () => {
+    nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight.rows[0]
+      .canonicalExecutableEvidence = false;
+  },
+  { name: 'TypeError' }
+);
 assert.deepEqual(
   shapeGate.jsonTransportSmoke.parserGate.batchedRecordGate.lifecycleRows.map(
     (row) => row.lifecycleTransition

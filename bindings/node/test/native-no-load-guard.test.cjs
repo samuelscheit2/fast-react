@@ -222,6 +222,77 @@ async function main() {
       true
     );
     assert.equal(
+      native.nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight
+        .preflightStatus,
+      'preflighted-native-root-bridge-worker-thread-cleanup-hook-order'
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight
+        .workerThreadId,
+      764
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight
+        .sourceExecutablePreflightStatus,
+      native.nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+        .preflightStatus
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight
+        .canonicalExecutableEvidenceAccepted,
+      true
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight
+        .napiCleanupHookExecution,
+      false
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight
+        .nativeAddonLoaded,
+      false
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight
+        .nativeExecution,
+      false
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight
+        .publicNativeCompatibility,
+      false
+    );
+    assert.deepEqual(
+      native.nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight
+        .rows.map((row) => row.id),
+      [
+        'cleanup-hook-worker-root-before-value-release',
+        'cleanup-hook-worker-value-after-root-release',
+        'cleanup-hook-stale-worker-transport-evidence-rejected',
+        'cleanup-hook-forged-peer-active-evidence-rejected'
+      ]
+    );
+    assert.deepEqual(
+      native.nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight
+        .rows.map((row) => row.status),
+      ['accepted', 'accepted', 'rejected', 'rejected']
+    );
+    assert.equal(
+      native.nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight.rows
+        .every(
+          (row) =>
+            row.nodeWorkerThreadsExecution === false &&
+            row.napiCleanupHookExecution === false &&
+            row.nativeAddonLoaded === false &&
+            row.nativeExecution === false &&
+            row.rendererExecution === false &&
+            row.reconcilerExecution === false &&
+            row.publicNativeCompatibility === false &&
+            row.reactBehaviorError === false
+        ),
+      true
+    );
+    assert.equal(
       native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
         .batchedRecordGate.responseSequenceGate.responseSequenceGateStatus,
       'diagnosed-native-root-bridge-json-batch-response-sequence'

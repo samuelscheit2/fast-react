@@ -32,6 +32,16 @@ const nativeRootBridgeWorkerThreadTeardownExecutablePreflightModel =
   'fast-react-napi.WorkerThreadTeardownPreflight';
 const nativeRootBridgeWorkerThreadTeardownExecutablePreflightExecutionScope =
   'rust-only-handle-table-preflight-no-node-worker-thread-no-napi-cleanup-hook';
+const nativeRootBridgeWorkerThreadCleanupHookPreflightStatus =
+  'preflighted-native-root-bridge-worker-thread-cleanup-hook-order';
+const nativeRootBridgeWorkerThreadCleanupHookPreflightModel =
+  'fast-react-napi.WorkerThreadCleanupHookOrderPreflight';
+const nativeRootBridgeWorkerThreadCleanupHookPreflightExecutionScope =
+  'rust-only-cleanup-hook-order-preflight-no-node-worker-thread-no-napi-cleanup-hook-execution';
+const nativeRootBridgeWorkerThreadCleanupHookStaleEvidenceCode =
+  'FAST_REACT_NAPI_CLEANUP_HOOK_STALE_EXECUTABLE_PREFLIGHT';
+const nativeRootBridgeWorkerThreadCleanupHookForgedEvidenceCode =
+  'FAST_REACT_NAPI_CLEANUP_HOOK_FORGED_EVIDENCE';
 const nativeRootBridgeJsonTransportBatchResponseSequenceGateStatus =
   'diagnosed-native-root-bridge-json-batch-response-sequence';
 const nativeRootBridgeJsonTransportBatchResponseSequenceBatchId =
@@ -339,6 +349,38 @@ const nativeRootBridgeWorkerThreadTeardownExecutablePreflightRowFields =
     'rejectedByBoundary',
     'peerInvariantPreserved',
     'preflightPassed',
+    'nodeWorkerThreadsExecution',
+    'napiCleanupHookExecution',
+    'nativeAddonLoaded',
+    'nativeExecution',
+    'rendererExecution',
+    'reconcilerExecution',
+    'publicNativeCompatibility',
+    'reactBehaviorError'
+  ]);
+const nativeRootBridgeWorkerThreadCleanupHookPreflightRowFields =
+  Object.freeze([
+    'id',
+    'operation',
+    'cleanupHookId',
+    'cleanupHookFunctionIdentityToken',
+    'cleanupHookArgumentIdentityToken',
+    'registrationOrder',
+    'expectedExecutionOrder',
+    'observedExecutionOrder',
+    'status',
+    'code',
+    'sourcePreflightStatus',
+    'sourceWorkerThreadId',
+    'sourceEnvironmentId',
+    'sourceRowId',
+    'sourceHandleKind',
+    'sourceErrorCode',
+    'sourceBoundaryErrorCode',
+    'canonicalExecutableEvidence',
+    'cleanupHookOrderPrivate',
+    'cleanupHookIdentityPrivate',
+    'staleOrForgedCleanupEvidenceRejected',
     'nodeWorkerThreadsExecution',
     'napiCleanupHookExecution',
     'nativeAddonLoaded',
@@ -899,6 +941,62 @@ function freezeNativeRootBridgeWorkerThreadTeardownExecutablePreflightRow({
   });
 }
 
+function freezeNativeRootBridgeWorkerThreadCleanupHookPreflightRow({
+  id,
+  operation,
+  cleanupHookId,
+  cleanupHookFunctionIdentityToken,
+  cleanupHookArgumentIdentityToken,
+  registrationOrder,
+  expectedExecutionOrder,
+  observedExecutionOrder,
+  status,
+  code,
+  sourcePreflightStatus,
+  sourceWorkerThreadId,
+  sourceEnvironmentId,
+  sourceRowId,
+  sourceHandleKind,
+  sourceErrorCode,
+  sourceBoundaryErrorCode,
+  canonicalExecutableEvidence,
+  cleanupHookOrderPrivate,
+  cleanupHookIdentityPrivate,
+  staleOrForgedCleanupEvidenceRejected
+}) {
+  return Object.freeze({
+    id,
+    operation,
+    cleanupHookId,
+    cleanupHookFunctionIdentityToken,
+    cleanupHookArgumentIdentityToken,
+    registrationOrder,
+    expectedExecutionOrder,
+    observedExecutionOrder,
+    status,
+    code,
+    sourcePreflightStatus,
+    sourceWorkerThreadId,
+    sourceEnvironmentId,
+    sourceRowId,
+    sourceHandleKind,
+    sourceErrorCode,
+    sourceBoundaryErrorCode,
+    canonicalExecutableEvidence,
+    cleanupHookOrderPrivate,
+    cleanupHookIdentityPrivate,
+    staleOrForgedCleanupEvidenceRejected,
+    nodeWorkerThreadsExecution: false,
+    napiCleanupHookExecution: false,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    publicNativeCompatibility: false,
+    reactBehaviorError: false
+  });
+}
+
 const nativeBoundaryErrorCodeMap = Object.freeze({
   unsupportedNativeExecution: unavailableErrorCode,
   rustNativeExportsNotBuilt: rustNativeExportsNotBuiltErrorCode,
@@ -1183,6 +1281,143 @@ const nativeRootBridgeWorkerThreadTeardownExecutablePreflight = Object.freeze({
   reactBehaviorError: false
 });
 
+const nativeRootBridgeWorkerThreadCleanupHookPreflight = Object.freeze({
+  preflightStatus: nativeRootBridgeWorkerThreadCleanupHookPreflightStatus,
+  model: nativeRootBridgeWorkerThreadCleanupHookPreflightModel,
+  executionScope:
+    nativeRootBridgeWorkerThreadCleanupHookPreflightExecutionScope,
+  sourceExecutablePreflightStatus:
+    nativeRootBridgeWorkerThreadTeardownExecutablePreflightStatus,
+  workerThreadId: 764,
+  workerEnvironmentId: 764,
+  peerEnvironmentId: 1764,
+  canonicalExecutableEvidenceRequired: true,
+  canonicalExecutableEvidenceAccepted: true,
+  cleanupHookRegistrationCount: 2,
+  cleanupHookExecutionOrder: 'reverse-registration-order',
+  acceptedCleanupEvidenceCount: 2,
+  rejectedCleanupEvidenceCount: 2,
+  staleOrForgedCleanupEvidenceRejectionCount: 2,
+  cleanupHookOrderPrivate: true,
+  cleanupHookIdentityPrivate: true,
+  cleanupHookPreflightRowFields:
+    nativeRootBridgeWorkerThreadCleanupHookPreflightRowFields,
+  rows: Object.freeze([
+    freezeNativeRootBridgeWorkerThreadCleanupHookPreflightRow({
+      id: 'cleanup-hook-worker-root-before-value-release',
+      operation: 'cleanup-hook-order-preflight',
+      cleanupHookId: 'worker-root-handle-cleanup-hook',
+      cleanupHookFunctionIdentityToken:
+        'private-cleanup-hook-fn:worker-root-handle-teardown',
+      cleanupHookArgumentIdentityToken:
+        'private-cleanup-hook-arg:worker-764-root-slot-1',
+      registrationOrder: 2,
+      expectedExecutionOrder: 1,
+      observedExecutionOrder: 1,
+      status: 'accepted',
+      code: null,
+      sourcePreflightStatus:
+        nativeRootBridgeWorkerThreadTeardownExecutablePreflightStatus,
+      sourceWorkerThreadId: 764,
+      sourceEnvironmentId: 764,
+      sourceRowId: 'worker-render-root-stale-executable-preflight',
+      sourceHandleKind: nativeRootBridgeHandleKindRoot,
+      sourceErrorCode: nativeRootBridgeValidationErrorCodes.staleHandle,
+      sourceBoundaryErrorCode: nativeBoundaryErrorCodeMap.rootBridgeStaleHandle,
+      canonicalExecutableEvidence: true,
+      cleanupHookOrderPrivate: true,
+      cleanupHookIdentityPrivate: true,
+      staleOrForgedCleanupEvidenceRejected: false
+    }),
+    freezeNativeRootBridgeWorkerThreadCleanupHookPreflightRow({
+      id: 'cleanup-hook-worker-value-after-root-release',
+      operation: 'cleanup-hook-order-preflight',
+      cleanupHookId: 'worker-value-handle-cleanup-hook',
+      cleanupHookFunctionIdentityToken:
+        'private-cleanup-hook-fn:worker-value-handle-teardown',
+      cleanupHookArgumentIdentityToken:
+        'private-cleanup-hook-arg:worker-764-value-slot-3',
+      registrationOrder: 1,
+      expectedExecutionOrder: 2,
+      observedExecutionOrder: 2,
+      status: 'accepted',
+      code: null,
+      sourcePreflightStatus:
+        nativeRootBridgeWorkerThreadTeardownExecutablePreflightStatus,
+      sourceWorkerThreadId: 764,
+      sourceEnvironmentId: 764,
+      sourceRowId: 'worker-render-value-stale-executable-preflight',
+      sourceHandleKind: nativeRootBridgeHandleKindValue,
+      sourceErrorCode: nativeRootBridgeValidationErrorCodes.staleHandle,
+      sourceBoundaryErrorCode: nativeBoundaryErrorCodeMap.rootBridgeStaleHandle,
+      canonicalExecutableEvidence: true,
+      cleanupHookOrderPrivate: true,
+      cleanupHookIdentityPrivate: true,
+      staleOrForgedCleanupEvidenceRejected: false
+    }),
+    freezeNativeRootBridgeWorkerThreadCleanupHookPreflightRow({
+      id: 'cleanup-hook-stale-worker-transport-evidence-rejected',
+      operation: 'cleanup-hook-evidence-preflight-rejection',
+      cleanupHookId: 'stale-worker-transport-cleanup-hook',
+      cleanupHookFunctionIdentityToken:
+        'private-cleanup-hook-fn:stale-worker-teardown',
+      cleanupHookArgumentIdentityToken:
+        'private-cleanup-hook-arg:worker-524-root-slot-1',
+      registrationOrder: 2,
+      expectedExecutionOrder: 1,
+      observedExecutionOrder: null,
+      status: 'rejected',
+      code: nativeRootBridgeWorkerThreadCleanupHookStaleEvidenceCode,
+      sourcePreflightStatus:
+        nativeRootBridgeTransportWorkerThreadTeardownGateStatus,
+      sourceWorkerThreadId: 524,
+      sourceEnvironmentId: 524,
+      sourceRowId: 'worker-root-stale-after-thread-teardown',
+      sourceHandleKind: nativeRootBridgeHandleKindRoot,
+      sourceErrorCode: nativeRootBridgeValidationErrorCodes.staleHandle,
+      sourceBoundaryErrorCode: nativeBoundaryErrorCodeMap.rootBridgeStaleHandle,
+      canonicalExecutableEvidence: false,
+      cleanupHookOrderPrivate: true,
+      cleanupHookIdentityPrivate: true,
+      staleOrForgedCleanupEvidenceRejected: true
+    }),
+    freezeNativeRootBridgeWorkerThreadCleanupHookPreflightRow({
+      id: 'cleanup-hook-forged-peer-active-evidence-rejected',
+      operation: 'cleanup-hook-evidence-preflight-rejection',
+      cleanupHookId: 'forged-peer-active-cleanup-hook',
+      cleanupHookFunctionIdentityToken:
+        'private-cleanup-hook-fn:forged-peer-active',
+      cleanupHookArgumentIdentityToken:
+        'private-cleanup-hook-arg:worker-1764-peer-root',
+      registrationOrder: 1,
+      expectedExecutionOrder: 2,
+      observedExecutionOrder: null,
+      status: 'rejected',
+      code: nativeRootBridgeWorkerThreadCleanupHookForgedEvidenceCode,
+      sourcePreflightStatus:
+        nativeRootBridgeWorkerThreadTeardownExecutablePreflightStatus,
+      sourceWorkerThreadId: 764,
+      sourceEnvironmentId: 764,
+      sourceRowId: 'peer-root-active-executable-preflight',
+      sourceHandleKind: nativeRootBridgeHandleKindRoot,
+      sourceErrorCode: null,
+      sourceBoundaryErrorCode: null,
+      canonicalExecutableEvidence: false,
+      cleanupHookOrderPrivate: true,
+      cleanupHookIdentityPrivate: true,
+      staleOrForgedCleanupEvidenceRejected: true
+    })
+  ]),
+  nodeWorkerThreadsExecution: false,
+  napiCleanupHookExecution: false,
+  nativeAddonLoaded: false,
+  nativeExecution: false,
+  rendererExecution: false,
+  reconcilerExecution: false,
+  publicNativeCompatibility: false,
+  reactBehaviorError: false
+});
+
 const nativeRootBridgeRequestShape = Object.freeze({
   gateStatus: nativeRootBridgeRequestShapeGateStatus,
   validationModel: nativeRootBridgeRequestValidationModel,
@@ -1205,6 +1440,8 @@ const nativeRootBridgeRequestShape = Object.freeze({
     nativeRootBridgeTransportWorkerThreadTeardownGate,
   workerThreadTeardownExecutablePreflight:
     nativeRootBridgeWorkerThreadTeardownExecutablePreflight,
+  workerThreadCleanupHookPreflight:
+    nativeRootBridgeWorkerThreadCleanupHookPreflight,
   validationErrorCodes: nativeRootBridgeValidationErrorCodes
 });
 

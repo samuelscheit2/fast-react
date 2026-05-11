@@ -743,6 +743,208 @@ const expectedNativeRootBridgeWorkerThreadTeardownExecutablePreflight = {
   reactBehaviorError: false
 };
 
+const expectedNativeRootBridgeWorkerThreadCleanupHookPreflightRowFields = [
+  'id',
+  'operation',
+  'cleanupHookId',
+  'cleanupHookFunctionIdentityToken',
+  'cleanupHookArgumentIdentityToken',
+  'registrationOrder',
+  'expectedExecutionOrder',
+  'observedExecutionOrder',
+  'status',
+  'code',
+  'sourcePreflightStatus',
+  'sourceWorkerThreadId',
+  'sourceEnvironmentId',
+  'sourceRowId',
+  'sourceHandleKind',
+  'sourceErrorCode',
+  'sourceBoundaryErrorCode',
+  'canonicalExecutableEvidence',
+  'cleanupHookOrderPrivate',
+  'cleanupHookIdentityPrivate',
+  'staleOrForgedCleanupEvidenceRejected',
+  'nodeWorkerThreadsExecution',
+  'napiCleanupHookExecution',
+  'nativeAddonLoaded',
+  'nativeExecution',
+  'rendererExecution',
+  'reconcilerExecution',
+  'publicNativeCompatibility',
+  'reactBehaviorError'
+];
+const expectedNativeRootBridgeWorkerThreadCleanupHookPreflightRows = [
+  {
+    id: 'cleanup-hook-worker-root-before-value-release',
+    operation: 'cleanup-hook-order-preflight',
+    cleanupHookId: 'worker-root-handle-cleanup-hook',
+    cleanupHookFunctionIdentityToken:
+      'private-cleanup-hook-fn:worker-root-handle-teardown',
+    cleanupHookArgumentIdentityToken:
+      'private-cleanup-hook-arg:worker-764-root-slot-1',
+    registrationOrder: 2,
+    expectedExecutionOrder: 1,
+    observedExecutionOrder: 1,
+    status: 'accepted',
+    code: null,
+    sourcePreflightStatus:
+      'preflighted-native-root-bridge-worker-thread-teardown-boundary',
+    sourceWorkerThreadId: 764,
+    sourceEnvironmentId: 764,
+    sourceRowId: 'worker-render-root-stale-executable-preflight',
+    sourceHandleKind: 'root',
+    sourceErrorCode: 'FAST_REACT_NAPI_STALE_HANDLE',
+    sourceBoundaryErrorCode: 'FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE',
+    canonicalExecutableEvidence: true,
+    cleanupHookOrderPrivate: true,
+    cleanupHookIdentityPrivate: true,
+    staleOrForgedCleanupEvidenceRejected: false,
+    nodeWorkerThreadsExecution: false,
+    napiCleanupHookExecution: false,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    publicNativeCompatibility: false,
+    reactBehaviorError: false
+  },
+  {
+    id: 'cleanup-hook-worker-value-after-root-release',
+    operation: 'cleanup-hook-order-preflight',
+    cleanupHookId: 'worker-value-handle-cleanup-hook',
+    cleanupHookFunctionIdentityToken:
+      'private-cleanup-hook-fn:worker-value-handle-teardown',
+    cleanupHookArgumentIdentityToken:
+      'private-cleanup-hook-arg:worker-764-value-slot-3',
+    registrationOrder: 1,
+    expectedExecutionOrder: 2,
+    observedExecutionOrder: 2,
+    status: 'accepted',
+    code: null,
+    sourcePreflightStatus:
+      'preflighted-native-root-bridge-worker-thread-teardown-boundary',
+    sourceWorkerThreadId: 764,
+    sourceEnvironmentId: 764,
+    sourceRowId: 'worker-render-value-stale-executable-preflight',
+    sourceHandleKind: 'value',
+    sourceErrorCode: 'FAST_REACT_NAPI_STALE_HANDLE',
+    sourceBoundaryErrorCode: 'FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE',
+    canonicalExecutableEvidence: true,
+    cleanupHookOrderPrivate: true,
+    cleanupHookIdentityPrivate: true,
+    staleOrForgedCleanupEvidenceRejected: false,
+    nodeWorkerThreadsExecution: false,
+    napiCleanupHookExecution: false,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    publicNativeCompatibility: false,
+    reactBehaviorError: false
+  },
+  {
+    id: 'cleanup-hook-stale-worker-transport-evidence-rejected',
+    operation: 'cleanup-hook-evidence-preflight-rejection',
+    cleanupHookId: 'stale-worker-transport-cleanup-hook',
+    cleanupHookFunctionIdentityToken:
+      'private-cleanup-hook-fn:stale-worker-teardown',
+    cleanupHookArgumentIdentityToken:
+      'private-cleanup-hook-arg:worker-524-root-slot-1',
+    registrationOrder: 2,
+    expectedExecutionOrder: 1,
+    observedExecutionOrder: null,
+    status: 'rejected',
+    code: 'FAST_REACT_NAPI_CLEANUP_HOOK_STALE_EXECUTABLE_PREFLIGHT',
+    sourcePreflightStatus:
+      'diagnosed-native-root-bridge-transport-worker-thread-teardown',
+    sourceWorkerThreadId: 524,
+    sourceEnvironmentId: 524,
+    sourceRowId: 'worker-root-stale-after-thread-teardown',
+    sourceHandleKind: 'root',
+    sourceErrorCode: 'FAST_REACT_NAPI_STALE_HANDLE',
+    sourceBoundaryErrorCode: 'FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE',
+    canonicalExecutableEvidence: false,
+    cleanupHookOrderPrivate: true,
+    cleanupHookIdentityPrivate: true,
+    staleOrForgedCleanupEvidenceRejected: true,
+    nodeWorkerThreadsExecution: false,
+    napiCleanupHookExecution: false,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    publicNativeCompatibility: false,
+    reactBehaviorError: false
+  },
+  {
+    id: 'cleanup-hook-forged-peer-active-evidence-rejected',
+    operation: 'cleanup-hook-evidence-preflight-rejection',
+    cleanupHookId: 'forged-peer-active-cleanup-hook',
+    cleanupHookFunctionIdentityToken:
+      'private-cleanup-hook-fn:forged-peer-active',
+    cleanupHookArgumentIdentityToken:
+      'private-cleanup-hook-arg:worker-1764-peer-root',
+    registrationOrder: 1,
+    expectedExecutionOrder: 2,
+    observedExecutionOrder: null,
+    status: 'rejected',
+    code: 'FAST_REACT_NAPI_CLEANUP_HOOK_FORGED_EVIDENCE',
+    sourcePreflightStatus:
+      'preflighted-native-root-bridge-worker-thread-teardown-boundary',
+    sourceWorkerThreadId: 764,
+    sourceEnvironmentId: 764,
+    sourceRowId: 'peer-root-active-executable-preflight',
+    sourceHandleKind: 'root',
+    sourceErrorCode: null,
+    sourceBoundaryErrorCode: null,
+    canonicalExecutableEvidence: false,
+    cleanupHookOrderPrivate: true,
+    cleanupHookIdentityPrivate: true,
+    staleOrForgedCleanupEvidenceRejected: true,
+    nodeWorkerThreadsExecution: false,
+    napiCleanupHookExecution: false,
+    nativeAddonLoaded: false,
+    nativeExecution: false,
+    rendererExecution: false,
+    reconcilerExecution: false,
+    publicNativeCompatibility: false,
+    reactBehaviorError: false
+  }
+];
+const expectedNativeRootBridgeWorkerThreadCleanupHookPreflight = {
+  preflightStatus:
+    'preflighted-native-root-bridge-worker-thread-cleanup-hook-order',
+  model: 'fast-react-napi.WorkerThreadCleanupHookOrderPreflight',
+  executionScope:
+    'rust-only-cleanup-hook-order-preflight-no-node-worker-thread-no-napi-cleanup-hook-execution',
+  sourceExecutablePreflightStatus:
+    'preflighted-native-root-bridge-worker-thread-teardown-boundary',
+  workerThreadId: 764,
+  workerEnvironmentId: 764,
+  peerEnvironmentId: 1764,
+  canonicalExecutableEvidenceRequired: true,
+  canonicalExecutableEvidenceAccepted: true,
+  cleanupHookRegistrationCount: 2,
+  cleanupHookExecutionOrder: 'reverse-registration-order',
+  acceptedCleanupEvidenceCount: 2,
+  rejectedCleanupEvidenceCount: 2,
+  staleOrForgedCleanupEvidenceRejectionCount: 2,
+  cleanupHookOrderPrivate: true,
+  cleanupHookIdentityPrivate: true,
+  cleanupHookPreflightRowFields:
+    expectedNativeRootBridgeWorkerThreadCleanupHookPreflightRowFields,
+  rows: expectedNativeRootBridgeWorkerThreadCleanupHookPreflightRows,
+  nodeWorkerThreadsExecution: false,
+  napiCleanupHookExecution: false,
+  nativeAddonLoaded: false,
+  nativeExecution: false,
+  rendererExecution: false,
+  reconcilerExecution: false,
+  publicNativeCompatibility: false,
+  reactBehaviorError: false
+};
+
 const expectedPackageExports = {
   '.': {
     import: './index.mjs',
@@ -1070,6 +1272,8 @@ const expectedNativeRootBridgeRequestShape = {
     expectedNativeRootBridgeTransportWorkerThreadTeardownGate,
   workerThreadTeardownExecutablePreflight:
     expectedNativeRootBridgeWorkerThreadTeardownExecutablePreflight,
+  workerThreadCleanupHookPreflight:
+    expectedNativeRootBridgeWorkerThreadCleanupHookPreflight,
   validationErrorCodes: {
     createAfterRootCreated:
       'FAST_REACT_NAPI_ROOT_REQUEST_CREATE_AFTER_ROOT_CREATED',
@@ -1267,6 +1471,10 @@ for (const shapeValue of [
     .matchedTeardown,
   native.nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
     .rows,
+  native.nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight,
+  native.nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight
+    .cleanupHookPreflightRowFields,
+  native.nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight.rows,
   native.nativeRootBridgeRequestShape.validationErrorCodes
 ]) {
   assert.ok(Object.isFrozen(shapeValue));
@@ -1282,6 +1490,12 @@ assertNativeRootBridgeWorkerThreadTeardownExecutablePreflight(
 );
 assertNativeRootBridgeWorkerThreadTeardownExecutablePreflightRejectsForgery(
   native.nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+);
+assertNativeRootBridgeWorkerThreadCleanupHookPreflight(
+  native.nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight
+);
+assertNativeRootBridgeWorkerThreadCleanupHookPreflightRejectsForgery(
+  native.nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight
 );
 
 const document = createDocument('native-request-shape');
@@ -2991,6 +3205,214 @@ function assertNativeRootBridgeWorkerThreadTeardownExecutablePreflightRejectsFor
   assert.throws(
     () =>
       assertNativeRootBridgeWorkerThreadTeardownExecutablePreflight(
+        Object.freeze({
+          ...preflight,
+          publicNativeCompatibility: true
+        })
+      ),
+    {
+      name: 'AssertionError'
+    }
+  );
+}
+
+function assertNativeRootBridgeWorkerThreadCleanupHookPreflight(preflight) {
+  assert.equal(Object.isFrozen(preflight), true);
+  assert.equal(Object.isFrozen(preflight.cleanupHookPreflightRowFields), true);
+  assert.equal(Object.isFrozen(preflight.rows), true);
+  assert.deepEqual(
+    preflight,
+    expectedNativeRootBridgeWorkerThreadCleanupHookPreflight
+  );
+  assert.equal(
+    preflight.preflightStatus,
+    'preflighted-native-root-bridge-worker-thread-cleanup-hook-order'
+  );
+  assert.equal(
+    preflight.model,
+    'fast-react-napi.WorkerThreadCleanupHookOrderPreflight'
+  );
+  assert.equal(
+    preflight.executionScope,
+    'rust-only-cleanup-hook-order-preflight-no-node-worker-thread-no-napi-cleanup-hook-execution'
+  );
+  assert.equal(
+    preflight.sourceExecutablePreflightStatus,
+    native.nativeRootBridgeRequestShape.workerThreadTeardownExecutablePreflight
+      .preflightStatus
+  );
+  assert.equal(preflight.workerThreadId, 764);
+  assert.equal(preflight.workerEnvironmentId, 764);
+  assert.equal(preflight.peerEnvironmentId, 1764);
+  assert.equal(preflight.canonicalExecutableEvidenceRequired, true);
+  assert.equal(preflight.canonicalExecutableEvidenceAccepted, true);
+  assert.equal(preflight.cleanupHookRegistrationCount, 2);
+  assert.equal(
+    preflight.cleanupHookExecutionOrder,
+    'reverse-registration-order'
+  );
+  assert.equal(preflight.acceptedCleanupEvidenceCount, 2);
+  assert.equal(preflight.rejectedCleanupEvidenceCount, 2);
+  assert.equal(preflight.staleOrForgedCleanupEvidenceRejectionCount, 2);
+  assert.equal(preflight.cleanupHookOrderPrivate, true);
+  assert.equal(preflight.cleanupHookIdentityPrivate, true);
+  assert.deepEqual(
+    preflight.cleanupHookPreflightRowFields,
+    expectedNativeRootBridgeWorkerThreadCleanupHookPreflightRowFields
+  );
+  assert.deepEqual(
+    preflight.rows.map((row) => row.id),
+    [
+      'cleanup-hook-worker-root-before-value-release',
+      'cleanup-hook-worker-value-after-root-release',
+      'cleanup-hook-stale-worker-transport-evidence-rejected',
+      'cleanup-hook-forged-peer-active-evidence-rejected'
+    ]
+  );
+
+  const acceptedRows = preflight.rows.filter((row) => row.status === 'accepted');
+  const rejectedRows = preflight.rows.filter((row) => row.status === 'rejected');
+  assert.equal(acceptedRows.length, preflight.acceptedCleanupEvidenceCount);
+  assert.equal(rejectedRows.length, preflight.rejectedCleanupEvidenceCount);
+  assert.deepEqual(
+    acceptedRows.map((row) => row.registrationOrder),
+    [2, 1]
+  );
+  assert.deepEqual(
+    acceptedRows.map((row) => row.expectedExecutionOrder),
+    [1, 2]
+  );
+  assert.deepEqual(
+    acceptedRows.map((row) => row.observedExecutionOrder),
+    [1, 2]
+  );
+  assert.deepEqual(
+    acceptedRows.map((row) => row.cleanupHookId),
+    ['worker-root-handle-cleanup-hook', 'worker-value-handle-cleanup-hook']
+  );
+  assert.deepEqual(
+    acceptedRows.map((row) => row.cleanupHookFunctionIdentityToken),
+    [
+      'private-cleanup-hook-fn:worker-root-handle-teardown',
+      'private-cleanup-hook-fn:worker-value-handle-teardown'
+    ]
+  );
+  assert.deepEqual(
+    acceptedRows.map((row) => row.cleanupHookArgumentIdentityToken),
+    [
+      'private-cleanup-hook-arg:worker-764-root-slot-1',
+      'private-cleanup-hook-arg:worker-764-value-slot-3'
+    ]
+  );
+  assert.deepEqual(
+    acceptedRows.map((row) => row.sourceRowId),
+    [
+      'worker-render-root-stale-executable-preflight',
+      'worker-render-value-stale-executable-preflight'
+    ]
+  );
+  assert.deepEqual(
+    acceptedRows.map((row) => row.sourceHandleKind),
+    ['root', 'value']
+  );
+  assert.deepEqual(
+    acceptedRows.map((row) => row.canonicalExecutableEvidence),
+    [true, true]
+  );
+  assert.deepEqual(
+    rejectedRows.map((row) => row.code),
+    [
+      'FAST_REACT_NAPI_CLEANUP_HOOK_STALE_EXECUTABLE_PREFLIGHT',
+      'FAST_REACT_NAPI_CLEANUP_HOOK_FORGED_EVIDENCE'
+    ]
+  );
+  assert.deepEqual(
+    rejectedRows.map((row) => row.sourcePreflightStatus),
+    [
+      'diagnosed-native-root-bridge-transport-worker-thread-teardown',
+      'preflighted-native-root-bridge-worker-thread-teardown-boundary'
+    ]
+  );
+  assert.deepEqual(
+    rejectedRows.map((row) => row.sourceWorkerThreadId),
+    [524, 764]
+  );
+  assert.deepEqual(
+    rejectedRows.map((row) => row.sourceRowId),
+    [
+      'worker-root-stale-after-thread-teardown',
+      'peer-root-active-executable-preflight'
+    ]
+  );
+  assert.deepEqual(
+    rejectedRows.map((row) => row.canonicalExecutableEvidence),
+    [false, false]
+  );
+  assert.deepEqual(
+    rejectedRows.map((row) => row.staleOrForgedCleanupEvidenceRejected),
+    [true, true]
+  );
+  assert.deepEqual(
+    rejectedRows.map((row) => row.observedExecutionOrder),
+    [null, null]
+  );
+
+  for (const row of preflight.rows) {
+    assert.equal(Object.isFrozen(row), true);
+    assert.deepEqual(Object.keys(row), preflight.cleanupHookPreflightRowFields);
+    assert.equal(row.cleanupHookOrderPrivate, true);
+    assert.equal(row.cleanupHookIdentityPrivate, true);
+    assert.equal(row.nodeWorkerThreadsExecution, false);
+    assert.equal(row.napiCleanupHookExecution, false);
+    assert.equal(row.nativeAddonLoaded, false);
+    assert.equal(row.nativeExecution, false);
+    assert.equal(row.rendererExecution, false);
+    assert.equal(row.reconcilerExecution, false);
+    assert.equal(row.publicNativeCompatibility, false);
+    assert.equal(row.reactBehaviorError, false);
+  }
+  assert.equal(preflight.nodeWorkerThreadsExecution, false);
+  assert.equal(preflight.napiCleanupHookExecution, false);
+  assert.equal(preflight.nativeAddonLoaded, false);
+  assert.equal(preflight.nativeExecution, false);
+  assert.equal(preflight.rendererExecution, false);
+  assert.equal(preflight.reconcilerExecution, false);
+  assert.equal(preflight.publicNativeCompatibility, false);
+  assert.equal(preflight.reactBehaviorError, false);
+}
+
+function assertNativeRootBridgeWorkerThreadCleanupHookPreflightRejectsForgery(
+  preflight
+) {
+  assert.throws(
+    () => {
+      preflight.rows[0].canonicalExecutableEvidence = false;
+    },
+    {
+      name: 'TypeError'
+    }
+  );
+  assert.throws(
+    () =>
+      assertNativeRootBridgeWorkerThreadCleanupHookPreflight(
+        Object.freeze({
+          ...preflight,
+          rows: Object.freeze([
+            Object.freeze({
+              ...preflight.rows[0],
+              observedExecutionOrder: 2
+            }),
+            ...preflight.rows.slice(1)
+          ])
+        })
+      ),
+    {
+      name: 'AssertionError'
+    }
+  );
+  assert.throws(
+    () =>
+      assertNativeRootBridgeWorkerThreadCleanupHookPreflight(
         Object.freeze({
           ...preflight,
           publicNativeCompatibility: true
