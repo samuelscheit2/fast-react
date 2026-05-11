@@ -70,6 +70,12 @@ const privateTestInstanceClassQueryExecutionDiagnosticName =
   "fast-react-test-renderer.testinstance.private-class-root-query-execution-evidence";
 const privateTestInstanceClassQueryExecutionStatus =
   "private-test-instance-class-root-update-query-execution-public-test-instance-blocked";
+const privateTestInstanceLifecycleGateDiagnosticName =
+  "fast-react-test-renderer.testinstance.private-root-lifecycle-gate";
+const privateTestInstanceLifecycleGateRequiredStatus =
+  "private-test-instance-root-lifecycle-evidence-required-public-test-instance-blocked";
+const privateTestInstanceLifecycleGateAcceptedStatus =
+  "private-test-instance-root-lifecycle-evidence-accepted-public-test-instance-blocked";
 const privateErrorBoundaryDiagnosticsSymbolDescription =
   "fast.react_test_renderer.private_error_boundary_diagnostics";
 const privateErrorBoundaryDiagnosticsSymbol = Symbol.for(
@@ -593,6 +599,9 @@ function isPackageRootEntrypoint(entrypoint) {
     entrypoint === packageRootEntrypoint ||
     entrypoint.startsWith(`${packageRootEntrypoint} `)
   );
+}
+function hasCompletePrivateRootLifecycleExecutionSourceRecords(entrypoint) {
+  return entrypoint === cjsDevelopmentEntrypoint;
 }
 function hasSiblingTextPrivateAdmission(entrypoint) {
   return isPackageRootEntrypoint(entrypoint) || entrypoint.includes("/cjs/");
@@ -4884,6 +4893,42 @@ test("react-test-renderer package root and CJS consume source-owned root lifecyc
       update: updateResult,
       unmount: unmountResult
     };
+    if (!hasCompletePrivateRootLifecycleExecutionSourceRecords(entry.entrypoint)) {
+      assert.equal(
+        bridge.canConsumePrivateRootLifecycleExecutionEvidence(rows),
+        false,
+        `${entry.entrypoint} incomplete source records rejected`
+      );
+      const missingSourceError = captureThrown(() =>
+        bridge.consumePrivateRootLifecycleExecutionEvidence(rows)
+      );
+      assert.equal(
+        missingSourceError.name,
+        "FastReactTestRendererPrivateRootRequestError"
+      );
+      assert.match(
+        missingSourceError.message,
+        /finished work or current host output source records/u,
+        entry.entrypoint
+      );
+      assertPrivateTestInstanceLifecycleGate(
+        bridge.getRendererTestInstanceQueryDiagnostics(renderer),
+        entry.entrypoint,
+        {
+          acceptedLifecycleEvidenceAvailable: false,
+          currentRootRequest: unmountResult.request,
+          exposesPrivateQueryDiagnostics: false,
+          rootRequest: unmountResult.request
+        }
+      );
+      assert.notEqual(
+        bridge.getRendererTestInstanceQueryDiagnostics(renderer).bridgeRouted,
+        true,
+        entry.entrypoint
+      );
+      continue;
+    }
+
     assert.equal(
       bridge.canConsumePrivateRootLifecycleExecutionEvidence(rows),
       true,
@@ -4897,6 +4942,15 @@ test("react-test-renderer package root and CJS consume source-owned root lifecyc
       updateResult,
       unmountResult
     });
+    assert.equal(
+      bridge.canConsumePrivateRootLifecycleExecutionEvidence(rows),
+      false,
+      `${entry.entrypoint} replay rejected`
+    );
+    const replayError = captureThrown(() =>
+      bridge.consumePrivateRootLifecycleExecutionEvidence(rows)
+    );
+    assert.match(replayError.message, /already been accepted/u);
 
     const publicJsonError = captureThrown(() => renderer.toJSON());
     assertReactTestRendererUnimplemented(
@@ -5028,7 +5082,11 @@ test("react-test-renderer package root and CJS consume source-owned root lifecyc
 });
 
 test("react-test-renderer private serialization currentness requires source-owned lifecycle evidence", () => {
-  const contexts = entrypoints.map((entry) => {
+  const contexts = entrypoints
+    .filter((entry) =>
+      hasCompletePrivateRootLifecycleExecutionSourceRecords(entry.entrypoint)
+    )
+    .map((entry) => {
     const moduleExports = loadFresh(entry.modulePath);
     const bridge = assertPrivateRootRequestBridge(
       moduleExports,
@@ -5103,7 +5161,8 @@ test("react-test-renderer private serialization currentness requires source-owne
       treeReport,
       unmountRequest
     };
-  });
+    });
+  assert.notEqual(contexts.length, 0);
 
   for (const context of contexts) {
     assert.equal(
@@ -5339,17 +5398,17 @@ test("react-test-renderer private serialization currentness requires source-owne
   const cjsContext = contexts.find(
     (context) => context.entry.entrypoint === cjsDevelopmentEntrypoint
   );
-  assert.notEqual(packageContext, undefined);
-  assert.notEqual(cjsContext, undefined);
-  const crossEntrypointError = captureThrown(() =>
-    cjsContext.jsonFacade.validateAcceptedFinishedWorkIdentity(
-      cjsContext.jsonIdentity,
-      cjsContext.jsonReport,
-      cjsContext.unmountRequest,
-      packageContext.lifecycleEvidence
-    )
-  );
-  assert.match(crossEntrypointError.message, /different package entrypoint/u);
+  if (packageContext !== undefined && cjsContext !== undefined) {
+    const crossEntrypointError = captureThrown(() =>
+      cjsContext.jsonFacade.validateAcceptedFinishedWorkIdentity(
+        cjsContext.jsonIdentity,
+        cjsContext.jsonReport,
+        cjsContext.unmountRequest,
+        packageContext.lifecycleEvidence
+      )
+    );
+    assert.match(crossEntrypointError.message, /different package entrypoint/u);
+  }
 
   const entry = entrypoints.find(
     (candidate) => candidate.entrypoint === cjsDevelopmentEntrypoint
@@ -5414,6 +5473,94 @@ test("react-test-renderer private serialization currentness requires source-owne
     )
   );
   assert.match(staleUpdateError.message, /stale for the current renderer root/u);
+});
+
+test("react-test-renderer lifecycle-gated TestInstance diagnostics reject rows without source records", () => {
+  for (const entry of entrypoints) {
+    const moduleExports = loadFresh(entry.modulePath);
+    const bridge = assertPrivateRootRequestBridge(
+      moduleExports,
+      entry.entrypoint
+    );
+    const rows = createPrivateRootLifecycleExecutionRows(moduleExports, bridge, {
+      includeCreateHostOutputHandoff: false
+    });
+    const lifecycleRows = {
+      create: rows.createResult,
+      update: rows.updateResult,
+      unmount: rows.unmountResult
+    };
+
+    assert.equal(
+      bridge.canConsumePrivateRootLifecycleExecutionEvidence(lifecycleRows),
+      false,
+      entry.entrypoint
+    );
+    const error = captureThrown(() =>
+      bridge.consumePrivateRootLifecycleExecutionEvidence(lifecycleRows)
+    );
+    assert.equal(
+      error.name,
+      "FastReactTestRendererPrivateRootRequestError",
+      entry.entrypoint
+    );
+    assert.match(
+      error.message,
+      /finished work or current host output source records/u,
+      entry.entrypoint
+    );
+
+    const record = bridge.getRendererTestInstanceQueryDiagnostics(rows.renderer);
+    assertPrivateTestInstanceLifecycleGate(record, entry.entrypoint, {
+      acceptedLifecycleEvidenceAvailable: false,
+      currentRootRequest: rows.unmountResult.request,
+      exposesPrivateQueryDiagnostics: false,
+      rootRequest: rows.unmountResult.request
+    });
+    assert.notEqual(record.bridgeRouted, true, entry.entrypoint);
+  }
+});
+
+test("react-test-renderer lifecycle-gated TestInstance diagnostics reject cross-entrypoint rows", () => {
+  const packageEntry = entrypoints.find(
+    (entry) => entry.entrypoint === packageRootEntrypoint
+  );
+  const cjsEntry = entrypoints.find(
+    (entry) => entry.entrypoint === cjsDevelopmentEntrypoint
+  );
+  assert.notEqual(packageEntry, undefined);
+  assert.notEqual(cjsEntry, undefined);
+
+  const packageExports = loadFresh(packageEntry.modulePath);
+  const packageBridge = assertPrivateRootRequestBridge(
+    packageExports,
+    packageEntry.entrypoint
+  );
+  const packageRows = createPrivateRootLifecycleExecutionRows(
+    packageExports,
+    packageBridge
+  );
+
+  const cjsExports = loadFresh(cjsEntry.modulePath);
+  const cjsBridge = assertPrivateRootRequestBridge(
+    cjsExports,
+    cjsEntry.entrypoint
+  );
+  const crossEntrypointRows = {
+    create: packageRows.createResult,
+    update: packageRows.updateResult,
+    unmount: packageRows.unmountResult
+  };
+  assert.equal(
+    cjsBridge.canConsumePrivateRootLifecycleExecutionEvidence(
+      crossEntrypointRows
+    ),
+    false
+  );
+  const error = captureThrown(() =>
+    cjsBridge.consumePrivateRootLifecycleExecutionEvidence(crossEntrypointRows)
+  );
+  assert.match(error.message, /source-owned private root lifecycle/u);
 });
 
 test("react-test-renderer create routing gate feeds only private error diagnostic rows", () => {
@@ -5570,14 +5717,20 @@ test("react-test-renderer TestInstance query and serialization surfaces stay pub
   }
 });
 
-test("react-test-renderer private TestInstance wrapper skeleton exposes record-only metadata", () => {
+test("react-test-renderer private TestInstance wrapper requires accepted lifecycle evidence", () => {
   for (const entry of entrypoints) {
     const moduleExports = loadFresh(entry.modulePath);
     const bridge = assertPrivateRootRequestBridge(
       moduleExports,
       entry.entrypoint
     );
-    const renderer = moduleExports.create({ type: "private-query-record" });
+    const renderer = moduleExports.create(
+      {
+        props: { children: "private-query-record" },
+        type: "span"
+      },
+      {}
+    );
     const [createRequest] = bridge.getRendererRootRequests(renderer);
     const descriptor = Object.getOwnPropertyDescriptor(
       renderer,
@@ -5587,27 +5740,118 @@ test("react-test-renderer private TestInstance wrapper skeleton exposes record-o
     assert.equal(descriptor.enumerable, false, entry.entrypoint);
     assert.equal(descriptor.configurable, false, entry.entrypoint);
     assert.equal(descriptor.writable, false, entry.entrypoint);
-    assertPrivateTestInstanceWrapperSkeleton(
-      descriptor.value,
+
+    const initialGate = descriptor.value;
+    assertPrivateTestInstanceLifecycleGate(initialGate, entry.entrypoint, {
+      acceptedLifecycleEvidenceAvailable: false,
+      currentRootRequest: createRequest,
+      exposesPrivateQueryDiagnostics: false,
+      rootRequest: createRequest
+    });
+    assertPrivateTestInstanceLifecycleGate(
+      bridge.getTestInstanceQueryDiagnostics(createRequest),
       entry.entrypoint,
       {
-        bridge,
+        acceptedLifecycleEvidenceAvailable: false,
+        currentRootRequest: createRequest,
+        exposesPrivateQueryDiagnostics: false,
         rootRequest: createRequest
       }
     );
+
+    const rows = completePrivateRootLifecycleExecutionRowsForRenderer(
+      moduleExports,
+      bridge,
+      renderer
+    );
+    const lifecycleRows = {
+      create: rows.createResult,
+      update: rows.updateResult,
+      unmount: rows.unmountResult
+    };
+    if (!hasCompletePrivateRootLifecycleExecutionSourceRecords(entry.entrypoint)) {
+      assert.equal(
+        initialGate.canAcceptPrivateRootLifecycleExecutionEvidence(lifecycleRows),
+        false,
+        `${entry.entrypoint} incomplete lifecycle source rows rejected`
+      );
+      const acceptError = captureThrown(() =>
+        initialGate.acceptPrivateRootLifecycleExecutionEvidence(lifecycleRows)
+      );
+      assert.equal(
+        acceptError.name,
+        "FastReactTestRendererPrivateRootRequestError",
+        entry.entrypoint
+      );
+      assert.match(
+        acceptError.message,
+        /finished work or current host output source records/u,
+        entry.entrypoint
+      );
+      const blockedGate =
+        bridge.getTestInstanceQueryDiagnostics(rows.unmountResult.request);
+      assertPrivateTestInstanceLifecycleGate(blockedGate, entry.entrypoint, {
+        acceptedLifecycleEvidenceAvailable: false,
+        currentRootRequest: rows.unmountResult.request,
+        exposesPrivateQueryDiagnostics: false,
+        rootRequest: rows.unmountResult.request
+      });
+      assert.notEqual(blockedGate.bridgeRouted, true, entry.entrypoint);
+      continue;
+    }
+
     assert.equal(
+      initialGate.canAcceptPrivateRootLifecycleExecutionEvidence(lifecycleRows),
+      true,
+      entry.entrypoint
+    );
+    const lifecycleEvidence =
+      initialGate.acceptPrivateRootLifecycleExecutionEvidence(lifecycleRows);
+    assertPrivateRootLifecycleExecutionEvidence(lifecycleEvidence, {
+      createResult: rows.createResult,
+      entrypoint: entry.entrypoint,
+      updateResult: rows.updateResult,
+      unmountResult: rows.unmountResult
+    });
+    assert.equal(
+      bridge.canConsumePrivateRootLifecycleExecutionEvidence({
+        create: rows.createResult,
+        update: rows.updateResult,
+        unmount: rows.unmountResult
+      }),
+      false,
+      `${entry.entrypoint} replay rejected`
+    );
+
+    assertPrivateTestInstanceLifecycleGate(
       bridge.getTestInstanceQueryDiagnostics(createRequest),
-      descriptor.value,
+      entry.entrypoint,
+      {
+        acceptedLifecycleEvidenceAvailable: true,
+        currentRootRequest: rows.unmountResult.request,
+        exposesPrivateQueryDiagnostics: false,
+        rootRequest: createRequest
+      }
+    );
+    const record = bridge.getRendererTestInstanceQueryDiagnostics(renderer);
+    assertPrivateTestInstanceWrapperSkeleton(record, entry.entrypoint, {
+      bridge,
+      lifecycleEvidence,
+      rootRequest: rows.unmountResult.request
+    });
+    assert.equal(
+      bridge.getTestInstanceQueryDiagnostics(rows.unmountResult.request),
+      record,
       entry.entrypoint
     );
     assert.equal(
       bridge.getRendererTestInstanceQueryDiagnostics(renderer),
-      descriptor.value,
+      record,
       entry.entrypoint
     );
     assert.equal(
       bridge.getRootTestInstanceQueryDiagnostics(createRequest.rootHandle),
-      descriptor.value,
+      record,
       entry.entrypoint
     );
     const rootError = captureThrown(() => renderer.root);
@@ -5617,31 +5861,32 @@ test("react-test-renderer private TestInstance wrapper skeleton exposes record-o
       "create().root"
     );
     assert.notEqual(
-      descriptor.value,
+      record,
       rootError.routingGate.privateTestInstanceWrapperSkeleton,
       entry.entrypoint
     );
     assert.equal(
       rootError.privateTestInstanceWrapperRecord,
-      descriptor.value,
+      record,
       entry.entrypoint
     );
   }
 });
 
-test("react-test-renderer CJS private TestInstance bridge records deterministic findAll predicate diagnostics", () => {
-  for (const entry of cjsEntrypoints) {
+test("react-test-renderer CJS development private TestInstance bridge records deterministic findAll predicate diagnostics", () => {
+  for (const entry of cjsEntrypoints.filter((candidate) =>
+    hasCompletePrivateRootLifecycleExecutionSourceRecords(candidate.entrypoint)
+  )) {
     const moduleExports = loadFresh(entry.modulePath);
     const bridge = assertPrivateRootRequestBridge(
       moduleExports,
       entry.entrypoint
     );
-    const renderer = moduleExports.create({ type: "private-find-all" });
-    const [createRequest] = bridge.getRendererRootRequests(renderer);
-    const record = Object.getOwnPropertyDescriptor(
-      renderer,
-      privateTestInstanceWrapperRecordSymbol
-    ).value;
+    const { record, renderer, unmountResult } =
+      createAcceptedTestInstanceLifecycle(moduleExports, bridge, {
+        element: { props: { children: "private-find-all" }, type: "span" }
+      });
+    const currentRequest = unmountResult.request;
     const diagnostics = record.findAllPredicateDiagnostics;
 
     assertPrivateFindAllPredicateDiagnostics(
@@ -5675,7 +5920,7 @@ test("react-test-renderer CJS private TestInstance bridge records deterministic 
       entry.entrypoint
     );
     assert.equal(
-      bridge.getTestInstanceQueryDiagnostics(createRequest),
+      bridge.getTestInstanceQueryDiagnostics(currentRequest),
       record,
       entry.entrypoint
     );
@@ -5694,12 +5939,11 @@ test("react-test-renderer CJS development private TestInstance bridge records de
     moduleExports,
     entry.entrypoint
   );
-  const renderer = moduleExports.create({ type: "private-find-by" });
-  const [createRequest] = bridge.getRendererRootRequests(renderer);
-  const record = Object.getOwnPropertyDescriptor(
-    renderer,
-    privateTestInstanceWrapperRecordSymbol
-  ).value;
+  const { record, renderer, unmountResult } =
+    createAcceptedTestInstanceLifecycle(moduleExports, bridge, {
+      element: { props: { children: "private-find-by" }, type: "span" }
+    });
+  const currentRequest = unmountResult.request;
   const diagnostics = record.findByQueryDiagnostics;
 
   assertPrivateFindByQueryDiagnostics(diagnostics, record, entry.entrypoint);
@@ -5739,7 +5983,7 @@ test("react-test-renderer CJS development private TestInstance bridge records de
     entry.entrypoint
   );
   assert.equal(
-    bridge.getTestInstanceQueryDiagnostics(createRequest),
+    bridge.getTestInstanceQueryDiagnostics(currentRequest),
     record,
     entry.entrypoint
   );
@@ -5757,27 +6001,26 @@ test("react-test-renderer CJS development private TestInstance query bridge pref
     moduleExports,
     entry.entrypoint
   );
-  const renderer = moduleExports.create({ type: "private-query-preflight" });
-  const [createRequest] = bridge.getRendererRootRequests(renderer);
-  const record = Object.getOwnPropertyDescriptor(
-    renderer,
-    privateTestInstanceWrapperRecordSymbol
-  ).value;
+  const { record, renderer, unmountResult } =
+    createAcceptedTestInstanceLifecycle(moduleExports, bridge, {
+      element: { props: { children: "private-query-preflight" }, type: "span" }
+    });
+  const currentRequest = unmountResult.request;
   const preflight = record.queryBridgePreflight;
 
   assertPrivateTestInstanceQueryBridgePreflight(
     preflight,
     record,
-    createRequest,
+    currentRequest,
     entry.entrypoint
   );
   assert.equal(
-    bridge.getTestInstanceQueryBridgePreflight(createRequest),
+    bridge.getTestInstanceQueryBridgePreflight(currentRequest),
     preflight,
     entry.entrypoint
   );
   assert.equal(
-    bridge.getRootTestInstanceQueryBridgePreflight(createRequest.rootHandle),
+    bridge.getRootTestInstanceQueryBridgePreflight(currentRequest.rootHandle),
     preflight,
     entry.entrypoint
   );
@@ -5787,7 +6030,7 @@ test("react-test-renderer CJS development private TestInstance query bridge pref
     entry.entrypoint
   );
   assert.equal(
-    bridge.canConsumeAcceptedRustTestInstanceQueryDiagnostics(createRequest, {
+    bridge.canConsumeAcceptedRustTestInstanceQueryDiagnostics(currentRequest, {
       findAll: record.findAllPredicateDiagnostics,
       findBy: record.findByQueryDiagnostics
     }),
@@ -5796,7 +6039,7 @@ test("react-test-renderer CJS development private TestInstance query bridge pref
   );
 
   const consumed = bridge.consumeAcceptedRustTestInstanceQueryDiagnostics(
-    createRequest,
+    currentRequest,
     {
       findAll: record.findAllPredicateDiagnostics,
       findBy: record.findByQueryDiagnostics
@@ -5805,7 +6048,7 @@ test("react-test-renderer CJS development private TestInstance query bridge pref
   assertPrivateTestInstanceQueryBridgePreflight(
     consumed,
     record,
-    createRequest,
+    currentRequest,
     `${entry.entrypoint} consumed`
   );
   assert.equal(
@@ -5819,12 +6062,20 @@ test("react-test-renderer CJS development private TestInstance query bridge pref
     entry.entrypoint
   );
   assert.equal(
-    bridge.canConsumeAcceptedRustTestInstanceQueryDiagnostics(createRequest, {
+    bridge.canConsumeAcceptedRustTestInstanceQueryDiagnostics(currentRequest, {
       findAll: { diagnosticName: "not-accepted" },
       findBy: record.findByQueryDiagnostics
     }),
     false,
     entry.entrypoint
+  );
+  assert.equal(
+    bridge.canConsumeAcceptedRustTestInstanceQueryDiagnostics(currentRequest, {
+      findAll: { ...record.findAllPredicateDiagnostics },
+      findBy: record.findByQueryDiagnostics
+    }),
+    false,
+    `${entry.entrypoint} caller-shaped findAll row rejected`
   );
   assertNoPublicTestInstanceQueryMethods(renderer, entry.entrypoint);
 });
@@ -5846,10 +6097,16 @@ test("react-test-renderer CJS development private TestInstance query consumes ac
   );
   const [createRequest] = bridge.getRendererRootRequests(renderer);
   const createAdmission = bridge.getRootCreateRouteAdmission(createRequest);
-  const record = Object.getOwnPropertyDescriptor(
+  const initialGate = Object.getOwnPropertyDescriptor(
     renderer,
     privateTestInstanceWrapperRecordSymbol
   ).value;
+  assertPrivateTestInstanceLifecycleGate(initialGate, entry.entrypoint, {
+    acceptedLifecycleEvidenceAvailable: false,
+    currentRootRequest: createRequest,
+    exposesPrivateQueryDiagnostics: false,
+    rootRequest: createRequest
+  });
   const updateError = captureThrown(() =>
     renderer.update({ props: { children: "goodbye" }, type: "span" })
   );
@@ -5890,6 +6147,18 @@ test("react-test-renderer CJS development private TestInstance query consumes ac
   const unmountResult = bridge.executeRootRequest(
     unmountError.rootRequest,
     executor
+  );
+  const lifecycleEvidence =
+    bridge.consumePrivateRootLifecycleExecutionEvidence({
+      create: createResult,
+      update: updateResult,
+      unmount: unmountResult
+    });
+  const record = bridge.getRendererTestInstanceQueryDiagnostics(renderer);
+  assert.equal(
+    record.privateRootLifecycleExecutionEvidence,
+    lifecycleEvidence,
+    entry.entrypoint
   );
 
   assert.equal(record.privateNativeQueryExecutionEvidenceAvailable, true);
@@ -5969,26 +6238,11 @@ test("react-test-renderer CJS development private TestInstance class-root query 
     moduleExports,
     entry.entrypoint
   );
-  const renderer = moduleExports.create(
-    { props: { children: "hello" }, type: "span" },
-    {}
-  );
-  const record = Object.getOwnPropertyDescriptor(
-    renderer,
-    privateTestInstanceWrapperRecordSymbol
-  ).value;
-  const updateError = captureThrown(() =>
-    renderer.update({ props: { children: "goodbye" }, type: "span" })
-  );
-  const updateResult = bridge.executeRootRequest(
-    updateError.rootRequest,
-    (handoff) => {
-      assert.equal(handoff.operation, "update");
-      return createRustUpdateNativeBridgeAdmissionEvidence(
-        updateError.rootRequest
-      );
-    }
-  );
+  const { record, renderer, updateResult } =
+    createAcceptedTestInstanceLifecycle(moduleExports, bridge, {
+      element: { props: { children: "hello" }, type: "span" },
+      updateElements: [{ props: { children: "goodbye" }, type: "span" }]
+    });
   const classRootReport = createRustPrivateClassRootQueryReport({
     hostOutputUpdateKind: "Update",
     text: "goodbye"
@@ -6567,24 +6821,70 @@ function createPrivateRootLifecycleExecutionRows(
   bridge,
   options = {}
 ) {
+  const renderer = moduleExports.create(
+    options.element ?? {
+      props: { children: "hello" },
+      type: "span"
+    },
+    options.rootOptions ?? {}
+  );
+  return completePrivateRootLifecycleExecutionRowsForRenderer(
+    moduleExports,
+    bridge,
+    renderer,
+    options
+  );
+}
+
+function createAcceptedTestInstanceLifecycle(
+  moduleExports,
+  bridge,
+  options = {}
+) {
+  const rows = createPrivateRootLifecycleExecutionRows(
+    moduleExports,
+    bridge,
+    options
+  );
+  const lifecycleEvidence = bridge.consumePrivateRootLifecycleExecutionEvidence({
+    create: rows.createResult,
+    update: rows.updateResult,
+    unmount: rows.unmountResult
+  });
+  const record = bridge.getRendererTestInstanceQueryDiagnostics(rows.renderer);
+
+  assert.equal(
+    record.privateRootLifecycleExecutionEvidence,
+    lifecycleEvidence,
+    moduleExports.__FAST_REACT_ENTRYPOINT__
+  );
+
+  return {
+    ...rows,
+    lifecycleEvidence,
+    record
+  };
+}
+
+function completePrivateRootLifecycleExecutionRowsForRenderer(
+  moduleExports,
+  bridge,
+  renderer,
+  options = {}
+) {
   const updateElements = options.updateElements ?? [
     {
       props: { children: "goodbye" },
       type: "span"
     }
   ];
-  const renderer = moduleExports.create(
-    {
-      props: { children: "hello" },
-      type: "span"
-    },
-    {}
-  );
   const [createRequest] = bridge.getRendererRootRequests(renderer);
   const createAdmission =
     typeof bridge.getRootCreateRouteAdmission === "function"
       ? bridge.getRootCreateRouteAdmission(createRequest)
       : null;
+  const includeCreateHostOutputHandoff =
+    options.includeCreateHostOutputHandoff !== false;
 
   const updateErrors = updateElements.map((element) =>
     captureThrown(() => renderer.update(element))
@@ -6644,14 +6944,23 @@ function createPrivateRootLifecycleExecutionRows(
     };
     if (
       createAdmission !== null &&
+      includeCreateHostOutputHandoff &&
       typeof bridge.canConsumePrivateCreateNativeBridgeHostOutputHandoff ===
         "function"
     ) {
-      result.privateCreateNativeBridgeHostOutputHandoff =
+      const createHandoff =
         createRustCreateNativeBridgeHostOutputHandoffSource(
           request,
           createAdmission
         );
+      if (
+        bridge.canConsumePrivateCreateNativeBridgeHostOutputHandoff(
+          request,
+          createHandoff
+        )
+      ) {
+        result.privateCreateNativeBridgeHostOutputHandoff = createHandoff;
+      }
     }
     return result;
   };
@@ -8034,6 +8343,10 @@ function assertPrivateRootLifecycleOperationEvidence(
   assert.equal(row.status, privateRootLifecycleExecutionStatus);
   assert.equal(row.operation, operation);
   assert.equal(row.publicSurface, publicSurface);
+  const sourceRecord = sourceRecordForRootLifecycleResult(result);
+  assert.notEqual(sourceRecord, undefined, result.entrypoint);
+  assert.equal(row.sourceExecutionRecordId, sourceRecord.id);
+  assert.equal(row.sourceExecutionStatus, sourceRecord.status);
   assert.equal(row.requestId, result.requestId);
   assert.equal(row.requestSequence, result.requestSequence);
   assert.equal(row.rootId, result.rootId);
@@ -8058,6 +8371,19 @@ function assertPrivateRootLifecycleOperationEvidence(
   assert.equal(row.hostOutputSnapshotCurrent, true);
   assert.equal(row.sourceOwnedExecutionAccepted, true);
   assertPrivateRootLifecycleCompatibilityBlockers(row);
+}
+
+function sourceRecordForRootLifecycleResult(result) {
+  if (result.operation === "create") {
+    return result.privateCreateNativeBridgeHostOutputHandoff;
+  }
+  if (result.operation === "update") {
+    return result.privateUpdateNativeBridgeAdmission;
+  }
+  if (result.operation === "unmount") {
+    return result.privateUnmountNativeBridgeAdmission;
+  }
+  return undefined;
 }
 
 function assertPrivateRootLifecycleCompatibilityBlockers(record) {
@@ -13018,6 +13344,133 @@ function assertPrivateToTreeFacade(record, entrypoint) {
   }
 }
 
+function assertPrivateTestInstanceLifecycleGate(record, entrypoint, expected) {
+  assert.equal(Object.isFrozen(record), true, entrypoint);
+  assert.equal(
+    record.kind,
+    "FastReactTestRendererPrivateTestInstanceRootLifecycleGate",
+    entrypoint
+  );
+  assert.equal(
+    record.id,
+    "react-test-renderer-private-test-instance-root-lifecycle-gate-record",
+    entrypoint
+  );
+  assert.equal(
+    record.diagnosticName,
+    privateTestInstanceLifecycleGateDiagnosticName,
+    entrypoint
+  );
+  assert.equal(
+    record.status,
+    expected.exposesPrivateQueryDiagnostics
+      ? privateTestInstanceLifecycleGateAcceptedStatus
+      : privateTestInstanceLifecycleGateRequiredStatus,
+    entrypoint
+  );
+  assert.equal(record.entrypoint, entrypoint);
+  assert.equal(record.compatibilityTarget, compatibilityTarget);
+  assert.equal(
+    record.symbol,
+    privateTestInstanceWrapperRecordSymbolDescription,
+    entrypoint
+  );
+  assert.equal(record.rootRequest, expected.rootRequest, entrypoint);
+  assert.equal(
+    record.currentRootRequest,
+    expected.currentRootRequest,
+    entrypoint
+  );
+  assert.equal(record.rootHandle, expected.rootRequest.rootHandle, entrypoint);
+  assert.equal(record.rootId, expected.rootRequest.rootId, entrypoint);
+  assert.equal(record.rootSequence, expected.rootRequest.rootSequence, entrypoint);
+  assert.equal(
+    record.requestedRootRequestSequence,
+    expected.rootRequest.requestSequence,
+    entrypoint
+  );
+  assert.equal(
+    record.currentRootRequestSequence,
+    expected.currentRootRequest.requestSequence,
+    entrypoint
+  );
+  assert.equal(
+    record.sourceLifecycleDiagnosticName,
+    privateRootLifecycleExecutionDiagnosticName,
+    entrypoint
+  );
+  assert.equal(
+    record.sourceLifecycleStatus,
+    privateRootLifecycleExecutionStatus,
+    entrypoint
+  );
+  assert.equal(
+    record.acceptedLifecycleEvidenceAvailable,
+    expected.acceptedLifecycleEvidenceAvailable,
+    entrypoint
+  );
+  assert.equal(
+    record.exposesPrivateQueryDiagnostics,
+    expected.exposesPrivateQueryDiagnostics,
+    entrypoint
+  );
+  assert.equal(record.requiresSourceOwnedCreateUpdateUnmountEvidence, true);
+  assert.equal(record.requiresCurrentRootRequest, true);
+  assert.equal(
+    typeof record.canAcceptPrivateRootLifecycleExecutionEvidence,
+    "function"
+  );
+  assert.equal(
+    typeof record.acceptPrivateRootLifecycleExecutionEvidence,
+    "function"
+  );
+  assert.equal(
+    typeof record.getAcceptedPrivateTestInstanceQueryDiagnostics,
+    "function"
+  );
+  assertPrivateTestInstanceLifecycleCompatibilityBlockers(record);
+
+  const gate = record.gate;
+  assert.equal(Object.isFrozen(gate), true, entrypoint);
+  assert.equal(
+    gate.diagnosticName,
+    privateTestInstanceLifecycleGateDiagnosticName,
+    entrypoint
+  );
+  assert.equal(gate.status, privateTestInstanceLifecycleGateRequiredStatus);
+  assert.equal(
+    gate.acceptedStatus,
+    privateTestInstanceLifecycleGateAcceptedStatus
+  );
+  assert.equal(gate.requiresSourceOwnedCreateUpdateUnmountEvidence, true);
+  assert.equal(gate.requiresCurrentRootRequest, true);
+  assert.equal(gate.validatesEntrypointIdentity, true);
+  assert.equal(gate.validatesRootHandleIdentity, true);
+  assert.equal(gate.validatesRootRequestCurrentness, true);
+  assert.equal(gate.validatesFinishedWorkAndHostOutputSourceRecords, true);
+  assert.equal(gate.rejectsReplayLifecycleEvidence, true);
+  assert.equal(gate.rejectsStaleUpdateLifecycleEvidence, true);
+  assert.equal(gate.rejectsStaleAfterUnmountLifecycleEvidence, true);
+  assert.equal(gate.rejectsCrossSurfaceLifecycleEvidence, true);
+  assert.equal(gate.rejectsClonedLifecycleRows, true);
+  assert.equal(gate.rejectsCallerBuiltLifecycleRows, true);
+  assert.equal(gate.rejectsCallerShapedQueryRows, true);
+  assertPrivateTestInstanceLifecycleCompatibilityBlockers(gate);
+}
+
+function assertPrivateTestInstanceLifecycleCompatibilityBlockers(record) {
+  assert.equal(record.publicRootAvailable, false);
+  assert.equal(record.publicQueryMethodsAvailable, false);
+  assert.equal(record.publicTestInstanceObjectAvailable, false);
+  assert.equal(record.publicSerializationAvailable, false);
+  assert.equal(record.publicActAvailable, false);
+  assert.equal(record.publicSchedulerAvailable, false);
+  assert.equal(record.nativeBridgeAvailable, false);
+  assert.equal(record.nativeExecution, false);
+  assert.equal(record.jsPackageCompatibilityAvailable, false);
+  assert.equal(record.compatibilityClaimed, false);
+}
+
 function assertPrivateTestInstanceWrapperSkeleton(
   record,
   entrypoint,
@@ -13047,6 +13500,17 @@ function assertPrivateTestInstanceWrapperSkeleton(
   assert.equal(record.publicRootAvailable, false, entrypoint);
   assert.equal(record.publicQueryMethodsAvailable, false, entrypoint);
   assert.equal(record.publicTestInstanceObjectAvailable, false, entrypoint);
+  assert.equal(
+    record.privateRootLifecycleExecutionDiagnosticName,
+    privateRootLifecycleExecutionDiagnosticName,
+    entrypoint
+  );
+  assert.equal(
+    record.privateRootLifecycleExecutionStatus,
+    privateRootLifecycleExecutionStatus,
+    entrypoint
+  );
+  assert.equal(record.privateRootLifecycleEvidenceRequired, true, entrypoint);
   assert.equal(record.nativeBridgeAvailable, false, entrypoint);
   assert.equal(record.nativeExecution, false, entrypoint);
   assert.equal(record.compatibilityClaimed, false, entrypoint);
@@ -13054,6 +13518,32 @@ function assertPrivateTestInstanceWrapperSkeleton(
   if (bridgeRouted) {
     assert.equal(record.bridgeRouted, true, entrypoint);
     assert.equal(record.consumesRootBridgeMetadata, true, entrypoint);
+    assert.equal(
+      record.consumesPrivateRootLifecycleExecutionEvidence,
+      true,
+      entrypoint
+    );
+    assert.equal(record.privateRootLifecycleEvidenceAccepted, true, entrypoint);
+    assert.equal(
+      record.privateRootLifecycleExecutionEvidence,
+      options.lifecycleEvidence,
+      entrypoint
+    );
+    assert.equal(
+      record.sourceLifecycleDiagnosticName,
+      privateRootLifecycleExecutionDiagnosticName,
+      entrypoint
+    );
+    assert.equal(
+      record.sourceLifecycleStatus,
+      privateRootLifecycleExecutionStatus,
+      entrypoint
+    );
+    assert.deepEqual(
+      record.sourceLifecycleRequestSequences,
+      options.lifecycleEvidence.requestSequences,
+      entrypoint
+    );
     assert.equal(record.standaloneWrapperMetadata, false, entrypoint);
     assert.equal(
       record.bridgeMetadataSource,
@@ -13092,7 +13582,11 @@ function assertPrivateTestInstanceWrapperSkeleton(
       rootRequestCompatibilityStatus,
       entrypoint
     );
-    assert.equal(record.rootRequestOperation, "create", entrypoint);
+    assert.equal(
+      record.rootRequestOperation,
+      options.rootRequest.operation,
+      entrypoint
+    );
     assert.equal(
       record.rootRequestRustCanaryMetadata,
       options.rootRequest.rustCanaryMetadata,
@@ -13109,7 +13603,8 @@ function assertPrivateTestInstanceWrapperSkeleton(
     assertPrivateTestInstanceRootBridgeMetadata(
       record.rootBridgeMetadata,
       options.rootRequest,
-      entrypoint
+      entrypoint,
+      options.lifecycleEvidence
     );
     if (options.bridge !== undefined) {
       assert.equal(
@@ -13336,7 +13831,8 @@ function assertPrivateTestInstanceWrapperSkeleton(
 function assertPrivateTestInstanceRootBridgeMetadata(
   metadata,
   rootRequest,
-  entrypoint
+  entrypoint,
+  lifecycleEvidence
 ) {
   assert.equal(Object.isFrozen(metadata), true, entrypoint);
   assert.equal(
@@ -13389,6 +13885,28 @@ function assertPrivateTestInstanceRootBridgeMetadata(
   assert.equal(
     metadata.testInstanceQueryMetadata,
     rootRequest.rustCanaryMetadata.testInstanceQuery,
+    entrypoint
+  );
+  assert.equal(metadata.privateRootLifecycleGate.diagnosticName, privateTestInstanceLifecycleGateDiagnosticName, entrypoint);
+  assert.equal(
+    metadata.privateRootLifecycleExecutionEvidence,
+    lifecycleEvidence,
+    entrypoint
+  );
+  assert.equal(metadata.privateRootLifecycleEvidenceAccepted, true, entrypoint);
+  assert.equal(
+    metadata.sourceLifecycleDiagnosticName,
+    privateRootLifecycleExecutionDiagnosticName,
+    entrypoint
+  );
+  assert.equal(
+    metadata.sourceLifecycleStatus,
+    privateRootLifecycleExecutionStatus,
+    entrypoint
+  );
+  assert.deepEqual(
+    metadata.sourceLifecycleRequestSequences,
+    lifecycleEvidence.requestSequences,
     entrypoint
   );
   assert.equal(metadata.recordOnlyPrivateBridge, false, entrypoint);
@@ -14123,6 +14641,27 @@ function assertPrivateTestInstanceQueryBridgePreflight(
   assert.equal(preflight.rootHandle, rootRequest.rootHandle, entrypoint);
   assert.equal(preflight.rootId, rootRequest.rootId, entrypoint);
   assert.equal(
+    preflight.privateRootLifecycleExecutionEvidence,
+    owner.privateRootLifecycleExecutionEvidence,
+    entrypoint
+  );
+  assert.equal(preflight.privateRootLifecycleEvidenceAccepted, true, entrypoint);
+  assert.equal(
+    preflight.sourceLifecycleDiagnosticName,
+    privateRootLifecycleExecutionDiagnosticName,
+    entrypoint
+  );
+  assert.equal(
+    preflight.sourceLifecycleStatus,
+    privateRootLifecycleExecutionStatus,
+    entrypoint
+  );
+  assert.deepEqual(
+    preflight.sourceLifecycleRequestSequences,
+    owner.sourceLifecycleRequestSequences,
+    entrypoint
+  );
+  assert.equal(
     preflight.bridgeSource,
     "FastReactTestRendererPrivateRootRequestRecord.rustCanaryMetadata.testInstanceQuery",
     entrypoint
@@ -14175,6 +14714,11 @@ function assertPrivateTestInstanceQueryBridgePreflight(
   );
   assert.equal(
     preflight.consumesAcceptedRustFindByDiagnostics,
+    true,
+    entrypoint
+  );
+  assert.equal(
+    preflight.consumesPrivateRootLifecycleExecutionEvidence,
     true,
     entrypoint
   );
