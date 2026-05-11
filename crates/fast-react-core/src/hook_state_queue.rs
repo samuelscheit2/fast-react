@@ -9,6 +9,7 @@ use std::collections::HashSet;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
+use crate::hook_list::{HookListArena, HookListError, HookStateQueueSource};
 use crate::{Lane, Lanes};
 
 const ID_SLOT_BITS: u64 = 32;
@@ -465,6 +466,7 @@ impl<State, ReducerId, DispatchId> QueueSlot<State, ReducerId, DispatchId> {
 struct UpdateSlot<Action, State> {
     generation: u32,
     update: Option<HookUpdate<Action, State>>,
+    pending_source: Option<HookPendingUpdateSourceState>,
 }
 
 impl<Action, State> UpdateSlot<Action, State> {
@@ -472,7 +474,46 @@ impl<Action, State> UpdateSlot<Action, State> {
         Self {
             generation,
             update: None,
+            pending_source: None,
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct HookPendingUpdateSourceState {
+    source: HookPendingUpdateSource,
+    consumed: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct HookPendingUpdateSource {
+    hook_source: HookStateQueueSource,
+    update: HookUpdateId,
+    update_generation: u32,
+    lane: HookUpdateLane,
+    source_owned: bool,
+}
+
+#[allow(dead_code)]
+impl HookPendingUpdateSource {
+    #[must_use]
+    fn source_owned(
+        hook_source: HookStateQueueSource,
+        update: HookUpdateId,
+        lane: HookUpdateLane,
+    ) -> Self {
+        Self {
+            hook_source,
+            update,
+            update_generation: update.generation(),
+            lane,
+            source_owned: true,
+        }
+    }
+
+    #[must_use]
+    const fn queue(self) -> HookQueueId {
+        self.hook_source.queue()
     }
 }
 
@@ -512,6 +553,31 @@ pub enum HookQueueError {
     },
     DuplicateStagedUpdate {
         id: HookUpdateId,
+    },
+    MissingStagedUpdateSource {
+        id: HookUpdateId,
+    },
+    CallerShapedHookQueueSource {
+        queue: HookQueueId,
+    },
+    CallerShapedStagedUpdateSource {
+        id: HookUpdateId,
+    },
+    StagedUpdateSourceMismatch {
+        source_update: HookUpdateId,
+        staged_update: HookUpdateId,
+        source_queue: HookQueueId,
+        staged_queue: HookQueueId,
+    },
+    StagedUpdateAlreadyConsumed {
+        id: HookUpdateId,
+    },
+    ExistingPendingUpdateSourceNotConsumed {
+        id: HookUpdateId,
+    },
+    InvalidStagedHookSource {
+        id: HookUpdateId,
+        source: HookListError,
     },
     GenerationOverflow,
     InvalidHookUpdateLane {
@@ -581,6 +647,50 @@ impl Display for HookQueueError {
                     id.raw()
                 )
             }
+            Self::MissingStagedUpdateSource { id } => write!(
+                formatter,
+                "hook update id {} is missing source-owned staging currentness",
+                id.raw()
+            ),
+            Self::CallerShapedHookQueueSource { queue } => write!(
+                formatter,
+                "hook queue id {} has caller-shaped hook-list source currentness",
+                queue.raw()
+            ),
+            Self::CallerShapedStagedUpdateSource { id } => write!(
+                formatter,
+                "hook update id {} has caller-shaped staging source currentness",
+                id.raw()
+            ),
+            Self::StagedUpdateSourceMismatch {
+                source_update,
+                staged_update,
+                source_queue,
+                staged_queue,
+            } => write!(
+                formatter,
+                "staged hook update source points at update {} queue {}, but row points at update {} queue {}",
+                source_update.raw(),
+                source_queue.raw(),
+                staged_update.raw(),
+                staged_queue.raw()
+            ),
+            Self::StagedUpdateAlreadyConsumed { id } => write!(
+                formatter,
+                "hook update id {} source currentness was already consumed",
+                id.raw()
+            ),
+            Self::ExistingPendingUpdateSourceNotConsumed { id } => write!(
+                formatter,
+                "existing pending hook update id {} has unconsumed source currentness",
+                id.raw()
+            ),
+            Self::InvalidStagedHookSource { id, source } => write!(
+                formatter,
+                "hook update id {} has invalid hook-list source currentness: {}",
+                id.raw(),
+                source
+            ),
             Self::GenerationOverflow => formatter.write_str("hook queue generation overflowed"),
             Self::InvalidHookUpdateLane { lanes } => {
                 write!(
@@ -706,6 +816,7 @@ pub struct StagedHookUpdate<OwnerId> {
     queue: HookQueueId,
     update: HookUpdateId,
     lane: HookUpdateLane,
+    source: Option<HookPendingUpdateSource>,
 }
 
 impl<OwnerId> StagedHookUpdate<OwnerId> {
@@ -721,6 +832,19 @@ impl<OwnerId> StagedHookUpdate<OwnerId> {
             queue,
             update,
             lane,
+            source: None,
+        }
+    }
+
+    #[must_use]
+    #[allow(dead_code)]
+    fn source_owned(owner: OwnerId, source: HookPendingUpdateSource) -> Self {
+        Self {
+            owner,
+            queue: source.queue(),
+            update: source.update,
+            lane: source.lane,
+            source: Some(source),
         }
     }
 
@@ -742,6 +866,12 @@ impl<OwnerId> StagedHookUpdate<OwnerId> {
     #[must_use]
     pub const fn lane(&self) -> HookUpdateLane {
         self.lane
+    }
+
+    #[must_use]
+    #[allow(dead_code)]
+    const fn source(&self) -> Option<HookPendingUpdateSource> {
+        self.source
     }
 }
 
@@ -770,6 +900,13 @@ impl<OwnerId> HookUpdateStaging<OwnerId> {
         self.lanes = self.lanes.merge(lane.lanes());
         self.entries
             .push(StagedHookUpdate::new(owner, queue, update, lane));
+    }
+
+    #[allow(dead_code)]
+    fn stage_source_owned(&mut self, owner: OwnerId, source: HookPendingUpdateSource) {
+        self.lanes = self.lanes.merge(source.lane.lanes());
+        self.entries
+            .push(StagedHookUpdate::source_owned(owner, source));
     }
 
     #[must_use]
@@ -849,6 +986,29 @@ impl<State, Action, ReducerId, DispatchId> HookQueueStore<State, Action, Reducer
         self.insert_update(HookUpdate::new(lane, action))
     }
 
+    #[allow(dead_code)]
+    fn create_source_owned_update(
+        &mut self,
+        hook_source: HookStateQueueSource,
+        lane: HookUpdateLane,
+        action: Action,
+    ) -> Result<HookPendingUpdateSource, HookQueueError> {
+        if !hook_source.is_source_owned() {
+            return Err(HookQueueError::CallerShapedHookQueueSource {
+                queue: hook_source.queue(),
+            });
+        }
+
+        self.validate_queue_id(hook_source.queue())?;
+        let update = self.insert_update(HookUpdate::new(lane, action));
+        let source = HookPendingUpdateSource::source_owned(hook_source, update, lane);
+        self.updates[update.slot_index()].pending_source = Some(HookPendingUpdateSourceState {
+            source,
+            consumed: false,
+        });
+        Ok(source)
+    }
+
     pub fn create_update_from_dispatch_metadata(
         &mut self,
         metadata: HookUpdateDispatchMetadata<Action, State>,
@@ -913,6 +1073,7 @@ impl<State, Action, ReducerId, DispatchId> HookQueueStore<State, Action, Reducer
             .checked_add(1)
             .ok_or(HookQueueError::GenerationOverflow)?;
         self.updates[index].update = None;
+        self.updates[index].pending_source = None;
         self.updates[index].generation = next_generation;
         self.vacant_updates.push(index);
         Ok(())
@@ -1053,6 +1214,7 @@ impl<State, Action, ReducerId, DispatchId> HookQueueStore<State, Action, Reducer
         let generation = self.updates[slot_index].generation;
         let id = HookUpdateId::from_parts(slot_index, generation);
         self.updates[slot_index].update = Some(update);
+        self.updates[slot_index].pending_source = None;
         id
     }
 
@@ -1094,6 +1256,133 @@ impl<State, Action, ReducerId, DispatchId> HookQueueStore<State, Action, Reducer
         }
 
         Ok(ids)
+    }
+
+    #[allow(dead_code)]
+    fn validate_source_owned_staged_entry<OwnerId>(
+        &self,
+        entry: &StagedHookUpdate<OwnerId>,
+        hook_lists: &HookListArena,
+    ) -> Result<(), HookQueueError> {
+        let source = entry
+            .source()
+            .ok_or(HookQueueError::MissingStagedUpdateSource { id: entry.update })?;
+        if !source.source_owned || !source.hook_source.is_source_owned() {
+            return Err(HookQueueError::CallerShapedStagedUpdateSource { id: entry.update });
+        }
+        if source.update != entry.update
+            || source.update_generation != entry.update.generation()
+            || source.queue() != entry.queue
+            || source.lane != entry.lane
+        {
+            return Err(HookQueueError::StagedUpdateSourceMismatch {
+                source_update: source.update,
+                staged_update: entry.update,
+                source_queue: source.queue(),
+                staged_queue: entry.queue,
+            });
+        }
+
+        hook_lists
+            .validate_state_queue_source(source.hook_source)
+            .map_err(|error| HookQueueError::InvalidStagedHookSource {
+                id: entry.update,
+                source: error,
+            })?;
+        self.validate_queue_id(entry.queue)?;
+        self.validate_update_id(entry.update)?;
+        self.ensure_update_is_unlinked(entry.update)?;
+
+        let slot = &self.updates[entry.update.slot_index()];
+        let stored = slot
+            .pending_source
+            .as_ref()
+            .ok_or(HookQueueError::MissingStagedUpdateSource { id: entry.update })?;
+        if stored.consumed {
+            return Err(HookQueueError::StagedUpdateAlreadyConsumed { id: entry.update });
+        }
+        if stored.source != source {
+            return Err(HookQueueError::StagedUpdateSourceMismatch {
+                source_update: source.update,
+                staged_update: entry.update,
+                source_queue: source.queue(),
+                staged_queue: entry.queue,
+            });
+        }
+
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    fn validate_source_owned_pending_ring(
+        &self,
+        queue: HookQueueId,
+        tail: HookUpdateId,
+        hook_lists: &HookListArena,
+    ) -> Result<(), HookQueueError> {
+        for update in self.collect_ring_ids(tail)? {
+            self.validate_source_owned_pending_update(queue, update, hook_lists)?;
+        }
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    fn validate_source_owned_pending_update(
+        &self,
+        queue: HookQueueId,
+        update: HookUpdateId,
+        hook_lists: &HookListArena,
+    ) -> Result<(), HookQueueError> {
+        self.validate_update_id(update)?;
+        let stored = self.updates[update.slot_index()]
+            .pending_source
+            .as_ref()
+            .ok_or(HookQueueError::MissingStagedUpdateSource { id: update })?;
+        if !stored.consumed {
+            return Err(HookQueueError::ExistingPendingUpdateSourceNotConsumed { id: update });
+        }
+
+        let source = stored.source;
+        if !source.source_owned || !source.hook_source.is_source_owned() {
+            return Err(HookQueueError::CallerShapedStagedUpdateSource { id: update });
+        }
+        if source.update != update
+            || source.update_generation != update.generation()
+            || source.queue() != queue
+            || source.lane != self.update(update)?.lane()
+        {
+            return Err(HookQueueError::StagedUpdateSourceMismatch {
+                source_update: source.update,
+                staged_update: update,
+                source_queue: source.queue(),
+                staged_queue: queue,
+            });
+        }
+
+        hook_lists
+            .validate_state_queue_source(source.hook_source)
+            .map_err(|error| HookQueueError::InvalidStagedHookSource {
+                id: update,
+                source: error,
+            })?;
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    fn consume_pending_update_source(
+        &mut self,
+        update: HookUpdateId,
+    ) -> Result<(), HookQueueError> {
+        let index = self.validate_update_id(update)?;
+        let stored = self.updates[index]
+            .pending_source
+            .as_mut()
+            .ok_or(HookQueueError::MissingStagedUpdateSource { id: update })?;
+        if stored.consumed {
+            return Err(HookQueueError::StagedUpdateAlreadyConsumed { id: update });
+        }
+        stored.consumed = true;
+        Ok(())
     }
 }
 
@@ -1327,6 +1616,38 @@ impl<OwnerId: Clone> HookUpdateStaging<OwnerId> {
         self.lanes = Lanes::NO;
         Ok(finished)
     }
+
+    #[allow(dead_code)]
+    fn finish_queueing_with_source_currentness<State, Action, ReducerId, DispatchId>(
+        &mut self,
+        store: &mut HookQueueStore<State, Action, ReducerId, DispatchId>,
+        hook_lists: &HookListArena,
+    ) -> Result<Vec<StagedHookUpdate<OwnerId>>, HookQueueError> {
+        let mut seen_updates = HashSet::new();
+        let mut seen_queues = HashSet::new();
+        for entry in &self.entries {
+            store.validate_source_owned_staged_entry(entry, hook_lists)?;
+            if !seen_updates.insert(entry.update) {
+                return Err(HookQueueError::DuplicateStagedUpdate { id: entry.update });
+            }
+            if seen_queues.insert(entry.queue) {
+                if let Some(pending) = store.queue(entry.queue)?.pending {
+                    store.validate_source_owned_pending_ring(entry.queue, pending, hook_lists)?;
+                }
+            }
+        }
+
+        let finished = self.entries.clone();
+        for entry in &finished {
+            store.append_pending_update_unchecked(entry.queue, entry.update)?;
+        }
+        for entry in &finished {
+            store.consume_pending_update_source(entry.update)?;
+        }
+        self.entries.clear();
+        self.lanes = Lanes::NO;
+        Ok(finished)
+    }
 }
 
 fn reduce_hook_update<State: Clone, Action>(
@@ -1345,6 +1666,11 @@ fn reduce_hook_update<State: Clone, Action>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::hook_list::HookStateQueueSource;
+    use crate::{
+        FiberArena, FiberId, FiberMode, FiberTag, HookListArena, HookListError, HookSlotId,
+        HookSlotPayload, HookStatePayload, PropsHandle, StateHandle,
+    };
 
     fn lane(lane: Lane) -> HookUpdateLane {
         HookUpdateLane::from_lane(lane).unwrap()
@@ -1352,6 +1678,35 @@ mod tests {
 
     fn add(state: i32, action: &i32) -> i32 {
         state + action
+    }
+
+    fn owner() -> FiberId {
+        let mut fibers = FiberArena::new();
+        fibers.create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::NONE,
+            FiberMode::NO,
+        )
+    }
+
+    fn append_state_hook_source(
+        hook_lists: &mut HookListArena,
+        list: crate::HookListId,
+        slot: &HookStateSlot<i32>,
+        raw_state: u64,
+    ) -> (HookSlotId, HookStateQueueSource) {
+        let payload = HookStatePayload::new(
+            StateHandle::from_raw(raw_state),
+            StateHandle::from_raw(raw_state),
+            slot.base_queue(),
+            slot.queue(),
+        );
+        let hook = hook_lists
+            .append_hook(list, HookSlotPayload::state(payload))
+            .unwrap();
+        let source = hook_lists.state_queue_source(hook).unwrap();
+        (hook, source)
     }
 
     fn assert_staging_preserved(
@@ -1733,6 +2088,501 @@ mod tests {
             store.pending_updates(slot.queue()).unwrap(),
             vec![first, second]
         );
+    }
+
+    #[test]
+    fn source_owned_finish_appends_and_consumes_pending_sources() {
+        let mut hook_lists = HookListArena::new();
+        let list = hook_lists.create_list(owner());
+        let mut store = HookQueueStore::<i32, i32>::new();
+        let slot = store.create_state_slot(0);
+        let (_hook, hook_source) = append_state_hook_source(&mut hook_lists, list, &slot, 10);
+        let first = store
+            .create_source_owned_update(hook_source, lane(Lane::SYNC), 1)
+            .unwrap();
+        let second = store
+            .create_source_owned_update(hook_source, lane(Lane::DEFAULT), 2)
+            .unwrap();
+        let mut staging = HookUpdateStaging::new();
+        staging.stage_source_owned("owner", first);
+        staging.stage_source_owned("owner", second);
+
+        let finished = staging
+            .finish_queueing_with_source_currentness(&mut store, &hook_lists)
+            .unwrap();
+
+        assert_eq!(finished.len(), 2);
+        assert!(staging.is_empty());
+        assert_eq!(staging.lanes(), Lanes::NO);
+        assert_eq!(
+            store.pending_updates(slot.queue()).unwrap(),
+            vec![first.update, second.update]
+        );
+
+        let third = store
+            .create_source_owned_update(hook_source, lane(Lane::TRANSITION_1), 3)
+            .unwrap();
+        staging.stage_source_owned("owner", third);
+        let appended = staging
+            .finish_queueing_with_source_currentness(&mut store, &hook_lists)
+            .unwrap();
+
+        assert_eq!(appended.len(), 1);
+        assert!(staging.is_empty());
+        assert_eq!(
+            store.pending_updates(slot.queue()).unwrap(),
+            vec![first.update, second.update, third.update]
+        );
+    }
+
+    #[test]
+    fn source_owned_finish_rejects_missing_and_caller_shaped_currentness_without_clearing() {
+        let mut hook_lists = HookListArena::new();
+        let list = hook_lists.create_list(owner());
+        let mut store = HookQueueStore::<i32, i32>::new();
+        let slot = store.create_state_slot(0);
+        let (hook, hook_source) = append_state_hook_source(&mut hook_lists, list, &slot, 10);
+        let update = store.create_update(lane(Lane::SYNC), 1);
+        let mut missing = HookUpdateStaging::new();
+        missing.stage("owner", slot.queue(), update, lane(Lane::SYNC));
+
+        assert_eq!(
+            missing.finish_queueing_with_source_currentness(&mut store, &hook_lists),
+            Err(HookQueueError::MissingStagedUpdateSource { id: update })
+        );
+        assert_staging_preserved(&missing, Lanes::SYNC, &[update]);
+        assert_eq!(store.update(update).unwrap().next(), None);
+
+        let caller_source =
+            HookStateQueueSource::caller_shaped_for_canary(list, hook, slot.queue());
+        assert_eq!(
+            store.create_source_owned_update(caller_source, lane(Lane::DEFAULT), 2),
+            Err(HookQueueError::CallerShapedHookQueueSource {
+                queue: slot.queue()
+            })
+        );
+
+        let source = store
+            .create_source_owned_update(hook_source, lane(Lane::DEFAULT), 3)
+            .unwrap();
+        let mut caller_shaped = HookUpdateStaging::new();
+        caller_shaped.stage_source_owned("owner", source);
+        caller_shaped.entries[0]
+            .source
+            .as_mut()
+            .unwrap()
+            .source_owned = false;
+
+        assert_eq!(
+            caller_shaped.finish_queueing_with_source_currentness(&mut store, &hook_lists),
+            Err(HookQueueError::CallerShapedStagedUpdateSource { id: source.update })
+        );
+        assert_staging_preserved(&caller_shaped, Lanes::DEFAULT, &[source.update]);
+        assert_eq!(store.update(source.update).unwrap().next(), None);
+    }
+
+    #[test]
+    fn source_owned_finish_rejects_cross_queue_smuggling_without_clearing() {
+        let mut hook_lists = HookListArena::new();
+        let list = hook_lists.create_list(owner());
+        let mut store = HookQueueStore::<i32, i32>::new();
+        let first_slot = store.create_state_slot(0);
+        let second_slot = store.create_state_slot(0);
+        let (_first_hook, first_source) =
+            append_state_hook_source(&mut hook_lists, list, &first_slot, 10);
+        let (_second_hook, _second_source) =
+            append_state_hook_source(&mut hook_lists, list, &second_slot, 20);
+        let source = store
+            .create_source_owned_update(first_source, lane(Lane::DEFAULT), 1)
+            .unwrap();
+        let mut staging = HookUpdateStaging::new();
+        staging.stage_source_owned("owner", source);
+        staging.entries[0].queue = second_slot.queue();
+
+        assert_eq!(
+            staging.finish_queueing_with_source_currentness(&mut store, &hook_lists),
+            Err(HookQueueError::StagedUpdateSourceMismatch {
+                source_update: source.update,
+                staged_update: source.update,
+                source_queue: first_slot.queue(),
+                staged_queue: second_slot.queue()
+            })
+        );
+        assert_staging_preserved(&staging, Lanes::DEFAULT, &[source.update]);
+        assert_eq!(
+            store.pending_updates(first_slot.queue()).unwrap(),
+            Vec::<HookUpdateId>::new()
+        );
+        assert_eq!(
+            store.pending_updates(second_slot.queue()).unwrap(),
+            Vec::<HookUpdateId>::new()
+        );
+        assert_eq!(store.update(source.update).unwrap().next(), None);
+    }
+
+    #[test]
+    fn source_owned_finish_rejects_no_source_existing_pending_ring_without_clearing() {
+        let mut hook_lists = HookListArena::new();
+        let list = hook_lists.create_list(owner());
+        let mut store = HookQueueStore::<i32, i32>::new();
+        let slot = store.create_state_slot(0);
+        let (_hook, hook_source) = append_state_hook_source(&mut hook_lists, list, &slot, 10);
+        let existing = store.create_update(lane(Lane::SYNC), 1);
+        store.append_pending_update(slot.queue(), existing).unwrap();
+        let source = store
+            .create_source_owned_update(hook_source, lane(Lane::DEFAULT), 2)
+            .unwrap();
+        let mut staging = HookUpdateStaging::new();
+        staging.stage_source_owned("owner", source);
+
+        assert_eq!(
+            staging.finish_queueing_with_source_currentness(&mut store, &hook_lists),
+            Err(HookQueueError::MissingStagedUpdateSource { id: existing })
+        );
+        assert_staging_preserved(&staging, Lanes::DEFAULT, &[source.update]);
+        assert_eq!(store.pending_updates(slot.queue()).unwrap(), vec![existing]);
+        assert_eq!(store.update(source.update).unwrap().next(), None);
+    }
+
+    #[test]
+    fn source_owned_finish_rejects_caller_shaped_existing_pending_ring_without_clearing() {
+        let mut hook_lists = HookListArena::new();
+        let list = hook_lists.create_list(owner());
+        let mut store = HookQueueStore::<i32, i32>::new();
+        let slot = store.create_state_slot(0);
+        let (_hook, hook_source) = append_state_hook_source(&mut hook_lists, list, &slot, 10);
+        let existing = store
+            .create_source_owned_update(hook_source, lane(Lane::SYNC), 1)
+            .unwrap();
+        let mut first = HookUpdateStaging::new();
+        first.stage_source_owned("owner", existing);
+        first
+            .finish_queueing_with_source_currentness(&mut store, &hook_lists)
+            .unwrap();
+        store.updates[existing.update.slot_index()]
+            .pending_source
+            .as_mut()
+            .unwrap()
+            .source
+            .source_owned = false;
+
+        let staged = store
+            .create_source_owned_update(hook_source, lane(Lane::DEFAULT), 2)
+            .unwrap();
+        let mut staging = HookUpdateStaging::new();
+        staging.stage_source_owned("owner", staged);
+
+        assert_eq!(
+            staging.finish_queueing_with_source_currentness(&mut store, &hook_lists),
+            Err(HookQueueError::CallerShapedStagedUpdateSource {
+                id: existing.update
+            })
+        );
+        assert_staging_preserved(&staging, Lanes::DEFAULT, &[staged.update]);
+        assert_eq!(
+            store.pending_updates(slot.queue()).unwrap(),
+            vec![existing.update]
+        );
+        assert_eq!(store.update(staged.update).unwrap().next(), None);
+    }
+
+    #[test]
+    fn source_owned_finish_rejects_cross_queue_existing_pending_ring_without_clearing() {
+        let mut hook_lists = HookListArena::new();
+        let list = hook_lists.create_list(owner());
+        let mut store = HookQueueStore::<i32, i32>::new();
+        let first_slot = store.create_state_slot(0);
+        let second_slot = store.create_state_slot(0);
+        let (_first_hook, first_source) =
+            append_state_hook_source(&mut hook_lists, list, &first_slot, 10);
+        let (_second_hook, second_source) =
+            append_state_hook_source(&mut hook_lists, list, &second_slot, 20);
+        let existing = store
+            .create_source_owned_update(first_source, lane(Lane::SYNC), 1)
+            .unwrap();
+        let mut first = HookUpdateStaging::new();
+        first.stage_source_owned("owner", existing);
+        first
+            .finish_queueing_with_source_currentness(&mut store, &hook_lists)
+            .unwrap();
+
+        store.queue_mut(second_slot.queue()).unwrap().pending = Some(existing.update);
+        let staged = store
+            .create_source_owned_update(second_source, lane(Lane::DEFAULT), 2)
+            .unwrap();
+        let mut staging = HookUpdateStaging::new();
+        staging.stage_source_owned("owner", staged);
+
+        assert_eq!(
+            staging.finish_queueing_with_source_currentness(&mut store, &hook_lists),
+            Err(HookQueueError::StagedUpdateSourceMismatch {
+                source_update: existing.update,
+                staged_update: existing.update,
+                source_queue: first_slot.queue(),
+                staged_queue: second_slot.queue()
+            })
+        );
+        assert_staging_preserved(&staging, Lanes::DEFAULT, &[staged.update]);
+        assert_eq!(store.update(staged.update).unwrap().next(), None);
+        assert_eq!(
+            store.queue(second_slot.queue()).unwrap().pending(),
+            Some(existing.update)
+        );
+    }
+
+    #[test]
+    fn source_owned_finish_rejects_cross_list_existing_pending_ring_without_clearing() {
+        let mut hook_lists = HookListArena::new();
+        let first_list = hook_lists.create_list(owner());
+        let second_list = hook_lists.create_list(owner());
+        let mut store = HookQueueStore::<i32, i32>::new();
+        let slot = store.create_state_slot(0);
+        let (first_hook, first_source) =
+            append_state_hook_source(&mut hook_lists, first_list, &slot, 10);
+        let (_second_hook, second_source) =
+            append_state_hook_source(&mut hook_lists, second_list, &slot, 20);
+        let existing = store
+            .create_source_owned_update(first_source, lane(Lane::SYNC), 1)
+            .unwrap();
+        let mut first = HookUpdateStaging::new();
+        first.stage_source_owned("owner", existing);
+        first
+            .finish_queueing_with_source_currentness(&mut store, &hook_lists)
+            .unwrap();
+        hook_lists
+            .set_hook_list_for_canary(first_hook, second_list)
+            .unwrap();
+
+        let staged = store
+            .create_source_owned_update(second_source, lane(Lane::DEFAULT), 2)
+            .unwrap();
+        let mut staging = HookUpdateStaging::new();
+        staging.stage_source_owned("owner", staged);
+
+        assert!(matches!(
+            staging.finish_queueing_with_source_currentness(&mut store, &hook_lists),
+            Err(HookQueueError::InvalidStagedHookSource {
+                id,
+                source: HookListError::WrongHookListOwner { hook: wrong_hook, expected, actual }
+            }) if id == existing.update
+                && wrong_hook == first_hook
+                && expected == first_list
+                && actual == second_list
+        ));
+        assert_staging_preserved(&staging, Lanes::DEFAULT, &[staged.update]);
+        assert_eq!(
+            store.pending_updates(slot.queue()).unwrap(),
+            vec![existing.update]
+        );
+        assert_eq!(store.update(staged.update).unwrap().next(), None);
+    }
+
+    #[test]
+    fn source_owned_finish_rejects_cross_list_smuggling_without_clearing() {
+        let mut hook_lists = HookListArena::new();
+        let first_list = hook_lists.create_list(owner());
+        let second_list = hook_lists.create_list(owner());
+        let mut store = HookQueueStore::<i32, i32>::new();
+        let slot = store.create_state_slot(0);
+        let (hook, hook_source) = append_state_hook_source(&mut hook_lists, first_list, &slot, 10);
+        let source = store
+            .create_source_owned_update(hook_source, lane(Lane::DEFAULT), 1)
+            .unwrap();
+        let mut staging = HookUpdateStaging::new();
+        staging.stage_source_owned("owner", source);
+        hook_lists
+            .set_hook_list_for_canary(hook, second_list)
+            .unwrap();
+
+        assert!(matches!(
+            staging.finish_queueing_with_source_currentness(&mut store, &hook_lists),
+            Err(HookQueueError::InvalidStagedHookSource {
+                id,
+                source: HookListError::WrongHookListOwner { hook: wrong_hook, expected, actual }
+            }) if id == source.update
+                && wrong_hook == hook
+                && expected == first_list
+                && actual == second_list
+        ));
+        assert_staging_preserved(&staging, Lanes::DEFAULT, &[source.update]);
+        assert_eq!(
+            store.pending_updates(slot.queue()).unwrap(),
+            Vec::<HookUpdateId>::new()
+        );
+        assert_eq!(store.update(source.update).unwrap().next(), None);
+    }
+
+    #[test]
+    fn source_owned_finish_rejects_stale_hook_source_without_clearing() {
+        let mut hook_lists = HookListArena::new();
+        let list = hook_lists.create_list(owner());
+        let mut store = HookQueueStore::<i32, i32>::new();
+        let slot = store.create_state_slot(0);
+        let (_hook, hook_source) = append_state_hook_source(&mut hook_lists, list, &slot, 10);
+        let source = store
+            .create_source_owned_update(hook_source, lane(Lane::DEFAULT), 1)
+            .unwrap();
+        let mut staging = HookUpdateStaging::new();
+        staging.stage_source_owned("owner", source);
+        hook_lists.discard_list(list).unwrap();
+
+        assert!(matches!(
+            staging.finish_queueing_with_source_currentness(&mut store, &hook_lists),
+            Err(HookQueueError::InvalidStagedHookSource {
+                id,
+                source: HookListError::StaleListGeneration { id: stale_list, .. }
+            }) if id == source.update && stale_list == list
+        ));
+        assert_staging_preserved(&staging, Lanes::DEFAULT, &[source.update]);
+        assert_eq!(store.update(source.update).unwrap().next(), None);
+    }
+
+    #[test]
+    fn source_owned_finish_rejects_stale_queue_source_without_clearing() {
+        let mut hook_lists = HookListArena::new();
+        let list = hook_lists.create_list(owner());
+        let mut store = HookQueueStore::<i32, i32>::new();
+        let slot = store.create_state_slot(0);
+        let (_hook, hook_source) = append_state_hook_source(&mut hook_lists, list, &slot, 10);
+        let source = store
+            .create_source_owned_update(hook_source, lane(Lane::DEFAULT), 1)
+            .unwrap();
+        let mut staging = HookUpdateStaging::new();
+        staging.stage_source_owned("owner", source);
+
+        store.reclaim_queue(slot.queue()).unwrap();
+        let reused = store.create_queue(0);
+        assert_ne!(slot.queue(), reused);
+
+        assert!(matches!(
+            staging.finish_queueing_with_source_currentness(&mut store, &hook_lists),
+            Err(HookQueueError::StaleQueueId { id, current_generation: 1 })
+                if id == slot.queue()
+        ));
+        assert_staging_preserved(&staging, Lanes::DEFAULT, &[source.update]);
+        assert_eq!(store.queue(reused).unwrap().pending(), None);
+        assert_eq!(store.update(source.update).unwrap().next(), None);
+    }
+
+    #[test]
+    fn source_owned_finish_rejects_duplicate_prelinked_corrupt_and_stale_ids_without_clearing() {
+        let mut hook_lists = HookListArena::new();
+        let list = hook_lists.create_list(owner());
+        let mut store = HookQueueStore::<i32, i32>::new();
+        let slot = store.create_state_slot(0);
+        let (_hook, hook_source) = append_state_hook_source(&mut hook_lists, list, &slot, 10);
+        let duplicate = store
+            .create_source_owned_update(hook_source, lane(Lane::SYNC), 1)
+            .unwrap();
+        let mut duplicate_staging = HookUpdateStaging::new();
+        duplicate_staging.stage_source_owned("owner", duplicate);
+        duplicate_staging.stage_source_owned("owner", duplicate);
+
+        assert_eq!(
+            duplicate_staging.finish_queueing_with_source_currentness(&mut store, &hook_lists),
+            Err(HookQueueError::DuplicateStagedUpdate {
+                id: duplicate.update
+            })
+        );
+        assert_staging_preserved(
+            &duplicate_staging,
+            Lanes::SYNC,
+            &[duplicate.update, duplicate.update],
+        );
+
+        let linked = store
+            .create_source_owned_update(hook_source, lane(Lane::DEFAULT), 2)
+            .unwrap();
+        store
+            .append_pending_update(slot.queue(), linked.update)
+            .unwrap();
+        let staged = store
+            .create_source_owned_update(hook_source, lane(Lane::SYNC), 3)
+            .unwrap();
+        let mut prelinked_staging = HookUpdateStaging::new();
+        prelinked_staging.stage_source_owned("owner", linked);
+        prelinked_staging.stage_source_owned("owner", staged);
+
+        assert_eq!(
+            prelinked_staging.finish_queueing_with_source_currentness(&mut store, &hook_lists),
+            Err(HookQueueError::LinkedUpdateCannotBeReclaimed { id: linked.update })
+        );
+        assert_staging_preserved(
+            &prelinked_staging,
+            Lanes::DEFAULT.merge(Lanes::SYNC),
+            &[linked.update, staged.update],
+        );
+        assert_eq!(
+            store.pending_updates(slot.queue()).unwrap(),
+            vec![linked.update]
+        );
+        assert_eq!(store.update(staged.update).unwrap().next(), None);
+
+        let corrupt = store
+            .create_source_owned_update(hook_source, lane(Lane::SYNC), 4)
+            .unwrap();
+        let mut corrupt_staging = HookUpdateStaging::new();
+        corrupt_staging.stage_source_owned("owner", corrupt);
+        store.update_mut(linked.update).unwrap().next = None;
+
+        assert_eq!(
+            corrupt_staging.finish_queueing_with_source_currentness(&mut store, &hook_lists),
+            Err(HookQueueError::MissingCircularNext { id: linked.update })
+        );
+        assert_staging_preserved(&corrupt_staging, Lanes::SYNC, &[corrupt.update]);
+        assert_eq!(
+            store.queue(slot.queue()).unwrap().pending(),
+            Some(linked.update)
+        );
+        assert_eq!(store.update(corrupt.update).unwrap().next(), None);
+
+        store.queue_mut(slot.queue()).unwrap().pending = None;
+        store.update_mut(linked.update).unwrap().next = None;
+        store.reclaim_update(corrupt.update).unwrap();
+        let reused = store.create_update(lane(Lane::SYNC), 5);
+        assert_ne!(corrupt.update, reused);
+        let mut stale_staging = HookUpdateStaging::new();
+        stale_staging.stage_source_owned("owner", corrupt);
+
+        assert!(matches!(
+            stale_staging.finish_queueing_with_source_currentness(&mut store, &hook_lists),
+            Err(HookQueueError::StaleUpdateId { id, current_generation: 1 })
+                if id == corrupt.update
+        ));
+        assert_staging_preserved(&stale_staging, Lanes::SYNC, &[corrupt.update]);
+    }
+
+    #[test]
+    fn source_owned_finish_rejects_replay_after_double_consume_without_clearing() {
+        let mut hook_lists = HookListArena::new();
+        let list = hook_lists.create_list(owner());
+        let mut store = HookQueueStore::<i32, i32>::new();
+        let slot = store.create_state_slot(0);
+        let (_hook, hook_source) = append_state_hook_source(&mut hook_lists, list, &slot, 10);
+        let source = store
+            .create_source_owned_update(hook_source, lane(Lane::SYNC), 1)
+            .unwrap();
+        let mut first = HookUpdateStaging::new();
+        first.stage_source_owned("owner", source);
+        first
+            .finish_queueing_with_source_currentness(&mut store, &hook_lists)
+            .unwrap();
+
+        store.queue_mut(slot.queue()).unwrap().pending = None;
+        store.update_mut(source.update).unwrap().next = None;
+        let mut replay = HookUpdateStaging::new();
+        replay.stage_source_owned("owner", source);
+
+        assert_eq!(
+            replay.finish_queueing_with_source_currentness(&mut store, &hook_lists),
+            Err(HookQueueError::StagedUpdateAlreadyConsumed { id: source.update })
+        );
+        assert_staging_preserved(&replay, Lanes::SYNC, &[source.update]);
+        assert_eq!(
+            store.pending_updates(slot.queue()).unwrap(),
+            Vec::<HookUpdateId>::new()
+        );
+        assert_eq!(store.update(source.update).unwrap().next(), None);
     }
 
     #[test]
