@@ -74,6 +74,11 @@ const privateSchedulerMockExpiredActRootWorkDiagnosticsKind =
 const privateSchedulerMockExpiredActRootWorkDiagnosticsBrand = Symbol.for(
   privateSchedulerMockExpiredActRootWorkDiagnosticsKind
 );
+const privateSchedulerDrivenPassiveEffectDiagnosticsKind =
+  "fast-react.react.private-scheduler-driven-passive-effect-diagnostics";
+const privateSchedulerDrivenPassiveEffectDiagnosticsBrand = Symbol.for(
+  privateSchedulerDrivenPassiveEffectDiagnosticsKind
+);
 const oldSchedulerMockExpiredActRootWorkSourceProof = Symbol.for(
   "fast-react.scheduler.mock-expired-act-root-work-source-proof"
 );
@@ -321,7 +326,8 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     "passive-effects-committed-fiber-traversal",
     "passive-effects-scheduler-flush-diagnostic",
     "passive-effect-mount-unmount-execution-diagnostics",
-    "passive-effect-root-error-routing-diagnostics"
+    "passive-effect-root-error-routing-diagnostics",
+    "scheduler-driven-passive-effect-execution-diagnostics"
   ];
   const blockedPrivatePassivePrerequisiteIds =
     acceptedPrivatePassiveDiagnosticIds.map(
@@ -373,6 +379,7 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     "passive-effects-scheduler-flush-diagnostic",
     "passive-effect-mount-unmount-execution-diagnostics",
     "passive-effect-root-error-routing-diagnostics",
+    "scheduler-driven-passive-effect-execution-diagnostics",
     "react-dom-private-root-bridge-records",
     "react-dom-private-flush-sync-root-output-diagnostic",
     "react-dom-private-root-warning-boundary-diagnostics",
@@ -481,7 +488,7 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     publicPassivePrerequisite.acceptedPrivatePassiveDiagnosticIds,
     acceptedPrivatePassiveDiagnosticIds
   );
-  assert.equal(publicPassivePrerequisite.acceptedPrivatePassiveDiagnosticCount, 4);
+  assert.equal(publicPassivePrerequisite.acceptedPrivatePassiveDiagnosticCount, 5);
   assert.equal(publicPassivePrerequisite.publicEffectExecutionEnabled, false);
   assert.equal(
     publicPassivePrerequisite.schedulerDrivenPassiveExecutionEnabled,
@@ -617,6 +624,24 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     acceptsSchedulerMockDelayedActRootWorkOnlyAsNestedExpiredDiagnostics:
       true,
     acceptsTopLevelDelayedActRootWorkAsPublicActEvidence: false,
+    schedulerDrivenPassiveEffectDiagnosticsReady: true,
+    consumesSchedulerDrivenPassiveEffectDiagnostics: true,
+    schedulerDrivenPassiveEffectConsumptionStatus:
+      "consumed-accepted-private-scheduler-driven-passive-effect-execution-diagnostics",
+    acceptedSchedulerDrivenPassiveEffectRecords: [
+      "SchedulerActQueueRequest",
+      "SyncFlushActPrivateExecutionDiagnosticsForCanary",
+      "SchedulerPassiveEffectsFlushRequest",
+      "PassiveEffectSchedulerFlushGateRecord",
+      "PendingPassiveCommitHandoff",
+      "PassiveEffectSchedulerFlushExecutionRecord",
+      "PassiveEffectsFlushResult",
+      "PassiveEffectFlushRecord",
+      "PassiveEffectDestroyCallbackExecutionRecord",
+      "PassiveEffectMountCreateCallbackExecutionRecord"
+    ],
+    privateSchedulerDrivenPassiveExecution: true,
+    schedulerDrivenPassiveExecution: false,
     executesQueuedWork: false,
     executesEffects: false
   });
@@ -1211,17 +1236,19 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     "test-controlled-passive-destroy-callback-execution",
     "test-controlled-passive-mount-create-callback-execution",
     "passive-callback-error-root-capture-metadata",
+    "scheduler-driven-passive-effect-private-execution",
     "root-error-callbacks-not-invoked",
     "public-act-passive-drain-blocked"
   ]);
   assert.deepEqual(passiveDiagnostics.summary, {
     acceptedDiagnosticIds: acceptedPrivatePassiveDiagnosticIds,
-    acceptedDiagnosticCount: 4,
+    acceptedDiagnosticCount: 5,
     acceptedStatus:
       "accepted-private-passive-effect-diagnostic-without-public-act-passive-drain",
     publicActPassiveDrain: false,
     publicEffectExecution: false,
     schedulerDrivenPassiveExecution: false,
+    privateSchedulerDrivenPassiveExecution: true,
     publicRootErrorCallbacksInvoked: false,
     publicActErrorAggregation: false,
     compatibilityClaimed: false,
@@ -1235,7 +1262,7 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
     passiveDiagnostics.blockedPrerequisiteIds,
     blockedPrivatePassivePrerequisiteIds
   );
-  assert.equal(passiveDiagnostics.blockedPrerequisites.length, 4);
+  assert.equal(passiveDiagnostics.blockedPrerequisites.length, 5);
   assert.deepEqual(passiveDiagnostics.blockedPrerequisites[0], {
     id:
       "accepted-private-passive-diagnostic-passive-effects-committed-fiber-traversal",
@@ -1260,6 +1287,7 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
   assert.equal(passiveDiagnostics.publicActPassiveDrain, false);
   assert.equal(passiveDiagnostics.publicEffectExecution, false);
   assert.equal(passiveDiagnostics.schedulerDrivenPassiveExecution, false);
+  assert.equal(passiveDiagnostics.summary.privateSchedulerDrivenPassiveExecution, true);
   assert.equal(passiveDiagnostics.publicRootExecution, false);
   assert.equal(passiveDiagnostics.publicRootErrorCallbacksInvoked, false);
   assert.equal(passiveDiagnostics.publicActErrorAggregation, false);
@@ -1379,6 +1407,51 @@ test("Fast React test-utils act private routing gate records accepted prerequisi
   assert.equal(passiveRootErrorDiagnostic.schedulesRootErrorUpdates, true);
   assert.equal(passiveRootErrorDiagnostic.invokesRootErrorCallbacks, false);
   assert.equal(passiveRootErrorDiagnostic.publicActErrorAggregationEnabled, false);
+
+  const schedulerDrivenPassiveDiagnostic =
+    passiveDiagnostics.acceptedDiagnostics.find(
+      (diagnostic) =>
+        diagnostic.id ===
+        "scheduler-driven-passive-effect-execution-diagnostics"
+    );
+  assert.equal(
+    schedulerDrivenPassiveDiagnostic.diagnosticGateId,
+    "react-dom-test-utils-act-private-scheduler-driven-passive-effect-gate-1"
+  );
+  assert.deepEqual(schedulerDrivenPassiveDiagnostic.workerIds, [
+    "worker-836-reconciler-private-act-queue-execution-path",
+    "worker-837-scheduler-driven-passive-effect-execution"
+  ]);
+  assert.equal(
+    schedulerDrivenPassiveDiagnostic.privateSchedulerDrivenPassiveExecution,
+    true
+  );
+  assert.equal(
+    schedulerDrivenPassiveDiagnostic.schedulerDrivenPassiveExecution,
+    false
+  );
+  assert.equal(schedulerDrivenPassiveDiagnostic.publicEffectExecution, false);
+  assert.equal(schedulerDrivenPassiveDiagnostic.publicActPassiveDrain, false);
+  assert.equal(
+    schedulerDrivenPassiveDiagnostic.requiresSchedulerOwnedSourceProof,
+    true
+  );
+  assert.equal(
+    schedulerDrivenPassiveDiagnostic.requiresSourceOwnedPassiveEvidence,
+    true
+  );
+  assert.equal(
+    schedulerDrivenPassiveDiagnostic.linksRootCommitPassiveExecutionToActFlushDiagnostics,
+    true
+  );
+  assert.deepEqual(
+    schedulerDrivenPassiveDiagnostic.records,
+    gate.privateSchedulerDrivenPassiveEffectDiagnostics.records
+  );
+  assert.deepEqual(
+    gate.privateSchedulerDrivenPassiveEffectDiagnostics.summary,
+    schedulerDrivenPassiveDiagnostic.summary
+  );
   assert.deepEqual(gate.reactDomRootBridge.records, [
     "FastReactDomPrivateRootCreateRecord",
     "FastReactDomPrivateRootUpdateRecord",
@@ -2114,6 +2187,217 @@ test("Fast React test-utils private act route consumes Scheduler mock expired ac
     }
 
     Scheduler.reset();
+  }
+});
+
+test("Fast React test-utils private act route consumes source-owned scheduler-driven passive diagnostics only", () => {
+  for (const nodeEnv of ["development", "production"]) {
+    const { reactGate, report } =
+      createSchedulerMockExpiredActRootWorkDiagnostics(nodeEnv);
+    const gateModule = loadFreshCjs(fastReactDomTestUtilsActGatePath);
+    const diagnostics =
+      reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
+        report,
+        {
+          finishedWorkId: `dom-test-utils-passive-${nodeEnv}`
+        }
+      );
+
+    assert.equal(
+      diagnostics[privateSchedulerDrivenPassiveEffectDiagnosticsBrand],
+      true,
+      nodeEnv
+    );
+    assert.equal(
+      gateModule.isAcceptedSchedulerDrivenPassiveEffectDiagnostics(diagnostics),
+      true,
+      nodeEnv
+    );
+
+    const consumption =
+      gateModule.consumeSchedulerDrivenPassiveEffectDiagnostics(diagnostics);
+    assert.equal(
+      consumption.status,
+      gateModule.privateSchedulerDrivenPassiveEffectConsumptionStatus,
+      nodeEnv
+    );
+    assert.equal(
+      consumption.gateId,
+      gateModule.privateSchedulerDrivenPassiveEffectDiagnosticGateId,
+      nodeEnv
+    );
+    assert.equal(
+      consumption.diagnosticStatus,
+      gateModule.privateSchedulerDrivenPassiveEffectDiagnosticStatus,
+      nodeEnv
+    );
+    assert.equal(
+      consumption.prerequisiteId,
+      gateModule.privateSchedulerDrivenPassiveEffectPrerequisiteId,
+      nodeEnv
+    );
+    assert.equal(
+      consumption.reactActConsumptionStatus,
+      reactGate.schedulerDrivenPassiveEffectConsumptionStatus,
+      nodeEnv
+    );
+    assert.equal(consumption.rootLabel, "mock-root-747", nodeEnv);
+    assert.equal(
+      consumption.finishedWorkId,
+      `dom-test-utils-passive-${nodeEnv}`,
+      nodeEnv
+    );
+    assert.equal(
+      consumption.consumesReactActPrivateSchedulerDrivenPassiveDiagnostics,
+      true,
+      nodeEnv
+    );
+    assert.equal(
+      consumption.consumesSchedulerMockExpiredActRootWorkDiagnostics,
+      true,
+      nodeEnv
+    );
+    assert.equal(consumption.requiresSchedulerOwnedSourceProof, true, nodeEnv);
+    assert.equal(consumption.requiresSourceOwnedPassiveEvidence, true, nodeEnv);
+    assert.equal(
+      consumption.linksRootCommitPassiveExecutionToActFlushDiagnostics,
+      true,
+      nodeEnv
+    );
+    assert.equal(consumption.consumesRootCommitPassiveExecution, true, nodeEnv);
+    assert.equal(consumption.consumesSchedulerPassiveFlushRequest, true, nodeEnv);
+    assert.equal(consumption.consumesPendingPassiveHandoff, true, nodeEnv);
+    assert.equal(consumption.privateSchedulerDrivenPassiveExecution, true, nodeEnv);
+    assert.equal(consumption.didExecutePrivateCallbackExecutors, true, nodeEnv);
+    assert.equal(consumption.rejectsStaleDiagnostics, true, nodeEnv);
+    assert.equal(consumption.rejectsCrossRootDiagnostics, true, nodeEnv);
+    assert.equal(consumption.rejectsMissingSchedulerSourceProof, true, nodeEnv);
+    assert.equal(consumption.rejectsMissingPassiveOwnership, true, nodeEnv);
+    assert.equal(consumption.schedulerDrivenPassiveExecution, false, nodeEnv);
+    assert.equal(consumption.privateRoutingReady, false, nodeEnv);
+    assert.equal(consumption.publicReactActReady, false, nodeEnv);
+    assert.equal(consumption.publicTestUtilsActReady, false, nodeEnv);
+    assert.equal(consumption.queueFlushingReady, false, nodeEnv);
+    assert.equal(consumption.rendererRootsReady, false, nodeEnv);
+    assert.equal(consumption.passiveEffectsReady, false, nodeEnv);
+    assert.equal(consumption.continuationFlushingReady, false, nodeEnv);
+    assert.equal(consumption.publicActExecution, false, nodeEnv);
+    assert.equal(consumption.publicRootExecution, false, nodeEnv);
+    assert.equal(consumption.publicEffectExecution, false, nodeEnv);
+    assert.equal(consumption.publicActPassiveDrain, false, nodeEnv);
+    assert.equal(consumption.publicCompatibilityClaimed, false, nodeEnv);
+    assert.equal(
+      consumption.publicSchedulerTimingCompatibilityClaimed,
+      false,
+      nodeEnv
+    );
+    assert.equal(consumption.publicReactActCompatibilityClaimed, false, nodeEnv);
+    assert.equal(
+      consumption.publicRootSchedulerCompatibilityClaimed,
+      false,
+      nodeEnv
+    );
+    assert.equal(consumption.publicRendererCompatibilityClaimed, false, nodeEnv);
+    assert.equal(consumption.drainsPublicSchedulerTaskQueue, false, nodeEnv);
+    assert.equal(consumption.drainsPublicReactActQueue, false, nodeEnv);
+    assert.equal(consumption.executesQueuedWork, false, nodeEnv);
+    assert.equal(consumption.executesEffects, false, nodeEnv);
+    assert.equal(consumption.executesPassiveEffects, false, nodeEnv);
+    assert.equal(consumption.executesRendererWork, false, nodeEnv);
+    assert.equal(consumption.executesRendererRoots, false, nodeEnv);
+    assert.deepEqual(consumption.workerIds, [
+      "worker-836-reconciler-private-act-queue-execution-path",
+      "worker-837-scheduler-driven-passive-effect-execution"
+    ]);
+
+    const clonedScheduler = cloneExpiredActRootWorkReport(report);
+    const missingSchedulerSource =
+      reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
+        clonedScheduler
+      );
+    assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+      gateModule,
+      missingSchedulerSource,
+      "scheduler-driven-passive-diagnostics-scheduler-source-proof",
+      `${nodeEnv}:missing-scheduler-source-proof`
+    );
+    assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+      gateModule,
+      reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
+        report,
+        {
+          schedulerGateOverrides: {
+            rootId: 999,
+            rootLabel: "foreign-passive-root"
+          }
+        }
+      ),
+      "scheduler-driven-passive-diagnostics-scheduler-gate",
+      `${nodeEnv}:cross-root-scheduler-gate`
+    );
+    assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+      gateModule,
+      reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
+        report,
+        {
+          pendingPassiveHandoffOverrides: {
+            finishedWorkId: "stale-dom-test-utils-passive"
+          }
+        }
+      ),
+      "scheduler-driven-passive-diagnostics-pending-passive",
+      `${nodeEnv}:stale-pending-passive`
+    );
+    assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+      gateModule,
+      cloneSchedulerDrivenPassiveEffectDiagnostics(diagnostics),
+      "scheduler-driven-passive-diagnostics-passive-ownership",
+      `${nodeEnv}:missing-passive-ownership`
+    );
+    const callerBuiltNestedDiagnostics =
+      reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(report, {
+        finishedWorkId: diagnostics.finishedWorkId,
+        diagnosticsOverrides:
+          createCallerBuiltSchedulerDrivenPassiveEffectNestedRecords(diagnostics)
+      });
+    assert.equal(
+      callerBuiltNestedDiagnostics[
+        privateSchedulerDrivenPassiveEffectDiagnosticsBrand
+      ],
+      true,
+      nodeEnv
+    );
+    assert.equal(Object.isFrozen(callerBuiltNestedDiagnostics), true, nodeEnv);
+    assert.equal(
+      Object.isFrozen(callerBuiltNestedDiagnostics.schedulerRequest),
+      false,
+      nodeEnv
+    );
+    assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+      gateModule,
+      callerBuiltNestedDiagnostics,
+      "scheduler-driven-passive-diagnostics-nested-passive-ownership",
+      `${nodeEnv}:caller-built-nested-passive-records`
+    );
+    assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+      gateModule,
+      Object.freeze({
+        kind: privateSchedulerDrivenPassiveEffectDiagnosticsKind,
+        status:
+          "test title says scheduler-driven passive effect execution passed",
+        source: "PassiveEffectSchedulerFlushExecutionRecord { }"
+      }),
+      "scheduler-driven-passive-diagnostics-brand",
+      `${nodeEnv}:prose-source-syntax`
+    );
+    assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+      gateModule,
+      new Error(
+        "PassiveEffectSchedulerFlushExecutionRecord.did_execute_private_callback_executors"
+      ),
+      "scheduler-driven-passive-diagnostics-not-frozen",
+      `${nodeEnv}:error-message-not-evidence`
+    );
   }
 });
 
@@ -3013,6 +3297,62 @@ function cloneDelayedActRootWorkReport(
   return Object.freeze(cloned);
 }
 
+function cloneSchedulerDrivenPassiveEffectDiagnostics(
+  diagnostics,
+  overrides = {},
+  { withBrand = true } = {}
+) {
+  const cloned = {
+    ...diagnostics,
+    ...overrides
+  };
+
+  if (withBrand) {
+    Object.defineProperty(
+      cloned,
+      privateSchedulerDrivenPassiveEffectDiagnosticsBrand,
+      {
+        configurable: false,
+        enumerable: false,
+        value: true,
+        writable: false
+      }
+    );
+  }
+
+  return Object.freeze(cloned);
+}
+
+function createCallerBuiltSchedulerDrivenPassiveEffectNestedRecords(
+  diagnostics
+) {
+  const schedulerRequest = { ...diagnostics.schedulerRequest };
+  const schedulerGate = {
+    ...diagnostics.schedulerGate,
+    schedulerRequest
+  };
+  const passiveEffects = { ...diagnostics.passiveEffects };
+  const schedulerExecution = {
+    ...diagnostics.schedulerExecution,
+    schedulerGate,
+    schedulerRequest,
+    passiveEffects
+  };
+
+  return {
+    rootCommitPassiveExecution: {
+      ...diagnostics.rootCommitPassiveExecution
+    },
+    pendingPassiveHandoff: {
+      ...diagnostics.pendingPassiveHandoff
+    },
+    schedulerRequest,
+    schedulerGate,
+    passiveEffects,
+    schedulerExecution
+  };
+}
+
 function cloneFrozenObject(value, overrides = {}) {
   return Object.freeze({
     ...value,
@@ -3056,6 +3396,51 @@ function assertReactDomExpiredSchedulerDiagnosticsRejected(
       assert.equal(error.publicRendererCompatibilityClaimed, false, label);
       assert.equal(error.drainsPublicSchedulerTaskQueue, false, label);
       assert.equal(error.drainsPublicReactActQueue, false, label);
+      assert.equal(error.executesQueuedWork, false, label);
+      assert.equal(error.executesEffects, false, label);
+      assert.equal(error.executesPassiveEffects, false, label);
+      assert.equal(error.executesRendererWork, false, label);
+      assert.equal(error.executesRendererRoots, false, label);
+      return true;
+    },
+    label
+  );
+}
+
+function assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+  gateModule,
+  diagnostics,
+  reason,
+  label
+) {
+  assert.equal(
+    gateModule.isAcceptedSchedulerDrivenPassiveEffectDiagnostics(diagnostics),
+    false,
+    label
+  );
+  assert.throws(
+    () => gateModule.consumeSchedulerDrivenPassiveEffectDiagnostics(diagnostics),
+    (error) => {
+      assert.equal(error.name, "FastReactDomUnimplementedError", label);
+      assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED", label);
+      assert.equal(error.entrypoint, "react-dom/test-utils", label);
+      assert.equal(
+        error.exportName,
+        `${gateModule.privateTestUtilsActGateExport}.consumeSchedulerDrivenPassiveEffectDiagnostics`,
+        label
+      );
+      assert.equal(error.compatibilityTarget, "react-dom@19.2.6", label);
+      assert.equal(error.reason, reason, label);
+      assert.equal(error.publicCompatibilityClaimed, false, label);
+      assert.equal(error.publicSchedulerTimingCompatibilityClaimed, false, label);
+      assert.equal(error.publicReactActCompatibilityClaimed, false, label);
+      assert.equal(error.publicRootSchedulerCompatibilityClaimed, false, label);
+      assert.equal(error.publicRendererCompatibilityClaimed, false, label);
+      assert.equal(error.drainsPublicSchedulerTaskQueue, false, label);
+      assert.equal(error.drainsPublicReactActQueue, false, label);
+      assert.equal(error.publicActPassiveDrain, false, label);
+      assert.equal(error.publicEffectExecution, false, label);
+      assert.equal(error.publicRootExecution, false, label);
       assert.equal(error.executesQueuedWork, false, label);
       assert.equal(error.executesEffects, false, label);
       assert.equal(error.executesPassiveEffects, false, label);
