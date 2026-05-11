@@ -7,6 +7,7 @@ import {
   PRIVATE_ADMISSION_806_MARKER_LISTENER_FIELD_NAMES,
   PRIVATE_ADMISSION_806_MATRIX_FIELD_NAMES,
   PRIVATE_ADMISSION_806_PACKAGE_SURFACE_EVIDENCE,
+  PRIVATE_ADMISSION_806_PUBLIC_BLOCKER_FIELD_EVIDENCE,
   PRIVATE_ADMISSION_806_PUBLIC_BLOCKER_FIELDS,
   PRIVATE_ADMISSION_806_RECOVERABLE_ERROR_FIELD_NAMES,
   PRIVATE_ADMISSION_806_RECORD_TYPES,
@@ -72,6 +73,16 @@ test("private admission 806 manifest pins hydrateRoot preflight workers and reco
     ),
     true
   );
+  assert.equal(
+    PRIVATE_ADMISSION_806_PUBLIC_BLOCKER_FIELDS.includes("canHydrate"),
+    true
+  );
+  assert.equal(
+    PRIVATE_ADMISSION_806_PUBLIC_BLOCKER_FIELDS.includes(
+      "replayQueueDrained"
+    ),
+    true
+  );
 });
 
 test("private admission 806 gate recognizes static hydrateRoot preflight evidence without public compatibility", () => {
@@ -94,6 +105,10 @@ test("private admission 806 gate recognizes static hydrateRoot preflight evidenc
   assert.deepEqual(gate.publicBlockerClaimViolationIds, []);
   assert.deepEqual(gate.packageCompatibilityClaimIds, []);
   assert.deepEqual(gate.publicHydrationCompatibilityClaimIds, []);
+  assert.deepEqual(
+    [...gate.publicBlockerFieldCoverageFields].sort(),
+    [...PRIVATE_ADMISSION_806_PUBLIC_BLOCKER_FIELDS].sort()
+  );
 
   assertLedgerRow(gate.rowsByWorker[worker762], {
     privateAdmission: "accepted-private-hydrateroot-marker-listener-preflight",
@@ -128,6 +143,11 @@ test("private admission 806 gate recognizes static hydrateRoot preflight evidenc
     assert.deepEqual(evidenceRow.missingTokens, [], evidenceRow.role);
     assert.deepEqual(evidenceRow.forbiddenTokensPresent, [], evidenceRow.role);
   }
+  for (const evidenceRow of gate.publicBlockerEvidence) {
+    assert.equal(evidenceRow.recognized, true, evidenceRow.role);
+    assert.deepEqual(evidenceRow.missingTokens, [], evidenceRow.role);
+    assert.deepEqual(evidenceRow.forbiddenTokensPresent, [], evidenceRow.role);
+  }
 });
 
 test("private admission 806 gate rejects missing evidence tokens and package-surface leaks", () => {
@@ -142,8 +162,19 @@ test("private admission 806 gate rejects missing evidence tokens and package-sur
       };
     }
   );
+  const publicBlockerFieldEvidence =
+    PRIVATE_ADMISSION_806_PUBLIC_BLOCKER_FIELD_EVIDENCE.map((evidenceRow) => {
+      if (evidenceRow.field !== "publicRootCreated") {
+        return evidenceRow;
+      }
+      return {
+        ...evidenceRow,
+        tokens: [...evidenceRow.tokens, "missing-public-root-created-token"]
+      };
+    });
   const gate = evaluatePrivateAdmission806Gate({
     packageSurfaceEvidence: packageEvidence,
+    publicBlockerFieldEvidence,
     rowOverrides: {
       [worker762]: {
         evidence: withMissingEvidenceToken(
@@ -160,7 +191,9 @@ test("private admission 806 gate rejects missing evidence tokens and package-sur
   assert.equal(gate.evidenceRecognized, false);
   assertViolationIds(gate, [
     "hydrateroot-admission-evidence-token-missing",
-    "hydrateroot-package-surface-evidence-mismatch"
+    "hydrateroot-package-surface-evidence-mismatch",
+    "hydrateroot-public-blocker-field-mismatch",
+    "hydrateroot-public-blocker-evidence-missing"
   ]);
   assertEvidenceRoleRecognized(
     gate,
@@ -170,6 +203,9 @@ test("private admission 806 gate rejects missing evidence tokens and package-sur
   );
   assert.deepEqual(gate.packageEvidenceMismatchRows.map((row) => row.role), [
     "react-dom-package-exports-public-client-only"
+  ]);
+  assert.deepEqual(gate.publicBlockerEvidenceMismatchRows.map((row) => row.field), [
+    "publicRootCreated"
   ]);
 });
 
@@ -190,8 +226,10 @@ test("private admission 806 gate rejects drift in durable statuses, ids, fields,
           (diagnosticId) =>
             diagnosticId !== "hydrate-root-target-claiming-canonical-evidence"
         ),
-        observedFieldNames: PRIVATE_ADMISSION_806_TARGET_CLAIMING_FIELD_NAMES.filter(
-          (field) => field !== "canonicalTargetClaimingEvidence"
+        evidence: withoutEvidenceFieldName(
+          rowByWorker(worker770),
+          "worker-770-root-bridge-target-claiming-source",
+          "canonicalTargetClaimingEvidence"
         ),
         requiredPriorWorkers: []
       }
@@ -355,23 +393,14 @@ function assertLedgerRow(
   assert.equal(row.sourceTokenChecksOnly, true);
   assert.equal(row.manifestEvaluationOnly, true);
   assert.equal(row.runtimeExecutionClaimed, false);
-  assert.equal(row.packageCompatibilityClaimed, false);
-  assert.equal(row.packageExportsChanged, false);
   assert.equal(row.compatibilityClaimed, false);
   assert.equal(row.publicCompatibilityClaimed, false);
+  assert.equal(Object.hasOwn(row, "publicBlockerClaims"), false);
+  assert.equal(Object.hasOwn(row, "packageCompatibilityClaimed"), false);
+  assert.equal(Object.hasOwn(row, "packageExportsChanged"), false);
   assert.equal(
     row.ledgerEvaluationMode,
     "source-token-checks-and-manifest-only"
-  );
-  assert.deepEqual(
-    Object.keys(row.publicBlockerClaims).sort(),
-    [...PRIVATE_ADMISSION_806_PUBLIC_BLOCKER_FIELDS].sort(),
-    row.workerId
-  );
-  assert.deepEqual(
-    Object.values(row.publicBlockerClaims),
-    Object.values(row.publicBlockerClaims).map(() => false),
-    row.workerId
   );
   for (const evidenceRow of row.evidence) {
     assert.equal(evidenceRow.recognized, true, evidenceRow.role);
@@ -422,6 +451,18 @@ function withMissingEvidenceToken(row, role, token) {
     return {
       ...evidenceRow,
       tokens: [...evidenceRow.tokens, token]
+    };
+  });
+}
+
+function withoutEvidenceFieldName(row, role, fieldName) {
+  return row.evidence.map((evidenceRow) => {
+    if (evidenceRow.role !== role) {
+      return evidenceRow;
+    }
+    return {
+      ...evidenceRow,
+      fieldNames: evidenceRow.fieldNames.filter((field) => field !== fieldName)
     };
   });
 }

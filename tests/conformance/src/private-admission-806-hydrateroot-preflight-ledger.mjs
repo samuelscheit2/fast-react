@@ -101,10 +101,14 @@ export const PRIVATE_ADMISSION_806_REQUIRED_DIAGNOSTIC_IDS = freezeRecord({
     "hydrate-root-event-replay-state-unchanged"
   ]),
   [worker797]: freezeArray([
-    "hydrate-root-preflight-matrix-marker-listener-chain",
-    "hydrate-root-preflight-matrix-recoverable-error-chain",
-    "hydrate-root-preflight-matrix-target-claiming-chain",
-    "hydrate-root-preflight-matrix-event-replay-chain"
+    "getPrivateHydrateRootPublicFacadePreflightPayload",
+    "getPrivateHydrateRootPublicFacadeMarkerListenerPreflightPayload",
+    "getPrivateHydrationTextMismatchRecoverableErrorPreflightPayload",
+    "getPrivateHydrateRootPublicFacadeTargetClaimingPreflightPayload",
+    "getPrivateHydrationTargetClaimingDiagnosticPayload",
+    "getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload",
+    "getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload",
+    "assertHydrateRootPreflightEvidenceBlocked"
   ])
 });
 
@@ -234,8 +238,7 @@ export const PRIVATE_ADMISSION_806_MATRIX_FIELD_NAMES = freezeArray([
   "hydrationBoundaryRecord",
   "targetClaimingDiagnosticPayload",
   "targetDispatchLinkPayload",
-  "recoverableErrorMetadata",
-  "assertHydrateRootPreflightEvidenceBlocked"
+  "recoverableErrorMetadata"
 ]);
 
 export const PRIVATE_ADMISSION_806_PUBLIC_BLOCKER_FIELDS = freezeArray([
@@ -257,8 +260,11 @@ export const PRIVATE_ADMISSION_806_PUBLIC_BLOCKER_FIELDS = freezeArray([
   "eventReplaySupported",
   "hydrationReplaySupported",
   "eventsReplayed",
+  "hydrateInstanceCalled",
+  "hydrateTextInstanceCalled",
   "replayQueueDrained",
   "replayQueuesDrained",
+  "publicDispatchEnabled",
   "targetDispatchExecuted",
   "eventReplayDispatchAttempted",
   "pluginDispatchEventForPluginEventSystemCalled",
@@ -273,6 +279,15 @@ export const PRIVATE_ADMISSION_806_PUBLIC_BLOCKER_FIELDS = freezeArray([
   "rootErrorCallbackInvocationCount",
   "rootScheduled",
   "suspenseHydrationScheduled",
+  "publicHydrationTargetClaimed",
+  "publicRootBehaviorChanged",
+  "queueMutationAllowed",
+  "queued",
+  "targetClaimExecuted",
+  "willDispatch",
+  "willDrainReplayQueues",
+  "willHydrate",
+  "willReplay",
   "nativeExecution",
   "reconcilerExecution",
   "compatibilityClaimed",
@@ -314,35 +329,23 @@ export const PRIVATE_ADMISSION_806_ROWS = freezeArray([
           "ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHTED",
           "preflighted-private-hydrate-root-public-facade-marker-listener-gate",
           "createPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord(",
-          "markerGuardAction: markerGuard.action",
-          "listenerGuardAction: listenerGuard.action",
-          "markerGuardMatchesContainerState: true",
-          "listenerGuardMatchesContainerState: true",
-          "rootMarkerPropertyCount",
-          "ownerDocumentListeningMarkerPropertyCount",
-          "rootListenerRegistrationCount",
-          "ownerDocumentListenerRegistrationCount",
-          "rootMarkerWriteBlocked: true",
-          "rootListenerInstallationBlocked: true",
-          "hydrationMarkerConsumptionBlocked: true",
-          "eventReplayBlocked: true",
-          "recoverableErrorRoutingBlocked: true",
-          "publicHydrateRootBlocked: true",
           "getPrivateHydrateRootPublicFacadeMarkerListenerPreflightPayload",
           "isPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord"
-        ]
+        ],
+        fieldNames: PRIVATE_ADMISSION_806_MARKER_LISTENER_FIELD_NAMES
       }),
       evidenceData({
         role: "worker-762-root-facade-conformance",
         path: rootFacadeConformancePath,
         tokens: [
+          "assertHydrateRootPreflightEvidenceBlocked",
           "markerListenerPreflight.preconditions.accepted",
           "markerListenerPreflight.preconditions.stateUnchanged",
           "markerListenerPreflight.blockerEvidence.rootMarkerWriteBlocked",
           "markerListenerPreflight.blockerEvidence.rootListenerInstallationBlocked",
-          "assert.equal(rootMarkers.getContainerRoot(container), null);",
-          "assert.equal(listenerRegistry.hasListeningMarker(container), false);",
-          "assert.equal(container.__mutationLog.length, 0);"
+          "getContainerRoot",
+          "hasListeningMarker",
+          "__mutationLog"
         ]
       })
     ]
@@ -365,23 +368,14 @@ export const PRIVATE_ADMISSION_806_ROWS = freezeArray([
           "preflightTargetClaiming(",
           "createPrivateHydrateRootPublicFacadeTargetClaimingPreflightRecord(",
           "assertCanonicalPrivateHydrationTargetClaimingDiagnostic(",
-          "canonicalTargetClaimingEvidence: true",
-          "targetClaimingDiagnosticImmutable: Object.isFrozen(",
-          "targetDispatchLinkDiagnosticImmutable: Object.isFrozen(",
-          "ownershipDiagnosticsImmutable: Object.isFrozen(ownershipDiagnostics)",
-          "targetClaimingPayloadAccepted: true",
           "targetPathDeterministicallySelected",
           "targetPathResolvedToDispatchTarget",
           "targetPathUniqueInContainer",
           "hydratableLookupTargetPathRetained",
-          "targetClaimExecuted: false",
-          "publicHydrationTargetClaimed: false",
-          "hydrateInstanceBlocked: true",
-          "eventDispatchBlocked: true",
-          "replayQueueDrainBlocked: true",
-          "publicHydrationCompatibilityClaimed: false",
-          "browserDomEventCompatibilityClaimed: false"
-        ]
+          "publicHydrationCompatibilityClaimed",
+          "browserDomEventCompatibilityClaimed"
+        ],
+        fieldNames: PRIVATE_ADMISSION_806_TARGET_CLAIMING_FIELD_NAMES
       }),
       evidenceData({
         role: "worker-770-hydration-boundary-target-claiming-source",
@@ -394,8 +388,8 @@ export const PRIVATE_ADMISSION_806_ROWS = freezeArray([
           "createHydrationTargetClaimingDiagnostic(",
           "assertCanonicalPrivateHydrationTargetClaimingDiagnostic(",
           "hydrationTargetClaimingDiagnosticPayloads.set(",
-          "targetClaimExecuted: false",
-          "publicHydrationTargetClaimed: false",
+          "targetClaimExecuted",
+          "publicHydrationTargetClaimed",
           "targetPathDeterministicallySelected",
           "hydratableLookupTargetPathRetained"
         ]
@@ -411,7 +405,7 @@ export const PRIVATE_ADMISSION_806_ROWS = freezeArray([
           "claimPayload.hydrationBoundaryRecord",
           "claimPayload.targetPathResolution.node",
           "hydrate-root-target-claiming-canonical-evidence",
-          "assert.equal(dispatchRecord.hydrationReplay.queued, false);"
+          "hydrationReplay"
         ]
       })
     ]
@@ -431,16 +425,33 @@ export const PRIVATE_ADMISSION_806_ROWS = freezeArray([
           "recoverableErrorPreflightRecords",
           "createHydrationTextMismatchRecoverableErrorPreflightRecord(",
           "private-hydrate-root-public-facade-recoverable-error-preflight",
-          "recoverableErrorPreflightAccepted: true",
-          "recoverableErrorMetadataAccepted:",
-          "recoverableErrorMetadataStatus:",
-          "queuedRecoverableErrorCount:",
-          "wouldQueueRecoverableErrorCount:",
-          "recoverableErrorsQueued:",
-          "onRecoverableErrorInvoked:",
-          "publicOnRecoverableErrorInvoked:",
-          "rootErrorCallbackInvocationCount:"
-        ]
+          "recoverableErrorPreflightAccepted",
+          "recoverableErrorMetadataAccepted",
+          "recoverableErrorMetadataStatus",
+          "queuedRecoverableErrorCount",
+          "wouldQueueRecoverableErrorCount",
+          "recoverableErrorsQueued",
+          "onRecoverableErrorInvoked",
+          "publicOnRecoverableErrorInvoked",
+          "rootErrorCallbackInvocationCount"
+        ],
+        fieldNames: freezeArray([
+          "recoverableErrorPreflight",
+          "recoverableErrorPreflightId",
+          "recoverableErrorPreflightStatus",
+          "recoverableErrorPreflightAccepted",
+          "recoverableErrorMetadataAccepted",
+          "recoverableErrorMetadataStatus",
+          "recoverableErrorMetadataCount",
+          "queuedRecoverableErrorCount",
+          "wouldQueueRecoverableErrorCount",
+          "recoverableErrorsQueued",
+          "willQueueRecoverableErrors",
+          "onRecoverableErrorConfigured",
+          "onRecoverableErrorInvoked",
+          "publicOnRecoverableErrorInvoked",
+          "rootErrorCallbackInvocationCount"
+        ])
       }),
       evidenceData({
         role: "worker-776-hydration-boundary-recoverable-source",
@@ -451,22 +462,31 @@ export const PRIVATE_ADMISSION_806_ROWS = freezeArray([
           "privateHydrationTextMismatchRecoverableErrorPreflightStatus",
           "preflighted-private-hydration-text-mismatch-recoverable-error-metadata",
           "createHydrationTextMismatchRecoverableErrorPreflightRecord(",
-          "privatePreflight: true",
-          "diagnosticOnly: true",
-          "readOnly: true",
-          "publicHydrateRootSupported: false",
-          "rootErrorUpdatesScheduled: false",
-          "recoverableErrorsQueued: false",
-          "willQueueRecoverableErrors: false",
-          "callbackInvocationRecordCount: 0",
-          "privateOnRecoverableErrorInvoked: false",
-          "publicOnRecoverableErrorInvoked: false",
-          "acceptedPrivateMetadataPreflight: true",
-          "queuedRecoverableErrorPreflight: false",
-          "callbackInvocationPreflight: false",
+          "privatePreflight",
+          "diagnosticOnly",
+          "readOnly",
+          "publicHydrateRootSupported",
+          "rootErrorUpdatesScheduled",
+          "recoverableErrorsQueued",
+          "willQueueRecoverableErrors",
+          "callbackInvocationRecordCount",
+          "privateOnRecoverableErrorInvoked",
+          "publicOnRecoverableErrorInvoked",
+          "acceptedPrivateMetadataPreflight",
+          "queuedRecoverableErrorPreflight",
+          "callbackInvocationPreflight",
           "validateHydrationTextMismatchRecoverableErrorPreflightMetadata",
           "metadata-recorded-callback-not-invoked"
-        ]
+        ],
+        fieldNames: freezeArray([
+          "privatePreflight",
+          "diagnosticOnly",
+          "readOnly",
+          "acceptedBoundaryMetadataDiagnostics",
+          "acceptedBoundaryMetadataRow",
+          "callbackInvocationRecordCount",
+          "callbackInvocationPreflight"
+        ])
       }),
       evidenceData({
         role: "worker-776-hydration-conformance",
@@ -474,10 +494,10 @@ export const PRIVATE_ADMISSION_806_ROWS = freezeArray([
         tokens: [
           "createHydrationTextMismatchRecoverableErrorPreflightRecord(",
           "getPrivateHydrationTextMismatchRecoverableErrorPreflightPayload(",
-          "assert.equal(preflight.recoverableErrorMetadataAccepted, true);",
-          "assert.equal(preflight.recoverableErrorsQueued, false);",
-          "assert.equal(preflight.onRecoverableErrorInvoked, false);",
-          "assert.equal(recoverableErrorCalls, 0);"
+          "recoverableErrorMetadataAccepted",
+          "recoverableErrorsQueued",
+          "onRecoverableErrorInvoked",
+          "recoverableErrorCalls"
         ]
       })
     ]
@@ -500,20 +520,21 @@ export const PRIVATE_ADMISSION_806_ROWS = freezeArray([
           "preflightEventReplay(",
           "createPrivateHydrateRootPublicFacadeEventReplayPreflightRecord(",
           "assertCanonicalPrivateHydrationClaimedReplayTargetDispatchExecutionRecord(",
-          "canonicalReplayExecutionMetadata: true",
-          "replayExecutionRecordImmutable:",
-          "blockedDispatchRecord:",
-          "clickReplayDispatchDiagnosticBlocked:",
-          "replayExecutionRecord,",
-          "replayExecutionGateId: replayExecutionRecord.gateId",
-          "targetDispatchExecuted: false",
-          "eventReplayDispatchAttempted: false",
-          "pluginDispatchEventForPluginEventSystemCalled: false",
-          "nativeEventRedispatched: false",
-          "syntheticEventCreated: false",
-          "listenerInvocationCount: 0",
-          "recoverableErrorsQueued: false"
-        ]
+          "canonicalReplayExecutionMetadata",
+          "replayExecutionRecordImmutable",
+          "blockedDispatchRecord",
+          "clickReplayDispatchDiagnosticBlocked",
+          "replayExecutionRecord",
+          "replayExecutionGateId",
+          "targetDispatchExecuted",
+          "eventReplayDispatchAttempted",
+          "pluginDispatchEventForPluginEventSystemCalled",
+          "nativeEventRedispatched",
+          "syntheticEventCreated",
+          "listenerInvocationCount",
+          "recoverableErrorsQueued"
+        ],
+        fieldNames: PRIVATE_ADMISSION_806_EVENT_REPLAY_FIELD_NAMES
       }),
       evidenceData({
         role: "worker-786-hydration-boundary-replay-source",
@@ -524,14 +545,14 @@ export const PRIVATE_ADMISSION_806_ROWS = freezeArray([
           "privateHydrationClaimedReplayTargetDispatchExecutionStatus",
           "blocked-private-hydration-claimed-replay-target-dispatch-execution",
           "createHydrationClaimedReplayTargetDispatchExecutionRecord(",
-          "replayTargetDispatchExecutionRecorded: true",
-          "replayTargetDispatchExecutionBlocked: true",
-          "dispatchExecutionBlocked: true",
-          "eventReplayDispatchAttempted: false",
-          "pluginDispatchEventForPluginEventSystemCalled: false",
-          "hydrateInstanceCalled: false",
-          "onRecoverableErrorInvoked: false",
-          "hydrationEventReplayBlockerCount:",
+          "replayTargetDispatchExecutionRecorded",
+          "replayTargetDispatchExecutionBlocked",
+          "dispatchExecutionBlocked",
+          "eventReplayDispatchAttempted",
+          "pluginDispatchEventForPluginEventSystemCalled",
+          "hydrateInstanceCalled",
+          "onRecoverableErrorInvoked",
+          "hydrationEventReplayBlockerCount",
           "assertCanonicalPrivateHydrationClaimedReplayTargetDispatchExecutionRecord("
         ]
       }),
@@ -565,6 +586,14 @@ export const PRIVATE_ADMISSION_806_ROWS = freezeArray([
         role: "worker-797-conformance-matrix",
         path: rootFacadeConformancePath,
         tokens: [
+          "getPrivateHydrateRootPublicFacadePreflightPayload",
+          "getPrivateHydrateRootPublicFacadeMarkerListenerPreflightPayload",
+          "getPrivateHydrationTextMismatchRecoverableErrorPreflightPayload",
+          "getPrivateHydrateRootPublicFacadeTargetClaimingPreflightPayload",
+          "getPrivateHydrationTargetClaimingDiagnosticPayload",
+          "getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload",
+          "getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload",
+          "assertHydrateRootPreflightEvidenceBlocked",
           "preflightPayload.preflightRecords",
           "preflightPayload.markerListenerPreflightRecords",
           "preflightPayload.recoverableErrorPreflightRecords",
@@ -582,15 +611,23 @@ export const PRIVATE_ADMISSION_806_ROWS = freezeArray([
           "executionPayload.targetClaimingDiagnosticPayload",
           "executionPayload.targetDispatchLinkPayload",
           "executionPayload.recoverableErrorMetadata",
-          "assertHydrateRootPreflightEvidenceBlocked([",
-          "assert.equal(recoverableErrorCalls.length, 0);",
-          "assert.equal(dispatchRecord.hydrationReplay.queued, false);"
-        ]
+          "recoverableErrorCalls",
+          "hydrationReplay"
+        ],
+        fieldNames: PRIVATE_ADMISSION_806_MATRIX_FIELD_NAMES
       }),
       evidenceData({
         role: "worker-797-package-matrix",
         path: rootBridgePackageTestPath,
         tokens: [
+          "getPrivateHydrateRootPublicFacadePreflightPayload",
+          "getPrivateHydrateRootPublicFacadeMarkerListenerPreflightPayload",
+          "getPrivateHydrationTextMismatchRecoverableErrorPreflightPayload",
+          "getPrivateHydrateRootPublicFacadeTargetClaimingPreflightPayload",
+          "getPrivateHydrationTargetClaimingDiagnosticPayload",
+          "getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload",
+          "getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload",
+          "assertHydrateRootPreflightRowsBlocked",
           "preflightPayload.preflightRecords",
           "preflightPayload.markerListenerPreflightRecords",
           "preflightPayload.recoverableErrorPreflightRecords",
@@ -602,8 +639,7 @@ export const PRIVATE_ADMISSION_806_ROWS = freezeArray([
           "eventReplayPayload.replayExecutionPayload",
           "executionPayload.targetClaimingDiagnosticPayload",
           "executionPayload.targetDispatchLinkPayload",
-          "assertHydrateRootPreflightRowsBlocked([",
-          "assert.equal(recoverableErrorCalls.length, 0);"
+          "recoverableErrorCalls"
         ]
       })
     ]
@@ -621,14 +657,14 @@ export const PRIVATE_ADMISSION_806_PACKAGE_SURFACE_EVIDENCE = freezeArray([
     tokens: [
       "privateHydrateRootPublicFacadePreflightSymbol",
       "createPrivateHydrateRootPublicFacadePreflight",
-      "Object.defineProperty(",
-      "hydrateRoot,"
+      "Object.defineProperty",
+      "hydrateRoot"
     ]
   }),
   evidenceData({
     role: "react-dom-package-exports-public-client-only",
     path: packageJsonPath,
-    tokens: ['"./client": {', '"default": "./client.js"'],
+    tokens: ["./client", "./package.json"],
     forbiddenTokens: [
       '"./src/client/root-bridge"',
       '"./src/client/hydration-boundary-gate"',
@@ -658,10 +694,53 @@ export const PRIVATE_ADMISSION_806_PACKAGE_SURFACE_EVIDENCE = freezeArray([
   })
 ]);
 
+const packageCompatibilityBlockerFields = freezeArray([
+  "packageCompatibilityClaimed",
+  "packageExportsChanged"
+]);
+
+export const PRIVATE_ADMISSION_806_PUBLIC_BLOCKER_FIELD_EVIDENCE = freezeArray([
+  ...PRIVATE_ADMISSION_806_PUBLIC_BLOCKER_FIELDS.filter(
+    (field) => !packageCompatibilityBlockerFields.includes(field)
+  ).map((field) =>
+    publicBlockerEvidenceData({
+      field,
+      path: rootBridgePath,
+      tokens: [
+        field,
+        "ROOT_BRIDGE_EXECUTION_BLOCKED",
+        "ROOT_BRIDGE_COMPATIBILITY_BLOCKED",
+        "createPrivateHydrateRootPublicFacadePreflightRecord",
+        "assertHydrateRootEventReplayPreflightEvidenceBlocked"
+      ]
+    })
+  ),
+  publicBlockerEvidenceData({
+    field: "packageCompatibilityClaimed",
+    path: packageSurfaceGuardPath,
+    tokens: [
+      "assertNoPrivateDiagnosticExportKeys",
+      "assertNoPrivateDiagnosticRuntimeExports",
+      "assertPrivateImplementationExportMapBlocked"
+    ]
+  }),
+  publicBlockerEvidenceData({
+    field: "packageExportsChanged",
+    path: packageSurfaceGuardPath,
+    tokens: [
+      "manifestSurface",
+      "assertNoPrivateDiagnosticExportKeys",
+      "assertPrivateImplementationExportMapBlocked"
+    ]
+  })
+]);
+
 export function evaluatePrivateAdmission806Gate({
   workspaceRoot = DEFAULT_WORKSPACE_ROOT,
   rowOverrides = {},
   packageSurfaceEvidence = PRIVATE_ADMISSION_806_PACKAGE_SURFACE_EVIDENCE,
+  publicBlockerFieldEvidence =
+    PRIVATE_ADMISSION_806_PUBLIC_BLOCKER_FIELD_EVIDENCE,
   compatibilityClaimed = false,
   publicCompatibilityClaimed = false
 } = {}) {
@@ -675,6 +754,15 @@ export function evaluatePrivateAdmission806Gate({
   const packageEvidence = freezeArray(
     packageSurfaceEvidence.map((evidenceRow) =>
       evaluateEvidenceRow({
+        evidenceRow,
+        fileCache,
+        workspaceRoot
+      })
+    )
+  );
+  const publicBlockerEvidence = freezeArray(
+    publicBlockerFieldEvidence.map((evidenceRow) =>
+      evaluatePublicBlockerEvidenceRow({
         evidenceRow,
         fileCache,
         workspaceRoot
@@ -717,6 +805,7 @@ export function evaluatePrivateAdmission806Gate({
         role: evidenceRow.role,
         path: evidenceRow.path,
         missingTokens: evidenceRow.missingTokens,
+        missingFieldNames: evidenceRow.missingFieldNames,
         forbiddenTokensPresent: evidenceRow.forbiddenTokensPresent,
         readError: evidenceRow.readError,
         sliceError: evidenceRow.sliceError
@@ -755,22 +844,39 @@ export function evaluatePrivateAdmission806Gate({
       })
     ];
   });
-  const publicBlockerKeyMismatches = evaluatedRows.flatMap((row) => {
-    const actualFields = Object.keys(row.publicBlockerClaims);
-    if (sameStringSet(PRIVATE_ADMISSION_806_PUBLIC_BLOCKER_FIELDS, actualFields)) {
-      return [];
-    }
-    return [
+  const publicBlockerEvidenceMismatches = publicBlockerEvidence
+    .filter((evidenceRow) => evidenceRow.recognized !== true)
+    .map((evidenceRow) =>
       freezeRecord({
-        workerId: row.workerId,
-        expectedPublicBlockerFields:
-          PRIVATE_ADMISSION_806_PUBLIC_BLOCKER_FIELDS,
-        actualPublicBlockerFields: freezeArray(actualFields)
+        field: evidenceRow.field,
+        path: evidenceRow.path,
+        role: evidenceRow.role,
+        missingTokens: evidenceRow.missingTokens,
+        missingFieldNames: evidenceRow.missingFieldNames,
+        forbiddenTokensPresent: evidenceRow.forbiddenTokensPresent,
+        readError: evidenceRow.readError,
+        sliceError: evidenceRow.sliceError
       })
-    ];
-  });
+    );
+  const observedPublicBlockerFields = freezeArray(
+    publicBlockerEvidence
+      .filter((evidenceRow) => evidenceRow.recognized === true)
+      .map((evidenceRow) => evidenceRow.field)
+  );
+  const publicBlockerFieldMismatches = sameStringSet(
+    PRIVATE_ADMISSION_806_PUBLIC_BLOCKER_FIELDS,
+    observedPublicBlockerFields
+  )
+    ? []
+    : [
+        freezeRecord({
+          expectedPublicBlockerFields:
+            PRIVATE_ADMISSION_806_PUBLIC_BLOCKER_FIELDS,
+          actualPublicBlockerFields: observedPublicBlockerFields
+        })
+      ];
   const publicBlockerClaimViolations = evaluatedRows.flatMap((row) =>
-    Object.entries(row.publicBlockerClaims)
+    Object.entries(row.publicBlockerClaims ?? {})
       .filter(([, value]) => value !== false && value !== 0)
       .map(([claimId]) => `${row.workerId}.${claimId}`)
   );
@@ -878,7 +984,12 @@ export function evaluatePrivateAdmission806Gate({
   pushRowsViolation(
     violations,
     "hydrateroot-public-blocker-field-mismatch",
-    publicBlockerKeyMismatches
+    publicBlockerFieldMismatches
+  );
+  pushRowsViolation(
+    violations,
+    "hydrateroot-public-blocker-evidence-missing",
+    publicBlockerEvidenceMismatches
   );
   pushClaimIdsViolation(
     violations,
@@ -947,7 +1058,8 @@ export function evaluatePrivateAdmission806Gate({
   const ownershipChainRecognized = chainMismatches.length === 0;
   const fieldNamesRecognized = fieldMismatches.length === 0;
   const blockedPublicClaimsRecognized =
-    publicBlockerKeyMismatches.length === 0 &&
+    publicBlockerFieldMismatches.length === 0 &&
+    publicBlockerEvidenceMismatches.length === 0 &&
     publicBlockerClaimViolations.length === 0 &&
     rowCompatibilityClaimViolations.length === 0 &&
     rowPublicCompatibilityClaimViolations.length === 0;
@@ -998,9 +1110,14 @@ export function evaluatePrivateAdmission806Gate({
       Object.fromEntries(evaluatedRows.map((row) => [row.workerId, row]))
     ),
     packageSurfaceEvidence: packageEvidence,
+    publicBlockerEvidence,
+    publicBlockerFieldCoverageFields: observedPublicBlockerFields,
     manifest,
     evidenceTokenMismatchRows: freezeArray(evidenceTokenMismatches),
     packageEvidenceMismatchRows: freezeArray(packageEvidenceMismatches),
+    publicBlockerEvidenceMismatchRows: freezeArray(
+      publicBlockerEvidenceMismatches
+    ),
     publicBlockerClaimViolationIds: freezeArray(publicBlockerClaimViolations),
     publicHydrateRootClaimIds: freezeArray(publicHydrateRootClaimIds),
     rootCreationClaimIds: freezeArray(rootCreationClaimIds),
@@ -1038,19 +1155,13 @@ function row({
     acceptedStatuses: PRIVATE_ADMISSION_806_REQUIRED_STATUSES[workerId],
     requiredPriorWorkers: PRIVATE_ADMISSION_806_REQUIRED_CHAIN[workerId],
     requiredFieldNames,
-    observedFieldNames: requiredFieldNames,
     evidence: freezeArray(evidence),
-    publicBlockerClaims: falseRecord(
-      PRIVATE_ADMISSION_806_PUBLIC_BLOCKER_FIELDS
-    ),
     promotion: "rejected",
     privateEvidenceOnly: true,
     sourceTokenChecksOnly: true,
     manifestEvaluationOnly: true,
     runtimeExecutionClaimed: false,
     publicRuntimeExecutionClaimed: false,
-    packageCompatibilityClaimed: false,
-    packageExportsChanged: false,
     compatibilityClaimed: false,
     publicCompatibilityClaimed: false,
     ledgerEvaluationMode: "source-token-checks-and-manifest-only"
@@ -1061,6 +1172,7 @@ function evidenceData({
   role,
   path,
   tokens,
+  fieldNames = [],
   forbiddenTokens = [],
   sliceStart = null,
   sliceEnd = null
@@ -1069,9 +1181,23 @@ function evidenceData({
     role,
     path,
     tokens: freezeArray(tokens),
+    fieldNames: freezeArray(fieldNames),
     forbiddenTokens: freezeArray(forbiddenTokens),
     sliceStart,
     sliceEnd
+  });
+}
+
+function publicBlockerEvidenceData({ field, path, tokens, forbiddenTokens = [] }) {
+  return freezeRecord({
+    field,
+    role: `public-blocker-${field}`,
+    path,
+    tokens: freezeArray(tokens),
+    fieldNames: freezeArray([]),
+    forbiddenTokens: freezeArray(forbiddenTokens),
+    sliceStart: null,
+    sliceEnd: null
   });
 }
 
@@ -1086,7 +1212,6 @@ function mergeRowOverride(row, override) {
     "acceptedStatuses",
     "requiredPriorWorkers",
     "requiredFieldNames",
-    "observedFieldNames",
     "evidence"
   ]) {
     if (Object.hasOwn(override, key)) {
@@ -1095,7 +1220,7 @@ function mergeRowOverride(row, override) {
   }
   if (Object.hasOwn(override, "publicBlockerClaims")) {
     merged.publicBlockerClaims = freezeRecord({
-      ...row.publicBlockerClaims,
+      ...(row.publicBlockerClaims ?? {}),
       ...override.publicBlockerClaims
     });
   }
@@ -1110,14 +1235,21 @@ function evaluatePrivateAdmissionRow({ fileCache, row, workspaceRoot }) {
       workspaceRoot
     })
   );
+  const observedFieldNames = freezeArray(
+    row.requiredFieldNames.filter((fieldName) =>
+      evidence.some((evidenceRow) =>
+        evidenceRow.coveredFieldNames.includes(fieldName)
+      )
+    )
+  );
   const staticReadOnlyRecognized =
     row.privateEvidenceOnly === true &&
     row.sourceTokenChecksOnly === true &&
     row.manifestEvaluationOnly === true &&
     row.runtimeExecutionClaimed === false &&
     row.publicRuntimeExecutionClaimed === false &&
-    row.packageCompatibilityClaimed === false &&
-    row.packageExportsChanged === false &&
+    row.packageCompatibilityClaimed !== true &&
+    row.packageExportsChanged !== true &&
     row.compatibilityClaimed === false &&
     row.publicCompatibilityClaimed === false &&
     row.ledgerEvaluationMode === "source-token-checks-and-manifest-only";
@@ -1125,6 +1257,7 @@ function evaluatePrivateAdmissionRow({ fileCache, row, workspaceRoot }) {
   return freezeRecord({
     ...row,
     evidence: freezeArray(evidence),
+    observedFieldNames,
     evidenceRecognized: evidence.every(
       (evidenceRow) => evidenceRow.recognized === true
     ),
@@ -1159,6 +1292,14 @@ function evaluateEvidenceRow({ evidenceRow, fileCache, workspaceRoot }) {
     readResult.readError === null && sliceError === null
       ? evidenceRow.forbiddenTokens.filter((token) => text.includes(token))
       : [];
+  const coveredFieldNames =
+    readResult.readError === null && sliceError === null
+      ? evidenceRow.fieldNames.filter((fieldName) => text.includes(fieldName))
+      : [];
+  const missingFieldNames =
+    readResult.readError === null && sliceError === null
+      ? evidenceRow.fieldNames.filter((fieldName) => !text.includes(fieldName))
+      : [...evidenceRow.fieldNames];
 
   return freezeRecord({
     ...evidenceRow,
@@ -1166,11 +1307,32 @@ function evaluateEvidenceRow({ evidenceRow, fileCache, workspaceRoot }) {
       readResult.readError === null &&
       sliceError === null &&
       missingTokens.length === 0 &&
+      missingFieldNames.length === 0 &&
       forbiddenTokensPresent.length === 0,
     missingTokens: freezeArray(missingTokens),
+    coveredFieldNames: freezeArray(coveredFieldNames),
+    missingFieldNames: freezeArray(missingFieldNames),
     forbiddenTokensPresent: freezeArray(forbiddenTokensPresent),
     readError: readResult.readError,
     sliceError
+  });
+}
+
+function evaluatePublicBlockerEvidenceRow({
+  evidenceRow,
+  fileCache,
+  workspaceRoot
+}) {
+  const evaluated = evaluateEvidenceRow({
+    evidenceRow,
+    fileCache,
+    workspaceRoot
+  });
+  return freezeRecord({
+    ...evaluated,
+    recognized:
+      PRIVATE_ADMISSION_806_PUBLIC_BLOCKER_FIELDS.includes(evidenceRow.field) &&
+      evaluated.recognized === true
   });
 }
 
@@ -1227,6 +1389,7 @@ function evidenceViolationDetails({ row, evidenceRow }) {
     role: evidenceRow.role,
     path: evidenceRow.path,
     missingTokens: evidenceRow.missingTokens,
+    missingFieldNames: evidenceRow.missingFieldNames,
     forbiddenTokensPresent: evidenceRow.forbiddenTokensPresent,
     readError: evidenceRow.readError,
     sliceError: evidenceRow.sliceError
@@ -1276,12 +1439,6 @@ function pushClaimIdsViolation(violations, id, claimIds) {
   if (claimIds.length > 0) {
     violations.push(createViolation(id, { claimIds: freezeArray(claimIds) }));
   }
-}
-
-function falseRecord(fields) {
-  return freezeRecord(
-    Object.fromEntries(fields.map((field) => [field, false]))
-  );
 }
 
 function sameStringSet(expected, actual) {

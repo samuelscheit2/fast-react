@@ -104,3 +104,33 @@
 - Keep public `hydrateRoot` blocked until a later execution worker proves the
   full hydration root, DOM mutation, listener, event replay, recoverable-error,
   and compatibility path together.
+
+## Audit Follow-up
+
+- Follow-up blocker received after commit `c46b717`. The requested audit file
+  `/root/audit_806_hydrateroot_ledger` was not present in this environment, so
+  the fix followed the explicit blocker bullets from the orchestrator message.
+- Removed self-populated `observedFieldNames` and all-false
+  `publicBlockerClaims` from base ledger rows.
+- Field coverage is now derived from evaluated evidence rows via durable
+  function names, constants, statuses, and field names.
+- Public blocker coverage is now derived from one evidence row per required
+  blocker field, including `publicRootCreated`, `canHydrate`,
+  `replayQueueDrained`, `packageCompatibilityClaimed`, package export blocking,
+  root creation, DOM mutation, listener installation, replay drain/dispatch,
+  callback invocation, and public hydration compatibility fields.
+- Replaced brittle evidence tokens such as exact `assert.equal(...)` snippets,
+  object-literal value snippets, and local scenario strings with source-owned
+  function names, constants, statuses, and field names.
+- Added negative coverage for missing public blocker evidence so a missing
+  blocker token now fails the gate.
+
+### Audit Verification
+
+- `node --check tests/conformance/src/private-admission-806-hydrateroot-preflight-ledger.mjs`: passed.
+- `node --check tests/conformance/test/private-admission-806-hydrateroot-preflight-ledger.test.mjs`: passed.
+- `node --test tests/conformance/test/private-admission-806-hydrateroot-preflight-ledger.test.mjs`: passed, 5 tests.
+- `npm run check:package-surface`: passed with the existing
+  `minimum-release-age` npm warning.
+- `node tests/smoke/import-entrypoints.mjs`: passed.
+- `git diff --check`: passed.
