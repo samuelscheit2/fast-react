@@ -536,6 +536,9 @@ mod root_bridge_requests {
     pub(crate) struct NativeRootBridgeHandleTableAdmissionSmokeRecord {
         request_id: u64,
         kind: NativeRootBridgeRequestKind,
+        source_environment_id: BridgeEnvironmentId,
+        source_root_handle: BridgeHandle,
+        source_root_id: u64,
         lifecycle_transition: NativeRootBridgeLifecycleTransition,
         root_handle_state_before: Option<NativeRootBridgeRootHandleState>,
         root_handle_state_after: NativeRootBridgeRootHandleState,
@@ -562,6 +565,9 @@ mod root_bridge_requests {
             Self {
                 request_id: request.request_id(),
                 kind: request.kind(),
+                source_environment_id: request.environment_id(),
+                source_root_handle: request.root_handle(),
+                source_root_id: request.root_id(),
                 lifecycle_transition,
                 root_handle_state_before,
                 root_handle_state_after,
@@ -581,6 +587,21 @@ mod root_bridge_requests {
         #[must_use]
         pub(crate) const fn kind(self) -> NativeRootBridgeRequestKind {
             self.kind
+        }
+
+        #[must_use]
+        pub(crate) const fn source_environment_id(self) -> BridgeEnvironmentId {
+            self.source_environment_id
+        }
+
+        #[must_use]
+        pub(crate) const fn source_root_handle(self) -> BridgeHandle {
+            self.source_root_handle
+        }
+
+        #[must_use]
+        pub(crate) const fn source_root_id(self) -> u64 {
+            self.source_root_id
         }
 
         #[must_use]
@@ -625,6 +646,12 @@ mod root_bridge_requests {
         #[must_use]
         pub(crate) const fn retired_root_source_error_code(self) -> Option<&'static str> {
             self.retired_root_source_error_code
+        }
+
+        #[cfg(test)]
+        pub(crate) const fn with_source_root_id_for_test(mut self, root_id: u64) -> Self {
+            self.source_root_id = root_id;
+            self
         }
     }
 
@@ -1163,6 +1190,9 @@ mod root_bridge_requests {
         response_order: usize,
         request_id: u64,
         kind: &'static str,
+        source_environment_id: Option<BridgeEnvironmentId>,
+        source_root_handle: Option<BridgeHandle>,
+        source_root_id: Option<u64>,
         response_status: NativeRootBridgeBatchedJsonTransportLifecycleStatus,
         error_row_status: NativeRootBridgeBatchResponseErrorRowStatus,
         teardown_state: NativeRootBridgeBatchResponseTeardownState,
@@ -1201,6 +1231,9 @@ mod root_bridge_requests {
                 response_order,
                 request_id: row.request_id(),
                 kind: row.kind(),
+                source_environment_id: row.source_environment_id(),
+                source_root_handle: row.source_root_handle(),
+                source_root_id: row.source_root_id(),
                 response_status,
                 error_row_status,
                 teardown_state: teardown_state_for_batch_lifecycle_row(row),
@@ -1220,6 +1253,9 @@ mod root_bridge_requests {
                 response_order,
                 request_id: row.request_id(),
                 kind: row.kind(),
+                source_environment_id: row.source_environment_id(),
+                source_root_handle: row.source_root_handle(),
+                source_root_id: row.source_root_id(),
                 response_status: row.status(),
                 error_row_status: NativeRootBridgeBatchResponseErrorRowStatus::Deterministic,
                 teardown_state: teardown_state_for_batch_lifecycle_row(row),
@@ -1237,6 +1273,9 @@ mod root_bridge_requests {
                 response_order: init.response_order,
                 request_id: init.request_id,
                 kind: init.kind,
+                source_environment_id: init.source_environment_id,
+                source_root_handle: init.source_root_handle,
+                source_root_id: init.source_root_id,
                 response_status: init.response_status,
                 error_row_status: init.error_row_status,
                 teardown_state: init.teardown_state,
@@ -1279,6 +1318,21 @@ mod root_bridge_requests {
         #[must_use]
         pub(crate) const fn kind(&self) -> &'static str {
             self.kind
+        }
+
+        #[must_use]
+        pub(crate) const fn source_environment_id(&self) -> Option<BridgeEnvironmentId> {
+            self.source_environment_id
+        }
+
+        #[must_use]
+        pub(crate) const fn source_root_handle(&self) -> Option<BridgeHandle> {
+            self.source_root_handle
+        }
+
+        #[must_use]
+        pub(crate) const fn source_root_id(&self) -> Option<u64> {
+            self.source_root_id
         }
 
         #[must_use]
@@ -1343,6 +1397,12 @@ mod root_bridge_requests {
             self.batch_id = batch_id;
             self
         }
+
+        #[cfg(test)]
+        pub(crate) fn with_source_root_id_for_test(mut self, root_id: Option<u64>) -> Self {
+            self.source_root_id = root_id;
+            self
+        }
     }
 
     struct NativeRootBridgeBatchResponseSequenceRowInit {
@@ -1351,6 +1411,9 @@ mod root_bridge_requests {
         response_order: usize,
         request_id: u64,
         kind: &'static str,
+        source_environment_id: Option<BridgeEnvironmentId>,
+        source_root_handle: Option<BridgeHandle>,
+        source_root_id: Option<u64>,
         response_status: NativeRootBridgeBatchedJsonTransportLifecycleStatus,
         error_row_status: NativeRootBridgeBatchResponseErrorRowStatus,
         teardown_state: NativeRootBridgeBatchResponseTeardownState,
@@ -1539,6 +1602,9 @@ mod root_bridge_requests {
         request_id: u64,
         request_order: usize,
         response_order: usize,
+        source_environment_id: Option<BridgeEnvironmentId>,
+        source_root_handle: Option<BridgeHandle>,
+        source_root_id: Option<u64>,
         chunk_order: usize,
         batch_sequence: usize,
         chunk_kind: NativeRootBridgeJsonTransportStreamChunkKind,
@@ -1627,6 +1693,9 @@ mod root_bridge_requests {
                 request_id: init.chunk.request_id,
                 request_order: init.chunk.request_order,
                 response_order: init.chunk.response_order,
+                source_environment_id: init.chunk.source_environment_id,
+                source_root_handle: init.chunk.source_root_handle,
+                source_root_id: init.chunk.source_root_id,
                 chunk_order: init.chunk.chunk_order,
                 batch_sequence: init.chunk.batch_sequence,
                 chunk_kind: init.chunk.chunk_kind,
@@ -1677,6 +1746,21 @@ mod root_bridge_requests {
         #[must_use]
         pub(crate) const fn response_order(&self) -> usize {
             self.response_order
+        }
+
+        #[must_use]
+        pub(crate) const fn source_environment_id(&self) -> Option<BridgeEnvironmentId> {
+            self.source_environment_id
+        }
+
+        #[must_use]
+        pub(crate) const fn source_root_handle(&self) -> Option<BridgeHandle> {
+            self.source_root_handle
+        }
+
+        #[must_use]
+        pub(crate) const fn source_root_id(&self) -> Option<u64> {
+            self.source_root_id
         }
 
         #[must_use]
@@ -1793,6 +1877,12 @@ mod root_bridge_requests {
         }
 
         #[cfg(test)]
+        pub(crate) fn with_source_root_id_for_test(mut self, root_id: Option<u64>) -> Self {
+            self.source_root_id = root_id;
+            self
+        }
+
+        #[cfg(test)]
         pub(crate) fn with_chunk_kind_for_test(
             mut self,
             chunk_kind: NativeRootBridgeJsonTransportStreamChunkKind,
@@ -1819,6 +1909,9 @@ mod root_bridge_requests {
         request_id: u64,
         request_order: usize,
         response_order: usize,
+        source_environment_id: Option<BridgeEnvironmentId>,
+        source_root_handle: Option<BridgeHandle>,
+        source_root_id: Option<u64>,
         chunk_order: usize,
         batch_sequence: usize,
         chunk_kind: NativeRootBridgeJsonTransportStreamChunkKind,
@@ -2321,6 +2414,7 @@ mod root_bridge_requests {
         handle_generation: u64,
         current_generation: Option<u64>,
         record_id: Option<u64>,
+        source_root_id: Option<u64>,
         source_error_code: Option<&'static str>,
         boundary_error_code: Option<&'static str>,
         rejected_by_boundary: bool,
@@ -2347,6 +2441,7 @@ mod root_bridge_requests {
                 table_environment_id: init.table_environment_id,
                 current_generation: current_generation_for_handle_table_error(init.error),
                 record_id: None,
+                source_root_id: init.source_root_id,
                 source_error_code: Some(init.error.code()),
                 boundary_error_code: Some(boundary_error_code_for_handle_table_error(init.error)),
                 rejected_by_boundary: true,
@@ -2376,6 +2471,11 @@ mod root_bridge_requests {
                 table_environment_id: table.environment_id(),
                 current_generation: Some(handle.generation()),
                 record_id: Some(record_id),
+                source_root_id: if handle.kind() == BridgeHandleKind::Root {
+                    Some(record_id)
+                } else {
+                    None
+                },
                 source_error_code: None,
                 boundary_error_code: None,
                 rejected_by_boundary: false,
@@ -2397,6 +2497,7 @@ mod root_bridge_requests {
                 handle_generation: init.handle.generation(),
                 current_generation: init.current_generation,
                 record_id: init.record_id,
+                source_root_id: init.source_root_id,
                 source_error_code: init.source_error_code,
                 boundary_error_code: init.boundary_error_code,
                 rejected_by_boundary: init.rejected_by_boundary,
@@ -2466,6 +2567,11 @@ mod root_bridge_requests {
         #[must_use]
         pub(crate) const fn record_id(self) -> Option<u64> {
             self.record_id
+        }
+
+        #[must_use]
+        pub(crate) const fn source_root_id(self) -> Option<u64> {
+            self.source_root_id
         }
 
         #[must_use]
@@ -2543,6 +2649,7 @@ mod root_bridge_requests {
         table_environment_id: BridgeEnvironmentId,
         current_generation: Option<u64>,
         record_id: Option<u64>,
+        source_root_id: Option<u64>,
         source_error_code: Option<&'static str>,
         boundary_error_code: Option<&'static str>,
         rejected_by_boundary: bool,
@@ -2558,6 +2665,7 @@ mod root_bridge_requests {
         handle: BridgeHandle,
         table_environment_id: BridgeEnvironmentId,
         error: &'a BridgeHandleTableError,
+        source_root_id: Option<u64>,
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2746,6 +2854,12 @@ mod root_bridge_requests {
         source_environment_id: BridgeEnvironmentId,
         source_row_id: &'static str,
         source_handle_kind: BridgeHandleKind,
+        source_handle_environment_id: Option<BridgeEnvironmentId>,
+        source_handle_slot: Option<u64>,
+        source_handle_generation: Option<u64>,
+        source_current_generation: Option<u64>,
+        source_record_id: Option<u64>,
+        source_root_id: Option<u64>,
         source_error_code: Option<&'static str>,
         source_boundary_error_code: Option<&'static str>,
         public_native_package_claimed: bool,
@@ -2785,6 +2899,12 @@ mod root_bridge_requests {
                 source_environment_id,
                 source_row_id,
                 source_handle_kind,
+                source_handle_environment_id: None,
+                source_handle_slot: None,
+                source_handle_generation: None,
+                source_current_generation: None,
+                source_record_id: None,
+                source_root_id: None,
                 source_error_code,
                 source_boundary_error_code,
                 public_native_package_claimed: false,
@@ -2822,6 +2942,7 @@ mod root_bridge_requests {
                 source_row.source_error_code(),
                 source_row.boundary_error_code(),
             )
+            .with_source_identity_from_executable_preflight_row(source_row)
         }
 
         #[must_use]
@@ -2841,6 +2962,12 @@ mod root_bridge_requests {
                 source_environment_id: row.source_environment_id(),
                 source_row_id: row.source_row_id(),
                 source_handle_kind: row.source_handle_kind(),
+                source_handle_environment_id: row.source_handle_environment_id(),
+                source_handle_slot: row.source_handle_slot(),
+                source_handle_generation: row.source_handle_generation(),
+                source_current_generation: row.source_current_generation(),
+                source_record_id: row.source_record_id(),
+                source_root_id: row.source_root_id(),
                 source_error_code: row.source_error_code(),
                 source_boundary_error_code: row.source_boundary_error_code(),
                 public_native_package_claimed: false,
@@ -2853,6 +2980,41 @@ mod root_bridge_requests {
         pub(crate) const fn with_public_native_package_claim(mut self) -> Self {
             self.public_native_package_claimed = true;
             self
+        }
+
+        const fn with_source_identity_from_executable_preflight_row(
+            mut self,
+            row: NativeRootBridgeWorkerThreadTeardownExecutablePreflightRow,
+        ) -> Self {
+            self.source_handle_environment_id = Some(row.handle_environment_id());
+            self.source_handle_slot = Some(row.slot());
+            self.source_handle_generation = Some(row.handle_generation());
+            self.source_current_generation = row.current_generation();
+            self.source_record_id = row.record_id();
+            self.source_root_id = row.source_root_id();
+            self
+        }
+
+        #[cfg(test)]
+        pub(crate) const fn with_source_identity_from_preflight_row_for_test(
+            mut self,
+            row: NativeRootBridgeWorkerThreadCleanupHookPreflightRow,
+        ) -> Self {
+            self.source_handle_environment_id = row.source_handle_environment_id();
+            self.source_handle_slot = row.source_handle_slot();
+            self.source_handle_generation = row.source_handle_generation();
+            self.source_current_generation = row.source_current_generation();
+            self.source_record_id = row.source_record_id();
+            self.source_root_id = row.source_root_id();
+            self
+        }
+
+        #[cfg(test)]
+        pub(crate) const fn with_source_identity_from_executable_preflight_row_for_test(
+            self,
+            row: NativeRootBridgeWorkerThreadTeardownExecutablePreflightRow,
+        ) -> Self {
+            self.with_source_identity_from_executable_preflight_row(row)
         }
 
         #[must_use]
@@ -2913,6 +3075,36 @@ mod root_bridge_requests {
         #[must_use]
         pub(crate) const fn source_handle_kind(self) -> BridgeHandleKind {
             self.source_handle_kind
+        }
+
+        #[must_use]
+        pub(crate) const fn source_handle_environment_id(self) -> Option<BridgeEnvironmentId> {
+            self.source_handle_environment_id
+        }
+
+        #[must_use]
+        pub(crate) const fn source_handle_slot(self) -> Option<u64> {
+            self.source_handle_slot
+        }
+
+        #[must_use]
+        pub(crate) const fn source_handle_generation(self) -> Option<u64> {
+            self.source_handle_generation
+        }
+
+        #[must_use]
+        pub(crate) const fn source_current_generation(self) -> Option<u64> {
+            self.source_current_generation
+        }
+
+        #[must_use]
+        pub(crate) const fn source_record_id(self) -> Option<u64> {
+            self.source_record_id
+        }
+
+        #[must_use]
+        pub(crate) const fn source_root_id(self) -> Option<u64> {
+            self.source_root_id
         }
 
         #[must_use]
@@ -3023,6 +3215,12 @@ mod root_bridge_requests {
         source_environment_id: BridgeEnvironmentId,
         source_row_id: &'static str,
         source_handle_kind: BridgeHandleKind,
+        source_handle_environment_id: Option<BridgeEnvironmentId>,
+        source_handle_slot: Option<u64>,
+        source_handle_generation: Option<u64>,
+        source_current_generation: Option<u64>,
+        source_record_id: Option<u64>,
+        source_root_id: Option<u64>,
         source_error_code: Option<&'static str>,
         source_boundary_error_code: Option<&'static str>,
         canonical_executable_evidence: bool,
@@ -3094,6 +3292,12 @@ mod root_bridge_requests {
                 source_environment_id: evidence.source_environment_id(),
                 source_row_id: evidence.source_row_id(),
                 source_handle_kind: evidence.source_handle_kind(),
+                source_handle_environment_id: evidence.source_handle_environment_id(),
+                source_handle_slot: evidence.source_handle_slot(),
+                source_handle_generation: evidence.source_handle_generation(),
+                source_current_generation: evidence.source_current_generation(),
+                source_record_id: evidence.source_record_id(),
+                source_root_id: evidence.source_root_id(),
                 source_error_code: evidence.source_error_code(),
                 source_boundary_error_code: evidence.source_boundary_error_code(),
                 canonical_executable_evidence: init.canonical_executable_evidence,
@@ -3187,6 +3391,36 @@ mod root_bridge_requests {
         #[must_use]
         pub(crate) const fn source_handle_kind(self) -> BridgeHandleKind {
             self.source_handle_kind
+        }
+
+        #[must_use]
+        pub(crate) const fn source_handle_environment_id(self) -> Option<BridgeEnvironmentId> {
+            self.source_handle_environment_id
+        }
+
+        #[must_use]
+        pub(crate) const fn source_handle_slot(self) -> Option<u64> {
+            self.source_handle_slot
+        }
+
+        #[must_use]
+        pub(crate) const fn source_handle_generation(self) -> Option<u64> {
+            self.source_handle_generation
+        }
+
+        #[must_use]
+        pub(crate) const fn source_current_generation(self) -> Option<u64> {
+            self.source_current_generation
+        }
+
+        #[must_use]
+        pub(crate) const fn source_record_id(self) -> Option<u64> {
+            self.source_record_id
+        }
+
+        #[must_use]
+        pub(crate) const fn source_root_id(self) -> Option<u64> {
+            self.source_root_id
         }
 
         #[must_use]
@@ -3433,6 +3667,12 @@ mod root_bridge_requests {
         cleanup_hook_evidence_row_id: Option<&'static str>,
         cleanup_hook_source_row_id: Option<&'static str>,
         cleanup_hook_source_handle_kind: Option<BridgeHandleKind>,
+        cleanup_hook_source_handle_environment_id: Option<BridgeEnvironmentId>,
+        cleanup_hook_source_handle_slot: Option<u64>,
+        cleanup_hook_source_handle_generation: Option<u64>,
+        cleanup_hook_source_current_generation: Option<u64>,
+        cleanup_hook_source_record_id: Option<u64>,
+        cleanup_hook_source_root_id: Option<u64>,
         cleanup_hook_canonical_executable_evidence: Option<bool>,
         status: NativeRootBridgeBatchedJsonTransportLifecycleStatus,
         code: Option<&'static str>,
@@ -3483,6 +3723,17 @@ mod root_bridge_requests {
                 cleanup_hook_source_row_id: cleanup_hook_row.map(|row| row.source_row_id()),
                 cleanup_hook_source_handle_kind: cleanup_hook_row
                     .map(|row| row.source_handle_kind()),
+                cleanup_hook_source_handle_environment_id: cleanup_hook_row
+                    .and_then(|row| row.source_handle_environment_id()),
+                cleanup_hook_source_handle_slot: cleanup_hook_row
+                    .and_then(|row| row.source_handle_slot()),
+                cleanup_hook_source_handle_generation: cleanup_hook_row
+                    .and_then(|row| row.source_handle_generation()),
+                cleanup_hook_source_current_generation: cleanup_hook_row
+                    .and_then(|row| row.source_current_generation()),
+                cleanup_hook_source_record_id: cleanup_hook_row
+                    .and_then(|row| row.source_record_id()),
+                cleanup_hook_source_root_id: cleanup_hook_row.and_then(|row| row.source_root_id()),
                 cleanup_hook_canonical_executable_evidence: cleanup_hook_row
                     .map(|row| row.canonical_executable_evidence()),
                 status: lifecycle_row.status(),
@@ -3604,6 +3855,38 @@ mod root_bridge_requests {
         #[must_use]
         pub(crate) const fn cleanup_hook_source_handle_kind(&self) -> Option<BridgeHandleKind> {
             self.cleanup_hook_source_handle_kind
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_source_handle_environment_id(
+            &self,
+        ) -> Option<BridgeEnvironmentId> {
+            self.cleanup_hook_source_handle_environment_id
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_source_handle_slot(&self) -> Option<u64> {
+            self.cleanup_hook_source_handle_slot
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_source_handle_generation(&self) -> Option<u64> {
+            self.cleanup_hook_source_handle_generation
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_source_current_generation(&self) -> Option<u64> {
+            self.cleanup_hook_source_current_generation
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_source_record_id(&self) -> Option<u64> {
+            self.cleanup_hook_source_record_id
+        }
+
+        #[must_use]
+        pub(crate) const fn cleanup_hook_source_root_id(&self) -> Option<u64> {
+            self.cleanup_hook_source_root_id
         }
 
         #[must_use]
@@ -3761,6 +4044,15 @@ mod root_bridge_requests {
             cleanup_hook_source_handle_kind: Option<BridgeHandleKind>,
         ) -> Self {
             self.cleanup_hook_source_handle_kind = cleanup_hook_source_handle_kind;
+            self
+        }
+
+        #[cfg(test)]
+        pub(crate) fn with_cleanup_hook_source_handle_slot_for_test(
+            mut self,
+            cleanup_hook_source_handle_slot: Option<u64>,
+        ) -> Self {
+            self.cleanup_hook_source_handle_slot = cleanup_hook_source_handle_slot;
             self
         }
 
@@ -5378,6 +5670,9 @@ mod root_bridge_requests {
             request_id: row.request_id(),
             request_order: row.request_order(),
             response_order: row.response_order(),
+            source_environment_id: row.source_environment_id(),
+            source_root_handle: row.source_root_handle(),
+            source_root_id: row.source_root_id(),
             chunk_order,
             batch_sequence: 0,
             chunk_kind,
@@ -5513,6 +5808,9 @@ mod root_bridge_requests {
                 request_id: synthetic_request_id,
                 request_order: synthetic_request_order,
                 response_order: synthetic_response_order,
+                source_environment_id: last_response_row.source_environment_id(),
+                source_root_handle: last_response_row.source_root_handle(),
+                source_root_id: last_response_row.source_root_id(),
                 chunk_order: 0,
                 batch_sequence: accepted_chunks.len(),
                 chunk_kind: NativeRootBridgeJsonTransportStreamChunkKind::Metadata,
@@ -5523,6 +5821,9 @@ mod root_bridge_requests {
                 request_id: synthetic_request_id,
                 request_order: synthetic_request_order,
                 response_order: synthetic_response_order,
+                source_environment_id: last_response_row.source_environment_id(),
+                source_root_handle: last_response_row.source_root_handle(),
+                source_root_id: last_response_row.source_root_id(),
                 chunk_order: 1,
                 batch_sequence: accepted_chunks.len(),
                 chunk_kind: NativeRootBridgeJsonTransportStreamChunkKind::Payload,
@@ -6064,6 +6365,10 @@ mod root_bridge_requests {
             || !batch_lifecycle_consumer_rows_have_matching_source_root_identity(
                 consumer_row,
                 lifecycle_row,
+                response_row,
+                stream_metadata_row,
+                stream_payload_row,
+                smoke_record,
             )
         {
             return Some(
@@ -6153,6 +6458,18 @@ mod root_bridge_requests {
                 != expected_cleanup_evidence.cleanup_hook_source_row_id
             || consumer_row.cleanup_hook_source_handle_kind()
                 != expected_cleanup_evidence.cleanup_hook_source_handle_kind
+            || consumer_row.cleanup_hook_source_handle_environment_id()
+                != expected_cleanup_evidence.cleanup_hook_source_handle_environment_id
+            || consumer_row.cleanup_hook_source_handle_slot()
+                != expected_cleanup_evidence.cleanup_hook_source_handle_slot
+            || consumer_row.cleanup_hook_source_handle_generation()
+                != expected_cleanup_evidence.cleanup_hook_source_handle_generation
+            || consumer_row.cleanup_hook_source_current_generation()
+                != expected_cleanup_evidence.cleanup_hook_source_current_generation
+            || consumer_row.cleanup_hook_source_record_id()
+                != expected_cleanup_evidence.cleanup_hook_source_record_id
+            || consumer_row.cleanup_hook_source_root_id()
+                != expected_cleanup_evidence.cleanup_hook_source_root_id
             || consumer_row.cleanup_hook_canonical_executable_evidence()
                 != expected_cleanup_evidence.cleanup_hook_canonical_executable_evidence
         {
@@ -6229,6 +6546,12 @@ mod root_bridge_requests {
         cleanup_hook_evidence_row_id: Option<&'static str>,
         cleanup_hook_source_row_id: Option<&'static str>,
         cleanup_hook_source_handle_kind: Option<BridgeHandleKind>,
+        cleanup_hook_source_handle_environment_id: Option<BridgeEnvironmentId>,
+        cleanup_hook_source_handle_slot: Option<u64>,
+        cleanup_hook_source_handle_generation: Option<u64>,
+        cleanup_hook_source_current_generation: Option<u64>,
+        cleanup_hook_source_record_id: Option<u64>,
+        cleanup_hook_source_root_id: Option<u64>,
         cleanup_hook_canonical_executable_evidence: Option<bool>,
     }
 
@@ -6244,52 +6567,97 @@ mod root_bridge_requests {
                     cleanup_hook_evidence_row_id: None,
                     cleanup_hook_source_row_id: None,
                     cleanup_hook_source_handle_kind: None,
+                    cleanup_hook_source_handle_environment_id: None,
+                    cleanup_hook_source_handle_slot: None,
+                    cleanup_hook_source_handle_generation: None,
+                    cleanup_hook_source_current_generation: None,
+                    cleanup_hook_source_record_id: None,
+                    cleanup_hook_source_root_id: None,
                     cleanup_hook_canonical_executable_evidence: None,
                 },
             ),
-            NativeRootBridgeRequestKind::Render => Some(
-                NativeRootBridgeBatchLifecycleConsumerExpectedCleanupHookEvidence {
-                    cleanup_hook_evidence_required: true,
-                    cleanup_hook_evidence_status:
-                        NativeRootBridgeWorkerThreadCleanupHookPreflightRowStatus::Accepted.code(),
-                    cleanup_hook_evidence_row_id: Some(
-                        "cleanup-hook-worker-value-after-root-release",
-                    ),
-                    cleanup_hook_source_row_id: Some(
-                        NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_SOURCE_ROW_ID,
-                    ),
-                    cleanup_hook_source_handle_kind: Some(BridgeHandleKind::Value),
-                    cleanup_hook_canonical_executable_evidence: Some(true),
-                },
-            ),
-            NativeRootBridgeRequestKind::Unmount => Some(
-                NativeRootBridgeBatchLifecycleConsumerExpectedCleanupHookEvidence {
-                    cleanup_hook_evidence_required: true,
-                    cleanup_hook_evidence_status:
-                        NativeRootBridgeWorkerThreadCleanupHookPreflightRowStatus::Accepted.code(),
-                    cleanup_hook_evidence_row_id: Some(
-                        "cleanup-hook-worker-root-before-value-release",
-                    ),
-                    cleanup_hook_source_row_id: Some(
-                        NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ROOT_SOURCE_ROW_ID,
-                    ),
-                    cleanup_hook_source_handle_kind: Some(BridgeHandleKind::Root),
-                    cleanup_hook_canonical_executable_evidence: Some(true),
-                },
-            ),
+            NativeRootBridgeRequestKind::Render => {
+                native_root_bridge_batch_lifecycle_consumer_cleanup_hook_evidence_from_source(
+                    "cleanup-hook-worker-value-after-root-release",
+                    NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_VALUE_SOURCE_ROW_ID,
+                    BridgeHandleKind::Value,
+                )
+            }
+            NativeRootBridgeRequestKind::Unmount => {
+                native_root_bridge_batch_lifecycle_consumer_cleanup_hook_evidence_from_source(
+                    "cleanup-hook-worker-root-before-value-release",
+                    NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ROOT_SOURCE_ROW_ID,
+                    BridgeHandleKind::Root,
+                )
+            }
         }
+    }
+
+    fn native_root_bridge_batch_lifecycle_consumer_cleanup_hook_evidence_from_source(
+        cleanup_hook_evidence_row_id: &'static str,
+        cleanup_hook_source_row_id: &'static str,
+        cleanup_hook_source_handle_kind: BridgeHandleKind,
+    ) -> Option<NativeRootBridgeBatchLifecycleConsumerExpectedCleanupHookEvidence> {
+        let preflight = native_root_bridge_worker_thread_cleanup_hook_preflight();
+        let row = preflight.rows().iter().find(|row| {
+            row.id() == cleanup_hook_evidence_row_id
+                && row.source_row_id() == cleanup_hook_source_row_id
+                && row.source_handle_kind() == cleanup_hook_source_handle_kind
+                && row.status()
+                    == NativeRootBridgeWorkerThreadCleanupHookPreflightRowStatus::Accepted
+                && row.canonical_executable_evidence()
+        })?;
+
+        Some(
+            NativeRootBridgeBatchLifecycleConsumerExpectedCleanupHookEvidence {
+                cleanup_hook_evidence_required: true,
+                cleanup_hook_evidence_status:
+                    NativeRootBridgeWorkerThreadCleanupHookPreflightRowStatus::Accepted.code(),
+                cleanup_hook_evidence_row_id: Some(cleanup_hook_evidence_row_id),
+                cleanup_hook_source_row_id: Some(cleanup_hook_source_row_id),
+                cleanup_hook_source_handle_kind: Some(cleanup_hook_source_handle_kind),
+                cleanup_hook_source_handle_environment_id: row.source_handle_environment_id(),
+                cleanup_hook_source_handle_slot: row.source_handle_slot(),
+                cleanup_hook_source_handle_generation: row.source_handle_generation(),
+                cleanup_hook_source_current_generation: row.source_current_generation(),
+                cleanup_hook_source_record_id: row.source_record_id(),
+                cleanup_hook_source_root_id: row.source_root_id(),
+                cleanup_hook_canonical_executable_evidence: Some(true),
+            },
+        )
     }
 
     fn batch_lifecycle_consumer_rows_have_matching_source_root_identity(
         consumer_row: &NativeRootBridgeBatchLifecycleConsumerRow,
         lifecycle_row: &NativeRootBridgeBatchedJsonTransportLifecycleRow,
+        response_row: &NativeRootBridgeBatchResponseSequenceRow,
+        stream_metadata_row: &NativeRootBridgeJsonTransportStreamBatchRoundtripChunkRow,
+        stream_payload_row: &NativeRootBridgeJsonTransportStreamBatchRoundtripChunkRow,
+        smoke_record: NativeRootBridgeHandleTableAdmissionSmokeRecord,
     ) -> bool {
-        consumer_row.source_environment_id().is_some()
-            && consumer_row.source_root_handle().is_some()
-            && consumer_row.source_root_id().is_some()
-            && consumer_row.source_environment_id() == lifecycle_row.source_environment_id()
-            && consumer_row.source_root_handle() == lifecycle_row.source_root_handle()
-            && consumer_row.source_root_id() == lifecycle_row.source_root_id()
+        let (Some(source_environment_id), Some(source_root_handle), Some(source_root_id)) = (
+            consumer_row.source_environment_id(),
+            consumer_row.source_root_handle(),
+            consumer_row.source_root_id(),
+        ) else {
+            return false;
+        };
+
+        lifecycle_row.source_environment_id() == Some(source_environment_id)
+            && lifecycle_row.source_root_handle() == Some(source_root_handle)
+            && lifecycle_row.source_root_id() == Some(source_root_id)
+            && response_row.source_environment_id() == Some(source_environment_id)
+            && response_row.source_root_handle() == Some(source_root_handle)
+            && response_row.source_root_id() == Some(source_root_id)
+            && stream_metadata_row.source_environment_id() == Some(source_environment_id)
+            && stream_metadata_row.source_root_handle() == Some(source_root_handle)
+            && stream_metadata_row.source_root_id() == Some(source_root_id)
+            && stream_payload_row.source_environment_id() == Some(source_environment_id)
+            && stream_payload_row.source_root_handle() == Some(source_root_handle)
+            && stream_payload_row.source_root_id() == Some(source_root_id)
+            && smoke_record.source_environment_id() == source_environment_id
+            && smoke_record.source_root_handle() == source_root_handle
+            && smoke_record.source_root_id() == source_root_id
     }
 
     fn has_native_root_bridge_batch_lifecycle_consumer_public_native_claim(
@@ -6698,6 +7066,7 @@ mod root_bridge_requests {
                     handle: root_handle,
                     table_environment_id: worker_table.environment_id(),
                     error: root_error,
+                    source_root_id: Some(root_id),
                 },
             ),
         );
@@ -6716,6 +7085,7 @@ mod root_bridge_requests {
                         handle,
                         table_environment_id: worker_table.environment_id(),
                         error: &error,
+                        source_root_id: Some(root_id),
                     },
                 ),
             );
@@ -6923,6 +7293,13 @@ mod root_bridge_requests {
             );
         };
 
+        if !cleanup_hook_evidence_matches_executable_preflight_source(evidence, *source_row) {
+            return NativeRootBridgeWorkerThreadCleanupHookPreflightRow::rejected(
+                evidence,
+                NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_FORGED_EVIDENCE_CODE,
+            );
+        }
+
         if !source_row.preflight_passed()
             || !source_row.rejected_by_boundary()
             || source_row.worker_thread_id() != evidence.source_worker_thread_id()
@@ -6976,6 +7353,18 @@ mod root_bridge_requests {
         }
 
         NativeRootBridgeWorkerThreadCleanupHookPreflightRow::accepted(evidence)
+    }
+
+    fn cleanup_hook_evidence_matches_executable_preflight_source(
+        evidence: NativeRootBridgeWorkerThreadCleanupHookEvidence,
+        source_row: NativeRootBridgeWorkerThreadTeardownExecutablePreflightRow,
+    ) -> bool {
+        evidence.source_handle_environment_id() == Some(source_row.handle_environment_id())
+            && evidence.source_handle_slot() == Some(source_row.slot())
+            && evidence.source_handle_generation() == Some(source_row.handle_generation())
+            && evidence.source_current_generation() == source_row.current_generation()
+            && evidence.source_record_id() == source_row.record_id()
+            && evidence.source_root_id() == source_row.source_root_id()
     }
 
     const fn current_generation_for_handle_table_error(
@@ -10565,6 +10954,46 @@ mod tests {
         );
         assert_eq!(
             rows.iter()
+                .map(|row| row.cleanup_hook_source_handle_environment_id())
+                .collect::<Vec<_>>(),
+            [
+                None,
+                Some(BridgeEnvironmentId::from_raw(764)),
+                Some(BridgeEnvironmentId::from_raw(764))
+            ]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.cleanup_hook_source_handle_slot())
+                .collect::<Vec<_>>(),
+            [None, Some(3), Some(1)]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.cleanup_hook_source_handle_generation())
+                .collect::<Vec<_>>(),
+            [None, Some(1), Some(1)]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.cleanup_hook_source_current_generation())
+                .collect::<Vec<_>>(),
+            [None, Some(2), Some(2)]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.cleanup_hook_source_record_id())
+                .collect::<Vec<_>>(),
+            [None, None, None]
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.cleanup_hook_source_root_id())
+                .collect::<Vec<_>>(),
+            [None, Some(1), Some(1)]
+        );
+        assert_eq!(
+            rows.iter()
                 .map(|row| row.cleanup_hook_canonical_executable_evidence())
                 .collect::<Vec<_>>(),
             [None, Some(true), Some(true)]
@@ -10653,6 +11082,20 @@ mod tests {
             .rows()
             .to_vec();
         let smoke_records = gate.admission_smoke().admission_records().to_vec();
+        let foreign_json = r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":1858,"root_handle":{"environment_id":1858,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":1858,"slot":2,"generation":1,"kind":"value"},"root_handle_state":"active"},{"request_id":2,"kind":"render","environment_id":1858,"root_handle":{"environment_id":1858,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":1858,"slot":3,"generation":1,"kind":"value"},"root_handle_state":"active"},{"request_id":3,"kind":"unmount","environment_id":1858,"root_handle":{"environment_id":1858,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"retired"}]}"#;
+        let foreign_gate = parse_native_root_bridge_json_transport_for_gate(foreign_json).unwrap();
+        let foreign_response_rows = foreign_gate
+            .batched_record_gate()
+            .response_sequence_gate()
+            .rows()
+            .to_vec();
+        let foreign_stream_rows = foreign_gate
+            .batched_record_gate()
+            .response_sequence_gate()
+            .stream_roundtrip_gate()
+            .rows()
+            .to_vec();
+        let foreign_smoke_records = foreign_gate.admission_smoke().admission_records().to_vec();
 
         let mut bad_consumer_rows = consumer_rows.clone();
         bad_consumer_rows[0] = bad_consumer_rows[0]
@@ -10746,6 +11189,19 @@ mod tests {
             NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_JSON_BATCH_ROUNDTRIP_CLEANUP_STATUS_MISMATCH_CODE,
         );
 
+        let mut bad_consumer_rows = consumer_rows.clone();
+        bad_consumer_rows[1] = bad_consumer_rows[1]
+            .clone()
+            .with_cleanup_hook_source_handle_slot_for_test(None);
+        assert_link_rejection_code(
+            &bad_consumer_rows,
+            &lifecycle_rows,
+            &response_rows,
+            &stream_rows,
+            &smoke_records,
+            NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_JSON_BATCH_ROUNDTRIP_CLEANUP_STATUS_MISMATCH_CODE,
+        );
+
         let mut bad_response_rows = response_rows.clone();
         bad_response_rows[0] = bad_response_rows[0]
             .clone()
@@ -10754,6 +11210,15 @@ mod tests {
             &consumer_rows,
             &lifecycle_rows,
             &bad_response_rows,
+            &stream_rows,
+            &smoke_records,
+            NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_JSON_BATCH_ROUNDTRIP_STALE_OR_FOREIGN_JSON_BATCH_ROW_CODE,
+        );
+
+        assert_link_rejection_code(
+            &consumer_rows,
+            &lifecycle_rows,
+            &foreign_response_rows,
             &stream_rows,
             &smoke_records,
             NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_JSON_BATCH_ROUNDTRIP_STALE_OR_FOREIGN_JSON_BATCH_ROW_CODE,
@@ -10768,6 +11233,15 @@ mod tests {
             &lifecycle_rows,
             &response_rows,
             &bad_stream_rows,
+            &smoke_records,
+            NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_JSON_BATCH_ROUNDTRIP_STALE_OR_FOREIGN_JSON_BATCH_ROW_CODE,
+        );
+
+        assert_link_rejection_code(
+            &consumer_rows,
+            &lifecycle_rows,
+            &response_rows,
+            &foreign_stream_rows,
             &smoke_records,
             NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_JSON_BATCH_ROUNDTRIP_STALE_OR_FOREIGN_JSON_BATCH_ROW_CODE,
         );
@@ -10796,6 +11270,15 @@ mod tests {
             &stream_rows,
             &smoke_records,
             NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_JSON_BATCH_ROUNDTRIP_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE,
+        );
+
+        assert_link_rejection_code(
+            &consumer_rows,
+            &lifecycle_rows,
+            &response_rows,
+            &stream_rows,
+            &foreign_smoke_records,
+            NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_JSON_BATCH_ROUNDTRIP_STALE_OR_FOREIGN_JSON_BATCH_ROW_CODE,
         );
 
         let mut cross_root_lifecycle_rows = lifecycle_rows.clone();
@@ -12228,6 +12711,25 @@ mod tests {
         assert!(value_cleanup.canonical_executable_evidence());
         assert!(value_cleanup.cleanup_hook_order_private());
         assert!(value_cleanup.cleanup_hook_identity_private());
+
+        assert_eq!(
+            root_cleanup.source_handle_environment_id(),
+            Some(BridgeEnvironmentId::from_raw(764))
+        );
+        assert_eq!(root_cleanup.source_handle_slot(), Some(1));
+        assert_eq!(root_cleanup.source_handle_generation(), Some(1));
+        assert_eq!(root_cleanup.source_current_generation(), Some(2));
+        assert_eq!(root_cleanup.source_record_id(), None);
+        assert_eq!(root_cleanup.source_root_id(), Some(1));
+        assert_eq!(
+            value_cleanup.source_handle_environment_id(),
+            Some(BridgeEnvironmentId::from_raw(764))
+        );
+        assert_eq!(value_cleanup.source_handle_slot(), Some(3));
+        assert_eq!(value_cleanup.source_handle_generation(), Some(1));
+        assert_eq!(value_cleanup.source_current_generation(), Some(2));
+        assert_eq!(value_cleanup.source_record_id(), None);
+        assert_eq!(value_cleanup.source_root_id(), Some(1));
     }
 
     #[test]
@@ -12364,7 +12866,8 @@ mod tests {
                     canonical_root.source_handle_kind(),
                     canonical_root.source_error_code(),
                     canonical_root.source_boundary_error_code(),
-                ),
+                )
+                .with_source_identity_from_preflight_row_for_test(preflight.rows()[0]),
                 expected_code: NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_ORDER_MISMATCH_CODE,
                 stale_or_forged_rejected: false,
             },
@@ -12385,7 +12888,8 @@ mod tests {
                     canonical_root.source_handle_kind(),
                     canonical_root.source_error_code(),
                     canonical_root.source_boundary_error_code(),
-                ),
+                )
+                .with_source_identity_from_preflight_row_for_test(preflight.rows()[0]),
                 expected_code: NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_IDENTITY_MISMATCH_CODE,
                 stale_or_forged_rejected: false,
             },
@@ -12407,6 +12911,7 @@ mod tests {
                     canonical_root.source_error_code(),
                     canonical_root.source_boundary_error_code(),
                 )
+                .with_source_identity_from_preflight_row_for_test(preflight.rows()[0])
                 .with_public_native_package_claim(),
                 expected_code:
                     NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_PUBLIC_NATIVE_PACKAGE_CLAIM_CODE,
@@ -12547,6 +13052,11 @@ mod tests {
         let executable_preflight = native_root_bridge_worker_thread_teardown_executable_preflight();
         let cleanup_preflight = native_root_bridge_worker_thread_cleanup_hook_preflight();
         let rows = cleanup_preflight.rows();
+        let root_source_row = *executable_preflight
+            .rows()
+            .iter()
+            .find(|row| row.id() == "worker-render-root-stale-executable-preflight")
+            .expect("root executable preflight source row exists");
 
         let stale = row(
             rows,
@@ -12626,7 +13136,8 @@ mod tests {
                     BridgeHandleKind::Root,
                     Some("FAST_REACT_NAPI_STALE_HANDLE"),
                     Some("FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE"),
-                ),
+                )
+                .with_source_identity_from_executable_preflight_row_for_test(root_source_row),
             );
         assert_eq!(
             wrong_order.status(),
@@ -12639,6 +13150,33 @@ mod tests {
         assert!(!wrong_order.canonical_executable_evidence());
         assert!(!wrong_order.stale_or_forged_cleanup_evidence_rejected());
         assert_eq!(wrong_order.observed_execution_order(), None);
+
+        let caller_built_canonical_strings =
+            validate_native_root_bridge_worker_thread_cleanup_hook_evidence_for_preflight(
+                &executable_preflight,
+                NativeRootBridgeWorkerThreadCleanupHookEvidence::new(
+                    "cleanup-hook-caller-built-canonical-strings-rejected",
+                    "cleanup-hook-evidence-preflight-rejection",
+                    "worker-root-handle-cleanup-hook",
+                    "private-cleanup-hook-fn:worker-root-handle-teardown",
+                    "private-cleanup-hook-arg:worker-764-root-slot-1",
+                    2,
+                    1,
+                    executable_preflight.status(),
+                    executable_preflight.worker_thread_id(),
+                    executable_preflight.worker_environment_id(),
+                    "worker-render-root-stale-executable-preflight",
+                    BridgeHandleKind::Root,
+                    Some("FAST_REACT_NAPI_STALE_HANDLE"),
+                    Some("FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE"),
+                ),
+            );
+        assert_rejected_cleanup_hook_evidence(
+            caller_built_canonical_strings,
+            NATIVE_ROOT_BRIDGE_WORKER_THREAD_CLEANUP_HOOK_FORGED_EVIDENCE_CODE,
+            "cleanup-hook-caller-built-canonical-strings-rejected",
+        );
+        assert!(caller_built_canonical_strings.stale_or_forged_cleanup_evidence_rejected());
     }
 
     fn assert_rejected_cleanup_hook_evidence(
@@ -12839,6 +13377,11 @@ mod tests {
         ];
 
         for case in cases {
+            let source_row = *executable_preflight
+                .rows()
+                .iter()
+                .find(|row| row.id() == case.source_row_id)
+                .expect("cleanup hook executable source row exists");
             let rejected =
                 validate_native_root_bridge_worker_thread_cleanup_hook_evidence_for_preflight(
                     &executable_preflight,
@@ -12857,7 +13400,8 @@ mod tests {
                         case.source_handle_kind,
                         Some("FAST_REACT_NAPI_STALE_HANDLE"),
                         Some("FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE"),
-                    ),
+                    )
+                    .with_source_identity_from_executable_preflight_row_for_test(source_row),
                 );
 
             assert_rejected_cleanup_hook_evidence(
@@ -12948,6 +13492,11 @@ mod tests {
         ];
 
         for case in cases {
+            let source_row = *executable_preflight
+                .rows()
+                .iter()
+                .find(|row| row.id() == case.source_row_id)
+                .expect("cleanup hook executable source row exists");
             let tampered =
                 validate_native_root_bridge_worker_thread_cleanup_hook_evidence_for_preflight(
                     &executable_preflight,
@@ -12966,7 +13515,8 @@ mod tests {
                         case.source_handle_kind,
                         Some("FAST_REACT_NAPI_STALE_HANDLE"),
                         Some("FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE"),
-                    ),
+                    )
+                    .with_source_identity_from_executable_preflight_row_for_test(source_row),
                 );
 
             assert_eq!(
