@@ -20,6 +20,11 @@
   call snippets, weak collection implementation shapes, source collection
   method expressions, source declarations, field-value expressions, and block
   or statement syntax.
+- Re-audit follow-up replaced the blacklist-only durability rule with a
+  positive allowlist: evidence tokens must be JavaScript identifiers, field or
+  function names, source-owned constants, or lower-case diagnostic/status IDs.
+- Prose, test-title, and error-message evidence tokens now fail closed even
+  when the text exists in a source or test file.
 
 ## Changed Files
 
@@ -46,6 +51,14 @@
 - Audit follow-up: `npm run check:package-surface` - passed; npm printed the existing `minimum-release-age` warning.
 - Audit follow-up: `node tests/smoke/import-entrypoints.mjs` - passed.
 - Audit follow-up: `git diff --check` - passed.
+- Re-audit follow-up: `node --check tests/conformance/src/private-admission-810-react-act-scheduler-diagnostics-ledger.mjs` - passed.
+- Re-audit follow-up: `node --check tests/conformance/test/private-admission-810-react-act-scheduler-diagnostics-ledger.test.mjs` - passed.
+- Re-audit follow-up: `node --test tests/conformance/test/private-admission-810-react-act-scheduler-diagnostics-ledger.test.mjs` - passed, 8 tests.
+- Re-audit follow-up: read-only override smoke for the existing test title `scheduler mock rejects unsafe delayed renderer-root producer metadata` returned blocked status with `durableEvidenceTokensRecognized: false`.
+- Re-audit follow-up: `node --test tests/conformance/test/react-act-oracle.test.mjs tests/conformance/test/scheduler-mock-delayed-act-root-work.test.mjs tests/conformance/test/scheduler-mock-oracle.test.mjs tests/conformance/test/react-dom-test-utils-act-oracle.test.mjs tests/conformance/test/scheduler-native-entry-oracle.test.mjs tests/conformance/test/scheduler-mock-expired-lane-flush.test.mjs` - passed, 82 tests.
+- Re-audit follow-up: `npm run check:package-surface` - passed; npm printed the existing `minimum-release-age` warning.
+- Re-audit follow-up: `node tests/smoke/import-entrypoints.mjs` - passed.
+- Re-audit follow-up: `git diff --check` - passed.
 
 ## Evidence Gathered
 
@@ -67,6 +80,10 @@
 - Focused negative coverage now injects those token shapes as row overrides and
   verifies the gate reports `non-durable-evidence-token-shape` while keeping
   source token presence checks separate.
+- Re-audit negative coverage now injects the previously accepted Scheduler
+  delayed renderer-root test title plus an existing React act gate error
+  message and verifies both are rejected as
+  `not-allowed-durable-token-class` without relying on missing-token behavior.
 
 ## Risks Or Blockers
 

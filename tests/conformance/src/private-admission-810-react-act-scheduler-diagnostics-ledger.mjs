@@ -109,6 +109,18 @@ export const PRIVATE_ADMISSION_810_REQUIRED_FALSE_REQUIREMENTS = freezeArray([
   "publicDelayedRendererRootAdmissionClaimed"
 ]);
 
+export const PRIVATE_ADMISSION_810_DURABLE_EVIDENCE_TOKEN_CLASSES =
+  freezeArray([
+    freezeRecord({
+      id: "js-identifier-field-function-or-constant",
+      pattern: /^[$A-Z_a-z][\w$]*$/u
+    }),
+    freezeRecord({
+      id: "diagnostic-or-status-id",
+      pattern: /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/u
+    })
+  ]);
+
 export const PRIVATE_ADMISSION_810_NON_DURABLE_EVIDENCE_TOKEN_SHAPES =
   freezeArray([
     freezeRecord({
@@ -138,6 +150,10 @@ export const PRIVATE_ADMISSION_810_NON_DURABLE_EVIDENCE_TOKEN_SHAPES =
     freezeRecord({
       id: "block-or-statement-syntax",
       pattern: /[{};]/u
+    }),
+    freezeRecord({
+      id: "not-allowed-durable-token-class",
+      pattern: /[\s\S]/u
     })
   ]);
 
@@ -1069,16 +1085,22 @@ function evaluateEvidenceRow({ evidenceRow, fileCache, workspaceRoot }) {
 function collectNonDurableEvidenceTokens(tokens) {
   return freezeArray(
     tokens.flatMap((token) => {
-      const shape = PRIVATE_ADMISSION_810_NON_DURABLE_EVIDENCE_TOKEN_SHAPES.find(
-        (candidate) => candidate.pattern.test(token)
-      );
-      if (shape === undefined) {
+      const durableClass =
+        PRIVATE_ADMISSION_810_DURABLE_EVIDENCE_TOKEN_CLASSES.find(
+          (candidate) => candidate.pattern.test(token)
+        );
+      if (durableClass !== undefined) {
         return [];
       }
+      const shape =
+        PRIVATE_ADMISSION_810_NON_DURABLE_EVIDENCE_TOKEN_SHAPES.find(
+          (candidate) => candidate.pattern.test(token)
+        );
       return [
         freezeRecord({
           token,
-          shapeId: shape.id
+          durableClassId: null,
+          shapeId: shape?.id ?? "not-allowed-durable-token-class"
         })
       ];
     })

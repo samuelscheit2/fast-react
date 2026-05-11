@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  PRIVATE_ADMISSION_810_DURABLE_EVIDENCE_TOKEN_CLASSES,
   PRIVATE_ADMISSION_810_GATE_STATUS,
   PRIVATE_ADMISSION_810_NON_DURABLE_EVIDENCE_TOKEN_SHAPES,
   PRIVATE_ADMISSION_810_PUBLIC_BLOCKER_FIELDS,
@@ -229,6 +230,15 @@ test("private admission 810 gate rejects missing Scheduler-owned source validato
 
 test("private admission 810 gate rejects source-syntax evidence tokens", () => {
   assert.deepEqual(
+    PRIVATE_ADMISSION_810_DURABLE_EVIDENCE_TOKEN_CLASSES.map(
+      (tokenClass) => tokenClass.id
+    ),
+    [
+      "js-identifier-field-function-or-constant",
+      "diagnostic-or-status-id"
+    ]
+  );
+  assert.deepEqual(
     PRIVATE_ADMISSION_810_NON_DURABLE_EVIDENCE_TOKEN_SHAPES.map(
       (shape) => shape.id
     ),
@@ -239,7 +249,8 @@ test("private admission 810 gate rejects source-syntax evidence tokens", () => {
       "source-collection-method-expression",
       "source-declaration-snippet",
       "field-value-expression",
-      "block-or-statement-syntax"
+      "block-or-statement-syntax",
+      "not-allowed-durable-token-class"
     ]
   );
 
@@ -283,6 +294,58 @@ test("private admission 810 gate rejects source-syntax evidence tokens", () => {
       "source-collection-method-expression",
       "field-value-expression"
     ]
+  );
+});
+
+test("private admission 810 gate rejects prose, test-title, and error-message evidence tokens", () => {
+  const gate = evaluatePrivateAdmission810Gate({
+    rowOverrides: {
+      [worker772]: {
+        evidence: withAdditionalEvidenceTokens(
+          rowByWorker(worker772),
+          "worker-772-delayed-test-fields",
+          ["scheduler mock rejects unsafe delayed renderer-root producer metadata"]
+        )
+      },
+      [worker775]: {
+        evidence: withAdditionalEvidenceTokens(
+          rowByWorker(worker775),
+          "worker-775-react-act-source",
+          [
+            "Only accepted private scheduler/unstable_mock delayed act/root work diagnostics with nested expired act/root evidence can pass this package-private preflight."
+          ]
+        )
+      }
+    }
+  });
+
+  assert.equal(gate.status, PRIVATE_ADMISSION_810_VIOLATION_STATUS);
+  assert.equal(gate.privateDiagnosticsRecognized, false);
+  assert.equal(gate.evidenceRecognized, true);
+  assert.equal(gate.durableEvidenceTokensRecognized, false);
+  assert.deepEqual(gate.nonDurableEvidenceTokenViolationIds, [
+    `${worker772}.worker-772-delayed-test-fields`,
+    `${worker775}.worker-775-react-act-source`
+  ]);
+  assertViolationIds(gate, ["non-durable-evidence-token-shape"]);
+
+  const delayedTestEvidence = gate.rowsByWorker[worker772].evidence.find(
+    (row) => row.role === "worker-772-delayed-test-fields"
+  );
+  const reactActSourceEvidence = gate.rowsByWorker[worker775].evidence.find(
+    (row) => row.role === "worker-775-react-act-source"
+  );
+  assert.notEqual(delayedTestEvidence, undefined);
+  assert.notEqual(reactActSourceEvidence, undefined);
+  assert.deepEqual(delayedTestEvidence.missingTokens, []);
+  assert.deepEqual(reactActSourceEvidence.missingTokens, []);
+  assert.deepEqual(
+    delayedTestEvidence.nonDurableTokens.map((entry) => entry.shapeId),
+    ["not-allowed-durable-token-class"]
+  );
+  assert.deepEqual(
+    reactActSourceEvidence.nonDurableTokens.map((entry) => entry.shapeId),
+    ["not-allowed-durable-token-class"]
   );
 });
 
