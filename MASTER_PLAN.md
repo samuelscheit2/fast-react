@@ -1,6 +1,6 @@
 # Fast React Master Plan
 
-Last updated: 2026-05-11
+Last updated: 2026-05-12
 
 This file owns current and future work only. Accepted history belongs in
 `MASTER_PROGRESS.md`; durable orchestration policy belongs in `ORCHESTRATOR.md`;
@@ -45,11 +45,12 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Runtime accepted baseline is main `732a6b21`
-(`Make audit scope case by case`); this docs refresh makes no runtime
-compatibility claim. Accepted implementation history now includes merges
-through Worker 997, including the accepted Worker 910, 949, 964, 972-974,
-976-977, 979-982, 985, 988, 991, 993, 995, and 997 branches since the previous
+Top-level cap: 30 workers. Runtime accepted baseline is main `cf31f851`
+(`Merge worker 989 conformance private gate false-green sweep`); this docs
+refresh makes no runtime compatibility claim. Accepted implementation history
+now includes merges through Worker 997, including accepted Workers 910, 949,
+964, 972-974, 976-977, 979-982, 985, 988-989, 991, 993, 995, and 997 branches
+since the previous
 `c2cb703f` docs baseline. Worker 853's competing test-renderer branch was
 rejected as redundant after Worker 844 was accepted; do not use it as accepted
 input.
@@ -59,9 +60,9 @@ Current orchestration queue:
 - Worker 967: active repair after audits found the ToJSON host-output source
   evidence still false-greens on a dead function declaration/token shell.
 - Worker 978: under audit after escaped quoted hidden-carrier key repair.
-- Workers 986, 987, 989, 990, and 994: active repair workers after concrete
+- Workers 986, 987, 990, and 994: active repair workers after concrete
   audit blockers in React DOM `flushSync`, Scheduler public timing,
-  private-admission 729-731, controlled input/restore, and benchmark scanners.
+  controlled input/restore, and benchmark scanners.
 - Worker 992: under audit after its test-renderer act/Scheduler repair.
 - Worker 996: hydrateRoot replay blocker audit is being rerun after a
   null/no-result audit return.
@@ -73,7 +74,7 @@ Do not consume active worker outputs as accepted evidence until reviewed,
 verified, and merged to main. When any active repair or audit lane lands, move
 the accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
-Accepted private evidence through `57dc6e0b`, plus audit policy through
+Accepted private evidence through `cf31f851`, plus audit policy through
 `732a6b21`, still keeps public root/render/unmount, `act`,
 `react-dom/test-utils.act`, `flushSync`, Scheduler timing, hydration,
 resources/forms, public input/change or controlled-input behavior,
@@ -87,7 +88,7 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat the accepted branch baseline through `732a6b21` as private evidence
+1. Treat the accepted branch baseline through `cf31f851` as private evidence
    only. Public package, root, native, React DOM, test-renderer, Scheduler,
    `act`, `react-dom/test-utils.act`, hydration, resource/form,
    public controlled-input, serialization, React Children lazy/full traversal,

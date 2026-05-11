@@ -1,6 +1,6 @@
 # Fast React Master Progress
 
-Last updated: 2026-05-11
+Last updated: 2026-05-12
 
 This file owns accepted history only. Current queues, next actions, and future
 sequencing belong in `MASTER_PLAN.md`.
@@ -49,6 +49,14 @@ sequencing belong in `MASTER_PLAN.md`.
   `useRef` execution canary, and renderer lifecycle blockers. Public `useRef`
   execution/ref identity, hook dispatcher lifecycle, root scheduling, renderer
   behavior, Scheduler timing, `act`, and package compatibility remain blocked.
+- Worker 989 hardened the private-admission 729-731 gate against additional
+  false-green classes, including hidden compatibility aliases and claim
+  containers, skipped-row summary drift, report-only row sanitization, and
+  sanitizer-discovered stateful proxy/read failures. Sanitizer-observed array
+  shape failures now fail closed through
+  `private-admission-report-array-shape-mismatch`. This remains private
+  conformance evidence only and does not unblock public renderer or package
+  compatibility.
 - Worker 910's hydration recoverable-error boundary admission, Worker 949's
   Scheduler variant currentness, Worker 979's profiling createRoot private
   facade, Worker 981's resource/form root currentness, and Worker 993's N-API
@@ -65,12 +73,13 @@ sequencing belong in `MASTER_PLAN.md`.
   Useful audit surfaces may include hostile/source review, regression-command
   reruns with targeted probes, package-surface checks, or source-currentness
   checks, but there is no mandated audit template.
-- The accepted state before this docs refresh is current main `732a6b21`
-  (`Make audit scope case by case`) after the Worker 910, 949, 964, 969,
-  972-974, 976-977, 979-982, 985, 988, 991, 993, 995, and 997 merge path plus
-  audit policy commits. Focused verification and audit evidence remain recorded
-  in worker reports, read-only audit reports, post-merge checks, and git
-  history; this docs batch makes no runtime compatibility claim.
+- The accepted state before this docs refresh is current main `cf31f851`
+  (`Merge worker 989 conformance private gate false-green sweep`) after the
+  Worker 910, 949, 964, 969, 972-974, 976-977, 979-982, 985, 988-989, 991,
+  993, 995, and 997 merge path plus audit policy commits. Focused verification
+  and audit evidence remain recorded in worker reports, read-only audit
+  reports, post-merge checks, and git history; this docs batch makes no runtime
+  compatibility claim.
 
 ### Worker 968 Docs Refresh and Worker 966
 
