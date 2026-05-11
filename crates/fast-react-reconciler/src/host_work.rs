@@ -970,6 +970,14 @@ impl HostWorkResult {
     fn detached_hosts_mut(&mut self) -> &mut DetachedHostRecords {
         &mut self.detached_hosts
     }
+
+    pub(crate) fn detached_hosts_mut_for_canary(&mut self) -> &mut DetachedHostRecords {
+        &mut self.detached_hosts
+    }
+
+    pub(crate) fn into_detached_hosts_for_canary(self) -> DetachedHostRecords {
+        self.detached_hosts
+    }
 }
 
 const TEST_HOST_SAFE_PROPERTY_PROP_NAME: &str = "testHostProperty";
@@ -1326,25 +1334,25 @@ pub(crate) enum TestHostRootMutationApplyStatus {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct TestHostRootMutationApplyRecord {
+pub(crate) struct TestHostRootMutationApplyRecord {
     mutation: HostRootMutationApplyRecord,
     status: TestHostRootMutationApplyStatus,
 }
 
 impl TestHostRootMutationApplyRecord {
     #[must_use]
-    const fn mutation(self) -> HostRootMutationApplyRecord {
+    pub(crate) const fn mutation(self) -> HostRootMutationApplyRecord {
         self.mutation
     }
 
     #[must_use]
-    const fn status(self) -> TestHostRootMutationApplyStatus {
+    pub(crate) const fn status(self) -> TestHostRootMutationApplyStatus {
         self.status
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct TestHostRootMutationApplyResult {
+pub(crate) struct TestHostRootMutationApplyResult {
     root: FiberRootId,
     finished_work: FiberId,
     records: Vec<TestHostRootMutationApplyRecord>,
@@ -1352,22 +1360,22 @@ struct TestHostRootMutationApplyResult {
 
 impl TestHostRootMutationApplyResult {
     #[must_use]
-    const fn root(&self) -> FiberRootId {
+    pub(crate) const fn root(&self) -> FiberRootId {
         self.root
     }
 
     #[must_use]
-    const fn finished_work(&self) -> FiberId {
+    pub(crate) const fn finished_work(&self) -> FiberId {
         self.finished_work
     }
 
     #[must_use]
-    fn records(&self) -> &[TestHostRootMutationApplyRecord] {
+    pub(crate) fn records(&self) -> &[TestHostRootMutationApplyRecord] {
         &self.records
     }
 
     #[must_use]
-    fn applied_host_call_count(&self) -> usize {
+    pub(crate) fn applied_host_call_count(&self) -> usize {
         self.records
             .iter()
             .filter(|record| matches!(record.status(), TestHostRootMutationApplyStatus::Applied(_)))
@@ -1375,7 +1383,7 @@ impl TestHostRootMutationApplyResult {
     }
 
     #[must_use]
-    fn private_host_store_update_count(&self) -> usize {
+    pub(crate) fn private_host_store_update_count(&self) -> usize {
         self.records
             .iter()
             .filter(|record| {
@@ -2390,6 +2398,15 @@ fn apply_test_host_root_commit_mutations(
         finished_work: commit.finished_work(),
         records,
     })
+}
+
+pub(crate) fn apply_test_host_root_commit_mutations_for_canary(
+    store: &mut FiberRootStore<RecordingHost>,
+    host: &mut RecordingHost,
+    commit: &HostRootCommitRecord,
+    host_work: &mut HostWorkResult,
+) -> Result<TestHostRootMutationApplyResult, HostWorkError> {
+    apply_test_host_root_commit_mutations(store, host, commit, host_work.detached_hosts_mut())
 }
 
 fn apply_one_test_host_update_with_finished_work_handoff_for_canary(
@@ -4072,6 +4089,24 @@ pub(crate) fn mount_test_host_sibling_work(
     source: &TestHostTree,
     source_children: &[RootElementHandle],
 ) -> Result<HostWorkResult, HostWorkError> {
+    mount_test_host_sibling_work_with_detached_hosts_for_canary(
+        store,
+        host,
+        render,
+        source,
+        source_children,
+        DetachedHostRecords::default(),
+    )
+}
+
+pub(crate) fn mount_test_host_sibling_work_with_detached_hosts_for_canary(
+    store: &mut FiberRootStore<RecordingHost>,
+    host: &mut RecordingHost,
+    render: HostRootRenderPhaseRecord,
+    source: &TestHostTree,
+    source_children: &[RootElementHandle],
+    mut detached_hosts: DetachedHostRecords,
+) -> Result<HostWorkResult, HostWorkError> {
     expect_tag(store, render.work_in_progress(), FiberTag::HostRoot)?;
     if source_children.len() < 2 {
         return Err(HostWorkError::ExpectedMultipleRootChildren {
@@ -4094,7 +4129,6 @@ pub(crate) fn mount_test_host_sibling_work(
     }
 
     let container = *store.root(render.root())?.container_info();
-    let mut detached_hosts = DetachedHostRecords::default();
     let mut root_children = Vec::with_capacity(root_nodes.len());
     host.root_host_context(&container)?;
     for node in root_nodes {
