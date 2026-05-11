@@ -32,7 +32,7 @@ use crate::function_component::FunctionComponentSingleChildUpdateReconciliationR
 use crate::host_nodes::{
     HostNodeAppliedTextUpdate, HostNodeMetadata, HostNodePropertyUpdate,
     HostNodePropertyUpdateExecution, HostNodeScope, HostNodeStore, HostNodeTextUpdate,
-    HostNodeValidationError, HostNodeViolation,
+    HostNodeUpdateCurrentness, HostNodeValidationError, HostNodeViolation,
 };
 use crate::passive_effects::{
     DeletedSubtreeRefCleanupReturnExecutor, DeletedSubtreeRefPassiveCleanupExecutionError,
@@ -910,7 +910,13 @@ impl DetachedHostRecords {
         let applied = self.nodes.apply_text_update(
             handle,
             scope,
-            HostNodeTextUpdate::new(old_text, new_text),
+            HostNodeTextUpdate::new(old_text, new_text).with_currentness(
+                HostNodeUpdateCurrentness::for_scope(
+                    handle,
+                    scope,
+                    HostFiberTokenTarget::TextInstance,
+                ),
+            ),
         )?;
 
         let record = self.test_host_text_record_mut(handle)?;
@@ -5750,6 +5756,8 @@ fn apply_test_host_component_update_record(
                 scope,
                 host_node_property_update_for_component_payload(
                     &payload,
+                    mutation.state_node(),
+                    scope,
                     HostNodePropertyUpdateExecution::CommitUpdate,
                 ),
             )?;
@@ -5773,6 +5781,8 @@ fn apply_test_host_component_update_record(
         scope,
         host_node_property_update_for_component_payload(
             &payload,
+            mutation.state_node(),
+            scope,
             host_node_property_update_execution_for_host_call(host_call),
         ),
     )?;
@@ -5788,6 +5798,8 @@ const fn should_commit_component_property_payload_to_private_host_store_only(
 
 fn host_node_property_update_for_component_payload(
     payload: &HostComponentUpdatePayload,
+    handle: StateNodeHandle,
+    scope: HostNodeScope,
     execution: HostNodePropertyUpdateExecution,
 ) -> HostNodePropertyUpdate {
     HostNodePropertyUpdate::new(
@@ -5798,6 +5810,11 @@ fn host_node_property_update_for_component_payload(
     )
     .with_payload_kind(payload.property_row().kind().as_str())
     .with_execution(execution)
+    .with_currentness(HostNodeUpdateCurrentness::for_scope(
+        handle,
+        scope,
+        HostFiberTokenTarget::Instance,
+    ))
 }
 
 fn apply_test_host_component_property_payload_host_call(
@@ -7800,6 +7817,28 @@ mod tests {
         assert_eq!(updates[0].root_id(), root_id);
         assert_eq!(updates[0].fiber_id(), current_component);
         assert_eq!(updates[0].token_id(), metadata.token_id());
+        assert_eq!(updates[0].phase(), metadata.phase());
+        assert_eq!(updates[0].target(), HostFiberTokenTarget::Instance);
+        assert_eq!(updates[0].source_currentness().handle(), handle);
+        assert_eq!(updates[0].source_currentness().root_id(), root_id);
+        assert_eq!(
+            updates[0].source_currentness().fiber_id(),
+            current_component
+        );
+        assert_eq!(
+            updates[0].source_currentness().token_id(),
+            metadata.token_id()
+        );
+        assert_eq!(updates[0].source_currentness().phase(), metadata.phase());
+        assert_eq!(
+            updates[0].source_currentness().target(),
+            HostFiberTokenTarget::Instance
+        );
+        assert!(
+            !updates[0]
+                .source_currentness()
+                .public_dom_compatibility_claimed()
+        );
         assert_eq!(updates[0].payload_kind(), payload_kind.as_str());
         assert_eq!(updates[0].prop_name(), prop_name);
         assert_eq!(updates[0].property_name(), property_name);
@@ -7833,6 +7872,39 @@ mod tests {
         assert_eq!(latest_props_updates[0].root_id(), root_id);
         assert_eq!(latest_props_updates[0].fiber_id(), current_component);
         assert_eq!(latest_props_updates[0].token_id(), metadata.token_id());
+        assert_eq!(latest_props_updates[0].phase(), metadata.phase());
+        assert_eq!(
+            latest_props_updates[0].target(),
+            HostFiberTokenTarget::Instance
+        );
+        assert_eq!(
+            latest_props_updates[0].source_currentness(),
+            property_updates[0].source_currentness()
+        );
+        assert_eq!(
+            latest_props_updates[0].source_currentness().handle(),
+            handle
+        );
+        assert_eq!(
+            latest_props_updates[0].source_currentness().root_id(),
+            root_id
+        );
+        assert_eq!(
+            latest_props_updates[0].source_currentness().fiber_id(),
+            current_component
+        );
+        assert_eq!(
+            latest_props_updates[0].source_currentness().token_id(),
+            metadata.token_id()
+        );
+        assert_eq!(
+            latest_props_updates[0].source_currentness().phase(),
+            metadata.phase()
+        );
+        assert_eq!(
+            latest_props_updates[0].source_currentness().target(),
+            HostFiberTokenTarget::Instance
+        );
         assert_eq!(
             latest_props_updates[0].payload_kind(),
             payload_kind.as_str()
@@ -7925,6 +7997,86 @@ mod tests {
             operations_before_apply,
             token_count_before_apply,
         }
+    }
+
+    #[test]
+    fn host_work_rejects_sequence_only_component_payload_currentness_before_recording() {
+        let mut fixture = root_component_update_apply_fixture();
+        let scope = fixture
+            .detached_hosts
+            .scope(fixture.state_node, HostFiberTokenTarget::Instance)
+            .unwrap();
+        let row = fixture.payload.property_row();
+        let update = HostNodePropertyUpdate::new(
+            row.prop_name(),
+            row.property_name(),
+            fixture.payload.old_props(),
+            fixture.payload.new_props(),
+        )
+        .with_payload_kind(row.kind().as_str())
+        .with_execution(HostNodePropertyUpdateExecution::CommitUpdate);
+
+        let error = fixture
+            .detached_hosts
+            .nodes
+            .apply_instance_property_update(fixture.state_node, scope, update)
+            .unwrap_err();
+
+        assert_eq!(error.violation(), HostNodeViolation::MissingCurrentness);
+        assert_eq!(
+            fixture
+                .detached_hosts
+                .instance_property_updates(fixture.state_node)
+                .unwrap(),
+            &[]
+        );
+    }
+
+    #[test]
+    fn host_work_rejects_sequence_only_text_payload_currentness_before_recording() {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let create_render =
+            render_test_root(&mut store, root_id, RootElementHandle::from_raw(79_200));
+        let current_text = attach_detached_root_text_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            create_render.finished_work(),
+            "before",
+            FiberFlags::PLACEMENT,
+        );
+        let state_node = store.fiber_arena().get(current_text).unwrap().state_node();
+        let create_commit = commit_finished_host_root(&mut store, create_render).unwrap();
+        apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &create_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+        let scope = detached_hosts
+            .scope(state_node, HostFiberTokenTarget::TextInstance)
+            .unwrap();
+
+        let error = detached_hosts
+            .nodes
+            .apply_text_update(
+                state_node,
+                scope,
+                HostNodeTextUpdate::new("before", "after"),
+            )
+            .unwrap_err();
+
+        assert_eq!(error.violation(), HostNodeViolation::MissingCurrentness);
+        assert_eq!(
+            detached_hosts
+                .test_host_text_record_updates(state_node)
+                .unwrap(),
+            &[]
+        );
     }
 
     struct DangerousHtmlTextResetHandoffFixture {
@@ -12023,11 +12175,38 @@ mod tests {
         let text_updates = detached_hosts
             .test_host_text_record_updates(state_node)
             .unwrap();
+        let text_metadata = detached_hosts.text_metadata(state_node).unwrap();
         assert_eq!(text_updates.len(), 1);
         assert_eq!(text_updates[0].sequence(), 0);
         assert_eq!(text_updates[0].handle(), state_node);
         assert_eq!(text_updates[0].root_id(), root_id);
         assert_eq!(text_updates[0].fiber_id(), current_text);
+        assert_eq!(text_updates[0].token_id(), text_metadata.token_id());
+        assert_eq!(text_updates[0].phase(), text_metadata.phase());
+        assert_eq!(text_updates[0].target(), HostFiberTokenTarget::TextInstance);
+        assert_eq!(text_updates[0].source_currentness().handle(), state_node);
+        assert_eq!(text_updates[0].source_currentness().root_id(), root_id);
+        assert_eq!(
+            text_updates[0].source_currentness().fiber_id(),
+            current_text
+        );
+        assert_eq!(
+            text_updates[0].source_currentness().token_id(),
+            text_metadata.token_id()
+        );
+        assert_eq!(
+            text_updates[0].source_currentness().phase(),
+            text_metadata.phase()
+        );
+        assert_eq!(
+            text_updates[0].source_currentness().target(),
+            HostFiberTokenTarget::TextInstance
+        );
+        assert!(
+            !text_updates[0]
+                .source_currentness()
+                .public_dom_compatibility_claimed()
+        );
         assert_eq!(text_updates[0].old_text(), "before");
         assert_eq!(text_updates[0].new_text(), "after");
         assert_eq!(detached_hosts.text(state_node).unwrap().text(), "before");

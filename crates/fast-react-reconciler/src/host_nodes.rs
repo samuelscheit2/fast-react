@@ -1573,40 +1573,40 @@ impl<H: HostTypes> HostNodeRecord<H> {
         let currentness = currentness.ok_or_else(|| {
             self.currentness_error(handle, target, HostNodeViolation::MissingCurrentness)
         })?;
-        if currentness
-            .handle()
-            .is_some_and(|current_handle| current_handle != handle)
-        {
+        let current_handle = currentness.handle().ok_or_else(|| {
+            self.currentness_error(handle, target, HostNodeViolation::MissingCurrentness)
+        })?;
+        if current_handle != handle {
             return Err(self.currentness_error(handle, target, HostNodeViolation::InvalidHandle));
         }
-        if currentness
-            .target()
-            .is_some_and(|current_target| current_target != target)
-        {
+        let current_target = currentness.target().ok_or_else(|| {
+            self.currentness_error(handle, target, HostNodeViolation::MissingCurrentness)
+        })?;
+        if current_target != target {
             return Err(self.currentness_error(handle, target, HostNodeViolation::WrongTarget));
         }
-        if currentness
-            .phase()
-            .is_some_and(|current_phase| current_phase != self.metadata.phase)
-        {
+        let current_phase = currentness.phase().ok_or_else(|| {
+            self.currentness_error(handle, target, HostNodeViolation::MissingCurrentness)
+        })?;
+        if current_phase != self.metadata.phase {
             return Err(self.currentness_error(handle, target, HostNodeViolation::WrongPhase));
         }
-        if currentness
-            .root_id()
-            .is_some_and(|current_root| current_root != self.metadata.root_id)
-        {
+        let current_root = currentness.root_id().ok_or_else(|| {
+            self.currentness_error(handle, target, HostNodeViolation::MissingCurrentness)
+        })?;
+        if current_root != self.metadata.root_id {
             return Err(self.currentness_error(handle, target, HostNodeViolation::WrongRoot));
         }
-        if currentness
-            .fiber_id()
-            .is_some_and(|current_fiber| current_fiber != self.metadata.fiber_id)
-        {
+        let current_fiber = currentness.fiber_id().ok_or_else(|| {
+            self.currentness_error(handle, target, HostNodeViolation::MissingCurrentness)
+        })?;
+        if current_fiber != self.metadata.fiber_id {
             return Err(self.currentness_error(handle, target, HostNodeViolation::WrongFiber));
         }
-        if currentness
-            .token_id()
-            .is_some_and(|current_token| current_token != self.metadata.token_id)
-        {
+        let current_token = currentness.token_id().ok_or_else(|| {
+            self.currentness_error(handle, target, HostNodeViolation::MissingCurrentness)
+        })?;
+        if current_token != self.metadata.token_id {
             return Err(self.currentness_error(handle, target, HostNodeViolation::WrongToken));
         }
         if self
@@ -1860,7 +1860,12 @@ mod tests {
             "testHostProperty",
             PropsHandle::from_raw(10),
             PropsHandle::from_raw(11),
-        );
+        )
+        .with_currentness(HostNodeUpdateCurrentness::for_scope(
+            handle,
+            scope,
+            HostFiberTokenTarget::Instance,
+        ));
 
         let applied = store
             .apply_instance_property_update(handle, scope, update)
@@ -1922,7 +1927,12 @@ mod tests {
             PropsHandle::from_raw(40),
             PropsHandle::from_raw(41),
         )
-        .with_payload_kind("style");
+        .with_payload_kind("style")
+        .with_currentness(HostNodeUpdateCurrentness::for_scope(
+            handle,
+            scope,
+            HostFiberTokenTarget::Instance,
+        ));
 
         let commit = store
             .commit_instance_property_update_to_private_store(handle, scope, update)
@@ -2017,7 +2027,12 @@ mod tests {
             PropsHandle::from_raw(31),
         )
         .with_payload_kind("text-content")
-        .with_execution(HostNodePropertyUpdateExecution::ResetTextContent);
+        .with_execution(HostNodePropertyUpdateExecution::ResetTextContent)
+        .with_currentness(HostNodeUpdateCurrentness::for_scope(
+            handle,
+            scope,
+            HostFiberTokenTarget::Instance,
+        ));
 
         let applied = store
             .apply_instance_property_update(handle, scope, update)
@@ -2051,7 +2066,9 @@ mod tests {
                 text: "before".to_owned(),
             },
         );
-        let update = HostNodeTextUpdate::new("before", "after");
+        let update = HostNodeTextUpdate::new("before", "after").with_currentness(
+            HostNodeUpdateCurrentness::for_scope(handle, scope, HostFiberTokenTarget::TextInstance),
+        );
         assert_eq!(update.old_text(), "before");
         assert_eq!(update.new_text(), "after");
 
@@ -2201,6 +2218,36 @@ mod tests {
             },
         );
 
+        let wrong_handle_update = HostNodePropertyUpdate::new(
+            "testHostProperty",
+            "testHostProperty",
+            PropsHandle::from_raw(60),
+            PropsHandle::from_raw(61),
+        )
+        .with_currentness(
+            HostNodeUpdateCurrentness::for_scope(handle, scope, HostFiberTokenTarget::Instance)
+                .with_handle(StateNodeHandle::from_raw(handle.raw() + 1)),
+        );
+        assert_violation(
+            store.apply_instance_property_update(handle, scope, wrong_handle_update),
+            HostNodeViolation::InvalidHandle,
+        );
+
+        let wrong_target_update = HostNodePropertyUpdate::new(
+            "testHostProperty",
+            "testHostProperty",
+            PropsHandle::from_raw(60),
+            PropsHandle::from_raw(61),
+        )
+        .with_currentness(
+            HostNodeUpdateCurrentness::for_scope(handle, scope, HostFiberTokenTarget::Instance)
+                .with_target(HostFiberTokenTarget::TextInstance),
+        );
+        assert_violation(
+            store.apply_instance_property_update(handle, scope, wrong_target_update),
+            HostNodeViolation::WrongTarget,
+        );
+
         let wrong_token_update = HostNodePropertyUpdate::new(
             "testHostProperty",
             "testHostProperty",
@@ -2231,6 +2278,21 @@ mod tests {
             HostNodeViolation::WrongRoot,
         );
 
+        let wrong_fiber_update = HostNodePropertyUpdate::new(
+            "testHostProperty",
+            "testHostProperty",
+            PropsHandle::from_raw(60),
+            PropsHandle::from_raw(61),
+        )
+        .with_currentness(
+            HostNodeUpdateCurrentness::for_scope(handle, scope, HostFiberTokenTarget::Instance)
+                .with_fiber_id(create_fiber_id(FiberTag::HostComponent)),
+        );
+        assert_violation(
+            store.apply_instance_property_update(handle, scope, wrong_fiber_update),
+            HostNodeViolation::WrongFiber,
+        );
+
         let wrong_phase_update = HostNodePropertyUpdate::new(
             "testHostProperty",
             "testHostProperty",
@@ -2245,6 +2307,7 @@ mod tests {
             store.apply_instance_property_update(handle, scope, wrong_phase_update),
             HostNodeViolation::WrongPhase,
         );
+        assert_eq!(store.instance_property_updates(handle, scope).unwrap(), &[]);
     }
 
     #[test]
@@ -2291,6 +2354,57 @@ mod tests {
             ),
             HostNodeViolation::MissingCurrentness,
         );
+    }
+
+    #[test]
+    fn host_nodes_reject_sequence_only_update_payload_currentness() {
+        let mut store = HostNodeStore::<TestHost>::new();
+        let instance_scope = instance_scope();
+        let instance_handle = store.insert_instance(
+            instance_scope,
+            TestInstance {
+                id: 1,
+                label: "section",
+            },
+        );
+
+        assert_violation(
+            store.apply_instance_property_update(
+                instance_handle,
+                instance_scope,
+                HostNodePropertyUpdate::new(
+                    "testHostProperty",
+                    "testHostProperty",
+                    PropsHandle::from_raw(72),
+                    PropsHandle::from_raw(73),
+                ),
+            ),
+            HostNodeViolation::MissingCurrentness,
+        );
+        assert_eq!(
+            store
+                .instance_property_updates(instance_handle, instance_scope)
+                .unwrap(),
+            &[]
+        );
+
+        let text_scope = text_scope();
+        let text_handle = store.insert_text(
+            text_scope,
+            TestTextInstance {
+                id: 1,
+                text: "before".to_owned(),
+            },
+        );
+        assert_violation(
+            store.apply_text_update(
+                text_handle,
+                text_scope,
+                HostNodeTextUpdate::new("before", "after"),
+            ),
+            HostNodeViolation::MissingCurrentness,
+        );
+        assert_eq!(store.text_updates(text_handle, text_scope).unwrap(), &[]);
     }
 
     #[test]
@@ -2436,7 +2550,12 @@ mod tests {
                     PropsHandle::from_raw(90),
                     PropsHandle::from_raw(91),
                 )
-                .with_payload_kind("style"),
+                .with_payload_kind("style")
+                .with_currentness(HostNodeUpdateCurrentness::for_scope(
+                    handle,
+                    scope,
+                    HostFiberTokenTarget::Instance,
+                )),
             )
             .unwrap();
 
