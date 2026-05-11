@@ -46,26 +46,33 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Accepted/merged baseline includes Workers 803-837,
-842-846, 848-852, 855-860, 862-874, 878-883, 885-890, 892-893, and
-895-896. Current main after the latest accepted batch is
-`ed79f32dc45d1b73cde365b2c7689edd870415fc`.
+842-846, 848-852, 855-860, 862-874, 878-883, 885-893, 895-896, and 898.
+Current main after the latest accepted batch is
+`935de5cdd9de989c7e61b45c5f0f5c53b7ccc59d`.
 Worker 853's competing test-renderer branch was rejected as redundant after
 Worker 844 was accepted; do not use it as accepted input.
 
 Current active queue:
 
-- Worker 891: active fixing after DO NOT MERGE for unmount lifecycle
-  blocked-behavior aliases and source boundary path.
-- Worker 897: active docs worker refreshing coordination docs after the latest
-  accepted batch.
-- Worker 898: active implementation worker.
+- Worker 899: active implementation worker for Rust test-renderer direct
+  multi-child fiber inspection.
+- Worker 900: active fixing after DO NOT MERGE for hydrateRoot lifecycle
+  admission ledger; do not treat it as accepted input.
+- Worker 901: active implementation worker for React DOM render lifecycle
+  boundary consumer.
+- Worker 902: active implementation worker for test-renderer act lifecycle
+  boundary.
+- Worker 903: active docs worker refreshing coordination docs after accepted
+  Workers 891 and 898.
 
-Workers 891 and 898 remain unaccepted. Do not use their branches as accepted
-input until they are reviewed, verified, and merged. Worker 897 is docs-only.
+Workers 899-902 remain unaccepted. Do not use their branches as accepted input
+until they are reviewed, verified, and merged. Worker 903 is docs-only.
 
-Accepted private evidence still keeps public root/render, `act`, `flushSync`,
-Scheduler timing, hydration, resources/forms, serialization, native execution,
-package compatibility, and broad renderer compatibility blocked.
+Accepted private evidence, including the Worker 891 unmount lifecycle consumer
+and Worker 898 HostRoot queue-lane commit consumer, still keeps public
+root/render/unmount, `act`, `flushSync`, Scheduler timing, hydration,
+resources/forms, serialization, native execution, package compatibility, and
+broad renderer compatibility blocked.
 
 Future workers may intentionally overlap with accepted areas when that improves
 throughput. Resolve merge conflicts by preserving accepted private blockers and
@@ -74,15 +81,16 @@ canonical evidence requirements.
 ## Near-Term Sequencing
 
 1. Treat the accepted baseline through current main
-   `ed79f32dc45d1b73cde365b2c7689edd870415fc` as private evidence only. Public
+   `935de5cdd9de989c7e61b45c5f0f5c53b7ccc59d` as private evidence only. Public
    package, root, native, React DOM, test-renderer, Scheduler, `act`,
    hydration, resource/form, serialization, and `flushSync` compatibility still
    require fail-closed gates and dual-run oracle evidence.
-2. Re-review Worker 891 after its active DO NOT MERGE fix is ready, and review
-   Worker 898 against the accepted source-owned lifecycle, hydration, `act`,
-   deletion, sync-flush, HostRoot lane handoff, test-renderer multi-child
-   native, native-generation, resource/form, Scheduler variant,
-   package-surface, and public blocker requirements before any merge.
+2. Review active Workers 899, 901, and 902 against the accepted source-owned
+   lifecycle, hydration, `act`, deletion, sync-flush, HostRoot lane handoff,
+   test-renderer multi-child native, native-generation, resource/form,
+   Scheduler variant, package-surface, and public blocker requirements before
+   any merge. Re-review Worker 900 only after its DO NOT MERGE fix is ready;
+   do not accept or consume it as input until then.
 3. Prefer parallelizable independent proofs even when they may conflict in test
    files. Resolve conflicts during merge by keeping all accepted negative tests,
    blockers, and source-ownership checks.
@@ -92,11 +100,12 @@ canonical evidence requirements.
 ## Next Queue Candidates
 
 - Rust root/sync-flush/function/deletion execution can extend accepted Workers
-  855, 860, 862-867, 878-879, 889-890, and 896 toward managed-child, HostText,
-  multi-child, sync-flush delete/post-passive continuation,
-  FunctionComponent deletion, and HostRoot update-queue lane handoff shapes
-  only as private test-host canaries with source-owned commit, host-node,
-  root/lane, queue/handoff, topology, replay, ref/passive, and cleanup
+  855, 860, 862-867, 878-879, 889-890, 896, and 898 toward managed-child,
+  HostText, multi-child, sync-flush delete/post-passive continuation,
+  FunctionComponent deletion, HostRoot update-queue lane handoff, and
+  finished-work commit queue-lane consumer shapes only as private test-host
+  canaries with source-owned commit, host-node, root/lane, queue/handoff,
+  store-backed row lane metadata, topology, replay, ref/passive, and cleanup
   validation. Public React DOM/test-renderer roots and public `flushSync`
   remain blocked.
 - Test-renderer package-root/native work should use accepted Worker 844
@@ -112,11 +121,13 @@ canonical evidence requirements.
 - React DOM facade/native handoffs may use accepted Worker 848 nested facade
   native handoff metadata, Worker 869 fake-DOM lifecycle snapshots, Worker 874
   private lifecycle request/snapshot boundary hardening, Worker 880 root update
-  execution consumer, and Worker 883 resource/form lifecycle boundary
-  hardening as diagnostic input. Worker 891 remains non-input until accepted.
-  Any real native/Rust execution or public facade work still must prove
-  scheduling, commit, cleanup, DOM output, listener/event/ref behavior,
-  hydration boundaries, and package compatibility.
+  execution consumer, Worker 883 resource/form lifecycle boundary hardening,
+  and Worker 891 source-owned root unmount lifecycle request-boundary consumer
+  as diagnostic input. Any real native/Rust execution or public facade work
+  still must prove scheduling, commit, cleanup, DOM output,
+  listener/event/ref behavior, hydration boundaries, public/browser
+  DOM/hydration/event/ref/package/native/Rust alias rejection, and package
+  compatibility.
 - Resource and form work can consume accepted Worker 856's root execution
   consumer with Worker 850 ledger/source-token metadata and Worker 883
   lifecycle boundary hardening, plus Worker 893's private root/lifecycle-bound
@@ -147,9 +158,10 @@ canonical evidence requirements.
   hydration work must prove real root creation, marker/listener behavior,
   recoverable error routing, event replay, and DOM mutation semantics against
   React 19.2.6.
-- Additional private root/test-renderer bridge gates that require accepted
-  `finished_work` / `finished_lanes` handoff before any wider serialization or
-  native bridge execution.
+- Additional private root/test-renderer bridge gates can build on Worker 898's
+  accepted `finished_work` / `finished_lanes` queue-lane consumer only after
+  preserving source-owned handoff rows and store-backed row lane metadata
+  before any wider serialization or native bridge execution.
 
 Premature until later gates are green: public React DOM root render/unmount,
 public `act`, public `flushSync`, public Scheduler timing, public hydration,

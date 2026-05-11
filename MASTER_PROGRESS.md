@@ -29,6 +29,27 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 891 and 898
+
+- Worker 891 added a private React DOM `root.unmount()` lifecycle execution
+  consumer that now requires source-owned
+  `PrivateRootLifecycleRequestBoundaryRecord` evidence before cleanup
+  diagnostics are accepted. It rejects public/browser
+  DOM/hydration/event/ref/package/native/Rust/prose/source-syntax aliases
+  before root retirement. Public root unmount/render/hydration/browser
+  DOM/native/package compatibility remain blocked.
+- Worker 898 added a private Rust HostRoot finished-work/commit queue-lane
+  consumer that requires source-owned queue/lane handoff rows and store-backed
+  row lane metadata before switching `root.current`. Forged-row bypass,
+  stale, replayed, cross-root, wrong-lane, and skipped-lane evidence is
+  rejected before commit. Public React DOM/test-renderer roots, scheduling
+  timing, broad hooks, and package compatibility remain blocked.
+- The batch was accepted in current main
+  `935de5cdd9de989c7e61b45c5f0f5c53b7ccc59d` after focused React DOM private
+  root lifecycle, public-facade blocker, Rust queue-lane commit consumer,
+  package-surface, import-smoke, formatting, and `git diff --check`
+  verification recorded in worker reports and git history.
+
 ### Workers 885, 887, and 895
 
 - Worker 885 replaced React-minted `act` lifecycle evidence with React DOM
