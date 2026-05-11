@@ -1515,6 +1515,8 @@ test("React DOM client private hydrateRoot event replay preflight validates bloc
   assert.equal(eventReplayRecord.syntheticEventCreated, false);
   assert.equal(eventReplayRecord.listenerInvocationCount, 0);
   assert.equal(eventReplayRecord.hydrateInstanceCalled, false);
+  assert.equal(eventReplayRecord.rootScheduled, false);
+  assert.equal(eventReplayRecord.suspenseHydrationScheduled, false);
   assert.equal(eventReplayRecord.replayQueueDrained, false);
   assert.equal(eventReplayRecord.replayQueuesDrained, false);
   assert.equal(eventReplayRecord.clickReplayDispatchDiagnosticRecorded, true);

@@ -7264,6 +7264,8 @@ test('private react-dom/client hydrateRoot event replay preflight validates bloc
   assert.equal(eventReplayPreflight.willInvokeListeners, false);
   assert.equal(eventReplayPreflight.hydrateInstanceCalled, false);
   assert.equal(eventReplayPreflight.hydrateTextInstanceCalled, false);
+  assert.equal(eventReplayPreflight.rootScheduled, false);
+  assert.equal(eventReplayPreflight.suspenseHydrationScheduled, false);
   assert.equal(eventReplayPreflight.replayQueueDrained, false);
   assert.equal(eventReplayPreflight.replayQueuesDrained, false);
   assert.equal(eventReplayPreflight.queued, false);

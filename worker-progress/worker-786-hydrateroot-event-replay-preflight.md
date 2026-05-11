@@ -118,3 +118,31 @@ git diff --stat
 - Merge after orchestrator review.
 - Use this accepted event replay preflight evidence as a prerequisite for any
   future real hydration replay execution gate.
+
+## Acceptance Audit Follow-up
+
+- Added explicit positive-test assertions that the private hydrateRoot event
+  replay preflight keeps `rootScheduled === false` and
+  `suspenseHydrationScheduled === false`.
+- Updated both the focused root-bridge package test and the public facade
+  conformance test while preserving the existing dispatch, listener, DOM
+  mutation, callback, replay draining, and public compatibility blockers.
+
+### Follow-up Verification
+
+- `node --check packages/react-dom/test/react-dom-private-root-bridge-shell.test.js`:
+  passed.
+- `node --check tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs`:
+  passed.
+- `node --test packages/react-dom/test/hydration-private.test.js`: passed,
+  10 tests.
+- `node --test packages/react-dom/test/react-dom-private-root-bridge-shell.test.js`:
+  passed, 64 tests.
+- `node --test tests/conformance/test/react-dom-root-public-facade-blocked-gate.test.mjs`:
+  passed, 30 tests.
+- `npm run check --workspace @fast-react/react-dom`: passed, 171 package
+  tests plus import-entrypoint smoke. npm emitted the existing unknown
+  `minimum-release-age` config warning.
+- `npm run check:package-surface`: passed.
+- `node tests/smoke/import-entrypoints.mjs`: passed.
+- `git diff --check`: passed.
