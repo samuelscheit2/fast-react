@@ -379,6 +379,10 @@ const privateAdmission850Rows = freezeArray([
           "fakeRootResourceStorageMutated",
           "fakeHoistableStylesMapMutated",
           "fakeHoistableScriptsMapMutated",
+          "describePrivateResourceFormRootExecutionConsumerBoundary",
+          "resourceRootMapStorageExecutionConsumed",
+          "deterministicFakeRootMapStorageConsumed",
+          "privateResourceFormExecutionAdmissionLedgerId",
           "rootMapStorageGate",
           "describePrivateResourceHintRootMapStorageGate"
         ]
@@ -497,7 +501,12 @@ const privateAdmission850Rows = freezeArray([
           "resetUpdateEnqueued",
           "resetFormInstanceCalled",
           "formResetCommitted",
-          "realFormReset"
+          "realFormReset",
+          "describePrivateResourceFormRootExecutionConsumerBoundary",
+          "formFulfilledResetExecutionConsumed",
+          "deterministicFakeResetStateQueueConsumed",
+          "deterministicFakeResetCommitConsumed",
+          "privateResourceFormExecutionAdmissionLedgerId"
         ]
       }),
       packageExportEvidenceData({

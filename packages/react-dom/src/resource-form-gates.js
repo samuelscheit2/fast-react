@@ -8,11 +8,22 @@ const internalsGate = require('./resource-form-internals-gate.js');
 const formActions = require('./shared/form-actions.js');
 const rootBridge = require('./client/root-bridge.js');
 
+const hasOwn = Object.prototype.hasOwnProperty;
+
 const resourceFormRootBridgeGateSchemaVersion = 1;
+const resourceFormRootExecutionConsumerGateSchemaVersion = 1;
 const resourceFormRootBridgeBlockedGateId =
   'resource-form-root-bridge-blocked-gate-1';
+const privateResourceFormRootExecutionConsumerGateId =
+  'resource-form-root-execution-consumer-private-gate-1';
+const privateResourceFormRootExecutionConsumerStatus =
+  'consumed-private-resource-form-root-execution-evidence';
+const privateResourceFormRootExecutionConsumerCompatibilityBlockedStatus =
+  'blocked-private-resource-form-root-execution-consumer-compatibility';
 const resourceFormRootBoundaryRecordType =
   'fast.react_dom.resource_form_root_boundary_record';
+const resourceFormRootExecutionConsumerRecordType =
+  'fast.react_dom.resource_form_root_execution_consumer_record';
 const resourceFormPortalCommitBoundaryRecordType =
   'fast.react_dom.resource_form_portal_commit_boundary_record';
 const resourceFormPortalFakeDomMountBoundaryRecordType =
@@ -39,10 +50,30 @@ const rootBoundaryInvalidRootMetadataCode =
   'FAST_REACT_DOM_RESOURCE_FORM_ROOT_BOUNDARY_INVALID_ROOT_METADATA';
 const rootBoundaryInvalidPublicMetadataCode =
   'FAST_REACT_DOM_RESOURCE_FORM_ROOT_BOUNDARY_INVALID_PUBLIC_METADATA';
+const rootBoundaryInvalidRootExecutionConsumerAdmissionCode =
+  'FAST_REACT_DOM_RESOURCE_FORM_ROOT_EXECUTION_CONSUMER_INVALID_ADMISSION';
+const rootBoundaryInvalidRootExecutionConsumerRecordCode =
+  'FAST_REACT_DOM_RESOURCE_FORM_ROOT_EXECUTION_CONSUMER_INVALID_RECORD';
+const privateResourceFormExecutionAdmissionLedgerId =
+  'private-admission-850-resource-form-execution-ledger-1';
+const privateResourceFormExecutionAdmissionLedgerStatus =
+  'recognized-worker-829-830-resource-form-private-execution-public-blocked';
+const privateResourceFormExecutionAdmissionLedgerSource =
+  'tests/conformance/src/private-admission-850-resource-form-execution-ledger.mjs';
+const privateResourceFormExecutionAdmissionSourceTokenPolicy =
+  'source-owned-identifiers-statuses-functions-fields-and-constants';
+const privateResourceFormExecutionAdmissionWorkerIds = freezeArray([
+  'worker-829-resource-root-map-storage-private-execution',
+  'worker-830-form-action-fulfilled-reset-fake-commit',
+  'worker-850-resource-form-execution-admission-ledger'
+]);
 
 const boundaryRecordPayloads = new WeakMap();
+const rootExecutionConsumerRecordPayloads = new WeakMap();
 const portalCommitBoundaryRecordPayloads = new WeakMap();
 const portalFakeDomMountBoundaryRecordPayloads = new WeakMap();
+const consumedRootMapStorageExecutionRecords = new WeakSet();
+const consumedFulfilledResetExecutionRecords = new WeakSet();
 
 const rootBlockedFlagFields = freezeArray([
   'nativeExecution',
@@ -107,6 +138,21 @@ const portalFakeDomMountResourceSideEffects = freezeRecord({
   portalListenersInstalled: false
 });
 
+const rootExecutionConsumerSideEffects = freezeRecord({
+  ...rootBoundarySideEffects,
+  rootExecutionConsumerInvoked: true,
+  worker850AdmissionLedgerBoundaryRecorded: true,
+  resourceRootMapStorageExecutionConsumed: true,
+  formFulfilledResetExecutionConsumed: true,
+  deterministicFakeRootMapStorageConsumed: true,
+  deterministicFakeResetStateQueueConsumed: true,
+  deterministicFakeResetCommitConsumed: true,
+  callerSuppliedSourceTokensAccepted: false,
+  publicResourceCompatibilityClaimed: false,
+  publicFormCompatibilityClaimed: false,
+  publicPackageCompatibilityClaimed: false
+});
+
 function describeResourceFormRootBridgeBlockedGate() {
   return freezeRecord({
     schemaVersion: resourceFormRootBridgeGateSchemaVersion,
@@ -134,6 +180,8 @@ function describeResourceFormRootBridgeBlockedGate() {
       describePrivateFormActionFulfilledResetExecutionBoundary(null),
     privateFormActionRejectedErrorPreflightBoundary:
       describePrivateFormActionRejectedErrorPreflightBoundary(null),
+    privateResourceFormRootExecutionConsumerBoundary:
+      describePrivateResourceFormRootExecutionConsumerBoundary(),
     sourceAdapterBoundary: describeSourceAdapterBoundary(null),
     sideEffects: rootBoundarySideEffects
   });
@@ -176,6 +224,8 @@ function recordResourceFormRootBridgeBlockedRequest(record, options) {
     describePrivateFormActionRejectedErrorPreflightBoundary(
       request.behaviorArea
     );
+  const privateResourceFormRootExecutionConsumerBoundary =
+    describePrivateResourceFormRootExecutionConsumerBoundary();
 
   const payload = freezeRecord({
     $$typeof: resourceFormRootBoundaryRecordType,
@@ -202,6 +252,7 @@ function recordResourceFormRootBridgeBlockedRequest(record, options) {
     privateFormActionAsyncCallbackExecutionBoundary,
     privateFormActionFulfilledResetExecutionBoundary,
     privateFormActionRejectedErrorPreflightBoundary,
+    privateResourceFormRootExecutionConsumerBoundary,
     sourceAdapterBoundary,
     sideEffects: rootBoundarySideEffects
   });
@@ -290,12 +341,172 @@ function recordResourceFormPortalFakeDomMountBlockedRequest(mountRecord) {
   return payload;
 }
 
+function createResourceFormRootExecutionConsumerGate(options) {
+  const requestIdPrefix =
+    options && typeof options.requestIdPrefix === 'string'
+      ? options.requestIdPrefix
+      : 'resource-form-root-execution-consumer';
+  const gateState = {
+    requestIdPrefix,
+    nextRequestSequence: 1
+  };
+
+  return Object.freeze({
+    recordRootExecutionConsumer(
+      rootBridgeAdmission,
+      resourceRootMapStorageExecutionRecord,
+      formFulfilledResetExecutionRecord,
+      admission
+    ) {
+      return recordResourceFormRootExecutionConsumerWithGate(
+        gateState,
+        rootBridgeAdmission,
+        resourceRootMapStorageExecutionRecord,
+        formFulfilledResetExecutionRecord,
+        admission
+      );
+    }
+  });
+}
+
+function recordResourceFormRootExecutionConsumerWithGate(
+  gateState,
+  rootBridgeAdmission,
+  resourceRootMapStorageExecutionRecord,
+  formFulfilledResetExecutionRecord,
+  admission
+) {
+  assertRootBridgeAdmissionIsRecordOnly(rootBridgeAdmission);
+  const normalizedAdmission =
+    normalizeResourceFormRootExecutionConsumerAdmission(admission);
+  const resourceExecution =
+    assertResourceRootMapStorageExecutionForRootConsumer(
+      resourceRootMapStorageExecutionRecord,
+      rootBridgeAdmission
+    );
+  const fulfilledResetExecution =
+    assertFormFulfilledResetExecutionForRootConsumer(
+      formFulfilledResetExecutionRecord
+    );
+
+  if (
+    consumedRootMapStorageExecutionRecords.has(
+      resourceRootMapStorageExecutionRecord
+    )
+  ) {
+    throwInvalidRootExecutionConsumerRecord(
+      'resource root-map storage execution was already consumed by a root boundary consumer'
+    );
+  }
+  if (
+    consumedFulfilledResetExecutionRecords.has(
+      formFulfilledResetExecutionRecord
+    )
+  ) {
+    throwInvalidRootExecutionConsumerRecord(
+      'form fulfilled reset execution was already consumed by a root boundary consumer'
+    );
+  }
+
+  const consumerSequence = gateState.nextRequestSequence++;
+  const consumerId = `${gateState.requestIdPrefix}:${consumerSequence}`;
+  const resourceBoundary =
+    createResourceRootMapStorageConsumerBoundary(resourceExecution);
+  const formBoundary =
+    createFormFulfilledResetConsumerBoundary(fulfilledResetExecution);
+
+  const payload = freezeRecord({
+    $$typeof: resourceFormRootExecutionConsumerRecordType,
+    kind: 'FastReactDomResourceFormRootExecutionConsumerRecord',
+    schemaVersion: resourceFormRootExecutionConsumerGateSchemaVersion,
+    gateId: privateResourceFormRootExecutionConsumerGateId,
+    compatibilityTarget,
+    status: privateResourceFormRootExecutionConsumerStatus,
+    compatibilityStatus:
+      privateResourceFormRootExecutionConsumerCompatibilityBlockedStatus,
+    unsupportedCode: unimplementedCode,
+    consumerId,
+    consumerSequence,
+    requestType: 'resource-form-root-execution-consumer.private-fake',
+    rootId: rootBridgeAdmission.rootId,
+    rootKind: rootBridgeAdmission.rootKind,
+    rootTag: rootBridgeAdmission.rootTag,
+    sourceRootBridgeAdmissionId: rootBridgeAdmission.requestId,
+    sourceRootBridgeAdmissionStatus: rootBridgeAdmission.admissionStatus,
+    sourceRootBridgeOperation: rootBridgeAdmission.operation,
+    admission: normalizedAdmission,
+    rootBridgeBoundary:
+      describePrivateRootBridgeBoundary(rootBridgeAdmission),
+    publicRootBoundary: describePublicRootBoundary(),
+    ledgerBoundary: createResourceFormExecutionAdmissionLedgerBoundary(),
+    resourceRootMapStorageBoundary: resourceBoundary,
+    formFulfilledResetBoundary: formBoundary,
+    sourceOwnedEvidence: freezeRecord({
+      workerIds: privateResourceFormExecutionAdmissionWorkerIds,
+      sourceTokenPolicy:
+        privateResourceFormExecutionAdmissionSourceTokenPolicy,
+      resourceRootMapStorageExecutionTokens:
+        resourceBoundary.sourceOwnedTokens,
+      formFulfilledResetExecutionTokens: formBoundary.sourceOwnedTokens,
+      callerSuppliedAliasesAccepted: false,
+      clonedEvidenceAccepted: false,
+      testTitleEvidenceAccepted: false,
+      errorMessageEvidenceAccepted: false,
+      sourceSyntaxFragmentEvidenceAccepted: false
+    }),
+    publicResourceBoundary: freezeRecord({
+      publicResourcesClaimed: false,
+      publicResourceApisReachable: false,
+      publicResourceHintDomInsertion: false,
+      publicResourceMapCommitBehavior: false,
+      publicResourceCompatibilityClaimed: false
+    }),
+    publicFormBoundary: freezeRecord({
+      publicFormsClaimed: false,
+      publicFormActionsEnabled: false,
+      publicSubmitDispatchReachable: false,
+      publicRequestFormResetReachable: false,
+      actionInvoked: false,
+      reactUpdateQueued: false,
+      formResetCommitted: false,
+      realFormReset: false,
+      publicFormCompatibilityClaimed: false
+    }),
+    sideEffects: rootExecutionConsumerSideEffects,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    publicRootExecution: false,
+    domMutation: false,
+    resourceSideEffects: false,
+    formSideEffects: false,
+    reactUpdateQueued: false,
+    compatibilityClaimed: false
+  });
+
+  consumedRootMapStorageExecutionRecords.add(
+    resourceRootMapStorageExecutionRecord
+  );
+  consumedFulfilledResetExecutionRecords.add(
+    formFulfilledResetExecutionRecord
+  );
+  rootExecutionConsumerRecordPayloads.set(payload, payload);
+  return payload;
+}
+
 function getResourceFormRootBridgeBlockedRecordPayload(record) {
   return boundaryRecordPayloads.get(record) || null;
 }
 
 function isResourceFormRootBridgeBlockedRecord(value) {
   return boundaryRecordPayloads.has(value);
+}
+
+function getResourceFormRootExecutionConsumerRecordPayload(record) {
+  return rootExecutionConsumerRecordPayloads.get(record) || null;
+}
+
+function isResourceFormRootExecutionConsumerRecord(value) {
+  return rootExecutionConsumerRecordPayloads.has(value);
 }
 
 function getResourceFormPortalCommitBlockedRecordPayload(record) {
@@ -312,6 +523,511 @@ function getResourceFormPortalFakeDomMountBlockedRecordPayload(record) {
 
 function isResourceFormPortalFakeDomMountBlockedRecord(value) {
   return portalFakeDomMountBoundaryRecordPayloads.has(value);
+}
+
+function normalizeResourceFormRootExecutionConsumerAdmission(admission) {
+  if (admission == null || typeof admission !== 'object') {
+    throwInvalidRootExecutionConsumerAdmission(
+      'root execution consumer admission metadata must be an object'
+    );
+  }
+
+  if (admission.explicitResourceFormRootExecutionConsumer !== true) {
+    throwInvalidRootExecutionConsumerAdmission(
+      'explicitResourceFormRootExecutionConsumer must be true'
+    );
+  }
+
+  assertNoRootExecutionConsumerRawAdmissionFields(admission);
+  assertNoRootExecutionConsumerPublicClaims(admission);
+  assertNoRootExecutionConsumerCallerSourceTokens(admission);
+
+  return freezeRecord({
+    explicitResourceFormRootExecutionConsumer: true,
+    sourceOwnedPrivateRecordsRequired: true,
+    sourceOwnedLedgerBoundaryRequired: true,
+    callerSuppliedSourceTokensAccepted: false,
+    deterministicFakeResourceEvidenceOnly: true,
+    deterministicFakeFormEvidenceOnly: true,
+    publicRootTouched: false,
+    publicResourcesClaimed: false,
+    publicFormsClaimed: false,
+    publicPackageCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
+}
+
+function assertResourceRootMapStorageExecutionForRootConsumer(
+  record,
+  rootBridgeAdmission
+) {
+  const payload =
+    internalsGate.getPrivateResourceHintRootMapStorageRecordPayload(record);
+  if (payload === null) {
+    throwInvalidRootExecutionConsumerRecord(
+      'resource root-map storage execution record must be source-owned'
+    );
+  }
+
+  if (
+    payload.$$typeof !==
+      internalsGate.privateResourceHintRootMapStorageRecordType ||
+    payload.kind !== 'FastReactDomPrivateResourceHintRootMapStorageRecord' ||
+    payload.gateId !==
+      internalsGate.privateResourceHintRootMapStorageGateId ||
+    payload.status !== internalsGate.unsupportedStatus ||
+    payload.rootMapStorageStatus !==
+      internalsGate.privateResourceHintRootMapStorageStatus ||
+    payload.executionStatus !==
+      internalsGate.privateResourceHintRootMapStorageExecutionStatus ||
+    payload.compatibilityStatus !==
+      internalsGate
+        .privateResourceHintRootMapStorageCompatibilityBlockedStatus ||
+    payload.rootMapStorageExecutionPlan?.storageKind !==
+      'react-19.2.6-resource-root-map-storage-private-execution' ||
+    payload.rootMapStorageSnapshot?.snapshotKind !==
+      'react-19.2.6-resource-root-map-storage-private-execution-snapshot' ||
+    payload.storageAdmission?.executionKind !==
+      'deterministic-private-root-map-storage-execution'
+  ) {
+    throwInvalidRootExecutionConsumerRecord(
+      'resource root-map storage execution record is missing source-owned Worker 829 tokens'
+    );
+  }
+
+  if (
+    payload.storageAdmission.rootId !== rootBridgeAdmission.rootId ||
+    payload.storageAdmission.ownerRootId !== rootBridgeAdmission.rootId ||
+    payload.rootMapStorageExecutionPlan.rootId !==
+      rootBridgeAdmission.rootId ||
+    payload.rootMapStorageExecutionPlan.ownerRootId !==
+      rootBridgeAdmission.rootId ||
+    payload.rootMapStorageSnapshot.rootId !== rootBridgeAdmission.rootId ||
+    payload.rootMapStorageSnapshot.ownerRootId !==
+      rootBridgeAdmission.rootId ||
+    payload.rootMapStorageValidationBoundary?.rootId !==
+      rootBridgeAdmission.rootId ||
+    payload.rootMapStorageValidationBoundary?.ownerRootId !==
+      rootBridgeAdmission.rootId
+  ) {
+    throwInvalidRootExecutionConsumerRecord(
+      'resource root-map storage execution rootId must match root bridge admission'
+    );
+  }
+
+  assertResourceRootMapStorageExecutionPlanForRootConsumer(payload);
+  return payload;
+}
+
+function assertResourceRootMapStorageExecutionPlanForRootConsumer(payload) {
+  const rows = payload.rootMapStorageExecutionRows;
+  const styleRows = payload.hoistableStylesRootMapExecutionRows;
+  const scriptRows = payload.hoistableScriptsRootMapExecutionRows;
+  const snapshot = payload.rootMapStorageSnapshot;
+  const validation = payload.rootMapStorageValidationBoundary;
+  const plan = payload.rootMapStorageExecutionPlan;
+
+  if (
+    !Array.isArray(rows) ||
+    rows.length === 0 ||
+    !Array.isArray(styleRows) ||
+    !Array.isArray(scriptRows) ||
+    plan.rootMapStorageExecutionRowCount !== rows.length ||
+    plan.canonicalRootMapStorageRowCount !== rows.length ||
+    snapshot.rootMapStorageExecutionRowCount !== rows.length ||
+    snapshot.hoistableStylesMapSize !== styleRows.length ||
+    snapshot.hoistableScriptsMapSize !== scriptRows.length ||
+    validation?.status !==
+      'validated-private-resource-root-map-storage-execution' ||
+    validation.checkedRowCount !== rows.length ||
+    validation.preflightRecordConsumed !== true ||
+    validation.clonedPreflightRecordRejected !== true ||
+    validation.fakeRootStorageTargetsRejected !== true ||
+    validation.realResourceMapsMutated !== false ||
+    validation.preloadPropsMapMutated !== false ||
+    validation.compatibilityClaimed !== false
+  ) {
+    throwInvalidRootExecutionConsumerRecord(
+      'resource root-map storage execution rows must match source-owned Worker 829 shape'
+    );
+  }
+
+  rows.forEach((row, index) => {
+    if (
+      row == null ||
+      row.rowType !== 'root-map-storage-execution' ||
+      row.rowId !== `root-map-storage-execution-${index}` ||
+      row.storedEntryId !== `root-map-storage-entry-${index}` ||
+      row.rootId !== payload.storageAdmission.rootId ||
+      row.ownerRootId !== payload.storageAdmission.ownerRootId ||
+      row.storedInRootMap !== true ||
+      row.canonicalRootMapStorageRow !== true ||
+      row.rootStoragePreflighted !== true ||
+      row.rootResourceStorageCreated !== true ||
+      row.rootResourceStorageMutated !== true ||
+      row.fakeRootMapEntryCreated !== true ||
+      row.fakeRootMapEntryMutated !== true ||
+      row.realResourceMapCreated !== false ||
+      row.realResourceMapMutated !== false ||
+      row.preloadPropsMapCreated !== false ||
+      row.preloadPropsMapMutated !== false ||
+      row.publicResourceHintDomInsertion !== false ||
+      row.publicResourceMapCommitBehavior !== false ||
+      row.publicScriptModuleResourceDispatch !== false ||
+      row.publicStylesheetLoadStateDispatch !== false ||
+      row.compatibilityClaimed !== false
+    ) {
+      throwInvalidRootExecutionConsumerRecord(
+        'resource root-map storage execution rows must stay canonical fake root-map rows'
+      );
+    }
+  });
+
+  assertRootMapStorageSnapshotEntriesForRootConsumer(
+    snapshot.hoistableStylesMapEntries,
+    rows
+  );
+  assertRootMapStorageSnapshotEntriesForRootConsumer(
+    snapshot.hoistableScriptsMapEntries,
+    rows
+  );
+
+  if (
+    plan.rootResourceStorageShapeRecorded !== true ||
+    plan.rootMapStorageSnapshotRecorded !== true ||
+    plan.deterministicFakeRootMapStorageExecuted !== true ||
+    plan.rootResourceStorageCreated !== true ||
+    plan.rootResourceStorageMutated !== true ||
+    plan.fakeResourceMapsCreated !== true ||
+    plan.fakeResourceMapsMutated !== true ||
+    plan.realResourceMapsCreated !== false ||
+    plan.realResourceMapsMutated !== false ||
+    plan.preloadPropsMapCreated !== false ||
+    plan.preloadPropsMapMutated !== false ||
+    plan.publicResourceHintDomInsertion !== false ||
+    plan.publicResourceMapCommitBehavior !== false ||
+    plan.publicScriptModuleResourceDispatch !== false ||
+    plan.publicStylesheetLoadStateDispatch !== false ||
+    plan.compatibilityClaimed !== false ||
+    payload.rootMapPublicBoundary?.status !==
+      'blocked-public-resource-root-map-storage' ||
+    payload.rootMapPublicBoundary?.publicResourceApisReachable !== false ||
+    payload.rootMapPublicBoundary?.compatibilityClaimed !== false ||
+    payload.sideEffects?.rootMapStorageExecutionRecorded !== true ||
+    payload.sideEffects?.deterministicFakeRootMapStorageExecuted !== true ||
+    payload.sideEffects?.realResourceMapsMutated !== false ||
+    payload.sideEffects?.preloadPropsMapMutated !== false ||
+    payload.sideEffects?.publicResourceMapCommitBehavior !== false ||
+    payload.sideEffects?.compatibilityClaimed !== false
+  ) {
+    throwInvalidRootExecutionConsumerRecord(
+      'resource root-map storage execution must remain fake and public-blocked'
+    );
+  }
+}
+
+function assertRootMapStorageSnapshotEntriesForRootConsumer(entries, rows) {
+  if (!Array.isArray(entries)) {
+    throwInvalidRootExecutionConsumerRecord(
+      'resource root-map storage snapshot entries must be source-owned arrays'
+    );
+  }
+
+  for (const entry of entries) {
+    const sourceRow = rows.find(
+      (row) => row.storedEntryId === entry.entryId
+    );
+    if (
+      sourceRow === undefined ||
+      entry.sourceRootMapStorageRowId !==
+        sourceRow.sourceRootMapStorageRowId ||
+      entry.sourceResourceMapCommitRowId !==
+        sourceRow.sourceResourceMapCommitRowId ||
+      entry.rootMapName !== sourceRow.rootMapName ||
+      entry.rootMapDedupeKey !== sourceRow.rootMapDedupeKey ||
+      entry.deterministicFakeRootMapStorageOnly !== true ||
+      entry.realResourceMapEntry !== false ||
+      entry.preloadPropsMapEntry !== false ||
+      entry.compatibilityClaimed !== false
+    ) {
+      throwInvalidRootExecutionConsumerRecord(
+        'resource root-map storage snapshot entries must match executed rows'
+      );
+    }
+  }
+}
+
+function assertFormFulfilledResetExecutionForRootConsumer(record) {
+  const payload =
+    formActions.getPrivateFormActionFulfilledResetExecutionRecordPayload(
+      record
+    );
+  if (payload === null) {
+    throwInvalidRootExecutionConsumerRecord(
+      'form fulfilled reset execution record must be source-owned'
+    );
+  }
+
+  if (
+    payload.$$typeof !==
+      formActions.privateFormActionFulfilledResetExecutionRecordType ||
+    payload.kind !==
+      'FastReactDomPrivateFormActionFulfilledResetExecutionRecord' ||
+    payload.gateId !==
+      formActions.privateFormActionFulfilledResetExecutionGateId ||
+    payload.status !==
+      formActions.privateFormActionFulfilledResetExecutionRecordedStatus ||
+    payload.requestType !==
+      'form-action-fulfilled-reset-execution.fake-commit' ||
+    payload.contractId !== 'form-action-fulfilled-reset-fake-commit' ||
+    payload.admission?.diagnosticKind !==
+      formActions.formActionFulfilledResetExecutionDiagnosticKind ||
+    payload.admission?.queueExecutionKind !==
+      formActions.formActionFulfilledResetExecutionQueueExecutionKind ||
+    payload.admission?.commitKind !== 'after-mutation-form-reset-order' ||
+    payload.admission?.deterministicFakeResetCommitOnly !== true ||
+    payload.admission?.postFulfillmentOnly !== true
+  ) {
+    throwInvalidRootExecutionConsumerRecord(
+      'form fulfilled reset execution record is missing source-owned Worker 830 tokens'
+    );
+  }
+
+  assertFormFulfilledResetExecutionPlanForRootConsumer(payload);
+  return payload;
+}
+
+function assertFormFulfilledResetExecutionPlanForRootConsumer(payload) {
+  const asyncSource = payload.sourceAsyncCallbackExecution;
+  const submitResetSource = payload.sourceSubmitResetExecution;
+  const fulfilledResult = payload.fulfilledActionResult;
+  const queue = payload.fakeResetStateQueueExecution;
+  const commit = payload.fakeResetCommitExecution;
+
+  if (
+    asyncSource?.callbackExecutionStatus !==
+      'executed-private-form-action-async-callback-fulfilled' ||
+    asyncSource.fulfilled !== true ||
+    asyncSource.rejected !== false ||
+    asyncSource.failClosed !== false ||
+    asyncSource.publicActionInvoked !== false ||
+    asyncSource.reactUpdateQueued !== false ||
+    asyncSource.realFormReset !== false ||
+    submitResetSource?.fakeFormResetPathExecuted !== true ||
+    submitResetSource.fakeFormResetRecorded !== true ||
+    submitResetSource.callbackDispatchExecuted !== false ||
+    submitResetSource.actionInvoked !== false ||
+    submitResetSource.reactUpdateQueued !== false ||
+    submitResetSource.realFormReset !== false ||
+    fulfilledResult?.status !==
+      'recorded-private-form-action-fulfilled-result-metadata' ||
+    fulfilledResult.metadataOnly !== true ||
+    fulfilledResult.fulfilled !== true ||
+    fulfilledResult.actionResultExposed !== false ||
+    fulfilledResult.publicActionInvoked !== false ||
+    fulfilledResult.reactUpdateQueued !== false ||
+    fulfilledResult.realFormReset !== false
+  ) {
+    throwInvalidRootExecutionConsumerRecord(
+      'form fulfilled reset execution sources must stay accepted fake metadata'
+    );
+  }
+
+  if (
+    queue?.status !==
+      'executed-private-form-action-fulfilled-reset-state-queue-fake' ||
+    queue.queueExecutionKind !==
+      formActions.formActionFulfilledResetExecutionQueueExecutionKind ||
+    !sameStringArray(queue.sourceFunctionNames, [
+      'request' + 'FormReset',
+      'ensureFormComponentIsStateful',
+      'dispatchSetStateInternal',
+      'requestUpdateLane'
+    ]) ||
+    queue.requestUpdateLaneRecorded !== true ||
+    queue.dispatchSetStateInternalRecorded !== true ||
+    queue.fakeResetStateQueueExecuted !== true ||
+    queue.fakeResetStateUpdateQueued !== true ||
+    queue.resetQueuePendingMutated !== false ||
+    queue.realReactUpdateQueued !== false ||
+    queue.resetStateQueued !== false ||
+    queue.resetUpdateEnqueued !== false ||
+    queue.reactUpdateQueued !== false ||
+    queue.updateQueueCaptured !== false ||
+    commit?.status !==
+      'executed-private-form-action-fulfilled-reset-commit-fake' ||
+    commit.commitKind !== 'after-mutation-form-reset-order' ||
+    !sameStringArray(commit.sourceFunctionNames, [
+      'request' + 'FormReset',
+      'resetForm' + 'Instance'
+    ]) ||
+    commit.fakeResetStateQueueExecutionId !== queue.queueExecutionId ||
+    commit.fakeResetStateUpdateId !== queue.resetStateUpdateId ||
+    commit.fakeResetCommitExecuted !== true ||
+    commit.fakeFormResetCommitRecorded !== true ||
+    commit.fakeResetFormInstanceCallRecorded !== true ||
+    commit.resetFormInstanceCalled !== false ||
+    commit.formResetCommitted !== false ||
+    commit.realFormReset !== false ||
+    commit.domMutation !== false
+  ) {
+    throwInvalidRootExecutionConsumerRecord(
+      'form fulfilled reset fake queue and commit evidence must remain source-owned'
+    );
+  }
+
+  if (
+    payload.publicFormActionBoundary?.publicFormActionsEnabled !== false ||
+    payload.publicFormActionBoundary?.publicSubmitDispatchReachable !==
+      false ||
+    payload.publicFormActionBoundary?.publicRequestFormResetReachable !==
+      false ||
+    payload.publicFormActionBoundary?.actionInvoked !== false ||
+    payload.publicFormActionBoundary?.reactUpdateQueued !== false ||
+    payload.publicFormActionBoundary?.domMutation !== false ||
+    payload.publicFormActionBoundary?.realFormReset !== false ||
+    payload.sideEffects?.fakeResetStateQueueExecuted !== true ||
+    payload.sideEffects?.fakeResetCommitExecuted !== true ||
+    payload.sideEffects?.privateAsyncActionCallbackInvoked !== false ||
+    payload.sideEffects?.actionInvoked !== false ||
+    payload.sideEffects?.reactUpdateQueued !== false ||
+    payload.sideEffects?.realFormReset !== false ||
+    payload.sideEffects?.domMutation !== false ||
+    payload.sideEffects?.compatibilityClaimed !== false
+  ) {
+    throwInvalidRootExecutionConsumerRecord(
+      'form fulfilled reset execution must remain fake and public-blocked'
+    );
+  }
+}
+
+function createResourceRootMapStorageConsumerBoundary(resourceExecution) {
+  const plan = resourceExecution.rootMapStorageExecutionPlan;
+  const snapshot = resourceExecution.rootMapStorageSnapshot;
+  return freezeRecord({
+    status: privateResourceFormRootExecutionConsumerStatus,
+    sourceWorkerId:
+      'worker-829-resource-root-map-storage-private-execution',
+    gateId: resourceExecution.gateId,
+    recordType: resourceExecution.$$typeof,
+    rootMapStorageStatus: resourceExecution.rootMapStorageStatus,
+    executionStatus: resourceExecution.executionStatus,
+    compatibilityStatus: resourceExecution.compatibilityStatus,
+    rootMapStorageExecutionId:
+      resourceExecution.rootMapStorageExecutionId,
+    sourceRootMapStoragePreflightId:
+      resourceExecution.sourceRootMapStoragePreflightId,
+    rootId: plan.rootId,
+    rootKind: plan.rootKind,
+    ownerRootId: plan.ownerRootId,
+    rowCount: resourceExecution.rootMapStorageExecutionRows.length,
+    hoistableStylesRowCount: snapshot.hoistableStylesMapSize,
+    hoistableScriptsRowCount: snapshot.hoistableScriptsMapSize,
+    executionRowIds: freezeArray(
+      resourceExecution.rootMapStorageExecutionRows.map((row) => row.rowId)
+    ),
+    storedEntryIds: freezeArray(
+      resourceExecution.rootMapStorageExecutionRows.map(
+        (row) => row.storedEntryId
+      )
+    ),
+    sourceOwnedTokens: freezeArray([
+      resourceExecution.gateId,
+      resourceExecution.$$typeof,
+      resourceExecution.rootMapStorageStatus,
+      resourceExecution.executionStatus,
+      resourceExecution.compatibilityStatus,
+      resourceExecution.storageAdmission.executionKind,
+      plan.storageKind,
+      snapshot.snapshotKind,
+      resourceExecution.rootMapStorageValidationBoundary.status
+    ]),
+    sourceOwnedRowsConsumed: true,
+    deterministicFakeRootMapStorageConsumed: true,
+    rootResourceStorageMutated: plan.rootResourceStorageMutated,
+    fakeRootResourceStorageMutated: plan.rootResourceStorageMutated,
+    fakeHoistableStylesMapMutated: plan.hoistableStylesMapMutated,
+    fakeHoistableScriptsMapMutated: plan.hoistableScriptsMapMutated,
+    realResourceMapsMutated: false,
+    preloadPropsMapMutated: false,
+    publicResourceHintDomInsertion: false,
+    publicResourceMapCommitBehavior: false,
+    publicScriptModuleResourceDispatch: false,
+    publicStylesheetLoadStateDispatch: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createFormFulfilledResetConsumerBoundary(fulfilledResetExecution) {
+  const queue = fulfilledResetExecution.fakeResetStateQueueExecution;
+  const commit = fulfilledResetExecution.fakeResetCommitExecution;
+  return freezeRecord({
+    status: privateResourceFormRootExecutionConsumerStatus,
+    sourceWorkerId:
+      'worker-830-form-action-fulfilled-reset-fake-commit',
+    gateId: fulfilledResetExecution.gateId,
+    recordType: fulfilledResetExecution.$$typeof,
+    executionStatus: fulfilledResetExecution.status,
+    executionId: fulfilledResetExecution.executionId,
+    sourceAsyncCallbackExecutionId:
+      fulfilledResetExecution.sourceAsyncCallbackExecutionId,
+    sourceSubmitResetExecutionId:
+      fulfilledResetExecution.sourceSubmitResetExecutionId,
+    queueExecutionId: queue.queueExecutionId,
+    resetStateUpdateId: queue.resetStateUpdateId,
+    commitExecutionId: commit.commitExecutionId,
+    fakeFormResetCommitId: commit.fakeFormResetCommitId,
+    sourceOwnedTokens: freezeArray([
+      fulfilledResetExecution.gateId,
+      fulfilledResetExecution.$$typeof,
+      fulfilledResetExecution.status,
+      fulfilledResetExecution.requestType,
+      fulfilledResetExecution.contractId,
+      fulfilledResetExecution.admission.diagnosticKind,
+      fulfilledResetExecution.admission.queueExecutionKind,
+      fulfilledResetExecution.admission.commitKind,
+      queue.status,
+      commit.status
+    ]),
+    queueSourceFunctionNames: queue.sourceFunctionNames,
+    commitSourceFunctionNames: commit.sourceFunctionNames,
+    sourceOwnedQueueAndCommitConsumed: true,
+    deterministicFakeResetStateQueueConsumed: true,
+    deterministicFakeResetCommitConsumed: true,
+    fulfilledActionResultConsumed: true,
+    privateAsyncActionCallbackInvoked: false,
+    actionInvoked: false,
+    publicActionInvoked: false,
+    resetStateQueued: false,
+    resetUpdateEnqueued: false,
+    reactUpdateQueued: false,
+    resetFormInstanceCalled: false,
+    formResetCommitted: false,
+    realFormReset: false,
+    domMutation: false,
+    compatibilityClaimed: false
+  });
+}
+
+function createResourceFormExecutionAdmissionLedgerBoundary() {
+  return freezeRecord({
+    ledgerId: privateResourceFormExecutionAdmissionLedgerId,
+    ledgerStatus: privateResourceFormExecutionAdmissionLedgerStatus,
+    ledgerSource: privateResourceFormExecutionAdmissionLedgerSource,
+    workerIds: privateResourceFormExecutionAdmissionWorkerIds,
+    sourceTokenPolicy:
+      privateResourceFormExecutionAdmissionSourceTokenPolicy,
+    staticLedgerAccepted: true,
+    runtimeRecordsRequired: true,
+    sourceOwnedEvidenceRequired: true,
+    workerProgressEvidenceAccepted: false,
+    testTitleEvidenceAccepted: false,
+    errorMessageEvidenceAccepted: false,
+    sourceSyntaxFragmentEvidenceAccepted: false,
+    callerSuppliedDiagnosticStringsAccepted: false,
+    publicCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
 }
 
 function describePublicRootBoundary(options) {
@@ -1130,6 +1846,49 @@ function describeControlledValueTrackerBoundary(behaviorArea) {
   });
 }
 
+function describePrivateResourceFormRootExecutionConsumerBoundary() {
+  return freezeRecord({
+    gateId: privateResourceFormRootExecutionConsumerGateId,
+    gateStatus: privateResourceFormRootExecutionConsumerStatus,
+    compatibilityStatus:
+      privateResourceFormRootExecutionConsumerCompatibilityBlockedStatus,
+    ledgerBoundary: createResourceFormExecutionAdmissionLedgerBoundary(),
+    acceptedRootBridgeAdmissionStatus:
+      rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED,
+    acceptedResourceRootMapStorageRecordType:
+      internalsGate.privateResourceHintRootMapStorageRecordType,
+    acceptedResourceRootMapStorageStatus:
+      internalsGate.privateResourceHintRootMapStorageStatus,
+    acceptedResourceRootMapStorageExecutionStatus:
+      internalsGate.privateResourceHintRootMapStorageExecutionStatus,
+    acceptedFormFulfilledResetRecordType:
+      formActions.privateFormActionFulfilledResetExecutionRecordType,
+    acceptedFormFulfilledResetStatus:
+      formActions.privateFormActionFulfilledResetExecutionRecordedStatus,
+    consumesRootBridgeAdmission: true,
+    consumesResourceRootMapStorageExecution: true,
+    consumesFormFulfilledResetExecution: true,
+    requiresSourceOwnedPrivateRecords: true,
+    requiresWorker850AdmissionLedgerBoundary: true,
+    rejectsStaleRootMapStorageRecords: true,
+    rejectsCrossRootResourceRecords: true,
+    rejectsClonedRecords: true,
+    rejectsCallerSuppliedSourceTokens: true,
+    rejectsPublicCompatibilityAliases: true,
+    deterministicFakeResourceEvidenceOnly: true,
+    deterministicFakeFormEvidenceOnly: true,
+    publicRootExecution: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: false,
+    resourceSideEffects: false,
+    formSideEffects: false,
+    reactUpdateQueued: false,
+    realFormReset: false,
+    compatibilityClaimed: false
+  });
+}
+
 function describePrivateResourceDispatcherBoundary(behaviorArea) {
   if (behaviorArea !== null && behaviorArea !== 'resource-hint') {
     return null;
@@ -1228,12 +1987,126 @@ function assertResourceFormGateRecord(record) {
   throw error;
 }
 
+function assertNoRootExecutionConsumerRawAdmissionFields(admission) {
+  for (const field of [
+    'root',
+    'container',
+    'document',
+    'head',
+    'fakeHead',
+    'resourceRoot',
+    'rootResources',
+    'resourceMap',
+    'hoistableStyles',
+    'hoistableScripts',
+    'form',
+    'formElement',
+    'target',
+    'nativeEvent',
+    'event',
+    'action',
+    'formData',
+    'queue',
+    'updateQueue',
+    'domNode',
+    'instance'
+  ]) {
+    if (hasOwn.call(admission, field)) {
+      throwInvalidRootExecutionConsumerAdmission(
+        `${field} must not be passed to the root execution consumer gate`
+      );
+    }
+  }
+}
+
+function assertNoRootExecutionConsumerPublicClaims(admission) {
+  for (const field of [
+    'publicResourceApisReachable',
+    'publicResourceHintCallsReachable',
+    'publicResourceHintDomInsertion',
+    'publicResourceMapCommitBehavior',
+    'publicResourceDispatchCompatibilityClaimed',
+    'publicResourceRootMapStorageCompatibilityClaimed',
+    'publicResourceMapCommitCompatibilityClaimed',
+    'publicFormActionsEnabled',
+    'publicFormSubmissionReachable',
+    'publicSubmitDispatchReachable',
+    'publicRequestFormResetReachable',
+    'publicRequestFormResetRequested',
+    'publicActionInvocationReachable',
+    'publicActionInvocationRequested',
+    'actionInvocationRequested',
+    'actionInvoked',
+    'publicActionInvoked',
+    'reactUpdateRequested',
+    'reactUpdateQueued',
+    'realReactUpdateQueued',
+    'updateQueueCaptured',
+    'resetUpdateEnqueued',
+    'resetFormInstanceCalled',
+    'formResetCommitted',
+    'realFormReset',
+    'domMutation',
+    'domMutationRequested',
+    'publicDomMutationRequested',
+    'publicPackageCompatibilityClaimed',
+    'publicPackageExportsCompatibilityClaimed',
+    'packageCompatibilityClaimed',
+    'packageExportCompatibilityClaimed',
+    'packageExportsMutated',
+    'packageJsonExportsMutated',
+    'publicCompatibilityClaimed',
+    'compatibilityClaimed'
+  ]) {
+    if (admission[field] === true) {
+      throwInvalidRootExecutionConsumerAdmission(
+        `${field} must remain blocked in the root execution consumer gate`
+      );
+    }
+  }
+}
+
+function assertNoRootExecutionConsumerCallerSourceTokens(admission) {
+  for (const field of [
+    'sourceRootBridgeAdmissionId',
+    'sourceResourceRootMapStorageExecutionId',
+    'sourceFormFulfilledResetExecutionId',
+    'sourceRootMapStoragePreflightId',
+    'sourceAsyncCallbackExecutionId',
+    'sourceSubmitResetExecutionId',
+    'rootMapStorageExecutionRows',
+    'fakeResetStateQueueExecution',
+    'fakeResetCommitExecution',
+    'ledgerId',
+    'ledgerStatus',
+    'workerId',
+    'workerIds',
+    'sourceTokenPolicy',
+    'executionKind',
+    'storageKind',
+    'snapshotKind',
+    'diagnosticKind',
+    'queueExecutionKind',
+    'commitKind'
+  ]) {
+    if (hasOwn.call(admission, field)) {
+      throwInvalidRootExecutionConsumerAdmission(
+        'source-owned root execution tokens must come from private records'
+      );
+    }
+  }
+}
+
 function assertRootBridgeAdmissionIsRecordOnly(admission) {
   if (admission == null || typeof admission !== 'object') {
     throwInvalidRootBridgeMetadata();
   }
 
   if (
+    !rootBridge.isPrivateRootBridgeAdmissionRecord(admission) ||
+    !rootBridge.isSourceOwnedPrivateRootBridgeAdmissionRecord(admission) ||
+    admission.$$typeof !== rootBridge.privateRootAdmissionRecordType ||
+    admission.kind !== 'FastReactDomPrivateRootAdmissionRecord' ||
     admission.admissionStatus !== rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED ||
     admission.executionStatus !== rootBridge.ROOT_BRIDGE_EXECUTION_BLOCKED ||
     admission.compatibilityStatus !==
@@ -1412,6 +2285,13 @@ function getPublicRootOption(options, key, fallback) {
   return options[key];
 }
 
+function sameStringArray(actual, expected) {
+  if (!Array.isArray(actual) || actual.length !== expected.length) {
+    return false;
+  }
+  return expected.every((value, index) => actual[index] === value);
+}
+
 function throwInvalidRootBridgeMetadata() {
   const error = new Error(
     'Expected accepted private root bridge metadata to remain record-only.'
@@ -1429,6 +2309,28 @@ function throwInvalidPublicRootMetadata() {
   error.name = 'FastReactDomResourceFormRootBoundaryError';
   error.code = rootBoundaryInvalidPublicMetadataCode;
   error.compatibilityTarget = compatibilityTarget;
+  throw error;
+}
+
+function throwInvalidRootExecutionConsumerAdmission(reason) {
+  const error = new Error(
+    'Invalid private React DOM resource/form root execution consumer admission.'
+  );
+  error.name = 'FastReactDomResourceFormRootExecutionConsumerError';
+  error.code = rootBoundaryInvalidRootExecutionConsumerAdmissionCode;
+  error.compatibilityTarget = compatibilityTarget;
+  error.reason = reason;
+  throw error;
+}
+
+function throwInvalidRootExecutionConsumerRecord(reason) {
+  const error = new Error(
+    'Invalid private React DOM resource/form root execution consumer record.'
+  );
+  error.name = 'FastReactDomResourceFormRootExecutionConsumerError';
+  error.code = rootBoundaryInvalidRootExecutionConsumerRecordCode;
+  error.compatibilityTarget = compatibilityTarget;
+  error.reason = reason;
   throw error;
 }
 
@@ -1456,17 +2358,29 @@ module.exports = Object.assign({}, internalsGate, {
   describePrivateFormActionEventExtractionBoundary,
   describePrivateFormActionFulfilledResetExecutionBoundary,
   describePrivateFormActionRejectedErrorPreflightBoundary,
+  describePrivateResourceFormRootExecutionConsumerBoundary,
   describePrivateFormActionResetDispatcherBoundary,
   describePrivateFormActionSubmitResetExecutionBoundary,
   describePrivateFormActionSubmitDispatchBoundary,
   describeResourceFormRootBridgeBlockedGate,
   describePrivateResourceDispatcherBoundary,
+  createResourceFormRootExecutionConsumerGate,
   getResourceFormPortalCommitBlockedRecordPayload,
   getResourceFormPortalFakeDomMountBlockedRecordPayload,
   getResourceFormRootBridgeBlockedRecordPayload,
+  getResourceFormRootExecutionConsumerRecordPayload,
   isResourceFormPortalCommitBlockedRecord,
   isResourceFormPortalFakeDomMountBlockedRecord,
   isResourceFormRootBridgeBlockedRecord,
+  isResourceFormRootExecutionConsumerRecord,
+  privateResourceFormExecutionAdmissionLedgerId,
+  privateResourceFormExecutionAdmissionLedgerSource,
+  privateResourceFormExecutionAdmissionLedgerStatus,
+  privateResourceFormExecutionAdmissionSourceTokenPolicy,
+  privateResourceFormExecutionAdmissionWorkerIds,
+  privateResourceFormRootExecutionConsumerCompatibilityBlockedStatus,
+  privateResourceFormRootExecutionConsumerGateId,
+  privateResourceFormRootExecutionConsumerStatus,
   privatePortalCommitResourceBlockedStatus,
   privatePortalFakeDomMountResourceBlockedStatus,
   privateControlledValueTrackerBlockedStatus,
@@ -1476,9 +2390,14 @@ module.exports = Object.assign({}, internalsGate, {
   portalFakeDomMountResourceSideEffects,
   publicRootFacadeBlockedGateId,
   publicRootFacadeBlockedStatus,
+  rootBoundaryInvalidRootExecutionConsumerAdmissionCode,
+  rootBoundaryInvalidRootExecutionConsumerRecordCode,
+  rootExecutionConsumerSideEffects,
   recordResourceFormPortalCommitBlockedRequest,
   recordResourceFormPortalFakeDomMountBlockedRequest,
   recordResourceFormRootBridgeBlockedRequest,
+  resourceFormRootExecutionConsumerGateSchemaVersion,
+  resourceFormRootExecutionConsumerRecordType,
   resourceFormPortalCommitBoundaryRecordType,
   resourceFormPortalFakeDomMountBoundaryRecordType,
   resourceFormRootBoundaryRecordType,
