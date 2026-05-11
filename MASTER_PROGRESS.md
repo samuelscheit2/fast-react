@@ -29,6 +29,45 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 963 Docs Refresh, Worker 958, and Worker 965
+
+- Worker 963 refreshed coordination docs for the `2cf80d7d` baseline after
+  Workers 957, 953, and 954 were accepted. It was accepted at `8b2bbeeb`
+  (`Merge worker 963 docs refresh after workers 957 953 954`) with no runtime
+  compatibility claim change.
+- Worker 958 hardened private React DOM input/change extraction currentness so
+  source-owned root listener currentness is tied to the exact dispatch root
+  container, native event type, listener registration identity, and current
+  listener state.
+- Worker 958 also bound controlled restore bridge/execution records to
+  source-owned dispatch payloads, the exact bridge preflight, controlled
+  restore queue/gate identity, and fake-DOM-only target mutation.
+- Audit repair coverage rejects cloned, stale, cross-root, cross-dispatch, and
+  post-cleanup listener currentness; swapped bridge preflights; hydration and
+  resource/form aliases; nested resource/form smuggling; live DOM targets;
+  public/browser/SyntheticEvent claims; and foreign restore gates. Public React
+  DOM events, SyntheticEvent creation, hydration replay, resource/form aliases,
+  browser DOM mutation, public controlled-input behavior, and package
+  compatibility remain blocked.
+- Worker 965 refreshed private admission 739-745 evidence without changing
+  source capability files. Worker 740 native loader evidence now matches the
+  current `freezeNativeRootBridgeRequestShape` source layout, Worker 741
+  `react-dom/client` evidence now matches the
+  `definePrivateSymbolOnlyFacadeGate` helper shape, and Worker 745 sibling-text
+  identity evidence is scoped to the dedicated Rust function with a targeted
+  mutation canary.
+- Worker 965 preserves worker-thread teardown, public `hydrateRoot` placeholder,
+  private symbol-only facade, sibling-text blocker, and public, native, root,
+  hydration, test-renderer, and package compatibility blockers. Worker 910
+  evidence remains unaccepted and was not consumed.
+- The accepted state for this batch is current main `b625e49c`
+  (`Merge worker 965 private admission 739-745 evidence refresh`) after merge
+  commits `8b2bbeeb`, `43379920`, and `b625e49c`, with focused React DOM event,
+  resource/form, input/change oracle, DOM delegation oracle, private-admission
+  739-745 and 737-738 subset, package-surface, import-smoke, JS syntax, React
+  DOM workspace, and `git diff --check` evidence recorded in worker reports,
+  read-only audits, post-merge checks, and git history.
+
 ### Worker 962 Docs Refresh and Workers 957, 953, and 954
 
 - Worker 962 refreshed coordination docs for the `323fcfee` baseline after
