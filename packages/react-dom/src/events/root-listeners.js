@@ -391,7 +391,20 @@ function invokePrivateRootClickEventDelegationDispatchGate(
   const diagnosticOptions =
     normalizePrivateRootClickEventDelegationDispatchGateOptions(options);
   const registrationPayload =
-    assertActiveRootListenerRegistrationPayload(listenerRegistrationRecord);
+    assertActiveRootListenerRegistrationPayload(
+      listenerRegistrationRecord,
+      throwRootClickEventDelegationDispatchGateError,
+      'Expected a private React DOM root listener registration record.',
+      'Cannot dispatch a private root click event delegation gate after root listeners were reverted.'
+    );
+  const rootListenerCurrentness =
+    assertPrivateRootDispatchListenerCurrentnessGate(
+      listenerRegistrationRecord,
+      registrationPayload,
+      diagnosticOptions.rootListenerCurrentnessGateRecord,
+      throwRootClickEventDelegationDispatchGateError,
+      'Private root click event delegation dispatch requires a current root listener currentness gate before dispatch.'
+    );
   const targetRecord = isPrivateRootHostOutputEventTargetRecord(
     hostOutputPayloadOrTargetRecord
   )
@@ -491,6 +504,13 @@ function invokePrivateRootClickEventDelegationDispatchGate(
     publicPortalBubblingEnabled: pluginGateRecord.publicPortalBubblingEnabled,
     publicRootBehaviorChanged: false,
     rootContainerContainsTarget: pluginGateRecord.rootContainerContainsTarget,
+    rootListenerCurrentnessGateKind:
+      rootListenerCurrentness.gateRecord.kind,
+    rootListenerCurrentnessGateStatus:
+      rootListenerCurrentness.gateRecord.status,
+    rootListenerCurrentnessSourceKind:
+      rootListenerCurrentness.gateRecord.sourceKind,
+    rootListenerCurrentnessSourceOwned: true,
     rootListenerDispatchOrder: freezeArray([diagnosticOptions.phase]),
     rootListenerSetKey: rootListenerRecord.listenerSetKey,
     selectedFromProcessingOrder: pluginGateRecord.selectedFromProcessingOrder,
@@ -517,6 +537,12 @@ function invokePrivateRootClickEventDelegationDispatchGate(
       nativeEvent,
       options: diagnosticOptions,
       pluginGateRecord,
+      rootListenerCurrentnessGateRecord:
+        rootListenerCurrentness.gateRecord,
+      rootListenerCurrentnessGatePayload:
+        rootListenerCurrentness.gatePayload,
+      rootListenerCurrentnessState:
+        rootListenerCurrentness.currentState,
       rootListenerRecord,
       targetPayload,
       targetRecord
@@ -538,7 +564,20 @@ function invokePrivateRootFocusBlurEventDispatchExecution(
       options
     );
   const registrationPayload =
-    assertActiveRootListenerRegistrationPayload(listenerRegistrationRecord);
+    assertActiveRootListenerRegistrationPayload(
+      listenerRegistrationRecord,
+      throwRootFocusBlurEventDispatchExecutionError,
+      'Expected a private React DOM root listener registration record.',
+      'Cannot execute a private root focus/blur event dispatch after root listeners were reverted.'
+    );
+  const rootListenerCurrentness =
+    assertPrivateRootDispatchListenerCurrentnessGate(
+      listenerRegistrationRecord,
+      registrationPayload,
+      diagnosticOptions.rootListenerCurrentnessGateRecord,
+      throwRootFocusBlurEventDispatchExecutionError,
+      'Private root focus/blur event dispatch execution requires a current root listener currentness gate before dispatch.'
+    );
   const targetRecord = isPrivateRootHostOutputEventTargetRecord(
     hostOutputPayloadOrTargetRecord
   )
@@ -649,6 +688,13 @@ function invokePrivateRootFocusBlurEventDispatchExecution(
     publicRootBehaviorChanged: false,
     reactName: pluginExecutionRecord.reactName,
     registrationName: pluginExecutionRecord.registrationName,
+    rootListenerCurrentnessGateKind:
+      rootListenerCurrentness.gateRecord.kind,
+    rootListenerCurrentnessGateStatus:
+      rootListenerCurrentness.gateRecord.status,
+    rootListenerCurrentnessSourceKind:
+      rootListenerCurrentness.gateRecord.sourceKind,
+    rootListenerCurrentnessSourceOwned: true,
     rootListenerDispatchOrder: freezeArray([diagnosticOptions.phase]),
     rootListenerSetKey: rootListenerRecord.listenerSetKey,
     selectedFromProcessingOrder:
@@ -677,6 +723,12 @@ function invokePrivateRootFocusBlurEventDispatchExecution(
       nativeEvent,
       options: diagnosticOptions,
       pluginExecutionRecord,
+      rootListenerCurrentnessGateRecord:
+        rootListenerCurrentness.gateRecord,
+      rootListenerCurrentnessGatePayload:
+        rootListenerCurrentness.gatePayload,
+      rootListenerCurrentnessState:
+        rootListenerCurrentness.currentState,
       rootListenerRecord,
       targetPayload,
       targetRecord
@@ -2036,17 +2088,30 @@ function getMaybeStringProperty(value, propertyName) {
     : null;
 }
 
-function assertActiveRootListenerRegistrationPayload(registrationRecord) {
+function assertActiveRootListenerRegistrationPayload(
+  registrationRecord,
+  throwRegistrationError,
+  invalidRegistrationMessage,
+  staleRegistrationMessage
+) {
+  const throwError =
+    typeof throwRegistrationError === 'function'
+      ? throwRegistrationError
+      : throwRootHostOutputClickDispatchError;
+  const invalidMessage =
+    typeof invalidRegistrationMessage === 'string'
+      ? invalidRegistrationMessage
+      : 'Expected a private React DOM root listener registration record.';
+  const staleMessage =
+    typeof staleRegistrationMessage === 'string'
+      ? staleRegistrationMessage
+      : 'Cannot dispatch a private root host-output click after root listeners were reverted.';
   const payload = rootListenerRegistrationPayloads.get(registrationRecord);
   if (payload === undefined) {
-    throwRootHostOutputClickDispatchError(
-      'Expected a private React DOM root listener registration record.'
-    );
+    throwError(invalidMessage, 'invalid-registration-record');
   }
   if (!payload.active) {
-    throwRootHostOutputClickDispatchError(
-      'Cannot dispatch a private root host-output click after root listeners were reverted.'
-    );
+    throwError(staleMessage, 'stale-registration-record');
   }
   return payload;
 }
@@ -2134,6 +2199,49 @@ function assertNoPrivateRootListenerCurrentnessPublicBehaviorClaims(options) {
   }
 }
 
+function assertNoPrivateRootDispatchGatePublicBehaviorClaims(
+  options,
+  throwError
+) {
+  const blockedClaimFields = [
+    'browserDomEventCompatibilityClaimed',
+    'browserListenerInstallation',
+    'compatibilityClaimed',
+    'eventDispatch',
+    'gateInstalledBrowserListener',
+    'listenerInstallation',
+    'publicDispatchEnabled',
+    'publicListenerInstallation',
+    'publicPortalBubblingEnabled',
+    'publicRootBehaviorChanged',
+    'rootListenerInstallation',
+    'syntheticEventDispatch',
+    'syntheticFocusEventCreation',
+    'willCreateSyntheticFocusEvent',
+    'willDispatchPublicEvent',
+    'willInvokePublicListeners'
+  ];
+
+  for (const field of blockedClaimFields) {
+    if (options[field] === true) {
+      throwError(
+        'Private root event dispatch gates cannot claim public DOM event behavior.',
+        'public-behavior-claimed'
+      );
+    }
+  }
+
+  if (
+    typeof options.syntheticEventCount === 'number' &&
+    options.syntheticEventCount > 0
+  ) {
+    throwError(
+      'Private root event dispatch gates cannot claim public DOM event behavior.',
+      'public-behavior-claimed'
+    );
+  }
+}
+
 function assertPrivateRootListenerCurrentnessSourceRecord(
   sourceRecord,
   sourceKind
@@ -2173,6 +2281,84 @@ function assertPrivateRootListenerCurrentnessSourceRecord(
   }
 }
 
+function assertPrivateRootDispatchListenerCurrentnessGate(
+  listenerRegistrationRecord,
+  registrationPayload,
+  currentnessGateRecord,
+  throwError,
+  missingMessage
+) {
+  if (currentnessGateRecord === null) {
+    throwError(missingMessage, 'missing-root-listener-currentness-gate');
+  }
+
+  const currentnessGatePayload =
+    getPrivateRootListenerCurrentnessGatePayload(currentnessGateRecord);
+  if (currentnessGatePayload === null) {
+    throwError(
+      'Private root event dispatch requires a source-owned root listener currentness gate record.',
+      'invalid-root-listener-currentness-gate'
+    );
+  }
+
+  if (
+    currentnessGatePayload.listenerRegistrationRecord !==
+    listenerRegistrationRecord
+  ) {
+    throwError(
+      'Private root event dispatch currentness evidence does not belong to the active listener registration.',
+      'root-listener-currentness-registration-mismatch'
+    );
+  }
+
+  const currentState =
+    createRootListenerCurrentnessGateState(registrationPayload);
+  if (
+    !rootListenerCurrentnessGateStateMatches(
+      currentnessGatePayload.afterState,
+      currentState
+    )
+  ) {
+    throwError(
+      'Private root event dispatch rejected stale root listener currentness evidence.',
+      'root-listener-currentness-changed-after-capture'
+    );
+  }
+  assertPrivateRootDispatchListenerCurrentnessStateCurrent(
+    currentState,
+    throwError
+  );
+
+  return freezeRecord({
+    currentState,
+    gatePayload: currentnessGatePayload,
+    gateRecord: currentnessGateRecord
+  });
+}
+
+function assertPrivateRootDispatchListenerCurrentnessStateCurrent(
+  state,
+  throwError
+) {
+  for (const targetRow of state.targetRows) {
+    if (!targetRow.current) {
+      throwError(
+        'Private root event dispatch currentness evidence no longer matches listener target state.',
+        'root-listener-currentness-not-current'
+      );
+    }
+  }
+
+  for (const listenerRow of state.listenerRows) {
+    if (!listenerRow.current) {
+      throwError(
+        'Private root event dispatch currentness evidence no longer matches an installed listener registration.',
+        'root-listener-currentness-not-current'
+      );
+    }
+  }
+}
+
 function normalizePrivateRootHostOutputClickDispatchCanaryOptions(options) {
   const normalizedOptions =
     options !== null &&
@@ -2198,6 +2384,10 @@ function normalizePrivateRootClickEventDelegationDispatchGateOptions(options) {
     (typeof options === 'object' || typeof options === 'function')
       ? options
       : {};
+  assertNoPrivateRootDispatchGatePublicBehaviorClaims(
+    normalizedOptions,
+    throwRootClickEventDelegationDispatchGateError
+  );
   const phase =
     normalizedOptions.phase === undefined ? 'bubble' : normalizedOptions.phase;
   if (phase !== 'bubble' && phase !== 'capture') {
@@ -2213,6 +2403,11 @@ function normalizePrivateRootClickEventDelegationDispatchGateOptions(options) {
       normalizedOptions.portalEventOwnerRootGateRecord ||
       normalizedOptions.portalOwnerRootGateRecord ||
       null,
+    rootListenerCurrentnessGateRecord:
+      normalizedOptions.rootListenerCurrentnessGateRecord ||
+      normalizedOptions.listenerCurrentnessGateRecord ||
+      normalizedOptions.currentnessGateRecord ||
+      null,
     useProcessingOrder: normalizedOptions.useProcessingOrder !== false
   });
 }
@@ -2226,6 +2421,10 @@ function normalizePrivateRootFocusBlurEventDispatchExecutionOptions(
     (typeof options === 'object' || typeof options === 'function')
       ? options
       : {};
+  assertNoPrivateRootDispatchGatePublicBehaviorClaims(
+    normalizedOptions,
+    throwRootFocusBlurEventDispatchExecutionError
+  );
   const queuePayload = getPrivateEventListenerQueueEntryPayload(
     acceptedListenerQueueEntryRecord
   );
@@ -2256,6 +2455,11 @@ function normalizePrivateRootFocusBlurEventDispatchExecutionOptions(
     portalEventOwnerRootGateRecord:
       normalizedOptions.portalEventOwnerRootGateRecord ||
       normalizedOptions.portalOwnerRootGateRecord ||
+      null,
+    rootListenerCurrentnessGateRecord:
+      normalizedOptions.rootListenerCurrentnessGateRecord ||
+      normalizedOptions.listenerCurrentnessGateRecord ||
+      normalizedOptions.currentnessGateRecord ||
       null,
     useProcessingOrder: normalizedOptions.useProcessingOrder !== false
   });

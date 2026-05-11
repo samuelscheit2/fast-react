@@ -61,13 +61,20 @@ test('private click event delegation dispatch gate routes one accepted listener 
     );
   const rootRegistration =
     rootListeners.registerRootListenersForPrivateRoot(fixture.container);
+  const rootCurrentnessGate = createPrivateRootDispatchCurrentnessGate(
+    rootRegistration,
+    'click-gate-route'
+  );
 
   try {
     const gate =
       rootListeners.invokePrivateRootClickEventDelegationDispatchGate(
         rootRegistration,
         fixture.hostOutputPayload,
-        listenerRecord
+        listenerRecord,
+        {
+          rootListenerCurrentnessGateRecord: rootCurrentnessGate
+        }
       );
     const payload =
       rootListeners.getPrivateRootClickEventDelegationDispatchGatePayload(
@@ -102,6 +109,11 @@ test('private click event delegation dispatch gate routes one accepted listener 
     assert.equal(gate.publicDispatchEnabled, false);
     assert.equal(gate.publicRootBehaviorChanged, false);
     assert.equal(gate.browserDomEventCompatibilityClaimed, false);
+    assert.equal(
+      gate.rootListenerCurrentnessGateStatus,
+      rootListeners.PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE_STATUS
+    );
+    assert.equal(gate.rootListenerCurrentnessSourceOwned, true);
     assert.equal(gate.syntheticEventCount, 0);
     assert.equal(
       gate.pluginGateRecordKind,
@@ -113,6 +125,18 @@ test('private click event delegation dispatch gate routes one accepted listener 
       pluginEventSystem.DISPATCH_LISTENER_INVOCATION_CANARY_RECORD_KIND
     );
     assert.equal(payload.acceptedListenerQueueEntryRecord, listenerRecord);
+    assert.equal(
+      payload.rootListenerCurrentnessGateRecord,
+      rootCurrentnessGate
+    );
+    assert.equal(
+      payload.rootListenerCurrentnessGatePayload.listenerRegistrationRecord,
+      rootRegistration
+    );
+    assert.equal(
+      payload.rootListenerCurrentnessState.listenerRows.length,
+      rootCurrentnessGate.listenerRowCount
+    );
     assert.equal(payload.dispatchRecord.domEventName, 'click');
     assert.equal(payload.dispatchRecord.extractionRecord.domEventName, 'click');
     assert.equal(payload.dispatchListenerRecord.privateListenerQueue, true);
@@ -1208,6 +1232,342 @@ test('private root listener currentness gate rejects cloned stale aliased and mu
   }
 });
 
+test('private root click and focus dispatch gates reject missing currentness before invoking', () => {
+  const clickFixture = createPrivateClickDelegationFixture(
+    'click-gate-missing-currentness'
+  );
+  const clickCalls = [];
+  const clickListenerRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      clickFixture.targetNode,
+      'click',
+      false,
+      () => {
+        clickCalls.push('missing-click-currentness-invoked');
+      }
+    );
+  const clickRootRegistration =
+    rootListeners.registerRootListenersForPrivateRoot(clickFixture.container);
+
+  try {
+    assert.throws(
+      () =>
+        rootListeners.invokePrivateRootClickEventDelegationDispatchGate(
+          clickRootRegistration,
+          clickFixture.hostOutputPayload,
+          clickListenerRecord
+        ),
+      {
+        code:
+          rootListeners
+            .INVALID_PRIVATE_ROOT_CLICK_EVENT_DELEGATION_DISPATCH_GATE_CODE,
+        reason: 'missing-root-listener-currentness-gate'
+      }
+    );
+    assert.deepEqual(clickCalls, []);
+  } finally {
+    listenerRegistry.removePrivateEventListenerQueueEntry(
+      clickListenerRecord
+    );
+    rootListeners.revertRootListenersForPrivateRoot(clickRootRegistration);
+    componentTree.detachHostInstanceToken(clickFixture.token);
+  }
+
+  const focusFixture = createPrivateFocusBlurDelegationFixture(
+    'focus-gate-missing-currentness'
+  );
+  const focusCalls = [];
+  const focusListenerRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      focusFixture.targetNode,
+      'focusin',
+      false,
+      () => {
+        focusCalls.push('missing-focus-currentness-invoked');
+      }
+    );
+  const focusRootRegistration =
+    rootListeners.registerRootListenersForPrivateRoot(focusFixture.container);
+
+  try {
+    assert.throws(
+      () =>
+        rootListeners.invokePrivateRootFocusBlurEventDispatchExecution(
+          focusRootRegistration,
+          focusFixture.hostOutputPayload,
+          focusListenerRecord
+        ),
+      {
+        code:
+          rootListeners
+            .INVALID_PRIVATE_ROOT_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_CODE,
+        reason: 'missing-root-listener-currentness-gate'
+      }
+    );
+    assert.deepEqual(focusCalls, []);
+  } finally {
+    listenerRegistry.removePrivateEventListenerQueueEntry(
+      focusListenerRecord
+    );
+    rootListeners.revertRootListenersForPrivateRoot(focusRootRegistration);
+    componentTree.detachHostInstanceToken(focusFixture.token);
+  }
+});
+
+test('private root click dispatch gate rejects cloned and foreign currentness before invoking', () => {
+  const fixture = createPrivateClickDelegationFixture(
+    'click-gate-currentness-source'
+  );
+  const foreignFixture = createPrivateClickDelegationFixture(
+    'click-gate-currentness-foreign'
+  );
+  const calls = [];
+  const listenerRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      fixture.targetNode,
+      'click',
+      false,
+      () => {
+        calls.push('invalid-currentness-invoked');
+      }
+    );
+  const rootRegistration =
+    rootListeners.registerRootListenersForPrivateRoot(fixture.container);
+  const foreignRootRegistration =
+    rootListeners.registerRootListenersForPrivateRoot(
+      foreignFixture.container
+    );
+  const rootCurrentnessGate = createPrivateRootDispatchCurrentnessGate(
+    rootRegistration,
+    'click-gate-currentness-source'
+  );
+  const foreignCurrentnessGate = createPrivateRootDispatchCurrentnessGate(
+    foreignRootRegistration,
+    'click-gate-currentness-foreign'
+  );
+
+  try {
+    assert.throws(
+      () =>
+        rootListeners.invokePrivateRootClickEventDelegationDispatchGate(
+          rootRegistration,
+          fixture.hostOutputPayload,
+          listenerRecord,
+          {
+            rootListenerCurrentnessGateRecord: {
+              ...rootCurrentnessGate
+            }
+          }
+        ),
+      {
+        code:
+          rootListeners
+            .INVALID_PRIVATE_ROOT_CLICK_EVENT_DELEGATION_DISPATCH_GATE_CODE,
+        reason: 'invalid-root-listener-currentness-gate'
+      }
+    );
+
+    assert.throws(
+      () =>
+        rootListeners.invokePrivateRootClickEventDelegationDispatchGate(
+          rootRegistration,
+          fixture.hostOutputPayload,
+          listenerRecord,
+          {
+            rootListenerCurrentnessGateRecord: foreignCurrentnessGate
+          }
+        ),
+      {
+        code:
+          rootListeners
+            .INVALID_PRIVATE_ROOT_CLICK_EVENT_DELEGATION_DISPATCH_GATE_CODE,
+        reason: 'root-listener-currentness-registration-mismatch'
+      }
+    );
+    assert.deepEqual(calls, []);
+  } finally {
+    listenerRegistry.removePrivateEventListenerQueueEntry(listenerRecord);
+    rootListeners.revertRootListenersForPrivateRoot(
+      foreignRootRegistration
+    );
+    rootListeners.revertRootListenersForPrivateRoot(rootRegistration);
+    componentTree.detachHostInstanceToken(foreignFixture.token);
+    componentTree.detachHostInstanceToken(fixture.token);
+  }
+});
+
+test('private root click dispatch gate rejects listener registration changes after currentness capture', () => {
+  const fixture = createPrivateClickDelegationFixture(
+    'click-gate-currentness-changed'
+  );
+  const calls = [];
+  const listenerRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      fixture.targetNode,
+      'click',
+      false,
+      () => {
+        calls.push('changed-currentness-invoked');
+      }
+    );
+  const rootRegistration =
+    rootListeners.registerRootListenersForPrivateRoot(fixture.container);
+  const rootCurrentnessGate = createPrivateRootDispatchCurrentnessGate(
+    rootRegistration,
+    'click-gate-currentness-changed'
+  );
+  const registrationCountBeforeMutation =
+    fixture.container.__registrations.length;
+
+  try {
+    fixture.container.__registrations.push({
+      listener() {},
+      options: false,
+      type: 'click'
+    });
+
+    assert.throws(
+      () =>
+        rootListeners.invokePrivateRootClickEventDelegationDispatchGate(
+          rootRegistration,
+          fixture.hostOutputPayload,
+          listenerRecord,
+          {
+            rootListenerCurrentnessGateRecord: rootCurrentnessGate
+          }
+        ),
+      {
+        code:
+          rootListeners
+            .INVALID_PRIVATE_ROOT_CLICK_EVENT_DELEGATION_DISPATCH_GATE_CODE,
+        reason: 'root-listener-currentness-changed-after-capture'
+      }
+    );
+    assert.deepEqual(calls, []);
+  } finally {
+    fixture.container.__registrations.length =
+      registrationCountBeforeMutation;
+    listenerRegistry.removePrivateEventListenerQueueEntry(listenerRecord);
+    rootListeners.revertRootListenersForPrivateRoot(rootRegistration);
+    componentTree.detachHostInstanceToken(fixture.token);
+  }
+});
+
+test('private root dispatch gates reject forged public synthetic and browser claims before invoking', () => {
+  const fixture = createPrivateClickDelegationFixture(
+    'click-gate-forged-claims'
+  );
+  const calls = [];
+  const listenerRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      fixture.targetNode,
+      'click',
+      false,
+      () => {
+        calls.push('forged-click-claim-invoked');
+      }
+    );
+  const rootRegistration =
+    rootListeners.registerRootListenersForPrivateRoot(fixture.container);
+  const rootCurrentnessGate = createPrivateRootDispatchCurrentnessGate(
+    rootRegistration,
+    'click-gate-forged-claims'
+  );
+  const forgedClaimOptions = [
+    {
+      browserDomEventCompatibilityClaimed: true
+    },
+    {
+      publicDispatchEnabled: true
+    },
+    {
+      syntheticEventDispatch: true
+    },
+    {
+      syntheticEventCount: 1
+    }
+  ];
+
+  try {
+    for (const forgedClaimOption of forgedClaimOptions) {
+      assert.throws(
+        () =>
+          rootListeners.invokePrivateRootClickEventDelegationDispatchGate(
+            rootRegistration,
+            fixture.hostOutputPayload,
+            listenerRecord,
+            {
+              rootListenerCurrentnessGateRecord: rootCurrentnessGate,
+              ...forgedClaimOption
+            }
+          ),
+        {
+          code:
+            rootListeners
+              .INVALID_PRIVATE_ROOT_CLICK_EVENT_DELEGATION_DISPATCH_GATE_CODE,
+          reason: 'public-behavior-claimed'
+        }
+      );
+    }
+    assert.deepEqual(calls, []);
+  } finally {
+    listenerRegistry.removePrivateEventListenerQueueEntry(listenerRecord);
+    rootListeners.revertRootListenersForPrivateRoot(rootRegistration);
+    componentTree.detachHostInstanceToken(fixture.token);
+  }
+
+  const focusFixture = createPrivateFocusBlurDelegationFixture(
+    'focus-gate-forged-claims'
+  );
+  const focusCalls = [];
+  const focusListenerRecord =
+    listenerRegistry.registerPrivateEventListenerQueueEntry(
+      focusFixture.targetNode,
+      'focusout',
+      false,
+      () => {
+        focusCalls.push('forged-focus-claim-invoked');
+      }
+    );
+  const focusRootRegistration =
+    rootListeners.registerRootListenersForPrivateRoot(focusFixture.container);
+  const focusCurrentnessGate = createPrivateRootDispatchCurrentnessGate(
+    focusRootRegistration,
+    'focus-gate-forged-claims'
+  );
+
+  try {
+    assert.throws(
+      () =>
+        rootListeners.invokePrivateRootFocusBlurEventDispatchExecution(
+          focusRootRegistration,
+          focusFixture.hostOutputPayload,
+          focusListenerRecord,
+          {
+            domEventName: 'focusout',
+            rootListenerCurrentnessGateRecord: focusCurrentnessGate,
+            willCreateSyntheticFocusEvent: true
+          }
+        ),
+      {
+        code:
+          rootListeners
+            .INVALID_PRIVATE_ROOT_FOCUS_BLUR_EVENT_DISPATCH_EXECUTION_CODE,
+        reason: 'public-behavior-claimed'
+      }
+    );
+    assert.deepEqual(focusCalls, []);
+  } finally {
+    listenerRegistry.removePrivateEventListenerQueueEntry(
+      focusListenerRecord
+    );
+    rootListeners.revertRootListenersForPrivateRoot(
+      focusRootRegistration
+    );
+    componentTree.detachHostInstanceToken(focusFixture.token);
+  }
+});
+
 test('private root click event delegation dispatch gate invokes a portal child listener after owner-root validation', () => {
   const fixture = createPrivateClickPortalDelegationFixture(
     'click-gate-portal-child'
@@ -1260,6 +1620,10 @@ test('private root click event delegation dispatch gate invokes a portal child l
     );
   const rootRegistration =
     rootListeners.registerRootListenersForPrivateRoot(fixture.container);
+  const rootCurrentnessGate = createPrivateRootDispatchCurrentnessGate(
+    rootRegistration,
+    'click-gate-portal-child'
+  );
 
   try {
     const gate =
@@ -1268,6 +1632,7 @@ test('private root click event delegation dispatch gate invokes a portal child l
         fixture.hostOutputPayload,
         childListenerRecord,
         {
+          rootListenerCurrentnessGateRecord: rootCurrentnessGate,
           portalEventOwnerRootGateRecord: portalOwnerGate
         }
       );
@@ -1292,6 +1657,10 @@ test('private root click event delegation dispatch gate invokes a portal child l
     assert.equal(gate.publicPortalBubblingEnabled, false);
     assert.equal(gate.publicPortalBubblingBlocked, true);
     assert.equal(gate.publicDispatchEnabled, false);
+    assert.equal(
+      gate.rootListenerCurrentnessGateStatus,
+      rootListeners.PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE_STATUS
+    );
     assert.equal(gate.browserDomEventCompatibilityClaimed, false);
     assert.equal(gate.syntheticEventCount, 0);
     assert.equal(gate.targetDispatchPathLength, 2);
@@ -1393,15 +1762,20 @@ test('private click delegation preserves portal owner root across a secondary fa
           portalKey: 'click-gate-secondary-root-portal',
           rootContainer: fixture.container
         }
-      );
+    );
     rootRegistration =
       rootListeners.registerRootListenersForPrivateRoot(fixture.container);
+    const rootCurrentnessGate = createPrivateRootDispatchCurrentnessGate(
+      rootRegistration,
+      'click-gate-secondary-root-portal'
+    );
     const gate =
       rootListeners.invokePrivateRootClickEventDelegationDispatchGate(
         rootRegistration,
         fixture.hostOutputPayload,
         childListenerRecord,
         {
+          rootListenerCurrentnessGateRecord: rootCurrentnessGate,
           portalEventOwnerRootGateRecord: portalOwnerGate
         }
       );
@@ -1483,6 +1857,10 @@ test('private click delegation preserves portal owner root across a secondary fa
     assert.equal(gate.publicPortalBubblingEnabled, false);
     assert.equal(gate.publicDispatchEnabled, false);
     assert.equal(gate.eventDispatch, false);
+    assert.equal(
+      gate.rootListenerCurrentnessGateStatus,
+      rootListeners.PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE_STATUS
+    );
     assert.equal(gate.syntheticEventCount, 0);
     assert.equal(
       pluginPayload.portalEventOwnerRootGateRecord,
@@ -1606,6 +1984,10 @@ test('private focus/blur dispatch execution routes one accepted fake focus liste
     );
   const rootRegistration =
     rootListeners.registerRootListenersForPrivateRoot(fixture.container);
+  const rootCurrentnessGate = createPrivateRootDispatchCurrentnessGate(
+    rootRegistration,
+    'focus-blur-execution-route'
+  );
 
   try {
     const execution =
@@ -1614,7 +1996,8 @@ test('private focus/blur dispatch execution routes one accepted fake focus liste
         fixture.hostOutputPayload,
         listenerRecord,
         {
-          domEventName: 'focusin'
+          domEventName: 'focusin',
+          rootListenerCurrentnessGateRecord: rootCurrentnessGate
         }
       );
     const payload =
@@ -1652,6 +2035,11 @@ test('private focus/blur dispatch execution routes one accepted fake focus liste
     assert.equal(execution.publicDispatchEnabled, false);
     assert.equal(execution.publicRootBehaviorChanged, false);
     assert.equal(execution.browserDomEventCompatibilityClaimed, false);
+    assert.equal(
+      execution.rootListenerCurrentnessGateStatus,
+      rootListeners.PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE_STATUS
+    );
+    assert.equal(execution.rootListenerCurrentnessSourceOwned, true);
     assert.equal(execution.syntheticEventCount, 0);
     assert.equal(execution.syntheticFocusEventCreation, false);
     assert.equal(
@@ -1664,6 +2052,14 @@ test('private focus/blur dispatch execution routes one accepted fake focus liste
       pluginEventSystem.DISPATCH_LISTENER_INVOCATION_CANARY_RECORD_KIND
     );
     assert.equal(payload.acceptedListenerQueueEntryRecord, listenerRecord);
+    assert.equal(
+      payload.rootListenerCurrentnessGateRecord,
+      rootCurrentnessGate
+    );
+    assert.equal(
+      payload.rootListenerCurrentnessGatePayload.listenerRegistrationRecord,
+      rootRegistration
+    );
     assert.equal(payload.dispatchRecord.domEventName, 'focusin');
     assert.equal(
       payload.dispatchRecord.extractionRecord.domEventName,
@@ -2510,6 +2906,24 @@ test('private input/change extraction preflight rejects foreign records', () => 
     false
   );
 });
+
+function createPrivateRootDispatchCurrentnessGate(
+  rootRegistration,
+  label,
+  sourceKind = 'createRoot'
+) {
+  return rootListeners.createPrivateRootListenerCurrentnessGateRecord(
+    rootRegistration,
+    {
+      sourceKind,
+      sourceRecord: {
+        operation: sourceKind,
+        requestId: `${label}:root-listener-currentness`,
+        requestType: sourceKind
+      }
+    }
+  );
+}
 
 function createPrivateRootListenerCurrentnessFixture(label) {
   const document = createDocument();
