@@ -17001,6 +17001,8 @@ impl TestRendererRoot {
         let inner = &nodes[1];
         let stable = &nodes[2];
         let placed = &nodes[3];
+        let stable_text_fiber = inspection.host_texts()[0].fiber();
+        let placed_text_fiber = inspection.host_texts()[1].fiber();
         if outer.node_kind() != TestRendererPrivateJsonNodeKind::HostComponent
             || outer.parent_ordinal().is_some()
             || outer.child_ordinals() != [1]
@@ -17011,11 +17013,15 @@ impl TestRendererRoot {
             || inner.fiber().fiber() != fiber_handle!(output.inner_fibers().component())
             || stable.node_kind() != TestRendererPrivateJsonNodeKind::Text
             || stable.parent_ordinal() != Some(1)
+            || !stable.child_ordinals().is_empty()
             || stable.text() != Some(stable_text.text())
             || stable.fiber().fiber() != fiber_handle!(output.inner_fibers().text())
+            || stable.fiber().fiber() != fiber_handle!(stable_text_fiber)
             || placed.node_kind() != TestRendererPrivateJsonNodeKind::Text
             || placed.parent_ordinal() != Some(1)
+            || !placed.child_ordinals().is_empty()
             || placed.text() != Some(placed_text.text())
+            || placed.fiber().fiber() != fiber_handle!(placed_text_fiber)
         {
             return Err(Self::private_unmount_nested_source_report_gate_error(
                 "nested-source-report-ownership-mismatch",
@@ -24416,6 +24422,27 @@ mod tests {
                 &nested_output,
                 nested_route,
                 Some(&broad_report),
+                Some(nested_identity),
+                &unmount_root,
+                &unmounted,
+                Some(handoff),
+                admission,
+                Some(unmount_identity),
+            )
+            .unwrap_err();
+        assert_unmount_nested_source_report_gate_error_reason(
+            error,
+            "nested-source-report-ownership-mismatch",
+        );
+
+        let mut tampered_placed_text_report = nested_report.clone();
+        tampered_placed_text_report.nodes[3].fiber = tampered_placed_text_report.nodes[2].fiber;
+        let error =
+            TestRendererRoot::describe_private_unmount_nested_source_report_admission_gate_for_canary(
+                &nested_root,
+                &nested_output,
+                nested_route,
+                Some(&tampered_placed_text_report),
                 Some(nested_identity),
                 &unmount_root,
                 &unmounted,
