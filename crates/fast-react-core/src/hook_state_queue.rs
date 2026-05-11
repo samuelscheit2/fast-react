@@ -1089,6 +1089,10 @@ impl<State, Action, ReducerId, DispatchId> HookQueueStore<State, Action, Reducer
             }
         }
 
+        if !seen.contains(&tail) {
+            return Err(HookQueueError::CorruptRing { tail });
+        }
+
         Ok(ids)
     }
 }
@@ -1295,7 +1299,12 @@ impl<OwnerId: Clone> HookUpdateStaging<OwnerId> {
         &mut self,
         store: &mut HookQueueStore<State, Action, ReducerId, DispatchId>,
     ) -> Result<Vec<StagedHookUpdate<OwnerId>>, HookQueueError> {
+        // React drains staged `(fiber, queue, update, lane)` rows into each hook
+        // queue's pending ring. This store uses generational IDs, so validate
+        // every row and existing ring before mutating or clearing the staging
+        // buffer; failed currentness checks must leave pending work observable.
         let mut seen_updates = HashSet::new();
+        let mut seen_queues = HashSet::new();
         for entry in &self.entries {
             store.validate_queue_id(entry.queue)?;
             store.validate_update_id(entry.update)?;
@@ -1303,8 +1312,10 @@ impl<OwnerId: Clone> HookUpdateStaging<OwnerId> {
             if !seen_updates.insert(entry.update) {
                 return Err(HookQueueError::DuplicateStagedUpdate { id: entry.update });
             }
-            if let Some(pending) = store.queue(entry.queue)?.pending {
-                store.next_in_ring(pending)?;
+            if seen_queues.insert(entry.queue) {
+                if let Some(pending) = store.queue(entry.queue)?.pending {
+                    store.collect_ring_ids(pending)?;
+                }
             }
         }
 
@@ -1341,6 +1352,22 @@ mod tests {
 
     fn add(state: i32, action: &i32) -> i32 {
         state + action
+    }
+
+    fn assert_staging_preserved(
+        staging: &HookUpdateStaging<&'static str>,
+        expected_lanes: Lanes,
+        expected_updates: &[HookUpdateId],
+    ) {
+        assert_eq!(staging.lanes(), expected_lanes);
+        assert_eq!(
+            staging
+                .entries()
+                .iter()
+                .map(StagedHookUpdate::update)
+                .collect::<Vec<_>>(),
+            expected_updates
+        );
     }
 
     #[test]
@@ -1701,10 +1728,130 @@ mod tests {
         let finished = staging.finish_queueing(&mut store).unwrap();
         assert_eq!(finished.len(), 2);
         assert!(staging.is_empty());
+        assert_eq!(staging.lanes(), Lanes::NO);
         assert_eq!(
             store.pending_updates(slot.queue()).unwrap(),
             vec![first, second]
         );
+    }
+
+    #[test]
+    fn finish_queueing_rejects_duplicate_staged_update_without_clearing() {
+        let mut store = HookQueueStore::<i32, i32>::new();
+        let slot = store.create_state_slot(0);
+        let update = store.create_update(lane(Lane::SYNC), 1);
+        let mut staging = HookUpdateStaging::new();
+        staging.stage("owner", slot.queue(), update, lane(Lane::SYNC));
+        staging.stage("owner", slot.queue(), update, lane(Lane::SYNC));
+
+        assert_eq!(
+            staging.finish_queueing(&mut store),
+            Err(HookQueueError::DuplicateStagedUpdate { id: update })
+        );
+        assert_staging_preserved(&staging, Lanes::SYNC, &[update, update]);
+        assert_eq!(
+            store.pending_updates(slot.queue()).unwrap(),
+            Vec::<HookUpdateId>::new()
+        );
+        assert_eq!(store.update(update).unwrap().next(), None);
+    }
+
+    #[test]
+    fn finish_queueing_rejects_stale_queue_row_without_clearing() {
+        let mut store = HookQueueStore::<i32, i32>::new();
+        let stale_queue = store.create_queue(0);
+        let update = store.create_update(lane(Lane::DEFAULT), 1);
+        let mut staging = HookUpdateStaging::new();
+        staging.stage("owner", stale_queue, update, lane(Lane::DEFAULT));
+
+        store.reclaim_queue(stale_queue).unwrap();
+        let current_queue = store.create_queue(0);
+
+        assert_ne!(stale_queue, current_queue);
+        assert!(matches!(
+            staging.finish_queueing(&mut store),
+            Err(HookQueueError::StaleQueueId {
+                id,
+                current_generation: 1
+            }) if id == stale_queue
+        ));
+        assert_staging_preserved(&staging, Lanes::DEFAULT, &[update]);
+        assert_eq!(store.queue(current_queue).unwrap().pending(), None);
+        assert_eq!(store.update(update).unwrap().next(), None);
+    }
+
+    #[test]
+    fn finish_queueing_rejects_stale_update_row_without_clearing() {
+        let mut store = HookQueueStore::<i32, i32>::new();
+        let slot = store.create_state_slot(0);
+        let stale_update = store.create_update(lane(Lane::DEFAULT), 1);
+        let mut staging = HookUpdateStaging::new();
+        staging.stage("owner", slot.queue(), stale_update, lane(Lane::DEFAULT));
+
+        store.reclaim_update(stale_update).unwrap();
+        let current_update = store.create_update(lane(Lane::DEFAULT), 2);
+
+        assert_ne!(stale_update, current_update);
+        assert!(matches!(
+            staging.finish_queueing(&mut store),
+            Err(HookQueueError::StaleUpdateId {
+                id,
+                current_generation: 1
+            }) if id == stale_update
+        ));
+        assert_staging_preserved(&staging, Lanes::DEFAULT, &[stale_update]);
+        assert_eq!(
+            store.pending_updates(slot.queue()).unwrap(),
+            Vec::<HookUpdateId>::new()
+        );
+    }
+
+    #[test]
+    fn finish_queueing_rejects_already_linked_update_without_clearing() {
+        let mut store = HookQueueStore::<i32, i32>::new();
+        let slot = store.create_state_slot(0);
+        let linked = store.create_update(lane(Lane::SYNC), 1);
+        let staged = store.create_update(lane(Lane::DEFAULT), 2);
+        let mut staging = HookUpdateStaging::new();
+        store.append_pending_update(slot.queue(), linked).unwrap();
+        staging.stage("owner", slot.queue(), linked, lane(Lane::SYNC));
+        staging.stage("owner", slot.queue(), staged, lane(Lane::DEFAULT));
+
+        assert_eq!(
+            staging.finish_queueing(&mut store),
+            Err(HookQueueError::LinkedUpdateCannotBeReclaimed { id: linked })
+        );
+        assert_staging_preserved(
+            &staging,
+            Lanes::SYNC.merge(Lanes::DEFAULT),
+            &[linked, staged],
+        );
+        assert_eq!(store.pending_updates(slot.queue()).unwrap(), vec![linked]);
+        assert_eq!(store.update(staged).unwrap().next(), None);
+    }
+
+    #[test]
+    fn finish_queueing_rejects_corrupt_existing_pending_ring_without_clearing() {
+        let mut store = HookQueueStore::<i32, i32>::new();
+        let slot = store.create_state_slot(0);
+        let first = store.create_update(lane(Lane::SYNC), 1);
+        let tail = store.create_update(lane(Lane::SYNC), 2);
+        let staged = store.create_update(lane(Lane::DEFAULT), 3);
+        let mut staging = HookUpdateStaging::new();
+        store.append_pending_update(slot.queue(), first).unwrap();
+        store.append_pending_update(slot.queue(), tail).unwrap();
+        store.update_mut(first).unwrap().next = Some(first);
+        staging.stage("owner", slot.queue(), staged, lane(Lane::DEFAULT));
+
+        assert_eq!(
+            staging.finish_queueing(&mut store),
+            Err(HookQueueError::CorruptRing { tail })
+        );
+        assert_staging_preserved(&staging, Lanes::DEFAULT, &[staged]);
+        assert_eq!(store.queue(slot.queue()).unwrap().pending(), Some(tail));
+        assert_eq!(store.update(first).unwrap().next(), Some(first));
+        assert_eq!(store.update(tail).unwrap().next(), Some(first));
+        assert_eq!(store.update(staged).unwrap().next(), None);
     }
 
     #[test]
