@@ -29,6 +29,44 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 820-825
+
+- Worker 820 added the static reconciler private-admission ledger for accepted
+  Workers 803 and 817. The accepted fixes make top-level public/root/act/
+  Scheduler/package/native compatibility aliases and adjacent managed-child and
+  Scheduler admission aliases fail closed while keeping the ledger static and
+  source-token-only.
+- Worker 821 added the static native cleanup stale admission ledger for Worker
+  815. The accepted fix makes Worker 815 progress ownership a real evaluated
+  evidence row, so missing or stale cleanup-stale ownership evidence blocks
+  admission. Native addon loading, cleanup-hook execution, renderer execution,
+  package exports, and public native compatibility remain blocked.
+- Worker 822 added the React DOM test-utils act negative matrix for the accepted
+  Worker 810 React act/Scheduler diagnostics ledger. Follow-ups validated
+  nested summary/public-blocker tampering, prevented gate overrides from
+  replacing the returned Worker 810 ledger surface, classified additional public
+  claim aliases, and updated the adjacent act/passive local gate to recognize
+  the new private prerequisite without opening public act compatibility.
+- Worker 823 hardened resource/form reset-action private preflights. Public
+  submit dispatch, requestFormReset, action invocation, DOM mutation, React
+  updates, package/export compatibility, and reset/action alias claims now fail
+  before private preflight records are admitted.
+- Worker 824 added a private hydrateRoot execution-preflight boundary after the
+  accepted marker/listener, recoverable-error, target-claiming, and event-replay
+  preflight chain. The accepted fix freezes stored hydrateRoot public-facade
+  payloads so exposed WeakMap payload objects cannot be mutated to spoof
+  boundary ownership.
+- Worker 825 added the static test-renderer private-admission ledger for
+  Workers 816 and 818. The accepted fix removed Rust syntax-bearing anchors and
+  extends durability checks to `sliceStart` and `sliceEnd` as well as evidence
+  tokens. Public serialization, JS/CJS/package compatibility, native bridge
+  loading/execution, root/act/Scheduler compatibility, and broad multichild
+  identity remain blocked.
+- The batch was accepted after focused ledger, React DOM act, hydration,
+  resource/form, native, test-renderer, Rust, package-surface, import-smoke, and
+  `git diff --check` verification, with read-only audits before merge. Accepted
+  branches and worktrees were cleaned up after merge.
+
 ### Workers 810 and 819
 
 - Worker 810 added the static React act/Scheduler diagnostics ledger after

@@ -45,21 +45,27 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Workers 803-819 have been accepted, verified,
-merged, and cleaned up. Workers 820-825 are active in isolated worktrees.
+Top-level cap: 30 workers. Workers 803-825 have been accepted, verified,
+merged, and cleaned up. Workers 826-837 are active in isolated worktrees.
 Accepted private evidence still keeps public root, act, Scheduler timing,
 hydration, serialization, native execution, package compatibility, and broad
 renderer compatibility blocked.
 
 Active workers:
 
-- Worker 820: static private-admission ledger for accepted Workers 803/817.
-- Worker 821: static native cleanup stale-evidence admission ledger.
-- Worker 822: React DOM test-utils act negative matrix.
-- Worker 823: resource/form reset-action private preflight.
-- Worker 824: hydrateRoot private execution-preflight boundary.
-- Worker 825: static test-renderer private-admission ledger for accepted
-  Workers 816/818.
+- Worker 826: root-work-loop managed-child sibling-order handoff.
+- Worker 827: sync-flush finished-work/root-finished-lanes main-path handoff.
+- Worker 828: hydrateRoot text-claim patch bridge execution after the private
+  execution-preflight boundary.
+- Worker 829: resource root-map storage private execution.
+- Worker 830: form action fulfilled-callback reset fake commit.
+- Worker 831: package-root `toTree` sibling-text private admission.
+- Worker 832: Rust test-renderer unmount/nested native execution consumer.
+- Worker 833: native cleanup-hook callable private preflight.
+- Worker 834: Scheduler mock public descriptor/source-proof repair.
+- Worker 835: React DOM test-utils act delayed Scheduler handoff.
+- Worker 836: reconciler private act queue execution path.
+- Worker 837: scheduler-driven passive effect execution.
 
 Future workers may intentionally overlap with accepted areas when that improves
 throughput. Resolve merge conflicts by preserving accepted private blockers and
@@ -67,9 +73,10 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Audit and merge Workers 820, 821, 822, 823, 824, and 825 as they complete.
-   Expect overlap in conformance ledgers, React DOM hydration/resource/form
-   tests, React DOM test-utils act gates, and test-renderer private evidence.
+1. Audit and merge Workers 826-837 as they complete. Expect intentional overlap
+   in reconciler sync-flush/root-scheduler paths, React DOM act/hydration/
+   resource/form tests, Scheduler mock source proof, and test-renderer private
+   serialization/native evidence.
 2. Prefer parallelizable independent proofs even when they may conflict in test
    files. Resolve conflicts during merge by keeping all accepted negative tests,
    blockers, and source-ownership checks.
@@ -95,12 +102,13 @@ canonical evidence requirements.
   sibling-text serialization, package compatibility, native bridge
   loading/execution, and broad multichild identity remain blocked.
 - Resource and form work remains private/fake after accepted root-map storage
-  and rejected-error preflights. Public resources, forms, reset/action
-  invocation, DOM/head mutation, and package compatibility remain blocked.
+  and rejected-error preflights. Workers 829 and 830 may advance private
+  execution records, but public resources, forms, reset/action invocation,
+  DOM/head mutation, and package compatibility remain blocked.
 - Worker 736's nested `toJSON` source-report identity and Worker 733's unmount
   identity gates are now connected by an accepted static bridge ledger and are
-  active input for Worker 825. JS/CJS, public serialization, native bridge
-  loading/execution, and package compatibility remain blocked.
+  active input for Workers 831 and 832. JS/CJS, public serialization, native
+  bridge loading/execution, and package compatibility remain blocked.
 - Additional private root/test-renderer bridge gates that require accepted
   `finished_work` / `finished_lanes` handoff before any wider serialization or
   native bridge execution.
