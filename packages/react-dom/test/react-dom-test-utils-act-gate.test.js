@@ -203,6 +203,45 @@ test('private act gate rejects stale foreign or tampered Worker 810 ledger metad
       publicClaimFields: []
     },
     {
+      label: 'nested-summary-foreign-worker',
+      prerequisite: {
+        ...baseline,
+        summary: {
+          ...baseline.summary,
+          workerId: 'worker-822-foreign-react-act-scheduler-ledger'
+        }
+      },
+      staleReasons: ['summary.worker-id-mismatch'],
+      publicClaimFields: []
+    },
+    {
+      label: 'nested-summary-public-execution',
+      prerequisite: {
+        ...baseline,
+        summary: {
+          ...baseline.summary,
+          publicActExecution: true
+        }
+      },
+      staleReasons: ['summary.publicActExecution-not-false'],
+      publicClaimFields: ['summary.publicActExecution']
+    },
+    {
+      label: 'nested-summary-public-blocker-claim',
+      prerequisite: {
+        ...baseline,
+        summary: {
+          ...baseline.summary,
+          publicBlockerClaims: {
+            ...baseline.summary.publicBlockerClaims,
+            publicActExecution: true
+          }
+        }
+      },
+      staleReasons: ['summary.publicBlockerClaims.publicActExecution-not-false'],
+      publicClaimFields: ['summary.publicBlockerClaims.publicActExecution']
+    },
+    {
       label: 'tampered-public-claims',
       prerequisite: {
         ...baseline,

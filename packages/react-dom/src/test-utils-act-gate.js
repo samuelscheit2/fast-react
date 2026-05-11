@@ -2053,27 +2053,19 @@ function collectAcceptedPrivatePrerequisitePublicClaims(prerequisites) {
   const claims = [];
 
   for (const prerequisite of prerequisites) {
-    for (const field of acceptedPrivatePrerequisitePublicClaimFields) {
-      if (prerequisite[field] === true) {
-        claims.push(
-          freezeRecord({
-            prerequisiteId: prerequisite.id,
-            field
-          })
-        );
-      }
-    }
-    if (isObjectLike(prerequisite.publicBlockerClaims)) {
-      for (const field of privateReactActSchedulerDiagnosticsLedgerPublicBlockerFields) {
-        if (prerequisite.publicBlockerClaims[field] === true) {
-          claims.push(
-            freezeRecord({
-              prerequisiteId: prerequisite.id,
-              field: `publicBlockerClaims.${field}`
-            })
-          );
-        }
-      }
+    collectPrivatePrerequisitePublicClaimsFromRecord({
+      claims,
+      prerequisite,
+      record: prerequisite,
+      prefix: ''
+    });
+    if (isObjectLike(prerequisite.summary)) {
+      collectPrivatePrerequisitePublicClaimsFromRecord({
+        claims,
+        prerequisite,
+        record: prerequisite.summary,
+        prefix: 'summary.'
+      });
     }
   }
 
@@ -2081,112 +2073,194 @@ function collectAcceptedPrivatePrerequisitePublicClaims(prerequisites) {
 }
 
 function collectReactActSchedulerDiagnosticsLedgerStaleReasons(prerequisite) {
-  const reasons = [];
-  if (prerequisite.workerId !== privateReactActSchedulerDiagnosticsLedgerWorkerId) {
-    reasons.push('worker-id-mismatch');
-  }
-  if (prerequisite.status !== privateReactActSchedulerDiagnosticsLedgerStatus) {
-    reasons.push('status-mismatch');
-  }
-  if (prerequisite.source !== privateReactActSchedulerDiagnosticsLedgerSource) {
-    reasons.push('source-mismatch');
-  }
-  if (
-    prerequisite.gateId !== privateReactActSchedulerDiagnosticsLedgerGateId ||
-    prerequisite.diagnosticGateId !==
-      privateReactActSchedulerDiagnosticsLedgerGateId
-  ) {
-    reasons.push('gate-id-mismatch');
-  }
-  if (
-    prerequisite.diagnosticStatus !==
-    privateReactActSchedulerDiagnosticsLedgerStatus
-  ) {
-    reasons.push('diagnostic-status-mismatch');
-  }
-  if (
-    prerequisite.workerCount !==
-    privateReactActSchedulerDiagnosticsLedgerWorkerIds.length
-  ) {
-    reasons.push('worker-count-mismatch');
-  }
-  if (
-    !sameStringArray(
-      prerequisite.workerIds,
-      privateReactActSchedulerDiagnosticsLedgerWorkerIds
-    )
-  ) {
-    reasons.push('worker-ids-mismatch');
-  }
-  if (
-    !sameStringArray(
-      prerequisite.evidenceKinds,
-      privateReactActSchedulerDiagnosticsLedgerEvidenceKinds
-    )
-  ) {
-    reasons.push('evidence-kinds-mismatch');
-  }
-  if (
-    !sameStringArray(
-      prerequisite.delayedRendererRootEvidenceScopes,
-      privateReactActSchedulerDiagnosticsLedgerRendererRootScopes
-    )
-  ) {
-    reasons.push('delayed-renderer-root-scopes-mismatch');
-  }
-  for (const field of privateReactActSchedulerDiagnosticsLedgerRequiredTrueFields) {
-    if (prerequisite[field] !== true) {
-      reasons.push(`${field}-not-true`);
-    }
-  }
-  for (const field of privateReactActSchedulerDiagnosticsLedgerRequiredFalseFields) {
-    if (prerequisite[field] !== false) {
-      reasons.push(`${field}-not-false`);
-    }
-  }
+  const reasons = collectReactActSchedulerDiagnosticsLedgerRecordReasons({
+    record: prerequisite,
+    prefix: '',
+    validateDiagnosticAliases: true
+  });
 
-  const requirements = prerequisite.requirements;
-  if (!isObjectLike(requirements)) {
-    reasons.push('requirements-missing');
+  if (!isObjectLike(prerequisite.summary)) {
+    reasons.push('summary-missing');
   } else {
-    if (
-      !sameStringSet(
-        Object.keys(requirements),
-        privateReactActSchedulerDiagnosticsLedgerRequirementFields
-      )
-    ) {
-      reasons.push('requirements-field-mismatch');
-    }
-    for (const field of privateReactActSchedulerDiagnosticsLedgerRequirementFields) {
-      if (
-        requirements[field] !==
-        privateReactActSchedulerDiagnosticsLedgerRequirements[field]
-      ) {
-        reasons.push(`requirements.${field}-mismatch`);
-      }
-    }
-  }
-
-  const publicBlockerClaims = prerequisite.publicBlockerClaims;
-  if (!isObjectLike(publicBlockerClaims)) {
-    reasons.push('public-blocker-claims-missing');
-  } else {
-    if (
-      !sameStringSet(
-        Object.keys(publicBlockerClaims),
-        privateReactActSchedulerDiagnosticsLedgerPublicBlockerFields
-      )
-    ) {
-      reasons.push('public-blocker-claims-field-mismatch');
-    }
-    for (const field of privateReactActSchedulerDiagnosticsLedgerPublicBlockerFields) {
-      if (publicBlockerClaims[field] !== false) {
-        reasons.push(`publicBlockerClaims.${field}-not-false`);
-      }
-    }
+    reasons.push(
+      ...collectReactActSchedulerDiagnosticsLedgerRecordReasons({
+        record: prerequisite.summary,
+        prefix: 'summary.',
+        validateDiagnosticAliases: false
+      })
+    );
   }
 
   return freezeArray(reasons);
+}
+
+function collectReactActSchedulerDiagnosticsLedgerRecordReasons({
+  record,
+  prefix,
+  validateDiagnosticAliases
+}) {
+  const reasons = [];
+  if (record.workerId !== privateReactActSchedulerDiagnosticsLedgerWorkerId) {
+    reasons.push(`${prefix}worker-id-mismatch`);
+  }
+  if (record.status !== privateReactActSchedulerDiagnosticsLedgerStatus) {
+    reasons.push(`${prefix}status-mismatch`);
+  }
+  if (record.source !== privateReactActSchedulerDiagnosticsLedgerSource) {
+    reasons.push(`${prefix}source-mismatch`);
+  }
+  if (record.gateId !== privateReactActSchedulerDiagnosticsLedgerGateId) {
+    reasons.push(`${prefix}gate-id-mismatch`);
+  }
+  if (
+    validateDiagnosticAliases &&
+    record.diagnosticGateId !== privateReactActSchedulerDiagnosticsLedgerGateId
+  ) {
+    reasons.push(`${prefix}diagnostic-gate-id-mismatch`);
+  }
+  if (
+    validateDiagnosticAliases &&
+    record.diagnosticStatus !== privateReactActSchedulerDiagnosticsLedgerStatus
+  ) {
+    reasons.push(`${prefix}diagnostic-status-mismatch`);
+  }
+  if (
+    record.workerCount !==
+    privateReactActSchedulerDiagnosticsLedgerWorkerIds.length
+  ) {
+    reasons.push(`${prefix}worker-count-mismatch`);
+  }
+  if (
+    !sameStringArray(
+      record.workerIds,
+      privateReactActSchedulerDiagnosticsLedgerWorkerIds
+    )
+  ) {
+    reasons.push(`${prefix}worker-ids-mismatch`);
+  }
+  if (
+    !sameStringArray(
+      record.evidenceKinds,
+      privateReactActSchedulerDiagnosticsLedgerEvidenceKinds
+    )
+  ) {
+    reasons.push(`${prefix}evidence-kinds-mismatch`);
+  }
+  if (
+    !sameStringArray(
+      record.delayedRendererRootEvidenceScopes,
+      privateReactActSchedulerDiagnosticsLedgerRendererRootScopes
+    )
+  ) {
+    reasons.push(`${prefix}delayed-renderer-root-scopes-mismatch`);
+  }
+  for (const field of privateReactActSchedulerDiagnosticsLedgerRequiredTrueFields) {
+    if (record[field] !== true) {
+      reasons.push(`${prefix}${field}-not-true`);
+    }
+  }
+  for (const field of privateReactActSchedulerDiagnosticsLedgerRequiredFalseFields) {
+    if (record[field] !== false) {
+      reasons.push(`${prefix}${field}-not-false`);
+    }
+  }
+
+  const requirements = record.requirements;
+  collectReactActSchedulerDiagnosticsLedgerRequirementsReasons(
+    reasons,
+    requirements,
+    `${prefix}requirements`
+  );
+
+  const publicBlockerClaims = record.publicBlockerClaims;
+  collectReactActSchedulerDiagnosticsLedgerPublicBlockerReasons(
+    reasons,
+    publicBlockerClaims,
+    `${prefix}publicBlockerClaims`
+  );
+
+  return reasons;
+}
+
+function collectReactActSchedulerDiagnosticsLedgerRequirementsReasons(
+  reasons,
+  requirements,
+  label
+) {
+  if (!isObjectLike(requirements)) {
+    reasons.push(`${label}-missing`);
+    return;
+  }
+  if (
+    !sameStringSet(
+      Object.keys(requirements),
+      privateReactActSchedulerDiagnosticsLedgerRequirementFields
+    )
+  ) {
+    reasons.push(`${label}-field-mismatch`);
+  }
+  for (const field of privateReactActSchedulerDiagnosticsLedgerRequirementFields) {
+    if (
+      requirements[field] !==
+      privateReactActSchedulerDiagnosticsLedgerRequirements[field]
+    ) {
+      reasons.push(`${label}.${field}-mismatch`);
+    }
+  }
+}
+
+function collectReactActSchedulerDiagnosticsLedgerPublicBlockerReasons(
+  reasons,
+  publicBlockerClaims,
+  label
+) {
+  if (!isObjectLike(publicBlockerClaims)) {
+    reasons.push(`${label}-missing`);
+    return;
+  }
+  if (
+    !sameStringSet(
+      Object.keys(publicBlockerClaims),
+      privateReactActSchedulerDiagnosticsLedgerPublicBlockerFields
+    )
+  ) {
+    reasons.push(`${label}-field-mismatch`);
+  }
+  for (const field of privateReactActSchedulerDiagnosticsLedgerPublicBlockerFields) {
+    if (publicBlockerClaims[field] !== false) {
+      reasons.push(`${label}.${field}-not-false`);
+    }
+  }
+}
+
+function collectPrivatePrerequisitePublicClaimsFromRecord({
+  claims,
+  prerequisite,
+  record,
+  prefix
+}) {
+  for (const field of acceptedPrivatePrerequisitePublicClaimFields) {
+    if (record[field] === true) {
+      claims.push(
+        freezeRecord({
+          prerequisiteId: prerequisite.id,
+          field: `${prefix}${field}`
+        })
+      );
+    }
+  }
+  if (isObjectLike(record.publicBlockerClaims)) {
+    for (const field of privateReactActSchedulerDiagnosticsLedgerPublicBlockerFields) {
+      if (record.publicBlockerClaims[field] === true) {
+        claims.push(
+          freezeRecord({
+            prerequisiteId: prerequisite.id,
+            field: `${prefix}publicBlockerClaims.${field}`
+          })
+        );
+      }
+    }
+  }
 }
 
 function createViolation(id, extra = {}) {

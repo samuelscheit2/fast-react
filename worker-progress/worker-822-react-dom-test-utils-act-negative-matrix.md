@@ -15,6 +15,10 @@
 - Updated adjacent React DOM act oracle assertions, including the React-act
   conformance test section that hard-codes the React DOM private prerequisite
   manifest.
+- Audit follow-up validates the duplicated nested `summary` representation of
+  the Worker 810 ledger prerequisite, including nested `summary.publicBlockerClaims`.
+  Nested summary worker-id, public execution, and public blocker-claim tampering
+  now fail closed.
 
 ## Changed Files
 
@@ -37,6 +41,17 @@
 - `npm run check:package-surface` - passed; npm printed the existing `minimum-release-age` warning.
 - `node tests/smoke/import-entrypoints.mjs` - passed.
 - `git diff --check` - passed.
+- Audit follow-up: `node --check packages/react-dom/src/test-utils-act-gate.js` - passed.
+- Audit follow-up: `node --check packages/react-dom/test/react-dom-test-utils-act-gate.test.js` - passed.
+- Audit follow-up: `node --check tests/conformance/test/react-dom-test-utils-act-oracle.test.mjs` - passed.
+- Audit follow-up: `node --check tests/conformance/test/react-act-oracle.test.mjs` - passed.
+- Audit follow-up: `node --test packages/react-dom/test/react-dom-test-utils-act-gate.test.js` - passed, 4 tests.
+- Audit follow-up: `node --test tests/conformance/test/private-admission-810-react-act-scheduler-diagnostics-ledger.test.mjs tests/conformance/test/react-dom-test-utils-act-oracle.test.mjs` - passed, 25 tests.
+- Audit follow-up: `node --test tests/conformance/test/react-act-oracle.test.mjs tests/conformance/test/scheduler-mock-delayed-act-root-work.test.mjs tests/conformance/test/scheduler-mock-oracle.test.mjs tests/conformance/test/scheduler-native-entry-oracle.test.mjs tests/conformance/test/scheduler-mock-expired-lane-flush.test.mjs` - passed, 69 tests.
+- Audit follow-up: `npm run check --workspace @fast-react/react-dom` - passed, 182 package tests plus import smoke; npm printed the existing `minimum-release-age` warning.
+- Audit follow-up: `npm run check:package-surface` - passed; npm printed the existing `minimum-release-age` warning.
+- Audit follow-up: `node tests/smoke/import-entrypoints.mjs` - passed.
+- Audit follow-up: `git diff --check` - passed.
 
 ## Evidence Gathered
 
@@ -55,6 +70,11 @@
   side-effect execution remain false.
 - Confirmed package surface and import smokes still pass, so no new public
   entrypoints or package exports were exposed.
+- Audit follow-up confirmed a nested `summary.workerId` foreign worker,
+  `summary.publicActExecution: true`, and
+  `summary.publicBlockerClaims.publicActExecution: true` each produce
+  fail-closed Worker 810 prerequisite violations and do not open public
+  test-utils act readiness or side-effect execution.
 
 ## Risks Or Blockers
 
