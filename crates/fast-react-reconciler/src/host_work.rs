@@ -2813,13 +2813,24 @@ pub(crate) fn execute_sync_flush_host_mutations_for_canary(
     store: &mut FiberRootStore<RecordingHost>,
     host: &mut RecordingHost,
     record: &SyncFlushRootRecord,
+    diagnostics: SyncFlushRootHostOutputCommitDiagnosticsForCanary,
     request: SyncFlushHostMutationExecutionRequestForCanary,
     host_work: &mut HostWorkResult,
 ) -> Result<
     SyncFlushHostMutationExecutionDiagnosticForCanary,
     SyncFlushHostMutationExecutionErrorForCanary,
 > {
+    let source_request =
+        sync_flush_host_mutation_execution_request_for_canary(record, diagnostics)?;
     validate_sync_flush_host_mutation_request_matches_record(request, record)?;
+    if request != source_request {
+        return Err(
+            SyncFlushHostMutationExecutionErrorForCanary::StaleFinishedWorkEvidence {
+                root: request.root(),
+                order: request.order(),
+            },
+        );
+    }
 
     if host_work.root() != request.root() {
         return Err(

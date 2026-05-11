@@ -4268,6 +4268,7 @@ mod tests {
             &mut fixture.store,
             &mut fixture.host,
             &fixture.committed,
+            fixture.diagnostics,
             request,
             &mut fixture.host_work,
         )
@@ -4326,6 +4327,28 @@ mod tests {
             fixture.diagnostics,
         )
         .unwrap();
+        let mut stale_execution_record = fixture.committed.clone();
+        stale_execution_record.finished_work_handoff_identity = None;
+
+        let error = execute_sync_flush_host_mutations_for_canary(
+            &mut fixture.store,
+            &mut fixture.host,
+            &stale_execution_record,
+            fixture.diagnostics,
+            request,
+            &mut fixture.host_work,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            SyncFlushHostMutationExecutionErrorForCanary::StaleFinishedWorkEvidence {
+                root,
+                order,
+            } if root == fixture.root_id && order == fixture.committed.order()
+        ));
+        assert_eq!(fixture.host.operations(), fixture.operations_before_opt_in);
+
         let previous_current = fixture.committed.commit().previous_current();
         fixture
             .store
@@ -4337,6 +4360,7 @@ mod tests {
             &mut fixture.store,
             &mut fixture.host,
             &fixture.committed,
+            fixture.diagnostics,
             request,
             &mut fixture.host_work,
         )
@@ -4455,6 +4479,7 @@ mod tests {
             &mut fixture.store,
             &mut fixture.host,
             &fixture.committed,
+            fixture.diagnostics,
             request,
             &mut foreign_host_work,
         )

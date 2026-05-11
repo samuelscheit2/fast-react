@@ -89,3 +89,15 @@ git diff --check
 2. Keep public renderer/root wiring separate until the same fail-closed
    finished-work, detached-host, and root/lanes ownership checks are proven
    outside private canaries.
+
+## Audit Follow-up - 2026-05-11
+
+- Fixed the execution-boundary stale evidence gap: `execute_sync_flush_host_mutations_for_canary`
+  now rebuilds the source-owned request from the supplied `SyncFlushRootRecord`
+  plus diagnostics before any host mutation application.
+- Added replay coverage where a request created from valid evidence is reused
+  with a stale record whose copied fields still match; execution rejects before
+  host calls and preserves the inert operation log.
+- Re-ran `sync_flush_private_host_mutation_execution`, `sync_flush`,
+  `host_work`, `root_scheduler`, `cargo check`, `cargo fmt --all --check`, and
+  `git diff --check`; all passed.
