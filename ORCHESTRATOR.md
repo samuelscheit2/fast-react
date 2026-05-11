@@ -86,13 +86,16 @@ The orchestrator goal is continuous. Do not call
   implementation workers, spawn independent read-only audit subagents before
   merge when the change is non-trivial, touches compatibility gates, source
   currentness, one-shot tokens, package surfaces, or prior blocker areas.
-  Prefer at least two focused audits for risky changes: one surface/hostile
-  audit for false greens, caller-shaped evidence, stale source/currentness,
-  hidden/proxy aliases, and compatibility broadening; and one
-  regression-command audit that reruns claimed checks and targeted hostile
-  probes. Add more focused audits in parallel when they would produce
-  independent acceptance evidence. Merge only after audit results and local
-  post-rebase checks support the acceptance decision.
+  Decide the number and focus of audit subagents case by case from the
+  worker's blast radius, prior blockers, touched surfaces, and uncertainty.
+  Useful audit surfaces may include hostile/source review for false greens,
+  caller-shaped evidence, stale source/currentness, hidden/proxy aliases, and
+  compatibility broadening; regression-command reruns with targeted hostile
+  probes; package-surface checks; source-currentness checks; or other focused
+  reviews that produce independent acceptance evidence. Small, low-risk
+  changes may need fewer audits; risky or cross-surface changes may need
+  several in parallel. Merge only after audit results and local post-rebase
+  checks support the acceptance decision.
 - Accept only scoped, intentional changes. Do not revert user changes.
 - Regenerable artifacts such as `node_modules/`, `target/`, and root
   `Cargo.lock` do not need removal merely because they exist. Remove or
