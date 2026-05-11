@@ -2699,6 +2699,151 @@ test("react-test-renderer JS private serialization finished-work identity valida
   }
 });
 
+test("react-test-renderer JS private root finished-work/lanes handoff clone and tamper audit stays private", () => {
+  for (const entry of jsEntrypoints) {
+    const moduleExports = loadFresh(entry.specifier);
+    const renderer = moduleExports.create({
+      type: "span",
+      props: {},
+      children: ["hello"]
+    });
+
+    const jsonError = captureThrown(() => renderer.toJSON());
+    const jsonFacade = Object.getOwnPropertyDescriptor(
+      renderer.toJSON,
+      privateToJSONSerializationFacadeSymbol
+    ).value;
+    const jsonReport = createAcceptedMinimalHostOutputDiagnostic();
+    const jsonEvidence = createAcceptedFinishedWorkIdentityEvidence({
+      rootRequest: jsonError.rootRequest,
+      publicSurface: "create().toJSON",
+      sourceSerializationDiagnosticName:
+        "fast-react-test-renderer.serialization.private-json-canary",
+      consumesPrivateToJSONEvidence: true,
+      consumesPrivateToTreeEvidence: false
+    });
+    const clonedEvidence = withFinishedWorkIdentityChange(
+      jsonEvidence,
+      () => {}
+    );
+    const clonedReport = withHostOutputReportChange(jsonReport, () => {});
+
+    assert.notEqual(
+      clonedEvidence.rootFinishedLanesHandoff,
+      jsonEvidence.rootFinishedLanesHandoff,
+      entry.entrypoint
+    );
+    assert.notEqual(clonedReport, jsonReport, entry.entrypoint);
+    assert.equal(
+      jsonFacade.canValidateAcceptedFinishedWorkIdentity(
+        clonedEvidence,
+        clonedReport
+      ),
+      true,
+      entry.entrypoint
+    );
+
+    const identity = jsonFacade.validateAcceptedFinishedWorkIdentity(
+      clonedEvidence,
+      clonedReport
+    );
+    assert.equal(Object.isFrozen(identity), true, entry.entrypoint);
+    assert.equal(
+      Object.isFrozen(identity.rootFinishedLanesHandoff),
+      true,
+      entry.entrypoint
+    );
+    assert.equal(identity.publicToJSONAvailable, false, entry.entrypoint);
+    assert.equal(identity.publicToTreeAvailable, false, entry.entrypoint);
+    assert.equal(
+      identity.publicTestInstanceAvailable,
+      false,
+      entry.entrypoint
+    );
+    assert.equal(
+      identity.publicSerializationAvailable,
+      false,
+      entry.entrypoint
+    );
+    assert.equal(identity.compatibilityClaimed, false, entry.entrypoint);
+    assertPrivateRootFinishedLanesHandoffBlockers(
+      identity.rootFinishedLanesHandoff,
+      entry.entrypoint
+    );
+
+    assertRootFinishedLanesHandoffAliasRejections(
+      jsonFacade,
+      clonedEvidence,
+      clonedReport,
+      "FastReactTestRendererPrivateToJSONSerializationError"
+    );
+    assertFinishedWorkIdentityRejection(
+      jsonFacade,
+      withFinishedWorkIdentityChange(clonedEvidence, (evidence) => {
+        evidence.rootFinishedLanesHandoff.commitFinishedLanesBits = 2;
+      }),
+      clonedReport,
+      "FastReactTestRendererPrivateToJSONSerializationError"
+    );
+    assertFinishedWorkIdentityRejection(
+      jsonFacade,
+      withFinishedWorkIdentityChange(clonedEvidence, (evidence) => {
+        evidence.rootFinishedLanesHandoff.commitCurrent.slot += 1;
+      }),
+      clonedReport,
+      "FastReactTestRendererPrivateToJSONSerializationError"
+    );
+    assertFinishedWorkIdentityRejection(
+      jsonFacade,
+      withFinishedWorkIdentityChange(clonedEvidence, (evidence) => {
+        evidence.commitFinishedLanesBits = 2;
+      }),
+      clonedReport,
+      "FastReactTestRendererPrivateToJSONSerializationError"
+    );
+    assertFinishedWorkIdentityRejection(
+      jsonFacade,
+      withFinishedWorkIdentityChange(clonedEvidence, (evidence) => {
+        evidence.reportFinishedWork.slot += 1;
+      }),
+      clonedReport,
+      "FastReactTestRendererPrivateToJSONSerializationError"
+    );
+    assertFinishedWorkIdentityRejection(
+      jsonFacade,
+      clonedEvidence,
+      withHostOutputReportChange(clonedReport, (report) => {
+        report.hostOutputUpdateKind = "Update";
+      }),
+      "FastReactTestRendererPrivateToJSONSerializationError"
+    );
+    assertFinishedWorkIdentityRejection(
+      jsonFacade,
+      clonedEvidence,
+      withHostOutputReportChange(clonedReport, (report) => {
+        report.publicBlockers.compatibilityClaimBlocked = false;
+      }),
+      "FastReactTestRendererPrivateToJSONSerializationError"
+    );
+    assertFinishedWorkIdentityRejection(
+      jsonFacade,
+      withFinishedWorkIdentityChange(clonedEvidence, (evidence) => {
+        evidence.rootFinishedLanesHandoff.nativeBridgeAvailable = true;
+      }),
+      clonedReport,
+      "FastReactTestRendererPrivateToJSONSerializationError"
+    );
+    assertFinishedWorkIdentityRejection(
+      jsonFacade,
+      withFinishedWorkIdentityChange(clonedEvidence, (evidence) => {
+        evidence.rootFinishedLanesHandoff.packageCompatibilityClaimed = true;
+      }),
+      clonedReport,
+      "FastReactTestRendererPrivateToJSONSerializationError"
+    );
+  }
+});
+
 test("react-test-renderer package-root private unmount finished-work identity requires matching handoff evidence", () => {
   const entry = jsEntrypoints.find(
     (candidate) => candidate.entrypoint === "react-test-renderer"
@@ -4127,6 +4272,21 @@ function withSiblingTextReportChange(report, mutate) {
   const clone = JSON.parse(JSON.stringify(report));
   mutate(clone);
   return clone;
+}
+
+function withHostOutputReportChange(report, mutate) {
+  const clone = JSON.parse(JSON.stringify(report));
+  mutate(clone);
+  return clone;
+}
+
+function assertPrivateRootFinishedLanesHandoffBlockers(handoff, label) {
+  assert.equal(handoff.publicSerializationAvailable, false, label);
+  assert.equal(handoff.publicRouteAvailable, false, label);
+  assert.equal(handoff.nativeBridgeAvailable, false, label);
+  assert.equal(handoff.nativeExecution, false, label);
+  assert.equal(handoff.packageCompatibilityClaimed, false, label);
+  assert.equal(handoff.compatibilityClaimed, false, label);
 }
 
 function assertNativeExecutionIdentityRejection({

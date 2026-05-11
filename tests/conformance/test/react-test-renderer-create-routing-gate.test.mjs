@@ -2365,6 +2365,137 @@ test("react-test-renderer development private create execution can consume Rust 
   });
 });
 
+test("react-test-renderer CJS private create native handoff clone and tamper audit stays private", () => {
+  for (const entry of cjsEntrypoints) {
+    const moduleExports = loadFresh(entry.modulePath);
+    const bridge = assertPrivateRootRequestBridge(
+      moduleExports,
+      entry.entrypoint
+    );
+    if (typeof bridge.getRootCreateRouteAdmission !== "function") {
+      assert.equal(entry.production, true, entry.entrypoint);
+      assert.equal(bridge.nativeBridgeAvailable, false, entry.entrypoint);
+      assert.equal(bridge.nativeExecution, false, entry.entrypoint);
+      assert.equal(bridge.rustExecution, false, entry.entrypoint);
+      continue;
+    }
+    const renderer = moduleExports.create(
+      { props: { children: `hello ${entry.entrypoint}` }, type: "span" },
+      {}
+    );
+    const [createRequest] = bridge.getRendererRootRequests(renderer);
+    const admission = bridge.getRootCreateRouteAdmission(createRequest);
+    const sourceHandoff =
+      createRustCreateNativeBridgeHostOutputHandoffSource(
+        createRequest,
+        admission
+      );
+    const clonedHandoff = cloneDiagnostic(sourceHandoff);
+    const clonedLifecycle = cloneDiagnostic(
+      createRustLifecycleDiagnosticSource(createRequest)
+    );
+
+    assert.notEqual(clonedHandoff, sourceHandoff, entry.entrypoint);
+    assert.notEqual(
+      clonedHandoff.createRouteAdmission,
+      sourceHandoff.createRouteAdmission,
+      entry.entrypoint
+    );
+    assert.notEqual(
+      clonedHandoff.workLoopFinishedWorkPreflight,
+      sourceHandoff.workLoopFinishedWorkPreflight,
+      entry.entrypoint
+    );
+    assert.notEqual(
+      clonedHandoff.createRouteAdmission.workLoopFinishedWorkPreflight,
+      sourceHandoff.createRouteAdmission.workLoopFinishedWorkPreflight,
+      entry.entrypoint
+    );
+
+    const result = bridge.executeRootRequest(createRequest, () => ({
+      rustLifecycleDiagnostic: clonedLifecycle,
+      privateCreateNativeBridgeHostOutputHandoff: clonedHandoff,
+      nativeAddonLoaded: false,
+      nativeExecution: false,
+      rustExecution: true
+    }));
+
+    assertRootExecutionResult(result, createRequest);
+    const acceptedHandoff = result.privateCreateNativeBridgeHostOutputHandoff;
+    assertPrivateCreateNativeBridgeHostOutputHandoff(
+      acceptedHandoff,
+      createRequest
+    );
+    assert.notEqual(
+      acceptedHandoff.sourceDiagnostic,
+      clonedHandoff,
+      entry.entrypoint
+    );
+    assert.equal(
+      Object.isFrozen(acceptedHandoff.sourceDiagnostic),
+      true,
+      entry.entrypoint
+    );
+    assert.equal(
+      Object.isFrozen(acceptedHandoff.createRouteAdmission.sourceDiagnostic),
+      true,
+      entry.entrypoint
+    );
+    assert.equal(acceptedHandoff.publicCreateBehaviorAvailable, false);
+    assert.equal(acceptedHandoff.publicSerializationAvailable, false);
+    assert.equal(acceptedHandoff.publicTestInstanceAvailable, false);
+    assert.equal(acceptedHandoff.nativeAddonLoaded, false);
+    assert.equal(acceptedHandoff.nativeBridgeAvailable, false);
+    assert.equal(acceptedHandoff.nativeExecution, false);
+    assert.equal(acceptedHandoff.compatibilityClaimed, false);
+
+    assertCreateNativeHandoffMutationRejection(
+      entry,
+      (handoff) => {
+        handoff.commitFinishedLanesBits = 2;
+      },
+      /finished lanes/u
+    );
+    assertCreateNativeHandoffMutationRejection(
+      entry,
+      (handoff) => {
+        handoff.commitCurrent.slot += 1;
+      },
+      /finished work/u
+    );
+    assertCreateNativeHandoffMutationRejection(
+      entry,
+      (handoff) => {
+        handoff.createRouteAdmission.workLoopFinishedWorkPreflight.finishedWork.slot +=
+          1;
+      },
+      /finished work/u
+    );
+    assertCreateNativeHandoffMutationRejection(
+      entry,
+      (handoff) => {
+        handoff.createRouteAdmission.workLoopFinishedWorkPreflight.renderLanesBits =
+          2;
+      },
+      /finished lanes/u
+    );
+    assertCreateNativeHandoffMutationRejection(
+      entry,
+      (handoff) => {
+        handoff.nativeBridgeAvailable = true;
+      },
+      /compatibility/u
+    );
+    assertCreateNativeHandoffMutationRejection(
+      entry,
+      (handoff) => {
+        handoff.compatibilityClaimed = true;
+      },
+      /compatibility/u
+    );
+  }
+});
+
 test("react-test-renderer CJS development private toJSON facade consumes accepted native execution records", () => {
   const entry = entrypoints.find(
     (candidate) => candidate.entrypoint === cjsDevelopmentEntrypoint
@@ -6636,6 +6767,50 @@ function assertPrivateCreateNativeBridgeHostOutputHandoff(handoff, request) {
   assert.equal(handoff.rustExecutionFromJs, false);
   assert.equal(handoff.hostOutputProducedFromJs, false);
   assert.equal(handoff.compatibilityClaimed, false);
+}
+
+function assertCreateNativeHandoffMutationRejection(
+  entry,
+  mutateHandoff,
+  messagePattern
+) {
+  const moduleExports = loadFresh(entry.modulePath);
+  const bridge = assertPrivateRootRequestBridge(
+    moduleExports,
+    entry.entrypoint
+  );
+  const renderer = moduleExports.create(
+    { props: { children: `tamper ${entry.entrypoint}` }, type: "span" },
+    {}
+  );
+  const [createRequest] = bridge.getRendererRootRequests(renderer);
+  const admission = bridge.getRootCreateRouteAdmission(createRequest);
+  const handoff = cloneDiagnostic(
+    createRustCreateNativeBridgeHostOutputHandoffSource(
+      createRequest,
+      admission
+    )
+  );
+  mutateHandoff(handoff);
+
+  const error = captureThrown(() =>
+    bridge.executeRootRequest(createRequest, () => ({
+      rustLifecycleDiagnostic: cloneDiagnostic(
+        createRustLifecycleDiagnosticSource(createRequest)
+      ),
+      privateCreateNativeBridgeHostOutputHandoff: handoff,
+      nativeAddonLoaded: false,
+      nativeExecution: false,
+      rustExecution: true
+    }))
+  );
+  assert.equal(
+    error.name,
+    "FastReactTestRendererPrivateRootRequestError",
+    entry.entrypoint
+  );
+  assert.equal(error.entrypoint, entry.entrypoint);
+  assert.match(error.message, messagePattern, entry.entrypoint);
 }
 
 function createRustRootCreatePreflightDiagnosticSource(preflight) {
@@ -13416,6 +13591,10 @@ function captureThrown(callback) {
   }
 
   assert.fail("Expected callback to throw");
+}
+
+function cloneDiagnostic(value) {
+  return JSON.parse(JSON.stringify(value));
 }
 
 function isForbiddenNativeLoad(request) {
