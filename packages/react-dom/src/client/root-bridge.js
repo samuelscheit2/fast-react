@@ -2479,6 +2479,12 @@ const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UPDATE_ACCEPTED_CAPABILITIES =
         'The diagnostic routes the public-shaped private root.render update call into a bridge-owned render request record.'
     }),
     freezeRecord({
+      id: 'private-native-update-request-handoff',
+      accepted: true,
+      reason:
+        'The private root.render update request was mirrored as an inert native root request handoff.'
+    }),
+    freezeRecord({
       id: 'host-output-update-handoff',
       accepted: true,
       reason:
@@ -2591,6 +2597,12 @@ const ROOT_BRIDGE_PUBLIC_FACADE_HOST_OUTPUT_UNMOUNT_ACCEPTED_CAPABILITIES =
       accepted: true,
       reason:
         'The diagnostic routes the public-shaped private root.unmount call into a bridge-owned unmount request record.'
+    }),
+    freezeRecord({
+      id: 'private-native-unmount-request-handoff',
+      accepted: true,
+      reason:
+        'The private root.unmount request was mirrored as an inert native root request handoff before cleanup metadata was exposed.'
     }),
     freezeRecord({
       id: 'root-marker-setup-cleanup',
@@ -7700,6 +7712,10 @@ function updatePrivateRootPublicFacadeHostOutputFromPayload(
       'Public-facade host-output update requires an applied host-output update handoff.'
     );
   }
+  const nativeHandoffRecord =
+    payload.bridge.createNativeRequestHandoff(updateRecord);
+  const nativeHandoffPayload =
+    rootNativeHandoffPayloads.get(nativeHandoffRecord) || null;
 
   const rootBridgeState = handleState.bridgeState;
   const sequence = rootBridgeState.nextPublicFacadeHostOutputUpdateSequence++;
@@ -7742,6 +7758,10 @@ function updatePrivateRootPublicFacadeHostOutputFromPayload(
     hostOutputUpdateHandoffSequence:
       hostOutputUpdateHandoff.handoffSequence,
     hostOutputUpdateStatus: hostOutputUpdateHandoff.updateStatus,
+    nativeHandoffId: nativeHandoffRecord.handoffId,
+    nativeHandoffStatus: nativeHandoffRecord.handoffStatus,
+    nativeRequestKind: nativeHandoffRecord.nativeRequestRecord.kind,
+    nativeRequestRecord: nativeHandoffRecord.nativeRequestRecord,
     hostType: hostOutputUpdateHandoff.hostTag,
     propertyMutation: hostOutputUpdateHandoff.propertyMutation,
     textMutation: hostOutputUpdateHandoff.textMutation,
@@ -7763,6 +7783,7 @@ function updatePrivateRootPublicFacadeHostOutputFromPayload(
     publicRootObjectExposed: false,
     publicRootExecution: false,
     publicRootCompatibilitySurface: false,
+    nativeUpdateRequestMirrored: true,
     nativeExecution: false,
     reconcilerExecution: false,
     rootScheduled: false,
@@ -7790,6 +7811,8 @@ function updatePrivateRootPublicFacadeHostOutputFromPayload(
     hostOutputUpdateHandoff,
     hostOutputUpdatePayload,
     initialHostOutputPayload: activeRender.hostOutputPayload,
+    nativeHandoffPayload,
+    nativeHandoffRecord,
     normalizedUpdate: normalized,
     renderRecord: activeRender.renderPayload.renderRecord,
     root: payload.root,
@@ -8316,6 +8339,10 @@ function createPrivateRootPublicFacadeHostOutputUnmountCleanupDiagnostic({
     rootBridgeState.nextPublicFacadeHostOutputUnmountCleanupSequence++;
   const diagnosticId =
     `${rootBridgeState.publicFacadeHostOutputUnmountCleanupIdPrefix}:${sequence}`;
+  const nativeHandoffRecord =
+    payload.bridge.createNativeRequestHandoff(unmountRecord);
+  const nativeHandoffPayload =
+    rootNativeHandoffPayloads.get(nativeHandoffRecord) || null;
   const diagnosticRecord = freezeRecord({
     $$typeof: privateRootPublicFacadeHostOutputUnmountCleanupRecordType,
     kind: 'FastReactDomPrivateRootPublicFacadeHostOutputUnmountCleanupDiagnosticRecord',
@@ -8376,6 +8403,10 @@ function createPrivateRootPublicFacadeHostOutputUnmountCleanupDiagnostic({
     unmountAdmissionSequence: unmountCleanupRecord.unmountAdmissionSequence,
     unmountAdmissionStatus: unmountCleanupRecord.unmountAdmissionStatus,
     unmountAdmission: unmountCleanupRecord.unmountAdmission,
+    nativeHandoffId: nativeHandoffRecord.handoffId,
+    nativeHandoffStatus: nativeHandoffRecord.handoffStatus,
+    nativeRequestKind: nativeHandoffRecord.nativeRequestRecord.kind,
+    nativeRequestRecord: nativeHandoffRecord.nativeRequestRecord,
     rootUnmountOwnership:
       unmountCleanupRecord.unmountAdmission.rootOwnership,
     fakeDomCleanup: unmountCleanupRecord.fakeDomCleanup,
@@ -8444,6 +8475,7 @@ function createPrivateRootPublicFacadeHostOutputUnmountCleanupDiagnostic({
     publicRootCompatibilitySurface: false,
     publicRootUnmounted: false,
     publicRootBehaviorChanged: false,
+    nativeUnmountRequestMirrored: true,
     nativeExecution: false,
     reconcilerExecution: false,
     rootScheduled: false,
@@ -8479,6 +8511,8 @@ function createPrivateRootPublicFacadeHostOutputUnmountCleanupDiagnostic({
     element,
     hostOutputHandoff,
     hostOutputPayload,
+    nativeHandoffPayload,
+    nativeHandoffRecord,
     renderCallback,
     renderRecord,
     root: payload.root,

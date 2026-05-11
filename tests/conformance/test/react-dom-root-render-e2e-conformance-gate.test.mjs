@@ -366,6 +366,8 @@ test("private facade root.render update mutates one fake DOM property and text p
   );
   const adapter = descriptor.value({
     hostOutputUpdateIdPrefix: "conformance-update-handoff",
+    nativeEnvironmentId: 843,
+    nativeHandoffIdPrefix: "conformance-update-native",
     publicFacadeHostOutputRenderIdPrefix: "conformance-update-render",
     publicFacadeHostOutputUpdateIdPrefix: "conformance-update-diagnostic",
     requestIdPrefix: "conformance-update-request",
@@ -417,6 +419,7 @@ test("private facade root.render update mutates one fake DOM property and text p
       "public-facade-create-root-record",
       "public-facade-initial-host-output-render",
       "public-facade-root-render-update-record",
+      "private-native-update-request-handoff",
       "host-output-update-handoff",
       "fake-dom-property-update",
       "property-payload-evidence",
@@ -434,6 +437,17 @@ test("private facade root.render update mutates one fake DOM property and text p
     updateDiagnostic.propertyMutation.propertyPayloadEvidence.setAttributeCount,
     1
   );
+  assert.equal(updateDiagnostic.nativeHandoffId, "conformance-update-native:3");
+  assert.equal(
+    updateDiagnostic.nativeHandoffStatus,
+    rootBridge.ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED
+  );
+  assert.equal(
+    updateDiagnostic.nativeRequestKind,
+    rootBridge.NATIVE_ROOT_BRIDGE_REQUEST_RENDER
+  );
+  assert.equal(updateDiagnostic.nativeRequestRecord.environmentId, 843);
+  assert.equal(updateDiagnostic.nativeUpdateRequestMirrored, true);
   assert.deepEqual(updateDiagnostic.textMutation, {
     newTextLength: 26,
     oldTextLength: 26,
@@ -459,6 +473,11 @@ test("private facade root.render update mutates one fake DOM property and text p
   assert.equal(updateHandoffPayload.previousProps, initialElement.props);
   assert.equal(updateHandoffPayload.nextProps, nextElement.props);
   assert.equal(updateHandoffPayload.latestPropsPublished, true);
+  assert.equal(
+    updatePayload.nativeHandoffPayload.sourceRecord,
+    updatePayload.updateRecord
+  );
+  assert.equal(updatePayload.nativeHandoffPayload.value, nextElement);
   assert.equal(container.childNodes.length, 1);
   assert.equal(container.firstChild.textContent, "updated conformance update");
   assert.deepEqual(attributeEntries(container.firstChild), [
@@ -487,6 +506,8 @@ test("root render E2E gate keeps private facade root.unmount cleanup below publi
     rootBridge.privateRootPublicFacadeAdapterSymbol
   );
   const adapter = descriptor.value({
+    nativeEnvironmentId: 844,
+    nativeHandoffIdPrefix: "conformance-root-unmount-native",
     publicFacadeHostOutputUnmountCleanupIdPrefix:
       "conformance-root-unmount-cleanup"
   });
@@ -534,6 +555,21 @@ test("root render E2E gate keeps private facade root.unmount cleanup below publi
   assert.equal(cleanup.publicRootUnmounted, false);
   assert.equal(cleanup.publicRootExecution, false);
   assert.equal(cleanup.publicRootCompatibilitySurface, false);
+  assert.equal(
+    cleanup.nativeHandoffId,
+    "conformance-root-unmount-native:3"
+  );
+  assert.equal(
+    cleanup.nativeHandoffStatus,
+    rootBridge.ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED
+  );
+  assert.equal(
+    cleanup.nativeRequestKind,
+    rootBridge.NATIVE_ROOT_BRIDGE_REQUEST_UNMOUNT
+  );
+  assert.equal(cleanup.nativeRequestRecord.environmentId, 844);
+  assert.equal(cleanup.nativeUnmountRequestMirrored, true);
+  assert.equal(cleanup.nativeExecution, false);
   assert.equal(cleanup.compatibilityClaimed, false);
   assert.equal(container.childNodes.length, 0);
   assert.equal(rootPayloadAfter.activeHostOutputRenderRecordCount, 0);

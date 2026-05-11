@@ -2826,6 +2826,8 @@ test("React DOM client private facade host-output update routes through private 
   };
   const adapter = descriptor.value({
     hostOutputUpdateIdPrefix: "facade-conformance-update-handoff",
+    nativeEnvironmentId: 843,
+    nativeHandoffIdPrefix: "facade-conformance-update-native",
     publicFacadeHostOutputRenderIdPrefix: "facade-conformance-render",
     publicFacadeHostOutputUpdateIdPrefix: "facade-conformance-update",
     requestIdPrefix: "facade-conformance-request",
@@ -2907,12 +2909,26 @@ test("React DOM client private facade host-output update routes through private 
     update.hostOutputUpdateHandoffId,
     "facade-conformance-update-handoff:1"
   );
+  assert.equal(
+    update.nativeHandoffId,
+    "facade-conformance-update-native:3"
+  );
+  assert.equal(
+    update.nativeHandoffStatus,
+    rootBridge.ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED
+  );
+  assert.equal(
+    update.nativeRequestKind,
+    rootBridge.NATIVE_ROOT_BRIDGE_REQUEST_RENDER
+  );
+  assert.equal(update.nativeRequestRecord.environmentId, 843);
   assert.deepEqual(
     update.acceptedCapabilities.map((capability) => capability.id),
     [
       "public-facade-create-root-record",
       "public-facade-initial-host-output-render",
       "public-facade-root-render-update-record",
+      "private-native-update-request-handoff",
       "host-output-update-handoff",
       "fake-dom-property-update",
       "property-payload-evidence",
@@ -2925,6 +2941,7 @@ test("React DOM client private facade host-output update routes through private 
   assert.equal(update.publicCreateRootEnabled, false);
   assert.equal(update.publicRootExecution, false);
   assert.equal(update.publicRootCompatibilitySurface, false);
+  assert.equal(update.nativeUpdateRequestMirrored, true);
   assert.equal(update.nativeExecution, false);
   assert.equal(update.reconcilerExecution, false);
   assert.equal(update.browserDomMutation, false);
@@ -2949,6 +2966,8 @@ test("React DOM client private facade host-output update routes through private 
     hidden.hostOutputUpdateHandoff.updateStatus,
     rootBridge.ROOT_BRIDGE_HOST_OUTPUT_UPDATE_APPLIED
   );
+  assert.equal(hidden.nativeHandoffPayload.sourceRecord, hidden.updateRecord);
+  assert.equal(hidden.nativeHandoffPayload.value, nextElement);
   assert.equal(container.childNodes.length, 1);
   assert.equal(container.firstChild.textContent, "updated facade output");
   assert.deepEqual(attributeEntries(container.firstChild), [
@@ -3214,6 +3233,8 @@ test("React DOM client private facade unmount cleanup stays private and non-comp
   const adapter = descriptor.value({
     createRenderAdmissionIdPrefix: "facade-unmount-admission",
     initialHostOutputIdPrefix: "facade-unmount-initial",
+    nativeEnvironmentId: 844,
+    nativeHandoffIdPrefix: "facade-unmount-native",
     publicFacadeHostOutputUnmountCleanupIdPrefix:
       "facade-unmount-diagnostic",
     requestIdPrefix: "facade-unmount-request",
@@ -3244,12 +3265,23 @@ test("React DOM client private facade unmount cleanup stays private and non-comp
   assert.equal(diagnostic.unmountRequestType, "root.unmount");
   assert.equal(diagnostic.unmountNoOp, false);
   assert.equal(diagnostic.unmountSync, true);
+  assert.equal(diagnostic.nativeHandoffId, "facade-unmount-native:3");
+  assert.equal(
+    diagnostic.nativeHandoffStatus,
+    rootBridge.ROOT_BRIDGE_NATIVE_HANDOFF_MIRRORED
+  );
+  assert.equal(
+    diagnostic.nativeRequestKind,
+    rootBridge.NATIVE_ROOT_BRIDGE_REQUEST_UNMOUNT
+  );
+  assert.equal(diagnostic.nativeRequestRecord.environmentId, 844);
   assert.deepEqual(
     diagnostic.acceptedCapabilities.map((capability) => capability.id),
     [
       "public-facade-create-root-record",
       "public-facade-root-render-record",
       "public-facade-root-unmount-record",
+      "private-native-unmount-request-handoff",
       "root-marker-setup-cleanup",
       "root-listener-setup-cleanup",
       "create-render-admission",
@@ -3279,6 +3311,7 @@ test("React DOM client private facade unmount cleanup stays private and non-comp
   assert.equal(diagnostic.publicRootExecution, false);
   assert.equal(diagnostic.publicRootCompatibilitySurface, false);
   assert.equal(diagnostic.publicRootUnmounted, false);
+  assert.equal(diagnostic.nativeUnmountRequestMirrored, true);
   assert.equal(diagnostic.nativeExecution, false);
   assert.equal(diagnostic.reconcilerExecution, false);
   assert.equal(diagnostic.fakeDomMutation, true);
@@ -3311,6 +3344,8 @@ test("React DOM client private facade unmount cleanup stays private and non-comp
   );
   assert.equal(hidden.renderRecord.requestType, "root.render");
   assert.equal(hidden.unmountRecord.requestType, "root.unmount");
+  assert.equal(hidden.nativeHandoffPayload.sourceRecord, hidden.unmountRecord);
+  assert.equal(hidden.nativeHandoffPayload.value, null);
   assert.deepEqual(adapter.getRootRequestRecords(root), [
     hidden.createRecord,
     hidden.renderRecord,
