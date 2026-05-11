@@ -1041,6 +1041,16 @@ impl<H: HostTypes> HostNodeStore<H> {
         Ok(applied)
     }
 
+    pub(crate) fn preflight_text_update(
+        &self,
+        handle: StateNodeHandle,
+        scope: HostNodeScope,
+        update: &HostNodeTextUpdate,
+    ) -> Result<HostNodeAppliedUpdateCurrentness, HostNodeValidationError> {
+        let record = self.record(handle, scope, HostFiberTokenTarget::TextInstance, true)?;
+        record.validate_text_update_currentness(handle, update)
+    }
+
     pub(crate) fn text_updates(
         &self,
         handle: StateNodeHandle,

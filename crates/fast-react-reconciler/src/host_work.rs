@@ -163,6 +163,12 @@ pub(crate) enum HostWorkError {
         expected_old_text: String,
         actual_text: String,
     },
+    InvalidHostTextCommitExecutionRequest {
+        root: FiberRootId,
+        finished_work: FiberId,
+        fiber: FiberId,
+        violation: HostTextCommitExecutionRequestViolation,
+    },
     InvalidHostComponentPropertyUpdatePayload {
         root: FiberRootId,
         fiber: FiberId,
@@ -363,6 +369,19 @@ impl Display for HostWorkError {
                 expected_old_text,
                 actual_text
             ),
+            Self::InvalidHostTextCommitExecutionRequest {
+                root,
+                finished_work,
+                fiber,
+                violation,
+            } => write!(
+                formatter,
+                "root {} HostText commit execution request for finished work fiber slot {} and text fiber slot {} failed currentness validation: {}",
+                root.raw(),
+                finished_work.slot().get(),
+                fiber.slot().get(),
+                violation.as_str()
+            ),
             Self::InvalidHostComponentPropertyUpdatePayload {
                 root,
                 fiber,
@@ -406,6 +425,7 @@ impl Error for HostWorkError {
             | Self::ConsumedHostUpdatePayload { .. }
             | Self::UnchangedHostTextUpdatePayload { .. }
             | Self::HostTextCommitRecordMismatch { .. }
+            | Self::InvalidHostTextCommitExecutionRequest { .. }
             | Self::InvalidHostComponentPropertyUpdatePayload { .. } => None,
         }
     }
@@ -629,7 +649,8 @@ impl DetachedHostRecords {
         self.text_updates
             .iter()
             .find(|payload| {
-                payload.work_in_progress() == mutation.fiber()
+                payload.root() == mutation.root()
+                    && payload.work_in_progress() == mutation.fiber()
                     && payload.state_node() == mutation.state_node()
                     && Some(payload.current()) == mutation.alternate_fiber()
             })
@@ -886,13 +907,14 @@ impl DetachedHostRecords {
             .ok_or_else(|| Self::invalid_handle(handle, HostFiberTokenTarget::TextInstance))
     }
 
-    fn commit_test_host_text_record(
-        &mut self,
+    fn preflight_test_host_text_record_update(
+        &self,
         handle: StateNodeHandle,
         scope: HostNodeScope,
         old_text: &str,
         new_text: &str,
-    ) -> Result<usize, HostWorkError> {
+        source_currentness: Option<HostNodeUpdateCurrentness>,
+    ) -> Result<HostNodeTextUpdate, HostWorkError> {
         {
             let record = self.test_host_text_record(handle)?;
             if record.root_id() != scope.root_id() {
@@ -932,22 +954,28 @@ impl DetachedHostRecords {
             }
         }
 
-        let applied = self.nodes.apply_text_update(
-            handle,
-            scope,
-            HostNodeTextUpdate::new(old_text, new_text).with_currentness(
-                HostNodeUpdateCurrentness::for_scope(
-                    handle,
-                    scope,
-                    HostFiberTokenTarget::TextInstance,
-                ),
-            ),
-        )?;
+        let update = match source_currentness {
+            Some(currentness) => {
+                HostNodeTextUpdate::new(old_text, new_text).with_currentness(currentness)
+            }
+            None => HostNodeTextUpdate::new(old_text, new_text).without_currentness_for_canary(),
+        };
+        self.nodes.preflight_text_update(handle, scope, &update)?;
+        Ok(update)
+    }
+
+    fn commit_preflighted_test_host_text_record(
+        &mut self,
+        handle: StateNodeHandle,
+        scope: HostNodeScope,
+        update: HostNodeTextUpdate,
+    ) -> Result<usize, HostWorkError> {
+        let applied = self.nodes.apply_text_update(handle, scope, update)?;
 
         let record = self.test_host_text_record_mut(handle)?;
         debug_assert_eq!(applied.sequence(), record.update_count());
 
-        record.text = new_text.to_owned();
+        record.text = applied.new_text().to_owned();
         record.update_count += 1;
         Ok(record.update_count())
     }
@@ -1562,6 +1590,46 @@ impl Display for TestHostComponentPropertyPayloadViolation {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum HostTextCommitExecutionRequestViolation {
+    WrongRootToken,
+    WrongFinishedWork,
+    WrongCommittedCurrent,
+    WrongCommitOrder,
+    WrongBlockers,
+    WrongMutationRoot,
+    WrongMutationKind,
+    WrongMutationTag,
+    MissingCurrent,
+    MissingStateNode,
+    MissingUpdateFlag,
+}
+
+impl HostTextCommitExecutionRequestViolation {
+    #[must_use]
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::WrongRootToken => "request root token does not match the root",
+            Self::WrongFinishedWork => {
+                "request finished work does not match the mutation host root"
+            }
+            Self::WrongCommittedCurrent => {
+                "request committed current does not match the finished work"
+            }
+            Self::WrongCommitOrder => {
+                "request order does not follow source handoff and commit order"
+            }
+            Self::WrongBlockers => "request public compatibility blockers were tampered",
+            Self::WrongMutationRoot => "mutation apply record belongs to another root",
+            Self::WrongMutationKind => "mutation apply record is not a HostText update",
+            Self::WrongMutationTag => "mutation apply record is not for a HostText fiber",
+            Self::MissingCurrent => "mutation apply record is missing the current alternate",
+            Self::MissingStateNode => "mutation apply record is missing the text state node",
+            Self::MissingUpdateFlag => "mutation apply record is missing the UPDATE effect flag",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct HostComponentUpdatePayload {
     root: FiberRootId,
@@ -1618,14 +1686,21 @@ impl HostComponentUpdatePayload {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct HostTextUpdatePayload {
+    root: FiberRootId,
     current: FiberId,
     work_in_progress: FiberId,
     state_node: StateNodeHandle,
     old_text: String,
     new_text: String,
+    source_currentness: Option<HostNodeUpdateCurrentness>,
 }
 
 impl HostTextUpdatePayload {
+    #[must_use]
+    const fn root(&self) -> FiberRootId {
+        self.root
+    }
+
     #[must_use]
     const fn current(&self) -> FiberId {
         self.current
@@ -1649,6 +1724,11 @@ impl HostTextUpdatePayload {
     #[must_use]
     fn new_text(&self) -> &str {
         &self.new_text
+    }
+
+    #[must_use]
+    const fn source_currentness(&self) -> Option<HostNodeUpdateCurrentness> {
+        self.source_currentness
     }
 }
 
@@ -7414,22 +7494,124 @@ fn apply_test_host_text_update_record(
     )?;
     let old_text = payload.old_text().to_owned();
     let new_text = payload.new_text().to_owned();
+    let update = detached_hosts.preflight_test_host_text_record_update(
+        mutation.state_node(),
+        scope,
+        &old_text,
+        &new_text,
+        payload.source_currentness(),
+    )?;
     {
         let text = detached_hosts
             .nodes
             .text_mut(mutation.state_node(), scope)?;
         host.commit_text_update(text, &old_text, &new_text)?;
     }
-    detached_hosts.commit_test_host_text_record(
+    detached_hosts.commit_preflighted_test_host_text_record(
         mutation.state_node(),
         scope,
-        &old_text,
-        &new_text,
+        update,
     )?;
     detached_hosts.mark_host_update_consumed(mutation);
     Ok(TestHostRootMutationApplyStatus::Applied(
         TestHostRootMutationHostCall::CommitTextUpdate,
     ))
+}
+
+#[cfg(test)]
+fn invalid_host_text_commit_execution_request(
+    request: HostRootTextUpdateCommitExecutionRequestForCanary,
+    violation: HostTextCommitExecutionRequestViolation,
+) -> HostWorkError {
+    HostWorkError::InvalidHostTextCommitExecutionRequest {
+        root: request.root(),
+        finished_work: request.finished_work(),
+        fiber: request.mutation().fiber(),
+        violation,
+    }
+}
+
+#[cfg(test)]
+fn validate_host_text_update_commit_execution_request_for_host_call(
+    request: HostRootTextUpdateCommitExecutionRequestForCanary,
+) -> Result<(), HostWorkError> {
+    let mutation = request.mutation();
+
+    if request.root_token() != request.root().state_node_handle() {
+        return Err(invalid_host_text_commit_execution_request(
+            request,
+            HostTextCommitExecutionRequestViolation::WrongRootToken,
+        ));
+    }
+    if request.finished_work() != mutation.host_root() {
+        return Err(invalid_host_text_commit_execution_request(
+            request,
+            HostTextCommitExecutionRequestViolation::WrongFinishedWork,
+        ));
+    }
+    if request.committed_current() != request.finished_work() {
+        return Err(invalid_host_text_commit_execution_request(
+            request,
+            HostTextCommitExecutionRequestViolation::WrongCommittedCurrent,
+        ));
+    }
+    if request.commit_order() <= request.source_handoff_order()
+        || request.request_order() <= request.commit_order()
+    {
+        return Err(invalid_host_text_commit_execution_request(
+            request,
+            HostTextCommitExecutionRequestViolation::WrongCommitOrder,
+        ));
+    }
+    if !request.private_blockers_intact_for_canary()
+        || !request.private_test_host_text_mutation_allowed()
+        || !request.public_root_rendering_blocked()
+        || !request.public_renderer_mutation_blocked()
+        || request.public_renderer_compatibility_claimed()
+    {
+        return Err(invalid_host_text_commit_execution_request(
+            request,
+            HostTextCommitExecutionRequestViolation::WrongBlockers,
+        ));
+    }
+    if mutation.root() != request.root() {
+        return Err(invalid_host_text_commit_execution_request(
+            request,
+            HostTextCommitExecutionRequestViolation::WrongMutationRoot,
+        ));
+    }
+    if mutation.kind() != HostRootMutationApplyRecordKind::CommitHostTextUpdate {
+        return Err(invalid_host_text_commit_execution_request(
+            request,
+            HostTextCommitExecutionRequestViolation::WrongMutationKind,
+        ));
+    }
+    if mutation.tag() != FiberTag::HostText {
+        return Err(invalid_host_text_commit_execution_request(
+            request,
+            HostTextCommitExecutionRequestViolation::WrongMutationTag,
+        ));
+    }
+    if mutation.alternate_fiber().is_none() {
+        return Err(invalid_host_text_commit_execution_request(
+            request,
+            HostTextCommitExecutionRequestViolation::MissingCurrent,
+        ));
+    }
+    if mutation.state_node().is_none() {
+        return Err(invalid_host_text_commit_execution_request(
+            request,
+            HostTextCommitExecutionRequestViolation::MissingStateNode,
+        ));
+    }
+    if !mutation.effect_flag().contains_all(FiberFlags::UPDATE) {
+        return Err(invalid_host_text_commit_execution_request(
+            request,
+            HostTextCommitExecutionRequestViolation::MissingUpdateFlag,
+        ));
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -7519,6 +7701,7 @@ fn execute_test_host_text_update_commit(
     request: HostRootTextUpdateCommitExecutionRequestForCanary,
     detached_hosts: &mut DetachedHostRecords,
 ) -> Result<TestHostTextUpdateCommitExecutionRecord, HostWorkError> {
+    validate_host_text_update_commit_execution_request_for_host_call(request)?;
     let root = store.root(request.root())?;
     if root.current() != request.committed_current() {
         return Err(HostWorkError::CommitCurrentMismatch {
@@ -7529,6 +7712,7 @@ fn execute_test_host_text_update_commit(
     }
 
     let mutation = request.mutation();
+    detached_hosts.ensure_host_update_not_consumed(mutation)?;
     let Some(payload) = detached_hosts.text_update_payload(mutation) else {
         return Err(HostWorkError::MissingHostTextUpdatePayload {
             root: request.root(),
@@ -7553,18 +7737,25 @@ fn execute_test_host_text_update_commit(
     )?;
     let old_text = payload.old_text().to_owned();
     let new_text = payload.new_text().to_owned();
+    let update = detached_hosts.preflight_test_host_text_record_update(
+        mutation.state_node(),
+        scope,
+        &old_text,
+        &new_text,
+        payload.source_currentness(),
+    )?;
     {
         let text = detached_hosts
             .nodes
             .text_mut(mutation.state_node(), scope)?;
         host.commit_text_update(text, &old_text, &new_text)?;
     }
-    let update_count = detached_hosts.commit_test_host_text_record(
+    let update_count = detached_hosts.commit_preflighted_test_host_text_record(
         mutation.state_node(),
         scope,
-        &old_text,
-        &new_text,
+        update,
     )?;
+    detached_hosts.mark_host_update_consumed(mutation);
 
     Ok(TestHostTextUpdateCommitExecutionRecord {
         root: request.root(),
@@ -9265,11 +9456,17 @@ fn complete_host_text_update(
     };
     if diff.changed() {
         detached_hosts.record_text_update(HostTextUpdatePayload {
+            root: root_id,
             current: diff.current(),
             work_in_progress: diff.work_in_progress(),
             state_node: diff.state_node(),
             old_text: diff.old_text().to_owned(),
             new_text: diff.new_text().to_owned(),
+            source_currentness: Some(HostNodeUpdateCurrentness::for_scope(
+                diff.state_node(),
+                scope,
+                HostFiberTokenTarget::TextInstance,
+            )),
         });
     }
 
@@ -17586,6 +17783,29 @@ mod tests {
                 .unwrap(),
             1
         );
+        let text_updates = detached_hosts
+            .test_host_text_record_updates(state_node)
+            .unwrap();
+        let text_metadata = detached_hosts.text_metadata(state_node).unwrap();
+        assert_eq!(text_updates.len(), 1);
+        assert_eq!(text_updates[0].source_currentness().handle(), state_node);
+        assert_eq!(text_updates[0].source_currentness().root_id(), root_id);
+        assert_eq!(
+            text_updates[0].source_currentness().fiber_id(),
+            current_text
+        );
+        assert_eq!(
+            text_updates[0].source_currentness().token_id(),
+            text_metadata.token_id()
+        );
+        assert_eq!(
+            text_updates[0].source_currentness().phase(),
+            text_metadata.phase()
+        );
+        assert_eq!(
+            text_updates[0].source_currentness().target(),
+            HostFiberTokenTarget::TextInstance
+        );
         assert_eq!(detached_hosts.text(state_node).unwrap().text(), "before");
         assert!(request.public_renderer_mutation_blocked());
         assert!(!request.public_renderer_compatibility_claimed());
@@ -17593,6 +17813,279 @@ mod tests {
         let mut expected_operations = operations_before_execute;
         expected_operations.push("commit_text_update");
         assert_eq!(host.operations(), expected_operations);
+
+        let operations_after_first_execute = host.operations();
+        let replay_error =
+            execute_test_host_text_update_commit(&store, &mut host, request, &mut detached_hosts)
+                .unwrap_err();
+        assert!(matches!(
+            replay_error,
+            HostWorkError::ConsumedHostUpdatePayload {
+                root,
+                fiber,
+                state_node: consumed_state_node,
+                kind,
+            } if root == root_id
+                && fiber == diff.work_in_progress()
+                && consumed_state_node == state_node
+                && kind == HostRootMutationApplyRecordKind::CommitHostTextUpdate
+        ));
+        assert_eq!(host.operations(), operations_after_first_execute);
+    }
+
+    #[test]
+    fn host_text_update_commit_execution_rejects_tampered_finished_work_before_payload_consumption()
+    {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let create_render =
+            render_test_root(&mut store, root_id, RootElementHandle::from_raw(7_905));
+        let current_text = attach_detached_root_text_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            create_render.finished_work(),
+            "before",
+            FiberFlags::PLACEMENT,
+        );
+        let state_node = store.fiber_arena().get(current_text).unwrap().state_node();
+        let create_commit = commit_finished_host_root(&mut store, create_render).unwrap();
+        apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &create_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        let mut source = TestHostTree::new();
+        let next_element = source.insert_text("after");
+        let next_text = text_from_root(&source, next_element);
+        let update_render =
+            render_test_root(&mut store, root_id, RootElementHandle::from_raw(7_906));
+        update_root_text_for_commit_with_payload(
+            &mut store,
+            root_id,
+            update_render.finished_work(),
+            current_text,
+            next_text,
+            &mut detached_hosts,
+        );
+        let pending =
+            record_host_root_finished_work_pending_commit_for_canary(&store, update_render, 24)
+                .unwrap();
+        let handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
+            &mut store,
+            update_render,
+            Some(pending),
+            25,
+        )
+        .unwrap();
+        let request = host_root_text_update_commit_execution_request_for_canary(&handoff, 0, 26)
+            .unwrap()
+            .with_finished_work_for_canary(create_render.finished_work());
+        let operations_before_execute = host.operations();
+
+        let error =
+            execute_test_host_text_update_commit(&store, &mut host, request, &mut detached_hosts)
+                .unwrap_err();
+
+        assert!(matches!(
+            error,
+            HostWorkError::InvalidHostTextCommitExecutionRequest {
+                root,
+                finished_work,
+                fiber,
+                violation: HostTextCommitExecutionRequestViolation::WrongFinishedWork,
+            } if root == root_id
+                && finished_work == create_render.finished_work()
+                && fiber != current_text
+        ));
+        assert_eq!(
+            detached_hosts
+                .test_host_text_record_update_count(state_node)
+                .unwrap(),
+            0
+        );
+        assert_eq!(host.operations(), operations_before_execute);
+    }
+
+    #[test]
+    fn host_text_update_commit_execution_rejects_payload_without_source_currentness_before_host_call()
+     {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let create_render =
+            render_test_root(&mut store, root_id, RootElementHandle::from_raw(7_907));
+        let current_text = attach_detached_root_text_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            create_render.finished_work(),
+            "before",
+            FiberFlags::PLACEMENT,
+        );
+        let state_node = store.fiber_arena().get(current_text).unwrap().state_node();
+        let create_commit = commit_finished_host_root(&mut store, create_render).unwrap();
+        apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &create_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        let update_render =
+            render_test_root(&mut store, root_id, RootElementHandle::from_raw(7_908));
+        let work_text = update_root_text_for_commit_without_payload(
+            &mut store,
+            update_render.finished_work(),
+            current_text,
+            PropsHandle::from_raw(7_909),
+        );
+        detached_hosts.record_text_update(HostTextUpdatePayload {
+            root: root_id,
+            current: current_text,
+            work_in_progress: work_text,
+            state_node,
+            old_text: "before".to_owned(),
+            new_text: "after".to_owned(),
+            source_currentness: None,
+        });
+        let pending =
+            record_host_root_finished_work_pending_commit_for_canary(&store, update_render, 27)
+                .unwrap();
+        let handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
+            &mut store,
+            update_render,
+            Some(pending),
+            28,
+        )
+        .unwrap();
+        let request =
+            host_root_text_update_commit_execution_request_for_canary(&handoff, 0, 29).unwrap();
+        let operations_before_execute = host.operations();
+
+        let error =
+            execute_test_host_text_update_commit(&store, &mut host, request, &mut detached_hosts)
+                .unwrap_err();
+
+        assert!(matches!(
+            error,
+            HostWorkError::HostNode(error)
+                if error.violation() == HostNodeViolation::MissingCurrentness
+        ));
+        assert_eq!(
+            detached_hosts
+                .test_host_text_record_update_count(state_node)
+                .unwrap(),
+            0
+        );
+        assert_eq!(host.operations(), operations_before_execute);
+    }
+
+    #[test]
+    fn host_text_update_commit_execution_rejects_cross_sibling_payload_currentness_before_host_call()
+     {
+        let (mut store, root_id) = root_store();
+        let mut host = RecordingHost::default();
+        let mut detached_hosts = DetachedHostRecords::default();
+        let create_render =
+            render_test_root(&mut store, root_id, RootElementHandle::from_raw(7_914));
+        let current_text = create_detached_root_text_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            create_render.finished_work(),
+            "before",
+            FiberFlags::PLACEMENT,
+        );
+        let sibling_text = create_detached_root_text_for_commit(
+            &mut store,
+            &mut host,
+            &mut detached_hosts,
+            root_id,
+            create_render.finished_work(),
+            "sibling",
+            FiberFlags::PLACEMENT,
+        );
+        store
+            .fiber_arena_mut()
+            .set_children(create_render.finished_work(), &[current_text, sibling_text])
+            .unwrap();
+        complete_host_root(&mut store, create_render.finished_work()).unwrap();
+        let state_node = store.fiber_arena().get(current_text).unwrap().state_node();
+        let sibling_state_node = store.fiber_arena().get(sibling_text).unwrap().state_node();
+        let create_commit = commit_finished_host_root(&mut store, create_render).unwrap();
+        apply_test_host_root_commit_mutations(
+            &mut store,
+            &mut host,
+            &create_commit,
+            &mut detached_hosts,
+        )
+        .unwrap();
+
+        let update_render =
+            render_test_root(&mut store, root_id, RootElementHandle::from_raw(7_915));
+        let work_text = update_root_text_for_commit_without_payload(
+            &mut store,
+            update_render.finished_work(),
+            current_text,
+            PropsHandle::from_raw(7_916),
+        );
+        let sibling_metadata = detached_hosts.text_metadata(sibling_state_node).unwrap();
+        detached_hosts.record_text_update(HostTextUpdatePayload {
+            root: root_id,
+            current: current_text,
+            work_in_progress: work_text,
+            state_node,
+            old_text: "before".to_owned(),
+            new_text: "after".to_owned(),
+            source_currentness: Some(
+                HostNodeUpdateCurrentness::new()
+                    .with_handle(state_node)
+                    .with_root_id(root_id)
+                    .with_fiber_id(sibling_text)
+                    .with_token_id(sibling_metadata.token_id())
+                    .with_phase(sibling_metadata.phase())
+                    .with_target(HostFiberTokenTarget::TextInstance),
+            ),
+        });
+        let pending =
+            record_host_root_finished_work_pending_commit_for_canary(&store, update_render, 34)
+                .unwrap();
+        let handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
+            &mut store,
+            update_render,
+            Some(pending),
+            35,
+        )
+        .unwrap();
+        let request =
+            host_root_text_update_commit_execution_request_for_canary(&handoff, 0, 36).unwrap();
+        let operations_before_execute = host.operations();
+
+        let error =
+            execute_test_host_text_update_commit(&store, &mut host, request, &mut detached_hosts)
+                .unwrap_err();
+
+        assert!(matches!(
+            error,
+            HostWorkError::HostNode(error)
+                if error.violation() == HostNodeViolation::WrongFiber
+        ));
+        assert_eq!(
+            detached_hosts
+                .test_host_text_record_update_count(state_node)
+                .unwrap(),
+            0
+        );
+        assert_eq!(host.operations(), operations_before_execute);
     }
 
     #[test]
@@ -17630,11 +18123,13 @@ mod tests {
             PropsHandle::from_raw(7_912),
         );
         detached_hosts.record_text_update(HostTextUpdatePayload {
+            root: root_id,
             current: current_text,
             work_in_progress: work_text,
             state_node,
             old_text: "stable".to_owned(),
             new_text: "stable".to_owned(),
+            source_currentness: None,
         });
         let pending =
             record_host_root_finished_work_pending_commit_for_canary(&store, update_render, 31)
@@ -17814,11 +18309,13 @@ mod tests {
             PropsHandle::from_raw(7_933),
         );
         detached_hosts.record_text_update(HostTextUpdatePayload {
+            root: root_id,
             current: current_text,
             work_in_progress: work_text,
             state_node: foreign_state_node,
             old_text: "foreign".to_owned(),
             new_text: "after".to_owned(),
+            source_currentness: None,
         });
         let pending =
             record_host_root_finished_work_pending_commit_for_canary(&store, update_render, 51)
