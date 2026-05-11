@@ -11,6 +11,10 @@
   react-server absence. No public compatibility, renderer behavior, root
   scheduling, `act`, ref identity, package compatibility, callback,
   external-store, or id-generation claim was opened.
+- Audit repair: `privateRefHookDispatcherMetadata` is now accepted only by
+  canonical module-owned object identity, and `useRef` surface currentness rows
+  derive source-function identity plus rootless/generic-dispatcher probes
+  instead of hardcoded blocker booleans.
 
 ## Changed Files
 
@@ -33,11 +37,14 @@
   `hookDispatcher.validateUseRefHookCurrentnessReport(report)`.
 
 The gate requires the report object to come from the package-private factory,
-keeps the generated surface rows identity-bound through a `WeakMap`, and
-rejects cloned rows, root/CJS/server drift, stale source rows, generic
-dispatcher forwarding, public compatibility flags, Scheduler/root prerequisite
-smuggling, callback/external-store/id claims, and ref identity compatibility
-claims.
+keeps generated no-override surface rows identity-bound through a `WeakMap`, and
+rejects cloned rows, row-overridden reports, root/CJS/server drift, stale source
+rows, same-shaped fake `useRef` exports, generic dispatcher forwarding, public
+compatibility flags, Scheduler/root prerequisite smuggling,
+callback/external-store/id claims, and ref identity compatibility claims.
+
+`isPrivateRefHookDispatcherMetadata(metadata)` now rejects same-shaped clones by
+requiring `metadata === privateRefHookDispatcherMetadata`.
 
 ## Evidence Gathered
 
@@ -53,6 +60,9 @@ claims.
   - `packages/react/src/ReactServer.js` server absence
 - Checked existing private Rust useRef metadata names from Worker 358 in
   `crates/fast-react-reconciler/src/function_component.rs`.
+- Added audit negative coverage for shallow-cloned ref dispatcher metadata,
+  same-shaped fake `React.useRef` returning a ref object, row-overridden
+  currentness reports, and cloned surface/currentness report rows.
 
 ## Commands Run
 
@@ -71,9 +81,9 @@ git diff --check
 
 ## Verification Results
 
-- Hook dispatcher guard passed: 31 tests.
-- Hook dispatcher oracle passed: 14 tests.
-- Combined hook dispatcher suite passed: 45 tests.
+- Hook dispatcher guard passed: 32 tests.
+- Hook dispatcher oracle passed: 15 tests.
+- Combined hook dispatcher suite passed: 47 tests.
 - React workspace import smoke passed, with the existing npm
   `minimum-release-age` warning.
 - Package surface guard passed, with the existing npm `minimum-release-age`

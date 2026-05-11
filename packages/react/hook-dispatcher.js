@@ -1133,6 +1133,7 @@ const useRefHookSurfaceCurrentnessFieldNames = freezeArray([
   'sameAsRootExport',
   'hookName',
   'useRefExportPolicy',
+  'sourceFunctionCurrent',
   'hasUseRefExport',
   'currentName',
   'currentLength',
@@ -1154,6 +1155,7 @@ const useRefHookSurfaceCurrentnessRows = freezeUseRefSurfaceCurrentnessRows([
     sameAsRootExport: true,
     hookName: 'useRef',
     useRefExportPolicy: 'available-root-hook',
+    sourceFunctionCurrent: true,
     hasUseRefExport: true,
     currentName: '',
     currentLength: 1,
@@ -1174,6 +1176,7 @@ const useRefHookSurfaceCurrentnessRows = freezeUseRefSurfaceCurrentnessRows([
     sameAsRootExport: true,
     hookName: 'useRef',
     useRefExportPolicy: 'available-root-hook',
+    sourceFunctionCurrent: true,
     hasUseRefExport: true,
     currentName: '',
     currentLength: 1,
@@ -1194,6 +1197,7 @@ const useRefHookSurfaceCurrentnessRows = freezeUseRefSurfaceCurrentnessRows([
     sameAsRootExport: true,
     hookName: 'useRef',
     useRefExportPolicy: 'available-root-hook',
+    sourceFunctionCurrent: true,
     hasUseRefExport: true,
     currentName: '',
     currentLength: 1,
@@ -1214,6 +1218,7 @@ const useRefHookSurfaceCurrentnessRows = freezeUseRefSurfaceCurrentnessRows([
     sameAsRootExport: false,
     hookName: 'useRef',
     useRefExportPolicy: 'absent-react-server-hook',
+    sourceFunctionCurrent: true,
     hasUseRefExport: false,
     currentName: null,
     currentLength: null,
@@ -2279,10 +2284,25 @@ function describeUseRefHookSurfaceCurrentness({
     typeof currentUseRef === 'function' ? currentUseRef.name : null;
   const currentLength =
     typeof currentUseRef === 'function' ? currentUseRef.length : null;
+  const sourceFunctionCurrent = expectsUseRefExport
+    ? currentUseRef === useRef
+    : !hasUseRefExport;
+  const rootlessInvalidHookBlocked = expectsUseRefExport
+    ? probeUseRefRootlessInvalidHookBlocked(currentUseRef)
+    : true;
+  const genericDispatcherForwardingBlocked = expectsUseRefExport
+    ? probeUseRefGenericDispatcherForwardingBlocked(currentUseRef)
+    : true;
+  const privateDispatcherRequired =
+    sourceFunctionCurrent &&
+    rootlessInvalidHookBlocked &&
+    genericDispatcherForwardingBlocked;
   const useRefPolicyCurrent = expectsUseRefExport
     ? typeof currentUseRef === 'function' &&
       currentName === expectedName &&
-      currentLength === expectedLength
+      currentLength === expectedLength &&
+      sourceFunctionCurrent &&
+      privateDispatcherRequired
     : !hasUseRefExport;
 
   return {
@@ -2295,24 +2315,80 @@ function describeUseRefHookSurfaceCurrentness({
     useRefExportPolicy: expectsUseRefExport
       ? 'available-root-hook'
       : 'absent-react-server-hook',
+    sourceFunctionCurrent,
     hasUseRefExport,
     currentName,
     currentLength,
     expectedName,
     expectedLength,
     useRefPolicyCurrent,
-    rootlessInvalidHookBlocked: true,
-    genericDispatcherForwardingBlocked: true,
-    privateDispatcherRequired: true,
+    rootlessInvalidHookBlocked,
+    genericDispatcherForwardingBlocked,
+    privateDispatcherRequired,
     publicCompatibilityClaimed: false,
     compatibilityClaimed: false
   };
+}
+
+function probeUseRefRootlessInvalidHookBlocked(currentUseRef) {
+  if (typeof currentUseRef !== 'function') {
+    return false;
+  }
+
+  const previousDispatcher = ReactSharedInternals.H;
+  ReactSharedInternals.H = null;
+
+  try {
+    currentUseRef('rootless-useRef-probe');
+    return false;
+  } catch (error) {
+    return isUseRefInvalidHookCallError(error);
+  } finally {
+    ReactSharedInternals.H = previousDispatcher;
+  }
+}
+
+function probeUseRefGenericDispatcherForwardingBlocked(currentUseRef) {
+  if (typeof currentUseRef !== 'function') {
+    return false;
+  }
+
+  const calls = [];
+  const previousDispatcher = ReactSharedInternals.H;
+  ReactSharedInternals.H = {
+    useRef(initialValue) {
+      calls.push(initialValue);
+      return { current: initialValue };
+    }
+  };
+
+  try {
+    currentUseRef('generic-dispatcher-useRef-probe');
+    return false;
+  } catch (error) {
+    return isUseRefInvalidHookCallError(error) && calls.length === 0;
+  } finally {
+    ReactSharedInternals.H = previousDispatcher;
+  }
+}
+
+function isUseRefInvalidHookCallError(error) {
+  return (
+    isObjectLike(error) &&
+    error.code === invalidHookCallErrorCode &&
+    error.hookName === 'useRef'
+  );
 }
 
 function createUseRefHookCurrentnessReport(overrides = {}) {
   const normalized = overrides ?? {};
   const hasSurfaceCurrentnessRowsOverride =
     Object.prototype.hasOwnProperty.call(normalized, 'surfaceCurrentnessRows');
+  const hasSurfaceCurrentnessRowOverrides =
+    Object.prototype.hasOwnProperty.call(
+      normalized,
+      'surfaceCurrentnessRowOverrides'
+    );
   const surfaceCurrentnessRows = hasSurfaceCurrentnessRowsOverride
     ? freezeUseRefSurfaceCurrentnessRows(normalized.surfaceCurrentnessRows)
     : createUseRefHookSurfaceCurrentnessRows(
@@ -2379,7 +2455,7 @@ function createUseRefHookCurrentnessReport(overrides = {}) {
     packageCompatibility: normalized.packageCompatibility ?? false
   });
 
-  if (!hasSurfaceCurrentnessRowsOverride) {
+  if (!hasSurfaceCurrentnessRowsOverride && !hasSurfaceCurrentnessRowOverrides) {
     useRefHookSurfaceCurrentnessRowsByReport.set(
       report,
       surfaceCurrentnessRows
@@ -2913,6 +2989,10 @@ function isPrivateMemoHookDispatcherMetadata(metadata) {
 }
 
 function isPrivateRefHookDispatcherMetadata(metadata) {
+  if (metadata !== privateRefHookDispatcherMetadata) {
+    return false;
+  }
+
   if (
     !isObjectLike(metadata) ||
     metadata.capability !== privateRefHookDispatcherMetadata.capability ||

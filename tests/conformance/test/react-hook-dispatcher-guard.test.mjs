@@ -982,6 +982,7 @@ test("private ref-hook dispatcher metadata records source-owned blockers", () =>
     "sameAsRootExport",
     "hookName",
     "useRefExportPolicy",
+    "sourceFunctionCurrent",
     "hasUseRefExport",
     "currentName",
     "currentLength",
@@ -1003,6 +1004,7 @@ test("private ref-hook dispatcher metadata records source-owned blockers", () =>
       sameAsRootExport: true,
       hookName: "useRef",
       useRefExportPolicy: "available-root-hook",
+      sourceFunctionCurrent: true,
       hasUseRefExport: true,
       currentName: "",
       currentLength: 1,
@@ -1023,6 +1025,7 @@ test("private ref-hook dispatcher metadata records source-owned blockers", () =>
       sameAsRootExport: true,
       hookName: "useRef",
       useRefExportPolicy: "available-root-hook",
+      sourceFunctionCurrent: true,
       hasUseRefExport: true,
       currentName: "",
       currentLength: 1,
@@ -1043,6 +1046,7 @@ test("private ref-hook dispatcher metadata records source-owned blockers", () =>
       sameAsRootExport: true,
       hookName: "useRef",
       useRefExportPolicy: "available-root-hook",
+      sourceFunctionCurrent: true,
       hasUseRefExport: true,
       currentName: "",
       currentLength: 1,
@@ -1063,6 +1067,7 @@ test("private ref-hook dispatcher metadata records source-owned blockers", () =>
       sameAsRootExport: false,
       hookName: "useRef",
       useRefExportPolicy: "absent-react-server-hook",
+      sourceFunctionCurrent: true,
       hasUseRefExport: false,
       currentName: null,
       currentLength: null,
@@ -1287,6 +1292,27 @@ test("private ref-hook dispatcher marker rejects source and surface drift", () =
   );
   assertInvalidHookCall(
     () => hookDispatcher.markPrivateRefHookDispatcher(dispatcher, driftedMetadata),
+    "useRef"
+  );
+  assert.equal(hookDispatcher.isPrivateRefHookDispatcher(dispatcher), false);
+});
+
+test("private ref-hook dispatcher marker rejects shallow-cloned metadata", () => {
+  const dispatcher = {
+    useRef() {
+      throw new Error("unreachable ref dispatch");
+    }
+  };
+  const clonedMetadata = {
+    ...hookDispatcher.privateRefHookDispatcherMetadata
+  };
+
+  assert.equal(
+    hookDispatcher.isPrivateRefHookDispatcherMetadata(clonedMetadata),
+    false
+  );
+  assertInvalidHookCall(
+    () => hookDispatcher.markPrivateRefHookDispatcher(dispatcher, clonedMetadata),
     "useRef"
   );
   assert.equal(hookDispatcher.isPrivateRefHookDispatcher(dispatcher), false);

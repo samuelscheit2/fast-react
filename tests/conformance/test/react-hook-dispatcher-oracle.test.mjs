@@ -319,6 +319,7 @@ const expectedUseRefSurfaceCurrentnessFieldNames = [
   "sameAsRootExport",
   "hookName",
   "useRefExportPolicy",
+  "sourceFunctionCurrent",
   "hasUseRefExport",
   "currentName",
   "currentLength",
@@ -340,6 +341,7 @@ const expectedUseRefSurfaceCurrentnessRows = [
     sameAsRootExport: true,
     hookName: "useRef",
     useRefExportPolicy: "available-root-hook",
+    sourceFunctionCurrent: true,
     hasUseRefExport: true,
     currentName: "",
     currentLength: 1,
@@ -360,6 +362,7 @@ const expectedUseRefSurfaceCurrentnessRows = [
     sameAsRootExport: true,
     hookName: "useRef",
     useRefExportPolicy: "available-root-hook",
+    sourceFunctionCurrent: true,
     hasUseRefExport: true,
     currentName: "",
     currentLength: 1,
@@ -380,6 +383,7 @@ const expectedUseRefSurfaceCurrentnessRows = [
     sameAsRootExport: true,
     hookName: "useRef",
     useRefExportPolicy: "available-root-hook",
+    sourceFunctionCurrent: true,
     hasUseRefExport: true,
     currentName: "",
     currentLength: 1,
@@ -400,6 +404,7 @@ const expectedUseRefSurfaceCurrentnessRows = [
     sameAsRootExport: false,
     hookName: "useRef",
     useRefExportPolicy: "absent-react-server-hook",
+    sourceFunctionCurrent: true,
     hasUseRefExport: false,
     currentName: null,
     currentLength: null,
@@ -1166,7 +1171,7 @@ test("useRef hook currentness rejects stale source, surface drift, and forged cl
         }
       }
     }),
-    "useRef-hook-currentness-surface-currentness"
+    "useRef-hook-currentness-surface-currentness-source-proof"
   );
   assertUseRefCurrentnessRejected(
     hookDispatcher.createUseRefHookCurrentnessReport({
@@ -1176,11 +1181,19 @@ test("useRef hook currentness rejects stale source, surface drift, and forged cl
         }
       }
     }),
-    "useRef-hook-currentness-surface-currentness"
+    "useRef-hook-currentness-surface-currentness-source-proof"
   );
   assertUseRefCurrentnessRejected(
     hookDispatcher.createUseRefHookCurrentnessReport({
       surfaceCurrentnessRows: report.surfaceCurrentnessRows
+    }),
+    "useRef-hook-currentness-surface-currentness-source-proof"
+  );
+  assertUseRefCurrentnessRejected(
+    hookDispatcher.createUseRefHookCurrentnessReport({
+      surfaceCurrentnessRows: expectedUseRefSurfaceCurrentnessRows.map(
+        (row) => ({ ...row })
+      )
     }),
     "useRef-hook-currentness-surface-currentness-source-proof"
   );
@@ -1198,6 +1211,49 @@ test("useRef hook currentness rejects stale source, surface drift, and forged cl
       }),
       "useRef-hook-currentness-compatibility-or-prerequisite-claim"
     );
+  }
+});
+
+test("useRef hook currentness rejects same-shaped fake root useRef", () => {
+  const originalUseRef = React.useRef;
+  const fakeUseRef = function (initialValue) {
+    return { current: initialValue };
+  };
+
+  Object.defineProperties(fakeUseRef, {
+    length: {
+      configurable: true,
+      value: 1
+    },
+    name: {
+      configurable: true,
+      value: ""
+    }
+  });
+
+  React.useRef = fakeUseRef;
+
+  try {
+    assert.equal(React.useRef.name, "");
+    assert.equal(React.useRef.length, 1);
+    assert.equal(ReactCjsDevelopment.useRef, fakeUseRef);
+    assert.equal(ReactCjsProduction.useRef, fakeUseRef);
+
+    const report = hookDispatcher.createUseRefHookCurrentnessReport();
+    const rootRow = report.surfaceCurrentnessRows.find(
+      (row) => row.surfaceId === "react-root"
+    );
+    assert.equal(rootRow.sourceFunctionCurrent, false);
+    assert.equal(rootRow.rootlessInvalidHookBlocked, false);
+    assert.equal(rootRow.genericDispatcherForwardingBlocked, false);
+    assert.equal(rootRow.privateDispatcherRequired, false);
+
+    assertUseRefCurrentnessRejected(
+      report,
+      "useRef-hook-currentness-surface-currentness"
+    );
+  } finally {
+    React.useRef = originalUseRef;
   }
 });
 
