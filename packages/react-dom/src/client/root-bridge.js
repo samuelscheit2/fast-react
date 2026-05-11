@@ -3036,6 +3036,8 @@ const rootPublicFacadeRootUnmountLifecycleExecutionConsumedRows =
   new WeakMap();
 const rootPublicFacadeLifecycleContainerSnapshotPayloads = new WeakMap();
 const rootPublicFacadeLifecycleContainerSnapshotCaptures = new WeakMap();
+const rootPublicFacadeLatestLifecycleRequestBoundaryByContainer =
+  new WeakMap();
 
 function createPrivateRootBridgeShell(options) {
   const bridgeState = createBridgeState(options);
@@ -6930,6 +6932,7 @@ function createPrivateRootPublicFacadeRoot(
     hostOutputUpdateRecords: [],
     hostOutputNestedUpdateRecords: [],
     hostOutputUnmountCleanupRecords: [],
+    lifecycleRequestBoundaryRecords: [],
     renderRecords: [],
     rootRenderNativeHandoffRecords: [],
     markerListenerPreflightRecords: [],
@@ -6941,6 +6944,10 @@ function createPrivateRootPublicFacadeRoot(
     unmountRecords: []
   };
   const root = {};
+  recordPrivateRootPublicFacadeLifecycleContainerCurrentness(
+    container,
+    createRecord
+  );
 
   Object.defineProperties(root, {
     render: {
@@ -8039,9 +8046,12 @@ function renderPrivateRootPublicFacadeHostOutputFromPayload(
   let admissionRecord = null;
   let hostOutputHandoff = null;
   let hostOutputPayload = null;
+  let lifecycleRequestAdmission = null;
+  let lifecycleRequestBoundary = null;
+  let lifecycleRequestBoundaryPayload = null;
   let rootWorkLoopFinishedWorkRecord = null;
   let sideEffectCleanup = null;
-  const lifecycleRequestBoundary =
+  const lifecycleSourceRecordBoundary =
     createPrivateRootPublicFacadeLifecycleRequestBoundary(payload);
   const sourceContainerSnapshotBefore =
     capturePrivateRootPublicFacadeLifecycleContainerSnapshot(
@@ -8071,8 +8081,24 @@ function renderPrivateRootPublicFacadeHostOutputFromPayload(
       createRecord,
       'render',
       renderRecord,
-      lifecycleRequestBoundary
+      lifecycleSourceRecordBoundary
     );
+    {
+      const lifecycleEvidence =
+        createPrivateRootPublicFacadeAcceptedLifecycleRequestBoundary({
+          container: createPayload.container,
+          createRecord,
+          payload,
+          phase: 'render',
+          sourceRecord: renderRecord
+        });
+      lifecycleRequestAdmission =
+        lifecycleEvidence.lifecycleRequestAdmission;
+      lifecycleRequestBoundary =
+        lifecycleEvidence.lifecycleRequestBoundary;
+      lifecycleRequestBoundaryPayload =
+        lifecycleEvidence.lifecycleRequestBoundaryPayload;
+    }
     if (rootWorkLoopMetadataOption.found) {
       normalizePublicFacadeRootWorkLoopFinishedWorkMetadata(
         rootWorkLoopMetadataOption.value,
@@ -8181,6 +8207,19 @@ function renderPrivateRootPublicFacadeHostOutputFromPayload(
     admissionId: admissionRecord.admissionId,
     admissionSequence: admissionRecord.admissionSequence,
     admissionStatus: admissionRecord.admissionStatus,
+    lifecycleRequestAdmission,
+    lifecycleRequestAdmissionStatus:
+      lifecycleRequestAdmission.admissionStatus,
+    lifecycleRequestBoundary,
+    lifecycleRequestBoundaryId: lifecycleRequestBoundary.boundaryId,
+    lifecycleRequestBoundaryStatus:
+      lifecycleRequestBoundary.boundaryStatus,
+    lifecycleRequestBoundaryAccepted: true,
+    lifecycleRequestBoundarySourceOwned:
+      lifecycleRequestBoundary.sourceOwned,
+    lifecycleRequestBoundaryCurrent: true,
+    lifecycleRequestVersion:
+      lifecycleRequestBoundary.lifecycleRequestVersion,
     hostOutputHandoffId: hostOutputHandoff.handoffId,
     hostOutputHandoffSequence: hostOutputHandoff.handoffSequence,
     hostOutputHandoffStatus: hostOutputHandoff.handoffStatus,
@@ -8261,6 +8300,9 @@ function renderPrivateRootPublicFacadeHostOutputFromPayload(
     element,
     hostOutputHandoff,
     hostOutputPayload,
+    lifecycleRequestAdmission,
+    lifecycleRequestBoundary,
+    lifecycleRequestBoundaryPayload,
     renderRecord,
     root: payload.root,
     rootWorkLoopFinishedWorkPayload:
@@ -8392,6 +8434,20 @@ function createPrivateRootRenderNativeHandoffRecordFromPayload(
     renderUpdateId: validation.renderRecord.updateId,
     renderLifecycleStatusBefore: validation.renderRecord.lifecycleStatusBefore,
     renderLifecycleStatusAfter: validation.renderRecord.lifecycleStatusAfter,
+    lifecycleRequestAdmission: validation.lifecycleRequestAdmission,
+    lifecycleRequestAdmissionStatus:
+      validation.lifecycleRequestAdmission.admissionStatus,
+    lifecycleRequestBoundary: validation.lifecycleRequestBoundary,
+    lifecycleRequestBoundaryId:
+      validation.lifecycleRequestBoundary.boundaryId,
+    lifecycleRequestBoundaryStatus:
+      validation.lifecycleRequestBoundary.boundaryStatus,
+    lifecycleRequestBoundaryAccepted: true,
+    lifecycleRequestBoundarySourceOwned:
+      validation.lifecycleRequestBoundary.sourceOwned,
+    lifecycleRequestBoundaryCurrent: true,
+    lifecycleRequestVersion:
+      validation.lifecycleRequestBoundary.lifecycleRequestVersion,
     hostOutputHandoffId: validation.hostOutputHandoff.handoffId,
     hostOutputHandoffStatus: validation.hostOutputHandoff.handoffStatus,
     rootWorkLoopFinishedWorkHandoffId:
@@ -8446,6 +8502,11 @@ function createPrivateRootRenderNativeHandoffRecordFromPayload(
     hostOutputHandoff: validation.hostOutputHandoff,
     hostOutputPayload: validation.hostOutputPayload,
     hostOutputRenderRecord,
+    lifecycleRequestAdmission:
+      validation.lifecycleRequestAdmission,
+    lifecycleRequestBoundary: validation.lifecycleRequestBoundary,
+    lifecycleRequestBoundaryPayload:
+      validation.lifecycleRequestBoundaryPayload,
     nativeHandoffPayload,
     nativeHandoffRecord,
     renderRecord: validation.renderRecord,
@@ -8564,7 +8625,7 @@ function updatePrivateRootPublicFacadeHostOutputFromPayload(
     activeRender.renderPayload.hostOutputHandoff
   );
   assertPublicFacadeLifecycleSourceRecordOverrides(payload, options, 'update');
-  const lifecycleRequestBoundary =
+  const lifecycleSourceRecordBoundary =
     createPrivateRootPublicFacadeLifecycleRequestBoundary(payload);
   const sourceContainerSnapshotBefore =
     capturePrivateRootPublicFacadeLifecycleContainerSnapshot(
@@ -8597,8 +8658,22 @@ function updatePrivateRootPublicFacadeHostOutputFromPayload(
     createRecord,
     'update',
     updateRecord,
-    lifecycleRequestBoundary
+    lifecycleSourceRecordBoundary
   );
+  const lifecycleEvidence =
+    createPrivateRootPublicFacadeAcceptedLifecycleRequestBoundary({
+      container: createPayload.container,
+      createRecord,
+      payload,
+      phase: 'update',
+      sourceRecord: updateRecord
+    });
+  const lifecycleRequestAdmission =
+    lifecycleEvidence.lifecycleRequestAdmission;
+  const lifecycleRequestBoundary =
+    lifecycleEvidence.lifecycleRequestBoundary;
+  const lifecycleRequestBoundaryPayload =
+    lifecycleEvidence.lifecycleRequestBoundaryPayload;
   let hostOutputUpdateHandoff;
   let hostOutputUpdatePayload;
   let rootCommitHostComponentUpdateHandoff = null;
@@ -8651,10 +8726,6 @@ function updatePrivateRootPublicFacadeHostOutputFromPayload(
       'Public-facade host-output update requires an applied host-output update handoff.'
     );
   }
-  const nativeHandoffRecord =
-    payload.bridge.createNativeRequestHandoff(updateRecord);
-  const nativeHandoffPayload =
-    rootNativeHandoffPayloads.get(nativeHandoffRecord) || null;
   const sourceContainerSnapshot =
     createPrivateRootPublicFacadeLifecycleContainerSnapshotRecord({
       before: sourceContainerSnapshotBefore,
@@ -8668,6 +8739,10 @@ function updatePrivateRootPublicFacadeHostOutputFromPayload(
       phase: 'update',
       sourceRecord: updateRecord
     });
+  const nativeHandoffRecord =
+    payload.bridge.createNativeRequestHandoff(updateRecord);
+  const nativeHandoffPayload =
+    rootNativeHandoffPayloads.get(nativeHandoffRecord) || null;
 
   const rootBridgeState = handleState.bridgeState;
   const sequence = rootBridgeState.nextPublicFacadeHostOutputUpdateSequence++;
@@ -8709,6 +8784,19 @@ function updatePrivateRootPublicFacadeHostOutputFromPayload(
     updateUpdateId: updateRecord.updateId,
     updateLifecycleStatusBefore: updateRecord.lifecycleStatusBefore,
     updateLifecycleStatusAfter: updateRecord.lifecycleStatusAfter,
+    lifecycleRequestAdmission,
+    lifecycleRequestAdmissionStatus:
+      lifecycleRequestAdmission.admissionStatus,
+    lifecycleRequestBoundary,
+    lifecycleRequestBoundaryId: lifecycleRequestBoundary.boundaryId,
+    lifecycleRequestBoundaryStatus:
+      lifecycleRequestBoundary.boundaryStatus,
+    lifecycleRequestBoundaryAccepted: true,
+    lifecycleRequestBoundarySourceOwned:
+      lifecycleRequestBoundary.sourceOwned,
+    lifecycleRequestBoundaryCurrent: true,
+    lifecycleRequestVersion:
+      lifecycleRequestBoundary.lifecycleRequestVersion,
     hostOutputUpdateHandoffId: hostOutputUpdateHandoff.handoffId,
     hostOutputUpdateHandoffSequence:
       hostOutputUpdateHandoff.handoffSequence,
@@ -8825,6 +8913,9 @@ function updatePrivateRootPublicFacadeHostOutputFromPayload(
     hostOutputUpdateHandoff,
     hostOutputUpdatePayload,
     initialHostOutputPayload: activeRender.hostOutputPayload,
+    lifecycleRequestAdmission,
+    lifecycleRequestBoundary,
+    lifecycleRequestBoundaryPayload,
     nativeHandoffPayload,
     nativeHandoffRecord,
     normalizedUpdate: normalized,
@@ -9528,6 +9619,7 @@ function updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
     initialElement,
     nextElement
   );
+  assertPublicFacadeNestedLifecycleSourceRecordOverrides(payload, options);
   const rootBridgeState = handleState.bridgeState;
   const sequence =
     rootBridgeState.nextPublicFacadeNestedHostOutputUpdateSequence++;
@@ -9543,9 +9635,15 @@ function updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
   let sideEffectRecord = null;
   let sideEffectCleanup = null;
   let renderRecord = null;
+  let renderLifecycleRequestAdmission = null;
+  let renderLifecycleRequestBoundary = null;
+  let renderLifecycleRequestBoundaryPayload = null;
   let admissionRecord = null;
   let nestedMount = null;
   let updateRecord = null;
+  let updateLifecycleRequestAdmission = null;
+  let updateLifecycleRequestBoundary = null;
+  let updateLifecycleRequestBoundaryPayload = null;
   let hostOutputUpdateHandoff = null;
   let hostOutputUpdatePayload = null;
   let nativeHandoffRecord = null;
@@ -9556,7 +9654,7 @@ function updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
       createRecord,
       sideEffectOptions
     );
-    const renderLifecycleRequestBoundary =
+    const renderLifecycleSourceRecordBoundary =
       createPrivateRootPublicFacadeLifecycleRequestBoundary(payload);
     renderRecord = appendPrivateRootPublicFacadeRenderRecord(
       payload,
@@ -9568,8 +9666,24 @@ function updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
       createRecord,
       'render',
       renderRecord,
-      renderLifecycleRequestBoundary
+      renderLifecycleSourceRecordBoundary
     );
+    {
+      const lifecycleEvidence =
+        createPrivateRootPublicFacadeAcceptedLifecycleRequestBoundary({
+          container: createPayload.container,
+          createRecord,
+          payload,
+          phase: 'render',
+          sourceRecord: renderRecord
+        });
+      renderLifecycleRequestAdmission =
+        lifecycleEvidence.lifecycleRequestAdmission;
+      renderLifecycleRequestBoundary =
+        lifecycleEvidence.lifecycleRequestBoundary;
+      renderLifecycleRequestBoundaryPayload =
+        lifecycleEvidence.lifecycleRequestBoundaryPayload;
+    }
     admissionRecord = payload.bridge.admitCreateRenderPath(
       createRecord,
       sideEffectRecord,
@@ -9584,7 +9698,7 @@ function updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
     });
     sideEffectCleanup =
       payload.bridge.revertCreateRootSideEffects(sideEffectRecord);
-    const updateLifecycleRequestBoundary =
+    const updateLifecycleSourceRecordBoundary =
       createPrivateRootPublicFacadeLifecycleRequestBoundary(payload);
     updateRecord = appendPrivateRootPublicFacadeRenderRecord(
       payload,
@@ -9596,8 +9710,24 @@ function updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
       createRecord,
       'update',
       updateRecord,
-      updateLifecycleRequestBoundary
+      updateLifecycleSourceRecordBoundary
     );
+    {
+      const lifecycleEvidence =
+        createPrivateRootPublicFacadeAcceptedLifecycleRequestBoundary({
+          container: createPayload.container,
+          createRecord,
+          payload,
+          phase: 'update',
+          sourceRecord: updateRecord
+        });
+      updateLifecycleRequestAdmission =
+        lifecycleEvidence.lifecycleRequestAdmission;
+      updateLifecycleRequestBoundary =
+        lifecycleEvidence.lifecycleRequestBoundary;
+      updateLifecycleRequestBoundaryPayload =
+        lifecycleEvidence.lifecycleRequestBoundaryPayload;
+    }
     hostOutputUpdateHandoff = payload.bridge.applyHostOutputUpdate(
       updateRecord,
       {
@@ -9681,12 +9811,40 @@ function updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
     initialRenderUpdateId: renderRecord.updateId,
     initialRenderLifecycleStatusBefore: renderRecord.lifecycleStatusBefore,
     initialRenderLifecycleStatusAfter: renderRecord.lifecycleStatusAfter,
+    initialLifecycleRequestAdmission: renderLifecycleRequestAdmission,
+    initialLifecycleRequestAdmissionStatus:
+      renderLifecycleRequestAdmission.admissionStatus,
+    initialLifecycleRequestBoundary: renderLifecycleRequestBoundary,
+    initialLifecycleRequestBoundaryId:
+      renderLifecycleRequestBoundary.boundaryId,
+    initialLifecycleRequestBoundaryStatus:
+      renderLifecycleRequestBoundary.boundaryStatus,
+    initialLifecycleRequestBoundaryAccepted: true,
+    initialLifecycleRequestBoundarySourceOwned:
+      renderLifecycleRequestBoundary.sourceOwned,
+    initialLifecycleRequestBoundaryCurrent: true,
+    initialLifecycleRequestVersion:
+      renderLifecycleRequestBoundary.lifecycleRequestVersion,
     updateRequestId: updateRecord.requestId,
     updateRequestSequence: updateRecord.requestSequence,
     updateRequestType: updateRecord.requestType,
     updateUpdateId: updateRecord.updateId,
     updateLifecycleStatusBefore: updateRecord.lifecycleStatusBefore,
     updateLifecycleStatusAfter: updateRecord.lifecycleStatusAfter,
+    updateLifecycleRequestAdmission,
+    updateLifecycleRequestAdmissionStatus:
+      updateLifecycleRequestAdmission.admissionStatus,
+    updateLifecycleRequestBoundary,
+    updateLifecycleRequestBoundaryId:
+      updateLifecycleRequestBoundary.boundaryId,
+    updateLifecycleRequestBoundaryStatus:
+      updateLifecycleRequestBoundary.boundaryStatus,
+    updateLifecycleRequestBoundaryAccepted: true,
+    updateLifecycleRequestBoundarySourceOwned:
+      updateLifecycleRequestBoundary.sourceOwned,
+    updateLifecycleRequestBoundaryCurrent: true,
+    updateLifecycleRequestVersion:
+      updateLifecycleRequestBoundary.lifecycleRequestVersion,
     sideEffectId: sideEffectRecord.sideEffectId,
     sideEffectSequence: sideEffectRecord.sideEffectSequence,
     setupSideEffectStatus: sideEffectRecord.sideEffectStatus,
@@ -9773,6 +9931,10 @@ function updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
     hostOutputUpdatePayload,
     initialElement,
     initialRenderRecord: renderRecord,
+    initialLifecycleRequestAdmission: renderLifecycleRequestAdmission,
+    initialLifecycleRequestBoundary: renderLifecycleRequestBoundary,
+    initialLifecycleRequestBoundaryPayload:
+      renderLifecycleRequestBoundaryPayload,
     latestPropsAfterUpdate,
     nativeHandoffPayload,
     nativeHandoffRecord,
@@ -9788,6 +9950,9 @@ function updatePrivateRootPublicFacadeNestedHostOutputFromPayload(
     textInstance: nestedMount.textNode,
     textToken: nestedMount.textToken,
     updateCallback,
+    updateLifecycleRequestAdmission,
+    updateLifecycleRequestBoundary,
+    updateLifecycleRequestBoundaryPayload,
     updateRecord
   });
   payload.hostOutputNestedUpdateRecords.push(diagnosticRecord);
@@ -24619,6 +24784,12 @@ function assertPublicFacadeLifecycleSourceRecordOverrides(
     return;
   }
 
+  assertNoCallerProvidedPrivateRootPublicFacadeLifecycleEvidence(
+    options,
+    phase,
+    false
+  );
+
   if (Object.prototype.hasOwnProperty.call(options, 'sourceCreateRecord')) {
     assertPrivateRootPublicFacadeLifecycleCreateRecord(
       payload,
@@ -24627,24 +24798,195 @@ function assertPublicFacadeLifecycleSourceRecordOverrides(
     );
   }
 
-  const sourceRecordField =
-    phase === 'render'
-      ? 'sourceRenderRecord'
-      : phase === 'update'
-        ? 'sourceUpdateRecord'
-        : 'sourceUnmountRecord';
-  if (Object.prototype.hasOwnProperty.call(options, sourceRecordField)) {
-    assertPrivateRootPublicFacadeLifecycleSourceRecord(
+  assertPublicFacadeLifecycleSourceRecordAliasOptions(
+    payload,
+    options,
+    phase
+  );
+
+  assertNoCallerProvidedPrivateRootPublicFacadeLifecycleEvidence(
+    options,
+    phase,
+    true
+  );
+}
+
+function assertPublicFacadeNestedLifecycleSourceRecordOverrides(
+  payload,
+  options
+) {
+  if (!isObjectOrFunction(options)) {
+    return;
+  }
+
+  assertNoCallerProvidedPrivateRootPublicFacadeLifecycleEvidence(
+    options,
+    'update',
+    false
+  );
+
+  if (Object.prototype.hasOwnProperty.call(options, 'sourceCreateRecord')) {
+    assertPrivateRootPublicFacadeLifecycleCreateRecord(
       payload,
-      payload.createRecord,
-      phase,
-      options[sourceRecordField]
+      'update',
+      options.sourceCreateRecord
     );
     throwInvalidRootPublicFacadeLifecycleSourceRecord(
-      phase,
+      'update',
       'Private public-facade lifecycle execution rejected a stale source record snapshot; render, update, and unmount records must be created inside the active lifecycle boundary.'
     );
   }
+
+  assertPublicFacadeLifecycleSourceRecordAliasOptions(
+    payload,
+    options,
+    'update'
+  );
+
+  assertNoCallerProvidedPrivateRootPublicFacadeLifecycleEvidence(
+    options,
+    'update',
+    true
+  );
+}
+
+const privateRootPublicFacadeLifecycleSourceRecordOptionFields =
+  freezeArray([
+    freezeRecord({
+      field: 'sourceRenderRecord',
+      phase: 'render'
+    }),
+    freezeRecord({
+      field: 'sourceUpdateRecord',
+      phase: 'update'
+    }),
+    freezeRecord({
+      field: 'sourceUnmountRecord',
+      phase: 'unmount'
+    })
+  ]);
+
+function assertPublicFacadeLifecycleSourceRecordAliasOptions(
+  payload,
+  options,
+  errorPhase
+) {
+  for (const {
+    field,
+    phase
+  } of privateRootPublicFacadeLifecycleSourceRecordOptionFields) {
+    if (Object.prototype.hasOwnProperty.call(options, field)) {
+      try {
+        assertPrivateRootPublicFacadeLifecycleSourceRecord(
+          payload,
+          payload.createRecord,
+          phase,
+          options[field]
+        );
+      } catch (error) {
+        throwInvalidRootPublicFacadeLifecycleSourceRecord(
+          errorPhase,
+          error.message
+        );
+      }
+      throwInvalidRootPublicFacadeLifecycleSourceRecord(
+        errorPhase,
+        'Private public-facade lifecycle execution rejected a stale source record snapshot; render, update, and unmount records must be created inside the active lifecycle boundary.'
+      );
+    }
+  }
+}
+
+const privateRootPublicFacadeLifecycleEvidenceOptionFields =
+  freezeArray([
+    'boundaryRecord',
+    'containerSnapshot',
+    'fakeDomSnapshot',
+    'hydrateRootLifecycleRequestBoundary',
+    'hydrationLifecycleRequestBoundary',
+    'lifecycleBoundary',
+    'lifecycleContainerSnapshot',
+    'lifecycleRequestBoundary',
+    'privateRootLifecycleRequestBoundary',
+    'requestBoundary',
+    'rootBoundary',
+    'rootLifecycleRequestBoundary',
+    'rootLifecycleContainerSnapshot',
+    'sourceBoundary',
+    'sourceContainerSnapshot',
+    'sourceLifecycleBoundary',
+    'sourceLifecycleContainerSnapshot',
+    'sourceLifecycleRequestBoundary',
+    'sourceSnapshot'
+  ]);
+const privateRootPublicFacadeLifecycleEvidenceValueFields =
+  freezeArray(['callback', 'renderCallback', 'updateCallback']);
+
+function assertNoCallerProvidedPrivateRootPublicFacadeLifecycleEvidence(
+  options,
+  phase,
+  scanValues
+) {
+  if (!isObjectOrFunction(options)) {
+    return;
+  }
+  if (isPrivateRootPublicFacadeLifecycleBoundaryEvidenceShape(options)) {
+    throwInvalidCallerProvidedPrivateRootPublicFacadeLifecycleEvidence(phase);
+  }
+
+  for (const field of privateRootPublicFacadeLifecycleEvidenceOptionFields) {
+    if (Object.prototype.hasOwnProperty.call(options, field)) {
+      throwInvalidCallerProvidedPrivateRootPublicFacadeLifecycleEvidence(
+        phase
+      );
+    }
+  }
+
+  if (!scanValues) {
+    return;
+  }
+
+  for (const field of privateRootPublicFacadeLifecycleEvidenceValueFields) {
+    if (
+      Object.prototype.hasOwnProperty.call(options, field) &&
+      isPrivateRootPublicFacadeLifecycleBoundaryEvidenceShape(
+        options[field]
+      )
+    ) {
+      throwInvalidCallerProvidedPrivateRootPublicFacadeLifecycleEvidence(
+        phase
+      );
+    }
+  }
+}
+
+function isPrivateRootPublicFacadeLifecycleBoundaryEvidenceShape(value) {
+  if (!isObjectOrFunction(value)) {
+    return false;
+  }
+  return (
+    isPrivateRootLifecycleRequestBoundaryRecord(value) ||
+    isPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord(value) ||
+    isPrivateRootPublicFacadeLifecycleContainerSnapshotRecord(value) ||
+    value.kind ===
+      'FastReactDomPrivateRootLifecycleRequestBoundaryRecord' ||
+    value.kind ===
+      'FastReactDomPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryRecord' ||
+    value.kind ===
+      'FastReactDomPrivateRootPublicFacadeLifecycleContainerSnapshotRecord' ||
+    value.operation === 'root-lifecycle-request-boundary' ||
+    value.operation === 'hydrate-root-lifecycle-request-boundary' ||
+    value.operation === 'public-facade-lifecycle-container-snapshot'
+  );
+}
+
+function throwInvalidCallerProvidedPrivateRootPublicFacadeLifecycleEvidence(
+  phase
+) {
+  throwInvalidRootPublicFacadeLifecycleSourceRecord(
+    phase,
+    'Private public-facade lifecycle execution rejected caller-supplied, stale, replayed, cloned, cross-root, cross-entrypoint, or same-container stale lifecycle request-boundary evidence.'
+  );
 }
 
 function createPrivateRootPublicFacadeLifecycleRequestBoundary(payload) {
@@ -24653,6 +24995,199 @@ function createPrivateRootPublicFacadeLifecycleRequestBoundary(payload) {
     requestRecordCount: payload.requestRecords.length,
     unmountRecordCount: payload.unmountRecords.length
   });
+}
+
+function createPrivateRootPublicFacadeAcceptedLifecycleRequestBoundary({
+  container,
+  createRecord,
+  payload,
+  phase,
+  sourceRecord
+}) {
+  const lifecycleRequestAdmission =
+    payload.bridge.admitRequest(sourceRecord);
+  const lifecycleRequestBoundary =
+    payload.bridge.createLifecycleRequestBoundary(
+      lifecycleRequestAdmission
+    );
+  recordPrivateRootPublicFacadeLifecycleContainerCurrentness(
+    container,
+    lifecycleRequestBoundary
+  );
+  const validation =
+    assertPrivateRootPublicFacadeAcceptedLifecycleRequestBoundary({
+      container,
+      createRecord,
+      lifecycleRequestAdmission,
+      lifecycleRequestBoundary,
+      payload,
+      phase,
+      sourceRecord
+    });
+
+  payload.lifecycleRequestBoundaryRecords.push(lifecycleRequestBoundary);
+  return freezeRecord({
+    containerRequestCurrent: validation.containerRequestCurrent,
+    lifecycleRequestAdmission,
+    lifecycleRequestBoundary,
+    lifecycleRequestBoundaryPayload:
+      validation.lifecycleRequestBoundaryPayload
+  });
+}
+
+function assertPrivateRootPublicFacadeAcceptedLifecycleRequestBoundary({
+  container,
+  createRecord,
+  lifecycleRequestAdmission,
+  lifecycleRequestBoundary,
+  payload,
+  phase,
+  sourceRecord
+}) {
+  const validation =
+    validatePrivateRootPublicFacadeLifecycleRequestBoundaryEvidence({
+      container,
+      createRecord,
+      lifecycleRequestAdmission,
+      lifecycleRequestBoundary,
+      payload,
+      sourceRecord
+    });
+
+  if (validation === null) {
+    throwInvalidRootPublicFacadeLifecycleSourceRecord(
+      phase,
+      'Private public-facade lifecycle execution requires source-owned active lifecycle request-boundary evidence for the same root request.'
+    );
+  }
+  if (!validation.containerRequestCurrent) {
+    throwInvalidRootPublicFacadeLifecycleSourceRecord(
+      phase,
+      'Private public-facade lifecycle execution rejected stale same-container lifecycle request-boundary evidence.'
+    );
+  }
+  return validation;
+}
+
+function validatePrivateRootPublicFacadeLifecycleRequestBoundaryEvidence({
+  container,
+  createRecord,
+  lifecycleRequestAdmission,
+  lifecycleRequestBoundary,
+  payload,
+  sourceRecord
+}) {
+  if (
+    payload == null ||
+    createRecord !== payload.createRecord ||
+    sourceRecord == null ||
+    typeof sourceRecord !== 'object' ||
+    !isSourceOwnedPrivateRootBridgeAdmissionRecord(
+      lifecycleRequestAdmission
+    ) ||
+    lifecycleRequestAdmission.requestId !== sourceRecord.requestId ||
+    lifecycleRequestAdmission.requestSequence !==
+      sourceRecord.requestSequence ||
+    lifecycleRequestAdmission.requestType !== sourceRecord.requestType ||
+    lifecycleRequestAdmission.operation !== sourceRecord.operation ||
+    lifecycleRequestAdmission.rootId !== sourceRecord.rootId ||
+    lifecycleRequestAdmission.rootKind !== sourceRecord.rootKind ||
+    lifecycleRequestAdmission.rootTag !== sourceRecord.rootTag
+  ) {
+    return null;
+  }
+
+  const sourcePayload = rootRecordPayloads.get(sourceRecord);
+  const boundaryPayload = validateActivePrivateRootLifecycleRequestBoundary(
+    lifecycleRequestAdmission,
+    lifecycleRequestBoundary
+  );
+  if (
+    sourcePayload === undefined ||
+    sourcePayload.rootHandle !== payload.rootHandle ||
+    boundaryPayload === null ||
+    boundaryPayload.admissionRecord !== lifecycleRequestAdmission ||
+    boundaryPayload.sourceRecord !== sourceRecord ||
+    boundaryPayload.rootHandleState !==
+      getPrivateRootHandleState(payload.rootHandle) ||
+    boundaryPayload.bridgeState !==
+      getPrivateRootHandleState(payload.rootHandle).bridgeState ||
+    lifecycleRequestBoundary.sourceRequestId !== sourceRecord.requestId ||
+    lifecycleRequestBoundary.sourceRequestSequence !==
+      sourceRecord.requestSequence ||
+    lifecycleRequestBoundary.sourceRequestType !==
+      sourceRecord.requestType ||
+    lifecycleRequestBoundary.sourceOperation !== sourceRecord.operation ||
+    lifecycleRequestBoundary.rootId !== createRecord.rootId ||
+    lifecycleRequestBoundary.rootKind !== createRecord.rootKind ||
+    lifecycleRequestBoundary.rootTag !== createRecord.rootTag
+  ) {
+    return null;
+  }
+
+  return freezeRecord({
+    containerRequestCurrent:
+      privateRootPublicFacadeLifecycleBoundaryMatchesCurrentContainer(
+        container,
+        lifecycleRequestBoundary
+      ),
+    lifecycleRequestBoundaryPayload: boundaryPayload
+  });
+}
+
+function recordPrivateRootPublicFacadeLifecycleContainerCurrentness(
+  container,
+  lifecycleRequestBoundary
+) {
+  if (!isObjectOrFunction(container)) {
+    return;
+  }
+  rootPublicFacadeLatestLifecycleRequestBoundaryByContainer.set(
+    container,
+    lifecycleRequestBoundary
+  );
+}
+
+function privateRootPublicFacadeLifecycleBoundaryMatchesCurrentContainer(
+  container,
+  lifecycleRequestBoundary
+) {
+  if (!isObjectOrFunction(container)) {
+    return true;
+  }
+  return (
+    rootPublicFacadeLatestLifecycleRequestBoundaryByContainer.get(
+      container
+    ) === lifecycleRequestBoundary
+  );
+}
+
+function privateRootPublicFacadeLifecycleContainerSnapshotCurrent(
+  container,
+  sourceRecord,
+  snapshotRecord
+) {
+  const snapshotPayload =
+    rootPublicFacadeLifecycleContainerSnapshotPayloads.get(snapshotRecord);
+  if (
+    snapshotPayload === undefined ||
+    snapshotPayload.container !== container ||
+    snapshotPayload.sourceRecord !== sourceRecord
+  ) {
+    return false;
+  }
+
+  const currentState =
+    inspectPublicFacadeMarkerListenerPreflightState(container);
+  return (
+    getChildNodeCount(container) === snapshotRecord.afterChildCount &&
+    getContainerTextContent(container) ===
+      snapshotRecord.afterTextContent &&
+    markerListenerStateMatches(
+      snapshotPayload.after.markerListenerState,
+      currentState
+    )
+  );
 }
 
 function assertPrivateRootPublicFacadeLifecycleNewSourceRecord(
@@ -26790,6 +27325,39 @@ function validatePrivateRootRenderNativeHandoff(
     );
   }
 
+  const lifecycleValidation =
+    validatePrivateRootPublicFacadeLifecycleRequestBoundaryEvidence({
+      container: renderPayload.container,
+      createRecord,
+      lifecycleRequestAdmission:
+        renderPayload.lifecycleRequestAdmission,
+      lifecycleRequestBoundary:
+        renderPayload.lifecycleRequestBoundary,
+      payload: rootPayload,
+      sourceRecord: renderRecord
+    });
+  if (lifecycleValidation === null) {
+    throwInvalidRootRenderNativeHandoff(
+      'Private root render native handoff requires source-owned active lifecycle request-boundary evidence for the same render request.'
+    );
+  }
+  if (!lifecycleValidation.containerRequestCurrent) {
+    throwInvalidRootRenderNativeHandoff(
+      'Private root render native handoff rejected stale same-container lifecycle request-boundary evidence.'
+    );
+  }
+  if (
+    !privateRootPublicFacadeLifecycleContainerSnapshotCurrent(
+      renderPayload.container,
+      renderRecord,
+      renderPayload.sourceContainerSnapshot
+    )
+  ) {
+    throwInvalidRootRenderNativeHandoff(
+      'Private root render native handoff rejected stale lifecycle container snapshot evidence.'
+    );
+  }
+
   return {
     admissionRecord: renderPayload.admissionRecord,
     bridge: renderPayload.bridge,
@@ -26798,6 +27366,12 @@ function validatePrivateRootRenderNativeHandoff(
     createRecord,
     hostOutputHandoff,
     hostOutputPayload,
+    lifecycleRequestAdmission:
+      renderPayload.lifecycleRequestAdmission,
+    lifecycleRequestBoundary:
+      renderPayload.lifecycleRequestBoundary,
+    lifecycleRequestBoundaryPayload:
+      lifecycleValidation.lifecycleRequestBoundaryPayload,
     renderRecord,
     rootWorkLoopFinishedWorkPayload,
     rootWorkLoopFinishedWorkRecord
@@ -26852,6 +27426,9 @@ function createPrivateRootPublicFacadeRootPayloadSnapshot(payload) {
     ),
     hostOutputUnmountCleanupRecords: freezeArray(
       payload.hostOutputUnmountCleanupRecords
+    ),
+    lifecycleRequestBoundaryRecords: freezeArray(
+      payload.lifecycleRequestBoundaryRecords
     ),
     markerListenerPreflightRecords: freezeArray(
       payload.markerListenerPreflightRecords

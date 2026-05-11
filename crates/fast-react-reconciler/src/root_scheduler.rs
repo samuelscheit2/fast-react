@@ -1745,6 +1745,7 @@ impl RootSyncSchedulerQueueLaneContinuationExecutionRecordForCanary {
     #[must_use]
     pub(crate) fn accepted_root_scheduler_execution_evidence_for_canary(&self) -> bool {
         self.did_execute_queue_lane_scheduler_continuation()
+            && self.requested_callback_node == self.current_callback_node
             && self.selected_lanes == self.handoff.lanes()
             && self.finished_work_handoff_identity.is_some_and(
                 RootSyncSchedulerFinishedWorkHandoffIdentityForCanary::accepted_for_root_scheduler_commit_handoff,
@@ -9446,6 +9447,62 @@ mod tests {
     }
 
     #[test]
+    fn root_scheduler_queue_lane_continuation_rejects_stale_callback_identity() {
+        let (mut store, root_id, host) = root_store();
+        let stale_callback = scheduled_callback_request(&mut store, root_id);
+        assert!(stale_callback.node().is_some());
+
+        let stale_render = execute_scheduled_root_callback(&mut store, stale_callback)
+            .unwrap()
+            .render_phase()
+            .unwrap();
+        let stale_commit = commit_finished_host_root(&mut store, stale_render).unwrap();
+        assert_eq!(stale_commit.current(), stale_render.finished_work());
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().callback_node(),
+            RootSchedulerCallbackHandle::NONE
+        );
+
+        let (_accepted, handoff, queue_handoff) = sync_queue_lane_scheduler_handoff(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(9056),
+        );
+
+        let execution = execute_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            handoff,
+            stale_callback.node(),
+            Some(&queue_handoff),
+        )
+        .unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootSyncSchedulerQueueLaneContinuationExecutionStatusForCanary::StaleCallbackNode
+        );
+        assert!(execution.rejected_stale_callback_node());
+        assert_eq!(execution.requested_callback_node(), stale_callback.node());
+        assert_eq!(
+            execution.current_callback_node(),
+            RootSchedulerCallbackHandle::NONE
+        );
+        assert_eq!(execution.selected_lanes(), Lanes::NO);
+        assert!(execution.finished_work_handoff_identity().is_none());
+        assert!(execution.queue_handoff_error().is_none());
+        assert!(execution.queue_commit_handoff().is_none());
+        assert!(!execution.accepted_root_scheduler_execution_evidence_for_canary());
+        assert!(!execution.accepted_root_commit_execution_evidence_for_canary());
+        assert!(!execution.accepted_queue_lane_handoff_evidence_for_canary());
+        assert!(execution.commit().is_none());
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            stale_commit.current()
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
     fn root_scheduler_queue_lane_continuation_rejects_stale_handoff_after_update() {
         let (mut store, root_id, host) = root_store();
         let current = store.root(root_id).unwrap().current();
@@ -9531,6 +9588,54 @@ mod tests {
     }
 
     #[test]
+    fn root_scheduler_queue_lane_continuation_rejects_wrong_selected_lanes() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        let (_accepted, handoff, queue_handoff) = sync_queue_lane_scheduler_handoff(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(9057),
+        );
+        let mut forged = queue_handoff.clone();
+        forged.selected_next_lanes_before_render = Lanes::DEFAULT;
+
+        let execution = execute_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            handoff,
+            RootSchedulerCallbackHandle::NONE,
+            Some(&forged),
+        )
+        .unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootSyncSchedulerQueueLaneContinuationExecutionStatusForCanary::BlockedByQueueLaneHandoffMismatch
+        );
+        assert!(
+            execution
+                .finished_work_handoff_identity()
+                .unwrap()
+                .accepted_for_root_scheduler_commit_handoff()
+        );
+        assert_eq!(
+            execution.queue_handoff_error(),
+            Some(
+                &HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::SelectedLanesMismatch {
+                    root: root_id,
+                    expected: Lanes::SYNC,
+                    actual: Lanes::DEFAULT
+                }
+            )
+        );
+        assert!(!forged.proves_source_owned_lane_handoff());
+        assert!(execution.queue_commit_handoff().is_none());
+        assert!(!execution.accepted_queue_lane_handoff_evidence_for_canary());
+        assert!(execution.commit().is_none());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
     fn root_scheduler_queue_lane_continuation_rejects_wrong_finished_lanes() {
         let (mut store, root_id, host) = root_store();
         let current = store.root(root_id).unwrap().current();
@@ -9566,6 +9671,69 @@ mod tests {
         );
         assert!(execution.commit().is_none());
         assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_queue_lane_continuation_rejects_replayed_queue_rows_after_current_switch() {
+        let (mut store, root_id, host) = root_store();
+        let (_accepted, first_handoff, stale_queue_handoff) = sync_queue_lane_scheduler_handoff(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(9058),
+        );
+        let first_execution =
+            execute_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
+                &mut store,
+                first_handoff,
+                RootSchedulerCallbackHandle::NONE,
+                Some(&stale_queue_handoff),
+            )
+            .unwrap();
+        let committed_current = first_execution.commit().unwrap().current();
+
+        let (_accepted, second_handoff, _second_queue_handoff) = sync_queue_lane_scheduler_handoff(
+            &mut store,
+            root_id,
+            RootElementHandle::from_raw(9059),
+        );
+        let second_render = second_handoff.render_phase();
+        let execution = execute_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
+            &mut store,
+            second_handoff,
+            RootSchedulerCallbackHandle::NONE,
+            Some(&stale_queue_handoff),
+        )
+        .unwrap();
+
+        assert!(first_execution.did_execute_queue_lane_scheduler_continuation());
+        assert_eq!(second_render.current(), committed_current);
+        assert_eq!(
+            execution.status(),
+            RootSyncSchedulerQueueLaneContinuationExecutionStatusForCanary::BlockedByQueueLaneHandoffMismatch
+        );
+        assert!(
+            execution
+                .finished_work_handoff_identity()
+                .unwrap()
+                .accepted_for_root_scheduler_commit_handoff()
+        );
+        assert_eq!(
+            execution.queue_handoff_error(),
+            Some(
+                &HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueFiberIdentityMismatch {
+                    root: root_id,
+                    expected_current: second_render.current(),
+                    actual_current: stale_queue_handoff.current(),
+                    expected_finished_work: second_render.finished_work(),
+                    actual_finished_work: stale_queue_handoff.finished_work()
+                }
+            )
+        );
+        assert!(execution.queue_commit_handoff().is_none());
+        assert!(!execution.accepted_queue_lane_handoff_evidence_for_canary());
+        assert!(execution.commit().is_none());
+        assert_eq!(store.root(root_id).unwrap().current(), committed_current);
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
 

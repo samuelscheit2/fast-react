@@ -19,6 +19,15 @@ const actSchedulerMissingBeforeExecution = Object.freeze([
 ]);
 const privateActQueueFlushDiagnosticsExport =
   '__FAST_REACT_PRIVATE_ACT_QUEUE_FLUSH_DIAGNOSTICS__';
+const privateActUpdateLifecycleBoundaryDiagnosticId =
+  'react-test-renderer-act-update-lifecycle-boundary-private-diagnostic';
+const privateActUpdateLifecycleBoundaryStatus =
+  'private-act-update-lifecycle-boundary-source-owned-lifecycle-host-output-public-act-blocked';
+const privateActUpdateLifecycleBoundaryWorkers = Object.freeze([
+  'worker-881-test-renderer-serialization-lifecycle-gate',
+  'worker-888-test-renderer-instance-lifecycle-gate',
+  'worker-895-rust-test-renderer-multichild-lifecycle-native'
+]);
 const reactCompatibilityTarget = 'react@19.2.6';
 const schedulerCompatibilityTarget = 'scheduler@0.27.0';
 const privateActQueueTestQueueKind =
@@ -491,6 +500,30 @@ const testRendererRootActFlushRecords = Object.freeze([
     nativeExecution: false,
     rustExecution: false,
     hostOutputProducedFromJs: false
+  }),
+  Object.freeze({
+    id: privateActUpdateLifecycleBoundaryDiagnosticId,
+    jsRecord: 'FastReactTestRendererPrivateActUpdateLifecycleBoundary',
+    symbol: 'fast.react_test_renderer.root_request_bridge',
+    status: privateActUpdateLifecycleBoundaryStatus,
+    acceptedWorkers: privateActUpdateLifecycleBoundaryWorkers,
+    requiresSourceOwnedCreateUpdateUnmountLifecycleEvidence: true,
+    requiresCurrentFinishedWorkIdentity: true,
+    requiresCurrentHostOutputSnapshot: true,
+    requiresSameEntrypointRootAndRendererOwner: true,
+    requiresLatestUpdateBeforeUnmountSequence: true,
+    rejectsPublicActStrings: true,
+    rejectsTestTitlesAndProseClaims: true,
+    rejectsSourceSyntaxClaims: true,
+    rejectsRawSerializationReports: true,
+    rejectsCallerBuiltRows: true,
+    rejectsClonedRows: true,
+    rejectsSchedulerPackageAndNativeAliases: true,
+    publicActAvailable: false,
+    nativeExecution: false,
+    rustExecution: false,
+    hostOutputProducedFromJs: false,
+    compatibilityClaimed: false
   })
 ]);
 const schedulerReactActQueueDiagnosticRecords = Object.freeze([
@@ -778,7 +811,8 @@ const actSchedulerGate = Object.freeze({
     'worker-334-test-renderer-testinstance-private-query-path',
     'worker-426-test-renderer-testinstance-bridge-query',
     'worker-349-hook-effect-destroy-callback-execution-private',
-    'worker-377-scheduler-act-queue-flush-helper-private'
+    'worker-377-scheduler-act-queue-flush-helper-private',
+    ...privateActUpdateLifecycleBoundaryWorkers
   ]),
   publicActBehaviorAvailable: false,
   publicSchedulerFlushExecutionAvailable: false,
@@ -3430,6 +3464,7 @@ const rootRequestTestInstanceQueryDiagnostics = new WeakMap();
 const rootHandleTestInstanceLifecycleEvidence = new WeakMap();
 const rootExecutionResults = new WeakSet();
 const rootLifecycleExecutionEvidences = new WeakSet();
+const privateSerializationFinishedWorkIdentityResults = new WeakSet();
 
 function createTestRendererRootRequestBridge(options) {
   const bridgeState = {
@@ -3584,6 +3619,41 @@ function createTestRendererRootRequestBridge(options) {
     },
     consumePrivateRootLifecycleExecutionEvidence(records) {
       return consumePrivateRootLifecycleExecutionEvidence(records);
+    },
+    describePrivateActUpdateLifecycleBoundary(
+      updateExecutionResult,
+      rootLifecycleExecutionEvidence,
+      finishedWorkIdentity
+    ) {
+      return describePrivateActUpdateLifecycleBoundary(
+        updateExecutionResult,
+        rootLifecycleExecutionEvidence,
+        finishedWorkIdentity
+      );
+    },
+    canConsumePrivateActUpdateLifecycleBoundary(
+      updateExecutionResult,
+      rootLifecycleExecutionEvidence,
+      finishedWorkIdentity
+    ) {
+      return (
+        getRejectedPrivateActUpdateLifecycleBoundaryReason(
+          updateExecutionResult,
+          rootLifecycleExecutionEvidence,
+          finishedWorkIdentity
+        ) === null
+      );
+    },
+    consumePrivateActUpdateLifecycleBoundary(
+      updateExecutionResult,
+      rootLifecycleExecutionEvidence,
+      finishedWorkIdentity
+    ) {
+      return consumePrivateActUpdateLifecycleBoundary(
+        updateExecutionResult,
+        rootLifecycleExecutionEvidence,
+        finishedWorkIdentity
+      );
     },
     executeRootRequest(record, executor) {
       return executeRootRequestWithBridge(record, executor);
@@ -4323,6 +4393,314 @@ function consumePrivateRootLifecycleExecutionEvidence(records, options) {
   }
 
   return evidence;
+}
+
+function getRejectedNativeUpdateExecutionResultReason(result) {
+  if (!isObjectLike(result)) {
+    return 'native-update-result-not-object';
+  }
+  if (!Object.isFrozen(result)) {
+    return 'native-update-result-not-frozen';
+  }
+  if (result.kind !== 'FastReactTestRendererPrivateRootExecutionResult') {
+    return 'native-update-result-kind';
+  }
+  if (result.status !== 'accepted-private-test-renderer-root-execution-result') {
+    return 'native-update-result-status';
+  }
+  if (
+    result.operation !== 'update' ||
+    result.updateKind !== 'Update' ||
+    result.rustOutcome !== 'Scheduled' ||
+    result.scheduled !== true
+  ) {
+    return 'native-update-result-operation';
+  }
+  if (
+    !isObjectLike(result.request) ||
+    typeof result.request.rootId !== 'string'
+  ) {
+    return 'native-update-result-request';
+  }
+  if (
+    result.privateRootRequestExecution !== true ||
+    result.rustRootExecutionBoundaryCalled !== true ||
+    result.rustExecution !== true ||
+    result.reconcilerExecution !== true ||
+    result.hostOutputProduced !== true
+  ) {
+    return 'native-update-result-execution-evidence';
+  }
+  if (
+    result.publicRouteAvailable !== false ||
+    result.publicCreateUpdateUnmountBehaviorAvailable !== false ||
+    result.compatibilityClaimed !== false
+  ) {
+    return 'native-update-result-public-claim';
+  }
+  if (
+    result.nativeAddonLoaded !== false ||
+    result.nativeBridgeAvailable !== false ||
+    result.nativeExecution !== false
+  ) {
+    return 'native-update-result-native-addon-claim';
+  }
+
+  const admission = result.privateUpdateNativeBridgeAdmission;
+  if (!isObjectLike(admission) || !Object.isFrozen(admission)) {
+    return 'native-update-admission-not-object';
+  }
+  if (
+    admission.id !== privateUpdateNativeBridgeAdmissionDiagnosticId ||
+    admission.kind !== 'FastReactTestRendererPrivateUpdateNativeBridgeAdmission' ||
+    admission.status !== privateUpdateNativeBridgeAdmissionStatus
+  ) {
+    return 'native-update-admission-identity';
+  }
+  if (
+    admission.operation !== 'update' ||
+    admission.request !== result.request ||
+    admission.requestId !== result.requestId ||
+    admission.requestSequence !== result.requestSequence ||
+    admission.updateKind !== 'Update' ||
+    admission.updateOutcome !== 'Scheduled' ||
+    admission.scheduled !== true
+  ) {
+    return 'native-update-admission-request';
+  }
+  if (
+    admission.updateRouteAdmissionAccepted !== true ||
+    admission.lifecycleEvidenceAccepted !== true ||
+    admission.rootWorkLoopHandoffAccepted !== true ||
+    admission.hostOutputHandoffAccepted !== true ||
+    admission.textUpdateApplyRecorded !== true ||
+    admission.hostTextUpdateApplyCount !== 1 ||
+    admission.hostComponentUpdateApplyCount !== 1 ||
+    admission.rustExecutionFromJs !== true ||
+    admission.reconcilerExecutionFromJs !== true ||
+    admission.hostOutputProduced !== true
+  ) {
+    return 'native-update-admission-execution-evidence';
+  }
+  if (
+    Object.hasOwn(admission, 'hostComponentPropUpdateRecorded') &&
+    admission.hostComponentPropUpdateRecorded !== true
+  ) {
+    return 'native-update-admission-execution-evidence';
+  }
+  if (
+    Object.hasOwn(admission, 'hostComponentStyleUpdateRecorded') &&
+    admission.hostComponentStyleUpdateRecorded !== true
+  ) {
+    return 'native-update-admission-execution-evidence';
+  }
+  if (
+    Object.hasOwn(admission, 'acceptedHostComponentUpdatePayloadShape') &&
+    admission.acceptedHostComponentUpdatePayloadShape !==
+      'HostComponentPropStyleTextUpdate'
+  ) {
+    return 'native-update-admission-execution-evidence';
+  }
+  if (
+    admission.publicUpdateCompatibilityClaimed !== false ||
+    admission.publicSerializationAvailable !== false ||
+    admission.actFlushingClaimed !== false ||
+    admission.nativeBridgeAvailable !== false ||
+    admission.nativeExecution !== false ||
+    admission.compatibilityClaimed !== false
+  ) {
+    return 'native-update-admission-public-claim';
+  }
+
+  return null;
+}
+
+function getRejectedPrivateActUpdateLifecycleBoundaryReason(
+  updateExecutionResult,
+  rootLifecycleExecutionEvidence,
+  finishedWorkIdentity
+) {
+  const updateRejectionReason =
+    getRejectedNativeUpdateExecutionResultReason(updateExecutionResult);
+  if (updateRejectionReason !== null) {
+    return updateRejectionReason;
+  }
+  if (!rootExecutionResults.has(updateExecutionResult)) {
+    return 'act-update-execution-not-source-owned';
+  }
+  if (!isObjectLike(rootLifecycleExecutionEvidence)) {
+    return 'act-update-lifecycle-evidence-not-object';
+  }
+  if (!Object.isFrozen(rootLifecycleExecutionEvidence)) {
+    return 'act-update-lifecycle-evidence-not-frozen';
+  }
+  if (!rootLifecycleExecutionEvidences.has(rootLifecycleExecutionEvidence)) {
+    return 'act-update-lifecycle-evidence-not-source-owned';
+  }
+
+  let lifecycle;
+  try {
+    lifecycle = validatePrivateSerializationLifecycleExecutionEvidence(
+      'create().act(update)',
+      updateExecutionResult.request,
+      rootLifecycleExecutionEvidence
+    );
+  } catch (_error) {
+    return 'act-update-lifecycle-evidence-currentness';
+  }
+  if (
+    lifecycle.updateRequest !== updateExecutionResult.request ||
+    lifecycle.evidence.update.requestSequence !==
+      updateExecutionResult.requestSequence ||
+    lifecycle.evidence.unmount.requestSequence <=
+      updateExecutionResult.requestSequence
+  ) {
+    return 'act-update-lifecycle-request-sequence';
+  }
+  if (
+    lifecycle.evidence.create.sourceExecutionRecordId !==
+      privateCreateNativeBridgeHostOutputHandoffDiagnosticId ||
+    lifecycle.evidence.update.sourceExecutionRecordId !==
+      privateUpdateNativeBridgeAdmissionDiagnosticId ||
+    lifecycle.evidence.unmount.sourceExecutionRecordId !==
+      privateUnmountNativeBridgeAdmissionDiagnosticId
+  ) {
+    return 'act-update-lifecycle-source-records';
+  }
+  if (!isObjectLike(finishedWorkIdentity)) {
+    return 'act-update-finished-work-identity-not-object';
+  }
+  if (!Object.isFrozen(finishedWorkIdentity)) {
+    return 'act-update-finished-work-identity-not-frozen';
+  }
+  if (!privateSerializationFinishedWorkIdentityResults.has(finishedWorkIdentity)) {
+    return 'act-update-finished-work-identity-not-source-owned';
+  }
+  if (
+    finishedWorkIdentity.diagnosticName !==
+      privateSerializationFinishedWorkIdentityDiagnosticName ||
+    finishedWorkIdentity.rootRequest !== updateExecutionResult.request ||
+    finishedWorkIdentity.rootRequestOperation !== 'update' ||
+    finishedWorkIdentity.rootRequestSequence !==
+      updateExecutionResult.requestSequence ||
+    finishedWorkIdentity.hostOutputUpdateKind !== 'Update'
+  ) {
+    return 'act-update-finished-work-identity-currentness';
+  }
+  if (
+    finishedWorkIdentity.rootFinishedLanesHandoffAccepted !== true ||
+    finishedWorkIdentity.consumesPrivateRootFinishedLanesHandoffGate !== true ||
+    finishedWorkIdentity.hostOutputSnapshotCurrent !== true ||
+    finishedWorkIdentity.consumesCommittedHostRootFinishedWorkIdentity !== true ||
+    finishedWorkIdentity.consumesCommittedHostRootFinishedWorkLanes !== true
+  ) {
+    return 'act-update-finished-work-identity-host-output';
+  }
+  if (
+    finishedWorkIdentity.publicToJSONAvailable !== false ||
+    finishedWorkIdentity.publicToTreeAvailable !== false ||
+    finishedWorkIdentity.publicTestInstanceAvailable !== false ||
+    finishedWorkIdentity.publicSerializationAvailable !== false ||
+    finishedWorkIdentity.compatibilityClaimed !== false
+  ) {
+    return 'act-update-finished-work-identity-public-claim';
+  }
+
+  return null;
+}
+
+function describePrivateActUpdateLifecycleBoundary(
+  updateExecutionResult,
+  rootLifecycleExecutionEvidence,
+  finishedWorkIdentity
+) {
+  const rejectionReason = getRejectedPrivateActUpdateLifecycleBoundaryReason(
+    updateExecutionResult,
+    rootLifecycleExecutionEvidence,
+    finishedWorkIdentity
+  );
+  const accepted = rejectionReason === null;
+
+  return freezeRecord({
+    id: privateActUpdateLifecycleBoundaryDiagnosticId,
+    status: accepted
+      ? privateActUpdateLifecycleBoundaryStatus
+      : 'rejected-private-act-update-lifecycle-boundary',
+    accepted,
+    rejectionReason,
+    acceptedWorkers: privateActUpdateLifecycleBoundaryWorkers,
+    consumer: 'react-test-renderer-act-update-lifecycle-boundary-private-gate',
+    gateStatus: actSchedulerGateStatus,
+    updateRequestId: isObjectLike(updateExecutionResult)
+      ? updateExecutionResult.requestId
+      : null,
+    updateRequestSequence: isObjectLike(updateExecutionResult)
+      ? updateExecutionResult.requestSequence
+      : null,
+    rootId: isObjectLike(updateExecutionResult)
+      ? updateExecutionResult.rootId
+      : null,
+    sourceOwnedLifecycleEvidenceAccepted: accepted,
+    sourceOwnedFinishedWorkIdentityAccepted: accepted,
+    sourceOwnedCurrentHostOutputAccepted: accepted,
+    consumesSourceOwnedCreateUpdateUnmountLifecycleEvidence: accepted,
+    consumesFinishedWorkCurrentHostOutputIdentity: accepted,
+    consumesAcceptedNativeUpdateExecution: accepted,
+    consumesPrivateUpdateNativeBridgeAdmission: accepted,
+    requiresLatestUpdateBeforeUnmountSequence: true,
+    rejectsPublicActStrings: true,
+    rejectsTestTitlesAndProseClaims: true,
+    rejectsSourceSyntaxClaims: true,
+    rejectsRawSerializationReports: true,
+    rejectsCallerBuiltRows: true,
+    rejectsClonedRows: true,
+    rejectsSchedulerPackageAndNativeAliases: true,
+    publicActCompatibilityClaimed: false,
+    publicUpdateCompatibilityClaimed: false,
+    publicSerializationAvailable: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    compatibilityClaimed: false
+  });
+}
+
+function consumePrivateActUpdateLifecycleBoundary(
+  updateExecutionResult,
+  rootLifecycleExecutionEvidence,
+  finishedWorkIdentity
+) {
+  const boundary = describePrivateActUpdateLifecycleBoundary(
+    updateExecutionResult,
+    rootLifecycleExecutionEvidence,
+    finishedWorkIdentity
+  );
+  if (boundary.accepted !== true) {
+    throwInvalidRootRequest(
+      `Private act update lifecycle boundary rejected: ${boundary.rejectionReason}.`
+    );
+  }
+
+  return freezeRecord({
+    ...boundary,
+    status: privateActUpdateLifecycleBoundaryStatus,
+    rootLifecycleExecutionEvidence,
+    rootLifecycleExecutionDiagnosticName:
+      rootLifecycleExecutionEvidence.diagnosticName,
+    rootLifecycleExecutionStatus: rootLifecycleExecutionEvidence.status,
+    finishedWorkIdentity,
+    finishedWorkIdentityDiagnosticName: finishedWorkIdentity.diagnosticName,
+    finishedWorkIdentityStatus: finishedWorkIdentity.status,
+    privateUpdateNativeBridgeAdmission:
+      updateExecutionResult.privateUpdateNativeBridgeAdmission,
+    privateUpdateNativeBridgeAdmissionId:
+      updateExecutionResult.privateUpdateNativeBridgeAdmission.id,
+    rootFinishedLanesHandoff: finishedWorkIdentity.rootFinishedLanesHandoff,
+    rootFinishedLanesHandoffAccepted: true,
+    hostOutputSnapshotCurrent: true,
+    sourceExecutionRecordIds:
+      rootLifecycleExecutionEvidence.sourceExecutionRecordIds,
+    latestUpdateLifecycleBeforeUnmountAccepted: true
+  });
 }
 
 function readLifecycleExecutionResult(records, operation) {
@@ -9149,7 +9527,7 @@ function createPrivateSerializationFinishedWorkIdentityGateResult(
       rootLifecycleExecutionEvidenceInput
     );
 
-  return freezeRecord({
+  const result = freezeRecord({
     id: 'react-test-renderer-private-serialization-finished-work-identity-result',
     diagnosticName: privateSerializationFinishedWorkIdentityDiagnosticName,
     status: privateSerializationFinishedWorkIdentityStatus,
@@ -9230,6 +9608,8 @@ function createPrivateSerializationFinishedWorkIdentityGateResult(
     publicSerializationAvailable: false,
     compatibilityClaimed: false
   });
+  privateSerializationFinishedWorkIdentityResults.add(result);
+  return result;
 }
 
 function validatePrivateSerializationRootLifecycleExecutionEvidence(

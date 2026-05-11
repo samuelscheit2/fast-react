@@ -266,6 +266,10 @@ const actNativeUpdatePassiveDrainRecordId =
   "react-test-renderer-act-native-update-passive-drain-private-diagnostic";
 const actNativeUpdatePassiveDrainPrerequisiteId =
   "private-native-update-execution-passive-effect-drain-metadata";
+const privateActUpdateLifecycleBoundaryDiagnosticId =
+  "react-test-renderer-act-update-lifecycle-boundary-private-diagnostic";
+const privateActUpdateLifecycleBoundaryStatus =
+  "private-act-update-lifecycle-boundary-source-owned-lifecycle-host-output-public-act-blocked";
 const actNestedScopePassiveFlushRecordId =
   "react-test-renderer-act-nested-scope-passive-flush-private-diagnostic";
 const actNestedScopePassiveFlushPrerequisiteId =
@@ -532,7 +536,8 @@ const actSchedulerRootFlushRecordIds = [
   "test-renderer-private-root-update-unmount-lifecycle",
   "test-renderer-private-root-native-canary-metadata",
   "test-renderer-private-tojson-host-output-diagnostic",
-  "test-renderer-private-testinstance-query-path"
+  "test-renderer-private-testinstance-query-path",
+  privateActUpdateLifecycleBoundaryDiagnosticId
 ];
 const acceptedPrivateActFlushPrerequisiteIds = [
   "react-act-private-dispatcher-gate",
@@ -1379,6 +1384,35 @@ test("react-test-renderer CJS private act diagnostics consume update execution w
         privateActQueueFlushDiagnosticsExport
       ].privateActPassiveEffectDrainDiagnostics;
     assert.equal(
+      diagnostics.privateActUpdateLifecycleBoundaryDiagnosticId,
+      privateActUpdateLifecycleBoundaryDiagnosticId,
+      entry.entrypoint
+    );
+    assert.equal(
+      diagnostics.privateActUpdateLifecycleBoundaryStatus,
+      privateActUpdateLifecycleBoundaryStatus,
+      entry.entrypoint
+    );
+    assert.deepEqual(
+      diagnostics.privateActUpdateLifecycleBoundaryAcceptedWorkers,
+      [
+        "worker-881-test-renderer-serialization-lifecycle-gate",
+        "worker-888-test-renderer-instance-lifecycle-gate",
+        "worker-895-rust-test-renderer-multichild-lifecycle-native"
+      ],
+      entry.entrypoint
+    );
+    assert.equal(
+      diagnostics.requiresSourceOwnedActUpdateLifecycleBoundary,
+      true,
+      entry.entrypoint
+    );
+    assert.equal(
+      diagnostics.requiresCurrentActUpdateFinishedWorkIdentity,
+      true,
+      entry.entrypoint
+    );
+    assert.equal(
       diagnostics.nativeUpdatePassiveEffectDrainDiagnosticId,
       actNativeUpdatePassiveDrainRecordId,
       entry.entrypoint
@@ -1394,20 +1428,11 @@ test("react-test-renderer CJS private act diagnostics consume update execution w
       entry.entrypoint
     );
 
-    const renderer = moduleExports.create({
-      props: {
-        "data-state": "old",
-        children: "hello",
-        ...(entry.production ? {} : { style: { color: "red" } })
-      },
-      type: "span"
-    });
+    const renderer = moduleExports.create({ type: "span" });
     const updateError = captureThrown(() =>
       renderer.update({
         props: {
-          "data-state": "new",
-          children: "goodbye",
-          ...(entry.production ? {} : { style: { color: "blue" } })
+          children: "goodbye"
         },
         type: "span"
       })
@@ -1420,12 +1445,101 @@ test("react-test-renderer CJS private act diagnostics consume update execution w
       updateExecutionResult.privateUpdateNativeBridgeAdmission,
       updateError.rootRequest
     );
+    const missingBoundaryMetadata =
+      diagnostics.createAcceptedPendingPassiveFlushMetadata([
+        diagnostics.createAcceptedPendingPassiveFlushRecord({
+          label: "private-update-passive-execution",
+          recordKind: "PassiveEffectSchedulerFlushExecutionRecord",
+          root: updateError.rootRequest.rootId,
+          finishedWork: "updated-finished-work",
+          lanes: "Default",
+          pendingUnmountCount: 0,
+          pendingMountCount: 1,
+          schedulerRequestOrder: 3
+        })
+      ]);
+    const missingBoundary =
+      diagnostics.describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
+        updateExecutionResult,
+        missingBoundaryMetadata
+      );
+    assert.equal(missingBoundary.accepted, false, entry.entrypoint);
+    assert.equal(
+      missingBoundary.rejectionReason,
+      "act-update-lifecycle-evidence-not-object",
+      entry.entrypoint
+    );
+    assert.equal(missingBoundary.updateExecutionAccepted, true, entry.entrypoint);
+    assert.equal(
+      missingBoundary.actUpdateLifecycleBoundaryAccepted,
+      false,
+      entry.entrypoint
+    );
+    assert.equal(
+      missingBoundary.consumesSourceOwnedActUpdateLifecycleBoundary,
+      false,
+      entry.entrypoint
+    );
+    assert.equal(missingBoundaryMetadata.records.length, 1, entry.entrypoint);
 
+    if (entry.entrypoint !== cjsDevelopmentEntrypoint) {
+      continue;
+    }
+
+    const {
+      finishedWorkIdentity,
+      lifecycleEvidence,
+      updateRequest,
+      updateResult
+    } = createPrivateActUpdateLifecycleBoundaryRuntime(
+      moduleExports,
+      bridge
+    );
+    const describedBoundary = bridge.describePrivateActUpdateLifecycleBoundary(
+      updateResult,
+      lifecycleEvidence,
+      finishedWorkIdentity
+    );
+    assert.equal(
+      describedBoundary.id,
+      privateActUpdateLifecycleBoundaryDiagnosticId
+    );
+    assert.equal(describedBoundary.accepted, true);
+    assert.equal(describedBoundary.rejectionReason, null);
+    assert.equal(
+      bridge.canConsumePrivateActUpdateLifecycleBoundary(
+        updateResult,
+        lifecycleEvidence,
+        finishedWorkIdentity
+      ),
+      true,
+      entry.entrypoint
+    );
+    const boundary = bridge.consumePrivateActUpdateLifecycleBoundary(
+      updateResult,
+      lifecycleEvidence,
+      finishedWorkIdentity
+    );
+    assert.equal(boundary.id, privateActUpdateLifecycleBoundaryDiagnosticId);
+    assert.equal(boundary.status, privateActUpdateLifecycleBoundaryStatus);
+    assert.equal(boundary.accepted, true);
+    assert.equal(boundary.updateRequestSequence, updateRequest.requestSequence);
+    assert.equal(boundary.rootLifecycleExecutionEvidence, lifecycleEvidence);
+    assert.equal(boundary.finishedWorkIdentity, finishedWorkIdentity);
+    assert.equal(
+      boundary.privateUpdateNativeBridgeAdmission,
+      updateResult.privateUpdateNativeBridgeAdmission
+    );
+    assert.deepEqual(boundary.sourceExecutionRecordIds, [
+      privateCreateNativeBridgeHostOutputHandoffDiagnosticId,
+      privateUpdateNativeBridgeAdmissionDiagnosticId,
+      privateUnmountNativeBridgeAdmissionDiagnosticId
+    ]);
     const metadata = diagnostics.createAcceptedPendingPassiveFlushMetadata([
       diagnostics.createAcceptedPendingPassiveFlushRecord({
         label: "private-update-passive-execution",
         recordKind: "PassiveEffectSchedulerFlushExecutionRecord",
-        root: updateError.rootRequest.rootId,
+        root: updateRequest.rootId,
         finishedWork: "updated-finished-work",
         lanes: "Default",
         pendingUnmountCount: 0,
@@ -1435,21 +1549,34 @@ test("react-test-renderer CJS private act diagnostics consume update execution w
     ]);
     const described =
       diagnostics.describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
-        updateExecutionResult,
-        metadata
+        updateResult,
+        metadata,
+        lifecycleEvidence,
+        finishedWorkIdentity
       );
     assert.equal(described.id, actNativeUpdatePassiveDrainRecordId);
     assert.equal(described.accepted, true);
     assert.equal(described.rejectionReason, null);
     assert.equal(described.updateExecutionAccepted, true);
+    assert.equal(described.actUpdateLifecycleBoundaryAccepted, true);
     assert.equal(described.passiveMetadataAccepted, true);
+    assert.equal(
+      described.privateActUpdateLifecycleBoundaryDiagnosticId,
+      privateActUpdateLifecycleBoundaryDiagnosticId
+    );
+    assert.equal(
+      described.consumesSourceOwnedActUpdateLifecycleBoundary,
+      true
+    );
     assert.equal(described.publicActCompatibilityClaimed, false);
     assert.equal(described.publicUpdateCompatibilityClaimed, false);
 
     const report =
       diagnostics.consumeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
-        updateExecutionResult,
-        metadata
+        updateResult,
+        metadata,
+        lifecycleEvidence,
+        finishedWorkIdentity
       );
     assert.equal(report.id, actNativeUpdatePassiveDrainRecordId);
     assert.equal(
@@ -1458,6 +1585,16 @@ test("react-test-renderer CJS private act diagnostics consume update execution w
     );
     assert.equal(report.nativeUpdateExecutionConsumed, true);
     assert.equal(report.privateRootRequestExecutionConsumed, true);
+    assert.equal(
+      report.privateActUpdateLifecycleBoundaryId,
+      privateActUpdateLifecycleBoundaryDiagnosticId
+    );
+    assert.equal(
+      report.privateActUpdateLifecycleBoundary.status,
+      privateActUpdateLifecycleBoundaryStatus
+    );
+    assert.equal(report.rootLifecycleExecutionEvidence, lifecycleEvidence);
+    assert.equal(report.finishedWorkIdentity, finishedWorkIdentity);
     assert.equal(report.rustExecution, true);
     assert.equal(report.reconcilerExecution, true);
     assert.equal(report.hostOutputProduced, true);
@@ -1485,6 +1622,8 @@ test("react-test-renderer CJS private act diagnostics consume update execution w
     assert.equal(report.consumesAcceptedNativeUpdateExecution, true);
     assert.equal(report.consumesPrivateUpdateNativeBridgeAdmission, true);
     assert.equal(report.consumesAcceptedNativeUpdateHostOutput, true);
+    assert.equal(report.consumesSourceOwnedActUpdateLifecycleBoundary, true);
+    assert.equal(report.consumesFinishedWorkCurrentHostOutputIdentity, true);
     assert.equal(report.drainsAcceptedPendingPassiveFlushMetadata, true);
     assert.equal(report.publicActCompatibilityClaimed, false);
     assert.equal(report.publicUpdateCompatibilityClaimed, false);
@@ -1497,14 +1636,178 @@ test("react-test-renderer CJS private act diagnostics consume update execution w
     const rejected =
       diagnostics.describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
         {
-          ...updateExecutionResult,
+          ...updateResult,
           hostOutputProduced: false
         },
-        diagnostics.createAcceptedPendingPassiveFlushMetadata([])
+        diagnostics.createAcceptedPendingPassiveFlushMetadata([]),
+        lifecycleEvidence,
+        finishedWorkIdentity
       );
     assert.equal(rejected.accepted, false);
     assert.equal(rejected.rejectionReason, "native-update-result-not-frozen");
+
+    const clonedLifecycle =
+      diagnostics.describePrivateActUpdateLifecycleBoundary(
+        updateResult,
+        { ...lifecycleEvidence },
+        finishedWorkIdentity
+      );
+    assert.equal(clonedLifecycle.accepted, false);
+    assert.equal(
+      clonedLifecycle.rejectionReason,
+      "act-update-lifecycle-evidence-not-frozen"
+    );
+    const rawSerializationReport =
+      diagnostics.describePrivateActUpdateLifecycleBoundary(
+        updateResult,
+        lifecycleEvidence,
+        { diagnosticName: "fast-react-test-renderer.serialization.private-json-canary" }
+      );
+    assert.equal(rawSerializationReport.accepted, false);
+    assert.equal(
+      rawSerializationReport.rejectionReason,
+      "act-update-finished-work-identity-not-frozen"
+    );
+    const publicActString =
+      diagnostics.describePrivateActUpdateLifecycleBoundary(
+        updateResult,
+        "act(() => root.update())",
+        finishedWorkIdentity
+      );
+    assert.equal(publicActString.accepted, false);
+    assert.equal(
+      publicActString.rejectionReason,
+      "act-update-lifecycle-evidence-not-object"
+    );
   }
+});
+
+test("react-test-renderer package root private act update lifecycle boundary rejects cross-entrypoint rows", () => {
+  const packageRootEntry = entrypoints.find(
+    (candidate) => candidate.entrypoint === packageRootEntrypoint
+  );
+  const cjsDevelopmentEntry = entrypoints.find(
+    (candidate) => candidate.entrypoint === cjsDevelopmentEntrypoint
+  );
+  const cjsProductionEntry = entrypoints.find(
+    (candidate) =>
+      candidate.entrypoint ===
+      "react-test-renderer/cjs/react-test-renderer.production"
+  );
+  assert.notEqual(packageRootEntry, undefined);
+  assert.notEqual(cjsDevelopmentEntry, undefined);
+  assert.notEqual(cjsProductionEntry, undefined);
+
+  const packageRootModule = loadFresh(packageRootEntry.modulePath);
+  const packageRootBridge = assertPrivateRootRequestBridge(
+    packageRootModule,
+    packageRootEntry.entrypoint
+  );
+  const publicActBoundary =
+    packageRootBridge.describePrivateActUpdateLifecycleBoundary(
+      "act(() => root.update())",
+      Object.freeze({}),
+      Object.freeze({})
+    );
+  assert.equal(publicActBoundary.accepted, false);
+  assert.equal(
+    publicActBoundary.rejectionReason,
+    "native-update-result-not-object"
+  );
+  assert.equal(publicActBoundary.publicActCompatibilityClaimed, false);
+  assert.equal(publicActBoundary.nativeExecution, false);
+
+  const packageRenderer = packageRootModule.create({ type: "span" });
+  const packageUpdateError = captureThrown(() =>
+    packageRenderer.update({
+      props: { children: "package-root-update" },
+      type: "span"
+    })
+  );
+  assertReactTestRendererUnimplemented(
+    packageUpdateError,
+    packageRootEntry.entrypoint,
+    "create().update"
+  );
+  const packageUpdateResult = packageRootBridge.consumeRootExecutionResult(
+    packageUpdateError.rootRequest,
+    {
+      rustLifecycleDiagnostic: createRustLifecycleDiagnosticSource(
+        packageUpdateError.rootRequest
+      ),
+      nativeAddonLoaded: false,
+      nativeBridgeAvailable: false,
+      nativeExecution: false,
+      rustExecution: true
+    }
+  );
+  const packageOwnBoundary =
+    packageRootBridge.describePrivateActUpdateLifecycleBoundary(
+      packageUpdateResult,
+      Object.freeze({}),
+      Object.freeze({})
+    );
+  assert.equal(packageOwnBoundary.accepted, false);
+  assert.equal(
+    packageOwnBoundary.rejectionReason,
+    "native-update-result-execution-evidence"
+  );
+  assert.equal(
+    packageRootBridge.canConsumePrivateActUpdateLifecycleBoundary(
+      packageUpdateResult,
+      Object.freeze({}),
+      Object.freeze({})
+    ),
+    false
+  );
+
+  const cjsDevelopmentModule = loadFresh(cjsDevelopmentEntry.modulePath);
+  const cjsDevelopmentBridge = assertPrivateRootRequestBridge(
+    cjsDevelopmentModule,
+    cjsDevelopmentEntry.entrypoint
+  );
+  const { finishedWorkIdentity, lifecycleEvidence, updateResult } =
+    createPrivateActUpdateLifecycleBoundaryRuntime(
+      cjsDevelopmentModule,
+      cjsDevelopmentBridge
+    );
+  assert.equal(
+    cjsDevelopmentBridge.canConsumePrivateActUpdateLifecycleBoundary(
+      updateResult,
+      lifecycleEvidence,
+      finishedWorkIdentity
+    ),
+    true
+  );
+
+  const packageRootCrossEntrypoint =
+    packageRootBridge.describePrivateActUpdateLifecycleBoundary(
+      updateResult,
+      lifecycleEvidence,
+      finishedWorkIdentity
+    );
+  assert.equal(packageRootCrossEntrypoint.accepted, false);
+  assert.equal(
+    packageRootCrossEntrypoint.rejectionReason,
+    "act-update-execution-not-source-owned"
+  );
+
+  const cjsProductionModule = loadFresh(cjsProductionEntry.modulePath);
+  const cjsProductionBridge = assertPrivateRootRequestBridge(
+    cjsProductionModule,
+    cjsProductionEntry.entrypoint
+  );
+  const cjsCrossEntrypoint =
+    cjsProductionBridge.describePrivateActUpdateLifecycleBoundary(
+      updateResult,
+      lifecycleEvidence,
+      finishedWorkIdentity
+    );
+  assert.equal(cjsCrossEntrypoint.accepted, false);
+  assert.equal(
+    cjsCrossEntrypoint.rejectionReason,
+    "act-update-execution-not-source-owned"
+  );
 });
 
 test("react-test-renderer CJS development private act diagnostics flush accepted nested-scope passive metadata in order", () => {
@@ -6993,6 +7296,132 @@ function completePrivateRootLifecycleExecutionRowsForRenderer(
   };
 }
 
+function createPrivateActUpdateLifecycleBoundaryRuntime(
+  moduleExports,
+  bridge
+) {
+  const renderer = moduleExports.create(
+    {
+      props: {
+        children: "hello"
+      },
+      type: "span"
+    },
+    {}
+  );
+  const jsonFacade = renderer.toJSON[privateToJSONSerializationFacadeSymbol];
+  const [createRequest] = bridge.getRendererRootRequests(renderer);
+  const createAdmission = bridge.getRootCreateRouteAdmission(createRequest);
+  const requestsBySequence = new Map([
+    [createRequest.requestSequence, createRequest]
+  ]);
+  const executor = (handoff) => {
+    const request = requestsBySequence.get(handoff.requestSequence);
+    if (request.operation === "update") {
+      return createRustUpdateNativeBridgeAdmissionEvidence(request);
+    }
+    if (request.operation === "unmount") {
+      return {
+        ...createRustUnmountNativeBridgeAdmissionEvidence(request),
+        nativeAddonLoaded: false,
+        nativeBridgeAvailable: false,
+        nativeExecution: false,
+        rustExecution: true
+      };
+    }
+
+    const result = {
+      rustLifecycleDiagnostic: createRustLifecycleDiagnosticSource(request),
+      nativeAddonLoaded: false,
+      nativeBridgeAvailable: false,
+      nativeExecution: false,
+      rustExecution: true
+    };
+    const createHandoff =
+      createRustCreateNativeBridgeHostOutputHandoffSource(
+        request,
+        createAdmission
+      );
+    result.privateCreateNativeBridgeHostOutputHandoff = createHandoff;
+    return result;
+  };
+
+  const createResult = bridge.executeRootRequest(createRequest, executor);
+  const updateError = captureThrown(() =>
+    renderer.update({
+      props: {
+        "data-state": "new",
+        children: "goodbye",
+        style: { color: "blue" }
+      },
+      type: "span"
+    })
+  );
+  assertReactTestRendererUnimplemented(
+    updateError,
+    moduleExports.__FAST_REACT_ENTRYPOINT__,
+    "create().update"
+  );
+  const updateRequest = updateError.rootRequest;
+  requestsBySequence.set(updateRequest.requestSequence, updateRequest);
+  const updateResult = bridge.executeRootRequest(updateRequest, executor);
+  const updateReport = privateToJSONReport({
+    hostOutputUpdateKind: "Update",
+    rowId: privateToJSONUpdateHostOutputRowId,
+    rowShape: "SingleHostText",
+    rootChildCount: 1,
+    rootNodeKind: "HostComponent",
+    nodes: [
+      hostComponentNode(0, null, [1], "span", {
+        "data-state": "new",
+        style: { color: "blue" }
+      }),
+      textNode(1, 0, "goodbye")
+    ]
+  });
+  const updateIdentity = privateSerializationFinishedWorkIdentityEvidence({
+    rootRequest: updateRequest,
+    publicSurface: "create().toJSON",
+    sourceSerializationDiagnosticName:
+      "fast-react-test-renderer.serialization.private-json-canary",
+    consumesPrivateToJSONEvidence: true,
+    consumesPrivateToTreeEvidence: false,
+    hostOutputUpdateKind: "Update"
+  });
+  const finishedWorkIdentity = jsonFacade.validateAcceptedFinishedWorkIdentity(
+    updateIdentity,
+    updateReport,
+    updateRequest
+  );
+
+  const unmountError = captureThrown(() => renderer.unmount());
+  assertReactTestRendererUnimplemented(
+    unmountError,
+    moduleExports.__FAST_REACT_ENTRYPOINT__,
+    "create().unmount"
+  );
+  const unmountRequest = unmountError.rootRequest;
+  requestsBySequence.set(unmountRequest.requestSequence, unmountRequest);
+  const unmountResult = bridge.executeRootRequest(unmountRequest, executor);
+  const lifecycleEvidence =
+    bridge.consumePrivateRootLifecycleExecutionEvidence({
+      create: createResult,
+      update: updateResult,
+      unmount: unmountResult
+    });
+
+  return {
+    createResult,
+    finishedWorkIdentity,
+    lifecycleEvidence,
+    renderer,
+    updateReport,
+    updateRequest,
+    updateResult,
+    unmountResult
+  };
+}
+
 function privateRootFinishedLanesHandoffEvidence(rootRequest, evidence) {
   return {
     diagnosticName: privateRootFinishedLanesHandoffDiagnosticName,
@@ -7937,6 +8366,18 @@ function assertPrivateRootRequestBridge(moduleExports, entrypoint) {
   );
   assert.equal(
     typeof bridge.consumePrivateRootLifecycleExecutionEvidence,
+    "function"
+  );
+  assert.equal(
+    typeof bridge.describePrivateActUpdateLifecycleBoundary,
+    "function"
+  );
+  assert.equal(
+    typeof bridge.canConsumePrivateActUpdateLifecycleBoundary,
+    "function"
+  );
+  assert.equal(
+    typeof bridge.consumePrivateActUpdateLifecycleBoundary,
     "function"
   );
   assert.equal(typeof bridge.executeRootRequest, "function");
@@ -15732,6 +16173,11 @@ function assertActSchedulerGate(gate, entrypoint) {
       "worker-700-test-renderer-act-nested-scope-passive-flush"
     );
   }
+  expectedAcceptedWorkers.push(
+    "worker-881-test-renderer-serialization-lifecycle-gate",
+    "worker-888-test-renderer-instance-lifecycle-gate",
+    "worker-895-rust-test-renderer-multichild-lifecycle-native"
+  );
 
   assert.equal(Object.isFrozen(gate), true, entrypoint);
   assert.equal(gate.id, "react-test-renderer-act-scheduler-private-gate");
@@ -16076,7 +16522,10 @@ function assertActSchedulerGate(gate, entrypoint) {
     );
     assert.deepEqual(nativeUpdatePassiveRecord.buildsOnWorkers, [
       "worker-473-test-renderer-act-passive-effect-drain",
-      "worker-637-test-renderer-update-native-execution"
+      "worker-637-test-renderer-update-native-execution",
+      "worker-881-test-renderer-serialization-lifecycle-gate",
+      "worker-888-test-renderer-instance-lifecycle-gate",
+      "worker-895-rust-test-renderer-multichild-lifecycle-native"
     ]);
     assert.equal(
       nativeUpdatePassiveRecord.nativeUpdateExecutionResultKind,
@@ -16084,6 +16533,10 @@ function assertActSchedulerGate(gate, entrypoint) {
     );
     assert.equal(
       nativeUpdatePassiveRecord.consumesAcceptedNativeUpdateExecution,
+      true
+    );
+    assert.equal(
+      nativeUpdatePassiveRecord.consumesSourceOwnedActUpdateLifecycleBoundary,
       true
     );
     assert.equal(
@@ -16287,6 +16740,38 @@ function assertActSchedulerGate(gate, entrypoint) {
     gate.recognizedRootActFlushRecords[4].standaloneWrapperMetadata,
     false
   );
+  const actUpdateLifecycleBoundaryRecord =
+    gate.recognizedRootActFlushRecords.find(
+      (record) => record.id === privateActUpdateLifecycleBoundaryDiagnosticId
+    );
+  assert.notEqual(actUpdateLifecycleBoundaryRecord, undefined);
+  assert.equal(
+    actUpdateLifecycleBoundaryRecord.status,
+    privateActUpdateLifecycleBoundaryStatus
+  );
+  assert.deepEqual(actUpdateLifecycleBoundaryRecord.acceptedWorkers, [
+    "worker-881-test-renderer-serialization-lifecycle-gate",
+    "worker-888-test-renderer-instance-lifecycle-gate",
+    "worker-895-rust-test-renderer-multichild-lifecycle-native"
+  ]);
+  assert.equal(
+    actUpdateLifecycleBoundaryRecord.requiresSourceOwnedCreateUpdateUnmountLifecycleEvidence,
+    true
+  );
+  assert.equal(
+    actUpdateLifecycleBoundaryRecord.requiresCurrentFinishedWorkIdentity,
+    true
+  );
+  assert.equal(
+    actUpdateLifecycleBoundaryRecord.requiresCurrentHostOutputSnapshot,
+    true
+  );
+  assert.equal(
+    actUpdateLifecycleBoundaryRecord.rejectsRawSerializationReports,
+    true
+  );
+  assert.equal(actUpdateLifecycleBoundaryRecord.publicActAvailable, false);
+  assert.equal(actUpdateLifecycleBoundaryRecord.compatibilityClaimed, false);
   const getInstanceRecord = gate.recognizedRootActFlushRecords.find(
     (record) =>
       record.id === "test-renderer-private-getinstance-class-root-diagnostic"
