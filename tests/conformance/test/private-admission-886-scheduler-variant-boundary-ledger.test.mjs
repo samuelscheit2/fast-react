@@ -12,6 +12,7 @@ import {
   PRIVATE_ADMISSION_886_REQUIRED_EVIDENCE_ROLES,
   PRIVATE_ADMISSION_886_REQUIRED_FALSE_REQUIREMENTS,
   PRIVATE_ADMISSION_886_REQUIRED_REQUIREMENT_FIELDS,
+  PRIVATE_ADMISSION_886_REQUIRED_SOURCE_CURRENTNESS,
   PRIVATE_ADMISSION_886_REQUIRED_SOURCE_BOUNDARIES,
   PRIVATE_ADMISSION_886_REQUIRED_STATUSES,
   PRIVATE_ADMISSION_886_REQUIRED_TRUE_REQUIREMENTS,
@@ -81,6 +82,23 @@ test("private admission 886 manifest pins Scheduler package variant boundary row
       PRIVATE_ADMISSION_886_REQUIRED_SOURCE_BOUNDARIES[row.variantId],
       row.variantId
     );
+    assert.equal(Object.isFrozen(row.sourceCurrentness), true, row.variantId);
+    assert.deepEqual(
+      row.sourceCurrentness,
+      PRIVATE_ADMISSION_886_REQUIRED_SOURCE_CURRENTNESS[row.variantId],
+      row.variantId
+    );
+    assert.equal(
+      row.sourceCurrentness.sourceFile,
+      row.sourceBoundary.sourceFile,
+      row.variantId
+    );
+    assert.equal(
+      row.sourceCurrentness.physicalEntrypoint,
+      row.sourceBoundary.physicalEntrypoint,
+      row.variantId
+    );
+    assert.match(row.sourceCurrentness.sourceSha256, /^[a-f0-9]{64}$/u);
     assert.equal(row.sourceBoundary.packageName, "scheduler", row.variantId);
     assert.equal(
       row.sourceBoundary.compatibilityTarget,
@@ -149,6 +167,7 @@ test("private admission 886 gate recognizes source-owned Scheduler variant diagn
   assert.equal(gate.evidenceRecognized, true);
   assert.equal(gate.evidenceRolesRecognized, true);
   assert.equal(gate.durableEvidenceTokensRecognized, true);
+  assert.equal(gate.sourceCurrentnessRecognized, true);
   assert.equal(gate.sourceOwnedPackageEntrypointsRecognized, true);
   assert.equal(gate.privateDiagnosticIdsRecognized, true);
   assert.equal(gate.privateDiagnosticStatusesRecognized, true);
@@ -169,6 +188,7 @@ test("private admission 886 gate recognizes source-owned Scheduler variant diagn
   assert.deepEqual(gate.publicVariantBehaviorClaimIds, []);
   assert.deepEqual(gate.publicPackageSurfaceClaimIds, []);
   assert.deepEqual(gate.nonDurableEvidenceTokenViolationIds, []);
+  assert.deepEqual(gate.sourceCurrentnessViolationIds, []);
   assert.deepEqual(gate.crossVariantDiagnosticViolationIds, []);
 
   assertVariantRow(gate.rowsByVariant["scheduler-unstable-mock-root"], {
@@ -257,6 +277,7 @@ test("private admission 886 gate rejects cross-variant diagnostics and entrypoin
   assert.equal(gate.status, PRIVATE_ADMISSION_886_VIOLATION_STATUS);
   assert.equal(gate.privateDiagnosticsRecognized, false);
   assert.equal(gate.sourceOwnedPackageEntrypointsRecognized, false);
+  assert.equal(gate.sourceCurrentnessRecognized, false);
   assert.equal(gate.privateDiagnosticIdsRecognized, false);
   assert.equal(gate.crossVariantRowsRejected, false);
   assertSubset(
@@ -269,10 +290,113 @@ test("private admission 886 gate rejects cross-variant diagnostics and entrypoin
   assert.deepEqual(gate.sourceBoundaryViolationIds, [
     "scheduler-cjs-unstable-post-task-development"
   ]);
+  assert.deepEqual(gate.sourceCurrentnessViolationIds, [
+    "scheduler-cjs-unstable-post-task-development"
+  ]);
   assertViolationIds(gate, [
     "scheduler-variant-boundary-mismatch",
+    "scheduler-variant-source-currentness-mismatch",
     "scheduler-variant-private-diagnostic-id-mismatch",
     "scheduler-cross-variant-private-diagnostic-row"
+  ]);
+});
+
+test("private admission 886 gate rejects stale and caller-cloned source currentness rows", () => {
+  const mockRoot = rowByVariant("scheduler-unstable-mock-root");
+  const postTaskDevelopment = rowByVariant(
+    "scheduler-cjs-unstable-post-task-development"
+  );
+
+  const gate = evaluatePrivateAdmission886Gate({
+    rowOverrides: {
+      "scheduler-unstable-mock-root": {
+        sourceCurrentness: {
+          ...mockRoot.sourceCurrentness,
+          sourceSha256: "0".repeat(64)
+        }
+      },
+      "scheduler-cjs-unstable-post-task-production": {
+        sourceCurrentness: {
+          ...postTaskDevelopment.sourceCurrentness
+        }
+      }
+    }
+  });
+
+  assert.equal(gate.status, PRIVATE_ADMISSION_886_VIOLATION_STATUS);
+  assert.equal(gate.privateDiagnosticsRecognized, false);
+  assert.equal(gate.sourceCurrentnessRecognized, false);
+  assert.equal(gate.sourceOwnedPackageEntrypointsRecognized, false);
+  assert.deepEqual(gate.sourceCurrentnessViolationIds, [
+    "scheduler-unstable-mock-root",
+    "scheduler-cjs-unstable-post-task-production"
+  ]);
+  assertViolationIds(gate, ["scheduler-variant-source-currentness-mismatch"]);
+
+  const rows = getViolationRows(
+    gate,
+    "scheduler-variant-source-currentness-mismatch"
+  );
+  const staleDigestRow = rows.find(
+    (row) => row.variantId === "scheduler-unstable-mock-root"
+  );
+  const clonedDevelopmentRow = rows.find(
+    (row) =>
+      row.variantId === "scheduler-cjs-unstable-post-task-production"
+  );
+  assert.notEqual(staleDigestRow, undefined);
+  assert.notEqual(clonedDevelopmentRow, undefined);
+  assert.equal(staleDigestRow.declaredSourceCurrentnessMatches, false);
+  assert.equal(staleDigestRow.actualSourceCurrentnessMatches, true);
+  assert.equal(clonedDevelopmentRow.declaredSourceCurrentnessMatches, false);
+  assert.equal(clonedDevelopmentRow.actualSourceCurrentnessMatches, true);
+});
+
+test("private admission 886 gate rejects Scheduler root, native, mock, postTask, and deep-import alias confusion", () => {
+  const rootWrapper = rowByVariant("scheduler-index-wrapper");
+  const nativeWrapper = rowByVariant("scheduler-native-wrapper");
+  const postTaskWrapper = rowByVariant("scheduler-unstable-post-task-wrapper");
+
+  const gate = evaluatePrivateAdmission886Gate({
+    rowOverrides: {
+      "scheduler-index-wrapper": {
+        sourceBoundary: nativeWrapper.sourceBoundary,
+        sourceCurrentness: nativeWrapper.sourceCurrentness
+      },
+      "scheduler-unstable-mock-root": {
+        sourceBoundary: postTaskWrapper.sourceBoundary,
+        sourceCurrentness: postTaskWrapper.sourceCurrentness
+      },
+      "scheduler-cjs-index-development": {
+        sourceBoundary: rootWrapper.sourceBoundary,
+        sourceCurrentness: rootWrapper.sourceCurrentness
+      }
+    }
+  });
+
+  assert.equal(gate.status, PRIVATE_ADMISSION_886_VIOLATION_STATUS);
+  assert.equal(gate.privateDiagnosticsRecognized, false);
+  assert.equal(gate.sourceOwnedPackageEntrypointsRecognized, false);
+  assert.equal(gate.sourceCurrentnessRecognized, false);
+  assertSubset(
+    [
+      "scheduler-index-wrapper",
+      "scheduler-unstable-mock-root",
+      "scheduler-cjs-index-development"
+    ],
+    gate.sourceBoundaryViolationIds
+  );
+  assertSubset(
+    [
+      "scheduler-index-wrapper",
+      "scheduler-unstable-mock-root",
+      "scheduler-cjs-index-development"
+    ],
+    gate.sourceCurrentnessViolationIds
+  );
+  assertViolationIds(gate, [
+    "scheduler-variant-boundary-mismatch",
+    "scheduler-variant-source-currentness-mismatch"
   ]);
 });
 
@@ -481,6 +605,11 @@ function assertVariantRow(
   assert.equal(row.sourceBoundary.sourceFile, sourceFile);
   assert.deepEqual(row.acceptedDiagnosticIds, expectedDiagnosticIds);
   assert.equal(row.ledgerEvaluationMode, "source-token-checks-and-manifest-only");
+  assert.deepEqual(
+    row.sourceCurrentness,
+    PRIVATE_ADMISSION_886_REQUIRED_SOURCE_CURRENTNESS[row.variantId]
+  );
+  assert.deepEqual(row.actualSourceCurrentness, row.sourceCurrentness);
   assert.equal(row.evidenceRecognized, true);
   assertAllFalse(row.publicBlockerClaims, row.variantId);
   for (const evidenceRow of row.evidence) {
