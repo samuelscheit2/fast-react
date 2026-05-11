@@ -5,6 +5,7 @@
 - Added a private, test-only HostRoot queue/lane gated finished-work commit consumer in `root_updates.rs`.
 - The consumer refuses to switch `root.current` through the finished-work commit handoff unless the Worker 896 HostRoot queue/lane evidence still matches the source queue, render record, finished lanes, remaining lanes, applied/skipped counts, current/finished fiber identity, and resulting element.
 - Tightened the private queue/lane handoff validator so a queue handoff becomes stale when the source queue has new pending rows after the render.
+- Audit fix: the commit consumer now revalidates each handoff row against the authoritative update store before calling the finished-work commit handoff, including stored update lanes after removing `OFFSCREEN` against both row `source_lanes` and row `lane`.
 - Kept public root render/update/scheduler compatibility claims blocked; all new surface is `#[cfg(test)]`.
 
 ## Changed Files
@@ -22,12 +23,14 @@
   - Wrong finished lanes are rejected before commit.
   - Cross-root queue evidence is rejected before commit.
   - Caller-built/cloned handoff rows are rejected before commit.
+  - Forged rows that preserve update IDs and sequence but alter row lane metadata are rejected before commit.
   - Replayed handoff after commit is rejected before a second commit.
   - Skipped lanes forged as committed are rejected before commit.
 
 ## Commands Run
 
 - `cargo test -p fast-react-reconciler --all-features queue_lane_commit_consumer -- --nocapture`
+- `cargo test -p fast-react-reconciler --all-features root_updates_queue_lane_commit_consumer_rejects_forged_row_lane_metadata -- --nocapture`
 - `cargo test -p fast-react-reconciler --all-features root_updates_queue_lane_handoff_gates_finished_work_commit_current_switch -- --nocapture`
 - `cargo test -p fast-react-reconciler --all-features host_root_queue_lane_handoff -- --nocapture`
 - `cargo fmt --all`
@@ -39,7 +42,7 @@
 - `cargo fmt --all --check`
 - `git diff --check`
 
-All commands passed after tightening stale pending-row validation.
+All commands passed after tightening stale pending-row validation and adding store-backed row lane revalidation for the audit fix.
 
 ## Risks Or Blockers
 

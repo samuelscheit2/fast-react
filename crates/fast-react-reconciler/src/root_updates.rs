@@ -2499,6 +2499,11 @@ fn commit_host_root_update_queue_lane_handoff_for_canary<H: HostTypes>(
         queue_handoff,
     )?;
     validate_host_root_update_queue_lane_handoff_record_for_canary(store, queue_handoff)?;
+    validate_host_root_update_queue_lane_handoff_source_rows_for_commit_for_canary(
+        store,
+        root_id,
+        queue_handoff,
+    )?;
 
     let finished_work_handoff =
         commit_completed_host_root_render_with_finished_work_handoff_for_canary(
@@ -2520,6 +2525,36 @@ fn commit_host_root_update_queue_lane_handoff_for_canary<H: HostTypes>(
     };
 
     Ok(record)
+}
+
+#[cfg(test)]
+fn validate_host_root_update_queue_lane_handoff_source_rows_for_commit_for_canary<H: HostTypes>(
+    store: &FiberRootStore<H>,
+    root_id: FiberRootId,
+    queue_handoff: &HostRootUpdateQueueLaneHandoffRecordForCanary,
+) -> Result<(), HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary> {
+    for record in queue_handoff.update_records() {
+        let actual_lanes = store
+            .update_queues()
+            .update(record.update())
+            .map_err(HostRootUpdateQueueLaneHandoffErrorForCanary::from)?
+            .lane()
+            .remove_lane(Lane::OFFSCREEN);
+        if actual_lanes != record.source_lanes() || actual_lanes != record.lane().to_lanes() {
+            return Err(
+                HostRootUpdateQueueLaneHandoffErrorForCanary::WrongLaneMetadata {
+                    root: root_id,
+                    queue: queue_handoff.current_update_queue(),
+                    update: record.update(),
+                    expected_lane: record.lane(),
+                    actual_lanes,
+                }
+                .into(),
+            );
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -3580,6 +3615,55 @@ mod tests {
                 records_in_sequence_order: false
             }
         );
+        assert_eq!(store.root(root_id).unwrap().current(), render.current());
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+    }
+
+    #[test]
+    fn root_updates_queue_lane_commit_consumer_rejects_forged_row_lane_metadata() {
+        let (mut store, root_id, _host) = root_store();
+        let first =
+            update_container(&mut store, root_id, RootElementHandle::from_raw(8997), None).unwrap();
+        let second =
+            update_container_sync(&mut store, root_id, RootElementHandle::from_raw(8998), None)
+                .unwrap();
+        let render =
+            render_host_root_for_lanes(&mut store, root_id, second.selected_next_lanes()).unwrap();
+        let handoff = host_root_update_queue_lane_handoff_for_canary(
+            &store,
+            root_id,
+            &[first.clone(), second],
+            render,
+        )
+        .unwrap();
+        let mut forged = handoff.clone();
+        forged.update_records[0].lane = Lane::INPUT_CONTINUOUS;
+
+        let error = commit_host_root_update_queue_lane_handoff_for_canary(
+            &mut store,
+            root_id,
+            render,
+            Some(&forged),
+            916,
+            917,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            HostRootUpdateQueueFinishedWorkCommitHandoffErrorForCanary::QueueLane(
+                HostRootUpdateQueueLaneHandoffErrorForCanary::WrongLaneMetadata {
+                    root: root_id,
+                    queue: handoff.current_update_queue(),
+                    update: first.update(),
+                    expected_lane: Lane::INPUT_CONTINUOUS,
+                    actual_lanes: Lanes::DEFAULT
+                }
+            )
+        );
+        assert_eq!(forged.update_sequence_ids(), handoff.update_sequence_ids());
+        assert!(forged.records_in_update_sequence_order());
+        assert!(forged.proves_source_owned_lane_handoff());
         assert_eq!(store.root(root_id).unwrap().current(), render.current());
         assert_eq!(store.root(root_id).unwrap().finished_work(), None);
     }
