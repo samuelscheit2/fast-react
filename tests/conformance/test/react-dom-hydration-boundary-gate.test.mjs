@@ -2023,6 +2023,374 @@ test("private hydration replay error metadata connects ownership rows to root op
   assert.deepEqual(document.__registrations, []);
 });
 
+test("private hydration replay error metadata rejects stale roots and public replay claims", () => {
+  const scenario =
+    createHydrationReplayErrorMetadataScenario("replay-error-negative");
+  const metadata = scenario.bridge.createHydrationReplayErrorMetadata(
+    scenario.hydrateRecord,
+    scenario.ownershipDiagnostics,
+    {
+      replayTargetLabels: ["boundary"],
+      source: "conformance-hydration-replay-error-negative"
+    }
+  );
+
+  assert.equal(
+    rootBridge.isPrivateRootHydrationReplayErrorMetadataRecord(metadata),
+    true
+  );
+  assert.equal(metadata.compatibilityClaimed, false);
+  assert.equal(metadata.eventDispatch, false);
+  assert.equal(metadata.eventsReplayed, false);
+  assert.equal(metadata.replayQueuesDrained, false);
+  assert.equal(metadata.listenerInstallation, false);
+  assert.equal(metadata.domMutation, false);
+  assert.equal(metadata.publicRootErrorCallbacksInvoked, false);
+  assert.deepEqual(scenario.callbackCalls, []);
+
+  const routing = scenario.bridge.createHydrationRecoverableErrorRouting(
+    scenario.hydrateRecord,
+    scenario.hydrateRecord.recoverableErrorMetadata,
+    metadata,
+    {
+      mismatchLabels: ["boundary-text"],
+      rootOptions: scenario.hydrationOptions,
+      source: "conformance-hydration-recoverable-routing-negative-baseline"
+    }
+  );
+  assert.equal(
+    rootBridge.isPrivateRootHydrationRecoverableErrorRoutingRecord(routing),
+    true
+  );
+  assert.equal(routing.publicOnRecoverableErrorInvoked, false);
+  assert.equal(routing.rootErrorCallbackInvocationCount, 0);
+  assert.equal(routing.compatibilityClaimed, false);
+  assert.equal(routing.domMutation, false);
+  assert.deepEqual(scenario.callbackCalls, []);
+
+  const foreignScenario =
+    createHydrationReplayErrorMetadataScenario("replay-error-negative-foreign");
+  assert.throws(
+    () =>
+      scenario.bridge.createHydrationReplayErrorMetadata(
+        scenario.hydrateRecord,
+        foreignScenario.ownershipDiagnostics
+      ),
+    {
+      code: "FAST_REACT_DOM_INVALID_HYDRATION_REPLAY_ERROR_METADATA"
+    }
+  );
+  assert.throws(
+    () =>
+      foreignScenario.bridge.createHydrationReplayErrorMetadata(
+        scenario.hydrateRecord,
+        scenario.ownershipDiagnostics
+      ),
+    {
+      code: "FAST_REACT_DOM_FOREIGN_ROOT_HANDLE"
+    }
+  );
+
+  const outsideContainer = createElement("SECTION", scenario.document);
+  const outsideTarget = createElement("BUTTON", scenario.document);
+  outsideTarget.parentNode = outsideContainer;
+  outsideContainer.childNodes = [outsideTarget];
+  const unownedDispatchRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      eventListener.createEventListenerWrapperRecordWithPriority(
+        outsideContainer,
+        "click",
+        eventSystemFlags.IS_CAPTURE_PHASE
+      ),
+      createNativeEvent("click", outsideTarget)
+    );
+  const unownedOwnership =
+    hydrationGate.createHydrationReplayOwnershipGateDiagnostic(
+      scenario.hydrateRecord.hydrationBoundaryRecord,
+      unownedDispatchRecord,
+      {
+        source: "conformance-hydration-replay-error-unowned"
+      }
+    );
+  assert.throws(
+    () =>
+      scenario.bridge.createHydrationReplayErrorMetadata(
+        scenario.hydrateRecord,
+        unownedOwnership
+      ),
+    {
+      code: "FAST_REACT_DOM_INVALID_HYDRATION_REPLAY_ERROR_METADATA"
+    }
+  );
+
+  const invalidReplayMetadataCode =
+    "FAST_REACT_DOM_INVALID_HYDRATION_REPLAY_ERROR_METADATA";
+  function assertReplayMetadataRejects(tamperedOwnership, message) {
+    const expected = {
+      code: invalidReplayMetadataCode
+    };
+    if (message !== undefined) {
+      expected.message = message;
+    }
+    assert.throws(
+      () =>
+        scenario.bridge.createHydrationReplayErrorMetadata(
+          scenario.hydrateRecord,
+          tamperedOwnership
+        ),
+      expected
+    );
+  }
+
+  assertReplayMetadataRejects(
+    Object.freeze({
+      ...scenario.ownershipDiagnostics,
+      ownershipRows: scenario.ownershipDiagnostics.ownershipRows.map((row) =>
+        Object.freeze({
+          ...row,
+          compatibilityClaimed: true
+        })
+      )
+    }),
+    /ownership rows/
+  );
+  assertReplayMetadataRejects(
+    Object.freeze({
+      ...scenario.ownershipDiagnostics,
+      eventReplayQueueDiagnostics: Object.freeze({
+        ...scenario.ownershipDiagnostics.eventReplayQueueDiagnostics,
+        replayQueueDrainOrderDiagnostics: Object.freeze({
+          ...scenario.ownershipDiagnostics.eventReplayQueueDiagnostics
+            .replayQueueDrainOrderDiagnostics,
+          compatibilityClaimed: true
+        })
+      })
+    }),
+    /ownership or queue diagnostics/
+  );
+  assertReplayMetadataRejects(
+    Object.freeze({
+      ...scenario.ownershipDiagnostics,
+      eventReplayQueueDiagnostics: Object.freeze({
+        ...scenario.ownershipDiagnostics.eventReplayQueueDiagnostics,
+        blockedEventReplayTargets:
+          scenario.ownershipDiagnostics.eventReplayQueueDiagnostics
+            .blockedEventReplayTargets.map((row) =>
+              Object.freeze({
+                ...row,
+                compatibilityClaimed: true
+              })
+            )
+      })
+    }),
+    /blocked target rows/
+  );
+  assertReplayMetadataRejects(
+    Object.freeze({
+      ...scenario.ownershipDiagnostics,
+      eventReplayQueueDiagnostics: Object.freeze({
+        ...scenario.ownershipDiagnostics.eventReplayQueueDiagnostics,
+        replayQueueDrainOrderDiagnostics: Object.freeze({
+          ...scenario.ownershipDiagnostics.eventReplayQueueDiagnostics
+            .replayQueueDrainOrderDiagnostics,
+          drainOrder:
+            scenario.ownershipDiagnostics.eventReplayQueueDiagnostics
+              .replayQueueDrainOrderDiagnostics.drainOrder.map((row) =>
+                Object.freeze({
+                  ...row,
+                  publicOnRecoverableErrorInvoked: true
+                })
+              )
+        })
+      })
+    }),
+    /replay queue drain diagnostic rows/
+  );
+
+  for (const tamperedOwnership of [
+    Object.freeze({
+      ...scenario.ownershipDiagnostics,
+      rootRecordId: "stale-hydration-root:1"
+    }),
+    Object.freeze({
+      ...scenario.ownershipDiagnostics,
+      compatibilityClaimed: true
+    }),
+    Object.freeze({
+      ...scenario.ownershipDiagnostics,
+      publicRootBehaviorChanged: true
+    }),
+    Object.freeze({
+      ...scenario.ownershipDiagnostics,
+      eventsReplayed: true
+    }),
+    Object.freeze({
+      ...scenario.ownershipDiagnostics,
+      replayQueuesDrained: true
+    }),
+    Object.freeze({
+      ...scenario.ownershipDiagnostics,
+      eventReplayQueueDiagnostics: Object.freeze({
+        ...scenario.ownershipDiagnostics.eventReplayQueueDiagnostics,
+        compatibilityClaimed: true
+      })
+    }),
+    Object.freeze({
+      ...scenario.ownershipDiagnostics,
+      eventReplayQueueDiagnostics: Object.freeze({
+        ...scenario.ownershipDiagnostics.eventReplayQueueDiagnostics,
+        eventsReplayed: true,
+        replayQueuesDrained: true
+      })
+    }),
+    Object.freeze({
+      ...scenario.ownershipDiagnostics,
+      eventReplayQueueDiagnostics: Object.freeze({
+        ...scenario.ownershipDiagnostics.eventReplayQueueDiagnostics,
+        blockedEventReplayTargets:
+          scenario.ownershipDiagnostics.eventReplayQueueDiagnostics
+            .blockedEventReplayTargets.map((row) =>
+              Object.freeze({
+                ...row,
+                queued: true
+              })
+            )
+      })
+    }),
+    Object.freeze({
+      ...scenario.ownershipDiagnostics,
+      eventReplayQueueDiagnostics: Object.freeze({
+        ...scenario.ownershipDiagnostics.eventReplayQueueDiagnostics,
+        drainOrder:
+          scenario.ownershipDiagnostics.eventReplayQueueDiagnostics
+            .drainOrder.map((row) =>
+              Object.freeze({
+                ...row,
+                willReplay: true
+              })
+            )
+      })
+    }),
+    Object.freeze({
+      ...scenario.ownershipDiagnostics,
+      eventReplayQueueDiagnostics: Object.freeze({
+        ...scenario.ownershipDiagnostics.eventReplayQueueDiagnostics,
+        replayQueueDrainOrderDiagnostics: Object.freeze({
+          ...scenario.ownershipDiagnostics.eventReplayQueueDiagnostics
+            .replayQueueDrainOrderDiagnostics,
+          drainOrder:
+            scenario.ownershipDiagnostics.eventReplayQueueDiagnostics
+              .replayQueueDrainOrderDiagnostics.drainOrder.map((row) =>
+                Object.freeze({
+                  ...row,
+                  replayQueueDrained: true
+                })
+              )
+        })
+      })
+    }),
+    Object.freeze({
+      ...scenario.ownershipDiagnostics,
+      ownershipRows: scenario.ownershipDiagnostics.ownershipRows.map((row) =>
+        Object.freeze({
+          ...row,
+          willDispatch: true
+        })
+      )
+    })
+  ]) {
+    assertReplayMetadataRejects(tamperedOwnership, undefined);
+  }
+
+  const invalidRootRequestCode = "FAST_REACT_DOM_INVALID_ROOT_BRIDGE_REQUEST";
+  for (const tamperedHydrateRecord of [
+    Object.freeze({
+      ...scenario.hydrateRecord,
+      rootId: "stale-root-id"
+    }),
+    Object.freeze({
+      ...scenario.hydrateRecord,
+      markerGuard: null
+    }),
+    Object.freeze({
+      ...scenario.hydrateRecord,
+      listenerGuard: null
+    }),
+    Object.freeze({
+      ...scenario.hydrateRecord,
+      markerWrites: true
+    }),
+    Object.freeze({
+      ...scenario.hydrateRecord,
+      listenerInstallation: true
+    }),
+    Object.freeze({
+      ...scenario.hydrateRecord,
+      domMutation: true
+    }),
+    Object.freeze({
+      ...scenario.hydrateRecord,
+      compatibilityClaimed: true
+    })
+  ]) {
+    assert.throws(
+      () => scenario.bridge.admitRequest(tamperedHydrateRecord),
+      {
+        code: invalidRootRequestCode
+      }
+    );
+  }
+
+  assert.throws(
+    () =>
+      scenario.bridge.createHydrationRecoverableErrorRouting(
+        scenario.hydrateRecord,
+        Object.freeze({
+          ...scenario.hydrateRecord.recoverableErrorMetadata,
+          rootRecordId: "wrong-recoverable-route:1"
+        }),
+        metadata,
+        {
+          rootOptions: scenario.hydrationOptions,
+          source: "conformance-hydration-recoverable-wrong-route"
+        }
+      ),
+    {
+      code: "FAST_REACT_DOM_INVALID_HYDRATION_RECOVERABLE_ERROR_ROUTING"
+    }
+  );
+  for (const callbackClaim of [
+    { onRecoverableErrorInvoked: true },
+    { publicCallbackInvoked: true },
+    { rootErrorCallbackInvocationCount: 1 }
+  ]) {
+    assert.throws(
+      () =>
+        scenario.bridge.createHydrationRecoverableErrorRouting(
+          scenario.hydrateRecord,
+          scenario.hydrateRecord.recoverableErrorMetadata,
+          metadata,
+          {
+            ...callbackClaim,
+            rootOptions: scenario.hydrationOptions,
+            source: "conformance-hydration-recoverable-callback-claim"
+          }
+        ),
+      {
+        code: "FAST_REACT_DOM_INVALID_HYDRATION_RECOVERABLE_ERROR_ROUTING"
+      }
+    );
+  }
+
+  assert.deepEqual(scenario.callbackCalls, []);
+  assert.equal(scenario.dispatchRecord.hydrationReplay.queued, false);
+  assert.equal(unownedDispatchRecord.hydrationReplay.queued, false);
+  assert.deepEqual(scenario.container.__registrations, []);
+  assert.deepEqual(scenario.document.__registrations, []);
+  assert.deepEqual(foreignScenario.container.__registrations, []);
+  assert.deepEqual(foreignScenario.document.__registrations, []);
+});
+
 test("private hydration boundary gate does not mark containers, install listeners, or mutate DOM-like nodes", () => {
   const { container, document, record } =
     createUnsupportedRecordScenario("side-effects");
@@ -2761,6 +3129,67 @@ function createRootBridgeHydrateRootScenario(label) {
     hydrationOptions,
     initialChildren,
     record
+  };
+}
+
+function createHydrationReplayErrorMetadataScenario(label) {
+  const document = createDocument(label);
+  const container = createElement("DIV", document);
+  const target = createElement("BUTTON", document);
+  const callbackCalls = [];
+  target.parentNode = container;
+  container.childNodes = [
+    createComment("$"),
+    target,
+    createComment("/$")
+  ];
+
+  function onRecoverableError(error) {
+    callbackCalls.push(["recoverable", error.message]);
+  }
+
+  const hydrationOptions = {
+    identifierPrefix: `${label}-`,
+    onRecoverableError
+  };
+  const bridge = rootBridge.createPrivateRootBridgeShell({
+    hydrateIdPrefix: `${label}-hydrate`,
+    hydrationRecordIdPrefix: `${label}-boundary`,
+    requestIdPrefix: `${label}-request`
+  });
+  const hydrateRecord = bridge.createHydrateRoot(
+    container,
+    { props: { children: "client text" }, type: "App" },
+    hydrationOptions
+  );
+  const dispatchRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      eventListener.createEventListenerWrapperRecordWithPriority(
+        container,
+        "click",
+        eventSystemFlags.IS_CAPTURE_PHASE
+      ),
+      createNativeEvent("click", target)
+    );
+  const ownershipDiagnostics =
+    hydrationGate.createHydrationReplayOwnershipGateDiagnostic(
+      hydrateRecord.hydrationBoundaryRecord,
+      dispatchRecord,
+      {
+        source: `${label}-ownership`
+      }
+    );
+
+  return {
+    bridge,
+    callbackCalls,
+    container,
+    dispatchRecord,
+    document,
+    hydrateRecord,
+    hydrationOptions,
+    ownershipDiagnostics,
+    target
   };
 }
 

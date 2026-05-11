@@ -17490,6 +17490,9 @@ function validateHydrationReplayErrorMetadataOwnership(
       'Hydration replay error metadata requires accepted target resolution and drain-order diagnostics.'
     );
   }
+  validateHydrationReplayErrorMetadataBlockedOwnershipDiagnostics(
+    ownershipDiagnostics
+  );
   if (
     ownershipDiagnostics.status !==
       'blocked-replay-ownership-retained-through-drain-order' ||
@@ -17534,6 +17537,123 @@ function validateHydrationReplayErrorMetadataOwnership(
   };
 }
 
+function validateHydrationReplayErrorMetadataBlockedOwnershipDiagnostics(
+  ownershipDiagnostics
+) {
+  const eventReplayQueueDiagnostics =
+    ownershipDiagnostics.eventReplayQueueDiagnostics;
+  const replayQueueDrainOrderDiagnostics =
+    eventReplayQueueDiagnostics.replayQueueDrainOrderDiagnostics;
+  if (
+    ownershipDiagnostics.compatibilityClaimed !== false ||
+    ownershipDiagnostics.browserDomEventCompatibilityClaimed !== false ||
+    ownershipDiagnostics.publicRootBehaviorChanged !== false ||
+    ownershipDiagnostics.eventReplayInstalled !== false ||
+    ownershipDiagnostics.eventReplaySupported !== false ||
+    ownershipDiagnostics.hydrationReplaySupported !== false ||
+    ownershipDiagnostics.hostInstanceHydrationAttempted !== false ||
+    ownershipDiagnostics.hasScheduledReplayAttempt !== false ||
+    ownershipDiagnostics.queueMutationAllowed !== false ||
+    ownershipDiagnostics.replayQueuesDrained !== false ||
+    ownershipDiagnostics.willDrainReplayQueues !== false ||
+    ownershipDiagnostics.eventsReplayed !== false ||
+    ownershipDiagnostics.willDispatchEvents !== false ||
+    ownershipDiagnostics.willHydrateHostInstances !== false ||
+    ownershipDiagnostics.queuedEventReplayTargetCount !== 0 ||
+    ownershipDiagnostics.replayedEventCount !== 0 ||
+    eventReplayQueueDiagnostics.compatibilityClaimed !== false ||
+    eventReplayQueueDiagnostics.browserDomEventCompatibilityClaimed !==
+      false ||
+    eventReplayQueueDiagnostics.publicRootBehaviorChanged !== false ||
+    eventReplayQueueDiagnostics.eventReplayInstalled !== false ||
+    eventReplayQueueDiagnostics.eventReplaySupported !== false ||
+    eventReplayQueueDiagnostics.hydrationReplaySupported !== false ||
+    eventReplayQueueDiagnostics.hostInstanceHydrationAttempted !== false ||
+    eventReplayQueueDiagnostics.hasScheduledReplayAttempt !== false ||
+    eventReplayQueueDiagnostics.queueMutationAllowed !== false ||
+    eventReplayQueueDiagnostics.replayQueuesDrained !== false ||
+    eventReplayQueueDiagnostics.willDrainReplayQueues !== false ||
+    eventReplayQueueDiagnostics.eventsReplayed !== false ||
+    eventReplayQueueDiagnostics.willDispatchEvents !== false ||
+    eventReplayQueueDiagnostics.willHydrateHostInstances !== false ||
+    eventReplayQueueDiagnostics.queuedEventReplayTargetCount !== 0 ||
+    eventReplayQueueDiagnostics.replayedEventCount !== 0 ||
+    !replayQueueDrainOrderDiagnostics ||
+    typeof replayQueueDrainOrderDiagnostics !== 'object' ||
+    replayQueueDrainOrderDiagnostics.compatibilityClaimed === true ||
+    replayQueueDrainOrderDiagnostics.browserDomEventCompatibilityClaimed ===
+      true ||
+    replayQueueDrainOrderDiagnostics.publicRootBehaviorChanged === true ||
+    replayQueueDrainOrderDiagnostics.replayQueuesDrained !== false ||
+    replayQueueDrainOrderDiagnostics.willDrainReplayQueues !== false ||
+    replayQueueDrainOrderDiagnostics.eventsReplayed !== false ||
+    !Array.isArray(eventReplayQueueDiagnostics.blockedEventReplayTargets) ||
+    !Array.isArray(eventReplayQueueDiagnostics.drainOrder) ||
+    !Array.isArray(replayQueueDrainOrderDiagnostics.drainOrder)
+  ) {
+    throwInvalidHydrationReplayErrorMetadata(
+      'Hydration replay error metadata cannot accept ownership or queue diagnostics that claim public compatibility, replay, dispatch, or hydration effects.'
+    );
+  }
+
+  validateHydrationReplayErrorMetadataBlockedQueueRows(
+    eventReplayQueueDiagnostics.blockedEventReplayTargets,
+    'blocked target'
+  );
+  validateHydrationReplayErrorMetadataBlockedQueueRows(
+    eventReplayQueueDiagnostics.drainOrder,
+    'event replay drain-order'
+  );
+  validateHydrationReplayErrorMetadataBlockedQueueRows(
+    replayQueueDrainOrderDiagnostics.drainOrder,
+    'replay queue drain diagnostic'
+  );
+}
+
+function validateHydrationReplayErrorMetadataBlockedQueueRows(
+  rows,
+  rowType
+) {
+  for (const row of rows) {
+    if (
+      !row ||
+      typeof row !== 'object' ||
+      row.queued !== false ||
+      row.replayQueueDrained !== false ||
+      row.willDrainReplayQueues !== false ||
+      row.willDispatch !== false ||
+      row.willHydrate !== false ||
+      row.willReplay !== false ||
+      hasHydrationReplayErrorMetadataPublicCallbackOrCompatibilityClaim(row)
+    ) {
+      throwInvalidHydrationReplayErrorMetadata(
+        `Hydration replay error metadata cannot accept ${rowType} rows that claim queueing, dispatch, hydration, replay, draining, public callback, or compatibility effects.`
+      );
+    }
+  }
+}
+
+function hasHydrationReplayErrorMetadataPublicCallbackOrCompatibilityClaim(
+  row
+) {
+  return (
+    row.compatibilityClaimed === true ||
+    row.browserDomEventCompatibilityClaimed === true ||
+    row.publicRootBehaviorChanged === true ||
+    row.recoverableErrorCompatibilityClaimed === true ||
+    row.publicErrorBoundariesEnabled === true ||
+    row.rootErrorCallbacksInvoked === true ||
+    row.publicRootErrorCallbacksInvoked === true ||
+    row.onRecoverableErrorInvoked === true ||
+    row.publicOnRecoverableErrorInvoked === true ||
+    row.rootErrorCallbackInvocationCount > 0 ||
+    row.reportGlobalErrorInvoked === true ||
+    row.rootErrorUpdatesScheduled === true ||
+    row.queuedRecoverableError === true ||
+    row.recoverableErrorsQueued === true
+  );
+}
+
 function validateHydrationReplayErrorMetadataOwnershipRow(ownershipRow) {
   if (
     !ownershipRow ||
@@ -17573,10 +17693,13 @@ function validateHydrationReplayErrorMetadataOwnershipRow(ownershipRow) {
     ownershipRow.willDrainReplayQueues !== false ||
     ownershipRow.willDispatch !== false ||
     ownershipRow.willHydrate !== false ||
-    ownershipRow.willReplay !== false
+    ownershipRow.willReplay !== false ||
+    hasHydrationReplayErrorMetadataPublicCallbackOrCompatibilityClaim(
+      ownershipRow
+    )
   ) {
     throwInvalidHydrationReplayErrorMetadata(
-      'Hydration replay error metadata must not consume replayed or queued event rows.'
+      'Hydration replay error metadata must not consume replayed, queued, public callback, or compatibility ownership rows.'
     );
   }
 }
