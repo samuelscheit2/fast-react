@@ -830,6 +830,384 @@ test('private root click event delegation dispatch gate rejects unsupported phas
   }
 });
 
+test('private root listener currentness gate records source-owned listener evidence only', () => {
+  const document = createDocument();
+  const container = createNode('DIV', document);
+  const sourceRecord = {
+    operation: 'createRoot',
+    requestId: 'root-listener-currentness:create',
+    requestType: 'createRoot'
+  };
+  const rootRegistration =
+    rootListeners.registerRootListenersForPrivateRoot(container);
+
+  try {
+    const gate =
+      rootListeners.createPrivateRootListenerCurrentnessGateRecord(
+        rootRegistration,
+        {
+          sourceKind: 'createRoot',
+          sourceRecord
+        }
+      );
+    const payload =
+      rootListeners.getPrivateRootListenerCurrentnessGatePayload(gate);
+    const clickRows = gate.listenerRows.filter(
+      row => row.domEventName === 'click'
+    );
+    const selectionChangeRows = gate.listenerRows.filter(
+      row =>
+        row.targetRole === 'owner-document' &&
+        row.domEventName === 'selectionchange'
+    );
+
+    assert.equal(
+      gate.kind,
+      'FastReactDomPrivateRootListenerCurrentnessGateRecord'
+    );
+    assert.equal(
+      gate.status,
+      rootListeners.PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE_STATUS
+    );
+    assert.equal(
+      gate.$$typeof,
+      rootListeners.privateRootListenerCurrentnessGateRecordType
+    );
+    assert.equal(
+      rootListeners.isPrivateRootListenerCurrentnessGateRecord(gate),
+      true
+    );
+    assert.equal(gate.sourceKind, 'createRoot');
+    assert.equal(gate.sourceOwned, true);
+    assert.equal(gate.currentRegistration, true);
+    assert.equal(gate.registrationActive, true);
+    assert.equal(gate.registrationCount, 139);
+    assert.equal(gate.rootRegistrationCount, 138);
+    assert.equal(gate.ownerDocumentRegistrationCount, 1);
+    assert.equal(gate.listenerRowCount, 139);
+    assert.equal(gate.currentListenerRowCount, 139);
+    assert.equal(gate.rootListenerRowCount, 138);
+    assert.equal(gate.ownerDocumentListenerRowCount, 1);
+    assert.equal(gate.ownerDocumentSelectionChangeCurrent, true);
+    assert.equal(gate.ownerDocumentSelectionChangeRowCount, 1);
+    assert.equal(gate.sameContainerDedupeCurrent, false);
+    assert.equal(gate.sameDocumentDedupeCurrent, false);
+    assert.equal(gate.listenerStateStable, true);
+    assert.equal(gate.gateInstalledBrowserListener, false);
+    assert.equal(gate.listenerInstallation, false);
+    assert.equal(gate.eventDispatch, false);
+    assert.equal(gate.syntheticEventDispatch, false);
+    assert.equal(gate.willDispatchPublicEvent, false);
+    assert.equal(gate.publicDispatchEnabled, false);
+    assert.equal(gate.publicRootBehaviorChanged, false);
+    assert.equal(gate.browserDomEventCompatibilityClaimed, false);
+    assert.equal(gate.compatibilityClaimed, false);
+    assert.deepEqual(clickRows.map(row => row.phase).sort(), [
+      'bubble',
+      'capture'
+    ]);
+    assert.equal(selectionChangeRows.length, 1);
+    assert.equal(selectionChangeRows[0].phase, 'bubble');
+    assert.equal(selectionChangeRows[0].current, true);
+    assert.equal(
+      gate.listenerRows.every(row =>
+        row.current === true &&
+        row.sourceOwned === true &&
+        row.compatibilityClaimed === false &&
+        row.browserDomEventCompatibilityClaimed === false &&
+        row.eventDispatch === false &&
+        row.gateInstalledBrowserListener === false &&
+        row.publicRootBehaviorChanged === false
+      ),
+      true
+    );
+    assert.equal(
+      gate.targetRows.every(row =>
+        row.current === true &&
+        row.compatibilityClaimed === false &&
+        row.browserDomEventCompatibilityClaimed === false &&
+        row.eventDispatch === false &&
+        row.gateInstalledBrowserListener === false &&
+        row.publicRootBehaviorChanged === false
+      ),
+      true
+    );
+    assert.equal(payload.listenerRegistrationRecord, rootRegistration);
+    assert.equal(payload.sourceRecord, sourceRecord);
+    assert.equal(payload.beforeState.listenerRows.length, 139);
+    assert.equal(payload.afterState.listenerRows.length, 139);
+
+    const hydrateGate =
+      rootListeners.createPrivateRootListenerCurrentnessGateRecord(
+        rootRegistration,
+        {
+          sourceKind: 'hydrateRoot',
+          sourceRecord: {
+            facadeCall: 'hydrateRoot',
+            operation: 'hydrate-root-marker-listener-preflight',
+            requestType: 'hydrateRoot'
+          }
+        }
+      );
+    assert.equal(hydrateGate.sourceKind, 'hydrateRoot');
+    assert.equal(hydrateGate.sourceRequestType, 'hydrateRoot');
+    assert.equal(hydrateGate.currentRegistration, true);
+    assert.equal(hydrateGate.publicRootBehaviorChanged, false);
+    assert.equal(hydrateGate.eventDispatch, false);
+    assert.equal(hydrateGate.browserDomEventCompatibilityClaimed, false);
+    assert.equal(hydrateGate.compatibilityClaimed, false);
+    assert.equal(container.__registrations.length, 138);
+    assert.equal(document.__registrations.length, 1);
+  } finally {
+    rootListeners.revertRootListenersForPrivateRoot(rootRegistration);
+  }
+});
+
+test('private root listener currentness gate records same-container and same-document dedupe evidence', () => {
+  const document = createDocument();
+  const firstContainer = createNode('DIV', document);
+  const secondContainer = createNode('SECTION', document);
+  const firstRegistration =
+    rootListeners.registerRootListenersForPrivateRoot(firstContainer);
+  const sameContainerRegistration =
+    rootListeners.registerRootListenersForPrivateRoot(firstContainer);
+  const sameDocumentRegistration =
+    rootListeners.registerRootListenersForPrivateRoot(secondContainer);
+
+  try {
+    const sameContainerGate =
+      rootListeners.createPrivateRootListenerCurrentnessGateRecord(
+        sameContainerRegistration,
+        {
+          sourceKind: 'createRoot',
+          sourceRecord: {
+            operation: 'createRoot',
+            requestType: 'createRoot'
+          }
+        }
+      );
+    const sameDocumentGate =
+      rootListeners.createPrivateRootListenerCurrentnessGateRecord(
+        sameDocumentRegistration,
+        {
+          sourceKind: 'portal',
+          sourceRecord: {
+            operation: 'preparePortalMount',
+            requestType: 'root.render'
+          }
+        }
+      );
+    const sameContainerPayload =
+      rootListeners.getPrivateRootListenerCurrentnessGatePayload(
+        sameContainerGate
+      );
+    const sameDocumentPayload =
+      rootListeners.getPrivateRootListenerCurrentnessGatePayload(
+        sameDocumentGate
+      );
+
+    assert.equal(sameContainerGate.registrationCount, 0);
+    assert.equal(sameContainerGate.rootRegistrationCount, 0);
+    assert.equal(sameContainerGate.ownerDocumentRegistrationCount, 0);
+    assert.equal(sameContainerGate.listenerRowCount, 0);
+    assert.equal(sameContainerGate.currentListenerRowCount, 0);
+    assert.equal(sameContainerGate.sameContainerDedupeCurrent, true);
+    assert.equal(sameContainerGate.sameContainerDedupeRowCount, 1);
+    assert.equal(sameContainerGate.sameDocumentDedupeCurrent, true);
+    assert.equal(sameContainerGate.sameDocumentDedupeRowCount, 1);
+    assert.equal(
+      sameContainerGate.targetRows.find(
+        row => row.targetRole === 'root-container'
+      ).sameContainerDedupeEvidence,
+      true
+    );
+    assert.equal(
+      sameContainerGate.targetRows.find(
+        row => row.targetRole === 'owner-document'
+      ).sameDocumentDedupeEvidence,
+      true
+    );
+
+    assert.equal(sameDocumentGate.sourceKind, 'portal');
+    assert.equal(sameDocumentGate.registrationCount, 138);
+    assert.equal(sameDocumentGate.rootRegistrationCount, 138);
+    assert.equal(sameDocumentGate.ownerDocumentRegistrationCount, 0);
+    assert.equal(sameDocumentGate.listenerRowCount, 138);
+    assert.equal(sameDocumentGate.ownerDocumentSelectionChangeCurrent, true);
+    assert.equal(sameDocumentGate.ownerDocumentSelectionChangeRowCount, 0);
+    assert.equal(sameDocumentGate.sameContainerDedupeCurrent, false);
+    assert.equal(sameDocumentGate.sameDocumentDedupeCurrent, true);
+    assert.equal(sameDocumentGate.sameDocumentDedupeRowCount, 1);
+    assert.equal(
+      sameDocumentGate.targetRows.find(
+        row => row.targetRole === 'owner-document'
+      ).ownerDocumentSelectionChangeDedupeEvidence,
+      true
+    );
+    assert.equal(
+      sameContainerPayload.listenerRegistrationRecord,
+      sameContainerRegistration
+    );
+    assert.equal(
+      sameDocumentPayload.listenerRegistrationRecord,
+      sameDocumentRegistration
+    );
+    assert.equal(firstContainer.__registrations.length, 138);
+    assert.equal(secondContainer.__registrations.length, 138);
+    assert.equal(document.__registrations.length, 1);
+  } finally {
+    rootListeners.revertRootListenersForPrivateRoot(
+      sameDocumentRegistration
+    );
+    rootListeners.revertRootListenersForPrivateRoot(
+      sameContainerRegistration
+    );
+    rootListeners.revertRootListenersForPrivateRoot(firstRegistration);
+  }
+});
+
+test('private root listener currentness gate rejects cloned stale aliased and mutating evidence', () => {
+  const cloneFixture = createPrivateRootListenerCurrentnessFixture(
+    'root-listener-currentness-clone'
+  );
+  try {
+    assert.throws(
+      () =>
+        rootListeners.createPrivateRootListenerCurrentnessGateRecord(
+          {...cloneFixture.rootRegistration},
+          {
+            sourceKind: 'createRoot'
+          }
+        ),
+      {
+        code:
+          rootListeners
+            .INVALID_PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE_CODE,
+        reason: 'invalid-registration-record'
+      }
+    );
+  } finally {
+    rootListeners.revertRootListenersForPrivateRoot(
+      cloneFixture.rootRegistration
+    );
+  }
+
+  const staleFixture = createPrivateRootListenerCurrentnessFixture(
+    'root-listener-currentness-stale'
+  );
+  rootListeners.revertRootListenersForPrivateRoot(
+    staleFixture.rootRegistration
+  );
+  assert.throws(
+    () =>
+      rootListeners.createPrivateRootListenerCurrentnessGateRecord(
+        staleFixture.rootRegistration,
+        {
+          sourceKind: 'createRoot'
+        }
+      ),
+    {
+      code:
+        rootListeners
+          .INVALID_PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE_CODE,
+      reason: 'stale-registration-record'
+    }
+  );
+
+  const aliasFixture = createPrivateRootListenerCurrentnessFixture(
+    'root-listener-currentness-alias'
+  );
+  try {
+    assert.throws(
+      () =>
+        rootListeners.createPrivateRootListenerCurrentnessGateRecord(
+          aliasFixture.rootRegistration,
+          {
+            sourceKind: 'createRoot',
+            sourceRecord: {
+              facadeCall: 'hydrateRoot',
+              requestType: 'hydrateRoot'
+            }
+          }
+        ),
+      {
+        code:
+          rootListeners
+            .INVALID_PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE_CODE,
+        reason: 'source-kind-alias-mismatch'
+      }
+    );
+    assert.throws(
+      () =>
+        rootListeners.createPrivateRootListenerCurrentnessGateRecord(
+          aliasFixture.rootRegistration,
+          {
+            sourceKind: 'hydrateRoot',
+            sourceRecord: {
+              facadeCall: 'createRoot',
+              requestType: 'createRoot'
+            }
+          }
+        ),
+      {
+        code:
+          rootListeners
+            .INVALID_PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE_CODE,
+        reason: 'source-kind-alias-mismatch'
+      }
+    );
+    assert.throws(
+      () =>
+        rootListeners.createPrivateRootListenerCurrentnessGateRecord(
+          aliasFixture.rootRegistration,
+          {
+            eventDispatch: true,
+            sourceKind: 'createRoot'
+          }
+        ),
+      {
+        code:
+          rootListeners
+            .INVALID_PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE_CODE,
+        reason: 'public-behavior-claimed'
+      }
+    );
+
+    const beforeMutationRegistrationCount =
+      aliasFixture.container.__registrations.length;
+    assert.throws(
+      () =>
+        rootListeners.createPrivateRootListenerCurrentnessGateRecord(
+          aliasFixture.rootRegistration,
+          {
+            afterDiagnosticsHook() {
+              aliasFixture.container.__registrations.push({
+                listener() {},
+                options: false,
+                type: 'click'
+              });
+            },
+            sourceKind: 'createRoot'
+          }
+        ),
+      {
+        code:
+          rootListeners
+            .INVALID_PRIVATE_ROOT_LISTENER_CURRENTNESS_GATE_CODE,
+        reason: 'listener-state-mutated-during-diagnostics'
+      }
+    );
+    aliasFixture.container.__registrations.length =
+      beforeMutationRegistrationCount;
+    assert.equal(aliasFixture.container.__registrations.length, 138);
+    assert.equal(aliasFixture.document.__registrations.length, 1);
+  } finally {
+    rootListeners.revertRootListenersForPrivateRoot(
+      aliasFixture.rootRegistration
+    );
+  }
+});
+
 test('private root click event delegation dispatch gate invokes a portal child listener after owner-root validation', () => {
   const fixture = createPrivateClickPortalDelegationFixture(
     'click-gate-portal-child'
@@ -2132,6 +2510,22 @@ test('private input/change extraction preflight rejects foreign records', () => 
     false
   );
 });
+
+function createPrivateRootListenerCurrentnessFixture(label) {
+  const document = createDocument();
+  const container = createNode('DIV', document);
+  return {
+    container,
+    document,
+    rootRegistration:
+      rootListeners.registerRootListenersForPrivateRoot(container),
+    sourceRecord: {
+      operation: 'createRoot',
+      requestId: `${label}:create`,
+      requestType: 'createRoot'
+    }
+  };
+}
 
 function createPrivateClickDelegationFixture(label) {
   const document = installEventTargetMethods(createDocument());
