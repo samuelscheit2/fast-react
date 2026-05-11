@@ -149,6 +149,7 @@ const blockedPublicClaimKeys = Object.freeze([
   "schedulerDelayedRendererRootAdmissionClaimed",
   "packageCompatibilityClaimed",
   "publicPackageCompatibilityClaimed",
+  "schedulerPackageCompatibilityClaimed",
   "packageSurfaceChanged",
   "newPublicExportsAdded",
   "publicDiagnosticExportAdded",
@@ -157,13 +158,18 @@ const blockedPublicClaimKeys = Object.freeze([
   "nativeCompatibilityClaimed",
   "publicNativeCompatibilityClaimed",
   "publicNativeCompatibility",
+  "schedulerNativeCompatibilityClaimed",
+  "nativeAliasAccepted",
   "nativeExecution",
+  "nativeRuntimeExecution",
   "publicNativeExecution",
   "publicNativeExecutionClaimed",
   "nativeRuntimeCompatibilityClaimed",
   "nativePublicBehaviorClaimed",
   "postTaskCompatibilityClaimed",
   "publicPostTaskCompatibilityClaimed",
+  "schedulerPostTaskCompatibilityClaimed",
+  "postTaskAliasAccepted",
   "browserPostTaskCompatibilityClaimed",
   "browserTaskOrderingCompatibilityClaimed",
   "postTaskPublicBehaviorClaimed",
@@ -174,6 +180,11 @@ const blockedPublicClaimKeys = Object.freeze([
   "publicMockSchedulerCompatibilityClaimed",
   "mockSchedulerPublicBehaviorClaimed",
   "schedulerMockCompatibilityClaimed",
+  "mockAliasAccepted",
+  "packageAliasAccepted",
+  "packageExecution",
+  "rootAliasAccepted",
+  "actAliasAccepted",
   "publicTimingAliasAccepted",
   "publicRootAliasAccepted",
   "publicActAliasAccepted",
@@ -282,7 +293,7 @@ export function createSchedulerVariantBoundaryDiagnosticsReport(options = {}) {
     ...sourceGateUntrustedClaimContainerIds
   ];
 
-  if (sourceGate.rowsByVariant === null || sourceRowRejectionIds.length > 0) {
+  if (sourceGate.rowsByVariant === null || rejectionIds.length > 0) {
     return createBoundaryDiagnosticsReportRecord({
       sourceGate,
       rows: freezeArray([]),
@@ -386,6 +397,29 @@ function readVariantCurrentnessGateForBoundaryReport(variantCurrentnessGate) {
     typeof normalizedGate.rowsByVariant !== "object"
   ) {
     rejectionIds.push("variantCurrentnessGate.rowsByVariant.[[Object]]");
+  } else {
+    const rowsArrayResult = safeIsArray(
+      normalizedGate.rowsByVariant,
+      "variantCurrentnessGate.rowsByVariant"
+    );
+    if (!rowsArrayResult.ok) {
+      rejectionIds.push(rowsArrayResult.id);
+    } else if (rowsArrayResult.isArray) {
+      rejectionIds.push("variantCurrentnessGate.rowsByVariant.[[Record]]");
+    }
+
+    const rowsPrototypeResult = safePrototypeOf(
+      normalizedGate.rowsByVariant,
+      "variantCurrentnessGate.rowsByVariant"
+    );
+    if (!rowsPrototypeResult.ok) {
+      rejectionIds.push(rowsPrototypeResult.id);
+    } else if (
+      rowsPrototypeResult.prototype !== Object.prototype &&
+      rowsPrototypeResult.prototype !== null
+    ) {
+      rejectionIds.push("variantCurrentnessGate.rowsByVariant.[[Prototype]]");
+    }
   }
 
   return freezeRecord({
@@ -444,7 +478,12 @@ function readBoundarySourceRowsByVariant(rowsByVariant, path, rejectionIds) {
 
 function validateBoundarySourceRow(row, path, rejectionIds) {
   for (const field of requiredSourceRowStringFields) {
-    if (typeof row[field] !== "string") {
+    const descriptor = Object.getOwnPropertyDescriptor(row, field);
+    if (
+      descriptor === undefined ||
+      !("value" in descriptor) ||
+      typeof descriptor.value !== "string"
+    ) {
       rejectionIds.push(`${path}.${field}.[[String]]`);
     }
   }
@@ -484,6 +523,28 @@ function sourceGateReportRejectionIds(report) {
   }
   const descriptor = descriptorResult.descriptor;
   if (descriptor === undefined) {
+    const hasResult = safeHasProperty(
+      report,
+      "sourceGateReportRejectionIds",
+      "report"
+    );
+    if (!hasResult.ok) {
+      return freezeArray([hasResult.id]);
+    }
+    if (hasResult.has) {
+      return freezeArray([`${rejectionIdsPath}.[[Inherited]]`]);
+    }
+    const hiddenReadResult = safeReadProperty(
+      report,
+      "sourceGateReportRejectionIds",
+      rejectionIdsPath
+    );
+    if (!hiddenReadResult.ok) {
+      return freezeArray([hiddenReadResult.id]);
+    }
+    if (hiddenReadResult.value !== undefined) {
+      return freezeArray([`${rejectionIdsPath}.[[HiddenGet]]`]);
+    }
     return freezeArray([]);
   }
   if (!("value" in descriptor)) {
@@ -600,6 +661,7 @@ function readBoundaryDiagnosticsFactoryOptions(options) {
     });
   }
 
+  const publicClaimIds = findPublicClaimIds(options, "options");
   const descriptorResult = safeOwnPropertyDescriptor(
     options,
     "variantCurrentnessGate",
@@ -608,28 +670,51 @@ function readBoundaryDiagnosticsFactoryOptions(options) {
   if (!descriptorResult.ok) {
     return freezeRecord({
       variantCurrentnessGate: null,
-      violationIds: freezeArray([descriptorResult.id])
+      violationIds: freezeArray([...publicClaimIds, descriptorResult.id])
     });
   }
 
   const descriptor = descriptorResult.descriptor;
   if (descriptor === undefined) {
+    const hasResult = safeHasProperty(
+      options,
+      "variantCurrentnessGate",
+      "options"
+    );
+    if (!hasResult.ok) {
+      return freezeRecord({
+        variantCurrentnessGate: null,
+        violationIds: freezeArray([...publicClaimIds, hasResult.id])
+      });
+    }
+    if (hasResult.has) {
+      return freezeRecord({
+        variantCurrentnessGate: null,
+        violationIds: freezeArray([
+          ...publicClaimIds,
+          "options.variantCurrentnessGate.[[Inherited]]"
+        ])
+      });
+    }
     return freezeRecord({
       variantCurrentnessGate: markModuleOwnedClaimContainerTree(
         evaluateSchedulerVariantCurrentnessGate()
       ),
-      violationIds: freezeArray([])
+      violationIds: freezeArray(publicClaimIds)
     });
   }
   if (!("value" in descriptor)) {
     return freezeRecord({
       variantCurrentnessGate: null,
-      violationIds: freezeArray(["options.variantCurrentnessGate.[[Accessor]]"])
+      violationIds: freezeArray([
+        ...publicClaimIds,
+        "options.variantCurrentnessGate.[[Accessor]]"
+      ])
     });
   }
   return freezeRecord({
     variantCurrentnessGate: descriptor.value,
-    violationIds: freezeArray([])
+    violationIds: freezeArray(publicClaimIds)
   });
 }
 
@@ -638,6 +723,7 @@ function readBoundaryDiagnosticsEvaluatorOptions(options) {
     return freezeRecord({
       boundaryDiagnosticsReport: null,
       variantCurrentnessGate: null,
+      publicClaimIds: freezeArray([]),
       violationIds: freezeArray([])
     });
   }
@@ -645,10 +731,12 @@ function readBoundaryDiagnosticsEvaluatorOptions(options) {
     return freezeRecord({
       boundaryDiagnosticsReport: null,
       variantCurrentnessGate: null,
+      publicClaimIds: freezeArray([]),
       violationIds: freezeArray(["options.[[Object]]"])
     });
   }
 
+  const publicClaimIds = findPublicClaimIds(options, "options");
   const violationIds = [];
   const boundaryDiagnosticsReport = readEvaluatorOptionValue(
     options,
@@ -664,6 +752,7 @@ function readBoundaryDiagnosticsEvaluatorOptions(options) {
   return freezeRecord({
     boundaryDiagnosticsReport,
     variantCurrentnessGate,
+    publicClaimIds: freezeArray(publicClaimIds),
     violationIds: freezeArray(violationIds)
   });
 }
@@ -677,6 +766,12 @@ function readEvaluatorOptionValue(options, key, violationIds) {
 
   const descriptor = descriptorResult.descriptor;
   if (descriptor === undefined) {
+    const hasResult = safeHasProperty(options, key, "options");
+    if (!hasResult.ok) {
+      violationIds.push(hasResult.id);
+    } else if (hasResult.has) {
+      violationIds.push(`options.${key}.[[Inherited]]`);
+    }
     return null;
   }
   if (!("value" in descriptor)) {
@@ -898,6 +993,7 @@ export function evaluateSchedulerVariantBoundaryDiagnosticsCurrentnessGate(
   const unsupportedStatusMismatches = [];
   const variantReuseRows = [];
   const publicClaimIds = [
+    ...evaluatorOptions.publicClaimIds,
     ...findPublicClaimIds(candidateReport.report, "report"),
     ...findSuppliedVariantCurrentnessGatePublicClaimIds(
       variantCurrentnessGate
@@ -913,7 +1009,7 @@ export function evaluateSchedulerVariantBoundaryDiagnosticsCurrentnessGate(
     ...evaluatorOptions.violationIds,
     ...candidateReport.violationIds,
     ...normalizedReport.violationIds,
-    ...sourceGateReportRejectionIds(effectiveReport)
+    ...sourceGateReportRejectionIds(candidateReport.report)
   );
 
   for (const rowId of requiredRowIds) {
@@ -1100,6 +1196,9 @@ export function evaluateSchedulerVariantBoundaryDiagnosticsCurrentnessGate(
 
   const sourceCurrentnessRecognized =
     sourceCurrentnessMismatches.length === 0 &&
+    manifest.missing.length === 0 &&
+    manifest.unexpected.length === 0 &&
+    manifest.duplicates.length === 0 &&
     authoritativeVariantCurrentnessGate.gateId ===
       SCHEDULER_VARIANT_CURRENTNESS_GATE_ID &&
     authoritativeVariantCurrentnessGate.status ===
@@ -1253,7 +1352,7 @@ function normalizeBoundaryRow(row, path, violationIds) {
 }
 
 function normalizePlainDataObject(value, path, violationIds) {
-  const normalized = {};
+  const normalized = Object.create(null);
   if (value === null || typeof value !== "object") {
     violationIds.push(`${path}.[[Object]]`);
     return normalized;
@@ -2170,6 +2269,20 @@ function safeReadProperty(value, key, path) {
     return {
       ok: false,
       id: `${path}.[[Get]]`
+    };
+  }
+}
+
+function safeHasProperty(value, key, path) {
+  try {
+    return {
+      ok: true,
+      has: key in value
+    };
+  } catch {
+    return {
+      ok: false,
+      id: `${path}.${formatPathKey(key)}.[[Has]]`
     };
   }
 }
