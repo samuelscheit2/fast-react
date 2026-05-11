@@ -46,14 +46,13 @@ Drive toward a minimal real root render/update/unmount path:
 ## Active Queue
 
 Top-level cap: 30 workers. Accepted/merged baseline includes Workers 803-837,
-842-846, 848-852, 855-860, 862-870, 873, and 874. Worker 853's competing
+842-846, 848-852, 855-860, 862-870, and 872-874. Worker 853's competing
 test-renderer branch was rejected as redundant after Worker 844 was accepted;
 do not use it as accepted input.
 
 Current active queue:
 
-- Worker 872: test-renderer JS lifecycle consumer, pending stale multi-update
-  follow-up and audit.
+- None.
 
 Accepted private evidence still keeps public root/render, `act`, `flushSync`,
 Scheduler timing, hydration, resources/forms, serialization, native execution,
@@ -65,16 +64,16 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Keep Worker 872 in the active queue until its stale multi-update follow-up
-   and audit are reviewed and merged; do not treat its output as accepted input
-   yet.
+1. Treat Workers 872-874 as accepted private evidence only; public package,
+   root, native, React DOM, and test-renderer compatibility still require
+   fail-closed gates and dual-run oracle evidence.
 2. Use accepted Workers 855, 860, and 862-867 as private Rust execution
    inputs for narrow root/sync-flush/function/deletion host mutation follow-ups
    only when source-owned finished work, detached-host, lane/root, topology, and
    cleanup evidence is preserved.
-3. Consume accepted Workers 844, 848, 856-859, 868-870, 873, and 874 only through
-   fail-closed package/private gates. Public compatibility still needs dual-run
-   oracle evidence and broad package validation.
+3. Consume accepted Workers 844, 848, 856-859, 868-870, and 872-874 only
+   through fail-closed package/private gates. Public compatibility still needs
+   dual-run oracle evidence and broad package validation.
 4. Prefer parallelizable independent proofs even when they may conflict in test
    files. Resolve conflicts during merge by keeping all accepted negative tests,
    blockers, and source-ownership checks.
@@ -89,13 +88,12 @@ canonical evidence requirements.
   root/lane, topology, replay, ref/passive, and cleanup validation. Public
   React DOM/test-renderer roots and public `flushSync` remain blocked.
 - Test-renderer package-root/native work should use accepted Worker 844
-  package-root native execution parity plus Workers 859 and 868 Rust private
-  lifecycle/native consumer hardening. Worker 872 remains active pending its
-  stale multi-update follow-up and audit; Worker 853 remains
-  rejected/redundant. Public serialization, `ReactTestInstance`,
-  JS/CJS/package compatibility, native bridge loading/execution,
-  root/act/Scheduler compatibility, and broad multichild identity remain
-  blocked.
+  package-root native execution parity, Workers 859 and 868 Rust private
+  lifecycle/native consumer hardening, and Worker 872 package-root/CJS private
+  lifecycle execution evidence. Worker 853 remains rejected/redundant. Public
+  serialization, `ReactTestInstance`, JS/CJS/package compatibility, native
+  bridge loading/execution, root/act/Scheduler compatibility, and broad
+  multichild identity remain blocked.
 - React DOM facade/native handoffs may use accepted Worker 848 nested facade
   native handoff metadata, Worker 869 fake-DOM lifecycle snapshots, and Worker
   874 private lifecycle request/snapshot boundary hardening as diagnostic input.

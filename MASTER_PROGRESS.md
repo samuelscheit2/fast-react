@@ -29,8 +29,16 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
-### Workers 873 and 874
+### Workers 872-874
 
+- Worker 872 added a private `react-test-renderer` package-root/CJS lifecycle
+  execution evidence consumer for create, update, and unmount rows from
+  `FastReactTestRendererPrivateRootExecutionResult`, returning frozen private
+  evidence only for source-owned bridge rows and rejecting cloned,
+  caller-built, cross-surface, and stale multi-update rows. Public root,
+  serialization, `ReactTestInstance`, `act`, Scheduler, native bridge
+  loading/execution, JS package compatibility, and broader compatibility remain
+  blocked.
 - Worker 873 added private source-owned generation and consume-once guards to
   the Rust native JSON batch lifecycle executor, binding lifecycle acceptance to
   executor generation, handle-table root/value state, environment/root/value
@@ -44,10 +52,11 @@ sequencing belong in `MASTER_PLAN.md`.
   before fake-DOM mutation or native handoff metadata. Public `createRoot`,
   `hydrateRoot`, browser DOM/root execution, native/Rust execution,
   resources/forms, refs/events, and compatibility remain blocked.
-- The pair was accepted after focused native lifecycle, cleanup-hook,
-  React DOM private bridge, React DOM conformance, package-surface,
-  import-smoke, workspace, formatting, Rust check, and `git diff --check`
-  verification recorded in git history and worker reports.
+- The batch was accepted after focused test-renderer package/CJS lifecycle,
+  native lifecycle, cleanup-hook, React DOM private bridge, React DOM
+  conformance, package-surface, import-smoke, workspace, formatting, Rust check,
+  and `git diff --check` verification recorded in git history and worker
+  reports.
 
 ### Worker 863
 
