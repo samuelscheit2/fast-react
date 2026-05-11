@@ -172,8 +172,7 @@ export const PRIVATE_ADMISSION_727_728_REQUIRED_CURRENT_UNMOUNT_IDENTITY_EVIDENC
     "current-worker-754-cjs-production-totree-unmount-identity-source",
     "current-worker-757-package-root-unmount-identity-report",
     "current-worker-757-package-root-tojson-unmount-identity-source",
-    "current-worker-757-package-root-totree-unmount-identity-source",
-    "current-unmount-native-strict-identity-conformance"
+    "current-worker-757-package-root-totree-unmount-identity-source"
   ]);
 
 const privateAdmission727728SkippedRowData = Object.freeze([
@@ -480,29 +479,6 @@ const privateAdmission727728CurrentUnmountIdentityEvidenceData = Object.freeze([
       "acceptedUnmountFinishedWorkIdentityWorker:\n    'worker-733-test-renderer-unmount-finished-work-identity'"
     ],
     sourceAssertions: packageRootToTreeUnmountIdentitySourceAssertions
-  }),
-  evidenceData({
-    role: "current-unmount-native-strict-identity-conformance",
-    path: "tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs",
-    tokens: [
-      'test("react-test-renderer JS private native unmount serialization accepts strict finished-work identity evidence"',
-      "createAcceptedEmptyRootHostOutputDiagnostic({",
-      'hostOutputUpdateKind: "Unmount"',
-      "jsonFacade.canCreateAcceptedNativeExecutionDiagnosticResult(\n        unmountExecutionRecord,\n        jsonUnmountReport\n      ),\n      false",
-      "jsonFacade.canCreateAcceptedNativeExecutionDiagnosticResult(\n        unmountExecutionRecord,\n        jsonUnmountReport,\n        jsonUnmountIdentityEvidence\n      ),\n      true",
-      "treeFacade.canCreateAcceptedNativeExecutionDiagnosticResult(\n        unmountExecutionRecord,\n        treeUnmountReport\n      ),\n      false",
-      "treeFacade.canCreateAcceptedNativeExecutionDiagnosticResult(\n        unmountExecutionRecord,\n        treeUnmountReport,\n        treeUnmountIdentityEvidence\n      ),\n      true",
-      "createAcceptedUnmountTreeMetadataDiagnostic()",
-      "jsonUnmountResult.consumesAcceptedFinishedWorkIdentityGate",
-      "jsonUnmountResult.finishedWorkIdentity.rootRequestOperation",
-      "treeUnmountResult.consumesAcceptedFinishedWorkIdentityGate",
-      "treeUnmountResult.finishedWorkIdentity.rootRequestOperation"
-    ],
-    forbiddenTokens: [
-      'test("react-test-renderer JS private native unmount serialization rejects finished-work identity evidence"',
-      "assert.equal(jsonUnmountResult.finishedWorkIdentity, null);",
-      "assert.equal(treeUnmountResult.finishedWorkIdentity, null);"
-    ]
   })
 ]);
 
@@ -1534,6 +1510,33 @@ function evaluateSourceAssertions({ text, sourceAssertions }) {
     });
   }
 
+  const unassertedCompatibilityProperties =
+    findUnassertedCompatibilityLookingProperties({
+      properties: extractedProperties.properties,
+      sourceAssertions
+    });
+  if (unassertedCompatibilityProperties.length > 0) {
+    const error = `unasserted-compatibility-looking-properties:${unassertedCompatibilityProperties.join(
+      ","
+    )}`;
+    const results = sourceAssertions.map((assertion) =>
+      freezeRecord({
+        ...assertion,
+        expectedValue: assertion.value,
+        actualSource: null,
+        actualValue: null,
+        passed: false,
+        error
+      })
+    );
+
+    return freezeRecord({
+      results: freezeArray(results),
+      failed: freezeArray(results),
+      error
+    });
+  }
+
   const results = sourceAssertions.map((assertion) =>
     evaluateSourceAssertion({
       assertion,
@@ -1550,6 +1553,31 @@ function evaluateSourceAssertions({ text, sourceAssertions }) {
     ),
     error: null
   });
+}
+
+function findUnassertedCompatibilityLookingProperties({
+  properties,
+  sourceAssertions
+}) {
+  const assertedProperties = new Set(
+    sourceAssertions.map((assertion) => assertion.property)
+  );
+
+  return freezeArray(
+    [...properties.keys()].filter(
+      (property) =>
+        assertedProperties.has(property) !== true &&
+        isCompatibilityLookingProperty(property) === true
+    )
+  );
+}
+
+function isCompatibilityLookingProperty(property) {
+  return (
+    /^(public|native|package|root|toJSON|toJson|toTree|compatibility)/.test(
+      property
+    ) && /(Compatibility|Compatible|Available|Enabled|Ready|Claimed)/.test(property)
+  );
 }
 
 function evaluateSourceAssertionsForUnavailableSource(sourceAssertions) {
@@ -1621,6 +1649,7 @@ function evaluateSourceAssertion({ assertion, properties }) {
 }
 
 function extractTopLevelJsObjectProperties(text) {
+  const codeMask = createJsCodeMask(text);
   const freezeIndex = findJsSourceOutsideCommentsAndStrings(
     text,
     "Object.freeze"
@@ -1628,7 +1657,8 @@ function extractTopLevelJsObjectProperties(text) {
   const openIndex = findNextJsPunctuator(
     text,
     freezeIndex < 0 ? 0 : freezeIndex,
-    "{"
+    "{",
+    codeMask
   );
 
   if (openIndex < 0) {
@@ -1639,7 +1669,7 @@ function extractTopLevelJsObjectProperties(text) {
     });
   }
 
-  const closeIndex = findMatchingJsBrace(text, openIndex);
+  const closeIndex = findMatchingJsBrace(text, openIndex, codeMask);
   if (closeIndex < 0) {
     return freezeRecord({
       ok: false,
@@ -1648,6 +1678,22 @@ function extractTopLevelJsObjectProperties(text) {
     });
   }
 
+  return readJsObjectLiteralProperties({
+    text,
+    openIndex,
+    closeIndex,
+    codeMask,
+    collectProperties: true
+  });
+}
+
+function readJsObjectLiteralProperties({
+  text,
+  openIndex,
+  closeIndex,
+  codeMask,
+  collectProperties
+}) {
   const properties = new Map();
   let index = openIndex + 1;
   while (index < closeIndex) {
@@ -1661,35 +1707,73 @@ function extractTopLevelJsObjectProperties(text) {
       break;
     }
 
+    if (text.startsWith("...", index)) {
+      return createUnsupportedObjectMemberResult("spread", text, index);
+    }
+
+    if (text[index] === "[") {
+      return createUnsupportedObjectMemberResult(
+        "computed-property",
+        text,
+        index
+      );
+    }
+
+    if (text[index] === "*") {
+      return createUnsupportedObjectMemberResult("method", text, index);
+    }
+
     const propertyKey = readJsObjectPropertyKey(text, index, closeIndex);
     if (propertyKey.ok !== true) {
-      const nextIndex = findNextTopLevelPropertySeparator(
+      return createUnsupportedObjectMemberResult(
+        propertyKey.error,
         text,
-        index,
-        closeIndex
+        index
       );
-      index = nextIndex < closeIndex ? nextIndex + 1 : closeIndex;
-      continue;
+    }
+
+    if (isHiddenCompatibilityCarrierProperty(propertyKey.key) === true) {
+      return createUnsupportedObjectMemberResult(
+        "hidden-claim-carrier",
+        text,
+        propertyKey.start
+      );
     }
 
     index = skipJsTrivia(text, propertyKey.end, closeIndex);
     if (text[index] !== ":") {
-      const nextIndex = findNextTopLevelPropertySeparator(
+      if (text[index] === "," || index >= closeIndex) {
+        properties.set(propertyKey.key, propertyKey.key);
+        continue;
+      }
+
+      return createUnsupportedObjectMemberResult(
+        unsupportedPropertyMemberKind({ propertyKey, text, index }),
         text,
-        index,
-        closeIndex
+        propertyKey.start
       );
-      index = nextIndex < closeIndex ? nextIndex + 1 : closeIndex;
-      continue;
     }
 
     const valueStart = skipJsTrivia(text, index + 1, closeIndex);
     const valueEnd = findNextTopLevelPropertySeparator(
       text,
       valueStart,
-      closeIndex
+      closeIndex,
+      codeMask
     );
-    properties.set(propertyKey.key, text.slice(valueStart, valueEnd).trim());
+    const nestedHiddenCarrierScan = findNestedHiddenCompatibilityCarrier({
+      text,
+      startIndex: valueStart,
+      endIndex: valueEnd,
+      codeMask
+    });
+    if (nestedHiddenCarrierScan.ok !== true) {
+      return nestedHiddenCarrierScan;
+    }
+
+    if (collectProperties === true) {
+      properties.set(propertyKey.key, text.slice(valueStart, valueEnd).trim());
+    }
     index = valueEnd < closeIndex ? valueEnd + 1 : closeIndex;
   }
 
@@ -1700,17 +1784,100 @@ function extractTopLevelJsObjectProperties(text) {
   });
 }
 
-function findNextJsPunctuator(text, startIndex, punctuator) {
+function findNestedHiddenCompatibilityCarrier({
+  text,
+  startIndex,
+  endIndex,
+  codeMask
+}) {
   let index = startIndex;
 
-  while (index < text.length) {
-    const nextIndex = skipJsCommentOrString(text, index);
-    if (nextIndex !== index) {
-      index = nextIndex;
+  while (index < endIndex) {
+    if (codeMask[index] !== 1) {
+      index += 1;
       continue;
     }
 
-    if (text[index] === punctuator) {
+    if (text[index] !== "{") {
+      index += 1;
+      continue;
+    }
+
+    const closeIndex = findMatchingJsBrace(text, index, codeMask);
+    if (closeIndex < 0 || closeIndex > endIndex) {
+      return createUnsupportedObjectMemberResult(
+        "nested-object-literal-not-closed",
+        text,
+        index
+      );
+    }
+
+    const nestedProperties = readJsObjectLiteralProperties({
+      text,
+      openIndex: index,
+      closeIndex,
+      codeMask,
+      collectProperties: false
+    });
+    if (nestedProperties.ok !== true) {
+      return nestedProperties;
+    }
+
+    index = closeIndex + 1;
+  }
+
+  return freezeRecord({
+    ok: true,
+    properties: new Map(),
+    error: null
+  });
+}
+
+function isHiddenCompatibilityCarrierProperty(property) {
+  return (
+    property === "__proto__" ||
+    property === "constructor" ||
+    property === "prototype"
+  );
+}
+
+function createUnsupportedObjectMemberResult(kind, text, startIndex) {
+  return freezeRecord({
+    ok: false,
+    properties: new Map(),
+    error: `unsupported-object-member:${kind}:${sourcePreview(text, startIndex)}`
+  });
+}
+
+function unsupportedPropertyMemberKind({ propertyKey, text, index }) {
+  if (propertyKey.key === "get" || propertyKey.key === "set") {
+    return "accessor";
+  }
+
+  if (text[index] === "(") {
+    return "method";
+  }
+
+  return "shorthand-or-method";
+}
+
+function sourcePreview(text, startIndex) {
+  return text
+    .slice(startIndex, startIndex + 48)
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function findNextJsPunctuator(
+  text,
+  startIndex,
+  punctuator,
+  codeMask = createJsCodeMask(text)
+) {
+  let index = startIndex;
+
+  while (index < text.length) {
+    if (codeMask[index] === 1 && text[index] === punctuator) {
       return index;
     }
 
@@ -1721,33 +1888,60 @@ function findNextJsPunctuator(text, startIndex, punctuator) {
 }
 
 function findJsSourceOutsideCommentsAndStrings(text, needle, fromIndex = 0) {
-  let index = fromIndex;
+  const codeMask = createJsCodeMask(text);
+  return findJsSourceWithMask({
+    text,
+    needle,
+    fromIndex,
+    codeMask,
+    startMask: codeMask
+  });
+}
 
-  while (index < text.length) {
-    const nextIndex = skipJsCommentOrString(text, index);
-    if (nextIndex !== index) {
-      index = nextIndex;
-      continue;
-    }
+function findTopLevelJsSourceOutsideCommentsAndStrings(
+  text,
+  needle,
+  fromIndex = 0
+) {
+  const codeMask = createJsCodeMask(text);
+  return findJsSourceWithMask({
+    text,
+    needle,
+    fromIndex,
+    codeMask,
+    startMask: createJsTopLevelStartMask(text, codeMask)
+  });
+}
 
-    if (text.startsWith(needle, index)) {
+function findJsSourceWithMask({ text, needle, fromIndex, codeMask, startMask }) {
+  const lastStartIndex = text.length - needle.length;
+  for (
+    let index = Math.max(0, fromIndex);
+    index <= lastStartIndex;
+    index += 1
+  ) {
+    if (
+      startMask[index] === 1 &&
+      text.startsWith(needle, index) &&
+      sourceRangeIsCode(codeMask, index, index + needle.length)
+    ) {
       return index;
     }
-
-    index += 1;
   }
-
   return -1;
 }
 
-function findMatchingJsBrace(text, openIndex) {
+function findMatchingJsBrace(
+  text,
+  openIndex,
+  codeMask = createJsCodeMask(text)
+) {
   let depth = 0;
   let index = openIndex;
 
   while (index < text.length) {
-    const nextIndex = skipJsCommentOrString(text, index);
-    if (nextIndex !== index) {
-      index = nextIndex;
+    if (codeMask[index] !== 1) {
+      index += 1;
       continue;
     }
 
@@ -1766,16 +1960,20 @@ function findMatchingJsBrace(text, openIndex) {
   return -1;
 }
 
-function findNextTopLevelPropertySeparator(text, startIndex, endIndex) {
+function findNextTopLevelPropertySeparator(
+  text,
+  startIndex,
+  endIndex,
+  codeMask = createJsCodeMask(text)
+) {
   let index = startIndex;
   let braceDepth = 0;
   let bracketDepth = 0;
   let parenDepth = 0;
 
   while (index < endIndex) {
-    const nextIndex = skipJsCommentOrString(text, index);
-    if (nextIndex !== index) {
-      index = nextIndex;
+    if (codeMask[index] !== 1) {
+      index += 1;
       continue;
     }
 
@@ -1835,25 +2033,6 @@ function skipJsTrivia(text, startIndex, endIndex) {
   return index;
 }
 
-function skipJsCommentOrString(text, index) {
-  if (text.startsWith("//", index)) {
-    const lineEnd = text.indexOf("\n", index + 2);
-    return lineEnd < 0 ? text.length : lineEnd + 1;
-  }
-
-  if (text.startsWith("/*", index)) {
-    const blockEnd = text.indexOf("*/", index + 2);
-    return blockEnd < 0 ? text.length : blockEnd + 2;
-  }
-
-  const character = text[index];
-  if (character === "'" || character === '"' || character === "`") {
-    return skipQuotedJsLiteral(text, index);
-  }
-
-  return index;
-}
-
 function readJsObjectPropertyKey(text, startIndex, endIndex) {
   const character = text[startIndex];
   if (character === "'" || character === '"') {
@@ -1861,6 +2040,7 @@ function readJsObjectPropertyKey(text, startIndex, endIndex) {
     return freezeRecord({
       ok: parsed.ok,
       key: parsed.ok === true ? parsed.value : null,
+      start: startIndex,
       end: parsed.end,
       error: parsed.error
     });
@@ -1870,6 +2050,7 @@ function readJsObjectPropertyKey(text, startIndex, endIndex) {
     return freezeRecord({
       ok: false,
       key: null,
+      start: startIndex,
       end: startIndex,
       error: "property-key-not-supported"
     });
@@ -1883,6 +2064,7 @@ function readJsObjectPropertyKey(text, startIndex, endIndex) {
   return freezeRecord({
     ok: true,
     key: text.slice(startIndex, index),
+    start: startIndex,
     end: index,
     error: null
   });
@@ -1925,17 +2107,18 @@ function readQuotedJsLiteral(text, startIndex, endIndex) {
     const character = text[index];
 
     if (character === "\\") {
-      if (index + 1 >= endIndex) {
+      const escape = readJsStringEscape(text, index, endIndex);
+      if (escape.ok !== true) {
         return freezeRecord({
           ok: false,
           value: null,
-          end: index,
-          error: "unterminated-string-escape"
+          end: escape.end,
+          error: escape.error
         });
       }
 
-      value += text[index + 1];
-      index += 2;
+      value += escape.value;
+      index = escape.end;
       continue;
     }
 
@@ -1945,6 +2128,15 @@ function readQuotedJsLiteral(text, startIndex, endIndex) {
         value,
         end: index + 1,
         error: null
+      });
+    }
+
+    if (quote !== "`" && isJsLineTerminatorAt(text, index) === true) {
+      return freezeRecord({
+        ok: false,
+        value: null,
+        end: index,
+        error: "unterminated-string-literal"
       });
     }
 
@@ -1958,6 +2150,174 @@ function readQuotedJsLiteral(text, startIndex, endIndex) {
     end: index,
     error: "unterminated-string-literal"
   });
+}
+
+function readJsStringEscape(text, escapeIndex, endIndex) {
+  const escapedIndex = escapeIndex + 1;
+  if (escapedIndex >= endIndex) {
+    return freezeRecord({
+      ok: false,
+      value: null,
+      end: escapeIndex,
+      error: "unterminated-string-escape"
+    });
+  }
+
+  if (isJsLineTerminatorAt(text, escapedIndex) === true) {
+    return freezeRecord({
+      ok: true,
+      value: "",
+      end: skipJsLineTerminator(text, escapedIndex),
+      error: null
+    });
+  }
+
+  const escaped = text[escapedIndex];
+  switch (escaped) {
+    case "b":
+      return createJsStringEscapeResult("\b", escapedIndex + 1);
+    case "f":
+      return createJsStringEscapeResult("\f", escapedIndex + 1);
+    case "n":
+      return createJsStringEscapeResult("\n", escapedIndex + 1);
+    case "r":
+      return createJsStringEscapeResult("\r", escapedIndex + 1);
+    case "t":
+      return createJsStringEscapeResult("\t", escapedIndex + 1);
+    case "v":
+      return createJsStringEscapeResult("\v", escapedIndex + 1);
+    case "0": {
+      const next = text[escapedIndex + 1];
+      if (next !== undefined && /[0-9]/.test(next)) {
+        return createInvalidJsStringEscapeResult(
+          "legacy-numeric-string-escape",
+          escapedIndex + 1
+        );
+      }
+      return createJsStringEscapeResult("\0", escapedIndex + 1);
+    }
+    case "x":
+      return readHexJsStringEscape(text, escapedIndex + 1, endIndex);
+    case "u":
+      return readUnicodeJsStringEscape(text, escapedIndex + 1, endIndex);
+    default:
+      if (/[1-9]/.test(escaped)) {
+        return createInvalidJsStringEscapeResult(
+          "legacy-numeric-string-escape",
+          escapedIndex + 1
+        );
+      }
+
+      return createJsStringEscapeResult(escaped, escapedIndex + 1);
+  }
+}
+
+function readHexJsStringEscape(text, hexStartIndex, endIndex) {
+  const hexEndIndex = hexStartIndex + 2;
+  if (
+    hexEndIndex > endIndex ||
+    isHexJsStringEscape(text, hexStartIndex, hexEndIndex) !== true
+  ) {
+    return createInvalidJsStringEscapeResult(
+      "invalid-hex-string-escape",
+      hexStartIndex
+    );
+  }
+
+  return createJsStringEscapeResult(
+    String.fromCharCode(parseInt(text.slice(hexStartIndex, hexEndIndex), 16)),
+    hexEndIndex
+  );
+}
+
+function readUnicodeJsStringEscape(text, unicodeStartIndex, endIndex) {
+  if (text[unicodeStartIndex] === "{") {
+    const closeIndex = text.indexOf("}", unicodeStartIndex + 1);
+    if (closeIndex < 0 || closeIndex >= endIndex) {
+      return createInvalidJsStringEscapeResult(
+        "unterminated-unicode-code-point-escape",
+        unicodeStartIndex
+      );
+    }
+
+    const codePointSource = text.slice(unicodeStartIndex + 1, closeIndex);
+    if (
+      /^[0-9A-Fa-f]{1,6}$/.test(codePointSource) !== true ||
+      parseInt(codePointSource, 16) > 0x10ffff
+    ) {
+      return createInvalidJsStringEscapeResult(
+        "invalid-unicode-code-point-escape",
+        unicodeStartIndex
+      );
+    }
+
+    return createJsStringEscapeResult(
+      String.fromCodePoint(parseInt(codePointSource, 16)),
+      closeIndex + 1
+    );
+  }
+
+  const unicodeEndIndex = unicodeStartIndex + 4;
+  if (
+    unicodeEndIndex > endIndex ||
+    isHexJsStringEscape(text, unicodeStartIndex, unicodeEndIndex) !== true
+  ) {
+    return createInvalidJsStringEscapeResult(
+      "invalid-unicode-string-escape",
+      unicodeStartIndex
+    );
+  }
+
+  return createJsStringEscapeResult(
+    String.fromCharCode(
+      parseInt(text.slice(unicodeStartIndex, unicodeEndIndex), 16)
+    ),
+    unicodeEndIndex
+  );
+}
+
+function isHexJsStringEscape(text, startIndex, endIndex) {
+  let index = startIndex;
+  while (index < endIndex) {
+    if (/[0-9A-Fa-f]/.test(text[index]) !== true) {
+      return false;
+    }
+    index += 1;
+  }
+  return true;
+}
+
+function createJsStringEscapeResult(value, end) {
+  return freezeRecord({
+    ok: true,
+    value,
+    end,
+    error: null
+  });
+}
+
+function createInvalidJsStringEscapeResult(error, end) {
+  return freezeRecord({
+    ok: false,
+    value: null,
+    end,
+    error
+  });
+}
+
+function isJsLineTerminatorAt(text, index) {
+  return (
+    text[index] === "\n" ||
+    text[index] === "\r" ||
+    text[index] === "\u2028" ||
+    text[index] === "\u2029"
+  );
+}
+
+function skipJsLineTerminator(text, index) {
+  return text[index] === "\r" && text[index + 1] === "\n"
+    ? index + 2
+    : index + 1;
 }
 
 function skipQuotedJsLiteral(text, startIndex) {
@@ -1986,7 +2346,7 @@ function extractEvidenceSourceSlice({ path, text, sliceStart, sliceEnd }) {
   }
 
   const findMarker = isJavaScriptSourcePath(path)
-    ? findJsSourceOutsideCommentsAndStrings
+    ? findTopLevelJsSourceOutsideCommentsAndStrings
     : findRawSource;
   const startIndex =
     sliceStart == null
@@ -2023,6 +2383,251 @@ function extractEvidenceSourceSlice({ path, text, sliceStart, sliceEnd }) {
 
 function isJavaScriptSourcePath(path) {
   return path.endsWith(".js") || path.endsWith(".mjs");
+}
+
+function createJsCodeMask(text) {
+  const mask = new Uint8Array(text.length);
+  mask.fill(1);
+
+  let index = 0;
+  let previousSignificantToken = null;
+  while (index < text.length) {
+    if (text.startsWith("//", index)) {
+      const lineEnd = text.indexOf("\n", index + 2);
+      const endIndex = lineEnd < 0 ? text.length : lineEnd + 1;
+      maskSourceRange(mask, index, endIndex, 0);
+      index = endIndex;
+      continue;
+    }
+
+    if (text.startsWith("/*", index)) {
+      const blockEnd = text.indexOf("*/", index + 2);
+      const endIndex = blockEnd < 0 ? text.length : blockEnd + 2;
+      maskSourceRange(mask, index, endIndex, 0);
+      index = endIndex;
+      continue;
+    }
+
+    const character = text[index];
+    if (character === "'" || character === '"' || character === "`") {
+      const endIndex = skipQuotedJsLiteral(text, index);
+      maskSourceRange(mask, index, endIndex, 0);
+      previousSignificantToken = freezeRecord({
+        type: "literal",
+        value: "string"
+      });
+      index = endIndex;
+      continue;
+    }
+
+    if (
+      character === "/" &&
+      canStartJsRegexLiteral(previousSignificantToken) === true
+    ) {
+      const endIndex = readJsRegexLiteralEnd(text, index);
+      if (endIndex > index) {
+        maskSourceRange(mask, index, endIndex, 0);
+        previousSignificantToken = freezeRecord({
+          type: "literal",
+          value: "regex"
+        });
+        index = endIndex;
+        continue;
+      }
+    }
+
+    if (/\s/.test(character)) {
+      index += 1;
+      continue;
+    }
+
+    const token = readJsSignificantToken(text, index);
+    if (token !== null) {
+      previousSignificantToken = token;
+      index = token.end;
+      continue;
+    }
+
+    index += 1;
+  }
+
+  return mask;
+}
+
+function createJsTopLevelStartMask(text, codeMask) {
+  const mask = new Uint8Array(text.length);
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+
+  for (let index = 0; index < text.length; index += 1) {
+    if (codeMask[index] !== 1) {
+      continue;
+    }
+
+    if (braceDepth === 0 && bracketDepth === 0 && parenDepth === 0) {
+      mask[index] = 1;
+    }
+
+    const character = text[index];
+    if (character === "{") {
+      braceDepth += 1;
+    } else if (character === "}" && braceDepth > 0) {
+      braceDepth -= 1;
+    } else if (character === "[") {
+      bracketDepth += 1;
+    } else if (character === "]" && bracketDepth > 0) {
+      bracketDepth -= 1;
+    } else if (character === "(") {
+      parenDepth += 1;
+    } else if (character === ")" && parenDepth > 0) {
+      parenDepth -= 1;
+    }
+  }
+
+  return mask;
+}
+
+function sourceRangeIsCode(codeMask, startIndex, endIndex) {
+  for (let index = startIndex; index < endIndex; index += 1) {
+    if (codeMask[index] !== 1) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function maskSourceRange(mask, startIndex, endIndex, value) {
+  for (let index = startIndex; index < endIndex; index += 1) {
+    mask[index] = value;
+  }
+}
+
+function readJsSignificantToken(text, startIndex) {
+  const character = text[startIndex];
+
+  if (/[A-Za-z_$]/.test(character)) {
+    let index = startIndex + 1;
+    while (index < text.length && /[A-Za-z0-9_$]/.test(text[index])) {
+      index += 1;
+    }
+
+    return freezeRecord({
+      type: "identifier",
+      value: text.slice(startIndex, index),
+      end: index
+    });
+  }
+
+  if (/[0-9]/.test(character)) {
+    let index = startIndex + 1;
+    while (index < text.length && /[A-Za-z0-9_.$]/.test(text[index])) {
+      index += 1;
+    }
+
+    return freezeRecord({
+      type: "literal",
+      value: "number",
+      end: index
+    });
+  }
+
+  const twoCharacterPunctuator = text.slice(startIndex, startIndex + 2);
+  if (
+    twoCharacterPunctuator === "=>" ||
+    twoCharacterPunctuator === "++" ||
+    twoCharacterPunctuator === "--" ||
+    twoCharacterPunctuator === "&&" ||
+    twoCharacterPunctuator === "||" ||
+    twoCharacterPunctuator === "??"
+  ) {
+    return freezeRecord({
+      type: "punctuator",
+      value: twoCharacterPunctuator,
+      end: startIndex + 2
+    });
+  }
+
+  return freezeRecord({
+    type: "punctuator",
+    value: character,
+    end: startIndex + 1
+  });
+}
+
+function canStartJsRegexLiteral(previousSignificantToken) {
+  if (previousSignificantToken === null) {
+    return true;
+  }
+
+  if (previousSignificantToken.type === "literal") {
+    return false;
+  }
+
+  if (previousSignificantToken.type === "identifier") {
+    return new Set([
+      "await",
+      "case",
+      "delete",
+      "do",
+      "else",
+      "in",
+      "instanceof",
+      "of",
+      "return",
+      "throw",
+      "typeof",
+      "void",
+      "yield"
+    ]).has(previousSignificantToken.value);
+  }
+
+  return !new Set([")", "]", "++", "--"]).has(
+    previousSignificantToken.value
+  );
+}
+
+function readJsRegexLiteralEnd(text, startIndex) {
+  let index = startIndex + 1;
+  let inCharacterClass = false;
+
+  while (index < text.length) {
+    const character = text[index];
+
+    if (character === "\\" && index + 1 < text.length) {
+      index += 2;
+      continue;
+    }
+
+    if (character === "\n" || character === "\r") {
+      return startIndex;
+    }
+
+    if (character === "[" && inCharacterClass === false) {
+      inCharacterClass = true;
+      index += 1;
+      continue;
+    }
+
+    if (character === "]" && inCharacterClass === true) {
+      inCharacterClass = false;
+      index += 1;
+      continue;
+    }
+
+    if (character === "/" && inCharacterClass === false) {
+      index += 1;
+      while (index < text.length && /[A-Za-z]/.test(text[index])) {
+        index += 1;
+      }
+      return index;
+    }
+
+    index += 1;
+  }
+
+  return text.length;
 }
 
 function findRawSource(text, needle, fromIndex = 0) {
