@@ -15205,6 +15205,301 @@ test('private resource root-map fake metadata negative matrix stays fail-closed 
   assert.equal(JSON.stringify(preflight).includes('nonce-module'), false);
 });
 
+test('private resource root-map storage execution mutates deterministic fake maps only', () => {
+  const scenario = createRootMapStoragePreflightScenario(
+    'root-map-storage-private-execution'
+  );
+  const preflight = scenario.storageGate.recordRootMapStoragePreflight(
+    scenario.commit,
+    {
+      explicitRootMapStoragePreflight: true,
+      preflightId: 'private-execution-root-map-preflight',
+      rootId: 'private-execution-resource-root',
+      expectedSourceResourceMapCommitRowIds: [
+        'resource-map-commit-1',
+        'resource-map-commit-3',
+        'resource-map-commit-4'
+      ]
+    }
+  );
+  const storageGate = resourceFormGate.createResourceHintRootMapStorageGate({
+    requestIdPrefix: 'root-map-storage-private-execution-run'
+  });
+  const execution = storageGate.recordRootMapStorageExecution(preflight, {
+    explicitRootMapStorageExecution: true,
+    executionId: 'private-execution-root-map-storage',
+    rootId: 'private-execution-resource-root',
+    expectedRootMapStorageRowIds: [
+      'root-map-storage-preflight-0',
+      'root-map-storage-preflight-1',
+      'root-map-storage-preflight-2'
+    ]
+  });
+  const summary =
+    resourceFormGate.describePrivateResourceHintRootMapStorageGate();
+
+  assert.equal(
+    resourceFormGate.isPrivateResourceHintRootMapStorageRecord(execution),
+    true
+  );
+  assert.equal(
+    resourceFormGate.getPrivateResourceHintRootMapStorageRecordPayload(
+      execution
+    ),
+    execution
+  );
+  assert.equal(
+    execution.rootMapStorageStatus,
+    resourceFormGate.privateResourceHintRootMapStorageStatus
+  );
+  assert.equal(
+    execution.executionStatus,
+    resourceFormGate.privateResourceHintRootMapStorageExecutionStatus
+  );
+  assert.equal(
+    execution.compatibilityStatus,
+    resourceFormGate
+      .privateResourceHintRootMapStorageCompatibilityBlockedStatus
+  );
+  assert.equal(
+    execution.sourceRootMapStoragePreflightId,
+    preflight.rootMapStoragePreflightId
+  );
+  assert.equal(preflight.rootMapStoragePlan.rootResourceStorageMutated, false);
+  assert.equal(preflight.rootMapStoragePlan.fakeResourceMapsMutated, false);
+  assert.equal(preflight.sideEffects.rootResourceStorageMutated, false);
+  assert.equal(execution.rootMapStorageExecutionRows.length, 3);
+  assert.deepEqual(
+    execution.rootMapStorageExecutionRows.map((row) => ({
+      sourceRootMapStorageRowId: row.sourceRootMapStorageRowId,
+      sourceResourceMapCommitRowId: row.sourceResourceMapCommitRowId,
+      rootMapName: row.rootMapName,
+      rootMapDedupeKey: row.rootMapDedupeKey,
+      storedInRootMap: row.storedInRootMap,
+      rootResourceStorageMutated: row.rootResourceStorageMutated,
+      hoistableStylesMapMutated: row.hoistableStylesMapMutated,
+      hoistableScriptsMapMutated: row.hoistableScriptsMapMutated,
+      preloadPropsMapMutated: row.preloadPropsMapMutated,
+      publicResourceMapCommitBehavior: row.publicResourceMapCommitBehavior,
+      compatibilityClaimed: row.compatibilityClaimed
+    })),
+    [
+      {
+        sourceRootMapStorageRowId: 'root-map-storage-preflight-0',
+        sourceResourceMapCommitRowId: 'resource-map-commit-1',
+        rootMapName: 'hoistableStyles',
+        rootMapDedupeKey: 'hoistableStyles:style:style-main',
+        storedInRootMap: true,
+        rootResourceStorageMutated: true,
+        hoistableStylesMapMutated: true,
+        hoistableScriptsMapMutated: false,
+        preloadPropsMapMutated: false,
+        publicResourceMapCommitBehavior: false,
+        compatibilityClaimed: false
+      },
+      {
+        sourceRootMapStorageRowId: 'root-map-storage-preflight-1',
+        sourceResourceMapCommitRowId: 'resource-map-commit-3',
+        rootMapName: 'hoistableScripts',
+        rootMapDedupeKey: 'hoistableScripts:script:script-main',
+        storedInRootMap: true,
+        rootResourceStorageMutated: true,
+        hoistableStylesMapMutated: false,
+        hoistableScriptsMapMutated: true,
+        preloadPropsMapMutated: false,
+        publicResourceMapCommitBehavior: false,
+        compatibilityClaimed: false
+      },
+      {
+        sourceRootMapStorageRowId: 'root-map-storage-preflight-2',
+        sourceResourceMapCommitRowId: 'resource-map-commit-4',
+        rootMapName: 'hoistableScripts',
+        rootMapDedupeKey: 'hoistableScripts:script:module-main',
+        storedInRootMap: true,
+        rootResourceStorageMutated: true,
+        hoistableStylesMapMutated: false,
+        hoistableScriptsMapMutated: true,
+        preloadPropsMapMutated: false,
+        publicResourceMapCommitBehavior: false,
+        compatibilityClaimed: false
+      }
+    ]
+  );
+  assert.deepEqual(execution.rootMapStorageSnapshot.hoistableStylesMapKeys, [
+    'hoistableStyles:style:style-main'
+  ]);
+  assert.deepEqual(execution.rootMapStorageSnapshot.hoistableScriptsMapKeys, [
+    'hoistableScripts:script:script-main',
+    'hoistableScripts:script:module-main'
+  ]);
+  assert.equal(
+    execution.rootMapStorageExecutionPlan.rootResourceStorageMutated,
+    true
+  );
+  assert.equal(
+    execution.rootMapStorageExecutionPlan.fakeResourceMapsMutated,
+    true
+  );
+  assert.equal(
+    execution.rootMapStorageExecutionPlan.realResourceMapsMutated,
+    false
+  );
+  assert.equal(
+    execution.rootMapStorageExecutionPlan.preloadPropsMapMutated,
+    false
+  );
+  assert.equal(
+    execution.rootMapStorageExecutionPlan.publicResourceMapCommitBehavior,
+    false
+  );
+  assert.equal(execution.sideEffects.rootMapStorageExecutionRecorded, true);
+  assert.equal(
+    execution.sideEffects.deterministicFakeRootMapStorageExecuted,
+    true
+  );
+  assert.equal(execution.sideEffects.fakeResourceMapsMutated, true);
+  assert.equal(execution.sideEffects.realResourceMapsMutated, false);
+  assert.equal(execution.sideEffects.preloadPropsMapMutated, false);
+  assert.equal(execution.sideEffects.publicResourceHintDomInsertion, false);
+  assert.equal(execution.sideEffects.publicResourceMapCommitBehavior, false);
+  assert.equal(execution.sideEffects.publicScriptModuleResourceDispatch, false);
+  assert.equal(execution.sideEffects.publicStylesheetLoadStateDispatch, false);
+  assert.equal(execution.sideEffects.scriptExecutionStarted, false);
+  assert.equal(execution.sideEffects.resourceLoadStateMutated, false);
+  assert.equal(execution.sideEffects.packageExportsMutated, false);
+  assert.equal(execution.sideEffects.compatibilityClaimed, false);
+  assert.equal(summary.gateId, resourceFormGate.privateResourceHintRootMapStorageGateId);
+  assert.equal(summary.mutatesFakeRootResourceStorage, true);
+  assert.equal(summary.mutatesRealRootResourceStorage, false);
+  assert.equal(summary.mutatesPreloadPropsMap, false);
+  assert.equal(summary.publicResourceMapCommitBehavior, false);
+  assert.deepEqual(
+    summary.blockedCapabilities,
+    resourceFormGate.resourceHintRootMapStorageBlockedCapabilities
+  );
+
+  const error =
+    resourceFormGate.createUnsupportedResourceHintRootMapStorageError(
+      execution
+    );
+  assert.equal(
+    error.code,
+    resourceFormGate.privateResourceHintRootMapStorageGateErrorCode
+  );
+  assert.equal(
+    error.rootMapStorageExecutionId,
+    execution.rootMapStorageExecutionId
+  );
+  assert.equal(JSON.stringify(execution).includes('/style.css'), false);
+  assert.equal(JSON.stringify(execution).includes('/script.js'), false);
+  assert.equal(JSON.stringify(execution).includes('/module.mjs'), false);
+  assert.equal(JSON.stringify(execution).includes('sha256-style'), false);
+  assert.equal(JSON.stringify(execution).includes('nonce-module'), false);
+
+  assert.throws(
+    () =>
+      storageGate.recordRootMapStorageExecution(preflight, {
+        explicitRootMapStorageExecution: true
+      }),
+    {
+      code:
+        resourceFormGate.privateResourceHintRootMapStorageInvalidAdmissionCode,
+      compatibilityTarget
+    }
+  );
+
+  assertRootMapStorageExecutionAdmissionRejects(
+    preflight,
+    {
+      explicitRootMapStorageExecution: true,
+      sourceRootMapStoragePreflightId: 'stale-root-map-preflight'
+    }
+  );
+  assertRootMapStorageExecutionAdmissionRejects(
+    preflight,
+    {
+      explicitRootMapStorageExecution: true,
+      rootId: 'foreign-resource-root'
+    }
+  );
+  assertRootMapStorageExecutionAdmissionRejects(
+    preflight,
+    {
+      explicitRootMapStorageExecution: true,
+      expectedRootMapStorageRowIds: [
+        'root-map-storage-preflight-0',
+        'stale-root-map-storage-preflight-row',
+        'root-map-storage-preflight-2'
+      ]
+    }
+  );
+  assertRootMapStorageExecutionAdmissionRejects(
+    preflight,
+    {
+      explicitRootMapStorageExecution: true,
+      fakeRootResources: throwingProxy('fake root resources')
+    }
+  );
+  assertRootMapStorageExecutionAdmissionRejects(
+    preflight,
+    {
+      explicitRootMapStorageExecution: true,
+      publicResourceHintDomInsertion: true
+    }
+  );
+  assertRootMapStorageExecutionAdmissionRejects(
+    preflight,
+    {
+      explicitRootMapStorageExecution: true,
+      packageExportCompatibilityClaimed: true
+    }
+  );
+  assertRootMapStorageExecutionAdmissionRejects(
+    preflight,
+    {
+      explicitRootMapStorageExecution: true,
+      scriptExecutionStarted: true
+    }
+  );
+  for (const field of [
+    'publicResourceRootMapStorageCompatibilityClaimed',
+    'publicResourceMapCommitCompatibilityClaimed',
+    'publicResourceDispatchCompatibilityClaimed',
+    'publicPackageCompatibilityClaimed',
+    'publicPackageExportsCompatibilityClaimed'
+  ]) {
+    assertRootMapStorageExecutionAdmissionRejects(
+      preflight,
+      {
+        explicitRootMapStorageExecution: true,
+        [field]: true
+      }
+    );
+  }
+  assert.throws(
+    () =>
+      resourceFormGate
+        .createResourceHintRootMapStorageGate()
+        .recordRootMapStorageExecution({...preflight}, {
+          explicitRootMapStorageExecution: true
+        }),
+    {
+      code: resourceFormGate.privateResourceHintRootMapStorageInvalidRecordCode,
+      compatibilityTarget
+    }
+  );
+  assert.throws(
+    () =>
+      resourceFormGate.createUnsupportedResourceHintRootMapStorageError(
+        {...execution}
+      ),
+    {
+      code: resourceFormGate.privateResourceHintRootMapStorageInvalidRecordCode,
+      compatibilityTarget
+    }
+  );
+});
+
 test('private resource root-map storage preflight rejects stale duplicate and foreign rows', () => {
   const staleScenario = createRootMapStoragePreflightScenario(
     'root-map-storage-stale'
@@ -17625,12 +17920,23 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
       duplicateRootMapStorageRowsRejected: false,
       staleRootMapStorageRowsRejected: false,
       foreignRootMapStorageRowsRejected: false,
+      rootMapStorageExecutionRecorded: false,
+      rootMapStorageExecutionRowsRecorded: false,
+      canonicalRootMapStorageRowsExecuted: false,
+      rootMapStorageSnapshotRecorded: false,
+      deterministicFakeRootMapStorageExecuted: false,
       rootResourceStorageCreated: false,
       rootResourceStorageMutated: false,
       hoistableStylesMapCreated: false,
       hoistableStylesMapMutated: false,
       hoistableScriptsMapCreated: false,
       hoistableScriptsMapMutated: false,
+      fakeRootResourceStorageCreated: false,
+      fakeRootResourceStorageMutated: false,
+      fakeHoistableStylesMapCreated: false,
+      fakeHoistableStylesMapMutated: false,
+      fakeHoistableScriptsMapCreated: false,
+      fakeHoistableScriptsMapMutated: false,
       preloadPropsMapCreated: false,
       preloadPropsMapMutated: false,
       duplicateStylesheetPrecedenceRowsRejected: false,
@@ -17678,6 +17984,8 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
       rootMapStoragePreflightGate:
         resourceFormGate
           .describePrivateResourceHintRootMapStoragePreflightGate(),
+      rootMapStorageGate:
+        resourceFormGate.describePrivateResourceHintRootMapStorageGate(),
       stylesheetLoadErrorStateGate:
         resourceFormGate
           .describePrivateResourceHintStylesheetLoadErrorStateGate()
@@ -19929,6 +20237,24 @@ function assertRootMapStoragePreflightAdmissionRejects(
           .privateResourceHintRootMapStoragePreflightInvalidAdmissionCode,
       compatibilityTarget,
       reason
+    }
+  );
+}
+
+function assertRootMapStorageExecutionAdmissionRejects(
+  rootMapStoragePreflight,
+  admission
+) {
+  assert.throws(
+    () =>
+      resourceFormGate
+        .createResourceHintRootMapStorageGate()
+        .recordRootMapStorageExecution(rootMapStoragePreflight, admission),
+    {
+      code:
+        resourceFormGate
+          .privateResourceHintRootMapStorageInvalidAdmissionCode,
+      compatibilityTarget
     }
   );
 }

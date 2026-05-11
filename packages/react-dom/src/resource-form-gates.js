@@ -72,6 +72,7 @@ const rootBoundarySideEffects = freezeRecord({
   ...internalsGate.resourceHintStylesheetPrecedenceBlockedSideEffects,
   ...internalsGate.resourceHintResourceMapCommitBlockedSideEffects,
   ...internalsGate.resourceHintRootMapStoragePreflightBlockedSideEffects,
+  ...internalsGate.resourceHintRootMapStorageBlockedSideEffects,
   ...internalsGate.resourceHintStylesheetLoadErrorStateBlockedSideEffects,
   ...internalsGate.formActionResetDispatcherBlockedSideEffects,
   ...internalsGate.formActionEventExtractionBlockedSideEffects,
@@ -588,12 +589,23 @@ function describeResourceHintFakeDomAdapterBoundary(behaviorArea) {
     duplicateRootMapStorageRowsRejected: false,
     staleRootMapStorageRowsRejected: false,
     foreignRootMapStorageRowsRejected: false,
+    rootMapStorageExecutionRecorded: false,
+    rootMapStorageExecutionRowsRecorded: false,
+    canonicalRootMapStorageRowsExecuted: false,
+    rootMapStorageSnapshotRecorded: false,
+    deterministicFakeRootMapStorageExecuted: false,
     rootResourceStorageCreated: false,
     rootResourceStorageMutated: false,
     hoistableStylesMapCreated: false,
     hoistableStylesMapMutated: false,
     hoistableScriptsMapCreated: false,
     hoistableScriptsMapMutated: false,
+    fakeRootResourceStorageCreated: false,
+    fakeRootResourceStorageMutated: false,
+    fakeHoistableStylesMapCreated: false,
+    fakeHoistableStylesMapMutated: false,
+    fakeHoistableScriptsMapCreated: false,
+    fakeHoistableScriptsMapMutated: false,
     preloadPropsMapCreated: false,
     preloadPropsMapMutated: false,
     duplicateStylesheetPrecedenceRowsRejected: false,
@@ -640,6 +652,8 @@ function describeResourceHintFakeDomAdapterBoundary(behaviorArea) {
       internalsGate.describePrivateResourceHintResourceMapCommitGate(),
     rootMapStoragePreflightGate:
       internalsGate.describePrivateResourceHintRootMapStoragePreflightGate(),
+    rootMapStorageGate:
+      internalsGate.describePrivateResourceHintRootMapStorageGate(),
     stylesheetLoadErrorStateGate:
       internalsGate.describePrivateResourceHintStylesheetLoadErrorStateGate()
   });
