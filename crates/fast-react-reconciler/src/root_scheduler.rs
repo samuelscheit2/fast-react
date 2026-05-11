@@ -165,7 +165,7 @@ impl RootErrorCaptureScheduleRecord {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct RootSchedulerState {
     first_scheduled_root: Option<FiberRootId>,
     last_scheduled_root: Option<FiberRootId>,
@@ -221,7 +221,7 @@ impl RootSchedulerState {
     }
 
     #[must_use]
-    pub const fn current_event_transition_lane(&self) -> Lane {
+    const fn current_event_transition_lane(&self) -> Lane {
         self.current_event_transition_lane
     }
 
@@ -258,6 +258,39 @@ impl RootSchedulerState {
         self.current_event_transition_lane = lane;
     }
 }
+
+impl fmt::Debug for RootSchedulerState {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("RootSchedulerState")
+            .field("first_scheduled_root", &self.first_scheduled_root)
+            .field("last_scheduled_root", &self.last_scheduled_root)
+            .field("did_schedule_microtask", &self.did_schedule_microtask)
+            .field(
+                "did_schedule_microtask_act",
+                &self.did_schedule_microtask_act,
+            )
+            .field(
+                "might_have_pending_sync_work",
+                &self.might_have_pending_sync_work,
+            )
+            .field("is_flushing_work", &self.is_flushing_work)
+            .finish_non_exhaustive()
+    }
+}
+
+impl PartialEq for RootSchedulerState {
+    fn eq(&self, other: &Self) -> bool {
+        self.first_scheduled_root == other.first_scheduled_root
+            && self.last_scheduled_root == other.last_scheduled_root
+            && self.did_schedule_microtask == other.did_schedule_microtask
+            && self.did_schedule_microtask_act == other.did_schedule_microtask_act
+            && self.might_have_pending_sync_work == other.might_have_pending_sync_work
+            && self.is_flushing_work == other.is_flushing_work
+    }
+}
+
+impl Eq for RootSchedulerState {}
 
 impl Default for RootSchedulerState {
     fn default() -> Self {
@@ -7031,6 +7064,186 @@ mod tests {
 
     fn activate_act_queue(store: &mut FiberRootStore<RecordingHost>) {
         store.scheduler_bridge_mut().set_act_queue_active(true);
+    }
+
+    #[test]
+    fn root_scheduler_transition_private_event_lane_stays_out_of_public_state_observers() {
+        let mut scheduler = RootSchedulerState::new();
+        let baseline = scheduler.clone();
+        scheduler.set_current_event_transition_lane(Lane::TRANSITION_1);
+
+        assert_eq!(
+            scheduler.current_event_transition_lane(),
+            Lane::TRANSITION_1
+        );
+        assert_eq!(baseline.current_event_transition_lane(), Lane::NO);
+        assert_eq!(scheduler, baseline);
+
+        let debug = format!("{scheduler:?}");
+        assert!(debug.contains("RootSchedulerState"));
+        assert!(debug.contains("first_scheduled_root"));
+        assert!(!debug.contains("current_event_transition_lane"));
+        assert!(!debug.contains(&format!("{:?}", Lane::TRANSITION_1)));
+    }
+
+    #[test]
+    fn root_scheduler_transition_public_root_store_api_cannot_observe_current_event_lane() {
+        use std::path::PathBuf;
+        use std::process::Command;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let workspace_crates = manifest_dir
+            .parent()
+            .expect("reconciler crate should live under workspace crates directory");
+        let host_config_dir = workspace_crates.join("fast-react-host-config");
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after unix epoch")
+            .as_nanos();
+        let temp_root = std::env::temp_dir().join(format!(
+            "fast-react-root-scheduler-public-lane-probe-{}-{nonce}",
+            std::process::id()
+        ));
+        let src_dir = temp_root.join("src");
+        std::fs::create_dir_all(&src_dir).expect("public API probe src dir should be writable");
+
+        let manifest = format!(
+            r#"[package]
+name = "fast-react-root-scheduler-public-lane-probe"
+version = "0.0.0"
+edition = "2024"
+
+[dependencies]
+fast-react-host-config = {{ path = "{}" }}
+fast-react-reconciler = {{ path = "{}" }}
+"#,
+            host_config_dir.display(),
+            manifest_dir.display()
+        );
+        std::fs::write(temp_root.join("Cargo.toml"), manifest)
+            .expect("public API probe manifest should be writable");
+
+        let public_prelude = r#"
+use fast_react_host_config::HostTypes;
+use fast_react_reconciler::{FiberRootStore, RootSchedulerState};
+
+struct Host;
+
+impl HostTypes for Host {
+    type HostFiberToken = ();
+    type Type = ();
+    type Props = ();
+    type Container = ();
+    type Instance = ();
+    type TextInstance = ();
+    type PublicInstance = ();
+    type HostContext = ();
+    type UpdatePayload = ();
+    type TimeoutHandle = ();
+    type NoTimeout = ();
+    type CommitState = ();
+    type EventPriority = ();
+    type EventType = ();
+    type EventTimestamp = ();
+    type ActivityInstance = ();
+    type SuspenseInstance = ();
+    type HydratableInstance = ();
+    type FormInstance = ();
+    type ChildSet = ();
+    type Resource = ();
+    type HoistableRoot = ();
+    type TransitionStatus = ();
+    type SuspendedState = ();
+    type RunningViewTransition = ();
+    type ViewTransitionInstance = ();
+    type InstanceMeasurement = ();
+    type EventResponder = ();
+    type GestureTimeline = ();
+    type FragmentInstance = ();
+    type RendererInspectionConfig = ();
+}
+"#;
+        let debug_probe = format!(
+            r#"{public_prelude}
+fn main() {{
+    let store = FiberRootStore::<Host>::new();
+    let root_store_debug = format!("{{:?}}", store.root_scheduler());
+    assert!(root_store_debug.contains("RootSchedulerState"));
+    assert!(!root_store_debug.contains("current_event_transition_lane"));
+
+    let scheduler_debug = format!("{{:?}}", RootSchedulerState::new());
+    assert!(scheduler_debug.contains("RootSchedulerState"));
+    assert!(!scheduler_debug.contains("current_event_transition_lane"));
+}}
+"#
+        );
+        std::fs::write(src_dir.join("main.rs"), debug_probe)
+            .expect("public API debug probe should be writable");
+
+        let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
+        let target_dir = temp_root.join("target");
+        let debug_output = Command::new(&cargo)
+            .arg("run")
+            .arg("--quiet")
+            .arg("--target-dir")
+            .arg(&target_dir)
+            .current_dir(&temp_root)
+            .output()
+            .expect("public API debug probe should run cargo");
+        assert!(
+            debug_output.status.success(),
+            "public API debug probe failed\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&debug_output.stdout),
+            String::from_utf8_lossy(&debug_output.stderr)
+        );
+
+        let getter_probe = format!(
+            r#"{public_prelude}
+fn read_direct_scheduler() {{
+    let scheduler = RootSchedulerState::new();
+    let _lane = scheduler.current_event_transition_lane();
+}}
+
+fn read_root_store_scheduler() {{
+    let store = FiberRootStore::<Host>::new();
+    let _lane = store.root_scheduler().current_event_transition_lane();
+}}
+
+fn main() {{}}
+"#
+        );
+        std::fs::write(src_dir.join("main.rs"), getter_probe)
+            .expect("public API getter probe should be writable");
+
+        let check_output = Command::new(&cargo)
+            .arg("check")
+            .arg("--quiet")
+            .arg("--target-dir")
+            .arg(&target_dir)
+            .current_dir(&temp_root)
+            .output()
+            .expect("public API getter probe should run cargo");
+        assert!(
+            !check_output.status.success(),
+            "public API getter probe unexpectedly compiled\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&check_output.stdout),
+            String::from_utf8_lossy(&check_output.stderr)
+        );
+
+        let stderr = String::from_utf8_lossy(&check_output.stderr);
+        assert!(
+            stderr.matches("current_event_transition_lane").count() >= 2,
+            "public API getter probe did not reject both exported scheduler paths\nstderr:\n{stderr}"
+        );
+        assert!(
+            stderr.contains("private")
+                || stderr.contains("E0624")
+                || stderr.contains("no method named"),
+            "public API getter probe failed for an unexpected reason\nstderr:\n{stderr}"
+        );
+
+        std::fs::remove_dir_all(&temp_root).expect("public API probe temp dir should be removable");
     }
 
     #[test]
