@@ -51,3 +51,15 @@ and broad child reconciliation remain blocked.
   HostComponent mount canary.
 - Public hooks/render behavior and generalized FunctionComponent child
   reconciliation are still blocked.
+
+## Audit Follow-up - 2026-05-11
+
+- Fixed the execution-boundary topology gap: the private host mutation gate now
+  re-reads the committed HostRoot child and the FunctionComponent return fiber
+  before calling fake host mutation execution.
+- Added stale root-child topology coverage that detaches the FunctionComponent
+  from the committed HostRoot while leaving `root.current` unchanged, and proves
+  no host operation occurs.
+- Re-ran `root_work_loop_function_component`, `function_component`,
+  `host_work`, `root_commit`, `cargo check`, `cargo fmt --all --check`, and
+  `git diff --check`; all passed.

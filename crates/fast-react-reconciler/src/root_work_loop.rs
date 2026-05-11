@@ -2477,6 +2477,12 @@ enum HostRootFunctionComponentSingleChildHostMutationExecutionError {
         expected_function_component: FiberId,
         actual_root_child: Option<FiberId>,
     },
+    FunctionComponentParentMismatch {
+        root: FiberRootId,
+        function_component: FiberId,
+        expected_parent: FiberId,
+        actual_parent: Option<FiberId>,
+    },
     MissingFunctionComponentHostChild {
         root: FiberRootId,
         function_component: FiberId,
@@ -2594,6 +2600,19 @@ impl Display for HostRootFunctionComponentSingleChildHostMutationExecutionError 
                 expected_function_component.slot().get(),
                 actual_root_child.map(|fiber| fiber.slot().get())
             ),
+            Self::FunctionComponentParentMismatch {
+                root,
+                function_component,
+                expected_parent,
+                actual_parent,
+            } => write!(
+                formatter,
+                "function-component host mutation execution root {} FunctionComponent {} expected parent {}, found {:?}",
+                root.raw(),
+                function_component.slot().get(),
+                expected_parent.slot().get(),
+                actual_parent.map(|fiber| fiber.slot().get())
+            ),
             Self::MissingFunctionComponentHostChild {
                 root,
                 function_component,
@@ -2693,6 +2712,7 @@ impl Error for HostRootFunctionComponentSingleChildHostMutationExecutionError {
             | Self::MismatchedFunctionComponent { .. }
             | Self::MismatchedChildElement { .. }
             | Self::RootFunctionComponentMismatch { .. }
+            | Self::FunctionComponentParentMismatch { .. }
             | Self::MissingFunctionComponentHostChild { .. }
             | Self::FunctionComponentHostChildMismatch { .. }
             | Self::UnexpectedFunctionComponentHostChildSibling { .. }
@@ -3407,6 +3427,17 @@ fn validate_function_component_single_child_host_mutation_evidence(
         );
     }
 
+    let root_node = store.fiber_arena().get(render.work_in_progress())?;
+    if root_node.child() != Some(function_component) {
+        return Err(
+            HostRootFunctionComponentSingleChildHostMutationExecutionError::RootFunctionComponentMismatch {
+                root: render.root(),
+                expected_function_component: function_component,
+                actual_root_child: root_node.child(),
+            },
+        );
+    }
+
     if complete_work.root_child_count() != 1
         || complete_work.root_child() != Some(function_component)
         || host_work.root_child_count() != 1
@@ -3441,6 +3472,16 @@ fn validate_function_component_single_child_host_mutation_evidence(
     }
 
     let function_node = store.fiber_arena().get(function_component)?;
+    if function_node.return_fiber() != Some(render.work_in_progress()) {
+        return Err(
+            HostRootFunctionComponentSingleChildHostMutationExecutionError::FunctionComponentParentMismatch {
+                root: render.root(),
+                function_component,
+                expected_parent: render.work_in_progress(),
+                actual_parent: function_node.return_fiber(),
+            },
+        );
+    }
     if function_node.child() != Some(completed_child) {
         return Err(
             HostRootFunctionComponentSingleChildHostMutationExecutionError::FunctionComponentHostChildMismatch {
@@ -17967,6 +18008,52 @@ mod tests {
             }
         );
         assert_eq!(missing_host.operations(), missing_operations_before_execute);
+
+        let (mut root_child_store, root_child_root, mut root_child_host) = root_store();
+        let mut root_child_source = TestHostTree::new();
+        let root_child_element = root_child_source.insert_text("detached root child evidence");
+        let mut root_child_fixture = function_component_single_child_commit_fixture(
+            &mut root_child_store,
+            &mut root_child_host,
+            root_child_root,
+            &root_child_source,
+            RootElementHandle::from_raw(86_605),
+            root_child_element,
+        );
+        root_child_store
+            .fiber_arena_mut()
+            .set_children(root_child_fixture.render.work_in_progress(), &[])
+            .unwrap();
+        assert_eq!(
+            root_child_store.root(root_child_root).unwrap().current(),
+            root_child_fixture.render.work_in_progress()
+        );
+        let root_child_operations_before_execute = root_child_host.operations();
+
+        let root_child_error = execute_function_component_single_child_host_mutation_for_canary(
+            &mut root_child_store,
+            &mut root_child_host,
+            root_child_fixture.render,
+            root_child_fixture.function_component,
+            root_child_fixture.single_child,
+            root_child_fixture.complete_work,
+            root_child_fixture.finished_work_handoff.commit(),
+            &mut root_child_fixture.host_work,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            root_child_error,
+            HostRootFunctionComponentSingleChildHostMutationExecutionError::RootFunctionComponentMismatch {
+                root: root_child_root,
+                expected_function_component: root_child_fixture.function_component,
+                actual_root_child: None,
+            }
+        );
+        assert_eq!(
+            root_child_host.operations(),
+            root_child_operations_before_execute
+        );
 
         let (mut stale_store, stale_root, mut stale_host) = root_store();
         let mut stale_source = TestHostTree::new();
