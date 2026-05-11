@@ -1573,6 +1573,274 @@ test("React DOM client private hydrateRoot event replay preflight validates bloc
   assert.equal(publicBoundary.hydrateRoot.rootObjectCreated, false);
 });
 
+test("React DOM client private hydrateRoot preflight matrix composes blocked evidence only", () => {
+  const reactDomClient = require(
+    path.join(repoRoot, "packages/react-dom/client.js")
+  );
+  const rootBridge = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-bridge.js")
+  );
+  const hydrationGate = require(
+    path.join(
+      repoRoot,
+      "packages/react-dom/src/client/hydration-boundary-gate.js"
+    )
+  );
+  const rootMarkers = require(
+    path.join(repoRoot, "packages/react-dom/src/client/root-markers.js")
+  );
+  const listenerRegistry = require(
+    path.join(repoRoot, "packages/react-dom/src/events/listener-registry.js")
+  );
+  const domContainer = require(
+    path.join(repoRoot, "packages/react-dom/src/client/dom-container.js")
+  );
+  const eventListener = require(
+    path.join(repoRoot, "packages/react-dom/src/events/react-dom-event-listener.js")
+  );
+  const eventSystemFlags = require(
+    path.join(repoRoot, "packages/react-dom/src/events/event-system-flags.js")
+  );
+  const pluginEventSystem = require(
+    path.join(repoRoot, "packages/react-dom/src/events/plugin-event-system.js")
+  );
+  const descriptor = Object.getOwnPropertyDescriptor(
+    reactDomClient.hydrateRoot,
+    rootBridge.privateHydrateRootPublicFacadePreflightSymbol
+  );
+  const document = createPrivateGateDocument(
+    "public-facade-hydrate-preflight-matrix",
+    domContainer
+  );
+  const container = createPrivateGateElement("DIV", document, domContainer);
+  const target = createPrivateGateElement("BUTTON", document, domContainer);
+  const start = createPrivateGateCommentNode("$", document, domContainer);
+  const end = createPrivateGateCommentNode("/$", document, domContainer);
+  const recoverableErrorCalls = [];
+  start.parentNode = container;
+  target.parentNode = container;
+  end.parentNode = container;
+  container.childNodes = [start, target, end];
+
+  const hydrationOptions = {
+    identifierPrefix: "hydrate-preflight-matrix-",
+    onRecoverableError(error) {
+      recoverableErrorCalls.push(error);
+    }
+  };
+  const preflight = descriptor.value({
+    hydrateIdPrefix: "facade-hydrate-matrix-root",
+    publicFacadeHydratePreflightIdPrefix: "facade-hydrate-matrix",
+    requestIdPrefix: "facade-hydrate-matrix-request"
+  });
+  const hydrateRecord = preflight.hydrateRoot(
+    container,
+    {
+      props: {
+        children: "matrix child"
+      },
+      type: "App"
+    },
+    hydrationOptions
+  );
+  const wrapper =
+    eventListener.createEventListenerWrapperRecordWithPriority(
+      container,
+      "click",
+      eventSystemFlags.IS_CAPTURE_PHASE
+    );
+  const dispatchRecord =
+    pluginEventSystem.createEventDispatchRecordFromWrapperRecord(
+      wrapper,
+      {
+        target,
+        type: "click"
+      }
+    );
+  const targetClaimRecord = preflight.preflightTargetClaiming(
+    hydrateRecord,
+    dispatchRecord,
+    {
+      source: "conformance-hydrate-root-preflight-matrix-target-claim"
+    }
+  );
+  const eventReplayRecord = preflight.preflightEventReplay(
+    targetClaimRecord,
+    {
+      source: "conformance-hydrate-root-preflight-matrix-event-replay"
+    }
+  );
+
+  const preflightPayload =
+    rootBridge.getPrivateHydrateRootPublicFacadePreflightPayload(preflight);
+  const hydratePayload =
+    rootBridge.getPrivateHydrateRootPublicFacadePreflightRecordPayload(
+      hydrateRecord
+    );
+  const markerListenerPayload =
+    rootBridge.getPrivateHydrateRootPublicFacadeMarkerListenerPreflightPayload(
+      hydrateRecord.markerListenerPreflight
+    );
+  const recoverableErrorPayload =
+    rootBridge
+      .getPrivateHydrationTextMismatchRecoverableErrorPreflightPayload(
+        hydrateRecord.recoverableErrorPreflight
+      );
+  const targetClaimPayload =
+    rootBridge.getPrivateHydrateRootPublicFacadeTargetClaimingPreflightPayload(
+      targetClaimRecord
+    );
+  const claimPayload =
+    rootBridge.getPrivateHydrationTargetClaimingDiagnosticPayload(
+      targetClaimRecord.targetClaimingDiagnostic
+    );
+  const eventReplayPayload =
+    rootBridge.getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload(
+      eventReplayRecord
+    );
+  const executionPayload =
+    rootBridge.getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload(
+      eventReplayRecord.replayExecutionRecord
+    );
+
+  assert.deepEqual(preflightPayload.preflightRecords, [hydrateRecord]);
+  assert.deepEqual(preflightPayload.markerListenerPreflightRecords, [
+    hydrateRecord.markerListenerPreflight
+  ]);
+  assert.deepEqual(preflightPayload.recoverableErrorPreflightRecords, [
+    hydrateRecord.recoverableErrorPreflight
+  ]);
+  assert.deepEqual(preflightPayload.targetClaimingPreflightRecords, [
+    targetClaimRecord
+  ]);
+  assert.deepEqual(preflightPayload.eventReplayPreflightRecords, [
+    eventReplayRecord
+  ]);
+  assert.equal(hydratePayload.preflight, preflight);
+  assert.equal(markerListenerPayload.preflight, preflight);
+  assert.equal(markerListenerPayload.requestRecord, hydratePayload.requestRecord);
+  assert.equal(markerListenerPayload.container, container);
+  assert.equal(markerListenerPayload.preconditions.accepted, true);
+  assert.equal(markerListenerPayload.preconditions.stateUnchanged, true);
+  assert.equal(
+    recoverableErrorPayload.hydrationBoundaryRecord,
+    hydrateRecord.hydrationBoundaryRecord
+  );
+  assert.equal(recoverableErrorPayload.hydrationOptions, hydrationOptions);
+  assert.equal(
+    recoverableErrorPayload.recoverableErrorMetadata,
+    hydrateRecord.recoverableErrorMetadata
+  );
+  assert.equal(
+    recoverableErrorPayload.acceptedBoundaryMetadataDiagnostics,
+    hydrateRecord.acceptedPrivateMetadataDiagnostics
+  );
+  assert.equal(
+    hydrateRecord.recoverableErrorPreflight.acceptedBoundaryMetadataRow
+      .metadataId,
+    hydrationGate.privateHydrationTextMismatchRecoverableErrorRoutingMetadataId
+  );
+  assert.equal(
+    targetClaimPayload.markerListenerPreflight,
+    hydrateRecord.markerListenerPreflight
+  );
+  assert.equal(targetClaimPayload.markerListenerPayload, markerListenerPayload);
+  assert.equal(targetClaimPayload.requestRecord, hydratePayload.requestRecord);
+  assert.equal(targetClaimPayload.dispatchRecord, dispatchRecord);
+  assert.equal(targetClaimPayload.targetClaimingPayload, claimPayload);
+  assert.equal(
+    claimPayload.hydrationBoundaryRecord,
+    hydrateRecord.hydrationBoundaryRecord
+  );
+  assert.equal(
+    claimPayload.targetDispatchLinkDiagnostic,
+    targetClaimRecord.targetDispatchLinkDiagnostic
+  );
+  assert.equal(
+    claimPayload.ownershipDiagnostics,
+    targetClaimRecord.ownershipDiagnostics
+  );
+  assert.equal(
+    eventReplayPayload.markerListenerPreflight,
+    hydrateRecord.markerListenerPreflight
+  );
+  assert.equal(eventReplayPayload.targetClaimingPreflight, targetClaimRecord);
+  assert.equal(eventReplayPayload.targetClaimingPayload, targetClaimPayload);
+  assert.equal(eventReplayPayload.replayExecutionPayload, executionPayload);
+  assert.equal(executionPayload.dispatchRecord, dispatchRecord);
+  assert.equal(
+    executionPayload.hydrationBoundaryRecord,
+    hydrateRecord.hydrationBoundaryRecord
+  );
+  assert.equal(
+    executionPayload.targetClaimingDiagnostic,
+    targetClaimRecord.targetClaimingDiagnostic
+  );
+  assert.equal(executionPayload.targetClaimingDiagnosticPayload, claimPayload);
+  assert.equal(
+    executionPayload.targetDispatchLinkPayload,
+    claimPayload.targetDispatchLinkPayload
+  );
+  assert.equal(
+    executionPayload.recoverableErrorMetadata,
+    hydrateRecord.recoverableErrorMetadata
+  );
+  assert.equal(
+    executionPayload.clickReplayDispatchDiagnosticPayload.dispatchRecord,
+    dispatchRecord
+  );
+
+  assertHydrateRootPreflightEvidenceBlocked([
+    hydrateRecord,
+    hydrateRecord.markerListenerPreflight,
+    hydrateRecord.recoverableErrorPreflight,
+    targetClaimRecord.targetDispatchLinkDiagnostic,
+    targetClaimRecord.ownershipDiagnostics,
+    targetClaimRecord.targetClaimingDiagnostic,
+    targetClaimRecord,
+    eventReplayRecord.replayExecutionRecord,
+    eventReplayRecord
+  ]);
+  assert.equal(eventReplayRecord.replayQueueDrained, false);
+  assert.equal(eventReplayRecord.replayQueuesDrained, false);
+  assert.equal(eventReplayRecord.listenerInvocationCount, 0);
+  assert.equal(recoverableErrorCalls.length, 0);
+  assert.equal(dispatchRecord.hydrationReplay.queued, false);
+
+  assert.throws(
+    () => preflight.preflightTargetClaiming(hydratePayload.requestRecord, dispatchRecord),
+    {
+      code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT",
+      message: /marker\/listener/
+    }
+  );
+  assert.throws(
+    () => preflight.preflightEventReplay(hydrateRecord),
+    {
+      code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT",
+      message: /target-claiming/
+    }
+  );
+  assert.throws(
+    () => preflight.preflightEventReplay(Object.freeze({...targetClaimRecord})),
+    {
+      code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT",
+      message: /target-claiming/
+    }
+  );
+  assert.equal(rootMarkers.getContainerRoot(container), null);
+  assert.equal(listenerRegistry.hasListeningMarker(container), false);
+  assert.equal(listenerRegistry.hasListeningMarker(document), false);
+  assert.equal(container.__registrations.length, 0);
+  assert.equal(document.__registrations.length, 0);
+  assert.equal(container.__mutationLog.length, 0);
+  assert.equal(document.__mutationLog.length, 0);
+
+  const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
+  assert.equal(publicBoundary.hydrateRoot.status, "throws");
+  assert.equal(publicBoundary.hydrateRoot.rootObjectCreated, false);
+});
+
 test("React DOM client private facade preflights marker/listener setup and cleanup without public behavior", () => {
   const reactDomClient = require(
     path.join(repoRoot, "packages/react-dom/client.js")
@@ -3395,6 +3663,80 @@ test("React DOM explicit private createRoot mark/listen gate stays separate from
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function assertHydrateRootPreflightEvidenceBlocked(rows) {
+  const blockedBooleanFields = [
+    "browserDomEventCompatibilityClaimed",
+    "canHydrate",
+    "compatibilityClaimed",
+    "containerMarked",
+    "domMutated",
+    "domMutation",
+    "eventDispatch",
+    "eventReplayDispatchAttempted",
+    "eventReplayInstalled",
+    "eventReplaySupported",
+    "eventsReplayed",
+    "hydrateInstanceCalled",
+    "hydrateTextInstanceCalled",
+    "hydration",
+    "hydrationReplaySupported",
+    "listenerInstallation",
+    "listenersAttached",
+    "markerWrites",
+    "nativeEventRedispatched",
+    "onRecoverableErrorInvoked",
+    "pluginDispatchEventForPluginEventSystemCalled",
+    "publicDispatchEnabled",
+    "publicHydrateRootEnabled",
+    "publicHydrateRootSupported",
+    "publicHydrationCompatibilityClaimed",
+    "publicHydrationReplayCompatibilityClaimed",
+    "publicHydrationTargetClaimed",
+    "publicOnRecoverableErrorInvoked",
+    "publicRootBehaviorChanged",
+    "publicRootCompatibilitySurface",
+    "publicRootCreated",
+    "publicRootObjectExposed",
+    "queueMutationAllowed",
+    "queued",
+    "recoverableErrorsQueued",
+    "replayQueueDrained",
+    "replayQueuesDrained",
+    "rootScheduled",
+    "suspenseHydrationScheduled",
+    "syntheticEventCreated",
+    "targetClaimExecuted",
+    "targetDispatchExecuted",
+    "willDispatch",
+    "willDrainReplayQueues",
+    "willHydrate",
+    "willInvokeListeners",
+    "willQueueRecoverableErrors",
+    "willReplay"
+  ];
+
+  for (const row of rows) {
+    assert.equal(Object.isFrozen(row), true);
+    const rowLabel = row.kind || row.operation || row.status;
+    for (const field of blockedBooleanFields) {
+      if (Object.prototype.hasOwnProperty.call(row, field)) {
+        assert.equal(row[field], false, `${rowLabel}.${field}`);
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(row, "listenerInvocationCount")) {
+      assert.equal(row.listenerInvocationCount, 0, rowLabel);
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(
+        row,
+        "rootErrorCallbackInvocationCount"
+      )
+    ) {
+      assert.equal(row.rootErrorCallbackInvocationCount, 0, rowLabel);
+    }
+  }
 }
 
 function createPrivateGateDocument(label, domContainer) {
