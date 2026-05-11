@@ -2461,7 +2461,12 @@ const privateToJSONUpdateUnmountDependencyMetadata = Object.freeze({
   unmountRouteDiagnosticsAvailable: true,
   serializationDiagnosticsAvailable: true,
   hostOutputSnapshotFreshnessRequired: true,
+  sourceOwnedLifecycleExecutionEvidenceRequiredForUnmountCurrentness: true,
+  latestUpdateBeforeUnmountLifecycleRequired: true,
   staleSnapshotRejection: true,
+  staleLifecycleExecutionEvidenceRejection: true,
+  clonedLifecycleExecutionEvidenceRejection: true,
+  crossEntrypointLifecycleExecutionEvidenceRejection: true,
   mismatchedUpdateUnmountRecordRejection: true,
   publicToJSONAvailable: false,
   publicTestInstanceAvailable: false,
@@ -2552,6 +2557,15 @@ const toJSONPrivateSerializationFacadeGate = Object.freeze({
   privateRootFinishedLanesHandoffDiagnosticName,
   privateRootFinishedLanesHandoffStatus,
   requiresRootFinishedLanesHandoffEvidence: true,
+  privateRootLifecycleExecutionEvidenceRequired: true,
+  privateRootLifecycleExecutionDiagnosticName,
+  privateRootLifecycleExecutionStatus,
+  requiresLatestUpdateLifecycleBeforeUnmount: true,
+  rejectsMissingRootLifecycleExecutionEvidence: true,
+  rejectsStaleRootLifecycleExecutionEvidence: true,
+  rejectsClonedRootLifecycleExecutionEvidence: true,
+  rejectsCrossEntrypointRootLifecycleExecutionEvidence: true,
+  rejectsPublicNativePackageRootLifecycleClaims: true,
   rejectsMissingRootFinishedLanesHandoff: true,
   rejectsStaleRootFinishedLanesHandoff: true,
   rejectsPublicNativePackageRootFinishedLanesHandoffClaims: true,
@@ -2825,6 +2839,15 @@ const toTreePrivateFacadeGate = Object.freeze({
   privateRootFinishedLanesHandoffDiagnosticName,
   privateRootFinishedLanesHandoffStatus,
   requiresRootFinishedLanesHandoffEvidence: true,
+  privateRootLifecycleExecutionEvidenceRequired: true,
+  privateRootLifecycleExecutionDiagnosticName,
+  privateRootLifecycleExecutionStatus,
+  requiresLatestUpdateLifecycleBeforeUnmount: true,
+  rejectsMissingRootLifecycleExecutionEvidence: true,
+  rejectsStaleRootLifecycleExecutionEvidence: true,
+  rejectsClonedRootLifecycleExecutionEvidence: true,
+  rejectsCrossEntrypointRootLifecycleExecutionEvidence: true,
+  rejectsPublicNativePackageRootLifecycleClaims: true,
   rejectsMissingRootFinishedLanesHandoff: true,
   rejectsStaleRootFinishedLanesHandoff: true,
   rejectsPublicNativePackageRootFinishedLanesHandoffClaims: true,
@@ -7364,6 +7387,7 @@ const rootRequestCreateRouteAdmissions = new WeakMap();
 const rootRequestUpdateRouteAdmissions = new WeakMap();
 const rootRequestUpdateNativeBridgeAdmissions = new WeakMap();
 const rootExecutionResults = new WeakSet();
+const rootLifecycleExecutionEvidences = new WeakSet();
 
 function createTestRendererRootRequestBridge(options) {
   const bridgeState = {
@@ -10067,7 +10091,7 @@ function consumePrivateRootLifecycleExecutionEvidence(records) {
     createPrivateRootLifecycleExecutionOperationEvidence(unmountResult)
   ]);
 
-  return freezeRecord({
+  const evidence = freezeRecord({
     id: privateRootLifecycleExecutionDiagnosticName,
     kind: 'FastReactTestRendererPrivateRootLifecycleExecutionEvidence',
     diagnosticName: privateRootLifecycleExecutionDiagnosticName,
@@ -10114,6 +10138,8 @@ function consumePrivateRootLifecycleExecutionEvidence(records) {
     jsPackageCompatibilityAvailable: false,
     compatibilityClaimed: false
   });
+  rootLifecycleExecutionEvidences.add(evidence);
+  return evidence;
 }
 
 function readLifecycleExecutionResult(records, operation) {
@@ -10758,6 +10784,15 @@ function createPrivateToJSONSerializationFacade(rootRequest) {
     privateRootFinishedLanesHandoffDiagnosticName,
     privateRootFinishedLanesHandoffStatus,
     requiresRootFinishedLanesHandoffEvidence: true,
+    privateRootLifecycleExecutionEvidenceRequired: true,
+    privateRootLifecycleExecutionDiagnosticName,
+    privateRootLifecycleExecutionStatus,
+    requiresLatestUpdateLifecycleBeforeUnmount: true,
+    rejectsMissingRootLifecycleExecutionEvidence: true,
+    rejectsStaleRootLifecycleExecutionEvidence: true,
+    rejectsClonedRootLifecycleExecutionEvidence: true,
+    rejectsCrossEntrypointRootLifecycleExecutionEvidence: true,
+    rejectsPublicNativePackageRootLifecycleClaims: true,
     acceptedNativeExecutionRecordKind: privateToJSONNativeExecutionRecordKind,
     acceptedNativeExecutionOperations:
       privateToJSONNativeExecutionAcceptedOperations,
@@ -10791,14 +10826,16 @@ function createPrivateToJSONSerializationFacade(rootRequest) {
     canCreateAcceptedNativeExecutionDiagnosticResult(
       executionRecord,
       report,
-      finishedWorkIdentityEvidence = undefined
+      finishedWorkIdentityEvidence = undefined,
+      rootLifecycleExecutionEvidence = undefined
     ) {
       try {
         createPrivateToJSONNativeExecutionDiagnosticResult(
           rootRequest,
           executionRecord,
           report,
-          finishedWorkIdentityEvidence
+          finishedWorkIdentityEvidence,
+          rootLifecycleExecutionEvidence
         );
         return true;
       } catch (_error) {
@@ -10808,13 +10845,15 @@ function createPrivateToJSONSerializationFacade(rootRequest) {
     createAcceptedNativeExecutionDiagnosticResult(
       executionRecord,
       report,
-      finishedWorkIdentityEvidence = undefined
+      finishedWorkIdentityEvidence = undefined,
+      rootLifecycleExecutionEvidence = undefined
     ) {
       return createPrivateToJSONNativeExecutionDiagnosticResult(
         rootRequest,
         executionRecord,
         report,
-        finishedWorkIdentityEvidence
+        finishedWorkIdentityEvidence,
+        rootLifecycleExecutionEvidence
       );
     },
     canCreateAcceptedSiblingTextDiagnosticResult(
@@ -10849,7 +10888,8 @@ function createPrivateToJSONSerializationFacade(rootRequest) {
     canValidateAcceptedFinishedWorkIdentity(
       evidence,
       report,
-      sourceRootRequest = undefined
+      sourceRootRequest = undefined,
+      rootLifecycleExecutionEvidence = undefined
     ) {
       try {
         createPrivateSerializationFinishedWorkIdentityGateResult(
@@ -10858,7 +10898,8 @@ function createPrivateToJSONSerializationFacade(rootRequest) {
           privateToJSONAcceptedDiagnosticName,
           evidence,
           report,
-          sourceRootRequest
+          sourceRootRequest,
+          rootLifecycleExecutionEvidence
         );
         return true;
       } catch (_error) {
@@ -10868,7 +10909,8 @@ function createPrivateToJSONSerializationFacade(rootRequest) {
     validateAcceptedFinishedWorkIdentity(
       evidence,
       report,
-      sourceRootRequest = undefined
+      sourceRootRequest = undefined,
+      rootLifecycleExecutionEvidence = undefined
     ) {
       return createPrivateSerializationFinishedWorkIdentityGateResult(
         rootRequest,
@@ -10876,7 +10918,8 @@ function createPrivateToJSONSerializationFacade(rootRequest) {
         privateToJSONAcceptedDiagnosticName,
         evidence,
         report,
-        sourceRootRequest
+        sourceRootRequest,
+        rootLifecycleExecutionEvidence
       );
     }
   });
@@ -10952,6 +10995,15 @@ function createPrivateToTreeFacade(rootRequest) {
     privateRootFinishedLanesHandoffDiagnosticName,
     privateRootFinishedLanesHandoffStatus,
     requiresRootFinishedLanesHandoffEvidence: true,
+    privateRootLifecycleExecutionEvidenceRequired: true,
+    privateRootLifecycleExecutionDiagnosticName,
+    privateRootLifecycleExecutionStatus,
+    requiresLatestUpdateLifecycleBeforeUnmount: true,
+    rejectsMissingRootLifecycleExecutionEvidence: true,
+    rejectsStaleRootLifecycleExecutionEvidence: true,
+    rejectsClonedRootLifecycleExecutionEvidence: true,
+    rejectsCrossEntrypointRootLifecycleExecutionEvidence: true,
+    rejectsPublicNativePackageRootLifecycleClaims: true,
     privateSiblingTextFinishedWorkIdentityGateAvailable: true,
     privateSiblingTextFinishedWorkIdentityDiagnosticName:
       privateToJSONSiblingTextFinishedWorkIdentityDiagnosticName,
@@ -10988,14 +11040,16 @@ function createPrivateToTreeFacade(rootRequest) {
     canCreateAcceptedNativeExecutionDiagnosticResult(
       executionRecord,
       report,
-      finishedWorkIdentityEvidence = undefined
+      finishedWorkIdentityEvidence = undefined,
+      rootLifecycleExecutionEvidence = undefined
     ) {
       try {
         createPrivateToTreeNativeExecutionDiagnosticResult(
           rootRequest,
           executionRecord,
           report,
-          finishedWorkIdentityEvidence
+          finishedWorkIdentityEvidence,
+          rootLifecycleExecutionEvidence
         );
         return true;
       } catch (_error) {
@@ -11005,13 +11059,15 @@ function createPrivateToTreeFacade(rootRequest) {
     createAcceptedNativeExecutionDiagnosticResult(
       executionRecord,
       report,
-      finishedWorkIdentityEvidence = undefined
+      finishedWorkIdentityEvidence = undefined,
+      rootLifecycleExecutionEvidence = undefined
     ) {
       return createPrivateToTreeNativeExecutionDiagnosticResult(
         rootRequest,
         executionRecord,
         report,
-        finishedWorkIdentityEvidence
+        finishedWorkIdentityEvidence,
+        rootLifecycleExecutionEvidence
       );
     },
     canCreateAcceptedSiblingTextDiagnosticResult(
@@ -11046,7 +11102,8 @@ function createPrivateToTreeFacade(rootRequest) {
     canValidateAcceptedFinishedWorkIdentity(
       evidence,
       report,
-      sourceRootRequest = undefined
+      sourceRootRequest = undefined,
+      rootLifecycleExecutionEvidence = undefined
     ) {
       try {
         createPrivateSerializationFinishedWorkIdentityGateResult(
@@ -11055,7 +11112,8 @@ function createPrivateToTreeFacade(rootRequest) {
           privateToTreeAcceptedDiagnosticName,
           evidence,
           report,
-          sourceRootRequest
+          sourceRootRequest,
+          rootLifecycleExecutionEvidence
         );
         return true;
       } catch (_error) {
@@ -11065,7 +11123,8 @@ function createPrivateToTreeFacade(rootRequest) {
     validateAcceptedFinishedWorkIdentity(
       evidence,
       report,
-      sourceRootRequest = undefined
+      sourceRootRequest = undefined,
+      rootLifecycleExecutionEvidence = undefined
     ) {
       return createPrivateSerializationFinishedWorkIdentityGateResult(
         rootRequest,
@@ -11073,7 +11132,8 @@ function createPrivateToTreeFacade(rootRequest) {
         privateToTreeAcceptedDiagnosticName,
         evidence,
         report,
-        sourceRootRequest
+        sourceRootRequest,
+        rootLifecycleExecutionEvidence
       );
     }
   });
@@ -11843,7 +11903,8 @@ function createPrivateToTreeNativeExecutionDiagnosticResult(
   rootRequest,
   executionRecord,
   report,
-  finishedWorkIdentityEvidence = undefined
+  finishedWorkIdentityEvidence = undefined,
+  rootLifecycleExecutionEvidence = undefined
 ) {
   const execution = consumeAcceptedToTreeNativeExecutionRecord(
     rootRequest,
@@ -11856,7 +11917,8 @@ function createPrivateToTreeNativeExecutionDiagnosticResult(
       privateToTreeAcceptedDiagnosticName,
       finishedWorkIdentityEvidence,
       report,
-      execution.request
+      execution.request,
+      rootLifecycleExecutionEvidence
     );
   validatePrivateUnmountNativeExecutionFinishedWorkIdentity(
     'create().toTree',
@@ -12684,7 +12746,8 @@ function createPrivateToJSONNativeExecutionDiagnosticResult(
   rootRequest,
   executionRecord,
   report,
-  finishedWorkIdentityEvidence = undefined
+  finishedWorkIdentityEvidence = undefined,
+  rootLifecycleExecutionEvidence = undefined
 ) {
   const execution = consumeAcceptedToJSONNativeExecutionRecord(
     rootRequest,
@@ -12713,7 +12776,8 @@ function createPrivateToJSONNativeExecutionDiagnosticResult(
       privateToJSONAcceptedDiagnosticName,
       finishedWorkIdentityEvidence,
       report,
-      execution.request
+      execution.request,
+      rootLifecycleExecutionEvidence
     );
   validatePrivateUnmountNativeExecutionFinishedWorkIdentity(
     'create().toJSON',
@@ -13327,7 +13391,8 @@ function createPrivateSerializationFinishedWorkIdentityGateResult(
   sourceSerializationDiagnosticName,
   evidence,
   report,
-  sourceRootRequest = undefined
+  sourceRootRequest = undefined,
+  rootLifecycleExecutionEvidenceInput = undefined
 ) {
   if (!isRootRequestRecord(rootRequest)) {
     throwPrivateSerializationFinishedWorkIdentityError(
@@ -13513,6 +13578,13 @@ function createPrivateSerializationFinishedWorkIdentityGateResult(
     normalized,
     report
   );
+  const rootLifecycleExecutionEvidence =
+    validatePrivateSerializationRootLifecycleExecutionEvidence(
+      publicSurface,
+      identityRootRequest,
+      normalized,
+      rootLifecycleExecutionEvidenceInput
+    );
 
   return freezeRecord({
     id: 'react-test-renderer-private-serialization-finished-work-identity-result',
@@ -13533,6 +13605,17 @@ function createPrivateSerializationFinishedWorkIdentityGateResult(
     rootFinishedLanesHandoffStatus: rootFinishedLanesHandoff.status,
     rootFinishedLanesHandoffAccepted: true,
     consumesPrivateRootFinishedLanesHandoffGate: true,
+    ...(rootLifecycleExecutionEvidence === null
+      ? {}
+      : {
+          rootLifecycleExecutionEvidence,
+          rootLifecycleExecutionDiagnosticName:
+            rootLifecycleExecutionEvidence.diagnosticName,
+          rootLifecycleExecutionStatus: rootLifecycleExecutionEvidence.status,
+          rootLifecycleExecutionEvidenceAccepted: true,
+          consumesPrivateRootLifecycleExecutionEvidence: true,
+          latestUpdateLifecycleBeforeUnmountAccepted: true
+        }),
     renderCurrent: normalized.renderCurrent,
     renderFinishedWork: normalized.renderFinishedWork,
     commitPreviousCurrent: normalized.commitPreviousCurrent,
@@ -13562,6 +13645,286 @@ function createPrivateSerializationFinishedWorkIdentityGateResult(
     publicSerializationAvailable: false,
     compatibilityClaimed: false
   });
+}
+
+function validatePrivateSerializationRootLifecycleExecutionEvidence(
+  publicSurface,
+  identityRootRequest,
+  identity,
+  lifecycleEvidence
+) {
+  if (identity.hostOutputUpdateKind !== 'Unmount') {
+    return null;
+  }
+  if (
+    lifecycleEvidence === undefined ||
+    lifecycleEvidence === null ||
+    typeof lifecycleEvidence !== 'object' ||
+    Array.isArray(lifecycleEvidence)
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Expected source-owned private root lifecycle execution evidence for unmount serialization currentness.'
+    );
+  }
+  if (
+    lifecycleEvidence.entrypoint !== entrypoint ||
+    lifecycleEvidence.compatibilityTarget !== compatibilityTarget
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private root lifecycle execution evidence belongs to a different package entrypoint.'
+    );
+  }
+  if (
+    lifecycleEvidence.kind !==
+      'FastReactTestRendererPrivateRootLifecycleExecutionEvidence' ||
+    lifecycleEvidence.diagnosticName !==
+      privateRootLifecycleExecutionDiagnosticName ||
+    lifecycleEvidence.status !== privateRootLifecycleExecutionStatus ||
+    lifecycleEvidence.publicSurface !==
+      'create() -> create().update -> create().unmount'
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private root lifecycle execution evidence diagnostic identity is not accepted.'
+    );
+  }
+  if (
+    lifecycleEvidence.rootId !== identityRootRequest.rootId ||
+    lifecycleEvidence.rootSequence !== identityRootRequest.rootSequence
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private root lifecycle execution evidence belongs to a foreign root.'
+    );
+  }
+  assertPrivateSerializationRootLifecycleEvidenceDoesNotClaimCompatibility(
+    publicSurface,
+    lifecycleEvidence
+  );
+
+  const requestSequences = lifecycleEvidence.requestSequences;
+  if (
+    requestSequences === null ||
+    typeof requestSequences !== 'object' ||
+    Array.isArray(requestSequences)
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Expected private root lifecycle execution evidence request sequences.'
+    );
+  }
+  const createRequest = findPrivateSerializationLifecycleRequest(
+    publicSurface,
+    identityRootRequest.rootHandle,
+    'create',
+    requestSequences.create
+  );
+  const updateRequest = findPrivateSerializationLifecycleRequest(
+    publicSurface,
+    identityRootRequest.rootHandle,
+    'update',
+    requestSequences.update
+  );
+  const unmountRequest = findPrivateSerializationLifecycleRequest(
+    publicSurface,
+    identityRootRequest.rootHandle,
+    'unmount',
+    requestSequences.unmount
+  );
+  assertPrivateSerializationLifecycleRequestsAreCurrent(
+    publicSurface,
+    identityRootRequest.rootHandle,
+    createRequest,
+    updateRequest,
+    unmountRequest
+  );
+  if (
+    unmountRequest !== identityRootRequest ||
+    identity.rootRequestSequence !== unmountRequest.requestSequence
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private root lifecycle execution evidence is stale for the current unmount serialization request.'
+    );
+  }
+  validatePrivateSerializationRootLifecycleOperationEvidence(
+    publicSurface,
+    lifecycleEvidence.create,
+    createRequest,
+    'create'
+  );
+  validatePrivateSerializationRootLifecycleOperationEvidence(
+    publicSurface,
+    lifecycleEvidence.update,
+    updateRequest,
+    'update'
+  );
+  validatePrivateSerializationRootLifecycleOperationEvidence(
+    publicSurface,
+    lifecycleEvidence.unmount,
+    unmountRequest,
+    'unmount'
+  );
+  if (!rootLifecycleExecutionEvidences.has(lifecycleEvidence)) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Expected source-owned private root lifecycle execution evidence.'
+    );
+  }
+
+  return lifecycleEvidence;
+}
+
+function findPrivateSerializationLifecycleRequest(
+  publicSurface,
+  rootHandle,
+  operation,
+  requestSequence
+) {
+  if (!Number.isInteger(requestSequence) || requestSequence < 0) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Expected private root lifecycle execution evidence request sequence.'
+    );
+  }
+  const request = getRootRequestsForHandle(rootHandle).find(
+    (candidate) =>
+      candidate.requestSequence === requestSequence &&
+      candidate.operation === operation
+  );
+  if (!isRootRequestRecord(request)) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private root lifecycle execution evidence is stale for the current renderer root.'
+    );
+  }
+  return request;
+}
+
+function assertPrivateSerializationLifecycleRequestsAreCurrent(
+  publicSurface,
+  rootHandle,
+  createRequest,
+  updateRequest,
+  unmountRequest
+) {
+  const requests = getRootRequestsForHandle(rootHandle);
+  const createIndex = requests.indexOf(createRequest);
+  const updateIndex = requests.indexOf(updateRequest);
+  const unmountIndex = requests.indexOf(unmountRequest);
+  let latestUpdateIndex = -1;
+  for (let index = 0; index < unmountIndex; index++) {
+    if (requests[index].operation === 'update') {
+      latestUpdateIndex = index;
+    }
+  }
+  if (
+    createIndex === -1 ||
+    updateIndex === -1 ||
+    unmountIndex === -1 ||
+    requests[0] !== createRequest ||
+    requests[requests.length - 1] !== unmountRequest ||
+    !(createIndex < updateIndex && updateIndex < unmountIndex) ||
+    updateIndex !== latestUpdateIndex
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private root lifecycle execution evidence is stale for the current renderer root.'
+    );
+  }
+}
+
+function validatePrivateSerializationRootLifecycleOperationEvidence(
+  publicSurface,
+  operationEvidence,
+  request,
+  operation
+) {
+  if (
+    operationEvidence === null ||
+    typeof operationEvidence !== 'object' ||
+    Array.isArray(operationEvidence)
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Expected private root lifecycle operation evidence.'
+    );
+  }
+  if (
+    operationEvidence.diagnosticName !==
+      privateRootLifecycleExecutionDiagnosticName ||
+    operationEvidence.status !== privateRootLifecycleExecutionStatus ||
+    operationEvidence.operation !== operation ||
+    operationEvidence.publicSurface !==
+      publicSurfaceForRootLifecycleOperation(operation) ||
+    operationEvidence.requestId !== request.requestId ||
+    operationEvidence.requestSequence !== request.requestSequence ||
+    operationEvidence.rootId !== request.rootId ||
+    operationEvidence.rootSequence !== request.rootSequence ||
+    operationEvidence.scheduledUpdateKind !== request.updateKind ||
+    operationEvidence.hostOutputUpdateKind !== request.updateKind ||
+    operationEvidence.scheduledUpdateSequence !== request.requestSequence ||
+    operationEvidence.updateOutcome !== request.rustOutcome ||
+    operationEvidence.scheduled !== true
+  ) {
+    throwPrivateSerializationFinishedWorkIdentityError(
+      publicSurface,
+      'Private root lifecycle operation evidence does not match the source request.'
+    );
+  }
+  for (const fieldName of [
+    'sourceRendererOwnerAccepted',
+    'sourceLifecycleRowAccepted',
+    'sourceReconcilerHostExecutionConsumed',
+    'snapshotProducedFromExecutedState',
+    'hostOutputSnapshotCurrent',
+    'sourceOwnedExecutionAccepted'
+  ]) {
+    if (operationEvidence[fieldName] !== true) {
+      throwPrivateSerializationFinishedWorkIdentityError(
+        publicSurface,
+        'Private root lifecycle operation evidence is not accepted.'
+      );
+    }
+  }
+  assertPrivateSerializationRootLifecycleEvidenceDoesNotClaimCompatibility(
+    publicSurface,
+    operationEvidence
+  );
+}
+
+function assertPrivateSerializationRootLifecycleEvidenceDoesNotClaimCompatibility(
+  publicSurface,
+  evidence
+) {
+  for (const fieldName of [
+    'publicRootAvailable',
+    'publicSerializationAvailable',
+    'publicTestInstanceAvailable',
+    'publicActAvailable',
+    'publicSchedulerAvailable',
+    'nativeBridgeAvailable',
+    'nativeExecutionAvailable',
+    'jsPackageCompatibilityAvailable',
+    'compatibilityClaimed'
+  ]) {
+    if (evidence[fieldName] !== false) {
+      throwPrivateSerializationFinishedWorkIdentityError(
+        publicSurface,
+        'Private root lifecycle execution evidence cannot claim public, native, or package compatibility.'
+      );
+    }
+  }
+  for (const fieldName of ['nativeExecution', 'packageCompatibilityClaimed']) {
+    if (evidence[fieldName] === true) {
+      throwPrivateSerializationFinishedWorkIdentityError(
+        publicSurface,
+        'Private root lifecycle execution evidence cannot claim public, native, or package compatibility.'
+      );
+    }
+  }
 }
 
 function getLatestScheduledRootRequestForSerializationIdentity(rootHandle) {
