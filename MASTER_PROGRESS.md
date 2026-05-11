@@ -29,6 +29,49 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 969-997 and Audit Workflow Updates
+
+- Worker 969 refreshed coordination docs after Worker 966. Worker 964 then
+  refreshed the private admission 727-728 ledger with accepted
+  source-structural evidence; the old comment-spoofed anchor blocker is no
+  longer live queue state.
+- Workers 972, 976, and 995 added React Children lazy traversal oracle evidence,
+  lazy renderer blockers, and portal/ref/owner blockers. These remain
+  fail-closed private evidence only; full public Children traversal parity,
+  renderer/root/portal execution, owner/ref integration, and package
+  compatibility remain blocked.
+- Workers 973, 980, 982, 985, 991, and 997 advanced private Rust root, HostWork,
+  scheduler, and hook currentness canaries: root sibling replacement,
+  expired queue-lane currentness consumption, root work-loop FunctionComponent
+  bailout consumption, render-phase update root consumption, HostWork
+  delete/place continuation, and hook queue pending-ring currentness.
+- Workers 974, 977, and 988 added private `useRef` execution evidence, a Rust
+  `useRef` execution canary, and renderer lifecycle blockers. Public `useRef`
+  execution/ref identity, hook dispatcher lifecycle, root scheduling, renderer
+  behavior, Scheduler timing, `act`, and package compatibility remain blocked.
+- Worker 910's hydration recoverable-error boundary admission, Worker 949's
+  Scheduler variant currentness, Worker 979's profiling createRoot private
+  facade, Worker 981's resource/form root currentness, and Worker 993's N-API
+  cleanup worker-thread/source provenance were accepted as private evidence.
+  Public hydration, Scheduler timing, profiling/root behavior, resources/forms,
+  native cleanup execution, worker-thread teardown, and package compatibility
+  remain blocked.
+- Orchestrator audit policy was updated through `732a6b21` so worker
+  self-reports are inputs, not acceptance evidence. Non-trivial implementation
+  changes that touch compatibility gates, source currentness, one-shot tokens,
+  package surfaces, or prior blocker areas require independent read-only audit
+  subagents before merge; the orchestrator chooses the number and focus case by
+  case from blast radius, prior blockers, touched surfaces, and uncertainty.
+  Useful audit surfaces may include hostile/source review, regression-command
+  reruns with targeted probes, package-surface checks, or source-currentness
+  checks, but there is no mandated audit template.
+- The accepted state before this docs refresh is current main `732a6b21`
+  (`Make audit scope case by case`) after the Worker 910, 949, 964, 969,
+  972-974, 976-977, 979-982, 985, 988, 991, 993, 995, and 997 merge path plus
+  audit policy commits. Focused verification and audit evidence remain recorded
+  in worker reports, read-only audit reports, post-merge checks, and git
+  history; this docs batch makes no runtime compatibility claim.
+
 ### Worker 968 Docs Refresh and Worker 966
 
 - Worker 968 refreshed coordination docs for the `b625e49c` baseline after
@@ -56,7 +99,7 @@ sequencing belong in `MASTER_PLAN.md`.
 - Public React DOM roots, react-test-renderer/native behavior, hydration,
   events, refs, resources/forms, package/native compatibility, and public
   compatibility remain blocked.
-- The accepted state for this batch is current main `c2cb703f`
+- The accepted state for that batch was main `c2cb703f`
   (`Merge worker 966 private admission 804 ledger refresh`) after merge commits
   `7aaaec6d` and `c2cb703f`, with focused docs, private-admission 804,
   package-surface, import-smoke, JS syntax, and `git diff --check` evidence
@@ -89,10 +132,10 @@ sequencing belong in `MASTER_PLAN.md`.
   `definePrivateSymbolOnlyFacadeGate` helper shape, and Worker 745 sibling-text
   identity evidence is scoped to the dedicated Rust function with a targeted
   mutation canary.
-- Worker 965 preserves worker-thread teardown, public `hydrateRoot` placeholder,
+- Worker 965 preserved worker-thread teardown, public `hydrateRoot` placeholder,
   private symbol-only facade, sibling-text blocker, and public, native, root,
-  hydration, test-renderer, and package compatibility blockers. Worker 910
-  evidence remains unaccepted and was not consumed.
+  hydration, test-renderer, and package compatibility blockers. At that
+  baseline, Worker 910 evidence was not yet accepted and was not consumed.
 - The accepted state for this batch is current main `b625e49c`
   (`Merge worker 965 private admission 739-745 evidence refresh`) after merge
   commits `8b2bbeeb`, `43379920`, and `b625e49c`, with focused React DOM event,
