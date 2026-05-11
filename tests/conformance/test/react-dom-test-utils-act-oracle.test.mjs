@@ -2354,6 +2354,31 @@ test("Fast React test-utils private act route consumes source-owned scheduler-dr
       "scheduler-driven-passive-diagnostics-passive-ownership",
       `${nodeEnv}:missing-passive-ownership`
     );
+    const callerBuiltNestedDiagnostics =
+      reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(report, {
+        finishedWorkId: diagnostics.finishedWorkId,
+        diagnosticsOverrides:
+          createCallerBuiltSchedulerDrivenPassiveEffectNestedRecords(diagnostics)
+      });
+    assert.equal(
+      callerBuiltNestedDiagnostics[
+        privateSchedulerDrivenPassiveEffectDiagnosticsBrand
+      ],
+      true,
+      nodeEnv
+    );
+    assert.equal(Object.isFrozen(callerBuiltNestedDiagnostics), true, nodeEnv);
+    assert.equal(
+      Object.isFrozen(callerBuiltNestedDiagnostics.schedulerRequest),
+      false,
+      nodeEnv
+    );
+    assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+      gateModule,
+      callerBuiltNestedDiagnostics,
+      "scheduler-driven-passive-diagnostics-nested-passive-ownership",
+      `${nodeEnv}:caller-built-nested-passive-records`
+    );
     assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
       gateModule,
       Object.freeze({
@@ -3296,6 +3321,36 @@ function cloneSchedulerDrivenPassiveEffectDiagnostics(
   }
 
   return Object.freeze(cloned);
+}
+
+function createCallerBuiltSchedulerDrivenPassiveEffectNestedRecords(
+  diagnostics
+) {
+  const schedulerRequest = { ...diagnostics.schedulerRequest };
+  const schedulerGate = {
+    ...diagnostics.schedulerGate,
+    schedulerRequest
+  };
+  const passiveEffects = { ...diagnostics.passiveEffects };
+  const schedulerExecution = {
+    ...diagnostics.schedulerExecution,
+    schedulerGate,
+    schedulerRequest,
+    passiveEffects
+  };
+
+  return {
+    rootCommitPassiveExecution: {
+      ...diagnostics.rootCommitPassiveExecution
+    },
+    pendingPassiveHandoff: {
+      ...diagnostics.pendingPassiveHandoff
+    },
+    schedulerRequest,
+    schedulerGate,
+    passiveEffects,
+    schedulerExecution
+  };
 }
 
 function cloneFrozenObject(value, overrides = {}) {

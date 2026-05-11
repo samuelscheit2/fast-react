@@ -895,6 +895,35 @@ test('private act gate consumes scheduler-driven passive diagnostics through Rea
       'scheduler-driven-passive-diagnostics-passive-ownership',
       `${nodeEnv}:missing-passive-ownership`
     );
+    const callerBuiltNestedDiagnostics =
+      reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
+        expiredReport,
+        {
+          finishedWorkId: passiveDiagnostics.finishedWorkId,
+          diagnosticsOverrides:
+            createCallerBuiltSchedulerDrivenPassiveEffectNestedRecords(
+              passiveDiagnostics
+            )
+        }
+      );
+    assert.equal(
+      callerBuiltNestedDiagnostics[
+        privateSchedulerDrivenPassiveEffectDiagnosticsBrand
+      ],
+      true,
+      nodeEnv
+    );
+    assert.equal(Object.isFrozen(callerBuiltNestedDiagnostics), true, nodeEnv);
+    assert.equal(
+      Object.isFrozen(callerBuiltNestedDiagnostics.schedulerRequest),
+      false,
+      nodeEnv
+    );
+    assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
+      callerBuiltNestedDiagnostics,
+      'scheduler-driven-passive-diagnostics-nested-passive-ownership',
+      `${nodeEnv}:caller-built-nested-passive-records`
+    );
     assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(
       reactGate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
         cloneExpiredActRootWorkReport(expiredReport)
@@ -1173,6 +1202,36 @@ function cloneSchedulerDrivenPassiveEffectDiagnostics(
   );
 
   return Object.freeze(cloned);
+}
+
+function createCallerBuiltSchedulerDrivenPassiveEffectNestedRecords(
+  diagnostics
+) {
+  const schedulerRequest = { ...diagnostics.schedulerRequest };
+  const schedulerGate = {
+    ...diagnostics.schedulerGate,
+    schedulerRequest
+  };
+  const passiveEffects = { ...diagnostics.passiveEffects };
+  const schedulerExecution = {
+    ...diagnostics.schedulerExecution,
+    schedulerGate,
+    schedulerRequest,
+    passiveEffects
+  };
+
+  return {
+    rootCommitPassiveExecution: {
+      ...diagnostics.rootCommitPassiveExecution
+    },
+    pendingPassiveHandoff: {
+      ...diagnostics.pendingPassiveHandoff
+    },
+    schedulerRequest,
+    schedulerGate,
+    passiveEffects,
+    schedulerExecution
+  };
 }
 
 function assertReactDomSchedulerDrivenPassiveDiagnosticsRejected(

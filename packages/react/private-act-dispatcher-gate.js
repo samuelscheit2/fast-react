@@ -520,6 +520,8 @@ const privateActQueueTestCallbackBrand = Symbol.for(
 );
 let currentSchedulerMockExpiredActRootWorkSourceValidator = null;
 const privateSchedulerDrivenPassiveEffectDiagnostics = new WeakSet();
+const privateSchedulerDrivenPassiveEffectDiagnosticTokens = new WeakMap();
+const privateSchedulerDrivenPassiveEffectRecordTokens = new WeakMap();
 
 installSchedulerMockSourceProofLoadHook();
 
@@ -3400,6 +3402,7 @@ function createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
   schedulerMockExpiredActRootWorkDiagnostics,
   options = {}
 ) {
+  const ownershipToken = {};
   const schedulerReport = schedulerMockExpiredActRootWorkDiagnostics;
   const rootCommitRecord =
     getSchedulerDrivenPassiveEffectRootCommitRecord(schedulerReport) ??
@@ -3421,7 +3424,7 @@ function createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
   const pendingUnmountCount = options.pendingUnmountCount ?? 1;
   const pendingMountCount = options.pendingMountCount ?? 1;
   const pendingRecordCount = pendingUnmountCount + pendingMountCount;
-  const schedulerRequest = Object.freeze({
+  const schedulerRequest = createSchedulerDrivenPassiveEffectOwnedRecord({
     recordKind: 'SchedulerPassiveEffectsFlushRequest',
     source: 'crates/fast-react-reconciler/src/scheduler_bridge.rs',
     order: options.schedulerRequestOrder ?? 1,
@@ -3438,8 +3441,8 @@ function createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
     publicSchedulerPackageBehaviorChanged: false,
     compatibilityClaimed: false,
     ...(options.schedulerRequestOverrides ?? {})
-  });
-  const schedulerGate = Object.freeze({
+  }, ownershipToken);
+  const schedulerGate = createSchedulerDrivenPassiveEffectOwnedRecord({
     recordKind: 'PassiveEffectSchedulerFlushGateRecord',
     source: 'crates/fast-react-reconciler/src/root_scheduler.rs',
     status: 'Scheduled',
@@ -3454,8 +3457,8 @@ function createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
     publicActCompatibilityClaimed: false,
     compatibilityClaimed: false,
     ...(options.schedulerGateOverrides ?? {})
-  });
-  const pendingPassiveHandoff = Object.freeze({
+  }, ownershipToken);
+  const pendingPassiveHandoff = createSchedulerDrivenPassiveEffectOwnedRecord({
     recordKind: 'PendingPassiveCommitHandoff',
     source: 'crates/fast-react-reconciler/src/root_commit.rs',
     rootId,
@@ -3472,8 +3475,8 @@ function createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
     publicActCompatibilityClaimed: false,
     compatibilityClaimed: false,
     ...(options.pendingPassiveHandoffOverrides ?? {})
-  });
-  const passiveEffects = Object.freeze({
+  }, ownershipToken);
+  const passiveEffects = createSchedulerDrivenPassiveEffectOwnedRecord({
     recordKind: 'PassiveEffectsFlushResult',
     source: 'crates/fast-react-reconciler/src/passive_effects.rs',
     status: 'Flushed',
@@ -3492,8 +3495,8 @@ function createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
     publicActCompatibilityClaimed: false,
     compatibilityClaimed: false,
     ...(options.passiveEffectsOverrides ?? {})
-  });
-  const schedulerExecution = Object.freeze({
+  }, ownershipToken);
+  const schedulerExecution = createSchedulerDrivenPassiveEffectOwnedRecord({
     recordKind: 'PassiveEffectSchedulerFlushExecutionRecord',
     source: 'crates/fast-react-reconciler/src/passive_effects.rs',
     executionOrder: schedulerRequest.order,
@@ -3514,25 +3517,29 @@ function createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
     publicSchedulerPackageBehaviorChanged: false,
     compatibilityClaimed: false,
     ...(options.schedulerExecutionOverrides ?? {})
-  });
-  const rootCommitPassiveExecution = Object.freeze({
-    recordKind: 'HostRootFinishedWorkCommitHandoffRecordForCanary',
-    source: 'crates/fast-react-reconciler/src/root_commit.rs',
-    rootId,
-    rootLabel,
-    lane: lanes,
-    laneLabel,
-    finishedWorkId,
-    pendingPassiveEffectCount: pendingRecordCount,
-    hasPendingPassiveHandoff: true,
-    consumesCommittedFiberEffects: true,
-    linksRootCommitPassiveExecutionToActFlush: true,
-    publicRootExecution: false,
-    publicEffectExecution: false,
-    publicActCompatibilityClaimed: false,
-    compatibilityClaimed: false,
-    ...(options.rootCommitPassiveExecutionOverrides ?? {})
-  });
+  }, ownershipToken);
+  const rootCommitPassiveExecution =
+    createSchedulerDrivenPassiveEffectOwnedRecord(
+      {
+        recordKind: 'HostRootFinishedWorkCommitHandoffRecordForCanary',
+        source: 'crates/fast-react-reconciler/src/root_commit.rs',
+        rootId,
+        rootLabel,
+        lane: lanes,
+        laneLabel,
+        finishedWorkId,
+        pendingPassiveEffectCount: pendingRecordCount,
+        hasPendingPassiveHandoff: true,
+        consumesCommittedFiberEffects: true,
+        linksRootCommitPassiveExecutionToActFlush: true,
+        publicRootExecution: false,
+        publicEffectExecution: false,
+        publicActCompatibilityClaimed: false,
+        compatibilityClaimed: false,
+        ...(options.rootCommitPassiveExecutionOverrides ?? {})
+      },
+      ownershipToken
+    );
   const diagnostics = {
     kind: privateSchedulerDrivenPassiveEffectDiagnosticsKind,
     version: privateSchedulerDrivenPassiveEffectDiagnosticsVersion,
@@ -3608,7 +3615,61 @@ function createSchedulerDrivenPassiveEffectDiagnosticsForCanary(
 
   const frozenDiagnostics = Object.freeze(diagnostics);
   privateSchedulerDrivenPassiveEffectDiagnostics.add(frozenDiagnostics);
+  privateSchedulerDrivenPassiveEffectDiagnosticTokens.set(
+    frozenDiagnostics,
+    ownershipToken
+  );
   return frozenDiagnostics;
+}
+
+function createSchedulerDrivenPassiveEffectOwnedRecord(record, ownershipToken) {
+  const frozenRecord = Object.freeze(record);
+  privateSchedulerDrivenPassiveEffectRecordTokens.set(
+    frozenRecord,
+    ownershipToken
+  );
+  return frozenRecord;
+}
+
+function isSchedulerDrivenPassiveEffectOwnedRecord(record, diagnostics) {
+  const ownershipToken =
+    privateSchedulerDrivenPassiveEffectDiagnosticTokens.get(diagnostics);
+  return (
+    ownershipToken !== undefined &&
+    isObjectLike(record) &&
+    Object.isFrozen(record) &&
+    privateSchedulerDrivenPassiveEffectRecordTokens.get(record) ===
+      ownershipToken
+  );
+}
+
+function hasSchedulerDrivenPassiveEffectNestedRecordOwnership(diagnostics) {
+  return (
+    isSchedulerDrivenPassiveEffectOwnedRecord(
+      diagnostics.rootCommitPassiveExecution,
+      diagnostics
+    ) &&
+    isSchedulerDrivenPassiveEffectOwnedRecord(
+      diagnostics.pendingPassiveHandoff,
+      diagnostics
+    ) &&
+    isSchedulerDrivenPassiveEffectOwnedRecord(
+      diagnostics.schedulerRequest,
+      diagnostics
+    ) &&
+    isSchedulerDrivenPassiveEffectOwnedRecord(
+      diagnostics.schedulerGate,
+      diagnostics
+    ) &&
+    isSchedulerDrivenPassiveEffectOwnedRecord(
+      diagnostics.passiveEffects,
+      diagnostics
+    ) &&
+    isSchedulerDrivenPassiveEffectOwnedRecord(
+      diagnostics.schedulerExecution,
+      diagnostics
+    )
+  );
 }
 
 function matchesSchedulerDrivenPassiveEffectRootFields(
@@ -3651,6 +3712,7 @@ function isAcceptedSchedulerDrivenPassiveRootCommit(
   schedulerRootCommitRecord
 ) {
   return (
+    isSchedulerDrivenPassiveEffectOwnedRecord(record, diagnostics) &&
     matchesSchedulerDrivenPassiveEffectRootFields(record, diagnostics) &&
     hasExactOwnStringKeys(
       record,
@@ -3673,6 +3735,7 @@ function isAcceptedSchedulerDrivenPassiveRootCommit(
 
 function isAcceptedSchedulerDrivenPassiveHandoff(record, diagnostics) {
   return (
+    isSchedulerDrivenPassiveEffectOwnedRecord(record, diagnostics) &&
     matchesSchedulerDrivenPassiveEffectRootFields(record, diagnostics) &&
     hasExactOwnStringKeys(record, schedulerDrivenPassiveEffectHandoffKeys) &&
     record.recordKind === 'PendingPassiveCommitHandoff' &&
@@ -3688,6 +3751,7 @@ function isAcceptedSchedulerDrivenPassiveHandoff(record, diagnostics) {
 
 function isAcceptedSchedulerDrivenPassiveRequest(record, diagnostics) {
   return (
+    isSchedulerDrivenPassiveEffectOwnedRecord(record, diagnostics) &&
     matchesSchedulerDrivenPassiveEffectRootFields(record, diagnostics) &&
     hasExactOwnStringKeys(record, schedulerDrivenPassiveEffectRequestKeys) &&
     record.recordKind === 'SchedulerPassiveEffectsFlushRequest' &&
@@ -3703,6 +3767,7 @@ function isAcceptedSchedulerDrivenPassiveRequest(record, diagnostics) {
 
 function isAcceptedSchedulerDrivenPassiveGate(record, diagnostics) {
   return (
+    isSchedulerDrivenPassiveEffectOwnedRecord(record, diagnostics) &&
     matchesSchedulerDrivenPassiveEffectRootFields(record, diagnostics) &&
     hasExactOwnStringKeys(record, schedulerDrivenPassiveEffectGateKeys) &&
     record.recordKind === 'PassiveEffectSchedulerFlushGateRecord' &&
@@ -3718,6 +3783,7 @@ function isAcceptedSchedulerDrivenPassiveGate(record, diagnostics) {
 
 function isAcceptedSchedulerDrivenPassiveResult(record, diagnostics) {
   return (
+    isSchedulerDrivenPassiveEffectOwnedRecord(record, diagnostics) &&
     matchesSchedulerDrivenPassiveEffectRootFields(record, diagnostics) &&
     hasExactOwnStringKeys(record, schedulerDrivenPassiveEffectResultKeys) &&
     record.recordKind === 'PassiveEffectsFlushResult' &&
@@ -3740,6 +3806,7 @@ function isAcceptedSchedulerDrivenPassiveResult(record, diagnostics) {
 
 function isAcceptedSchedulerDrivenPassiveExecution(record, diagnostics) {
   return (
+    isSchedulerDrivenPassiveEffectOwnedRecord(record, diagnostics) &&
     matchesSchedulerDrivenPassiveEffectRootFields(record, diagnostics) &&
     hasExactOwnStringKeys(record, schedulerDrivenPassiveEffectExecutionKeys) &&
     record.recordKind ===
@@ -3879,6 +3946,9 @@ function getRejectedSchedulerDrivenPassiveEffectDiagnosticsReason(
       diagnostics.pendingUnmountCount + diagnostics.pendingMountCount
   ) {
     return 'scheduler-driven-passive-diagnostics-root-link';
+  }
+  if (!hasSchedulerDrivenPassiveEffectNestedRecordOwnership(diagnostics)) {
+    return 'scheduler-driven-passive-diagnostics-nested-passive-ownership';
   }
   if (
     !isAcceptedSchedulerDrivenPassiveRootCommit(

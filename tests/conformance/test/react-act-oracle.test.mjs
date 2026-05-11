@@ -2203,6 +2203,30 @@ test("React act gate consumes source-owned scheduler-driven passive effect diagn
       "scheduler-driven-passive-diagnostics-passive-ownership",
       `${nodeEnv}:caller-built-public-alias`
     );
+    const callerBuiltNestedDiagnostics =
+      gate.createSchedulerDrivenPassiveEffectDiagnosticsForCanary(report, {
+        finishedWorkId: diagnostics.finishedWorkId,
+        diagnosticsOverrides:
+          createCallerBuiltSchedulerDrivenPassiveEffectNestedRecords(diagnostics)
+      });
+    assert.equal(
+      callerBuiltNestedDiagnostics[
+        privateSchedulerDrivenPassiveEffectDiagnosticsBrand
+      ],
+      true,
+      nodeEnv
+    );
+    assert.equal(Object.isFrozen(callerBuiltNestedDiagnostics), true, nodeEnv);
+    assert.equal(
+      Object.isFrozen(callerBuiltNestedDiagnostics.schedulerRequest),
+      false,
+      nodeEnv
+    );
+    assertRejected(
+      callerBuiltNestedDiagnostics,
+      "scheduler-driven-passive-diagnostics-nested-passive-ownership",
+      `${nodeEnv}:caller-built-nested-passive-records`
+    );
     assertRejected(
       Object.freeze({
         kind: privateSchedulerDrivenPassiveEffectDiagnosticsKind,
@@ -4366,6 +4390,36 @@ function cloneSchedulerDrivenPassiveEffectDiagnostics(
   }
 
   return Object.freeze(cloned);
+}
+
+function createCallerBuiltSchedulerDrivenPassiveEffectNestedRecords(
+  diagnostics
+) {
+  const schedulerRequest = { ...diagnostics.schedulerRequest };
+  const schedulerGate = {
+    ...diagnostics.schedulerGate,
+    schedulerRequest
+  };
+  const passiveEffects = { ...diagnostics.passiveEffects };
+  const schedulerExecution = {
+    ...diagnostics.schedulerExecution,
+    schedulerGate,
+    schedulerRequest,
+    passiveEffects
+  };
+
+  return {
+    rootCommitPassiveExecution: {
+      ...diagnostics.rootCommitPassiveExecution
+    },
+    pendingPassiveHandoff: {
+      ...diagnostics.pendingPassiveHandoff
+    },
+    schedulerRequest,
+    schedulerGate,
+    passiveEffects,
+    schedulerExecution
+  };
 }
 
 function createInheritedDiagnosticsAlias(report) {
