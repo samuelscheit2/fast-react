@@ -2697,6 +2697,15 @@ impl TestHostRootDeletionTeardownExecutionRequestForCanary {
     }
 
     #[must_use]
+    const fn has_required_source_evidence(self) -> bool {
+        self.deletion_list_count > 0
+            && self.deleted_root_count > 0
+            && self.ref_cleanup_return_count > 0
+            && self.passive_destroy_count > 0
+            && self.host_node_cleanup_count > 0
+    }
+
+    #[must_use]
     pub(crate) const fn private_test_control_execution_requested(self) -> bool {
         true
     }
@@ -4101,8 +4110,14 @@ pub(crate) fn test_host_root_deletion_teardown_execution_request_for_canary(
     let commit = handoff.commit();
     let order_gate = commit.deletion_cleanup_order_gate_for_canary();
     if commit.deletion_lists().is_empty()
+        || commit
+            .deletion_lists()
+            .iter()
+            .all(|list| list.deleted().is_empty())
         || commit.host_node_deletion_cleanup_log().records().is_empty()
-        || order_gate.is_empty()
+        || order_gate.ref_cleanup_return_count() == 0
+        || order_gate.passive_destroy_count() == 0
+        || order_gate.host_node_cleanup_count() == 0
     {
         return Err(
             TestHostRootDeletionTeardownExecutionErrorForCanary::MissingDeletionTeardownMetadata {
@@ -4132,6 +4147,7 @@ pub(crate) fn test_host_root_deletion_teardown_execution_request_for_canary(
         host_detachment_plan,
     };
     debug_assert!(request.matches_source_handoff(handoff));
+    debug_assert!(request.has_required_source_evidence());
     Ok(request)
 }
 
@@ -4176,6 +4192,15 @@ where
                 root: request.root(),
                 commit_order: request.commit_order(),
                 request_order: request.request_order(),
+            },
+        );
+    }
+
+    if !source_request.has_required_source_evidence() {
+        return Err(
+            TestHostRootDeletionTeardownExecutionErrorForCanary::MissingDeletionTeardownMetadata {
+                root: source_request.root(),
+                finished_work: source_request.finished_work(),
             },
         );
     }

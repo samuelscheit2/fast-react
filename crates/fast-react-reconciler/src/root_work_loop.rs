@@ -127,8 +127,7 @@ use crate::{
         HostRootFinishedWorkCommitExecutionStatusForCanary,
         HostRootFinishedWorkCommitHandoffErrorForCanary,
         HostRootFinishedWorkCommitHandoffRecordForCanary,
-        HostRootFinishedWorkPendingCommitRecordForCanary,
-        HostRootMutationApplyRecordKind,
+        HostRootFinishedWorkPendingCommitRecordForCanary, HostRootMutationApplyRecordKind,
         HostRootPlacementApplyDiagnosticForCanary,
         HostRootSingleHostUpdateApplyRecordErrorForCanary,
         HostRootSingleHostUpdateApplyRecordForCanary,
@@ -16146,6 +16145,77 @@ mod tests {
         expected_operations.push("remove_child");
         expected_operations.push("detach_deleted_instance");
         assert_eq!(host.operations(), expected_operations);
+    }
+
+    #[test]
+    fn root_work_loop_deleted_subtree_teardown_rejects_missing_ref_and_passive_evidence_before_host_calls()
+     {
+        let (mut store, root_id, mut host) = root_store();
+        let fixture = prepare_root_work_loop_deleted_subtree_teardown_fixture(
+            &mut store, &mut host, root_id, 86_750,
+        );
+        store
+            .fiber_arena_mut()
+            .get_mut(fixture.deleted_host)
+            .unwrap()
+            .set_ref_handle(RefHandle::NONE);
+
+        let handoff = commit_finished_host_root_with_finished_work_handoff_for_canary(
+            &mut store,
+            fixture.delete_render,
+            Some(fixture.pending),
+            ROOT_WORK_LOOP_DELETED_SUBTREE_TEARDOWN_COMMIT_ORDER,
+        )
+        .unwrap();
+        let order_gate = handoff.commit().deletion_cleanup_order_gate_for_canary();
+        let executor = RecordingDeletedSubtreeTeardownExecutor::default();
+
+        let error = test_host_root_deletion_teardown_execution_request_for_canary(
+            &handoff,
+            ROOT_WORK_LOOP_DELETED_SUBTREE_TEARDOWN_REQUEST_ORDER,
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            TestHostRootDeletionTeardownExecutionErrorForCanary::MissingDeletionTeardownMetadata {
+                root,
+                finished_work,
+            } if root == root_id && finished_work == fixture.delete_render.finished_work()
+        ));
+        assert_eq!(handoff.commit().deletion_lists().len(), 1);
+        assert_eq!(
+            handoff.commit().deletion_lists()[0].deleted(),
+            &[fixture.deleted_host]
+        );
+        assert_eq!(
+            handoff
+                .commit()
+                .host_node_deletion_cleanup_log()
+                .records()
+                .len(),
+            2
+        );
+        assert_eq!(order_gate.ref_cleanup_return_count(), 0);
+        assert_eq!(order_gate.passive_destroy_count(), 0);
+        assert_eq!(order_gate.host_node_cleanup_count(), 2);
+        assert!(executor.ref_cleanup_calls().is_empty());
+        assert!(executor.destroy_calls().is_empty());
+        assert_eq!(host.operations(), fixture.operations_before_teardown);
+        assert!(
+            fixture
+                .detached_hosts
+                .text_metadata(fixture.deleted_text_state_node)
+                .unwrap()
+                .is_active()
+        );
+        assert!(
+            fixture
+                .detached_hosts
+                .instance_metadata(fixture.deleted_host_state_node)
+                .unwrap()
+                .is_active()
+        );
     }
 
     #[test]

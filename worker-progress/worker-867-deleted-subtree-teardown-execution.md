@@ -14,3 +14,8 @@
 - `cargo check -p fast-react-reconciler --all-features`
 - `cargo fmt --all --check`
 - `git diff --check`
+
+## Follow-Up Audit Fix
+- Merged current `main` into the worker branch and resolved the expected `root_work_loop.rs` conflict by retaining Worker 862 root-unmount imports/constants alongside Worker 867 teardown imports/constants.
+- Tightened deleted-subtree teardown request construction and execution to require nonzero deletion-list/deleted-root, ref cleanup return, passive destroy, and host cleanup source evidence before any host calls.
+- Added a root-work-loop negative canary where host cleanup evidence exists while ref/passive evidence is absent; request construction rejects and executor/host calls remain untouched.
