@@ -2888,6 +2888,7 @@ const rootNativeHandoffPayloads = new WeakMap();
 const rootNativeHandoffRecords = new WeakMap();
 const rootRenderNativeHandoffPayloads = new WeakMap();
 const rootRenderNativeHandoffRecords = new WeakMap();
+const rootBridgeAdmissionPayloads = new WeakMap();
 const rootCreateRenderAdmissionPayloads = new WeakMap();
 const rootCreateRenderAdmissionRecords = new WeakMap();
 const rootCreateSideEffectPayloads = new WeakMap();
@@ -10989,6 +10990,35 @@ function isPrivateRootRenderNativeHandoffRecord(value) {
   return rootRenderNativeHandoffPayloads.has(value);
 }
 
+function isPrivateRootBridgeAdmissionRecord(value) {
+  return rootBridgeAdmissionPayloads.has(value);
+}
+
+function isSourceOwnedPrivateRootBridgeAdmissionRecord(value) {
+  const payload = rootBridgeAdmissionPayloads.get(value);
+  if (payload === undefined || value == null || typeof value !== 'object') {
+    return false;
+  }
+
+  const lifecycle = value.lifecyclePrerequisites;
+  const sourceRecord = payload.sourceRecord;
+  return (
+    value.$$typeof === privateRootAdmissionRecordType &&
+    value.kind === 'FastReactDomPrivateRootAdmissionRecord' &&
+    sourceRecord != null &&
+    sourceRecord.requestId === value.requestId &&
+    sourceRecord.requestSequence === value.requestSequence &&
+    sourceRecord.requestType === value.requestType &&
+    sourceRecord.rootId === value.rootId &&
+    sourceRecord.rootKind === value.rootKind &&
+    sourceRecord.rootTag === value.rootTag &&
+    sourceRecord.operation === value.operation &&
+    payload.operation === value.operation &&
+    lifecycle != null &&
+    payload.lifecycleTransition === lifecycle.lifecycleTransition
+  );
+}
+
 function getPrivateRootCreateRenderAdmissionPayload(record) {
   return rootCreateRenderAdmissionPayloads.get(record) || null;
 }
@@ -12315,7 +12345,7 @@ function validateUpdateRootBridgeRequestRecord(record) {
 }
 
 function createRootBridgeAdmissionRecord(record, validation) {
-  return freezeRecord({
+  const admissionRecord = freezeRecord({
     $$typeof: privateRootAdmissionRecordType,
     kind: 'FastReactDomPrivateRootAdmissionRecord',
     operation: record.operation,
@@ -12357,6 +12387,18 @@ function createRootBridgeAdmissionRecord(record, validation) {
     eventDispatch: false,
     compatibilityClaimed: false
   });
+
+  rootBridgeAdmissionPayloads.set(
+    admissionRecord,
+    freezeRecord({
+      bridgeState: validation.bridgeState,
+      lifecycleTransition: validation.lifecycleTransition,
+      operation: validation.operation,
+      rootHandleState: validation.rootHandleState,
+      sourceRecord: record
+    })
+  );
+  return admissionRecord;
 }
 
 function createNativeRequestRecordMirror(record, rootHandleState, payload) {
@@ -23182,6 +23224,8 @@ module.exports = {
   getRootOwnerFromHandle,
   isNativeRootBridgeHandoffRecord,
   isPrivateRootRenderNativeHandoffRecord,
+  isPrivateRootBridgeAdmissionRecord,
+  isSourceOwnedPrivateRootBridgeAdmissionRecord,
   isPrivateRootCommitHostComponentUpdateHandoffRecord,
   isPrivateRootDangerousHtmlTextResetCommitHandoffRecord,
   isPrivateRootDangerousHtmlTextResetCommitMetadataRecord,

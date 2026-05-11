@@ -2103,6 +2103,10 @@ function assertRootBridgeAdmissionIsRecordOnly(admission) {
   }
 
   if (
+    !rootBridge.isPrivateRootBridgeAdmissionRecord(admission) ||
+    !rootBridge.isSourceOwnedPrivateRootBridgeAdmissionRecord(admission) ||
+    admission.$$typeof !== rootBridge.privateRootAdmissionRecordType ||
+    admission.kind !== 'FastReactDomPrivateRootAdmissionRecord' ||
     admission.admissionStatus !== rootBridge.ROOT_BRIDGE_REQUEST_ADMITTED ||
     admission.executionStatus !== rootBridge.ROOT_BRIDGE_EXECUTION_BLOCKED ||
     admission.compatibilityStatus !==

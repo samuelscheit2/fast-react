@@ -19314,6 +19314,33 @@ test('private resource/form root execution consumer rejects stale cross-root mis
   const gate = resourceFormGate.createResourceFormRootExecutionConsumerGate({
     requestIdPrefix: 'root-execution-consumer-negative-gate'
   });
+  const callerShapedRootBridgeAdmission = {
+    ...admission,
+    requestId: 'caller-shaped-admission:1'
+  };
+
+  assert.equal(rootBridge.isPrivateRootBridgeAdmissionRecord(admission), true);
+  assert.equal(
+    rootBridge.isPrivateRootBridgeAdmissionRecord(
+      callerShapedRootBridgeAdmission
+    ),
+    false
+  );
+  assert.throws(
+    () =>
+      gate.recordRootExecutionConsumer(
+        callerShapedRootBridgeAdmission,
+        resourceExecution,
+        fulfilledResetExecution,
+        {
+          explicitResourceFormRootExecutionConsumer: true
+        }
+      ),
+    {
+      code: resourceFormGate.rootBoundaryInvalidRootMetadataCode,
+      compatibilityTarget
+    }
+  );
 
   assert.throws(
     () =>
