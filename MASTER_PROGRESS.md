@@ -29,6 +29,53 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 844, 848, and 855-860
+
+- Worker 844 added package-root private `react-test-renderer` native execution
+  parity for committed `toJSON`/`toTree` single-host and unmount rows, with
+  source-owned host-output row validation mirrored across package root and CJS
+  bundles. Public serializer, `ReactTestInstance`, native bridge
+  loading/execution, package compatibility, and broad multichild identity remain
+  blocked.
+- Worker 848 extended private React DOM nested public-facade host-output update
+  diagnostics through the inert native root bridge handoff, with exact fake-DOM
+  output, topology, payload, and listener snapshot validation. Public root
+  execution, native/Rust execution, reconciler scheduling, browser DOM,
+  hydration, refs/events, and compatibility remain blocked.
+- Workers 855 and 860 advanced private Rust host mutation execution. Worker 855
+  applies one-level HostRoot child-set append/insert-before canaries through the
+  test-host mutation applier; Worker 860 adds an opt-in sync-flush host
+  mutation canary that revalidates accepted finished-work handoff evidence
+  before host calls while keeping default sync flush inert. Public React DOM,
+  test-renderer, `flushSync`, hydration, native/package behavior, refs/effects,
+  and broad renderer compatibility remain blocked.
+- Worker 856 added the private resource/form root execution consumer, binding
+  accepted resource root-map storage and fulfilled-reset fake queue/commit
+  evidence to private root admission plus Worker 850 ledger/source-token
+  metadata. Public resources, forms, action/reset invocation, React updates,
+  DOM/head mutation, native/root execution, and package compatibility remain
+  blocked.
+- Worker 857 consumed accepted scheduler-driven passive effect evidence in the
+  React private act dispatcher and React DOM test-utils gates, requiring frozen
+  nested source-owned diagnostics while preserving Scheduler source-proof load
+  ordering. Public `act`, public root execution, Scheduler timing, passive
+  effect behavior, renderer behavior, and package compatibility remain blocked.
+- Worker 858 added the Rust mirror for private native root JSON batch lifecycle
+  links, tying consumer rows to lifecycle, response, stream, handle-table smoke,
+  and cleanup-hook preflight provenance without package exports. Native addon
+  loading/execution, cleanup hooks, worker threads, renderer/reconciler output,
+  public native compatibility, and React behavior remain blocked.
+- Worker 859 hardened the Rust test-renderer private unmount/nested native
+  consumer with source-owned renderer IDs, `toJSON`/`toTree` identity surfaces,
+  durable row IDs, cleanup counts, and update sequences. Public serialization,
+  JS/CJS/package compatibility, native bridge loading/public execution,
+  root/act/Scheduler compatibility, and broad multichild identity remain
+  blocked.
+- The batch was accepted after focused Rust, React DOM, React act/test-utils,
+  resource/form, native lifecycle, test-renderer package/CJS, package-surface,
+  import-smoke, formatting, and `git diff --check` verification recorded in
+  git history and the worker reports.
+
 ### Workers 826-837, 842-843, 845-846, 849-852
 
 - Workers 826-837 moved the former active queue into accepted private evidence:
