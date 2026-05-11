@@ -14,6 +14,16 @@ after that evidence is accepted and remains current.
 
 - Source-owned lifecycle execution rows must be frozen records from the current
   entrypoint's root execution WeakSet.
+- Lifecycle rows no longer fall back to their own request id/status as
+  source-execution evidence; TestInstance diagnostics require real
+  create/update/unmount source records.
+- Accepted source records are limited to the create native bridge host-output
+  handoff, update native bridge admission, and unmount native bridge admission,
+  with id/status, request, root, and entrypoint identity checked before the
+  lifecycle evidence is accepted.
+- Package-root lifecycle-only rows and CJS production rows without a create
+  host-output source record now remain blocked at the TestInstance lifecycle
+  gate and do not expose `bridgeRouted: true` diagnostics.
 - Accepted lifecycle evidence is recorded per root handle only on real
   consumption, while `canConsume...` remains dry-run.
 - Replay consumption is rejected.

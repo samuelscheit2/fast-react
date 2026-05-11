@@ -531,7 +531,7 @@ test("React test renderer private update and commit error rows stay metadata onl
   assert.deepEqual(calls, []);
 });
 
-test("React test renderer error surface gate keeps multi-child TestInstance query metadata private", () => {
+test("React test renderer error surface gate keeps multi-child TestInstance query metadata behind lifecycle source evidence", () => {
   const gate = evaluateReactTestRendererErrorSurfaceLocalGate({ oracle });
 
   assert.equal(
@@ -617,32 +617,44 @@ test("React test renderer error surface gate keeps multi-child TestInstance quer
       unmountError.rootRequest,
       executor
     );
-    const lifecycleEvidence =
-      bridge.consumePrivateRootLifecycleExecutionEvidence({
-        create: createResult,
-        update: updateResult,
-        unmount: unmountResult
-      });
+    const lifecycleRows = {
+      create: createResult,
+      update: updateResult,
+      unmount: unmountResult
+    };
+    assert.equal(
+      bridge.canConsumePrivateRootLifecycleExecutionEvidence(lifecycleRows),
+      false,
+      entry.entrypoint
+    );
+    const lifecycleError = captureThrown(() =>
+      bridge.consumePrivateRootLifecycleExecutionEvidence(lifecycleRows)
+    );
+    assert.equal(
+      lifecycleError.name,
+      "FastReactTestRendererPrivateRootRequestError",
+      entry.entrypoint
+    );
+    assert.match(
+      lifecycleError.message,
+      /finished work or current host output source records/u,
+      entry.entrypoint
+    );
+
     const record = bridge.getRendererTestInstanceQueryDiagnostics(renderer);
     assert.equal(
-      record.privateRootLifecycleExecutionEvidence,
-      lifecycleEvidence,
+      record.kind,
+      "FastReactTestRendererPrivateTestInstanceRootLifecycleGate",
       entry.entrypoint
     );
     assert.equal(record.publicRootAvailable, false, entry.entrypoint);
     assert.equal(record.publicQueryMethodsAvailable, false, entry.entrypoint);
-    assert.equal(record.bridgeRouted, true, entry.entrypoint);
-    assert.equal(record.consumesRootBridgeMetadata, true, entry.entrypoint);
-    assert.equal(record.standaloneWrapperMetadata, false, entry.entrypoint);
-    assert.equal(record.rootRequest, unmountError.rootRequest, entry.entrypoint);
+    assert.equal(record.acceptedLifecycleEvidenceAvailable, false, entry.entrypoint);
+    assert.equal(record.exposesPrivateQueryDiagnostics, false, entry.entrypoint);
+    assert.notEqual(record.bridgeRouted, true, entry.entrypoint);
     assert.equal(
-      record.rootRequestTestInstanceQueryMetadata,
-      unmountError.rootRequest.rustCanaryMetadata.testInstanceQuery,
-      entry.entrypoint
-    );
-    assert.equal(
-      bridge.getRendererTestInstanceQueryDiagnostics(renderer),
-      record,
+      bridge.getRendererTestInstanceQueryDiagnostics(renderer).kind,
+      "FastReactTestRendererPrivateTestInstanceRootLifecycleGate",
       entry.entrypoint
     );
     assert.equal(
@@ -650,55 +662,12 @@ test("React test renderer error surface gate keeps multi-child TestInstance quer
       false,
       entry.entrypoint
     );
-    assert.equal(record.multiChildHostTree.rootChildCount, 2, entry.entrypoint);
-    assert.equal(
-      record.multiChildHostTree.publicRootAccessAvailable,
-      false,
-      entry.entrypoint
-    );
-    assert.deepEqual(
-      record.queryPath.map((inspection) => inspection.fiberTag),
-      ["HostRoot", "HostComponent"],
-      entry.entrypoint
-    );
-    assert.deepEqual(
-      record.queryMethodRecords.findAll.skippedRecords.map(
-        (inspection) => inspection.text
-      ),
-      ["first sibling", "second sibling"],
-      entry.entrypoint
-    );
-    assert.equal(
-      record.queryMethodRecords.findAll.expectedCanaryMatchCount,
-      2,
-      entry.entrypoint
-    );
-    assert.equal(
-      record.queryMethodRecords.findAllByType.expectedCanaryMatchCount,
-      1,
-      entry.entrypoint
-    );
-    assert.deepEqual(
-      record.rootQueryRecord.result.children.map((child) => child.fiberTag),
-      ["HostText", "HostComponent"],
-      entry.entrypoint
-    );
-    assert.equal(
-      Object.hasOwn(record.rootQueryRecord.result, "findAll"),
-      false,
-      entry.entrypoint
-    );
 
     const rootError = captureThrown(() => renderer.root);
     assert.equal(rootError.exportName, "create().root", entry.entrypoint);
-    assert.equal(
-      rootError.privateTestInstanceWrapperRecord,
-      record,
-      entry.entrypoint
-    );
     assert.notEqual(
-      rootError.routingGate.privateTestInstanceWrapperSkeleton,
-      record,
+      rootError.privateTestInstanceWrapperRecord?.bridgeRouted,
+      true,
       entry.entrypoint
     );
   }

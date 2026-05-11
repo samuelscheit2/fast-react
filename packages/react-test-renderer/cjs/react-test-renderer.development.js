@@ -11738,18 +11738,13 @@ function assertRootLifecycleExecutionRowsHaveSourceRecords(
   unmountResult
 ) {
   for (const result of [createResult, updateResult, unmountResult]) {
-    const sourceRecordId = sourceExecutionRecordIdForRootLifecycleResult(result);
-    const sourceStatus = sourceExecutionStatusForRootLifecycleResult(result);
-    if (
-      typeof sourceRecordId !== 'string' ||
-      sourceRecordId.length === 0 ||
-      typeof sourceStatus !== 'string' ||
-      sourceStatus.length === 0
-    ) {
+    const sourceRecord = sourceExecutionRecordForRootLifecycleResult(result);
+    if (sourceRecord === undefined) {
       throwInvalidRootRequest(
         'Private root lifecycle execution evidence must carry finished work or current host output source records.'
       );
     }
+    assertRootLifecycleSourceRecordMatchesResult(result, sourceRecord);
   }
 }
 
@@ -11820,29 +11815,76 @@ function publicSurfaceForRootLifecycleOperation(operation) {
 }
 
 function sourceExecutionRecordIdForRootLifecycleResult(result) {
-  if (result.privateCreateNativeBridgeHostOutputHandoff != null) {
-    return result.privateCreateNativeBridgeHostOutputHandoff.id;
-  }
-  if (result.privateUpdateNativeBridgeAdmission != null) {
-    return result.privateUpdateNativeBridgeAdmission.id;
-  }
-  if (result.privateUnmountNativeBridgeAdmission != null) {
-    return result.privateUnmountNativeBridgeAdmission.id;
-  }
-  return result.requestId;
+  return sourceExecutionRecordForRootLifecycleResult(result)?.id;
 }
 
 function sourceExecutionStatusForRootLifecycleResult(result) {
-  if (result.privateCreateNativeBridgeHostOutputHandoff != null) {
-    return result.privateCreateNativeBridgeHostOutputHandoff.status;
+  return sourceExecutionRecordForRootLifecycleResult(result)?.status;
+}
+
+function sourceExecutionRecordForRootLifecycleResult(result) {
+  switch (result.operation) {
+    case 'create':
+      return result.privateCreateNativeBridgeHostOutputHandoff ?? undefined;
+    case 'update':
+      return result.privateUpdateNativeBridgeAdmission ?? undefined;
+    case 'unmount':
+      return result.privateUnmountNativeBridgeAdmission ?? undefined;
   }
-  if (result.privateUpdateNativeBridgeAdmission != null) {
-    return result.privateUpdateNativeBridgeAdmission.status;
+  return undefined;
+}
+
+function assertRootLifecycleSourceRecordMatchesResult(result, sourceRecord) {
+  if (
+    sourceRecord === null ||
+    typeof sourceRecord !== 'object' ||
+    !Object.isFrozen(sourceRecord)
+  ) {
+    throwInvalidRootRequest(
+      'Private root lifecycle execution source record must be source-owned.'
+    );
   }
-  if (result.privateUnmountNativeBridgeAdmission != null) {
-    return result.privateUnmountNativeBridgeAdmission.status;
+
+  let expectedId;
+  let expectedStatus;
+  switch (result.operation) {
+    case 'create':
+      expectedId = privateCreateNativeBridgeHostOutputHandoffDiagnosticId;
+      expectedStatus = privateCreateNativeBridgeHostOutputHandoffStatus;
+      break;
+    case 'update':
+      expectedId = privateUpdateNativeBridgeAdmissionDiagnosticId;
+      expectedStatus = privateUpdateNativeBridgeAdmissionStatus;
+      break;
+    case 'unmount':
+      expectedId = privateUnmountNativeBridgeAdmissionDiagnosticId;
+      expectedStatus = privateUnmountNativeBridgeAdmissionStatus;
+      break;
+    default:
+      throwInvalidRootRequest(
+        `Unsupported private root lifecycle operation: ${String(result.operation)}.`
+      );
   }
-  return result.status;
+
+  const sourceRequest = sourceRecord.request;
+  if (
+    sourceRecord.id !== expectedId ||
+    sourceRecord.status !== expectedStatus ||
+    sourceRecord.operation !== result.operation ||
+    sourceRequest !== result.request ||
+    sourceRequest.entrypoint !== entrypoint ||
+    (sourceRecord.requestId !== undefined &&
+      sourceRecord.requestId !== result.requestId) ||
+    (sourceRecord.requestSequence !== undefined &&
+      sourceRecord.requestSequence !== result.requestSequence) ||
+    (sourceRecord.rootId !== undefined && sourceRecord.rootId !== result.rootId) ||
+    (sourceRecord.rootSequence !== undefined &&
+      sourceRecord.rootSequence !== result.request.rootSequence)
+  ) {
+    throwInvalidRootRequest(
+      'Private root lifecycle execution source record is stale for the execution result.'
+    );
+  }
 }
 
 function readDiagnosticField(record, names) {
