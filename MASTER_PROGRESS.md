@@ -29,6 +29,50 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 881, 888, 890, 892-893, and 896
+
+- Worker 890 added a private sync-flush canary that composes accepted
+  deleted-subtree ref/passive teardown with post-passive sync continuation,
+  validating source-owned deletion and sync-flush evidence before ref cleanup,
+  passive destroy, host detach, cleanup, and one Sync-lane continuation. Public
+  `flushSync`, public renderers, hooks/effects, native, and package behavior
+  remain blocked.
+- Worker 892 added a private Rust-only native cleanup-generation consumer that
+  binds cleanup-hook preflight rows to source-owned JSON batch lifecycle
+  executor rows and consumes cleanup-generation evidence once. Native addon
+  loading, runtime cleanup-hook execution, worker-thread teardown, package
+  exports, and public native compatibility remain blocked.
+- Worker 896 added a private test-only HostRoot update queue/lane handoff
+  canary, tying current root/fiber identity, current and work-in-progress
+  queues, pending/selected/finished lanes, update sequence IDs, applied/skipped
+  counts, and replay/stale/cross-root rejection to source-owned evidence.
+  Public root scheduling/rendering and package compatibility remain blocked.
+- Worker 881 hardened package-root and CJS `react-test-renderer` serialization
+  currentness so unmount `toJSON`, `toTree`, raw serialization, and metadata
+  description paths require source-owned create/latest-update/unmount lifecycle
+  execution evidence. Public serialization, TestInstance, native bridge,
+  root/act/Scheduler, and package compatibility remain blocked.
+- Worker 888 added the package-root and CJS private TestInstance lifecycle gate,
+  returning private diagnostics only after current source-owned
+  create/update/unmount lifecycle execution evidence is accepted and rejecting
+  self-fallback, dry-run consumption, replay, stale, cross-entrypoint, and
+  caller-shaped rows. Public `.root`, public `ReactTestInstance`, query
+  methods, serialization, act/Scheduler, native bridge availability, and
+  compatibility claims remain blocked.
+- Worker 893 added private resource/form reset lifecycle execution binding for
+  fulfilled reset queue/commit records, requiring root admission, lifecycle
+  boundary, container identity, currentness, and source row identity before
+  root execution consumption. Public resources, forms, action invocation, real
+  reset/update/DOM behavior, native/reconciler execution, and package exports
+  remain blocked.
+- Worker 888 was merged with Worker 881 conflict resolution, preserving both
+  the private serialization lifecycle gate and the private TestInstance
+  lifecycle gate.
+- The batch was accepted after focused Rust reconciler, native cleanup
+  generation, HostRoot lane handoff, test-renderer package/CJS lifecycle,
+  resource/form reset, package-surface, import-smoke, formatting, and
+  `git diff --check` verification recorded in git history and worker reports.
+
 ### Workers 878-880, 882-883, 886, and 889
 
 - Worker 878 extended private Rust HostRoot test-host execution from
