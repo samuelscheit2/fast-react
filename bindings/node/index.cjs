@@ -1662,18 +1662,31 @@ function getNativeRootBridgeRequestRecord(input) {
 }
 
 function assertBlockedNativeRootBridgeHandoff(input) {
-  if (!input || typeof input !== 'object' || !hasOwn(input, 'nativeRequestRecord')) {
+  if (!input || typeof input !== 'object') {
     return;
   }
 
+  assertBlockedNativeRootBridgeHandoffClaims(input);
+  if (
+    input.nativeRequestRecord &&
+    typeof input.nativeRequestRecord === 'object'
+  ) {
+    assertBlockedNativeRootBridgeHandoffClaims(input.nativeRequestRecord);
+  }
+}
+
+function assertBlockedNativeRootBridgeHandoffClaims(input) {
   for (const flag of [
+    'nativeAddonLoaded',
     'nativeExecution',
+    'rendererExecution',
     'reconcilerExecution',
     'domMutation',
     'markerWrites',
     'listenerInstallation',
     'hydration',
     'eventDispatch',
+    'publicNativeCompatibility',
     'compatibilityClaimed'
   ]) {
     if (input[flag] === true) {
