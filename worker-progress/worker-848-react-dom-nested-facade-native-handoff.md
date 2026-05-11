@@ -58,6 +58,13 @@
 - Added negative coverage for factories that mutate container attributes,
   container own properties, or container style state after creating the
   canonical native handoff.
+- Fourth audit follow-up: added an explicit fake-DOM listener registration
+  snapshot for container, parent, child, and text nodes so in-place mutations of
+  `__registrations` or `__removals` arrays fail validation before a diagnostic
+  can report `listenerInstallation: false`.
+- Added negative coverage for factory-time listener installation on the
+  container, parent host, child host, and text node after canonical native
+  handoff creation.
 
 ## Commands Run
 

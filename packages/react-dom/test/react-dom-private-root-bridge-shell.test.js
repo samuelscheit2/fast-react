@@ -10301,7 +10301,14 @@ test('private react-dom/client facade nested host-output native handoff fails cl
     };
   }
 
-  function assertRejectedScenario(scenario) {
+  function assertRejectedScenario(scenario, options) {
+    const expectedContainerRegistrations =
+      options && Object.prototype.hasOwnProperty.call(
+        options,
+        'containerRegistrations'
+      )
+        ? options.containerRegistrations
+        : 0;
     assert.deepEqual(
       scenario.adapter.getRootNestedHostOutputUpdateDiagnostics(scenario.root),
       []
@@ -10310,7 +10317,10 @@ test('private react-dom/client facade nested host-output native handoff fails cl
     assert.equal(rootMarkers.getContainerRoot(scenario.container), null);
     assert.equal(listenerRegistry.hasListeningMarker(scenario.container), false);
     assert.equal(listenerRegistry.hasListeningMarker(scenario.document), false);
-    assert.equal(scenario.container.__registrations.length, 0);
+    assert.equal(
+      scenario.container.__registrations.length,
+      expectedContainerRegistrations
+    );
     assert.equal(scenario.document.__registrations.length, 0);
   }
 
@@ -10478,6 +10488,43 @@ test('private react-dom/client facade nested host-output native handoff fails cl
       options: {withStyleContainer: true}
     },
     {
+      assertRejectedOptions: {containerRegistrations: 1},
+      label: 'container-listener-install',
+      mutate({container}) {
+        container.addEventListener(
+          'click',
+          function onContainerNativeHandoffClick() {}
+        );
+      }
+    },
+    {
+      label: 'parent-listener-install',
+      mutate({parentHostInstanceNode}) {
+        parentHostInstanceNode.addEventListener(
+          'click',
+          function onParentNativeHandoffClick() {}
+        );
+      }
+    },
+    {
+      label: 'child-listener-install',
+      mutate({childHostInstanceNode}) {
+        childHostInstanceNode.addEventListener(
+          'click',
+          function onChildNativeHandoffClick() {}
+        );
+      }
+    },
+    {
+      label: 'text-listener-install',
+      mutate({textInstance}) {
+        textInstance.addEventListener(
+          'click',
+          function onTextNativeHandoffClick() {}
+        );
+      }
+    },
+    {
       label: 'extra-child-sibling',
       mutate({childHostInstanceNode, container}) {
         childHostInstanceNode.appendChild(
@@ -10522,7 +10569,7 @@ test('private react-dom/client facade nested host-output native handoff fails cl
       }
     );
     assert.equal(factoryCalled, true, tamper.label);
-    assertRejectedScenario(scenario);
+    assertRejectedScenario(scenario, tamper.assertRejectedOptions);
   }
 
   const mismatchedHostOutputScenario =

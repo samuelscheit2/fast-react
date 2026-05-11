@@ -8384,6 +8384,7 @@ function createActiveHostOutputNodeSnapshot(node) {
   return freezeRecord({
     attributes: snapshotStringMap(node.attributes),
     childNodes: snapshotChildNodes(node),
+    eventListenerState: snapshotEventListenerState(node),
     ownProperties: snapshotOwnProperties(node),
     style: snapshotStyleObject(node.style),
     textContent: node.textContent
@@ -8438,6 +8439,7 @@ function activeHostOutputNodeSnapshotMatches(node, snapshot) {
     node.textContent === snapshot.textContent &&
     stringMapMatches(node.attributes, snapshot.attributes) &&
     styleObjectMatches(node.style, snapshot.style) &&
+    eventListenerStateMatches(node, snapshot.eventListenerState) &&
     ownPropertiesMatch(node, snapshot.ownProperties)
   );
 }
@@ -8493,6 +8495,181 @@ function childNodesMatch(node, expectedChildren) {
       return false;
     }
   }
+  return true;
+}
+
+function snapshotEventListenerState(node) {
+  return freezeRecord({
+    registrations: snapshotEventListenerEntries(node.__registrations),
+    removals: snapshotEventListenerEntries(node.__removals)
+  });
+}
+
+function eventListenerStateMatches(node, snapshot) {
+  return (
+    eventListenerEntriesMatch(node.__registrations, snapshot.registrations) &&
+    eventListenerEntriesMatch(node.__removals, snapshot.removals)
+  );
+}
+
+function snapshotEventListenerEntries(entries) {
+  if (!Array.isArray(entries)) {
+    return null;
+  }
+  return freezeArray(
+    entries.map((entry) =>
+      snapshotEventListenerValue(entry, 4, new WeakSet())
+    )
+  );
+}
+
+function eventListenerEntriesMatch(entries, snapshot) {
+  if (snapshot === null) {
+    return !Array.isArray(entries);
+  }
+  if (!Array.isArray(entries) || entries.length !== snapshot.length) {
+    return false;
+  }
+  for (let index = 0; index < snapshot.length; index += 1) {
+    if (
+      !eventListenerValueMatches(
+        entries[index],
+        snapshot[index],
+        4,
+        new WeakSet()
+      )
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function snapshotEventListenerValue(value, depth, seen) {
+  if (value === null || typeof value !== 'object') {
+    return freezeRecord({
+      kind: 'value',
+      value
+    });
+  }
+  if (depth === 0 || seen.has(value)) {
+    return freezeRecord({
+      kind: 'reference',
+      value
+    });
+  }
+  if (Array.isArray(value)) {
+    seen.add(value);
+    const entries = freezeArray(
+      value.map((entry) =>
+        snapshotEventListenerValue(entry, depth - 1, seen)
+      )
+    );
+    seen.delete(value);
+    return freezeRecord({
+      entries,
+      kind: 'array'
+    });
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    return freezeRecord({
+      kind: 'reference',
+      value
+    });
+  }
+  seen.add(value);
+  const entries = freezeArray(
+    Reflect.ownKeys(value)
+      .map((key) => freezeRecord({
+        key,
+        value: snapshotEventListenerValue(value[key], depth - 1, seen)
+      }))
+      .sort(compareSnapshotEntries)
+  );
+  seen.delete(value);
+  return freezeRecord({
+    entries,
+    kind: 'object'
+  });
+}
+
+function eventListenerValueMatches(value, snapshot, depth, seen) {
+  switch (snapshot.kind) {
+    case 'value':
+    case 'reference':
+      return value === snapshot.value;
+    case 'array':
+      return eventListenerArrayValueMatches(value, snapshot, depth, seen);
+    case 'object':
+      return eventListenerObjectValueMatches(value, snapshot, depth, seen);
+    default:
+      return false;
+  }
+}
+
+function eventListenerArrayValueMatches(value, snapshot, depth, seen) {
+  if (
+    depth === 0 ||
+    !Array.isArray(value) ||
+    value.length !== snapshot.entries.length ||
+    seen.has(value)
+  ) {
+    return false;
+  }
+  seen.add(value);
+  for (let index = 0; index < snapshot.entries.length; index += 1) {
+    if (
+      !eventListenerValueMatches(
+        value[index],
+        snapshot.entries[index],
+        depth - 1,
+        seen
+      )
+    ) {
+      seen.delete(value);
+      return false;
+    }
+  }
+  seen.delete(value);
+  return true;
+}
+
+function eventListenerObjectValueMatches(value, snapshot, depth, seen) {
+  if (
+    value === null ||
+    typeof value !== 'object' ||
+    depth === 0 ||
+    seen.has(value)
+  ) {
+    return false;
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    return false;
+  }
+  const keys = Reflect.ownKeys(value).sort(compareSnapshotKeys);
+  if (keys.length !== snapshot.entries.length) {
+    return false;
+  }
+  seen.add(value);
+  for (let index = 0; index < snapshot.entries.length; index += 1) {
+    const expected = snapshot.entries[index];
+    const key = keys[index];
+    if (
+      key !== expected.key ||
+      !eventListenerValueMatches(
+        value[key],
+        expected.value,
+        depth - 1,
+        seen
+      )
+    ) {
+      seen.delete(value);
+      return false;
+    }
+  }
+  seen.delete(value);
   return true;
 }
 
