@@ -7244,6 +7244,7 @@ mod tests {
         NativeRootBridgeRequestRecorder, NativeRootBridgeRequestSequenceValidator,
         NativeRootBridgeRootHandleState, NativeRootBridgeUnmountRequest,
         NativeRootBridgeWorkerThreadCleanupHookEvidence,
+        NativeRootBridgeWorkerThreadCleanupHookPreflightRow,
         NativeRootBridgeWorkerThreadCleanupHookPreflightRowStatus,
         native_root_bridge_batched_json_transport_error_rows,
         native_root_bridge_cross_environment_teardown_gate,
@@ -9689,6 +9690,234 @@ mod tests {
         assert!(!wrong_order.canonical_executable_evidence());
         assert!(!wrong_order.stale_or_forged_cleanup_evidence_rejected());
         assert_eq!(wrong_order.observed_execution_order(), None);
+    }
+
+    fn assert_rejected_cleanup_hook_evidence(
+        row: NativeRootBridgeWorkerThreadCleanupHookPreflightRow,
+        expected_code: &'static str,
+        id: &'static str,
+    ) {
+        assert_eq!(
+            row.status(),
+            NativeRootBridgeWorkerThreadCleanupHookPreflightRowStatus::Rejected,
+            "{id}"
+        );
+        assert_eq!(row.code(), Some(expected_code), "{id}");
+        assert_eq!(row.observed_execution_order(), None, "{id}");
+        assert!(!row.canonical_executable_evidence(), "{id}");
+        assert!(row.cleanup_hook_order_private(), "{id}");
+        assert!(row.cleanup_hook_identity_private(), "{id}");
+        assert!(!row.node_worker_threads_execution(), "{id}");
+        assert!(!row.napi_cleanup_hook_execution(), "{id}");
+        assert!(!row.native_addon_loaded(), "{id}");
+        assert!(!row.native_execution(), "{id}");
+        assert!(!row.renderer_execution(), "{id}");
+        assert!(!row.reconciler_execution(), "{id}");
+        assert!(!row.public_native_compatibility(), "{id}");
+        assert!(!row.react_behavior_error(), "{id}");
+    }
+
+    #[test]
+    fn native_root_bridge_worker_thread_cleanup_hook_preflight_rejects_stale_source_mismatches() {
+        #[derive(Clone, Copy)]
+        struct CleanupHookSourceMismatchCase {
+            id: &'static str,
+            source_preflight_status: &'static str,
+            source_worker_thread_id: u64,
+            source_environment_id: BridgeEnvironmentId,
+            source_row_id: &'static str,
+            source_handle_kind: BridgeHandleKind,
+            source_error_code: Option<&'static str>,
+            source_boundary_error_code: Option<&'static str>,
+            expected_code: &'static str,
+            stale_or_forged_rejected: bool,
+        }
+
+        let executable_preflight = native_root_bridge_worker_thread_teardown_executable_preflight();
+        let cases = [
+            CleanupHookSourceMismatchCase {
+                id: "cleanup-hook-canonical-root-wrong-worker-rejected",
+                source_preflight_status: executable_preflight.status(),
+                source_worker_thread_id: 524,
+                source_environment_id: executable_preflight.worker_environment_id(),
+                source_row_id: "worker-render-root-stale-executable-preflight",
+                source_handle_kind: BridgeHandleKind::Root,
+                source_error_code: Some("FAST_REACT_NAPI_STALE_HANDLE"),
+                source_boundary_error_code: Some("FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE"),
+                expected_code: "FAST_REACT_NAPI_CLEANUP_HOOK_STALE_EXECUTABLE_PREFLIGHT",
+                stale_or_forged_rejected: true,
+            },
+            CleanupHookSourceMismatchCase {
+                id: "cleanup-hook-canonical-root-wrong-environment-rejected",
+                source_preflight_status: executable_preflight.status(),
+                source_worker_thread_id: executable_preflight.worker_thread_id(),
+                source_environment_id: executable_preflight.peer_environment_id(),
+                source_row_id: "worker-render-root-stale-executable-preflight",
+                source_handle_kind: BridgeHandleKind::Root,
+                source_error_code: Some("FAST_REACT_NAPI_STALE_HANDLE"),
+                source_boundary_error_code: Some("FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE"),
+                expected_code: "FAST_REACT_NAPI_CLEANUP_HOOK_STALE_EXECUTABLE_PREFLIGHT",
+                stale_or_forged_rejected: true,
+            },
+            CleanupHookSourceMismatchCase {
+                id: "cleanup-hook-canonical-root-as-value-rejected",
+                source_preflight_status: executable_preflight.status(),
+                source_worker_thread_id: executable_preflight.worker_thread_id(),
+                source_environment_id: executable_preflight.worker_environment_id(),
+                source_row_id: "worker-render-root-stale-executable-preflight",
+                source_handle_kind: BridgeHandleKind::Value,
+                source_error_code: Some("FAST_REACT_NAPI_STALE_HANDLE"),
+                source_boundary_error_code: Some("FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE"),
+                expected_code: "FAST_REACT_NAPI_CLEANUP_HOOK_FORGED_EVIDENCE",
+                stale_or_forged_rejected: true,
+            },
+            CleanupHookSourceMismatchCase {
+                id: "cleanup-hook-canonical-value-as-root-rejected",
+                source_preflight_status: executable_preflight.status(),
+                source_worker_thread_id: executable_preflight.worker_thread_id(),
+                source_environment_id: executable_preflight.worker_environment_id(),
+                source_row_id: "worker-render-value-stale-executable-preflight",
+                source_handle_kind: BridgeHandleKind::Root,
+                source_error_code: Some("FAST_REACT_NAPI_STALE_HANDLE"),
+                source_boundary_error_code: Some("FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE"),
+                expected_code: "FAST_REACT_NAPI_CLEANUP_HOOK_FORGED_EVIDENCE",
+                stale_or_forged_rejected: true,
+            },
+            CleanupHookSourceMismatchCase {
+                id: "cleanup-hook-canonical-value-wrong-source-code-rejected",
+                source_preflight_status: executable_preflight.status(),
+                source_worker_thread_id: executable_preflight.worker_thread_id(),
+                source_environment_id: executable_preflight.worker_environment_id(),
+                source_row_id: "worker-render-value-stale-executable-preflight",
+                source_handle_kind: BridgeHandleKind::Value,
+                source_error_code: Some("FAST_REACT_NAPI_WRONG_ENVIRONMENT"),
+                source_boundary_error_code: Some("FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE"),
+                expected_code: "FAST_REACT_NAPI_CLEANUP_HOOK_FORGED_EVIDENCE",
+                stale_or_forged_rejected: true,
+            },
+            CleanupHookSourceMismatchCase {
+                id: "cleanup-hook-canonical-root-wrong-boundary-code-rejected",
+                source_preflight_status: executable_preflight.status(),
+                source_worker_thread_id: executable_preflight.worker_thread_id(),
+                source_environment_id: executable_preflight.worker_environment_id(),
+                source_row_id: "worker-render-root-stale-executable-preflight",
+                source_handle_kind: BridgeHandleKind::Root,
+                source_error_code: Some("FAST_REACT_NAPI_STALE_HANDLE"),
+                source_boundary_error_code: Some("FAST_REACT_NAPI_ROOT_BRIDGE_WRONG_ENVIRONMENT"),
+                expected_code: "FAST_REACT_NAPI_CLEANUP_HOOK_FORGED_EVIDENCE",
+                stale_or_forged_rejected: true,
+            },
+        ];
+
+        for case in cases {
+            let rejected =
+                validate_native_root_bridge_worker_thread_cleanup_hook_evidence_for_preflight(
+                    &executable_preflight,
+                    NativeRootBridgeWorkerThreadCleanupHookEvidence::new(
+                        case.id,
+                        "cleanup-hook-evidence-preflight-rejection",
+                        "worker-root-handle-cleanup-hook",
+                        "private-cleanup-hook-fn:worker-root-handle-teardown",
+                        "private-cleanup-hook-arg:worker-764-root-slot-1",
+                        2,
+                        1,
+                        case.source_preflight_status,
+                        case.source_worker_thread_id,
+                        case.source_environment_id,
+                        case.source_row_id,
+                        case.source_handle_kind,
+                        case.source_error_code,
+                        case.source_boundary_error_code,
+                    ),
+                );
+
+            assert_rejected_cleanup_hook_evidence(rejected, case.expected_code, case.id);
+            assert_eq!(
+                rejected.stale_or_forged_cleanup_evidence_rejected(),
+                case.stale_or_forged_rejected,
+                "{}",
+                case.id
+            );
+        }
+    }
+
+    #[test]
+    fn cleanup_hook_preflight_rejects_stale_value_and_order_identity_forgery() {
+        #[derive(Clone, Copy)]
+        struct CleanupHookOrderIdentityForgeryCase {
+            id: &'static str,
+            cleanup_hook_id: &'static str,
+            cleanup_hook_function_identity_token: &'static str,
+            cleanup_hook_argument_identity_token: &'static str,
+            registration_order: u8,
+            expected_execution_order: u8,
+            source_row_id: &'static str,
+            source_handle_kind: BridgeHandleKind,
+        }
+
+        let executable_preflight = native_root_bridge_worker_thread_teardown_executable_preflight();
+        let cases = [
+            CleanupHookOrderIdentityForgeryCase {
+                id: "cleanup-hook-create-value-stale-after-teardown-rejected",
+                cleanup_hook_id: "worker-value-handle-cleanup-hook",
+                cleanup_hook_function_identity_token: "private-cleanup-hook-fn:worker-value-handle-teardown",
+                cleanup_hook_argument_identity_token: "private-cleanup-hook-arg:worker-764-value-slot-3",
+                registration_order: 1,
+                expected_execution_order: 2,
+                source_row_id: "worker-create-value-stale-executable-preflight",
+                source_handle_kind: BridgeHandleKind::Value,
+            },
+            CleanupHookOrderIdentityForgeryCase {
+                id: "cleanup-hook-root-source-with-value-order-identity-rejected",
+                cleanup_hook_id: "worker-value-handle-cleanup-hook",
+                cleanup_hook_function_identity_token: "private-cleanup-hook-fn:worker-value-handle-teardown",
+                cleanup_hook_argument_identity_token: "private-cleanup-hook-arg:worker-764-value-slot-3",
+                registration_order: 1,
+                expected_execution_order: 2,
+                source_row_id: "worker-render-root-stale-executable-preflight",
+                source_handle_kind: BridgeHandleKind::Root,
+            },
+            CleanupHookOrderIdentityForgeryCase {
+                id: "cleanup-hook-value-source-with-root-order-identity-rejected",
+                cleanup_hook_id: "worker-root-handle-cleanup-hook",
+                cleanup_hook_function_identity_token: "private-cleanup-hook-fn:worker-root-handle-teardown",
+                cleanup_hook_argument_identity_token: "private-cleanup-hook-arg:worker-764-root-slot-1",
+                registration_order: 2,
+                expected_execution_order: 1,
+                source_row_id: "worker-render-value-stale-executable-preflight",
+                source_handle_kind: BridgeHandleKind::Value,
+            },
+        ];
+
+        for case in cases {
+            let rejected =
+                validate_native_root_bridge_worker_thread_cleanup_hook_evidence_for_preflight(
+                    &executable_preflight,
+                    NativeRootBridgeWorkerThreadCleanupHookEvidence::new(
+                        case.id,
+                        "cleanup-hook-evidence-preflight-rejection",
+                        case.cleanup_hook_id,
+                        case.cleanup_hook_function_identity_token,
+                        case.cleanup_hook_argument_identity_token,
+                        case.registration_order,
+                        case.expected_execution_order,
+                        executable_preflight.status(),
+                        executable_preflight.worker_thread_id(),
+                        executable_preflight.worker_environment_id(),
+                        case.source_row_id,
+                        case.source_handle_kind,
+                        Some("FAST_REACT_NAPI_STALE_HANDLE"),
+                        Some("FAST_REACT_NAPI_ROOT_BRIDGE_STALE_HANDLE"),
+                    ),
+                );
+
+            assert_rejected_cleanup_hook_evidence(
+                rejected,
+                "FAST_REACT_NAPI_CLEANUP_HOOK_IDENTITY_MISMATCH",
+                case.id,
+            );
+            assert!(!rejected.stale_or_forged_cleanup_evidence_rejected());
+        }
     }
 
     #[test]

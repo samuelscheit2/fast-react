@@ -113,6 +113,12 @@ function createForbiddenLoadFixtureMatrix() {
     'native-addon-probe.node',
     ''
   );
+  const realNativeAddonPath = fs.realpathSync(nativeAddonPath);
+  writeFixtureFile(
+    tempDir,
+    'cjs-dynamic-native-addon-entry.cjs',
+    `'use strict';\nrequire(${JSON.stringify(realNativeAddonPath)});\n`
+  );
   writeFixtureFile(
     tempDir,
     'esm-worker-entry.mjs',
@@ -140,6 +146,10 @@ function createForbiddenLoadFixtureMatrix() {
   );
 
   return {
+    cjsDynamicNativeAddonEntry: path.join(
+      tempDir,
+      'cjs-dynamic-native-addon-entry.cjs'
+    ),
     cjsNativeAddonEntry: path.join(tempDir, 'cjs-native-addon-entry.cjs'),
     cjsNodeWorkerEntry: path.join(tempDir, 'cjs-node-worker-entry.cjs'),
     cjsWorkerEntry: path.join(tempDir, 'cjs-worker-entry.cjs'),
@@ -152,7 +162,7 @@ function createForbiddenLoadFixtureMatrix() {
     esmWorkerEntry: pathToFileURL(
       path.join(tempDir, 'esm-worker-entry.mjs')
     ).href,
-    nativeAddonPath: fs.realpathSync(nativeAddonPath),
+    nativeAddonPath: realNativeAddonPath,
     tempDir
   };
 }
@@ -201,6 +211,11 @@ async function runForbiddenLoadFixtureMatrix() {
       'transitive CommonJS .node extension resolution',
       () => require(fixtures.cjsNativeAddonEntry),
       { kind: 'node-extension', request: fixtures.nativeAddonPath }
+    );
+    await assertForbiddenLoad(
+      'dynamic CommonJS explicit .node load',
+      () => require(fixtures.cjsDynamicNativeAddonEntry),
+      { kind: 'module-load', request: fixtures.nativeAddonPath }
     );
     await assertForbiddenLoad(
       'transitive ESM worker_threads import',
@@ -307,6 +322,33 @@ async function main() {
       actualRootBridgeEvidence,
       expectedRootBridgeEvidence
     );
+    for (const blockedClaim of [
+      'nativeExecution',
+      'reconcilerExecution',
+      'compatibilityClaimed'
+    ]) {
+      assert.throws(
+        () =>
+          native.createNativeRootBridgeRequestShapeGate({
+            nativeRequestRecord: {},
+            [blockedClaim]: true
+          }),
+        (error) => {
+          assert.equal(error.name, 'FastReactNativeRequestShapeError');
+          assert.equal(
+            error.code,
+            'FAST_REACT_NATIVE_ROOT_BRIDGE_REQUEST_SHAPE_INVALID'
+          );
+          assert.deepEqual(error.details, { flag: blockedClaim });
+          assert.equal(error.nativeAddonLoaded, false);
+          assert.equal(error.nativeExecution, false);
+          assert.equal(error.rendererExecution, false);
+          assert.equal(error.reconcilerExecution, false);
+          return true;
+        },
+        `native no-load guard must reject ${blockedClaim} claims before request validation`
+      );
+    }
     assert.equal(
       native.nativeRootBridgeRequestShape.crossEnvironmentTeardownGate
         .teardownGateStatus,
