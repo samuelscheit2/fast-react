@@ -8,6 +8,7 @@
 #![cfg(test)]
 #![allow(dead_code)]
 
+use std::collections::HashSet;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
@@ -2752,6 +2753,814 @@ fn validate_managed_child_deletion_sibling_order_shape_for_canary(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct AppendAllChildrenSourceEvidenceForCanary {
+    react_version: &'static str,
+    react_commit: &'static str,
+    source_path: &'static str,
+    append_all_children_start_line: u32,
+    append_all_children_end_line: u32,
+    terminal_host_condition_line: u32,
+    append_initial_child_line: u32,
+    portal_skip_line: u32,
+    descend_to_child_line: u32,
+    sibling_return_repair_line: u32,
+    host_component_mount_call_line: u32,
+}
+
+impl AppendAllChildrenSourceEvidenceForCanary {
+    #[must_use]
+    pub(crate) const fn react_version(self) -> &'static str {
+        self.react_version
+    }
+
+    #[must_use]
+    pub(crate) const fn react_commit(self) -> &'static str {
+        self.react_commit
+    }
+
+    #[must_use]
+    pub(crate) const fn source_path(self) -> &'static str {
+        self.source_path
+    }
+
+    #[must_use]
+    pub(crate) const fn append_all_children_start_line(self) -> u32 {
+        self.append_all_children_start_line
+    }
+
+    #[must_use]
+    pub(crate) const fn append_all_children_end_line(self) -> u32 {
+        self.append_all_children_end_line
+    }
+
+    #[must_use]
+    pub(crate) const fn terminal_host_condition_line(self) -> u32 {
+        self.terminal_host_condition_line
+    }
+
+    #[must_use]
+    pub(crate) const fn append_initial_child_line(self) -> u32 {
+        self.append_initial_child_line
+    }
+
+    #[must_use]
+    pub(crate) const fn portal_skip_line(self) -> u32 {
+        self.portal_skip_line
+    }
+
+    #[must_use]
+    pub(crate) const fn descend_to_child_line(self) -> u32 {
+        self.descend_to_child_line
+    }
+
+    #[must_use]
+    pub(crate) const fn sibling_return_repair_line(self) -> u32 {
+        self.sibling_return_repair_line
+    }
+
+    #[must_use]
+    pub(crate) const fn host_component_mount_call_line(self) -> u32 {
+        self.host_component_mount_call_line
+    }
+}
+
+const APPEND_ALL_CHILDREN_SOURCE_EVIDENCE_FOR_CANARY: AppendAllChildrenSourceEvidenceForCanary =
+    AppendAllChildrenSourceEvidenceForCanary {
+        react_version: "19.2.6",
+        react_commit: "eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401",
+        source_path: "packages/react-reconciler/src/ReactFiberCompleteWork.js",
+        append_all_children_start_line: 240,
+        append_all_children_end_line: 342,
+        terminal_host_condition_line: 251,
+        append_initial_child_line: 252,
+        portal_skip_line: 254,
+        descend_to_child_line: 261,
+        sibling_return_repair_line: 278,
+        host_component_mount_call_line: 1399,
+    };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TerminalHostDescendantHostMutationBlockerForCanary {
+    CollectionOnlyDoesNotCallAppendInitialChild,
+}
+
+impl TerminalHostDescendantHostMutationBlockerForCanary {
+    #[must_use]
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::CollectionOnlyDoesNotCallAppendInitialChild => {
+                "collection-only-does-not-call-append-initial-child"
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TerminalHostDescendantCompatibilityClaimForCanary {
+    PublicDom,
+    TestRenderer,
+}
+
+impl TerminalHostDescendantCompatibilityClaimForCanary {
+    #[must_use]
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::PublicDom => "public-dom",
+            Self::TestRenderer => "test-renderer",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct TerminalHostDescendantExpectedRowForCanary {
+    parent: FiberId,
+    ordinal: usize,
+    terminal: FiberId,
+    terminal_tag: FiberTag,
+    terminal_state_node: StateNodeHandle,
+}
+
+impl TerminalHostDescendantExpectedRowForCanary {
+    #[must_use]
+    pub(crate) const fn new(
+        parent: FiberId,
+        ordinal: usize,
+        terminal: FiberId,
+        terminal_tag: FiberTag,
+        terminal_state_node: StateNodeHandle,
+    ) -> Self {
+        Self {
+            parent,
+            ordinal,
+            terminal,
+            terminal_tag,
+            terminal_state_node,
+        }
+    }
+
+    #[must_use]
+    pub(crate) const fn parent(self) -> FiberId {
+        self.parent
+    }
+
+    #[must_use]
+    pub(crate) const fn ordinal(self) -> usize {
+        self.ordinal
+    }
+
+    #[must_use]
+    pub(crate) const fn terminal(self) -> FiberId {
+        self.terminal
+    }
+
+    #[must_use]
+    pub(crate) const fn terminal_tag(self) -> FiberTag {
+        self.terminal_tag
+    }
+
+    #[must_use]
+    pub(crate) const fn terminal_state_node(self) -> StateNodeHandle {
+        self.terminal_state_node
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct TerminalHostDescendantRowForCanary {
+    parent: FiberId,
+    ordinal: usize,
+    terminal: FiberId,
+    terminal_tag: FiberTag,
+    terminal_state_node: StateNodeHandle,
+    direct_parent: FiberId,
+}
+
+impl TerminalHostDescendantRowForCanary {
+    #[must_use]
+    pub(crate) const fn parent(self) -> FiberId {
+        self.parent
+    }
+
+    #[must_use]
+    pub(crate) const fn ordinal(self) -> usize {
+        self.ordinal
+    }
+
+    #[must_use]
+    pub(crate) const fn terminal(self) -> FiberId {
+        self.terminal
+    }
+
+    #[must_use]
+    pub(crate) const fn terminal_tag(self) -> FiberTag {
+        self.terminal_tag
+    }
+
+    #[must_use]
+    pub(crate) const fn terminal_state_node(self) -> StateNodeHandle {
+        self.terminal_state_node
+    }
+
+    #[must_use]
+    pub(crate) const fn direct_parent(self) -> FiberId {
+        self.direct_parent
+    }
+
+    #[must_use]
+    pub(crate) fn matches_expected(
+        self,
+        expected: TerminalHostDescendantExpectedRowForCanary,
+    ) -> bool {
+        self.parent == expected.parent
+            && self.ordinal == expected.ordinal
+            && self.terminal == expected.terminal
+            && self.terminal_tag == expected.terminal_tag
+            && self.terminal_state_node == expected.terminal_state_node
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct TerminalHostDescendantSkippedWrapperForCanary {
+    parent: FiberId,
+    wrapper: FiberId,
+    wrapper_tag: FiberTag,
+    direct_parent: FiberId,
+    child_count: usize,
+}
+
+impl TerminalHostDescendantSkippedWrapperForCanary {
+    #[must_use]
+    pub(crate) const fn parent(self) -> FiberId {
+        self.parent
+    }
+
+    #[must_use]
+    pub(crate) const fn wrapper(self) -> FiberId {
+        self.wrapper
+    }
+
+    #[must_use]
+    pub(crate) const fn wrapper_tag(self) -> FiberTag {
+        self.wrapper_tag
+    }
+
+    #[must_use]
+    pub(crate) const fn direct_parent(self) -> FiberId {
+        self.direct_parent
+    }
+
+    #[must_use]
+    pub(crate) const fn child_count(self) -> usize {
+        self.child_count
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TerminalHostDescendantCollectionCompleteWorkRecordForCanary {
+    parent: FiberId,
+    parent_state_node: StateNodeHandle,
+    source_evidence: AppendAllChildrenSourceEvidenceForCanary,
+    terminal_descendants: Vec<TerminalHostDescendantRowForCanary>,
+    skipped_wrappers: Vec<TerminalHostDescendantSkippedWrapperForCanary>,
+    host_mutation_blocker: TerminalHostDescendantHostMutationBlockerForCanary,
+    append_initial_child_called: bool,
+    host_mutation_performed: bool,
+    private_reconciler_handoff_only: bool,
+    public_dom_compatibility_claimed: bool,
+    test_renderer_compatibility_claimed: bool,
+}
+
+impl TerminalHostDescendantCollectionCompleteWorkRecordForCanary {
+    #[must_use]
+    pub(crate) const fn parent(&self) -> FiberId {
+        self.parent
+    }
+
+    #[must_use]
+    pub(crate) const fn parent_state_node(&self) -> StateNodeHandle {
+        self.parent_state_node
+    }
+
+    #[must_use]
+    pub(crate) const fn source_evidence(&self) -> AppendAllChildrenSourceEvidenceForCanary {
+        self.source_evidence
+    }
+
+    #[must_use]
+    pub(crate) fn terminal_descendants(&self) -> &[TerminalHostDescendantRowForCanary] {
+        &self.terminal_descendants
+    }
+
+    #[must_use]
+    pub(crate) fn terminal_descendant_count(&self) -> usize {
+        self.terminal_descendants.len()
+    }
+
+    #[must_use]
+    pub(crate) fn skipped_wrappers(&self) -> &[TerminalHostDescendantSkippedWrapperForCanary] {
+        &self.skipped_wrappers
+    }
+
+    #[must_use]
+    pub(crate) fn skipped_wrapper_count(&self) -> usize {
+        self.skipped_wrappers.len()
+    }
+
+    #[must_use]
+    pub(crate) const fn host_mutation_blocker(
+        &self,
+    ) -> TerminalHostDescendantHostMutationBlockerForCanary {
+        self.host_mutation_blocker
+    }
+
+    #[must_use]
+    pub(crate) const fn append_initial_child_called(&self) -> bool {
+        self.append_initial_child_called
+    }
+
+    #[must_use]
+    pub(crate) const fn host_mutation_performed(&self) -> bool {
+        self.host_mutation_performed
+    }
+
+    #[must_use]
+    pub(crate) const fn private_reconciler_handoff_only(&self) -> bool {
+        self.private_reconciler_handoff_only
+    }
+
+    #[must_use]
+    pub(crate) const fn public_dom_compatibility_claimed(&self) -> bool {
+        self.public_dom_compatibility_claimed
+    }
+
+    #[must_use]
+    pub(crate) const fn test_renderer_compatibility_claimed(&self) -> bool {
+        self.test_renderer_compatibility_claimed
+    }
+
+    #[must_use]
+    pub(crate) fn with_public_dom_compatibility_claimed_for_canary(mut self) -> Self {
+        self.public_dom_compatibility_claimed = true;
+        self
+    }
+
+    #[must_use]
+    pub(crate) fn with_test_renderer_compatibility_claimed_for_canary(mut self) -> Self {
+        self.test_renderer_compatibility_claimed = true;
+        self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum TerminalHostDescendantCollectionCompleteWorkErrorForCanary {
+    FiberTopology(FiberTopologyError),
+    ExpectedParentHostComponent {
+        parent: FiberId,
+        tag: FiberTag,
+    },
+    MissingParentStateNode {
+        parent: FiberId,
+    },
+    PortalTraversalBlocked {
+        parent: FiberId,
+        portal: FiberId,
+    },
+    VisibilityBoundaryTraversalBlocked {
+        parent: FiberId,
+        boundary: FiberId,
+        tag: FiberTag,
+    },
+    UnsupportedNonTerminalTraversal {
+        parent: FiberId,
+        child: FiberId,
+        tag: FiberTag,
+    },
+    MissingTerminalStateNode {
+        parent: FiberId,
+        terminal: FiberId,
+        tag: FiberTag,
+    },
+    DuplicateTerminalChild {
+        parent: FiberId,
+        terminal: FiberId,
+    },
+    StaleOrClonedTerminalRow {
+        parent: FiberId,
+        row: TerminalHostDescendantExpectedRowForCanary,
+        reason: &'static str,
+    },
+    TerminalChildOrderMismatch {
+        parent: FiberId,
+        expected: Vec<TerminalHostDescendantExpectedRowForCanary>,
+        actual: Vec<TerminalHostDescendantRowForCanary>,
+    },
+    PublicCompatibilityClaimed {
+        parent: FiberId,
+        compatibility: TerminalHostDescendantCompatibilityClaimForCanary,
+    },
+}
+
+impl Display for TerminalHostDescendantCollectionCompleteWorkErrorForCanary {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::FiberTopology(error) => Display::fmt(error, formatter),
+            Self::ExpectedParentHostComponent { parent, tag } => write!(
+                formatter,
+                "fiber {} must be HostComponent for private appendAllChildren terminal host descendant collection, found {:?}",
+                parent.slot().get(),
+                tag
+            ),
+            Self::MissingParentStateNode { parent } => write!(
+                formatter,
+                "HostComponent parent {} has no state node for private appendAllChildren terminal host descendant collection",
+                parent.slot().get()
+            ),
+            Self::PortalTraversalBlocked { parent, portal } => write!(
+                formatter,
+                "private appendAllChildren terminal host descendant collection for parent {} blocks portal child {} traversal",
+                parent.slot().get(),
+                portal.slot().get()
+            ),
+            Self::VisibilityBoundaryTraversalBlocked {
+                parent,
+                boundary,
+                tag,
+            } => write!(
+                formatter,
+                "private appendAllChildren terminal host descendant collection for parent {} blocks {:?} boundary {} visibility traversal claims",
+                parent.slot().get(),
+                tag,
+                boundary.slot().get()
+            ),
+            Self::UnsupportedNonTerminalTraversal { parent, child, tag } => write!(
+                formatter,
+                "private appendAllChildren terminal host descendant collection for parent {} only traverses FunctionComponent/Fragment wrappers; child {} was {:?}",
+                parent.slot().get(),
+                child.slot().get(),
+                tag
+            ),
+            Self::MissingTerminalStateNode {
+                parent,
+                terminal,
+                tag,
+            } => write!(
+                formatter,
+                "private appendAllChildren terminal host descendant collection for parent {} requires {:?} terminal {} to have a state node",
+                parent.slot().get(),
+                tag,
+                terminal.slot().get()
+            ),
+            Self::DuplicateTerminalChild { parent, terminal } => write!(
+                formatter,
+                "private appendAllChildren terminal host descendant collection for parent {} found duplicate terminal child {}",
+                parent.slot().get(),
+                terminal.slot().get()
+            ),
+            Self::StaleOrClonedTerminalRow {
+                parent,
+                row,
+                reason,
+            } => write!(
+                formatter,
+                "private appendAllChildren terminal host descendant collection for parent {} rejected stale/cloned expected row {:?}: {reason}",
+                parent.slot().get(),
+                row
+            ),
+            Self::TerminalChildOrderMismatch {
+                parent,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "private appendAllChildren terminal host descendant collection for parent {} expected terminal rows {:?}, found {:?}",
+                parent.slot().get(),
+                expected,
+                actual
+            ),
+            Self::PublicCompatibilityClaimed {
+                parent,
+                compatibility,
+            } => write!(
+                formatter,
+                "private appendAllChildren terminal host descendant collection for parent {} cannot claim {} compatibility",
+                parent.slot().get(),
+                compatibility.as_str()
+            ),
+        }
+    }
+}
+
+impl Error for TerminalHostDescendantCollectionCompleteWorkErrorForCanary {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::FiberTopology(error) => Some(error),
+            Self::ExpectedParentHostComponent { .. }
+            | Self::MissingParentStateNode { .. }
+            | Self::PortalTraversalBlocked { .. }
+            | Self::VisibilityBoundaryTraversalBlocked { .. }
+            | Self::UnsupportedNonTerminalTraversal { .. }
+            | Self::MissingTerminalStateNode { .. }
+            | Self::DuplicateTerminalChild { .. }
+            | Self::StaleOrClonedTerminalRow { .. }
+            | Self::TerminalChildOrderMismatch { .. }
+            | Self::PublicCompatibilityClaimed { .. } => None,
+        }
+    }
+}
+
+impl From<FiberTopologyError> for TerminalHostDescendantCollectionCompleteWorkErrorForCanary {
+    fn from(error: FiberTopologyError) -> Self {
+        Self::FiberTopology(error)
+    }
+}
+
+pub(crate) fn terminal_host_descendant_collection_complete_work_record_for_canary(
+    arena: &FiberArena,
+    parent: FiberId,
+    expected_rows: &[TerminalHostDescendantExpectedRowForCanary],
+) -> Result<
+    TerminalHostDescendantCollectionCompleteWorkRecordForCanary,
+    TerminalHostDescendantCollectionCompleteWorkErrorForCanary,
+> {
+    let parent_node = arena.get(parent)?;
+    if parent_node.tag() != FiberTag::HostComponent {
+        return Err(
+            TerminalHostDescendantCollectionCompleteWorkErrorForCanary::ExpectedParentHostComponent {
+                parent,
+                tag: parent_node.tag(),
+            },
+        );
+    }
+    let parent_state_node = parent_node.state_node();
+    if parent_state_node.is_none() {
+        return Err(
+            TerminalHostDescendantCollectionCompleteWorkErrorForCanary::MissingParentStateNode {
+                parent,
+            },
+        );
+    }
+
+    let mut terminal_descendants = Vec::new();
+    let mut skipped_wrappers = Vec::new();
+    let mut seen_terminals = HashSet::new();
+    for child in arena.child_ids(parent)? {
+        collect_terminal_host_descendants_for_canary(
+            arena,
+            parent,
+            child,
+            parent,
+            &mut terminal_descendants,
+            &mut skipped_wrappers,
+            &mut seen_terminals,
+        )?;
+    }
+
+    validate_terminal_host_descendant_expected_rows_for_canary(
+        arena,
+        parent,
+        expected_rows,
+        &terminal_descendants,
+    )?;
+
+    let record = TerminalHostDescendantCollectionCompleteWorkRecordForCanary {
+        parent,
+        parent_state_node,
+        source_evidence: APPEND_ALL_CHILDREN_SOURCE_EVIDENCE_FOR_CANARY,
+        terminal_descendants,
+        skipped_wrappers,
+        host_mutation_blocker:
+            TerminalHostDescendantHostMutationBlockerForCanary::CollectionOnlyDoesNotCallAppendInitialChild,
+        append_initial_child_called: false,
+        host_mutation_performed: false,
+        private_reconciler_handoff_only: true,
+        public_dom_compatibility_claimed: false,
+        test_renderer_compatibility_claimed: false,
+    };
+    validate_terminal_host_descendant_private_scope_for_canary(&record)?;
+    Ok(record)
+}
+
+fn collect_terminal_host_descendants_for_canary(
+    arena: &FiberArena,
+    parent: FiberId,
+    child: FiberId,
+    direct_parent: FiberId,
+    terminal_descendants: &mut Vec<TerminalHostDescendantRowForCanary>,
+    skipped_wrappers: &mut Vec<TerminalHostDescendantSkippedWrapperForCanary>,
+    seen_terminals: &mut HashSet<FiberId>,
+) -> Result<(), TerminalHostDescendantCollectionCompleteWorkErrorForCanary> {
+    let child_node = arena.get(child)?;
+    let tag = child_node.tag();
+    match tag {
+        FiberTag::HostComponent | FiberTag::HostText => {
+            let terminal_state_node = child_node.state_node();
+            if terminal_state_node.is_none() {
+                return Err(
+                    TerminalHostDescendantCollectionCompleteWorkErrorForCanary::MissingTerminalStateNode {
+                        parent,
+                        terminal: child,
+                        tag,
+                    },
+                );
+            }
+            if !seen_terminals.insert(child) {
+                return Err(
+                    TerminalHostDescendantCollectionCompleteWorkErrorForCanary::DuplicateTerminalChild {
+                        parent,
+                        terminal: child,
+                    },
+                );
+            }
+            terminal_descendants.push(TerminalHostDescendantRowForCanary {
+                parent,
+                ordinal: terminal_descendants.len(),
+                terminal: child,
+                terminal_tag: tag,
+                terminal_state_node,
+                direct_parent,
+            });
+        }
+        FiberTag::FunctionComponent | FiberTag::Fragment => {
+            let children = arena.child_ids(child)?;
+            skipped_wrappers.push(TerminalHostDescendantSkippedWrapperForCanary {
+                parent,
+                wrapper: child,
+                wrapper_tag: tag,
+                direct_parent,
+                child_count: children.len(),
+            });
+            for grandchild in children {
+                collect_terminal_host_descendants_for_canary(
+                    arena,
+                    parent,
+                    grandchild,
+                    child,
+                    terminal_descendants,
+                    skipped_wrappers,
+                    seen_terminals,
+                )?;
+            }
+        }
+        FiberTag::Portal => {
+            return Err(
+                TerminalHostDescendantCollectionCompleteWorkErrorForCanary::PortalTraversalBlocked {
+                    parent,
+                    portal: child,
+                },
+            );
+        }
+        FiberTag::Suspense | FiberTag::Offscreen => {
+            return Err(
+                TerminalHostDescendantCollectionCompleteWorkErrorForCanary::VisibilityBoundaryTraversalBlocked {
+                    parent,
+                    boundary: child,
+                    tag,
+                },
+            );
+        }
+        _ => {
+            return Err(
+                TerminalHostDescendantCollectionCompleteWorkErrorForCanary::UnsupportedNonTerminalTraversal {
+                    parent,
+                    child,
+                    tag,
+                },
+            );
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_terminal_host_descendant_expected_rows_for_canary(
+    arena: &FiberArena,
+    parent: FiberId,
+    expected_rows: &[TerminalHostDescendantExpectedRowForCanary],
+    actual_rows: &[TerminalHostDescendantRowForCanary],
+) -> Result<(), TerminalHostDescendantCollectionCompleteWorkErrorForCanary> {
+    let mut seen_expected_terminals = HashSet::new();
+    for row in expected_rows.iter().copied() {
+        if row.parent() != parent {
+            return Err(
+                TerminalHostDescendantCollectionCompleteWorkErrorForCanary::StaleOrClonedTerminalRow {
+                    parent,
+                    row,
+                    reason: "expected row belongs to a different parent",
+                },
+            );
+        }
+        if !seen_expected_terminals.insert(row.terminal()) {
+            return Err(
+                TerminalHostDescendantCollectionCompleteWorkErrorForCanary::DuplicateTerminalChild {
+                    parent,
+                    terminal: row.terminal(),
+                },
+            );
+        }
+        let terminal_node = arena.get(row.terminal())?;
+        if !matches!(
+            terminal_node.tag(),
+            FiberTag::HostComponent | FiberTag::HostText
+        ) {
+            return Err(
+                TerminalHostDescendantCollectionCompleteWorkErrorForCanary::StaleOrClonedTerminalRow {
+                    parent,
+                    row,
+                    reason: "expected terminal row is not a HostComponent/HostText fiber",
+                },
+            );
+        }
+        if terminal_node.tag() != row.terminal_tag() {
+            return Err(
+                TerminalHostDescendantCollectionCompleteWorkErrorForCanary::StaleOrClonedTerminalRow {
+                    parent,
+                    row,
+                    reason: "expected terminal row tag differs from current fiber tag",
+                },
+            );
+        }
+        if terminal_node.state_node() != row.terminal_state_node() {
+            return Err(
+                TerminalHostDescendantCollectionCompleteWorkErrorForCanary::StaleOrClonedTerminalRow {
+                    parent,
+                    row,
+                    reason: "expected terminal row state node differs from current fiber state node",
+                },
+            );
+        }
+        if !has_ancestor_for_canary(arena, parent, row.terminal())? {
+            return Err(
+                TerminalHostDescendantCollectionCompleteWorkErrorForCanary::StaleOrClonedTerminalRow {
+                    parent,
+                    row,
+                    reason: "expected terminal row is not inside parent subtree",
+                },
+            );
+        }
+    }
+
+    let order_matches = expected_rows.len() == actual_rows.len()
+        && actual_rows
+            .iter()
+            .zip(expected_rows.iter())
+            .all(|(actual, expected)| actual.matches_expected(*expected));
+    if !order_matches {
+        return Err(
+            TerminalHostDescendantCollectionCompleteWorkErrorForCanary::TerminalChildOrderMismatch {
+                parent,
+                expected: expected_rows.to_vec(),
+                actual: actual_rows.to_vec(),
+            },
+        );
+    }
+
+    Ok(())
+}
+
+fn has_ancestor_for_canary(
+    arena: &FiberArena,
+    ancestor: FiberId,
+    child: FiberId,
+) -> Result<bool, FiberTopologyError> {
+    let mut next = Some(child);
+    let mut seen = HashSet::new();
+    while let Some(fiber) = next {
+        if fiber == ancestor {
+            return Ok(true);
+        }
+        if !seen.insert(fiber) {
+            return Err(FiberTopologyError::ReturnCycle {
+                start: child,
+                repeated: fiber,
+            });
+        }
+        next = arena.get(fiber)?.return_fiber();
+    }
+    Ok(false)
+}
+
+pub(crate) fn validate_terminal_host_descendant_private_scope_for_canary(
+    record: &TerminalHostDescendantCollectionCompleteWorkRecordForCanary,
+) -> Result<(), TerminalHostDescendantCollectionCompleteWorkErrorForCanary> {
+    if record.public_dom_compatibility_claimed() {
+        return Err(
+            TerminalHostDescendantCollectionCompleteWorkErrorForCanary::PublicCompatibilityClaimed {
+                parent: record.parent(),
+                compatibility: TerminalHostDescendantCompatibilityClaimForCanary::PublicDom,
+            },
+        );
+    }
+    if record.test_renderer_compatibility_claimed() {
+        return Err(
+            TerminalHostDescendantCollectionCompleteWorkErrorForCanary::PublicCompatibilityClaimed {
+                parent: record.parent(),
+                compatibility: TerminalHostDescendantCompatibilityClaimForCanary::TestRenderer,
+            },
+        );
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct HostRootOneLevelChildSetCompletionRecord {
     host_root: FiberId,
     child_count: usize,
@@ -3617,6 +4426,519 @@ mod tests {
                 deletion_list: None,
             },
         )
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    struct TerminalHostDescendantFixture {
+        parent: FiberId,
+        function: FiberId,
+        first_terminal: FiberId,
+        fragment: FiberId,
+        second_terminal: FiberId,
+        nested_host_text: FiberId,
+        parent_state_node: StateNodeHandle,
+        first_terminal_state_node: StateNodeHandle,
+        second_terminal_state_node: StateNodeHandle,
+        nested_host_text_state_node: StateNodeHandle,
+    }
+
+    impl TerminalHostDescendantFixture {
+        fn expected_rows(self) -> [TerminalHostDescendantExpectedRowForCanary; 2] {
+            [
+                TerminalHostDescendantExpectedRowForCanary::new(
+                    self.parent,
+                    0,
+                    self.first_terminal,
+                    FiberTag::HostComponent,
+                    self.first_terminal_state_node,
+                ),
+                TerminalHostDescendantExpectedRowForCanary::new(
+                    self.parent,
+                    1,
+                    self.second_terminal,
+                    FiberTag::HostText,
+                    self.second_terminal_state_node,
+                ),
+            ]
+        }
+    }
+
+    fn terminal_host_descendant_fixture() -> (FiberArena, TerminalHostDescendantFixture) {
+        let mut arena = FiberArena::new();
+        let parent_state_node = StateNodeHandle::from_raw(30_001);
+        let first_terminal_state_node = StateNodeHandle::from_raw(30_002);
+        let second_terminal_state_node = StateNodeHandle::from_raw(30_003);
+        let nested_host_text_state_node = StateNodeHandle::from_raw(30_004);
+
+        let parent = arena.create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::from_raw(30_101),
+            FiberMode::NO,
+        );
+        arena
+            .get_mut(parent)
+            .unwrap()
+            .set_state_node(parent_state_node);
+        let function = arena.create_fiber(
+            FiberTag::FunctionComponent,
+            None,
+            PropsHandle::from_raw(30_102),
+            FiberMode::NO,
+        );
+        let first_terminal = arena.create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::from_raw(30_103),
+            FiberMode::NO,
+        );
+        arena
+            .get_mut(first_terminal)
+            .unwrap()
+            .set_state_node(first_terminal_state_node);
+        let fragment = arena.create_fiber(
+            FiberTag::Fragment,
+            None,
+            PropsHandle::from_raw(30_104),
+            FiberMode::NO,
+        );
+        let second_terminal = arena.create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(30_105),
+            FiberMode::NO,
+        );
+        arena
+            .get_mut(second_terminal)
+            .unwrap()
+            .set_state_node(second_terminal_state_node);
+        let nested_host_text = arena.create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(30_106),
+            FiberMode::NO,
+        );
+        arena
+            .get_mut(nested_host_text)
+            .unwrap()
+            .set_state_node(nested_host_text_state_node);
+
+        arena
+            .set_children(first_terminal, &[nested_host_text])
+            .unwrap();
+        arena.set_children(fragment, &[second_terminal]).unwrap();
+        arena
+            .set_children(function, &[first_terminal, fragment])
+            .unwrap();
+        arena.set_children(parent, &[function]).unwrap();
+
+        (
+            arena,
+            TerminalHostDescendantFixture {
+                parent,
+                function,
+                first_terminal,
+                fragment,
+                second_terminal,
+                nested_host_text,
+                parent_state_node,
+                first_terminal_state_node,
+                second_terminal_state_node,
+                nested_host_text_state_node,
+            },
+        )
+    }
+
+    fn terminal_host_descendant_boundary_fixture(
+        boundary_tag: FiberTag,
+    ) -> (FiberArena, FiberId, FiberId, FiberId) {
+        let mut arena = FiberArena::new();
+        let parent = arena.create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::from_raw(30_201),
+            FiberMode::NO,
+        );
+        arena
+            .get_mut(parent)
+            .unwrap()
+            .set_state_node(StateNodeHandle::from_raw(30_202));
+        let boundary = arena.create_fiber(
+            boundary_tag,
+            None,
+            PropsHandle::from_raw(30_203),
+            FiberMode::NO,
+        );
+        let terminal = arena.create_fiber(
+            FiberTag::HostText,
+            None,
+            PropsHandle::from_raw(30_204),
+            FiberMode::NO,
+        );
+        arena
+            .get_mut(terminal)
+            .unwrap()
+            .set_state_node(StateNodeHandle::from_raw(30_205));
+        arena.set_children(boundary, &[terminal]).unwrap();
+        arena.set_children(parent, &[boundary]).unwrap();
+
+        (arena, parent, boundary, terminal)
+    }
+
+    #[test]
+    fn append_all_children_terminal_host_canary_collects_ordered_descendants_without_mutation() {
+        let (arena, fixture) = terminal_host_descendant_fixture();
+        let expected = fixture.expected_rows();
+        let parent_children_before = arena.child_ids(fixture.parent).unwrap();
+        let function_children_before = arena.child_ids(fixture.function).unwrap();
+        let fragment_children_before = arena.child_ids(fixture.fragment).unwrap();
+
+        let record = terminal_host_descendant_collection_complete_work_record_for_canary(
+            &arena,
+            fixture.parent,
+            &expected,
+        )
+        .unwrap();
+
+        assert_eq!(record.parent(), fixture.parent);
+        assert_eq!(record.parent_state_node(), fixture.parent_state_node);
+        let source = record.source_evidence();
+        assert_eq!(source.react_version(), "19.2.6");
+        assert_eq!(
+            source.react_commit(),
+            "eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401"
+        );
+        assert_eq!(
+            source.source_path(),
+            "packages/react-reconciler/src/ReactFiberCompleteWork.js"
+        );
+        assert_eq!(source.append_all_children_start_line(), 240);
+        assert_eq!(source.append_all_children_end_line(), 342);
+        assert_eq!(source.terminal_host_condition_line(), 251);
+        assert_eq!(source.append_initial_child_line(), 252);
+        assert_eq!(source.portal_skip_line(), 254);
+        assert_eq!(source.descend_to_child_line(), 261);
+        assert_eq!(source.sibling_return_repair_line(), 278);
+        assert_eq!(source.host_component_mount_call_line(), 1399);
+
+        assert_eq!(record.terminal_descendant_count(), 2);
+        assert_eq!(
+            record.terminal_descendants()[0],
+            TerminalHostDescendantRowForCanary {
+                parent: fixture.parent,
+                ordinal: 0,
+                terminal: fixture.first_terminal,
+                terminal_tag: FiberTag::HostComponent,
+                terminal_state_node: fixture.first_terminal_state_node,
+                direct_parent: fixture.function,
+            }
+        );
+        assert_eq!(
+            record.terminal_descendants()[1],
+            TerminalHostDescendantRowForCanary {
+                parent: fixture.parent,
+                ordinal: 1,
+                terminal: fixture.second_terminal,
+                terminal_tag: FiberTag::HostText,
+                terminal_state_node: fixture.second_terminal_state_node,
+                direct_parent: fixture.fragment,
+            }
+        );
+        assert!(
+            !record
+                .terminal_descendants()
+                .iter()
+                .any(|row| row.terminal() == fixture.nested_host_text)
+        );
+        assert_eq!(
+            arena.get(fixture.nested_host_text).unwrap().state_node(),
+            fixture.nested_host_text_state_node
+        );
+
+        assert_eq!(record.skipped_wrapper_count(), 2);
+        assert_eq!(
+            record.skipped_wrappers()[0],
+            TerminalHostDescendantSkippedWrapperForCanary {
+                parent: fixture.parent,
+                wrapper: fixture.function,
+                wrapper_tag: FiberTag::FunctionComponent,
+                direct_parent: fixture.parent,
+                child_count: 2,
+            }
+        );
+        assert_eq!(
+            record.skipped_wrappers()[1],
+            TerminalHostDescendantSkippedWrapperForCanary {
+                parent: fixture.parent,
+                wrapper: fixture.fragment,
+                wrapper_tag: FiberTag::Fragment,
+                direct_parent: fixture.function,
+                child_count: 1,
+            }
+        );
+        assert_eq!(
+            record.host_mutation_blocker(),
+            TerminalHostDescendantHostMutationBlockerForCanary::CollectionOnlyDoesNotCallAppendInitialChild
+        );
+        assert_eq!(
+            record.host_mutation_blocker().as_str(),
+            "collection-only-does-not-call-append-initial-child"
+        );
+        assert!(!record.append_initial_child_called());
+        assert!(!record.host_mutation_performed());
+        assert!(record.private_reconciler_handoff_only());
+        assert!(!record.public_dom_compatibility_claimed());
+        assert!(!record.test_renderer_compatibility_claimed());
+        validate_terminal_host_descendant_private_scope_for_canary(&record).unwrap();
+
+        assert_eq!(
+            arena.child_ids(fixture.parent).unwrap(),
+            parent_children_before
+        );
+        assert_eq!(
+            arena.child_ids(fixture.function).unwrap(),
+            function_children_before
+        );
+        assert_eq!(
+            arena.child_ids(fixture.fragment).unwrap(),
+            fragment_children_before
+        );
+        assert_eq!(
+            arena.get(fixture.first_terminal).unwrap().state_node(),
+            fixture.first_terminal_state_node
+        );
+        assert_eq!(
+            arena.get(fixture.second_terminal).unwrap().state_node(),
+            fixture.second_terminal_state_node
+        );
+    }
+
+    #[test]
+    fn append_all_children_terminal_host_canary_rejects_portal_child() {
+        let (arena, parent, portal, _terminal) =
+            terminal_host_descendant_boundary_fixture(FiberTag::Portal);
+
+        assert_eq!(
+            terminal_host_descendant_collection_complete_work_record_for_canary(
+                &arena,
+                parent,
+                &[],
+            ),
+            Err(
+                TerminalHostDescendantCollectionCompleteWorkErrorForCanary::PortalTraversalBlocked {
+                    parent,
+                    portal,
+                },
+            )
+        );
+    }
+
+    #[test]
+    fn append_all_children_terminal_host_canary_blocks_suspense_and_offscreen_visibility_claims() {
+        let (arena, parent, suspense, _terminal) =
+            terminal_host_descendant_boundary_fixture(FiberTag::Suspense);
+        assert_eq!(
+            terminal_host_descendant_collection_complete_work_record_for_canary(
+                &arena,
+                parent,
+                &[],
+            ),
+            Err(
+                TerminalHostDescendantCollectionCompleteWorkErrorForCanary::VisibilityBoundaryTraversalBlocked {
+                    parent,
+                    boundary: suspense,
+                    tag: FiberTag::Suspense,
+                },
+            )
+        );
+
+        let (arena, parent, offscreen, _terminal) =
+            terminal_host_descendant_boundary_fixture(FiberTag::Offscreen);
+        assert_eq!(
+            terminal_host_descendant_collection_complete_work_record_for_canary(
+                &arena,
+                parent,
+                &[],
+            ),
+            Err(
+                TerminalHostDescendantCollectionCompleteWorkErrorForCanary::VisibilityBoundaryTraversalBlocked {
+                    parent,
+                    boundary: offscreen,
+                    tag: FiberTag::Offscreen,
+                },
+            )
+        );
+    }
+
+    #[test]
+    fn append_all_children_terminal_host_canary_rejects_missing_state_node() {
+        let (mut arena, fixture) = terminal_host_descendant_fixture();
+        let expected = fixture.expected_rows();
+        arena
+            .get_mut(fixture.second_terminal)
+            .unwrap()
+            .set_state_node(StateNodeHandle::NONE);
+
+        assert_eq!(
+            terminal_host_descendant_collection_complete_work_record_for_canary(
+                &arena,
+                fixture.parent,
+                &expected,
+            ),
+            Err(
+                TerminalHostDescendantCollectionCompleteWorkErrorForCanary::MissingTerminalStateNode {
+                    parent: fixture.parent,
+                    terminal: fixture.second_terminal,
+                    tag: FiberTag::HostText,
+                },
+            )
+        );
+    }
+
+    #[test]
+    fn append_all_children_terminal_host_canary_rejects_order_drift_and_duplicate_rows() {
+        let (mut arena, fixture) = terminal_host_descendant_fixture();
+        let expected = fixture.expected_rows();
+        arena
+            .set_children(
+                fixture.function,
+                &[fixture.fragment, fixture.first_terminal],
+            )
+            .unwrap();
+
+        assert_eq!(
+            terminal_host_descendant_collection_complete_work_record_for_canary(
+                &arena,
+                fixture.parent,
+                &expected,
+            ),
+            Err(
+                TerminalHostDescendantCollectionCompleteWorkErrorForCanary::TerminalChildOrderMismatch {
+                    parent: fixture.parent,
+                    expected: expected.to_vec(),
+                    actual: vec![
+                        TerminalHostDescendantRowForCanary {
+                            parent: fixture.parent,
+                            ordinal: 0,
+                            terminal: fixture.second_terminal,
+                            terminal_tag: FiberTag::HostText,
+                            terminal_state_node: fixture.second_terminal_state_node,
+                            direct_parent: fixture.fragment,
+                        },
+                        TerminalHostDescendantRowForCanary {
+                            parent: fixture.parent,
+                            ordinal: 1,
+                            terminal: fixture.first_terminal,
+                            terminal_tag: FiberTag::HostComponent,
+                            terminal_state_node: fixture.first_terminal_state_node,
+                            direct_parent: fixture.function,
+                        },
+                    ],
+                },
+            )
+        );
+
+        let (arena, fixture) = terminal_host_descendant_fixture();
+        let duplicate_rows = [fixture.expected_rows()[0], fixture.expected_rows()[0]];
+        assert_eq!(
+            terminal_host_descendant_collection_complete_work_record_for_canary(
+                &arena,
+                fixture.parent,
+                &duplicate_rows,
+            ),
+            Err(
+                TerminalHostDescendantCollectionCompleteWorkErrorForCanary::DuplicateTerminalChild {
+                    parent: fixture.parent,
+                    terminal: fixture.first_terminal,
+                },
+            )
+        );
+    }
+
+    #[test]
+    fn append_all_children_terminal_host_canary_rejects_stale_or_cloned_rows() {
+        let (mut arena, fixture) = terminal_host_descendant_fixture();
+        let cloned_terminal = arena
+            .create_work_in_progress(fixture.first_terminal, PropsHandle::from_raw(30_301))
+            .unwrap();
+        let stale_row = TerminalHostDescendantExpectedRowForCanary::new(
+            fixture.parent,
+            0,
+            cloned_terminal,
+            FiberTag::HostComponent,
+            fixture.first_terminal_state_node,
+        );
+        let expected = [
+            stale_row,
+            TerminalHostDescendantExpectedRowForCanary::new(
+                fixture.parent,
+                1,
+                fixture.second_terminal,
+                FiberTag::HostText,
+                fixture.second_terminal_state_node,
+            ),
+        ];
+
+        assert_eq!(
+            terminal_host_descendant_collection_complete_work_record_for_canary(
+                &arena,
+                fixture.parent,
+                &expected,
+            ),
+            Err(
+                TerminalHostDescendantCollectionCompleteWorkErrorForCanary::StaleOrClonedTerminalRow {
+                    parent: fixture.parent,
+                    row: stale_row,
+                    reason: "expected terminal row is not inside parent subtree",
+                },
+            )
+        );
+    }
+
+    #[test]
+    fn append_all_children_terminal_host_canary_rejects_public_compatibility_claims() {
+        let (arena, fixture) = terminal_host_descendant_fixture();
+        let expected = fixture.expected_rows();
+        let record = terminal_host_descendant_collection_complete_work_record_for_canary(
+            &arena,
+            fixture.parent,
+            &expected,
+        )
+        .unwrap();
+
+        assert_eq!(
+            validate_terminal_host_descendant_private_scope_for_canary(
+                &record
+                    .clone()
+                    .with_public_dom_compatibility_claimed_for_canary(),
+            ),
+            Err(
+                TerminalHostDescendantCollectionCompleteWorkErrorForCanary::PublicCompatibilityClaimed {
+                    parent: fixture.parent,
+                    compatibility: TerminalHostDescendantCompatibilityClaimForCanary::PublicDom,
+                },
+            )
+        );
+        assert_eq!(
+            TerminalHostDescendantCompatibilityClaimForCanary::PublicDom.as_str(),
+            "public-dom"
+        );
+
+        assert_eq!(
+            validate_terminal_host_descendant_private_scope_for_canary(
+                &record.with_test_renderer_compatibility_claimed_for_canary(),
+            ),
+            Err(
+                TerminalHostDescendantCollectionCompleteWorkErrorForCanary::PublicCompatibilityClaimed {
+                    parent: fixture.parent,
+                    compatibility: TerminalHostDescendantCompatibilityClaimForCanary::TestRenderer,
+                },
+            )
+        );
+        assert_eq!(
+            TerminalHostDescendantCompatibilityClaimForCanary::TestRenderer.as_str(),
+            "test-renderer"
+        );
     }
 
     #[test]
