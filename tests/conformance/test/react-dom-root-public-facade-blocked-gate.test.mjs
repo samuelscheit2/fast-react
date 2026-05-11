@@ -2835,16 +2835,21 @@ test("React DOM client private facade host-output update routes through private 
     updateIdPrefix: "facade-conformance-update-id"
   });
   const root = adapter.createRoot(container);
-  const initial = adapter.renderHostOutput(root, initialElement);
+  const initial = root.render(initialElement);
   const initialHidden =
     rootBridge.getPrivateRootPublicFacadeHostOutputRenderPayload(initial);
-  const update = adapter.updateHostOutput(root, nextElement);
+  const update = root.render(nextElement);
   const hidden =
     rootBridge.getPrivateRootPublicFacadeHostOutputUpdatePayload(update);
   const rootWorkLoopRecord = initial.rootWorkLoopFinishedWorkRecord;
   const rootWorkLoopPayload =
     rootBridge.getPrivateRootPublicFacadeRootWorkLoopFinishedWorkPayload(
       rootWorkLoopRecord
+    );
+  const snapshot = update.sourceContainerSnapshot;
+  const snapshotPayload =
+    rootBridge.getPrivateRootPublicFacadeLifecycleContainerSnapshotPayload(
+      snapshot
     );
 
   assert.equal(
@@ -2949,6 +2954,29 @@ test("React DOM client private facade host-output update routes through private 
   assert.equal(update.listenerInstallation, false);
   assert.equal(update.compatibilityClaimed, false);
   assert.equal(
+    update.sourceContainerSnapshotStatus,
+    rootBridge.ROOT_BRIDGE_PUBLIC_FACADE_LIFECYCLE_CONTAINER_SNAPSHOT_ACCEPTED
+  );
+  assert.equal(update.sourceContainerSnapshotPhase, "update");
+  assert.equal(update.sourceContainerSnapshotOwned, true);
+  assert.equal(update.sourceContainerSnapshotBeforeChildCount, 1);
+  assert.equal(update.sourceContainerSnapshotAfterChildCount, 1);
+  assert.equal(update.sourceContainerSnapshotMarkerListenerPreserved, true);
+  assert.equal(
+    snapshot.$$typeof,
+    rootBridge.privateRootPublicFacadeLifecycleContainerSnapshotRecordType
+  );
+  assert.equal(snapshot.phase, "update");
+  assert.equal(snapshot.sourceOwned, true);
+  assert.equal(snapshot.beforeTextContent, "initial facade output");
+  assert.equal(snapshot.afterTextContent, "updated facade output");
+  assert.equal(
+    rootBridge.isPrivateRootPublicFacadeLifecycleContainerSnapshotRecord(
+      snapshot
+    ),
+    true
+  );
+  assert.equal(
     rootBridge.isPrivateRootPublicFacadeHostOutputUpdateRecord(update),
     true
   );
@@ -2962,6 +2990,10 @@ test("React DOM client private facade host-output update routes through private 
     rootBridge.getPrivateRootRecordPayload(hidden.updateRecord).element,
     nextElement
   );
+  assert.equal(snapshotPayload.sourceRecord, hidden.updateRecord);
+  assert.equal(snapshotPayload.container, container);
+  assert.equal(snapshotPayload.before.childCount, 1);
+  assert.equal(snapshotPayload.after.childCount, 1);
   assert.equal(
     hidden.hostOutputUpdateHandoff.updateStatus,
     rootBridge.ROOT_BRIDGE_HOST_OUTPUT_UPDATE_APPLIED
