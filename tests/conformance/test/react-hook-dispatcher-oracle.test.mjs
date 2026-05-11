@@ -440,6 +440,97 @@ const expectedUseRefCompatibilityFalseFlags = [
   "idGenerationClaimed",
   "packageCompatibility"
 ];
+const expectedUseRefExecutionSourceReportFieldNames = [
+  "kind",
+  "version",
+  "status",
+  "reactSourceTag",
+  "reactSourceCommit",
+  "reactHooksSource",
+  "reactReconcilerSource",
+  "fastReactSource",
+  "reactHookSourceFunction",
+  "reactMountFunction",
+  "reactUpdateFunction",
+  "mountCreatesRefObject",
+  "mountStoresRefObjectInMemoizedState",
+  "updateReturnsMemoizedState",
+  "updateIgnoresInitialValue",
+  "dispatcherMethodCurrentInReactSource",
+  "compatibilityClaimed"
+];
+const expectedUseRefExecutionSourceReport = {
+  kind: "fast-react.private.use_ref_hook_execution_source_report",
+  version: 1,
+  status: "source-current-for-react-19.2.6-useRef-mount-update-ref-identity",
+  reactSourceTag: "v19.2.6",
+  reactSourceCommit: "eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401",
+  reactHooksSource: "packages/react/src/ReactHooks.js",
+  reactReconcilerSource: "packages/react-reconciler/src/ReactFiberHooks.js",
+  fastReactSource: "packages/react/hook-dispatcher.js",
+  reactHookSourceFunction: "ReactHooks.useRef",
+  reactMountFunction: "mountRef",
+  reactUpdateFunction: "updateRef",
+  mountCreatesRefObject: true,
+  mountStoresRefObjectInMemoizedState: true,
+  updateReturnsMemoizedState: true,
+  updateIgnoresInitialValue: true,
+  dispatcherMethodCurrentInReactSource: true,
+  compatibilityClaimed: false
+};
+const expectedUseRefExecutionCallRecordFieldNames = [
+  "phase",
+  "hookName",
+  "callIndex",
+  "initialValue",
+  "metadataIdentityCurrent",
+  "thisMatchesDispatcher",
+  "privateDispatcherMarked",
+  "returnedRefObject",
+  "returnedCurrent",
+  "executionErrorCode"
+];
+const expectedUseRefRefIdentityRecordFieldNames = [
+  "mountRefObject",
+  "updateRefObject",
+  "sourceOwnedRefObject",
+  "mountUpdateRefObjectSame",
+  "mountCurrentValue",
+  "updateCurrentValue",
+  "updateInitialValue",
+  "updateInitialValueIgnored",
+  "callerSuppliedRefObjectAccepted",
+  "refIdentityCompatibilityClaimed",
+  "refObjectCompatibilityClaimed"
+];
+const expectedUseRefExecutionEvidenceFieldNames = [
+  "kind",
+  "version",
+  "status",
+  "compatibilityTarget",
+  "hookNames",
+  "sourceReport",
+  "currentnessReport",
+  "mountCallRecord",
+  "updateCallRecord",
+  "refIdentityRecord",
+  "rootUseRefSourceFunctionCurrent",
+  "privateDispatcherMarked",
+  "sourceOwnedDispatcherExecution",
+  "sourceOwnedRefObject",
+  "publicRootlessInvalidHookBlocked",
+  "genericDispatcherForwardingBlocked",
+  "privateDispatcherRequired",
+  "publicRootRenderingBlocked",
+  "rootSchedulerIntegrationBlocked",
+  "schedulerTimingBlocked",
+  "actIntegrationBlocked",
+  "rendererCompatibilityBlocked",
+  "callbackInvocationBlocked",
+  "externalStoreInvocationBlocked",
+  "idGenerationBlocked",
+  ...expectedUseRefCompatibilityFalseFlags
+];
 const expectedUnsupportedPlaceholderHookNames = [
   "useActionState",
   "useOptimistic",
@@ -998,6 +1089,33 @@ test("private useRef hook blockers record source and surface currentness", () =>
   );
   assert.deepEqual(metadata.sourceReport, expectedUseRefSourceReport);
   assert.deepEqual(
+    metadata.executionSourceReportFieldNames,
+    expectedUseRefExecutionSourceReportFieldNames
+  );
+  assert.deepEqual(
+    metadata.executionSourceReport,
+    expectedUseRefExecutionSourceReport
+  );
+  assert.deepEqual(
+    metadata.executionEvidenceFieldNames,
+    expectedUseRefExecutionEvidenceFieldNames
+  );
+  assert.deepEqual(
+    metadata.executionCallRecordFieldNames,
+    expectedUseRefExecutionCallRecordFieldNames
+  );
+  assert.deepEqual(
+    metadata.refIdentityRecordFieldNames,
+    expectedUseRefRefIdentityRecordFieldNames
+  );
+  assert.equal(
+    metadata.privateExecutionEvidenceStatus,
+    hookDispatcher.useRefHookExecutionEvidenceStatus
+  );
+  assert.equal(metadata.sourceOwnedPrivateExecutionEvidence, true);
+  assert.equal(metadata.callerSuppliedRefObjectsAccepted, false);
+  assert.equal(metadata.rowOverridesAccepted, false);
+  assert.deepEqual(
     metadata.blockerCurrentnessFieldNames,
     expectedUseRefBlockerCurrentnessFieldNames
   );
@@ -1041,6 +1159,26 @@ test("private useRef hook blockers record source and surface currentness", () =>
     hookDispatcher.useRefHookSurfaceCurrentnessRows,
     expectedUseRefSurfaceCurrentnessRows
   );
+  assert.deepEqual(
+    hookDispatcher.useRefHookExecutionSourceReportFieldNames,
+    expectedUseRefExecutionSourceReportFieldNames
+  );
+  assert.deepEqual(
+    hookDispatcher.useRefHookExecutionSourceReport,
+    expectedUseRefExecutionSourceReport
+  );
+  assert.deepEqual(
+    hookDispatcher.useRefHookExecutionEvidenceFieldNames,
+    expectedUseRefExecutionEvidenceFieldNames
+  );
+  assert.deepEqual(
+    hookDispatcher.useRefHookExecutionCallRecordFieldNames,
+    expectedUseRefExecutionCallRecordFieldNames
+  );
+  assert.deepEqual(
+    hookDispatcher.useRefHookRefIdentityRecordFieldNames,
+    expectedUseRefRefIdentityRecordFieldNames
+  );
   assert.equal(
     hookDispatcher.isPrivateRefHookDispatcherMetadata(metadata),
     true
@@ -1054,6 +1192,10 @@ test("private useRef hook blockers record source and surface currentness", () =>
   assert.equal(ReactCjsDevelopment.createUseRefHookCurrentnessReport, undefined);
   assert.equal(ReactCjsProduction.createUseRefHookCurrentnessReport, undefined);
   assert.equal(ReactServer.createUseRefHookCurrentnessReport, undefined);
+  assert.equal(React.createUseRefHookExecutionEvidence, undefined);
+  assert.equal(ReactCjsDevelopment.createUseRefHookExecutionEvidence, undefined);
+  assert.equal(ReactCjsProduction.createUseRefHookExecutionEvidence, undefined);
+  assert.equal(ReactServer.createUseRefHookExecutionEvidence, undefined);
 });
 
 test("useRef hook currentness rejects stale source, surface drift, and forged claims", () => {
@@ -1292,6 +1434,250 @@ test("useRef hook currentness rejects same-shaped fake root useRef", () => {
         inheritedOverrideOptions
       ),
       "useRef-hook-currentness-source-proof"
+    );
+  } finally {
+    React.useRef = originalUseRef;
+  }
+});
+
+test("private useRef execution evidence records source-owned mount/update ref identity", () => {
+  const report = hookDispatcher.createUseRefHookExecutionEvidence();
+  const mountRefObject = report.refIdentityRecord.mountRefObject;
+
+  assert.equal(report.kind, "fast-react.private.use_ref_hook_execution_evidence");
+  assert.equal(report.version, 1);
+  assert.equal(
+    report.status,
+    hookDispatcher.useRefHookExecutionEvidenceStatus
+  );
+  assert.equal(report.compatibilityTarget, "react@19.2.6");
+  assert.deepEqual(
+    Object.keys(report),
+    expectedUseRefExecutionEvidenceFieldNames
+  );
+  assert.deepEqual(report.hookNames, expectedUseRefHookNames);
+  assert.deepEqual(report.sourceReport, expectedUseRefExecutionSourceReport);
+  assert.equal(
+    hookDispatcher.validateUseRefHookCurrentnessReport(report.currentnessReport),
+    null
+  );
+  assert.deepEqual(
+    Object.keys(report.mountCallRecord),
+    expectedUseRefExecutionCallRecordFieldNames
+  );
+  assert.deepEqual(
+    Object.keys(report.updateCallRecord),
+    expectedUseRefExecutionCallRecordFieldNames
+  );
+  assert.deepEqual(
+    Object.keys(report.refIdentityRecord),
+    expectedUseRefRefIdentityRecordFieldNames
+  );
+  assert.equal(report.rootUseRefSourceFunctionCurrent, true);
+  assert.equal(report.privateDispatcherMarked, true);
+  assert.equal(report.sourceOwnedDispatcherExecution, true);
+  assert.equal(report.sourceOwnedRefObject, true);
+  assert.equal(report.mountCallRecord.phase, "Mount");
+  assert.equal(report.mountCallRecord.hookName, "useRef");
+  assert.equal(report.mountCallRecord.callIndex, 0);
+  assert.equal(
+    report.mountCallRecord.initialValue,
+    "fast-react-private-useRef-mount-initial"
+  );
+  assert.equal(report.mountCallRecord.metadataIdentityCurrent, true);
+  assert.equal(report.mountCallRecord.thisMatchesDispatcher, true);
+  assert.equal(report.mountCallRecord.privateDispatcherMarked, true);
+  assert.equal(report.mountCallRecord.returnedRefObject, mountRefObject);
+  assert.equal(
+    report.mountCallRecord.returnedCurrent,
+    "fast-react-private-useRef-mount-initial"
+  );
+  assert.equal(report.mountCallRecord.executionErrorCode, null);
+  assert.equal(report.updateCallRecord.phase, "Update");
+  assert.equal(report.updateCallRecord.hookName, "useRef");
+  assert.equal(report.updateCallRecord.callIndex, 1);
+  assert.equal(
+    report.updateCallRecord.initialValue,
+    "fast-react-private-useRef-update-ignored"
+  );
+  assert.equal(report.updateCallRecord.metadataIdentityCurrent, true);
+  assert.equal(report.updateCallRecord.thisMatchesDispatcher, true);
+  assert.equal(report.updateCallRecord.privateDispatcherMarked, true);
+  assert.equal(report.updateCallRecord.returnedRefObject, mountRefObject);
+  assert.equal(
+    report.updateCallRecord.returnedCurrent,
+    "fast-react-private-useRef-mount-initial"
+  );
+  assert.equal(report.updateCallRecord.executionErrorCode, null);
+  assert.equal(report.refIdentityRecord.updateRefObject, mountRefObject);
+  assert.equal(report.refIdentityRecord.sourceOwnedRefObject, true);
+  assert.equal(report.refIdentityRecord.mountUpdateRefObjectSame, true);
+  assert.equal(
+    report.refIdentityRecord.mountCurrentValue,
+    "fast-react-private-useRef-mount-initial"
+  );
+  assert.equal(
+    report.refIdentityRecord.updateCurrentValue,
+    "fast-react-private-useRef-mount-initial"
+  );
+  assert.equal(
+    report.refIdentityRecord.updateInitialValue,
+    "fast-react-private-useRef-update-ignored"
+  );
+  assert.equal(report.refIdentityRecord.updateInitialValueIgnored, true);
+  assert.equal(report.refIdentityRecord.callerSuppliedRefObjectAccepted, false);
+  assert.equal(report.refIdentityRecord.refIdentityCompatibilityClaimed, false);
+  assert.equal(report.refIdentityRecord.refObjectCompatibilityClaimed, false);
+  assert.equal(Object.isFrozen(report), true);
+  assert.equal(Object.isFrozen(report.mountCallRecord), true);
+  assert.equal(Object.isFrozen(report.updateCallRecord), true);
+  assert.equal(Object.isFrozen(report.refIdentityRecord), true);
+  assert.equal(Object.isFrozen(mountRefObject), true);
+
+  for (const flagName of expectedUseRefCompatibilityFalseFlags) {
+    assert.equal(report[flagName], false, flagName);
+  }
+
+  assert.equal(hookDispatcher.validateUseRefHookExecutionEvidence(report), null);
+  assert.equal(hookDispatcher.isUseRefHookExecutionEvidence(report), true);
+
+  const consumption = hookDispatcher.consumeUseRefHookExecutionEvidence(report);
+  assert.equal(
+    consumption.status,
+    hookDispatcher.useRefHookExecutionEvidenceConsumptionStatus
+  );
+  assert.equal(consumption.accepted, true);
+  assert.equal(consumption.mountRefObject, mountRefObject);
+  assert.equal(consumption.updateRefObject, mountRefObject);
+  assert.equal(consumption.refIdentityStable, true);
+  assert.equal(consumption.updateInitialValueIgnored, true);
+  assert.equal(consumption.sourceOwnedDispatcherExecution, true);
+  assert.equal(consumption.sourceOwnedRefObject, true);
+  assert.equal(consumption.currentnessReportAccepted, true);
+  assert.equal(consumption.publicRootRenderingBlocked, true);
+  assert.equal(consumption.rootSchedulerIntegrationBlocked, true);
+  assert.equal(consumption.schedulerTimingBlocked, true);
+  assert.equal(consumption.actIntegrationBlocked, true);
+  assert.equal(consumption.rendererCompatibilityBlocked, true);
+  assert.equal(consumption.callbackInvocationBlocked, true);
+  assert.equal(consumption.externalStoreInvocationBlocked, true);
+  assert.equal(consumption.idGenerationBlocked, true);
+  assert.equal(consumption.publicCompatibilityClaimed, false);
+  assert.equal(consumption.compatibilityClaimed, false);
+
+  assert.equal(React.createUseRefHookExecutionEvidence, undefined);
+  assert.equal(ReactCjsDevelopment.createUseRefHookExecutionEvidence, undefined);
+  assert.equal(ReactCjsProduction.createUseRefHookExecutionEvidence, undefined);
+  assert.equal(ReactServer.createUseRefHookExecutionEvidence, undefined);
+  assert.equal(React.consumeUseRefHookExecutionEvidence, undefined);
+  assert.equal(ReactCjsDevelopment.consumeUseRefHookExecutionEvidence, undefined);
+  assert.equal(ReactCjsProduction.consumeUseRefHookExecutionEvidence, undefined);
+  assert.equal(ReactServer.consumeUseRefHookExecutionEvidence, undefined);
+});
+
+test("private useRef execution evidence rejects forged execution and compatibility claims", () => {
+  const report = hookDispatcher.createUseRefHookExecutionEvidence();
+
+  assertUseRefExecutionEvidenceRejected(
+    Object.freeze({ ...report }),
+    "useRef-hook-execution-source-proof"
+  );
+  assertUseRefExecutionEvidenceRejected(
+    hookDispatcher.createUseRefHookExecutionEvidence({
+      dispatcherMetadata: {
+        ...hookDispatcher.privateRefHookDispatcherMetadata
+      }
+    }),
+    "useRef-hook-execution-private-execution"
+  );
+  assertUseRefExecutionEvidenceRejected(
+    hookDispatcher.createUseRefHookExecutionEvidence({
+      useGenericDispatcher: true
+    }),
+    "useRef-hook-execution-private-execution"
+  );
+  assertUseRefExecutionEvidenceRejected(
+    hookDispatcher.createUseRefHookExecutionEvidence({
+      currentnessReport: hookDispatcher.createUseRefHookCurrentnessReport({
+        sourceReport: {
+          reactSourceCommit: "forged"
+        }
+      })
+    }),
+    "useRef-hook-execution-currentness-report"
+  );
+  assertUseRefExecutionEvidenceRejected(
+    hookDispatcher.createUseRefHookExecutionEvidence({
+      refObject: { current: "fast-react-private-useRef-mount-initial" }
+    }),
+    "useRef-hook-execution-caller-ref-object"
+  );
+  assertUseRefExecutionEvidenceRejected(
+    hookDispatcher.createUseRefHookExecutionEvidence({
+      surfaceCurrentnessRowOverrides: {
+        "react-root": {
+          sourceFunctionCurrent: true
+        }
+      }
+    }),
+    "useRef-hook-execution-row-overrides"
+  );
+
+  for (const flagName of [
+    "publicCompatibilityClaimed",
+    "hookExecutionCompatibility",
+    "refIdentityCompatibility",
+    "packageCompatibility"
+  ]) {
+    assertUseRefExecutionEvidenceRejected(
+      hookDispatcher.createUseRefHookExecutionEvidence({
+        [flagName]: true
+      }),
+      "useRef-hook-execution-compatibility-or-prerequisite-claim"
+    );
+  }
+
+  for (const prerequisiteSmuggling of [
+    { publicRootRenderingBlocked: false },
+    { rootExecution: true },
+    { rendererCompatibility: true }
+  ]) {
+    assertUseRefExecutionEvidenceRejected(
+      hookDispatcher.createUseRefHookExecutionEvidence(prerequisiteSmuggling),
+      "useRef-hook-execution-root-renderer-prerequisite-smuggling"
+    );
+  }
+});
+
+test("private useRef execution evidence rejects same-shaped fake root useRef", () => {
+  const originalUseRef = React.useRef;
+  const currentnessReport = hookDispatcher.createUseRefHookCurrentnessReport();
+  const fakeRefObject = { current: "fast-react-private-useRef-mount-initial" };
+  const fakeUseRef = function () {
+    return fakeRefObject;
+  };
+
+  Object.defineProperties(fakeUseRef, {
+    length: {
+      configurable: true,
+      value: 1
+    },
+    name: {
+      configurable: true,
+      value: ""
+    }
+  });
+
+  React.useRef = fakeUseRef;
+
+  try {
+    assert.equal(React.useRef.name, "");
+    assert.equal(React.useRef.length, 1);
+    assertUseRefExecutionEvidenceRejected(
+      hookDispatcher.createUseRefHookExecutionEvidence({
+        currentnessReport
+      }),
+      "useRef-hook-execution-source-function"
     );
   } finally {
     React.useRef = originalUseRef;
@@ -2273,6 +2659,48 @@ test("private startTransition routing records action identity and blocked lane e
   assert.equal(record.compatibilityClaimed, false);
   assert.deepEqual(calls, []);
 });
+
+function assertUseRefExecutionEvidenceRejected(report, reason) {
+  assert.equal(
+    hookDispatcher.validateUseRefHookExecutionEvidence(report),
+    reason
+  );
+  assert.equal(hookDispatcher.isUseRefHookExecutionEvidence(report), false);
+  assert.throws(
+    () => hookDispatcher.consumeUseRefHookExecutionEvidence(report),
+    (error) => {
+      assert.equal(error.name, "FastReactUnimplementedError", reason);
+      assert.equal(error.code, "FAST_REACT_UNIMPLEMENTED", reason);
+      assert.equal(error.entrypoint, "react", reason);
+      assert.equal(
+        error.exportName,
+        "useRefHookExecutionEvidence",
+        reason
+      );
+      assert.equal(error.compatibilityTarget, "react@19.2.6", reason);
+      assert.equal(error.reason, reason);
+      assert.equal(error.publicCompatibilityClaimed, false, reason);
+      assert.equal(error.publicHookCompatibility, false, reason);
+      assert.equal(error.exposesPublicHookImplementation, false, reason);
+      assert.equal(error.hookExecutionCompatibility, false, reason);
+      assert.equal(error.refIdentityCompatibility, false, reason);
+      assert.equal(error.refObjectCompatibility, false, reason);
+      assert.equal(error.rendererCompatibility, false, reason);
+      assert.equal(error.schedulerIntegration, false, reason);
+      assert.equal(error.rootLaneIntegration, false, reason);
+      assert.equal(error.rootScheduling, false, reason);
+      assert.equal(error.rootExecution, false, reason);
+      assert.equal(error.callbackExecutionClaimed, false, reason);
+      assert.equal(error.externalStoreSubscriptionClaimed, false, reason);
+      assert.equal(error.externalStoreSnapshotReadClaimed, false, reason);
+      assert.equal(error.idGenerationClaimed, false, reason);
+      assert.equal(error.packageCompatibility, false, reason);
+      assert.equal(error.compatibilityClaimed, false, reason);
+      return true;
+    },
+    reason
+  );
+}
 
 function assertUseRefCurrentnessRejected(report, reason) {
   assert.equal(

@@ -32,6 +32,9 @@ const privateTransitionHookDispatchers = new WeakSet();
 const privateTransitionHookDispatcherMetadataByDispatcher = new WeakMap();
 const useRefHookCurrentnessReports = new WeakSet();
 const useRefHookSurfaceCurrentnessRowsByReport = new WeakMap();
+const useRefHookExecutionEvidenceReports = new WeakSet();
+const useRefHookExecutionRefObjects = new WeakSet();
+const useRefHookExecutionEvidenceOverrideKeysByReport = new WeakMap();
 const unsupportedPlaceholderHookCurrentnessReports = new WeakSet();
 const unsupportedPlaceholderHookSurfaceCurrentnessRowsByReport = new WeakMap();
 const unsupportedPlaceholderHookCurrentnessReportOverrideKeys = new WeakMap();
@@ -1270,6 +1273,108 @@ const useRefHookCompatibilityFalseFlags = freezeArray([
   'idGenerationClaimed',
   'packageCompatibility'
 ]);
+const useRefHookExecutionMountInitialValue =
+  'fast-react-private-useRef-mount-initial';
+const useRefHookExecutionUpdateInitialValue =
+  'fast-react-private-useRef-update-ignored';
+const useRefHookExecutionSourceReportFieldNames = freezeArray([
+  'kind',
+  'version',
+  'status',
+  'reactSourceTag',
+  'reactSourceCommit',
+  'reactHooksSource',
+  'reactReconcilerSource',
+  'fastReactSource',
+  'reactHookSourceFunction',
+  'reactMountFunction',
+  'reactUpdateFunction',
+  'mountCreatesRefObject',
+  'mountStoresRefObjectInMemoizedState',
+  'updateReturnsMemoizedState',
+  'updateIgnoresInitialValue',
+  'dispatcherMethodCurrentInReactSource',
+  'compatibilityClaimed'
+]);
+const useRefHookExecutionSourceReport = freezeRecord({
+  kind: 'fast-react.private.use_ref_hook_execution_source_report',
+  version: 1,
+  status: 'source-current-for-react-19.2.6-useRef-mount-update-ref-identity',
+  reactSourceTag: 'v19.2.6',
+  reactSourceCommit: 'eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401',
+  reactHooksSource: 'packages/react/src/ReactHooks.js',
+  reactReconcilerSource: 'packages/react-reconciler/src/ReactFiberHooks.js',
+  fastReactSource: 'packages/react/hook-dispatcher.js',
+  reactHookSourceFunction: 'ReactHooks.useRef',
+  reactMountFunction: 'mountRef',
+  reactUpdateFunction: 'updateRef',
+  mountCreatesRefObject: true,
+  mountStoresRefObjectInMemoizedState: true,
+  updateReturnsMemoizedState: true,
+  updateIgnoresInitialValue: true,
+  dispatcherMethodCurrentInReactSource: true,
+  compatibilityClaimed: false
+});
+const useRefHookExecutionCallRecordFieldNames = freezeArray([
+  'phase',
+  'hookName',
+  'callIndex',
+  'initialValue',
+  'metadataIdentityCurrent',
+  'thisMatchesDispatcher',
+  'privateDispatcherMarked',
+  'returnedRefObject',
+  'returnedCurrent',
+  'executionErrorCode'
+]);
+const useRefHookRefIdentityRecordFieldNames = freezeArray([
+  'mountRefObject',
+  'updateRefObject',
+  'sourceOwnedRefObject',
+  'mountUpdateRefObjectSame',
+  'mountCurrentValue',
+  'updateCurrentValue',
+  'updateInitialValue',
+  'updateInitialValueIgnored',
+  'callerSuppliedRefObjectAccepted',
+  'refIdentityCompatibilityClaimed',
+  'refObjectCompatibilityClaimed'
+]);
+const useRefHookExecutionEvidenceFieldNames = freezeArray([
+  'kind',
+  'version',
+  'status',
+  'compatibilityTarget',
+  'hookNames',
+  'sourceReport',
+  'currentnessReport',
+  'mountCallRecord',
+  'updateCallRecord',
+  'refIdentityRecord',
+  'rootUseRefSourceFunctionCurrent',
+  'privateDispatcherMarked',
+  'sourceOwnedDispatcherExecution',
+  'sourceOwnedRefObject',
+  'publicRootlessInvalidHookBlocked',
+  'genericDispatcherForwardingBlocked',
+  'privateDispatcherRequired',
+  'publicRootRenderingBlocked',
+  'rootSchedulerIntegrationBlocked',
+  'schedulerTimingBlocked',
+  'actIntegrationBlocked',
+  'rendererCompatibilityBlocked',
+  'callbackInvocationBlocked',
+  'externalStoreInvocationBlocked',
+  'idGenerationBlocked',
+  ...useRefHookCompatibilityFalseFlags
+]);
+const useRefHookExecutionEvidenceReportKind =
+  'fast-react.private.use_ref_hook_execution_evidence';
+const useRefHookExecutionEvidenceReportVersion = 1;
+const useRefHookExecutionEvidenceStatus =
+  'source-owned-private-useRef-mount-update-ref-identity-evidence';
+const useRefHookExecutionEvidenceConsumptionStatus =
+  'accepted-source-owned-private-useRef-execution-evidence';
 const useRefHookCurrentnessReportOptionNames = freezeArray([
   'hookNames',
   'publicShapeBlockers',
@@ -1320,6 +1425,15 @@ const privateRefHookDispatcherMetadata = freezeRecord({
   publicShapeBlockers: useRefHookPublicShapeBlockers,
   sourceReportFieldNames: useRefHookSourceReportFieldNames,
   sourceReport: useRefHookSourceReport,
+  executionSourceReportFieldNames: useRefHookExecutionSourceReportFieldNames,
+  executionSourceReport: useRefHookExecutionSourceReport,
+  executionEvidenceFieldNames: useRefHookExecutionEvidenceFieldNames,
+  executionCallRecordFieldNames: useRefHookExecutionCallRecordFieldNames,
+  refIdentityRecordFieldNames: useRefHookRefIdentityRecordFieldNames,
+  privateExecutionEvidenceStatus: useRefHookExecutionEvidenceStatus,
+  sourceOwnedPrivateExecutionEvidence: true,
+  callerSuppliedRefObjectsAccepted: false,
+  rowOverridesAccepted: false,
   blockerCurrentnessFieldNames: useRefHookBlockerCurrentnessFieldNames,
   blockerCurrentness: useRefHookBlockerCurrentness,
   surfaceCurrentnessFieldNames: useRefHookSurfaceCurrentnessFieldNames,
@@ -1353,6 +1467,10 @@ const privateRefHookDispatcherMetadataArrayKeys = freezeArray([
   'hookNames',
   'publicShapeBlockerFields',
   'sourceReportFieldNames',
+  'executionSourceReportFieldNames',
+  'executionEvidenceFieldNames',
+  'executionCallRecordFieldNames',
+  'refIdentityRecordFieldNames',
   'blockerCurrentnessFieldNames',
   'surfaceCurrentnessFieldNames',
   'hookCallFields',
@@ -1706,6 +1824,34 @@ function createUseRefHookCurrentnessGateError(reason) {
   error.schedulerIntegration = false;
   error.rootLaneIntegration = false;
   error.rootScheduling = false;
+  error.callbackExecutionClaimed = false;
+  error.externalStoreSubscriptionClaimed = false;
+  error.externalStoreSnapshotReadClaimed = false;
+  error.idGenerationClaimed = false;
+  error.packageCompatibility = false;
+  error.compatibilityClaimed = false;
+  return error;
+}
+
+function createUseRefHookExecutionEvidenceGateError(reason) {
+  const error = createUnimplementedError(
+    'react',
+    'useRefHookExecutionEvidence',
+    'rejected source-owned private useRef execution evidence',
+    'Only current package-owned useRef mount/update execution and ref identity evidence can pass this package-private gate.'
+  );
+  error.reason = reason;
+  error.publicCompatibilityClaimed = false;
+  error.publicHookCompatibility = false;
+  error.exposesPublicHookImplementation = false;
+  error.hookExecutionCompatibility = false;
+  error.refIdentityCompatibility = false;
+  error.refObjectCompatibility = false;
+  error.rendererCompatibility = false;
+  error.schedulerIntegration = false;
+  error.rootLaneIntegration = false;
+  error.rootScheduling = false;
+  error.rootExecution = false;
   error.callbackExecutionClaimed = false;
   error.externalStoreSubscriptionClaimed = false;
   error.externalStoreSnapshotReadClaimed = false;
@@ -2619,6 +2765,262 @@ function consumeUseRefHookCurrentnessReport(report) {
   });
 }
 
+function createUseRefHookExecutionEvidence(overrides = {}) {
+  const normalized = captureOwnDataOptions(overrides, arguments.length > 0);
+  const optionValues = normalized.values;
+  const hasOption = (key) =>
+    Object.prototype.hasOwnProperty.call(optionValues, key);
+  const currentnessReport = hasOption('currentnessReport')
+    ? optionValues.currentnessReport
+    : createUseRefHookCurrentnessReport(
+        hasOption('surfaceCurrentnessRowOverrides')
+          ? {
+              surfaceCurrentnessRowOverrides:
+                optionValues.surfaceCurrentnessRowOverrides
+            }
+          : {}
+      );
+  const rootReact = require('./index.js');
+  const currentUseRef = rootReact.useRef;
+  const mountInitialValue = hasOption('mountInitialValue')
+    ? optionValues.mountInitialValue
+    : useRefHookExecutionMountInitialValue;
+  const updateInitialValue = hasOption('updateInitialValue')
+    ? optionValues.updateInitialValue
+    : useRefHookExecutionUpdateInitialValue;
+  const callerSuppliedRefObject = hasOption('refObject');
+  const refObject = callerSuppliedRefObject
+    ? optionValues.refObject
+    : { current: mountInitialValue };
+  const calls = [];
+  let dispatcher = null;
+  let markError = null;
+  let mountError = null;
+  let updateError = null;
+  let mountReturnedRefObject = null;
+  let updateReturnedRefObject = null;
+
+  const dispatcherTarget = {
+    useRef(initialValue, receivedMetadata) {
+      const callIndex = calls.length;
+      const phase = callIndex === 0 ? 'Mount' : 'Update';
+      const returnedRefObject = refObject;
+      calls.push({
+        phase,
+        hookName: 'useRef',
+        callIndex,
+        initialValue,
+        metadataIdentityCurrent:
+          receivedMetadata === privateRefHookDispatcherMetadata,
+        thisMatchesDispatcher: this === dispatcher,
+        privateDispatcherMarked: isPrivateRefHookDispatcher(this),
+        returnedRefObject,
+        returnedCurrent: isObjectLike(returnedRefObject)
+          ? returnedRefObject.current
+          : undefined,
+        executionErrorCode: null
+      });
+      return returnedRefObject;
+    }
+  };
+  const dispatcherMetadata = hasOption('dispatcherMetadata')
+    ? optionValues.dispatcherMetadata
+    : privateRefHookDispatcherMetadata;
+
+  try {
+    dispatcher = markPrivateRefHookDispatcher(
+      dispatcherTarget,
+      dispatcherMetadata
+    );
+  } catch (error) {
+    markError = error;
+    dispatcher = dispatcherTarget;
+  }
+
+  const previousDispatcher = ReactSharedInternals.H;
+  if (markError === null) {
+    ReactSharedInternals.H = optionValues.useGenericDispatcher === true
+      ? {
+          useRef(initialValue) {
+            return { current: initialValue };
+          }
+        }
+      : dispatcher;
+
+    try {
+      mountReturnedRefObject = currentUseRef(mountInitialValue);
+    } catch (error) {
+      mountError = error;
+    }
+
+    if (mountError === null) {
+      try {
+        updateReturnedRefObject = currentUseRef(updateInitialValue);
+      } catch (error) {
+        updateError = error;
+      }
+    }
+
+    ReactSharedInternals.H = previousDispatcher;
+  }
+
+  if (!callerSuppliedRefObject && isObjectLike(refObject)) {
+    useRefHookExecutionRefObjects.add(refObject);
+    Object.freeze(refObject);
+  }
+
+  const mountCallRecord = freezeUseRefHookExecutionCallRecord({
+    expectedPhase: 'Mount',
+    expectedCallIndex: 0,
+    expectedInitialValue: mountInitialValue,
+    observedCall: calls[0],
+    returnedRefObject: mountReturnedRefObject,
+    executionError: markError ?? mountError
+  });
+  const updateCallRecord = freezeUseRefHookExecutionCallRecord({
+    expectedPhase: 'Update',
+    expectedCallIndex: 1,
+    expectedInitialValue: updateInitialValue,
+    observedCall: calls[1],
+    returnedRefObject: updateReturnedRefObject,
+    executionError: updateError
+  });
+  const refIdentityRecord = freezeRecord({
+    mountRefObject: mountReturnedRefObject,
+    updateRefObject: updateReturnedRefObject,
+    sourceOwnedRefObject:
+      !callerSuppliedRefObject && useRefHookExecutionRefObjects.has(refObject),
+    mountUpdateRefObjectSame:
+      mountReturnedRefObject === updateReturnedRefObject,
+    mountCurrentValue: isObjectLike(mountReturnedRefObject)
+      ? mountReturnedRefObject.current
+      : undefined,
+    updateCurrentValue: isObjectLike(updateReturnedRefObject)
+      ? updateReturnedRefObject.current
+      : undefined,
+    updateInitialValue,
+    updateInitialValueIgnored:
+      mountReturnedRefObject === updateReturnedRefObject &&
+      isObjectLike(updateReturnedRefObject) &&
+      updateReturnedRefObject.current === mountInitialValue,
+    callerSuppliedRefObjectAccepted: callerSuppliedRefObject,
+    refIdentityCompatibilityClaimed: false,
+    refObjectCompatibilityClaimed: false
+  });
+  const report = freezeRecord({
+    kind: useRefHookExecutionEvidenceReportKind,
+    version: useRefHookExecutionEvidenceReportVersion,
+    status: useRefHookExecutionEvidenceStatus,
+    compatibilityTarget: 'react@19.2.6',
+    hookNames: freezeArray(optionValues.hookNames ?? useRefHookNames),
+    sourceReport: freezeRecord({
+      ...useRefHookExecutionSourceReport,
+      ...(optionValues.sourceReport ?? {})
+    }),
+    currentnessReport,
+    mountCallRecord,
+    updateCallRecord,
+    refIdentityRecord,
+    rootUseRefSourceFunctionCurrent: currentUseRef === useRef,
+    privateDispatcherMarked: isPrivateRefHookDispatcher(dispatcher),
+    sourceOwnedDispatcherExecution:
+      calls.length === 2 &&
+      calls[0].thisMatchesDispatcher === true &&
+      calls[1].thisMatchesDispatcher === true,
+    sourceOwnedRefObject:
+      !callerSuppliedRefObject && useRefHookExecutionRefObjects.has(refObject),
+    publicRootlessInvalidHookBlocked:
+      optionValues.publicRootlessInvalidHookBlocked ?? true,
+    genericDispatcherForwardingBlocked:
+      optionValues.genericDispatcherForwardingBlocked ?? true,
+    privateDispatcherRequired: optionValues.privateDispatcherRequired ?? true,
+    publicRootRenderingBlocked:
+      optionValues.publicRootRenderingBlocked ?? true,
+    rootSchedulerIntegrationBlocked:
+      optionValues.rootSchedulerIntegrationBlocked ?? true,
+    schedulerTimingBlocked: optionValues.schedulerTimingBlocked ?? true,
+    actIntegrationBlocked: optionValues.actIntegrationBlocked ?? true,
+    rendererCompatibilityBlocked:
+      optionValues.rendererCompatibilityBlocked ?? true,
+    callbackInvocationBlocked:
+      optionValues.callbackInvocationBlocked ?? true,
+    externalStoreInvocationBlocked:
+      optionValues.externalStoreInvocationBlocked ?? true,
+    idGenerationBlocked: optionValues.idGenerationBlocked ?? true,
+    compatibilityClaimed: optionValues.compatibilityClaimed ?? false,
+    publicCompatibilityClaimed:
+      optionValues.publicCompatibilityClaimed ?? false,
+    publicHookCompatibility: optionValues.publicHookCompatibility ?? false,
+    exposesPublicHookImplementation:
+      optionValues.exposesPublicHookImplementation ?? false,
+    hookExecutionCompatibility:
+      optionValues.hookExecutionCompatibility ?? false,
+    refIdentityCompatibility:
+      optionValues.refIdentityCompatibility ?? false,
+    refObjectCompatibility: optionValues.refObjectCompatibility ?? false,
+    rendererIntegration: optionValues.rendererIntegration ?? false,
+    rendererCompatibility: optionValues.rendererCompatibility ?? false,
+    publicActIntegration: optionValues.publicActIntegration ?? false,
+    schedulerIntegration: optionValues.schedulerIntegration ?? false,
+    schedulerPrerequisitesReady:
+      optionValues.schedulerPrerequisitesReady ?? false,
+    rootLaneIntegration: optionValues.rootLaneIntegration ?? false,
+    rootScheduling: optionValues.rootScheduling ?? false,
+    rootExecution: optionValues.rootExecution ?? false,
+    callbackExecutionClaimed:
+      optionValues.callbackExecutionClaimed ?? false,
+    externalStoreSubscriptionClaimed:
+      optionValues.externalStoreSubscriptionClaimed ?? false,
+    externalStoreSnapshotReadClaimed:
+      optionValues.externalStoreSnapshotReadClaimed ?? false,
+    idGenerationClaimed: optionValues.idGenerationClaimed ?? false,
+    packageCompatibility: optionValues.packageCompatibility ?? false
+  });
+
+  useRefHookExecutionEvidenceReports.add(report);
+  useRefHookExecutionEvidenceOverrideKeysByReport.set(
+    report,
+    normalized.overrideKeys
+  );
+  return report;
+}
+
+function consumeUseRefHookExecutionEvidence(report) {
+  const rejectionReason = validateUseRefHookExecutionEvidence(report);
+
+  if (rejectionReason !== null) {
+    throw createUseRefHookExecutionEvidenceGateError(rejectionReason);
+  }
+
+  return freezeRecord({
+    status: useRefHookExecutionEvidenceConsumptionStatus,
+    accepted: true,
+    executionStatus: report.status,
+    compatibilityTarget: 'react@19.2.6',
+    hookNames: report.hookNames,
+    mountRefObject: report.refIdentityRecord.mountRefObject,
+    updateRefObject: report.refIdentityRecord.updateRefObject,
+    refIdentityStable: true,
+    updateInitialValueIgnored: true,
+    sourceOwnedDispatcherExecution: true,
+    sourceOwnedRefObject: true,
+    currentnessReportAccepted: true,
+    publicRootlessInvalidHookBlocked: true,
+    genericDispatcherForwardingBlocked: true,
+    privateDispatcherRequired: true,
+    publicRootRenderingBlocked: true,
+    rootSchedulerIntegrationBlocked: true,
+    schedulerTimingBlocked: true,
+    actIntegrationBlocked: true,
+    rendererCompatibilityBlocked: true,
+    callbackInvocationBlocked: true,
+    externalStoreInvocationBlocked: true,
+    idGenerationBlocked: true,
+    publicCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
+}
+
 function createUnsupportedPlaceholderHookSurfaceCurrentnessRows(
   rowOverridesBySurfaceId
 ) {
@@ -3126,7 +3528,12 @@ function isPrivateRefHookDispatcherMetadata(metadata) {
     metadata.compatibilityTarget !==
       privateRefHookDispatcherMetadata.compatibilityTarget ||
     metadata.cjsSurfaceCurrentnessBlocked !== true ||
-    metadata.reactServerSurfaceCurrentnessBlocked !== true
+    metadata.reactServerSurfaceCurrentnessBlocked !== true ||
+    metadata.privateExecutionEvidenceStatus !==
+      useRefHookExecutionEvidenceStatus ||
+    metadata.sourceOwnedPrivateExecutionEvidence !== true ||
+    metadata.callerSuppliedRefObjectsAccepted !== false ||
+    metadata.rowOverridesAccepted !== false
   ) {
     return false;
   }
@@ -3155,6 +3562,11 @@ function isPrivateRefHookDispatcherMetadata(metadata) {
       metadata.sourceReport,
       privateRefHookDispatcherMetadata.sourceReport,
       useRefHookSourceReportFieldNames
+    ) &&
+    hasSameRecordFields(
+      metadata.executionSourceReport,
+      privateRefHookDispatcherMetadata.executionSourceReport,
+      useRefHookExecutionSourceReportFieldNames
     ) &&
     hasSameRecordFields(
       metadata.blockerCurrentness,
@@ -3355,6 +3767,10 @@ function isUseRefHookCurrentnessReport(report) {
   return validateUseRefHookCurrentnessReport(report) === null;
 }
 
+function isUseRefHookExecutionEvidence(report) {
+  return validateUseRefHookExecutionEvidence(report) === null;
+}
+
 function validateUseRefHookCurrentnessReport(report) {
   if (!isObjectLike(report) || !Object.isFrozen(report)) {
     return 'useRef-hook-currentness-not-frozen';
@@ -3433,6 +3849,83 @@ function validateUseRefHookCurrentnessReport(report) {
     if (report[flagName] !== false) {
       return 'useRef-hook-currentness-compatibility-or-prerequisite-claim';
     }
+  }
+
+  return null;
+}
+
+function validateUseRefHookExecutionEvidence(report) {
+  if (!isObjectLike(report) || !Object.isFrozen(report)) {
+    return 'useRef-hook-execution-not-frozen';
+  }
+
+  if (!useRefHookExecutionEvidenceReports.has(report)) {
+    return 'useRef-hook-execution-source-proof';
+  }
+
+  if (
+    report.kind !== useRefHookExecutionEvidenceReportKind ||
+    report.version !== useRefHookExecutionEvidenceReportVersion ||
+    report.status !== useRefHookExecutionEvidenceStatus ||
+    report.compatibilityTarget !== 'react@19.2.6' ||
+    !hasSameStringArray(report.hookNames, useRefHookNames) ||
+    report.publicRootlessInvalidHookBlocked !== true ||
+    report.genericDispatcherForwardingBlocked !== true ||
+    report.privateDispatcherRequired !== true
+  ) {
+    return 'useRef-hook-execution-shape';
+  }
+
+  if (
+    !hasSameRecordFields(
+      report.sourceReport,
+      useRefHookExecutionSourceReport,
+      useRefHookExecutionSourceReportFieldNames
+    )
+  ) {
+    return 'useRef-hook-execution-source-report';
+  }
+
+  const overrideKeys =
+    useRefHookExecutionEvidenceOverrideKeysByReport.get(report) ||
+    freezeArray([]);
+  if (
+    overrideKeys.includes('surfaceCurrentnessRows') ||
+    overrideKeys.includes('surfaceCurrentnessRowOverrides')
+  ) {
+    return 'useRef-hook-execution-row-overrides';
+  }
+
+  if (validateUseRefHookCurrentnessReport(report.currentnessReport) !== null) {
+    return 'useRef-hook-execution-currentness-report';
+  }
+
+  if (report.rootUseRefSourceFunctionCurrent !== true) {
+    return 'useRef-hook-execution-source-function';
+  }
+
+  if (!hasSourceOwnedUseRefExecutionRecords(report)) {
+    return 'useRef-hook-execution-private-execution';
+  }
+
+  if (!hasSourceOwnedUseRefRefObject(report)) {
+    return 'useRef-hook-execution-caller-ref-object';
+  }
+
+  if (!hasStableUseRefRefIdentityEvidence(report)) {
+    return 'useRef-hook-execution-ref-identity';
+  }
+
+  if (!hasBlockedUseRefExecutionPrerequisites(report)) {
+    return 'useRef-hook-execution-root-renderer-prerequisite-smuggling';
+  }
+
+  if (!hasBlockedUseRefExecutionCompatibilityClaims(report)) {
+    return 'useRef-hook-execution-compatibility-or-prerequisite-claim';
+  }
+
+  if (overrideKeys.length > 0) {
+    return 'useRef-hook-execution-caller-overrides';
   }
 
   return null;
@@ -3679,6 +4172,134 @@ function hasSameUseRefSurfaceCurrentnessRow(actual, expected) {
   return true;
 }
 
+function hasSourceOwnedUseRefExecutionRecords(report) {
+  const mount = report.mountCallRecord;
+  const update = report.updateCallRecord;
+
+  if (
+    !hasUseRefExecutionCallRecordShape(mount) ||
+    !hasUseRefExecutionCallRecordShape(update)
+  ) {
+    return false;
+  }
+
+  return (
+    report.privateDispatcherMarked === true &&
+    report.sourceOwnedDispatcherExecution === true &&
+    mount.phase === 'Mount' &&
+    mount.hookName === 'useRef' &&
+    mount.callIndex === 0 &&
+    mount.initialValue === useRefHookExecutionMountInitialValue &&
+    mount.metadataIdentityCurrent === true &&
+    mount.thisMatchesDispatcher === true &&
+    mount.privateDispatcherMarked === true &&
+    mount.executionErrorCode === null &&
+    update.phase === 'Update' &&
+    update.hookName === 'useRef' &&
+    update.callIndex === 1 &&
+    update.initialValue === useRefHookExecutionUpdateInitialValue &&
+    update.metadataIdentityCurrent === true &&
+    update.thisMatchesDispatcher === true &&
+    update.privateDispatcherMarked === true &&
+    update.executionErrorCode === null &&
+    mount.returnedRefObject === report.refIdentityRecord.mountRefObject &&
+    update.returnedRefObject === report.refIdentityRecord.updateRefObject
+  );
+}
+
+function hasUseRefExecutionCallRecordShape(record) {
+  if (!isObjectLike(record) || !Object.isFrozen(record)) {
+    return false;
+  }
+
+  for (const fieldName of useRefHookExecutionCallRecordFieldNames) {
+    if (!Object.prototype.hasOwnProperty.call(record, fieldName)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function hasSourceOwnedUseRefRefObject(report) {
+  const identity = report.refIdentityRecord;
+
+  return (
+    isObjectLike(identity) &&
+    Object.isFrozen(identity) &&
+    identity.callerSuppliedRefObjectAccepted === false &&
+    report.sourceOwnedRefObject === true &&
+    identity.sourceOwnedRefObject === true &&
+    isObjectLike(identity.mountRefObject) &&
+    useRefHookExecutionRefObjects.has(identity.mountRefObject)
+  );
+}
+
+function hasStableUseRefRefIdentityEvidence(report) {
+  const identity = report.refIdentityRecord;
+
+  if (!isObjectLike(identity) || !Object.isFrozen(identity)) {
+    return false;
+  }
+
+  for (const fieldName of useRefHookRefIdentityRecordFieldNames) {
+    if (!Object.prototype.hasOwnProperty.call(identity, fieldName)) {
+      return false;
+    }
+  }
+
+  return (
+    identity.mountRefObject === report.mountCallRecord.returnedRefObject &&
+    identity.updateRefObject === report.updateCallRecord.returnedRefObject &&
+    identity.mountRefObject === identity.updateRefObject &&
+    identity.mountUpdateRefObjectSame === true &&
+    identity.mountCurrentValue === useRefHookExecutionMountInitialValue &&
+    identity.updateCurrentValue === useRefHookExecutionMountInitialValue &&
+    identity.updateInitialValue === useRefHookExecutionUpdateInitialValue &&
+    identity.updateInitialValueIgnored === true &&
+    identity.refIdentityCompatibilityClaimed === false &&
+    identity.refObjectCompatibilityClaimed === false
+  );
+}
+
+function hasBlockedUseRefExecutionPrerequisites(report) {
+  return (
+    report.publicRootRenderingBlocked === true &&
+    report.rootSchedulerIntegrationBlocked === true &&
+    report.schedulerTimingBlocked === true &&
+    report.actIntegrationBlocked === true &&
+    report.rendererCompatibilityBlocked === true &&
+    report.callbackInvocationBlocked === true &&
+    report.externalStoreInvocationBlocked === true &&
+    report.idGenerationBlocked === true &&
+    report.rendererIntegration === false &&
+    report.rendererCompatibility === false &&
+    report.publicActIntegration === false &&
+    report.schedulerIntegration === false &&
+    report.schedulerPrerequisitesReady === false &&
+    report.rootLaneIntegration === false &&
+    report.rootScheduling === false &&
+    report.rootExecution === false &&
+    report.callbackExecutionClaimed === false &&
+    report.externalStoreSubscriptionClaimed === false &&
+    report.externalStoreSnapshotReadClaimed === false &&
+    report.idGenerationClaimed === false
+  );
+}
+
+function hasBlockedUseRefExecutionCompatibilityClaims(report) {
+  for (const flagName of useRefHookCompatibilityFalseFlags) {
+    if (report[flagName] !== false) {
+      return false;
+    }
+  }
+
+  return (
+    report.refIdentityRecord.refIdentityCompatibilityClaimed === false &&
+    report.refIdentityRecord.refObjectCompatibilityClaimed === false
+  );
+}
+
 function hasSameSurfaceCurrentnessRows(actual, expected) {
   if (!Array.isArray(actual) || actual.length !== expected.length) {
     return false;
@@ -3834,6 +4455,32 @@ function freezeUseRefSurfaceCurrentnessRows(rows) {
   return freezeArray((rows ?? []).map(freezeUseRefSurfaceCurrentnessRow));
 }
 
+function freezeUseRefHookExecutionCallRecord({
+  expectedPhase,
+  expectedCallIndex,
+  expectedInitialValue,
+  observedCall,
+  returnedRefObject,
+  executionError
+}) {
+  return freezeRecord({
+    phase: observedCall?.phase ?? expectedPhase,
+    hookName: observedCall?.hookName ?? 'useRef',
+    callIndex: observedCall?.callIndex ?? expectedCallIndex,
+    initialValue: observedCall?.initialValue ?? expectedInitialValue,
+    metadataIdentityCurrent:
+      observedCall?.metadataIdentityCurrent ?? false,
+    thisMatchesDispatcher: observedCall?.thisMatchesDispatcher ?? false,
+    privateDispatcherMarked:
+      observedCall?.privateDispatcherMarked ?? false,
+    returnedRefObject,
+    returnedCurrent: isObjectLike(returnedRefObject)
+      ? returnedRefObject.current
+      : undefined,
+    executionErrorCode: executionError?.code ?? null
+  });
+}
+
 function freezeSurfaceCurrentnessRow(row) {
   const surfaceRow = {};
 
@@ -3929,10 +4576,12 @@ module.exports = {
   callPrivateMemoDispatcherHook,
   callPrivateRefDispatcherHook,
   callPrivateStateDispatcherHook,
+  consumeUseRefHookExecutionEvidence,
   consumeUseRefHookCurrentnessReport,
   consumeUnsupportedPlaceholderHookCurrentnessReport,
   createInvalidHookCallError,
   createMissingPrivateStateHookDispatcherError,
+  createUseRefHookExecutionEvidence,
   createUseRefHookCurrentnessReport,
   createUnsupportedPlaceholderHookCurrentnessReport,
   createUnsupportedPrivateTransitionCallbackError,
@@ -3963,6 +4612,7 @@ module.exports = {
   isPrivateStateHookDispatcherMetadata,
   isPrivateTransitionHookDispatcher,
   isPrivateTransitionHookDispatcherMetadata,
+  isUseRefHookExecutionEvidence,
   isUseRefHookCurrentnessReport,
   isUnsupportedPlaceholderHookCurrentnessReport,
   markPrivateCallbackHookDispatcher,
@@ -3983,6 +4633,13 @@ module.exports = {
   recordPrivateStartTransitionDispatcherRouting,
   resolveDispatcher,
   transitionHookNames,
+  useRefHookExecutionEvidenceConsumptionStatus,
+  useRefHookExecutionEvidenceStatus,
+  useRefHookExecutionEvidenceFieldNames,
+  useRefHookExecutionCallRecordFieldNames,
+  useRefHookExecutionSourceReportFieldNames,
+  useRefHookExecutionSourceReport,
+  useRefHookRefIdentityRecordFieldNames,
   useRefHookCurrentnessConsumptionStatus,
   useRefHookCurrentnessStatus,
   useRefHookNames,
@@ -3993,6 +4650,7 @@ module.exports = {
   unsupportedPlaceholderHookCurrentnessConsumptionStatus,
   unsupportedPlaceholderHookCurrentnessStatus,
   unsupportedPlaceholderHookNames,
+  validateUseRefHookExecutionEvidence,
   validateUseRefHookCurrentnessReport,
   validateUnsupportedPlaceholderHookCurrentnessReport,
   use,
