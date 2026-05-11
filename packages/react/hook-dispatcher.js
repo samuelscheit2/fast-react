@@ -28,6 +28,7 @@ const privateContextHookDispatchers = new WeakSet();
 const privateContextHookDispatcherMetadataByDispatcher = new WeakMap();
 const privateTransitionHookDispatchers = new WeakSet();
 const privateTransitionHookDispatcherMetadataByDispatcher = new WeakMap();
+const unsupportedPlaceholderHookCurrentnessReports = new WeakSet();
 
 const effectRegistrationFieldNames = Object.freeze([
   'hook',
@@ -309,6 +310,394 @@ const transitionHookBlockerCurrentness = freezeRecord({
   rendererCompatibilityBlocked: true,
   compatibilityClaimed: false
 });
+const unsupportedPlaceholderHookNames = freezeArray([
+  'useActionState',
+  'useOptimistic',
+  'useSyncExternalStore',
+  'useEffectEvent',
+  'useId',
+  'useDebugValue'
+]);
+const unsupportedPlaceholderHookPublicShapeBlockerFields = freezeArray([
+  'hookName',
+  'reactSourceFunction',
+  'reactDispatcherMethod',
+  'reactSourceLength',
+  'currentPublicExport',
+  'currentName',
+  'currentLength',
+  'blocker'
+]);
+const unsupportedPlaceholderHookPublicShapeBlockers = freezeRecordArray([
+  {
+    hookName: 'useActionState',
+    reactSourceFunction: 'ReactHooks.useActionState',
+    reactDispatcherMethod: 'dispatcher.useActionState',
+    reactSourceLength: 3,
+    currentPublicExport: 'react.useActionState placeholder',
+    currentName: 'useActionState',
+    currentLength: 0,
+    blocker:
+      'public export remains a createUnimplementedFunction placeholder until action state queues, async action lifecycle, scheduler lanes, and renderer compatibility are admitted'
+  },
+  {
+    hookName: 'useOptimistic',
+    reactSourceFunction: 'ReactHooks.useOptimistic',
+    reactDispatcherMethod: 'dispatcher.useOptimistic',
+    reactSourceLength: 2,
+    currentPublicExport: 'react.useOptimistic placeholder',
+    currentName: 'useOptimistic',
+    currentLength: 0,
+    blocker:
+      'public export remains a createUnimplementedFunction placeholder until optimistic state queues, revert lanes, and renderer scheduling are admitted'
+  },
+  {
+    hookName: 'useSyncExternalStore',
+    reactSourceFunction: 'ReactHooks.useSyncExternalStore',
+    reactDispatcherMethod: 'dispatcher.useSyncExternalStore',
+    reactSourceLength: 3,
+    currentPublicExport: 'react.useSyncExternalStore placeholder',
+    currentName: 'useSyncExternalStore',
+    currentLength: 0,
+    blocker:
+      'public export remains a createUnimplementedFunction placeholder until external store subscription, snapshot consistency, hydration, and renderer scheduling are admitted'
+  },
+  {
+    hookName: 'useEffectEvent',
+    reactSourceFunction: 'ReactHooks.useEffectEvent',
+    reactDispatcherMethod: 'dispatcher.useEffectEvent',
+    reactSourceLength: 1,
+    currentPublicExport: 'react.useEffectEvent placeholder',
+    currentName: 'useEffectEvent',
+    currentLength: 0,
+    blocker:
+      'public export remains a createUnimplementedFunction placeholder until effect-event callback identity and commit-time invocation rules are admitted'
+  },
+  {
+    hookName: 'useId',
+    reactSourceFunction: 'ReactHooks.useId',
+    reactDispatcherMethod: 'dispatcher.useId',
+    reactSourceLength: 0,
+    currentPublicExport: 'react.useId placeholder',
+    currentName: 'useId',
+    currentLength: 0,
+    blocker:
+      'public export remains a createUnimplementedFunction placeholder until root tree-id allocation, hydration id prefixes, and renderer output compatibility are admitted'
+  },
+  {
+    hookName: 'useDebugValue',
+    reactSourceFunction: 'ReactHooks.useDebugValue',
+    reactDispatcherMethod: 'dispatcher.useDebugValue',
+    reactSourceLength: 2,
+    currentPublicExport: 'react.useDebugValue placeholder',
+    currentName: 'useDebugValue',
+    currentLength: 0,
+    blocker:
+      'public export remains a createUnimplementedFunction placeholder until devtools debug-value formatting and renderer instrumentation are admitted'
+  }
+]);
+const unsupportedPlaceholderHookSourceReportFieldNames = freezeArray([
+  'kind',
+  'version',
+  'status',
+  'reactSourceTag',
+  'reactSourceCommit',
+  'reactHooksSource',
+  'reactClientSource',
+  'reactReconcilerSource',
+  'fastReactSource',
+  'hookCount',
+  'dispatcherMethodsCurrentInReactSource',
+  'publicExportsPlaceholderBlocked',
+  'compatibilityClaimed'
+]);
+const unsupportedPlaceholderHookSourceReport = freezeRecord({
+  kind: 'fast-react.private.unsupported_placeholder_hook_source_report',
+  version: 1,
+  status: 'source-current-for-react-19.2.6-unsupported-placeholder-hooks',
+  reactSourceTag: 'v19.2.6',
+  reactSourceCommit: 'eaf3e95ca92be7a23d3c9cc8ffd6f199a40be401',
+  reactHooksSource: 'packages/react/src/ReactHooks.js',
+  reactClientSource: 'packages/react/src/ReactClient.js',
+  reactReconcilerSource: 'packages/react-reconciler/src/ReactFiberHooks.js',
+  fastReactSource: 'packages/react/index.js',
+  hookCount: 6,
+  dispatcherMethodsCurrentInReactSource: true,
+  publicExportsPlaceholderBlocked: true,
+  compatibilityClaimed: false
+});
+const unsupportedPlaceholderHookBlockerCurrentnessFieldNames = freezeArray([
+  'status',
+  'compatibilityTarget',
+  'sourceReportCurrent',
+  'publicExportsPlaceholderBlocked',
+  'dispatcherRoutingBlocked',
+  'dispatcherPrerequisitesBlocked',
+  'schedulerPrerequisitesBlocked',
+  'rootLanePrerequisitesBlocked',
+  'rootSchedulingBlocked',
+  'rendererCompatibilityBlocked',
+  'callbackInvocationBlocked',
+  'externalStoreInvocationBlocked',
+  'idGenerationBlocked',
+  'debugValueInstrumentationBlocked',
+  'publicCompatibilityClaimed',
+  'compatibilityClaimed'
+]);
+const unsupportedPlaceholderHookBlockerCurrentness = freezeRecord({
+  status:
+    'blocked-until-dispatcher-scheduler-root-renderer-and-hook-semantics-admitted',
+  compatibilityTarget: 'react@19.2.6',
+  sourceReportCurrent: true,
+  publicExportsPlaceholderBlocked: true,
+  dispatcherRoutingBlocked: true,
+  dispatcherPrerequisitesBlocked: true,
+  schedulerPrerequisitesBlocked: true,
+  rootLanePrerequisitesBlocked: true,
+  rootSchedulingBlocked: true,
+  rendererCompatibilityBlocked: true,
+  callbackInvocationBlocked: true,
+  externalStoreInvocationBlocked: true,
+  idGenerationBlocked: true,
+  debugValueInstrumentationBlocked: true,
+  publicCompatibilityClaimed: false,
+  compatibilityClaimed: false
+});
+const unsupportedPlaceholderHookCallbackInvocationReportFieldNames =
+  freezeArray([
+    'useActionStateActionInvocationBlocked',
+    'useOptimisticReducerInvocationBlocked',
+    'useEffectEventCallbackInvocationBlocked',
+    'useDebugValueFormatterInvocationBlocked',
+    'invokesActionStateAction',
+    'invokesOptimisticReducer',
+    'invokesEffectEventCallback',
+    'invokesDebugValueFormatter',
+    'callbackExecutionClaimed',
+    'compatibilityClaimed'
+  ]);
+const unsupportedPlaceholderHookCallbackInvocationReport = freezeRecord({
+  useActionStateActionInvocationBlocked: true,
+  useOptimisticReducerInvocationBlocked: true,
+  useEffectEventCallbackInvocationBlocked: true,
+  useDebugValueFormatterInvocationBlocked: true,
+  invokesActionStateAction: false,
+  invokesOptimisticReducer: false,
+  invokesEffectEventCallback: false,
+  invokesDebugValueFormatter: false,
+  callbackExecutionClaimed: false,
+  compatibilityClaimed: false
+});
+const unsupportedPlaceholderHookExternalStoreInvocationReportFieldNames =
+  freezeArray([
+    'subscribeInvocationBlocked',
+    'getSnapshotInvocationBlocked',
+    'getServerSnapshotInvocationBlocked',
+    'invokesSubscribe',
+    'invokesGetSnapshot',
+    'invokesGetServerSnapshot',
+    'externalStoreSubscriptionClaimed',
+    'externalStoreSnapshotReadClaimed',
+    'compatibilityClaimed'
+  ]);
+const unsupportedPlaceholderHookExternalStoreInvocationReport = freezeRecord({
+  subscribeInvocationBlocked: true,
+  getSnapshotInvocationBlocked: true,
+  getServerSnapshotInvocationBlocked: true,
+  invokesSubscribe: false,
+  invokesGetSnapshot: false,
+  invokesGetServerSnapshot: false,
+  externalStoreSubscriptionClaimed: false,
+  externalStoreSnapshotReadClaimed: false,
+  compatibilityClaimed: false
+});
+const unsupportedPlaceholderHookIdGenerationReportFieldNames = freezeArray([
+  'idGenerationBlocked',
+  'treeIdAllocationBlocked',
+  'hydrationPrefixBlocked',
+  'generatesIds',
+  'allocatesTreeIds',
+  'claimsHydrationIdPrefix',
+  'compatibilityClaimed'
+]);
+const unsupportedPlaceholderHookIdGenerationReport = freezeRecord({
+  idGenerationBlocked: true,
+  treeIdAllocationBlocked: true,
+  hydrationPrefixBlocked: true,
+  generatesIds: false,
+  allocatesTreeIds: false,
+  claimsHydrationIdPrefix: false,
+  compatibilityClaimed: false
+});
+const unsupportedPlaceholderHookMissingDispatcherPrerequisites = freezeArray([
+  'dispatcher.useActionState',
+  'dispatcher.useOptimistic',
+  'dispatcher.useSyncExternalStore',
+  'dispatcher.useEffectEvent',
+  'dispatcher.useId',
+  'dispatcher.useDebugValue',
+  'private unsupported-placeholder hook dispatcher admission marker'
+]);
+const unsupportedPlaceholderHookMissingSchedulerPrerequisites = freezeArray([
+  'mountActionState',
+  'updateActionState',
+  'rerenderActionState',
+  'mountOptimistic',
+  'updateOptimistic',
+  'rerenderOptimistic',
+  'mountSyncExternalStore',
+  'updateSyncExternalStore',
+  'mountEvent',
+  'updateEvent',
+  'mountId',
+  'updateId',
+  'mountDebugValue',
+  'updateDebugValue'
+]);
+const unsupportedPlaceholderHookMissingRootLanePrerequisites = freezeArray([
+  'requestUpdateLane',
+  'dispatchOptimisticSetState',
+  'dispatchActionState',
+  'enqueueConcurrentHookUpdate',
+  'scheduleUpdateOnFiber',
+  'entangleTransitionUpdate',
+  'markSkippedUpdateLanes',
+  'getWorkInProgressRoot',
+  'pushTreeId'
+]);
+const unsupportedPlaceholderHookPublicCompatibilityFalseFlags = freezeArray([
+  'compatibilityClaimed',
+  'publicCompatibilityClaimed',
+  'publicHookCompatibility',
+  'exposesPublicHookImplementation'
+]);
+const unsupportedPlaceholderHookPrerequisiteFalseFlags = freezeArray([
+  'dispatcherRouting',
+  'dispatcherPrerequisitesReady',
+  'schedulerIntegration',
+  'schedulerPrerequisitesReady',
+  'rootLaneIntegration',
+  'rootScheduling',
+  'rendererIntegration',
+  'rendererCompatibility'
+]);
+const unsupportedPlaceholderHookCallbackInvocationFalseFlags = freezeArray([
+  'invokesCallbacks',
+  'invokesActionStateAction',
+  'invokesOptimisticReducer',
+  'invokesEffectEventCallback',
+  'invokesDebugValueFormatter',
+  'callbackExecutionClaimed'
+]);
+const unsupportedPlaceholderHookExternalStoreInvocationFalseFlags = freezeArray([
+  'invokesExternalStoreSubscribe',
+  'invokesExternalStoreGetSnapshot',
+  'invokesExternalStoreGetServerSnapshot',
+  'externalStoreSubscriptionClaimed',
+  'externalStoreSnapshotReadClaimed'
+]);
+const unsupportedPlaceholderHookIdGenerationFalseFlags = freezeArray([
+  'generatesIds',
+  'allocatesTreeIds',
+  'claimsHydrationIdPrefix'
+]);
+const unsupportedPlaceholderHookCompatibilityFalseFlags = freezeArray([
+  ...unsupportedPlaceholderHookPublicCompatibilityFalseFlags,
+  ...unsupportedPlaceholderHookPrerequisiteFalseFlags,
+  ...unsupportedPlaceholderHookCallbackInvocationFalseFlags,
+  ...unsupportedPlaceholderHookExternalStoreInvocationFalseFlags,
+  ...unsupportedPlaceholderHookIdGenerationFalseFlags
+]);
+const unsupportedPlaceholderHookCurrentnessReportKind =
+  'fast-react.private.unsupported_placeholder_hook_currentness';
+const unsupportedPlaceholderHookCurrentnessReportVersion = 1;
+const unsupportedPlaceholderHookCurrentnessStatus =
+  'blocked-unsupported-placeholder-hook-currentness';
+const unsupportedPlaceholderHookCurrentnessConsumptionStatus =
+  'accepted-blocked-unsupported-placeholder-hook-currentness';
+const privateUnsupportedPlaceholderHookBlockerMetadata = freezeRecord({
+  capability: 'fast-react.private.unsupported_placeholder_hook_blockers',
+  compatibilityTarget: 'react@19.2.6',
+  compatibilityClaimed: false,
+  publicCompatibilityClaimed: false,
+  publicHookCompatibility: false,
+  exposesPublicHookImplementation: false,
+  dispatcherRouting: false,
+  dispatcherPrerequisitesReady: false,
+  schedulerIntegration: false,
+  schedulerPrerequisitesReady: false,
+  rootLaneIntegration: false,
+  rootScheduling: false,
+  rendererIntegration: false,
+  rendererCompatibility: false,
+  invokesCallbacks: false,
+  invokesActionStateAction: false,
+  invokesOptimisticReducer: false,
+  invokesEffectEventCallback: false,
+  invokesDebugValueFormatter: false,
+  callbackExecutionClaimed: false,
+  invokesExternalStoreSubscribe: false,
+  invokesExternalStoreGetSnapshot: false,
+  invokesExternalStoreGetServerSnapshot: false,
+  externalStoreSubscriptionClaimed: false,
+  externalStoreSnapshotReadClaimed: false,
+  generatesIds: false,
+  allocatesTreeIds: false,
+  claimsHydrationIdPrefix: false,
+  hookNames: unsupportedPlaceholderHookNames,
+  publicShapeBlockerFields:
+    unsupportedPlaceholderHookPublicShapeBlockerFields,
+  publicShapeBlockers: unsupportedPlaceholderHookPublicShapeBlockers,
+  sourceReportFieldNames: unsupportedPlaceholderHookSourceReportFieldNames,
+  sourceReport: unsupportedPlaceholderHookSourceReport,
+  blockerCurrentnessFieldNames:
+    unsupportedPlaceholderHookBlockerCurrentnessFieldNames,
+  blockerCurrentness: unsupportedPlaceholderHookBlockerCurrentness,
+  callbackInvocationReportFieldNames:
+    unsupportedPlaceholderHookCallbackInvocationReportFieldNames,
+  callbackInvocationReport:
+    unsupportedPlaceholderHookCallbackInvocationReport,
+  externalStoreInvocationReportFieldNames:
+    unsupportedPlaceholderHookExternalStoreInvocationReportFieldNames,
+  externalStoreInvocationReport:
+    unsupportedPlaceholderHookExternalStoreInvocationReport,
+  idGenerationReportFieldNames:
+    unsupportedPlaceholderHookIdGenerationReportFieldNames,
+  idGenerationReport: unsupportedPlaceholderHookIdGenerationReport,
+  missingDispatcherPrerequisites:
+    unsupportedPlaceholderHookMissingDispatcherPrerequisites,
+  missingSchedulerPrerequisites:
+    unsupportedPlaceholderHookMissingSchedulerPrerequisites,
+  missingRootLanePrerequisites:
+    unsupportedPlaceholderHookMissingRootLanePrerequisites,
+  publicCompatibilityFalseFlags:
+    unsupportedPlaceholderHookPublicCompatibilityFalseFlags,
+  prerequisiteFalseFlags: unsupportedPlaceholderHookPrerequisiteFalseFlags,
+  callbackInvocationFalseFlags:
+    unsupportedPlaceholderHookCallbackInvocationFalseFlags,
+  externalStoreInvocationFalseFlags:
+    unsupportedPlaceholderHookExternalStoreInvocationFalseFlags,
+  idGenerationFalseFlags: unsupportedPlaceholderHookIdGenerationFalseFlags,
+  compatibilityFalseFlags: unsupportedPlaceholderHookCompatibilityFalseFlags
+});
+const privateUnsupportedPlaceholderHookBlockerMetadataArrayKeys = freezeArray([
+  'hookNames',
+  'publicShapeBlockerFields',
+  'sourceReportFieldNames',
+  'blockerCurrentnessFieldNames',
+  'callbackInvocationReportFieldNames',
+  'externalStoreInvocationReportFieldNames',
+  'idGenerationReportFieldNames',
+  'missingDispatcherPrerequisites',
+  'missingSchedulerPrerequisites',
+  'missingRootLanePrerequisites',
+  'publicCompatibilityFalseFlags',
+  'prerequisiteFalseFlags',
+  'callbackInvocationFalseFlags',
+  'externalStoreInvocationFalseFlags',
+  'idGenerationFalseFlags',
+  'compatibilityFalseFlags'
+]);
 
 const effectHookMetadataByHookName = Object.freeze({
   useEffect: createEffectHookMetadata({
@@ -801,6 +1190,31 @@ function createUnsupportedPrivateTransitionCallbackError() {
   return error;
 }
 
+function createUnsupportedPlaceholderHookCurrentnessGateError(reason) {
+  const error = createUnimplementedError(
+    'react',
+    'unsupportedPlaceholderHookCurrentness',
+    'rejected source/currentness report',
+    'Only current source-owned unsupported placeholder hook blocker reports can pass this package-private gate.'
+  );
+  error.reason = reason;
+  error.publicCompatibilityClaimed = false;
+  error.publicHookCompatibility = false;
+  error.exposesPublicHookImplementation = false;
+  error.dispatcherRouting = false;
+  error.schedulerIntegration = false;
+  error.rootLaneIntegration = false;
+  error.rootScheduling = false;
+  error.rendererCompatibility = false;
+  error.invokesCallbacks = false;
+  error.invokesExternalStoreSubscribe = false;
+  error.invokesExternalStoreGetSnapshot = false;
+  error.invokesExternalStoreGetServerSnapshot = false;
+  error.generatesIds = false;
+  error.compatibilityClaimed = false;
+  return error;
+}
+
 function createEffectHookMetadata({
   effectPhaseName,
   hasPassiveHandoff,
@@ -1228,6 +1642,121 @@ function recordPrivateStartTransitionDispatcherRouting(callback, metadata) {
   });
 }
 
+function createUnsupportedPlaceholderHookCurrentnessReport(overrides = {}) {
+  const normalized = overrides ?? {};
+  const report = freezeRecord({
+    kind: unsupportedPlaceholderHookCurrentnessReportKind,
+    version: unsupportedPlaceholderHookCurrentnessReportVersion,
+    status: unsupportedPlaceholderHookCurrentnessStatus,
+    compatibilityTarget: 'react@19.2.6',
+    hookNames: freezeArray(
+      normalized.hookNames ?? unsupportedPlaceholderHookNames
+    ),
+    publicShapeBlockers: freezeRecordArray(
+      normalized.publicShapeBlockers ??
+        unsupportedPlaceholderHookPublicShapeBlockers
+    ),
+    sourceReport: freezeRecord({
+      ...unsupportedPlaceholderHookSourceReport,
+      ...(normalized.sourceReport ?? {})
+    }),
+    blockerCurrentness: freezeRecord({
+      ...unsupportedPlaceholderHookBlockerCurrentness,
+      ...(normalized.blockerCurrentness ?? {})
+    }),
+    callbackInvocationReport: freezeRecord({
+      ...unsupportedPlaceholderHookCallbackInvocationReport,
+      ...(normalized.callbackInvocationReport ?? {})
+    }),
+    externalStoreInvocationReport: freezeRecord({
+      ...unsupportedPlaceholderHookExternalStoreInvocationReport,
+      ...(normalized.externalStoreInvocationReport ?? {})
+    }),
+    idGenerationReport: freezeRecord({
+      ...unsupportedPlaceholderHookIdGenerationReport,
+      ...(normalized.idGenerationReport ?? {})
+    }),
+    publicExportsPlaceholderBlocked:
+      normalized.publicExportsPlaceholderBlocked ?? true,
+    compatibilityClaimed: normalized.compatibilityClaimed ?? false,
+    publicCompatibilityClaimed:
+      normalized.publicCompatibilityClaimed ?? false,
+    publicHookCompatibility: normalized.publicHookCompatibility ?? false,
+    exposesPublicHookImplementation:
+      normalized.exposesPublicHookImplementation ?? false,
+    dispatcherRouting: normalized.dispatcherRouting ?? false,
+    dispatcherPrerequisitesReady:
+      normalized.dispatcherPrerequisitesReady ?? false,
+    schedulerIntegration: normalized.schedulerIntegration ?? false,
+    schedulerPrerequisitesReady:
+      normalized.schedulerPrerequisitesReady ?? false,
+    rootLaneIntegration: normalized.rootLaneIntegration ?? false,
+    rootScheduling: normalized.rootScheduling ?? false,
+    rendererIntegration: normalized.rendererIntegration ?? false,
+    rendererCompatibility: normalized.rendererCompatibility ?? false,
+    invokesCallbacks: normalized.invokesCallbacks ?? false,
+    invokesActionStateAction:
+      normalized.invokesActionStateAction ?? false,
+    invokesOptimisticReducer:
+      normalized.invokesOptimisticReducer ?? false,
+    invokesEffectEventCallback:
+      normalized.invokesEffectEventCallback ?? false,
+    invokesDebugValueFormatter:
+      normalized.invokesDebugValueFormatter ?? false,
+    callbackExecutionClaimed:
+      normalized.callbackExecutionClaimed ?? false,
+    invokesExternalStoreSubscribe:
+      normalized.invokesExternalStoreSubscribe ?? false,
+    invokesExternalStoreGetSnapshot:
+      normalized.invokesExternalStoreGetSnapshot ?? false,
+    invokesExternalStoreGetServerSnapshot:
+      normalized.invokesExternalStoreGetServerSnapshot ?? false,
+    externalStoreSubscriptionClaimed:
+      normalized.externalStoreSubscriptionClaimed ?? false,
+    externalStoreSnapshotReadClaimed:
+      normalized.externalStoreSnapshotReadClaimed ?? false,
+    generatesIds: normalized.generatesIds ?? false,
+    allocatesTreeIds: normalized.allocatesTreeIds ?? false,
+    claimsHydrationIdPrefix:
+      normalized.claimsHydrationIdPrefix ?? false
+  });
+
+  unsupportedPlaceholderHookCurrentnessReports.add(report);
+  return report;
+}
+
+function consumeUnsupportedPlaceholderHookCurrentnessReport(report) {
+  const rejectionReason =
+    validateUnsupportedPlaceholderHookCurrentnessReport(report);
+
+  if (rejectionReason !== null) {
+    throw createUnsupportedPlaceholderHookCurrentnessGateError(
+      rejectionReason
+    );
+  }
+
+  return freezeRecord({
+    status: unsupportedPlaceholderHookCurrentnessConsumptionStatus,
+    accepted: true,
+    currentnessStatus: report.status,
+    compatibilityTarget: 'react@19.2.6',
+    hookNames: report.hookNames,
+    publicExportsPlaceholderBlocked: true,
+    dispatcherRoutingBlocked: true,
+    dispatcherPrerequisitesReady: false,
+    schedulerPrerequisitesReady: false,
+    rootLaneIntegration: false,
+    rootScheduling: false,
+    rendererCompatibility: false,
+    callbackInvocationBlocked: true,
+    externalStoreInvocationBlocked: true,
+    idGenerationBlocked: true,
+    debugValueInstrumentationBlocked: true,
+    publicCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
+}
+
 function createPrivateEffectHookArgs(args, metadata) {
   const privateArgs = Array.prototype.slice.call(args);
   privateArgs.push(metadata);
@@ -1491,6 +2020,146 @@ function isPrivateTransitionHookDispatcherMetadata(metadata) {
   );
 }
 
+function isPrivateUnsupportedPlaceholderHookBlockerMetadata(metadata) {
+  if (
+    !isObjectLike(metadata) ||
+    metadata.capability !==
+      privateUnsupportedPlaceholderHookBlockerMetadata.capability ||
+    metadata.compatibilityTarget !==
+      privateUnsupportedPlaceholderHookBlockerMetadata.compatibilityTarget
+  ) {
+    return false;
+  }
+
+  for (const flagName of unsupportedPlaceholderHookCompatibilityFalseFlags) {
+    if (metadata[flagName] !== false) {
+      return false;
+    }
+  }
+
+  for (const key of privateUnsupportedPlaceholderHookBlockerMetadataArrayKeys) {
+    if (
+      !hasSameStringArray(
+        metadata[key],
+        privateUnsupportedPlaceholderHookBlockerMetadata[key]
+      )
+    ) {
+      return false;
+    }
+  }
+
+  return (
+    hasSameRecordArrayFields(
+      metadata.publicShapeBlockers,
+      privateUnsupportedPlaceholderHookBlockerMetadata.publicShapeBlockers,
+      unsupportedPlaceholderHookPublicShapeBlockerFields
+    ) &&
+    hasSameRecordFields(
+      metadata.sourceReport,
+      privateUnsupportedPlaceholderHookBlockerMetadata.sourceReport,
+      unsupportedPlaceholderHookSourceReportFieldNames
+    ) &&
+    hasSameRecordFields(
+      metadata.blockerCurrentness,
+      privateUnsupportedPlaceholderHookBlockerMetadata.blockerCurrentness,
+      unsupportedPlaceholderHookBlockerCurrentnessFieldNames
+    ) &&
+    hasSameRecordFields(
+      metadata.callbackInvocationReport,
+      privateUnsupportedPlaceholderHookBlockerMetadata.callbackInvocationReport,
+      unsupportedPlaceholderHookCallbackInvocationReportFieldNames
+    ) &&
+    hasSameRecordFields(
+      metadata.externalStoreInvocationReport,
+      privateUnsupportedPlaceholderHookBlockerMetadata
+        .externalStoreInvocationReport,
+      unsupportedPlaceholderHookExternalStoreInvocationReportFieldNames
+    ) &&
+    hasSameRecordFields(
+      metadata.idGenerationReport,
+      privateUnsupportedPlaceholderHookBlockerMetadata.idGenerationReport,
+      unsupportedPlaceholderHookIdGenerationReportFieldNames
+    )
+  );
+}
+
+function isUnsupportedPlaceholderHookCurrentnessReport(report) {
+  return validateUnsupportedPlaceholderHookCurrentnessReport(report) === null;
+}
+
+function validateUnsupportedPlaceholderHookCurrentnessReport(report) {
+  if (!isObjectLike(report) || !Object.isFrozen(report)) {
+    return 'unsupported-placeholder-hook-currentness-not-frozen';
+  }
+
+  if (!unsupportedPlaceholderHookCurrentnessReports.has(report)) {
+    return 'unsupported-placeholder-hook-currentness-source-proof';
+  }
+
+  if (
+    report.kind !== unsupportedPlaceholderHookCurrentnessReportKind ||
+    report.version !== unsupportedPlaceholderHookCurrentnessReportVersion ||
+    report.status !== unsupportedPlaceholderHookCurrentnessStatus ||
+    report.compatibilityTarget !== 'react@19.2.6' ||
+    !hasSameStringArray(report.hookNames, unsupportedPlaceholderHookNames) ||
+    report.publicExportsPlaceholderBlocked !== true
+  ) {
+    return 'unsupported-placeholder-hook-currentness-shape';
+  }
+
+  if (
+    !hasSameRecordArrayFields(
+      report.publicShapeBlockers,
+      unsupportedPlaceholderHookPublicShapeBlockers,
+      unsupportedPlaceholderHookPublicShapeBlockerFields
+    )
+  ) {
+    return 'unsupported-placeholder-hook-currentness-public-shape';
+  }
+
+  if (
+    !hasSameRecordFields(
+      report.sourceReport,
+      unsupportedPlaceholderHookSourceReport,
+      unsupportedPlaceholderHookSourceReportFieldNames
+    )
+  ) {
+    return 'unsupported-placeholder-hook-currentness-source-report';
+  }
+
+  if (
+    !hasSameRecordFields(
+      report.blockerCurrentness,
+      unsupportedPlaceholderHookBlockerCurrentness,
+      unsupportedPlaceholderHookBlockerCurrentnessFieldNames
+    )
+  ) {
+    return 'unsupported-placeholder-hook-currentness-blocker-currentness';
+  }
+
+  if (!hasBlockedUnsupportedPlaceholderHookPublicCompatibilityClaims(report)) {
+    return 'unsupported-placeholder-hook-currentness-public-compatibility-claim';
+  }
+
+  if (!hasBlockedUnsupportedPlaceholderHookPrerequisites(report)) {
+    return 'unsupported-placeholder-hook-currentness-prerequisite-smuggling';
+  }
+
+  if (!hasBlockedUnsupportedPlaceholderHookCallbackInvocations(report)) {
+    return 'unsupported-placeholder-hook-currentness-callback-invocation-claim';
+  }
+
+  if (!hasBlockedUnsupportedPlaceholderHookExternalStoreInvocations(report)) {
+    return 'unsupported-placeholder-hook-currentness-external-store-claim';
+  }
+
+  if (!hasBlockedUnsupportedPlaceholderHookIdGeneration(report)) {
+    return 'unsupported-placeholder-hook-currentness-id-generation-claim';
+  }
+
+  return null;
+}
+
 function validatePrivateStateHookDispatcherMetadata(metadata) {
   if (!isPrivateStateHookDispatcherMetadata(metadata)) {
     throw createMissingPrivateStateHookDispatcherError('useState');
@@ -1578,6 +2247,82 @@ function hasSameRecordFields(actual, expected, fieldNames) {
   return true;
 }
 
+function hasSameRecordArrayFields(actual, expected, fieldNames) {
+  if (!Array.isArray(actual) || actual.length !== expected.length) {
+    return false;
+  }
+
+  for (let index = 0; index < expected.length; index += 1) {
+    if (!hasSameRecordFields(actual[index], expected[index], fieldNames)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function hasBlockedUnsupportedPlaceholderHookPublicCompatibilityClaims(report) {
+  for (const flagName of unsupportedPlaceholderHookPublicCompatibilityFalseFlags) {
+    if (report[flagName] !== false) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function hasBlockedUnsupportedPlaceholderHookPrerequisites(report) {
+  for (const flagName of unsupportedPlaceholderHookPrerequisiteFalseFlags) {
+    if (report[flagName] !== false) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function hasBlockedUnsupportedPlaceholderHookCallbackInvocations(report) {
+  for (const flagName of unsupportedPlaceholderHookCallbackInvocationFalseFlags) {
+    if (report[flagName] !== false) {
+      return false;
+    }
+  }
+
+  return hasSameRecordFields(
+    report.callbackInvocationReport,
+    unsupportedPlaceholderHookCallbackInvocationReport,
+    unsupportedPlaceholderHookCallbackInvocationReportFieldNames
+  );
+}
+
+function hasBlockedUnsupportedPlaceholderHookExternalStoreInvocations(report) {
+  for (const flagName of unsupportedPlaceholderHookExternalStoreInvocationFalseFlags) {
+    if (report[flagName] !== false) {
+      return false;
+    }
+  }
+
+  return hasSameRecordFields(
+    report.externalStoreInvocationReport,
+    unsupportedPlaceholderHookExternalStoreInvocationReport,
+    unsupportedPlaceholderHookExternalStoreInvocationReportFieldNames
+  );
+}
+
+function hasBlockedUnsupportedPlaceholderHookIdGeneration(report) {
+  for (const flagName of unsupportedPlaceholderHookIdGenerationFalseFlags) {
+    if (report[flagName] !== false) {
+      return false;
+    }
+  }
+
+  return hasSameRecordFields(
+    report.idGenerationReport,
+    unsupportedPlaceholderHookIdGenerationReport,
+    unsupportedPlaceholderHookIdGenerationReportFieldNames
+  );
+}
+
 function freezeArray(values) {
   return Object.freeze(values.slice());
 }
@@ -1658,8 +2403,10 @@ module.exports = {
   callPrivateEffectDispatcherHook,
   callPrivateMemoDispatcherHook,
   callPrivateStateDispatcherHook,
+  consumeUnsupportedPlaceholderHookCurrentnessReport,
   createInvalidHookCallError,
   createMissingPrivateStateHookDispatcherError,
+  createUnsupportedPlaceholderHookCurrentnessReport,
   createUnsupportedPrivateTransitionCallbackError,
   effectHookMetadataByHookName,
   effectHookNames,
@@ -1672,6 +2419,7 @@ module.exports = {
   getPrivateTransitionHookDispatcherMetadata,
   invalidHookCallErrorCode,
   invalidHookCallMessage,
+  isPrivateUnsupportedPlaceholderHookBlockerMetadata,
   isPrivateCallbackHookDispatcher,
   isPrivateCallbackHookDispatcherMetadata,
   isPrivateContextHookDispatcher,
@@ -1684,12 +2432,14 @@ module.exports = {
   isPrivateStateHookDispatcherMetadata,
   isPrivateTransitionHookDispatcher,
   isPrivateTransitionHookDispatcherMetadata,
+  isUnsupportedPlaceholderHookCurrentnessReport,
   markPrivateCallbackHookDispatcher,
   markPrivateContextHookDispatcher,
   markPrivateEffectHookDispatcher,
   markPrivateMemoHookDispatcher,
   markPrivateStateHookDispatcher,
   markPrivateTransitionHookDispatcher,
+  privateUnsupportedPlaceholderHookBlockerMetadata,
   privateCallbackHookDispatcherMetadata,
   privateContextHookDispatcherMetadata,
   privateEffectHookDispatcherMetadata,
@@ -1699,6 +2449,10 @@ module.exports = {
   recordPrivateStartTransitionDispatcherRouting,
   resolveDispatcher,
   transitionHookNames,
+  unsupportedPlaceholderHookCurrentnessConsumptionStatus,
+  unsupportedPlaceholderHookCurrentnessStatus,
+  unsupportedPlaceholderHookNames,
+  validateUnsupportedPlaceholderHookCurrentnessReport,
   use,
   useCallback,
   useContext,
