@@ -23,6 +23,19 @@ const publicFlushSyncBlockedCurrentnessEntrypoints = freezeArray([
   'react-dom',
   'react-dom/profiling'
 ]);
+const publicFlushSyncBlockedCurrentnessSourceRowVersion = 1;
+const publicFlushSyncBlockedCurrentnessSourceRowSpecs = freezeRecords([
+  {
+    rowId: 'react-dom-public-flush-sync-placeholder-source',
+    entrypoint: 'react-dom',
+    packageSource: 'packages/react-dom/index.js'
+  },
+  {
+    rowId: 'react-dom-profiling-public-flush-sync-placeholder-source',
+    entrypoint: 'react-dom/profiling',
+    packageSource: 'packages/react-dom/profiling.js'
+  }
+]);
 const publicFlushSyncBlockedCurrentnessScenarios = freezeArray([
   'rootless-sync-callback',
   'rootless-error-callback',
@@ -83,6 +96,38 @@ const publicFlushSyncBlockedCurrentnessExecutionClaimFields = freezeArray([
   'executesSyncFlush',
   'executesPublicFlushSync',
   'executesPublicDomMutation'
+]);
+const publicFlushSyncBlockedCurrentnessNativeRustClaimFields = freezeArray([
+  'publicNativeCompatibilityClaimed',
+  'nativeCompatibilityClaimed',
+  'nativeExecution',
+  'nativeExecutionClaimed',
+  'publicNativeExecutionClaimed',
+  'nativeBridgeAvailable',
+  'nativeBridgeCompatibilityClaimed',
+  'nativeBridgeExecutionClaimed',
+  'nativeRuntimeExecution',
+  'nativeRuntimeExecutionClaimed',
+  'nativeRuntimeCompatibilityClaimed',
+  'publicRustCompatibilityClaimed',
+  'rustCompatibilityClaimed',
+  'rustExecution',
+  'rustExecutionClaimed',
+  'rustRuntimeExecution',
+  'rustRuntimeExecutionClaimed',
+  'rustRuntimeCompatibilityClaimed',
+  'rustBridgeAvailable',
+  'rustBridgeCompatibilityClaimed',
+  'rustBridgeExecutionClaimed'
+]);
+const publicFlushSyncBlockedCurrentnessSourceIdentityClaimFields = freezeArray([
+  'invokesCallback',
+  'returnsThenable',
+  'returnValueCompatibilityClaimed',
+  ...publicFlushSyncBlockedCurrentnessPackageClaimFields,
+  ...publicFlushSyncBlockedCurrentnessPublicClaimFields,
+  ...publicFlushSyncBlockedCurrentnessExecutionClaimFields,
+  ...publicFlushSyncBlockedCurrentnessNativeRustClaimFields
 ]);
 const privateNestedActRootContinuationPrerequisiteId =
   'sync-flush-nested-act-root-continuation-evidence';
@@ -160,6 +205,7 @@ const publicFlushSyncBlockedCurrentnessAcceptedPrivateRows = freezeRecords([
 ]);
 const publicFlushSyncBlockedCurrentnessReports = new WeakSet();
 const publicFlushSyncBlockedCurrentnessReportOverrideKeys = new WeakMap();
+const publicFlushSyncBlockedCurrentnessSourceRowsByReport = new WeakMap();
 
 function isDevelopmentMode(options) {
   if (options && typeof options.development === 'boolean') {
@@ -217,6 +263,17 @@ function createPublicReactDomFlushSyncBlockedCurrentnessReport(
     arguments.length > 0
   );
   const optionValues = normalizedOptions.values;
+  const hasSourceRowsOverride = Object.prototype.hasOwnProperty.call(
+    optionValues,
+    'sourceRows'
+  );
+  const sourceRows = hasSourceRowsOverride
+    ? freezePublicFlushSyncBlockedCurrentnessSourceRows(
+        optionValues.sourceRows
+      )
+    : createPublicFlushSyncBlockedCurrentnessSourceRows(
+        optionValues.sourceRowOverrides
+      );
   const publicFlushSyncExports = freezeArray(
     (
       optionValues.publicFlushSyncExports ??
@@ -254,6 +311,7 @@ function createPublicReactDomFlushSyncBlockedCurrentnessReport(
       optionValues.scenarioIds,
       publicFlushSyncBlockedCurrentnessScenarios
     ),
+    sourceRows,
     scenarios,
     publicFlushSyncExports,
     acceptedWorkerIds: freezeStringArray(
@@ -361,6 +419,12 @@ function createPublicReactDomFlushSyncBlockedCurrentnessReport(
     report,
     normalizedOptions.overrideKeys
   );
+  if (!hasSourceRowsOverride) {
+    publicFlushSyncBlockedCurrentnessSourceRowsByReport.set(
+      report,
+      sourceRows
+    );
+  }
   return report;
 }
 
@@ -398,6 +462,7 @@ function consumePublicReactDomFlushSyncBlockedCurrentnessReport(report) {
     returnValueCompatibilityClaimed: false,
     acceptedWorkerIds: report.acceptedWorkerIds,
     excludedWorkerIds: report.excludedWorkerIds,
+    sourceRows: report.sourceRows,
     privatePrerequisites:
       createPublicFlushSyncBlockedCurrentnessPrivatePrerequisites(),
     publicFlushSyncReady: false,
@@ -476,6 +541,11 @@ function validatePublicReactDomFlushSyncBlockedCurrentnessReport(report) {
     )
   ) {
     return 'public-react-dom-flush-sync-currentness-shape';
+  }
+  const sourceRowsRejection =
+    validatePublicFlushSyncBlockedCurrentnessSourceRows(report);
+  if (sourceRowsRejection !== null) {
+    return sourceRowsRejection;
   }
   if (!isAcceptedPublicFlushSyncExportShapes(report.publicFlushSyncExports)) {
     return 'public-react-dom-flush-sync-currentness-public-export-shape';
@@ -674,6 +744,458 @@ function isAcceptedPublicFlushSyncBlockedCurrentnessPrivatePrerequisites(
     prerequisites,
     createPublicFlushSyncBlockedCurrentnessPrivatePrerequisites()
   );
+}
+
+function validatePublicFlushSyncBlockedCurrentnessSourceRows(report) {
+  if (
+    publicFlushSyncBlockedCurrentnessSourceRowsByReport.get(report) !==
+    report.sourceRows
+  ) {
+    return 'public-react-dom-flush-sync-currentness-source-rows-source-proof';
+  }
+
+  if (
+    !Array.isArray(report.sourceRows) ||
+    !Object.isFrozen(report.sourceRows) ||
+    report.sourceRows.length !==
+      publicFlushSyncBlockedCurrentnessSourceRowSpecs.length
+  ) {
+    return 'public-react-dom-flush-sync-currentness-source-rows';
+  }
+
+  for (const row of report.sourceRows) {
+    if (!isAcceptedPublicFlushSyncBlockedCurrentnessSourceRow(row)) {
+      return 'public-react-dom-flush-sync-currentness-source-rows';
+    }
+  }
+
+  if (
+    !sameFrozenValue(
+      report.sourceRows,
+      createPublicFlushSyncBlockedCurrentnessSourceRows()
+    )
+  ) {
+    return 'public-react-dom-flush-sync-currentness-source-rows';
+  }
+
+  return null;
+}
+
+function isAcceptedPublicFlushSyncBlockedCurrentnessSourceRow(row) {
+  return (
+    isObjectLike(row) &&
+    Object.isFrozen(row) &&
+    row.sourceRowVersion ===
+      publicFlushSyncBlockedCurrentnessSourceRowVersion &&
+    row.guardSource === 'packages/react-dom/src/shared/flush-sync-guard.js' &&
+    row.placeholderFactorySource === 'packages/react-dom/placeholder-utils.js' &&
+    row.placeholderFactory === 'createUnsupportedFunction' &&
+    row.exportName === 'flushSync' &&
+    row.sourceOwned === true &&
+    row.sourceCurrent === true &&
+    row.descriptorSnapshotReadable === true &&
+    row.descriptorOwn === true &&
+    row.descriptorData === true &&
+    row.descriptorEnumerable === true &&
+    row.descriptorConfigurable === true &&
+    row.descriptorWritable === true &&
+    row.exportKeysInclude === true &&
+    row.reflectOwnKeysInclude === true &&
+    row.functionType === 'function' &&
+    row.functionName === '' &&
+    row.functionLength === 1 &&
+    row.functionThenable === false &&
+    row.placeholderMetadataOwn === true &&
+    row.placeholderMetadataEnumerable === false &&
+    row.placeholderMetadataValue === true &&
+    row.entrypointMetadataOwn === true &&
+    row.entrypointMetadataEnumerable === false &&
+    row.entrypointMetadataValue === row.entrypoint &&
+    row.compatibilityTargetMetadataOwn === true &&
+    row.compatibilityTargetMetadataEnumerable === false &&
+    row.compatibilityTargetMetadataValue === compatibilityTarget &&
+    sameStringArray(
+      row.acceptedPrivateBlockerWorkerIds,
+      publicFlushSyncBlockedCurrentnessAcceptedWorkerIds
+    ) &&
+    sameStringArray(
+      row.acceptedPrivateBlockerPrerequisiteIds,
+      privateSyncFlushRootHandoffPrerequisiteIds
+    ) &&
+    row.publicRootBlockedLifecycleWorkerId ===
+      publicRootBlockedLifecycleWorkerId &&
+    row.publicRootBlockedLifecycleProgressPath ===
+      publicRootBlockedLifecycleProgressPath &&
+    sameStringArray(
+      row.excludedPrivateBlockerWorkerIds,
+      publicFlushSyncBlockedCurrentnessExcludedWorkerIds
+    ) &&
+    row.ownPublicCompatibilityClaimKeys.length === 0 &&
+    row.hiddenPublicCompatibilityAliasKeys.length === 0 &&
+    row.symbolPublicCompatibilityClaimKeys.length === 0 &&
+    row.nonEnumerablePublicCompatibilityClaimKeys.length === 0 &&
+    row.accessorPublicCompatibilityClaimKeys.length === 0 &&
+    row.inheritedPublicCompatibilityClaimKeys.length === 0 &&
+    row.functionPublicCompatibilityClaimKeys.length === 0 &&
+    row.publicFlushSyncCompatibilityClaimed === false &&
+    row.publicSchedulerTimingCompatibilityClaimed === false &&
+    row.publicActTimingCompatibilityClaimed === false &&
+    row.publicRootCompatibilityClaimed === false &&
+    row.publicPackageCompatibilityClaimed === false &&
+    row.packageCompatibilityClaimed === false &&
+    row.profilingCompatibilityClaimed === false &&
+    row.drainsPublicSchedulerTaskQueue === false &&
+    row.drainsPublicReactActQueue === false &&
+    row.publicRootExecution === false &&
+    row.executesPublicFlushSync === false &&
+    row.executesPublicDomMutation === false &&
+    row.compatibilityClaimed === false
+  );
+}
+
+function createPublicFlushSyncBlockedCurrentnessSourceRows(
+  sourceRowOverrides
+) {
+  return freezeArray(
+    publicFlushSyncBlockedCurrentnessSourceRowSpecs.map((sourceSpec) =>
+      freezePublicFlushSyncBlockedCurrentnessSourceRow({
+        ...describePublicFlushSyncBlockedCurrentnessSourceRow(sourceSpec),
+        ...getOwnDataOverride(sourceRowOverrides, sourceSpec.rowId)
+      })
+    )
+  );
+}
+
+function describePublicFlushSyncBlockedCurrentnessSourceRow(sourceSpec) {
+  const ReactDOM = loadPublicFlushSyncEntrypoint(sourceSpec.entrypoint);
+  const moduleSnapshot = snapshotOwnPropertyDescriptors(ReactDOM);
+  const moduleDescriptors = moduleSnapshot.descriptors;
+  const flushSyncDescriptor = moduleDescriptors.flushSync;
+  const flushSyncValue = dataDescriptorValue(flushSyncDescriptor);
+  const placeholderMetadata = describePublicFlushSyncPlaceholderMetadata(
+    moduleDescriptors,
+    sourceSpec.entrypoint
+  );
+  const sourceClaims = describePublicFlushSyncSourceClaims(
+    ReactDOM,
+    moduleDescriptors,
+    flushSyncValue
+  );
+
+  return freezePublicFlushSyncBlockedCurrentnessSourceRow({
+    rowId: sourceSpec.rowId,
+    sourceRowVersion: publicFlushSyncBlockedCurrentnessSourceRowVersion,
+    entrypoint: sourceSpec.entrypoint,
+    packageSource: sourceSpec.packageSource,
+    guardSource: 'packages/react-dom/src/shared/flush-sync-guard.js',
+    placeholderFactorySource: 'packages/react-dom/placeholder-utils.js',
+    placeholderFactory: 'createUnsupportedFunction',
+    exportName: 'flushSync',
+    sourceOwned: true,
+    sourceCurrent: true,
+    descriptorSnapshotReadable: moduleSnapshot.readable,
+    descriptorOwn: flushSyncDescriptor !== undefined,
+    descriptorData: isDataDescriptor(flushSyncDescriptor),
+    descriptorEnumerable: flushSyncDescriptor?.enumerable === true,
+    descriptorConfigurable: flushSyncDescriptor?.configurable === true,
+    descriptorWritable: flushSyncDescriptor?.writable === true,
+    exportKeysInclude: objectKeysInclude(ReactDOM, 'flushSync'),
+    reflectOwnKeysInclude: Reflect.ownKeys(moduleDescriptors).includes(
+      'flushSync'
+    ),
+    functionType: typeof flushSyncValue,
+    functionName:
+      typeof flushSyncValue === 'function' ? flushSyncValue.name : undefined,
+    functionLength:
+      typeof flushSyncValue === 'function' ? flushSyncValue.length : undefined,
+    functionThenable: isThenable(flushSyncValue),
+    ...placeholderMetadata,
+    acceptedPrivateBlockerWorkerIds:
+      publicFlushSyncBlockedCurrentnessAcceptedWorkerIds,
+    acceptedPrivateBlockerPrerequisiteIds:
+      privateSyncFlushRootHandoffPrerequisiteIds,
+    publicRootBlockedLifecycleWorkerId,
+    publicRootBlockedLifecycleProgressPath,
+    excludedPrivateBlockerWorkerIds:
+      publicFlushSyncBlockedCurrentnessExcludedWorkerIds,
+    ...sourceClaims,
+    publicFlushSyncCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicActTimingCompatibilityClaimed: false,
+    publicRootCompatibilityClaimed: false,
+    publicPackageCompatibilityClaimed: false,
+    packageCompatibilityClaimed: false,
+    profilingCompatibilityClaimed: false,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    publicRootExecution: false,
+    executesPublicFlushSync: false,
+    executesPublicDomMutation: false,
+    compatibilityClaimed: false
+  });
+}
+
+function describePublicFlushSyncPlaceholderMetadata(
+  descriptors,
+  entrypoint
+) {
+  const placeholder = descriptors.__FAST_REACT_PLACEHOLDER__;
+  const entrypointDescriptor = descriptors.__FAST_REACT_ENTRYPOINT__;
+  const compatibility = descriptors.compatibilityTarget;
+
+  return freezeRecord({
+    placeholderMetadataOwn: placeholder !== undefined,
+    placeholderMetadataEnumerable: placeholder?.enumerable === true,
+    placeholderMetadataValue: dataDescriptorValue(placeholder),
+    entrypointMetadataOwn: entrypointDescriptor !== undefined,
+    entrypointMetadataEnumerable: entrypointDescriptor?.enumerable === true,
+    entrypointMetadataValue: dataDescriptorValue(entrypointDescriptor),
+    compatibilityTargetMetadataOwn: compatibility !== undefined,
+    compatibilityTargetMetadataEnumerable: compatibility?.enumerable === true,
+    compatibilityTargetMetadataValue: dataDescriptorValue(compatibility)
+  });
+}
+
+function describePublicFlushSyncSourceClaims(
+  ReactDOM,
+  moduleDescriptors,
+  flushSyncValue
+) {
+  const ownPublicCompatibilityClaimKeys = [];
+  const hiddenPublicCompatibilityAliasKeys = [];
+  const symbolPublicCompatibilityClaimKeys = [];
+  const nonEnumerablePublicCompatibilityClaimKeys = [];
+  const accessorPublicCompatibilityClaimKeys = [];
+
+  for (const key of Reflect.ownKeys(moduleDescriptors)) {
+    if (key === 'flushSync') {
+      continue;
+    }
+
+    const descriptor = moduleDescriptors[key];
+    if (isPublicFlushSyncAliasDescriptor(key, descriptor, flushSyncValue)) {
+      hiddenPublicCompatibilityAliasKeys.push(describePropertyKey(key));
+    }
+
+    if (isPublicFlushSyncCompatibilityClaimKey(key)) {
+      ownPublicCompatibilityClaimKeys.push(describePropertyKey(key));
+      if (typeof key === 'symbol') {
+        symbolPublicCompatibilityClaimKeys.push(describePropertyKey(key));
+      }
+      if (descriptor?.enumerable !== true) {
+        nonEnumerablePublicCompatibilityClaimKeys.push(
+          describePropertyKey(key)
+        );
+      }
+      if (!isDataDescriptor(descriptor)) {
+        accessorPublicCompatibilityClaimKeys.push(describePropertyKey(key));
+      }
+    }
+  }
+
+  const hiddenProxyPublicCompatibilityClaimKeys =
+    describeProxyHiddenPublicCompatibilityClaimKeys(
+      ReactDOM,
+      moduleDescriptors
+    );
+
+  return freezeRecord({
+    ownPublicCompatibilityClaimKeys: freezeArray(
+      ownPublicCompatibilityClaimKeys
+    ),
+    hiddenPublicCompatibilityAliasKeys: freezeArray(
+      uniqueStringArray([
+        ...hiddenPublicCompatibilityAliasKeys,
+        ...hiddenProxyPublicCompatibilityClaimKeys
+      ])
+    ),
+    symbolPublicCompatibilityClaimKeys: freezeArray(
+      symbolPublicCompatibilityClaimKeys
+    ),
+    nonEnumerablePublicCompatibilityClaimKeys: freezeArray(
+      nonEnumerablePublicCompatibilityClaimKeys
+    ),
+    accessorPublicCompatibilityClaimKeys: freezeArray(
+      accessorPublicCompatibilityClaimKeys
+    ),
+    inheritedPublicCompatibilityClaimKeys:
+      describeInheritedPublicCompatibilityClaimKeys(ReactDOM, flushSyncValue),
+    functionPublicCompatibilityClaimKeys:
+      describeFunctionPublicCompatibilityClaimKeys(flushSyncValue)
+  });
+}
+
+function describeProxyHiddenPublicCompatibilityClaimKeys(
+  target,
+  moduleDescriptors
+) {
+  const hiddenClaimKeys = [];
+  const claimFields = publicFlushSyncBlockedCurrentnessSourceIdentityClaimFields;
+
+  for (const field of claimFields) {
+    if (Object.prototype.hasOwnProperty.call(moduleDescriptors, field)) {
+      continue;
+    }
+
+    const exposure = describeProxyHiddenPublicCompatibilityClaimKey(
+      target,
+      field
+    );
+    if (exposure !== null) {
+      hiddenClaimKeys.push(exposure);
+    }
+  }
+
+  return uniqueStringArray(hiddenClaimKeys);
+}
+
+function describeProxyHiddenPublicCompatibilityClaimKey(target, field) {
+  try {
+    if (field in Object(target)) {
+      return field;
+    }
+  } catch {
+    return `${field}:unreadable-in`;
+  }
+
+  try {
+    const value = target[field];
+    if (value === undefined) {
+      return null;
+    }
+    if (
+      value === false &&
+      !isPresenceBasedPublicFlushSyncSourceClaimField(field)
+    ) {
+      return null;
+    }
+    return field;
+  } catch {
+    return `${field}:unreadable-get`;
+  }
+}
+
+function isPresenceBasedPublicFlushSyncSourceClaimField(field) {
+  return publicFlushSyncBlockedCurrentnessNativeRustClaimFields.includes(field);
+}
+
+function freezePublicFlushSyncBlockedCurrentnessSourceRows(rows) {
+  return freezeArray(
+    (Array.isArray(rows) ? rows : []).map(
+      freezePublicFlushSyncBlockedCurrentnessSourceRow
+    )
+  );
+}
+
+function freezePublicFlushSyncBlockedCurrentnessSourceRow(row) {
+  const normalizedRow = row ?? {};
+  return freezeRecord({
+    rowId: normalizedRow.rowId,
+    sourceRowVersion: normalizedRow.sourceRowVersion,
+    entrypoint: normalizedRow.entrypoint,
+    packageSource: normalizedRow.packageSource,
+    guardSource: normalizedRow.guardSource,
+    placeholderFactorySource: normalizedRow.placeholderFactorySource,
+    placeholderFactory: normalizedRow.placeholderFactory,
+    exportName: normalizedRow.exportName,
+    sourceOwned: normalizedRow.sourceOwned === true,
+    sourceCurrent: normalizedRow.sourceCurrent === true,
+    descriptorSnapshotReadable:
+      normalizedRow.descriptorSnapshotReadable === true,
+    descriptorOwn: normalizedRow.descriptorOwn === true,
+    descriptorData: normalizedRow.descriptorData === true,
+    descriptorEnumerable: normalizedRow.descriptorEnumerable === true,
+    descriptorConfigurable: normalizedRow.descriptorConfigurable === true,
+    descriptorWritable: normalizedRow.descriptorWritable === true,
+    exportKeysInclude: normalizedRow.exportKeysInclude === true,
+    reflectOwnKeysInclude: normalizedRow.reflectOwnKeysInclude === true,
+    functionType: normalizedRow.functionType,
+    functionName: normalizedRow.functionName,
+    functionLength: normalizedRow.functionLength,
+    functionThenable: normalizedRow.functionThenable === true,
+    placeholderMetadataOwn: normalizedRow.placeholderMetadataOwn === true,
+    placeholderMetadataEnumerable:
+      normalizedRow.placeholderMetadataEnumerable === true,
+    placeholderMetadataValue: normalizedRow.placeholderMetadataValue,
+    entrypointMetadataOwn: normalizedRow.entrypointMetadataOwn === true,
+    entrypointMetadataEnumerable:
+      normalizedRow.entrypointMetadataEnumerable === true,
+    entrypointMetadataValue: normalizedRow.entrypointMetadataValue,
+    compatibilityTargetMetadataOwn:
+      normalizedRow.compatibilityTargetMetadataOwn === true,
+    compatibilityTargetMetadataEnumerable:
+      normalizedRow.compatibilityTargetMetadataEnumerable === true,
+    compatibilityTargetMetadataValue:
+      normalizedRow.compatibilityTargetMetadataValue,
+    acceptedPrivateBlockerWorkerIds: freezeStringArray(
+      normalizedRow.acceptedPrivateBlockerWorkerIds,
+      []
+    ),
+    acceptedPrivateBlockerPrerequisiteIds: freezeStringArray(
+      normalizedRow.acceptedPrivateBlockerPrerequisiteIds,
+      []
+    ),
+    publicRootBlockedLifecycleWorkerId:
+      normalizedRow.publicRootBlockedLifecycleWorkerId,
+    publicRootBlockedLifecycleProgressPath:
+      normalizedRow.publicRootBlockedLifecycleProgressPath,
+    excludedPrivateBlockerWorkerIds: freezeStringArray(
+      normalizedRow.excludedPrivateBlockerWorkerIds,
+      []
+    ),
+    ownPublicCompatibilityClaimKeys: freezeStringArray(
+      normalizedRow.ownPublicCompatibilityClaimKeys,
+      []
+    ),
+    hiddenPublicCompatibilityAliasKeys: freezeStringArray(
+      normalizedRow.hiddenPublicCompatibilityAliasKeys,
+      []
+    ),
+    symbolPublicCompatibilityClaimKeys: freezeStringArray(
+      normalizedRow.symbolPublicCompatibilityClaimKeys,
+      []
+    ),
+    nonEnumerablePublicCompatibilityClaimKeys: freezeStringArray(
+      normalizedRow.nonEnumerablePublicCompatibilityClaimKeys,
+      []
+    ),
+    accessorPublicCompatibilityClaimKeys: freezeStringArray(
+      normalizedRow.accessorPublicCompatibilityClaimKeys,
+      []
+    ),
+    inheritedPublicCompatibilityClaimKeys: freezeStringArray(
+      normalizedRow.inheritedPublicCompatibilityClaimKeys,
+      []
+    ),
+    functionPublicCompatibilityClaimKeys: freezeStringArray(
+      normalizedRow.functionPublicCompatibilityClaimKeys,
+      []
+    ),
+    publicFlushSyncCompatibilityClaimed:
+      normalizedRow.publicFlushSyncCompatibilityClaimed ?? false,
+    publicSchedulerTimingCompatibilityClaimed:
+      normalizedRow.publicSchedulerTimingCompatibilityClaimed ?? false,
+    publicActTimingCompatibilityClaimed:
+      normalizedRow.publicActTimingCompatibilityClaimed ?? false,
+    publicRootCompatibilityClaimed:
+      normalizedRow.publicRootCompatibilityClaimed ?? false,
+    publicPackageCompatibilityClaimed:
+      normalizedRow.publicPackageCompatibilityClaimed ?? false,
+    packageCompatibilityClaimed:
+      normalizedRow.packageCompatibilityClaimed ?? false,
+    profilingCompatibilityClaimed:
+      normalizedRow.profilingCompatibilityClaimed ?? false,
+    drainsPublicSchedulerTaskQueue:
+      normalizedRow.drainsPublicSchedulerTaskQueue ?? false,
+    drainsPublicReactActQueue:
+      normalizedRow.drainsPublicReactActQueue ?? false,
+    publicRootExecution: normalizedRow.publicRootExecution ?? false,
+    executesPublicFlushSync:
+      normalizedRow.executesPublicFlushSync ?? false,
+    executesPublicDomMutation:
+      normalizedRow.executesPublicDomMutation ?? false,
+    compatibilityClaimed: normalizedRow.compatibilityClaimed ?? false
+  });
 }
 
 function isAcceptedPublicFlushSyncExportShapes(exportShapes) {
@@ -1148,6 +1670,160 @@ function captureOwnDataOptions(options, callerProvided) {
       ? freezeArray(['caller-options-object', ...ownKeys])
       : freezeArray([])
   });
+}
+
+function getOwnDataOverride(overrides, key) {
+  if (!isObjectLike(overrides)) {
+    return undefined;
+  }
+
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(overrides, key);
+    if (descriptor && isDataDescriptor(descriptor)) {
+      return descriptor.value;
+    }
+  } catch {
+    return {
+      descriptorSnapshotReadable: false
+    };
+  }
+
+  return undefined;
+}
+
+function snapshotOwnPropertyDescriptors(value) {
+  try {
+    return {
+      readable: true,
+      descriptors: Object.getOwnPropertyDescriptors(Object(value))
+    };
+  } catch {
+    return {
+      readable: false,
+      descriptors: Object.create(null)
+    };
+  }
+}
+
+function dataDescriptorValue(descriptor) {
+  return isDataDescriptor(descriptor) ? descriptor.value : undefined;
+}
+
+function isDataDescriptor(descriptor) {
+  return (
+    descriptor !== undefined &&
+    Object.prototype.hasOwnProperty.call(descriptor, 'value')
+  );
+}
+
+function objectKeysInclude(value, key) {
+  try {
+    return Object.keys(value).includes(key);
+  } catch {
+    return false;
+  }
+}
+
+function isPublicFlushSyncAliasDescriptor(key, descriptor, flushSyncValue) {
+  return (
+    (isDataDescriptor(descriptor) && descriptor.value === flushSyncValue) ||
+    normalizedPropertyKeyText(key).includes('flushsync')
+  );
+}
+
+function isPublicFlushSyncCompatibilityClaimKey(key) {
+  return publicFlushSyncBlockedCurrentnessSourceIdentityClaimFields.includes(
+    propertyKeyText(key)
+  );
+}
+
+function describeInheritedPublicCompatibilityClaimKeys(
+  target,
+  flushSyncValue
+) {
+  const claimKeys = [];
+  let prototype;
+
+  try {
+    prototype = Object.getPrototypeOf(target);
+  } catch {
+    return freezeArray(['unreadable-prototype']);
+  }
+
+  let depth = 0;
+  while (prototype !== null && depth < 8) {
+    let descriptors;
+    try {
+      descriptors = Object.getOwnPropertyDescriptors(prototype);
+    } catch {
+      claimKeys.push(`prototype-${depth}:unreadable-descriptors`);
+      break;
+    }
+
+    for (const key of Reflect.ownKeys(descriptors)) {
+      const descriptor = descriptors[key];
+      if (
+        key === 'flushSync' ||
+        isPublicFlushSyncCompatibilityClaimKey(key) ||
+        isPublicFlushSyncAliasDescriptor(key, descriptor, flushSyncValue)
+      ) {
+        claimKeys.push(`prototype-${depth}:${describePropertyKey(key)}`);
+      }
+    }
+
+    try {
+      prototype = Object.getPrototypeOf(prototype);
+    } catch {
+      claimKeys.push(`prototype-${depth}:unreadable-parent`);
+      break;
+    }
+    depth++;
+  }
+
+  return freezeArray(uniqueStringArray(claimKeys));
+}
+
+function describeFunctionPublicCompatibilityClaimKeys(value) {
+  if (typeof value !== 'function') {
+    return freezeArray([]);
+  }
+
+  const snapshot = snapshotOwnPropertyDescriptors(value);
+  if (!snapshot.readable) {
+    return freezeArray(['unreadable-function-descriptors']);
+  }
+
+  return freezeArray(
+    uniqueStringArray(
+      Reflect.ownKeys(snapshot.descriptors)
+        .filter(isPublicFlushSyncCompatibilityClaimKey)
+        .map(describePropertyKey)
+    )
+  );
+}
+
+function propertyKeyText(key) {
+  if (typeof key === 'symbol') {
+    return key.description ?? '';
+  }
+  return String(key);
+}
+
+function normalizedPropertyKeyText(key) {
+  return propertyKeyText(key)
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function describePropertyKey(key) {
+  if (typeof key === 'symbol') {
+    return `Symbol(${key.description ?? ''})`;
+  }
+  return String(key);
+}
+
+function uniqueStringArray(values) {
+  return [...new Set(values)];
 }
 
 function freezeStringArray(value, fallback) {
