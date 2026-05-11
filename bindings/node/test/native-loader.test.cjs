@@ -976,6 +976,96 @@ const expectedNativeRootBridgeBatchLifecycleConsumerRowFields = [
   'publicNativeCompatibility',
   'reactBehaviorError'
 ];
+const expectedNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRowFields =
+  [
+    'id',
+    'consumerRowId',
+    'lifecycleRowId',
+    'responseRowId',
+    'streamMetadataRowId',
+    'streamPayloadRowId',
+    'batchId',
+    'streamId',
+    'batchIndex',
+    'requestId',
+    'kind',
+    'lifecycleTransition',
+    'rootHandleAction',
+    'cleanupHookEvidenceStatus',
+    'requestOrder',
+    'responseOrder',
+    'metadataBatchSequence',
+    'payloadBatchSequence',
+    'metadataChunkKind',
+    'payloadChunkKind',
+    'responseStatus',
+    'payloadAssemblyState',
+    'teardownState',
+    'status',
+    'code',
+    'nativeAddonLoaded',
+    'nativeExecution',
+    'rendererExecution',
+    'reconcilerExecution',
+    'nodeWorkerThreadsExecution',
+    'napiCleanupHookExecution',
+    'publicNativeCompatibility',
+    'reactBehaviorError'
+  ];
+const expectedNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes =
+  {
+    cleanupHookStatusMismatch:
+      'FAST_REACT_NAPI_BATCH_LIFECYCLE_CONSUMER_CLEANUP_STATUS_MISMATCH',
+    consumerRowIdMismatch:
+      'FAST_REACT_NAPI_BATCH_LIFECYCLE_CONSUMER_ROW_ID_MISMATCH',
+    kindTransitionMismatch:
+      'FAST_REACT_NAPI_BATCH_LIFECYCLE_CONSUMER_KIND_TRANSITION_MISMATCH',
+    publicNativeExecutionClaim:
+      'FAST_REACT_NAPI_BATCH_LIFECYCLE_CONSUMER_PUBLIC_NATIVE_EXECUTION_CLAIM',
+    rowOrderMismatch:
+      'FAST_REACT_NAPI_BATCH_LIFECYCLE_CONSUMER_ROW_ORDER_MISMATCH',
+    staleOrForeignJsonBatchRow:
+      'FAST_REACT_NAPI_BATCH_LIFECYCLE_CONSUMER_STALE_OR_FOREIGN_JSON_BATCH_ROW'
+  };
+const expectedNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLink = {
+  linkStatus:
+    'linked-native-root-bridge-batch-lifecycle-consumer-json-batch-roundtrip',
+  model:
+    'fast-react-napi.NativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLink',
+  validationModel: 'fast-react-napi.NativeRootBridgeRequestSequenceValidator',
+  handleTableModel: 'fast-react-napi.BridgeHandleTable',
+  consumerStatus: 'consumed-native-root-bridge-batch-lifecycle-records',
+  batchGateStatus: 'validated-native-root-bridge-batched-json-transport-records',
+  responseSequenceGateStatus:
+    'diagnosed-native-root-bridge-json-batch-response-sequence',
+  streamRoundtripGateStatus:
+    'diagnosed-native-root-bridge-json-stream-batch-roundtrip',
+  batchId: 'native-root-bridge-json-batch-552',
+  streamId: 'native-root-bridge-json-stream-batch-roundtrip-587',
+  validateJsonBatchRoundtripLinkRowsName:
+    'validateNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRows',
+  rowStatuses: ['linked', 'rejected'],
+  rejectionCaseIds: [
+    'consumer-row-id-mismatch',
+    'consumer-row-order-mismatch',
+    'consumer-kind-transition-mismatch',
+    'consumer-cleanup-status-mismatch',
+    'stale-or-foreign-json-batch-row',
+    'public-native-execution-claim'
+  ],
+  rejectionCodes:
+    expectedNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes,
+  jsonBatchRoundtripLinkRowFields:
+    expectedNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRowFields,
+  nativeAddonLoaded: false,
+  nativeExecution: false,
+  rendererExecution: false,
+  reconcilerExecution: false,
+  nodeWorkerThreadsExecution: false,
+  napiCleanupHookExecution: false,
+  publicNativeCompatibility: false,
+  reactBehaviorError: false
+};
 const expectedNativeRootBridgeBatchLifecycleConsumer = {
   consumerStatus: 'consumed-native-root-bridge-batch-lifecycle-records',
   model: 'fast-react-napi.NativeRootBridgeBatchLifecycleConsumer',
@@ -988,6 +1078,8 @@ const expectedNativeRootBridgeBatchLifecycleConsumer = {
   cleanupHookEvidenceStatuses: ['not-required', 'accepted', 'rejected'],
   batchLifecycleConsumerRowFields:
     expectedNativeRootBridgeBatchLifecycleConsumerRowFields,
+  jsonBatchRoundtripLink:
+    expectedNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLink,
   nativeAddonLoaded: false,
   nativeExecution: false,
   rendererExecution: false,
@@ -1534,6 +1626,16 @@ for (const shapeValue of [
     .cleanupHookEvidenceStatuses,
   native.nativeRootBridgeRequestShape.batchLifecycleConsumer
     .batchLifecycleConsumerRowFields,
+  native.nativeRootBridgeRequestShape.batchLifecycleConsumer
+    .jsonBatchRoundtripLink,
+  native.nativeRootBridgeRequestShape.batchLifecycleConsumer
+    .jsonBatchRoundtripLink.rowStatuses,
+  native.nativeRootBridgeRequestShape.batchLifecycleConsumer
+    .jsonBatchRoundtripLink.rejectionCaseIds,
+  native.nativeRootBridgeRequestShape.batchLifecycleConsumer
+    .jsonBatchRoundtripLink.rejectionCodes,
+  native.nativeRootBridgeRequestShape.batchLifecycleConsumer
+    .jsonBatchRoundtripLink.jsonBatchRoundtripLinkRowFields,
   native.nativeRootBridgeRequestShape.validationErrorCodes
 ]) {
   assert.ok(Object.isFrozen(shapeValue));
@@ -1627,6 +1729,11 @@ assertNativeRootBridgeJsonTransportSmoke(nativeShapeGate.jsonTransportSmoke, {
 });
 assertNativeRootBridgeBatchLifecycleConsumer(
   nativeShapeGate.batchLifecycleConsumer
+);
+assertNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectsForgery(
+  nativeShapeGate.batchLifecycleConsumer,
+  nativeShapeGate.jsonTransportSmoke.parserGate.batchedRecordGate,
+  nativeShapeGate.rustHandleTableAdmissionSmoke
 );
 assert.deepEqual(
   nativeShapeGate.validationRecords.map((record) => record.lifecycleTransition),
@@ -3493,6 +3600,7 @@ function assertNativeRootBridgeBatchLifecycleConsumerMetadata(consumer) {
   assert.equal(Object.isFrozen(consumer), true);
   assert.equal(Object.isFrozen(consumer.cleanupHookEvidenceStatuses), true);
   assert.equal(Object.isFrozen(consumer.batchLifecycleConsumerRowFields), true);
+  assert.equal(Object.isFrozen(consumer.jsonBatchRoundtripLink), true);
   assert.deepEqual(consumer, expectedNativeRootBridgeBatchLifecycleConsumer);
   assert.equal(
     consumer.consumerStatus,
@@ -3518,6 +3626,9 @@ function assertNativeRootBridgeBatchLifecycleConsumerMetadata(consumer) {
     consumer.batchLifecycleConsumerRowFields,
     expectedNativeRootBridgeBatchLifecycleConsumerRowFields
   );
+  assertNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkMetadata(
+    consumer.jsonBatchRoundtripLink
+  );
   assert.equal(consumer.nativeAddonLoaded, false);
   assert.equal(consumer.nativeExecution, false);
   assert.equal(consumer.rendererExecution, false);
@@ -3528,10 +3639,417 @@ function assertNativeRootBridgeBatchLifecycleConsumerMetadata(consumer) {
   assert.equal(consumer.reactBehaviorError, false);
 }
 
+function assertNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkMetadata(
+  link
+) {
+  assert.equal(Object.isFrozen(link), true);
+  assert.equal(Object.isFrozen(link.rowStatuses), true);
+  assert.equal(Object.isFrozen(link.rejectionCaseIds), true);
+  assert.equal(Object.isFrozen(link.rejectionCodes), true);
+  assert.equal(Object.isFrozen(link.jsonBatchRoundtripLinkRowFields), true);
+  assert.deepEqual(
+    {
+      ...link,
+      rows: undefined,
+      rejectedRows: undefined,
+      requestCount: undefined,
+      linkedRowCount: undefined,
+      rejectedRowCount: undefined
+    },
+    {
+      ...expectedNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLink,
+      rows: undefined,
+      rejectedRows: undefined,
+      requestCount: undefined,
+      linkedRowCount: undefined,
+      rejectedRowCount: undefined
+    }
+  );
+  assert.equal(
+    link.linkStatus,
+    'linked-native-root-bridge-batch-lifecycle-consumer-json-batch-roundtrip'
+  );
+  assert.equal(
+    link.model,
+    'fast-react-napi.NativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLink'
+  );
+  assert.equal(
+    link.responseSequenceGateStatus,
+    'diagnosed-native-root-bridge-json-batch-response-sequence'
+  );
+  assert.equal(
+    link.streamRoundtripGateStatus,
+    'diagnosed-native-root-bridge-json-stream-batch-roundtrip'
+  );
+  assert.deepEqual(link.rowStatuses, ['linked', 'rejected']);
+  assert.deepEqual(
+    link.rejectionCodes,
+    expectedNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes
+  );
+  assert.deepEqual(
+    link.jsonBatchRoundtripLinkRowFields,
+    expectedNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRowFields
+  );
+  assert.equal(link.nativeAddonLoaded, false);
+  assert.equal(link.nativeExecution, false);
+  assert.equal(link.rendererExecution, false);
+  assert.equal(link.reconcilerExecution, false);
+  assert.equal(link.nodeWorkerThreadsExecution, false);
+  assert.equal(link.napiCleanupHookExecution, false);
+  assert.equal(link.publicNativeCompatibility, false);
+  assert.equal(link.reactBehaviorError, false);
+
+  const descriptor = Object.getOwnPropertyDescriptor(
+    link,
+    'validateJsonBatchRoundtripLinkRows'
+  );
+  assert.equal(typeof descriptor.value, 'function');
+  assert.equal(
+    descriptor.value.name,
+    'validateNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRows'
+  );
+  assert.equal(descriptor.enumerable, false);
+  assert.equal(descriptor.configurable, false);
+  assert.equal(descriptor.writable, false);
+  assert.equal(
+    Object.keys(link).includes('validateJsonBatchRoundtripLinkRows'),
+    false
+  );
+}
+
+function assertNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLink(
+  link
+) {
+  assertNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkMetadata(
+    link
+  );
+  assert.equal(Object.isFrozen(link.rows), true);
+  assert.equal(Object.isFrozen(link.rejectedRows), true);
+  assert.equal(link.requestCount, 3);
+  assert.equal(link.linkedRowCount, 3);
+  assert.equal(link.rejectedRowCount, 0);
+  assert.deepEqual(link.rejectedRows, []);
+  assert.deepEqual(
+    link.rows.map((row) => row.id),
+    [
+      'batch-lifecycle-consumer-json-roundtrip-link-0-create',
+      'batch-lifecycle-consumer-json-roundtrip-link-1-render',
+      'batch-lifecycle-consumer-json-roundtrip-link-2-unmount'
+    ]
+  );
+  assert.deepEqual(
+    link.rows.map((row) => row.consumerRowId),
+    [
+      'batch-lifecycle-consumer-0-create',
+      'batch-lifecycle-consumer-1-render',
+      'batch-lifecycle-consumer-2-unmount'
+    ]
+  );
+  assert.deepEqual(
+    link.rows.map((row) => row.lifecycleRowId),
+    ['batch-record-0-create', 'batch-record-1-render', 'batch-record-2-unmount']
+  );
+  assert.deepEqual(
+    link.rows.map((row) => row.responseRowId),
+    [
+      'batch-response-0-create',
+      'batch-response-1-render',
+      'batch-response-2-unmount'
+    ]
+  );
+  assert.deepEqual(
+    link.rows.map((row) => row.streamMetadataRowId),
+    [
+      'stream-batch-chunk-0-request-1-metadata',
+      'stream-batch-chunk-2-request-2-metadata',
+      'stream-batch-chunk-4-request-3-metadata'
+    ]
+  );
+  assert.deepEqual(
+    link.rows.map((row) => row.streamPayloadRowId),
+    [
+      'stream-batch-chunk-1-request-1-payload',
+      'stream-batch-chunk-3-request-2-payload',
+      'stream-batch-chunk-5-request-3-payload'
+    ]
+  );
+  assert.deepEqual(
+    link.rows.map((row) => row.kind),
+    ['create', 'render', 'unmount']
+  );
+  assert.deepEqual(
+    link.rows.map((row) => row.lifecycleTransition),
+    ['none->active', 'active->active', 'active->retired']
+  );
+  assert.deepEqual(
+    link.rows.map((row) => row.rootHandleAction),
+    ['admit-root-handle', 'validate-active-root-handle', 'retire-root-handle']
+  );
+  assert.deepEqual(
+    link.rows.map((row) => row.cleanupHookEvidenceStatus),
+    ['not-required', 'accepted', 'accepted']
+  );
+  assert.deepEqual(
+    link.rows.map((row) => row.requestOrder),
+    [0, 1, 2]
+  );
+  assert.deepEqual(
+    link.rows.map((row) => row.responseOrder),
+    [0, 1, 2]
+  );
+  assert.deepEqual(
+    link.rows.map((row) => row.metadataBatchSequence),
+    [0, 2, 4]
+  );
+  assert.deepEqual(
+    link.rows.map((row) => row.payloadBatchSequence),
+    [1, 3, 5]
+  );
+  assert.deepEqual(
+    link.rows.map((row) => row.metadataChunkKind),
+    ['metadata', 'metadata', 'metadata']
+  );
+  assert.deepEqual(
+    link.rows.map((row) => row.payloadChunkKind),
+    ['payload', 'payload', 'payload']
+  );
+  assert.deepEqual(
+    link.rows.map((row) => row.responseStatus),
+    ['accepted', 'accepted', 'accepted']
+  );
+  assert.deepEqual(
+    link.rows.map((row) => row.payloadAssemblyState),
+    ['assembled', 'assembled', 'assembled']
+  );
+  assert.deepEqual(
+    link.rows.map((row) => row.teardownState),
+    ['root-active', 'root-active', 'root-retired']
+  );
+  assert.deepEqual(
+    link.rows.map((row) => row.status),
+    ['linked', 'linked', 'linked']
+  );
+  assert.deepEqual(
+    link.rows.map((row) => row.code),
+    [null, null, null]
+  );
+
+  for (const row of link.rows) {
+    assert.equal(Object.isFrozen(row), true);
+    assert.deepEqual(
+      Object.keys(row),
+      expectedNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRowFields
+    );
+    assert.equal(row.batchId, 'native-root-bridge-json-batch-552');
+    assert.equal(row.streamId, 'native-root-bridge-json-stream-batch-roundtrip-587');
+    assert.equal(row.nativeAddonLoaded, false);
+    assert.equal(row.nativeExecution, false);
+    assert.equal(row.rendererExecution, false);
+    assert.equal(row.reconcilerExecution, false);
+    assert.equal(row.nodeWorkerThreadsExecution, false);
+    assert.equal(row.napiCleanupHookExecution, false);
+    assert.equal(row.publicNativeCompatibility, false);
+    assert.equal(row.reactBehaviorError, false);
+  }
+}
+
+function assertNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectsForgery(
+  consumer,
+  batchGate,
+  rustHandleTableAdmissionSmoke
+) {
+  const link = consumer.jsonBatchRoundtripLink;
+  const validate = link.validateJsonBatchRoundtripLinkRows;
+  const source = {
+    consumerRows: consumer.rows,
+    lifecycleRows: batchGate.lifecycleRows,
+    responseRows: batchGate.responseSequenceGate.rows,
+    streamRows: batchGate.responseSequenceGate.streamRoundtripGate.rows,
+    smokeRecords: rustHandleTableAdmissionSmoke.smokeRecords
+  };
+  const rejectionCode = (override) =>
+    validate({ ...source, ...override }).rejectedRows[0].code;
+  const replaceRow = (rows, index, patch) =>
+    Object.freeze(
+      rows.map((row, rowIndex) =>
+        rowIndex === index ? Object.freeze({ ...row, ...patch }) : row
+      )
+    );
+
+  assert.equal(
+    rejectionCode({
+      consumerRows: replaceRow(source.consumerRows, 0, {
+        id: 'batch-lifecycle-consumer-0-render'
+      })
+    }),
+    expectedNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes
+      .consumerRowIdMismatch
+  );
+  assert.equal(
+    rejectionCode({
+      consumerRows: Object.freeze([
+        source.consumerRows[1],
+        source.consumerRows[0],
+        source.consumerRows[2]
+      ])
+    }),
+    expectedNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes
+      .rowOrderMismatch
+  );
+  assert.equal(
+    rejectionCode({
+      consumerRows: replaceRow(source.consumerRows, 1, {
+        lifecycleTransition: 'active->retired',
+        rootHandleAction: 'retire-root-handle'
+      })
+    }),
+    expectedNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes
+      .kindTransitionMismatch
+  );
+  assert.equal(
+    rejectionCode({
+      consumerRows: replaceRow(source.consumerRows, 1, {
+        cleanupHookEvidenceStatus: 'rejected'
+      })
+    }),
+    expectedNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes
+      .cleanupHookStatusMismatch
+  );
+  assert.equal(
+    rejectionCode({
+      responseRows: replaceRow(source.responseRows, 0, {
+        batchId: 'foreign-native-root-bridge-json-batch'
+      })
+    }),
+    expectedNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes
+      .staleOrForeignJsonBatchRow
+  );
+  assert.equal(
+    rejectionCode({
+      streamRows: replaceRow(source.streamRows, 0, {
+        streamId: 'foreign-native-root-bridge-json-stream'
+      })
+    }),
+    expectedNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes
+      .staleOrForeignJsonBatchRow
+  );
+  assert.equal(
+    rejectionCode({
+      responseRows: Object.freeze(
+        source.responseRows.map((row) =>
+          Object.freeze({
+            ...row,
+            batchId: 'foreign-native-root-bridge-json-batch'
+          })
+        )
+      ),
+      streamRows: Object.freeze(
+        source.streamRows.map((row) =>
+          Object.freeze({
+            ...row,
+            batchId: 'foreign-native-root-bridge-json-batch',
+            streamId: 'foreign-native-root-bridge-json-stream'
+          })
+        )
+      )
+    }),
+    expectedNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes
+      .staleOrForeignJsonBatchRow
+  );
+  assert.equal(
+    rejectionCode({
+      streamRows: replaceRow(source.streamRows, 0, {
+        chunkKind: 'payload'
+      })
+    }),
+    expectedNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes
+      .staleOrForeignJsonBatchRow
+  );
+  assert.equal(
+    rejectionCode({
+      streamRows: replaceRow(source.streamRows, 1, {
+        chunkKind: 'metadata'
+      })
+    }),
+    expectedNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes
+      .staleOrForeignJsonBatchRow
+  );
+  assert.equal(
+    rejectionCode({
+      consumerRows: replaceRow(source.consumerRows, 0, {
+        nativeExecution: true,
+        publicNativeCompatibility: true
+      })
+    }),
+    expectedNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes
+      .publicNativeExecutionClaim
+  );
+  assert.equal(
+    rejectionCode({
+      consumerRows: replaceRow(source.consumerRows, 1, {
+        cleanupHookEvidenceRowId:
+          'cleanup-hook-worker-root-before-value-release'
+      })
+    }),
+    expectedNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes
+      .cleanupHookStatusMismatch
+  );
+  assert.equal(
+    rejectionCode({
+      consumerRows: replaceRow(source.consumerRows, 2, {
+        cleanupHookSourceRowId:
+          'worker-render-value-stale-executable-preflight'
+      })
+    }),
+    expectedNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes
+      .cleanupHookStatusMismatch
+  );
+  assert.equal(
+    rejectionCode({
+      consumerRows: replaceRow(source.consumerRows, 1, {
+        cleanupHookSourceHandleKind: 'root'
+      })
+    }),
+    expectedNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes
+      .cleanupHookStatusMismatch
+  );
+  assert.equal(
+    rejectionCode({
+      consumerRows: replaceRow(source.consumerRows, 1, {
+        valueHandleAction: null
+      })
+    }),
+    expectedNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes
+      .kindTransitionMismatch
+  );
+  assert.equal(
+    rejectionCode({
+      consumerRows: replaceRow(source.consumerRows, 1, {
+        valueHandleCurrentGeneration: 2
+      }),
+      smokeRecords: replaceRow(source.smokeRecords, 1, {
+        valueHandleCurrentGeneration: 2
+      })
+    }),
+    expectedNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes
+      .kindTransitionMismatch
+  );
+  assert.equal(
+    rejectionCode({
+      consumerRows: replaceRow(source.consumerRows, 2, {
+        retiredRootSourceErrorCode: null
+      })
+    }),
+    expectedNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLinkRejectionCodes
+      .kindTransitionMismatch
+  );
+}
+
 function assertNativeRootBridgeBatchLifecycleConsumer(consumer) {
   assert.equal(Object.isFrozen(consumer), true);
   assert.equal(Object.isFrozen(consumer.cleanupHookEvidenceStatuses), true);
   assert.equal(Object.isFrozen(consumer.batchLifecycleConsumerRowFields), true);
+  assert.equal(Object.isFrozen(consumer.jsonBatchRoundtripLink), true);
   assert.equal(Object.isFrozen(consumer.rows), true);
   assert.equal(
     consumer.consumerStatus,
@@ -3568,6 +4086,9 @@ function assertNativeRootBridgeBatchLifecycleConsumer(consumer) {
   assert.deepEqual(
     consumer.batchLifecycleConsumerRowFields,
     expectedNativeRootBridgeBatchLifecycleConsumerRowFields
+  );
+  assertNativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLink(
+    consumer.jsonBatchRoundtripLink
   );
   assert.deepEqual(
     consumer.rows.map((row) => row.id),
