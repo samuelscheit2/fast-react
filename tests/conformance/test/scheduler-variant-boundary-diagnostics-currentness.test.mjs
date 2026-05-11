@@ -172,6 +172,8 @@ test("scheduler variant boundary diagnostics reject caller-forged source current
   });
 
   assert.equal(report.sourceGateId, "stale-source-gate");
+  assert.deepEqual(report.rows, []);
+  assert.deepEqual(report.rowsById, {});
   assert.equal(
     gate.status,
     SCHEDULER_VARIANT_BOUNDARY_DIAGNOSTICS_VIOLATION_STATUS
@@ -182,12 +184,9 @@ test("scheduler variant boundary diagnostics reject caller-forged source current
     gate,
     "scheduler-variant-boundary-diagnostics-source-gate-mismatch"
   );
-  assert.deepEqual(
-    violationRows(
-      gate,
-      "scheduler-variant-boundary-diagnostics-source-currentness-mismatch"
-    ),
-    ["scheduler-post-task-development-boundary-diagnostics"]
+  assertViolation(
+    gate,
+    "scheduler-variant-boundary-diagnostics-manifest-mismatch"
   );
 });
 
@@ -242,6 +241,8 @@ test("scheduler variant boundary diagnostics reject prebuilt reports from claime
     ],
     report.sourceGateReportRejectionIds
   );
+  assert.deepEqual(report.rows, []);
+  assert.deepEqual(report.rowsById, {});
   assert.equal(
     gate.status,
     SCHEDULER_VARIANT_BOUNDARY_DIAGNOSTICS_VIOLATION_STATUS
@@ -285,6 +286,8 @@ test("scheduler variant boundary diagnostics reject prebuilt reports from hidden
     ],
     report.sourceGateReportRejectionIds
   );
+  assert.deepEqual(report.rows, []);
+  assert.deepEqual(report.rowsById, {});
   assert.equal(
     gate.status,
     SCHEDULER_VARIANT_BOUNDARY_DIAGNOSTICS_VIOLATION_STATUS
@@ -323,6 +326,8 @@ test("scheduler variant boundary diagnostics reject prebuilt reports from hidden
     ["variantCurrentnessGate.[[HiddenInferredPublicClaims]]"],
     report.sourceGateReportRejectionIds
   );
+  assert.deepEqual(report.rows, []);
+  assert.deepEqual(report.rowsById, {});
   assert.equal(
     gate.status,
     SCHEDULER_VARIANT_BOUNDARY_DIAGNOSTICS_VIOLATION_STATUS
@@ -356,6 +361,20 @@ test("scheduler variant boundary diagnostics factory rejects top-level source ga
   );
 });
 
+test("scheduler variant boundary diagnostics factory rejects inherited source gate options", () => {
+  const report = createSchedulerVariantBoundaryDiagnosticsReport(
+    withInheritedOptionAccessor("variantCurrentnessGate")
+  );
+
+  assert.equal(report.compatibilityClaimed, false);
+  assert.equal(report.sourceGateAcceptedAsCurrentPrivateContext, false);
+  assert.deepEqual(report.rows, []);
+  assertSubset(
+    ["options.variantCurrentnessGate.[[Inherited]]"],
+    report.sourceGateReportRejectionIds
+  );
+});
+
 test("scheduler variant boundary diagnostics factory rejects null options", () => {
   const report = createSchedulerVariantBoundaryDiagnosticsReport(null);
 
@@ -364,6 +383,54 @@ test("scheduler variant boundary diagnostics factory rejects null options", () =
   assert.deepEqual(report.rows, []);
   assertSubset(
     ["options.[[Object]]"],
+    report.sourceGateReportRejectionIds
+  );
+});
+
+test("scheduler variant boundary diagnostics factory rejects top-level options public claims", () => {
+  const report = createSchedulerVariantBoundaryDiagnosticsReport(
+    Object.freeze({
+      publicPackageCompatibilityClaimed: true,
+      publicNativeCompatibility: true,
+      publicSchedulerTimingCompatibilityClaimed: true
+    })
+  );
+
+  assert.equal(report.compatibilityClaimed, false);
+  assert.equal(report.sourceGateAcceptedAsCurrentPrivateContext, false);
+  assert.equal(
+    report.sourceGateReportStatus,
+    "rejected-malformed-scheduler-variant-currentness-gate"
+  );
+  assertSubset(
+    [
+      "options.publicPackageCompatibilityClaimed",
+      "options.publicNativeCompatibility",
+      "options.publicSchedulerTimingCompatibilityClaimed"
+    ],
+    report.sourceGateReportRejectionIds
+  );
+});
+
+test("scheduler variant boundary diagnostics factory rejects hidden top-level options public claims", () => {
+  const report = createSchedulerVariantBoundaryDiagnosticsReport(
+    withHiddenPublicClaimGetRecordProxy(Object.freeze({}), {
+      publicPackageCompatibilityClaimed: true,
+      publicNativeCompatibility: true
+    })
+  );
+
+  assert.equal(report.compatibilityClaimed, false);
+  assert.equal(report.sourceGateAcceptedAsCurrentPrivateContext, false);
+  assert.equal(
+    report.sourceGateReportStatus,
+    "rejected-malformed-scheduler-variant-currentness-gate"
+  );
+  assertSubset(
+    [
+      "options.publicPackageCompatibilityClaimed",
+      "options.publicNativeCompatibility"
+    ],
     report.sourceGateReportRejectionIds
   );
 });
@@ -388,6 +455,8 @@ test("scheduler variant boundary diagnostics reject prebuilt reports from mutabl
     ["variantCurrentnessGate.[[Frozen]]"],
     report.sourceGateReportRejectionIds
   );
+  assert.deepEqual(report.rows, []);
+  assert.deepEqual(report.rowsById, {});
   assert.equal(
     gate.status,
     SCHEDULER_VARIANT_BOUNDARY_DIAGNOSTICS_VIOLATION_STATUS
@@ -445,6 +514,27 @@ test("scheduler variant boundary diagnostics factory fails closed for empty sour
   );
 });
 
+test("scheduler variant boundary diagnostics factory rejects array-shaped source rows", () => {
+  const currentGate = evaluateSchedulerVariantCurrentnessGate();
+  const rowsByVariant = Object.freeze(
+    Object.assign([], currentGate.rowsByVariant)
+  );
+  const report = createSchedulerVariantBoundaryDiagnosticsReport({
+    variantCurrentnessGate: Object.freeze({
+      ...currentGate,
+      rowsByVariant
+    })
+  });
+
+  assert.equal(report.compatibilityClaimed, false);
+  assert.equal(report.sourceGateAcceptedAsCurrentPrivateContext, false);
+  assert.deepEqual(report.rows, []);
+  assertSubset(
+    ["variantCurrentnessGate.rowsByVariant.[[Record]]"],
+    report.sourceGateReportRejectionIds
+  );
+});
+
 test("scheduler variant boundary diagnostics factory rejects malformed source row descriptors", () => {
   const currentGate = evaluateSchedulerVariantCurrentnessGate();
   const variantId = "scheduler-unstable-mock-root";
@@ -476,6 +566,38 @@ test("scheduler variant boundary diagnostics factory rejects malformed source ro
     [
       "variantCurrentnessGate.[[BoundaryDiagnosticsReport]]",
       `variantCurrentnessGate.rowsByVariant.${variantId}.physicalEntrypoint.[[Accessor]]`
+    ],
+    report.sourceGateReportRejectionIds
+  );
+});
+
+test("scheduler variant boundary diagnostics factory rejects inherited source row fields", () => {
+  const report = withTemporaryObjectPrototypeProperties(
+    {
+      packagePath: "scheduler/forged",
+      canonicalEntrypoint: "scheduler/forged",
+      physicalEntrypoint: "forged.js",
+      sourceFile: "packages/scheduler/forged.js",
+      sourceSha256: "forged-source-sha"
+    },
+    () =>
+      createSchedulerVariantBoundaryDiagnosticsReport({
+        variantCurrentnessGate: Object.freeze({
+          ...evaluateSchedulerVariantCurrentnessGate(),
+          rowsByVariant: createRowsByVariantWithRequiredRows(() =>
+            Object.freeze({})
+          )
+        })
+      })
+  );
+
+  assert.equal(report.compatibilityClaimed, false);
+  assert.equal(report.sourceGateAcceptedAsCurrentPrivateContext, false);
+  assert.deepEqual(report.rows, []);
+  assertSubset(
+    [
+      "variantCurrentnessGate.rowsByVariant.scheduler-unstable-mock-root.packagePath.[[String]]",
+      "variantCurrentnessGate.rowsByVariant.scheduler-unstable-mock-root.sourceSha256.[[String]]"
     ],
     report.sourceGateReportRejectionIds
   );
@@ -813,6 +935,45 @@ test("scheduler variant boundary diagnostics reject Scheduler act root execution
   );
 });
 
+test("scheduler variant boundary diagnostics reject native and package alias claims", () => {
+  const packageSymbolClaim = Symbol("publicPackageCompatibilityClaimed");
+  const report = mutateRows([], {
+    compatibilityClaimed: false,
+    nativeAliasAccepted: true,
+    packageAliasAccepted: true,
+    nativeRuntimeExecution: true,
+    packageExecution: true,
+    schedulerPackageCompatibilityClaimed: true,
+    schedulerNativeCompatibilityClaimed: true,
+    [packageSymbolClaim]: true
+  });
+
+  const gate = evaluateSchedulerVariantBoundaryDiagnosticsCurrentnessGate({
+    boundaryDiagnosticsReport: report
+  });
+
+  assert.equal(
+    gate.status,
+    SCHEDULER_VARIANT_BOUNDARY_DIAGNOSTICS_VIOLATION_STATUS
+  );
+  assertSubset(
+    [
+      "report.nativeAliasAccepted",
+      "report.packageAliasAccepted",
+      "report.nativeRuntimeExecution",
+      "report.packageExecution",
+      "report.schedulerPackageCompatibilityClaimed",
+      "report.schedulerNativeCompatibilityClaimed",
+      "report.[Symbol(publicPackageCompatibilityClaimed)]"
+    ],
+    gate.publicCompatibilityClaimIds
+  );
+  assertViolation(
+    gate,
+    "scheduler-variant-boundary-diagnostics-public-compatibility-claim-detected"
+  );
+});
+
 test("scheduler variant boundary diagnostics reject hidden native public claim aliases", () => {
   const rowId = "scheduler-post-task-production-boundary-diagnostics";
   const report = withHiddenPublicClaimGetRecordProxy(
@@ -972,6 +1133,32 @@ test("scheduler variant boundary diagnostics reject top-level evaluator option a
   }
 });
 
+test("scheduler variant boundary diagnostics reject inherited evaluator options", () => {
+  for (const [key, id] of [
+    [
+      "boundaryDiagnosticsReport",
+      "options.boundaryDiagnosticsReport.[[Inherited]]"
+    ],
+    ["variantCurrentnessGate", "options.variantCurrentnessGate.[[Inherited]]"]
+  ]) {
+    const gate = evaluateSchedulerVariantBoundaryDiagnosticsCurrentnessGate(
+      withInheritedOptionAccessor(key)
+    );
+
+    assert.equal(
+      gate.status,
+      SCHEDULER_VARIANT_BOUNDARY_DIAGNOSTICS_VIOLATION_STATUS
+    );
+    assertSubset(
+      [id],
+      violationIds(
+        gate,
+        "scheduler-variant-boundary-diagnostics-untrusted-public-claim-container"
+      )
+    );
+  }
+});
+
 test("scheduler variant boundary diagnostics reject null evaluator options", () => {
   const gate = evaluateSchedulerVariantBoundaryDiagnosticsCurrentnessGate(null);
 
@@ -985,6 +1172,58 @@ test("scheduler variant boundary diagnostics reject null evaluator options", () 
       gate,
       "scheduler-variant-boundary-diagnostics-untrusted-public-claim-container"
     )
+  );
+});
+
+test("scheduler variant boundary diagnostics reject top-level evaluator options public claims", () => {
+  const gate = evaluateSchedulerVariantBoundaryDiagnosticsCurrentnessGate(
+    Object.freeze({
+      publicPackageCompatibilityClaimed: true,
+      publicNativeCompatibility: true,
+      publicSchedulerTimingCompatibilityClaimed: true
+    })
+  );
+
+  assert.equal(
+    gate.status,
+    SCHEDULER_VARIANT_BOUNDARY_DIAGNOSTICS_VIOLATION_STATUS
+  );
+  assertSubset(
+    [
+      "options.publicPackageCompatibilityClaimed",
+      "options.publicNativeCompatibility",
+      "options.publicSchedulerTimingCompatibilityClaimed"
+    ],
+    gate.publicCompatibilityClaimIds
+  );
+  assertViolation(
+    gate,
+    "scheduler-variant-boundary-diagnostics-public-compatibility-claim-detected"
+  );
+});
+
+test("scheduler variant boundary diagnostics reject hidden top-level evaluator options public claims", () => {
+  const gate = evaluateSchedulerVariantBoundaryDiagnosticsCurrentnessGate(
+    withHiddenPublicClaimGetRecordProxy(Object.freeze({}), {
+      publicPackageCompatibilityClaimed: true,
+      publicNativeCompatibility: true
+    })
+  );
+
+  assert.equal(
+    gate.status,
+    SCHEDULER_VARIANT_BOUNDARY_DIAGNOSTICS_VIOLATION_STATUS
+  );
+  assertSubset(
+    [
+      "options.publicPackageCompatibilityClaimed",
+      "options.publicNativeCompatibility"
+    ],
+    gate.publicCompatibilityClaimIds
+  );
+  assertViolation(
+    gate,
+    "scheduler-variant-boundary-diagnostics-public-compatibility-claim-detected"
   );
 });
 
@@ -1915,6 +2154,54 @@ test("scheduler variant boundary diagnostics reject source gate rejection id fil
   );
 });
 
+test("scheduler variant boundary diagnostics reject inherited source gate rejection ids", () => {
+  const report = withInheritedOwnProperty(
+    baselineReport(),
+    "sourceGateReportRejectionIds",
+    Object.freeze(["variantCurrentnessGate.rowsByVariant.[[Forged]]"])
+  );
+
+  const gate = evaluateSchedulerVariantBoundaryDiagnosticsCurrentnessGate({
+    boundaryDiagnosticsReport: report
+  });
+
+  assert.equal(
+    gate.status,
+    SCHEDULER_VARIANT_BOUNDARY_DIAGNOSTICS_VIOLATION_STATUS
+  );
+  assertSubset(
+    ["report.sourceGateReportRejectionIds.[[Inherited]]"],
+    violationIds(
+      gate,
+      "scheduler-variant-boundary-diagnostics-untrusted-public-claim-container"
+    )
+  );
+});
+
+test("scheduler variant boundary diagnostics reject hidden source gate rejection ids", () => {
+  const report = withHiddenPublicClaimGetRecordProxy(baselineReport(), {
+    sourceGateReportRejectionIds: Object.freeze([
+      "variantCurrentnessGate.rowsByVariant.[[Forged]]"
+    ])
+  });
+
+  const gate = evaluateSchedulerVariantBoundaryDiagnosticsCurrentnessGate({
+    boundaryDiagnosticsReport: report
+  });
+
+  assert.equal(
+    gate.status,
+    SCHEDULER_VARIANT_BOUNDARY_DIAGNOSTICS_VIOLATION_STATUS
+  );
+  assertSubset(
+    ["report.sourceGateReportRejectionIds.[[HiddenGet]]"],
+    violationIds(
+      gate,
+      "scheduler-variant-boundary-diagnostics-untrusted-public-claim-container"
+    )
+  );
+});
+
 test("scheduler variant boundary diagnostics reject source gate rejection id object-like arrays", () => {
   const report = Object.freeze({
     ...baselineReport(),
@@ -2187,6 +2474,68 @@ function mutateFrozenReport(rowId, mutateRow, reportOverrides = {}) {
 
 function nestedClaimContainerFields() {
   return ["sourceCurrentness", "queueIdentity", "unsupportedStatus"];
+}
+
+function requiredSourceVariantIdsForBoundaryDiagnostics() {
+  return [
+    "scheduler-unstable-mock-root",
+    "scheduler-cjs-unstable-mock-development",
+    "scheduler-cjs-unstable-mock-production",
+    "scheduler-unstable-post-task-wrapper",
+    "scheduler-cjs-unstable-post-task-development",
+    "scheduler-cjs-unstable-post-task-production"
+  ];
+}
+
+function createRowsByVariantWithRequiredRows(createRow) {
+  return Object.freeze(
+    Object.fromEntries(
+      requiredSourceVariantIdsForBoundaryDiagnostics().map((variantId) => [
+        variantId,
+        createRow(variantId)
+      ])
+    )
+  );
+}
+
+function withInheritedOptionAccessor(key) {
+  const prototype = {};
+  Object.defineProperty(prototype, key, {
+    configurable: true,
+    enumerable: true,
+    get() {
+      throw new TypeError(`inherited ${key} trap`);
+    }
+  });
+  return Object.create(prototype);
+}
+
+function withTemporaryObjectPrototypeProperties(properties, callback) {
+  const previousDescriptors = new Map();
+  for (const [key, value] of Object.entries(properties)) {
+    previousDescriptors.set(
+      key,
+      Object.getOwnPropertyDescriptor(Object.prototype, key)
+    );
+    Object.defineProperty(Object.prototype, key, {
+      configurable: true,
+      enumerable: false,
+      value,
+      writable: true
+    });
+  }
+
+  try {
+    return callback();
+  } finally {
+    for (const [key, descriptor] of previousDescriptors) {
+      if (descriptor === undefined) {
+        delete Object.prototype[key];
+      } else {
+        Object.defineProperty(Object.prototype, key, descriptor);
+      }
+    }
+  }
 }
 
 function createFunctionClaimCarrier(
