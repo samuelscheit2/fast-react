@@ -13,6 +13,20 @@ const repoRoot = path.resolve(
 );
 const reactPackageRoot = path.join(repoRoot, "packages", "react");
 const React = require(path.join(reactPackageRoot, "index.js"));
+const ReactCjsDevelopment = require(path.join(
+  reactPackageRoot,
+  "cjs",
+  "react.development.js"
+));
+const ReactCjsProduction = require(path.join(
+  reactPackageRoot,
+  "cjs",
+  "react.production.js"
+));
+const ReactServer = require(path.join(
+  reactPackageRoot,
+  "react.react-server.js"
+));
 const hookDispatcher = require(path.join(
   reactPackageRoot,
   "hook-dispatcher.js"
@@ -413,6 +427,138 @@ const expectedUnsupportedIdGenerationReport = {
   claimsHydrationIdPrefix: false,
   compatibilityClaimed: false
 };
+const expectedUnsupportedServerAvailableHookNames = [
+  "useId",
+  "useDebugValue"
+];
+const expectedUnsupportedServerAbsentHookNames = [
+  "useActionState",
+  "useOptimistic",
+  "useSyncExternalStore",
+  "useEffectEvent"
+];
+const expectedUnsupportedSurfaceCurrentnessFieldNames = [
+  "surfaceId",
+  "source",
+  "entrypoint",
+  "moduleShape",
+  "sameAsRootExport",
+  "hookNames",
+  "availableHookNames",
+  "absentHookNames",
+  "placeholderThrowHookNames",
+  "unexpectedReturnHookNames",
+  "unexpectedErrorHookNames",
+  "probeSideEffectNames",
+  "publicExportsPlaceholderOrAbsentBlocked",
+  "dispatcherRoutingBlocked",
+  "dispatcherPrerequisitesBlocked",
+  "rootSchedulingBlocked",
+  "callbackInvocationBlocked",
+  "externalStoreInvocationBlocked",
+  "idGenerationBlocked",
+  "debugValueInstrumentationBlocked",
+  "publicCompatibilityClaimed",
+  "compatibilityClaimed"
+];
+const expectedUnsupportedSurfaceCurrentnessRows = [
+  {
+    surfaceId: "react-root",
+    source: "packages/react/index.js",
+    entrypoint: "react",
+    moduleShape: "default-root",
+    sameAsRootExport: true,
+    hookNames: expectedUnsupportedPlaceholderHookNames,
+    availableHookNames: expectedUnsupportedPlaceholderHookNames,
+    absentHookNames: [],
+    placeholderThrowHookNames: expectedUnsupportedPlaceholderHookNames,
+    unexpectedReturnHookNames: [],
+    unexpectedErrorHookNames: [],
+    probeSideEffectNames: [],
+    publicExportsPlaceholderOrAbsentBlocked: true,
+    dispatcherRoutingBlocked: true,
+    dispatcherPrerequisitesBlocked: true,
+    rootSchedulingBlocked: true,
+    callbackInvocationBlocked: true,
+    externalStoreInvocationBlocked: true,
+    idGenerationBlocked: true,
+    debugValueInstrumentationBlocked: true,
+    publicCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  },
+  {
+    surfaceId: "react-cjs-development",
+    source: "packages/react/cjs/react.development.js",
+    entrypoint: "react",
+    moduleShape: "cjs-root-alias",
+    sameAsRootExport: true,
+    hookNames: expectedUnsupportedPlaceholderHookNames,
+    availableHookNames: expectedUnsupportedPlaceholderHookNames,
+    absentHookNames: [],
+    placeholderThrowHookNames: expectedUnsupportedPlaceholderHookNames,
+    unexpectedReturnHookNames: [],
+    unexpectedErrorHookNames: [],
+    probeSideEffectNames: [],
+    publicExportsPlaceholderOrAbsentBlocked: true,
+    dispatcherRoutingBlocked: true,
+    dispatcherPrerequisitesBlocked: true,
+    rootSchedulingBlocked: true,
+    callbackInvocationBlocked: true,
+    externalStoreInvocationBlocked: true,
+    idGenerationBlocked: true,
+    debugValueInstrumentationBlocked: true,
+    publicCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  },
+  {
+    surfaceId: "react-cjs-production",
+    source: "packages/react/cjs/react.production.js",
+    entrypoint: "react",
+    moduleShape: "cjs-root-alias",
+    sameAsRootExport: true,
+    hookNames: expectedUnsupportedPlaceholderHookNames,
+    availableHookNames: expectedUnsupportedPlaceholderHookNames,
+    absentHookNames: [],
+    placeholderThrowHookNames: expectedUnsupportedPlaceholderHookNames,
+    unexpectedReturnHookNames: [],
+    unexpectedErrorHookNames: [],
+    probeSideEffectNames: [],
+    publicExportsPlaceholderOrAbsentBlocked: true,
+    dispatcherRoutingBlocked: true,
+    dispatcherPrerequisitesBlocked: true,
+    rootSchedulingBlocked: true,
+    callbackInvocationBlocked: true,
+    externalStoreInvocationBlocked: true,
+    idGenerationBlocked: true,
+    debugValueInstrumentationBlocked: true,
+    publicCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  },
+  {
+    surfaceId: "react-server",
+    source: "packages/react/react.react-server.js",
+    entrypoint: "react react-server",
+    moduleShape: "react-server-root",
+    sameAsRootExport: false,
+    hookNames: expectedUnsupportedPlaceholderHookNames,
+    availableHookNames: expectedUnsupportedServerAvailableHookNames,
+    absentHookNames: expectedUnsupportedServerAbsentHookNames,
+    placeholderThrowHookNames: expectedUnsupportedServerAvailableHookNames,
+    unexpectedReturnHookNames: [],
+    unexpectedErrorHookNames: [],
+    probeSideEffectNames: [],
+    publicExportsPlaceholderOrAbsentBlocked: true,
+    dispatcherRoutingBlocked: true,
+    dispatcherPrerequisitesBlocked: true,
+    rootSchedulingBlocked: true,
+    callbackInvocationBlocked: true,
+    externalStoreInvocationBlocked: true,
+    idGenerationBlocked: true,
+    debugValueInstrumentationBlocked: true,
+    publicCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  }
+];
 const expectedUnsupportedMissingDispatcherPrerequisites = [
   "dispatcher.useActionState",
   "dispatcher.useOptimistic",
@@ -658,6 +804,16 @@ test("private unsupported placeholder hook blockers record source and currentnes
     expectedUnsupportedIdGenerationReport
   );
   assert.deepEqual(
+    metadata.surfaceCurrentnessFieldNames,
+    expectedUnsupportedSurfaceCurrentnessFieldNames
+  );
+  assert.deepEqual(
+    metadata.surfaceCurrentnessRows,
+    expectedUnsupportedSurfaceCurrentnessRows
+  );
+  assert.equal(metadata.cjsSurfaceCurrentnessBlocked, true);
+  assert.equal(metadata.reactServerSurfaceCurrentnessBlocked, true);
+  assert.deepEqual(
     metadata.missingDispatcherPrerequisites,
     expectedUnsupportedMissingDispatcherPrerequisites
   );
@@ -736,11 +892,47 @@ test("private unsupported placeholder hook blockers record source and currentnes
     undefined
   );
   assert.equal(
+    ReactCjsDevelopment.privateUnsupportedPlaceholderHookBlockerMetadata,
+    undefined
+  );
+  assert.equal(
+    ReactCjsProduction.privateUnsupportedPlaceholderHookBlockerMetadata,
+    undefined
+  );
+  assert.equal(
+    ReactServer.privateUnsupportedPlaceholderHookBlockerMetadata,
+    undefined
+  );
+  assert.equal(
     React.createUnsupportedPlaceholderHookCurrentnessReport,
     undefined
   );
   assert.equal(
+    ReactCjsDevelopment.createUnsupportedPlaceholderHookCurrentnessReport,
+    undefined
+  );
+  assert.equal(
+    ReactCjsProduction.createUnsupportedPlaceholderHookCurrentnessReport,
+    undefined
+  );
+  assert.equal(
+    ReactServer.createUnsupportedPlaceholderHookCurrentnessReport,
+    undefined
+  );
+  assert.equal(
     React.consumeUnsupportedPlaceholderHookCurrentnessReport,
+    undefined
+  );
+  assert.equal(
+    ReactCjsDevelopment.consumeUnsupportedPlaceholderHookCurrentnessReport,
+    undefined
+  );
+  assert.equal(
+    ReactCjsProduction.consumeUnsupportedPlaceholderHookCurrentnessReport,
+    undefined
+  );
+  assert.equal(
+    ReactServer.consumeUnsupportedPlaceholderHookCurrentnessReport,
     undefined
   );
 });
@@ -777,6 +969,16 @@ test("unsupported placeholder hook currentness rejects stale source and forged c
     report.idGenerationReport,
     expectedUnsupportedIdGenerationReport
   );
+  assert.deepEqual(
+    report.surfaceCurrentnessFieldNames,
+    expectedUnsupportedSurfaceCurrentnessFieldNames
+  );
+  assert.deepEqual(
+    report.surfaceCurrentnessRows,
+    expectedUnsupportedSurfaceCurrentnessRows
+  );
+  assert.equal(report.cjsSurfaceCurrentnessBlocked, true);
+  assert.equal(report.reactServerSurfaceCurrentnessBlocked, true);
   assert.equal(Object.isFrozen(report), true);
   assert.equal(Object.isFrozen(report.hookNames), true);
   assert.equal(Object.isFrozen(report.publicShapeBlockers), true);
@@ -785,6 +987,16 @@ test("unsupported placeholder hook currentness rejects stale source and forged c
   assert.equal(Object.isFrozen(report.callbackInvocationReport), true);
   assert.equal(Object.isFrozen(report.externalStoreInvocationReport), true);
   assert.equal(Object.isFrozen(report.idGenerationReport), true);
+  assert.equal(Object.isFrozen(report.surfaceCurrentnessFieldNames), true);
+  assert.equal(Object.isFrozen(report.surfaceCurrentnessRows), true);
+  for (const row of report.surfaceCurrentnessRows) {
+    assert.equal(Object.isFrozen(row), true, row.surfaceId);
+    for (const value of Object.values(row)) {
+      if (Array.isArray(value)) {
+        assert.equal(Object.isFrozen(value), true, row.surfaceId);
+      }
+    }
+  }
   assert.equal(
     hookDispatcher.validateUnsupportedPlaceholderHookCurrentnessReport(report),
     null
@@ -801,6 +1013,12 @@ test("unsupported placeholder hook currentness rejects stale source and forged c
     hookDispatcher.unsupportedPlaceholderHookCurrentnessConsumptionStatus
   );
   assert.equal(consumption.accepted, true);
+  assert.deepEqual(
+    consumption.surfaceCurrentnessRows,
+    expectedUnsupportedSurfaceCurrentnessRows
+  );
+  assert.equal(consumption.cjsSurfaceCurrentnessBlocked, true);
+  assert.equal(consumption.reactServerSurfaceCurrentnessBlocked, true);
   assert.equal(consumption.publicExportsPlaceholderBlocked, true);
   assert.equal(consumption.callbackInvocationBlocked, true);
   assert.equal(consumption.externalStoreInvocationBlocked, true);
@@ -846,6 +1064,79 @@ test("unsupported placeholder hook currentness rejects stale source and forged c
     }),
     "unsupported-placeholder-hook-currentness-blocker-currentness"
   );
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
+      surfaceCurrentnessRowOverrides: {
+        "react-root": {
+          placeholderThrowHookNames:
+            expectedUnsupportedPlaceholderHookNames.slice(1)
+        }
+      }
+    }),
+    "unsupported-placeholder-hook-currentness-surface-currentness"
+  );
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
+      surfaceCurrentnessRowOverrides: {
+        "react-cjs-development": {
+          sameAsRootExport: false
+        }
+      }
+    }),
+    "unsupported-placeholder-hook-currentness-surface-currentness"
+  );
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
+      surfaceCurrentnessRowOverrides: {
+        "react-server": {
+          availableHookNames: expectedUnsupportedPlaceholderHookNames,
+          absentHookNames: []
+        }
+      }
+    }),
+    "unsupported-placeholder-hook-currentness-surface-currentness"
+  );
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
+      surfaceCurrentnessRowOverrides: {
+        "react-cjs-production": {
+          publicCompatibilityClaimed: true
+        }
+      }
+    }),
+    "unsupported-placeholder-hook-currentness-surface-currentness"
+  );
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
+      surfaceCurrentnessRowOverrides: {
+        "react-root": {
+          callbackInvocationBlocked: "true"
+        }
+      }
+    }),
+    "unsupported-placeholder-hook-currentness-surface-currentness"
+  );
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
+      surfaceCurrentnessRows: report.surfaceCurrentnessRows
+    }),
+    "unsupported-placeholder-hook-currentness-surface-currentness-source-proof"
+  );
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
+      surfaceCurrentnessRows: report.surfaceCurrentnessRows.map((row) => ({
+        ...row,
+        hookNames: [...row.hookNames],
+        availableHookNames: [...row.availableHookNames],
+        absentHookNames: [...row.absentHookNames],
+        placeholderThrowHookNames: [...row.placeholderThrowHookNames],
+        unexpectedReturnHookNames: [...row.unexpectedReturnHookNames],
+        unexpectedErrorHookNames: [...row.unexpectedErrorHookNames],
+        probeSideEffectNames: [...row.probeSideEffectNames]
+      }))
+    }),
+    "unsupported-placeholder-hook-currentness-surface-currentness-source-proof"
+  );
 
   for (const flagName of expectedUnsupportedPublicCompatibilityFalseFlags) {
     assertUnsupportedCurrentnessRejected(
@@ -858,9 +1149,12 @@ test("unsupported placeholder hook currentness rejects stale source and forged c
 
   for (const flagName of [
     "dispatcherRouting",
+    "dispatcherPrerequisitesReady",
     "schedulerIntegration",
+    "schedulerPrerequisitesReady",
     "rootLaneIntegration",
-    "rootScheduling"
+    "rootScheduling",
+    "rendererCompatibility"
   ]) {
     assertUnsupportedCurrentnessRejected(
       hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
@@ -870,6 +1164,12 @@ test("unsupported placeholder hook currentness rejects stale source and forged c
     );
   }
 
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
+      invokesCallbacks: "false"
+    }),
+    "unsupported-placeholder-hook-currentness-callback-invocation-claim"
+  );
   assertUnsupportedCurrentnessRejected(
     hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
       callbackInvocationReport: {
@@ -883,6 +1183,20 @@ test("unsupported placeholder hook currentness rejects stale source and forged c
       invokesActionStateAction: true
     }),
     "unsupported-placeholder-hook-currentness-callback-invocation-claim"
+  );
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
+      callbackInvocationReport: {
+        invokesDebugValueFormatter: "false"
+      }
+    }),
+    "unsupported-placeholder-hook-currentness-callback-invocation-claim"
+  );
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
+      externalStoreSnapshotReadClaimed: 0
+    }),
+    "unsupported-placeholder-hook-currentness-external-store-claim"
   );
   assertUnsupportedCurrentnessRejected(
     hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
@@ -900,8 +1214,30 @@ test("unsupported placeholder hook currentness rejects stale source and forged c
   );
   assertUnsupportedCurrentnessRejected(
     hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
+      externalStoreInvocationReport: {
+        invokesGetServerSnapshot: "false"
+      }
+    }),
+    "unsupported-placeholder-hook-currentness-external-store-claim"
+  );
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
+      generatesIds: "false"
+    }),
+    "unsupported-placeholder-hook-currentness-id-generation-claim"
+  );
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
       idGenerationReport: {
         generatesIds: true
+      }
+    }),
+    "unsupported-placeholder-hook-currentness-id-generation-claim"
+  );
+  assertUnsupportedCurrentnessRejected(
+    hookDispatcher.createUnsupportedPlaceholderHookCurrentnessReport({
+      idGenerationReport: {
+        claimsHydrationIdPrefix: "false"
       }
     }),
     "unsupported-placeholder-hook-currentness-id-generation-claim"
@@ -914,9 +1250,14 @@ test("unsupported placeholder hook currentness rejects stale source and forged c
   );
 });
 
-test("unsupported public placeholder hooks do not call dispatcher methods or user callbacks", () => {
+test("unsupported public placeholder hooks do not call dispatcher methods or user callbacks across root surfaces", () => {
   const calls = [];
   const sideEffects = [];
+  const defaultSurfaces = [
+    ["react-root", React],
+    ["react-cjs-development", ReactCjsDevelopment],
+    ["react-cjs-production", ReactCjsProduction]
+  ];
   const dispatcher = Object.fromEntries(
     expectedUnsupportedPlaceholderHookNames.map((hookName) => [
       hookName,
@@ -967,10 +1308,29 @@ test("unsupported public placeholder hooks do not call dispatcher methods or use
 
   hookDispatcher.ReactCurrentDispatcher.current = dispatcher;
 
-  for (const [hookName, args] of scenarios) {
-    assert.equal(React[hookName].name, hookName);
-    assert.equal(React[hookName].length, 0);
-    assertUnimplemented(() => React[hookName](...args), {
+  for (const [surfaceId, ReactSurface] of defaultSurfaces) {
+    for (const [hookName, args] of scenarios) {
+      assert.equal(ReactSurface[hookName].name, hookName, surfaceId);
+      assert.equal(ReactSurface[hookName].length, 0, surfaceId);
+      assertUnimplemented(() => ReactSurface[hookName](...args), {
+        exportName: hookName
+      });
+    }
+  }
+
+  assert.equal(ReactCjsDevelopment, React);
+  assert.equal(ReactCjsProduction, React);
+
+  for (const hookName of expectedUnsupportedServerAbsentHookNames) {
+    assert.equal(Object.hasOwn(ReactServer, hookName), false, hookName);
+  }
+
+  for (const [hookName, args] of scenarios.filter(([hookName]) =>
+    expectedUnsupportedServerAvailableHookNames.includes(hookName)
+  )) {
+    assert.equal(ReactServer[hookName].name, hookName);
+    assert.equal(ReactServer[hookName].length, 0);
+    assertUnimplemented(() => ReactServer[hookName](...args), {
       exportName: hookName
     });
   }
