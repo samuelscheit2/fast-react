@@ -122,6 +122,10 @@ function describeResourceFormRootBridgeBlockedGate() {
       describePrivateFormActionEventExtractionBoundary(null),
     privateFormActionSubmitDispatchBoundary:
       describePrivateFormActionSubmitDispatchBoundary(null),
+    privateFormActionSubmitResetExecutionBoundary:
+      describePrivateFormActionSubmitResetExecutionBoundary(null),
+    privateFormActionCallbackActionPreflightBoundary:
+      describePrivateFormActionCallbackActionPreflightBoundary(null),
     privateFormActionAsyncCallbackExecutionBoundary:
       describePrivateFormActionAsyncCallbackExecutionBoundary(null),
     privateFormActionRejectedErrorPreflightBoundary:
@@ -148,6 +152,14 @@ function recordResourceFormRootBridgeBlockedRequest(record, options) {
     describePrivateFormActionEventExtractionBoundary(request.behaviorArea);
   const privateFormActionSubmitDispatchBoundary =
     describePrivateFormActionSubmitDispatchBoundary(request.behaviorArea);
+  const privateFormActionSubmitResetExecutionBoundary =
+    describePrivateFormActionSubmitResetExecutionBoundary(
+      request.behaviorArea
+    );
+  const privateFormActionCallbackActionPreflightBoundary =
+    describePrivateFormActionCallbackActionPreflightBoundary(
+      request.behaviorArea
+    );
   const privateFormActionAsyncCallbackExecutionBoundary =
     describePrivateFormActionAsyncCallbackExecutionBoundary(
       request.behaviorArea
@@ -177,6 +189,8 @@ function recordResourceFormRootBridgeBlockedRequest(record, options) {
     privateFormActionResetDispatcherBoundary,
     privateFormActionEventExtractionBoundary,
     privateFormActionSubmitDispatchBoundary,
+    privateFormActionSubmitResetExecutionBoundary,
+    privateFormActionCallbackActionPreflightBoundary,
     privateFormActionAsyncCallbackExecutionBoundary,
     privateFormActionRejectedErrorPreflightBoundary,
     sourceAdapterBoundary,
@@ -471,6 +485,10 @@ function describeSourceAdapterBoundary(behaviorArea) {
       describeFormActionEventExtractionBoundary(behaviorArea),
     formActionSubmitDispatchBoundary:
       describeFormActionSubmitDispatchBoundary(behaviorArea),
+    formActionSubmitResetExecutionBoundary:
+      describeFormActionSubmitResetExecutionBoundary(behaviorArea),
+    formActionCallbackActionPreflightBoundary:
+      describeFormActionCallbackActionPreflightBoundary(behaviorArea),
     formActionAsyncCallbackExecutionBoundary:
       describeFormActionAsyncCallbackExecutionBoundary(behaviorArea),
     formActionRejectedErrorPreflightBoundary:
@@ -780,6 +798,118 @@ function describeFormActionSubmitDispatchBoundary(behaviorArea) {
   });
 }
 
+function describeFormActionSubmitResetExecutionBoundary(behaviorArea) {
+  if (behaviorArea !== null && behaviorArea !== 'form-action') {
+    return null;
+  }
+
+  return freezeRecord({
+    gateStatus: privateSourceAdapterBlockedStatus,
+    behaviorArea,
+    supportedBehaviorArea: 'form-action',
+    appliesToRequest: behaviorArea === 'form-action',
+    metadataGateAvailable: true,
+    sourceRecordsAccepted:
+      behaviorArea === null || behaviorArea === 'form-action',
+    acceptedSourceRecordType:
+      formActions.privateFormActionSubmitDispatchRecordType,
+    acceptedSourceStatus:
+      formActions.privateFormActionSubmitDispatchRecordedStatus,
+    consumesBlockedFormDataMetadata: true,
+    consumesResetIntentMetadata: true,
+    executesDeterministicFakeFormResetPath: true,
+    admitsExactlyOneFakeFormPath: true,
+    callbackActionPreflightGateAvailable: true,
+    rejectsStaleSubmitDispatchMetadata: true,
+    rejectsPublicResetRequest: true,
+    rejectsActionInvocation: true,
+    rejectsPublicDomMutation: true,
+    rejectsPackageCompatibilityClaims: true,
+    realFormAccepted: false,
+    rawTargetCaptured: false,
+    rawEventCaptured: false,
+    nativeEventInspected: false,
+    formInspected: false,
+    submitControlInspected: false,
+    formDataConstructed: false,
+    syntheticEventCreated: false,
+    listenerDispatchStarted: false,
+    callbackDispatchExecuted: false,
+    submitCallbackInvoked: false,
+    actionInvoked: false,
+    transitionStarted: false,
+    resetFiberResolved: false,
+    resetStateQueued: false,
+    reactUpdateQueued: false,
+    resetFormInstanceCalled: false,
+    formResetCommitted: false,
+    realFormReset: false,
+    publicRootTouched: false,
+    compatibilityClaimed: false,
+    submitResetExecutionGate:
+      formActions.describePrivateFormActionSubmitResetExecutionGate()
+  });
+}
+
+function describeFormActionCallbackActionPreflightBoundary(behaviorArea) {
+  if (behaviorArea !== null && behaviorArea !== 'form-action') {
+    return null;
+  }
+
+  return freezeRecord({
+    gateStatus: privateSourceAdapterBlockedStatus,
+    behaviorArea,
+    supportedBehaviorArea: 'form-action',
+    appliesToRequest: behaviorArea === 'form-action',
+    metadataGateAvailable: true,
+    sourceRecordsAccepted:
+      behaviorArea === null || behaviorArea === 'form-action',
+    acceptedSubmitDispatchRecordType:
+      formActions.privateFormActionSubmitDispatchRecordType,
+    acceptedSubmitDispatchStatus:
+      formActions.privateFormActionSubmitDispatchRecordedStatus,
+    acceptedSubmitResetExecutionRecordType:
+      formActions.privateFormActionSubmitResetExecutionRecordType,
+    acceptedSubmitResetExecutionStatus:
+      formActions.privateFormActionSubmitResetExecutionRecordedStatus,
+    consumesSubmitDispatchMetadata: true,
+    consumesSubmitResetExecutionMetadata: true,
+    recordsCallbackQueuePreflight: true,
+    recordsActionInvocationPreflight: true,
+    recordsResetActionPublicBlockers: true,
+    rejectsStaleSubmitDispatchMetadata: true,
+    rejectsStaleSubmitResetExecutionMetadata: true,
+    rejectsForeignSubmitResetExecutionMetadata: true,
+    rejectsPublicResetRequest: true,
+    rejectsActionInvocation: true,
+    rejectsPublicDomMutation: true,
+    rejectsPackageCompatibilityClaims: true,
+    realFormAccepted: false,
+    rawTargetCaptured: false,
+    rawEventCaptured: false,
+    nativeEventInspected: false,
+    formInspected: false,
+    submitControlInspected: false,
+    formDataConstructed: false,
+    syntheticEventCreated: false,
+    listenerDispatchStarted: false,
+    callbackDispatchExecuted: false,
+    submitCallbackInvoked: false,
+    actionInvoked: false,
+    publicActionInvoked: false,
+    transitionStarted: false,
+    resetStateQueued: false,
+    reactUpdateQueued: false,
+    resetFormInstanceCalled: false,
+    formResetCommitted: false,
+    realFormReset: false,
+    publicRootTouched: false,
+    compatibilityClaimed: false,
+    callbackActionPreflightGate:
+      formActions.describePrivateFormActionCallbackActionPreflightGate()
+  });
+}
+
 function describeFormActionAsyncCallbackExecutionBoundary(behaviorArea) {
   if (behaviorArea !== null && behaviorArea !== 'form-action') {
     return null;
@@ -935,6 +1065,26 @@ function describePrivateFormActionSubmitDispatchBoundary(behaviorArea) {
   }
 
   return formActions.describePrivateFormActionSubmitDispatchGate();
+}
+
+function describePrivateFormActionSubmitResetExecutionBoundary(
+  behaviorArea
+) {
+  if (behaviorArea !== null && behaviorArea !== 'form-action') {
+    return null;
+  }
+
+  return formActions.describePrivateFormActionSubmitResetExecutionGate();
+}
+
+function describePrivateFormActionCallbackActionPreflightBoundary(
+  behaviorArea
+) {
+  if (behaviorArea !== null && behaviorArea !== 'form-action') {
+    return null;
+  }
+
+  return formActions.describePrivateFormActionCallbackActionPreflightGate();
 }
 
 function describePrivateFormActionAsyncCallbackExecutionBoundary(
@@ -1197,9 +1347,11 @@ function freezeRecord(value) {
 
 module.exports = Object.assign({}, internalsGate, {
   describePrivateFormActionAsyncCallbackExecutionBoundary,
+  describePrivateFormActionCallbackActionPreflightBoundary,
   describePrivateFormActionEventExtractionBoundary,
   describePrivateFormActionRejectedErrorPreflightBoundary,
   describePrivateFormActionResetDispatcherBoundary,
+  describePrivateFormActionSubmitResetExecutionBoundary,
   describePrivateFormActionSubmitDispatchBoundary,
   describeResourceFormRootBridgeBlockedGate,
   describePrivateResourceDispatcherBoundary,

@@ -357,6 +357,7 @@ const formActionCallbackActionPreflightBlockedSideEffects = freezeRecord({
   submitResetExecutionMetadataConsumed: false,
   callbackQueuePreflightRecorded: false,
   actionInvocationPreflightRecorded: false,
+  resetActionPublicBlockersRecorded: false,
   rawTargetCaptured: false,
   rawEventCaptured: false,
   rawActionCaptured: false,
@@ -395,7 +396,8 @@ const formActionCallbackActionPreflightDiagnosticSideEffects = freezeRecord({
   submitDispatchMetadataConsumed: true,
   submitResetExecutionMetadataConsumed: true,
   callbackQueuePreflightRecorded: true,
-  actionInvocationPreflightRecorded: true
+  actionInvocationPreflightRecorded: true,
+  resetActionPublicBlockersRecorded: true
 });
 
 const formActionAsyncCallbackExecutionBlockedSideEffects = freezeRecord({
@@ -1059,8 +1061,15 @@ function describePrivateFormActionSubmitResetExecutionGate() {
     executesDeterministicFakeFormResetPath: true,
     admitsExactlyOneFakeFormPath: true,
     callbackActionPreflightGateAvailable: true,
+    rejectsStaleSubmitDispatchMetadata: true,
     rejectsLiveForms: true,
     rejectsCallbackExecution: true,
+    rejectsPublicSubmitDispatch: true,
+    rejectsPublicFormSubmission: true,
+    rejectsPublicResetRequest: true,
+    rejectsActionInvocation: true,
+    rejectsPublicDomMutation: true,
+    rejectsPackageCompatibilityClaims: true,
     acceptsRealForms: false,
     acceptsRawEvents: false,
     acceptsActionFunctions: false,
@@ -1113,11 +1122,20 @@ function describePrivateFormActionCallbackActionPreflightGate() {
     recordsAcceptedMetadataIds: true,
     recordsCallbackQueuePreflight: true,
     recordsActionInvocationPreflight: true,
+    recordsResetActionPublicBlockers: true,
     provesCallbacksRemainUninvoked: true,
     provesActionsRemainUninvoked: true,
+    rejectsStaleSubmitDispatchMetadata: true,
+    rejectsStaleSubmitResetExecutionMetadata: true,
+    rejectsForeignSubmitResetExecutionMetadata: true,
     rejectsLiveForms: true,
     rejectsCallbackExecution: true,
     rejectsActionInvocation: true,
+    rejectsPublicSubmitDispatch: true,
+    rejectsPublicFormSubmission: true,
+    rejectsPublicResetRequest: true,
+    rejectsPublicDomMutation: true,
+    rejectsPackageCompatibilityClaims: true,
     acceptsRealForms: false,
     acceptsRawEvents: false,
     acceptsActionFunctions: false,
@@ -1356,6 +1374,7 @@ function createUnsupportedFormActionCallbackActionPreflightError(record) {
     payload.sourceSubmitResetExecutionId;
   error.callbackDispatchPreflight = payload.callbackDispatchPreflight;
   error.actionInvocationPreflight = payload.actionInvocationPreflight;
+  error.resetActionPublicBlockers = payload.resetActionPublicBlockers;
   error.sideEffects = payload.sideEffects;
 
   return error;
@@ -1738,6 +1757,11 @@ function recordFormActionCallbackActionPreflightWithGate(
       submitResetExecution,
       normalizedAdmission
     );
+  const resetActionPublicBlockers =
+    createCallbackActionResetActionPublicBlockers(
+      submitDispatch,
+      submitResetExecution
+    );
 
   const payload = freezeRecord({
     schemaVersion: formActionCallbackActionPreflightGateSchemaVersion,
@@ -1786,6 +1810,7 @@ function recordFormActionCallbackActionPreflightWithGate(
     submitResetExecutionMetadataConsumption,
     callbackDispatchPreflight,
     actionInvocationPreflight,
+    resetActionPublicBlockers,
     publicFormActionBoundary:
       createPublicFormActionCallbackActionPreflightBoundary(),
     sideEffects: formActionCallbackActionPreflightDiagnosticSideEffects,
@@ -2259,6 +2284,17 @@ function assertAcceptedFormActionCallbackActionPreflightRecordForAsyncCallbackEx
     payload.actionInvocationPreflight?.formDataConstructed === false &&
     payload.actionInvocationPreflight?.actionInvoked === false &&
     payload.actionInvocationPreflight?.hostTransitionStarted === false &&
+    payload.resetActionPublicBlockers?.publicFormActionsEnabled === false &&
+    payload.resetActionPublicBlockers?.publicSubmitDispatchReachable ===
+      false &&
+    payload.resetActionPublicBlockers?.publicRequestFormResetReachable ===
+      false &&
+    payload.resetActionPublicBlockers?.publicActionInvocationReachable ===
+      false &&
+    payload.resetActionPublicBlockers?.publicDomMutationReachable === false &&
+    payload.resetActionPublicBlockers?.actionInvoked === false &&
+    payload.resetActionPublicBlockers?.realFormReset === false &&
+    payload.resetActionPublicBlockers?.compatibilityClaimed === false &&
     payload.publicFormActionBoundary?.publicFormActionsEnabled === false &&
     payload.publicFormActionBoundary?.callbackDispatchExecuted === false &&
     payload.publicFormActionBoundary?.actionInvoked === false &&
@@ -2558,6 +2594,82 @@ function normalizeFormActionSubmitResetExecutionAdmission(
       'callback dispatch execution must remain blocked'
     );
   }
+  const sourceSubmitDispatchId = getSubmitResetExecutionStringProperty(
+    admission,
+    'sourceSubmitDispatchId',
+    submitDispatch.dispatchId
+  );
+  if (sourceSubmitDispatchId !== submitDispatch.dispatchId) {
+    throwInvalidSubmitResetExecutionAdmission(
+      'sourceSubmitDispatchId must match the submit dispatch record'
+    );
+  }
+  if (admission.publicDispatchRequested === true) {
+    throwInvalidSubmitResetExecutionAdmission(
+      'public submit dispatch must remain blocked'
+    );
+  }
+  if (admission.publicSubmitDispatchRequested === true) {
+    throwInvalidSubmitResetExecutionAdmission(
+      'public submit dispatch must remain blocked'
+    );
+  }
+  if (admission.publicFormSubmissionRequested === true) {
+    throwInvalidSubmitResetExecutionAdmission(
+      'public form submission must remain blocked'
+    );
+  }
+  if (
+    admission.actionInvocationRequested === true ||
+    admission.actionExecutionRequested === true ||
+    admission.publicActionInvocationRequested === true
+  ) {
+    throwInvalidSubmitResetExecutionAdmission(
+      'action invocation must remain blocked'
+    );
+  }
+  if (admission.formDataConstructionRequested === true) {
+    throwInvalidSubmitResetExecutionAdmission(
+      'form data construction must remain blocked'
+    );
+  }
+  if (admission.hostTransitionRequested === true) {
+    throwInvalidSubmitResetExecutionAdmission(
+      'host transition start must remain blocked'
+    );
+  }
+  if (admission.reactUpdateRequested === true) {
+    throwInvalidSubmitResetExecutionAdmission(
+      'react update queueing must remain blocked'
+    );
+  }
+  if (admission.resetExecutionRequested === true) {
+    throwInvalidSubmitResetExecutionAdmission(
+      'reset execution must remain blocked'
+    );
+  }
+  if (admission.publicRequestFormResetRequested === true) {
+    throwInvalidSubmitResetExecutionAdmission(
+      'public reset request must remain blocked'
+    );
+  }
+  if (
+    admission.domMutationRequested === true ||
+    admission.publicDomMutationRequested === true
+  ) {
+    throwInvalidSubmitResetExecutionAdmission(
+      'DOM mutation must remain blocked'
+    );
+  }
+  if (
+    admission.compatibilityClaimed === true ||
+    admission.publicFormActionCompatibilityClaimed === true ||
+    admission.packageCompatibilityClaimed === true
+  ) {
+    throwInvalidSubmitResetExecutionAdmission(
+      'package compatibility must remain unclaimed'
+    );
+  }
 
   const fakeFormPath = normalizeSubmitResetExecutionFakeFormPath(
     submitDispatch,
@@ -2581,6 +2693,19 @@ function normalizeFormActionSubmitResetExecutionAdmission(
       submitDispatch.sourceResetIntentRequestId,
     fakeFormPath,
     callbackDispatchExecutionRequested: false,
+    publicDispatchRequested: false,
+    publicSubmitDispatchRequested: false,
+    publicFormSubmissionRequested: false,
+    actionInvocationRequested: false,
+    actionExecutionRequested: false,
+    publicActionInvocationRequested: false,
+    formDataConstructionRequested: false,
+    hostTransitionRequested: false,
+    reactUpdateRequested: false,
+    resetExecutionRequested: false,
+    publicRequestFormResetRequested: false,
+    domMutationRequested: false,
+    publicDomMutationRequested: false,
     rawTargetCaptured: false,
     rawEventCaptured: false,
     rawActionCaptured: false,
@@ -2625,6 +2750,27 @@ function normalizeFormActionCallbackActionPreflightAdmission(
       'callback dispatch execution must remain blocked'
     );
   }
+  const sourceSubmitDispatchId = getCallbackActionPreflightStringProperty(
+    admission,
+    'sourceSubmitDispatchId',
+    submitDispatch.dispatchId
+  );
+  if (sourceSubmitDispatchId !== submitDispatch.dispatchId) {
+    throwInvalidCallbackActionPreflightAdmission(
+      'sourceSubmitDispatchId must match the submit dispatch record'
+    );
+  }
+  const sourceSubmitResetExecutionId =
+    getCallbackActionPreflightStringProperty(
+      admission,
+      'sourceSubmitResetExecutionId',
+      submitResetExecution.executionId
+    );
+  if (sourceSubmitResetExecutionId !== submitResetExecution.executionId) {
+    throwInvalidCallbackActionPreflightAdmission(
+      'sourceSubmitResetExecutionId must match the submit reset execution record'
+    );
+  }
   if (admission.callbackInvocationRequested === true) {
     throwInvalidCallbackActionPreflightAdmission(
       'callback invocation must remain blocked'
@@ -2632,10 +2778,26 @@ function normalizeFormActionCallbackActionPreflightAdmission(
   }
   if (
     admission.actionInvocationRequested === true ||
-    admission.actionExecutionRequested === true
+    admission.actionExecutionRequested === true ||
+    admission.publicActionInvocationRequested === true
   ) {
     throwInvalidCallbackActionPreflightAdmission(
       'action invocation must remain blocked'
+    );
+  }
+  if (admission.publicDispatchRequested === true) {
+    throwInvalidCallbackActionPreflightAdmission(
+      'public submit dispatch must remain blocked'
+    );
+  }
+  if (admission.publicSubmitDispatchRequested === true) {
+    throwInvalidCallbackActionPreflightAdmission(
+      'public submit dispatch must remain blocked'
+    );
+  }
+  if (admission.publicFormSubmissionRequested === true) {
+    throwInvalidCallbackActionPreflightAdmission(
+      'public form submission must remain blocked'
     );
   }
   if (admission.formDataConstructionRequested === true) {
@@ -2651,6 +2813,33 @@ function normalizeFormActionCallbackActionPreflightAdmission(
   if (admission.resetExecutionRequested === true) {
     throwInvalidCallbackActionPreflightAdmission(
       'reset execution must remain blocked'
+    );
+  }
+  if (admission.publicRequestFormResetRequested === true) {
+    throwInvalidCallbackActionPreflightAdmission(
+      'public reset request must remain blocked'
+    );
+  }
+  if (admission.reactUpdateRequested === true) {
+    throwInvalidCallbackActionPreflightAdmission(
+      'react update queueing must remain blocked'
+    );
+  }
+  if (
+    admission.domMutationRequested === true ||
+    admission.publicDomMutationRequested === true
+  ) {
+    throwInvalidCallbackActionPreflightAdmission(
+      'DOM mutation must remain blocked'
+    );
+  }
+  if (
+    admission.compatibilityClaimed === true ||
+    admission.publicFormActionCompatibilityClaimed === true ||
+    admission.packageCompatibilityClaimed === true
+  ) {
+    throwInvalidCallbackActionPreflightAdmission(
+      'package compatibility must remain unclaimed'
     );
   }
 
@@ -2681,9 +2870,17 @@ function normalizeFormActionCallbackActionPreflightAdmission(
     callbackInvocationRequested: false,
     actionInvocationRequested: false,
     actionExecutionRequested: false,
+    publicDispatchRequested: false,
+    publicSubmitDispatchRequested: false,
+    publicFormSubmissionRequested: false,
+    publicActionInvocationRequested: false,
     formDataConstructionRequested: false,
     hostTransitionRequested: false,
+    reactUpdateRequested: false,
     resetExecutionRequested: false,
+    publicRequestFormResetRequested: false,
+    domMutationRequested: false,
+    publicDomMutationRequested: false,
     rawTargetCaptured: false,
     rawEventCaptured: false,
     rawActionCaptured: false,
@@ -3059,6 +3256,7 @@ function normalizeSubmitResetExecutionFakeFormPath(
       'fakeFormPath must be an object when present'
     );
   }
+  assertNoSubmitResetExecutionFakeFormPathBlockedFields(record);
 
   const pathKind = getSubmitResetExecutionShapeStringProperty(
     record,
@@ -3122,6 +3320,64 @@ function normalizeSubmitResetExecutionFakeFormPath(
     realFormReset: false,
     compatibilityClaimed: false
   });
+}
+
+function assertNoSubmitResetExecutionFakeFormPathBlockedFields(record) {
+  for (const field of [
+    'form',
+    'formElement',
+    'target',
+    'currentTarget',
+    'nativeEvent',
+    'event',
+    'action',
+    'formData',
+    'submit' + 'ter',
+    'submitControl',
+    'reset',
+    'resetCallback',
+    'formResetCallback',
+    'root',
+    'fiber',
+    'domNode',
+    'hostInstance'
+  ]) {
+    if (hasOwnProp(record, field)) {
+      throwInvalidSubmitResetExecutionAdmission(
+        `fakeFormPath.${field} must not be passed to the submit reset execution fake form gate`
+      );
+    }
+  }
+
+  for (const field of [
+    'liveFormAccepted',
+    'realFormInspected',
+    'formDataConstructed',
+    'syntheticEventCreated',
+    'callbackDispatchExecuted',
+    'submitCallbackInvoked',
+    'actionInvoked',
+    'hostTransitionStarted',
+    'resetStateQueued',
+    'reactUpdateQueued',
+    'resetFormInstanceCalled',
+    'formResetCommitted',
+    'realFormReset',
+    'publicRootTouched',
+    'publicRequestFormResetRequested',
+    'resetExecutionRequested',
+    'domMutationRequested',
+    'publicDomMutationRequested',
+    'publicFormActionCompatibilityClaimed',
+    'packageCompatibilityClaimed',
+    'compatibilityClaimed'
+  ]) {
+    if (record[field] === true) {
+      throwInvalidSubmitResetExecutionAdmission(
+        `fakeFormPath.${field} must remain blocked`
+      );
+    }
+  }
 }
 
 function normalizeFormTargetShape(eventExtraction, shape) {
@@ -3984,6 +4240,48 @@ function createActionInvocationPreflight(
   });
 }
 
+function createCallbackActionResetActionPublicBlockers(
+  submitDispatch,
+  submitResetExecution
+) {
+  return freezeRecord({
+    status: 'blocked-public-form-action-reset-and-action-preflight',
+    metadataOnly: true,
+    sourceSubmitDispatchId: submitDispatch.dispatchId,
+    sourceSubmitResetExecutionId: submitResetExecution.executionId,
+    sourceResetIntentRequestId:
+      submitResetExecution.sourceResetIntentRequestId,
+    publicFormActionsEnabled: false,
+    publicFormSubmissionReachable: false,
+    publicSubmitDispatchReachable: false,
+    publicRequestFormResetReachable: false,
+    publicActionInvocationReachable: false,
+    publicDomMutationReachable: false,
+    publicRootTouched: false,
+    formDataConstructed: false,
+    syntheticEventCreated: false,
+    callbackDispatchExecuted: false,
+    submitCallbackInvoked: false,
+    actionFunctionCaptured: false,
+    actionInvoked: false,
+    publicActionInvoked: false,
+    hostTransitionStarted: false,
+    previousDispatcherCalled: false,
+    resetFiberResolved: false,
+    resetStateQueued: false,
+    resetUpdateEnqueued: false,
+    reactUpdateQueued: false,
+    afterMutationEffectsVisited: false,
+    resetFormInstanceCalled: false,
+    formResetCommitted: false,
+    realFormReset: false,
+    domMutation: false,
+    publicFormActionCompatibilityClaimed: false,
+    packageCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
+}
+
 function createAsyncCallbackAcceptedMetadataIds(preflight) {
   return freezeRecord({
     ...preflight.acceptedMetadataIds,
@@ -4594,6 +4892,10 @@ function createPublicFormActionSubmitResetExecutionBoundary() {
       'blocked-public-form-action-submit-reset-execution-compatibility',
     publicFormActionsEnabled: false,
     publicRequestFormResetReachable: false,
+    publicFormSubmissionReachable: false,
+    publicSubmitDispatchReachable: false,
+    publicActionInvocationReachable: false,
+    publicDomMutationReachable: false,
     publicRootTouched: false,
     realFormAccepted: false,
     realFormInspected: false,
@@ -4605,6 +4907,8 @@ function createPublicFormActionSubmitResetExecutionBoundary() {
     resetFormInstanceCalled: false,
     formResetCommitted: false,
     realFormReset: false,
+    publicFormActionCompatibilityClaimed: false,
+    packageCompatibilityClaimed: false,
     compatibilityClaimed: false
   });
 }
@@ -4615,6 +4919,10 @@ function createPublicFormActionCallbackActionPreflightBoundary() {
       'blocked-public-form-action-callback-action-preflight-compatibility',
     publicFormActionsEnabled: false,
     publicRequestFormResetReachable: false,
+    publicFormSubmissionReachable: false,
+    publicSubmitDispatchReachable: false,
+    publicActionInvocationReachable: false,
+    publicDomMutationReachable: false,
     publicRootTouched: false,
     realFormAccepted: false,
     realFormInspected: false,
@@ -4630,6 +4938,10 @@ function createPublicFormActionCallbackActionPreflightBoundary() {
     resetFormInstanceCalled: false,
     formResetCommitted: false,
     realFormReset: false,
+    publicActionInvoked: false,
+    domMutation: false,
+    publicFormActionCompatibilityClaimed: false,
+    packageCompatibilityClaimed: false,
     compatibilityClaimed: false
   });
 }

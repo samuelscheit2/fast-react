@@ -1942,8 +1942,15 @@ test('private form action submit reset execution consumes one fake form path onl
   assert.equal(summary.consumesResetIntentMetadata, true);
   assert.equal(summary.executesDeterministicFakeFormResetPath, true);
   assert.equal(summary.admitsExactlyOneFakeFormPath, true);
+  assert.equal(summary.rejectsStaleSubmitDispatchMetadata, true);
   assert.equal(summary.rejectsLiveForms, true);
   assert.equal(summary.rejectsCallbackExecution, true);
+  assert.equal(summary.rejectsPublicSubmitDispatch, true);
+  assert.equal(summary.rejectsPublicFormSubmission, true);
+  assert.equal(summary.rejectsPublicResetRequest, true);
+  assert.equal(summary.rejectsActionInvocation, true);
+  assert.equal(summary.rejectsPublicDomMutation, true);
+  assert.equal(summary.rejectsPackageCompatibilityClaims, true);
   assert.equal(summary.acceptsRealForms, false);
   assert.equal(summary.constructsFormData, false);
   assert.equal(summary.createsSyntheticEvents, false);
@@ -2070,10 +2077,34 @@ test('private form action submit reset execution consumes one fake form path onl
   assert.equal(record.fakeFormResetExecution.resetFormInstanceCalled, false);
   assert.equal(record.fakeFormResetExecution.realFormReset, false);
   assert.equal(record.publicFormActionBoundary.publicFormActionsEnabled, false);
+  assert.equal(
+    record.publicFormActionBoundary.publicFormSubmissionReachable,
+    false
+  );
+  assert.equal(
+    record.publicFormActionBoundary.publicSubmitDispatchReachable,
+    false
+  );
+  assert.equal(
+    record.publicFormActionBoundary.publicRequestFormResetReachable,
+    false
+  );
+  assert.equal(
+    record.publicFormActionBoundary.publicActionInvocationReachable,
+    false
+  );
+  assert.equal(
+    record.publicFormActionBoundary.publicDomMutationReachable,
+    false
+  );
   assert.equal(record.publicFormActionBoundary.submitDispatchReachable, false);
   assert.equal(record.publicFormActionBoundary.formDataConstructed, false);
   assert.equal(record.publicFormActionBoundary.actionInvoked, false);
   assert.equal(record.publicFormActionBoundary.realFormReset, false);
+  assert.equal(
+    record.publicFormActionBoundary.packageCompatibilityClaimed,
+    false
+  );
 
   assert.deepEqual(
     record.sideEffects,
@@ -2341,11 +2372,20 @@ test('private form action callback/action invocation preflight consumes submit a
   assert.equal(summary.recordsAcceptedMetadataIds, true);
   assert.equal(summary.recordsCallbackQueuePreflight, true);
   assert.equal(summary.recordsActionInvocationPreflight, true);
+  assert.equal(summary.recordsResetActionPublicBlockers, true);
   assert.equal(summary.provesCallbacksRemainUninvoked, true);
   assert.equal(summary.provesActionsRemainUninvoked, true);
+  assert.equal(summary.rejectsStaleSubmitDispatchMetadata, true);
+  assert.equal(summary.rejectsStaleSubmitResetExecutionMetadata, true);
+  assert.equal(summary.rejectsForeignSubmitResetExecutionMetadata, true);
   assert.equal(summary.rejectsLiveForms, true);
   assert.equal(summary.rejectsCallbackExecution, true);
   assert.equal(summary.rejectsActionInvocation, true);
+  assert.equal(summary.rejectsPublicSubmitDispatch, true);
+  assert.equal(summary.rejectsPublicFormSubmission, true);
+  assert.equal(summary.rejectsPublicResetRequest, true);
+  assert.equal(summary.rejectsPublicDomMutation, true);
+  assert.equal(summary.rejectsPackageCompatibilityClaims, true);
   assert.equal(summary.acceptsRealForms, false);
   assert.equal(summary.acceptsRawEvents, false);
   assert.equal(summary.acceptsActionFunctions, false);
@@ -2469,10 +2509,35 @@ test('private form action callback/action invocation preflight consumes submit a
   assert.equal(record.actionInvocationPreflight.actionFunctionCaptured, false);
   assert.equal(record.actionInvocationPreflight.actionInvoked, false);
   assert.equal(record.actionInvocationPreflight.hostTransitionStarted, false);
+  assertCallbackActionPreflightPublicBlockersFailClosed(record);
   assert.equal(record.publicFormActionBoundary.publicFormActionsEnabled, false);
+  assert.equal(
+    record.publicFormActionBoundary.publicFormSubmissionReachable,
+    false
+  );
+  assert.equal(
+    record.publicFormActionBoundary.publicSubmitDispatchReachable,
+    false
+  );
+  assert.equal(
+    record.publicFormActionBoundary.publicRequestFormResetReachable,
+    false
+  );
+  assert.equal(
+    record.publicFormActionBoundary.publicActionInvocationReachable,
+    false
+  );
+  assert.equal(
+    record.publicFormActionBoundary.publicDomMutationReachable,
+    false
+  );
   assert.equal(record.publicFormActionBoundary.callbackDispatchExecuted, false);
   assert.equal(record.publicFormActionBoundary.actionInvoked, false);
   assert.equal(record.publicFormActionBoundary.realFormReset, false);
+  assert.equal(
+    record.publicFormActionBoundary.packageCompatibilityClaimed,
+    false
+  );
 
   assert.deepEqual(
     record.sideEffects,
@@ -2484,6 +2549,7 @@ test('private form action callback/action invocation preflight consumes submit a
   assert.equal(record.sideEffects.submitResetExecutionMetadataConsumed, true);
   assert.equal(record.sideEffects.callbackQueuePreflightRecorded, true);
   assert.equal(record.sideEffects.actionInvocationPreflightRecorded, true);
+  assert.equal(record.sideEffects.resetActionPublicBlockersRecorded, true);
   assert.equal(record.sideEffects.formDataConstructed, false);
   assert.equal(record.sideEffects.syntheticEventCreated, false);
   assert.equal(record.sideEffects.callbackDispatchExecuted, false);
@@ -2657,6 +2723,352 @@ test('private form action callback/action invocation preflight consumes submit a
       compatibilityTarget
     }
   );
+});
+
+test('private form reset/action preflight negative matrix rejects stale public and fake metadata', () => {
+  const scenario = createPrivateFormActionCallbackPreflightScenario(
+    'reset-action-preflight-negative'
+  );
+  const foreign = createPrivateFormActionCallbackPreflightScenario(
+    'reset-action-preflight-foreign'
+  );
+
+  assert.equal(
+    scenario.preflight.acceptedMetadataIds.submitDispatchId,
+    scenario.dispatch.dispatchId
+  );
+  assert.equal(
+    scenario.preflight.acceptedMetadataIds.submitResetExecutionId,
+    scenario.execution.executionId
+  );
+  assertCallbackActionPreflightPublicBlockersFailClosed(scenario.preflight);
+  assertCallbackActionPreflightPublicBoundaryFailClosed(
+    scenario.preflight.publicFormActionBoundary
+  );
+
+  for (const value of [
+    scenario.dispatch,
+    scenario.dispatch.acceptedMetadataIds,
+    scenario.execution,
+    scenario.execution.acceptedMetadataIds,
+    scenario.execution.fakeFormResetExecution,
+    scenario.preflight,
+    scenario.preflight.acceptedMetadataIds,
+    scenario.preflight.submitDispatchMetadataConsumption,
+    scenario.preflight.submitResetExecutionMetadataConsumption,
+    scenario.preflight.callbackDispatchPreflight,
+    scenario.preflight.actionInvocationPreflight,
+    scenario.preflight.resetActionPublicBlockers,
+    scenario.preflight.publicFormActionBoundary
+  ]) {
+    assert.equal(Object.isFrozen(value), true);
+  }
+
+  for (const mutate of [
+    () => {
+      scenario.dispatch.actionIdentity.actionInvoked = true;
+    },
+    () => {
+      scenario.execution.fakeFormResetExecution.realFormReset = true;
+    },
+    () => {
+      scenario.preflight.acceptedMetadataIds.submitDispatchId =
+        'stale-submit-dispatch';
+    },
+    () => {
+      scenario.preflight.callbackDispatchPreflight.callbackDispatchExecuted =
+        true;
+    },
+    () => {
+      scenario.preflight.actionInvocationPreflight.actionInvoked = true;
+    },
+    () => {
+      scenario.preflight.resetActionPublicBlockers
+        .publicRequestFormResetReachable = true;
+    },
+    () => {
+      scenario.preflight.publicFormActionBoundary.compatibilityClaimed =
+        true;
+    }
+  ]) {
+    assert.throws(mutate, TypeError);
+  }
+
+  const preflightGate =
+    formActions.createFormActionCallbackActionPreflightDiagnosticGate({
+      requestIdPrefix: 'reset-action-preflight-negative-gate'
+    });
+  assert.throws(
+    () =>
+      preflightGate.recordCallbackActionInvocationPreflight(
+        scenario.dispatch,
+        scenario.execution,
+        {
+          explicitFormActionCallbackActionPreflight: true,
+          sourceSubmitDispatchId: 'stale-submit-dispatch'
+        }
+      ),
+    {
+      code:
+        formActions.privateFormActionCallbackActionPreflightInvalidAdmissionCode,
+      compatibilityTarget,
+      reason: 'sourceSubmitDispatchId must match the submit dispatch record'
+    }
+  );
+  assert.throws(
+    () =>
+      preflightGate.recordCallbackActionInvocationPreflight(
+        scenario.dispatch,
+        scenario.execution,
+        {
+          explicitFormActionCallbackActionPreflight: true,
+          sourceSubmitResetExecutionId: 'stale-submit-reset-execution'
+        }
+      ),
+    {
+      code:
+        formActions.privateFormActionCallbackActionPreflightInvalidAdmissionCode,
+      compatibilityTarget,
+      reason:
+        'sourceSubmitResetExecutionId must match the submit reset execution record'
+    }
+  );
+  assert.throws(
+    () =>
+      preflightGate.recordCallbackActionInvocationPreflight(
+        scenario.dispatch,
+        foreign.execution,
+        {
+          explicitFormActionCallbackActionPreflight: true
+        }
+      ),
+    {
+      code:
+        formActions.privateFormActionCallbackActionPreflightInvalidRecordCode,
+      compatibilityTarget,
+      reason:
+        'source submit reset execution must be accepted metadata-only fake reset execution'
+    }
+  );
+
+  const fakeDispatch = {
+    ...scenario.dispatch
+  };
+  const fakeExecution = {
+    ...scenario.execution
+  };
+  assert.equal(
+    formActions.isPrivateFormActionSubmitDispatchRecord(fakeDispatch),
+    false
+  );
+  assert.equal(
+    formActions.isPrivateFormActionSubmitResetExecutionRecord(fakeExecution),
+    false
+  );
+  assert.throws(
+    () =>
+      preflightGate.recordCallbackActionInvocationPreflight(
+        fakeDispatch,
+        scenario.execution,
+        {
+          explicitFormActionCallbackActionPreflight: true
+        }
+      ),
+    {
+      code:
+        formActions.privateFormActionCallbackActionPreflightInvalidRecordCode,
+      compatibilityTarget,
+      reason:
+        'source submit dispatch must be accepted metadata-only submit dispatch'
+    }
+  );
+  assert.throws(
+    () =>
+      preflightGate.recordCallbackActionInvocationPreflight(
+        scenario.dispatch,
+        fakeExecution,
+        {
+          explicitFormActionCallbackActionPreflight: true
+        }
+      ),
+    {
+      code:
+        formActions.privateFormActionCallbackActionPreflightInvalidRecordCode,
+      compatibilityTarget,
+      reason:
+        'source submit reset execution must be accepted metadata-only fake reset execution'
+    }
+  );
+
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionSubmitResetExecutionDiagnosticGate()
+        .recordSubmitResetExecution(scenario.dispatch, {
+          explicitFormActionSubmitResetExecution: true,
+          sourceSubmitDispatchId: 'stale-submit-dispatch'
+        }),
+    {
+      code:
+        formActions.privateFormActionSubmitResetExecutionInvalidAdmissionCode,
+      compatibilityTarget,
+      reason: 'sourceSubmitDispatchId must match the submit dispatch record'
+    }
+  );
+  for (const {field, reason} of [
+    {
+      field: 'publicSubmitDispatchRequested',
+      reason: 'public submit dispatch must remain blocked'
+    },
+    {
+      field: 'publicFormSubmissionRequested',
+      reason: 'public form submission must remain blocked'
+    },
+    {
+      field: 'publicRequestFormResetRequested',
+      reason: 'public reset request must remain blocked'
+    },
+    {
+      field: 'publicActionInvocationRequested',
+      reason: 'action invocation must remain blocked'
+    },
+    {
+      field: 'formDataConstructionRequested',
+      reason: 'form data construction must remain blocked'
+    },
+    {
+      field: 'hostTransitionRequested',
+      reason: 'host transition start must remain blocked'
+    },
+    {
+      field: 'reactUpdateRequested',
+      reason: 'react update queueing must remain blocked'
+    },
+    {
+      field: 'resetExecutionRequested',
+      reason: 'reset execution must remain blocked'
+    },
+    {
+      field: 'domMutationRequested',
+      reason: 'DOM mutation must remain blocked'
+    },
+    {
+      field: 'packageCompatibilityClaimed',
+      reason: 'package compatibility must remain unclaimed'
+    }
+  ]) {
+    assert.throws(
+      () =>
+        formActions
+          .createFormActionSubmitResetExecutionDiagnosticGate()
+          .recordSubmitResetExecution(scenario.dispatch, {
+            explicitFormActionSubmitResetExecution: true,
+            [field]: true
+          }),
+      {
+        code:
+          formActions
+            .privateFormActionSubmitResetExecutionInvalidAdmissionCode,
+        compatibilityTarget,
+        reason
+      },
+      field
+    );
+  }
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionSubmitResetExecutionDiagnosticGate()
+        .recordSubmitResetExecution(scenario.dispatch, {
+          explicitFormActionSubmitResetExecution: true,
+          fakeFormPath: {
+            pathKind: 'action-completion-submit-reset',
+            hostTag: 'form',
+            resetMode: 'record-only-fake-reset',
+            realFormReset: true
+          }
+        }),
+    {
+      code:
+        formActions.privateFormActionSubmitResetExecutionInvalidAdmissionCode,
+      compatibilityTarget,
+      reason: 'fakeFormPath.realFormReset must remain blocked'
+    }
+  );
+  assert.throws(
+    () =>
+      formActions
+        .createFormActionSubmitResetExecutionDiagnosticGate()
+        .recordSubmitResetExecution(scenario.dispatch, {
+          explicitFormActionSubmitResetExecution: true,
+          fakeFormPath: {
+            pathKind: 'action-completion-submit-reset',
+            hostTag: 'form',
+            resetMode: 'record-only-fake-reset',
+            form: throwingProxy('fake form path form')
+          }
+        }),
+    {
+      code:
+        formActions.privateFormActionSubmitResetExecutionInvalidAdmissionCode,
+      compatibilityTarget,
+      reason:
+        'fakeFormPath.form must not be passed to the submit reset execution fake form gate'
+    }
+  );
+
+  for (const {field, reason} of [
+    {
+      field: 'publicSubmitDispatchRequested',
+      reason: 'public submit dispatch must remain blocked'
+    },
+    {
+      field: 'publicFormSubmissionRequested',
+      reason: 'public form submission must remain blocked'
+    },
+    {
+      field: 'publicRequestFormResetRequested',
+      reason: 'public reset request must remain blocked'
+    },
+    {
+      field: 'publicActionInvocationRequested',
+      reason: 'action invocation must remain blocked'
+    },
+    {
+      field: 'reactUpdateRequested',
+      reason: 'react update queueing must remain blocked'
+    },
+    {
+      field: 'domMutationRequested',
+      reason: 'DOM mutation must remain blocked'
+    },
+    {
+      field: 'publicFormActionCompatibilityClaimed',
+      reason: 'package compatibility must remain unclaimed'
+    }
+  ]) {
+    assert.throws(
+      () =>
+        formActions
+          .createFormActionCallbackActionPreflightDiagnosticGate()
+          .recordCallbackActionInvocationPreflight(
+            scenario.dispatch,
+            scenario.execution,
+            {
+              explicitFormActionCallbackActionPreflight: true,
+              [field]: true
+            }
+          ),
+      {
+        code:
+          formActions
+            .privateFormActionCallbackActionPreflightInvalidAdmissionCode,
+        compatibilityTarget,
+        reason
+      },
+      field
+    );
+  }
 });
 
 test('private form action async callback execution records pending/reset metadata and fail-closed errors', async () => {
@@ -16928,6 +17340,24 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
     formActions.describePrivateFormActionSubmitDispatchGate()
   );
   assert.deepEqual(
+    summary.privateFormActionSubmitResetExecutionBoundary,
+    resourceFormGate
+      .describePrivateFormActionSubmitResetExecutionBoundary(null)
+  );
+  assert.deepEqual(
+    summary.privateFormActionSubmitResetExecutionBoundary,
+    formActions.describePrivateFormActionSubmitResetExecutionGate()
+  );
+  assert.deepEqual(
+    summary.privateFormActionCallbackActionPreflightBoundary,
+    resourceFormGate
+      .describePrivateFormActionCallbackActionPreflightBoundary(null)
+  );
+  assert.deepEqual(
+    summary.privateFormActionCallbackActionPreflightBoundary,
+    formActions.describePrivateFormActionCallbackActionPreflightGate()
+  );
+  assert.deepEqual(
     summary.privateFormActionAsyncCallbackExecutionBoundary,
     resourceFormGate
       .describePrivateFormActionAsyncCallbackExecutionBoundary(null)
@@ -17261,6 +17691,102 @@ test('resource/form root bridge boundary metadata matches accepted blocked root 
 	      compatibilityClaimed: false,
 	      submitDispatchGate:
 	        formActions.describePrivateFormActionSubmitDispatchGate()
+	    },
+	    formActionSubmitResetExecutionBoundary: {
+	      gateStatus: resourceFormGate.privateSourceAdapterBlockedStatus,
+	      behaviorArea: null,
+	      supportedBehaviorArea: 'form-action',
+	      appliesToRequest: false,
+	      metadataGateAvailable: true,
+	      sourceRecordsAccepted: true,
+	      acceptedSourceRecordType:
+	        formActions.privateFormActionSubmitDispatchRecordType,
+	      acceptedSourceStatus:
+	        formActions.privateFormActionSubmitDispatchRecordedStatus,
+	      consumesBlockedFormDataMetadata: true,
+	      consumesResetIntentMetadata: true,
+	      executesDeterministicFakeFormResetPath: true,
+	      admitsExactlyOneFakeFormPath: true,
+	      callbackActionPreflightGateAvailable: true,
+	      rejectsStaleSubmitDispatchMetadata: true,
+	      rejectsPublicResetRequest: true,
+	      rejectsActionInvocation: true,
+	      rejectsPublicDomMutation: true,
+	      rejectsPackageCompatibilityClaims: true,
+	      realFormAccepted: false,
+	      rawTargetCaptured: false,
+	      rawEventCaptured: false,
+	      nativeEventInspected: false,
+	      formInspected: false,
+	      submitControlInspected: false,
+	      formDataConstructed: false,
+	      syntheticEventCreated: false,
+	      listenerDispatchStarted: false,
+	      callbackDispatchExecuted: false,
+	      submitCallbackInvoked: false,
+	      actionInvoked: false,
+	      transitionStarted: false,
+	      resetFiberResolved: false,
+	      resetStateQueued: false,
+	      reactUpdateQueued: false,
+	      resetFormInstanceCalled: false,
+	      formResetCommitted: false,
+	      realFormReset: false,
+	      publicRootTouched: false,
+	      compatibilityClaimed: false,
+	      submitResetExecutionGate:
+	        formActions.describePrivateFormActionSubmitResetExecutionGate()
+	    },
+	    formActionCallbackActionPreflightBoundary: {
+	      gateStatus: resourceFormGate.privateSourceAdapterBlockedStatus,
+	      behaviorArea: null,
+	      supportedBehaviorArea: 'form-action',
+	      appliesToRequest: false,
+	      metadataGateAvailable: true,
+	      sourceRecordsAccepted: true,
+	      acceptedSubmitDispatchRecordType:
+	        formActions.privateFormActionSubmitDispatchRecordType,
+	      acceptedSubmitDispatchStatus:
+	        formActions.privateFormActionSubmitDispatchRecordedStatus,
+	      acceptedSubmitResetExecutionRecordType:
+	        formActions.privateFormActionSubmitResetExecutionRecordType,
+	      acceptedSubmitResetExecutionStatus:
+	        formActions.privateFormActionSubmitResetExecutionRecordedStatus,
+	      consumesSubmitDispatchMetadata: true,
+	      consumesSubmitResetExecutionMetadata: true,
+	      recordsCallbackQueuePreflight: true,
+	      recordsActionInvocationPreflight: true,
+	      recordsResetActionPublicBlockers: true,
+	      rejectsStaleSubmitDispatchMetadata: true,
+	      rejectsStaleSubmitResetExecutionMetadata: true,
+	      rejectsForeignSubmitResetExecutionMetadata: true,
+	      rejectsPublicResetRequest: true,
+	      rejectsActionInvocation: true,
+	      rejectsPublicDomMutation: true,
+	      rejectsPackageCompatibilityClaims: true,
+	      realFormAccepted: false,
+	      rawTargetCaptured: false,
+	      rawEventCaptured: false,
+	      nativeEventInspected: false,
+	      formInspected: false,
+	      submitControlInspected: false,
+	      formDataConstructed: false,
+	      syntheticEventCreated: false,
+	      listenerDispatchStarted: false,
+	      callbackDispatchExecuted: false,
+	      submitCallbackInvoked: false,
+	      actionInvoked: false,
+	      publicActionInvoked: false,
+	      transitionStarted: false,
+	      resetStateQueued: false,
+	      reactUpdateQueued: false,
+	      resetFormInstanceCalled: false,
+	      formResetCommitted: false,
+	      realFormReset: false,
+	      publicRootTouched: false,
+	      compatibilityClaimed: false,
+	      callbackActionPreflightGate:
+	        formActions.describePrivateFormActionCallbackActionPreflightGate()
 	    },
 	    formActionAsyncCallbackExecutionBoundary: {
 	      gateStatus: resourceFormGate.privateSourceAdapterBlockedStatus,
@@ -18277,6 +18803,79 @@ function replaceDispatcherWithSpies(moduleExports) {
     };
   }
   return dispatchCalls;
+}
+
+function assertCallbackActionPreflightPublicBlockersFailClosed(record) {
+  assert.deepEqual(record.resetActionPublicBlockers, {
+    status: 'blocked-public-form-action-reset-and-action-preflight',
+    metadataOnly: true,
+    sourceSubmitDispatchId: record.sourceSubmitDispatchId,
+    sourceSubmitResetExecutionId: record.sourceSubmitResetExecutionId,
+    sourceResetIntentRequestId: record.sourceResetIntentRequestId,
+    publicFormActionsEnabled: false,
+    publicFormSubmissionReachable: false,
+    publicSubmitDispatchReachable: false,
+    publicRequestFormResetReachable: false,
+    publicActionInvocationReachable: false,
+    publicDomMutationReachable: false,
+    publicRootTouched: false,
+    formDataConstructed: false,
+    syntheticEventCreated: false,
+    callbackDispatchExecuted: false,
+    submitCallbackInvoked: false,
+    actionFunctionCaptured: false,
+    actionInvoked: false,
+    publicActionInvoked: false,
+    hostTransitionStarted: false,
+    previousDispatcherCalled: false,
+    resetFiberResolved: false,
+    resetStateQueued: false,
+    resetUpdateEnqueued: false,
+    reactUpdateQueued: false,
+    afterMutationEffectsVisited: false,
+    resetFormInstanceCalled: false,
+    formResetCommitted: false,
+    realFormReset: false,
+    domMutation: false,
+    publicFormActionCompatibilityClaimed: false,
+    packageCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
+  assert.equal(Object.isFrozen(record.resetActionPublicBlockers), true);
+}
+
+function assertCallbackActionPreflightPublicBoundaryFailClosed(boundary) {
+  assert.deepEqual(boundary, {
+    status:
+      'blocked-public-form-action-callback-action-preflight-compatibility',
+    publicFormActionsEnabled: false,
+    publicRequestFormResetReachable: false,
+    publicFormSubmissionReachable: false,
+    publicSubmitDispatchReachable: false,
+    publicActionInvocationReachable: false,
+    publicDomMutationReachable: false,
+    publicRootTouched: false,
+    realFormAccepted: false,
+    realFormInspected: false,
+    submitDispatchReachable: false,
+    callbackDispatchExecuted: false,
+    submitCallbackInvoked: false,
+    formDataConstructed: false,
+    syntheticEventCreated: false,
+    actionFunctionCaptured: false,
+    actionInvoked: false,
+    hostTransitionStarted: false,
+    reactUpdateQueued: false,
+    resetFormInstanceCalled: false,
+    formResetCommitted: false,
+    realFormReset: false,
+    publicActionInvoked: false,
+    domMutation: false,
+    publicFormActionCompatibilityClaimed: false,
+    packageCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
+  assert.equal(Object.isFrozen(boundary), true);
 }
 
 function assertRejectedErrorPreflightPublicBlockersFailClosed(record) {
