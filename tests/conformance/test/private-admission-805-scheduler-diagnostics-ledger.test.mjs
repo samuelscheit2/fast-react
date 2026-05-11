@@ -276,7 +276,7 @@ test("private admission 805 gate rejects progress prose evidence", () => {
           {
             role: "worker-791-progress-prose",
             path: "worker-progress/worker-791-scheduler-source-proof-private-diagnostics.md",
-            tokens: ["Moved the Scheduler mock"]
+            tokens: ["Moved the Scheduler mock", "Object.isFrozen(value)"]
           }
         ]
       }
@@ -296,7 +296,8 @@ test("private admission 805 gate rejects progress prose evidence", () => {
   assertSubset(
     [
       "worker-progress-evidence-path",
-      "prose-or-formatted-token:Moved the Scheduler mock"
+      "prose-or-formatted-token:Moved the Scheduler mock",
+      "expression-token:Object.isFrozen(value)"
     ],
     mismatch.rows[0].unstableEvidenceReasons
   );

@@ -220,8 +220,9 @@ const rowData805 = freezeArray([
           "getSchedulerMockExpiredActRootWorkSourceValidator",
           "Object.getOwnPropertyDescriptor",
           "privateActQueueFlushDiagnosticsExport",
-          "Object.isFrozen(value)",
-          "validator.isSchedulerMockExpiredActRootWorkSource(value)"
+          "Object.isFrozen",
+          "isSchedulerMockExpiredActRootWorkSource",
+          "hasSchedulerMockExpiredActRootWorkSourceProof"
         ]
       }),
       evidenceData({
@@ -231,7 +232,9 @@ const rowData805 = freezeArray([
           "assertSchedulerMockSourceValidatorOnlyThroughPrivateDiagnostics",
           "schedulerMockExpiredActRootWorkSourceValidator",
           "isSchedulerMockExpiredActRootWorkSource",
-          "privateSymbolDescriptions(helper)",
+          "privateSymbolDescriptions",
+          "Object.hasOwn",
+          "Reflect.ownKeys",
           "fast-react.scheduler.mock-expired-act-root-work-source-validator"
         ]
       })
@@ -264,8 +267,12 @@ const rowData805 = freezeArray([
         role: "worker-792-react-preflight-test",
         path: reactActOracleTestPath,
         tokens: [
-          "renderer-root-mutated-source-evidence",
-          "renderer-root-missing-top-level-source",
+          "cloneDelayedActRootWorkReport",
+          "deepCloneDelayedActRootWorkDiagnosticsWithOldGlobalSourceProof",
+          "delayedRendererRootMetadata",
+          "sourceEvidenceMatches",
+          "scheduler-delayed-act-root-diagnostics-renderer-root-source",
+          "scheduler-delayed-act-root-diagnostics-metadata",
           "accepted-renderer-root-metadata",
           "produced-private-delayed-act-root-work-metadata-from-accepted-renderer-root-metadata",
           "acceptsTopLevelDelayedActRootWorkAsPublicActEvidence",
@@ -313,15 +320,25 @@ const rowData805 = freezeArray([
         role: "worker-793-renderer-root-negative-test",
         path: schedulerDelayedTestPath,
         tokens: [
-          "renderer-root-public-flush-helper-claim",
-          "renderer-root-package-claim",
-          "renderer-root-public-scheduler-flush-executed",
-          "renderer-root-public-handoff-policy-claim",
+          "publicSchedulerTimingCompatibilityClaimed",
+          "publicSchedulerFlushHelperCompatibilityClaimed",
+          "packageCompatibilityClaimed",
+          "compatibilityClaimed",
+          "drainsPublicSchedulerTaskQueue",
+          "invokesPublicSchedulerFlushHelper",
+          "publicSchedulerFlushBehaviorExecuted",
+          "privateActRootHandoffOnly",
+          "renderer-root-metadata-public-claim",
+          "renderer-root-metadata-execution-claim",
+          "renderer-root-metadata-policy",
           "renderer-root-producer-priority-timeout-mismatch",
-          "renderer-root-request-id-mutation",
-          "renderer-root-delayed-request-id-after",
+          "createDelayedRendererRootWorkOptions",
+          "createMutableRootRequestMetadata",
+          "rootRequestId",
+          "rootRequestSequence",
+          "rootOperation",
           "metadata-source-renderer-root-signature-mismatch",
-          "mock-delayed-renderer-root-793"
+          "sourceEvidenceMatches"
         ]
       })
     ]
@@ -356,10 +373,12 @@ const rowData805 = freezeArray([
         role: "worker-798-expired-lane-public-claim-test",
         path: schedulerExpiredLaneTestPath,
         tokens: [
-          "public-scheduler-flush-helper-claim",
-          "package-compatibility-claim",
-          "invokes-public-scheduler-flush-helper",
-          "public-scheduler-flush-executed",
+          "publicSchedulerTimingCompatibilityClaimed",
+          "publicSchedulerFlushHelperCompatibilityClaimed",
+          "packageCompatibilityClaimed",
+          "invokesPublicSchedulerFlushHelper",
+          "publicSchedulerFlushBehaviorExecuted",
+          "drainsPublicSchedulerTaskQueue",
           "metadata-public-claim",
           "metadata-execution-claim"
         ]
@@ -368,9 +387,13 @@ const rowData805 = freezeArray([
         role: "worker-798-expired-act-root-public-claim-test",
         path: schedulerMockOracleTestPath,
         tokens: [
-          "expired-public-flush-helper-claim",
-          "expired-package-claim",
-          "expired-public-flush-helper-execution",
+          "publicSchedulerTimingCompatibilityClaimed",
+          "publicSchedulerFlushHelperCompatibilityClaimed",
+          "packageCompatibilityClaimed",
+          "invokesPublicSchedulerFlushHelper",
+          "publicSchedulerFlushBehaviorExecuted",
+          "drainsPublicSchedulerTaskQueue",
+          "flushAllOrFlushExpiredRoute",
           "metadata-public-claim"
         ]
       }),
@@ -381,7 +404,8 @@ const rowData805 = freezeArray([
           "assertSchedulerFlushHelperRejectsFakeValidatorMutation",
           "createFakeSchedulerPrivateDiagnostics",
           "createFakeSchedulerSourceValidator",
-          "fast-react.scheduler.mock-expired-act-root-work-source-proof",
+          "freezeWithOldGlobalSchedulerSourceProof",
+          "deepCloneExpiredActRootWorkDiagnosticsWithOldGlobalSourceProof",
           "scheduler-delayed-act-root-diagnostics-source-proof"
         ]
       }),
@@ -814,6 +838,9 @@ function evaluateEvidenceRow({ evidenceRow, fileCache, workspaceRoot }) {
   for (const token of tokens) {
     if (/\s/u.test(token)) {
       unstableEvidenceReasons.push(`prose-or-formatted-token:${token}`);
+    }
+    if (/[()]/u.test(token)) {
+      unstableEvidenceReasons.push(`expression-token:${token}`);
     }
   }
 
