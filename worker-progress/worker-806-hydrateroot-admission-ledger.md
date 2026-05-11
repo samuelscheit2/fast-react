@@ -134,3 +134,31 @@
   `minimum-release-age` npm warning.
 - `node tests/smoke/import-entrypoints.mjs`: passed.
 - `git diff --check`: passed.
+
+## Re-audit Follow-up
+
+- Replaced whole-file public blocker evidence for `root-bridge.js` with
+  field-scoped slices from the hydrateRoot conformance blocker helper,
+  package root-bridge shell blocker helper, and the narrow hydrateRoot
+  preflight source slice for `nativeExecution` and `reconcilerExecution`.
+- Kept package blocker evidence on package surface/import smoke checks, now
+  using narrow slices around runtime export guarding and manifest/export-map
+  assertions.
+- Added a generic `public-blocker-claim-detected` violation so every
+  recognized public blocker claim creates an actionable violation row, including
+  fields outside the named buckets.
+- Tightened static/read-only package checks so any non-`false`/non-absent
+  `packageCompatibilityClaimed` or `packageExportsChanged` value fails static
+  ledger recognition.
+- Added regressions for scoped public blocker evidence, previously omitted
+  blocker claim fields, and non-boolean package blocker leaks.
+
+### Re-audit Verification
+
+- `node --check tests/conformance/src/private-admission-806-hydrateroot-preflight-ledger.mjs`: passed.
+- `node --check tests/conformance/test/private-admission-806-hydrateroot-preflight-ledger.test.mjs`: passed.
+- `node --test tests/conformance/test/private-admission-806-hydrateroot-preflight-ledger.test.mjs`: passed, 8 tests.
+- `npm run check:package-surface`: passed with the existing
+  `minimum-release-age` npm warning.
+- `node tests/smoke/import-entrypoints.mjs`: passed.
+- `git diff --check`: passed.

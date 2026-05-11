@@ -150,6 +150,31 @@ test("private admission 806 gate recognizes static hydrateRoot preflight evidenc
   }
 });
 
+test("private admission 806 public blocker evidence is field-scoped", () => {
+  assert.deepEqual(
+    PRIVATE_ADMISSION_806_PUBLIC_BLOCKER_FIELD_EVIDENCE
+      .map((evidenceRow) => evidenceRow.field)
+      .sort(),
+    [...PRIVATE_ADMISSION_806_PUBLIC_BLOCKER_FIELDS].sort()
+  );
+
+  for (const evidenceRow of PRIVATE_ADMISSION_806_PUBLIC_BLOCKER_FIELD_EVIDENCE) {
+    assert.notEqual(evidenceRow.sliceStart, null, evidenceRow.field);
+    assert.notEqual(evidenceRow.sliceEnd, null, evidenceRow.field);
+  }
+
+  assert.deepEqual(
+    PRIVATE_ADMISSION_806_PUBLIC_BLOCKER_FIELD_EVIDENCE
+      .filter(
+        (evidenceRow) =>
+          evidenceRow.path === "packages/react-dom/src/client/root-bridge.js"
+      )
+      .map((evidenceRow) => evidenceRow.field)
+      .sort(),
+    ["nativeExecution", "reconcilerExecution"]
+  );
+});
+
 test("private admission 806 gate rejects missing evidence tokens and package-surface leaks", () => {
   const packageEvidence = PRIVATE_ADMISSION_806_PACKAGE_SURFACE_EVIDENCE.map(
     (evidenceRow) => {
@@ -366,6 +391,58 @@ test("private admission 806 gate rejects public hydrateRoot, root, DOM, listener
     ],
     gate.publicHydrationCompatibilityClaimIds
   );
+});
+
+test("private admission 806 gate reports every public blocker claim as a violation", () => {
+  const claimedFields = [
+    "hydrateInstanceCalled",
+    "publicDispatchEnabled",
+    "publicHydrationTargetClaimed",
+    "willDrainReplayQueues",
+    "nativeExecution",
+    "reconcilerExecution"
+  ];
+  const gate = evaluatePrivateAdmission806Gate({
+    rowOverrides: {
+      [worker786]: {
+        publicBlockerClaims: Object.fromEntries(
+          claimedFields.map((field) => [field, true])
+        )
+      }
+    }
+  });
+
+  assert.equal(gate.status, PRIVATE_ADMISSION_806_VIOLATION_STATUS);
+  assert.equal(gate.blockedPublicClaimsRecognized, false);
+  assert.deepEqual(
+    [...gate.publicBlockerClaimViolationIds].sort(),
+    claimedFields.map((field) => `${worker786}.${field}`).sort()
+  );
+  assertViolationIds(gate, ["public-blocker-claim-detected"]);
+  const genericViolation = gate.violations.find(
+    (violation) => violation.id === "public-blocker-claim-detected"
+  );
+  assert.notEqual(genericViolation, undefined);
+  assertSubset(
+    gate.publicBlockerClaimViolationIds,
+    genericViolation.claimIds
+  );
+});
+
+test("private admission 806 gate rejects non-boolean package blocker leaks", () => {
+  const gate = evaluatePrivateAdmission806Gate({
+    rowOverrides: {
+      [worker797]: {
+        packageCompatibilityClaimed: 1,
+        packageExportsChanged: "claimed"
+      }
+    }
+  });
+
+  assert.equal(gate.status, PRIVATE_ADMISSION_806_VIOLATION_STATUS);
+  assert.equal(gate.staticReadOnlyRecognized, false);
+  assert.deepEqual(gate.staticReadOnlyViolationIds, [worker797]);
+  assertViolationIds(gate, ["static-ledger-mode-mismatch"]);
 });
 
 function assertLedgerRow(

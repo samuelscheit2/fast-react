@@ -311,6 +311,25 @@ const rootBridgePackageTestPath =
 const packageJsonPath = "packages/react-dom/package.json";
 const packageSurfaceGuardPath = "tests/smoke/package-surface-guard.mjs";
 const importSmokePath = "tests/smoke/import-entrypoints.mjs";
+const rootFacadeBlockedHelperSliceStart =
+  "function assertHydrateRootPreflightEvidenceBlocked(rows) {";
+const rootFacadeBlockedHelperSliceEnd = "function createPrivateGateDocument";
+const rootBridgePackageBlockedHelperSliceStart =
+  "function assertHydrateRootPreflightRowsBlocked(rows) {";
+const rootBridgePackageBlockedHelperSliceEnd =
+  "function assertBridgeDidNotTouchContainer";
+const rootBridgeHydrateRootPreflightSliceStart =
+  "function createPrivateHydrateRootPublicFacadePreflight(options) {";
+const rootBridgeHydrateRootPreflightSliceEnd =
+  "function createPrivateHydrateRootPublicFacadePreflightRecord(";
+const packageSurfaceReactDomManifestSliceStart =
+  "const surfaceManifest = manifestSurface(packageJson);";
+const packageSurfaceReactDomManifestSliceEnd =
+  "const actualPublicFiles = await publicResolverFiles(";
+const importSmokeRuntimeExportGuardSliceStart =
+  "function assertNoPrivateDiagnosticRuntimeExports(moduleExports, label) {";
+const importSmokeRuntimeExportGuardSliceEnd =
+  "function assertPrivateRuntimeFacadeSymbols";
 
 export const PRIVATE_ADMISSION_806_ROWS = freezeArray([
   row({
@@ -694,35 +713,116 @@ export const PRIVATE_ADMISSION_806_PACKAGE_SURFACE_EVIDENCE = freezeArray([
   })
 ]);
 
-const packageCompatibilityBlockerFields = freezeArray([
-  "packageCompatibilityClaimed",
-  "packageExportsChanged"
+const rootFacadePublicBlockerHelperFields = freezeArray([
+  "browserDomEventCompatibilityClaimed",
+  "canHydrate",
+  "compatibilityClaimed",
+  "containerMarked",
+  "domMutated",
+  "domMutation",
+  "eventDispatch",
+  "eventReplayInstalled",
+  "eventReplaySupported",
+  "eventsReplayed",
+  "hydration",
+  "hydrationReplaySupported",
+  "listenerInstallation",
+  "listenersAttached",
+  "markerWrites",
+  "publicHydrateRootEnabled",
+  "publicHydrateRootSupported",
+  "publicHydrationCompatibilityClaimed",
+  "publicHydrationReplayCompatibilityClaimed",
+  "publicRootBehaviorChanged",
+  "publicRootCompatibilitySurface",
+  "publicRootCreated",
+  "publicRootObjectExposed",
+  "queueMutationAllowed",
+  "queued",
+  "rootScheduled",
+  "suspenseHydrationScheduled",
+  "willDispatch",
+  "willHydrate",
+  "willReplay"
+]);
+
+const rootBridgePackagePublicBlockerHelperFields = freezeArray([
+  "eventReplayDispatchAttempted",
+  "hydrateInstanceCalled",
+  "hydrateTextInstanceCalled",
+  "listenerInvocationCount",
+  "nativeEventRedispatched",
+  "onRecoverableErrorInvoked",
+  "pluginDispatchEventForPluginEventSystemCalled",
+  "publicDispatchEnabled",
+  "publicHydrationTargetClaimed",
+  "publicOnRecoverableErrorInvoked",
+  "recoverableErrorsQueued",
+  "replayQueueDrained",
+  "replayQueuesDrained",
+  "rootErrorCallbackInvocationCount",
+  "syntheticEventCreated",
+  "targetClaimExecuted",
+  "targetDispatchExecuted",
+  "willDrainReplayQueues",
+  "willInvokeListeners",
+  "willQueueRecoverableErrors"
+]);
+
+const rootBridgeHydrateRootPreflightBlockerFields = freezeArray([
+  "nativeExecution",
+  "reconcilerExecution"
+]);
+
+const publicBlockerCounterFieldNames = freezeArray([
+  "listenerInvocationCount",
+  "rootErrorCallbackInvocationCount"
 ]);
 
 export const PRIVATE_ADMISSION_806_PUBLIC_BLOCKER_FIELD_EVIDENCE = freezeArray([
-  ...PRIVATE_ADMISSION_806_PUBLIC_BLOCKER_FIELDS.filter(
-    (field) => !packageCompatibilityBlockerFields.includes(field)
-  ).map((field) =>
+  ...rootFacadePublicBlockerHelperFields.map((field) =>
+    publicBlockerHelperEvidenceData({
+      field,
+      path: rootFacadeConformancePath,
+      helperName: "assertHydrateRootPreflightEvidenceBlocked",
+      sliceStart: rootFacadeBlockedHelperSliceStart,
+      sliceEnd: rootFacadeBlockedHelperSliceEnd
+    })
+  ),
+  ...rootBridgePackagePublicBlockerHelperFields.map((field) =>
+    publicBlockerHelperEvidenceData({
+      field,
+      path: rootBridgePackageTestPath,
+      helperName: "assertHydrateRootPreflightRowsBlocked",
+      sliceStart: rootBridgePackageBlockedHelperSliceStart,
+      sliceEnd: rootBridgePackageBlockedHelperSliceEnd
+    })
+  ),
+  ...rootBridgeHydrateRootPreflightBlockerFields.map((field) =>
     publicBlockerEvidenceData({
       field,
       path: rootBridgePath,
       tokens: [
         field,
+        "createPrivateHydrateRootPublicFacadePreflight",
         "ROOT_BRIDGE_EXECUTION_BLOCKED",
-        "ROOT_BRIDGE_COMPATIBILITY_BLOCKED",
-        "createPrivateHydrateRootPublicFacadePreflightRecord",
-        "assertHydrateRootEventReplayPreflightEvidenceBlocked"
-      ]
+        "ROOT_BRIDGE_COMPATIBILITY_BLOCKED"
+      ],
+      fieldNames: [field],
+      sliceStart: rootBridgeHydrateRootPreflightSliceStart,
+      sliceEnd: rootBridgeHydrateRootPreflightSliceEnd
     })
   ),
   publicBlockerEvidenceData({
     field: "packageCompatibilityClaimed",
-    path: packageSurfaceGuardPath,
+    path: importSmokePath,
     tokens: [
-      "assertNoPrivateDiagnosticExportKeys",
       "assertNoPrivateDiagnosticRuntimeExports",
-      "assertPrivateImplementationExportMapBlocked"
-    ]
+      "privateDiagnosticRuntimeExportPattern",
+      "allowedRuntimeMetadataKeys"
+    ],
+    sliceStart: importSmokeRuntimeExportGuardSliceStart,
+    sliceEnd: importSmokeRuntimeExportGuardSliceEnd
   }),
   publicBlockerEvidenceData({
     field: "packageExportsChanged",
@@ -731,7 +831,9 @@ export const PRIVATE_ADMISSION_806_PUBLIC_BLOCKER_FIELD_EVIDENCE = freezeArray([
       "manifestSurface",
       "assertNoPrivateDiagnosticExportKeys",
       "assertPrivateImplementationExportMapBlocked"
-    ]
+    ],
+    sliceStart: packageSurfaceReactDomManifestSliceStart,
+    sliceEnd: packageSurfaceReactDomManifestSliceEnd
   })
 ]);
 
@@ -1033,6 +1135,11 @@ export function evaluatePrivateAdmission806Gate({
   );
   pushClaimIdsViolation(
     violations,
+    "public-blocker-claim-detected",
+    publicBlockerClaimViolations
+  );
+  pushClaimIdsViolation(
+    violations,
     "private-diagnostic-compatibility-claim-detected",
     [
       ...rowCompatibilityClaimViolations,
@@ -1188,16 +1295,47 @@ function evidenceData({
   });
 }
 
-function publicBlockerEvidenceData({ field, path, tokens, forbiddenTokens = [] }) {
+function publicBlockerHelperEvidenceData({
+  field,
+  path,
+  helperName,
+  sliceStart,
+  sliceEnd
+}) {
+  return publicBlockerEvidenceData({
+    field,
+    path,
+    tokens: [
+      field,
+      helperName,
+      publicBlockerCounterFieldNames.includes(field)
+        ? "Object.prototype.hasOwnProperty.call"
+        : "blockedBooleanFields"
+    ],
+    fieldNames: [field],
+    sliceStart,
+    sliceEnd
+  });
+}
+
+function publicBlockerEvidenceData({
+  field,
+  path,
+  tokens,
+  fieldNames = [],
+  forbiddenTokens = [],
+  sliceStart = null,
+  sliceEnd = null
+}) {
   return freezeRecord({
     field,
     role: `public-blocker-${field}`,
     path,
     tokens: freezeArray(tokens),
-    fieldNames: freezeArray([]),
+    fieldNames: freezeArray(fieldNames),
     forbiddenTokens: freezeArray(forbiddenTokens),
-    sliceStart: null,
-    sliceEnd: null
+    sliceStart,
+    sliceEnd
   });
 }
 
@@ -1248,8 +1386,10 @@ function evaluatePrivateAdmissionRow({ fileCache, row, workspaceRoot }) {
     row.manifestEvaluationOnly === true &&
     row.runtimeExecutionClaimed === false &&
     row.publicRuntimeExecutionClaimed === false &&
-    row.packageCompatibilityClaimed !== true &&
-    row.packageExportsChanged !== true &&
+    (row.packageCompatibilityClaimed === undefined ||
+      row.packageCompatibilityClaimed === false) &&
+    (row.packageExportsChanged === undefined ||
+      row.packageExportsChanged === false) &&
     row.compatibilityClaimed === false &&
     row.publicCompatibilityClaimed === false &&
     row.ledgerEvaluationMode === "source-token-checks-and-manifest-only";
