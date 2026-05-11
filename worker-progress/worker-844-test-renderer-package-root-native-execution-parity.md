@@ -41,3 +41,16 @@
 - `packages/react-test-renderer/index.js` has a large existing diff from this
   worker branch and may require careful conflict handling if adjacent
   test-renderer workers land first.
+
+## Audit Follow-up
+
+- Made package-root native update `toJSON` nested-row evidence reachable through
+  the generic finished-work identity gate.
+- Made package-root native update `toJSON` sibling-text row evidence reachable
+  through the dedicated sibling-text finished-work identity gate and committed
+  fiber inspection validation.
+- Required direct `hostOutputRowId` evidence to match embedded
+  `hostOutputRow.id` exactly, and added negative package-root coverage for that
+  mismatch.
+- Added focused package-root nested and sibling-text native update coverage in
+  both serialization and create-routing conformance gates.

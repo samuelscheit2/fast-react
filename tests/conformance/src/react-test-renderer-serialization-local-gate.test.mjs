@@ -4016,6 +4016,104 @@ test("react-test-renderer package-root private native create/update serializatio
   assert.equal(updateJSONResult.acceptedHostOutputRowShape, true);
   assert.equal(updateJSONResult.nativeExecution, false);
 
+  const updateJSONIdentity = createAcceptedFinishedWorkIdentityEvidence({
+    rootRequest: updateRequest,
+    publicSurface: "create().toJSON",
+    sourceSerializationDiagnosticName:
+      "fast-react-test-renderer.serialization.private-json-canary",
+    consumesPrivateToJSONEvidence: true,
+    consumesPrivateToTreeEvidence: false,
+    hostOutputUpdateKind: "Update"
+  });
+  const nestedUpdateJSONResult =
+    jsonFacade.createAcceptedNativeExecutionDiagnosticResult(
+      updateRecord,
+      createAcceptedNestedHostOutputDiagnostic(),
+      updateJSONIdentity
+    );
+  assert.equal(nestedUpdateJSONResult.operation, "update");
+  assert.equal(nestedUpdateJSONResult.hostOutputShape, "NestedHostText");
+  assert.equal(
+    nestedUpdateJSONResult.hostOutputRowId,
+    privateToJSONNestedUpdateHostOutputRowId
+  );
+  assert.equal(nestedUpdateJSONResult.acceptedHostOutputRowShape, true);
+  assert.equal(nestedUpdateJSONResult.minimalTreeShape, false);
+  assert.equal(nestedUpdateJSONResult.nestedHostOutputRowShape, true);
+  assert.equal(nestedUpdateJSONResult.siblingTextHostOutputRowShape, false);
+  assert.deepEqual(nestedUpdateJSONResult.result, {
+    type: "section",
+    props: {},
+    children: [
+      {
+        type: "span",
+        props: {},
+        children: ["stable", "inserted"]
+      }
+    ]
+  });
+
+  const siblingUpdateJSONResult =
+    jsonFacade.createAcceptedNativeExecutionDiagnosticResult(
+      updateRecord,
+      createAcceptedSiblingTextHostOutputDiagnostic(),
+      createAcceptedSiblingTextFinishedWorkIdentityEvidence({
+        rootRequest: updateRequest
+      })
+    );
+  assert.equal(siblingUpdateJSONResult.operation, "update");
+  assert.equal(siblingUpdateJSONResult.hostOutputShape, "SiblingText");
+  assert.equal(
+    siblingUpdateJSONResult.hostOutputRowId,
+    privateToJSONSiblingTextHostOutputRowId
+  );
+  assert.equal(siblingUpdateJSONResult.acceptedHostOutputRowShape, true);
+  assert.equal(siblingUpdateJSONResult.minimalTreeShape, false);
+  assert.equal(siblingUpdateJSONResult.nestedHostOutputRowShape, false);
+  assert.equal(siblingUpdateJSONResult.siblingTextHostOutputRowShape, true);
+  assert.equal(
+    siblingUpdateJSONResult.finishedWorkIdentity.diagnosticName,
+    privateToJSONSiblingTextFinishedWorkIdentityDiagnosticName
+  );
+  assert.deepEqual(siblingUpdateJSONResult.result, [
+    "first sibling",
+    {
+      type: "span",
+      props: {},
+      children: ["second sibling"]
+    }
+  ]);
+
+  const mismatchedDirectRowId = createAcceptedMinimalHostOutputDiagnostic({
+    hostOutputUpdateKind: "Update",
+    text: "mismatch"
+  });
+  mismatchedDirectRowId.hostOutputRowId =
+    privateToJSONSiblingTextHostOutputRowId;
+  assert.equal(
+    jsonFacade.canCreateAcceptedNativeExecutionDiagnosticResult(
+      updateRecord,
+      mismatchedDirectRowId,
+      updateJSONIdentity
+    ),
+    false
+  );
+  const mismatchedDirectRowIdError = captureThrown(() =>
+    jsonFacade.createAcceptedNativeExecutionDiagnosticResult(
+      updateRecord,
+      mismatchedDirectRowId,
+      updateJSONIdentity
+    )
+  );
+  assert.equal(
+    mismatchedDirectRowIdError.name,
+    "FastReactTestRendererPrivateToJSONSerializationError"
+  );
+  assert.match(
+    mismatchedDirectRowIdError.message,
+    /hostOutputRowId to match hostOutputRow\.id/u
+  );
+
   const updateTreeResult =
     treeFacade.createAcceptedNativeExecutionDiagnosticResult(
       updateRecord,
@@ -6082,6 +6180,97 @@ function createAcceptedBroaderHostOutputDiagnostic({
     currentRootChildCount: 3
   });
   return diagnostic;
+}
+
+function createAcceptedNestedHostOutputDiagnostic({
+  hostOutputSnapshotCurrent = true
+} = {}) {
+  return {
+    diagnosticName: "fast-react-test-renderer.serialization.private-json-canary",
+    hostOutputUpdateKind: "Update",
+    hostOutputSnapshotCurrent,
+    rootChildCount: 1,
+    rootNodeKind: "HostComponent",
+    hostOutputRow: {
+      id: privateToJSONNestedUpdateHostOutputRowId,
+      status: privateToJSONUpdateUnmountRowStatus,
+      hostOutputUpdateKind: "Update",
+      hostOutputShape: "NestedHostText",
+      previousRootChildCount: 1,
+      currentRootChildCount: 1,
+      dependencyMetadata: {
+        acceptedPrivateDiagnosticDependencyIds:
+          privateToJSONUpdateUnmountDependencyIds,
+        updateRouteDiagnosticsAvailable: true,
+        unmountRouteDiagnosticsAvailable: true,
+        serializationDiagnosticsAvailable: true,
+        hostOutputSnapshotFreshnessRequired: true,
+        staleSnapshotRejection: true,
+        mismatchedUpdateUnmountRecordRejection: true,
+        publicToJSONAvailable: false,
+        publicTestInstanceAvailable: false,
+        nativeExecutionAvailable: false,
+        compatibilityClaimed: false
+      },
+      publicToJSONAvailable: false,
+      publicTestInstanceAvailable: false,
+      nativeExecution: false,
+      compatibilityClaimed: false
+    },
+    nodes: [
+      {
+        ordinal: 0,
+        nodeKind: "HostComponent",
+        parentOrdinal: null,
+        childOrdinals: [1],
+        elementType: { name: "section" },
+        props: {
+          attributes: {},
+          textContent: null
+        },
+        text: null,
+        hidden: false,
+        detached: false
+      },
+      {
+        ordinal: 1,
+        nodeKind: "HostComponent",
+        parentOrdinal: 0,
+        childOrdinals: [2, 3],
+        elementType: { name: "span" },
+        props: {
+          attributes: {},
+          textContent: null
+        },
+        text: null,
+        hidden: false,
+        detached: false
+      },
+      {
+        ordinal: 2,
+        nodeKind: "Text",
+        parentOrdinal: 1,
+        childOrdinals: [],
+        elementType: null,
+        props: null,
+        text: "stable",
+        hidden: false,
+        detached: false
+      },
+      {
+        ordinal: 3,
+        nodeKind: "Text",
+        parentOrdinal: 1,
+        childOrdinals: [],
+        elementType: null,
+        props: null,
+        text: "inserted",
+        hidden: false,
+        detached: false
+      }
+    ],
+    publicBlockers: createAcceptedPrivateJsonPublicBlockers()
+  };
 }
 
 function createAcceptedSiblingTextHostOutputDiagnostic({

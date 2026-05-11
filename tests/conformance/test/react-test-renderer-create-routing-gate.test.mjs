@@ -3841,6 +3841,113 @@ test("react-test-renderer package root private toJSON/toTree facades consume acc
   assert.equal(updateJSONEvidence.acceptedHostOutputRowShape, true);
   assert.equal(updateJSONEvidence.nativeExecution, false);
 
+  const updateJSONIdentity = privateSerializationFinishedWorkIdentityEvidence({
+    rootRequest: updateRequest,
+    publicSurface: "create().toJSON",
+    sourceSerializationDiagnosticName:
+      "fast-react-test-renderer.serialization.private-json-canary",
+    consumesPrivateToJSONEvidence: true,
+    consumesPrivateToTreeEvidence: false,
+    hostOutputUpdateKind: "Update"
+  });
+  const nestedUpdateJSONEvidence =
+    jsonFacade.createAcceptedNativeExecutionDiagnosticResult(
+      updateResult,
+      privateToJSONReport({
+        hostOutputUpdateKind: "Update",
+        rowId: privateToJSONNestedUpdateHostOutputRowId,
+        rowShape: "NestedHostText",
+        rootChildCount: 1,
+        rootNodeKind: "HostComponent",
+        nodes: [
+          hostComponentNode(0, null, [1], "section"),
+          hostComponentNode(1, 0, [2, 3], "span"),
+          textNode(2, 1, "stable"),
+          textNode(3, 1, "inserted")
+        ]
+      }),
+      updateJSONIdentity
+    );
+  assert.equal(nestedUpdateJSONEvidence.operation, "update");
+  assert.equal(nestedUpdateJSONEvidence.hostOutputShape, "NestedHostText");
+  assert.equal(
+    nestedUpdateJSONEvidence.hostOutputRowId,
+    privateToJSONNestedUpdateHostOutputRowId
+  );
+  assert.equal(nestedUpdateJSONEvidence.minimalTreeShape, false);
+  assert.equal(nestedUpdateJSONEvidence.nestedHostOutputRowShape, true);
+  assert.equal(nestedUpdateJSONEvidence.siblingTextHostOutputRowShape, false);
+
+  const siblingTextUpdateJSONEvidence =
+    jsonFacade.createAcceptedNativeExecutionDiagnosticResult(
+      updateResult,
+      privateToJSONReport({
+        hostOutputUpdateKind: "Update",
+        rowId: privateToJSONSiblingTextHostOutputRowId,
+        rowShape: "SiblingText",
+        rootChildCount: 2,
+        rootNodeKind: "MultipleHostChildren",
+        nodes: [
+          textNode(0, null, "first sibling"),
+          hostComponentNode(1, null, [2], "span"),
+          textNode(2, 1, "second sibling")
+        ]
+      }),
+      privateSiblingTextFinishedWorkIdentityEvidence({
+        rootRequest: updateRequest
+      })
+    );
+  assert.equal(siblingTextUpdateJSONEvidence.operation, "update");
+  assert.equal(siblingTextUpdateJSONEvidence.hostOutputShape, "SiblingText");
+  assert.equal(
+    siblingTextUpdateJSONEvidence.hostOutputRowId,
+    privateToJSONSiblingTextHostOutputRowId
+  );
+  assert.equal(siblingTextUpdateJSONEvidence.minimalTreeShape, false);
+  assert.equal(siblingTextUpdateJSONEvidence.nestedHostOutputRowShape, false);
+  assert.equal(siblingTextUpdateJSONEvidence.siblingTextHostOutputRowShape, true);
+  assert.equal(
+    siblingTextUpdateJSONEvidence.finishedWorkIdentity.diagnosticName,
+    privateToJSONSiblingTextFinishedWorkIdentityDiagnosticName
+  );
+
+  const mismatchedDirectRowIdReport = privateToJSONReport({
+    hostOutputUpdateKind: "Update",
+    rowId: privateToJSONUpdateHostOutputRowId,
+    rowShape: "SingleHostText",
+    rootChildCount: 1,
+    rootNodeKind: "HostComponent",
+    nodes: [
+      hostComponentNode(0, null, [1], "span"),
+      textNode(1, 0, "mismatch")
+    ]
+  });
+  mismatchedDirectRowIdReport.hostOutputRowId =
+    privateToJSONSiblingTextHostOutputRowId;
+  assert.equal(
+    jsonFacade.canCreateAcceptedNativeExecutionDiagnosticResult(
+      updateResult,
+      mismatchedDirectRowIdReport,
+      updateJSONIdentity
+    ),
+    false
+  );
+  const mismatchedDirectRowIdError = captureThrown(() =>
+    jsonFacade.createAcceptedNativeExecutionDiagnosticResult(
+      updateResult,
+      mismatchedDirectRowIdReport,
+      updateJSONIdentity
+    )
+  );
+  assert.equal(
+    mismatchedDirectRowIdError.name,
+    "FastReactTestRendererPrivateToJSONSerializationError"
+  );
+  assert.match(
+    mismatchedDirectRowIdError.message,
+    /hostOutputRowId to match hostOutputRow\.id/u
+  );
+
   const updateTreeEvidence =
     treeFacade.createAcceptedNativeExecutionDiagnosticResult(
       updateResult,

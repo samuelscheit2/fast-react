@@ -6982,51 +6982,50 @@ function createPrivateToJSONNativeExecutionDiagnosticResult(
     rootRequest,
     executionRecord
   );
+  let diagnostic;
   if (
     execution.operation === 'update' &&
     report !== null &&
     typeof report === 'object'
   ) {
-    const updateDiagnostic =
-      validatePrivateToJSONHostOutputDiagnostic(report);
-    if (
-      updateDiagnostic.hostOutputUpdateKind === 'Update' &&
-      !isMinimalToJSONNativeExecutionShape(updateDiagnostic)
-    ) {
-      throwPrivateToJSONSerializationError(
-        'Expected private native update toJSON finished-work identity admission to consume the minimal single-host-text update evidence.'
+    diagnostic = validatePrivateToJSONHostOutputDiagnostic(report);
+    if (isSiblingTextToJSONNativeExecutionDiagnostic(diagnostic)) {
+      diagnostic = validatePrivateToJSONSiblingTextHostOutputDiagnostic(
+        report
       );
     }
   }
-  const finishedWorkIdentity =
-    createPrivateSerializationFinishedWorkIdentityGateResult(
-      rootRequest,
-      'create().toJSON',
-      privateToJSONAcceptedDiagnosticName,
-      finishedWorkIdentityEvidence,
-      report,
-      execution.request
-    );
+  const finishedWorkIdentity = isSiblingTextToJSONNativeExecutionDiagnostic(
+    diagnostic
+  )
+    ? createPrivateToJSONSiblingTextFinishedWorkIdentityGateResult(
+        rootRequest,
+        finishedWorkIdentityEvidence,
+        report,
+        execution.request
+      )
+    : createPrivateSerializationFinishedWorkIdentityGateResult(
+        rootRequest,
+        'create().toJSON',
+        privateToJSONAcceptedDiagnosticName,
+        finishedWorkIdentityEvidence,
+        report,
+        execution.request
+      );
   validatePrivateUnmountNativeExecutionFinishedWorkIdentity(
     'create().toJSON',
     execution,
     finishedWorkIdentity
   );
-  const diagnostic = validatePrivateToJSONHostOutputDiagnostic(report);
+  if (diagnostic === undefined) {
+    diagnostic = validatePrivateToJSONHostOutputDiagnostic(report);
+  }
   const expectedHostOutputUpdateKind =
     hostOutputUpdateKindForRootExecutionOperation(execution.operation);
 
   if (diagnostic.hostOutputUpdateKind !== expectedHostOutputUpdateKind) {
     throwPrivateToJSONSerializationError(
       `Expected private native ${execution.operation} execution to consume ${expectedHostOutputUpdateKind} toJSON evidence.`
-    );
-  }
-  if (
-    execution.operation === 'update' &&
-    !isMinimalToJSONNativeExecutionShape(diagnostic)
-  ) {
-    throwPrivateToJSONSerializationError(
-      'Expected private native update toJSON finished-work identity admission to consume the minimal single-host-text update evidence.'
     );
   }
   const acceptedShape =
@@ -7386,6 +7385,16 @@ function isSiblingTextToJSONNativeExecutionShape(diagnostic) {
     Array.isArray(sibling.children) &&
     sibling.children.length === 1 &&
     typeof sibling.children[0] === 'string'
+  );
+}
+
+function isSiblingTextToJSONNativeExecutionDiagnostic(diagnostic) {
+  return (
+    diagnostic !== undefined &&
+    diagnostic !== null &&
+    diagnostic.hostOutputUpdateKind === 'Update' &&
+    diagnostic.hostOutputRow !== null &&
+    diagnostic.hostOutputRow.id === privateToJSONSiblingTextHostOutputRowId
   );
 }
 
@@ -11359,6 +11368,11 @@ function validatePrivateToJSONUpdateUnmountRowMetadata(
   if (!expectedRowIds.includes(rowId)) {
     throwPrivateToJSONSerializationError(
       `Expected private JSON ${hostOutputUpdateKind} row id to be one of ${expectedRowIds.join(', ')}.`
+    );
+  }
+  if (directRowId !== undefined && directRowId !== rowId) {
+    throwPrivateToJSONSerializationError(
+      `Expected private JSON ${hostOutputUpdateKind} hostOutputRowId to match hostOutputRow.id.`
     );
   }
   const hostOutputShape = normalizePrivateToJSONHostOutputShape(
