@@ -2961,6 +2961,8 @@ pub(crate) fn complete_test_function_component_single_host_update_work_for_canar
         completed_child: Some(update.work_in_progress_child()),
         completed_children: vec![update.work_in_progress_child()],
         detached_hosts,
+        sync_flush_host_work_epoch: 0,
+        consumed_sync_flush_host_mutations: Vec::new(),
     })
 }
 
