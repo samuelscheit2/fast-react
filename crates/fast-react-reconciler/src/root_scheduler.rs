@@ -1985,6 +1985,21 @@ impl SyncFlushActContinuationDrainRecord {
             && !self.executes_queued_work()
             && !self.executes_effects()
     }
+
+    #[must_use]
+    pub(crate) fn matches_source_act_continuation(
+        self,
+        source: SchedulerActContinuationRecord,
+    ) -> bool {
+        self.root == source.root()
+            && self.sync_flush_order == source.sync_flush_order()
+            && self.flushed_lanes == source.flushed_lanes()
+            && self.remaining_lanes == source.remaining_lanes()
+            && self.continuation_lanes == source.continuation_lanes()
+            && self.act_scope_depth == source.act_scope_depth()
+            && self.nested_act_scope == source.nested_act_scope()
+            && self.source_status == source.status()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -3762,6 +3777,26 @@ fn execute_scheduler_bridge_act_continuation<H: HostTypes>(
     SchedulerBridgeActContinuationExecutionError,
 > {
     if !continuation.is_accepted_internal_act_continuation() {
+        return Ok(scheduler_bridge_act_continuation_execution_record(
+            continuation,
+            execution_order,
+            Lanes::NO,
+            Lanes::NO,
+            Lanes::NO,
+            SchedulerBridgeActContinuationExecutionStatus::RejectedContinuation,
+            None,
+            None,
+        ));
+    }
+
+    #[cfg(test)]
+    if !store
+        .scheduler_bridge()
+        .act_continuation_records()
+        .iter()
+        .copied()
+        .any(|source| continuation.matches_source_act_continuation(source))
+    {
         return Ok(scheduler_bridge_act_continuation_execution_record(
             continuation,
             execution_order,
@@ -7251,6 +7286,59 @@ mod tests {
     }
 
     #[test]
+    fn root_scheduler_scheduler_bridge_act_continuation_execution_rejects_fabricated_sequence() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        store.scheduler_bridge_mut().enter_act_scope();
+        schedule_default_update(&mut store, root_id);
+        let fabricated = SyncFlushActContinuationDrainRecord {
+            root: root_id,
+            sync_flush_order: 99,
+            flushed_lanes: Lanes::SYNC,
+            remaining_lanes: Lanes::DEFAULT,
+            continuation_lanes: Lanes::DEFAULT,
+            act_scope_depth: 1,
+            nested_act_scope: false,
+            source_status: SchedulerActContinuationStatus::PendingContinuation,
+            host_output_canary_committed: true,
+        };
+
+        let result = execute_scheduler_bridge_act_continuations(&mut store, &[fabricated]).unwrap();
+
+        assert_eq!(result.records().len(), 1);
+        assert_eq!(result.executed_count(), 0);
+        assert_eq!(result.rejected_count(), 1);
+        assert_eq!(result.blocked_count(), 0);
+        assert!(!result.did_execute_accepted_internal_act_continuations());
+        assert!(!result.drains_public_react_act_queue());
+        assert!(!result.public_act_compatibility_claimed());
+        assert!(!result.public_flush_sync_compatibility_claimed());
+        assert!(!result.public_scheduler_timing_compatibility_claimed());
+        assert!(!result.executes_effects());
+        let record = &result.records()[0];
+        assert_eq!(
+            record.status(),
+            SchedulerBridgeActContinuationExecutionStatus::RejectedContinuation
+        );
+        assert!(record.rejected_unaccepted_continuation());
+        assert_eq!(record.continuation(), fabricated);
+        assert_eq!(record.selected_lanes(), Lanes::NO);
+        assert_eq!(record.render_phase(), None);
+        assert!(record.commit().is_none());
+        assert!(!record.drains_public_react_act_queue());
+        assert!(!record.public_act_compatibility_claimed());
+        assert!(!record.public_flush_sync_compatibility_claimed());
+        assert!(!record.public_scheduler_timing_compatibility_claimed());
+        assert!(!record.executes_effects());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(
+            store.root(root_id).unwrap().lanes().pending_lanes(),
+            Lanes::DEFAULT
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
     fn root_scheduler_scheduler_bridge_act_continuation_execution_blocks_stale_lane_order() {
         let (mut store, root_id, host) = root_store();
         store.scheduler_bridge_mut().enter_act_scope();
@@ -7618,6 +7706,54 @@ mod tests {
     }
 
     #[test]
+    fn root_scheduler_sync_continuation_rejects_finished_lanes_mismatch() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        schedule_sync_update(&mut store, root_id, RootElementHandle::from_raw(59671));
+        let rendered =
+            flush_sync_work_on_all_roots(&mut store, &ExecutionContextState::new()).unwrap();
+        let handoff = rendered.records()[0];
+        store
+            .root_mut(root_id)
+            .unwrap()
+            .record_finished_work_for_canary(
+                handoff.render_phase().finished_work(),
+                Lanes::from(Lane::SYNC_HYDRATION),
+            );
+
+        let execution = execute_sync_scheduler_continuation_for_render_handoff(
+            &mut store,
+            handoff,
+            RootSchedulerCallbackHandle::NONE,
+        )
+        .unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootSyncSchedulerContinuationExecutionStatus::BlockedByFinishedWorkHandoffMismatch
+        );
+        assert!(execution.blocked_by_finished_work_handoff_mismatch());
+        assert!(execution.commit().is_none());
+        assert!(execution.root_commit_handoff_for_canary().is_none());
+        assert!(!execution.did_execute_private_sync_scheduler_continuation());
+        assert!(!execution.public_root_compatibility_claimed());
+        assert!(!execution.executes_public_effects());
+        let identity = execution.finished_work_handoff_identity().unwrap();
+        assert_eq!(
+            identity.root_finished_work_before_commit(),
+            Some(handoff.render_phase().finished_work())
+        );
+        assert_eq!(
+            identity.root_finished_lanes_before_commit(),
+            Lanes::from(Lane::SYNC_HYDRATION)
+        );
+        assert_eq!(identity.finished_lanes(), Lanes::SYNC);
+        assert!(!identity.accepted_for_root_scheduler_commit_handoff());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
     fn root_scheduler_sync_continuation_rejects_foreign_finished_work_handoff() {
         let host = RecordingHost::default();
         let mut store = FiberRootStore::<RecordingHost>::new();
@@ -7858,6 +7994,67 @@ mod tests {
         assert_eq!(
             store.root(root_id).unwrap().lanes().expired_lanes(),
             Lanes::NO
+        );
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
+    fn root_scheduler_expired_lane_continuation_rejects_foreign_callback_node() {
+        let host = RecordingHost::default();
+        let mut store = FiberRootStore::<RecordingHost>::new();
+        let first = store
+            .create_client_root(FakeContainer::new(1), RootOptions::new())
+            .unwrap();
+        let second = store
+            .create_client_root(FakeContainer::new(2), RootOptions::new())
+            .unwrap();
+        schedule_default_update(&mut store, first);
+        process_root_schedule_in_microtask(&mut store).unwrap();
+        let first_callback = *store.scheduler_bridge().callback_requests().last().unwrap();
+        schedule_default_update(&mut store, second);
+        process_root_schedule_in_microtask(&mut store).unwrap();
+        let second_callback = *store.scheduler_bridge().callback_requests().last().unwrap();
+        assert_eq!(first_callback.root(), first);
+        assert_eq!(second_callback.root(), second);
+        assert_ne!(first_callback.node(), second_callback.node());
+        assert_eq!(
+            store.root(second).unwrap().scheduling().callback_node(),
+            second_callback.node()
+        );
+        let second_current = store.root(second).unwrap().current();
+        assert!(
+            store
+                .root_mut(second)
+                .unwrap()
+                .lanes_mut()
+                .set_expiration_time(Lane::DEFAULT, 625)
+        );
+
+        let execution = execute_expired_lane_sync_scheduler_continuation_for_root_for_canary(
+            &mut store,
+            second,
+            625,
+            first_callback.node(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootExpiredLaneSyncSchedulerContinuationStatus::StaleCallbackNode
+        );
+        assert!(execution.rejected_stale_callback_node());
+        assert_eq!(execution.root(), second);
+        assert_eq!(execution.requested_callback_node(), first_callback.node());
+        assert_eq!(execution.current_callback_node(), second_callback.node());
+        assert!(execution.handoff().is_none());
+        assert!(execution.continuation().is_none());
+        assert!(!execution.did_execute_expired_lane_sync_continuation());
+        assert!(execution.async_callback_execution_blocked());
+        assert!(execution.public_update_scheduling_blocked());
+        assert_eq!(store.root(second).unwrap().current(), second_current);
+        assert_eq!(
+            store.root(second).unwrap().lanes().pending_lanes(),
+            Lanes::DEFAULT
         );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
     }
