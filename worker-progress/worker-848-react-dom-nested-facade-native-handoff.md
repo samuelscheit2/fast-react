@@ -35,6 +35,13 @@
 - Added validation functions that reject non-canonical native handoff metadata,
   stale update records, foreign native records, cloned/tampered handoff objects,
   and mismatched active nested fake-DOM host output.
+- Audit follow-up: revalidated live fake-DOM output after the native handoff
+  factory returns, including text node content, container/parent/child text
+  content, full parent/child attribute payload state, style payload state, and
+  latest-props pointers.
+- Added negative coverage where a factory creates the canonical handoff, mutates
+  text, child attributes, child style properties, or parent attributes, returns
+  the handoff, and the nested update fails closed.
 
 ## Commands Run
 

@@ -147,6 +147,7 @@ const {
   PRIVATE_STYLE_OBJECT_DIFF_DIAGNOSTIC_STATUS,
   PRIVATE_STYLE_OBJECT_DIFF_FAKE_DOM_COMMIT_METADATA_KIND,
   PRIVATE_STYLE_OBJECT_DIFF_FAKE_DOM_COMMIT_STATUS,
+  diffDomPropertyPayload,
   recordPrivateDomStyleObjectDiffDiagnostics
 } = require('../dom-host/property-payload.js');
 const {
@@ -8330,12 +8331,86 @@ function assertActiveNestedHostOutputForNativeUpdateHandoff(context) {
     getLatestPropsFromHostInstanceToken(context.nestedMount.parentToken) !==
       context.normalized.initial.parentProps ||
     getLatestPropsFromHostInstanceToken(context.nestedMount.childToken) !==
+      context.normalized.next.childProps ||
+    textNode.nodeValue !== context.normalized.next.text ||
+    textNode.textContent !== context.normalized.next.text ||
+    context.nestedMount.childNode.textContent !== context.normalized.next.text ||
+    context.nestedMount.parentNode.textContent !== context.normalized.next.text ||
+    context.container.textContent !== context.normalized.next.text ||
+    !activeHostOutputNodeMatchesProps(
+      context.nestedMount.parentNode,
+      context.normalized.initial.parentType,
+      context.normalized.initial.parentProps
+    ) ||
+    !activeHostOutputNodeMatchesProps(
+      context.nestedMount.childNode,
+      context.normalized.next.childType,
       context.normalized.next.childProps
+    )
   ) {
     throwInvalidRootPublicFacadeHostOutputUpdate(
       'Public-facade nested host-output update native handoff requires active matching fake-DOM host output.'
     );
   }
+}
+
+function activeHostOutputNodeMatchesProps(node, tag, props) {
+  const payload = diffDomPropertyPayload(tag, {}, props);
+  for (let index = 0; index < payload.length; index += 1) {
+    const entry = payload[index];
+    if (entry.kind === ENTRY_NON_PAYLOAD) {
+      continue;
+    }
+    if (!activeHostOutputNodeMatchesPayloadEntry(node, entry)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function activeHostOutputNodeMatchesPayloadEntry(node, entry) {
+  switch (entry.kind) {
+    case ENTRY_SET_ATTRIBUTE:
+      return getActiveHostOutputAttribute(node, entry.attributeName) ===
+        entry.value;
+    case ENTRY_REMOVE_ATTRIBUTE:
+      return getActiveHostOutputAttribute(node, entry.attributeName) === null;
+    case ENTRY_SET_PROPERTY:
+      return node[entry.propertyName] === entry.value;
+    case ENTRY_REMOVE_PROPERTY:
+      return node[entry.propertyName] === null;
+    case ENTRY_SET_STYLE:
+    case ENTRY_REMOVE_STYLE:
+      return getActiveHostOutputStyleValue(node, entry) === entry.value;
+    case ENTRY_SET_INNER_HTML:
+      return node.innerHTML === entry.value;
+    default:
+      return false;
+  }
+}
+
+function getActiveHostOutputAttribute(node, attributeName) {
+  if (typeof node.getAttribute === 'function') {
+    return node.getAttribute(attributeName);
+  }
+  if (node.attributes instanceof Map) {
+    return node.attributes.has(attributeName)
+      ? String(node.attributes.get(attributeName))
+      : null;
+  }
+  return null;
+}
+
+function getActiveHostOutputStyleValue(node, entry) {
+  const style = node.style;
+  if (style === null || typeof style !== 'object') {
+    return null;
+  }
+  if (style.properties instanceof Map && style.properties.has(entry.styleName)) {
+    return String(style.properties.get(entry.styleName));
+  }
+  const value = style[entry.styleName];
+  return value == null ? '' : String(value);
 }
 
 function getMountedNestedHostOutputNodeForNativeUpdateHandoff(token) {

@@ -10195,11 +10195,14 @@ test('private react-dom/client facade nested host-output native handoff fails cl
       children: {
         props: {
           children: 'nested initial native guard',
+          className: 'native-guard-child-initial',
+          'data-phase': 'initial',
           id: 'native-guard-child'
         },
         type: 'span'
       },
-      id: 'native-guard-parent'
+      id: 'native-guard-parent',
+      'data-shell': 'stable'
     },
     type: 'section'
   };
@@ -10208,8 +10211,46 @@ test('private react-dom/client facade nested host-output native handoff fails cl
       children: {
         props: {
           children: 'nested updated native guard',
+          className: 'native-guard-child-updated',
+          'data-phase': 'updated',
           id: 'native-guard-child',
           title: 'updated native guard'
+        },
+        type: 'span'
+      },
+      id: 'native-guard-parent',
+      'data-shell': 'stable'
+    },
+    type: 'section'
+  };
+
+  const initialStyleElement = {
+    props: {
+      children: {
+        props: {
+          children: 'nested initial native guard',
+          id: 'native-guard-child',
+          style: {
+            color: 'blue',
+            opacity: 0.25
+          }
+        },
+        type: 'span'
+      },
+      id: 'native-guard-parent'
+    },
+    type: 'section'
+  };
+  const nextStyleElement = {
+    props: {
+      children: {
+        props: {
+          children: 'nested updated native guard',
+          id: 'native-guard-child',
+          style: {
+            color: 'green',
+            opacity: 0.5
+          }
         },
         type: 'span'
       },
@@ -10218,8 +10259,20 @@ test('private react-dom/client facade nested host-output native handoff fails cl
     type: 'section'
   };
 
-  function createScenario(label) {
+  function createScenario(label, options) {
     const document = createDocument(label);
+    if (options && options.withStyleTarget) {
+      const createDocumentElement = document.createElement;
+      document.createElement = function createFakeElementWithStyle(tagName) {
+        const element = createDocumentElement.call(this, tagName);
+        element.style = {
+          setProperty(name, value) {
+            this[String(name)] = String(value);
+          }
+        };
+        return element;
+      };
+    }
     const container = createElement('DIV', document);
     const adapter = descriptor.value({
       createRenderAdmissionIdPrefix: `${label}-admission`,
@@ -10342,6 +10395,66 @@ test('private react-dom/client facade nested host-output native handoff fails cl
   );
   assert.equal(staleFactoryCalled, true);
   assertRejectedScenario(staleScenario);
+
+  const tamperScenarios = [
+    {
+      label: 'text-tamper',
+      mutate({textInstance}) {
+        textInstance.nodeValue = 'tampered nested native guard';
+      }
+    },
+    {
+      label: 'child-attribute-tamper',
+      mutate({childHostInstanceNode}) {
+        childHostInstanceNode.setAttribute('data-phase', 'tampered');
+      }
+    },
+    {
+      label: 'child-style-tamper',
+      initialElement: initialStyleElement,
+      mutate({childHostInstanceNode}) {
+        childHostInstanceNode.style.color = 'purple';
+      },
+      nextElement: nextStyleElement,
+      options: {withStyleTarget: true}
+    },
+    {
+      label: 'parent-attribute-tamper',
+      mutate({parentHostInstanceNode}) {
+        parentHostInstanceNode.setAttribute('data-shell', 'tampered');
+      }
+    }
+  ];
+  for (const tamper of tamperScenarios) {
+    const scenario = createScenario(
+      `nested-native-${tamper.label}`,
+      tamper.options
+    );
+    let factoryCalled = false;
+    assert.throws(
+      () =>
+        scenario.adapter.updateNestedHostOutput(
+          scenario.root,
+          tamper.initialElement || initialElement,
+          tamper.nextElement || nextElement,
+          {
+            nativeHandoffRecordFactory(factoryContext) {
+              factoryCalled = true;
+              const handoff = factoryContext.bridge.createNativeRequestHandoff(
+                factoryContext.updateRecord
+              );
+              tamper.mutate(factoryContext);
+              return handoff;
+            }
+          }
+        ),
+      {
+        code: 'FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_HOST_OUTPUT_UPDATE'
+      }
+    );
+    assert.equal(factoryCalled, true, tamper.label);
+    assertRejectedScenario(scenario);
+  }
 
   const mismatchedHostOutputScenario =
     createScenario('nested-native-mismatched-host-output');
