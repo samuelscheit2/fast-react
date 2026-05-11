@@ -1708,6 +1708,255 @@ test("React DOM client private hydrateRoot execution preflight consumes blocked 
   assert.equal(publicBoundary.hydrateRoot.rootObjectCreated, false);
 });
 
+test("React DOM client private hydrateRoot post-preflight execution applies fake text patch only", () => {
+  const recoverableErrorCalls = [];
+  const {
+    container,
+    dispatchRecord,
+    document,
+    eventReplayRecord,
+    hydrateRecord,
+    hydrationOptions,
+    preflight,
+    rootBridge,
+    textNode
+  } = createHydrateRootExecutionPreflightScenario(
+    "public-facade-hydrate-text-claim-patch",
+    {
+      onRecoverableError(error) {
+        recoverableErrorCalls.push(error);
+      },
+      textMismatch: true
+    }
+  );
+  const executionRecord = preflight.preflightExecution(eventReplayRecord, {
+    source: "conformance-hydrate-root-text-claim-patch-preflight"
+  });
+  const mismatchRow = hydrateRecord.textMismatchDiagnostics.mismatchRows[0];
+  const bridgeExecution = preflight.postPreflightExecution(
+    executionRecord,
+    {
+      claimLabel: "conformance-text",
+      hydrationOptions,
+      mismatchRow,
+      source: "conformance-hydrate-root-text-claim-patch"
+    }
+  );
+  const bridgePayload =
+    rootBridge
+      .getPrivateHydrateRootPublicFacadeTextNodeClaimPatchExecutionPayload(
+        bridgeExecution
+      );
+  const textPatchRecord =
+    bridgeExecution.textNodeClaimPatchExecutionRecord;
+  const textPatchPayload =
+    rootBridge.getPrivateHydrationTextNodeClaimPatchExecutionPayload(
+      textPatchRecord
+    );
+  const preflightPayload =
+    rootBridge.getPrivateHydrateRootPublicFacadePreflightPayload(
+      preflight
+    );
+
+  assert.equal(Object.isFrozen(bridgeExecution), true);
+  assert.equal(
+    bridgeExecution.$$typeof,
+    rootBridge
+      .privateHydrateRootPublicFacadeTextNodeClaimPatchExecutionRecordType
+  );
+  assert.equal(
+    bridgeExecution.executionStatus,
+    rootBridge
+      .ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_TEXT_NODE_CLAIM_PATCH_EXECUTED
+  );
+  assert.equal(
+    rootBridge
+      .isPrivateHydrateRootPublicFacadeTextNodeClaimPatchExecutionRecord(
+        bridgeExecution
+      ),
+    true
+  );
+  assert.equal(bridgeExecution.executionPreflight, executionRecord);
+  assert.equal(bridgeExecution.privateExecution, true);
+  assert.equal(bridgeExecution.fakeDomMutation, true);
+  assert.equal(bridgeExecution.fakeTextNodeClaimed, true);
+  assert.equal(bridgeExecution.fakeTextNodePatched, true);
+  assert.equal(bridgeExecution.textPatchApplied, true);
+  assert.equal(bridgeExecution.actualTextBefore, "server text");
+  assert.equal(bridgeExecution.actualTextAfter, "client text");
+  assert.equal(bridgeExecution.expectedPath, "initialChildren.props.children");
+  assert.equal(bridgeExecution.actualPath, "container.childNodes[2]");
+  assert.equal(bridgeExecution.claimLabel, "conformance-text");
+  assert.equal(bridgeExecution.publicHydrateRootEnabled, false);
+  assert.equal(bridgeExecution.publicHydrateRootSupported, false);
+  assert.equal(bridgeExecution.publicRootObjectExposed, false);
+  assert.equal(bridgeExecution.nativeExecution, false);
+  assert.equal(bridgeExecution.reconcilerExecution, false);
+  assert.equal(bridgeExecution.domMutation, false);
+  assert.equal(bridgeExecution.browserDomMutated, false);
+  assert.equal(bridgeExecution.hydration, false);
+  assert.equal(bridgeExecution.eventDispatch, false);
+  assert.equal(bridgeExecution.recoverableErrorsQueued, false);
+  assert.equal(bridgeExecution.onRecoverableErrorInvoked, false);
+  assert.equal(bridgeExecution.publicOnRecoverableErrorInvoked, false);
+  assert.equal(bridgeExecution.compatibilityClaimed, false);
+  assert.deepEqual(
+    bridgeExecution.acceptedCapabilities.map((capability) => capability.id),
+    [
+      "hydrate-root-execution-preflight-required",
+      "hydrate-root-text-node-claim-patch-execution-record",
+      "hydrate-root-text-node-claim-patch-options-owned",
+      "hydrate-root-text-node-claim-patch-state-unchanged"
+    ]
+  );
+  assert.equal(
+    rootBridge.isPrivateHydrationTextNodeClaimPatchExecutionRecord(
+      textPatchRecord
+    ),
+    true
+  );
+  assert.equal(
+    textPatchRecord.kind,
+    rootBridge.HYDRATION_TEXT_NODE_CLAIM_PATCH_EXECUTION_RECORD_KIND
+  );
+  assert.equal(textPatchRecord.textMismatchRow, mismatchRow);
+  assert.equal(textPatchRecord.patchWriteProperty, "nodeValue");
+  assert.deepEqual(textNode.writeLog, [["nodeValue", "client text"]]);
+  assert.equal(textNode.textContent, "client text");
+  assert.equal(textPatchPayload.hydrationBoundaryRecord, hydrateRecord.hydrationBoundaryRecord);
+  assert.equal(textPatchPayload.mismatchRow, mismatchRow);
+  assert.equal(bridgePayload.preflight, preflight);
+  assert.equal(bridgePayload.executionPreflight, executionRecord);
+  assert.equal(
+    bridgePayload.textNodeClaimPatchExecutionPayload,
+    textPatchPayload
+  );
+  assert.deepEqual(
+    preflight.getHydrateRootTextNodeClaimPatchExecutionRecords(),
+    [bridgeExecution]
+  );
+  assert.deepEqual(
+    preflightPayload.textNodeClaimPatchExecutionRecords,
+    [bridgeExecution]
+  );
+  assert.equal(preflightPayload.textNodeClaimPatchExecutionRecordCount, 1);
+  assertHydrateRootPreflightEvidenceBlocked([
+    eventReplayRecord.replayExecutionRecord,
+    eventReplayRecord,
+    executionRecord
+  ]);
+  assert.equal(recoverableErrorCalls.length, 0);
+  assert.equal(dispatchRecord.hydrationReplay.queued, false);
+  assert.equal(container.__registrations.length, 0);
+  assert.equal(document.__registrations.length, 0);
+  assert.equal(container.__mutationLog.length, 0);
+  assert.equal(document.__mutationLog.length, 0);
+
+  const publicBoundary = inspectReactDomRootPublicFacadeBoundary();
+  assert.equal(publicBoundary.hydrateRoot.status, "throws");
+  assert.equal(publicBoundary.hydrateRoot.rootObjectCreated, false);
+});
+
+test("React DOM client private hydrateRoot post-preflight execution rejects noncanonical records", () => {
+  const {
+    eventReplayRecord,
+    hydrateRecord,
+    hydrationOptions,
+    preflight,
+    rootBridge,
+    targetClaimRecord
+  } = createHydrateRootExecutionPreflightScenario(
+    "public-facade-hydrate-text-claim-patch-negative",
+    {
+      textMismatch: true
+    }
+  );
+  const executionPreflightRecord = preflight.preflightExecution(
+    eventReplayRecord
+  );
+
+  assert.throws(
+    () => preflight.postPreflightExecution(eventReplayRecord),
+    {
+      code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT"
+    }
+  );
+  assert.throws(
+    () =>
+      preflight.postPreflightExecution(
+        Object.freeze({...executionPreflightRecord})
+      ),
+    {
+      code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT"
+    }
+  );
+  assert.throws(
+    () =>
+      preflight.postPreflightExecution(
+        Object.freeze({
+          ...executionPreflightRecord,
+          publicHydrateRootSupported: true
+        })
+      ),
+    {
+      code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT"
+    }
+  );
+  assert.throws(
+    () =>
+      preflight.postPreflightExecution(executionPreflightRecord, {
+        hydrationOptions: {}
+      }),
+    {
+      code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT"
+    }
+  );
+  assert.throws(
+    () => preflight.postPreflightExecution(targetClaimRecord),
+    {
+      code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT"
+    }
+  );
+
+  const foreign =
+    createHydrateRootExecutionPreflightScenario(
+      "public-facade-hydrate-text-claim-patch-foreign",
+      {
+        textMismatch: true
+      }
+    );
+  const foreignExecutionRecord = foreign.preflight.preflightExecution(
+    foreign.eventReplayRecord
+  );
+  assert.throws(
+    () => preflight.postPreflightExecution(foreignExecutionRecord),
+    {
+      code: "FAST_REACT_DOM_INVALID_ROOT_PUBLIC_FACADE_PREFLIGHT"
+    }
+  );
+
+  const bridgeExecution = preflight.postPreflightExecution(
+    executionPreflightRecord,
+    {
+      hydrationOptions,
+      mismatchRow: hydrateRecord.textMismatchDiagnostics.mismatchRows[0]
+    }
+  );
+  assert.equal(bridgeExecution.textPatchApplied, true);
+  assert.throws(
+    () => preflight.postPreflightExecution(executionPreflightRecord),
+    {
+      code:
+        "FAST_REACT_DOM_INVALID_HYDRATION_TEXT_NODE_CLAIM_PATCH_EXECUTION"
+    }
+  );
+  assert.equal(
+    rootBridge.getPrivateHydrateRootPublicFacadePreflightPayload(preflight)
+      .textNodeClaimPatchExecutionRecordCount,
+    1
+  );
+});
+
 test("React DOM client private hydrateRoot execution preflight rejects stale foreign or public execution claims", () => {
   const {
     container,
@@ -3957,12 +4206,22 @@ function createHydrateRootExecutionPreflightScenario(label, options = {}) {
   const document = createPrivateGateDocument(label, domContainer);
   const container = createPrivateGateElement("DIV", document, domContainer);
   const target = createPrivateGateElement("BUTTON", document, domContainer);
+  const textNode =
+    options.textMismatch === true
+      ? createPrivateGateTextNode("server text", document, domContainer)
+      : null;
   const start = createPrivateGateCommentNode("$", document, domContainer);
   const end = createPrivateGateCommentNode("/$", document, domContainer);
   start.parentNode = container;
   target.parentNode = container;
+  if (textNode !== null) {
+    textNode.parentNode = container;
+  }
   end.parentNode = container;
-  container.childNodes = [start, target, end];
+  container.childNodes =
+    textNode === null
+      ? [start, target, end]
+      : [start, target, textNode, end];
 
   const hydrationOptions = {
     identifierPrefix: `${label}-`
@@ -3981,7 +4240,10 @@ function createHydrateRootExecutionPreflightScenario(label, options = {}) {
     container,
     {
       props: {
-        children: `${label} child`
+        children:
+          options.textMismatch === true
+            ? "client text"
+            : `${label} child`
       },
       type: "App"
     },
@@ -4021,10 +4283,12 @@ function createHydrateRootExecutionPreflightScenario(label, options = {}) {
     document,
     eventReplayRecord,
     hydrateRecord,
+    hydrationOptions,
     preflight,
     rootBridge,
     target,
-    targetClaimRecord
+    targetClaimRecord,
+    textNode
   };
 }
 

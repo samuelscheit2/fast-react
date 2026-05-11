@@ -44,6 +44,7 @@ const {
   HYDRATION_TEXT_MISMATCH_BLOCKED_REASON,
   HYDRATION_TEXT_MISMATCH_DIAGNOSTIC_KIND,
   HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND,
+  HYDRATION_TEXT_NODE_CLAIM_PATCH_EXECUTION_RECORD_KIND,
   UNSUPPORTED_HYDRATION_ROOT_KIND,
   acceptedHydrationBoundaryMetadataContracts,
   assertCanonicalPrivateHydrationClaimedReplayTargetDispatchExecutionRecord,
@@ -55,17 +56,22 @@ const {
   getPrivateHydrationBoundaryRecordPayload,
   getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload,
   getPrivateHydrationTargetClaimingDiagnosticPayload,
+  getPrivateHydrationTextNodeClaimPatchExecutionPayload,
   getPrivateHydrationTextMismatchRecoverableErrorPreflightPayload,
   isPrivateHydrationBoundaryRecord,
   isPrivateHydrationClaimedReplayTargetDispatchExecutionRecord,
   isPrivateHydrationTargetClaimingDiagnostic,
+  isPrivateHydrationTextNodeClaimPatchExecutionRecord,
   isPrivateHydrationTextMismatchRecoverableErrorPreflightRecord,
   privateHydrationBoundaryAcceptedMetadataGateId,
   privateHydrationBoundaryAcceptedMetadataStatus,
   privateHydrationClaimedReplayTargetDispatchExecutionGateId,
   privateHydrationClaimedReplayTargetDispatchExecutionStatus,
   privateHydrationTargetClaimingGateId,
-  privateHydrationTargetClaimingMetadataStatus
+  privateHydrationTargetClaimingMetadataStatus,
+  privateHydrationTextNodeClaimPatchExecutionGateId,
+  privateHydrationTextNodeClaimPatchExecutionStatus,
+  privateHydrationTextNodeClaimPatchMetadataId
 } = require('./hydration-boundary-gate.js');
 const {
   hasListeningMarker,
@@ -248,6 +254,8 @@ const privateHydrateRootPublicFacadeEventReplayPreflightRecordType =
   'fast.react_dom.private_hydrate_root_public_facade_event_replay_preflight_record';
 const privateHydrateRootPublicFacadeExecutionPreflightRecordType =
   'fast.react_dom.private_hydrate_root_public_facade_execution_preflight_record';
+const privateHydrateRootPublicFacadeTextNodeClaimPatchExecutionRecordType =
+  'fast.react_dom.private_hydrate_root_public_facade_text_node_claim_patch_execution_record';
 const privateRootLiveContainerPreflightRecordType =
   'fast.react_dom.private_root_live_container_preflight_record';
 const privateRootPublicFacadeMarkerListenerPreflightRecordType =
@@ -364,6 +372,8 @@ const ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_EVENT_REPLAY_PREFLIGHTED =
   'preflighted-private-hydrate-root-public-facade-event-replay-gate';
 const ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_EXECUTION_PREFLIGHTED =
   'preflighted-private-hydrate-root-public-facade-execution-gate';
+const ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_TEXT_NODE_CLAIM_PATCH_EXECUTED =
+  'executed-private-hydrate-root-public-facade-text-node-claim-patch';
 const ROOT_BRIDGE_LIVE_CONTAINER_PREFLIGHT_BLOCKED =
   'blocked-private-root-live-container-preflight';
 const ROOT_BRIDGE_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHTED =
@@ -724,6 +734,96 @@ const ROOT_BRIDGE_HYDRATE_ROOT_EXECUTION_PREFLIGHT_ACCEPTED_CAPABILITIES =
   ]);
 const ROOT_BRIDGE_HYDRATE_ROOT_EXECUTION_PREFLIGHT_BLOCKED_CAPABILITIES =
   ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_BLOCKED_CAPABILITIES;
+const ROOT_BRIDGE_HYDRATE_ROOT_TEXT_NODE_CLAIM_PATCH_ACCEPTED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'hydrate-root-execution-preflight-required',
+      accepted: true,
+      reason:
+        'The private text claim patch starts only after hydrateRoot execution preflight has accepted the blocked replay boundary.'
+    }),
+    freezeRecord({
+      id: 'hydrate-root-text-node-claim-patch-execution-record',
+      accepted: true,
+      reason:
+        'The bridge executed the private hydration text-node claim patch record for one fake DOM text mismatch.'
+    }),
+    freezeRecord({
+      id: 'hydrate-root-text-node-claim-patch-options-owned',
+      accepted: true,
+      reason:
+        'The patch consumed the original hydrateRoot boundary and options object.'
+    }),
+    freezeRecord({
+      id: 'hydrate-root-text-node-claim-patch-state-unchanged',
+      accepted: true,
+      reason:
+        'The marker/listener state remained unchanged while applying the private fake text patch.'
+    })
+  ]);
+const ROOT_BRIDGE_HYDRATE_ROOT_TEXT_NODE_CLAIM_PATCH_BLOCKED_CAPABILITIES =
+  freezeArray([
+    freezeRecord({
+      id: 'public-hydrate-root-execution',
+      blocked: true,
+      reason:
+        'The execution is private and does not call public hydrateRoot behavior.'
+    }),
+    freezeRecord({
+      id: 'public-root-object',
+      blocked: true,
+      reason: 'No public React DOM root object is created or exposed.'
+    }),
+    freezeRecord({
+      id: 'native-execution',
+      blocked: true,
+      reason: 'No native or Rust root bridge execution is admitted.'
+    }),
+    freezeRecord({
+      id: 'reconciler-execution',
+      blocked: true,
+      reason:
+        'No reconciler hydration, render, schedule, or commit execution is admitted.'
+    }),
+    freezeRecord({
+      id: 'browser-dom-mutation',
+      blocked: true,
+      reason:
+        'No browser DOM mutation is admitted; only a private fake text node is patched.'
+    }),
+    freezeRecord({
+      id: 'marker-writes',
+      blocked: true,
+      reason: 'Hydration marker consumption and root marker writes remain blocked.'
+    }),
+    freezeRecord({
+      id: 'listener-installation',
+      blocked: true,
+      reason: 'Root listener installation remains blocked.'
+    }),
+    freezeRecord({
+      id: 'hydration',
+      blocked: true,
+      reason:
+        'Hydration root creation, host instance hydration, and replay remain blocked.'
+    }),
+    freezeRecord({
+      id: 'events',
+      blocked: true,
+      reason: 'Hydration replay and synthetic event dispatch are not admitted.'
+    }),
+    freezeRecord({
+      id: 'recoverable-error-callbacks',
+      blocked: true,
+      reason:
+        'Recoverable errors are not queued and root callbacks are not invoked.'
+    }),
+    freezeRecord({
+      id: 'compatibility-claims',
+      blocked: true,
+      reason: 'React DOM hydrateRoot compatibility remains unclaimed.'
+    })
+  ]);
 const HYDRATION_BOUNDARY_ACCEPTED_METADATA_BLOCKED_PUBLIC_FIELDS = freezeArray([
   'compatibilityClaimed',
   'publicRootCompatibilitySurface',
@@ -2824,6 +2924,8 @@ const rootHydratePublicFacadeEventReplayPreflightPayloads =
   new WeakMap();
 const rootHydratePublicFacadeExecutionPreflightPayloads =
   new WeakMap();
+const rootHydratePublicFacadeTextNodeClaimPatchExecutionPayloads =
+  new WeakMap();
 const rootLiveContainerPreflightPayloads = new WeakMap();
 const rootPublicFacadeMarkerListenerPreflightPayloads = new WeakMap();
 const rootPublicFacadeHostOutputRenderPayloads = new WeakMap();
@@ -3348,6 +3450,7 @@ function createPrivateHydrateRootPublicFacadePreflight(options) {
     nextExecutionPreflightSequence: 1,
     nextPreflightSequence: 1,
     nextTargetClaimingPreflightSequence: 1,
+    nextTextNodeClaimPatchExecutionSequence: 1,
     preflight: null,
     preflightIdPrefix: getIdPrefix(
       options && options.publicFacadeHydratePreflightIdPrefix,
@@ -3355,7 +3458,8 @@ function createPrivateHydrateRootPublicFacadePreflight(options) {
     ),
     recoverableErrorPreflightRecords: [],
     records: [],
-    targetClaimingPreflightRecords: []
+    targetClaimingPreflightRecords: [],
+    textNodeClaimPatchExecutionRecords: []
   };
   const preflight = freezeRecord({
     $$typeof: privateHydrateRootPublicFacadePreflightType,
@@ -3435,8 +3539,25 @@ function createPrivateHydrateRootPublicFacadePreflight(options) {
       preflightState.executionPreflightRecords.push(executionPreflight);
       return executionPreflight;
     },
+    postPreflightExecution(executionPreflightRecord, options) {
+      const textNodeClaimPatchExecution =
+        createPrivateHydrateRootPublicFacadeTextNodeClaimPatchExecutionRecord(
+          preflightState,
+          executionPreflightRecord,
+          options
+        );
+      preflightState.textNodeClaimPatchExecutionRecords.push(
+        textNodeClaimPatchExecution
+      );
+      return textNodeClaimPatchExecution;
+    },
     getHydrateRootExecutionPreflightRecords() {
       return freezeArray(preflightState.executionPreflightRecords);
+    },
+    getHydrateRootTextNodeClaimPatchExecutionRecords() {
+      return freezeArray(
+        preflightState.textNodeClaimPatchExecutionRecords
+      );
     }
   });
 
@@ -4914,6 +5035,388 @@ function createPrivateHydrateRootPublicFacadeExecutionPreflightRecord(
   return record;
 }
 
+function createPrivateHydrateRootPublicFacadeTextNodeClaimPatchExecutionRecord(
+  preflightState,
+  executionPreflightRecord,
+  options
+) {
+  const executionPayload =
+    assertPrivateHydrateRootPublicFacadeExecutionPreflightRecordForTextNodeClaimPatch(
+      executionPreflightRecord,
+      preflightState
+    );
+  const requestRecord = executionPayload.requestRecord;
+  const requestPayload = rootRecordPayloads.get(requestRecord);
+  if (requestPayload === undefined) {
+    throwInvalidRootPublicFacadePreflight(
+      'hydrateRoot text-node claim patch requires the private hydrateRoot request payload.'
+    );
+  }
+
+  const container = requestPayload.container;
+  const ownerDocument = getOwnerDocument(container);
+  const executionOptions =
+    normalizeHydrateRootTextNodeClaimPatchExecutionOptions(
+      options,
+      requestPayload.hydrationOptions
+    );
+  const beforeState =
+    inspectPublicFacadeMarkerListenerPreflightState(container);
+  if (!markerListenerStateMatches(executionPayload.afterState, beforeState)) {
+    throwInvalidRootPublicFacadePreflight(
+      'hydrateRoot text-node claim patch requires the current marker/listener state to match the accepted execution preflight.'
+    );
+  }
+
+  const textNodeClaimPatchExecutionRecord =
+    requestPayload.bridgeState.hydrationBoundaryGate
+      .createHydrationTextNodeClaimPatchExecutionRecord(
+        requestRecord.hydrationBoundaryRecord,
+        requestRecord.acceptedPrivateMetadataDiagnostics,
+        executionOptions.textNodeClaimPatchOptions
+      );
+  const textNodeClaimPatchExecutionPayload =
+    assertHydrateRootTextNodeClaimPatchExecutionRecord(
+      textNodeClaimPatchExecutionRecord,
+      executionPayload,
+      requestRecord,
+      requestPayload,
+      executionOptions
+    );
+
+  const afterState =
+    inspectPublicFacadeMarkerListenerPreflightState(container);
+  const stateUnchanged = markerListenerStateMatches(beforeState, afterState);
+  if (!stateUnchanged) {
+    throwInvalidRootPublicFacadePreflight(
+      'hydrateRoot text-node claim patch changed marker/listener state while applying the private fake text patch.'
+    );
+  }
+
+  const textNodeClaimPatchExecutionSequence =
+    preflightState.nextTextNodeClaimPatchExecutionSequence++;
+  const textNodeClaimPatchExecutionId =
+    `${executionPreflightRecord.executionPreflightId}:text-node-claim-patch:${textNodeClaimPatchExecutionSequence}`;
+  const preconditions = freezeRecord({
+    accepted: true,
+    stateUnchanged,
+    currentStateMatchesExecutionPreflight: true,
+    executionPreflightRequired: true,
+    executionPreflightAccepted: true,
+    eventReplayPreflightRequired: true,
+    eventReplayPreflightAccepted:
+      executionPreflightRecord.preconditions.eventReplayPreflightAccepted,
+    replayExecutionPayloadAccepted:
+      executionPreflightRecord.replayExecutionPayloadAccepted,
+    canonicalTextNodeClaimPatchExecution: true,
+    textNodeClaimPatchExecutionRecordImmutable:
+      Object.isFrozen(textNodeClaimPatchExecutionRecord),
+    hydrationOptionsOwned:
+      textNodeClaimPatchExecutionPayload.hydrationOptions ===
+      requestPayload.hydrationOptions,
+    acceptedBoundaryMetadataConsumed:
+      textNodeClaimPatchExecutionRecord
+        .acceptedBoundaryMetadataConsumed,
+    fakeTextNodeClaimed:
+      textNodeClaimPatchExecutionRecord.fakeTextNodeClaimed,
+    fakeTextNodePatched:
+      textNodeClaimPatchExecutionRecord.fakeTextNodePatched,
+    textPatchApplied:
+      textNodeClaimPatchExecutionRecord.textPatchApplied,
+    rootMarkerPropertyCount: beforeState.containerMarker.propertyCount,
+    rootListeningMarkerPropertyCount:
+      beforeState.rootListeningMarker.propertyCount,
+    rootListenerRegistrationCount:
+      beforeState.rootListenerRegistrationCount,
+    ownerDocumentListenerRegistrationCount:
+      beforeState.ownerDocumentListenerRegistrationCount,
+    rootMutationCount: beforeState.rootMutationCount,
+    ownerDocumentMutationCount: beforeState.ownerDocumentMutationCount
+  });
+  const blockerEvidence = freezeRecord({
+    status:
+      ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_TEXT_NODE_CLAIM_PATCH_EXECUTED,
+    executionPreflightRequired: true,
+    executionPreflightAccepted: true,
+    markerListenerStateUnchanged: stateUnchanged,
+    fakeDomOnly: true,
+    fakeDomMutation: true,
+    fakeTextNodeClaimed: true,
+    fakeTextNodePatched: true,
+    textPatchApplied: true,
+    publicHydrateRootBlocked: true,
+    publicRootObjectBlocked: true,
+    browserDomMutationBlocked: true,
+    nativeExecutionBlocked: true,
+    reconcilerExecutionBlocked: true,
+    rootSchedulingBlocked: true,
+    markerWriteBlocked: true,
+    listenerInstallationBlocked: true,
+    hydrationMarkerConsumptionBlocked: true,
+    hydrateInstanceBlocked: true,
+    eventReplayBlocked: true,
+    eventDispatchBlocked: true,
+    replayQueueDrainBlocked: true,
+    recoverableErrorQueueingBlocked: true,
+    recoverableErrorCallbackBlocked: true,
+    compatibilityClaimed: false
+  });
+
+  const record = freezeRecord({
+    $$typeof:
+      privateHydrateRootPublicFacadeTextNodeClaimPatchExecutionRecordType,
+    kind:
+      'FastReactDomPrivateHydrateRootPublicFacadeTextNodeClaimPatchExecutionRecord',
+    operation: 'hydrate-root-text-node-claim-patch-execution',
+    facadeCall: 'hydrateRoot',
+    entrypoint: 'react-dom/client',
+    preflightId: executionPreflightRecord.preflightId,
+    preflightSequence: executionPreflightRecord.preflightSequence,
+    targetClaimingPreflightId:
+      executionPreflightRecord.targetClaimingPreflightId,
+    targetClaimingPreflightSequence:
+      executionPreflightRecord.targetClaimingPreflightSequence,
+    eventReplayPreflightId:
+      executionPreflightRecord.eventReplayPreflightId,
+    eventReplayPreflightSequence:
+      executionPreflightRecord.eventReplayPreflightSequence,
+    executionPreflightId:
+      executionPreflightRecord.executionPreflightId,
+    executionPreflightSequence:
+      executionPreflightRecord.executionPreflightSequence,
+    textNodeClaimPatchExecutionId,
+    textNodeClaimPatchExecutionSequence,
+    preflightStatus:
+      ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_EXECUTION_PREFLIGHTED,
+    executionStatus:
+      ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_TEXT_NODE_CLAIM_PATCH_EXECUTED,
+    compatibilityStatus: ROOT_BRIDGE_COMPATIBILITY_BLOCKED,
+    requestId: requestRecord.requestId,
+    requestSequence: requestRecord.requestSequence,
+    requestType: requestRecord.requestType,
+    hydrateId: requestRecord.hydrateId,
+    rootId: requestRecord.rootId,
+    rootKind: requestRecord.rootKind,
+    rootTag: requestRecord.rootTag,
+    rootRecordId: requestRecord.hydrationBoundaryRecord.recordId,
+    containerInfo: beforeState.containerInfo,
+    ownerDocumentInfo: beforeState.ownerDocumentInfo,
+    markerListenerPreflight:
+      executionPayload.markerListenerPreflight,
+    markerListenerPreflightId:
+      executionPreflightRecord.markerListenerPreflightId,
+    markerListenerPreflightStatus:
+      executionPreflightRecord.markerListenerPreflightStatus,
+    markerListenerStateUnchanged:
+      executionPreflightRecord.markerListenerStateUnchanged,
+    targetClaimingPreflight:
+      executionPayload.targetClaimingPreflight,
+    targetClaimingPreflightStatus:
+      executionPreflightRecord.targetClaimingPreflightStatus,
+    eventReplayPreflight:
+      executionPayload.eventReplayPreflight,
+    eventReplayPreflightStatus:
+      executionPreflightRecord.eventReplayPreflightStatus,
+    executionPreflight: executionPreflightRecord,
+    executionPreflightStatus:
+      executionPreflightRecord.preflightStatus,
+    executionPreflightAccepted:
+      executionPreflightRecord.executionPreflightAccepted,
+    markerGuard: requestRecord.markerGuard,
+    listenerGuard: requestRecord.listenerGuard,
+    beforeState,
+    afterState,
+    preconditions,
+    blockerEvidence,
+    replayExecutionRecord:
+      executionPreflightRecord.replayExecutionRecord,
+    replayExecutionGateId:
+      executionPreflightRecord.replayExecutionGateId,
+    replayExecutionStatus:
+      executionPreflightRecord.replayExecutionStatus,
+    replayExecutionPayloadAccepted: true,
+    textNodeClaimPatchExecutionRecord,
+    textNodeClaimPatchExecutionKind:
+      textNodeClaimPatchExecutionRecord.kind,
+    textNodeClaimPatchExecutionGateId:
+      textNodeClaimPatchExecutionRecord.gateId,
+    textNodeClaimPatchExecutionMetadataId:
+      textNodeClaimPatchExecutionRecord.metadataId,
+    textNodeClaimPatchExecutionStatus:
+      textNodeClaimPatchExecutionRecord.status,
+    textNodeClaimPatchExecutionPayloadAccepted: true,
+    sourceTextMismatchDiagnosticKind:
+      textNodeClaimPatchExecutionRecord.sourceTextMismatchDiagnosticKind,
+    sourceTextMismatchDiagnosticStatus:
+      textNodeClaimPatchExecutionRecord.sourceTextMismatchDiagnosticStatus,
+    sourceRecoverableErrorMetadataKind:
+      textNodeClaimPatchExecutionRecord.sourceRecoverableErrorMetadataKind,
+    sourceRecoverableErrorMetadataStatus:
+      textNodeClaimPatchExecutionRecord.sourceRecoverableErrorMetadataStatus,
+    acceptedPrivateMetadataDiagnostics:
+      requestRecord.acceptedPrivateMetadataDiagnostics,
+    acceptedPrivateMetadataIds:
+      requestRecord.acceptedPrivateMetadataIds,
+    acceptedPrivateMetadataGateIds:
+      requestRecord.acceptedPrivateMetadataGateIds,
+    acceptedBoundaryMetadataConsumed:
+      textNodeClaimPatchExecutionRecord.acceptedBoundaryMetadataConsumed,
+    acceptedBoundaryMetadataId:
+      textNodeClaimPatchExecutionRecord.acceptedBoundaryMetadataId,
+    acceptedBoundaryMetadataRow:
+      textNodeClaimPatchExecutionRecord.acceptedBoundaryMetadataRow,
+    recoverableErrorMetadata:
+      textNodeClaimPatchExecutionRecord.recoverableErrorMetadata,
+    recoverableErrorMetadataAccepted:
+      textNodeClaimPatchExecutionRecord.recoverableErrorMetadataAccepted,
+    textMismatchRowCount:
+      textNodeClaimPatchExecutionRecord.textMismatchRowCount,
+    patchedTextMismatchRowCount:
+      textNodeClaimPatchExecutionRecord.patchedTextMismatchRowCount,
+    textMismatchRow:
+      textNodeClaimPatchExecutionRecord.textMismatchRow,
+    textMismatchRowId:
+      textNodeClaimPatchExecutionRecord.textMismatchRowId,
+    textMismatchReason:
+      textNodeClaimPatchExecutionRecord.textMismatchReason,
+    expectedPath: textNodeClaimPatchExecutionRecord.expectedPath,
+    actualPath: textNodeClaimPatchExecutionRecord.actualPath,
+    expectedText: textNodeClaimPatchExecutionRecord.expectedText,
+    actualTextBefore:
+      textNodeClaimPatchExecutionRecord.actualTextBefore,
+    actualTextAfter:
+      textNodeClaimPatchExecutionRecord.actualTextAfter,
+    normalizedTextMatchesBefore:
+      textNodeClaimPatchExecutionRecord.normalizedTextMatchesBefore,
+    normalizedTextMatchesAfter:
+      textNodeClaimPatchExecutionRecord.normalizedTextMatchesAfter,
+    claimedTextNodeInfo:
+      textNodeClaimPatchExecutionRecord.claimedTextNodeInfo,
+    claimedTextNodePath:
+      textNodeClaimPatchExecutionRecord.claimedTextNodePath,
+    claimedTextNodePathStatus:
+      textNodeClaimPatchExecutionRecord.claimedTextNodePathStatus,
+    claimedTextNodeParentPath:
+      textNodeClaimPatchExecutionRecord.claimedTextNodeParentPath,
+    claimedTextNodeIndex:
+      textNodeClaimPatchExecutionRecord.claimedTextNodeIndex,
+    claimedTextNodeSegmentCount:
+      textNodeClaimPatchExecutionRecord.claimedTextNodeSegmentCount,
+    fakeTextNodeMarkerAccepted:
+      textNodeClaimPatchExecutionRecord.fakeTextNodeMarkerAccepted,
+    fakeTextNodeConstructorName:
+      textNodeClaimPatchExecutionRecord.fakeTextNodeConstructorName,
+    patchWriteProperty:
+      textNodeClaimPatchExecutionRecord.patchWriteProperty,
+    patchWriteCount:
+      textNodeClaimPatchExecutionRecord.patchWriteCount,
+    patchWrites: textNodeClaimPatchExecutionRecord.patchWrites,
+    claimLabel: textNodeClaimPatchExecutionRecord.claimLabel,
+    privateExecutionPreflight: false,
+    privateExecution: true,
+    fakeDomOnly: true,
+    fakeDomMutation: true,
+    fakeTextNodeClaimed: true,
+    fakeTextNodePatched: true,
+    textNodeClaimRecorded: true,
+    textNodeClaimExecuted: true,
+    textPatchAdmitted: true,
+    textPatchApplied: true,
+    textPatched: true,
+    targetClaimAccepted:
+      executionPreflightRecord.targetClaimAccepted,
+    targetClaimExecuted: false,
+    publicHydrationTargetClaimed: false,
+    targetDispatchExecuted: false,
+    eventReplayDispatchAttempted: false,
+    pluginDispatchEventForPluginEventSystemCalled: false,
+    nativeEventRedispatched: false,
+    syntheticEventCreated: false,
+    syntheticEventCount: 0,
+    listenerInvocationCount: 0,
+    willInvokeListeners: false,
+    hydrateInstanceCalled: false,
+    hydrateTextInstanceCalled: false,
+    replayQueueDrained: false,
+    queued: false,
+    recoverableErrorsQueued: false,
+    onRecoverableErrorConfigured:
+      executionPreflightRecord.onRecoverableErrorConfigured,
+    onRecoverableErrorInvoked: false,
+    publicOnRecoverableErrorInvoked: false,
+    rootErrorCallbacksInvoked: false,
+    publicRootErrorCallbacksInvoked: false,
+    rootErrorCallbackInvocationCount: 0,
+    rootErrorUpdatesScheduled: false,
+    reportGlobalErrorInvoked: false,
+    willQueueRecoverableErrors: false,
+    acceptedCapabilities:
+      ROOT_BRIDGE_HYDRATE_ROOT_TEXT_NODE_CLAIM_PATCH_ACCEPTED_CAPABILITIES,
+    blockedCapabilities:
+      ROOT_BRIDGE_HYDRATE_ROOT_TEXT_NODE_CLAIM_PATCH_BLOCKED_CAPABILITIES,
+    acceptedPrivateBridgeDiagnostics: true,
+    hydrateRootRequestRecorded: true,
+    hydrationRequested: requestRecord.hydrationRequested,
+    canHydrate: false,
+    publicRootCreated: false,
+    publicRootExecution: false,
+    publicRootObjectExposed: false,
+    publicCreateRootEnabled: false,
+    publicHydrateRootEnabled: false,
+    publicHydrateRootSupported: false,
+    publicRootCompatibilitySurface: false,
+    containerMarked: false,
+    listenersAttached: false,
+    domMutated: false,
+    browserDomMutated: false,
+    eventsReplayed: false,
+    rootScheduled: false,
+    suspenseHydrationScheduled: false,
+    nativeExecution: false,
+    reconcilerExecution: false,
+    domMutation: false,
+    markerWrites: false,
+    listenerInstallation: false,
+    hydration: false,
+    eventDispatch: false,
+    eventReplayInstalled: false,
+    replayQueuesDrained: false,
+    compatibilityClaimed: false,
+    publicHydrationCompatibilityClaimed: false,
+    publicHydrationReplayCompatibilityClaimed: false,
+    browserDomEventCompatibilityClaimed: false
+  });
+
+  rootHydratePublicFacadeTextNodeClaimPatchExecutionPayloads.set(
+    record,
+    freezeRecord({
+      afterState,
+      beforeState,
+      blockerEvidence,
+      bridge: preflightState.bridge,
+      container,
+      eventReplayPayload: executionPayload.eventReplayPayload,
+      eventReplayPreflight: executionPayload.eventReplayPreflight,
+      executionPreflight: executionPreflightRecord,
+      executionPayload,
+      markerListenerPreflight:
+        executionPayload.markerListenerPreflight,
+      ownerDocument,
+      preconditions,
+      preflight: preflightState.preflight,
+      requestRecord,
+      targetClaimingPayload: executionPayload.targetClaimingPayload,
+      targetClaimingPreflight:
+        executionPayload.targetClaimingPreflight,
+      textNodeClaimPatchExecutionPayload,
+      textNodeClaimPatchExecutionRecord,
+      textNodeClaimPatchOptions:
+        executionOptions.textNodeClaimPatchOptions
+    })
+  );
+  return record;
+}
+
 function assertPrivateHydrateRootPublicFacadePreflightRecordForPreflight(
   record,
   preflightState
@@ -5102,6 +5605,192 @@ function assertPrivateHydrateRootPublicFacadeEventReplayPreflightRecordForExecut
     }
     throwInvalidRootPublicFacadePreflight(
       'hydrateRoot execution preflight requires an accepted private hydrateRoot event replay preflight record.'
+    );
+  }
+
+  return payload;
+}
+
+function assertPrivateHydrateRootPublicFacadeExecutionPreflightRecordForTextNodeClaimPatch(
+  record,
+  preflightState
+) {
+  const payload =
+    rootHydratePublicFacadeExecutionPreflightPayloads.get(record);
+  if (
+    payload === undefined ||
+    payload.preflight !== preflightState.preflight ||
+    payload.bridge !== preflightState.bridge ||
+    record.$$typeof !==
+      privateHydrateRootPublicFacadeExecutionPreflightRecordType ||
+    record.kind !==
+      'FastReactDomPrivateHydrateRootPublicFacadeExecutionPreflightRecord' ||
+    record.facadeCall !== 'hydrateRoot' ||
+    record.requestType !== 'hydrateRoot' ||
+    record.preflightStatus !==
+      ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_EXECUTION_PREFLIGHTED ||
+    record.executionStatus !== ROOT_BRIDGE_EXECUTION_BLOCKED ||
+    record.compatibilityStatus !== ROOT_BRIDGE_COMPATIBILITY_BLOCKED ||
+    record.eventReplayPreflight !== payload.eventReplayPreflight ||
+    record.replayExecutionRecord !== payload.replayExecutionRecord ||
+    record.replayExecutionPayloadAccepted !== true ||
+    record.executionPreflightAccepted !== true ||
+    record.privateExecutionPreflight !== true ||
+    record.privateExecution !== false ||
+    record.preconditions.accepted !== true ||
+    record.preconditions.stateUnchanged !== true ||
+    record.preconditions.eventReplayPreflightAccepted !== true ||
+    record.preconditions.canonicalReplayExecutionMetadata !== true ||
+    record.blockerEvidence.publicHydrateRootBlocked !== true ||
+    record.blockerEvidence.eventReplayBlocked !== true ||
+    record.blockerEvidence.eventDispatchBlocked !== true ||
+    record.publicHydrateRootEnabled !== false ||
+    record.publicHydrateRootSupported !== false ||
+    record.publicRootObjectExposed !== false ||
+    record.nativeExecution !== false ||
+    record.reconcilerExecution !== false ||
+    record.domMutation !== false ||
+    record.hydration !== false ||
+    record.eventDispatch !== false ||
+    record.replayQueuesDrained !== false ||
+    record.recoverableErrorsQueued !== false ||
+    record.onRecoverableErrorInvoked !== false ||
+    record.publicOnRecoverableErrorInvoked !== false ||
+    record.compatibilityClaimed !== false ||
+    record.rootRecordId !==
+      payload.requestRecord.hydrationBoundaryRecord.recordId
+  ) {
+    if (hasHydrateRootExecutionPreflightPublicClaim(record)) {
+      throwInvalidRootPublicFacadePreflight(
+        'hydrateRoot text-node claim patch cannot accept public hydration, replay, dispatch, callbacks, execution, or compatibility claims.'
+      );
+    }
+    throwInvalidRootPublicFacadePreflight(
+      'hydrateRoot text-node claim patch requires an accepted private hydrateRoot execution preflight record.'
+    );
+  }
+
+  return payload;
+}
+
+function normalizeHydrateRootTextNodeClaimPatchExecutionOptions(
+  options,
+  hydrationOptions
+) {
+  const normalizedOptions = isObjectOrFunction(options) ? options : {};
+  if (
+    Object.prototype.hasOwnProperty.call(
+      normalizedOptions,
+      'hydrationOptions'
+    ) &&
+    normalizedOptions.hydrationOptions !== hydrationOptions
+  ) {
+    throwInvalidRootPublicFacadePreflight(
+      'hydrateRoot text-node claim patch requires the current hydrateRoot options object.'
+    );
+  }
+
+  const source =
+    typeof normalizedOptions.source === 'string'
+      ? normalizedOptions.source
+      : 'private-hydrate-root-text-node-claim-patch-execution';
+  const textNodeClaimPatchOptions = {
+    enableTextNodeClaimPatchExecution: true,
+    hydrationOptions,
+    source: `${source}:hydration-text-node-claim-patch`
+  };
+  if (
+    Object.prototype.hasOwnProperty.call(normalizedOptions, 'mismatchRow')
+  ) {
+    textNodeClaimPatchOptions.mismatchRow = normalizedOptions.mismatchRow;
+  }
+  if (typeof normalizedOptions.claimLabel === 'string') {
+    textNodeClaimPatchOptions.claimLabel = normalizedOptions.claimLabel;
+  }
+
+  return freezeRecord({
+    hasMismatchRow: Object.prototype.hasOwnProperty.call(
+      normalizedOptions,
+      'mismatchRow'
+    ),
+    hydrationOptions,
+    mismatchRow: normalizedOptions.mismatchRow,
+    rawOptions: options,
+    source,
+    textNodeClaimPatchOptions: freezeRecord(textNodeClaimPatchOptions)
+  });
+}
+
+function assertHydrateRootTextNodeClaimPatchExecutionRecord(
+  record,
+  executionPayload,
+  requestRecord,
+  requestPayload,
+  executionOptions
+) {
+  const payload =
+    getPrivateHydrationTextNodeClaimPatchExecutionPayload(record);
+  if (
+    payload === null ||
+    !isPrivateHydrationTextNodeClaimPatchExecutionRecord(record) ||
+    record.kind !== HYDRATION_TEXT_NODE_CLAIM_PATCH_EXECUTION_RECORD_KIND ||
+    record.gateId !== privateHydrationTextNodeClaimPatchExecutionGateId ||
+    record.metadataId !== privateHydrationTextNodeClaimPatchMetadataId ||
+    record.status !== privateHydrationTextNodeClaimPatchExecutionStatus ||
+    record.executionStatus !==
+      privateHydrationTextNodeClaimPatchExecutionStatus ||
+    record.operation !== 'hydration-text-node-claim-patch-execution' ||
+    record.privateExecution !== true ||
+    record.fakeDomOnly !== true ||
+    record.fakeDomMutation !== true ||
+    record.fakeTextNodeClaimed !== true ||
+    record.fakeTextNodePatched !== true ||
+    record.textNodeClaimRecorded !== true ||
+    record.textNodeClaimExecuted !== true ||
+    record.textPatchAdmitted !== true ||
+    record.textPatchApplied !== true ||
+    record.textPatched !== true ||
+    record.rootRecordId !== requestRecord.hydrationBoundaryRecord.recordId ||
+    record.acceptedBoundaryMetadataDiagnostics !==
+      requestRecord.acceptedPrivateMetadataDiagnostics ||
+    record.recoverableErrorMetadata !==
+      requestRecord.recoverableErrorMetadata ||
+    record.sourceTextMismatchDiagnosticKind !==
+      HYDRATION_TEXT_MISMATCH_DIAGNOSTIC_KIND ||
+    record.sourceRecoverableErrorMetadataKind !==
+      HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND ||
+    record.recoverableErrorMetadataAccepted !== true ||
+    record.patchedTextMismatchRowCount !== 1 ||
+    record.patchWriteCount !== 1 ||
+    record.exactTextMatchesAfter !== true ||
+    record.normalizedTextMatchesAfter !== true ||
+    payload.hydrationBoundaryRecord !==
+      requestRecord.hydrationBoundaryRecord ||
+    payload.acceptedBoundaryMetadataDiagnostics !==
+      requestRecord.acceptedPrivateMetadataDiagnostics ||
+    payload.hydrationOptions !== requestPayload.hydrationOptions ||
+    payload.initialChildren !== requestPayload.initialChildren ||
+    payload.recoverableErrorMetadata !==
+      requestRecord.recoverableErrorMetadata ||
+    payload.textMismatchDiagnostics !==
+      requestRecord.textMismatchDiagnostics ||
+    (executionOptions.hasMismatchRow &&
+      payload.mismatchRow !== executionOptions.mismatchRow) ||
+    executionPayload.requestRecord !== requestRecord
+  ) {
+    if (hasHydrateRootTextNodeClaimPatchPublicClaim(record)) {
+      throwInvalidRootPublicFacadePreflight(
+        'hydrateRoot text-node claim patch cannot accept public hydration, DOM, callback, execution, or compatibility claims.'
+      );
+    }
+    throwInvalidRootPublicFacadePreflight(
+      'hydrateRoot text-node claim patch requires canonical private text patch execution for the accepted hydrateRoot boundary.'
+    );
+  }
+
+  if (hasHydrateRootTextNodeClaimPatchPublicClaim(record)) {
+    throwInvalidRootPublicFacadePreflight(
+      'hydrateRoot text-node claim patch cannot accept public hydration, DOM, callback, execution, or compatibility claims.'
     );
   }
 
@@ -5433,6 +6122,56 @@ function hasHydrateRootExecutionPreflightPublicClaim(record) {
     record.onRecoverableErrorInvoked === true ||
     record.publicRootErrorCallbacksInvoked === true
   );
+}
+
+function hasHydrateRootTextNodeClaimPatchPublicClaim(record) {
+  if (!isObjectOrFunction(record)) {
+    return false;
+  }
+
+  const blockedBooleanFields = [
+    'browserDomEventCompatibilityClaimed',
+    'browserDomMutated',
+    'canHydrate',
+    'compatibilityClaimed',
+    'diffHydratedTextForDevWarningsCalled',
+    'domMutated',
+    'domMutation',
+    'eventDispatch',
+    'eventReplayInstalled',
+    'eventReplaySupported',
+    'eventsReplayed',
+    'hostInstanceHydrationAttempted',
+    'hydrateTextInstanceCalled',
+    'hydration',
+    'hydrationCompatibilityClaimed',
+    'hydrationReplaySupported',
+    'listenerInstallation',
+    'markerWrites',
+    'nativeExecution',
+    'onRecoverableErrorInvoked',
+    'publicHydrateRootSupported',
+    'publicHydrationCompatibilityClaimed',
+    'publicHydrationReplayCompatibilityClaimed',
+    'publicOnRecoverableErrorInvoked',
+    'publicRootBehaviorChanged',
+    'publicRootCreated',
+    'publicRootExecution',
+    'publicRootObjectExposed',
+    'reconcilerExecution',
+    'recoverableErrorsQueued',
+    'replayQueuesDrained',
+    'rootScheduled',
+    'suspenseHydrationScheduled',
+    'willQueueRecoverableErrors'
+  ];
+
+  for (const field of blockedBooleanFields) {
+    if (record[field] === true) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function createPrivateRootPublicFacadeRoot(
@@ -10471,6 +11210,11 @@ function getPrivateHydrateRootPublicFacadePreflightPayload(preflight) {
       payload.targetClaimingPreflightRecords.length,
     targetClaimingPreflightRecords: freezeArray(
       payload.targetClaimingPreflightRecords
+    ),
+    textNodeClaimPatchExecutionRecordCount:
+      payload.textNodeClaimPatchExecutionRecords.length,
+    textNodeClaimPatchExecutionRecords: freezeArray(
+      payload.textNodeClaimPatchExecutionRecords
     )
   });
 }
@@ -10558,6 +11302,21 @@ function isPrivateHydrateRootPublicFacadeExecutionPreflightRecord(
   value
 ) {
   return rootHydratePublicFacadeExecutionPreflightPayloads.has(value);
+}
+
+function getPrivateHydrateRootPublicFacadeTextNodeClaimPatchExecutionPayload(
+  record
+) {
+  return (
+    rootHydratePublicFacadeTextNodeClaimPatchExecutionPayloads.get(record) ||
+    null
+  );
+}
+
+function isPrivateHydrateRootPublicFacadeTextNodeClaimPatchExecutionRecord(
+  value
+) {
+  return rootHydratePublicFacadeTextNodeClaimPatchExecutionPayloads.has(value);
 }
 
 function getPrivateRootLiveContainerPreflightPayload(record) {
@@ -22217,6 +22976,8 @@ module.exports = {
   ROOT_BRIDGE_HYDRATE_ROOT_EVENT_REPLAY_PREFLIGHT_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_HYDRATE_ROOT_EXECUTION_PREFLIGHT_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_HYDRATE_ROOT_EXECUTION_PREFLIGHT_BLOCKED_CAPABILITIES,
+  ROOT_BRIDGE_HYDRATE_ROOT_TEXT_NODE_CLAIM_PATCH_ACCEPTED_CAPABILITIES,
+  ROOT_BRIDGE_HYDRATE_ROOT_TEXT_NODE_CLAIM_PATCH_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_HYDRATE_ROOT_TARGET_CLAIMING_PREFLIGHT_ACCEPTED_CAPABILITIES,
   ROOT_BRIDGE_HYDRATE_ROOT_TARGET_CLAIMING_PREFLIGHT_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_PREFLIGHT_ACCEPTED_CAPABILITIES,
@@ -22225,6 +22986,7 @@ module.exports = {
   ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_EXECUTION_PREFLIGHTED,
   ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_MARKER_LISTENER_PREFLIGHTED,
   ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_TARGET_CLAIMING_PREFLIGHTED,
+  ROOT_BRIDGE_HYDRATE_ROOT_PUBLIC_FACADE_TEXT_NODE_CLAIM_PATCH_EXECUTED,
   ROOT_BRIDGE_REF_CALLBACK_HOST_OUTPUT_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_REF_CALLBACK_ERROR_ROUTING_BLOCKED_CAPABILITIES,
   ROOT_BRIDGE_REF_CALLBACK_ERROR_ROUTING_RECORDED,
@@ -22252,6 +23014,7 @@ module.exports = {
   NATIVE_ROOT_BRIDGE_SYNTHETIC_ENVIRONMENT_ID,
   HYDRATION_CLAIMED_REPLAY_TARGET_DISPATCH_EXECUTION_RECORD_KIND,
   HYDRATION_TARGET_CLAIMING_DIAGNOSTIC_KIND,
+  HYDRATION_TEXT_NODE_CLAIM_PATCH_EXECUTION_RECORD_KIND,
   admitPrivateCreateRenderPath,
   admitPrivateRootCommitRefMetadata,
   admitRootBridgeRequestRecord,
@@ -22323,6 +23086,7 @@ module.exports = {
   getPrivateHydrateRootPublicFacadePreflightPayload,
   getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload,
   getPrivateHydrateRootPublicFacadeExecutionPreflightPayload,
+  getPrivateHydrateRootPublicFacadeTextNodeClaimPatchExecutionPayload,
   getPrivateHydrateRootPublicFacadeMarkerListenerPreflightPayload,
   getPrivateHydrateRootPublicFacadeTargetClaimingPreflightPayload,
   getPrivateHydrateRootPublicFacadePreflightRecordPayload,
@@ -22332,6 +23096,7 @@ module.exports = {
   getPrivateRootHydrationRecoverableErrorRoutingPayload,
   getPrivateRootHydrationReplayErrorMetadataPayload,
   getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload,
+  getPrivateHydrationTextNodeClaimPatchExecutionPayload,
   getPrivateHydrationTextMismatchRecoverableErrorPreflightPayload,
   getPrivateHydrationTargetClaimingDiagnosticPayload,
   getPrivateRootRefCallbackErrorRoutingPayload,
@@ -22371,6 +23136,7 @@ module.exports = {
   isPrivateHydrateRootPublicFacadePreflight,
   isPrivateHydrateRootPublicFacadeEventReplayPreflightRecord,
   isPrivateHydrateRootPublicFacadeExecutionPreflightRecord,
+  isPrivateHydrateRootPublicFacadeTextNodeClaimPatchExecutionRecord,
   isPrivateHydrateRootPublicFacadeMarkerListenerPreflightRecord,
   isPrivateHydrateRootPublicFacadeTargetClaimingPreflightRecord,
   isPrivateHydrateRootPublicFacadePreflightRecord,
@@ -22382,6 +23148,7 @@ module.exports = {
   isPrivateRootHydrationRecoverableErrorRoutingRecord,
   isPrivateRootHydrationReplayErrorMetadataRecord,
   isPrivateHydrationClaimedReplayTargetDispatchExecutionRecord,
+  isPrivateHydrationTextNodeClaimPatchExecutionRecord,
   isPrivateHydrationTextMismatchRecoverableErrorPreflightRecord,
   isPrivateHydrationTargetClaimingDiagnostic,
   isPrivateRootRefCallbackErrorRoutingRecord,
@@ -22419,6 +23186,7 @@ module.exports = {
   privateHydrateRootPublicFacadeMarkerListenerPreflightRecordType,
   privateHydrateRootPublicFacadeEventReplayPreflightRecordType,
   privateHydrateRootPublicFacadeExecutionPreflightRecordType,
+  privateHydrateRootPublicFacadeTextNodeClaimPatchExecutionRecordType,
   privateHydrateRootPublicFacadeTargetClaimingPreflightRecordType,
   privateHydrateRootPublicFacadePreflightRecordType,
   privateHydrateRootPublicFacadePreflightSymbol,
@@ -22441,6 +23209,9 @@ module.exports = {
   privateHydrationClaimedReplayTargetDispatchExecutionStatus,
   privateHydrationTargetClaimingGateId,
   privateHydrationTargetClaimingMetadataStatus,
+  privateHydrationTextNodeClaimPatchExecutionGateId,
+  privateHydrationTextNodeClaimPatchExecutionStatus,
+  privateHydrationTextNodeClaimPatchMetadataId,
   privateRootRefCallbackHostOutputOrderingDiagnosticRecordType,
   privateRootRefCallbackErrorRoutingRecordType,
   privateRootCreateRecordType,
