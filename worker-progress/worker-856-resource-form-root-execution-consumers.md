@@ -16,6 +16,7 @@
 ## Changed Files
 
 - `packages/react-dom/src/resource-form-gates.js`
+- `packages/react-dom/src/client/root-bridge.js`
 - `packages/react-dom/test/resource-form-unsupported-gates.test.js`
 - `tests/conformance/src/private-admission-850-resource-form-execution-ledger.mjs`
 - `worker-progress/worker-856-resource-form-root-execution-consumers.md`
