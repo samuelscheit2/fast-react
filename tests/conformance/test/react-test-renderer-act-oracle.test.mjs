@@ -189,6 +189,10 @@ const ACT_UPDATE_LIFECYCLE_BOUNDARY_RECORD_ID =
   "react-test-renderer-act-update-lifecycle-boundary-private-diagnostic";
 const ACT_UPDATE_LIFECYCLE_BOUNDARY_STATUS =
   "private-act-update-lifecycle-boundary-source-owned-lifecycle-host-output-public-act-blocked";
+const ACT_SCHEDULER_BLOCKER_CURRENTNESS_RECORD_ID =
+  "react-test-renderer-act-scheduler-blocker-currentness-private-diagnostic";
+const ACT_SCHEDULER_BLOCKER_CURRENTNESS_STATUS =
+  "private-act-scheduler-blocker-currentness-source-owned-act-update-scheduler-helper-public-compat-blocked";
 const ACT_UPDATE_LIFECYCLE_BOUNDARY_WORKERS = [
   "worker-881-test-renderer-serialization-lifecycle-gate",
   "worker-888-test-renderer-instance-lifecycle-gate",
@@ -277,6 +281,7 @@ const ACT_SCHEDULER_REACT_QUEUE_DIAGNOSTIC_RECORD_IDS = [
 const ACT_SCHEDULER_CJS_DEVELOPMENT_REACT_QUEUE_DIAGNOSTIC_RECORD_IDS = [
   "scheduler-private-act-queue-flush-diagnostics",
   "test-renderer-mock-scheduler-flush-helper-routing",
+  ACT_SCHEDULER_BLOCKER_CURRENTNESS_RECORD_ID,
   ACT_WARNING_THENABLE_BLOCKER_RECORD_ID,
   ACT_NESTED_SCOPE_BLOCKER_RECORD_ID,
   ACT_PRIVATE_ROOT_PASSIVE_SEQUENCE_RECORD_ID,
@@ -1444,6 +1449,18 @@ function assertPrivateActQueueDiagnosticConsumer(entry, moduleExports) {
     );
     assert.equal(
       typeof diagnostics.routeAcceptedMockSchedulerFlushHelperMetadata,
+      "function"
+    );
+    assert.equal(
+      typeof diagnostics.createPrivateActSchedulerBlockerCurrentnessReport,
+      "function"
+    );
+    assert.equal(
+      typeof diagnostics.isAcceptedPrivateActSchedulerBlockerCurrentnessReport,
+      "function"
+    );
+    assert.equal(
+      typeof diagnostics.consumePrivateActSchedulerBlockerCurrentnessReport,
       "function"
     );
     assert.equal(
@@ -3156,6 +3173,11 @@ function assertActSchedulerGate(gate, entrypoint) {
       "worker-700-test-renderer-act-nested-scope-passive-flush"
     );
   }
+  if (isCjs) {
+    expectedAcceptedWorkers.push(
+      "worker-992-test-renderer-act-scheduler-blocker-refresh"
+    );
+  }
   expectedAcceptedWorkers.push(...ACT_UPDATE_LIFECYCLE_BOUNDARY_WORKERS);
 
   assert.equal(Object.isFrozen(gate), true, entrypoint);
@@ -3766,6 +3788,34 @@ function assertActSchedulerGate(gate, entrypoint) {
       false
     );
     assert.equal(expiredActRootWorkRouteRecord.executesRendererWork, false);
+
+    const blockerCurrentnessRecord =
+      gate.recognizedSchedulerReactActQueueDiagnostics.find(
+        (record) => record.id === ACT_SCHEDULER_BLOCKER_CURRENTNESS_RECORD_ID
+      );
+    assert.notEqual(blockerCurrentnessRecord, undefined);
+    assert.equal(
+      blockerCurrentnessRecord.status,
+      ACT_SCHEDULER_BLOCKER_CURRENTNESS_STATUS
+    );
+    assert.equal(
+      blockerCurrentnessRecord.requiresSourceOwnedActUpdateLifecycleBoundary,
+      true
+    );
+    assert.equal(
+      blockerCurrentnessRecord.requiresSourceOwnedSchedulerHelperMetadata,
+      true
+    );
+    assert.equal(
+      blockerCurrentnessRecord.rejectsCallerShapedSchedulerHelperMetadata,
+      true
+    );
+    assert.equal(
+      blockerCurrentnessRecord.rejectsProxyHiddenPublicCompatibilityAliases,
+      true
+    );
+    assert.equal(blockerCurrentnessRecord.nativeExecution, false);
+    assert.equal(blockerCurrentnessRecord.packageCompatibilityClaimed, false);
   } else {
     const nestedScopeRecord =
       gate.recognizedSchedulerReactActQueueDiagnostics.find(

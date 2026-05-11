@@ -270,6 +270,14 @@ const privateActUpdateLifecycleBoundaryDiagnosticId =
   "react-test-renderer-act-update-lifecycle-boundary-private-diagnostic";
 const privateActUpdateLifecycleBoundaryStatus =
   "private-act-update-lifecycle-boundary-source-owned-lifecycle-host-output-public-act-blocked";
+const privateActSchedulerBlockerCurrentnessRecordId =
+  "react-test-renderer-act-scheduler-blocker-currentness-private-diagnostic";
+const privateActSchedulerBlockerCurrentnessKind =
+  "fast-react-test-renderer.act-scheduler.blocker-currentness";
+const privateActSchedulerBlockerCurrentnessStatus =
+  "private-act-scheduler-blocker-currentness-source-owned-act-update-scheduler-helper-public-compat-blocked";
+const privateActSchedulerBlockerCurrentnessConsumptionStatus =
+  "consumed-private-act-scheduler-blocker-currentness-public-compat-blocked";
 const actNestedScopePassiveFlushRecordId =
   "react-test-renderer-act-nested-scope-passive-flush-private-diagnostic";
 const actNestedScopePassiveFlushPrerequisiteId =
@@ -502,6 +510,7 @@ const actSchedulerReactQueueDiagnosticRecordIds = [
 const actSchedulerCjsDevelopmentReactQueueDiagnosticRecordIds = [
   "scheduler-private-act-queue-flush-diagnostics",
   "test-renderer-mock-scheduler-flush-helper-routing",
+  privateActSchedulerBlockerCurrentnessRecordId,
   "react-test-renderer-act-warning-thenable-blockers",
   "react-test-renderer-act-nested-scope-blockers",
   actPrivateRootPassiveSequenceRecordId,
@@ -1384,10 +1393,12 @@ test("react-test-renderer CJS private act diagnostics consume update execution w
       moduleExports,
       entry.entrypoint
     );
-    const diagnostics =
+    const actQueueDiagnostics =
       moduleExports._Scheduler.unstable_flushAllWithoutAsserting[
         privateActQueueFlushDiagnosticsExport
-      ].privateActPassiveEffectDrainDiagnostics;
+      ];
+    const diagnostics =
+      actQueueDiagnostics.privateActPassiveEffectDrainDiagnostics;
     assert.equal(
       diagnostics.privateActUpdateLifecycleBoundaryDiagnosticId,
       privateActUpdateLifecycleBoundaryDiagnosticId,
@@ -1633,6 +1644,210 @@ test("react-test-renderer CJS private act diagnostics consume update execution w
     assert.equal(report.executesRendererRoots, false);
     assert.equal(report.mutatesHostOutput, false);
     assert.equal(metadata.records.length, 0);
+
+    const Scheduler = loadFresh("packages/scheduler/unstable_mock.js");
+    Scheduler.reset();
+    const schedulerHelper = Scheduler.unstable_flushExpired;
+    const blockerCurrentness =
+      actQueueDiagnostics.createPrivateActSchedulerBlockerCurrentnessReport(
+        updateResult,
+        lifecycleEvidence,
+        finishedWorkIdentity,
+        schedulerHelper
+      );
+    assert.equal(
+      blockerCurrentness.id,
+      privateActSchedulerBlockerCurrentnessRecordId
+    );
+    assert.equal(
+      blockerCurrentness.kind,
+      privateActSchedulerBlockerCurrentnessKind
+    );
+    assert.equal(
+      blockerCurrentness.status,
+      privateActSchedulerBlockerCurrentnessStatus
+    );
+    assert.equal(blockerCurrentness.accepted, true);
+    assert.equal(blockerCurrentness.rejectionReason, null);
+    assert.equal(
+      blockerCurrentness.sourceOwnedActUpdateLifecycleBoundaryAccepted,
+      true
+    );
+    assert.equal(
+      blockerCurrentness.sourceOwnedSchedulerHelperMetadataAccepted,
+      true
+    );
+    assert.equal(
+      blockerCurrentness.consumesPrivateActUpdateLifecycleBoundary,
+      true
+    );
+    assert.equal(
+      blockerCurrentness.consumesSchedulerOwnedMockFlushHelperMetadata,
+      true
+    );
+    assert.equal(
+      actQueueDiagnostics.isAcceptedPrivateActSchedulerBlockerCurrentnessReport(
+        blockerCurrentness
+      ),
+      true
+    );
+    const consumedBlockerCurrentness =
+      actQueueDiagnostics.consumePrivateActSchedulerBlockerCurrentnessReport(
+        blockerCurrentness
+      );
+    assert.equal(
+      consumedBlockerCurrentness.status,
+      privateActSchedulerBlockerCurrentnessConsumptionStatus
+    );
+    assert.equal(consumedBlockerCurrentness.accepted, true);
+    assert.equal(
+      consumedBlockerCurrentness.currentnessReport,
+      blockerCurrentness
+    );
+    assert.equal(consumedBlockerCurrentness.publicActAvailable, false);
+    assert.equal(
+      consumedBlockerCurrentness.publicSchedulerFlushExecutionAvailable,
+      false
+    );
+    assert.equal(consumedBlockerCurrentness.nativeExecution, false);
+    assert.equal(
+      consumedBlockerCurrentness.packageCompatibilityClaimed,
+      false
+    );
+
+    const clonedBlockerCurrentness = Object.freeze({
+      ...blockerCurrentness
+    });
+    assert.equal(
+      actQueueDiagnostics.isAcceptedPrivateActSchedulerBlockerCurrentnessReport(
+        clonedBlockerCurrentness
+      ),
+      false
+    );
+    assert.throws(
+      () =>
+        actQueueDiagnostics.consumePrivateActSchedulerBlockerCurrentnessReport(
+          clonedBlockerCurrentness
+        ),
+      (error) => {
+        assert.equal(
+          error.reason,
+          "act-scheduler-blocker-currentness-source-proof"
+        );
+        assert.equal(error.invokesPublicSchedulerFlushHelper, false);
+        assert.equal(error.publicSchedulerFlushBehaviorExecuted, false);
+        return true;
+      },
+      entry.entrypoint
+    );
+
+    const sourceSchedulerDiagnostics =
+      schedulerHelper[privateActQueueFlushDiagnosticsExport];
+    for (const [label, helper, expectedReason] of [
+      [
+        "caller-shaped",
+        createFakeSchedulerHelperWithDiagnostics({
+          ...sourceSchedulerDiagnostics
+        }),
+        "scheduler-diagnostics-source-proof"
+      ],
+      [
+        "fake-self-validator",
+        createFakeSchedulerHelperWithDiagnostics({
+          ...sourceSchedulerDiagnostics,
+          schedulerMockExpiredActRootWorkSourceValidator:
+            createFakeSchedulerMockExpiredActRootWorkSourceValidator()
+        }),
+        "scheduler-diagnostics-source-proof"
+      ],
+      [
+        "public-claim",
+        createFakeSchedulerHelperWithDiagnostics({
+          ...sourceSchedulerDiagnostics,
+          publicSchedulerTimingCompatibilityClaimed: true,
+          publicReactActCompatibilityClaimed: true,
+          packageCompatibilityClaimed: true
+        }),
+        "scheduler-diagnostics-public-claim"
+      ],
+      [
+        "native-execution-available-claim",
+        createFakeSchedulerHelperWithDiagnostics({
+          ...sourceSchedulerDiagnostics,
+          nativeExecutionAvailable: true,
+          schedulerMockExpiredActRootWorkSourceValidator:
+            createFakeSchedulerMockExpiredActRootWorkSourceValidator()
+        }),
+        "scheduler-diagnostics-public-claim"
+      ],
+      [
+        "native-runtime-claim",
+        createFakeSchedulerHelperWithDiagnostics({
+          ...sourceSchedulerDiagnostics,
+          nativeBridgeRuntimeAvailable: true,
+          schedulerMockExpiredActRootWorkSourceValidator:
+            createFakeSchedulerMockExpiredActRootWorkSourceValidator()
+        }),
+        "scheduler-diagnostics-public-claim"
+      ],
+      [
+        "accessor-claim",
+        createFakeSchedulerHelperWithDiagnostics(
+          createAccessorSchedulerDiagnostics(sourceSchedulerDiagnostics)
+        ),
+        "scheduler-diagnostics-accessor-claim"
+      ],
+      [
+        "symbol-claim",
+        createFakeSchedulerHelperWithDiagnostics(
+          createSymbolClaimSchedulerDiagnostics(sourceSchedulerDiagnostics)
+        ),
+        "scheduler-diagnostics-symbol-claim"
+      ],
+      [
+        "native-claim",
+        createFakeSchedulerHelperWithDiagnostics({
+          ...sourceSchedulerDiagnostics,
+          nativeExecution: true
+        }),
+        "scheduler-diagnostics-public-claim"
+      ],
+      [
+        "proxy-hidden-public-claim",
+        createFakeSchedulerHelperWithDiagnostics(
+          createProxyHiddenPublicSchedulerDiagnostics(
+            sourceSchedulerDiagnostics
+          )
+        ),
+        "scheduler-diagnostics-own-key-snapshot"
+      ]
+    ]) {
+      const rejectedCurrentness =
+        actQueueDiagnostics.createPrivateActSchedulerBlockerCurrentnessReport(
+          updateResult,
+          lifecycleEvidence,
+          finishedWorkIdentity,
+          helper
+        );
+      assert.equal(rejectedCurrentness.accepted, false, label);
+      assert.equal(rejectedCurrentness.rejectionReason, expectedReason, label);
+      assert.equal(
+        rejectedCurrentness.sourceOwnedActUpdateLifecycleBoundaryAccepted,
+        true,
+        label
+      );
+      assert.equal(
+        rejectedCurrentness.sourceOwnedSchedulerHelperMetadataAccepted,
+        false,
+        label
+      );
+      assert.equal(rejectedCurrentness.publicActCompatibilityClaimed, false);
+      assert.equal(
+        rejectedCurrentness.publicSchedulerTimingCompatibilityClaimed,
+        false
+      );
+      assert.equal(rejectedCurrentness.nativeExecution, false);
+    }
 
     const rejected =
       diagnostics.describeAcceptedNativeUpdateExecutionAndPendingPassiveFlushMetadata(
@@ -8477,6 +8692,87 @@ function loadFresh(relativePath) {
   const resolved = require.resolve(absolutePath);
   delete require.cache[resolved];
   return require(resolved);
+}
+
+function createFakeSchedulerHelperWithDiagnostics(diagnostics) {
+  const helper = function fakeSchedulerHelper() {};
+  Object.defineProperty(helper, privateActQueueFlushDiagnosticsExport, {
+    configurable: false,
+    enumerable: false,
+    value: freezeFakeSchedulerDiagnostics(diagnostics),
+    writable: false
+  });
+  return Object.freeze(helper);
+}
+
+function freezeFakeSchedulerDiagnostics(diagnostics) {
+  try {
+    return Object.isExtensible(diagnostics)
+      ? Object.freeze(diagnostics)
+      : diagnostics;
+  } catch (_error) {
+    return diagnostics;
+  }
+}
+
+function createFakeSchedulerMockExpiredActRootWorkSourceValidator() {
+  return Object.freeze({
+    status: "fast-react.scheduler.mock-expired-act-root-work-source-validator",
+    isSchedulerMockExpiredActRootWorkSource() {
+      return true;
+    }
+  });
+}
+
+function createAccessorSchedulerDiagnostics(sourceDiagnostics) {
+  const diagnostics = {
+    ...sourceDiagnostics
+  };
+  Object.defineProperty(diagnostics, "publicSchedulerTimingCompatibilityClaimed", {
+    configurable: false,
+    enumerable: false,
+    get() {
+      return true;
+    }
+  });
+  return Object.freeze(diagnostics);
+}
+
+function createSymbolClaimSchedulerDiagnostics(sourceDiagnostics) {
+  const diagnostics = {
+    ...sourceDiagnostics
+  };
+  Object.defineProperty(
+    diagnostics,
+    Symbol.for("fast-react.test.public-scheduler-compatibility-claim"),
+    {
+      configurable: false,
+      enumerable: false,
+      value: true,
+      writable: false
+    }
+  );
+  return Object.freeze(diagnostics);
+}
+
+function createProxyHiddenPublicSchedulerDiagnostics(sourceDiagnostics) {
+  const target = {
+    ...sourceDiagnostics
+  };
+  Object.defineProperty(target, "publicSchedulerTimingCompatibilityClaimed", {
+    configurable: false,
+    enumerable: false,
+    value: true,
+    writable: false
+  });
+  Object.freeze(target);
+  return new Proxy(target, {
+    ownKeys(proxyTarget) {
+      return Reflect.ownKeys(proxyTarget).filter(
+        (key) => key !== "publicSchedulerTimingCompatibilityClaimed"
+      );
+    }
+  });
 }
 
 function assertPrivateRootRequestBridge(moduleExports, entrypoint) {
@@ -16430,6 +16726,11 @@ function assertActSchedulerGate(gate, entrypoint) {
       "worker-700-test-renderer-act-nested-scope-passive-flush"
     );
   }
+  if (isCjs) {
+    expectedAcceptedWorkers.push(
+      "worker-992-test-renderer-act-scheduler-blocker-refresh"
+    );
+  }
   expectedAcceptedWorkers.push(
     "worker-881-test-renderer-serialization-lifecycle-gate",
     "worker-888-test-renderer-instance-lifecycle-gate",
@@ -16767,6 +17068,51 @@ function assertActSchedulerGate(gate, entrypoint) {
       false
     );
     assert.equal(expiredActRootWorkRecord.executesRendererWork, false);
+
+    const blockerCurrentnessRecord =
+      gate.recognizedSchedulerReactActQueueDiagnostics.find(
+        (record) => record.id === privateActSchedulerBlockerCurrentnessRecordId
+      );
+    assert.notEqual(blockerCurrentnessRecord, undefined);
+    assert.equal(
+      blockerCurrentnessRecord.kind,
+      privateActSchedulerBlockerCurrentnessKind
+    );
+    assert.equal(
+      blockerCurrentnessRecord.status,
+      privateActSchedulerBlockerCurrentnessStatus
+    );
+    assert.deepEqual(blockerCurrentnessRecord.acceptedWorkers, [
+      "worker-881-test-renderer-serialization-lifecycle-gate",
+      "worker-888-test-renderer-instance-lifecycle-gate",
+      "worker-895-rust-test-renderer-multichild-lifecycle-native",
+      "worker-377-scheduler-act-queue-flush-helper-private",
+      "worker-482-test-renderer-act-scheduler-flush-gate",
+      "worker-992-test-renderer-act-scheduler-blocker-refresh"
+    ]);
+    assert.equal(
+      blockerCurrentnessRecord.requiresSourceOwnedActUpdateLifecycleBoundary,
+      true
+    );
+    assert.equal(
+      blockerCurrentnessRecord.requiresSourceOwnedSchedulerHelperMetadata,
+      true
+    );
+    assert.equal(
+      blockerCurrentnessRecord.rejectsCallerShapedSchedulerHelperMetadata,
+      true
+    );
+    assert.equal(
+      blockerCurrentnessRecord.rejectsNonEnumerableSymbolAndAccessorClaims,
+      true
+    );
+    assert.equal(blockerCurrentnessRecord.publicActCompatibilityClaimed, false);
+    assert.equal(
+      blockerCurrentnessRecord.publicSchedulerTimingCompatibilityClaimed,
+      false
+    );
+    assert.equal(blockerCurrentnessRecord.nativeExecution, false);
+    assert.equal(blockerCurrentnessRecord.packageCompatibilityClaimed, false);
 
     const nativeUpdatePassiveRecord =
       gate.recognizedSchedulerReactActQueueDiagnostics.find(

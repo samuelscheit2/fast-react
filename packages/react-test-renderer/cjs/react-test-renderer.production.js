@@ -90,6 +90,21 @@ const privateActUpdateLifecycleBoundaryWorkers = Object.freeze([
   'worker-888-test-renderer-instance-lifecycle-gate',
   'worker-895-rust-test-renderer-multichild-lifecycle-native'
 ]);
+const privateActSchedulerBlockerCurrentnessDiagnosticId =
+  'react-test-renderer-act-scheduler-blocker-currentness-private-diagnostic';
+const privateActSchedulerBlockerCurrentnessKind =
+  'fast-react-test-renderer.act-scheduler.blocker-currentness';
+const privateActSchedulerBlockerCurrentnessVersion = 1;
+const privateActSchedulerBlockerCurrentnessStatus =
+  'private-act-scheduler-blocker-currentness-source-owned-act-update-scheduler-helper-public-compat-blocked';
+const privateActSchedulerBlockerCurrentnessConsumptionStatus =
+  'consumed-private-act-scheduler-blocker-currentness-public-compat-blocked';
+const privateActSchedulerBlockerCurrentnessWorkers = Object.freeze([
+  ...privateActUpdateLifecycleBoundaryWorkers,
+  'worker-377-scheduler-act-queue-flush-helper-private',
+  'worker-482-test-renderer-act-scheduler-flush-gate',
+  'worker-992-test-renderer-act-scheduler-blocker-refresh'
+]);
 const privateActQueueTestQueueBrand = Symbol.for(
   'fast-react.react.private-act-queue-test-queue'
 );
@@ -1023,6 +1038,33 @@ const schedulerReactActQueueDiagnosticRecords = Object.freeze([
     executesEffects: false
   }),
   Object.freeze({
+    id: privateActSchedulerBlockerCurrentnessDiagnosticId,
+    kind: privateActSchedulerBlockerCurrentnessKind,
+    version: privateActSchedulerBlockerCurrentnessVersion,
+    status: privateActSchedulerBlockerCurrentnessStatus,
+    jsPrivateExport: privateActQueueFlushDiagnosticsExport,
+    acceptedWorkers: privateActSchedulerBlockerCurrentnessWorkers,
+    requiresSourceOwnedActUpdateLifecycleBoundary: true,
+    requiresSourceOwnedSchedulerHelperMetadata: true,
+    consumesPrivateActUpdateLifecycleBoundary: true,
+    consumesSchedulerOwnedMockFlushHelperMetadata: true,
+    rejectsCallerShapedSchedulerHelperMetadata: true,
+    rejectsClonedCurrentnessReports: true,
+    rejectsStaleActUpdateLifecycleReports: true,
+    rejectsProxyHiddenPublicCompatibilityAliases: true,
+    rejectsNonEnumerableSymbolAndAccessorClaims: true,
+    rejectsNativeExecutionSmuggling: true,
+    publicActCompatibilityClaimed: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicSchedulerFlushBehaviorExecuted: false,
+    publicPackageCompatibilityClaimed: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    schedulerFlushCompatibilityClaimed: false,
+    packageCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  }),
+  Object.freeze({
     id: 'react-test-renderer-act-warning-thenable-blockers',
     jsPrivateExport: privateActQueueFlushDiagnosticsExport,
     status: actWarningThenableBlockerStatus,
@@ -1295,6 +1337,9 @@ const privateActQueueFlushDiagnostics = Object.freeze({
   describeAcceptedInternalActQueue,
   describeAcceptedMockSchedulerFlushHelperMetadata,
   routeAcceptedMockSchedulerFlushHelperMetadata,
+  createPrivateActSchedulerBlockerCurrentnessReport,
+  isAcceptedPrivateActSchedulerBlockerCurrentnessReport,
+  consumePrivateActSchedulerBlockerCurrentnessReport,
   describeAcceptedMockSchedulerExpiredWorkMetadata,
   routeAcceptedMockSchedulerExpiredWorkMetadata,
   createExpiredActRootWorkMetadataFromPrivateRootRequest,
@@ -1731,6 +1776,7 @@ const actSchedulerGate = Object.freeze({
     'worker-622-scheduler-mock-act-root-work-execution',
     'worker-640-test-renderer-act-scheduler-flush-execution',
     'worker-670-test-renderer-act-passive-native-flush',
+    'worker-992-test-renderer-act-scheduler-blocker-refresh',
     ...privateActUpdateLifecycleBoundaryWorkers
   ]),
   publicActBehaviorAvailable: false,
@@ -5233,6 +5279,255 @@ function includesString(value, expectedValues) {
   return typeof value === 'string' && expectedValues.includes(value);
 }
 
+let currentSchedulerMockExpiredActRootWorkSourceValidator = null;
+
+installSchedulerMockSourceProofLoadHook();
+
+function getPrivateActSchedulerFrozenObjectReason(value, scope) {
+  try {
+    if (!Object.isFrozen(value)) {
+      return `${scope}-not-frozen`;
+    }
+  } catch (_error) {
+    return `${scope}-own-key-snapshot`;
+  }
+  return null;
+}
+
+function isPrivateActSchedulerBlockedClaimKey(key) {
+  return (
+    key === 'compatibilityClaimed' ||
+    key === 'packageCompatibilityClaimed' ||
+    key === 'jsPackageCompatibilityAvailable' ||
+    key === 'nativeAddonLoaded' ||
+    key === 'nativeBridgeAvailable' ||
+    key === 'nativeExecution' ||
+    key.startsWith('native') ||
+    (key.startsWith('public') && key !== 'publicSurface') ||
+    key.startsWith('drainsPublic') ||
+    key.endsWith('CompatibilityClaimed') ||
+    key.endsWith('CompatibilityAvailable')
+  );
+}
+
+function getRejectedPrivateActSchedulerOwnClaimReason(
+  value,
+  scope,
+  allowedSymbols = []
+) {
+  let keys;
+  try {
+    keys = Reflect.ownKeys(value);
+  } catch (_error) {
+    return `${scope}-own-key-snapshot`;
+  }
+
+  for (const key of keys) {
+    let descriptor;
+    try {
+      descriptor = Object.getOwnPropertyDescriptor(value, key);
+    } catch (_error) {
+      return `${scope}-own-key-snapshot`;
+    }
+    if (descriptor === undefined) {
+      return `${scope}-own-key-snapshot`;
+    }
+    if (!Object.hasOwn(descriptor, 'value')) {
+      return `${scope}-accessor-claim`;
+    }
+    if (typeof key === 'symbol') {
+      if (!allowedSymbols.includes(key)) {
+        return `${scope}-symbol-claim`;
+      }
+      continue;
+    }
+    if (
+      isPrivateActSchedulerBlockedClaimKey(key) &&
+      descriptor.value !== false
+    ) {
+      return `${scope}-public-claim`;
+    }
+  }
+
+  return null;
+}
+
+function installSchedulerMockSourceProofLoadHook() {
+  const CommonJsModule = require('node:module');
+  const originalJavaScriptExtension = CommonJsModule._extensions['.js'];
+  CommonJsModule._extensions['.js'] =
+    function fastReactTestRendererSchedulerMockSourceProofJavaScriptExtension(
+      moduleRecord,
+      filename
+    ) {
+      originalJavaScriptExtension.apply(this, arguments);
+
+      if (isSchedulerMockSourceProofPath(filename)) {
+        captureSchedulerMockExpiredActRootWorkSourceValidator(
+          moduleRecord.exports
+        );
+      }
+    };
+}
+
+function isSchedulerMockSourceProofPath(resolvedModulePath) {
+  return resolveSchedulerMockSourceProofPaths().includes(
+    resolvedModulePath
+  );
+}
+
+function refreshSchedulerMockExpiredActRootWorkSourceValidator() {
+  for (const resolvedModulePath of resolveSchedulerMockSourceProofPaths()) {
+    try {
+      captureSchedulerMockExpiredActRootWorkSourceValidator(
+        require(resolvedModulePath)
+      );
+    } catch (error) {
+      if (error === null || error.code !== 'MODULE_NOT_FOUND') {
+        throw error;
+      }
+    }
+  }
+}
+
+function resolveSchedulerMockSourceProofPaths() {
+  const resolvedModulePaths = [];
+
+  for (const request of [
+    '../../scheduler/unstable_mock.js',
+    'scheduler/unstable_mock.js'
+  ]) {
+    try {
+      const resolvedModulePath = require.resolve(request);
+      if (!resolvedModulePaths.includes(resolvedModulePath)) {
+        resolvedModulePaths.push(resolvedModulePath);
+      }
+    } catch (error) {
+      if (error === null || error.code !== 'MODULE_NOT_FOUND') {
+        throw error;
+      }
+    }
+  }
+
+  return resolvedModulePaths;
+}
+
+function captureSchedulerMockExpiredActRootWorkSourceValidator(Scheduler) {
+  if (!isObjectLike(Scheduler)) {
+    return;
+  }
+
+  const flushExpiredDescriptor = Object.getOwnPropertyDescriptor(
+    Scheduler,
+    'unstable_flushExpired'
+  );
+  if (
+    flushExpiredDescriptor === undefined ||
+    flushExpiredDescriptor.enumerable !== true ||
+    typeof flushExpiredDescriptor.value !== 'function'
+  ) {
+    return;
+  }
+
+  const diagnosticsDescriptor = Object.getOwnPropertyDescriptor(
+    flushExpiredDescriptor.value,
+    privateActQueueFlushDiagnosticsExport
+  );
+  if (
+    diagnosticsDescriptor === undefined ||
+    diagnosticsDescriptor.configurable !== false ||
+    diagnosticsDescriptor.enumerable !== false ||
+    diagnosticsDescriptor.writable !== false
+  ) {
+    return;
+  }
+
+  const validator =
+    getSchedulerMockSourceValidatorFromTrustedDiagnostics(
+      diagnosticsDescriptor.value
+    );
+  if (validator !== null) {
+    currentSchedulerMockExpiredActRootWorkSourceValidator = validator;
+  }
+}
+
+function getSchedulerMockSourceValidatorFromTrustedDiagnostics(
+  diagnostics
+) {
+  if (
+    !isObjectLike(diagnostics) ||
+    diagnostics.providesExpiredActRootWorkSourceValidatorThroughPrivateDiagnostics !==
+      true
+  ) {
+    return null;
+  }
+
+  const validator =
+    diagnostics.schedulerMockExpiredActRootWorkSourceValidator;
+  if (
+    !isObjectLike(validator) ||
+    getPrivateActSchedulerFrozenObjectReason(
+      validator,
+      'scheduler-diagnostics-source-validator'
+    ) !== null ||
+    validator !== diagnostics.schedulerMockExpiredActRootWorkSourceValidator ||
+    validator.status !==
+      'fast-react.scheduler.mock-expired-act-root-work-source-validator' ||
+    typeof validator.isSchedulerMockExpiredActRootWorkSource !== 'function'
+  ) {
+    return null;
+  }
+
+  try {
+    if (
+      validator.isSchedulerMockExpiredActRootWorkSource(diagnostics) !== true
+    ) {
+      return null;
+    }
+  } catch (_error) {
+    return null;
+  }
+
+  return validator;
+}
+
+function hasTrustedSchedulerMockExpiredActRootWorkSourceProof(value) {
+  if (
+    !isObjectLike(value) ||
+    getPrivateActSchedulerFrozenObjectReason(
+      value,
+      'scheduler-diagnostics'
+    ) !== null
+  ) {
+    return false;
+  }
+
+  if (
+    doesSchedulerMockExpiredActRootWorkSourceValidatorAccept(value)
+  ) {
+    return true;
+  }
+
+  refreshSchedulerMockExpiredActRootWorkSourceValidator();
+  return doesSchedulerMockExpiredActRootWorkSourceValidatorAccept(value);
+}
+
+function doesSchedulerMockExpiredActRootWorkSourceValidatorAccept(value) {
+  const validator =
+    currentSchedulerMockExpiredActRootWorkSourceValidator;
+  if (validator === null) {
+    return false;
+  }
+
+  try {
+    return (
+      validator.isSchedulerMockExpiredActRootWorkSource(value) === true
+    );
+  } catch (_error) {
+    return false;
+  }
+}
+
 function isNonNegativeInteger(value) {
   return Number.isInteger(value) && value >= 0;
 }
@@ -5363,8 +5658,22 @@ function getRejectedSchedulerMockFlushDiagnosticsReason(diagnostics) {
   if (!isObjectLike(diagnostics)) {
     return 'scheduler-diagnostics-not-object';
   }
-  if (!Object.isFrozen(diagnostics)) {
-    return 'scheduler-diagnostics-not-frozen';
+  const frozenReason = getPrivateActSchedulerFrozenObjectReason(
+    diagnostics,
+    'scheduler-diagnostics'
+  );
+  if (frozenReason !== null) {
+    return frozenReason;
+  }
+  const ownClaimReason = getRejectedPrivateActSchedulerOwnClaimReason(
+    diagnostics,
+    'scheduler-diagnostics'
+  );
+  if (ownClaimReason !== null) {
+    return ownClaimReason;
+  }
+  if (!hasTrustedSchedulerMockExpiredActRootWorkSourceProof(diagnostics)) {
+    return 'scheduler-diagnostics-source-proof';
   }
   if (diagnostics.status !== 'private-scheduler-act-queue-flush-diagnostics') {
     return 'scheduler-diagnostics-status';
@@ -5732,6 +6041,17 @@ function getRejectedSchedulerMockExpiredWorkTaskReason(task, index) {
 
 function readMockSchedulerFlushDiagnosticsCarrier(flushHelperOrDiagnostics) {
   if (typeof flushHelperOrDiagnostics === 'function') {
+    const helperClaimReason = getRejectedPrivateActSchedulerOwnClaimReason(
+      flushHelperOrDiagnostics,
+      'flush-helper'
+    );
+    if (helperClaimReason !== null) {
+      return {
+        diagnostics: null,
+        helperDescriptor: null,
+        rejectionReason: helperClaimReason
+      };
+    }
     const descriptor = Object.getOwnPropertyDescriptor(
       flushHelperOrDiagnostics,
       privateActQueueFlushDiagnosticsExport
@@ -5762,9 +6082,9 @@ function readMockSchedulerFlushDiagnosticsCarrier(flushHelperOrDiagnostics) {
   }
 
   return {
-    diagnostics: flushHelperOrDiagnostics,
+    diagnostics: null,
     helperDescriptor: null,
-    rejectionReason: null
+    rejectionReason: 'flush-helper-not-function'
   };
 }
 
@@ -7376,8 +7696,19 @@ function getRejectedNativeUpdateExecutionResultReason(result) {
   if (!isObjectLike(result)) {
     return 'native-update-result-not-object';
   }
-  if (!Object.isFrozen(result)) {
-    return 'native-update-result-not-frozen';
+  const frozenReason = getPrivateActSchedulerFrozenObjectReason(
+    result,
+    'native-update-result'
+  );
+  if (frozenReason !== null) {
+    return frozenReason;
+  }
+  const ownClaimReason = getRejectedPrivateActSchedulerOwnClaimReason(
+    result,
+    'native-update-result'
+  );
+  if (ownClaimReason !== null) {
+    return ownClaimReason;
   }
   if (result.kind !== 'FastReactTestRendererPrivateRootExecutionResult') {
     return 'native-update-result-kind';
@@ -7424,8 +7755,22 @@ function getRejectedNativeUpdateExecutionResultReason(result) {
   }
 
   const admission = result.privateUpdateNativeBridgeAdmission;
-  if (!isObjectLike(admission) || !Object.isFrozen(admission)) {
+  if (!isObjectLike(admission)) {
     return 'native-update-admission-not-object';
+  }
+  const admissionFrozenReason = getPrivateActSchedulerFrozenObjectReason(
+    admission,
+    'native-update-admission'
+  );
+  if (admissionFrozenReason !== null) {
+    return admissionFrozenReason;
+  }
+  const admissionClaimReason = getRejectedPrivateActSchedulerOwnClaimReason(
+    admission,
+    'native-update-admission'
+  );
+  if (admissionClaimReason !== null) {
+    return admissionClaimReason;
   }
   if (
     admission.id !==
@@ -7499,8 +7844,19 @@ function getRejectedPrivateActUpdateLifecycleBoundaryReason(
   if (!isObjectLike(rootLifecycleExecutionEvidence)) {
     return 'act-update-lifecycle-evidence-not-object';
   }
-  if (!Object.isFrozen(rootLifecycleExecutionEvidence)) {
-    return 'act-update-lifecycle-evidence-not-frozen';
+  const lifecycleFrozenReason = getPrivateActSchedulerFrozenObjectReason(
+    rootLifecycleExecutionEvidence,
+    'act-update-lifecycle-evidence'
+  );
+  if (lifecycleFrozenReason !== null) {
+    return lifecycleFrozenReason;
+  }
+  const lifecycleClaimReason = getRejectedPrivateActSchedulerOwnClaimReason(
+    rootLifecycleExecutionEvidence,
+    'act-update-lifecycle-evidence'
+  );
+  if (lifecycleClaimReason !== null) {
+    return lifecycleClaimReason;
   }
   if (
     rootLifecycleExecutionEvidence.publicActAvailable === true ||
@@ -7545,8 +7901,20 @@ function getRejectedPrivateActUpdateLifecycleBoundaryReason(
   if (!isObjectLike(finishedWorkIdentity)) {
     return 'act-update-finished-work-identity-not-object';
   }
-  if (!Object.isFrozen(finishedWorkIdentity)) {
-    return 'act-update-finished-work-identity-not-frozen';
+  const finishedWorkFrozenReason = getPrivateActSchedulerFrozenObjectReason(
+    finishedWorkIdentity,
+    'act-update-finished-work-identity'
+  );
+  if (finishedWorkFrozenReason !== null) {
+    return finishedWorkFrozenReason;
+  }
+  const finishedWorkClaimReason =
+    getRejectedPrivateActSchedulerOwnClaimReason(
+      finishedWorkIdentity,
+      'act-update-finished-work-identity'
+    );
+  if (finishedWorkClaimReason !== null) {
+    return finishedWorkClaimReason;
   }
   if (!privateSerializationFinishedWorkIdentityResults.has(finishedWorkIdentity)) {
     return 'act-update-finished-work-identity-not-source-owned';
@@ -7675,6 +8043,182 @@ function consumePrivateActUpdateLifecycleBoundary(
     sourceExecutionRecordIds:
       rootLifecycleExecutionEvidence.sourceExecutionRecordIds,
     latestUpdateLifecycleBeforeUnmountAccepted: true
+  });
+}
+
+function createPrivateActSchedulerBlockerCurrentnessReport(
+  updateExecutionResult,
+  rootLifecycleExecutionEvidence,
+  finishedWorkIdentity,
+  flushHelper
+) {
+  const actUpdateLifecycleBoundary =
+    describePrivateActUpdateLifecycleBoundary(
+      updateExecutionResult,
+      rootLifecycleExecutionEvidence,
+      finishedWorkIdentity
+    );
+  const schedulerHelperMetadata =
+    describeAcceptedMockSchedulerFlushHelperMetadata(flushHelper);
+  const accepted =
+    actUpdateLifecycleBoundary.accepted === true &&
+    schedulerHelperMetadata.accepted === true;
+  const rejectionReason =
+    actUpdateLifecycleBoundary.accepted !== true
+      ? actUpdateLifecycleBoundary.rejectionReason
+      : schedulerHelperMetadata.rejectionReason;
+  const report = freezeRecord({
+    id: privateActSchedulerBlockerCurrentnessDiagnosticId,
+    kind: privateActSchedulerBlockerCurrentnessKind,
+    version: privateActSchedulerBlockerCurrentnessVersion,
+    status: accepted
+      ? privateActSchedulerBlockerCurrentnessStatus
+      : 'rejected-private-act-scheduler-blocker-currentness',
+    accepted,
+    rejectionReason,
+    entrypoint,
+    compatibilityTarget,
+    reactCompatibilityTarget,
+    schedulerCompatibilityTarget,
+    acceptedWorkers: privateActSchedulerBlockerCurrentnessWorkers,
+    consumer: 'react-test-renderer-act-scheduler-blocker-currentness-gate',
+    gateStatus: actSchedulerGateStatus,
+    actUpdateLifecycleBoundary,
+    schedulerHelperMetadata,
+    sourceOwnedActUpdateLifecycleBoundaryAccepted:
+      actUpdateLifecycleBoundary.accepted === true,
+    sourceOwnedSchedulerHelperMetadataAccepted:
+      schedulerHelperMetadata.accepted === true,
+    consumesPrivateActUpdateLifecycleBoundary: accepted,
+    consumesSchedulerOwnedMockFlushHelperMetadata: accepted,
+    rejectsCallerShapedSchedulerHelperMetadata: true,
+    rejectsClonedCurrentnessReports: true,
+    rejectsStaleActUpdateLifecycleReports: true,
+    rejectsProxyHiddenPublicCompatibilityAliases: true,
+    rejectsNonEnumerableSymbolAndAccessorClaims: true,
+    rejectsNativeExecutionSmuggling: true,
+    publicActAvailable: false,
+    publicSchedulerFlushExecutionAvailable: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    publicActCompatibilityClaimed: false,
+    schedulerFlushCompatibilityClaimed: false,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    packageCompatibilityClaimed: false,
+    compatibilityClaimed: false
+  });
+
+  if (accepted) {
+    privateActSchedulerBlockerCurrentnessReports.add(report);
+  }
+  return report;
+}
+
+function validatePrivateActSchedulerBlockerCurrentnessReport(report) {
+  if (!isObjectLike(report)) {
+    return 'act-scheduler-blocker-currentness-not-object';
+  }
+  const frozenReason = getPrivateActSchedulerFrozenObjectReason(
+    report,
+    'act-scheduler-blocker-currentness'
+  );
+  if (frozenReason !== null) {
+    return frozenReason;
+  }
+  const ownClaimReason = getRejectedPrivateActSchedulerOwnClaimReason(
+    report,
+    'act-scheduler-blocker-currentness'
+  );
+  if (ownClaimReason !== null) {
+    return ownClaimReason;
+  }
+  if (!privateActSchedulerBlockerCurrentnessReports.has(report)) {
+    return 'act-scheduler-blocker-currentness-source-proof';
+  }
+  if (
+    report.id !== privateActSchedulerBlockerCurrentnessDiagnosticId ||
+    report.kind !== privateActSchedulerBlockerCurrentnessKind ||
+    report.version !== privateActSchedulerBlockerCurrentnessVersion ||
+    report.status !== privateActSchedulerBlockerCurrentnessStatus ||
+    report.accepted !== true ||
+    report.rejectionReason !== null ||
+    report.entrypoint !== entrypoint ||
+    report.compatibilityTarget !== compatibilityTarget ||
+    report.reactCompatibilityTarget !== reactCompatibilityTarget ||
+    report.schedulerCompatibilityTarget !== schedulerCompatibilityTarget ||
+    report.acceptedWorkers !== privateActSchedulerBlockerCurrentnessWorkers
+  ) {
+    return 'act-scheduler-blocker-currentness-shape';
+  }
+  if (
+    !isObjectLike(report.actUpdateLifecycleBoundary) ||
+    report.actUpdateLifecycleBoundary.accepted !== true ||
+    report.actUpdateLifecycleBoundary.status !==
+      privateActUpdateLifecycleBoundaryStatus ||
+    report.sourceOwnedActUpdateLifecycleBoundaryAccepted !== true ||
+    report.consumesPrivateActUpdateLifecycleBoundary !== true
+  ) {
+    return 'act-scheduler-blocker-currentness-act-boundary';
+  }
+  if (
+    !isObjectLike(report.schedulerHelperMetadata) ||
+    report.schedulerHelperMetadata.accepted !== true ||
+    report.schedulerHelperMetadata.status !==
+      'accepted-mock-scheduler-flush-helper-metadata' ||
+    report.sourceOwnedSchedulerHelperMetadataAccepted !== true ||
+    report.consumesSchedulerOwnedMockFlushHelperMetadata !== true
+  ) {
+    return 'act-scheduler-blocker-currentness-scheduler-helper';
+  }
+  if (
+    report.publicActAvailable !== false ||
+    report.publicSchedulerFlushExecutionAvailable !== false ||
+    report.schedulerFlushCompatibilityClaimed !== false ||
+    report.nativeBridgeAvailable !== false ||
+    report.nativeExecution !== false ||
+    report.packageCompatibilityClaimed !== false ||
+    report.compatibilityClaimed !== false
+  ) {
+    return 'act-scheduler-blocker-currentness-public-claim';
+  }
+  return null;
+}
+
+function isAcceptedPrivateActSchedulerBlockerCurrentnessReport(report) {
+  return validatePrivateActSchedulerBlockerCurrentnessReport(report) === null;
+}
+
+function consumePrivateActSchedulerBlockerCurrentnessReport(report) {
+  const rejectionReason =
+    validatePrivateActSchedulerBlockerCurrentnessReport(report);
+  if (rejectionReason !== null) {
+    throw createMockSchedulerFlushHelperRoutingError(rejectionReason);
+  }
+
+  return freezeRecord({
+    status: privateActSchedulerBlockerCurrentnessConsumptionStatus,
+    accepted: true,
+    currentnessStatus: report.status,
+    currentnessReport: report,
+    actUpdateLifecycleBoundary: report.actUpdateLifecycleBoundary,
+    schedulerHelperMetadata: report.schedulerHelperMetadata,
+    consumesPrivateActUpdateLifecycleBoundary: true,
+    consumesSchedulerOwnedMockFlushHelperMetadata: true,
+    publicActAvailable: false,
+    publicSchedulerFlushExecutionAvailable: false,
+    publicSchedulerTimingCompatibilityClaimed: false,
+    publicReactActCompatibilityClaimed: false,
+    publicActCompatibilityClaimed: false,
+    schedulerFlushCompatibilityClaimed: false,
+    drainsPublicSchedulerTaskQueue: false,
+    drainsPublicReactActQueue: false,
+    nativeBridgeAvailable: false,
+    nativeExecution: false,
+    packageCompatibilityClaimed: false,
+    compatibilityClaimed: false
   });
 }
 
@@ -7911,6 +8455,7 @@ const rootHandleTestInstanceLifecycleEvidence = new WeakMap();
 const rootExecutionResults = new WeakSet();
 const rootLifecycleExecutionEvidences = new WeakSet();
 const privateSerializationFinishedWorkIdentityResults = new WeakSet();
+const privateActSchedulerBlockerCurrentnessReports = new WeakSet();
 
 function createTestRendererRootRequestBridge(options) {
   const bridgeState = {
