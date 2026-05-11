@@ -34,45 +34,46 @@ const {
   privateRootMarkerMutationRecordType,
   revertContainerRootMarkerMutation
 } = require('./root-markers.js');
-const {
-  HYDRATION_RECOVERABLE_ERROR_CALLBACK_BLOCKED_REASON,
-  HYDRATION_BOUNDARY_ACCEPTED_METADATA_DIAGNOSTIC_KIND,
-  HYDRATION_CLAIMED_REPLAY_TARGET_DISPATCH_EXECUTION_RECORD_KIND,
-  HYDRATION_REPLAY_OWNERSHIP_GATE_DIAGNOSTIC_KIND,
-  HYDRATION_REPLAY_OWNERSHIP_GATE_ENTRY_RECORD_KIND,
-  HYDRATION_TARGET_CLAIMING_DIAGNOSTIC_KIND,
-  HYDRATION_TEXT_MISMATCH_BLOCKED_REASON,
-  HYDRATION_TEXT_MISMATCH_DIAGNOSTIC_KIND,
-  HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND,
-  HYDRATION_TEXT_NODE_CLAIM_PATCH_EXECUTION_RECORD_KIND,
-  UNSUPPORTED_HYDRATION_ROOT_KIND,
-  acceptedHydrationBoundaryMetadataContracts,
-  assertCanonicalPrivateHydrationClaimedReplayTargetDispatchExecutionRecord,
-  assertCanonicalPrivateHydrationTargetClaimingDiagnostic,
-  createHydrationBoundaryGate,
-  createHydrationReplayOwnershipGateDiagnostic,
-  createHydrationReplayTargetDispatchLinkDiagnostic,
-  createHydrationTextMismatchRecoverableErrorPreflightRecord,
-  getPrivateHydrationBoundaryRecordPayload,
-  getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload,
-  getPrivateHydrationTargetClaimingDiagnosticPayload,
-  getPrivateHydrationTextNodeClaimPatchExecutionPayload,
-  getPrivateHydrationTextMismatchRecoverableErrorPreflightPayload,
-  isPrivateHydrationBoundaryRecord,
-  isPrivateHydrationClaimedReplayTargetDispatchExecutionRecord,
-  isPrivateHydrationTargetClaimingDiagnostic,
-  isPrivateHydrationTextNodeClaimPatchExecutionRecord,
-  isPrivateHydrationTextMismatchRecoverableErrorPreflightRecord,
-  privateHydrationBoundaryAcceptedMetadataGateId,
-  privateHydrationBoundaryAcceptedMetadataStatus,
-  privateHydrationClaimedReplayTargetDispatchExecutionGateId,
-  privateHydrationClaimedReplayTargetDispatchExecutionStatus,
-  privateHydrationTargetClaimingGateId,
-  privateHydrationTargetClaimingMetadataStatus,
-  privateHydrationTextNodeClaimPatchExecutionGateId,
-  privateHydrationTextNodeClaimPatchExecutionStatus,
-  privateHydrationTextNodeClaimPatchMetadataId
-} = require('./hydration-boundary-gate.js');
+const HYDRATION_RECOVERABLE_ERROR_CALLBACK_BLOCKED_REASON =
+  'FAST_REACT_DOM_HYDRATION_RECOVERABLE_ERROR_CALLBACK_BLOCKED';
+const HYDRATION_BOUNDARY_ACCEPTED_METADATA_DIAGNOSTIC_KIND =
+  'FastReactDomHydrationBoundaryAcceptedMetadataDiagnostics';
+const HYDRATION_CLAIMED_REPLAY_TARGET_DISPATCH_EXECUTION_RECORD_KIND =
+  'FastReactDomHydrationClaimedReplayTargetDispatchExecutionRecord';
+const HYDRATION_REPLAY_OWNERSHIP_GATE_DIAGNOSTIC_KIND =
+  'FastReactDomHydrationReplayOwnershipGateDiagnostic';
+const HYDRATION_REPLAY_OWNERSHIP_GATE_ENTRY_RECORD_KIND =
+  'FastReactDomHydrationReplayOwnershipGateEntryRecord';
+const HYDRATION_TARGET_CLAIMING_DIAGNOSTIC_KIND =
+  'FastReactDomHydrationTargetClaimingDiagnostic';
+const HYDRATION_TEXT_MISMATCH_BLOCKED_REASON =
+  'FAST_REACT_DOM_HYDRATION_TEXT_MISMATCH_BLOCKED';
+const HYDRATION_TEXT_MISMATCH_DIAGNOSTIC_KIND =
+  'FastReactDomHydrationTextMismatchDiagnostics';
+const HYDRATION_TEXT_MISMATCH_RECOVERABLE_ERROR_METADATA_KIND =
+  'FastReactDomHydrationTextMismatchRecoverableErrorMetadata';
+const HYDRATION_TEXT_NODE_CLAIM_PATCH_EXECUTION_RECORD_KIND =
+  'FastReactDomHydrationTextNodeClaimPatchExecutionRecord';
+const UNSUPPORTED_HYDRATION_ROOT_KIND = 'unsupported-hydration';
+const privateHydrationBoundaryAcceptedMetadataGateId =
+  'hydration-boundary-accepted-resource-form-metadata-private-gate-1';
+const privateHydrationBoundaryAcceptedMetadataStatus =
+  'accepted-private-hydration-boundary-resource-form-metadata-ids';
+const privateHydrationClaimedReplayTargetDispatchExecutionGateId =
+  'hydration-claimed-replay-target-dispatch-execution-private-gate-1';
+const privateHydrationClaimedReplayTargetDispatchExecutionStatus =
+  'blocked-private-hydration-claimed-replay-target-dispatch-execution';
+const privateHydrationTargetClaimingGateId =
+  'hydration-target-claiming-private-gate-1';
+const privateHydrationTargetClaimingMetadataStatus =
+  'accepted-private-hydration-target-claiming-metadata';
+const privateHydrationTextNodeClaimPatchExecutionGateId =
+  'hydration-text-node-claim-patch-execution-private-gate-1';
+const privateHydrationTextNodeClaimPatchExecutionStatus =
+  'executed-private-hydration-text-node-claim-patch';
+const privateHydrationTextNodeClaimPatchMetadataId =
+  'hydration-text-node-claim-patch';
+let hydrationBoundaryGateModule = null;
 const {
   hasListeningMarker,
   inspectListeningMarker,
@@ -159,6 +160,113 @@ const {
   getDangerousHtmlTextResetDiagnosticPayload
 } = require('./dom-property-operations.js');
 const testUtilsActGate = require('../test-utils-act-gate.js');
+
+function getHydrationBoundaryGateModule() {
+  if (hydrationBoundaryGateModule === null) {
+    hydrationBoundaryGateModule = require('./hydration-boundary-gate.js');
+  }
+  return hydrationBoundaryGateModule;
+}
+
+function getAcceptedHydrationBoundaryMetadataContracts() {
+  return getHydrationBoundaryGateModule()
+    .acceptedHydrationBoundaryMetadataContracts;
+}
+
+function assertCanonicalPrivateHydrationClaimedReplayTargetDispatchExecutionRecord(
+  ...args
+) {
+  return getHydrationBoundaryGateModule()
+    .assertCanonicalPrivateHydrationClaimedReplayTargetDispatchExecutionRecord(
+      ...args
+    );
+}
+
+function assertCanonicalPrivateHydrationTargetClaimingDiagnostic(...args) {
+  return getHydrationBoundaryGateModule()
+    .assertCanonicalPrivateHydrationTargetClaimingDiagnostic(...args);
+}
+
+function createHydrationBoundaryGate(...args) {
+  return getHydrationBoundaryGateModule().createHydrationBoundaryGate(
+    ...args
+  );
+}
+
+function createHydrationReplayOwnershipGateDiagnostic(...args) {
+  return getHydrationBoundaryGateModule()
+    .createHydrationReplayOwnershipGateDiagnostic(...args);
+}
+
+function createHydrationReplayTargetDispatchLinkDiagnostic(...args) {
+  return getHydrationBoundaryGateModule()
+    .createHydrationReplayTargetDispatchLinkDiagnostic(...args);
+}
+
+function createHydrationTextMismatchRecoverableErrorPreflightRecord(
+  ...args
+) {
+  return getHydrationBoundaryGateModule()
+    .createHydrationTextMismatchRecoverableErrorPreflightRecord(...args);
+}
+
+function getPrivateHydrationBoundaryRecordPayload(...args) {
+  return getHydrationBoundaryGateModule()
+    .getPrivateHydrationBoundaryRecordPayload(...args);
+}
+
+function getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload(
+  ...args
+) {
+  return getHydrationBoundaryGateModule()
+    .getPrivateHydrationClaimedReplayTargetDispatchExecutionPayload(...args);
+}
+
+function getPrivateHydrationTargetClaimingDiagnosticPayload(...args) {
+  return getHydrationBoundaryGateModule()
+    .getPrivateHydrationTargetClaimingDiagnosticPayload(...args);
+}
+
+function getPrivateHydrationTextNodeClaimPatchExecutionPayload(...args) {
+  return getHydrationBoundaryGateModule()
+    .getPrivateHydrationTextNodeClaimPatchExecutionPayload(...args);
+}
+
+function getPrivateHydrationTextMismatchRecoverableErrorPreflightPayload(
+  ...args
+) {
+  return getHydrationBoundaryGateModule()
+    .getPrivateHydrationTextMismatchRecoverableErrorPreflightPayload(...args);
+}
+
+function isPrivateHydrationBoundaryRecord(...args) {
+  return getHydrationBoundaryGateModule()
+    .isPrivateHydrationBoundaryRecord(...args);
+}
+
+function isPrivateHydrationClaimedReplayTargetDispatchExecutionRecord(
+  ...args
+) {
+  return getHydrationBoundaryGateModule()
+    .isPrivateHydrationClaimedReplayTargetDispatchExecutionRecord(...args);
+}
+
+function isPrivateHydrationTargetClaimingDiagnostic(...args) {
+  return getHydrationBoundaryGateModule()
+    .isPrivateHydrationTargetClaimingDiagnostic(...args);
+}
+
+function isPrivateHydrationTextNodeClaimPatchExecutionRecord(...args) {
+  return getHydrationBoundaryGateModule()
+    .isPrivateHydrationTextNodeClaimPatchExecutionRecord(...args);
+}
+
+function isPrivateHydrationTextMismatchRecoverableErrorPreflightRecord(
+  ...args
+) {
+  return getHydrationBoundaryGateModule()
+    .isPrivateHydrationTextMismatchRecoverableErrorPreflightRecord(...args);
+}
 
 const CLIENT_ROOT_KIND = 'client';
 const CONCURRENT_ROOT_TAG = 'ConcurrentRoot';
@@ -3311,7 +3419,14 @@ function createPrivateRootBridgeShell(options) {
   });
 }
 
-const defaultBridgeShell = createPrivateRootBridgeShell();
+let defaultBridgeShell = null;
+
+function getDefaultBridgeShell() {
+  if (defaultBridgeShell === null) {
+    defaultBridgeShell = createPrivateRootBridgeShell();
+  }
+  return defaultBridgeShell;
+}
 
 function createPrivateRootPublicFacadeAdapter(options) {
   const bridge = createPrivateRootBridgeShell(options);
@@ -7343,7 +7458,7 @@ function createPrivateRootPublicFacadePreflightRecord(
 }
 
 function preflightPrivateRootLiveContainer(container, admission) {
-  return defaultBridgeShell.preflightLiveContainer(container, admission);
+  return getDefaultBridgeShell().preflightLiveContainer(container, admission);
 }
 
 function preflightPrivateRootLiveContainerWithBridge(
@@ -13081,11 +13196,11 @@ function createPublicFacadeHostOutputUnmountBlockedCapabilities(evidence) {
 }
 
 function createClientRootRecord(container, rootOptions) {
-  return defaultBridgeShell.createClientRoot(container, rootOptions);
+  return getDefaultBridgeShell().createClientRoot(container, rootOptions);
 }
 
 function createHydrateRootRecord(container, initialChildren, hydrationOptions) {
-  return defaultBridgeShell.createHydrateRoot(
+  return getDefaultBridgeShell().createHydrateRoot(
     container,
     initialChildren,
     hydrationOptions
@@ -16249,7 +16364,9 @@ function assertHydrationBoundaryAcceptedPrivateMetadataRows(
     acceptedPrivateMetadataDiagnostics.acceptedRecordTypes;
   const acceptedStatuses =
     acceptedPrivateMetadataDiagnostics.acceptedStatuses;
-  const contractCount = acceptedHydrationBoundaryMetadataContracts.length;
+  const acceptedMetadataContracts =
+    getAcceptedHydrationBoundaryMetadataContracts();
+  const contractCount = acceptedMetadataContracts.length;
 
   if (
     !Array.isArray(metadataRows) ||
@@ -16270,7 +16387,7 @@ function assertHydrationBoundaryAcceptedPrivateMetadataRows(
   }
 
   for (let index = 0; index < contractCount; index++) {
-    const contract = acceptedHydrationBoundaryMetadataContracts[index];
+    const contract = acceptedMetadataContracts[index];
     const row = metadataRows[index];
 
     if (
@@ -28616,11 +28733,3 @@ const rootBridgeExports = Object.freeze({
 });
 
 module.exports = rootBridgeExports;
-
-require('./hydrate-root-source-ledger.js')
-  .installPrivateHydrateRootSourceLedgerPayloadReaders({
-    getPrivateHydrateRootPublicFacadePreflightRecordPayload,
-    getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload,
-    getPrivateHydrateRootPublicFacadeExecutionPreflightPayload,
-    getPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryPayload
-  });

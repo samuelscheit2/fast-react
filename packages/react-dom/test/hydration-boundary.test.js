@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const test = require('node:test');
+const vm = require('node:vm');
 
 const packageRoot = path.resolve(__dirname, '..');
 const hydrationGate = require(path.join(
@@ -2062,26 +2063,21 @@ test('private hydration recoverable error boundary admission rejects stale clone
     undefined
   );
   assert.equal(
-    Object.prototype.propertyIsEnumerable.call(
-      hydrateRootSourceLedger,
-      'installPrivateHydrateRootSourceLedgerPayloadReaders'
-    ),
-    false
+    hydrateRootSourceLedger
+      .installPrivateHydrateRootSourceLedgerPayloadReaders,
+    undefined
   );
   assert.throws(
     () =>
-      hydrateRootSourceLedger.installPrivateHydrateRootSourceLedgerPayloadReaders(
-        Object.fromEntries(
-          [
-            'getPrivateHydrateRootPublicFacadePreflightRecordPayload',
-            'getPrivateHydrateRootPublicFacadeEventReplayPreflightPayload',
-            'getPrivateHydrateRootPublicFacadeExecutionPreflightPayload',
-            'getPrivateHydrateRootPublicFacadeLifecycleRequestBoundaryPayload'
-          ].map((getterName) => [getterName, () => null])
-        )
+      vm.runInNewContext(
+        'hydrateRootSourceLedger.installPrivateHydrateRootSourceLedgerPayloadReaders({});',
+        {hydrateRootSourceLedger},
+        {filename: '/tmp/root-bridge.js'}
       ),
     {
-      code: 'FAST_REACT_DOM_INVALID_HYDRATE_ROOT_SOURCE_LEDGER_INSTALL'
+      name: 'TypeError',
+      message:
+        /installPrivateHydrateRootSourceLedgerPayloadReaders is not a function/
     }
   );
   const clonedLifecycleRequestBoundary = Object.freeze({
