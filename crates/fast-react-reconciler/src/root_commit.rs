@@ -17835,7 +17835,10 @@ fn materialize_deletion_subtree_host_detachment_plan_for_canary(
             host_child: cleanup_record.fiber(),
         },
     )?;
-    if host_parent_tag != FiberTag::HostComponent {
+    if !matches!(
+        host_parent_tag,
+        FiberTag::HostComponent | FiberTag::HostRoot
+    ) {
         return Err(
             HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary::UnsupportedHostParent {
                 root: commit.root,
@@ -17846,7 +17849,9 @@ fn materialize_deletion_subtree_host_detachment_plan_for_canary(
             },
         );
     }
-    if cleanup_record.host_parent_state_node().is_none() {
+    if host_parent_tag == FiberTag::HostComponent
+        && cleanup_record.host_parent_state_node().is_none()
+    {
         return Err(
             HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary::MissingHostParentStateNode {
                 root: commit.root,

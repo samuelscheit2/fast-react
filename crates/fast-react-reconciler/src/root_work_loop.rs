@@ -7554,13 +7554,13 @@ mod tests {
 
     #[derive(Debug)]
     struct FunctionComponentDeletedSubtreeTeardownFixture {
+        mount_render: HostRootRenderPhaseRecord,
+        complete_work: HostRootCompleteWorkHandoffRecord,
+        host_mutation_apply: TestHostRootMutationApplyResult,
         delete_render: HostRootRenderPhaseRecord,
         pending: HostRootFinishedWorkPendingCommitRecordForCanary,
         previous_current: FiberId,
-        host_parent: FiberId,
-        work_parent: FiberId,
         deletion_list: DeletionListId,
-        host_parent_state_node: StateNodeHandle,
         function_component: FiberId,
         single_child: FunctionComponentSingleChildReconciliationRecord,
         function_host_child: FiberId,
@@ -7588,7 +7588,7 @@ mod tests {
         },
         RootFinishedChildMismatch {
             root: FiberRootId,
-            expected_child: FiberId,
+            expected_child: Option<FiberId>,
             actual_child: Option<FiberId>,
         },
         DeletionListMismatch {
@@ -7927,58 +7927,19 @@ mod tests {
         let mut source = TestHostTree::new();
         let child_element =
             source.insert_host_element_with_text("article", format!("function delete {raw}"));
-        let TestHostNode::Element(child_element_node) = source.root(child_element).unwrap() else {
-            unreachable!("fixture inserts a host element child");
-        };
-        let [TestHostNode::Text(child_text_node)] = child_element_node.children() else {
-            unreachable!("fixture host element has exactly one text child");
-        };
         let root_element = RootElementHandle::from_raw(raw);
-        let mut detached_hosts = DetachedHostRecords::new_for_canary();
-        let mut hook_store = FunctionComponentHookRenderStore::new();
 
         update_container(store, root_id, root_element, None).unwrap();
-        let create_render = render_host_root_for_lanes(store, root_id, Lanes::DEFAULT).unwrap();
-        let host_root = create_render.finished_work();
-        let mode = store.fiber_arena().get(host_root).unwrap().mode();
-
-        let host_parent_props = PropsHandle::from_raw(raw + 1);
-        let host_parent = store.fiber_arena_mut().create_fiber(
-            FiberTag::HostComponent,
-            None,
-            host_parent_props,
-            mode,
-        );
-        {
-            let node = store.fiber_arena_mut().get_mut(host_parent).unwrap();
-            node.set_element_type(ElementTypeHandle::from_raw(raw + 2));
-            node.set_memoized_props(host_parent_props);
-        }
-
-        let function_component = store.fiber_arena_mut().create_fiber(
-            FiberTag::FunctionComponent,
-            None,
-            PropsHandle::from_raw(raw + 3),
-            mode,
-        );
-        let component = FiberTypeHandle::from_raw(raw + 4);
-        {
-            let node = store.fiber_arena_mut().get_mut(function_component).unwrap();
-            node.set_fiber_type(component);
-            node.set_memoized_props(PropsHandle::from_raw(raw + 3));
-        }
-        store
-            .fiber_arena_mut()
-            .set_children(host_parent, &[function_component])
-            .unwrap();
-
+        let mount_render = render_host_root_for_lanes(store, root_id, Lanes::DEFAULT).unwrap();
+        let (_function_current, function_component, component) =
+            attach_function_component_wip_child(store, mount_render.work_in_progress());
         let output = FunctionComponentOutputHandle::from_raw(child_element.raw());
         let mut registry = TestFunctionComponentRegistry::default();
         registry.register(component, Ok(output));
         let resolver = TestHostTreeFunctionOutputResolver::new(&source);
         let begin_work = begin_work_reconcile_function_component_single_child(
             store.fiber_arena_mut(),
-            BeginWorkRequest::new(function_component, Lanes::DEFAULT),
+            BeginWorkRequest::new(function_component, mount_render.render_lanes()),
             &mut registry,
             &resolver,
         )
@@ -7987,65 +7948,72 @@ mod tests {
         assert_eq!(single_child.function_component(), function_component);
         assert_eq!(single_child.child_element(), child_element);
         assert_eq!(single_child.child_tag(), FiberTag::HostComponent);
-
-        let function_host_text = store.fiber_arena_mut().create_fiber(
-            FiberTag::HostText,
-            None,
-            child_text_node.props(),
-            mode,
-        );
-        let function_host_text_state_node =
-            create_detached_test_host_text_for_existing_fiber_for_canary(
+        let mut host_work = mount_test_function_component_single_host_child_work(
+            store,
+            host,
+            mount_render,
+            function_component,
+            single_child.child_element(),
+            &source,
+        )
+        .unwrap();
+        let complete_work = host_root_complete_work_handoff_record_from_host_work(
+            store,
+            mount_render,
+            single_child.child_element(),
+            &host_work,
+        )
+        .unwrap();
+        let mount_handoff =
+            commit_completed_host_root_render_with_finished_work_handoff_for_canary(
                 store,
-                host,
-                &mut detached_hosts,
-                root_id,
-                function_host_text,
-                child_text_node.text(),
-                child_text_node.props(),
+                mount_render,
+                ROOT_WORK_LOOP_FUNCTION_COMPONENT_DELETE_TEARDOWN_SOURCE_ORDER,
+                ROOT_WORK_LOOP_FUNCTION_COMPONENT_DELETE_TEARDOWN_COMMIT_ORDER - 1,
             )
             .unwrap();
+        let host_mutation_apply = execute_function_component_single_child_host_mutation_for_canary(
+            store,
+            host,
+            mount_render,
+            function_component,
+            single_child,
+            complete_work,
+            mount_handoff.commit(),
+            &mut host_work,
+        )
+        .unwrap();
 
-        let function_host_child = store.fiber_arena_mut().create_fiber(
-            FiberTag::HostComponent,
-            None,
-            single_child.child_props(),
-            mode,
-        );
-        let function_host_child_ref = RefHandle::from_raw(raw + 5);
+        let function_host_child = complete_work.completed_child().unwrap();
+        let function_host_text = store
+            .fiber_arena()
+            .get(function_host_child)
+            .unwrap()
+            .child()
+            .unwrap();
+        let function_host_child_state_node = store
+            .fiber_arena()
+            .get(function_host_child)
+            .unwrap()
+            .state_node();
+        let function_host_text_state_node = store
+            .fiber_arena()
+            .get(function_host_text)
+            .unwrap()
+            .state_node();
+        let function_host_child_ref = RefHandle::from_raw(raw + 1);
         {
             let node = store
                 .fiber_arena_mut()
                 .get_mut(function_host_child)
                 .unwrap();
-            node.set_element_type(single_child.child_element_type());
             node.set_ref_handle(function_host_child_ref);
-            node.set_memoized_props(single_child.child_props());
         }
-        store
-            .fiber_arena_mut()
-            .set_children(function_host_child, &[function_host_text])
-            .unwrap();
-        let function_host_child_state_node =
-            create_detached_test_host_component_for_existing_fiber_for_canary(
-                store,
-                host,
-                &mut detached_hosts,
-                root_id,
-                function_host_child,
-                child_element_node.ty(),
-                single_child.child_props(),
-                &[function_host_text],
-            )
-            .unwrap();
 
-        store
-            .fiber_arena_mut()
-            .set_children(function_component, &[function_host_child])
-            .unwrap();
-        let passive_create = root_work_loop_hook_callback(raw + 6);
-        let passive_destroy = root_work_loop_hook_callback(raw + 7);
-        let passive_dependencies = root_work_loop_hook_dependencies(raw + 8);
+        let mut hook_store = FunctionComponentHookRenderStore::new();
+        let passive_create = root_work_loop_hook_callback(raw + 2);
+        let passive_destroy = root_work_loop_hook_callback(raw + 3);
+        let passive_dependencies = root_work_loop_hook_dependencies(raw + 4);
         hook_store
             .create_current_effect_metadata(
                 store.fiber_arena_mut(),
@@ -8057,50 +8025,17 @@ mod tests {
             )
             .unwrap();
 
-        let host_parent_state_node =
-            create_detached_test_host_component_for_existing_fiber_for_canary(
-                store,
-                host,
-                &mut detached_hosts,
-                root_id,
-                host_parent,
-                "section",
-                host_parent_props,
-                &[function_host_child],
-            )
-            .unwrap();
-
-        store
-            .fiber_arena_mut()
-            .set_children(host_root, &[host_parent])
-            .unwrap();
-        bubble_managed_child_sibling_order_root_work_loop_fiber(store, function_host_child);
-        bubble_managed_child_sibling_order_root_work_loop_fiber(store, function_component);
-        bubble_managed_child_sibling_order_root_work_loop_fiber(store, host_parent);
-        bubble_managed_child_sibling_order_root_work_loop_fiber(store, host_root);
-        commit_finished_host_root(store, create_render).unwrap();
-
-        update_container(store, root_id, RootElementHandle::from_raw(raw + 9), None).unwrap();
+        update_container(store, root_id, RootElementHandle::from_raw(raw + 5), None).unwrap();
         let delete_render = render_host_root_for_lanes(store, root_id, Lanes::DEFAULT).unwrap();
         let previous_current = delete_render.current();
-        let work_parent = store
-            .fiber_arena_mut()
-            .create_work_in_progress(host_parent, host_parent_props)
-            .unwrap();
-        {
-            let node = store.fiber_arena_mut().get_mut(work_parent).unwrap();
-            node.set_lanes(Lanes::NO);
-            node.set_memoized_props(host_parent_props);
-        }
         let deletion_list = store
             .fiber_arena_mut()
-            .mark_child_for_deletion(work_parent, function_component)
+            .mark_child_for_deletion(delete_render.finished_work(), function_component)
             .unwrap();
         store
             .fiber_arena_mut()
-            .set_children(delete_render.finished_work(), &[work_parent])
+            .set_children(delete_render.finished_work(), &[])
             .unwrap();
-        bubble_managed_child_sibling_order_root_work_loop_fiber(store, work_parent);
         bubble_managed_child_sibling_order_root_work_loop_fiber(
             store,
             delete_render.finished_work(),
@@ -8110,7 +8045,7 @@ mod tests {
                 store,
                 root_id,
                 &hook_store,
-                work_parent,
+                delete_render.finished_work(),
                 function_component,
                 Lanes::DEFAULT,
             )
@@ -8121,15 +8056,16 @@ mod tests {
             ROOT_WORK_LOOP_FUNCTION_COMPONENT_DELETE_TEARDOWN_SOURCE_ORDER,
         );
         let operations_before_teardown = host.operations();
+        let detached_hosts = host_work.into_detached_hosts_for_canary();
 
         FunctionComponentDeletedSubtreeTeardownFixture {
+            mount_render,
+            complete_work,
+            host_mutation_apply,
             delete_render,
             pending,
             previous_current,
-            host_parent,
-            work_parent,
             deletion_list,
-            host_parent_state_node,
             function_component,
             single_child,
             function_host_child,
@@ -8228,11 +8164,11 @@ mod tests {
         }
 
         let finished_root = store.fiber_arena().get(request.committed_current())?;
-        if finished_root.child() != Some(fixture.work_parent) {
+        if finished_root.child().is_some() {
             return Err(
                 FunctionComponentDeletedSubtreeTeardownExecutionError::RootFinishedChildMismatch {
                     root: request.root(),
-                    expected_child: fixture.work_parent,
+                    expected_child: None,
                     actual_child: finished_root.child(),
                 },
             );
@@ -8242,7 +8178,7 @@ mod tests {
             return Err(
                 FunctionComponentDeletedSubtreeTeardownExecutionError::DeletionListMismatch {
                     root: request.root(),
-                    expected_parent: fixture.work_parent,
+                    expected_parent: fixture.delete_render.finished_work(),
                     actual_parent: commit.deletion_lists().first().map(|list| list.parent()),
                     expected_deleted: fixture.function_component,
                     actual_deleted: commit
@@ -8253,13 +8189,13 @@ mod tests {
                 },
             );
         };
-        if deletion_list.parent() != fixture.work_parent
+        if deletion_list.parent() != fixture.delete_render.finished_work()
             || deletion_list.deleted() != [fixture.function_component]
         {
             return Err(
                 FunctionComponentDeletedSubtreeTeardownExecutionError::DeletionListMismatch {
                     root: request.root(),
-                    expected_parent: fixture.work_parent,
+                    expected_parent: fixture.delete_render.finished_work(),
                     actual_parent: Some(deletion_list.parent()),
                     expected_deleted: fixture.function_component,
                     actual_deleted: deletion_list.deleted().to_vec(),
@@ -8267,21 +8203,8 @@ mod tests {
             );
         }
 
-        let work_parent = store.fiber_arena().get(fixture.work_parent)?;
-        if work_parent.child().is_some() || work_parent.alternate() != Some(fixture.host_parent) {
-            return Err(
-                FunctionComponentDeletedSubtreeTeardownExecutionError::DeletionListMismatch {
-                    root: request.root(),
-                    expected_parent: fixture.work_parent,
-                    actual_parent: work_parent.alternate(),
-                    expected_deleted: fixture.function_component,
-                    actual_deleted: store.fiber_arena().child_ids(fixture.work_parent)?,
-                },
-            );
-        }
-
         let function_node = store.fiber_arena().get(fixture.function_component)?;
-        if function_node.return_fiber() != Some(fixture.work_parent)
+        if function_node.return_fiber() != Some(fixture.delete_render.finished_work())
             || function_node.child() != Some(fixture.function_host_child)
             || function_node.sibling().is_some()
         {
@@ -8289,7 +8212,7 @@ mod tests {
                 FunctionComponentDeletedSubtreeTeardownExecutionError::FunctionComponentTopologyMismatch {
                     root: request.root(),
                     function_component: fixture.function_component,
-                    expected_parent: fixture.work_parent,
+                    expected_parent: fixture.delete_render.finished_work(),
                     actual_parent: function_node.return_fiber(),
                     expected_child: fixture.function_host_child,
                     actual_child: function_node.child(),
@@ -17012,6 +16935,30 @@ mod tests {
             ROOT_WORK_LOOP_FUNCTION_COMPONENT_DELETE_TEARDOWN_SOURCE_ORDER
         );
         assert_eq!(
+            fixture.previous_current,
+            fixture.mount_render.work_in_progress()
+        );
+        assert_eq!(fixture.complete_work.root(), root_id);
+        assert_eq!(
+            fixture.complete_work.host_root_work_in_progress(),
+            fixture.mount_render.work_in_progress()
+        );
+        assert_eq!(
+            fixture.complete_work.root_child(),
+            Some(fixture.function_component)
+        );
+        assert_eq!(
+            fixture.complete_work.completed_child(),
+            Some(fixture.function_host_child)
+        );
+        assert_single_function_component_container_append(
+            &fixture.host_mutation_apply,
+            root_id,
+            fixture.mount_render.work_in_progress(),
+            fixture.function_host_child,
+            FiberTag::HostComponent,
+        );
+        assert_eq!(
             fixture.single_child.function_component(),
             fixture.function_component
         );
@@ -17022,22 +16969,6 @@ mod tests {
                 .get(fixture.delete_render.finished_work())
                 .unwrap()
                 .child(),
-            Some(fixture.work_parent)
-        );
-        assert_eq!(
-            store
-                .fiber_arena()
-                .get(fixture.work_parent)
-                .unwrap()
-                .alternate(),
-            Some(fixture.host_parent)
-        );
-        assert_eq!(
-            store
-                .fiber_arena()
-                .get(fixture.work_parent)
-                .unwrap()
-                .child(),
             None
         );
         assert_eq!(
@@ -17046,7 +16977,7 @@ mod tests {
                 .get(fixture.function_component)
                 .unwrap()
                 .return_fiber(),
-            Some(fixture.work_parent)
+            Some(fixture.delete_render.finished_work())
         );
         assert_eq!(
             store
@@ -17106,7 +17037,7 @@ mod tests {
         );
         assert_eq!(
             handoff.commit().deletion_lists()[0].parent(),
-            fixture.work_parent
+            fixture.delete_render.finished_work()
         );
         assert_eq!(
             handoff.commit().deletion_lists()[0].deleted(),
@@ -17131,13 +17062,9 @@ mod tests {
         assert_eq!(plan.deletion_list(), fixture.deletion_list);
         assert_eq!(plan.deleted_root(), fixture.function_component);
         assert_eq!(plan.deleted_root_tag(), FiberTag::FunctionComponent);
-        assert_eq!(plan.parent(), fixture.work_parent);
-        assert_eq!(plan.parent_tag(), FiberTag::HostComponent);
-        assert_eq!(plan.host_parent(), fixture.work_parent);
-        assert_eq!(
-            plan.host_parent_state_node(),
-            fixture.host_parent_state_node
-        );
+        assert_eq!(plan.parent(), fixture.delete_render.finished_work());
+        assert_eq!(plan.parent_tag(), FiberTag::HostRoot);
+        assert_eq!(plan.host_parent(), fixture.delete_render.finished_work());
         assert_eq!(plan.host_child(), fixture.function_host_child);
         assert_eq!(plan.host_child_tag(), FiberTag::HostComponent);
         assert_eq!(
@@ -17192,7 +17119,9 @@ mod tests {
         assert_eq!(diagnostic.request(), source_request);
         assert_eq!(
             diagnostic.host_detachment_status(),
-            TestHostRootMutationApplyStatus::Applied(TestHostRootMutationHostCall::RemoveChild)
+            TestHostRootMutationApplyStatus::Applied(
+                TestHostRootMutationHostCall::RemoveChildFromContainer
+            )
         );
         assert!(diagnostic.ref_cleanup_return_callbacks_invoked());
         assert!(diagnostic.passive_destroy_callbacks_invoked());
@@ -17285,7 +17214,7 @@ mod tests {
                 .is_empty()
         );
         let mut expected_operations = fixture.operations_before_teardown;
-        expected_operations.push("remove_child");
+        expected_operations.push("remove_child_from_container");
         expected_operations.push("detach_deleted_instance");
         assert_eq!(host.operations(), expected_operations);
     }
