@@ -29,6 +29,57 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 962 Docs Refresh and Workers 957, 953, and 954
+
+- Worker 962 refreshed coordination docs for the `323fcfee` baseline after
+  Worker 956 was accepted. It was accepted at `a6a6f18e`
+  (`Merge worker 962 docs refresh after worker 956`) with no runtime
+  compatibility claim change.
+- Worker 957 hardened benchmark result validation so result JSON cannot serve
+  as decorative false-green evidence. Result artifacts must cover every
+  manifest-required scenario, reject duplicate scenario/lane rows, disallow
+  arbitrary timing-shaped fields, and keep diagnostic-only rows private and
+  backed by accepted private conformance gates.
+- Worker 957 also made accepted-gate command metadata executable rather than
+  prose-shaped by validating npm, Node gate, and Cargo command segments against
+  known workspace commands, target test files, real Cargo crates, accepted
+  gate filters, and non-zero Cargo test selection. No benchmark result
+  artifacts or public performance claims were admitted.
+- Worker 953 hardened accepted Workers 932-944 private-admission/currentness
+  ledgers against caller-shaped evidence. Scheduler variant currentness now
+  requires factory-owned source reports and module-owned Worker 886 boundary
+  provenance, native cleanup evidence is bound to exact path/slice context,
+  and resource/form evidence is bound to path/token context with Worker 942
+  currentness represented in the manifest.
+- Worker 953 also hardened public-blocked currentness factories for
+  `flushSync` and unsupported placeholder hooks by rejecting caller overrides
+  found through own-key and descriptor snapshots, including non-enumerable
+  keys, symbols, accessors, inherited/proxy-hidden values, fake Scheduler
+  gates, and non-enumerable public compatibility claims.
+- Worker 954 added a private Rust `RecordingHost` root child replacement
+  execution path for same-root single-child updates where the current root
+  child tag differs from the next source root child tag. The path models
+  replacement as source-owned HostRoot deletion plus placement and applies
+  `RemoveDeletedFromContainer` before `AppendPlacementToContainer`.
+- Worker 954's accepted replacement execution request consumes finished-work
+  handoff evidence, validates exact deletion/placement records, preflights
+  deletion apply and cleanup before host mutation, consumes execution identity
+  before container operations, records public/root/native/test-renderer
+  blockers, and rejects replay, stale host nodes, cross-root detached-host
+  evidence, same-tag replacement, unsupported multi-level placement, and stale
+  deleted-descendant cleanup.
+- Public React DOM roots, react-test-renderer roots/serialization, native
+  bridge execution, public Scheduler timing, public `act`, public
+  `flushSync`, public hook execution, resources/forms, hydration, DOM
+  mutation, broad benchmark/performance claims, package compatibility, and
+  broad renderer compatibility remain blocked.
+- The accepted state for this batch is current main `2cf80d7d`
+  (`Merge worker 954 HostWork root replacement`) after merge commits
+  `a6a6f18e`, `9b28ed52`, `2ab98eec`, and `2cf80d7d`, with focused
+  benchmark, private-admission/currentness, React package, React DOM package,
+  package-surface/import-smoke, Rust reconciler, formatting, and
+  `git diff --check` evidence recorded in worker reports and git history.
+
 ### Worker 961 Docs Refresh and Worker 956
 
 - Worker 961 refreshed coordination docs for the `a34f8c76` baseline after

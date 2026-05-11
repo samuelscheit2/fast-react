@@ -48,9 +48,9 @@ Drive toward a minimal real root render/update/unmount path:
 Top-level cap: 30 workers. Accepted implementation baseline for this branch
 includes Workers 803-837, 842-846, 848-852, 855-860, 862-874, 878-883,
 885-893, 895-896, 898-902, 904, 906-909, 912-930, 932-934, 936-948,
-950-952, and 955-956; coordination history includes docs refresh Workers 922,
-931, 935, 945, 959, 960, and 961. Current baseline is `323fcfee`
-(`Merge worker 956 useRef dispatcher currentness`). Worker 853's
+950-957; coordination history includes docs refresh Workers 922, 931, 935,
+945, 959, 960, 961, and 962. Current baseline is `2cf80d7d`
+(`Merge worker 954 HostWork root replacement`). Worker 853's
 competing test-renderer branch was rejected as redundant after Worker 844 was
 accepted; do not use it as accepted input.
 
@@ -61,17 +61,14 @@ Current orchestration queue:
   paths. The repair remains unaccepted and active as fix3 input only; do not
   treat any Worker 910 evidence as accepted until a fresh audited merge lands.
 - Worker 949: Scheduler postTask/mock variant currentness lane.
-- Worker 953: private-admission 932-944 ledger hardening lane.
-- Worker 954: HostWork root child replacement execution lane.
-- Worker 957: benchmark result false-green hardening lane.
 - Worker 958: React DOM input change extraction currentness lane.
 
-Worker 949 and Workers 953-954 and 957-958 remain unaccepted until merged to
-main. If Worker 910, Worker 949, or Workers 953-954 and 957-958 merge after
-this branch point, update this section and move accepted facts into
-`MASTER_PROGRESS.md` in the next docs pass.
+Worker 949 and Worker 958 remain unaccepted until merged to main. If a fresh
+Worker 910 repair, Worker 949, or Worker 958 merges after this branch point,
+update this section and move accepted facts into `MASTER_PROGRESS.md` in the
+next docs pass.
 
-Accepted private evidence through `323fcfee` still keeps public
+Accepted private evidence through `2cf80d7d` still keeps public
 root/render/unmount, `act`, `react-dom/test-utils.act`, `flushSync`, Scheduler
 timing, hydration, resources/forms, serialization, native/reconciler execution,
 React Children traversal parity, unsupported hook behavior, event dispatch,
@@ -83,15 +80,14 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat the accepted branch baseline through `323fcfee` as private evidence
+1. Treat the accepted branch baseline through `2cf80d7d` as private evidence
    only. Public package, root, native, React DOM, test-renderer, Scheduler,
    `act`, `react-dom/test-utils.act`, hydration, resource/form,
    serialization, React Children lazy/full traversal, unsupported hook, event
    dispatch, and `flushSync` compatibility still require fail-closed gates and
    dual-run oracle evidence.
-2. Review Worker 910 fix3, Worker 949, and Workers 953-954 and 957-958 against
-   the accepted source-owned lifecycle, hydration, `act`, deletion, sync-flush,
-   HostRoot
+2. Review Worker 910 fix3, Worker 949, and Worker 958 against the accepted
+   source-owned lifecycle, hydration, `act`, deletion, sync-flush, HostRoot
    lane handoff, scheduler continuation/currentness,
    reconciler/test-renderer direct multi-child fiber inspection,
    native-generation/cleanup, worker-thread cleanup, concurrent update drain,
@@ -110,8 +106,8 @@ canonical evidence requirements.
 
 - Rust root/sync-flush/function/deletion execution can extend accepted Workers
   855, 860, 862-867, 878-879, 889-890, 896, 898, 904, 906-907, 917-921, 936,
-  943, and 948 toward managed-child, HostText, multi-child, sync-flush
-  delete/post-passive
+  943, 948, and 954 toward managed-child, HostText, multi-child, sync-flush
+  delete/post-passive, root child replacement/delete-plus-place
   continuation, FunctionComponent deletion/render-phase update/bailout blocker
   coverage, HostRoot update-queue lane handoff, finished-work commit queue-lane
   consumer, direct committed-fiber inspection, terminal host descendant
@@ -160,10 +156,11 @@ canonical evidence requirements.
   consumer with Worker 850 ledger/source-token metadata and Worker 883
   lifecycle boundary hardening, plus Worker 893's private root/lifecycle-bound
   reset execution evidence and Worker 942's fulfilled-reset generation
-  currentness, and Worker 952's source-owned resource root lifecycle
-  boundary/currentness evidence. Public resources, forms, action/reset
-  invocation, React updates, DOM/head mutation, native/root execution, and
-  package compatibility remain blocked.
+  currentness, Worker 952's source-owned resource root lifecycle
+  boundary/currentness evidence, and Worker 953's path/token evidence-context
+  hardening. Public resources, forms, action/reset invocation, React updates,
+  DOM/head mutation, native/root execution, and package compatibility remain
+  blocked.
 - React `act` and React DOM test-utils work can consume accepted Worker 857's
   frozen, nested source-owned scheduler-driven passive diagnostics, Worker
   885's source-owned root lifecycle boundary gate, Worker 902's private
@@ -175,10 +172,11 @@ canonical evidence requirements.
   compatibility remain blocked.
 - Public `flushSync` follow-ups can consume accepted Worker 933's
   source-owned public `react-dom` and `react-dom/profiling` blocked-currentness
-  report only as negative/private evidence. Callback execution, return/thenable
-  compatibility, public root execution, Scheduler queue draining,
-  act/test-utils routing, DOM mutation, passive effects, package/profiling
-  compatibility, and Worker 910 evidence remain blocked.
+  report only as negative/private evidence, plus Worker 953's caller-override
+  and non-enumerable-claim rejection hardening. Callback execution,
+  return/thenable compatibility, public root execution, Scheduler queue
+  draining, act/test-utils routing, DOM mutation, passive effects,
+  package/profiling compatibility, and Worker 910 evidence remain blocked.
 - Native lifecycle work can consume accepted Worker 858's Rust JSON lifecycle
   mirror, Worker 870's in-process JSON batch lifecycle executor, Worker 873's
   private generation/replay no-stale guard, and Worker 882's native JS
@@ -186,7 +184,8 @@ canonical evidence requirements.
   consumer, Worker 908's cleanup-generation currentness gate, Worker 923's
   cleanup currentness admission ledger, Worker 924's worker-thread/environment
   cleanup currentness, Worker 940's cleanup re-entry/retirement currentness,
-  and Worker 951's cleanup-hook worker-thread/source-row currentness hardening.
+  Worker 951's cleanup-hook worker-thread/source-row currentness hardening, and
+  Worker 953's path/slice evidence-context hardening.
   Executable native addon loading, cleanup hooks, scheduling,
   renderer/reconciler output, worker-thread teardown, public no-stale-value
   behavior, public native compatibility, and package exports remain blocked.
@@ -200,7 +199,8 @@ canonical evidence requirements.
   hook staging failure-preservation currentness, Worker 929 unsupported
   placeholder hook blocker currentness, Worker 938 CJS/server unsupported hook
   surface currentness, Worker 943 private render-phase staging currentness, and
-  Worker 956 private `useRef` dispatcher currentness. Public dispatcher
+  Worker 956 private `useRef` dispatcher currentness, plus Worker 953's
+  unsupported-hook report override/source-proof hardening. Public dispatcher
   routing, `useRef` execution/ref identity, unsupported hook execution,
   external-store subscription, callback invocation, ID generation, root
   scheduling, renderer behavior, `act`, Scheduler timing, and package
@@ -209,21 +209,26 @@ canonical evidence requirements.
   Worker 886 as the variant boundary, Worker 909's live source-currentness seal,
   Worker 914's public root-entry currentness gate, and Worker 937's variant
   currentness parity gate for root, native, mock, postTask, and CJS variant
-  diagnostics. Root-scheduler follow-ups can build on Worker 904's private
-  HostRoot queue/lane continuation gate, Worker 907's callback/currentness
-  negative canaries, Worker 906's expired default+sync continuation, and Worker
-  934's transition queue/lane continuation, plus Worker 948's finished-work
-  commit queue-lane consumer, only when preserving scheduler identity, Worker
-  898 queue/lane proof, store-backed row lane metadata, sequence IDs,
-  applied/skipped counts, resulting element, callback identity, expired/selected
-  lane currentness, and root/current/finished-work identity.
+  diagnostics, plus Worker 953's factory-owned source-report and Worker 886
+  provenance hardening. Root-scheduler follow-ups can build on Worker 904's
+  private HostRoot queue/lane continuation gate, Worker 907's
+  callback/currentness negative canaries, Worker 906's expired default+sync
+  continuation, and Worker 934's transition queue/lane continuation, plus
+  Worker 948's finished-work commit queue-lane consumer, only when preserving
+  scheduler identity, Worker 898 queue/lane proof, store-backed row lane
+  metadata, sequence IDs, applied/skipped counts, resulting element, callback
+  identity, expired/selected lane currentness, and root/current/finished-work
+  identity.
   Public Scheduler timing, public root/act/package/native behavior,
   postTask/mock compatibility, and package compatibility remain blocked.
 - Conformance harness follow-ups can consume accepted Worker 955's discovery
-  gate to keep executable conformance gate files covered by workspace scripts.
-  Full conformance execution still has pre-existing serialization and
-  private-admission failures, so discovery coverage is not a broad conformance
-  compatibility claim.
+  gate to keep executable conformance gate files covered by workspace scripts,
+  and benchmark harness follow-ups can consume Worker 957's result-schema,
+  required-scenario, diagnostic-only, duplicate-row, and command-provenance
+  false-green hardening. Full conformance execution still has pre-existing
+  serialization and private-admission failures, so discovery coverage and
+  benchmark manifest/result validation are not broad conformance or performance
+  compatibility claims.
 - Public `hydrateRoot` remains blocked after accepted marker/listener,
   target-claiming, recoverable-error, replay-target preflights, private
   text-claim patch execution, the text-patch admission ledger, Worker 887's
