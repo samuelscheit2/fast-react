@@ -1571,6 +1571,15 @@ pub(crate) enum HostComponentManagedChildCompleteWorkErrorForCanary {
         child: FiberId,
         actual_parent: Option<FiberId>,
     },
+    MissingParentFinishedChild {
+        parent_work_in_progress: FiberId,
+        child: FiberId,
+    },
+    UnexpectedParentFirstChild {
+        parent_work_in_progress: FiberId,
+        child: FiberId,
+        first_child: FiberId,
+    },
     UnexpectedChildSibling {
         parent_work_in_progress: FiberId,
         child: FiberId,
@@ -1685,6 +1694,26 @@ impl Display for HostComponentManagedChildCompleteWorkErrorForCanary {
                 parent_work_in_progress.slot().get(),
                 actual_parent.map(|fiber| fiber.slot().get())
             ),
+            Self::MissingParentFinishedChild {
+                parent_work_in_progress,
+                child,
+            } => write!(
+                formatter,
+                "private managed child metadata expected parent {} to list candidate {} as its sole finished child, found no first child",
+                parent_work_in_progress.slot().get(),
+                child.slot().get()
+            ),
+            Self::UnexpectedParentFirstChild {
+                parent_work_in_progress,
+                child,
+                first_child,
+            } => write!(
+                formatter,
+                "private managed child metadata admits one child under parent {}; candidate {} is not first finished child {}",
+                parent_work_in_progress.slot().get(),
+                child.slot().get(),
+                first_child.slot().get()
+            ),
             Self::UnexpectedChildSibling {
                 parent_work_in_progress,
                 child,
@@ -1777,6 +1806,8 @@ impl Error for HostComponentManagedChildCompleteWorkErrorForCanary {
             | Self::ParentStillBeingPlaced { .. }
             | Self::ExpectedHostComponentChild { .. }
             | Self::ChildParentMismatch { .. }
+            | Self::MissingParentFinishedChild { .. }
+            | Self::UnexpectedParentFirstChild { .. }
             | Self::UnexpectedChildSibling { .. }
             | Self::MissingChildStateNode { .. }
             | Self::MissingPlacementFlag { .. }
@@ -1905,6 +1936,23 @@ pub(crate) fn host_component_managed_child_complete_work_record_for_canary(
 
     let deletion_list = match kind {
         HostComponentManagedChildMutationKindForCanary::Placement => {
+            if parent_node.child() != Some(child) {
+                let Some(first_child) = parent_node.child() else {
+                    return Err(
+                        HostComponentManagedChildCompleteWorkErrorForCanary::MissingParentFinishedChild {
+                            parent_work_in_progress,
+                            child,
+                        },
+                    );
+                };
+                return Err(
+                    HostComponentManagedChildCompleteWorkErrorForCanary::UnexpectedParentFirstChild {
+                        parent_work_in_progress,
+                        child,
+                        first_child,
+                    },
+                );
+            }
             if !child_node.flags().contains_all(FiberFlags::PLACEMENT) {
                 return Err(
                     HostComponentManagedChildCompleteWorkErrorForCanary::MissingPlacementFlag {
@@ -3192,6 +3240,46 @@ mod tests {
                     parent_work_in_progress: fixture.parent_work_in_progress,
                     child: fixture.child,
                     sibling,
+                },
+            )
+        );
+    }
+
+    #[test]
+    fn complete_managed_child_rejects_final_child_in_multi_child_parent() {
+        let (mut arena, fixture) = managed_child_placement_complete_fixture();
+        let first_child = arena.create_fiber(
+            FiberTag::HostComponent,
+            None,
+            PropsHandle::from_raw(20_203),
+            FiberMode::NO,
+        );
+        {
+            let node = arena.get_mut(first_child).unwrap();
+            node.set_flags(FiberFlags::PLACEMENT);
+            node.set_state_node(StateNodeHandle::from_raw(20_204));
+            node.set_memoized_props(PropsHandle::from_raw(20_203));
+        }
+        arena
+            .set_children(
+                fixture.parent_work_in_progress,
+                &[first_child, fixture.child],
+            )
+            .unwrap();
+
+        assert_eq!(
+            host_component_managed_child_complete_work_record_for_canary(
+                &arena,
+                fixture.root,
+                fixture.parent_work_in_progress,
+                fixture.child,
+                HostComponentManagedChildMutationKindForCanary::Placement,
+            ),
+            Err(
+                HostComponentManagedChildCompleteWorkErrorForCanary::UnexpectedParentFirstChild {
+                    parent_work_in_progress: fixture.parent_work_in_progress,
+                    child: fixture.child,
+                    first_child,
                 },
             )
         );
