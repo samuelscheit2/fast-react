@@ -29,6 +29,31 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 786-795
+
+- Workers 786 and 794 advanced React DOM private coverage. Worker 786 added
+  hydrateRoot event-replay preflight evidence with explicit scheduling
+  blockers; Worker 794 added resource root-map conformance for canonical
+  stylesheet/script rows, skipped preload props, stale source rejection, and
+  public resource/head/package blockers.
+- Workers 787, 791, 792, and 793 advanced test-renderer and Scheduler private
+  handoffs. Worker 787 added CJS `toJSON` sibling-text admission with own
+  `rootFinishedLanesHandoff` rejection coverage; Worker 791 moved Scheduler
+  mock source proof into frozen private diagnostics; Worker 792 let React
+  preflight renderer-root delayed reports only as private nested-expired
+  evidence; Worker 793 added delayed renderer-root negative coverage.
+- Workers 788, 789, and 790 hardened native private boundaries: ESM/CJS
+  `worker_threads` no-load guarding, private subpath blocklist refresh, and
+  cleanup-hook identity tamper coverage. Worker 795 hardened form async failure
+  gates while public form submission, reset, action invocation, and error
+  routing remain blocked.
+- The batch was accepted after focused React act/Scheduler, React DOM
+  hydration/root/resource/form, react-test-renderer serialization/create-routing,
+  native no-load/workspace, package-surface, import-smoke, conflict-resolution,
+  and `git diff --check` verification. A merge fix kept package-root
+  sibling-text assertions on the existing package-root path while scoping new
+  CJS committed-fiber/root-handoff assertions to CJS entries.
+
 ### Workers 767-784
 
 - Workers 767, 781, 782, and 784 added audit/ledger and private cleanup
