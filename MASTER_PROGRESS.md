@@ -29,6 +29,33 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 945 and 947
+
+- Worker 945 refreshed coordination docs for the `4b5902a5` baseline, moved
+  Worker 935 and Workers 934 and 936-944 into accepted history, kept Worker 910
+  and then-unaccepted Workers 946-953 in current/future planning only, and
+  preserved the split where `MASTER_PLAN.md` owns live queue state and this
+  file owns accepted history. It was accepted at `2bcdd673`
+  (`Merge worker 945 docs refresh after worker 942`) with no runtime
+  compatibility claim change.
+- Worker 947 fixed the private React DOM root-bridge unmount host-output
+  cleanup smoke path after an accepted host-output update advances render
+  count. The root handle now tracks the latest accepted private host-output
+  update record, and cleanup can proceed only when that update is source-owned,
+  belongs to the same root handle and bridge, targets an active initial
+  host-output node/token from the admitted render, and occurs between the
+  admitted render and unmount request.
+- Worker 947 added regression coverage for cleanup after a current host-output
+  update and negative coverage for later unapplied render evidence. Public
+  roots, native/reconciler execution, browser DOM compatibility, events, and
+  compatibility claims remain blocked.
+- The accepted state for this batch is current main `39e695e1`
+  (`Merge worker 947 React DOM root bridge smoke fix`) after merge commits
+  `2bcdd673` and `39e695e1`, with Worker 947's focused React DOM root-bridge
+  smoke/test checks, package-surface/import-smoke checks, workspace check,
+  syntax checks, and `git diff --check` evidence recorded in the worker report
+  and git history.
+
 ### Workers 934-944 and Worker 935 Docs Refresh
 
 - Worker 935 refreshed coordination docs for the Worker 933 baseline, moved
