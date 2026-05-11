@@ -29,6 +29,42 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 1018 Docs Refresh and Workers 1010-1015 Cleanup Split Batch
+
+- Worker 1018 refreshed master docs after the accepted cleanup split batch.
+  This is a docs-only refresh and makes no runtime or public compatibility
+  claim.
+- Worker 1010 split the `fast-react-test-renderer` facade into private
+  `host.rs`, `diagnostics.rs`, `errors.rs`, and `host_config_impl.rs` modules
+  while preserving crate-root exports and public paths.
+- Worker 1011 split the `fast-react-napi` root bridge request implementation
+  out of `lib.rs` into `root_bridge_requests` leaf include files while
+  preserving the `crate::root_bridge_requests` module path.
+- Workers 1012 and 1014 split large reconciler test files into facade modules
+  plus behavior-focused child modules for `root_work_loop`, `root_commit`, and
+  `host_work`. Individual test names were preserved, but exact full module
+  path filters now include the new child-module names.
+- Worker 1013 extracted `RootCommitError` into `root_commit/errors.rs` and
+  re-exported it from the existing facade paths.
+- Worker 1015 split `function_component.rs` handles and error types into
+  `function_component/handles.rs` and `function_component/errors.rs` while
+  preserving crate-visible paths through child modules and re-exports.
+- Accepted verification for the batch included full
+  `fast-react-reconciler` tests with 886 unit tests plus 1 doctest,
+  `fast-react-test-renderer` tests with 182 tests, `fast-react-napi` library
+  tests with 79 tests, Cargo formatting and diff checks, the npm
+  package-surface guard, import-entrypoints smoke, and post-merge
+  `cargo test -p fast-react-reconciler function_component --lib` for Worker
+  1015.
+- Worker 1015 audits cleared after the only staging concern was resolved.
+- The accepted state for this cleanup batch is main `878a842c` after merge
+  commits `5e257676`, `9b391ff3`, `cdaa5eb0`, `e9a5181c`, and `334d31aa`.
+  Worker 1015 then landed at `878a842c`. These changes improve file
+  organization only. Public React DOM roots, test-renderer/native behavior,
+  hooks, Scheduler timing, hydration, events, resources/forms, package
+  compatibility, and broad renderer compatibility remain blocked unless
+  separately proven.
+
 ### Worker 1009 Docs Refresh and Workers 1002-1008 Cleanup Batch
 
 - Worker 1009 refreshed master docs after the accepted Rust test-module
