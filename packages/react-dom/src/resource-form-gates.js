@@ -65,6 +65,9 @@ const privateResourceFormExecutionAdmissionSourceTokenPolicy =
 const privateResourceFormExecutionAdmissionWorkerIds = freezeArray([
   'worker-829-resource-root-map-storage-private-execution',
   'worker-830-form-action-fulfilled-reset-fake-commit',
+  'worker-883-resource-form-lifecycle-boundary-hardening',
+  'worker-893-resource-form-reset-lifecycle-execution',
+  'worker-942-resource-form-reset-currentness',
   'worker-850-resource-form-execution-admission-ledger'
 ]);
 
@@ -144,6 +147,7 @@ const rootExecutionConsumerSideEffects = freezeRecord({
   worker850AdmissionLedgerBoundaryRecorded: true,
   resourceRootMapStorageExecutionConsumed: true,
   formFulfilledResetExecutionConsumed: true,
+  formFulfilledResetCurrentnessConsumed: true,
   deterministicFakeRootMapStorageConsumed: true,
   deterministicFakeResetStateQueueConsumed: true,
   deterministicFakeResetCommitConsumed: true,
@@ -866,6 +870,16 @@ function assertFormFulfilledResetExecutionForRootConsumer(
     );
   }
 
+  if (
+    !formActions.isCurrentPrivateFormActionFulfilledResetExecutionRecord(
+      record
+    )
+  ) {
+    throwInvalidRootExecutionConsumerRecord(
+      'form fulfilled reset execution replay is stale for the current reset generation'
+    );
+  }
+
   assertFormFulfilledResetRootLifecycleForRootConsumer(
     record,
     payload,
@@ -1009,6 +1023,7 @@ function assertFormFulfilledResetExecutionPlanForRootConsumer(
   const asyncSource = payload.sourceAsyncCallbackExecution;
   const submitResetSource = payload.sourceSubmitResetExecution;
   const fulfilledResult = payload.fulfilledActionResult;
+  const resetCurrentness = payload.resetCurrentness;
   const queue = payload.fakeResetStateQueueExecution;
   const commit = payload.fakeResetCommitExecution;
 
@@ -1021,8 +1036,14 @@ function assertFormFulfilledResetExecutionPlanForRootConsumer(
     asyncSource.publicActionInvoked !== false ||
     asyncSource.reactUpdateQueued !== false ||
     asyncSource.realFormReset !== false ||
+    asyncSource.resetGenerationCurrent !== true ||
     submitResetSource?.fakeFormResetPathExecuted !== true ||
     submitResetSource.fakeFormResetRecorded !== true ||
+    submitResetSource.resetCurrentnessId !==
+      resetCurrentness?.currentnessId ||
+    submitResetSource.resetGeneration !==
+      resetCurrentness?.resetGeneration ||
+    submitResetSource.resetGenerationCurrent !== true ||
     submitResetSource.callbackDispatchExecuted !== false ||
     submitResetSource.actionInvoked !== false ||
     submitResetSource.reactUpdateQueued !== false ||
@@ -1034,7 +1055,22 @@ function assertFormFulfilledResetExecutionPlanForRootConsumer(
     fulfilledResult.actionResultExposed !== false ||
     fulfilledResult.publicActionInvoked !== false ||
     fulfilledResult.reactUpdateQueued !== false ||
-    fulfilledResult.realFormReset !== false
+    fulfilledResult.realFormReset !== false ||
+    resetCurrentness?.$$typeof !==
+      formActions.privateFormActionResetCurrentnessRecordType ||
+    resetCurrentness.status !==
+      formActions.privateFormActionResetCurrentnessStatus ||
+    resetCurrentness.currentnessId !==
+      payload.acceptedMetadataIds.resetCurrentnessId ||
+    resetCurrentness.resetGeneration !==
+      payload.acceptedMetadataIds.resetGeneration ||
+    resetCurrentness.sourceOwnedResetCurrentness !== true ||
+    resetCurrentness.replayAfterGenerationAdvanceRejected !== true ||
+    resetCurrentness.resetGenerationCurrent !== true ||
+    resetCurrentness.publicResetExecution !== false ||
+    resetCurrentness.reactUpdateQueued !== false ||
+    resetCurrentness.realFormReset !== false ||
+    resetCurrentness.compatibilityClaimed !== false
   ) {
     throwInvalidRootExecutionConsumerRecord(
       'form fulfilled reset execution sources must stay accepted fake metadata'
@@ -1052,6 +1088,9 @@ function assertFormFulfilledResetExecutionPlanForRootConsumer(
       'dispatchSetStateInternal',
       'requestUpdateLane'
     ]) ||
+    queue.resetCurrentnessId !== resetCurrentness.currentnessId ||
+    queue.resetGeneration !== resetCurrentness.resetGeneration ||
+    queue.resetGenerationCurrent !== true ||
     queue.requestUpdateLaneRecorded !== true ||
     queue.dispatchSetStateInternalRecorded !== true ||
     queue.fakeResetStateQueueExecuted !== true ||
@@ -1071,6 +1110,9 @@ function assertFormFulfilledResetExecutionPlanForRootConsumer(
     ]) ||
     commit.fakeResetStateQueueExecutionId !== queue.queueExecutionId ||
     commit.fakeResetStateUpdateId !== queue.resetStateUpdateId ||
+    commit.resetCurrentnessId !== resetCurrentness.currentnessId ||
+    commit.resetGeneration !== resetCurrentness.resetGeneration ||
+    commit.resetGenerationCurrent !== true ||
     commit.fakeResetCommitExecuted !== true ||
     commit.fakeFormResetCommitRecorded !== true ||
     commit.fakeResetFormInstanceCallRecorded !== true ||
@@ -1301,6 +1343,7 @@ function createFormFulfilledResetConsumerBoundary(fulfilledResetExecution) {
   const commit = fulfilledResetExecution.fakeResetCommitExecution;
   const rootExecutionBoundary =
     fulfilledResetExecution.rootExecutionBoundary;
+  const resetCurrentness = fulfilledResetExecution.resetCurrentness;
   return freezeRecord({
     status: privateResourceFormRootExecutionConsumerStatus,
     sourceWorkerId:
@@ -1313,6 +1356,12 @@ function createFormFulfilledResetConsumerBoundary(fulfilledResetExecution) {
       fulfilledResetExecution.sourceAsyncCallbackExecutionId,
     sourceSubmitResetExecutionId:
       fulfilledResetExecution.sourceSubmitResetExecutionId,
+    fakeFormIdentityId: resetCurrentness.fakeFormIdentityId,
+    resetCurrentnessId: resetCurrentness.currentnessId,
+    resetGeneration: resetCurrentness.resetGeneration,
+    resetGenerationCurrent: resetCurrentness.resetGenerationCurrent,
+    replayAfterResetGenerationAdvanceRejected:
+      resetCurrentness.replayAfterGenerationAdvanceRejected,
     queueExecutionId: queue.queueExecutionId,
     resetStateUpdateId: queue.resetStateUpdateId,
     commitExecutionId: commit.commitExecutionId,
@@ -1337,6 +1386,8 @@ function createFormFulfilledResetConsumerBoundary(fulfilledResetExecution) {
       fulfilledResetExecution.admission.diagnosticKind,
       fulfilledResetExecution.admission.queueExecutionKind,
       fulfilledResetExecution.admission.commitKind,
+      formActions.privateFormActionResetCurrentnessRecordType,
+      formActions.privateFormActionResetCurrentnessStatus,
       rootExecutionBoundary.$$typeof,
       rootExecutionBoundary.status,
       rootExecutionBoundary.sourceRootBridgeAdmissionStatus,
@@ -2230,10 +2281,15 @@ function describePrivateResourceFormRootExecutionConsumerBoundary() {
     acceptedFormFulfilledResetRootLifecycleBoundaryStatus:
       formActions
         .privateFormActionFulfilledResetRootLifecycleBoundaryStatus,
+    acceptedFormResetCurrentnessRecordType:
+      formActions.privateFormActionResetCurrentnessRecordType,
+    acceptedFormResetCurrentnessStatus:
+      formActions.privateFormActionResetCurrentnessStatus,
     consumesRootBridgeAdmission: true,
     consumesRootLifecycleRequestBoundary: true,
     consumesResourceRootMapStorageExecution: true,
     consumesFormFulfilledResetExecution: true,
+    consumesFormFulfilledResetCurrentness: true,
     requiresSourceOwnedActiveRootLifecycleRequestBoundary: true,
     requiresFormFulfilledResetRootLifecycleIdentity: true,
     requiresSourceOwnedPrivateRecords: true,
@@ -2245,6 +2301,7 @@ function describePrivateResourceFormRootExecutionConsumerBoundary() {
     rejectsCrossRootResourceRecords: true,
     rejectsRootlessFormFulfilledResetRecords: true,
     rejectsStaleFormFulfilledResetRecords: true,
+    rejectsFormFulfilledResetReplayAfterGenerationAdvance: true,
     rejectsCrossRootFormFulfilledResetRecords: true,
     rejectsCrossContainerFormFulfilledResetRecords: true,
     rejectsClonedRecords: true,
@@ -2410,6 +2467,7 @@ function assertNoRootExecutionConsumerPublicClaims(admission) {
     'publicRequestFormResetRequested',
     'publicActionInvocationReachable',
     'publicActionInvocationRequested',
+    'publicFormActionCompatibilityClaimed',
     'actionInvocationRequested',
     'actionInvoked',
     'publicActionInvoked',
@@ -2424,6 +2482,15 @@ function assertNoRootExecutionConsumerPublicClaims(admission) {
     'domMutation',
     'domMutationRequested',
     'publicDomMutationRequested',
+    'publicHeadMutation',
+    'realHeadMutated',
+    'resourceMutationRequested',
+    'realResourceMapsMutated',
+    'preloadPropsMapMutated',
+    'publicRootExecution',
+    'rootExecutionRequested',
+    'nativeExecution',
+    'reconcilerExecution',
     'publicPackageCompatibilityClaimed',
     'publicPackageExportsCompatibilityClaimed',
     'packageCompatibilityClaimed',
@@ -2456,6 +2523,10 @@ function assertNoRootExecutionConsumerCallerSourceTokens(admission) {
     'sourceRootMapStoragePreflightId',
     'sourceAsyncCallbackExecutionId',
     'sourceSubmitResetExecutionId',
+    'fakeFormIdentityId',
+    'resetCurrentnessId',
+    'resetGeneration',
+    'resetCurrentness',
     'rootMapStorageExecutionRows',
     'fakeResetStateQueueExecution',
     'fakeResetCommitExecution',

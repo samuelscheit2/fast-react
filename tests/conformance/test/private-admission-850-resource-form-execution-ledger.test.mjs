@@ -158,6 +158,10 @@ test("private admission 850 recognizes accepted private execution evidence witho
   assertIncludes(form.requiredFieldNames, [
     "fakeResetStateQueueExecution",
     "fakeResetCommitExecution",
+    "resetCurrentness",
+    "resetCurrentnessId",
+    "resetGeneration",
+    "resetGenerationCurrent",
     "queueExecutionKind",
     "requestUpdateLaneRecorded",
     "dispatchSetStateInternalRecorded",
