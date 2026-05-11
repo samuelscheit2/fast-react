@@ -67,7 +67,7 @@ test("children-helper oracle keeps Fast React compatibility claims false", () =>
       generatedProbe: false,
       statusCounts: {
         "known-mismatch": 4,
-        "unsupported-placeholder": 36
+        "unsupported-placeholder": 40
       },
       compatibilityClaimed: false
     },
@@ -75,7 +75,7 @@ test("children-helper oracle keeps Fast React compatibility claims false", () =>
       source: "generated fastReactComparisons in this oracle artifact",
       generatedProbe: true,
       statusCounts: {
-        "matched-but-compatibility-not-claimed": 40
+        "matched-but-compatibility-not-claimed": 44
       },
       compatibilityClaimed: false
     }
@@ -97,6 +97,7 @@ test("children-helper oracle covers every scenario in every probe mode", () => {
     "Children.toArray key synthesis",
     "Children iterable traversal",
     "Children thenable traversal",
+    "Children lazy traversal",
     "Children thrown errors"
   ]) {
     assert.ok(areas.has(requiredArea), `missing scenario area ${requiredArea}`);
@@ -354,6 +355,78 @@ test("React oracle captures iterable and thenable behavior", () => {
   assert.equal(thenables.pendingAfter.properties.status.value, "pending");
 });
 
+test("React oracle captures direct lazy child traversal without public compatibility claims", () => {
+  const scenario = oracle.scenarios.find(
+    (candidate) => candidate.id === "children-lazy-values"
+  );
+  assert.ok(scenario);
+  assert.equal(scenario.area, "Children lazy traversal");
+  assert.ok(
+    scenario.captures.includes(
+      "direct traversal only without renderer, Suspense, owner, root, portal, or ref claims"
+    )
+  );
+
+  const lazyValues = operationValue(
+    "default-node-development",
+    "children-lazy-values"
+  );
+  assert.equal(lazyValues.fulfilled.loaderCalls, 1);
+  assert.deepEqual(childKeys(lazyValues.fulfilled.toArray.value.items), [
+    ".$lazy-fulfilled",
+    null
+  ]);
+  assert.equal(lazyValues.fulfilled.count.value.value, 3);
+  assert.deepEqual(
+    lazyValues.fulfilled.mapCalls.map((call) => [
+      call.child.summary?.reactElement === true ? "element" : call.child.type,
+      call.index
+    ]),
+    [
+      ["element", 0],
+      ["string", 1],
+      ["null", 2]
+    ]
+  );
+  assert.equal(lazyValues.fulfilled.lazyAfter.payloadStatus.value, 1);
+  assert.equal(
+    lazyValues.fulfilled.thenableAfter.properties.status.value,
+    "fulfilled"
+  );
+
+  assert.equal(lazyValues.pending.loaderCalls, 1);
+  assert.equal(lazyValues.pending.toArray.status, "throws");
+  assert.equal(lazyValues.pending.thrownSameAsThenable, true);
+  assert.equal(lazyValues.pending.lazyAfter.payloadStatus.value, 0);
+  assert.deepEqual(lazyValues.pending.toArray.error.objectKeys, ["then"]);
+
+  assert.equal(lazyValues.rejected.loaderCalls, 1);
+  assert.equal(lazyValues.rejected.toArray.status, "throws");
+  assert.equal(lazyValues.rejected.thrownSameAsReason, true);
+  assert.equal(lazyValues.rejected.toArray.error.message, "lazy child rejected");
+  assert.equal(lazyValues.rejected.lazyAfter.payloadStatus.value, 2);
+
+  assert.equal(lazyValues.loaderThrows.loaderCalls, 1);
+  assert.equal(lazyValues.loaderThrows.toArray.status, "throws");
+  assert.equal(lazyValues.loaderThrows.thrownSameAsReason, true);
+  assert.equal(
+    lazyValues.loaderThrows.toArray.error.message,
+    "lazy child loader exploded"
+  );
+  assert.equal(lazyValues.loaderThrows.lazyAfter.payloadStatus.value, -1);
+
+  for (const mode of CHILDREN_HELPER_PROBE_MODES) {
+    assert.equal(
+      findComparison(mode.id, "children-lazy-values").status,
+      "matched-but-compatibility-not-claimed"
+    );
+    assert.equal(
+      findComparison(mode.id, "children-lazy-values").compatibilityClaimed,
+      false
+    );
+  }
+});
+
 test("React oracle captures thrown Children errors including react-server production minification", () => {
   const developmentErrors = operationValue(
     "default-node-development",
@@ -397,7 +470,7 @@ test("Fast React Children helper observations match without compatibility claim"
   );
   assert.deepEqual(totalCounts, {
     "known-mismatch": 0,
-    "matched-but-compatibility-not-claimed": 40,
+    "matched-but-compatibility-not-claimed": 44,
     "unsupported-placeholder": 0
   });
 
@@ -409,7 +482,7 @@ test("Fast React Children helper observations match without compatibility claim"
       modeCounts,
       {
         "known-mismatch": 0,
-        "matched-but-compatibility-not-claimed": 10,
+        "matched-but-compatibility-not-claimed": 11,
         "unsupported-placeholder": 0
       },
       mode.id
@@ -467,6 +540,14 @@ function fastReactObservation(modeId, scenarioId) {
     oracle.fastReactTarget.packageName,
     scenarioId
   );
+}
+
+function findComparison(modeId, scenarioId) {
+  const comparison = oracle.fastReactComparisons[modeId].find(
+    (candidate) => candidate.scenarioId === scenarioId
+  );
+  assert.ok(comparison, `missing comparison ${modeId}:${scenarioId}`);
+  return comparison;
 }
 
 function operationValue(modeId, scenarioId) {
