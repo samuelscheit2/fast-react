@@ -996,15 +996,74 @@ const expectedNativePackageExports = {
   },
   './package.json': './package.json'
 };
+const nativeBlockedDirectFiles = [
+  'cleanup-hook-preflight.js',
+  'cross-environment-teardown.js',
+  'diagnostics.js',
+  'executable-preflight.js',
+  'index.cjs',
+  'index.mjs',
+  'native-root-bridge-cleanup-hook-preflight.js',
+  'native-root-bridge-diagnostics.js',
+  'native-root-bridge-executable-preflight.js',
+  'native-root-bridge-private-diagnostics.js',
+  'native-root-bridge-worker-thread-cleanup-hook-preflight.js',
+  'native-root-bridge-worker-thread-teardown.js',
+  'native-root-bridge-worker-thread-teardown-executable-preflight.js',
+  'native-root-bridge.js',
+  'private-cleanup-hook-preflight.js',
+  'private-diagnostics.js',
+  'private-root-bridge-cleanup-hook-preflight.js',
+  'private-root-bridge-diagnostics.js',
+  'private-root-bridge-executable-preflight.js',
+  'private-root-bridge-worker-thread-cleanup-hook-preflight.js',
+  'private-root-bridge-worker-thread-teardown.js',
+  'private-root-bridge-worker-thread-teardown-executable-preflight.js',
+  'private-root-bridge.js',
+  'root-bridge-cleanup-hook-preflight.js',
+  'root-bridge-diagnostics.js',
+  'root-bridge-executable-preflight.js',
+  'root-bridge-private-diagnostics.js',
+  'root-bridge-worker-thread-cleanup-hook-preflight.js',
+  'root-bridge-worker-thread-teardown.js',
+  'root-bridge-worker-thread-teardown-executable-preflight.js',
+  'src/cleanup-hook-preflight.js',
+  'src/cross-environment-teardown.js',
+  'src/diagnostics.js',
+  'src/executable-preflight.js',
+  'src/native-root-bridge-cleanup-hook-preflight.js',
+  'src/native-root-bridge-diagnostics.js',
+  'src/native-root-bridge-executable-preflight.js',
+  'src/native-root-bridge-private-diagnostics.js',
+  'src/native-root-bridge-worker-thread-cleanup-hook-preflight.js',
+  'src/native-root-bridge-worker-thread-teardown.js',
+  'src/native-root-bridge-worker-thread-teardown-executable-preflight.js',
+  'src/native-root-bridge.js',
+  'src/private-cleanup-hook-preflight.js',
+  'src/private-diagnostics.js',
+  'src/private-root-bridge-cleanup-hook-preflight.js',
+  'src/private-root-bridge-diagnostics.js',
+  'src/private-root-bridge-executable-preflight.js',
+  'src/private-root-bridge-worker-thread-cleanup-hook-preflight.js',
+  'src/private-root-bridge-worker-thread-teardown.js',
+  'src/private-root-bridge-worker-thread-teardown-executable-preflight.js',
+  'src/private-root-bridge.js',
+  'src/root-bridge-cleanup-hook-preflight.js',
+  'src/root-bridge-diagnostics.js',
+  'src/root-bridge-executable-preflight.js',
+  'src/root-bridge-private-diagnostics.js',
+  'src/root-bridge-worker-thread-cleanup-hook-preflight.js',
+  'src/root-bridge-worker-thread-teardown.js',
+  'src/root-bridge-worker-thread-teardown-executable-preflight.js',
+  'src/worker-thread-cleanup-hook-preflight.js',
+  'src/worker-thread-teardown-executable-preflight.js',
+  'src/worker-thread-teardown.js',
+  'worker-thread-cleanup-hook-preflight.js',
+  'worker-thread-teardown-executable-preflight.js',
+  'worker-thread-teardown.js'
+];
 const blockedNativeExtensionSubpaths = [
-  ...packageFileSubpaths('@fast-react/native', [
-    'index.cjs',
-    'index.mjs',
-    'native-root-bridge.js',
-    'private-root-bridge.js',
-    'src/native-root-bridge.js',
-    'src/private-root-bridge.js'
-  ]),
+  ...packageFileSubpaths('@fast-react/native', nativeBlockedDirectFiles),
   '@fast-react/native/src'
 ];
 
@@ -5095,6 +5154,11 @@ async function runNativePackageProbe(tempRoot) {
           () => require(specifier),
           (error) => error?.code === 'ERR_PACKAGE_PATH_NOT_EXPORTED',
           specifier
+        );
+        await assert.rejects(
+          import(specifier),
+          (error) => error?.code === 'ERR_PACKAGE_PATH_NOT_EXPORTED',
+          specifier + ' ESM'
         );
       }
     })().catch((error) => {
