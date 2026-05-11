@@ -29,6 +29,26 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 810 and 819
+
+- Worker 810 added the static React act/Scheduler diagnostics ledger after
+  several re-audit fixes. The accepted ledger requires exact evidence roles,
+  closed requirements schemas, role/path-approved durable evidence tokens, and
+  rejects prose, test-title, error-message, source-snippet, member-expression,
+  public act/root/Scheduler/package/renderer/effects, and single-word prose
+  fragment claims. Public `act`, Scheduler timing, root execution,
+  renderer/effect execution, and package compatibility remain blocked.
+- Worker 819 advanced the Rust managed-child host-work path from sibling-order
+  canary evidence into private delete/sibling execution validation. Host-work
+  validates the previous sibling host child before applying private delete
+  mutation, rejects stale sibling evidence before `remove_child`, and preserves
+  sibling/parent state while cleaning the deleted child. Public renderer,
+  React DOM, test-renderer, hydration/events/refs/resources/forms, native, and
+  package compatibility remain blocked.
+- The pair was accepted after focused ledger, React act/Scheduler, managed-child
+  Rust, package-surface, import-smoke, formatting, and `git diff --check`
+  verification, with read-only audits before merge.
+
 ### Workers 803-809, 811-818
 
 - Workers 803, 804, and 817 advanced Rust reconciler private evidence. Worker

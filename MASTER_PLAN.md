@@ -45,21 +45,17 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Workers 803-809 and 811-818 have been accepted,
-verified, merged, and cleaned up. Worker 810 remains active after re-audit
-follow-up. Workers 819, 820, 821, 823, 824, and 825 are active in isolated
-worktrees. Worker 822 is held until Worker 810 is accepted. Accepted private
-evidence still keeps public root, act, Scheduler timing, hydration,
-serialization, native execution, package compatibility, and broad renderer
-compatibility blocked.
+Top-level cap: 30 workers. Workers 803-819 have been accepted, verified,
+merged, and cleaned up. Workers 820-825 are active in isolated worktrees.
+Accepted private evidence still keeps public root, act, Scheduler timing,
+hydration, serialization, native execution, package compatibility, and broad
+renderer compatibility blocked.
 
 Active workers:
 
-- Worker 810: static React act/Scheduler diagnostics ledger, in final
-  re-audit after evidence-role and schema-closure fixes.
-- Worker 819: Rust managed-child delete/sibling execution follow-up.
 - Worker 820: static private-admission ledger for accepted Workers 803/817.
 - Worker 821: static native cleanup stale-evidence admission ledger.
+- Worker 822: React DOM test-utils act negative matrix.
 - Worker 823: resource/form reset-action private preflight.
 - Worker 824: hydrateRoot private execution-preflight boundary.
 - Worker 825: static test-renderer private-admission ledger for accepted
@@ -71,23 +67,17 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Finish Worker 810 re-audit, then merge or send back precise blockers.
-2. Audit and merge Workers 819, 820, 821, 823, 824, and 825 as they complete.
+1. Audit and merge Workers 820, 821, 822, 823, 824, and 825 as they complete.
    Expect overlap in conformance ledgers, React DOM hydration/resource/form
-   tests, and Rust host-work/test-renderer private evidence.
-3. Launch Worker 822 after Worker 810 is accepted so React DOM test-utils act
-   negatives can consume the final Scheduler/React act ledger shape.
-4. Prefer parallelizable independent proofs even when they may conflict in test
+   tests, React DOM test-utils act gates, and test-renderer private evidence.
+2. Prefer parallelizable independent proofs even when they may conflict in test
    files. Resolve conflicts during merge by keeping all accepted negative tests,
    blockers, and source-ownership checks.
-5. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
+3. Keep package-surface, benchmark, import-smoke, and broad Rust/JS checks green
    after each accepted merge batch.
 
 ## Next Queue Candidates
 
-- Worker 822: React DOM test-utils act negative matrix after Worker 810 is
-  accepted; keep public `act`, root execution, Scheduler timing, effects,
-  renderer execution, and compatibility blocked until proven together.
 - Scheduler work can move beyond the accepted delayed renderer-root producer and
   React delayed mock preflight only after public Scheduler timing, public
   `act`/root semantics, renderer/effect execution, public flush helper
