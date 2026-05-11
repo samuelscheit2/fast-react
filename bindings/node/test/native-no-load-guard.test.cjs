@@ -463,6 +463,165 @@ function assertPrivateCleanupHookPreflightCallable(native) {
   }
 }
 
+function assertNativeRootBridgeBatchLifecycleConsumerNoLoad(native) {
+  const createRecord = createValidNativeRootBridgeRequestRecord();
+  const renderRecord = createValidNativeRootBridgeRequestRecord({
+    requestId: 2,
+    kind: 'render',
+    valueHandle: {
+      environmentId: 815,
+      slot: 3,
+      generation: 1,
+      kind: 'value'
+    }
+  });
+  const unmountRecord = createValidNativeRootBridgeRequestRecord({
+    requestId: 3,
+    kind: 'unmount',
+    valueHandle: null,
+    rootHandleState: 'retired'
+  });
+  const gate = native.createNativeRootBridgeRequestShapeGate([
+    createRecord,
+    renderRecord,
+    unmountRecord
+  ]);
+  const consumer = gate.batchLifecycleConsumer;
+
+  assert.ok(Object.isFrozen(consumer));
+  assert.ok(Object.isFrozen(consumer.rows));
+  assert.equal(
+    native.nativeRootBridgeRequestShape.batchLifecycleConsumer.consumerStatus,
+    'consumed-native-root-bridge-batch-lifecycle-records'
+  );
+  assertNoNativeCleanupHookExecution(
+    native.nativeRootBridgeRequestShape.batchLifecycleConsumer,
+    'static batch lifecycle consumer metadata'
+  );
+  assert.equal(
+    consumer.consumerStatus,
+    'consumed-native-root-bridge-batch-lifecycle-records'
+  );
+  assert.equal(
+    consumer.model,
+    'fast-react-napi.NativeRootBridgeBatchLifecycleConsumer'
+  );
+  assert.equal(
+    consumer.validationModel,
+    native.nativeRootBridgeRequestShape.validationModel
+  );
+  assert.equal(
+    consumer.handleTableModel,
+    native.nativeRootBridgeRequestShape.handleTableModel
+  );
+  assert.equal(
+    consumer.batchGateStatus,
+    gate.jsonTransportSmoke.parserGate.batchedRecordGate.batchGateStatus
+  );
+  assert.equal(
+    consumer.cleanupHookPreflightStatus,
+    native.nativeRootBridgeRequestShape.workerThreadCleanupHookPreflight
+      .preflightStatus
+  );
+  assert.equal(consumer.cleanupHookCallableName, 'validateCleanupHookEvidenceRows');
+  assert.equal(consumer.requestCount, 3);
+  assert.equal(consumer.consumedBatchRecordCount, 3);
+  assert.equal(consumer.acceptedBatchRecordCount, 3);
+  assert.equal(consumer.cleanupHookCallablePreflightAccepted, true);
+  assert.equal(consumer.acceptedCleanupEvidenceCount, 2);
+  assert.equal(consumer.rejectedCleanupEvidenceCount, 2);
+  assert.deepEqual(consumer.cleanupHookEvidenceStatuses, [
+    'not-required',
+    'accepted',
+    'rejected'
+  ]);
+  assertNoNativeCleanupHookExecution(consumer, 'batch lifecycle consumer');
+
+  assert.deepEqual(
+    consumer.rows.map((row) => row.id),
+    [
+      'batch-lifecycle-consumer-0-create',
+      'batch-lifecycle-consumer-1-render',
+      'batch-lifecycle-consumer-2-unmount'
+    ]
+  );
+  assert.deepEqual(
+    consumer.rows.map((row) => row.kind),
+    ['create', 'render', 'unmount']
+  );
+  assert.deepEqual(
+    consumer.rows.map((row) => row.lifecycleTransition),
+    ['none->active', 'active->active', 'active->retired']
+  );
+  assert.deepEqual(
+    consumer.rows.map((row) => row.rootHandleAction),
+    [
+      'admit-root-handle',
+      'validate-active-root-handle',
+      'retire-root-handle'
+    ]
+  );
+  assert.deepEqual(
+    consumer.rows.map((row) => row.rootHandleStateBefore),
+    [null, 'active', 'active']
+  );
+  assert.deepEqual(
+    consumer.rows.map((row) => row.rootHandleStateAfter),
+    ['active', 'active', 'retired']
+  );
+  assert.deepEqual(
+    consumer.rows.map((row) => row.rootHandleCurrentGeneration),
+    [1, 1, 2]
+  );
+  assert.deepEqual(
+    consumer.rows.map((row) => row.valueHandleAction),
+    ['admit-value-handle', 'admit-value-handle', null]
+  );
+  assert.deepEqual(
+    consumer.rows.map((row) => row.cleanupHookEvidenceRequired),
+    [false, true, true]
+  );
+  assert.deepEqual(
+    consumer.rows.map((row) => row.cleanupHookEvidenceStatus),
+    ['not-required', 'accepted', 'accepted']
+  );
+  assert.deepEqual(
+    consumer.rows.map((row) => row.cleanupHookEvidenceRowId),
+    [
+      null,
+      'cleanup-hook-worker-value-after-root-release',
+      'cleanup-hook-worker-root-before-value-release'
+    ]
+  );
+  assert.deepEqual(
+    consumer.rows.map((row) => row.cleanupHookSourceHandleKind),
+    [null, 'value', 'root']
+  );
+  assert.deepEqual(
+    consumer.rows.map((row) => row.cleanupHookCanonicalExecutableEvidence),
+    [null, true, true]
+  );
+  assert.equal(
+    consumer.rows.every(
+      (row) =>
+        Object.isFrozen(row) &&
+        row.status === 'accepted' &&
+        row.code === null &&
+        row.sourceErrorCode === null &&
+        row.boundaryErrorCode === null &&
+        row.nativeAddonLoaded === false &&
+        row.nativeExecution === false &&
+        row.rendererExecution === false &&
+        row.reconcilerExecution === false &&
+        row.nodeWorkerThreadsExecution === false &&
+        row.napiCleanupHookExecution === false &&
+        row.publicNativeCompatibility === false &&
+        row.reactBehaviorError === false
+    ),
+    true
+  );
+}
+
 async function runForbiddenLoadFixtureMatrix() {
   const fixtures = createForbiddenLoadFixtureMatrix();
 
@@ -803,6 +962,7 @@ async function main() {
       true
     );
     assertPrivateCleanupHookPreflightCallable(native);
+    assertNativeRootBridgeBatchLifecycleConsumerNoLoad(native);
     assert.equal(
       native.nativeRootBridgeRequestShape.jsonTransportSmoke.parserGate
         .batchedRecordGate.responseSequenceGate.responseSequenceGateStatus,
