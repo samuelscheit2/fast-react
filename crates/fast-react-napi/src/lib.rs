@@ -20,6 +20,8 @@ mod root_bridge_requests {
     use std::collections::HashSet;
     use std::error::Error;
     use std::fmt::{self, Display, Formatter};
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::{Mutex, OnceLock};
 
     use serde_json::{Map, Value};
 
@@ -88,6 +90,11 @@ mod root_bridge_requests {
         "FAST_REACT_NAPI_JSON_BATCH_LIFECYCLE_EXECUTOR_CALLER_BUILT_ROW";
     pub(crate) const NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE: &str =
         "FAST_REACT_NAPI_JSON_BATCH_LIFECYCLE_EXECUTOR_PUBLIC_NATIVE_EXECUTION_CLAIM";
+    static NEXT_NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_GENERATION: AtomicU64 =
+        AtomicU64::new(1);
+    static CONSUMED_NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_GENERATIONS: OnceLock<
+        Mutex<HashSet<u64>>,
+    > = OnceLock::new();
     pub(crate) const NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_JSON_BATCH_ROUNDTRIP_CLEANUP_STATUS_MISMATCH_CODE: &str =
         "FAST_REACT_NAPI_BATCH_LIFECYCLE_CONSUMER_CLEANUP_STATUS_MISMATCH";
     pub(crate) const NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_JSON_BATCH_ROUNDTRIP_ROW_ID_MISMATCH_CODE: &str =
@@ -1937,6 +1944,110 @@ mod root_bridge_requests {
         teardown_state: NativeRootBridgeBatchResponseTeardownState,
     }
 
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) struct NativeRootBridgeJsonBatchLifecycleExecutorSourceGuard {
+        executor_generation: u64,
+        batch_index: usize,
+        request_id: u64,
+        kind: &'static str,
+        table_environment_id: BridgeEnvironmentId,
+        source_root_handle: BridgeHandle,
+        source_root_id: u64,
+        root_handle_current_generation: u64,
+        source_value_handle: Option<BridgeHandle>,
+        value_handle_current_generation: Option<u64>,
+    }
+
+    impl NativeRootBridgeJsonBatchLifecycleExecutorSourceGuard {
+        fn new(
+            executor_generation: u64,
+            batch_index: usize,
+            request: NativeRootBridgeRequestRecord,
+            admission_record: NativeRootBridgeHandleTableAdmissionSmokeRecord,
+        ) -> Self {
+            Self {
+                executor_generation,
+                batch_index,
+                request_id: request.request_id(),
+                kind: request.kind().code(),
+                table_environment_id: request.environment_id(),
+                source_root_handle: request.root_handle(),
+                source_root_id: request.root_id(),
+                root_handle_current_generation: admission_record.root_handle_current_generation(),
+                source_value_handle: request.value_handle(),
+                value_handle_current_generation: admission_record.value_handle_current_generation(),
+            }
+        }
+
+        #[must_use]
+        pub(crate) const fn executor_generation(self) -> u64 {
+            self.executor_generation
+        }
+
+        #[must_use]
+        pub(crate) const fn batch_index(self) -> usize {
+            self.batch_index
+        }
+
+        #[must_use]
+        pub(crate) const fn request_id(self) -> u64 {
+            self.request_id
+        }
+
+        #[must_use]
+        pub(crate) const fn kind(self) -> &'static str {
+            self.kind
+        }
+
+        #[must_use]
+        pub(crate) const fn table_environment_id(self) -> BridgeEnvironmentId {
+            self.table_environment_id
+        }
+
+        #[must_use]
+        pub(crate) const fn source_root_handle(self) -> BridgeHandle {
+            self.source_root_handle
+        }
+
+        #[must_use]
+        pub(crate) const fn source_root_id(self) -> u64 {
+            self.source_root_id
+        }
+
+        #[must_use]
+        pub(crate) const fn root_handle_current_generation(self) -> u64 {
+            self.root_handle_current_generation
+        }
+
+        #[must_use]
+        pub(crate) const fn source_value_handle(self) -> Option<BridgeHandle> {
+            self.source_value_handle
+        }
+
+        #[must_use]
+        pub(crate) const fn value_handle_current_generation(self) -> Option<u64> {
+            self.value_handle_current_generation
+        }
+
+        #[cfg(test)]
+        pub(crate) const fn with_executor_generation_for_test(
+            mut self,
+            executor_generation: u64,
+        ) -> Self {
+            self.executor_generation = executor_generation;
+            self
+        }
+
+        #[cfg(test)]
+        pub(crate) const fn with_source_value_handle_for_test(
+            mut self,
+            source_value_handle: Option<BridgeHandle>,
+        ) -> Self {
+            self.source_value_handle = source_value_handle;
+            self
+        }
+    }
+
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub(crate) struct NativeRootBridgeJsonBatchLifecycleExecutor {
         status: &'static str,
@@ -1944,6 +2055,7 @@ mod root_bridge_requests {
         validation_model: &'static str,
         handle_table_model: &'static str,
         transport: &'static str,
+        executor_generation: u64,
         request_count: usize,
         executed_row_count: usize,
         environment_id: BridgeEnvironmentId,
@@ -1988,6 +2100,11 @@ mod root_bridge_requests {
         #[must_use]
         pub(crate) const fn transport(&self) -> &'static str {
             self.transport
+        }
+
+        #[must_use]
+        pub(crate) const fn executor_generation(&self) -> u64 {
+            self.executor_generation
         }
 
         #[must_use]
@@ -2130,10 +2247,12 @@ mod root_bridge_requests {
         reconciler_execution: bool,
         public_native_compatibility: bool,
         react_behavior_error: bool,
+        source_guard: NativeRootBridgeJsonBatchLifecycleExecutorSourceGuard,
     }
 
     impl NativeRootBridgeJsonBatchLifecycleExecutorRow {
         fn applied(
+            executor_generation: u64,
             batch_index: usize,
             request: NativeRootBridgeRequestRecord,
             lifecycle_before: NativeRootBridgeBatchedJsonTransportLifecycleState,
@@ -2177,6 +2296,12 @@ mod root_bridge_requests {
                 reconciler_execution: false,
                 public_native_compatibility: false,
                 react_behavior_error: false,
+                source_guard: NativeRootBridgeJsonBatchLifecycleExecutorSourceGuard::new(
+                    executor_generation,
+                    batch_index,
+                    request,
+                    admission_record,
+                ),
             }
         }
 
@@ -2348,6 +2473,13 @@ mod root_bridge_requests {
             self.react_behavior_error
         }
 
+        #[must_use]
+        pub(crate) const fn source_guard(
+            &self,
+        ) -> NativeRootBridgeJsonBatchLifecycleExecutorSourceGuard {
+            self.source_guard
+        }
+
         #[cfg(test)]
         pub(crate) fn with_source_environment_id_for_test(
             mut self,
@@ -2369,6 +2501,16 @@ mod root_bridge_requests {
             current_generation: u64,
         ) -> Self {
             self.root_handle_current_generation = current_generation;
+            self.source_guard.root_handle_current_generation = current_generation;
+            self
+        }
+
+        #[cfg(test)]
+        pub(crate) fn with_source_guard_for_test(
+            mut self,
+            source_guard: NativeRootBridgeJsonBatchLifecycleExecutorSourceGuard,
+        ) -> Self {
+            self.source_guard = source_guard;
             self
         }
 
@@ -3986,6 +4128,10 @@ mod root_bridge_requests {
         cleanup_hook_callable_preflight_accepted: bool,
         accepted_cleanup_evidence_count: usize,
         rejected_cleanup_evidence_count: usize,
+        json_batch_lifecycle_executor_generation: u64,
+        json_batch_lifecycle_executor_source_rows_validated: bool,
+        json_batch_lifecycle_executor_source_error_code: Option<&'static str>,
+        json_batch_lifecycle_executor_replay_guard_consumed: bool,
         json_batch_roundtrip_link: NativeRootBridgeBatchLifecycleConsumerJsonBatchRoundtripLink,
         rows: Vec<NativeRootBridgeBatchLifecycleConsumerRow>,
         node_worker_threads_execution: bool,
@@ -4057,6 +4203,28 @@ mod root_bridge_requests {
         #[must_use]
         pub(crate) const fn rejected_cleanup_evidence_count(&self) -> usize {
             self.rejected_cleanup_evidence_count
+        }
+
+        #[must_use]
+        pub(crate) const fn json_batch_lifecycle_executor_generation(&self) -> u64 {
+            self.json_batch_lifecycle_executor_generation
+        }
+
+        #[must_use]
+        pub(crate) const fn json_batch_lifecycle_executor_source_rows_validated(&self) -> bool {
+            self.json_batch_lifecycle_executor_source_rows_validated
+        }
+
+        #[must_use]
+        pub(crate) const fn json_batch_lifecycle_executor_source_error_code(
+            &self,
+        ) -> Option<&'static str> {
+            self.json_batch_lifecycle_executor_source_error_code
+        }
+
+        #[must_use]
+        pub(crate) const fn json_batch_lifecycle_executor_replay_guard_consumed(&self) -> bool {
+            self.json_batch_lifecycle_executor_replay_guard_consumed
         }
 
         #[must_use]
@@ -5332,6 +5500,9 @@ mod root_bridge_requests {
             kind: NativeRootBridgeRequestKind,
             value_handle: BridgeHandle,
         },
+        ReusedValueHandle {
+            value_handle: BridgeHandle,
+        },
         SequenceMustStartWithCreate {
             actual: NativeRootBridgeRequestKind,
         },
@@ -5346,6 +5517,7 @@ mod root_bridge_requests {
             request_id: u64,
         },
         RequestSequenceExhausted,
+        ExecutorGenerationExhausted,
         JsonTransportRecordInvalid {
             field: &'static str,
             value: &'static str,
@@ -5375,6 +5547,7 @@ mod root_bridge_requests {
                 Self::UnexpectedValueHandle { .. } => {
                     "FAST_REACT_NAPI_ROOT_REQUEST_UNEXPECTED_VALUE_HANDLE"
                 }
+                Self::ReusedValueHandle { .. } => "FAST_REACT_NAPI_ROOT_REQUEST_VALUE_HANDLE_REUSE",
                 Self::SequenceMustStartWithCreate { .. } => {
                     "FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_MUST_START_WITH_CREATE"
                 }
@@ -5386,6 +5559,9 @@ mod root_bridge_requests {
                     "FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_OUT_OF_ORDER"
                 }
                 Self::RequestSequenceExhausted => "FAST_REACT_NAPI_ROOT_REQUEST_SEQUENCE_EXHAUSTED",
+                Self::ExecutorGenerationExhausted => {
+                    "FAST_REACT_NAPI_ROOT_REQUEST_EXECUTOR_GENERATION_EXHAUSTED"
+                }
                 Self::JsonTransportRecordInvalid { .. } => {
                     "FAST_REACT_NAPI_ROOT_REQUEST_JSON_TRANSPORT_RECORD_INVALID"
                 }
@@ -5437,6 +5613,12 @@ mod root_bridge_requests {
                     "native root bridge {} record cannot carry a value handle",
                     kind.code()
                 ),
+                Self::ReusedValueHandle { value_handle } => write!(
+                    formatter,
+                    "native root bridge value handle slot {} generation {} was already consumed by this executor",
+                    value_handle.slot(),
+                    value_handle.generation()
+                ),
                 Self::SequenceMustStartWithCreate { actual } => write!(
                     formatter,
                     "native root bridge request sequence must start with create, got {}",
@@ -5459,6 +5641,9 @@ mod root_bridge_requests {
                 ),
                 Self::RequestSequenceExhausted => formatter
                     .write_str("native root bridge request sequence cannot allocate another id"),
+                Self::ExecutorGenerationExhausted => formatter.write_str(
+                    "native root bridge JSON lifecycle executor cannot allocate another generation",
+                ),
                 Self::JsonTransportRecordInvalid { field, value } => write!(
                     formatter,
                     "native root bridge JSON transport record has unsupported {field} value {value}"
@@ -5942,9 +6127,35 @@ mod root_bridge_requests {
         execute_native_root_bridge_json_batch_lifecycle_requests(&requests)
     }
 
+    fn allocate_native_root_bridge_json_batch_lifecycle_executor_generation()
+    -> Result<u64, NativeRootBridgeRequestError> {
+        NEXT_NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_GENERATION
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |generation| {
+                generation.checked_add(1)
+            })
+            .map_err(|_| NativeRootBridgeRequestError::ExecutorGenerationExhausted)
+    }
+
+    fn validate_executor_value_handle_not_reused(
+        consumed_value_handles: &mut HashSet<BridgeHandle>,
+        request: NativeRootBridgeRequestRecord,
+    ) -> Result<(), NativeRootBridgeRequestError> {
+        let Some(value_handle) = request.value_handle() else {
+            return Ok(());
+        };
+
+        if consumed_value_handles.insert(value_handle) {
+            return Ok(());
+        }
+
+        Err(NativeRootBridgeRequestError::ReusedValueHandle { value_handle })
+    }
+
     fn execute_native_root_bridge_json_batch_lifecycle_requests(
         requests: &[NativeRootBridgeRequestRecord],
     ) -> Result<NativeRootBridgeJsonBatchLifecycleExecutor, NativeRootBridgeRequestError> {
+        let executor_generation =
+            allocate_native_root_bridge_json_batch_lifecycle_executor_generation()?;
         let environment_id = requests
             .first()
             .map_or(BridgeEnvironmentId::NONE, |request| {
@@ -5956,10 +6167,12 @@ mod root_bridge_requests {
         let mut validation_records = Vec::with_capacity(requests.len());
         let mut root_handle_state = None;
         let mut rows = Vec::with_capacity(requests.len());
+        let mut consumed_value_handles = HashSet::new();
 
         for (batch_index, request) in requests.iter().copied().enumerate() {
             let lifecycle_before = lifecycle_state_for_root_handle_state(root_handle_state);
             prevalidate_handoff_lifecycle(&validator, request)?;
+            validate_executor_value_handle_not_reused(&mut consumed_value_handles, request)?;
             let admission_record =
                 admit_js_native_root_bridge_handoff_record(&mut table, request, root_handle_state)?;
             let validation_record = validator.validate_next(&table, request)?;
@@ -5968,6 +6181,7 @@ mod root_bridge_requests {
 
             root_handle_state = Some(validation_record.root_handle_state());
             rows.push(NativeRootBridgeJsonBatchLifecycleExecutorRow::applied(
+                executor_generation,
                 batch_index,
                 request,
                 lifecycle_before,
@@ -5985,6 +6199,7 @@ mod root_bridge_requests {
             validation_model: super::NATIVE_ROOT_BRIDGE_REQUEST_VALIDATION_MODEL,
             handle_table_model: super::NATIVE_ROOT_BRIDGE_HANDLE_TABLE_MODEL,
             transport: super::NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_FORMAT,
+            executor_generation,
             request_count: requests.len(),
             executed_row_count: rows.len(),
             environment_id,
@@ -6625,27 +6840,36 @@ mod root_bridge_requests {
                     .iter()
                     .copied(),
             );
-        let rows = gate
-            .batched_record_gate()
-            .lifecycle_rows()
-            .iter()
-            .zip(
-                gate.json_batch_lifecycle_executor()
-                    .admission_records()
-                    .iter()
-                    .copied(),
+        let executor_source_error_code =
+            validate_and_consume_native_root_bridge_json_batch_lifecycle_executor(
+                gate.json_batch_lifecycle_executor(),
             )
-            .map(|(lifecycle_row, smoke_record)| {
-                NativeRootBridgeBatchLifecycleConsumerRow::new(
-                    lifecycle_row,
-                    smoke_record,
-                    cleanup_hook_row_for_batch_lifecycle_consumer(
-                        lifecycle_row.kind(),
-                        &cleanup_hook_preflight,
-                    ),
+            .err();
+        let executor_source_rows_validated = executor_source_error_code.is_none();
+        let rows = if executor_source_rows_validated {
+            gate.batched_record_gate()
+                .lifecycle_rows()
+                .iter()
+                .zip(
+                    gate.json_batch_lifecycle_executor()
+                        .admission_records()
+                        .iter()
+                        .copied(),
                 )
-            })
-            .collect::<Vec<_>>();
+                .map(|(lifecycle_row, smoke_record)| {
+                    NativeRootBridgeBatchLifecycleConsumerRow::new(
+                        lifecycle_row,
+                        smoke_record,
+                        cleanup_hook_row_for_batch_lifecycle_consumer(
+                            lifecycle_row.kind(),
+                            &cleanup_hook_preflight,
+                        ),
+                    )
+                })
+                .collect::<Vec<_>>()
+        } else {
+            Vec::new()
+        };
         let accepted_batch_record_count = rows
             .iter()
             .filter(|row| {
@@ -6680,6 +6904,12 @@ mod root_bridge_requests {
                 .accepted_cleanup_evidence_count(),
             rejected_cleanup_evidence_count: cleanup_hook_preflight
                 .rejected_cleanup_evidence_count(),
+            json_batch_lifecycle_executor_generation: gate
+                .json_batch_lifecycle_executor()
+                .executor_generation(),
+            json_batch_lifecycle_executor_source_rows_validated: executor_source_rows_validated,
+            json_batch_lifecycle_executor_source_error_code: executor_source_error_code,
+            json_batch_lifecycle_executor_replay_guard_consumed: executor_source_rows_validated,
             json_batch_roundtrip_link,
             rows,
             node_worker_threads_execution: false,
@@ -7234,6 +7464,17 @@ mod root_bridge_requests {
     }
 
     fn has_native_root_bridge_json_batch_lifecycle_executor_public_native_claim(
+        executor: &NativeRootBridgeJsonBatchLifecycleExecutor,
+    ) -> bool {
+        executor.native_addon_loaded()
+            || executor.native_execution()
+            || executor.renderer_execution()
+            || executor.reconciler_execution()
+            || executor.public_native_compatibility()
+            || executor.react_behavior_error()
+    }
+
+    fn has_native_root_bridge_json_batch_lifecycle_executor_row_public_native_claim(
         row: &NativeRootBridgeJsonBatchLifecycleExecutorRow,
     ) -> bool {
         row.native_addon_loaded()
@@ -8235,21 +8476,25 @@ mod root_bridge_requests {
     }
 
     pub(crate) fn validate_native_root_bridge_json_batch_lifecycle_executor_source_rows(
-        records: &[NativeRootBridgeJsonTransportRecord],
+        executor: &NativeRootBridgeJsonBatchLifecycleExecutor,
         candidate_rows: &[NativeRootBridgeJsonBatchLifecycleExecutorRow],
     ) -> Result<(), &'static str> {
-        let expected_executor = native_root_bridge_json_batch_lifecycle_executor_for_records(
-            records,
-        )
-        .map_err(|_| NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_STALE_OR_FOREIGN_ROW_CODE)?;
-        let expected_rows = expected_executor.rows();
+        if has_native_root_bridge_json_batch_lifecycle_executor_public_native_claim(executor) {
+            return Err(
+                NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE,
+            );
+        }
+
+        let expected_rows = executor.rows();
 
         if candidate_rows.len() != expected_rows.len() {
             return Err(NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_CALLER_BUILT_ROW_CODE);
         }
 
         for (candidate, expected) in candidate_rows.iter().zip(expected_rows) {
-            if has_native_root_bridge_json_batch_lifecycle_executor_public_native_claim(candidate) {
+            if has_native_root_bridge_json_batch_lifecycle_executor_row_public_native_claim(
+                candidate,
+            ) {
                 return Err(
                     NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_PUBLIC_NATIVE_EXECUTION_CLAIM_CODE,
                 );
@@ -8257,6 +8502,14 @@ mod root_bridge_requests {
 
             if !candidate.source_owned_json_row() || !candidate.rust_state_machine_execution() {
                 return Err(NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_CALLER_BUILT_ROW_CODE);
+            }
+
+            if !native_root_bridge_json_batch_lifecycle_executor_source_guard_matches(
+                executor, candidate,
+            ) {
+                return Err(
+                    NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_STALE_OR_FOREIGN_ROW_CODE,
+                );
             }
 
             if !native_root_bridge_json_batch_lifecycle_executor_rows_match_source(
@@ -8269,6 +8522,46 @@ mod root_bridge_requests {
         }
 
         Ok(())
+    }
+
+    fn validate_and_consume_native_root_bridge_json_batch_lifecycle_executor(
+        executor: &NativeRootBridgeJsonBatchLifecycleExecutor,
+    ) -> Result<(), &'static str> {
+        validate_native_root_bridge_json_batch_lifecycle_executor_source_rows(
+            executor,
+            executor.rows(),
+        )?;
+
+        let consumed_generations =
+            CONSUMED_NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_GENERATIONS
+                .get_or_init(|| Mutex::new(HashSet::new()));
+        let mut consumed_generations = consumed_generations
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+        if consumed_generations.insert(executor.executor_generation()) {
+            return Ok(());
+        }
+
+        Err(NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_STALE_OR_FOREIGN_ROW_CODE)
+    }
+
+    fn native_root_bridge_json_batch_lifecycle_executor_source_guard_matches(
+        executor: &NativeRootBridgeJsonBatchLifecycleExecutor,
+        row: &NativeRootBridgeJsonBatchLifecycleExecutorRow,
+    ) -> bool {
+        let guard = row.source_guard();
+
+        guard.executor_generation() == executor.executor_generation()
+            && guard.batch_index() == row.batch_index()
+            && guard.request_id() == row.request_id()
+            && guard.kind() == row.kind()
+            && guard.table_environment_id() == row.source_environment_id()
+            && guard.source_root_handle() == row.source_root_handle()
+            && guard.source_root_id() == row.source_root_id()
+            && guard.root_handle_current_generation() == row.root_handle_current_generation()
+            && guard.source_value_handle() == row.source_value_handle()
+            && guard.value_handle_current_generation() == row.value_handle_current_generation()
     }
 
     fn native_root_bridge_json_batch_lifecycle_executor_rows_match_source(
@@ -8303,6 +8596,7 @@ mod root_bridge_requests {
             && candidate.source_error_code() == expected.source_error_code()
             && candidate.boundary_error_code() == expected.boundary_error_code()
             && candidate.source_owned_json_row() == expected.source_owned_json_row()
+            && candidate.source_guard() == expected.source_guard()
     }
 
     fn boundary_code_for_batch_lifecycle_error(
@@ -8318,14 +8612,18 @@ mod root_bridge_requests {
             NativeRootBridgeRequestError::HandleTable(
                 BridgeHandleTableError::StaleHandle { .. }
                 | BridgeHandleTableError::DisposedHandle { .. },
-            ) => super::NativeBoundaryErrorKind::RootBridgeStaleHandle.code(),
+            )
+            | NativeRootBridgeRequestError::ReusedValueHandle { .. } => {
+                super::NativeBoundaryErrorKind::RootBridgeStaleHandle.code()
+            }
             NativeRootBridgeRequestError::RecordRootHandleStateMismatch { .. }
             | NativeRootBridgeRequestError::RootHandleStillActive { .. }
             | NativeRootBridgeRequestError::SequenceMustStartWithCreate { .. }
             | NativeRootBridgeRequestError::CreateAfterRootCreated { .. }
             | NativeRootBridgeRequestError::RequestAfterUnmount { .. }
             | NativeRootBridgeRequestError::RequestSequenceOutOfOrder { .. }
-            | NativeRootBridgeRequestError::RequestSequenceExhausted => {
+            | NativeRootBridgeRequestError::RequestSequenceExhausted
+            | NativeRootBridgeRequestError::ExecutorGenerationExhausted => {
                 super::NativeBoundaryErrorKind::RootBridgeWrongLifecycleOrder.code()
             }
             NativeRootBridgeRequestError::HandleTable(_)
@@ -10113,7 +10411,10 @@ fn native_boundary_kind_for_root_bridge_request_error(
         root_bridge_requests::NativeRootBridgeRequestError::HandleTable(
             handle_table::BridgeHandleTableError::StaleHandle { .. }
             | handle_table::BridgeHandleTableError::DisposedHandle { .. },
-        ) => NativeBoundaryErrorKind::RootBridgeStaleHandle,
+        )
+        | root_bridge_requests::NativeRootBridgeRequestError::ReusedValueHandle { .. } => {
+            NativeBoundaryErrorKind::RootBridgeStaleHandle
+        }
         root_bridge_requests::NativeRootBridgeRequestError::RecordRootHandleStateMismatch {
             ..
         }
@@ -10126,7 +10427,8 @@ fn native_boundary_kind_for_root_bridge_request_error(
         | root_bridge_requests::NativeRootBridgeRequestError::RequestSequenceOutOfOrder {
             ..
         }
-        | root_bridge_requests::NativeRootBridgeRequestError::RequestSequenceExhausted => {
+        | root_bridge_requests::NativeRootBridgeRequestError::RequestSequenceExhausted
+        | root_bridge_requests::NativeRootBridgeRequestError::ExecutorGenerationExhausted => {
             NativeBoundaryErrorKind::RootBridgeWrongLifecycleOrder
         }
         root_bridge_requests::NativeRootBridgeRequestError::HandleTable(_)
@@ -10189,6 +10491,7 @@ mod tests {
         NativeRootBridgeWorkerThreadCleanupHookEvidence,
         NativeRootBridgeWorkerThreadCleanupHookPreflightRow,
         NativeRootBridgeWorkerThreadCleanupHookPreflightRowStatus,
+        native_root_bridge_batch_lifecycle_consumer_for_gate,
         native_root_bridge_batch_lifecycle_consumer_for_json,
         native_root_bridge_batched_json_transport_error_rows,
         native_root_bridge_cross_environment_teardown_gate,
@@ -11165,8 +11468,31 @@ mod tests {
         let gate = parse_native_root_bridge_json_transport_for_gate(json).unwrap();
         let rows = executor.rows();
 
-        assert_eq!(executor, record_executor);
-        assert_eq!(gate.json_batch_lifecycle_executor().rows(), executor.rows());
+        assert_ne!(
+            executor.executor_generation(),
+            record_executor.executor_generation()
+        );
+        assert_eq!(record_executor.request_count(), executor.request_count());
+        assert_eq!(
+            record_executor
+                .rows()
+                .iter()
+                .map(|row| row.kind())
+                .collect::<Vec<_>>(),
+            rows.iter().map(|row| row.kind()).collect::<Vec<_>>()
+        );
+        assert_ne!(
+            gate.json_batch_lifecycle_executor().executor_generation(),
+            executor.executor_generation()
+        );
+        assert_eq!(
+            gate.json_batch_lifecycle_executor()
+                .rows()
+                .iter()
+                .map(|row| row.kind())
+                .collect::<Vec<_>>(),
+            rows.iter().map(|row| row.kind()).collect::<Vec<_>>()
+        );
         assert_eq!(
             executor.status(),
             NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_STATUS
@@ -11187,6 +11513,7 @@ mod tests {
             executor.transport(),
             NATIVE_ROOT_BRIDGE_JSON_TRANSPORT_FORMAT
         );
+        assert!(executor.executor_generation() > 0);
         assert_eq!(executor.request_count(), 3);
         assert_eq!(executor.executed_row_count(), 3);
         assert_eq!(executor.environment_id(), environment_id);
@@ -11306,6 +11633,20 @@ mod tests {
                 .collect::<Vec<_>>(),
             [None, None, Some("FAST_REACT_NAPI_STALE_HANDLE")]
         );
+        assert!(rows.iter().all(|row| {
+            row.source_guard().executor_generation() == executor.executor_generation()
+                && row.source_guard().batch_index() == row.batch_index()
+                && row.source_guard().request_id() == row.request_id()
+                && row.source_guard().kind() == row.kind()
+                && row.source_guard().table_environment_id() == row.source_environment_id()
+                && row.source_guard().source_root_handle() == row.source_root_handle()
+                && row.source_guard().source_root_id() == row.source_root_id()
+                && row.source_guard().root_handle_current_generation()
+                    == row.root_handle_current_generation()
+                && row.source_guard().source_value_handle() == row.source_value_handle()
+                && row.source_guard().value_handle_current_generation()
+                    == row.value_handle_current_generation()
+        }));
         assert_eq!(
             rows.iter()
                 .map(|row| row.root_handle_validated())
@@ -11329,13 +11670,36 @@ mod tests {
             assert_executor_row_inert(row);
         }
 
-        validate_native_root_bridge_json_batch_lifecycle_executor_source_rows(&records, rows)
+        validate_native_root_bridge_json_batch_lifecycle_executor_source_rows(&executor, rows)
             .unwrap();
+        assert_eq!(
+            validate_native_root_bridge_json_batch_lifecycle_executor_source_rows(
+                &record_executor,
+                rows
+            )
+            .unwrap_err(),
+            NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_STALE_OR_FOREIGN_ROW_CODE
+        );
 
         let stale_root_json = r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":870,"root_handle":{"environment_id":870,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":870,"slot":2,"generation":1,"kind":"value"},"root_handle_state":"active"},{"request_id":2,"kind":"render","environment_id":870,"root_handle":{"environment_id":870,"slot":1,"generation":2,"kind":"root"},"root_id":1,"value_handle":{"environment_id":870,"slot":3,"generation":1,"kind":"value"},"root_handle_state":"active"}]}"#;
         let stale_root_error =
             native_root_bridge_json_batch_lifecycle_executor_for_json(stale_root_json).unwrap_err();
         assert_eq!(stale_root_error.code(), "FAST_REACT_NAPI_STALE_HANDLE");
+
+        let reused_value_json = r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":870,"root_handle":{"environment_id":870,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":870,"slot":2,"generation":1,"kind":"value"},"root_handle_state":"active"},{"request_id":2,"kind":"render","environment_id":870,"root_handle":{"environment_id":870,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":870,"slot":2,"generation":1,"kind":"value"},"root_handle_state":"active"}]}"#;
+        let reused_value_error =
+            native_root_bridge_json_batch_lifecycle_executor_for_json(reused_value_json)
+                .unwrap_err();
+        assert_eq!(
+            reused_value_error.code(),
+            "FAST_REACT_NAPI_ROOT_REQUEST_VALUE_HANDLE_REUSE"
+        );
+
+        let stale_value_json = r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":870,"root_handle":{"environment_id":870,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":870,"slot":2,"generation":1,"kind":"value"},"root_handle_state":"active"},{"request_id":2,"kind":"render","environment_id":870,"root_handle":{"environment_id":870,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":870,"slot":3,"generation":2,"kind":"value"},"root_handle_state":"active"}]}"#;
+        let stale_value_error =
+            native_root_bridge_json_batch_lifecycle_executor_for_json(stale_value_json)
+                .unwrap_err();
+        assert_eq!(stale_value_error.code(), "FAST_REACT_NAPI_STALE_HANDLE");
 
         let foreign_root_json = r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":870,"root_handle":{"environment_id":1870,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":null,"root_handle_state":"active"}]}"#;
         let foreign_root_error =
@@ -11346,13 +11710,22 @@ mod tests {
             "FAST_REACT_NAPI_WRONG_ENVIRONMENT"
         );
 
+        let foreign_value_json = r#"{"transport":"json","schemaVersion":1,"requestRecords":[{"request_id":1,"kind":"create","environment_id":870,"root_handle":{"environment_id":870,"slot":1,"generation":1,"kind":"root"},"root_id":1,"value_handle":{"environment_id":1870,"slot":2,"generation":1,"kind":"value"},"root_handle_state":"active"}]}"#;
+        let foreign_value_error =
+            native_root_bridge_json_batch_lifecycle_executor_for_json(foreign_value_json)
+                .unwrap_err();
+        assert_eq!(
+            foreign_value_error.code(),
+            "FAST_REACT_NAPI_WRONG_ENVIRONMENT"
+        );
+
         let mut foreign_rows = rows.to_vec();
         foreign_rows[1] = foreign_rows[1]
             .clone()
             .with_source_environment_id_for_test(BridgeEnvironmentId::from_raw(1870));
         assert_eq!(
             validate_native_root_bridge_json_batch_lifecycle_executor_source_rows(
-                &records,
+                &executor,
                 &foreign_rows
             )
             .unwrap_err(),
@@ -11363,7 +11736,7 @@ mod tests {
         cross_root_rows[1] = cross_root_rows[1].clone().with_source_root_id_for_test(2);
         assert_eq!(
             validate_native_root_bridge_json_batch_lifecycle_executor_source_rows(
-                &records,
+                &executor,
                 &cross_root_rows
             )
             .unwrap_err(),
@@ -11376,8 +11749,24 @@ mod tests {
             .with_root_handle_current_generation_for_test(1);
         assert_eq!(
             validate_native_root_bridge_json_batch_lifecycle_executor_source_rows(
-                &records,
+                &executor,
                 &stale_generation_rows
+            )
+            .unwrap_err(),
+            NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_STALE_OR_FOREIGN_ROW_CODE
+        );
+
+        let mut stale_guard_rows = rows.to_vec();
+        let stale_guard = stale_guard_rows[1]
+            .source_guard()
+            .with_executor_generation_for_test(record_executor.executor_generation());
+        stale_guard_rows[1] = stale_guard_rows[1]
+            .clone()
+            .with_source_guard_for_test(stale_guard);
+        assert_eq!(
+            validate_native_root_bridge_json_batch_lifecycle_executor_source_rows(
+                &executor,
+                &stale_guard_rows
             )
             .unwrap_err(),
             NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_STALE_OR_FOREIGN_ROW_CODE
@@ -11389,7 +11778,7 @@ mod tests {
             .with_source_owned_json_row_for_test(false);
         assert_eq!(
             validate_native_root_bridge_json_batch_lifecycle_executor_source_rows(
-                &records,
+                &executor,
                 &caller_built_rows
             )
             .unwrap_err(),
@@ -11402,7 +11791,7 @@ mod tests {
             .with_native_execution_claim_for_test();
         assert_eq!(
             validate_native_root_bridge_json_batch_lifecycle_executor_source_rows(
-                &records,
+                &executor,
                 &native_claim_rows
             )
             .unwrap_err(),
@@ -11493,6 +11882,13 @@ mod tests {
         assert!(consumer.cleanup_hook_callable_preflight_accepted());
         assert_eq!(consumer.accepted_cleanup_evidence_count(), 2);
         assert_eq!(consumer.rejected_cleanup_evidence_count(), 2);
+        assert!(consumer.json_batch_lifecycle_executor_generation() > 0);
+        assert!(consumer.json_batch_lifecycle_executor_source_rows_validated());
+        assert_eq!(
+            consumer.json_batch_lifecycle_executor_source_error_code(),
+            None
+        );
+        assert!(consumer.json_batch_lifecycle_executor_replay_guard_consumed());
         assert_consumer_inert(&consumer);
 
         let link = consumer.json_batch_roundtrip_link();
@@ -11958,6 +12354,43 @@ mod tests {
         for row in rows {
             assert_row_inert(row);
         }
+
+        let replay_gate = parse_native_root_bridge_json_transport_for_gate(json).unwrap();
+        let first_consumer = native_root_bridge_batch_lifecycle_consumer_for_gate(&replay_gate);
+        assert!(first_consumer.json_batch_lifecycle_executor_source_rows_validated());
+        assert!(first_consumer.json_batch_lifecycle_executor_replay_guard_consumed());
+        assert_eq!(first_consumer.consumed_batch_record_count(), 3);
+
+        let replayed_consumer = native_root_bridge_batch_lifecycle_consumer_for_gate(&replay_gate);
+        assert!(!replayed_consumer.json_batch_lifecycle_executor_source_rows_validated());
+        assert_eq!(
+            replayed_consumer.json_batch_lifecycle_executor_source_error_code(),
+            Some(NATIVE_ROOT_BRIDGE_JSON_BATCH_LIFECYCLE_EXECUTOR_STALE_OR_FOREIGN_ROW_CODE)
+        );
+        assert!(!replayed_consumer.json_batch_lifecycle_executor_replay_guard_consumed());
+        assert_eq!(
+            replayed_consumer.json_batch_lifecycle_executor_generation(),
+            first_consumer.json_batch_lifecycle_executor_generation()
+        );
+        assert_eq!(replayed_consumer.consumed_batch_record_count(), 0);
+        assert_eq!(replayed_consumer.accepted_batch_record_count(), 0);
+        assert!(replayed_consumer.rows().is_empty());
+        assert!(
+            !replayed_consumer
+                .json_batch_roundtrip_link()
+                .source_owned_native_rows()
+        );
+        assert!(replayed_consumer
+            .json_batch_roundtrip_link()
+            .rejected_rows()
+            .iter()
+            .any(|row| {
+                row.code()
+                    == Some(
+                        NATIVE_ROOT_BRIDGE_BATCH_LIFECYCLE_CONSUMER_JSON_BATCH_ROUNDTRIP_STALE_OR_FOREIGN_JSON_BATCH_ROW_CODE,
+                    )
+            }));
+        assert_consumer_inert(&replayed_consumer);
     }
 
     #[test]
