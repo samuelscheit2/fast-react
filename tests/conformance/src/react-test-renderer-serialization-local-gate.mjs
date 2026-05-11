@@ -318,7 +318,8 @@ export function evaluateReactTestRendererSerializationLocalGate({
     localChecks.rustTestRendererRootFacadePresent &&
     localChecks.committedTestRendererHostOutputPresent &&
     localChecks.committedFiberInspectionPresent &&
-    localChecks.privateJsonDiagnosticsPresent;
+    localChecks.privateJsonDiagnosticsPresent &&
+    localChecks.privateSerializationLifecycleSourceEvidencePresent;
   const privateToJSONFacadeGateReady =
     privateDiagnosticsReady &&
     localChecks.privateToJSONSerializationFacadeGatePresent &&
@@ -652,6 +653,176 @@ export function evaluateReactTestRendererErrorSurfaceLocalGate({
   };
 }
 
+const sharedFinishedWorkIdentitySourceAssertions = freezeArray([
+  jsBooleanPropertyAssertion("privateFinishedWorkIdentityGateAvailable", true),
+  jsBooleanPropertyAssertion("privateUnmountFinishedWorkIdentityGateAvailable", true),
+  jsBooleanPropertyAssertion(
+    "unmountNativeExecutionRequiresFinishedWorkIdentity",
+    true
+  ),
+  jsBooleanPropertyAssertion("rejectsStaleUnmountFinishedWorkIdentity", true),
+  jsBooleanPropertyAssertion(
+    "requiresUnmountDeletionCleanupHandoffEvidence",
+    true
+  ),
+  jsBooleanPropertyAssertion(
+    "privateRootLifecycleExecutionEvidenceRequired",
+    true
+  )
+]);
+
+const sharedPublicBlockerSourceAssertions = freezeArray([
+  jsBooleanPropertyAssertion("publicRouteAvailable", false),
+  jsBooleanPropertyAssertion("nativeBridgeAvailable", false),
+  jsBooleanPropertyAssertion("nativeExecution", false),
+  jsBooleanPropertyAssertion("compatibilityClaimed", false)
+]);
+
+const privateToJSONFinishedWorkIdentitySourceAssertions = freezeArray([
+  ...sharedFinishedWorkIdentitySourceAssertions
+]);
+
+const privateToJSONPublicBlockerSourceAssertions = freezeArray([
+  ...sharedPublicBlockerSourceAssertions,
+  jsBooleanPropertyAssertion("publicSerializationAvailable", false)
+]);
+
+const privateToJSONHostOutputDiagnosticGateSourceAssertions = freezeArray([
+  jsStringPropertyAssertion(
+    "id",
+    "react-test-renderer-tojson-private-serialization-facade-gate"
+  ),
+  jsBooleanPropertyAssertion("privateHostOutputDiagnosticsSerializable", true),
+  jsSourcePropertyAssertion(
+    "privateSerializationFacadeSymbol",
+    "privateToJSONSerializationFacadeSymbol.description"
+  ),
+  jsBooleanPropertyAssertion("acceptedRustPrivateJsonDiagnostics", true),
+  jsBooleanPropertyAssertion("hostOutputSnapshotFreshnessRequired", true),
+  jsBooleanPropertyAssertion("staleSnapshotRejection", true),
+  jsBooleanPropertyAssertion("publicSerializationAvailable", false),
+  jsBooleanPropertyAssertion("publicRouteAvailable", false),
+  jsBooleanPropertyAssertion("nativeBridgeAvailable", false),
+  jsBooleanPropertyAssertion("nativeExecution", false),
+  jsBooleanPropertyAssertion("compatibilityClaimed", false)
+]);
+
+const privateToTreeFinishedWorkIdentitySourceAssertions = freezeArray([
+  ...sharedFinishedWorkIdentitySourceAssertions
+]);
+
+const privateToTreePublicBlockerSourceAssertions = freezeArray([
+  ...sharedPublicBlockerSourceAssertions,
+  jsBooleanPropertyAssertion("publicTreeAvailable", false)
+]);
+
+const publicJsReactTestRendererEntrypointSourcePaths = freezeArray([
+  "packages/react-test-renderer/index.js",
+  "packages/react-test-renderer/cjs/react-test-renderer.development.js",
+  "packages/react-test-renderer/cjs/react-test-renderer.production.js"
+]);
+
+const privateSerializationLifecycleSourceTokens = freezeArray([
+  "rootLifecycleExecutionEvidences",
+  "validatePrivateSerializationLifecycleExecutionEvidence",
+  "validatePrivateSerializationRootLifecycleExecutionEvidence",
+  "validatePrivateSerializationHostOutputLifecycleExecutionEvidence"
+]);
+
+const privateToJSONHostOutputDiagnosticSourceTokens = freezeArray([
+  "privateToJSONSerializationFacadeSymbol",
+  "createPrivateToJSONSerializationFacade",
+  "serializeAcceptedHostOutputDiagnostic",
+  "hostOutputSnapshotCurrent"
+]);
+
+const privateToJSONHostOutputDiagnosticFunctionSourceTokens = freezeArray([
+  "validatePrivateToJSONHostOutputDiagnostic",
+  "validatePrivateSerializationHostOutputLifecycleExecutionEvidence",
+  "diagnostic.hostOutputUpdateKind",
+  "rootLifecycleExecutionEvidence",
+  "return diagnostic.result"
+]);
+
+const privateToJSONHostOutputDiagnosticFunctionSourceCalls = freezeArray([
+  freezeRecord({
+    callee: "validatePrivateToJSONHostOutputDiagnostic",
+    arguments: freezeArray(["report"])
+  }),
+  freezeRecord({
+    callee:
+      "validatePrivateSerializationHostOutputLifecycleExecutionEvidence",
+    arguments: freezeArray([
+      "'create().toJSON'",
+      "rootRequest",
+      "diagnostic.hostOutputUpdateKind",
+      "rootLifecycleExecutionEvidence"
+    ])
+  })
+]);
+
+const privateToJSONHostOutputDiagnosticFacadeSourceCalls = freezeArray([
+  freezeRecord({
+    methodName: "canSerializeAcceptedHostOutputDiagnostic",
+    callee: "serializePrivateToJSONHostOutputDiagnostic",
+    arguments: freezeArray([
+      "report",
+      "rootRequest",
+      "rootLifecycleExecutionEvidence"
+    ])
+  }),
+  freezeRecord({
+    methodName: "serializeAcceptedHostOutputDiagnostic",
+    callee: "serializePrivateToJSONHostOutputDiagnostic",
+    arguments: freezeArray([
+      "report",
+      "rootRequest",
+      "rootLifecycleExecutionEvidence"
+    ])
+  })
+]);
+
+const updateUnmountRustLifecycleDiagnosticGateSourceAssertions = freezeArray([
+  jsStringPropertyAssertion(
+    "id",
+    "react-test-renderer-update-unmount-rust-lifecycle-diagnostic-gate"
+  ),
+  jsBooleanPropertyAssertion("privateDiagnosticConsumptionAvailable", true),
+  jsBooleanPropertyAssertion("publicCreateUpdateUnmountBehaviorAvailable", false),
+  jsBooleanPropertyAssertion("publicRouteAvailable", false),
+  jsBooleanPropertyAssertion("nativeBridgeAvailable", false),
+  jsBooleanPropertyAssertion("nativeExecution", false),
+  jsBooleanPropertyAssertion("compatibilityClaimed", false)
+]);
+
+const updatePrivateRouteLifecycleSourceAssertions = freezeArray([
+  jsStringPropertyAssertion("id", "react-test-renderer-update-private-route"),
+  jsBooleanPropertyAssertion("privateRustCanaryAccepted", true),
+  jsBooleanPropertyAssertion("acceptedRustLifecycleDiagnostics", true),
+  jsBooleanPropertyAssertion("consumesAcceptedRustLifecycleDiagnostics", true),
+  jsSourcePropertyAssertion(
+    "lifecycleDiagnosticGate",
+    "updateUnmountRustLifecycleDiagnosticGate"
+  ),
+  jsBooleanPropertyAssertion("publicRouteAvailable", false),
+  jsBooleanPropertyAssertion("nativeBridgeAvailable", false),
+  jsBooleanPropertyAssertion("nativeExecution", false)
+]);
+
+const unmountPrivateRouteLifecycleSourceAssertions = freezeArray([
+  jsStringPropertyAssertion("id", "react-test-renderer-unmount-private-route"),
+  jsBooleanPropertyAssertion("privateRustCanaryAccepted", true),
+  jsBooleanPropertyAssertion("acceptedRustLifecycleDiagnostics", true),
+  jsBooleanPropertyAssertion("consumesAcceptedRustLifecycleDiagnostics", true),
+  jsSourcePropertyAssertion(
+    "lifecycleDiagnosticGate",
+    "updateUnmountRustLifecycleDiagnosticGate"
+  ),
+  jsBooleanPropertyAssertion("publicRouteAvailable", false),
+  jsBooleanPropertyAssertion("nativeBridgeAvailable", false),
+  jsBooleanPropertyAssertion("nativeExecution", false)
+]);
+
 export function inspectReactTestRendererSerializationLocalTargets({
   workspaceRoot = DEFAULT_WORKSPACE_ROOT
 } = {}) {
@@ -675,6 +846,82 @@ export function inspectReactTestRendererSerializationLocalTargets({
     publicJsReactTestRendererPackageRoots.map((packageRoot) =>
       readWorkspaceTree(workspaceRoot, packageRoot)
     ).join("\n");
+  const publicJsReactTestRendererEntrypointSources =
+    publicJsReactTestRendererEntrypointSourcePaths.map((path) =>
+      readWorkspaceFile(workspaceRoot, path)
+    );
+  const privateToJSONFinishedWorkIdentitySourceEvidencePresent =
+    publicJsReactTestRendererEntrypointSources.every((source) =>
+      jsObjectSourceAssertionsPass({
+        source,
+        declaration:
+          "const toJSONPrivateSerializationFacadeGate = Object.freeze",
+        assertions: privateToJSONFinishedWorkIdentitySourceAssertions
+      })
+    );
+  const privateToJSONPublicBlockerSourceEvidencePresent =
+    publicJsReactTestRendererEntrypointSources.every((source) =>
+      jsObjectSourceAssertionsPass({
+        source,
+        declaration:
+          "const toJSONPrivateSerializationFacadeGate = Object.freeze",
+        assertions: privateToJSONPublicBlockerSourceAssertions
+      })
+    );
+  const privateToTreeFinishedWorkIdentitySourceEvidencePresent =
+    publicJsReactTestRendererEntrypointSources.every((source) =>
+      jsObjectSourceAssertionsPass({
+        source,
+        declaration: "const toTreePrivateFacadeGate = Object.freeze",
+        assertions: privateToTreeFinishedWorkIdentitySourceAssertions
+      })
+    );
+  const privateToTreePublicBlockerSourceEvidencePresent =
+    publicJsReactTestRendererEntrypointSources.every((source) =>
+      jsObjectSourceAssertionsPass({
+        source,
+        declaration: "const toTreePrivateFacadeGate = Object.freeze",
+        assertions: privateToTreePublicBlockerSourceAssertions
+      })
+    );
+  const privateSerializationLifecycleSourceEvidencePresent =
+    publicJsReactTestRendererEntrypointSources.every((source) =>
+      jsSourceTokensOutsideCommentsAndStringsPass(
+        source,
+        privateSerializationLifecycleSourceTokens
+      )
+    );
+  const privateToJSONHostOutputDiagnosticSourceEvidencePresent =
+    publicJsReactTestRendererEntrypointSources.every(
+      (source) =>
+        jsObjectSourceAssertionsPass({
+          source,
+          declaration:
+            "const toJSONPrivateSerializationFacadeGate = Object.freeze",
+          assertions: privateToJSONHostOutputDiagnosticGateSourceAssertions
+        }) &&
+        jsSourceTokensOutsideCommentsAndStringsPass(
+          source,
+          privateToJSONHostOutputDiagnosticSourceTokens
+        ) &&
+        jsFunctionDeclarationSourceTokensPass({
+          source,
+          functionName: "serializePrivateToJSONHostOutputDiagnostic",
+          afterDeclaration:
+            "function createPrivateToJSONHostOutputDiagnosticResult",
+          tokens: privateToJSONHostOutputDiagnosticFunctionSourceTokens
+        }) &&
+        jsFunctionDeclarationSourceCallsPass({
+          source,
+          functionName: "serializePrivateToJSONHostOutputDiagnostic",
+          calls: privateToJSONHostOutputDiagnosticFunctionSourceCalls
+        }) &&
+        jsFunctionDeclarationReturnedFreezeRecordMethodSourceCallsPass({
+          source,
+          functionName: "createPrivateToJSONSerializationFacade",
+          methodCalls: privateToJSONHostOutputDiagnosticFacadeSourceCalls
+        })
+    );
 
   const publicJsReactTestRendererFacadePresent =
     publicJsReactTestRendererPackageRoots.some((packageRoot) =>
@@ -779,6 +1026,7 @@ export function inspectReactTestRendererSerializationLocalTargets({
     );
   const privateToJSONSerializationFacadeSerializesHostOutputDiagnostics =
     privateToJSONSerializationFacadeGatePresent &&
+    privateToJSONHostOutputDiagnosticSourceEvidencePresent &&
     hasSourcePattern(
       publicJsReactTestRendererPackageSource,
       /\bprivateHostOutputDiagnosticsSerializable\s*:\s*true\b/u
@@ -1031,6 +1279,8 @@ export function inspectReactTestRendererSerializationLocalTargets({
     );
   const privateToJSONFinishedWorkIdentityGatePresent =
     privateToJSONSerializationFacadeGatePresent &&
+    privateToJSONFinishedWorkIdentitySourceEvidencePresent &&
+    privateSerializationLifecycleSourceEvidencePresent &&
     hasSourcePattern(
       publicJsReactTestRendererPackageSource,
       /\bprivateFinishedWorkIdentityGateAvailable\s*:\s*true\b/u
@@ -1101,7 +1351,7 @@ export function inspectReactTestRendererSerializationLocalTargets({
     ) &&
     hasSourcePattern(
       publicJsReactTestRendererPackageSource,
-      /\bidentityRootRequest\.operation\s*===\s*['"]update['"]/u
+      /\bidentityRootRequest\.operation\s*!==\s*rootRequestOperationForHostOutputUpdateKind\b/u
     ) &&
     hasSourcePattern(
       publicJsReactTestRendererPackageSource,
@@ -1153,6 +1403,7 @@ export function inspectReactTestRendererSerializationLocalTargets({
     );
   const privateToJSONSerializationFacadePubliclyBlocked =
     privateToJSONSerializationFacadeGatePresent &&
+    privateToJSONPublicBlockerSourceEvidencePresent &&
     hasSourcePattern(
       publicJsReactTestRendererPackageSource,
       /\bpublicSerializationAvailable\s*:\s*false\b/u
@@ -1418,6 +1669,8 @@ export function inspectReactTestRendererSerializationLocalTargets({
     );
   const privateToTreeFinishedWorkIdentityGatePresent =
     privateToTreePrivateFacadeGatePresent &&
+    privateToTreeFinishedWorkIdentitySourceEvidencePresent &&
+    privateSerializationLifecycleSourceEvidencePresent &&
     hasSourcePattern(
       publicJsReactTestRendererPackageSource,
       /\bprivateFinishedWorkIdentityGateAvailable\s*:\s*true\b/u
@@ -1488,7 +1741,7 @@ export function inspectReactTestRendererSerializationLocalTargets({
     ) &&
     hasSourcePattern(
       publicJsReactTestRendererPackageSource,
-      /\bidentityRootRequest\.operation\s*===\s*['"]update['"]/u
+      /\bidentityRootRequest\.operation\s*!==\s*rootRequestOperationForHostOutputUpdateKind\b/u
     ) &&
     hasSourcePattern(
       publicJsReactTestRendererPackageSource,
@@ -1532,6 +1785,7 @@ export function inspectReactTestRendererSerializationLocalTargets({
     );
   const privateToTreeHostOutputMetadataPubliclyBlocked =
     privateToTreeHostOutputMetadataGatePresent &&
+    privateToTreePublicBlockerSourceEvidencePresent &&
     hasSourcePattern(
       publicJsReactTestRendererPackageSource,
       /\bpublicTreeAvailable\s*:\s*false\b/u
@@ -1825,12 +2079,14 @@ export function inspectReactTestRendererSerializationLocalTargets({
     privateTreeMetadataPresent,
     privateToJSONSerializationFacadeGatePresent,
     privateToJSONSerializationFacadeRecognizesRustDiagnostics,
+    privateToJSONHostOutputDiagnosticSourceEvidencePresent,
     privateToJSONSerializationFacadeSerializesHostOutputDiagnostics,
     privateToJSONSerializationFacadeCoversBroaderHostShapes,
     privateToJSONSerializationFacadeExposesDiagnosticResult,
     privateToJSONUpdateUnmountRowsPresent,
     privateToJSONUpdatePropAndTextDiagnosticsPresent,
     privateToJSONFinishedWorkIdentityGatePresent,
+    privateSerializationLifecycleSourceEvidencePresent,
     privateToJSONSerializationFacadePubliclyBlocked,
     privateToTreeHostOutputMetadataGatePresent,
     privateToTreePrivateFacadeGatePresent,
@@ -1863,6 +2119,10 @@ export function inspectReactTestRendererErrorSurfaceLocalTargets({
     workspaceRoot,
     "packages/react-test-renderer"
   );
+  const publicJsReactTestRendererEntrypointSources =
+    publicJsReactTestRendererEntrypointSourcePaths.map((path) =>
+      readWorkspaceFile(workspaceRoot, path)
+    );
   const shallowSource = readWorkspaceFile(
     workspaceRoot,
     "packages/react-test-renderer/shallow.js"
@@ -1894,57 +2154,43 @@ export function inspectReactTestRendererErrorSurfaceLocalTargets({
       /\breact-test-renderer-create-routing-prerequisite-gate\b/u
     ) &&
     hasSourcePattern(testRendererSource, /\bcreateRouteAvailable:\s*false\b/u);
-  const updatePrivateRoutePresent =
-    hasSourcePattern(
-      testRendererSource,
-      /\breact-test-renderer-update-private-route\b/u
-    ) &&
-    hasSourcePattern(
-      testRendererSource,
-      /\bprivateRustCanaryAccepted:\s*true\b/u
+  const updateUnmountRustLifecycleDiagnosticGateSourceEvidencePresent =
+    publicJsReactTestRendererEntrypointSources.every((source) =>
+      jsObjectSourceAssertionsPass({
+        source,
+        declaration:
+          "const updateUnmountRustLifecycleDiagnosticGate = Object.freeze",
+        assertions: updateUnmountRustLifecycleDiagnosticGateSourceAssertions
+      })
     );
+  const updatePrivateRouteLifecycleSourceEvidencePresent =
+    publicJsReactTestRendererEntrypointSources.every((source) =>
+      jsObjectSourceAssertionsPass({
+        source,
+        declaration: "const updatePrivateRoute = Object.freeze",
+        assertions: updatePrivateRouteLifecycleSourceAssertions
+      })
+    );
+  const unmountPrivateRouteLifecycleSourceEvidencePresent =
+    publicJsReactTestRendererEntrypointSources.every((source) =>
+      jsObjectSourceAssertionsPass({
+        source,
+        declaration: "const unmountPrivateRoute = Object.freeze",
+        assertions: unmountPrivateRouteLifecycleSourceAssertions
+      })
+    );
+  const updatePrivateRoutePresent =
+    updatePrivateRouteLifecycleSourceEvidencePresent;
   const updatePrivateRouteConsumesLifecycleDiagnostics =
     updatePrivateRoutePresent &&
-    hasSourcePattern(
-      testRendererSource,
-      /\breact-test-renderer-update-unmount-rust-lifecycle-diagnostic-gate\b/u
-    ) &&
-    hasSourcePattern(
-      testRendererSource,
-      /\bacceptedRustLifecycleDiagnostics:\s*true\b/u
-    ) &&
-    hasSourcePattern(
-      testRendererSource,
-      /\bconsumesAcceptedRustLifecycleDiagnostics:\s*true\b/u
-    ) &&
-    hasSourcePattern(testRendererSource, /\bTestRendererRootLifecycle\b/u) &&
-    hasSourcePattern(testRendererSource, /\bTestRendererRootUpdateOutcome\b/u) &&
-    hasSourcePattern(testRendererSource, /\bIgnoredAfterUnmount\b/u);
+    updateUnmountRustLifecycleDiagnosticGateSourceEvidencePresent &&
+    serializationLocalChecks.privateSerializationLifecycleSourceEvidencePresent;
   const unmountPrivateRoutePresent =
-    hasSourcePattern(
-      testRendererSource,
-      /\breact-test-renderer-unmount-private-route\b/u
-    ) &&
-    hasSourcePattern(
-      testRendererSource,
-      /\bprivateRustCanaryAccepted:\s*true\b/u
-    );
+    unmountPrivateRouteLifecycleSourceEvidencePresent;
   const unmountPrivateRouteConsumesLifecycleDiagnostics =
     unmountPrivateRoutePresent &&
-    hasSourcePattern(
-      testRendererSource,
-      /\breact-test-renderer-update-unmount-rust-lifecycle-diagnostic-gate\b/u
-    ) &&
-    hasSourcePattern(
-      testRendererSource,
-      /\bacceptedRustLifecycleDiagnostics:\s*true\b/u
-    ) &&
-    hasSourcePattern(
-      testRendererSource,
-      /\bconsumeAcceptedRustLifecycleDiagnostic\b/u
-    ) &&
-    hasSourcePattern(testRendererSource, /\bRootElementHandle::NONE\b/u) &&
-    hasSourcePattern(testRendererSource, /\bAlreadyUnmountScheduled\b/u);
+    updateUnmountRustLifecycleDiagnosticGateSourceEvidencePresent &&
+    serializationLocalChecks.privateSerializationLifecycleSourceEvidencePresent;
   const publicCreateUpdateUnmountErrorSurfaceBlocked =
     hasSourcePattern(
       testRendererSource,
@@ -2047,8 +2293,11 @@ export function inspectReactTestRendererErrorSurfaceLocalTargets({
   return {
     ...serializationLocalChecks,
     createRoutingGatePresent,
+    updateUnmountRustLifecycleDiagnosticGateSourceEvidencePresent,
+    updatePrivateRouteLifecycleSourceEvidencePresent,
     updatePrivateRoutePresent,
     updatePrivateRouteConsumesLifecycleDiagnostics,
+    unmountPrivateRouteLifecycleSourceEvidencePresent,
     unmountPrivateRoutePresent,
     unmountPrivateRouteConsumesLifecycleDiagnostics,
     publicCreateUpdateUnmountErrorSurfaceBlocked,
@@ -2187,6 +2436,1002 @@ function isTextSourceFile(path) {
   return /\.(?:rs|toml|json|mjs|js)$/u.test(path);
 }
 
+function jsBooleanPropertyAssertion(property, value) {
+  return freezeRecord({
+    kind: "js-boolean-property",
+    property,
+    value
+  });
+}
+
+function jsStringPropertyAssertion(property, value) {
+  return freezeRecord({
+    kind: "js-string-property",
+    property,
+    value
+  });
+}
+
+function jsSourcePropertyAssertion(property, value) {
+  return freezeRecord({
+    kind: "js-source-property",
+    property,
+    value
+  });
+}
+
+function jsObjectSourceAssertionsPass({ source, declaration, assertions }) {
+  const extracted = extractJsObjectFreezePropertiesForDeclaration({
+    source,
+    declaration
+  });
+  if (extracted.ok !== true) {
+    return false;
+  }
+
+  return assertions.every((assertion) => {
+    const actualSource = extracted.properties.get(assertion.property);
+    if (assertion.kind === "js-boolean-property") {
+      return actualSource === String(assertion.value);
+    }
+    if (assertion.kind === "js-string-property") {
+      return parseJsStringLiteralSource(actualSource) === assertion.value;
+    }
+    if (assertion.kind === "js-source-property") {
+      return actualSource === assertion.value;
+    }
+    return false;
+  });
+}
+
+function parseJsStringLiteralSource(source) {
+  if (typeof source !== "string" || source.length < 2) {
+    return null;
+  }
+  const quote = source[0];
+  if (
+    (quote !== "'" && quote !== '"' && quote !== "`") ||
+    source[source.length - 1] !== quote
+  ) {
+    return null;
+  }
+
+  let value = "";
+  for (let index = 1; index < source.length - 1; index += 1) {
+    if (source[index] === "\\") {
+      index += 1;
+      if (index >= source.length - 1) {
+        return null;
+      }
+    }
+    value += source[index];
+  }
+  return value;
+}
+
+function jsSourceTokensOutsideCommentsAndStringsPass(source, tokens) {
+  return tokens.every(
+    (token) => findJsSourceOutsideCommentsAndStrings(source, token) >= 0
+  );
+}
+
+function jsFunctionDeclarationSourceTokensPass({
+  source,
+  functionName,
+  afterDeclaration,
+  tokens
+}) {
+  const declaration = extractJsFunctionDeclarationBody({
+    source,
+    functionName,
+    afterDeclaration
+  });
+  if (declaration.ok !== true) {
+    return false;
+  }
+
+  return jsSourceTokensOutsideCommentsAndStringsPass(
+    declaration.body,
+    tokens
+  );
+}
+
+function jsFunctionDeclarationSourceCallsPass({
+  source,
+  functionName,
+  afterDeclaration = undefined,
+  calls
+}) {
+  const declaration = extractJsFunctionDeclarationBody({
+    source,
+    functionName,
+    afterDeclaration
+  });
+  if (declaration.ok !== true) {
+    return false;
+  }
+
+  return calls.every((call) =>
+    jsCallExpressionWithArgumentsPass({
+      source: declaration.body,
+      callee: call.callee,
+      expectedArguments: call.arguments
+    })
+  );
+}
+
+function jsFunctionDeclarationReturnedFreezeRecordMethodSourceCallsPass({
+  source,
+  functionName,
+  methodCalls
+}) {
+  const declaration = extractJsFunctionDeclarationBody({
+    source,
+    functionName
+  });
+  if (declaration.ok !== true) {
+    return false;
+  }
+
+  const returnedObject = extractTopLevelReturnedFreezeRecordObject(
+    declaration.body
+  );
+  if (returnedObject.ok !== true) {
+    return false;
+  }
+
+  return methodCalls.every((methodCall) => {
+    const method = extractTopLevelJsObjectMethodBody({
+      source: declaration.body,
+      openIndex: returnedObject.openIndex,
+      closeIndex: returnedObject.closeIndex,
+      methodName: methodCall.methodName
+    });
+    if (method.ok !== true) {
+      return false;
+    }
+
+    return jsCallExpressionWithArgumentsPass({
+      source: method.body,
+      callee: methodCall.callee,
+      expectedArguments: methodCall.arguments
+    });
+  });
+}
+
+function extractTopLevelReturnedFreezeRecordObject(source) {
+  let index = 0;
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+
+  while (index < source.length) {
+    const nextIndex = skipJsCommentStringOrRegex(source, index);
+    if (nextIndex !== index) {
+      index = nextIndex;
+      continue;
+    }
+
+    if (
+      braceDepth === 0 &&
+      bracketDepth === 0 &&
+      parenDepth === 0 &&
+      jsIdentifierAt(source, index, "return")
+    ) {
+      const calleeIndex = skipJsTrivia(
+        source,
+        index + "return".length,
+        source.length
+      );
+      if (!jsIdentifierAt(source, calleeIndex, "freezeRecord")) {
+        index += "return".length;
+        continue;
+      }
+
+      const callOpenIndex = skipJsTrivia(
+        source,
+        calleeIndex + "freezeRecord".length,
+        source.length
+      );
+      if (source[callOpenIndex] !== "(") {
+        return freezeRecord({
+          ok: false,
+          openIndex: -1,
+          closeIndex: -1,
+          error: "returned-freeze-record-call-not-found"
+        });
+      }
+
+      const callCloseIndex = findMatchingJsEnclosure(
+        source,
+        callOpenIndex,
+        "(",
+        ")"
+      );
+      if (callCloseIndex < 0) {
+        return freezeRecord({
+          ok: false,
+          openIndex: -1,
+          closeIndex: -1,
+          error: "returned-freeze-record-call-not-closed"
+        });
+      }
+
+      const objectOpenIndex = skipJsTrivia(
+        source,
+        callOpenIndex + 1,
+        callCloseIndex
+      );
+      if (source[objectOpenIndex] !== "{") {
+        return freezeRecord({
+          ok: false,
+          openIndex: -1,
+          closeIndex: -1,
+          error: "returned-freeze-record-object-not-found"
+        });
+      }
+
+      const objectCloseIndex = findMatchingJsBrace(source, objectOpenIndex);
+      if (objectCloseIndex < 0 || objectCloseIndex > callCloseIndex) {
+        return freezeRecord({
+          ok: false,
+          openIndex: -1,
+          closeIndex: -1,
+          error: "returned-freeze-record-object-not-closed"
+        });
+      }
+
+      return freezeRecord({
+        ok: true,
+        openIndex: objectOpenIndex,
+        closeIndex: objectCloseIndex,
+        error: null
+      });
+    }
+
+    const character = source[index];
+    if (character === "{" && bracketDepth === 0 && parenDepth === 0) {
+      braceDepth += 1;
+    } else if (character === "}" && braceDepth > 0) {
+      braceDepth -= 1;
+    } else if (character === "[" && braceDepth === 0 && parenDepth === 0) {
+      bracketDepth += 1;
+    } else if (character === "]" && bracketDepth > 0) {
+      bracketDepth -= 1;
+    } else if (character === "(" && braceDepth === 0 && bracketDepth === 0) {
+      parenDepth += 1;
+    } else if (character === ")" && parenDepth > 0) {
+      parenDepth -= 1;
+    }
+
+    index += 1;
+  }
+
+  return freezeRecord({
+    ok: false,
+    openIndex: -1,
+    closeIndex: -1,
+    error: "top-level-returned-freeze-record-not-found"
+  });
+}
+
+function extractJsFunctionDeclarationBody({
+  source,
+  functionName,
+  afterDeclaration = undefined
+}) {
+  const declarationIndex = findJsSourceOutsideCommentsAndStrings(
+    source,
+    `function ${functionName}`
+  );
+  if (declarationIndex < 0) {
+    return freezeRecord({
+      ok: false,
+      body: "",
+      bodyOpenIndex: -1,
+      bodyCloseIndex: -1,
+      error: "function-declaration-not-found"
+    });
+  }
+
+  const afterNameIndex = declarationIndex + `function ${functionName}`.length;
+  if (/[A-Za-z0-9_$]/u.test(source[afterNameIndex] ?? "")) {
+    return freezeRecord({
+      ok: false,
+      body: "",
+      bodyOpenIndex: -1,
+      bodyCloseIndex: -1,
+      error: "function-name-prefix-match"
+    });
+  }
+
+  const paramsOpenIndex = skipJsTrivia(
+    source,
+    afterNameIndex,
+    source.length
+  );
+  if (source[paramsOpenIndex] !== "(") {
+    return freezeRecord({
+      ok: false,
+      body: "",
+      bodyOpenIndex: -1,
+      bodyCloseIndex: -1,
+      error: "function-params-not-found"
+    });
+  }
+  const paramsCloseIndex = findMatchingJsEnclosure(
+    source,
+    paramsOpenIndex,
+    "(",
+    ")"
+  );
+  if (paramsCloseIndex < 0) {
+    return freezeRecord({
+      ok: false,
+      body: "",
+      bodyOpenIndex: -1,
+      bodyCloseIndex: -1,
+      error: "function-params-not-closed"
+    });
+  }
+  const bodyOpenIndex = skipJsTrivia(
+    source,
+    paramsCloseIndex + 1,
+    source.length
+  );
+  if (source[bodyOpenIndex] !== "{") {
+    return freezeRecord({
+      ok: false,
+      body: "",
+      bodyOpenIndex: -1,
+      bodyCloseIndex: -1,
+      error: "function-body-not-found"
+    });
+  }
+  const bodyCloseIndex = findMatchingJsBrace(source, bodyOpenIndex);
+  if (bodyCloseIndex < 0) {
+    return freezeRecord({
+      ok: false,
+      body: "",
+      bodyOpenIndex: -1,
+      bodyCloseIndex: -1,
+      error: "function-body-not-closed"
+    });
+  }
+  if (
+    typeof afterDeclaration === "string" &&
+    findJsSourceOutsideCommentsAndStrings(
+      source,
+      afterDeclaration,
+      bodyCloseIndex + 1
+    ) < 0
+  ) {
+    return freezeRecord({
+      ok: false,
+      body: "",
+      bodyOpenIndex,
+      bodyCloseIndex,
+      error: "after-declaration-not-found"
+    });
+  }
+
+  return freezeRecord({
+    ok: true,
+    body: source.slice(bodyOpenIndex + 1, bodyCloseIndex),
+    bodyOpenIndex,
+    bodyCloseIndex,
+    error: null
+  });
+}
+
+function extractJsObjectFreezePropertiesForDeclaration({
+  source,
+  declaration
+}) {
+  const declarationIndex = findJsSourceOutsideCommentsAndStrings(
+    source,
+    declaration
+  );
+  if (declarationIndex < 0) {
+    return freezeRecord({
+      ok: false,
+      properties: new Map(),
+      error: "declaration-not-found"
+    });
+  }
+
+  const openIndex = findNextJsPunctuator(source, declarationIndex, "{");
+  if (openIndex < 0) {
+    return freezeRecord({
+      ok: false,
+      properties: new Map(),
+      error: "object-freeze-literal-not-found"
+    });
+  }
+
+  const closeIndex = findMatchingJsBrace(source, openIndex);
+  if (closeIndex < 0) {
+    return freezeRecord({
+      ok: false,
+      properties: new Map(),
+      error: "object-freeze-literal-not-closed"
+    });
+  }
+
+  return extractTopLevelJsObjectProperties(source, openIndex, closeIndex);
+}
+
+function extractTopLevelJsObjectProperties(source, openIndex, closeIndex) {
+  const properties = new Map();
+  let index = openIndex + 1;
+
+  while (index < closeIndex) {
+    index = skipJsTrivia(source, index, closeIndex);
+    while (source[index] === "," && index < closeIndex) {
+      index = skipJsTrivia(source, index + 1, closeIndex);
+    }
+    if (index >= closeIndex) {
+      break;
+    }
+
+    const propertyKey = readJsObjectPropertyKey(source, index, closeIndex);
+    if (propertyKey.ok !== true) {
+      const nextIndex = findNextTopLevelPropertySeparator(
+        source,
+        index,
+        closeIndex
+      );
+      index = nextIndex < closeIndex ? nextIndex + 1 : closeIndex;
+      continue;
+    }
+
+    index = skipJsTrivia(source, propertyKey.end, closeIndex);
+    if (source[index] !== ":") {
+      const nextIndex = findNextTopLevelPropertySeparator(
+        source,
+        index,
+        closeIndex
+      );
+      index = nextIndex < closeIndex ? nextIndex + 1 : closeIndex;
+      continue;
+    }
+
+    const valueStart = skipJsTrivia(source, index + 1, closeIndex);
+    const valueEnd = findNextTopLevelPropertySeparator(
+      source,
+      valueStart,
+      closeIndex
+    );
+    properties.set(propertyKey.key, source.slice(valueStart, valueEnd).trim());
+    index = valueEnd < closeIndex ? valueEnd + 1 : closeIndex;
+  }
+
+  return freezeRecord({
+    ok: true,
+    properties,
+    error: null
+  });
+}
+
+function findJsSourceOutsideCommentsAndStrings(source, needle, fromIndex = 0) {
+  let index = fromIndex;
+
+  while (index < source.length) {
+    const nextIndex = skipJsCommentStringOrRegex(source, index);
+    if (nextIndex !== index) {
+      index = nextIndex;
+      continue;
+    }
+
+    if (source.startsWith(needle, index)) {
+      return index;
+    }
+
+    index += 1;
+  }
+
+  return -1;
+}
+
+function findNextJsPunctuator(source, startIndex, punctuator) {
+  let index = startIndex;
+
+  while (index < source.length) {
+    const nextIndex = skipJsCommentStringOrRegex(source, index);
+    if (nextIndex !== index) {
+      index = nextIndex;
+      continue;
+    }
+
+    if (source[index] === punctuator) {
+      return index;
+    }
+
+    index += 1;
+  }
+
+  return -1;
+}
+
+function findMatchingJsBrace(source, openIndex) {
+  return findMatchingJsEnclosure(source, openIndex, "{", "}");
+}
+
+function findMatchingJsEnclosure(source, openIndex, openCharacter, closeCharacter) {
+  let depth = 0;
+  let index = openIndex;
+
+  while (index < source.length) {
+    const nextIndex = skipJsCommentStringOrRegex(source, index);
+    if (nextIndex !== index) {
+      index = nextIndex;
+      continue;
+    }
+
+    if (source[index] === openCharacter) {
+      depth += 1;
+    } else if (source[index] === closeCharacter) {
+      depth -= 1;
+      if (depth === 0) {
+        return index;
+      }
+    }
+
+    index += 1;
+  }
+
+  return -1;
+}
+
+function extractTopLevelJsObjectMethodBody({
+  source,
+  openIndex,
+  closeIndex,
+  methodName
+}) {
+  let index = openIndex + 1;
+
+  while (index < closeIndex) {
+    index = skipJsTrivia(source, index, closeIndex);
+    while (source[index] === "," && index < closeIndex) {
+      index = skipJsTrivia(source, index + 1, closeIndex);
+    }
+    if (index >= closeIndex) {
+      break;
+    }
+
+    const propertyKey = readJsObjectPropertyKey(source, index, closeIndex);
+    if (propertyKey.ok !== true) {
+      const nextIndex = findNextTopLevelPropertySeparator(
+        source,
+        index,
+        closeIndex
+      );
+      index = nextIndex < closeIndex ? nextIndex + 1 : closeIndex;
+      continue;
+    }
+
+    const afterKeyIndex = skipJsTrivia(source, propertyKey.end, closeIndex);
+    if (source[afterKeyIndex] === "(") {
+      const paramsCloseIndex = findMatchingJsEnclosure(
+        source,
+        afterKeyIndex,
+        "(",
+        ")"
+      );
+      if (paramsCloseIndex < 0) {
+        return freezeRecord({
+          ok: false,
+          body: "",
+          bodyOpenIndex: -1,
+          bodyCloseIndex: -1,
+          error: "object-method-params-not-closed"
+        });
+      }
+
+      const bodyOpenIndex = skipJsTrivia(
+        source,
+        paramsCloseIndex + 1,
+        closeIndex
+      );
+      if (source[bodyOpenIndex] !== "{") {
+        const nextIndex = findNextTopLevelPropertySeparator(
+          source,
+          paramsCloseIndex + 1,
+          closeIndex
+        );
+        index = nextIndex < closeIndex ? nextIndex + 1 : closeIndex;
+        continue;
+      }
+
+      const bodyCloseIndex = findMatchingJsBrace(source, bodyOpenIndex);
+      if (bodyCloseIndex < 0 || bodyCloseIndex > closeIndex) {
+        return freezeRecord({
+          ok: false,
+          body: "",
+          bodyOpenIndex: -1,
+          bodyCloseIndex: -1,
+          error: "object-method-body-not-closed"
+        });
+      }
+
+      if (propertyKey.key === methodName) {
+        return freezeRecord({
+          ok: true,
+          body: source.slice(bodyOpenIndex + 1, bodyCloseIndex),
+          bodyOpenIndex,
+          bodyCloseIndex,
+          error: null
+        });
+      }
+
+      index = bodyCloseIndex + 1;
+      continue;
+    }
+
+    const nextIndex = findNextTopLevelPropertySeparator(
+      source,
+      afterKeyIndex,
+      closeIndex
+    );
+    index = nextIndex < closeIndex ? nextIndex + 1 : closeIndex;
+  }
+
+  return freezeRecord({
+    ok: false,
+    body: "",
+    bodyOpenIndex: -1,
+    bodyCloseIndex: -1,
+    error: "top-level-object-method-not-found"
+  });
+}
+
+function jsCallExpressionWithArgumentsPass({
+  source,
+  callee,
+  expectedArguments
+}) {
+  let searchIndex = 0;
+
+  while (searchIndex < source.length) {
+    const calleeIndex = findJsSourceOutsideCommentsAndStrings(
+      source,
+      callee,
+      searchIndex
+    );
+    if (calleeIndex < 0) {
+      return false;
+    }
+
+    const beforeCallee = source[calleeIndex - 1] ?? "";
+    const afterCalleeIndex = calleeIndex + callee.length;
+    const afterCallee = source[afterCalleeIndex] ?? "";
+    if (
+      /[A-Za-z0-9_$]/u.test(beforeCallee) ||
+      /[A-Za-z0-9_$]/u.test(afterCallee)
+    ) {
+      searchIndex = afterCalleeIndex;
+      continue;
+    }
+
+    const callOpenIndex = skipJsTrivia(
+      source,
+      afterCalleeIndex,
+      source.length
+    );
+    if (source[callOpenIndex] !== "(") {
+      searchIndex = afterCalleeIndex;
+      continue;
+    }
+
+    const callCloseIndex = findMatchingJsEnclosure(
+      source,
+      callOpenIndex,
+      "(",
+      ")"
+    );
+    if (callCloseIndex < 0) {
+      return false;
+    }
+
+    const actualArguments = extractTopLevelJsCallArguments(
+      source,
+      callOpenIndex,
+      callCloseIndex
+    );
+    if (
+      actualArguments.length === expectedArguments.length &&
+      actualArguments.every(
+        (actualArgument, index) => actualArgument === expectedArguments[index]
+      )
+    ) {
+      return true;
+    }
+
+    searchIndex = callCloseIndex + 1;
+  }
+
+  return false;
+}
+
+function extractTopLevelJsCallArguments(source, openIndex, closeIndex) {
+  const callArguments = [];
+  let index = openIndex + 1;
+
+  while (index < closeIndex) {
+    const argumentStart = skipJsTrivia(source, index, closeIndex);
+    if (argumentStart >= closeIndex) {
+      break;
+    }
+
+    const argumentEnd = findNextTopLevelPropertySeparator(
+      source,
+      argumentStart,
+      closeIndex
+    );
+    callArguments.push(source.slice(argumentStart, argumentEnd).trim());
+    index = argumentEnd < closeIndex ? argumentEnd + 1 : closeIndex;
+  }
+
+  return callArguments;
+}
+
+function findNextTopLevelPropertySeparator(source, startIndex, endIndex) {
+  let index = startIndex;
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+
+  while (index < endIndex) {
+    const nextIndex = skipJsCommentStringOrRegex(source, index);
+    if (nextIndex !== index) {
+      index = nextIndex;
+      continue;
+    }
+
+    const character = source[index];
+    if (character === "{" && bracketDepth === 0 && parenDepth === 0) {
+      braceDepth += 1;
+    } else if (character === "}" && braceDepth > 0) {
+      braceDepth -= 1;
+    } else if (character === "[" && braceDepth === 0 && parenDepth === 0) {
+      bracketDepth += 1;
+    } else if (character === "]" && bracketDepth > 0) {
+      bracketDepth -= 1;
+    } else if (character === "(" && braceDepth === 0 && bracketDepth === 0) {
+      parenDepth += 1;
+    } else if (character === ")" && parenDepth > 0) {
+      parenDepth -= 1;
+    } else if (
+      character === "," &&
+      braceDepth === 0 &&
+      bracketDepth === 0 &&
+      parenDepth === 0
+    ) {
+      return index;
+    }
+
+    index += 1;
+  }
+
+  return endIndex;
+}
+
+function skipJsTrivia(source, startIndex, endIndex) {
+  let index = startIndex;
+
+  while (index < endIndex) {
+    const character = source[index];
+    if (/\s/u.test(character)) {
+      index += 1;
+      continue;
+    }
+    if (source.startsWith("//", index)) {
+      const lineEnd = source.indexOf("\n", index + 2);
+      index = lineEnd < 0 ? endIndex : lineEnd + 1;
+      continue;
+    }
+    if (source.startsWith("/*", index)) {
+      const blockEnd = source.indexOf("*/", index + 2);
+      index = blockEnd < 0 ? endIndex : blockEnd + 2;
+      continue;
+    }
+    break;
+  }
+
+  return index;
+}
+
+function skipJsCommentStringOrRegex(source, index) {
+  const nextIndex = skipJsCommentOrString(source, index);
+  if (nextIndex !== index) {
+    return nextIndex;
+  }
+
+  const character = source[index];
+  if (character === "/" && isJsRegexLiteralStart(source, index)) {
+    const regexEnd = skipJsRegexLiteral(source, index);
+    if (regexEnd !== index) {
+      return regexEnd;
+    }
+  }
+
+  return index;
+}
+
+function skipJsCommentOrString(source, index) {
+  if (source.startsWith("//", index)) {
+    const lineEnd = source.indexOf("\n", index + 2);
+    return lineEnd < 0 ? source.length : lineEnd + 1;
+  }
+  if (source.startsWith("/*", index)) {
+    const blockEnd = source.indexOf("*/", index + 2);
+    return blockEnd < 0 ? source.length : blockEnd + 2;
+  }
+
+  const character = source[index];
+  if (character === "'" || character === '"' || character === "`") {
+    return skipQuotedJsLiteral(source, index);
+  }
+
+  return index;
+}
+
+function isJsRegexLiteralStart(source, index) {
+  const previousToken = findPreviousJsSignificantToken(source, index);
+  if (previousToken === null) {
+    return true;
+  }
+  if (previousToken.type === "word") {
+    return [
+      "await",
+      "case",
+      "delete",
+      "else",
+      "in",
+      "instanceof",
+      "new",
+      "of",
+      "return",
+      "throw",
+      "typeof",
+      "void",
+      "yield"
+    ].includes(previousToken.value);
+  }
+  return "({[=,:;!?&|^~+-*%<>}".includes(previousToken.value);
+}
+
+function findPreviousJsSignificantToken(source, index) {
+  let cursor = 0;
+  let previousToken = null;
+
+  while (cursor < index) {
+    const nextIndex = skipJsCommentOrString(source, cursor);
+    if (nextIndex !== cursor) {
+      cursor = nextIndex;
+      continue;
+    }
+
+    const character = source[cursor];
+    if (/\s/u.test(character)) {
+      cursor += 1;
+      continue;
+    }
+    if (/[A-Za-z0-9_$]/u.test(character)) {
+      const start = cursor;
+      cursor += 1;
+      while (cursor < index && /[A-Za-z0-9_$]/u.test(source[cursor])) {
+        cursor += 1;
+      }
+      previousToken = freezeRecord({
+        type: "word",
+        value: source.slice(start, cursor)
+      });
+      continue;
+    }
+
+    previousToken = freezeRecord({
+      type: "punctuator",
+      value: character
+    });
+    cursor += 1;
+  }
+
+  return previousToken;
+}
+
+function jsIdentifierAt(source, index, identifier) {
+  if (!source.startsWith(identifier, index)) {
+    return false;
+  }
+
+  const beforeIdentifier = source[index - 1] ?? "";
+  const afterIdentifier = source[index + identifier.length] ?? "";
+  return (
+    !/[A-Za-z0-9_$]/u.test(beforeIdentifier) &&
+    !/[A-Za-z0-9_$]/u.test(afterIdentifier)
+  );
+}
+
+function readJsObjectPropertyKey(source, startIndex, endIndex) {
+  const character = source[startIndex];
+  if (!/[A-Za-z_$]/u.test(character)) {
+    return freezeRecord({
+      ok: false,
+      key: null,
+      end: startIndex,
+      error: "property-key-not-supported"
+    });
+  }
+
+  let index = startIndex + 1;
+  while (index < endIndex && /[A-Za-z0-9_$]/u.test(source[index])) {
+    index += 1;
+  }
+
+  return freezeRecord({
+    ok: true,
+    key: source.slice(startIndex, index),
+    end: index,
+    error: null
+  });
+}
+
+function skipQuotedJsLiteral(source, startIndex) {
+  const quote = source[startIndex];
+  let index = startIndex + 1;
+
+  while (index < source.length) {
+    if (source[index] === "\\") {
+      index += 2;
+      continue;
+    }
+    if (source[index] === quote) {
+      return index + 1;
+    }
+    index += 1;
+  }
+
+  return source.length;
+}
+
+function skipJsRegexLiteral(source, startIndex) {
+  let index = startIndex + 1;
+  let inCharacterClass = false;
+
+  while (index < source.length) {
+    const character = source[index];
+    if (character === "\\") {
+      index += 2;
+      continue;
+    }
+    if (character === "\n" || character === "\r") {
+      return startIndex;
+    }
+    if (character === "[") {
+      inCharacterClass = true;
+      index += 1;
+      continue;
+    }
+    if (character === "]" && inCharacterClass) {
+      inCharacterClass = false;
+      index += 1;
+      continue;
+    }
+    if (character === "/" && !inCharacterClass) {
+      index += 1;
+      while (index < source.length && /[A-Za-z]/u.test(source[index])) {
+        index += 1;
+      }
+      return index;
+    }
+    index += 1;
+  }
+
+  return startIndex;
+}
+
 function hasSourcePattern(source, pattern) {
   return pattern.test(stripLineComments(source));
 }
@@ -2196,4 +3441,12 @@ function stripLineComments(source) {
     .split("\n")
     .filter((line) => !line.trimStart().startsWith("//"))
     .join("\n");
+}
+
+function freezeArray(value) {
+  return Object.freeze([...value]);
+}
+
+function freezeRecord(value) {
+  return Object.freeze(value);
 }
