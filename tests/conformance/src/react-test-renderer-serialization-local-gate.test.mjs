@@ -3165,6 +3165,13 @@ test("react-test-renderer CJS dev/prod private toJSON sibling text admission req
     assertSiblingTextAdmissionRejection(
       jsonFacade,
       siblingTextReport,
+      withInheritedSiblingTextRootFinishedLanesHandoff(siblingTextIdentity),
+      updateError.rootRequest,
+      /rootFinishedLanesHandoff/u
+    );
+    assertSiblingTextAdmissionRejection(
+      jsonFacade,
+      siblingTextReport,
       withSiblingTextIdentityChange(siblingTextIdentity, (evidence) => {
         evidence.rootFinishedLanesHandoff.commitFinishedLanesBits = 2;
       }),
@@ -4690,6 +4697,21 @@ function withSiblingTextIdentityChange(evidence, mutate) {
   const clone = JSON.parse(JSON.stringify(evidence));
   mutate(clone);
   return clone;
+}
+
+function withInheritedSiblingTextRootFinishedLanesHandoff(evidence) {
+  const clone = JSON.parse(JSON.stringify(evidence));
+  const rootFinishedLanesHandoff = clone.rootFinishedLanesHandoff;
+  delete clone.rootFinishedLanesHandoff;
+  const inheritedEvidence = Object.assign(
+    Object.create({ rootFinishedLanesHandoff }),
+    clone
+  );
+  assert.equal(
+    Object.hasOwn(inheritedEvidence, "rootFinishedLanesHandoff"),
+    false
+  );
+  return inheritedEvidence;
 }
 
 function withSiblingTextReportChange(report, mutate) {

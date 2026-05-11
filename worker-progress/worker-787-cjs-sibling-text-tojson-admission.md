@@ -27,6 +27,9 @@ blocked.
 - Missing handoff, alias-only handoff, forged lane handoff, generic identity
   evidence, missing committed inspection, and invalid committed inspection all
   fail closed in tests.
+- Follow-up audit coverage added for inherited/prototype
+  `rootFinishedLanesHandoff` rejection on the CJS dev/prod private `toJSON`
+  sibling-text path, with a routing-gate mirror.
 
 ## Commands Run
 
@@ -40,6 +43,14 @@ blocked.
 - `node tests/smoke/package-surface-guard.mjs`
 - `node tests/smoke/import-entrypoints.mjs`
 - `git diff --check`
+- Follow-up:
+  - `node --check tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`
+  - `node --check tests/conformance/test/react-test-renderer-create-routing-gate.test.mjs`
+  - `node --test tests/conformance/src/react-test-renderer-serialization-local-gate.test.mjs`
+  - `node --test tests/conformance/test/react-test-renderer-create-routing-gate.test.mjs`
+  - `node tests/smoke/package-surface-guard.mjs`
+  - `node tests/smoke/import-entrypoints.mjs`
+  - `git diff --check`
 
 ## Risks Or Blockers
 
