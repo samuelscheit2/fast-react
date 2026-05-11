@@ -29,6 +29,56 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Worker 933
+
+- Worker 933 added a private, source-owned public `ReactDOM.flushSync`
+  blocked-currentness report and consumer for both `react-dom` and
+  `react-dom/profiling`, recording that public placeholders do not invoke
+  callbacks, do not claim thenable/return-value compatibility, and leave public
+  root/Scheduler/act timing paths blocked.
+- Worker 933's private consumer is fail-closed through source proof and exact
+  canonical prerequisite validation. It rejects cloned reports,
+  public/package/profiling compatibility claims, callback execution,
+  thenable/return compatibility claims, Scheduler/root/private prerequisite
+  smuggling, Worker 910 evidence, future-worker evidence, and forged nested
+  claims while preserving public exports unchanged.
+- The accepted state for this batch is current main `ab17ce62`
+  (`Merge worker 933 public flushSync blocked currentness`) after the focused
+  worker checks, post-merge checks reported by the orchestrator, and
+  `git diff --check` verification recorded in worker reports and git history.
+
+### Worker 932
+
+- Worker 932 extended the CJS production private root bridge to expose and
+  consume source-owned create-route admission and create native host-output
+  handoff evidence. CJS production can now build the same private
+  create/update/unmount lifecycle chain used by the private act/update
+  lifecycle boundary and passive-drain diagnostic.
+- Worker 932 added parity coverage for CJS development and production plus
+  negatives for cloned/stale lifecycle rows, production rows crossing into
+  development/package roots, public update/act/Scheduler compatibility claims,
+  scheduler-shaped lifecycle smuggling, and package/CJS parity drift. Public
+  `act`, public update behavior, public Scheduler flushing, serialization,
+  native addon loading/execution, and compatibility claims remain blocked.
+- The accepted state for this batch was main `7276a927`
+  (`Merge worker 932 test renderer CJS act lifecycle parity`) after the
+  focused worker checks, post-merge checks reported by the orchestrator, and
+  `git diff --check` verification recorded in worker reports and git history.
+
+### Worker 931 Docs Refresh
+
+- Worker 931 refreshed coordination docs after Worker 930 was accepted. It
+  moved Workers 923-930 into accepted history, kept then-unaccepted Worker 910
+  and Workers 932-934 out of accepted input at that baseline, and preserved
+  the split where
+  `MASTER_PLAN.md` owns current/future queue state while this file owns
+  accepted history only.
+- The accepted state for this docs refresh was main `9047872b`
+  (`Merge worker 931 docs refresh after worker 930`). This was a docs-only
+  merge on top of `9af7741e`; no runtime compatibility claim changed.
+  Verification evidence remains the focused checks recorded in accepted worker
+  reports, the Worker 931 docs report, and git history.
+
 ### Workers 923-930
 
 - Worker 923 admitted Worker 908 cleanup-generation currentness into the
@@ -82,7 +132,7 @@ sequencing belong in `MASTER_PLAN.md`.
   explicitly excludes Worker 910. Public React act readiness, test-utils act,
   Scheduler/root/passive drains, renderer execution, warnings, and package
   compatibility remain blocked.
-- The accepted state for this batch is current main `9af7741e`
+- The accepted state for this batch was main `9af7741e`
   (`Merge worker 930 react dom test utils act blocked currentness`) after the
   focused native, reconciler, core hook, React DOM event/test-utils, hook
   dispatcher, package-surface, import-smoke, formatting, and `git diff --check`
