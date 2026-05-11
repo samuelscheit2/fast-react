@@ -29,6 +29,89 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 934-944 and Worker 935 Docs Refresh
+
+- Worker 935 refreshed coordination docs for the Worker 933 baseline, moved
+  Workers 931-933 into accepted history, and kept then-unaccepted Workers 910,
+  934, and 936-944 in current/future planning only. It was accepted at
+  `52de4d91` (`Merge worker 935 docs current queue refresh`) with no runtime
+  compatibility claim change.
+- Worker 934 closed the public `RootSchedulerState` current-event transition
+  lane leak by making the transition-lane reader private and omitting the
+  private field from public `Debug`/`PartialEq` observers. Its accepted private
+  path still preserves transition queue/lane scheduler continuation evidence
+  through source-owned scheduler, queue/lane, finished-work, and commit handoff
+  rows; public Scheduler timing, transition hooks, `act`, renderer, and package
+  compatibility remain blocked.
+- Worker 937 added a Scheduler variant currentness parity report and gate that
+  consumes the accepted Worker 886/909 source-currentness ledger and binds root,
+  native, mock, postTask, wrapper, and deep-CJS variant rows to live entrypoint,
+  source SHA, diagnostic symbol/id, and blocker metadata. It rejects root/variant
+  aliasing, forged diagnostics, stale oracle/report schemas, and public timing,
+  root, `act`, native, postTask, mock, or package compatibility claims.
+- Worker 938 extended unsupported placeholder hook currentness to React root,
+  CJS development, CJS production, and react-server surfaces, preserving public
+  placeholder/absence behavior while rejecting cloned or stale surface rows,
+  prerequisite smuggling, callback/external-store/id execution claims, and
+  public compatibility claims.
+- Worker 939 bound private focus/blur root-listener dispatch to current
+  capture/bubble root listener shells plus source-owned plugin dispatch
+  metadata, rejecting stale registrations, missing shells, cloned or foreign
+  currentness, hydration replay aliases, wrong phase/type evidence, and public
+  event, SyntheticEvent, hydration replay, or package compatibility claims.
+- Worker 944 added a shared private React DOM `root.render` update native
+  handoff validation boundary that rechecks lifecycle request-boundary evidence,
+  same-container snapshot currentness, active host-output ownership, fake-DOM
+  host-output update evidence, consumed HostComponent/HostText update metadata,
+  and one-shot native handoff status before mirroring private update records.
+  Public roots, native/reconciler execution, browser DOM mutation,
+  Scheduler/`act`/`flushSync`, hydration, events/refs, and package
+  compatibility remain blocked.
+- Worker 941 hardened `react-test-renderer` CJS production private
+  `TestInstance` diagnostics to match CJS development findBy/query-bridge
+  preflight metadata, requiring source-owned lifecycle evidence, current
+  create/update/unmount sequencing, current root request identity, and public,
+  native, and package blocker fields before private query diagnostics can be
+  consumed. Public `root`, `ReactTestInstance.find*`, serialization, `act`,
+  Scheduler, native bridge execution, and package compatibility remain blocked.
+- Worker 936 added a reconciler-owned source-bound private inspection path for
+  committed `HostRoot -> HostComponent -> [HostText, HostText]` while keeping
+  the generic `inspect_test_renderer_committed_fiber_tree(store, root_id)`
+  boundary fail-closed for that shape. The source path validates
+  `HostRootCommitRecord`, live committed topology, state-node/root-token
+  identity, lanes, props/text identity, and compatibility blockers before
+  returning inspection rows.
+- Worker 940 extended private Rust N-API cleanup-generation currentness with a
+  test-only cleanup re-entry/retirement guard that consumes one source-owned
+  current cleanup handoff key and rejects duplicate cleanup evidence,
+  post-retirement re-entry, missing source identity, stale generation,
+  cross-environment/thread handoff, caller-built rows, and public native/package
+  claims. Native addon loading, real cleanup hooks, worker-thread teardown,
+  renderer/reconciler output, package exports, and public native compatibility
+  remain blocked.
+- Worker 943 strengthened private FunctionComponent render-phase currentness so
+  state/reducer render-phase updates stage through `HookUpdateStaging` before
+  entering pending rings, bound to the active FunctionComponent fiber/current
+  alternate, hook list, queue/update generations, render attempt id, staging
+  generation, lanes, and Worker 921 bailout/context blocker state. Public hook
+  dispatchers, root scheduling, Scheduler, `act`, renderer behavior, effects,
+  and package compatibility remain blocked.
+- Worker 942 added source-owned fake form identity and reset currentness records
+  to the private form action submit-reset path, bound fulfilled reset queue and
+  commit evidence to the current reset generation, and required current
+  fulfilled-reset generation evidence before resource/form root execution
+  consumers accept reset rows. Public resources, form actions,
+  `requestFormReset`, action invocation, React updates, real form reset, DOM and
+  head mutation, native/root execution, and package compatibility remain
+  blocked.
+- The accepted state for this batch is current main `4b5902a5`
+  (`Merge worker 942 resource form reset currentness`) after merge commits
+  `52de4d91`, `f8d57834`, `e62d3c81`, `05f006ad`, `2b240940`, `ed246fb5`,
+  `5abc1ce6`, `d3b26bb4`, `59d31ce4`, `f5b7c250`, and `4b5902a5`, with
+  focused worker checks, package-surface/import-smoke checks where applicable,
+  formatting, and `git diff --check` evidence recorded in worker reports and
+  git history.
+
 ### Worker 933
 
 - Worker 933 added a private, source-owned public `ReactDOM.flushSync`

@@ -45,42 +45,34 @@ Drive toward a minimal real root render/update/unmount path:
 
 ## Active Queue
 
-Top-level cap: 30 workers. Accepted/merged baseline for this branch includes
-Workers 803-837, 842-846, 848-852, 855-860, 862-874, 878-883, 885-893,
-895-896, 898-902, 904, 906-909, 912-930, Worker 932, and Worker 933;
-coordination history includes docs refresh Workers 922 and 931. Current
-baseline is `ab17ce62`
-(`Merge worker 933 public flushSync blocked currentness`). Worker 853's
-competing test-renderer branch was rejected as redundant after Worker 844 was
-accepted; do not use it as accepted input.
+Top-level cap: 30 workers. Accepted implementation baseline for this branch
+includes Workers 803-837, 842-846, 848-852, 855-860, 862-874, 878-883,
+885-893, 895-896, 898-902, 904, 906-909, 912-930, 932-934, and 936-944;
+coordination history includes docs refresh Workers 922, 931, and 935. Current
+baseline is `4b5902a5` (`Merge worker 942 resource form reset currentness`).
+Worker 853's competing test-renderer branch was rejected as redundant after
+Worker 844 was accepted; do not use it as accepted input.
 
 Current orchestration queue:
 
 - Worker 910: DO NOT MERGE again for hydration recoverable-error boundary
-  admission after the fresh audit found first-load
-  `require.cache[rootBridgePath].exports` replacement before
-  `hydrate-root-source-ledger.js` imports root-bridge, allowing fake getters
-  and cloned admission. Repair restarted as
-  `worker_910_hydration_recoverable_error_boundary_admission_fix2`; do not
-  treat it as accepted input.
-- Worker 934: failed audit for transition queue-lane scheduler continuation
-  and is under repair.
-- Worker 935: docs-only refresh for the `ab17ce62` baseline and current queue.
-- Worker 936: reconciler generic direct multi-child inspection lane.
-- Worker 937: Scheduler variant currentness parity lane.
-- Worker 938: React hook CJS/server blocker currentness lane.
-- Worker 939: root-listener focus/blur dispatch currentness lane.
-- Worker 940: N-API cleanup reentry currentness lane.
-- Worker 941: test-renderer CJS TestInstance currentness lane.
-- Worker 942: resource/form reset currentness lane.
-- Worker 943: FunctionComponent render-phase currentness lane.
-- Worker 944: React DOM `root.update` native handoff currentness lane.
+  admission after repeated audits found cloned/fake root-bridge admission
+  paths. The repair remains unaccepted and active as fix3 input only; do not
+  treat any Worker 910 evidence as accepted until a fresh audited merge lands.
+- Worker 945: docs-only refresh for the `4b5902a5` baseline and current queue.
+- Worker 946: test-renderer direct inspection consumer lane.
+- Worker 947: React DOM private root-bridge smoke fix lane.
+- Worker 948: Rust finished-work commit queue-lane currentness lane.
+- Worker 949: Scheduler postTask/mock variant currentness lane.
+- Worker 950: React Children traversal blocker currentness lane.
+- Worker 951: native cleanup hook worker-thread currentness lane.
+- Worker 952: React DOM resource hints currentness lane.
+- Worker 953: private-admission 932-944 ledger hardening lane.
 
-If Workers 910, 934, or 936-944 merge after this branch point, update this
-section and move their accepted facts into `MASTER_PROGRESS.md` in the next
-docs pass.
+If Workers 910 or 945-953 merge after this branch point, update this section
+and move accepted facts into `MASTER_PROGRESS.md` in the next docs pass.
 
-Accepted private evidence through `ab17ce62` still keeps public
+Accepted private evidence through `4b5902a5` still keeps public
 root/render/unmount, `act`, `react-dom/test-utils.act`, `flushSync`, Scheduler
 timing, hydration, resources/forms, serialization, native/reconciler execution,
 unsupported hook behavior, event dispatch, package compatibility, and broad
@@ -92,20 +84,21 @@ canonical evidence requirements.
 
 ## Near-Term Sequencing
 
-1. Treat the accepted branch baseline through `ab17ce62` as private evidence
+1. Treat the accepted branch baseline through `4b5902a5` as private evidence
    only. Public package, root, native, React DOM, test-renderer, Scheduler,
    `act`, `react-dom/test-utils.act`, hydration, resource/form,
    serialization, unsupported hook, event dispatch, and `flushSync`
    compatibility still require fail-closed gates and dual-run oracle evidence.
-2. Review Workers 910, 934, and 936-944 against the accepted
+2. Review Worker 910 fix3 and Workers 945-953 against the accepted
    source-owned lifecycle, hydration, `act`, deletion, sync-flush, HostRoot
    lane handoff, scheduler continuation/currentness,
    reconciler/test-renderer direct multi-child fiber inspection,
    native-generation/cleanup, worker-thread cleanup, concurrent update drain,
-   hook staging failure preservation, root-listener dispatch, resource/form,
-   host-node currentness, Scheduler variant/root currentness, package-surface,
-   and public blocker requirements before any merge. Do not consume their
-   outputs until reviewed, verified, and merged.
+   hook staging failure preservation, root-listener dispatch, React Children
+   traversal, resource/form/resource hints, host-node currentness, Scheduler
+   variant/root currentness, package-surface, private-admission ledger, and
+   public blocker requirements before any merge. Do not consume their outputs
+   until reviewed, verified, and merged.
 3. Prefer parallelizable independent proofs even when they may conflict in test
    files. Resolve conflicts during merge by keeping all accepted negative tests,
    blockers, and source-ownership checks.
@@ -115,8 +108,9 @@ canonical evidence requirements.
 ## Next Queue Candidates
 
 - Rust root/sync-flush/function/deletion execution can extend accepted Workers
-  855, 860, 862-867, 878-879, 889-890, 896, 898, 904, 906-907, 917-921 toward
-  managed-child, HostText, multi-child, sync-flush delete/post-passive
+  855, 860, 862-867, 878-879, 889-890, 896, 898, 904, 906-907, 917-921, 936,
+  and 943 toward managed-child, HostText, multi-child, sync-flush
+  delete/post-passive
   continuation, FunctionComponent deletion/render-phase update/bailout blocker
   coverage, HostRoot update-queue lane handoff, finished-work commit queue-lane
   consumer, direct committed-fiber inspection, terminal host descendant
@@ -136,8 +130,10 @@ canonical evidence requirements.
   multi-child test-renderer native lifecycle evidence, Worker 899 source-owned
   direct multi-child fiber inspection, Worker 902 private act/update lifecycle
   boundary evidence, Worker 932 CJS production private act/update lifecycle
-  parity evidence, and Worker 917 only as reconciler-owned inspection context
-  that keeps the generic test-renderer boundary fail-closed. Worker 853 remains
+  parity evidence, Worker 936 source-bound reconciler generic direct
+  multi-child inspection, and Worker 941 CJS production TestInstance
+  currentness. Worker 917 remains reconciler-owned inspection context that
+  keeps the generic test-renderer boundary fail-closed. Worker 853 remains
   rejected/redundant. Public serialization, `ReactTestInstance`, JS/CJS/package
   compatibility, native bridge loading/execution, root/act/Scheduler
   compatibility, and broad multichild identity remain blocked.
@@ -148,9 +144,10 @@ canonical evidence requirements.
   Worker 891 source-owned root unmount lifecycle request-boundary consumer, and
   Worker 901 source-owned render/update/nested lifecycle boundary consumer,
   plus Worker 912 root-listener currentness, Worker 927 root-listener dispatch
-  currentness, and Worker 915 symbol-only client facade gates, as diagnostic
-  input. Worker 920's HostNodeStore payload currentness can inform fake/native
-  host update handoffs only when scoped
+  currentness, Worker 939 focus/blur dispatch currentness, Worker 944 root
+  update native handoff currentness, and Worker 915 symbol-only client facade
+  gates, as diagnostic input. Worker 920's HostNodeStore payload currentness
+  can inform fake/native host update handoffs only when scoped
   root/fiber/token/phase/target identity is preserved. Any real native/Rust
   execution or public facade work still must prove scheduling, commit, cleanup,
   DOM output, listener/event/ref behavior, hydration boundaries,
@@ -159,9 +156,10 @@ canonical evidence requirements.
 - Resource and form work can consume accepted Worker 856's root execution
   consumer with Worker 850 ledger/source-token metadata and Worker 883
   lifecycle boundary hardening, plus Worker 893's private root/lifecycle-bound
-  reset execution evidence. Public resources, forms, action/reset invocation,
-  React updates, DOM/head mutation, native/root execution, and package
-  compatibility remain blocked.
+  reset execution evidence and Worker 942's fulfilled-reset generation
+  currentness. Public resources, forms, action/reset invocation, React updates,
+  DOM/head mutation, native/root execution, and package compatibility remain
+  blocked.
 - React `act` and React DOM test-utils work can consume accepted Worker 857's
   frozen, nested source-owned scheduler-driven passive diagnostics, Worker
   885's source-owned root lifecycle boundary gate, Worker 902's private
@@ -182,37 +180,39 @@ canonical evidence requirements.
   private generation/replay no-stale guard, and Worker 882's native JS
   generation admission ledger, plus Worker 892's private cleanup-generation
   consumer, Worker 908's cleanup-generation currentness gate, Worker 923's
-  cleanup currentness admission ledger, and Worker 924's worker-thread/
-  environment cleanup currentness. Executable native addon loading, cleanup
-  hooks, scheduling, renderer/reconciler output, worker-thread teardown, public
-  no-stale-value behavior, public native compatibility, and package exports
-  remain blocked.
+  cleanup currentness admission ledger, Worker 924's worker-thread/environment
+  cleanup currentness, and Worker 940's cleanup re-entry/retirement
+  currentness. Executable native addon loading, cleanup hooks, scheduling,
+  renderer/reconciler output, worker-thread teardown, public no-stale-value
+  behavior, public native compatibility, and package exports remain blocked.
 - React hook facade work can consume accepted Worker 916 transition blocker
   currentness, Worker 918 render-phase update ownership evidence, Worker 926
-  hook staging failure-preservation currentness, and Worker 929 unsupported
-  placeholder hook blocker currentness. Public dispatcher routing, unsupported
-  hook execution, external-store subscription, callback invocation, ID
-  generation, root scheduling, renderer behavior, `act`, Scheduler timing, and
-  package compatibility remain blocked.
+  hook staging failure-preservation currentness, Worker 929 unsupported
+  placeholder hook blocker currentness, Worker 938 CJS/server unsupported hook
+  surface currentness, and Worker 943 private render-phase staging currentness.
+  Public dispatcher routing, unsupported hook execution, external-store
+  subscription, callback invocation, ID generation, root scheduling, renderer
+  behavior, `act`, Scheduler timing, and package compatibility remain blocked.
 - Scheduler variant and root-scheduler continuation work can consume accepted
   Worker 886 as the variant boundary, Worker 909's live source-currentness seal,
-  and Worker 914's public root-entry currentness gate for root, native, mock,
-  postTask, and CJS variant diagnostics. Root-scheduler follow-ups can build on
-  Worker 904's private HostRoot queue/lane continuation gate, Worker 907's
-  callback/currentness negative canaries, and Worker 906's expired default+sync
-  continuation only when preserving scheduler identity, Worker 898 queue/lane
-  proof, store-backed row lane metadata, sequence IDs, applied/skipped counts,
-  resulting element, callback identity, expired/selected lane currentness, and
-  root/current/finished-work identity. Public Scheduler timing, public
-  root/act/package/native behavior, postTask/mock compatibility, and package
-  compatibility remain blocked.
+  Worker 914's public root-entry currentness gate, and Worker 937's variant
+  currentness parity gate for root, native, mock, postTask, and CJS variant
+  diagnostics. Root-scheduler follow-ups can build on Worker 904's private
+  HostRoot queue/lane continuation gate, Worker 907's callback/currentness
+  negative canaries, Worker 906's expired default+sync continuation, and Worker
+  934's transition queue/lane continuation only when preserving scheduler
+  identity, Worker 898 queue/lane proof, store-backed row lane metadata,
+  sequence IDs, applied/skipped counts, resulting element, callback identity,
+  expired/selected lane currentness, and root/current/finished-work identity.
+  Public Scheduler timing, public root/act/package/native behavior,
+  postTask/mock compatibility, and package compatibility remain blocked.
 - Public `hydrateRoot` remains blocked after accepted marker/listener,
   target-claiming, recoverable-error, replay-target preflights, private
   text-claim patch execution, the text-patch admission ledger, Worker 887's
   private lifecycle boundary admission/currentness evidence, Worker 900's
   corrected private admission 820 source ledger for hydrateRoot lifecycle
-  boundary rows, and Worker 912's listener currentness gate. Worker 910 remains
-  unaccepted in this baseline. Future hydration work must prove real root
+  boundary rows, and Worker 912's listener currentness gate. Worker 910 fix3
+  remains unaccepted in this baseline. Future hydration work must prove real root
   creation, marker/listener behavior, recoverable error routing, event replay,
   browser DOM mutation, native/reconciler execution, and package compatibility
   against React 19.2.6.
@@ -220,11 +220,13 @@ canonical evidence requirements.
   accepted `finished_work` / `finished_lanes` queue-lane consumer, Worker 904's
   scheduler-owned continuation evidence, Worker 899's test-renderer direct
   multi-child fiber identity proof, Worker 917's reconciler-owned direct
-  committed-fiber inspection, and Worker 920's host-node update currentness
-  only after preserving source-owned handoff rows, store-backed row lane
-  metadata, scheduler/commit identity, direct child fiber handles, scoped host
-  update currentness, and public blockers before any wider serialization or
-  native bridge execution.
+  committed-fiber inspection, Worker 920's host-node update currentness, Worker
+  936's source-bound generic inspection, Worker 941's CJS TestInstance
+  currentness, and Worker 944's root update native handoff currentness only
+  after preserving source-owned handoff rows, store-backed row lane metadata,
+  scheduler/commit identity, direct child fiber handles, scoped host update
+  currentness, and public blockers before any wider serialization or native
+  bridge execution.
 
 Premature until later gates are green: public React DOM root render/unmount,
 public `act`, public `react-dom/test-utils.act`, public `flushSync`, public
