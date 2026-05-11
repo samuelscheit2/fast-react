@@ -98,8 +98,23 @@ const privateSchedulerMockDelayedActRootWorkDiagnosticsVersion = 1;
 const privateSchedulerMockDelayedActRootWorkMetadataKind =
   'fast-react.scheduler.mock-delayed-act-root-work-metadata';
 const privateSchedulerMockDelayedActRootWorkMetadataVersion = 1;
+const privateSchedulerMockDelayedRendererRootWorkMetadataKind =
+  'fast-react.scheduler.mock-delayed-renderer-root-work-metadata';
+const privateSchedulerMockDelayedRendererRootWorkMetadataVersion = 1;
 const schedulerMockDelayedActRootWorkDiagnosticsStatus =
   'drained-delayed-mock-scheduler-work-with-act-root-metadata-for-diagnostics';
+const schedulerMockDelayedActRootWorkAcceptedRootProducerKind =
+  'accepted-root-metadata';
+const schedulerMockDelayedActRootWorkAcceptedRootProducerStatus =
+  'produced-private-delayed-act-root-work-metadata-from-accepted-root-metadata';
+const schedulerMockDelayedActRootWorkAcceptedRendererRootProducerKind =
+  'accepted-renderer-root-metadata';
+const schedulerMockDelayedActRootWorkAcceptedRendererRootProducerStatus =
+  'produced-private-delayed-act-root-work-metadata-from-accepted-renderer-root-metadata';
+const schedulerMockDelayedRendererRootWorkMetadataStatus =
+  'accepted-private-delayed-renderer-root-work-metadata-for-diagnostics';
+const schedulerMockDelayedRendererRootWorkProducerStatus =
+  'produced-private-delayed-renderer-root-work-metadata-for-private-act-root-handoff';
 const acceptedSchedulerMockExpiredActRootWorkRecords = Object.freeze([
   'RootLaneSchedulingSnapshot',
   'UpdateContainerResult',
@@ -2529,6 +2544,99 @@ function consumeSchedulerMockExpiredActRootWorkDiagnostics(report) {
   });
 }
 
+function isAcceptedSchedulerMockDelayedRendererRootWorkMetadataSummary(
+  metadata,
+  delayedActRootWorkMetadata
+) {
+  return (
+    isObjectLike(metadata) &&
+    Object.isFrozen(metadata) &&
+    metadata.kind ===
+      privateSchedulerMockDelayedRendererRootWorkMetadataKind &&
+    metadata.version ===
+      privateSchedulerMockDelayedRendererRootWorkMetadataVersion &&
+    metadata.status === schedulerMockDelayedRendererRootWorkMetadataStatus &&
+    metadata.accepted === true &&
+    metadata.sourceEvidenceMatches === true &&
+    metadata.compatibilityTarget === schedulerCompatibilityTarget &&
+    metadata.reactCompatibilityTarget === compatibilityTarget &&
+    metadata.rootId !== null &&
+    metadata.rootId !== undefined &&
+    typeof metadata.rootLabel === 'string' &&
+    typeof metadata.lane === 'string' &&
+    typeof metadata.laneLabel === 'string' &&
+    metadata.producerStatus ===
+      schedulerMockDelayedRendererRootWorkProducerStatus &&
+    (metadata.rootRequestId === null ||
+      typeof metadata.rootRequestId === 'string') &&
+    (metadata.rootRequestSequence === null ||
+      isNonNegativeInteger(metadata.rootRequestSequence)) &&
+    (metadata.rootOperation === null ||
+      typeof metadata.rootOperation === 'string') &&
+    isPositiveInteger(metadata.actQueueRecordCount) &&
+    isPositiveInteger(metadata.rootWorkRecordCount) &&
+    isNonNegativeFiniteNumber(metadata.scheduledVirtualTime) &&
+    isPositiveFiniteNumber(metadata.delayMs) &&
+    isPositiveFiniteNumber(metadata.startTime) &&
+    isPositiveFiniteNumber(metadata.expirationTime) &&
+    isPositiveFiniteNumber(metadata.priorityTimeoutMs) &&
+    metadata.rendererWorkExecutionBlocked === true &&
+    metadata.rootWorkMetadataOnly === true &&
+    metadata.actQueueHandoffOnly === true &&
+    metadata.delayedCallbackPromotionOnly === true &&
+    metadata.privateActRootHandoffOnly === true &&
+    hasBlockedPublicCompatibilityClaims(metadata) &&
+    hasBlockedPublicQueueAndExecutionClaims(metadata) &&
+    (!isObjectLike(delayedActRootWorkMetadata) ||
+      (metadata.rootId === delayedActRootWorkMetadata.rootId &&
+        metadata.rootLabel === delayedActRootWorkMetadata.rootLabel &&
+        metadata.lane === delayedActRootWorkMetadata.lane &&
+        metadata.laneLabel === delayedActRootWorkMetadata.laneLabel &&
+        metadata.scheduledVirtualTime ===
+          delayedActRootWorkMetadata.scheduledVirtualTime &&
+        metadata.delayMs === delayedActRootWorkMetadata.delayMs &&
+        metadata.startTime === delayedActRootWorkMetadata.startTime &&
+        metadata.expirationTime ===
+          delayedActRootWorkMetadata.expirationTime &&
+        metadata.priorityTimeoutMs ===
+          delayedActRootWorkMetadata.priorityTimeoutMs))
+  );
+}
+
+function isAcceptedSchedulerMockDelayedActRootWorkProducerSummary(
+  metadata
+) {
+  if (
+    metadata.producerKind ===
+      schedulerMockDelayedActRootWorkAcceptedRootProducerKind ||
+    metadata.producerKind === undefined
+  ) {
+    return (
+      metadata.producerStatus ===
+        schedulerMockDelayedActRootWorkAcceptedRootProducerStatus &&
+      metadata.producedByPrivateDelayedRendererRootProducer === false &&
+      metadata.rendererRootMetadata === null
+    );
+  }
+
+  if (
+    metadata.producerKind !==
+    schedulerMockDelayedActRootWorkAcceptedRendererRootProducerKind
+  ) {
+    return false;
+  }
+
+  return (
+    metadata.producerStatus ===
+      schedulerMockDelayedActRootWorkAcceptedRendererRootProducerStatus &&
+    metadata.producedByPrivateDelayedRendererRootProducer === true &&
+    isAcceptedSchedulerMockDelayedRendererRootWorkMetadataSummary(
+      metadata.rendererRootMetadata,
+      metadata
+    )
+  );
+}
+
 function isAcceptedSchedulerMockDelayedActRootWorkMetadataSummary(
   metadata
 ) {
@@ -2550,8 +2658,7 @@ function isAcceptedSchedulerMockDelayedActRootWorkMetadataSummary(
     metadata.callbackHandleMatched === true &&
     metadata.callbackHandleDelayedPending === true &&
     metadata.producedByPrivateDelayedActRootWorkMetadataProducer === true &&
-    metadata.producerStatus ===
-      'produced-private-delayed-act-root-work-metadata-from-accepted-root-metadata' &&
+    isAcceptedSchedulerMockDelayedActRootWorkProducerSummary(metadata) &&
     isNonNegativeFiniteNumber(metadata.scheduledVirtualTime) &&
     isPositiveFiniteNumber(metadata.delayMs) &&
     isPositiveFiniteNumber(metadata.startTime) &&
@@ -2573,6 +2680,46 @@ function isAcceptedSchedulerMockDelayedActRootWorkMetadataSummary(
     metadata.delayedCallbackPromotionOnly === true &&
     hasBlockedPublicCompatibilityClaims(metadata) &&
     hasBlockedPublicQueueAndExecutionClaims(metadata)
+  );
+}
+
+function hasAcceptedSchedulerMockDelayedActRootWorkRendererRootReportEvidence(
+  report
+) {
+  if (!isObjectLike(report)) {
+    return false;
+  }
+
+  const metadata = report.delayedActRootWorkMetadata;
+  if (!isObjectLike(metadata)) {
+    return false;
+  }
+
+  if (
+    metadata.producerKind ===
+      schedulerMockDelayedActRootWorkAcceptedRootProducerKind ||
+    metadata.producerKind === undefined
+  ) {
+    return (
+      report.producedByPrivateDelayedRendererRootProducer === false &&
+      report.delayedRendererRootMetadata === null
+    );
+  }
+
+  if (
+    metadata.producerKind !==
+    schedulerMockDelayedActRootWorkAcceptedRendererRootProducerKind
+  ) {
+    return false;
+  }
+
+  return (
+    report.producedByPrivateDelayedRendererRootProducer === true &&
+    report.delayedRendererRootMetadata === metadata.rendererRootMetadata &&
+    isAcceptedSchedulerMockDelayedRendererRootWorkMetadataSummary(
+      report.delayedRendererRootMetadata,
+      metadata
+    )
   );
 }
 
@@ -2719,6 +2866,15 @@ function getRejectedSchedulerMockDelayedActRootWorkDiagnosticsReason(
     report.rejectsDelayedActRootWorkPublicCompatibilityClaims !== true ||
     report.producesDelayedActRootWorkMetadataFromAcceptedRootMetadata !==
       true ||
+    report.producesDelayedActRootWorkMetadataFromAcceptedRendererRootMetadata !==
+      true ||
+    report.createsDelayedRendererRootWorkMetadataForDiagnostics !== true ||
+    report.recognizesDelayedRendererRootWorkMetadata !== true ||
+    report.bindsDelayedRendererRootProducerEvidence !== true ||
+    report.rejectsStaleDelayedRendererRootProducerEvidence !== true ||
+    report.rejectsClonedDelayedRendererRootSourceEvidence !== true ||
+    report.handsOffDelayedRendererRootWorkThroughPrivateActRootRoute !==
+      true ||
     report.rejectsUnownedDelayedActRootWorkMetadata !== true ||
     report.rejectsClonedDelayedActRootWorkEvidence !== true ||
     report.bindsProducedDelayedActRootWorkNestedEvidence !== true ||
@@ -2740,6 +2896,13 @@ function getRejectedSchedulerMockDelayedActRootWorkDiagnosticsReason(
     )
   ) {
     return 'scheduler-delayed-act-root-diagnostics-metadata';
+  }
+  if (
+    !hasAcceptedSchedulerMockDelayedActRootWorkRendererRootReportEvidence(
+      report
+    )
+  ) {
+    return 'scheduler-delayed-act-root-diagnostics-renderer-root-source';
   }
   if (
     !isAcceptedSchedulerMockDelayedActRootWorkPromotionEvidence(
@@ -2818,12 +2981,27 @@ function preflightSchedulerMockDelayedActRootWorkDiagnostics(report) {
     delayedCallbackVirtualTimeAfterPromotion:
       report.delayedCallbackVirtualTimeAfterPromotion,
     delayedCallbackAdvanceTimeBy: report.delayedCallbackAdvanceTimeBy,
+    delayedActRootWorkProducerKind:
+      report.delayedActRootWorkMetadata.producerKind,
+    delayedActRootWorkProducerStatus:
+      report.delayedActRootWorkMetadata.producerStatus,
+    producedByPrivateDelayedRendererRootProducer:
+      report.producedByPrivateDelayedRendererRootProducer === true,
+    rendererRootSourceEvidencePresent:
+      isObjectLike(report.delayedRendererRootMetadata),
+    rendererRootSourceEvidenceOwned:
+      report.producedByPrivateDelayedRendererRootProducer === true &&
+      isAcceptedSchedulerMockDelayedRendererRootWorkMetadataSummary(
+        report.delayedRendererRootMetadata,
+        report.delayedActRootWorkMetadata
+      ),
     selectedFlushHelper: report.expiredActRootWorkRouteSelectedFlushHelper,
     nestedExpiredActRootWorkConsumption: nestedExpiredConsumption,
     rootWorkRecordSummary:
       nestedExpiredConsumption.rootWorkRecordSummary,
     actQueueDrainSummary: nestedExpiredConsumption.actQueueDrainSummary,
     delayedActRootWorkMetadata: report.delayedActRootWorkMetadata,
+    delayedRendererRootMetadata: report.delayedRendererRootMetadata,
     expiredActRootWorkDrainReport: report.expiredActRootWorkDrainReport,
     delayedCallbackPromotionEvidence:
       report.delayedCallbackPromotionEvidence,
