@@ -22073,7 +22073,15 @@ function capturePrivateRootPublicFacadeLifecycleContainerSnapshot(container) {
     childCount: getChildNodeCount(container),
     markerListenerState:
       inspectPublicFacadeMarkerListenerPreflightState(container),
-    textContent: getContainerTextContent(container)
+    nodeSnapshot: createActiveHostOutputNodeSnapshot(container),
+    textContent: getContainerTextContent(container),
+    toJSON() {
+      return {
+        childCount: this.childCount,
+        markerListenerState: this.markerListenerState,
+        textContent: this.textContent
+      };
+    }
   });
   rootPublicFacadeLifecycleContainerSnapshotCaptures.set(
     snapshot,

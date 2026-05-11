@@ -20,7 +20,7 @@
 
 - The lifecycle boundary is WeakMap-backed and tied to the exact hydrateRoot request admission, bridge, request record, hydration boundary record, container, and source-owned lifecycle container snapshot.
 - The currentness guard records the latest lifecycle request boundary per container in both the active preflight state and module-level container WeakMap, then requires exact boundary identity plus request id, request sequence, and hydrate id before any later stage can consume the evidence.
-- The lifecycle container snapshot now retains serializable child-count, text-content, and marker/listener state evidence without embedding raw DOM-like node cycles.
+- The lifecycle container snapshot preserves the active host output `nodeSnapshot` and adds text-content evidence; its JSON diagnostics stay limited to child-count, marker/listener state, and text content so raw DOM-like node cycles are not serialized.
 - Each hydrateRoot preflight stage retains the same lifecycle boundary while keeping public hydrateRoot, root object, native, reconciler, browser DOM mutation, event replay, callback, and compatibility claims blocked.
 - The final text patch rejects caller-built/cloned lifecycle records and snapshots, foreign-root boundary evidence, string/source-token aliases, and stale same-container request order before the fake text node is mutated.
 
