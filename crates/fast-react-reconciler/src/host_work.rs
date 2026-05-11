@@ -321,7 +321,7 @@ impl From<HostRootDeletionSubtreeHostDetachmentPlanErrorForCanary> for HostWorkE
 }
 
 #[derive(Default)]
-struct DetachedHostRecords {
+pub(crate) struct DetachedHostRecords {
     nodes: HostNodeStore<RecordingHost>,
     scopes: Vec<Option<HostNodeScope>>,
     component_updates: Vec<HostComponentUpdatePayload>,
@@ -340,6 +340,10 @@ impl fmt::Debug for DetachedHostRecords {
 }
 
 impl DetachedHostRecords {
+    pub(crate) fn new_for_canary() -> Self {
+        Self::default()
+    }
+
     fn insert_instance(&mut self, scope: HostNodeScope, instance: FakeInstance) -> StateNodeHandle {
         let handle = self.nodes.insert_instance(scope, instance);
         self.remember_scope(handle, scope);
@@ -364,7 +368,7 @@ impl DetachedHostRecords {
         Ok(self.nodes.text(handle, scope)?)
     }
 
-    fn instance_metadata(
+    pub(crate) fn instance_metadata(
         &self,
         handle: StateNodeHandle,
     ) -> Result<HostNodeMetadata, HostWorkError> {
@@ -773,6 +777,54 @@ impl DetachedHostRecords {
         record.update_count += 1;
         Ok(record.update_count())
     }
+}
+
+pub(crate) fn create_detached_test_host_component_for_existing_fiber_for_canary(
+    store: &mut FiberRootStore<RecordingHost>,
+    host: &mut RecordingHost,
+    detached_hosts: &mut DetachedHostRecords,
+    root_id: FiberRootId,
+    fiber: FiberId,
+    ty: &'static str,
+    props: PropsHandle,
+    initial_children: &[FiberId],
+) -> Result<StateNodeHandle, HostWorkError> {
+    expect_tag(store, fiber, FiberTag::HostComponent)?;
+
+    let scope =
+        issue_creation_host_node_scope(store, root_id, fiber, HostFiberTokenTarget::Instance)?;
+    let token = FakeHostFiberToken(scope.token_id().raw());
+    let container = *store.root(root_id)?.container_info();
+    let mut instance = host.create_instance(
+        HostFiberTokenRef::new(
+            &token,
+            HostFiberTokenPhase::Creation,
+            HostFiberTokenTarget::Instance,
+        ),
+        &ty,
+        &(),
+        &container,
+        &(),
+    )?;
+    for &child in initial_children {
+        detached_hosts.append_initial_child(
+            store.host_tokens(),
+            host,
+            &mut instance,
+            root_id,
+            store.fiber_arena().get(child)?,
+        )?;
+    }
+    host.finalize_initial_children(&mut instance, &ty, &(), &container, &())?;
+    let state_node = detached_hosts.insert_instance(scope, instance);
+    complete_fiber_common(
+        store,
+        fiber,
+        props,
+        state_node,
+        InitialChildrenFinalization::NoCommitMount,
+    )?;
+    Ok(state_node)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1202,7 +1254,7 @@ impl HostTextUpdateDiff {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum TestHostRootMutationHostCall {
+pub(crate) enum TestHostRootMutationHostCall {
     AppendChild,
     AppendChildToContainer,
     InsertBefore,
@@ -1215,12 +1267,12 @@ enum TestHostRootMutationHostCall {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum TestHostRootPrivateStoreMutation {
+pub(crate) enum TestHostRootPrivateStoreMutation {
     HostComponentPropertyAndLatestProps,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum TestHostRootMutationApplyStatus {
+pub(crate) enum TestHostRootMutationApplyStatus {
     Applied(TestHostRootMutationHostCall),
     PrivateHostStoreOnly(TestHostRootPrivateStoreMutation),
     RecordedOnly,
@@ -1634,13 +1686,13 @@ impl From<HostWorkError> for TestHostRootHostUpdateExecutionErrorForCanary {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum TestHostRootDeletionCleanupAction {
+pub(crate) enum TestHostRootDeletionCleanupAction {
     DetachDeletedInstance,
     InvalidateDeletedText,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum TestHostRootDeletionCleanupStatus {
+pub(crate) enum TestHostRootDeletionCleanupStatus {
     Applied(TestHostRootDeletionCleanupAction),
     RecordedOnly,
 }
@@ -1740,7 +1792,7 @@ const TEST_HOST_ROOT_MANAGED_CHILD_EXECUTION_BLOCKERS:
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct TestHostRootManagedChildExecutionDiagnosticForCanary {
+pub(crate) struct TestHostRootManagedChildExecutionDiagnosticForCanary {
     root: FiberRootId,
     finished_work: FiberId,
     source_handoff_order: usize,
@@ -1757,57 +1809,57 @@ struct TestHostRootManagedChildExecutionDiagnosticForCanary {
 
 impl TestHostRootManagedChildExecutionDiagnosticForCanary {
     #[must_use]
-    const fn root(&self) -> FiberRootId {
+    pub(crate) const fn root(&self) -> FiberRootId {
         self.root
     }
 
     #[must_use]
-    const fn finished_work(&self) -> FiberId {
+    pub(crate) const fn finished_work(&self) -> FiberId {
         self.finished_work
     }
 
     #[must_use]
-    const fn source_handoff_order(&self) -> usize {
+    pub(crate) const fn source_handoff_order(&self) -> usize {
         self.source_handoff_order
     }
 
     #[must_use]
-    const fn commit_order(&self) -> usize {
+    pub(crate) const fn commit_order(&self) -> usize {
         self.commit_order
     }
 
     #[must_use]
-    const fn request_order(&self) -> usize {
+    pub(crate) const fn request_order(&self) -> usize {
         self.request_order
     }
 
     #[must_use]
-    const fn kind(&self) -> HostComponentManagedChildMutationKindForCanary {
+    pub(crate) const fn kind(&self) -> HostComponentManagedChildMutationKindForCanary {
         self.kind
     }
 
     #[must_use]
-    const fn mutation(&self) -> HostRootMutationApplyRecord {
+    pub(crate) const fn mutation(&self) -> HostRootMutationApplyRecord {
         self.mutation
     }
 
     #[must_use]
-    const fn mutation_status(&self) -> TestHostRootMutationApplyStatus {
+    pub(crate) const fn mutation_status(&self) -> TestHostRootMutationApplyStatus {
         self.mutation_status
     }
 
     #[must_use]
-    const fn cleanup_status(&self) -> Option<TestHostRootDeletionCleanupStatus> {
+    pub(crate) const fn cleanup_status(&self) -> Option<TestHostRootDeletionCleanupStatus> {
         self.cleanup_status
     }
 
     #[must_use]
-    const fn applied_host_call_count(&self) -> usize {
+    pub(crate) const fn applied_host_call_count(&self) -> usize {
         self.applied_host_call_count
     }
 
     #[must_use]
-    const fn deletion_cleanup_apply_count(&self) -> usize {
+    pub(crate) const fn deletion_cleanup_apply_count(&self) -> usize {
         self.deletion_cleanup_apply_count
     }
 
@@ -1817,7 +1869,7 @@ impl TestHostRootManagedChildExecutionDiagnosticForCanary {
     }
 
     #[must_use]
-    const fn private_test_host_mutation_executed(&self) -> bool {
+    pub(crate) const fn private_test_host_mutation_executed(&self) -> bool {
         match self.kind {
             HostComponentManagedChildMutationKindForCanary::Placement => matches!(
                 self.mutation_status,
@@ -1840,33 +1892,33 @@ impl TestHostRootManagedChildExecutionDiagnosticForCanary {
     }
 
     #[must_use]
-    const fn public_root_rendering_blocked(&self) -> bool {
+    pub(crate) const fn public_root_rendering_blocked(&self) -> bool {
         true
     }
 
     #[must_use]
-    const fn public_renderer_mutation_blocked(&self) -> bool {
+    pub(crate) const fn public_renderer_mutation_blocked(&self) -> bool {
         true
     }
 
     #[must_use]
-    const fn react_dom_compatibility_claimed(&self) -> bool {
+    pub(crate) const fn react_dom_compatibility_claimed(&self) -> bool {
         false
     }
 
     #[must_use]
-    const fn test_renderer_compatibility_claimed(&self) -> bool {
+    pub(crate) const fn test_renderer_compatibility_claimed(&self) -> bool {
         false
     }
 
     #[must_use]
-    const fn hydration_events_refs_resources_forms_claimed(&self) -> bool {
+    pub(crate) const fn hydration_events_refs_resources_forms_claimed(&self) -> bool {
         false
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct TestHostRootManagedChildSiblingOrderExecutionDiagnosticForCanary {
+pub(crate) struct TestHostRootManagedChildSiblingOrderExecutionDiagnosticForCanary {
     root: FiberRootId,
     finished_work: FiberId,
     source_handoff_order: usize,
@@ -1886,72 +1938,72 @@ struct TestHostRootManagedChildSiblingOrderExecutionDiagnosticForCanary {
 
 impl TestHostRootManagedChildSiblingOrderExecutionDiagnosticForCanary {
     #[must_use]
-    const fn root(&self) -> FiberRootId {
+    pub(crate) const fn root(&self) -> FiberRootId {
         self.root
     }
 
     #[must_use]
-    const fn finished_work(&self) -> FiberId {
+    pub(crate) const fn finished_work(&self) -> FiberId {
         self.finished_work
     }
 
     #[must_use]
-    const fn source_handoff_order(&self) -> usize {
+    pub(crate) const fn source_handoff_order(&self) -> usize {
         self.source_handoff_order
     }
 
     #[must_use]
-    const fn commit_order(&self) -> usize {
+    pub(crate) const fn commit_order(&self) -> usize {
         self.commit_order
     }
 
     #[must_use]
-    const fn request_order(&self) -> usize {
+    pub(crate) const fn request_order(&self) -> usize {
         self.request_order
     }
 
     #[must_use]
-    const fn kind(&self) -> HostComponentManagedChildMutationKindForCanary {
+    pub(crate) const fn kind(&self) -> HostComponentManagedChildMutationKindForCanary {
         self.kind
     }
 
     #[must_use]
-    const fn order_evidence_name(&self) -> &'static str {
+    pub(crate) const fn order_evidence_name(&self) -> &'static str {
         self.order_evidence_name
     }
 
     #[must_use]
-    const fn order_sibling(&self) -> FiberId {
+    pub(crate) const fn order_sibling(&self) -> FiberId {
         self.order_sibling
     }
 
     #[must_use]
-    const fn order_sibling_state_node(&self) -> StateNodeHandle {
+    pub(crate) const fn order_sibling_state_node(&self) -> StateNodeHandle {
         self.order_sibling_state_node
     }
 
     #[must_use]
-    const fn mutation(&self) -> HostRootMutationApplyRecord {
+    pub(crate) const fn mutation(&self) -> HostRootMutationApplyRecord {
         self.mutation
     }
 
     #[must_use]
-    const fn mutation_status(&self) -> TestHostRootMutationApplyStatus {
+    pub(crate) const fn mutation_status(&self) -> TestHostRootMutationApplyStatus {
         self.mutation_status
     }
 
     #[must_use]
-    const fn cleanup_status(&self) -> Option<TestHostRootDeletionCleanupStatus> {
+    pub(crate) const fn cleanup_status(&self) -> Option<TestHostRootDeletionCleanupStatus> {
         self.cleanup_status
     }
 
     #[must_use]
-    const fn applied_host_call_count(&self) -> usize {
+    pub(crate) const fn applied_host_call_count(&self) -> usize {
         self.applied_host_call_count
     }
 
     #[must_use]
-    const fn deletion_cleanup_apply_count(&self) -> usize {
+    pub(crate) const fn deletion_cleanup_apply_count(&self) -> usize {
         self.deletion_cleanup_apply_count
     }
 
@@ -1961,7 +2013,7 @@ impl TestHostRootManagedChildSiblingOrderExecutionDiagnosticForCanary {
     }
 
     #[must_use]
-    const fn private_test_host_mutation_executed(&self) -> bool {
+    pub(crate) const fn private_test_host_mutation_executed(&self) -> bool {
         match self.kind {
             HostComponentManagedChildMutationKindForCanary::Placement => matches!(
                 self.mutation_status,
@@ -1986,33 +2038,33 @@ impl TestHostRootManagedChildSiblingOrderExecutionDiagnosticForCanary {
     }
 
     #[must_use]
-    const fn public_root_rendering_blocked(&self) -> bool {
+    pub(crate) const fn public_root_rendering_blocked(&self) -> bool {
         true
     }
 
     #[must_use]
-    const fn public_renderer_mutation_blocked(&self) -> bool {
+    pub(crate) const fn public_renderer_mutation_blocked(&self) -> bool {
         true
     }
 
     #[must_use]
-    const fn react_dom_compatibility_claimed(&self) -> bool {
+    pub(crate) const fn react_dom_compatibility_claimed(&self) -> bool {
         false
     }
 
     #[must_use]
-    const fn test_renderer_compatibility_claimed(&self) -> bool {
+    pub(crate) const fn test_renderer_compatibility_claimed(&self) -> bool {
         false
     }
 
     #[must_use]
-    const fn hydration_events_refs_resources_forms_claimed(&self) -> bool {
+    pub(crate) const fn hydration_events_refs_resources_forms_claimed(&self) -> bool {
         false
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum TestHostRootManagedChildExecutionErrorForCanary {
+pub(crate) enum TestHostRootManagedChildExecutionErrorForCanary {
     HostWork(HostWorkError),
     UnexpectedMutationApplyCount {
         root: FiberRootId,
@@ -2458,7 +2510,7 @@ fn apply_dangerous_html_text_reset_handoff_for_canary(
     })
 }
 
-fn apply_managed_child_complete_work_handoff_for_canary(
+pub(crate) fn apply_managed_child_complete_work_handoff_for_canary(
     store: &mut FiberRootStore<RecordingHost>,
     host: &mut RecordingHost,
     handoff: &HostRootManagedChildCommitHandoffRecordForCanary,
@@ -2569,7 +2621,7 @@ fn apply_managed_child_complete_work_handoff_for_canary(
     })
 }
 
-fn apply_managed_child_sibling_order_complete_work_handoff_for_canary(
+pub(crate) fn apply_managed_child_sibling_order_complete_work_handoff_for_canary(
     store: &mut FiberRootStore<RecordingHost>,
     host: &mut RecordingHost,
     handoff: &HostRootManagedChildSiblingOrderCommitHandoffRecordForCanary,

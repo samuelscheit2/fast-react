@@ -6284,8 +6284,10 @@ mod tests {
         PORTAL_RECONCILER_UNSUPPORTED_FEATURE,
     };
     use crate::complete_work::{
+        HostComponentManagedChildCompleteWorkRecordForCanary,
         HostComponentManagedChildMutationKindForCanary,
         HostComponentManagedChildSiblingOrderCompleteWorkRecordForCanary,
+        host_component_managed_child_complete_work_record_for_canary,
         host_component_managed_child_sibling_order_complete_work_record_for_canary,
     };
     use crate::concurrent_updates::{
@@ -6303,12 +6305,21 @@ mod tests {
         FunctionComponentSingleChildOutputResolver,
         FunctionComponentSingleChildReconciliationError, FunctionComponentStateDispatchRequest,
     };
+    use crate::host_work::{
+        DetachedHostRecords, TestHostRootManagedChildExecutionDiagnosticForCanary,
+        TestHostRootManagedChildSiblingOrderExecutionDiagnosticForCanary,
+        TestHostRootMutationApplyStatus, TestHostRootMutationHostCall,
+        apply_managed_child_complete_work_handoff_for_canary,
+        apply_managed_child_sibling_order_complete_work_handoff_for_canary,
+        create_detached_test_host_component_for_existing_fiber_for_canary,
+    };
     use crate::root_commit::{
         HostRootManagedChildCommitExecutionBlockerForCanary,
         HostRootManagedChildCommitExecutionStatusForCanary,
+        HostRootManagedChildCommitHandoffRecordForCanary,
         HostRootManagedChildSiblingOrderCommitHandoffRecordForCanary,
         HostRootMutationApplyRecordSource, HostRootMutationPhaseRecordKind,
-        HostRootPlacementSiblingStatus,
+        HostRootPlacementSiblingStatus, commit_managed_child_complete_work_handoff_for_canary,
         commit_managed_child_sibling_order_complete_work_handoff_for_canary,
     };
     use crate::root_updates::validate_update_container_lane_diagnostics_for_canary;
@@ -6342,6 +6353,9 @@ mod tests {
     const ROOT_WORK_LOOP_MANAGED_CHILD_SIBLING_ORDER_DELETE_SOURCE_ORDER: usize = 826_011;
     const ROOT_WORK_LOOP_MANAGED_CHILD_SIBLING_ORDER_DELETE_COMMIT_ORDER: usize = 826_012;
     const ROOT_WORK_LOOP_MANAGED_CHILD_SIBLING_ORDER_DELETE_REQUEST_ORDER: usize = 826_013;
+    const ROOT_WORK_LOOP_MANAGED_CHILD_APPEND_SOURCE_ORDER: usize = 826_021;
+    const ROOT_WORK_LOOP_MANAGED_CHILD_APPEND_COMMIT_ORDER: usize = 826_022;
+    const ROOT_WORK_LOOP_MANAGED_CHILD_APPEND_REQUEST_ORDER: usize = 826_023;
 
     #[derive(Debug, Clone)]
     struct RegisteredComponent {
@@ -6558,6 +6572,40 @@ mod tests {
         deletion_list: Option<DeletionListId>,
     }
 
+    struct ManagedChildRootWorkLoopHostExecutionFixture {
+        render: HostRootRenderPhaseRecord,
+        pending: HostRootFinishedWorkPendingCommitRecordForCanary,
+        complete_work: HostComponentManagedChildCompleteWorkRecordForCanary,
+        current_parent: FiberId,
+        work_parent: FiberId,
+        child: FiberId,
+        parent_state_node: StateNodeHandle,
+        child_state_node: StateNodeHandle,
+        previous_current: FiberId,
+        detached_hosts: DetachedHostRecords,
+        operations_before_apply: Vec<&'static str>,
+        token_count_before_apply: usize,
+    }
+
+    struct ManagedChildSiblingOrderRootWorkLoopHostExecutionFixture {
+        render: HostRootRenderPhaseRecord,
+        pending: HostRootFinishedWorkPendingCommitRecordForCanary,
+        complete_work: HostComponentManagedChildSiblingOrderCompleteWorkRecordForCanary,
+        current_parent: FiberId,
+        work_parent: FiberId,
+        child: FiberId,
+        order_sibling: FiberId,
+        order_sibling_current: FiberId,
+        parent_state_node: StateNodeHandle,
+        child_state_node: StateNodeHandle,
+        order_sibling_state_node: StateNodeHandle,
+        previous_current: FiberId,
+        deletion_list: Option<DeletionListId>,
+        detached_hosts: DetachedHostRecords,
+        operations_before_apply: Vec<&'static str>,
+        token_count_before_apply: usize,
+    }
+
     fn attach_managed_child_sibling_order_host_root_child(
         store: &mut FiberRootStore<RecordingHost>,
         host_root: FiberId,
@@ -6594,7 +6642,7 @@ mod tests {
         node.set_subtree_flags(bubbled.subtree_flags());
     }
 
-    fn prepare_root_work_loop_managed_child_sibling_order_pending_commit(
+    fn prepare_root_work_loop_managed_child_pending_commit(
         store: &mut FiberRootStore<RecordingHost>,
         render: HostRootRenderPhaseRecord,
         handoff_order: usize,
@@ -6605,6 +6653,115 @@ mod tests {
             .record_finished_work_for_canary(render.finished_work(), render.render_lanes());
         record_host_root_finished_work_pending_commit_for_canary(store, render, handoff_order)
             .unwrap()
+    }
+
+    fn prepare_root_work_loop_managed_child_append_execution_fixture(
+        store: &mut FiberRootStore<RecordingHost>,
+        host: &mut RecordingHost,
+        root_id: FiberRootId,
+        raw: u64,
+    ) -> ManagedChildRootWorkLoopHostExecutionFixture {
+        let mut detached_hosts = DetachedHostRecords::new_for_canary();
+        let current_root = store.root(root_id).unwrap().current();
+        let parent_props = PropsHandle::from_raw(raw + 1);
+        let child_props = PropsHandle::from_raw(raw + 2);
+        let mode = store.fiber_arena().get(current_root).unwrap().mode();
+
+        let current_parent =
+            store
+                .fiber_arena_mut()
+                .create_fiber(FiberTag::HostComponent, None, parent_props, mode);
+        let parent_state_node = create_detached_test_host_component_for_existing_fiber_for_canary(
+            store,
+            host,
+            &mut detached_hosts,
+            root_id,
+            current_parent,
+            "section",
+            parent_props,
+            &[],
+        )
+        .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(current_root, &[current_parent])
+            .unwrap();
+
+        update_container(store, root_id, RootElementHandle::from_raw(raw + 3), None).unwrap();
+        let render = render_host_root_for_lanes(store, root_id, Lanes::DEFAULT).unwrap();
+        let work_parent = store
+            .fiber_arena_mut()
+            .create_work_in_progress(current_parent, parent_props)
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(work_parent).unwrap();
+            node.set_state_node(parent_state_node);
+            node.set_memoized_props(parent_props);
+            node.set_lanes(Lanes::NO);
+        }
+        let child =
+            store
+                .fiber_arena_mut()
+                .create_fiber(FiberTag::HostComponent, None, child_props, mode);
+        store
+            .fiber_arena_mut()
+            .get_mut(child)
+            .unwrap()
+            .set_flags(FiberFlags::PLACEMENT);
+        let child_state_node = create_detached_test_host_component_for_existing_fiber_for_canary(
+            store,
+            host,
+            &mut detached_hosts,
+            root_id,
+            child,
+            "span",
+            child_props,
+            &[],
+        )
+        .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(work_parent, &[child])
+            .unwrap();
+        bubble_managed_child_sibling_order_root_work_loop_fiber(store, child);
+        bubble_managed_child_sibling_order_root_work_loop_fiber(store, work_parent);
+        store
+            .fiber_arena_mut()
+            .set_children(render.finished_work(), &[work_parent])
+            .unwrap();
+        bubble_managed_child_sibling_order_root_work_loop_fiber(store, render.finished_work());
+
+        let complete_work = host_component_managed_child_complete_work_record_for_canary(
+            store.fiber_arena(),
+            root_id,
+            work_parent,
+            child,
+            HostComponentManagedChildMutationKindForCanary::Placement,
+        )
+        .unwrap();
+        let pending = prepare_root_work_loop_managed_child_pending_commit(
+            store,
+            render,
+            ROOT_WORK_LOOP_MANAGED_CHILD_APPEND_SOURCE_ORDER,
+        );
+        let previous_current = store.root(root_id).unwrap().current();
+        let operations_before_apply = host.operations();
+        let token_count_before_apply = store.host_tokens().len();
+
+        ManagedChildRootWorkLoopHostExecutionFixture {
+            render,
+            pending,
+            complete_work,
+            current_parent,
+            work_parent,
+            child,
+            parent_state_node,
+            child_state_node,
+            previous_current,
+            detached_hosts,
+            operations_before_apply,
+            token_count_before_apply,
+        }
     }
 
     fn prepare_root_work_loop_managed_child_placement_sibling_order_fixture(
@@ -6701,7 +6858,7 @@ mod tests {
                 HostComponentManagedChildMutationKindForCanary::Placement,
             )
             .unwrap();
-        let pending = prepare_root_work_loop_managed_child_sibling_order_pending_commit(
+        let pending = prepare_root_work_loop_managed_child_pending_commit(
             store,
             render,
             ROOT_WORK_LOOP_MANAGED_CHILD_SIBLING_ORDER_PLACEMENT_SOURCE_ORDER,
@@ -6824,7 +6981,7 @@ mod tests {
                 HostComponentManagedChildMutationKindForCanary::DeleteDetach,
             )
             .unwrap();
-        let pending = prepare_root_work_loop_managed_child_sibling_order_pending_commit(
+        let pending = prepare_root_work_loop_managed_child_pending_commit(
             store,
             render,
             ROOT_WORK_LOOP_MANAGED_CHILD_SIBLING_ORDER_DELETE_SOURCE_ORDER,
@@ -6848,6 +7005,302 @@ mod tests {
             order_sibling_props,
             previous_current,
             deletion_list: Some(deletion_list),
+        }
+    }
+
+    fn prepare_root_work_loop_managed_child_placement_sibling_order_execution_fixture(
+        store: &mut FiberRootStore<RecordingHost>,
+        host: &mut RecordingHost,
+        root_id: FiberRootId,
+        raw: u64,
+    ) -> ManagedChildSiblingOrderRootWorkLoopHostExecutionFixture {
+        let mut detached_hosts = DetachedHostRecords::new_for_canary();
+        let current_root = store.root(root_id).unwrap().current();
+        let parent_props = PropsHandle::from_raw(raw + 1);
+        let child_props = PropsHandle::from_raw(raw + 2);
+        let order_sibling_props = PropsHandle::from_raw(raw + 3);
+        let mode = store.fiber_arena().get(current_root).unwrap().mode();
+
+        let current_parent =
+            store
+                .fiber_arena_mut()
+                .create_fiber(FiberTag::HostComponent, None, parent_props, mode);
+        let order_sibling_current = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostComponent,
+            None,
+            order_sibling_props,
+            mode,
+        );
+        let order_sibling_state_node =
+            create_detached_test_host_component_for_existing_fiber_for_canary(
+                store,
+                host,
+                &mut detached_hosts,
+                root_id,
+                order_sibling_current,
+                "strong",
+                order_sibling_props,
+                &[],
+            )
+            .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(current_parent, &[order_sibling_current])
+            .unwrap();
+        let parent_state_node = create_detached_test_host_component_for_existing_fiber_for_canary(
+            store,
+            host,
+            &mut detached_hosts,
+            root_id,
+            current_parent,
+            "section",
+            parent_props,
+            &[order_sibling_current],
+        )
+        .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(current_root, &[current_parent])
+            .unwrap();
+
+        update_container(store, root_id, RootElementHandle::from_raw(raw + 4), None).unwrap();
+        let render = render_host_root_for_lanes(store, root_id, Lanes::DEFAULT).unwrap();
+        let work_parent = store
+            .fiber_arena_mut()
+            .create_work_in_progress(current_parent, parent_props)
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(work_parent).unwrap();
+            node.set_state_node(parent_state_node);
+            node.set_memoized_props(parent_props);
+            node.set_lanes(Lanes::NO);
+        }
+        let child =
+            store
+                .fiber_arena_mut()
+                .create_fiber(FiberTag::HostComponent, None, child_props, mode);
+        store
+            .fiber_arena_mut()
+            .get_mut(child)
+            .unwrap()
+            .set_flags(FiberFlags::PLACEMENT);
+        let child_state_node = create_detached_test_host_component_for_existing_fiber_for_canary(
+            store,
+            host,
+            &mut detached_hosts,
+            root_id,
+            child,
+            "span",
+            child_props,
+            &[],
+        )
+        .unwrap();
+        let order_sibling = store
+            .fiber_arena_mut()
+            .create_work_in_progress(order_sibling_current, order_sibling_props)
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(order_sibling).unwrap();
+            node.set_state_node(order_sibling_state_node);
+            node.set_memoized_props(order_sibling_props);
+            node.set_lanes(Lanes::NO);
+        }
+        store
+            .fiber_arena_mut()
+            .set_children(work_parent, &[child, order_sibling])
+            .unwrap();
+        bubble_managed_child_sibling_order_root_work_loop_fiber(store, child);
+        bubble_managed_child_sibling_order_root_work_loop_fiber(store, order_sibling);
+        bubble_managed_child_sibling_order_root_work_loop_fiber(store, work_parent);
+        store
+            .fiber_arena_mut()
+            .set_children(render.finished_work(), &[work_parent])
+            .unwrap();
+        bubble_managed_child_sibling_order_root_work_loop_fiber(store, render.finished_work());
+
+        let complete_work =
+            host_component_managed_child_sibling_order_complete_work_record_for_canary(
+                store.fiber_arena(),
+                root_id,
+                work_parent,
+                child,
+                order_sibling,
+                HostComponentManagedChildMutationKindForCanary::Placement,
+            )
+            .unwrap();
+        let pending = prepare_root_work_loop_managed_child_pending_commit(
+            store,
+            render,
+            ROOT_WORK_LOOP_MANAGED_CHILD_SIBLING_ORDER_PLACEMENT_SOURCE_ORDER,
+        );
+        let previous_current = store.root(root_id).unwrap().current();
+        let operations_before_apply = host.operations();
+        let token_count_before_apply = store.host_tokens().len();
+
+        ManagedChildSiblingOrderRootWorkLoopHostExecutionFixture {
+            render,
+            pending,
+            complete_work,
+            current_parent,
+            work_parent,
+            child,
+            order_sibling,
+            order_sibling_current,
+            parent_state_node,
+            child_state_node,
+            order_sibling_state_node,
+            previous_current,
+            deletion_list: None,
+            detached_hosts,
+            operations_before_apply,
+            token_count_before_apply,
+        }
+    }
+
+    fn prepare_root_work_loop_managed_child_delete_sibling_order_execution_fixture(
+        store: &mut FiberRootStore<RecordingHost>,
+        host: &mut RecordingHost,
+        root_id: FiberRootId,
+        raw: u64,
+    ) -> ManagedChildSiblingOrderRootWorkLoopHostExecutionFixture {
+        let mut detached_hosts = DetachedHostRecords::new_for_canary();
+        let current_root = store.root(root_id).unwrap().current();
+        let parent_props = PropsHandle::from_raw(raw + 1);
+        let child_props = PropsHandle::from_raw(raw + 2);
+        let order_sibling_props = PropsHandle::from_raw(raw + 3);
+        let mode = store.fiber_arena().get(current_root).unwrap().mode();
+
+        let current_parent =
+            store
+                .fiber_arena_mut()
+                .create_fiber(FiberTag::HostComponent, None, parent_props, mode);
+        let order_sibling_current = store.fiber_arena_mut().create_fiber(
+            FiberTag::HostComponent,
+            None,
+            order_sibling_props,
+            mode,
+        );
+        let child =
+            store
+                .fiber_arena_mut()
+                .create_fiber(FiberTag::HostComponent, None, child_props, mode);
+        let order_sibling_state_node =
+            create_detached_test_host_component_for_existing_fiber_for_canary(
+                store,
+                host,
+                &mut detached_hosts,
+                root_id,
+                order_sibling_current,
+                "strong",
+                order_sibling_props,
+                &[],
+            )
+            .unwrap();
+        let child_state_node = create_detached_test_host_component_for_existing_fiber_for_canary(
+            store,
+            host,
+            &mut detached_hosts,
+            root_id,
+            child,
+            "span",
+            child_props,
+            &[],
+        )
+        .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(current_parent, &[order_sibling_current, child])
+            .unwrap();
+        let parent_state_node = create_detached_test_host_component_for_existing_fiber_for_canary(
+            store,
+            host,
+            &mut detached_hosts,
+            root_id,
+            current_parent,
+            "section",
+            parent_props,
+            &[order_sibling_current, child],
+        )
+        .unwrap();
+        store
+            .fiber_arena_mut()
+            .set_children(current_root, &[current_parent])
+            .unwrap();
+
+        update_container(store, root_id, RootElementHandle::from_raw(raw + 4), None).unwrap();
+        let render = render_host_root_for_lanes(store, root_id, Lanes::DEFAULT).unwrap();
+        let work_parent = store
+            .fiber_arena_mut()
+            .create_work_in_progress(current_parent, parent_props)
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(work_parent).unwrap();
+            node.set_state_node(parent_state_node);
+            node.set_memoized_props(parent_props);
+            node.set_lanes(Lanes::NO);
+        }
+        let order_sibling = store
+            .fiber_arena_mut()
+            .create_work_in_progress(order_sibling_current, order_sibling_props)
+            .unwrap();
+        {
+            let node = store.fiber_arena_mut().get_mut(order_sibling).unwrap();
+            node.set_state_node(order_sibling_state_node);
+            node.set_memoized_props(order_sibling_props);
+            node.set_lanes(Lanes::NO);
+        }
+        store
+            .fiber_arena_mut()
+            .set_children(work_parent, &[order_sibling])
+            .unwrap();
+        let deletion_list = store
+            .fiber_arena_mut()
+            .mark_child_for_deletion(work_parent, child)
+            .unwrap();
+        bubble_managed_child_sibling_order_root_work_loop_fiber(store, order_sibling);
+        bubble_managed_child_sibling_order_root_work_loop_fiber(store, work_parent);
+        store
+            .fiber_arena_mut()
+            .set_children(render.finished_work(), &[work_parent])
+            .unwrap();
+        bubble_managed_child_sibling_order_root_work_loop_fiber(store, render.finished_work());
+
+        let complete_work =
+            host_component_managed_child_sibling_order_complete_work_record_for_canary(
+                store.fiber_arena(),
+                root_id,
+                work_parent,
+                child,
+                order_sibling,
+                HostComponentManagedChildMutationKindForCanary::DeleteDetach,
+            )
+            .unwrap();
+        let pending = prepare_root_work_loop_managed_child_pending_commit(
+            store,
+            render,
+            ROOT_WORK_LOOP_MANAGED_CHILD_SIBLING_ORDER_DELETE_SOURCE_ORDER,
+        );
+        let previous_current = store.root(root_id).unwrap().current();
+        let operations_before_apply = host.operations();
+        let token_count_before_apply = store.host_tokens().len();
+
+        ManagedChildSiblingOrderRootWorkLoopHostExecutionFixture {
+            render,
+            pending,
+            complete_work,
+            current_parent,
+            work_parent,
+            child,
+            order_sibling,
+            order_sibling_current,
+            parent_state_node,
+            child_state_node,
+            order_sibling_state_node,
+            previous_current,
+            deletion_list: Some(deletion_list),
+            detached_hosts,
+            operations_before_apply,
+            token_count_before_apply,
         }
     }
 
@@ -7042,6 +7495,211 @@ mod tests {
             RootRenderExitStatus::NoWork
         );
         assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    fn assert_root_work_loop_managed_child_append_host_execution(
+        store: &FiberRootStore<RecordingHost>,
+        host: &RecordingHost,
+        root_id: FiberRootId,
+        fixture: &ManagedChildRootWorkLoopHostExecutionFixture,
+        handoff: &HostRootManagedChildCommitHandoffRecordForCanary,
+        diagnostic: &TestHostRootManagedChildExecutionDiagnosticForCanary,
+    ) {
+        assert_eq!(handoff.root(), root_id);
+        assert_eq!(handoff.finished_work(), fixture.render.finished_work());
+        assert_eq!(handoff.complete_work(), fixture.complete_work);
+        assert_eq!(fixture.previous_current, fixture.render.current());
+        assert_eq!(
+            handoff.execution_request().previous_current(),
+            fixture.previous_current
+        );
+        assert_eq!(
+            handoff.source_handoff_order(),
+            fixture.pending.handoff_order()
+        );
+        assert_eq!(
+            handoff.commit_order(),
+            ROOT_WORK_LOOP_MANAGED_CHILD_APPEND_COMMIT_ORDER
+        );
+        assert_eq!(
+            handoff.request_order(),
+            ROOT_WORK_LOOP_MANAGED_CHILD_APPEND_REQUEST_ORDER
+        );
+        assert_eq!(
+            handoff.kind(),
+            HostComponentManagedChildMutationKindForCanary::Placement
+        );
+        assert!(handoff.private_test_host_mutation_allowed());
+        assert!(handoff.public_root_rendering_blocked());
+        assert!(handoff.public_renderer_mutation_blocked());
+        assert!(!handoff.public_dom_compatibility_claimed());
+        assert!(!handoff.test_renderer_compatibility_claimed());
+
+        assert_eq!(diagnostic.root(), root_id);
+        assert_eq!(diagnostic.finished_work(), fixture.render.finished_work());
+        assert_eq!(
+            diagnostic.source_handoff_order(),
+            ROOT_WORK_LOOP_MANAGED_CHILD_APPEND_SOURCE_ORDER
+        );
+        assert_eq!(
+            diagnostic.commit_order(),
+            ROOT_WORK_LOOP_MANAGED_CHILD_APPEND_COMMIT_ORDER
+        );
+        assert_eq!(
+            diagnostic.request_order(),
+            ROOT_WORK_LOOP_MANAGED_CHILD_APPEND_REQUEST_ORDER
+        );
+        assert_eq!(
+            diagnostic.kind(),
+            HostComponentManagedChildMutationKindForCanary::Placement
+        );
+        assert_eq!(diagnostic.mutation(), handoff.mutation());
+        assert_eq!(
+            diagnostic.mutation_status(),
+            TestHostRootMutationApplyStatus::Applied(TestHostRootMutationHostCall::AppendChild)
+        );
+        assert_eq!(diagnostic.cleanup_status(), None);
+        assert_eq!(diagnostic.applied_host_call_count(), 1);
+        assert_eq!(diagnostic.deletion_cleanup_apply_count(), 0);
+        assert!(diagnostic.private_test_host_mutation_executed());
+        assert!(diagnostic.public_root_rendering_blocked());
+        assert!(diagnostic.public_renderer_mutation_blocked());
+        assert!(!diagnostic.react_dom_compatibility_claimed());
+        assert!(!diagnostic.test_renderer_compatibility_claimed());
+        assert!(!diagnostic.hydration_events_refs_resources_forms_claimed());
+
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            fixture.render.finished_work()
+        );
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            None
+        );
+        assert_eq!(
+            store
+                .root(root_id)
+                .unwrap()
+                .scheduling()
+                .render_exit_status(),
+            RootRenderExitStatus::NoWork
+        );
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(fixture.work_parent)
+                .unwrap()
+                .alternate(),
+            Some(fixture.current_parent)
+        );
+        assert!(
+            fixture
+                .detached_hosts
+                .instance_metadata(fixture.child_state_node)
+                .unwrap()
+                .is_active()
+        );
+        assert_eq!(store.host_tokens().len(), fixture.token_count_before_apply);
+        let mut expected_operations = fixture.operations_before_apply.clone();
+        expected_operations.push("append_child");
+        assert_eq!(host.operations(), expected_operations);
+    }
+
+    fn assert_root_work_loop_managed_child_sibling_order_host_execution(
+        store: &FiberRootStore<RecordingHost>,
+        host: &RecordingHost,
+        root_id: FiberRootId,
+        fixture: &ManagedChildSiblingOrderRootWorkLoopHostExecutionFixture,
+        handoff: &HostRootManagedChildSiblingOrderCommitHandoffRecordForCanary,
+        diagnostic: &TestHostRootManagedChildSiblingOrderExecutionDiagnosticForCanary,
+        expected_status: TestHostRootMutationApplyStatus,
+        expected_operation: &'static str,
+        expected_cleanup_count: usize,
+        expected_token_count_after_apply: usize,
+    ) {
+        assert_eq!(handoff.root(), root_id);
+        assert_eq!(handoff.finished_work(), fixture.render.finished_work());
+        assert_eq!(handoff.complete_work(), fixture.complete_work);
+        assert_eq!(fixture.previous_current, fixture.render.current());
+        assert_eq!(
+            handoff.execution_request().previous_current(),
+            fixture.previous_current
+        );
+        assert_eq!(
+            handoff.source_handoff_order(),
+            fixture.pending.handoff_order()
+        );
+        assert_eq!(diagnostic.root(), root_id);
+        assert_eq!(diagnostic.finished_work(), fixture.render.finished_work());
+        assert_eq!(
+            diagnostic.source_handoff_order(),
+            fixture.pending.handoff_order()
+        );
+        assert_eq!(diagnostic.commit_order(), handoff.commit_order());
+        assert_eq!(diagnostic.request_order(), handoff.request_order());
+        assert_eq!(diagnostic.kind(), handoff.kind());
+        assert_eq!(
+            diagnostic.order_evidence_name(),
+            handoff.order_evidence_name()
+        );
+        assert_eq!(diagnostic.order_sibling(), fixture.order_sibling);
+        assert_eq!(
+            diagnostic.order_sibling_state_node(),
+            fixture.order_sibling_state_node
+        );
+        assert_eq!(diagnostic.mutation(), handoff.mutation());
+        assert_eq!(
+            diagnostic.mutation().parent_state_node(),
+            fixture.parent_state_node
+        );
+        assert_eq!(diagnostic.mutation_status(), expected_status);
+        assert_eq!(diagnostic.applied_host_call_count(), 1);
+        assert_eq!(
+            diagnostic.deletion_cleanup_apply_count(),
+            expected_cleanup_count
+        );
+        assert!(diagnostic.private_test_host_mutation_executed());
+        assert!(diagnostic.public_root_rendering_blocked());
+        assert!(diagnostic.public_renderer_mutation_blocked());
+        assert!(!diagnostic.react_dom_compatibility_claimed());
+        assert!(!diagnostic.test_renderer_compatibility_claimed());
+        assert!(!diagnostic.hydration_events_refs_resources_forms_claimed());
+
+        assert_eq!(
+            store.root(root_id).unwrap().current(),
+            fixture.render.finished_work()
+        );
+        assert_eq!(store.root(root_id).unwrap().finished_work(), None);
+        assert_eq!(store.root(root_id).unwrap().finished_lanes(), Lanes::NO);
+        assert_eq!(
+            store.root(root_id).unwrap().scheduling().work_in_progress(),
+            None
+        );
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(fixture.work_parent)
+                .unwrap()
+                .alternate(),
+            Some(fixture.current_parent)
+        );
+        assert_eq!(
+            store
+                .fiber_arena()
+                .get(fixture.order_sibling)
+                .unwrap()
+                .alternate(),
+            Some(fixture.order_sibling_current)
+        );
+        assert_eq!(store.host_tokens().len(), expected_token_count_after_apply);
+        let mut expected_operations = fixture.operations_before_apply.clone();
+        expected_operations.push(expected_operation);
+        if expected_cleanup_count > 0 {
+            expected_operations.push("detach_deleted_instance");
+        }
+        assert_eq!(host.operations(), expected_operations);
     }
 
     fn current_host_root_element(
@@ -12943,6 +13601,267 @@ mod tests {
         assert_eq!(
             host.operations().len(),
             record.host_operation_count_after_commit()
+        );
+    }
+
+    #[test]
+    fn root_work_loop_managed_child_placement_handoff_executes_private_append_child_after_commit() {
+        let (mut store, root_id, mut host) = root_store();
+        let mut fixture = prepare_root_work_loop_managed_child_append_execution_fixture(
+            &mut store, &mut host, root_id, 82_800,
+        );
+
+        let handoff = commit_managed_child_complete_work_handoff_for_canary(
+            &mut store,
+            fixture.render,
+            Some(fixture.pending),
+            fixture.complete_work,
+            0,
+            ROOT_WORK_LOOP_MANAGED_CHILD_APPEND_COMMIT_ORDER,
+            ROOT_WORK_LOOP_MANAGED_CHILD_APPEND_REQUEST_ORDER,
+        )
+        .unwrap();
+        let diagnostic = apply_managed_child_complete_work_handoff_for_canary(
+            &mut store,
+            &mut host,
+            &handoff,
+            &mut fixture.detached_hosts,
+        )
+        .unwrap();
+
+        assert_eq!(fixture.previous_current, fixture.render.current());
+        assert_eq!(fixture.complete_work.root(), root_id);
+        assert_eq!(
+            fixture.complete_work.parent_current(),
+            fixture.current_parent
+        );
+        assert_eq!(
+            fixture.complete_work.parent_work_in_progress(),
+            fixture.work_parent
+        );
+        assert_eq!(
+            fixture.complete_work.parent_state_node(),
+            fixture.parent_state_node
+        );
+        assert_eq!(fixture.complete_work.child(), fixture.child);
+        assert_eq!(
+            fixture.complete_work.child_state_node(),
+            fixture.child_state_node
+        );
+        assert_eq!(
+            fixture.complete_work.kind(),
+            HostComponentManagedChildMutationKindForCanary::Placement
+        );
+        assert_eq!(fixture.complete_work.child_alternate(), None);
+        assert_eq!(fixture.complete_work.child_flags(), FiberFlags::PLACEMENT);
+        assert!(fixture.complete_work.private_reconciler_handoff_only());
+        assert!(!fixture.complete_work.public_dom_compatibility_claimed());
+        assert!(!fixture.complete_work.test_renderer_compatibility_claimed());
+        assert!(
+            !fixture
+                .complete_work
+                .broad_reconciliation_traversal_claimed()
+        );
+
+        assert_eq!(
+            handoff.mutation().source(),
+            HostRootMutationApplyRecordSource::MutationPhase(
+                HostRootMutationPhaseRecordKind::Placement
+            )
+        );
+        assert_eq!(
+            handoff.mutation().kind(),
+            HostRootMutationApplyRecordKind::AppendPlacementToHostParent
+        );
+        assert_eq!(handoff.mutation().parent(), fixture.work_parent);
+        assert_eq!(
+            handoff.mutation().parent_state_node(),
+            fixture.parent_state_node
+        );
+        assert_eq!(handoff.mutation().fiber(), fixture.child);
+        assert_eq!(handoff.mutation().state_node(), fixture.child_state_node);
+        let placement_sibling = handoff.mutation().placement_sibling().unwrap();
+        assert_eq!(
+            placement_sibling.status(),
+            HostRootPlacementSiblingStatus::Append
+        );
+        assert_eq!(placement_sibling.sibling(), None);
+        assert_eq!(placement_sibling.sibling_tag(), None);
+        assert_eq!(
+            placement_sibling.sibling_state_node(),
+            StateNodeHandle::NONE
+        );
+        assert_eq!(placement_sibling.skipped_pending_sibling_count(), 0);
+        assert_root_work_loop_managed_child_append_host_execution(
+            &store,
+            &host,
+            root_id,
+            &fixture,
+            &handoff,
+            &diagnostic,
+        );
+    }
+
+    #[test]
+    fn root_work_loop_managed_child_sibling_order_placement_executes_private_insert_before() {
+        let (mut store, root_id, mut host) = root_store();
+        let mut fixture =
+            prepare_root_work_loop_managed_child_placement_sibling_order_execution_fixture(
+                &mut store, &mut host, root_id, 82_900,
+            );
+
+        let handoff = commit_managed_child_sibling_order_complete_work_handoff_for_canary(
+            &mut store,
+            fixture.render,
+            Some(fixture.pending),
+            fixture.complete_work,
+            0,
+            ROOT_WORK_LOOP_MANAGED_CHILD_SIBLING_ORDER_PLACEMENT_COMMIT_ORDER,
+            ROOT_WORK_LOOP_MANAGED_CHILD_SIBLING_ORDER_PLACEMENT_REQUEST_ORDER,
+        )
+        .unwrap();
+        let diagnostic = apply_managed_child_sibling_order_complete_work_handoff_for_canary(
+            &mut store,
+            &mut host,
+            &handoff,
+            &mut fixture.detached_hosts,
+        )
+        .unwrap();
+
+        assert_eq!(
+            handoff.kind(),
+            HostComponentManagedChildMutationKindForCanary::Placement
+        );
+        assert_eq!(handoff.order_evidence_name(), "next-sibling");
+        assert_eq!(
+            handoff.mutation().source(),
+            HostRootMutationApplyRecordSource::MutationPhase(
+                HostRootMutationPhaseRecordKind::Placement
+            )
+        );
+        assert_eq!(
+            handoff.mutation().kind(),
+            HostRootMutationApplyRecordKind::InsertPlacementInHostParentBefore
+        );
+        let placement_sibling = handoff.mutation().placement_sibling().unwrap();
+        assert_eq!(
+            placement_sibling.status(),
+            HostRootPlacementSiblingStatus::InsertBefore
+        );
+        assert_eq!(placement_sibling.sibling(), Some(fixture.order_sibling));
+        assert_eq!(
+            placement_sibling.sibling_state_node(),
+            fixture.order_sibling_state_node
+        );
+        assert!(placement_sibling.can_insert_before());
+        assert_root_work_loop_managed_child_sibling_order_host_execution(
+            &store,
+            &host,
+            root_id,
+            &fixture,
+            &handoff,
+            &diagnostic,
+            TestHostRootMutationApplyStatus::Applied(TestHostRootMutationHostCall::InsertBefore),
+            "insert_before",
+            0,
+            fixture.token_count_before_apply,
+        );
+        assert!(
+            fixture
+                .detached_hosts
+                .instance_metadata(fixture.child_state_node)
+                .unwrap()
+                .is_active()
+        );
+        assert!(
+            fixture
+                .detached_hosts
+                .instance_metadata(fixture.order_sibling_state_node)
+                .unwrap()
+                .is_active()
+        );
+    }
+
+    #[test]
+    fn root_work_loop_managed_child_sibling_order_delete_executes_private_remove_after_commit() {
+        let (mut store, root_id, mut host) = root_store();
+        let mut fixture =
+            prepare_root_work_loop_managed_child_delete_sibling_order_execution_fixture(
+                &mut store, &mut host, root_id, 83_000,
+            );
+        let deletion_list = fixture.deletion_list.unwrap();
+
+        let handoff = commit_managed_child_sibling_order_complete_work_handoff_for_canary(
+            &mut store,
+            fixture.render,
+            Some(fixture.pending),
+            fixture.complete_work,
+            0,
+            ROOT_WORK_LOOP_MANAGED_CHILD_SIBLING_ORDER_DELETE_COMMIT_ORDER,
+            ROOT_WORK_LOOP_MANAGED_CHILD_SIBLING_ORDER_DELETE_REQUEST_ORDER,
+        )
+        .unwrap();
+        let diagnostic = apply_managed_child_sibling_order_complete_work_handoff_for_canary(
+            &mut store,
+            &mut host,
+            &handoff,
+            &mut fixture.detached_hosts,
+        )
+        .unwrap();
+
+        assert_eq!(
+            handoff.kind(),
+            HostComponentManagedChildMutationKindForCanary::DeleteDetach
+        );
+        assert_eq!(handoff.order_evidence_name(), "previous-sibling");
+        assert_eq!(
+            handoff.mutation().source(),
+            HostRootMutationApplyRecordSource::DeletionList(deletion_list)
+        );
+        assert_eq!(
+            handoff.mutation().kind(),
+            HostRootMutationApplyRecordKind::RemoveDeletedFromHostParent
+        );
+        assert_eq!(handoff.mutation().placement_sibling(), None);
+        assert_eq!(handoff.commit().deletion_lists().len(), 1);
+        assert_eq!(handoff.commit().deletion_lists()[0].list(), deletion_list);
+        assert_eq!(
+            handoff.commit().deletion_lists()[0].deleted(),
+            &[fixture.child]
+        );
+        assert_root_work_loop_managed_child_sibling_order_host_execution(
+            &store,
+            &host,
+            root_id,
+            &fixture,
+            &handoff,
+            &diagnostic,
+            TestHostRootMutationApplyStatus::Applied(TestHostRootMutationHostCall::RemoveChild),
+            "remove_child",
+            1,
+            fixture.token_count_before_apply + 1,
+        );
+        assert!(
+            !fixture
+                .detached_hosts
+                .instance_metadata(fixture.child_state_node)
+                .unwrap()
+                .is_active()
+        );
+        assert!(
+            fixture
+                .detached_hosts
+                .instance_metadata(fixture.order_sibling_state_node)
+                .unwrap()
+                .is_active()
+        );
+        assert_eq!(
+            diagnostic.cleanup_status(),
+            Some(
+                crate::host_work::TestHostRootDeletionCleanupStatus::Applied(
+                    crate::host_work::TestHostRootDeletionCleanupAction::DetachDeletedInstance
+                )
+            )
         );
     }
 
