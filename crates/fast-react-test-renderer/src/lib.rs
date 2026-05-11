@@ -3535,6 +3535,9 @@ pub const TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_IDENTITY_DIAGNOSTI
     "fast-react-test-renderer.tojson.multi-child-host-text.finished-work-identity";
 pub const TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_IDENTITY_STATUS: &str =
     "private-tojson-multi-child-host-text-lifecycle-native-finished-work-validated-public-blocked";
+pub const TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_FIBER_INSPECTION_DIAGNOSTIC_NAME: &str =
+    "fast-react-test-renderer.tojson.direct-multi-child-host-text.committed-fiber-inspection";
+pub const TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_FIBER_INSPECTION_STATUS: &str = "private-tojson-direct-multi-child-host-text-current-fiber-inspection-validated-public-native-package-blocked";
 pub const TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_GATE_DIAGNOSTIC_NAME: &str =
     "fast-react-test-renderer.serialization.private-unmount-nested-source-report-gate";
 pub const TEST_RENDERER_PRIVATE_UNMOUNT_NESTED_SOURCE_REPORT_GATE_STATUS: &str =
@@ -9296,6 +9299,416 @@ impl TestRendererPrivateMultiChildHostTextFinishedWorkIdentityGate {
             && !self.cjs_facade_available()
             && !self.package_compatibility_claimed()
             && !self.compatibility_claimed()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TestRendererPrivateDirectMultiChildHostTextCommittedFiberInspection {
+    diagnostic_name: &'static str,
+    status: &'static str,
+    root: FiberRootId,
+    renderer_id: TestRendererId,
+    root_scheduled_update_sequence: usize,
+    public_surface: &'static str,
+    source_route_record_id: &'static str,
+    source_route_status: &'static str,
+    source_lifecycle_diagnostic_name: &'static str,
+    source_lifecycle_status: &'static str,
+    source_identity_diagnostic_name: &'static str,
+    source_identity_status: &'static str,
+    source_row_id: &'static str,
+    host_output_update_kind: TestRendererRootUpdateKind,
+    host_output_shape: TestRendererPrivateToJsonHostOutputShape,
+    current_fiber_shape: [&'static str; 4],
+    root_child_count: usize,
+    host_component_child_count: usize,
+    host_text_count: usize,
+    render_current: TestRendererFiberHandleDiagnostics,
+    render_finished_work: TestRendererFiberHandleDiagnostics,
+    commit_previous_current: TestRendererFiberHandleDiagnostics,
+    commit_current: TestRendererFiberHandleDiagnostics,
+    store_current: TestRendererFiberHandleDiagnostics,
+    host_component_fiber: TestRendererFiberHandleDiagnostics,
+    stable_text_fiber: TestRendererFiberHandleDiagnostics,
+    placed_text_fiber: TestRendererFiberHandleDiagnostics,
+    stable_text_sibling: Option<TestRendererFiberHandleDiagnostics>,
+    placed_text_sibling: Option<TestRendererFiberHandleDiagnostics>,
+    host_component_element_type_raw: u64,
+    host_component_props_raw: u64,
+    stable_text_props_raw: u64,
+    placed_text_props_raw: u64,
+    host_component_state_node_raw: u64,
+    placed_text_state_node_raw: u64,
+    render_lanes_bits: u32,
+    commit_finished_lanes_bits: u32,
+    commit_remaining_lanes_bits: u32,
+    commit_pending_lanes_bits: u32,
+    route_evidence_accepted: bool,
+    lifecycle_evidence_accepted: bool,
+    identity_evidence_accepted: bool,
+    row_identity_accepted: bool,
+    current_root_matches_commit: bool,
+    finished_work_matches_current_root: bool,
+    lanes_match: bool,
+    current_child_topology_matches_output: bool,
+    placement_handoff_accepted: bool,
+    generic_reconciler_direct_inspection_available: bool,
+    broad_multichild_fiber_inspection_available: bool,
+    public_to_json_available: bool,
+    public_to_tree_available: bool,
+    public_test_instance_available: bool,
+    public_serialization_available: bool,
+    public_route_available: bool,
+    native_bridge_loading_available: bool,
+    native_bridge_available: bool,
+    native_execution_available: bool,
+    js_facade_available: bool,
+    cjs_facade_available: bool,
+    package_compatibility_claimed: bool,
+    compatibility_claimed: bool,
+}
+
+impl TestRendererPrivateDirectMultiChildHostTextCommittedFiberInspection {
+    #[must_use]
+    pub const fn diagnostic_name(self) -> &'static str {
+        self.diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn status(self) -> &'static str {
+        self.status
+    }
+
+    #[must_use]
+    pub const fn root(self) -> FiberRootId {
+        self.root
+    }
+
+    #[cfg(test)]
+    const fn renderer_id(self) -> TestRendererId {
+        self.renderer_id
+    }
+
+    #[must_use]
+    pub const fn root_scheduled_update_sequence(self) -> usize {
+        self.root_scheduled_update_sequence
+    }
+
+    #[must_use]
+    pub const fn public_surface(self) -> &'static str {
+        self.public_surface
+    }
+
+    #[must_use]
+    pub const fn source_route_record_id(self) -> &'static str {
+        self.source_route_record_id
+    }
+
+    #[must_use]
+    pub const fn source_route_status(self) -> &'static str {
+        self.source_route_status
+    }
+
+    #[must_use]
+    pub const fn source_lifecycle_diagnostic_name(self) -> &'static str {
+        self.source_lifecycle_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn source_lifecycle_status(self) -> &'static str {
+        self.source_lifecycle_status
+    }
+
+    #[must_use]
+    pub const fn source_identity_diagnostic_name(self) -> &'static str {
+        self.source_identity_diagnostic_name
+    }
+
+    #[must_use]
+    pub const fn source_identity_status(self) -> &'static str {
+        self.source_identity_status
+    }
+
+    #[must_use]
+    pub const fn source_row_id(self) -> &'static str {
+        self.source_row_id
+    }
+
+    #[must_use]
+    pub const fn host_output_update_kind(self) -> TestRendererRootUpdateKind {
+        self.host_output_update_kind
+    }
+
+    #[must_use]
+    pub const fn host_output_shape(self) -> TestRendererPrivateToJsonHostOutputShape {
+        self.host_output_shape
+    }
+
+    #[must_use]
+    pub const fn current_fiber_shape(self) -> [&'static str; 4] {
+        self.current_fiber_shape
+    }
+
+    #[must_use]
+    pub const fn root_child_count(self) -> usize {
+        self.root_child_count
+    }
+
+    #[must_use]
+    pub const fn host_component_child_count(self) -> usize {
+        self.host_component_child_count
+    }
+
+    #[must_use]
+    pub const fn host_text_count(self) -> usize {
+        self.host_text_count
+    }
+
+    #[must_use]
+    pub const fn render_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.render_current
+    }
+
+    #[must_use]
+    pub const fn render_finished_work(self) -> TestRendererFiberHandleDiagnostics {
+        self.render_finished_work
+    }
+
+    #[must_use]
+    pub const fn commit_previous_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.commit_previous_current
+    }
+
+    #[must_use]
+    pub const fn commit_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.commit_current
+    }
+
+    #[must_use]
+    pub const fn store_current(self) -> TestRendererFiberHandleDiagnostics {
+        self.store_current
+    }
+
+    #[must_use]
+    pub const fn host_component_fiber(self) -> TestRendererFiberHandleDiagnostics {
+        self.host_component_fiber
+    }
+
+    #[must_use]
+    pub const fn stable_text_fiber(self) -> TestRendererFiberHandleDiagnostics {
+        self.stable_text_fiber
+    }
+
+    #[must_use]
+    pub const fn placed_text_fiber(self) -> TestRendererFiberHandleDiagnostics {
+        self.placed_text_fiber
+    }
+
+    #[must_use]
+    pub const fn stable_text_sibling(self) -> Option<TestRendererFiberHandleDiagnostics> {
+        self.stable_text_sibling
+    }
+
+    #[must_use]
+    pub const fn placed_text_sibling(self) -> Option<TestRendererFiberHandleDiagnostics> {
+        self.placed_text_sibling
+    }
+
+    #[must_use]
+    pub const fn host_component_element_type_raw(self) -> u64 {
+        self.host_component_element_type_raw
+    }
+
+    #[must_use]
+    pub const fn host_component_props_raw(self) -> u64 {
+        self.host_component_props_raw
+    }
+
+    #[must_use]
+    pub const fn stable_text_props_raw(self) -> u64 {
+        self.stable_text_props_raw
+    }
+
+    #[must_use]
+    pub const fn placed_text_props_raw(self) -> u64 {
+        self.placed_text_props_raw
+    }
+
+    #[must_use]
+    pub const fn host_component_state_node_raw(self) -> u64 {
+        self.host_component_state_node_raw
+    }
+
+    #[must_use]
+    pub const fn placed_text_state_node_raw(self) -> u64 {
+        self.placed_text_state_node_raw
+    }
+
+    #[must_use]
+    pub const fn render_lanes_bits(self) -> u32 {
+        self.render_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn commit_finished_lanes_bits(self) -> u32 {
+        self.commit_finished_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn commit_remaining_lanes_bits(self) -> u32 {
+        self.commit_remaining_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn commit_pending_lanes_bits(self) -> u32 {
+        self.commit_pending_lanes_bits
+    }
+
+    #[must_use]
+    pub const fn route_evidence_accepted(self) -> bool {
+        self.route_evidence_accepted
+    }
+
+    #[must_use]
+    pub const fn lifecycle_evidence_accepted(self) -> bool {
+        self.lifecycle_evidence_accepted
+    }
+
+    #[must_use]
+    pub const fn identity_evidence_accepted(self) -> bool {
+        self.identity_evidence_accepted
+    }
+
+    #[must_use]
+    pub const fn row_identity_accepted(self) -> bool {
+        self.row_identity_accepted
+    }
+
+    #[must_use]
+    pub const fn current_root_matches_commit(self) -> bool {
+        self.current_root_matches_commit
+    }
+
+    #[must_use]
+    pub const fn finished_work_matches_current_root(self) -> bool {
+        self.finished_work_matches_current_root
+    }
+
+    #[must_use]
+    pub const fn lanes_match(self) -> bool {
+        self.lanes_match
+    }
+
+    #[must_use]
+    pub const fn current_child_topology_matches_output(self) -> bool {
+        self.current_child_topology_matches_output
+    }
+
+    #[must_use]
+    pub const fn placement_handoff_accepted(self) -> bool {
+        self.placement_handoff_accepted
+    }
+
+    #[must_use]
+    pub const fn generic_reconciler_direct_inspection_available(self) -> bool {
+        self.generic_reconciler_direct_inspection_available
+    }
+
+    #[must_use]
+    pub const fn broad_multichild_fiber_inspection_available(self) -> bool {
+        self.broad_multichild_fiber_inspection_available
+    }
+
+    #[must_use]
+    pub const fn public_to_json_available(self) -> bool {
+        self.public_to_json_available
+    }
+
+    #[must_use]
+    pub const fn public_to_tree_available(self) -> bool {
+        self.public_to_tree_available
+    }
+
+    #[must_use]
+    pub const fn public_test_instance_available(self) -> bool {
+        self.public_test_instance_available
+    }
+
+    #[must_use]
+    pub const fn public_serialization_available(self) -> bool {
+        self.public_serialization_available
+    }
+
+    #[must_use]
+    pub const fn public_route_available(self) -> bool {
+        self.public_route_available
+    }
+
+    #[must_use]
+    pub const fn native_bridge_loading_available(self) -> bool {
+        self.native_bridge_loading_available
+    }
+
+    #[must_use]
+    pub const fn native_bridge_available(self) -> bool {
+        self.native_bridge_available
+    }
+
+    #[must_use]
+    pub const fn native_execution_available(self) -> bool {
+        self.native_execution_available
+    }
+
+    #[must_use]
+    pub const fn js_facade_available(self) -> bool {
+        self.js_facade_available
+    }
+
+    #[must_use]
+    pub const fn cjs_facade_available(self) -> bool {
+        self.cjs_facade_available
+    }
+
+    #[must_use]
+    pub const fn package_compatibility_claimed(self) -> bool {
+        self.package_compatibility_claimed
+    }
+
+    #[must_use]
+    pub const fn compatibility_claimed(self) -> bool {
+        self.compatibility_claimed
+    }
+
+    #[must_use]
+    pub fn public_native_package_js_surfaces_blocked(self) -> bool {
+        !self.public_to_json_available()
+            && !self.public_to_tree_available()
+            && !self.public_test_instance_available()
+            && !self.public_serialization_available()
+            && !self.public_route_available()
+            && !self.native_bridge_loading_available()
+            && !self.native_bridge_available()
+            && !self.native_execution_available()
+            && !self.js_facade_available()
+            && !self.cjs_facade_available()
+            && !self.package_compatibility_claimed()
+            && !self.compatibility_claimed()
+    }
+
+    #[must_use]
+    pub fn source_owned_current_fiber_inspection_accepted(self) -> bool {
+        self.route_evidence_accepted()
+            && self.lifecycle_evidence_accepted()
+            && self.identity_evidence_accepted()
+            && self.row_identity_accepted()
+            && self.current_root_matches_commit()
+            && self.finished_work_matches_current_root()
+            && self.lanes_match()
+            && self.current_child_topology_matches_output()
+            && self.placement_handoff_accepted()
+            && !self.generic_reconciler_direct_inspection_available()
+            && !self.broad_multichild_fiber_inspection_available()
+            && self.public_native_package_js_surfaces_blocked()
     }
 }
 
@@ -17010,6 +17423,302 @@ impl TestRendererRoot {
         Ok(gate)
     }
 
+    pub fn describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
+        &self,
+        output: &TestRendererHostParentPlacedHostOutput,
+        route: Option<TestRendererPrivateUpdateRouteAdmissionRecord>,
+        lifecycle: Option<&TestRendererPrivateRootLifecycleExecutionEvidence>,
+        identity: Option<TestRendererPrivateMultiChildHostTextFinishedWorkIdentityGate>,
+        row: Option<TestRendererPrivateToJsonHostOutputRow>,
+    ) -> Result<
+        TestRendererPrivateDirectMultiChildHostTextCommittedFiberInspection,
+        TestRendererRootError,
+    > {
+        let Some(route) = route else {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_error(
+                    "direct-multi-child-host-text-route-evidence-missing",
+                ),
+            );
+        };
+        let Some(lifecycle) = lifecycle else {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_error(
+                    "direct-multi-child-host-text-lifecycle-evidence-missing",
+                ),
+            );
+        };
+        let Some(identity) = identity else {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_error(
+                    "direct-multi-child-host-text-finished-work-identity-missing",
+                ),
+            );
+        };
+        let Some(row) = row else {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_error(
+                    "direct-multi-child-host-text-row-identity-missing",
+                ),
+            );
+        };
+
+        let render = output.render();
+        let commit = output.commit();
+        if render.root() != self.root_id || commit.root() != self.root_id {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_foreign_error(
+                    "direct-multi-child-host-text-cross-root-current-mismatch",
+                ),
+            );
+        }
+        if route.root() != self.root_id || route.renderer_id() != self.renderer.renderer_id {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_foreign_error(
+                    "direct-multi-child-host-text-cross-root-current-mismatch",
+                ),
+            );
+        }
+
+        macro_rules! fiber_handle {
+            ($fiber:expr) => {{
+                let fiber = $fiber;
+                TestRendererFiberHandleDiagnostics {
+                    arena_id: fiber.arena_id().get(),
+                    slot: fiber.slot().get(),
+                    generation: fiber.generation().get(),
+                }
+            }};
+        }
+
+        let store_current = self.store.root(self.root_id)?.current();
+        if store_current != commit.current() {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_stale_error(
+                    "direct-multi-child-host-text-current-root-mismatch",
+                ),
+            );
+        }
+
+        self.validate_private_to_json_multi_child_host_text_update_route_admission_record_for_identity(route)?;
+        self.validate_private_multi_child_host_text_lifecycle_execution_for_identity(
+            output, route, lifecycle,
+        )?;
+        self.validate_private_to_json_multi_child_host_text_native_execution_identity_for_canary(
+            output,
+            route,
+            lifecycle,
+            Some(identity),
+        )
+        .map_err(|reason| {
+            TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                reason,
+            }
+        })?;
+        self.validate_private_multi_child_host_text_output_for_canary(output)?;
+
+        let expected_row =
+            self.describe_private_to_json_multi_child_host_text_output_row_for_canary(output)?;
+        if row != expected_row
+            || row.id() != TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_HOST_OUTPUT_ROW_ID
+            || row.host_output_update_kind() != TestRendererRootUpdateKind::Update
+            || row.host_output_shape()
+                != TestRendererPrivateToJsonHostOutputShape::MultiChildHostText
+            || row.current_root_child_count() != 1
+            || row.current_host_component_count() != 1
+            || row.current_host_text_count() != 2
+            || row.current_root_text_count() != 0
+            || row.current_max_host_component_depth() != 1
+        {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_error(
+                    "direct-multi-child-host-text-row-identity-mismatch",
+                ),
+            );
+        }
+        if !row.public_blockers().all_blocked()
+            || !row.dependency_diagnostics().public_surfaces_blocked()
+        {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_public_error(
+                    "public-or-native-package-js-compatibility-claim",
+                ),
+            );
+        }
+
+        let root_node = self
+            .store
+            .fiber_arena()
+            .get(commit.current())
+            .map_err(FiberRootStoreError::from)?;
+        let Some(component_fiber) = root_node.child() else {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_error(
+                    "direct-multi-child-host-text-current-child-topology-mismatch",
+                ),
+            );
+        };
+        let component_node = self
+            .store
+            .fiber_arena()
+            .get(component_fiber)
+            .map_err(FiberRootStoreError::from)?;
+        let Some(stable_text_fiber) = component_node.child() else {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_error(
+                    "direct-multi-child-host-text-current-child-topology-mismatch",
+                ),
+            );
+        };
+        let stable_text_node = self
+            .store
+            .fiber_arena()
+            .get(stable_text_fiber)
+            .map_err(FiberRootStoreError::from)?;
+        let Some(placed_text_fiber) = stable_text_node.sibling() else {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_error(
+                    "direct-multi-child-host-text-current-child-topology-mismatch",
+                ),
+            );
+        };
+        let placed_text_node = self
+            .store
+            .fiber_arena()
+            .get(placed_text_fiber)
+            .map_err(FiberRootStoreError::from)?;
+
+        let current = output.updated_fibers();
+        let fixture = current.fixture();
+        let current_child_topology_matches_output = root_node.tag().react_tag() == 3
+            && component_node.tag().react_tag() == 5
+            && stable_text_node.tag().react_tag() == 6
+            && placed_text_node.tag().react_tag() == 6
+            && root_node.return_fiber().is_none()
+            && root_node.child() == Some(component_fiber)
+            && root_node.sibling().is_none()
+            && component_node.return_fiber() == Some(commit.current())
+            && component_node.index() == 0
+            && component_node.sibling().is_none()
+            && component_node.child() == Some(stable_text_fiber)
+            && stable_text_node.return_fiber() == Some(component_fiber)
+            && stable_text_node.index() == 0
+            && stable_text_node.child().is_none()
+            && stable_text_node.sibling() == Some(placed_text_fiber)
+            && placed_text_node.return_fiber() == Some(component_fiber)
+            && placed_text_node.index() == 1
+            && placed_text_node.child().is_none()
+            && placed_text_node.sibling().is_none()
+            && component_fiber == current.component()
+            && stable_text_fiber == current.text()
+            && fiber_handle!(placed_text_fiber) == output.placed_text_fiber()
+            && component_node.element_type().raw() == fixture.element_type_raw()
+            && component_node.pending_props().raw() == fixture.component_props_raw()
+            && component_node.memoized_props().raw() == fixture.component_props_raw()
+            && stable_text_node.pending_props().raw() == fixture.text_props_raw()
+            && stable_text_node.memoized_props().raw() == fixture.text_props_raw()
+            && placed_text_node.pending_props().raw() == output.placed_text_props_raw()
+            && placed_text_node.memoized_props().raw() == output.placed_text_props_raw()
+            && component_node.state_node().raw() == output.parent_state_node_raw()
+            && stable_text_node.state_node().is_some()
+            && placed_text_node.state_node().raw() == output.placed_text_state_node_raw();
+        if !current_child_topology_matches_output {
+            return Err(
+                Self::private_direct_multi_child_host_text_committed_fiber_inspection_error(
+                    "direct-multi-child-host-text-current-child-topology-mismatch",
+                ),
+            );
+        }
+
+        let placement_handoff_accepted = output.host_parent_placement_apply_count() > 0
+            && commit.has_test_only_host_parent_placement_apply_for_canary(
+                output.parent_state_node_raw(),
+                output.placed_text_state_node_raw(),
+            );
+        let generic_reconciler_direct_inspection_available =
+            inspect_test_renderer_committed_fiber_tree(&self.store, self.root_id).is_ok();
+        let report = TestRendererPrivateDirectMultiChildHostTextCommittedFiberInspection {
+            diagnostic_name:
+                TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_FIBER_INSPECTION_DIAGNOSTIC_NAME,
+            status:
+                TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_FIBER_INSPECTION_STATUS,
+            root: self.root_id,
+            renderer_id: self.renderer.renderer_id,
+            root_scheduled_update_sequence: output.scheduled_update_sequence(),
+            public_surface: "create().update -> create().toJSON",
+            source_route_record_id: route.record_id(),
+            source_route_status: route.status(),
+            source_lifecycle_diagnostic_name: lifecycle.diagnostic_name(),
+            source_lifecycle_status: lifecycle.status(),
+            source_identity_diagnostic_name: identity.diagnostic_name(),
+            source_identity_status: identity.status(),
+            source_row_id: row.id(),
+            host_output_update_kind: TestRendererRootUpdateKind::Update,
+            host_output_shape: TestRendererPrivateToJsonHostOutputShape::MultiChildHostText,
+            current_fiber_shape: TEST_RENDERER_PRIVATE_TREE_HOST_TEXT_MULTI_CHILD_ACCEPTED_FIBER_SHAPE,
+            root_child_count: 1,
+            host_component_child_count: 2,
+            host_text_count: 2,
+            render_current: fiber_handle!(render.current()),
+            render_finished_work: fiber_handle!(render.finished_work()),
+            commit_previous_current: fiber_handle!(commit.previous_current()),
+            commit_current: fiber_handle!(commit.current()),
+            store_current: fiber_handle!(store_current),
+            host_component_fiber: fiber_handle!(component_fiber),
+            stable_text_fiber: fiber_handle!(stable_text_fiber),
+            placed_text_fiber: fiber_handle!(placed_text_fiber),
+            stable_text_sibling: stable_text_node.sibling().map(|fiber| fiber_handle!(fiber)),
+            placed_text_sibling: placed_text_node.sibling().map(|fiber| fiber_handle!(fiber)),
+            host_component_element_type_raw: component_node.element_type().raw(),
+            host_component_props_raw: component_node.memoized_props().raw(),
+            stable_text_props_raw: stable_text_node.memoized_props().raw(),
+            placed_text_props_raw: placed_text_node.memoized_props().raw(),
+            host_component_state_node_raw: component_node.state_node().raw(),
+            placed_text_state_node_raw: placed_text_node.state_node().raw(),
+            render_lanes_bits: render.render_lanes().bits(),
+            commit_finished_lanes_bits: commit.finished_lanes().bits(),
+            commit_remaining_lanes_bits: commit.remaining_lanes().bits(),
+            commit_pending_lanes_bits: commit.pending_lanes().bits(),
+            route_evidence_accepted: true,
+            lifecycle_evidence_accepted: lifecycle.source_owned_execution_accepted(),
+            identity_evidence_accepted: identity.identity_admission_available(),
+            row_identity_accepted: true,
+            current_root_matches_commit: store_current == commit.current(),
+            finished_work_matches_current_root: render.finished_work() == commit.current()
+                && commit.current() == store_current,
+            lanes_match: render.render_lanes().bits() != 0
+                && render.render_lanes() == commit.finished_lanes()
+                && commit.remaining_lanes().bits() == 0
+                && commit.pending_lanes().bits() == 0,
+            current_child_topology_matches_output,
+            placement_handoff_accepted,
+            generic_reconciler_direct_inspection_available,
+            broad_multichild_fiber_inspection_available: false,
+            public_to_json_available: false,
+            public_to_tree_available: false,
+            public_test_instance_available: false,
+            public_serialization_available: false,
+            public_route_available: false,
+            native_bridge_loading_available: false,
+            native_bridge_available: false,
+            native_execution_available: false,
+            js_facade_available: false,
+            cjs_facade_available: false,
+            package_compatibility_claimed: false,
+            compatibility_claimed: false,
+        };
+        Self::validate_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
+            report,
+        )
+        .map_err(|reason| {
+            TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                reason,
+            }
+        })?;
+
+        Ok(report)
+    }
+
     pub fn describe_private_to_json_nested_finished_work_identity_gate_for_canary(
         &self,
         output: &TestRendererNestedHostParentPlacedHostOutput,
@@ -19436,6 +20145,129 @@ impl TestRendererRoot {
             return Err("broad-multichild-identity-unexpectedly-open");
         }
         if !gate.public_native_package_js_surfaces_blocked() {
+            return Err("public-or-native-package-js-compatibility-claim");
+        }
+
+        Ok(())
+    }
+
+    fn private_direct_multi_child_host_text_committed_fiber_inspection_error(
+        reason: &'static str,
+    ) -> TestRendererRootError {
+        TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+            reason,
+        }
+        .into()
+    }
+
+    fn private_direct_multi_child_host_text_committed_fiber_inspection_foreign_error(
+        reason: &'static str,
+    ) -> TestRendererRootError {
+        TestRendererPrivateSerializationFinishedWorkIdentityError::ForeignFinishedWorkIdentity {
+            reason,
+        }
+        .into()
+    }
+
+    fn private_direct_multi_child_host_text_committed_fiber_inspection_stale_error(
+        reason: &'static str,
+    ) -> TestRendererRootError {
+        TestRendererPrivateSerializationFinishedWorkIdentityError::StaleFinishedWorkIdentity {
+            reason,
+        }
+        .into()
+    }
+
+    fn private_direct_multi_child_host_text_committed_fiber_inspection_public_error(
+        reason: &'static str,
+    ) -> TestRendererRootError {
+        TestRendererPrivateSerializationFinishedWorkIdentityError::PublicCompatibilityOpened {
+            reason,
+        }
+        .into()
+    }
+
+    fn validate_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
+        report: TestRendererPrivateDirectMultiChildHostTextCommittedFiberInspection,
+    ) -> Result<(), &'static str> {
+        if report.diagnostic_name()
+            != TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_FIBER_INSPECTION_DIAGNOSTIC_NAME
+            || report.status()
+                != TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_FIBER_INSPECTION_STATUS
+        {
+            return Err("direct-multi-child-host-text-current-fiber-diagnostic-mismatch");
+        }
+        if report.public_surface() != "create().update -> create().toJSON"
+            || report.source_route_record_id()
+                != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_RECORD_ID
+            || report.source_route_status() != TEST_RENDERER_PRIVATE_UPDATE_ROUTE_ADMISSION_STATUS
+            || report.source_lifecycle_diagnostic_name()
+                != TEST_RENDERER_PRIVATE_ROOT_LIFECYCLE_EXECUTION_DIAGNOSTIC_NAME
+            || report.source_lifecycle_status()
+                != TEST_RENDERER_PRIVATE_ROOT_LIFECYCLE_EXECUTION_STATUS
+            || report.source_identity_diagnostic_name()
+                != TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_IDENTITY_DIAGNOSTIC_NAME
+            || report.source_identity_status()
+                != TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_IDENTITY_STATUS
+            || report.source_row_id()
+                != TEST_RENDERER_PRIVATE_TO_JSON_MULTI_CHILD_HOST_TEXT_HOST_OUTPUT_ROW_ID
+        {
+            return Err("direct-multi-child-host-text-current-fiber-source-mismatch");
+        }
+        if report.host_output_update_kind() != TestRendererRootUpdateKind::Update
+            || report.host_output_shape()
+                != TestRendererPrivateToJsonHostOutputShape::MultiChildHostText
+            || report.current_fiber_shape()
+                != TEST_RENDERER_PRIVATE_TREE_HOST_TEXT_MULTI_CHILD_ACCEPTED_FIBER_SHAPE
+            || report.root_child_count() != 1
+            || report.host_component_child_count() != 2
+            || report.host_text_count() != 2
+        {
+            return Err("direct-multi-child-host-text-current-fiber-shape-mismatch");
+        }
+        if report.render_finished_work() != report.commit_current()
+            || report.commit_current() != report.store_current()
+            || report.commit_previous_current() != report.render_current()
+            || !report.current_root_matches_commit()
+            || !report.finished_work_matches_current_root()
+        {
+            return Err("direct-multi-child-host-text-current-root-mismatch");
+        }
+        if report.render_lanes_bits() == 0
+            || report.render_lanes_bits() != report.commit_finished_lanes_bits()
+            || report.commit_remaining_lanes_bits() != 0
+            || report.commit_pending_lanes_bits() != 0
+            || !report.lanes_match()
+        {
+            return Err("direct-multi-child-host-text-current-fiber-lane-mismatch");
+        }
+        if report.stable_text_sibling() != Some(report.placed_text_fiber())
+            || report.placed_text_sibling().is_some()
+            || report.host_component_state_node_raw() == 0
+            || report.placed_text_state_node_raw() == 0
+            || report.host_component_element_type_raw() == 0
+            || report.host_component_props_raw() == 0
+            || report.stable_text_props_raw() == 0
+            || report.placed_text_props_raw() == 0
+            || !report.current_child_topology_matches_output()
+        {
+            return Err("direct-multi-child-host-text-current-child-topology-mismatch");
+        }
+        if !report.route_evidence_accepted()
+            || !report.lifecycle_evidence_accepted()
+            || !report.identity_evidence_accepted()
+            || !report.row_identity_accepted()
+            || !report.placement_handoff_accepted()
+            || !report.source_owned_current_fiber_inspection_accepted()
+        {
+            return Err("direct-multi-child-host-text-current-fiber-evidence-not-consumed");
+        }
+        if report.generic_reconciler_direct_inspection_available()
+            || report.broad_multichild_fiber_inspection_available()
+        {
+            return Err("broad-multichild-fiber-inspection-unexpectedly-open");
+        }
+        if !report.public_native_package_js_surfaces_blocked() {
             return Err("public-or-native-package-js-compatibility-claim");
         }
 
@@ -24684,6 +25516,317 @@ mod tests {
     }
 
     #[test]
+    fn root_private_direct_multi_child_host_text_committed_fiber_inspection_consumes_source_owned_current_topology()
+     {
+        let (root, output, route, lifecycle, identity, row, inspection) =
+            direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
+
+        assert_eq!(
+            inspection.diagnostic_name(),
+            TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_FIBER_INSPECTION_DIAGNOSTIC_NAME
+        );
+        assert_eq!(
+            inspection.status(),
+            TEST_RENDERER_PRIVATE_TO_JSON_DIRECT_MULTI_CHILD_HOST_TEXT_FIBER_INSPECTION_STATUS
+        );
+        assert_eq!(inspection.root(), root.root_id());
+        assert_eq!(inspection.renderer_id(), root.renderer.renderer_id);
+        assert_eq!(
+            inspection.root_scheduled_update_sequence(),
+            output.scheduled_update_sequence()
+        );
+        assert_eq!(
+            inspection.public_surface(),
+            "create().update -> create().toJSON"
+        );
+        assert_eq!(inspection.source_route_record_id(), route.record_id());
+        assert_eq!(inspection.source_route_status(), route.status());
+        assert_eq!(
+            inspection.source_lifecycle_diagnostic_name(),
+            lifecycle.diagnostic_name()
+        );
+        assert_eq!(inspection.source_lifecycle_status(), lifecycle.status());
+        assert_eq!(
+            inspection.source_identity_diagnostic_name(),
+            identity.diagnostic_name()
+        );
+        assert_eq!(inspection.source_identity_status(), identity.status());
+        assert_eq!(inspection.source_row_id(), row.id());
+        assert_eq!(
+            inspection.host_output_update_kind(),
+            TestRendererRootUpdateKind::Update
+        );
+        assert_eq!(
+            inspection.host_output_shape(),
+            TestRendererPrivateToJsonHostOutputShape::MultiChildHostText
+        );
+        assert_eq!(
+            inspection.current_fiber_shape(),
+            TEST_RENDERER_PRIVATE_TREE_HOST_TEXT_MULTI_CHILD_ACCEPTED_FIBER_SHAPE
+        );
+        assert_eq!(inspection.root_child_count(), 1);
+        assert_eq!(inspection.host_component_child_count(), 2);
+        assert_eq!(inspection.host_text_count(), 2);
+        assert_eq!(inspection.render_current(), route.render_current());
+        assert_eq!(
+            inspection.render_finished_work(),
+            route.render_finished_work()
+        );
+        assert_eq!(
+            inspection.commit_previous_current(),
+            route.commit_previous_current()
+        );
+        assert_eq!(inspection.commit_current(), route.commit_current());
+        assert_eq!(inspection.store_current(), inspection.commit_current());
+        assert_eq!(
+            inspection.render_finished_work(),
+            inspection.commit_current()
+        );
+        assert_eq!(
+            inspection.host_component_fiber().slot(),
+            output.updated_fibers().component().slot().get()
+        );
+        assert_eq!(
+            inspection.stable_text_fiber().slot(),
+            output.updated_fibers().text().slot().get()
+        );
+        assert_eq!(inspection.placed_text_fiber(), output.placed_text_fiber());
+        assert_eq!(
+            inspection.stable_text_sibling(),
+            Some(inspection.placed_text_fiber())
+        );
+        assert_eq!(inspection.placed_text_sibling(), None);
+        assert_eq!(
+            inspection.host_component_element_type_raw(),
+            output.updated_fibers().fixture().element_type_raw()
+        );
+        assert_eq!(
+            inspection.host_component_props_raw(),
+            output.updated_fibers().fixture().component_props_raw()
+        );
+        assert_eq!(
+            inspection.stable_text_props_raw(),
+            output.updated_fibers().fixture().text_props_raw()
+        );
+        assert_eq!(
+            inspection.placed_text_props_raw(),
+            output.placed_text_props_raw()
+        );
+        assert_eq!(
+            inspection.host_component_state_node_raw(),
+            output.parent_state_node_raw()
+        );
+        assert_eq!(
+            inspection.placed_text_state_node_raw(),
+            output.placed_text_state_node_raw()
+        );
+        assert_eq!(inspection.render_lanes_bits(), route.render_lanes_bits());
+        assert_eq!(
+            inspection.commit_finished_lanes_bits(),
+            route.commit_finished_lanes_bits()
+        );
+        assert_eq!(inspection.commit_remaining_lanes_bits(), 0);
+        assert_eq!(inspection.commit_pending_lanes_bits(), 0);
+        assert!(inspection.route_evidence_accepted());
+        assert!(inspection.lifecycle_evidence_accepted());
+        assert!(inspection.identity_evidence_accepted());
+        assert!(inspection.row_identity_accepted());
+        assert!(inspection.current_root_matches_commit());
+        assert!(inspection.finished_work_matches_current_root());
+        assert!(inspection.lanes_match());
+        assert!(inspection.current_child_topology_matches_output());
+        assert!(inspection.placement_handoff_accepted());
+        assert!(inspection.source_owned_current_fiber_inspection_accepted());
+        assert!(!inspection.generic_reconciler_direct_inspection_available());
+        assert!(!inspection.broad_multichild_fiber_inspection_available());
+        assert!(inspection.public_native_package_js_surfaces_blocked());
+
+        let generic_error = root
+            .describe_committed_fiber_tree_for_canary(output.commit())
+            .unwrap_err();
+        assert!(matches!(
+            generic_error,
+            TestRendererRootError::FiberInspection(_)
+        ));
+    }
+
+    #[test]
+    fn root_private_direct_multi_child_host_text_committed_fiber_inspection_rejects_missing_stale_or_replayed_source_rows()
+     {
+        let (root, output, route, lifecycle, identity, row, _inspection) =
+            direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
+
+        assert_direct_multi_child_host_text_inspection_error_reason(
+            root.describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
+                &output,
+                None,
+                Some(&lifecycle),
+                Some(identity),
+                Some(row),
+            )
+            .unwrap_err(),
+            "direct-multi-child-host-text-route-evidence-missing",
+        );
+
+        let mut stale_route = route;
+        stale_route.scheduled_update_sequence += 1;
+        assert_direct_multi_child_host_text_inspection_error_reason(
+            root.describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
+                &output,
+                Some(stale_route),
+                Some(&lifecycle),
+                Some(identity),
+                Some(row),
+            )
+            .unwrap_err(),
+            "multi-child-host-text-route-update-sequence-stale",
+        );
+
+        let (_other_root, _other_output, other_route, _other_lifecycle, _other_identity, _, _) =
+            direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
+        assert_direct_multi_child_host_text_inspection_error_reason(
+            root.describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
+                &output,
+                Some(other_route),
+                Some(&lifecycle),
+                Some(identity),
+                Some(row),
+            )
+            .unwrap_err(),
+            "direct-multi-child-host-text-cross-root-current-mismatch",
+        );
+
+        assert_direct_multi_child_host_text_inspection_error_reason(
+            root.describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
+                &output,
+                Some(route),
+                None,
+                Some(identity),
+                Some(row),
+            )
+            .unwrap_err(),
+            "direct-multi-child-host-text-lifecycle-evidence-missing",
+        );
+
+        let mut cloned_lifecycle = lifecycle.clone();
+        cloned_lifecycle.source_lifecycle_row_accepted = false;
+        assert_direct_multi_child_host_text_inspection_error_reason(
+            root.describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
+                &output,
+                Some(route),
+                Some(&cloned_lifecycle),
+                Some(identity),
+                Some(row),
+            )
+            .unwrap_err(),
+            "multi-child-host-text-lifecycle-evidence-mismatch",
+        );
+
+        assert_direct_multi_child_host_text_inspection_error_reason(
+            root.describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
+                &output,
+                Some(route),
+                Some(&lifecycle),
+                None,
+                Some(row),
+            )
+            .unwrap_err(),
+            "direct-multi-child-host-text-finished-work-identity-missing",
+        );
+    }
+
+    #[test]
+    fn root_private_direct_multi_child_host_text_committed_fiber_inspection_rejects_row_topology_lane_current_and_public_aliases()
+     {
+        let (root, output, route, lifecycle, identity, row, _inspection) =
+            direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
+
+        let mut wrong_kind_route = route;
+        wrong_kind_route.host_output_update_kind = TestRendererRootUpdateKind::Create;
+        assert_direct_multi_child_host_text_inspection_error_reason(
+            root.describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
+                &output,
+                Some(wrong_kind_route),
+                Some(&lifecycle),
+                Some(identity),
+                Some(row),
+            )
+            .unwrap_err(),
+            "multi-child-host-text-route-metadata-stale",
+        );
+
+        let mut wrong_kind_row = row;
+        wrong_kind_row.host_output_update_kind = TestRendererRootUpdateKind::Create;
+        assert_direct_multi_child_host_text_inspection_error_reason(
+            root.describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
+                &output,
+                Some(route),
+                Some(&lifecycle),
+                Some(identity),
+                Some(wrong_kind_row),
+            )
+            .unwrap_err(),
+            "direct-multi-child-host-text-row-identity-mismatch",
+        );
+
+        let mut lane_drift_identity = identity;
+        lane_drift_identity.report_finished_lanes_bits += 1;
+        assert_direct_multi_child_host_text_inspection_error_reason(
+            root.describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
+                &output,
+                Some(route),
+                Some(&lifecycle),
+                Some(lane_drift_identity),
+                Some(row),
+            )
+            .unwrap_err(),
+            "multi-child-host-text-finished-work-identity-lane-mismatch",
+        );
+
+        let mut stale_topology_output = output.clone();
+        stale_topology_output.placed_text_fiber.slot += 1;
+        assert_direct_multi_child_host_text_inspection_error_reason(
+            root.describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
+                &stale_topology_output,
+                Some(route),
+                Some(&lifecycle),
+                Some(identity),
+                Some(row),
+            )
+            .unwrap_err(),
+            "direct-multi-child-host-text-current-child-topology-mismatch",
+        );
+
+        let (_cross_root, cross_output, cross_route, cross_lifecycle, cross_identity, cross_row, _) =
+            direct_multi_child_host_text_fiber_inspection_inputs_for_canary();
+        assert_direct_multi_child_host_text_inspection_error_reason(
+            root.describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
+                &cross_output,
+                Some(cross_route),
+                Some(&cross_lifecycle),
+                Some(cross_identity),
+                Some(cross_row),
+            )
+            .unwrap_err(),
+            "direct-multi-child-host-text-cross-root-current-mismatch",
+        );
+
+        let mut public_alias_identity = identity;
+        public_alias_identity.package_compatibility_claimed = true;
+        assert_direct_multi_child_host_text_inspection_error_reason(
+            root.describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
+                &output,
+                Some(route),
+                Some(&lifecycle),
+                Some(public_alias_identity),
+                Some(row),
+            )
+            .unwrap_err(),
+            "public-or-native-package-js-compatibility-claim",
+        );
+    }
+
+    #[test]
     fn root_private_root_lifecycle_execution_rejects_stale_or_cross_surface_rows() {
         let (mut root, created, create_handoff) = create_lifecycle_handoff_for_root();
         root.update_host_component_with_text_for_canary("span", "later")
@@ -24960,6 +26103,33 @@ mod tests {
         (root, output, route, lifecycle, identity)
     }
 
+    fn direct_multi_child_host_text_fiber_inspection_inputs_for_canary() -> (
+        TestRendererRoot,
+        TestRendererHostParentPlacedHostOutput,
+        TestRendererPrivateUpdateRouteAdmissionRecord,
+        TestRendererPrivateRootLifecycleExecutionEvidence,
+        TestRendererPrivateMultiChildHostTextFinishedWorkIdentityGate,
+        TestRendererPrivateToJsonHostOutputRow,
+        TestRendererPrivateDirectMultiChildHostTextCommittedFiberInspection,
+    ) {
+        let (root, output, route, lifecycle, identity) =
+            multi_child_host_text_identity_inputs_for_canary();
+        let row = root
+            .describe_private_to_json_multi_child_host_text_output_row_for_canary(&output)
+            .unwrap();
+        let inspection = root
+            .describe_private_direct_multi_child_host_text_committed_fiber_inspection_for_canary(
+                &output,
+                Some(route),
+                Some(&lifecycle),
+                Some(identity),
+                Some(row),
+            )
+            .unwrap();
+
+        (root, output, route, lifecycle, identity, row, inspection)
+    }
+
     fn assert_sibling_text_identity_error_reason(
         error: TestRendererRootError,
         expected_reason: &'static str,
@@ -25011,6 +26181,38 @@ mod tests {
                 reason,
             } => assert_eq!(*reason, expected_reason),
             other => panic!("unexpected multi-child HostText identity error: {other:?}"),
+        }
+    }
+
+    fn assert_direct_multi_child_host_text_inspection_error_reason(
+        error: TestRendererRootError,
+        expected_reason: &'static str,
+    ) {
+        let TestRendererRootError::PrivateSerializationFinishedWorkIdentity(error) = error else {
+            panic!("expected direct multi-child HostText private fiber inspection error");
+        };
+        match error.as_ref() {
+            TestRendererPrivateSerializationFinishedWorkIdentityError::ForeignFinishedWorkIdentity {
+                reason,
+            }
+            | TestRendererPrivateSerializationFinishedWorkIdentityError::StaleFinishedWorkIdentity {
+                reason,
+            }
+            | TestRendererPrivateSerializationFinishedWorkIdentityError::NonCommittedFinishedWorkIdentity {
+                reason,
+            }
+            | TestRendererPrivateSerializationFinishedWorkIdentityError::SerializationEvidenceMismatch {
+                reason,
+            }
+            | TestRendererPrivateSerializationFinishedWorkIdentityError::PublicCompatibilityOpened {
+                reason,
+            } => assert_eq!(*reason, expected_reason),
+            TestRendererPrivateSerializationFinishedWorkIdentityError::LaneMismatch {
+                ..
+            } => assert_eq!(expected_reason, "lane-mismatch"),
+            other => {
+                panic!("unexpected direct multi-child HostText fiber inspection error: {other:?}")
+            }
         }
     }
 
