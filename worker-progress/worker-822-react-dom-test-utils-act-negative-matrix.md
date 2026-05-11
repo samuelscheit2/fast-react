@@ -23,6 +23,10 @@
   Worker 810 ledger surface, and classifies `publicReactActCompatibilityClaimed`
   and `packageSurfaceChanged` as public-claim violations when accepted Worker
   810 metadata sets them.
+- Post-merge follow-up updated the adjacent act/passive local gate expectation
+  so the React DOM test-utils act accepted private prerequisite list includes
+  `react-act-scheduler-private-diagnostics-ledger` as private, non-compatible
+  evidence.
 
 ## Changed Files
 
@@ -30,6 +34,7 @@
 - `packages/react-dom/test/react-dom-test-utils-act-gate.test.js`
 - `tests/conformance/test/react-dom-test-utils-act-oracle.test.mjs`
 - `tests/conformance/test/react-act-oracle.test.mjs`
+- `tests/conformance/test/act-passive-local-gate.test.mjs`
 - `worker-progress/worker-822-react-dom-test-utils-act-negative-matrix.md`
 
 ## Commands Run
@@ -67,6 +72,12 @@
 - Re-audit follow-up: `npm run check:package-surface` - passed; npm printed the existing `minimum-release-age` warning.
 - Re-audit follow-up: `node tests/smoke/import-entrypoints.mjs` - passed.
 - Re-audit follow-up: `git diff --check` - passed.
+- Post-merge follow-up: `node --check tests/conformance/test/act-passive-local-gate.test.mjs` - passed.
+- Post-merge follow-up: `node --test tests/conformance/test/scheduler-mock-delayed-act-root-work.test.mjs tests/conformance/test/scheduler-mock-expired-lane-flush.test.mjs tests/conformance/test/scheduler-mock-oracle.test.mjs tests/conformance/test/act-passive-local-gate.test.mjs` - passed, 39 tests.
+- Post-merge follow-up: `node --test packages/react-dom/test/react-dom-test-utils-act-gate.test.js` - passed, 5 tests.
+- Post-merge follow-up: `npm run check:package-surface` - passed; npm printed the existing `minimum-release-age` warning.
+- Post-merge follow-up: `node tests/smoke/import-entrypoints.mjs` - passed.
+- Post-merge follow-up: `git diff --check` - passed.
 
 ## Evidence Gathered
 
@@ -98,6 +109,9 @@
 - Re-audit follow-up confirmed accepted prerequisite metadata that sets
   `publicReactActCompatibilityClaimed` or `packageSurfaceChanged` is reported in
   `privatePrerequisitePublicClaims`, not only stale-evidence reasons.
+- Post-merge follow-up confirmed the adjacent act/passive local gate still
+  reports no public compatibility violations while recognizing the new React DOM
+  Worker 810 private prerequisite id.
 
 ## Risks Or Blockers
 
