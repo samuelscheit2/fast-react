@@ -29,6 +29,55 @@ sequencing belong in `MASTER_PLAN.md`.
 
 ## Accepted Implementation History
 
+### Workers 826-837, 842-843, 845-846, 849-852
+
+- Workers 826-837 moved the former active queue into accepted private evidence:
+  managed-child root-work-loop handoffs, sync-flush finished-work state,
+  hydrateRoot text-claim patch execution, resource root-map storage, form
+  fulfilled-reset fake commit, package-root `toTree` sibling-text admission,
+  Rust unmount/nested native execution, cleanup-hook callable preflights,
+  Scheduler descriptor/source-proof repair, React DOM delayed Scheduler act,
+  reconciler act queue execution, and scheduler-driven passive effects. These
+  remain private and do not open public root, act, Scheduler, hydration,
+  resource/form, serialization, native, package, or broad renderer
+  compatibility.
+- Worker 842 connected accepted managed-child root-work-loop handoffs through
+  root commit into private fake host-work execution for HostComponent append,
+  insert-before, delete, and cleanup. Worker 852 extended that path to HostText
+  append, insert-before, remove, and stale text sibling rejection. The path
+  remains a private direct HostComponent-parent canary, not generalized
+  renderer or package compatibility.
+- Worker 843 mirrored private React DOM facade update and unmount cleanup
+  diagnostics through the inert native root bridge handoff while keeping public
+  `createRoot`, `root.render`, `root.unmount`, nested facade execution,
+  reconciler execution, hydration, events/refs, browser DOM, and compatibility
+  claims blocked.
+- Worker 845 added the native-root batch lifecycle consumer for create, render,
+  and unmount rows, binding handle-table lifecycle rows to cleanup-hook
+  callable preflight evidence. Worker 851 linked those consumer rows to the
+  JSON batch response and stream roundtrip diagnostics with source-owned
+  validation. Native addon loading, N-API cleanup hooks, worker threads,
+  renderer/reconciler execution, public native compatibility, and package
+  exports remain blocked.
+- Worker 846 fixed React DOM test-utils act source-proof fixtures so valid
+  focused paths load the React private act gate before fresh Scheduler mock
+  execution; Scheduler-first cache-hit fixtures remain rejected at the nested
+  source-proof validation layer.
+- Worker 849 added the static private hydrateRoot text-patch admission ledger
+  for Worker 828's accepted post-preflight text-claim patch bridge execution.
+  It remains source-token and manifest only; public hydrateRoot/root/native/
+  reconciler/browser DOM mutation/listener/event replay/recoverable callback
+  and package compatibility remain blocked.
+- Worker 850 added the static private resource/form execution admission ledger
+  for Worker 829 resource root-map storage execution and Worker 830 form
+  fulfilled-reset fake queue/commit execution. Public resources, forms,
+  reset/action invocation, React updates, DOM/head mutation, and package
+  compatibility remain blocked.
+- The recent batch was accepted after focused Rust, React DOM, Scheduler,
+  native binding, resource/form, hydrateRoot, package-surface, import-smoke, and
+  `git diff --check` verification recorded in the worker reports and git
+  history.
+
 ### Workers 820-825
 
 - Worker 820 added the static reconciler private-admission ledger for accepted
