@@ -5191,7 +5191,6 @@ pub(crate) fn execute_expired_lane_sync_scheduler_continuation_for_queue_lane_ha
         );
     }
 
-    record_root_finished_work_for_scheduler_handoff_for_canary(store, handoff.render_phase())?;
     let continuation = execute_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
         store,
         handoff,
@@ -6423,6 +6422,7 @@ mod tests {
             render,
         )
         .unwrap();
+        record_root_finished_work_for_scheduler_handoff_for_canary(store, render).unwrap();
 
         (default_update, sync_update, handoff, queue_handoff)
     }
@@ -10698,6 +10698,59 @@ mod tests {
     }
 
     #[test]
+    fn root_scheduler_expired_default_sync_queue_lane_continuation_rejects_stale_scheduler_pass() {
+        let (mut store, root_id, host) = root_store();
+        let current = store.root(root_id).unwrap().current();
+        let (_default_update, _sync_update, handoff, queue_handoff) =
+            expired_default_sync_queue_lane_scheduler_handoff(
+                &mut store,
+                root_id,
+                RootElementHandle::from_raw(9068),
+                RootElementHandle::from_raw(9069),
+            );
+        let second_render =
+            render_host_root_for_lanes(&mut store, root_id, Lanes::SYNC.merge(Lanes::DEFAULT))
+                .unwrap();
+        record_root_finished_work_for_scheduler_handoff_for_canary(&mut store, second_render)
+            .unwrap();
+
+        let execution =
+            execute_expired_lane_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
+                &mut store,
+                root_id,
+                10,
+                RootSchedulerCallbackHandle::NONE,
+                handoff,
+                Some(&queue_handoff),
+            )
+            .unwrap();
+
+        assert_eq!(
+            execution.status(),
+            RootExpiredLaneSyncSchedulerQueueLaneContinuationStatusForCanary::BlockedByFinishedWorkHandoffMismatch
+        );
+        assert_eq!(execution.handoff(), Some(handoff));
+        assert!(!execution.consumed_accepted_queue_lane_scheduler_continuation_record());
+        assert!(
+            !execution.routed_through_expired_queue_lane_scheduler_and_commit_evidence_for_canary()
+        );
+        let continuation = execution.continuation().unwrap();
+        assert!(continuation.blocked_by_finished_work_handoff_mismatch());
+        assert_eq!(
+            continuation
+                .finished_work_handoff_identity()
+                .unwrap()
+                .root_finished_work_before_commit(),
+            Some(second_render.finished_work())
+        );
+        assert!(execution.queue_handoff_error().is_none());
+        assert!(execution.queue_commit_handoff().is_none());
+        assert!(execution.commit().is_none());
+        assert_eq!(store.root(root_id).unwrap().current(), current);
+        assert_eq!(host.operations(), Vec::<&'static str>::new());
+    }
+
+    #[test]
     fn root_scheduler_expired_default_sync_queue_lane_continuation_rejects_forged_row_metadata() {
         let (mut store, root_id, host) = root_store();
         let current = store.root(root_id).unwrap().current();
@@ -10705,8 +10758,8 @@ mod tests {
             expired_default_sync_queue_lane_scheduler_handoff(
                 &mut store,
                 root_id,
-                RootElementHandle::from_raw(9068),
-                RootElementHandle::from_raw(9069),
+                RootElementHandle::from_raw(9070),
+                RootElementHandle::from_raw(9071),
             );
         let mut forged = queue_handoff.clone();
         forged.update_records[0].lane = Lane::TRANSITION_1;
@@ -10753,8 +10806,8 @@ mod tests {
             expired_default_sync_queue_lane_scheduler_handoff(
                 &mut store,
                 root_id,
-                RootElementHandle::from_raw(9070),
-                RootElementHandle::from_raw(9071),
+                RootElementHandle::from_raw(9072),
+                RootElementHandle::from_raw(9073),
             );
         let mut forged = queue_handoff.clone();
         forged.selected_next_lanes_before_render = Lanes::DEFAULT;
@@ -10797,8 +10850,8 @@ mod tests {
             expired_default_sync_queue_lane_scheduler_handoff(
                 &mut store,
                 root_id,
-                RootElementHandle::from_raw(9072),
-                RootElementHandle::from_raw(9073),
+                RootElementHandle::from_raw(9074),
+                RootElementHandle::from_raw(9075),
             );
         let mut forged = queue_handoff.clone();
         forged.finished_lanes = Lanes::DEFAULT;
@@ -10838,25 +10891,25 @@ mod tests {
         let host = RecordingHost::default();
         let mut store = FiberRootStore::<RecordingHost>::new();
         let first = store
-            .create_client_root(FakeContainer::new(9074), RootOptions::new())
+            .create_client_root(FakeContainer::new(9076), RootOptions::new())
             .unwrap();
         let second = store
-            .create_client_root(FakeContainer::new(9075), RootOptions::new())
+            .create_client_root(FakeContainer::new(9077), RootOptions::new())
             .unwrap();
         let (_first_default, _first_sync, _first_handoff, first_queue_handoff) =
             expired_default_sync_queue_lane_scheduler_handoff(
                 &mut store,
                 first,
-                RootElementHandle::from_raw(9076),
-                RootElementHandle::from_raw(9077),
+                RootElementHandle::from_raw(9078),
+                RootElementHandle::from_raw(9079),
             );
         let second_current = store.root(second).unwrap().current();
         let (_second_default, _second_sync, second_handoff, _second_queue_handoff) =
             expired_default_sync_queue_lane_scheduler_handoff(
                 &mut store,
                 second,
-                RootElementHandle::from_raw(9078),
-                RootElementHandle::from_raw(9079),
+                RootElementHandle::from_raw(9080),
+                RootElementHandle::from_raw(9081),
             );
 
         let execution =
@@ -10896,8 +10949,8 @@ mod tests {
             expired_default_sync_queue_lane_scheduler_handoff(
                 &mut store,
                 root_id,
-                RootElementHandle::from_raw(9080),
-                RootElementHandle::from_raw(9081),
+                RootElementHandle::from_raw(9082),
+                RootElementHandle::from_raw(9083),
             );
         let mut forged = queue_handoff.clone();
         forged.update_records.swap(0, 1);
@@ -11037,6 +11090,7 @@ mod tests {
             skipped_update_count: render.skipped_update_count(),
             resulting_element: render.resulting_element(),
         };
+        record_root_finished_work_for_scheduler_handoff_for_canary(&mut store, render).unwrap();
 
         let execution =
             execute_expired_lane_sync_scheduler_continuation_for_queue_lane_handoff_for_canary(
